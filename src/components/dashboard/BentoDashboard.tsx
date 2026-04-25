@@ -11,6 +11,7 @@ import {
   LineChart, Line, AreaChart, Area,
   ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid
 } from "recharts";
+import Link from "next/link";
 import type { UserProfile, HRVData, Workout } from "@/types";
 import { TaperingWidget } from "@/components/dashboard/TaperingWidget";
 
@@ -66,11 +67,27 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
 
   const raceDate = (plan as { race_date?: string } | null)?.race_date ?? null;
 
+  const noData = workouts.length === 0 && hrv.length === 0;
+
   return (
     <div
       className="min-h-full transition-all duration-1000"
       style={{ background: `linear-gradient(135deg, ${stateConfig.bg} 0%, #FFFFFF 60%)` }}
     >
+      {/* No data banner */}
+      {noData && (
+        <div className="mb-5 flex items-center gap-3 px-4 py-3 rounded-2xl bg-amber-50 border border-amber-200 text-sm">
+          <span className="text-amber-500 text-lg">⚠️</span>
+          <div className="flex-1">
+            <p className="font-semibold text-amber-800">Aucune donnée synchronisée</p>
+            <p className="text-amber-600 text-xs mt-0.5">Connectez votre montre pour voir vos activités, VFC et données de sommeil.</p>
+          </div>
+          <Link href="/dashboard/sync" className="flex-shrink-0 px-3 py-1.5 bg-amber-500 text-white text-xs font-semibold rounded-xl hover:bg-amber-600 transition-colors">
+            Sync Montre →
+          </Link>
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-6 flex items-start justify-between">
         <div>

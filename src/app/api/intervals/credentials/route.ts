@@ -50,8 +50,13 @@ export async function POST(req: Request) {
     { headers: { Authorization: intervalsAuth(apiKey) } }
   );
 
-  if (!verifyRes.ok && verifyRes.status === 401) {
-    return NextResponse.json({ error: "Identifiants invalides — vérifiez votre Athlete ID et clé API" }, { status: 422 });
+  if (!verifyRes.ok && verifyRes.status < 500) {
+    const msg =
+      verifyRes.status === 401 ? "Clé API invalide — vérifiez votre clé dans Intervals.icu → Paramètres → Accès développeur" :
+      verifyRes.status === 403 ? "Accès refusé (403) — vérifiez que l'Athlete ID correspond à votre compte (ex: i564686)" :
+      verifyRes.status === 404 ? "Athlete ID introuvable — l'identifiant doit commencer par 'i' suivi de chiffres (ex: i564686)" :
+      `Erreur Intervals.icu (HTTP ${verifyRes.status}) — vérifiez vos identifiants`;
+    return NextResponse.json({ error: msg }, { status: 422 });
   }
 
   // 2. Save to profile
