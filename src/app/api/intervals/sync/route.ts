@@ -46,14 +46,13 @@ export async function GET(req: Request) {
     }),
   ]);
 
-  if (!activitiesRes.ok || !wellnessRes.ok) {
+  if (!activitiesRes.ok) {
     return NextResponse.json({ error: "Intervals.icu fetch failed" }, { status: 502 });
   }
 
-  const [activities, wellness]: [IntervalsActivity[], IntervalsWellness[]] = await Promise.all([
-    activitiesRes.json(),
-    wellnessRes.json(),
-  ]);
+  const activities: IntervalsActivity[] = await activitiesRes.json();
+  // Wellness is optional — some athletes don't have it configured on Intervals.icu
+  const wellness: IntervalsWellness[] = wellnessRes.ok ? await wellnessRes.json() : [];
 
   let synced = { workouts: 0, hrv: 0, sleep: 0 };
 

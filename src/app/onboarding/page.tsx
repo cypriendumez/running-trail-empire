@@ -319,7 +319,7 @@ export default function OnboardingPage() {
                   </div>
                   <div>
                     <h2 className="font-semibold text-zinc-900">Connecter votre montre</h2>
-                    <p className="text-xs text-zinc-400 mt-0.5">Optionnel — vous pouvez le faire plus tard</p>
+                    <p className="text-xs text-red-400 mt-0.5 font-medium">Obligatoire pour accéder au Dashboard</p>
                   </div>
                 </div>
 
@@ -401,17 +401,12 @@ export default function OnboardingPage() {
                       </div>
                     )}
 
-                    <div className="flex gap-3">
-                      <button type="button" onClick={handleFinish} disabled={loading} className="btn-secondary flex-1 justify-center text-sm">
-                        Ignorer pour l&apos;instant
-                      </button>
-                      <button type="submit"
-                        disabled={savingWatch || !watchAthleteId || !watchApiKey}
-                        className="btn-brand flex-1 justify-center text-sm disabled:opacity-40">
-                        {savingWatch ? <RefreshCw className="w-4 h-4 animate-spin" /> : null}
-                        {savingWatch ? "Vérification…" : "Connecter & continuer"}
-                      </button>
-                    </div>
+                    <button type="submit"
+                      disabled={savingWatch || !watchAthleteId || !watchApiKey}
+                      className="btn-brand w-full justify-center text-sm disabled:opacity-40">
+                      {savingWatch ? <RefreshCw className="w-4 h-4 animate-spin" /> : null}
+                      {savingWatch ? "Vérification…" : "Connecter & continuer"}
+                    </button>
                   </form>
                 ) : (
                   <div className="space-y-3 pt-1 border-t border-zinc-100">
