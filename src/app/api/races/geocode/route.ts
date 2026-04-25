@@ -1,14 +1,10 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
-import { createClient as createSupabaseAdmin } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-const supabaseAdmin = createSupabaseAdmin(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 async function nominatim(city: string, dept: string): Promise<{ lat: number; lon: number } | null> {
   const queries = [
@@ -33,7 +29,7 @@ async function nominatim(city: string, dept: string): Promise<{ lat: number; lon
 
 export async function POST() {
   // Fetch races without GPS
-  const { data: races, error } = await supabaseAdmin
+  const { data: races, error } = await createAdminClient()
     .from("races")
     .select("id,city,department")
     .or("latitude.is.null,longitude.is.null")
@@ -51,7 +47,7 @@ export async function POST() {
 
     const coords = await nominatim(race.city || "", race.department || "");
     if (coords) {
-      const { error: updErr } = await supabaseAdmin
+      const { error: updErr } = await createAdminClient()
         .from("races")
         .update({ latitude: coords.lat, longitude: coords.lon, updated_at: new Date().toISOString() })
         .eq("id", race.id);
@@ -62,7 +58,7 @@ export async function POST() {
     }
   }
 
-  const { count } = await supabaseAdmin
+  const { count } = await createAdminClient()
     .from("races")
     .select("*", { count: "exact", head: true })
     .not("latitude", "is", null);

@@ -1,14 +1,9 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createSupabaseAdmin } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
-const supabaseAdmin = createSupabaseAdmin(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -48,7 +43,7 @@ export async function POST(req: NextRequest) {
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
 
-  const { error: upErr } = await supabaseAdmin.storage
+  const { error: upErr } = await createAdminClient().storage
     .from("avatars")
     .upload(path, buffer, {
       contentType: file.type,
@@ -60,12 +55,12 @@ export async function POST(req: NextRequest) {
   }
 
   // 5. Get public URL
-  const { data: { publicUrl } } = supabaseAdmin.storage
+  const { data: { publicUrl } } = createAdminClient().storage
     .from("avatars")
     .getPublicUrl(path);
 
   // 6. Update profiles.avatar_url
-  const { error: dbErr } = await supabaseAdmin
+  const { error: dbErr } = await createAdminClient()
     .from("profiles")
     .update({ avatar_url: publicUrl })
     .eq("id", user.id);

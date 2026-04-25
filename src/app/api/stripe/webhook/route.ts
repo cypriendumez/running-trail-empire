@@ -1,13 +1,9 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { stripe } from "@/lib/stripe/client";
-import { createClient as createSupabaseAdmin } from "@supabase/supabase-js";
 import type Stripe from "stripe";
 
-const supabaseAdmin = createSupabaseAdmin(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 export async function POST(req: Request) {
   const body = await req.text();
@@ -26,7 +22,7 @@ export async function POST(req: Request) {
       const sub = event.data.object as Stripe.Subscription;
       const userId = sub.metadata.supabase_user_id;
       if (!userId) break;
-      await supabaseAdmin.from("profiles").update({
+      await createAdminClient().from("profiles").update({
         subscription_tier: sub.status === "active" ? "pro" : "free",
         stripe_subscription_id: sub.id,
       }).eq("id", userId);
@@ -36,7 +32,7 @@ export async function POST(req: Request) {
       const sub = event.data.object as Stripe.Subscription;
       const userId = sub.metadata.supabase_user_id;
       if (!userId) break;
-      await supabaseAdmin.from("profiles").update({
+      await createAdminClient().from("profiles").update({
         subscription_tier: "free",
         stripe_subscription_id: null,
       }).eq("id", userId);

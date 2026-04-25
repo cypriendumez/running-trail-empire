@@ -1,15 +1,10 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createSupabaseAdmin } from "@supabase/supabase-js";
 import * as cheerio from "cheerio";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-const supabaseAdmin = createSupabaseAdmin(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 // ─── Department → Region ────────────────────────────────────────────────────
 const DEPT_REGION: Record<string, string> = {
@@ -570,14 +565,14 @@ function toSupabaseRace(r: RaceEntry) {
 
 // ─── GET: status ────────────────────────────────────────────────────────────
 export async function GET() {
-  const { count } = await supabaseAdmin.from("races").select("*", { count:"exact", head:true });
+  const { count } = await createAdminClient().from("races").select("*", { count:"exact", head:true });
   return NextResponse.json({ races_in_db: count || 0 });
 }
 
 // ─── DELETE: remove past races ───────────────────────────────────────────────
 export async function DELETE() {
   const today = new Date().toISOString().slice(0, 10);
-  const { error, count } = await supabaseAdmin
+  const { error, count } = await createAdminClient()
     .from("races")
     .delete({ count: "exact" })
     .lt("date", today);
@@ -626,7 +621,7 @@ export async function POST(req: NextRequest) {
   let exPage = 0;
   const EX_PAGE = 1000;
   while (true) {
-    const { data: exData } = await supabaseAdmin
+    const { data: exData } = await createAdminClient()
       .from("races")
       .select("name,date")
       .range(exPage, exPage + EX_PAGE - 1);
@@ -643,12 +638,12 @@ export async function POST(req: NextRequest) {
   const BATCH = 50;
   let inserted = 0, errors = 0;
   for (let i = 0; i < toInsert.length; i += BATCH) {
-    const { error } = await supabaseAdmin.from("races").insert(toInsert.slice(i, i + BATCH));
+    const { error } = await createAdminClient().from("races").insert(toInsert.slice(i, i + BATCH));
     if (error) { console.error(error.message); errors++; }
     else inserted += Math.min(BATCH, toInsert.length - i);
   }
 
-  const { count } = await supabaseAdmin.from("races").select("*", { count:"exact", head:true });
+  const { count } = await createAdminClient().from("races").select("*", { count:"exact", head:true });
 
   return NextResponse.json({
     scraped: races.length,

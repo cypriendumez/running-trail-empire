@@ -1,14 +1,10 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 // Fetch ALL races paginated (bypasses 1000-row cap)
 async function fetchAllRaces() {
@@ -60,7 +56,7 @@ export async function POST() {
   const BATCH = 100;
   for (let i = 0; i < toDelete.length; i += BATCH) {
     const batch = toDelete.slice(i, i + BATCH);
-    const { error } = await supabaseAdmin.from("races").delete().in("id", batch);
+    const { error } = await createAdminClient().from("races").delete().in("id", batch);
     if (!error) deleted += batch.length;
   }
 
@@ -100,7 +96,7 @@ export async function PATCH(req: Request) {
   const updates: Record<string, string> = { updated_at: new Date().toISOString() };
   if (date) updates.date = date;
   if (name) updates.name = name;
-  const { error } = await supabaseAdmin.from("races").update(updates).eq("id", id);
+  const { error } = await createAdminClient().from("races").update(updates).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, updated: { id, ...updates } });
 }

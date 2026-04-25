@@ -1,13 +1,9 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
-import { createClient as createSupabaseAdmin } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
-const supabaseAdmin = createSupabaseAdmin(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 // ─── 500+ vraies courses françaises 2026 ────────────────────────────────────
 const RACES_2026 = [
@@ -480,7 +476,7 @@ export async function POST() {
   const today = new Date().toISOString().slice(0, 10);
 
   // Get existing races to avoid duplicates
-  const { data: existing } = await supabaseAdmin.from("races").select("name,date");
+  const { data: existing } = await createAdminClient().from("races").select("name,date");
   const existingKeys = new Set((existing || []).map((r: { name: string; date: string }) =>
     `${r.name.toLowerCase().trim()}::${r.date}`
   ));
@@ -512,19 +508,19 @@ export async function POST() {
     }));
 
   if (toInsert.length === 0) {
-    const { count } = await supabaseAdmin.from("races").select("*", { count: "exact", head: true });
+    const { count } = await createAdminClient().from("races").select("*", { count: "exact", head: true });
     return NextResponse.json({ inserted: 0, total: count, message: "All races already in DB" });
   }
 
   const BATCH = 50;
   let inserted = 0;
   for (let i = 0; i < toInsert.length; i += BATCH) {
-    const { error } = await supabaseAdmin.from("races").insert(toInsert.slice(i, i + BATCH));
+    const { error } = await createAdminClient().from("races").insert(toInsert.slice(i, i + BATCH));
     if (error) console.error("Batch error:", error.message);
     else inserted += Math.min(BATCH, toInsert.length - i);
   }
 
-  const { count } = await supabaseAdmin.from("races").select("*", { count: "exact", head: true });
+  const { count } = await createAdminClient().from("races").select("*", { count: "exact", head: true });
   return NextResponse.json({ inserted, total: count, message: `${inserted} courses ajoutées` });
 }
 

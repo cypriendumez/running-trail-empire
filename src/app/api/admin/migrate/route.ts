@@ -1,13 +1,9 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
-import { createClient as createSupabaseAdmin } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
-const supabaseAdmin = createSupabaseAdmin(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 export async function POST() {
   const migrations = [
@@ -34,7 +30,7 @@ export async function POST() {
 
   for (const sql of migrations) {
     try {
-      const { error } = await supabaseAdmin.rpc("exec_sql", { sql }).single();
+      const { error } = await createAdminClient().rpc("exec_sql", { sql }).single();
       if (error) {
         // Try direct query approach
         results.push(`Note: ${error.message}`);

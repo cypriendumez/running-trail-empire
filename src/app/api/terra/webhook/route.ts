@@ -1,11 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
-import { createClient as createSupabaseAdmin } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/admin";
 
-const supabaseAdmin = createSupabaseAdmin(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 interface TerraActivity {
   user: { user_id: string };
@@ -40,7 +36,7 @@ export async function POST(req: Request) {
       const userId = data.user?.user_id;
       if (!userId) continue;
 
-      await supabaseAdmin.from("workouts").insert({
+      await createAdminClient().from("workouts").insert({
         user_id: userId,
         title: `Séance ${act.device_data?.name ?? "Montre"}`,
         type: "easy",
@@ -66,7 +62,7 @@ export async function POST(req: Request) {
       const rmssd = hrv.avg_rmssd ?? 0;
       const state = rmssd > 60 ? "optimal" : rmssd > 35 ? "recovery" : "recovery";
 
-      await supabaseAdmin.from("hrv_data").upsert({
+      await createAdminClient().from("hrv_data").upsert({
         user_id: userId,
         date: new Date().toISOString().split("T")[0],
         hrv_ms: rmssd,

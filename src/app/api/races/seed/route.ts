@@ -1,12 +1,8 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { createClient as createSupabaseAdmin } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/admin";
 
-const supabaseAdmin = createSupabaseAdmin(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 const SEED_RACES = [
   {
@@ -123,7 +119,7 @@ const SEED_RACES = [
 
 export async function GET() {
   // Check what's already in DB to avoid duplicates
-  const { data: existing } = await supabaseAdmin.from("races").select("name,date");
+  const { data: existing } = await createAdminClient().from("races").select("name,date");
   const existingKeys = new Set((existing || []).map(r => `${r.name}::${r.date}`));
 
   const toInsert = SEED_RACES
@@ -135,13 +131,13 @@ export async function GET() {
     }));
 
   if (toInsert.length === 0) {
-    const { count } = await supabaseAdmin.from("races").select("*", { count: "exact", head: true });
+    const { count } = await createAdminClient().from("races").select("*", { count: "exact", head: true });
     return NextResponse.json({ seeded: 0, total: count, message: "Races already seeded" });
   }
 
-  const { error } = await supabaseAdmin.from("races").insert(toInsert);
+  const { error } = await createAdminClient().from("races").insert(toInsert);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const { count } = await supabaseAdmin.from("races").select("*", { count: "exact", head: true });
+  const { count } = await createAdminClient().from("races").select("*", { count: "exact", head: true });
   return NextResponse.json({ seeded: toInsert.length, total: count, message: "Races seeded successfully" });
 }

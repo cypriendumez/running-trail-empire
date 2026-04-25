@@ -1,12 +1,8 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
-import { createClient as createSupabaseAdmin } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 // Use service role to bypass PostgREST 1000-row default limit (races are public data)
-const supabaseAdmin = createSupabaseAdmin(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 export async function GET() {
   const today = new Date().toISOString().slice(0, 10);
@@ -16,7 +12,7 @@ export async function GET() {
   let from = 0;
 
   while (true) {
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await createAdminClient()
       .from("races")
       .select("*")
       .gte("date", today)
