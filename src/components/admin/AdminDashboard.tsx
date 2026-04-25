@@ -255,7 +255,7 @@ export function AdminDashboard({ users }: { users: User[] }) {
               </div>
               <div>
                 <h2 className="font-bold text-zinc-900">Générer un plan d&apos;entraînement</h2>
-                <p className="text-xs text-zinc-400">Gemini analyse les données → Claude rédige le plan semaine</p>
+                <p className="text-xs text-zinc-400">Gemini Flash analyse les données → Gemini Pro rédige le plan semaine</p>
               </div>
             </div>
 
@@ -353,7 +353,7 @@ export function AdminDashboard({ users }: { users: User[] }) {
                 <div className="w-7 h-7 bg-violet-50 rounded-lg flex items-center justify-center">
                   <Sparkles className="w-4 h-4 text-violet-500" />
                 </div>
-                <h3 className="font-semibold text-zinc-900 text-sm">Plan Claude — semaine prochaine</h3>
+                <h3 className="font-semibold text-zinc-900 text-sm">Plan Gemini Pro — semaine prochaine</h3>
               </div>
               <div className="text-sm text-zinc-700 leading-relaxed whitespace-pre-wrap">{planResult}</div>
             </div>

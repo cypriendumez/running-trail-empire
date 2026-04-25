@@ -5,7 +5,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 const ADMIN_EMAIL = "cypriendumez@outlook.fr";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 export async function POST(req: NextRequest) {
   // Auth guard
@@ -88,27 +87,21 @@ export async function POST(req: NextRequest) {
   let analysis: Record<string, unknown> = {};
   try { analysis = JSON.parse(rawText); } catch { const m = rawText.match(/\{[\s\S]*\}/); if (m) analysis = JSON.parse(m[0]); }
 
-  // Step 2: Claude coaching plan
-  if (!ANTHROPIC_API_KEY) return NextResponse.json({ gemini: analysis, error: "ANTHROPIC_API_KEY manquant" }, { status: 206 });
-  const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-opus-4-5",
-      max_tokens: 1200,
-      messages: [{
-        role: "user",
-        content: `Tu es un coach trail running expert. Rédige un plan de la semaine prochaine pour ${profile?.full_name || "l'athlète"} basé sur cette analyse.\n\nANALYSE GEMINI:\n${JSON.stringify(analysis, null, 2)}\n\nDONNÉES ATHLÈTE:\n- VMA: ${baseline?.vma_kmh ?? "?"}km/h, FC max: ${baseline?.max_hr ?? "?"}bpm\n- Mode: ${profile?.mode}\n\nFormat attendu:\n1. Commentaire sur la semaine passée (2-3 phrases, cite des chiffres)\n2. Plan semaine prochaine : liste les séances jour par jour (type, durée, intensité, allure cible)\n3. Point clé à surveiller\n\nTon direct, humain, exigeant. 250-300 mots max. PAS de mention IA.`,
-      }],
-    }),
-  });
+  // Step 2: Gemini Pro — coaching plan
+  const planRes = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: `Tu es un coach trail running expert. Rédige un plan de la semaine prochaine pour ${profile?.full_name || "l'athlète"} basé sur cette analyse.\n\nANALYSE:\n${JSON.stringify(analysis, null, 2)}\n\nDONNÉES ATHLÈTE:\n- VMA: ${baseline?.vma_kmh ?? "?"}km/h, FC max: ${baseline?.max_hr ?? "?"}bpm, Mode: ${profile?.mode}\n\nFormat:\n1. Bilan semaine passée (2-3 phrases, cite des chiffres réels)\n2. Plan jour par jour : type de séance, durée, intensité, allure cible\n3. Point clé à surveiller\n\nTon direct, humain, exigeant. 250-300 mots. PAS de mention IA.` }] }],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 1200 },
+      }),
+    }
+  );
 
-  const claudeData = await claudeRes.json();
-  const plan = claudeData.content?.[0]?.text ?? "";
+  const planData = await planRes.json();
+  const plan = planData.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
   return NextResponse.json({
     gemini: analysis,
