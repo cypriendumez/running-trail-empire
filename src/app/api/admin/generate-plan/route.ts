@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { user_id, sessions = 10 } = await req.json().catch(() => ({}));
+  const { user_id, sessions = 5, planType = "semaine", coachNote = "" } = await req.json().catch(() => ({}));
   if (!user_id) return NextResponse.json({ error: "user_id requis" }, { status: 400 });
   if (!GEMINI_KEY) return NextResponse.json({ error: "GEMINI_API_KEY manquant dans Railway" }, { status: 503 });
 
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: `Tu es un coach trail running expert. Rédige le plan d'entraînement de la semaine prochaine pour ${profile?.full_name || "l'athlète"}.\n\nANALYSE DES ${workouts.length} DERNIÈRES SÉANCES:\n${JSON.stringify(analysis, null, 2)}\n\nPROFIL:\n- VMA: ${baseline?.vma_kmh ?? "?"}km/h | FC max: ${baseline?.max_hr ?? "?"}bpm | FC repos: ${baseline?.resting_hr ?? "?"}bpm | Mode: ${profile?.mode}\n\nSTRUCTURE OBLIGATOIRE:\n**Bilan** : 2-3 phrases sur les séances analysées (cite des chiffres)\n**Plan semaine** :\n- Lundi : [type] [durée] [intensité] [allure/FC cible]\n- Mardi : ...\n- (etc pour chaque jour)\n**Point clé** : 1 conseil technique prioritaire\n\nTon : coach direct et exigeant. 280 mots max. Zéro mention IA.` }] }],
+      contents: [{ role: "user", parts: [{ text: `Tu es un coach trail running expert. Rédige un plan "${planType}" pour ${profile?.full_name || "l'athlète"}.\n\nANALYSE DES ${workouts.length} DERNIÈRES SÉANCES:\n${JSON.stringify(analysis, null, 2)}\n\nPROFIL:\n- VMA: ${baseline?.vma_kmh ?? "?"}km/h | FC max: ${baseline?.max_hr ?? "?"}bpm | FC repos: ${baseline?.resting_hr ?? "?"}bpm | Mode: ${profile?.mode}${coachNote ? `\n\nNOTE DU COACH: ${coachNote}` : ""}\n\nSTRUCTURE OBLIGATOIRE:\n**Bilan** : 2-3 phrases sur les séances analysées (cite des chiffres réels)\n**Plan semaine — type "${planType}"** :\n- Lundi : [type] [durée] [intensité] [allure/FC cible]\n- Mardi : ...\n- (chaque jour de la semaine)\n**Point clé** : 1 conseil technique prioritaire\n\nTon : coach direct et exigeant. 300 mots max. Zéro mention IA.` }] }],
       generationConfig: { temperature: 0.6, maxOutputTokens: 1200 },
     }),
   });

@@ -49,8 +49,12 @@ export function AdminDashboard({ users }: { users: User[] }) {
 
   // Coaching AI state
   const [coachingUser, setCoachingUser] = useState<User | null>(null);
-  const [coachingSessions, setCoachingSessions] = useState(10);
+  const [coachingSessions, setCoachingSessions] = useState(5);
+  const [planType, setPlanType] = useState("semaine");
+  const [coachNote, setCoachNote] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [sendingPlan, setSendingPlan] = useState(false);
+  const [planSent, setPlanSent] = useState(false);
   const [geminiResult, setGeminiResult] = useState<{
     summary?: string;
     training_load?: string;
@@ -65,12 +69,12 @@ export function AdminDashboard({ users }: { users: User[] }) {
 
   async function generatePlan() {
     if (!coachingUser) return;
-    setGenerating(true); setCoachingError(null); setGeminiResult(null); setPlanResult("");
+    setGenerating(true); setCoachingError(null); setGeminiResult(null); setPlanResult(""); setPlanSent(false);
     try {
       const res = await fetch("/api/admin/generate-plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: coachingUser.id, sessions: coachingSessions }),
+        body: JSON.stringify({ user_id: coachingUser.id, sessions: coachingSessions, planType, coachNote }),
       });
       const data = await res.json();
       if (!res.ok && res.status !== 206) throw new Error(data.error ?? "Erreur génération");
@@ -80,6 +84,28 @@ export function AdminDashboard({ users }: { users: User[] }) {
       setCoachingError(String(err).replace("Error: ", ""));
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function sendPlanByEmail() {
+    if (!coachingUser?.email || !planResult) return;
+    setSendingPlan(true);
+    try {
+      const res = await fetch("/api/admin/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: coachingUser.email,
+          subject: `Ton plan d'entraînement — ${new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}`,
+          body: planResult,
+        }),
+      });
+      if (!res.ok) throw new Error("Erreur envoi");
+      setPlanSent(true);
+    } catch (err) {
+      setCoachingError(String(err).replace("Error: ", ""));
+    } finally {
+      setSendingPlan(false);
     }
   }
 
@@ -255,51 +281,69 @@ export function AdminDashboard({ users }: { users: User[] }) {
 
       {/* Coaching IA */}
       {tab === "coaching" && (
-        <div className="p-8 max-w-4xl mx-auto w-full">
-          <div className="bg-white border border-zinc-100 rounded-2xl p-6 shadow-sm mb-6">
-            <div className="flex items-center gap-3 mb-5">
+        <div className="p-8 max-w-4xl mx-auto w-full space-y-5">
+
+          {/* Config card */}
+          <div className="bg-white border border-zinc-100 rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center gap-3 mb-6">
               <div className="w-9 h-9 bg-violet-50 rounded-xl flex items-center justify-center">
                 <Brain className="w-5 h-5 text-violet-600" />
               </div>
               <div>
-                <h2 className="font-bold text-zinc-900">Générer un plan d&apos;entraînement</h2>
-                <p className="text-xs text-zinc-400">Gemini Flash analyse les données → Gemini Pro rédige le plan semaine</p>
+                <h2 className="font-bold text-zinc-900">Coaching IA</h2>
+                <p className="text-xs text-zinc-400">Analyse des séances + génération du plan par Gemini</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-5">
+            {/* Row 1: Athlete + sessions */}
+            <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="text-xs font-medium text-zinc-500 block mb-2">Athlète</label>
-                <select
-                  value={coachingUser?.id ?? ""}
-                  onChange={e => setCoachingUser(users.find(u => u.id === e.target.value) ?? null)}
+                <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wide block mb-2">Athlète</label>
+                <select value={coachingUser?.id ?? ""} onChange={e => { setCoachingUser(users.find(u => u.id === e.target.value) ?? null); setGeminiResult(null); setPlanResult(""); }}
                   className="w-full border border-zinc-200 rounded-xl px-4 py-3 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white">
-                  <option value="">Sélectionner un athlète...</option>
-                  {users.map(u => (
-                    <option key={u.id} value={u.id}>{u.full_name || u.email}</option>
-                  ))}
+                  <option value="">Sélectionner...</option>
+                  {users.map(u => <option key={u.id} value={u.id}>{u.full_name || u.email} ({u.workout_count} séances)</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-zinc-500 block mb-2">Séances à analyser</label>
-                <select
-                  value={coachingSessions}
-                  onChange={e => setCoachingSessions(Number(e.target.value))}
+                <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wide block mb-2">Séances à analyser</label>
+                <select value={coachingSessions} onChange={e => setCoachingSessions(Number(e.target.value))}
                   className="w-full border border-zinc-200 rounded-xl px-4 py-3 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white">
-                  <option value={5}>5 dernières séances</option>
-                  <option value={10}>10 dernières séances</option>
-                  <option value={20}>20 dernières séances</option>
-                  <option value={30}>30 dernières séances</option>
+                  {[1,2,3,5,8,10,15,20,30].map(n => <option key={n} value={n}>{n} dernière{n > 1 ? "s" : ""} séance{n > 1 ? "s" : ""}</option>)}
                 </select>
               </div>
             </div>
 
-            <button onClick={generatePlan}
-              disabled={generating || !coachingUser}
+            {/* Row 2: Plan type */}
+            <div className="mb-4">
+              <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wide block mb-2">Type de plan</label>
+              <div className="grid grid-cols-5 gap-2">
+                {[
+                  { v: "recuperation", l: "🛌 Récupération" },
+                  { v: "endurance", l: "🏃 Endurance base" },
+                  { v: "intensite", l: "⚡ Intensité" },
+                  { v: "pre-competition", l: "🎯 Pré-compet" },
+                  { v: "semaine", l: "📅 Semaine type" },
+                ].map(({ v, l }) => (
+                  <button key={v} onClick={() => setPlanType(v)}
+                    className={`py-2.5 px-2 rounded-xl text-xs font-medium border transition-all text-center ${planType === v ? "bg-violet-600 text-white border-violet-600" : "bg-white text-zinc-600 border-zinc-200 hover:border-violet-300"}`}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Row 3: Coach note */}
+            <div className="mb-5">
+              <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wide block mb-2">Note du coach (optionnel)</label>
+              <textarea value={coachNote} onChange={e => setCoachNote(e.target.value)} rows={2}
+                placeholder="Ex: il a une compétition dans 3 semaines, genou droit sensible, objectif sub-4h marathon..."
+                className="w-full border border-zinc-200 rounded-xl px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none" />
+            </div>
+
+            <button onClick={generatePlan} disabled={generating || !coachingUser}
               className="w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-xl transition-all text-sm">
-              {generating
-                ? <><RefreshCw className="w-4 h-4 animate-spin" /> Gemini analyse… puis Claude rédige…</>
-                : <><Sparkles className="w-4 h-4" /> Générer le plan</>}
+              {generating ? <><RefreshCw className="w-4 h-4 animate-spin" /> Analyse en cours…</> : <><Sparkles className="w-4 h-4" /> Générer le plan</>}
             </button>
 
             {coachingError && (
@@ -309,61 +353,73 @@ export function AdminDashboard({ users }: { users: User[] }) {
             )}
           </div>
 
-          {/* Gemini analysis */}
+          {/* Analysis */}
           {geminiResult && (
-            <div className="bg-white border border-zinc-100 rounded-2xl p-6 shadow-sm mb-6">
+            <div className="bg-white border border-zinc-100 rounded-2xl p-6 shadow-sm">
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-7 h-7 bg-blue-50 rounded-lg flex items-center justify-center">
                   <BarChart3 className="w-4 h-4 text-blue-500" />
                 </div>
-                <h3 className="font-semibold text-zinc-900 text-sm">Analyse Gemini</h3>
+                <h3 className="font-semibold text-zinc-900 text-sm">Analyse des séances</h3>
               </div>
               <div className="grid grid-cols-3 gap-3 mb-4">
                 {[
-                  { label: "Charge", value: String(geminiResult.training_load ?? "—") },
-                  { label: "Récupération", value: String(geminiResult.recovery_status ?? "—") },
-                  { label: "Tendance VFC", value: String(geminiResult.hrv_trend ?? "—") },
+                  { label: "Charge", value: geminiResult.training_load ?? "—" },
+                  { label: "Récupération", value: geminiResult.recovery_status ?? "—" },
+                  { label: "VFC trend", value: geminiResult.hrv_trend ?? "—" },
                 ].map(({ label, value }) => (
                   <div key={label} className="bg-zinc-50 rounded-xl p-3">
                     <div className="text-xs text-zinc-400 mb-1">{label}</div>
-                    <div className="text-sm font-semibold text-zinc-800 capitalize">{value}</div>
+                    <div className="text-sm font-semibold text-zinc-800 capitalize">{String(value)}</div>
                   </div>
                 ))}
               </div>
-              {geminiResult.summary && (
-                <p className="text-sm text-zinc-600 mb-3 leading-relaxed">{String(geminiResult.summary)}</p>
-              )}
-              {Array.isArray(geminiResult.strengths) && geminiResult.strengths.length > 0 && (
-                <div className="mb-2">
-                  <div className="text-xs font-medium text-emerald-600 mb-1">✓ Points forts</div>
-                  {(geminiResult.strengths as string[]).map((s, i) => <div key={i} className="text-xs text-zinc-600 ml-3">• {s}</div>)}
-                </div>
-              )}
-              {Array.isArray(geminiResult.areas_to_improve) && geminiResult.areas_to_improve.length > 0 && (
-                <div className="mb-2">
-                  <div className="text-xs font-medium text-amber-600 mb-1">↗ À améliorer</div>
-                  {(geminiResult.areas_to_improve as string[]).map((s, i) => <div key={i} className="text-xs text-zinc-600 ml-3">• {s}</div>)}
-                </div>
-              )}
-              {Array.isArray(geminiResult.risk_flags) && (geminiResult.risk_flags as string[]).length > 0 && (
-                <div>
-                  <div className="text-xs font-medium text-red-500 mb-1">⚠ Risques</div>
-                  {(geminiResult.risk_flags as string[]).map((s, i) => <div key={i} className="text-xs text-zinc-600 ml-3">• {s}</div>)}
+              {geminiResult.summary && <p className="text-sm text-zinc-600 mb-3 leading-relaxed">{geminiResult.summary}</p>}
+              <div className="grid grid-cols-2 gap-4">
+                {Array.isArray(geminiResult.strengths) && geminiResult.strengths.length > 0 && (
+                  <div>
+                    <div className="text-xs font-semibold text-emerald-600 mb-1.5">✓ Points forts</div>
+                    {geminiResult.strengths.map((s, i) => <div key={i} className="text-xs text-zinc-600 mb-0.5">• {s}</div>)}
+                  </div>
+                )}
+                {Array.isArray(geminiResult.areas_to_improve) && geminiResult.areas_to_improve.length > 0 && (
+                  <div>
+                    <div className="text-xs font-semibold text-amber-600 mb-1.5">↗ À améliorer</div>
+                    {geminiResult.areas_to_improve.map((s, i) => <div key={i} className="text-xs text-zinc-600 mb-0.5">• {s}</div>)}
+                  </div>
+                )}
+              </div>
+              {Array.isArray(geminiResult.risk_flags) && geminiResult.risk_flags.length > 0 && (
+                <div className="mt-3 p-3 bg-red-50 rounded-xl">
+                  <div className="text-xs font-semibold text-red-500 mb-1">⚠ Vigilance</div>
+                  {geminiResult.risk_flags.map((s, i) => <div key={i} className="text-xs text-red-600">• {s}</div>)}
                 </div>
               )}
             </div>
           )}
 
-          {/* Claude plan */}
+          {/* Plan */}
           {planResult && (
             <div className="bg-white border border-violet-100 rounded-2xl p-6 shadow-sm">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-7 h-7 bg-violet-50 rounded-lg flex items-center justify-center">
-                  <Sparkles className="w-4 h-4 text-violet-500" />
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 bg-violet-50 rounded-lg flex items-center justify-center">
+                    <Sparkles className="w-4 h-4 text-violet-500" />
+                  </div>
+                  <h3 className="font-semibold text-zinc-900 text-sm">Plan généré — {coachingUser?.full_name}</h3>
                 </div>
-                <h3 className="font-semibold text-zinc-900 text-sm">Plan Gemini Pro — semaine prochaine</h3>
+                <div className="flex gap-2">
+                  <button onClick={() => navigator.clipboard.writeText(planResult)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-all">
+                    Copier
+                  </button>
+                  <button onClick={sendPlanByEmail} disabled={sendingPlan || planSent}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition-all">
+                    {sendingPlan ? <><RefreshCw className="w-3 h-3 animate-spin" /> Envoi…</> : planSent ? <><CheckCircle2 className="w-3 h-3" /> Envoyé !</> : <><Send className="w-3 h-3" /> Envoyer à l&apos;athlète</>}
+                  </button>
+                </div>
               </div>
-              <div className="text-sm text-zinc-700 leading-relaxed whitespace-pre-wrap">{planResult}</div>
+              <div className="text-sm text-zinc-700 leading-relaxed whitespace-pre-wrap bg-zinc-50 rounded-xl p-4">{planResult}</div>
             </div>
           )}
         </div>
