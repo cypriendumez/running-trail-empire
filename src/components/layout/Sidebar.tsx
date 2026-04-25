@@ -83,12 +83,7 @@ export function Sidebar({ profile }: { profile: Record<string, unknown> | null }
           <Settings className="w-4 h-4 flex-shrink-0" />
           {!collapsed && "Paramètres"}
         </Link>
-        <Link href="/admin"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-500 hover:bg-violet-50 hover:text-violet-700 transition-all">
-          <ShieldCheck className="w-4 h-4 flex-shrink-0" />
-          {!collapsed && "Admin"}
-        </Link>
-        <button onClick={signOut}
+<button onClick={signOut}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-500 hover:bg-red-50 hover:text-red-600 transition-all">
           <LogOut className="w-4 h-4 flex-shrink-0" />
           {!collapsed && "Déconnexion"}

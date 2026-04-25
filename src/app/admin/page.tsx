@@ -1,21 +1,33 @@
 export const dynamic = "force-dynamic";
-import { AdminWorkflow } from "@/components/admin/AdminWorkflow";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { AdminDashboard } from "@/components/admin/AdminDashboard";
 import { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Admin – Running Elite" };
+export const metadata: Metadata = { title: "Admin — Running & Trail Empire" };
 
-export default function AdminPage() {
-  return (
-    <div className="min-h-screen bg-zinc-950 text-white p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-1">Admin Workflow</h1>
-          <p className="text-zinc-400 text-sm">
-            Générez les rapports Gemini Flash · Rédigez vos conseils Claude Pro · Publiez aux athlètes
-          </p>
-        </div>
-        <AdminWorkflow />
-      </div>
-    </div>
-  );
+export default async function AdminPage() {
+  const supabase = createAdminClient();
+
+  // Fetch all profiles
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, full_name, email, age, gender, subscription_tier, league, discipline_score, onboarding_completed, created_at, intervals_athlete_id, avatar_url, mode")
+    .order("created_at", { ascending: false });
+
+  // Fetch workout counts per user
+  const { data: workoutCounts } = await supabase
+    .from("workouts")
+    .select("user_id")
+    .then(({ data }) => {
+      const counts: Record<string, number> = {};
+      for (const w of data ?? []) counts[w.user_id] = (counts[w.user_id] ?? 0) + 1;
+      return { data: counts };
+    });
+
+  const users = (profiles ?? []).map(p => ({
+    ...p,
+    workout_count: (workoutCounts as Record<string, number>)?.[p.id] ?? 0,
+  }));
+
+  return <AdminDashboard users={users} />;
 }
