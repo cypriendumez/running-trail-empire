@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     .getPublicUrl(path);
 
   // 6. Update profiles.avatar_url
-  const { error: dbErr } = await supabaseAdmin
+  const { error: dbErr } = await createAdminClient()
     .from("profiles")
     .update({ avatar_url: publicUrl })
     .eq("id", user.id);

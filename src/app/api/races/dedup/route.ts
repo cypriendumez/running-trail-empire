@@ -12,7 +12,7 @@ async function fetchAllRaces() {
   let from = 0;
   const PAGE = 1000;
   while (true) {
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await createAdminClient()
       .from("races")
       .select("id,name,date,latitude")
       .range(from, from + PAGE - 1);
@@ -60,7 +60,7 @@ export async function POST() {
     if (!error) deleted += batch.length;
   }
 
-  const { count } = await supabaseAdmin
+  const { count } = await createAdminClient()
     .from("races")
     .select("*", { count: "exact", head: true });
 

@@ -572,7 +572,7 @@ export async function GET() {
 // ─── DELETE: remove past races ───────────────────────────────────────────────
 export async function DELETE() {
   const today = new Date().toISOString().slice(0, 10);
-  const { error, count } = await supabaseAdmin
+  const { error, count } = await createAdminClient()
     .from("races")
     .delete({ count: "exact" })
     .lt("date", today);
@@ -621,7 +621,7 @@ export async function POST(req: NextRequest) {
   let exPage = 0;
   const EX_PAGE = 1000;
   while (true) {
-    const { data: exData } = await supabaseAdmin
+    const { data: exData } = await createAdminClient()
       .from("races")
       .select("name,date")
       .range(exPage, exPage + EX_PAGE - 1);
