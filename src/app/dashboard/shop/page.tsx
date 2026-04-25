@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { ShoppingHub } from "@/components/shop/ShoppingHub";
 
 export const metadata = { title: "Shopping Hub" };

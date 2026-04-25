@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { AdminWorkflow } from "@/components/admin/AdminWorkflow";
 import { Metadata } from "next";
 

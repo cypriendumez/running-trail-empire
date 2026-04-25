@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { createClient as createSupabaseAdmin } from "@supabase/supabase-js";
 import { RacesHub } from "@/components/races/RacesHub";
 
