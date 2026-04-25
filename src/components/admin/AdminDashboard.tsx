@@ -80,6 +80,7 @@ export function AdminDashboard({ users }: { users: User[] }) {
       if (!res.ok && res.status !== 206) throw new Error(data.error ?? "Erreur génération");
       setGeminiResult(data.gemini ?? null);
       setPlanResult(data.plan ?? "");
+      if (data.icu_connected) setCoachingError(null);
     } catch (err) {
       setCoachingError(String(err).replace("Error: ", ""));
     } finally {
@@ -341,9 +342,21 @@ export function AdminDashboard({ users }: { users: User[] }) {
                 className="w-full border border-zinc-200 rounded-xl px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none" />
             </div>
 
+            {coachingUser && (
+              <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-xl mb-3 ${
+                coachingUser.intervals_athlete_id
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                  : "bg-amber-50 text-amber-700 border border-amber-100"
+              }`}>
+                {coachingUser.intervals_athlete_id
+                  ? <><CheckCircle2 className="w-3.5 h-3.5" /> Données Intervals.icu en temps réel — {coachingUser.intervals_athlete_id}</>
+                  : <><AlertCircle className="w-3.5 h-3.5" /> Pas de montre connectée — analyse basée sur les données synchronisées</>
+                }
+              </div>
+            )}
             <button onClick={generatePlan} disabled={generating || !coachingUser}
               className="w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-xl transition-all text-sm">
-              {generating ? <><RefreshCw className="w-4 h-4 animate-spin" /> Analyse en cours…</> : <><Sparkles className="w-4 h-4" /> Générer le plan</>}
+              {generating ? <><RefreshCw className="w-4 h-4 animate-spin" /> Récupération Intervals.icu + analyse…</> : <><Sparkles className="w-4 h-4" /> Générer le plan</>}
             </button>
 
             {coachingError && (
