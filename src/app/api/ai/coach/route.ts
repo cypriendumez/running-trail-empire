@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -52,7 +53,9 @@ Règles :
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [
-        { role: "user", parts: [{ text: systemPrompt + "\n\nQuestion du coureur : " + message }] },
+        { role: "user", parts: [{ text: systemPrompt + "
+
+Question du coureur : " + message }] },
       ],
       generationConfig: {
         temperature: 0.7,

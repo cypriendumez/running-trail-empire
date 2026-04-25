@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 /**
  * POST /api/admin/migrate-full
  * Complete Supabase schema for long-term athlete data (>2 years).

@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 /**
  * POST /api/admin/claude-advice
  * Takes a Gemini Flash analysis + athlete profile and asks Claude to write
