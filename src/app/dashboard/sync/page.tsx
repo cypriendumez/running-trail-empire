@@ -14,6 +14,7 @@ interface SyncStats {
   hrv: number;
   sleep: number;
   period?: { oldest: string; newest: string };
+  fetched?: { activities: number; wellness: number };
 }
 
 interface RecentActivity {
@@ -249,10 +250,16 @@ export default function SyncPage() {
           {syncResult && (
             <div className="mt-4 flex items-center gap-6 pt-4 border-t border-zinc-100">
               <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
-              <div className="flex gap-6 text-sm">
-                <span><strong className="text-zinc-900">{syncResult.workouts}</strong> <span className="text-zinc-500">activités</span></span>
-                <span><strong className="text-zinc-900">{syncResult.hrv}</strong> <span className="text-zinc-500">mesures VFC</span></span>
-                <span><strong className="text-zinc-900">{syncResult.sleep}</strong> <span className="text-zinc-500">nuits sommeil</span></span>
+              <div className="flex gap-6 text-sm flex-wrap">
+                <span><strong className="text-zinc-900">{syncResult.workouts}</strong> <span className="text-zinc-500">activités sauvegardées</span></span>
+                <span><strong className="text-zinc-900">{syncResult.hrv}</strong> <span className="text-zinc-500">VFC</span></span>
+                <span><strong className="text-zinc-900">{syncResult.sleep}</strong> <span className="text-zinc-500">nuits</span></span>
+                {syncResult.fetched && syncResult.fetched.activities > 0 && syncResult.workouts === 0 && (
+                  <span className="text-amber-600 text-xs">⚠️ {syncResult.fetched.activities} activités reçues d&apos;Intervals.icu mais 0 sauvegardées (erreur Supabase ?)</span>
+                )}
+                {syncResult.fetched && syncResult.fetched.activities === 0 && (
+                  <span className="text-amber-600 text-xs">⚠️ Intervals.icu a renvoyé 0 activité — cliquez &quot;IMPORTER TOUTES LES DONNÉES&quot; sur intervals.icu d&apos;abord</span>
+                )}
               </div>
               {lastSyncTime && <span className="ml-auto text-xs text-zinc-400">Dernière sync : {lastSyncTime}</span>}
             </div>

@@ -165,7 +165,11 @@ export async function GET(req: Request) {
     }
   }
 
-  return NextResponse.json({ synced, period: { oldest, newest } });
+  return NextResponse.json({
+    synced,
+    period: { oldest, newest },
+    fetched: { activities: activities.length, wellness: wellness.length },
+  });
 }
 
 // ─── Helpers ────────────────────────────────────────────────
