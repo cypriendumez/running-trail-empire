@@ -65,11 +65,13 @@ export function AdminDashboard({ users }: { users: User[] }) {
     risk_flags?: string[];
   } | null>(null);
   const [planResult, setPlanResult] = useState<string>("");
+  const [rawActivities, setRawActivities] = useState<any[]>([]);
+  const [dataSource, setDataSource] = useState<string>("");
   const [coachingError, setCoachingError] = useState<string | null>(null);
 
   async function generatePlan() {
     if (!coachingUser) return;
-    setGenerating(true); setCoachingError(null); setGeminiResult(null); setPlanResult(""); setPlanSent(false);
+    setGenerating(true); setCoachingError(null); setGeminiResult(null); setPlanResult(""); setPlanSent(false); setRawActivities([]); setDataSource("");
     try {
       const res = await fetch("/api/admin/generate-plan", {
         method: "POST",
@@ -80,6 +82,8 @@ export function AdminDashboard({ users }: { users: User[] }) {
       if (!res.ok && res.status !== 206) throw new Error(data.error ?? "Erreur génération");
       setGeminiResult(data.gemini ?? null);
       setPlanResult(data.plan ?? "");
+      setRawActivities(data.raw_activities ?? []);
+      setDataSource(data.data_source ?? "");
       if (data.icu_connected) setCoachingError(null);
     } catch (err) {
       setCoachingError(String(err).replace("Error: ", ""));
@@ -365,6 +369,53 @@ export function AdminDashboard({ users }: { users: User[] }) {
               </div>
             )}
           </div>
+
+          {/* Raw sessions fetched */}
+          {rawActivities.length > 0 && (
+            <div className="bg-white border border-zinc-100 rounded-2xl p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 bg-emerald-50 rounded-lg flex items-center justify-center">
+                    <Activity className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <h3 className="font-semibold text-zinc-900 text-sm">{rawActivities.length} séances récupérées</h3>
+                </div>
+                <span className="text-xs text-zinc-400 bg-zinc-50 px-2 py-1 rounded-lg">{dataSource}</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-zinc-400 border-b border-zinc-100">
+                      <th className="text-left py-2 pr-4 font-medium">Date</th>
+                      <th className="text-left py-2 pr-4 font-medium">Nom</th>
+                      <th className="text-left py-2 pr-4 font-medium">Type</th>
+                      <th className="text-right py-2 pr-4 font-medium">Dist.</th>
+                      <th className="text-right py-2 pr-4 font-medium">Durée</th>
+                      <th className="text-right py-2 pr-4 font-medium">FC moy.</th>
+                      <th className="text-right py-2 pr-4 font-medium">Dénivelé</th>
+                      <th className="text-right py-2 pr-4 font-medium">TSS</th>
+                      <th className="text-right py-2 font-medium">Allure</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rawActivities.map((a: any, i: number) => (
+                      <tr key={i} className="border-b border-zinc-50 hover:bg-zinc-50">
+                        <td className="py-2 pr-4 text-zinc-500">{a.date}</td>
+                        <td className="py-2 pr-4 text-zinc-700 font-medium max-w-[140px] truncate">{a.name || "—"}</td>
+                        <td className="py-2 pr-4"><span className="bg-zinc-100 text-zinc-600 px-1.5 py-0.5 rounded">{a.type || "—"}</span></td>
+                        <td className="py-2 pr-4 text-right text-zinc-700">{a.distance_km ? `${a.distance_km}km` : "—"}</td>
+                        <td className="py-2 pr-4 text-right text-zinc-700">{a.duration_min ? `${a.duration_min}min` : "—"}</td>
+                        <td className="py-2 pr-4 text-right text-zinc-700">{a.avg_hr ? `${a.avg_hr}bpm` : "—"}</td>
+                        <td className="py-2 pr-4 text-right text-zinc-700">{a.elevation_m ? `${a.elevation_m}m` : "—"}</td>
+                        <td className="py-2 pr-4 text-right text-zinc-700">{a.tss ?? "—"}</td>
+                        <td className="py-2 text-right text-zinc-700">{a.avg_pace_min_km ? `${a.avg_pace_min_km}'/km` : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Analysis */}
           {geminiResult && (

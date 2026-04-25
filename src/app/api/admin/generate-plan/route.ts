@@ -5,7 +5,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 const ADMIN_EMAIL = "cypriendumez@outlook.fr";
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_URL = (model: string) =>
+// gemini-1.5-flash = free tier, gemini-2.0-flash = requires billing
+const GEMINI_URL = (model: string = "gemini-1.5-flash") =>
   `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
 const ICU_BASE = "https://intervals.icu/api/v1";
 
@@ -137,7 +138,7 @@ export async function POST(req: NextRequest) {
   };
 
   // Step 1 — Gemini Flash: analysis
-  const analysisRes = await fetch(GEMINI_URL("gemini-2.0-flash"), {
+  const analysisRes = await fetch(GEMINI_URL("gemini-1.5-flash"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -157,7 +158,7 @@ export async function POST(req: NextRequest) {
   try { analysis = JSON.parse(rawText); } catch { const m = rawText.match(/\{[\s\S]*\}/); if (m) try { analysis = JSON.parse(m[0]); } catch {} }
 
   // Step 2 — Gemini: coaching plan
-  const planRes = await fetch(GEMINI_URL("gemini-2.0-flash"), {
+  const planRes = await fetch(GEMINI_URL("gemini-1.5-flash"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -175,5 +176,7 @@ export async function POST(req: NextRequest) {
     sessions_analyzed: athleteData.sessions_count,
     data_source: athleteData.data_source,
     icu_connected: icuSource,
+    raw_activities: athleteData.activities,
+    raw_wellness: icuSource ? icuWellness.slice(0, 7) : [],
   });
 }
