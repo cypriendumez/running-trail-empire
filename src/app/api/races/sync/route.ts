@@ -262,8 +262,7 @@ function parseCalendarTable(html: string, isTrail: boolean): RaceEntry[] {
 
     // Parse city and dept from "(47 - Lot et Garonne)" pattern
     const cityDeptMatch = cityDeptRaw.match(/^([^(]+?)\s*\((\d{1,3}[AB]?)\s*[-–]\s*([^)]+)\)/);
-    const city = cityDeptMatch?.[1]?.trim() || cityDeptRaw.split("
-")[0].trim();
+    const city = cityDeptMatch?.[1]?.trim() || cityDeptRaw.split("\n")[0].trim();
     const deptNum = cityDeptMatch?.[2]?.replace(/^0/, "") || "";
     const deptName = cityDeptMatch?.[3]?.trim() || "";
     const region = DEPT_REGION[deptNum] || DEPT_REGION[deptNum.padStart(2, "0")] || "ile-de-france";
@@ -457,8 +456,8 @@ async function fetchWordPressAPI(maxPages = 5, startPage = 1): Promise<RaceEntry
 
         const contentText = $.text();
         const isTrail = contentText.toLowerCase().includes("trail");
-        if (contentText.match(/vélo|cyclisme|triathlon|nage/i)) continue;
-        if (!contentText.match(/km|run|courir|course|marathon|trail/i)) continue;
+        if (contentText.match(/\bvélo\b|\bcyclisme\b|\btriathlon\b|\bnage\b/i)) continue;
+        if (!contentText.match(/\bkm\b|\brun|\bcourir|\bcourse|\bmarathon|\btrail/i)) continue;
 
         const type = inferRaceType(contentText, isTrail);
 
@@ -572,7 +571,7 @@ export async function GET() {
 // ─── DELETE: remove past races ───────────────────────────────────────────────
 export async function DELETE() {
   const today = new Date().toISOString().slice(0, 10);
-  const { error, count } = await createAdminClient()
+  const { error, count } = await supabaseAdmin
     .from("races")
     .delete({ count: "exact" })
     .lt("date", today);
@@ -621,7 +620,7 @@ export async function POST(req: NextRequest) {
   let exPage = 0;
   const EX_PAGE = 1000;
   while (true) {
-    const { data: exData } = await createAdminClient()
+    const { data: exData } = await supabaseAdmin
       .from("races")
       .select("name,date")
       .range(exPage, exPage + EX_PAGE - 1);

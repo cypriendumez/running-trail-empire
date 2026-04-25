@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -98,9 +99,7 @@ Retourne UNIQUEMENT du JSON valide avec cette structure exacte:
       contents: [
         {
           role: "user",
-          parts: [{ text: "Tu es un coach running expert. Génère uniquement du JSON valide sans markdown, sans backticks.
-
-" + prompt }],
+          parts: [{ text: "Tu es un coach running expert. Génère uniquement du JSON valide sans markdown, sans backticks.\n\n" + prompt }],
         },
       ],
       generationConfig: {

@@ -12,7 +12,7 @@ export async function GET() {
   let from = 0;
 
   while (true) {
-    const { data, error } = await createAdminClient()
+    const { data, error } = await supabaseAdmin
       .from("races")
       .select("*")
       .gte("date", today)

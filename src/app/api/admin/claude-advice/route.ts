@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
  * a personalized, human-voiced coaching message ready to publish.
  */
 import { NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const ADMIN_SECRET = process.env.ADMIN_SECRET;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;

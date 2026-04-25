@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -53,9 +54,7 @@ Règles :
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [
-        { role: "user", parts: [{ text: systemPrompt + "
-
-Question du coureur : " + message }] },
+        { role: "user", parts: [{ text: systemPrompt + "\n\nQuestion du coureur : " + message }] },
       ],
       generationConfig: {
         temperature: 0.7,

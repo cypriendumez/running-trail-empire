@@ -29,7 +29,7 @@ async function nominatim(city: string, dept: string): Promise<{ lat: number; lon
 
 export async function POST() {
   // Fetch races without GPS
-  const { data: races, error } = await createAdminClient()
+  const { data: races, error } = await supabaseAdmin
     .from("races")
     .select("id,city,department")
     .or("latitude.is.null,longitude.is.null")
@@ -47,7 +47,7 @@ export async function POST() {
 
     const coords = await nominatim(race.city || "", race.department || "");
     if (coords) {
-      const { error: updErr } = await createAdminClient()
+      const { error: updErr } = await supabaseAdmin
         .from("races")
         .update({ latitude: coords.lat, longitude: coords.lon, updated_at: new Date().toISOString() })
         .eq("id", race.id);
@@ -58,7 +58,7 @@ export async function POST() {
     }
   }
 
-  const { count } = await createAdminClient()
+  const { count } = await supabaseAdmin
     .from("races")
     .select("*", { count: "exact", head: true })
     .not("latitude", "is", null);
