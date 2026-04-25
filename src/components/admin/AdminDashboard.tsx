@@ -49,7 +49,7 @@ export function AdminDashboard({ users }: { users: User[] }) {
 
   // Coaching AI state
   const [coachingUser, setCoachingUser] = useState<User | null>(null);
-  const [coachingDays, setCoachingDays] = useState(30);
+  const [coachingSessions, setCoachingSessions] = useState(10);
   const [generating, setGenerating] = useState(false);
   const [geminiResult, setGeminiResult] = useState<{
     summary?: string;
@@ -70,7 +70,7 @@ export function AdminDashboard({ users }: { users: User[] }) {
       const res = await fetch("/api/admin/generate-plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: coachingUser.id, days: coachingDays }),
+        body: JSON.stringify({ user_id: coachingUser.id, sessions: coachingSessions }),
       });
       const data = await res.json();
       if (!res.ok && res.status !== 206) throw new Error(data.error ?? "Erreur génération");
@@ -281,15 +281,15 @@ export function AdminDashboard({ users }: { users: User[] }) {
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-zinc-500 block mb-2">Période d&apos;analyse</label>
+                <label className="text-xs font-medium text-zinc-500 block mb-2">Séances à analyser</label>
                 <select
-                  value={coachingDays}
-                  onChange={e => setCoachingDays(Number(e.target.value))}
+                  value={coachingSessions}
+                  onChange={e => setCoachingSessions(Number(e.target.value))}
                   className="w-full border border-zinc-200 rounded-xl px-4 py-3 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white">
-                  <option value={7}>7 derniers jours</option>
-                  <option value={14}>14 derniers jours</option>
-                  <option value={30}>30 derniers jours</option>
-                  <option value={60}>60 derniers jours</option>
+                  <option value={5}>5 dernières séances</option>
+                  <option value={10}>10 dernières séances</option>
+                  <option value={20}>20 dernières séances</option>
+                  <option value={30}>30 dernières séances</option>
                 </select>
               </div>
             </div>

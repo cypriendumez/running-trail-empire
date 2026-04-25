@@ -4,28 +4,29 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const ADMIN_EMAIL = "cypriendumez@outlook.fr";
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_URL = (model: string) =>
+  `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
 
 export async function POST(req: NextRequest) {
-  // Auth guard
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user || user.email !== ADMIN_EMAIL) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { user_id, days = 30 } = await req.json().catch(() => ({}));
+  const { user_id, sessions = 10 } = await req.json().catch(() => ({}));
   if (!user_id) return NextResponse.json({ error: "user_id requis" }, { status: 400 });
+  if (!GEMINI_KEY) return NextResponse.json({ error: "GEMINI_API_KEY manquant dans Railway" }, { status: 503 });
 
   const admin = createAdminClient();
-  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
-  // Fetch all athlete data
+  // Fetch athlete data — last N sessions (no date filter)
   const [profileRes, workoutsRes, hrvRes, sleepRes, baselineRes] = await Promise.all([
     admin.from("profiles").select("*").eq("id", user_id).single(),
-    admin.from("workouts").select("*").eq("user_id", user_id).gte("date", since).order("date", { ascending: false }).limit(50),
-    admin.from("hrv_data").select("*").eq("user_id", user_id).gte("date", since).order("date", { ascending: false }).limit(30),
-    admin.from("sleep_data").select("*").eq("user_id", user_id).gte("date", since).order("date", { ascending: false }).limit(30),
+    admin.from("workouts").select("*").eq("user_id", user_id).order("date", { ascending: false }).limit(sessions),
+    admin.from("hrv_data").select("*").eq("user_id", user_id).order("date", { ascending: false }).limit(sessions * 2),
+    admin.from("sleep_data").select("*").eq("user_id", user_id).order("date", { ascending: false }).limit(sessions * 2),
     admin.from("performance_baselines").select("*").eq("user_id", user_id).order("tested_at", { ascending: false }).limit(1).single(),
   ]);
 
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
       max_hr: baseline?.max_hr,
       resting_hr: baseline?.resting_hr,
     },
-    period_days: days,
+    sessions_analyzed: workouts.length,
     workouts: workouts.map(w => ({
       date: w.date,
       type: w.type,
@@ -59,54 +60,41 @@ export async function POST(req: NextRequest) {
       cadence: w.avg_cadence_spm,
     })),
     hrv: hrv.map(h => ({ date: h.date, hrv_ms: h.hrv_ms, state: h.physiological_state })),
-    sleep: sleep.map(s => ({
-      date: s.date,
-      total_min: s.total_sleep_min,
-      score: s.sleep_score,
-      body_battery: s.body_battery_end,
-    })),
+    sleep: sleep.map(s => ({ date: s.date, total_min: s.total_sleep_min, score: s.sleep_score, body_battery: s.body_battery_end })),
   };
 
-  // Step 1: Gemini analysis
-  if (!GEMINI_API_KEY) return NextResponse.json({ error: "GEMINI_API_KEY manquant" }, { status: 503 });
-  const geminiRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: `Analyse les données d'entraînement de cet athlète et génère un rapport JSON structuré.\n\nDONNÉES:\n${JSON.stringify(athleteData)}\n\nRéponds en JSON:\n{\n  "summary": "Synthèse 2 phrases",\n  "weekly_km": number,\n  "training_load": "low|moderate|high|very_high",\n  "recovery_status": "recovered|adequate|fatigued|overreached",\n  "hrv_trend": "improving|stable|declining",\n  "strengths": ["force 1", "force 2"],\n  "areas_to_improve": ["point 1"],\n  "risk_flags": ["risque si applicable"],\n  "next_week_recommendation": "recommandation précise"\n}` }] }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 1500, responseMimeType: "application/json" },
-      }),
-    }
-  );
+  // Step 1 — Gemini Flash: structured analysis
+  const analysisRes = await fetch(GEMINI_URL("gemini-2.0-flash"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: `Analyse les ${workouts.length} dernières séances de cet athlète et génère un rapport JSON.\n\nDONNÉES:\n${JSON.stringify(athleteData)}\n\nRéponds UNIQUEMENT en JSON valide:\n{"summary":"Synthèse 2 phrases","training_load":"low|moderate|high|very_high","recovery_status":"recovered|adequate|fatigued|overreached","hrv_trend":"improving|stable|declining","strengths":["force 1"],"areas_to_improve":["point 1"],"risk_flags":[],"next_week_recommendation":"recommandation précise"}` }] }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 1000, responseMimeType: "application/json" },
+    }),
+  });
 
-  if (!geminiRes.ok) return NextResponse.json({ error: "Erreur Gemini" }, { status: 502 });
-  const geminiData = await geminiRes.json();
-  const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
+  if (!analysisRes.ok) {
+    const errText = await analysisRes.text();
+    return NextResponse.json({ error: `Gemini error ${analysisRes.status}: ${errText.slice(0, 200)}` }, { status: 502 });
+  }
+
+  const analysisData = await analysisRes.json();
+  const rawText = analysisData.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
   let analysis: Record<string, unknown> = {};
-  try { analysis = JSON.parse(rawText); } catch { const m = rawText.match(/\{[\s\S]*\}/); if (m) analysis = JSON.parse(m[0]); }
+  try { analysis = JSON.parse(rawText); } catch { const m = rawText.match(/\{[\s\S]*\}/); if (m) try { analysis = JSON.parse(m[0]); } catch {} }
 
-  // Step 2: Gemini Pro — coaching plan
-  const planRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: `Tu es un coach trail running expert. Rédige un plan de la semaine prochaine pour ${profile?.full_name || "l'athlète"} basé sur cette analyse.\n\nANALYSE:\n${JSON.stringify(analysis, null, 2)}\n\nDONNÉES ATHLÈTE:\n- VMA: ${baseline?.vma_kmh ?? "?"}km/h, FC max: ${baseline?.max_hr ?? "?"}bpm, Mode: ${profile?.mode}\n\nFormat:\n1. Bilan semaine passée (2-3 phrases, cite des chiffres réels)\n2. Plan jour par jour : type de séance, durée, intensité, allure cible\n3. Point clé à surveiller\n\nTon direct, humain, exigeant. 250-300 mots. PAS de mention IA.` }] }],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 1200 },
-      }),
-    }
-  );
+  // Step 2 — Gemini Pro: coaching plan week by week
+  const planRes = await fetch(GEMINI_URL("gemini-2.0-flash"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: `Tu es un coach trail running expert. Rédige le plan d'entraînement de la semaine prochaine pour ${profile?.full_name || "l'athlète"}.\n\nANALYSE DES ${workouts.length} DERNIÈRES SÉANCES:\n${JSON.stringify(analysis, null, 2)}\n\nPROFIL:\n- VMA: ${baseline?.vma_kmh ?? "?"}km/h | FC max: ${baseline?.max_hr ?? "?"}bpm | FC repos: ${baseline?.resting_hr ?? "?"}bpm | Mode: ${profile?.mode}\n\nSTRUCTURE OBLIGATOIRE:\n**Bilan** : 2-3 phrases sur les séances analysées (cite des chiffres)\n**Plan semaine** :\n- Lundi : [type] [durée] [intensité] [allure/FC cible]\n- Mardi : ...\n- (etc pour chaque jour)\n**Point clé** : 1 conseil technique prioritaire\n\nTon : coach direct et exigeant. 280 mots max. Zéro mention IA.` }] }],
+      generationConfig: { temperature: 0.6, maxOutputTokens: 1200 },
+    }),
+  });
 
   const planData = await planRes.json();
   const plan = planData.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
-  return NextResponse.json({
-    gemini: analysis,
-    plan,
-    workouts_analyzed: workouts.length,
-    period_days: days,
-  });
+  return NextResponse.json({ gemini: analysis, plan, sessions_analyzed: workouts.length });
 }
