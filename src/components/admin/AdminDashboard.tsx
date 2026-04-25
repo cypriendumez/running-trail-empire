@@ -51,7 +51,15 @@ export function AdminDashboard({ users }: { users: User[] }) {
   const [coachingUser, setCoachingUser] = useState<User | null>(null);
   const [coachingDays, setCoachingDays] = useState(30);
   const [generating, setGenerating] = useState(false);
-  const [geminiResult, setGeminiResult] = useState<Record<string, unknown> | null>(null);
+  const [geminiResult, setGeminiResult] = useState<{
+    summary?: string;
+    training_load?: string;
+    recovery_status?: string;
+    hrv_trend?: string;
+    strengths?: string[];
+    areas_to_improve?: string[];
+    risk_flags?: string[];
+  } | null>(null);
   const [planResult, setPlanResult] = useState<string>("");
   const [coachingError, setCoachingError] = useState<string | null>(null);
 
