@@ -1,16 +1,11 @@
 export const dynamic = "force-dynamic";
-import { createClient as createSupabaseAdmin } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { RacesHub } from "@/components/races/RacesHub";
 
 export const metadata = { title: "Courses France" };
 
-// Service role bypasses PostgREST 1000-row cap for public race data
-const supabaseAdmin = createSupabaseAdmin(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 export default async function RacesPage() {
+  const supabaseAdmin = createAdminClient();
   const today = new Date().toISOString().slice(0, 10);
   const allRaces: any[] = [];
   const PAGE = 1000;
