@@ -1,0 +1,74 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "races": "Races",
+    "trail": "Trail Builder",
+    "health": "Health",
+    "shop": "Shop",
+    "profile": "Profile",
+    "coaching": "AI Coaching"
+  },
+  "dashboard": {
+    "welcome": "Hello, {name}",
+    "state_recovery": "Recovery Mode",
+    "state_optimal": "Peak Form",
+    "state_competition": "Race Day",
+    "discipline_score": "Discipline Score",
+    "weekly_volume": "Weekly Volume",
+    "next_session": "Next Session",
+    "hrv_today": "HRV Today",
+    "fitness": "Fitness (CTL)",
+    "fatigue": "Fatigue (ATL)",
+    "form": "Form (TSB)",
+    "toggle_elite": "Elite Mode",
+    "toggle_ludique": "Fun Mode"
+  },
+  "races": {
+    "search_placeholder": "Search a race...",
+    "filter_region": "Region",
+    "filter_distance": "Distance",
+    "filter_elevation": "Elevation",
+    "filter_type": "Type",
+    "train_for_race": "Train for this race",
+    "register": "Register",
+    "difficulty": "Difficulty",
+    "time_limits": "Time limits",
+    "historical_weather": "Historical weather"
+  },
+  "health": {
+    "report_pain": "Report pain",
+    "guardian_active": "Guardian Mode Active",
+    "nutrition_lab": "Nutrition Lab",
+    "carbs_per_hour": "Carbs/h",
+    "hydration_per_hour": "Hydration/h"
+  },
+  "gamification": {
+    "discipline_score": "Discipline Score",
+    "league": "League",
+    "badges": "Badges",
+    "team_challenge": "Team Challenge",
+    "xp_points": "XP Points",
+    "rank": "Rank"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "success": "Success!",
+    "km": "km",
+    "m": "m",
+    "min_km": "min/km",
+    "bpm": "bpm",
+    "watts": "W"
+  },
+  "onboarding": {
+    "title": "Welcome to the Empire",
+    "subtitle": "Let's calibrate your profile for personalized training",
+    "step_profile": "Profile",
+    "step_baseline": "Baseline Test",
+    "step_goals": "Goals",
+    "start_vma_test": "Start 6-min VMA test",
+    "start_hill_test": "Start hill test"
+  }
+}

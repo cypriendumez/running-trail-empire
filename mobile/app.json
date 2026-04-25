@@ -1,0 +1,85 @@
+{
+  "expo": {
+    "name": "Running & Trail Empire",
+    "slug": "running-trail-empire",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "runningtrailempire",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FAFAFA"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.runningtrailempire.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Running & Trail Empire utilise votre position pour le Trail Builder et le Guardian Mode.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Running & Trail Empire utilise votre position en arrière-plan pour le Guardian Mode de sécurité.",
+        "NSMotionUsageDescription": "Détection de chute pour le Guardian Mode.",
+        "NSCameraUsageDescription": "Analyse de foulée pour le Posture Lab.",
+        "NSMicrophoneUsageDescription": "Smart Journaling vocal post-course.",
+        "NSHealthShareUsageDescription": "Import de vos données santé Apple Health.",
+        "NSHealthUpdateUsageDescription": "Synchronisation des entraînements vers Apple Health."
+      },
+      "entitlements": {
+        "com.apple.developer.healthkit": true
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FAFAFA"
+      },
+      "package": "com.runningtrailempire.app",
+      "versionCode": 1,
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "BODY_SENSORS",
+        "ACTIVITY_RECOGNITION",
+        "CAMERA",
+        "RECORD_AUDIO",
+        "VIBRATE",
+        "POST_NOTIFICATIONS"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-location",
+      "expo-sensors",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#22c55e"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Analyse de foulée Posture Lab"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": { "deploymentTarget": "16.0" },
+          "android": { "compileSdkVersion": 35, "targetSdkVersion": 35 }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

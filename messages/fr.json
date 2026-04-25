@@ -1,0 +1,74 @@
+{
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "races": "Courses",
+    "trail": "Trail Builder",
+    "health": "Santé",
+    "shop": "Boutique",
+    "profile": "Profil",
+    "coaching": "Coaching IA"
+  },
+  "dashboard": {
+    "welcome": "Bonjour, {name}",
+    "state_recovery": "Mode Récupération",
+    "state_optimal": "Forme Optimale",
+    "state_competition": "Jour de Course",
+    "discipline_score": "Score Discipline",
+    "weekly_volume": "Volume Hebdo",
+    "next_session": "Prochaine Séance",
+    "hrv_today": "VFC Aujourd'hui",
+    "fitness": "Forme (CTL)",
+    "fatigue": "Fatigue (ATL)",
+    "form": "Forme (TSB)",
+    "toggle_elite": "Mode Élite",
+    "toggle_ludique": "Mode Ludique"
+  },
+  "races": {
+    "search_placeholder": "Rechercher une course...",
+    "filter_region": "Région",
+    "filter_distance": "Distance",
+    "filter_elevation": "Dénivelé",
+    "filter_type": "Type",
+    "train_for_race": "M'entraîner pour cette course",
+    "register": "S'inscrire",
+    "difficulty": "Technicité",
+    "time_limits": "Barrières horaires",
+    "historical_weather": "Météo historique"
+  },
+  "health": {
+    "report_pain": "Signaler une douleur",
+    "guardian_active": "Guardian Mode Actif",
+    "nutrition_lab": "Nutrition Lab",
+    "carbs_per_hour": "Glucides/h",
+    "hydration_per_hour": "Hydratation/h"
+  },
+  "gamification": {
+    "discipline_score": "Score Discipline",
+    "league": "Ligue",
+    "badges": "Badges",
+    "team_challenge": "Défi Équipage",
+    "xp_points": "Points XP",
+    "rank": "Classement"
+  },
+  "common": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "loading": "Chargement...",
+    "error": "Une erreur est survenue",
+    "success": "Succès !",
+    "km": "km",
+    "m": "m",
+    "min_km": "min/km",
+    "bpm": "bpm",
+    "watts": "W"
+  },
+  "onboarding": {
+    "title": "Bienvenue dans l'Empire",
+    "subtitle": "Calibrons votre profil pour des entraînements sur mesure",
+    "step_profile": "Profil",
+    "step_baseline": "Test de référence",
+    "step_goals": "Objectifs",
+    "start_vma_test": "Démarrer le test VMA 6 min",
+    "start_hill_test": "Démarrer le test de côte"
+  }
+}

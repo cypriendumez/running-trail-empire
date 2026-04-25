@@ -1,0 +1,150 @@
+@import "leaflet/dist/leaflet.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-inter: "Inter", system-ui, sans-serif;
+    --radius: 0.75rem;
+
+    /* Organic state colors */
+    --state-recovery: #E0F2FE;
+    --state-optimal: #D1FAE5;
+    --state-competition: #FFEDD5;
+
+    /* Surfaces */
+    --bg-primary: #FAFAFA;
+    --bg-secondary: #F4F4F5;
+    --bg-card: #FFFFFF;
+    --border: #E4E4E7;
+    --text-primary: #09090B;
+    --text-secondary: #71717A;
+    --text-muted: #A1A1AA;
+
+    /* Brand */
+    --brand-500: #22c55e;
+    --brand-600: #16a34a;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    @apply bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  * { @apply border-zinc-200; }
+
+  ::selection { @apply bg-green-200 text-green-900; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { @apply bg-transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-zinc-300 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-zinc-400; }
+}
+
+@layer components {
+  /* Organic state backgrounds */
+  .state-recovery  { background-color: var(--state-recovery); }
+  .state-optimal   { background-color: var(--state-optimal); }
+  .state-competition { background-color: var(--state-competition); }
+
+  /* Bento card */
+  .bento-card {
+    @apply bg-white rounded-3xl border border-zinc-100 shadow-card p-6
+           transition-all duration-300 hover:shadow-soft;
+  }
+
+  .bento-card-dark {
+    @apply bg-zinc-900 rounded-3xl border border-zinc-800 p-6
+           transition-all duration-300;
+  }
+
+  /* Metric display */
+  .metric-value {
+    @apply text-4xl font-bold tabular-nums tracking-tight;
+  }
+
+  .metric-label {
+    @apply text-xs uppercase tracking-widest text-zinc-500 font-medium;
+  }
+
+  /* Zone pills */
+  .zone-z1 { @apply bg-blue-100 text-blue-700; }
+  .zone-z2 { @apply bg-green-100 text-green-700; }
+  .zone-z3 { @apply bg-yellow-100 text-yellow-700; }
+  .zone-z4 { @apply bg-orange-100 text-orange-700; }
+  .zone-z5 { @apply bg-red-100 text-red-700; }
+  .zone-z6 { @apply bg-purple-100 text-purple-700; }
+
+  /* Difficulty badges */
+  .diff-green  { @apply bg-green-100 text-green-800 border border-green-200; }
+  .diff-blue   { @apply bg-blue-100 text-blue-800 border border-blue-200; }
+  .diff-red    { @apply bg-red-100 text-red-800 border border-red-200; }
+  .diff-black  { @apply bg-zinc-900 text-white border border-zinc-700; }
+
+  /* League tiers */
+  .league-bronze   { @apply text-amber-700 bg-amber-50 border border-amber-200; }
+  .league-silver   { @apply text-zinc-500 bg-zinc-50 border border-zinc-200; }
+  .league-gold     { @apply text-yellow-600 bg-yellow-50 border border-yellow-200; }
+  .league-platinum { @apply text-cyan-600 bg-cyan-50 border border-cyan-200; }
+  .league-diamond  { @apply text-violet-600 bg-violet-50 border border-violet-200; }
+
+  /* Gradient text */
+  .gradient-text {
+    @apply bg-gradient-to-r from-green-600 to-emerald-500 bg-clip-text text-transparent;
+  }
+
+  /* Glass effect */
+  .glass {
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    background-color: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  /* Button variants */
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-5 py-2.5 rounded-xl
+           bg-zinc-900 text-white text-sm font-medium
+           hover:bg-zinc-800 active:scale-95 transition-all duration-150
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center gap-2 px-5 py-2.5 rounded-xl
+           bg-white text-zinc-900 text-sm font-medium border border-zinc-200
+           hover:bg-zinc-50 active:scale-95 transition-all duration-150;
+  }
+
+  .btn-brand {
+    @apply inline-flex items-center gap-2 px-5 py-2.5 rounded-xl
+           bg-green-600 text-white text-sm font-semibold
+           hover:bg-green-700 active:scale-95 transition-all duration-150
+           shadow-glow;
+  }
+}
+
+/* Mapbox overrides */
+.mapboxgl-ctrl-logo { display: none !important; }
+.mapboxgl-map { border-radius: 1.5rem; }
+
+/* React Grid Layout */
+.react-grid-item.react-grid-placeholder {
+  @apply bg-green-100 rounded-3xl opacity-50;
+}
+
+/* Chart tooltips */
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  @apply bg-white border border-zinc-100 rounded-2xl shadow-soft text-sm;
+}
+
+/* Number animations */
+@keyframes countUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+.count-up { animation: countUp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
