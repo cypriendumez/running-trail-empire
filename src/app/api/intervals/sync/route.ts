@@ -47,7 +47,12 @@ export async function GET(req: Request) {
   ]);
 
   if (!activitiesRes.ok) {
-    return NextResponse.json({ error: "Intervals.icu fetch failed" }, { status: 502 });
+    const body = await activitiesRes.text().catch(() => "");
+    return NextResponse.json({
+      error: `Intervals.icu fetch failed (HTTP ${activitiesRes.status})`,
+      detail: body.slice(0, 300),
+      athleteId: ATHLETE_ID,
+    }, { status: 502 });
   }
 
   const activities: IntervalsActivity[] = await activitiesRes.json();
