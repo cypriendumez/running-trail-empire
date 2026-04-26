@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, ArrowLeft, User, Activity, Target, CheckCircle2, Watch, Eye, EyeOff, ExternalLink, RefreshCw, AlertCircle } from "lucide-react";
+import { ArrowRight, ArrowLeft, User, Activity, Target, CheckCircle2, Watch, Eye, EyeOff, ExternalLink, RefreshCw, AlertCircle, Wifi } from "lucide-react";
 
 type Step = "profile" | "physio" | "goals" | "watch" | "done";
 
@@ -30,12 +30,47 @@ export default function OnboardingPage() {
   const [goals, setGoals] = useState({ target_race: "", target_weekly_km: "50" });
 
   // Watch step state
+  const [watchSubStep, setWatchSubStep] = useState(0); // 0=compte 1=montre 2=clé 3=connecter
   const [watchAthleteId, setWatchAthleteId] = useState("");
   const [watchApiKey, setWatchApiKey] = useState("");
   const [showWatchKey, setShowWatchKey] = useState(false);
   const [savingWatch, setSavingWatch] = useState(false);
   const [watchSaved, setWatchSaved] = useState(false);
   const [watchError, setWatchError] = useState<string | null>(null);
+  const [pollingActive, setPollingActive] = useState(false);
+  const [pollingStatus, setPollingStatus] = useState<"checking" | "ok" | "timeout">("checking");
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Auto-poll Intervals.icu after credentials saved
+  useEffect(() => {
+    if (!pollingActive) return;
+    let attempts = 0;
+    const MAX = 12; // 12 × 5s = 60s timeout
+    pollingRef.current = setInterval(async () => {
+      attempts++;
+      try {
+        const r = await fetch("/api/intervals/status");
+        const d = await r.json();
+        if (d.configured) {
+          // Try a quick sync to confirm activities exist
+          const sr = await fetch("/api/intervals/sync?days=7");
+          const sd = await sr.json();
+          if (sd?.fetched?.activities > 0 || sd?.synced?.workouts >= 0) {
+            setPollingStatus("ok");
+            clearInterval(pollingRef.current!);
+            setPollingActive(false);
+            return;
+          }
+        }
+      } catch {}
+      if (attempts >= MAX) {
+        setPollingStatus("timeout");
+        clearInterval(pollingRef.current!);
+        setPollingActive(false);
+      }
+    }, 5000);
+    return () => clearInterval(pollingRef.current!);
+  }, [pollingActive]);
 
   const stepIdx = STEPS.indexOf(step);
 
@@ -59,6 +94,8 @@ export default function OnboardingPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Erreur de sauvegarde");
       setWatchSaved(true);
+      setPollingActive(true);
+      setPollingStatus("checking");
     } catch (err) {
       setWatchError(String(err).replace("Error: ", ""));
     } finally {
@@ -313,113 +350,215 @@ export default function OnboardingPage() {
 
             {step === "watch" && (
               <div className="bento-card space-y-5">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-9 h-9 bg-zinc-100 rounded-xl flex items-center justify-center">
-                    <Watch className="w-4 h-4 text-zinc-700" />
-                  </div>
+
+                {/* Header */}
+                <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="font-semibold text-zinc-900">Connecter votre montre</h2>
-                    <p className="text-xs text-red-400 mt-0.5 font-medium">Obligatoire pour accéder au Dashboard</p>
+                    <h2 className="font-semibold text-zinc-900">🔗 Connecter votre montre</h2>
+                    <p className="text-xs text-red-400 mt-0.5 font-medium">Obligatoire · ~2 minutes</p>
                   </div>
+                  <div className="text-xs text-zinc-400 font-medium">{watchSubStep + 1}/4</div>
                 </div>
 
-                {/* Mini visual tutorial */}
-                <div className="space-y-3">
-                  {[
-                    {
-                      n: "1",
-                      icon: "🌐",
-                      title: "Créer un compte Intervals.icu",
-                      desc: "Gratuit. Intervals.icu fait le pont entre votre montre (Garmin, COROS, Polar…) et cette application.",
-                      href: "https://intervals.icu",
-                    },
-                    {
-                      n: "2",
-                      icon: "⌚",
-                      title: "Connecter votre montre",
-                      desc: "Avatar → Connexions → choisissez Garmin / COROS / Polar et autorisez. Les activités s'importent automatiquement.",
-                      href: "https://intervals.icu/settings#connections",
-                    },
-                    {
-                      n: "3",
-                      icon: "🔑",
-                      title: "Obtenir votre clé API",
-                      desc: "Avatar → Paramètres → Accès développeur. Copiez l'Athlete ID et créez une clé API.",
-                      href: "https://intervals.icu/settings#developer",
-                    },
-                  ].map(s => (
-                    <div key={s.n} className="flex items-start gap-3 p-3.5 rounded-xl bg-zinc-50 border border-zinc-100">
-                      <div className="text-xl leading-none mt-0.5">{s.icon}</div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-zinc-800">{s.title}</p>
-                        <p className="text-xs text-zinc-500 mt-0.5 leading-relaxed">{s.desc}</p>
-                        <a href={s.href} target="_blank" rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline mt-1 font-medium">
-                          Ouvrir <ExternalLink className="w-3 h-3" />
-                        </a>
-                      </div>
+                {/* Sub-step progress dots */}
+                <div className="flex gap-1.5">
+                  {["Compte", "Montre", "Clé API", "Connexion"].map((label, i) => (
+                    <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                      <div className={`h-1.5 w-full rounded-full transition-all ${
+                        i < watchSubStep ? "bg-green-400" : i === watchSubStep ? "bg-zinc-900" : "bg-zinc-100"
+                      }`} />
+                      <span className={`text-[10px] font-medium ${i === watchSubStep ? "text-zinc-900" : i < watchSubStep ? "text-green-600" : "text-zinc-300"}`}>
+                        {i < watchSubStep ? "✓" : label}
+                      </span>
                     </div>
                   ))}
                 </div>
 
-                {/* Credentials form */}
-                {!watchSaved ? (
-                  <form onSubmit={handleSaveWatch} className="space-y-3 pt-1 border-t border-zinc-100">
-                    <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">Vos identifiants</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs font-medium text-zinc-500 block mb-1.5">Athlete ID</label>
-                        <input
-                          type="text"
-                          value={watchAthleteId}
-                          onChange={e => setWatchAthleteId(e.target.value)}
-                          placeholder="i000000"
-                          className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-zinc-500 block mb-1.5">Clé API</label>
-                        <div className="relative">
-                          <input
-                            type={showWatchKey ? "text" : "password"}
-                            value={watchApiKey}
-                            onChange={e => setWatchApiKey(e.target.value)}
-                            placeholder="votre_cle_api"
-                            className="w-full px-3 py-2.5 pr-9 rounded-xl border border-zinc-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500"
-                          />
-                          <button type="button" onClick={() => setShowWatchKey(v => !v)}
-                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600">
-                            {showWatchKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                <AnimatePresence mode="wait">
+                  <motion.div key={watchSubStep} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.2 }}>
 
-                    {watchError && (
-                      <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
-                        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />{watchError}
+                    {/* STEP 0 — Compte Intervals.icu */}
+                    {watchSubStep === 0 && (
+                      <div className="space-y-4 py-2 text-center">
+                        <div className="text-5xl">🌐</div>
+                        <div>
+                          <p className="font-semibold text-zinc-900 text-base">Créez un compte Intervals.icu</p>
+                          <p className="text-xs text-zinc-500 mt-1.5 leading-relaxed">
+                            Gratuit. C&apos;est le pont entre votre montre<br />(Garmin, COROS, Polar, Suunto…) et cette app.
+                          </p>
+                        </div>
+                        <a href="https://intervals.icu" target="_blank" rel="noopener noreferrer"
+                          className="btn-brand justify-center w-full">
+                          Créer mon compte gratuit <ExternalLink className="w-4 h-4" />
+                        </a>
+                        <button onClick={() => setWatchSubStep(1)}
+                          className="w-full text-xs text-zinc-400 hover:text-zinc-700 underline underline-offset-2 transition-colors">
+                          J&apos;ai déjà un compte →
+                        </button>
                       </div>
                     )}
 
-                    <button type="submit"
-                      disabled={savingWatch || !watchAthleteId || !watchApiKey}
-                      className="btn-brand w-full justify-center text-sm disabled:opacity-40">
-                      {savingWatch ? <RefreshCw className="w-4 h-4 animate-spin" /> : null}
-                      {savingWatch ? "Vérification…" : "Connecter & continuer"}
-                    </button>
-                  </form>
-                ) : (
-                  <div className="space-y-3 pt-1 border-t border-zinc-100">
-                    <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
-                      <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-                      <span>Montre connectée ! Vous pourrez synchroniser depuis le Dashboard.</span>
-                    </div>
-                    <button onClick={handleFinish} disabled={loading} className="btn-brand w-full justify-center">
-                      {loading ? "Sauvegarde..." : <>Terminer <ArrowRight className="w-4 h-4" /></>}
-                    </button>
-                  </div>
-                )}
+                    {/* STEP 1 — Connecter la montre */}
+                    {watchSubStep === 1 && (
+                      <div className="space-y-4 py-2">
+                        <div className="text-center">
+                          <div className="text-5xl mb-3">⌚</div>
+                          <p className="font-semibold text-zinc-900 text-base">Connectez votre montre</p>
+                          <p className="text-xs text-zinc-500 mt-1">Sur Intervals.icu → Avatar → Connexions</p>
+                        </div>
+                        {/* Brands */}
+                        <div className="flex justify-center gap-2 flex-wrap">
+                          {["Garmin", "COROS", "Polar", "Suunto", "Wahoo"].map(b => (
+                            <span key={b} className="px-2.5 py-1 bg-zinc-100 rounded-lg text-xs font-medium text-zinc-600">{b}</span>
+                          ))}
+                        </div>
+                        {/* Permissions reminder */}
+                        <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 space-y-1.5">
+                          <p className="text-xs font-semibold text-amber-700">⚠️ Sur Garmin Connect, activez :</p>
+                          {["Activities", "Daily Health Stats", "Historical Data"].map(p => (
+                            <div key={p} className="flex items-center gap-2 text-xs text-amber-700">
+                              <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />{p}
+                            </div>
+                          ))}
+                          <a href="https://connect.garmin.com/modern/settings/application-list" target="_blank" rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-amber-700 font-semibold hover:underline mt-1">
+                            Ouvrir Garmin Connect <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                        <a href="https://intervals.icu/settings/connections" target="_blank" rel="noopener noreferrer"
+                          className="btn-brand justify-center w-full">
+                          Ouvrir les Connexions Intervals.icu <ExternalLink className="w-4 h-4" />
+                        </a>
+                        <div className="flex gap-3">
+                          <button onClick={() => setWatchSubStep(0)} className="flex-1 text-xs text-zinc-400 hover:text-zinc-600 py-2">← Retour</button>
+                          <button onClick={() => setWatchSubStep(2)} className="flex-1 btn-brand justify-center text-sm py-2">C&apos;est fait →</button>
+                        </div>
+                      </div>
+                    )}
 
+                    {/* STEP 2 — Clé API */}
+                    {watchSubStep === 2 && (
+                      <div className="space-y-4 py-2 text-center">
+                        <div className="text-5xl">🔑</div>
+                        <div>
+                          <p className="font-semibold text-zinc-900 text-base">Copiez votre clé API</p>
+                          <p className="text-xs text-zinc-500 mt-1">Sur Intervals.icu → Avatar → Paramètres → Accès développeur</p>
+                        </div>
+                        <div className="bg-zinc-50 border border-zinc-100 rounded-xl p-3 text-left space-y-2.5">
+                          <div className="flex items-start gap-2.5 text-xs text-zinc-600">
+                            <span className="w-5 h-5 bg-zinc-200 rounded-full flex items-center justify-center font-bold flex-shrink-0 mt-0.5">1</span>
+                            <span>Notez l&apos;<strong>Athlete ID</strong> (format&nbsp;<code className="bg-zinc-200 px-1 rounded">i564686</code>)</span>
+                          </div>
+                          <div className="flex items-start gap-2.5 text-xs text-zinc-600">
+                            <span className="w-5 h-5 bg-zinc-200 rounded-full flex items-center justify-center font-bold flex-shrink-0 mt-0.5">2</span>
+                            <span>Cliquez <strong>Afficher</strong> ou <strong>Produire</strong> pour obtenir la clé API</span>
+                          </div>
+                        </div>
+                        <a href="https://intervals.icu/settings#developer" target="_blank" rel="noopener noreferrer"
+                          className="btn-brand justify-center w-full">
+                          Ouvrir les paramètres développeur <ExternalLink className="w-4 h-4" />
+                        </a>
+                        <div className="flex gap-3">
+                          <button onClick={() => setWatchSubStep(1)} className="flex-1 text-xs text-zinc-400 hover:text-zinc-600 py-2">← Retour</button>
+                          <button onClick={() => setWatchSubStep(3)} className="flex-1 btn-brand justify-center text-sm py-2">J&apos;ai la clé →</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* STEP 3 — Connexion finale */}
+                    {watchSubStep === 3 && (
+                      <div className="space-y-4 py-1">
+                        {!watchSaved ? (
+                          <form onSubmit={handleSaveWatch} className="space-y-4">
+                            <div className="text-center">
+                              <div className="text-4xl mb-2">🎯</div>
+                              <p className="font-semibold text-zinc-900">Entrez vos identifiants</p>
+                              <p className="text-xs text-zinc-500 mt-0.5">Copiez-collez depuis intervals.icu</p>
+                            </div>
+                            <div className="space-y-3">
+                              <div>
+                                <label className="text-xs font-medium text-zinc-500 block mb-1.5">Athlete ID</label>
+                                <input type="text" value={watchAthleteId} onChange={e => setWatchAthleteId(e.target.value)}
+                                  placeholder="i564686"
+                                  className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500" />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-zinc-500 block mb-1.5">Clé API</label>
+                                <div className="relative">
+                                  <input type={showWatchKey ? "text" : "password"} value={watchApiKey} onChange={e => setWatchApiKey(e.target.value)}
+                                    placeholder="votre_cle_api"
+                                    className="w-full px-3 py-2.5 pr-9 rounded-xl border border-zinc-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500" />
+                                  <button type="button" onClick={() => setShowWatchKey(v => !v)}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600">
+                                    {showWatchKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                            {watchError && (
+                              <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
+                                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />{watchError}
+                              </div>
+                            )}
+                            <button type="submit" disabled={savingWatch || !watchAthleteId || !watchApiKey}
+                              className="btn-brand w-full justify-center disabled:opacity-40">
+                              {savingWatch ? <><RefreshCw className="w-4 h-4 animate-spin mr-2" />Vérification…</> : "Connecter & terminer 🚀"}
+                            </button>
+                            <button type="button" onClick={() => setWatchSubStep(2)}
+                              className="w-full text-xs text-zinc-400 hover:text-zinc-600 text-center py-1">← Retour</button>
+                          </form>
+                        ) : (
+                          /* Post-save: polling status */
+                          <div className="text-center space-y-4 py-4">
+                            {pollingStatus === "checking" && (
+                              <>
+                                <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto">
+                                  <Wifi className="w-7 h-7 text-blue-500 animate-pulse" />
+                                </div>
+                                <div>
+                                  <p className="font-semibold text-zinc-900">Connexion établie !</p>
+                                  <p className="text-xs text-zinc-500 mt-1">Vérification de vos activités en cours…</p>
+                                </div>
+                                <div className="flex justify-center gap-1.5">
+                                  {[0,1,2].map(i => (
+                                    <div key={i} className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+                                  ))}
+                                </div>
+                              </>
+                            )}
+                            {pollingStatus === "ok" && (
+                              <>
+                                <div className="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center mx-auto">
+                                  <CheckCircle2 className="w-7 h-7 text-green-600" />
+                                </div>
+                                <div>
+                                  <p className="font-semibold text-zinc-900">Activités détectées ✅</p>
+                                  <p className="text-xs text-zinc-500 mt-1">Tout est prêt. Votre dashboard sera rempli.</p>
+                                </div>
+                              </>
+                            )}
+                            {pollingStatus === "timeout" && (
+                              <>
+                                <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto">
+                                  <RefreshCw className="w-7 h-7 text-amber-500" />
+                                </div>
+                                <div>
+                                  <p className="font-semibold text-zinc-900">Sync en arrière-plan</p>
+                                  <p className="text-xs text-zinc-500 mt-1">La connexion est enregistrée. Vos activités apparaîtront dans quelques minutes.</p>
+                                </div>
+                              </>
+                            )}
+                            <button onClick={handleFinish} disabled={loading}
+                              className="btn-brand w-full justify-center">
+                              {loading ? "Sauvegarde..." : <>Accéder au Dashboard <ArrowRight className="w-4 h-4" /></>}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                  </motion.div>
+                </AnimatePresence>
               </div>
             )}
 
