@@ -107,7 +107,7 @@ export async function GET(req: Request) {
         tss: act.icu_tss ?? null,
         training_effect: act.aerobic_te ?? null,
         vertical_oscillation_cm: act.avg_vertical_oscillation ?? null,
-        ground_contact_time_ms: act.avg_ground_contact_time ?? null,
+        ground_contact_ms: act.avg_ground_contact_time ?? null,
         stride_length_m: act.avg_stride_length ? act.avg_stride_length / 100 : null,
         cardiac_decoupling: act.decoupling ?? null,
         source: "garmin",
