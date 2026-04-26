@@ -37,13 +37,16 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Intervals.icu non configuré — ajoutez vos identifiants dans l'onglet Configuration" }, { status: 503 });
   }
 
-  const [activitiesRes, wellnessRes] = await Promise.all([
+  // ── Fetch ICU data + existing DB workouts in parallel ──────
+  const [activitiesRes, wellnessRes, existingWorkoutsResult] = await Promise.all([
     fetch(`${BASE}/athlete/${ATHLETE_ID}/activities?oldest=${oldest}&newest=${newest}`, {
       headers: authHeader(API_KEY),
     }),
     fetch(`${BASE}/athlete/${ATHLETE_ID}/wellness?oldest=${oldest}&newest=${newest}`, {
       headers: authHeader(API_KEY),
     }),
+    supabase.from("workouts").select("id, date, title")
+      .eq("user_id", user.id).gte("date", oldest).lte("date", newest),
   ]);
 
   if (!activitiesRes.ok) {
@@ -56,46 +59,31 @@ export async function GET(req: Request) {
   }
 
   const activities: IntervalsActivity[] = await activitiesRes.json();
-  // Wellness is optional — some athletes don't have it configured on Intervals.icu
   const wellness: IntervalsWellness[] = wellnessRes.ok ? await wellnessRes.json() : [];
 
   let synced = { workouts: 0, hrv: 0, sleep: 0 };
   const syncErrors: string[] = [];
 
-  // ── Sync activities → workouts (batch approach to avoid timeout) ──
+  // ── Sync activities → workouts ──────────────────────────────
   const validActivities = activities.filter(a => a.type && a.start_date_local);
 
   if (validActivities.length > 0) {
-    // 1. Fetch all existing workouts for this user in the date range (1 query)
-    const { data: existingWorkouts } = await supabase
-      .from("workouts")
-      .select("id, date, title")
-      .eq("user_id", user.id)
-      .gte("date", oldest)
-      .lte("date", newest);
-
     const existingMap = new Map<string, string>();
-    for (const w of existingWorkouts ?? []) {
+    for (const w of existingWorkoutsResult.data ?? []) {
       existingMap.set(`${w.date}__${w.title}`, w.id);
     }
 
-    // 2. Build payloads
     const toInsert: Record<string, unknown>[] = [];
     const toUpdate: { id: string; payload: Record<string, unknown> }[] = [];
+    const ri = (v: number | null | undefined) => v != null ? Math.round(v) : null;
 
     for (const act of validActivities) {
       const workoutType = mapActivityType(act.type!);
       const date = act.start_date_local!.split("T")[0];
       const title = act.name ?? workoutType;
-      const key = `${date}__${title}`;
-
-      const ri = (v: number | null | undefined) => v != null ? Math.round(v) : null;
 
       const payload: Record<string, unknown> = {
-        user_id: user.id,
-        title,
-        type: workoutType,
-        date,
+        user_id: user.id, title, type: workoutType, date,
         duration_seconds: Math.max(1, Math.round(act.moving_time ?? act.elapsed_time ?? 1)),
         distance_km: act.distance ? act.distance / 1000 : null,
         elevation_gain_m: ri(act.total_elevation_gain),
@@ -115,22 +103,18 @@ export async function GET(req: Request) {
         source: "garmin",
       };
 
-      const existingId = existingMap.get(key);
-      if (existingId) {
-        toUpdate.push({ id: existingId, payload });
-      } else {
-        toInsert.push(payload);
-      }
+      const existingId = existingMap.get(`${date}__${title}`);
+      if (existingId) toUpdate.push({ id: existingId, payload });
+      else toInsert.push(payload);
     }
 
-    // 3. Batch insert new activities
+    // Batch insert
     if (toInsert.length > 0) {
       const { error } = await supabase.from("workouts").insert(toInsert);
       if (!error) {
         synced.workouts += toInsert.length;
       } else {
         syncErrors.push(`Insert batch: ${error.message}`);
-        // Fallback: insert one by one to save what we can
         for (const p of toInsert) {
           const { error: e2 } = await supabase.from("workouts").insert(p);
           if (!e2) synced.workouts++;
@@ -139,71 +123,54 @@ export async function GET(req: Request) {
       }
     }
 
-    // 4. Update existing activities (in parallel, capped at 10 concurrent)
-    for (let i = 0; i < toUpdate.length; i += 10) {
-      const batch = toUpdate.slice(i, i + 10);
-      await Promise.all(batch.map(({ id, payload }) =>
+    // Parallel updates (20 concurrent)
+    for (let i = 0; i < toUpdate.length; i += 20) {
+      await Promise.all(toUpdate.slice(i, i + 20).map(({ id, payload }) =>
         supabase.from("workouts").update(payload).eq("id", id)
           .then(({ error }) => { if (!error) synced.workouts++; })
       ));
     }
   }
 
-  // Power zones skipped for now (requires per-activity lookup, adds latency)
+  // ── Sync wellness → 2 batch upserts (HRV + sleep) ──────────
+  const validWellness = wellness.filter(d => d.id);
 
-  // ── Sync wellness → hrv_data + sleep_data ──────────────────
-  for (const day of wellness) {
-    if (!day.id) continue;
+  const hrvRows = validWellness
+    .filter(d => d.hrv !== undefined)
+    .map(d => ({
+      user_id: user.id, date: d.id,
+      hrv_ms: d.hrv!, rmssd: d.hrv!,
+      sdnn: d.hrvSDNN ?? null,
+      physiological_state: derivePhysiologicalState(d.hrv!, d.hrvSDNN),
+      notes: "Synced from Intervals.icu",
+    }));
 
-    // HRV
-    if (day.hrv !== undefined) {
-      const state = derivePhysiologicalState(day.hrv, day.hrvSDNN);
-      await supabase.from("hrv_data").upsert(
-        {
-          user_id: user.id,
-          date: day.id,
-          hrv_ms: day.hrv,
-          rmssd: day.hrv,
-          sdnn: day.hrvSDNN ?? null,
-          physiological_state: state,
-          notes: `Synced from Intervals.icu`,
-        },
-        { onConflict: "user_id,date" }
-      );
-      synced.hrv++;
-    }
+  const sleepRows = validWellness
+    .filter(d => d.sleepSecs !== undefined)
+    .map(d => ({
+      user_id: user.id, date: d.id,
+      total_sleep_min: Math.round(d.sleepSecs! / 60),
+      deep_sleep_min: d.deepSleepSecs ? Math.round(d.deepSleepSecs / 60) : 0,
+      light_sleep_min: d.lightSleepSecs ? Math.round(d.lightSleepSecs / 60) : 0,
+      rem_sleep_min: d.remSleepSecs ? Math.round(d.remSleepSecs / 60) : 0,
+      sleep_score: d.sleepScore ?? null,
+      body_battery_start: d.bbMax ?? null,
+      body_battery_end: d.bb ?? null,
+      respiration_rate: d.avgRespiration ?? null,
+      spo2_avg: d.avgSpo2 ?? null,
+      source: "intervals_icu",
+    }));
 
-    // Sleep
-    if (day.sleepSecs !== undefined) {
-      await supabase.from("sleep_data").upsert(
-        {
-          user_id: user.id,
-          date: day.id,
-          total_sleep_min: Math.round(day.sleepSecs / 60),
-          deep_sleep_min: day.deepSleepSecs ? Math.round(day.deepSleepSecs / 60) : 0,
-          light_sleep_min: day.lightSleepSecs ? Math.round(day.lightSleepSecs / 60) : 0,
-          rem_sleep_min: day.remSleepSecs ? Math.round(day.remSleepSecs / 60) : 0,
-          sleep_score: day.sleepScore ?? null,
-          body_battery_start: day.bbMax ?? null,
-          body_battery_end: day.bb ?? null,
-          respiration_rate: day.avgRespiration ?? null,
-          spo2_avg: day.avgSpo2 ?? null,
-          source: "intervals_icu",
-        },
-        { onConflict: "user_id,date" }
-      );
-      synced.sleep++;
-    }
-  }
-
-  // Debug: show first 3 raw activities from ICU to diagnose filter issues
-  const rawSample = activities.slice(0, 3).map((a: any) => ({
-    id: a.id,
-    type: a.type,
-    start_date_local: a.start_date_local,
-    name: a.name,
-    distance: a.distance,
-  }));
+  await Promise.all([
+    hrvRows.length > 0
+      ? supabase.from("hrv_data").upsert(hrvRows, { onConflict: "user_id,date" })
+          .then(() => { synced.hrv = hrvRows.length; })
+      : Promise.resolve(),
+    sleepRows.length > 0
+      ? supabase.from("sleep_data").upsert(sleepRows, { onConflict: "user_id,date" })
+          .then(() => { synced.sleep = sleepRows.length; })
+      : Promise.resolve(),
+  ]);
 
   return NextResponse.json({
     synced,
@@ -211,7 +178,6 @@ export async function GET(req: Request) {
     fetched: { activities: activities.length, wellness: wellness.length },
     valid_activities: validActivities.length,
     errors: syncErrors.slice(0, 5),
-    raw_sample: rawSample,
   });
 }
 
