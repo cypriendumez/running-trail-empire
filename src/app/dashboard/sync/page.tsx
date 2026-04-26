@@ -72,6 +72,8 @@ export default function SyncPage() {
   const [loadingData, setLoadingData] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"activities" | "wellness" | "setup">("activities");
+  const [debugResult, setDebugResult] = useState<Record<string, unknown> | null>(null);
+  const [debugLoading, setDebugLoading] = useState(false);
 
   // Credentials form state
   const [credsAthleteId, setCredsAthleteId] = useState("");
@@ -174,6 +176,20 @@ export default function SyncPage() {
       setSyncError(String(e));
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function handleDebug() {
+    setDebugLoading(true);
+    setDebugResult(null);
+    try {
+      const res = await fetch("/api/intervals/debug");
+      const data = await res.json();
+      setDebugResult(data);
+    } catch (e) {
+      setDebugResult({ error: String(e) });
+    } finally {
+      setDebugLoading(false);
     }
   }
 
@@ -281,19 +297,46 @@ export default function SyncPage() {
             </div>
           )}
 
-          {/* Debug: raw sample from ICU */}
-          {syncResult && syncResult.raw_sample && (
+          {/* Debug: raw sample from ICU (after sync) */}
+          {syncResult && (
             <div className="mt-3 bg-zinc-50 border border-zinc-200 rounded-xl p-3 text-xs font-mono text-zinc-600 space-y-1">
               <p className="font-semibold text-zinc-700 font-sans mb-2">
-                ICU: {syncResult.fetched?.activities ?? 0} activités reçues · {syncResult.valid_activities ?? 0} valides · {syncResult.errors?.length ?? 0} erreurs
+                ICU: {syncResult.fetched?.activities ?? "?"} activités reçues · {syncResult.valid_activities ?? "?"} valides · {syncResult.errors?.length ?? 0} erreurs
               </p>
-              {syncResult.raw_sample.length === 0 && <p className="text-amber-600">→ L&apos;API Intervals.icu renvoie un tableau vide</p>}
-              {syncResult.raw_sample.map((a, i) => (
+              {syncResult.raw_sample && syncResult.raw_sample.length === 0 && <p className="text-amber-600">→ L&apos;API Intervals.icu renvoie un tableau vide (0 activités)</p>}
+              {syncResult.raw_sample?.map((a, i) => (
                 <p key={i}>{a.start_date_local?.slice(0,10)} | {a.type} | {a.name} | {a.distance ? (a.distance/1000).toFixed(1)+'km' : '?'}</p>
               ))}
               {syncResult.errors && syncResult.errors.length > 0 && (
                 <p className="text-red-600 mt-1">Erreur: {syncResult.errors[0]}</p>
               )}
+            </div>
+          )}
+
+          {/* Manual API debug button */}
+          <div className="mt-3 flex items-center gap-3">
+            <button
+              onClick={handleDebug}
+              disabled={debugLoading || !configured}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 rounded-xl text-xs font-medium disabled:opacity-40 transition-all"
+            >
+              <Info className={`w-3.5 h-3.5 ${debugLoading ? "animate-spin" : ""}`} />
+              {debugLoading ? "Test en cours…" : "Tester l'API ICU (90j)"}
+            </button>
+          </div>
+          {debugResult && (
+            <div className="mt-2 bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs font-mono text-zinc-700 space-y-1">
+              <p className="font-semibold text-zinc-800 font-sans mb-1">Réponse brute Intervals.icu :</p>
+              <p>HTTP {String(debugResult.status)} · Athlete {String(debugResult.athleteId)}</p>
+              <p>Période : {String(debugResult.oldest)} → {String(debugResult.newest)}</p>
+              <p className={Number(debugResult.count) === 0 ? "text-red-600 font-bold" : "text-green-700 font-bold"}>
+                {Number(debugResult.count) === 0
+                  ? "⚠️ 0 activités reçues → ICU n'a pas d'activités sur cette période"
+                  : `✅ ${String(debugResult.count)} activités reçues de ICU`}
+              </p>
+              {Array.isArray(debugResult.sample) && debugResult.sample.slice(0, 3).map((a: Record<string, unknown>, i: number) => (
+                <p key={i}>{String((a.start_date_local as string)?.slice(0,10) ?? "?")} | {String(a.type ?? "?")} | {String(a.name ?? "?")} | {a.distance ? (Number(a.distance)/1000).toFixed(1)+'km' : '?'}</p>
+              ))}
             </div>
           )}
         </div>
