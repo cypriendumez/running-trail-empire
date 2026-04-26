@@ -62,85 +62,92 @@ export async function GET(req: Request) {
   let synced = { workouts: 0, hrv: 0, sleep: 0 };
   const syncErrors: string[] = [];
 
-  // ── Sync activities → workouts ──────────────────────────────
-  for (const act of activities) {
-    if (!act.type || !act.start_date_local) continue;
+  // ── Sync activities → workouts (batch approach to avoid timeout) ──
+  const validActivities = activities.filter(a => a.type && a.start_date_local);
 
-    const workoutType = mapActivityType(act.type);
-    const date = act.start_date_local.split("T")[0];
-    const title = act.name ?? workoutType;
-
-    const payload = {
-      user_id: user.id,
-      title,
-      type: workoutType,
-      date,
-      duration_seconds: act.moving_time ?? act.elapsed_time ?? 0,
-      distance_km: act.distance ? act.distance / 1000 : null,
-      elevation_gain_m: act.total_elevation_gain ?? 0,
-      elevation_loss_m: act.total_elevation_loss ?? 0,
-      avg_hr: act.average_heartrate ?? null,
-      max_hr: act.max_heartrate ?? null,
-      avg_pace_min_km: act.average_speed ? 1000 / 60 / act.average_speed : null,
-      avg_power_watts: act.average_watts ?? null,
-      max_power_watts: act.max_watts ?? null,
-      avg_cadence_spm: act.average_cadence ? act.average_cadence * 2 : null,
-      tss: act.icu_tss ?? null,
-      training_effect: act.aerobic_te ?? null,
-      vertical_oscillation_cm: act.avg_vertical_oscillation ?? null,
-      ground_contact_time_ms: act.avg_ground_contact_time ?? null,
-      stride_length_m: act.avg_stride_length ? act.avg_stride_length / 100 : null,
-      cardiac_decoupling: act.decoupling ?? null,
-      source: "garmin",
-    };
-
-    // Check if activity already exists (avoid constraint dependency)
-    const { data: existing } = await supabase
+  if (validActivities.length > 0) {
+    // 1. Fetch all existing workouts for this user in the date range (1 query)
+    const { data: existingWorkouts } = await supabase
       .from("workouts")
-      .select("id")
+      .select("id, date, title")
       .eq("user_id", user.id)
-      .eq("date", date)
-      .eq("title", title)
-      .maybeSingle();
+      .gte("date", oldest)
+      .lte("date", newest);
 
-    let error;
-    if (existing?.id) {
-      ({ error } = await supabase.from("workouts").update(payload).eq("id", existing.id));
-    } else {
-      ({ error } = await supabase.from("workouts").insert(payload));
+    const existingMap = new Map<string, string>();
+    for (const w of existingWorkouts ?? []) {
+      existingMap.set(`${w.date}__${w.title}`, w.id);
     }
 
-    if (!error) {
-      synced.workouts++;
-    } else {
-      syncErrors.push(`${date} "${title}": ${error.message}`);
-    }
+    // 2. Build payloads
+    const toInsert: Record<string, unknown>[] = [];
+    const toUpdate: { id: string; payload: Record<string, unknown> }[] = [];
 
-    // Sync power zones if available
-    if (act.pace_z1 !== undefined) {
-      const workoutRow = await supabase
-        .from("workouts")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("date", act.start_date_local.split("T")[0])
-        .eq("title", act.name ?? workoutType)
-        .single();
+    for (const act of validActivities) {
+      const workoutType = mapActivityType(act.type!);
+      const date = act.start_date_local!.split("T")[0];
+      const title = act.name ?? workoutType;
+      const key = `${date}__${title}`;
 
-      if (workoutRow.data) {
-        await supabase.from("power_zone_distribution").upsert({
-          workout_id: workoutRow.data.id,
-          user_id: user.id,
-          z1_seconds: act.pace_z1 ?? 0,
-          z2_seconds: act.pace_z2 ?? 0,
-          z3_seconds: act.pace_z3 ?? 0,
-          z4_seconds: act.pace_z4 ?? 0,
-          z5_seconds: act.pace_z5 ?? 0,
-          aerobic_te: act.aerobic_te ?? null,
-          anaerobic_te: act.anaerobic_te ?? null,
-        }, { onConflict: "workout_id" });
+      const payload: Record<string, unknown> = {
+        user_id: user.id,
+        title,
+        type: workoutType,
+        date,
+        duration_seconds: act.moving_time ?? act.elapsed_time ?? 0,
+        distance_km: act.distance ? act.distance / 1000 : null,
+        elevation_gain_m: act.total_elevation_gain ?? 0,
+        elevation_loss_m: act.total_elevation_loss ?? 0,
+        avg_hr: act.average_heartrate ?? null,
+        max_hr: act.max_heartrate ?? null,
+        avg_pace_min_km: act.average_speed ? 1000 / 60 / act.average_speed : null,
+        avg_power_watts: act.average_watts ?? null,
+        max_power_watts: act.max_watts ?? null,
+        avg_cadence_spm: act.average_cadence ? act.average_cadence * 2 : null,
+        tss: act.icu_tss ?? null,
+        training_effect: act.aerobic_te ?? null,
+        vertical_oscillation_cm: act.avg_vertical_oscillation ?? null,
+        ground_contact_time_ms: act.avg_ground_contact_time ?? null,
+        stride_length_m: act.avg_stride_length ? act.avg_stride_length / 100 : null,
+        cardiac_decoupling: act.decoupling ?? null,
+        source: "garmin",
+      };
+
+      const existingId = existingMap.get(key);
+      if (existingId) {
+        toUpdate.push({ id: existingId, payload });
+      } else {
+        toInsert.push(payload);
       }
     }
+
+    // 3. Batch insert new activities
+    if (toInsert.length > 0) {
+      const { error } = await supabase.from("workouts").insert(toInsert);
+      if (!error) {
+        synced.workouts += toInsert.length;
+      } else {
+        syncErrors.push(`Insert batch: ${error.message}`);
+        // Fallback: insert one by one to save what we can
+        for (const p of toInsert) {
+          const { error: e2 } = await supabase.from("workouts").insert(p);
+          if (!e2) synced.workouts++;
+          else syncErrors.push(`${p.date} "${p.title}": ${e2.message}`);
+        }
+      }
+    }
+
+    // 4. Update existing activities (in parallel, capped at 10 concurrent)
+    for (let i = 0; i < toUpdate.length; i += 10) {
+      const batch = toUpdate.slice(i, i + 10);
+      await Promise.all(batch.map(({ id, payload }) =>
+        supabase.from("workouts").update(payload).eq("id", id)
+          .then(({ error }) => { if (!error) synced.workouts++; })
+      ));
+    }
   }
+
+  // Power zones skipped for now (requires per-activity lookup, adds latency)
 
   // ── Sync wellness → hrv_data + sleep_data ──────────────────
   for (const day of wellness) {
