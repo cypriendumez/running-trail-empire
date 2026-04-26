@@ -7,14 +7,14 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, ArrowLeft, User, Activity, Target, CheckCircle2, Watch, Eye, EyeOff, ExternalLink, RefreshCw, AlertCircle, Wifi } from "lucide-react";
 
-type Step = "profile" | "physio" | "goals" | "watch" | "done";
+type Step = "watch" | "profile" | "physio" | "goals" | "done";
 
-const STEPS: Step[] = ["profile", "physio", "goals", "watch", "done"];
-const STEP_LABELS = ["Profil", "Données physio", "Objectifs", "Montre"];
+const STEPS: Step[] = ["watch", "profile", "physio", "goals", "done"];
+const STEP_LABELS = ["Montre", "Profil", "Données physio", "Objectifs"];
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const [step, setStep] = useState<Step>("profile");
+  const [step, setStep] = useState<Step>("watch");
   const [loading, setLoading] = useState(false);
 
   const [profile, setProfile] = useState({
@@ -341,8 +341,8 @@ export default function OnboardingPage() {
                   <button onClick={prev} className="btn-secondary flex-1 justify-center">
                     <ArrowLeft className="w-4 h-4" /> Retour
                   </button>
-                  <button onClick={next} className="btn-brand flex-1 justify-center">
-                    Suivant <ArrowRight className="w-4 h-4" />
+                  <button onClick={handleFinish} disabled={loading} className="btn-brand flex-1 justify-center">
+                    {loading ? "Sauvegarde…" : <>Terminer <ArrowRight className="w-4 h-4" /></>}
                   </button>
                 </div>
               </div>
@@ -502,7 +502,7 @@ export default function OnboardingPage() {
                             )}
                             <button type="submit" disabled={savingWatch || !watchAthleteId || !watchApiKey}
                               className="btn-brand w-full justify-center disabled:opacity-40">
-                              {savingWatch ? <><RefreshCw className="w-4 h-4 animate-spin mr-2" />Vérification…</> : "Connecter & terminer 🚀"}
+                              {savingWatch ? <><RefreshCw className="w-4 h-4 animate-spin mr-2" />Vérification…</> : "Connecter & continuer 🚀"}
                             </button>
                             <button type="button" onClick={() => setWatchSubStep(2)}
                               className="w-full text-xs text-zinc-400 hover:text-zinc-600 text-center py-1">← Retour</button>
@@ -548,9 +548,9 @@ export default function OnboardingPage() {
                                 </div>
                               </>
                             )}
-                            <button onClick={handleFinish} disabled={loading}
+                            <button onClick={next}
                               className="btn-brand w-full justify-center">
-                              {loading ? "Sauvegarde..." : <>Accéder au Dashboard <ArrowRight className="w-4 h-4" /></>}
+                              Configurer mon profil <ArrowRight className="w-4 h-4" />
                             </button>
                           </div>
                         )}
