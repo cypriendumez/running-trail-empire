@@ -89,25 +89,27 @@ export async function GET(req: Request) {
       const title = act.name ?? workoutType;
       const key = `${date}__${title}`;
 
+      const ri = (v: number | null | undefined) => v != null ? Math.round(v) : null;
+
       const payload: Record<string, unknown> = {
         user_id: user.id,
         title,
         type: workoutType,
         date,
-        duration_seconds: act.moving_time ?? act.elapsed_time ?? 0,
+        duration_seconds: Math.max(1, Math.round(act.moving_time ?? act.elapsed_time ?? 1)),
         distance_km: act.distance ? act.distance / 1000 : null,
-        elevation_gain_m: act.total_elevation_gain ?? 0,
-        elevation_loss_m: act.total_elevation_loss ?? 0,
-        avg_hr: act.average_heartrate ?? null,
-        max_hr: act.max_heartrate ?? null,
-        avg_pace_min_km: act.average_speed ? 1000 / 60 / act.average_speed : null,
-        avg_power_watts: act.average_watts ?? null,
-        max_power_watts: act.max_watts ?? null,
-        avg_cadence_spm: act.average_cadence ? act.average_cadence * 2 : null,
+        elevation_gain_m: ri(act.total_elevation_gain),
+        elevation_loss_m: ri(act.total_elevation_loss),
+        avg_hr: ri(act.average_heartrate),
+        max_hr: ri(act.max_heartrate),
+        avg_pace_min_km: act.average_speed ? Math.min(999, 1000 / 60 / act.average_speed) : null,
+        avg_power_watts: ri(act.average_watts),
+        max_power_watts: ri(act.max_watts),
+        avg_cadence_spm: act.average_cadence ? Math.round(act.average_cadence * 2) : null,
         tss: act.icu_tss ?? null,
         training_effect: act.aerobic_te ?? null,
         vertical_oscillation_cm: act.avg_vertical_oscillation ?? null,
-        ground_contact_ms: act.avg_ground_contact_time ?? null,
+        ground_contact_ms: ri(act.avg_ground_contact_time),
         stride_length_m: act.avg_stride_length ? act.avg_stride_length / 100 : null,
         cardiac_decoupling: act.decoupling ?? null,
         source: "garmin",
