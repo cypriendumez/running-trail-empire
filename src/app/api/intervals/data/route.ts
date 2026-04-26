@@ -25,7 +25,7 @@ export async function GET(req: Request) {
       .eq("user_id", user.id)
       .gte("date", since)
       .order("date", { ascending: false })
-      .limit(200);
+      .limit(Math.min(days * 3, 2000));
 
     const activities = (data ?? []).map(w => ({
       id: w.id,
@@ -49,8 +49,8 @@ export async function GET(req: Request) {
 
   if (type === "wellness") {
     const [hrvRes, sleepRes] = await Promise.all([
-      supabase.from("hrv_data").select("date, hrv_ms, sdnn, physiological_state").eq("user_id", user.id).gte("date", since).order("date", { ascending: false }).limit(200),
-      supabase.from("sleep_data").select("date, total_sleep_min, sleep_score, body_battery_end, spo2_avg").eq("user_id", user.id).gte("date", since).order("date", { ascending: false }).limit(200),
+      supabase.from("hrv_data").select("date, hrv_ms, sdnn, physiological_state").eq("user_id", user.id).gte("date", since).order("date", { ascending: false }).limit(Math.min(days, 2000)),
+      supabase.from("sleep_data").select("date, total_sleep_min, sleep_score, body_battery_end, spo2_avg").eq("user_id", user.id).gte("date", since).order("date", { ascending: false }).limit(Math.min(days, 2000)),
     ]);
 
     // Merge by date
