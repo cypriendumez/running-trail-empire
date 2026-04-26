@@ -15,6 +15,9 @@ interface SyncStats {
   sleep: number;
   period?: { oldest: string; newest: string };
   fetched?: { activities: number; wellness: number };
+  valid_activities?: number;
+  errors?: string[];
+  raw_sample?: { id: string; type: string; name: string; start_date_local: string; distance: number }[];
 }
 
 interface RecentActivity {
@@ -255,10 +258,10 @@ export default function SyncPage() {
                 <span><strong className="text-zinc-900">{syncResult.hrv}</strong> <span className="text-zinc-500">VFC</span></span>
                 <span><strong className="text-zinc-900">{syncResult.sleep}</strong> <span className="text-zinc-500">nuits</span></span>
                 {syncResult.fetched && syncResult.fetched.activities > 0 && syncResult.workouts === 0 && (
-                  <span className="text-amber-600 text-xs">⚠️ {syncResult.fetched.activities} activités reçues d&apos;Intervals.icu mais 0 sauvegardées (erreur Supabase ?)</span>
+                  <span className="text-amber-600 text-xs">⚠️ {syncResult.fetched.activities} reçues · {syncResult.valid_activities ?? 0} valides · 0 sauvegardées</span>
                 )}
                 {syncResult.fetched && syncResult.fetched.activities === 0 && (
-                  <span className="text-amber-600 text-xs">⚠️ Intervals.icu a renvoyé 0 activité — cliquez &quot;IMPORTER TOUTES LES DONNÉES&quot; sur intervals.icu d&apos;abord</span>
+                  <span className="text-amber-600 text-xs">⚠️ Intervals.icu a renvoyé 0 activité sur cette période</span>
                 )}
               </div>
               {lastSyncTime && <span className="ml-auto text-xs text-zinc-400">Dernière sync : {lastSyncTime}</span>}
@@ -269,6 +272,22 @@ export default function SyncPage() {
             <div className="mt-3 flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               {syncError}
+            </div>
+          )}
+
+          {/* Debug: raw sample from ICU */}
+          {syncResult && syncResult.raw_sample && (
+            <div className="mt-3 bg-zinc-50 border border-zinc-200 rounded-xl p-3 text-xs font-mono text-zinc-600 space-y-1">
+              <p className="font-semibold text-zinc-700 font-sans mb-2">
+                ICU: {syncResult.fetched?.activities ?? 0} activités reçues · {syncResult.valid_activities ?? 0} valides · {syncResult.errors?.length ?? 0} erreurs
+              </p>
+              {syncResult.raw_sample.length === 0 && <p className="text-amber-600">→ L&apos;API Intervals.icu renvoie un tableau vide</p>}
+              {syncResult.raw_sample.map((a, i) => (
+                <p key={i}>{a.start_date_local?.slice(0,10)} | {a.type} | {a.name} | {a.distance ? (a.distance/1000).toFixed(1)+'km' : '?'}</p>
+              ))}
+              {syncResult.errors && syncResult.errors.length > 0 && (
+                <p className="text-red-600 mt-1">Erreur: {syncResult.errors[0]}</p>
+              )}
             </div>
           )}
         </div>

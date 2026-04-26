@@ -194,11 +194,22 @@ export async function GET(req: Request) {
     }
   }
 
+  // Debug: show first 3 raw activities from ICU to diagnose filter issues
+  const rawSample = activities.slice(0, 3).map((a: any) => ({
+    id: a.id,
+    type: a.type,
+    start_date_local: a.start_date_local,
+    name: a.name,
+    distance: a.distance,
+  }));
+
   return NextResponse.json({
     synced,
     period: { oldest, newest },
     fetched: { activities: activities.length, wellness: wellness.length },
+    valid_activities: validActivities.length,
     errors: syncErrors.slice(0, 5),
+    raw_sample: rawSample,
   });
 }
 
