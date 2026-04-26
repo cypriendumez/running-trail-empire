@@ -64,6 +64,7 @@ function activityIcon(type?: string) {
 export default function SyncPage() {
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState(0); // 0-100
   const [syncResult, setSyncResult] = useState<SyncStats | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [days, setDays] = useState(30);
@@ -157,21 +158,43 @@ export default function SyncPage() {
     setSyncing(true);
     setSyncError(null);
     setSyncResult(null);
-    try {
-      const res = await fetch(`/api/intervals/sync?days=${days}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Erreur sync");
-      setSyncResult({
-        ...data.synced,
-        fetched: data.fetched,
-        valid_activities: data.valid_activities,
-        errors: data.errors,
-        raw_sample: data.raw_sample,
+    setSyncProgress(0);
+
+    // Split into 90-day chunks to avoid Railway 30s timeout
+    const CHUNK = 90;
+    const chunks: { oldest: string; newest: string }[] = [];
+    const now = new Date();
+    for (let offset = 0; offset < days; offset += CHUNK) {
+      const chunkDays = Math.min(CHUNK, days - offset);
+      const newest = new Date(now.getTime() - offset * 86400000);
+      const oldest = new Date(now.getTime() - (offset + chunkDays) * 86400000);
+      chunks.unshift({
+        oldest: oldest.toISOString().split("T")[0],
+        newest: newest.toISOString().split("T")[0],
       });
+    }
+
+    const totals = { workouts: 0, hrv: 0, sleep: 0 };
+    const allErrors: string[] = [];
+
+    try {
+      for (let i = 0; i < chunks.length; i++) {
+        const { oldest, newest } = chunks[i];
+        const res = await fetch(`/api/intervals/sync?oldest=${oldest}&newest=${newest}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Erreur sync");
+        totals.workouts += data.synced?.workouts ?? 0;
+        totals.hrv += data.synced?.hrv ?? 0;
+        totals.sleep += data.synced?.sleep ?? 0;
+        if (data.errors?.length) allErrors.push(...data.errors);
+        setSyncProgress(Math.round(((i + 1) / chunks.length) * 100));
+      }
+
+      setSyncResult({ ...totals, errors: allErrors });
       setLastSyncTime(new Date().toLocaleString("fr-FR"));
       await loadData();
     } catch (e) {
-      setSyncError(String(e));
+      setSyncError(String(e).replace("Error: ", ""));
     } finally {
       setSyncing(false);
     }
@@ -245,14 +268,27 @@ export default function SyncPage() {
               ))}
             </div>
 
-            <button
-              onClick={handleSync}
-              disabled={syncing || !configured}
-              className="ml-auto flex items-center gap-2 px-5 py-2.5 bg-zinc-900 hover:bg-zinc-700 text-white rounded-xl text-sm font-semibold disabled:opacity-40 transition-all"
-            >
-              <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
-              {syncing ? "Synchronisation…" : "Synchroniser maintenant"}
-            </button>
+            <div className="ml-auto flex items-center gap-3">
+              {syncing && (
+                <div className="flex items-center gap-2">
+                  <div className="w-28 h-2 bg-zinc-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-zinc-900 rounded-full transition-all duration-500"
+                      style={{ width: `${syncProgress}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-semibold text-zinc-600 w-8 text-right">{syncProgress}%</span>
+                </div>
+              )}
+              <button
+                onClick={handleSync}
+                disabled={syncing || !configured}
+                className="flex items-center gap-2 px-5 py-2.5 bg-zinc-900 hover:bg-zinc-700 text-white rounded-xl text-sm font-semibold disabled:opacity-40 transition-all"
+              >
+                <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
+                {syncing ? "Synchronisation…" : "Synchroniser maintenant"}
+              </button>
+            </div>
           </div>
 
           {/* Results */}

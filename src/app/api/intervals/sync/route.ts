@@ -20,8 +20,8 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const days = parseInt(url.searchParams.get("days") ?? "14");
-  const oldest = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-  const newest = new Date().toISOString().split("T")[0];
+  const oldest = url.searchParams.get("oldest") ?? new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  const newest = url.searchParams.get("newest") ?? new Date().toISOString().split("T")[0];
 
   // Load credentials: user profile first, then global env vars
   const { data: profile } = await supabase
