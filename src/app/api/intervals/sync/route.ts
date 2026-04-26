@@ -60,39 +60,61 @@ export async function GET(req: Request) {
   const wellness: IntervalsWellness[] = wellnessRes.ok ? await wellnessRes.json() : [];
 
   let synced = { workouts: 0, hrv: 0, sleep: 0 };
+  const syncErrors: string[] = [];
 
   // ── Sync activities → workouts ──────────────────────────────
   for (const act of activities) {
     if (!act.type || !act.start_date_local) continue;
 
     const workoutType = mapActivityType(act.type);
-    const { error } = await supabase.from("workouts").upsert(
-      {
-        user_id: user.id,
-        title: act.name ?? workoutType,
-        type: workoutType,
-        date: act.start_date_local.split("T")[0],
-        duration_seconds: act.moving_time ?? act.elapsed_time ?? 0,
-        distance_km: act.distance ? act.distance / 1000 : null,
-        elevation_gain_m: act.total_elevation_gain ?? 0,
-        elevation_loss_m: act.total_elevation_loss ?? 0,
-        avg_hr: act.average_heartrate ?? null,
-        max_hr: act.max_heartrate ?? null,
-        avg_pace_min_km: act.average_speed ? 1000 / 60 / act.average_speed : null,
-        avg_power_watts: act.average_watts ?? null,
-        max_power_watts: act.max_watts ?? null,
-        avg_cadence_spm: act.average_cadence ? act.average_cadence * 2 : null,
-        tss: act.icu_tss ?? null,
-        training_effect: act.aerobic_te ?? null,
-        vertical_oscillation_cm: act.avg_vertical_oscillation ?? null,
-        ground_contact_time_ms: act.avg_ground_contact_time ?? null,
-        stride_length_m: act.avg_stride_length ? act.avg_stride_length / 100 : null,
-        cardiac_decoupling: act.decoupling ?? null,
-        source: "garmin",
-      },
-      { onConflict: "user_id,date,title", ignoreDuplicates: false }
-    );
-    if (!error) synced.workouts++;
+    const date = act.start_date_local.split("T")[0];
+    const title = act.name ?? workoutType;
+
+    const payload = {
+      user_id: user.id,
+      title,
+      type: workoutType,
+      date,
+      duration_seconds: act.moving_time ?? act.elapsed_time ?? 0,
+      distance_km: act.distance ? act.distance / 1000 : null,
+      elevation_gain_m: act.total_elevation_gain ?? 0,
+      elevation_loss_m: act.total_elevation_loss ?? 0,
+      avg_hr: act.average_heartrate ?? null,
+      max_hr: act.max_heartrate ?? null,
+      avg_pace_min_km: act.average_speed ? 1000 / 60 / act.average_speed : null,
+      avg_power_watts: act.average_watts ?? null,
+      max_power_watts: act.max_watts ?? null,
+      avg_cadence_spm: act.average_cadence ? act.average_cadence * 2 : null,
+      tss: act.icu_tss ?? null,
+      training_effect: act.aerobic_te ?? null,
+      vertical_oscillation_cm: act.avg_vertical_oscillation ?? null,
+      ground_contact_time_ms: act.avg_ground_contact_time ?? null,
+      stride_length_m: act.avg_stride_length ? act.avg_stride_length / 100 : null,
+      cardiac_decoupling: act.decoupling ?? null,
+      source: "garmin",
+    };
+
+    // Check if activity already exists (avoid constraint dependency)
+    const { data: existing } = await supabase
+      .from("workouts")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("date", date)
+      .eq("title", title)
+      .maybeSingle();
+
+    let error;
+    if (existing?.id) {
+      ({ error } = await supabase.from("workouts").update(payload).eq("id", existing.id));
+    } else {
+      ({ error } = await supabase.from("workouts").insert(payload));
+    }
+
+    if (!error) {
+      synced.workouts++;
+    } else {
+      syncErrors.push(`${date} "${title}": ${error.message}`);
+    }
 
     // Sync power zones if available
     if (act.pace_z1 !== undefined) {
@@ -169,6 +191,7 @@ export async function GET(req: Request) {
     synced,
     period: { oldest, newest },
     fetched: { activities: activities.length, wellness: wellness.length },
+    errors: syncErrors.slice(0, 5),
   });
 }
 
