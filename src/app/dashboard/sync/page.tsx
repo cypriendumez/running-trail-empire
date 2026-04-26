@@ -161,7 +161,13 @@ export default function SyncPage() {
       const res = await fetch(`/api/intervals/sync?days=${days}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Erreur sync");
-      setSyncResult(data.synced);
+      setSyncResult({
+        ...data.synced,
+        fetched: data.fetched,
+        valid_activities: data.valid_activities,
+        errors: data.errors,
+        raw_sample: data.raw_sample,
+      });
       setLastSyncTime(new Date().toLocaleString("fr-FR"));
       await loadData();
     } catch (e) {
