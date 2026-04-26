@@ -257,13 +257,13 @@ export default function SyncPage() {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-zinc-600">Période :</label>
-              {[7, 14, 30, 90, 365].map(d => (
+              {[7, 14, 30, 90, 365, 730].map(d => (
                 <button key={d}
                   onClick={() => setDays(d)}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                     days === d ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
                   }`}>
-                  {d >= 365 ? "1 an" : d >= 90 ? "3 mois" : `${d}j`}
+                  {d >= 730 ? "2 ans" : d >= 365 ? "1 an" : d >= 90 ? "3 mois" : `${d}j`}
                 </button>
               ))}
             </div>
