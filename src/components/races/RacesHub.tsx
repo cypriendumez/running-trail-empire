@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Search, MapPin, Mountain, Clock, Calendar, ExternalLink, Zap, ChevronLeft, ChevronRight, Globe, Loader2, Map, Flag, ArrowDownUp, Footprints, X } from "lucide-react";
 import type { Race } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
@@ -53,12 +53,29 @@ export type PlannedRace = { id: string; name: string; location: string; distance
 
 const normName = (s: string) => (s || "").toLowerCase().trim().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
-export function RacesHub({ races: initialRaces, units = "metric", planned: plannedProp = [], initialSearch = "" }: { races: Race[]; units?: UnitSystem; planned?: PlannedRace[]; initialSearch?: string }) {
+export function RacesHub({ races: initialRaces, totalCount, units = "metric", planned: plannedProp = [], initialSearch = "" }: { races: Race[]; totalCount?: number; units?: UnitSystem; planned?: PlannedRace[]; initialSearch?: string }) {
   const { lang } = useT();
   const d = RX[lang] ?? RX.fr;
   const tr = (k: string, p?: Record<string, string | number>) => fillR(d[k] ?? k, p);
   const fdate = (s: string, style: "short" | "long" = "short") => formatDate(s, lang, d["dateTBD"], style);
-  const [races] = useState<Race[]>(initialRaces);
+  const [races, setRaces] = useState<Race[]>(initialRaces);
+  // Le catalogue complet (~17k) arrive APRÈS le 1er rendu, depuis l'API cachée au CDN —
+  // la page s'affiche instantanément avec les ~90 premières, puis se complète toute seule.
+  const [loadingAll, setLoadingAll] = useState((totalCount ?? initialRaces.length) > initialRaces.length);
+  useEffect(() => {
+    if ((totalCount ?? initialRaces.length) <= initialRaces.length) return;
+    let cancelled = false;
+    fetch("/api/races/list")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.races?.length) return;
+        setRaces(data.races as Race[]);
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoadingAll(false); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [search, setSearch] = useState(initialSearch);
   const [region, setRegion] = useState("Toutes");
   const [raceType, setRaceType] = useState<string>("all");
@@ -178,10 +195,15 @@ export function RacesHub({ races: initialRaces, units = "metric", planned: plann
             />
           </div>
           <span className="flex-shrink-0 text-right">
-            <span className="block text-sm font-semibold text-zinc-600">{filtered.length.toLocaleString(lang)} {filtered.length > 1 ? d["courses"] : d["course"]}</span>
-            <span className="block text-[11px] text-zinc-400">
-              {races.filter(r => !r.date?.startsWith("2099")).length.toLocaleString(lang)} {d["dated"]} · {races.filter(r => r.date?.startsWith("2099")).length.toLocaleString(lang)} {d["toConfirm"]}
+            <span className="flex items-center justify-end gap-1.5 text-sm font-semibold text-zinc-600">
+              {loadingAll && <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />}
+              {(loadingAll && !search && region === "Toutes" && raceType === "all" && !dateFrom ? (totalCount ?? filtered.length) : filtered.length).toLocaleString(lang)} {filtered.length > 1 || loadingAll ? d["courses"] : d["course"]}
             </span>
+            {!loadingAll && (
+              <span className="block text-[11px] text-zinc-400">
+                {races.filter(r => !r.date?.startsWith("2099")).length.toLocaleString(lang)} {d["dated"]} · {races.filter(r => r.date?.startsWith("2099")).length.toLocaleString(lang)} {d["toConfirm"]}
+              </span>
+            )}
           </span>
           <button
             onClick={() => setShowMap(true)}

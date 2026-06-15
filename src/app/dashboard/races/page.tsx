@@ -114,7 +114,10 @@ export default async function RacesPage({ searchParams }: { searchParams: Promis
           </div>
         </div>
       )}
-      <RacesHub races={allRaces} units={units} planned={planned} initialSearch={q ?? ""} />
+      {/* Payload initial réduit (~90 courses) pour un affichage INSTANTANÉ ; RacesHub
+          charge ensuite le catalogue complet en arrière-plan via /api/races/list (caché
+          au CDN). Avant : ~2 Mo de payload force-dynamic à chaque visite = lenteur. */}
+      <RacesHub races={allRaces.slice(0, 90)} totalCount={allRaces.length} units={units} planned={planned} initialSearch={q ?? ""} />
     </>
   );
 }
