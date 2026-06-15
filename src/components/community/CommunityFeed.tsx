@@ -39,22 +39,27 @@ const THEME: Record<Cat, { grad: string; icon: LucideIcon }> = {
 // (aucun risque marque déposée). Plusieurs par catégorie → varié d'une carte à l'autre.
 const UN = (id: string) => `https://images.unsplash.com/photo-${id}?w=640&q=70&auto=format&fit=crop`;
 const PX = (id: number) => `https://images.pexels.com/photos/${id}/pexels-photo-${id}.jpeg?auto=compress&cs=tinysrgb&w=640`;
+// ~100 photos vérifiées une par une (planches-contacts) : toutes pertinentes pour leur
+// thème + AUCUN logo de marque (vérifié, surtout les gros plans matériel). Sources :
+// Pexels + Unsplash (toutes deux licence usage commercial sans attribution).
 const PHOTOS: Record<Cat, string[]> = {
-  all: [PX(35115744), PX(2402734), UN("1504025468847-0e438279542c"), PX(33944102), PX(35765666), PX(8454901), PX(33874842)],
-  running: [PX(35115744), PX(35765666), PX(23857950), PX(19783892), PX(19881117), PX(5198385), PX(33378482), UN("1571008887538-b36bb32f4571"), UN("1476480862126-209bfaa8edc8")],
-  trail: [PX(32798746), PX(33874842), PX(33944102), PX(33284135), PX(32798744), PX(37730884), PX(35206081), PX(32798745), UN("1504025468847-0e438279542c")],
-  ultra: [PX(33874842), PX(33284135), PX(33874841), PX(33944102), PX(30742916), PX(38011335), UN("1551632811-561732d1e306")],
-  marathon: [PX(2402734), PX(2461977), PX(2526884), PX(4606708), PX(29400388), PX(7523360), PX(18408950), PX(2461982), UN("1461896836934-ffe607ba8211")],
+  all: [PX(35115744), PX(2402734), PX(32798746), PX(33944102), PX(35765666), PX(8454901), PX(33874842), PX(18408950), PX(37718409), PX(33608349), UN("1504025468847-0e438279542c")],
+  running: [PX(35115744), PX(35765666), PX(23857950), PX(19783892), PX(19881117), PX(5198385), PX(33378482), PX(10615641), PX(37046063), PX(34015055), PX(37718409), PX(10516108), PX(8533790), PX(3760259), PX(31675724), PX(19787364), PX(30144519), PX(12698200), PX(32130258), PX(4348640), PX(7242918), PX(7879913), PX(20033330), PX(10615645), PX(29881478), UN("1571008887538-b36bb32f4571"), UN("1476480862126-209bfaa8edc8"), UN("1502904550040-7534597429ae")],
+  trail: [PX(32798746), PX(33874842), PX(32798745), PX(33284136), PX(33284135), PX(32798744), PX(37730884), PX(35206081), PX(33944102), PX(33874841), PX(33874843), PX(29116008), PX(25078526), PX(30932860), PX(31805881), PX(9790261), PX(33522755), PX(32798754), PX(35599353), PX(38074682), PX(35388298), PX(33076361), PX(30932855), PX(32962276), PX(32798757), UN("1504025468847-0e438279542c"), UN("1486218119243-13883505764c"), UN("1486739985386-d4fae04ca6f7")],
+  ultra: [PX(33874842), PX(33284135), PX(33874841), PX(33944102), PX(25078526), PX(30932860), PX(31805881), PX(33522755), PX(38074682), PX(35388298), PX(29116008), PX(32798754), PX(32962276), UN("1551632811-561732d1e306")],
+  marathon: [PX(2402734), PX(2461977), PX(2461982), PX(2526884), PX(4606708), PX(29400388), PX(7523360), PX(18408950), PX(18275606), PX(33608349), PX(2526889), PX(10313865), PX(3518952), PX(2719567), PX(18521752), PX(18408979), PX(14585153), PX(17982926), PX(10313671), PX(30770061), PX(29694800), UN("1461896836934-ffe607ba8211")],
   gear: [PX(260044), PX(8454904), PX(8497536), PX(3763869), PX(32145212), PX(9207813), PX(8454901), PX(8456074)],
 };
 
-// Déduit la catégorie d'un article à partir de son titre (pour l'habillage en vue « Tout »).
+// Déduit la catégorie d'un article depuis son titre → choisit une photo en LIEN avec
+// le sujet (mots-clés enrichis FR + EN). Ordre = du plus spécifique au plus général.
 function catOf(title: string): Cat {
   const s = title.toLowerCase();
-  if (/ultra|utmb|100\s?km|100\s?miles|ultramarathon|backyard/.test(s)) return "ultra";
-  if (/trail|sentier|montagne|kilomètre vertical|\bkv\b|verticale|skyrace/.test(s)) return "trail";
-  if (/marathon|semi-marathon|42\s?km|42,195/.test(s)) return "marathon";
-  if (/chaussure|montre|gps|\btest\b|matériel|équipement|sneaker|baskets/.test(s)) return "gear";
+  // Matériel d'abord (un test de chaussure peut contenir "trail" ou "marathon").
+  if (/chaussure|sneaker|basket|montre|gps|cardio|capteur|\btest\b|comparatif|mat[ée]riel|[ée]quipement|gel\b|nutrition|hydratation|ravitaillement|sac\b|b[âa]ton|veste|review|garmin|coros|suunto|polar|\bshoe|gear|watch/.test(s)) return "gear";
+  if (/ultra|utmb|\b100\s?km\b|\b100\s?miles\b|ultramarathon|ultra-?trail|backyard|diagonale des fous|grand raid|tor des|western states|barkley|hardrock|\b6000d\b|\b160\s?km|endurance extr/.test(s)) return "ultra";
+  if (/trail|sentier|montagne|\bmont\b|kilom[èe]tre vertical|\bkv\b|verticale|skyrace|sky\s?running|d[ée]nivel[ée]|single\s?track|for[êe]t|cross\b/.test(s)) return "trail";
+  if (/marathon|semi[- ]?marathon|\bsemi\b|42\s?km|42[.,]195|21\s?km|21[.,]1|record.*(marathon|route)/.test(s)) return "marathon";
   return "running";
 }
 
