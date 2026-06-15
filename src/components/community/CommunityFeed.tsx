@@ -32,20 +32,20 @@ const THEME: Record<Cat, { grad: string; icon: LucideIcon }> = {
   gear: { grad: "from-violet-500 to-fuchsia-600", icon: Watch },
 };
 
-// Photos d'illustration par catégorie — Unsplash (licence : usage commercial autorisé,
-// SANS attribution requise → 100 % légal pour la commercialisation). Ce ne sont PAS les
-// photos des articles sources (qui seraient, elles, protégées) : juste un visuel
-// représentatif du thème. Plusieurs par catégorie → varié d'une carte à l'autre.
-const U = (id: string) => `https://images.unsplash.com/photo-${id}?w=640&q=70&auto=format&fit=crop`;
-// IDs vérifiés visuellement : photos de course/trail pertinentes, SANS logo de marque
-// (pas de risque marque déposée), licence Unsplash usage commercial.
+// Photos d'illustration par catégorie — sources LÉGALES pour usage COMMERCIAL, sans
+// attribution requise : Unsplash + Pexels. Ce ne sont PAS les photos des articles
+// sources (qui seraient protégées) : juste un visuel de thème. CHAQUE photo a été
+// vérifiée visuellement : pertinente (course/trail/matériel) et SANS logo de marque
+// (aucun risque marque déposée). Plusieurs par catégorie → varié d'une carte à l'autre.
+const UN = (id: string) => `https://images.unsplash.com/photo-${id}?w=640&q=70&auto=format&fit=crop`;
+const PX = (id: number) => `https://images.pexels.com/photos/${id}/pexels-photo-${id}.jpeg?auto=compress&cs=tinysrgb&w=640`;
 const PHOTOS: Record<Cat, string[]> = {
-  all: [U("1571008887538-b36bb32f4571"), U("1502904550040-7534597429ae"), U("1504025468847-0e438279542c")],
-  running: [U("1571008887538-b36bb32f4571"), U("1476480862126-209bfaa8edc8"), U("1483721310020-03333e577078"), U("1502904550040-7534597429ae")],
-  trail: [U("1504025468847-0e438279542c"), U("1486218119243-13883505764c"), U("1486739985386-d4fae04ca6f7"), U("1551632811-561732d1e306")],
-  ultra: [U("1551632811-561732d1e306"), U("1504025468847-0e438279542c"), U("1486739985386-d4fae04ca6f7")],
-  marathon: [U("1461896836934-ffe607ba8211"), U("1502904550040-7534597429ae"), U("1571008887538-b36bb32f4571")],
-  gear: [U("1476480862126-209bfaa8edc8"), U("1571008887538-b36bb32f4571")],
+  all: [PX(35115744), PX(2402734), UN("1504025468847-0e438279542c"), PX(33944102), PX(35765666), PX(8454901), PX(33874842)],
+  running: [PX(35115744), PX(35765666), PX(23857950), PX(19783892), PX(19881117), PX(5198385), PX(33378482), UN("1571008887538-b36bb32f4571"), UN("1476480862126-209bfaa8edc8")],
+  trail: [PX(32798746), PX(33874842), PX(33944102), PX(33284135), PX(32798744), PX(37730884), PX(35206081), PX(32798745), UN("1504025468847-0e438279542c")],
+  ultra: [PX(33874842), PX(33284135), PX(33874841), PX(33944102), PX(30742916), PX(38011335), UN("1551632811-561732d1e306")],
+  marathon: [PX(2402734), PX(2461977), PX(2526884), PX(4606708), PX(29400388), PX(7523360), PX(18408950), PX(2461982), UN("1461896836934-ffe607ba8211")],
+  gear: [PX(260044), PX(8454904), PX(8497536), PX(3763869), PX(32145212), PX(9207813), PX(8454901), PX(8456074)],
 };
 
 // Déduit la catégorie d'un article à partir de son titre (pour l'habillage en vue « Tout »).
