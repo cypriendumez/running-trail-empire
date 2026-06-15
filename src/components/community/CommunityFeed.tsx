@@ -32,6 +32,22 @@ const THEME: Record<Cat, { grad: string; icon: LucideIcon }> = {
   gear: { grad: "from-violet-500 to-fuchsia-600", icon: Watch },
 };
 
+// Photos d'illustration par catégorie — Unsplash (licence : usage commercial autorisé,
+// SANS attribution requise → 100 % légal pour la commercialisation). Ce ne sont PAS les
+// photos des articles sources (qui seraient, elles, protégées) : juste un visuel
+// représentatif du thème. Plusieurs par catégorie → varié d'une carte à l'autre.
+const U = (id: string) => `https://images.unsplash.com/photo-${id}?w=640&q=70&auto=format&fit=crop`;
+// IDs vérifiés visuellement : photos de course/trail pertinentes, SANS logo de marque
+// (pas de risque marque déposée), licence Unsplash usage commercial.
+const PHOTOS: Record<Cat, string[]> = {
+  all: [U("1571008887538-b36bb32f4571"), U("1502904550040-7534597429ae"), U("1504025468847-0e438279542c")],
+  running: [U("1571008887538-b36bb32f4571"), U("1476480862126-209bfaa8edc8"), U("1483721310020-03333e577078"), U("1502904550040-7534597429ae")],
+  trail: [U("1504025468847-0e438279542c"), U("1486218119243-13883505764c"), U("1486739985386-d4fae04ca6f7"), U("1551632811-561732d1e306")],
+  ultra: [U("1551632811-561732d1e306"), U("1504025468847-0e438279542c"), U("1486739985386-d4fae04ca6f7")],
+  marathon: [U("1461896836934-ffe607ba8211"), U("1502904550040-7534597429ae"), U("1571008887538-b36bb32f4571")],
+  gear: [U("1476480862126-209bfaa8edc8"), U("1571008887538-b36bb32f4571")],
+};
+
 // Déduit la catégorie d'un article à partir de son titre (pour l'habillage en vue « Tout »).
 function catOf(title: string): Cat {
   const s = title.toLowerCase();
@@ -96,18 +112,21 @@ export function CommunityFeed() {
     </div>
   );
 
-  const Cover = ({ c, big = false }: { c: Cat; big?: boolean }) => {
+  const Cover = ({ c, big = false, seed = 0 }: { c: Cat; big?: boolean; seed?: number }) => {
     const Icon = THEME[c].icon;
+    const pool = PHOTOS[c] ?? PHOTOS.running;
+    const photo = pool[((seed % pool.length) + pool.length) % pool.length];
     return (
       <div className={`relative overflow-hidden bg-gradient-to-br ${THEME[c].grad} ${big ? "h-48 sm:h-auto sm:w-[40%]" : "h-28"}`}>
-        {/* texture pointillée + halo + profondeur (100 % légal, aucune photo tierce) */}
-        <div className="pointer-events-none absolute inset-0 opacity-30" style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.35) 1px, transparent 1px)", backgroundSize: "14px 14px" }} />
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_70%_25%,rgba(255,255,255,0.22),transparent_60%)]" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/15 to-transparent" />
+        {/* Photo représentative libre de droits (Unsplash, usage commercial OK) par catégorie */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={photo} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        {/* Voile dégradé teinté : lisibilité du badge + identité couleur de la catégorie */}
+        <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${THEME[c].grad} opacity-50 mix-blend-multiply`} />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-black/10" />
         {/* reflet qui balaie au survol */}
         <div className="pointer-events-none absolute -inset-y-2 -left-1/3 w-1/3 -skew-x-12 bg-white/20 blur-md transition-transform duration-700 group-hover:translate-x-[420%]" />
-        <Icon strokeWidth={1.25} className={`absolute text-white/15 transition-transform duration-500 group-hover:scale-110 ${big ? "right-2 top-1/2 h-44 w-44 -translate-y-1/2" : "-right-3 top-1/2 h-28 w-28 -translate-y-1/2"}`} />
-        <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white ring-1 ring-white/25 backdrop-blur-sm">
+        <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white ring-1 ring-white/25 backdrop-blur-sm">
           <Icon className="h-3 w-3" /> {tr(c)}
         </span>
       </div>
@@ -181,7 +200,7 @@ export function CommunityFeed() {
                   <motion.a key={i} href={it.link} target="_blank" rel="noopener noreferrer"
                     initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.04, 0.4), duration: 0.3 }} whileHover={{ y: -4 }}
                     className="group flex flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white transition-[border-color,box-shadow] hover:border-emerald-300 hover:shadow-[0_18px_44px_-22px_rgba(16,185,129,0.45)] sm:col-span-2 sm:flex-row">
-                    <Cover c={c} big />
+                    <Cover c={c} big seed={i} />
                     <div className="flex flex-1 flex-col p-5 sm:p-6">
                       <h2 className="text-lg font-bold leading-snug text-zinc-900 line-clamp-3 group-hover:text-emerald-700 sm:text-xl">{it.title}</h2>
                       <Footer it={it} />
@@ -193,7 +212,7 @@ export function CommunityFeed() {
                 <motion.a key={i} href={it.link} target="_blank" rel="noopener noreferrer"
                   initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.04, 0.4), duration: 0.3 }} whileHover={{ y: -4 }}
                   className="group flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white transition-[border-color,box-shadow] hover:border-emerald-300 hover:shadow-[0_16px_40px_-22px_rgba(16,185,129,0.4)]">
-                  <Cover c={c} />
+                  <Cover c={c} seed={i} />
                   <div className="flex flex-1 flex-col p-4">
                     <h3 className="text-[15px] font-semibold leading-snug text-zinc-900 line-clamp-3 group-hover:text-emerald-700">{it.title}</h3>
                     <Footer it={it} />
