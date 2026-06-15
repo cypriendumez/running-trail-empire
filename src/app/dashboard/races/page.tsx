@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-import { unstable_cache } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { RacesHub } from "@/components/races/RacesHub";
@@ -24,39 +23,18 @@ const BL: Record<string, { upcoming: string; planned: string; jourJ: string; rac
 // demande via /api/races/detail au clic. Payload ~5 Mo → ~2 Mo pour 17k courses.
 const RACE_COLS = "id,name,type,region,department,city,date,distance_km,elevation_gain_m,difficulty,latitude,longitude,is_itra_certified,itra_points";
 
-// Le catalogue des courses est public et change rarement → cache serveur 30 min.
-// C'est CE cache qui rend la navigation Dashboard → Courses instantanée (avant :
-// 18 requêtes Supabase paginées à CHAQUE visite).
-const loadAllRaces = unstable_cache(
-  async () => {
-    const supabaseAdmin = createAdminClient();
-    const today = new Date().toISOString().slice(0, 10);
-    const allRaces: any[] = [];
-    const PAGE = 1000;
-    let from = 0;
-    while (true) {
-      const { data } = await supabaseAdmin
-        .from("races")
-        .select(RACE_COLS)
-        .gte("date", today)
-        .order("date", { ascending: true })
-        .range(from, from + PAGE - 1);
-      if (!data?.length) break;
-      allRaces.push(...data);
-      if (data.length < PAGE) break;
-      from += PAGE;
-      if (allRaces.length >= 25000) break;
-    }
-    return allRaces;
-  },
-  ["races-catalog"],
-  { revalidate: 1800 },
-);
-
 export default async function RacesPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const { q } = await searchParams;
   const today = new Date().toISOString().slice(0, 10);
-  const allRaces = await loadAllRaces();
+  // Affichage INSTANTANÉ : on ne charge côté serveur que les ~90 premières courses
+  // + le nombre total. Le catalogue complet (~16,5k) est récupéré ensuite côté client
+  // via /api/races/list (caché au CDN Vercel). Avant : 17 requêtes paginées + ~5,5 Mo
+  // sérialisés dans la page à CHAQUE visite = lenteur.
+  const admin = createAdminClient();
+  const [{ data: initialRaces }, { count: totalCount }] = await Promise.all([
+    admin.from("races").select(RACE_COLS).gte("date", today).order("date", { ascending: true }).limit(90),
+    admin.from("races").select("id", { count: "estimated", head: true }).gte("date", today),
+  ]);
 
   // Courses planifiées par l'athlète (depuis le calendrier) — affichées en haut.
   const sb = await createClient();
@@ -114,10 +92,7 @@ export default async function RacesPage({ searchParams }: { searchParams: Promis
           </div>
         </div>
       )}
-      {/* Payload initial réduit (~90 courses) pour un affichage INSTANTANÉ ; RacesHub
-          charge ensuite le catalogue complet en arrière-plan via /api/races/list (caché
-          au CDN). Avant : ~2 Mo de payload force-dynamic à chaque visite = lenteur. */}
-      <RacesHub races={allRaces.slice(0, 90)} totalCount={allRaces.length} units={units} planned={planned} initialSearch={q ?? ""} />
+      <RacesHub races={(initialRaces ?? []) as never[]} totalCount={totalCount ?? 0} units={units} planned={planned} initialSearch={q ?? ""} />
     </>
   );
 }

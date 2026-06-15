@@ -59,16 +59,15 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
   const tr = (k: string, p?: Record<string, string | number>) => fillR(d[k] ?? k, p);
   const fdate = (s: string, style: "short" | "long" = "short") => formatDate(s, lang, d["dateTBD"], style);
   const [races, setRaces] = useState<Race[]>(initialRaces);
-  // Le catalogue complet (~17k) arrive APRÈS le 1er rendu, depuis l'API cachée au CDN —
+  // Le catalogue complet (~16,5k) arrive APRÈS le 1er rendu, depuis l'API cachée au CDN —
   // la page s'affiche instantanément avec les ~90 premières, puis se complète toute seule.
-  const [loadingAll, setLoadingAll] = useState((totalCount ?? initialRaces.length) > initialRaces.length);
+  const [loadingAll, setLoadingAll] = useState(true);
   useEffect(() => {
-    if ((totalCount ?? initialRaces.length) <= initialRaces.length) return;
     let cancelled = false;
     fetch("/api/races/list")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (cancelled || !data?.races?.length) return;
+        if (cancelled || !Array.isArray(data?.races) || data.races.length <= initialRaces.length) return;
         setRaces(data.races as Race[]);
       })
       .catch(() => {})
