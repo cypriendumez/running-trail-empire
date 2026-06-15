@@ -198,9 +198,9 @@ export function SmartJournal() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-zinc-900">Smart Journal</h2>
+          <h2 className="text-2xl font-bold text-zinc-900">{tr("title")}</h2>
           <p className="text-sm text-zinc-500 mt-1">
-            Analyse NLP de votre état mental · Détection de fatigue psychologique
+            {tr("subtitle")}
           </p>
         </div>
         <div className="flex gap-2">
@@ -210,7 +210,7 @@ export function SmartJournal() {
               activeTab === "write" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
             }`}
           >
-            Écrire
+            {tr("write")}
           </button>
           <button
             onClick={loadHistory}
@@ -218,7 +218,7 @@ export function SmartJournal() {
               activeTab === "history" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
             }`}
           >
-            Historique
+            {tr("history")}
           </button>
         </div>
       </div>
@@ -231,7 +231,7 @@ export function SmartJournal() {
               <textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder="Comment s'est passée votre séance ? Comment vous sentez-vous mentalement et physiquement ? Parlez librement…"
+                placeholder={tr("placeholder")}
                 rows={6}
                 className="w-full px-5 pt-5 pb-3 text-zinc-800 text-sm leading-relaxed resize-none focus:outline-none placeholder:text-zinc-400"
               />
@@ -246,9 +246,9 @@ export function SmartJournal() {
                     }`}
                   >
                     {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                    {isRecording ? "Arrêter" : "Vocal"}
+                    {isRecording ? tr("stop") : tr("voice")}
                   </button>
-                  <span className="text-xs text-zinc-400">{text.length} caractères</span>
+                  <span className="text-xs text-zinc-400">{tr("chars", { n: text.length })}</span>
                 </div>
                 <button
                   onClick={analyzeEntry}
@@ -256,7 +256,7 @@ export function SmartJournal() {
                   className="flex items-center gap-2 bg-zinc-900 text-white px-5 py-2 rounded-xl text-sm font-semibold hover:bg-zinc-700 transition-all disabled:opacity-40"
                 >
                   <Sparkles className="w-4 h-4" />
-                  {isAnalyzing ? "Analyse en cours…" : "Analyser"}
+                  {isAnalyzing ? tr("analyzing") : tr("analyze")}
                 </button>
               </div>
             </div>
@@ -272,7 +272,7 @@ export function SmartJournal() {
                   <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Brain className="w-4 h-4 text-violet-500" />
-                      <span className="text-sm font-semibold text-zinc-700">Analyse NLP</span>
+                      <span className="text-sm font-semibold text-zinc-700">{tr("nlp")}</span>
                     </div>
                     {analysis.sentiment && (() => {
                       const cfg = sentimentConfig[analysis.sentiment];
@@ -287,14 +287,14 @@ export function SmartJournal() {
                   </div>
 
                   <div className="p-6 grid grid-cols-3 gap-4 border-b border-zinc-100">
-                    <ScoreBar label="Fatigue mentale" value={analysis.mental_fatigue ?? 0} icon={<Brain className="w-4 h-4" />} invertColor />
-                    <ScoreBar label="Motivation" value={analysis.motivation_score ?? 0} icon={<Flame className="w-4 h-4" />} />
-                    <ScoreBar label="Stress" value={analysis.stress_level ?? 0} icon={<Zap className="w-4 h-4" />} invertColor />
+                    <ScoreBar label={tr("score.fatigue")} value={analysis.mental_fatigue ?? 0} icon={<Brain className="w-4 h-4" />} invertColor />
+                    <ScoreBar label={tr("score.motivation")} value={analysis.motivation_score ?? 0} icon={<Flame className="w-4 h-4" />} />
+                    <ScoreBar label={tr("score.stress")} value={analysis.stress_level ?? 0} icon={<Zap className="w-4 h-4" />} invertColor />
                   </div>
 
                   {analysis.keywords && analysis.keywords.length > 0 && (
                     <div className="px-6 py-4 border-b border-zinc-100">
-                      <div className="text-xs text-zinc-500 mb-2">Mots-clés détectés</div>
+                      <div className="text-xs text-zinc-500 mb-2">{tr("keywords")}</div>
                       <div className="flex flex-wrap gap-2">
                         {analysis.keywords.map((kw) => (
                           <span key={kw} className="text-xs px-3 py-1 bg-zinc-100 text-zinc-700 rounded-full">{kw}</span>
@@ -306,7 +306,7 @@ export function SmartJournal() {
                   {analysis.ai_insights && (
                     <div className="px-6 py-4 border-b border-zinc-100">
                       <div className="text-xs text-zinc-500 mb-2 flex items-center gap-1">
-                        <Sparkles className="w-3 h-3" /> Insights IA
+                        <Sparkles className="w-3 h-3" /> {tr("insights")}
                       </div>
                       <p className="text-sm text-zinc-700 leading-relaxed">{analysis.ai_insights}</p>
                     </div>
@@ -318,7 +318,7 @@ export function SmartJournal() {
                       className="flex items-center gap-2 bg-zinc-900 text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-zinc-700 transition-all"
                     >
                       <Send className="w-4 h-4" />
-                      {saved ? "Sauvegardé ✓" : "Sauvegarder l'entrée"}
+                      {saved ? tr("saved") : tr("save")}
                     </button>
                   </div>
                 </motion.div>
@@ -330,7 +330,7 @@ export function SmartJournal() {
         {activeTab === "history" && (
           <motion.div key="history" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
             {entries.length === 0 ? (
-              <div className="text-center py-16 text-zinc-400">Aucune entrée pour le moment</div>
+              <div className="text-center py-16 text-zinc-400">{tr("empty")}</div>
             ) : (
               entries.map((entry) => {
                 const cfg = sentimentConfig[entry.sentiment ?? "neutral"];
@@ -340,7 +340,7 @@ export function SmartJournal() {
                     <div className="flex items-start justify-between mb-3">
                       <div>
                         <div className="text-sm font-semibold text-zinc-700">
-                          {new Date(entry.entry_date).toLocaleDateString("fr", { weekday: "long", day: "numeric", month: "long" })}
+                          {new Date(entry.entry_date).toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long" })}
                         </div>
                       </div>
                       <span className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full ${cfg.bg} ${cfg.color}`}>
@@ -350,9 +350,9 @@ export function SmartJournal() {
                     </div>
                     <p className="text-sm text-zinc-600 mb-3 line-clamp-2">{entry.raw_text}</p>
                     <div className="flex items-center gap-4 text-xs text-zinc-500">
-                      <span>💪 Motivation {entry.motivation_score}/10</span>
-                      <span>🧠 Fatigue {entry.mental_fatigue}/10</span>
-                      <span>⚡ Stress {entry.stress_level}/10</span>
+                      <span>{tr("h.motivation", { n: entry.motivation_score })}</span>
+                      <span>{tr("h.fatigue", { n: entry.mental_fatigue })}</span>
+                      <span>{tr("h.stress", { n: entry.stress_level })}</span>
                     </div>
                     {entry.ai_insights && (
                       <p className="mt-3 text-xs text-zinc-500 italic border-t border-zinc-100 pt-3">{entry.ai_insights}</p>
