@@ -10,11 +10,16 @@ export async function POST(req: Request) {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-  const body = await req.json().catch(() => ({})) as { avatarColor?: string; unitSystem?: string; weekStart?: string };
+  const body = await req.json().catch(() => ({})) as Record<string, unknown>;
   const patch: Record<string, unknown> = {};
   if (typeof body.avatarColor === "string") patch.avatarColor = body.avatarColor.slice(0, 20);
   if (body.unitSystem === "metric" || body.unitSystem === "imperial") patch.unitSystem = body.unitSystem;
   if (body.weekStart === "mon" || body.weekStart === "sun") patch.weekStart = body.weekStart;
+  // Préférences booléennes (notifications + confidentialité). Stockées centralement,
+  // lues par les générateurs de notifications / les pages Ligues & Communauté.
+  for (const k of ["weeklyDigest", "recoveryAlerts", "coachTips", "sessionReminders", "leaguePublic", "communityVisible"]) {
+    if (typeof body[k] === "boolean") patch[k] = body[k];
+  }
   if (Object.keys(patch).length === 0) return NextResponse.json({ error: "Rien à enregistrer" }, { status: 400 });
 
   const admin = createAdminClient();

@@ -46,6 +46,79 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 const inputCls = "w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3.5 py-2.5 text-sm outline-none transition-colors focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100";
 
+// ── i18n local (5 langues) — nouveaux réglages (préférences notif + confidentialité). ──
+const SX: Record<string, Record<string, string>> = {
+  fr: {
+    "np.title": "Préférences de notification", "np.desc": "Choisis ce que tu veux recevoir.",
+    "np.session": "Rappels de séance", "np.sessionD": "Avant chaque séance planifiée.",
+    "np.digest": "Résumé hebdomadaire", "np.digestD": "Ton bilan de la semaine par e-mail, chaque lundi.",
+    "np.recovery": "Alertes de récupération", "np.recoveryD": "Si ta VFC chute ou en cas de surcharge détectée.",
+    "np.coach": "Conseils du coach IA", "np.coachD": "Recommandations personnalisées après tes séances.",
+    "pv.title": "Confidentialité", "pv.desc": "Contrôle ta visibilité auprès des autres coureurs.",
+    "pv.league": "Profil visible dans les Ligues", "pv.leagueD": "Apparais dans les classements hebdomadaires.",
+    "pv.community": "Apparaître dans la Communauté", "pv.communityD": "Ton nom et tes parcours partagés restent visibles.",
+    "saved": "Préférence enregistrée",
+  },
+  en: {
+    "np.title": "Notification preferences", "np.desc": "Choose what you want to receive.",
+    "np.session": "Session reminders", "np.sessionD": "Before each planned session.",
+    "np.digest": "Weekly digest", "np.digestD": "Your weekly recap by email, every Monday.",
+    "np.recovery": "Recovery alerts", "np.recoveryD": "If your HRV drops or overload is detected.",
+    "np.coach": "AI coach tips", "np.coachD": "Personalised recommendations after your sessions.",
+    "pv.title": "Privacy", "pv.desc": "Control your visibility to other runners.",
+    "pv.league": "Profile visible in Leagues", "pv.leagueD": "Appear in the weekly rankings.",
+    "pv.community": "Appear in the Community", "pv.communityD": "Your name and shared routes stay visible.",
+    "saved": "Preference saved",
+  },
+  de: {
+    "np.title": "Benachrichtigungen", "np.desc": "Wähle, was du erhalten möchtest.",
+    "np.session": "Trainingserinnerungen", "np.sessionD": "Vor jeder geplanten Einheit.",
+    "np.digest": "Wochenrückblick", "np.digestD": "Deine Wochenbilanz per E-Mail, jeden Montag.",
+    "np.recovery": "Erholungswarnungen", "np.recoveryD": "Wenn deine HRV sinkt oder Überlastung erkannt wird.",
+    "np.coach": "KI-Coach-Tipps", "np.coachD": "Persönliche Empfehlungen nach deinen Einheiten.",
+    "pv.title": "Privatsphäre", "pv.desc": "Steuere deine Sichtbarkeit für andere Läufer.",
+    "pv.league": "Profil in Ligen sichtbar", "pv.leagueD": "Erscheine in den Wochenranglisten.",
+    "pv.community": "In der Community erscheinen", "pv.communityD": "Dein Name und geteilte Strecken bleiben sichtbar.",
+    "saved": "Einstellung gespeichert",
+  },
+  es: {
+    "np.title": "Preferencias de notificación", "np.desc": "Elige qué quieres recibir.",
+    "np.session": "Recordatorios de sesión", "np.sessionD": "Antes de cada sesión planificada.",
+    "np.digest": "Resumen semanal", "np.digestD": "Tu balance semanal por correo, cada lunes.",
+    "np.recovery": "Alertas de recuperación", "np.recoveryD": "Si tu VFC baja o se detecta sobrecarga.",
+    "np.coach": "Consejos del coach IA", "np.coachD": "Recomendaciones personalizadas tras tus sesiones.",
+    "pv.title": "Privacidad", "pv.desc": "Controla tu visibilidad ante otros corredores.",
+    "pv.league": "Perfil visible en las Ligas", "pv.leagueD": "Aparece en las clasificaciones semanales.",
+    "pv.community": "Aparecer en la Comunidad", "pv.communityD": "Tu nombre y rutas compartidas siguen visibles.",
+    "saved": "Preferencia guardada",
+  },
+  pt: {
+    "np.title": "Preferências de notificação", "np.desc": "Escolhe o que queres receber.",
+    "np.session": "Lembretes de sessão", "np.sessionD": "Antes de cada sessão planeada.",
+    "np.digest": "Resumo semanal", "np.digestD": "O teu balanço da semana por e-mail, todas as segundas.",
+    "np.recovery": "Alertas de recuperação", "np.recoveryD": "Se a tua VFC descer ou em caso de sobrecarga.",
+    "np.coach": "Conselhos do treinador IA", "np.coachD": "Recomendações personalizadas após as sessões.",
+    "pv.title": "Privacidade", "pv.desc": "Controla a tua visibilidade para outros corredores.",
+    "pv.league": "Perfil visível nas Ligas", "pv.leagueD": "Aparece nas classificações semanais.",
+    "pv.community": "Aparecer na Comunidade", "pv.communityD": "O teu nome e percursos partilhados ficam visíveis.",
+    "saved": "Preferência guardada",
+  },
+};
+
+function ToggleRow({ label, desc, on, onToggle }: { label: string; desc?: string; on: boolean; onToggle: () => void }) {
+  return (
+    <button onClick={onToggle} className="flex w-full items-center justify-between gap-3 rounded-xl bg-zinc-50 p-4 text-left transition-colors hover:bg-zinc-100">
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-zinc-800">{label}</span>
+        {desc && <span className="mt-0.5 block text-xs text-zinc-400">{desc}</span>}
+      </span>
+      <span className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors ${on ? "bg-emerald-500" : "bg-zinc-300"}`}>
+        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
+      </span>
+    </button>
+  );
+}
+
 export function SettingsView({ profile, email, userId, settings }: { profile: Profile; email: string; userId: string; settings: Record<string, unknown> }) {
   const router = useRouter();
   const sb = createClient();
@@ -64,6 +137,17 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
     } catch { toast.error("Erreur"); }
   };
   const ac = colorOf(color);
+  const lt = (k: string) => SX[lang]?.[k] ?? SX.fr[k] ?? k;
+
+  // ── Préférences de notification + confidentialité (persistées via /api/settings) ──
+  const boolPref = (k: string, def: boolean) => (typeof settings[k] === "boolean" ? (settings[k] as boolean) : def);
+  const [sessionReminders, setSessionReminders] = useState(boolPref("sessionReminders", true));
+  const [weeklyDigest, setWeeklyDigest] = useState(boolPref("weeklyDigest", true));
+  const [recoveryAlerts, setRecoveryAlerts] = useState(boolPref("recoveryAlerts", true));
+  const [coachTips, setCoachTips] = useState(boolPref("coachTips", true));
+  const [leaguePublic, setLeaguePublic] = useState(boolPref("leaguePublic", true));
+  const [communityVisible, setCommunityVisible] = useState(boolPref("communityVisible", true));
+  const togglePref = (k: string, val: boolean, setter: (v: boolean) => void) => { setter(val); saveSettings({ [k]: val }, lt("saved")); };
 
   // ── Profil ──
   const [avatar, setAvatar] = useState(s(profile.avatar_url));
@@ -263,6 +347,15 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
                 </div>
               </Card>
 
+              <Card title={lt("np.title")} desc={lt("np.desc")}>
+                <div className="space-y-2.5">
+                  <ToggleRow label={lt("np.session")} desc={lt("np.sessionD")} on={sessionReminders} onToggle={() => togglePref("sessionReminders", !sessionReminders, setSessionReminders)} />
+                  <ToggleRow label={lt("np.digest")} desc={lt("np.digestD")} on={weeklyDigest} onToggle={() => togglePref("weeklyDigest", !weeklyDigest, setWeeklyDigest)} />
+                  <ToggleRow label={lt("np.recovery")} desc={lt("np.recoveryD")} on={recoveryAlerts} onToggle={() => togglePref("recoveryAlerts", !recoveryAlerts, setRecoveryAlerts)} />
+                  <ToggleRow label={lt("np.coach")} desc={lt("np.coachD")} on={coachTips} onToggle={() => togglePref("coachTips", !coachTips, setCoachTips)} />
+                </div>
+              </Card>
+
               <Card title={t("set.sound.title")} desc={t("set.sound.desc")}>
                 <button onClick={toggleSound} className="flex w-full items-center justify-between gap-3 rounded-xl bg-zinc-50 p-4 text-left transition-colors hover:bg-zinc-100">
                   <span className="flex items-center gap-3">
@@ -308,6 +401,13 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
                       ))}
                     </select>
                   </Field>
+                </div>
+              </Card>
+
+              <Card title={lt("pv.title")} desc={lt("pv.desc")}>
+                <div className="space-y-2.5">
+                  <ToggleRow label={lt("pv.league")} desc={lt("pv.leagueD")} on={leaguePublic} onToggle={() => togglePref("leaguePublic", !leaguePublic, setLeaguePublic)} />
+                  <ToggleRow label={lt("pv.community")} desc={lt("pv.communityD")} on={communityVisible} onToggle={() => togglePref("communityVisible", !communityVisible, setCommunityVisible)} />
                 </div>
               </Card>
             </>
