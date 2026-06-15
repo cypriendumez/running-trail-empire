@@ -38,7 +38,7 @@ export function TaperingWidget({ workouts, raceDate }: TaperingWidgetProps) {
     : null;
 
   return (
-    <div className="bg-white rounded-2xl border border-zinc-200 p-5">
+    <div className="bento-card h-full">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Zap className="w-4 h-4 text-zinc-500" />

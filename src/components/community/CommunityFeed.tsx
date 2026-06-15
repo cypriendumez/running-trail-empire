@@ -1,0 +1,210 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import { useT } from "@/lib/i18n/LanguageProvider";
+import {
+  Newspaper, ExternalLink, RefreshCw,
+  Footprints, Mountain, Flame, Medal, Watch, type LucideIcon,
+} from "lucide-react";
+
+type Item = { title: string; source: string; link: string; date: string; domain?: string; favicon?: string };
+type Cat = "all" | "running" | "trail" | "ultra" | "marathon" | "gear";
+const CATS: Cat[] = ["all", "running", "trail", "ultra", "marathon", "gear"];
+
+// i18n local de la page (5 langues) — la page naît traduite.
+const L: Record<string, Record<string, string>> = {
+  fr: { title: "Communauté & Actualité", subtitle: "Toute l'actu running & trail, en direct des médias spécialisés.", all: "Tout", running: "Running", trail: "Trail", ultra: "Ultra", marathon: "Marathon", gear: "Matériel", read: "Lire", loading: "Chargement de l'actu…", empty: "Aucune actualité pour le moment.", via: "Actus agrégées via Google News — clique pour lire chez la source.", refresh: "Actualiser" },
+  en: { title: "Community & News", subtitle: "All the running & trail news, live from specialist media.", all: "All", running: "Running", trail: "Trail", ultra: "Ultra", marathon: "Marathon", gear: "Gear", read: "Read", loading: "Loading news…", empty: "No news right now.", via: "News aggregated via Google News — click to read at the source.", refresh: "Refresh" },
+  de: { title: "Community & News", subtitle: "Alle Lauf- & Trail-News, live aus den Fachmedien.", all: "Alle", running: "Laufen", trail: "Trail", ultra: "Ultra", marathon: "Marathon", gear: "Ausrüstung", read: "Lesen", loading: "News werden geladen…", empty: "Aktuell keine News.", via: "News aggregiert über Google News — zum Lesen auf die Quelle klicken.", refresh: "Aktualisieren" },
+  es: { title: "Comunidad y Actualidad", subtitle: "Toda la actualidad de running y trail, en directo de los medios especializados.", all: "Todo", running: "Running", trail: "Trail", ultra: "Ultra", marathon: "Maratón", gear: "Material", read: "Leer", loading: "Cargando noticias…", empty: "No hay noticias por ahora.", via: "Noticias agregadas vía Google News — haz clic para leer en la fuente.", refresh: "Actualizar" },
+  pt: { title: "Comunidade e Atualidade", subtitle: "Todas as notícias de corrida e trail, ao vivo da mídia especializada.", all: "Tudo", running: "Corrida", trail: "Trail", ultra: "Ultra", marathon: "Maratona", gear: "Material", read: "Ler", loading: "A carregar notícias…", empty: "Nenhuma notícia por agora.", via: "Notícias agregadas via Google News — clica para ler na fonte.", refresh: "Atualizar" },
+};
+const LOCALE: Record<string, string> = { fr: "fr-FR", en: "en-GB", de: "de-DE", es: "es-ES", pt: "pt-PT" };
+
+// Habillage par catégorie : un dégradé + une icône en lien avec le thème de l'article.
+const THEME: Record<Cat, { grad: string; icon: LucideIcon }> = {
+  all: { grad: "from-zinc-600 to-zinc-800", icon: Newspaper },
+  running: { grad: "from-emerald-500 to-teal-600", icon: Footprints },
+  trail: { grad: "from-lime-600 via-emerald-600 to-emerald-700", icon: Mountain },
+  ultra: { grad: "from-orange-500 to-red-600", icon: Flame },
+  marathon: { grad: "from-sky-500 to-indigo-600", icon: Medal },
+  gear: { grad: "from-violet-500 to-fuchsia-600", icon: Watch },
+};
+
+// Déduit la catégorie d'un article à partir de son titre (pour l'habillage en vue « Tout »).
+function catOf(title: string): Cat {
+  const s = title.toLowerCase();
+  if (/ultra|utmb|100\s?km|100\s?miles|ultramarathon|backyard/.test(s)) return "ultra";
+  if (/trail|sentier|montagne|kilomètre vertical|\bkv\b|verticale|skyrace/.test(s)) return "trail";
+  if (/marathon|semi-marathon|42\s?km|42,195/.test(s)) return "marathon";
+  if (/chaussure|montre|gps|\btest\b|matériel|équipement|sneaker|baskets/.test(s)) return "gear";
+  return "running";
+}
+
+// Favicon de l'éditeur (logo public) avec repli sur une initiale si l'image manque.
+function Favicon({ src, name, className = "h-4 w-4" }: { src?: string; name: string; className?: string }) {
+  const [ok, setOk] = useState(true);
+  if (src && ok) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={src} alt="" loading="lazy" onError={() => setOk(false)} className={`${className} rounded-sm object-contain`} />;
+  }
+  return (
+    <span className={`${className} flex items-center justify-center rounded-sm bg-zinc-200 text-[9px] font-bold text-zinc-500`}>
+      {(name || "?").charAt(0).toUpperCase()}
+    </span>
+  );
+}
+
+export function CommunityFeed() {
+  const { lang } = useT();
+  const tr = (k: string) => L[lang]?.[k] ?? L.fr[k] ?? k;
+  const [cat, setCat] = useState<Cat>("all");
+  const [items, setItems] = useState<Item[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = (c: Cat) => {
+    setLoading(true);
+    fetch(`/api/community/news?cat=${c}`)
+      .then((r) => r.json())
+      .then((j) => setItems(Array.isArray(j.items) ? j.items : []))
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(cat); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [cat]);
+
+  const fmtDate = (d: string) => {
+    const t = new Date(d).getTime();
+    if (!t) return "";
+    const h = Math.floor((Date.now() - t) / 3600000);
+    if (h < 1) return "•";
+    if (h < 24) return `${h} h`;
+    return new Date(t).toLocaleDateString(LOCALE[lang] ?? "fr-FR", { day: "numeric", month: "short" });
+  };
+
+  const itemCat = (it: Item): Cat => (cat !== "all" ? cat : catOf(it.title));
+
+  // Pied de carte (source + date + « Lire ») — réutilisé par la carte vedette et les cartes standard.
+  const Footer = ({ it }: { it: Item }) => (
+    <div className="mt-auto flex items-center gap-2 pt-3 text-xs">
+      <Favicon src={it.favicon} name={it.source} className="h-4 w-4" />
+      <span className="truncate font-medium text-zinc-500">{it.source}</span>
+      {it.date && <><span className="text-zinc-300">·</span><span className="shrink-0 text-zinc-400">{fmtDate(it.date)}</span></>}
+      <span className="ml-auto flex shrink-0 items-center gap-1 font-semibold text-emerald-600 opacity-0 transition-opacity group-hover:opacity-100">
+        {tr("read")} <ExternalLink className="h-3 w-3" />
+      </span>
+    </div>
+  );
+
+  const Cover = ({ c, big = false }: { c: Cat; big?: boolean }) => {
+    const Icon = THEME[c].icon;
+    return (
+      <div className={`relative overflow-hidden bg-gradient-to-br ${THEME[c].grad} ${big ? "h-48 sm:h-auto sm:w-[40%]" : "h-28"}`}>
+        {/* texture pointillée + halo + profondeur (100 % légal, aucune photo tierce) */}
+        <div className="pointer-events-none absolute inset-0 opacity-30" style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.35) 1px, transparent 1px)", backgroundSize: "14px 14px" }} />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_70%_25%,rgba(255,255,255,0.22),transparent_60%)]" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/15 to-transparent" />
+        {/* reflet qui balaie au survol */}
+        <div className="pointer-events-none absolute -inset-y-2 -left-1/3 w-1/3 -skew-x-12 bg-white/20 blur-md transition-transform duration-700 group-hover:translate-x-[420%]" />
+        <Icon strokeWidth={1.25} className={`absolute text-white/15 transition-transform duration-500 group-hover:scale-110 ${big ? "right-2 top-1/2 h-44 w-44 -translate-y-1/2" : "-right-3 top-1/2 h-28 w-28 -translate-y-1/2"}`} />
+        <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white ring-1 ring-white/25 backdrop-blur-sm">
+          <Icon className="h-3 w-3" /> {tr(c)}
+        </span>
+      </div>
+    );
+  };
+
+  return (
+    <div className="mx-auto max-w-5xl pb-12">
+      {/* Hero */}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
+        className="relative overflow-hidden rounded-3xl p-7 text-white shadow-[0_18px_50px_-24px_rgba(5,80,60,0.7)]" style={{ background: "linear-gradient(135deg,#064e3b 0%,#047857 45%,#0d9488 100%)" }}>
+        <div className="pointer-events-none absolute -top-20 -right-12 h-64 w-64 rounded-full bg-emerald-300/25 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 -left-10 h-56 w-56 rounded-full bg-teal-300/20 blur-3xl" />
+        <div className="pointer-events-none absolute inset-0 opacity-[0.12]" style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.6) 1px, transparent 1px)", backgroundSize: "18px 18px" }} />
+        <div className="relative z-10">
+          <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/20 backdrop-blur-md">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-300 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-300" />
+            </span>
+            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-50">{tr("title")}</span>
+          </span>
+          <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">{tr("title")}</h1>
+          <p className="mt-1.5 max-w-2xl text-[15px] leading-relaxed text-white/85">{tr("subtitle")}</p>
+        </div>
+      </motion.div>
+
+      {/* Filtres */}
+      <div className="mt-5 flex flex-wrap items-center gap-2">
+        {CATS.map((c) => {
+          const Icon = THEME[c].icon;
+          const active = cat === c;
+          return (
+            <button key={c} onClick={() => setCat(c)}
+              className={`relative inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${active ? "text-white" : "bg-white text-zinc-600 ring-1 ring-zinc-200 hover:bg-zinc-50"}`}>
+              {active && <motion.span layoutId="community-cat-pill" transition={{ type: "spring", stiffness: 460, damping: 34 }} className="absolute inset-0 rounded-full bg-zinc-900" />}
+              <span className="relative flex items-center gap-1.5"><Icon className="h-3.5 w-3.5" /> {tr(c)}</span>
+            </button>
+          );
+        })}
+        <button onClick={() => load(cat)} disabled={loading} title={tr("refresh")}
+          className="ml-auto flex h-9 w-9 items-center justify-center rounded-full bg-white text-zinc-500 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50 disabled:opacity-50">
+          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+        </button>
+      </div>
+
+      {/* Liste */}
+      <div className="mt-5">
+        {loading ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+                <div className="h-24 animate-pulse bg-zinc-100" />
+                <div className="space-y-2 p-4">
+                  <div className="h-4 w-5/6 animate-pulse rounded bg-zinc-100" />
+                  <div className="h-4 w-2/3 animate-pulse rounded bg-zinc-100" />
+                  <div className="mt-3 h-3 w-1/3 animate-pulse rounded bg-zinc-100" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : items.length === 0 ? (
+          <div className="py-20 text-center text-sm text-zinc-400"><Newspaper className="mx-auto mb-3 h-10 w-10 text-zinc-200" />{tr("empty")}</div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {items.map((it, i) => {
+              const c = itemCat(it);
+              if (i === 0) {
+                // Carte vedette — pleine largeur, cover latérale, titre plus grand.
+                return (
+                  <motion.a key={i} href={it.link} target="_blank" rel="noopener noreferrer"
+                    initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.04, 0.4), duration: 0.3 }} whileHover={{ y: -4 }}
+                    className="group flex flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white transition-[border-color,box-shadow] hover:border-emerald-300 hover:shadow-[0_18px_44px_-22px_rgba(16,185,129,0.45)] sm:col-span-2 sm:flex-row">
+                    <Cover c={c} big />
+                    <div className="flex flex-1 flex-col p-5 sm:p-6">
+                      <h2 className="text-lg font-bold leading-snug text-zinc-900 line-clamp-3 group-hover:text-emerald-700 sm:text-xl">{it.title}</h2>
+                      <Footer it={it} />
+                    </div>
+                  </motion.a>
+                );
+              }
+              return (
+                <motion.a key={i} href={it.link} target="_blank" rel="noopener noreferrer"
+                  initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.04, 0.4), duration: 0.3 }} whileHover={{ y: -4 }}
+                  className="group flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white transition-[border-color,box-shadow] hover:border-emerald-300 hover:shadow-[0_16px_40px_-22px_rgba(16,185,129,0.4)]">
+                  <Cover c={c} />
+                  <div className="flex flex-1 flex-col p-4">
+                    <h3 className="text-[15px] font-semibold leading-snug text-zinc-900 line-clamp-3 group-hover:text-emerald-700">{it.title}</h3>
+                    <Footer it={it} />
+                  </div>
+                </motion.a>
+              );
+            })}
+          </div>
+        )}
+        <p className="mt-6 text-center text-[11px] text-zinc-400">{tr("via")}</p>
+      </div>
+    </div>
+  );
+}

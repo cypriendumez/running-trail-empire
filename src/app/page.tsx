@@ -65,12 +65,12 @@ export default function LandingPage() {
 
       {/* ── NAV ── */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-zinc-100">
-        <div className="max-w-7xl mx-auto px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-zinc-900 rounded-xl flex items-center justify-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 bg-zinc-900 rounded-xl flex items-center justify-center flex-shrink-0">
               <span className="text-white font-bold text-sm">R</span>
             </div>
-            <span className="font-semibold text-zinc-900 text-sm tracking-tight">Running & Trail Empire</span>
+            <span className="hidden sm:inline font-semibold text-zinc-900 text-sm tracking-tight whitespace-nowrap">Running & Trail Empire</span>
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-500">
             <a href="#programmes" className="hover:text-zinc-900 transition-colors">Programmes</a>
@@ -80,11 +80,11 @@ export default function LandingPage() {
             <Link href="/blog" className="hover:text-zinc-900 transition-colors">Blog</Link>
             <Link href="/avis" className="hover:text-zinc-900 transition-colors">Avis</Link>
           </div>
-          <div className="flex items-center gap-3">
-            <Link href="/login" className="text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors px-4 py-2">
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+            <Link href="/login" className="hidden sm:inline-flex text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors px-4 py-2">
               Connexion
             </Link>
-            <Link href="/signup" className="inline-flex items-center gap-1.5 bg-zinc-900 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-zinc-700 transition-colors">
+            <Link href="/signup" className="inline-flex items-center gap-1.5 bg-zinc-900 text-white text-sm font-semibold px-4 sm:px-5 py-2.5 rounded-xl hover:bg-zinc-700 transition-colors whitespace-nowrap">
               Essai gratuit <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -131,7 +131,7 @@ export default function LandingPage() {
           <div className="flex items-end justify-between mb-12">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400 mb-3">Entraînement</p>
-              <h2 className="font-sport text-6xl font-black uppercase text-zinc-900 leading-tight">NOS PROGRAMMES</h2>
+              <h2 className="font-sport text-4xl sm:text-5xl lg:text-6xl font-black uppercase text-zinc-900 leading-tight">NOS PROGRAMMES</h2>
             </div>
             <Link href="/signup" className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-900 hover:text-zinc-600 transition-colors">
               Voir tout <ChevronRight className="w-4 h-4" />
@@ -235,7 +235,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-8">
           <div className="text-center mb-16">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400 mb-3">Plateforme complète</p>
-            <h2 className="font-sport text-6xl font-black uppercase text-zinc-900">TOUT CE DONT<br />UN COUREUR A BESOIN</h2>
+            <h2 className="font-sport text-4xl sm:text-5xl lg:text-6xl font-black uppercase text-zinc-900">TOUT CE DONT<br />UN COUREUR A BESOIN</h2>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {FEATURES.map((f, i) => (
@@ -270,7 +270,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-8">
           <div className="text-center mb-16">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400 mb-3">Tarification</p>
-            <h2 className="font-sport text-6xl font-black uppercase text-zinc-900">SIMPLE &amp; TRANSPARENT</h2>
+            <h2 className="font-sport text-4xl sm:text-5xl lg:text-6xl font-black uppercase text-zinc-900">SIMPLE &amp; TRANSPARENT</h2>
           </div>
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {[
@@ -357,8 +357,9 @@ export default function LandingPage() {
             <span className="font-semibold text-white text-sm">Running & Trail Empire</span>
           </div>
           <p className="text-sm text-white/30">© 2026 Running & Trail Empire. Fait avec ❤️ pour les coureurs.</p>
-          <div className="flex gap-6 text-sm text-white/30">
-            <Link href="/privacy" className="hover:text-white/60 transition-colors">Confidentialité</Link>
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-white/30">
+            <Link href="/mentions-legales" className="hover:text-white/60 transition-colors">Mentions légales</Link>
+            <Link href="/confidentialite" className="hover:text-white/60 transition-colors">Confidentialité</Link>
             <Link href="/terms" className="hover:text-white/60 transition-colors">CGU</Link>
             <Link href="/contact" className="hover:text-white/60 transition-colors">Contact</Link>
           </div>

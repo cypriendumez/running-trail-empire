@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Users, Activity, Crown, Search, Mail,
   ShieldCheck, BarChart3, TrendingUp, Watch,
@@ -24,6 +24,8 @@ interface User {
   mode: string | null;
   workout_count: number;
 }
+
+type DetailWk = { date: string; title: string | null; type: string | null; distance_km: number | null; duration_seconds: number | null; avg_hr: number | null };
 
 function Avatar({ user, size = "md" }: { user: User; size?: "sm" | "md" | "lg" }) {
   const sizes = { sm: "w-8 h-8 text-sm", md: "w-10 h-10 text-base", lg: "w-14 h-14 text-xl" };
@@ -68,6 +70,16 @@ export function AdminDashboard({ users }: { users: User[] }) {
   const [rawActivities, setRawActivities] = useState<any[]>([]);
   const [dataSource, setDataSource] = useState<string>("");
   const [coachingError, setCoachingError] = useState<string | null>(null);
+
+  // Détail client (séances récentes + charge) affiché dans la fiche Utilisateurs.
+  const [detail, setDetail] = useState<{ workouts: DetailWk[] } | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  useEffect(() => {
+    if (!selected) { setDetail(null); return; }
+    setDetail(null); setDetailLoading(true);
+    fetch("/api/admin/client-detail", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: selected.id }) })
+      .then(r => r.json()).then(j => { if (!j.error) setDetail(j); }).catch(() => { /* ignore */ }).finally(() => setDetailLoading(false));
+  }, [selected?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function generatePlan() {
     if (!coachingUser) return;
@@ -592,6 +604,56 @@ export function AdminDashboard({ users }: { users: User[] }) {
                       <div className="text-sm font-semibold text-zinc-800 truncate capitalize">{String(value)}</div>
                     </div>
                   ))}
+                </div>
+
+                {/* Séances récentes + graphique de charge */}
+                <div className="bg-white border border-zinc-100 rounded-2xl p-6 shadow-sm mb-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold text-zinc-900 text-sm flex items-center gap-2"><Activity className="w-4 h-4 text-violet-500" /> Séances & charge récentes</h3>
+                    <a href="/admin/coach" className="text-xs font-semibold text-violet-600 hover:underline flex items-center gap-1">Analyse IA complète <ChevronRight className="w-3 h-3" /></a>
+                  </div>
+                  {detailLoading ? (
+                    <div className="text-sm text-zinc-400 py-8 text-center">Chargement des séances…</div>
+                  ) : !detail?.workouts?.length ? (
+                    <div className="text-sm text-zinc-400 py-8 text-center">Aucune séance sur les 60 derniers jours.</div>
+                  ) : (
+                    <>
+                      {(() => {
+                        const days = Array.from({ length: 21 }, (_, i) => {
+                          const ds = new Date(Date.now() - (20 - i) * 86400000).toISOString().slice(0, 10);
+                          const km = detail.workouts.filter(w => String(w.date).slice(0, 10) === ds).reduce((s, w) => s + (w.distance_km ?? 0), 0);
+                          return { ds, km };
+                        });
+                        const max = Math.max(1, ...days.map(d => d.km));
+                        return (
+                          <div className="mb-1 flex items-end gap-[3px]" style={{ height: 96 }}>
+                            {days.map((d, i) => (
+                              <div key={i} className="flex-1 rounded-t bg-violet-400/80 transition-colors hover:bg-violet-600" style={{ height: `${Math.max(3, (d.km / max) * 100)}%` }} title={`${d.ds} : ${d.km.toFixed(1)} km`} />
+                            ))}
+                          </div>
+                        );
+                      })()}
+                      <div className="mb-4 text-[11px] text-zinc-400">Volume quotidien (km) — 21 derniers jours</div>
+                      <div className="space-y-1.5">
+                        {detail.workouts.slice(0, 8).map((w, i) => (
+                          <div key={i} className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors hover:bg-zinc-50">
+                            <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-zinc-100"><Activity className="h-4 w-4 text-zinc-500" /></span>
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate font-medium text-zinc-800">{w.title || w.type || "Séance"}</div>
+                              <div className="text-xs text-zinc-400">{new Date(w.date).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })}</div>
+                            </div>
+                            <div className="flex flex-shrink-0 gap-3 text-xs text-zinc-500">
+                              {w.distance_km != null && <span className="font-semibold text-zinc-700">{w.distance_km.toFixed(1)} km</span>}
+                              {w.avg_hr ? <span>{w.avg_hr} bpm</span> : null}
+                              {w.duration_seconds ? <span>{Math.floor(w.duration_seconds / 3600)}h{String(Math.floor((w.duration_seconds % 3600) / 60)).padStart(2, "0")}</span> : null}
+                            </div>
+                            <a href={`/admin/coach/session?user=${selected.id}&date=${String(w.date).slice(0, 10)}${w.distance_km ? `&dist=${w.distance_km}` : ""}&title=${encodeURIComponent(w.title || w.type || "Séance")}`}
+                              className="flex-shrink-0 text-[11px] font-semibold text-violet-600 hover:underline">Analyser →</a>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Email composer */}

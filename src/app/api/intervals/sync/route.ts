@@ -94,11 +94,11 @@ export async function GET(req: Request) {
         avg_power_watts: ri(act.average_watts),
         max_power_watts: ri(act.max_watts),
         avg_cadence_spm: act.average_cadence ? Math.round(act.average_cadence * 2) : null,
-        tss: act.icu_tss ?? null,
+        tss: act.icu_training_load ?? act.icu_tss ?? null,                 // « Charge » intervals.icu
         training_effect: act.aerobic_te ?? null,
         vertical_oscillation_cm: act.avg_vertical_oscillation ?? null,
         ground_contact_ms: ri(act.avg_ground_contact_time),
-        stride_length_m: act.avg_stride_length ? act.avg_stride_length / 100 : null,
+        stride_length_m: act.average_stride ?? (act.avg_stride_length ? act.avg_stride_length / 100 : null),
         cardiac_decoupling: act.decoupling ?? null,
         source: "garmin",
       };
@@ -221,6 +221,10 @@ interface IntervalsActivity {
   max_watts?: number;
   average_cadence?: number;
   icu_tss?: number;
+  icu_training_load?: number;
+  trimp?: number;
+  icu_intensity?: number;
+  average_stride?: number;
   aerobic_te?: number;
   anaerobic_te?: number;
   avg_vertical_oscillation?: number;

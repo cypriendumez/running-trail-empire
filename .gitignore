@@ -37,3 +37,21 @@ next-env.d.ts
 # Supabase
 /supabase/.branches
 /supabase/.temp
+handoff-parcours/
+
+# Logs
+*.log
+
+# Captures d'écran / archives locales
+Capture*.png
+*.zip
+
+# Worktrees Claude
+/.claude/worktrees/
+
+# Dossier data/ : on ne versionne QUE les JSON lus par l'app (/api/parcours).
+# Le reste (artefacts de crawl, caches, jsonl) est régénérable / hors-app.
+/data/*
+!/data/parcours_certifies.json
+!/data/dataset_france.json
+!/data/dataset.json

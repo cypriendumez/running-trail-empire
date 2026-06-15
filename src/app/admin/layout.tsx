@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { MessageNotifier } from "@/components/messages/MessageNotifier";
 
 const ADMIN_EMAIL = "cypriendumez@outlook.fr";
 
@@ -12,5 +13,5 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     redirect("/dashboard");
   }
 
-  return <>{children}</>;
+  return <><MessageNotifier />{children}</>;
 }

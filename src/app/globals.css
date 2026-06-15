@@ -6,7 +6,8 @@
 
 @layer base {
   :root {
-    --font-inter: "Inter", system-ui, sans-serif;
+    --font-inter: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-barlow: "Arial Narrow", "Oswald", "Impact", system-ui, sans-serif;
     --radius: 0.75rem;
 
     /* Organic state colors */
@@ -52,10 +53,13 @@
   .state-optimal   { background-color: var(--state-optimal); }
   .state-competition { background-color: var(--state-competition); }
 
-  /* Bento card */
+  /* Bento card — finition premium : ombre douce en couches + léger soulèvement au survol */
   .bento-card {
-    @apply bg-white rounded-3xl border border-zinc-100 shadow-card p-6
-           transition-all duration-300 hover:shadow-soft;
+    @apply bg-white rounded-3xl border border-zinc-200/70 p-6
+           shadow-[0_1px_2px_rgba(0,0,0,0.04),0_10px_30px_-14px_rgba(16,24,40,0.12)]
+           transition-all duration-300
+           hover:-translate-y-0.5 hover:border-zinc-200
+           hover:shadow-[0_2px_6px_rgba(0,0,0,0.05),0_20px_44px_-18px_rgba(16,24,40,0.20)];
   }
 
   .bento-card-dark {
@@ -69,7 +73,7 @@
   }
 
   .metric-label {
-    @apply text-xs uppercase tracking-widest text-zinc-500 font-medium;
+    @apply text-[11px] uppercase tracking-widest text-zinc-400 font-semibold;
   }
 
   /* Zone pills */

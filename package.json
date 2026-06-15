@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbo",
-    "build": "next build",
+    "dev": "next dev --turbopack",
+    "dev:webpack": "next dev --webpack",
+    "build": "next build --experimental-app-only",
     "start": "next start",
     "lint": "next lint",
     "db:push": "supabase db push",

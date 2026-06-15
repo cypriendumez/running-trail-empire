@@ -1,0 +1,441 @@
+import type { createClient } from "@/lib/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
+import { bestVmaFromWorkouts } from "@/lib/running/fitness";
+
+type SB = Awaited<ReturnType<typeof createClient>>;
+
+export type CoachObjective = {
+  race: string; distanceKm: number; raceDate: string;
+  targetSeconds: number; targetTime: string; targetPace: string;
+};
+
+// ── Persona coach élite — réutilisé par toutes les IA d'entraînement ────────────
+export const COACH_SYSTEM = `Tu es un entraîneur de course à pied et de trail de niveau INTERNATIONAL, capable de coacher aussi bien un grand débutant qu'un athlète élite. Tu raisonnes en scientifique de l'entraînement :
+- POLARISÉ ~80/20 (Seiler) : la majorité du volume en facile (Z1-Z2), l'intensité dosée et ciblée.
+- PÉRIODISATION : base aérobie → développement (VMA / seuil / côtes) → spécifique (allure course, terrain) → AFFÛTAGE (volume −40 %, fraîcheur, TSB positif le jour J).
+- CHARGE : pilote CTL (forme), ATL (fatigue), TSB (fraîcheur) et le ratio aigu:chronique (éviter > 1,5 = risque blessure). Progressivité ≤ +10 %/semaine.
+- GUIDÉ PAR LA VFC & LE SOMMEIL : VFC sous la base ou sommeil dégradé → allège ; athlète frais → ose la qualité.
+- INDIVIDUALISATION DU VOLUME : adapte fréquence, volume, intensité, complexité et vocabulaire au NIVEAU réel, à l'âge, au sexe et au passif. Débutant : 3-4 séances/sem, volume facile, régularité avant tout. Amateur confirmé : 4-6 séances. Athlète AVANCÉ/ÉLITE visant un chrono rapide : jusqu'à 10-12 séances/SEMAINE avec des DOUBLES SÉANCES (matin + soir) certains jours. N'impose JAMAIS un tel volume à un débutant (blessure assurée) — la progression prime sur l'ego.
+- SÉCURITÉ : prévention des blessures, prise en compte des douleurs signalées, jamais de surcharge.
+- SPÉCIFICITÉ OBJECTIF : TOUT converge vers la course cible (date, distance, dénivelé, allure visée). Travaille l'allure spécifique et le terrain, gère le pacing et la nutrition de course.
+- ANALYSE MULTIFACTORIELLE : croise efficacité aérobie (allure à FC donnée et sa tendance), tendance VFC, monotonie de charge (Foster), forme de course (cadence, oscillation verticale, temps de contact au sol, foulée, puissance), dérive cardiaque, architecture du sommeil (profond/REM/énergie/respiration), terrain (D+), chaleur, et phase du cycle menstruel le cas échéant — pour expliquer le POURQUOI, prévenir blessure/plateau et accélérer la progression.
+- PROGRAMME COMPLET (pas seulement courir) : intègre le RENFORCEMENT musculaire (1–2×/sem — prévention blessure n°1 + économie), les ÉDUCATIFS / la technique (cadence, gammes), le CROSS-TRAINING (vélo/natation/aqua-jogging pour ajouter du volume ou s'entraîner/récupérer SANS impact en cas de bobo), et la NUTRITION DE COURSE (30–60 g de glucides/h au-delà de 90 min, hydratation, à TESTER à l'entraînement). Tu disposes d'une palette de 100 séances : choisis et ADAPTE, ne récite pas.
+- BOUCLE ADAPTATIVE : compare le PRESCRIT au RÉALISÉ. Si l'athlète court ses footings trop vite (FC trop haute en facile) → ralentis-le explicitement et explique pourquoi (la base se construit lentement, courir facile rend plus fort). S'il rate/écourte des séances → réajuste sans culpabiliser. S'il assimile bien (RPE bas, allures tenues, VFC stable ou ↑) → progresse d'un cran. S'il galère (RPE haut, VFC ↓) → allège. Le plan ÉVOLUE séance après séance selon ce qu'il fait réellement.
+Tu ANALYSES CHAQUE donnée fournie sans EN OUBLIER AUCUNE, et tu n'oublies JAMAIS l'objectif de course. Conseils concrets, chiffrés (allures, zones FC, durées, dénivelé), personnalisés et sûrs.`;
+
+type Wk = {
+  date: string; type?: string | null; distance_km?: number | null; duration_seconds?: number | null;
+  elevation_gain_m?: number | null; avg_hr?: number | null; training_effect?: number | null;
+  tss?: number | null; avg_cadence_spm?: number | null; avg_power_watts?: number | null; max_hr?: number | null;
+  vertical_oscillation_cm?: number | null; ground_contact_ms?: number | null; stride_length_m?: number | null;
+  cardiac_decoupling?: number | null; weather_temp_c?: number | null;
+};
+
+const TYPE_TSS: Record<string, number> = { easy: 50, tempo: 75, interval: 90, vma: 100, long_run: 65, trail: 70, hill_repeat: 85, race: 110, recovery: 30, strength: 40 };
+const estimateTSS = (w: Wk) => w.tss != null ? Number(w.tss) : Math.round(((w.duration_seconds ?? 0) / 3600) * (TYPE_TSS[String(w.type ?? "")] ?? 60));
+
+// CTL/ATL/TSB (Banister) — identique au TaperingWidget, + ratio aigu:chronique.
+function computeLoad(workouts: Wk[]) {
+  const tssMap: Record<string, number> = {};
+  for (const w of workouts) { const d = String(w.date).slice(0, 10); tssMap[d] = (tssMap[d] ?? 0) + estimateTSS(w); }
+  let ctl = 40, atl = 40;
+  for (let i = 41; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+    const tss = tssMap[d] ?? 0;
+    ctl += (tss - ctl) / 42; atl += (tss - atl) / 7;
+  }
+  return { ctl, atl, tsb: ctl - atl, acr: ctl > 0 ? atl / ctl : 0 };
+}
+
+const isHardType = (t?: string | null) => {
+  const x = String(t ?? "").toLowerCase();
+  if (/easy|recovery|long|trail|endurance|footing|récup|fond|marche/.test(x)) return false;
+  return /interval|vma|tempo|seuil|race|hill|fractionn|côte|cote|sprint|vif|fartlek|threshold/.test(x);
+};
+const r1 = (n: number) => Math.round(n * 10) / 10;
+
+// Estime une VMA quand aucun test n'est enregistré : meilleure vitesse soutenue récente
+// (4–18 km, ≤ 45 j), calibrée par l'intensité FC réelle de la séance. Repli INDISPENSABLE
+// — sans VMA, tout le coaching se dégrade (niveau mal classé, aucune allure, intensité non dosée).
+function estimateVmaFromRuns(workouts: Wk[], fcMaxEst: number | null, now: number): number | null {
+  let best = 0;
+  for (const w of workouts) {
+    const km = w.distance_km ?? 0, sec = w.duration_seconds ?? 0;
+    if (km < 4 || km > 18 || sec <= 0) continue;
+    if (now - new Date(w.date).getTime() > 45 * 86400000) continue;
+    const spd = km / (sec / 3600);
+    if (!(spd > 6) || spd > 25) continue; // garde-fous : données aberrantes
+    // Fraction de VMA déduite de l'intensité (% FCmax) ; sinon hypothèse modérée prudente.
+    let frac = 0.80;
+    const hr = w.avg_hr ?? null;
+    if (hr && fcMaxEst) {
+      const pct = hr / fcMaxEst;
+      // % de VMA soutenu selon l'intensité FC — calibration CONSERVATRICE (mieux vaut sous-estimer
+      // la VMA que prescrire trop vite). Ex : un effort continu à ~90 % FCmax ≈ 90 % VMA.
+      frac = pct >= 0.95 ? 0.93 : pct >= 0.90 ? 0.90 : pct >= 0.85 ? 0.86 : pct >= 0.80 ? 0.81 : pct >= 0.75 ? 0.77 : 0.72;
+    }
+    const vmaImplied = spd / frac;
+    if (vmaImplied > best) best = vmaImplied;
+  }
+  return best > 0 ? Math.round(best * 10) / 10 : null;
+}
+
+// Reclasse une séance selon l'allure/FC RÉELLES (les imports intervals.icu arrivent souvent
+// TOUS en « easy ») → l'IA lit une histoire d'entraînement juste, pas une suite de faux footings.
+export function classifyRun(w: { distance_km?: number | null; duration_seconds?: number | null; avg_hr?: number | null; type?: string | null }, fcMax: number | null): string {
+  const km = w.distance_km ?? 0, sec = w.duration_seconds ?? 0;
+  if (km <= 0 || sec <= 0) return String(w.type ?? "séance");
+  if (km >= 18 || sec >= 95 * 60) return "Sortie longue";
+  const pct = (w.avg_hr && fcMax) ? w.avg_hr / fcMax : null;
+  if (pct != null) {
+    if (pct >= 0.90) return "Intense (VMA/course)";
+    if (pct >= 0.85) return "Seuil/Tempo";
+    if (pct >= 0.80) return "Allure soutenue";
+    if (pct >= 0.70) return "Endurance";
+    return "Footing facile";
+  }
+  return "Footing";
+}
+
+export type AthleteContext = {
+  text: string;
+  objective: CoachObjective | null;
+  daysToRace: number | null;
+  weeksToRace: number | null;
+  athleteName: string;
+  vma: number | null; // VMA km/h (test enregistré ou estimée) — pour les cibles d'allure montre.
+  // Squelette de semaine déterministe → permet de VALIDER/corriger le plan de l'IA.
+  weekPlan: { qBudget: number; quality: { type: string; desc: string }[]; easyPace: string | null; eased: boolean };
+  // Plan macro périodisé semaine par semaine jusqu'au jour J.
+  macroPlan: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[];
+};
+
+// Rassemble et ANALYSE toutes les données de l'athlète → briefing pour l'IA coach.
+export async function buildAthleteContext(sb: SB, userId: string): Promise<AthleteContext> {
+  const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, objRes, csRes] = await Promise.all([
+    sb.from("profiles").select("full_name,age,gender,weight_kg,height_cm,chronotype,mode,is_female_cycle_sync,current_phase").eq("id", userId).single(),
+    sb.from("performance_baselines").select("*").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).single(),
+    sb.from("hrv_data").select("hrv_ms,physiological_state,date").eq("user_id", userId).order("date", { ascending: false }).limit(14),
+    sb.from("sleep_data").select("sleep_score,total_sleep_min,deep_sleep_min,rem_sleep_min,body_battery_end,respiration_rate,date").eq("user_id", userId).order("date", { ascending: false }).limit(7),
+    sb.from("workouts").select("date,type,distance_km,duration_seconds,elevation_gain_m,avg_hr,max_hr,training_effect,tss,avg_cadence_spm,avg_power_watts,vertical_oscillation_cm,ground_contact_ms,stride_length_m,cardiac_decoupling,weather_temp_c").eq("user_id", userId).order("date", { ascending: false }).limit(60),
+    sb.from("notifications").select("data").eq("user_id", userId).eq("type", "session_feedback").order("created_at", { ascending: false }).limit(5),
+    sb.from("notifications").select("data").eq("user_id", userId).eq("type", "race_objective").maybeSingle(),
+    sb.from("notifications").select("data").eq("user_id", userId).eq("type", "coach_session").order("created_at", { ascending: false }).limit(40),
+  ]);
+
+  const p = profileRes.data as Record<string, unknown> | null;
+  const b = baseRes.data as Record<string, unknown> | null;
+  const hrv = (hrvRes.data ?? []) as { hrv_ms: number | null; physiological_state: string | null; date: string }[];
+  const sleep = (sleepRes.data ?? []) as { sleep_score: number | null; total_sleep_min: number | null; deep_sleep_min: number | null; rem_sleep_min: number | null; body_battery_end: number | null; respiration_rate: number | null; date: string }[];
+  const workouts = (woRes.data ?? []) as Wk[];
+  const feedback = (fbRes.data ?? []) as { data: { rpe?: number; pain?: string[]; note?: string } }[];
+  const objective = (objRes.data?.data ?? null) as CoachObjective | null;
+  const coachSessions = ((csRes.data ?? []) as { data: { date?: string; sessionType?: string } }[]).map(r => r.data).filter((d): d is { date?: string; sessionType?: string } => !!d?.date);
+
+  const now = Date.now();
+  const num = (v: unknown) => (v == null ? null : Number(v));
+  const kmIn = (days: number) => workouts.filter(w => now - new Date(w.date).getTime() <= days * 86400000).reduce((s, w) => s + (w.distance_km ?? 0), 0);
+  const weekKm = kmIn(7), avg4wkKm = kmIn(28) / 4;
+  const load = computeLoad(workouts);
+  const daysSinceLast = workouts[0]?.date ? Math.floor((now - new Date(workouts[0].date).getTime()) / 86400000) : null;
+  const restDays7 = Math.max(0, 7 - new Set(workouts.filter(w => now - new Date(w.date).getTime() <= 7 * 86400000).map(w => String(w.date).slice(0, 10))).size);
+  const recent14 = workouts.filter(w => now - new Date(w.date).getTime() <= 14 * 86400000);
+  // FC max de repli (baseline → max observé en séance → formule d'âge) — sert à CLASSER l'effort
+  // ET à estimer la VMA. Les imports intervals.icu étiquettent souvent TOUT en « easy » : on lit la FC.
+  const obsMaxHr0 = Math.max(0, ...workouts.map(w => num(w.max_hr) ?? 0));
+  const fcMaxEst = num(b?.max_hr) ?? (obsMaxHr0 > 150 ? obsMaxHr0 : null) ?? (num(p?.age) != null ? 220 - (num(p?.age) as number) : 190);
+  // Une séance est « dure » si son TYPE le dit OU si la FC révèle un effort élevé (≥ 90 % FCmax).
+  const isHardWk = (w: Wk) => isHardType(w.type) || (fcMaxEst != null && w.avg_hr != null && w.avg_hr >= fcMaxEst * 0.90);
+  const hardShare = recent14.length ? Math.round(recent14.filter(isHardWk).length / recent14.length * 100) : null;
+
+  const hrvVals = hrv.map(h => h.hrv_ms).filter((v): v is number => v != null);
+  const hrvLatest = hrvVals[0] ?? null;
+  const hrvBase = hrvVals.length >= 3 ? Math.round(hrvVals.reduce((a, c) => a + c, 0) / hrvVals.length) : null;
+  const hrvTrend = hrvLatest != null && hrvBase != null ? (hrvLatest >= hrvBase ? "au-dessus de sa base → frais" : "sous sa base → fatigue possible") : "n/c";
+  const state = hrv[0]?.physiological_state ?? "optimal";
+  const sleepAvg = sleep.length ? Math.round(sleep.reduce((s, d) => s + (d.sleep_score ?? 0), 0) / sleep.length) : null;
+  // Sommeil de cette nuit pris en compte SEULEMENT s'il est récent (montre portée).
+  const freshSleep = sleep[0]?.date && now - new Date(sleep[0].date + "T00:00:00").getTime() <= 2 * 86400000 ? sleep[0] : null;
+  const lastSleepMin = freshSleep?.total_sleep_min ?? null;
+
+  const pains = [...new Set(feedback.flatMap(f => f.data?.pain ?? []).filter(Boolean))];
+  const lastRpe = feedback[0]?.data?.rpe ?? null;
+
+  const maxHr = num(b?.max_hr), restHr = num(b?.resting_hr), ltHr = num(b?.lt_hr);
+  const vmaStored = num(b?.vma_kmh);
+  // VMA : test enregistré → sinon estimateur du dashboard (effort maximal, distance-aware, cohérent
+  // app-wide) → sinon repli FC. Garantit le MÊME chiffre côté coach et côté client.
+  const vma = (vmaStored != null && vmaStored > 0) ? vmaStored
+    : (bestVmaFromWorkouts(workouts, fcMaxEst) ?? estimateVmaFromRuns(workouts, fcMaxEst, now));
+  const vmaIsEst = !(vmaStored != null && vmaStored > 0) && vma != null;
+  const level = vma == null ? "à évaluer (VMA inconnue)" : vma < 13 ? "débutant" : vma < 16 ? "intermédiaire" : vma < 19 ? "confirmé" : "expert/élite";
+
+  // Zones FC (Karvonen) si dispo
+  const hrZone = (lo: number, hi: number) => (maxHr != null && restHr != null) ? `${Math.round(restHr + (maxHr - restHr) * lo)}-${Math.round(restHr + (maxHr - restHr) * hi)} bpm` : null;
+  // Zones d'allure stockées (min/km)
+  const paceZones = b && b.z2_min != null
+    ? `Z1 ${num(b.z1_min)}-${num(b.z1_max)} · Z2 ${num(b.z2_min)}-${num(b.z2_max)} · Z3 ${num(b.z3_min)}-${num(b.z3_max)} · Z4 ${num(b.z4_min)}-${num(b.z4_max)} · Z5 ${num(b.z5_min)}-${num(b.z5_max)} (min/km)`
+    : null;
+
+  // Objectif + faisabilité
+  let daysToRace: number | null = null, weeksToRace: number | null = null;
+  const objLines: string[] = [];
+  if (objective?.raceDate) {
+    daysToRace = Math.ceil((new Date(objective.raceDate + "T00:00:00").getTime() - now) / 86400000);
+    weeksToRace = Math.floor(daysToRace / 7);
+    objLines.push(`• Course : ${objective.race} — ${objective.distanceKm} km, le ${objective.raceDate} (J-${daysToRace}, ~${weeksToRace} sem.)`);
+    objLines.push(`• Temps visé : ${objective.targetTime} → allure cible ${objective.targetPace}`);
+    if (vma && objective.distanceKm && objective.targetSeconds) {
+      const targetSpeed = objective.distanceKm / (objective.targetSeconds / 3600);
+      const pctVma = Math.round((targetSpeed / vma) * 100);
+      // Fraction de VMA réellement soutenable sur la distance → VMA requise pour le chrono visé.
+      const frac = objective.distanceKm <= 5 ? 93 : objective.distanceKm <= 10 ? 90 : objective.distanceKm <= 21.5 ? 85 : 80;
+      const reqVma = r1(targetSpeed / (frac / 100));
+      const verdict = pctVma > frac + 4
+        ? `⚠️ TRÈS ambitieux : ce chrono demande une VMA ~${reqVma} km/h (il est à ~${vma}${vmaIsEst ? " estimée" : ""}). Il faut un GROS travail de VMA d'ici la course, ou réviser l'objectif — sois honnête avec lui.`
+        : pctVma < frac - 6
+        ? "objectif confortable au vu de son niveau : il peut viser plus ambitieux."
+        : "objectif cohérent avec son niveau actuel : la spécificité fera la différence.";
+      objLines.push(`• Allure cible = ${pctVma} % VMA (un ${objective.distanceKm} km se court ~${frac} % VMA). ${verdict}`);
+      // Feuille de route concrète : combien de VMA gagner, à quel rythme, est-ce réaliste.
+      if (reqVma > vma && weeksToRace && weeksToRace > 0) {
+        const gain = r1(reqVma - vma);
+        const perWk = Math.round((gain / weeksToRace) * 100) / 100;
+        const realism = perWk <= 0.08 ? "réaliste avec un bon bloc VMA" : perWk <= 0.15 ? "ambitieux mais jouable avec 2 séances VMA/sem et de la régularité" : "très difficile dans le délai — propose-lui un objectif intermédiaire (ex. viser ~5-8 s/km de plus) puis le vrai chrono plus tard";
+        objLines.push(`• Feuille de route : gagner +${gain} km/h de VMA en ${weeksToRace} sem (~+${perWk} km/h/sem) → ${realism}.`);
+      } else if (reqVma <= vma) {
+        objLines.push(`• Sa VMA actuelle suffit DÉJÀ pour le chrono : le travail = spécificité (tenir l'allure), endurance et pacing, pas plus de VMA brute.`);
+      }
+    }
+  }
+
+  const last5 = workouts.slice(0, 5).map(w => {
+    const pace = w.distance_km && w.duration_seconds ? `${Math.floor((w.duration_seconds / 60) / w.distance_km)}'${String(Math.round(((w.duration_seconds / 60) / w.distance_km % 1) * 60)).padStart(2, "0")}/km` : "?";
+    return `${String(w.date).slice(5, 10)} ${classifyRun(w, fcMaxEst)} ${r1(w.distance_km ?? 0)}km @${pace}${w.avg_hr ? ` ${w.avg_hr}bpm` : ""}${w.elevation_gain_m ? ` D+${w.elevation_gain_m}` : ""}`;
+  });
+
+  // ── ANALYSE APPROFONDIE — facteurs avancés (efficacité, forme, charge, sommeil, cycle) ──
+  const vo2 = vma ? Math.round(vma * 3.5) : null;
+  // Efficacité aérobie : distance/min par battement sur séances faciles → tendance 21j vs 21j.
+  const easyEF = (from: number, to: number) => {
+    const runs = workouts.filter(w => { const age = now - new Date(w.date).getTime(); return age > from * 86400000 && age <= to * 86400000 && !isHardType(w.type) && !!w.avg_hr && !!w.distance_km && !!w.duration_seconds; });
+    if (!runs.length) return null;
+    return runs.reduce((s, w) => s + (w.distance_km! * 1000 / (w.duration_seconds! / 60)) / w.avg_hr!, 0) / runs.length;
+  };
+  const efR = easyEF(0, 21), efP = easyEF(21, 42);
+  const efTrend = efR != null && efP != null ? (efR > efP * 1.02 ? "↑ en hausse (plus efficace à FC égale → tu progresses)" : efR < efP * 0.98 ? "↓ en baisse (fatigue/forme à surveiller)" : "→ stable") : null;
+  // VFC : moyenne 7 j vs 7 j précédents.
+  const hrvAvg = (from: number, to: number) => { const v = hrv.filter(h => { const age = now - new Date(h.date).getTime(); return age > from * 86400000 && age <= to * 86400000 && h.hrv_ms != null; }).map(h => h.hrv_ms!); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+  const hrv7 = hrvAvg(0, 7), hrv7p = hrvAvg(7, 14);
+  const hrvWeekTrend = hrv7 != null && hrv7p != null ? (hrv7 > hrv7p * 1.03 ? "↑ en hausse (bonne adaptation)" : hrv7 < hrv7p * 0.97 ? "↓ en baisse (fatigue accumulée)" : "→ stable") : null;
+  // Monotonie (Foster) — uniformité de la charge sur 7 j (>2 = risque surcharge/maladie).
+  const dailyTss = Array.from({ length: 7 }, (_, i) => { const d = new Date(now - i * 86400000).toISOString().slice(0, 10); return workouts.filter(w => String(w.date).slice(0, 10) === d).reduce((s, w) => s + estimateTSS(w), 0); });
+  const tMean = dailyTss.reduce((a, b) => a + b, 0) / 7;
+  const tSd = Math.sqrt(dailyTss.reduce((a, b) => a + (b - tMean) ** 2, 0) / 7) || 1;
+  const monotony = tMean > 0 ? Math.round((tMean / tSd) * 10) / 10 : 0;
+  // Forme de course (moyenne ~10 dernières séances).
+  const recForm = workouts.slice(0, 10);
+  const avgOf = (key: keyof Wk) => { const v = recForm.map(w => num(w[key])).filter((x): x is number => x != null && Number.isFinite(x)); return v.length ? Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 10) / 10 : null; };
+  const cadence = avgOf("avg_cadence_spm"), power = avgOf("avg_power_watts"), vosc = avgOf("vertical_oscillation_cm"), gct = avgOf("ground_contact_ms"), stride = avgOf("stride_length_m"), decoupling = avgOf("cardiac_decoupling");
+  // Sommeil détaillé + terrain + chaleur + cycle.
+  const sl = sleep[0];
+  const pctOf = (part?: number | null, tot?: number | null) => part && tot ? Math.round(part / tot * 100) : null;
+  const deepPct = pctOf(sl?.deep_sleep_min, sl?.total_sleep_min), remPct = pctOf(sl?.rem_sleep_min, sl?.total_sleep_min);
+  const elevWeek = Math.round(workouts.filter(w => now - new Date(w.date).getTime() <= 7 * 86400000).reduce((s, w) => s + (w.elevation_gain_m ?? 0), 0));
+  const temps = recForm.map(w => num(w.weather_temp_c)).filter((x): x is number => x != null && Number.isFinite(x));
+  const avgTemp = temps.length ? Math.round(temps.reduce((a, b) => a + b, 0) / temps.length) : null;
+  const cycle = p?.is_female_cycle_sync && p?.current_phase ? String(p.current_phase) : null;
+
+  // Palette de séances adaptée au niveau + objectif (la lib est la base de connaissances).
+  const libLevel: Level = vma == null || vma < 13 ? "debutant" : vma < 16 ? "intermediaire" : vma < 19 ? "confirme" : "elite";
+  const libGoal: Goal = !objective ? "general"
+    : (/trail|utmb|ultra|vertical|\bkv\b|montagne/i.test(objective.race) || (objective.distanceKm ?? 0) > 45) ? ((objective.distanceKm ?? 0) > 60 ? "ultra" : "trail")
+    : (objective.distanceKm ?? 99) <= 5 ? "5k" : (objective.distanceKm ?? 99) <= 10 ? "10k" : (objective.distanceKm ?? 99) <= 21.5 ? "semi" : "marathon";
+  const catalog = buildSessionCatalog({ level: libLevel, goal: libGoal });
+
+  // Phase de périodisation (selon l'échéance) → oriente l'emphase des séances.
+  const phase = objective?.raceDate && weeksToRace != null
+    ? (weeksToRace <= 2 ? "AFFÛTAGE (volume −40 %, fraîcheur, TSB positif le jour J ; on GARDE de courtes touches de qualité/allure course, on coupe le VOLUME pas l'intensité)"
+      : weeksToRace <= 5 ? "SPÉCIFIQUE (allure course + terrain ; 2-3 qualités/sem dont l'allure objectif ; l'affûtage approche)"
+      : weeksToRace <= 11 ? "DÉVELOPPEMENT (VMA, seuil, côtes, allure objectif ; 2-3 qualités/sem ; volume soutenu)"
+      : "BASE AÉROBIE + VITESSE (volume facile en hausse, MAIS on pose DÉJÀ 2 qualités/sem : VMA courte pour le plafond + seuil/tempo — 'base' ne veut JAMAIS dire 'tout lent', surtout pour un objectif chrono)")
+    : "PROGRESSION GLOBALE (base aérobie + 1-2 qualités/sem selon le niveau ; jamais 100 % facile pour qui veut progresser)";
+
+  // Allures cibles calculées depuis la VMA (repli si zones non stockées).
+  const paceAt = (pct: number) => { if (!vma) return "?"; const s = 3600 / (vma * pct / 100); return `${Math.floor(s / 60)}'${String(Math.round(s % 60)).padStart(2, "0")}`; };
+  const computedPaces = vma ? `Z1 récup ~${paceAt(60)} · Z2 endurance ~${paceAt(70)} · seuil ~${paceAt(85)} · VMA ~${paceAt(100)} (min/km)` : null;
+  // Chronos théoriques au potentiel actuel (% VMA soutenable par distance) → réalisme + allures.
+  const predict = (km: number, pct: number) => { if (!vma) return "?"; const sec = km / (vma * pct / 100) * 3600; const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = Math.round(sec % 60); return h ? `${h}h${String(m).padStart(2, "0")}` : `${m}'${String(s).padStart(2, "0")}`; };
+  const predictions = vma ? `5K ~${predict(5, 93)} · 10K ~${predict(10, 90)} · semi ~${predict(21.1, 85)} · marathon ~${predict(42.2, 80)}` : null;
+
+  // ── BOUCLE ADAPTATIVE — prescrit (séances coach) vs réalisé (workouts) ──
+  // FC de repli si pas de baseline : FC max observée en séance, sinon estimée par l'âge.
+  const obsMaxHr = Math.max(0, ...workouts.map(w => num(w.max_hr) ?? 0));
+  const ageNum = num(p?.age);
+  const fcMax = maxHr ?? (obsMaxHr > 120 ? obsMaxHr : null) ?? (ageNum ? 220 - ageNum : null);
+  const fcRest = restHr ?? 55;
+  const easyCeiling = fcMax != null ? Math.round(fcRest + (fcMax - fcRest) * 0.78) : null;
+  const easyRuns = recent14.filter(w => w.avg_hr != null && !isHardWk(w));
+  const tooFastEasy = easyCeiling != null ? easyRuns.filter(w => (w.avg_hr ?? 0) > easyCeiling).length : 0;
+  const easyDiscipline = easyRuns.length && easyCeiling != null
+    ? `${tooFastEasy}/${easyRuns.length} footings au-dessus du plafond facile (~${easyCeiling} bpm)${tooFastEasy / easyRuns.length >= 0.34 ? " ⚠️ tendance à courir TROP VITE en facile → fais-le RALENTIR (frein n°1 à la progression)" : tooFastEasy === 0 ? " ✅ excellente discipline" : " ✅ discipline correcte"}`
+    : "n/c (FC ou séances manquantes)";
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const doneDates = new Set(workouts.map(w => String(w.date).slice(0, 10)));
+  const pastPrescribed = coachSessions.filter(c => c.date && c.date <= todayStr && now - new Date(c.date).getTime() <= 14 * 86400000);
+  const adherence = pastPrescribed.length
+    ? `${pastPrescribed.filter(c => doneDates.has(String(c.date).slice(0, 10))).length}/${pastPrescribed.length} séances prescrites réalisées (14 j)`
+    : "pas de plan prescrit récent";
+
+  // ── STRUCTURE CIBLE DE LA SEMAINE — squelette DÉTERMINISTE (l'IA l'habille) ──────
+  // Anti « tout en EF » : un objectif chrono impose une dose de qualité spécifique
+  // CHAQUE semaine, dosée selon le niveau, la phase ET la fraîcheur RÉELLE du jour.
+  // targetPace contient déjà « /km » → on le retire avant de réafficher « .../km » (sinon « 3'18/km/km »).
+  const goalPace = objective?.targetPace ? objective.targetPace.replace(/\s*\/?\s*km\s*$/i, "").trim() || null : null;
+  const raceShort = objective?.race ? objective.race.replace(/\s*\d{4}.*$/, "").trim() : null;
+  const isShortGoal = libGoal === "5k" || libGoal === "10k" || libGoal === "semi";
+  // Budget de qualité de base selon le niveau.
+  let qBudget = libLevel === "debutant" ? 1 : libLevel === "intermediaire" ? 2 : 3;
+  if (libGoal === "marathon" || libGoal === "ultra") qBudget -= 1; // le volume prime → un cran de moins
+  if (phase.startsWith("BASE")) qBudget = Math.min(qBudget, libLevel === "debutant" ? 1 : 2);
+  else if (phase.startsWith("AFFÛTAGE")) qBudget = Math.min(qBudget, 2); // garde l'intensité, coupe le volume
+  // Atténuations SÉCURITÉ selon l'état réel (chaque signal fort = −1 séance dure).
+  const easeReasons: string[] = [];
+  if (pains.length) { qBudget -= 1; easeReasons.push("douleur signalée"); }
+  if (hrvWeekTrend?.startsWith("↓")) { qBudget -= 1; easeReasons.push("VFC en baisse"); }
+  if (load.acr > 1.5) { qBudget -= 1; easeReasons.push(`charge aiguë élevée (ratio ${r1(load.acr)})`); }
+  if (load.tsb < -25) { qBudget -= 1; easeReasons.push(`TSB très négatif (${Math.round(load.tsb)})`); }
+  qBudget = Math.max(0, Math.min(3, qBudget));
+  // Plancher : sans signal de fatigue, un objectif chrono garde ≥ 2 qualités (sauf débutant).
+  if (!easeReasons.length && objective && isShortGoal && libLevel !== "debutant") qBudget = Math.max(qBudget, 2);
+  if (!easeReasons.length && qBudget === 0 && libLevel !== "debutant") qBudget = 1;
+
+  // Menu de qualité (type + détail chiffré) — ordonné par priorité selon l'objectif.
+  const qVMA = { type: "VMA", desc: `VO2max / VMA (ex 10×400 m ou 6×1000 m à ~${paceAt(100)}–${paceAt(104)}/km, récup trottinée) → élève le plafond` };
+  const qSeuil = { type: "Seuil", desc: `Seuil (ex 3×10 min ou 2×15 min à ~${paceAt(86)}/km, récup 2 min) → tenir l'allure plus longtemps` };
+  const qSpec = { type: "Spécifique", desc: goalPace
+    ? `Allure spécifique ${raceShort ?? "objectif"} (ex 5–6×1 km ou 3×2 km à ${goalPace}/km, récup courte) → ancre ton allure de course`
+    : `Allure spécifique objectif (répétitions à l'allure visée)` };
+  const qCote = { type: "VMA", desc: `Côtes (ex 8–10×30–45 s en montée vive, récup descente) → force & économie de foulée` };
+  const qMara = { type: "Spécifique", desc: goalPace ? `Bloc allure marathon (ex 2×20 min à ${goalPace}/km) intégré à la sortie longue` : `Allure marathon en sortie longue` };
+  let menu: { type: string; desc: string }[];
+  if (libGoal === "5k" || libGoal === "10k") menu = [qVMA, qSpec, qSeuil];
+  else if (libGoal === "semi") menu = [qSeuil, qSpec, qVMA];
+  else if (libGoal === "marathon") menu = [qSeuil, qMara, qVMA];
+  else if (libGoal === "trail" || libGoal === "ultra") menu = [qCote, qSeuil, qVMA];
+  else menu = [qVMA, qSeuil, qSpec];
+  const chosen = menu.slice(0, qBudget);
+  const longRunNote = `1 sortie longue facile en Z2${(phase.startsWith("SPÉ") || phase.startsWith("AFFÛ") || libGoal === "marathon") && goalPace ? ` avec un bloc à ${goalPace}/km` : ""}`;
+
+  const weekTarget = `${chosen.length ? chosen.map((s, i) => `• Qualité ${i + 1} : ${s.desc}`).join("\n") : "• Aucune séance dure ce cycle (récupération) : que du facile + mobilité/renfo léger."}
+• ${longRunNote}.
+• 1 renforcement musculaire (peut se greffer après un footing facile, pas un jour à part obligatoire).
+• ≥ 1 jour de repos complet.
+• Tout le reste = footing FACILE Z2 (~${paceAt(70)}/km), allure conversationnelle.
+RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total), PAS du nombre de séances. ${chosen.length} séance(s) de qualité COURTE(S) (20–40 min d'effort réel) dans une semaine de plusieurs heures = toujours ~80 % facile. Le piège « presque tout en EF + renfo » SOUS-ENTRAÎNE un coureur qui vise un chrono : refuse-le.${easeReasons.length ? `\n⚠️ ALLÈGEMENT ce cycle (${easeReasons.join(" ; ")}) → qualité réduite, priorité récupération. La santé d'abord.` : ""}${daysSinceLast != null && daysSinceLast >= 3 && daysSinceLast <= 8 && !easeReasons.length ? `\nREPRISE : ${daysSinceLast} j de repos SANS perte de forme (3–8 j d'arrêt ne déconditionnent PAS). UN footing de remise en route suffit, PUIS on enchaîne la qualité normalement — ne transforme pas ça en semaine molle entière.` : ""}`;
+
+  // ── PLAN MACRO PÉRIODISÉ — bloc complet jusqu'au jour J (base → dév → spécifique → affûtage) ──
+  const macroPlan: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[] = (() => {
+    if (!weeksToRace || weeksToRace < 1 || !vma) return [];
+    const W = Math.min(weeksToRace, 26);
+    const baseKm = Math.max(Math.round(weekKm), Math.round(avg4wkKm), 20);
+    const menuTypes = (libGoal === "5k" || libGoal === "10k") ? ["VMA", "Allure spé", "Seuil"]
+      : libGoal === "marathon" ? ["Seuil", "Allure mara", "VMA"]
+      : (libGoal === "trail" || libGoal === "ultra") ? ["Côtes", "Seuil", "Spécifique"]
+      : libGoal === "semi" ? ["Seuil", "Allure spé", "VMA"]
+      : ["VMA", "Seuil", "Allure spé"];
+    const out: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[] = [];
+    for (let i = 0; i < W; i++) {
+      const wkUntil = weeksToRace - i;                 // semaines restantes au début de cette semaine
+      const ph = wkUntil <= 2 ? "Affûtage" : wkUntil <= 6 ? "Spécifique" : wkUntil <= 11 ? "Développement" : "Base";
+      let factor: number;
+      if (wkUntil <= 1) factor = 0.55;                  // semaine de course
+      else if (wkUntil === 2) factor = 0.72;            // affûtage
+      else { factor = Math.min(1.4, 1 + i * 0.06); if ((i + 1) % 4 === 0) factor *= 0.8; } // +6 %/sem, plafond +40 %, semaine allégée /4
+      const volumeKm = Math.round(baseKm * factor);
+      const qn = ph === "Affûtage" ? (wkUntil <= 1 ? 1 : 2) : ph === "Base" ? Math.min(qBudget || 2, 2) : (qBudget || 2);
+      const quality = (ph === "Base" ? ["VMA", "Seuil"] : menuTypes).slice(0, Math.max(1, qn));
+      const longRunKm = Math.round(volumeKm * (ph === "Affûtage" ? 0.22 : 0.32));
+      const focus = ph === "Base" ? "Volume aérobie + pose de vitesse"
+        : ph === "Développement" ? "VMA & seuil — montée en charge"
+        : ph === "Spécifique" ? `Allure course${goalPace ? ` (${goalPace}/km)` : ""} + endurance spécifique`
+        : wkUntil <= 1 ? "Fraîcheur — repos, rappels d'allure" : "Volume −, on garde l'intensité (fraîcheur jour J)";
+      out.push({ week: i + 1, phase: ph, volumeKm, quality, longRunKm, focus });
+    }
+    return out;
+  })();
+
+  const text = `PROFIL
+- ${p?.full_name ?? "Athlète"} · ${p?.age ?? "?"} ans · ${p?.gender ?? "?"} · ${num(p?.weight_kg) ?? "?"} kg · ${num(p?.height_cm) ?? "?"} cm · chronotype ${p?.chronotype ?? "?"} · mode ${p?.mode ?? "?"}
+- NIVEAU estimé : ${level}${vma ? ` (VMA ${vma} km/h${vmaIsEst ? " estimée" : ""})` : ""}
+
+CAPACITÉS (tests)
+- VMA : ${vma ?? "?"} km/h${vmaIsEst ? ` ⚠️ ESTIMÉE depuis ses séances (aucun test VMA enregistré) → recommande-lui un test VMA pour affiner, et reste un cran prudent sur la 1re séance VMA` : ""} · FC max ${maxHr ?? (vmaIsEst && fcMaxEst ? `~${fcMaxEst} (obs.)` : "?")} · FC repos ${restHr ?? "?"} · FC seuil ${ltHr ?? "?"}
+- Zones FC : Z2 facile ${hrZone(0.6, 0.7) ?? "?"} · Z4 seuil ${hrZone(0.8, 0.9) ?? "?"}
+- Zones allure : ${paceZones ?? (computedPaces ? `(calculées depuis la VMA) ${computedPaces}` : "non renseignées")}
+- Chronos théoriques au potentiel actuel (depuis la VMA) : ${predictions ?? "?"}
+- Repères physio : seuil lactique ~${vma ? paceAt(86) : "?"}/km · vitesse critique ~${vma ? r1(vma * 0.90) : "?"} km/h (${vma ? paceAt(90) : "?"}/km) · VO2max estimé ~${vo2 ?? "?"} ml/kg/min
+
+FORME & RÉCUPÉRATION (aujourd'hui)
+- État physiologique : ${state}
+- VFC : ${hrvLatest ?? "?"} ms (base 14j ${hrvBase ?? "?"} ms → ${hrvTrend})
+- Sommeil : ${freshSleep ? `${freshSleep.sleep_score ?? "?"}/100 cette nuit${lastSleepMin ? ` (${Math.floor(lastSleepMin / 60)}h${String(lastSleepMin % 60).padStart(2, "0")})` : ""}` : "montre non portée la nuit dernière (donnée ignorée)"} · moyenne 7j ${sleepAvg ?? "?"}/100
+
+CHARGE D'ENTRAÎNEMENT
+- Volume : ${Math.round(weekKm)} km cette semaine · ~${Math.round(avg4wkKm)} km/sem (moy. 4 sem.)
+- Repos : dernière séance il y a ${daysSinceLast ?? "?"} j · ${restDays7} j sans courir sur les 7 derniers${daysSinceLast != null && daysSinceLast >= 3 ? " ⚠️ reprise après coupure : redémarre en douceur, pas de grosse séance d'emblée" : ""}
+- CTL ${Math.round(load.ctl)} (forme) · ATL ${Math.round(load.atl)} (fatigue) · TSB ${Math.round(load.tsb)} (fraîcheur) · ratio aigu:chronique ${r1(load.acr)}${load.acr > 1.5 ? " ⚠️ élevé (risque)" : ""}
+- Répartition d'intensité 14j : ${hardShare ?? "?"} % de séances qualité (cible polarisée ≤ 20 %)
+- 5 dernières séances : ${last5.join(" | ") || "aucune"}
+${pains.length ? `- ⚠️ Douleurs récemment signalées : ${pains.join(", ")} (en tenir compte)` : ""}${lastRpe != null ? `\n- Dernier ressenti d'effort (RPE) : ${lastRpe}/10` : ""}
+
+ANALYSE APPROFONDIE (croise tous ces facteurs)
+- VO2max estimé : ${vo2 ?? "?"} ml/kg/min${efTrend ? ` · efficacité aérobie ${efTrend}` : ""}
+- Tendance VFC (7j vs 7j) : ${hrvWeekTrend ?? "n/c"}
+- Monotonie de charge : ${monotony}${monotony > 2 ? " ⚠️ trop uniforme → varie l'intensité (risque surcharge/maladie)" : " (ok)"}
+- Forme de course : ${[cadence ? `cadence ${cadence} spm` : null, stride ? `foulée ${stride} m` : null, vosc ? `oscillation ${vosc} cm` : null, gct ? `contact sol ${gct} ms` : null, power ? `puissance ${power} W` : null, decoupling != null ? `dérive cardiaque ${decoupling}%${decoupling > 5 ? " (>5 % → endurance à renforcer)" : ""}` : null].filter(Boolean).join(" · ") || "n/c"}
+- Sommeil détaillé : ${[deepPct != null ? `profond ${deepPct}%` : null, remPct != null ? `REM ${remPct}%` : null, sl?.body_battery_end != null ? `énergie ${sl.body_battery_end}/100` : null, sl?.respiration_rate != null ? `respiration ${sl.respiration_rate}/min` : null].filter(Boolean).join(" · ") || "n/c"}
+- Terrain & environnement : ${elevWeek} m D+ cette semaine${avgTemp != null ? ` · ~${avgTemp}°C récemment${avgTemp >= 25 ? " (chaleur → ralentir l'allure, hydrater)" : ""}` : ""}${cycle ? `\n- Cycle menstruel : phase ${cycle} → adapte l'intensité (pousser en folliculaire, prudence en lutéale/prémenstruel)` : ""}
+
+EXÉCUTION & ADHÉRENCE (boucle adaptative — fais ÉVOLUER la suite selon ce qu'il fait VRAIMENT)
+- Discipline des footings : ${easyDiscipline}
+- Adhérence au plan prescrit : ${adherence}
+
+OBJECTIF DE COURSE
+${objLines.length ? objLines.join("\n") : "• Aucun objectif de course → vise une PROGRESSION GLOBALE selon son profil/niveau, ses dernières séances et sa récupération (sommeil/VFC) : base aérobie, développement progressif de la VMA et du seuil, régularité, polarisé 80/20. Ne réclame pas d'objectif."}
+• Phase d'entraînement recommandée : ${phase}
+
+STRUCTURE CIBLE DE LA SEMAINE (squelette à RESPECTER — calculé pour CE coureur ; tu ajustes l'ordre des jours et les allures à sa fraîcheur, mais tu tiens le nombre de séances de qualité indiqué, ni moins par excès de prudence, ni plus)
+${weekTarget}
+
+GARDE-FOUS ANTI-BLESSURE (à respecter ABSOLUMENT — la santé prime sur la performance)
+- Progressivité : +10 % de charge/volume maximum par semaine.${load.acr > 1.4 ? " ⚠️ Ratio aigu:chronique élevé → prévoir une semaine ALLÉGÉE." : ""}${monotony > 2 ? " ⚠️ Monotonie élevée → varier l'intensité, garantir un vrai jour facile/repos." : ""}
+- Jamais 2 séances de qualité d'affilée ; ≥ 48 h entre deux séances dures ; ≥ 1 jour de repos/semaine.
+- ${pains.length ? "⚠️ Douleur signalée → réduire l'impact ou passer au croisé (vélo/natation), ne JAMAIS forcer sur une douleur." : "Au moindre signal de douleur → adapter immédiatement, pas de stoïcisme."}
+- ${daysSinceLast != null && daysSinceLast >= 4 ? "Reprise après coupure → repartir un cran en dessous, remonter progressivement." : "Si VFC sous la base ou sommeil dégradé → alléger la séance du jour."}
+- ~80 % du volume en facile (Z1-Z2). But ultime : faire RÉUSSIR l'objectif SANS blessure.
+
+PALETTE DE SÉANCES (niveau ${libLevel} · objectif ${libGoal}) — pioche les plus pertinentes et ADAPTE allures/durées/volume à CE coureur ; combine-les avec logique (périodisation, 80/20), ne les empile pas :
+${catalog}`;
+
+  return {
+    text, objective, daysToRace, weeksToRace, athleteName: String(p?.full_name ?? "Athlète"), vma,
+    weekPlan: { qBudget, quality: chosen, easyPace: vma ? paceAt(70) : null, eased: easeReasons.length > 0 },
+    macroPlan,
+  };
+}
+
+// VMA « effective » d'un athlète : test enregistré sinon estimation depuis ses séances (même
+// logique que le dashboard). Sert aux routes admin pour pousser des cibles d'allure vers la montre.
+export async function getEffectiveVma(sb: SupabaseClient, userId: string): Promise<number | null> {
+  const [baseRes, woRes] = await Promise.all([
+    sb.from("performance_baselines").select("vma_kmh").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).maybeSingle(),
+    sb.from("workouts").select("distance_km,duration_seconds,type,avg_hr,max_hr").eq("user_id", userId).order("date", { ascending: false }).limit(60),
+  ]);
+  const stored = Number((baseRes.data as { vma_kmh?: number } | null)?.vma_kmh) || 0;
+  if (stored > 0) return stored;
+  const wks = (woRes.data ?? []) as { distance_km?: number | null; duration_seconds?: number | null; type?: string | null; avg_hr?: number | null; max_hr?: number | null }[];
+  const obsMaxHr = Math.max(0, ...wks.map((w) => Number(w.max_hr ?? 0)));
+  return bestVmaFromWorkouts(wks, obsMaxHr > 120 ? obsMaxHr : null);
+}

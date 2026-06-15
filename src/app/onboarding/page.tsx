@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
+import { vmaFrom6min } from "@/lib/running/fitness";
 import { ArrowRight, ArrowLeft, User, Activity, Target, CheckCircle2, Watch, Eye, EyeOff, ExternalLink, RefreshCw, AlertCircle, Wifi } from "lucide-react";
 
 type Step = "watch" | "profile" | "physio" | "goals" | "done";
@@ -27,6 +28,7 @@ export default function OnboardingPage() {
   });
 
   const [vma, setVma] = useState({ vma_kmh: "", max_hr: "", resting_hr: "" });
+  const [test6min, setTest6min] = useState("");
   const [goals, setGoals] = useState({ target_race: "", target_weekly_km: "50" });
 
   // Watch step state
@@ -74,6 +76,25 @@ export default function OnboardingPage() {
 
   const stepIdx = STEPS.indexOf(step);
 
+  // ── Smart validation — catches the most common mistakes ──
+  const idTrim = watchAthleteId.trim();
+  const keyTrim = watchApiKey.trim();
+  const idIsEmail = idTrim.includes("@");
+  const idValid = /^i\d{3,}$/i.test(idTrim);
+  const idHint =
+    idTrim === "" ? null :
+    idIsEmail ? "C'est votre email — pas l'Athlete ID. Il ressemble à i564686." :
+    !idTrim.toLowerCase().startsWith("i") ? "L'Athlete ID commence par un « i » (ex: i564686)." :
+    !idValid ? "Format inattendu — un « i » suivi de chiffres (ex: i564686)." :
+    null;
+  const keyLooksLikePassword = keyTrim.length > 0 && keyTrim.length < 20 && /[A-Z!?@#$%^&*]/.test(keyTrim);
+  const keyValid = /^[a-z0-9]{16,}$/i.test(keyTrim);
+  const keyHint =
+    keyTrim === "" ? null :
+    keyLooksLikePassword ? "On dirait un mot de passe. La clé API est une longue suite de lettres/chiffres." :
+    !keyValid ? "La clé API fait ~30 caractères (lettres + chiffres uniquement)." :
+    null;
+
   function next() {
     if (stepIdx < STEPS.length - 1) setStep(STEPS[stepIdx + 1]);
   }
@@ -105,6 +126,24 @@ export default function OnboardingPage() {
 
   async function handleFinish() {
     setLoading(true);
+
+    // Hard guard — the watch connection is mandatory. Re-verify before completing.
+    try {
+      const statusRes = await fetch("/api/intervals/status");
+      const status = await statusRes.json();
+      if (!status.configured) {
+        toast.error("Connectez d'abord votre montre pour continuer.");
+        setStep("watch");
+        setWatchSubStep(3);
+        setLoading(false);
+        return;
+      }
+    } catch {
+      toast.error("Impossible de vérifier la connexion à votre montre.");
+      setLoading(false);
+      return;
+    }
+
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { router.push("/login"); return; }
@@ -266,15 +305,35 @@ export default function OnboardingPage() {
                   <h2 className="font-semibold text-zinc-900">Données physiologiques</h2>
                 </div>
 
-                <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl text-sm text-amber-800">
-                  <strong>Test VMA recommandé :</strong> Courez 6 min à allure maximale sur terrain plat. Distance parcourue ÷ 0.1 = votre VMA en km/h.
+                <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl text-sm text-amber-800 space-y-2">
+                  <div className="font-bold">🎯 Test VMA — à faire avant ta première séance</div>
+                  <p>Ta <b>VMA</b> (Vitesse Maximale Aérobie) calibre TOUTES tes allures, zones, prédictions de chrono et le coaching IA. 6 minutes qui changent tout.</p>
+                  <ol className="list-decimal list-inside space-y-0.5 text-amber-700">
+                    <li>Échauffe-toi 15 min en footing facile.</li>
+                    <li>Cours <b>6 minutes À FOND</b> (allure la plus rapide que tu tiens), terrain plat — une piste d&apos;athlétisme est idéale.</li>
+                    <li>Relève la <b>distance parcourue</b> en mètres et saisis-la ci-dessous.</li>
+                  </ol>
+                </div>
+
+                <div className="rounded-2xl border border-zinc-200 p-4">
+                  <label className="text-xs font-medium text-zinc-500 block mb-1">Distance parcourue en 6 min (mètres)</label>
+                  <div className="flex items-center gap-2">
+                    <input type="number" value={test6min}
+                      onChange={e => { setTest6min(e.target.value); const v = vmaFrom6min(parseFloat(e.target.value)); if (v != null) setVma(p => ({ ...p, vma_kmh: String(v) })); }}
+                      placeholder="ex: 1650" min="800" max="3500" step="10"
+                      className="flex-1 px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                    {test6min && vmaFrom6min(parseFloat(test6min)) != null && (
+                      <div className="px-4 py-3 rounded-xl bg-green-50 text-green-700 font-bold text-sm whitespace-nowrap">→ VMA {vmaFrom6min(parseFloat(test6min))} km/h</div>
+                    )}
+                  </div>
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-zinc-500 block mb-1">VMA (km/h) — optionnel</label>
+                  <label className="text-xs font-medium text-zinc-500 block mb-1">VMA (km/h)</label>
                   <input type="number" value={vma.vma_kmh} onChange={e => setVma(p => ({...p, vma_kmh: e.target.value}))}
                     placeholder="ex: 16.5" min="8" max="30" step="0.5"
                     className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                  <p className="text-[11px] text-zinc-400 mt-1">Calculée automatiquement depuis le test ci-dessus — ou saisis-la si tu la connais. Pas encore testé ? On l&apos;estimera depuis tes séances, mais un vrai test la rend exacte.</p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -305,11 +364,15 @@ export default function OnboardingPage() {
                   </div>
                 )}
 
+                {!(parseFloat(vma.vma_kmh) >= 8 && parseFloat(vma.vma_kmh) <= 30) && (
+                  <p className="text-xs text-amber-600">⚠️ Le test VMA est <b>obligatoire</b> pour continuer : fais le test 6 min ci-dessus, ou saisis ta VMA si tu la connais déjà.</p>
+                )}
                 <div className="flex gap-3">
                   <button onClick={prev} className="btn-secondary flex-1 justify-center">
                     <ArrowLeft className="w-4 h-4" /> Retour
                   </button>
-                  <button onClick={next} className="btn-brand flex-1 justify-center">
+                  <button onClick={next} disabled={!(parseFloat(vma.vma_kmh) >= 8 && parseFloat(vma.vma_kmh) <= 30)}
+                    className="btn-brand flex-1 justify-center disabled:opacity-50 disabled:cursor-not-allowed">
                     Suivant <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -327,13 +390,13 @@ export default function OnboardingPage() {
 
                 <div>
                   <label className="text-xs font-medium text-zinc-500 block mb-1">Volume cible / semaine (km)</label>
-                  <input type="range" min="10" max="150" step="5" value={goals.target_weekly_km}
+                  <input type="range" min="5" max="200" step="5" value={goals.target_weekly_km}
                     onChange={e => setGoals(g => ({...g, target_weekly_km: e.target.value}))}
                     className="w-full accent-green-500" />
                   <div className="flex justify-between text-xs text-zinc-400 mt-1">
-                    <span>10 km</span>
+                    <span>5 km</span>
                     <span className="font-semibold text-zinc-900">{goals.target_weekly_km} km/sem</span>
-                    <span>150 km</span>
+                    <span>200 km</span>
                   </div>
                 </div>
 
@@ -382,19 +445,41 @@ export default function OnboardingPage() {
                       <div className="space-y-4 py-2 text-center">
                         <div className="text-5xl">🌐</div>
                         <div>
-                          <p className="font-semibold text-zinc-900 text-base">Créez un compte Intervals.icu</p>
+                          <p className="font-semibold text-zinc-900 text-base">D&apos;abord, un compte Intervals.icu</p>
                           <p className="text-xs text-zinc-500 mt-1.5 leading-relaxed">
-                            Gratuit. C&apos;est le pont entre votre montre<br />(Garmin, COROS, Polar, Suunto…) et cette app.
+                            C&apos;est <strong>gratuit</strong> et c&apos;est le pont entre votre montre<br />(Garmin, COROS, Polar, Suunto…) et cette app.
                           </p>
                         </div>
-                        <a href="https://intervals.icu" target="_blank" rel="noopener noreferrer"
+
+                        {/* Visual bridge */}
+                        <div className="flex items-center justify-center gap-2 py-1">
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="w-12 h-12 bg-zinc-100 rounded-2xl flex items-center justify-center text-2xl">⌚</div>
+                            <span className="text-[10px] text-zinc-400 font-medium">Montre</span>
+                          </div>
+                          <ArrowRight className="w-4 h-4 text-zinc-300" />
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="w-12 h-12 bg-blue-50 border-2 border-blue-200 rounded-2xl flex items-center justify-center text-2xl">🌐</div>
+                            <span className="text-[10px] text-blue-500 font-semibold">Intervals</span>
+                          </div>
+                          <ArrowRight className="w-4 h-4 text-zinc-300" />
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="w-12 h-12 bg-green-50 border-2 border-green-200 rounded-2xl flex items-center justify-center text-2xl">🏔</div>
+                            <span className="text-[10px] text-green-600 font-semibold">Cette app</span>
+                          </div>
+                        </div>
+
+                        <a href="https://intervals.icu/signup" target="_blank" rel="noopener noreferrer"
                           className="btn-brand justify-center w-full">
                           Créer mon compte gratuit <ExternalLink className="w-4 h-4" />
                         </a>
                         <button onClick={() => setWatchSubStep(1)}
-                          className="w-full text-xs text-zinc-400 hover:text-zinc-700 underline underline-offset-2 transition-colors">
-                          J&apos;ai déjà un compte →
+                          className="w-full flex items-center justify-center gap-1.5 text-sm text-zinc-600 font-medium hover:text-zinc-900 bg-zinc-50 hover:bg-zinc-100 rounded-xl py-2.5 transition-colors">
+                          ✅ J&apos;ai déjà un compte, continuer
                         </button>
+                        <p className="text-[11px] text-zinc-400 leading-relaxed">
+                          Astuce : si en cliquant ci-dessus vous arrivez sur un calendrier, c&apos;est que vous êtes <strong>déjà inscrit</strong> — cliquez simplement « J&apos;ai déjà un compte ».
+                        </p>
                       </div>
                     )}
 
@@ -414,16 +499,15 @@ export default function OnboardingPage() {
                         </div>
                         {/* Permissions reminder */}
                         <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 space-y-1.5">
-                          <p className="text-xs font-semibold text-amber-700">⚠️ Sur Garmin Connect, activez :</p>
-                          {["Activities", "Daily Health Stats", "Historical Data"].map(p => (
+                          <p className="text-xs font-semibold text-amber-700">⚠️ Sur la carte Garmin d&apos;Intervals.icu, cochez :</p>
+                          {["Télécharger les activités", "Télécharger les données de santé", "Importer les données historiques"].map(p => (
                             <div key={p} className="flex items-center gap-2 text-xs text-amber-700">
                               <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />{p}
                             </div>
                           ))}
-                          <a href="https://connect.garmin.com/modern/settings/application-list" target="_blank" rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-xs text-amber-700 font-semibold hover:underline mt-1">
-                            Ouvrir Garmin Connect <ExternalLink className="w-3 h-3" />
-                          </a>
+                          <p className="text-[11px] text-amber-600 mt-1">
+                            Une fenêtre Garmin s&apos;ouvrira pour autoriser l&apos;accès — connectez-vous et acceptez.
+                          </p>
                         </div>
                         <a href="https://intervals.icu/settings/connections" target="_blank" rel="noopener noreferrer"
                           className="btn-brand justify-center w-full">
@@ -438,29 +522,62 @@ export default function OnboardingPage() {
 
                     {/* STEP 2 — Clé API */}
                     {watchSubStep === 2 && (
-                      <div className="space-y-4 py-2 text-center">
-                        <div className="text-5xl">🔑</div>
-                        <div>
-                          <p className="font-semibold text-zinc-900 text-base">Copiez votre clé API</p>
-                          <p className="text-xs text-zinc-500 mt-1">Sur Intervals.icu → Avatar → Paramètres → Accès développeur</p>
+                      <div className="space-y-4 py-2">
+                        <div className="text-center">
+                          <div className="text-5xl">🔑</div>
+                          <p className="font-semibold text-zinc-900 text-base mt-2">Récupérez vos 2 codes secrets</p>
+                          <p className="text-xs text-zinc-500 mt-1">Sur Intervals.icu : <strong>Paramètres</strong> → tout en bas, <strong>Accès développeur</strong></p>
                         </div>
-                        <div className="bg-zinc-50 border border-zinc-100 rounded-xl p-3 text-left space-y-2.5">
-                          <div className="flex items-start gap-2.5 text-xs text-zinc-600">
-                            <span className="w-5 h-5 bg-zinc-200 rounded-full flex items-center justify-center font-bold flex-shrink-0 mt-0.5">1</span>
-                            <span>Notez l&apos;<strong>Athlete ID</strong> (format&nbsp;<code className="bg-zinc-200 px-1 rounded">i564686</code>)</span>
+
+                        {/* Annotated mockup of the developer settings screen */}
+                        <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden">
+                          <div className="bg-zinc-50 border-b border-zinc-100 px-3 py-2 flex items-center gap-1.5">
+                            <div className="flex gap-1">
+                              <span className="w-2 h-2 rounded-full bg-red-300" />
+                              <span className="w-2 h-2 rounded-full bg-amber-300" />
+                              <span className="w-2 h-2 rounded-full bg-green-300" />
+                            </div>
+                            <span className="text-[10px] text-zinc-400 ml-1">intervals.icu — Accès développeur</span>
                           </div>
-                          <div className="flex items-start gap-2.5 text-xs text-zinc-600">
-                            <span className="w-5 h-5 bg-zinc-200 rounded-full flex items-center justify-center font-bold flex-shrink-0 mt-0.5">2</span>
-                            <span>Cliquez <strong>Afficher</strong> ou <strong>Produire</strong> pour obtenir la clé API</span>
+                          <div className="p-3 space-y-2.5">
+                            {/* Athlete ID row */}
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 bg-blue-50 border-2 border-blue-300 rounded-lg px-3 py-2 animate-pulse">
+                                <p className="text-[10px] text-blue-400 font-medium">Athlete ID</p>
+                                <p className="font-mono text-sm font-bold text-blue-700">i564686</p>
+                              </div>
+                              <div className="flex items-center gap-1 text-blue-500 w-20">
+                                <ArrowLeft className="w-4 h-4 flex-shrink-0" />
+                                <span className="text-[11px] font-semibold leading-tight">code 1️⃣</span>
+                              </div>
+                            </div>
+                            {/* API key row */}
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 bg-green-50 border-2 border-green-300 rounded-lg px-3 py-2 animate-pulse">
+                                <p className="text-[10px] text-green-500 font-medium">API Key</p>
+                                <p className="font-mono text-xs font-bold text-green-700 truncate">a1b2c3d4e5f6…</p>
+                              </div>
+                              <div className="flex items-center gap-1 text-green-600 w-20">
+                                <ArrowLeft className="w-4 h-4 flex-shrink-0" />
+                                <span className="text-[11px] font-semibold leading-tight">code 2️⃣</span>
+                              </div>
+                            </div>
                           </div>
                         </div>
+
+                        {/* Warnings about common mistakes */}
+                        <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 space-y-1">
+                          <p className="text-[11px] text-amber-700 flex items-start gap-1.5"><span>❌</span> <span>Ce n&apos;est <strong>pas</strong> votre email ni votre mot de passe.</span></p>
+                          <p className="text-[11px] text-amber-700 flex items-start gap-1.5"><span>👉</span> <span>Pas de clé visible ? Cliquez <strong>« Produire »</strong> / <strong>« Generate »</strong>.</span></p>
+                        </div>
+
                         <a href="https://intervals.icu/settings#developer" target="_blank" rel="noopener noreferrer"
                           className="btn-brand justify-center w-full">
-                          Ouvrir les paramètres développeur <ExternalLink className="w-4 h-4" />
+                          Ouvrir l&apos;Accès développeur <ExternalLink className="w-4 h-4" />
                         </a>
                         <div className="flex gap-3">
                           <button onClick={() => setWatchSubStep(1)} className="flex-1 text-xs text-zinc-400 hover:text-zinc-600 py-2">← Retour</button>
-                          <button onClick={() => setWatchSubStep(3)} className="flex-1 btn-brand justify-center text-sm py-2">J&apos;ai la clé →</button>
+                          <button onClick={() => setWatchSubStep(3)} className="flex-1 btn-brand justify-center text-sm py-2">J&apos;ai mes 2 codes →</button>
                         </div>
                       </div>
                     )}
@@ -477,22 +594,44 @@ export default function OnboardingPage() {
                             </div>
                             <div className="space-y-3">
                               <div>
-                                <label className="text-xs font-medium text-zinc-500 block mb-1.5">Athlete ID</label>
-                                <input type="text" value={watchAthleteId} onChange={e => setWatchAthleteId(e.target.value)}
-                                  placeholder="i564686"
-                                  className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500" />
+                                <label className="text-xs font-medium text-zinc-500 mb-1.5 flex items-center gap-1.5">
+                                  <span className="w-4 h-4 bg-blue-100 text-blue-600 rounded text-[10px] font-bold flex items-center justify-center">1</span>
+                                  Athlete ID <span className="text-zinc-400 font-normal">(commence par i)</span>
+                                </label>
+                                <div className="relative">
+                                  <input type="text" value={watchAthleteId} onChange={e => setWatchAthleteId(e.target.value)}
+                                    placeholder="i564686"
+                                    className={`w-full px-3 py-2.5 pr-9 rounded-xl border text-sm font-mono focus:outline-none focus:ring-2 transition-colors ${
+                                      idHint ? "border-red-300 focus:ring-red-400 bg-red-50/40" :
+                                      idValid ? "border-green-300 focus:ring-green-400 bg-green-50/40" :
+                                      "border-zinc-200 focus:ring-green-500"
+                                    }`} />
+                                  {idValid && <CheckCircle2 className="w-4 h-4 text-green-500 absolute right-3 top-1/2 -translate-y-1/2" />}
+                                  {idHint && <AlertCircle className="w-4 h-4 text-red-400 absolute right-3 top-1/2 -translate-y-1/2" />}
+                                </div>
+                                {idHint && <p className="text-[11px] text-red-500 mt-1 flex items-start gap-1"><span>⚠️</span>{idHint}</p>}
                               </div>
                               <div>
-                                <label className="text-xs font-medium text-zinc-500 block mb-1.5">Clé API</label>
+                                <label className="text-xs font-medium text-zinc-500 mb-1.5 flex items-center gap-1.5">
+                                  <span className="w-4 h-4 bg-green-100 text-green-600 rounded text-[10px] font-bold flex items-center justify-center">2</span>
+                                  Clé API <span className="text-zinc-400 font-normal">(longue suite de caractères)</span>
+                                </label>
                                 <div className="relative">
                                   <input type={showWatchKey ? "text" : "password"} value={watchApiKey} onChange={e => setWatchApiKey(e.target.value)}
-                                    placeholder="votre_cle_api"
-                                    className="w-full px-3 py-2.5 pr-9 rounded-xl border border-zinc-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500" />
+                                    placeholder="a1b2c3d4e5f6…"
+                                    className={`w-full px-3 py-2.5 pr-16 rounded-xl border text-sm font-mono focus:outline-none focus:ring-2 transition-colors ${
+                                      keyHint ? "border-red-300 focus:ring-red-400 bg-red-50/40" :
+                                      keyValid ? "border-green-300 focus:ring-green-400 bg-green-50/40" :
+                                      "border-zinc-200 focus:ring-green-500"
+                                    }`} />
+                                  {keyValid && <CheckCircle2 className="w-4 h-4 text-green-500 absolute right-9 top-1/2 -translate-y-1/2" />}
+                                  {keyHint && <AlertCircle className="w-4 h-4 text-red-400 absolute right-9 top-1/2 -translate-y-1/2" />}
                                   <button type="button" onClick={() => setShowWatchKey(v => !v)}
                                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600">
                                     {showWatchKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                   </button>
                                 </div>
+                                {keyHint && <p className="text-[11px] text-red-500 mt-1 flex items-start gap-1"><span>⚠️</span>{keyHint}</p>}
                               </div>
                             </div>
                             {watchError && (
@@ -500,7 +639,7 @@ export default function OnboardingPage() {
                                 <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />{watchError}
                               </div>
                             )}
-                            <button type="submit" disabled={savingWatch || !watchAthleteId || !watchApiKey}
+                            <button type="submit" disabled={savingWatch || !idValid || !keyValid}
                               className="btn-brand w-full justify-center disabled:opacity-40">
                               {savingWatch ? <><RefreshCw className="w-4 h-4 animate-spin mr-2" />Vérification…</> : "Connecter & continuer 🚀"}
                             </button>

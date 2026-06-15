@@ -24,7 +24,7 @@ export async function GET() {
     allRaces.push(...data);
     if (data.length < PAGE) break;
     from += PAGE;
-    if (allRaces.length >= 15000) break; // safety cap
+    if (allRaces.length >= 25000) break; // safety cap
   }
 
   return NextResponse.json({ races: allRaces });

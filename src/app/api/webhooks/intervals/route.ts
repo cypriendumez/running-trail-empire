@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { autoCoachForUser } from "@/lib/ai/autoCoach";
 
 export const runtime = "nodejs";
 
@@ -143,8 +144,15 @@ export async function POST(req: Request) {
     }
   }
 
-  console.log(`[webhook/intervals] athlete=${athleteId} → ${synced} activités synced`);
-  return NextResponse.json({ ok: true, synced });
+  // Coach AUTONOME INSTANTANÉ : dès qu'intervals notifie une nouvelle séance, on (re)publie
+  // la prochaine séance sur le dashboard + la montre, sans aucun délai ni clic.
+  let coached = false;
+  if (synced > 0) {
+    const r = await autoCoachForUser(admin, { userId: profile.id, athleteId, apiKey: profile.intervals_api_key }).catch(() => null);
+    coached = !!r?.processed;
+  }
+  console.log(`[webhook/intervals] athlete=${athleteId} → ${synced} activités synced · coach=${coached}`);
+  return NextResponse.json({ ok: true, synced, coached });
 }
 
 // Intervals.icu also sends GET to verify the webhook endpoint is alive

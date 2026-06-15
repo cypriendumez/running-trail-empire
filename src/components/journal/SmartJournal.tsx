@@ -7,6 +7,71 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mic, MicOff, Send, Sparkles, Brain, Flame, Zap, Frown, Meh, Smile } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useT } from "@/lib/i18n/LanguageProvider";
+
+// ── i18n local (5 langues) — le journal naît traduit. ───────────────────────────
+type Tr = (k: string, p?: Record<string, string | number>) => string;
+function fill(s: string, p?: Record<string, string | number>) {
+  return p ? s.replace(/\{(\w+)\}/g, (m, k) => (k in p ? String(p[k]) : m)) : s;
+}
+const SPEECH: Record<string, string> = { fr: "fr-FR", en: "en-US", de: "de-DE", es: "es-ES", pt: "pt-PT" };
+const J: Record<string, Record<string, string>> = {
+  fr: {
+    "title": "Smart Journal", "subtitle": "Analyse NLP de votre état mental · Détection de fatigue psychologique",
+    "write": "Écrire", "history": "Historique",
+    "placeholder": "Comment s'est passée votre séance ? Comment vous sentez-vous mentalement et physiquement ? Parlez librement…",
+    "stop": "Arrêter", "voice": "Vocal", "chars": "{n} caractères", "analyzing": "Analyse en cours…", "analyze": "Analyser",
+    "nlp": "Analyse NLP", "sent.positive": "Positif", "sent.neutral": "Neutre", "sent.negative": "Négatif",
+    "score.fatigue": "Fatigue mentale", "score.motivation": "Motivation", "score.stress": "Stress",
+    "keywords": "Mots-clés détectés", "insights": "Insights IA", "saved": "Sauvegardé ✓", "save": "Sauvegarder l'entrée",
+    "empty": "Aucune entrée pour le moment", "voiceUnsupported": "Reconnaissance vocale non supportée sur ce navigateur.",
+    "h.motivation": "💪 Motivation {n}/10", "h.fatigue": "🧠 Fatigue {n}/10", "h.stress": "⚡ Stress {n}/10",
+  },
+  en: {
+    "title": "Smart Journal", "subtitle": "NLP analysis of your mental state · Psychological fatigue detection",
+    "write": "Write", "history": "History",
+    "placeholder": "How did your session go? How do you feel mentally and physically? Speak freely…",
+    "stop": "Stop", "voice": "Voice", "chars": "{n} characters", "analyzing": "Analyzing…", "analyze": "Analyze",
+    "nlp": "NLP analysis", "sent.positive": "Positive", "sent.neutral": "Neutral", "sent.negative": "Negative",
+    "score.fatigue": "Mental fatigue", "score.motivation": "Motivation", "score.stress": "Stress",
+    "keywords": "Keywords detected", "insights": "AI insights", "saved": "Saved ✓", "save": "Save entry",
+    "empty": "No entry yet", "voiceUnsupported": "Speech recognition not supported on this browser.",
+    "h.motivation": "💪 Motivation {n}/10", "h.fatigue": "🧠 Fatigue {n}/10", "h.stress": "⚡ Stress {n}/10",
+  },
+  de: {
+    "title": "Smart Journal", "subtitle": "NLP-Analyse deines mentalen Zustands · Erkennung psychischer Ermüdung",
+    "write": "Schreiben", "history": "Verlauf",
+    "placeholder": "Wie war dein Training? Wie fühlst du dich mental und körperlich? Sprich frei…",
+    "stop": "Stopp", "voice": "Sprache", "chars": "{n} Zeichen", "analyzing": "Analyse läuft…", "analyze": "Analysieren",
+    "nlp": "NLP-Analyse", "sent.positive": "Positiv", "sent.neutral": "Neutral", "sent.negative": "Negativ",
+    "score.fatigue": "Mentale Ermüdung", "score.motivation": "Motivation", "score.stress": "Stress",
+    "keywords": "Erkannte Schlüsselwörter", "insights": "KI-Insights", "saved": "Gespeichert ✓", "save": "Eintrag speichern",
+    "empty": "Noch kein Eintrag", "voiceUnsupported": "Spracherkennung in diesem Browser nicht unterstützt.",
+    "h.motivation": "💪 Motivation {n}/10", "h.fatigue": "🧠 Ermüdung {n}/10", "h.stress": "⚡ Stress {n}/10",
+  },
+  es: {
+    "title": "Smart Journal", "subtitle": "Análisis NLP de tu estado mental · Detección de fatiga psicológica",
+    "write": "Escribir", "history": "Historial",
+    "placeholder": "¿Cómo fue tu sesión? ¿Cómo te sientes mental y físicamente? Habla con libertad…",
+    "stop": "Detener", "voice": "Voz", "chars": "{n} caracteres", "analyzing": "Analizando…", "analyze": "Analizar",
+    "nlp": "Análisis NLP", "sent.positive": "Positivo", "sent.neutral": "Neutral", "sent.negative": "Negativo",
+    "score.fatigue": "Fatiga mental", "score.motivation": "Motivación", "score.stress": "Estrés",
+    "keywords": "Palabras clave detectadas", "insights": "Insights IA", "saved": "Guardado ✓", "save": "Guardar entrada",
+    "empty": "Aún no hay entradas", "voiceUnsupported": "Reconocimiento de voz no compatible con este navegador.",
+    "h.motivation": "💪 Motivación {n}/10", "h.fatigue": "🧠 Fatiga {n}/10", "h.stress": "⚡ Estrés {n}/10",
+  },
+  pt: {
+    "title": "Smart Journal", "subtitle": "Análise NLP do teu estado mental · Deteção de fadiga psicológica",
+    "write": "Escrever", "history": "Histórico",
+    "placeholder": "Como correu o teu treino? Como te sentes mental e fisicamente? Fala à vontade…",
+    "stop": "Parar", "voice": "Voz", "chars": "{n} caracteres", "analyzing": "A analisar…", "analyze": "Analisar",
+    "nlp": "Análise NLP", "sent.positive": "Positivo", "sent.neutral": "Neutro", "sent.negative": "Negativo",
+    "score.fatigue": "Fadiga mental", "score.motivation": "Motivação", "score.stress": "Stress",
+    "keywords": "Palavras-chave detetadas", "insights": "Insights IA", "saved": "Guardado ✓", "save": "Guardar entrada",
+    "empty": "Ainda não há entradas", "voiceUnsupported": "Reconhecimento de voz não suportado neste navegador.",
+    "h.motivation": "💪 Motivação {n}/10", "h.fatigue": "🧠 Fadiga {n}/10", "h.stress": "⚡ Stress {n}/10",
+  },
+};
 
 interface JournalEntry {
   id: string;
@@ -23,6 +88,8 @@ interface JournalEntry {
 const GEMINI_ANALYZE_URL = "/api/ai/journal-analyze";
 
 export function SmartJournal() {
+  const { lang } = useT();
+  const tr: Tr = (k, p) => fill(J[lang]?.[k] ?? J.fr[k] ?? k, p);
   const [text, setText] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -36,12 +103,12 @@ export function SmartJournal() {
   function startRecording() {
     const w = window as AnyWindow;
     if (!("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) {
-      alert("Reconnaissance vocale non supportée sur ce navigateur.");
+      alert(tr("voiceUnsupported"));
       return;
     }
     const SpeechRecognitionAPI = w.SpeechRecognition ?? w.webkitSpeechRecognition;
     const rec = new SpeechRecognitionAPI();
-    rec.lang = "fr-FR";
+    rec.lang = SPEECH[lang] ?? "fr-FR";
     rec.continuous = true;
     rec.interimResults = true;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -121,9 +188,9 @@ export function SmartJournal() {
   }
 
   const sentimentConfig = {
-    positive: { icon: Smile, color: "text-green-600", bg: "bg-green-50", label: "Positif" },
-    neutral: { icon: Meh, color: "text-blue-600", bg: "bg-blue-50", label: "Neutre" },
-    negative: { icon: Frown, color: "text-orange-600", bg: "bg-orange-50", label: "Négatif" },
+    positive: { icon: Smile, color: "text-green-600", bg: "bg-green-50", labelKey: "sent.positive" },
+    neutral: { icon: Meh, color: "text-blue-600", bg: "bg-blue-50", labelKey: "sent.neutral" },
+    negative: { icon: Frown, color: "text-orange-600", bg: "bg-orange-50", labelKey: "sent.negative" },
   };
 
   return (
@@ -213,7 +280,7 @@ export function SmartJournal() {
                       return (
                         <span className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full ${cfg.bg} ${cfg.color}`}>
                           <Icon className="w-3.5 h-3.5" />
-                          {cfg.label}
+                          {tr(cfg.labelKey)}
                         </span>
                       );
                     })()}
@@ -278,7 +345,7 @@ export function SmartJournal() {
                       </div>
                       <span className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full ${cfg.bg} ${cfg.color}`}>
                         <Icon className="w-3.5 h-3.5" />
-                        {cfg.label}
+                        {tr(cfg.labelKey)}
                       </span>
                     </div>
                     <p className="text-sm text-zinc-600 mb-3 line-clamp-2">{entry.raw_text}</p>

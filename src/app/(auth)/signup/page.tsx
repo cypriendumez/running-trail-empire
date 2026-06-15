@@ -154,6 +154,16 @@ export default function SignupPage() {
             />
           </div>
 
+          <label className="flex items-start gap-2.5 text-xs text-zinc-500">
+            <input type="checkbox" required className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-300 text-green-600 focus:ring-green-500" />
+            <span>
+              J&apos;accepte les{" "}
+              <Link href="/terms" className="text-green-600 hover:underline">CGU</Link>{" "}et la{" "}
+              <Link href="/confidentialite" className="text-green-600 hover:underline">politique de confidentialité</Link>,
+              et le traitement de mes <b>données de santé</b> pour le coaching.
+            </span>
+          </label>
+
           <button type="submit" disabled={loading} className="btn-brand w-full justify-center py-3">
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
             Créer mon compte
@@ -164,7 +174,7 @@ export default function SignupPage() {
           En créant un compte vous acceptez nos{" "}
           <Link href="/terms" className="text-zinc-600 hover:text-zinc-900">CGU</Link>
           {" "}et notre{" "}
-          <Link href="/privacy" className="text-zinc-600 hover:text-zinc-900">Politique de confidentialité</Link>
+          <Link href="/confidentialite" className="text-zinc-600 hover:text-zinc-900">Politique de confidentialité</Link>
         </p>
 
         <p className="text-center text-sm text-zinc-500 mt-4">

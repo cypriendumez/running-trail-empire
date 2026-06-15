@@ -1,19 +1,28 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
-  Activity, Heart, Zap, Trophy, Target, TrendingUp,
-  Calendar, MapPin, Droplets, Wind, Thermometer, Footprints,
-  Moon, BatteryCharging
+  Activity, Heart, Trophy, Target,
+  Calendar, Footprints, Moon, ChevronRight,
+  Gauge, Mountain, Timer, Flame, Rocket, Award, TrendingUp,
+  type LucideIcon,
 } from "lucide-react";
 import {
-  LineChart, Line, AreaChart, Area,
+  BarChart, Bar, Cell, AreaChart, Area,
   ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid
 } from "recharts";
 import Link from "next/link";
 import type { UserProfile, HRVData, Workout } from "@/types";
+import { racePredictions, fmtPaceSec, fmtTime } from "@/lib/running/fitness";
 import { TaperingWidget } from "@/components/dashboard/TaperingWidget";
+import { SessionFeedback } from "@/components/dashboard/SessionFeedback";
+import { ObjectiveCard, type Objective } from "@/components/dashboard/ObjectiveCard";
+import { cleanActivityName } from "@/lib/utils/activityName";
+import { useT } from "@/lib/i18n/LanguageProvider";
+
+// Fonction de traduction (avec interpolation {clé}) passée aux helpers.
+type TFn = (k: string, params?: Record<string, string | number>) => string;
 
 interface Props {
   profile: UserProfile | null;
@@ -22,21 +31,22 @@ interface Props {
   plan: Record<string, unknown> | null;
   league: Record<string, unknown> | null;
   disciplineHistory: Record<string, unknown>[];
-  sleep?: { total_sleep_min: number; sleep_score: number; body_battery_end: number; deep_sleep_min: number; rem_sleep_min: number } | null;
+  sleep?: { total_sleep_min: number; sleep_score: number; body_battery_end: number; deep_sleep_min: number; rem_sleep_min: number; date: string } | null;
+  coachSession?: { title: string; subtitle: string; tags: string[]; why: string } | null;
+  pendingFeedback?: { date: string; title: string } | null;
+  objective?: Objective | null;
+  currentVma?: number | null;
+  loadRisk?: { acwr: number; monotony: number; deload: boolean; level: string; reason: string };
 }
 
-// Exact spec colors: Bleu Polaire / Vert Émeraude / Orange Braise
-const STATE_COLORS = {
-  recovery:    { bg: "#E0F2FE", accent: "#0284C7", label: "Mode Récupération", emoji: "💙" },
-  optimal:     { bg: "#D1FAE5", accent: "#059669", label: "Forme Optimale",    emoji: "💚" },
-  competition: { bg: "#FFEDD5", accent: "#EA580C", label: "Haute Intensité",   emoji: "🔥" },
-} as const;
+// La forme du jour est calculée à partir de données réelles : voir computeReadiness().
 
-export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplineHistory, sleep }: Props) {
-  const mode = profile?.mode ?? "ludique";
+export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplineHistory, sleep, coachSession, pendingFeedback, objective, currentVma, loadRisk }: Props) {
+  const { t, lang } = useT();
   const state = hrv[0]?.physiological_state ?? "optimal";
 
-  const stateConfig = STATE_COLORS[state];
+  // Sommeil : on n'exploite/affiche que des données RÉCENTES (montre réellement portée).
+  const freshSleep = sleep && sleep.date && Date.now() - new Date(sleep.date + "T00:00:00").getTime() <= 2 * 86400000 ? sleep : null;
 
   const weeklyKm = workouts
     .filter(w => {
@@ -47,127 +57,415 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
     })
     .reduce((sum, w) => sum + (w.distance_km ?? 0), 0);
 
-  const hrvChartData = hrv.slice(0, 14).reverse().map(h => ({
-    date: new Date(h.date).toLocaleDateString("fr", { day: "2-digit", month: "2-digit" }),
-    hrv: h.hrv_ms,
-  }));
+  const hrvChartData = hrv.slice(0, 14).reverse()
+    .filter(h => h.hrv_ms != null)
+    .map(h => ({
+      date: new Date(h.date).toLocaleDateString(lang, { day: "2-digit", month: "2-digit" }),
+      hrv: h.hrv_ms,
+    }));
 
   const weeklyData = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
     const dayWorkouts = workouts.filter(w => new Date(w.date).toDateString() === d.toDateString());
     return {
-      day: d.toLocaleDateString("fr", { weekday: "short" }),
+      day: d.toLocaleDateString(lang, { weekday: "short" }),
       km: dayWorkouts.reduce((s, w) => s + (w.distance_km ?? 0), 0),
       elev: dayWorkouts.reduce((s, w) => s + (w.elevation_gain_m ?? 0), 0),
     };
   });
 
-  const disciplineScore = profile?.discipline_score ?? 0;
+  // Score Discipline — calculé à partir des vraies données (l'anneau = moyenne
+  // pondérée des 3 axes affichés → toujours cohérent, jamais de chiffres factices).
+  const disc = computeDiscipline(workouts, hrv, freshSleep, state);
+
+  // VFC : valeur du jour + base 14 j pour situer si elle est « bonne ».
+  const hrvLatest = hrv[0]?.hrv_ms ?? null;
+  const hrvSeries = hrv.slice(0, 14).map(h => h.hrv_ms).filter((v): v is number => v != null);
+  const hrvBaseline = hrvSeries.length ? Math.round(hrvSeries.reduce((a, b) => a + b, 0) / hrvSeries.length) : null;
+  const hrvDelta = hrvLatest != null && hrvBaseline != null ? hrvLatest - hrvBaseline : null;
+
+  // État du jour = lecture honnête de la forme (VFC vs base + sommeil récent), pas un label figé.
+  const readiness = computeReadiness(hrvDelta, hrvBaseline, freshSleep?.sleep_score ?? null, t);
 
   const raceDate = (plan as { race_date?: string } | null)?.race_date ?? null;
+
+  // Séance-clé du jour : l'algo s'affiche INSTANTANÉMENT (repli fiable),
+  // puis la version IA (Gemini) le remplace dès qu'elle répond (badge ✨).
+  const keySession = recommendSession({ state, weeklyKm, workouts, sleep, raceDate, t });
+  const coachKey = coachSession ? aiToSession(coachSession) : null;   // séance prescrite par le coach = prioritaire
+  const [aiSession, setAiSession] = useState<KeySession | null>(null);
+  const [aiTried, setAiTried] = useState(false);
+  useEffect(() => {
+    if (coachSession) return;   // le coach a déjà prescrit → inutile d'appeler l'IA
+    let cancel = false;
+    fetch("/api/ai/session", { method: "POST" })
+      .then((r) => r.json())
+      .then((j) => { if (!cancel && j.session?.title) setAiSession(aiToSession(j.session)); })
+      .catch(() => { /* repli silencieux sur l'algo */ })
+      .finally(() => { if (!cancel) setAiTried(true); });
+    return () => { cancel = true; };
+  }, [coachSession]);
+  const displaySession = coachKey ?? aiSession ?? keySession;
+
+  // Dernière séance : on n'affiche que les métriques réellement disponibles (pas de "--" vide).
+  const w0 = workouts[0];
+  const lastMetrics = w0 ? buildLastMetrics(w0, t) : [];
+
+  // ── Données dérivées (toutes calculées depuis le réel — rien d'inventé) ──────────
+  const predictions = currentVma && currentVma > 0 ? racePredictions(currentVma) : null;
+  const volumeTrend = computeWeeklyTrend(workouts, 6);
+  const trendMax = Math.max(1, ...volumeTrend.map((v) => v.km));
+  const prevWeeks = volumeTrend.slice(0, -1);
+  const prevAvg = prevWeeks.length ? prevWeeks.reduce((s, v) => s + v.km, 0) / prevWeeks.length : 0;
+  const volumeDelta = prevAvg > 0 ? weeklyKm - prevAvg : null;
+  const intensity = computeIntensitySplit(workouts, 30);
+  const records = computeRecords(workouts);
+  const weekSummary = computeWeekSummary(workouts);
+  const acwr = loadRisk?.acwr ?? 0;
+  // Historique du Score Discipline (8 sem.) — du plus ancien au plus récent.
+  const discTrend = disciplineHistory
+    .map((h) => Number((h as Record<string, unknown>).total ?? (h as Record<string, unknown>).score ?? 0))
+    .filter((n) => n > 0)
+    .reverse();
+  const coachMinimal = !!coachKey && coachKey.tags.length === 0 && !coachKey.why;
+
+  // ── Cartes de droite : on garde toujours les 2 plus pertinentes (sommeil > séance-clé
+  //    > records > résumé semaine > forme) → les colonnes ne sont jamais vides. ─────
+  const fillerPool: { key: string; node: React.ReactNode }[] = [];
+  if (freshSleep) fillerPool.push({ key: "sleep", node: (
+    <div className="bento-card h-full">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="metric-label">{t("dash.sleep.title")}</div>
+        <Moon className="h-4 w-4 text-indigo-400" />
+      </div>
+      <div className="mb-3 grid grid-cols-2 gap-3">
+        <div>
+          <div className="text-2xl font-bold text-zinc-900">{Math.floor(freshSleep.total_sleep_min / 60)}h{String(freshSleep.total_sleep_min % 60).padStart(2, "0")}</div>
+          <div className="text-xs text-zinc-400">{t("dash.sleep.total")}</div>
+        </div>
+        <div>
+          <div className="text-2xl font-bold text-zinc-900">{freshSleep.sleep_score}/100</div>
+          <div className="text-xs text-zinc-400">{t("dash.sleep.score")}</div>
+        </div>
+      </div>
+      {(freshSleep.deep_sleep_min > 0 || freshSleep.rem_sleep_min > 0) && (
+        <div className="space-y-1.5">
+          {[
+            { label: t("dash.sleep.deep"), min: freshSleep.deep_sleep_min, color: "bg-indigo-500" },
+            { label: t("dash.sleep.rem"), min: freshSleep.rem_sleep_min, color: "bg-violet-400" },
+            { label: t("dash.sleep.light"), min: Math.max(0, freshSleep.total_sleep_min - freshSleep.deep_sleep_min - freshSleep.rem_sleep_min), color: "bg-blue-300" },
+          ].map((s) => (
+            <div key={s.label} className="flex items-center gap-2 text-xs">
+              <span className="w-12 text-zinc-500">{s.label}</span>
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-100">
+                <div className={`h-full ${s.color} rounded-full`} style={{ width: `${Math.min(100, (s.min / freshSleep.total_sleep_min) * 100)}%` }} />
+              </div>
+              <span className="w-10 text-right text-zinc-600">{Math.floor(s.min / 60)}h{String(s.min % 60).padStart(2, "0")}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  ) });
+  if (!coachKey) fillerPool.push({ key: "keysession", node: (
+    <div className="bento-card h-full">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="metric-label">{t("dash.key.title")}</div>
+          {aiSession ? (
+            <span className="inline-flex items-center gap-1 rounded-md bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-700">{t("dash.key.aiCoach")}</span>
+          ) : !aiTried ? (
+            <span className="animate-pulse text-[10px] font-semibold text-zinc-300">{t("dash.key.aiLoading")}</span>
+          ) : null}
+        </div>
+        <Calendar className="h-4 w-4 text-zinc-400" />
+      </div>
+      <div className="text-base font-semibold" style={{ color: displaySession.accent }}>{displaySession.title}</div>
+      <div className="mt-1 text-sm text-zinc-500">{displaySession.subtitle}</div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {displaySession.tags.map((tg) => (
+          <span key={tg.l} className={`rounded-lg px-2 py-1 text-xs font-medium ${tg.c}`}>{tg.l}</span>
+        ))}
+      </div>
+      <div className="mt-3 flex items-start gap-1.5 text-xs text-zinc-500">
+        <Target className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-zinc-400" />
+        <span>{displaySession.why}</span>
+      </div>
+    </div>
+  ) });
+  if (records) {
+    const rows = ([
+      { icon: Footprints, label: t("dash.records.longest"), value: `${records.longest.toFixed(1)} km`, color: "text-emerald-600", bg: "bg-emerald-50" },
+      records.bestPace != null ? { icon: TrendingUp, label: t("dash.records.pace"), value: `${fmtPaceSec(records.bestPace)}/km`, color: "text-sky-600", bg: "bg-sky-50" } : null,
+      records.maxElev > 0 ? { icon: Mountain, label: t("dash.records.climb"), value: `${Math.round(records.maxElev)} m`, color: "text-orange-600", bg: "bg-orange-50" } : null,
+      records.longestSec > 0 ? { icon: Timer, label: t("dash.records.duration"), value: fmtTime(records.longestSec), color: "text-violet-600", bg: "bg-violet-50" } : null,
+    ] as ({ icon: LucideIcon; label: string; value: string; color: string; bg: string } | null)[])
+      .filter((r): r is { icon: LucideIcon; label: string; value: string; color: string; bg: string } => r !== null)
+      .slice(0, 4);
+    fillerPool.push({ key: "records", node: (
+      <div className="bento-card h-full">
+        <div className="mb-1 flex items-center justify-between">
+          <div className="metric-label">{t("dash.records.title")}</div>
+          <Award className="h-4 w-4 text-amber-400" />
+        </div>
+        <div className="mb-3 text-[11px] text-zinc-400">{t("dash.records.sub")}</div>
+        <div className="space-y-2.5">
+          {rows.map((r) => (
+            <div key={r.label} className="flex items-center gap-3">
+              <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${r.bg}`}><r.icon className={`h-4 w-4 ${r.color}`} /></span>
+              <span className="flex-1 text-sm text-zinc-500">{r.label}</span>
+              <span className="text-sm font-bold tabular-nums text-zinc-900">{r.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    ) });
+  }
+  fillerPool.push({ key: "summary", node: (
+    <div className="bento-card h-full">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="metric-label">{t("dash.summary.title")}</div>
+        <Activity className="h-4 w-4 text-zinc-300" />
+      </div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+        {[
+          { v: String(weekSummary.sessions), u: "", l: t("dash.summary.sessions") },
+          { v: weekSummary.km.toFixed(1), u: "km", l: t("dash.metric.distance") },
+          { v: String(Math.round(weekSummary.elev)), u: "m", l: t("dash.metric.elevation") },
+          { v: fmtTime(weekSummary.sec), u: "", l: t("dash.metric.duration") },
+        ].map((s) => (
+          <div key={s.l}>
+            <div className="text-2xl font-bold leading-none tabular-nums text-zinc-900">{s.v}<span className="ml-0.5 text-sm font-normal text-zinc-400">{s.u}</span></div>
+            <div className="mt-1.5 text-xs text-zinc-500">{s.l}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  ) });
+  fillerPool.push({ key: "ready", node: (
+    <div className="bento-card flex h-full flex-col">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="metric-label">{t("dash.readyCard.title")}</div>
+        <span className="h-3 w-3 rounded-full" style={{ background: readiness.accent }} />
+      </div>
+      <p className="text-sm font-medium leading-relaxed text-zinc-700">{readiness.tagline}</p>
+      <div className="mt-auto space-y-1.5 pt-4 text-xs">
+        {hrvDelta != null && hrvBaseline != null && (
+          <div className="flex justify-between"><span className="text-zinc-400">{t("dash.hrv.title")}</span><span className={`font-semibold ${hrvDelta >= 0 ? "text-emerald-600" : "text-amber-600"}`}>{hrvDelta >= 0 ? "↑" : "↓"} {Math.abs(hrvDelta)} ms</span></div>
+        )}
+        {freshSleep && (
+          <div className="flex justify-between"><span className="text-zinc-400">{t("dash.sleep.title")}</span><span className="font-semibold text-zinc-700">{freshSleep.sleep_score}/100</span></div>
+        )}
+      </div>
+    </div>
+  ) });
+  const fillers = fillerPool.slice(0, 2);
 
   const noData = workouts.length === 0 && hrv.length === 0;
 
   return (
-    <div
-      className="min-h-full transition-all duration-1000"
-      style={{ background: `linear-gradient(135deg, ${stateConfig.bg} 0%, #FFFFFF 60%)` }}
-    >
+    <div className="min-h-full bg-gradient-to-b from-zinc-50 to-white">
       {/* No data banner */}
       {noData && (
         <div className="mb-5 flex items-center gap-3 px-4 py-3 rounded-2xl bg-amber-50 border border-amber-200 text-sm">
           <span className="text-amber-500 text-lg">⚠️</span>
           <div className="flex-1">
-            <p className="font-semibold text-amber-800">Aucune donnée synchronisée</p>
-            <p className="text-amber-600 text-xs mt-0.5">Connectez votre montre pour voir vos activités, VFC et données de sommeil.</p>
+            <p className="font-semibold text-amber-800">{t("dash.noData.title")}</p>
+            <p className="text-amber-600 text-xs mt-0.5">{t("dash.noData.desc")}</p>
           </div>
           <Link href="/dashboard/sync" className="flex-shrink-0 px-3 py-1.5 bg-amber-500 text-white text-xs font-semibold rounded-xl hover:bg-amber-600 transition-colors">
-            Sync Montre →
+            {t("dash.noData.cta")}
           </Link>
         </div>
       )}
 
-      {/* Header */}
-      <div className="mb-6 flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-lg">{stateConfig.emoji}</span>
-            <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: stateConfig.accent }}>
-              {stateConfig.label}
-            </span>
-          </div>
-          <h1 className="text-3xl font-bold text-zinc-900">
-            Bonjour, {profile?.full_name?.split(" ")[0] ?? "Champion"} 👋
-          </h1>
-          <p className="text-zinc-500 mt-1">
-            {new Date().toLocaleDateString("fr", { weekday: "long", day: "numeric", month: "long" })}
+      {/* Header élite — carte premium */}
+      <div className="relative mb-6 flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-3xl border border-zinc-200/70 bg-white px-5 py-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_16px_40px_-20px_rgba(16,24,40,0.18)] sm:px-7">
+        <div className="pointer-events-none absolute -right-10 -top-16 h-40 w-40 rounded-full opacity-[0.07] blur-2xl" style={{ background: readiness.accent }} />
+        <div className="relative z-10 min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400 first-letter:uppercase">
+            {new Date().toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long" })}
           </p>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight text-zinc-900 sm:text-[2.15rem]">
+            {t("dash.greeting")}, {profile?.full_name?.split(" ")[0] ?? t("dash.champion")} <span className="inline-block">👋</span>
+          </h1>
+          <p className="mt-1.5 text-sm text-zinc-500">{readiness.tagline}</p>
         </div>
-        {mode === "elite" && (
-          <div className="flex gap-3">
-            <Chip label="CTL" value="72" color="#059669" />
-            <Chip label="ATL" value="68" color="#EA580C" />
-            <Chip label="TSB" value="+4" color="#0284C7" />
-          </div>
-        )}
       </div>
 
-      {/* Bento Grid */}
+      {/* Ressenti post-séance — demandé après la dernière séance */}
+      {pendingFeedback && <SessionFeedback date={pendingFeedback.date} title={pendingFeedback.title} />}
+
+      {/* Anti-blessure proactif — déload auto si la charge devient risquée */}
+      {loadRisk?.deload && (
+        <div className="mb-5 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3.5">
+          <span className="flex-shrink-0 text-xl">🛡️</span>
+          <div className="flex-1">
+            <p className="font-bold text-red-800">{t("dash.deload.title")}</p>
+            <p className="mt-0.5 text-sm text-red-600">{loadRisk.reason}. {t("dash.deload.desc")}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Objectif de course — saisi par le client → e-mail coach + perso IA */}
+      <ObjectiveCard objective={objective ?? null} currentVma={currentVma ?? null} />
+
+      {/* Séance prescrite par le coach — bannière mise en avant (prioritaire) */}
+      {coachKey && coachMinimal && (
+        // Variante compacte : séance « légère » (repos, footing court) → barre horizontale,
+        // pas de grand aplat vide.
+        <motion.div
+          initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+          className="relative mb-5 flex items-center gap-4 overflow-hidden rounded-3xl px-5 py-4 text-white shadow-xl shadow-emerald-900/30 ring-1 ring-white/10 sm:px-6"
+          style={{ background: "linear-gradient(120deg,#064e3b 0%,#047857 48%,#0d9488 100%)" }}
+        >
+          <div className="pointer-events-none absolute -top-16 -right-10 h-44 w-44 rounded-full bg-emerald-300/20 blur-3xl" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+          <span className="relative z-10 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-white/10 text-2xl ring-1 ring-white/20 backdrop-blur-md">🌙</span>
+          <div className="relative z-10 min-w-0 flex-1">
+            <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-100/90">{t("dash.coach.badge")}</span>
+            <h2 className="text-xl font-bold leading-tight tracking-tight drop-shadow-sm sm:text-[1.4rem]">{coachKey.title}</h2>
+            {coachKey.subtitle && <p className="mt-0.5 truncate text-[13px] text-white/85">{coachKey.subtitle}</p>}
+          </div>
+          <Link href="/dashboard/calendrier" title={t("dash.viewCalendar")}
+            className="relative z-10 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/15 backdrop-blur-md transition-colors hover:bg-white/25">
+            <Calendar className="h-4 w-4 text-white/80" />
+          </Link>
+        </motion.div>
+      )}
+      {coachKey && !coachMinimal && (
+        <motion.div
+          initial={{ opacity: 0, y: 18, scale: 0.99 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          className="relative mb-5 overflow-hidden rounded-3xl p-5 sm:p-6 text-white shadow-2xl shadow-emerald-900/40 ring-1 ring-white/10"
+          style={{ background: "linear-gradient(135deg,#064e3b 0%,#047857 44%,#0d9488 100%)" }}
+        >
+          {/* Halos lumineux — profondeur premium */}
+          <div className="pointer-events-none absolute -top-24 -right-16 h-72 w-72 rounded-full bg-emerald-300/20 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-28 -left-16 h-80 w-80 rounded-full bg-teal-300/10 blur-3xl" />
+          <div className="pointer-events-none absolute -top-6 right-12 h-40 w-40 rounded-full bg-amber-200/10 blur-2xl" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+
+          <div className="relative z-10">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/20 backdrop-blur-md">
+                <Trophy className="h-3.5 w-3.5 text-amber-300" />
+                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-50">{t("dash.coach.badge")}</span>
+              </span>
+              <Link href="/dashboard/calendrier" title={t("dash.viewCalendar")}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/15 backdrop-blur-md transition-colors hover:bg-white/25">
+                <Calendar className="h-4 w-4 text-white/80" />
+              </Link>
+            </div>
+
+            <h2 className="text-[1.4rem] font-bold leading-[1.1] tracking-tight drop-shadow-sm sm:text-[1.7rem]">{coachKey.title}</h2>
+            {coachKey.subtitle && <p className="mt-2 max-w-2xl text-[13.5px] leading-relaxed text-white/85 sm:text-[15px]">{coachKey.subtitle}</p>}
+
+            {coachKey.tags.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {coachKey.tags.map((t, i) => (
+                  <span key={t.l} className={`rounded-full px-2.5 py-1 text-xs font-semibold backdrop-blur-sm ring-1 ${i === 0 ? "bg-amber-300/15 text-amber-50 ring-amber-200/30" : "bg-white/10 text-white/90 ring-white/15"}`}>{t.l}</span>
+                ))}
+              </div>
+            )}
+
+            {coachKey.why && (
+              <div className="mt-4 flex items-start gap-3 border-t border-white/15 pt-3.5">
+                <span className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/15">
+                  <Target className="h-3.5 w-3.5 text-emerald-100" />
+                </span>
+                <p className="text-[13px] leading-relaxed text-white/80">{coachKey.why}</p>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Bento Grid — sections éditoriales, chaque rangée pavée (aucune colonne vide) */}
       <div className="grid grid-cols-12 gap-4 auto-rows-auto">
+
+        <SectionLabel>{t("dash.sec.today")}</SectionLabel>
 
         {/* Discipline Score — large card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
           className="col-span-12 md:col-span-4 bento-card"
         >
-          <div className="metric-label mb-4">Score Discipline</div>
-          <div className="flex items-end gap-4">
-            <div className="relative w-28 h-28">
-              <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="42" fill="none" stroke="#F4F4F5" strokeWidth="10" />
-                <circle cx="50" cy="50" r="42" fill="none" stroke={stateConfig.accent} strokeWidth="10"
-                  strokeLinecap="round"
-                  strokeDasharray={`${2 * Math.PI * 42 * disciplineScore / 100} ${2 * Math.PI * 42}`}
-                  className="transition-all duration-1000" />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-3xl font-bold text-zinc-900">{Math.round(disciplineScore)}</span>
-                <span className="text-xs text-zinc-400">/100</span>
+          <div className="flex items-center justify-between mb-4">
+            <div className="metric-label">{t("dash.discipline.title")}</div>
+            <Target className="w-4 h-4 text-zinc-300" />
+          </div>
+          {disc.hasData ? (
+            <div className="flex items-center gap-5">
+              <div className="relative h-28 w-28 flex-shrink-0">
+                <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="42" fill="none" stroke="#F4F4F5" strokeWidth="9" />
+                  <circle cx="50" cy="50" r="42" fill="none" stroke={readiness.accent} strokeWidth="9"
+                    strokeLinecap="round"
+                    strokeDasharray={`${2 * Math.PI * 42 * disc.total / 100} ${2 * Math.PI * 42}`}
+                    className="transition-all duration-1000" />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-[2rem] font-bold leading-none tabular-nums text-zinc-900">{disc.total}</span>
+                  <span className="mt-0.5 text-[11px] text-zinc-400">/ 100</span>
+                </div>
+              </div>
+              <div className="flex-1 space-y-2.5">
+                {[
+                  { label: t("dash.discipline.precision"), val: disc.precision },
+                  { label: t("dash.discipline.consistency"), val: disc.consistency },
+                  { label: t("dash.discipline.recovery"), val: disc.recovery },
+                ].map(m => (
+                  <div key={m.label}>
+                    <div className="mb-1 flex justify-between text-xs">
+                      <span className="text-zinc-500">{m.label}</span>
+                      <span className="font-semibold tabular-nums text-zinc-900">{m.val}</span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-zinc-100">
+                      <div className="h-full rounded-full transition-all duration-700"
+                        style={{ width: `${m.val}%`, backgroundColor: readiness.accent }} />
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-            <div className="flex-1 space-y-2">
-              {[
-                { label: "Précision", pct: 40, val: 82 },
-                { label: "Assiduité", pct: 40, val: 75 },
-                { label: "Récupération", pct: 20, val: 68 },
-              ].map(m => (
-                <div key={m.label}>
-                  <div className="flex justify-between text-xs mb-0.5">
-                    <span className="text-zinc-500">{m.label}</span>
-                    <span className="font-medium text-zinc-900">{m.val}</span>
-                  </div>
-                  <div className="h-1.5 bg-zinc-100 rounded-full">
-                    <div className="h-full rounded-full transition-all duration-700"
-                      style={{ width: `${m.val}%`, backgroundColor: stateConfig.accent }} />
-                  </div>
-                </div>
-              ))}
+          ) : (
+            <div className="flex flex-col items-center justify-center py-6 text-center">
+              <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-50">
+                <Target className="h-6 w-6 text-zinc-300" />
+              </div>
+              <p className="text-sm font-medium text-zinc-600">{t("dash.discipline.emptyTitle")}</p>
+              <p className="mt-1 max-w-[210px] text-xs text-zinc-400">{t("dash.discipline.emptyDesc")}</p>
             </div>
-          </div>
+          )}
         </motion.div>
 
         {/* HRV Chart */}
         <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.10 }}
-          className="col-span-12 md:col-span-5 bento-card"
+          className="col-span-12 md:col-span-4 bento-card"
         >
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-start justify-between mb-3">
             <div>
-              <div className="metric-label">VFC (HRV)</div>
-              <div className="text-3xl font-bold text-zinc-900 mt-1">
-                {hrv[0]?.hrv_ms?.toFixed(0) ?? "--"} <span className="text-sm font-normal text-zinc-400">ms</span>
+              <div className="metric-label">{t("dash.hrv.title")}</div>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-3xl font-bold tabular-nums text-zinc-900">
+                  {hrvLatest != null ? hrvLatest.toFixed(0) : "--"} <span className="text-sm font-normal text-zinc-400">ms</span>
+                </span>
+                {hrvDelta != null && (
+                  <span className={`inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs font-semibold ${hrvDelta >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>
+                    {hrvDelta >= 0 ? "↑" : "↓"} {Math.abs(hrvDelta)} ms
+                  </span>
+                )}
               </div>
+              {hrvBaseline != null && (
+                <div className="mt-1 text-[11px] text-zinc-400">
+                  {t("dash.hrv.baseline")} : <span className="font-medium text-zinc-500">{hrvBaseline} ms</span>
+                  {hrvDelta != null && <span> · {hrvDelta >= 0 ? t("dash.hrv.above") : t("dash.hrv.below")}</span>}
+                </div>
+              )}
             </div>
             <Heart className="w-5 h-5 text-red-400 animate-heartbeat" />
           </div>
@@ -176,11 +474,11 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
               <AreaChart data={hrvChartData}>
                 <defs>
                   <linearGradient id="hrv-grad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={stateConfig.accent} stopOpacity={0.2} />
-                    <stop offset="100%" stopColor={stateConfig.accent} stopOpacity={0} />
+                    <stop offset="0%" stopColor={readiness.accent} stopOpacity={0.2} />
+                    <stop offset="100%" stopColor={readiness.accent} stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <Area type="monotone" dataKey="hrv" stroke={stateConfig.accent} strokeWidth={2}
+                <Area type="monotone" dataKey="hrv" stroke={readiness.accent} strokeWidth={2}
                   fill="url(#hrv-grad)" dot={false} />
                 <Tooltip
                   contentStyle={{ borderRadius: "12px", border: "1px solid #E4E4E7", fontSize: "12px" }}
@@ -190,213 +488,281 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
             </ResponsiveContainer>
           ) : (
             <div className="h-20 flex items-center justify-center text-sm text-zinc-400">
-              Synchronisez votre montre pour voir votre VFC
+              {t("dash.hrv.empty")}
             </div>
           )}
         </motion.div>
 
-        {/* Weekly Volume */}
+        {/* VMA & prédictions de course — depuis la VMA estimée (modèle % VMA) */}
         <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
-          className="col-span-12 md:col-span-3 bento-card"
+          className="col-span-12 md:col-span-4 bento-card"
         >
-          <div className="metric-label mb-2">Volume Semaine</div>
-          <div className="metric-value text-zinc-900">{weeklyKm.toFixed(1)}</div>
-          <div className="text-zinc-400 text-sm">km</div>
-          <div className="mt-3 h-1.5 bg-zinc-100 rounded-full">
-            <div className="h-full bg-green-500 rounded-full transition-all"
-              style={{ width: `${Math.min(weeklyKm / (Number(plan ? 50 : 60)) * 100, 100)}%` }} />
+          <div className="mb-3 flex items-center justify-between">
+            <div className="metric-label">{t("dash.vma.title")}</div>
+            <Rocket className="h-4 w-4 text-emerald-400" />
           </div>
-          <div className="text-xs text-zinc-400 mt-1">
-            Objectif: {plan ? "selon plan" : "60 km"}
-          </div>
+          {predictions ? (
+            <>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-4xl font-bold tabular-nums text-zinc-900">{(currentVma ?? 0).toFixed(1)}</span>
+                <span className="text-sm text-zinc-400">km/h</span>
+              </div>
+              <div className="text-[11px] text-zinc-400">{t("dash.vma.sub")}</div>
+              <div className="mt-4 grid grid-cols-2 gap-2.5">
+                {predictions.map((p) => (
+                  <div key={p.label} className="rounded-xl bg-zinc-50 px-3 py-2">
+                    <div className="text-[11px] font-medium text-zinc-400">{p.label}</div>
+                    <div className="text-base font-bold tabular-nums text-zinc-900">{p.time}</div>
+                    <div className="text-[10px] tabular-nums text-zinc-400">{p.pace}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-50"><Rocket className="h-6 w-6 text-zinc-300" /></div>
+              <p className="max-w-[210px] text-xs text-zinc-400">{t("dash.vma.empty")}</p>
+            </div>
+          )}
         </motion.div>
 
-        {/* Weekly chart */}
+        <SectionLabel>{t("dash.sec.load")}</SectionLabel>
+
+        {/* Charge & Affûtage — CTL/ATL/TSB réels (modèle Banister) */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+          className="col-span-12 md:col-span-6"
+        >
+          <TaperingWidget workouts={workouts} raceDate={raceDate} />
+        </motion.div>
+
+        {/* Charge aiguë / chronique (ACWR) — prévention blessure (modèle Gabbett) */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.10 }}
+          className="col-span-12 md:col-span-6 bento-card flex flex-col"
+        >
+          <div className="mb-1 flex items-start justify-between">
+            <div>
+              <div className="metric-label">{t("dash.acwr.title")}</div>
+              <div className="mt-0.5 text-[11px] text-zinc-400">{t("dash.acwr.sub")}</div>
+            </div>
+            <Gauge className="h-5 w-5 text-zinc-300" />
+          </div>
+          {acwr > 0 ? (() => {
+            const zone = acwr < 0.8 ? { l: t("dash.acwr.under"), c: "#0284C7" }
+              : acwr <= 1.3 ? { l: t("dash.acwr.optimal"), c: "#059669" }
+              : acwr <= 1.5 ? { l: t("dash.acwr.caution"), c: "#EA580C" }
+              : { l: t("dash.acwr.high"), c: "#DC2626" };
+            const pos = Math.max(0, Math.min(1, (acwr - 0.5) / 1.3)) * 100;
+            const ticks = [{ v: "0.8", p: 23.08 }, { v: "1.3", p: 61.54 }, { v: "1.5", p: 76.92 }];
+            return (
+              <div className="mt-auto pt-2">
+                <div className="flex items-end gap-3">
+                  <span className="text-4xl font-bold tabular-nums" style={{ color: zone.c }}>{acwr.toFixed(2)}</span>
+                  <span className="mb-1 text-sm font-semibold" style={{ color: zone.c }}>{zone.l}</span>
+                </div>
+                <div className="relative mt-4 mb-6">
+                  <div className="flex h-2.5 w-full overflow-hidden rounded-full">
+                    <div style={{ width: "23.08%", background: "#BAE6FD" }} />
+                    <div style={{ width: "38.46%", background: "#A7F3D0" }} />
+                    <div style={{ width: "15.38%", background: "#FED7AA" }} />
+                    <div style={{ width: "23.08%", background: "#FECACA" }} />
+                  </div>
+                  <div className="absolute h-4 w-1.5 rounded-full bg-zinc-900 ring-2 ring-white" style={{ top: -3, left: `calc(${pos}% - 3px)` }} />
+                  {ticks.map((tk) => (
+                    <span key={tk.v} className="absolute top-4 -translate-x-1/2 text-[10px] tabular-nums text-zinc-400" style={{ left: `${tk.p}%` }}>{tk.v}</span>
+                  ))}
+                </div>
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="text-zinc-400">{t("dash.acwr.monotony")} <strong className="tabular-nums text-zinc-700">{(loadRisk?.monotony ?? 0).toFixed(1)}</strong></span>
+                  <span className="text-zinc-300">·</span>
+                  <span className="text-zinc-500">{t("dash.acwr.sweet")}</span>
+                </div>
+              </div>
+            );
+          })() : (
+            <div className="flex flex-1 flex-col items-center justify-center py-6 text-center">
+              <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-50"><Gauge className="h-6 w-6 text-zinc-300" /></div>
+              <p className="max-w-[230px] text-xs text-zinc-400">{t("dash.acwr.empty")}</p>
+            </div>
+          )}
+        </motion.div>
+
+        {/* Volume + tendance 6 semaines */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+          className="col-span-12 md:col-span-4 bento-card"
+        >
+          <div className="mb-2 flex items-center justify-between">
+            <div className="metric-label">{t("dash.volume.title")}</div>
+            <TrendingUp className="h-4 w-4 text-zinc-300" />
+          </div>
+          <div className="flex items-baseline gap-1.5">
+            <span className="metric-value text-zinc-900">{weeklyKm.toFixed(1)}</span>
+            <span className="text-sm text-zinc-400">km</span>
+            {volumeDelta != null && Math.abs(volumeDelta) >= 0.1 && (
+              <span className={`ml-auto inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs font-semibold ${volumeDelta >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>
+                {volumeDelta >= 0 ? "↑" : "↓"} {Math.abs(volumeDelta).toFixed(0)} km
+              </span>
+            )}
+          </div>
+          <div className="text-[11px] text-zinc-400">{volumeDelta != null ? t("dash.volume.vsAvg") : " "}</div>
+          <div className="mt-3 flex h-14 items-end gap-1.5">
+            {volumeTrend.map((v, i) => (
+              <div key={i} className="flex-1 rounded-t-md transition-all"
+                style={{ height: `${Math.max(4, (v.km / trendMax) * 56)}px`, background: v.isCurrent ? "#16a34a" : "#D1FAE5" }}
+                title={`${v.km.toFixed(1)} km`} />
+            ))}
+          </div>
+          <div className="mt-1 text-center text-[10px] text-zinc-400">{t("dash.volume.trend")}</div>
+          <div className="mt-3 h-1.5 rounded-full bg-zinc-100">
+            <div className="h-full rounded-full bg-green-500 transition-all" style={{ width: `${Math.min((weeklyKm / 60) * 100, 100)}%` }} />
+          </div>
+          <div className="mt-1 text-xs text-zinc-400">{t("dash.volume.goal")}: {plan ? t("dash.volume.perPlan") : "60 km"}</div>
+        </motion.div>
+
+        {/* Répartition d'intensité (polarisation 80/20) */}
         <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.20 }}
-          className="col-span-12 md:col-span-7 bento-card"
+          className="col-span-12 md:col-span-4 bento-card"
         >
-          <div className="metric-label mb-4">Activité 7 jours</div>
-          <ResponsiveContainer width="100%" height={100}>
-            <LineChart data={weeklyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#F4F4F5" />
-              <XAxis dataKey="day" tick={{ fontSize: 11, fill: "#A1A1AA" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: "#A1A1AA" }} axisLine={false} tickLine={false} />
-              <Tooltip
-                contentStyle={{ borderRadius: "12px", border: "1px solid #E4E4E7", fontSize: "12px" }}
-                formatter={(v: number, name: string) => [
-                  name === "km" ? `${v.toFixed(1)} km` : `${v} m D+`, name === "km" ? "Distance" : "Dénivelé"
-                ]}
-              />
-              <Line type="monotone" dataKey="km" stroke="#22c55e" strokeWidth={2.5} dot={{ r: 3, fill: "#22c55e" }} />
-            </LineChart>
-          </ResponsiveContainer>
+          <div className="mb-1 flex items-center justify-between">
+            <div className="metric-label">{t("dash.intensity.title")}</div>
+            <Flame className="h-4 w-4 text-orange-400" />
+          </div>
+          <div className="mb-3 text-[11px] text-zinc-400">{t("dash.intensity.sub")}</div>
+          {intensity.total >= 3 ? (() => {
+            const easyPct = Math.round((intensity.easy / intensity.total) * 100);
+            const good = easyPct >= 75 && easyPct <= 88;
+            const verdict = good ? t("dash.intensity.polarized") : easyPct < 75 ? t("dash.intensity.tooHard") : t("dash.intensity.tooEasy");
+            const r = 34, C = 2 * Math.PI * r;
+            return (
+              <div className="flex items-center gap-4">
+                <div className="relative h-24 w-24 flex-shrink-0">
+                  <svg viewBox="0 0 80 80" className="h-full w-full -rotate-90">
+                    <circle cx="40" cy="40" r={r} fill="none" stroke="#FED7AA" strokeWidth="10" />
+                    <circle cx="40" cy="40" r={r} fill="none" stroke="#10B981" strokeWidth="10" strokeLinecap="round"
+                      strokeDasharray={`${(C * easyPct) / 100} ${C}`} className="transition-all duration-700" />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-xl font-bold tabular-nums text-zinc-900">{easyPct}%</span>
+                    <span className="text-[10px] text-zinc-400">{t("dash.intensity.easy")}</span>
+                  </div>
+                </div>
+                <div className="flex-1 space-y-2 text-sm">
+                  <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /><span className="flex-1 text-zinc-500">{t("dash.intensity.easy")}</span><span className="font-semibold tabular-nums text-zinc-900">{intensity.easy}</span></div>
+                  <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-orange-400" /><span className="flex-1 text-zinc-500">{t("dash.intensity.quality")}</span><span className="font-semibold tabular-nums text-zinc-900">{intensity.quality}</span></div>
+                  <div className="pt-1 text-xs font-semibold" style={{ color: good ? "#059669" : "#EA580C" }}>{verdict}</div>
+                </div>
+              </div>
+            );
+          })() : (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-50"><Flame className="h-6 w-6 text-zinc-300" /></div>
+              <p className="max-w-[200px] text-xs text-zinc-400">{t("dash.intensity.empty")}</p>
+            </div>
+          )}
         </motion.div>
 
-        {/* League */}
+        {/* Ligue — badge + score + tendance 8 sem. */}
         <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
-          className="col-span-12 md:col-span-5 bento-card"
+          className="col-span-12 md:col-span-4 bento-card flex flex-col"
         >
-          <div className="flex items-center justify-between mb-4">
-            <div className="metric-label">Ligue</div>
-            <Trophy className="w-4 h-4 text-yellow-500" />
+          <div className="mb-4 flex items-center justify-between">
+            <div className="metric-label">{t("dash.league.title")}</div>
+            <Trophy className="h-4 w-4 text-yellow-500" />
           </div>
-          <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-semibold mb-3 league-${profile?.league ?? "bronze"}`}>
+          <div className={`inline-flex w-fit items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-semibold league-${profile?.league ?? "bronze"}`}>
             <span>
               {profile?.league === "diamond" ? "💎" :
                profile?.league === "platinum" ? "🔷" :
                profile?.league === "gold" ? "🥇" :
                profile?.league === "silver" ? "🥈" : "🥉"}
             </span>
-            {profile?.league?.charAt(0).toUpperCase()}{profile?.league?.slice(1) ?? "Bronze"}
+            {(profile?.league ?? "bronze").charAt(0).toUpperCase()}{(profile?.league ?? "bronze").slice(1)}
           </div>
-          <div className="text-sm text-zinc-500">
-            Score hebdo: <strong className="text-zinc-900">{Math.round(disciplineScore)}</strong>
+          <div className="mt-3 text-sm text-zinc-500">
+            {t("dash.league.weekly")} : <strong className="tabular-nums text-zinc-900">{disc.hasData ? disc.total : "—"}</strong>
           </div>
-        </motion.div>
-
-        {/* Tapering widget — Elite mode */}
-        {mode === "elite" && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.27 }}
-            className="col-span-12 md:col-span-5"
-          >
-            <TaperingWidget workouts={workouts} raceDate={raceDate} />
-          </motion.div>
-        )}
-
-        {/* Sleep widget */}
-        {sleep && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28 }}
-            className="col-span-12 md:col-span-4 bento-card"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className="metric-label">Sommeil & Body Battery</div>
-              <Moon className="w-4 h-4 text-indigo-400" />
-            </div>
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              <div>
-                <div className="text-2xl font-bold text-zinc-900">{Math.floor(sleep.total_sleep_min / 60)}h{String(sleep.total_sleep_min % 60).padStart(2, "0")}</div>
-                <div className="text-xs text-zinc-400">Durée totale</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-zinc-900">{sleep.sleep_score}/100</div>
-                <div className="text-xs text-zinc-400">Score sommeil</div>
-              </div>
-            </div>
-            <div className="space-y-1.5 mb-3">
-              {[
-                { label: "Profond", min: sleep.deep_sleep_min, color: "bg-indigo-500" },
-                { label: "REM", min: sleep.rem_sleep_min, color: "bg-violet-400" },
-                { label: "Léger", min: sleep.total_sleep_min - sleep.deep_sleep_min - sleep.rem_sleep_min, color: "bg-blue-300" },
-              ].map((s) => (
-                <div key={s.label} className="flex items-center gap-2 text-xs">
-                  <span className="text-zinc-500 w-12">{s.label}</span>
-                  <div className="flex-1 h-1.5 bg-zinc-100 rounded-full overflow-hidden">
-                    <div className={`h-full ${s.color} rounded-full`} style={{ width: `${Math.min(100, (s.min / sleep.total_sleep_min) * 100)}%` }} />
-                  </div>
-                  <span className="text-zinc-600 w-10 text-right">{Math.floor(s.min / 60)}h{String(s.min % 60).padStart(2, "0")}</span>
-                </div>
+          {discTrend.length > 1 && (
+            <div className="mt-3 flex h-10 items-end gap-1">
+              {discTrend.map((s, i) => (
+                <div key={i} className={`flex-1 rounded-sm ${i === discTrend.length - 1 ? "bg-yellow-400" : "bg-yellow-200"}`}
+                  style={{ height: `${Math.max(8, (s / 100) * 40)}px` }} title={`${s}`} />
               ))}
             </div>
-            <div className="flex items-center gap-2">
-              <BatteryCharging className="w-4 h-4 text-green-500" />
-              <div className="flex-1 h-2 bg-zinc-100 rounded-full overflow-hidden">
-                <div className="h-full bg-green-500 rounded-full" style={{ width: `${sleep.body_battery_end}%` }} />
-              </div>
-              <span className="text-sm font-bold text-zinc-700">{sleep.body_battery_end}%</span>
-            </div>
-            <div className="text-xs text-zinc-400 mt-1">Body Battery</div>
-          </motion.div>
-        )}
-
-        {/* Next session */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.30 }}
-          className="col-span-12 md:col-span-4 bento-card"
-        >
-          <div className="flex items-center justify-between mb-3">
-            <div className="metric-label">Prochaine Séance</div>
-            <Calendar className="w-4 h-4 text-zinc-400" />
-          </div>
-          {plan ? (
-            <div>
-              <div className="font-semibold text-zinc-900 text-base">Sortie Longue</div>
-              <div className="text-sm text-zinc-500 mt-1">Dimanche · Zone 2 · 25 km</div>
-              <div className="mt-3 flex gap-2">
-                <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-lg font-medium">Z2</span>
-                <span className="px-2 py-1 bg-zinc-100 text-zinc-600 text-xs rounded-lg font-medium">25 km</span>
-                <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-lg font-medium">2h20</span>
-              </div>
-            </div>
-          ) : (
-            <div className="text-sm text-zinc-400">Aucun plan actif. Cherchez une course cible.</div>
           )}
+          <Link href="/dashboard/leagues" className="mt-auto pt-3 text-xs font-medium text-green-600 hover:text-green-700">{t("dash.league.cta")}</Link>
         </motion.div>
 
-        {/* Last workout biomechanics — Elite only */}
-        {mode === "elite" && workouts[0] && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
-            className="col-span-12 md:col-span-8 bento-card"
-          >
-            <div className="flex items-center gap-2 mb-4">
-              <Footprints className="w-4 h-4 text-zinc-500" />
-              <div className="metric-label">Biomécanique — Dernière Séance</div>
-            </div>
-            <div className="grid grid-cols-4 gap-4">
-              {[
-                { label: "Cadence", value: workouts[0].avg_cadence_spm ?? "--", unit: "SPM" },
-                { label: "Oscillation", value: workouts[0].vertical_oscillation_cm ?? "--", unit: "cm" },
-                { label: "Contact sol", value: workouts[0].ground_contact_time_ms ?? workouts[0].ground_contact_ms ?? "--", unit: "ms" },
-                { label: "Puissance", value: workouts[0].avg_power_watts ?? "--", unit: "W" },
-              ].map(m => (
-                <div key={m.label} className="text-center">
-                  <div className="text-2xl font-bold text-zinc-900">{m.value}</div>
-                  <div className="text-xs text-zinc-400">{m.unit}</div>
-                  <div className="text-xs text-zinc-500 mt-0.5">{m.label}</div>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        )}
+        <SectionLabel>{t("dash.sec.activity")}</SectionLabel>
 
-        {/* Fun mode — Battery widget */}
-        {mode === "ludique" && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
-            className="col-span-12 md:col-span-8 bento-card"
-          >
-            <div className="metric-label mb-3">Jauge de Forme Physique</div>
-            <div className="flex items-center gap-4">
-              <div className="text-5xl">
-                {disciplineScore >= 80 ? "🔋" : disciplineScore >= 50 ? "🪫" : "⚡"}
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-zinc-700">
-                    {disciplineScore >= 80 ? "Plein d'énergie !" : disciplineScore >= 50 ? "Bonne forme" : "Récupération conseillée"}
-                  </span>
-                  <span className="font-bold text-zinc-900">{Math.round(disciplineScore)}%</span>
-                </div>
-                <div className="h-4 bg-zinc-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-1000"
-                    style={{
-                      width: `${disciplineScore}%`,
-                      backgroundColor: disciplineScore >= 80 ? "#22c55e" : disciplineScore >= 50 ? "#f59e0b" : "#ef4444",
-                    }}
-                  />
-                </div>
-                <div className="flex justify-between text-xs text-zinc-400 mt-1.5">
-                  <span>Épuisé</span><span>Super forme</span>
-                </div>
-              </div>
+        {/* Activité 7 jours — barres km/jour */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+          className="col-span-12 md:col-span-8 bento-card"
+        >
+          <div className="mb-4 flex items-center justify-between">
+            <div className="metric-label">{t("dash.weekly.title")}</div>
+            <div className="flex items-center gap-4 text-xs">
+              <span className="text-zinc-400">{t("dash.weekly.total")} <strong className="tabular-nums text-zinc-900">{weekSummary.km.toFixed(1)} km</strong></span>
+              <span className="text-zinc-400">{t("dash.chart.elevation")} <strong className="tabular-nums text-zinc-900">+{Math.round(weekSummary.elev)} m</strong></span>
             </div>
-          </motion.div>
+          </div>
+          <ResponsiveContainer width="100%" height={140}>
+            <BarChart data={weeklyData} barCategoryGap="24%">
+              <CartesianGrid strokeDasharray="3 3" stroke="#F4F4F5" vertical={false} />
+              <XAxis dataKey="day" tick={{ fontSize: 11, fill: "#A1A1AA" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: "#A1A1AA" }} axisLine={false} tickLine={false} width={28} />
+              <Tooltip cursor={{ fill: "rgba(34,197,94,0.06)" }}
+                contentStyle={{ borderRadius: "12px", border: "1px solid #E4E4E7", fontSize: "12px" }}
+                formatter={(v: number) => [`${v.toFixed(1)} km`, t("dash.chart.distance")]} />
+              <Bar dataKey="km" radius={[6, 6, 0, 0]} maxBarSize={36}>
+                {weeklyData.map((d, i) => (<Cell key={i} fill={d.km > 0 ? "#22c55e" : "#E4E4E7"} />))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </motion.div>
+
+        {/* Carte de droite n°1 — toujours remplie (pas de colonne vide) */}
+        <motion.div key={fillers[0].key}
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.10 }}
+          className="col-span-12 md:col-span-4"
+        >
+          {fillers[0].node}
+        </motion.div>
+
+        {/* Dernière séance (col-8) + carte de droite n°2 (col-4) — rangée pavée */}
+        {w0 && lastMetrics.length > 0 && (
+          <>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.30 }}
+              className="col-span-12 md:col-span-8 bento-card"
+            >
+              <div className="mb-4 flex items-center gap-2">
+                <Footprints className="h-4 w-4 text-zinc-500" />
+                <div className="metric-label">{t("dash.last.title")}{w0.title ? ` — ${cleanActivityName(w0.title)}` : ""}</div>
+              </div>
+              <div className="grid grid-cols-3 gap-x-4 gap-y-5 sm:grid-cols-4">
+                {lastMetrics.map((m) => (
+                  <div key={m.label} className="text-center">
+                    <div className="text-2xl font-bold leading-none text-zinc-900">
+                      {m.value}<span className="ml-0.5 text-sm font-normal text-zinc-400">{m.unit}</span>
+                    </div>
+                    <div className="mt-1.5 text-xs text-zinc-500">{m.label}</div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+            <motion.div key={fillers[1].key}
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
+              className="col-span-12 md:col-span-4"
+            >
+              {fillers[1].node}
+            </motion.div>
+          </>
         )}
 
         {/* Recent workouts */}
@@ -405,26 +771,30 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
           className="col-span-12 bento-card"
         >
           <div className="flex items-center justify-between mb-4">
-            <div className="metric-label">Activités Récentes</div>
-            <a href="/dashboard/workouts" className="text-xs text-green-600 font-medium hover:text-green-700">
-              Tout voir →
+            <div className="metric-label">{t("dash.recent.title")}</div>
+            <a href="/dashboard/calendrier" className="text-xs text-green-600 font-medium hover:text-green-700">
+              {t("dash.recent.viewAll")}
             </a>
           </div>
           {workouts.length === 0 ? (
             <div className="text-center py-8 text-zinc-400 text-sm">
-              Aucune activité pour l&apos;instant. Synchronisez votre montre ou ajoutez une séance.
+              {t("dash.recent.empty")}
             </div>
           ) : (
             <div className="space-y-2">
               {workouts.slice(0, 5).map((w) => (
-                <div key={w.id} className="flex items-center gap-4 p-3 rounded-2xl hover:bg-zinc-50 transition-colors">
+                <Link
+                  key={w.id}
+                  href={`/dashboard/activite?date=${String(w.date).slice(0, 10)}&dist=${w.distance_km ?? ""}&title=${encodeURIComponent(w.title ?? "")}`}
+                  className="group flex items-center gap-4 p-3 rounded-2xl hover:bg-zinc-50 transition-colors cursor-pointer"
+                >
                   <div className="w-9 h-9 bg-zinc-100 rounded-xl flex items-center justify-center flex-shrink-0">
                     <Activity className="w-4 h-4 text-zinc-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-zinc-900 text-sm truncate">{w.title}</div>
+                    <div className="font-medium text-zinc-900 text-sm truncate group-hover:text-emerald-700">{cleanActivityName(w.title)}</div>
                     <div className="text-xs text-zinc-400">
-                      {new Date(w.date).toLocaleDateString("fr", { weekday: "long", day: "numeric", month: "short" })}
+                      {new Date(w.date).toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "short" })}
                     </div>
                   </div>
                   <div className="flex gap-4 text-sm text-zinc-600 flex-shrink-0">
@@ -440,7 +810,8 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
                   }`}>
                     Z{w.training_effect ? Math.ceil(w.training_effect) : 2}
                   </span>
-                </div>
+                  <ChevronRight className="w-4 h-4 text-zinc-300 group-hover:text-emerald-600 flex-shrink-0" />
+                </Link>
               ))}
             </div>
           )}
@@ -450,11 +821,235 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
   );
 }
 
-function Chip({ label, value, color }: { label: string; value: string; color: string }) {
+// ── Séance-clé du jour : heuristique coach (VFC, sommeil, dernières séances, volume, course) ──
+type KeyTag = { l: string; c: string };
+type KeySession = { title: string; subtitle: string; accent: string; tags: KeyTag[]; why: string };
+
+function recommendSession({ state, weeklyKm, workouts, sleep, raceDate, t }: {
+  state: string; weeklyKm: number; workouts: Workout[];
+  sleep?: { sleep_score: number } | null; raceDate: string | null; t: TFn;
+}): KeySession {
+  const Z1 = "bg-sky-100 text-sky-700", Z2 = "bg-green-100 text-green-700",
+    Z4 = "bg-orange-100 text-orange-700", NEU = "bg-zinc-100 text-zinc-600", RED = "bg-red-100 text-red-700";
+  const ss = sleep?.sleep_score ?? null;
+  const last = workouts[0];
+  const daysSinceLast = last ? Math.floor((Date.now() - new Date(last.date).getTime()) / 86400000) : 99;
+  const lastHard = !!last && /interval|vma|tempo|race|hill|seuil/i.test(String(last.type ?? ""));
+  const lastLong = !!last && (last.distance_km ?? 0) >= 18;
+  const dow = new Date().getDay();
+  const daysToRace = raceDate ? Math.ceil((new Date(raceDate).getTime() - Date.now()) / 86400000) : null;
+  const tired = state === "recovery" || (ss != null && ss < 55);
+
+  if (tired) return {
+    title: t("dash.rec.tired.title"), accent: "#0284C7", subtitle: t("dash.rec.tired.sub"),
+    tags: [{ l: "Z1", c: Z1 }, { l: "30–40 min", c: NEU }],
+    why: ss != null && ss < 55 ? t("dash.rec.tired.whySleep", { score: ss })
+      : t("dash.rec.tired.whyHrv"),
+  };
+  if (daysToRace != null && daysToRace >= 0 && daysToRace <= 10) return {
+    title: t("dash.rec.taper.title"), accent: "#0284C7", subtitle: t("dash.rec.taper.sub", { days: daysToRace }),
+    tags: [{ l: "Z2", c: Z2 }, { l: t("dash.tag.short"), c: NEU }, { l: `J-${daysToRace}`, c: Z1 }],
+    why: t("dash.rec.taper.why"),
+  };
+  if ((lastHard || lastLong) && daysSinceLast <= 1) return {
+    title: t("dash.rec.assim.title"), accent: "#059669", subtitle: t("dash.rec.assim.sub"),
+    tags: [{ l: "Z2", c: Z2 }, { l: "45–60 min", c: NEU }],
+    why: t("dash.rec.assim.why"),
+  };
+  if (dow === 0 || dow === 6) {
+    const target = Math.max(12, Math.round(weeklyKm * 0.4));
+    return {
+      title: t("dash.rec.long.title"), accent: "#059669", subtitle: t("dash.rec.long.sub", { km: target }),
+      tags: [{ l: "Z2", c: Z2 }, { l: `${target} km`, c: NEU }],
+      why: t("dash.rec.long.why"),
+    };
+  }
+  if (state === "competition") return {
+    title: t("dash.rec.thr.title"), accent: "#EA580C", subtitle: t("dash.rec.thr.sub"),
+    tags: [{ l: "Z4", c: Z4 }, { l: "~10 km", c: NEU }, { l: t("dash.tag.quality"), c: RED }],
+    why: t("dash.rec.thr.why"),
+  };
+  if (state === "optimal") return {
+    title: t("dash.rec.vma.title"), accent: "#EA580C", subtitle: t("dash.rec.vma.sub"),
+    tags: [{ l: "Z4-Z5", c: Z4 }, { l: "VMA", c: RED }, { l: "~8 km", c: NEU }],
+    why: t("dash.rec.vma.why"),
+  };
+  return {
+    title: t("dash.rec.base.title"), accent: "#059669", subtitle: t("dash.rec.base.sub"),
+    tags: [{ l: "Z2", c: Z2 }, { l: "50 min", c: NEU }],
+    why: t("dash.rec.base.why"),
+  };
+}
+
+// ── Conversion de la séance IA (tags texte) en séance affichable (tags colorés) ──
+function colorizeTag(label: string): string {
+  const t = label.toLowerCase();
+  if (/z1|récup|recup|repos|marche/.test(t)) return "bg-sky-100 text-sky-700";
+  if (/z4|z5|vma|seuil|fractionn|interval|tempo|vif|sprint|côte|cote|fartlek/.test(t)) return "bg-orange-100 text-orange-700";
+  if (/z2|z3|endurance|footing|longue|facile|fond/.test(t)) return "bg-green-100 text-green-700";
+  return "bg-zinc-100 text-zinc-600";
+}
+function aiToSession(s: { title: string; subtitle: string; tags: string[]; why: string }): KeySession {
+  const tags = (s.tags ?? []).filter(Boolean).map((l) => ({ l, c: colorizeTag(l) }));
+  const accent = tags.some((t) => t.c.includes("orange")) ? "#EA580C"
+    : tags.some((t) => t.c.includes("sky")) ? "#0284C7" : "#059669";
+  return { title: s.title, subtitle: s.subtitle, accent, tags, why: s.why };
+}
+
+// ── Métriques réellement disponibles de la dernière séance (jamais de "--" vide) ──
+function buildLastMetrics(w: Workout, t: TFn): { label: string; value: string | number; unit: string }[] {
+  const out: { label: string; value: string | number; unit: string }[] = [];
+  if (w.distance_km != null) out.push({ label: t("dash.metric.distance"), value: w.distance_km.toFixed(1), unit: "km" });
+  if (w.duration_seconds) out.push({ label: t("dash.metric.duration"), value: `${Math.floor(w.duration_seconds / 3600)}h${String(Math.floor((w.duration_seconds % 3600) / 60)).padStart(2, "0")}`, unit: "" });
+  if (w.distance_km && w.duration_seconds) {
+    const p = (w.duration_seconds / 60) / w.distance_km;
+    if (isFinite(p) && p > 0 && p < 30) out.push({ label: t("dash.metric.pace"), value: `${Math.floor(p)}'${String(Math.round((p - Math.floor(p)) * 60)).padStart(2, "0")}`, unit: "/km" });
+  }
+  if (w.avg_hr != null) out.push({ label: t("dash.metric.avgHr"), value: w.avg_hr, unit: "bpm" });
+  if (w.avg_cadence_spm != null) out.push({ label: t("dash.metric.cadence"), value: w.avg_cadence_spm, unit: "spm" });
+  if (w.elevation_gain_m != null) out.push({ label: t("dash.metric.elevation"), value: w.elevation_gain_m, unit: "m" });
+  if (w.vertical_oscillation_cm != null) out.push({ label: t("dash.metric.oscillation"), value: w.vertical_oscillation_cm, unit: "cm" });
+  const gct = w.ground_contact_time_ms ?? w.ground_contact_ms;
+  if (gct != null) out.push({ label: t("dash.metric.groundContact"), value: gct, unit: "ms" });
+  if (w.avg_power_watts != null) out.push({ label: t("dash.metric.power"), value: w.avg_power_watts, unit: "W" });
+  return out.slice(0, 8);
+}
+
+// ── Score Discipline — modèle cohérent, documenté et ajustable ───────────────────
+//  Principes reconnus : répartition polarisée 80/20 (Seiler / « 80/20 Running »)
+//  pour la Précision · régularité hebdo pour l'Assiduité · sommeil + tendance VFC
+//  (RMSSD vs base) pour la Récupération. total = somme pondérée → l'anneau colle
+//  TOUJOURS aux 3 barres. Toutes les constantes sont regroupées ici pour être
+//  ajustées sans toucher à la logique.
+const DISCIPLINE_CONFIG = {
+  weights: { precision: 0.4, consistency: 0.4, recovery: 0.2 }, // somme = 1
+  windowDays: 14,            // fenêtre d'analyse (lisse le bruit d'une semaine isolée)
+  weeklyTarget: 4,           // séances/semaine visées (Assiduité)
+  easyShareTarget: 0.8,      // 80 % facile / 20 % qualité (modèle polarisé)
+  penaltyTooHard: 220,       // trop d'intensité = pénalité forte (risque surcharge/blessure)
+  penaltyTooEasy: 120,       // trop facile = pénalité plus douce (annulée en semaine de récup)
+  minForPrecision: 3,        // sous ce nombre de séances, la Précision est peu fiable
+  stateBaseline: { optimal: 85, competition: 80, recovery: 55 } as Record<string, number>,
+};
+
+// État du jour — lecture honnête de la forme (VFC vs base 14 j + sommeil RÉCENT).
+function computeReadiness(hrvDelta: number | null, hrvBaseline: number | null, sleepScore: number | null, t: TFn) {
+  const sig: number[] = [];
+  if (hrvDelta != null && hrvBaseline) sig.push(hrvDelta >= 0 ? 1 : hrvDelta / hrvBaseline >= -0.06 ? 0 : -1);
+  if (sleepScore != null) sig.push(sleepScore >= 75 ? 1 : sleepScore >= 55 ? 0 : -1);
+  if (!sig.length) return { accent: "#0d9488", tagline: t("dash.ready.none") };
+  const avg = sig.reduce((a, b) => a + b, 0) / sig.length;
+  if (avg >= 0.5) return { accent: "#059669", tagline: t("dash.ready.top") };
+  if (avg <= -0.5) return { accent: "#0284C7", tagline: t("dash.ready.rest") };
+  return { accent: "#0d9488", tagline: t("dash.ready.ok") };
+}
+
+const clamp = (n: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, n));
+
+function computeDiscipline(
+  workouts: Workout[], hrv: HRVData[],
+  sleep: { sleep_score: number } | null, state: string,
+): { total: number; precision: number; consistency: number; recovery: number; hasData: boolean } {
+  const C = DISCIPLINE_CONFIG;
+  const now = Date.now();
+  const recent = workouts.filter(w => now - new Date(w.date).getTime() <= C.windowDays * 86400000);
+  const hasData = workouts.length > 0 || hrv.length > 0;
+
+  // Assiduité — régularité sur la fenêtre vs cible (séances/sem × nb de semaines).
+  const consistency = clamp(Math.round((recent.length / (C.weeklyTarget * (C.windowDays / 7))) * 100));
+
+  // Précision — proximité d'une répartition polarisée ~80 % facile / 20 % qualité.
+  //  Pénalité asymétrique : le « trop dur » coûte plus cher que le « trop facile ».
+  let precision: number;
+  if (recent.length >= C.minForPrecision) {
+    const easyShare = recent.filter(w => !isQualityWorkout(w)).length / recent.length;
+    const dev = easyShare - C.easyShareTarget;                          // <0 trop dur · >0 trop facile
+    const tooEasy = state === "recovery" ? 0 : C.penaltyTooEasy;        // semaine de récup → le facile est normal
+    precision = clamp(Math.round(100 - (dev < 0 ? -dev * C.penaltyTooHard : dev * tooEasy)));
+  } else {
+    precision = recent.length ? consistency : 0;                        // pas assez d'historique
+  }
+
+  // Récupération — données réelles : sommeil + tendance VFC (RMSSD du jour vs base 14 j).
+  const signals: number[] = [];
+  if (sleep?.sleep_score != null) signals.push(sleep.sleep_score);
+  const hrvVals = hrv.slice(0, 14).map(h => h.hrv_ms).filter((v): v is number => v != null);
+  if (hrvVals.length >= 3) {
+    const base = hrvVals.reduce((a, b) => a + b, 0) / hrvVals.length;
+    signals.push(clamp(70 + ((hrvVals[0] - base) / base) * 300));       // à la base ≈ 70, +10 % ≈ 100
+  }
+  const recovery = signals.length
+    ? Math.round(signals.reduce((a, b) => a + b, 0) / signals.length)
+    : (C.stateBaseline[state] ?? 70);
+
+  const total = Math.round(
+    C.weights.precision * precision + C.weights.consistency * consistency + C.weights.recovery * recovery,
+  );
+  return { total, precision, consistency, recovery, hasData };
+}
+
+// ── Qualité (intensité) d'une séance — partagé par le Score Discipline ET la
+//    répartition d'intensité (une seule source de vérité). ─────────────────────────
+function isQualityWorkout(w: Workout): boolean {
+  const type = String(w.type ?? "").toLowerCase();
+  if (/easy|recovery|long|trail|endurance|footing|récup|fond|marche/.test(type)) return false;
+  if (/interval|vma|tempo|seuil|race|hill|fractionn|côte|cote|sprint|vif|fartlek|threshold/.test(type)) return true;
+  return (w.training_effect ?? 0) >= 4; // type ambigu : seul un effort très élevé compte comme qualité
+}
+
+// Tendance du volume : N blocs glissants de 7 jours (du plus ancien au plus récent).
+function computeWeeklyTrend(workouts: Workout[], weeks = 6): { km: number; isCurrent: boolean }[] {
+  const now = Date.now();
+  return Array.from({ length: weeks }, (_, i) => {
+    const end = now - (weeks - 1 - i) * 7 * 86400000;
+    const start = end - 7 * 86400000;
+    const km = workouts
+      .filter(w => { const ts = new Date(w.date).getTime(); return ts > start && ts <= end; })
+      .reduce((s, w) => s + (w.distance_km ?? 0), 0);
+    return { km, isCurrent: i === weeks - 1 };
+  });
+}
+
+// Répartition facile / qualité sur une fenêtre (polarisation 80/20).
+function computeIntensitySplit(workouts: Workout[], days = 30): { easy: number; quality: number; total: number } {
+  const now = Date.now();
+  const recent = workouts.filter(w => now - new Date(w.date).getTime() <= days * 86400000);
+  const quality = recent.filter(isQualityWorkout).length;
+  return { quality, easy: recent.length - quality, total: recent.length };
+}
+
+// Meilleures sorties récentes (sur l'historique chargé — honnête, pas « all-time »).
+function computeRecords(workouts: Workout[]): { longest: number; maxElev: number; longestSec: number; bestPace: number | null } | null {
+  const runs = workouts.filter(w => (w.distance_km ?? 0) > 0);
+  if (!runs.length) return null;
+  const longest = Math.max(...runs.map(w => w.distance_km ?? 0));
+  const maxElev = Math.max(0, ...runs.map(w => w.elevation_gain_m ?? 0));
+  const longestSec = Math.max(0, ...runs.map(w => w.duration_seconds ?? 0));
+  const paces = runs
+    .filter(w => (w.distance_km ?? 0) >= 3 && (w.duration_seconds ?? 0) > 0)
+    .map(w => (w.duration_seconds as number) / (w.distance_km as number)); // sec/km
+  const bestPace = paces.length ? Math.min(...paces) : null;
+  return { longest, maxElev, longestSec, bestPace };
+}
+
+// Résumé de la semaine en cours (7 derniers jours).
+function computeWeekSummary(workouts: Workout[]): { sessions: number; km: number; elev: number; sec: number } {
+  const weekAgo = Date.now() - 7 * 86400000;
+  const wk = workouts.filter(w => new Date(w.date).getTime() >= weekAgo);
+  return {
+    sessions: wk.length,
+    km: wk.reduce((s, w) => s + (w.distance_km ?? 0), 0),
+    elev: wk.reduce((s, w) => s + (w.elevation_gain_m ?? 0), 0),
+    sec: wk.reduce((s, w) => s + (w.duration_seconds ?? 0), 0),
+  };
+}
+
+// Intitulé de section — repère éditorial entre les rangées du bento.
+function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-center px-3 py-2 bg-white border border-zinc-200 rounded-xl shadow-sm">
-      <div className="text-xs text-zinc-500 font-medium">{label}</div>
-      <div className="font-bold text-zinc-900 mt-0.5" style={{ color }}>{value}</div>
+    <div className="col-span-12 flex items-center gap-3 pt-2 first:pt-0">
+      <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-400">{children}</span>
+      <span className="h-px flex-1 bg-gradient-to-r from-zinc-200 to-transparent" />
     </div>
   );
 }

@@ -23,6 +23,17 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // Le crawl écrit des milliers de fichiers dans data/ : on les exclut du file-watcher
+  // de dev (sinon le serveur se fige au démarrage). Ils restent lisibles à l'exécution.
+  webpack: (config, { dev }) => {
+    if (dev) {
+      config.watchOptions = {
+        ...config.watchOptions,
+        ignored: ["**/node_modules/**", "**/.next/**", "**/data/**"],
+      };
+    }
+    return config;
+  },
 };
 
 export default withNextIntl(nextConfig);

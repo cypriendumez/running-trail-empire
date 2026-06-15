@@ -8,6 +8,7 @@ import {
   X, ChevronDown, ChevronUp, Check,
   Search, Loader2, ChevronRight, SlidersHorizontal, LayoutGrid, List,
 } from "lucide-react";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Category = "shoes_road" | "shoes_trail" | "watches" | "clothing" | "accessories" | "nutrition";
@@ -453,6 +454,15 @@ const PRODUCTS: Product[] = (() => {
     ["OTE",           "Anytime Bar",            34.99, 78, ["Barre","Polyvalent","Naturel"],       ["Barre avant/pendant/après","Naturel facile digestion"]],
   ];
 
+  // Vignette produit PRO, générée (100% légale) : dégradé par coloris + marque + modèle + icône.
+  // Remplace les photos génériques en attendant les VRAIES photos produit du flux d'affiliation (sous licence).
+  const ph = (brand: string, model: string, accent: string, emoji: string): string => {
+    const a = accent && /^#?[0-9a-fA-F]{3,8}$/.test(accent) ? (accent.startsWith("#") ? accent : "#" + accent) : "#10b981";
+    const esc = (s: string) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='500' height='350'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='${a}' stop-opacity='0.16'/><stop offset='1' stop-color='${a}' stop-opacity='0.42'/></linearGradient></defs><rect width='500' height='350' fill='#fafafa'/><rect width='500' height='350' fill='url(#g)'/><text x='250' y='160' font-size='96' text-anchor='middle'>${emoji}</text><text x='250' y='240' font-size='30' font-weight='800' fill='#18181b' text-anchor='middle' font-family='Arial,Helvetica,sans-serif'>${esc(brand).toUpperCase()}</text><text x='250' y='278' font-size='19' fill='#52525b' text-anchor='middle' font-family='Arial,Helvetica,sans-serif'>${esc(model)}</text></svg>`;
+    return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  };
+
   // ── Generate road shoes: 55 templates × 8 colorways = 440 ───────────────────
   ROAD_T.forEach(([brand, model, price, score, drop, stack, weight, ci, tags, reasons], ti) => {
     CW_ROAD.forEach(([ver, accent, dp, ds, inStock], cwi) => {
@@ -466,7 +476,7 @@ const PRODUCTS: Product[] = (() => {
         terrain: "road", cushioning: CUSH[ci],
         drop_mm: drop, stack_mm: stack, weight_g: weight,
         color_accent: accent,
-        image: imgRoad(brand, ti, cwi),
+        image: ph(brand, model, accent, "👟"),
         url: RETAILER_URLS[r], retailer: r, in_stock: inStock,
         tags, bio_reasons: reasons,
         specs: [
@@ -491,7 +501,7 @@ const PRODUCTS: Product[] = (() => {
         terrain: "trail", cushioning: CUSH[ci],
         drop_mm: drop, stack_mm: stack, weight_g: weight,
         color_accent: accent,
-        image: imgTrail(brand, ti, cwi),
+        image: ph(brand, model, accent, "🥾"),
         url: RETAILER_URLS[r], retailer: r, in_stock: inStock,
         tags, bio_reasons: reasons,
         specs: [
@@ -516,7 +526,7 @@ const PRODUCTS: Product[] = (() => {
         terrain: "n/a", cushioning: "n/a",
         weight_g: weight, gps,
         color_accent: accent,
-        image: img("watch", ti + cwi),
+        image: ph(brand, model, accent, "⌚"),
         url: RETAILER_URLS[r], retailer: r, in_stock: inStock,
         tags, bio_reasons: reasons,
         specs: [
@@ -540,7 +550,7 @@ const PRODUCTS: Product[] = (() => {
         terrain: "n/a", cushioning: "n/a",
         weight_g: weight,
         color_accent: accent,
-        image: img("cloth", ti + cwi),
+        image: ph(brand, model, accent, "👕"),
         url: RETAILER_URLS[r], retailer: r, in_stock: inStock,
         tags, bio_reasons: reasons,
         specs: [{ label: "Poids", value: `${weight}g` }],
@@ -561,7 +571,7 @@ const PRODUCTS: Product[] = (() => {
         terrain: "n/a", cushioning: "n/a",
         weight_g: weight,
         color_accent: accent,
-        image: img("acc", ti + cwi),
+        image: ph(brand, model, accent, "🎒"),
         url: RETAILER_URLS[r], retailer: r, in_stock: inStock,
         tags, bio_reasons: reasons,
         specs: [{ label: "Poids", value: `${weight}g` }],
@@ -582,7 +592,7 @@ const PRODUCTS: Product[] = (() => {
         terrain: "n/a", cushioning: "n/a",
         weight_g: 100,
         color_accent: accent,
-        image: img("nutr", ti + cwi),
+        image: ph(brand, model, accent, "🍫"),
         url: RETAILER_URLS[r], retailer: r, in_stock: inStock,
         tags, bio_reasons: reasons,
         specs: [],
@@ -615,6 +625,87 @@ const CATEGORIES: { key: Category | "all"; label: string; emoji: string; img: st
 const BRANDS = [...new Set(PRODUCTS.map(p => p.brand))].sort();
 const PAGE_SIZE = 48;
 
+// ── i18n local (5 langues) — chrome UI de la boutique (le catalogue simulé reste tel quel). ──
+const SX: Record<string, Record<string, string>> = {
+  fr: {
+    "title": "Boutique Running", "subtitle": "1 167 références · Recommandations IA · Meilleurs prix",
+    "searchHeroPh": "Rechercher Nike, Garmin, Vaporfly…", "searchBtn": "Rechercher", "popular": "Recherches populaires",
+    "cat.shoes_road": "Chaussures Route", "cat.shoes_trail": "Chaussures Trail", "cat.watches": "Montres GPS",
+    "cat.clothing": "Vêtements", "cat.accessories": "Accessoires", "cat.nutrition": "Nutrition",
+    "searchPh": "Rechercher un produit…", "reset": "Réinitialiser", "shop": "Boutique", "searchOf": "Recherche de «{q}»",
+    "filters": "Filtres", "f.cat": "Catégorie", "f.brand": "Marque", "f.price": "Prix", "f.score": "Score IA min", "f.avail": "Disponibilité",
+    "all": "Tout", "inStockOnly": "En stock uniquement", "inStock": "En stock",
+    "product": "produit", "products": "produits",
+    "sortBy": "Classer par :", "sort.score": "Pertinence (Score IA)", "sort.priceAsc": "Prix croissant", "sort.priceDesc": "Prix décroissant", "sort.weight": "Poids",
+    "empty": "Aucun produit ne correspond à vos critères", "resetAll": "Tout réinitialiser",
+    "loadN": "Charger {n} produits de plus", "remaining": "{n} restants sur {m}", "loadMore": "Charger plus",
+    "oos": "Rupture", "viewOffer": "Voir l'offre", "reviews": "avis", "spec.Poids": "Poids", "yes": "Oui", "no": "Non",
+  },
+  en: {
+    "title": "Running Store", "subtitle": "1 167 products · AI recommendations · Best prices",
+    "searchHeroPh": "Search Nike, Garmin, Vaporfly…", "searchBtn": "Search", "popular": "Popular searches",
+    "cat.shoes_road": "Road shoes", "cat.shoes_trail": "Trail shoes", "cat.watches": "GPS watches",
+    "cat.clothing": "Clothing", "cat.accessories": "Accessories", "cat.nutrition": "Nutrition",
+    "searchPh": "Search for a product…", "reset": "Reset", "shop": "Store", "searchOf": "Search for “{q}”",
+    "filters": "Filters", "f.cat": "Category", "f.brand": "Brand", "f.price": "Price", "f.score": "Min AI score", "f.avail": "Availability",
+    "all": "All", "inStockOnly": "In stock only", "inStock": "In stock",
+    "product": "product", "products": "products",
+    "sortBy": "Sort by:", "sort.score": "Relevance (AI score)", "sort.priceAsc": "Price: low to high", "sort.priceDesc": "Price: high to low", "sort.weight": "Weight",
+    "empty": "No products match your filters", "resetAll": "Reset everything",
+    "loadN": "Load {n} more products", "remaining": "{n} left of {m}", "loadMore": "Load more",
+    "oos": "Out of stock", "viewOffer": "View offer", "reviews": "reviews", "spec.Poids": "Weight", "yes": "Yes", "no": "No",
+  },
+  de: {
+    "title": "Running-Shop", "subtitle": "1 167 Artikel · KI-Empfehlungen · Beste Preise",
+    "searchHeroPh": "Nike, Garmin, Vaporfly suchen…", "searchBtn": "Suchen", "popular": "Beliebte Suchanfragen",
+    "cat.shoes_road": "Straßenschuhe", "cat.shoes_trail": "Trailschuhe", "cat.watches": "GPS-Uhren",
+    "cat.clothing": "Bekleidung", "cat.accessories": "Zubehör", "cat.nutrition": "Ernährung",
+    "searchPh": "Produkt suchen…", "reset": "Zurücksetzen", "shop": "Shop", "searchOf": "Suche nach „{q}“",
+    "filters": "Filter", "f.cat": "Kategorie", "f.brand": "Marke", "f.price": "Preis", "f.score": "Min. KI-Score", "f.avail": "Verfügbarkeit",
+    "all": "Alle", "inStockOnly": "Nur auf Lager", "inStock": "Auf Lager",
+    "product": "Produkt", "products": "Produkte",
+    "sortBy": "Sortieren nach:", "sort.score": "Relevanz (KI-Score)", "sort.priceAsc": "Preis aufsteigend", "sort.priceDesc": "Preis absteigend", "sort.weight": "Gewicht",
+    "empty": "Kein Produkt entspricht deinen Kriterien", "resetAll": "Alles zurücksetzen",
+    "loadN": "{n} weitere Produkte laden", "remaining": "{n} von {m} übrig", "loadMore": "Mehr laden",
+    "oos": "Ausverkauft", "viewOffer": "Zum Angebot", "reviews": "Bewertungen", "spec.Poids": "Gewicht", "yes": "Ja", "no": "Nein",
+  },
+  es: {
+    "title": "Tienda Running", "subtitle": "1 167 referencias · Recomendaciones IA · Mejores precios",
+    "searchHeroPh": "Buscar Nike, Garmin, Vaporfly…", "searchBtn": "Buscar", "popular": "Búsquedas populares",
+    "cat.shoes_road": "Zapatillas asfalto", "cat.shoes_trail": "Zapatillas trail", "cat.watches": "Relojes GPS",
+    "cat.clothing": "Ropa", "cat.accessories": "Accesorios", "cat.nutrition": "Nutrición",
+    "searchPh": "Buscar un producto…", "reset": "Restablecer", "shop": "Tienda", "searchOf": "Búsqueda de «{q}»",
+    "filters": "Filtros", "f.cat": "Categoría", "f.brand": "Marca", "f.price": "Precio", "f.score": "Score IA mín.", "f.avail": "Disponibilidad",
+    "all": "Todo", "inStockOnly": "Solo en stock", "inStock": "En stock",
+    "product": "producto", "products": "productos",
+    "sortBy": "Ordenar por:", "sort.score": "Relevancia (Score IA)", "sort.priceAsc": "Precio ascendente", "sort.priceDesc": "Precio descendente", "sort.weight": "Peso",
+    "empty": "Ningún producto coincide con tus criterios", "resetAll": "Restablecer todo",
+    "loadN": "Cargar {n} productos más", "remaining": "quedan {n} de {m}", "loadMore": "Cargar más",
+    "oos": "Agotado", "viewOffer": "Ver la oferta", "reviews": "reseñas", "spec.Poids": "Peso", "yes": "Sí", "no": "No",
+  },
+  pt: {
+    "title": "Loja Running", "subtitle": "1 167 referências · Recomendações IA · Melhores preços",
+    "searchHeroPh": "Pesquisar Nike, Garmin, Vaporfly…", "searchBtn": "Pesquisar", "popular": "Pesquisas populares",
+    "cat.shoes_road": "Sapatilhas estrada", "cat.shoes_trail": "Sapatilhas trail", "cat.watches": "Relógios GPS",
+    "cat.clothing": "Vestuário", "cat.accessories": "Acessórios", "cat.nutrition": "Nutrição",
+    "searchPh": "Pesquisar um produto…", "reset": "Repor", "shop": "Loja", "searchOf": "Pesquisa de «{q}»",
+    "filters": "Filtros", "f.cat": "Categoria", "f.brand": "Marca", "f.price": "Preço", "f.score": "Score IA mín.", "f.avail": "Disponibilidade",
+    "all": "Tudo", "inStockOnly": "Só em stock", "inStock": "Em stock",
+    "product": "produto", "products": "produtos",
+    "sortBy": "Ordenar por:", "sort.score": "Relevância (Score IA)", "sort.priceAsc": "Preço crescente", "sort.priceDesc": "Preço decrescente", "sort.weight": "Peso",
+    "empty": "Nenhum produto corresponde aos teus critérios", "resetAll": "Repor tudo",
+    "loadN": "Carregar mais {n} produtos", "remaining": "faltam {n} de {m}", "loadMore": "Carregar mais",
+    "oos": "Esgotado", "viewOffer": "Ver a oferta", "reviews": "avaliações", "spec.Poids": "Peso", "yes": "Sim", "no": "Não",
+  },
+};
+function fillS(s: string, p: Record<string, string | number>): string {
+  return s.replace(/\{(\w+)\}/g, (m, k) => (k in p ? String(p[k]) : m));
+}
+function useShopT() {
+  const { lang } = useT();
+  return SX[lang] ?? SX.fr;
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function scoreToStars(score: number) {
   if (score >= 95) return 5.0;
@@ -640,6 +731,7 @@ function fakeOriginalPrice(price: number, id: string) {
 }
 
 function StarRating({ stars, count }: { stars: number; count: number }) {
+  const d = useShopT();
   return (
     <div className="flex items-center gap-1.5">
       <div className="flex items-center">
@@ -647,7 +739,7 @@ function StarRating({ stars, count }: { stars: number; count: number }) {
           <Star key={i} className={`w-3 h-3 ${i <= Math.floor(stars) ? "fill-yellow-400 text-yellow-400" : i - 0.5 <= stars ? "fill-yellow-400/50 text-yellow-400" : "text-zinc-200 fill-zinc-200"}`} />
         ))}
       </div>
-      <span className="text-xs text-zinc-400">{stars.toFixed(1)} ({count} avis)</span>
+      <span className="text-xs text-zinc-400">{stars.toFixed(1)} ({count} {d["reviews"]})</span>
     </div>
   );
 }
@@ -675,6 +767,7 @@ function FilterSection({ title, children, defaultOpen = true }: {
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 export function ShoppingHub() {
+  const d = useShopT();
   const [category, setCategory] = useState<Category | "all">("all");
   const [search, setSearch] = useState("");
   const [inputVal, setInputVal] = useState("");
@@ -773,8 +866,8 @@ export function ShoppingHub() {
       <div className="pb-10">
         {/* Hero search */}
         <div className="max-w-2xl mx-auto py-10 px-4 text-center">
-          <h1 className="text-3xl font-black text-zinc-900 mb-2">Boutique Running</h1>
-          <p className="text-zinc-400 text-sm mb-8">1 167 références · Recommandations IA · Meilleurs prix</p>
+          <h1 className="text-3xl font-black text-zinc-900 mb-2">{d["title"]}</h1>
+          <p className="text-zinc-400 text-sm mb-8">{d["subtitle"]}</p>
 
           <div ref={searchRef} className="relative">
             <div className="flex items-center bg-white border-2 border-zinc-900 rounded-2xl overflow-hidden shadow-lg">
@@ -785,12 +878,12 @@ export function ShoppingHub() {
                 onFocus={() => setShowSuggestions(true)}
                 onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                 onKeyDown={e => e.key === "Enter" && submitSearch(inputVal)}
-                placeholder="Rechercher Nike, Garmin, Vaporfly…"
+                placeholder={d["searchHeroPh"]}
                 className="flex-1 px-4 py-4 text-base focus:outline-none placeholder:text-zinc-300"
               />
               <button onClick={() => submitSearch(inputVal)}
                 className="bg-zinc-900 text-white px-6 py-4 font-semibold hover:bg-zinc-700 transition-colors text-sm">
-                Rechercher
+                {d["searchBtn"]}
               </button>
             </div>
 
@@ -821,18 +914,18 @@ export function ShoppingHub() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`https://images.unsplash.com/${c.img}?w=200&h=200&fit=crop&q=75`}
-                  alt={c.label}
+                  alt={d[`cat.${c.key}`] ?? c.label}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
               </div>
-              <span className="text-xs font-semibold text-zinc-600 group-hover:text-zinc-900 text-center leading-tight transition-colors">{c.label}</span>
+              <span className="text-xs font-semibold text-zinc-600 group-hover:text-zinc-900 text-center leading-tight transition-colors">{d[`cat.${c.key}`] ?? c.label}</span>
             </button>
           ))}
         </div>
 
         {/* Popular searches */}
         <div className="max-w-2xl mx-auto px-4 mt-10">
-          <p className="text-xs font-semibold text-zinc-400 uppercase tracking-widest mb-3">Recherches populaires</p>
+          <p className="text-xs font-semibold text-zinc-400 uppercase tracking-widest mb-3">{d["popular"]}</p>
           <div className="flex flex-wrap gap-2">
             {["Nike Vaporfly", "Hoka Speedgoat", "Garmin Fenix 7", "Salomon Speedcross", "Adidas Adizero", "Trail shoes", "GPS watch", "Hydration vest"].map(q => (
               <button key={q} onMouseDown={() => submitSearch(q)}
@@ -860,7 +953,7 @@ export function ShoppingHub() {
               onFocus={() => setShowSuggestions(true)}
               onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
               onKeyDown={e => e.key === "Enter" && submitSearch(inputVal)}
-              placeholder="Rechercher un produit…"
+              placeholder={d["searchPh"]}
               className="flex-1 px-3 py-2.5 text-sm focus:outline-none"
             />
             {inputVal && (
@@ -885,24 +978,24 @@ export function ShoppingHub() {
           </AnimatePresence>
         </div>
         <button onClick={resetAll} className="text-sm text-zinc-400 hover:text-zinc-700 whitespace-nowrap flex items-center gap-1">
-          <X className="w-3.5 h-3.5" /> Réinitialiser
+          <X className="w-3.5 h-3.5" /> {d["reset"]}
         </button>
       </div>
 
       {/* Breadcrumb */}
       {(search || category !== "all") && (
         <div className="flex items-center gap-2 mb-4 text-sm text-zinc-400">
-          <button onClick={resetAll} className="hover:text-zinc-700">Boutique</button>
+          <button onClick={resetAll} className="hover:text-zinc-700">{d["shop"]}</button>
           {category !== "all" && (
             <>
               <span>/</span>
-              <span className="text-zinc-700 font-medium">{CATEGORIES.find(c => c.key === category)?.label}</span>
+              <span className="text-zinc-700 font-medium">{d[`cat.${category}`] ?? CATEGORIES.find(c => c.key === category)?.label}</span>
             </>
           )}
           {search && (
             <>
               <span>/</span>
-              <span className="text-zinc-700 font-medium">Recherche de «{search}»</span>
+              <span className="text-zinc-700 font-medium">{fillS(d["searchOf"], { q: search })}</span>
             </>
           )}
         </div>
@@ -914,25 +1007,25 @@ export function ShoppingHub() {
           <div className="sticky top-4 bg-white border border-zinc-200 rounded-2xl p-4">
             <div className="flex items-center justify-between mb-4">
               <span className="text-sm font-bold text-zinc-900 flex items-center gap-2">
-                <SlidersHorizontal className="w-4 h-4" /> Filtres
+                <SlidersHorizontal className="w-4 h-4" /> {d["filters"]}
               </span>
               {activeFilterCount > 0 && (
                 <button onClick={() => { setSelectedBrands(new Set()); setMinScore(0); setInStockOnly(false); setPriceRange([0, 1000]); }}
                   className="text-xs text-red-500 hover:text-red-700 font-medium">
-                  Réinitialiser
+                  {d["reset"]}
                 </button>
               )}
             </div>
 
             {/* Catégorie */}
-            <FilterSection title="Catégorie">
+            <FilterSection title={d["f.cat"]}>
               <div className="space-y-1.5">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <div onClick={() => setCategory("all")}
                     className={`w-4 h-4 rounded border transition-all flex items-center justify-center ${category === "all" ? "bg-zinc-900 border-zinc-900" : "border-zinc-300"}`}>
                     {category === "all" && <Check className="w-3 h-3 text-white" />}
                   </div>
-                  <span className="text-sm text-zinc-700">Tout ({PRODUCTS.length})</span>
+                  <span className="text-sm text-zinc-700">{d["all"]} ({PRODUCTS.length})</span>
                 </label>
                 {CATEGORIES.map(c => {
                   const cnt = PRODUCTS.filter(p => p.category === c.key).length;
@@ -942,7 +1035,7 @@ export function ShoppingHub() {
                         className={`w-4 h-4 rounded border transition-all flex items-center justify-center ${category === c.key ? "bg-zinc-900 border-zinc-900" : "border-zinc-300 hover:border-zinc-500"}`}>
                         {category === c.key && <Check className="w-3 h-3 text-white" />}
                       </div>
-                      <span className="text-sm text-zinc-700">{c.emoji} {c.label} <span className="text-zinc-400">({cnt})</span></span>
+                      <span className="text-sm text-zinc-700">{c.emoji} {d[`cat.${c.key}`] ?? c.label} <span className="text-zinc-400">({cnt})</span></span>
                     </label>
                   );
                 })}
@@ -950,7 +1043,7 @@ export function ShoppingHub() {
             </FilterSection>
 
             {/* Marque */}
-            <FilterSection title="Marque">
+            <FilterSection title={d["f.brand"]}>
               <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                 {BRANDS.map(b => {
                   const cnt = PRODUCTS.filter(p => p.brand === b && (category === "all" || p.category === category)).length;
@@ -970,7 +1063,7 @@ export function ShoppingHub() {
             </FilterSection>
 
             {/* Prix */}
-            <FilterSection title="Prix">
+            <FilterSection title={d["f.price"]}>
               <div className="space-y-3">
                 <div className="flex justify-between text-sm font-semibold text-zinc-800">
                   <span>{priceRange[0]}€</span><span>{priceRange[1]}€</span>
@@ -993,10 +1086,10 @@ export function ShoppingHub() {
             </FilterSection>
 
             {/* Score IA */}
-            <FilterSection title="Score IA min">
+            <FilterSection title={d["f.score"]}>
               <div className="space-y-2">
                 <div className="flex items-baseline gap-1">
-                  <span className="text-xl font-black text-zinc-900">{minScore || "Tout"}</span>
+                  <span className="text-xl font-black text-zinc-900">{minScore || d["all"]}</span>
                   {minScore > 0 && <span className="text-xs text-zinc-400">/100</span>}
                 </div>
                 <input type="range" min={0} max={95} step={5} value={minScore}
@@ -1006,7 +1099,7 @@ export function ShoppingHub() {
                   {[0,75,85,90].map(v => (
                     <button key={v} onClick={() => setMinScore(v)}
                       className={`text-xs px-2 py-1 rounded-lg border transition-all ${minScore===v ? "bg-zinc-900 text-white border-zinc-900" : "border-zinc-200 text-zinc-500 hover:border-zinc-400"}`}>
-                      {v===0 ? "Tout" : `≥${v}`}
+                      {v===0 ? d["all"] : `≥${v}`}
                     </button>
                   ))}
                 </div>
@@ -1014,9 +1107,9 @@ export function ShoppingHub() {
             </FilterSection>
 
             {/* Options */}
-            <FilterSection title="Disponibilité" defaultOpen={false}>
+            <FilterSection title={d["f.avail"]} defaultOpen={false}>
               <label className="flex items-center justify-between cursor-pointer">
-                <span className="text-sm text-zinc-700">En stock uniquement</span>
+                <span className="text-sm text-zinc-700">{d["inStockOnly"]}</span>
                 <button onClick={() => setInStockOnly(s => !s)}
                   className={`relative w-10 h-5 rounded-full transition-colors ${inStockOnly ? "bg-zinc-900" : "bg-zinc-200"}`}>
                   <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${inStockOnly ? "left-5" : "left-0.5"}`} />
@@ -1032,18 +1125,18 @@ export function ShoppingHub() {
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <div>
               <p className="font-bold text-zinc-900 text-sm">
-                {search && <>Recherche de «{search}» · </>}
-                <span className="text-zinc-500 font-normal">{filtered.length} produit{filtered.length > 1 ? "s" : ""}</span>
+                {search && <>{fillS(d["searchOf"], { q: search })} · </>}
+                <span className="text-zinc-500 font-normal">{filtered.length} {filtered.length > 1 ? d["products"] : d["product"]}</span>
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-zinc-400 hidden sm:inline">Classer par :</span>
+              <span className="text-xs text-zinc-400 hidden sm:inline">{d["sortBy"]}</span>
               <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)}
                 className="text-sm px-3 py-2 rounded-xl border border-zinc-200 bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900 cursor-pointer font-medium">
-                <option value="score">Pertinence (Score IA)</option>
-                <option value="price_asc">Prix croissant</option>
-                <option value="price_desc">Prix décroissant</option>
-                <option value="weight">Poids</option>
+                <option value="score">{d["sort.score"]}</option>
+                <option value="price_asc">{d["sort.priceAsc"]}</option>
+                <option value="price_desc">{d["sort.priceDesc"]}</option>
+                <option value="weight">{d["sort.weight"]}</option>
               </select>
               <div className="flex gap-0.5 p-1 bg-zinc-100 rounded-xl">
                 <button onClick={() => setViewMode("grid")} className={`p-1.5 rounded-lg transition-all ${viewMode==="grid" ? "bg-white shadow-sm text-zinc-900" : "text-zinc-400"}`}>
@@ -1066,7 +1159,7 @@ export function ShoppingHub() {
               ))}
               {inStockOnly && (
                 <span className="flex items-center gap-1.5 bg-zinc-900 text-white text-xs px-3 py-1.5 rounded-full font-medium">
-                  En stock <button onClick={() => setInStockOnly(false)}><X className="w-3 h-3" /></button>
+                  {d["inStock"]} <button onClick={() => setInStockOnly(false)}><X className="w-3 h-3" /></button>
                 </span>
               )}
               {minScore > 0 && (
@@ -1085,8 +1178,8 @@ export function ShoppingHub() {
           {filtered.length === 0 ? (
             <div className="bg-white rounded-2xl border border-zinc-200 py-20 text-center">
               <ShoppingBag className="w-10 h-10 text-zinc-200 mx-auto mb-3" />
-              <p className="text-zinc-500 font-medium">Aucun produit ne correspond à vos critères</p>
-              <button onClick={resetAll} className="mt-3 text-sm text-blue-600 hover:underline">Tout réinitialiser</button>
+              <p className="text-zinc-500 font-medium">{d["empty"]}</p>
+              <button onClick={resetAll} className="mt-3 text-sm text-blue-600 hover:underline">{d["resetAll"]}</button>
             </div>
           ) : viewMode === "grid" ? (
             <>
@@ -1103,10 +1196,10 @@ export function ShoppingHub() {
                 <div className="mt-8 text-center">
                   <button onClick={() => setPage(p => p + 1)}
                     className="inline-flex items-center gap-2 px-8 py-3 border-2 border-zinc-900 text-zinc-900 rounded-xl text-sm font-bold hover:bg-zinc-900 hover:text-white transition-all">
-                    Charger {Math.min(PAGE_SIZE, filtered.length - displayed.length)} produits de plus
+                    {fillS(d["loadN"], { n: Math.min(PAGE_SIZE, filtered.length - displayed.length) })}
                     <ChevronRight className="w-4 h-4" />
                   </button>
-                  <p className="text-xs text-zinc-400 mt-2">{filtered.length - displayed.length} restants sur {filtered.length}</p>
+                  <p className="text-xs text-zinc-400 mt-2">{fillS(d["remaining"], { n: filtered.length - displayed.length, m: filtered.length })}</p>
                 </div>
               )}
             </>
@@ -1125,7 +1218,7 @@ export function ShoppingHub() {
                 <div className="mt-8 text-center">
                   <button onClick={() => setPage(p => p + 1)}
                     className="inline-flex items-center gap-2 px-8 py-3 border-2 border-zinc-900 text-zinc-900 rounded-xl text-sm font-bold hover:bg-zinc-900 hover:text-white transition-all">
-                    Charger plus <ChevronRight className="w-4 h-4" />
+                    {d["loadMore"]} <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
               )}
@@ -1157,7 +1250,7 @@ export function ShoppingHub() {
                   <span className="bg-zinc-900/80 backdrop-blur text-white text-xs font-bold px-2.5 py-1 rounded-full">
                     ⭐ {selected.compatibility_score}/100
                   </span>
-                  {!selected.in_stock && <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">Rupture</span>}
+                  {!selected.in_stock && <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">{d["oos"]}</span>}
                 </div>
                 <div className="absolute bottom-4 left-5">
                   <p className="text-xs text-white/70 font-semibold uppercase tracking-wider">{selected.brand}</p>
@@ -1171,8 +1264,8 @@ export function ShoppingHub() {
                   <div className="grid grid-cols-3 gap-2">
                     {selected.specs.map(s => (
                       <div key={s.label} className="bg-zinc-50 rounded-xl px-3 py-2 text-center">
-                        <div className="text-xs text-zinc-400">{s.label}</div>
-                        <div className="text-sm font-bold text-zinc-800">{s.value}</div>
+                        <div className="text-xs text-zinc-400">{d[`spec.${s.label}`] ?? s.label}</div>
+                        <div className="text-sm font-bold text-zinc-800">{s.value === "Oui" ? d["yes"] : s.value === "Non" ? d["no"] : s.value}</div>
                       </div>
                     ))}
                   </div>
@@ -1196,7 +1289,7 @@ export function ShoppingHub() {
                   </div>
                   <a href={selected.url} target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-2 px-5 py-3 bg-zinc-900 hover:bg-zinc-700 text-white rounded-2xl text-sm font-bold transition-all">
-                    <ExternalLink className="w-4 h-4" /> Voir l&apos;offre
+                    <ExternalLink className="w-4 h-4" /> {d["viewOffer"]}
                   </a>
                 </div>
               </div>
@@ -1213,6 +1306,7 @@ function ProductCard({ p, i, isWishlisted, isSelected, onSelect, onWishlist }: {
   p: Product; i: number; isWishlisted: boolean; isSelected: boolean;
   onSelect: () => void; onWishlist: (e: React.MouseEvent) => void;
 }) {
+  const d = useShopT();
   const stars = scoreToStars(p.compatibility_score);
   const reviewCount = fakeReviewCount(p.id, p.compatibility_score);
   const origPrice = fakeOriginalPrice(p.price, p.id);
@@ -1242,7 +1336,7 @@ function ProductCard({ p, i, isWishlisted, isSelected, onSelect, onWishlist }: {
             <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-md">-{discountPct}%</span>
           )}
           {p.new && <span className="bg-zinc-900 text-white text-xs font-bold px-2 py-0.5 rounded-md">NEW</span>}
-          {!p.in_stock && <span className="bg-red-100 text-red-700 text-xs font-bold px-2 py-0.5 rounded-md">Rupture</span>}
+          {!p.in_stock && <span className="bg-red-100 text-red-700 text-xs font-bold px-2 py-0.5 rounded-md">{d["oos"]}</span>}
         </div>
 
         {/* Score + wishlist top-right */}
@@ -1285,6 +1379,7 @@ function ProductRow({ p, i, isWishlisted, isSelected, onSelect, onWishlist }: {
   p: Product; i: number; isWishlisted: boolean; isSelected: boolean;
   onSelect: () => void; onWishlist: (e: React.MouseEvent) => void;
 }) {
+  const d = useShopT();
   const stars = scoreToStars(p.compatibility_score);
   const reviewCount = fakeReviewCount(p.id, p.compatibility_score);
   const origPrice = fakeOriginalPrice(p.price, p.id);
@@ -1311,9 +1406,9 @@ function ProductRow({ p, i, isWishlisted, isSelected, onSelect, onWishlist }: {
         <StarRating stars={stars} count={reviewCount} />
         <div className="flex flex-wrap gap-1 mt-1.5">
           {p.specs.slice(0,2).map(s => (
-            <span key={s.label} className="text-xs bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-md">{s.value}</span>
+            <span key={s.label} className="text-xs bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-md">{s.value === "Oui" ? d["yes"] : s.value === "Non" ? d["no"] : s.value}</span>
           ))}
-          {!p.in_stock && <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-md font-medium">Rupture</span>}
+          {!p.in_stock && <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-md font-medium">{d["oos"]}</span>}
         </div>
       </div>
       {/* Price + action */}

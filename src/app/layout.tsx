@@ -1,21 +1,7 @@
 export const dynamic = "force-dynamic";
 import type { Metadata, Viewport } from "next";
-import { Inter, Barlow_Condensed } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/layout/Providers";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
-
-const barlow = Barlow_Condensed({
-  subsets: ["latin"],
-  weight: ["700", "800", "900"],
-  variable: "--font-barlow",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: {
@@ -67,7 +53,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fr" suppressHydrationWarning>
-      <body className={`${inter.variable} ${barlow.variable} font-sans`}>
+      <body className="font-sans">
         <Providers>{children}</Providers>
       </body>
     </html>

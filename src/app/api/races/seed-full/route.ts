@@ -495,7 +495,8 @@ export async function POST() {
       elevation_gain_m: r.elev,
       difficulty: r.diff,
       terrain: r.terrain,
-      time_limits: [{ checkpoint: "Arrivée", km: r.km, time_limit_seconds: Math.round(((r.type === "marathon" ? 540 : r.type === "semi" ? 600 : r.type.includes("trail") ? 900 : 720)) * r.km) }],
+      // Pas de barrières inventées (calcul allure×km ≠ donnée réelle) — [] si inconnues.
+      time_limits: [],
       registration_url: r.url || "",
       organization: r.org || "",
       description: `${r.name} — ${r.city} (${r.dept})`,

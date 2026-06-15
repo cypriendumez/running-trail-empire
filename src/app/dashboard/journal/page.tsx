@@ -1,12 +1,6 @@
-export const dynamic = "force-dynamic";
-import { SmartJournal } from "@/components/journal/SmartJournal";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Journal" };
-
+// Le Journal a été intégré au hub Santé (onglet « Journal »).
 export default function JournalPage() {
-  return (
-    <div className="max-w-3xl mx-auto">
-      <SmartJournal />
-    </div>
-  );
+  redirect("/dashboard/health");
 }

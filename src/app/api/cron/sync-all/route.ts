@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { autoCoachForUser } from "@/lib/ai/autoCoach";
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // 60s timeout (Vercel hobby = 10s, pro = 60s)
@@ -42,7 +43,7 @@ export async function GET(req: Request) {
   const oldest = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
   const newest = new Date().toISOString().split("T")[0];
 
-  const results: { userId: string; ok: boolean; workouts?: number; error?: string }[] = [];
+  const results: { userId: string; ok: boolean; workouts?: number; coached?: boolean; error?: string }[] = [];
 
   for (const profile of profiles ?? []) {
     if (!profile.intervals_athlete_id || !profile.intervals_api_key) continue;
@@ -69,10 +70,15 @@ export async function GET(req: Request) {
 
       let synced = 0;
 
+      // FC max de l'athlète (baseline → max observé) pour CLASSER les séances par intensité réelle.
+      const { data: baseRow } = await admin.from("performance_baselines").select("max_hr").eq("user_id", profile.id).order("tested_at", { ascending: false }).limit(1).maybeSingle();
+      const obsMax = Math.max(0, ...activities.map((a) => a.max_heartrate ?? 0));
+      const fcMax = (baseRow?.max_hr as number | undefined) || (obsMax > 150 ? obsMax : null);
+
       // Sync activities
       for (const act of activities) {
         if (!act.type || !act.start_date_local) continue;
-        const workoutType = mapActivityType(act.type);
+        const workoutType = refineType(act, fcMax);
         const { error: upsertErr } = await admin.from("workouts").upsert(
           {
             user_id: profile.id,
@@ -131,7 +137,13 @@ export async function GET(req: Request) {
         }
       }
 
-      results.push({ userId: profile.id, ok: true, workouts: synced });
+      // Coach AUTONOME : si du nouveau a été synchronisé, recalcule & publie la prochaine séance.
+      let coached = false;
+      if (synced > 0) {
+        const r = await autoCoachForUser(admin, { userId: profile.id, athleteId: profile.intervals_athlete_id, apiKey: profile.intervals_api_key }).catch(() => null);
+        coached = !!r?.processed;
+      }
+      results.push({ userId: profile.id, ok: true, workouts: synced, coached });
     } catch (err) {
       results.push({ userId: profile.id, ok: false, error: String(err) });
     }
@@ -150,6 +162,26 @@ function mapActivityType(type: string): string {
     Workout: "interval", Ride: "easy", Walk: "recovery", Hike: "trail",
   };
   return map[type] ?? "easy";
+}
+
+// Classe la séance par intensité RÉELLE (FC) + distance + dénivelé → type canonique juste,
+// au lieu de tout marquer « easy ». Préserve le trail. enum workouts.type valide.
+function refineType(act: IntervalsActivity, fcMax: number | null): string {
+  if (/trail|hike/i.test(act.type ?? "")) return "trail";
+  const km = act.distance ? act.distance / 1000 : 0;
+  const sec = act.moving_time ?? act.elapsed_time ?? 0;
+  if (km <= 0 || sec <= 0) return mapActivityType(act.type ?? "");
+  if ((act.total_elevation_gain ?? 0) / km > 25) return "trail";
+  if (km >= 18 || sec >= 95 * 60) return "long_run";
+  const hr = act.average_heartrate;
+  if (hr && fcMax) {
+    const pct = hr / fcMax;
+    if (pct >= 0.90) return "vma";
+    if (pct >= 0.85) return "tempo";
+    if (pct >= 0.68) return "easy";
+    return "recovery";
+  }
+  return mapActivityType(act.type ?? "");
 }
 
 interface IntervalsActivity {

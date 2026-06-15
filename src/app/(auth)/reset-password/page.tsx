@@ -1,0 +1,109 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { toast } from "sonner";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
+
+export default function ResetPasswordPage() {
+  const router = useRouter();
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [showPwd, setShowPwd] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [ready, setReady] = useState<boolean | null>(null); // session de récupération présente ?
+
+  // Après le clic sur le lien de l'email → /auth/callback a posé la session → on doit avoir un user.
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => setReady(!!data.user));
+  }, []);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (password.length < 8) { toast.error("8 caractères minimum."); return; }
+    if (password !== confirm) { toast.error("Les deux mots de passe ne correspondent pas."); return; }
+    setLoading(true);
+    const supabase = createClient();
+    const { error } = await supabase.auth.updateUser({ password });
+    setLoading(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Mot de passe mis à jour ! Reconnecte-toi.", { duration: 6000 });
+    await supabase.auth.signOut();
+    router.push("/login");
+  }
+
+  return (
+    <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-6">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center gap-2.5 mb-6">
+            <div className="w-10 h-10 bg-zinc-900 rounded-2xl flex items-center justify-center">
+              <span className="text-white font-bold">R</span>
+            </div>
+            <span className="font-bold text-zinc-900">Running &amp; Trail Empire</span>
+          </div>
+          <h1 className="text-2xl font-bold text-zinc-900">Nouveau mot de passe</h1>
+          <p className="text-zinc-500 text-sm mt-1">Choisis un nouveau mot de passe pour ton compte.</p>
+        </div>
+
+        {ready === false ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-center text-sm text-zinc-700">
+            Lien invalide ou expiré. Redemande un lien depuis{" "}
+            <Link href="/forgot-password" className="text-green-600 font-medium hover:text-green-700">Mot de passe oublié</Link>.
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-zinc-700 block mb-1.5">Nouveau mot de passe</label>
+              <div className="relative">
+                <input
+                  type={showPwd ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  minLength={8}
+                  className="w-full px-4 py-3 pr-12 rounded-xl border border-zinc-200 bg-white text-sm
+                             focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent
+                             placeholder:text-zinc-400 transition-shadow"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPwd(!showPwd)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+                >
+                  {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-zinc-700 block mb-1.5">Confirme le mot de passe</label>
+              <input
+                type={showPwd ? "text" : "password"}
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                placeholder="••••••••"
+                required
+                minLength={8}
+                className="w-full px-4 py-3 rounded-xl border border-zinc-200 bg-white text-sm
+                           focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent
+                           placeholder:text-zinc-400 transition-shadow"
+              />
+            </div>
+            <button type="submit" disabled={loading || ready === null} className="btn-brand w-full justify-center py-3">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              Mettre à jour
+            </button>
+          </form>
+        )}
+
+        <p className="text-center text-sm text-zinc-500 mt-6">
+          <Link href="/login" className="text-green-600 font-medium hover:text-green-700">Retour à la connexion</Link>
+        </p>
+      </div>
+    </div>
+  );
+}

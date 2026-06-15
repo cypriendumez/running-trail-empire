@@ -1,12 +1,13 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { buildAthleteContext } from "@/lib/ai/coachContext";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const ADMIN_EMAIL = "cypriendumez@outlook.fr";
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
-// gemini-2.5-flash-preview-04-17 = free tier, gemini-2.5-flash-preview-04-17 = requires billing
-const GEMINI_URL = (model: string = "gemini-2.5-flash-preview-04-17") =>
+// gemini-2.5-flash = free tier, gemini-2.5-flash = requires billing
+const GEMINI_URL = (model: string = "gemini-2.5-flash") =>
   `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
 const ICU_BASE = "https://intervals.icu/api/v1";
 
@@ -28,13 +29,19 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient();
 
   // Fetch profile + baseline from Supabase
-  const [profileRes, baselineRes] = await Promise.all([
+  const [profileRes, baselineRes, objRes] = await Promise.all([
     admin.from("profiles").select("*").eq("id", user_id).single(),
     admin.from("performance_baselines").select("*").eq("user_id", user_id).order("tested_at", { ascending: false }).limit(1).single(),
+    admin.from("notifications").select("data").eq("user_id", user_id).eq("type", "race_objective").maybeSingle(),
   ]);
 
   const profile = profileRes.data;
   const baseline = baselineRes.data;
+  const objective = objRes.data?.data as { race?: string; distanceKm?: number; raceDate?: string; targetTime?: string; targetPace?: string } | null;
+  const daysToRace = objective?.raceDate ? Math.ceil((new Date(objective.raceDate + "T00:00:00").getTime() - Date.now()) / 86400000) : null;
+  const objTxt = objective
+    ? `${objective.race} — ${objective.distanceKm} km le ${objective.raceDate} (J-${daysToRace}), temps visé ${objective.targetTime}, allure cible ${objective.targetPace}`
+    : "aucun objectif de course → viser une PROGRESSION GLOBALE selon profil, historique et récupération";
 
   // ── Fetch directly from Intervals.icu if credentials available ──
   const athleteId = profile?.intervals_athlete_id;
@@ -120,8 +127,14 @@ export async function POST(req: NextRequest) {
     fallbackSleep = (sRes.data ?? []).map((s: any) => ({ date: s.date, sleep_hours: s.total_sleep_min ? +(s.total_sleep_min / 60).toFixed(1) : null, score: s.sleep_score, body_battery: s.body_battery_end }));
   }
 
+  const recentDates = (icuSource ? icuActivities : fallbackWorkouts).map((a) => (a as { date?: string }).date).filter((d): d is string => !!d).sort().reverse();
+  const daysSinceLast = recentDates[0] ? Math.floor((Date.now() - new Date(recentDates[0]).getTime()) / 86400000) : null;
+  const restDays7 = Math.max(0, 7 - new Set(recentDates.filter((d) => Date.now() - new Date(d).getTime() <= 7 * 86400000)).size);
+
   const athleteData = {
     data_source: icuSource ? "intervals.icu (temps réel)" : "supabase (synchronisé)",
+    objectif_course: objTxt,
+    repos: { jours_depuis_derniere_seance: daysSinceLast, jours_sans_courir_7j: restDays7 },
     profile: {
       name: profile?.full_name,
       age: profile?.age,
@@ -138,7 +151,7 @@ export async function POST(req: NextRequest) {
   };
 
   // Step 1 — Gemini Flash: analysis
-  const analysisRes = await fetch(GEMINI_URL("gemini-2.5-flash-preview-04-17"), {
+  const analysisRes = await fetch(GEMINI_URL("gemini-2.5-flash"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -157,12 +170,15 @@ export async function POST(req: NextRequest) {
   let analysis: Record<string, unknown> = {};
   try { analysis = JSON.parse(rawText); } catch { const m = rawText.match(/\{[\s\S]*\}/); if (m) try { analysis = JSON.parse(m[0]); } catch {} }
 
+  // Cerveau coach complet (tendances, forme de course, sommeil, cycle, palette de séances).
+  const ctx = await buildAthleteContext(admin as unknown as Parameters<typeof buildAthleteContext>[0], user_id).catch(() => null);
+
   // Step 2 — Gemini: coaching plan
-  const planRes = await fetch(GEMINI_URL("gemini-2.5-flash-preview-04-17"), {
+  const planRes = await fetch(GEMINI_URL("gemini-2.5-flash"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: `Tu es un coach trail running expert. Rédige un plan "${planType}" pour ${profile?.full_name || "l'athlète"}.\n\nANALYSE (basée sur données ${athleteData.data_source}):\n${JSON.stringify(analysis, null, 2)}\n\nPROFIL:\n- VMA: ${baseline?.vma_kmh ?? "?"}km/h | FC max: ${baseline?.max_hr ?? "?"}bpm | FC repos: ${baseline?.resting_hr ?? "?"}bpm | Mode: ${profile?.mode}${coachNote ? `\n\nNOTE DU COACH: ${coachNote}` : ""}\n\nSTRUCTURE OBLIGATOIRE:\n**Bilan** : 2-3 phrases sur les séances analysées (cite des chiffres réels)\n**Plan semaine — "${planType}"** :\n- Lundi : [type] [durée] [intensité] [allure/FC cible]\n- Mardi : ...\n- (tous les jours)\n**Point clé** : 1 conseil technique prioritaire\n\nTon : coach direct et exigeant. 300 mots max. Zéro mention IA.` }] }],
+      contents: [{ role: "user", parts: [{ text: `Tu es un coach trail running expert. Rédige un plan "${planType}" pour ${profile?.full_name || "l'athlète"}.\n\nANALYSE (basée sur données ${athleteData.data_source}):\n${JSON.stringify(analysis, null, 2)}\n\nPROFIL:\n- VMA: ${baseline?.vma_kmh ?? "?"}km/h | FC max: ${baseline?.max_hr ?? "?"}bpm | FC repos: ${baseline?.resting_hr ?? "?"}bpm | Mode: ${profile?.mode}${coachNote ? `\n\nNOTE DU COACH: ${coachNote}` : ""}\n\n🎯 OBJECTIF: ${objTxt}\n→ S'il y a une course cible : ajuste CHAQUE séance vers elle (allure/distance spécifiques, terrain) et affûtage si elle approche. SINON : progression GLOBALE (base aérobie + VMA/seuil progressifs) selon le profil, l'historique et la récupération.\n→ RESPECTE la « STRUCTURE CIBLE DE LA SEMAINE » du contexte (le NOMBRE de séances de qualité indiqué). Le 80/20 est une répartition du VOLUME (temps), PAS du nombre de séances : un objectif chrono garde ≥ 2 séances de qualité spécifique/semaine (VMA + seuil/allure objectif). Ne propose JAMAIS une semaine quasi 100 % footing — ça sous-entraîne. 3-8 j sans courir ≠ désentraînement : 1 footing de reprise puis on enchaîne la qualité.\n\n⏸️ REPOS RÉCENT: ${daysSinceLast ?? "?"} j depuis la dernière séance, ${restDays7} j sans courir sur 7j${daysSinceLast != null && daysSinceLast >= 3 ? " → REPRISE progressive, pas de grosse séance d'emblée" : ""}.${ctx ? `\n\nCONTEXTE APPROFONDI (analyse-le pour personnaliser, pioche dans la palette) :\n${ctx.text}` : ""}\n\nSTRUCTURE OBLIGATOIRE:\n**Bilan** : 2-3 phrases sur les séances analysées (cite des chiffres réels)\n**Plan semaine — "${planType}"** :\n- Lundi : [type] [durée] [intensité] [allure/FC cible]\n- Mardi : ...\n- (tous les jours)\n**Point clé** : 1 conseil technique prioritaire\n\nTon : coach direct et exigeant. 300 mots max. Zéro mention IA.` }] }],
       generationConfig: { temperature: 0.6, maxOutputTokens: 1200 },
     }),
   });

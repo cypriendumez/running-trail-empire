@@ -172,7 +172,7 @@ export interface Race {
   city?: string;
   date: string;
   distance_km: number;
-  elevation_gain_m: number;
+  elevation_gain_m: number | null;   // null = D+ inconnu (affiché « — », jamais inventé)
   max_participants?: number;
   difficulty: TrailDifficulty;
   terrain: string[];

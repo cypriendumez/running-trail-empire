@@ -217,6 +217,7 @@ type CalendarType = { slug: string; isTrail: boolean; label: string };
 const CALENDAR_SLUGS: Array<{ slug: string; isTrail: boolean }> = [
   { slug: "trails", isTrail: true },
   { slug: "courses/france", isTrail: false },          // all road races (3750+)
+  { slug: "courses-5-10-15-km/france", isTrail: false }, // calendrier 5/10/15 km dédié (~1100 lignes)
   { slug: "semi-marathons", isTrail: false },
   { slug: "marathons", isTrail: false },
   { slug: "courses-100km-france", isTrail: true },
@@ -227,39 +228,71 @@ const CALENDAR_SLUGS: Array<{ slug: string; isTrail: boolean }> = [
 ];
 
 // ─── Parse jogging-plus HTML calendar TABLE (the real structure) ─────────────
-function parseCalendarTable(html: string, isTrail: boolean): RaceEntry[] {
+function parseCalendarTable(html: string, isTrail: boolean, pageUrl = ""): RaceEntry[] {
   const $ = cheerio.load(html);
   const races: RaceEntry[] = [];
   const todayStr = new Date().toISOString().slice(0, 10);
   const currentYear = new Date().getFullYear();
 
-  $("tr").each((_, row) => {
-    const cells = $(row).find("td");
-    if (cells.length < 3) return;
+  // Le HTML de jogging-plus est mal fermé : des dizaines de courses s'entassent
+  // dans une même <tr> (N × 3 cellules). On ne parcourt donc PAS les lignes mais
+  // TOUS les <td> dans l'ordre du document, par triplets (date, nom+distances,
+  // ville) — avec resynchronisation si un triplet est désaligné.
+  const isDateCell = (txt: string): boolean => {
+    const t = txt.toLowerCase().trim();
+    if (!t || t.length > 45) return false;
+    if (t.includes("connue")) return true;
+    const m = t.replace(/^(du|le|samedi|dimanche|lundi|mardi|mercredi|jeudi|vendredi)\s+/, "")
+      .match(/^(\d{1,2})\s+([a-zéèêûôî]+)/);
+    return !!(m && MONTHS_FR[m[2]]);
+  };
 
-    const dateText = $(cells[0]).text().trim();
-    const $link = $(cells[1]).find("a[href*='presentation-courses-trails']");
-    if (!$link.length) return;
+  const tds = $("td").toArray();
+  for (let i = 0; i < tds.length - 2; ) {
+    const dateText = $(tds[i]).text().trim();
+    if (!isDateCell(dateText)) { i++; continue; }
+    const $nameCell = $(tds[i + 1]);
+    const cityDeptRaw = $(tds[i + 2]).text().trim();
+    if (isDateCell(cityDeptRaw)) { i++; continue; } // désalignement → resynchronise
+    i += 3; // triplet consommé (valide ou non)
 
-    const name = $link.text().trim();
-    const href = ($link.attr("href") || "").trim();
-    if (!name || name.length < 3) return;
+    // Nom + URL : ligne AVEC lien (fiche jogging-plus) OU ligne en texte brut
+    // (la majorité des lignes du calendrier n'ont PAS de fiche — on les garde
+    // désormais, avec la page calendrier comme source).
+    const $link = $nameCell.find("a[href*='presentation-courses-trails']");
+    let name = "";
+    let href = "";
+    if ($link.length) {
+      name = $link.text().trim();
+      href = ($link.attr("href") || "").trim();
+    } else {
+      const $c = $nameCell.clone();
+      $c.find("em, script, style").remove();
+      name = $c.text().replace(/\s+/g, " ").trim();
+      href = pageUrl;
+    }
+    if (!name || name.length < 4 || name.length > 120) continue;
+    if (/aucune épreuve|^\d+([.,]\d+)?\s*km/i.test(name)) continue;
 
-    const distText = $(cells[1]).find("em").text().trim();
-    const cityDeptRaw = $(cells[2]).text().trim();
+    const distText = $nameCell.find("em").text().trim();
 
-    // Parse date: "19 avril", "3 mai", etc.  — no year given
-    if (!dateText || dateText.toLowerCase().includes("connue")) return;
-    const dayMonthMatch = dateText.toLowerCase().match(/^(\d{1,2})\s+([a-zé]+)/);
-    if (!dayMonthMatch) return;
-    const day = parseInt(dayMonthMatch[1]);
-    const month = MONTHS_FR[dayMonthMatch[2]];
-    if (!month || day < 1 || day > 31) return;
-
-    // Year inference: if this date already passed this year → use next year
-    const thisYearDate = `${currentYear}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
-    const year = thisYearDate < todayStr ? currentYear + 1 : currentYear;
-    const dateStr = `${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+    // Date : "19 avril" (sans année) ou "Non connue" → marqueur 2099-01-01
+    // ("Date à venir") : l'événement existe, seule sa prochaine date est inconnue.
+    let dateStr = "";
+    if (dateText.toLowerCase().includes("connue")) {
+      dateStr = "2099-01-01";
+    } else {
+      const clean = dateText.toLowerCase().replace(/^(du|le|samedi|dimanche|lundi|mardi|mercredi|jeudi|vendredi)\s+/, "");
+      const dayMonthMatch = clean.match(/^(\d{1,2})\s+([a-zéèêûôî]+)/);
+      if (!dayMonthMatch) continue;
+      const day = parseInt(dayMonthMatch[1]);
+      const month = MONTHS_FR[dayMonthMatch[2]];
+      if (!month || day < 1 || day > 31) continue;
+      // Year inference: if this date already passed this year → use next year
+      const thisYearDate = `${currentYear}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+      const year = thisYearDate < todayStr ? currentYear + 1 : currentYear;
+      dateStr = `${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+    }
 
     // Parse city and dept from "(47 - Lot et Garonne)" pattern
     const cityDeptMatch = cityDeptRaw.match(/^([^(]+?)\s*\((\d{1,3}[AB]?)\s*[-–]\s*([^)]+)\)/);
@@ -284,7 +317,7 @@ function parseCalendarTable(html: string, isTrail: boolean): RaceEntry[] {
       latitude: null,
       longitude: null,
     });
-  });
+  }
 
   return races;
 }
@@ -308,7 +341,7 @@ async function scrapeJoggingPlusCalendar(): Promise<RaceEntry[]> {
       const html = await resp.text();
       if (html.length < 5000) continue;
 
-      const parsed = parseCalendarTable(html, isTrail);
+      const parsed = parseCalendarTable(html, isTrail, url);
       all.push(...parsed);
       await new Promise(r => setTimeout(r, 1200));
     } catch (e) {
@@ -322,6 +355,10 @@ async function scrapeJoggingPlusCalendar(): Promise<RaceEntry[]> {
 // ─── FFA (Fédération Française d'Athlétisme) calendar ──────────────────────
 async function scrapeFfaCalendar(): Promise<RaceEntry[]> {
   const races: RaceEntry[] = [];
+  // DÉSACTIVÉ (légalité) : le robots.txt d'athle.fr contient « Disallow: /bases/liste.aspx?* »
+  // — exactement l'URL utilisée ici. On respecte la directive : plus aucune requête FFA.
+  return races;
+  // eslint-disable-next-line no-unreachable
   const today = new Date();
   const dateFrom = `${String(today.getDate()).padStart(2,"0")}/${String(today.getMonth()+1).padStart(2,"0")}/${today.getFullYear()}`;
   const dateTo = `31/12/${today.getFullYear() + 1}`;
@@ -535,10 +572,6 @@ function getDefaultDistance(type: string): number {
 function toSupabaseRace(r: RaceEntry) {
   const kmMatch = r.distancesText?.match(/(\d+(?:[.,]\d+)?)\s*km/i);
   const distKm = kmMatch ? parseFloat(kmMatch[1].replace(",",".")) : getDefaultDistance(r.type);
-  const sPerKm: Record<string, number> = {
-    road_5k:720, road_10k:720, semi:600, marathon:540,
-    trail_s:900, trail_m:900, trail_l:900, trail_xl:900, ultra:900,
-  };
   return {
     name: r.name,
     type: r.type,
@@ -547,10 +580,13 @@ function toSupabaseRace(r: RaceEntry) {
     city: r.city || "",
     date: r.date,
     distance_km: distKm,
-    elevation_gain_m: r.type.includes("trail") ? 500 : 0,
+    // RÈGLE D'OR : on n'invente JAMAIS une donnée. D+ inconnu → null (affiché « — »),
+    // barrières horaires inconnues → [] (rien d'affiché). Avant : 500 m forfaitaire
+    // sur les trails + barrières calculées allure×km → données fausses montrées aux clients.
+    elevation_gain_m: null,
     difficulty: r.difficulty,
     terrain: r.terrain,
-    time_limits: [{ checkpoint: "Arrivée", km: distKm, time_limit_seconds: Math.round((sPerKm[r.type]||720)*distKm) }],
+    time_limits: [],
     registration_url: r.source_url || "",
     organization: "",
     description: r.description || `${r.name} — ${r.city}${r.department ? `, ${r.department}` : ""}`,
@@ -569,15 +605,51 @@ export async function GET() {
   return NextResponse.json({ races_in_db: count || 0 });
 }
 
-// ─── DELETE: remove past races ───────────────────────────────────────────────
+// ─── DELETE: courses passées → « Date à venir » (2099-01-01) ─────────────────
+// Les courses françaises sont annuelles : une édition passée ≠ course disparue.
+// On bascule la date sur le marqueur 2099 (affiché « Date à venir ») au lieu de
+// supprimer. On ne supprime que les éditions périmées DÉJÀ remplacées par une
+// édition future de la même course (même nom + ville + distance).
 export async function DELETE() {
+  const sb = createAdminClient();
   const today = new Date().toISOString().slice(0, 10);
-  const { error, count } = await createAdminClient()
-    .from("races")
-    .delete({ count: "exact" })
-    .lt("date", today);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ deleted: count, message: `${count} courses passées supprimées` });
+
+  const all: { id: string; name: string; city: string | null; date: string; distance_km: number | null }[] = [];
+  let from = 0;
+  const PAGE = 1000;
+  while (true) {
+    const { data, error } = await sb.from("races").select("id,name,city,date,distance_km").range(from, from + PAGE - 1);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!data?.length) break;
+    all.push(...data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+
+  const key = (r: { name: string; city: string | null; distance_km: number | null }) =>
+    `${r.name.toLowerCase().trim()}::${(r.city || "").toLowerCase().trim()}::${r.distance_km ?? ""}`;
+  const futureKeys = new Set(all.filter(r => r.date >= today).map(key));
+  const past = all.filter(r => r.date < today);
+  const toDelete = past.filter(r => futureKeys.has(key(r))).map(r => r.id);
+  const toRoll = past.filter(r => !futureKeys.has(key(r))).map(r => r.id);
+
+  const CHUNK = 200;
+  for (let i = 0; i < toDelete.length; i += CHUNK) {
+    const { error } = await sb.from("races").delete().in("id", toDelete.slice(i, i + CHUNK));
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  for (let i = 0; i < toRoll.length; i += CHUNK) {
+    const { error } = await sb.from("races")
+      .update({ date: "2099-01-01", updated_at: new Date().toISOString() })
+      .in("id", toRoll.slice(i, i + CHUNK));
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({
+    rolled_to_tbd: toRoll.length,
+    deleted_superseded: toDelete.length,
+    message: `${toRoll.length} courses passées basculées en « Date à venir » · ${toDelete.length} éditions périmées supprimées (déjà remplacées)`,
+  });
 }
 
 // ─── POST: trigger sync ─────────────────────────────────────────────────────

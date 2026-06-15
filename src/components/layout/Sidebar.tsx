@@ -4,31 +4,53 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, MapPin, Mountain, Heart, ShoppingBag,
-  User, Trophy, Bot, Settings, LogOut, ChevronLeft,
-  Ghost, BookOpen, ShieldCheck, Zap, Watch
+  User, Trophy, Settings, LogOut, ChevronLeft,
+  Ghost, Watch, GraduationCap, CalendarDays, MessagesSquare, Newspaper,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
 import { useState } from "react";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
-const nav = [
-  { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { href: "/dashboard/races", icon: MapPin, label: "Courses" },
-  { href: "/dashboard/trail", icon: Mountain, label: "Trail Builder" },
-  { href: "/dashboard/health", icon: Heart, label: "Santé" },
-  { href: "/dashboard/shop", icon: ShoppingBag, label: "Boutique" },
-  { href: "/dashboard/coaching", icon: Bot, label: "Coaching IA" },
-  { href: "/dashboard/ghost-runner", icon: Ghost, label: "Ghost Runner" },
-  { href: "/dashboard/journal", icon: BookOpen, label: "Journal" },
-  { href: "/dashboard/leagues", icon: Trophy, label: "Ligues" },
-  { href: "/dashboard/sync", icon: Watch, label: "Sync Montre" },
-  { href: "/dashboard/profile", icon: User, label: "Profil" },
+// Navigation groupée par univers — plus lisible et pro.
+const groups: { titleKey: string | null; items: { href: string; icon: typeof LayoutDashboard; tk: string }[] }[] = [
+  {
+    titleKey: null,
+    items: [{ href: "/dashboard", icon: LayoutDashboard, tk: "nav.dashboard" }],
+  },
+  {
+    titleKey: "group.training",
+    items: [
+      { href: "/dashboard/calendrier", icon: CalendarDays, tk: "nav.calendar" },
+      { href: "/dashboard/races", icon: MapPin, tk: "nav.races" },
+      { href: "/dashboard/trail", icon: Mountain, tk: "nav.trail" },
+      { href: "/dashboard/ghost-runner", icon: Ghost, tk: "nav.ghost" },
+      { href: "/dashboard/cours", icon: GraduationCap, tk: "nav.courses" },
+    ],
+  },
+  {
+    titleKey: "group.tracking",
+    items: [
+      { href: "/dashboard/health", icon: Heart, tk: "nav.health" },
+      { href: "/dashboard/messages", icon: MessagesSquare, tk: "nav.messaging" },
+      { href: "/dashboard/sync", icon: Watch, tk: "nav.sync" },
+    ],
+  },
+  {
+    titleKey: "group.club",
+    items: [
+      { href: "/dashboard/communaute", icon: Newspaper, tk: "nav.community" },
+      { href: "/dashboard/leagues", icon: Trophy, tk: "nav.leagues" },
+      { href: "/dashboard/shop", icon: ShoppingBag, tk: "nav.shop" },
+    ],
+  },
 ];
 
-export function Sidebar({ profile }: { profile: Record<string, unknown> | null }) {
+export function Sidebar({ profile, unreadMessages = 0 }: { profile: Record<string, unknown> | null; unreadMessages?: number }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { t } = useT();
   const [collapsed, setCollapsed] = useState(false);
 
   async function signOut() {
@@ -37,61 +59,83 @@ export function Sidebar({ profile }: { profile: Record<string, unknown> | null }
     router.push("/login");
   }
 
+  const NavItem = ({ href, icon: Icon, label }: { href: string; icon: typeof LayoutDashboard; label: string }) => {
+    const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
+    // Pastille de messages non lus — masquée quand on consulte déjà la messagerie.
+    const count = href === "/dashboard/messages" && pathname !== "/dashboard/messages" ? unreadMessages : 0;
+    return (
+      <Link
+        href={href}
+        title={collapsed ? label : undefined}
+        className={cn(
+          "group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
+          active ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900",
+        )}
+      >
+        {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-green-500" />}
+        <span className="relative flex-shrink-0">
+          <Icon className="w-[18px] h-[18px]" />
+          {count > 0 && collapsed && (
+            <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-emerald-500 px-1 text-[9px] font-bold text-white ring-2 ring-white">{count > 9 ? "9+" : count}</span>
+          )}
+        </span>
+        {!collapsed && <span className="flex-1">{label}</span>}
+        {!collapsed && count > 0 && (
+          <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[10px] font-bold text-white shadow-sm">{count > 99 ? "99+" : count}</span>
+        )}
+      </Link>
+    );
+  };
+
   return (
     <aside className={cn(
       "h-screen flex flex-col border-r border-zinc-100 bg-white transition-all duration-300",
-      collapsed ? "w-[72px]" : "w-[220px]"
+      collapsed ? "w-[76px]" : "w-[232px]",
     )}>
       {/* Logo */}
       <div className="h-16 flex items-center px-4 border-b border-zinc-100">
-        <div className="w-8 h-8 bg-zinc-900 rounded-xl flex items-center justify-center flex-shrink-0">
+        <div className="w-9 h-9 bg-zinc-900 rounded-2xl flex items-center justify-center flex-shrink-0">
           <span className="text-white font-bold text-sm">R</span>
         </div>
         {!collapsed && (
-          <span className="ml-3 font-semibold text-zinc-900 text-sm leading-tight">
+          <span className="ml-3 font-bold text-zinc-900 text-sm leading-tight tracking-tight">
             Running &<br />Trail Empire
           </span>
         )}
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-        {nav.map(({ href, icon: Icon, label }) => {
-          const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
-                active
-                  ? "bg-zinc-900 text-white"
-                  : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
-              )}
-            >
-              <Icon className="w-4 h-4 flex-shrink-0" />
-              {!collapsed && label}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 px-3 py-4 overflow-y-auto">
+        {groups.map((g, gi) => (
+          <div key={gi} className={gi > 0 ? "mt-5" : ""}>
+            {g.titleKey && !collapsed && (
+              <div className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-300">{t(g.titleKey)}</div>
+            )}
+            {g.titleKey && collapsed && gi > 0 && <div className="mx-3 mb-2 border-t border-zinc-100" />}
+            <div className="space-y-0.5">
+              {g.items.map((it) => <NavItem key={it.href} href={it.href} icon={it.icon} label={t(it.tk)} />)}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Footer */}
       <div className="p-3 border-t border-zinc-100 space-y-0.5">
+        <NavItem href="/dashboard/profile" icon={User} label={t("nav.profile")} />
         <Link href="/dashboard/settings"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 transition-all">
-          <Settings className="w-4 h-4 flex-shrink-0" />
-          {!collapsed && "Paramètres"}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition-all">
+          <Settings className="w-[18px] h-[18px] flex-shrink-0" />
+          {!collapsed && t("nav.settings")}
         </Link>
-<button onClick={signOut}
+        <button onClick={signOut}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-500 hover:bg-red-50 hover:text-red-600 transition-all">
-          <LogOut className="w-4 h-4 flex-shrink-0" />
-          {!collapsed && "Déconnexion"}
+          <LogOut className="w-[18px] h-[18px] flex-shrink-0" />
+          {!collapsed && t("nav.logout")}
         </button>
         <button onClick={() => setCollapsed(!collapsed)}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs text-zinc-400 hover:bg-zinc-50 transition-all">
           <ChevronLeft className={cn("w-4 h-4 transition-transform flex-shrink-0", collapsed && "rotate-180")} />
-          {!collapsed && "Réduire"}
+          {!collapsed && t("nav.collapse")}
         </button>
       </div>
     </aside>
