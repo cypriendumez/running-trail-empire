@@ -40,12 +40,15 @@ function zonePaceRange(vmaKmh: number, zone: number): string | null {
 // Une étape : ALLURE cible avec libellé d'intensité. Priorité à l'allure EXPLICITE prescrite par le
 // coach (paceSec → colle exactement à ce qu'affiche le calendrier client), sinon l'allure de la zone
 // calculée depuis la VMA, sinon repli cible FC. Garmin n'alerte que sur UNE cible/étape → l'allure.
-function zoneStep(durMin: number, zone: number, vmaKmh: number | null, label: string, paceSec?: number | null): string {
+function zoneStep(durMin: number, zone: number, vmaKmh: number | null, label: string, paceSec?: number | null, hrOnly?: boolean): string {
   const d = Math.max(1, Math.round(durMin));
+  // Échauffement / retour au calme : pilotés à la FRÉQUENCE CARDIAQUE (jamais à l'allure)
+  // → on monte/descend en température par la FC, pas en visant un chrono.
+  if (hrOnly) return `- ${d}m Z${zone} HR ${label}`;
   let range: string | null = null;
   if (paceSec && paceSec > 0) range = `${fmtPace(Math.max(120, paceSec - 8))}-${fmtPace(paceSec + 8)}`;
   else if (vmaKmh) range = zonePaceRange(vmaKmh, zone);
-  return range ? `- ${d}m ${range} pace ${label}` : `- ${d}m Z${zone} HR`;
+  return range ? `- ${d}m ${range} pace ${label}` : `- ${d}m Z${zone} HR ${label}`;
 }
 
 // Extrait l'allure prescrite d'un texte de séance : « 4'20/km », « 4:20/km », « à 4'20 ».
@@ -68,22 +71,22 @@ export function stepsForType(type: string, durationMin: number, vmaKmh?: number 
   if (/renfo|muscu|gainage|force|ppg/.test(s)) return null; // pas une course
   if (/récup|recup/.test(s)) {
     const warm = 10, cool = 10, main = Math.max(10, d - warm - cool);
-    return [zoneStep(warm, 1, v, "Échauffement"), zoneStep(main, 1, v, "Récup", p), zoneStep(cool, 1, v, "Retour au calme")].join("\n");
+    return [zoneStep(warm, 1, v, "Échauffement", null, true), zoneStep(main, 1, v, "Récup", p), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
   }
   if (/long|endurance|footing|fond|easy/.test(s)) {
     const warm = 15, cool = 10, main = Math.max(15, d - warm - cool);
-    return [zoneStep(warm, 1, v, "Échauffement"), zoneStep(main, 2, v, "Endurance facile", p), zoneStep(cool, 1, v, "Retour au calme")].join("\n");
+    return [zoneStep(warm, 1, v, "Échauffement", null, true), zoneStep(main, 2, v, "Endurance facile", p), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
   }
   if (/spéci|specif|allure|objectif|seuil|tempo/.test(s)) {
     const warm = 15, cool = 10, main = Math.max(10, d - warm - cool);
-    return [zoneStep(warm, 2, v, "Échauffement"), zoneStep(main, 4, v, "Seuil", p), zoneStep(cool, 1, v, "Retour au calme")].join("\n");
+    return [zoneStep(warm, 2, v, "Échauffement", null, true), zoneStep(main, 4, v, "Seuil", p), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
   }
   if (/vma|fractionn|interval|piste|côte|cote|fartlek|30\/30/.test(s)) {
     const warm = 15, cool = 10, main = Math.max(10, d - warm - cool);
-    return [zoneStep(warm, 2, v, "Échauffement"), zoneStep(main, 5, v, "VMA", p), zoneStep(cool, 1, v, "Retour au calme")].join("\n");
+    return [zoneStep(warm, 2, v, "Échauffement", null, true), zoneStep(main, 5, v, "VMA", p), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
   }
   const warm = 15, cool = 10, main = Math.max(15, d - warm - cool);
-  return [zoneStep(warm, 1, v, "Échauffement"), zoneStep(main, 2, v, "Endurance facile", p), zoneStep(cool, 1, v, "Retour au calme")].join("\n");
+  return [zoneStep(warm, 1, v, "Échauffement", null, true), zoneStep(main, 2, v, "Endurance facile", p), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
 }
 
 // Crée (en remplaçant l'éventuelle séance coach déjà présente) une séance dans le

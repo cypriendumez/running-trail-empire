@@ -18,7 +18,7 @@ export const COACH_SYSTEM = `Tu es un entraîneur de course à pied et de trail 
 - GUIDÉ PAR LA VFC & LE SOMMEIL : VFC sous la base ou sommeil dégradé → allège ; athlète frais → ose la qualité.
 - INDIVIDUALISATION DU VOLUME : adapte fréquence, volume, intensité, complexité et vocabulaire au NIVEAU réel, à l'âge, au sexe et au passif. Débutant : 3-4 séances/sem, volume facile, régularité avant tout. Amateur confirmé : 4-6 séances. Athlète AVANCÉ/ÉLITE visant un chrono rapide : jusqu'à 10-12 séances/SEMAINE avec des DOUBLES SÉANCES (matin + soir) certains jours. N'impose JAMAIS un tel volume à un débutant (blessure assurée) — la progression prime sur l'ego.
 - SÉCURITÉ : prévention des blessures, prise en compte des douleurs signalées, jamais de surcharge.
-- STRUCTURE DE SÉANCE (toujours) : chaque séance de course se décompose en 3 temps — ÉCHAUFFEMENT (AU MOINS 15 min de footing progressif Z1→Z2 ; + 3-5 lignes droites de 80-100 m avant une séance de qualité), CORPS de séance, puis RETOUR AU CALME (AU MOINS 10 min de footing très facile Z1). MÊME les séances faciles/endurance/récup commencent et finissent tranquillement — JAMAIS un bloc brut sans mise en route ni récupération active. Échauffement et retour au calme se font EN COURANT (jamais en marchant). Les descriptions de séance explicitent ces 3 temps avec leurs durées et allures.
+- STRUCTURE DE SÉANCE (toujours) : chaque séance de course se décompose en 3 temps — ÉCHAUFFEMENT (AU MOINS 15 min de footing progressif Z1→Z2 ; + 3-5 lignes droites de 80-100 m avant une séance de qualité), CORPS de séance, puis RETOUR AU CALME (AU MOINS 10 min de footing très facile Z1). MÊME les séances faciles/endurance/récup commencent et finissent tranquillement — JAMAIS un bloc brut sans mise en route ni récupération active. Échauffement et retour au calme se font EN COURANT (jamais en marchant). ⚠️ L'ÉCHAUFFEMENT et le RETOUR AU CALME se pilotent à la FRÉQUENCE CARDIAQUE (zones FC Z1→Z2), JAMAIS à l'allure (on ne vise pas un chrono pour se mettre en route ou récupérer) → exprime-les en FC. Seul le CORPS de séance porte une allure cible en /km.
 - SPÉCIFICITÉ OBJECTIF : TOUT converge vers la course cible (date, distance, dénivelé, allure visée). Travaille l'allure spécifique et le terrain, gère le pacing et la nutrition de course.
 - ANALYSE MULTIFACTORIELLE : croise efficacité aérobie (allure à FC donnée et sa tendance), tendance VFC, monotonie de charge (Foster), forme de course (cadence, oscillation verticale, temps de contact au sol, foulée, puissance), dérive cardiaque, architecture du sommeil (profond/REM/énergie/respiration), terrain (D+), chaleur, et phase du cycle menstruel le cas échéant — pour expliquer le POURQUOI, prévenir blessure/plateau et accélérer la progression.
 - PROGRAMME COMPLET (pas seulement courir) : intègre le RENFORCEMENT musculaire (1–2×/sem — prévention blessure n°1 + économie), les ÉDUCATIFS / la technique (cadence, gammes), le CROSS-TRAINING (vélo/natation/aqua-jogging pour ajouter du volume ou s'entraîner/récupérer SANS impact en cas de bobo), et la NUTRITION DE COURSE (30–60 g de glucides/h au-delà de 90 min, hydratation, à TESTER à l'entraînement). Tu disposes d'une palette de 100 séances : choisis et ADAPTE, ne récite pas.
@@ -160,8 +160,10 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const freshSleep = sleep[0]?.date && now - new Date(sleep[0].date + "T00:00:00").getTime() <= 2 * 86400000 ? sleep[0] : null;
   const lastSleepMin = freshSleep?.total_sleep_min ?? null;
 
-  const pains = [...new Set(feedback.flatMap(f => f.data?.pain ?? []).filter(Boolean))];
+  const pains = [...new Set(feedback.flatMap(f => f.data?.pain ?? []).filter((p) => p && p !== "Aucune douleur"))];
   const lastRpe = feedback[0]?.data?.rpe ?? null;
+  // Notes libres récentes de l'athlète (sensations, douleur précise…) → vues par le coach.
+  const fbNotes = feedback.map(f => f.data?.note?.trim()).filter((n): n is string => !!n).slice(0, 3);
 
   const maxHr = num(b?.max_hr), restHr = num(b?.resting_hr), ltHr = num(b?.lt_hr);
   const vmaStored = num(b?.vma_kmh);
@@ -389,7 +391,7 @@ CHARGE D'ENTRAÎNEMENT
 - CTL ${Math.round(load.ctl)} (forme) · ATL ${Math.round(load.atl)} (fatigue) · TSB ${Math.round(load.tsb)} (fraîcheur) · ratio aigu:chronique ${r1(load.acr)}${load.acr > 1.5 ? " ⚠️ élevé (risque)" : ""}
 - Répartition d'intensité 14j : ${hardShare ?? "?"} % de séances qualité (cible polarisée ≤ 20 %)
 - 5 dernières séances : ${last5.join(" | ") || "aucune"}
-${pains.length ? `- ⚠️ Douleurs récemment signalées : ${pains.join(", ")} (en tenir compte)` : ""}${lastRpe != null ? `\n- Dernier ressenti d'effort (RPE) : ${lastRpe}/10` : ""}
+${pains.length ? `- ⚠️ DOULEUR(S) SIGNALÉE(S) par l'athlète (zone précise) : ${pains.join(", ")} → ADAPTE les prochaines séances à CETTE zone (voir consigne sécurité).` : ""}${fbNotes.length ? `\n- 🗣️ Notes récentes de l'athlète (ressenti/douleur — LIS-LES et tiens-en compte) : ${fbNotes.map(n => `« ${n} »`).join(" ; ")}` : ""}${lastRpe != null ? `\n- Dernier ressenti d'effort (RPE) : ${lastRpe}/10` : ""}
 
 ANALYSE APPROFONDIE (croise tous ces facteurs)
 - VO2max estimé : ${vo2 ?? "?"} ml/kg/min${efTrend ? ` · efficacité aérobie ${efTrend}` : ""}
@@ -413,7 +415,7 @@ ${weekTarget}
 GARDE-FOUS ANTI-BLESSURE (à respecter ABSOLUMENT — la santé prime sur la performance)
 - Progressivité : +10 % de charge/volume maximum par semaine.${load.acr > 1.4 ? " ⚠️ Ratio aigu:chronique élevé → prévoir une semaine ALLÉGÉE." : ""}${monotony > 2 ? " ⚠️ Monotonie élevée → varier l'intensité, garantir un vrai jour facile/repos." : ""}
 - Jamais 2 séances de qualité d'affilée ; ≥ 48 h entre deux séances dures ; ≥ 1 jour de repos/semaine.
-- ${pains.length ? "⚠️ Douleur signalée → réduire l'impact ou passer au croisé (vélo/natation), ne JAMAIS forcer sur une douleur." : "Au moindre signal de douleur → adapter immédiatement, pas de stoïcisme."}
+- ${pains.length ? `⚠️ DOULEUR SIGNALÉE (${pains.join(", ")}) → ADAPTE la/les prochaine(s) séance(s) à CETTE zone, ne JAMAIS forcer sur une douleur : tendon d'Achille/mollet → supprime vitesse, côtes et pliométrie, footing plat très court ; genou/ITB → évite descentes, longues sorties et fractionné, réduis le volume ; tibia/périoste → coupe le volume et les surfaces dures, privilégie le croisé ; ischio/cuisse → pas de sprint ni d'allure spécifique, allure douce ; hanche/psoas → pas de fractionné court ; pied/cheville → repos ou croisé SANS impact (vélo/natation/aqua-jogging). Si la douleur est vive/persistante (≥ plusieurs jours) → REPOS de course + conseille une consultation (kiné/médecin). La santé prime sur le plan.` : "Au moindre signal de douleur → adapter immédiatement, pas de stoïcisme."}
 - ${daysSinceLast != null && daysSinceLast >= 4 ? "Reprise après coupure → repartir un cran en dessous, remonter progressivement." : "Si VFC sous la base ou sommeil dégradé → alléger la séance du jour."}
 - ~80 % du volume en facile (Z1-Z2). But ultime : faire RÉUSSIR l'objectif SANS blessure.
 

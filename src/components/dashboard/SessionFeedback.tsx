@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { CheckCircle2, Loader2, MessageSquareHeart } from "lucide-react";
 
 const PAINS = ["Aucune douleur", "Musculaire", "Articulaire"];
+// Localisation de la douleur → transmise au coach pour adapter les séances suivantes.
+const ZONES = ["Mollet", "Tendon d'Achille", "Genou", "Cuisse", "Ischio-jambier", "Hanche", "Tibia (périoste)", "Pied / cheville", "Dos / bas du dos"];
 // Dégradé vert → rouge pour l'échelle d'effort 0-10
 const rpeColor = (v: number) => {
   const stops = ["#10b981", "#22c55e", "#84cc16", "#eab308", "#f59e0b", "#f97316", "#ef4444"];
@@ -120,6 +122,22 @@ export function SessionFeedback({ date, title }: { date: string; title: string }
               );
             })}
           </div>
+          {pain.some((p) => p !== "Aucune douleur") && (
+            <div className="mt-2.5">
+              <div className="mb-1.5 text-xs font-medium text-zinc-500">Où exactement ? (aide ton coach à adapter les prochaines séances)</div>
+              <div className="flex flex-wrap gap-1.5">
+                {ZONES.map((z) => {
+                  const active = pain.includes(z);
+                  return (
+                    <button key={z} onClick={() => togglePain(z)}
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 transition-colors ${active ? "bg-amber-500 text-white ring-amber-500" : "bg-white text-zinc-600 ring-zinc-200 hover:bg-zinc-50"}`}>
+                      {z}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Note */}
