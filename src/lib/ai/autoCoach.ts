@@ -56,14 +56,14 @@ export async function autoCoachForUser(
   if (!wp || wp.qBudget <= 0 || wp.eased || lastHard) {
     session = {
       type: "Récup", title: "Footing de récupération",
-      subtitle: `40 min footing très facile en Z1-Z2${wp?.easyPace ? ` (~${wp.easyPace}/km)` : ""}`,
+      subtitle: `10 min échauffement très doux Z1 → 25 min footing facile Z1-Z2${wp?.easyPace ? ` (~${wp.easyPace}/km)` : ""} → 10 min retour au calme Z1`,
       why: lastHard ? "Ta dernière séance était intense : on récupère pour bien l'assimiler." : "On reste en facile aujourd'hui selon ta forme du moment.",
       tags: ["Récup", "Z1/Z2"],
     };
   } else {
     const q = wp.quality[0];
     const title = q.type === "VMA" ? "Séance VMA" : q.type === "Spécifique" ? "Allure spécifique objectif" : q.type === "Seuil" ? "Séance au seuil" : q.type;
-    session = { type: q.type, title, subtitle: q.desc, why: "Prochaine séance de qualité de ton bloc, calée sur ta forme et ton objectif.", tags: [q.type, "Qualité"] };
+    session = { type: q.type, title, subtitle: `15-20 min échauffement progressif Z1→Z2 + 3-5 lignes droites → ${q.desc} → 10-15 min retour au calme Z1`, why: "Prochaine séance de qualité de ton bloc, calée sur ta forme et ton objectif.", tags: [q.type, "Qualité"] };
   }
 
   // 4) Publication AUTOMATIQUE : dashboard client (notification) + montre (cible FC).

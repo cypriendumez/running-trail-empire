@@ -66,8 +66,14 @@ export function stepsForType(type: string, durationMin: number, vmaKmh?: number 
   const p = mainPaceSec ?? null;
   if (/repos|rest/.test(s)) return null;
   if (/renfo|muscu|gainage|force|ppg/.test(s)) return null; // pas une course
-  if (/récup|recup/.test(s)) return zoneStep(d, 1, v, "Récup", p);
-  if (/long|endurance|footing|fond|easy/.test(s)) return zoneStep(d, 2, v, "Endurance facile", p);
+  if (/récup|recup/.test(s)) {
+    const warm = 10, cool = 10, main = Math.max(10, d - warm - cool);
+    return [zoneStep(warm, 1, v, "Échauffement"), zoneStep(main, 1, v, "Récup", p), zoneStep(cool, 1, v, "Retour au calme")].join("\n");
+  }
+  if (/long|endurance|footing|fond|easy/.test(s)) {
+    const warm = 15, cool = 10, main = Math.max(15, d - warm - cool);
+    return [zoneStep(warm, 1, v, "Échauffement"), zoneStep(main, 2, v, "Endurance facile", p), zoneStep(cool, 1, v, "Retour au calme")].join("\n");
+  }
   if (/spéci|specif|allure|objectif|seuil|tempo/.test(s)) {
     const warm = 15, cool = 10, main = Math.max(10, d - warm - cool);
     return [zoneStep(warm, 2, v, "Échauffement"), zoneStep(main, 4, v, "Seuil", p), zoneStep(cool, 1, v, "Retour au calme")].join("\n");
@@ -76,7 +82,8 @@ export function stepsForType(type: string, durationMin: number, vmaKmh?: number 
     const warm = 15, cool = 10, main = Math.max(10, d - warm - cool);
     return [zoneStep(warm, 2, v, "Échauffement"), zoneStep(main, 5, v, "VMA", p), zoneStep(cool, 1, v, "Retour au calme")].join("\n");
   }
-  return zoneStep(d, 2, v, "Endurance facile", p);
+  const warm = 15, cool = 10, main = Math.max(15, d - warm - cool);
+  return [zoneStep(warm, 1, v, "Échauffement"), zoneStep(main, 2, v, "Endurance facile", p), zoneStep(cool, 1, v, "Retour au calme")].join("\n");
 }
 
 // Crée (en remplaçant l'éventuelle séance coach déjà présente) une séance dans le
