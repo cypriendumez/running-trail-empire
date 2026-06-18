@@ -310,7 +310,7 @@ export function CalendarView({ sessions, notes: notesProp = [], races: racesProp
                 <div className="text-[10px] font-extrabold uppercase tracking-wide" style={{ color: typeColor(coach.type).fg }}>{coach.type} · {t("cal.panel.coachSession")}</div>
                 <h3 className="text-lg font-bold text-zinc-900">{coach.title}</h3>
                 {coach.tags.length > 0 && <div className="mt-1.5 flex flex-wrap gap-1.5">{coach.tags.map((tg) => <span key={tg} className="rounded-full bg-white/70 px-2.5 py-0.5 text-xs font-semibold text-zinc-600">{tg}</span>)}</div>}
-                <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-zinc-700">{coach.detail}</p>
+                <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-zinc-700">{coach.detail.replace(/\s*→\s*/g, "\n")}</p>
                 {coach.why && <div className="mt-2 rounded-xl bg-white/60 p-3 text-sm leading-relaxed text-zinc-700"><b>{t("cal.panel.why")}&nbsp;:</b> {coach.why}</div>}
                 {coach.feel && <div className="mt-2 flex items-start gap-2 text-sm leading-relaxed text-zinc-600"><Target className="mt-0.5 h-4 w-4 flex-shrink-0 text-zinc-400" /><span><b className="text-zinc-700">{t("cal.panel.feel")}&nbsp;:</b> {coach.feel}</span></div>}
                 {isRenfo(coach.type) && <div className="mt-3"><RenfoGuide /></div>}

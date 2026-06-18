@@ -55,7 +55,7 @@ MISSION : construis un plan d'entraînement PÉRIODISÉ de ${planWeeks} semaines
 - Estime CTL/ATL/TSB par semaine de façon réaliste (TSB positif la semaine de course).
 
 Réponds UNIQUEMENT par du JSON valide (sans markdown), structure EXACTE :
-{"summary":"2 phrases : logique du plan et points de vigilance pour cet athlète","weeks":[{"week_number":1,"phase":"base|development|specific|taper","start_date":"YYYY-MM-DD","total_km":50,"total_elevation_m":500,"ctl":45,"atl":48,"tsb":-3,"sessions":[{"day_of_week":1,"type":"easy|tempo|interval|long_run|trail|vma|hill_repeat|recovery","title":"Titre court","description":"Détail avec zone/allure et cible","target_duration_min":60,"target_distance_km":10,"target_elevation_m":0,"intensity_zone":"Z1|Z2|Z3|Z4|Z5","is_key_session":false}]}]}`;
+{"summary":"2 phrases : logique du plan et points de vigilance pour cet athlète","weeks":[{"week_number":1,"phase":"base|development|specific|taper","start_date":"YYYY-MM-DD","total_km":50,"total_elevation_m":500,"ctl":45,"atl":48,"tsb":-3,"sessions":[{"day_of_week":1,"type":"easy|tempo|interval|long_run|trail|vma|hill_repeat|recovery","title":"Titre court","description":"Détail STRUCTURÉ séparé par ' → ' : Échauffement (≥15 min footing à la FC Z1→Z2) → Corps (allure /km ; format chiffré pour la qualité) → Retour au calme (≥10 min FC Z1). Allure /km UNIQUEMENT sur le corps ; échauffement/retour au calme en FC. Repos/Renfo = pas d'échauffement course, juste les exercices clés","target_duration_min":60,"target_distance_km":10,"target_elevation_m":0,"intensity_zone":"Z1|Z2|Z3|Z4|Z5","is_key_session":false}]}]}`;
 
   const response = await fetch(GEMINI_URL, {
     method: "POST",
