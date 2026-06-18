@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import {
   Target, X, Plus, StickyNote, Flag, Loader2, Trash2,
   ChevronLeft, ChevronRight, LayoutGrid, List, CalendarRange,
+  CalendarDays, CalendarClock, ListChecks, ArrowLeft,
 } from "lucide-react";
 import { RenfoGuide } from "@/components/training/RenfoGuide";
 import { fmtDistance, type UnitSystem } from "@/lib/units";
@@ -53,6 +54,7 @@ export function CalendarView({ sessions, notes: notesProp = [], races: racesProp
   const [view, setView] = useState<"month" | "agenda">("month");
   const [offset, setOffset] = useState(0); // décalage en blocs de 4 semaines
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const heroRef = useRef<HTMLDivElement | null>(null);
 
   const onRaceName = (v: string) => {
     setRace((r) => ({ ...r, name: v }));
@@ -89,9 +91,22 @@ export function CalendarView({ sessions, notes: notesProp = [], races: racesProp
   const dayHeaders = Array.from({ length: 7 }, (_, i) => { const d = new Date(gridStart); d.setDate(gridStart.getDate() + i); return d.toLocaleDateString(lang, { weekday: "short" }); });
   const rangeLabel = `${weeks[0][0].toLocaleDateString(lang, { day: "numeric", month: "short" })} – ${weeks[3][6].toLocaleDateString(lang, { day: "numeric", month: "short" })}`;
 
-  // Stats de période (séances planifiées sur les 4 semaines affichées + cette semaine).
-  const periodCount = weeks.flat().filter((d) => coachByDate[fmtKey(d)]).length;
-  const thisWeekCount = weeks[0].filter((d) => coachByDate[fmtKey(d)] && offset === 0).length;
+  // Stats du hero (cette semaine / à venir / prochaine course) — indépendantes de la période affichée.
+  const sow = new Date(today);
+  sow.setDate(today.getDate() - (weekStart === "sun" ? today.getDay() : (today.getDay() + 6) % 7));
+  const sowKey = fmtKey(sow);
+  const eowKey = fmtKey(new Date(sow.getTime() + 7 * 86400000));
+  const weekCount = sessions.filter((s) => s.date >= sowKey && s.date < eowKey).length;
+  const upcomingCount = sessions.filter((s) => s.date >= todayKey).length;
+  const nextRace = races.filter((r) => r.date >= todayKey).sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;
+  const nextRaceLabel = nextRace
+    ? `${nextRace.name} · ${new Date(nextRace.date + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "short" })}`
+    : t("cal.stat.noRace");
+  const heroChips: { Icon: typeof Flag; text: string }[] = [
+    { Icon: CalendarClock, text: `${weekCount} ${t("cal.stat.weekSessions")}` },
+    { Icon: ListChecks, text: `${upcomingCount} ${t("cal.stat.periodSessions")}` },
+    { Icon: Flag, text: nextRaceLabel },
+  ];
 
   // Agenda : toutes les dates avec contenu, ≥ aujourd'hui, triées.
   const agendaDates = useMemo(() => {
@@ -104,7 +119,11 @@ export function CalendarView({ sessions, notes: notesProp = [], races: racesProp
   const selNotes = sel ? (notesByDate[sel] ?? []) : [];
   const selRaces = sel ? (racesByDate[sel] ?? []) : [];
 
-  const openDay = (key: string) => { setSel(key); setAdding(null); setNoteText(""); setRace({ name: "", location: "", distanceKm: "" }); setSuggest([]); };
+  const openDay = (key: string) => {
+    setSel(key); setAdding(null); setNoteText(""); setRace({ name: "", location: "", distanceKm: "" }); setSuggest([]);
+    // Si le jour a une séance, on remonte vers le hero pour y afficher son détail.
+    if (coachByDate[key]) heroRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
   const weekLabel = (n: number) => (n > 1 ? t("cal.week.many", { n }) : t("cal.week.one", { n }));
 
   const addEntry = async () => {
@@ -157,7 +176,61 @@ export function CalendarView({ sessions, notes: notesProp = [], races: racesProp
   };
 
   return (
-    <div>
+    <div className="min-h-screen bg-gradient-to-b from-zinc-50 to-white">
+      {/* ── Hero : par défaut = présentation du plan ; quand une séance est sélectionnée = son détail ── */}
+      <div ref={heroRef} className="relative overflow-hidden text-white" style={{ background: "linear-gradient(135deg,#064e3b 0%,#047857 45%,#0d9488 100%)" }}>
+        <div className="pointer-events-none absolute -top-24 -right-16 h-72 w-72 rounded-full bg-emerald-300/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-28 left-1/3 h-72 w-72 rounded-full bg-teal-300/10 blur-3xl" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+        <div className="relative z-10 mx-auto max-w-6xl px-5 py-8">
+          {coach ? (
+            /* Détail de la séance du jour sélectionné */
+            <>
+              <button onClick={() => setSel(null)} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[12px] font-semibold text-white/90 ring-1 ring-white/20 backdrop-blur-md transition hover:bg-white/20">
+                <ArrowLeft className="h-3.5 w-3.5" /> {t("cal.hero.overview")}
+              </button>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] ring-1 ring-white/20 backdrop-blur-md">
+                  <span className="h-2 w-2 rounded-full" style={{ background: typeColor(coach.type).bg }} />
+                  {coach.type}
+                </span>
+                <span className="text-[12px] font-semibold uppercase tracking-wide text-white/70 first-letter:uppercase">
+                  {sel && new Date(sel + "T00:00:00").toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long" })}
+                </span>
+              </div>
+              <h1 className="mt-2 text-2xl font-bold tracking-tight drop-shadow-sm sm:text-3xl">{coach.title}</h1>
+              {coach.detail && <p className="mt-2 max-w-2xl whitespace-pre-line text-[15px] leading-relaxed text-white/90">{coach.detail.replace(/\s*→\s*/g, "\n")}</p>}
+              {coach.tags.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {coach.tags.map((tg) => <span key={tg} className="rounded-full bg-white/12 px-2.5 py-0.5 text-xs font-semibold text-white/90 ring-1 ring-white/15 backdrop-blur-md">{tg}</span>)}
+                </div>
+              )}
+              {coach.why && <div className="mt-3 max-w-2xl rounded-xl bg-white/10 p-3 text-sm leading-relaxed text-white/90 ring-1 ring-white/15 backdrop-blur-md"><b>{t("cal.panel.why")}&nbsp;:</b> {coach.why}</div>}
+              {coach.feel && <div className="mt-2 flex max-w-2xl items-start gap-2 text-sm leading-relaxed text-white/80"><Target className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-200" /><span><b className="text-white">{t("cal.panel.feel")}&nbsp;:</b> {coach.feel}</span></div>}
+            </>
+          ) : (
+            /* Présentation par défaut du calendrier */
+            <>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/20 backdrop-blur-md">
+                <CalendarDays className="h-3.5 w-3.5 text-amber-300" />
+                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-50">{t("cal.eyebrow")}</span>
+              </span>
+              <h1 className="mt-3 text-2xl font-bold tracking-tight drop-shadow-sm sm:text-3xl">{t("cal.title")}</h1>
+              <p className="mt-1.5 max-w-2xl text-[15px] leading-relaxed text-white/85">{t("cal.subtitle")}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {heroChips.map((c, i) => (
+                  <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[13px] font-semibold text-white/90 ring-1 ring-white/15 backdrop-blur-md">
+                    <c.Icon className="h-3.5 w-3.5 text-amber-200" />
+                    {c.text}
+                  </span>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-6xl px-5 py-6">
       {/* Barre de contrôle : navigation période + bascule de vue */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1.5">
@@ -304,18 +377,8 @@ export function CalendarView({ sessions, notes: notesProp = [], races: racesProp
           </div>
 
           <div className="space-y-4 p-5">
-            {/* Séance coach */}
-            {coach && (
-              <div className="rounded-2xl p-4" style={{ background: typeColor(coach.type).soft }}>
-                <div className="text-[10px] font-extrabold uppercase tracking-wide" style={{ color: typeColor(coach.type).fg }}>{coach.type} · {t("cal.panel.coachSession")}</div>
-                <h3 className="text-lg font-bold text-zinc-900">{coach.title}</h3>
-                {coach.tags.length > 0 && <div className="mt-1.5 flex flex-wrap gap-1.5">{coach.tags.map((tg) => <span key={tg} className="rounded-full bg-white/70 px-2.5 py-0.5 text-xs font-semibold text-zinc-600">{tg}</span>)}</div>}
-                <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-zinc-700">{coach.detail.replace(/\s*→\s*/g, "\n")}</p>
-                {coach.why && <div className="mt-2 rounded-xl bg-white/60 p-3 text-sm leading-relaxed text-zinc-700"><b>{t("cal.panel.why")}&nbsp;:</b> {coach.why}</div>}
-                {coach.feel && <div className="mt-2 flex items-start gap-2 text-sm leading-relaxed text-zinc-600"><Target className="mt-0.5 h-4 w-4 flex-shrink-0 text-zinc-400" /><span><b className="text-zinc-700">{t("cal.panel.feel")}&nbsp;:</b> {coach.feel}</span></div>}
-                {isRenfo(coach.type) && <div className="mt-3"><RenfoGuide /></div>}
-              </div>
-            )}
+            {/* Le détail de la séance s'affiche dans le hero ↑. Ici, on garde le guide de renfo. */}
+            {coach && isRenfo(coach.type) && <RenfoGuide />}
 
             {/* Courses planifiées du jour */}
             {selRaces.map((r) => (
@@ -385,6 +448,7 @@ export function CalendarView({ sessions, notes: notesProp = [], races: racesProp
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
