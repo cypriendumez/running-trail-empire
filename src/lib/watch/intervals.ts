@@ -79,11 +79,13 @@ export function stepsForType(type: string, durationMin: number, vmaKmh?: number 
   }
   if (/spéci|specif|allure|objectif|seuil|tempo/.test(s)) {
     const warm = 15, cool = 10, main = Math.max(10, d - warm - cool);
-    return [zoneStep(warm, 2, v, "Échauffement", null, true), zoneStep(main, 4, v, "Seuil", p), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
+    // Échauffement & retour au calme en Z1 HR (doux) ; seul le corps vise l'allure seuil.
+    return [zoneStep(warm, 1, v, "Échauffement", null, true), zoneStep(main, 4, v, "Seuil", p), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
   }
   if (/vma|fractionn|interval|piste|côte|cote|fartlek|30\/30/.test(s)) {
     const warm = 15, cool = 10, main = Math.max(10, d - warm - cool);
-    return [zoneStep(warm, 2, v, "Échauffement", null, true), zoneStep(main, 5, v, "VMA", p), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
+    // Échauffement & retour au calme en Z1 HR (doux) ; seul le corps vise l'allure VMA.
+    return [zoneStep(warm, 1, v, "Échauffement", null, true), zoneStep(main, 5, v, "VMA", p), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
   }
   const warm = 15, cool = 10, main = Math.max(15, d - warm - cool);
   return [zoneStep(warm, 1, v, "Échauffement", null, true), zoneStep(main, 2, v, "Endurance facile", p), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
