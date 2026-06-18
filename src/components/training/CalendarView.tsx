@@ -41,6 +41,20 @@ const typeColor = (t: string) => CAT_COLOR[categoryOf(t)];
 const isRenfo = (t: string) => categoryOf(t) === "renfo";
 const fmtKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
+// Détail d'une séance prêt à afficher en 3 temps. Comme la montre (cf. intervals.ts → stepsForType),
+// si le coach n'a stocké que le corps, on reconstruit échauffement (FC) + corps + retour au calme (FC).
+type SessionDetail =
+  | { mode: "plain"; lines: string[] }                 // rest/renfo (1 ligne) ou déjà structuré (séparé par →)
+  | { mode: "wrapped"; warmMin: number; body: string }; // corps seul → on enveloppe échauffement/retour au calme
+function sessionDetail(type: string, detail: string): SessionDetail | null {
+  const body = (detail || "").trim();
+  if (!body) return null;
+  const cat = categoryOf(type);
+  if (cat === "rest" || cat === "renfo") return { mode: "plain", lines: [body] };       // pas une course continue
+  if (body.includes("→")) return { mode: "plain", lines: body.split("→").map((s) => s.trim()).filter(Boolean) };
+  return { mode: "wrapped", warmMin: cat === "recovery" ? 10 : 15, body };
+}
+
 export function CalendarView({ sessions, notes: notesProp = [], races: racesProp = [], weekStart = "mon", units = "metric" }: { sessions: Planned[]; notes?: CalNote[]; races?: CalRace[]; weekStart?: "mon" | "sun"; units?: UnitSystem }) {
   const { t, lang } = useT();
   const [sel, setSel] = useState<string | null>(null);
@@ -118,6 +132,22 @@ export function CalendarView({ sessions, notes: notesProp = [], races: racesProp
   const coach = sel ? coachByDate[sel] : null;
   const selNotes = sel ? (notesByDate[sel] ?? []) : [];
   const selRaces = sel ? (racesByDate[sel] ?? []) : [];
+
+  // Détail de la séance sélectionnée, présenté en temps (échauffement/corps/retour au calme reconstruits au besoin).
+  const detail = coach ? sessionDetail(coach.type, coach.detail) : null;
+  type Phase = { label?: string; text: string; strong?: boolean };
+  const phases: Phase[] | null = !detail
+    ? null
+    : detail.mode === "wrapped"
+      ? [
+          { label: t("cal.phase.warm"), text: t("cal.phase.warmText", { min: detail.warmMin }) },
+          { label: t("cal.phase.body"), text: detail.body, strong: true },
+          { label: t("cal.phase.cool"), text: t("cal.phase.coolText", { min: 10 }) },
+        ]
+      : detail.lines.length > 1
+        ? detail.lines.map((l): Phase => ({ text: l }))
+        : null;
+  const plainSingle = detail && detail.mode === "plain" && detail.lines.length === 1 ? detail.lines[0] : null;
 
   const openDay = (key: string) => {
     setSel(key); setAdding(null); setNoteText(""); setRace({ name: "", location: "", distanceKm: "" }); setSuggest([]);
@@ -199,7 +229,20 @@ export function CalendarView({ sessions, notes: notesProp = [], races: racesProp
                 </span>
               </div>
               <h1 className="mt-2 text-2xl font-bold tracking-tight drop-shadow-sm sm:text-3xl">{coach.title}</h1>
-              {coach.detail && <p className="mt-2 max-w-2xl whitespace-pre-line text-[15px] leading-relaxed text-white/90">{coach.detail.replace(/\s*→\s*/g, "\n")}</p>}
+              {phases ? (
+                <div className="mt-2.5 max-w-2xl space-y-1.5">
+                  {phases.map((p, i) => (
+                    <div key={i} className="flex items-baseline gap-2.5">
+                      {p.label
+                        ? <span className="w-28 flex-shrink-0 text-[10.5px] font-bold uppercase tracking-wide text-amber-200/90">{p.label}</span>
+                        : <span className="relative top-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-200/70" />}
+                      <span className={`text-[14px] leading-relaxed ${p.strong ? "font-semibold text-white" : "text-white/85"}`}>{p.text}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : plainSingle ? (
+                <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-white/90">{plainSingle}</p>
+              ) : null}
               {coach.tags.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {coach.tags.map((tg) => <span key={tg} className="rounded-full bg-white/12 px-2.5 py-0.5 text-xs font-semibold text-white/90 ring-1 ring-white/15 backdrop-blur-md">{tg}</span>)}
