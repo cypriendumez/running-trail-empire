@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import {
   ArrowLeft, Loader2, Sparkles, Activity, HeartPulse, Gauge, Zap,
-  Footprints, Mountain, Clock, TrendingUp, Thermometer, Send, CalendarDays,
+  Footprints, Mountain, Clock, TrendingUp, Thermometer, Send, CalendarDays, Watch,
 } from "lucide-react";
 
 type SeriesPoint = { km: number | null; min: number | null; pace: number | null; hr: number | null; power: number | null; cad: number | null; alt: number | null };
@@ -169,6 +169,7 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
   const [analyzing, setAnalyzing] = useState(false);
   const [sendingClient, setSendingClient] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [repushing, setRepushing] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true); setErr(null);
@@ -261,6 +262,19 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
     finally { setPublishing(false); }
   };
 
+  // Re-pousse sur la montre TOUTES les séances à venir déjà stockées, avec le code actuel
+  // (échauffement & retour au calme FC Z1 + durées du profil). Ne régénère rien.
+  const repushWatch = async () => {
+    setRepushing(true);
+    try {
+      const r = await fetch("/api/admin/repush-watch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: user }) });
+      const j = await r.json();
+      if (j.ok) toast.success(`${j.pushed}/${j.total} séance(s) re-poussée(s) sur la montre ⌚ (synchro via Garmin Connect)`, { duration: 6000 });
+      else toast.error(j.error || "Re-push impossible");
+    } catch { toast.error("Re-push impossible"); }
+    finally { setRepushing(false); }
+  };
+
   const a = data?.activity ?? null;
   const sections = a ? buildSections(a, data?.power ?? null, { gain: data?.elevGain ?? null, loss: data?.elevLoss ?? null }) : [];
   const series = data?.series ?? null;
@@ -297,11 +311,19 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
               <p className="mt-1 text-sm text-white/75 first-letter:uppercase">{new Date(date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
             </div>
             {!clientMode && (
-            <button onClick={sendToAI} disabled={analyzing || loading || !a}
-              className="inline-flex items-center gap-2 rounded-2xl bg-white/15 px-4 py-2.5 font-semibold ring-1 ring-white/25 backdrop-blur-md transition-colors hover:bg-white/25 disabled:opacity-50">
-              {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 text-amber-200" />}
-              {analyzing ? "Analyse…" : "Envoyer à l'IA"}
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button onClick={repushWatch} disabled={repushing}
+                title="Re-pousse toutes les séances à venir sur la montre (échauffement & retour au calme FC Z1 + durées du profil)"
+                className="inline-flex items-center gap-2 rounded-2xl bg-white/10 px-4 py-2.5 font-semibold ring-1 ring-white/25 backdrop-blur-md transition-colors hover:bg-white/20 disabled:opacity-50">
+                {repushing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Watch className="h-4 w-4 text-amber-200" />}
+                {repushing ? "Envoi…" : "Re-pousser sur la montre"}
+              </button>
+              <button onClick={sendToAI} disabled={analyzing || loading || !a}
+                className="inline-flex items-center gap-2 rounded-2xl bg-white/15 px-4 py-2.5 font-semibold ring-1 ring-white/25 backdrop-blur-md transition-colors hover:bg-white/25 disabled:opacity-50">
+                {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 text-amber-200" />}
+                {analyzing ? "Analyse…" : "Envoyer à l'IA"}
+              </button>
+            </div>
             )}
           </div>
           {/* Chiffres clés */}
