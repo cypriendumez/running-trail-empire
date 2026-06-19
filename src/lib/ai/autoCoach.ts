@@ -76,8 +76,11 @@ export async function autoCoachForUser(
   try {
     const { data: objRow } = await admin.from("notifications").select("data").eq("user_id", userId).eq("type", "race_objective").maybeSingle();
     const objectiveRace = ((objRow?.data as { race?: string } | undefined)?.race) || null;
+    const { data: prof } = await admin.from("profiles").select("*").eq("id", userId).maybeSingle();
+    const warmMin = (prof?.warmup_min as number | null | undefined) ?? null;
+    const coolMin = (prof?.cooldown_min as number | null | undefined) ?? null;
     await ensureRunThresholdPace({ athleteId, apiKey, vmaKmh: ctx.vma }); // pour que Garmin transmette l'allure
-    const built = buildWorkoutDescription(session.title, session.subtitle, `${session.title} ${session.tags.join(" ")}`, objectiveRace, ctx.vma);
+    const built = buildWorkoutDescription(session.title, session.subtitle, `${session.title} ${session.tags.join(" ")}`, objectiveRace, ctx.vma, warmMin, coolMin);
     if (built) {
       const r = await pushIntervalsWorkout({ athleteId, apiKey, userId, name: built.name, date: tomorrow, description: built.description });
       pushed = r.ok;

@@ -25,6 +25,8 @@ export default function OnboardingPage() {
     gender: "male" as "male" | "female" | "other",
     chronotype: "neutral" as "morning" | "evening" | "neutral",
     is_female_cycle_sync: false,
+    warmup_min: 15,   // temps d'échauffement habituel (min) → pilote l'échauffement FC des séances montre
+    cooldown_min: 10, // temps de retour au calme habituel (min)
   });
 
   const [vma, setVma] = useState({ vma_kmh: "", max_hr: "", resting_hr: "" });
@@ -159,6 +161,12 @@ export default function OnboardingPage() {
       onboarding_completed: true,
     }).eq("id", user.id);
 
+    // Durées d'échauffement / retour au calme — best-effort (colonnes ajoutées via SQL). N'empêche pas l'onboarding.
+    await supabase.from("profiles").update({
+      warmup_min: profile.warmup_min,
+      cooldown_min: profile.cooldown_min,
+    }).eq("id", user.id);
+
     if (!profileError && vma.vma_kmh) {
       await supabase.from("performance_baselines").insert({
         user_id: user.id,
@@ -273,6 +281,32 @@ export default function OnboardingPage() {
                     ))}
                   </div>
                 </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-zinc-500 block mb-2">⏱️ Échauffement habituel</label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {[5,10,15,20,25,30].map(m => (
+                        <button key={m} type="button" onClick={() => setProfile(p => ({...p, warmup_min: m}))}
+                          className={`py-2 rounded-xl text-sm font-medium border transition-all ${profile.warmup_min === m ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                          {m} min
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-zinc-500 block mb-2">🧊 Retour au calme habituel</label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {[5,10,15,20,25,30].map(m => (
+                        <button key={m} type="button" onClick={() => setProfile(p => ({...p, cooldown_min: m}))}
+                          className={`py-2 rounded-xl text-sm font-medium border transition-all ${profile.cooldown_min === m ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                          {m} min
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <p className="text-[11px] text-zinc-400 -mt-2">On s&apos;en sert pour caler l&apos;échauffement et le retour au calme (en fréquence cardiaque douce, Z1) des séances envoyées à ta montre. Le corps de séance garde les allures précises.</p>
 
                 {profile.gender === "female" && (
                   <div className="flex items-center justify-between p-4 bg-pink-50 rounded-2xl border border-pink-100">

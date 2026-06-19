@@ -52,9 +52,11 @@ export async function POST(req: Request) {
   // ── Pousse aussi chaque séance (hors repos/renfo) sur la montre Garmin du client ──
   let watchSent = 0;
   try {
-    const { data: prof } = await admin.from("profiles").select("intervals_athlete_id, intervals_api_key").eq("id", user_id).single();
+    const { data: prof } = await admin.from("profiles").select("*").eq("id", user_id).single();
     const athleteId = (prof?.intervals_athlete_id as string | undefined) || process.env.INTERVALS_ICU_ATHLETE_ID;
     const apiKey = (prof?.intervals_api_key as string | undefined) || process.env.INTERVALS_ICU_API_KEY;
+    const warmMin = (prof?.warmup_min as number | null | undefined) ?? null;
+    const coolMin = (prof?.cooldown_min as number | null | undefined) ?? null;
     if (athleteId && apiKey) {
       // Objectif du client → toutes les séances de la semaine s'appellent « Prépa <objectif> » sur la montre.
       const { data: objRow } = await admin.from("notifications").select("data").eq("user_id", user_id).eq("type", "race_objective").maybeSingle();
@@ -62,7 +64,7 @@ export async function POST(req: Request) {
       const vma = await getEffectiveVma(admin, user_id);
       await ensureRunThresholdPace({ athleteId, apiKey, vmaKmh: vma }); // pour que Garmin transmette l'allure
       const results = await Promise.all(sessions.filter((s) => s.date).map((s) => {
-        const built = buildWorkoutDescription(String(s.title || s.type || "Séance"), String(s.detail || ""), String(s.type || ""), objectiveRace, vma);
+        const built = buildWorkoutDescription(String(s.title || s.type || "Séance"), String(s.detail || ""), String(s.type || ""), objectiveRace, vma, warmMin, coolMin);
         if (!built) return Promise.resolve(false);
         return pushIntervalsWorkout({ athleteId, apiKey, userId: user_id, name: built.name, date: String(s.date).slice(0, 10), description: built.description }).then((r) => r.ok);
       }));

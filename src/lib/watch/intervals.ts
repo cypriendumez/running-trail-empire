@@ -62,32 +62,34 @@ export function parsePaceSec(text: string): number | null {
 
 // Étapes intervals.icu selon le type de séance. Allure prescrite (mainPaceSec) > allure de zone (VMA)
 // > repli cible FC. mainPaceSec s'applique à l'étape PRINCIPALE. null = pas de séance montre.
-export function stepsForType(type: string, durationMin: number, vmaKmh?: number | null, mainPaceSec?: number | null): string | null {
+export function stepsForType(type: string, durationMin: number, vmaKmh?: number | null, mainPaceSec?: number | null, warmMin?: number | null, coolMin?: number | null): string | null {
   const s = (type || "").toLowerCase();
   const d = Math.max(15, Math.round(durationMin));
   const v = vmaKmh ?? null;
   const p = mainPaceSec ?? null;
+  // Durées d'échauffement / retour au calme = réglage du profil de l'athlète (5–30 min), repli 15 / 10.
+  // Échauffement & retour au calme toujours pilotés à la FRÉQUENCE CARDIAQUE Z1 (doux) ; seul le corps vise l'allure.
+  const warm = Math.min(30, Math.max(5, Math.round(warmMin ?? 15)));
+  const cool = Math.min(30, Math.max(5, Math.round(coolMin ?? 10)));
   if (/repos|rest/.test(s)) return null;
   if (/renfo|muscu|gainage|force|ppg/.test(s)) return null; // pas une course
   if (/récup|recup/.test(s)) {
-    const warm = 10, cool = 10, main = Math.max(10, d - warm - cool);
+    const main = Math.max(10, d - warm - cool);
     return [zoneStep(warm, 1, v, "Échauffement", null, true), zoneStep(main, 1, v, "Récup", p), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
   }
   if (/long|endurance|footing|fond|easy/.test(s)) {
-    const warm = 15, cool = 10, main = Math.max(15, d - warm - cool);
+    const main = Math.max(15, d - warm - cool);
     return [zoneStep(warm, 1, v, "Échauffement", null, true), zoneStep(main, 2, v, "Endurance facile", p), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
   }
   if (/spéci|specif|allure|objectif|seuil|tempo/.test(s)) {
-    const warm = 15, cool = 10, main = Math.max(10, d - warm - cool);
-    // Échauffement & retour au calme en Z1 HR (doux) ; seul le corps vise l'allure seuil.
+    const main = Math.max(10, d - warm - cool);
     return [zoneStep(warm, 1, v, "Échauffement", null, true), zoneStep(main, 4, v, "Seuil", p), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
   }
   if (/vma|fractionn|interval|piste|côte|cote|fartlek|30\/30/.test(s)) {
-    const warm = 15, cool = 10, main = Math.max(10, d - warm - cool);
-    // Échauffement & retour au calme en Z1 HR (doux) ; seul le corps vise l'allure VMA.
+    const main = Math.max(10, d - warm - cool);
     return [zoneStep(warm, 1, v, "Échauffement", null, true), zoneStep(main, 5, v, "VMA", p), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
   }
-  const warm = 15, cool = 10, main = Math.max(15, d - warm - cool);
+  const main = Math.max(15, d - warm - cool);
   return [zoneStep(warm, 1, v, "Échauffement", null, true), zoneStep(main, 2, v, "Endurance facile", p), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
 }
 
@@ -141,10 +143,11 @@ export function parseDurationMin(text: string): number | null {
 // s'affiche sur la montre « Prépa Marathon de Paris 2027 — <séance> ».
 export function buildWorkoutDescription(
   title: string, detail: string, type: string, objectiveRace?: string | null, vmaKmh?: number | null,
+  warmMin?: number | null, coolMin?: number | null,
 ): { name: string; description: string } | null {
   const dur = parseDurationMin(`${title} ${detail} ${type}`) ?? durationForType(type);
   const mainPaceSec = parsePaceSec(`${title} ${detail}`);
-  const steps = stepsForType(type, dur, vmaKmh, mainPaceSec);
+  const steps = stepsForType(type, dur, vmaKmh, mainPaceSec, warmMin, coolMin);
   if (!steps) return null;
   const note = [title, detail].map((x) => (x || "").trim()).filter(Boolean).join(" · ").slice(0, 180);
   const baseName = objectiveRace ? `Prépa ${objectiveRace} — ${title || type}` : (title || type);

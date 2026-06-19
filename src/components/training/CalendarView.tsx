@@ -41,21 +41,47 @@ const typeColor = (t: string) => CAT_COLOR[categoryOf(t)];
 const isRenfo = (t: string) => categoryOf(t) === "renfo";
 const fmtKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-// Détail d'une séance prêt à afficher en 3 temps. Comme la montre (cf. intervals.ts → stepsForType),
-// si le coach n'a stocké que le corps, on reconstruit échauffement (FC) + corps + retour au calme (FC).
-type SessionDetail =
-  | { mode: "plain"; lines: string[] }                 // rest/renfo (1 ligne) ou déjà structuré (séparé par →)
-  | { mode: "wrapped"; warmMin: number; body: string }; // corps seul → on enveloppe échauffement/retour au calme
-function sessionDetail(type: string, detail: string): SessionDetail | null {
-  const body = (detail || "").trim();
-  if (!body) return null;
-  const cat = categoryOf(type);
-  if (cat === "rest" || cat === "renfo") return { mode: "plain", lines: [body] };       // pas une course continue
-  if (body.includes("→")) return { mode: "plain", lines: body.split("→").map((s) => s.trim()).filter(Boolean) };
-  return { mode: "wrapped", warmMin: cat === "recovery" ? 10 : 15, body };
+// Extrait le CORPS d'une séance : retire un éventuel échauffement en tête et un retour au calme en queue
+// (séparés par →), en recollant les fragments de simple progression de zone (« … FC Z1 → Z2 »).
+function stripBodyLabel(s: string): string {
+  return (s || "").replace(/^(?:corps(?:\s+de\s+s[ée]ance)?|main\s*set|hauptteil|parte\s+principal)\s*[:：]?\s*/i, "").trim();
+}
+function extractBody(raw: string): string {
+  let segs = raw.split("→").map((x) => x.trim()).filter(Boolean);
+  // Recolle « Z1 → Z2 » (progression interne d'une phase) au segment précédent — ce n'est pas une étape à part.
+  const merged: string[] = [];
+  for (const seg of segs) {
+    if (merged.length && /^z\d(?:\s*[-–]\s*z?\d)?$/i.test(seg)) merged[merged.length - 1] += ` → ${seg}`;
+    else merged.push(seg);
+  }
+  segs = merged;
+  if (segs.length <= 1) return stripBodyLabel(segs[0] ?? raw);
+  const isWarm = (x: string) => /échauff|warm[- ]?up|aufwärm|calent|aquec/i.test(x);
+  const isCool = (x: string) => /retour au calme|cool[- ]?down|auslauf|vuelta a la calma|retorno|à la calma|\bcalma\b/i.test(x);
+  let lo = 0, hi = segs.length - 1;
+  if (isWarm(segs[lo])) {
+    lo++;
+    while (lo < hi && /^z\d/i.test(segs[lo])) lo++; // absorbe la suite de l'échauffement (« Z2 + lignes droites »)
+  }
+  if (hi > lo && isCool(segs[hi])) hi--;
+  const mid = segs.slice(lo, hi + 1);
+  return stripBodyLabel((mid.length ? mid : segs).join(" → "));
 }
 
-export function CalendarView({ sessions, notes: notesProp = [], races: racesProp = [], weekStart = "mon", units = "metric" }: { sessions: Planned[]; notes?: CalNote[]; races?: CalRace[]; weekStart?: "mon" | "sun"; units?: UnitSystem }) {
+// Détail d'une séance prêt à afficher. Comme la montre (cf. intervals.ts → stepsForType), pour une course
+// on reconstruit échauffement (FC, durée du profil) + corps + retour au calme (FC, durée du profil).
+type SessionDetail =
+  | { mode: "plain"; text: string }     // repos / renfo : un seul bloc
+  | { mode: "wrapped"; body: string };  // course : échauffement/retour au calme reconstruits autour du corps
+function sessionDetail(type: string, detail: string): SessionDetail | null {
+  const raw = (detail || "").trim();
+  if (!raw) return null;
+  const cat = categoryOf(type);
+  if (cat === "rest" || cat === "renfo") return { mode: "plain", text: raw };  // pas une course continue
+  return { mode: "wrapped", body: extractBody(raw) };
+}
+
+export function CalendarView({ sessions, notes: notesProp = [], races: racesProp = [], weekStart = "mon", units = "metric", warmupMin = 15, cooldownMin = 10 }: { sessions: Planned[]; notes?: CalNote[]; races?: CalRace[]; weekStart?: "mon" | "sun"; units?: UnitSystem; warmupMin?: number; cooldownMin?: number }) {
   const { t, lang } = useT();
   const [sel, setSel] = useState<string | null>(null);
   const [notes, setNotes] = useState<CalNote[]>(notesProp);
@@ -136,18 +162,14 @@ export function CalendarView({ sessions, notes: notesProp = [], races: racesProp
   // Détail de la séance sélectionnée, présenté en temps (échauffement/corps/retour au calme reconstruits au besoin).
   const detail = coach ? sessionDetail(coach.type, coach.detail) : null;
   type Phase = { label?: string; text: string; strong?: boolean };
-  const phases: Phase[] | null = !detail
-    ? null
-    : detail.mode === "wrapped"
-      ? [
-          { label: t("cal.phase.warm"), text: t("cal.phase.warmText", { min: detail.warmMin }) },
-          { label: t("cal.phase.body"), text: detail.body, strong: true },
-          { label: t("cal.phase.cool"), text: t("cal.phase.coolText", { min: 10 }) },
-        ]
-      : detail.lines.length > 1
-        ? detail.lines.map((l): Phase => ({ text: l }))
-        : null;
-  const plainSingle = detail && detail.mode === "plain" && detail.lines.length === 1 ? detail.lines[0] : null;
+  const phases: Phase[] | null = detail && detail.mode === "wrapped"
+    ? [
+        { label: t("cal.phase.warm"), text: t("cal.phase.warmText", { min: warmupMin }) },
+        { label: t("cal.phase.body"), text: detail.body, strong: true },
+        { label: t("cal.phase.cool"), text: t("cal.phase.coolText", { min: cooldownMin }) },
+      ]
+    : null;
+  const plainSingle = detail && detail.mode === "plain" ? detail.text : null;
 
   const openDay = (key: string) => {
     setSel(key); setAdding(null); setNoteText(""); setRace({ name: "", location: "", distanceKm: "" }); setSuggest([]);

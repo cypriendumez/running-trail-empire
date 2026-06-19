@@ -11,15 +11,19 @@ export default async function CalendrierPage() {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data }, { data: settingsRow }] = await Promise.all([
+  const [{ data }, { data: settingsRow }, { data: profileRow }] = await Promise.all([
     sb.from("notifications").select("id, type, title, data, created_at")
       .eq("user_id", user.id).in("type", ["coach_session", "client_note", "planned_race"])
       .order("created_at", { ascending: false }).limit(200),
     sb.from("notifications").select("data").eq("user_id", user.id).eq("type", "user_settings").maybeSingle(),
+    sb.from("profiles").select("warmup_min, cooldown_min").eq("id", user.id).maybeSingle(),
   ]);
   const us = (settingsRow?.data ?? {}) as Record<string, unknown>;
   const weekStart: "mon" | "sun" = String(us.weekStart ?? "mon") === "sun" ? "sun" : "mon";
   const units: "metric" | "imperial" = String(us.unitSystem ?? "metric") === "imperial" ? "imperial" : "metric";
+  // Durées d'échauffement / retour au calme choisies par l'athlète (repli 15 / 10 min).
+  const warmupMin = Number((profileRow as { warmup_min?: number | null } | null)?.warmup_min) || 15;
+  const cooldownMin = Number((profileRow as { cooldown_min?: number | null } | null)?.cooldown_min) || 10;
 
   const rows = data ?? [];
   // UNE séance par date (la plus récente) → même plan que Dashboard & Ghost Runner.
@@ -41,5 +45,5 @@ export default async function CalendrierPage() {
   }).filter((x) => x.date);
 
   // Le hero (présentation + détail réactif de la séance sélectionnée) vit désormais dans CalendarView.
-  return <CalendarView sessions={sessions} notes={notes} races={racesPlanned} weekStart={weekStart} units={units} />;
+  return <CalendarView sessions={sessions} notes={notes} races={racesPlanned} weekStart={weekStart} units={units} warmupMin={warmupMin} cooldownMin={cooldownMin} />;
 }
