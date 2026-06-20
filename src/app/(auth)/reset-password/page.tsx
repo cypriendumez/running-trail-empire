@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { AuthShell } from "@/components/auth/AuthShell";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -36,8 +37,7 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-6">
-      <div className="w-full max-w-md">
+    <AuthShell>
         <div className="text-center mb-10">
           <div className="inline-flex items-center gap-2.5 mb-6">
             <div className="w-10 h-10 bg-zinc-900 rounded-2xl flex items-center justify-center">
@@ -103,7 +103,6 @@ export default function ResetPasswordPage() {
         <p className="text-center text-sm text-zinc-500 mt-6">
           <Link href="/login" className="text-green-600 font-medium hover:text-green-700">Retour à la connexion</Link>
         </p>
-      </div>
-    </div>
+    </AuthShell>
   );
 }
