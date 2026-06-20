@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { BentoDashboard } from "@/components/dashboard/BentoDashboard";
+import { stripProfileSecrets } from "@/lib/profile/safe";
 import type { Objective } from "@/components/dashboard/ObjectiveCard";
 import { bestVmaFromWorkouts, loadRisk } from "@/lib/running/fitness";
 import { oneSessionPerDate } from "@/lib/coach/sessions";
@@ -55,7 +56,7 @@ export default async function DashboardPage() {
 
   return (
     <BentoDashboard
-      profile={profileRes.data}
+      profile={stripProfileSecrets(profileRes.data)}
       hrv={hrvRes.data ?? []}
       workouts={workoutsRes.data ?? []}
       plan={planRes.data}

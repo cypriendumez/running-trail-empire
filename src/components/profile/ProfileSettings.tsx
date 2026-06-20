@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { languageOptions } from "@/i18n/config";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { vo2maxEstimate, vo2maxLabel, racePredictions } from "@/lib/running/fitness";
+import { stripProfileSecrets } from "@/lib/profile/safe";
 import type { Lang } from "@/lib/i18n/translations";
 import {
   User, Activity, Footprints, CreditCard, Target, Bell,
@@ -414,7 +415,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
         supabase.from("performance_baselines").select("*").eq("user_id", userId),
         supabase.from("user_goals").select("*").eq("user_id", userId),
       ]);
-      const payload = { exported_at: new Date().toISOString(), profile: prof.data ?? null, workouts: wk.data ?? [], baselines: base.data ?? [], goals: gl.data ?? [] };
+      const payload = { exported_at: new Date().toISOString(), profile: stripProfileSecrets(prof.data ?? null), workouts: wk.data ?? [], baselines: base.data ?? [], goals: gl.data ?? [] };
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");

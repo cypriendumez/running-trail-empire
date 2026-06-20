@@ -1,4 +1,5 @@
 export const dynamic = "force-dynamic";
+import { stripProfileSecrets } from "@/lib/profile/safe";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { MedicalDisclaimer } from "@/components/layout/MedicalDisclaimer";
@@ -28,9 +29,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <div className="flex h-screen bg-[#FAFAFA] overflow-hidden">
         <AutoSync />
         <MessageNotifier />
-        <Sidebar profile={profile} unreadMessages={unreadMessages ?? 0} />
+        <Sidebar profile={stripProfileSecrets(profile)} unreadMessages={unreadMessages ?? 0} />
         <div className="flex-1 flex flex-col min-w-0">
-          <TopBar profile={profile} avatarColor={avatarColor} />
+          <TopBar profile={stripProfileSecrets(profile)} avatarColor={avatarColor} />
           <main className="flex-1 overflow-auto p-6">
             {children}
           </main>

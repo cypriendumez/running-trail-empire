@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Providers } from "@/components/layout/Providers";
+import { ErrorReporter } from "@/components/ErrorReporter";
 
 export const metadata: Metadata = {
   title: {
@@ -54,6 +55,7 @@ export default function RootLayout({
   return (
     <html lang="fr" suppressHydrationWarning>
       <body className="font-sans">
+        <ErrorReporter />
         <Providers>{children}</Providers>
       </body>
     </html>

@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { SettingsView } from "@/components/settings/SettingsView";
+import { stripProfileSecrets } from "@/lib/profile/safe";
 
 export const metadata = { title: "Paramètres | Running & Trail Empire" };
 
@@ -15,7 +16,7 @@ export default async function SettingsPage() {
   ]);
   return (
     <SettingsView
-      profile={(profile ?? {}) as Record<string, unknown>}
+      profile={stripProfileSecrets((profile ?? {}) as Record<string, unknown>)}
       email={user.email ?? ""}
       userId={user.id}
       settings={(settingsRow?.data ?? {}) as Record<string, unknown>}

@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { createClient } from "@/lib/supabase/server";
 import { GhostRunner } from "@/components/ghost-runner/GhostRunner";
+import { stripProfileSecrets } from "@/lib/profile/safe";
 import { oneSessionPerDate } from "@/lib/coach/sessions";
 
 export const metadata = { title: "Ghost Runner" };
@@ -39,7 +40,7 @@ export default async function GhostRunnerPage() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <GhostRunner profile={profileRes.data} baseline={baselineRes.data} coachSessions={coachSessions} />
+      <GhostRunner profile={stripProfileSecrets(profileRes.data)} baseline={baselineRes.data} coachSessions={coachSessions} />
     </div>
   );
 }

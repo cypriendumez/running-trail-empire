@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { createClient } from "@/lib/supabase/server";
 import { ProfileSettings } from "@/components/profile/ProfileSettings";
+import { stripProfileSecrets } from "@/lib/profile/safe";
 import { bestVmaFromWorkouts } from "@/lib/running/fitness";
 
 export const metadata = { title: "Mon Profil | Running & Trail Empire" };
@@ -53,7 +54,7 @@ export default async function ProfilePage() {
 
   return (
     <ProfileSettings
-      profile={profile}
+      profile={stripProfileSecrets(profile)}
       baseline={baseline}
       shoes={shoes ?? []}
       goals={goals ?? []}
