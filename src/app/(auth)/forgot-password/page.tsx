@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { Loader2, ArrowLeft, MailCheck } from "lucide-react";
+import { AuthShell } from "@/components/auth/AuthShell";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -25,8 +26,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-6">
-      <div className="w-full max-w-md">
+    <AuthShell>
         <div className="text-center mb-10">
           <Link href="/" className="inline-flex items-center gap-2.5 mb-6">
             <div className="w-10 h-10 bg-zinc-900 rounded-2xl flex items-center justify-center">
@@ -73,7 +73,6 @@ export default function ForgotPasswordPage() {
             <ArrowLeft className="w-3.5 h-3.5" /> Retour à la connexion
           </Link>
         </p>
-      </div>
-    </div>
+    </AuthShell>
   );
 }

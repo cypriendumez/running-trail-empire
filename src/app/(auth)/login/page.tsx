@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { AuthShell } from "@/components/auth/AuthShell";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -45,8 +46,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-6">
-      <div className="w-full max-w-md">
+    <AuthShell>
         {/* Logo */}
         <div className="text-center mb-10">
           <Link href="/" className="inline-flex items-center gap-2.5 mb-6">
@@ -148,7 +148,6 @@ export default function LoginPage() {
             Créer un compte
           </Link>
         </p>
-      </div>
-    </div>
+    </AuthShell>
   );
 }

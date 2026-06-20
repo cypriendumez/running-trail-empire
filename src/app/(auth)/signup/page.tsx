@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { Loader2, Check } from "lucide-react";
+import { AuthShell } from "@/components/auth/AuthShell";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -46,8 +47,8 @@ export default function SignupPage() {
 
   if (step === "verify") {
     return (
-      <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-6">
-        <div className="w-full max-w-md text-center">
+      <AuthShell>
+        <div className="text-center">
           <div className="w-16 h-16 bg-green-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
             <Check className="w-8 h-8 text-green-600" />
           </div>
@@ -60,15 +61,14 @@ export default function SignupPage() {
             Aller à la connexion
           </Link>
         </div>
-      </div>
+      </AuthShell>
     );
   }
 
   const passwordStrength = getPasswordStrength(form.password);
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-6">
-      <div className="w-full max-w-md">
+    <AuthShell>
         <div className="text-center mb-10">
           <Link href="/" className="inline-flex items-center gap-2.5 mb-6">
             <div className="w-10 h-10 bg-zinc-900 rounded-2xl flex items-center justify-center">
@@ -183,8 +183,7 @@ export default function SignupPage() {
             Se connecter
           </Link>
         </p>
-      </div>
-    </div>
+    </AuthShell>
   );
 }
 
