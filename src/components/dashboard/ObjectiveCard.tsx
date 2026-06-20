@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Target, Loader2, Check, Pencil, Search, MapPin } from "lucide-react";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
 export type Objective = {
   race: string; distanceKm: number; raceDate: string;
@@ -37,6 +38,7 @@ function inferDistance(name: string, dbKm: number | null): number | null {
 
 export function ObjectiveCard({ objective, currentVma }: { objective: Objective | null; currentVma?: number | null }) {
   const router = useRouter();
+  const { t, lang } = useT();
   const [editing, setEditing] = useState(!objective);
   const [race, setRace] = useState(objective?.race ?? "");
   const [distance, setDistance] = useState(objective ? String(objective.distanceKm) : "");
@@ -76,10 +78,10 @@ export function ObjectiveCard({ objective, currentVma }: { objective: Objective 
   const targetSeconds = (Number(th) || 0) * 3600 + (Number(tm) || 0) * 60 + (Number(ts) || 0);
 
   const save = async () => {
-    if (!race.trim()) return toast.error("Indique la course");
-    if (!(Number(distance) > 0)) return toast.error("Distance invalide");
-    if (targetSeconds <= 0) return toast.error("Indique le temps visé");
-    if (!date) return toast.error("Choisis la date de la course");
+    if (!race.trim()) return toast.error(t("obj.errRace"));
+    if (!(Number(distance) > 0)) return toast.error(t("obj.errDistance"));
+    if (targetSeconds <= 0) return toast.error(t("obj.errTime"));
+    if (!date) return toast.error(t("obj.errDate"));
     setSaving(true);
     try {
       const r = await fetch("/api/objective", {
@@ -87,9 +89,9 @@ export function ObjectiveCard({ objective, currentVma }: { objective: Objective 
         body: JSON.stringify({ race: race.trim(), distanceKm: Number(distance), targetTime: `${Number(th) || 0}:${Number(tm) || 0}:${Number(ts) || 0}`, raceDate: date }),
       });
       const j = await r.json();
-      if (j.ok) { toast.success("Objectif enregistré 🎯 Ton coach est prévenu par e-mail."); setEditing(false); router.refresh(); }
-      else toast.error(j.error || "Échec");
-    } catch { toast.error("Enregistrement impossible"); }
+      if (j.ok) { toast.success(t("obj.ok")); setEditing(false); router.refresh(); }
+      else toast.error(j.error || t("obj.fail"));
+    } catch { toast.error(t("obj.saveFail")); }
     finally { setSaving(false); }
   };
 
@@ -115,7 +117,7 @@ export function ObjectiveCard({ objective, currentVma }: { objective: Objective 
           </span>
           <button onClick={() => setEditing(true)}
             className="ml-auto inline-flex items-center gap-1 rounded-lg border border-zinc-200 px-2 py-1 text-xs font-semibold text-zinc-500 transition-colors hover:bg-zinc-50">
-            <Pencil className="h-3 w-3" /> Modifier
+            <Pencil className="h-3 w-3" /> {t("obj.edit")}
           </button>
         </div>
       </motion.div>
@@ -133,19 +135,19 @@ export function ObjectiveCard({ objective, currentVma }: { objective: Objective 
           <Target className="h-3.5 w-3.5 text-indigo-500" />
         </span>
         <div>
-          <div className="text-sm font-bold text-zinc-900">{objective ? "Modifier mon objectif" : "Fixe ton objectif de course"}</div>
-          <div className="text-[11px] text-zinc-400">Ton coach est prévenu et l&apos;IA adapte tes séances.</div>
+          <div className="text-sm font-bold text-zinc-900">{objective ? t("obj.editTitle") : t("obj.createTitle")}</div>
+          <div className="text-[11px] text-zinc-400">{t("obj.sub")}</div>
         </div>
       </div>
 
       <div className="space-y-2.5">
         <label className="block">
-          <span className="mb-1 block text-xs font-semibold text-zinc-600">Course</span>
+          <span className="mb-1 block text-xs font-semibold text-zinc-600">{t("obj.race")}</span>
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-300" />
             <input value={race} onChange={(e) => onRace(e.target.value)} onFocus={() => sug.length && setOpenSug(true)}
               onBlur={() => setTimeout(() => setOpenSug(false), 150)}
-              placeholder="Tape « marathon », « paris »… on te propose la course" className={inputCls + " pl-8"} autoComplete="off" />
+              placeholder={t("obj.racePh")} className={inputCls + " pl-8"} autoComplete="off" />
             {openSug && (
               <div className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-zinc-200 bg-white py-1 shadow-lg">
                 {sug.map((s, i) => (
@@ -154,7 +156,7 @@ export function ObjectiveCard({ objective, currentVma }: { objective: Objective 
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-semibold text-zinc-800">{s.name}</span>
                       <span className="flex items-center gap-1 truncate text-[11px] text-zinc-400">
-                        {s.city && <><MapPin className="h-2.5 w-2.5" />{s.city} · </>}{new Date(s.date + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
+                        {s.city && <><MapPin className="h-2.5 w-2.5" />{s.city} · </>}{new Date(s.date + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "short", year: "numeric" })}
                       </span>
                     </span>
                     {(() => { const dk = inferDistance(s.name, s.distanceKm); return dk != null ? <span className="flex-shrink-0 rounded-md bg-zinc-100 px-1.5 py-0.5 text-[11px] font-semibold text-zinc-600">{dk} km</span> : null; })()}
@@ -166,12 +168,12 @@ export function ObjectiveCard({ objective, currentVma }: { objective: Objective 
         </label>
 
         <div>
-          <span className="mb-1 block text-xs font-semibold text-zinc-600">Distance</span>
+          <span className="mb-1 block text-xs font-semibold text-zinc-600">{t("obj.distance")}</span>
           <div className="flex flex-wrap items-center gap-1.5">
             {PRESETS.map((p) => (
               <button key={p.label} type="button" onClick={() => setDistance(String(p.km))}
                 className={`rounded-lg px-2 py-1 text-xs font-semibold transition-colors ${Number(distance) === p.km ? "bg-indigo-600 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}>
-                {p.label}
+                {p.km === 21.1 ? t("obj.presetHalf") : p.km === 25 ? t("obj.presetTrail25") : p.label}
               </button>
             ))}
             <div className="relative ml-auto w-[88px]">
@@ -183,18 +185,18 @@ export function ObjectiveCard({ objective, currentVma }: { objective: Objective 
 
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
           <div>
-            <span className="mb-1 block text-xs font-semibold text-zinc-600">Temps visé</span>
+            <span className="mb-1 block text-xs font-semibold text-zinc-600">{t("obj.target")}</span>
             <div className="flex items-center gap-1.5">
-              <input type="number" min="0" max="99" inputMode="numeric" value={th} onChange={(e) => setTh(e.target.value)} placeholder="3" className={numCls} aria-label="heures" />
+              <input type="number" min="0" max="99" inputMode="numeric" value={th} onChange={(e) => setTh(e.target.value)} placeholder="3" className={numCls} aria-label={t("obj.hours")} />
               <span className="text-xs text-zinc-400">h</span>
-              <input type="number" min="0" max="59" inputMode="numeric" value={tm} onChange={(e) => setTm(e.target.value)} placeholder="30" className={numCls} aria-label="minutes" />
+              <input type="number" min="0" max="59" inputMode="numeric" value={tm} onChange={(e) => setTm(e.target.value)} placeholder="30" className={numCls} aria-label={t("obj.minutes")} />
               <span className="text-xs text-zinc-400">min</span>
-              <input type="number" min="0" max="59" inputMode="numeric" value={ts} onChange={(e) => setTs(e.target.value)} placeholder="00" className={numCls} aria-label="secondes" />
+              <input type="number" min="0" max="59" inputMode="numeric" value={ts} onChange={(e) => setTs(e.target.value)} placeholder="00" className={numCls} aria-label={t("obj.seconds")} />
               <span className="text-xs text-zinc-400">s</span>
             </div>
           </div>
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold text-zinc-600">Date de la course</span>
+            <span className="mb-1 block text-xs font-semibold text-zinc-600">{t("obj.date")}</span>
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
           </label>
         </div>
@@ -202,11 +204,11 @@ export function ObjectiveCard({ objective, currentVma }: { objective: Objective 
         <div className="flex items-center gap-2 pt-0.5">
           <button onClick={save} disabled={saving}
             className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Enregistrer
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} {t("obj.save")}
           </button>
           {objective && (
             <button onClick={() => setEditing(false)} className="rounded-lg px-3 py-2 text-sm font-semibold text-zinc-500 transition-colors hover:bg-zinc-100">
-              Annuler
+              {t("obj.cancel")}
             </button>
           )}
         </div>
