@@ -53,7 +53,7 @@ export async function POST(req: Request) {
       const sessionType = `${title} ${(Array.isArray(tags) ? tags.join(" ") : "")}`;
       const built = buildWorkoutDescription(title, subtitle ?? "", sessionType, objectiveRace, vma, warmMin, coolMin);
       if (built) {
-        const r = await pushIntervalsWorkout({ athleteId, apiKey, userId: user_id, name: built.name, date: today, description: built.description });
+        const r = await pushIntervalsWorkout({ athleteId, apiKey, userId: user_id, name: built.name, date: today, description: built.description, sport: built.sport });
         watchSent = r.ok;
       }
     }

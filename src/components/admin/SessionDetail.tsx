@@ -228,6 +228,7 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
       const catOf = (t: string) => {
         const s = (t || "").toLowerCase();
         if (/repos|rest/.test(s)) return "Repos";
+        if (/vélo|velo|bike|cycl|home ?trainer/.test(s)) return "Vélo";
         if (/récup|recup/.test(s)) return "Récup";
         if (/spéci|specif|allure|objectif/.test(s)) return "Spécifique";
         if (/seuil|tempo/.test(s)) return "Seuil";

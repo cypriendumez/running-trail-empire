@@ -56,7 +56,7 @@ export async function POST(req: Request) {
       `${d.sessionType || ""} ${r.title || ""}`, objectiveRace, vma, warmMin, coolMin,
     );
     if (!built) return false; // repos / renfo : pas de séance montre
-    const res = await pushIntervalsWorkout({ athleteId, apiKey, userId: user_id, name: built.name, date, description: built.description });
+    const res = await pushIntervalsWorkout({ athleteId, apiKey, userId: user_id, name: built.name, date, description: built.description, sport: built.sport });
     return res.ok;
   }));
 

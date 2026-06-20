@@ -66,7 +66,7 @@ export async function POST(req: Request) {
       const results = await Promise.all(sessions.filter((s) => s.date).map((s) => {
         const built = buildWorkoutDescription(String(s.title || s.type || "Séance"), String(s.detail || ""), String(s.type || ""), objectiveRace, vma, warmMin, coolMin);
         if (!built) return Promise.resolve(false);
-        return pushIntervalsWorkout({ athleteId, apiKey, userId: user_id, name: built.name, date: String(s.date).slice(0, 10), description: built.description }).then((r) => r.ok);
+        return pushIntervalsWorkout({ athleteId, apiKey, userId: user_id, name: built.name, date: String(s.date).slice(0, 10), description: built.description, sport: built.sport }).then((r) => r.ok);
       }));
       watchSent = results.filter(Boolean).length;
     }

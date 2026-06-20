@@ -16,7 +16,7 @@ export type CalNote = { id: string; date: string; text: string };
 export type CalRace = { id: string; date: string; name: string; location: string; distanceKm: number | null };
 
 // Catégorie canonique d'une séance (à partir du libellé libre du coach) → couleur + légende i18n.
-type Cat = "endurance" | "long" | "vma" | "threshold" | "recovery" | "renfo" | "rest";
+type Cat = "endurance" | "long" | "vma" | "threshold" | "recovery" | "renfo" | "rest" | "bike";
 const CAT_COLOR: Record<Cat, { bg: string; fg: string; soft: string }> = {
   rest: { bg: "#71717a", fg: "#52525b", soft: "#f4f4f5" },
   recovery: { bg: "#0284c7", fg: "#0369a1", soft: "#e0f2fe" },
@@ -25,11 +25,13 @@ const CAT_COLOR: Record<Cat, { bg: string; fg: string; soft: string }> = {
   renfo: { bg: "#7c3aed", fg: "#6d28d9", soft: "#ede9fe" },
   long: { bg: "#16a34a", fg: "#15803d", soft: "#dcfce7" },
   endurance: { bg: "#059669", fg: "#047857", soft: "#d1fae5" },
+  bike: { bg: "#0891b2", fg: "#0e7490", soft: "#cffafe" },
 };
-const LEGEND_ORDER: Cat[] = ["endurance", "long", "vma", "threshold", "recovery", "renfo", "rest"];
+const LEGEND_ORDER: Cat[] = ["endurance", "long", "bike", "vma", "threshold", "recovery", "renfo", "rest"];
 function categoryOf(t: string): Cat {
   const s = t.toLowerCase();
   if (/repos|rest|ruhe|descans/.test(s)) return "rest";
+  if (/vélo|velo|bike|cycl|home ?trainer|fahrrad|bici|radfahren/.test(s)) return "bike";
   if (/récup|recup|recovery|erholung/.test(s)) return "recovery";
   if (/seuil|tempo|threshold|schwelle|umbral|limiar/.test(s)) return "threshold";
   if (/vma|fractionn|interval|vo2|vo₂|série|series|serie/.test(s)) return "vma";

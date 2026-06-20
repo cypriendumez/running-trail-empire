@@ -108,6 +108,7 @@ export type AthleteContext = {
   vma: number | null; // VMA km/h (test enregistré ou estimée) — pour les cibles d'allure montre.
   // Squelette de semaine déterministe → permet de VALIDER/corriger le plan de l'IA.
   weekPlan: { qBudget: number; quality: { type: string; desc: string }[]; easyPace: string | null; eased: boolean };
+  longRunMode: "run" | "bike"; // préférence : sortie longue en course ou remplacée par du vélo (cross-training)
   // Plan macro périodisé semaine par semaine jusqu'au jour J.
   macroPlan: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[];
 };
@@ -115,7 +116,7 @@ export type AthleteContext = {
 // Rassemble et ANALYSE toutes les données de l'athlète → briefing pour l'IA coach.
 export async function buildAthleteContext(sb: SB, userId: string): Promise<AthleteContext> {
   const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, objRes, csRes] = await Promise.all([
-    sb.from("profiles").select("full_name,age,gender,weight_kg,height_cm,chronotype,mode,is_female_cycle_sync,current_phase").eq("id", userId).single(),
+    sb.from("profiles").select("*").eq("id", userId).single(),
     sb.from("performance_baselines").select("*").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).single(),
     sb.from("hrv_data").select("hrv_ms,physiological_state,date").eq("user_id", userId).order("date", { ascending: false }).limit(14),
     sb.from("sleep_data").select("sleep_score,total_sleep_min,deep_sleep_min,rem_sleep_min,body_battery_end,respiration_rate,date").eq("user_id", userId).order("date", { ascending: false }).limit(7),
@@ -329,7 +330,11 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   else if (libGoal === "trail" || libGoal === "ultra") menu = [qCote, qSeuil, qVMA];
   else menu = [qVMA, qSeuil, qSpec];
   const chosen = menu.slice(0, qBudget);
-  const longRunNote = `1 sortie longue facile en Z2${(phase.startsWith("SPÉ") || phase.startsWith("AFFÛ") || libGoal === "marathon") && goalPace ? ` avec un bloc à ${goalPace}/km` : ""}`;
+  // Préférence athlète : remplacer la sortie longue course par du VÉLO (cross-training sans impact, comme beaucoup de pros).
+  const bikeLong = String((p as Record<string, unknown> | null)?.long_run_mode ?? "run") === "bike";
+  const longRunNote = bikeLong
+    ? `1 SORTIE LONGUE EN VÉLO (cross-training) À LA PLACE de la sortie longue en course — même durée/volume aérobie (FC Z2, allure conversationnelle), SANS impact pour limiter le risque blessure (choix de l'athlète, comme beaucoup de pros). Pas d'allure /km (pilotée à la FC). ${(libGoal === "marathon" || libGoal === "trail" || libGoal === "ultra") ? "Garde au moins 1 sortie longue EN COURSE par mois pour la spécificité (impact, terrain)." : ""}`.trim()
+    : `1 sortie longue facile en Z2${(phase.startsWith("SPÉ") || phase.startsWith("AFFÛ") || libGoal === "marathon") && goalPace ? ` avec un bloc à ${goalPace}/km` : ""}`;
 
   const weekTarget = `${chosen.length ? chosen.map((s, i) => `• Qualité ${i + 1} : ${s.desc}`).join("\n") : "• Aucune séance dure ce cycle (récupération) : que du facile + mobilité/renfo léger."}
 • ${longRunNote}.
@@ -425,6 +430,7 @@ ${catalog}`;
   return {
     text, objective, daysToRace, weeksToRace, athleteName: String(p?.full_name ?? "Athlète"), vma,
     weekPlan: { qBudget, quality: chosen, easyPace: vma ? paceAt(70) : null, eased: easeReasons.length > 0 },
+    longRunMode: bikeLong ? "bike" : "run",
     macroPlan,
   };
 }

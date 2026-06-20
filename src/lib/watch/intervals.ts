@@ -73,6 +73,11 @@ export function stepsForType(type: string, durationMin: number, vmaKmh?: number 
   const cool = Math.min(30, Math.max(5, Math.round(coolMin ?? 10)));
   if (/repos|rest/.test(s)) return null;
   if (/renfo|muscu|gainage|force|ppg/.test(s)) return null; // pas une course
+  if (/vélo|velo|bike|cycl|home ?trainer|\bride\b/.test(s)) {
+    // Vélo (cross-training) : tout piloté à la FRÉQUENCE CARDIAQUE (pas d'allure course à vélo).
+    const main = Math.max(15, d - warm - cool);
+    return [zoneStep(warm, 1, v, "Échauffement", null, true), zoneStep(main, 2, v, "Vélo endurance", null, true), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
+  }
   if (/récup|recup/.test(s)) {
     const main = Math.max(10, d - warm - cool);
     return [zoneStep(warm, 1, v, "Échauffement", null, true), zoneStep(main, 1, v, "Récup", p), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
@@ -97,14 +102,14 @@ export function stepsForType(type: string, durationMin: number, vmaKmh?: number 
 // calendrier intervals.icu du client → synchronisée sur sa montre.
 export async function pushIntervalsWorkout(opts: {
   athleteId: string; apiKey: string; userId: string;
-  name: string; date: string; description: string;
+  name: string; date: string; description: string; sport?: "Run" | "Ride";
 }): Promise<{ ok: boolean; eventId?: number; error?: string }> {
-  const { athleteId, apiKey, userId, name, date, description } = opts;
+  const { athleteId, apiKey, userId, name, date, description, sport } = opts;
   const extId = `rte-coach-${userId}-${date}`;
   const event = {
     category: "WORKOUT",
     start_date_local: `${date}T00:00:00`,
-    type: "Run",
+    type: sport ?? "Run",
     name: name.slice(0, 90),
     description,
     external_id: extId,
@@ -144,14 +149,17 @@ export function parseDurationMin(text: string): number | null {
 export function buildWorkoutDescription(
   title: string, detail: string, type: string, objectiveRace?: string | null, vmaKmh?: number | null,
   warmMin?: number | null, coolMin?: number | null,
-): { name: string; description: string } | null {
+): { name: string; description: string; sport: "Run" | "Ride" } | null {
   const dur = parseDurationMin(`${title} ${detail} ${type}`) ?? durationForType(type);
   const mainPaceSec = parsePaceSec(`${title} ${detail}`);
   const steps = stepsForType(type, dur, vmaKmh, mainPaceSec, warmMin, coolMin);
   if (!steps) return null;
+  // Séance vélo (cross-training) → exporte un workout "Ride" sur la montre (sinon "Run").
+  const isBike = /vélo|velo|bike|cycl|home ?trainer|\bride\b/i.test(`${title} ${type}`);
+  const sport: "Run" | "Ride" = isBike ? "Ride" : "Run";
   const note = [title, detail].map((x) => (x || "").trim()).filter(Boolean).join(" · ").slice(0, 180);
   const baseName = objectiveRace ? `Prépa ${objectiveRace} — ${title || type}` : (title || type);
-  return { name: `🏃 ${baseName}`.slice(0, 90), description: `${note}\n\n${steps}` };
+  return { name: `${isBike ? "🚴" : "🏃"} ${baseName}`.slice(0, 90), description: `${note}\n\n${steps}`, sport };
 }
 
 // intervals.icu n'envoie l'allure cible à Garmin QUE si une « allure seuil de course » est définie.

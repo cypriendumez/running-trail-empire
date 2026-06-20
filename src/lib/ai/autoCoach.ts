@@ -82,7 +82,7 @@ export async function autoCoachForUser(
     await ensureRunThresholdPace({ athleteId, apiKey, vmaKmh: ctx.vma }); // pour que Garmin transmette l'allure
     const built = buildWorkoutDescription(session.title, session.subtitle, `${session.title} ${session.tags.join(" ")}`, objectiveRace, ctx.vma, warmMin, coolMin);
     if (built) {
-      const r = await pushIntervalsWorkout({ athleteId, apiKey, userId, name: built.name, date: tomorrow, description: built.description });
+      const r = await pushIntervalsWorkout({ athleteId, apiKey, userId, name: built.name, date: tomorrow, description: built.description, sport: built.sport });
       pushed = r.ok;
     }
   } catch { /* best effort */ }

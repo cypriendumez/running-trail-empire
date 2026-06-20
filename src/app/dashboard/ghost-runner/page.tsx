@@ -34,7 +34,7 @@ export default async function GhostRunnerPage() {
     (s) => s.date,
   )
     .filter((s) => s.date && s.date >= todayStr)
-    .filter((s) => !/repos|renfo|muscu|gainage|force|ppg|\brest\b/i.test(`${s.title} ${s.detail}`))
+    .filter((s) => !/repos|renfo|muscu|gainage|force|ppg|\brest\b|vélo|velo|bike|cycl/i.test(`${s.title} ${s.detail}`))
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(0, 6);
 

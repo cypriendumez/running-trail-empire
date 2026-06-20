@@ -27,6 +27,7 @@ export default function OnboardingPage() {
     is_female_cycle_sync: false,
     warmup_min: 15,   // temps d'échauffement habituel (min) → pilote l'échauffement FC des séances montre
     cooldown_min: 10, // temps de retour au calme habituel (min)
+    long_run_mode: "run" as "run" | "bike", // sortie longue en course ou remplacée par du vélo (cross-training)
   });
 
   const [vma, setVma] = useState({ vma_kmh: "", max_hr: "", resting_hr: "" });
@@ -165,6 +166,7 @@ export default function OnboardingPage() {
     await supabase.from("profiles").update({
       warmup_min: profile.warmup_min,
       cooldown_min: profile.cooldown_min,
+      long_run_mode: profile.long_run_mode,
     }).eq("id", user.id);
 
     if (!profileError && vma.vma_kmh) {
@@ -307,6 +309,19 @@ export default function OnboardingPage() {
                   </div>
                 </div>
                 <p className="text-[11px] text-zinc-400 -mt-2">On s&apos;en sert pour caler l&apos;échauffement et le retour au calme (en fréquence cardiaque douce, Z1) des séances envoyées à ta montre. Le corps de séance garde les allures précises.</p>
+
+                <div>
+                  <label className="text-xs font-medium text-zinc-500 block mb-2">🚴 Sorties longues</label>
+                  <div className="flex gap-2">
+                    {([["run", "🏃 En course"], ["bike", "🚴 En vélo"]] as const).map(([v, l]) => (
+                      <button key={v} type="button" onClick={() => setProfile(p => ({ ...p, long_run_mode: v }))}
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition-all ${profile.long_run_mode === v ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-zinc-400 mt-1.5">Beaucoup de pros remplacent la sortie longue par du vélo : même volume aérobie, sans l&apos;impact. Ton coach et l&apos;IA s&apos;adaptent automatiquement.</p>
+                </div>
 
                 {profile.gender === "female" && (
                   <div className="flex items-center justify-between p-4 bg-pink-50 rounded-2xl border border-pink-100">

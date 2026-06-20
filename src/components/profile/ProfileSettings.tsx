@@ -29,7 +29,7 @@ const P: Record<string, Record<string, string>> = {
     "stat.kmYear": "Km cette année", "stat.kmMonth": "Km ce mois", "stat.sessions": "Sessions mois", "stat.longest": "Plus longue",
     "pi.title": "Informations personnelles",
     "photo.title": "Photo de profil", "photo.hint": "JPG, PNG, WebP · max 5 Mo", "photo.uploading": "Upload…", "photo.change": "Changer la photo",
-    "f.name": "Nom complet", "f.age": "Âge", "f.height": "Taille (cm)", "f.weight": "Poids (kg)", "f.lang": "Langue", "f.bio": "Bio courte", "f.bioPh": "Coureur trail passionné, objectif UTMB 2027…", "f.warmup": "⏱️ Échauffement habituel", "f.cooldown": "🧊 Retour au calme habituel", "f.wcHint": "Cale l'échauffement et le retour au calme (fréquence cardiaque douce, Z1) des séances envoyées à ta montre. Le corps de séance garde ses allures précises.",
+    "f.name": "Nom complet", "f.age": "Âge", "f.height": "Taille (cm)", "f.weight": "Poids (kg)", "f.lang": "Langue", "f.bio": "Bio courte", "f.bioPh": "Coureur trail passionné, objectif UTMB 2027…", "f.warmup": "⏱️ Échauffement habituel", "f.cooldown": "🧊 Retour au calme habituel", "f.wcHint": "Cale l'échauffement et le retour au calme (fréquence cardiaque douce, Z1) des séances envoyées à ta montre. Le corps de séance garde ses allures précises.", "f.longMode": "Sorties longues", "f.longRun": "🏃 En course", "f.longBike": "🚴 En vélo", "f.longHint": "Beaucoup de pros remplacent la sortie longue par du vélo : même volume aérobie, sans l'impact. Ton coach et l'IA s'adaptent automatiquement.",
     "notif.title": "Notifications", "notif.workout": "Rappels de séance", "notif.goal": "Objectifs atteints", "notif.league": "Classement ligue", "notif.coach": "Conseils du coach IA", "notif.save": "Sauvegarder les préférences",
     "guard.title": "Mode Guardian", "guard.desc": "Bloque automatiquement les séances à haute intensité en cas de surentraînement détecté par l'IA (HRV, fatigue mentale).", "guard.active": "Actif — votre santé est protégée",
     "gdpr.title": "Données & confidentialité", "gdpr.desc": "Conformément au RGPD, tu peux récupérer toutes tes données à tout moment.", "gdpr.export": "Exporter mes données (JSON)", "gdpr.exporting": "Export…", "gdpr.privacy": "Politique de confidentialité", "gdpr.delPre": "Pour supprimer ton compte et toutes tes données, écris à ", "gdpr.delPost": " — suppression sous 30 jours.",
@@ -55,7 +55,7 @@ const P: Record<string, Record<string, string>> = {
     "stat.kmYear": "Km this year", "stat.kmMonth": "Km this month", "stat.sessions": "Sessions/month", "stat.longest": "Longest",
     "pi.title": "Personal information",
     "photo.title": "Profile photo", "photo.hint": "JPG, PNG, WebP · max 5 MB", "photo.uploading": "Uploading…", "photo.change": "Change photo",
-    "f.name": "Full name", "f.age": "Age", "f.height": "Height (cm)", "f.weight": "Weight (kg)", "f.lang": "Language", "f.bio": "Short bio", "f.bioPh": "Passionate trail runner, UTMB 2027 goal…", "f.warmup": "⏱️ Usual warm-up", "f.cooldown": "🧊 Usual cool-down", "f.wcHint": "Sets the warm-up and cool-down (easy heart rate, Z1) of the sessions sent to your watch. The main set keeps its exact paces.",
+    "f.name": "Full name", "f.age": "Age", "f.height": "Height (cm)", "f.weight": "Weight (kg)", "f.lang": "Language", "f.bio": "Short bio", "f.bioPh": "Passionate trail runner, UTMB 2027 goal…", "f.warmup": "⏱️ Usual warm-up", "f.cooldown": "🧊 Usual cool-down", "f.wcHint": "Sets the warm-up and cool-down (easy heart rate, Z1) of the sessions sent to your watch. The main set keeps its exact paces.", "f.longMode": "Long sessions", "f.longRun": "🏃 Running", "f.longBike": "🚴 Cycling", "f.longHint": "Many pros swap the long run for cycling: same aerobic volume, no impact. Your coach and the AI adapt automatically.",
     "notif.title": "Notifications", "notif.workout": "Workout reminders", "notif.goal": "Goals achieved", "notif.league": "League ranking", "notif.coach": "AI coach tips", "notif.save": "Save preferences",
     "guard.title": "Guardian Mode", "guard.desc": "Automatically blocks high-intensity sessions when the AI detects overtraining (HRV, mental fatigue).", "guard.active": "Active — your health is protected",
     "gdpr.title": "Data & privacy", "gdpr.desc": "Under GDPR, you can retrieve all your data at any time.", "gdpr.export": "Export my data (JSON)", "gdpr.exporting": "Exporting…", "gdpr.privacy": "Privacy policy", "gdpr.delPre": "To delete your account and all your data, email ", "gdpr.delPost": " — deletion within 30 days.",
@@ -81,7 +81,7 @@ const P: Record<string, Record<string, string>> = {
     "stat.kmYear": "Km dieses Jahr", "stat.kmMonth": "Km diesen Monat", "stat.sessions": "Einheiten/Monat", "stat.longest": "Längste",
     "pi.title": "Persönliche Daten",
     "photo.title": "Profilbild", "photo.hint": "JPG, PNG, WebP · max. 5 MB", "photo.uploading": "Hochladen…", "photo.change": "Bild ändern",
-    "f.name": "Vollständiger Name", "f.age": "Alter", "f.height": "Größe (cm)", "f.weight": "Gewicht (kg)", "f.lang": "Sprache", "f.bio": "Kurz-Bio", "f.bioPh": "Begeisterter Trailrunner, Ziel UTMB 2027…", "f.warmup": "⏱️ Übliches Aufwärmen", "f.cooldown": "🧊 Übliches Auslaufen", "f.wcHint": "Legt Aufwärmen und Auslaufen (lockere Herzfrequenz, Z1) der an deine Uhr gesendeten Einheiten fest. Der Hauptteil behält seine genauen Tempi.",
+    "f.name": "Vollständiger Name", "f.age": "Alter", "f.height": "Größe (cm)", "f.weight": "Gewicht (kg)", "f.lang": "Sprache", "f.bio": "Kurz-Bio", "f.bioPh": "Begeisterter Trailrunner, Ziel UTMB 2027…", "f.warmup": "⏱️ Übliches Aufwärmen", "f.cooldown": "🧊 Übliches Auslaufen", "f.wcHint": "Legt Aufwärmen und Auslaufen (lockere Herzfrequenz, Z1) der an deine Uhr gesendeten Einheiten fest. Der Hauptteil behält seine genauen Tempi.", "f.longMode": "Lange Einheiten", "f.longRun": "🏃 Laufen", "f.longBike": "🚴 Radfahren", "f.longHint": "Viele Profis ersetzen den langen Lauf durch Radfahren: gleiches aerobes Volumen, ohne Belastung. Dein Coach und die KI passen sich automatisch an.",
     "notif.title": "Benachrichtigungen", "notif.workout": "Trainings-Erinnerungen", "notif.goal": "Erreichte Ziele", "notif.league": "Liga-Ranking", "notif.coach": "Tipps des KI-Coachs", "notif.save": "Einstellungen speichern",
     "guard.title": "Guardian-Modus", "guard.desc": "Blockiert automatisch intensive Einheiten, wenn die KI Übertraining erkennt (HRV, mentale Ermüdung).", "guard.active": "Aktiv — deine Gesundheit ist geschützt",
     "gdpr.title": "Daten & Datenschutz", "gdpr.desc": "Gemäß DSGVO kannst du jederzeit alle deine Daten abrufen.", "gdpr.export": "Meine Daten exportieren (JSON)", "gdpr.exporting": "Export…", "gdpr.privacy": "Datenschutzerklärung", "gdpr.delPre": "Um dein Konto und alle Daten zu löschen, schreibe an ", "gdpr.delPost": " — Löschung innerhalb von 30 Tagen.",
@@ -107,7 +107,7 @@ const P: Record<string, Record<string, string>> = {
     "stat.kmYear": "Km este año", "stat.kmMonth": "Km este mes", "stat.sessions": "Sesiones/mes", "stat.longest": "Más larga",
     "pi.title": "Información personal",
     "photo.title": "Foto de perfil", "photo.hint": "JPG, PNG, WebP · máx. 5 MB", "photo.uploading": "Subiendo…", "photo.change": "Cambiar foto",
-    "f.name": "Nombre completo", "f.age": "Edad", "f.height": "Altura (cm)", "f.weight": "Peso (kg)", "f.lang": "Idioma", "f.bio": "Bio corta", "f.bioPh": "Corredor de trail apasionado, objetivo UTMB 2027…", "f.warmup": "⏱️ Calentamiento habitual", "f.cooldown": "🧊 Vuelta a la calma habitual", "f.wcHint": "Fija el calentamiento y la vuelta a la calma (frecuencia cardíaca suave, Z1) de las sesiones enviadas a tu reloj. La parte principal mantiene sus ritmos exactos.",
+    "f.name": "Nombre completo", "f.age": "Edad", "f.height": "Altura (cm)", "f.weight": "Peso (kg)", "f.lang": "Idioma", "f.bio": "Bio corta", "f.bioPh": "Corredor de trail apasionado, objetivo UTMB 2027…", "f.warmup": "⏱️ Calentamiento habitual", "f.cooldown": "🧊 Vuelta a la calma habitual", "f.wcHint": "Fija el calentamiento y la vuelta a la calma (frecuencia cardíaca suave, Z1) de las sesiones enviadas a tu reloj. La parte principal mantiene sus ritmos exactos.", "f.longMode": "Sesiones largas", "f.longRun": "🏃 Corriendo", "f.longBike": "🚴 En bici", "f.longHint": "Muchos pros sustituyen la tirada larga por bici: mismo volumen aeróbico, sin impacto. Tu entrenador y la IA se adaptan automáticamente.",
     "notif.title": "Notificaciones", "notif.workout": "Recordatorios de sesión", "notif.goal": "Objetivos logrados", "notif.league": "Clasificación de liga", "notif.coach": "Consejos del entrenador IA", "notif.save": "Guardar preferencias",
     "guard.title": "Modo Guardian", "guard.desc": "Bloquea automáticamente las sesiones de alta intensidad cuando la IA detecta sobreentrenamiento (VFC, fatiga mental).", "guard.active": "Activo — tu salud está protegida",
     "gdpr.title": "Datos y privacidad", "gdpr.desc": "Conforme al RGPD, puedes recuperar todos tus datos en cualquier momento.", "gdpr.export": "Exportar mis datos (JSON)", "gdpr.exporting": "Exportando…", "gdpr.privacy": "Política de privacidad", "gdpr.delPre": "Para eliminar tu cuenta y todos tus datos, escribe a ", "gdpr.delPost": " — eliminación en 30 días.",
@@ -133,7 +133,7 @@ const P: Record<string, Record<string, string>> = {
     "stat.kmYear": "Km este ano", "stat.kmMonth": "Km este mês", "stat.sessions": "Sessões/mês", "stat.longest": "Mais longa",
     "pi.title": "Informações pessoais",
     "photo.title": "Foto de perfil", "photo.hint": "JPG, PNG, WebP · máx. 5 MB", "photo.uploading": "A enviar…", "photo.change": "Mudar foto",
-    "f.name": "Nome completo", "f.age": "Idade", "f.height": "Altura (cm)", "f.weight": "Peso (kg)", "f.lang": "Idioma", "f.bio": "Bio curta", "f.bioPh": "Corredor de trail apaixonado, objetivo UTMB 2027…", "f.warmup": "⏱️ Aquecimento habitual", "f.cooldown": "🧊 Retorno à calma habitual", "f.wcHint": "Define o aquecimento e o retorno à calma (frequência cardíaca fácil, Z1) das sessões enviadas para o teu relógio. A parte principal mantém os ritmos exatos.",
+    "f.name": "Nome completo", "f.age": "Idade", "f.height": "Altura (cm)", "f.weight": "Peso (kg)", "f.lang": "Idioma", "f.bio": "Bio curta", "f.bioPh": "Corredor de trail apaixonado, objetivo UTMB 2027…", "f.warmup": "⏱️ Aquecimento habitual", "f.cooldown": "🧊 Retorno à calma habitual", "f.wcHint": "Define o aquecimento e o retorno à calma (frequência cardíaca fácil, Z1) das sessões enviadas para o teu relógio. A parte principal mantém os ritmos exatos.", "f.longMode": "Sessões longas", "f.longRun": "🏃 A correr", "f.longBike": "🚴 De bicicleta", "f.longHint": "Muitos profissionais trocam a saída longa por bicicleta: mesmo volume aeróbio, sem impacto. O teu treinador e a IA adaptam-se automaticamente.",
     "notif.title": "Notificações", "notif.workout": "Lembretes de sessão", "notif.goal": "Objetivos alcançados", "notif.league": "Classificação da liga", "notif.coach": "Conselhos do treinador IA", "notif.save": "Guardar preferências",
     "guard.title": "Modo Guardian", "guard.desc": "Bloqueia automaticamente as sessões de alta intensidade quando a IA deteta excesso de treino (VFC, fadiga mental).", "guard.active": "Ativo — a tua saúde está protegida",
     "gdpr.title": "Dados e privacidade", "gdpr.desc": "Em conformidade com o RGPD, podes recuperar todos os teus dados a qualquer momento.", "gdpr.export": "Exportar os meus dados (JSON)", "gdpr.exporting": "A exportar…", "gdpr.privacy": "Política de privacidade", "gdpr.delPre": "Para eliminar a tua conta e todos os dados, escreve para ", "gdpr.delPost": " — eliminação em 30 dias.",
@@ -285,6 +285,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
     bio: String(profile?.bio ?? ""),
     warmup_min: Number(profile?.warmup_min) || 15,
     cooldown_min: Number(profile?.cooldown_min) || 10,
+    long_run_mode: String(profile?.long_run_mode ?? "run") === "bike" ? "bike" : "run",
     guardian_mode_enabled: Boolean(profile?.guardian_mode_enabled),
     notif_workout: Boolean(profile?.notif_workout ?? true),
     notif_goal: Boolean(profile?.notif_goal ?? true),
@@ -313,6 +314,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
       bio: form.bio,
       warmup_min: form.warmup_min,
       cooldown_min: form.cooldown_min,
+      long_run_mode: form.long_run_mode,
       notif_workout: form.notif_workout,
       notif_goal: form.notif_goal,
       notif_league: form.notif_league,
@@ -627,6 +629,18 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                     </div>
                   </div>
                   <p className="col-span-2 text-[11px] text-zinc-400">{tr("f.wcHint")}</p>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-medium text-zinc-500 block mb-1.5">{tr("f.longMode")}</label>
+                  <div className="flex gap-2">
+                    {([["run", "f.longRun"], ["bike", "f.longBike"]] as const).map(([v, k]) => (
+                      <button key={v} type="button" onClick={() => setForm(f => ({ ...f, long_run_mode: v }))}
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition-all ${form.long_run_mode === v ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                        {tr(k)}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-zinc-400 mt-1.5">{tr("f.longHint")}</p>
                 </div>
               </div>
               <button onClick={save} disabled={saving} className="btn-brand">
