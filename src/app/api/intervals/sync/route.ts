@@ -167,7 +167,7 @@ export async function GET(req: Request) {
   // (Garmin ne met à jour la VO2max que ~1×/semaine) et le wellness récent manque souvent la FC repos.
   let histWell: IntervalsWellness[] = validWellness;
   try {
-    const histOldest = new Date(Date.now() - 180 * 86400000).toISOString().slice(0, 10);
+    const histOldest = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
     const hr = await fetch(`${BASE}/athlete/${ATHLETE_ID}/wellness?oldest=${histOldest}&newest=${newest}`, { headers: authHeader(API_KEY) });
     if (hr.ok) { const j = await hr.json(); if (Array.isArray(j) && j.length) histWell = (j as IntervalsWellness[]).filter(d => d.id); }
   } catch { /* on garde la fenêtre courte en repli */ }

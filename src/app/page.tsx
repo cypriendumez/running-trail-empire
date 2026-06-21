@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ArrowRight, ChevronRight, Star, Zap, Heart, Map, Trophy, Bot, Ghost, Moon, CloudRain, ShoppingBag, BookOpen, Shield, Activity } from "lucide-react";
+import { NewsletterSignup } from "@/components/NewsletterSignup";
 
 const PROGRAMS = [
   { category: "10KM", title: "10 KILOMÈTRES", subtitle: "DE 6 SEMAINES À 4 MOIS", img: "https://images.unsplash.com/photo-1571008887538-b36bb32f4571?w=600&q=80&fit=crop" },
@@ -349,6 +350,12 @@ export default function LandingPage() {
 
       {/* ── FOOTER ── */}
       <footer className="bg-zinc-950 text-white py-16 px-8">
+        <div className="max-w-7xl mx-auto mb-12 flex flex-col items-center gap-4 border-b border-white/10 pb-12 text-center">
+          <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-300 ring-1 ring-white/15">Newsletter</div>
+          <h3 className="text-xl font-bold sm:text-2xl">Reçois nos articles & conseils course</h3>
+          <p className="max-w-md text-sm text-white/50">Entraînement, trail, matériel, nutrition — directement dans ta boîte mail. Désinscription en un clic.</p>
+          <div className="w-full max-w-md"><NewsletterSignup variant="dark" /></div>
+        </div>
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 bg-white rounded-xl flex items-center justify-center">
