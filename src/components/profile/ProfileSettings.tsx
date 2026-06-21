@@ -6,7 +6,8 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { languageOptions } from "@/i18n/config";
 import { useT } from "@/lib/i18n/LanguageProvider";
-import { vo2maxEstimate, vo2maxLabel, racePredictions, vmaFromVo2max } from "@/lib/running/fitness";
+import { vo2maxEstimate, vo2maxLabel, racePredictions, vmaFromVo2max, predictRaceSec } from "@/lib/running/fitness";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import type { Lang } from "@/lib/i18n/translations";
 import {
@@ -38,7 +39,7 @@ const P: Record<string, Record<string, string>> = {
     "perf.title": "Données de performance", "perf.vma": "VMA", "perf.maxHr": "FC Max", "perf.restHr": "FC Repos", "perf.lt": "Seuil lactique",
     "perf.vmaWarn": "VMA estimée depuis tes meilleures séances (pas de test enregistré). Fais un test VMA pour des allures et prédictions exactes.",
     "perf.vo2est": "VO2max estimé", "perf.vo2from": "D'après {sources}", "perf.emptyTitle": "Aucune donnée de performance", "perf.emptyDesc": "Fais le test VMA (à l'inscription ou dans Paramètres) pour tout calibrer",
-    "perf.predTitle": "Prédictions de chrono", "perf.predDescTest": "Estimées depuis ta VMA (test). Un test VMA récent = des prédictions plus justes.", "perf.predDescSess": "Estimées depuis ta VMA (tes séances récentes). Un test VMA récent = des prédictions plus justes.", "perf.predDescGarmin": "Calées sur ta VO2max Garmin (mesurée par ta montre) — bien plus fiable qu'une estimation.",
+    "perf.predTitle": "Prédictions de chrono", "perf.vo2trend": "Tendance VO2max", "perf.predGraph": "Tendance des allures prédites", "perf.predDescTest": "Estimées depuis ta VMA (test). Un test VMA récent = des prédictions plus justes.", "perf.predDescSess": "Estimées depuis ta VMA (tes séances récentes). Un test VMA récent = des prédictions plus justes.", "perf.predDescGarmin": "Calées sur ta VO2max Garmin (mesurée par ta montre) — bien plus fiable qu'une estimation.",
     "perf.zonesTitle": "Zones de fréquence cardiaque", "perf.maxHrLabel": "FC max : {n} bpm", "perf.pacesTitle": "Allures de référence",
     "perf.loadTitle": "Forme & charge", "perf.fitness": "Condition", "perf.fatigue": "Fatigue", "perf.form": "Forme", "perf.loadHint": "Condition = forme de fond · Fatigue = charge récente · Forme = fraîcheur (positif = frais).", "perf.thresholdPace": "Allure seuil",
     "zone.z1": "Récupération", "zone.z1d": "Récupération active, ultra-endurance", "zone.z2": "Aérobie", "zone.z2d": "Base aérobie, sorties longues", "zone.z3": "Tempo", "zone.z3d": "Seuil aérobie, tempo", "zone.z4": "Seuil", "zone.z4d": "Seuil lactique, intervalles", "zone.z5": "VO2max", "zone.z5d": "Effort maximal, VMA",
@@ -65,7 +66,7 @@ const P: Record<string, Record<string, string>> = {
     "perf.title": "Performance data", "perf.vma": "vVO2max", "perf.maxHr": "Max HR", "perf.restHr": "Resting HR", "perf.lt": "Lactate threshold",
     "perf.vmaWarn": "vVO2max estimated from your best sessions (no test on record). Take a vVO2max test for exact paces and predictions.",
     "perf.vo2est": "Estimated VO2max", "perf.vo2from": "From {sources}", "perf.emptyTitle": "No performance data", "perf.emptyDesc": "Take the vVO2max test (at sign-up or in Settings) to calibrate everything",
-    "perf.predTitle": "Time predictions", "perf.predDescTest": "Estimated from your vVO2max (test). A recent test = sharper predictions.", "perf.predDescSess": "Estimated from your vVO2max (your recent sessions). A recent test = sharper predictions.", "perf.predDescGarmin": "Based on your Garmin VO2max (measured by your watch) — far more reliable than an estimate.",
+    "perf.predTitle": "Time predictions", "perf.vo2trend": "VO2max trend", "perf.predGraph": "Predicted pace trend", "perf.predDescTest": "Estimated from your vVO2max (test). A recent test = sharper predictions.", "perf.predDescSess": "Estimated from your vVO2max (your recent sessions). A recent test = sharper predictions.", "perf.predDescGarmin": "Based on your Garmin VO2max (measured by your watch) — far more reliable than an estimate.",
     "perf.zonesTitle": "Heart rate zones", "perf.maxHrLabel": "Max HR: {n} bpm", "perf.pacesTitle": "Reference paces",
     "perf.loadTitle": "Form & load", "perf.fitness": "Fitness", "perf.fatigue": "Fatigue", "perf.form": "Form", "perf.loadHint": "Fitness = long-term form · Fatigue = recent load · Form = freshness (positive = fresh).", "perf.thresholdPace": "Threshold pace",
     "zone.z1": "Recovery", "zone.z1d": "Active recovery, ultra-endurance", "zone.z2": "Aerobic", "zone.z2d": "Aerobic base, long runs", "zone.z3": "Tempo", "zone.z3d": "Aerobic threshold, tempo", "zone.z4": "Threshold", "zone.z4d": "Lactate threshold, intervals", "zone.z5": "VO2max", "zone.z5d": "Maximal effort, vVO2max",
@@ -92,7 +93,7 @@ const P: Record<string, Record<string, string>> = {
     "perf.title": "Leistungsdaten", "perf.vma": "vVO2max", "perf.maxHr": "Max. Puls", "perf.restHr": "Ruhepuls", "perf.lt": "Laktatschwelle",
     "perf.vmaWarn": "vVO2max aus deinen besten Einheiten geschätzt (kein Test gespeichert). Mach einen vVO2max-Test für exakte Tempi und Prognosen.",
     "perf.vo2est": "Geschätzte VO2max", "perf.vo2from": "Aus {sources}", "perf.emptyTitle": "Keine Leistungsdaten", "perf.emptyDesc": "Mach den vVO2max-Test (bei der Anmeldung oder in den Einstellungen) zum Kalibrieren",
-    "perf.predTitle": "Zeitprognosen", "perf.predDescTest": "Geschätzt aus deiner vVO2max (Test). Ein aktueller Test = genauere Prognosen.", "perf.predDescSess": "Geschätzt aus deiner vVO2max (deine letzten Einheiten). Ein aktueller Test = genauere Prognosen.", "perf.predDescGarmin": "Basierend auf deiner Garmin-VO2max (von deiner Uhr gemessen) — viel zuverlässiger als eine Schätzung.",
+    "perf.predTitle": "Zeitprognosen", "perf.vo2trend": "VO2max-Verlauf", "perf.predGraph": "Tempo-Prognose-Verlauf", "perf.predDescTest": "Geschätzt aus deiner vVO2max (Test). Ein aktueller Test = genauere Prognosen.", "perf.predDescSess": "Geschätzt aus deiner vVO2max (deine letzten Einheiten). Ein aktueller Test = genauere Prognosen.", "perf.predDescGarmin": "Basierend auf deiner Garmin-VO2max (von deiner Uhr gemessen) — viel zuverlässiger als eine Schätzung.",
     "perf.zonesTitle": "Herzfrequenzzonen", "perf.maxHrLabel": "Max. Puls: {n} bpm", "perf.pacesTitle": "Referenz-Tempi",
     "perf.loadTitle": "Form & Belastung", "perf.fitness": "Fitness", "perf.fatigue": "Ermüdung", "perf.form": "Form", "perf.loadHint": "Fitness = langfristige Form · Ermüdung = jüngste Belastung · Form = Frische (positiv = frisch).", "perf.thresholdPace": "Schwellentempo",
     "zone.z1": "Erholung", "zone.z1d": "Aktive Erholung, Ultra-Ausdauer", "zone.z2": "Aerob", "zone.z2d": "Aerobe Basis, lange Läufe", "zone.z3": "Tempo", "zone.z3d": "Aerobe Schwelle, Tempo", "zone.z4": "Schwelle", "zone.z4d": "Laktatschwelle, Intervalle", "zone.z5": "VO2max", "zone.z5d": "Maximale Belastung, vVO2max",
@@ -119,7 +120,7 @@ const P: Record<string, Record<string, string>> = {
     "perf.title": "Datos de rendimiento", "perf.vma": "VAM", "perf.maxHr": "FC Máx", "perf.restHr": "FC Reposo", "perf.lt": "Umbral láctico",
     "perf.vmaWarn": "VAM estimada a partir de tus mejores sesiones (sin test registrado). Haz un test de VAM para ritmos y predicciones exactas.",
     "perf.vo2est": "VO2máx estimado", "perf.vo2from": "Según {sources}", "perf.emptyTitle": "Sin datos de rendimiento", "perf.emptyDesc": "Haz el test de VAM (al registrarte o en Ajustes) para calibrarlo todo",
-    "perf.predTitle": "Predicciones de tiempo", "perf.predDescTest": "Estimadas a partir de tu VAM (test). Un test reciente = predicciones más exactas.", "perf.predDescSess": "Estimadas a partir de tu VAM (tus sesiones recientes). Un test reciente = predicciones más exactas.", "perf.predDescGarmin": "Basadas en tu VO2máx de Garmin (medida por tu reloj) — mucho más fiable que una estimación.",
+    "perf.predTitle": "Predicciones de tiempo", "perf.vo2trend": "Tendencia VO2máx", "perf.predGraph": "Tendencia de ritmos previstos", "perf.predDescTest": "Estimadas a partir de tu VAM (test). Un test reciente = predicciones más exactas.", "perf.predDescSess": "Estimadas a partir de tu VAM (tus sesiones recientes). Un test reciente = predicciones más exactas.", "perf.predDescGarmin": "Basadas en tu VO2máx de Garmin (medida por tu reloj) — mucho más fiable que una estimación.",
     "perf.zonesTitle": "Zonas de frecuencia cardíaca", "perf.maxHrLabel": "FC máx: {n} ppm", "perf.pacesTitle": "Ritmos de referencia",
     "perf.loadTitle": "Forma y carga", "perf.fitness": "Condición", "perf.fatigue": "Fatiga", "perf.form": "Forma", "perf.loadHint": "Condición = forma de fondo · Fatiga = carga reciente · Forma = frescura (positivo = fresco).", "perf.thresholdPace": "Ritmo umbral",
     "zone.z1": "Recuperación", "zone.z1d": "Recuperación activa, ultra-resistencia", "zone.z2": "Aeróbico", "zone.z2d": "Base aeróbica, tiradas largas", "zone.z3": "Tempo", "zone.z3d": "Umbral aeróbico, tempo", "zone.z4": "Umbral", "zone.z4d": "Umbral láctico, intervalos", "zone.z5": "VO2máx", "zone.z5d": "Esfuerzo máximo, VAM",
@@ -146,7 +147,7 @@ const P: Record<string, Record<string, string>> = {
     "perf.title": "Dados de desempenho", "perf.vma": "VAM", "perf.maxHr": "FC Máx", "perf.restHr": "FC Repouso", "perf.lt": "Limiar de lactato",
     "perf.vmaWarn": "VAM estimada a partir das tuas melhores sessões (sem teste registado). Faz um teste de VAM para ritmos e previsões exatas.",
     "perf.vo2est": "VO2máx estimado", "perf.vo2from": "Segundo {sources}", "perf.emptyTitle": "Sem dados de desempenho", "perf.emptyDesc": "Faz o teste de VAM (no registo ou nas Definições) para calibrar tudo",
-    "perf.predTitle": "Previsões de tempo", "perf.predDescTest": "Estimadas a partir da tua VAM (teste). Um teste recente = previsões mais exatas.", "perf.predDescSess": "Estimadas a partir da tua VAM (as tuas sessões recentes). Um teste recente = previsões mais exatas.", "perf.predDescGarmin": "Baseadas na tua VO2máx Garmin (medida pelo teu relógio) — muito mais fiável que uma estimativa.",
+    "perf.predTitle": "Previsões de tempo", "perf.vo2trend": "Tendência VO2máx", "perf.predGraph": "Tendência dos ritmos previstos", "perf.predDescTest": "Estimadas a partir da tua VAM (teste). Um teste recente = previsões mais exatas.", "perf.predDescSess": "Estimadas a partir da tua VAM (as tuas sessões recentes). Um teste recente = previsões mais exatas.", "perf.predDescGarmin": "Baseadas na tua VO2máx Garmin (medida pelo teu relógio) — muito mais fiável que uma estimativa.",
     "perf.zonesTitle": "Zonas de frequência cardíaca", "perf.maxHrLabel": "FC máx: {n} bpm", "perf.pacesTitle": "Ritmos de referência",
     "perf.loadTitle": "Forma e carga", "perf.fitness": "Condição", "perf.fatigue": "Fadiga", "perf.form": "Forma", "perf.loadHint": "Condição = forma de fundo · Fadiga = carga recente · Forma = frescura (positivo = fresco).", "perf.thresholdPace": "Ritmo limiar",
     "zone.z1": "Recuperação", "zone.z1d": "Recuperação ativa, ultra-resistência", "zone.z2": "Aeróbico", "zone.z2d": "Base aeróbica, treinos longos", "zone.z3": "Tempo", "zone.z3d": "Limiar aeróbico, tempo", "zone.z4": "Limiar", "zone.z4d": "Limiar de lactato, intervalos", "zone.z5": "VO2máx", "zone.z5d": "Esforço máximo, VAM",
@@ -266,7 +267,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
   goals: Record<string, unknown>[];
   stats: Stats;
   fitness?: { estimatedVma: number | null; obsMaxHr: number | null; garminVo2max?: number | null;
-    garmin?: { vo2max?: number | null; restingHR?: number | null; lthr?: number | null; thresholdPaceSecPerKm?: number | null; ctl?: number | null; atl?: number | null } | null };
+    garmin?: { vo2max?: number | null; restingHR?: number | null; lthr?: number | null; thresholdPaceSecPerKm?: number | null; ctl?: number | null; atl?: number | null; vo2maxHistory?: { date: string; v: number }[] | null } | null };
   userId: string;
 }) {
   const { lang, setLang } = useT();
@@ -451,6 +452,28 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
   const vo2 = garminVo2 || effVma > 0 || maxHr > 0 ? vo2maxEstimate({ vma: effVma || null, maxHr: maxHr || null, restHr, garmin: garminVo2 }) : null;
   const vo2max = vo2?.value ?? null;
   const predictions = effVma > 0 ? racePredictions(effVma) : [];
+
+  // ── Graphiques façon Garmin : tendance VO2max + prédicteur de course (allures) ──
+  const vo2Hist = Array.isArray(g?.vo2maxHistory) ? g!.vo2maxHistory! : [];
+  const fmtD = (s: string) => new Date(s + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "short" });
+  const secToPace = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, "0")}`;
+  const vo2ChartData = vo2Hist.map(p => ({ d: fmtD(p.date), v: p.v }));
+  const latestVo2pt = vo2Hist.length ? vo2Hist[vo2Hist.length - 1].v : (garminVo2 ?? 0);
+  const PRED_LINES = [
+    { km: 5, key: "p5", label: "5 km", color: "#2563eb" },
+    { km: 10, key: "p10", label: "10 km", color: "#16a34a" },
+    { km: 21.1, key: "p21", label: "Semi", color: "#ea580c" },
+    { km: 42.2, key: "p42", label: "Marathon", color: "#dc2626" },
+  ] as const;
+  // Allure prédite par distance, projetée sur l'historique VO2max (ancrée sur l'allure actuelle).
+  const paceChartData = (effVma > 0 && latestVo2pt > 0)
+    ? vo2Hist.map(p => {
+        const factor = latestVo2pt / p.v; // VO2max plus haute dans le passé → allure plus rapide
+        const row: Record<string, number | string> = { d: fmtD(p.date) };
+        for (const ln of PRED_LINES) row[ln.key] = Math.round((predictRaceSec(effVma, ln.km) / ln.km) * factor);
+        return row;
+      })
+    : [];
 
   const tabs = [
     { v: "profile", l: tr("tab.profile"), icon: User },
@@ -932,6 +955,20 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                         <div className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-zinc-900 shadow-md"
                           style={{ left: `${Math.min(100, Math.max(0, ((vo2max - 30) / 42) * 100))}%` }} />
                       </div>
+                      {vo2ChartData.length > 1 && (
+                        <div className="mt-4">
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400 mb-1">{tr("perf.vo2trend")}</div>
+                          <ResponsiveContainer width="100%" height={130}>
+                            <LineChart data={vo2ChartData} margin={{ top: 6, right: 10, bottom: 0, left: -22 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                              <XAxis dataKey="d" tick={{ fontSize: 10, fill: "#a1a1aa" }} interval="preserveStartEnd" minTickGap={32} axisLine={false} tickLine={false} />
+                              <YAxis domain={["dataMin - 1", "dataMax + 1"]} tick={{ fontSize: 10, fill: "#a1a1aa" }} width={30} axisLine={false} tickLine={false} />
+                              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 12, border: "1px solid #e4e4e7" }} formatter={(v: number | string) => [`${v} ml/kg/min`, "VO2max"]} />
+                              <Line type="monotone" dataKey="v" stroke="#7c3aed" strokeWidth={2.5} dot={false} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      )}
                     </div>
                   )}
                 </>
@@ -970,14 +1007,39 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                 <h3 className="font-semibold text-zinc-900 flex items-center gap-2"><Trophy className="w-4 h-4 text-amber-500" /> {tr("perf.predTitle")}</h3>
                 <p className="text-xs text-zinc-400 -mt-1">{tr(vmaSource === "test" ? "perf.predDescTest" : vmaSource === "garmin" ? "perf.predDescGarmin" : "perf.predDescSess")}</p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {predictions.map(p => (
+                  {predictions.map((p, i) => (
                     <div key={p.label} className="rounded-2xl bg-zinc-50 p-4 text-center">
-                      <div className="text-xs font-medium text-zinc-400">{p.label}</div>
+                      <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-zinc-400">
+                        <span className="h-2 w-2 rounded-full" style={{ background: PRED_LINES[i]?.color ?? "#71717a" }} />{p.label}
+                      </div>
                       <div className="text-xl font-black text-zinc-900 mt-1">{p.time}</div>
                       <div className="text-[11px] text-zinc-400 mt-0.5">{p.pace}</div>
                     </div>
                   ))}
                 </div>
+                {paceChartData.length > 1 && (
+                  <div className="pt-2">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400 mb-1">{tr("perf.predGraph")}</div>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <LineChart data={paceChartData} margin={{ top: 6, right: 12, bottom: 0, left: -8 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                        <XAxis dataKey="d" tick={{ fontSize: 10, fill: "#a1a1aa" }} interval="preserveStartEnd" minTickGap={32} axisLine={false} tickLine={false} />
+                        <YAxis reversed domain={["dataMin - 8", "dataMax + 8"]} tickFormatter={(s: number) => secToPace(s)} tick={{ fontSize: 10, fill: "#a1a1aa" }} width={42} axisLine={false} tickLine={false} />
+                        <Tooltip contentStyle={{ fontSize: 12, borderRadius: 12, border: "1px solid #e4e4e7" }} formatter={(v: number | string, n) => [`${secToPace(Number(v))}/km`, n]} />
+                        {PRED_LINES.map(ln => (
+                          <Line key={ln.key} type="monotone" dataKey={ln.key} name={ln.label} stroke={ln.color} strokeWidth={2.2} dot={false} />
+                        ))}
+                      </LineChart>
+                    </ResponsiveContainer>
+                    <div className="mt-1.5 flex flex-wrap justify-center gap-x-4 gap-y-1">
+                      {PRED_LINES.map(ln => (
+                        <span key={ln.key} className="inline-flex items-center gap-1.5 text-[11px] font-medium text-zinc-500">
+                          <span className="h-2 w-2 rounded-full" style={{ background: ln.color }} />{ln.label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

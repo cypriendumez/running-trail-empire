@@ -161,22 +161,32 @@ export async function GET(req: Request) {
       source: "intervals_icu",
     }));
 
-  // Métriques RICHES Garmin (montre) → profil. Wellness le plus récent + dernière activité course.
-  // VO2max (source de vérité), FC repos, seuil lactique (lthr), allure seuil, forme (CTL/ATL/rampe).
-  const lastWell = [...validWellness].sort((a, b) => b.id.localeCompare(a.id))[0];
-  const latestVo2 = validWellness
-    .filter(d => typeof d.vo2max === "number" && (d.vo2max as number) > 0)
-    .sort((a, b) => b.id.localeCompare(a.id))[0]?.vo2max ?? null;
+  // Métriques RICHES Garmin (montre) → profil. ⚠️ Le wellness le PLUS RÉCENT est souvent incomplet
+  // (la FC repos / VFC se mesurent la nuit) → pour CHAQUE champ on prend la dernière valeur NON nulle.
+  const wDesc = [...validWellness].sort((a, b) => b.id.localeCompare(a.id)); // plus récent d'abord
+  const latestNum = (k: keyof IntervalsWellness): number | null => {
+    for (const w of wDesc) { const v = w[k]; if (typeof v === "number" && !Number.isNaN(v)) return v; }
+    return null;
+  };
+  const latestVo2 = latestNum("vo2max");
+  const ctlV = latestNum("ctl"), atlV = latestNum("atl"), rampV = latestNum("rampRate");
   const lastRun = (activities as unknown as Array<Record<string, unknown>>).find(a => /run/i.test(String(a.type ?? "")));
   const tpMps = Number(lastRun?.threshold_pace) || 0;
+  // Historique VO2max (pour le graphique de tendance), ordre chronologique, ~120 derniers points.
+  const vo2maxHistory = wDesc
+    .filter(w => typeof w.vo2max === "number" && (w.vo2max as number) > 0)
+    .map(w => ({ date: w.id, v: Math.round((w.vo2max as number) * 10) / 10 }))
+    .reverse()
+    .slice(-120);
   const garminMetrics = {
     vo2max: latestVo2,
-    restingHR: Number(lastWell?.restingHR) || null,
+    restingHR: latestNum("restingHR"),
     lthr: Number(lastRun?.lthr) || null,
     thresholdPaceSecPerKm: tpMps > 0 ? Math.round(1000 / tpMps) : null,
-    ctl: lastWell?.ctl != null ? Math.round(Number(lastWell.ctl)) : null,
-    atl: lastWell?.atl != null ? Math.round(Number(lastWell.atl)) : null,
-    rampRate: lastWell?.rampRate != null ? Math.round(Number(lastWell.rampRate) * 10) / 10 : null,
+    ctl: ctlV != null ? Math.round(ctlV) : null,
+    atl: atlV != null ? Math.round(atlV) : null,
+    rampRate: rampV != null ? Math.round(rampV * 10) / 10 : null,
+    vo2maxHistory,
     updatedAt: new Date().toISOString(),
   };
   const hasGarminMetrics = [garminMetrics.vo2max, garminMetrics.restingHR, garminMetrics.lthr, garminMetrics.ctl].some(v => v != null);

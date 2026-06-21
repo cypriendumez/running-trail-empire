@@ -144,11 +144,32 @@ export async function POST(req: Request) {
     }
   }
 
-  // Garmin VO2max (mesure montre) la plus récente → profil (source de vérité, best-effort).
-  const latestVo2 = wellness
-    .filter(d => d.id && typeof d.vo2max === "number" && (d.vo2max as number) > 0)
-    .sort((a, b) => b.id.localeCompare(a.id))[0]?.vo2max;
-  if (latestVo2) await admin.from("profiles").update({ garmin_vo2max: latestVo2 }).eq("id", profile.id).then(() => {}, () => {});
+  // Métriques RICHES Garmin → profil. Dernière valeur NON nulle par champ (le wellness du jour est
+  // souvent incomplet : FC repos/VFC mesurées la nuit) + historique VO2max pour le graphique.
+  const wDesc = wellness.filter(d => d.id).sort((a, b) => b.id.localeCompare(a.id));
+  const wLatest = (k: keyof IntervalsWellness): number | null => {
+    for (const w of wDesc) { const v = w[k]; if (typeof v === "number" && !Number.isNaN(v)) return v; }
+    return null;
+  };
+  const latestVo2 = wLatest("vo2max");
+  const lastRunAct = (activities as unknown as Array<Record<string, unknown>>).find(a => /run/i.test(String(a.type ?? "")));
+  const tpMps = Number(lastRunAct?.threshold_pace) || 0;
+  const ctlV = wLatest("ctl"), atlV = wLatest("atl"), rampV = wLatest("rampRate");
+  const gm = {
+    vo2max: latestVo2,
+    restingHR: wLatest("restingHR"),
+    lthr: Number(lastRunAct?.lthr) || null,
+    thresholdPaceSecPerKm: tpMps > 0 ? Math.round(1000 / tpMps) : null,
+    ctl: ctlV != null ? Math.round(ctlV) : null,
+    atl: atlV != null ? Math.round(atlV) : null,
+    rampRate: rampV != null ? Math.round(rampV * 10) / 10 : null,
+    vo2maxHistory: wDesc.filter(w => typeof w.vo2max === "number" && (w.vo2max as number) > 0)
+      .map(w => ({ date: w.id, v: Math.round((w.vo2max as number) * 10) / 10 })).reverse().slice(-120),
+    updatedAt: new Date().toISOString(),
+  };
+  if (latestVo2 != null || gm.restingHR != null || gm.ctl != null) {
+    await admin.from("profiles").update({ garmin_vo2max: latestVo2, garmin_metrics: gm }).eq("id", profile.id).then(() => {}, () => {});
+  }
 
   // Coach AUTONOME INSTANTANÉ : dès qu'intervals notifie une nouvelle séance, on (re)publie
   // la prochaine séance sur le dashboard + la montre, sans aucun délai ni clic.
@@ -194,4 +215,5 @@ interface IntervalsWellness {
   id: string; hrv?: number; hrvSDNN?: number; sleepSecs?: number;
   deepSleepSecs?: number; lightSleepSecs?: number; remSleepSecs?: number;
   sleepScore?: number; bb?: number; avgSpo2?: number; vo2max?: number;
+  restingHR?: number; ctl?: number; atl?: number; rampRate?: number;
 }
