@@ -1,5 +1,5 @@
 export const dynamic = "force-dynamic";
-import { TrailBuilder } from "@/components/trail/TrailBuilder";
+import { TrailBuilderLazy } from "@/components/trail/TrailBuilderLazy";
 import { ParcoursBrowser } from "@/components/parcours/ParcoursBrowser";
 
 export const metadata = { title: "Trail Builder" };
@@ -8,7 +8,7 @@ export default async function TrailPage({ searchParams }: { searchParams: Promis
   const { q } = await searchParams;
   return (
     <div className="space-y-6">
-      <TrailBuilder />
+      <TrailBuilderLazy />
       <ParcoursBrowser initialSearch={q ?? ""} />
     </div>
   );

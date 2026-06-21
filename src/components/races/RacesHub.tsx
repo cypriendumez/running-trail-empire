@@ -5,11 +5,22 @@ import { Search, MapPin, Mountain, Clock, Calendar, ExternalLink, Zap, ChevronLe
 import type { Race } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { RacesMapView } from "./RacesMapView";
+import dynamic from "next/dynamic";
 import { fmtDistance, type UnitSystem } from "@/lib/units";
 import { correctedRaceType } from "@/lib/raceType";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { RX, fillR } from "./racesI18n";
+
+// La carte (mapbox-gl + leaflet) est LOURDE : on la charge à la demande (quand l'utilisateur
+// ouvre la carte), pas au chargement de la page → liste des courses bien plus rapide.
+const RacesMapView = dynamic(() => import("./RacesMapView").then((m) => m.RacesMapView), {
+  ssr: false,
+  loading: () => (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-white/80 backdrop-blur-sm">
+      <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+    </div>
+  ),
+});
 
 // « Toutes » = valeur sentinelle de filtre (libellé traduit au rendu) ; régions = toponymes FR.
 const REGIONS = [

@@ -4,6 +4,11 @@ import createNextIntlPlugin from "next-intl/plugin";
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 const nextConfig: NextConfig = {
+  // Tree-shaking ciblé des grosses libs à barrel-file → JS par page nettement plus léger
+  // (recharts, framer-motion, lucide importent énormément par défaut). Transitions plus fluides.
+  experimental: {
+    optimizePackageImports: ["lucide-react", "framer-motion", "recharts", "date-fns"],
+  },
   images: {
     remotePatterns: [
       { hostname: "*.supabase.co" },
