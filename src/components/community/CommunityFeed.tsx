@@ -5,8 +5,9 @@ import { motion } from "framer-motion";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import {
   Newspaper, ExternalLink, RefreshCw,
-  Footprints, Mountain, Flame, Medal, Watch, type LucideIcon,
+  Footprints, Mountain, Flame, Medal, Watch, Mail, type LucideIcon,
 } from "lucide-react";
+import { NewsletterSignup } from "@/components/NewsletterSignup";
 
 type Item = { title: string; source: string; link: string; date: string; domain?: string; favicon?: string };
 type Cat = "all" | "running" | "trail" | "ultra" | "marathon" | "gear";
@@ -158,6 +159,18 @@ export function CommunityFeed() {
           <p className="mt-1.5 max-w-2xl text-[15px] leading-relaxed text-white/85">{tr("subtitle")}</p>
         </div>
       </motion.div>
+
+      {/* Encart newsletter (opt-in in-app) */}
+      <div className="mt-5 overflow-hidden rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50/80 to-white p-5 sm:flex sm:items-center sm:justify-between sm:gap-6">
+        <div className="mb-3 flex items-start gap-3 sm:mb-0">
+          <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-emerald-100"><Mail className="h-5 w-5 text-emerald-600" /></span>
+          <div>
+            <h3 className="font-bold text-zinc-900">Reçois nos articles & conseils course</h3>
+            <p className="text-sm text-zinc-500">Entraînement, trail, matériel, nutrition — dans ta boîte mail. Désinscription en un clic.</p>
+          </div>
+        </div>
+        <div className="w-full sm:max-w-sm"><NewsletterSignup /></div>
+      </div>
 
       {/* Filtres */}
       <div className="mt-5 flex flex-wrap items-center gap-2">
