@@ -38,7 +38,7 @@ export function NewsletterComposer({ subscriberCount }: { subscriberCount: numbe
         <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-50"><Mail className="h-5 w-5 text-emerald-600" /></span>
         <div>
           <h1 className="text-xl font-bold text-zinc-900">Nouvel article / newsletter</h1>
-          <p className="flex items-center gap-1.5 text-sm text-zinc-500"><Users className="h-3.5 w-3.5" /> {subscriberCount} destinataire(s) (abonnés + comptes)</p>
+          <p className="flex items-center gap-1.5 text-sm text-zinc-500"><Users className="h-3.5 w-3.5" /> {subscriberCount} abonné(s) à la newsletter</p>
         </div>
       </div>
 
@@ -63,7 +63,7 @@ export function NewsletterComposer({ subscriberCount }: { subscriberCount: numbe
           </button>
         ) : (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3.5">
-            <p className="text-sm font-medium text-amber-800">Envoyer à <b>{subscriberCount}</b> destinataire(s) par e-mail + notification ?</p>
+            <p className="text-sm font-medium text-amber-800">Envoyer à <b>{subscriberCount}</b> abonné(s) à la newsletter (e-mail + notif) ?</p>
             <div className="mt-3 flex gap-2">
               <button onClick={send} disabled={sending}
                 className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">

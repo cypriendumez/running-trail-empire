@@ -20,19 +20,21 @@ export async function POST(req: Request) {
 
   const admin = createAdminClient();
 
-  // Destinataires : abonnés newsletter (non désinscrits) + e-mails des comptes. Dédupliqués.
-  const [{ data: subs }, { data: profs }] = await Promise.all([
-    admin.from("newsletter_subscribers").select("email").eq("unsubscribed", false),
-    admin.from("profiles").select("id, email"),
-  ]);
+  // Destinataires : UNIQUEMENT les personnes ABONNÉES à la newsletter (opt-in, non désinscrites).
+  // On n'envoie JAMAIS aux comptes qui ne se sont pas abonnés.
+  const { data: subs } = await admin
+    .from("newsletter_subscribers")
+    .select("email, user_id")
+    .eq("unsubscribed", false);
+  const subRows = (subs ?? []) as { email?: string; user_id?: string | null }[];
   const emails = new Set<string>();
-  for (const s of (subs ?? []) as { email?: string }[]) if (s.email) emails.add(s.email.toLowerCase());
-  for (const p of (profs ?? []) as { email?: string }[]) if (p.email) emails.add(p.email.toLowerCase());
+  for (const s of subRows) if (s.email) emails.add(s.email.toLowerCase());
   const recipients = [...emails];
 
-  // 1) Notification site pour chaque utilisateur inscrit.
-  const notifRows = ((profs ?? []) as { id: string }[]).map((p) => ({
-    user_id: p.id, type: "newsletter", title: t.slice(0, 120), body: b.slice(0, 500),
+  // 1) Notification site : seulement pour les abonnés qui ont un compte (user_id), dédupliqués.
+  const subUserIds = [...new Set(subRows.map((s) => s.user_id).filter((id): id is string => !!id))];
+  const notifRows = subUserIds.map((uid) => ({
+    user_id: uid, type: "newsletter", title: t.slice(0, 120), body: b.slice(0, 500),
     data: { from: "newsletter", title: t, ts: new Date().toISOString() },
   }));
   let notified = 0;
