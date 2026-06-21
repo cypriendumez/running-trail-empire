@@ -163,7 +163,15 @@ export async function GET(req: Request) {
 
   // Métriques RICHES Garmin (montre) → profil. ⚠️ Le wellness le PLUS RÉCENT est souvent incomplet
   // (la FC repos / VFC se mesurent la nuit) → pour CHAQUE champ on prend la dernière valeur NON nulle.
-  const wDesc = [...validWellness].sort((a, b) => b.id.localeCompare(a.id)); // plus récent d'abord
+  // Historique LONG (180 j) dédié : la fenêtre de sync est trop courte pour une vraie tendance VO2max
+  // (Garmin ne met à jour la VO2max que ~1×/semaine) et le wellness récent manque souvent la FC repos.
+  let histWell: IntervalsWellness[] = validWellness;
+  try {
+    const histOldest = new Date(Date.now() - 180 * 86400000).toISOString().slice(0, 10);
+    const hr = await fetch(`${BASE}/athlete/${ATHLETE_ID}/wellness?oldest=${histOldest}&newest=${newest}`, { headers: authHeader(API_KEY) });
+    if (hr.ok) { const j = await hr.json(); if (Array.isArray(j) && j.length) histWell = (j as IntervalsWellness[]).filter(d => d.id); }
+  } catch { /* on garde la fenêtre courte en repli */ }
+  const wDesc = [...histWell].sort((a, b) => b.id.localeCompare(a.id)); // plus récent d'abord
   const latestNum = (k: keyof IntervalsWellness): number | null => {
     for (const w of wDesc) { const v = w[k]; if (typeof v === "number" && !Number.isNaN(v)) return v; }
     return null;

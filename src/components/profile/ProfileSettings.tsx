@@ -319,6 +319,8 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
 
   const [newGoal, setNewGoal] = useState({ type: "race", label: "", target_value: "", target_date: "" });
   const [newShoe, setNewShoe] = useState({ brand: "", model: "", max_km: "800", purchase_date: "" });
+  const [brandFocus, setBrandFocus] = useState(false);
+  const [modelFocus, setModelFocus] = useState(false);
 
   async function save() {
     setSaving(true);
@@ -469,6 +471,13 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
   const vo2 = garminVo2 || effVma > 0 || maxHr > 0 ? vo2maxEstimate({ vma: effVma || null, maxHr: maxHr || null, restHr, garmin: garminVo2 }) : null;
   const vo2max = vo2?.value ?? null;
   const predictions = effVma > 0 ? racePredictions(effVma) : [];
+
+  // Autocomplétion chaussures : filtre la marque puis les modèles de cette marque selon la saisie.
+  const shoeBrandQ = newShoe.brand.trim().toLowerCase();
+  const shoeBrandOpts = SHOE_BRANDS.filter(b => b.toLowerCase().includes(shoeBrandQ) && b.toLowerCase() !== shoeBrandQ).slice(0, 8);
+  const shoeModelPool = SHOE_MODELS[shoeBrandQ] ?? Array.from(new Set(Object.values(SHOE_MODELS).flat()));
+  const shoeModelQ = newShoe.model.trim().toLowerCase();
+  const shoeModelOpts = shoeModelPool.filter(m => m.toLowerCase().includes(shoeModelQ) && m.toLowerCase() !== shoeModelQ).slice(0, 10);
 
   // ── Graphiques façon Garmin : tendance VO2max + prédicteur de course (allures) ──
   const vo2Hist = Array.isArray(g?.vo2maxHistory) ? g!.vo2maxHistory! : [];
@@ -1140,24 +1149,46 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
               {addingShoe && (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
                   className="overflow-hidden rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50/80 to-white p-5 shadow-sm">
-                  <datalist id="shoe-brands">{SHOE_BRANDS.map(b => <option key={b} value={b} />)}</datalist>
-                  <datalist id="shoe-models">{(SHOE_MODELS[newShoe.brand.trim().toLowerCase()] ?? Object.values(SHOE_MODELS).flat()).map(m => <option key={m} value={m} />)}</datalist>
                   <div className="mb-4 flex items-center justify-between">
                     <h4 className="flex items-center gap-2 font-semibold text-zinc-900"><Footprints className="h-4 w-4 text-emerald-600" /> {tr("shoes.new")}</h4>
                     <button onClick={() => setAddingShoe(false)} className="flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600"><X className="h-4 w-4" /></button>
                   </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
+                    <div className="relative">
                       <label className="mb-1 block text-xs font-semibold text-zinc-500">{tr("shoes.brand")}</label>
-                      <input list="shoe-brands" value={newShoe.brand} onChange={e => setNewShoe(s => ({...s, brand: e.target.value}))}
+                      <input value={newShoe.brand} onChange={e => setNewShoe(s => ({...s, brand: e.target.value, model: "" }))}
+                        onFocus={() => setBrandFocus(true)} onBlur={() => setTimeout(() => setBrandFocus(false), 150)}
                         placeholder={tr("shoes.brandPh")} autoComplete="off"
                         className="w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-sm transition-colors focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+                      {brandFocus && shoeBrandOpts.length > 0 && (
+                        <div className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-zinc-200 bg-white py-1 shadow-xl">
+                          {shoeBrandOpts.map(b => (
+                            <button key={b} type="button" onMouseDown={e => e.preventDefault()}
+                              onClick={() => { setNewShoe(s => ({ ...s, brand: b, model: "" })); setBrandFocus(false); }}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-zinc-700 transition-colors hover:bg-emerald-50">
+                              <Footprints className="h-3.5 w-3.5 flex-shrink-0 text-zinc-300" /> {b}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <div>
+                    <div className="relative">
                       <label className="mb-1 block text-xs font-semibold text-zinc-500">{tr("shoes.model")}</label>
-                      <input list="shoe-models" value={newShoe.model} onChange={e => setNewShoe(s => ({...s, model: e.target.value}))}
+                      <input value={newShoe.model} onChange={e => setNewShoe(s => ({...s, model: e.target.value}))}
+                        onFocus={() => setModelFocus(true)} onBlur={() => setTimeout(() => setModelFocus(false), 150)}
                         placeholder={tr("shoes.modelPh")} autoComplete="off"
                         className="w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-sm transition-colors focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+                      {modelFocus && shoeModelOpts.length > 0 && (
+                        <div className="absolute z-30 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-zinc-200 bg-white py-1 shadow-xl">
+                          {shoeModelOpts.map(m => (
+                            <button key={m} type="button" onMouseDown={e => e.preventDefault()}
+                              onClick={() => { setNewShoe(s => ({ ...s, model: m })); setModelFocus(false); }}
+                              className="block w-full px-3 py-2 text-left text-sm font-medium text-zinc-700 transition-colors hover:bg-emerald-50">
+                              {m}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className="mb-1 block text-xs font-semibold text-zinc-500">{tr("shoes.life")}</label>
