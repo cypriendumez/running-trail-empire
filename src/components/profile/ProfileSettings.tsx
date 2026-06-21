@@ -44,7 +44,7 @@ const P: Record<string, Record<string, string>> = {
     "perf.loadTitle": "Forme & charge", "perf.fitness": "Condition", "perf.fatigue": "Fatigue", "perf.form": "Forme", "perf.loadHint": "Condition = forme de fond · Fatigue = charge récente · Forme = fraîcheur (positif = frais).", "perf.thresholdPace": "Allure seuil",
     "zone.z1": "Récupération", "zone.z1d": "Récupération active, ultra-endurance", "zone.z2": "Aérobie", "zone.z2d": "Base aérobie, sorties longues", "zone.z3": "Tempo", "zone.z3d": "Seuil aérobie, tempo", "zone.z4": "Seuil", "zone.z4d": "Seuil lactique, intervalles", "zone.z5": "VO2max", "zone.z5d": "Effort maximal, VMA",
     "pace.z2": "Z2 (endurance)", "pace.tempo": "Tempo (Z3-Z4)", "pace.seuil": "Seuil (Z4)", "pace.vma": "VMA (Z5)",
-    "shoes.title": "Mon Garage", "shoes.count": "{n} paire active", "shoes.countP": "{n} paires actives", "shoes.new": "Nouvelle paire", "shoes.brand": "Marque", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Modèle", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Durée de vie (km)", "shoes.buyDate": "Date d'achat", "shoes.addGarage": "Ajouter au garage", "shoes.emptyTitle": "Aucune chaussure dans le garage", "shoes.emptyDesc": "Ajoutez vos paires pour suivre leur kilométrage", "shoes.replace": "À remplacer", "shoes.watch": "Surveiller", "shoes.good": "Bon état", "shoes.km": "{cur} km parcourus · {rem} km restants",
+    "shoes.title": "Mon Garage", "shoes.count": "{n} paire active", "shoes.countP": "{n} paires actives", "shoes.new": "Nouvelle paire", "shoes.brand": "Marque", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Modèle", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Durée de vie (km)", "shoes.buyDate": "Date d'achat", "shoes.addGarage": "Ajouter au garage", "shoes.suggestHint": "Commence à taper la marque puis le modèle — on te suggère les modèles populaires.", "shoes.emptyTitle": "Aucune chaussure dans le garage", "shoes.emptyDesc": "Ajoutez vos paires pour suivre leur kilométrage", "shoes.replace": "À remplacer", "shoes.watch": "Surveiller", "shoes.good": "Bon état", "shoes.km": "{cur} km parcourus · {rem} km restants",
     "sub.title": "Abonnement actuel", "sub.plan": "Plan {tier}", "sub.freeDesc": "Accès limité aux fonctionnalités de base", "sub.proDesc": "Accès complet à toutes les fonctionnalités", "sub.active": "✓ Actif", "sub.free": "Gratuit", "sub.pro": "Pro",
     "feat.dash": "Dashboard & statistiques", "feat.journal": "Journal intelligent (NLP)", "feat.plans3": "Plans d'entraînement (3 max)", "feat.plansUnli": "Plans d'entraînement illimités", "feat.coach": "Coach IA personnalisé (Claude)", "feat.ghost": "Ghost Runner IA", "feat.vma": "Analyses VMA & zones cardiaques", "feat.sync": "Sync montres GPS (Garmin, Polar…)", "feat.shop": "Shopping Hub & recommandations", "feat.leagues": "Ligues & classements",
     "sub.goPro": "Passer à Pro", "sub.unlock": "Débloquez toutes les fonctionnalités", "sub.perMonth": "/mois", "sub.yearly": "ou 84€/an (-30%)", "sub.trial": "Commencer l'essai gratuit 14 jours",
@@ -71,7 +71,7 @@ const P: Record<string, Record<string, string>> = {
     "perf.loadTitle": "Form & load", "perf.fitness": "Fitness", "perf.fatigue": "Fatigue", "perf.form": "Form", "perf.loadHint": "Fitness = long-term form · Fatigue = recent load · Form = freshness (positive = fresh).", "perf.thresholdPace": "Threshold pace",
     "zone.z1": "Recovery", "zone.z1d": "Active recovery, ultra-endurance", "zone.z2": "Aerobic", "zone.z2d": "Aerobic base, long runs", "zone.z3": "Tempo", "zone.z3d": "Aerobic threshold, tempo", "zone.z4": "Threshold", "zone.z4d": "Lactate threshold, intervals", "zone.z5": "VO2max", "zone.z5d": "Maximal effort, vVO2max",
     "pace.z2": "Z2 (endurance)", "pace.tempo": "Tempo (Z3-Z4)", "pace.seuil": "Threshold (Z4)", "pace.vma": "vVO2max (Z5)",
-    "shoes.title": "My Garage", "shoes.count": "{n} active pair", "shoes.countP": "{n} active pairs", "shoes.new": "New pair", "shoes.brand": "Brand", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Model", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Lifespan (km)", "shoes.buyDate": "Purchase date", "shoes.addGarage": "Add to garage", "shoes.emptyTitle": "No shoes in the garage", "shoes.emptyDesc": "Add your pairs to track their mileage", "shoes.replace": "Replace", "shoes.watch": "Watch", "shoes.good": "Good", "shoes.km": "{cur} km run · {rem} km left",
+    "shoes.title": "My Garage", "shoes.count": "{n} active pair", "shoes.countP": "{n} active pairs", "shoes.new": "New pair", "shoes.brand": "Brand", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Model", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Lifespan (km)", "shoes.buyDate": "Purchase date", "shoes.addGarage": "Add to garage", "shoes.suggestHint": "Start typing the brand then the model — we suggest popular models.", "shoes.emptyTitle": "No shoes in the garage", "shoes.emptyDesc": "Add your pairs to track their mileage", "shoes.replace": "Replace", "shoes.watch": "Watch", "shoes.good": "Good", "shoes.km": "{cur} km run · {rem} km left",
     "sub.title": "Current subscription", "sub.plan": "{tier} plan", "sub.freeDesc": "Limited access to basic features", "sub.proDesc": "Full access to all features", "sub.active": "✓ Active", "sub.free": "Free", "sub.pro": "Pro",
     "feat.dash": "Dashboard & stats", "feat.journal": "Smart journal (NLP)", "feat.plans3": "Training plans (3 max)", "feat.plansUnli": "Unlimited training plans", "feat.coach": "Personalized AI coach (Claude)", "feat.ghost": "AI Ghost Runner", "feat.vma": "vVO2max & HR-zone analysis", "feat.sync": "GPS watch sync (Garmin, Polar…)", "feat.shop": "Shopping Hub & recommendations", "feat.leagues": "Leagues & rankings",
     "sub.goPro": "Go Pro", "sub.unlock": "Unlock all features", "sub.perMonth": "/mo", "sub.yearly": "or €84/yr (-30%)", "sub.trial": "Start the 14-day free trial",
@@ -98,7 +98,7 @@ const P: Record<string, Record<string, string>> = {
     "perf.loadTitle": "Form & Belastung", "perf.fitness": "Fitness", "perf.fatigue": "Ermüdung", "perf.form": "Form", "perf.loadHint": "Fitness = langfristige Form · Ermüdung = jüngste Belastung · Form = Frische (positiv = frisch).", "perf.thresholdPace": "Schwellentempo",
     "zone.z1": "Erholung", "zone.z1d": "Aktive Erholung, Ultra-Ausdauer", "zone.z2": "Aerob", "zone.z2d": "Aerobe Basis, lange Läufe", "zone.z3": "Tempo", "zone.z3d": "Aerobe Schwelle, Tempo", "zone.z4": "Schwelle", "zone.z4d": "Laktatschwelle, Intervalle", "zone.z5": "VO2max", "zone.z5d": "Maximale Belastung, vVO2max",
     "pace.z2": "Z2 (Ausdauer)", "pace.tempo": "Tempo (Z3-Z4)", "pace.seuil": "Schwelle (Z4)", "pace.vma": "vVO2max (Z5)",
-    "shoes.title": "Meine Garage", "shoes.count": "{n} aktives Paar", "shoes.countP": "{n} aktive Paare", "shoes.new": "Neues Paar", "shoes.brand": "Marke", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Modell", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Lebensdauer (km)", "shoes.buyDate": "Kaufdatum", "shoes.addGarage": "Zur Garage hinzufügen", "shoes.emptyTitle": "Keine Schuhe in der Garage", "shoes.emptyDesc": "Füge deine Paare hinzu, um die Kilometer zu verfolgen", "shoes.replace": "Ersetzen", "shoes.watch": "Beobachten", "shoes.good": "Guter Zustand", "shoes.km": "{cur} km gelaufen · {rem} km übrig",
+    "shoes.title": "Meine Garage", "shoes.count": "{n} aktives Paar", "shoes.countP": "{n} aktive Paare", "shoes.new": "Neues Paar", "shoes.brand": "Marke", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Modell", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Lebensdauer (km)", "shoes.buyDate": "Kaufdatum", "shoes.addGarage": "Zur Garage hinzufügen", "shoes.suggestHint": "Tippe Marke und Modell — wir schlagen beliebte Modelle vor.", "shoes.emptyTitle": "Keine Schuhe in der Garage", "shoes.emptyDesc": "Füge deine Paare hinzu, um die Kilometer zu verfolgen", "shoes.replace": "Ersetzen", "shoes.watch": "Beobachten", "shoes.good": "Guter Zustand", "shoes.km": "{cur} km gelaufen · {rem} km übrig",
     "sub.title": "Aktuelles Abo", "sub.plan": "{tier}-Plan", "sub.freeDesc": "Eingeschränkter Zugang zu Basisfunktionen", "sub.proDesc": "Voller Zugang zu allen Funktionen", "sub.active": "✓ Aktiv", "sub.free": "Kostenlos", "sub.pro": "Pro",
     "feat.dash": "Dashboard & Statistiken", "feat.journal": "Intelligentes Tagebuch (NLP)", "feat.plans3": "Trainingspläne (max. 3)", "feat.plansUnli": "Unbegrenzte Trainingspläne", "feat.coach": "Personalisierter KI-Coach (Claude)", "feat.ghost": "KI Ghost Runner", "feat.vma": "vVO2max- & HF-Zonen-Analyse", "feat.sync": "GPS-Uhr-Sync (Garmin, Polar…)", "feat.shop": "Shopping-Hub & Empfehlungen", "feat.leagues": "Ligen & Ranglisten",
     "sub.goPro": "Auf Pro upgraden", "sub.unlock": "Alle Funktionen freischalten", "sub.perMonth": "/Monat", "sub.yearly": "oder 84€/Jahr (-30%)", "sub.trial": "14 Tage kostenlos testen",
@@ -125,7 +125,7 @@ const P: Record<string, Record<string, string>> = {
     "perf.loadTitle": "Forma y carga", "perf.fitness": "Condición", "perf.fatigue": "Fatiga", "perf.form": "Forma", "perf.loadHint": "Condición = forma de fondo · Fatiga = carga reciente · Forma = frescura (positivo = fresco).", "perf.thresholdPace": "Ritmo umbral",
     "zone.z1": "Recuperación", "zone.z1d": "Recuperación activa, ultra-resistencia", "zone.z2": "Aeróbico", "zone.z2d": "Base aeróbica, tiradas largas", "zone.z3": "Tempo", "zone.z3d": "Umbral aeróbico, tempo", "zone.z4": "Umbral", "zone.z4d": "Umbral láctico, intervalos", "zone.z5": "VO2máx", "zone.z5d": "Esfuerzo máximo, VAM",
     "pace.z2": "Z2 (resistencia)", "pace.tempo": "Tempo (Z3-Z4)", "pace.seuil": "Umbral (Z4)", "pace.vma": "VAM (Z5)",
-    "shoes.title": "Mi Garaje", "shoes.count": "{n} par activo", "shoes.countP": "{n} pares activos", "shoes.new": "Nuevo par", "shoes.brand": "Marca", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Modelo", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Vida útil (km)", "shoes.buyDate": "Fecha de compra", "shoes.addGarage": "Añadir al garaje", "shoes.emptyTitle": "Ninguna zapatilla en el garaje", "shoes.emptyDesc": "Añade tus pares para seguir su kilometraje", "shoes.replace": "Reemplazar", "shoes.watch": "Vigilar", "shoes.good": "Buen estado", "shoes.km": "{cur} km recorridos · {rem} km restantes",
+    "shoes.title": "Mi Garaje", "shoes.count": "{n} par activo", "shoes.countP": "{n} pares activos", "shoes.new": "Nuevo par", "shoes.brand": "Marca", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Modelo", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Vida útil (km)", "shoes.buyDate": "Fecha de compra", "shoes.addGarage": "Añadir al garaje", "shoes.suggestHint": "Empieza a escribir la marca y el modelo — te sugerimos modelos populares.", "shoes.emptyTitle": "Ninguna zapatilla en el garaje", "shoes.emptyDesc": "Añade tus pares para seguir su kilometraje", "shoes.replace": "Reemplazar", "shoes.watch": "Vigilar", "shoes.good": "Buen estado", "shoes.km": "{cur} km recorridos · {rem} km restantes",
     "sub.title": "Suscripción actual", "sub.plan": "Plan {tier}", "sub.freeDesc": "Acceso limitado a las funciones básicas", "sub.proDesc": "Acceso completo a todas las funciones", "sub.active": "✓ Activo", "sub.free": "Gratis", "sub.pro": "Pro",
     "feat.dash": "Panel y estadísticas", "feat.journal": "Diario inteligente (NLP)", "feat.plans3": "Planes de entrenamiento (máx. 3)", "feat.plansUnli": "Planes de entrenamiento ilimitados", "feat.coach": "Entrenador IA personalizado (Claude)", "feat.ghost": "Ghost Runner IA", "feat.vma": "Análisis de VAM y zonas cardíacas", "feat.sync": "Sync relojes GPS (Garmin, Polar…)", "feat.shop": "Shopping Hub y recomendaciones", "feat.leagues": "Ligas y clasificaciones",
     "sub.goPro": "Pasar a Pro", "sub.unlock": "Desbloquea todas las funciones", "sub.perMonth": "/mes", "sub.yearly": "o 84€/año (-30%)", "sub.trial": "Empezar la prueba gratuita de 14 días",
@@ -152,7 +152,7 @@ const P: Record<string, Record<string, string>> = {
     "perf.loadTitle": "Forma e carga", "perf.fitness": "Condição", "perf.fatigue": "Fadiga", "perf.form": "Forma", "perf.loadHint": "Condição = forma de fundo · Fadiga = carga recente · Forma = frescura (positivo = fresco).", "perf.thresholdPace": "Ritmo limiar",
     "zone.z1": "Recuperação", "zone.z1d": "Recuperação ativa, ultra-resistência", "zone.z2": "Aeróbico", "zone.z2d": "Base aeróbica, treinos longos", "zone.z3": "Tempo", "zone.z3d": "Limiar aeróbico, tempo", "zone.z4": "Limiar", "zone.z4d": "Limiar de lactato, intervalos", "zone.z5": "VO2máx", "zone.z5d": "Esforço máximo, VAM",
     "pace.z2": "Z2 (resistência)", "pace.tempo": "Tempo (Z3-Z4)", "pace.seuil": "Limiar (Z4)", "pace.vma": "VAM (Z5)",
-    "shoes.title": "A minha Garagem", "shoes.count": "{n} par ativo", "shoes.countP": "{n} pares ativos", "shoes.new": "Novo par", "shoes.brand": "Marca", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Modelo", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Vida útil (km)", "shoes.buyDate": "Data de compra", "shoes.addGarage": "Adicionar à garagem", "shoes.emptyTitle": "Nenhum ténis na garagem", "shoes.emptyDesc": "Adiciona os teus pares para seguir a quilometragem", "shoes.replace": "Substituir", "shoes.watch": "Vigiar", "shoes.good": "Bom estado", "shoes.km": "{cur} km percorridos · {rem} km restantes",
+    "shoes.title": "A minha Garagem", "shoes.count": "{n} par ativo", "shoes.countP": "{n} pares ativos", "shoes.new": "Novo par", "shoes.brand": "Marca", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Modelo", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Vida útil (km)", "shoes.buyDate": "Data de compra", "shoes.addGarage": "Adicionar à garagem", "shoes.suggestHint": "Começa a escrever a marca e o modelo — sugerimos modelos populares.", "shoes.emptyTitle": "Nenhum ténis na garagem", "shoes.emptyDesc": "Adiciona os teus pares para seguir a quilometragem", "shoes.replace": "Substituir", "shoes.watch": "Vigiar", "shoes.good": "Bom estado", "shoes.km": "{cur} km percorridos · {rem} km restantes",
     "sub.title": "Subscrição atual", "sub.plan": "Plano {tier}", "sub.freeDesc": "Acesso limitado às funcionalidades básicas", "sub.proDesc": "Acesso completo a todas as funcionalidades", "sub.active": "✓ Ativo", "sub.free": "Gratuito", "sub.pro": "Pro",
     "feat.dash": "Painel e estatísticas", "feat.journal": "Diário inteligente (NLP)", "feat.plans3": "Planos de treino (máx. 3)", "feat.plansUnli": "Planos de treino ilimitados", "feat.coach": "Treinador IA personalizado (Claude)", "feat.ghost": "Ghost Runner IA", "feat.vma": "Análise de VAM e zonas cardíacas", "feat.sync": "Sync relógios GPS (Garmin, Polar…)", "feat.shop": "Shopping Hub e recomendações", "feat.leagues": "Ligas e classificações",
     "sub.goPro": "Passar a Pro", "sub.unlock": "Desbloqueia todas as funcionalidades", "sub.perMonth": "/mês", "sub.yearly": "ou 84€/ano (-30%)", "sub.trial": "Começar o teste gratuito de 14 dias",
@@ -258,6 +258,23 @@ function Toggle({ enabled, onToggle, label }: { enabled: boolean; onToggle: () =
     </div>
   );
 }
+
+// Marques + modèles populaires (autocomplétion du garage) — clés en minuscules.
+const SHOE_BRANDS = ["Nike", "Hoka", "Adidas", "Asics", "Saucony", "Brooks", "New Balance", "Salomon", "On", "Puma", "Mizuno", "Altra"];
+const SHOE_MODELS: Record<string, string[]> = {
+  nike: ["Vaporfly 3", "Alphafly 3", "Pegasus 41", "Pegasus Plus", "Vomero 18", "Structure 25", "Invincible 3", "Zoom Fly 6", "Streakfly", "Pegasus Trail 5", "Ultrafly", "Kiger 10"],
+  hoka: ["Mach 6", "Clifton 9", "Bondi 9", "Rocket X 2", "Speedgoat 6", "Mafate 4", "Challenger 7", "Arahi 7", "Skyward X", "Cielo X1", "Torrent 3", "Tecton X 2"],
+  adidas: ["Adizero Adios Pro 4", "Adizero Boston 12", "Adizero SL", "Supernova Rise", "Ultraboost Light", "Takumi Sen 10", "Terrex Agravic Speed", "Terrex Speed Ultra"],
+  asics: ["Metaspeed Sky Paris", "Metaspeed Edge Paris", "Novablast 4", "Gel-Nimbus 26", "Gel-Kayano 31", "Gel-Cumulus 26", "Magic Speed 4", "Superblast 2", "Trabuco Max 3", "Fuji Lite 4"],
+  saucony: ["Endorphin Speed 4", "Endorphin Pro 4", "Endorphin Elite", "Kinvara 15", "Ride 17", "Triumph 22", "Guide 17", "Peregrine 14", "Xodus Ultra 3"],
+  brooks: ["Ghost 16", "Glycerin 21", "Hyperion Max 2", "Hyperion Elite 4", "Launch 10", "Adrenaline GTS 23", "Caldera 7", "Cascadia 18", "Catamount 3"],
+  "new balance": ["FuelCell SC Elite v4", "FuelCell Rebel v4", "SuperComp Trainer v3", "Fresh Foam X 1080v14", "Fresh Foam More v5", "Hierro v8", "SC Trail"],
+  salomon: ["S/Lab Genesis", "Sense Ride 5", "Speedcross 6", "Pulsar Trail Pro 2", "Ultra Glide 2", "S/Lab Pulsar 3", "Thundercross", "Aero Glide 2"],
+  on: ["Cloudmonster 2", "Cloudboom Strike", "Cloudsurfer 2", "Cloudeclipse", "Cloudultra 2", "Cloudvista 2"],
+  puma: ["Deviate Nitro 3", "Deviate Nitro Elite 3", "Velocity Nitro 3", "ForeverRun Nitro 2", "Fast-R Nitro Elite 2"],
+  mizuno: ["Wave Rebellion Pro 2", "Wave Neo Ultra", "Wave Sky 8", "Wave Rider 28", "Wave Inspire 20", "Wave Mujin 10"],
+  altra: ["Escalante 4", "Torin 8", "Lone Peak 8", "Olympus 6", "Mont Blanc Carbon", "Vanish Carbon"],
+};
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals, stats, fitness, userId }: {
@@ -1122,40 +1139,44 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
             <AnimatePresence>
               {addingShoe && (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-                  className="bento-card border-2 border-blue-200 bg-blue-50 overflow-hidden">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-semibold text-zinc-900">{tr("shoes.new")}</h4>
-                    <button onClick={() => setAddingShoe(false)}><X className="w-4 h-4 text-zinc-400" /></button>
+                  className="overflow-hidden rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50/80 to-white p-5 shadow-sm">
+                  <datalist id="shoe-brands">{SHOE_BRANDS.map(b => <option key={b} value={b} />)}</datalist>
+                  <datalist id="shoe-models">{(SHOE_MODELS[newShoe.brand.trim().toLowerCase()] ?? Object.values(SHOE_MODELS).flat()).map(m => <option key={m} value={m} />)}</datalist>
+                  <div className="mb-4 flex items-center justify-between">
+                    <h4 className="flex items-center gap-2 font-semibold text-zinc-900"><Footprints className="h-4 w-4 text-emerald-600" /> {tr("shoes.new")}</h4>
+                    <button onClick={() => setAddingShoe(false)} className="flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600"><X className="h-4 w-4" /></button>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
-                      <label className="text-xs font-medium text-zinc-500 block mb-1">{tr("shoes.brand")}</label>
-                      <input value={newShoe.brand} onChange={e => setNewShoe(s => ({...s, brand: e.target.value}))}
-                        placeholder={tr("shoes.brandPh")}
-                        className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+                      <label className="mb-1 block text-xs font-semibold text-zinc-500">{tr("shoes.brand")}</label>
+                      <input list="shoe-brands" value={newShoe.brand} onChange={e => setNewShoe(s => ({...s, brand: e.target.value}))}
+                        placeholder={tr("shoes.brandPh")} autoComplete="off"
+                        className="w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-sm transition-colors focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100" />
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-zinc-500 block mb-1">{tr("shoes.model")}</label>
-                      <input value={newShoe.model} onChange={e => setNewShoe(s => ({...s, model: e.target.value}))}
-                        placeholder={tr("shoes.modelPh")}
-                        className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+                      <label className="mb-1 block text-xs font-semibold text-zinc-500">{tr("shoes.model")}</label>
+                      <input list="shoe-models" value={newShoe.model} onChange={e => setNewShoe(s => ({...s, model: e.target.value}))}
+                        placeholder={tr("shoes.modelPh")} autoComplete="off"
+                        className="w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-sm transition-colors focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100" />
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-zinc-500 block mb-1">{tr("shoes.life")}</label>
+                      <label className="mb-1 block text-xs font-semibold text-zinc-500">{tr("shoes.life")}</label>
                       <input type="number" value={newShoe.max_km} onChange={e => setNewShoe(s => ({...s, max_km: e.target.value}))}
-                        className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+                        className="w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-sm transition-colors focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100" />
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-zinc-500 block mb-1">{tr("shoes.buyDate")}</label>
+                      <label className="mb-1 block text-xs font-semibold text-zinc-500">{tr("shoes.buyDate")}</label>
                       <input type="date" value={newShoe.purchase_date} onChange={e => setNewShoe(s => ({...s, purchase_date: e.target.value}))}
-                        className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+                        className="w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-sm transition-colors focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100" />
                     </div>
                   </div>
-                  <div className="flex gap-2 mt-4">
-                    <button onClick={addShoe} className="flex-1 bg-blue-500 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-600 transition-all">
+                  <p className="mt-2 text-[11px] text-zinc-400">💡 {tr("shoes.suggestHint")}</p>
+                  <div className="mt-4 flex gap-2">
+                    <button onClick={addShoe} disabled={!newShoe.brand.trim() || !newShoe.model.trim()}
+                      className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50">
                       {tr("shoes.addGarage")}
                     </button>
-                    <button onClick={() => setAddingShoe(false)} className="px-4 py-2.5 rounded-xl text-sm font-medium bg-white text-zinc-600 border border-zinc-200">
+                    <button onClick={() => setAddingShoe(false)} className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50">
                       {tr("common.cancel")}
                     </button>
                   </div>
