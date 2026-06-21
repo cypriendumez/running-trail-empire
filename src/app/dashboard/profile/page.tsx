@@ -59,7 +59,7 @@ export default async function ProfilePage() {
       shoes={shoes ?? []}
       goals={goals ?? []}
       stats={{ kmYear, kmMonth, sessionsMonth, longestRun, streak }}
-      fitness={{ estimatedVma, obsMaxHr }}
+      fitness={{ estimatedVma, obsMaxHr, garminVo2max: Number((profile as { garmin_vo2max?: number | null } | null)?.garmin_vo2max) || null, garmin: ((profile as { garmin_metrics?: Record<string, number | null> | null } | null)?.garmin_metrics) ?? null }}
       userId={user!.id}
     />
   );

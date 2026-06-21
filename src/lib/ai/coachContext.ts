@@ -1,7 +1,7 @@
 import type { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
-import { bestVmaFromWorkouts } from "@/lib/running/fitness";
+import { bestVmaFromWorkouts, vmaFromVo2max } from "@/lib/running/fitness";
 
 type SB = Awaited<ReturnType<typeof createClient>>;
 
@@ -168,10 +168,12 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
 
   const maxHr = num(b?.max_hr), restHr = num(b?.resting_hr), ltHr = num(b?.lt_hr);
   const vmaStored = num(b?.vma_kmh);
-  // VMA : test enregistré → sinon estimateur du dashboard (effort maximal, distance-aware, cohérent
-  // app-wide) → sinon repli FC. Garantit le MÊME chiffre côté coach et côté client.
+  const garminVo2 = num((p as Record<string, unknown> | null)?.garmin_vo2max);
+  // VMA, par fiabilité : test enregistré → efforts réels (reflète l'allure de course) → dérivée de la
+  // VO2max Garmin (repli) → repli FC. Garantit le MÊME chiffre côté coach et côté client.
   const vma = (vmaStored != null && vmaStored > 0) ? vmaStored
-    : (bestVmaFromWorkouts(workouts, fcMaxEst) ?? estimateVmaFromRuns(workouts, fcMaxEst, now));
+    : (bestVmaFromWorkouts(workouts, fcMaxEst) ?? estimateVmaFromRuns(workouts, fcMaxEst, now)
+       ?? (garminVo2 != null && garminVo2 > 0 ? vmaFromVo2max(garminVo2) : null));
   const vmaIsEst = !(vmaStored != null && vmaStored > 0) && vma != null;
   const level = vma == null ? "à évaluer (VMA inconnue)" : vma < 13 ? "débutant" : vma < 16 ? "intermédiaire" : vma < 19 ? "confirmé" : "expert/élite";
 
@@ -220,7 +222,7 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   });
 
   // ── ANALYSE APPROFONDIE — facteurs avancés (efficacité, forme, charge, sommeil, cycle) ──
-  const vo2 = vma ? Math.round(vma * 3.5) : null;
+  const vo2 = (garminVo2 != null && garminVo2 > 0) ? Math.round(garminVo2) : (vma ? Math.round(vma * 3.5) : null);
   // Efficacité aérobie : distance/min par battement sur séances faciles → tendance 21j vs 21j.
   const easyEF = (from: number, to: number) => {
     const runs = workouts.filter(w => { const age = now - new Date(w.date).getTime(); return age > from * 86400000 && age <= to * 86400000 && !isHardType(w.type) && !!w.avg_hr && !!w.distance_km && !!w.duration_seconds; });
@@ -438,13 +440,18 @@ ${catalog}`;
 // VMA « effective » d'un athlète : test enregistré sinon estimation depuis ses séances (même
 // logique que le dashboard). Sert aux routes admin pour pousser des cibles d'allure vers la montre.
 export async function getEffectiveVma(sb: SupabaseClient, userId: string): Promise<number | null> {
-  const [baseRes, woRes] = await Promise.all([
+  const [baseRes, woRes, profRes] = await Promise.all([
     sb.from("performance_baselines").select("vma_kmh").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).maybeSingle(),
     sb.from("workouts").select("distance_km,duration_seconds,type,avg_hr,max_hr").eq("user_id", userId).order("date", { ascending: false }).limit(60),
+    sb.from("profiles").select("*").eq("id", userId).maybeSingle(),
   ]);
   const stored = Number((baseRes.data as { vma_kmh?: number } | null)?.vma_kmh) || 0;
   if (stored > 0) return stored;
+  // Efforts réels d'abord (reflète l'allure de course) → repli sur la VO2max Garmin.
   const wks = (woRes.data ?? []) as { distance_km?: number | null; duration_seconds?: number | null; type?: string | null; avg_hr?: number | null; max_hr?: number | null }[];
   const obsMaxHr = Math.max(0, ...wks.map((w) => Number(w.max_hr ?? 0)));
-  return bestVmaFromWorkouts(wks, obsMaxHr > 120 ? obsMaxHr : null);
+  const fromRuns = bestVmaFromWorkouts(wks, obsMaxHr > 120 ? obsMaxHr : null);
+  if (fromRuns && fromRuns > 0) return fromRuns;
+  const garminVo2 = Number((profRes.data as { garmin_vo2max?: number | null } | null)?.garmin_vo2max) || 0;
+  return garminVo2 > 0 ? vmaFromVo2max(garminVo2) : null;
 }

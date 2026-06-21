@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { BentoDashboard } from "@/components/dashboard/BentoDashboard";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import type { Objective } from "@/components/dashboard/ObjectiveCard";
-import { bestVmaFromWorkouts, loadRisk } from "@/lib/running/fitness";
+import { bestVmaFromWorkouts, loadRisk, vmaFromVo2max } from "@/lib/running/fitness";
 import { oneSessionPerDate } from "@/lib/coach/sessions";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +33,11 @@ export default async function DashboardPage() {
   // VMA actuelle (test sinon estimée) + risque de charge (déload proactif).
   const wks = (workoutsRes.data ?? []) as { date: string; type?: string | null; distance_km?: number | null; duration_seconds?: number | null; avg_hr?: number | null; max_hr?: number | null; tss?: number | null }[];
   const obsMaxHr = Math.max(0, ...wks.map(w => Number(w.max_hr ?? 0)));
-  const currentVma = Number((baseRes.data as { vma_kmh?: number } | null)?.vma_kmh ?? 0) || bestVmaFromWorkouts(wks, obsMaxHr > 120 ? obsMaxHr : null);
+  const garminVo2 = Number((profileRes.data as { garmin_vo2max?: number | null } | null)?.garmin_vo2max) || 0;
+  // VMA : test → efforts réels (reflète l'allure de course) → dérivée de la VO2max Garmin (repli).
+  const currentVma = Number((baseRes.data as { vma_kmh?: number } | null)?.vma_kmh ?? 0)
+    || bestVmaFromWorkouts(wks, obsMaxHr > 120 ? obsMaxHr : null)
+    || (garminVo2 > 0 ? vmaFromVo2max(garminVo2) : 0);
   const risk = loadRisk(wks);
 
   // Prochaine séance prescrite par le coach (aujourd'hui ou à venir) → prioritaire sur l'IA/l'algo.

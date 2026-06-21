@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { languageOptions } from "@/i18n/config";
 import { useT } from "@/lib/i18n/LanguageProvider";
-import { vo2maxEstimate, vo2maxLabel, racePredictions } from "@/lib/running/fitness";
+import { vo2maxEstimate, vo2maxLabel, racePredictions, vmaFromVo2max } from "@/lib/running/fitness";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import type { Lang } from "@/lib/i18n/translations";
 import {
@@ -38,8 +38,9 @@ const P: Record<string, Record<string, string>> = {
     "perf.title": "Données de performance", "perf.vma": "VMA", "perf.maxHr": "FC Max", "perf.restHr": "FC Repos", "perf.lt": "Seuil lactique",
     "perf.vmaWarn": "VMA estimée depuis tes meilleures séances (pas de test enregistré). Fais un test VMA pour des allures et prédictions exactes.",
     "perf.vo2est": "VO2max estimé", "perf.vo2from": "D'après {sources}", "perf.emptyTitle": "Aucune donnée de performance", "perf.emptyDesc": "Fais le test VMA (à l'inscription ou dans Paramètres) pour tout calibrer",
-    "perf.predTitle": "Prédictions de chrono", "perf.predDescTest": "Estimées depuis ta VMA (test). Un test VMA récent = des prédictions plus justes.", "perf.predDescSess": "Estimées depuis ta VMA (tes séances récentes). Un test VMA récent = des prédictions plus justes.",
+    "perf.predTitle": "Prédictions de chrono", "perf.predDescTest": "Estimées depuis ta VMA (test). Un test VMA récent = des prédictions plus justes.", "perf.predDescSess": "Estimées depuis ta VMA (tes séances récentes). Un test VMA récent = des prédictions plus justes.", "perf.predDescGarmin": "Calées sur ta VO2max Garmin (mesurée par ta montre) — bien plus fiable qu'une estimation.",
     "perf.zonesTitle": "Zones de fréquence cardiaque", "perf.maxHrLabel": "FC max : {n} bpm", "perf.pacesTitle": "Allures de référence",
+    "perf.loadTitle": "Forme & charge", "perf.fitness": "Condition", "perf.fatigue": "Fatigue", "perf.form": "Forme", "perf.loadHint": "Condition = forme de fond · Fatigue = charge récente · Forme = fraîcheur (positif = frais).", "perf.thresholdPace": "Allure seuil",
     "zone.z1": "Récupération", "zone.z1d": "Récupération active, ultra-endurance", "zone.z2": "Aérobie", "zone.z2d": "Base aérobie, sorties longues", "zone.z3": "Tempo", "zone.z3d": "Seuil aérobie, tempo", "zone.z4": "Seuil", "zone.z4d": "Seuil lactique, intervalles", "zone.z5": "VO2max", "zone.z5d": "Effort maximal, VMA",
     "pace.z2": "Z2 (endurance)", "pace.tempo": "Tempo (Z3-Z4)", "pace.seuil": "Seuil (Z4)", "pace.vma": "VMA (Z5)",
     "shoes.title": "Mon Garage", "shoes.count": "{n} paire active", "shoes.countP": "{n} paires actives", "shoes.new": "Nouvelle paire", "shoes.brand": "Marque", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Modèle", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Durée de vie (km)", "shoes.buyDate": "Date d'achat", "shoes.addGarage": "Ajouter au garage", "shoes.emptyTitle": "Aucune chaussure dans le garage", "shoes.emptyDesc": "Ajoutez vos paires pour suivre leur kilométrage", "shoes.replace": "À remplacer", "shoes.watch": "Surveiller", "shoes.good": "Bon état", "shoes.km": "{cur} km parcourus · {rem} km restants",
@@ -64,8 +65,9 @@ const P: Record<string, Record<string, string>> = {
     "perf.title": "Performance data", "perf.vma": "vVO2max", "perf.maxHr": "Max HR", "perf.restHr": "Resting HR", "perf.lt": "Lactate threshold",
     "perf.vmaWarn": "vVO2max estimated from your best sessions (no test on record). Take a vVO2max test for exact paces and predictions.",
     "perf.vo2est": "Estimated VO2max", "perf.vo2from": "From {sources}", "perf.emptyTitle": "No performance data", "perf.emptyDesc": "Take the vVO2max test (at sign-up or in Settings) to calibrate everything",
-    "perf.predTitle": "Time predictions", "perf.predDescTest": "Estimated from your vVO2max (test). A recent test = sharper predictions.", "perf.predDescSess": "Estimated from your vVO2max (your recent sessions). A recent test = sharper predictions.",
+    "perf.predTitle": "Time predictions", "perf.predDescTest": "Estimated from your vVO2max (test). A recent test = sharper predictions.", "perf.predDescSess": "Estimated from your vVO2max (your recent sessions). A recent test = sharper predictions.", "perf.predDescGarmin": "Based on your Garmin VO2max (measured by your watch) — far more reliable than an estimate.",
     "perf.zonesTitle": "Heart rate zones", "perf.maxHrLabel": "Max HR: {n} bpm", "perf.pacesTitle": "Reference paces",
+    "perf.loadTitle": "Form & load", "perf.fitness": "Fitness", "perf.fatigue": "Fatigue", "perf.form": "Form", "perf.loadHint": "Fitness = long-term form · Fatigue = recent load · Form = freshness (positive = fresh).", "perf.thresholdPace": "Threshold pace",
     "zone.z1": "Recovery", "zone.z1d": "Active recovery, ultra-endurance", "zone.z2": "Aerobic", "zone.z2d": "Aerobic base, long runs", "zone.z3": "Tempo", "zone.z3d": "Aerobic threshold, tempo", "zone.z4": "Threshold", "zone.z4d": "Lactate threshold, intervals", "zone.z5": "VO2max", "zone.z5d": "Maximal effort, vVO2max",
     "pace.z2": "Z2 (endurance)", "pace.tempo": "Tempo (Z3-Z4)", "pace.seuil": "Threshold (Z4)", "pace.vma": "vVO2max (Z5)",
     "shoes.title": "My Garage", "shoes.count": "{n} active pair", "shoes.countP": "{n} active pairs", "shoes.new": "New pair", "shoes.brand": "Brand", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Model", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Lifespan (km)", "shoes.buyDate": "Purchase date", "shoes.addGarage": "Add to garage", "shoes.emptyTitle": "No shoes in the garage", "shoes.emptyDesc": "Add your pairs to track their mileage", "shoes.replace": "Replace", "shoes.watch": "Watch", "shoes.good": "Good", "shoes.km": "{cur} km run · {rem} km left",
@@ -90,8 +92,9 @@ const P: Record<string, Record<string, string>> = {
     "perf.title": "Leistungsdaten", "perf.vma": "vVO2max", "perf.maxHr": "Max. Puls", "perf.restHr": "Ruhepuls", "perf.lt": "Laktatschwelle",
     "perf.vmaWarn": "vVO2max aus deinen besten Einheiten geschätzt (kein Test gespeichert). Mach einen vVO2max-Test für exakte Tempi und Prognosen.",
     "perf.vo2est": "Geschätzte VO2max", "perf.vo2from": "Aus {sources}", "perf.emptyTitle": "Keine Leistungsdaten", "perf.emptyDesc": "Mach den vVO2max-Test (bei der Anmeldung oder in den Einstellungen) zum Kalibrieren",
-    "perf.predTitle": "Zeitprognosen", "perf.predDescTest": "Geschätzt aus deiner vVO2max (Test). Ein aktueller Test = genauere Prognosen.", "perf.predDescSess": "Geschätzt aus deiner vVO2max (deine letzten Einheiten). Ein aktueller Test = genauere Prognosen.",
+    "perf.predTitle": "Zeitprognosen", "perf.predDescTest": "Geschätzt aus deiner vVO2max (Test). Ein aktueller Test = genauere Prognosen.", "perf.predDescSess": "Geschätzt aus deiner vVO2max (deine letzten Einheiten). Ein aktueller Test = genauere Prognosen.", "perf.predDescGarmin": "Basierend auf deiner Garmin-VO2max (von deiner Uhr gemessen) — viel zuverlässiger als eine Schätzung.",
     "perf.zonesTitle": "Herzfrequenzzonen", "perf.maxHrLabel": "Max. Puls: {n} bpm", "perf.pacesTitle": "Referenz-Tempi",
+    "perf.loadTitle": "Form & Belastung", "perf.fitness": "Fitness", "perf.fatigue": "Ermüdung", "perf.form": "Form", "perf.loadHint": "Fitness = langfristige Form · Ermüdung = jüngste Belastung · Form = Frische (positiv = frisch).", "perf.thresholdPace": "Schwellentempo",
     "zone.z1": "Erholung", "zone.z1d": "Aktive Erholung, Ultra-Ausdauer", "zone.z2": "Aerob", "zone.z2d": "Aerobe Basis, lange Läufe", "zone.z3": "Tempo", "zone.z3d": "Aerobe Schwelle, Tempo", "zone.z4": "Schwelle", "zone.z4d": "Laktatschwelle, Intervalle", "zone.z5": "VO2max", "zone.z5d": "Maximale Belastung, vVO2max",
     "pace.z2": "Z2 (Ausdauer)", "pace.tempo": "Tempo (Z3-Z4)", "pace.seuil": "Schwelle (Z4)", "pace.vma": "vVO2max (Z5)",
     "shoes.title": "Meine Garage", "shoes.count": "{n} aktives Paar", "shoes.countP": "{n} aktive Paare", "shoes.new": "Neues Paar", "shoes.brand": "Marke", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Modell", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Lebensdauer (km)", "shoes.buyDate": "Kaufdatum", "shoes.addGarage": "Zur Garage hinzufügen", "shoes.emptyTitle": "Keine Schuhe in der Garage", "shoes.emptyDesc": "Füge deine Paare hinzu, um die Kilometer zu verfolgen", "shoes.replace": "Ersetzen", "shoes.watch": "Beobachten", "shoes.good": "Guter Zustand", "shoes.km": "{cur} km gelaufen · {rem} km übrig",
@@ -116,8 +119,9 @@ const P: Record<string, Record<string, string>> = {
     "perf.title": "Datos de rendimiento", "perf.vma": "VAM", "perf.maxHr": "FC Máx", "perf.restHr": "FC Reposo", "perf.lt": "Umbral láctico",
     "perf.vmaWarn": "VAM estimada a partir de tus mejores sesiones (sin test registrado). Haz un test de VAM para ritmos y predicciones exactas.",
     "perf.vo2est": "VO2máx estimado", "perf.vo2from": "Según {sources}", "perf.emptyTitle": "Sin datos de rendimiento", "perf.emptyDesc": "Haz el test de VAM (al registrarte o en Ajustes) para calibrarlo todo",
-    "perf.predTitle": "Predicciones de tiempo", "perf.predDescTest": "Estimadas a partir de tu VAM (test). Un test reciente = predicciones más exactas.", "perf.predDescSess": "Estimadas a partir de tu VAM (tus sesiones recientes). Un test reciente = predicciones más exactas.",
+    "perf.predTitle": "Predicciones de tiempo", "perf.predDescTest": "Estimadas a partir de tu VAM (test). Un test reciente = predicciones más exactas.", "perf.predDescSess": "Estimadas a partir de tu VAM (tus sesiones recientes). Un test reciente = predicciones más exactas.", "perf.predDescGarmin": "Basadas en tu VO2máx de Garmin (medida por tu reloj) — mucho más fiable que una estimación.",
     "perf.zonesTitle": "Zonas de frecuencia cardíaca", "perf.maxHrLabel": "FC máx: {n} ppm", "perf.pacesTitle": "Ritmos de referencia",
+    "perf.loadTitle": "Forma y carga", "perf.fitness": "Condición", "perf.fatigue": "Fatiga", "perf.form": "Forma", "perf.loadHint": "Condición = forma de fondo · Fatiga = carga reciente · Forma = frescura (positivo = fresco).", "perf.thresholdPace": "Ritmo umbral",
     "zone.z1": "Recuperación", "zone.z1d": "Recuperación activa, ultra-resistencia", "zone.z2": "Aeróbico", "zone.z2d": "Base aeróbica, tiradas largas", "zone.z3": "Tempo", "zone.z3d": "Umbral aeróbico, tempo", "zone.z4": "Umbral", "zone.z4d": "Umbral láctico, intervalos", "zone.z5": "VO2máx", "zone.z5d": "Esfuerzo máximo, VAM",
     "pace.z2": "Z2 (resistencia)", "pace.tempo": "Tempo (Z3-Z4)", "pace.seuil": "Umbral (Z4)", "pace.vma": "VAM (Z5)",
     "shoes.title": "Mi Garaje", "shoes.count": "{n} par activo", "shoes.countP": "{n} pares activos", "shoes.new": "Nuevo par", "shoes.brand": "Marca", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Modelo", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Vida útil (km)", "shoes.buyDate": "Fecha de compra", "shoes.addGarage": "Añadir al garaje", "shoes.emptyTitle": "Ninguna zapatilla en el garaje", "shoes.emptyDesc": "Añade tus pares para seguir su kilometraje", "shoes.replace": "Reemplazar", "shoes.watch": "Vigilar", "shoes.good": "Buen estado", "shoes.km": "{cur} km recorridos · {rem} km restantes",
@@ -142,8 +146,9 @@ const P: Record<string, Record<string, string>> = {
     "perf.title": "Dados de desempenho", "perf.vma": "VAM", "perf.maxHr": "FC Máx", "perf.restHr": "FC Repouso", "perf.lt": "Limiar de lactato",
     "perf.vmaWarn": "VAM estimada a partir das tuas melhores sessões (sem teste registado). Faz um teste de VAM para ritmos e previsões exatas.",
     "perf.vo2est": "VO2máx estimado", "perf.vo2from": "Segundo {sources}", "perf.emptyTitle": "Sem dados de desempenho", "perf.emptyDesc": "Faz o teste de VAM (no registo ou nas Definições) para calibrar tudo",
-    "perf.predTitle": "Previsões de tempo", "perf.predDescTest": "Estimadas a partir da tua VAM (teste). Um teste recente = previsões mais exatas.", "perf.predDescSess": "Estimadas a partir da tua VAM (as tuas sessões recentes). Um teste recente = previsões mais exatas.",
+    "perf.predTitle": "Previsões de tempo", "perf.predDescTest": "Estimadas a partir da tua VAM (teste). Um teste recente = previsões mais exatas.", "perf.predDescSess": "Estimadas a partir da tua VAM (as tuas sessões recentes). Um teste recente = previsões mais exatas.", "perf.predDescGarmin": "Baseadas na tua VO2máx Garmin (medida pelo teu relógio) — muito mais fiável que uma estimativa.",
     "perf.zonesTitle": "Zonas de frequência cardíaca", "perf.maxHrLabel": "FC máx: {n} bpm", "perf.pacesTitle": "Ritmos de referência",
+    "perf.loadTitle": "Forma e carga", "perf.fitness": "Condição", "perf.fatigue": "Fadiga", "perf.form": "Forma", "perf.loadHint": "Condição = forma de fundo · Fadiga = carga recente · Forma = frescura (positivo = fresco).", "perf.thresholdPace": "Ritmo limiar",
     "zone.z1": "Recuperação", "zone.z1d": "Recuperação ativa, ultra-resistência", "zone.z2": "Aeróbico", "zone.z2d": "Base aeróbica, treinos longos", "zone.z3": "Tempo", "zone.z3d": "Limiar aeróbico, tempo", "zone.z4": "Limiar", "zone.z4d": "Limiar de lactato, intervalos", "zone.z5": "VO2máx", "zone.z5d": "Esforço máximo, VAM",
     "pace.z2": "Z2 (resistência)", "pace.tempo": "Tempo (Z3-Z4)", "pace.seuil": "Limiar (Z4)", "pace.vma": "VAM (Z5)",
     "shoes.title": "A minha Garagem", "shoes.count": "{n} par ativo", "shoes.countP": "{n} pares ativos", "shoes.new": "Novo par", "shoes.brand": "Marca", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Modelo", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Vida útil (km)", "shoes.buyDate": "Data de compra", "shoes.addGarage": "Adicionar à garagem", "shoes.emptyTitle": "Nenhum ténis na garagem", "shoes.emptyDesc": "Adiciona os teus pares para seguir a quilometragem", "shoes.replace": "Substituir", "shoes.watch": "Vigiar", "shoes.good": "Bom estado", "shoes.km": "{cur} km percorridos · {rem} km restantes",
@@ -260,7 +265,8 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
   shoes: Record<string, unknown>[];
   goals: Record<string, unknown>[];
   stats: Stats;
-  fitness?: { estimatedVma: number | null; obsMaxHr: number | null };
+  fitness?: { estimatedVma: number | null; obsMaxHr: number | null; garminVo2max?: number | null;
+    garmin?: { vo2max?: number | null; restingHR?: number | null; lthr?: number | null; thresholdPaceSecPerKm?: number | null; ctl?: number | null; atl?: number | null } | null };
   userId: string;
 }) {
   const { lang, setLang } = useT();
@@ -431,13 +437,18 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
   const maxHr = Number(baseline?.max_hr ?? 0) || (fitness?.obsMaxHr ?? 0);
   const zones = maxHr > 0 ? calcZones(maxHr, tr) : null;
 
-  // VMA effective : le test (baseline) sinon estimée depuis les meilleures séances récentes.
+  // VO2max = mesure Garmin (montre) ; métriques riches Garmin (FC repos, seuil, forme).
+  const g = fitness?.garmin ?? null;
+  const garminVo2 = Number(fitness?.garminVo2max ?? g?.vo2max ?? 0) || null;
+  // VMA, par fiabilité : test > efforts réels (reflète l'allure de course → colle au prédicteur Garmin)
+  // > dérivée de la VO2max (repli). NE PAS dériver la VMA de la VO2max en priorité : ça sous-estime l'allure.
   const baselineVma = Number(baseline?.vma_kmh ?? 0);
-  const effVma = baselineVma > 0 ? baselineVma : (fitness?.estimatedVma ?? 0);
-  const vmaSource: "test" | "séances" | null = baselineVma > 0 ? "test" : (effVma > 0 ? "séances" : null);
+  const effVma = baselineVma > 0 ? baselineVma : (fitness?.estimatedVma ?? 0) || (garminVo2 ? vmaFromVo2max(garminVo2) : 0);
+  const vmaSource: "test" | "séances" | "garmin" | null = baselineVma > 0 ? "test" : (fitness?.estimatedVma ?? 0) > 0 ? "séances" : garminVo2 ? "garmin" : null;
   const vma = effVma; // utilisé par les "allures de référence"
-  const restHr = Number(baseline?.resting_hr ?? 0) || null;
-  const vo2 = effVma > 0 || maxHr > 0 ? vo2maxEstimate({ vma: effVma || null, maxHr: maxHr || null, restHr }) : null;
+  const restHr = Number(baseline?.resting_hr ?? 0) || Number(g?.restingHR ?? 0) || null;
+  const ltHrEff = Number(baseline?.lt_hr ?? 0) || Number(g?.lthr ?? 0) || null;
+  const vo2 = garminVo2 || effVma > 0 || maxHr > 0 ? vo2maxEstimate({ vma: effVma || null, maxHr: maxHr || null, restHr, garmin: garminVo2 }) : null;
   const vo2max = vo2?.value ?? null;
   const predictions = effVma > 0 ? racePredictions(effVma) : [];
 
@@ -885,8 +896,8 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                     {[
                       { label: tr("perf.vma"), value: effVma > 0 ? `${effVma}` : "—", unit: "km/h", icon: <Wind className="w-4 h-4 text-blue-500" />, bg: "bg-blue-50" },
                       { label: tr("perf.maxHr"), value: maxHr > 0 ? `${maxHr}` : "—", unit: "bpm", icon: <Heart className="w-4 h-4 text-red-500" />, bg: "bg-red-50" },
-                      { label: tr("perf.restHr"), value: baseline?.resting_hr ? `${baseline.resting_hr}` : "—", unit: baseline?.resting_hr ? "bpm" : "", icon: <Heart className="w-4 h-4 text-green-500" />, bg: "bg-green-50" },
-                      { label: tr("perf.lt"), value: baseline?.lt_hr ? `${baseline.lt_hr}` : "—", unit: baseline?.lt_hr ? "bpm" : "", icon: <Zap className="w-4 h-4 text-orange-500" />, bg: "bg-orange-50" },
+                      { label: tr("perf.restHr"), value: restHr ? `${restHr}` : "—", unit: restHr ? "bpm" : "", icon: <Heart className="w-4 h-4 text-green-500" />, bg: "bg-green-50" },
+                      { label: tr("perf.lt"), value: ltHrEff ? `${ltHrEff}` : "—", unit: ltHrEff ? "bpm" : "", icon: <Zap className="w-4 h-4 text-orange-500" />, bg: "bg-orange-50" },
                     ].map(m => (
                       <div key={m.label} className={`${m.bg} rounded-2xl p-4`}>
                         <div className="flex items-center gap-1.5 text-xs text-zinc-500 mb-1">{m.icon}{m.label}</div>
@@ -902,14 +913,24 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                     </div>
                   )}
 
-                  {/* VO2max — multi-sources (façon Garmin) */}
+                  {/* VO2max — multi-sources (façon Garmin) + échelle de niveau visuelle */}
                   {vo2max && (
-                    <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-violet-50 to-blue-50 rounded-2xl border border-violet-100">
-                      <div className="text-4xl font-black text-violet-700">{vo2max}</div>
-                      <div>
-                        <div className="font-semibold text-zinc-900 text-sm">{tr("perf.vo2est")} <span className="text-xs font-normal text-zinc-400">ml/kg/min</span></div>
-                        <div className="text-xs text-zinc-500 mt-0.5">{tr("perf.vo2from", { sources: vo2?.sources.join(" + ") ?? "" })}</div>
-                        <div className={`text-xs font-semibold mt-1 ${vo2max >= 56 ? "text-green-600" : vo2max >= 46 ? "text-blue-600" : vo2max >= 36 ? "text-orange-500" : "text-zinc-500"}`}>{vo2maxLabel(vo2max)}</div>
+                    <div className="rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-blue-50 p-4">
+                      <div className="flex items-center gap-4">
+                        <div className="flex h-16 w-16 flex-shrink-0 flex-col items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-violet-100">
+                          <div className="text-2xl font-black leading-none text-violet-700">{vo2max}</div>
+                          <div className="mt-0.5 text-[8px] font-semibold uppercase tracking-wider text-zinc-400">ml/kg/min</div>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold text-zinc-900">{tr("perf.vo2est")}</div>
+                          <div className="truncate text-xs text-zinc-500">{tr("perf.vo2from", { sources: vo2?.sources.join(" + ") ?? "" })}</div>
+                          <div className={`mt-0.5 text-xs font-bold ${vo2max >= 56 ? "text-green-600" : vo2max >= 46 ? "text-blue-600" : vo2max >= 36 ? "text-orange-500" : "text-zinc-500"}`}>{vo2maxLabel(vo2max)}</div>
+                        </div>
+                      </div>
+                      {/* Position sur l'échelle 30 → 72 ml/kg/min (moyen → élite) */}
+                      <div className="relative mt-3.5 h-2 rounded-full" style={{ background: "linear-gradient(90deg,#d4d4d8,#fdba74,#93c5fd,#86efac,#8b5cf6)" }}>
+                        <div className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-zinc-900 shadow-md"
+                          style={{ left: `${Math.min(100, Math.max(0, ((vo2max - 30) / 42) * 100))}%` }} />
                       </div>
                     </div>
                   )}
@@ -923,11 +944,31 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
               )}
             </div>
 
+            {/* Forme & charge (Garmin : Condition/Fatigue/Forme = CTL/ATL/TSB) */}
+            {g && g.ctl != null && (
+              <div className="bento-card space-y-3">
+                <h3 className="font-semibold text-zinc-900 flex items-center gap-2"><Activity className="w-4 h-4 text-violet-500" /> {tr("perf.loadTitle")}</h3>
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { label: tr("perf.fitness"), value: g.ctl != null ? `${g.ctl}` : "—", color: "text-blue-600", bg: "bg-blue-50" },
+                    { label: tr("perf.fatigue"), value: g.atl != null ? `${g.atl}` : "—", color: "text-orange-600", bg: "bg-orange-50" },
+                    { label: tr("perf.form"), value: (g.ctl != null && g.atl != null) ? (g.ctl - g.atl > 0 ? `+${g.ctl - g.atl}` : `${g.ctl - g.atl}`) : "—", color: "text-emerald-600", bg: "bg-emerald-50" },
+                  ].map(m => (
+                    <div key={m.label} className={`${m.bg} rounded-2xl p-4 text-center`}>
+                      <div className="text-xs text-zinc-500 mb-1">{m.label}</div>
+                      <div className={`text-2xl font-black ${m.color}`}>{m.value}</div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[11px] text-zinc-400">{tr("perf.loadHint")}</p>
+              </div>
+            )}
+
             {/* Prédictions de chrono par distance */}
             {predictions.length > 0 && (
               <div className="bento-card space-y-3">
                 <h3 className="font-semibold text-zinc-900 flex items-center gap-2"><Trophy className="w-4 h-4 text-amber-500" /> {tr("perf.predTitle")}</h3>
-                <p className="text-xs text-zinc-400 -mt-1">{tr(vmaSource === "test" ? "perf.predDescTest" : "perf.predDescSess")}</p>
+                <p className="text-xs text-zinc-400 -mt-1">{tr(vmaSource === "test" ? "perf.predDescTest" : vmaSource === "garmin" ? "perf.predDescGarmin" : "perf.predDescSess")}</p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {predictions.map(p => (
                     <div key={p.label} className="rounded-2xl bg-zinc-50 p-4 text-center">

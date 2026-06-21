@@ -144,6 +144,12 @@ export async function POST(req: Request) {
     }
   }
 
+  // Garmin VO2max (mesure montre) la plus récente → profil (source de vérité, best-effort).
+  const latestVo2 = wellness
+    .filter(d => d.id && typeof d.vo2max === "number" && (d.vo2max as number) > 0)
+    .sort((a, b) => b.id.localeCompare(a.id))[0]?.vo2max;
+  if (latestVo2) await admin.from("profiles").update({ garmin_vo2max: latestVo2 }).eq("id", profile.id).then(() => {}, () => {});
+
   // Coach AUTONOME INSTANTANÉ : dès qu'intervals notifie une nouvelle séance, on (re)publie
   // la prochaine séance sur le dashboard + la montre, sans aucun délai ni clic.
   let coached = false;
@@ -187,5 +193,5 @@ interface IntervalsActivity {
 interface IntervalsWellness {
   id: string; hrv?: number; hrvSDNN?: number; sleepSecs?: number;
   deepSleepSecs?: number; lightSleepSecs?: number; remSleepSecs?: number;
-  sleepScore?: number; bb?: number; avgSpo2?: number;
+  sleepScore?: number; bb?: number; avgSpo2?: number; vo2max?: number;
 }

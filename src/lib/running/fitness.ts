@@ -36,7 +36,12 @@ export function vmaFromEffort(distanceKm: number, durationSec: number): number |
 
 // VO2max (ml/kg/min) à partir de plusieurs sources, comme Garmin combine les données.
 //  • VMA × 3.5 (Léger)  • 15.3 × FCmax/FCrepos (Uth-Sørensen)
-export function vo2maxEstimate(opts: { vma?: number | null; maxHr?: number | null; restHr?: number | null }): { value: number; sources: string[] } | null {
+// VMA (km/h) déduite d'une VO2max (formule de Léger : VO2max ≈ 3,5 × VMA).
+export const vmaFromVo2max = (vo2max: number): number => Math.round((vo2max / 3.5) * 10) / 10;
+
+export function vo2maxEstimate(opts: { vma?: number | null; maxHr?: number | null; restHr?: number | null; garmin?: number | null }): { value: number; sources: string[] } | null {
+  // Mesure Garmin (montre) = source de vérité → on la prend telle quelle, sans moyenner avec l'estimation.
+  if (opts.garmin && opts.garmin > 0) return { value: Math.round(opts.garmin), sources: ["Garmin"] };
   const ests: { v: number; src: string }[] = [];
   if (opts.vma && opts.vma > 0) ests.push({ v: opts.vma * 3.5, src: "VMA" });
   if (opts.maxHr && opts.restHr && opts.restHr > 0 && opts.maxHr > opts.restHr) ests.push({ v: 15.3 * (opts.maxHr / opts.restHr), src: "FC max/repos" });
