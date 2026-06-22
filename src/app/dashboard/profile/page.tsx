@@ -4,7 +4,7 @@ import { ProfileSettings } from "@/components/profile/ProfileSettings";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import { bestVmaFromWorkouts } from "@/lib/running/fitness";
 
-export const metadata = { title: "Mon Profil | Running & Trail Empire" };
+export const metadata = { title: "Mon Profil | Pacevo" };
 
 export default async function ProfilePage() {
   const supabase = await createClient();

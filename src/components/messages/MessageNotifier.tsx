@@ -64,7 +64,7 @@ export function MessageNotifier() {
           toast(msg, { description: d.desc, action: { label: d.open, onClick: () => { window.location.href = dest; } } });
           try {
             if ("Notification" in window && Notification.permission === "granted") {
-              const n = new Notification("Running & Trail Empire", { body: msg, icon: "/favicon.ico", tag: "rte-message" });
+              const n = new Notification("Pacevo", { body: msg, icon: "/favicon.ico", tag: "rte-message" });
               n.onclick = () => { window.focus(); window.location.href = dest; };
             }
           } catch { /* notif indisponible */ }

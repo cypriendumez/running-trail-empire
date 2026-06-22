@@ -147,7 +147,7 @@ function buildGPX(name: string, pts: LatLng[], elevations: number[]): string {
     `      <trkpt lat="${p.lat.toFixed(6)}" lon="${p.lng.toFixed(6)}">${elevations[i] != null ? `<ele>${elevations[i].toFixed(1)}</ele>` : ""}</trkpt>`
   ).join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="Running Trail Empire"
+<gpx version="1.1" creator="Pacevo"
      xmlns="http://www.topografix.com/GPX/1/1">
   <trk>
     <name>${name}</name>

@@ -396,7 +396,7 @@ function escapeXml(s: string): string {
 function buildGpx(name: string, coords: [number, number][]): string {
   const seg = coords.map(([lng, lat]) => `      <trkpt lat="${lat.toFixed(6)}" lon="${lng.toFixed(6)}"></trkpt>`).join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="Running &amp; Trail Empire" xmlns="http://www.topografix.com/GPX/1/1">
+<gpx version="1.1" creator="Pacevo" xmlns="http://www.topografix.com/GPX/1/1">
   <metadata><name>${escapeXml(name)}</name><desc>Tracé © les contributeurs OpenStreetMap (ODbL)</desc></metadata>
   <trk><name>${escapeXml(name)}</name><trkseg>
 ${seg}

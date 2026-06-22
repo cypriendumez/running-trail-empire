@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 // Aperçu social (lien partagé sur WhatsApp, X, LinkedIn, iMessage…). 1200×630.
-export const alt = "Running & Trail Empire — Coaching IA, analyse VFC, Trail Builder";
+export const alt = "Pacevo — Coaching IA, analyse VFC, Trail Builder";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -41,16 +41,16 @@ export default function OpengraphImage() {
               width: 84,
               height: 84,
               borderRadius: 22,
-              background: "#09090B",
+              background: "linear-gradient(135deg, #1c6e56 0%, #0a3a2d 100%)",
               border: "1px solid rgba(255,255,255,0.12)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <span style={{ color: "#fff", fontSize: 50, fontWeight: 800 }}>R</span>
+            <span style={{ color: "#fff", fontSize: 50, fontWeight: 800 }}>P</span>
           </div>
-          <span style={{ color: "#fff", fontSize: 30, fontWeight: 700 }}>Running &amp; Trail Empire</span>
+          <span style={{ color: "#fff", fontSize: 30, fontWeight: 700 }}>Pacevo</span>
         </div>
 
         {/* milieu : accroche */}
@@ -68,7 +68,7 @@ export default function OpengraphImage() {
 
         {/* bas : url + chips */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 26 }}>running-trail-empire</span>
+          <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 26 }}>pacevo</span>
           <div style={{ display: "flex", gap: 12 }}>
             {["Garmin", "Coros", "intervals.icu"].map(s => (
               <span

@@ -1,6 +1,6 @@
 {
-  "name": "Running & Trail Empire",
-  "short_name": "RTE",
+  "name": "Pacevo",
+  "short_name": "Pacevo",
   "description": "L'application hégémonique du running et du trail",
   "start_url": "/dashboard",
   "display": "standalone",

@@ -49,7 +49,7 @@ export async function POST(req: Request) {
         method: "POST",
         headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          from: process.env.RESEND_FROM || "Running & Trail Empire <onboarding@resend.dev>",
+          from: process.env.RESEND_FROM || "Pacevo <onboarding@resend.dev>",
           to: [COACH_EMAIL],
           reply_to: (prof?.email as string) || undefined,
           subject: `🎯 Objectif de ${name} : ${race} (${data.targetTime})`,

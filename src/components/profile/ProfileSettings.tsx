@@ -447,7 +447,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url; a.download = "mes-donnees-running-trail-empire.json"; a.click();
+      a.href = url; a.download = "mes-donnees-pacevo.json"; a.click();
       URL.revokeObjectURL(url);
       toast.success(tr("t.exportOk"));
     } catch { toast.error(tr("t.exportErr")); }

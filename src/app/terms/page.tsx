@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Conditions générales (CGU / CGV) | Running & Trail Empire",
-  description: "Conditions générales d'utilisation et de vente de Running & Trail Empire.",
+  title: "Conditions générales (CGU / CGV) | Pacevo",
+  description: "Conditions générales d'utilisation et de vente de Pacevo.",
 };
 
 // Page PUBLIQUE (CGU + conditions d'abonnement). ⚠️ Adapte les montants/durées à ton offre réelle.
@@ -17,7 +17,7 @@ export default function TermsPage() {
       <div className="mt-8 space-y-7 text-[15px] leading-relaxed">
         <Section title="1. Objet">
           <p>Les présentes conditions régissent l&apos;accès et l&apos;utilisation de l&apos;application
-            <b> Running &amp; Trail Empire</b> (« l&apos;Application »), éditée par Cyprien Dumez
+            <b> Pacevo</b> (« l&apos;Application »), éditée par Cyprien Dumez
             (voir <a href="/mentions-legales" className="font-semibold text-emerald-600">mentions légales</a>),
             ainsi que les abonnements payants éventuels. En créant un compte, tu acceptes ces conditions.</p>
         </Section>
@@ -36,7 +36,7 @@ export default function TermsPage() {
 
         <Section title="4. Avertissement santé (important)">
           <p>Les analyses, plans et conseils fournis par l&apos;Application sont <b>informatifs</b> et
-            <b> ne constituent pas un avis médical</b>. Running &amp; Trail Empire <b>n&apos;est pas un dispositif
+            <b> ne constituent pas un avis médical</b>. Pacevo <b>n&apos;est pas un dispositif
             médical</b>. Consulte un médecin avant de reprendre ou d&apos;intensifier une activité physique, et
             arrête-toi en cas de douleur ou de malaise. Tu pratiques sous ta seule responsabilité.</p>
         </Section>
@@ -60,7 +60,7 @@ export default function TermsPage() {
         <Section title="7. Comparateur de prix et liens d'affiliation">
           <p>Les prix des produits tiers sont fournis à titre indicatif (via des flux d&apos;affiliation ou des
             données publiques) et peuvent ne pas être à jour ; seul le prix affiché sur le site marchand au moment
-            de l&apos;achat fait foi. Running &amp; Trail Empire n&apos;est pas vendeur de ces produits et peut
+            de l&apos;achat fait foi. Pacevo n&apos;est pas vendeur de ces produits et peut
             percevoir une commission d&apos;affiliation, sans surcoût pour toi.</p>
         </Section>
 

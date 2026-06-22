@@ -1,7 +1,8 @@
 // Génère toutes les icônes (favicon, apple-touch, PWA) à partir d'un seul SVG vectoriel.
 //   node gen-icons.js
-// Le « R » est dessiné en chemins (aucune dépendance à une police installée).
-// Fond plein (pas de transparence) → compatible icônes maskable iOS/Android.
+// Logo Pacevo : « P » blanc dont la base se prolonge en flèche ascendante (allure + progression).
+// Dessiné en chemins (aucune police), fond émeraude plein → compatible maskable iOS/Android.
+// Reprend exactement le tracé de src/components/brand/Logo.tsx (espace 120) recentré sur 512.
 const fs = require("fs");
 const path = require("path");
 const sharp = require("sharp");
@@ -9,22 +10,25 @@ const sharp = require("sharp");
 const MASTER = `
 <svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0.3" y2="1">
-      <stop offset="0" stop-color="#1C1C24"/>
-      <stop offset="1" stop-color="#09090B"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1c6e56"/>
+      <stop offset="1" stop-color="#0a3a2d"/>
     </linearGradient>
-    <radialGradient id="glow" cx="0.26" cy="0.22" r="0.85">
-      <stop offset="0" stop-color="#34d399" stop-opacity="0.30"/>
-      <stop offset="0.55" stop-color="#34d399" stop-opacity="0"/>
+    <radialGradient id="glow" cx="0.26" cy="0.22" r="0.9">
+      <stop offset="0" stop-color="#34d399" stop-opacity="0.22"/>
+      <stop offset="0.6" stop-color="#34d399" stop-opacity="0"/>
     </radialGradient>
   </defs>
   <rect width="512" height="512" fill="url(#bg)"/>
   <rect width="512" height="512" fill="url(#glow)"/>
-  <!-- stem + bowl du R (blanc) -->
-  <line x1="196" y1="150" x2="196" y2="376" stroke="#ffffff" stroke-width="50" stroke-linecap="round"/>
-  <path d="M196 152 H268 A60 60 0 0 1 268 272 H196" fill="none" stroke="#ffffff" stroke-width="50" stroke-linecap="round" stroke-linejoin="round"/>
-  <!-- jambe du R (émeraude = mouvement) -->
-  <path d="M252 266 L340 376" fill="none" stroke="#34d399" stroke-width="50" stroke-linecap="round" stroke-linejoin="round"/>
+  <g transform="scale(4.2667) translate(-5.6,-8.7)">
+    <g transform="translate(8,12) scale(0.9)" fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="30" y="22" width="16" height="66" rx="8" fill="#ffffff" stroke="none"/>
+      <path d="M44 25 C78 25 78 60 44 60" stroke-width="16"/>
+      <path d="M18 104 L46 74 L60 88 L102 38" stroke-width="13"/>
+      <path d="M102 38 L82 41 M102 38 L99 60" stroke-width="13"/>
+    </g>
+  </g>
 </svg>`;
 
 const master = Buffer.from(MASTER);

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Mentions légales | Running & Trail Empire",
-  description: "Mentions légales de Running & Trail Empire (éditeur, hébergeur, contact).",
+  title: "Mentions légales | Pacevo",
+  description: "Mentions légales de Pacevo (éditeur, hébergeur, contact).",
 };
 
 // Page PUBLIQUE. ⚠️ Remplace les [À RENSEIGNER] par tes informations réelles avant publication
@@ -17,7 +17,7 @@ export default function MentionsLegalesPage() {
 
       <div className="mt-8 space-y-7 text-[15px] leading-relaxed">
         <Section title="1. Éditeur du site">
-          <p>Le site et l&apos;application <b>Running &amp; Trail Empire</b> sont édités par :</p>
+          <p>Le site et l&apos;application <b>Pacevo</b> sont édités par :</p>
           <Ul items={[
             "Cyprien Dumez",
             "Statut juridique : [À RENSEIGNER : particulier / micro-entrepreneur / société — et n° SIREN/SIRET si immatriculé]",
@@ -40,7 +40,7 @@ export default function MentionsLegalesPage() {
         </Section>
 
         <Section title="4. Propriété intellectuelle">
-          <p>Le nom, le logo, les textes, l&apos;interface et le code de Running &amp; Trail Empire sont protégés.
+          <p>Le nom, le logo, les textes, l&apos;interface et le code de Pacevo sont protégés.
             Toute reproduction non autorisée est interdite. Les marques, noms de produits et photos de produits
             tiers appartiennent à leurs propriétaires respectifs ; ils sont, le cas échéant, utilisés dans le
             cadre de programmes d&apos;affiliation officiels (citation nominative à des fins de comparaison).</p>

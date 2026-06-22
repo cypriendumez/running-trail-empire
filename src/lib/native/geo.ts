@@ -37,7 +37,7 @@ export async function startRunTracking(onPoint: (p: GeoPoint) => void, onError?:
     const id = await BG.addWatcher(
       {
         backgroundMessage: "Enregistrement de ta course en cours…",
-        backgroundTitle: "Running & Trail Empire",
+        backgroundTitle: "Pacevo",
         requestPermissions: true,
         stale: false,
         distanceFilter: 5,

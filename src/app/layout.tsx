@@ -6,8 +6,8 @@ import { ErrorReporter } from "@/components/ErrorReporter";
 
 export const metadata: Metadata = {
   title: {
-    default: "Running & Trail Empire",
-    template: "%s | Running & Trail Empire",
+    default: "Pacevo",
+    template: "%s | Pacevo",
   },
   description:
     "Le compagnon intelligent pour les coureurs et traileurs. Plans IA, analyse biomécanique, courses France, Trail Builder.",
@@ -15,8 +15,8 @@ export const metadata: Metadata = {
     "running", "trail", "course à pied", "entraînement", "plan d'entraînement",
     "VMA", "biomécanique", "GPX", "Garmin", "Coros", "UTMB",
   ],
-  authors: [{ name: "Running & Trail Empire" }],
-  creator: "Running & Trail Empire",
+  authors: [{ name: "Pacevo" }],
+  creator: "Pacevo",
   manifest: "/manifest.json",
   icons: {
     icon: "/icon.png",
@@ -26,13 +26,13 @@ export const metadata: Metadata = {
     type: "website",
     locale: "fr_FR",
     url: process.env.NEXT_PUBLIC_APP_URL,
-    title: "Running & Trail Empire",
+    title: "Pacevo",
     description: "L'application hégémonique du running et du trail.",
-    siteName: "Running & Trail Empire",
+    siteName: "Pacevo",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Running & Trail Empire",
+    title: "Pacevo",
     description: "L'application hégémonique du running et du trail.",
   },
 };

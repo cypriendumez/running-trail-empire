@@ -183,7 +183,7 @@ export function AdminDashboard({ users }: { users: User[] }) {
           </div>
           <div>
             <span className="font-bold text-zinc-900 text-sm">Admin Panel</span>
-            <span className="text-zinc-400 text-xs ml-2">Running & Trail Empire</span>
+            <span className="text-zinc-400 text-xs ml-2">Pacevo</span>
           </div>
           <a href="/admin/newsletter" className="ml-3 inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100">✉️ Newsletter</a>
         </div>

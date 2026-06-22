@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { vmaFrom6min } from "@/lib/running/fitness";
 import { ArrowRight, ArrowLeft, User, Activity, Target, CheckCircle2, Watch, Eye, EyeOff, ExternalLink, RefreshCw, AlertCircle, Wifi } from "lucide-react";
+import { Logo } from "@/components/brand/Logo";
 
 type Step = "watch" | "profile" | "physio" | "goals" | "done";
 
@@ -190,11 +191,9 @@ export default function OnboardingPage() {
         {/* Header */}
         <div className="text-center mb-10">
           <div className="flex items-center justify-center gap-2.5 mb-6">
-            <div className="w-10 h-10 bg-zinc-900 rounded-2xl flex items-center justify-center">
-              <span className="text-white font-bold">R</span>
-            </div>
+            <Logo size={40} />
           </div>
-          <h1 className="text-3xl font-bold text-zinc-900 mb-2">Bienvenue dans l&apos;Empire</h1>
+          <h1 className="text-3xl font-bold text-zinc-900 mb-2">Bienvenue sur Pacevo</h1>
           <p className="text-zinc-500">Calibrons votre profil pour des plans sur mesure</p>
         </div>
 
@@ -756,7 +755,7 @@ export default function OnboardingPage() {
                   <CheckCircle2 className="w-10 h-10 text-green-600" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-zinc-900">Votre Empire est prêt !</h2>
+                  <h2 className="text-2xl font-bold text-zinc-900">Votre espace est prêt !</h2>
                   <p className="text-zinc-500 mt-2">Tout est configuré. Commencez à vous entraîner.</p>
                 </div>
                 <button onClick={() => router.push("/dashboard")} className="btn-brand justify-center w-full py-3.5 text-base">

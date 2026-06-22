@@ -45,17 +45,17 @@ export async function POST(req: Request) {
 
   // 2) E-mails via Resend, en lots BCC de 45 (un seul envoi par lot, sans exposer les adresses).
   const RESEND_API_KEY = process.env.RESEND_API_KEY;
-  const FROM = process.env.RESEND_FROM || "Running & Trail Empire <noreply@running-trail-empire.com>";
+  const FROM = process.env.RESEND_FROM || "Pacevo <noreply@running-trail-empire.com>";
   let emailed = 0;
   if (RESEND_API_KEY && recipients.length) {
     const html = `<div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#18181b">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
-        <div style="width:36px;height:36px;background:#059669;border-radius:10px;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center">R</div>
-        <strong style="font-size:15px">Running &amp; Trail Empire</strong>
+        <div style="width:36px;height:36px;background:#059669;border-radius:10px;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center">P</div>
+        <strong style="font-size:15px">Pacevo</strong>
       </div>
       <h1 style="font-size:22px;margin:0 0 12px">${escapeHtml(t)}</h1>
       <div style="font-size:15px;line-height:1.7;color:#3f3f46;white-space:pre-wrap">${escapeHtml(b)}</div>
-      <p style="margin-top:28px;font-size:12px;color:#a1a1aa">Tu reçois cet e-mail car tu es abonné(e) à Running &amp; Trail Empire.</p>
+      <p style="margin-top:28px;font-size:12px;color:#a1a1aa">Tu reçois cet e-mail car tu es abonné(e) à Pacevo.</p>
     </div>`;
     const batches: string[][] = [];
     for (let i = 0; i < recipients.length; i += 45) batches.push(recipients.slice(i, i + 45));

@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { Logo } from "@/components/brand/Logo";
 
 const CATEGORIES = ["TOUT", "IA & PERFORMANCE", "ENTRAÎNEMENT", "NUTRITION", "SANTÉ DU COUREUR", "LES COURSES", "ÉQUIPEMENT"];
 
@@ -106,10 +107,8 @@ export default function BlogPage() {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-zinc-100">
         <div className="max-w-7xl mx-auto px-8 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-zinc-900 rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-sm">R</span>
-            </div>
-            <span className="font-semibold text-zinc-900 text-sm tracking-tight">Running & Trail Empire</span>
+            <Logo size={32} />
+            <span className="font-semibold text-zinc-900 text-sm tracking-tight">Pacevo</span>
           </Link>
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-500">
             <Link href="/#programmes" className="hover:text-zinc-900 transition-colors">Programmes</Link>
@@ -231,7 +230,7 @@ export default function BlogPage() {
               </h3>
               <p className="text-sm text-zinc-400 leading-relaxed line-clamp-2">{post.excerpt}</p>
               <div className="flex items-center gap-2 mt-4 text-xs text-zinc-400">
-                <span className="w-6 h-6 bg-zinc-900 rounded-full flex items-center justify-center text-white font-bold text-xs">R</span>
+                <Logo size={24} />
                 <span>{post.author}</span>
                 <span>·</span>
                 <span>{post.date}</span>
@@ -266,12 +265,10 @@ export default function BlogPage() {
       <footer className="bg-zinc-950 border-t border-white/5 text-white py-12 px-8">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-white rounded-xl flex items-center justify-center">
-              <span className="text-zinc-900 font-bold text-sm">R</span>
-            </div>
-            <span className="font-semibold text-white text-sm">Running & Trail Empire</span>
+            <Logo size={32} />
+            <span className="font-semibold text-white text-sm">Pacevo</span>
           </div>
-          <p className="text-sm text-white/30">© 2026 Running & Trail Empire.</p>
+          <p className="text-sm text-white/30">© 2026 Pacevo.</p>
           <div className="flex gap-6 text-sm text-white/30">
             <Link href="/" className="hover:text-white/60 transition-colors">Accueil</Link>
             <Link href="/privacy" className="hover:text-white/60 transition-colors">Confidentialité</Link>

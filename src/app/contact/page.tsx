@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Contact | Running & Trail Empire",
-  description: "Une question, un bug, une suggestion ? Contacte l'équipe de Running & Trail Empire.",
+  title: "Contact | Pacevo",
+  description: "Une question, un bug, une suggestion ? Contacte l'équipe de Pacevo.",
 };
 
 // Page PUBLIQUE (sans connexion). Coordonnées identiques aux mentions légales / RGPD.
@@ -25,7 +25,7 @@ export default function ContactPage() {
             <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">E-mail</p>
             <a href={`mailto:${EMAIL}`} className="mt-1 block font-semibold text-zinc-900 hover:text-emerald-600 break-all">{EMAIL}</a>
             <a
-              href={`mailto:${EMAIL}?subject=${encodeURIComponent("Contact — Running & Trail Empire")}`}
+              href={`mailto:${EMAIL}?subject=${encodeURIComponent("Contact — Pacevo")}`}
               className="mt-4 inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-zinc-700 transition-colors"
             >
               Écrire un e-mail →

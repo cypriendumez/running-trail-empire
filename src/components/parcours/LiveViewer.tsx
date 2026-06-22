@@ -90,7 +90,7 @@ export function LiveViewer({ id }: { id: string }) {
         )}
       </div>
       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000] text-[11px] text-zinc-500 bg-white/90 px-3 py-1 rounded-full">
-        Running &amp; Trail Empire · données © OpenStreetMap
+        Pacevo · données © OpenStreetMap
       </div>
     </div>
   );

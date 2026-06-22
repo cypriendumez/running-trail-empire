@@ -46,10 +46,10 @@ export async function POST(req: Request) {
       await fetch("https://api.resend.com/emails", {
         method: "POST", headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          from: process.env.RESEND_FROM || "Running & Trail Empire <onboarding@resend.dev>",
+          from: process.env.RESEND_FROM || "Pacevo <onboarding@resend.dev>",
           to: [COACH_EMAIL], reply_to: (prof?.email as string) || undefined,
           subject: `📩 ${name} t'a écrit${b.subject?.trim() ? ` : ${b.subject.trim()}` : ""}`,
-          html: `<div style="font-family:system-ui,-apple-system,sans-serif;max-width:540px;color:#18181b"><p style="font-size:15px"><b>${name}</b> t'a envoyé un message via Running &amp; Trail Empire :</p><blockquote style="border-left:3px solid #10b981;margin:14px 0;padding:8px 16px;color:#333;background:#f6fdf9;border-radius:0 8px 8px 0">${(b.body || "").replace(/</g, "&lt;") || "(pièce jointe)"}</blockquote>${attLine}<p style="margin-top:20px"><a href="${link}" style="background:#059669;color:#fff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:600;display:inline-block">Répondre à ${name} →</a></p><p style="color:#999;font-size:12px;margin-top:18px">Ce bouton ouvre directement la conversation dans ton espace coach.</p></div>`,
+          html: `<div style="font-family:system-ui,-apple-system,sans-serif;max-width:540px;color:#18181b"><p style="font-size:15px"><b>${name}</b> t'a envoyé un message via Pacevo :</p><blockquote style="border-left:3px solid #10b981;margin:14px 0;padding:8px 16px;color:#333;background:#f6fdf9;border-radius:0 8px 8px 0">${(b.body || "").replace(/</g, "&lt;") || "(pièce jointe)"}</blockquote>${attLine}<p style="margin-top:20px"><a href="${link}" style="background:#059669;color:#fff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:600;display:inline-block">Répondre à ${name} →</a></p><p style="color:#999;font-size:12px;margin-top:18px">Ce bouton ouvre directement la conversation dans ton espace coach.</p></div>`,
         }), signal: AbortSignal.timeout(10000),
       });
     } catch { /* best-effort */ }

@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { createClient } from "@/lib/supabase/server";
 import { LeaguesHub } from "@/components/gamification/LeaguesHub";
 
-export const metadata = { title: "Ligues & Gamification | Running & Trail Empire" };
+export const metadata = { title: "Ligues & Gamification | Pacevo" };
 
 export default async function LeaguesPage() {
   const supabase = await createClient();

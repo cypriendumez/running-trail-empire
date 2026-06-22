@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Check, Loader2, Zap, Crown, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { Logo } from "@/components/brand/Logo";
 
 export default function PricingPage() {
   const [billing, setBilling] = useState<"monthly" | "yearly">("monthly");
@@ -37,9 +38,7 @@ export default function PricingPage() {
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-12">
           <Link href="/" className="inline-flex items-center gap-2.5 mb-8">
-            <div className="w-9 h-9 bg-zinc-900 rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-sm">R</span>
-            </div>
+            <Logo size={36} />
           </Link>
           <h1 className="text-5xl font-bold text-zinc-900 mb-4">Tarification simple</h1>
           <p className="text-xl text-zinc-500">Sans engagement. Annulez quand vous voulez.</p>

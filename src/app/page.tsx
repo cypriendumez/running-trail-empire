@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { ArrowRight, ChevronRight, Star, Zap, Heart, Map, Trophy, Bot, Ghost, Moon, CloudRain, ShoppingBag, BookOpen, Shield, Activity } from "lucide-react";
 import { NewsletterSignup } from "@/components/NewsletterSignup";
+import { Logo } from "@/components/brand/Logo";
 
 const PROGRAMS = [
   { category: "10KM", title: "10 KILOMÈTRES", subtitle: "DE 6 SEMAINES À 4 MOIS", img: "https://images.unsplash.com/photo-1571008887538-b36bb32f4571?w=600&q=80&fit=crop" },
@@ -68,10 +69,8 @@ export default function LandingPage() {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-zinc-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 bg-zinc-900 rounded-xl flex items-center justify-center flex-shrink-0">
-              <span className="text-white font-bold text-sm">R</span>
-            </div>
-            <span className="hidden sm:inline font-semibold text-zinc-900 text-sm tracking-tight whitespace-nowrap">Running & Trail Empire</span>
+            <Logo size={32} className="flex-shrink-0" />
+            <span className="hidden sm:inline font-semibold text-zinc-900 text-sm tracking-tight whitespace-nowrap">Pacevo</span>
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-500">
             <a href="#programmes" className="hover:text-zinc-900 transition-colors">Programmes</a>
@@ -358,12 +357,10 @@ export default function LandingPage() {
         </div>
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-white rounded-xl flex items-center justify-center">
-              <span className="text-zinc-900 font-bold text-sm">R</span>
-            </div>
-            <span className="font-semibold text-white text-sm">Running & Trail Empire</span>
+            <Logo size={32} />
+            <span className="font-semibold text-white text-sm">Pacevo</span>
           </div>
-          <p className="text-sm text-white/30">© 2026 Running & Trail Empire. Fait avec ❤️ pour les coureurs.</p>
+          <p className="text-sm text-white/30">© 2026 Pacevo. Fait avec ❤️ pour les coureurs.</p>
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-white/30">
             <Link href="/mentions-legales" className="hover:text-white/60 transition-colors">Mentions légales</Link>
             <Link href="/confidentialite" className="hover:text-white/60 transition-colors">Confidentialité</Link>

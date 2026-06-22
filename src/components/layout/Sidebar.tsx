@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
 import { useState } from "react";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { Logo } from "@/components/brand/Logo";
 
 // Navigation groupée par univers — plus lisible et pro.
 const groups: { titleKey: string | null; items: { href: string; icon: typeof LayoutDashboard; tk: string }[] }[] = [
@@ -94,12 +95,10 @@ export function Sidebar({ profile, unreadMessages = 0 }: { profile: Record<strin
     )}>
       {/* Logo */}
       <div className="h-16 flex items-center px-4 border-b border-zinc-100">
-        <div className="w-9 h-9 bg-zinc-900 rounded-2xl flex items-center justify-center flex-shrink-0">
-          <span className="text-white font-bold text-sm">R</span>
-        </div>
+        <Logo size={36} className="flex-shrink-0" />
         {!collapsed && (
           <span className="ml-3 font-bold text-zinc-900 text-sm leading-tight tracking-tight">
-            Running &<br />Trail Empire
+            Pacevo
           </span>
         )}
       </div>

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Politique de confidentialité | Running & Trail Empire",
-  description: "Comment Running & Trail Empire collecte, utilise et protège tes données personnelles (RGPD).",
+  title: "Politique de confidentialité | Pacevo",
+  description: "Comment Pacevo collecte, utilise et protège tes données personnelles (RGPD).",
 };
 
 // Page PUBLIQUE (sans connexion) — URL à fournir à Apple App Store / Google Play.
@@ -18,7 +18,7 @@ export default function ConfidentialitePage() {
       <div className="mt-8 space-y-7 text-[15px] leading-relaxed">
         <section>
           <p>
-            La présente politique explique quelles données personnelles <b>Running &amp; Trail Empire</b>
+            La présente politique explique quelles données personnelles <b>Pacevo</b>
             {" "}(« l&apos;Application ») collecte, pourquoi, et quels sont tes droits. Elle est conforme au
             Règlement Général sur la Protection des Données (RGPD).
           </p>

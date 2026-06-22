@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { AuthShell } from "@/components/auth/AuthShell";
+import { Logo } from "@/components/brand/Logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -50,10 +51,8 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="text-center mb-10">
           <Link href="/" className="inline-flex items-center gap-2.5 mb-6">
-            <div className="w-10 h-10 bg-zinc-900 rounded-2xl flex items-center justify-center">
-              <span className="text-white font-bold">R</span>
-            </div>
-            <span className="font-bold text-zinc-900">Running & Trail Empire</span>
+            <Logo size={40} />
+            <span className="font-bold text-zinc-900">Pacevo</span>
           </Link>
           <h1 className="text-2xl font-bold text-zinc-900">Bon retour !</h1>
           <p className="text-zinc-500 text-sm mt-1">Connectez-vous pour reprendre votre entraînement</p>

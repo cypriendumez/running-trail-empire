@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
 import { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Admin — Running & Trail Empire" };
+export const metadata: Metadata = { title: "Admin — Pacevo" };
 
 export default async function AdminPage() {
   const supabase = createAdminClient();
