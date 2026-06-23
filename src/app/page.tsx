@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, ChevronRight, Star, Zap, Heart, Map, Trophy, Bot, Ghost, Moon, CloudRain, ShoppingBag, BookOpen, Shield, Activity } from "lucide-react";
 import { NewsletterSignup } from "@/components/NewsletterSignup";
 import { Logo } from "@/components/brand/Logo";
@@ -57,6 +57,17 @@ const STATS = [
 
 export default function LandingPage() {
   const [activeCategory, setActiveCategory] = useState("TOUT VOIR");
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 24);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Nav adaptative : transparente au-dessus du hero, barre blanche au scroll
+  const navLinkCls = scrolled ? "hover:text-zinc-900 transition-colors" : "hover:text-white transition-colors";
 
   const filtered = activeCategory === "TOUT VOIR"
     ? PROGRAMS
@@ -66,25 +77,25 @@ export default function LandingPage() {
     <div className="bg-white min-h-screen font-sans">
 
       {/* ── NAV ── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-zinc-100">
+      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "bg-white/90 backdrop-blur-xl shadow-[0_1px_0_rgba(0,0,0,0.06),0_8px_24px_-16px_rgba(0,0,0,0.25)]" : "bg-transparent"}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <Logo size={32} className="flex-shrink-0" />
-            <span className="hidden sm:inline font-semibold text-zinc-900 text-sm tracking-tight whitespace-nowrap">Pacevo</span>
+            <span className={`hidden sm:inline text-[1.4rem] font-black uppercase tracking-[-0.02em] leading-none whitespace-nowrap transition-colors ${scrolled ? "text-zinc-900" : "text-white drop-shadow-sm"}`}>Pacevo</span>
           </div>
-          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-500">
-            <a href="#programmes" className="hover:text-zinc-900 transition-colors">Programmes</a>
-            <a href="#coaching" className="hover:text-zinc-900 transition-colors">Coaching IA</a>
-            <a href="#features" className="hover:text-zinc-900 transition-colors">Fonctionnalités</a>
-            <a href="#tarifs" className="hover:text-zinc-900 transition-colors">Tarifs</a>
-            <Link href="/blog" className="hover:text-zinc-900 transition-colors">Blog</Link>
-            <Link href="/avis" className="hover:text-zinc-900 transition-colors">Avis</Link>
+          <div className={`hidden md:flex items-center gap-8 text-sm font-medium transition-colors ${scrolled ? "text-zinc-500" : "text-white/75"}`}>
+            <a href="#programmes" className={navLinkCls}>Programmes</a>
+            <a href="#coaching" className={navLinkCls}>Coaching IA</a>
+            <a href="#features" className={navLinkCls}>Fonctionnalités</a>
+            <a href="#tarifs" className={navLinkCls}>Tarifs</a>
+            <Link href="/blog" className={navLinkCls}>Blog</Link>
+            <Link href="/avis" className={navLinkCls}>Avis</Link>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-            <Link href="/login" className="hidden sm:inline-flex text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors px-4 py-2">
+            <Link href="/login" className={`hidden sm:inline-flex text-sm font-medium px-4 py-2 transition-colors ${scrolled ? "text-zinc-600 hover:text-zinc-900" : "text-white/90 hover:text-white"}`}>
               Connexion
             </Link>
-            <Link href="/signup" className="inline-flex items-center gap-1.5 bg-zinc-900 text-white text-sm font-semibold px-4 sm:px-5 py-2.5 rounded-xl hover:bg-zinc-700 transition-colors whitespace-nowrap">
+            <Link href="/signup" className={`inline-flex items-center gap-1.5 text-sm font-semibold px-4 sm:px-5 py-2.5 rounded-xl transition-colors whitespace-nowrap ${scrolled ? "bg-zinc-900 text-white hover:bg-zinc-700" : "bg-white text-zinc-900 hover:bg-white/90"}`}>
               Essai gratuit <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -98,7 +109,9 @@ export default function LandingPage() {
           alt="Runner"
           className="absolute inset-0 w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/20" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
+        {/* voile haut : lisibilité de la nav transparente */}
+        <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/45 to-transparent" />
 
         <div className="relative z-10 w-full max-w-7xl mx-auto px-8 pb-24">
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-white/50 mb-5">
@@ -358,7 +371,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2.5">
             <Logo size={32} />
-            <span className="font-semibold text-white text-sm">Pacevo</span>
+            <span className="text-lg font-black uppercase tracking-[-0.02em] text-white">Pacevo</span>
           </div>
           <p className="text-sm text-white/30">© 2026 Pacevo. Fait avec ❤️ pour les coureurs.</p>
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-white/30">

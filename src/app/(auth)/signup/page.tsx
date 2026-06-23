@@ -39,11 +39,27 @@ export default function SignupPage() {
     const { error } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
-      options: { data: { full_name: form.fullName } },
+      options: {
+        data: { full_name: form.fullName },
+        emailRedirectTo: `${window.location.origin}/auth/confirm?next=/onboarding`,
+      },
     });
     setLoading(false);
     if (error) { toast.error(error.message); return; }
     setStep("verify");
+  }
+
+  async function resendConfirmation() {
+    setLoading(true);
+    const supabase = createClient();
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: form.email,
+      options: { emailRedirectTo: `${window.location.origin}/auth/confirm?next=/onboarding` },
+    });
+    setLoading(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Email de confirmation renvoyé.");
   }
 
   if (step === "verify") {
@@ -56,11 +72,21 @@ export default function SignupPage() {
           <h1 className="text-2xl font-bold text-zinc-900 mb-3">Vérifiez votre email</h1>
           <p className="text-zinc-500 mb-8">
             Nous avons envoyé un lien de confirmation à{" "}
-            <strong className="text-zinc-900">{form.email}</strong>
+            <strong className="text-zinc-900">{form.email}</strong>.
+            Clique dessus pour activer ton compte.
           </p>
-          <Link href="/login" className="btn-brand justify-center inline-flex">
+          <Link href="/login" className="btn-brand justify-center inline-flex w-full">
             Aller à la connexion
           </Link>
+          <button
+            type="button"
+            onClick={resendConfirmation}
+            disabled={loading}
+            className="mt-4 text-sm text-zinc-500 hover:text-zinc-800 disabled:opacity-60 inline-flex items-center gap-2"
+          >
+            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+            Je n&apos;ai rien reçu — renvoyer l&apos;email
+          </button>
         </div>
       </AuthShell>
     );
@@ -73,7 +99,7 @@ export default function SignupPage() {
         <div className="text-center mb-10">
           <Link href="/" className="inline-flex items-center gap-2.5 mb-6">
             <Logo size={40} />
-            <span className="font-bold text-zinc-900">Pacevo</span>
+            <span className="text-xl font-black uppercase tracking-[-0.02em] text-zinc-900">Pacevo</span>
           </Link>
           <h1 className="text-2xl font-bold text-zinc-900">Créer un compte</h1>
           <p className="text-zinc-500 text-sm mt-1">30 jours gratuits · Pas de carte bancaire</p>
