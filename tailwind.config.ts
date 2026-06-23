@@ -33,8 +33,8 @@ const config: Config = {
       },
       fontFamily: {
         sans: ["var(--font-inter)", "system-ui", "sans-serif"],
-        display: ["var(--font-clash)", "system-ui", "sans-serif"],
-        sport: ["var(--font-barlow)", "Impact", "system-ui", "sans-serif"],
+        display: ["var(--font-anton)", "Impact", "sans-serif"],
+        sport: ["var(--font-anton)", "Impact", "sans-serif"],
         mono: ["var(--font-jetbrains)", "monospace"],
       },
       animation: {

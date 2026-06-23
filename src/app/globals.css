@@ -6,8 +6,7 @@
 
 @layer base {
   :root {
-    --font-inter: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    --font-barlow: "Arial Narrow", "Oswald", "Impact", system-ui, sans-serif;
+    /* --font-inter & --font-anton sont injectées par next/font (voir layout.tsx) */
     --radius: 0.75rem;
 
     /* Organic state colors */

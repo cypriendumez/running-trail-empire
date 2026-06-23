@@ -2,163 +2,197 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowRight, ChevronRight, Star, Zap, Heart, Map, Trophy, Bot, Ghost, Moon, CloudRain, ShoppingBag, BookOpen, Shield, Activity } from "lucide-react";
+import {
+  ArrowRight, ChevronRight, Play, Check, Star,
+  Bot, Heart, Map, Trophy, Ghost, Moon, CloudRain, ShoppingBag, BookOpen, Shield, Activity, Zap,
+} from "lucide-react";
 import { NewsletterSignup } from "@/components/NewsletterSignup";
 import { Logo } from "@/components/brand/Logo";
+import { Wordmark } from "@/components/brand/Wordmark";
+import { Container, Section, SectionHeading } from "@/components/ui/Container";
+import { Card } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { btnClass } from "@/components/ui/Button";
 
 const PROGRAMS = [
-  { category: "10KM", title: "10 KILOMÈTRES", subtitle: "DE 6 SEMAINES À 4 MOIS", img: "https://images.unsplash.com/photo-1571008887538-b36bb32f4571?w=600&q=80&fit=crop" },
-  { category: "SEMI", title: "SEMI-MARATHON", subtitle: "DE 8 SEMAINES À 12 MOIS", img: "", gradient: "linear-gradient(135deg,#1a1a2e 0%,#16213e 40%,#0f3460 70%,#e94560 100%)", label: "21.1 KM" },
-  { category: "MARATHON", title: "MARATHON", subtitle: "DE 8 SEMAINES À 12 MOIS", img: "", gradient: "linear-gradient(135deg,#0d0d0d 0%,#1a1a1a 30%,#2d4a1e 60%,#f4a11d 100%)", label: "42.2 KM" },
-  { category: "TRAIL", title: "TRAIL RUNNING", subtitle: "DE 6 SEMAINES À 12 MOIS", img: "https://images.unsplash.com/photo-1504025468847-0e438279542c?w=600&q=80&fit=crop" },
-  { category: "DÉBUTANT", title: "DÉBUTER EN COURSE", subtitle: "DE 4 SEMAINES À 3 MOIS", img: "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=600&q=80&fit=crop" },
-  { category: "VITESSE", title: "AMÉLIORER SA VITESSE", subtitle: "DE 4 À 12 SEMAINES", img: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=600&q=80&fit=crop" },
-  { category: "ENDURANCE", title: "ENDURANCE DE BASE", subtitle: "DE 6 SEMAINES À 6 MOIS", img: "https://images.unsplash.com/photo-1483721310020-03333e577078?w=600&q=80&fit=crop" },
-  { category: "BLESSURE", title: "REPRENDRE APRÈS BLESSURE", subtitle: "DE 4 À 16 SEMAINES", img: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=600&q=80&fit=crop" },
+  { category: "10KM", title: "10 KILOMÈTRES", subtitle: "De 6 semaines à 4 mois", img: "https://images.unsplash.com/photo-1571008887538-b36bb32f4571?w=600&q=80&fit=crop" },
+  { category: "SEMI", title: "SEMI-MARATHON", subtitle: "De 8 semaines à 12 mois", img: "", gradient: "linear-gradient(135deg,#0f172a,#1e293b 60%,#059669)", label: "21.1" },
+  { category: "MARATHON", title: "MARATHON", subtitle: "De 8 semaines à 12 mois", img: "", gradient: "linear-gradient(135deg,#0a0a0a,#1c1917 55%,#047857)", label: "42.2" },
+  { category: "TRAIL", title: "TRAIL RUNNING", subtitle: "De 6 semaines à 12 mois", img: "https://images.unsplash.com/photo-1504025468847-0e438279542c?w=600&q=80&fit=crop" },
+  { category: "DÉBUTANT", title: "DÉBUTER EN COURSE", subtitle: "De 4 semaines à 3 mois", img: "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=600&q=80&fit=crop" },
+  { category: "VITESSE", title: "AMÉLIORER SA VITESSE", subtitle: "De 4 à 12 semaines", img: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=600&q=80&fit=crop" },
+  { category: "ENDURANCE", title: "ENDURANCE DE BASE", subtitle: "De 6 semaines à 6 mois", img: "https://images.unsplash.com/photo-1483721310020-03333e577078?w=600&q=80&fit=crop" },
+  { category: "BLESSURE", title: "REPRENDRE APRÈS BLESSURE", subtitle: "De 4 à 16 semaines", img: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=600&q=80&fit=crop" },
 ];
-
-const CATEGORY_COLORS: Record<string, string> = {
-  "TOUT VOIR": "bg-zinc-900 text-white",
-  "10KM":      "bg-blue-500 text-white",
-  "SEMI":      "bg-violet-500 text-white",
-  "MARATHON":  "bg-orange-500 text-white",
-  "TRAIL":     "bg-green-600 text-white",
-  "DÉBUTANT":  "bg-lime-500 text-white",
-  "VITESSE":   "bg-red-500 text-white",
-  "ENDURANCE": "bg-sky-500 text-white",
-  "BLESSURE":  "bg-rose-500 text-white",
-};
-
-const CATEGORY_INACTIVE = "bg-zinc-100 text-zinc-500 hover:bg-zinc-200";
 
 const CATEGORIES = ["TOUT VOIR", "10KM", "SEMI", "MARATHON", "TRAIL", "DÉBUTANT", "VITESSE", "ENDURANCE", "BLESSURE"];
 
 const FEATURES = [
-  { icon: Bot,       title: "Coaching IA Gemini",   desc: "Plan ajusté chaque semaine selon ta VFC, ton sommeil et ta charge réelle.", badge: "Essentiel", img: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=400&q=80&fit=crop" },
-  { icon: Heart,     title: "Analyse VFC & HRV",    desc: "HRV quotidien, Body Battery, score de récupération. Sync Garmin & Coros.", badge: "Santé",     img: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&q=80&fit=crop" },
-  { icon: Ghost,     title: "Ghost Runner Vocal",   desc: "Coach audio en temps réel : allure cible, écart au plan, chrono live km/km.", badge: "Exclusif",  img: "https://images.unsplash.com/photo-1571008887538-b36bb32f4571?w=400&q=80&fit=crop" },
-  { icon: Map,       title: "Trail Builder SIG",    desc: "Carte IGN, tracé snap-to-path, dénivelé auto, export GPX Garmin/Coros.", badge: "Trail",     img: "https://images.unsplash.com/photo-1504025468847-0e438279542c?w=400&q=80&fit=crop" },
-  { icon: Zap,       title: "Affûtage Banister",    desc: "CTL/ATL/TSB en temps réel. TSB +15 le jour de course automatiquement.", badge: "Élite",     img: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=400&q=80&fit=crop" },
-  { icon: Moon,      title: "Suivi du Sommeil",     desc: "Deep/REM/Light, Body Battery réveil. L'IA décide si tu peux t'entraîner.", badge: "Récup",     img: "https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?w=400&q=80&fit=crop" },
-  { icon: Activity,  title: "Sync Garmin & Coros",  desc: "Activités, puissance, zones cardio et wellness synchronisés en temps réel.", badge: "Connecté",  img: "https://images.unsplash.com/photo-1510771463146-e89e6e86560e?w=400&q=80&fit=crop" },
-  { icon: CloudRain, title: "Météo & Performance",  desc: "Impact chaleur, humidité et vent. Objectifs de séance ajustés en direct.", badge: "Intelligent",img: "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=400&q=80&fit=crop" },
-  { icon: BookOpen,  title: "Smart Journal Vocal",  desc: "Parle de ta séance, l'IA détecte ta fatigue mentale et adapte ton plan.", badge: "Mental",    img: "https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=400&q=80&fit=crop" },
-  { icon: Trophy,    title: "Ligues & Badges",      desc: "Compétition hebdo, classement Bronze→Élite, score discipline et récompenses.", badge: "Social",    img: "https://images.unsplash.com/photo-1567427017947-545c5f8d16ad?w=400&q=80&fit=crop" },
-  { icon: ShoppingBag,title:"Shopping Hub",         desc: "Comparateur i-Run, Alltricks, Lepape. Chaussure idéale selon ta foulée.", badge: "Équipement",img: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&q=80&fit=crop" },
-  { icon: Shield,    title: "Guardian Mode",        desc: "Détection de chute. Alerte contacts d'urgence avec GPS en temps réel.", badge: "Sécurité",  img: "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=400&q=80&fit=crop" },
+  { icon: Bot, title: "Coaching IA", desc: "Un plan recalculé chaque semaine selon ta VFC, ton sommeil et ta charge réelle.", badge: "Essentiel" },
+  { icon: Heart, title: "Analyse VFC & HRV", desc: "HRV quotidien, Body Battery, score de récupération. Sync Garmin & Coros.", badge: "Santé" },
+  { icon: Ghost, title: "Ghost Runner vocal", desc: "Coach audio en temps réel : allure cible, écart au plan, chrono live km/km.", badge: "Exclusif" },
+  { icon: Map, title: "Trail Builder SIG", desc: "Carte IGN, tracé snap-to-path, dénivelé auto, export GPX Garmin/Coros.", badge: "Trail" },
+  { icon: Zap, title: "Affûtage Banister", desc: "CTL/ATL/TSB en temps réel. TSB optimal le jour de course, automatiquement.", badge: "Élite" },
+  { icon: Moon, title: "Suivi du sommeil", desc: "Deep / REM / Light, Body Battery au réveil. L'IA décide si tu peux pousser.", badge: "Récup" },
+  { icon: Activity, title: "Sync Garmin & Coros", desc: "Activités, puissance, zones cardio et wellness synchronisés en continu.", badge: "Connecté" },
+  { icon: CloudRain, title: "Météo & performance", desc: "Impact chaleur, humidité et vent. Objectifs de séance ajustés en direct.", badge: "Intelligent" },
+  { icon: BookOpen, title: "Smart Journal vocal", desc: "Raconte ta séance, l'IA détecte ta fatigue mentale et adapte ton plan.", badge: "Mental" },
+  { icon: Trophy, title: "Ligues & badges", desc: "Compétition hebdo, classement Bronze → Élite, score de discipline.", badge: "Social" },
+  { icon: ShoppingBag, title: "Shopping Hub", desc: "Comparateur i-Run, Alltricks, Lepape. La chaussure idéale pour ta foulée.", badge: "Équipement" },
+  { icon: Shield, title: "Guardian Mode", desc: "Détection de chute, alerte des contacts d'urgence avec ta position GPS.", badge: "Sécurité" },
 ];
 
 const STATS = [
-  { value: "10K+", label: "Coureurs actifs" },
-  { value: "98%", label: "Satisfaction" },
+  { value: "10k+", label: "Coureurs actifs" },
   { value: "4.9★", label: "Note moyenne" },
-  { value: "50+", label: "Courses référencées" },
+  { value: "98%", label: "Satisfaction" },
+  { value: "17k+", label: "Courses référencées" },
 ];
+
+const SYNC = ["Garmin", "Coros", "Strava", "Suunto", "Polar"];
 
 export default function LandingPage() {
   const [activeCategory, setActiveCategory] = useState("TOUT VOIR");
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 24);
+    const onScroll = () => setScrolled(window.scrollY > 8);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Nav adaptative : transparente au-dessus du hero, barre blanche au scroll
-  const navLinkCls = scrolled ? "hover:text-zinc-900 transition-colors" : "hover:text-white transition-colors";
-
-  const filtered = activeCategory === "TOUT VOIR"
-    ? PROGRAMS
-    : PROGRAMS.filter(p => p.category === activeCategory);
+  const filtered = activeCategory === "TOUT VOIR" ? PROGRAMS : PROGRAMS.filter((p) => p.category === activeCategory);
 
   return (
-    <div className="bg-white min-h-screen font-sans">
+    <div className="min-h-screen bg-white font-sans text-zinc-900 antialiased">
 
       {/* ── NAV ── */}
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "bg-white/90 backdrop-blur-xl shadow-[0_1px_0_rgba(0,0,0,0.06),0_8px_24px_-16px_rgba(0,0,0,0.25)]" : "bg-transparent"}`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 flex items-center justify-between gap-3">
-          <Link href="/" className="flex items-center gap-2.5 min-w-0">
-            <Logo size={32} className="flex-shrink-0" />
-            <span className={`hidden sm:inline text-[1.4rem] font-black uppercase tracking-[-0.02em] leading-none whitespace-nowrap transition-colors ${scrolled ? "text-zinc-900" : "text-white drop-shadow-sm"}`}>Pacevo</span>
+      <nav className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${scrolled ? "bg-white/80 backdrop-blur-xl border-b border-zinc-200/70" : "bg-transparent"}`}>
+        <Container className="flex h-16 items-center justify-between gap-3">
+          <Link href="/" className="flex items-center gap-2.5">
+            <Logo size={30} />
+            <Wordmark className="text-xl" />
           </Link>
-          <div className={`hidden md:flex items-center gap-8 text-sm font-medium transition-colors ${scrolled ? "text-zinc-500" : "text-white/75"}`}>
-            <a href="#programmes" className={navLinkCls}>Programmes</a>
-            <a href="#coaching" className={navLinkCls}>Coaching IA</a>
-            <a href="#features" className={navLinkCls}>Fonctionnalités</a>
-            <a href="#tarifs" className={navLinkCls}>Tarifs</a>
-            <Link href="/blog" className={navLinkCls}>Blog</Link>
-            <Link href="/avis" className={navLinkCls}>Avis</Link>
+          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-500">
+            <a href="#programmes" className="hover:text-zinc-900 transition-colors">Programmes</a>
+            <a href="#features" className="hover:text-zinc-900 transition-colors">Fonctionnalités</a>
+            <a href="#tarifs" className="hover:text-zinc-900 transition-colors">Tarifs</a>
+            <Link href="/blog" className="hover:text-zinc-900 transition-colors">Blog</Link>
+            <Link href="/avis" className="hover:text-zinc-900 transition-colors">Avis</Link>
           </div>
-          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-            <Link href="/login" className={`hidden sm:inline-flex text-sm font-medium px-4 py-2 transition-colors ${scrolled ? "text-zinc-600 hover:text-zinc-900" : "text-white/90 hover:text-white"}`}>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link href="/login" className="hidden sm:inline-flex px-3 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors">
               Connexion
             </Link>
-            <Link href="/signup" className={`inline-flex items-center gap-1.5 text-sm font-semibold px-4 sm:px-5 py-2.5 rounded-xl transition-colors whitespace-nowrap ${scrolled ? "bg-zinc-900 text-white hover:bg-zinc-700" : "bg-white text-zinc-900 hover:bg-white/90"}`}>
-              Essai gratuit <ArrowRight className="w-3.5 h-3.5" />
+            <Link href="/signup" className={btnClass("primary", "sm")}>
+              Essai gratuit <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
-        </div>
+        </Container>
       </nav>
 
       {/* ── HERO ── */}
-      <section className="relative min-h-screen flex items-end overflow-hidden">
-        <img
-          src="https://images.unsplash.com/photo-1502904550040-7534597429ae?w=1800&q=90&fit=crop&crop=center"
-          alt="Runner"
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
-        {/* voile haut : lisibilité de la nav transparente */}
-        <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/45 to-transparent" />
+      <Container className="pt-32 pb-12 sm:pt-36 lg:pt-40">
+        <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
+          <div>
+            <Badge tone="brand" dot>Nouveau · Ghost Runner vocal</Badge>
+            <h1 className="mt-5 text-4xl sm:text-5xl lg:text-[3.4rem] font-bold leading-[1.04] tracking-tight">
+              Cours plus loin,<br />récupère <span className="text-[#059669]">plus vite</span>.
+            </h1>
+            <p className="mt-5 max-w-md text-lg leading-relaxed text-zinc-500">
+              Un plan d&apos;entraînement qui s&apos;ajuste chaque jour à ta VFC, ton sommeil et ta charge réelle. Le coach intelligent du coureur exigeant.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Link href="/signup" className={btnClass("primary", "lg")}>
+                Commencer gratuitement <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link href="/login" className={btnClass("secondary", "lg")}>
+                <Play className="h-4 w-4" /> Voir la démo
+              </Link>
+            </div>
+            <div className="mt-10 flex flex-wrap items-center gap-x-5 gap-y-2">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-400">Synchro</span>
+              {SYNC.map((s) => (
+                <span key={s} className="text-xs font-bold uppercase tracking-wide text-zinc-300">{s}</span>
+              ))}
+            </div>
+          </div>
 
-        <div className="relative z-10 w-full max-w-7xl mx-auto px-8 pb-24">
-          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-white/50 mb-5">
-            L&apos;app running la plus avancée · 2026
-          </p>
-          <h1 className="font-sport text-[clamp(5rem,14vw,13rem)] font-black uppercase leading-[0.85] tracking-tight text-white mb-8">
-            COUREZ<br />PLUS LOIN.
-          </h1>
-          <p className="text-lg text-white/60 max-w-lg mb-10 leading-relaxed">
-            Coaching IA, analyse VFC, Ghost Runner, Trail Builder SIG.
-            Tout ce dont un coureur sérieux a besoin.
-          </p>
-          <div className="flex items-center gap-4 flex-wrap">
-            <Link href="/signup" className="inline-flex items-center gap-2 bg-white text-zinc-900 font-bold text-base px-8 py-4 rounded-2xl hover:bg-zinc-100 transition-all">
-              Créer un compte <ArrowRight className="w-4 h-4" />
-            </Link>
-            <Link href="/login" className="inline-flex items-center gap-2 border border-white/30 text-white font-semibold text-base px-8 py-4 rounded-2xl hover:bg-white/10 transition-all">
-              Se connecter
-            </Link>
+          {/* Aperçu produit */}
+          <div className="relative">
+            <div className="pointer-events-none absolute -inset-6 -z-10 rounded-[2rem] bg-[radial-gradient(120%_120%_at_70%_0%,rgba(16,185,129,.10),transparent_60%)]" />
+            <Card hover className="p-5 shadow-[0_30px_60px_-30px_rgba(16,24,40,.25)]">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-zinc-900">Cette semaine</span>
+                <Badge tone="brand">+12% de charge</Badge>
+              </div>
+              <svg viewBox="0 0 320 90" className="mt-4 h-24 w-full" preserveAspectRatio="none">
+                <path d="M0,72 L45,60 L90,66 L135,42 L180,48 L225,26 L270,32 L320,12" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M0,72 L45,60 L90,66 L135,42 L180,48 L225,26 L270,32 L320,12 L320,90 L0,90 Z" fill="#0596691a" />
+              </svg>
+              <div className="mt-4 grid grid-cols-3 gap-2.5">
+                {[
+                  { l: "Volume 7j", v: "52", u: "km" },
+                  { l: "VO2max", v: "58.4", u: "" },
+                  { l: "VFC", v: "72", u: "ms" },
+                ].map((m) => (
+                  <div key={m.l} className="rounded-xl bg-zinc-50 px-3 py-2.5">
+                    <div className="text-[10px] font-medium uppercase tracking-wider text-zinc-400">{m.l}</div>
+                    <div className="mt-0.5 text-xl font-bold tabular-nums">
+                      {m.v}{m.u && <span className="text-xs font-medium text-zinc-400"> {m.u}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 flex items-center justify-between rounded-xl border border-zinc-100 px-3.5 py-3">
+                <div>
+                  <div className="text-[10px] font-medium uppercase tracking-wider text-zinc-400">Aujourd&apos;hui</div>
+                  <div className="text-sm font-semibold">Seuil · 3 × 2 km @ 3:55</div>
+                </div>
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900 text-white">
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </span>
+              </div>
+            </Card>
           </div>
         </div>
-      </section>
+      </Container>
 
-      {/* ── DIVIDER ── */}
-      <div className="h-3 bg-zinc-900" />
+      {/* ── STATS ── */}
+      <Container>
+        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-200 sm:grid-cols-4">
+          {STATS.map((s) => (
+            <div key={s.label} className="bg-white px-6 py-7 text-center">
+              <div className="text-3xl font-bold tracking-tight">{s.value}</div>
+              <div className="mt-1 text-sm text-zinc-500">{s.label}</div>
+            </div>
+          ))}
+        </div>
+      </Container>
 
       {/* ── PROGRAMMES ── */}
-      <section id="programmes" className="py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-8">
-          <div className="flex items-end justify-between mb-12">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400 mb-3">Entraînement</p>
-              <h2 className="font-sport text-4xl sm:text-5xl lg:text-6xl font-black uppercase text-zinc-900 leading-tight">NOS PROGRAMMES</h2>
-            </div>
-            <Link href="/signup" className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-900 hover:text-zinc-600 transition-colors">
-              Voir tout <ChevronRight className="w-4 h-4" />
+      <Section id="programmes">
+        <Container>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <SectionHeading
+              align="left"
+              eyebrow="Entraînement"
+              title="Des programmes pour chaque objectif"
+              subtitle="Du premier 5 km à l'ultra-trail — chaque plan s'adapte ensuite à tes données réelles."
+            />
+            <Link href="/signup" className="inline-flex items-center gap-1.5 text-sm font-semibold text-zinc-900 hover:text-[#059669] transition-colors">
+              Voir tout <ChevronRight className="h-4 w-4" />
             </Link>
           </div>
 
-          {/* Category filters */}
-          <div className="flex items-center gap-2 flex-wrap mb-10">
-            {CATEGORIES.map(cat => (
+          <div className="mt-10 flex flex-wrap gap-2">
+            {CATEGORIES.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
-                className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
-                  activeCategory === cat ? CATEGORY_COLORS[cat] : CATEGORY_INACTIVE
+                className={`rounded-full px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
+                  activeCategory === cat ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
                 }`}
               >
                 {cat}
@@ -166,221 +200,190 @@ export default function LandingPage() {
             ))}
           </div>
 
-          {/* Program cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filtered.map(p => (
-              <Link href="/signup" key={p.title} className="group relative rounded-3xl overflow-hidden aspect-[3/4] block">
+          <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((p) => (
+              <Link href="/signup" key={p.title} className="group relative block aspect-[3/4] overflow-hidden rounded-2xl">
                 {p.img ? (
-                  <img src={p.img} alt={p.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                  <img src={p.img} alt={p.title} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
                 ) : (
-                  <div className="w-full h-full transition-transform duration-700 group-hover:scale-105" style={{ background: (p as {gradient?:string}).gradient }} />
+                  <div className="h-full w-full transition-transform duration-700 group-hover:scale-105" style={{ background: (p as { gradient?: string }).gradient }} />
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-                {(p as {label?:string}).label && (
-                  <div className="absolute top-5 left-5">
-                    <span className="font-sport text-5xl font-black text-white/20 leading-none">{(p as {label?:string}).label}</span>
-                  </div>
+                {(p as { label?: string }).label && (
+                  <span className="absolute left-5 top-5 font-sport text-5xl leading-none text-white/25">{(p as { label?: string }).label}</span>
                 )}
-                <div className="absolute bottom-0 left-0 right-0 p-6">
-                  <h3 className="font-sport text-3xl font-black uppercase text-white leading-tight">{p.title}</h3>
-                  <p className="text-white/60 text-sm mt-1 uppercase tracking-wider font-medium">{p.subtitle}</p>
+                <div className="absolute inset-x-0 bottom-0 p-6">
+                  <h3 className="text-2xl font-bold uppercase leading-tight text-white">{p.title}</h3>
+                  <p className="mt-1 text-xs font-medium uppercase tracking-wider text-white/60">{p.subtitle}</p>
                 </div>
-                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="bg-white rounded-full p-2">
-                    <ArrowRight className="w-4 h-4 text-zinc-900" />
-                  </div>
-                </div>
+                <span className="absolute right-4 top-4 flex h-8 w-8 translate-y-1 items-center justify-center rounded-full bg-white opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">
+                  <ArrowRight className="h-4 w-4 text-zinc-900" />
+                </span>
               </Link>
             ))}
           </div>
-        </div>
-      </section>
+        </Container>
+      </Section>
 
-      {/* ── DIVIDER ── */}
-      <div className="h-3 bg-zinc-900" />
-
-      {/* ── COACHING IA ── */}
-      <section id="coaching" className="relative overflow-hidden bg-zinc-950 py-32">
-        <img
-          src="https://images.unsplash.com/photo-1571008887538-b36bb32f4571?w=1400&q=80&fit=crop"
-          alt="Coaching"
-          className="absolute inset-0 w-full h-full object-cover opacity-20"
-        />
-        <div className="relative z-10 max-w-7xl mx-auto px-8">
-          <div className="max-w-3xl">
-            <span className="inline-block px-3 py-1 bg-green-400 text-zinc-900 text-xs font-bold uppercase tracking-widest rounded-full mb-8">
-              Coaching IA
-            </span>
-            <h2 className="font-sport text-[clamp(3rem,8vw,7rem)] font-black uppercase text-white leading-[0.9] mb-8">
-              L&apos;IA AU<br />CŒUR DE<br />TA PRÉPA
-            </h2>
-            <p className="text-lg text-white/50 max-w-xl leading-relaxed mb-10">
-              L&apos;intelligence de l&apos;app analyse ta VFC, ton sommeil et ta charge d&apos;entraînement
-              pour adapter ton plan en temps réel. Plus intelligent que n&apos;importe quel coach humain.
-            </p>
-            <Link href="/signup" className="inline-flex items-center gap-2 bg-white text-zinc-900 font-bold px-8 py-4 rounded-2xl hover:bg-zinc-100 transition-all">
-              Commencer gratuitement <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-
-          {/* Feature pills */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-20">
-            {[
-              { title: "Analyse VFC quotidienne", desc: "HRV, Body Battery, score de récupération Garmin & Coros synchronisés." },
-              { title: "Plan adaptatif IA", desc: "Ajustement automatique de la charge selon ton état physiologique du jour." },
-              { title: "Ghost Runner vocal", desc: "Coaching audio en temps réel avec prédiction de chrono live kilomètre par kilomètre." },
-            ].map(f => (
-              <div key={f.title} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
-                <div className="w-1.5 h-1.5 bg-green-400 rounded-full mb-4" />
-                <h3 className="font-semibold text-white mb-2">{f.title}</h3>
-                <p className="text-sm text-white/40 leading-relaxed">{f.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── DIVIDER ── */}
-      <div className="h-3 bg-white" />
-
-      {/* ── FEATURES GRID ── */}
-      <section id="features" className="py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-8">
-          <div className="text-center mb-16">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400 mb-3">Plateforme complète</p>
-            <h2 className="font-sport text-4xl sm:text-5xl lg:text-6xl font-black uppercase text-zinc-900">TOUT CE DONT<br />UN COUREUR A BESOIN</h2>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {FEATURES.map((f, i) => (
-              <div key={f.title} className="rounded-2xl overflow-hidden border border-zinc-100 hover:shadow-lg transition-all group cursor-default bg-white">
-                {/* Image */}
-                <div className="relative h-36 overflow-hidden">
-                  <img src={f.img} alt={f.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                  <span className={`absolute top-3 right-3 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${i === 0 ? "bg-green-400 text-zinc-900" : "bg-white/90 text-zinc-700"}`}>
-                    {f.badge}
+      {/* ── FEATURES ── */}
+      <Section className="bg-zinc-50">
+        <Container>
+          <SectionHeading
+            eyebrow="Plateforme complète"
+            title="Tout ce dont un coureur a besoin"
+            subtitle="Une suite d'outils pensés pour la performance — de l'analyse physiologique au coaching vocal en temps réel."
+          />
+          <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {FEATURES.map((f) => (
+              <Card key={f.title} hover className="p-5">
+                <div className="flex items-center justify-between">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#ecfdf5] text-[#059669]">
+                    <f.icon className="h-5 w-5" />
                   </span>
+                  <Badge>{f.badge}</Badge>
                 </div>
-                {/* Content */}
-                <div className="p-5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <f.icon className="w-4 h-4 text-zinc-400 flex-shrink-0" />
-                    <h3 className="font-bold text-sm text-zinc-900">{f.title}</h3>
-                  </div>
-                  <p className="text-xs text-zinc-400 leading-relaxed">{f.desc}</p>
-                </div>
-              </div>
+                <h3 className="mt-4 text-base font-semibold">{f.title}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-zinc-500">{f.desc}</p>
+              </Card>
             ))}
           </div>
-        </div>
-      </section>
+        </Container>
+      </Section>
 
-      {/* ── DIVIDER ── */}
-      <div className="h-3 bg-zinc-900" />
+      {/* ── COACHING IA (highlight) ── */}
+      <Section>
+        <Container>
+          <div className="overflow-hidden rounded-3xl bg-zinc-950 px-8 py-14 sm:px-14 sm:py-20">
+            <div className="grid items-center gap-12 lg:grid-cols-2">
+              <div>
+                <Badge tone="brand" dot>Coaching IA</Badge>
+                <h2 className="mt-5 text-3xl sm:text-4xl lg:text-5xl font-bold leading-[1.05] tracking-tight text-white">
+                  L&apos;intelligence au cœur de ta préparation.
+                </h2>
+                <p className="mt-5 max-w-lg text-lg leading-relaxed text-white/55">
+                  Pacevo analyse ta VFC, ton sommeil et ta charge d&apos;entraînement pour adapter ton plan en temps réel — plus réactif qu&apos;un coach humain.
+                </p>
+                <Link href="/signup" className={btnClass("secondary", "lg", "mt-8")}>
+                  Commencer gratuitement <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+              <div className="grid gap-3">
+                {[
+                  { t: "Analyse VFC quotidienne", d: "HRV, Body Battery et score de récupération synchronisés Garmin & Coros." },
+                  { t: "Plan adaptatif", d: "Ajustement automatique de la charge selon ton état physiologique du jour." },
+                  { t: "Ghost Runner vocal", d: "Coaching audio temps réel avec prédiction de chrono kilomètre par kilomètre." },
+                ].map((f) => (
+                  <div key={f.t} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                    <div className="flex items-center gap-2.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#34d399]" />
+                      <h3 className="font-semibold text-white">{f.t}</h3>
+                    </div>
+                    <p className="mt-2 text-sm leading-relaxed text-white/45">{f.d}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Container>
+      </Section>
 
       {/* ── TARIFS ── */}
-      <section id="tarifs" className="py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-8">
-          <div className="text-center mb-16">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400 mb-3">Tarification</p>
-            <h2 className="font-sport text-4xl sm:text-5xl lg:text-6xl font-black uppercase text-zinc-900">SIMPLE &amp; TRANSPARENT</h2>
-          </div>
-          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+      <Section id="tarifs" className="bg-zinc-50">
+        <Container>
+          <SectionHeading
+            eyebrow="Tarification"
+            title="Simple et transparent"
+            subtitle="Commence gratuitement. Passe au Pro quand tu es prêt à performer."
+          />
+          <div className="mx-auto mt-14 grid max-w-5xl gap-6 md:grid-cols-3">
             {[
-              {
-                name: "Gratuit", price: "0€", period: "pour toujours",
-                features: ["Dashboard complet", "5 plans IA/mois", "Hub courses France", "Coaching basique"],
-                cta: "Commencer", href: "/signup", dark: false,
-              },
-              {
-                name: "Pro", price: "10€", period: "/mois", badge: "Populaire",
-                features: ["Plans IA illimités", "Ghost Runner vocal", "Trail Builder SIG", "Sync Garmin/Coros", "Smart Journal", "Affûtage Banister"],
-                cta: "Essai 30 jours gratuit", href: "/signup?plan=pro", dark: true,
-              },
-              {
-                name: "Annuel", price: "80€", period: "/an", badge: "−33%",
-                features: ["Tout Pro inclus", "Posture Lab Vision IA", "API accès développeur", "Support prioritaire"],
-                cta: "Choisir l'annuel", href: "/signup?plan=yearly", dark: false,
-              },
-            ].map(plan => (
-              <div key={plan.name} className={`relative rounded-3xl p-8 flex flex-col ${plan.dark ? "bg-zinc-900 text-white" : "bg-zinc-50 border border-zinc-200"}`}>
+              { name: "Gratuit", price: "0€", period: "pour toujours", features: ["Dashboard complet", "5 plans IA / mois", "Hub courses France", "Coaching basique"], cta: "Commencer", href: "/signup", featured: false },
+              { name: "Pro", price: "10€", period: "/mois", badge: "Populaire", features: ["Plans IA illimités", "Ghost Runner vocal", "Trail Builder SIG", "Sync Garmin / Coros", "Smart Journal", "Affûtage Banister"], cta: "Essai 30 jours gratuit", href: "/signup?plan=pro", featured: true },
+              { name: "Annuel", price: "80€", period: "/an", badge: "−33%", features: ["Tout le Pro inclus", "Posture Lab Vision IA", "Accès API développeur", "Support prioritaire"], cta: "Choisir l'annuel", href: "/signup?plan=yearly", featured: false },
+            ].map((plan) => (
+              <div
+                key={plan.name}
+                className={`relative flex flex-col rounded-3xl p-8 ${plan.featured ? "bg-zinc-950 text-white ring-2 ring-[#059669]" : "bg-white ring-1 ring-inset ring-zinc-200"}`}
+              >
                 {plan.badge && (
-                  <div className={`absolute -top-3 left-6 px-3 py-1 rounded-full text-xs font-bold ${plan.dark ? "bg-green-400 text-zinc-900" : "bg-zinc-900 text-white"}`}>
+                  <span className={`absolute -top-3 left-8 rounded-full px-3 py-1 text-[11px] font-bold ${plan.featured ? "bg-[#10b981] text-[#04120c]" : "bg-zinc-900 text-white"}`}>
                     {plan.badge}
-                  </div>
+                  </span>
                 )}
-                <div className="mb-6">
-                  <div className={`text-sm font-semibold mb-2 ${plan.dark ? "text-white/50" : "text-zinc-400"}`}>{plan.name}</div>
-                  <div className="flex items-baseline gap-1">
-                    <span className={`text-5xl font-black font-sport ${plan.dark ? "text-white" : "text-zinc-900"}`}>{plan.price}</span>
-                    <span className={`text-sm ${plan.dark ? "text-white/40" : "text-zinc-400"}`}>{plan.period}</span>
-                  </div>
+                <div className={`text-sm font-semibold ${plan.featured ? "text-white/50" : "text-zinc-400"}`}>{plan.name}</div>
+                <div className="mt-2 flex items-baseline gap-1">
+                  <span className="text-5xl font-bold tracking-tight">{plan.price}</span>
+                  <span className={`text-sm ${plan.featured ? "text-white/40" : "text-zinc-400"}`}>{plan.period}</span>
                 </div>
-                <ul className="flex-1 space-y-3 mb-8">
-                  {plan.features.map(f => (
-                    <li key={f} className={`flex items-center gap-2.5 text-sm ${plan.dark ? "text-white/70" : "text-zinc-600"}`}>
-                      <Star className={`w-3.5 h-3.5 flex-shrink-0 ${plan.dark ? "text-green-400" : "text-zinc-400"}`} />
+                <ul className="mt-7 flex-1 space-y-3">
+                  {plan.features.map((f) => (
+                    <li key={f} className={`flex items-center gap-2.5 text-sm ${plan.featured ? "text-white/75" : "text-zinc-600"}`}>
+                      <Check className={`h-4 w-4 flex-shrink-0 ${plan.featured ? "text-[#34d399]" : "text-[#059669]"}`} />
                       {f}
                     </li>
                   ))}
                 </ul>
-                <Link href={plan.href} className={`text-center py-3.5 rounded-xl font-bold text-sm transition-all ${plan.dark ? "bg-white text-zinc-900 hover:bg-zinc-100" : "bg-zinc-900 text-white hover:bg-zinc-700"}`}>
+                <Link
+                  href={plan.href}
+                  className={btnClass(plan.featured ? "secondary" : "primary", "md", "mt-8 w-full")}
+                >
                   {plan.cta}
                 </Link>
               </div>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* ── DIVIDER ── */}
-      <div className="h-3 bg-zinc-900" />
+        </Container>
+      </Section>
 
       {/* ── CTA FINAL ── */}
-      <section className="relative overflow-hidden py-32">
-        <img
-          src="https://images.unsplash.com/photo-1483721310020-03333e577078?w=1400&q=80&fit=crop"
-          alt="Trail runner"
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-black/60" />
-        <div className="relative z-10 text-center px-8">
-          <h2 className="font-sport text-[clamp(4rem,12vw,10rem)] font-black uppercase text-white leading-[0.85] mb-8">
-            PRÊT À<br />PERFORMER ?
-          </h2>
-          <div className="flex items-center justify-center gap-4 flex-wrap">
-            <Link href="/signup" className="inline-flex items-center gap-2 bg-white text-zinc-900 font-bold text-lg px-10 py-5 rounded-2xl hover:bg-zinc-100 transition-all">
-              Créer un compte gratuit <ArrowRight className="w-5 h-5" />
-            </Link>
-            <Link href="/login" className="inline-flex items-center gap-2 border-2 border-white/40 text-white font-bold text-lg px-10 py-5 rounded-2xl hover:bg-white/10 transition-all">
-              Se connecter
-            </Link>
+      <Section>
+        <Container>
+          <div className="relative overflow-hidden rounded-3xl bg-zinc-950 px-8 py-20 text-center sm:py-24">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(80%_120%_at_50%_0%,rgba(16,185,129,.16),transparent_60%)]" />
+            <div className="relative">
+              <h2 className="mx-auto max-w-2xl text-4xl sm:text-5xl font-bold leading-[1.05] tracking-tight text-white">
+                Prêt à performer ?
+              </h2>
+              <p className="mx-auto mt-4 max-w-md text-lg text-white/55">
+                Rejoins les coureurs qui s&apos;entraînent plus intelligemment avec Pacevo.
+              </p>
+              <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
+                <Link href="/signup" className={btnClass("brand", "lg")}>
+                  Créer un compte gratuit <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link href="/login" className="inline-flex items-center gap-2 rounded-xl px-7 py-3.5 text-base font-semibold text-white ring-1 ring-inset ring-white/25 hover:bg-white/10 transition-colors">
+                  Se connecter
+                </Link>
+              </div>
+              <p className="mt-6 text-sm text-white/35">Gratuit · Sans carte bancaire · Annulable à tout moment</p>
+            </div>
           </div>
-          <p className="text-white/30 text-sm mt-6">Gratuit · Pas de carte bancaire · Annulable à tout moment</p>
-        </div>
-      </section>
+        </Container>
+      </Section>
 
       {/* ── FOOTER ── */}
-      <footer className="bg-zinc-950 text-white py-16 px-8">
-        <div className="max-w-7xl mx-auto mb-12 flex flex-col items-center gap-4 border-b border-white/10 pb-12 text-center">
-          <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-300 ring-1 ring-white/15">Newsletter</div>
-          <h3 className="text-xl font-bold sm:text-2xl">Reçois nos articles & conseils course</h3>
-          <p className="max-w-md text-sm text-white/50">Entraînement, trail, matériel, nutrition — directement dans ta boîte mail. Désinscription en un clic.</p>
-          <div className="w-full max-w-md"><NewsletterSignup variant="dark" /></div>
-        </div>
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          <Link href="/" className="flex items-center gap-2.5">
-            <Logo size={32} />
-            <span className="text-lg font-black uppercase tracking-[-0.02em] text-white">Pacevo</span>
-          </Link>
-          <p className="text-sm text-white/30">© 2026 Pacevo. Fait avec ❤️ pour les coureurs.</p>
-          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-white/30">
-            <Link href="/mentions-legales" className="hover:text-white/60 transition-colors">Mentions légales</Link>
-            <Link href="/confidentialite" className="hover:text-white/60 transition-colors">Confidentialité</Link>
-            <Link href="/terms" className="hover:text-white/60 transition-colors">CGU</Link>
-            <Link href="/contact" className="hover:text-white/60 transition-colors">Contact</Link>
+      <footer className="border-t border-zinc-200 bg-white">
+        <Container className="py-16">
+          <div className="mx-auto mb-14 flex max-w-xl flex-col items-center gap-4 border-b border-zinc-200 pb-14 text-center">
+            <Badge tone="brand">Newsletter</Badge>
+            <h3 className="text-xl font-bold sm:text-2xl">Reçois nos conseils course chaque semaine</h3>
+            <p className="max-w-md text-sm text-zinc-500">Entraînement, trail, matériel, nutrition — directement dans ta boîte mail. Désinscription en un clic.</p>
+            <div className="w-full max-w-md"><NewsletterSignup /></div>
           </div>
-        </div>
+          <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
+            <Link href="/" className="flex items-center gap-2.5">
+              <Logo size={28} />
+              <Wordmark className="text-lg" />
+            </Link>
+            <p className="text-sm text-zinc-400">© 2026 Pacevo. Fait avec ❤️ pour les coureurs.</p>
+            <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-zinc-400">
+              <Link href="/mentions-legales" className="hover:text-zinc-700 transition-colors">Mentions légales</Link>
+              <Link href="/confidentialite" className="hover:text-zinc-700 transition-colors">Confidentialité</Link>
+              <Link href="/terms" className="hover:text-zinc-700 transition-colors">CGU</Link>
+              <Link href="/contact" className="hover:text-zinc-700 transition-colors">Contact</Link>
+            </div>
+          </div>
+        </Container>
       </footer>
     </div>
   );

@@ -1,8 +1,13 @@
 export const dynamic = "force-dynamic";
 import type { Metadata, Viewport } from "next";
+import { Inter, Anton } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/layout/Providers";
 import { ErrorReporter } from "@/components/ErrorReporter";
+
+// Polices réellement chargées (avant : variables jamais définies → tout en system-ui).
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+const anton = Anton({ subsets: ["latin"], weight: "400", variable: "--font-anton", display: "swap" });
 
 export const metadata: Metadata = {
   title: {
@@ -53,7 +58,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr" suppressHydrationWarning>
+    <html lang="fr" className={`${inter.variable} ${anton.variable}`} suppressHydrationWarning>
       <body className="font-sans">
         <ErrorReporter />
         <Providers>{children}</Providers>

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Loader2, Check } from "lucide-react";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Logo } from "@/components/brand/Logo";
+import { Wordmark } from "@/components/brand/Wordmark";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -99,7 +100,7 @@ export default function SignupPage() {
         <div className="text-center mb-10">
           <Link href="/" className="inline-flex items-center gap-2.5 mb-6">
             <Logo size={40} />
-            <span className="text-xl font-black uppercase tracking-[-0.02em] text-zinc-900">Pacevo</span>
+            <Wordmark className="text-xl" />
           </Link>
           <h1 className="text-2xl font-bold text-zinc-900">Créer un compte</h1>
           <p className="text-zinc-500 text-sm mt-1">30 jours gratuits · Pas de carte bancaire</p>

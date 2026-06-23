@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Logo } from "@/components/brand/Logo";
+import { Wordmark } from "@/components/brand/Wordmark";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -71,7 +72,7 @@ export default function LoginPage() {
         <div className="text-center mb-10">
           <Link href="/" className="inline-flex items-center gap-2.5 mb-6">
             <Logo size={40} />
-            <span className="text-xl font-black uppercase tracking-[-0.02em] text-zinc-900">Pacevo</span>
+            <Wordmark className="text-xl" />
           </Link>
           <h1 className="text-2xl font-bold text-zinc-900">Bon retour !</h1>
           <p className="text-zinc-500 text-sm mt-1">Connectez-vous pour reprendre votre entraînement</p>

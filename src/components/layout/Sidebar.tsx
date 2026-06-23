@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils/cn";
 import { useState } from "react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { Logo } from "@/components/brand/Logo";
+import { Wordmark } from "@/components/brand/Wordmark";
 
 // Navigation groupée par univers — plus lisible et pro.
 const groups: { titleKey: string | null; items: { href: string; icon: typeof LayoutDashboard; tk: string }[] }[] = [
@@ -100,11 +101,7 @@ export function Sidebar({ profile, unreadMessages = 0 }: { profile: Record<strin
         className="h-16 flex items-center px-4 border-b border-zinc-100 hover:bg-zinc-50 transition-colors"
       >
         <Logo size={36} className="flex-shrink-0" />
-        {!collapsed && (
-          <span className="ml-3 text-base font-black uppercase tracking-[-0.02em] text-zinc-900 leading-none">
-            Pacevo
-          </span>
-        )}
+        {!collapsed && <Wordmark className="ml-3 text-lg" />}
       </Link>
 
       {/* Nav */}
