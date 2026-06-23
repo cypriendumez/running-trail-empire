@@ -93,15 +93,19 @@ export function Sidebar({ profile, unreadMessages = 0 }: { profile: Record<strin
       "h-screen flex flex-col border-r border-zinc-100 bg-white transition-all duration-300",
       collapsed ? "w-[76px]" : "w-[232px]",
     )}>
-      {/* Logo */}
-      <div className="h-16 flex items-center px-4 border-b border-zinc-100">
+      {/* Logo → retour au tableau de bord */}
+      <Link
+        href="/dashboard"
+        title="Tableau de bord"
+        className="h-16 flex items-center px-4 border-b border-zinc-100 hover:bg-zinc-50 transition-colors"
+      >
         <Logo size={36} className="flex-shrink-0" />
         {!collapsed && (
-          <span className="ml-3 font-bold text-zinc-900 text-sm leading-tight tracking-tight">
+          <span className="ml-3 text-base font-black uppercase tracking-[-0.02em] text-zinc-900 leading-none">
             Pacevo
           </span>
         )}
-      </div>
+      </Link>
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto">

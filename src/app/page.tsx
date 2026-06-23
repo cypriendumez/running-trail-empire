@@ -79,10 +79,10 @@ export default function LandingPage() {
       {/* ── NAV ── */}
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "bg-white/90 backdrop-blur-xl shadow-[0_1px_0_rgba(0,0,0,0.06),0_8px_24px_-16px_rgba(0,0,0,0.25)]" : "bg-transparent"}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
+          <Link href="/" className="flex items-center gap-2.5 min-w-0">
             <Logo size={32} className="flex-shrink-0" />
             <span className={`hidden sm:inline text-[1.4rem] font-black uppercase tracking-[-0.02em] leading-none whitespace-nowrap transition-colors ${scrolled ? "text-zinc-900" : "text-white drop-shadow-sm"}`}>Pacevo</span>
-          </div>
+          </Link>
           <div className={`hidden md:flex items-center gap-8 text-sm font-medium transition-colors ${scrolled ? "text-zinc-500" : "text-white/75"}`}>
             <a href="#programmes" className={navLinkCls}>Programmes</a>
             <a href="#coaching" className={navLinkCls}>Coaching IA</a>
@@ -369,10 +369,10 @@ export default function LandingPage() {
           <div className="w-full max-w-md"><NewsletterSignup variant="dark" /></div>
         </div>
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-2.5">
+          <Link href="/" className="flex items-center gap-2.5">
             <Logo size={32} />
             <span className="text-lg font-black uppercase tracking-[-0.02em] text-white">Pacevo</span>
-          </div>
+          </Link>
           <p className="text-sm text-white/30">© 2026 Pacevo. Fait avec ❤️ pour les coureurs.</p>
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-white/30">
             <Link href="/mentions-legales" className="hover:text-white/60 transition-colors">Mentions légales</Link>
