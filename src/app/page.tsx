@@ -119,42 +119,41 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Aperçu produit */}
+          {/* Visuel : piste vue du dessus + aperçu produit flottant */}
           <div className="relative">
-            <div className="pointer-events-none absolute -inset-6 -z-10 rounded-[2rem] bg-[radial-gradient(120%_120%_at_70%_0%,rgba(16,185,129,.10),transparent_60%)]" />
-            <Card hover className="p-5 shadow-[0_30px_60px_-30px_rgba(16,24,40,.25)]">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-zinc-900">Cette semaine</span>
-                <Badge tone="brand">+12% de charge</Badge>
-              </div>
-              <svg viewBox="0 0 320 90" className="mt-4 h-24 w-full" preserveAspectRatio="none">
-                <path d="M0,72 L45,60 L90,66 L135,42 L180,48 L225,26 L270,32 L320,12" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M0,72 L45,60 L90,66 L135,42 L180,48 L225,26 L270,32 L320,12 L320,90 L0,90 Z" fill="#0596691a" />
-              </svg>
-              <div className="mt-4 grid grid-cols-3 gap-2.5">
-                {[
-                  { l: "Volume 7j", v: "52", u: "km" },
-                  { l: "VO2max", v: "58.4", u: "" },
-                  { l: "VFC", v: "72", u: "ms" },
-                ].map((m) => (
-                  <div key={m.l} className="rounded-xl bg-zinc-50 px-3 py-2.5">
-                    <div className="text-[10px] font-medium uppercase tracking-wider text-zinc-400">{m.l}</div>
-                    <div className="mt-0.5 text-xl font-bold tabular-nums">
-                      {m.v}{m.u && <span className="text-xs font-medium text-zinc-400"> {m.u}</span>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-3 flex items-center justify-between rounded-xl border border-zinc-100 px-3.5 py-3">
-                <div>
-                  <div className="text-[10px] font-medium uppercase tracking-wider text-zinc-400">Aujourd&apos;hui</div>
-                  <div className="text-sm font-semibold">Seuil · 3 × 2 km @ 3:55</div>
+            <div className="relative aspect-[4/5] overflow-hidden rounded-3xl ring-1 ring-black/5 shadow-[0_30px_60px_-30px_rgba(16,24,40,.35)]">
+              <img
+                src="https://images.unsplash.com/photo-1502904550040-7534597429ae?w=1200&q=80&fit=crop&crop=center"
+                alt="Piste d'athlétisme vue du dessus"
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+              {/* Carte produit flottante */}
+              <div className="absolute inset-x-4 bottom-4 rounded-2xl bg-white/95 p-4 shadow-[0_20px_45px_-18px_rgba(0,0,0,.55)] backdrop-blur-md">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-zinc-900">Cette semaine</span>
+                  <Badge tone="brand">+12% de charge</Badge>
                 </div>
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900 text-white">
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </span>
+                <svg viewBox="0 0 320 60" className="mt-3 h-14 w-full" preserveAspectRatio="none">
+                  <path d="M0,48 L45,39 L90,43 L135,27 L180,32 L225,16 L270,21 L320,8" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M0,48 L45,39 L90,43 L135,27 L180,32 L225,16 L270,21 L320,8 L320,60 L0,60 Z" fill="#0596691a" />
+                </svg>
+                <div className="mt-3 grid grid-cols-3 gap-2.5">
+                  {[
+                    { l: "Volume 7j", v: "52", u: "km" },
+                    { l: "VO2max", v: "58.4", u: "" },
+                    { l: "VFC", v: "72", u: "ms" },
+                  ].map((m) => (
+                    <div key={m.l} className="rounded-xl bg-zinc-50 px-3 py-2.5">
+                      <div className="text-[10px] font-medium uppercase tracking-wider text-zinc-400">{m.l}</div>
+                      <div className="mt-0.5 text-lg font-bold tabular-nums">
+                        {m.v}{m.u && <span className="text-xs font-medium text-zinc-400"> {m.u}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </Card>
+            </div>
           </div>
         </div>
       </Container>

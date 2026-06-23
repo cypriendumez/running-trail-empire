@@ -74,7 +74,7 @@ export function Sidebar({ profile, unreadMessages = 0 }: { profile: Record<strin
           active ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900",
         )}
       >
-        {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-green-500" />}
+        {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-emerald-500" />}
         <span className="relative flex-shrink-0">
           <Icon className="w-[18px] h-[18px]" />
           {count > 0 && collapsed && (
