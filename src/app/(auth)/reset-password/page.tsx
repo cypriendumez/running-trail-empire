@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Logo } from "@/components/brand/Logo";
+import { Wordmark } from "@/components/brand/Wordmark";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -42,7 +43,7 @@ export default function ResetPasswordPage() {
         <div className="text-center mb-10">
           <div className="inline-flex items-center gap-2.5 mb-6">
             <Logo size={40} />
-            <span className="font-bold text-zinc-900">Pacevo</span>
+            <Wordmark className="text-xl" />
           </div>
           <h1 className="text-2xl font-bold text-zinc-900">Nouveau mot de passe</h1>
           <p className="text-zinc-500 text-sm mt-1">Choisis un nouveau mot de passe pour ton compte.</p>

@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { SiteHeader } from "@/components/layout/SiteHeader";
+import { SiteFooter } from "@/components/layout/SiteFooter";
 
 export const metadata: Metadata = {
   title: "Contact | Pacevo",
@@ -9,8 +11,9 @@ export const metadata: Metadata = {
 export default function ContactPage() {
   const EMAIL = "cypriendumez@outlook.fr";
   return (
-    <main className="mx-auto max-w-3xl px-5 py-12 text-zinc-800">
-      <a href="/" className="text-sm font-semibold text-emerald-600 hover:text-emerald-700">← Retour</a>
+    <div className="min-h-screen bg-white font-sans text-zinc-700">
+      <SiteHeader />
+      <main className="mx-auto max-w-3xl px-6 py-12 sm:py-16">
       <h1 className="mt-4 text-3xl font-bold tracking-tight text-zinc-900">Contact</h1>
       <p className="mt-2 text-sm text-zinc-500">On répond généralement sous 48 h ouvrées.</p>
 
@@ -50,5 +53,7 @@ export default function ContactPage() {
         </div>
       </div>
     </main>
+      <SiteFooter newsletter={false} />
+    </div>
   );
 }
