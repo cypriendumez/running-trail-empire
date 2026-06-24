@@ -1273,7 +1273,7 @@ export function ShoppingHub() {
                 <div className="space-y-1.5">
                   {selected.bio_reasons.slice(0, 3).map(r => (
                     <div key={r} className="flex items-start gap-2 text-sm text-zinc-600">
-                      <Zap className="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" />{r}
+                      <Zap className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />{r}
                     </div>
                   ))}
                 </div>

@@ -75,7 +75,7 @@ function Avatar({ name, url, size = 8 }: { name: string; url?: string; size?: nu
     <div className={cls}><img src={url} alt={name} className="w-full h-full object-cover" /></div>
   );
   return (
-    <div className={`${cls} bg-gradient-to-br from-green-400 to-emerald-600`}>
+    <div className={`${cls} bg-gradient-to-br from-emerald-400 to-emerald-600`}>
       {name.charAt(0).toUpperCase()}
     </div>
   );
@@ -153,7 +153,7 @@ export function LeaguesHub({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {(
           [
-            { label: d["s.kmYear"], value: stats.totalKm.toLocaleString(lang), unit: "km", icon: <BarChart2 className="h-4 w-4" />, grad: "from-emerald-50 to-green-50 border-emerald-100", ic: "bg-emerald-100 text-emerald-600", num: "text-emerald-700" },
+            { label: d["s.kmYear"], value: stats.totalKm.toLocaleString(lang), unit: "km", icon: <BarChart2 className="h-4 w-4" />, grad: "from-emerald-50 to-emerald-50 border-emerald-100", ic: "bg-emerald-100 text-emerald-600", num: "text-emerald-700" },
             { label: d["s.streak"], value: stats.streak, unit: d["u.day"], icon: <Flame className="h-4 w-4" />, grad: "from-orange-50 to-amber-50 border-orange-100", ic: "bg-orange-100 text-orange-600", num: "text-orange-700" },
             { label: d["s.sessions"], value: stats.sessions, unit: "", icon: <Target className="h-4 w-4" />, grad: "from-violet-50 to-fuchsia-50 border-violet-100", ic: "bg-violet-100 text-violet-600", num: "text-violet-700" },
             { label: d["s.elev"], value: stats.elevation.toLocaleString(lang), unit: "m", icon: <Mountain className="h-4 w-4" />, grad: "from-sky-50 to-blue-50 border-sky-100", ic: "bg-sky-100 text-sky-600", num: "text-sky-700" },
@@ -265,7 +265,7 @@ export function LeaguesHub({
                       <motion.div key={m.user_id}
                         initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.03 }}
                         className={`flex items-center gap-3 p-3 rounded-2xl transition-all ${
-                          isMe ? "bg-green-50 border border-green-200 ring-1 ring-green-200" : i === 0 ? "bg-yellow-50" : "hover:bg-zinc-50"
+                          isMe ? "bg-emerald-50 border border-emerald-200 ring-1 ring-emerald-200" : i === 0 ? "bg-yellow-50" : "hover:bg-zinc-50"
                         }`}
                       >
                         {/* Rank */}
@@ -281,7 +281,7 @@ export function LeaguesHub({
                         <Avatar name={displayName} url={avatarUrl} size={8} />
 
                         <div className="flex-1 min-w-0">
-                          <div className={`text-sm font-semibold truncate ${isMe ? "text-green-700" : "text-zinc-900"}`}>
+                          <div className={`text-sm font-semibold truncate ${isMe ? "text-emerald-700" : "text-zinc-900"}`}>
                             {displayName}{isMe && d["meSuffix"]}
                             {i === 0 && <Crown className="w-3.5 h-3.5 inline ml-1 text-yellow-500" />}
                           </div>
@@ -289,7 +289,7 @@ export function LeaguesHub({
 
                         <div className="flex items-center gap-2 shrink-0">
                           <div className="w-20 h-1.5 bg-zinc-100 rounded-full hidden sm:block">
-                            <motion.div className={`h-full rounded-full ${isMe ? "bg-green-500" : "bg-zinc-400"}`}
+                            <motion.div className={`h-full rounded-full ${isMe ? "bg-emerald-500" : "bg-zinc-400"}`}
                               initial={{ width: 0 }} animate={{ width: `${(m.score / maxScore) * 100}%` }}
                               transition={{ duration: 0.8, delay: i * 0.04 }} />
                           </div>
@@ -314,10 +314,10 @@ export function LeaguesHub({
                 {Object.entries(TIER_CONFIG).map(([key, t]) => {
                   const isCurrent = key === currentTierKey;
                   return (
-                    <div key={key} className={`relative rounded-2xl border p-3 text-center transition-all ${isCurrent ? "border-transparent ring-2 ring-green-400 shadow-md bg-green-50/40" : "border-zinc-200 bg-white opacity-70"}`}>
+                    <div key={key} className={`relative rounded-2xl border p-3 text-center transition-all ${isCurrent ? "border-transparent ring-2 ring-emerald-400 shadow-md bg-emerald-50/40" : "border-zinc-200 bg-white opacity-70"}`}>
                       <div className={`mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${t.gradient} text-2xl shadow`}>{t.emoji}</div>
                       <div className={`text-xs sm:text-sm font-bold ${t.textColor}`}>{d[`tier.${key}`]}</div>
-                      {isCurrent && <span className="mt-1 inline-block rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-700">{d["youChip"]}</span>}
+                      {isCurrent && <span className="mt-1 inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">{d["youChip"]}</span>}
                     </div>
                   );
                 })}
@@ -334,7 +334,7 @@ export function LeaguesHub({
                   { icon: <Zap className="w-3.5 h-3.5" />, label: d["rec.pace"], value: fmtPace(records.bestPace), unit: "/km", color: "text-blue-600" },
                   { icon: <Flame className="w-3.5 h-3.5" />, label: d["rec.streak"], value: records.longestStreak, unit: d["u.day"], color: "text-orange-600" },
                   { icon: <Mountain className="w-3.5 h-3.5" />, label: d["rec.elev"], value: records.maxElevRun.toLocaleString(lang), unit: "m", color: "text-sky-600" },
-                  { icon: <TrendingUp className="w-3.5 h-3.5" />, label: d["rec.week"], value: records.biggestWeek.toLocaleString(lang), unit: "km", color: "text-green-600" },
+                  { icon: <TrendingUp className="w-3.5 h-3.5" />, label: d["rec.week"], value: records.biggestWeek.toLocaleString(lang), unit: "km", color: "text-emerald-600" },
                   { icon: <BarChart2 className="w-3.5 h-3.5" />, label: d["rec.month"], value: records.biggestMonth.toLocaleString(lang), unit: "km", color: "text-teal-600" },
                   { icon: <CalendarClock className="w-3.5 h-3.5" />, label: d["rec.hours"], value: records.totalHours.toLocaleString(lang), unit: "h", color: "text-amber-600" },
                   { icon: <Calendar className="w-3.5 h-3.5" />, label: d["rec.weeks"], value: records.weeksActive, unit: "/52", color: "text-violet-600" },
@@ -384,7 +384,7 @@ export function LeaguesHub({
                   <span className="text-sm text-zinc-400">{Math.round(unlocked.length / computedBadges.length * 100)}%</span>
                 </div>
                 <div className="h-2 bg-zinc-700 rounded-full overflow-hidden">
-                  <motion.div className="h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-full"
+                  <motion.div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full"
                     initial={{ width: 0 }} animate={{ width: `${(unlocked.length / computedBadges.length) * 100}%` }}
                     transition={{ duration: 1, ease: "easeOut" }} />
                 </div>
@@ -424,7 +424,7 @@ export function LeaguesHub({
                   >
                     {badge.unlocked && (
                       <span className="absolute top-2 right-2">
-                        <CheckCircle className="w-4 h-4 text-green-500" />
+                        <CheckCircle className="w-4 h-4 text-emerald-500" />
                       </span>
                     )}
                     {!badge.unlocked && (
@@ -461,9 +461,9 @@ export function LeaguesHub({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-zinc-900 flex items-center gap-2">
-                  <Target className="w-4 h-4 text-green-500" /> {d["ch.title"]} <span className="text-xs font-normal text-zinc-400">{d["ch.auto"]}</span>
+                  <Target className="w-4 h-4 text-emerald-500" /> {d["ch.title"]} <span className="text-xs font-normal text-zinc-400">{d["ch.auto"]}</span>
                 </h3>
-                <span className="text-xs font-semibold text-green-600">{fillT(d["ch.done"], { a: autoChallenges.filter(c => c.current >= c.target).length, b: autoChallenges.length })}</span>
+                <span className="text-xs font-semibold text-emerald-600">{fillT(d["ch.done"], { a: autoChallenges.filter(c => c.current >= c.target).length, b: autoChallenges.length })}</span>
               </div>
               <div className="grid sm:grid-cols-2 gap-3">
                 {autoChallenges.map((c, i) => {
@@ -472,13 +472,13 @@ export function LeaguesHub({
                   return (
                     <motion.div key={c.id}
                       initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
-                      className={`rounded-3xl border p-4 transition-all ${done ? "border-green-200 bg-green-50/60" : "border-zinc-200 bg-white hover:border-zinc-300"}`}>
+                      className={`rounded-3xl border p-4 transition-all ${done ? "border-emerald-200 bg-emerald-50/60" : "border-zinc-200 bg-white hover:border-zinc-300"}`}>
                       <div className="flex items-start gap-3">
-                        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-xl ${done ? "bg-green-100" : "bg-zinc-100"}`}>{c.icon}</div>
+                        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-xl ${done ? "bg-emerald-100" : "bg-zinc-100"}`}>{c.icon}</div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-zinc-900 text-sm truncate">{cT(c)[0]}</span>
-                            {done && <span className="flex items-center gap-0.5 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-bold text-green-700"><CheckCircle className="w-3 h-3" /> {d["ch.doneChip"]}</span>}
+                            {done && <span className="flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700"><CheckCircle className="w-3 h-3" /> {d["ch.doneChip"]}</span>}
                           </div>
                           <p className="text-xs text-zinc-400 mt-0.5">{cT(c)[1]}</p>
                         </div>
@@ -487,10 +487,10 @@ export function LeaguesHub({
                       <div className="mt-3">
                         <div className="h-2.5 bg-zinc-100 rounded-full overflow-hidden">
                           <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.8, delay: i * 0.05 }}
-                            className={`h-full rounded-full ${done ? "bg-gradient-to-r from-green-500 to-emerald-400" : "bg-gradient-to-r from-zinc-400 to-zinc-500"}`} />
+                            className={`h-full rounded-full ${done ? "bg-gradient-to-r from-emerald-500 to-emerald-400" : "bg-gradient-to-r from-zinc-400 to-zinc-500"}`} />
                         </div>
                         <div className="flex justify-between text-xs mt-1">
-                          <span className={`font-semibold ${done ? "text-green-600" : "text-zinc-700"}`}>{c.current.toLocaleString(lang)} / {c.target.toLocaleString(lang)} {uT(c.unit)}</span>
+                          <span className={`font-semibold ${done ? "text-emerald-600" : "text-zinc-700"}`}>{c.current.toLocaleString(lang)} / {c.target.toLocaleString(lang)} {uT(c.unit)}</span>
                           <span className="text-zinc-400">{Math.round(pct)}%</span>
                         </div>
                       </div>
@@ -515,11 +515,11 @@ export function LeaguesHub({
                     ? Math.ceil((new Date(ch.end_date).getTime() - Date.now()) / 86400000)
                     : null;
                   return (
-                    <div key={ch.id} className="bento-card border-l-4 border-l-green-400">
+                    <div key={ch.id} className="bento-card border-l-4 border-l-emerald-400">
                       <div className="flex items-start justify-between mb-3">
                         <div>
                           <div className="font-semibold text-zinc-900 flex items-center gap-2">
-                            <Users className="w-4 h-4 text-green-500" /> {ch.name}
+                            <Users className="w-4 h-4 text-emerald-500" /> {ch.name}
                           </div>
                           {ch.description && <div className="text-xs text-zinc-400 mt-0.5">{ch.description}</div>}
                         </div>
@@ -539,12 +539,12 @@ export function LeaguesHub({
                         <div className="h-3 bg-zinc-100 rounded-full overflow-hidden">
                           <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(pct, 100)}%` }}
                             transition={{ duration: 1 }}
-                            className="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full" />
+                            className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full" />
                         </div>
                         <div className="text-right text-xs text-zinc-400 mt-1">{Math.round(pct)}%</div>
                       </div>
                       <div className="text-xs text-zinc-500">
-                        {d["ch.contrib"]} <span className="font-semibold text-green-600">{myKm.toFixed(1)} km</span>
+                        {d["ch.contrib"]} <span className="font-semibold text-emerald-600">{myKm.toFixed(1)} km</span>
                       </div>
                     </div>
                   );
@@ -586,7 +586,7 @@ export function LeaguesHub({
                           </div>
                         </div>
                         {alreadyIn ? (
-                          <span className="flex items-center gap-1 text-xs text-green-600 font-semibold bg-green-50 px-2 py-1 rounded-xl shrink-0">
+                          <span className="flex items-center gap-1 text-xs text-emerald-600 font-semibold bg-emerald-50 px-2 py-1 rounded-xl shrink-0">
                             <CheckCircle className="w-3.5 h-3.5" /> {d["ch.joined"]}
                           </span>
                         ) : (
