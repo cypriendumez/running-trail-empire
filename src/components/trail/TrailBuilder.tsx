@@ -888,7 +888,7 @@ export function TrailBuilder() {
                 aria-haspopup="listbox"
                 aria-expanded={activityMenuOpen}
                 aria-label={tb("activityType", { label: tb(`act.${activity}`) })}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-50 hover:bg-zinc-100 text-sm font-medium text-zinc-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-50 hover:bg-zinc-100 text-sm font-medium text-zinc-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
               >
                 <span className="text-base leading-none">{act.emoji}</span>
                 {tb(`act.${activity}`)}
@@ -912,8 +912,8 @@ export function TrailBuilder() {
                         <button
                           type="button"
                           onClick={() => { setActivity(key); setManualSpeed(null); setActivityMenuOpen(false); }}
-                          className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-left text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 ${
-                            activity === key ? "bg-green-50 text-green-700 font-semibold" : "text-zinc-700 hover:bg-zinc-100"
+                          className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-left text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+                            activity === key ? "bg-emerald-50 text-emerald-700 font-semibold" : "text-zinc-700 hover:bg-zinc-100"
                           }`}
                         >
                           <span className="text-lg leading-none">{cfg.emoji}</span>
@@ -933,7 +933,7 @@ export function TrailBuilder() {
               onClick={handleExportGPX}
               disabled={!hasRoute}
               aria-label={d["exportGpx"]}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
             >
               <Download className="w-4 h-4" />
               {d["exportGpx"]}
@@ -971,7 +971,7 @@ export function TrailBuilder() {
                         type="button"
                         onClick={() => setLayer(key)}
                         aria-pressed={layer === key}
-                        className={`w-full text-left px-3 py-2 rounded-xl text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 ${
+                        className={`w-full text-left px-3 py-2 rounded-xl text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
                           layer === key ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-100"
                         }`}
                       >
@@ -996,7 +996,7 @@ export function TrailBuilder() {
                         key={r.name}
                         type="button"
                         onClick={() => flyToPlace(r)}
-                        className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-zinc-100 transition-colors text-left group focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
+                        className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-zinc-100 transition-colors text-left group focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
                       >
                         <span className="text-xl leading-none flex-shrink-0">{r.emoji}</span>
                         <div className="flex-1 min-w-0">
@@ -1004,7 +1004,7 @@ export function TrailBuilder() {
                           <div className="text-[11px] text-zinc-400 truncate">{r.region}</div>
                           <div className="text-[11px] text-zinc-500 mt-0.5">{tbDesc(r.distance)} · {tbDesc(r.elevation)}</div>
                         </div>
-                        <MapPin className="w-4 h-4 text-zinc-300 group-hover:text-green-500 flex-shrink-0 transition-colors" />
+                        <MapPin className="w-4 h-4 text-zinc-300 group-hover:text-emerald-500 flex-shrink-0 transition-colors" />
                       </button>
                     ))}
                   </div>
@@ -1025,14 +1025,14 @@ export function TrailBuilder() {
                     onChange={e => setRouteName(e.target.value)}
                     placeholder={d["routeNamePh"]}
                     aria-label={d["routeNameAria"]}
-                    className="w-full px-3 py-2 rounded-xl border border-zinc-200 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 mb-2"
+                    className="w-full px-3 py-2 rounded-xl border border-zinc-200 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 mb-2"
                   />
                   <div className="flex gap-2 mb-3">
                     <button
                       type="button"
                       onClick={handleSave}
                       disabled={saving || !hasRoute || !routeName.trim()}
-                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-semibold disabled:opacity-40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold disabled:opacity-40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
                     >
                       {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                       {d["save"]}
@@ -1041,7 +1041,7 @@ export function TrailBuilder() {
                       type="button"
                       onClick={handleExportGPX}
                       disabled={!hasRoute}
-                      className="flex items-center justify-center gap-1.5 px-3 py-2 border border-zinc-200 hover:bg-zinc-50 rounded-xl text-xs font-medium text-zinc-600 disabled:opacity-40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
+                      className="flex items-center justify-center gap-1.5 px-3 py-2 border border-zinc-200 hover:bg-zinc-50 rounded-xl text-xs font-medium text-zinc-600 disabled:opacity-40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
                     >
                       <Download className="w-3.5 h-3.5" /> GPX
                     </button>
@@ -1060,7 +1060,7 @@ export function TrailBuilder() {
                             <div className="text-sm font-medium text-zinc-900 truncate">{r.name}</div>
                             <div className="text-xs text-zinc-400">{r.distance_km.toFixed(1)} km · +{r.elevation_gain_m}m</div>
                           </button>
-                          <button type="button" onClick={() => handleDeleteRoute(r.id)} aria-label={tb("delRoute", { name: r.name })} className="p-1 text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500">
+                          <button type="button" onClick={() => handleDeleteRoute(r.id)} aria-label={tb("delRoute", { name: r.name })} className="p-1 text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
                             <X className="w-3.5 h-3.5" />
                           </button>
                         </div>
@@ -1077,7 +1077,7 @@ export function TrailBuilder() {
         {routeLoading && (
           <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[999]">
             <div className="bg-white/95 backdrop-blur rounded-full shadow-lg border border-zinc-100 px-4 py-1.5 flex items-center gap-2 text-sm text-zinc-700">
-              <Loader2 className="w-4 h-4 animate-spin text-green-500" />
+              <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
               {d["computing"]}
             </div>
           </div>
@@ -1121,7 +1121,7 @@ export function TrailBuilder() {
                         type="button"
                         onClick={() => setManualSpeed(null)}
                         disabled={manualSpeed === null}
-                        className="flex items-center gap-1 text-[11px] font-semibold text-green-600 hover:text-green-700 disabled:text-zinc-300 disabled:cursor-default transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 rounded-md px-1"
+                        className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 disabled:text-zinc-300 disabled:cursor-default transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-md px-1"
                       >
                         <Gauge className="w-3 h-3" /> {d["auto"]}
                       </button>
@@ -1148,7 +1148,7 @@ export function TrailBuilder() {
                       value={clamp(speedKmh, speedCfg.min, speedCfg.max)}
                       onChange={e => setManualSpeed(Number(e.target.value))}
                       aria-label={speedCfg.mode === "pace" ? d["paceRangeAria"] : d["speedRangeAria"]}
-                      className="w-full accent-green-600 cursor-pointer"
+                      className="w-full accent-emerald-600 cursor-pointer"
                     />
                     <div className="flex justify-between text-[11px] font-medium text-zinc-400 mt-1">
                       <span>{speedCfg.mode === "pace" ? "7:00 /km" : "1 km/h"}</span>
@@ -1168,12 +1168,12 @@ export function TrailBuilder() {
                   onClick={() => setSpeedEditorOpen(o => !o)}
                   aria-label={d["setBothAria"]}
                   aria-expanded={speedEditorOpen}
-                  className="flex items-center rounded-full transition-colors hover:bg-zinc-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
+                  className="flex items-center rounded-full transition-colors hover:bg-zinc-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
                 >
                   <PillStat value={`${formatPace(paceMinPerKm)}/km`} label={d["st.pace"]} manual={manualSpeed !== null} />
                   <PillDivider />
                   <PillStat value={`${speedKmh.toFixed(2).replace(".", ",")} km/h`} label={d["st.speed"]} manual={manualSpeed !== null} />
-                  <SlidersHorizontal className={`w-3.5 h-3.5 mr-1.5 ${manualSpeed !== null ? "text-green-600" : "text-zinc-300"}`} />
+                  <SlidersHorizontal className={`w-3.5 h-3.5 mr-1.5 ${manualSpeed !== null ? "text-emerald-600" : "text-zinc-300"}`} />
                 </button>
               </div>
             </motion.div>
@@ -1265,7 +1265,7 @@ export function TrailBuilder() {
 function PillStat({ value, label, icon, manual }: { value: string; label: string; icon?: string; manual?: boolean }) {
   return (
     <div className="px-3 text-center min-w-[58px]">
-      <div className={`flex items-center justify-center gap-1 font-bold text-sm leading-tight whitespace-nowrap ${manual ? "text-green-600" : "text-zinc-900"}`}>
+      <div className={`flex items-center justify-center gap-1 font-bold text-sm leading-tight whitespace-nowrap ${manual ? "text-emerald-600" : "text-zinc-900"}`}>
         {value}{icon && <span className="text-xs">{icon}</span>}
       </div>
       <div className="text-[10px] text-zinc-400">{label}</div>
@@ -1286,7 +1286,7 @@ function Toggle({ id, checked, onChange, label }: { id: string; checked: boolean
         aria-checked={checked}
         aria-label={label}
         onClick={() => onChange(!checked)}
-        className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-1 ${checked ? "bg-green-500" : "bg-zinc-300"}`}
+        className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1 ${checked ? "bg-emerald-500" : "bg-zinc-300"}`}
       >
         <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-4" : ""}`} />
       </button>
@@ -1304,7 +1304,7 @@ function ToolChip({ active, onClick, label, children }: { active: boolean; onCli
       aria-label={label}
       aria-pressed={active}
       title={label}
-      className={`w-10 h-10 flex items-center justify-center rounded-xl shadow-lg border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 ${
+      className={`w-10 h-10 flex items-center justify-center rounded-xl shadow-lg border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
         active ? "bg-zinc-900 text-white border-zinc-900" : "bg-white/95 backdrop-blur text-zinc-700 border-zinc-100 hover:bg-zinc-100"
       }`}
     >
@@ -1322,7 +1322,7 @@ function EditBtn({ onClick, disabled, icon, label, danger }: { onClick: () => vo
       disabled={disabled}
       aria-label={label}
       title={label}
-      className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl text-[11px] font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 ${
+      className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl text-[11px] font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
         danger ? "text-red-500 hover:bg-red-50" : "text-zinc-600 hover:bg-zinc-100"
       }`}
     >
@@ -1377,7 +1377,7 @@ function ElevationProfile({
           <span className="px-2 py-0.5 rounded-lg text-[11px] font-bold text-white" style={{ backgroundColor: difficultyColor(difficulty) }}>{label}</span>
         </div>
         <div className="flex items-center gap-3 text-xs">
-          <span className="font-semibold text-green-600">D+ {Math.round(gain)} m</span>
+          <span className="font-semibold text-emerald-600">D+ {Math.round(gain)} m</span>
           <span className="font-semibold text-red-500">D− {Math.round(loss)} m</span>
           <span className="text-zinc-400">min {Math.round(minAlt)} m</span>
           <span className="text-zinc-400">max {Math.round(maxAlt)} m</span>

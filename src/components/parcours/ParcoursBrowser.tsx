@@ -149,7 +149,7 @@ export function ParcoursBrowser({ initialSearch = "" }: { initialSearch?: string
       <div className="flex flex-wrap items-end justify-between gap-4 mb-4">
         <div>
           <h2 className="flex items-center gap-2 text-xl font-bold text-zinc-900">
-            <RouteIcon className="w-5 h-5 text-green-600" />
+            <RouteIcon className="w-5 h-5 text-emerald-600" />
             {L["title"]}
           </h2>
           <p className="text-sm text-zinc-500 mt-1">
@@ -176,7 +176,7 @@ export function ParcoursBrowser({ initialSearch = "" }: { initialSearch?: string
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={L["searchPh"]}
-            className="w-full pl-10 pr-10 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
+            className="w-full pl-10 pr-10 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
           />
           {search && (
             <button
@@ -193,9 +193,9 @@ export function ParcoursBrowser({ initialSearch = "" }: { initialSearch?: string
           disabled={locating}
           aria-pressed={sort === "proche"}
           title={L["nearTitle"]}
-          className={`flex items-center gap-2 px-3.5 py-3 rounded-2xl text-sm font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 disabled:opacity-60 ${
+          className={`flex items-center gap-2 px-3.5 py-3 rounded-2xl text-sm font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:opacity-60 ${
             sort === "proche"
-              ? "bg-green-600 text-white shadow-sm"
+              ? "bg-emerald-600 text-white shadow-sm"
               : "bg-zinc-50 text-zinc-700 border border-zinc-200 hover:bg-zinc-100"
           }`}
         >
@@ -206,7 +206,7 @@ export function ParcoursBrowser({ initialSearch = "" }: { initialSearch?: string
           value={sort === "proche" ? "recommande" : sort}
           onChange={(e) => { setSort(e.target.value as SortKey); setNear(null); }}
           aria-label={L["sortAria"]}
-          className="px-3 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-sm font-medium text-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 cursor-pointer"
+          className="px-3 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-sm font-medium text-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 cursor-pointer"
         >
           {SORT_KEYS.filter((k) => k !== "proche").map((k) => (
             <option key={k} value={k}>{pr(`sort.${k}`)}</option>
@@ -221,7 +221,7 @@ export function ParcoursBrowser({ initialSearch = "" }: { initialSearch?: string
           return (
             <button
               key={t.key} type="button" onClick={() => setSport(t.key)} aria-pressed={active}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-full text-sm font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-full text-sm font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
                 active ? "bg-zinc-900 text-white shadow-sm" : "bg-zinc-50 text-zinc-600 border border-zinc-200 hover:bg-zinc-100"
               }`}
             >
@@ -283,7 +283,7 @@ export function ParcoursBrowser({ initialSearch = "" }: { initialSearch?: string
                 <label htmlFor="pb-region" className="block text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-1.5">{L["f.region"]}</label>
                 <select
                   id="pb-region" value={region} onChange={(e) => setRegion(e.target.value)}
-                  className="px-3 py-2 rounded-xl bg-white border border-zinc-200 text-sm font-medium text-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 cursor-pointer max-w-[220px]"
+                  className="px-3 py-2 rounded-xl bg-white border border-zinc-200 text-sm font-medium text-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 cursor-pointer max-w-[220px]"
                 >
                   <option value="all">{L["allF"]}</option>
                   {facets.regions.map((r) => <option key={r} value={r}>{r}</option>)}
@@ -294,7 +294,7 @@ export function ParcoursBrowser({ initialSearch = "" }: { initialSearch?: string
                 <label htmlFor="pb-dept" className="block text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-1.5">{L["f.dept"]}</label>
                 <select
                   id="pb-dept" value={departement} onChange={(e) => setDepartement(e.target.value)} disabled={region === "all"}
-                  className="px-3 py-2 rounded-xl bg-white border border-zinc-200 text-sm font-medium text-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed max-w-[200px]"
+                  className="px-3 py-2 rounded-xl bg-white border border-zinc-200 text-sm font-medium text-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed max-w-[200px]"
                 >
                   <option value="all">{region === "all" ? L["chooseRegion"] : L["allM"]}</option>
                   {deptsForRegion.map((d) => <option key={d} value={d}>{d}</option>)}
@@ -308,11 +308,11 @@ export function ParcoursBrowser({ initialSearch = "" }: { initialSearch?: string
                 <input
                   id="pb-dist" type="range" min={5} max={100} step={5} value={distMax}
                   onChange={(e) => setDistMax(Number(e.target.value))}
-                  className="w-full accent-green-600 cursor-pointer"
+                  className="w-full accent-emerald-600 cursor-pointer"
                 />
               </div>
 
-              <button type="button" onClick={resetFilters} className="ml-auto text-xs font-semibold text-zinc-400 hover:text-green-600 transition-colors">
+              <button type="button" onClick={resetFilters} className="ml-auto text-xs font-semibold text-zinc-400 hover:text-emerald-600 transition-colors">
                 {L["reset"]}
               </button>
             </div>
@@ -351,7 +351,7 @@ export function ParcoursBrowser({ initialSearch = "" }: { initialSearch?: string
         <div className="text-center py-16">
           <Mountain className="w-9 h-9 text-zinc-300 mx-auto mb-3" />
           <p className="text-zinc-500">{L["empty"]}</p>
-          <button onClick={resetFilters} className="mt-3 text-sm font-semibold text-green-600 hover:text-green-700">{L["resetFilters"]}</button>
+          <button onClick={resetFilters} className="mt-3 text-sm font-semibold text-emerald-600 hover:text-emerald-700">{L["resetFilters"]}</button>
         </div>
       ) : (
         <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 transition-opacity ${loading ? "opacity-60" : ""}`}>
@@ -454,7 +454,7 @@ function ParcoursCard({ p, near, loading, disabled, onLoad }: { p: ParcoursHdf; 
     <div className="relative group">
     <button
       type="button" onClick={onLoad} disabled={disabled}
-      className="block w-full text-left bg-white rounded-3xl border border-zinc-200 overflow-hidden shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+      className="block w-full text-left bg-white rounded-3xl border border-zinc-200 overflow-hidden shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       <div className="relative h-36 overflow-hidden bg-zinc-100">
         <img
@@ -467,7 +467,7 @@ function ParcoursCard({ p, near, loading, disabled, onLoad }: { p: ParcoursHdf; 
         <span className={`absolute top-3 left-3 px-2.5 py-1 rounded-full text-[11px] font-bold ${meta.chip}`}>{meta.emoji} {pr(`sport.${p.sport}`)}</span>
         <span className="absolute top-3 right-3 px-2.5 py-1 rounded-full text-[11px] font-bold text-white shadow" style={{ backgroundColor: diff.color }}>{pr(`diff.${p.difficulte}`)}</span>
         {kmAway != null && (
-          <span className="absolute bottom-2.5 left-3 flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-600/90 backdrop-blur text-[10px] font-bold text-white shadow">
+          <span className="absolute bottom-2.5 left-3 flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-600/90 backdrop-blur text-[10px] font-bold text-white shadow">
             <LocateFixed className="w-3 h-3" /> {pr("kmAway", { n: kmAway })}
           </span>
         )}
@@ -475,7 +475,7 @@ function ParcoursCard({ p, near, loading, disabled, onLoad }: { p: ParcoursHdf; 
         {loading && (
           <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center">
             <span className="flex items-center gap-2 text-sm font-semibold text-zinc-700">
-              <Loader2 className="w-4 h-4 animate-spin text-green-600" /> {L["loadingTrace"]}
+              <Loader2 className="w-4 h-4 animate-spin text-emerald-600" /> {L["loadingTrace"]}
             </span>
           </div>
         )}
@@ -486,7 +486,7 @@ function ParcoursCard({ p, near, loading, disabled, onLoad }: { p: ParcoursHdf; 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[13px] text-zinc-700 font-semibold">
           {p.distance_km > 0 ? (
             <>
-              <span className="flex items-center gap-1"><RouteIcon className="w-3.5 h-3.5 text-green-600" />{p.distance_km.toFixed(1)} km</span>
+              <span className="flex items-center gap-1"><RouteIcon className="w-3.5 h-3.5 text-emerald-600" />{p.distance_km.toFixed(1)} km</span>
               {p.temps_estime !== "—" && <span className="flex items-center gap-1"><Timer className="w-3.5 h-3.5 text-zinc-400" />{p.temps_estime}</span>}
             </>
           ) : (
@@ -513,7 +513,7 @@ function ParcoursCard({ p, near, loading, disabled, onLoad }: { p: ParcoursHdf; 
         type="button" onClick={downloadGpx} disabled={dl}
         aria-label={pr("gpxAria", { name: p.nom })}
         title={L["gpxTitle"]}
-        className="absolute bottom-3.5 right-3.5 z-10 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-white bg-zinc-900/90 backdrop-blur hover:bg-green-600 shadow-lg opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
+        className="absolute bottom-3.5 right-3.5 z-10 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-white bg-zinc-900/90 backdrop-blur hover:bg-emerald-600 shadow-lg opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
       >
         {dl ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} GPX
       </button>

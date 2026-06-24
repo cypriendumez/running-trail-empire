@@ -205,7 +205,7 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
 
         {/* Count */}
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          <MapPin className="w-3.5 h-3.5 text-green-600" />
+          <MapPin className="w-3.5 h-3.5 text-emerald-600" />
           <span className="text-sm font-bold text-zinc-800">{filtered.length}</span>
           <span className="text-xs text-zinc-400">{d["pins"]} · {races.length.toLocaleString(lang)} {d["courses"]}</span>
         </div>
@@ -328,7 +328,7 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
               {/* Stats */}
               <div className="grid grid-cols-2 gap-px bg-zinc-100">
                 {[
-                  { icon: <Zap className="w-3.5 h-3.5 text-green-500" />, label: d["l.distance"], value: `${selected.distance_km} km` },
+                  { icon: <Zap className="w-3.5 h-3.5 text-emerald-500" />, label: d["l.distance"], value: `${selected.distance_km} km` },
                   { icon: <Mountain className="w-3.5 h-3.5 text-amber-500" />, label: "D+", value: (selected.elevation_gain_m ?? 0) > 0 ? `+${Number(selected.elevation_gain_m).toLocaleString(lang)} m` : "—" },
                   { icon: <Calendar className="w-3.5 h-3.5 text-blue-500" />, label: d["l.date"], value: selected.date?.startsWith("2099") ? d["dateTBD"] : new Date(selected.date + "T00:00:00").toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long" }) },
                   { icon: <MapPin className="w-3.5 h-3.5 text-red-400" />, label: d["l.place"], value: selected.city ? `${selected.city}${selected.department ? ` (${selected.department})` : ""}` : (selected.department || "—") },

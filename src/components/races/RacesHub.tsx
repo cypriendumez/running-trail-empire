@@ -229,7 +229,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
           <select
             value={region}
             onChange={e => handleFilterChange(() => setRegion(e.target.value))}
-            className="text-sm px-3 py-1.5 rounded-lg border border-zinc-200 bg-white text-zinc-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="text-sm px-3 py-1.5 rounded-lg border border-zinc-200 bg-white text-zinc-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500"
           >
             {REGIONS.map(r => <option key={r} value={r}>{r === "Toutes" ? d["allRegions"] : r}</option>)}
           </select>
@@ -237,7 +237,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
           <select
             value={raceType}
             onChange={e => handleFilterChange(() => setRaceType(e.target.value))}
-            className="text-sm px-3 py-1.5 rounded-lg border border-zinc-200 bg-white text-zinc-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="text-sm px-3 py-1.5 rounded-lg border border-zinc-200 bg-white text-zinc-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500"
           >
             <option value="all">{d["allTypes"]}</option>
             {RACE_TYPE_KEYS.map(v => <option key={v} value={v}>{d[`rt.${v}`]}</option>)}
@@ -247,7 +247,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
             type="date"
             value={dateFrom}
             onChange={e => handleFilterChange(() => setDateFrom(e.target.value))}
-            className="text-sm px-3 py-1.5 rounded-lg border border-zinc-200 bg-white text-zinc-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="text-sm px-3 py-1.5 rounded-lg border border-zinc-200 bg-white text-zinc-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500"
           />
 
           <div className="flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white pl-2.5">
@@ -294,7 +294,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: Math.min(i * 0.015, 0.3) }}
                 onClick={() => openRace(race)}
-                className={`bento-card cursor-pointer transition-all hover:shadow-md ${selected?.id === race.id ? "ring-2 ring-green-500 bg-green-50/30" : ""}`}
+                className={`bento-card cursor-pointer transition-all hover:shadow-md ${selected?.id === race.id ? "ring-2 ring-emerald-500 bg-emerald-50/30" : ""}`}
               >
                 <div className="flex items-start gap-3.5">
                   <div
@@ -332,7 +332,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                         </span>
                       )}
                       <span className="flex items-center gap-1 font-semibold text-zinc-700">
-                        <Zap className="w-3 h-3 text-green-500" />
+                        <Zap className="w-3 h-3 text-emerald-500" />
                         {fmtDistance(race.distance_km, units)}
                       </span>
                       {(race.elevation_gain_m ?? 0) > 0 && (
