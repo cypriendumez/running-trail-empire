@@ -252,7 +252,7 @@ function Toggle({ enabled, onToggle, label }: { enabled: boolean; onToggle: () =
     <div className="flex items-center justify-between py-3 border-b border-zinc-100 last:border-0">
       <span className="text-sm text-zinc-700">{label}</span>
       <button onClick={onToggle}
-        className={`relative w-11 h-6 rounded-full transition-colors ${enabled ? "bg-green-500" : "bg-zinc-300"}`}>
+        className={`relative w-11 h-6 rounded-full transition-colors ${enabled ? "bg-emerald-500" : "bg-zinc-300"}`}>
         <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${enabled ? "translate-x-5" : ""}`} />
       </button>
     </div>
@@ -543,7 +543,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
               // eslint-disable-next-line @next/next/no-img-element
               <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
             ) : (
-              <div className="w-full h-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center text-white text-3xl font-black">
+              <div className="w-full h-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-3xl font-black">
                 {String(form.full_name)[0]?.toUpperCase() ?? "U"}
               </div>
             )}
@@ -556,7 +556,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
             </div>
           </button>
           {/* Online dot */}
-          <span className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-white flex items-center justify-center pointer-events-none">
+          <span className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 rounded-full border-2 border-white flex items-center justify-center pointer-events-none">
             <span className="w-2 h-2 rounded-full bg-white" />
           </span>
         </div>
@@ -583,7 +583,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
 
       {/* ── Stats banner ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label={tr("stat.kmYear")} value={Math.round(stats.kmYear)} unit="km" icon={<TrendingUp className="w-3.5 h-3.5" />} color="bg-green-50" />
+        <StatCard label={tr("stat.kmYear")} value={Math.round(stats.kmYear)} unit="km" icon={<TrendingUp className="w-3.5 h-3.5" />} color="bg-emerald-50" />
         <StatCard label={tr("stat.kmMonth")} value={Math.round(stats.kmMonth)} unit="km" icon={<Calendar className="w-3.5 h-3.5" />} color="bg-blue-50" />
         <StatCard label={tr("stat.sessions")} value={stats.sessionsMonth} icon={<Zap className="w-3.5 h-3.5" />} color="bg-violet-50" />
         <StatCard label={tr("stat.longest")} value={Math.round(stats.longestRun)} unit="km" icon={<Trophy className="w-3.5 h-3.5" />} color="bg-orange-50" />
@@ -616,7 +616,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center text-white text-xl font-black">
+                      <div className="w-full h-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-xl font-black">
                         {String(form.full_name)[0]?.toUpperCase() ?? "U"}
                       </div>
                     )}
@@ -628,7 +628,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={uploadingAvatar}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-zinc-200 rounded-xl text-xs font-semibold text-zinc-700 hover:border-green-400 hover:text-green-600 transition-all disabled:opacity-50"
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-zinc-200 rounded-xl text-xs font-semibold text-zinc-700 hover:border-emerald-400 hover:text-emerald-600 transition-all disabled:opacity-50"
                     >
                       {uploadingAvatar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
                       {uploadingAvatar ? tr("photo.uploading") : tr("photo.change")}
@@ -638,20 +638,20 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
               <div className="col-span-2">
                   <label className="text-xs font-medium text-zinc-500 block mb-1">{tr("f.name")}</label>
                   <input value={form.full_name} onChange={e => setForm(f => ({...f, full_name: e.target.value}))}
-                    className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                    className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                 </div>
                 {[{k:"age",l:tr("f.age")},{k:"height_cm",l:tr("f.height")},{k:"weight_kg",l:tr("f.weight")}].map(({k,l}) => (
                   <div key={k}>
                     <label className="text-xs font-medium text-zinc-500 block mb-1">{l}</label>
                     <input type="number" value={(form as unknown as Record<string,string>)[k]}
                       onChange={e => setForm(f => ({...f, [k]: e.target.value}))}
-                      className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                      className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                   </div>
                 ))}
                 <div>
                   <label className="text-xs font-medium text-zinc-500 block mb-1">{tr("f.lang")}</label>
                   <select value={lang} onChange={e => { const l = e.target.value as Lang; setLang(l); setForm(f => ({ ...f, preferred_language: l })); }}
-                    className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white">
+                    className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white">
                     {languageOptions.map(o => (
                       <option key={o.value} value={o.value}>{o.flag} {o.label}</option>
                     ))}
@@ -662,7 +662,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                   <textarea value={form.bio} onChange={e => setForm(f => ({...f, bio: e.target.value}))}
                     placeholder={tr("f.bioPh")}
                     rows={3} maxLength={200}
-                    className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
+                    className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none" />
                   <div className="text-right text-xs text-zinc-400 mt-1">{form.bio.length}/200</div>
                 </div>
                 <div className="col-span-2 grid grid-cols-2 gap-3">
@@ -719,7 +719,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
               <Toggle enabled={form.notif_league} onToggle={() => setForm(f => ({...f, notif_league: !f.notif_league}))} label={tr("notif.league")} />
               <Toggle enabled={form.notif_coach} onToggle={() => setForm(f => ({...f, notif_coach: !f.notif_coach}))} label={tr("notif.coach")} />
               <div className="pt-3">
-                <button onClick={save} disabled={saving} className="text-sm text-green-600 font-semibold hover:underline">
+                <button onClick={save} disabled={saving} className="text-sm text-emerald-600 font-semibold hover:underline">
                   {tr("notif.save")}
                 </button>
               </div>
@@ -765,7 +765,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
               <p className="text-sm text-zinc-500">{tr("gdpr.desc")}</p>
               <div className="flex flex-wrap gap-2">
                 <button onClick={exportData} disabled={exporting}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-white border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-700 hover:border-green-400 hover:text-green-600 transition-all disabled:opacity-50">
+                  className="flex items-center gap-1.5 px-3 py-2 bg-white border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-700 hover:border-emerald-400 hover:text-emerald-600 transition-all disabled:opacity-50">
                   {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                   {exporting ? tr("gdpr.exporting") : tr("gdpr.export")}
                 </button>
@@ -796,7 +796,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
             <AnimatePresence>
               {addingGoal && (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-                  className="bento-card border-2 border-green-200 bg-green-50 overflow-hidden">
+                  className="bento-card border-2 border-emerald-200 bg-emerald-50 overflow-hidden">
                   <div className="flex items-center justify-between mb-4">
                     <h4 className="font-semibold text-zinc-900">{tr("goals.new")}</h4>
                     <button onClick={() => setAddingGoal(false)}><X className="w-4 h-4 text-zinc-400" /></button>
@@ -808,7 +808,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                         {GOAL_TYPES.map(gt => (
                           <button key={gt.value} onClick={() => setNewGoal(g => ({...g, type: gt.value}))}
                             className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
-                              newGoal.type === gt.value ? "bg-green-500 text-white border-green-500" : "bg-white text-zinc-600 border-zinc-200 hover:border-green-300"
+                              newGoal.type === gt.value ? "bg-emerald-500 text-white border-emerald-500" : "bg-white text-zinc-600 border-zinc-200 hover:border-emerald-300"
                             }`}>
                             {gt.icon} {tr(gt.labelKey)}
                           </button>
@@ -819,7 +819,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       <label className="text-xs font-medium text-zinc-500 block mb-1">{tr("goals.name")}</label>
                       <input value={newGoal.label} onChange={e => setNewGoal(g => ({...g, label: e.target.value}))}
                         placeholder={newGoal.type === "race" ? tr("goals.namePhRace") : tr("goals.namePhOther")}
-                        className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white" />
+                        className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white" />
                     </div>
                     <div>
                       <label className="text-xs font-medium text-zinc-500 block mb-1">
@@ -827,18 +827,18 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       </label>
                       <input type="number" value={newGoal.target_value} onChange={e => setNewGoal(g => ({...g, target_value: e.target.value}))}
                         placeholder={tr("goals.targetValPh")}
-                        className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white" />
+                        className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white" />
                     </div>
                     {newGoal.type === "race" && (
                       <div>
                         <label className="text-xs font-medium text-zinc-500 block mb-1">{tr("goals.targetDate")}</label>
                         <input type="date" value={newGoal.target_date} onChange={e => setNewGoal(g => ({...g, target_date: e.target.value}))}
-                          className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white" />
+                          className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white" />
                       </div>
                     )}
                   </div>
                   <div className="flex gap-2 mt-4">
-                    <button onClick={addGoal} className="flex-1 bg-green-500 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-green-600 transition-all">
+                    <button onClick={addGoal} className="flex-1 bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-emerald-600 transition-all">
                       {tr("goals.create")}
                     </button>
                     <button onClick={() => setAddingGoal(false)} className="px-4 py-2.5 rounded-xl text-sm font-medium bg-white text-zinc-600 border border-zinc-200">
@@ -876,7 +876,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                             <div className="flex items-center gap-2">
                               <span className="text-base">{gt?.icon}</span>
                               <span className="font-semibold text-zinc-900 text-sm">{goal.label}</span>
-                              {goal.achieved && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">{tr("goals.achieved")}</span>}
+                              {goal.achieved && <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">{tr("goals.achieved")}</span>}
                             </div>
                             <div className="text-xs text-zinc-400 mt-0.5">
                               {goal.current_value} / {goal.target_value} {gt?.unit}
@@ -889,7 +889,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                           </div>
                           <div className="flex gap-1 shrink-0">
                             <button onClick={() => toggleGoalAchieved(goal)}
-                              className={`p-1.5 rounded-lg transition-all ${goal.achieved ? "bg-green-100 text-green-600" : "bg-zinc-100 text-zinc-400 hover:text-green-500"}`}>
+                              className={`p-1.5 rounded-lg transition-all ${goal.achieved ? "bg-emerald-100 text-emerald-600" : "bg-zinc-100 text-zinc-400 hover:text-emerald-500"}`}>
                               <CheckCircle className="w-4 h-4" />
                             </button>
                             <button onClick={() => deleteGoal(goal.id)}
@@ -899,7 +899,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                           </div>
                         </div>
                         <div className="mt-2 h-1.5 bg-zinc-100 rounded-full overflow-hidden">
-                          <motion.div className={`h-full rounded-full ${goal.achieved ? "bg-green-500" : "bg-blue-500"}`}
+                          <motion.div className={`h-full rounded-full ${goal.achieved ? "bg-emerald-500" : "bg-blue-500"}`}
                             initial={{ width: 0 }} animate={{ width: `${Math.min(pct * 100, 100)}%` }}
                             transition={{ duration: 0.8, ease: "easeOut" }} />
                         </div>
@@ -945,7 +945,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                     {[
                       { label: tr("perf.vma"), value: effVma > 0 ? `${effVma}` : "—", unit: "km/h", icon: <Wind className="w-4 h-4 text-blue-500" />, bg: "bg-blue-50" },
                       { label: tr("perf.maxHr"), value: maxHr > 0 ? `${maxHr}` : "—", unit: "bpm", icon: <Heart className="w-4 h-4 text-red-500" />, bg: "bg-red-50" },
-                      { label: tr("perf.restHr"), value: restHr ? `${restHr}` : "—", unit: restHr ? "bpm" : "", icon: <Heart className="w-4 h-4 text-green-500" />, bg: "bg-green-50" },
+                      { label: tr("perf.restHr"), value: restHr ? `${restHr}` : "—", unit: restHr ? "bpm" : "", icon: <Heart className="w-4 h-4 text-emerald-500" />, bg: "bg-emerald-50" },
                       { label: tr("perf.lt"), value: ltHrEff ? `${ltHrEff}` : "—", unit: ltHrEff ? "bpm" : "", icon: <Zap className="w-4 h-4 text-orange-500" />, bg: "bg-orange-50" },
                     ].map(m => (
                       <div key={m.label} className={`${m.bg} rounded-2xl p-4`}>
@@ -973,7 +973,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-semibold text-zinc-900">{tr("perf.vo2est")}</div>
                           <div className="truncate text-xs text-zinc-500">{tr("perf.vo2from", { sources: vo2?.sources.join(" + ") ?? "" })}</div>
-                          <div className={`mt-0.5 text-xs font-bold ${vo2max >= 56 ? "text-green-600" : vo2max >= 46 ? "text-blue-600" : vo2max >= 36 ? "text-orange-500" : "text-zinc-500"}`}>{vo2maxLabel(vo2max)}</div>
+                          <div className={`mt-0.5 text-xs font-bold ${vo2max >= 56 ? "text-emerald-600" : vo2max >= 46 ? "text-blue-600" : vo2max >= 36 ? "text-orange-500" : "text-zinc-500"}`}>{vo2maxLabel(vo2max)}</div>
                         </div>
                       </div>
                       {/* Position sur l'échelle 30 → 72 ml/kg/min (moyen → élite) */}
@@ -1108,7 +1108,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                 <h3 className="font-semibold text-zinc-900 flex items-center gap-2"><Clock className="w-4 h-4" /> {tr("perf.pacesTitle")}</h3>
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { label: tr("pace.z2"), pct: 0.65, color: "text-green-600" },
+                    { label: tr("pace.z2"), pct: 0.65, color: "text-emerald-600" },
                     { label: tr("pace.tempo"), pct: 0.80, color: "text-yellow-600" },
                     { label: tr("pace.seuil"), pct: 0.88, color: "text-orange-600" },
                     { label: tr("pace.vma"), pct: 1.00, color: "text-red-600" },
@@ -1227,7 +1227,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                   const pct = Number(shoe.current_km) / Number(shoe.max_km) * 100;
                   const status = pct >= 90 ? { color: "bg-red-500", text: tr("shoes.replace"), badge: "bg-red-100 text-red-700" }
                     : pct >= 70 ? { color: "bg-orange-500", text: tr("shoes.watch"), badge: "bg-orange-100 text-orange-700" }
-                    : { color: "bg-green-500", text: tr("shoes.good"), badge: "bg-green-100 text-green-700" };
+                    : { color: "bg-emerald-500", text: tr("shoes.good"), badge: "bg-emerald-100 text-emerald-700" };
                   const remaining = Number(shoe.max_km) - Number(shoe.current_km);
                   return (
                     <motion.div key={shoe.id} layout className="bento-card">
@@ -1279,7 +1279,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                   </div>
                 </div>
                 <span className={`px-3 py-1.5 rounded-xl text-sm font-semibold ${
-                  profile?.subscription_tier !== "free" ? "bg-green-100 text-green-700" : "bg-zinc-200 text-zinc-600"
+                  profile?.subscription_tier !== "free" ? "bg-emerald-100 text-emerald-700" : "bg-zinc-200 text-zinc-600"
                 }`}>
                   {profile?.subscription_tier !== "free" ? tr("sub.active") : tr("sub.free")}
                 </span>
@@ -1302,10 +1302,10 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                   <div key={feat.label} className="flex items-center justify-between py-2 border-b border-zinc-100 last:border-0">
                     <span className="text-sm text-zinc-700">{feat.label}</span>
                     <div className="flex items-center gap-4">
-                      <span className={`text-xs w-12 text-center ${feat.free ? "text-green-600" : "text-zinc-300"}`}>
+                      <span className={`text-xs w-12 text-center ${feat.free ? "text-emerald-600" : "text-zinc-300"}`}>
                         {feat.free ? "✓" : "✗"}
                       </span>
-                      <span className={`text-xs w-12 text-center font-semibold ${feat.pro ? "text-green-600" : "text-zinc-300"}`}>
+                      <span className={`text-xs w-12 text-center font-semibold ${feat.pro ? "text-emerald-600" : "text-zinc-300"}`}>
                         {feat.pro ? "✓" : "✗"}
                       </span>
                     </div>
@@ -1313,7 +1313,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                 ))}
               </div>
               <div className="flex justify-end gap-8 mt-2 text-xs font-semibold text-zinc-400">
-                <span>{tr("sub.free")}</span><span className="text-green-600">{tr("sub.pro")}</span>
+                <span>{tr("sub.free")}</span><span className="text-emerald-600">{tr("sub.pro")}</span>
               </div>
             </div>
 
@@ -1329,9 +1329,9 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                 <div className="flex items-end gap-1 mb-4">
                   <span className="text-4xl font-black">10€</span>
                   <span className="text-zinc-400 mb-1">{tr("sub.perMonth")}</span>
-                  <span className="ml-3 text-sm text-green-400 font-semibold">{tr("sub.yearly")}</span>
+                  <span className="ml-3 text-sm text-emerald-400 font-semibold">{tr("sub.yearly")}</span>
                 </div>
-                <a href="/pricing" className="block w-full text-center bg-green-500 hover:bg-green-400 text-white py-3 rounded-xl font-semibold transition-all">
+                <a href="/pricing" className="block w-full text-center bg-emerald-500 hover:bg-emerald-400 text-white py-3 rounded-xl font-semibold transition-all">
                   {tr("sub.trial")} <ChevronRight className="w-4 h-4 inline" />
                 </a>
               </div>

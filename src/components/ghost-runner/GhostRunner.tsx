@@ -785,12 +785,12 @@ export function GhostRunner({ baseline, coachSessions = [] }: GhostRunnerProps) 
                   {sendingWatch ? d["watch.sending"] : d["watch.send"]}
                   {!sendingWatch && watchStatus && (
                     <span title={watchStatus.pushReady ? tg("watch.okTitle", { d: watchStatus.device ?? "" }) : d["watch.setupTitle"]}
-                      className={`h-2 w-2 rounded-full ${watchStatus.pushReady ? "bg-green-400" : watchStatus.connected ? "bg-amber-400" : "bg-zinc-400"}`} />
+                      className={`h-2 w-2 rounded-full ${watchStatus.pushReady ? "bg-emerald-400" : watchStatus.connected ? "bg-amber-400" : "bg-zinc-400"}`} />
                   )}
                 </button>
                 <button
                   onClick={() => (targetMode === "hr" ? startHrSession() : startSession())}
-                  className="bg-green-500 hover:bg-green-400 text-white font-bold px-8 py-4 rounded-2xl flex items-center gap-3 text-lg transition-all"
+                  className="bg-emerald-500 hover:bg-emerald-400 text-white font-bold px-8 py-4 rounded-2xl flex items-center gap-3 text-lg transition-all"
                 >
                   <Play className="w-6 h-6" />
                   {d["start"]}
@@ -808,8 +808,8 @@ export function GhostRunner({ baseline, coachSessions = [] }: GhostRunnerProps) 
                 <div className="min-w-0 flex-1">
                   <span className="block text-sm font-bold text-zinc-900">{d["acc.title"]}</span>
                   {watchStatus && (
-                    <span className={`mt-0.5 flex items-center gap-1.5 text-xs font-semibold ${watchStatus.pushReady ? "text-green-700" : watchStatus.connected ? "text-amber-700" : "text-zinc-500"}`}>
-                      <span className={`h-2 w-2 flex-shrink-0 rounded-full ${watchStatus.pushReady ? "bg-green-500" : watchStatus.connected ? "bg-amber-500" : "bg-zinc-400"}`} />
+                    <span className={`mt-0.5 flex items-center gap-1.5 text-xs font-semibold ${watchStatus.pushReady ? "text-emerald-700" : watchStatus.connected ? "text-amber-700" : "text-zinc-500"}`}>
+                      <span className={`h-2 w-2 flex-shrink-0 rounded-full ${watchStatus.pushReady ? "bg-emerald-500" : watchStatus.connected ? "bg-amber-500" : "bg-zinc-400"}`} />
                       {watchStatus.pushReady
                         ? tg("acc.ok", { d: watchStatus.device ?? "" })
                         : watchStatus.connected
@@ -853,7 +853,7 @@ export function GhostRunner({ baseline, coachSessions = [] }: GhostRunnerProps) 
             {/* Statut GPS en course */}
             {phase === "running" && (
               <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-semibold">
-                {gpsStatus === "live" && <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-green-700"><span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" /> {d["st.gps"]}{gpsAccuracy != null ? ` · ±${Math.round(gpsAccuracy)} m` : ""}</span>}
+                {gpsStatus === "live" && <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-emerald-700"><span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" /> {d["st.gps"]}{gpsAccuracy != null ? ` · ±${Math.round(gpsAccuracy)} m` : ""}</span>}
                 {gpsStatus === "searching" && <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-amber-700"><Loader2 className="h-3 w-3 animate-spin" /> {d["st.search"]}</span>}
                 {gpsStatus === "sim" && sessionKind === "pace" && <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1 text-zinc-600">{d["st.demo"]}</span>}
                 {sessionKind === "hr" && (
@@ -1016,7 +1016,7 @@ export function GhostRunner({ baseline, coachSessions = [] }: GhostRunnerProps) 
                       <>
                         <span className="text-zinc-500 font-mono">{formatTime(cp.actualTime)}</span>
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                          cp.split === "ahead" ? "bg-green-100 text-green-700" :
+                          cp.split === "ahead" ? "bg-emerald-100 text-emerald-700" :
                           cp.split === "behind" ? "bg-orange-100 text-orange-700" :
                           "bg-blue-100 text-blue-700"
                         }`}>

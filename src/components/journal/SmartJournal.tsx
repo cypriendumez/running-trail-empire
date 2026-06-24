@@ -188,7 +188,7 @@ export function SmartJournal() {
   }
 
   const sentimentConfig = {
-    positive: { icon: Smile, color: "text-green-600", bg: "bg-green-50", labelKey: "sent.positive" },
+    positive: { icon: Smile, color: "text-emerald-600", bg: "bg-emerald-50", labelKey: "sent.positive" },
     neutral: { icon: Meh, color: "text-blue-600", bg: "bg-blue-50", labelKey: "sent.neutral" },
     negative: { icon: Frown, color: "text-orange-600", bg: "bg-orange-50", labelKey: "sent.negative" },
   };
@@ -373,8 +373,8 @@ function ScoreBar({ label, value, icon, invertColor = false }: {
 }) {
   const pct = (value / 10) * 100;
   const color = invertColor
-    ? value > 7 ? "bg-red-500" : value > 4 ? "bg-orange-400" : "bg-green-500"
-    : value > 7 ? "bg-green-500" : value > 4 ? "bg-blue-400" : "bg-zinc-300";
+    ? value > 7 ? "bg-red-500" : value > 4 ? "bg-orange-400" : "bg-emerald-500"
+    : value > 7 ? "bg-emerald-500" : value > 4 ? "bg-blue-400" : "bg-zinc-300";
 
   return (
     <div>
