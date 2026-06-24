@@ -14,7 +14,7 @@ export type CoachClient = {
 
 const STATE: Record<string, { l: string; c: string; dot: string }> = {
   recovery: { l: "Récup", c: "bg-sky-100 text-sky-700", dot: "#0284c7" },
-  optimal: { l: "Optimal", c: "bg-green-100 text-green-700", dot: "#059669" },
+  optimal: { l: "Optimal", c: "bg-emerald-100 text-emerald-700", dot: "#059669" },
   competition: { l: "Haute intensité", c: "bg-orange-100 text-orange-700", dot: "#ea580c" },
 };
 const ago = (d: string) => {
@@ -57,7 +57,7 @@ export function CoachPanel({ clients, unread = 0 }: { clients: CoachClient[]; un
     <div className="min-h-screen bg-zinc-50 p-4 sm:p-6">
       <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900 flex items-center gap-2"><Users className="w-6 h-6 text-green-600" /> Espace Coach</h1>
+          <h1 className="text-2xl font-bold text-zinc-900 flex items-center gap-2"><Users className="w-6 h-6 text-emerald-600" /> Espace Coach</h1>
           <p className="text-sm text-zinc-500 mt-1">Tes <b>{clients.length}</b> clients · données en temps réel · analyse IA + envoi de la séance du jour.</p>
         </div>
         <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
@@ -91,7 +91,7 @@ export function CoachPanel({ clients, unread = 0 }: { clients: CoachClient[]; un
                       <span key={i} className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${f.sev >= 3 ? "bg-red-50 text-red-600" : f.sev >= 2 ? "bg-amber-50 text-amber-700" : "bg-zinc-100 text-zinc-600"}`}>{f.icon} {f.label}</span>
                     ))}
                   </span>
-                  <span className="ml-auto text-xs font-semibold text-green-600">Voir →</span>
+                  <span className="ml-auto text-xs font-semibold text-emerald-600">Voir →</span>
                 </button>
               );
             })}
@@ -116,7 +116,7 @@ export function CoachPanel({ clients, unread = 0 }: { clients: CoachClient[]; un
                 const st = c.state ? STATE[c.state] : null;
                 return (
                   <button key={c.id} onClick={() => select(c)}
-                    className={`w-full text-left p-3 rounded-xl transition-colors ${sel?.id === c.id ? "bg-green-50 border border-green-200" : "hover:bg-zinc-50 border border-transparent"}`}>
+                    className={`w-full text-left p-3 rounded-xl transition-colors ${sel?.id === c.id ? "bg-emerald-50 border border-emerald-200" : "hover:bg-zinc-50 border border-transparent"}`}>
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: st?.dot ?? "#d4d4d8" }} />
                       <span className="font-semibold text-zinc-900 text-sm truncate flex-1">{c.name}</span>
@@ -153,7 +153,7 @@ export function CoachPanel({ clients, unread = 0 }: { clients: CoachClient[]; un
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <Stat icon={<HeartPulse className="w-4 h-4 text-red-400" />} label="VFC" value={sel.hrv != null ? `${sel.hrv} ms` : "—"} />
                   <Stat icon={<Moon className="w-4 h-4 text-indigo-400" />} label="Sommeil" value={sel.sleepScore != null ? `${sel.sleepScore}/100` : "—"} />
-                  <Stat icon={<Activity className="w-4 h-4 text-green-500" />} label="Volume 7j" value={`${sel.weekKm} km`} />
+                  <Stat icon={<Activity className="w-4 h-4 text-emerald-500" />} label="Volume 7j" value={`${sel.weekKm} km`} />
                   <Stat icon={<span className="text-sm">📊</span>} label="Charge 14j" value={sel.load14 != null ? `${sel.load14} TSS` : "—"} />
                 </div>
                 {sel.lastRun && (
