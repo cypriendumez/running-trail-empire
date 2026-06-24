@@ -1,20 +1,26 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { Container } from "@/components/ui/Container";
 import { btnClass } from "@/components/ui/Button";
-
-const LINKS = [
-  { href: "/#programmes", label: "Programmes" },
-  { href: "/#features", label: "Fonctionnalités" },
-  { href: "/pricing", label: "Tarifs" },
-  { href: "/blog", label: "Blog" },
-  { href: "/avis", label: "Avis" },
-];
+import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
+import { useT } from "@/lib/i18n/LanguageProvider";
+import { CHROME } from "@/components/layout/chromeI18n";
 
 // En-tête marketing partagé par les pages publiques (hors landing qui a son hero).
 export function SiteHeader() {
+  const { lang } = useT();
+  const c = (CHROME[lang] ?? CHROME.fr).nav;
+  const links = [
+    { href: "/#programmes", label: c.programs },
+    { href: "/#features", label: c.features },
+    { href: "/pricing", label: c.pricing },
+    { href: "/blog", label: c.blog },
+    { href: "/avis", label: c.reviews },
+  ];
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200/70 bg-white/80 backdrop-blur-xl">
       <Container className="flex h-16 items-center justify-between gap-3">
@@ -23,16 +29,17 @@ export function SiteHeader() {
           <Wordmark className="text-xl" />
         </Link>
         <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-500">
-          {LINKS.map((l) => (
+          {links.map((l) => (
             <Link key={l.href} href={l.href} className="hover:text-zinc-900 transition-colors">{l.label}</Link>
           ))}
         </nav>
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1 sm:gap-2">
+          <LanguageSwitcher />
           <Link href="/login" className="hidden sm:inline-flex px-3 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors">
-            Connexion
+            {c.login}
           </Link>
           <Link href="/signup" className={btnClass("primary", "sm")}>
-            Essai gratuit <ArrowRight className="h-3.5 w-3.5" />
+            {c.trial} <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
       </Container>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Globe, Check } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { LANGS } from "@/lib/i18n/translations";
@@ -8,6 +9,7 @@ import { LANGS } from "@/lib/i18n/translations";
 // Sélecteur de langue pour les pages publiques (et partout). Persisté via cookie par setLang.
 export function LanguageSwitcher({ light = false, className = "" }: { light?: boolean; className?: string }) {
   const { lang, setLang } = useT();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -35,7 +37,7 @@ export function LanguageSwitcher({ light = false, className = "" }: { light?: bo
           {LANGS.map((l) => (
             <button
               key={l.code}
-              onClick={() => { setLang(l.code); setOpen(false); }}
+              onClick={() => { setLang(l.code); setOpen(false); router.refresh(); }}
               className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-zinc-700 transition-colors hover:bg-zinc-50"
             >
               <span>{l.flag}</span>
