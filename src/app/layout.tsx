@@ -4,6 +4,8 @@ import { Inter, Anton } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/layout/Providers";
 import { ErrorReporter } from "@/components/ErrorReporter";
+import { LanguageProvider } from "@/lib/i18n/LanguageProvider";
+import { getPublicLang } from "@/lib/i18n/serverLang";
 
 // Polices réellement chargées (avant : variables jamais définies → tout en system-ui).
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
@@ -52,16 +54,19 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const lang = await getPublicLang();
   return (
-    <html lang="fr" className={`${inter.variable} ${anton.variable}`} suppressHydrationWarning>
+    <html lang={lang} className={`${inter.variable} ${anton.variable}`} suppressHydrationWarning>
       <body className="font-sans">
         <ErrorReporter />
-        <Providers>{children}</Providers>
+        <LanguageProvider initialLang={lang}>
+          <Providers>{children}</Providers>
+        </LanguageProvider>
       </body>
     </html>
   );

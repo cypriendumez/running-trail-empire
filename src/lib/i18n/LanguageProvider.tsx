@@ -18,7 +18,9 @@ export function LanguageProvider({ initialLang, userId, children }: { initialLan
   const setLang = useCallback((l: Lang) => {
     setLangState(l);
     try { document.documentElement.lang = l; } catch { /* ignore */ }
-    // Persistance (profiles.preferred_language) — l'app s'affiche dans cette langue à chaque visite.
+    // Mémorisation côté visiteur (pages publiques, pas de compte) — cookie lu par le serveur.
+    try { document.cookie = `pacevo_lang=${l}; path=/; max-age=31536000; SameSite=Lax`; } catch { /* ignore */ }
+    // Persistance compte (profiles.preferred_language) — l'app s'affiche dans cette langue à chaque visite.
     if (userId) { try { void createClient().from("profiles").update({ preferred_language: l }).eq("id", userId); } catch { /* ignore */ } }
   }, [userId]);
 
