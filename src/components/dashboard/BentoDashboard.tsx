@@ -611,13 +611,13 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
           <div className="mt-3 flex h-14 items-end gap-1.5">
             {volumeTrend.map((v, i) => (
               <div key={i} className="flex-1 rounded-t-md transition-all"
-                style={{ height: `${Math.max(4, (v.km / trendMax) * 56)}px`, background: v.isCurrent ? "#16a34a" : "#D1FAE5" }}
+                style={{ height: `${Math.max(4, (v.km / trendMax) * 56)}px`, background: v.isCurrent ? "#059669" : "#D1FAE5" }}
                 title={`${v.km.toFixed(1)} km`} />
             ))}
           </div>
           <div className="mt-1 text-center text-[10px] text-zinc-400">{t("dash.volume.trend")}</div>
           <div className="mt-3 h-1.5 rounded-full bg-zinc-100">
-            <div className="h-full rounded-full bg-green-500 transition-all" style={{ width: `${Math.min((weeklyKm / 60) * 100, 100)}%` }} />
+            <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${Math.min((weeklyKm / 60) * 100, 100)}%` }} />
           </div>
           <div className="mt-1 text-xs text-zinc-400">{t("dash.volume.goal")}: {plan ? t("dash.volume.perPlan") : "60 km"}</div>
         </motion.div>
@@ -694,7 +694,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
               ))}
             </div>
           )}
-          <Link href="/dashboard/leagues" className="mt-auto pt-3 text-xs font-medium text-green-600 hover:text-green-700">{t("dash.league.cta")}</Link>
+          <Link href="/dashboard/leagues" className="mt-auto pt-3 text-xs font-medium text-emerald-600 hover:text-emerald-700">{t("dash.league.cta")}</Link>
         </motion.div>
 
         <SectionLabel>{t("dash.sec.activity")}</SectionLabel>
@@ -716,11 +716,11 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
               <CartesianGrid strokeDasharray="3 3" stroke="#F4F4F5" vertical={false} />
               <XAxis dataKey="day" tick={{ fontSize: 11, fill: "#A1A1AA" }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: "#A1A1AA" }} axisLine={false} tickLine={false} width={28} />
-              <Tooltip cursor={{ fill: "rgba(34,197,94,0.06)" }}
+              <Tooltip cursor={{ fill: "rgba(16,185,129,0.06)" }}
                 contentStyle={{ borderRadius: "12px", border: "1px solid #E4E4E7", fontSize: "12px" }}
                 formatter={(v: number) => [`${v.toFixed(1)} km`, t("dash.chart.distance")]} />
               <Bar dataKey="km" radius={[6, 6, 0, 0]} maxBarSize={36}>
-                {weeklyData.map((d, i) => (<Cell key={i} fill={d.km > 0 ? "#22c55e" : "#E4E4E7"} />))}
+                {weeklyData.map((d, i) => (<Cell key={i} fill={d.km > 0 ? "#10b981" : "#E4E4E7"} />))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -772,7 +772,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
         >
           <div className="flex items-center justify-between mb-4">
             <div className="metric-label">{t("dash.recent.title")}</div>
-            <a href="/dashboard/calendrier" className="text-xs text-green-600 font-medium hover:text-green-700">
+            <a href="/dashboard/calendrier" className="text-xs text-emerald-600 font-medium hover:text-emerald-700">
               {t("dash.recent.viewAll")}
             </a>
           </div>
