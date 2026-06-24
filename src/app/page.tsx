@@ -62,6 +62,9 @@ export default function LandingPage() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Nav adaptative : blanche sur le hero photo, sombre une fois scrollé.
+  const navLink = scrolled ? "hover:text-zinc-900 transition-colors" : "hover:text-white transition-colors";
+
   const filtered = activeCategory === "TOUT VOIR" ? PROGRAMS : PROGRAMS.filter((p) => p.category === activeCategory);
 
   return (
@@ -72,94 +75,67 @@ export default function LandingPage() {
         <Container className="flex h-16 items-center justify-between gap-3">
           <Link href="/" className="flex items-center gap-2.5">
             <Logo size={30} />
-            <Wordmark className="text-xl" />
+            <Wordmark tone={scrolled ? "dark" : "light"} className="text-xl" />
           </Link>
-          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-500">
-            <a href="#programmes" className="hover:text-zinc-900 transition-colors">Programmes</a>
-            <a href="#features" className="hover:text-zinc-900 transition-colors">Fonctionnalités</a>
-            <a href="#tarifs" className="hover:text-zinc-900 transition-colors">Tarifs</a>
-            <Link href="/blog" className="hover:text-zinc-900 transition-colors">Blog</Link>
-            <Link href="/avis" className="hover:text-zinc-900 transition-colors">Avis</Link>
+          <div className={`hidden md:flex items-center gap-8 text-sm font-medium ${scrolled ? "text-zinc-500" : "text-white/80"}`}>
+            <a href="#programmes" className={navLink}>Programmes</a>
+            <a href="#features" className={navLink}>Fonctionnalités</a>
+            <a href="#tarifs" className={navLink}>Tarifs</a>
+            <Link href="/blog" className={navLink}>Blog</Link>
+            <Link href="/avis" className={navLink}>Avis</Link>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            <Link href="/login" className="hidden sm:inline-flex px-3 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors">
+            <Link href="/login" className={`hidden sm:inline-flex px-3 py-2 text-sm font-medium transition-colors ${scrolled ? "text-zinc-600 hover:text-zinc-900" : "text-white/90 hover:text-white"}`}>
               Connexion
             </Link>
-            <Link href="/signup" className={btnClass("primary", "sm")}>
+            <Link href="/signup" className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-semibold transition-colors ${scrolled ? "bg-zinc-900 text-white hover:bg-zinc-800" : "bg-white text-zinc-900 hover:bg-white/90"}`}>
               Essai gratuit <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
         </Container>
       </nav>
 
-      {/* ── HERO ── */}
-      <Container className="pt-32 pb-12 sm:pt-36 lg:pt-40">
-        <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
-          <div>
-            <Badge tone="brand" dot>Nouveau · Ghost Runner vocal</Badge>
-            <h1 className="mt-5 text-4xl sm:text-5xl lg:text-[3.4rem] font-bold leading-[1.04] tracking-tight">
-              Cours plus loin,<br />récupère <span className="text-[#059669]">plus vite</span>.
+      {/* ── HERO ── plein cadre, photo de piste immersive */}
+      <section className="relative flex min-h-screen items-end overflow-hidden">
+        <img
+          src="https://images.unsplash.com/photo-1502904550040-7534597429ae?w=1920&q=85&fit=crop&crop=center"
+          alt="Piste d'athlétisme vue du dessus"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/10" />
+        <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/50 to-transparent" />
+
+        <Container className="relative z-10 pb-20 pt-28 sm:pb-24">
+          <div className="max-w-2xl">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-white ring-1 ring-inset ring-white/20 backdrop-blur">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#34d399]" /> Nouveau · Ghost Runner vocal
+            </span>
+            <h1 className="mt-5 text-5xl font-bold leading-[1.02] tracking-tight text-white sm:text-6xl lg:text-7xl">
+              Cours plus loin,<br />récupère <span className="text-[#34d399]">plus vite</span>.
             </h1>
-            <p className="mt-5 max-w-md text-lg leading-relaxed text-zinc-500">
+            <p className="mt-6 max-w-lg text-lg leading-relaxed text-white/75">
               Un plan d&apos;entraînement qui s&apos;ajuste chaque jour à ta VFC, ton sommeil et ta charge réelle. Le coach intelligent du coureur exigeant.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Link href="/signup" className={btnClass("primary", "lg")}>
+              <Link href="/signup" className="inline-flex items-center gap-2 rounded-xl bg-white px-7 py-3.5 text-base font-semibold text-zinc-900 transition-colors hover:bg-white/90">
                 Commencer gratuitement <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link href="/login" className={btnClass("secondary", "lg")}>
+              <Link href="/login" className="inline-flex items-center gap-2 rounded-xl px-7 py-3.5 text-base font-semibold text-white ring-1 ring-inset ring-white/30 transition-colors hover:bg-white/10">
                 <Play className="h-4 w-4" /> Voir la démo
               </Link>
             </div>
             <div className="mt-10 flex flex-wrap items-center gap-x-5 gap-y-2">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-400">Synchro</span>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/40">Synchro</span>
               {SYNC.map((s) => (
-                <span key={s} className="text-xs font-bold uppercase tracking-wide text-zinc-300">{s}</span>
+                <span key={s} className="text-xs font-bold uppercase tracking-wide text-white/35">{s}</span>
               ))}
             </div>
           </div>
-
-          {/* Visuel : piste vue du dessus + aperçu produit flottant */}
-          <div className="relative">
-            <div className="relative aspect-[4/5] overflow-hidden rounded-3xl ring-1 ring-black/5 shadow-[0_30px_60px_-30px_rgba(16,24,40,.35)]">
-              <img
-                src="https://images.unsplash.com/photo-1502904550040-7534597429ae?w=1200&q=80&fit=crop&crop=center"
-                alt="Piste d'athlétisme vue du dessus"
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
-              {/* Carte produit flottante */}
-              <div className="absolute inset-x-4 bottom-4 rounded-2xl bg-white/95 p-4 shadow-[0_20px_45px_-18px_rgba(0,0,0,.55)] backdrop-blur-md">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-zinc-900">Cette semaine</span>
-                  <Badge tone="brand">+12% de charge</Badge>
-                </div>
-                <svg viewBox="0 0 320 60" className="mt-3 h-14 w-full" preserveAspectRatio="none">
-                  <path d="M0,48 L45,39 L90,43 L135,27 L180,32 L225,16 L270,21 L320,8" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M0,48 L45,39 L90,43 L135,27 L180,32 L225,16 L270,21 L320,8 L320,60 L0,60 Z" fill="#0596691a" />
-                </svg>
-                <div className="mt-3 grid grid-cols-3 gap-2.5">
-                  {[
-                    { l: "Volume 7j", v: "52", u: "km" },
-                    { l: "VO2max", v: "58.4", u: "" },
-                    { l: "VFC", v: "72", u: "ms" },
-                  ].map((m) => (
-                    <div key={m.l} className="rounded-xl bg-zinc-50 px-3 py-2.5">
-                      <div className="text-[10px] font-medium uppercase tracking-wider text-zinc-400">{m.l}</div>
-                      <div className="mt-0.5 text-lg font-bold tabular-nums">
-                        {m.v}{m.u && <span className="text-xs font-medium text-zinc-400"> {m.u}</span>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Container>
+        </Container>
+      </section>
 
       {/* ── STATS ── */}
-      <Container>
+      <Container className="py-16 sm:py-20">
         <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-200 sm:grid-cols-4">
           {STATS.map((s) => (
             <div key={s.label} className="bg-white px-6 py-7 text-center">
