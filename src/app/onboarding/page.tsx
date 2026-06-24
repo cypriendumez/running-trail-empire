@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { vmaFrom6min } from "@/lib/running/fitness";
 import { ArrowRight, ArrowLeft, User, Activity, Target, CheckCircle2, Watch, Eye, EyeOff, ExternalLink, RefreshCw, AlertCircle, Wifi } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
+import { Wordmark } from "@/components/brand/Wordmark";
 
 type Step = "watch" | "profile" | "physio" | "goals" | "done";
 
@@ -191,7 +192,8 @@ export default function OnboardingPage() {
         {/* Header */}
         <div className="text-center mb-10">
           <div className="flex items-center justify-center gap-2.5 mb-6">
-            <Logo size={40} />
+            <Logo size={36} />
+            <Wordmark className="text-2xl" />
           </div>
           <h1 className="text-3xl font-bold text-zinc-900 mb-2">Bienvenue sur Pacevo</h1>
           <p className="text-zinc-500">Calibrons votre profil pour des plans sur mesure</p>
@@ -203,14 +205,14 @@ export default function OnboardingPage() {
             {STEPS.slice(0, -1).map((s, i) => (
               <div key={s} className="flex items-center gap-2 flex-1">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-all ${
-                  i < stepIdx ? "bg-green-500 text-white" : i === stepIdx ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-400"
+                  i < stepIdx ? "bg-emerald-500 text-white" : i === stepIdx ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-400"
                 }`}>
                   {i < stepIdx ? <CheckCircle2 className="w-4 h-4" /> : i + 1}
                 </div>
                 <span className={`text-xs font-medium hidden sm:block ${i === stepIdx ? "text-zinc-900" : "text-zinc-400"}`}>
                   {STEP_LABELS[i]}
                 </span>
-                {i < STEPS.length - 2 && <div className={`flex-1 h-px ${i < stepIdx ? "bg-green-300" : "bg-zinc-200"}`} />}
+                {i < STEPS.length - 2 && <div className={`flex-1 h-px ${i < stepIdx ? "bg-emerald-300" : "bg-zinc-200"}`} />}
               </div>
             ))}
           </div>
@@ -239,19 +241,19 @@ export default function OnboardingPage() {
                     <label className="text-xs font-medium text-zinc-500 block mb-1">Âge</label>
                     <input type="number" value={profile.age} onChange={e => setProfile(p => ({...p, age: e.target.value}))}
                       placeholder="30" min="10" max="99"
-                      className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                      className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                   </div>
                   <div>
                     <label className="text-xs font-medium text-zinc-500 block mb-1">Taille (cm)</label>
                     <input type="number" value={profile.height_cm} onChange={e => setProfile(p => ({...p, height_cm: e.target.value}))}
                       placeholder="175" min="140" max="220"
-                      className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                      className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                   </div>
                   <div>
                     <label className="text-xs font-medium text-zinc-500 block mb-1">Poids (kg)</label>
                     <input type="number" value={profile.weight_kg} onChange={e => setProfile(p => ({...p, weight_kg: e.target.value}))}
                       placeholder="70" min="40" max="150"
-                      className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                      className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                   </div>
                 </div>
 
@@ -369,9 +371,9 @@ export default function OnboardingPage() {
                     <input type="number" value={test6min}
                       onChange={e => { setTest6min(e.target.value); const v = vmaFrom6min(parseFloat(e.target.value)); if (v != null) setVma(p => ({ ...p, vma_kmh: String(v) })); }}
                       placeholder="ex: 1650" min="800" max="3500" step="10"
-                      className="flex-1 px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                      className="flex-1 px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                     {test6min && vmaFrom6min(parseFloat(test6min)) != null && (
-                      <div className="px-4 py-3 rounded-xl bg-green-50 text-green-700 font-bold text-sm whitespace-nowrap">→ VMA {vmaFrom6min(parseFloat(test6min))} km/h</div>
+                      <div className="px-4 py-3 rounded-xl bg-emerald-50 text-emerald-700 font-bold text-sm whitespace-nowrap">→ VMA {vmaFrom6min(parseFloat(test6min))} km/h</div>
                     )}
                   </div>
                 </div>
@@ -380,7 +382,7 @@ export default function OnboardingPage() {
                   <label className="text-xs font-medium text-zinc-500 block mb-1">VMA (km/h)</label>
                   <input type="number" value={vma.vma_kmh} onChange={e => setVma(p => ({...p, vma_kmh: e.target.value}))}
                     placeholder="ex: 16.5" min="8" max="30" step="0.5"
-                    className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                    className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                   <p className="text-[11px] text-zinc-400 mt-1">Calculée automatiquement depuis le test ci-dessus — ou saisis-la si tu la connais. Pas encore testé ? On l&apos;estimera depuis tes séances, mais un vrai test la rend exacte.</p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -388,19 +390,19 @@ export default function OnboardingPage() {
                     <label className="text-xs font-medium text-zinc-500 block mb-1">FC Max (bpm)</label>
                     <input type="number" value={vma.max_hr} onChange={e => setVma(p => ({...p, max_hr: e.target.value}))}
                       placeholder="190" min="140" max="220"
-                      className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                      className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                   </div>
                   <div>
                     <label className="text-xs font-medium text-zinc-500 block mb-1">FC Repos (bpm)</label>
                     <input type="number" value={vma.resting_hr} onChange={e => setVma(p => ({...p, resting_hr: e.target.value}))}
                       placeholder="55" min="30" max="100"
-                      className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                      className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                   </div>
                 </div>
 
                 {vma.vma_kmh && (
-                  <div className="p-4 bg-green-50 border border-green-100 rounded-2xl">
-                    <div className="text-sm font-semibold text-green-800 mb-3">Vos zones calculées</div>
+                  <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl">
+                    <div className="text-sm font-semibold text-emerald-800 mb-3">Vos zones calculées</div>
                     <div className="grid grid-cols-5 gap-1 text-xs">
                       {computeZones(parseFloat(vma.vma_kmh)).map((z, i) => (
                         <div key={i} className={`rounded-lg p-2 text-center zone-z${i+1}`}>
@@ -440,7 +442,7 @@ export default function OnboardingPage() {
                   <label className="text-xs font-medium text-zinc-500 block mb-1">Volume cible / semaine (km)</label>
                   <input type="range" min="5" max="200" step="5" value={goals.target_weekly_km}
                     onChange={e => setGoals(g => ({...g, target_weekly_km: e.target.value}))}
-                    className="w-full accent-green-500" />
+                    className="w-full accent-emerald-500" />
                   <div className="flex justify-between text-xs text-zinc-400 mt-1">
                     <span>5 km</span>
                     <span className="font-semibold text-zinc-900">{goals.target_weekly_km} km/sem</span>
@@ -476,9 +478,9 @@ export default function OnboardingPage() {
                   {["Compte", "Montre", "Clé API", "Connexion"].map((label, i) => (
                     <div key={i} className="flex-1 flex flex-col items-center gap-1">
                       <div className={`h-1.5 w-full rounded-full transition-all ${
-                        i < watchSubStep ? "bg-green-400" : i === watchSubStep ? "bg-zinc-900" : "bg-zinc-100"
+                        i < watchSubStep ? "bg-emerald-400" : i === watchSubStep ? "bg-zinc-900" : "bg-zinc-100"
                       }`} />
-                      <span className={`text-[10px] font-medium ${i === watchSubStep ? "text-zinc-900" : i < watchSubStep ? "text-green-600" : "text-zinc-300"}`}>
+                      <span className={`text-[10px] font-medium ${i === watchSubStep ? "text-zinc-900" : i < watchSubStep ? "text-emerald-600" : "text-zinc-300"}`}>
                         {i < watchSubStep ? "✓" : label}
                       </span>
                     </div>
@@ -512,8 +514,8 @@ export default function OnboardingPage() {
                           </div>
                           <ArrowRight className="w-4 h-4 text-zinc-300" />
                           <div className="flex flex-col items-center gap-1">
-                            <div className="w-12 h-12 bg-green-50 border-2 border-green-200 rounded-2xl flex items-center justify-center text-2xl">🏔</div>
-                            <span className="text-[10px] text-green-600 font-semibold">Cette app</span>
+                            <div className="w-12 h-12 bg-emerald-50 border-2 border-emerald-200 rounded-2xl flex items-center justify-center text-2xl">🏔</div>
+                            <span className="text-[10px] text-emerald-600 font-semibold">Cette app</span>
                           </div>
                         </div>
 
@@ -583,7 +585,7 @@ export default function OnboardingPage() {
                             <div className="flex gap-1">
                               <span className="w-2 h-2 rounded-full bg-red-300" />
                               <span className="w-2 h-2 rounded-full bg-amber-300" />
-                              <span className="w-2 h-2 rounded-full bg-green-300" />
+                              <span className="w-2 h-2 rounded-full bg-emerald-300" />
                             </div>
                             <span className="text-[10px] text-zinc-400 ml-1">intervals.icu — Accès développeur</span>
                           </div>
@@ -601,11 +603,11 @@ export default function OnboardingPage() {
                             </div>
                             {/* API key row */}
                             <div className="flex items-center gap-2">
-                              <div className="flex-1 bg-green-50 border-2 border-green-300 rounded-lg px-3 py-2 animate-pulse">
-                                <p className="text-[10px] text-green-500 font-medium">API Key</p>
-                                <p className="font-mono text-xs font-bold text-green-700 truncate">a1b2c3d4e5f6…</p>
+                              <div className="flex-1 bg-emerald-50 border-2 border-emerald-300 rounded-lg px-3 py-2 animate-pulse">
+                                <p className="text-[10px] text-emerald-500 font-medium">API Key</p>
+                                <p className="font-mono text-xs font-bold text-emerald-700 truncate">a1b2c3d4e5f6…</p>
                               </div>
-                              <div className="flex items-center gap-1 text-green-600 w-20">
+                              <div className="flex items-center gap-1 text-emerald-600 w-20">
                                 <ArrowLeft className="w-4 h-4 flex-shrink-0" />
                                 <span className="text-[11px] font-semibold leading-tight">code 2️⃣</span>
                               </div>
@@ -651,17 +653,17 @@ export default function OnboardingPage() {
                                     placeholder="i564686"
                                     className={`w-full px-3 py-2.5 pr-9 rounded-xl border text-sm font-mono focus:outline-none focus:ring-2 transition-colors ${
                                       idHint ? "border-red-300 focus:ring-red-400 bg-red-50/40" :
-                                      idValid ? "border-green-300 focus:ring-green-400 bg-green-50/40" :
-                                      "border-zinc-200 focus:ring-green-500"
+                                      idValid ? "border-emerald-300 focus:ring-emerald-400 bg-emerald-50/40" :
+                                      "border-zinc-200 focus:ring-emerald-500"
                                     }`} />
-                                  {idValid && <CheckCircle2 className="w-4 h-4 text-green-500 absolute right-3 top-1/2 -translate-y-1/2" />}
+                                  {idValid && <CheckCircle2 className="w-4 h-4 text-emerald-500 absolute right-3 top-1/2 -translate-y-1/2" />}
                                   {idHint && <AlertCircle className="w-4 h-4 text-red-400 absolute right-3 top-1/2 -translate-y-1/2" />}
                                 </div>
                                 {idHint && <p className="text-[11px] text-red-500 mt-1 flex items-start gap-1"><span>⚠️</span>{idHint}</p>}
                               </div>
                               <div>
                                 <label className="text-xs font-medium text-zinc-500 mb-1.5 flex items-center gap-1.5">
-                                  <span className="w-4 h-4 bg-green-100 text-green-600 rounded text-[10px] font-bold flex items-center justify-center">2</span>
+                                  <span className="w-4 h-4 bg-emerald-100 text-emerald-600 rounded text-[10px] font-bold flex items-center justify-center">2</span>
                                   Clé API <span className="text-zinc-400 font-normal">(longue suite de caractères)</span>
                                 </label>
                                 <div className="relative">
@@ -669,10 +671,10 @@ export default function OnboardingPage() {
                                     placeholder="a1b2c3d4e5f6…"
                                     className={`w-full px-3 py-2.5 pr-16 rounded-xl border text-sm font-mono focus:outline-none focus:ring-2 transition-colors ${
                                       keyHint ? "border-red-300 focus:ring-red-400 bg-red-50/40" :
-                                      keyValid ? "border-green-300 focus:ring-green-400 bg-green-50/40" :
-                                      "border-zinc-200 focus:ring-green-500"
+                                      keyValid ? "border-emerald-300 focus:ring-emerald-400 bg-emerald-50/40" :
+                                      "border-zinc-200 focus:ring-emerald-500"
                                     }`} />
-                                  {keyValid && <CheckCircle2 className="w-4 h-4 text-green-500 absolute right-9 top-1/2 -translate-y-1/2" />}
+                                  {keyValid && <CheckCircle2 className="w-4 h-4 text-emerald-500 absolute right-9 top-1/2 -translate-y-1/2" />}
                                   {keyHint && <AlertCircle className="w-4 h-4 text-red-400 absolute right-9 top-1/2 -translate-y-1/2" />}
                                   <button type="button" onClick={() => setShowWatchKey(v => !v)}
                                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600">
@@ -715,8 +717,8 @@ export default function OnboardingPage() {
                             )}
                             {pollingStatus === "ok" && (
                               <>
-                                <div className="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center mx-auto">
-                                  <CheckCircle2 className="w-7 h-7 text-green-600" />
+                                <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto">
+                                  <CheckCircle2 className="w-7 h-7 text-emerald-600" />
                                 </div>
                                 <div>
                                   <p className="font-semibold text-zinc-900">Activités détectées ✅</p>
@@ -751,8 +753,8 @@ export default function OnboardingPage() {
 
             {step === "done" && (
               <div className="bento-card text-center space-y-6">
-                <div className="w-20 h-20 bg-green-100 rounded-3xl flex items-center justify-center mx-auto">
-                  <CheckCircle2 className="w-10 h-10 text-green-600" />
+                <div className="w-20 h-20 bg-emerald-100 rounded-3xl flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="w-10 h-10 text-emerald-600" />
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold text-zinc-900">Votre espace est prêt !</h2>
