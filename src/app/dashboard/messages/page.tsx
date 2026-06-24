@@ -45,7 +45,7 @@ export default async function MessagesPage() {
       <div className="mb-4 flex items-end justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2.5 text-xl font-bold tracking-tight text-zinc-900">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-[0_8px_20px_-8px_rgba(16,185,129,0.6)]"><MessagesSquare className="h-[18px] w-[18px]" /></span>
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-[0_8px_20px_-8px_rgba(16,185,129,0.6)]"><MessagesSquare className="h-[18px] w-[18px]" /></span>
             {l.title}
           </h1>
           <p className="mt-1 text-sm text-zinc-500">{l.subtitle}</p>

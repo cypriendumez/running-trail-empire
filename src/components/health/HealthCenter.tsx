@@ -341,7 +341,7 @@ export function HealthCenter() {
     <div className="space-y-5">
       {/* En-tête — hero */}
       <div className="flex items-center gap-3.5">
-        <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-[0_10px_26px_-10px_rgba(16,185,129,0.65)]">
+        <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-[0_10px_26px_-10px_rgba(16,185,129,0.65)]">
           <Heart className="h-6 w-6" />
         </span>
         <div className="min-w-0">
@@ -477,7 +477,7 @@ export function HealthCenter() {
             {/* Chat kiné IA */}
             <div className="col-span-12 lg:col-span-7 bento-card flex flex-col" style={{ minHeight: 520 }}>
               <div className="flex items-center gap-2 pb-3 border-b border-zinc-100">
-                <div className="w-9 h-9 rounded-xl bg-green-100 flex items-center justify-center"><Stethoscope className="w-5 h-5 text-green-600" /></div>
+                <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center"><Stethoscope className="w-5 h-5 text-emerald-600" /></div>
                 <div>
                   <div className="font-semibold text-zinc-900 text-sm">{tr("chat.title")}</div>
                   <div className="text-xs text-zinc-400">{tr("chat.sub")}</div>
@@ -504,9 +504,9 @@ export function HealthCenter() {
               <form onSubmit={(e) => { e.preventDefault(); send(input); }} className="pt-3 border-t border-zinc-100 flex items-center gap-2">
                 <input value={input} onChange={(e) => setInput(e.target.value)} disabled={sending}
                   placeholder={tr("chat.placeholder")}
-                  className="flex-1 px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-400" />
+                  className="flex-1 px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-400" />
                 <button type="submit" disabled={sending || !input.trim()}
-                  className="w-11 h-11 flex items-center justify-center rounded-2xl bg-green-600 text-white hover:bg-green-700 disabled:opacity-40 transition-colors flex-shrink-0">
+                  className="w-11 h-11 flex items-center justify-center rounded-2xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40 transition-colors flex-shrink-0">
                   <Send className="w-4 h-4" />
                 </button>
               </form>
@@ -531,7 +531,7 @@ export function HealthCenter() {
             <div className="bento-card col-span-2 md:col-span-1">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <span className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl transition-colors duration-300 ${guardianEnabled ? "bg-green-100 text-green-600" : "bg-zinc-100 text-zinc-400"}`}>
+                  <span className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl transition-colors duration-300 ${guardianEnabled ? "bg-emerald-100 text-emerald-600" : "bg-zinc-100 text-zinc-400"}`}>
                     <Shield className="h-6 w-6" />
                   </span>
                   <div>
@@ -541,7 +541,7 @@ export function HealthCenter() {
                 </div>
                 <button onClick={() => { setGuardianEnabled(!guardianEnabled); toast.success(guardianEnabled ? tr("gd.off") : tr("gd.on")); }}
                   role="switch" aria-checked={guardianEnabled} aria-label={tr("gd.title")}
-                  className={`relative h-7 w-14 flex-shrink-0 rounded-full transition-colors duration-300 ${guardianEnabled ? "bg-green-500" : "bg-zinc-200"}`}>
+                  className={`relative h-7 w-14 flex-shrink-0 rounded-full transition-colors duration-300 ${guardianEnabled ? "bg-emerald-500" : "bg-zinc-200"}`}>
                   <span className={`absolute top-1 left-1 h-5 w-5 rounded-full bg-white shadow transition-transform duration-300 ${guardianEnabled ? "translate-x-7" : "translate-x-0"}`} />
                 </button>
               </div>
@@ -551,15 +551,15 @@ export function HealthCenter() {
                 {guardianEnabled && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
                     transition={{ duration: 0.25 }} className="overflow-hidden">
-                    <div className="mt-4 rounded-2xl border border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 p-4">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-green-700">
+                    <div className="mt-4 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-emerald-50 p-4">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-emerald-700">
                         <span className="relative flex h-2.5 w-2.5">
-                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
-                          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
                         </span>
                         {tr("gd.active")}
                       </div>
-                      <p className="mt-1 text-xs text-green-600">{tr("gd.activeDesc")}</p>
+                      <p className="mt-1 text-xs text-emerald-600">{tr("gd.activeDesc")}</p>
                     </div>
                   </motion.div>
                 )}
@@ -578,7 +578,7 @@ export function HealthCenter() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         <span className="text-sm font-semibold text-zinc-900">{f.label}</span>
-                        <CheckCircle2 className={`h-3.5 w-3.5 flex-shrink-0 transition-colors ${guardianEnabled ? "text-green-500" : "text-zinc-300"}`} />
+                        <CheckCircle2 className={`h-3.5 w-3.5 flex-shrink-0 transition-colors ${guardianEnabled ? "text-emerald-500" : "text-zinc-300"}`} />
                       </div>
                       <div className="text-xs leading-snug text-zinc-500">{f.desc}</div>
                     </div>
@@ -590,19 +590,19 @@ export function HealthCenter() {
             {/* Contact d'urgence */}
             <div className="bento-card col-span-2 md:col-span-1">
               <div className="mb-4 flex items-center gap-2">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-green-100 text-green-600"><Phone className="h-[18px] w-[18px]" /></span>
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600"><Phone className="h-[18px] w-[18px]" /></span>
                 <h3 className="font-semibold text-zinc-900">{tr("gd.emergency")}</h3>
               </div>
               <div className="space-y-3">
                 <div>
                   <label className="mb-1 block text-xs font-medium text-zinc-500">{tr("gd.name")}</label>
                   <input value={emergencyName} onChange={(e) => setEmergencyName(e.target.value)} placeholder={tr("gd.namePh")}
-                    className="w-full rounded-xl border border-zinc-200 bg-zinc-50/60 px-4 py-3 text-sm transition-colors focus:border-green-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30" />
+                    className="w-full rounded-xl border border-zinc-200 bg-zinc-50/60 px-4 py-3 text-sm transition-colors focus:border-emerald-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30" />
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-zinc-500">{tr("gd.phone")}</label>
                   <input value={emergencyPhone} onChange={(e) => setEmergencyPhone(e.target.value)} placeholder="+33 6 12 34 56 78" type="tel"
-                    className="w-full rounded-xl border border-zinc-200 bg-zinc-50/60 px-4 py-3 text-sm transition-colors focus:border-green-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/30" />
+                    className="w-full rounded-xl border border-zinc-200 bg-zinc-50/60 px-4 py-3 text-sm transition-colors focus:border-emerald-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30" />
                 </div>
                 <button onClick={() => toast.success(tr("gd.savedContact"))} className="btn-brand w-full justify-center">
                   <Phone className="h-4 w-4" /> {tr("gd.saveContact")}
@@ -672,9 +672,9 @@ export function HealthCenter() {
                     <div className="text-3xl font-bold tabular-nums text-purple-600"><AnimatedNumber value={Math.round(500 + raceTemp * 10)} /></div>
                     <div className="mt-1 text-xs text-zinc-500">{tr("n.sodium")}</div>
                   </div>
-                  <div className="rounded-2xl border border-green-100 bg-gradient-to-br from-green-50 to-emerald-50 p-4 text-center transition-transform hover:-translate-y-0.5">
+                  <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-emerald-50 p-4 text-center transition-transform hover:-translate-y-0.5">
                     <div className="mb-1 text-xl">☕</div>
-                    <div className="text-3xl font-bold tabular-nums text-green-600">{raceHours >= 3 ? <AnimatedNumber value={Math.round(raceHours * 20)} /> : "—"}</div>
+                    <div className="text-3xl font-bold tabular-nums text-emerald-600">{raceHours >= 3 ? <AnimatedNumber value={Math.round(raceHours * 20)} /> : "—"}</div>
                     <div className="mt-1 text-xs text-zinc-500">{tr("n.caffeine")}</div>
                   </div>
                 </div>

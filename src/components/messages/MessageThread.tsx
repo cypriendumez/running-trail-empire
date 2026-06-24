@@ -149,7 +149,7 @@ function groupOf(ts: string): string {
 
 function Avatar({ coach, big }: { coach: boolean; big?: boolean }) {
   return (
-    <span className={`flex flex-shrink-0 items-center justify-center rounded-full text-white ${big ? "h-11 w-11" : "h-9 w-9"} ${coach ? "bg-gradient-to-br from-emerald-400 to-green-600 ring-2 ring-emerald-100" : "bg-gradient-to-br from-zinc-700 to-zinc-900"}`}>
+    <span className={`flex flex-shrink-0 items-center justify-center rounded-full text-white ${big ? "h-11 w-11" : "h-9 w-9"} ${coach ? "bg-gradient-to-br from-emerald-400 to-emerald-600 ring-2 ring-emerald-100" : "bg-gradient-to-br from-zinc-700 to-zinc-900"}`}>
       {coach ? <GraduationCap className={big ? "h-5 w-5" : "h-[18px] w-[18px]"} /> : <User className={big ? "h-5 w-5" : "h-[18px] w-[18px]"} />}
     </span>
   );
@@ -294,7 +294,7 @@ export function MessageThread({ initial }: { initial: Msg[] }) {
       <aside className="hidden w-60 flex-shrink-0 flex-col border-r border-zinc-100 bg-gradient-to-b from-zinc-50/80 to-white md:flex">
         <div className="p-3">
           <button onClick={() => startCompose()}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_10px_22px_-10px_rgba(16,185,129,0.7)] transition-all hover:shadow-[0_12px_26px_-10px_rgba(16,185,129,0.85)] active:scale-[0.98]">
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_10px_22px_-10px_rgba(16,185,129,0.7)] transition-all hover:shadow-[0_12px_26px_-10px_rgba(16,185,129,0.85)] active:scale-[0.98]">
             <PenSquare className="h-4 w-4" /> {d["new"]}
           </button>
         </div>
@@ -453,7 +453,7 @@ export function MessageThread({ initial }: { initial: Msg[] }) {
                 </button>
               </div>
               <button type="submit" disabled={sending || (!body.trim() && pending.length === 0)}
-                className="flex items-center gap-2 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_8px_18px_-8px_rgba(16,185,129,0.7)] transition-all hover:shadow-[0_10px_22px_-8px_rgba(16,185,129,0.85)] active:scale-[0.98] disabled:opacity-40 disabled:shadow-none">
+                className="flex items-center gap-2 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_8px_18px_-8px_rgba(16,185,129,0.7)] transition-all hover:shadow-[0_10px_22px_-8px_rgba(16,185,129,0.85)] active:scale-[0.98] disabled:opacity-40 disabled:shadow-none">
                 {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} {d["send"]}
               </button>
             </div>
@@ -503,10 +503,10 @@ export function MessageThread({ initial }: { initial: Msg[] }) {
         ) : (
           <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }} className="flex h-full flex-col items-center justify-center px-6 text-center">
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.05, type: "spring", stiffness: 260, damping: 20 }}
-              className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-emerald-50 to-green-50 ring-1 ring-emerald-100"><Mail className="h-9 w-9 text-emerald-300" /></motion.div>
+              className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-emerald-50 to-emerald-50 ring-1 ring-emerald-100"><Mail className="h-9 w-9 text-emerald-300" /></motion.div>
             <h3 className="mt-4 text-base font-semibold text-zinc-700">{d["pick.title"]}</h3>
             <p className="mt-1 max-w-xs text-sm text-zinc-400">{d["pick.desc"]}</p>
-            <button onClick={() => startCompose()} className="mt-5 flex items-center gap-2 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_8px_18px_-8px_rgba(16,185,129,0.7)] transition-all hover:shadow-[0_10px_22px_-8px_rgba(16,185,129,0.85)] active:scale-[0.98]"><PenSquare className="h-4 w-4" /> {d["new"]}</button>
+            <button onClick={() => startCompose()} className="mt-5 flex items-center gap-2 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_8px_18px_-8px_rgba(16,185,129,0.7)] transition-all hover:shadow-[0_10px_22px_-8px_rgba(16,185,129,0.85)] active:scale-[0.98]"><PenSquare className="h-4 w-4" /> {d["new"]}</button>
           </motion.div>
         )}
         </AnimatePresence>
