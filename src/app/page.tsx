@@ -122,7 +122,11 @@ export default function LandingPage() {
       <section className="relative flex min-h-screen items-end overflow-hidden">
         <img
           src="https://images.unsplash.com/photo-1502904550040-7534597429ae?w=1920&q=85&fit=crop&crop=center"
+          srcSet="https://images.unsplash.com/photo-1502904550040-7534597429ae?w=750&q=80&fit=crop&crop=center 750w, https://images.unsplash.com/photo-1502904550040-7534597429ae?w=1280&q=82&fit=crop&crop=center 1280w, https://images.unsplash.com/photo-1502904550040-7534597429ae?w=1920&q=85&fit=crop&crop=center 1920w"
+          sizes="100vw"
           alt="Piste d'athlétisme vue du dessus"
+          fetchPriority="high"
+          decoding="async"
           className="absolute inset-0 h-full w-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/10" />
@@ -204,7 +208,7 @@ export default function LandingPage() {
               return (
                 <Link href="/signup" key={p.key} className="group relative block aspect-[3/4] overflow-hidden rounded-2xl">
                   {p.img ? (
-                    <img src={p.img} alt={it.title} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                    <img src={p.img} alt={it.title} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
                   ) : (
                     <div className="h-full w-full transition-transform duration-700 group-hover:scale-105" style={{ background: p.gradient }} />
                   )}

@@ -80,7 +80,7 @@ export default function BlogPage() {
           {showFeatured && (
             <div className="mb-16 grid items-center gap-10 lg:grid-cols-2">
               <Link href="/signup" className="group relative block aspect-[4/3] overflow-hidden rounded-3xl">
-                <img src={featured.img} alt={featured.title} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                <img src={featured.img} alt={featured.title} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
                 <ReadTime t={featured.readTime} />
               </Link>
               <div>
@@ -122,7 +122,7 @@ export default function BlogPage() {
             {grid.map((post) => (
               <Link href="/signup" key={post.id} className="group">
                 <div className="relative mb-4 aspect-[4/3] overflow-hidden rounded-2xl">
-                  <img src={post.img} alt={post.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  <img src={post.img} alt={post.title} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
                   <ReadTime t={post.readTime} />
                 </div>
                 <CatBadge category={post.category} />
