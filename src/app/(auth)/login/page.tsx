@@ -9,6 +9,8 @@ import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Logo } from "@/components/brand/Logo";
 import { Wordmark } from "@/components/brand/Wordmark";
+import { useT } from "@/lib/i18n/LanguageProvider";
+import { AUTH } from "@/components/auth/authI18n";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,17 +19,16 @@ export default function LoginPage() {
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<null | "google" | "apple">(null);
+  const { lang } = useT();
+  const L = (AUTH[lang] ?? AUTH.fr).login;
 
   // Surface une erreur renvoyée par /auth/callback ou /auth/confirm
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const err = params.get("error");
-    if (err === "confirm") {
-      toast.error("Lien de confirmation invalide ou expiré. Demande un nouvel email.");
-    } else if (err) {
-      toast.error("La connexion a échoué. Réessaie ou utilise ton email.");
-    }
-  }, []);
+    if (err === "confirm") toast.error(L.errConfirm);
+    else if (err) toast.error(L.errGeneric);
+  }, [L]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -55,13 +56,13 @@ export default function LoginPage() {
       if (error) {
         toast.error(
           error.message?.toLowerCase().includes("not enabled") || error.message?.toLowerCase().includes("provider")
-            ? `La connexion ${provider === "google" ? "Google" : "Apple"} n'est pas encore activée.`
+            ? L.errProvider.replace("{provider}", provider === "google" ? "Google" : "Apple")
             : error.message
         );
         setOauthLoading(null);
       }
     } catch {
-      toast.error("Connexion impossible pour le moment. Réessaie.");
+      toast.error(L.errOAuth);
       setOauthLoading(null);
     }
   }
@@ -74,8 +75,8 @@ export default function LoginPage() {
             <Logo size={40} />
             <Wordmark className="text-xl" />
           </Link>
-          <h1 className="text-2xl font-bold text-zinc-900">Bon retour !</h1>
-          <p className="text-zinc-500 text-sm mt-1">Connectez-vous pour reprendre votre entraînement</p>
+          <h1 className="text-2xl font-bold text-zinc-900">{L.title}</h1>
+          <p className="text-zinc-500 text-sm mt-1">{L.subtitle}</p>
         </div>
 
         {/* Social Login */}
@@ -95,7 +96,7 @@ export default function LoginPage() {
                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
               </svg>
             )}
-            Continuer avec Google
+            {L.google}
           </button>
           <button
             onClick={() => handleOAuth("apple")}
@@ -109,20 +110,20 @@ export default function LoginPage() {
                 <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/>
               </svg>
             )}
-            Continuer avec Apple
+            {L.apple}
           </button>
         </div>
 
         <div className="flex items-center gap-3 mb-6">
           <div className="flex-1 h-px bg-zinc-200" />
-          <span className="text-xs text-zinc-400">ou</span>
+          <span className="text-xs text-zinc-400">{L.or}</span>
           <div className="flex-1 h-px bg-zinc-200" />
         </div>
 
         {/* Email form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-sm font-medium text-zinc-700 block mb-1.5">Email</label>
+            <label className="text-sm font-medium text-zinc-700 block mb-1.5">{L.email}</label>
             <input
               type="email"
               value={email}
@@ -130,15 +131,15 @@ export default function LoginPage() {
               placeholder="vous@exemple.com"
               required
               className="w-full px-4 py-3 rounded-xl border border-zinc-200 bg-white text-sm
-                         focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent
+                         focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent
                          placeholder:text-zinc-400 transition-shadow"
             />
           </div>
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-sm font-medium text-zinc-700">Mot de passe</label>
-              <Link href="/forgot-password" className="text-xs text-green-600 hover:text-green-700">
-                Mot de passe oublié ?
+              <label className="text-sm font-medium text-zinc-700">{L.password}</label>
+              <Link href="/forgot-password" className="text-xs text-emerald-600 hover:text-emerald-700">
+                {L.forgot}
               </Link>
             </div>
             <div className="relative">
@@ -149,7 +150,7 @@ export default function LoginPage() {
                 placeholder="••••••••"
                 required
                 className="w-full px-4 py-3 pr-12 rounded-xl border border-zinc-200 bg-white text-sm
-                           focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent
+                           focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent
                            placeholder:text-zinc-400 transition-shadow"
               />
               <button
@@ -167,14 +168,14 @@ export default function LoginPage() {
             className="btn-brand w-full justify-center py-3"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            Se connecter
+            {L.submit}
           </button>
         </form>
 
         <p className="text-center text-sm text-zinc-500 mt-6">
-          Pas encore de compte ?{" "}
-          <Link href="/signup" className="text-green-600 font-medium hover:text-green-700">
-            Créer un compte
+          {L.noAccount}{" "}
+          <Link href="/signup" className="text-emerald-600 font-medium hover:text-emerald-700">
+            {L.signup}
           </Link>
         </p>
     </AuthShell>

@@ -1,11 +1,17 @@
+"use client";
+
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Logo } from "@/components/brand/Logo";
 import { Wordmark } from "@/components/brand/Wordmark";
+import { useT } from "@/lib/i18n/LanguageProvider";
+import { AUTH } from "@/components/auth/authI18n";
 
 // Cadre commun des pages d'auth — split premium : panneau de marque sombre à gauche,
 // formulaire centré sur fond blanc à droite. Sur mobile, seul le formulaire s'affiche.
 export function AuthShell({ children }: { children: ReactNode }) {
+  const { lang } = useT();
+  const s = (AUTH[lang] ?? AUTH.fr).shell;
   return (
     <div className="min-h-screen bg-white lg:grid lg:grid-cols-2">
       {/* Panneau de marque */}
@@ -17,13 +23,13 @@ export function AuthShell({ children }: { children: ReactNode }) {
         </Link>
         <div className="relative">
           <h2 className="text-4xl font-bold leading-[1.1] tracking-tight text-white">
-            Le coach qui s&apos;adapte<br />à toi, chaque jour.
+            {s.title1}<br />{s.title2}
           </h2>
           <p className="mt-4 max-w-sm leading-relaxed text-white/55">
-            Plans IA, analyse VFC, Ghost Runner vocal, Trail Builder. Tout ce dont un coureur sérieux a besoin.
+            {s.subtitle}
           </p>
           <div className="mt-9 flex gap-9">
-            {[["10k+", "coureurs"], ["4.9★", "note moyenne"], ["98%", "satisfaction"]].map(([v, l]) => (
+            {[["10k+", s.runners], ["4.9★", s.rating], ["98%", s.satisfaction]].map(([v, l]) => (
               <div key={l}>
                 <div className="text-2xl font-bold tabular-nums text-white">{v}</div>
                 <div className="text-xs text-white/45">{l}</div>

@@ -8,8 +8,12 @@ import { Loader2, ArrowLeft, MailCheck } from "lucide-react";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Logo } from "@/components/brand/Logo";
 import { Wordmark } from "@/components/brand/Wordmark";
+import { useT } from "@/lib/i18n/LanguageProvider";
+import { AUTH } from "@/components/auth/authI18n";
 
 export default function ForgotPasswordPage() {
+  const { lang } = useT();
+  const L = (AUTH[lang] ?? AUTH.fr).forgot;
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -27,6 +31,8 @@ export default function ForgotPasswordPage() {
     setSent(true);
   }
 
+  const [sentPre, sentPost] = L.sent.split("{email}");
+
   return (
     <AuthShell>
         <div className="text-center mb-10">
@@ -34,22 +40,19 @@ export default function ForgotPasswordPage() {
             <Logo size={40} />
             <Wordmark className="text-xl" />
           </Link>
-          <h1 className="text-2xl font-bold text-zinc-900">Mot de passe oublié</h1>
-          <p className="text-zinc-500 text-sm mt-1">On t&apos;envoie un lien pour le réinitialiser.</p>
+          <h1 className="text-2xl font-bold text-zinc-900">{L.title}</h1>
+          <p className="text-zinc-500 text-sm mt-1">{L.subtitle}</p>
         </div>
 
         {sent ? (
-          <div className="rounded-2xl border border-green-200 bg-green-50 p-5 text-center">
-            <MailCheck className="w-8 h-8 text-green-600 mx-auto mb-2" />
-            <p className="text-sm text-zinc-700">
-              Si un compte existe pour <b>{email}</b>, un email de réinitialisation vient d&apos;être envoyé.
-              Vérifie ta boîte de réception (et les indésirables).
-            </p>
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-center">
+            <MailCheck className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
+            <p className="text-sm text-zinc-700">{sentPre}<b>{email}</b>{sentPost}</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-zinc-700 block mb-1.5">Email</label>
+              <label className="text-sm font-medium text-zinc-700 block mb-1.5">{L.email}</label>
               <input
                 type="email"
                 value={email}
@@ -57,20 +60,20 @@ export default function ForgotPasswordPage() {
                 placeholder="vous@exemple.com"
                 required
                 className="w-full px-4 py-3 rounded-xl border border-zinc-200 bg-white text-sm
-                           focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent
+                           focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent
                            placeholder:text-zinc-400 transition-shadow"
               />
             </div>
             <button type="submit" disabled={loading} className="btn-brand w-full justify-center py-3">
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              Envoyer le lien
+              {L.submit}
             </button>
           </form>
         )}
 
         <p className="text-center text-sm text-zinc-500 mt-6">
-          <Link href="/login" className="inline-flex items-center gap-1 text-green-600 font-medium hover:text-green-700">
-            <ArrowLeft className="w-3.5 h-3.5" /> Retour à la connexion
+          <Link href="/login" className="inline-flex items-center gap-1 text-emerald-600 font-medium hover:text-emerald-700">
+            <ArrowLeft className="w-3.5 h-3.5" /> {L.back}
           </Link>
         </p>
     </AuthShell>
