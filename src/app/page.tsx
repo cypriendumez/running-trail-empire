@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
-  ArrowRight, ChevronRight, Play, Check,
+  ArrowRight, ChevronRight, Play, Check, Menu, X,
   Bot, Heart, Map, Trophy, Ghost, Moon, CloudRain, ShoppingBag, BookOpen, Shield, Activity, Zap,
   type LucideIcon,
 } from "lucide-react";
@@ -45,6 +45,7 @@ export default function LandingPage() {
   const L = LANDING[lang] ?? LANDING.fr;
   const [activeCategory, setActiveCategory] = useState("ALL");
   const [scrolled, setScrolled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -53,8 +54,9 @@ export default function LandingPage() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Nav adaptative : blanche sur le hero photo, sombre une fois scrollé.
-  const navLink = scrolled ? "hover:text-zinc-900 transition-colors" : "hover:text-white transition-colors";
+  // Nav adaptative : transparente sur le hero, solide au scroll OU menu mobile ouvert.
+  const solidNav = scrolled || menuOpen;
+  const navLink = solidNav ? "hover:text-zinc-900 transition-colors" : "hover:text-white transition-colors";
 
   const filtered = activeCategory === "ALL" ? PROGRAMS : PROGRAMS.filter((p) => p.category === activeCategory);
   const stats = [L.stats.runners, L.stats.rating, L.stats.satisfaction, L.stats.races];
@@ -63,13 +65,13 @@ export default function LandingPage() {
     <div className="min-h-screen bg-white font-sans text-zinc-900 antialiased">
 
       {/* ── NAV ── */}
-      <nav className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${scrolled ? "bg-white/80 backdrop-blur-xl border-b border-zinc-200/70" : "bg-transparent"}`}>
+      <nav className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${solidNav ? "bg-white/90 backdrop-blur-xl border-b border-zinc-200/70" : "bg-transparent"}`}>
         <Container className="flex h-16 items-center justify-between gap-3">
-          <Link href="/" className="flex items-center gap-2.5">
+          <Link href="/" className="flex items-center gap-2.5" onClick={() => setMenuOpen(false)}>
             <Logo size={30} />
-            <Wordmark tone={scrolled ? "dark" : "light"} className="text-xl" />
+            <Wordmark tone={solidNav ? "dark" : "light"} className="text-xl" />
           </Link>
-          <div className={`hidden md:flex items-center gap-8 text-sm font-medium ${scrolled ? "text-zinc-500" : "text-white/80"}`}>
+          <div className={`hidden md:flex items-center gap-8 text-sm font-medium ${solidNav ? "text-zinc-500" : "text-white/80"}`}>
             <a href="#programmes" className={navLink}>{L.nav.programs}</a>
             <a href="#features" className={navLink}>{L.nav.features}</a>
             <a href="#tarifs" className={navLink}>{L.nav.pricing}</a>
@@ -77,15 +79,43 @@ export default function LandingPage() {
             <Link href="/avis" className={navLink}>{L.nav.reviews}</Link>
           </div>
           <div className="flex items-center gap-1 sm:gap-2">
-            <LanguageSwitcher light={!scrolled} />
-            <Link href="/login" className={`hidden sm:inline-flex px-3 py-2 text-sm font-medium transition-colors ${scrolled ? "text-zinc-600 hover:text-zinc-900" : "text-white/90 hover:text-white"}`}>
+            <LanguageSwitcher light={!solidNav} />
+            <Link href="/login" className={`hidden sm:inline-flex px-3 py-2 text-sm font-medium transition-colors ${solidNav ? "text-zinc-600 hover:text-zinc-900" : "text-white/90 hover:text-white"}`}>
               {L.nav.login}
             </Link>
-            <Link href="/signup" className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-semibold transition-colors ${scrolled ? "bg-zinc-900 text-white hover:bg-zinc-800" : "bg-white text-zinc-900 hover:bg-white/90"}`}>
+            <Link href="/signup" className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-semibold transition-colors ${solidNav ? "bg-zinc-900 text-white hover:bg-zinc-800" : "bg-white text-zinc-900 hover:bg-white/90"}`}>
               {L.nav.trial} <ArrowRight className="h-3.5 w-3.5" />
             </Link>
+            <button
+              type="button"
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-label="Menu"
+              className={`md:hidden inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${solidNav ? "text-zinc-700 hover:bg-zinc-100" : "text-white hover:bg-white/10"}`}
+            >
+              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
           </div>
         </Container>
+
+        {/* Menu mobile */}
+        {menuOpen && (
+          <div className="md:hidden border-t border-zinc-200 bg-white">
+            <Container className="flex flex-col py-2 text-sm font-medium text-zinc-700">
+              {[
+                { href: "#programmes", label: L.nav.programs },
+                { href: "#features", label: L.nav.features },
+                { href: "#tarifs", label: L.nav.pricing },
+                { href: "/blog", label: L.nav.blog },
+                { href: "/avis", label: L.nav.reviews },
+                { href: "/login", label: L.nav.login },
+              ].map((l) => (
+                <a key={l.href} href={l.href} onClick={() => setMenuOpen(false)} className="py-2.5 hover:text-[#059669] transition-colors">
+                  {l.label}
+                </a>
+              ))}
+            </Container>
+          </div>
+        )}
       </nav>
 
       {/* ── HERO ── plein cadre, photo de piste immersive */}
