@@ -299,19 +299,20 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
       )}
 
       {/* Header élite — carte premium */}
-      <div className="relative mb-6 overflow-hidden rounded-3xl bg-zinc-950 px-6 py-7 text-white shadow-[0_24px_60px_-30px_rgba(16,24,40,0.55)] sm:px-9 sm:py-8">
-        <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full opacity-25 blur-3xl" style={{ background: readiness.accent }} />
-        <div className="pointer-events-none absolute -left-10 bottom-[-6rem] h-56 w-56 rounded-full bg-emerald-500/10 blur-3xl" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+      <div
+        className="relative mb-6 overflow-hidden rounded-3xl border border-[#e3eef0] px-6 py-7 shadow-[0_12px_44px_-26px_rgba(16,24,40,0.22)] sm:px-9 sm:py-8"
+        style={{ background: "linear-gradient(120deg,#ecfdf5 0%,#eef6ff 58%,#ffffff 100%)" }}
+      >
+        <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[#0ea5e9]/10 blur-3xl" />
         <div className="relative z-10 flex flex-wrap items-end justify-between gap-x-10 gap-y-6">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/40 first-letter:uppercase">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#6e8a86] first-letter:uppercase">
               {new Date().toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long" })}
             </p>
-            <h1 className="mt-2 text-[2rem] font-bold tracking-tight sm:text-[2.5rem]">
+            <h1 className="mt-2 text-[2rem] font-bold tracking-tight text-[#11201d] sm:text-[2.5rem]">
               {t("dash.greeting")}, {profile?.full_name?.split(" ")[0] ?? t("dash.champion")}
             </h1>
-            <p className="mt-2 flex items-center gap-2 text-sm text-white/55">
+            <p className="mt-2 flex items-center gap-2 text-sm text-[#5f7d79]">
               <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ background: readiness.accent }} />
               {readiness.tagline}
             </p>
@@ -319,10 +320,10 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
           <div className="flex flex-wrap gap-x-7 gap-y-4 sm:gap-x-9">
             {heroStats.map((s) => (
               <div key={s.label}>
-                <div className="text-2xl font-bold tabular-nums sm:text-[1.7rem]">
-                  {s.value}{s.unit && <span className="ml-0.5 text-sm font-medium text-white/40">{s.unit}</span>}
+                <div className="text-2xl font-bold tabular-nums text-[#11201d] sm:text-[1.7rem]">
+                  {s.value}{s.unit && <span className="ml-0.5 text-sm font-medium text-[#8aa6a6]">{s.unit}</span>}
                 </div>
-                <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/40">{s.label}</div>
+                <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8aa6a6]">{s.label}</div>
               </div>
             ))}
           </div>
