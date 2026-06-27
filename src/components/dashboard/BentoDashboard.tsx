@@ -67,6 +67,11 @@ const NEXT_LABELS: Record<string, { next: string; details: string }> = {
   pt: { next: "Próxima sessão", details: "Detalhes da sessão" },
 };
 
+// Libellé FC pour la carte VFC (multilingue).
+const VITALS: Record<string, { hr: string }> = {
+  fr: { hr: "Fréquence cardiaque" }, en: { hr: "Heart rate" }, de: { hr: "Herzfrequenz" }, es: { hr: "Frecuencia cardíaca" }, pt: { hr: "Frequência cardíaca" },
+};
+
 // Niveau du coureur (depuis profile.mode), multilingue.
 const LEVELS: Record<string, { elite: string; inter: string }> = {
   fr: { elite: "Niveau Élite", inter: "Niveau Intermédiaire" },
@@ -321,6 +326,8 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
   const levelLabel = String((profile as { mode?: string } | null)?.mode ?? "") === "elite" ? lvl.elite : lvl.inter;
   const leagueName = String((league as { leagues?: { name?: string } } | null)?.leagues?.name ?? "");
   const nx = NEXT_LABELS[lang] ?? NEXT_LABELS.fr;
+  const vit = VITALS[lang] ?? VITALS.fr;
+  const restingHr = Number((profile as { resting_hr?: number } | null)?.resting_hr) || Number(workouts[0]?.avg_hr) || 0;
   const heroStats = [
     { label: kpi.form, value: disc.hasData ? String(disc.total) : "—", unit: disc.hasData ? "/100" : "" },
     { label: kpi.hrv, value: hrvLatest != null ? hrvLatest.toFixed(0) : "—", unit: hrvLatest != null ? "ms" : "" },
@@ -620,6 +627,28 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
           ) : (
             <div className="h-20 flex items-center justify-center text-sm text-zinc-400">
               {t("dash.hrv.empty")}
+            </div>
+          )}
+          {(restingHr > 0 || freshSleep) && (
+            <div className="mt-3 grid grid-cols-2 gap-2.5">
+              {restingHr > 0 && (
+                <div className="flex items-center gap-2.5 rounded-xl bg-zinc-50 px-3 py-2.5">
+                  <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-400"><Heart className="h-4 w-4" /></span>
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold tabular-nums text-zinc-900">{restingHr}<span className="ml-0.5 text-[11px] font-normal text-zinc-400">bpm</span></div>
+                    <div className="truncate text-[10px] text-zinc-400">{vit.hr}</div>
+                  </div>
+                </div>
+              )}
+              {freshSleep && (
+                <div className="flex items-center gap-2.5 rounded-xl bg-zinc-50 px-3 py-2.5">
+                  <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-400"><Moon className="h-4 w-4" /></span>
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold tabular-nums text-zinc-900">{Math.floor(freshSleep.total_sleep_min / 60)}h{String(freshSleep.total_sleep_min % 60).padStart(2, "0")}</div>
+                    <div className="truncate text-[10px] text-zinc-400">{t("dash.sleep.title")}</div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </motion.div>
