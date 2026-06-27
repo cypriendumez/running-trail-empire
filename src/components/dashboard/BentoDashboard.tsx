@@ -57,13 +57,22 @@ const HERO_LABELS: Record<string, { goal: string; plan: string; prep: string }> 
   pt: { goal: "Objetivo", plan: "Ver o meu plano", prep: "preparação" },
 };
 
+// Niveau du coureur (depuis profile.mode), multilingue.
+const LEVELS: Record<string, { elite: string; inter: string }> = {
+  fr: { elite: "Niveau Élite", inter: "Niveau Intermédiaire" },
+  en: { elite: "Elite level", inter: "Intermediate level" },
+  de: { elite: "Elite-Niveau", inter: "Mittleres Niveau" },
+  es: { elite: "Nivel Élite", inter: "Nivel intermedio" },
+  pt: { elite: "Nível Elite", inter: "Nível intermédio" },
+};
+
 // Libellés du rail de droite (multilingue).
-const RAIL_LABELS: Record<string, { prep: string; goal: string; ai: string; ready: string }> = {
-  fr: { prep: "Statut de préparation", goal: "Objectif principal", ai: "Analyse IA", ready: "Prêt à performer" },
-  en: { prep: "Readiness status", goal: "Main goal", ai: "AI analysis", ready: "Ready to perform" },
-  de: { prep: "Bereitschaftsstatus", goal: "Hauptziel", ai: "KI-Analyse", ready: "Bereit zu performen" },
-  es: { prep: "Estado de preparación", goal: "Objetivo principal", ai: "Análisis IA", ready: "Listo para rendir" },
-  pt: { prep: "Estado de preparação", goal: "Objetivo principal", ai: "Análise IA", ready: "Pronto para performar" },
+const RAIL_LABELS: Record<string, { prep: string; goal: string; ai: string; ready: string; badges: string }> = {
+  fr: { prep: "Statut de préparation", goal: "Objectif principal", ai: "Analyse IA", ready: "Prêt à performer", badges: "Badges" },
+  en: { prep: "Readiness status", goal: "Main goal", ai: "AI analysis", ready: "Ready to perform", badges: "Badges" },
+  de: { prep: "Bereitschaftsstatus", goal: "Hauptziel", ai: "KI-Analyse", ready: "Bereit zu performen", badges: "Abzeichen" },
+  es: { prep: "Estado de preparación", goal: "Objetivo principal", ai: "Análisis IA", ready: "Listo para rendir", badges: "Insignias" },
+  pt: { prep: "Estado de preparação", goal: "Objetivo principal", ai: "Análise IA", ready: "Pronto para performar", badges: "Medalhas" },
 };
 
 // La forme du jour est calculée à partir de données réelles : voir computeReadiness().
@@ -298,6 +307,8 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
   const kpi = KPI_LABELS[lang] ?? KPI_LABELS.fr;
   const hl = HERO_LABELS[lang] ?? HERO_LABELS.fr;
   const rl = RAIL_LABELS[lang] ?? RAIL_LABELS.fr;
+  const lvl = LEVELS[lang] ?? LEVELS.fr;
+  const levelLabel = String((profile as { mode?: string } | null)?.mode ?? "") === "elite" ? lvl.elite : lvl.inter;
   const heroStats = [
     { label: kpi.form, value: disc.hasData ? String(disc.total) : "—", unit: disc.hasData ? "/100" : "" },
     { label: kpi.hrv, value: hrvLatest != null ? hrvLatest.toFixed(0) : "—", unit: hrvLatest != null ? "ms" : "" },
@@ -341,6 +352,14 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
               <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ background: readiness.accent }} />
               {readiness.tagline}
             </p>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200/70 bg-white/70 px-3 py-1 text-xs font-medium text-zinc-600">
+                <Gauge className="h-3.5 w-3.5 text-[#059669]" /> {levelLabel}
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200/70 bg-white/70 px-3 py-1 text-xs font-medium text-zinc-600">
+                <Activity className="h-3.5 w-3.5 text-[#059669]" /> {weeklyKm.toFixed(0)} km · 7 j
+              </span>
+            </div>
           </div>
           {objective && objDaysTo != null && objDaysTo >= 0 ? (
             <div className="w-full rounded-2xl border border-white/70 bg-white/55 p-4 backdrop-blur-sm sm:w-auto sm:min-w-[260px]">
@@ -936,6 +955,27 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
           </div>
           <p className="mt-2.5 text-sm leading-relaxed text-zinc-600">{coachKey?.why || coachKey?.subtitle || readiness.tagline}</p>
         </div>
+
+        {/* Badges — jalons de distance réels */}
+        {records && (
+          <div className="bento-card">
+            <div className="flex items-center justify-between">
+              <div className="metric-label">{rl.badges}</div>
+              <Link href="/dashboard/leagues" className="text-xs font-medium text-[#059669] hover:text-[#047857]">{t("dash.league.cta")}</Link>
+            </div>
+            <div className="mt-3 flex gap-2">
+              {[{ km: 10, l: "10K" }, { km: 21.1, l: "Semi" }, { km: 42.2, l: "Marathon" }].map((b) => {
+                const earned = records.longest >= b.km;
+                return (
+                  <div key={b.l} className={`flex flex-1 flex-col items-center gap-1 rounded-xl py-2.5 ${earned ? "bg-amber-50 text-amber-600" : "bg-zinc-50 text-zinc-300"}`}>
+                    <Award className="h-5 w-5" />
+                    <span className="text-[10px] font-bold">{b.l}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Cette semaine */}
         <div className="bento-card">

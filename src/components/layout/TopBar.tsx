@@ -12,8 +12,18 @@ type Notif = { id: string; type: string; title: string; body: string | null; rea
 type RaceHit = { name: string; city: string; distanceKm: number | null; date: string };
 type ParcoursHit = { id: number; nom: string; distance_km: number; localisation: { departement: string } };
 
+const LEVELS: Record<string, { elite: string; inter: string }> = {
+  fr: { elite: "Niveau Élite", inter: "Niveau Intermédiaire" },
+  en: { elite: "Elite level", inter: "Intermediate level" },
+  de: { elite: "Elite-Niveau", inter: "Mittleres Niveau" },
+  es: { elite: "Nivel Élite", inter: "Nivel intermedio" },
+  pt: { elite: "Nível Elite", inter: "Nível intermédio" },
+};
+
 export function TopBar({ profile, avatarColor }: { profile: Record<string, unknown> | null; avatarColor?: string }) {
-  const { t } = useT();
+  const { t, lang } = useT();
+  const lv = LEVELS[lang] ?? LEVELS.fr;
+  const levelLabel = String(profile?.mode ?? "") === "elite" ? lv.elite : lv.inter;
   const router = useRouter();
   const name = String(profile?.full_name ?? "").trim();
   const initial = (name || "U")[0].toUpperCase();
@@ -250,7 +260,12 @@ export function TopBar({ profile, avatarColor }: { profile: Record<string, unkno
                 ? <img src={avatarSrc} alt="" className="w-full h-full object-cover" />
                 : initial}
             </div>
-            {name && <span className="hidden sm:block text-sm font-semibold text-zinc-800 pr-1">{name.split(" ")[0]}</span>}
+            {name && (
+              <span className="hidden flex-col items-start pr-1 leading-tight sm:flex">
+                <span className="text-sm font-semibold text-zinc-800">{name.split(" ")[0]}</span>
+                <span className="text-[11px] text-zinc-400">{levelLabel}</span>
+              </span>
+            )}
           </button>
           {openMenu && (
             <>
