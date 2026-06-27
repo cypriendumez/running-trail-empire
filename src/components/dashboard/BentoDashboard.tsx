@@ -57,6 +57,15 @@ const HERO_LABELS: Record<string, { goal: string; plan: string; prep: string }> 
   pt: { goal: "Objetivo", plan: "Ver o meu plano", prep: "preparação" },
 };
 
+// Libellés du rail de droite (multilingue).
+const RAIL_LABELS: Record<string, { prep: string; goal: string; ai: string; ready: string }> = {
+  fr: { prep: "Statut de préparation", goal: "Objectif principal", ai: "Analyse IA", ready: "Prêt à performer" },
+  en: { prep: "Readiness status", goal: "Main goal", ai: "AI analysis", ready: "Ready to perform" },
+  de: { prep: "Bereitschaftsstatus", goal: "Hauptziel", ai: "KI-Analyse", ready: "Bereit zu performen" },
+  es: { prep: "Estado de preparación", goal: "Objetivo principal", ai: "Análisis IA", ready: "Listo para rendir" },
+  pt: { prep: "Estado de preparação", goal: "Objetivo principal", ai: "Análise IA", ready: "Pronto para performar" },
+};
+
 // La forme du jour est calculée à partir de données réelles : voir computeReadiness().
 
 export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplineHistory, sleep, coachSession, pendingFeedback, objective, currentVma, loadRisk }: Props) {
@@ -288,6 +297,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
   // KPI de l'en-tête « hero » — résumé exécutif (valeurs réelles, repli « — »).
   const kpi = KPI_LABELS[lang] ?? KPI_LABELS.fr;
   const hl = HERO_LABELS[lang] ?? HERO_LABELS.fr;
+  const rl = RAIL_LABELS[lang] ?? RAIL_LABELS.fr;
   const heroStats = [
     { label: kpi.form, value: disc.hasData ? String(disc.total) : "—", unit: disc.hasData ? "/100" : "" },
     { label: kpi.hrv, value: hrvLatest != null ? hrvLatest.toFixed(0) : "—", unit: hrvLatest != null ? "ms" : "" },
@@ -333,28 +343,14 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
             </p>
           </div>
           {objective && objDaysTo != null && objDaysTo >= 0 ? (
-            <div className="flex w-full items-center gap-5 rounded-2xl border border-white/70 bg-white/55 p-4 backdrop-blur-sm sm:w-auto sm:min-w-[300px]">
-              <div className="relative h-24 w-24 flex-shrink-0">
-                <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
-                  <circle cx="50" cy="50" r="42" fill="none" stroke="#dbeafe" strokeWidth="8" />
-                  <circle cx="50" cy="50" r="42" fill="none" stroke="#059669" strokeWidth="8" strokeLinecap="round"
-                    strokeDasharray={`${(2 * Math.PI * 42 * (disc.hasData ? disc.total : 0)) / 100} ${2 * Math.PI * 42}`}
-                    className="transition-all duration-1000" />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-xl font-bold leading-none tabular-nums text-[#11201d]">{disc.hasData ? disc.total : "—"}<span className="text-xs text-[#8aa6a6]">%</span></span>
-                  <span className="mt-0.5 text-[8px] font-semibold uppercase tracking-wider text-[#8aa6a6]">{hl.prep}</span>
-                </div>
-              </div>
-              <div className="min-w-0">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8aa6a6]">{hl.goal}</div>
-                <div className="text-[2rem] font-black leading-none tabular-nums text-[#11201d]">J‑{objDaysTo}</div>
-                <div className="mt-1 truncate text-sm font-semibold text-[#11201d]">{objective.race}</div>
-                <div className="text-xs text-[#5f7d79]">{objective.distanceKm} km · {objective.targetTime}</div>
-                <Link href="/dashboard/calendrier" className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-[#059669] transition-colors hover:text-[#047857]">
-                  {hl.plan} <ChevronRight className="h-3.5 w-3.5" />
-                </Link>
-              </div>
+            <div className="w-full rounded-2xl border border-white/70 bg-white/55 p-4 backdrop-blur-sm sm:w-auto sm:min-w-[260px]">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8aa6a6]">{hl.goal}</div>
+              <div className="mt-1 text-[2.5rem] font-black leading-none tabular-nums text-[#11201d]">J‑{objDaysTo}</div>
+              <div className="mt-1 truncate text-sm font-semibold text-[#11201d]">{objective.race}</div>
+              <div className="text-xs text-[#5f7d79]">{objective.distanceKm} km · {objective.targetTime}</div>
+              <Link href="/dashboard/calendrier" className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-[#059669] transition-colors hover:text-[#047857]">
+                {hl.plan} <ChevronRight className="h-3.5 w-3.5" />
+              </Link>
             </div>
           ) : (
             <div className="flex flex-wrap gap-x-7 gap-y-4 sm:gap-x-9">
@@ -370,6 +366,10 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
           )}
         </div>
       </div>
+
+      {/* ── Contenu principal + rail de droite (3 colonnes avec la sidebar) ── */}
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-6">
+      <div className="min-w-0">
 
       {/* Ressenti post-séance — demandé après la dernière séance */}
       {pendingFeedback && <SessionFeedback date={pendingFeedback.date} title={pendingFeedback.title} />}
@@ -888,6 +888,73 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
             </div>
           )}
         </motion.div>
+      </div>
+      </div>
+
+      {/* ── Rail de droite ── */}
+      <aside className="mt-4 space-y-4 lg:mt-0">
+        {/* Statut de préparation */}
+        <div className="bento-card">
+          <div className="metric-label">{rl.prep}</div>
+          <div className="mt-4 flex items-center gap-4">
+            <div className="relative h-20 w-20 flex-shrink-0">
+              <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="42" fill="none" stroke="#F4F4F5" strokeWidth="9" />
+                <circle cx="50" cy="50" r="42" fill="none" stroke={readiness.accent} strokeWidth="9" strokeLinecap="round"
+                  strokeDasharray={`${(2 * Math.PI * 42 * (disc.hasData ? disc.total : 0)) / 100} ${2 * Math.PI * 42}`}
+                  className="transition-all duration-1000" />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center text-lg font-bold tabular-nums text-zinc-900">
+                {disc.hasData ? disc.total : "—"}<span className="text-xs text-zinc-400">%</span>
+              </div>
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-bold text-zinc-900">{rl.ready}</div>
+              <p className="mt-0.5 text-xs leading-relaxed text-zinc-500">{readiness.tagline}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Objectif principal */}
+        {objective && objDaysTo != null && objDaysTo >= 0 && (
+          <div className="bento-card">
+            <div className="metric-label">{rl.goal}</div>
+            <div className="mt-2 truncate text-sm font-bold text-zinc-900">{objective.race}</div>
+            <div className="text-xs text-zinc-400">{objective.distanceKm} km · {objective.targetTime}</div>
+            <div className="mt-3 text-3xl font-black leading-none tabular-nums text-zinc-900">J‑{objDaysTo}</div>
+            <Link href="/dashboard/calendrier" className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-[#059669] transition-colors hover:text-[#047857]">
+              {hl.plan} <ChevronRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        )}
+
+        {/* Analyse IA */}
+        <div className="bento-card">
+          <div className="flex items-center justify-between">
+            <div className="metric-label">{rl.ai}</div>
+            <span className="rounded-md bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-700">Beta</span>
+          </div>
+          <p className="mt-2.5 text-sm leading-relaxed text-zinc-600">{coachKey?.why || coachKey?.subtitle || readiness.tagline}</p>
+        </div>
+
+        {/* Cette semaine */}
+        <div className="bento-card">
+          <div className="metric-label">{t("dash.summary.title")}</div>
+          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
+            {[
+              { v: String(weekSummary.sessions), u: "", l: t("dash.summary.sessions") },
+              { v: weekSummary.km.toFixed(1), u: "km", l: t("dash.metric.distance") },
+              { v: String(Math.round(weekSummary.elev)), u: "m", l: t("dash.metric.elevation") },
+              { v: fmtTime(weekSummary.sec), u: "", l: t("dash.metric.duration") },
+            ].map((s) => (
+              <div key={s.l}>
+                <div className="text-lg font-bold leading-none tabular-nums text-zinc-900">{s.v}<span className="ml-0.5 text-xs font-normal text-zinc-400">{s.u}</span></div>
+                <div className="mt-1 text-[11px] text-zinc-500">{s.l}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </aside>
       </div>
     </div>
   );
