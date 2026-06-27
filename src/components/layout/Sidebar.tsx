@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, MapPin, Mountain, Heart, ShoppingBag,
   User, Trophy, Settings, LogOut, ChevronLeft,
-  Ghost, Watch, GraduationCap, CalendarDays, MessagesSquare, Newspaper,
+  Ghost, Watch, GraduationCap, CalendarDays, MessagesSquare, Newspaper, Crown,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -49,11 +49,21 @@ const groups: { titleKey: string | null; items: { href: string; icon: typeof Lay
   },
 ];
 
+const PREMIUM_CARD: Record<string, { title: string; sub: string }> = {
+  fr: { title: "Passe au Pro", sub: "Plans IA illimités, Ghost Runner, Trail Builder complet." },
+  en: { title: "Go Pro", sub: "Unlimited AI plans, Ghost Runner, full Trail Builder." },
+  de: { title: "Auf Pro upgraden", sub: "Unbegrenzte KI-Pläne, Ghost Runner, voller Trail Builder." },
+  es: { title: "Pasa a Pro", sub: "Planes IA ilimitados, Ghost Runner, Trail Builder completo." },
+  pt: { title: "Passa para Pro", sub: "Planos IA ilimitados, Ghost Runner, Trail Builder completo." },
+};
+
 export function Sidebar({ profile, unreadMessages = 0 }: { profile: Record<string, unknown> | null; unreadMessages?: number }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { t } = useT();
+  const { t, lang } = useT();
   const [collapsed, setCollapsed] = useState(false);
+  const tier = String(profile?.subscription_tier ?? "free");
+  const pc = PREMIUM_CARD[lang] ?? PREMIUM_CARD.fr;
 
   async function signOut() {
     const supabase = createClient();
@@ -118,6 +128,19 @@ export function Sidebar({ profile, unreadMessages = 0 }: { profile: Record<strin
           </div>
         ))}
       </nav>
+
+      {/* Encart Premium — comptes gratuits uniquement (comme la maquette) */}
+      {!collapsed && tier === "free" && (
+        <div className="px-3 pb-1">
+          <Link href="/pricing" className="block rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white p-3 transition-shadow hover:shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 to-amber-500 text-white"><Crown className="h-4 w-4" /></span>
+              <span className="text-sm font-bold text-zinc-900">{pc.title}</span>
+            </div>
+            <p className="mt-1.5 text-[11px] leading-snug text-zinc-500">{pc.sub}</p>
+          </Link>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="p-3 border-t border-zinc-100 space-y-0.5">

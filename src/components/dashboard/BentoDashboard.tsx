@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import {
   Activity, Heart, Trophy, Target,
   Calendar, Footprints, Moon, ChevronRight,
-  Gauge, Mountain, Timer, Flame, Rocket, Award, TrendingUp, AlertTriangle, Shield, Crown,
+  Gauge, Mountain, Timer, Flame, Rocket, Award, TrendingUp, AlertTriangle, Shield,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -48,13 +48,13 @@ const KPI_LABELS: Record<string, { form: string; hrv: string; vma: string; vol: 
   pt: { form: "Forma", hrv: "VFC", vma: "VAM", vol: "Volume 7d" },
 };
 
-// Encart « passe au Pro » (multilingue) — affiché aux comptes gratuits.
-const PREMIUM_LABELS: Record<string, { title: string; sub: string; cta: string }> = {
-  fr: { title: "Passe au Pro", sub: "Plans IA illimités, Ghost Runner vocal, Trail Builder complet, sync Garmin/Coros.", cta: "Voir les offres" },
-  en: { title: "Go Pro", sub: "Unlimited AI plans, voice Ghost Runner, full Trail Builder, Garmin/Coros sync.", cta: "See plans" },
-  de: { title: "Auf Pro upgraden", sub: "Unbegrenzte KI-Pläne, Voice Ghost Runner, voller Trail Builder, Garmin/Coros-Sync.", cta: "Angebote ansehen" },
-  es: { title: "Pasa a Pro", sub: "Planes IA ilimitados, Ghost Runner por voz, Trail Builder completo, sync Garmin/Coros.", cta: "Ver planes" },
-  pt: { title: "Passa para Pro", sub: "Planos IA ilimitados, Ghost Runner por voz, Trail Builder completo, sync Garmin/Coros.", cta: "Ver planos" },
+// Libellés du panneau objectif de l'en-tête (multilingue).
+const HERO_LABELS: Record<string, { goal: string; plan: string; prep: string }> = {
+  fr: { goal: "Objectif", plan: "Voir mon plan", prep: "préparation" },
+  en: { goal: "Goal", plan: "View my plan", prep: "readiness" },
+  de: { goal: "Ziel", plan: "Mein Plan ansehen", prep: "Bereitschaft" },
+  es: { goal: "Objetivo", plan: "Ver mi plan", prep: "preparación" },
+  pt: { goal: "Objetivo", plan: "Ver o meu plano", prep: "preparação" },
 };
 
 // La forme du jour est calculée à partir de données réelles : voir computeReadiness().
@@ -280,14 +280,14 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
   ) });
   const fillers = fillerPool.slice(0, 2);
 
-  // Compte à rebours course (objectif) + mini-courbe VFC pour le panneau de l'en-tête.
+  // Compte à rebours vers la prochaine course (objectif) pour le panneau de l'en-tête.
   const objDaysTo = objective
     ? Math.ceil((new Date(objective.raceDate + "T00:00:00").getTime() - Date.now()) / 86400000)
     : null;
-  const sparkVals = hrvChartData.map((d) => d.hrv as number).filter((v) => Number.isFinite(v));
 
   // KPI de l'en-tête « hero » — résumé exécutif (valeurs réelles, repli « — »).
   const kpi = KPI_LABELS[lang] ?? KPI_LABELS.fr;
+  const hl = HERO_LABELS[lang] ?? HERO_LABELS.fr;
   const heroStats = [
     { label: kpi.form, value: disc.hasData ? String(disc.total) : "—", unit: disc.hasData ? "/100" : "" },
     { label: kpi.hrv, value: hrvLatest != null ? hrvLatest.toFixed(0) : "—", unit: hrvLatest != null ? "ms" : "" },
@@ -333,18 +333,28 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
             </p>
           </div>
           {objective && objDaysTo != null && objDaysTo >= 0 ? (
-            <div className="relative w-full overflow-hidden rounded-2xl p-5 text-white shadow-[0_16px_38px_-18px_rgba(5,150,105,.55)] sm:w-[320px]" style={{ background: "linear-gradient(135deg,#047857 0%,#0d9488 62%,#0ea5e9 100%)" }}>
-              <div className="flex items-end justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-white/65">{objective.race}</div>
-                  <div className="mt-1 text-[2.75rem] font-black leading-none tabular-nums">J‑{objDaysTo}</div>
-                </div>
-                <div className="flex-shrink-0 text-right text-[11px] text-white/75">
-                  <div className="font-bold text-white">{objective.targetTime}</div>
-                  <div>{objective.distanceKm} km</div>
+            <div className="flex w-full items-center gap-5 rounded-2xl border border-white/70 bg-white/55 p-4 backdrop-blur-sm sm:w-auto sm:min-w-[300px]">
+              <div className="relative h-24 w-24 flex-shrink-0">
+                <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="42" fill="none" stroke="#dbeafe" strokeWidth="8" />
+                  <circle cx="50" cy="50" r="42" fill="none" stroke="#059669" strokeWidth="8" strokeLinecap="round"
+                    strokeDasharray={`${(2 * Math.PI * 42 * (disc.hasData ? disc.total : 0)) / 100} ${2 * Math.PI * 42}`}
+                    className="transition-all duration-1000" />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-xl font-bold leading-none tabular-nums text-[#11201d]">{disc.hasData ? disc.total : "—"}<span className="text-xs text-[#8aa6a6]">%</span></span>
+                  <span className="mt-0.5 text-[8px] font-semibold uppercase tracking-wider text-[#8aa6a6]">{hl.prep}</span>
                 </div>
               </div>
-              <div className="mt-3"><HeaderSparkline values={sparkVals} /></div>
+              <div className="min-w-0">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8aa6a6]">{hl.goal}</div>
+                <div className="text-[2rem] font-black leading-none tabular-nums text-[#11201d]">J‑{objDaysTo}</div>
+                <div className="mt-1 truncate text-sm font-semibold text-[#11201d]">{objective.race}</div>
+                <div className="text-xs text-[#5f7d79]">{objective.distanceKm} km · {objective.targetTime}</div>
+                <Link href="/dashboard/calendrier" className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-[#059669] transition-colors hover:text-[#047857]">
+                  {hl.plan} <ChevronRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
             </div>
           ) : (
             <div className="flex flex-wrap gap-x-7 gap-y-4 sm:gap-x-9">
@@ -377,25 +387,6 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
 
       {/* Objectif de course — saisi par le client → e-mail coach + perso IA */}
       <ObjectiveCard objective={objective ?? null} currentVma={currentVma ?? null} />
-
-      {/* Encart Premium — uniquement pour les comptes gratuits, vers la page Tarifs */}
-      {(((profile as { subscription_tier?: string } | null)?.subscription_tier ?? "free") === "free") && (() => {
-        const pr = PREMIUM_LABELS[lang] ?? PREMIUM_LABELS.fr;
-        return (
-          <Link href="/pricing" className="group mb-5 flex items-center gap-4 overflow-hidden rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50 via-white to-emerald-50 px-5 py-4 transition-shadow hover:shadow-[0_14px_36px_-20px_rgba(16,24,40,.25)]">
-            <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 text-white shadow-sm">
-              <Crown className="h-5 w-5" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-bold text-zinc-900">{pr.title}</div>
-              <div className="truncate text-xs text-zinc-500">{pr.sub}</div>
-            </div>
-            <span className="hidden flex-shrink-0 items-center gap-1.5 rounded-xl bg-zinc-900 px-4 py-2 text-xs font-semibold text-white transition-colors group-hover:bg-zinc-800 sm:inline-flex">
-              {pr.cta} <ChevronRight className="h-3.5 w-3.5" />
-            </span>
-          </Link>
-        );
-      })()}
 
       {/* Séance prescrite par le coach — bannière mise en avant (prioritaire) */}
       {coachKey && coachMinimal && (
@@ -1126,19 +1117,6 @@ function computeWeekSummary(workouts: Workout[]): { sessions: number; km: number
 }
 
 // Intitulé de section — repère éditorial entre les rangées du bento.
-// Mini-courbe (VFC) pour le panneau course de l'en-tête.
-function HeaderSparkline({ values }: { values: number[] }) {
-  if (values.length < 2) return null;
-  const W = 150, H = 40, min = Math.min(...values), max = Math.max(...values), rng = max - min || 1;
-  const line = values.map((v, i) => `${((i / (values.length - 1)) * W).toFixed(1)},${(H - 4 - ((v - min) / rng) * (H - 8)).toFixed(1)}`).join(" ");
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="h-10 w-full" preserveAspectRatio="none" aria-hidden="true">
-      <polygon points={`0,${H} ${line} ${W},${H}`} fill="rgba(255,255,255,0.18)" />
-      <polyline points={line} fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div className="col-span-12 flex items-center gap-2.5 pt-2 first:pt-0">
