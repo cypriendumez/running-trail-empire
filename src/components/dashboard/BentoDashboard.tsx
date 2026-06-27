@@ -271,6 +271,12 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
   ) });
   const fillers = fillerPool.slice(0, 2);
 
+  // Compte à rebours course (objectif) + mini-courbe VFC pour le panneau de l'en-tête.
+  const objDaysTo = objective
+    ? Math.ceil((new Date(objective.raceDate + "T00:00:00").getTime() - Date.now()) / 86400000)
+    : null;
+  const sparkVals = hrvChartData.map((d) => d.hrv as number).filter((v) => Number.isFinite(v));
+
   // KPI de l'en-tête « hero » — résumé exécutif (valeurs réelles, repli « — »).
   const kpi = KPI_LABELS[lang] ?? KPI_LABELS.fr;
   const heroStats = [
@@ -304,8 +310,8 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
         style={{ background: "linear-gradient(120deg,#ecfdf5 0%,#eef6ff 58%,#ffffff 100%)" }}
       >
         <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[#0ea5e9]/10 blur-3xl" />
-        <div className="relative z-10 flex flex-wrap items-end justify-between gap-x-10 gap-y-6">
-          <div className="min-w-0">
+        <div className="relative z-10 flex flex-wrap items-center justify-between gap-x-10 gap-y-6">
+          <div className="min-w-0 flex-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#6e8a86] first-letter:uppercase">
               {new Date().toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long" })}
             </p>
@@ -317,16 +323,32 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
               {readiness.tagline}
             </p>
           </div>
-          <div className="flex flex-wrap gap-x-7 gap-y-4 sm:gap-x-9">
-            {heroStats.map((s) => (
-              <div key={s.label}>
-                <div className="text-2xl font-bold tabular-nums text-[#11201d] sm:text-[1.7rem]">
-                  {s.value}{s.unit && <span className="ml-0.5 text-sm font-medium text-[#8aa6a6]">{s.unit}</span>}
+          {objective && objDaysTo != null && objDaysTo >= 0 ? (
+            <div className="relative w-full overflow-hidden rounded-2xl p-5 text-white shadow-[0_16px_38px_-18px_rgba(5,150,105,.55)] sm:w-[320px]" style={{ background: "linear-gradient(135deg,#047857 0%,#0d9488 62%,#0ea5e9 100%)" }}>
+              <div className="flex items-end justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-white/65">{objective.race}</div>
+                  <div className="mt-1 text-[2.75rem] font-black leading-none tabular-nums">J‑{objDaysTo}</div>
                 </div>
-                <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8aa6a6]">{s.label}</div>
+                <div className="flex-shrink-0 text-right text-[11px] text-white/75">
+                  <div className="font-bold text-white">{objective.targetTime}</div>
+                  <div>{objective.distanceKm} km</div>
+                </div>
               </div>
-            ))}
-          </div>
+              <div className="mt-3"><HeaderSparkline values={sparkVals} /></div>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-x-7 gap-y-4 sm:gap-x-9">
+              {heroStats.map((s) => (
+                <div key={s.label}>
+                  <div className="text-2xl font-bold tabular-nums text-[#11201d] sm:text-[1.7rem]">
+                    {s.value}{s.unit && <span className="ml-0.5 text-sm font-medium text-[#8aa6a6]">{s.unit}</span>}
+                  </div>
+                  <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8aa6a6]">{s.label}</div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -1076,6 +1098,19 @@ function computeWeekSummary(workouts: Workout[]): { sessions: number; km: number
 }
 
 // Intitulé de section — repère éditorial entre les rangées du bento.
+// Mini-courbe (VFC) pour le panneau course de l'en-tête.
+function HeaderSparkline({ values }: { values: number[] }) {
+  if (values.length < 2) return null;
+  const W = 150, H = 40, min = Math.min(...values), max = Math.max(...values), rng = max - min || 1;
+  const line = values.map((v, i) => `${((i / (values.length - 1)) * W).toFixed(1)},${(H - 4 - ((v - min) / rng) * (H - 8)).toFixed(1)}`).join(" ");
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="h-10 w-full" preserveAspectRatio="none" aria-hidden="true">
+      <polygon points={`0,${H} ${line} ${W},${H}`} fill="rgba(255,255,255,0.18)" />
+      <polyline points={line} fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div className="col-span-12 flex items-center gap-2.5 pt-2 first:pt-0">
