@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import {
   Activity, Heart, Trophy, Target,
   Calendar, Footprints, Moon, ChevronRight,
-  Gauge, Mountain, Timer, Flame, Rocket, Award, TrendingUp,
+  Gauge, Mountain, Timer, Flame, Rocket, Award, TrendingUp, AlertTriangle, Shield,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -269,7 +269,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
       {/* No data banner */}
       {noData && (
         <div className="mb-5 flex items-center gap-3 px-4 py-3 rounded-2xl bg-amber-50 border border-amber-200 text-sm">
-          <span className="text-amber-500 text-lg">⚠️</span>
+          <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-500" />
           <div className="flex-1">
             <p className="font-semibold text-amber-800">{t("dash.noData.title")}</p>
             <p className="text-amber-600 text-xs mt-0.5">{t("dash.noData.desc")}</p>
@@ -281,16 +281,19 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
       )}
 
       {/* Header élite — carte premium */}
-      <div className="relative mb-6 flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-3xl border border-zinc-200/70 bg-white px-5 py-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_16px_40px_-20px_rgba(16,24,40,0.18)] sm:px-7">
-        <div className="pointer-events-none absolute -right-10 -top-16 h-40 w-40 rounded-full opacity-[0.07] blur-2xl" style={{ background: readiness.accent }} />
+      <div className="relative mb-6 overflow-hidden rounded-3xl border border-zinc-200/70 bg-white px-6 py-7 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_44px_-22px_rgba(16,24,40,0.20)] sm:px-9 sm:py-8">
+        <div className="pointer-events-none absolute -right-12 -top-20 h-52 w-52 rounded-full opacity-[0.06] blur-3xl" style={{ background: readiness.accent }} />
         <div className="relative z-10 min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400 first-letter:uppercase">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-400 first-letter:uppercase">
             {new Date().toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long" })}
           </p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight text-zinc-900 sm:text-[2.15rem]">
-            {t("dash.greeting")}, {profile?.full_name?.split(" ")[0] ?? t("dash.champion")} <span className="inline-block">👋</span>
+          <h1 className="mt-2 text-[2rem] font-bold tracking-tight text-zinc-900 sm:text-[2.4rem]">
+            {t("dash.greeting")}, {profile?.full_name?.split(" ")[0] ?? t("dash.champion")}
           </h1>
-          <p className="mt-1.5 text-sm text-zinc-500">{readiness.tagline}</p>
+          <p className="mt-2 flex items-center gap-2 text-sm text-zinc-500">
+            <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ background: readiness.accent }} />
+            {readiness.tagline}
+          </p>
         </div>
       </div>
 
@@ -300,7 +303,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
       {/* Anti-blessure proactif — déload auto si la charge devient risquée */}
       {loadRisk?.deload && (
         <div className="mb-5 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3.5">
-          <span className="flex-shrink-0 text-xl">🛡️</span>
+          <Shield className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-500" />
           <div className="flex-1">
             <p className="font-bold text-red-800">{t("dash.deload.title")}</p>
             <p className="mt-0.5 text-sm text-red-600">{loadRisk.reason}. {t("dash.deload.desc")}</p>
@@ -323,7 +326,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
         >
           <div className="pointer-events-none absolute -top-16 -right-10 h-44 w-44 rounded-full bg-emerald-300/20 blur-3xl" />
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
-          <span className="relative z-10 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-white/10 text-2xl ring-1 ring-white/20 backdrop-blur-md">🌙</span>
+          <span className="relative z-10 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/20 backdrop-blur-md"><Moon className="h-5 w-5 text-white" /></span>
           <div className="relative z-10 min-w-0 flex-1">
             <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-100/90">{t("dash.coach.badge")}</span>
             <h2 className="text-xl font-bold leading-tight tracking-tight drop-shadow-sm sm:text-[1.4rem]">{coachKey.title}</h2>
@@ -674,13 +677,8 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
             <div className="metric-label">{t("dash.league.title")}</div>
             <Trophy className="h-4 w-4 text-yellow-500" />
           </div>
-          <div className={`inline-flex w-fit items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-semibold league-${profile?.league ?? "bronze"}`}>
-            <span>
-              {profile?.league === "diamond" ? "💎" :
-               profile?.league === "platinum" ? "🔷" :
-               profile?.league === "gold" ? "🥇" :
-               profile?.league === "silver" ? "🥈" : "🥉"}
-            </span>
+          <div className={`inline-flex w-fit items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-semibold league-${profile?.league ?? "bronze"}`}>
+            <Trophy className="h-3.5 w-3.5" />
             {(profile?.league ?? "bronze").charAt(0).toUpperCase()}{(profile?.league ?? "bronze").slice(1)}
           </div>
           <div className="mt-3 text-sm text-zinc-500">
