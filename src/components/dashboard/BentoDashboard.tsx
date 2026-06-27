@@ -39,6 +39,15 @@ interface Props {
   loadRisk?: { acwr: number; monotony: number; deload: boolean; level: string; reason: string };
 }
 
+// Libellés courts des KPI de l'en-tête (multilingues).
+const KPI_LABELS: Record<string, { form: string; hrv: string; vma: string; vol: string }> = {
+  fr: { form: "Forme", hrv: "VFC", vma: "VMA", vol: "Volume 7j" },
+  en: { form: "Form", hrv: "HRV", vma: "vVO2max", vol: "7-day volume" },
+  de: { form: "Form", hrv: "HRV", vma: "vVO2max", vol: "7-Tage-Volumen" },
+  es: { form: "Forma", hrv: "VFC", vma: "VAM", vol: "Volumen 7d" },
+  pt: { form: "Forma", hrv: "VFC", vma: "VAM", vol: "Volume 7d" },
+};
+
 // La forme du jour est calculée à partir de données réelles : voir computeReadiness().
 
 export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplineHistory, sleep, coachSession, pendingFeedback, objective, currentVma, loadRisk }: Props) {
@@ -262,6 +271,15 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
   ) });
   const fillers = fillerPool.slice(0, 2);
 
+  // KPI de l'en-tête « hero » — résumé exécutif (valeurs réelles, repli « — »).
+  const kpi = KPI_LABELS[lang] ?? KPI_LABELS.fr;
+  const heroStats = [
+    { label: kpi.form, value: disc.hasData ? String(disc.total) : "—", unit: disc.hasData ? "/100" : "" },
+    { label: kpi.hrv, value: hrvLatest != null ? hrvLatest.toFixed(0) : "—", unit: hrvLatest != null ? "ms" : "" },
+    { label: kpi.vma, value: currentVma && currentVma > 0 ? currentVma.toFixed(1) : "—", unit: currentVma && currentVma > 0 ? "km/h" : "" },
+    { label: kpi.vol, value: weeklyKm.toFixed(0), unit: "km" },
+  ];
+
   const noData = workouts.length === 0 && hrv.length === 0;
 
   return (
@@ -281,19 +299,33 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
       )}
 
       {/* Header élite — carte premium */}
-      <div className="relative mb-6 overflow-hidden rounded-3xl border border-zinc-200/70 bg-white px-6 py-7 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_44px_-22px_rgba(16,24,40,0.20)] sm:px-9 sm:py-8">
-        <div className="pointer-events-none absolute -right-12 -top-20 h-52 w-52 rounded-full opacity-[0.06] blur-3xl" style={{ background: readiness.accent }} />
-        <div className="relative z-10 min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-400 first-letter:uppercase">
-            {new Date().toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long" })}
-          </p>
-          <h1 className="mt-2 text-[2rem] font-bold tracking-tight text-zinc-900 sm:text-[2.4rem]">
-            {t("dash.greeting")}, {profile?.full_name?.split(" ")[0] ?? t("dash.champion")}
-          </h1>
-          <p className="mt-2 flex items-center gap-2 text-sm text-zinc-500">
-            <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ background: readiness.accent }} />
-            {readiness.tagline}
-          </p>
+      <div className="relative mb-6 overflow-hidden rounded-3xl bg-zinc-950 px-6 py-7 text-white shadow-[0_24px_60px_-30px_rgba(16,24,40,0.55)] sm:px-9 sm:py-8">
+        <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full opacity-25 blur-3xl" style={{ background: readiness.accent }} />
+        <div className="pointer-events-none absolute -left-10 bottom-[-6rem] h-56 w-56 rounded-full bg-emerald-500/10 blur-3xl" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+        <div className="relative z-10 flex flex-wrap items-end justify-between gap-x-10 gap-y-6">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/40 first-letter:uppercase">
+              {new Date().toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long" })}
+            </p>
+            <h1 className="mt-2 text-[2rem] font-bold tracking-tight sm:text-[2.5rem]">
+              {t("dash.greeting")}, {profile?.full_name?.split(" ")[0] ?? t("dash.champion")}
+            </h1>
+            <p className="mt-2 flex items-center gap-2 text-sm text-white/55">
+              <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ background: readiness.accent }} />
+              {readiness.tagline}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-x-7 gap-y-4 sm:gap-x-9">
+            {heroStats.map((s) => (
+              <div key={s.label}>
+                <div className="text-2xl font-bold tabular-nums sm:text-[1.7rem]">
+                  {s.value}{s.unit && <span className="ml-0.5 text-sm font-medium text-white/40">{s.unit}</span>}
+                </div>
+                <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/40">{s.label}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -1045,7 +1077,8 @@ function computeWeekSummary(workouts: Workout[]): { sessions: number; km: number
 // Intitulé de section — repère éditorial entre les rangées du bento.
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="col-span-12 flex items-center gap-3 pt-2 first:pt-0">
+    <div className="col-span-12 flex items-center gap-2.5 pt-2 first:pt-0">
+      <span className="h-1 w-1 flex-shrink-0 rounded-full bg-[#10b981]" />
       <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-400">{children}</span>
       <span className="h-px flex-1 bg-gradient-to-r from-zinc-200 to-transparent" />
     </div>
