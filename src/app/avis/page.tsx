@@ -5,6 +5,17 @@ import { SiteFooter } from "@/components/layout/SiteFooter";
 import { Container, Section } from "@/components/ui/Container";
 import { Badge } from "@/components/ui/Badge";
 import { btnClass } from "@/components/ui/Button";
+import { getPublicLang } from "@/lib/i18n/serverLang";
+import type { Lang } from "@/lib/i18n/translations";
+
+// Cadre de la page traduit ; les 26 témoignages restent en VO (authenticité).
+const AV: Record<Lang, { testers: string; titleA: string; titleAccent: string; subtitle: string; avgLabel: string; avgSub: string; publishedLabel: string; testersSub: string; fiveLabel: string; maxSub: string; beginnersLabel: string; beginnersSub: string; ctaTitle: string; ctaSub: string; ctaBtn: string; ctaNote: string }> = {
+  fr: { testers: "coureurs testeurs", titleA: "Ils ont testé. Ils ont ", titleAccent: "adoré", subtitle: "Coureurs amateurs, traileurs confirmés et athlètes élite — voici leurs retours, sans filtre.", avgLabel: "Note moyenne", avgSub: "sur 5 étoiles", publishedLabel: "Avis publiés", testersSub: "coureurs testeurs", fiveLabel: "5 étoiles", maxSub: "avis maximum", beginnersLabel: "Débutants", beginnersSub: "premiers km avec nous", ctaTitle: "Écris ton propre avis.", ctaSub: "Rejoins les coureurs qui progressent avec Pacevo.", ctaBtn: "Créer un compte gratuit", ctaNote: "Gratuit · Sans carte bancaire · Annulable à tout moment" },
+  en: { testers: "tester runners", titleA: "They tried it. They ", titleAccent: "loved it", subtitle: "Amateur runners, seasoned trail runners and elite athletes — here's their unfiltered feedback.", avgLabel: "Average rating", avgSub: "out of 5 stars", publishedLabel: "Published reviews", testersSub: "tester runners", fiveLabel: "5 stars", maxSub: "top reviews", beginnersLabel: "Beginners", beginnersSub: "first km with us", ctaTitle: "Write your own review.", ctaSub: "Join the runners progressing with Pacevo.", ctaBtn: "Create a free account", ctaNote: "Free · No credit card · Cancel anytime" },
+  de: { testers: "Test-Läufer", titleA: "Sie haben getestet. Sie waren ", titleAccent: "begeistert", subtitle: "Amateurläufer, erfahrene Trailrunner und Elite-Athleten — hier ihr ungefiltertes Feedback.", avgLabel: "Ø-Bewertung", avgSub: "von 5 Sternen", publishedLabel: "Veröffentlichte Bewertungen", testersSub: "Test-Läufer", fiveLabel: "5 Sterne", maxSub: "Top-Bewertungen", beginnersLabel: "Einsteiger", beginnersSub: "erste km mit uns", ctaTitle: "Schreib deine eigene Bewertung.", ctaSub: "Schließe dich den Läufern an, die mit Pacevo Fortschritte machen.", ctaBtn: "Kostenloses Konto erstellen", ctaNote: "Gratis · Keine Kreditkarte · Jederzeit kündbar" },
+  es: { testers: "corredores testers", titleA: "Lo probaron. Les ", titleAccent: "encantó", subtitle: "Corredores aficionados, traileros expertos y atletas de élite — aquí sus opiniones, sin filtro.", avgLabel: "Nota media", avgSub: "sobre 5 estrellas", publishedLabel: "Opiniones publicadas", testersSub: "corredores testers", fiveLabel: "5 estrellas", maxSub: "opiniones máximas", beginnersLabel: "Principiantes", beginnersSub: "primeros km con nosotros", ctaTitle: "Escribe tu propia opinión.", ctaSub: "Únete a los corredores que progresan con Pacevo.", ctaBtn: "Crear cuenta gratis", ctaNote: "Gratis · Sin tarjeta · Cancela cuando quieras" },
+  pt: { testers: "corredores testers", titleA: "Experimentaram. ", titleAccent: "Adoraram", subtitle: "Corredores amadores, traileiros experientes e atletas de elite — aqui o feedback deles, sem filtro.", avgLabel: "Nota média", avgSub: "em 5 estrelas", publishedLabel: "Avaliações publicadas", testersSub: "corredores testers", fiveLabel: "5 estrelas", maxSub: "avaliações máximas", beginnersLabel: "Iniciantes", beginnersSub: "primeiros km connosco", ctaTitle: "Escreve a tua própria avaliação.", ctaSub: "Junta-te aos corredores que evoluem com a Pacevo.", ctaBtn: "Criar conta grátis", ctaNote: "Grátis · Sem cartão · Cancela quando quiseres" },
+};
 
 const REVIEWS = [
   { name: "Thomas G.", stars: 5, text: "Le Ghost Runner vocal m'a fait gagner 4 minutes sur mon semi. Se faire coacher en temps réel kilomètre par kilomètre, c'est impressionnant.", date: "14 avr. 2026", tag: "Semi-marathon" },
@@ -45,16 +56,18 @@ function Stars({ count }: { count: number }) {
   );
 }
 
-export default function AvisPage() {
+export default async function AvisPage() {
+  const lang = await getPublicLang();
+  const A = AV[lang] ?? AV.fr;
   const avg = (REVIEWS.reduce((s, r) => s + r.stars, 0) / REVIEWS.length).toFixed(1);
   const fiveStars = REVIEWS.filter((r) => r.stars === 5).length;
   const cols = [0, 1, 2].map((c) => REVIEWS.filter((_, i) => i % 3 === c));
 
   const STATS = [
-    { value: avg, label: "Note moyenne", sub: "sur 5 étoiles" },
-    { value: String(REVIEWS.length), label: "Avis publiés", sub: "coureurs testeurs" },
-    { value: `${Math.round((fiveStars / REVIEWS.length) * 100)}%`, label: "5 étoiles", sub: `${fiveStars} avis maximum` },
-    { value: "12", label: "Débutants", sub: "premiers km avec nous" },
+    { value: avg, label: A.avgLabel, sub: A.avgSub },
+    { value: String(REVIEWS.length), label: A.publishedLabel, sub: A.testersSub },
+    { value: `${Math.round((fiveStars / REVIEWS.length) * 100)}%`, label: A.fiveLabel, sub: `${fiveStars} ${A.maxSub}` },
+    { value: "12", label: A.beginnersLabel, sub: A.beginnersSub },
   ];
 
   return (
@@ -64,14 +77,12 @@ export default function AvisPage() {
       {/* HERO */}
       <Container className="pt-16 pb-12 text-center sm:pt-20">
         <div className="flex justify-center">
-          <Badge tone="brand" dot>{REVIEWS.length} coureurs testeurs</Badge>
+          <Badge tone="brand" dot>{REVIEWS.length} {A.testers}</Badge>
         </div>
         <h1 className="mx-auto mt-5 max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
-          Ils ont testé. Ils ont <span className="text-[#059669]">adoré</span>.
+          {A.titleA}<span className="text-[#059669]">{A.titleAccent}</span>.
         </h1>
-        <p className="mx-auto mt-4 max-w-lg text-lg leading-relaxed text-zinc-500">
-          Coureurs amateurs, traileurs confirmés et athlètes élite — voici leurs retours, sans filtre.
-        </p>
+        <p className="mx-auto mt-4 max-w-lg text-lg leading-relaxed text-zinc-500">{A.subtitle}</p>
 
         {/* Stats */}
         <div className="mx-auto mt-12 grid max-w-3xl grid-cols-2 overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-200 sm:grid-cols-4 gap-px">
@@ -125,13 +136,13 @@ export default function AvisPage() {
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(80%_120%_at_50%_0%,rgba(16,185,129,.16),transparent_60%)]" />
             <div className="relative">
               <h2 className="mx-auto max-w-2xl text-4xl font-bold leading-[1.05] tracking-tight text-white sm:text-5xl">
-                Écris ton propre avis.
+                {A.ctaTitle}
               </h2>
-              <p className="mx-auto mt-4 max-w-sm text-lg text-white/55">Rejoins les coureurs qui progressent avec Pacevo.</p>
+              <p className="mx-auto mt-4 max-w-sm text-lg text-white/55">{A.ctaSub}</p>
               <Link href="/signup" className={btnClass("brand", "lg", "mt-8")}>
-                Créer un compte gratuit <ArrowRight className="h-4 w-4" />
+                {A.ctaBtn} <ArrowRight className="h-4 w-4" />
               </Link>
-              <p className="mt-6 text-sm text-white/35">Gratuit · Sans carte bancaire · Annulable à tout moment</p>
+              <p className="mt-6 text-sm text-white/35">{A.ctaNote}</p>
             </div>
           </div>
         </Container>
