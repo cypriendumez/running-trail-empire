@@ -481,7 +481,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
         >
           <div className="flex items-center justify-between mb-4">
             <div className="metric-label">{t("dash.discipline.title")}</div>
-            <Target className="w-4 h-4 text-zinc-300" />
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-zinc-100 text-zinc-500"><Target className="h-4 w-4" /></span>
           </div>
           {disc.hasData ? (
             <div className="flex items-center gap-5">
@@ -553,7 +553,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
                 </div>
               )}
             </div>
-            <Heart className="w-5 h-5 text-red-400 animate-heartbeat" />
+            <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-400"><Heart className="h-4 w-4 animate-heartbeat" /></span>
           </div>
           {hrvChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={80}>
@@ -586,7 +586,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
         >
           <div className="mb-3 flex items-center justify-between">
             <div className="metric-label">{t("dash.vma.title")}</div>
-            <Rocket className="h-4 w-4 text-emerald-400" />
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#ecfdf5] text-[#059669]"><Rocket className="h-4 w-4" /></span>
           </div>
           {predictions ? (
             <>
@@ -597,9 +597,9 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
               <div className="text-[11px] text-zinc-400">{t("dash.vma.sub")}</div>
               <div className="mt-4 grid grid-cols-2 gap-2.5">
                 {predictions.map((p) => (
-                  <div key={p.label} className="rounded-xl bg-zinc-50 px-3 py-2">
-                    <div className="text-[11px] font-medium text-zinc-400">{p.label}</div>
-                    <div className="text-base font-bold tabular-nums text-zinc-900">{p.time}</div>
+                  <div key={p.label} className="rounded-xl bg-gradient-to-b from-zinc-50 to-white px-3 py-2.5 ring-1 ring-inset ring-zinc-100 transition-shadow hover:shadow-sm">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">{p.label}</div>
+                    <div className="mt-0.5 text-lg font-bold tabular-nums text-zinc-900">{p.time}</div>
                     <div className="text-[10px] tabular-nums text-zinc-400">{p.pace}</div>
                   </div>
                 ))}
