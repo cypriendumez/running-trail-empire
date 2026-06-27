@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import {
   Activity, Heart, Trophy, Target,
   Calendar, Footprints, Moon, ChevronRight,
-  Gauge, Mountain, Timer, Flame, Rocket, Award, TrendingUp, AlertTriangle, Shield,
+  Gauge, Mountain, Timer, Flame, Rocket, Award, TrendingUp, AlertTriangle, Shield, Crown,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -46,6 +46,15 @@ const KPI_LABELS: Record<string, { form: string; hrv: string; vma: string; vol: 
   de: { form: "Form", hrv: "HRV", vma: "vVO2max", vol: "7-Tage-Volumen" },
   es: { form: "Forma", hrv: "VFC", vma: "VAM", vol: "Volumen 7d" },
   pt: { form: "Forma", hrv: "VFC", vma: "VAM", vol: "Volume 7d" },
+};
+
+// Encart « passe au Pro » (multilingue) — affiché aux comptes gratuits.
+const PREMIUM_LABELS: Record<string, { title: string; sub: string; cta: string }> = {
+  fr: { title: "Passe au Pro", sub: "Plans IA illimités, Ghost Runner vocal, Trail Builder complet, sync Garmin/Coros.", cta: "Voir les offres" },
+  en: { title: "Go Pro", sub: "Unlimited AI plans, voice Ghost Runner, full Trail Builder, Garmin/Coros sync.", cta: "See plans" },
+  de: { title: "Auf Pro upgraden", sub: "Unbegrenzte KI-Pläne, Voice Ghost Runner, voller Trail Builder, Garmin/Coros-Sync.", cta: "Angebote ansehen" },
+  es: { title: "Pasa a Pro", sub: "Planes IA ilimitados, Ghost Runner por voz, Trail Builder completo, sync Garmin/Coros.", cta: "Ver planes" },
+  pt: { title: "Passa para Pro", sub: "Planos IA ilimitados, Ghost Runner por voz, Trail Builder completo, sync Garmin/Coros.", cta: "Ver planos" },
 };
 
 // La forme du jour est calculée à partir de données réelles : voir computeReadiness().
@@ -368,6 +377,25 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
 
       {/* Objectif de course — saisi par le client → e-mail coach + perso IA */}
       <ObjectiveCard objective={objective ?? null} currentVma={currentVma ?? null} />
+
+      {/* Encart Premium — uniquement pour les comptes gratuits, vers la page Tarifs */}
+      {(((profile as { subscription_tier?: string } | null)?.subscription_tier ?? "free") === "free") && (() => {
+        const pr = PREMIUM_LABELS[lang] ?? PREMIUM_LABELS.fr;
+        return (
+          <Link href="/pricing" className="group mb-5 flex items-center gap-4 overflow-hidden rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50 via-white to-emerald-50 px-5 py-4 transition-shadow hover:shadow-[0_14px_36px_-20px_rgba(16,24,40,.25)]">
+            <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 text-white shadow-sm">
+              <Crown className="h-5 w-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-bold text-zinc-900">{pr.title}</div>
+              <div className="truncate text-xs text-zinc-500">{pr.sub}</div>
+            </div>
+            <span className="hidden flex-shrink-0 items-center gap-1.5 rounded-xl bg-zinc-900 px-4 py-2 text-xs font-semibold text-white transition-colors group-hover:bg-zinc-800 sm:inline-flex">
+              {pr.cta} <ChevronRight className="h-3.5 w-3.5" />
+            </span>
+          </Link>
+        );
+      })()}
 
       {/* Séance prescrite par le coach — bannière mise en avant (prioritaire) */}
       {coachKey && coachMinimal && (
