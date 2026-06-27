@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import {
   Activity, Heart, Trophy, Target,
   Calendar, Footprints, Moon, ChevronRight,
-  Gauge, Mountain, Timer, Flame, Rocket, Award, TrendingUp, AlertTriangle, Shield,
+  Gauge, Mountain, Timer, Flame, Rocket, Award, TrendingUp, AlertTriangle, Shield, Users,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -16,6 +16,7 @@ import Link from "next/link";
 import type { UserProfile, HRVData, Workout } from "@/types";
 import { racePredictions, fmtPaceSec, fmtTime } from "@/lib/running/fitness";
 import { TaperingWidget } from "@/components/dashboard/TaperingWidget";
+import { WeatherChip } from "@/components/dashboard/WeatherChip";
 import { SessionFeedback } from "@/components/dashboard/SessionFeedback";
 import { ObjectiveCard, type Objective } from "@/components/dashboard/ObjectiveCard";
 import { cleanActivityName } from "@/lib/utils/activityName";
@@ -57,6 +58,15 @@ const HERO_LABELS: Record<string, { goal: string; plan: string; prep: string }> 
   pt: { goal: "Objetivo", plan: "Ver o meu plano", prep: "preparação" },
 };
 
+// Bannière « prochaine séance » (multilingue).
+const NEXT_LABELS: Record<string, { next: string; details: string }> = {
+  fr: { next: "Prochaine séance", details: "Détails de la séance" },
+  en: { next: "Next session", details: "Session details" },
+  de: { next: "Nächste Einheit", details: "Einheit-Details" },
+  es: { next: "Próxima sesión", details: "Detalles de la sesión" },
+  pt: { next: "Próxima sessão", details: "Detalhes da sessão" },
+};
+
 // Niveau du coureur (depuis profile.mode), multilingue.
 const LEVELS: Record<string, { elite: string; inter: string }> = {
   fr: { elite: "Niveau Élite", inter: "Niveau Intermédiaire" },
@@ -67,12 +77,12 @@ const LEVELS: Record<string, { elite: string; inter: string }> = {
 };
 
 // Libellés du rail de droite (multilingue).
-const RAIL_LABELS: Record<string, { prep: string; goal: string; ai: string; ready: string; badges: string }> = {
-  fr: { prep: "Statut de préparation", goal: "Objectif principal", ai: "Analyse IA", ready: "Prêt à performer", badges: "Badges" },
-  en: { prep: "Readiness status", goal: "Main goal", ai: "AI analysis", ready: "Ready to perform", badges: "Badges" },
-  de: { prep: "Bereitschaftsstatus", goal: "Hauptziel", ai: "KI-Analyse", ready: "Bereit zu performen", badges: "Abzeichen" },
-  es: { prep: "Estado de preparación", goal: "Objetivo principal", ai: "Análisis IA", ready: "Listo para rendir", badges: "Insignias" },
-  pt: { prep: "Estado de preparação", goal: "Objetivo principal", ai: "Análise IA", ready: "Pronto para performar", badges: "Medalhas" },
+const RAIL_LABELS: Record<string, { prep: string; goal: string; ai: string; ready: string; badges: string; community: string; communitySub: string; see: string }> = {
+  fr: { prep: "Statut de préparation", goal: "Objectif principal", ai: "Analyse IA", ready: "Prêt à performer", badges: "Badges", community: "Communauté", communitySub: "Rejoins les coureurs Pacevo", see: "Voir" },
+  en: { prep: "Readiness status", goal: "Main goal", ai: "AI analysis", ready: "Ready to perform", badges: "Badges", community: "Community", communitySub: "Join the Pacevo runners", see: "View" },
+  de: { prep: "Bereitschaftsstatus", goal: "Hauptziel", ai: "KI-Analyse", ready: "Bereit zu performen", badges: "Abzeichen", community: "Community", communitySub: "Triff die Pacevo-Läufer", see: "Ansehen" },
+  es: { prep: "Estado de preparación", goal: "Objetivo principal", ai: "Análisis IA", ready: "Listo para rendir", badges: "Insignias", community: "Comunidad", communitySub: "Únete a los corredores Pacevo", see: "Ver" },
+  pt: { prep: "Estado de preparação", goal: "Objetivo principal", ai: "Análise IA", ready: "Pronto para performar", badges: "Medalhas", community: "Comunidade", communitySub: "Junta-te aos corredores Pacevo", see: "Ver" },
 };
 
 // La forme du jour est calculée à partir de données réelles : voir computeReadiness().
@@ -309,6 +319,8 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
   const rl = RAIL_LABELS[lang] ?? RAIL_LABELS.fr;
   const lvl = LEVELS[lang] ?? LEVELS.fr;
   const levelLabel = String((profile as { mode?: string } | null)?.mode ?? "") === "elite" ? lvl.elite : lvl.inter;
+  const leagueName = String((league as { leagues?: { name?: string } } | null)?.leagues?.name ?? "");
+  const nx = NEXT_LABELS[lang] ?? NEXT_LABELS.fr;
   const heroStats = [
     { label: kpi.form, value: disc.hasData ? String(disc.total) : "—", unit: disc.hasData ? "/100" : "" },
     { label: kpi.hrv, value: hrvLatest != null ? hrvLatest.toFixed(0) : "—", unit: hrvLatest != null ? "ms" : "" },
@@ -340,6 +352,11 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
         style={{ background: "linear-gradient(120deg,#ecfdf5 0%,#eef6ff 58%,#ffffff 100%)" }}
       >
         <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[#0ea5e9]/10 blur-3xl" />
+        {/* Photo de coureur — fondue dans le dégradé à droite */}
+        <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[44%] overflow-hidden lg:block">
+          <img src="https://images.unsplash.com/photo-1486218119243-13883505764c?w=900&q=70&fit=crop&crop=entropy" alt="" className="h-full w-full object-cover opacity-50" />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to right, #eef6ff 0%, rgba(238,246,255,0.5) 40%, rgba(238,246,255,0) 100%)" }} />
+        </div>
         <div className="relative z-10 flex flex-wrap items-center justify-between gap-x-10 gap-y-6">
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#6e8a86] first-letter:uppercase">
@@ -359,10 +376,11 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
               <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200/70 bg-white/70 px-3 py-1 text-xs font-medium text-zinc-600">
                 <Activity className="h-3.5 w-3.5 text-[#059669]" /> {weeklyKm.toFixed(0)} km · 7 j
               </span>
+              <WeatherChip />
             </div>
           </div>
           {objective && objDaysTo != null && objDaysTo >= 0 ? (
-            <div className="w-full rounded-2xl border border-white/70 bg-white/55 p-4 backdrop-blur-sm sm:w-auto sm:min-w-[260px]">
+            <div className="relative z-10 w-full rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm backdrop-blur-sm sm:w-auto sm:min-w-[260px]">
               <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8aa6a6]">{hl.goal}</div>
               <div className="mt-1 text-[2.5rem] font-black leading-none tabular-nums text-[#11201d]">J‑{objDaysTo}</div>
               <div className="mt-1 truncate text-sm font-semibold text-[#11201d]">{objective.race}</div>
@@ -406,6 +424,23 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
 
       {/* Objectif de course — saisi par le client → e-mail coach + perso IA */}
       <ObjectiveCard objective={objective ?? null} currentVma={currentVma ?? null} />
+
+      {/* Prochaine séance — bannière compacte (uniquement si pas de bandeau coach) */}
+      {!coachKey && (
+        <div className="mb-5 flex items-center gap-4 rounded-2xl border border-zinc-200/70 bg-white px-5 py-3.5 shadow-sm">
+          <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#ecfdf5]" style={{ color: displaySession.accent }}>
+            <Calendar className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">{nx.next}</div>
+            <div className="truncate text-sm font-bold text-zinc-900">{displaySession.title}</div>
+            {displaySession.subtitle && <div className="truncate text-xs text-zinc-500">{displaySession.subtitle}</div>}
+          </div>
+          <Link href="/dashboard/calendrier" className="flex-shrink-0 rounded-xl bg-zinc-900 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-zinc-800">
+            {nx.details}
+          </Link>
+        </div>
+      )}
 
       {/* Séance prescrite par le coach — bannière mise en avant (prioritaire) */}
       {coachKey && coachMinimal && (
@@ -992,6 +1027,21 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
                 <div className="mt-1 text-[11px] text-zinc-500">{s.l}</div>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Communauté active */}
+        <div className="bento-card">
+          <div className="flex items-center justify-between">
+            <div className="metric-label">{rl.community}</div>
+            <Link href="/dashboard/communaute" className="text-xs font-medium text-[#059669] hover:text-[#047857]">{rl.see}</Link>
+          </div>
+          <div className="mt-3 flex items-center gap-3">
+            <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#ecfdf5] text-[#059669]"><Users className="h-5 w-5" /></span>
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold text-zinc-900">{leagueName || "Pacevo"}</div>
+              <div className="text-xs text-zinc-400">{rl.communitySub}</div>
+            </div>
           </div>
         </div>
       </aside>
