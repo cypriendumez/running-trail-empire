@@ -83,12 +83,22 @@ const LEVELS: Record<string, { elite: string; inter: string }> = {
 };
 
 // Libellés du rail de droite (multilingue).
-const RAIL_LABELS: Record<string, { prep: string; goal: string; ai: string; ready: string; badges: string; community: string; communitySub: string; see: string; newWeek: string; records: string }> = {
-  fr: { prep: "Statut de préparation", goal: "Objectif principal", ai: "Analyse IA", ready: "Prêt à performer", badges: "Badges", community: "Communauté", communitySub: "Rejoins les coureurs Pacevo", see: "Voir", newWeek: "nouveaux cette semaine", records: "Records personnels" },
-  en: { prep: "Readiness status", goal: "Main goal", ai: "AI analysis", ready: "Ready to perform", badges: "Badges", community: "Community", communitySub: "Join the Pacevo runners", see: "View", newWeek: "new this week", records: "Personal records" },
-  de: { prep: "Bereitschaftsstatus", goal: "Hauptziel", ai: "KI-Analyse", ready: "Bereit zu performen", badges: "Abzeichen", community: "Community", communitySub: "Triff die Pacevo-Läufer", see: "Ansehen", newWeek: "neue diese Woche", records: "Persönliche Rekorde" },
-  es: { prep: "Estado de preparación", goal: "Objetivo principal", ai: "Análisis IA", ready: "Listo para rendir", badges: "Insignias", community: "Comunidad", communitySub: "Únete a los corredores Pacevo", see: "Ver", newWeek: "nuevos esta semana", records: "Records personales" },
-  pt: { prep: "Estado de preparação", goal: "Objetivo principal", ai: "Análise IA", ready: "Pronto para performar", badges: "Medalhas", community: "Comunidade", communitySub: "Junta-te aos corredores Pacevo", see: "Ver", newWeek: "novos esta semana", records: "Recordes pessoais" },
+const RAIL_LABELS: Record<string, { prep: string; goal: string; ai: string; ready: string; badges: string; community: string; communitySub: string; see: string; newWeek: string; records: string; recommend: string; progress: string }> = {
+  fr: { prep: "Statut de préparation", goal: "Objectif principal", ai: "Analyse IA", ready: "Prêt à performer", badges: "Badges", community: "Communauté", communitySub: "Rejoins les coureurs Pacevo", see: "Voir", newWeek: "nouveaux cette semaine", records: "Records personnels", recommend: "Voir les recommandations", progress: "Préparation" },
+  en: { prep: "Readiness status", goal: "Main goal", ai: "AI analysis", ready: "Ready to perform", badges: "Badges", community: "Community", communitySub: "Join the Pacevo runners", see: "View", newWeek: "new this week", records: "Personal records", recommend: "View recommendations", progress: "Preparation" },
+  de: { prep: "Bereitschaftsstatus", goal: "Hauptziel", ai: "KI-Analyse", ready: "Bereit zu performen", badges: "Abzeichen", community: "Community", communitySub: "Triff die Pacevo-Läufer", see: "Ansehen", newWeek: "neue diese Woche", records: "Persönliche Rekorde", recommend: "Empfehlungen ansehen", progress: "Vorbereitung" },
+  es: { prep: "Estado de preparación", goal: "Objetivo principal", ai: "Análisis IA", ready: "Listo para rendir", badges: "Insignias", community: "Comunidad", communitySub: "Únete a los corredores Pacevo", see: "Ver", newWeek: "nuevos esta semana", records: "Records personales", recommend: "Ver recomendaciones", progress: "Preparación" },
+  pt: { prep: "Estado de preparação", goal: "Objetivo principal", ai: "Análise IA", ready: "Pronto para performar", badges: "Medalhas", community: "Comunidade", communitySub: "Junta-te aos corredores Pacevo", see: "Ver", newWeek: "novos esta semana", records: "Recordes pessoais", recommend: "Ver recomendações", progress: "Preparação" },
+};
+
+// Score de forme — 4 axes calculés du réel (endurance & vitesse dérivées des séances/VMA,
+// récup & régularité reprises du modèle discipline). Couleurs par axe comme la maquette.
+const FORME_LABELS: Record<string, { title: string; endurance: string; speed: string; recovery: string; regularity: string; of: string; rate: (n: number) => string }> = {
+  fr: { title: "Score de forme", endurance: "Endurance", speed: "Vitesse", recovery: "Récupération", regularity: "Régularité", of: "/ 100", rate: (n) => (n >= 80 ? "Excellent" : n >= 60 ? "Bonne forme" : n >= 40 ? "Correct" : "À développer") },
+  en: { title: "Fitness score", endurance: "Endurance", speed: "Speed", recovery: "Recovery", regularity: "Consistency", of: "/ 100", rate: (n) => (n >= 80 ? "Excellent" : n >= 60 ? "Good shape" : n >= 40 ? "Fair" : "Building up") },
+  de: { title: "Fitness-Score", endurance: "Ausdauer", speed: "Tempo", recovery: "Erholung", regularity: "Regelmäßigkeit", of: "/ 100", rate: (n) => (n >= 80 ? "Exzellent" : n >= 60 ? "Gute Form" : n >= 40 ? "Solide" : "Im Aufbau") },
+  es: { title: "Puntuación de forma", endurance: "Resistencia", speed: "Velocidad", recovery: "Recuperación", regularity: "Regularidad", of: "/ 100", rate: (n) => (n >= 80 ? "Excelente" : n >= 60 ? "Buena forma" : n >= 40 ? "Correcto" : "En progreso") },
+  pt: { title: "Pontuação de forma", endurance: "Resistência", speed: "Velocidade", recovery: "Recuperação", regularity: "Regularidade", of: "/ 100", rate: (n) => (n >= 80 ? "Excelente" : n >= 60 ? "Boa forma" : n >= 40 ? "Correto" : "Em progresso") },
 };
 
 // La forme du jour est calculée à partir de données réelles : voir computeReadiness().
@@ -319,10 +329,27 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
     ? Math.ceil((new Date(objective.raceDate + "T00:00:00").getTime() - Date.now()) / 86400000)
     : null;
 
+  // Progression de la préparation = part du temps écoulé dans la fenêtre de prépa
+  // (départ du plan si connu, sinon build standard de 16 semaines avant la course).
+  const planMeta = plan as { start_date?: string; created_at?: string } | null;
+  const objStartMs = objective
+    ? (planMeta?.start_date ? new Date(planMeta.start_date).getTime()
+      : planMeta?.created_at ? new Date(planMeta.created_at).getTime()
+      : new Date(objective.raceDate + "T00:00:00").getTime() - 112 * 86400000)
+    : 0;
+  const objEndMs = objective ? new Date(objective.raceDate + "T00:00:00").getTime() : 0;
+  const objProgress = objective && objDaysTo != null && objDaysTo >= 0 && objEndMs > objStartMs
+    ? Math.max(0, Math.min(100, Math.round(((Date.now() - objStartMs) / (objEndMs - objStartMs)) * 100)))
+    : null;
+
+  // Score de forme — 4 axes réels (endurance + vitesse dérivées des séances/VMA).
+  const forme = computeForme(workouts, currentVma ?? 0, disc.recovery, disc.consistency);
+
   // KPI de l'en-tête « hero » — résumé exécutif (valeurs réelles, repli « — »).
   const kpi = KPI_LABELS[lang] ?? KPI_LABELS.fr;
   const hl = HERO_LABELS[lang] ?? HERO_LABELS.fr;
   const rl = RAIL_LABELS[lang] ?? RAIL_LABELS.fr;
+  const fl = FORME_LABELS[lang] ?? FORME_LABELS.fr;
   const lvl = LEVELS[lang] ?? LEVELS.fr;
   const levelLabel = String((profile as { mode?: string } | null)?.mode ?? "") === "elite" ? lvl.elite : lvl.inter;
   const leagueName = String((league as { leagues?: { name?: string } } | null)?.leagues?.name ?? "");
@@ -355,18 +382,18 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
         </div>
       )}
 
-      {/* Header élite — carte premium */}
+      {/* Header élite — carte premium (3 zones : salutation · objectif · photo) */}
       <div
-        className="relative mb-6 overflow-hidden rounded-3xl border border-[#e3eef0] px-6 py-7 shadow-[0_12px_44px_-26px_rgba(16,24,40,0.22)] sm:px-9 sm:py-8"
+        className="relative mb-6 overflow-hidden rounded-3xl border border-[#e3eef0] shadow-[0_12px_44px_-26px_rgba(16,24,40,0.22)]"
         style={{ background: "linear-gradient(120deg,#ecfdf5 0%,#eef6ff 58%,#ffffff 100%)" }}
       >
-        <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[#0ea5e9]/10 blur-3xl" />
-        {/* Photo de coureur — fondue dans le dégradé à droite */}
-        <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[44%] overflow-hidden lg:block">
-          <img src="https://images.unsplash.com/photo-1486218119243-13883505764c?w=900&q=70&fit=crop&crop=entropy" alt="" className="h-full w-full object-cover opacity-50" />
-          <div className="absolute inset-0" style={{ background: "linear-gradient(to right, #eef6ff 0%, rgba(238,246,255,0.5) 40%, rgba(238,246,255,0) 100%)" }} />
+        {/* Photo de coureur — panneau net à droite, fondu doux vers le dégradé */}
+        <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[32%] overflow-hidden xl:block">
+          <img src="https://images.unsplash.com/photo-1486218119243-13883505764c?w=900&q=75&fit=crop&crop=entropy" alt="" className="h-full w-full object-cover" />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to right, #eef6ff 0%, rgba(238,246,255,0.45) 26%, rgba(238,246,255,0) 64%)" }} />
         </div>
-        <div className="relative z-10 flex flex-wrap items-center justify-between gap-x-10 gap-y-6">
+        <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[#0ea5e9]/10 blur-3xl" />
+        <div className="relative z-10 flex flex-wrap items-center justify-between gap-x-10 gap-y-7 px-6 py-7 sm:px-9 sm:py-8 xl:pr-[34%]">
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#6e8a86] first-letter:uppercase">
               {new Date().toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long" })}
@@ -389,24 +416,25 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
             </div>
           </div>
           {objective && objDaysTo != null && objDaysTo >= 0 ? (
-            <div className="relative z-10 flex w-full items-center gap-4 rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm backdrop-blur-sm sm:w-auto sm:min-w-[290px]">
-              <div className="relative h-[72px] w-[72px] flex-shrink-0">
-                <svg className="h-full w-full -rotate-90" viewBox="0 0 80 80">
-                  <circle cx="40" cy="40" r="34" fill="none" stroke="#e3eef0" strokeWidth="7" />
-                  <circle cx="40" cy="40" r="34" fill="none" stroke="#059669" strokeWidth="7" strokeLinecap="round"
-                    strokeDasharray={`${(2 * Math.PI * 34 * (disc.hasData ? disc.total : 0)) / 100} ${2 * Math.PI * 34}`}
+            <div className="flex items-center gap-5">
+              <div className="relative h-[92px] w-[92px] flex-shrink-0">
+                <svg className="h-full w-full -rotate-90" viewBox="0 0 92 92">
+                  <circle cx="46" cy="46" r="40" fill="none" stroke="#e3eef0" strokeWidth="7" />
+                  <circle cx="46" cy="46" r="40" fill="none" stroke="#059669" strokeWidth="7" strokeLinecap="round"
+                    strokeDasharray={`${(2 * Math.PI * 40 * (objProgress ?? 0)) / 100} ${2 * Math.PI * 40}`}
                     className="transition-all duration-1000" />
                 </svg>
-                <div className="absolute inset-0 flex items-center justify-center text-sm font-bold tabular-nums text-[#11201d]">
-                  {disc.hasData ? disc.total : "—"}<span className="text-[10px] text-[#8aa6a6]">%</span>
+                <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
+                  <span className="text-base font-bold tabular-nums text-[#11201d]">{objProgress ?? "—"}<span className="text-[10px] text-[#8aa6a6]">%</span></span>
+                  <span className="mt-1 text-[8px] font-semibold uppercase tracking-[0.12em] text-[#8aa6a6]">{hl.prep}</span>
                 </div>
               </div>
               <div className="min-w-0">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8aa6a6]">{hl.goal}</div>
-                <div className="text-[2rem] font-black leading-none tabular-nums text-[#11201d]">J‑{objDaysTo}</div>
-                <div className="mt-1 truncate text-sm font-semibold text-[#11201d]">{objective.race}</div>
-                <div className="text-xs text-[#5f7d79]">{objective.distanceKm} km · {objective.targetTime}</div>
-                <Link href="/dashboard/calendrier" className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-[#059669] transition-colors hover:text-[#047857]">
+                <div className="text-[2.25rem] font-black leading-none tabular-nums text-[#11201d]">J‑{objDaysTo}</div>
+                <div className="mt-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8aa6a6]">{hl.goal}</div>
+                <div className="truncate text-sm font-bold text-[#11201d]">{objective.race}</div>
+                <div className="text-xs text-[#5f7d79]">{new Date(objective.raceDate + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "long", year: "numeric" })}</div>
+                <Link href="/dashboard/calendrier" className="mt-2.5 inline-flex items-center gap-1.5 rounded-xl bg-[#11201d] px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#0b1714]">
                   {hl.plan} <ChevronRight className="h-3.5 w-3.5" />
                 </Link>
               </div>
@@ -547,38 +575,40 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
           className="col-span-12 md:col-span-4 bento-card"
         >
           <div className="flex items-center justify-between mb-4">
-            <div className="metric-label">{t("dash.discipline.title")}</div>
+            <div className="metric-label">{fl.title}</div>
             <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-zinc-100 text-zinc-500"><Target className="h-4 w-4" /></span>
           </div>
-          {disc.hasData ? (
+          {forme.hasData ? (
             <div className="flex items-center gap-5">
               <div className="relative h-28 w-28 flex-shrink-0">
                 <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
                   <circle cx="50" cy="50" r="42" fill="none" stroke="#F4F4F5" strokeWidth="9" />
                   <circle cx="50" cy="50" r="42" fill="none" stroke={readiness.accent} strokeWidth="9"
                     strokeLinecap="round"
-                    strokeDasharray={`${2 * Math.PI * 42 * disc.total / 100} ${2 * Math.PI * 42}`}
+                    strokeDasharray={`${2 * Math.PI * 42 * forme.total / 100} ${2 * Math.PI * 42}`}
                     className="transition-all duration-1000" />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-[2rem] font-bold leading-none tabular-nums text-zinc-900">{disc.total}</span>
-                  <span className="mt-0.5 text-[11px] text-zinc-400">/ 100</span>
+                  <span className="text-[2rem] font-bold leading-none tabular-nums text-zinc-900">{forme.total}</span>
+                  <span className="mt-0.5 text-[11px] text-zinc-400">{fl.of}</span>
+                  <span className="mt-1 text-[10px] font-semibold" style={{ color: readiness.accent }}>{fl.rate(forme.total)}</span>
                 </div>
               </div>
               <div className="flex-1 space-y-2.5">
                 {[
-                  { label: t("dash.discipline.precision"), val: disc.precision },
-                  { label: t("dash.discipline.consistency"), val: disc.consistency },
-                  { label: t("dash.discipline.recovery"), val: disc.recovery },
+                  { label: fl.endurance, val: forme.endurance, c: "#059669" },
+                  { label: fl.speed, val: forme.speed, c: "#2563eb" },
+                  { label: fl.recovery, val: forme.recovery, c: "#7c3aed" },
+                  { label: fl.regularity, val: forme.regularity, c: "#ea580c" },
                 ].map(m => (
                   <div key={m.label}>
                     <div className="mb-1 flex justify-between text-xs">
                       <span className="text-zinc-500">{m.label}</span>
-                      <span className="font-semibold tabular-nums text-zinc-900">{m.val}</span>
+                      <span className="font-semibold tabular-nums text-zinc-900">{m.val}%</span>
                     </div>
                     <div className="h-1.5 overflow-hidden rounded-full bg-zinc-100">
                       <div className="h-full rounded-full transition-all duration-700"
-                        style={{ width: `${m.val}%`, backgroundColor: readiness.accent }} />
+                        style={{ width: `${m.val}%`, backgroundColor: m.c }} />
                     </div>
                   </div>
                 ))}
@@ -1011,6 +1041,9 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
               <p className="mt-0.5 text-xs leading-relaxed text-zinc-500">{readiness.tagline}</p>
             </div>
           </div>
+          <Link href="/dashboard/sante" className="mt-4 flex items-center justify-between rounded-xl border border-zinc-100 px-3 py-2 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50">
+            {rl.recommend} <ChevronRight className="h-3.5 w-3.5 text-zinc-400" />
+          </Link>
         </div>
 
         {/* Objectif principal */}
@@ -1020,6 +1053,16 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
             <div className="mt-2 truncate text-sm font-bold text-zinc-900">{objective.race}</div>
             <div className="text-xs text-zinc-400">{objective.distanceKm} km · {objective.targetTime}</div>
             <div className="mt-3 text-3xl font-black leading-none tabular-nums text-zinc-900">J‑{objDaysTo}</div>
+            {objProgress != null && (
+              <div className="mt-3">
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
+                  <div className="h-full rounded-full bg-[#059669] transition-all duration-1000" style={{ width: `${objProgress}%` }} />
+                </div>
+                <div className="mt-1.5 flex items-center justify-between text-[11px] text-zinc-400">
+                  <span>{rl.progress}</span><span className="font-semibold tabular-nums text-zinc-600">{objProgress}%</span>
+                </div>
+              </div>
+            )}
             <Link href="/dashboard/calendrier" className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-[#059669] transition-colors hover:text-[#047857]">
               {hl.plan} <ChevronRight className="h-3.5 w-3.5" />
             </Link>
@@ -1042,13 +1085,21 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
               <div className="metric-label">{rl.badges}</div>
               <Link href="/dashboard/leagues" className="text-xs font-medium text-[#059669] hover:text-[#047857]">{t("dash.league.cta")}</Link>
             </div>
-            <div className="mt-3 flex gap-2">
-              {[{ km: 10, l: "10K" }, { km: 21.1, l: "Semi" }, { km: 42.2, l: "Marathon" }].map((b) => {
+            <div className="mt-3 flex justify-around gap-2">
+              {[
+                { km: 10, l: "10K", rim: "#a7f3d0", grad: "linear-gradient(145deg,#10b981,#059669)" },
+                { km: 21.1, l: "21K", rim: "#c7d2fe", grad: "linear-gradient(145deg,#818cf8,#6366f1)" },
+                { km: 42.2, l: "42K", rim: "#fde68a", grad: "linear-gradient(145deg,#fbbf24,#d97706)" },
+              ].map((b) => {
                 const earned = records.longest >= b.km;
+                const HEX = "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)";
                 return (
-                  <div key={b.l} className={`flex flex-1 flex-col items-center gap-1 rounded-xl py-2.5 ${earned ? "bg-amber-50 text-amber-600" : "bg-zinc-50 text-zinc-300"}`}>
-                    <Award className="h-5 w-5" />
-                    <span className="text-[10px] font-bold">{b.l}</span>
+                  <div key={b.l} className="flex flex-col items-center gap-1.5">
+                    <div className="flex h-[52px] w-[46px] items-center justify-center" style={{ clipPath: HEX, background: earned ? b.rim : "#e4e4e7" }}>
+                      <div className="flex h-[44px] w-[39px] items-center justify-center text-[11px] font-black" style={{ clipPath: HEX, background: earned ? b.grad : "#f4f4f5", color: earned ? "#fff" : "#a1a1aa" }}>
+                        {b.l}
+                      </div>
+                    </div>
                   </div>
                 );
               })}
@@ -1213,6 +1264,25 @@ function buildLastMetrics(w: Workout, t: TFn): { label: string; value: string | 
   if (gct != null) out.push({ label: t("dash.metric.groundContact"), value: gct, unit: "ms" });
   if (w.avg_power_watts != null) out.push({ label: t("dash.metric.power"), value: w.avg_power_watts, unit: "W" });
   return out.slice(0, 8);
+}
+
+// ── Score de forme — 4 axes, tous dérivés de données réelles ─────────────────────
+//  Endurance = base aérobie (plus longue sortie réf 30 km + volume hebdo réf 50 km/sem
+//  sur 6 sem.) · Vitesse = VMA estimée placée sur une échelle 8→20 km/h · Récupération
+//  & Régularité reprises du modèle discipline (sommeil/VFC, assiduité). total = moyenne
+//  des 4 axes → l'anneau colle toujours aux barres affichées.
+function computeForme(
+  workouts: Workout[], currentVma: number, recovery: number, regularity: number,
+): { total: number; endurance: number; speed: number; recovery: number; regularity: number; hasData: boolean } {
+  const now = Date.now();
+  const recent = workouts.filter(w => now - new Date(w.date).getTime() <= 42 * 86400000);
+  const hasData = workouts.length > 0;
+  const longest = Math.max(0, ...recent.map(w => w.distance_km ?? 0));
+  const weeklyKm = recent.reduce((s, w) => s + (w.distance_km ?? 0), 0) / 6;
+  const endurance = clamp(Math.round(0.6 * (longest / 30) * 100 + 0.4 * (weeklyKm / 50) * 100));
+  const speed = currentVma > 0 ? clamp(Math.round(((currentVma - 8) / 12) * 100)) : 0;
+  const total = Math.round((endurance + speed + recovery + regularity) / 4);
+  return { total, endurance, speed, recovery, regularity, hasData };
 }
 
 // ── Score Discipline — modèle cohérent, documenté et ajustable ───────────────────
