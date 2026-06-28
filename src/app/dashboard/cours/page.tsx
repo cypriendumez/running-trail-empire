@@ -152,7 +152,7 @@ export default async function CoursPage() {
                         {c.repere && <div className="mt-3 rounded-lg bg-zinc-50 px-3 py-2 text-xs text-zinc-500" style={{ borderLeft: `3px solid ${m.from}` }}><b className="text-zinc-700">{ui.repereLabel}</b> {c.repere}</div>}
                         {perso[`${ch.id}:${i}`] && (
                           <div className="mt-2 flex items-start gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800 ring-1 ring-emerald-100">
-                            <span aria-hidden>🎯</span>
+                            <Target className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-emerald-600" aria-hidden />
                             <span><b>{ui.persoLabel}</b> {perso[`${ch.id}:${i}`]}</span>
                           </div>
                         )}
