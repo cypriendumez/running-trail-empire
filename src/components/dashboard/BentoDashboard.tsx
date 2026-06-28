@@ -83,12 +83,12 @@ const LEVELS: Record<string, { elite: string; inter: string }> = {
 };
 
 // Libellés du rail de droite (multilingue).
-const RAIL_LABELS: Record<string, { prep: string; goal: string; ai: string; ready: string; badges: string; community: string; communitySub: string; see: string; newWeek: string }> = {
-  fr: { prep: "Statut de préparation", goal: "Objectif principal", ai: "Analyse IA", ready: "Prêt à performer", badges: "Badges", community: "Communauté", communitySub: "Rejoins les coureurs Pacevo", see: "Voir", newWeek: "nouveaux cette semaine" },
-  en: { prep: "Readiness status", goal: "Main goal", ai: "AI analysis", ready: "Ready to perform", badges: "Badges", community: "Community", communitySub: "Join the Pacevo runners", see: "View", newWeek: "new this week" },
-  de: { prep: "Bereitschaftsstatus", goal: "Hauptziel", ai: "KI-Analyse", ready: "Bereit zu performen", badges: "Abzeichen", community: "Community", communitySub: "Triff die Pacevo-Läufer", see: "Ansehen", newWeek: "neue diese Woche" },
-  es: { prep: "Estado de preparación", goal: "Objetivo principal", ai: "Análisis IA", ready: "Listo para rendir", badges: "Insignias", community: "Comunidad", communitySub: "Únete a los corredores Pacevo", see: "Ver", newWeek: "nuevos esta semana" },
-  pt: { prep: "Estado de preparação", goal: "Objetivo principal", ai: "Análise IA", ready: "Pronto para performar", badges: "Medalhas", community: "Comunidade", communitySub: "Junta-te aos corredores Pacevo", see: "Ver", newWeek: "novos esta semana" },
+const RAIL_LABELS: Record<string, { prep: string; goal: string; ai: string; ready: string; badges: string; community: string; communitySub: string; see: string; newWeek: string; records: string }> = {
+  fr: { prep: "Statut de préparation", goal: "Objectif principal", ai: "Analyse IA", ready: "Prêt à performer", badges: "Badges", community: "Communauté", communitySub: "Rejoins les coureurs Pacevo", see: "Voir", newWeek: "nouveaux cette semaine", records: "Records personnels" },
+  en: { prep: "Readiness status", goal: "Main goal", ai: "AI analysis", ready: "Ready to perform", badges: "Badges", community: "Community", communitySub: "Join the Pacevo runners", see: "View", newWeek: "new this week", records: "Personal records" },
+  de: { prep: "Bereitschaftsstatus", goal: "Hauptziel", ai: "KI-Analyse", ready: "Bereit zu performen", badges: "Abzeichen", community: "Community", communitySub: "Triff die Pacevo-Läufer", see: "Ansehen", newWeek: "neue diese Woche", records: "Persönliche Rekorde" },
+  es: { prep: "Estado de preparación", goal: "Objetivo principal", ai: "Análisis IA", ready: "Listo para rendir", badges: "Insignias", community: "Comunidad", communitySub: "Únete a los corredores Pacevo", see: "Ver", newWeek: "nuevos esta semana", records: "Records personales" },
+  pt: { prep: "Estado de preparação", goal: "Objetivo principal", ai: "Análise IA", ready: "Pronto para performar", badges: "Medalhas", community: "Comunidade", communitySub: "Junta-te aos corredores Pacevo", see: "Ver", newWeek: "novos esta semana", records: "Recordes pessoais" },
 };
 
 // La forme du jour est calculée à partir de données réelles : voir computeReadiness().
@@ -329,6 +329,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
   const nx = NEXT_LABELS[lang] ?? NEXT_LABELS.fr;
   const vit = VITALS[lang] ?? VITALS.fr;
   const restingHr = Number((profile as { resting_hr?: number } | null)?.resting_hr) || Number(workouts[0]?.avg_hr) || 0;
+  const distancePRs = computeDistancePRs(workouts, lang);
   const heroStats = [
     { label: kpi.form, value: disc.hasData ? String(disc.total) : "—", unit: disc.hasData ? "/100" : "" },
     { label: kpi.hrv, value: hrvLatest != null ? hrvLatest.toFixed(0) : "—", unit: hrvLatest != null ? "ms" : "" },
@@ -1096,6 +1097,24 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
             </div>
           </div>
         </div>
+        {/* Records personnels — meilleurs temps réels par distance */}
+        {distancePRs.length > 0 && (
+          <div className="bento-card">
+            <div className="metric-label">{rl.records}</div>
+            <div className="mt-3 space-y-2.5">
+              {distancePRs.map((pr) => (
+                <div key={pr.label} className="flex items-center justify-between gap-2">
+                  <span className="text-sm text-zinc-500">{pr.label}</span>
+                  <span className="flex items-center gap-2">
+                    <span className="text-sm font-bold tabular-nums text-zinc-900">{pr.time}</span>
+                    <span className="hidden text-[10px] text-zinc-400 sm:inline">{pr.date}</span>
+                    <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-600">RP</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </aside>
       </div>
     </div>
@@ -1311,6 +1330,28 @@ function computeRecords(workouts: Workout[]): { longest: number; maxElev: number
     .map(w => (w.duration_seconds as number) / (w.distance_km as number)); // sec/km
   const bestPace = paces.length ? Math.min(...paces) : null;
   return { longest, maxElev, longestSec, bestPace };
+}
+
+// Records par distance — meilleur temps réel sur 5/10/semi/marathon (depuis les activités).
+function computeDistancePRs(workouts: Workout[], lang: string): { label: string; time: string; date: string }[] {
+  const targets = [
+    { l: "5 km", lo: 4.7, hi: 5.4 },
+    { l: "10 km", lo: 9.4, hi: 10.6 },
+    { l: "Semi", lo: 20, hi: 22 },
+    { l: "Marathon", lo: 40.5, hi: 43.5 },
+  ];
+  const out: { label: string; time: string; date: string }[] = [];
+  for (const tgt of targets) {
+    const cands = workouts.filter((w) => (w.distance_km ?? 0) >= tgt.lo && (w.distance_km ?? 0) <= tgt.hi && (w.duration_seconds ?? 0) > 0);
+    if (!cands.length) continue;
+    const best = cands.reduce((a, b) => ((a.duration_seconds ?? 1e9) <= (b.duration_seconds ?? 1e9) ? a : b));
+    out.push({
+      label: tgt.l,
+      time: fmtTime(best.duration_seconds as number),
+      date: new Date(best.date).toLocaleDateString(lang, { day: "numeric", month: "short", year: "numeric" }),
+    });
+  }
+  return out;
 }
 
 // Résumé de la semaine en cours (7 derniers jours).
