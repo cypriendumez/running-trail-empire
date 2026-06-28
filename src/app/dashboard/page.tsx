@@ -14,7 +14,7 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [profileRes, hrvRes, workoutsRes, planRes, leagueRes, disciplineRes, sleepRes, coachRes, feedbackRes, objRes, baseRes] = await Promise.all([
+  const [profileRes, hrvRes, workoutsRes, planRes, leagueRes, disciplineRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, newMembersRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single(),
     supabase.from("hrv_data").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(14),
     supabase.from("workouts").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(40),
@@ -26,7 +26,9 @@ export default async function DashboardPage() {
     supabase.from("notifications").select("data").eq("user_id", user!.id).eq("type", "session_feedback").order("created_at", { ascending: false }).limit(60),
     supabase.from("notifications").select("data").eq("user_id", user!.id).eq("type", "race_objective").maybeSingle(),
     supabase.from("performance_baselines").select("vma_kmh,max_hr").eq("user_id", user!.id).order("tested_at", { ascending: false }).limit(1).single(),
+    supabase.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", new Date(Date.now() - 7 * 86400000).toISOString()),
   ]);
+  const newMembersWeek = newMembersRes.count ?? 0;
 
   const objective = (objRes.data?.data ?? null) as Objective | null;
 
@@ -72,6 +74,7 @@ export default async function DashboardPage() {
       objective={objective}
       currentVma={currentVma}
       loadRisk={risk}
+      newMembersWeek={newMembersWeek}
     />
   );
 }

@@ -38,6 +38,7 @@ interface Props {
   objective?: Objective | null;
   currentVma?: number | null;
   loadRisk?: { acwr: number; monotony: number; deload: boolean; level: string; reason: string };
+  newMembersWeek?: number;
 }
 
 // Libellés courts des KPI de l'en-tête (multilingues).
@@ -82,17 +83,17 @@ const LEVELS: Record<string, { elite: string; inter: string }> = {
 };
 
 // Libellés du rail de droite (multilingue).
-const RAIL_LABELS: Record<string, { prep: string; goal: string; ai: string; ready: string; badges: string; community: string; communitySub: string; see: string }> = {
-  fr: { prep: "Statut de préparation", goal: "Objectif principal", ai: "Analyse IA", ready: "Prêt à performer", badges: "Badges", community: "Communauté", communitySub: "Rejoins les coureurs Pacevo", see: "Voir" },
-  en: { prep: "Readiness status", goal: "Main goal", ai: "AI analysis", ready: "Ready to perform", badges: "Badges", community: "Community", communitySub: "Join the Pacevo runners", see: "View" },
-  de: { prep: "Bereitschaftsstatus", goal: "Hauptziel", ai: "KI-Analyse", ready: "Bereit zu performen", badges: "Abzeichen", community: "Community", communitySub: "Triff die Pacevo-Läufer", see: "Ansehen" },
-  es: { prep: "Estado de preparación", goal: "Objetivo principal", ai: "Análisis IA", ready: "Listo para rendir", badges: "Insignias", community: "Comunidad", communitySub: "Únete a los corredores Pacevo", see: "Ver" },
-  pt: { prep: "Estado de preparação", goal: "Objetivo principal", ai: "Análise IA", ready: "Pronto para performar", badges: "Medalhas", community: "Comunidade", communitySub: "Junta-te aos corredores Pacevo", see: "Ver" },
+const RAIL_LABELS: Record<string, { prep: string; goal: string; ai: string; ready: string; badges: string; community: string; communitySub: string; see: string; newWeek: string }> = {
+  fr: { prep: "Statut de préparation", goal: "Objectif principal", ai: "Analyse IA", ready: "Prêt à performer", badges: "Badges", community: "Communauté", communitySub: "Rejoins les coureurs Pacevo", see: "Voir", newWeek: "nouveaux cette semaine" },
+  en: { prep: "Readiness status", goal: "Main goal", ai: "AI analysis", ready: "Ready to perform", badges: "Badges", community: "Community", communitySub: "Join the Pacevo runners", see: "View", newWeek: "new this week" },
+  de: { prep: "Bereitschaftsstatus", goal: "Hauptziel", ai: "KI-Analyse", ready: "Bereit zu performen", badges: "Abzeichen", community: "Community", communitySub: "Triff die Pacevo-Läufer", see: "Ansehen", newWeek: "neue diese Woche" },
+  es: { prep: "Estado de preparación", goal: "Objetivo principal", ai: "Análisis IA", ready: "Listo para rendir", badges: "Insignias", community: "Comunidad", communitySub: "Únete a los corredores Pacevo", see: "Ver", newWeek: "nuevos esta semana" },
+  pt: { prep: "Estado de preparação", goal: "Objetivo principal", ai: "Análise IA", ready: "Pronto para performar", badges: "Medalhas", community: "Comunidade", communitySub: "Junta-te aos corredores Pacevo", see: "Ver", newWeek: "novos esta semana" },
 };
 
 // La forme du jour est calculée à partir de données réelles : voir computeReadiness().
 
-export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplineHistory, sleep, coachSession, pendingFeedback, objective, currentVma, loadRisk }: Props) {
+export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplineHistory, sleep, coachSession, pendingFeedback, objective, currentVma, loadRisk, newMembersWeek }: Props) {
   const { t, lang } = useT();
   const state = hrv[0]?.physiological_state ?? "optimal";
 
@@ -387,14 +388,27 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
             </div>
           </div>
           {objective && objDaysTo != null && objDaysTo >= 0 ? (
-            <div className="relative z-10 w-full rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm backdrop-blur-sm sm:w-auto sm:min-w-[260px]">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8aa6a6]">{hl.goal}</div>
-              <div className="mt-1 text-[2.5rem] font-black leading-none tabular-nums text-[#11201d]">J‑{objDaysTo}</div>
-              <div className="mt-1 truncate text-sm font-semibold text-[#11201d]">{objective.race}</div>
-              <div className="text-xs text-[#5f7d79]">{objective.distanceKm} km · {objective.targetTime}</div>
-              <Link href="/dashboard/calendrier" className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-[#059669] transition-colors hover:text-[#047857]">
-                {hl.plan} <ChevronRight className="h-3.5 w-3.5" />
-              </Link>
+            <div className="relative z-10 flex w-full items-center gap-4 rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm backdrop-blur-sm sm:w-auto sm:min-w-[290px]">
+              <div className="relative h-[72px] w-[72px] flex-shrink-0">
+                <svg className="h-full w-full -rotate-90" viewBox="0 0 80 80">
+                  <circle cx="40" cy="40" r="34" fill="none" stroke="#e3eef0" strokeWidth="7" />
+                  <circle cx="40" cy="40" r="34" fill="none" stroke="#059669" strokeWidth="7" strokeLinecap="round"
+                    strokeDasharray={`${(2 * Math.PI * 34 * (disc.hasData ? disc.total : 0)) / 100} ${2 * Math.PI * 34}`}
+                    className="transition-all duration-1000" />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center text-sm font-bold tabular-nums text-[#11201d]">
+                  {disc.hasData ? disc.total : "—"}<span className="text-[10px] text-[#8aa6a6]">%</span>
+                </div>
+              </div>
+              <div className="min-w-0">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8aa6a6]">{hl.goal}</div>
+                <div className="text-[2rem] font-black leading-none tabular-nums text-[#11201d]">J‑{objDaysTo}</div>
+                <div className="mt-1 truncate text-sm font-semibold text-[#11201d]">{objective.race}</div>
+                <div className="text-xs text-[#5f7d79]">{objective.distanceKm} km · {objective.targetTime}</div>
+                <Link href="/dashboard/calendrier" className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-[#059669] transition-colors hover:text-[#047857]">
+                  {hl.plan} <ChevronRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
             </div>
           ) : (
             <div className="flex flex-wrap gap-x-7 gap-y-4 sm:gap-x-9">
@@ -1068,8 +1082,17 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
           <div className="mt-3 flex items-center gap-3">
             <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#ecfdf5] text-[#059669]"><Users className="h-5 w-5" /></span>
             <div className="min-w-0">
-              <div className="truncate text-sm font-semibold text-zinc-900">{leagueName || "Pacevo"}</div>
-              <div className="text-xs text-zinc-400">{rl.communitySub}</div>
+              {newMembersWeek && newMembersWeek > 0 ? (
+                <>
+                  <div className="text-lg font-bold tabular-nums text-zinc-900">+{newMembersWeek}</div>
+                  <div className="text-xs text-zinc-400">{rl.newWeek}</div>
+                </>
+              ) : (
+                <>
+                  <div className="truncate text-sm font-semibold text-zinc-900">{leagueName || "Pacevo"}</div>
+                  <div className="text-xs text-zinc-400">{rl.communitySub}</div>
+                </>
+              )}
             </div>
           </div>
         </div>
