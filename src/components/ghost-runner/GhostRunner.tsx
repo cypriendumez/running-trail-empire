@@ -508,37 +508,43 @@ export function GhostRunner({ baseline, coachSessions = [] }: GhostRunnerProps) 
 
   return (
     <div className="space-y-6">
-      {/* Header — clair & luxueux */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-zinc-200/70 bg-white px-6 py-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_40px_-26px_rgba(16,24,40,0.2)]">
-        <div className="flex items-center gap-3.5">
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-900 shadow-md ring-1 ring-zinc-700/50">
-            <Ghost className="h-6 w-6 text-emerald-400" />
-          </span>
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight text-zinc-900">Ghost Runner</h2>
-            <p className="mt-0.5 text-sm text-zinc-500">{d["hd.sub"]}</p>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {[
-                { icon: Satellite, l: d["ch.gps"] },
-                { icon: Mic, l: d["ch.voice"] },
-                { icon: Watch, l: d["ch.watch"] },
-              ].map((b) => (
-                <span key={b.l} className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] font-semibold text-zinc-500">
-                  <b.icon className="h-3 w-3" /> {b.l}
-                </span>
-              ))}
+      {/* Header — hero clair bi-ton (langage du dashboard) */}
+      <div
+        className="relative overflow-hidden rounded-3xl border border-[#e3eef0] px-6 py-6 shadow-[0_12px_44px_-26px_rgba(16,24,40,0.22)] sm:px-8"
+        style={{ background: "linear-gradient(120deg,#ecfdf5 0%,#eef6ff 58%,#ffffff 100%)" }}
+      >
+        <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[#0ea5e9]/10 blur-3xl" />
+        <div className="relative z-10 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <span className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl text-white shadow-[0_10px_26px_-10px_rgba(16,185,129,0.65)]" style={{ background: "linear-gradient(145deg,#10b981,#047857)" }}>
+              <Ghost className="h-7 w-7" />
+            </span>
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight text-[#11201d] sm:text-[1.75rem]">Ghost Runner</h2>
+              <p className="mt-0.5 text-sm text-[#5f7d79]">{d["hd.sub"]}</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {[
+                  { icon: Satellite, l: d["ch.gps"] },
+                  { icon: Mic, l: d["ch.voice"] },
+                  { icon: Watch, l: d["ch.watch"] },
+                ].map((b) => (
+                  <span key={b.l} className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200/70 bg-white/70 px-3 py-1 text-xs font-medium text-zinc-600">
+                    <b.icon className="h-3.5 w-3.5 text-[#059669]" /> {b.l}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
+          <button
+            onClick={() => setAudioEnabled(!audioEnabled)}
+            className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold shadow-sm transition-all ${
+              audioEnabled ? "bg-emerald-600 text-white hover:bg-emerald-500" : "bg-white/70 text-zinc-500 ring-1 ring-zinc-200 hover:bg-white"
+            }`}
+          >
+            {audioEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            Audio {audioEnabled ? "ON" : "OFF"}
+          </button>
         </div>
-        <button
-          onClick={() => setAudioEnabled(!audioEnabled)}
-          className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all ${
-            audioEnabled ? "bg-zinc-900 text-white hover:bg-zinc-800" : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
-          }`}
-        >
-          {audioEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-          Audio {audioEnabled ? "ON" : "OFF"}
-        </button>
       </div>
 
       <AnimatePresence mode="wait">
@@ -608,16 +614,16 @@ export function GhostRunner({ baseline, coachSessions = [] }: GhostRunnerProps) 
                     title={tg("feas.title", { l: feas.l, v: vma })}
                     className={`group rounded-2xl border p-3.5 text-left transition-all duration-200 hover:-translate-y-0.5 ${
                       active
-                        ? "border-transparent bg-zinc-900 text-white shadow-lg"
+                        ? "border-emerald-500 bg-emerald-50/70 shadow-[0_10px_30px_-14px_rgba(5,150,105,0.55)] ring-1 ring-emerald-200"
                         : "border-zinc-200 bg-white hover:border-zinc-300 hover:shadow-md"
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className={`text-[10px] font-bold uppercase tracking-[0.14em] ${active ? "text-zinc-400" : "text-zinc-400"}`}>{p.goal}</span>
+                      <span className={`text-[10px] font-bold uppercase tracking-[0.14em] ${active ? "text-emerald-600" : "text-zinc-400"}`}>{p.goal}</span>
                       <span className="h-2 w-2 rounded-full" style={{ background: feas.c }} />
                     </div>
-                    <div className={`mt-1 text-lg font-bold leading-tight ${active ? "text-white" : "text-zinc-900"}`}>{p.name === "Semi" ? d["pr.semi"] : p.name}</div>
-                    <div className={`mt-0.5 text-xs font-semibold tabular-nums ${active ? "text-emerald-300" : "text-zinc-500"}`}>{formatPace(pace)} /km</div>
+                    <div className={`mt-1 text-lg font-bold leading-tight ${active ? "text-emerald-700" : "text-zinc-900"}`}>{p.name === "Semi" ? d["pr.semi"] : p.name}</div>
+                    <div className={`mt-0.5 text-xs font-semibold tabular-nums ${active ? "text-emerald-600" : "text-zinc-500"}`}>{formatPace(pace)} /km</div>
                   </button>
                 );
               })}
@@ -630,15 +636,15 @@ export function GhostRunner({ baseline, coachSessions = [] }: GhostRunnerProps) 
                 <div className="flex items-center justify-between mb-2">
                   <label className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400"><MapPin className="h-3.5 w-3.5" /> {d["lb.dist"]}</label>
                   <div className="flex gap-1">
-                    <button onClick={() => setDistanceKeepPace(distance - 1)} className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 font-bold text-zinc-600 transition-colors hover:bg-zinc-900 hover:text-white">−</button>
-                    <button onClick={() => setDistanceKeepPace(distance + 1)} className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 font-bold text-zinc-600 transition-colors hover:bg-zinc-900 hover:text-white">+</button>
+                    <button onClick={() => setDistanceKeepPace(distance - 1)} className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 font-bold text-zinc-600 transition-colors hover:bg-emerald-600 hover:text-white">−</button>
+                    <button onClick={() => setDistanceKeepPace(distance + 1)} className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 font-bold text-zinc-600 transition-colors hover:bg-emerald-600 hover:text-white">+</button>
                   </div>
                 </div>
                 <div className="mb-3 text-4xl font-black tabular-nums text-zinc-900">{distance}<span className="ml-1 text-base font-semibold text-zinc-400">km</span></div>
-                <input type="range" min={1} max={50} step={0.5} value={Math.min(distance, 50)} onChange={(e) => setDistanceKeepPace(parseFloat(e.target.value))} className="w-full accent-zinc-900" />
+                <input type="range" min={1} max={50} step={0.5} value={Math.min(distance, 50)} onChange={(e) => setDistanceKeepPace(parseFloat(e.target.value))} className="w-full accent-emerald-600" />
                 <div className="mt-3 flex flex-wrap gap-1">
                   {[5, 10, 21.1, 42.2].map((dd) => (
-                    <button key={dd} onClick={() => setDistanceKeepPace(dd)} className={`rounded-lg px-2 py-0.5 text-xs font-semibold transition-colors ${distance === dd ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"}`}>{dd === 21.1 ? d["pr.semi"] : dd === 42.2 ? "Marathon" : dd + "K"}</button>
+                    <button key={dd} onClick={() => setDistanceKeepPace(dd)} className={`rounded-lg px-2 py-0.5 text-xs font-semibold transition-colors ${distance === dd ? "bg-emerald-600 text-white" : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"}`}>{dd === 21.1 ? d["pr.semi"] : dd === 42.2 ? "Marathon" : dd + "K"}</button>
                   ))}
                 </div>
               </div>
@@ -665,8 +671,8 @@ export function GhostRunner({ baseline, coachSessions = [] }: GhostRunnerProps) 
                 <div className="flex items-center justify-between mb-2">
                   <label className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400"><Timer className="h-3.5 w-3.5" /> {d["lb.time"]}</label>
                   <div className="flex gap-1">
-                    <button onClick={() => bumpTime(-60)} className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 font-bold text-zinc-600 transition-colors hover:bg-zinc-900 hover:text-white">−</button>
-                    <button onClick={() => bumpTime(60)} className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 font-bold text-zinc-600 transition-colors hover:bg-zinc-900 hover:text-white">+</button>
+                    <button onClick={() => bumpTime(-60)} className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 font-bold text-zinc-600 transition-colors hover:bg-emerald-600 hover:text-white">−</button>
+                    <button onClick={() => bumpTime(60)} className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 font-bold text-zinc-600 transition-colors hover:bg-emerald-600 hover:text-white">+</button>
                   </div>
                 </div>
                 <div className="mb-3 text-4xl font-black tabular-nums text-zinc-900">{formatTime(targetTime)}</div>
@@ -685,7 +691,7 @@ export function GhostRunner({ baseline, coachSessions = [] }: GhostRunnerProps) 
             <div className="mb-6 rounded-3xl border border-zinc-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_40px_-26px_rgba(16,24,40,0.2)]">
               <div className="mb-3.5 flex items-center justify-between">
                 <h3 className="text-sm font-bold text-zinc-900">{d["ref.title"]}</h3>
-                <span className="rounded-full bg-zinc-900 px-2.5 py-1 text-[11px] font-bold tabular-nums text-white">VMA {vma} km/h</span>
+                <span className="rounded-full px-2.5 py-1 text-[11px] font-bold tabular-nums text-white shadow-sm" style={{ background: "linear-gradient(135deg,#059669,#0d9488)" }}>VMA {vma} km/h</span>
               </div>
               <div className="grid grid-cols-5 gap-2">
                 {estimatedPaces.map((z, i) => {
@@ -714,15 +720,15 @@ export function GhostRunner({ baseline, coachSessions = [] }: GhostRunnerProps) 
                 <div className="flex items-center justify-between mb-2">
                   <label className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400"><Timer className="h-3.5 w-3.5" /> {d["lb.dur"]}</label>
                   <div className="flex gap-1">
-                    <button onClick={() => setDurationMin((d) => Math.max(5, d - 5))} className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 font-bold text-zinc-600 transition-colors hover:bg-zinc-900 hover:text-white">−</button>
-                    <button onClick={() => setDurationMin((d) => Math.min(240, d + 5))} className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 font-bold text-zinc-600 transition-colors hover:bg-zinc-900 hover:text-white">+</button>
+                    <button onClick={() => setDurationMin((d) => Math.max(5, d - 5))} className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 font-bold text-zinc-600 transition-colors hover:bg-emerald-600 hover:text-white">−</button>
+                    <button onClick={() => setDurationMin((d) => Math.min(240, d + 5))} className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 font-bold text-zinc-600 transition-colors hover:bg-emerald-600 hover:text-white">+</button>
                   </div>
                 </div>
                 <div className="mb-3 text-4xl font-black tabular-nums text-zinc-900">{durationMin}<span className="ml-1 text-base font-semibold text-zinc-400">min</span></div>
-                <input type="range" min={10} max={180} step={5} value={Math.min(durationMin, 180)} onChange={(e) => setDurationMin(parseInt(e.target.value))} className="w-full accent-zinc-900" />
+                <input type="range" min={10} max={180} step={5} value={Math.min(durationMin, 180)} onChange={(e) => setDurationMin(parseInt(e.target.value))} className="w-full accent-emerald-600" />
                 <div className="mt-3 flex flex-wrap gap-1">
                   {[30, 45, 60, 90].map((d) => (
-                    <button key={d} onClick={() => setDurationMin(d)} className={`rounded-lg px-2 py-0.5 text-xs font-semibold transition-colors ${durationMin === d ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"}`}>{d} min</button>
+                    <button key={d} onClick={() => setDurationMin(d)} className={`rounded-lg px-2 py-0.5 text-xs font-semibold transition-colors ${durationMin === d ? "bg-emerald-600 text-white" : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"}`}>{d} min</button>
                   ))}
                 </div>
               </div>
@@ -730,7 +736,7 @@ export function GhostRunner({ baseline, coachSessions = [] }: GhostRunnerProps) 
               <div className="relative overflow-hidden rounded-3xl border border-rose-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_20px_46px_-26px_rgba(244,63,94,0.4)] ring-1 ring-rose-100">
                 <div className="pointer-events-none absolute -right-10 -top-14 h-40 w-40 rounded-full bg-rose-400/10 blur-2xl" />
                 <div className="relative">
-                  <label className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-rose-600">❤️ {d["hr.zone"]}</label>
+                  <label className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-rose-600"><Heart className="h-3.5 w-3.5" /> {d["hr.zone"]}</label>
                   <div className="space-y-1.5">
                     {HR_ZONES.map((z) => (
                       <button key={z.z} onClick={() => setHrZone(z.z)}
@@ -748,7 +754,7 @@ export function GhostRunner({ baseline, coachSessions = [] }: GhostRunnerProps) 
                       </span>
                     ) : (
                       <button onClick={connectHrSensor} disabled={hrSensor === "connecting"}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-zinc-900 px-2.5 py-1 text-[11px] font-bold text-white transition-colors hover:bg-zinc-700 disabled:opacity-60">
+                        className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white transition-colors hover:bg-emerald-500 disabled:opacity-60">
                         {hrSensor === "connecting" ? <Loader2 className="h-3 w-3 animate-spin" /> : <Bluetooth className="h-3 w-3" />}
                         {d["hr.connect"]}
                       </button>
@@ -759,19 +765,21 @@ export function GhostRunner({ baseline, coachSessions = [] }: GhostRunnerProps) 
             </div>
             )}
 
-            {/* Summary */}
-            <div className="bg-zinc-900 text-white rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 mb-6">
+            {/* Summary — bandeau émeraude (langage du dashboard) */}
+            <div className="relative overflow-hidden rounded-3xl p-5 text-white shadow-xl shadow-emerald-900/30 ring-1 ring-white/10 flex flex-wrap items-center justify-between gap-4 mb-6" style={{ background: "linear-gradient(120deg,#064e3b 0%,#047857 48%,#0d9488 100%)" }}>
+              <div className="pointer-events-none absolute -top-16 -right-10 h-44 w-44 rounded-full bg-emerald-300/20 blur-3xl" />
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
               {targetMode === "pace" ? (
                 <div className="flex items-center gap-6 sm:gap-8">
-                  <div><div className="text-zinc-400 text-sm mb-1">{d["lb.pace"]}</div><div className="text-2xl font-bold">{formatPace(targetPace)} /km</div></div>
-                  <div><div className="text-zinc-400 text-sm mb-1">{d["lb.dist"]}</div><div className="text-2xl font-bold">{distance} km</div></div>
-                  <div><div className="text-zinc-400 text-sm mb-1">{d["sm.goal"]}</div><div className="text-2xl font-bold">{formatTime(targetTime)}</div></div>
+                  <div><div className="text-emerald-100/80 text-sm mb-1">{d["lb.pace"]}</div><div className="text-2xl font-bold">{formatPace(targetPace)} /km</div></div>
+                  <div><div className="text-emerald-100/80 text-sm mb-1">{d["lb.dist"]}</div><div className="text-2xl font-bold">{distance} km</div></div>
+                  <div><div className="text-emerald-100/80 text-sm mb-1">{d["sm.goal"]}</div><div className="text-2xl font-bold">{formatTime(targetTime)}</div></div>
                 </div>
               ) : (
                 <div className="flex items-center gap-6 sm:gap-8">
-                  <div><div className="text-zinc-400 text-sm mb-1">{d["lb.dur"]}</div><div className="text-2xl font-bold">{durationMin} min</div></div>
-                  <div><div className="text-zinc-400 text-sm mb-1">{d["sm.hrZone"]}</div><div className="text-2xl font-bold">{zn(hrZone)}</div></div>
-                  <div><div className="text-zinc-400 text-sm mb-1">{d["sm.target"]}</div><div className="text-2xl font-bold tabular-nums">{Math.round(maxHr * HR_ZONES[hrZone - 1].lo)}–{Math.round(maxHr * HR_ZONES[hrZone - 1].hi)}</div></div>
+                  <div><div className="text-emerald-100/80 text-sm mb-1">{d["lb.dur"]}</div><div className="text-2xl font-bold">{durationMin} min</div></div>
+                  <div><div className="text-emerald-100/80 text-sm mb-1">{d["sm.hrZone"]}</div><div className="text-2xl font-bold">{zn(hrZone)}</div></div>
+                  <div><div className="text-emerald-100/80 text-sm mb-1">{d["sm.target"]}</div><div className="text-2xl font-bold tabular-nums">{Math.round(maxHr * HR_ZONES[hrZone - 1].lo)}–{Math.round(maxHr * HR_ZONES[hrZone - 1].hi)}</div></div>
                 </div>
               )}
               <div className="flex items-center gap-3">
@@ -790,7 +798,7 @@ export function GhostRunner({ baseline, coachSessions = [] }: GhostRunnerProps) 
                 </button>
                 <button
                   onClick={() => (targetMode === "hr" ? startHrSession() : startSession())}
-                  className="bg-emerald-500 hover:bg-emerald-400 text-white font-bold px-8 py-4 rounded-2xl flex items-center gap-3 text-lg transition-all"
+                  className="bg-white hover:bg-emerald-50 text-emerald-700 font-bold px-8 py-4 rounded-2xl flex items-center gap-3 text-lg shadow-md transition-all"
                 >
                   <Play className="w-6 h-6" />
                   {d["start"]}
@@ -831,7 +839,7 @@ export function GhostRunner({ baseline, coachSessions = [] }: GhostRunnerProps) 
                       <ol className="space-y-2.5 text-sm text-zinc-700">
                         {(GUIDE[lang] ?? GUIDE.fr).map((txt, i) => (
                           <li key={i} className="flex gap-2.5">
-                            <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-zinc-900 text-[11px] font-bold text-white">{i + 1}</span>
+                            <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[11px] font-bold text-white">{i + 1}</span>
                             <span>{txt}</span>
                           </li>
                         ))}
@@ -863,7 +871,7 @@ export function GhostRunner({ baseline, coachSessions = [] }: GhostRunnerProps) 
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1 text-zinc-600"><Loader2 className="h-3 w-3 animate-spin" /> {d["st.hrConn"]}</span>
                   ) : (
                     <button onClick={connectHrSensor}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-zinc-900 px-3 py-1 text-white transition-colors hover:bg-zinc-700">
+                      className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1 text-white transition-colors hover:bg-emerald-500">
                       <Bluetooth className="h-3 w-3" /> {d["st.hrBtn"]}
                     </button>
                   )
