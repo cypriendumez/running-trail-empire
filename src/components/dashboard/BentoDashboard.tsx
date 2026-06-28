@@ -101,6 +101,22 @@ const FORME_LABELS: Record<string, { title: string; endurance: string; speed: st
   pt: { title: "Pontuação de forma", endurance: "Resistência", speed: "Velocidade", recovery: "Recuperação", regularity: "Regularidade", of: "/ 100", rate: (n) => (n >= 80 ? "Excelente" : n >= 60 ? "Boa forma" : n >= 40 ? "Correto" : "Em progresso") },
 };
 
+// Zones d'entraînement (FC) — temps par zone, estimé du réel (FC moyenne / FC max).
+const ZONES_LABELS: Record<string, { title: string; sub: string; z: [string, string, string, string, string]; min: string }> = {
+  fr: { title: "Zones d'entraînement", sub: "Répartition du temps · 6 sem.", z: ["Récupération", "Endurance", "Tempo", "Seuil", "VO₂max"], min: "min" },
+  en: { title: "Training zones", sub: "Time split · last 6 wks", z: ["Recovery", "Endurance", "Tempo", "Threshold", "VO₂max"], min: "min" },
+  de: { title: "Trainingszonen", sub: "Zeitverteilung · 6 Wo.", z: ["Erholung", "Ausdauer", "Tempo", "Schwelle", "VO₂max"], min: "Min" },
+  es: { title: "Zonas de entreno", sub: "Reparto de tiempo · 6 sem.", z: ["Recuperación", "Resistencia", "Tempo", "Umbral", "VO₂máx"], min: "min" },
+  pt: { title: "Zonas de treino", sub: "Distribuição · 6 sem.", z: ["Recuperação", "Resistência", "Tempo", "Limiar", "VO₂máx"], min: "min" },
+};
+const HR_ZONE_DEFS = [
+  { lo: 0, hi: 0.6, color: "#38bdf8" },
+  { lo: 0.6, hi: 0.7, color: "#10b981" },
+  { lo: 0.7, hi: 0.8, color: "#f59e0b" },
+  { lo: 0.8, hi: 0.9, color: "#f97316" },
+  { lo: 0.9, hi: 9, color: "#ef4444" },
+];
+
 // La forme du jour est calculée à partir de données réelles : voir computeReadiness().
 
 export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplineHistory, sleep, coachSession, pendingFeedback, objective, currentVma, loadRisk, newMembersWeek }: Props) {
@@ -181,7 +197,6 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
   const prevWeeks = volumeTrend.slice(0, -1);
   const prevAvg = prevWeeks.length ? prevWeeks.reduce((s, v) => s + v.km, 0) / prevWeeks.length : 0;
   const volumeDelta = prevAvg > 0 ? weeklyKm - prevAvg : null;
-  const intensity = computeIntensitySplit(workouts, 30);
   const records = computeRecords(workouts);
   const weekSummary = computeWeekSummary(workouts);
   const acwr = loadRisk?.acwr ?? 0;
@@ -345,11 +360,19 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
   // Score de forme — 4 axes réels (endurance + vitesse dérivées des séances/VMA).
   const forme = computeForme(workouts, currentVma ?? 0, disc.recovery, disc.consistency);
 
+  // Zones d'entraînement (FC) — FCmax = test/profil → âge (220−âge) → max observé.
+  const profMaxHr = Number((profile as { max_hr?: number } | null)?.max_hr) || 0;
+  const profAge = Number((profile as { age?: number } | null)?.age) || 0;
+  const obsMaxHr = Math.max(0, ...workouts.map(w => Number(w.max_hr ?? 0)));
+  const maxHrRef = profMaxHr || (profAge > 0 ? 220 - profAge : 0) || obsMaxHr;
+  const hrZones = computeHrZones(workouts, maxHrRef);
+
   // KPI de l'en-tête « hero » — résumé exécutif (valeurs réelles, repli « — »).
   const kpi = KPI_LABELS[lang] ?? KPI_LABELS.fr;
   const hl = HERO_LABELS[lang] ?? HERO_LABELS.fr;
   const rl = RAIL_LABELS[lang] ?? RAIL_LABELS.fr;
   const fl = FORME_LABELS[lang] ?? FORME_LABELS.fr;
+  const zl = ZONES_LABELS[lang] ?? ZONES_LABELS.fr;
   const lvl = LEVELS[lang] ?? LEVELS.fr;
   const levelLabel = String((profile as { mode?: string } | null)?.mode ?? "") === "elite" ? lvl.elite : lvl.inter;
   const leagueName = String((league as { leagues?: { name?: string } } | null)?.leagues?.name ?? "");
@@ -827,40 +850,58 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
           <div className="mt-1 text-xs text-zinc-400">{t("dash.volume.goal")}: {plan ? t("dash.volume.perPlan") : "60 km"}</div>
         </motion.div>
 
-        {/* Répartition d'intensité (polarisation 80/20) */}
+        {/* Zones d'entraînement (FC) — temps par zone + verdict de polarisation 80/20 */}
         <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.20 }}
           className="col-span-12 md:col-span-4 bento-card"
         >
           <div className="mb-1 flex items-center justify-between">
-            <div className="metric-label">{t("dash.intensity.title")}</div>
+            <div className="metric-label">{zl.title}</div>
             <Flame className="h-4 w-4 text-orange-400" />
           </div>
-          <div className="mb-3 text-[11px] text-zinc-400">{t("dash.intensity.sub")}</div>
-          {intensity.total >= 3 ? (() => {
-            const easyPct = Math.round((intensity.easy / intensity.total) * 100);
-            const good = easyPct >= 75 && easyPct <= 88;
-            const verdict = good ? t("dash.intensity.polarized") : easyPct < 75 ? t("dash.intensity.tooHard") : t("dash.intensity.tooEasy");
+          <div className="mb-3 text-[11px] text-zinc-400">{zl.sub}</div>
+          {hrZones.total > 0 ? (() => {
             const r = 34, C = 2 * Math.PI * r;
+            let acc = 0;
+            const segs = hrZones.secs.map((s, i) => {
+              const pct = s / hrZones.total;
+              const seg = { off: acc, len: C * pct, color: HR_ZONE_DEFS[i].color, pct, min: Math.round(s / 60) };
+              acc += C * pct;
+              return seg;
+            });
+            const easyPct = Math.round(((hrZones.secs[0] + hrZones.secs[1]) / hrZones.total) * 100);
+            const good = easyPct >= 75 && easyPct <= 90;
             return (
-              <div className="flex items-center gap-4">
-                <div className="relative h-24 w-24 flex-shrink-0">
-                  <svg viewBox="0 0 80 80" className="h-full w-full -rotate-90">
-                    <circle cx="40" cy="40" r={r} fill="none" stroke="#FED7AA" strokeWidth="10" />
-                    <circle cx="40" cy="40" r={r} fill="none" stroke="#10B981" strokeWidth="10" strokeLinecap="round"
-                      strokeDasharray={`${(C * easyPct) / 100} ${C}`} className="transition-all duration-700" />
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-xl font-bold tabular-nums text-zinc-900">{easyPct}%</span>
-                    <span className="text-[10px] text-zinc-400">{t("dash.intensity.easy")}</span>
+              <>
+                <div className="flex items-center gap-4">
+                  <div className="relative h-24 w-24 flex-shrink-0">
+                    <svg viewBox="0 0 80 80" className="h-full w-full -rotate-90">
+                      <circle cx="40" cy="40" r={r} fill="none" stroke="#F4F4F5" strokeWidth="10" />
+                      {segs.map((sg, i) => sg.len > 0 && (
+                        <circle key={i} cx="40" cy="40" r={r} fill="none" stroke={sg.color} strokeWidth="10"
+                          strokeDasharray={`${Math.max(sg.len - 1.5, 0)} ${C}`} strokeDashoffset={-sg.off}
+                          className="transition-all duration-700" />
+                      ))}
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-lg font-bold tabular-nums text-zinc-900">{easyPct}%</span>
+                      <span className="text-[9px] text-zinc-400">Z1–Z2</span>
+                    </div>
+                  </div>
+                  <div className="flex-1 space-y-1.5 text-[13px]">
+                    {segs.map((sg, i) => sg.min > 0 && (
+                      <div key={i} className="flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ background: sg.color }} />
+                        <span className="flex-1 truncate text-zinc-500">{zl.z[i]}</span>
+                        <span className="font-semibold tabular-nums text-zinc-900">{sg.min}<span className="ml-0.5 text-[10px] font-normal text-zinc-400">{zl.min}</span></span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <div className="flex-1 space-y-2 text-sm">
-                  <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /><span className="flex-1 text-zinc-500">{t("dash.intensity.easy")}</span><span className="font-semibold tabular-nums text-zinc-900">{intensity.easy}</span></div>
-                  <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-orange-400" /><span className="flex-1 text-zinc-500">{t("dash.intensity.quality")}</span><span className="font-semibold tabular-nums text-zinc-900">{intensity.quality}</span></div>
-                  <div className="pt-1 text-xs font-semibold" style={{ color: good ? "#059669" : "#EA580C" }}>{verdict}</div>
+                <div className="mt-3 border-t border-zinc-100 pt-2.5 text-xs font-semibold" style={{ color: good ? "#059669" : "#EA580C" }}>
+                  {good ? t("dash.intensity.polarized") : easyPct < 75 ? t("dash.intensity.tooHard") : t("dash.intensity.tooEasy")}
                 </div>
-              </div>
+              </>
             );
           })() : (
             <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -1285,6 +1326,24 @@ function computeForme(
   return { total, endurance, speed, recovery, regularity, hasData };
 }
 
+// ── Zones d'entraînement (FC) — temps par zone sur 6 sem. ────────────────────────
+//  Chaque séance (avec FC moyenne) est rangée dans une zone selon FCmoy/FCmax, et sa
+//  durée y est ajoutée. Estimation honnête (intra-séance non détaillée) → libellé sobre.
+function computeHrZones(workouts: Workout[], maxHr: number): { secs: number[]; total: number } {
+  const now = Date.now();
+  const secs = [0, 0, 0, 0, 0];
+  if (!(maxHr > 0)) return { secs, total: 0 };
+  for (const w of workouts) {
+    if (now - new Date(w.date).getTime() > 42 * 86400000) continue;
+    const hr = Number(w.avg_hr ?? 0), dur = Number(w.duration_seconds ?? 0);
+    if (!(hr > 0) || !(dur > 0)) continue;
+    const frac = hr / maxHr;
+    const zi = HR_ZONE_DEFS.findIndex(z => frac >= z.lo && frac < z.hi);
+    if (zi >= 0) secs[zi] += dur;
+  }
+  return { secs, total: secs.reduce((a, b) => a + b, 0) };
+}
+
 // ── Score Discipline — modèle cohérent, documenté et ajustable ───────────────────
 //  Principes reconnus : répartition polarisée 80/20 (Seiler / « 80/20 Running »)
 //  pour la Précision · régularité hebdo pour l'Assiduité · sommeil + tendance VFC
@@ -1378,14 +1437,6 @@ function computeWeeklyTrend(workouts: Workout[], weeks = 6): { km: number; isCur
       .reduce((s, w) => s + (w.distance_km ?? 0), 0);
     return { km, isCurrent: i === weeks - 1 };
   });
-}
-
-// Répartition facile / qualité sur une fenêtre (polarisation 80/20).
-function computeIntensitySplit(workouts: Workout[], days = 30): { easy: number; quality: number; total: number } {
-  const now = Date.now();
-  const recent = workouts.filter(w => now - new Date(w.date).getTime() <= days * 86400000);
-  const quality = recent.filter(isQualityWorkout).length;
-  return { quality, easy: recent.length - quality, total: recent.length };
 }
 
 // Meilleures sorties récentes (sur l'historique chargé — honnête, pas « all-time »).
