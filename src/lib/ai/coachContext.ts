@@ -499,8 +499,10 @@ ${p?.gender === "female" ? `- SEXE : femme → besoins en FER et disponibilité 
 ${readinessBlock}
 
 SANTÉ & ANTÉCÉDENTS (contraintes médicales — elles PRIMENT sur l'objectif de performance)
-${cond.rules.length ? cond.rules.map((r) => `- ${r}`).join("\n") : "- Aucune pathologie déclarée."}
-${inj.rules.length ? inj.rules.map((r) => `- ${r}`).join("\n") : "- Aucune zone de blessure récurrente déclarée."}
+${cond.rules.length ? cond.rules.map((r) => `- ${r}`).join("\n")
+  : p?.health_declared ? "- Aucune pathologie — l'athlète l'a CONFIRMÉ explicitement, tu peux t'y fier."
+  : "- ⚠️ Section santé JAMAIS renseignée (ce n'est pas « rien à signaler », c'est « on ne sait pas ») : reste un cran prudent sur l'intensité et invite-le à la remplir."}
+${inj.rules.length ? inj.rules.map((r) => `- ${r}`).join("\n") : p?.health_declared ? "- Aucune zone de blessure récurrente." : ""}
 ${healthNotes ? `- 🗣️ Note santé écrite par l'athlète (LIS-LA et tiens-en compte) : « ${healthNotes} »` : ""}${noMaxEffort ? "\n- ⛔ EFFORT MAXIMAL INTERDIT au vu de ses antécédents : pas de VMA à 100 %+, pas de test d'effort, pas de sprint all-out. Le développement passe par le volume et le seuil bas." : ""}
 
 ÂGE & RÉCUPÉRATION

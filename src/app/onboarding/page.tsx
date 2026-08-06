@@ -203,6 +203,7 @@ export default function OnboardingPage() {
       health_conditions: profile.health_conditions,
       injury_zones: profile.injury_zones,
       health_notes: profile.health_notes.trim() || null,
+      health_declared: healthAnswered,
     }).eq("id", user.id);
 
     // Terrains multiples — écriture ISOLÉE : la colonne `main_terrains` arrive avec la

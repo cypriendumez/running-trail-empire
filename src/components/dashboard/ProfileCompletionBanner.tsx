@@ -26,11 +26,9 @@ export function ProfileCompletionBanner({ profile }: { profile: Record<string, u
     profile?.running_years == null && t.exp,
     arr(profile?.main_terrains).length === 0 && !profile?.main_terrain && t.terr,
     !profile?.elevation_pref && t.elev,
-    // La santé compte comme manquante seulement si RIEN n'a été touché : un athlète en
-    // bonne santé a coché « rien à signaler », ce qui laisse les tableaux vides mais
-    // renseigne `health_notes`… on ne peut pas distinguer ici, donc on reste permissif
-    // et on ne réclame la santé que si aucun des trois champs n'existe.
-    arr(profile?.health_conditions).length === 0 && arr(profile?.injury_zones).length === 0 && !profile?.health_notes && t.health,
+    // `health_declared` distingue « je n'ai rien » de « je n'ai pas répondu » : un athlète
+    // en bonne santé coche « rien à signaler » et ne doit plus jamais voir ce rappel.
+    !profile?.health_declared && t.health,
   ].filter((x): x is string => typeof x === "string");
 
   if (hidden || missing.length === 0) return null;
