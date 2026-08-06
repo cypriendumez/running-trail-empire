@@ -61,7 +61,10 @@ export async function POST(req: Request) {
   if (!user_id || !date) return NextResponse.json({ error: "user_id et date requis" }, { status: 400 });
 
   const admin = createAdminClient();
-  const { data: p } = await admin.from("profiles").select("intervals_athlete_id, intervals_api_key, full_name").eq("id", user_id).single();
+  // select("*") volontaire : les colonnes de contexte (running_years, main_terrain,
+  // elevation_pref) sont optionnelles — les nommer ferait échouer la requête tant que
+  // la migration 007 n'est pas passée. Rien ne quitte le serveur (pas de clé exposée).
+  const { data: p } = await admin.from("profiles").select("*").eq("id", user_id).single();
   const ATH = p?.intervals_athlete_id || process.env.INTERVALS_ICU_ATHLETE_ID;
   const KEY = p?.intervals_api_key || process.env.INTERVALS_ICU_API_KEY;
   const prenom = (p?.full_name as string | undefined)?.split(" ")[0] || "l'athlète";
@@ -149,6 +152,17 @@ export async function POST(req: Request) {
     const histTxt = recent.map((w) => `${w.date} ${classifyRun(w, histFcMax)} ${w.distance_km ?? "?"}km FC ${w.avg_hr ?? "?"} charge ${w.tss ?? "?"}`).join("\n  ") || "aucune";
     const sp = n(a.average_speed);
 
+    // Passif / terrain / dénivelé — l'analyse de la séance en tient compte elle aussi
+    // (une allure sur sable ou en montagne ne se lit pas comme une allure sur route).
+    const ry = typeof p?.running_years === "number" ? p.running_years : null;
+    const profExp = ry == null ? "ancienneté non renseignée"
+      : ry < 1 ? "moins d'un an de course à pied (débutant : tendons encore jeunes)"
+      : `${ry} an${ry > 1 ? "s" : ""} de course à pied`;
+    const TERR: Record<string, string> = { plat: "plat (route)", vallonne: "vallonné", montagne: "montagne / sentier technique", plage: "plage / sable", piste: "piste", mixte: "mixte route + sentier" };
+    const profTerrain = TERR[String(p?.main_terrain ?? "")] ?? "non renseigné";
+    const ELEVL: Record<string, string> = { evite: "évite le dénivelé", modere: "dénivelé modéré", aime: "aime le dénivelé", specialiste: "spécialiste du dénivelé" };
+    const profElev = ELEVL[String(p?.elevation_pref ?? "")] ?? "";
+
     const summary = `SÉANCE du ${day} — ${a.name ?? "Course à pied"} (athlète : ${prenom})
 Distance ${n(a.distance) != null ? (n(a.distance)! / 1000).toFixed(2) : "?"} km · D+ ${n(a.total_elevation_gain) != null ? Math.round(n(a.total_elevation_gain)!) : "?"} m / D- ${n(a.total_elevation_loss) != null ? Math.round(n(a.total_elevation_loss)!) : "?"} m · durée ${n(a.moving_time) != null ? Math.round(n(a.moving_time)! / 60) : "?"} min
 Allure moy ${pace(sp)}/km · GAP ${pace(n(a.gap))}/km · vitesse max ${n(a.max_speed) ? (n(a.max_speed)! * 3.6).toFixed(1) : "?"} km/h
@@ -162,6 +176,7 @@ Répartition zones FC : ${zoneStr || "n/d"}
 TOURS (un par un) :
   ${lapsStr || "n/d"}
 CONTEXTE ATHLÈTE : VMA ${baseline?.vma_kmh ?? "?"} km/h · FC max ${baseline?.max_hr ?? "?"} · FC repos ${baseline?.resting_hr ?? "?"} · volume 7j ${weekKm.toFixed(0)} km · charge 14j ${tss14.toFixed(0)} TSS
+PROFIL : ${p?.age ?? "?"} ans · ${p?.gender === "female" ? "femme" : p?.gender === "male" ? "homme" : "sexe ?"} · ${profExp} · terrain ${profTerrain}${profElev ? ` · ${profElev}` : ""}${profTerrain === "plage / sable" ? "  ⚠️ sur SABLE l'allure /km n'est PAS comparable au bitume (45 s à 1 min 30 de plus au km) : juge l'effort à la FC, pas à l'allure." : ""}
 RÉCUPÉRATION (dernier relevé) : VFC ${hrv?.hrv_ms ?? "?"} ms${hrv?.physiological_state ? ` · état ${hrv.physiological_state}` : ""} · sommeil ${sleep?.sleep_score ?? "?"}/100${sleep?.total_sleep_min ? ` (${Math.round(sleep.total_sleep_min / 60)}h)` : ""}
 OBJECTIF DE COURSE : ${objLine}
 REPOS : dernière séance il y a ${daysSinceLast ?? "?"} j · ${restDays7} j sans courir sur 7${daysSinceLast != null && daysSinceLast >= 3 ? " ⚠️ reprise après coupure : redémarre progressivement" : ""}

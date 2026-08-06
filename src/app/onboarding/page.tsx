@@ -38,6 +38,10 @@ export default function OnboardingPage() {
     warmup_min: 15,
     cooldown_min: 10,
     long_run_mode: "run" as "run" | "bike",
+    // Contexte d'entraînement → individualise la prescription du coach IA.
+    running_years: 2,
+    main_terrain: "plat" as "plat" | "vallonne" | "montagne" | "plage" | "piste" | "mixte",
+    elevation_pref: "modere" as "evite" | "modere" | "aime" | "specialiste",
   });
 
   const [vma, setVma] = useState({ vma_kmh: "", max_hr: "", resting_hr: "" });
@@ -169,6 +173,9 @@ export default function OnboardingPage() {
       warmup_min: profile.warmup_min,
       cooldown_min: profile.cooldown_min,
       long_run_mode: profile.long_run_mode,
+      running_years: profile.running_years,
+      main_terrain: profile.main_terrain,
+      elevation_pref: profile.elevation_pref,
     }).eq("id", user.id);
 
     if (!profileError && vma.vma_kmh) {
@@ -322,6 +329,48 @@ export default function OnboardingPage() {
                     ))}
                   </div>
                   <p className="text-[11px] text-zinc-400 mt-1.5">{tr("longHint")}</p>
+                </div>
+
+                {/* Ancienneté — plafonne la charge que le coach IA se permet de prescrire. */}
+                <div>
+                  <label className="text-xs font-medium text-zinc-500 block mb-2">{tr("expTitle")}</label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {([[0, tr("exp0")], [1, tr("exp1")], [2, tr("exp2")], [4, tr("exp4")], [8, tr("exp8")], [12, tr("exp12")]] as const).map(([v, l]) => (
+                      <button key={v} type="button" onClick={() => setProfile(p => ({ ...p, running_years: v }))}
+                        className={`py-2 rounded-xl text-sm font-medium border transition-all ${profile.running_years === v ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-zinc-400 mt-1.5">{tr("expHint")}</p>
+                </div>
+
+                {/* Terrain — décide si les séances se pilotent à l'allure ou à la FC. */}
+                <div>
+                  <label className="text-xs font-medium text-zinc-500 block mb-2">{tr("terrTitle")}</label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {([["plat", tr("terrPlat")], ["vallonne", tr("terrVallonne")], ["montagne", tr("terrMontagne")], ["plage", tr("terrPlage")], ["piste", tr("terrPiste")], ["mixte", tr("terrMixte")]] as const).map(([v, l]) => (
+                      <button key={v} type="button" onClick={() => setProfile(p => ({ ...p, main_terrain: v }))}
+                        className={`py-2 rounded-xl text-xs font-medium border transition-all ${profile.main_terrain === v ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-zinc-400 mt-1.5">{tr("terrHint")}</p>
+                </div>
+
+                {/* Dénivelé — dose les côtes et le D+ hebdomadaire. */}
+                <div>
+                  <label className="text-xs font-medium text-zinc-500 block mb-2">{tr("elevTitle")}</label>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {([["evite", tr("elevEvite")], ["modere", tr("elevModere")], ["aime", tr("elevAime")], ["specialiste", tr("elevSpec")]] as const).map(([v, l]) => (
+                      <button key={v} type="button" onClick={() => setProfile(p => ({ ...p, elevation_pref: v }))}
+                        className={`py-2 rounded-xl text-xs font-medium border transition-all ${profile.elevation_pref === v ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-zinc-400 mt-1.5">{tr("elevHint")}</p>
                 </div>
 
                 {profile.gender === "female" && (

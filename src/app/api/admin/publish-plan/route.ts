@@ -9,18 +9,35 @@ const ADMIN_EMAIL = "cypriendumez@outlook.fr";
 
 type SessionIn = { date: string; type?: string; title?: string; detail?: string; why?: string; feel?: string; tags?: string[] };
 
-// POST /api/admin/publish-plan {user_id, sessions:[{date,type,title,detail,why,feel,tags}]}
+// POST /api/admin/publish-plan {user_id, sessions:[{date,type,title,detail,why,feel,tags}], auto?}
 // → publie le plan de la semaine dans le calendrier du client (notifications type=coach_session datées).
+//
+// `auto: true` = publication automatique déclenchée par l'ouverture d'une séance côté coach :
+//   • au plus UNE publication par jour et par athlète (sinon chaque visite réécrirait son plan) ;
+//   • AUCUN envoi sur la montre — le push Garmin reste une action explicite du coach.
 export async function POST(req: Request) {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user || user.email !== ADMIN_EMAIL) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { user_id, sessions } = await req.json() as { user_id: string; sessions: SessionIn[] };
+  const { user_id, sessions, auto } = await req.json() as { user_id: string; sessions: SessionIn[]; auto?: boolean };
   if (!user_id || !Array.isArray(sessions) || sessions.length === 0) return NextResponse.json({ error: "user_id et sessions requis" }, { status: 400 });
 
   const admin = createAdminClient();
   const today = new Date().toISOString().split("T")[0];
+
+  // Garde-fou anti-réécriture : si un plan a déjà été publié aujourd'hui (auto ou manuel),
+  // la publication automatique ne fait rien. Le bouton du coach, lui, force toujours.
+  // Le « jour » est celui d'UTC (created_at est un timestamptz) : la remise à zéro tombe donc
+  // vers 2 h du matin en France l'été — sans conséquence pratique pour un usage de journée.
+  if (auto) {
+    const { count } = await admin
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user_id).eq("type", "coach_session")
+      .gte("created_at", `${today}T00:00:00Z`);
+    if ((count ?? 0) > 0) return NextResponse.json({ ok: true, skipped: true, count: 0, watchSent: 0 });
+  }
 
   // Remplace le plan à venir : on efface les séances coach datées d'aujourd'hui ou plus tard, puis on réinsère.
   try {
@@ -50,7 +67,10 @@ export async function POST(req: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // ── Pousse aussi chaque séance (hors repos/renfo) sur la montre Garmin du client ──
+  // Jamais en mode auto : envoyer sur la montre d'un athlète est une action visible chez lui,
+  // elle reste déclenchée à la main par le coach.
   let watchSent = 0;
+  if (auto) return NextResponse.json({ ok: true, auto: true, count: rows.length, watchSent: 0 });
   try {
     const { data: prof } = await admin.from("profiles").select("*").eq("id", user_id).single();
     const athleteId = (prof?.intervals_athlete_id as string | undefined) || process.env.INTERVALS_ICU_ATHLETE_ID;

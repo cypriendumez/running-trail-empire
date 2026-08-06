@@ -219,7 +219,7 @@ export function CoachPanel({ clients, unread = 0 }: { clients: CoachClient[]; un
 
               {/* L'analyse + l'envoi se font depuis la page d'une séance */}
               <div className="bg-white rounded-2xl border border-zinc-200 p-4 text-sm text-zinc-500">
-                💡 Pour analyser une séance et envoyer un plan à <b className="text-zinc-700">{sel.name.split(" ")[0]}</b> : clique une séance ci-dessus → <b className="text-violet-600">Envoyer à l&apos;IA</b> → <b className="text-emerald-600">Envoyer au client</b>. Le plan s&apos;affiche dans son calendrier.
+                ⚡ Clique une séance ci-dessus : l&apos;IA l&apos;analyse <b className="text-violet-600">automatiquement</b> et publie les 7 prochains jours dans le calendrier de <b className="text-zinc-700">{sel.name.split(" ")[0]}</b> — sans aucun clic. Sur la page de la séance, <b className="text-emerald-600">Publier + envoyer sur la montre</b> pousse en plus les séances sur sa Garmin.
               </div>
             </div>
           )}

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import {
   ArrowLeft, Loader2, Sparkles, Activity, HeartPulse, Gauge, Zap,
   Footprints, Mountain, Clock, TrendingUp, Thermometer, Send, CalendarDays, Watch,
+  RefreshCw, CheckCircle2,
 } from "lucide-react";
 
 type SeriesPoint = { km: number | null; min: number | null; pace: number | null; hr: number | null; power: number | null; cad: number | null; alt: number | null };
@@ -170,6 +171,10 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
   const [sendingClient, setSendingClient] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [repushing, setRepushing] = useState(false);
+  // Résultat de la publication AUTOMATIQUE du calendrier (affiché en bandeau).
+  const [autoPub, setAutoPub] = useState<{ state: "done" | "skipped"; count: number } | null>(null);
+  // Une seule analyse automatique par séance ouverte (sinon re-render = re-appel IA).
+  const autoRan = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setErr(null);
@@ -183,21 +188,25 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
 
   useEffect(() => { load(); }, [load]);
 
-  const sendToAI = async () => {
-    setAnalyzing(true); setAnalysis(null); setPlan(null); setObjective(null); setRest(null); setMacro([]);
+  // Analyse IA. `silent` = déclenchement automatique à l'ouverture de la page : on enchaîne
+  // sur la publication du calendrier et on reste discret sur les toasts.
+  const sendToAI = useCallback(async (silent = false) => {
+    setAnalyzing(true); setAnalysis(null); setPlan(null); setObjective(null); setRest(null); setMacro([]); setAutoPub(null);
     try {
       const r = await fetch("/api/admin/analyze-session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: user, date, distance_km: dist ? Number(dist) : undefined }) });
       const j = await r.json();
       if (j.error) { toast.error(j.error); return; }
+      const p = { nextSession: (j.nextSession ?? null) as NextSession | null, week: (Array.isArray(j.week) ? j.week : []) as WeekDay[] };
       setAnalysis(j.analysis);
-      setPlan({ nextSession: j.nextSession ?? null, week: Array.isArray(j.week) ? j.week : [] });
+      setPlan(p);
       setObjective(j.objective ?? null);
       setRest(j.rest ?? null);
       setMacro(Array.isArray(j.macroPlan) ? j.macroPlan : []);
-      toast.success("Analyse IA prête ✅");
+      if (!silent) toast.success("Analyse IA prête ✅");
+      return p;
     } catch { toast.error("Analyse impossible"); }
     finally { setAnalyzing(false); }
-  };
+  }, [user, date, dist]);
 
   // Pousse la prochaine séance recommandée au dashboard du client (message chaleureux).
   const sendToClient = async () => {
@@ -217,11 +226,14 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
   };
 
   // Publie le plan de 7 jours dans le calendrier du client (à partir d'aujourd'hui).
-  const publishWeek = async () => {
-    if (!plan?.week?.length) return;
-    setPublishing(true);
+  // `auto` = publication silencieuse à l'ouverture de la page (1×/jour max, sans push montre).
+  // Le plan est passé en argument (et non lu dans l'état) pour pouvoir publier dans la foulée
+  // de l'analyse, sans attendre le re-render qui appliquerait setPlan.
+  const publishWeek = useCallback(async (src: { nextSession: NextSession | null; week: WeekDay[] }, auto = false) => {
+    if (!src?.week?.length) return;
+    if (!auto) setPublishing(true);
     try {
-      const ns = plan.nextSession;
+      const ns = src.nextSession;
       const start = new Date(); start.setHours(0, 0, 0, 0);
       const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       // Catégorie canonique d'un type libre → libellé cohérent (évite « ENDURANCE » collé sur une séance de récup).
@@ -245,23 +257,40 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
       const sessions: Sess[] = [];
       if (ns) {
         sessions.push({ date: fmt(start), type: nsCat || "Séance", title: ns.title, detail: ns.workout, why: ns.why, feel: ns.feel, tags: ns.tags });
-        plan.week.slice(1).forEach((d, i) => {
+        src.week.slice(1).forEach((d, i) => {
           const dt = new Date(start); dt.setDate(start.getDate() + 1 + i);
           sessions.push({ date: fmt(dt), type: catOf(d.type), title: d.type, detail: d.desc, why: "", feel: "", tags: [] });
         });
       } else {
-        plan.week.forEach((d, i) => {
+        src.week.forEach((d, i) => {
           const dt = new Date(start); dt.setDate(start.getDate() + i);
           sessions.push({ date: fmt(dt), type: catOf(d.type), title: d.type, detail: d.desc, why: "", feel: "", tags: [] });
         });
       }
-      const r = await fetch("/api/admin/publish-plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: user, sessions }) });
+      const r = await fetch("/api/admin/publish-plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: user, sessions, auto }) });
       const j = await r.json();
+      if (auto) {
+        if (j.ok) setAutoPub({ state: j.skipped ? "skipped" : "done", count: j.count ?? sessions.length });
+        return; // publication auto : aucun toast, le bandeau suffit
+      }
       if (j.ok) toast.success(`Plan de ${j.count} jours publié 📅${j.watchSent ? ` · ${j.watchSent} séances sur sa montre ⌚ (synchro via Garmin Connect)` : ""}`, { duration: 6000 });
       else toast.error(j.error || "Publication impossible");
-    } catch { toast.error("Publication impossible"); }
-    finally { setPublishing(false); }
-  };
+    } catch { if (!auto) toast.error("Publication impossible"); }
+    finally { if (!auto) setPublishing(false); }
+  }, [user]);
+
+  // ── AUTOMATIQUE : dès que la séance est chargée côté coach, l'IA analyse puis remplit
+  // le calendrier du client avec les 7 jours à venir. Plus aucun clic n'est nécessaire.
+  useEffect(() => {
+    if (clientMode || loading || !data?.activity) return;
+    const key = `${user}|${date}|${dist ?? ""}`;
+    if (autoRan.current === key) return;
+    autoRan.current = key;
+    (async () => {
+      const p = await sendToAI(true);
+      if (p?.week?.length) await publishWeek(p, true);
+    })();
+  }, [clientMode, loading, data, user, date, dist, sendToAI, publishWeek]);
 
   // Re-pousse sur la montre TOUTES les séances à venir déjà stockées, avec le code actuel
   // (échauffement & retour au calme FC Z1 + durées du profil). Ne régénère rien.
@@ -319,10 +348,11 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
                 {repushing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Watch className="h-4 w-4 text-amber-200" />}
                 {repushing ? "Envoi…" : "Re-pousser sur la montre"}
               </button>
-              <button onClick={sendToAI} disabled={analyzing || loading || !a}
+              <button onClick={() => sendToAI()} disabled={analyzing || loading || !a}
+                title="L'analyse se lance déjà toute seule à l'ouverture — ce bouton la relance (utile après un changement de profil ou d'objectif)."
                 className="inline-flex items-center gap-2 rounded-2xl bg-white/15 px-4 py-2.5 font-semibold ring-1 ring-white/25 backdrop-blur-md transition-colors hover:bg-white/25 disabled:opacity-50">
-                {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 text-amber-200" />}
-                {analyzing ? "Analyse…" : "Envoyer à l'IA"}
+                {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4 text-amber-200" />}
+                {analyzing ? "Analyse…" : "Relancer l'analyse"}
               </button>
             </div>
             )}
@@ -348,6 +378,19 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
           <div className="rounded-2xl border border-red-100 bg-red-50 p-5 text-sm text-red-700">{err}</div>
         ) : a ? (
           <>
+            {/* Coach IA automatique : état de l'analyse + de la publication du calendrier */}
+            {!clientMode && (analyzing || autoPub) && (
+              <div className={`flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-2xl border px-4 py-3 text-sm ${analyzing ? "border-violet-100 bg-violet-50/60 text-violet-700" : "border-emerald-100 bg-emerald-50/60 text-emerald-800"}`}>
+                {analyzing ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /><span className="font-semibold">Le coach IA analyse la séance et prépare la suite…</span><span className="text-violet-500">aucune action requise</span></>
+                ) : autoPub?.state === "done" ? (
+                  <><CheckCircle2 className="h-4 w-4" /><span className="font-semibold">{autoPub.count} séances publiées automatiquement dans son calendrier 📅</span><span className="text-emerald-600">montre non sollicitée — utilise « Publier + envoyer sur la montre » pour ça</span></>
+                ) : (
+                  <><CheckCircle2 className="h-4 w-4" /><span className="font-semibold">Son plan a déjà été mis à jour aujourd&apos;hui</span><span className="text-emerald-600">calendrier inchangé (1 publication auto/jour) — le bouton ci-dessous force la republication</span></>
+                )}
+              </div>
+            )}
+
             {/* Objectif de course + repos — ce que l'IA a pris en compte */}
             {(objective || rest) && (
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-indigo-100 bg-indigo-50/50 px-4 py-3 text-sm">
@@ -386,9 +429,10 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
                       {sendingClient ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />} Envoyer maintenant
                     </button>
                     {plan.week.length > 0 && (
-                      <button onClick={publishWeek} disabled={publishing}
+                      <button onClick={() => publishWeek(plan)} disabled={publishing}
+                        title="Republie les 7 jours dans son calendrier ET envoie les séances sur sa montre Garmin."
                         className="inline-flex items-center gap-1.5 rounded-xl bg-white px-3 py-1.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-50 disabled:opacity-50">
-                        {publishing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CalendarDays className="h-3.5 w-3.5" />} Publier la semaine
+                        {publishing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Watch className="h-3.5 w-3.5" />} Publier + envoyer sur la montre
                       </button>
                     )}
                   </div>
@@ -568,8 +612,8 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
             <div className="flex items-center justify-between pb-4 text-[11px] text-zinc-400">
               <span>⚡ Données live intervals.icu · {nMetrics} métriques{series ? ` · ${series.length} points de mesure` : ""}{laps ? ` · ${laps.length} tours` : ""}</span>
               {!clientMode && (
-              <button onClick={sendToAI} disabled={analyzing} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
-                {analyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />} Envoyer à l'IA
+              <button onClick={() => sendToAI()} disabled={analyzing} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
+                {analyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />} Relancer l&apos;analyse
               </button>
               )}
             </div>

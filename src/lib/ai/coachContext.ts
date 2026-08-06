@@ -253,6 +253,44 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const avgTemp = temps.length ? Math.round(temps.reduce((a, b) => a + b, 0) / temps.length) : null;
   const cycle = p?.is_female_cycle_sync && p?.current_phase ? String(p.current_phase) : null;
 
+  // ── PASSIF, TERRAIN & DÉNIVELÉ (déclarés par l'athlète) ──────────────────────
+  // Trois leviers d'individualisation que la physiologie seule ne donne pas :
+  // depuis combien de temps il court (tolérance à la charge), sur quoi il court
+  // (surface = allures pertinentes + charge mécanique), et son rapport au D+.
+  const runYears = num(p?.running_years);
+  const expLabel = runYears == null ? null
+    : runYears < 1 ? "moins d'un an de pratique (GRAND DÉBUTANT)"
+    : runYears < 2 ? "1 an de pratique (débutant)"
+    : runYears < 4 ? `${runYears} ans de pratique (encore jeune coureur)`
+    : runYears < 8 ? `${runYears} ans de pratique (coureur installé)`
+    : `${runYears} ans de pratique (long passif d'endurance)`;
+  // Le passif compte AUTANT que la VMA : un tendon met des années à se renforcer.
+  const expRule = runYears == null ? null
+    : runYears < 1 ? "⚠️ MOINS D'UN AN DE COURSE : le système musculo-tendineux n'est PAS encore adapté, même si le cardio suit. Priorité absolue à la RÉGULARITÉ et au volume facile. Maximum 1 séance de qualité/semaine, courte. Pas de pliométrie, pas de sortie longue > 1 h 15, progression du volume ≤ +5 %/semaine (pas +10 %). La blessure n°1 du débutant vient d'un cardio qui va plus vite que les tendons."
+    : runYears < 3 ? "Passif court (1-3 ans) : le cardio progresse plus vite que les tendons. Reste à 2 séances de qualité maximum, augmente le volume avant l'intensité, et garde une semaine allégée toutes les 4 semaines."
+    : runYears >= 8 ? "Long passif (8 ans et +) : structure tendineuse solide, tolérance à la charge élevée. Tu peux oser des blocs denses, des doubles séances et des sorties longues ambitieuses si la fraîcheur suit."
+    : "Passif solide (4-7 ans) : bonne tolérance à la charge, la périodisation classique s'applique pleinement.";
+
+  const TERRAIN: Record<string, { label: string; rule: string }> = {
+    plat: { label: "plat (route/ville)", rule: "Terrain PLAT : les allures /km sont parfaitement pertinentes — chiffre-les précisément. En revanche l'impact est répétitif et identique à chaque foulée → impose du renforcement et varie les surfaces quand c'est possible. Si l'objectif comporte du dénivelé, il DOIT aller chercher des côtes (même une bosse répétée en boucle)." },
+    vallonne: { label: "vallonné", rule: "Terrain VALLONNÉ : l'allure brute ment, raisonne en GAP (allure ajustée au dénivelé) et en FC. Les bosses naturelles font déjà du travail de force — n'ajoute pas une séance de côtes par-dessus sans raison." },
+    montagne: { label: "montagne / sentier technique", rule: "Terrain MONTAGNE : ne prescris PAS d'allure /km sur le terrain (elle n'a aucun sens) — pilote en DURÉE, en FC et en D+ (mètres de dénivelé). Travaille la montée (côtes longues, marche rapide efficace au-delà de 15 %) ET la DESCENTE (excentrique = première cause de destruction musculaire en trail, à doser très progressivement). Les séances chiffrées à l'allure se font sur du plat/piste." },
+    plage: { label: "plage / sable", rule: "⚠️ Terrain PLAGE (sable) : surface MOLLE → l'allure /km n'est PAS comparable au bitume (compte 45 s à 1 min 30 de plus au km), ne fixe donc AUCUNE allure cible sur le sable : pilote en DURÉE et en FRÉQUENCE CARDIAQUE. Le sable sollicite énormément mollets, tendon d'Achille et pieds → excellent pour la force et l'économie de foulée, mais RISQUE ÉLEVÉ de tendinopathie : limite à 1-2 sorties sable/semaine, jamais deux jours de suite, et cours de préférence sur le sable HUMIDE et plat près de l'eau (le sable sec et dévers déforment la foulée et fatiguent asymétriquement). Toutes les séances chiffrées à l'allure (VMA, seuil, allure spécifique) se font sur une surface DURE (route ou piste) — pas sur le sable." },
+    piste: { label: "piste d'athlétisme", rule: "Terrain PISTE : idéal pour la qualité chiffrée (fractionné calibré au mètre). Alterne les sens de rotation pour ne pas surcharger une jambe, et sors de la piste pour l'endurance (le volume facile se fait ailleurs, sur surface variée)." },
+    mixte: { label: "mixte (route + sentier)", rule: "Terrain MIXTE : la variété de surfaces est un atout anti-blessure. Cale les séances chiffrées sur le dur (allures fiables) et l'endurance/le long sur le sentier (proprioception, force)." },
+  };
+  const terrainKey = typeof p?.main_terrain === "string" ? String(p.main_terrain) : null;
+  const terrain = terrainKey ? TERRAIN[terrainKey] ?? null : null;
+
+  const ELEV: Record<string, { label: string; rule: string }> = {
+    evite: { label: "évite le dénivelé", rule: "Il ÉVITE le dénivelé : ne lui impose pas de séance de côtes s'il n'en a pas besoin pour son objectif. Développe la force autrement (renforcement, lignes droites, éducatifs). SI l'objectif comporte du D+, introduis-le très progressivement et explique-lui pourquoi c'est indispensable." },
+    modere: { label: "dénivelé modéré", rule: "Dénivelé modéré : 1 séance de côtes toutes les 1-2 semaines suffit, en complément de la qualité sur le plat." },
+    aime: { label: "aime le dénivelé", rule: "Il AIME le dénivelé : sers-t'en. Les côtes remplacent avantageusement une séance de VMA (même sollicitation cardiaque, moins d'impact), et le D+ hebdomadaire peut monter franchement." },
+    specialiste: { label: "spécialiste du dénivelé (trail/montagne)", rule: "SPÉCIALISTE du dénivelé : programme du D+ structuré chaque semaine (montées longues en Z2-Z3, côtes courtes explosives, DESCENTES travaillées à part pour l'excentrique). Raisonne en mètres de D+ hebdomadaires autant qu'en kilomètres." },
+  };
+  const elevKey = typeof p?.elevation_pref === "string" ? String(p.elevation_pref) : null;
+  const elev = elevKey ? ELEV[elevKey] ?? null : null;
+
   // Palette de séances adaptée au niveau + objectif (la lib est la base de connaissances).
   const libLevel: Level = vma == null || vma < 13 ? "debutant" : vma < 16 ? "intermediaire" : vma < 19 ? "confirme" : "elite";
   const libGoal: Goal = !objective ? "general"
@@ -312,10 +350,19 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   if (hrvWeekTrend?.startsWith("↓")) { qBudget -= 1; easeReasons.push("VFC en baisse"); }
   if (load.acr > 1.5) { qBudget -= 1; easeReasons.push(`charge aiguë élevée (ratio ${r1(load.acr)})`); }
   if (load.tsb < -25) { qBudget -= 1; easeReasons.push(`TSB très négatif (${Math.round(load.tsb)})`); }
+  // Le PASSIF plafonne la qualité : un cardio de confirmé sur des tendons de 8 mois = blessure.
+  // (Volontairement hors `easeReasons` : ce n'est pas un allègement passager mais une limite
+  // structurelle — le message affiché diffère, et le plancher « objectif chrono » ne doit pas
+  // pouvoir le contourner.)
+  const expCap = runYears == null ? null : runYears < 1 ? 1 : runYears < 3 ? 2 : null;
+  const expCapped = expCap != null && qBudget > expCap;
+  if (expCapped) qBudget = expCap!;
   qBudget = Math.max(0, Math.min(3, qBudget));
   // Plancher : sans signal de fatigue, un objectif chrono garde ≥ 2 qualités (sauf débutant).
-  if (!easeReasons.length && objective && isShortGoal && libLevel !== "debutant") qBudget = Math.max(qBudget, 2);
-  if (!easeReasons.length && qBudget === 0 && libLevel !== "debutant") qBudget = 1;
+  // Le plafond « passif » reste prioritaire : il n'est jamais franchi par un plancher.
+  const floor = (v: number) => { qBudget = Math.max(qBudget, expCap != null ? Math.min(v, expCap) : v); };
+  if (!easeReasons.length && objective && isShortGoal && libLevel !== "debutant") floor(2);
+  if (!easeReasons.length && qBudget === 0 && libLevel !== "debutant") floor(1);
 
   // Menu de qualité (type + détail chiffré) — ordonné par priorité selon l'objectif.
   const qVMA = { type: "VMA", desc: `VO2max / VMA (ex 10×400 m ou 6×1000 m à ~${paceAt(100)}–${paceAt(104)}/km, récup trottinée) → élève le plafond` };
@@ -343,7 +390,8 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
 • 1 renforcement musculaire (peut se greffer après un footing facile, pas un jour à part obligatoire).
 • ≥ 1 jour de repos complet.
 • Tout le reste = footing FACILE Z2 (~${paceAt(70)}/km), allure conversationnelle.
-RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total), PAS du nombre de séances. ${chosen.length} séance(s) de qualité COURTE(S) (20–40 min d'effort réel) dans une semaine de plusieurs heures = toujours ~80 % facile. Le piège « presque tout en EF + renfo » SOUS-ENTRAÎNE un coureur qui vise un chrono : refuse-le.${easeReasons.length ? `\n⚠️ ALLÈGEMENT ce cycle (${easeReasons.join(" ; ")}) → qualité réduite, priorité récupération. La santé d'abord.` : ""}${daysSinceLast != null && daysSinceLast >= 3 && daysSinceLast <= 8 && !easeReasons.length ? `\nREPRISE : ${daysSinceLast} j de repos SANS perte de forme (3–8 j d'arrêt ne déconditionnent PAS). UN footing de remise en route suffit, PUIS on enchaîne la qualité normalement — ne transforme pas ça en semaine molle entière.` : ""}`;
+RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total), PAS du nombre de séances. ${chosen.length} séance(s) de qualité COURTE(S) (20–40 min d'effort réel) dans une semaine de plusieurs heures = toujours ~80 % facile. Le piège « presque tout en EF + renfo » SOUS-ENTRAÎNE un coureur qui vise un chrono : refuse-le.${expCapped ? `
+⛔ PLAFOND LIÉ AU PASSIF : ${runYears != null && runYears < 1 ? "moins d'un an" : `${runYears} ans`} de course → maximum ${expCap} séance(s) de qualité/semaine, quel que soit l'objectif. Le cardio encaisse déjà, les tendons NON. Ce plafond n'est pas négociable, même si l'athlète se sent bien.` : ""}${easeReasons.length ? `\n⚠️ ALLÈGEMENT ce cycle (${easeReasons.join(" ; ")}) → qualité réduite, priorité récupération. La santé d'abord.` : ""}${daysSinceLast != null && daysSinceLast >= 3 && daysSinceLast <= 8 && !easeReasons.length ? `\nREPRISE : ${daysSinceLast} j de repos SANS perte de forme (3–8 j d'arrêt ne déconditionnent PAS). UN footing de remise en route suffit, PUIS on enchaîne la qualité normalement — ne transforme pas ça en semaine molle entière.` : ""}`;
 
   // ── PLAN MACRO PÉRIODISÉ — bloc complet jusqu'au jour J (base → dév → spécifique → affûtage) ──
   const macroPlan: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[] = (() => {
@@ -376,9 +424,18 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
     return out;
   })();
 
+  const genderLabel = p?.gender === "female" ? "femme" : p?.gender === "male" ? "homme" : p?.gender ? String(p.gender) : "?";
   const text = `PROFIL
-- ${p?.full_name ?? "Athlète"} · ${p?.age ?? "?"} ans · ${p?.gender ?? "?"} · ${num(p?.weight_kg) ?? "?"} kg · ${num(p?.height_cm) ?? "?"} cm · chronotype ${p?.chronotype ?? "?"} · mode ${p?.mode ?? "?"}
+- ${p?.full_name ?? "Athlète"} · ${p?.age ?? "?"} ans · ${genderLabel} · ${num(p?.weight_kg) ?? "?"} kg · ${num(p?.height_cm) ?? "?"} cm · chronotype ${p?.chronotype ?? "?"} · mode ${p?.mode ?? "?"}
 - NIVEAU estimé : ${level}${vma ? ` (VMA ${vma} km/h${vmaIsEst ? " estimée" : ""})` : ""}
+- ANCIENNETÉ en course à pied : ${expLabel ?? "non renseignée (reste prudent sur la charge tant que tu ne sais pas)"}
+- TERRAIN habituel : ${terrain?.label ?? "non renseigné"}${elev ? ` · dénivelé : ${elev.label}` : ""} · D+ réalisé cette semaine : ${elevWeek} m
+${p?.gender === "female" ? `- SEXE : femme → besoins en FER et disponibilité énergétique à surveiller (RED-S : une charge élevée + apport insuffisant coupe la progression et fragilise l'os) ; densité osseuse à protéger (renforcement + impacts dosés) ; ${cycle ? "cycle suivi (voir plus bas)" : "si elle synchronise son cycle, adapte l'intensité selon la phase"}. Ne calque pas mécaniquement des repères masculins.` : p?.gender === "male" ? "- SEXE : homme → tendance fréquente à partir trop vite en facile et à sur-doser l'intensité ; verrouille la discipline des footings." : ""}
+
+PASSIF, TERRAIN & DÉNIVELÉ (leviers d'individualisation — à respecter dans la prescription)
+- ${expRule ?? "Ancienneté inconnue : demande-la, et en attendant reste sur une progression prudente (+10 %/sem max)."}
+- ${terrain?.rule ?? "Terrain habituel inconnu : privilégie des consignes en durée + FC tant que tu ne sais pas sur quelle surface il court."}
+${elev ? `- ${elev.rule}` : ""}
 
 CAPACITÉS (tests)
 - VMA : ${vma ?? "?"} km/h${vmaIsEst ? ` ⚠️ ESTIMÉE depuis ses séances (aucun test VMA enregistré) → recommande-lui un test VMA pour affiner, et reste un cran prudent sur la 1re séance VMA` : ""} · FC max ${maxHr ?? (vmaIsEst && fcMaxEst ? `~${fcMaxEst} (obs.)` : "?")} · FC repos ${restHr ?? "?"} · FC seuil ${ltHr ?? "?"}
