@@ -32,8 +32,10 @@ export default async function CalendrierPage() {
     (r) => String((r.data as { date?: string } | null)?.date ?? "").slice(0, 10),
   );
   const sessions: Planned[] = coachRows.map((r) => {
-    const d = (r.data ?? {}) as { date?: string; sessionType?: string; subtitle?: string; why?: string; feel?: string; tags?: string[] };
-    return { date: String(d.date ?? "").slice(0, 10), type: d.sessionType || "Séance", title: r.title || "Séance", detail: d.subtitle || "", why: d.why || "", feel: d.feel || "", tags: Array.isArray(d.tags) ? d.tags : [] };
+    const d = (r.data ?? {}) as { date?: string; sessionType?: string; subtitle?: string; why?: string; feel?: string; tags?: string[]; confirmed?: boolean };
+    return { date: String(d.date ?? "").slice(0, 10), type: d.sessionType || "Séance", title: r.title || "Séance", detail: d.subtitle || "", why: d.why || "", feel: d.feel || "", tags: Array.isArray(d.tags) ? d.tags : [],
+      // Les séances publiées à la main par le coach n'ont pas ce champ → considérées confirmées.
+      confirmed: d.confirmed !== false };
   }).filter((s) => s.date);
   const notes: CalNote[] = rows.filter((r) => r.type === "client_note").map((r) => {
     const d = (r.data ?? {}) as { date?: string; text?: string };

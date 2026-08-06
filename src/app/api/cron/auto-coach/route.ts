@@ -5,9 +5,11 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { autoCoachForUser } from "@/lib/ai/autoCoach";
 
+type AutoSummary = { userId: string; processed: boolean; days?: number; pushed?: number; reason?: string };
+
 // GET /api/cron/auto-coach
-// Coach AUTONOME : pour chaque athlète, si une NOUVELLE séance a été synchronisée,
-// recalcule et publie la prochaine séance (dashboard + montre) automatiquement.
+// Coach AUTONOME : republie chaque nuit un plan glissant de 7 jours pour CHAQUE athlète,
+// recalculé sur sa forme du moment (VFC, sommeil, charge, santé, objectif, périodisation).
 // Sécurisé par CRON_SECRET (Bearer) si défini ; ouvert en local sinon (dev).
 export async function GET(req: Request) {
   const secret = req.headers.get("authorization")?.replace("Bearer ", "");
@@ -16,14 +18,15 @@ export async function GET(req: Request) {
   }
 
   const admin = createAdminClient();
+  // TOUS les athlètes ayant terminé leur inscription — la montre n'étant plus obligatoire,
+  // un client sans Garmin doit lui aussi recevoir son plan dans son calendrier.
   const { data: profiles, error } = await admin
     .from("profiles")
     .select("id, intervals_athlete_id, intervals_api_key")
-    .not("intervals_athlete_id", "is", null)
-    .not("intervals_api_key", "is", null);
+    .eq("onboarding_completed", true);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const results: { userId: string; processed: boolean; session?: string; pushed?: boolean; reason?: string }[] = [];
+  const results: AutoSummary[] = [];
   for (const p of profiles ?? []) {
     const r = await autoCoachForUser(admin, {
       userId: p.id as string,

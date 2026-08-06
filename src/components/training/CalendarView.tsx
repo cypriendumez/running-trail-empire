@@ -11,7 +11,8 @@ import { RenfoGuide } from "@/components/training/RenfoGuide";
 import { fmtDistance, type UnitSystem } from "@/lib/units";
 import { useT } from "@/lib/i18n/LanguageProvider";
 
-export type Planned = { date: string; type: string; title: string; detail: string; why: string; feel: string; tags: string[] };
+// `confirmed: false` = jour prévisionnel, que le coach automatique réajustera d'ici là.
+export type Planned = { date: string; type: string; title: string; detail: string; why: string; feel: string; tags: string[]; confirmed?: boolean };
 export type CalNote = { id: string; date: string; text: string };
 export type CalRace = { id: string; date: string; name: string; location: string; distanceKm: number | null };
 
@@ -220,7 +221,12 @@ export function CalendarView({ sessions, notes: notesProp = [], races: racesProp
       <div className="overflow-hidden rounded-xl text-left" style={{ background: c.soft }}>
         <div className="h-1.5" style={{ background: c.bg }} />
         <div className={dense ? "p-1.5" : "p-2.5"}>
-          <div className={`font-extrabold uppercase tracking-wide ${dense ? "text-[9px]" : "text-[10px]"}`} style={{ color: c.fg }}>{s.type}</div>
+          <div className="flex items-center gap-1">
+            <div className={`font-extrabold uppercase tracking-wide ${dense ? "text-[9px]" : "text-[10px]"}`} style={{ color: c.fg }}>{s.type}</div>
+            {s.confirmed === false && (
+              <span title={t("cal.provisional.hint")} className={`rounded bg-white/80 px-1 font-bold text-zinc-400 ${dense ? "text-[8px]" : "text-[9px]"}`}>~</span>
+            )}
+          </div>
           <div className={`font-bold leading-tight text-zinc-800 ${dense ? "line-clamp-2 text-[11.5px]" : "text-sm"}`}>{s.title}</div>
           {s.detail && <div className={`mt-0.5 whitespace-pre-line leading-snug text-zinc-500 ${dense ? "line-clamp-3 text-[10px]" : "text-xs"}`}>{s.detail}</div>}
           {s.tags.length > 0 && <div className="mt-1 flex flex-wrap gap-0.5">{s.tags.slice(0, dense ? 3 : 6).map((tg) => <span key={tg} className={`rounded bg-white/70 px-1 py-px font-semibold text-zinc-500 ${dense ? "text-[8.5px]" : "text-[10px]"}`}>{tg}</span>)}</div>}
@@ -251,7 +257,15 @@ export function CalendarView({ sessions, notes: notesProp = [], races: racesProp
                 <span className="text-[12px] font-semibold uppercase tracking-wide text-white/70 first-letter:uppercase">
                   {sel && new Date(sel + "T00:00:00").toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long" })}
                 </span>
+                {/* Jour prévisionnel : on le dit franchement plutôt que de laisser croire
+                    à un plan figé — c'est justement parce qu'il bouge qu'il est personnalisé. */}
+                <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] ring-1 backdrop-blur-md ${coach.confirmed === false ? "bg-white/10 text-white/70 ring-white/20" : "bg-emerald-400/20 text-emerald-50 ring-emerald-200/30"}`}>
+                  {coach.confirmed === false ? `~ ${t("cal.provisional")}` : `✓ ${t("cal.confirmed")}`}
+                </span>
               </div>
+              {coach.confirmed === false && (
+                <p className="mt-2 text-[12px] leading-relaxed text-white/60">{t("cal.provisional.hint")}</p>
+              )}
               <h1 className="mt-2 text-2xl font-bold tracking-tight drop-shadow-sm sm:text-3xl">{coach.title}</h1>
               {phases ? (
                 <div className="mt-2.5 max-w-2xl space-y-1.5">

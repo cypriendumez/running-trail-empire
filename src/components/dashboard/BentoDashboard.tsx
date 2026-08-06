@@ -21,6 +21,7 @@ import { SessionFeedback } from "@/components/dashboard/SessionFeedback";
 import { ObjectiveCard, type Objective } from "@/components/dashboard/ObjectiveCard";
 import { cleanActivityName } from "@/lib/utils/activityName";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { ProfileCompletionBanner } from "@/components/dashboard/ProfileCompletionBanner";
 
 // Fonction de traduction (avec interpolation {clé}) passée aux helpers.
 type TFn = (k: string, params?: Record<string, string | number>) => string;
@@ -391,6 +392,10 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
 
   return (
     <div className="min-h-full bg-gradient-to-b from-zinc-50 to-white">
+      {/* Profil incomplet : les comptes antérieurs au questionnaire complet ne repassent
+          jamais par l'inscription — on leur dit ce qui manque et ce que ça leur coûte. */}
+      <ProfileCompletionBanner profile={profile as unknown as Record<string, unknown> | null} />
+
       {/* No data banner */}
       {noData && (
         <div className="mb-5 flex items-center gap-3 px-4 py-3 rounded-2xl bg-amber-50 border border-amber-200 text-sm">

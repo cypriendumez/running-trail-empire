@@ -16,7 +16,10 @@ import { TERRAINS, terrainLabel } from "@/data/terrainCatalog";
 
 type Step = "watch" | "profile" | "physio" | "goals" | "done";
 
-const STEPS: Step[] = ["watch", "profile", "physio", "goals", "done"];
+// Le profil et la santé d'abord (questions faciles sur soi : l'athlète s'investit
+// progressivement), la connexion montre EN DERNIER et FACULTATIVE — exiger un compte
+// intervals.icu avant tout usage de l'app est ce qui fait le plus abandonner à l'inscription.
+const STEPS: Step[] = ["profile", "physio", "goals", "watch", "done"];
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -27,7 +30,7 @@ export default function OnboardingPage() {
     return s;
   };
 
-  const [step, setStep] = useState<Step>("watch");
+  const [step, setStep] = useState<Step>("profile");
   const [loading, setLoading] = useState(false);
 
   const [profile, setProfile] = useState({
@@ -125,7 +128,7 @@ export default function OnboardingPage() {
   }, [pollingActive]);
 
   const stepIdx = STEPS.indexOf(step);
-  const stepLabels = [tr("sMontre"), tr("sProfil"), tr("sPhysio"), tr("sObjectifs")];
+  const stepLabels = [tr("sProfil"), tr("sPhysio"), tr("sObjectifs"), tr("sMontre")];
 
   // ── Validation intelligente ──
   const idTrim = watchAthleteId.trim();
@@ -173,22 +176,8 @@ export default function OnboardingPage() {
 
   async function handleFinish() {
     setLoading(true);
-    try {
-      const statusRes = await fetch("/api/intervals/status");
-      const status = await statusRes.json();
-      if (!status.configured) {
-        toast.error(tr("tConnectFirst"));
-        setStep("watch");
-        setWatchSubStep(3);
-        setLoading(false);
-        return;
-      }
-    } catch {
-      toast.error(tr("tCantVerify"));
-      setLoading(false);
-      return;
-    }
-
+    // La montre n'est plus bloquante : le plan d'entraînement fonctionne sans elle, la
+    // synchro peut être branchée plus tard depuis l'onglet Sync Montre.
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { router.push("/login"); return; }
@@ -597,8 +586,8 @@ export default function OnboardingPage() {
                   <button onClick={prev} className="btn-secondary flex-1 justify-center">
                     <ArrowLeft className="w-4 h-4" /> {tr("back")}
                   </button>
-                  <button onClick={handleFinish} disabled={loading} className="btn-brand flex-1 justify-center">
-                    {loading ? tr("saving") : <>{tr("finish")} <ArrowRight className="w-4 h-4" /></>}
+                  <button onClick={next} className="btn-brand flex-1 justify-center">
+                    {tr("next")} <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
               </div>
@@ -611,10 +600,17 @@ export default function OnboardingPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="font-semibold text-zinc-900">{tr("wTitle")}</h2>
-                    <p className="text-xs text-red-400 mt-0.5 font-medium">{tr("wMandatory")}</p>
+                    <p className="text-xs text-zinc-400 mt-0.5 font-medium">{tr("wOptional")}</p>
                   </div>
                   <div className="text-xs text-zinc-400 font-medium">{watchSubStep + 1}/4</div>
                 </div>
+
+                {/* Sortie facultative : on termine sans montre et on synchronisera plus tard.
+                    C'est l'écran qui coûte le plus d'inscriptions — il ne doit jamais être un mur. */}
+                <button onClick={handleFinish} disabled={loading}
+                  className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-50">
+                  {loading ? tr("saving") : tr("wSkip")}
+                </button>
 
                 {/* Sub-step progress dots */}
                 <div className="flex gap-1.5">

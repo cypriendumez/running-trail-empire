@@ -115,6 +115,10 @@ export type AthleteContext = {
   longRunMode: "run" | "bike"; // préférence : sortie longue en course ou remplacée par du vélo (cross-training)
   // Verdict de fraîcheur du jour (déterministe) — affiché au coach et imposé à l'IA.
   readiness: { level: "vert" | "jaune" | "orange" | "rouge"; reasons: string[]; advice: string };
+  /** Heures minimales entre deux séances dures pour CET athlète (calculé sur son âge). */
+  hardGapHours: number;
+  /** Allure d'endurance facile (~70 % VMA), en min/km — null si VMA inconnue. */
+  easyPace: string | null;
   // Plan macro périodisé semaine par semaine jusqu'au jour J.
   macroPlan: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[];
 };
@@ -564,6 +568,8 @@ ${catalog}`;
     weekPlan: { qBudget, quality: chosen, easyPace: vma ? paceAt(70) : null, eased: easeReasons.length > 0 },
     longRunMode: bikeLong ? "bike" : "run",
     readiness: { level: readyLevel, reasons: [...redFlags, ...orangeFlags], advice: readinessRule },
+    hardGapHours: hardGapH,
+    easyPace: vma ? paceAt(70) : null,
     macroPlan,
   };
 }
