@@ -119,6 +119,14 @@ export type AthleteContext = {
   hardGapHours: number;
   /** Allure d'endurance facile (~70 % VMA), en min/km — null si VMA inconnue. */
   easyPace: string | null;
+  /** Jours écoulés depuis la dernière séance DURE réellement effectuée (0 = aujourd'hui). */
+  lastHardDaysAgo: number | null;
+  /** Volumes cibles de la semaine, en km. */
+  volume: { weekKm: number; avg4wkKm: number; targetKm: number; longRunKm: number };
+  /** Où l'on se situe dans le cycle : semaine allégée, affûtage, ou montée en charge. */
+  cycle: { deload: boolean; taper: boolean; label: string };
+  /** Jours de la semaine (0 = dimanche) systématiquement prescrits ET jamais réalisés. */
+  skippedWeekdays: number[];
   // Plan macro périodisé semaine par semaine jusqu'au jour J.
   macroPlan: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[];
 };
@@ -348,6 +356,32 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const todayStr = new Date().toISOString().slice(0, 10);
   const doneDates = new Set(workouts.map(w => String(w.date).slice(0, 10)));
   const pastPrescribed = coachSessions.filter(c => c.date && c.date <= todayStr && now - new Date(c.date).getTime() <= 14 * 86400000);
+  // ── JOURS SYSTÉMATIQUEMENT RATÉS (boucle d'adhérence) ──
+  // Un plan qu'on ne suit pas ne sert à rien. Si un jour de la semaine est prescrit
+  // encore et encore sans jamais être couru, ce n'est pas de la paresse : c'est que
+  // ce jour-là ne marche pas dans sa vie. On arrête de s'obstiner.
+  // Repos et Renfo sont exclus : ils n'apparaissent pas dans les activités enregistrées,
+  // ils sembleraient donc « ratés » à chaque fois.
+  const runnable = (t?: string) => !/repos|rest|renfo|muscu|gainage|ppg/i.test(t || "");
+  const wdStat = new Map<number, { p: number; d: number }>();
+  for (const c of coachSessions) {
+    if (!c.date || c.date > todayStr || now - new Date(c.date).getTime() > 28 * 86400000) continue;
+    if (!runnable(c.sessionType)) continue;
+    const wd = new Date(c.date + "T00:00:00").getDay();
+    const s = wdStat.get(wd) ?? { p: 0, d: 0 };
+    s.p++; if (doneDates.has(String(c.date).slice(0, 10))) s.d++;
+    wdStat.set(wd, s);
+  }
+  const skippedWeekdays = [...wdStat.entries()].filter(([, s]) => s.p >= 3 && s.d === 0).map(([wd]) => wd).slice(0, 2);
+
+  // ── DERNIÈRE SÉANCE DURE RÉELLEMENT EFFECTUÉE ──
+  // `workouts` est trié du plus récent au plus ancien : le premier match est le bon.
+  // Sert à espacer la prochaine qualité par rapport au PASSÉ, pas seulement aux jours à venir.
+  const lastHardWk = workouts.find(w => isHardWk(w));
+  const lastHardDaysAgo = lastHardWk
+    ? Math.max(0, Math.floor((now - new Date(String(lastHardWk.date) + "T00:00:00").getTime()) / 86400000))
+    : null;
+
   const adherence = pastPrescribed.length
     ? `${pastPrescribed.filter(c => doneDates.has(String(c.date).slice(0, 10))).length}/${pastPrescribed.length} séances prescrites réalisées (14 j)`
     : "pas de plan prescrit récent";
@@ -487,6 +521,30 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
     return out;
   })();
 
+  // ── VOLUME DE LA SEMAINE & PHASE DU CYCLE ───────────────────────────────────
+  // Sans ça, tout le monde recevait « 1h à 1h30 » de sortie longue, qu'il coure
+  // 25 ou 100 km par semaine. Le macro-plan calculait déjà ces chiffres : on les branche.
+  // Semaine allégée toutes les 4 semaines : sans objectif de course, on s'ancre sur le
+  // numéro de semaine ISO (stable d'un jour à l'autre, contrairement à un compteur maison).
+  const isoWeek = (() => {
+    const d = new Date(Date.UTC(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  })();
+  const taper = weeksToRace != null && weeksToRace <= 2 && weeksToRace >= 0;
+  const deload = !taper && (macroPlan.length ? macroPlan[0].phase !== "Affûtage" && isoWeek % 4 === 0 : isoWeek % 4 === 0);
+  const baseKm = Math.max(Math.round(weekKm), Math.round(avg4wkKm), 15);
+  // Progression plafonnée à +10 %/semaine (+5 % si passif court ou antécédent de fracture).
+  const growth = (runYears != null && runYears < 1) || (Array.isArray(p?.injury_zones) && (p.injury_zones as unknown[]).map(String).includes("fracture_fatigue")) ? 1.05 : 1.10;
+  const targetKm = macroPlan.length ? macroPlan[0].volumeKm
+    : Math.round(baseKm * (taper ? 0.65 : deload ? 0.8 : growth));
+  const longRunKm = macroPlan.length ? macroPlan[0].longRunKm : Math.round(targetKm * (taper ? 0.22 : 0.32));
+  const cycleLabel = taper ? "AFFÛTAGE — volume fortement réduit, on garde l'intensité pour arriver frais"
+    : deload ? "SEMAINE ALLÉGÉE (1 sur 4) — volume −20 %, c'est là que le corps assimile"
+    : "montée en charge normale";
+
   const genderLabel = p?.gender === "female" ? "femme" : p?.gender === "male" ? "homme" : p?.gender ? String(p.gender) : "?";
   const text = `PROFIL
 - ${p?.full_name ?? "Athlète"} · ${p?.age ?? "?"} ans · ${genderLabel} · ${num(p?.weight_kg) ?? "?"} kg · ${num(p?.height_cm) ?? "?"} cm · chronotype ${p?.chronotype ?? "?"} · mode ${p?.mode ?? "?"}
@@ -530,6 +588,9 @@ FORME & RÉCUPÉRATION (aujourd'hui)
 
 CHARGE D'ENTRAÎNEMENT
 - Volume : ${Math.round(weekKm)} km cette semaine · ~${Math.round(avg4wkKm)} km/sem (moy. 4 sem.)
+- 🎯 VOLUME CIBLE de la semaine à venir : ~${targetKm} km, dont une sortie longue de ~${longRunKm} km. Dimensionne les séances sur CES chiffres, pas sur des durées passe-partout.
+- 🔄 PHASE DU CYCLE : ${cycleLabel}.
+- ⏱️ Dernière séance DURE réellement effectuée : ${lastHardDaysAgo == null ? "aucune trace récente" : lastHardDaysAgo === 0 ? "AUJOURD'HUI ⚠️ → pas de deuxième séance dure aujourd'hui ni demain" : `il y a ${lastHardDaysAgo} j`}${lastHardDaysAgo != null && lastHardDaysAgo * 24 < hardGapH ? ` ⚠️ moins de ${hardGapH} h se sont écoulées : la prochaine qualité doit attendre.` : ""}${skippedWeekdays.length ? `\n- 🚫 JOURS SYSTÉMATIQUEMENT RATÉS : ${skippedWeekdays.map(d => ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d]).join(", ")} — prescrits plusieurs fois, jamais courus. Ne t'obstine pas : place-y du repos ou rien, et redistribue ailleurs.` : ""}
 - Repos : dernière séance il y a ${daysSinceLast ?? "?"} j · ${restDays7} j sans courir sur les 7 derniers${daysSinceLast != null && daysSinceLast >= 3 ? " ⚠️ reprise après coupure : redémarre en douceur, pas de grosse séance d'emblée" : ""}
 - CTL ${Math.round(load.ctl)} (forme) · ATL ${Math.round(load.atl)} (fatigue) · TSB ${Math.round(load.tsb)} (fraîcheur) · ratio aigu:chronique ${r1(load.acr)}${load.acr > 1.5 ? " ⚠️ élevé (risque)" : ""}
 - Répartition d'intensité 14j : ${hardShare ?? "?"} % de séances qualité (cible polarisée ≤ 20 %)
@@ -572,6 +633,10 @@ ${catalog}`;
     readiness: { level: readyLevel, reasons: [...redFlags, ...orangeFlags], advice: readinessRule },
     hardGapHours: hardGapH,
     easyPace: vma ? paceAt(70) : null,
+    lastHardDaysAgo,
+    volume: { weekKm: Math.round(weekKm), avg4wkKm: Math.round(avg4wkKm), targetKm, longRunKm },
+    cycle: { deload, taper, label: cycleLabel },
+    skippedWeekdays,
     macroPlan,
   };
 }
