@@ -11,6 +11,7 @@ import { Logo } from "@/components/brand/Logo";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { OB } from "./onboardingI18n";
+import { HEALTH_CONDITIONS, INJURY_ZONES, healthLabel } from "@/data/healthCatalog";
 
 type Step = "watch" | "profile" | "physio" | "goals" | "done";
 
@@ -42,7 +43,15 @@ export default function OnboardingPage() {
     running_years: 2,
     main_terrain: "plat" as "plat" | "vallonne" | "montagne" | "plage" | "piste" | "mixte",
     elevation_pref: "modere" as "evite" | "modere" | "aime" | "specialiste",
+    // Santé : contraint la prescription du coach IA (la santé prime sur la performance).
+    health_conditions: [] as string[],
+    injury_zones: [] as string[],
+    health_notes: "",
   });
+
+  // Bascule d'une puce santé (sélection multiple).
+  const toggleHealth = (key: "health_conditions" | "injury_zones", slug: string) =>
+    setProfile(p => ({ ...p, [key]: p[key].includes(slug) ? p[key].filter(s => s !== slug) : [...p[key], slug] }));
 
   const [vma, setVma] = useState({ vma_kmh: "", max_hr: "", resting_hr: "" });
   const [test6min, setTest6min] = useState("");
@@ -176,6 +185,9 @@ export default function OnboardingPage() {
       running_years: profile.running_years,
       main_terrain: profile.main_terrain,
       elevation_pref: profile.elevation_pref,
+      health_conditions: profile.health_conditions,
+      injury_zones: profile.injury_zones,
+      health_notes: profile.health_notes.trim() || null,
     }).eq("id", user.id);
 
     if (!profileError && vma.vma_kmh) {
@@ -371,6 +383,38 @@ export default function OnboardingPage() {
                     ))}
                   </div>
                   <p className="text-[11px] text-zinc-400 mt-1.5">{tr("elevHint")}</p>
+                </div>
+
+                {/* Santé — la seule section où « rien » est une réponse parfaitement valable. */}
+                <div className="rounded-2xl border border-zinc-200 bg-zinc-50/60 p-4 space-y-4">
+                  <div>
+                    <div className="text-sm font-semibold text-zinc-900">{tr("healthTitle")}</div>
+                    <p className="text-[11px] text-zinc-500 mt-0.5 leading-relaxed">{tr("healthSub")}</p>
+                  </div>
+                  {([["health_conditions", "condTitle", HEALTH_CONDITIONS], ["injury_zones", "injTitle", INJURY_ZONES]] as const).map(([key, titleKey, catalog]) => (
+                    <div key={key}>
+                      <label className="text-xs font-medium text-zinc-500 block mb-1.5">{tr(titleKey)}</label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {catalog.map(item => {
+                          const on = profile[key].includes(item.slug);
+                          return (
+                            <button key={item.slug} type="button" onClick={() => toggleHealth(key, item.slug)}
+                              className={`px-2.5 py-1.5 rounded-xl text-xs font-medium border transition-all ${on ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                              {healthLabel(item, lang)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {profile[key].length === 0 && <p className="text-[11px] text-zinc-400 mt-1.5">{tr("healthNone")} ✓</p>}
+                    </div>
+                  ))}
+                  <div>
+                    <label className="text-xs font-medium text-zinc-500 block mb-1.5">{tr("notesTitle")}</label>
+                    <textarea value={profile.health_notes} onChange={e => setProfile(p => ({ ...p, health_notes: e.target.value }))}
+                      placeholder={tr("notesPh")} rows={2} maxLength={500}
+                      className="w-full px-3 py-2 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none" />
+                  </div>
+                  <p className="text-[11px] text-zinc-400 leading-relaxed">⚕️ {tr("healthDisc")}</p>
                 </div>
 
                 {profile.gender === "female" && (

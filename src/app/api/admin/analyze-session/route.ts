@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildAthleteContext, classifyRun, type AthleteContext } from "@/lib/ai/coachContext";
+import { HEALTH_CONDITIONS, INJURY_ZONES, healthCoachLines } from "@/data/healthCatalog";
 
 const ADMIN_EMAIL = "cypriendumez@outlook.fr";
 const BASE = "https://intervals.icu/api/v1";
@@ -162,6 +163,16 @@ export async function POST(req: Request) {
     const profTerrain = TERR[String(p?.main_terrain ?? "")] ?? "non renseigné";
     const ELEVL: Record<string, string> = { evite: "évite le dénivelé", modere: "dénivelé modéré", aime: "aime le dénivelé", specialiste: "spécialiste du dénivelé" };
     const profElev = ELEVL[String(p?.elevation_pref ?? "")] ?? "";
+    // Santé : l'analyse d'une séance se lit différemment selon les antécédents (une FC haute
+    // chez un athlète anémié ou sous bêtabloquants ne veut pas dire la même chose).
+    const condL = healthCoachLines(p?.health_conditions, HEALTH_CONDITIONS).labels;
+    const injL = healthCoachLines(p?.injury_zones, INJURY_ZONES).labels;
+    const healthNote = typeof p?.health_notes === "string" ? p.health_notes.trim().slice(0, 300) : "";
+    const profHealth = [
+      condL.length ? `pathologies : ${condL.join(", ")}` : null,
+      injL.length ? `zones fragiles : ${injL.join(", ")}` : null,
+      healthNote ? `note de l'athlète : « ${healthNote} »` : null,
+    ].filter(Boolean).join(" · ") || "rien de déclaré";
 
     const summary = `SÉANCE du ${day} — ${a.name ?? "Course à pied"} (athlète : ${prenom})
 Distance ${n(a.distance) != null ? (n(a.distance)! / 1000).toFixed(2) : "?"} km · D+ ${n(a.total_elevation_gain) != null ? Math.round(n(a.total_elevation_gain)!) : "?"} m / D- ${n(a.total_elevation_loss) != null ? Math.round(n(a.total_elevation_loss)!) : "?"} m · durée ${n(a.moving_time) != null ? Math.round(n(a.moving_time)! / 60) : "?"} min
@@ -177,6 +188,7 @@ TOURS (un par un) :
   ${lapsStr || "n/d"}
 CONTEXTE ATHLÈTE : VMA ${baseline?.vma_kmh ?? "?"} km/h · FC max ${baseline?.max_hr ?? "?"} · FC repos ${baseline?.resting_hr ?? "?"} · volume 7j ${weekKm.toFixed(0)} km · charge 14j ${tss14.toFixed(0)} TSS
 PROFIL : ${p?.age ?? "?"} ans · ${p?.gender === "female" ? "femme" : p?.gender === "male" ? "homme" : "sexe ?"} · ${profExp} · terrain ${profTerrain}${profElev ? ` · ${profElev}` : ""}${profTerrain === "plage / sable" ? "  ⚠️ sur SABLE l'allure /km n'est PAS comparable au bitume (45 s à 1 min 30 de plus au km) : juge l'effort à la FC, pas à l'allure." : ""}
+SANTÉ (à prendre en compte dans la lecture de la séance) : ${profHealth}
 RÉCUPÉRATION (dernier relevé) : VFC ${hrv?.hrv_ms ?? "?"} ms${hrv?.physiological_state ? ` · état ${hrv.physiological_state}` : ""} · sommeil ${sleep?.sleep_score ?? "?"}/100${sleep?.total_sleep_min ? ` (${Math.round(sleep.total_sleep_min / 60)}h)` : ""}
 OBJECTIF DE COURSE : ${objLine}
 REPOS : dernière séance il y a ${daysSinceLast ?? "?"} j · ${restDays7} j sans courir sur 7${daysSinceLast != null && daysSinceLast >= 3 ? " ⚠️ reprise après coupure : redémarre progressivement" : ""}
@@ -199,6 +211,11 @@ SECTIONS :
     const planSystem = `Tu es le coach personnel de ${prenom} — entraîneur course à pied/trail de très haut niveau (méthodes Daniels & Canova, modèle polarisé 80/20, prévention des blessures). Tu prescris des séances DE PRO, précises et 100% personnalisées. À partir de cette séance, de son historique, de sa récupération et de son objectif : écris (1) LA prochaine séance, et (2) un plan sur 7 jours.
 
 RÈGLES DE COACHING NON NÉGOCIABLES :
+- ⚡ LE « VERDICT DE FRAÎCHEUR DU JOUR » DU CONTEXTE S'IMPOSE À TOI. Il est calculé à partir de sa VFC, de son sommeil de cette nuit, de sa charge et de son ressenti. Feu ROUGE = AUCUNE intensité aujourd'hui, quelles que soient l'échéance et l'envie. Feu VERT = ne sous-dose pas « par prudence », ce serait du potentiel perdu. Ne ré-arbitre pas ce verdict, applique-le et explique-le à ${prenom} avec des mots simples.
+- 🩺 LA SANTÉ PRIME SUR LA PERFORMANCE. Applique littéralement chaque consigne du bloc « SANTÉ & ANTÉCÉDENTS » : pathologies déclarées, zones de blessure récurrentes, notes écrites par l'athlète. Une contre-indication n'est JAMAIS contournée pour tenir un objectif ; si l'objectif devient incompatible avec sa santé, dis-le franchement plutôt que de prescrire quand même.
+- ⏳ ÂGE & RÉCUPÉRATION : respecte l'espacement minimum entre deux séances dures indiqué dans le contexte (il est calculé sur SON âge, il ne vaut pas 48 h pour tout le monde). Après 35 ans, c'est la récupération — pas la capacité — qui limite : mieux vaut 2 séances de qualité bien digérées que 3 subies.
+- 🌡️ CONDITIONS RÉELLES : tiens compte de la météo récente indiquée. Au-dessus de 25 °C, n'exige pas les allures habituelles (compte 15 à 45 s/km de plus selon la chaleur) et juge l'effort à la FC. Par temps glacial, rallonge l'échauffement et évite le fractionné court à froid.
+- 🗺️ SURFACE : sur SABLE ou en MONTAGNE, une allure au km n'a pas de sens — prescris en DURÉE et en FRÉQUENCE CARDIAQUE, et place les séances chiffrées sur surface dure (route/piste).
 - STRUCTURE DE CHAQUE SÉANCE (capital) : TOUTE séance de course se décompose en 3 temps — (1) ÉCHAUFFEMENT : AU MOINS 15 min de footing progressif Z1→Z2 (montée en température douce) ; (2) CORPS de séance ; (3) RETOUR AU CALME : AU MOINS 10 min de footing très facile Z1. Même une séance facile/endurance : on démarre tranquille et on finit tranquille — JAMAIS un seul bloc brut. Ex endurance : « 15 min échauffement progressif Z1→Z2 + 30 min Z2 (~X:XX/km), fin un peu plus soutenue + 10 min retour au calme Z1 ». Ex récup : « 10 min échauffement très doux + 20 min Z1 + 5 min retour au calme ». Échauffement et retour au calme se font EN COURANT (jamais en marchant). ⚠️ Échauffement et retour au calme = pilotés à la FRÉQUENCE CARDIAQUE (zones FC, ex « FC Z1→Z2 »), PAS à l'allure — n'y mets jamais d'allure /km ; seul le CORPS de séance porte une allure cible.
 - Pour les séances de QUALITÉ (VMA, seuil/tempo, fractionné, côtes, allure spécifique course) : après l'échauffement, ajoute 3-5 lignes droites de 80-100 m, puis le corps CHIFFRÉ, récup trottinée ENTRE répétitions, puis le retour au calme. L'échauffement y est plus long (15-20 min).
 - Séances de qualité chiffrées (allures min/km depuis la VMA : endurance 65-75 %, seuil 85-90 %, VMA 100-105 %) : fractionné court (10×400 m, 30/30), VMA longue (5-6×1000 m), seuil (2-3×10-15 min), côtes. Récup ENTRE répétitions = trottinée. Là, et seulement là, on découpe échauffement / corps / retour au calme.
@@ -257,7 +274,7 @@ Le plan "week" couvre 7 jours (la séance d'AUJOURD'HUI = nextSession est le 1er
       });
     } catch { /* table optionnelle */ }
 
-    return NextResponse.json({ analysis, nextSession, week, macroPlan: ctx?.macroPlan ?? [], objective: objective ? { ...objective, daysToRace: objDays } : null, rest: { daysSinceLast, restDays7 } });
+    return NextResponse.json({ analysis, nextSession, week, macroPlan: ctx?.macroPlan ?? [], objective: objective ? { ...objective, daysToRace: objDays } : null, rest: { daysSinceLast, restDays7 }, readiness: ctx?.readiness ?? null });
   } catch (e) {
     return NextResponse.json({ error: `Erreur: ${(e as Error).message}` }, { status: 502 });
   }

@@ -17,6 +17,14 @@ type Detail = { activity: Record<string, unknown> | null; series: SeriesPoint[] 
 type NextSession = { title: string; workout: string; why: string; feel: string; tags: string[] };
 type WeekDay = { label: string; type: string; desc: string };
 type MacroWeek = { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string };
+type Readiness = { level: "vert" | "jaune" | "orange" | "rouge"; reasons: string[]; advice: string };
+// Feu de fraîcheur du jour — calculé côté serveur (VFC, sommeil, charge, douleurs, ressenti).
+const READY_UI: Record<Readiness["level"], { dot: string; ring: string; bg: string; fg: string; label: string }> = {
+  vert:   { dot: "#10b981", ring: "border-emerald-200", bg: "bg-emerald-50/60", fg: "text-emerald-900", label: "Frais — feu vert" },
+  jaune:  { dot: "#eab308", ring: "border-yellow-200",  bg: "bg-yellow-50/60",  fg: "text-yellow-900",  label: "Vigilance légère" },
+  orange: { dot: "#f97316", ring: "border-orange-200",  bg: "bg-orange-50/60",  fg: "text-orange-900",  label: "Séance à alléger" },
+  rouge:  { dot: "#ef4444", ring: "border-red-200",     bg: "bg-red-50/60",     fg: "text-red-900",     label: "Pas d'intensité aujourd'hui" },
+};
 const PHASE_COLOR: Record<string, { bg: string; fg: string }> = {
   "Base": { bg: "#dbeafe", fg: "#1d4ed8" },
   "Développement": { bg: "#fee2e2", fg: "#b91c1c" },
@@ -166,6 +174,7 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
   const [objective, setObjective] = useState<{ race: string; distanceKm: number; raceDate: string; targetTime: string; targetPace: string; daysToRace: number | null } | null>(null);
   const [rest, setRest] = useState<{ daysSinceLast: number | null; restDays7: number } | null>(null);
   const [macro, setMacro] = useState<MacroWeek[]>([]);
+  const [readiness, setReadiness] = useState<Readiness | null>(null);
   const [showMacro, setShowMacro] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [sendingClient, setSendingClient] = useState(false);
@@ -191,7 +200,7 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
   // Analyse IA. `silent` = déclenchement automatique à l'ouverture de la page : on enchaîne
   // sur la publication du calendrier et on reste discret sur les toasts.
   const sendToAI = useCallback(async (silent = false) => {
-    setAnalyzing(true); setAnalysis(null); setPlan(null); setObjective(null); setRest(null); setMacro([]); setAutoPub(null);
+    setAnalyzing(true); setAnalysis(null); setPlan(null); setObjective(null); setRest(null); setMacro([]); setAutoPub(null); setReadiness(null);
     try {
       const r = await fetch("/api/admin/analyze-session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: user, date, distance_km: dist ? Number(dist) : undefined }) });
       const j = await r.json();
@@ -202,6 +211,7 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
       setObjective(j.objective ?? null);
       setRest(j.rest ?? null);
       setMacro(Array.isArray(j.macroPlan) ? j.macroPlan : []);
+      setReadiness(j.readiness ?? null);
       if (!silent) toast.success("Analyse IA prête ✅");
       return p;
     } catch { toast.error("Analyse impossible"); }
@@ -390,6 +400,31 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
                 )}
               </div>
             )}
+
+            {/* Feu de fraîcheur du jour — calculé (VFC, sommeil, charge, douleurs, RPE) */}
+            {!clientMode && readiness && (() => {
+              const ui = READY_UI[readiness.level];
+              return (
+                <div className={`rounded-2xl border ${ui.ring} ${ui.bg} px-4 py-3.5`}>
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <span className="relative flex h-3 w-3 flex-shrink-0">
+                      {readiness.level === "rouge" && <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ background: ui.dot }} />}
+                      <span className="relative inline-flex h-3 w-3 rounded-full" style={{ background: ui.dot }} />
+                    </span>
+                    <span className={`font-bold ${ui.fg}`}>{ui.label}</span>
+                    <span className="text-[11px] uppercase tracking-wide text-zinc-400">état du jour</span>
+                  </div>
+                  <p className={`mt-1.5 text-sm leading-relaxed ${ui.fg}`}>{readiness.advice}</p>
+                  {readiness.reasons.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {readiness.reasons.map((r) => (
+                        <span key={r} className="rounded-full bg-white/70 px-2.5 py-0.5 text-xs font-medium text-zinc-600 ring-1 ring-zinc-200">{r}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Objectif de course + repos — ce que l'IA a pris en compte */}
             {(objective || rest) && (

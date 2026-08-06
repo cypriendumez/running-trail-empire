@@ -1,6 +1,7 @@
 import type { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
+import { HEALTH_CONDITIONS, INJURY_ZONES, healthCoachLines } from "@/data/healthCatalog";
 import { bestVmaFromWorkouts, vmaFromVo2max } from "@/lib/running/fitness";
 
 type SB = Awaited<ReturnType<typeof createClient>>;
@@ -12,6 +13,8 @@ export type CoachObjective = {
 
 // ── Persona coach élite — réutilisé par toutes les IA d'entraînement ────────────
 export const COACH_SYSTEM = `Tu es un entraîneur de course à pied et de trail de niveau INTERNATIONAL, capable de coacher aussi bien un grand débutant qu'un athlète élite. Tu raisonnes en scientifique de l'entraînement :
+- COACH PARTICULIER, PAS GÉNÉRATEUR DE PLANS : tu t'adresses à UNE personne dont tu connais l'âge, le sexe, le passif, la santé, le terrain, le sommeil de cette nuit, la météo de ses sorties et ses dernières séances. Une prescription qui pourrait être donnée telle quelle à quelqu'un d'autre est une prescription ratée. À chaque séance, demande-toi : « qu'est-ce qui, chez LUI aujourd'hui, rend cette séance la bonne ? » — et dis-le-lui.
+- LA SANTÉ AVANT LA PERFORMANCE, TOUJOURS : contre-indication médicale, douleur signalée ou signal de fatigue franc l'emportent sur l'échéance, sur l'objectif et sur l'envie de l'athlète. Un athlète blessé ne progresse pas ; un athlète qui reste en bonne santé progresse toujours.
 - POLARISÉ ~80/20 (Seiler) : la majorité du volume en facile (Z1-Z2), l'intensité dosée et ciblée.
 - PÉRIODISATION : base aérobie → développement (VMA / seuil / côtes) → spécifique (allure course, terrain) → AFFÛTAGE (volume −40 %, fraîcheur, TSB positif le jour J).
 - CHARGE : pilote CTL (forme), ATL (fatigue), TSB (fraîcheur) et le ratio aigu:chronique (éviter > 1,5 = risque blessure). Progressivité ≤ +10 %/semaine.
@@ -109,6 +112,8 @@ export type AthleteContext = {
   // Squelette de semaine déterministe → permet de VALIDER/corriger le plan de l'IA.
   weekPlan: { qBudget: number; quality: { type: string; desc: string }[]; easyPace: string | null; eased: boolean };
   longRunMode: "run" | "bike"; // préférence : sortie longue en course ou remplacée par du vélo (cross-training)
+  // Verdict de fraîcheur du jour (déterministe) — affiché au coach et imposé à l'IA.
+  readiness: { level: "vert" | "jaune" | "orange" | "rouge"; reasons: string[]; advice: string };
   // Plan macro périodisé semaine par semaine jusqu'au jour J.
   macroPlan: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[];
 };
@@ -291,6 +296,24 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const elevKey = typeof p?.elevation_pref === "string" ? String(p.elevation_pref) : null;
   const elev = elevKey ? ELEV[elevKey] ?? null : null;
 
+  // ── ÂGE — la récupération, pas la performance, est ce qui change avec les années ──
+  const age = num(p?.age);
+  const ageRule = age == null ? null
+    : age < 18 ? "⚠️ MOINS DE 18 ANS : cartilages de croissance encore ouverts. Pas de charge lourde, pas de pliométrie intensive, pas de volume d'adulte. Priorité absolue au plaisir, à la variété et à la technique. Le volume et l'intensité se construiront après la fin de la croissance — brûler les étapes ici coûte une carrière."
+    : age < 35 ? "Fenêtre physiologique optimale : récupération rapide (48 h entre deux séances dures suffisent), tolérance à la charge élevée. C'est le moment d'oser le volume et la densité si le passif suit."
+    : age < 50 ? "MASTER (35-49 ans) : la VMA baisse lentement mais la RÉCUPÉRATION baisse vite — c'est le vrai facteur limitant. Espace les séances dures de 72 h plutôt que 48 h, et rends le renforcement musculaire NON NÉGOCIABLE (2×/semaine) : c'est ce qui préserve la puissance et prévient les tendinopathies après 35 ans. Mieux vaut 2 séances de qualité bien récupérées que 3 subies."
+    : age < 65 ? "MASTER+ (50-64 ans) : récupération nettement rallongée (72-96 h entre deux séances dures), masse musculaire à défendre activement (renforcement 2-3×/semaine, c'est prioritaire sur le volume de course). La formule 220−âge est particulièrement fausse à cet âge : fie-toi à la FC max OBSERVÉE, pas à la formule. Privilégie le seuil et les côtes au fractionné très court (moins traumatisant, bénéfice équivalent)."
+    : "VÉTÉRAN (65 ans et +) : la régularité et le renforcement priment sur tout le reste. Séances dures espacées de 96 h, échauffements rallongés, surfaces souples privilégiées, et alternance course/marche assumée sans complexe si nécessaire. L'objectif est de courir encore dans 10 ans.";
+  // Après 35 ans, l'espacement minimal entre deux séances dures s'allonge.
+  const hardGapH = age == null ? 48 : age < 35 ? 48 : age < 50 ? 72 : age < 65 ? 84 : 96;
+
+  // ── SANTÉ — pathologies déclarées et zones de blessure récurrentes ──
+  const cond = healthCoachLines(p?.health_conditions, HEALTH_CONDITIONS);
+  const inj = healthCoachLines(p?.injury_zones, INJURY_ZONES);
+  const healthNotes = typeof p?.health_notes === "string" ? p.health_notes.trim().slice(0, 500) : "";
+  // Certaines pathologies interdisent purement et simplement l'effort maximal.
+  const noMaxEffort = ["cardiaque", "covid_long", "grossesse"].some((s) => (Array.isArray(p?.health_conditions) ? (p.health_conditions as unknown[]).map(String) : []).includes(s));
+
   // Palette de séances adaptée au niveau + objectif (la lib est la base de connaissances).
   const libLevel: Level = vma == null || vma < 13 ? "debutant" : vma < 16 ? "intermediaire" : vma < 19 ? "confirme" : "elite";
   const libGoal: Goal = !objective ? "general"
@@ -350,6 +373,13 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   if (hrvWeekTrend?.startsWith("↓")) { qBudget -= 1; easeReasons.push("VFC en baisse"); }
   if (load.acr > 1.5) { qBudget -= 1; easeReasons.push(`charge aiguë élevée (ratio ${r1(load.acr)})`); }
   if (load.tsb < -25) { qBudget -= 1; easeReasons.push(`TSB très négatif (${Math.round(load.tsb)})`); }
+  // SOMMEIL : une nuit courte dégrade la tolérance à l'intensité AVANT de se voir sur la VFC.
+  // On ne compte que la nuit dernière si la montre a été portée (sinon la donnée est absente,
+  // pas mauvaise) — un score bas OU moins de 6 h coûtent une séance dure.
+  const badNight = freshSleep && ((freshSleep.sleep_score != null && freshSleep.sleep_score < 60) || (lastSleepMin != null && lastSleepMin < 360));
+  if (badNight) { qBudget -= 1; easeReasons.push(`nuit dégradée (${freshSleep?.sleep_score ?? "?"}/100${lastSleepMin ? `, ${Math.floor(lastSleepMin / 60)}h${String(lastSleepMin % 60).padStart(2, "0")}` : ""})`); }
+  // Pathologies interdisant l'effort maximal : on retire d'office la marche la plus haute.
+  if (noMaxEffort) { qBudget = Math.min(qBudget, 1); }
   // Le PASSIF plafonne la qualité : un cardio de confirmé sur des tendons de 8 mois = blessure.
   // (Volontairement hors `easeReasons` : ce n'est pas un allègement passager mais une limite
   // structurelle — le message affiché diffère, et le plancher « objectif chrono » ne doit pas
@@ -363,6 +393,42 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const floor = (v: number) => { qBudget = Math.max(qBudget, expCap != null ? Math.min(v, expCap) : v); };
   if (!easeReasons.length && objective && isShortGoal && libLevel !== "debutant") floor(2);
   if (!easeReasons.length && qBudget === 0 && libLevel !== "debutant") floor(1);
+
+  // ── VERDICT DE FRAÎCHEUR DU JOUR — calculé, pas laissé à l'appréciation de l'IA ──
+  // Un modèle de langage a tendance à « sentir » l'état de forme au fil du texte ; ici on
+  // tranche de façon déterministe et on lui impose la conclusion. Feu rouge = pas d'intensité,
+  // point final.
+  const redFlags: string[] = [];
+  const orangeFlags: string[] = [];
+  if (pains.length) redFlags.push(`douleur en cours (${pains.join(", ")})`);
+  if (load.acr > 1.8) redFlags.push(`ratio aigu:chronique ${r1(load.acr)} (zone de risque de blessure)`);
+  if (load.tsb < -30) redFlags.push(`TSB ${Math.round(load.tsb)} (fatigue profonde)`);
+  if (hrvWeekTrend?.startsWith("↓") && badNight) redFlags.push("VFC en baisse ET nuit dégradée (double signal)");
+  if (hrvWeekTrend?.startsWith("↓")) orangeFlags.push("VFC sous sa base");
+  if (badNight) orangeFlags.push(`sommeil dégradé (${freshSleep?.sleep_score ?? "?"}/100)`);
+  if (load.acr > 1.5 && load.acr <= 1.8) orangeFlags.push(`charge aiguë élevée (${r1(load.acr)})`);
+  if (monotony > 2) orangeFlags.push(`monotonie ${monotony} (charge trop uniforme)`);
+  if (lastRpe != null && lastRpe >= 8) orangeFlags.push(`dernière séance vécue très dure (RPE ${lastRpe}/10)`);
+  // Niveau calculé UNE seule fois : il alimente à la fois le prompt de l'IA et le bandeau
+  // affiché au coach — les deux ne peuvent donc pas diverger.
+  const readyLevel: "vert" | "jaune" | "orange" | "rouge" =
+    redFlags.length ? "rouge" : orangeFlags.length >= 2 ? "orange" : orangeFlags.length === 1 ? "jaune" : "vert";
+  const READY = {
+    rouge: { badge: "🔴 ROUGE", rule: "AUCUNE intensité aujourd'hui. Footing très facile, croisé sans impact ou repos complet — et dis-lui POURQUOI sans dramatiser. Reporter une séance dure de 24-48 h ne coûte rien ; la faire dans cet état coûte des semaines." },
+    orange: { badge: "🟠 ORANGE", rule: "Séance allégée : garde la qualité SI elle était prévue mais coupe le volume du corps de séance d'environ un tiers, ou bascule sur du footing. Réévalue demain." },
+    jaune: { badge: "🟡 JAUNE", rule: "Feu orange léger : la séance prévue peut se faire, mais reste attentif aux sensations sur l'échauffement — si ça ne vient pas dans les 15 premières minutes, transforme-la en footing." },
+    vert: { badge: "🟢 VERT", rule: "Il est frais : c'est le jour pour placer la séance exigeante prévue. Ne sous-dose pas par excès de prudence, ce serait du potentiel perdu." },
+  }[readyLevel];
+  const readiness = READY.badge, readinessRule = READY.rule;
+  const readinessBlock = `${readiness} — ${readinessRule}${redFlags.length ? `\n  • Signaux rouges : ${redFlags.join(" ; ")}` : ""}${orangeFlags.length ? `\n  • Signaux orange : ${orangeFlags.join(" ; ")}` : ""}${!redFlags.length && !orangeFlags.length ? "\n  • Aucun signal négatif : VFC, sommeil, charge et ressenti sont alignés." : ""}`;
+
+  // ── MÉTÉO — la chaleur dégrade l'allure à effort constant, le froid change l'échauffement ──
+  const tempRule = avgTemp == null ? null
+    : avgTemp >= 30 ? `🥵 ${avgTemp}°C : au-delà de 30°, déplace les séances tôt le matin ou tard le soir, et RENONCE au fractionné en pleine chaleur. Compte 30 à 45 s/km de plus à effort égal — juge la séance à la FC, jamais au chrono. Hydratation avec électrolytes obligatoire au-delà de 45 min.`
+    : avgTemp >= 25 ? `🌡️ ${avgTemp}°C : compte 15 à 30 s/km de plus à effort égal. Ne lui demande PAS de tenir ses allures habituelles — il se grillerait pour rien. Hydratation avant/pendant, et acclimatation progressive sur 10-14 jours.`
+    : avgTemp >= 18 ? `${avgTemp}°C : conditions correctes, allures de référence valables.`
+    : avgTemp >= 5 ? `${avgTemp}°C : conditions IDÉALES pour la performance — c'est le moment de placer les séances chronométrées et les tests.`
+    : `🥶 ${avgTemp}°C : échauffement rallongé (20 min minimum) et couvert, pas de fractionné court à froid (risque musculaire élevé). Attention aux voies respiratoires par temps sec et glacial.`;
 
   // Menu de qualité (type + détail chiffré) — ordonné par priorité selon l'objectif.
   const qVMA = { type: "VMA", desc: `VO2max / VMA (ex 10×400 m ou 6×1000 m à ~${paceAt(100)}–${paceAt(104)}/km, récup trottinée) → élève le plafond` };
@@ -432,10 +498,23 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
 - TERRAIN habituel : ${terrain?.label ?? "non renseigné"}${elev ? ` · dénivelé : ${elev.label}` : ""} · D+ réalisé cette semaine : ${elevWeek} m
 ${p?.gender === "female" ? `- SEXE : femme → besoins en FER et disponibilité énergétique à surveiller (RED-S : une charge élevée + apport insuffisant coupe la progression et fragilise l'os) ; densité osseuse à protéger (renforcement + impacts dosés) ; ${cycle ? "cycle suivi (voir plus bas)" : "si elle synchronise son cycle, adapte l'intensité selon la phase"}. Ne calque pas mécaniquement des repères masculins.` : p?.gender === "male" ? "- SEXE : homme → tendance fréquente à partir trop vite en facile et à sur-doser l'intensité ; verrouille la discipline des footings." : ""}
 
+⚡ VERDICT DE FRAÎCHEUR DU JOUR (calculé à partir de la VFC, du sommeil, de la charge et du ressenti — CETTE CONCLUSION S'IMPOSE À TOI, ne la ré-arbitre pas)
+${readinessBlock}
+
+SANTÉ & ANTÉCÉDENTS (contraintes médicales — elles PRIMENT sur l'objectif de performance)
+${cond.rules.length ? cond.rules.map((r) => `- ${r}`).join("\n") : "- Aucune pathologie déclarée."}
+${inj.rules.length ? inj.rules.map((r) => `- ${r}`).join("\n") : "- Aucune zone de blessure récurrente déclarée."}
+${healthNotes ? `- 🗣️ Note santé écrite par l'athlète (LIS-LA et tiens-en compte) : « ${healthNotes} »` : ""}${noMaxEffort ? "\n- ⛔ EFFORT MAXIMAL INTERDIT au vu de ses antécédents : pas de VMA à 100 %+, pas de test d'effort, pas de sprint all-out. Le développement passe par le volume et le seuil bas." : ""}
+
+ÂGE & RÉCUPÉRATION
+- ${ageRule ?? "Âge non renseigné : applique un espacement prudent de 72 h entre deux séances dures."}
+- Espacement MINIMUM entre deux séances dures pour CET athlète : ${hardGapH} h.
+
 PASSIF, TERRAIN & DÉNIVELÉ (leviers d'individualisation — à respecter dans la prescription)
 - ${expRule ?? "Ancienneté inconnue : demande-la, et en attendant reste sur une progression prudente (+10 %/sem max)."}
 - ${terrain?.rule ?? "Terrain habituel inconnu : privilégie des consignes en durée + FC tant que tu ne sais pas sur quelle surface il court."}
 ${elev ? `- ${elev.rule}` : ""}
+${tempRule ? `- MÉTÉO RÉCENTE : ${tempRule}` : ""}
 
 CAPACITÉS (tests)
 - VMA : ${vma ?? "?"} km/h${vmaIsEst ? ` ⚠️ ESTIMÉE depuis ses séances (aucun test VMA enregistré) → recommande-lui un test VMA pour affiner, et reste un cran prudent sur la 1re séance VMA` : ""} · FC max ${maxHr ?? (vmaIsEst && fcMaxEst ? `~${fcMaxEst} (obs.)` : "?")} · FC repos ${restHr ?? "?"} · FC seuil ${ltHr ?? "?"}
@@ -478,7 +557,7 @@ ${weekTarget}
 
 GARDE-FOUS ANTI-BLESSURE (à respecter ABSOLUMENT — la santé prime sur la performance)
 - Progressivité : +10 % de charge/volume maximum par semaine.${load.acr > 1.4 ? " ⚠️ Ratio aigu:chronique élevé → prévoir une semaine ALLÉGÉE." : ""}${monotony > 2 ? " ⚠️ Monotonie élevée → varier l'intensité, garantir un vrai jour facile/repos." : ""}
-- Jamais 2 séances de qualité d'affilée ; ≥ 48 h entre deux séances dures ; ≥ 1 jour de repos/semaine.
+- Jamais 2 séances de qualité d'affilée ; **≥ ${hardGapH} h entre deux séances dures pour CET athlète** (valeur calculée sur son âge) ; ≥ 1 jour de repos/semaine.
 - ${pains.length ? `⚠️ DOULEUR SIGNALÉE (${pains.join(", ")}) → ADAPTE la/les prochaine(s) séance(s) à CETTE zone, ne JAMAIS forcer sur une douleur : tendon d'Achille/mollet → supprime vitesse, côtes et pliométrie, footing plat très court ; genou/ITB → évite descentes, longues sorties et fractionné, réduis le volume ; tibia/périoste → coupe le volume et les surfaces dures, privilégie le croisé ; ischio/cuisse → pas de sprint ni d'allure spécifique, allure douce ; hanche/psoas → pas de fractionné court ; pied/cheville → repos ou croisé SANS impact (vélo/natation/aqua-jogging). Si la douleur est vive/persistante (≥ plusieurs jours) → REPOS de course + conseille une consultation (kiné/médecin). La santé prime sur le plan.` : "Au moindre signal de douleur → adapter immédiatement, pas de stoïcisme."}
 - ${daysSinceLast != null && daysSinceLast >= 4 ? "Reprise après coupure → repartir un cran en dessous, remonter progressivement." : "Si VFC sous la base ou sommeil dégradé → alléger la séance du jour."}
 - ~80 % du volume en facile (Z1-Z2). But ultime : faire RÉUSSIR l'objectif SANS blessure.
@@ -490,6 +569,7 @@ ${catalog}`;
     text, objective, daysToRace, weeksToRace, athleteName: String(p?.full_name ?? "Athlète"), vma,
     weekPlan: { qBudget, quality: chosen, easyPace: vma ? paceAt(70) : null, eased: easeReasons.length > 0 },
     longRunMode: bikeLong ? "bike" : "run",
+    readiness: { level: readyLevel, reasons: [...redFlags, ...orangeFlags], advice: readinessRule },
     macroPlan,
   };
 }
