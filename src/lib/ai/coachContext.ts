@@ -2,6 +2,7 @@ import type { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthCoachLines } from "@/data/healthCatalog";
+import { terrainCoachBlock } from "@/data/terrainCatalog";
 import { bestVmaFromWorkouts, vmaFromVo2max } from "@/lib/running/fitness";
 
 type SB = Awaited<ReturnType<typeof createClient>>;
@@ -276,16 +277,8 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
     : runYears >= 8 ? "Long passif (8 ans et +) : structure tendineuse solide, tolérance à la charge élevée. Tu peux oser des blocs denses, des doubles séances et des sorties longues ambitieuses si la fraîcheur suit."
     : "Passif solide (4-7 ans) : bonne tolérance à la charge, la périodisation classique s'applique pleinement.";
 
-  const TERRAIN: Record<string, { label: string; rule: string }> = {
-    plat: { label: "plat (route/ville)", rule: "Terrain PLAT : les allures /km sont parfaitement pertinentes — chiffre-les précisément. En revanche l'impact est répétitif et identique à chaque foulée → impose du renforcement et varie les surfaces quand c'est possible. Si l'objectif comporte du dénivelé, il DOIT aller chercher des côtes (même une bosse répétée en boucle)." },
-    vallonne: { label: "vallonné", rule: "Terrain VALLONNÉ : l'allure brute ment, raisonne en GAP (allure ajustée au dénivelé) et en FC. Les bosses naturelles font déjà du travail de force — n'ajoute pas une séance de côtes par-dessus sans raison." },
-    montagne: { label: "montagne / sentier technique", rule: "Terrain MONTAGNE : ne prescris PAS d'allure /km sur le terrain (elle n'a aucun sens) — pilote en DURÉE, en FC et en D+ (mètres de dénivelé). Travaille la montée (côtes longues, marche rapide efficace au-delà de 15 %) ET la DESCENTE (excentrique = première cause de destruction musculaire en trail, à doser très progressivement). Les séances chiffrées à l'allure se font sur du plat/piste." },
-    plage: { label: "plage / sable", rule: "⚠️ Terrain PLAGE (sable) : surface MOLLE → l'allure /km n'est PAS comparable au bitume (compte 45 s à 1 min 30 de plus au km), ne fixe donc AUCUNE allure cible sur le sable : pilote en DURÉE et en FRÉQUENCE CARDIAQUE. Le sable sollicite énormément mollets, tendon d'Achille et pieds → excellent pour la force et l'économie de foulée, mais RISQUE ÉLEVÉ de tendinopathie : limite à 1-2 sorties sable/semaine, jamais deux jours de suite, et cours de préférence sur le sable HUMIDE et plat près de l'eau (le sable sec et dévers déforment la foulée et fatiguent asymétriquement). Toutes les séances chiffrées à l'allure (VMA, seuil, allure spécifique) se font sur une surface DURE (route ou piste) — pas sur le sable." },
-    piste: { label: "piste d'athlétisme", rule: "Terrain PISTE : idéal pour la qualité chiffrée (fractionné calibré au mètre). Alterne les sens de rotation pour ne pas surcharger une jambe, et sors de la piste pour l'endurance (le volume facile se fait ailleurs, sur surface variée)." },
-    mixte: { label: "mixte (route + sentier)", rule: "Terrain MIXTE : la variété de surfaces est un atout anti-blessure. Cale les séances chiffrées sur le dur (allures fiables) et l'endurance/le long sur le sentier (proprioception, force)." },
-  };
-  const terrainKey = typeof p?.main_terrain === "string" ? String(p.main_terrain) : null;
-  const terrain = terrainKey ? TERRAIN[terrainKey] ?? null : null;
+  // Terrains MULTIPLES (tableau `main_terrains`, repli sur l'ancienne colonne `main_terrain`).
+  const terr = terrainCoachBlock(p?.main_terrains, p?.main_terrain);
 
   const ELEV: Record<string, { label: string; rule: string }> = {
     evite: { label: "évite le dénivelé", rule: "Il ÉVITE le dénivelé : ne lui impose pas de séance de côtes s'il n'en a pas besoin pour son objectif. Développe la force autrement (renforcement, lignes droites, éducatifs). SI l'objectif comporte du D+, introduis-le très progressivement et explique-lui pourquoi c'est indispensable." },
@@ -495,7 +488,7 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
 - ${p?.full_name ?? "Athlète"} · ${p?.age ?? "?"} ans · ${genderLabel} · ${num(p?.weight_kg) ?? "?"} kg · ${num(p?.height_cm) ?? "?"} cm · chronotype ${p?.chronotype ?? "?"} · mode ${p?.mode ?? "?"}
 - NIVEAU estimé : ${level}${vma ? ` (VMA ${vma} km/h${vmaIsEst ? " estimée" : ""})` : ""}
 - ANCIENNETÉ en course à pied : ${expLabel ?? "non renseignée (reste prudent sur la charge tant que tu ne sais pas)"}
-- TERRAIN habituel : ${terrain?.label ?? "non renseigné"}${elev ? ` · dénivelé : ${elev.label}` : ""} · D+ réalisé cette semaine : ${elevWeek} m
+- TERRAINS habituels : ${terr.labels.length ? terr.labels.join(" + ") : "non renseignés"}${elev ? ` · dénivelé : ${elev.label}` : ""} · D+ réalisé cette semaine : ${elevWeek} m
 ${p?.gender === "female" ? `- SEXE : femme → besoins en FER et disponibilité énergétique à surveiller (RED-S : une charge élevée + apport insuffisant coupe la progression et fragilise l'os) ; densité osseuse à protéger (renforcement + impacts dosés) ; ${cycle ? "cycle suivi (voir plus bas)" : "si elle synchronise son cycle, adapte l'intensité selon la phase"}. Ne calque pas mécaniquement des repères masculins.` : p?.gender === "male" ? "- SEXE : homme → tendance fréquente à partir trop vite en facile et à sur-doser l'intensité ; verrouille la discipline des footings." : ""}
 
 ⚡ VERDICT DE FRAÎCHEUR DU JOUR (calculé à partir de la VFC, du sommeil, de la charge et du ressenti — CETTE CONCLUSION S'IMPOSE À TOI, ne la ré-arbitre pas)
@@ -512,7 +505,8 @@ ${healthNotes ? `- 🗣️ Note santé écrite par l'athlète (LIS-LA et tiens-e
 
 PASSIF, TERRAIN & DÉNIVELÉ (leviers d'individualisation — à respecter dans la prescription)
 - ${expRule ?? "Ancienneté inconnue : demande-la, et en attendant reste sur une progression prudente (+10 %/sem max)."}
-- ${terrain?.rule ?? "Terrain habituel inconnu : privilégie des consignes en durée + FC tant que tu ne sais pas sur quelle surface il court."}
+${terr.rules.length ? terr.rules.map((r) => `- ${r}`).join("\n") : "- Terrain habituel inconnu : privilégie des consignes en durée + FC tant que tu ne sais pas sur quelle surface il court."}
+${terr.rules.length > 1 ? `- ⚖️ Il alterne PLUSIEURS terrains (${terr.labels.join(", ")}) : c'est un atout anti-blessure, exploite-le. Attribue chaque séance à la surface qui lui convient — les séances CHIFFRÉES à l'allure sur surface dure (route/piste), l'endurance et le long sur terrain souple.` : ""}${terr.paceMeaningless ? `- ⚠️ Au moins un de ses terrains rend l'allure /km NON PERTINENTE (sable, montagne ou neige). Sur ces surfaces : consignes en DURÉE + FRÉQUENCE CARDIAQUE uniquement, jamais d'allure cible. Précise explicitement dans chaque séance sur quelle surface elle doit se faire.` : ""}
 ${elev ? `- ${elev.rule}` : ""}
 ${tempRule ? `- MÉTÉO RÉCENTE : ${tempRule}` : ""}
 

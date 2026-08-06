@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildAthleteContext, classifyRun, type AthleteContext } from "@/lib/ai/coachContext";
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthCoachLines } from "@/data/healthCatalog";
+import { terrainCoachBlock } from "@/data/terrainCatalog";
 
 const ADMIN_EMAIL = "cypriendumez@outlook.fr";
 const BASE = "https://intervals.icu/api/v1";
@@ -159,8 +160,8 @@ export async function POST(req: Request) {
     const profExp = ry == null ? "ancienneté non renseignée"
       : ry < 1 ? "moins d'un an de course à pied (débutant : tendons encore jeunes)"
       : `${ry} an${ry > 1 ? "s" : ""} de course à pied`;
-    const TERR: Record<string, string> = { plat: "plat (route)", vallonne: "vallonné", montagne: "montagne / sentier technique", plage: "plage / sable", piste: "piste", mixte: "mixte route + sentier" };
-    const profTerrain = TERR[String(p?.main_terrain ?? "")] ?? "non renseigné";
+    const terrBlock = terrainCoachBlock(p?.main_terrains, p?.main_terrain);
+    const profTerrain = terrBlock.labels.length ? terrBlock.labels.join(" + ") : "non renseigné";
     const ELEVL: Record<string, string> = { evite: "évite le dénivelé", modere: "dénivelé modéré", aime: "aime le dénivelé", specialiste: "spécialiste du dénivelé" };
     const profElev = ELEVL[String(p?.elevation_pref ?? "")] ?? "";
     // Santé : l'analyse d'une séance se lit différemment selon les antécédents (une FC haute
@@ -187,7 +188,7 @@ Répartition zones FC : ${zoneStr || "n/d"}
 TOURS (un par un) :
   ${lapsStr || "n/d"}
 CONTEXTE ATHLÈTE : VMA ${baseline?.vma_kmh ?? "?"} km/h · FC max ${baseline?.max_hr ?? "?"} · FC repos ${baseline?.resting_hr ?? "?"} · volume 7j ${weekKm.toFixed(0)} km · charge 14j ${tss14.toFixed(0)} TSS
-PROFIL : ${p?.age ?? "?"} ans · ${p?.gender === "female" ? "femme" : p?.gender === "male" ? "homme" : "sexe ?"} · ${profExp} · terrain ${profTerrain}${profElev ? ` · ${profElev}` : ""}${profTerrain === "plage / sable" ? "  ⚠️ sur SABLE l'allure /km n'est PAS comparable au bitume (45 s à 1 min 30 de plus au km) : juge l'effort à la FC, pas à l'allure." : ""}
+PROFIL : ${p?.age ?? "?"} ans · ${p?.gender === "female" ? "femme" : p?.gender === "male" ? "homme" : "sexe ?"} · ${profExp} · terrain ${profTerrain}${profElev ? ` · ${profElev}` : ""}${terrBlock.paceMeaningless ? "  ⚠️ il court sur une surface où l'allure /km n'est PAS comparable au bitume (sable : +45 s à 1 min 30/km ; montagne ; neige) : juge l'effort à la FC, pas à l'allure." : ""}
 SANTÉ (à prendre en compte dans la lecture de la séance) : ${profHealth}
 RÉCUPÉRATION (dernier relevé) : VFC ${hrv?.hrv_ms ?? "?"} ms${hrv?.physiological_state ? ` · état ${hrv.physiological_state}` : ""} · sommeil ${sleep?.sleep_score ?? "?"}/100${sleep?.total_sleep_min ? ` (${Math.round(sleep.total_sleep_min / 60)}h)` : ""}
 OBJECTIF DE COURSE : ${objLine}

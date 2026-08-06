@@ -12,6 +12,7 @@ import { Wordmark } from "@/components/brand/Wordmark";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { OB } from "./onboardingI18n";
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthLabel } from "@/data/healthCatalog";
+import { TERRAINS, terrainLabel } from "@/data/terrainCatalog";
 
 type Step = "watch" | "profile" | "physio" | "goals" | "done";
 
@@ -44,7 +45,8 @@ export default function OnboardingPage() {
     // Contexte d'entraînement → individualise la prescription du coach IA.
     // Idem : aucun défaut, ces trois réponses changent radicalement la prescription.
     running_years: null as number | null,
-    main_terrain: "" as "" | "plat" | "vallonne" | "montagne" | "plage" | "piste" | "mixte",
+    // Terrains MULTIPLES : beaucoup alternent route en semaine et sentier/sable le week-end.
+    main_terrains: [] as string[],
     elevation_pref: "" as "" | "evite" | "modere" | "aime" | "specialiste",
     // Santé : contraint la prescription du coach IA (la santé prime sur la performance).
     health_conditions: [] as string[],
@@ -70,7 +72,7 @@ export default function OnboardingPage() {
     !profile.weight_kg && tr("weight"),
     !profile.gender && tr("gender"),
     profile.running_years == null && tr("expTitle"),
-    !profile.main_terrain && tr("terrTitle"),
+    profile.main_terrains.length === 0 && tr("terrTitle"),
     !profile.elevation_pref && tr("elevTitle"),
     !healthAnswered && tr("healthTitle"),
     // Retire l'emoji de tête des libellés. `\W` est à proscrire ici : sans le drapeau `u`
@@ -208,12 +210,17 @@ export default function OnboardingPage() {
       long_run_mode: profile.long_run_mode,
       // `|| null` : les contraintes CHECK en base refusent la chaîne vide.
       running_years: profile.running_years,
-      main_terrain: profile.main_terrain || null,
       elevation_pref: profile.elevation_pref || null,
       health_conditions: profile.health_conditions,
       injury_zones: profile.injury_zones,
       health_notes: profile.health_notes.trim() || null,
     }).eq("id", user.id);
+
+    // Terrains multiples — écriture ISOLÉE : la colonne `main_terrains` arrive avec la
+    // migration 009. Si elle manque encore, seule cette ligne échoue, pas tout le profil.
+    // Repli sur l'ancienne colonne mono-choix pour ne rien perdre entre-temps.
+    await supabase.from("profiles").update({ main_terrains: profile.main_terrains }).eq("id", user.id);
+    await supabase.from("profiles").update({ main_terrain: profile.main_terrains[0] ?? null }).eq("id", user.id);
 
     if (!profileError && vma.vma_kmh) {
       await supabase.from("performance_baselines").insert({
@@ -382,16 +389,20 @@ export default function OnboardingPage() {
                   <p className="text-[11px] text-zinc-400 mt-1.5">{tr("expHint")}</p>
                 </div>
 
-                {/* Terrain — décide si les séances se pilotent à l'allure ou à la FC. */}
+                {/* Terrains — CHOIX MULTIPLE : décide si les séances se pilotent à l'allure ou à la FC. */}
                 <div>
-                  <label className="text-xs font-medium text-zinc-500 block mb-2">{tr("terrTitle")}</label>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {([["plat", tr("terrPlat")], ["vallonne", tr("terrVallonne")], ["montagne", tr("terrMontagne")], ["plage", tr("terrPlage")], ["piste", tr("terrPiste")], ["mixte", tr("terrMixte")]] as const).map(([v, l]) => (
-                      <button key={v} type="button" onClick={() => setProfile(p => ({ ...p, main_terrain: v }))}
-                        className={`py-2 rounded-xl text-xs font-medium border transition-all ${profile.main_terrain === v ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
-                        {l}
-                      </button>
-                    ))}
+                  <label className="text-xs font-medium text-zinc-500 block mb-2">{tr("terrTitle")} <span className="font-normal text-zinc-400">· {tr("terrMulti")}</span></label>
+                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                    {TERRAINS.map(t => {
+                      const on = profile.main_terrains.includes(t.slug);
+                      return (
+                        <button key={t.slug} type="button"
+                          onClick={() => setProfile(p => ({ ...p, main_terrains: on ? p.main_terrains.filter(s => s !== t.slug) : [...p.main_terrains, t.slug] }))}
+                          className={`py-2 px-1.5 rounded-xl text-xs font-medium border transition-all ${on ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                          {terrainLabel(t, lang)}
+                        </button>
+                      );
+                    })}
                   </div>
                   <p className="text-[11px] text-zinc-400 mt-1.5">{tr("terrHint")}</p>
                 </div>
