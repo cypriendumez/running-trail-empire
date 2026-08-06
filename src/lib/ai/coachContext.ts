@@ -127,6 +127,8 @@ export type AthleteContext = {
   cycle: { deload: boolean; taper: boolean; label: string };
   /** Jours de la semaine (0 = dimanche) systématiquement prescrits ET jamais réalisés. */
   skippedWeekdays: number[];
+  /** Disponibilités déclarées : nb de séances de course/semaine et jours praticables (0 = dim). */
+  availability: { daysPerWeek: number; days: number[] };
   // Plan macro périodisé semaine par semaine jusqu'au jour J.
   macroPlan: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[];
 };
@@ -154,6 +156,15 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const coachSessions = ((csRes.data ?? []) as { data: { date?: string; sessionType?: string } }[]).map(r => r.data).filter((d): d is { date?: string; sessionType?: string } => !!d?.date);
 
   const now = Date.now();
+  // Semaine ISO : ancre STABLE d'un jour à l'autre. Sert à faire varier le stimulus des
+  // séances de qualité d'une semaine sur l'autre ET à placer la semaine allégée (1 sur 4).
+  const isoWeek = (() => {
+    const d = new Date(Date.UTC(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  })();
   const num = (v: unknown) => (v == null ? null : Number(v));
   const kmIn = (days: number) => workouts.filter(w => now - new Date(w.date).getTime() <= days * 86400000).reduce((s, w) => s + (w.distance_km ?? 0), 0);
   const weekKm = kmIn(7), avg4wkKm = kmIn(28) / 4;
@@ -461,14 +472,44 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
     : avgTemp >= 5 ? `${avgTemp}°C : conditions IDÉALES pour la performance — c'est le moment de placer les séances chronométrées et les tests.`
     : `🥶 ${avgTemp}°C : échauffement rallongé (20 min minimum) et couvert, pas de fractionné court à froid (risque musculaire élevé). Attention aux voies respiratoires par temps sec et glacial.`;
 
-  // Menu de qualité (type + détail chiffré) — ordonné par priorité selon l'objectif.
-  const qVMA = { type: "VMA", desc: `VO2max / VMA (ex 10×400 m ou 6×1000 m à ~${paceAt(100)}–${paceAt(104)}/km, récup trottinée) → élève le plafond` };
-  const qSeuil = { type: "Seuil", desc: `Seuil (ex 3×10 min ou 2×15 min à ~${paceAt(86)}/km, récup 2 min) → tenir l'allure plus longtemps` };
-  const qSpec = { type: "Spécifique", desc: goalPace
-    ? `Allure spécifique ${raceShort ?? "objectif"} (ex 5–6×1 km ou 3×2 km à ${goalPace}/km, récup courte) → ancre ton allure de course`
-    : `Allure spécifique objectif (répétitions à l'allure visée)` };
-  const qCote = { type: "VMA", desc: `Côtes (ex 8–10×30–45 s en montée vive, récup descente) → force & économie de foulée` };
-  const qMara = { type: "Spécifique", desc: goalPace ? `Bloc allure marathon (ex 2×20 min à ${goalPace}/km) intégré à la sortie longue` : `Allure marathon en sortie longue` };
+  // ── MENU DE QUALITÉ — le stimulus PROGRESSE d'une semaine à l'autre ──────────
+  // Prescrire « 6×1000 m » chaque semaine indéfiniment ennuie l'athlète et le fait
+  // plafonner physiologiquement. On fait tourner 4 variantes par type, du plus court
+  // et intense vers le plus long et spécifique, indexées sur la semaine ISO (stable
+  // dans la semaine, et qui avance toute seule le lundi suivant).
+  const variant = isoWeek % 4;
+  const pick = (arr: string[]) => arr[variant % arr.length];
+
+  const qVMA = { type: "VMA", desc: pick([
+    `VMA courte : 12×400 m à ~${paceAt(104)}/km, récup 45 s trottinés → aiguise la vitesse et la foulée`,
+    `VMA moyenne : 8×500 m à ~${paceAt(102)}/km, récup 1 min trottinée → tenue de la vitesse`,
+    `VMA longue : 6×800 m à ~${paceAt(100)}/km, récup 1 min 30 trottinée → soutien du VO2max`,
+    `VMA longue : 5×1000 m à ~${paceAt(100)}/km, récup 2 min trottinée → le format le plus proche de la course`,
+  ]) };
+  const qSeuil = { type: "Seuil", desc: pick([
+    `Seuil fractionné : 4×8 min à ~${paceAt(86)}/km, récup 2 min → accumule du temps au seuil sans casser`,
+    `Seuil long : 2×15 min à ~${paceAt(86)}/km, récup 3 min → apprend à tenir l'effort`,
+    `Seuil : 3×10 min à ~${paceAt(87)}/km, récup 2 min → le format de référence`,
+    `Seuil continu : 25 min d'un bloc à ~${paceAt(85)}/km → le plus exigeant mentalement, le plus payant`,
+  ]) };
+  const qSpec = { type: "Spécifique", desc: goalPace ? pick([
+    `Allure spécifique ${raceShort ?? "objectif"} : 6×1 km à ${goalPace}/km, récup 1 min 30 → ancre l'allure`,
+    `Allure spécifique ${raceShort ?? "objectif"} : 4×1500 m à ${goalPace}/km, récup 2 min → allonge les portions`,
+    `Allure spécifique ${raceShort ?? "objectif"} : 3×2 km à ${goalPace}/km, récup 2 min 30 → se rapproche des conditions de course`,
+    `Allure spécifique ${raceShort ?? "objectif"} : 2×3 km à ${goalPace}/km, récup 3 min → simulation de course`,
+  ]) : `Allure spécifique objectif (répétitions à l'allure visée)` };
+  const qCote = { type: "VMA", desc: pick([
+    `Côtes courtes : 10×30 s en montée vive, récup descente trottinée → force et explosivité`,
+    `Côtes moyennes : 8×45 s en montée soutenue, récup descente → puissance en montée`,
+    `Côtes longues : 6×2 min en montée régulière (FC Z4), récup descente → endurance de force`,
+    `Côtes + descente : 5×3 min en montée, DESCENTE travaillée en souplesse → prépare l'excentrique du trail`,
+  ]) };
+  const qMara = { type: "Spécifique", desc: goalPace ? pick([
+    `Bloc allure marathon : 2×20 min à ${goalPace}/km, intégré à la sortie longue`,
+    `Bloc allure marathon : 3×15 min à ${goalPace}/km, récup 3 min`,
+    `Finish rapide : sortie longue dont les 30 dernières minutes à ${goalPace}/km`,
+    `Bloc long : 1×40 min à ${goalPace}/km au cœur de la sortie longue`,
+  ]) : `Allure marathon en sortie longue` };
   let menu: { type: string; desc: string }[];
   if (libGoal === "5k" || libGoal === "10k") menu = [qVMA, qSpec, qSeuil];
   else if (libGoal === "semi") menu = [qSeuil, qSpec, qVMA];
@@ -526,13 +567,6 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // 25 ou 100 km par semaine. Le macro-plan calculait déjà ces chiffres : on les branche.
   // Semaine allégée toutes les 4 semaines : sans objectif de course, on s'ancre sur le
   // numéro de semaine ISO (stable d'un jour à l'autre, contrairement à un compteur maison).
-  const isoWeek = (() => {
-    const d = new Date(Date.UTC(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()));
-    const dayNum = d.getUTCDay() || 7;
-    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-  })();
   const taper = weeksToRace != null && weeksToRace <= 2 && weeksToRace >= 0;
   const deload = !taper && (macroPlan.length ? macroPlan[0].phase !== "Affûtage" && isoWeek % 4 === 0 : isoWeek % 4 === 0);
   const baseKm = Math.max(Math.round(weekKm), Math.round(avg4wkKm), 15);
@@ -544,6 +578,22 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   const cycleLabel = taper ? "AFFÛTAGE — volume fortement réduit, on garde l'intensité pour arriver frais"
     : deload ? "SEMAINE ALLÉGÉE (1 sur 4) — volume −20 %, c'est là que le corps assimile"
     : "montée en charge normale";
+
+  // ── DISPONIBILITÉS DÉCLARÉES ────────────────────────────────────────────────
+  // Sans elles, le plan remplissait 7 jours pour tout le monde. Un athlète qui peut
+  // courir 3 fois par semaine recevait un plan inapplicable et décrochait.
+  // Repli quand rien n'est renseigné : on déduit du niveau, sans jamais dépasser
+  // ce qu'il fait DÉJÀ + 1 séance (on ne double pas sa fréquence du jour au lendemain).
+  const runsPerWeekNow = new Set(
+    workouts.filter(w => now - new Date(w.date).getTime() <= 7 * 86400000).map(w => String(w.date).slice(0, 10)),
+  ).size;
+  const declaredDpw = num(p?.days_per_week);
+  const availDaysPerWeek = declaredDpw && declaredDpw > 0
+    ? Math.min(7, Math.round(declaredDpw))
+    : Math.max(3, Math.min(libLevel === "debutant" ? 3 : libLevel === "intermediaire" ? 4 : 5, runsPerWeekNow + 1));
+  const availDays = Array.isArray(p?.available_days) && (p.available_days as unknown[]).length
+    ? (p.available_days as unknown[]).map(Number).filter(d => Number.isInteger(d) && d >= 0 && d <= 6)
+    : [0, 1, 2, 3, 4, 5, 6];
 
   const genderLabel = p?.gender === "female" ? "femme" : p?.gender === "male" ? "homme" : p?.gender ? String(p.gender) : "?";
   const text = `PROFIL
@@ -590,6 +640,7 @@ CHARGE D'ENTRAÎNEMENT
 - Volume : ${Math.round(weekKm)} km cette semaine · ~${Math.round(avg4wkKm)} km/sem (moy. 4 sem.)
 - 🎯 VOLUME CIBLE de la semaine à venir : ~${targetKm} km, dont une sortie longue de ~${longRunKm} km. Dimensionne les séances sur CES chiffres, pas sur des durées passe-partout.
 - 🔄 PHASE DU CYCLE : ${cycleLabel}.
+- 📆 DISPONIBILITÉS : ${availDaysPerWeek} séance(s) de course par semaine${availDays.length < 7 ? `, uniquement les ${availDays.map(d => ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d]).join(", ")}` : ""}${declaredDpw ? " (déclaré par l'athlète)" : " (déduit de son niveau et de sa pratique actuelle — demande-lui de le préciser)"}. NE DÉPASSE PAS ce nombre : un plan qu'il ne peut pas suivre ne vaut rien.
 - ⏱️ Dernière séance DURE réellement effectuée : ${lastHardDaysAgo == null ? "aucune trace récente" : lastHardDaysAgo === 0 ? "AUJOURD'HUI ⚠️ → pas de deuxième séance dure aujourd'hui ni demain" : `il y a ${lastHardDaysAgo} j`}${lastHardDaysAgo != null && lastHardDaysAgo * 24 < hardGapH ? ` ⚠️ moins de ${hardGapH} h se sont écoulées : la prochaine qualité doit attendre.` : ""}${skippedWeekdays.length ? `\n- 🚫 JOURS SYSTÉMATIQUEMENT RATÉS : ${skippedWeekdays.map(d => ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d]).join(", ")} — prescrits plusieurs fois, jamais courus. Ne t'obstine pas : place-y du repos ou rien, et redistribue ailleurs.` : ""}
 - Repos : dernière séance il y a ${daysSinceLast ?? "?"} j · ${restDays7} j sans courir sur les 7 derniers${daysSinceLast != null && daysSinceLast >= 3 ? " ⚠️ reprise après coupure : redémarre en douceur, pas de grosse séance d'emblée" : ""}
 - CTL ${Math.round(load.ctl)} (forme) · ATL ${Math.round(load.atl)} (fatigue) · TSB ${Math.round(load.tsb)} (fraîcheur) · ratio aigu:chronique ${r1(load.acr)}${load.acr > 1.5 ? " ⚠️ élevé (risque)" : ""}
@@ -637,6 +688,7 @@ ${catalog}`;
     volume: { weekKm: Math.round(weekKm), avg4wkKm: Math.round(avg4wkKm), targetKm, longRunKm },
     cycle: { deload, taper, label: cycleLabel },
     skippedWeekdays,
+    availability: { daysPerWeek: availDaysPerWeek, days: availDays },
     macroPlan,
   };
 }

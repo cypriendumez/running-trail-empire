@@ -55,6 +55,9 @@ export default function OnboardingPage() {
     health_conditions: [] as string[],
     injury_zones: [] as string[],
     health_notes: "",
+    // Disponibilités : sans elles le plan remplit 7 jours pour tout le monde.
+    days_per_week: null as number | null,
+    available_days: [0, 1, 2, 3, 4, 5, 6] as number[],
   });
   // « Rien à signaler » coché explicitement — on distingue « pas de problème de santé »
   // de « l'utilisateur a survolé la question sans répondre ».
@@ -75,6 +78,7 @@ export default function OnboardingPage() {
     !profile.weight_kg && tr("weight"),
     !profile.gender && tr("gender"),
     profile.running_years == null && tr("expTitle"),
+    profile.days_per_week == null && tr("dpwTitle"),
     profile.main_terrains.length === 0 && tr("terrTitle"),
     !profile.elevation_pref && tr("elevTitle"),
     !healthAnswered && tr("healthTitle"),
@@ -204,6 +208,8 @@ export default function OnboardingPage() {
       injury_zones: profile.injury_zones,
       health_notes: profile.health_notes.trim() || null,
       health_declared: healthAnswered,
+      days_per_week: profile.days_per_week,
+      available_days: profile.available_days,
     }).eq("id", user.id);
 
     // Terrains multiples — écriture ISOLÉE : la colonne `main_terrains` arrive avec la
@@ -377,6 +383,38 @@ export default function OnboardingPage() {
                     ))}
                   </div>
                   <p className="text-[11px] text-zinc-400 mt-1.5">{tr("expHint")}</p>
+                </div>
+
+                {/* Disponibilités — le plan n'a de valeur que s'il est tenable. */}
+                <div>
+                  <label className="text-xs font-medium text-zinc-500 block mb-2">{tr("dpwTitle")}</label>
+                  <div className="grid grid-cols-6 gap-1.5">
+                    {[2, 3, 4, 5, 6, 7].map(n => (
+                      <button key={n} type="button" onClick={() => setProfile(p => ({ ...p, days_per_week: n }))}
+                        className={`py-2 rounded-xl text-sm font-medium border transition-all ${profile.days_per_week === n ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                        {n}×
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-zinc-400 mt-1.5">{tr("dpwHint")}</p>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-zinc-500 block mb-2">{tr("daysTitle")}</label>
+                  <div className="grid grid-cols-7 gap-1.5">
+                    {/* Ordre lundi→dimanche à l'affichage ; les valeurs restent au format JS (0 = dimanche). */}
+                    {[1, 2, 3, 4, 5, 6, 0].map(d => {
+                      const on = profile.available_days.includes(d);
+                      return (
+                        <button key={d} type="button"
+                          onClick={() => setProfile(p => ({ ...p, available_days: on ? p.available_days.filter(x => x !== d) : [...p.available_days, d] }))}
+                          className={`py-2 rounded-xl text-sm font-medium border transition-all ${on ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-400 border-zinc-200 hover:bg-zinc-50"}`}>
+                          {tr("dayShort").split(",")[d]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[11px] text-zinc-400 mt-1.5">{tr("daysHint")}</p>
                 </div>
 
                 {/* Terrains — CHOIX MULTIPLE : décide si les séances se pilotent à l'allure ou à la FC. */}

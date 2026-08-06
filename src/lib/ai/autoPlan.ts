@@ -80,6 +80,44 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
     return true;
   };
 
+  // ── 0. LA COURSE. Elle prime sur tout le reste : c'est l'objectif, pas une séance.
+  // Sans ce bloc, le moteur pouvait poser une VMA la veille ou une sortie longue le
+  // jour J — il ne consultait simplement jamais la date de course.
+  const raceIdx = ctx.daysToRace != null && ctx.daysToRace >= 0 && ctx.daysToRace <= 6 ? ctx.daysToRace : -1;
+  if (raceIdx >= 0) {
+    const o = ctx.objective;
+    put(raceIdx, {
+      type: "Course", title: o?.race ? `🏁 ${o.race}` : "🏁 Jour de course",
+      detail: `Échauffement 15 à 20 min progressif + 3 à 4 lignes droites, terminé 10 min avant le départ.${o?.targetPace ? ` Pars à ${o.targetPace}/km — surtout PAS plus vite sur les 2 premiers kilomètres, c'est l'erreur qui coûte le plus cher.` : ""} Retour au calme 10 min en trottinant.`,
+      why: o?.targetTime ? `C'est le jour. Tout le bloc a été construit pour ce chrono de ${o.targetTime}. Fais confiance à ta préparation et tiens ton allure.` : "C'est le jour. Fais confiance à ta préparation.",
+      tags: ["Course", o?.distanceKm ? `${o.distanceKm} km` : "Objectif"].filter(Boolean) as string[],
+    });
+    // Les 2 jours qui précèdent : décrassage seulement. Aucune séance dure dans les 48 h.
+    for (const d of [1, 2]) {
+      const i = raceIdx - d;
+      if (i < 0) continue;
+      put(i, d === 1
+        ? { type: "Récup", title: "Déblocage — veille de course",
+            detail: "20 min de footing très facile FC Z1 + 3 lignes droites de 80 m à l'allure de course. Rien de plus : on réveille les jambes, on ne les fatigue pas.",
+            why: "La forme se construit avant, pas la veille. Une séance de plus ne t'apportera rien et peut te coûter la course.",
+            tags: ["Récup", "Veille de course"] }
+        : { type: "Récup", title: "Avant-veille de course",
+            detail: "30 min de footing facile FC Z1-Z2, éventuellement 4×30 s à l'allure de course pour rester tonique.",
+            why: "On garde le contact avec l'allure sans entamer la fraîcheur.", tags: ["Récup", "Affûtage"] });
+    }
+    // Les jours qui suivent : récupération obligatoire.
+    for (const d of [1, 2]) {
+      const i = raceIdx + d;
+      if (i > 6) continue;
+      put(i, d === 1
+        ? { type: "Repos", title: "Repos post-course", detail: "Repos complet. Marche, étirements doux, hydratation et alimentation soignées.",
+            why: "Une course, c'est un effort maximal : le corps a besoin de plusieurs jours pour réparer.", tags: ["Repos"] }
+        : { type: "Récup", title: "Récupération post-course",
+            detail: "20 à 30 min de footing très facile FC Z1, ou repos si les jambes sont encore lourdes.",
+            why: "Reprise en douceur : compte environ un jour de récupération par tranche de 3 km courus en course.", tags: ["Récup", "Z1"] });
+    }
+  }
+
   // ── 1. Jours systématiquement ratés → repos assumé.
   // Continuer à prescrire un jour que l'athlète ne court jamais ne fait que dégrader
   // son adhérence et fausser nos statistiques. Mieux vaut l'acter.
@@ -91,21 +129,43 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
     }
   }
 
-  // ── 2. Sortie longue : dimanche de préférence, sinon samedi, sinon le dernier jour libre.
-  const weekend = dates.map((d, i) => ({ i, day: d.getDay() })).filter((x) => (x.day === 0 || x.day === 6) && !slot[x.i]);
-  const longIdx = weekend.find((x) => x.day === 0)?.i ?? weekend[0]?.i ?? [6, 5, 4].find((i) => !slot[i]) ?? 6;
+  // ── 1 bis. DISPONIBILITÉS : on ne place de la course QUE les jours praticables.
+  const isFree = (i: number) => i >= 0 && i <= 6 && !slot[i];
+  const avail = (i: number) => ctx.availability.days.includes(dates[i].getDay());
+  for (let i = 0; i <= 6; i++) {
+    if (isFree(i) && !avail(i)) put(i, {
+      type: "Repos", title: "Repos", tags: ["Repos"],
+      detail: "Repos — tu as indiqué ne pas pouvoir t'entraîner ce jour-là.",
+      why: "Ton plan est calé sur tes vraies disponibilités : c'est ce qui le rend tenable dans la durée.",
+    });
+  }
+  // Budget de séances de COURSE pour la semaine (la course elle-même en consomme une).
+  // C'est ce plafond qui empêche de prescrire 6 sorties à quelqu'un qui peut en faire 3.
+  let runBudget = Math.max(1, ctx.availability.daysPerWeek - (raceIdx >= 0 ? 1 : 0));
+  const canRun = (i: number) => isFree(i) && avail(i) && runBudget > 0;
+  const spend = () => { runBudget -= 1; };
+
+  // ── 2. Sortie longue : dimanche de préférence, sinon samedi, sinon un jour praticable.
+  // Semaine de course : PAS de sortie longue. La course est déjà l'effort long et dur
+  // de la semaine ; y ajouter 18 km trois jours avant saboterait la fraîcheur.
+  const weekend = dates.map((d, i) => ({ i, day: d.getDay() })).filter((x) => (x.day === 0 || x.day === 6) && canRun(x.i));
+  const longIdx = raceIdx >= 0 ? -1
+    : (weekend.find((x) => x.day === 0)?.i ?? weekend[0]?.i ?? [6, 5, 4, 3, 2, 1, 0].find((i) => canRun(i)) ?? -1);
   const bike = ctx.longRunMode === "bike";
-  put(longIdx, bike
-    ? { type: "Vélo", title: "Sortie longue à vélo",
-        detail: `Échauffement 15 min très facile → ${durationFor(longRunKm, pace) ?? "1h30"} à 2h en FC Z2, allure conversationnelle, cadence souple → 10 min de retour au calme. Pas d'allure cible : c'est du volume aérobie sans impact.${cycleNote}`,
-        why: "Le volume aérobie de la semaine, sans les contraintes d'impact de la course.", tags: ["Vélo", "Z2", "Long"] }
-    : { type: "Sortie longue", title: "Sortie longue",
-        detail: `Échauffement 15 min progressif FC Z1→Z2 → Corps : ${kmAndTime(longRunKm, pace)} en Z2${easy}, allure conversationnelle du début à la fin → Retour au calme 10 min FC Z1.${cycleNote}`,
-        why: `C'est la séance qui construit ton endurance de fond — ${longRunKm} km, calés sur ton volume actuel. Elle doit rester facile : si tu finis cassé, elle était trop rapide.`,
-        tags: ["Long", "Z2", `${longRunKm} km`] });
+  if (longIdx >= 0) {
+    put(longIdx, bike
+      ? { type: "Vélo", title: "Sortie longue à vélo",
+          detail: `Échauffement 15 min très facile → ${durationFor(longRunKm, pace) ?? "1h30"} à 2h en FC Z2, allure conversationnelle, cadence souple → 10 min de retour au calme. Pas d'allure cible : c'est du volume aérobie sans impact.${cycleNote}`,
+          why: "Le volume aérobie de la semaine, sans les contraintes d'impact de la course.", tags: ["Vélo", "Z2", "Long"] }
+      : { type: "Sortie longue", title: "Sortie longue",
+          detail: `Échauffement 15 min progressif FC Z1→Z2 → Corps : ${kmAndTime(longRunKm, pace)} en Z2${easy}, allure conversationnelle du début à la fin → Retour au calme 10 min FC Z1.${cycleNote}`,
+          why: `C'est la séance qui construit ton endurance de fond — ${longRunKm} km, calés sur ton volume actuel. Elle doit rester facile : si tu finis cassé, elle était trop rapide.`,
+          tags: ["Long", "Z2", `${longRunKm} km`] });
+    spend();
+  }
 
   // ── 3. Repos complet le lendemain de la sortie longue.
-  const restIdx = [longIdx + 1, longIdx - 1].find((i) => i >= 0 && i <= 6 && !slot[i]);
+  const restIdx = longIdx >= 0 ? [longIdx + 1, longIdx - 1].find((i) => isFree(i)) : undefined;
   if (restIdx != null) put(restIdx, {
     type: "Repos", title: "Repos complet",
     detail: "Repos complet. Marche, étirements doux ou mobilité si tu en ressens le besoin, rien de plus.",
@@ -115,20 +175,26 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // ── 4. Séances de qualité, espacées — Y COMPRIS PAR RAPPORT AU PASSÉ.
   // La dernière séance dure DÉJÀ EFFECTUÉE est traitée comme un jour dur d'index négatif :
   // si elle date d'hier, elle occupe l'index −1 et repousse d'autant la première qualité.
+  // La course, elle, agit comme un jour dur à ne pas approcher à moins de 48 h.
   const placed: number[] = ctx.lastHardDaysAgo != null ? [-ctx.lastHardDaysAgo] : [];
-  const isFree = (i: number) => i >= 0 && i <= 6 && !slot[i];
-  const okSpacing = (i: number) => placed.every((p) => Math.abs(p - i) >= gapDays) && Math.abs(i - longIdx) >= 2;
-  // Le VOLUME plafonne aussi le nombre de qualités : une séance de qualité complète
-  // (20 min d'échauffement + corps + 10 min de retour au calme) pèse ~11 km. En dessous
-  // de 35 km/semaine, deux séances de ce type ne rentrent tout simplement pas à côté de
-  // la sortie longue — le budget théorique doit céder devant l'arithmétique.
+  if (raceIdx >= 0) placed.push(raceIdx);
+  const okSpacing = (i: number) => placed.every((p) => Math.abs(p - i) >= gapDays)
+    && (longIdx < 0 || Math.abs(i - longIdx) >= 2)
+    && (raceIdx < 0 || Math.abs(i - raceIdx) >= 3);   // rien de dur dans les 48 h autour de la course
+  // Le VOLUME plafonne aussi le nombre de qualités : une séance complète (20 min
+  // d'échauffement + corps + 10 min de retour au calme) pèse ~11 km. En dessous de
+  // 35 km/semaine, deux séances de ce type ne rentrent pas à côté de la sortie longue.
   const QUALITY_KM = 11;
   const maxByVolume = Math.max(1, Math.floor((targetKm - longRunKm) / QUALITY_KM));
-  const quality = wp.quality.slice(0, Math.min(wp.quality.length, maxByVolume));
+  // La FRÉQUENCE plafonne aussi : à 3 sorties par semaine, deux séances de qualité plus
+  // la sortie longue ne laissent AUCUN footing facile — soit 100 % d'intensité, l'inverse
+  // du modèle polarisé. Une qualité pour trois sorties, deux à partir de cinq.
+  const maxByFrequency = ctx.availability.daysPerWeek <= 3 ? 1 : ctx.availability.daysPerWeek <= 5 ? 2 : 3;
+  const quality = wp.quality.slice(0, Math.min(wp.quality.length, maxByVolume, maxByFrequency));
   for (const q of quality) {
     let idx = -1;
-    for (let i = 0; i <= 6; i++) if (isFree(i) && okSpacing(i)) { idx = i; break; }
-    if (idx < 0) break; // impossible sans violer la récupération → on n'insiste pas
+    for (let i = 0; i <= 6; i++) if (canRun(i) && okSpacing(i)) { idx = i; break; }
+    if (idx < 0) break; // impossible sans violer la récupération ou le budget → on n'insiste pas
     const title = q.type === "VMA" ? "Séance VMA" : q.type === "Seuil" ? "Séance au seuil" : q.type === "Spécifique" ? "Allure spécifique objectif" : q.type;
     put(idx, {
       type: q.type, title,
@@ -137,38 +203,47 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
       tags: [q.type, "Qualité"],
     });
     placed.push(idx);
+    spend();
   }
 
-  // ── 5. Renforcement : jamais la VEILLE d'un jour dur.
-  // Principe « hard day hard, easy day easy » : le renfo fatigue les jambes, le poser
-  // devant une VMA ou une sortie longue sabote la séance du lendemain.
-  const hardIdx = new Set<number>([...placed.filter((i) => i >= 0), longIdx]);
-  let renfoIdx = -1;
-  for (let i = 1; i <= 6; i++) if (isFree(i) && !hardIdx.has(i + 1)) { renfoIdx = i; break; }
-  if (renfoIdx < 0) for (let i = 1; i <= 6; i++) if (isFree(i)) { renfoIdx = i; break; }
-  if (renfoIdx >= 0) put(renfoIdx, {
+  // ── 5. Endurance sur les jours de course restants (budget non consommé).
+  const easySlots: number[] = [];
+  for (let i = 0; i <= 6; i++) if (canRun(i)) { easySlots.push(i); spend(); }
+  const usedKm = (longIdx >= 0 ? longRunKm : 0) + placed.filter((i) => i >= 0 && i !== raceIdx).length * QUALITY_KM;
+  const rawEasy = easySlots.length > 0 ? (targetKm - usedKm) / easySlots.length : 0;
+  // Bornes de réalisme : en dessous de 4 km ce n'est plus une séance, au-dessus de 18 km
+  // ce n'est plus un footing — un gros volume se couvre en DOUBLANT les sorties.
+  // Semaine de course : les footings restent courts quoi qu'il arrive. Un « footing »
+  // de 18 km trois jours avant un départ ruinerait la fraîcheur, même si le volume
+  // cible n'a pas été correctement réduit en amont.
+  const easyCap = raceIdx >= 0 ? 10 : 18;
+  const easyKm = Math.min(easyCap, Math.max(4, Math.round(rawEasy)));
+  const doubles = rawEasy > easyCap && raceIdx < 0;
+  for (const i of easySlots) put(i, {
+    type: "Endurance", title: "Footing en endurance",
+    detail: `Échauffement 15 min progressif FC Z1→Z2 → Corps : ${kmAndTime(easyKm, pace)} en Z2${easy}, tu dois pouvoir tenir une conversation → Retour au calme 10 min FC Z1.${doubles ? " 💡 À ton volume, scinde en DEUX sorties dans la journée (matin + soir) plutôt qu'un seul footing interminable." : ""}${cycleNote}`,
+    why: `Le socle aérobie. Avec les autres séances, tu es sur ~${targetKm} km cette semaine — c'est le volume facile qui construit la forme de fond, pas les séances dures.`,
+    tags: ["Endurance", "Z2", `${easyKm} km`],
+  });
+
+  // ── 6. Renforcement : sur un jour SANS course, jamais la veille d'un jour dur.
+  // Il ne consomme pas de budget de course : 30 min à la maison restent possibles
+  // un jour de repos de course.
+  const hardIdx = new Set<number>([...placed.filter((i) => i >= 0), longIdx].filter((i) => i >= 0));
+  const renfoIdx = [1, 2, 3, 4, 5, 6].find((i) => isFree(i) && avail(i) && !hardIdx.has(i + 1))
+    ?? [1, 2, 3, 4, 5, 6].find((i) => isFree(i) && avail(i));
+  if (renfoIdx != null) put(renfoIdx, {
     type: "Renfo", title: "Renforcement musculaire",
     detail: "30 à 40 min : gainage (planche, gainage latéral), squats, fentes, montées de mollets, ischios (nordic curls), proprioception sur une jambe. 3 séries de chaque, sans matériel.",
     why: "La prévention de blessure n°1, et un gain direct d'économie de foulée. Non négociable sur le long terme.",
     tags: ["Renfo", "Prévention"],
   });
 
-  // ── 6. Le reste en endurance, DIMENSIONNÉE sur le volume qui reste à couvrir.
-  // On retire du volume cible ce qui est déjà attribué (sortie longue + ~9 km par
-  // séance de qualité, échauffement et retour au calme compris) et on répartit.
-  const easySlots = Array.from({ length: 7 }, (_, i) => i).filter((i) => !slot[i]);
-  const usedKm = longRunKm + placed.filter((i) => i >= 0).length * QUALITY_KM;
-  const rawEasy = easySlots.length > 0 ? (targetKm - usedKm) / easySlots.length : 0;
-  // Bornes de réalisme : en dessous de 4 km ce n'est plus une séance, au-dessus de 18 km
-  // ce n'est plus un footing. Un gros volume se couvre en DOUBLANT les séances, pas en
-  // allongeant indéfiniment les footings — on le dit à l'athlète au lieu de l'ignorer.
-  const easyKm = Math.min(18, Math.max(4, Math.round(rawEasy)));
-  const doubles = rawEasy > 18;
-  for (const i of easySlots) put(i, {
-    type: "Endurance", title: "Footing en endurance",
-    detail: `Échauffement 15 min progressif FC Z1→Z2 → Corps : ${kmAndTime(easyKm, pace)} en Z2${easy}, tu dois pouvoir tenir une conversation → Retour au calme 10 min FC Z1.${doubles ? " 💡 À ton volume, scinde en DEUX sorties dans la journée (matin + soir) plutôt qu'un seul footing interminable." : ""}${cycleNote}`,
-    why: `Le socle aérobie. Avec les autres séances, tu es sur ~${targetKm} km cette semaine — c'est le volume facile qui construit la forme de fond, pas les séances dures.`,
-    tags: ["Endurance", "Z2", `${easyKm} km`],
+  // ── 7. Tout ce qui reste = repos.
+  for (let i = 0; i <= 6; i++) put(i, {
+    type: "Repos", title: "Repos", tags: ["Repos"],
+    detail: "Repos. C'est le moment où le corps transforme le travail en progrès.",
+    why: "Ton plan tient compte du nombre de séances que tu peux réellement assurer.",
   });
 
   const week = slot as PlanDay[];

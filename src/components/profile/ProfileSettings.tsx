@@ -34,6 +34,7 @@ const P: Record<string, Record<string, string>> = {
     "photo.title": "Photo de profil", "photo.hint": "JPG, PNG, WebP · max 5 Mo", "photo.uploading": "Upload…", "photo.change": "Changer la photo",
     "f.name": "Nom complet", "f.age": "Âge", "f.height": "Taille (cm)", "f.weight": "Poids (kg)", "f.lang": "Langue", "f.bio": "Bio courte", "f.bioPh": "Coureur trail passionné, objectif UTMB 2027…", "f.warmup": "⏱️ Échauffement habituel", "f.cooldown": "🧊 Retour au calme habituel", "f.wcHint": "Cale l'échauffement et le retour au calme (fréquence cardiaque douce, Z1) des séances envoyées à ta montre. Le corps de séance garde ses allures précises.", "f.longMode": "Sorties longues", "f.longRun": "🏃 En course", "f.longBike": "🚴 En vélo", "f.longHint": "Beaucoup de pros remplacent la sortie longue par du vélo : même volume aérobie, sans l'impact. Ton coach et l'IA s'adaptent automatiquement.",
     "f.exp": "🗓️ Ancienneté en course à pied", "f.exp0": "< 1 an", "f.exp1": "1 an", "f.exp2": "2 ans", "f.exp4": "3-5 ans", "f.exp8": "6-10 ans", "f.exp12": "10 ans +", "f.expHint": "Ton cœur progresse en semaines, tes tendons en années. Le coach IA s'en sert pour plafonner la charge et éviter la blessure du coureur qui va trop vite.", "f.terr": "🗺️ Terrain habituel", "f.terrHint": "Sur sable ou en montagne, l'allure au km ne veut plus rien dire : le coach bascule sur la fréquence cardiaque et la durée.", "f.elev": "⛰️ Rapport au dénivelé", "f.elevEvite": "Je l'évite", "f.elevModere": "Modéré", "f.elevAime": "J'aime ça", "f.elevSpec": "Mon terrain", "f.elevHint": "Détermine la place des côtes et du D+ dans tes semaines.",
+    "f.dpw": "📆 Séances de course par semaine", "f.dpwHint": "Un plan qu'on ne peut pas suivre ne sert à rien : le coach ne dépassera jamais ce nombre.", "f.days": "Jours disponibles", "f.daysHint": "Décoche les jours où courir est impossible.", "f.dayShort": "D,L,M,M,J,V,S",
     "h.title": "Santé & antécédents", "h.sub": "Privé. Sert à ton coach IA pour ne jamais te prescrire une séance qui te mettrait en danger.", "h.cond": "Pathologies", "h.inj": "Zones de blessure récurrentes", "h.notes": "Autre chose à signaler ?", "h.notesPh": "Traitement en cours, opération, contre-indication du médecin…", "h.disc": "Pacevo ne remplace pas un avis médical. En cas de doute, consulte un professionnel de santé.",
     "h.none": "Rien à signaler, je suis en bonne santé",
     "f.terrMulti": "plusieurs choix possibles",
@@ -65,6 +66,7 @@ const P: Record<string, Record<string, string>> = {
     "photo.title": "Profile photo", "photo.hint": "JPG, PNG, WebP · max 5 MB", "photo.uploading": "Uploading…", "photo.change": "Change photo",
     "f.name": "Full name", "f.age": "Age", "f.height": "Height (cm)", "f.weight": "Weight (kg)", "f.lang": "Language", "f.bio": "Short bio", "f.bioPh": "Passionate trail runner, UTMB 2027 goal…", "f.warmup": "⏱️ Usual warm-up", "f.cooldown": "🧊 Usual cool-down", "f.wcHint": "Sets the warm-up and cool-down (easy heart rate, Z1) of the sessions sent to your watch. The main set keeps its exact paces.", "f.longMode": "Long sessions", "f.longRun": "🏃 Running", "f.longBike": "🚴 Cycling", "f.longHint": "Many pros swap the long run for cycling: same aerobic volume, no impact. Your coach and the AI adapt automatically.",
     "f.exp": "🗓️ Running experience", "f.exp0": "< 1 year", "f.exp1": "1 year", "f.exp2": "2 years", "f.exp4": "3-5 years", "f.exp8": "6-10 years", "f.exp12": "10+ years", "f.expHint": "Your heart adapts in weeks, your tendons in years. The AI coach uses this to cap training load and prevent overuse injuries.", "f.terr": "🗺️ Usual terrain", "f.terrHint": "On sand or in the mountains, pace per km means nothing: your coach switches to heart rate and duration.", "f.elev": "⛰️ Relationship with elevation", "f.elevEvite": "I avoid it", "f.elevModere": "Moderate", "f.elevAime": "I enjoy it", "f.elevSpec": "My terrain", "f.elevHint": "Sets how much hill work and vertical gain your weeks contain.",
+    "f.dpw": "📆 Runs per week", "f.dpwHint": "A plan you can't follow is worthless: your coach will never exceed this number.", "f.days": "Available days", "f.daysHint": "Untick the days when running is impossible.", "f.dayShort": "S,M,T,W,T,F,S",
     "h.title": "Health & history", "h.sub": "Private. Used by your AI coach to never prescribe a session that could put you at risk.", "h.cond": "Conditions", "h.inj": "Recurring injury areas", "h.notes": "Anything else we should know?", "h.notesPh": "Current medication, surgery, doctor's restriction…", "h.disc": "Pacevo is not a substitute for medical advice. When in doubt, consult a healthcare professional.",
     "h.none": "Nothing to report, I'm in good health",
     "f.terrMulti": "select all that apply",
@@ -96,6 +98,7 @@ const P: Record<string, Record<string, string>> = {
     "photo.title": "Profilbild", "photo.hint": "JPG, PNG, WebP · max. 5 MB", "photo.uploading": "Hochladen…", "photo.change": "Bild ändern",
     "f.name": "Vollständiger Name", "f.age": "Alter", "f.height": "Größe (cm)", "f.weight": "Gewicht (kg)", "f.lang": "Sprache", "f.bio": "Kurz-Bio", "f.bioPh": "Begeisterter Trailrunner, Ziel UTMB 2027…", "f.warmup": "⏱️ Übliches Aufwärmen", "f.cooldown": "🧊 Übliches Auslaufen", "f.wcHint": "Legt Aufwärmen und Auslaufen (lockere Herzfrequenz, Z1) der an deine Uhr gesendeten Einheiten fest. Der Hauptteil behält seine genauen Tempi.", "f.longMode": "Lange Einheiten", "f.longRun": "🏃 Laufen", "f.longBike": "🚴 Radfahren", "f.longHint": "Viele Profis ersetzen den langen Lauf durch Radfahren: gleiches aerobes Volumen, ohne Belastung. Dein Coach und die KI passen sich automatisch an.",
     "f.exp": "🗓️ Lauferfahrung", "f.exp0": "< 1 Jahr", "f.exp1": "1 Jahr", "f.exp2": "2 Jahre", "f.exp4": "3-5 Jahre", "f.exp8": "6-10 Jahre", "f.exp12": "10+ Jahre", "f.expHint": "Dein Herz passt sich in Wochen an, deine Sehnen in Jahren. Der KI-Coach begrenzt damit die Belastung und beugt Überlastungsverletzungen vor.", "f.terr": "🗺️ Übliches Terrain", "f.terrHint": "Auf Sand oder im Gebirge sagt das Tempo pro km nichts aus: Dein Coach steuert über Herzfrequenz und Dauer.", "f.elev": "⛰️ Verhältnis zu Höhenmetern", "f.elevEvite": "Ich meide sie", "f.elevModere": "Moderat", "f.elevAime": "Mag ich", "f.elevSpec": "Mein Terrain", "f.elevHint": "Bestimmt den Anteil an Bergläufen und Höhenmetern in deinen Wochen.",
+    "f.dpw": "📆 Läufe pro Woche", "f.dpwHint": "Ein Plan, dem du nicht folgen kannst, ist wertlos: Dein Coach überschreitet diese Zahl nie.", "f.days": "Verfügbare Tage", "f.daysHint": "Hake die Tage ab, an denen Laufen unmöglich ist.", "f.dayShort": "S,M,D,M,D,F,S",
     "h.title": "Gesundheit & Vorgeschichte", "h.sub": "Privat. Dein KI-Coach nutzt dies, um dir nie eine riskante Einheit zu verordnen.", "h.cond": "Erkrankungen", "h.inj": "Wiederkehrende Verletzungsbereiche", "h.notes": "Sonst noch etwas?", "h.notesPh": "Laufende Medikation, Operation, ärztliche Einschränkung…", "h.disc": "Pacevo ersetzt keine ärztliche Beratung. Im Zweifel wende dich an medizinisches Fachpersonal.",
     "h.none": "Nichts zu melden, ich bin gesund",
     "f.terrMulti": "Mehrfachauswahl möglich",
@@ -127,6 +130,7 @@ const P: Record<string, Record<string, string>> = {
     "photo.title": "Foto de perfil", "photo.hint": "JPG, PNG, WebP · máx. 5 MB", "photo.uploading": "Subiendo…", "photo.change": "Cambiar foto",
     "f.name": "Nombre completo", "f.age": "Edad", "f.height": "Altura (cm)", "f.weight": "Peso (kg)", "f.lang": "Idioma", "f.bio": "Bio corta", "f.bioPh": "Corredor de trail apasionado, objetivo UTMB 2027…", "f.warmup": "⏱️ Calentamiento habitual", "f.cooldown": "🧊 Vuelta a la calma habitual", "f.wcHint": "Fija el calentamiento y la vuelta a la calma (frecuencia cardíaca suave, Z1) de las sesiones enviadas a tu reloj. La parte principal mantiene sus ritmos exactos.", "f.longMode": "Sesiones largas", "f.longRun": "🏃 Corriendo", "f.longBike": "🚴 En bici", "f.longHint": "Muchos pros sustituyen la tirada larga por bici: mismo volumen aeróbico, sin impacto. Tu entrenador y la IA se adaptan automáticamente.",
     "f.exp": "🗓️ Antigüedad corriendo", "f.exp0": "< 1 año", "f.exp1": "1 año", "f.exp2": "2 años", "f.exp4": "3-5 años", "f.exp8": "6-10 años", "f.exp12": "10+ años", "f.expHint": "Tu corazón se adapta en semanas, tus tendones en años. El entrenador IA lo usa para limitar la carga y evitar lesiones por exceso.", "f.terr": "🗺️ Terreno habitual", "f.terrHint": "En arena o en montaña, el ritmo por km no significa nada: tu entrenador pasa a frecuencia cardíaca y duración.", "f.elev": "⛰️ Relación con el desnivel", "f.elevEvite": "Lo evito", "f.elevModere": "Moderado", "f.elevAime": "Me gusta", "f.elevSpec": "Mi terreno", "f.elevHint": "Define cuántas cuestas y desnivel tendrán tus semanas.",
+    "f.dpw": "📆 Carreras por semana", "f.dpwHint": "Un plan que no puedes seguir no sirve: tu entrenador nunca superará este número.", "f.days": "Días disponibles", "f.daysHint": "Desmarca los días en que correr es imposible.", "f.dayShort": "D,L,M,X,J,V,S",
     "h.title": "Salud y antecedentes", "h.sub": "Privado. Tu entrenador IA lo usa para no prescribirte nunca una sesión que te ponga en riesgo.", "h.cond": "Patologías", "h.inj": "Zonas de lesión recurrentes", "h.notes": "¿Algo más que debamos saber?", "h.notesPh": "Tratamiento en curso, operación, contraindicación médica…", "h.disc": "Pacevo no sustituye el consejo médico. Ante la duda, consulta a un profesional sanitario.",
     "h.none": "Nada que señalar, estoy bien de salud",
     "f.terrMulti": "varias opciones posibles",
@@ -158,6 +162,7 @@ const P: Record<string, Record<string, string>> = {
     "photo.title": "Foto de perfil", "photo.hint": "JPG, PNG, WebP · máx. 5 MB", "photo.uploading": "A enviar…", "photo.change": "Mudar foto",
     "f.name": "Nome completo", "f.age": "Idade", "f.height": "Altura (cm)", "f.weight": "Peso (kg)", "f.lang": "Idioma", "f.bio": "Bio curta", "f.bioPh": "Corredor de trail apaixonado, objetivo UTMB 2027…", "f.warmup": "⏱️ Aquecimento habitual", "f.cooldown": "🧊 Retorno à calma habitual", "f.wcHint": "Define o aquecimento e o retorno à calma (frequência cardíaca fácil, Z1) das sessões enviadas para o teu relógio. A parte principal mantém os ritmos exatos.", "f.longMode": "Sessões longas", "f.longRun": "🏃 A correr", "f.longBike": "🚴 De bicicleta", "f.longHint": "Muitos profissionais trocam a saída longa por bicicleta: mesmo volume aeróbio, sem impacto. O teu treinador e a IA adaptam-se automaticamente.",
     "f.exp": "🗓️ Experiência a correr", "f.exp0": "< 1 ano", "f.exp1": "1 ano", "f.exp2": "2 anos", "f.exp4": "3-5 anos", "f.exp8": "6-10 anos", "f.exp12": "10+ anos", "f.expHint": "O teu coração adapta-se em semanas, os teus tendões em anos. O treinador IA usa isto para limitar a carga e evitar lesões por excesso.", "f.terr": "🗺️ Terreno habitual", "f.terrHint": "Na areia ou na montanha, o ritmo por km não diz nada: o treinador passa para frequência cardíaca e duração.", "f.elev": "⛰️ Relação com o desnível", "f.elevEvite": "Evito-o", "f.elevModere": "Moderado", "f.elevAime": "Gosto", "f.elevSpec": "O meu terreno", "f.elevHint": "Define o peso das subidas e do desnível nas tuas semanas.",
+    "f.dpw": "📆 Corridas por semana", "f.dpwHint": "Um plano que não consegues seguir não serve: o treinador nunca ultrapassa este número.", "f.days": "Dias disponíveis", "f.daysHint": "Desmarca os dias em que correr é impossível.", "f.dayShort": "D,S,T,Q,Q,S,S",
     "h.title": "Saúde e antecedentes", "h.sub": "Privado. O teu treinador IA usa isto para nunca te prescrever uma sessão que te ponha em risco.", "h.cond": "Patologias", "h.inj": "Zonas de lesão recorrentes", "h.notes": "Mais alguma coisa a assinalar?", "h.notesPh": "Medicação em curso, operação, contraindicação médica…", "h.disc": "A Pacevo não substitui aconselhamento médico. Na dúvida, consulta um profissional de saúde.",
     "h.none": "Nada a assinalar, estou de boa saúde",
     "f.terrMulti": "várias opções possíveis",
@@ -343,6 +348,9 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
     health_notes: String(profile?.health_notes ?? ""),
     // A répondu à la question santé (y compris « rien à signaler »).
     health_declared: Boolean(profile?.health_declared),
+    days_per_week: profile?.days_per_week == null ? null : Number(profile.days_per_week),
+    available_days: (Array.isArray(profile?.available_days) && profile.available_days.length
+      ? profile.available_days.map(Number) : [0, 1, 2, 3, 4, 5, 6]) as number[],
     guardian_mode_enabled: Boolean(profile?.guardian_mode_enabled),
     notif_workout: Boolean(profile?.notif_workout ?? true),
     notif_goal: Boolean(profile?.notif_goal ?? true),
@@ -380,6 +388,8 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
       injury_zones: form.injury_zones,
       health_notes: form.health_notes.trim() || null,
       health_declared: form.health_declared,
+      days_per_week: form.days_per_week,
+      available_days: form.available_days,
       notif_workout: form.notif_workout,
       notif_goal: form.notif_goal,
       notif_league: form.notif_league,
@@ -758,6 +768,37 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                     ))}
                   </div>
                   <p className="text-[11px] text-zinc-400 mt-1.5">{tr("f.expHint")}</p>
+                </div>
+
+                {/* Disponibilités — le plan n'a de valeur que s'il est tenable. */}
+                <div className="col-span-2">
+                  <label className="text-xs font-medium text-zinc-500 block mb-1.5">{tr("f.dpw")}</label>
+                  <div className="grid grid-cols-6 gap-1.5">
+                    {[2, 3, 4, 5, 6, 7].map(n => (
+                      <button key={n} type="button" onClick={() => setForm(f => ({ ...f, days_per_week: n }))}
+                        className={`py-2 rounded-xl text-sm font-medium border transition-all ${form.days_per_week === n ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                        {n}×
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-zinc-400 mt-1.5">{tr("f.dpwHint")}</p>
+                </div>
+
+                <div className="col-span-2">
+                  <label className="text-xs font-medium text-zinc-500 block mb-1.5">{tr("f.days")}</label>
+                  <div className="grid grid-cols-7 gap-1.5">
+                    {[1, 2, 3, 4, 5, 6, 0].map(d => {
+                      const on = form.available_days.includes(d);
+                      return (
+                        <button key={d} type="button"
+                          onClick={() => setForm(f => ({ ...f, available_days: on ? f.available_days.filter(x => x !== d) : [...f.available_days, d] }))}
+                          className={`py-2 rounded-xl text-sm font-medium border transition-all ${on ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-400 border-zinc-200 hover:bg-zinc-50"}`}>
+                          {tr("f.dayShort").split(",")[d]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[11px] text-zinc-400 mt-1.5">{tr("f.daysHint")}</p>
                 </div>
 
                 {/* Terrains — CHOIX MULTIPLE : décide si les séances se pilotent à l'allure ou à la FC. */}
