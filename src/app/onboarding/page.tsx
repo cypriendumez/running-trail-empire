@@ -33,25 +33,49 @@ export default function OnboardingPage() {
     age: "",
     height_cm: "",
     weight_kg: "",
-    gender: "male" as "male" | "female" | "other",
+    // Pas de valeur par défaut sur le sexe : un défaut « male » silencieux fausserait tout le
+    // coaching d'une athlète qui n'aurait pas touché au champ. On l'oblige à choisir.
+    gender: "" as "" | "male" | "female" | "other",
     chronotype: "neutral" as "morning" | "evening" | "neutral",
     is_female_cycle_sync: false,
     warmup_min: 15,
     cooldown_min: 10,
     long_run_mode: "run" as "run" | "bike",
     // Contexte d'entraînement → individualise la prescription du coach IA.
-    running_years: 2,
-    main_terrain: "plat" as "plat" | "vallonne" | "montagne" | "plage" | "piste" | "mixte",
-    elevation_pref: "modere" as "evite" | "modere" | "aime" | "specialiste",
+    // Idem : aucun défaut, ces trois réponses changent radicalement la prescription.
+    running_years: null as number | null,
+    main_terrain: "" as "" | "plat" | "vallonne" | "montagne" | "plage" | "piste" | "mixte",
+    elevation_pref: "" as "" | "evite" | "modere" | "aime" | "specialiste",
     // Santé : contraint la prescription du coach IA (la santé prime sur la performance).
     health_conditions: [] as string[],
     injury_zones: [] as string[],
     health_notes: "",
   });
+  // « Rien à signaler » coché explicitement — on distingue « pas de problème de santé »
+  // de « l'utilisateur a survolé la question sans répondre ».
+  const [healthNone, setHealthNone] = useState(false);
 
-  // Bascule d'une puce santé (sélection multiple).
-  const toggleHealth = (key: "health_conditions" | "injury_zones", slug: string) =>
+  // Bascule d'une puce santé (sélection multiple). Cocher une pathologie annule « rien à signaler ».
+  const toggleHealth = (key: "health_conditions" | "injury_zones", slug: string) => {
+    setHealthNone(false);
     setProfile(p => ({ ...p, [key]: p[key].includes(slug) ? p[key].filter(s => s !== slug) : [...p[key], slug] }));
+  };
+  // Une réponse santé est donnée soit en cochant au moins une entrée, soit « rien à signaler ».
+  const healthAnswered = healthNone || profile.health_conditions.length > 0 || profile.injury_zones.length > 0;
+
+  // Champs manquants de l'étape Profil — listés à l'athlète, en toutes lettres.
+  const profileMissing = [
+    !profile.age && tr("age"),
+    !profile.height_cm && tr("height"),
+    !profile.weight_kg && tr("weight"),
+    !profile.gender && tr("gender"),
+    profile.running_years == null && tr("expTitle"),
+    !profile.main_terrain && tr("terrTitle"),
+    !profile.elevation_pref && tr("elevTitle"),
+    !healthAnswered && tr("healthTitle"),
+    // Retire l'emoji de tête des libellés. `\W` est à proscrire ici : sans le drapeau `u`
+    // il classe « Â » comme non-caractère et « Âge » deviendrait « ge ».
+  ].filter((x): x is string => typeof x === "string").map(s => s.replace(/^[^\p{L}\p{N}]+/u, ""));
 
   const [vma, setVma] = useState({ vma_kmh: "", max_hr: "", resting_hr: "" });
   const [test6min, setTest6min] = useState("");
@@ -182,9 +206,10 @@ export default function OnboardingPage() {
       warmup_min: profile.warmup_min,
       cooldown_min: profile.cooldown_min,
       long_run_mode: profile.long_run_mode,
+      // `|| null` : les contraintes CHECK en base refusent la chaîne vide.
       running_years: profile.running_years,
-      main_terrain: profile.main_terrain,
-      elevation_pref: profile.elevation_pref,
+      main_terrain: profile.main_terrain || null,
+      elevation_pref: profile.elevation_pref || null,
       health_conditions: profile.health_conditions,
       injury_zones: profile.injury_zones,
       health_notes: profile.health_notes.trim() || null,
@@ -280,7 +305,7 @@ export default function OnboardingPage() {
                   <label className="text-xs font-medium text-zinc-500 block mb-2">{tr("gender")}</label>
                   <div className="flex gap-2">
                     {(["male","female","other"] as const).map(g => (
-                      <button key={g} onClick={() => setProfile(p => ({...p, gender: g}))}
+                      <button key={g} type="button" onClick={() => setProfile(p => ({...p, gender: g}))}
                         className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-all ${
                           profile.gender === g ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"
                         }`}>
@@ -405,9 +430,15 @@ export default function OnboardingPage() {
                           );
                         })}
                       </div>
-                      {profile[key].length === 0 && <p className="text-[11px] text-zinc-400 mt-1.5">{tr("healthNone")} ✓</p>}
                     </div>
                   ))}
+                  {/* Réponse explicite « rien à signaler » — sans quoi on ne saurait pas
+                      distinguer un athlète en pleine forme d'un athlète qui a zappé la question. */}
+                  <button type="button"
+                    onClick={() => { setHealthNone(v => !v); setProfile(p => ({ ...p, health_conditions: [], injury_zones: [] })); }}
+                    className={`w-full px-3 py-2.5 rounded-xl text-sm font-medium border transition-all ${healthNone ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                    {healthNone ? "✓ " : ""}{tr("healthNone")}
+                  </button>
                   <div>
                     <label className="text-xs font-medium text-zinc-500 block mb-1.5">{tr("notesTitle")}</label>
                     <textarea value={profile.health_notes} onChange={e => setProfile(p => ({ ...p, health_notes: e.target.value }))}
@@ -432,7 +463,15 @@ export default function OnboardingPage() {
                   </div>
                 )}
 
-                <button onClick={next} disabled={!profile.age || !profile.height_cm || !profile.weight_kg}
+                {/* Tout est requis : chacun de ces champs change la prescription du coach.
+                    On dit à l'athlète CE QUI manque plutôt que de lui laisser un bouton mort. */}
+                {profileMissing.length > 0 && (
+                  <p className="flex items-start gap-2 text-[12px] text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                    <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                    <span>{tr("missing")} <b>{profileMissing.join(" · ")}</b></span>
+                  </p>
+                )}
+                <button onClick={next} disabled={profileMissing.length > 0}
                   className="btn-brand w-full justify-center">
                   {tr("next")} <ArrowRight className="w-4 h-4" />
                 </button>
