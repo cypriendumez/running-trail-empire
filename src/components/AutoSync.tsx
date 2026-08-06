@@ -15,8 +15,11 @@ const AUTO_SYNC_DAYS = 3;        // on tire les 3 derniers jours (inclut aujourd
  *  - dès que l'onglet (re)devient visible (ex. retour sur l'app après une sortie),
  *  - puis toutes les 2 min tant que le dashboard est ouvert.
  * Dès qu'une sync ramène du neuf, router.refresh() met à jour l'écran tout seul.
- * Throttle 60 s pour ne pas marteler l'API. NB : sur un déploiement public, le
- * webhook Intervals.icu rend l'arrivée d'activité INSTANTANÉE (push, pas de poll).
+ * Throttle 60 s pour ne pas marteler l'API.
+ *
+ * NB : intervals.icu ne permet PAS d'enregistrer un webhook avec une clé API (404 sur
+ * /athlete/{id}/webhooks). Ce sondage est donc le mécanisme réel de fraîcheur — et la
+ * route de sync republie le plan dès qu'une séance inédite arrive.
  */
 export function AutoSync() {
   const router = useRouter();

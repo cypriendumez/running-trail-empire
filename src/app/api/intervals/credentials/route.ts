@@ -100,6 +100,13 @@ export async function DELETE() {
 
 // ── Webhook helpers ──────────────────────────────────────────────────────────
 
+// ⚠️ intervals.icu N'EXPOSE PAS d'API d'enregistrement de webhook pour l'authentification
+// par clé API : `GET/POST /athlete/{id}/webhooks` répond 404 (vérifié le 6 août 2026, alors
+// que /activities répond 200 avec les mêmes identifiants). Cette fonction a donc TOUJOURS
+// échoué silencieusement. La fraîcheur des données est assurée autrement : le composant
+// AutoSync appelle /api/intervals/sync au chargement, au retour sur l'onglet et toutes les
+// 2 min, et cette route republie le plan dès qu'une séance INÉDITE est importée.
+// On conserve la tentative (sans coût) au cas où l'API évoluerait, mais sans rien promettre.
 async function registerWebhook(athleteId: string, apiKey: string): Promise<string> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;
   const secret = process.env.WEBHOOK_SECRET;

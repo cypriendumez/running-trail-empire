@@ -63,6 +63,7 @@ export async function GET(req: Request) {
 
   let synced = { workouts: 0, hrv: 0, sleep: 0 };
   const syncErrors: string[] = [];
+  let freshWorkouts = 0;   // insertions uniquement (cf. plus bas)
 
   // ── Sync activities → workouts ──────────────────────────────
   const validActivities = activities.filter(a => a.type && a.start_date_local);
@@ -107,6 +108,11 @@ export async function GET(req: Request) {
       if (existingId) toUpdate.push({ id: existingId, payload });
       else toInsert.push(payload);
     }
+
+    // Séances RÉELLEMENT nouvelles (les mises à jour ne comptent pas : la sync
+    // rafraîchit les 3 derniers jours à chaque sondage, ce qui produirait un
+    // « du neuf » permanent et ferait republier le plan toutes les 2 minutes).
+    freshWorkouts += toInsert.length;
 
     // Batch insert
     if (toInsert.length > 0) {
@@ -213,8 +219,33 @@ export async function GET(req: Request) {
     hasGarminMetrics ? supabase.from("profiles").update({ garmin_metrics: garminMetrics }).eq("id", user.id) : Promise.resolve(),
   ]);
 
+  // ── COACH INSTANTANÉ ──────────────────────────────────────────────────────
+  // Dès qu'une séance vient d'être importée, on republie le plan des 7 jours dans la
+  // foulée. AutoSync appelle cette route au chargement, au retour sur l'onglet et
+  // toutes les 2 min : le plan reflète donc la dernière sortie en quelques minutes,
+  // sans attendre le cron de la nuit. Best-effort — un échec ici ne casse pas la sync.
+  let replanned = false;
+  if (freshWorkouts > 0) {
+    try {
+      const { createAdminClient } = await import("@/lib/supabase/admin");
+      const admin = createAdminClient();
+      // Garde-fou supplémentaire : jamais deux republications à moins de 10 min
+      // d'intervalle (chaque republication pousse aussi des séances sur la montre).
+      const { data: st } = await admin.from("notifications").select("data")
+        .eq("user_id", user.id).eq("type", "auto_coach_state").maybeSingle();
+      const lastAt = (st?.data as { at?: string } | null)?.at;
+      if (!lastAt || Date.now() - new Date(lastAt).getTime() > 10 * 60000) {
+        const { autoCoachForUser } = await import("@/lib/ai/autoCoach");
+        const r = await autoCoachForUser(admin, { userId: user.id, athleteId: ATHLETE_ID, apiKey: API_KEY });
+        replanned = !!r.processed;
+      }
+    } catch { /* le plan sera de toute façon recalculé par le cron */ }
+  }
+
   return NextResponse.json({
     synced,
+    freshWorkouts,
+    replanned,
     period: { oldest, newest },
     fetched: { activities: activities.length, wellness: wellness.length },
     valid_activities: validActivities.length,
