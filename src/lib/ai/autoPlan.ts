@@ -311,10 +311,14 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // Un jour à 30 °C n'est pas un jour de qualité s'il existe une alternative plus fraîche
   // dans la fenêtre : on ne sacrifie pas une séance clé à la canicule.
   const tempOf = (i: number) => ctx.forecast.find((x) => x.date === iso(dates[i]))?.tempMax ?? null;
+  // Reporter une séance pour cause de chaleur n'a de sens que si l'alternative est
+  // réellement plus fraîche ET utilisable. Sans la condition d'espacement, une semaine
+  // entièrement caniculaire voyait TOUS ses jours disqualifiés par le seul jour un peu
+  // moins chaud — la qualité basculait alors sur le repli, et se perdait.
   const coolerExists = (i: number) => {
     const t = tempOf(i);
     if (t == null || t < 28) return false;
-    return dates.some((_, j) => j !== i && !slot[j] && (tempOf(j) ?? 99) < t - 3);
+    return dates.some((_, j) => j !== i && canRun(j) && okSpacing(j) && (tempOf(j) ?? 99) < t - 3);
   };
   const okSpacing = (i: number) => placed.every((p) => Math.abs(p - i) >= gapDays)
     && (longIdx < 0 || Math.abs(i - longIdx) >= 2)
@@ -332,7 +336,11 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   for (const q of quality) {
     let idx = -1;
     for (let i = dayZeroDropped ? 1 : 0; i <= 6; i++) if (canRun(i) && okSpacing(i) && !coolerExists(i)) { idx = i; break; }
-    if (idx < 0) for (let i = 0; i <= 6; i++) if (canRun(i) && okSpacing(i)) { idx = i; break; }
+    // Le repli ignorait `dayZeroDropped` : il replaçait la qualité sur le jour même,
+    // que l'étape 7 convertissait ensuite en récupération. La séance disparaissait donc
+    // de la semaine — le défaut que le premier correctif était censé supprimer, intact
+    // dans le chemin de secours.
+    if (idx < 0) for (let i = dayZeroDropped ? 1 : 0; i <= 6; i++) if (canRun(i) && okSpacing(i)) { idx = i; break; }
     if (idx < 0) break; // impossible sans violer la récupération ou le budget → on n'insiste pas
     const title = q.type === "VMA" ? "Séance VMA" : q.type === "Seuil" ? "Séance au seuil" : q.type === "Spécifique" ? "Allure spécifique objectif" : q.type;
     put(idx, {

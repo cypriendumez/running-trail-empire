@@ -164,6 +164,25 @@ test("une qualité annulée par la fraîcheur est DÉCALÉE, pas supprimée", ()
   const p = buildWeekPlan(ctx({ readiness: { level: "rouge", reasons: ["test"], advice: "" } } as never), new Date());
   assert.ok(p.filter((d) => /VMA|Seuil|Spécifique/.test(d.type)).length >= 1, "la semaine ne doit pas perdre sa qualité");
 });
+test("une semaine entièrement caniculaire n'efface pas la qualité", () => {
+  // Bug réel : `coolerExists` reportait la séance dès qu'un jour était 3 °C plus frais,
+  // même quand ce jour n'était pas utilisable. Sur une semaine à 29-31 °C, TOUS les
+  // créneaux valides étaient disqualifiés par le seul vendredi à 25,6 °C ; le repli
+  // replaçait alors la qualité sur le jour même, que la fraîcheur rouge convertissait
+  // en récupération. La séance disparaissait de la semaine.
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(Date.now() + i * 86400000).toISOString().slice(0, 10);
+    return { date: d, tempMax: i === 0 ? 25.6 : 30, tempMin: 18, feelsMax: 32, humidity: 55, precipMm: 0, windMaxKmh: 5 };
+  });
+  const p = buildWeekPlan(ctx({
+    forecast: days as never,
+    readiness: { level: "rouge", reasons: ["canicule"], advice: "" },
+  } as never), new Date());
+  const q = p.filter((d) => /VMA|Seuil|Spécifique/.test(d.type));
+  assert.equal(q.length, 1, "la qualité doit être DÉCALÉE, jamais perdue");
+  assert.notEqual(q[0].date, p[0].date, "et jamais posée sur un jour que la fraîcheur va effacer");
+});
+
 test("le plan couvre 7 jours et en confirme assez pour la montre", () => {
   const p = buildWeekPlan(ctx(), new Date());
   assert.equal(p.length, 7);
