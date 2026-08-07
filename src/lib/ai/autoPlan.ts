@@ -13,7 +13,7 @@
 //  séances dans la semaine sans violer les règles de récupération.
 // ─────────────────────────────────────────────────────────────────────────────
 import type { AthleteContext } from "@/lib/ai/coachContext";
-import { heatAdvice } from "@/lib/weather/openMeteo";
+import { heatAdvice, windAdvice } from "@/lib/weather/openMeteo";
 
 export type PlanDay = {
   date: string;          // AAAA-MM-JJ
@@ -96,7 +96,8 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
     const m = base.match(/(\d+)['’:](\d{2})/);
     const f = ctx.forecast.find((x) => x.date === iso(dates[i]));
     if (!m || !f) return base;
-    const penalty = heatAdvice(f.tempMax, f.humidity).penaltySecPerKm;
+    // Chaleur ET vent : les deux ralentissent, et ils se cumulent.
+    const penalty = heatAdvice(f.tempMax, f.humidity).penaltySecPerKm + windAdvice(f.windMaxKmh).penaltySecPerKm;
     if (!penalty) return base;
     const sec = Number(m[1]) * 60 + Number(m[2]) + penalty;
     return `${Math.floor(sec / 60)}'${String(sec % 60).padStart(2, "0")}`;
@@ -115,7 +116,7 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   const heatAdjustDesc = (desc: string, i: number): string => {
     const f = ctx.forecast.find((x) => x.date === iso(dates[i]));
     if (!f) return desc;
-    const penalty = Math.round(heatAdvice(f.tempMax, f.humidity).penaltySecPerKm / 2);
+    const penalty = Math.round((heatAdvice(f.tempMax, f.humidity).penaltySecPerKm + windAdvice(f.windMaxKmh).penaltySecPerKm) / 2);
     if (!penalty) return desc;
     return desc.replace(/(\d+)['’](\d{2})\/km/g, (_m, mm: string, ss: string) => {
       const sec = Number(mm) * 60 + Number(ss) + penalty;
@@ -128,7 +129,9 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
     const f = ctx.forecast.find((x) => x.date === iso(dates[i]));
     if (!f) return "";
     const a = heatAdvice(f.tempMax, f.humidity);
-    return a.penaltySecPerKm > 0 || f.tempMax < 5 ? `\n\n${a.note}` : "";
+    const w = windAdvice(f.windMaxKmh);
+    const notes = [a.penaltySecPerKm > 0 || f.tempMax < 5 ? a.note : "", w.note].filter(Boolean);
+    return notes.length ? `\n\n${notes.join("\n")}` : "";
   };
 
   const slot: (PlanDay | null)[] = Array(7).fill(null);

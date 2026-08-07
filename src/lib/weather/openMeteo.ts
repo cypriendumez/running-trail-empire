@@ -29,6 +29,8 @@ export type DayWeather = {
   feelsMax: number | null;
   humidity: number | null;
   precipMm: number | null;
+  /** Vent maximal du jour (km/h). Un vent de face coûte souvent plus qu'une forte chaleur. */
+  windMaxKmh: number | null;
 };
 
 const num = (v: unknown) => (typeof v === "number" && isFinite(v) ? v : null);
@@ -47,7 +49,7 @@ export function altitudeLossPct(elevationM: number | null): number {
  *  MÊME réponse (`elevation`). Une seule requête suffit donc pour les obtenir. */
 export async function forecastWithElevation(lat: number, lon: number): Promise<WeekForecast> {
   const url = `${FORECAST}?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}`
-    + `&daily=temperature_2m_max,temperature_2m_min,apparent_temperature_max,precipitation_sum`
+    + `&daily=temperature_2m_max,temperature_2m_min,apparent_temperature_max,precipitation_sum,wind_speed_10m_max`
     + `&hourly=relative_humidity_2m&forecast_days=7&timezone=auto`;
   try {
     const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
@@ -55,7 +57,7 @@ export async function forecastWithElevation(lat: number, lon: number): Promise<W
     const j = await r.json() as {
       elevation?: number;
       daily?: { time?: string[]; temperature_2m_max?: number[]; temperature_2m_min?: number[];
-                apparent_temperature_max?: number[]; precipitation_sum?: number[] };
+                apparent_temperature_max?: number[]; precipitation_sum?: number[]; wind_speed_10m_max?: number[] };
       hourly?: { time?: string[]; relative_humidity_2m?: number[] };
     };
     const d = j.daily;
@@ -76,6 +78,7 @@ export async function forecastWithElevation(lat: number, lon: number): Promise<W
         feelsMax: num(d.apparent_temperature_max?.[i]),
         humidity: hs.length ? Math.round(hs.reduce((a, b) => a + b, 0) / hs.length) : null,
         precipMm: num(d.precipitation_sum?.[i]),
+        windMaxKmh: num(d.wind_speed_10m_max?.[i]),
       };
     });
     return { days, elevationM: num(j.elevation) };
@@ -125,5 +128,29 @@ export function heatAdvice(tempC: number, humidity: number | null): { penaltySec
   return {
     penaltySecPerKm: 0,
     note: `🥶 ${Math.round(tempC)} °C : échauffement de 20 min minimum, pas de fractionné court à froid (risque musculaire). Attention aux voies respiratoires par temps sec et glacial.`,
+  };
+}
+
+/**
+ * Consigne d'entraînement pour le VENT.
+ *
+ * Facteur systématiquement sous-estimé : à 25 km/h de face, le surcoût énergétique
+ * dépasse celui d'une journée à 27 °C. Sur un aller-retour, le retour vent dans le dos
+ * ne rend JAMAIS ce que l'aller a coûté — la pénalité est donc nette, pas nulle.
+ * On raisonne sur environ la moitié du parcours face au vent, d'où le coefficient.
+ */
+export function windAdvice(windKmh: number | null): { penaltySecPerKm: number; note: string } {
+  if (windKmh == null || windKmh < 20) return { penaltySecPerKm: 0, note: "" };
+  if (windKmh >= 45) return {
+    penaltySecPerKm: 25,
+    note: `💨 Vent de ${Math.round(windKmh)} km/h : renonce à toute séance chronométrée, tu ne tiendras aucune allure de référence. Si tu sors, fais l'aller face au vent et le retour dans le dos, et juge-toi à la FC. En terrain découvert, prudence sur les rafales.`,
+  };
+  if (windKmh >= 35) return {
+    penaltySecPerKm: 18,
+    note: `💨 Vent de ${Math.round(windKmh)} km/h : compte ~18 s/km de plus face au vent. Une séance de qualité devient très difficile à piloter à l'allure — bascule sur la FC, ou déplace-la.`,
+  };
+  return {
+    penaltySecPerKm: 10,
+    note: `💨 Vent de ${Math.round(windKmh)} km/h : ~10 s/km de plus dans les portions face au vent. Le retour dans le dos ne compense pas l'aller, n'en attends rien.`,
   };
 }

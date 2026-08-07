@@ -223,7 +223,7 @@ export async function syncIntervalsForUser(
   try {
     const { data: prof } = await admin.from("profiles")
       .select("pace_curve, last_loc_at").eq("id", userId).maybeSingle();
-    const stored = (prof as { pace_curve?: { at?: string } } | null)?.pace_curve;
+    const stored = (prof as { pace_curve?: import("./performance").PaceCurve | null } | null)?.pace_curve ?? null;
 
     const lastQ = activities.find((a) =>
       /run/i.test(String(a.type ?? "")) && a.id &&
@@ -235,6 +235,7 @@ export async function syncIntervalsForUser(
       lastQualityId: lastQ?.id ? String(lastQ.id) : null,
       lastQualityDate: lastQ?.start_date_local ? String(lastQ.start_date_local).slice(0, 10) : null,
       storedAt: stored?.at ?? null,
+      previous: stored,
     });
 
     const lastGps = activities.find((a) => a.id && /run|ride|hike|walk/i.test(String(a.type ?? "")));

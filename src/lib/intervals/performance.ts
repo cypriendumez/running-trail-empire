@@ -16,6 +16,33 @@ const auth = (apiKey: string) => ({ Authorization: "Basic " + Buffer.from(`API_K
 /** Distances de référence sur lesquelles on suit la progression. */
 const TARGETS = [400, 1000, 3000, 5000, 10000];
 
+/** % de VMA soutenable selon la distance — même barème que le reste de l'application. */
+function pctVmaFor(km: number): number {
+  if (km <= 0.4) return 1.18;
+  if (km <= 0.8) return 1.12;
+  if (km <= 1.5) return 1.06;
+  if (km <= 3.2) return 1.0;
+  if (km <= 5.5) return 0.94;
+  if (km <= 11) return 0.90;
+  return 0.85;
+}
+
+/** VMA implicite des meilleurs efforts : on retient la plus favorable, car un effort
+ *  non maximal ne peut que sous-estimer la capacité réelle. */
+function vmaFromBest(best: { m: number; sec: number }[]): number | null {
+  let top: number | null = null;
+  for (const b of best) {
+    if (!(b.m > 0) || !(b.sec > 0)) continue;
+    const v = (b.m / 1000) / (b.sec / 3600) / pctVmaFor(b.m / 1000);
+    if (v > 5 && v < 30 && (top == null || v > top)) top = Math.round(v * 10) / 10;
+  }
+  return top;
+}
+
+/** Un relevé daté de la capacité de l'athlète. Sert à mesurer une TENDANCE : sans
+ *  historique, la courbe d'allure ne dit que « où il en est », jamais « où il va ». */
+export type CurvePoint = { at: string; cs: number | null; vma: number | null };
+
 export type PaceCurve = {
   /** Meilleur temps (s) par distance de référence, sur les 42 derniers jours. */
   best: { m: number; sec: number }[];
@@ -24,6 +51,8 @@ export type PaceCurve = {
   /** Réserve anaérobie (m) : capacité à courir au-dessus du seuil. */
   dPrime: number | null;
   at: string;
+  /** Relevés antérieurs, du plus ancien au plus récent (16 max, ~1 par 4 jours). */
+  history?: CurvePoint[];
 };
 
 export async function fetchPaceCurve(athleteId: string, apiKey: string): Promise<PaceCurve | null> {
@@ -144,7 +173,7 @@ export async function analyseQualityExecution(
  */
 export async function refreshPerformance(
   admin: SupabaseClient,
-  opts: { userId: string; athleteId: string; apiKey: string; lastQualityId?: string | null; lastQualityDate?: string | null; storedAt?: string | null },
+  opts: { userId: string; athleteId: string; apiKey: string; lastQualityId?: string | null; lastQualityDate?: string | null; storedAt?: string | null; previous?: PaceCurve | null },
 ): Promise<void> {
   if (opts.storedAt && Date.now() - new Date(opts.storedAt).getTime() < 20 * 3600_000) return;
   const [curve, exec] = await Promise.all([
@@ -154,7 +183,28 @@ export async function refreshPerformance(
       : Promise.resolve(null),
   ]);
   const patch: Record<string, unknown> = {};
-  if (curve) patch.pace_curve = curve;
+  if (curve) {
+    // ── HISTORIQUE ────────────────────────────────────────────────────────────
+    // La courbe d'allure était écrasée à chaque rafraîchissement : on savait où en
+    // était l'athlète, jamais dans quel sens il allait. Or c'est la TENDANCE qui
+    // permet de détecter un plateau (stagnation malgré une charge qui monte) et de
+    // projeter sa capacité au jour de la course. On conserve donc des relevés datés.
+    //
+    // Rangés DANS le JSON existant plutôt que dans une nouvelle colonne : pas de
+    // migration, et l'historique reste indissociable de la mesure dont il dérive.
+    const prev = opts.previous ?? null;
+    const past = Array.isArray(prev?.history) ? prev!.history! : [];
+    const lastAt = past.length ? new Date(past[past.length - 1].at).getTime() : 0;
+    // Un relevé tous les 4 jours au minimum : plus dense, on mesurerait du bruit.
+    const shouldAppend = Date.now() - lastAt >= 4 * 86400_000;
+    const point: CurvePoint = {
+      at: curve.at,
+      cs: curve.criticalSpeed,
+      vma: vmaFromBest(curve.best),
+    };
+    curve.history = (shouldAppend ? [...past, point] : past).slice(-16);
+    patch.pace_curve = curve;
+  }
   if (exec) patch.last_quality_exec = exec;
   if (!Object.keys(patch).length) return;
   await admin.from("profiles").update(patch).eq("id", opts.userId).then(() => {}, () => {});

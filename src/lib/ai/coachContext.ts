@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthCoachLines } from "@/data/healthCatalog";
 import { terrainCoachBlock } from "@/data/terrainCatalog";
-import { forecastWithElevation, altitudeLossPct, heatAdvice, type DayWeather } from "@/lib/weather/openMeteo";
+import { forecastWithElevation, altitudeLossPct, heatAdvice, windAdvice, type DayWeather } from "@/lib/weather/openMeteo";
 import { bestVmaFromWorkouts, vmaFromPaceCurve, vmaFromVo2max } from "@/lib/running/fitness";
 import { isRun } from "@/lib/intervals/sport";
 
@@ -303,11 +303,55 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // VMA, par fiabilité : test enregistré → efforts réels (reflète l'allure de course) → dérivée de la
   // VO2max Garmin (repli) → repli FC. Garantit le MÊME chiffre côté coach et côté client.
   // Meilleurs efforts mesurés : disponibles avant tout le reste car ils fondent la VMA.
-  const paceCurve = (p?.pace_curve ?? null) as { best?: { m: number; sec: number }[]; criticalSpeed?: number | null; dPrime?: number | null } | null;
+  const paceCurve = (p?.pace_curve ?? null) as import("@/lib/intervals/performance").PaceCurve | null;
   const vma = (vmaStored != null && vmaStored > 0) ? vmaStored
     : (vmaFromPaceCurve(paceCurve?.best) ?? bestVmaFromWorkouts(runs, fcMaxEst) ?? estimateVmaFromRuns(runs, fcMaxEst, now)
        ?? (garminVo2 != null && garminVo2 > 0 ? vmaFromVo2max(garminVo2) : null));
   const vmaIsEst = !(vmaStored != null && vmaStored > 0) && vma != null;
+
+  // ── TRAJECTOIRE DE CAPACITÉ — plateau et projection au jour J ────────────────
+  // La courbe d'allure disait « où il en est » ; l'historique dit « où il va ».
+  // Deux usages, tous deux impossibles sans série temporelle :
+  //   · PLATEAU — stagner pendant que la charge monte est le signal qu'il faut CHANGER
+  //     de stimulus, pas en rajouter. C'est l'erreur la plus coûteuse d'un plan
+  //     automatique : il ne sait qu'ajouter, et il ajoute jusqu'à la blessure.
+  //   · PROJECTION — annoncer « il te faut 20,2 km/h, tu es à 17,6 » sans dire si
+  //     l'écart se réduit, c'est répéter un constat d'échec. La pente réelle permet de
+  //     proposer un objectif atteignable au lieu d'un objectif décoratif.
+  const curvePts = (() => {
+    const hist = Array.isArray(paceCurve?.history) ? paceCurve!.history! : [];
+    const pts = hist
+      .filter(h => h?.at && typeof h.vma === "number" && h.vma! > 5)
+      .map(h => ({ t: new Date(h.at).getTime(), v: h.vma! }));
+    // Le relevé courant complète la série s'il est plus récent que le dernier point.
+    const cur = vmaFromPaceCurve(paceCurve?.best);
+    const at = paceCurve?.at ? new Date(paceCurve.at).getTime() : now;
+    if (cur && (!pts.length || at - pts[pts.length - 1].t > 86400000)) pts.push({ t: at, v: cur });
+    return pts.sort((a, b) => a.t - b.t);
+  })();
+
+  /** Pente de la VMA en km/h par semaine (régression linéaire sur la série). */
+  const vmaSlopePerWeek = (() => {
+    if (curvePts.length < 3) return null;
+    const span = curvePts[curvePts.length - 1].t - curvePts[0].t;
+    if (span < 14 * 86400000) return null;   // moins de deux semaines : pas une tendance
+    const xs = curvePts.map(p => (p.t - curvePts[0].t) / (7 * 86400000));
+    const ys = curvePts.map(p => p.v);
+    const mx = xs.reduce((a, b) => a + b, 0) / xs.length;
+    const my = ys.reduce((a, b) => a + b, 0) / ys.length;
+    const den = xs.reduce((s, x) => s + (x - mx) ** 2, 0);
+    if (den <= 0) return null;
+    const num2 = xs.reduce((s, x, i) => s + (x - mx) * (ys[i] - my), 0);
+    return Math.round((num2 / den) * 1000) / 1000;
+  })();
+
+  // PLATEAU : progression quasi nulle alors que la charge chronique monte. Le seuil de
+  // 0,05 km/h/sem correspond à ~1 s/km par semaine — en dessous, c'est du bruit.
+  const ctlRising = load.ctl > 0 && load.acr > 1.05;
+  const plateau = vmaSlopePerWeek != null && Math.abs(vmaSlopePerWeek) < 0.05 && ctlRising
+    && (curvePts[curvePts.length - 1].t - curvePts[0].t) >= 21 * 86400000;
+
+
   const level = vma == null ? "à évaluer (VMA inconnue)" : vma < 13 ? "débutant" : vma < 16 ? "intermédiaire" : vma < 19 ? "confirmé" : "expert/élite";
 
   // Zones FC (Karvonen) si dispo
@@ -343,6 +387,25 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
         const perWk = Math.round((gain / weeksToRace) * 100) / 100;
         const realism = perWk <= 0.08 ? "réaliste avec un bon bloc VMA" : perWk <= 0.15 ? "ambitieux mais jouable avec 2 séances VMA/sem et de la régularité" : "très difficile dans le délai — propose-lui un objectif intermédiaire (ex. viser ~5-8 s/km de plus) puis le vrai chrono plus tard";
         objLines.push(`• Feuille de route : gagner +${gain} km/h de VMA en ${weeksToRace} sem (~+${perWk} km/h/sem) → ${realism}.`);
+        // Confrontation à sa progression MESURÉE : c'est ce qui distingue un objectif
+        // ajusté sur des faits d'un objectif décoratif répété de semaine en semaine.
+        // Projection à pente constante, calculée ici car elle dépend de weeksToRace.
+        const projectedVma = (vmaSlopePerWeek != null && vma)
+          ? Math.round((vma + vmaSlopePerWeek * weeksToRace) * 10) / 10
+          : null;
+        if (vmaSlopePerWeek != null) {
+          const trend = vmaSlopePerWeek > 0.02 ? `+${r1(vmaSlopePerWeek)} km/h/sem`
+            : vmaSlopePerWeek < -0.02 ? `${r1(vmaSlopePerWeek)} km/h/sem (en BAISSE)` : "quasi nulle";
+          objLines.push(`• PROGRESSION RÉELLE MESURÉE : ${trend}${projectedVma ? `, ce qui le projette à ~${projectedVma} km/h le jour J (il lui en faudrait ${reqVma})` : ""}.`);
+          if (projectedVma != null && projectedVma < reqVma) {
+            const sec = Math.round((objective.distanceKm / (projectedVma * frac / 100)) * 3600);
+            const hh = Math.floor(sec / 3600), mm = Math.floor((sec % 3600) / 60), ss = sec % 60;
+            const chrono = hh ? `${hh}h${String(mm).padStart(2, "0")}` : `${mm}'${String(ss).padStart(2, "0")}`;
+            objLines.push(`• ⚠️ À CE RYTHME son objectif de ${objective.targetTime} n'est PAS atteignable : la projection donne plutôt ${chrono}. Propose-lui CE chrono comme cible révisée — un objectif ajusté sur des faits vaut mieux qu'un objectif décoratif qu'il ratera. Dis-le avec tact, en montrant d'abord le chemin parcouru.`);
+          } else if (projectedVma != null) {
+            objLines.push(`• ✅ À ce rythme son objectif est ATTEIGNABLE : dis-le-lui, c'est le meilleur carburant qui soit.`);
+          }
+        }
       } else if (reqVma <= vma) {
         objLines.push(`• Sa VMA actuelle suffit DÉJÀ pour le chrono : le travail = spécificité (tenir l'allure), endurance et pacing, pas plus de VMA brute.`);
       }
@@ -632,6 +695,9 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const fade = qe?.fadeSec ?? null;
   const faded = fade != null && fade >= 10;
   if (faded) { qBudget -= 1; easeReasons.push(`décrochage de ${fade} s/km sur sa dernière série (séance trop ambitieuse)`); }
+  // PLATEAU : stagner pendant que la charge monte ne se soigne pas avec plus de charge.
+  // Un plan automatique ne sait qu'ajouter — c'est exactement ainsi qu'il blesse.
+  if (plateau) { easeReasons.push("plateau de progression malgré une charge en hausse"); }
   if (badNight) { qBudget -= 1; easeReasons.push(`nuit dégradée (${freshSleep?.sleep_score ?? "?"}/100${lastSleepMin ? `, ${Math.floor(lastSleepMin / 60)}h${String(lastSleepMin % 60).padStart(2, "0")}` : ""})`); }
   // Pathologies interdisant l'effort maximal : on retire d'office la marche la plus haute.
   if (noMaxEffort) { qBudget = Math.min(qBudget, 1); }
@@ -914,7 +980,7 @@ CAPACITÉS (tests)
 - Zones FC : Z2 facile ${hrZone(0.6, 0.7) ?? "?"} · Z4 seuil ${hrZone(0.8, 0.9) ?? "?"}
 - Zones allure : ${paceZones ?? (computedPaces ? `(calculées depuis la VMA) ${computedPaces}` : "non renseignées")}
 - Chronos théoriques au potentiel actuel (depuis la VMA) : ${predictions ?? "?"}
-${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${vrLine ? `- 🦵 ÉCONOMIE DE COURSE (ratio vertical, ${vr!.n} séances) : ${vrLine}\n` : ""}${hrrLine ? `- ❤️‍🩹 RÉCUPÉRATION CARDIAQUE : ${hrrLine}\n` : ""}${thresholdPace ? `- 🎯 ALLURE SEUIL **MESURÉE** : ${thresholdPace}/km (vitesse critique ${(csMs! * 3.6).toFixed(2)} km/h, ajustée sur ses efforts réels)${pc?.dPrime ? ` · réserve anaérobie D' ${pc.dPrime} m` : ""}. UTILISE CETTE VALEUR pour les séances au seuil plutôt qu'un pourcentage de VMA estimée.\n` : ""}${qeLine ? `- 🔍 EXÉCUTION DE SA DERNIÈRE QUALITÉ : ${qeLine}${faded ? " → il a DÉCROCHÉ : la prochaine série doit être plus courte ou plus lente, pas plus dure. Ne répète pas la même erreur." : fade != null && fade <= -6 ? " → il a ACCÉLÉRÉ en fin de série : il en avait sous le pied, tu peux durcir (allure ou volume, pas les deux)." : ""}\n` : ""}- Repères physio : seuil lactique ~${thresholdPace ?? (vma ? paceAt(86) : "?")}/km · vitesse critique ~${vma ? r1(vma * 0.90) : "?"} km/h (${vma ? paceAt(90) : "?"}/km) · VO2max estimé ~${vo2 ?? "?"} ml/kg/min
+${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${plateau ? `- 🛑 PLATEAU DÉTECTÉ : sa capacité stagne (${vmaSlopePerWeek} km/h/sem sur ${Math.round((curvePts[curvePts.length - 1].t - curvePts[0].t) / 86400000)} j) ALORS QUE sa charge monte. N'AJOUTE PAS de volume ni de séances : c'est le réflexe qui blesse. CHANGE le stimulus — format de séance inédit, côtes, force, technique de foulée — ou impose une vraie semaine de décharge. Explique-lui pourquoi.\n` : vmaSlopePerWeek != null ? `- 📈 TRAJECTOIRE DE CAPACITÉ : ${vmaSlopePerWeek > 0 ? "+" : ""}${vmaSlopePerWeek} km/h de VMA par semaine sur ses efforts mesurés.\n` : ""}${vrLine ? `- 🦵 ÉCONOMIE DE COURSE (ratio vertical, ${vr!.n} séances) : ${vrLine}\n` : ""}${hrrLine ? `- ❤️‍🩹 RÉCUPÉRATION CARDIAQUE : ${hrrLine}\n` : ""}${thresholdPace ? `- 🎯 ALLURE SEUIL **MESURÉE** : ${thresholdPace}/km (vitesse critique ${(csMs! * 3.6).toFixed(2)} km/h, ajustée sur ses efforts réels)${pc?.dPrime ? ` · réserve anaérobie D' ${pc.dPrime} m` : ""}. UTILISE CETTE VALEUR pour les séances au seuil plutôt qu'un pourcentage de VMA estimée.\n` : ""}${qeLine ? `- 🔍 EXÉCUTION DE SA DERNIÈRE QUALITÉ : ${qeLine}${faded ? " → il a DÉCROCHÉ : la prochaine série doit être plus courte ou plus lente, pas plus dure. Ne répète pas la même erreur." : fade != null && fade <= -6 ? " → il a ACCÉLÉRÉ en fin de série : il en avait sous le pied, tu peux durcir (allure ou volume, pas les deux)." : ""}\n` : ""}- Repères physio : seuil lactique ~${thresholdPace ?? (vma ? paceAt(86) : "?")}/km · vitesse critique ~${vma ? r1(vma * 0.90) : "?"} km/h (${vma ? paceAt(90) : "?"}/km) · VO2max estimé ~${vo2 ?? "?"} ml/kg/min
 
 FORME & RÉCUPÉRATION (aujourd'hui)
 - État physiologique : ${state}

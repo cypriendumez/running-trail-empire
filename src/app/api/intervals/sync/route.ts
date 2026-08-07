@@ -296,6 +296,7 @@ export async function GET(req: Request) {
   {
     try {
       const { refreshPerformance } = await import("@/lib/intervals/performance");
+      const prevCurve = ((profile as { pace_curve?: import("@/lib/intervals/performance").PaceCurve | null } | null)?.pace_curve) ?? null;
       const { createAdminClient: adminFn2 } = await import("@/lib/supabase/admin");
       // Dernière séance dure identifiable : intensité élevée ou charge importante.
       const lastQ = validActivities.find((a) =>
@@ -305,7 +306,8 @@ export async function GET(req: Request) {
         userId: user.id, athleteId: ATHLETE_ID, apiKey: API_KEY,
         lastQualityId: lastQ?.id ? String(lastQ.id) : null,
         lastQualityDate: lastQ?.start_date_local ? String(lastQ.start_date_local).slice(0, 10) : null,
-        storedAt: ((profile as { pace_curve?: { at?: string } } | null)?.pace_curve)?.at ?? null,
+        storedAt: prevCurve?.at ?? null,
+        previous: prevCurve,
       });
     } catch { /* best-effort : la synchro n'échoue pas pour une analyse */ }
   }
