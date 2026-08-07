@@ -137,6 +137,8 @@ export type AthleteContext = {
   tooMuchIntensity: number | null;
   /** true si l'athlète s'entraîne réellement en terrain vallonné (D+ hebdo significatif). */
   hillyTraining: boolean;
+  /** Allure seuil MESURÉE (min/km) issue de la vitesse critique, si disponible. */
+  thresholdPace: string | null;
   // Plan macro périodisé semaine par semaine jusqu'au jour J.
   macroPlan: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[];
 };
@@ -439,6 +441,36 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const raceShort = objective?.race ? objective.race.replace(/\s*\d{4}.*$/, "").trim() : null;
   const isShortGoal = libGoal === "5k" || libGoal === "10k" || libGoal === "semi";
   // Budget de qualité de base selon le niveau.
+  // ── PERFORMANCE MESURÉE (courbe d'allure intervals.icu) ─────────────────────
+  // La vitesse critique est ajustée sur les efforts RÉELS de l'athlète : c'est un
+  // seuil mesuré, là où `paceAt(86)` n'est qu'un pourcentage d'une VMA elle-même
+  // souvent estimée. Quand elle existe, elle prime.
+  const pc = (p?.pace_curve ?? null) as { best?: { m: number; sec: number }[]; criticalSpeed?: number | null; dPrime?: number | null } | null;
+  const csMs = num(pc?.criticalSpeed);
+  const fmtPace = (secPerKm: number) => `${Math.floor(secPerKm / 60)}'${String(Math.round(secPerKm % 60)).padStart(2, "0")}`;
+  const thresholdPace = csMs && csMs > 1 ? fmtPace(1000 / csMs) : null;
+  const bestLine = pc?.best?.length
+    ? pc.best.map(b => {
+        const t = b.sec, mm = Math.floor(t / 60), ss = Math.round(t % 60);
+        const per = t / (b.m / 1000);
+        return `${b.m >= 1000 ? `${b.m / 1000} km` : `${b.m} m`} en ${mm}:${String(ss).padStart(2, "0")} (${fmtPace(per)}/km)`;
+      }).join(" · ")
+    : null;
+  // Exécution de la dernière séance de qualité : a-t-il tenu, ou décroché ?
+  // Périmée au-delà de 12 jours : une série ratée il y a trois semaines ne doit pas
+  // continuer à brider l'entraînement d'aujourd'hui. L'analyse n'est rafraîchie que
+  // lorsqu'une nouvelle séance dure est détectée, elle peut donc traîner.
+  const qeRaw = (p?.last_quality_exec ?? null) as { date?: string; repsSec?: number[]; avgHr?: number | null; fadeSec?: number | null } | null;
+  const qeAgeDays = qeRaw?.date ? Math.floor((Date.now() - new Date(`${qeRaw.date}T12:00:00`).getTime()) / 86400_000) : null;
+  const qe = qeAgeDays != null && qeAgeDays <= 12 ? qeRaw : null;
+  const qeLine = qe?.repsSec?.length
+    ? `${qe.repsSec.length} répétitions le ${qe.date} : ${qe.repsSec.map(fmtPace).join(" · ")}/km${qe.avgHr ? ` (FC moy ${qe.avgHr})` : ""}. ${
+        qe.fadeSec == null ? ""
+        : qe.fadeSec >= 12 ? `⚠️ DÉCROCHAGE de ${qe.fadeSec} s/km entre le début et la fin : la séance était trop ambitieuse, réduis l'allure cible ou le nombre de répétitions la prochaine fois.`
+        : qe.fadeSec <= -6 ? `✅ Il a ACCÉLÉRÉ de ${-qe.fadeSec} s/km sur la fin : il en avait sous le pied, tu peux durcir la prochaine.`
+        : "✅ Allure tenue du début à la fin : la charge était bien calibrée."}`
+    : null;
+
   let qBudget = libLevel === "debutant" ? 1 : libLevel === "intermediaire" ? 2 : 3;
   if (libGoal === "marathon" || libGoal === "ultra") qBudget -= 1; // le volume prime → un cran de moins
   if (phase.startsWith("BASE")) qBudget = Math.min(qBudget, libLevel === "debutant" ? 1 : 2);
@@ -458,6 +490,13 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // on en retire une et on lui dit franchement quoi corriger.
   if (rpeHigh) { qBudget -= 1; easeReasons.push(`ressenti élevé sur ses dernières séances (RPE moyen ${rpeAvg}/10)`); }
   if (hardTimePct != null && hardTimePct > 25) { qBudget -= 1; easeReasons.push(`${hardTimePct} % du temps en Z3+ (footings courus trop vite)`); }
+  // Prescrit vs réalisé : le décrochage sur la dernière série est le signal le plus
+  // direct qu'on ait. S'il a perdu du temps au fil des répétitions, la séance était
+  // au-dessus de ses moyens du moment — on n'en rajoute pas une couche la semaine
+  // suivante. Seuil à 10 s/km : en deçà, c'est du bruit de mesure et de terrain.
+  const fade = qe?.fadeSec ?? null;
+  const faded = fade != null && fade >= 10;
+  if (faded) { qBudget -= 1; easeReasons.push(`décrochage de ${fade} s/km sur sa dernière série (séance trop ambitieuse)`); }
   if (badNight) { qBudget -= 1; easeReasons.push(`nuit dégradée (${freshSleep?.sleep_score ?? "?"}/100${lastSleepMin ? `, ${Math.floor(lastSleepMin / 60)}h${String(lastSleepMin % 60).padStart(2, "0")}` : ""})`); }
   // Pathologies interdisant l'effort maximal : on retire d'office la marche la plus haute.
   if (noMaxEffort) { qBudget = Math.min(qBudget, 1); }
@@ -536,11 +575,13 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
     `VMA longue : 6×800 m à ~${paceAt(100)}/km, récup 1 min 30 trottinée → soutien du VO2max`,
     `VMA longue : 5×1000 m à ~${paceAt(100)}/km, récup 2 min trottinée → le format le plus proche de la course`,
   ]) };
+  // Allure seuil : la vitesse critique MESURÉE prime sur le pourcentage de VMA estimée.
+  const sPace = thresholdPace ?? paceAt(86);
   const qSeuil = { type: "Seuil", desc: pick([
-    `Seuil fractionné : 4×8 min à ~${paceAt(86)}/km, récup 2 min → accumule du temps au seuil sans casser`,
-    `Seuil long : 2×15 min à ~${paceAt(86)}/km, récup 3 min → apprend à tenir l'effort`,
-    `Seuil : 3×10 min à ~${paceAt(87)}/km, récup 2 min → le format de référence`,
-    `Seuil continu : 25 min d'un bloc à ~${paceAt(85)}/km → le plus exigeant mentalement, le plus payant`,
+    `Seuil fractionné : 4×8 min à ~${sPace}/km, récup 2 min → accumule du temps au seuil sans casser`,
+    `Seuil long : 2×15 min à ~${sPace}/km, récup 3 min → apprend à tenir l'effort`,
+    `Seuil : 3×10 min à ~${sPace}/km, récup 2 min → le format de référence`,
+    `Seuil continu : 25 min d'un bloc à ~${sPace}/km → le plus exigeant mentalement, le plus payant`,
   ]) };
   const qSpec = { type: "Spécifique", desc: goalPace ? pick([
     `Allure spécifique ${raceShort ?? "objectif"} : 6×1 km à ${goalPace}/km, récup 1 min 30 → ancre l'allure`,
@@ -679,7 +720,7 @@ CAPACITÉS (tests)
 - Zones FC : Z2 facile ${hrZone(0.6, 0.7) ?? "?"} · Z4 seuil ${hrZone(0.8, 0.9) ?? "?"}
 - Zones allure : ${paceZones ?? (computedPaces ? `(calculées depuis la VMA) ${computedPaces}` : "non renseignées")}
 - Chronos théoriques au potentiel actuel (depuis la VMA) : ${predictions ?? "?"}
-- Repères physio : seuil lactique ~${vma ? paceAt(86) : "?"}/km · vitesse critique ~${vma ? r1(vma * 0.90) : "?"} km/h (${vma ? paceAt(90) : "?"}/km) · VO2max estimé ~${vo2 ?? "?"} ml/kg/min
+${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${thresholdPace ? `- 🎯 ALLURE SEUIL **MESURÉE** : ${thresholdPace}/km (vitesse critique ${(csMs! * 3.6).toFixed(2)} km/h, ajustée sur ses efforts réels)${pc?.dPrime ? ` · réserve anaérobie D' ${pc.dPrime} m` : ""}. UTILISE CETTE VALEUR pour les séances au seuil plutôt qu'un pourcentage de VMA estimée.\n` : ""}${qeLine ? `- 🔍 EXÉCUTION DE SA DERNIÈRE QUALITÉ : ${qeLine}${faded ? " → il a DÉCROCHÉ : la prochaine série doit être plus courte ou plus lente, pas plus dure. Ne répète pas la même erreur." : fade != null && fade <= -6 ? " → il a ACCÉLÉRÉ en fin de série : il en avait sous le pied, tu peux durcir (allure ou volume, pas les deux)." : ""}\n` : ""}- Repères physio : seuil lactique ~${thresholdPace ?? (vma ? paceAt(86) : "?")}/km · vitesse critique ~${vma ? r1(vma * 0.90) : "?"} km/h (${vma ? paceAt(90) : "?"}/km) · VO2max estimé ~${vo2 ?? "?"} ml/kg/min
 
 FORME & RÉCUPÉRATION (aujourd'hui)
 - État physiologique : ${state}
@@ -742,6 +783,7 @@ ${catalog}`;
     forecast,
     tooMuchIntensity: hardTimePct != null && hardTimePct > 25 ? hardTimePct : null,
     hillyTraining: elevWeek >= 400 || terr.paceMeaningless,
+    thresholdPace,
     macroPlan,
   };
 }

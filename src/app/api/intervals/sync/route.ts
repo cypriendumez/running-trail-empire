@@ -26,7 +26,7 @@ export async function GET(req: Request) {
   // Load credentials: user profile first, then global env vars
   const { data: profile } = await supabase
     .from("profiles")
-    .select("intervals_athlete_id, intervals_api_key, last_loc_at")
+    .select("intervals_athlete_id, intervals_api_key, last_loc_at, pace_curve")
     .eq("id", user.id)
     .single();
 
@@ -250,6 +250,26 @@ export async function GET(req: Request) {
         });
       }
     } catch { /* best-effort : la synchro n'échoue pas pour une position */ }
+  }
+
+  // Performance MESURÉE : courbe d'allure (meilleurs efforts + vitesse critique) et
+  // exécution de la dernière séance de qualité. Deux appels réseau supplémentaires,
+  // donc au plus une fois par jour.
+  {
+    try {
+      const { refreshPerformance } = await import("@/lib/intervals/performance");
+      const { createAdminClient: adminFn2 } = await import("@/lib/supabase/admin");
+      // Dernière séance dure identifiable : intensité élevée ou charge importante.
+      const lastQ = validActivities.find((a) =>
+        /run/i.test(String(a.type ?? "")) && a.id &&
+        ((a.icu_intensity ?? 0) >= 85 || (a.icu_training_load ?? 0) >= 60));
+      await refreshPerformance(adminFn2(), {
+        userId: user.id, athleteId: ATHLETE_ID, apiKey: API_KEY,
+        lastQualityId: lastQ?.id ? String(lastQ.id) : null,
+        lastQualityDate: lastQ?.start_date_local ? String(lastQ.start_date_local).slice(0, 10) : null,
+        storedAt: ((profile as { pace_curve?: { at?: string } } | null)?.pace_curve)?.at ?? null,
+      });
+    } catch { /* best-effort : la synchro n'échoue pas pour une analyse */ }
   }
 
   let replanned = false;
