@@ -86,6 +86,8 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // montre en envoyait 15, avec un corps de séance réduit de 25 à 10 min. Deux séances
   // différentes pour le même jour.
   const { warm, cool } = ctx.warmCool;
+  // Allure visée le jour J, quand un objectif chiffré existe.
+  const goalPace = ctx.objective?.targetPace ?? null;
   // Même position de cycle que la qualité : 0-2 montée, 3 assimilation.
   const blockWeekRenfo = (() => { const d = new Date(start); const on = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const day = on.getUTCDay() || 7; on.setUTCDate(on.getUTCDate() + 4 - day); const ys = new Date(Date.UTC(on.getUTCFullYear(), 0, 1)); return Math.ceil(((on.getTime() - ys.getTime()) / 86400000 + 1) / 7) % 4; })();
   // Avant une séance de qualité, l'échauffement est allongé (mise en action progressive).
@@ -245,10 +247,45 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
       ? { type: "Vélo", title: "Sortie longue à vélo",
           detail: `Échauffement ${warm} min très facile → ${durationFor(longRunKm, paceFor(longIdx)) ?? "1h30"} à 2h en FC Z2, allure conversationnelle, cadence souple → 10 min de retour au calme. Pas d'allure cible : c'est du volume aérobie sans impact.${cycleNote}`,
           why: "Le volume aérobie de la semaine, sans les contraintes d'impact de la course.", tags: ["Vélo", "Z2", "Long"] }
-      : { type: "Sortie longue", title: "Sortie longue",
-          detail: `Échauffement ${warm} min progressif FC Z1→Z2 → Corps : ${kmAndTime(longRunKm, paceFor(longIdx))} en Z2${paceFor(longIdx) ? ` (~${paceFor(longIdx)}/km)` : ""}, allure conversationnelle du début à la fin → Retour au calme ${cool} min FC Z1.${gapNote}${cycleNote}`,
-          why: `C'est la séance qui construit ton endurance de fond — ${longRunKm} km, calés sur ton volume actuel. Elle doit rester facile : si tu finis cassé, elle était trop rapide.`,
-          tags: ["Long", "Z2", `${longRunKm} km`] });
+      : (() => {
+          // ── SORTIE LONGUE : PLUS UN SIMPLE BLOC DE Z2 ────────────────────────
+          // Elle était toujours identique — « X km en Z2, conversationnel » — quelle que
+          // soit la phase et quel que soit l'objectif. C'est la séance la plus longue de
+          // la semaine, donc la plus coûteuse : la laisser sans intention, c'est gâcher
+          // sa moitié la plus utile. Un entraîneur y insère de la spécificité dès que
+          // l'athlète encaisse le volume.
+          //
+          // Trois conditions pour oser : un athlète qui a de l'historique, une fraîcheur
+          // qui le permet, et une distance suffisante pour que la fin ait un sens.
+          const p = paceFor(longIdx);
+          const easyTag = p ? ` (~${p}/km)` : "";
+          const canSpice = longRunKm >= 12 && ctx.readiness.level !== "rouge" && !ctx.cycle.taper && !ctx.weekPlan.eased;
+          const phase = ctx.macroPlan[0]?.phase ?? "Développement";
+          if (canSpice && phase === "Spécifique" && goalPace) {
+            // Bloc à allure course EN FIN de sortie longue : courir vite sur des jambes
+            // déjà fatiguées, c'est ce qui se passe le jour J.
+            const spec = Math.max(2, Math.round(longRunKm * 0.25));
+            return { type: "Sortie longue", title: "Sortie longue avec bloc spécifique",
+              detail: `Échauffement ${warm} min progressif FC Z1→Z2 → Corps : ${kmAndTime(longRunKm - spec, p)} en Z2${easyTag}, puis ${spec} km à ${goalPace}/km SUR JAMBES FATIGUÉES → Retour au calme ${cool} min FC Z1.${gapNote}${cycleNote}`,
+              why: `Le bloc à allure course arrive en FIN de sortie, quand les jambes sont déjà lourdes — c'est exactement l'état dans lequel tu seras au dernier tiers de ta course. Aucune séance ne prépare mieux le jour J.`,
+              tags: ["Long", "Spécifique", `${longRunKm} km`] };
+          }
+          if (canSpice) {
+            // Finish progressif : le dernier tiers plus rapide que le premier. Habitue à
+            // finir fort plutôt qu'à survivre, et se paie en confiance le jour de course.
+            const fast = p ? (() => { const m = p.match(/(\d+)['’](\d{2})/); if (!m) return null;
+              const sec = Number(m[1]) * 60 + Number(m[2]) - 20; return `${Math.floor(sec / 60)}'${String(sec % 60).padStart(2, "0")}`; })() : null;
+            const third = Math.max(2, Math.round(longRunKm / 3));
+            return { type: "Sortie longue", title: "Sortie longue progressive",
+              detail: `Échauffement ${warm} min progressif FC Z1→Z2 → Corps : ${kmAndTime(longRunKm, p)} en Z2${easyTag}, dont les ${third} DERNIERS kilomètres accélérés${fast ? ` à ~${fast}/km` : " d'un cran"} → Retour au calme ${cool} min FC Z1.${gapNote}${cycleNote}`,
+              why: `Finir plus vite qu'on a commencé : ça t'apprend à terminer fort au lieu de subir, et ça fabrique la confiance qui décide d'une fin de course. La progression doit rester CONFORTABLE — si tu forces, c'est raté.`,
+              tags: ["Long", "Progressif", `${longRunKm} km`] };
+          }
+          return { type: "Sortie longue", title: "Sortie longue",
+            detail: `Échauffement ${warm} min progressif FC Z1→Z2 → Corps : ${kmAndTime(longRunKm, p)} en Z2${easyTag}, allure conversationnelle du début à la fin → Retour au calme ${cool} min FC Z1.${gapNote}${cycleNote}`,
+            why: `C'est la séance qui construit ton endurance de fond — ${longRunKm} km, calés sur ton volume actuel. Elle doit rester facile : si tu finis cassé, elle était trop rapide.`,
+            tags: ["Long", "Z2", `${longRunKm} km`] };
+        })());
     spend();
   }
 

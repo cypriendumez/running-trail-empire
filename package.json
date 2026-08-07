@@ -9,7 +9,9 @@
     "start": "next start",
     "lint": "next lint",
     "db:push": "supabase db push",
-    "db:types": "supabase gen types typescript --linked > src/types/supabase.ts"
+    "db:types": "supabase gen types typescript --linked > src/types/supabase.ts",
+    "test": "npx --yes tsx tests/coach.test.ts",
+    "verify": "npx tsc --noEmit && npx --yes tsx tests/coach.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

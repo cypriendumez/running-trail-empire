@@ -841,8 +841,11 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // plafonner physiologiquement. On fait tourner 4 variantes par type, du plus court
   // et intense vers le plus long et spécifique, indexées sur la semaine ISO (stable
   // dans la semaine, et qui avance toute seule le lundi suivant).
-  const variant = isoWeek % 4;
-  const pick = (arr: string[]) => arr[variant % arr.length];
+  // Sélection du FORMAT et position dans le cycle de SURCHARGE sont deux choses
+  // distinctes. `variant = isoWeek % 4` servait aux deux : quelle que soit la longueur
+  // du menu, seuls les quatre premiers formats étaient jamais tirés — les suivants
+  // n'existaient que sur le papier. On découple.
+  const pick = (arr: string[]) => arr[isoWeek % arr.length];
 
   /**
    * SURCHARGE PROGRESSIVE — le manque le plus coûteux du plan automatique.
@@ -857,7 +860,7 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
    * produit réellement. Le plafond de +2 répétitions évite qu'un cycle long ne dérive
    * vers des séances interminables.
    */
-  const blockWeek = variant;                       // 0,1,2 = montée · 3 = assimilation
+  const blockWeek = isoWeek % 4;                    // 0,1,2 = montée · 3 = assimilation
   const prog = (base: number): number => {
     if (blockWeek === 3) return Math.max(2, Math.round(base * 0.7));
     return base + Math.min(2, blockWeek);
@@ -876,6 +879,10 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
     `VMA moyenne : ${prog(7)}×500 m à ~${repPace(102, 500)}/km, récup 1 min trottinée → tenue de la vitesse`,
     `VMA longue : ${prog(5)}×800 m à ~${repPace(100, 800)}/km, récup 1 min 30 trottinée → soutien du VO2max`,
     `VMA longue : ${prog(4)}×1000 m à ~${repPace(100, 1000)}/km, récup 2 min trottinée → le format le plus proche de la course`,
+    `Pyramide : 200-400-600-800-600-400-200 m à ~${repPace(102, 500)}/km, récup = temps de l'effort → varie la sollicitation, mentalement plus facile qu'une série uniforme`,
+    `30/30 : ${prog(12)}×(30 s vif / 30 s trottiné) à ~${repPace(105, 400)}/km → beaucoup de temps à VO2max pour peu de fatigue musculaire`,
+    `VMA fractionnée en 2 blocs : 2×(${prog(5)}×300 m) à ~${repPace(105, 400)}/km, récup 45 s, 3 min entre blocs → volume élevé sans effondrement de la qualité`,
+    `Fartlek libre : ${prog(8)}×1 min vif / 1 min facile en terrain varié, à la sensation → réapprend à jouer avec les allures, sans montre`,
   ]) };
   // Allure seuil : la vitesse critique MESURÉE prime sur le pourcentage de VMA estimée.
   const sPace = thresholdPace ?? paceAt(86);
@@ -884,6 +891,9 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
     `Seuil long : 2×${progMin(13)} min à ~${sPace}/km, récup 3 min → apprend à tenir l'effort`,
     `Seuil : ${prog(2)}×10 min à ~${sPace}/km, récup 2 min → le format de référence`,
     `Seuil continu : ${progMin(21)} min d'un bloc à ~${sPace}/km → le plus exigeant mentalement, le plus payant`,
+    `Over-under : ${prog(3)}×6 min en alternant 1 min juste SOUS le seuil / 1 min juste AU-DESSUS, récup 3 min → apprend à recycler le lactate, la qualité qui sauve une fin de course`,
+    `Seuil progressif : ${progMin(18)} min en accélérant d'un cran tous les 6 min pour finir légèrement au-dessus du seuil → contrôle de l'allure et gestion de l'effort`,
+    `Tempo long : ${progMin(24)} min à ~${sPace}/km sur terrain roulant, sans regarder la montre après le 5e km → autonomie de l'athlète`,
   ]) };
   const qSpec = { type: "Spécifique", desc: goalPace ? pick([
     `Allure spécifique ${raceShort ?? "objectif"} : ${prog(5)}×1 km à ${goalPace}/km, récup 1 min 30 → ancre l'allure`,
