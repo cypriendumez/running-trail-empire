@@ -71,6 +71,11 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   const easy = pace ? ` (~${pace}/km)` : "";
   const wp = ctx.weekPlan;
   const { targetKm, longRunKm } = ctx.volume;
+  // En terrain vallonné, une allure au km brute est intenable en montée et trop facile
+  // en descente : on précise que la cible s'entend en allure AJUSTÉE AU DÉNIVELÉ.
+  const gapNote = ctx.hillyTraining
+    ? " ⛰️ Sur terrain vallonné, cette allure s'entend en GAP (allure ajustée au dénivelé) : en montée tu seras plus lent au chrono pour le même effort — fie-toi à la FC et au ressenti, pas au cadran."
+    : "";
   const cycleNote = ctx.cycle.taper ? " ⚠️ Semaine d'AFFÛTAGE : on réduit le volume, pas l'intensité."
     : ctx.cycle.deload ? " ⚠️ Semaine ALLÉGÉE : c'est maintenant que le corps assimile le travail des 3 semaines précédentes." : "";
 
@@ -171,7 +176,7 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
           detail: `Échauffement 15 min très facile → ${durationFor(longRunKm, pace) ?? "1h30"} à 2h en FC Z2, allure conversationnelle, cadence souple → 10 min de retour au calme. Pas d'allure cible : c'est du volume aérobie sans impact.${cycleNote}`,
           why: "Le volume aérobie de la semaine, sans les contraintes d'impact de la course.", tags: ["Vélo", "Z2", "Long"] }
       : { type: "Sortie longue", title: "Sortie longue",
-          detail: `Échauffement 15 min progressif FC Z1→Z2 → Corps : ${kmAndTime(longRunKm, pace)} en Z2${easy}, allure conversationnelle du début à la fin → Retour au calme 10 min FC Z1.${cycleNote}`,
+          detail: `Échauffement 15 min progressif FC Z1→Z2 → Corps : ${kmAndTime(longRunKm, pace)} en Z2${easy}, allure conversationnelle du début à la fin → Retour au calme 10 min FC Z1.${gapNote}${cycleNote}`,
           why: `C'est la séance qui construit ton endurance de fond — ${longRunKm} km, calés sur ton volume actuel. Elle doit rester facile : si tu finis cassé, elle était trop rapide.`,
           tags: ["Long", "Z2", `${longRunKm} km`] });
     spend();
@@ -243,7 +248,7 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   const doubles = rawEasy > easyCap && raceIdx < 0;
   for (const i of easySlots) put(i, {
     type: "Endurance", title: "Footing en endurance",
-    detail: `Échauffement 15 min progressif FC Z1→Z2 → Corps : ${kmAndTime(easyKm, pace)} en Z2${easy}, tu dois pouvoir tenir une conversation → Retour au calme 10 min FC Z1.${doubles ? " 💡 À ton volume, scinde en DEUX sorties dans la journée (matin + soir) plutôt qu'un seul footing interminable." : ""}${cycleNote}`,
+    detail: `Échauffement 15 min progressif FC Z1→Z2 → Corps : ${kmAndTime(easyKm, pace)} en Z2${easy}, tu dois pouvoir tenir une conversation → Retour au calme 10 min FC Z1.${gapNote}${doubles ? " 💡 À ton volume, scinde en DEUX sorties dans la journée (matin + soir) plutôt qu'un seul footing interminable." : ""}${cycleNote}`,
     why: ctx.tooMuchIntensity
       ? `⚠️ Tu passes ${ctx.tooMuchIntensity} % de ton temps de course en zone 3 et plus, alors que la cible est 20 %. Tes footings sont courus trop vite — c'est le frein n°1 à la progression. Ralentis jusqu'à pouvoir tenir une conversation complète : c'est censé paraître TROP facile.`
       : `Le socle aérobie. Avec les autres séances, tu es sur ~${targetKm} km cette semaine — c'est le volume facile qui construit la forme de fond, pas les séances dures.`,

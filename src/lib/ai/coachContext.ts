@@ -135,6 +135,8 @@ export type AthleteContext = {
   forecast: DayWeather[];
   /** % du temps passé en Z3+ s'il dépasse la cible (footings trop rapides), sinon null. */
   tooMuchIntensity: number | null;
+  /** true si l'athlète s'entraîne réellement en terrain vallonné (D+ hebdo significatif). */
+  hillyTraining: boolean;
   // Plan macro périodisé semaine par semaine jusqu'au jour J.
   macroPlan: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[];
 };
@@ -281,10 +283,17 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const easyEF = (from: number, to: number) => {
     const runs = workouts.filter(w => { const age = now - new Date(w.date).getTime(); return age > from * 86400000 && age <= to * 86400000 && !isHardType(w.type) && !!w.avg_hr && !!w.distance_km && !!w.duration_seconds; });
     if (!runs.length) return null;
-    return runs.reduce((s, w) => s + (w.distance_km! * 1000 / (w.duration_seconds! / 60)) / w.avg_hr!, 0) / runs.length;
+    // Vitesse AJUSTÉE AU DÉNIVELÉ quand elle est disponible : comparer l'allure brute
+    // d'une semaine en montagne à celle d'une semaine sur route ferait passer un athlète
+    // en progression pour un athlète en train de s'effondrer.
+    const speed = (w: Wk) => (w.gap_min_km && w.gap_min_km > 0)
+      ? 1000 / w.gap_min_km
+      : w.distance_km! * 1000 / (w.duration_seconds! / 60);
+    return runs.reduce((s, w) => s + speed(w) / w.avg_hr!, 0) / runs.length;
   };
   const efR = easyEF(0, 21), efP = easyEF(21, 42);
-  const efTrend = efR != null && efP != null ? (efR > efP * 1.02 ? "↑ en hausse (plus efficace à FC égale → tu progresses)" : efR < efP * 0.98 ? "↓ en baisse (fatigue/forme à surveiller)" : "→ stable") : null;
+  const efGap = workouts.slice(0, 20).some(w => w.gap_min_km != null);
+  const efTrend = efR != null && efP != null ? `${efR > efP * 1.02 ? "↑ en hausse (plus efficace à FC égale → tu progresses)" : efR < efP * 0.98 ? "↓ en baisse (fatigue/forme à surveiller)" : "→ stable"}${efGap ? " [calculé sur l\u2019allure AJUSTÉE AU DÉNIVELÉ, donc comparable entre plat et montagne]" : ""}` : null;
   // VFC : moyenne 7 j vs 7 j précédents.
   const hrvAvg = (from: number, to: number) => { const v = hrv.filter(h => { const age = now - new Date(h.date).getTime(); return age > from * 86400000 && age <= to * 86400000 && h.hrv_ms != null; }).map(h => h.hrv_ms!); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
   const hrv7 = hrvAvg(0, 7), hrv7p = hrvAvg(7, 14);
@@ -732,6 +741,7 @@ ${catalog}`;
     availability: { daysPerWeek: availDaysPerWeek, days: availDays },
     forecast,
     tooMuchIntensity: hardTimePct != null && hardTimePct > 25 ? hardTimePct : null,
+    hillyTraining: elevWeek >= 400 || terr.paceMeaningless,
     macroPlan,
   };
 }
