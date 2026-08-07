@@ -104,14 +104,31 @@ export function parseReps(text: string, fallbackPaceSec: number | null): RepBloc
   return { reps, workSec, recSec, paceSec };
 }
 
-/** Bloc d'étapes répétées au format intervals.icu (`Nx` ouvre la répétition). */
+/**
+ * Étapes répétées, ÉCRITES UNE PAR UNE.
+ *
+ * intervals.icu n'interprète AUCUNE syntaxe de répétition : testé le 7 août 2026
+ * contre leur parseur avec `12x` seul, indenté, précédé d'un tiret, et en blocs
+ * nommés — les quatre formes donnent 4 étapes au lieu de 26, la ligne de répétition
+ * étant purement ignorée. Résultat : l'athlète recevait UNE seule répétition de 70 s.
+ * Les répétitions explicites produisent bien 26 étapes et 48 min, vérifié.
+ *
+ * Elles sont numérotées (« Effort 3/12 ») : sur la montre, savoir où l'on en est
+ * pendant un fractionné vaut largement les quelques lignes supplémentaires.
+ */
 function repSteps(b: RepBlock, vmaKmh: number | null, zone: number, hill?: boolean): string {
   const fmt = (sec: number) => (sec % 60 === 0 ? `${sec / 60}m` : `${sec}s`);
   // En côte, une allure au km n'a aucun sens : on pilote à la fréquence cardiaque.
   const range = hill ? `Z${zone} HR` : b.paceSec
     ? `${fmtPace(Math.max(120, b.paceSec - 8))}-${fmtPace(b.paceSec + 8)} pace`
     : (vmaKmh ? `${zonePaceRange(vmaKmh, zone)} pace` : `Z${zone} HR`);
-  return [`${b.reps}x`, `- ${fmt(b.workSec)} ${range} Effort`, `- ${fmt(b.recSec)} Z1 HR Récup`].join("\n");
+  const out: string[] = [];
+  for (let i = 1; i <= b.reps; i++) {
+    out.push(`- ${fmt(b.workSec)} ${range} Effort ${i}/${b.reps}`);
+    // Pas de récupération après la dernière : le retour au calme enchaîne.
+    if (i < b.reps) out.push(`- ${fmt(b.recSec)} Z1 HR Récup`);
+  }
+  return out.join("\n");
 }
 
 // Étapes intervals.icu selon le type de séance. Allure prescrite (mainPaceSec) > allure de zone (VMA)
