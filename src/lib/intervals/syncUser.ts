@@ -88,7 +88,7 @@ export async function syncIntervalsForUser(
 
   // Colonnes issues de migrations éventuellement non appliquées : PostgREST rejette
   // l'écriture ENTIÈRE si l'une d'elles manque (42703). On sonde une fois.
-  const probe = await admin.from("workouts").select("sport, external_id").limit(1);
+  const probe = await admin.from("workouts").select("sport, external_id, vertical_ratio_pct, hrr_bpm").limit(1);
   const hasNewCols = probe.error?.code !== "42703";
 
   for (const act of activities) {
@@ -101,7 +101,12 @@ export async function syncIntervalsForUser(
       title,
       type: workoutType,
       date,
-      ...(hasNewCols ? { sport: sportOf(act.type), external_id: String(act.id) } : {}),
+      ...(hasNewCols ? {
+        sport: sportOf(act.type),
+        external_id: String(act.id),
+        vertical_ratio_pct: act.average_vertical_ratio != null ? Math.round(act.average_vertical_ratio * 100) / 100 : null,
+        hrr_bpm: act.icu_hrr?.hrr != null ? Math.round(act.icu_hrr.hrr) : null,
+      } : {}),
       duration_seconds: Math.max(1, act.moving_time ?? act.elapsed_time ?? 1),
       distance_km: act.distance ? act.distance / 1000 : null,
       elevation_gain_m: ri(act.total_elevation_gain) ?? 0,
@@ -121,6 +126,9 @@ export async function syncIntervalsForUser(
       vertical_oscillation_cm: act.average_vertical_oscillation != null ? Math.round(act.average_vertical_oscillation / 10 * 10) / 10 : null,
       ground_contact_ms: ri(act.avg_ground_contact_time),
       stride_length_m: act.average_stride ?? null,
+      // Économie de course et récupération cardiaque : déjà présentes dans la réponse,
+      // jamais lues. `icu_hrr` est un objet — seule la chute de FC nous intéresse.
+
       cardiac_decoupling: act.decoupling ?? null,
       // Champs disponibles chez intervals.icu mais jamais enregistrés jusqu'ici — dont
       // la TEMPÉRATURE, sans laquelle toute l'adaptation à la chaleur restait lettre morte.
@@ -157,9 +165,13 @@ export async function syncIntervalsForUser(
         {
           user_id: profile.id, date: day.id,
           total_sleep_min: Math.round(day.sleepSecs / 60),
-          deep_sleep_min: day.deepSleepSecs ? Math.round(day.deepSleepSecs / 60) : 0,
-          light_sleep_min: day.lightSleepSecs ? Math.round(day.lightSleepSecs / 60) : 0,
-          rem_sleep_min: day.remSleepSecs ? Math.round(day.remSleepSecs / 60) : 0,
+          // Ces champs sont ABSENTS de l'API wellness d'intervals.icu pour la plupart des
+          // comptes. Les forcer à 0 fabriquait de la donnée : le coach lisait « 0 % de
+          // sommeil profond » et y voyait une nuit catastrophique, alors qu'il s'agissait
+          // simplement d'une mesure indisponible. Absent doit rester NULL.
+          deep_sleep_min: day.deepSleepSecs != null ? Math.round(day.deepSleepSecs / 60) : null,
+          light_sleep_min: day.lightSleepSecs != null ? Math.round(day.lightSleepSecs / 60) : null,
+          rem_sleep_min: day.remSleepSecs != null ? Math.round(day.remSleepSecs / 60) : null,
           sleep_score: day.sleepScore ?? null,
           body_battery_end: day.bb ?? null,
           spo2_avg: day.avgSpo2 ?? null,
@@ -256,7 +268,8 @@ interface IntervalsActivity {
   average_watts?: number; average_cadence?: number; icu_tss?: number;
   aerobic_te?: number; avg_vertical_oscillation?: number;
   avg_ground_contact_time?: number; avg_stride_length?: number; decoupling?: number;
-  average_vertical_oscillation?: number; average_stride?: number;
+  average_vertical_oscillation?: number; average_vertical_ratio?: number;
+  icu_hrr?: { hrr?: number } | null; average_stride?: number;
   average_temp?: number; gap?: number; icu_hr_zone_times?: number[]; icu_intensity?: number;
   icu_training_load?: number;
 }

@@ -118,6 +118,10 @@ export async function GET(req: Request) {
         vertical_oscillation_cm: act.average_vertical_oscillation != null ? Math.round(act.average_vertical_oscillation / 10 * 10) / 10 : null,
         ground_contact_ms: ri(act.avg_ground_contact_time),
         stride_length_m: act.average_stride ?? null,
+        // Économie de course et récupération cardiaque : déjà présentes dans la réponse,
+        // jamais lues. `icu_hrr` est un objet — seule la chute de FC nous intéresse.
+        vertical_ratio_pct: act.average_vertical_ratio != null ? Math.round(act.average_vertical_ratio * 100) / 100 : null,
+        hrr_bpm: act.icu_hrr?.hrr != null ? Math.round(act.icu_hrr.hrr) : null,
         cardiac_decoupling: act.decoupling ?? null,
         // Champs disponibles chez intervals.icu mais jamais enregistrés jusqu'ici (recensement
         // du 7/08 : 0 % de remplissage côté base, 8/8 côté API). La température en particulier
@@ -144,10 +148,10 @@ export async function GET(req: Request) {
     // de laisser la synchronisation échouer en bloc — le sport sera renseigné au premier
     // passage suivant l'application de la migration.
     {
-      const probe = await supabase.from("workouts").select("sport, external_id").limit(1);
+      const probe = await supabase.from("workouts").select("sport, external_id, vertical_ratio_pct, hrr_bpm").limit(1);
       if (probe.error?.code === "42703") {
-        for (const p of toInsert) { delete p.sport; delete p.external_id; }
-        for (const u of toUpdate) { delete u.payload.sport; delete u.payload.external_id; }
+        for (const p of toInsert) { delete p.sport; delete p.external_id; delete p.vertical_ratio_pct; delete p.hrr_bpm; }
+        for (const u of toUpdate) { delete u.payload.sport; delete u.payload.external_id; delete u.payload.vertical_ratio_pct; delete u.payload.hrr_bpm; }
       }
     }
 
@@ -193,9 +197,13 @@ export async function GET(req: Request) {
     .map(d => ({
       user_id: user.id, date: d.id,
       total_sleep_min: Math.round(d.sleepSecs! / 60),
-      deep_sleep_min: d.deepSleepSecs ? Math.round(d.deepSleepSecs / 60) : 0,
-      light_sleep_min: d.lightSleepSecs ? Math.round(d.lightSleepSecs / 60) : 0,
-      rem_sleep_min: d.remSleepSecs ? Math.round(d.remSleepSecs / 60) : 0,
+      // Ces champs sont ABSENTS de l'API wellness d'intervals.icu pour la plupart des
+      // comptes. Les forcer à 0 fabriquait de la donnée : le coach lisait « 0 % de
+      // sommeil profond » et y voyait une nuit catastrophique, alors qu'il s'agissait
+      // simplement d'une mesure indisponible. Absent doit rester NULL.
+      deep_sleep_min: d.deepSleepSecs != null ? Math.round(d.deepSleepSecs / 60) : null,
+      light_sleep_min: d.lightSleepSecs != null ? Math.round(d.lightSleepSecs / 60) : null,
+      rem_sleep_min: d.remSleepSecs != null ? Math.round(d.remSleepSecs / 60) : null,
       sleep_score: d.sleepScore ?? null,
       body_battery_start: d.bbMax ?? null,
       body_battery_end: d.bb ?? null,
@@ -381,7 +389,8 @@ interface IntervalsActivity {
   avg_ground_contact_time?: number;
   avg_stride_length?: number;
   decoupling?: number;
-  average_vertical_oscillation?: number;
+  average_vertical_oscillation?: number; average_vertical_ratio?: number;
+  icu_hrr?: { hrr?: number } | null;
   average_temp?: number;
   gap?: number;
   icu_hr_zone_times?: number[];

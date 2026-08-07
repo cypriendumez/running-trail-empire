@@ -36,6 +36,7 @@ type Wk = {
   elevation_gain_m?: number | null; avg_hr?: number | null; training_effect?: number | null;
   tss?: number | null; avg_cadence_spm?: number | null; avg_power_watts?: number | null; max_hr?: number | null;
   vertical_oscillation_cm?: number | null; ground_contact_ms?: number | null; stride_length_m?: number | null;
+  vertical_ratio_pct?: number | null; hrr_bpm?: number | null;
   cardiac_decoupling?: number | null; weather_temp_c?: number | null;
   gap_min_km?: number | null; hr_zone_seconds?: number[] | null; intensity_pct?: number | null;
 };
@@ -153,7 +154,7 @@ export type AthleteContext = {
  * donc le coach de TOUT l'historique, et pas seulement du sport. On retente sans.
  */
 async function fetchWorkouts(sb: SB, userId: string) {
-  const cols = "date,type,distance_km,duration_seconds,elevation_gain_m,avg_hr,max_hr,training_effect,tss,avg_cadence_spm,avg_power_watts,vertical_oscillation_cm,ground_contact_ms,stride_length_m,cardiac_decoupling,weather_temp_c,gap_min_km,hr_zone_seconds,intensity_pct";
+  const cols = "vertical_ratio_pct,hrr_bpm,date,type,distance_km,duration_seconds,elevation_gain_m,avg_hr,max_hr,training_effect,tss,avg_cadence_spm,avg_power_watts,vertical_oscillation_cm,ground_contact_ms,stride_length_m,cardiac_decoupling,weather_temp_c,gap_min_km,hr_zone_seconds,intensity_pct";
   const q = async (c: string) => {
     const r = await sb.from("workouts").select(c).eq("user_id", userId).order("date", { ascending: false }).limit(60);
     return { data: r.data as unknown as Wk[] | null, error: r.error };
@@ -343,7 +344,10 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // Sommeil détaillé + terrain + chaleur + cycle.
   const sl = sleep[0];
   const pctOf = (part?: number | null, tot?: number | null) => part && tot ? Math.round(part / tot * 100) : null;
-  const deepPct = pctOf(sl?.deep_sleep_min, sl?.total_sleep_min), remPct = pctOf(sl?.rem_sleep_min, sl?.total_sleep_min);
+  // Une phase à 0 min sur une nuit de plusieurs heures n'existe pas : c'est une mesure
+  // manquante, pas un sommeil dégradé. On préfère ne rien dire que dire faux.
+  const phaseMin = (v: number | null | undefined) => (v != null && v > 0 ? v : null);
+  const deepPct = pctOf(phaseMin(sl?.deep_sleep_min), sl?.total_sleep_min), remPct = pctOf(phaseMin(sl?.rem_sleep_min), sl?.total_sleep_min);
   const elevWeek = Math.round(workouts.filter(w => now - new Date(w.date).getTime() <= 7 * 86400000).reduce((s, w) => s + (w.elevation_gain_m ?? 0), 0));
   const temps = recForm.map(w => num(w.weather_temp_c)).filter((x): x is number => x != null && Number.isFinite(x));
   const avgTemp = temps.length ? Math.round(temps.reduce((a, b) => a + b, 0) / temps.length) : null;
@@ -489,6 +493,29 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const raceShort = objective?.race ? objective.race.replace(/\s*\d{4}.*$/, "").trim() : null;
   const isShortGoal = libGoal === "5k" || libGoal === "10k" || libGoal === "semi";
   // Budget de qualité de base selon le niveau.
+  // ── ÉCONOMIE DE COURSE & RÉCUPÉRATION CARDIAQUE ─────────────────────────────
+  // Deux signaux qui bougent AVANT le chrono. On ne regarde pas la valeur absolue mais
+  // la TENDANCE : c'est elle qui distingue une forme qui monte d'une fatigue qui
+  // s'installe, et elle parle plus tôt que la VFC.
+  const trendOf = (key: "vertical_ratio_pct" | "hrr_bpm") => {
+    const vals = runsForVma.filter(w => w[key] != null)
+      .map(w => ({ d: new Date(w.date).getTime(), v: Number(w[key]) }));
+    if (vals.length < 4) return null;
+    const recent = vals.slice(0, Math.ceil(vals.length / 2));
+    const older = vals.slice(Math.ceil(vals.length / 2));
+    const avg = (a: { v: number }[]) => a.reduce((s, x) => s + x.v, 0) / a.length;
+    return { now: r1(avg(recent)), before: r1(avg(older)), n: vals.length };
+  };
+  const vr = trendOf("vertical_ratio_pct");
+  const hrr = trendOf("hrr_bpm");
+  // Ratio vertical : part du travail qui part vers le HAUT plutôt que vers l'avant.
+  // Indépendant de la taille du coureur, contrairement à l'oscillation seule.
+  const vrLine = vr ? `${vr.now} % (${vr.now < 6.5 ? "très économique" : vr.now < 8 ? "bon" : vr.now < 9 ? "correct" : "perfectible"})`
+    + `${Math.abs(vr.now - vr.before) >= 0.2 ? ` — ${vr.now < vr.before ? `EN AMÉLIORATION (${vr.before} % avant) : sa foulée devient plus efficace, dis-le-lui` : `EN DÉGRADATION (${vr.before} % avant) : souvent un signe de fatigue neuromusculaire ou de foulée qui s'écrase — renfo et éducatifs`}` : " — stable"}` : null;
+  // Chute de FC sur 60 s après un effort dur : marqueur parasympathique.
+  const hrrLine = hrr ? `${hrr.now} bpm de chute en 60 s après effort`
+    + `${Math.abs(hrr.now - hrr.before) >= 2 ? ` — ${hrr.now > hrr.before ? `EN HAUSSE (${hrr.before} avant) : il récupère mieux, tu peux oser la charge` : `EN BAISSE (${hrr.before} avant) : sa récupération se dégrade AVANT que le chrono ne bouge — allège maintenant, pas dans trois semaines`}` : " — stable"}` : null;
+
   // ── PERFORMANCE MESURÉE (courbe d'allure intervals.icu) ─────────────────────
   // La vitesse critique est ajustée sur les efforts RÉELS de l'athlète : c'est un
   // seuil mesuré, là où `paceAt(86)` n'est qu'un pourcentage d'une VMA elle-même
@@ -795,7 +822,7 @@ CAPACITÉS (tests)
 - Zones FC : Z2 facile ${hrZone(0.6, 0.7) ?? "?"} · Z4 seuil ${hrZone(0.8, 0.9) ?? "?"}
 - Zones allure : ${paceZones ?? (computedPaces ? `(calculées depuis la VMA) ${computedPaces}` : "non renseignées")}
 - Chronos théoriques au potentiel actuel (depuis la VMA) : ${predictions ?? "?"}
-${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${thresholdPace ? `- 🎯 ALLURE SEUIL **MESURÉE** : ${thresholdPace}/km (vitesse critique ${(csMs! * 3.6).toFixed(2)} km/h, ajustée sur ses efforts réels)${pc?.dPrime ? ` · réserve anaérobie D' ${pc.dPrime} m` : ""}. UTILISE CETTE VALEUR pour les séances au seuil plutôt qu'un pourcentage de VMA estimée.\n` : ""}${qeLine ? `- 🔍 EXÉCUTION DE SA DERNIÈRE QUALITÉ : ${qeLine}${faded ? " → il a DÉCROCHÉ : la prochaine série doit être plus courte ou plus lente, pas plus dure. Ne répète pas la même erreur." : fade != null && fade <= -6 ? " → il a ACCÉLÉRÉ en fin de série : il en avait sous le pied, tu peux durcir (allure ou volume, pas les deux)." : ""}\n` : ""}- Repères physio : seuil lactique ~${thresholdPace ?? (vma ? paceAt(86) : "?")}/km · vitesse critique ~${vma ? r1(vma * 0.90) : "?"} km/h (${vma ? paceAt(90) : "?"}/km) · VO2max estimé ~${vo2 ?? "?"} ml/kg/min
+${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${vrLine ? `- 🦵 ÉCONOMIE DE COURSE (ratio vertical, ${vr!.n} séances) : ${vrLine}\n` : ""}${hrrLine ? `- ❤️‍🩹 RÉCUPÉRATION CARDIAQUE : ${hrrLine}\n` : ""}${thresholdPace ? `- 🎯 ALLURE SEUIL **MESURÉE** : ${thresholdPace}/km (vitesse critique ${(csMs! * 3.6).toFixed(2)} km/h, ajustée sur ses efforts réels)${pc?.dPrime ? ` · réserve anaérobie D' ${pc.dPrime} m` : ""}. UTILISE CETTE VALEUR pour les séances au seuil plutôt qu'un pourcentage de VMA estimée.\n` : ""}${qeLine ? `- 🔍 EXÉCUTION DE SA DERNIÈRE QUALITÉ : ${qeLine}${faded ? " → il a DÉCROCHÉ : la prochaine série doit être plus courte ou plus lente, pas plus dure. Ne répète pas la même erreur." : fade != null && fade <= -6 ? " → il a ACCÉLÉRÉ en fin de série : il en avait sous le pied, tu peux durcir (allure ou volume, pas les deux)." : ""}\n` : ""}- Repères physio : seuil lactique ~${thresholdPace ?? (vma ? paceAt(86) : "?")}/km · vitesse critique ~${vma ? r1(vma * 0.90) : "?"} km/h (${vma ? paceAt(90) : "?"}/km) · VO2max estimé ~${vo2 ?? "?"} ml/kg/min
 
 FORME & RÉCUPÉRATION (aujourd'hui)
 - État physiologique : ${state}
