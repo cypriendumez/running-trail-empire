@@ -234,7 +234,11 @@ export async function GET(req: Request) {
   // Position d'entraînement : rafraîchie au maximum une fois par jour depuis la
   // dernière course avec trace GPS. Sert à interroger la météo RÉELLE (la température
   // de la montre est mesurée au poignet, donc peu fiable).
-  if (freshWorkouts > 0) {
+  //
+  // Volontairement PAS conditionné à `freshWorkouts` : sinon un athlète qui ne court
+  // pas pendant quelques jours n'aurait jamais de position, donc jamais de météo —
+  // alors que c'est précisément quand il ne court pas qu'on prépare ses prochains jours.
+  {
     try {
       const lastRun = validActivities.find((a) => /run/i.test(String(a.type ?? "")) && a.id);
       if (lastRun?.id) {
