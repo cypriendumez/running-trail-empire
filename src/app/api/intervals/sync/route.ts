@@ -46,7 +46,7 @@ export async function GET(req: Request) {
     fetch(`${BASE}/athlete/${ATHLETE_ID}/wellness?oldest=${oldest}&newest=${newest}`, {
       headers: authHeader(API_KEY),
     }),
-    supabase.from("workouts").select("id, date, title")
+    supabase.from("workouts").select("id, date, title, external_id")
       .eq("user_id", user.id).gte("date", oldest).lte("date", newest),
   ]);
 
@@ -70,8 +70,19 @@ export async function GET(req: Request) {
   const validActivities = activities.filter(a => a.type && a.start_date_local);
 
   if (validActivities.length > 0) {
+    // Repli si la migration 015 n'est pas encore appliquée : PostgREST rejette le
+    // select entier pour une seule colonne inconnue (42703).
+    const existingRows = existingWorkoutsResult.error
+      ? (await supabase.from("workouts").select("id, date, title")
+          .eq("user_id", user.id).gte("date", oldest).lte("date", newest)).data ?? []
+      : existingWorkoutsResult.data ?? [];
+
+    // L'identifiant d'origine prime sur (date, titre) : deux sorties le même jour
+    // portent le même titre automatique Garmin et se confondaient.
+    const byExt = new Map<string, string>();
     const existingMap = new Map<string, string>();
-    for (const w of existingWorkoutsResult.data ?? []) {
+    for (const w of existingRows as { id: string; date: string; title: string; external_id?: string | null }[]) {
+      if (w.external_id) byExt.set(w.external_id, w.id);
       existingMap.set(`${w.date}__${w.title}`, w.id);
     }
 
@@ -86,7 +97,7 @@ export async function GET(req: Request) {
       const title = act.name ?? workoutType;
 
       const payload: Record<string, unknown> = {
-        user_id: user.id, title, type: workoutType, sport, date,
+        user_id: user.id, title, type: workoutType, sport, external_id: String(act.id), date,
         duration_seconds: Math.max(1, Math.round(act.moving_time ?? act.elapsed_time ?? 1)),
         distance_km: act.distance ? act.distance / 1000 : null,
         elevation_gain_m: ri(act.total_elevation_gain),
@@ -113,7 +124,7 @@ export async function GET(req: Request) {
         source: "garmin",
       };
 
-      const existingId = existingMap.get(`${date}__${title}`);
+      const existingId = byExt.get(String(act.id)) ?? existingMap.get(`${date}__${title}`);
       if (existingId) toUpdate.push({ id: existingId, payload });
       else toInsert.push(payload);
     }
@@ -128,10 +139,10 @@ export async function GET(req: Request) {
     // de laisser la synchronisation échouer en bloc — le sport sera renseigné au premier
     // passage suivant l'application de la migration.
     {
-      const probe = await supabase.from("workouts").select("sport").limit(1);
+      const probe = await supabase.from("workouts").select("sport, external_id").limit(1);
       if (probe.error?.code === "42703") {
-        for (const p of toInsert) delete p.sport;
-        for (const u of toUpdate) delete u.payload.sport;
+        for (const p of toInsert) { delete p.sport; delete p.external_id; }
+        for (const u of toUpdate) { delete u.payload.sport; delete u.payload.external_id; }
       }
     }
 

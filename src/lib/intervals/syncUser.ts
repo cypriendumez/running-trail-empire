@@ -48,48 +48,73 @@ export async function syncIntervalsForUser(
 
   let synced = 0;
 
-  // Migration 015 possiblement en retard : PostgREST rejette l'écriture entière si
-  // `sport` n'existe pas (42703). On sonde une fois plutôt que de perdre la synchro.
-  const probe = await admin.from("workouts").select("sport").limit(1);
-  const hasSport = probe.error?.code !== "42703";
+  // ── ÉCRITURE DES SÉANCES ────────────────────────────────────────────────────
+  // On n'utilise PLUS `upsert(..., { onConflict: "user_id,date,title" })` : cette
+  // contrainte n'existe pas en base. Postgres répondait 42P10, et comme le code ne
+  // testait que `if (!error) synced++`, l'échec était compté comme « rien à faire ».
+  // Ce chemin (webhook + cron) n'a donc jamais enregistré une seule séance, et le
+  // coach n'était jamais déclenché : la replanification instantanée ne partait pas.
+  //
+  // On lit d'abord l'existant et on choisit explicitement insertion ou mise à jour,
+  // comme le fait déjà le chemin appelé depuis le navigateur.
+  const dates = [...new Set(activities.map(a => a.start_date_local?.split("T")[0]).filter(Boolean))] as string[];
+  const existing = dates.length
+    ? (await admin.from("workouts").select("id, date, title, external_id").eq("user_id", userId).in("date", dates)).data ?? []
+    : [];
+  const byExt = new Map<string, string>();
+  const byDateTitle = new Map<string, string>();
+  for (const w of existing as { id: string; date: string; title: string; external_id?: string | null }[]) {
+    if (w.external_id) byExt.set(w.external_id, w.id);
+    byDateTitle.set(`${w.date}__${w.title}`, w.id);
+  }
+
+  // Colonnes issues de migrations éventuellement non appliquées : PostgREST rejette
+  // l'écriture ENTIÈRE si l'une d'elles manque (42703). On sonde une fois.
+  const probe = await admin.from("workouts").select("sport, external_id").limit(1);
+  const hasNewCols = probe.error?.code !== "42703";
 
   for (const act of activities) {
     if (!act.type || !act.start_date_local) continue;
     const workoutType = mapActivityType(act.type);
-    const sport = sportOf(act.type);
-    const { error } = await admin.from("workouts").upsert(
-      {
-        user_id: profile.id,
-        title: act.name ?? workoutType,
-        type: workoutType,
-        ...(hasSport ? { sport } : {}),
-        date: act.start_date_local.split("T")[0],
-        duration_seconds: Math.max(1, act.moving_time ?? act.elapsed_time ?? 1),
-        distance_km: act.distance ? act.distance / 1000 : null,
-        elevation_gain_m: act.total_elevation_gain ?? 0,
-        elevation_loss_m: act.total_elevation_loss ?? 0,
-        avg_hr: act.average_heartrate ?? null,
-        max_hr: act.max_heartrate ?? null,
-        avg_pace_min_km: act.average_speed ? 1000 / 60 / act.average_speed : null,
-        avg_power_watts: act.average_watts ?? null,
-        avg_cadence_spm: act.average_cadence ? act.average_cadence * 2 : null,
-        tss: act.icu_tss ?? null,
-        training_effect: act.aerobic_te ?? null,
-        vertical_oscillation_cm: act.avg_vertical_oscillation ?? null,
-        ground_contact_ms: act.avg_ground_contact_time ?? null,
-        stride_length_m: act.avg_stride_length ? act.avg_stride_length / 100 : null,
-        cardiac_decoupling: act.decoupling ?? null,
-        // Champs disponibles chez intervals.icu mais jamais enregistrés jusqu'ici — dont
-        // la TEMPÉRATURE, sans laquelle toute l'adaptation à la chaleur restait lettre morte.
-        weather_temp_c: act.average_temp ?? null,
-        gap_min_km: act.gap && act.gap > 0.3 ? Math.round((1000 / 60 / act.gap) * 100) / 100 : null,
-        hr_zone_seconds: Array.isArray(act.icu_hr_zone_times) ? act.icu_hr_zone_times : null,
-        intensity_pct: act.icu_intensity != null ? Math.round(act.icu_intensity) : null,
-        source: "garmin",
-      },
-      { onConflict: "user_id,date,title", ignoreDuplicates: false }
-    );
-    if (!error) synced++;
+    const date = act.start_date_local.split("T")[0];
+    const title = act.name ?? workoutType;
+    const payload: Record<string, unknown> = {
+      user_id: userId,
+      title,
+      type: workoutType,
+      date,
+      ...(hasNewCols ? { sport: sportOf(act.type), external_id: String(act.id) } : {}),
+      duration_seconds: Math.max(1, act.moving_time ?? act.elapsed_time ?? 1),
+      distance_km: act.distance ? act.distance / 1000 : null,
+      elevation_gain_m: act.total_elevation_gain ?? 0,
+      elevation_loss_m: act.total_elevation_loss ?? 0,
+      avg_hr: act.average_heartrate ?? null,
+      max_hr: act.max_heartrate ?? null,
+      avg_pace_min_km: act.average_speed ? 1000 / 60 / act.average_speed : null,
+      avg_power_watts: act.average_watts ?? null,
+      avg_cadence_spm: act.average_cadence ? act.average_cadence * 2 : null,
+      tss: act.icu_training_load ?? act.icu_tss ?? null,
+      training_effect: act.aerobic_te ?? null,
+      vertical_oscillation_cm: act.avg_vertical_oscillation ?? null,
+      ground_contact_ms: act.avg_ground_contact_time ?? null,
+      stride_length_m: act.avg_stride_length ? act.avg_stride_length / 100 : null,
+      cardiac_decoupling: act.decoupling ?? null,
+      // Champs disponibles chez intervals.icu mais jamais enregistrés jusqu'ici — dont
+      // la TEMPÉRATURE, sans laquelle toute l'adaptation à la chaleur restait lettre morte.
+      weather_temp_c: act.average_temp ?? null,
+      gap_min_km: act.gap && act.gap > 0.3 ? Math.round((1000 / 60 / act.gap) * 100) / 100 : null,
+      hr_zone_seconds: Array.isArray(act.icu_hr_zone_times) ? act.icu_hr_zone_times : null,
+      intensity_pct: act.icu_intensity != null ? Math.round(act.icu_intensity) : null,
+      source: "garmin",
+    };
+
+    const id = byExt.get(String(act.id)) ?? byDateTitle.get(`${date}__${title}`);
+    const { error } = id
+      ? await admin.from("workouts").update(payload).eq("id", id)
+      : await admin.from("workouts").insert(payload);
+    // Seules les VRAIES nouveautés déclenchent une replanification : une mise à jour
+    // se produit à chaque sondage et republierait le plan en boucle.
+    if (!error && !id) synced++;
   }
 
   for (const day of wellness) {

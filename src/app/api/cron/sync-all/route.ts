@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { autoCoachForUser } from "@/lib/ai/autoCoach";
+import { syncIntervalsForUser } from "@/lib/intervals/syncUser";
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // 60s timeout (Vercel hobby = 10s, pro = 60s)
@@ -49,95 +50,20 @@ export async function GET(req: Request) {
     if (!profile.intervals_athlete_id || !profile.intervals_api_key) continue;
 
     try {
-      const [activitiesRes, wellnessRes] = await Promise.all([
-        fetch(`${BASE}/athlete/${profile.intervals_athlete_id}/activities?oldest=${oldest}&newest=${newest}`, {
-          headers: authHeader(profile.intervals_api_key),
-        }),
-        fetch(`${BASE}/athlete/${profile.intervals_athlete_id}/wellness?oldest=${oldest}&newest=${newest}`, {
-          headers: authHeader(profile.intervals_api_key),
-        }),
-      ]);
+      // Chemin de synchronisation PARTAGÉ. Ce cron avait sa propre copie de la logique :
+      // elle ignorait les champs récents (température, GAP, temps en zone, sport), ne
+      // lançait aucune des analyses mesurées, et faisait un upsert sur une contrainte
+      // inexistante — donc n'écrivait rien. Trois implémentations divergentes pour une
+      // seule tâche, c'est deux de trop.
+      const { synced, error: syncErr } = await syncIntervalsForUser(admin, {
+        userId: profile.id,
+        athleteId: profile.intervals_athlete_id,
+        apiKey: profile.intervals_api_key,
+        days,
+      });
+      if (syncErr) { results.push({ userId: profile.id, ok: false, error: syncErr }); continue; }
 
-      if (!activitiesRes.ok) {
-        results.push({ userId: profile.id, ok: false, error: `HTTP ${activitiesRes.status}` });
-        continue;
-      }
-
-      const [activities, wellness]: [IntervalsActivity[], IntervalsWellness[]] = await Promise.all([
-        activitiesRes.json(),
-        wellnessRes.ok ? wellnessRes.json() : Promise.resolve([]),
-      ]);
-
-      let synced = 0;
-
-      // FC max de l'athlète (baseline → max observé) pour CLASSER les séances par intensité réelle.
-      const { data: baseRow } = await admin.from("performance_baselines").select("max_hr").eq("user_id", profile.id).order("tested_at", { ascending: false }).limit(1).maybeSingle();
-      const obsMax = Math.max(0, ...activities.map((a) => a.max_heartrate ?? 0));
-      const fcMax = (baseRow?.max_hr as number | undefined) || (obsMax > 150 ? obsMax : null);
-
-      // Sync activities
-      for (const act of activities) {
-        if (!act.type || !act.start_date_local) continue;
-        const workoutType = refineType(act, fcMax);
-        const { error: upsertErr } = await admin.from("workouts").upsert(
-          {
-            user_id: profile.id,
-            title: act.name ?? workoutType,
-            type: workoutType,
-            date: act.start_date_local.split("T")[0],
-            duration_seconds: Math.max(1, act.moving_time ?? act.elapsed_time ?? 1),
-            distance_km: act.distance ? act.distance / 1000 : null,
-            elevation_gain_m: act.total_elevation_gain ?? 0,
-            elevation_loss_m: act.total_elevation_loss ?? 0,
-            avg_hr: act.average_heartrate ?? null,
-            max_hr: act.max_heartrate ?? null,
-            avg_pace_min_km: act.average_speed ? 1000 / 60 / act.average_speed : null,
-            avg_power_watts: act.average_watts ?? null,
-            max_power_watts: act.max_watts ?? null,
-            avg_cadence_spm: act.average_cadence ? act.average_cadence * 2 : null,
-            tss: act.icu_tss ?? null,
-            training_effect: act.aerobic_te ?? null,
-            vertical_oscillation_cm: act.avg_vertical_oscillation ?? null,
-            ground_contact_ms: act.avg_ground_contact_time ?? null,
-            stride_length_m: act.avg_stride_length ? act.avg_stride_length / 100 : null,
-            cardiac_decoupling: act.decoupling ?? null,
-            source: "garmin",
-          },
-          { onConflict: "user_id,date,title", ignoreDuplicates: false }
-        );
-        if (!upsertErr) synced++;
-      }
-
-      // Sync wellness (HRV + sleep)
-      for (const day of wellness) {
-        if (!day.id) continue;
-        if (day.hrv !== undefined) {
-          const state = day.hrv < 50 ? "recovery" : day.hrv > 80 ? "competition" : "optimal";
-          await admin.from("hrv_data").upsert(
-            { user_id: profile.id, date: day.id, hrv_ms: day.hrv, rmssd: day.hrv, sdnn: day.hrvSDNN ?? null, physiological_state: state, notes: "Auto-sync Intervals.icu" },
-            { onConflict: "user_id,date" }
-          );
-        }
-        if (day.sleepSecs !== undefined) {
-          await admin.from("sleep_data").upsert(
-            {
-              user_id: profile.id, date: day.id,
-              total_sleep_min: Math.round(day.sleepSecs / 60),
-              deep_sleep_min: day.deepSleepSecs ? Math.round(day.deepSleepSecs / 60) : 0,
-              light_sleep_min: day.lightSleepSecs ? Math.round(day.lightSleepSecs / 60) : 0,
-              rem_sleep_min: day.remSleepSecs ? Math.round(day.remSleepSecs / 60) : 0,
-              sleep_score: day.sleepScore ?? null,
-              body_battery_start: day.bbMax ?? null,
-              body_battery_end: day.bb ?? null,
-              spo2_avg: day.avgSpo2 ?? null,
-              source: "intervals_icu",
-            },
-            { onConflict: "user_id,date" }
-          );
-        }
-      }
-
-      // Coach AUTONOME : si du nouveau a été synchronisé, recalcule & publie la prochaine séance.
+      // Coach AUTONOME : du nouveau → recalcule et publie la prochaine séance.
       let coached = false;
       if (synced > 0) {
         const r = await autoCoachForUser(admin, { userId: profile.id, athleteId: profile.intervals_athlete_id, apiKey: profile.intervals_api_key }).catch(() => null);
