@@ -29,7 +29,9 @@ const P: Record<string, Record<string, string>> = {
     "tab.profile": "Profil", "tab.goals": "Objectifs", "tab.performance": "Performance", "tab.shoes": "Chaussures", "tab.subscription": "Abonnement",
     "common.save": "Enregistrer", "common.saving": "Sauvegarde…", "common.cancel": "Annuler", "common.add": "Ajouter",
     "hero.myProfile": "Mon profil", "hero.score": "Score {n}/100", "hero.streak": "{n} jour de suite", "hero.streakP": "{n} jours de suite",
-    "stat.kmYear": "Km cette année", "stat.kmMonth": "Km ce mois", "stat.sessions": "Sessions mois", "stat.longest": "Plus longue",
+    "stat.kmYear": "Km courus cette année", "stat.kmMonth": "Km courus ce mois", "stat.sessions": "Séances de course", "stat.longest": "Plus longue course",
+    "split.title": "Répartition par discipline", "split.year": "cette année", "split.road": "Course route", "split.trail": "Trail", "split.bike": "Vélo", "split.hike": "Randonnée / marche",
+    "split.note": "Les compteurs ci-dessus ne comptent que la course à pied — c'est aussi ce que le coach utilise pour dimensionner tes séances. Le vélo et la randonnée comptent dans ta fatigue, pas dans ton volume de course.",
     "pi.title": "Informations personnelles",
     "photo.title": "Photo de profil", "photo.hint": "JPG, PNG, WebP · max 5 Mo", "photo.uploading": "Upload…", "photo.change": "Changer la photo",
     "f.name": "Nom complet", "f.age": "Âge", "f.height": "Taille (cm)", "f.weight": "Poids (kg)", "f.lang": "Langue", "f.bio": "Bio courte", "f.bioPh": "Coureur trail passionné, objectif UTMB 2027…", "f.warmup": "⏱️ Échauffement habituel", "f.cooldown": "🧊 Retour au calme habituel", "f.wcHint": "Cale l'échauffement et le retour au calme (fréquence cardiaque douce, Z1) des séances envoyées à ta montre. Le corps de séance garde ses allures précises.", "f.longMode": "Sorties longues", "f.longRun": "🏃 En course", "f.longBike": "🚴 En vélo", "f.longHint": "Beaucoup de pros remplacent la sortie longue par du vélo : même volume aérobie, sans l'impact. Ton coach et l'IA s'adaptent automatiquement.",
@@ -61,7 +63,9 @@ const P: Record<string, Record<string, string>> = {
     "tab.profile": "Profile", "tab.goals": "Goals", "tab.performance": "Performance", "tab.shoes": "Shoes", "tab.subscription": "Subscription",
     "common.save": "Save", "common.saving": "Saving…", "common.cancel": "Cancel", "common.add": "Add",
     "hero.myProfile": "My profile", "hero.score": "Score {n}/100", "hero.streak": "{n} day in a row", "hero.streakP": "{n} days in a row",
-    "stat.kmYear": "Km this year", "stat.kmMonth": "Km this month", "stat.sessions": "Sessions/month", "stat.longest": "Longest",
+    "stat.kmYear": "Km run this year", "stat.kmMonth": "Km run this month", "stat.sessions": "Runs this month", "stat.longest": "Longest run",
+    "split.title": "By discipline", "split.year": "this year", "split.road": "Road running", "split.trail": "Trail", "split.bike": "Cycling", "split.hike": "Hiking / walking",
+    "split.note": "The counters above only include running — the same figure your coach uses to size your sessions. Cycling and hiking count towards fatigue, not towards running volume.",
     "pi.title": "Personal information",
     "photo.title": "Profile photo", "photo.hint": "JPG, PNG, WebP · max 5 MB", "photo.uploading": "Uploading…", "photo.change": "Change photo",
     "f.name": "Full name", "f.age": "Age", "f.height": "Height (cm)", "f.weight": "Weight (kg)", "f.lang": "Language", "f.bio": "Short bio", "f.bioPh": "Passionate trail runner, UTMB 2027 goal…", "f.warmup": "⏱️ Usual warm-up", "f.cooldown": "🧊 Usual cool-down", "f.wcHint": "Sets the warm-up and cool-down (easy heart rate, Z1) of the sessions sent to your watch. The main set keeps its exact paces.", "f.longMode": "Long sessions", "f.longRun": "🏃 Running", "f.longBike": "🚴 Cycling", "f.longHint": "Many pros swap the long run for cycling: same aerobic volume, no impact. Your coach and the AI adapt automatically.",
@@ -93,7 +97,9 @@ const P: Record<string, Record<string, string>> = {
     "tab.profile": "Profil", "tab.goals": "Ziele", "tab.performance": "Leistung", "tab.shoes": "Schuhe", "tab.subscription": "Abo",
     "common.save": "Speichern", "common.saving": "Speichern…", "common.cancel": "Abbrechen", "common.add": "Hinzufügen",
     "hero.myProfile": "Mein Profil", "hero.score": "Score {n}/100", "hero.streak": "{n} Tag in Folge", "hero.streakP": "{n} Tage in Folge",
-    "stat.kmYear": "Km dieses Jahr", "stat.kmMonth": "Km diesen Monat", "stat.sessions": "Einheiten/Monat", "stat.longest": "Längste",
+    "stat.kmYear": "Gelaufene km dieses Jahr", "stat.kmMonth": "Gelaufene km diesen Monat", "stat.sessions": "Läufe diesen Monat", "stat.longest": "Längster Lauf",
+    "split.title": "Nach Disziplin", "split.year": "dieses Jahr", "split.road": "Straßenlauf", "split.trail": "Trail", "split.bike": "Radfahren", "split.hike": "Wandern / Gehen",
+    "split.note": "Die Zähler oben berücksichtigen nur das Laufen — genau der Wert, mit dem dein Coach deine Einheiten bemisst. Rad und Wandern zählen zur Ermüdung, nicht zum Laufumfang.",
     "pi.title": "Persönliche Daten",
     "photo.title": "Profilbild", "photo.hint": "JPG, PNG, WebP · max. 5 MB", "photo.uploading": "Hochladen…", "photo.change": "Bild ändern",
     "f.name": "Vollständiger Name", "f.age": "Alter", "f.height": "Größe (cm)", "f.weight": "Gewicht (kg)", "f.lang": "Sprache", "f.bio": "Kurz-Bio", "f.bioPh": "Begeisterter Trailrunner, Ziel UTMB 2027…", "f.warmup": "⏱️ Übliches Aufwärmen", "f.cooldown": "🧊 Übliches Auslaufen", "f.wcHint": "Legt Aufwärmen und Auslaufen (lockere Herzfrequenz, Z1) der an deine Uhr gesendeten Einheiten fest. Der Hauptteil behält seine genauen Tempi.", "f.longMode": "Lange Einheiten", "f.longRun": "🏃 Laufen", "f.longBike": "🚴 Radfahren", "f.longHint": "Viele Profis ersetzen den langen Lauf durch Radfahren: gleiches aerobes Volumen, ohne Belastung. Dein Coach und die KI passen sich automatisch an.",
@@ -125,7 +131,9 @@ const P: Record<string, Record<string, string>> = {
     "tab.profile": "Perfil", "tab.goals": "Objetivos", "tab.performance": "Rendimiento", "tab.shoes": "Zapatillas", "tab.subscription": "Suscripción",
     "common.save": "Guardar", "common.saving": "Guardando…", "common.cancel": "Cancelar", "common.add": "Añadir",
     "hero.myProfile": "Mi perfil", "hero.score": "Puntuación {n}/100", "hero.streak": "{n} día seguido", "hero.streakP": "{n} días seguidos",
-    "stat.kmYear": "Km este año", "stat.kmMonth": "Km este mes", "stat.sessions": "Sesiones/mes", "stat.longest": "Más larga",
+    "stat.kmYear": "Km corridos este año", "stat.kmMonth": "Km corridos este mes", "stat.sessions": "Carreras este mes", "stat.longest": "Carrera más larga",
+    "split.title": "Por disciplina", "split.year": "este año", "split.road": "Carrera en ruta", "split.trail": "Trail", "split.bike": "Ciclismo", "split.hike": "Senderismo / marcha",
+    "split.note": "Los contadores de arriba solo incluyen la carrera a pie — la misma cifra que usa tu entrenador para dimensionar tus sesiones. El ciclismo y el senderismo cuentan para la fatiga, no para el volumen de carrera.",
     "pi.title": "Información personal",
     "photo.title": "Foto de perfil", "photo.hint": "JPG, PNG, WebP · máx. 5 MB", "photo.uploading": "Subiendo…", "photo.change": "Cambiar foto",
     "f.name": "Nombre completo", "f.age": "Edad", "f.height": "Altura (cm)", "f.weight": "Peso (kg)", "f.lang": "Idioma", "f.bio": "Bio corta", "f.bioPh": "Corredor de trail apasionado, objetivo UTMB 2027…", "f.warmup": "⏱️ Calentamiento habitual", "f.cooldown": "🧊 Vuelta a la calma habitual", "f.wcHint": "Fija el calentamiento y la vuelta a la calma (frecuencia cardíaca suave, Z1) de las sesiones enviadas a tu reloj. La parte principal mantiene sus ritmos exactos.", "f.longMode": "Sesiones largas", "f.longRun": "🏃 Corriendo", "f.longBike": "🚴 En bici", "f.longHint": "Muchos pros sustituyen la tirada larga por bici: mismo volumen aeróbico, sin impacto. Tu entrenador y la IA se adaptan automáticamente.",
@@ -157,7 +165,9 @@ const P: Record<string, Record<string, string>> = {
     "tab.profile": "Perfil", "tab.goals": "Objetivos", "tab.performance": "Desempenho", "tab.shoes": "Ténis", "tab.subscription": "Subscrição",
     "common.save": "Guardar", "common.saving": "A guardar…", "common.cancel": "Cancelar", "common.add": "Adicionar",
     "hero.myProfile": "O meu perfil", "hero.score": "Pontuação {n}/100", "hero.streak": "{n} dia seguido", "hero.streakP": "{n} dias seguidos",
-    "stat.kmYear": "Km este ano", "stat.kmMonth": "Km este mês", "stat.sessions": "Sessões/mês", "stat.longest": "Mais longa",
+    "stat.kmYear": "Km corridos este ano", "stat.kmMonth": "Km corridos este mês", "stat.sessions": "Corridas este mês", "stat.longest": "Corrida mais longa",
+    "split.title": "Por modalidade", "split.year": "este ano", "split.road": "Corrida de estrada", "split.trail": "Trail", "split.bike": "Ciclismo", "split.hike": "Caminhada",
+    "split.note": "Os contadores acima incluem apenas a corrida — o mesmo valor que o teu treinador usa para dimensionar as sessões. Ciclismo e caminhada contam para a fadiga, não para o volume de corrida.",
     "pi.title": "Informações pessoais",
     "photo.title": "Foto de perfil", "photo.hint": "JPG, PNG, WebP · máx. 5 MB", "photo.uploading": "A enviar…", "photo.change": "Mudar foto",
     "f.name": "Nome completo", "f.age": "Idade", "f.height": "Altura (cm)", "f.weight": "Peso (kg)", "f.lang": "Idioma", "f.bio": "Bio curta", "f.bioPh": "Corredor de trail apaixonado, objetivo UTMB 2027…", "f.warmup": "⏱️ Aquecimento habitual", "f.cooldown": "🧊 Retorno à calma habitual", "f.wcHint": "Define o aquecimento e o retorno à calma (frequência cardíaca fácil, Z1) das sessões enviadas para o teu relógio. A parte principal mantém os ritmos exatos.", "f.longMode": "Sessões longas", "f.longRun": "🏃 A correr", "f.longBike": "🚴 De bicicleta", "f.longHint": "Muitos profissionais trocam a saída longa por bicicleta: mesmo volume aeróbio, sem impacto. O teu treinador e a IA adaptam-se automaticamente.",
@@ -188,12 +198,19 @@ const P: Record<string, Record<string, string>> = {
 };
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+/** Kilomètres par discipline. Le trail est de la COURSE, mais séparé de la route :
+ *  l'effort n'est pas comparable, et les additionner masque les deux. */
+export interface SportSplit { road: number; trail: number; bike: number; hike: number }
+
 interface Stats {
+  /** Course à pied uniquement (route + trail) — le chiffre qu'utilise aussi le coach. */
   kmYear: number;
   kmMonth: number;
   sessionsMonth: number;
+  /** Plus longue COURSE : une sortie vélo de 62 km n'est pas un record de coureur. */
   longestRun: number;
   streak: number;
+  bySport?: { year: SportSplit; month: SportSplit };
 }
 
 interface Goal {
@@ -645,6 +662,37 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
         <StatCard label={tr("stat.sessions")} value={stats.sessionsMonth} icon={<Zap className="w-3.5 h-3.5" />} color="bg-violet-50" />
         <StatCard label={tr("stat.longest")} value={Math.round(stats.longestRun)} unit="km" icon={<Trophy className="w-3.5 h-3.5" />} color="bg-orange-50" />
       </div>
+
+      {/* ── Répartition par discipline ──
+          Les compteurs ci-dessus ne comptent que la COURSE. Le reste de l'activité
+          n'est pas effacé pour autant : il est montré à part, là où il ne fausse rien. */}
+      {stats.bySport && (
+        <div className="rounded-2xl border border-zinc-200 bg-white p-4">
+          <div className="flex items-baseline justify-between mb-3">
+            <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{tr("split.title")}</span>
+            <span className="text-[11px] text-zinc-400">{tr("split.year")}</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {([
+              ["split.road", stats.bySport.year.road, "bg-emerald-500"],
+              ["split.trail", stats.bySport.year.trail, "bg-lime-600"],
+              ["split.bike", stats.bySport.year.bike, "bg-sky-500"],
+              ["split.hike", stats.bySport.year.hike, "bg-amber-500"],
+            ] as const).map(([key, value, dot]) => (
+              <div key={key} className="rounded-xl bg-zinc-50 px-3 py-2.5">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className={`h-2 w-2 rounded-full ${dot}`} />
+                  <span className="text-[11px] font-medium text-zinc-600">{tr(key)}</span>
+                </div>
+                <div className="text-lg font-black text-zinc-900 tabular-nums">
+                  {Math.round(value)}<span className="text-xs font-semibold text-zinc-400 ml-0.5">km</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-[11px] leading-relaxed text-zinc-400">{tr("split.note")}</p>
+        </div>
+      )}
 
       {/* ── Tabs ── */}
       <div className="flex gap-1 p-1 bg-zinc-100 rounded-2xl overflow-x-auto">
