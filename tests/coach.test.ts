@@ -18,6 +18,11 @@ import { parseReps, parsePaceSec, stepsForType, warmCoolMin, buildWorkoutDescrip
 import { buildWeekPlan, CONFIRMED_DAYS } from "../src/lib/ai/autoPlan";
 import { stripProfileSecrets } from "../src/lib/profile/safe";
 import type { AthleteContext } from "../src/lib/ai/coachContext";
+import {
+  bmiOf, bmrMifflin, workoutKcal, weightTrend, weightModeEligibility,
+  buildWeightPlan, trendVerdict,
+} from "../src/lib/weight/energy";
+import { weightTrainingRules, weightCoachBlock } from "../src/lib/weight/coaching";
 
 let passed = 0;
 const fails: string[] = [];
@@ -485,6 +490,214 @@ test("l'importateur de flux reste protégé et ne scrape rien", () => {
   const src = readFileSync("src/app/api/shop/import-feed/route.ts", "utf8");
   assert.ok(/CRON_SECRET|ADMIN_SECRET/.test(src), "l'import de flux doit exiger un secret");
   assert.ok(/searchParams\.get\("url"\)/.test(src), "le flux doit être fourni explicitement, jamais deviné");
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  MODE PERTE DE POIDS
+//
+//  Ce module produit des nombres qui RESSEMBLENT à des mesures (« 1 950 kcal/jour »,
+//  « −0,4 kg/semaine ») alors qu'une partie vient d'équations de population. C'est le
+//  profil exact des défauts silencieux de l'audit : rien ne plante, le chiffre est
+//  plausible, et il oriente pourtant l'alimentation de quelqu'un pendant des mois.
+//  Chaque test ci-dessous fige soit un refus de fabriquer, soit un garde-fou de sécurité.
+// ─────────────────────────────────────────────────────────────────────────────
+const DAY = 86400000;
+const NOW = new Date("2026-08-07T09:00:00Z").getTime();
+const isoDay = (daysAgo: number) => new Date(NOW - daysAgo * DAY).toISOString().slice(0, 10);
+
+console.log("\nPERTE DE POIDS — une donnée manquante ne devient jamais une valeur par défaut");
+test("pas de taille → pas d'IMC (et non un IMC calculé sur une taille moyenne)", () => {
+  assert.equal(bmiOf(95, null), null);
+  assert.equal(bmiOf(null, 178), null);
+  assert.equal(bmiOf(95, 178), 30.0);
+});
+test("pas d'âge → pas de métabolisme de base", () => {
+  // Supposer 40 ans à quelqu'un qui en a 62 décale la cible d'environ 110 kcal/jour,
+  // soit près de 6 kg d'erreur cumulée sur un an — totalement invisible à l'écran.
+  assert.equal(bmrMifflin({ weightKg: 95, heightCm: 178, age: null, gender: "male" }), null);
+  assert.equal(bmrMifflin({ weightKg: null, heightCm: 178, age: 40, gender: "male" }), null);
+});
+test("le métabolisme de base suit bien Mifflin-St Jeor", () => {
+  // 10×95 + 6,25×178 − 5×40 + 5 = 1 867,5 → 1868
+  assert.equal(bmrMifflin({ weightKg: 95, heightCm: 178, age: 40, gender: "male" })!.kcal, 1868);
+  // Femme : même corps, constante −161 au lieu de +5 → 166 kcal d'écart.
+  assert.equal(bmrMifflin({ weightKg: 95, heightCm: 178, age: 40, gender: "female" })!.kcal, 1702);
+});
+test("sexe non précisé → moyenne des deux équations, mais l'écart est ANNONCÉ", () => {
+  const r = bmrMifflin({ weightKg: 95, heightCm: 178, age: 40, gender: "other" })!;
+  assert.equal(r.kcal, 1785); // milieu exact entre 1868 et 1702
+  assert.ok(r.assumptions.length > 0, "l'approximation doit être déclarée, pas masquée");
+});
+
+console.log("\nPERTE DE POIDS — la dépense des séances vient des données réelles");
+test("une séance sans durée NI distance n'est pas chiffrée", () => {
+  // Le repli tentant serait « une séance ≈ 400 kcal ». Une semaine de séances mal
+  // importées gonflerait alors la dépense de 2 000 kcal et autoriserait un déficit
+  // qui n'existe pas.
+  assert.equal(workoutKcal({ date: isoDay(1) }, 95), null);
+  assert.equal(workoutKcal({ date: isoDay(1), distance_km: 10 }, null), null);
+});
+test("le dénivelé compte : monter 1 200 m n'est pas une sortie plate", () => {
+  const plat = workoutKcal({ date: isoDay(1), sport: "run", distance_km: 20 }, 95)!;
+  const trail = workoutKcal({ date: isoDay(1), sport: "run", distance_km: 20, elevation_gain_m: 1200 }, 95)!;
+  assert.ok(trail > plat + 800, `le D+ doit ajouter ~1 000 kcal (plat ${plat}, trail ${trail})`);
+});
+test("la marche coûte moins cher au kilomètre que la course", () => {
+  const run = workoutKcal({ date: isoDay(1), sport: "Run", distance_km: 10 }, 95)!;
+  const walk = workoutKcal({ date: isoDay(1), sport: "Hike", distance_km: 10 }, 95)!;
+  assert.ok(walk < run, "randonnée et course ne peuvent pas coûter pareil");
+});
+
+console.log("\nPERTE DE POIDS — pas de tendance inventée à partir de bruit");
+test("moins de 4 pesées → aucune tendance", () => {
+  // Deux pesées à 3 jours d'écart, c'est de l'hydratation (±1 à 2 kg), pas de la graisse.
+  // Afficher « −1,3 kg/semaine » là-dessus, c'est présenter du bruit comme un résultat.
+  assert.equal(weightTrend([{ date: isoDay(3), weight_kg: 94 }, { date: isoDay(0), weight_kg: 92.7 }], 42, NOW), null);
+});
+test("4 pesées sur moins de 14 jours → toujours aucune tendance", () => {
+  const logs = [0, 2, 4, 6].map((d) => ({ date: isoDay(d), weight_kg: 95 - d * 0.1 }));
+  assert.equal(weightTrend(logs, 42, NOW), null);
+});
+test("assez de pesées → la pente mesurée est juste", () => {
+  // Série strictement linéaire : −0,1 kg/jour = −0,7 kg/semaine.
+  const logs = [0, 7, 14, 21, 28].map((d) => ({ date: isoDay(d), weight_kg: 95 - (28 - d) * 0.1 }));
+  const t = weightTrend(logs, 42, NOW)!;
+  assert.ok(Math.abs(t.ratePerWeek - -0.7) < 0.05, `pente ${t.ratePerWeek} attendue ≈ −0,7`);
+  assert.equal(t.points, 5);
+  assert.ok(t.spanDays >= 28);
+});
+test("des pesées abandonnées depuis un mois ne font plus une tendance « actuelle »", () => {
+  // Série impeccable… mais qui s'arrête il y a 35 jours. Sans garde-fou, l'écran
+  // affichait toujours « −0,5 kg/semaine » au présent, et le poids périmé pilotait
+  // en plus la cible calorique du jour.
+  const logs = [35, 42, 49, 56].map((d) => ({ date: isoDay(d), weight_kg: 100 - (56 - d) * 0.07 }));
+  assert.equal(weightTrend(logs, 90, NOW), null);
+});
+test("sans tendance mesurable, le verdict le DIT au lieu d'afficher 0", () => {
+  const plan = buildWeightPlan({
+    body: { weightKg: 110, heightCm: 175, age: 40, gender: "male" },
+    goalKg: 85, logs: [], workouts: [], now: NOW,
+  })!;
+  const v = trendVerdict(plan);
+  assert.equal(v.status, "insuffisant");
+  assert.ok(/pas encore assez de pesées/i.test(v.message));
+  assert.equal(plan.measured, null, "aucune tendance ne doit être fabriquée");
+});
+
+console.log("\nPERTE DE POIDS — les garde-fous de sécurité ne sont pas contournables");
+test("IMC sous 20 → mode refusé, avec une explication", () => {
+  const el = weightModeEligibility({ weightKg: 58, heightCm: 178, age: 30, gender: "male" }, []);
+  assert.equal(el.ok, false);
+  assert.equal(el.ok === false && el.reason, "imc_bas");
+});
+test("mineur → mode refusé", () => {
+  const el = weightModeEligibility({ weightKg: 90, heightCm: 175, age: 16, gender: "female" }, []);
+  assert.equal(el.ok === false && el.reason, "mineur");
+});
+test("grossesse déclarée → mode refusé, quelle que soit la corpulence", () => {
+  const el = weightModeEligibility({ weightKg: 95, heightCm: 168, age: 32, gender: "female" }, ["grossesse"]);
+  assert.equal(el.ok === false && el.reason, "grossesse");
+});
+test("la cible calorique ne descend JAMAIS sous le métabolisme de base", () => {
+  // Sous le métabolisme de base, le corps rogne sur la masse maigre : un coureur en
+  // déficit sévère se blesse au lieu de progresser (faible disponibilité énergétique).
+  for (const body of [
+    { weightKg: 110, heightCm: 175, age: 40, gender: "male" },
+    { weightKg: 140, heightCm: 165, age: 55, gender: "female" },
+    { weightKg: 82, heightCm: 180, age: 25, gender: "male" },
+  ]) {
+    const plan = buildWeightPlan({ body, goalKg: null, logs: [], workouts: [], now: NOW })!;
+    assert.ok(plan.targetKcal >= plan.bmr, `cible ${plan.targetKcal} < métabolisme de base ${plan.bmr}`);
+    assert.ok(plan.targetKcal >= (body.gender === "female" ? 1200 : 1500), `cible ${plan.targetKcal} sous le plancher absolu`);
+  }
+});
+test("la perte prévue ne dépasse jamais 0,75 %/semaine du poids", () => {
+  const plan = buildWeightPlan({
+    body: { weightKg: 140, heightCm: 170, age: 35, gender: "male" },
+    goalKg: 90, logs: [], workouts: [], now: NOW,
+  })!;
+  assert.ok(Math.abs(plan.plannedRatePerWeek) <= 140 * 0.0075 + 0.01, `${plan.plannedRatePerWeek} kg/sem est trop rapide`);
+  assert.ok(plan.caps.length > 0, "un plafond appliqué doit être expliqué à l'utilisateur");
+});
+test("les hypothèses non mesurées sont toujours renvoyées pour affichage", () => {
+  const plan = buildWeightPlan({
+    body: { weightKg: 100, heightCm: 180, age: 45, gender: "male" },
+    goalKg: 85, logs: [], workouts: [], now: NOW,
+  })!;
+  // Le facteur d'activité hors sport ne se mesure pas : il DOIT être annoncé.
+  assert.ok(plan.assumptions.some((a) => /vie courante/i.test(a)));
+  assert.ok(plan.assumptions.some((a) => /séance/i.test(a)));
+});
+test("une échéance annoncée dit sur QUOI elle est fondée", () => {
+  const logs = [0, 7, 14, 21, 28].map((d) => ({ date: isoDay(d), weight_kg: 100 - (28 - d) * 0.08 }));
+  const mesure = buildWeightPlan({ body: { weightKg: 100, heightCm: 180, age: 45, gender: "male" }, goalKg: 85, logs, workouts: [], now: NOW })!;
+  assert.equal(mesure.weeksToGoalBasis, "mesure", "une perte réelle prime sur la projection théorique");
+  const theorie = buildWeightPlan({ body: { weightKg: 100, heightCm: 180, age: 45, gender: "male" }, goalKg: 85, logs: [], workouts: [], now: NOW })!;
+  assert.equal(theorie.weeksToGoalBasis, "theorique");
+});
+test("le poids lissé des pesées prime sur la valeur figée du profil", () => {
+  // `profiles.weight_kg` est souvent saisi une fois à l'inscription puis jamais retouché.
+  const logs = [0, 7, 14, 21, 28].map((d) => ({ date: isoDay(d), weight_kg: 92 }));
+  const plan = buildWeightPlan({ body: { weightKg: 110, heightCm: 178, age: 40, gender: "male" }, goalKg: null, logs, workouts: [], now: NOW })!;
+  assert.equal(plan.currentSource, "pesees");
+  assert.ok(Math.abs(plan.currentKg - 92) < 0.2, `poids retenu ${plan.currentKg}, attendu ~92`);
+});
+
+console.log("\nPERTE DE POIDS — l'entraînement change vraiment, pas seulement l'affichage");
+test("plus l'IMC est haut, plus la qualité et la progression sont bridées", () => {
+  const mk = (w: number, h: number) => weightTrainingRules(buildWeightPlan({
+    body: { weightKg: w, heightCm: h, age: 40, gender: "male" }, goalKg: null, logs: [], workouts: [], now: NOW })!);
+  const obese2 = mk(120, 175);   // IMC 39,2
+  const surpoids = mk(85, 175);  // IMC 27,8
+  assert.equal(obese2.maxQualityPerWeek, 0, "aucun fractionné tant que la base n'est pas là");
+  assert.ok(obese2.walkRunAdvised, "l'alternance course/marche est la porte d'entrée");
+  assert.ok(obese2.lowImpactSharePct > surpoids.lowImpactSharePct);
+  assert.ok(obese2.maxWeeklyProgressPct <= surpoids.maxWeeklyProgressPct);
+  assert.ok(surpoids.strengthPerWeek >= 2, "le renforcement protège le muscle pendant le déficit");
+});
+test("le plafond de qualité du mode est appliqué APRÈS les planchers du coach", () => {
+  // Sans cet ordre, le plancher « objectif chrono → 2 qualités » redonnait deux séances
+  // de fractionné par semaine à quelqu'un dont les articulations encaissent près de
+  // 300 kg par appui. Le cardio suivait ; les tendons, non.
+  const src = readFileSync("src/lib/ai/coachContext.ts", "utf8");
+  const iFloor = src.indexOf("qBudget === 0 && libLevel !== \"debutant\") floor(1)");
+  const iCap = src.indexOf("weightLoss.rules.maxQualityPerWeek");
+  assert.ok(iFloor > 0 && iCap > 0, "plancher ou plafond introuvable");
+  assert.ok(iCap > iFloor, "le plafond perte de poids doit venir après les planchers");
+});
+test("le coach reçoit des consignes, pas un simple constat de poids", () => {
+  const plan = buildWeightPlan({
+    body: { weightKg: 115, heightCm: 175, age: 42, gender: "male" },
+    goalKg: 90, logs: [], workouts: [], now: NOW,
+  })!;
+  const block = weightCoachBlock(plan);
+  // Le piège n°1 du coureur en déficit : sous-alimenter la séance de qualité.
+  assert.ok(/JAMAIS autour d'une séance de qualité/.test(block), "la règle de non-restriction autour des séances dures manque");
+  // Cadre du discours — repris et durci depuis la consigne « surpoids » du catalogue santé.
+  assert.ok(/JAMAIS esthétique/.test(block), "le cadre de discours manque");
+  assert.ok(/N'ES PAS DIÉTÉTICIEN/.test(block), "la limite de compétence doit être explicite");
+  // Signaux de déficit trop agressif : c'est ce qui distingue un coach d'un compteur.
+  assert.ok(/REMONTER l'apport/.test(block));
+});
+test("mode désactivé ou profil non éligible → RIEN dans le prompt du coach", () => {
+  // Le coach ne parle jamais de poids de sa propre initiative : c'est un sujet qui
+  // appartient à l'athlète, pas à l'application.
+  const src = readFileSync("src/lib/ai/coachContext.ts", "utf8");
+  assert.ok(/if \(!p\?\.weight_mode_enabled\) return null;/.test(src), "l'activation volontaire doit conditionner le bloc");
+  assert.ok(/weightModeEligibility\(body, p\?\.health_conditions\)\.ok\) return null;/.test(src), "les garde-fous doivent être revérifiés côté coach");
+});
+test("un poids cible sous IMC 20 est refusé, comme l'est l'activation à IMC 20", () => {
+  // Sans cette symétrie, l'app refusait le mode à quelqu'un déjà mince mais acceptait
+  // de projeter quelqu'un VERS cette corpulence — échéance affichée à l'appui.
+  const src = readFileSync("src/app/api/weight/route.ts", "utf8");
+  assert.ok(/20 \* \(h \/ 100\) \*\* 2/.test(src), "aucun plancher d'IMC sur le poids cible");
+});
+test("la route /api/weight revérifie l'éligibilité côté serveur", () => {
+  // Masquer un bouton dans l'interface n'empêche personne d'appeler la route.
+  const src = readFileSync("src/app/api/weight/route.ts", "utf8");
+  assert.ok(/weightModeEligibility/.test(src), "activation sans revérification serveur");
+  assert.ok(!/from\("profiles"\)\.select\("\*"\)/.test(src), "le profil complet ne doit jamais être lu ici (secrets)");
+  assert.ok(/createClient/.test(src) && !/createAdminClient/.test(src), "les lectures doivent passer par la RLS, pas par la clé de service");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

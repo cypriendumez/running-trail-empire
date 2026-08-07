@@ -2,6 +2,8 @@ import type { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthCoachLines } from "@/data/healthCatalog";
+import { buildWeightPlan, weightModeEligibility, type WeightPlan } from "@/lib/weight/energy";
+import { weightCoachBlock, weightTrainingRules, type WeightTrainingRules } from "@/lib/weight/coaching";
 import { terrainCoachBlock } from "@/data/terrainCatalog";
 import { forecastWithElevation, altitudeLossPct, heatAdvice, windAdvice, archiveDailyMax, heatAcclimation, type DayWeather } from "@/lib/weather/openMeteo";
 import { bestVmaFromWorkouts, vmaFromPaceCurve, vmaFromVo2max } from "@/lib/running/fitness";
@@ -175,6 +177,10 @@ export type AthleteContext = {
   thresholdPace: string | null;
   // Plan macro périodisé semaine par semaine jusqu'au jour J.
   macroPlan: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[];
+  /** Mode perte de poids — `null` s'il n'est pas activé OU si le profil n'y est pas
+   *  éligible. Quand il est présent, il PLAFONNE la qualité et la progression du volume
+   *  dans le plan déterministe, il ne se contente pas d'informer l'IA. */
+  weightLoss: { plan: WeightPlan; rules: WeightTrainingRules } | null;
 };
 
 // Rassemble et ANALYSE toutes les données de l'athlète → briefing pour l'IA coach.
@@ -196,7 +202,7 @@ async function fetchWorkouts(sb: SB, userId: string) {
 }
 
 export async function buildAthleteContext(sb: SB, userId: string): Promise<AthleteContext> {
-  const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, shoeRes, objRes, csRes] = await Promise.all([
+  const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, shoeRes, objRes, csRes, wlRes] = await Promise.all([
     sb.from("profiles").select("*").eq("id", userId).single(),
     sb.from("performance_baselines").select("*").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).single(),
     sb.from("hrv_data").select("hrv_ms,physiological_state,date").eq("user_id", userId).order("date", { ascending: false }).limit(14),
@@ -211,6 +217,10 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
     sb.from("shoes").select("brand, model, current_km, km_at_purchase, max_km, purchase_date, terrain").eq("user_id", userId).eq("is_active", true),
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "race_objective").maybeSingle(),
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "coach_session").order("created_at", { ascending: false }).limit(40),
+    // Pesées du mode perte de poids. La table n'existe pas tant que la migration 018
+    // n'est pas passée : supabase-js renvoie alors `{ error }` sans lever d'exception,
+    // donc `Promise.all` tient et le reste du contexte coach est intact.
+    sb.from("weight_logs").select("date, weight_kg").eq("user_id", userId).order("date", { ascending: false }).limit(60),
   ]);
 
   const p = profileRes.data as Record<string, unknown> | null;
@@ -557,6 +567,21 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // Certaines pathologies interdisent purement et simplement l'effort maximal.
   const noMaxEffort = ["cardiaque", "covid_long", "grossesse"].some((s) => (Array.isArray(p?.health_conditions) ? (p.health_conditions as unknown[]).map(String) : []).includes(s));
 
+  // ── MODE PERTE DE POIDS ──
+  // Ne s'active QUE si l'athlète l'a demandé ET que son profil y est éligible (les
+  // garde-fous IMC < 20 / mineur / grossesse sont revérifiés ici : le coach ne doit pas
+  // hériter d'un mode resté activé après un changement de profil). Sans ces conditions,
+  // rien n'entre dans le prompt — le coach ne parle pas de poids de sa propre initiative.
+  const weightLoss = (() => {
+    if (!p?.weight_mode_enabled) return null;
+    const body = { weightKg: num(p?.weight_kg), heightCm: num(p?.height_cm), age: num(p?.age), gender: typeof p?.gender === "string" ? p.gender : null };
+    if (!weightModeEligibility(body, p?.health_conditions).ok) return null;
+    const logs = (wlRes.data ?? []) as { date: string; weight_kg: number }[];
+    const plan = buildWeightPlan({ body, goalKg: num(p?.weight_goal_kg), logs, workouts, now });
+    if (!plan) return null;
+    return { plan, rules: weightTrainingRules(plan) };
+  })();
+
   // Palette de séances adaptée au niveau + objectif (la lib est la base de connaissances).
   const libLevel: Level = vma == null || vma < 13 ? "debutant" : vma < 16 ? "intermediaire" : vma < 19 ? "confirme" : "elite";
   const libGoal: Goal = !objective ? "general"
@@ -767,6 +792,12 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const floor = (v: number) => { qBudget = Math.max(qBudget, expCap != null ? Math.min(v, expCap) : v); };
   if (!noHistory && !easeReasons.length && objective && isShortGoal && libLevel !== "debutant") floor(2);
   if (!noHistory && !easeReasons.length && qBudget === 0 && libLevel !== "debutant") floor(1);
+  // Plafond « perte de poids » — appliqué APRÈS les planchers, donc jamais contournable.
+  // Un athlète en obésité de classe II avec un objectif chrono déclencherait sinon le
+  // plancher « 2 qualités » : deux séances de fractionné par semaine sur des articulations
+  // qui encaissent près de 300 kg par appui, alors que son cardio, lui, suivrait sans
+  // broncher. C'est le scénario type de la périostite de la troisième semaine.
+  if (weightLoss) qBudget = Math.min(qBudget, weightLoss.rules.maxQualityPerWeek);
 
   // ── VERDICT DE FRAÎCHEUR DU JOUR — calculé, pas laissé à l'appréciation de l'IA ──
   // Un modèle de langage a tendance à « sentir » l'état de forme au fil du texte ; ici on
@@ -774,13 +805,18 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // point final.
   const redFlags: string[] = [];
   const orangeFlags: string[] = [];
+  // Mise en forme française : ces motifs ne partaient qu'au prompt de l'IA, où le format
+  // était sans importance. Ils sont désormais AFFICHÉS à l'athlète sur son calendrier
+  // (bandeau « pourquoi ce plan ») — « 2.4 » et « -44 » au milieu d'une phrase française
+  // trahissent une chaîne de débogage, pas une explication.
+  const frNum = (n: number, d = 0) => n.toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d }).replace("-", "−");
   if (pains.length) redFlags.push(`douleur en cours (${pains.join(", ")})`);
-  if (load.acr > 1.8) redFlags.push(`ratio aigu:chronique ${r1(load.acr)} (zone de risque de blessure)`);
-  if (load.tsb < -30) redFlags.push(`TSB ${Math.round(load.tsb)} (fatigue profonde)`);
+  if (load.acr > 1.8) redFlags.push(`ratio aigu:chronique ${frNum(load.acr, 1)} (zone de risque de blessure)`);
+  if (load.tsb < -30) redFlags.push(`TSB ${frNum(load.tsb)} (fatigue profonde)`);
   if (hrvWeekTrend?.startsWith("↓") && badNight) redFlags.push("VFC en baisse ET nuit dégradée (double signal)");
   if (hrvWeekTrend?.startsWith("↓")) orangeFlags.push("VFC sous sa base");
   if (badNight) orangeFlags.push(`sommeil dégradé (${freshSleep?.sleep_score ?? "?"}/100)`);
-  if (load.acr > 1.5 && load.acr <= 1.8) orangeFlags.push(`charge aiguë élevée (${r1(load.acr)})`);
+  if (load.acr > 1.5 && load.acr <= 1.8) orangeFlags.push(`charge aiguë élevée (${frNum(load.acr, 1)})`);
   if (monotony > 2) orangeFlags.push(`monotonie ${monotony} (charge trop uniforme)`);
   if (lastRpe != null && lastRpe >= 8) orangeFlags.push(`dernière séance vécue très dure (RPE ${lastRpe}/10)`);
   else if (rpeHigh) orangeFlags.push(`ressenti élevé sur la durée (RPE moyen ${rpeAvg}/10 sur ses 3 derniers retours)`);
@@ -1167,7 +1203,11 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   const deload = !taper && (macroPlan.length ? macroPlan[0].phase !== "Affûtage" && isoWeek % 4 === 0 : isoWeek % 4 === 0);
   const baseKm = targetFrom(15);
   // Progression plafonnée à +10 %/semaine (+5 % si passif court ou antécédent de fracture).
-  const growth = (runYears != null && runYears < 1) || (Array.isArray(p?.injury_zones) && (p.injury_zones as unknown[]).map(String).includes("fracture_fatigue")) ? 1.05 : 1.10;
+  // Le mode perte de poids resserre encore ce plafond : l'impact au sol vaut 2,5 à 3 fois
+  // le poids du corps à chaque appui, si bien qu'à volume ÉGAL en kilomètres la contrainte
+  // osseuse et tendineuse n'a rien de comparable entre 65 et 110 kg.
+  const growthBase = (runYears != null && runYears < 1) || (Array.isArray(p?.injury_zones) && (p.injury_zones as unknown[]).map(String).includes("fracture_fatigue")) ? 1.05 : 1.10;
+  const growth = weightLoss ? Math.min(growthBase, 1 + weightLoss.rules.maxWeeklyProgressPct / 100) : growthBase;
   const targetKm = macroPlan.length ? macroPlan[0].volumeKm
     : Math.round(baseKm * (taper ? 0.65 : deload ? 0.8 : growth));
   const longRunKm = macroPlan.length ? macroPlan[0].longRunKm : Math.round(targetKm * (taper ? 0.20 : 0.25));
@@ -1245,6 +1285,7 @@ ${cond.rules.length ? cond.rules.map((r) => `- ${r}`).join("\n")
   : "- ⚠️ Section santé JAMAIS renseignée (ce n'est pas « rien à signaler », c'est « on ne sait pas ») : reste un cran prudent sur l'intensité et invite-le à la remplir."}
 ${inj.rules.length ? inj.rules.map((r) => `- ${r}`).join("\n") : p?.health_declared ? "- Aucune zone de blessure récurrente." : ""}
 ${healthNotes ? `- 🗣️ Note santé écrite par l'athlète (LIS-LA et tiens-en compte) : « ${healthNotes} »` : ""}${noMaxEffort ? "\n- ⛔ EFFORT MAXIMAL INTERDIT au vu de ses antécédents : pas de VMA à 100 %+, pas de test d'effort, pas de sprint all-out. Le développement passe par le volume et le seuil bas." : ""}
+${weightLoss ? weightCoachBlock(weightLoss.plan) : ""}
 
 ÂGE & RÉCUPÉRATION
 - ${ageRule ?? "Âge non renseigné : applique un espacement prudent de 72 h entre deux séances dures."}
@@ -1357,6 +1398,7 @@ ${catalog}`;
     hillyTraining: elevWeek >= 400 || terr.paceMeaningless,
     thresholdPace,
     macroPlan,
+    weightLoss,
   };
 }
 

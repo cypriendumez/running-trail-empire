@@ -74,8 +74,32 @@ export async function autoCoachForUser(
     } catch { /* best effort : le calendrier reste publié même si Garmin est injoignable */ }
   }
 
-  // 4) Trace du dernier passage (visible côté coach pour vérifier que l'automate tourne).
-  const stateData = { at: new Date().toISOString(), days: rows.length, pushed, readiness: ctx.readiness.level };
+  // 4) Trace du dernier passage + POURQUOI le plan ressemble à ça.
+  //
+  // Défaut réel corrigé ici : un athlète venait de basculer son objectif d'un 10 km vers
+  // un marathon et voyait sept footings identiques dans son calendrier. Il en a conclu que
+  // le coach avait ignoré son changement. En réalité le macro-plan ÉTAIT devenu spécifique
+  // marathon (Seuil + Allure mara), mais aucune qualité n'était posée cette semaine-là
+  // parce que son ratio aigu:chronique était à 2,4 et son TSB à −44 — une fatigue bien
+  // réelle. L'application savait tout cela et n'en disait rien nulle part.
+  //
+  // On sérialise donc l'explication À L'INSTANT où le plan est construit, avec le même
+  // contexte : le calendrier ne peut alors plus afficher une raison qui contredit le plan.
+  const stateData = {
+    at: new Date().toISOString(), days: rows.length, pushed,
+    readiness: ctx.readiness.level,
+    reasons: ctx.readiness.reasons.slice(0, 4),
+    advice: ctx.readiness.advice.slice(0, 400),
+    qBudget: ctx.weekPlan.qBudget,
+    // L'objectif tel qu'il a RÉELLEMENT été pris en compte : c'est ce qui permet à
+    // l'athlète de vérifier que son changement a bien été enregistré.
+    objective: ctx.objective ? { race: ctx.objective.race, raceDate: ctx.objective.raceDate, distanceKm: ctx.objective.distanceKm } : null,
+    daysToRace: ctx.daysToRace,
+    phase: ctx.macroPlan[0]?.phase ?? null,
+    plannedQuality: ctx.macroPlan[0]?.quality ?? [],
+    nextWeekQuality: ctx.macroPlan[1]?.quality ?? [],
+    targetKm: ctx.volume.targetKm,
+  };
   const { data: stateRow } = await admin.from("notifications").select("id").eq("user_id", userId).eq("type", "auto_coach_state").maybeSingle();
   if (stateRow?.id) await admin.from("notifications").update({ data: stateData }).eq("id", stateRow.id);
   else await admin.from("notifications").insert({ user_id: userId, type: "auto_coach_state", title: "auto-coach", body: "", data: stateData });

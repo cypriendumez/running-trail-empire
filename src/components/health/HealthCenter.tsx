@@ -4,10 +4,11 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence, useMotionValue, animate as fmAnimate } from "framer-motion";
 import {
   Shield, Heart, Utensils, Stethoscope, AlertTriangle,
-  Phone, CheckCircle2, Zap, Droplets, BookOpen, Send, Loader2, Sparkles,
+  Phone, CheckCircle2, Zap, Droplets, BookOpen, Send, Loader2, Sparkles, Scale,
 } from "lucide-react";
 import { toast } from "sonner";
 import { SmartJournal } from "@/components/journal/SmartJournal";
+import { WeightMode } from "@/components/health/WeightMode";
 import { useT } from "@/lib/i18n/LanguageProvider";
 
 // ── i18n local (5 langues) — la page Santé naît traduite. ───────────────────────
@@ -18,7 +19,7 @@ function fill(s: string, p?: Record<string, string | number>) {
 const H: Record<string, Record<string, string>> = {
   fr: {
     "h.title": "Santé & Performance", "h.subtitle": "Votre kiné IA, votre journal, votre sécurité et votre nutrition — au même endroit.",
-    "tab.kine": "Kiné IA", "tab.journal": "Journal", "tab.guardian": "Guardian", "tab.nutrition": "Nutrition",
+    "tab.kine": "Kiné IA", "tab.journal": "Journal", "tab.guardian": "Guardian", "tab.nutrition": "Nutrition", "tab.poids": "Poids",
     "k.where": "Où as-tu mal ?", "view.face": "Face", "view.dos": "Dos",
     "k.hint": "Touche une zone sur le corps ou dans la liste, ajuste la douleur, puis demande au kiné.",
     "k.pain": "Douleur", "k.painLight": "Gêne légère", "k.painHard": "Très douloureux",
@@ -55,7 +56,7 @@ const H: Record<string, Record<string, string>> = {
   },
   en: {
     "h.title": "Health & Performance", "h.subtitle": "Your AI physio, your journal, your safety and your nutrition — all in one place.",
-    "tab.kine": "AI Physio", "tab.journal": "Journal", "tab.guardian": "Guardian", "tab.nutrition": "Nutrition",
+    "tab.kine": "AI Physio", "tab.journal": "Journal", "tab.guardian": "Guardian", "tab.nutrition": "Nutrition", "tab.poids": "Weight",
     "k.where": "Where does it hurt?", "view.face": "Front", "view.dos": "Back",
     "k.hint": "Tap a zone on the body or in the list, adjust the pain, then ask the physio.",
     "k.pain": "Pain", "k.painLight": "Mild discomfort", "k.painHard": "Very painful",
@@ -92,7 +93,7 @@ const H: Record<string, Record<string, string>> = {
   },
   de: {
     "h.title": "Gesundheit & Leistung", "h.subtitle": "Dein KI-Physio, dein Tagebuch, deine Sicherheit und deine Ernährung — alles an einem Ort.",
-    "tab.kine": "KI-Physio", "tab.journal": "Tagebuch", "tab.guardian": "Guardian", "tab.nutrition": "Ernährung",
+    "tab.kine": "KI-Physio", "tab.journal": "Tagebuch", "tab.guardian": "Guardian", "tab.nutrition": "Ernährung", "tab.poids": "Gewicht",
     "k.where": "Wo tut es weh?", "view.face": "Vorne", "view.dos": "Hinten",
     "k.hint": "Tippe eine Zone am Körper oder in der Liste an, stelle die Schmerzen ein und frage den Physio.",
     "k.pain": "Schmerz", "k.painLight": "Leichtes Unbehagen", "k.painHard": "Sehr schmerzhaft",
@@ -129,7 +130,7 @@ const H: Record<string, Record<string, string>> = {
   },
   es: {
     "h.title": "Salud y Rendimiento", "h.subtitle": "Tu fisio IA, tu diario, tu seguridad y tu nutrición — todo en un solo lugar.",
-    "tab.kine": "Fisio IA", "tab.journal": "Diario", "tab.guardian": "Guardian", "tab.nutrition": "Nutrición",
+    "tab.kine": "Fisio IA", "tab.journal": "Diario", "tab.guardian": "Guardian", "tab.nutrition": "Nutrición", "tab.poids": "Peso",
     "k.where": "¿Dónde te duele?", "view.face": "Frente", "view.dos": "Espalda",
     "k.hint": "Toca una zona del cuerpo o de la lista, ajusta el dolor y pregunta al fisio.",
     "k.pain": "Dolor", "k.painLight": "Molestia leve", "k.painHard": "Muy doloroso",
@@ -166,7 +167,7 @@ const H: Record<string, Record<string, string>> = {
   },
   pt: {
     "h.title": "Saúde e Desempenho", "h.subtitle": "O teu fisio IA, o teu diário, a tua segurança e a tua nutrição — tudo no mesmo sítio.",
-    "tab.kine": "Fisio IA", "tab.journal": "Diário", "tab.guardian": "Guardian", "tab.nutrition": "Nutrição",
+    "tab.kine": "Fisio IA", "tab.journal": "Diário", "tab.guardian": "Guardian", "tab.nutrition": "Nutrição", "tab.poids": "Peso",
     "k.where": "Onde te dói?", "view.face": "Frente", "view.dos": "Costas",
     "k.hint": "Toca numa zona do corpo ou na lista, ajusta a dor e pergunta ao fisio.",
     "k.pain": "Dor", "k.painLight": "Desconforto ligeiro", "k.painHard": "Muito doloroso",
@@ -263,7 +264,7 @@ const SHAPES: { slot: string; tag: "ellipse" | "rect"; p: Record<string, number>
   { slot: "footR", tag: "rect", p: { x: 106, y: 398, width: 22, height: 18, rx: 7 } },
 ];
 
-type Tab = "kine" | "journal" | "guardian" | "nutrition";
+type Tab = "kine" | "journal" | "guardian" | "nutrition" | "poids";
 type ChatMsg = { role: "user" | "model"; text: string };
 
 // Nombre qui s'anime en douceur quand sa valeur change (cartes nutrition).
@@ -357,6 +358,7 @@ export function HealthCenter() {
           { v: "journal", l: tr("tab.journal"), icon: BookOpen },
           { v: "guardian", l: tr("tab.guardian"), icon: Shield },
           { v: "nutrition", l: tr("tab.nutrition"), icon: Utensils },
+          { v: "poids", l: tr("tab.poids"), icon: Scale },
         ] as const).map((t) => {
           const active = tab === t.v;
           return (
@@ -705,6 +707,9 @@ export function HealthCenter() {
             </div>
           </motion.div>
         )}
+
+        {/* ── PERTE DE POIDS ── */}
+        {tab === "poids" && <WeightMode key="poids" />}
       </AnimatePresence>
     </div>
   );

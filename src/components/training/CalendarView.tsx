@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
   Target, X, Plus, StickyNote, Flag, Loader2, Trash2,
   ChevronLeft, ChevronRight, LayoutGrid, List, CalendarRange,
-  CalendarDays, CalendarClock, ListChecks, ArrowLeft,
+  CalendarDays, CalendarClock, ListChecks, ArrowLeft, Sparkles,
 } from "lucide-react";
 import { RenfoGuide } from "@/components/training/RenfoGuide";
 import { fmtDistance, type UnitSystem } from "@/lib/units";
@@ -14,7 +14,24 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 // `confirmed: false` = jour prévisionnel, que le coach automatique réajustera d'ici là.
 export type Planned = { date: string; type: string; title: string; detail: string; why: string; feel: string; tags: string[]; confirmed?: boolean };
 export type CalNote = { id: string; date: string; text: string };
-export type CalRace = { id: string; date: string; name: string; location: string; distanceKm: number | null };
+export type CalRace = { id: string; date: string; name: string; location: string; distanceKm: number | null; isObjective?: boolean };
+
+/**
+ * Explication du plan de la semaine, sérialisée par le coach autonome AU MOMENT où il
+ * génère les séances (`auto_coach_state`). Elle ne peut donc pas contredire ce qui est
+ * affiché : les deux sortent du même contexte, au même instant.
+ *
+ * Défaut réel qu'elle corrige : après être passé d'un objectif 10 km à un marathon,
+ * l'athlète voyait sept footings identiques et croyait son changement ignoré. Le plan
+ * ÉTAIT devenu spécifique marathon ; simplement, aucune qualité n'était posée cette
+ * semaine-là (ratio aigu:chronique 2,4, TSB −44). L'app le savait et se taisait.
+ */
+export type CoachState = {
+  at?: string; readiness?: "vert" | "jaune" | "orange" | "rouge"; reasons?: string[]; advice?: string;
+  qBudget?: number; objective?: { race?: string; raceDate?: string; distanceKm?: number } | null;
+  daysToRace?: number | null; phase?: string | null;
+  plannedQuality?: string[]; nextWeekQuality?: string[]; targetKm?: number;
+};
 
 // Catégorie canonique d'une séance (à partir du libellé libre du coach) → couleur + légende i18n.
 type Cat = "endurance" | "long" | "vma" | "threshold" | "recovery" | "renfo" | "rest" | "bike";
@@ -84,7 +101,7 @@ function sessionDetail(type: string, detail: string): SessionDetail | null {
   return { mode: "wrapped", body: extractBody(raw) };
 }
 
-export function CalendarView({ sessions, notes: notesProp = [], races: racesProp = [], weekStart = "mon", units = "metric", warmupMin = 15, cooldownMin = 10 }: { sessions: Planned[]; notes?: CalNote[]; races?: CalRace[]; weekStart?: "mon" | "sun"; units?: UnitSystem; warmupMin?: number; cooldownMin?: number }) {
+export function CalendarView({ sessions, notes: notesProp = [], races: racesProp = [], coachState = null, weekStart = "mon", units = "metric", warmupMin = 15, cooldownMin = 10 }: { sessions: Planned[]; notes?: CalNote[]; races?: CalRace[]; coachState?: CoachState | null; weekStart?: "mon" | "sun"; units?: UnitSystem; warmupMin?: number; cooldownMin?: number }) {
   const { t, lang } = useT();
   const [sel, setSel] = useState<string | null>(null);
   const [notes, setNotes] = useState<CalNote[]>(notesProp);
@@ -312,6 +329,9 @@ export function CalendarView({ sessions, notes: notesProp = [], races: racesProp
       </div>
 
       <div className="mx-auto max-w-6xl px-5 py-6">
+      {/* Pourquoi le plan ressemble à ça — voir le commentaire du type CoachState. */}
+      <CoachWhy state={coachState} lang={lang} t={t} />
+
       {/* Barre de contrôle : navigation période + bascule de vue */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1.5">
@@ -530,6 +550,74 @@ export function CalendarView({ sessions, notes: notesProp = [], races: racesProp
         </div>
       )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Bandeau « pourquoi ce plan » — rend visible la décision d'entraînement.
+ *
+ * Il répond à une question posée en production : « je viens de passer du 10 km au
+ * marathon et les séances n'ont pas changé ». Elles avaient changé — le macro-plan était
+ * devenu Seuil + Allure marathon — mais la semaine affichée ne contenait que du footing,
+ * parce que le ratio aigu:chronique était à 2,4. Le calendrier montrait le RÉSULTAT sans
+ * jamais montrer le RAISONNEMENT, et l'athlète en tirait la seule conclusion possible :
+ * que l'app l'avait ignoré.
+ *
+ * On n'affiche rien s'il n'y a rien de notable à dire : un bandeau permanent redevient
+ * un décor qu'on ne lit plus.
+ */
+function CoachWhy({ state, lang, t }: { state: CoachState | null; lang: string; t: (k: string, p?: Record<string, string | number>) => string }) {
+  if (!state) return null;
+  const noQuality = (state.qBudget ?? 1) === 0;
+  const reasons = (state.reasons ?? []).filter(Boolean);
+  const hasObjective = Boolean(state.objective?.race);
+  // Rien d'anormal ET pas d'objectif à rappeler → on se tait.
+  if (!noQuality && !hasObjective) return null;
+
+  const tone = noQuality
+    ? { border: "border-amber-200", bg: "bg-amber-50/70", dot: "text-amber-600", head: "text-amber-900", body: "text-amber-800" }
+    : { border: "border-emerald-200", bg: "bg-emerald-50/60", dot: "text-emerald-600", head: "text-emerald-900", body: "text-emerald-800" };
+
+  const race = state.objective?.race ?? "";
+  const raceDate = state.objective?.raceDate ?? "";
+  const dLeft = state.daysToRace;
+  const quality = (state.plannedQuality ?? []).filter(Boolean);
+  const nextQuality = (state.nextWeekQuality ?? []).filter(Boolean);
+
+  return (
+    <div className={`mb-4 rounded-2xl border ${tone.border} ${tone.bg} px-4 py-3.5`}>
+      <div className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider ${tone.dot}`}>
+        <Sparkles className="h-3.5 w-3.5" /> {t("cal.why.title")}
+      </div>
+
+      {hasObjective && (
+        <p className={`mt-2 text-sm ${tone.head}`}>
+          <span className="font-semibold">{t("cal.why.objective")} :</span>{" "}
+          {race}
+          {raceDate && ` · ${new Date(raceDate + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "long", year: "numeric" })}`}
+          {dLeft != null && dLeft >= 0 && ` · ${t("cal.why.daysLeft", { n: dLeft })}`}
+          {state.phase && ` · ${t("cal.why.phase")} ${state.phase}`}
+        </p>
+      )}
+
+      {noQuality ? (
+        <div className={`mt-2 text-sm leading-relaxed ${tone.body}`}>
+          <p>{t("cal.why.noQuality")}</p>
+          <ul className="mt-1 space-y-0.5">
+            {reasons.map((r, i) => <li key={i}>· {r}</li>)}
+          </ul>
+          {hasObjective && <p className="mt-1.5">{t("cal.why.noQualityTail", { race })}</p>}
+          {nextQuality.length > 0 && (
+            <p className="mt-1.5"><span className="font-semibold">{t("cal.why.nextWeek")} :</span> {nextQuality.join(" + ")}</p>
+          )}
+        </div>
+      ) : quality.length > 0 ? (
+        <p className={`mt-1.5 text-sm ${tone.body}`}>
+          <span className="font-semibold">{t("cal.why.plannedQuality")} :</span> {quality.join(" + ")}
+          {state.targetKm ? ` · ${t("cal.why.volume")} ~${state.targetKm} km` : ""}
+        </p>
+      ) : null}
     </div>
   );
 }

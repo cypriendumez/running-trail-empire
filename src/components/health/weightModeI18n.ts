@@ -1,0 +1,145 @@
+// ─────────────────────────────────────────────────────────────────────────────
+//  MODE PERTE DE POIDS — traductions des phrases CALCULÉES.
+//
+//  Le noyau (`src/lib/weight/energy.ts`) produit deux formes de la même information :
+//  une prose française, qui part dans le prompt du coach IA (lequel raisonne en français),
+//  et un CODE + des paramètres, destiné à l'interface. Ce fichier porte la seconde.
+//
+//  Sans cette séparation, un utilisateur allemand lisait « Déficit plafonné à 25 % de ta
+//  dépense totale » au milieu d'un écran par ailleurs entièrement traduit — le calcul
+//  avait l'air d'un morceau de débogage échappé du serveur.
+//
+//  Les nombres arrivent DÉJÀ mis en forme dans la locale de l'utilisateur : les formater
+//  ici obligerait chaque traduction à connaître la convention décimale de sa langue.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const WEIGHT_EXPLAIN: Record<string, Record<string, string>> = {
+  fr: {
+    // Verdict de tendance — la clé est le `status` renvoyé par trendVerdict().
+    "v.insuffisant": "Pas encore assez de pesées pour parler de tendance (il en faut au moins 4 réparties sur 2 semaines). Tant qu'on n'en a pas, aucun chiffre de progression ne serait honnête — un écart entre deux pesées, c'est de l'eau, pas de la graisse.",
+    "v.conforme": "Mesuré : {actual} kg/semaine sur {spanDays} jours, pour {planned} prévu. L'estimation de dépense est juste pour toi — on ne touche à rien.",
+    "v.plus_lent": "Mesuré : {actual} kg/semaine sur {spanDays} jours, contre {planned} prévu. L'app ne sait pas ce que tu manges : soit l'apport dépasse la cible, soit ta dépense réelle est plus basse que les {tdee} kcal estimés. Avant de baisser encore les calories, vérifie le plus probable des deux — l'estimation d'apport se trompe bien plus souvent que le métabolisme.",
+    "v.plus_rapide": "Mesuré : {actual} kg/semaine, soit plus vite que les {planned} prévus. Trop rapide n'est pas mieux : au-delà de ~0,75 %/semaine, la perte se fait sur le muscle et la récupération s'effondre. Remonte l'apport de 150 à 200 kcal/jour.",
+    "v.hausse": "Sur {spanDays} jours ({points} pesées), la tendance est à {actual} kg/semaine. Deux explications possibles, et l'app ne peut pas départager : l'apport réel dépasse la cible, ou l'estimation de dépense ({tdee} kcal) est trop haute pour toi. Garde la cible 2 semaines de plus en pesant régulièrement : c'est la courbe qui tranchera.",
+    // Plafonds de sécurité
+    "c.imc_proche_normale": "IMC proche de la normale : perte volontairement limitée à ~0,4 kg/semaine.",
+    "c.pct_tdee": "Déficit plafonné à 25 % de ta dépense totale.",
+    "c.plancher_mb": "Cible relevée : on ne descend jamais sous le métabolisme de base.",
+    "c.plancher_absolu": "Cible relevée au plancher de sécurité de {floor} kcal.",
+    // Hypothèses non mesurées
+    "a.sexe_non_precise": "Sexe non précisé : moyenne des deux équations (±83 kcal). Renseigne-le dans ton profil pour affiner.",
+    "a.neat": "Vie courante hors sport estimée à ×{factor} du métabolisme de base : c'est une hypothèse de population, elle n'est pas mesurable par l'app. Un métier debout ou 12 000 pas quotidiens la sous-estiment.",
+    "a.aucune_seance": "Aucune séance chiffrable sur les 28 derniers jours : la dépense sportive comptée est nulle. Elle remontera d'elle-même dès que tes séances se synchroniseront.",
+    "a.seances": "Dépense sportive calculée sur {n} séance(s) réelle(s) des 28 derniers jours.",
+    "a.seances_avec_ecart": "Dépense sportive calculée sur {n} séance(s) réelle(s) des 28 derniers jours, {skipped} écartée(s) faute de durée ou de distance.",
+    // Règles d'entraînement — la clé est la classe d'IMC.
+    "r.normal": "Aucune restriction liée au poids. Seule contrainte : ne pas cumuler un déficit calorique marqué et un bloc d'entraînement dense.",
+    "r.surpoids": "Entraînement classique, avec deux réserves : progression du volume plafonnée à +7 %/semaine plutôt que +10 %, et renforcement deux fois par semaine pour protéger la masse musculaire pendant le déficit.",
+    "r.obesite_1": "Alternance course/marche comme format principal, complétée de volume sans impact. Une seule séance un peu soutenue par semaine, en côtes douces ou en tempo court : même bénéfice cardiaque que le fractionné, bien moins de traumatisme.",
+    "r.obesite_2": "Priorité absolue aux articulations : l'essentiel du volume se fait en marche rapide, vélo ou elliptique, et la course arrive par touches courtes en alternance. Aucune séance de fractionné tant que la base n'est pas installée — le cardio suivrait, les tendons non.",
+    // Refus d'éligibilité
+    "e.donnees_manquantes": "Il manque ta taille, ton poids ou ton âge. Sans eux, aucun calcul de dépense n'est possible — et on ne va pas les inventer. Complète ton profil.",
+    "e.imc_bas": "Ton IMC est de {bmi}. En dessous de 20, perdre du poids dégrade la performance et la santé osseuse au lieu de les améliorer. Si tu veux changer ta composition corporelle, c'est le renforcement musculaire et l'apport en protéines qu'il faut travailler — pas les calories en moins.",
+    "e.mineur": "Le mode est réservé aux plus de 18 ans. Avant la fin de la croissance, toute restriction calorique relève d'un suivi médical, jamais d'une application.",
+    "e.grossesse": "Tu as déclaré une grossesse ou un post-partum. Aucune restriction calorique ne doit être entreprise sans l'avis de ton médecin ou de ta sage-femme : le mode reste désactivé.",
+  },
+  en: {
+    "v.insuffisant": "Not enough weigh-ins yet to talk about a trend (at least 4 spread over 2 weeks are needed). Until then, no progress figure would be honest — a gap between two weigh-ins is water, not fat.",
+    "v.conforme": "Measured: {actual} kg/week over {spanDays} days, against {planned} planned. The expenditure estimate is right for you — nothing to change.",
+    "v.plus_lent": "Measured: {actual} kg/week over {spanDays} days, against {planned} planned. The app does not know what you eat: either intake exceeds the target, or your real expenditure is lower than the estimated {tdee} kcal. Before cutting calories further, check the more likely of the two — intake estimates are wrong far more often than metabolism.",
+    "v.plus_rapide": "Measured: {actual} kg/week, faster than the {planned} planned. Faster is not better: beyond ~0.75 %/week, the loss comes from muscle and recovery collapses. Raise intake by 150 to 200 kcal/day.",
+    "v.hausse": "Over {spanDays} days ({points} weigh-ins), the trend is {actual} kg/week. Two possible explanations, and the app cannot decide between them: real intake exceeds the target, or the expenditure estimate ({tdee} kcal) is too high for you. Keep the target for 2 more weeks while weighing regularly: the curve will settle it.",
+    "c.imc_proche_normale": "BMI close to normal: loss deliberately limited to ~0.4 kg/week.",
+    "c.pct_tdee": "Deficit capped at 25 % of your total expenditure.",
+    "c.plancher_mb": "Target raised: we never go below your basal metabolic rate.",
+    "c.plancher_absolu": "Target raised to the {floor} kcal safety floor.",
+    "a.sexe_non_precise": "Sex not specified: average of both equations (±83 kcal). Set it in your profile to refine.",
+    "a.neat": "Daily life outside training estimated at ×{factor} of your basal metabolic rate: this is a population assumption, the app cannot measure it. A standing job or 12,000 daily steps make it an underestimate.",
+    "a.aucune_seance": "No quantifiable session over the last 28 days: training expenditure counted is zero. It will come back up as soon as your sessions sync.",
+    "a.seances": "Training expenditure computed from {n} real session(s) over the last 28 days.",
+    "a.seances_avec_ecart": "Training expenditure computed from {n} real session(s) over the last 28 days, {skipped} discarded for lack of duration or distance.",
+    "r.normal": "No weight-related restriction. Only constraint: do not combine a marked calorie deficit with a dense training block.",
+    "r.surpoids": "Standard training, with two caveats: volume progression capped at +7 %/week instead of +10 %, and strength work twice a week to protect muscle mass during the deficit.",
+    "r.obesite_1": "Run/walk alternation as the main format, complemented by low-impact volume. Only one moderately hard session per week, on gentle hills or short tempo: same cardiac benefit as intervals, far less trauma.",
+    "r.obesite_2": "Joints come first: most of the volume is brisk walking, cycling or elliptical, and running arrives in short alternating bouts. No interval session until the base is established — the heart would follow, the tendons would not.",
+    "e.donnees_manquantes": "Your height, weight or age is missing. Without them no expenditure calculation is possible — and we are not going to invent them. Complete your profile.",
+    "e.imc_bas": "Your BMI is {bmi}. Below 20, losing weight degrades performance and bone health rather than improving them. If you want to change body composition, strength training and protein intake are the levers — not fewer calories.",
+    "e.mineur": "The mode is restricted to those over 18. Before growth is complete, any calorie restriction belongs to medical supervision, never to an app.",
+    "e.grossesse": "You have declared a pregnancy or postpartum period. No calorie restriction should be undertaken without advice from your doctor or midwife: the mode stays off.",
+  },
+  de: {
+    "v.insuffisant": "Noch nicht genug Wiegungen für einen Trend (mindestens 4 über 2 Wochen verteilt). Bis dahin wäre keine Fortschrittszahl ehrlich — ein Unterschied zwischen zwei Wiegungen ist Wasser, kein Fett.",
+    "v.conforme": "Gemessen: {actual} kg/Woche über {spanDays} Tage, geplant waren {planned}. Die Verbrauchsschätzung passt für dich — wir ändern nichts.",
+    "v.plus_lent": "Gemessen: {actual} kg/Woche über {spanDays} Tage, geplant waren {planned}. Die App weiß nicht, was du isst: entweder liegt die Zufuhr über dem Ziel, oder dein realer Verbrauch liegt unter den geschätzten {tdee} kcal. Bevor du die Kalorien weiter senkst, prüfe das Wahrscheinlichere — Zufuhrschätzungen irren weit häufiger als der Stoffwechsel.",
+    "v.plus_rapide": "Gemessen: {actual} kg/Woche, schneller als die geplanten {planned}. Schneller ist nicht besser: über ~0,75 %/Woche geht der Verlust auf die Muskulatur und die Erholung bricht ein. Erhöhe die Zufuhr um 150 bis 200 kcal/Tag.",
+    "v.hausse": "Über {spanDays} Tage ({points} Wiegungen) liegt der Trend bei {actual} kg/Woche. Zwei mögliche Erklärungen, und die App kann nicht entscheiden: die reale Zufuhr übersteigt das Ziel, oder die Verbrauchsschätzung ({tdee} kcal) ist für dich zu hoch. Behalte das Ziel 2 weitere Wochen bei und wiege regelmäßig: die Kurve entscheidet.",
+    "c.imc_proche_normale": "BMI nahe am Normalbereich: Abnahme bewusst auf ~0,4 kg/Woche begrenzt.",
+    "c.pct_tdee": "Defizit auf 25 % deines Gesamtverbrauchs begrenzt.",
+    "c.plancher_mb": "Ziel angehoben: wir gehen nie unter den Grundumsatz.",
+    "c.plancher_absolu": "Ziel auf die Sicherheitsgrenze von {floor} kcal angehoben.",
+    "a.sexe_non_precise": "Geschlecht nicht angegeben: Mittelwert beider Gleichungen (±83 kcal). Trage es im Profil ein, um es zu präzisieren.",
+    "a.neat": "Alltag außerhalb des Sports mit ×{factor} des Grundumsatzes geschätzt: eine Populationsannahme, die die App nicht messen kann. Ein Stehberuf oder 12 000 Schritte täglich machen sie zur Unterschätzung.",
+    "a.aucune_seance": "Keine bezifferbare Einheit in den letzten 28 Tagen: der gezählte Sportverbrauch ist null. Er steigt von selbst, sobald deine Einheiten synchronisiert werden.",
+    "a.seances": "Sportverbrauch aus {n} realen Einheit(en) der letzten 28 Tage berechnet.",
+    "a.seances_avec_ecart": "Sportverbrauch aus {n} realen Einheit(en) der letzten 28 Tage berechnet, {skipped} mangels Dauer oder Distanz verworfen.",
+    "r.normal": "Keine gewichtsbedingte Einschränkung. Einzige Auflage: kein deutliches Kaloriendefizit zusammen mit einem dichten Trainingsblock.",
+    "r.surpoids": "Klassisches Training mit zwei Vorbehalten: Umfangssteigerung auf +7 %/Woche statt +10 % begrenzt, und zweimal wöchentlich Krafttraining, um die Muskelmasse im Defizit zu schützen.",
+    "r.obesite_1": "Lauf-Geh-Wechsel als Hauptformat, ergänzt durch gelenkschonendes Volumen. Nur eine etwas härtere Einheit pro Woche, an sanften Anstiegen oder als kurzer Tempolauf: gleicher kardialer Nutzen wie Intervalle, weit weniger Belastung.",
+    "r.obesite_2": "Gelenke zuerst: der Großteil des Umfangs erfolgt als zügiges Gehen, Radfahren oder Crosstrainer, Laufen kommt in kurzen Wechseln dazu. Keine Intervalleinheit, solange die Basis nicht steht — das Herz käme mit, die Sehnen nicht.",
+    "e.donnees_manquantes": "Größe, Gewicht oder Alter fehlen. Ohne sie ist keine Verbrauchsberechnung möglich — und wir erfinden sie nicht. Vervollständige dein Profil.",
+    "e.imc_bas": "Dein BMI liegt bei {bmi}. Unter 20 verschlechtert Abnehmen Leistung und Knochengesundheit, statt sie zu verbessern. Wenn du die Körperzusammensetzung ändern willst, sind Krafttraining und Proteinzufuhr die Hebel — nicht weniger Kalorien.",
+    "e.mineur": "Der Modus ist auf über 18-Jährige beschränkt. Vor Abschluss des Wachstums gehört jede Kalorienrestriktion in ärztliche Begleitung, nie in eine App.",
+    "e.grossesse": "Du hast eine Schwangerschaft oder Postpartum-Phase angegeben. Ohne Rat deiner Ärztin oder Hebamme sollte keine Kalorienrestriktion erfolgen: der Modus bleibt aus.",
+  },
+  es: {
+    "v.insuffisant": "Aún no hay suficientes pesajes para hablar de tendencia (hacen falta al menos 4 repartidos en 2 semanas). Hasta entonces, ninguna cifra de progreso sería honesta — una diferencia entre dos pesajes es agua, no grasa.",
+    "v.conforme": "Medido: {actual} kg/semana en {spanDays} días, frente a {planned} previsto. La estimación de gasto es correcta para ti — no tocamos nada.",
+    "v.plus_lent": "Medido: {actual} kg/semana en {spanDays} días, frente a {planned} previsto. La app no sabe lo que comes: o la ingesta supera el objetivo, o tu gasto real es menor que las {tdee} kcal estimadas. Antes de bajar más las calorías, comprueba lo más probable de los dos — la estimación de ingesta se equivoca mucho más a menudo que el metabolismo.",
+    "v.plus_rapide": "Medido: {actual} kg/semana, más rápido que los {planned} previstos. Más rápido no es mejor: por encima del ~0,75 %/semana, la pérdida se hace a costa del músculo y la recuperación se hunde. Sube la ingesta entre 150 y 200 kcal/día.",
+    "v.hausse": "En {spanDays} días ({points} pesajes), la tendencia es de {actual} kg/semana. Dos explicaciones posibles, y la app no puede decidir: la ingesta real supera el objetivo, o la estimación de gasto ({tdee} kcal) es demasiado alta para ti. Mantén el objetivo 2 semanas más pesándote con regularidad: la curva lo resolverá.",
+    "c.imc_proche_normale": "IMC cercano al normal: pérdida limitada a propósito a ~0,4 kg/semana.",
+    "c.pct_tdee": "Déficit limitado al 25 % de tu gasto total.",
+    "c.plancher_mb": "Objetivo elevado: nunca bajamos del metabolismo basal.",
+    "c.plancher_absolu": "Objetivo elevado al mínimo de seguridad de {floor} kcal.",
+    "a.sexe_non_precise": "Sexo no indicado: media de ambas ecuaciones (±83 kcal). Indícalo en tu perfil para afinar.",
+    "a.neat": "Vida diaria fuera del deporte estimada en ×{factor} del metabolismo basal: es una hipótesis poblacional, la app no puede medirla. Un trabajo de pie o 12 000 pasos diarios la subestiman.",
+    "a.aucune_seance": "Ninguna sesión cuantificable en los últimos 28 días: el gasto deportivo contado es cero. Subirá solo en cuanto tus sesiones se sincronicen.",
+    "a.seances": "Gasto deportivo calculado sobre {n} sesión(es) real(es) de los últimos 28 días.",
+    "a.seances_avec_ecart": "Gasto deportivo calculado sobre {n} sesión(es) real(es) de los últimos 28 días, {skipped} descartada(s) por falta de duración o distancia.",
+    "r.normal": "Ninguna restricción ligada al peso. Única condición: no acumular un déficit calórico marcado con un bloque de entrenamiento denso.",
+    "r.surpoids": "Entrenamiento clásico, con dos reservas: progresión de volumen limitada a +7 %/semana en lugar de +10 %, y fuerza dos veces por semana para proteger la masa muscular durante el déficit.",
+    "r.obesite_1": "Alternancia carrera/marcha como formato principal, completada con volumen sin impacto. Una sola sesión algo exigente por semana, en cuestas suaves o tempo corto: mismo beneficio cardíaco que las series, mucho menos traumatismo.",
+    "r.obesite_2": "Prioridad absoluta a las articulaciones: la mayor parte del volumen en marcha rápida, bici o elíptica, y la carrera llega en tramos cortos alternados. Ninguna sesión de series mientras no esté asentada la base — el corazón seguiría, los tendones no.",
+    "e.donnees_manquantes": "Falta tu altura, tu peso o tu edad. Sin ellos no es posible ningún cálculo de gasto — y no vamos a inventarlos. Completa tu perfil.",
+    "e.imc_bas": "Tu IMC es de {bmi}. Por debajo de 20, perder peso degrada el rendimiento y la salud ósea en lugar de mejorarlos. Si quieres cambiar tu composición corporal, las palancas son la fuerza y las proteínas — no menos calorías.",
+    "e.mineur": "El modo está reservado a mayores de 18 años. Antes del fin del crecimiento, toda restricción calórica corresponde a un seguimiento médico, nunca a una aplicación.",
+    "e.grossesse": "Has declarado un embarazo o posparto. No debe emprenderse ninguna restricción calórica sin el consejo de tu médico o matrona: el modo permanece desactivado.",
+  },
+  pt: {
+    "v.insuffisant": "Ainda não há pesagens suficientes para falar de tendência (são precisas pelo menos 4 distribuídas por 2 semanas). Até lá, nenhum número de progresso seria honesto — uma diferença entre duas pesagens é água, não gordura.",
+    "v.conforme": "Medido: {actual} kg/semana em {spanDays} dias, contra {planned} previsto. A estimativa de gasto está certa para ti — não mexemos em nada.",
+    "v.plus_lent": "Medido: {actual} kg/semana em {spanDays} dias, contra {planned} previsto. A app não sabe o que comes: ou a ingestão excede o objetivo, ou o teu gasto real é inferior às {tdee} kcal estimadas. Antes de baixar mais as calorias, verifica o mais provável dos dois — a estimativa de ingestão erra muito mais vezes do que o metabolismo.",
+    "v.plus_rapide": "Medido: {actual} kg/semana, mais rápido do que os {planned} previstos. Mais rápido não é melhor: acima de ~0,75 %/semana, a perda faz-se à custa do músculo e a recuperação desmorona. Sobe a ingestão em 150 a 200 kcal/dia.",
+    "v.hausse": "Em {spanDays} dias ({points} pesagens), a tendência é de {actual} kg/semana. Duas explicações possíveis, e a app não consegue decidir: a ingestão real excede o objetivo, ou a estimativa de gasto ({tdee} kcal) é alta demais para ti. Mantém o objetivo mais 2 semanas pesando-te com regularidade: a curva decidirá.",
+    "c.imc_proche_normale": "IMC próximo do normal: perda limitada de propósito a ~0,4 kg/semana.",
+    "c.pct_tdee": "Défice limitado a 25 % do teu gasto total.",
+    "c.plancher_mb": "Objetivo elevado: nunca descemos abaixo do metabolismo basal.",
+    "c.plancher_absolu": "Objetivo elevado ao mínimo de segurança de {floor} kcal.",
+    "a.sexe_non_precise": "Sexo não indicado: média das duas equações (±83 kcal). Indica-o no teu perfil para afinar.",
+    "a.neat": "Vida diária fora do desporto estimada em ×{factor} do metabolismo basal: é uma hipótese populacional, a app não a consegue medir. Um trabalho em pé ou 12 000 passos diários subestimam-na.",
+    "a.aucune_seance": "Nenhuma sessão quantificável nos últimos 28 dias: o gasto desportivo contado é zero. Voltará a subir assim que as tuas sessões sincronizarem.",
+    "a.seances": "Gasto desportivo calculado sobre {n} sessão(ões) real(is) dos últimos 28 dias.",
+    "a.seances_avec_ecart": "Gasto desportivo calculado sobre {n} sessão(ões) real(is) dos últimos 28 dias, {skipped} descartada(s) por falta de duração ou distância.",
+    "r.normal": "Nenhuma restrição ligada ao peso. Única condição: não acumular um défice calórico marcado com um bloco de treino denso.",
+    "r.surpoids": "Treino clássico, com duas reservas: progressão de volume limitada a +7 %/semana em vez de +10 %, e reforço muscular duas vezes por semana para proteger a massa muscular durante o défice.",
+    "r.obesite_1": "Alternância corrida/marcha como formato principal, complementada com volume sem impacto. Apenas uma sessão um pouco mais exigente por semana, em subidas suaves ou tempo curto: mesmo benefício cardíaco das séries, muito menos traumatismo.",
+    "r.obesite_2": "Prioridade absoluta às articulações: a maior parte do volume em marcha rápida, bicicleta ou elíptica, e a corrida entra em blocos curtos alternados. Nenhuma sessão de séries enquanto a base não estiver instalada — o coração acompanharia, os tendões não.",
+    "e.donnees_manquantes": "Falta a tua altura, o teu peso ou a tua idade. Sem eles nenhum cálculo de gasto é possível — e não os vamos inventar. Completa o teu perfil.",
+    "e.imc_bas": "O teu IMC é de {bmi}. Abaixo de 20, perder peso degrada o desempenho e a saúde óssea em vez de os melhorar. Se queres mudar a composição corporal, as alavancas são o reforço muscular e a proteína — não menos calorias.",
+    "e.mineur": "O modo está reservado a maiores de 18 anos. Antes do fim do crescimento, qualquer restrição calórica pertence a acompanhamento médico, nunca a uma aplicação.",
+    "e.grossesse": "Declaraste uma gravidez ou pós-parto. Nenhuma restrição calórica deve ser iniciada sem o parecer do teu médico ou parteira: o modo permanece desativado.",
+  },
+};
+
+/** Obésité II et III partagent la même consigne d'entraînement (priorité articulaire). */
+export const rationaleKey = (band: string) => `r.${band === "obesite_3" ? "obesite_2" : band === "insuffisant" ? "normal" : band}`;
