@@ -5,6 +5,7 @@ import { HEALTH_CONDITIONS, INJURY_ZONES, healthCoachLines } from "@/data/health
 import { terrainCoachBlock } from "@/data/terrainCatalog";
 import { forecastWeek, heatAdvice, type DayWeather } from "@/lib/weather/openMeteo";
 import { bestVmaFromWorkouts, vmaFromPaceCurve, vmaFromVo2max } from "@/lib/running/fitness";
+import { isRun } from "@/lib/intervals/sport";
 
 type SB = Awaited<ReturnType<typeof createClient>>;
 
@@ -31,7 +32,7 @@ export const COACH_SYSTEM = `Tu es un entraîneur de course à pied et de trail 
 Tu ANALYSES CHAQUE donnée fournie sans EN OUBLIER AUCUNE, et tu n'oublies JAMAIS l'objectif de course. Conseils concrets, chiffrés (allures, zones FC, durées, dénivelé), personnalisés et sûrs.`;
 
 type Wk = {
-  date: string; type?: string | null; distance_km?: number | null; duration_seconds?: number | null;
+  date: string; type?: string | null; sport?: string | null; distance_km?: number | null; duration_seconds?: number | null;
   elevation_gain_m?: number | null; avg_hr?: number | null; training_effect?: number | null;
   tss?: number | null; avg_cadence_spm?: number | null; avg_power_watts?: number | null; max_hr?: number | null;
   vertical_oscillation_cm?: number | null; ground_contact_ms?: number | null; stride_length_m?: number | null;
@@ -144,13 +145,30 @@ export type AthleteContext = {
 };
 
 // Rassemble et ANALYSE toutes les données de l'athlète → briefing pour l'IA coach.
+/**
+ * Séances de l'athlète, en tolérant qu'une migration soit en retard.
+ *
+ * PostgREST rejette la requête ENTIÈRE si une seule colonne du `select` n'existe pas
+ * encore (42703). Nommer `sport` avant l'application de la migration 015 priverait
+ * donc le coach de TOUT l'historique, et pas seulement du sport. On retente sans.
+ */
+async function fetchWorkouts(sb: SB, userId: string) {
+  const cols = "date,type,distance_km,duration_seconds,elevation_gain_m,avg_hr,max_hr,training_effect,tss,avg_cadence_spm,avg_power_watts,vertical_oscillation_cm,ground_contact_ms,stride_length_m,cardiac_decoupling,weather_temp_c,gap_min_km,hr_zone_seconds,intensity_pct";
+  const q = async (c: string) => {
+    const r = await sb.from("workouts").select(c).eq("user_id", userId).order("date", { ascending: false }).limit(60);
+    return { data: r.data as unknown as Wk[] | null, error: r.error };
+  };
+  const withSport = await q(`${cols},sport`);
+  return withSport.error ? await q(cols) : withSport;
+}
+
 export async function buildAthleteContext(sb: SB, userId: string): Promise<AthleteContext> {
   const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, objRes, csRes] = await Promise.all([
     sb.from("profiles").select("*").eq("id", userId).single(),
     sb.from("performance_baselines").select("*").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).single(),
     sb.from("hrv_data").select("hrv_ms,physiological_state,date").eq("user_id", userId).order("date", { ascending: false }).limit(14),
     sb.from("sleep_data").select("sleep_score,total_sleep_min,deep_sleep_min,rem_sleep_min,body_battery_end,respiration_rate,date").eq("user_id", userId).order("date", { ascending: false }).limit(7),
-    sb.from("workouts").select("date,type,distance_km,duration_seconds,elevation_gain_m,avg_hr,max_hr,training_effect,tss,avg_cadence_spm,avg_power_watts,vertical_oscillation_cm,ground_contact_ms,stride_length_m,cardiac_decoupling,weather_temp_c,gap_min_km,hr_zone_seconds,intensity_pct").eq("user_id", userId).order("date", { ascending: false }).limit(60),
+    fetchWorkouts(sb, userId),
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "session_feedback").order("created_at", { ascending: false }).limit(5),
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "race_objective").maybeSingle(),
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "coach_session").order("created_at", { ascending: false }).limit(40),
@@ -176,8 +194,16 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
     return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
   })();
   const num = (v: unknown) => (v == null ? null : Number(v));
-  const kmIn = (days: number) => workouts.filter(w => now - new Date(w.date).getTime() <= days * 86400000).reduce((s, w) => s + (w.distance_km ?? 0), 0);
+  // VOLUME DE COURSE — le vélo, la randonnée et la marche n'en font PAS partie.
+  // Les compter revenait à dimensionner les séances sur des kilomètres jamais courus
+  // (relevé : 101,8 km comptés pour 35,8 km réellement courus pendant un séjour en
+  // montagne, d'où une sortie longue de 33 km proposée pour un objectif 10 km).
+  // La CHARGE, elle, continue de tout prendre en compte : une randonnée fatigue.
+  const runs = workouts.filter(w => isRun(w.sport));
+  const kmIn = (days: number) => runs.filter(w => now - new Date(w.date).getTime() <= days * 86400000).reduce((s, w) => s + (w.distance_km ?? 0), 0);
   const weekKm = kmIn(7), avg4wkKm = kmIn(28) / 4;
+  const crossKm7 = workouts.filter(w => !isRun(w.sport) && now - new Date(w.date).getTime() <= 7 * 86400000)
+    .reduce((s, w) => s + (w.distance_km ?? 0), 0);
   const load = computeLoad(workouts);
   const daysSinceLast = workouts[0]?.date ? Math.floor((now - new Date(workouts[0].date).getTime()) / 86400000) : null;
   const restDays7 = Math.max(0, 7 - new Set(workouts.filter(w => now - new Date(w.date).getTime() <= 7 * 86400000).map(w => String(w.date).slice(0, 10))).size);
@@ -224,6 +250,9 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // Notes libres récentes de l'athlète (sensations, douleur précise…) → vues par le coach.
   const fbNotes = feedback.map(f => f.data?.note?.trim()).filter((n): n is string => !!n).slice(0, 3);
 
+  // Une sortie vélo à 30 km/h passe le garde-fou de vitesse et donnerait une VMA de
+  // 40 km/h : l'estimation ne doit voir QUE de la course.
+  const runsForVma = workouts.filter(w => isRun(w.sport));
   const maxHr = num(b?.max_hr), restHr = num(b?.resting_hr), ltHr = num(b?.lt_hr);
   const vmaStored = num(b?.vma_kmh);
   const garminVo2 = num((p as Record<string, unknown> | null)?.garmin_vo2max);
@@ -232,7 +261,7 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // Meilleurs efforts mesurés : disponibles avant tout le reste car ils fondent la VMA.
   const paceCurve = (p?.pace_curve ?? null) as { best?: { m: number; sec: number }[]; criticalSpeed?: number | null; dPrime?: number | null } | null;
   const vma = (vmaStored != null && vmaStored > 0) ? vmaStored
-    : (vmaFromPaceCurve(paceCurve?.best) ?? bestVmaFromWorkouts(workouts, fcMaxEst) ?? estimateVmaFromRuns(workouts, fcMaxEst, now)
+    : (vmaFromPaceCurve(paceCurve?.best) ?? bestVmaFromWorkouts(runsForVma, fcMaxEst) ?? estimateVmaFromRuns(runsForVma, fcMaxEst, now)
        ?? (garminVo2 != null && garminVo2 > 0 ? vmaFromVo2max(garminVo2) : null));
   const vmaIsEst = !(vmaStored != null && vmaStored > 0) && vma != null;
   const level = vma == null ? "à évaluer (VMA inconnue)" : vma < 13 ? "débutant" : vma < 16 ? "intermédiaire" : vma < 19 ? "confirmé" : "expert/élite";
@@ -747,7 +776,7 @@ FORME & RÉCUPÉRATION (aujourd'hui)
 - Sommeil : ${freshSleep ? `${freshSleep.sleep_score ?? "?"}/100 cette nuit${lastSleepMin ? ` (${Math.floor(lastSleepMin / 60)}h${String(lastSleepMin % 60).padStart(2, "0")})` : ""}` : "montre non portée la nuit dernière (donnée ignorée)"} · moyenne 7j ${sleepAvg ?? "?"}/100
 
 CHARGE D'ENTRAÎNEMENT
-- Volume : ${Math.round(weekKm)} km cette semaine · ~${Math.round(avg4wkKm)} km/sem (moy. 4 sem.)
+- Volume : ${Math.round(weekKm)} km COURUS cette semaine${crossKm7 > 3 ? ` (+ ${Math.round(crossKm7)} km d'autres sports — vélo/rando/marche : ça fatigue et ça compte dans la charge, mais ce N'EST PAS du volume de course, ne dimensionne rien dessus)` : ""} · ~${Math.round(avg4wkKm)} km/sem (moy. 4 sem.)
 - 🎯 VOLUME CIBLE de la semaine à venir : ~${targetKm} km, dont une sortie longue de ~${longRunKm} km. Dimensionne les séances sur CES chiffres, pas sur des durées passe-partout.
 - 🔄 PHASE DU CYCLE : ${cycleLabel}.
 - 📆 DISPONIBILITÉS : ${availDaysPerWeek} séance(s) de course par semaine${availDays.length < 7 ? `, uniquement les ${availDays.map(d => ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d]).join(", ")}` : ""}${declaredDpw ? " (déclaré par l'athlète)" : " (déduit de son niveau et de sa pratique actuelle — demande-lui de le préciser)"}. NE DÉPASSE PAS ce nombre : un plan qu'il ne peut pas suivre ne vaut rien.
@@ -812,16 +841,21 @@ ${catalog}`;
 export async function getEffectiveVma(sb: SupabaseClient, userId: string): Promise<number | null> {
   const [baseRes, woRes, profRes] = await Promise.all([
     sb.from("performance_baselines").select("vma_kmh").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).maybeSingle(),
-    sb.from("workouts").select("distance_km,duration_seconds,type,avg_hr,max_hr").eq("user_id", userId).order("date", { ascending: false }).limit(60),
+    fetchWorkouts(sb, userId),
     sb.from("profiles").select("*").eq("id", userId).maybeSingle(),
   ]);
   const stored = Number((baseRes.data as { vma_kmh?: number } | null)?.vma_kmh) || 0;
   if (stored > 0) return stored;
-  // Efforts réels d'abord (reflète l'allure de course) → repli sur la VO2max Garmin.
-  const wks = (woRes.data ?? []) as { distance_km?: number | null; duration_seconds?: number | null; type?: string | null; avg_hr?: number | null; max_hr?: number | null }[];
+  // MÊME ORDRE DE FIABILITÉ QUE LE COACH — sans quoi la montre recevrait des allures
+  // calculées autrement que celles affichées dans l'application.
+  const prof = profRes.data as { garmin_vo2max?: number | null; pace_curve?: { best?: { m: number; sec: number }[] } | null } | null;
+  const fromCurve = vmaFromPaceCurve(prof?.pace_curve?.best);
+  if (fromCurve && fromCurve > 0) return fromCurve;
+  // Course à pied uniquement : une sortie vélo produirait une VMA fantaisiste.
+  const wks = ((woRes.data ?? []) as Wk[]).filter(w => isRun(w.sport));
   const obsMaxHr = Math.max(0, ...wks.map((w) => Number(w.max_hr ?? 0)));
   const fromRuns = bestVmaFromWorkouts(wks, obsMaxHr > 120 ? obsMaxHr : null);
   if (fromRuns && fromRuns > 0) return fromRuns;
-  const garminVo2 = Number((profRes.data as { garmin_vo2max?: number | null } | null)?.garmin_vo2max) || 0;
+  const garminVo2 = Number(prof?.garmin_vo2max) || 0;
   return garminVo2 > 0 ? vmaFromVo2max(garminVo2) : null;
 }

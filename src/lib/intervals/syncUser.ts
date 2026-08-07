@@ -4,6 +4,7 @@
 //  déclencheur (l'ouverture de l'app et le cron quotidien s'en servent aussi).
 // ─────────────────────────────────────────────────────────────────────────────
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { sportOf } from "./sport";
 
 const BASE = "https://intervals.icu/api/v1";
 
@@ -47,14 +48,21 @@ export async function syncIntervalsForUser(
 
   let synced = 0;
 
+  // Migration 015 possiblement en retard : PostgREST rejette l'écriture entière si
+  // `sport` n'existe pas (42703). On sonde une fois plutôt que de perdre la synchro.
+  const probe = await admin.from("workouts").select("sport").limit(1);
+  const hasSport = probe.error?.code !== "42703";
+
   for (const act of activities) {
     if (!act.type || !act.start_date_local) continue;
     const workoutType = mapActivityType(act.type);
+    const sport = sportOf(act.type);
     const { error } = await admin.from("workouts").upsert(
       {
         user_id: profile.id,
         title: act.name ?? workoutType,
         type: workoutType,
+        ...(hasSport ? { sport } : {}),
         date: act.start_date_local.split("T")[0],
         duration_seconds: Math.max(1, act.moving_time ?? act.elapsed_time ?? 1),
         distance_km: act.distance ? act.distance / 1000 : null,

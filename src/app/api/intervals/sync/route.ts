@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { sportOf } from "@/lib/intervals/sport";
 
 const BASE = "https://intervals.icu/api/v1";
 
@@ -80,11 +81,12 @@ export async function GET(req: Request) {
 
     for (const act of validActivities) {
       const workoutType = mapActivityType(act.type!);
+      const sport = sportOf(act.type);
       const date = act.start_date_local!.split("T")[0];
       const title = act.name ?? workoutType;
 
       const payload: Record<string, unknown> = {
-        user_id: user.id, title, type: workoutType, date,
+        user_id: user.id, title, type: workoutType, sport, date,
         duration_seconds: Math.max(1, Math.round(act.moving_time ?? act.elapsed_time ?? 1)),
         distance_km: act.distance ? act.distance / 1000 : null,
         elevation_gain_m: ri(act.total_elevation_gain),
@@ -120,6 +122,18 @@ export async function GET(req: Request) {
     // rafraîchit les 3 derniers jours à chaque sondage, ce qui produirait un
     // « du neuf » permanent et ferait republier le plan toutes les 2 minutes).
     freshWorkouts += toInsert.length;
+
+    // Migration 015 en retard : PostgREST refuse l'écriture ENTIÈRE si `sport` n'existe
+    // pas encore (42703). On sonde une fois et on retire la colonne partout plutôt que
+    // de laisser la synchronisation échouer en bloc — le sport sera renseigné au premier
+    // passage suivant l'application de la migration.
+    {
+      const probe = await supabase.from("workouts").select("sport").limit(1);
+      if (probe.error?.code === "42703") {
+        for (const p of toInsert) delete p.sport;
+        for (const u of toUpdate) delete u.payload.sport;
+      }
+    }
 
     // Batch insert
     if (toInsert.length > 0) {
