@@ -187,7 +187,7 @@ export function stepsForType(type: string, durationMin: number, vmaKmh?: number 
 export async function pushIntervalsWorkout(opts: {
   athleteId: string; apiKey: string; userId: string;
   name: string; date: string; description: string; sport?: "Run" | "Ride";
-}): Promise<{ ok: boolean; eventId?: number; error?: string }> {
+}): Promise<{ ok: boolean; eventId?: number; error?: string; unchanged?: boolean }> {
   const { athleteId, apiKey, userId, name, date, description, sport } = opts;
   const extId = `rte-coach-${userId}-${date}`;
   const event = {
@@ -199,15 +199,43 @@ export async function pushIntervalsWorkout(opts: {
     external_id: extId,
   };
   try {
+    let mine: { id: number; name?: string; description?: string }[] = [];
     const existRes = await fetch(`${BASE}/athlete/${athleteId}/events?oldest=${date}&newest=${date}`, { headers: authHeader(apiKey) });
     if (existRes.ok) {
-      const existing = (await existRes.json()) as { id: number; external_id?: string }[];
-      // Remplace UNIQUEMENT la séance du même type (coach) déjà présente ce jour-là.
-      // → la séance coach n'écrase jamais un défi Ghost Runner, et vice-versa (ils coexistent).
-      await Promise.all(existing
-        .filter((e) => e.external_id === extId)
-        .map((e) => fetch(`${BASE}/athlete/${athleteId}/events/${e.id}`, { method: "DELETE", headers: authHeader(apiKey) }).catch(() => undefined)));
+      const existing = (await existRes.json()) as { id: number; external_id?: string; name?: string; description?: string }[];
+      // On ne touche QUE la séance coach du jour : elle n'écrase jamais un défi Ghost
+      // Runner, et vice-versa (ils coexistent sur le calendrier).
+      mine = existing.filter((e) => e.external_id === extId);
+      // Séance inchangée → on ne réécrit RIEN. Le plan est recalculé plusieurs fois par
+      // jour et retombe presque toujours sur la même séance ; toute écriture relance une
+      // synchronisation Garmin inutile. Ne pas toucher est ici la bonne action.
+      const same = mine.find((e) => e.name === event.name && e.description === description);
+      if (same) return { ok: true, eventId: same.id, unchanged: true };
     }
+
+    // MISE À JOUR EN PLACE plutôt que suppression + recréation.
+    //
+    // Le plan est republié à chaque synchronisation d'une nouvelle séance, plus une fois
+    // par jour via le cron. En supprimant l'événement, on demandait à intervals.icu de
+    // RETIRER l'entraînement de Garmin Connect, puis d'en pousser un nouveau. Chaque
+    // replanification cassait donc le lien avec la montre, et il fallait une nouvelle
+    // synchronisation Garmin pour que la séance réapparaisse — d'où une montre qui
+    // n'affiche « rien de prévu » une bonne partie du temps.
+    // Le PUT conserve l'identifiant de l'événement (vérifié : id inchangé, étapes
+    // reconstruites), donc l'entraînement Garmin reste en place et est simplement mis à jour.
+    if (mine.length) {
+      const [keep, ...extra] = mine;
+      const res = await fetch(`${BASE}/athlete/${athleteId}/events/${keep.id}`, {
+        method: "PUT", headers: authHeader(apiKey), body: JSON.stringify(event),
+      });
+      // Doublons éventuels d'une ancienne version : on ne garde qu'une séance par jour.
+      await Promise.all(extra.map((e) =>
+        fetch(`${BASE}/athlete/${athleteId}/events/${e.id}`, { method: "DELETE", headers: authHeader(apiKey) }).catch(() => undefined)));
+      if (res.ok) return { ok: true, eventId: keep.id };
+      // Le PUT peut échouer si l'événement a été supprimé côté intervals.icu entre-temps :
+      // on retombe alors sur la création.
+    }
+
     const res = await fetch(`${BASE}/athlete/${athleteId}/events`, { method: "POST", headers: authHeader(apiKey), body: JSON.stringify(event) });
     if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
     const created = await res.json().catch(() => ({}));

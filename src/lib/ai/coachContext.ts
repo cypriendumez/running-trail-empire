@@ -4,7 +4,7 @@ import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrar
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthCoachLines } from "@/data/healthCatalog";
 import { terrainCoachBlock } from "@/data/terrainCatalog";
 import { forecastWeek, heatAdvice, type DayWeather } from "@/lib/weather/openMeteo";
-import { bestVmaFromWorkouts, vmaFromVo2max } from "@/lib/running/fitness";
+import { bestVmaFromWorkouts, vmaFromPaceCurve, vmaFromVo2max } from "@/lib/running/fitness";
 
 type SB = Awaited<ReturnType<typeof createClient>>;
 
@@ -229,8 +229,10 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const garminVo2 = num((p as Record<string, unknown> | null)?.garmin_vo2max);
   // VMA, par fiabilité : test enregistré → efforts réels (reflète l'allure de course) → dérivée de la
   // VO2max Garmin (repli) → repli FC. Garantit le MÊME chiffre côté coach et côté client.
+  // Meilleurs efforts mesurés : disponibles avant tout le reste car ils fondent la VMA.
+  const paceCurve = (p?.pace_curve ?? null) as { best?: { m: number; sec: number }[]; criticalSpeed?: number | null; dPrime?: number | null } | null;
   const vma = (vmaStored != null && vmaStored > 0) ? vmaStored
-    : (bestVmaFromWorkouts(workouts, fcMaxEst) ?? estimateVmaFromRuns(workouts, fcMaxEst, now)
+    : (vmaFromPaceCurve(paceCurve?.best) ?? bestVmaFromWorkouts(workouts, fcMaxEst) ?? estimateVmaFromRuns(workouts, fcMaxEst, now)
        ?? (garminVo2 != null && garminVo2 > 0 ? vmaFromVo2max(garminVo2) : null));
   const vmaIsEst = !(vmaStored != null && vmaStored > 0) && vma != null;
   const level = vma == null ? "à évaluer (VMA inconnue)" : vma < 13 ? "débutant" : vma < 16 ? "intermédiaire" : vma < 19 ? "confirmé" : "expert/élite";
@@ -383,6 +385,23 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
 
   // Allures cibles calculées depuis la VMA (repli si zones non stockées).
   const paceAt = (pct: number) => { if (!vma) return "?"; const s = 3600 / (vma * pct / 100); return `${Math.floor(s / 60)}'${String(Math.round(s % 60)).padStart(2, "0")}`; };
+  /**
+   * Allure d'une RÉPÉTITION, plafonnée par ce que l'athlète a réellement produit.
+   *
+   * Garde-fou d'impossibilité, pas de réglage fin : on ne prescrit jamais une SÉRIE de
+   * répétitions plus rapide que le MEILLEUR effort UNIQUE mesuré sur cette distance en
+   * six semaines. Vu en production — 12×400 m à 2'55/km demandés à un athlète dont le
+   * meilleur 400 m était à 3'20/km. Douze fois plus vite que son record : la séance ne
+   * pouvait qu'échouer, et l'échec aurait été mis sur le compte de l'athlète.
+   */
+  const repPace = (pct: number, meters: number) => {
+    const target = vma ? 3600 / (vma * pct / 100) : null;
+    if (target == null) return "?";
+    const anchor = paceCurve?.best?.find((b) => Math.abs(b.m - meters) / meters <= 0.25);
+    const floorSec = anchor ? anchor.sec / (anchor.m / 1000) : null;
+    const sec = floorSec != null ? Math.max(target, floorSec) : target;
+    return `${Math.floor(sec / 60)}'${String(Math.round(sec % 60)).padStart(2, "0")}`;
+  };
   const computedPaces = vma ? `Z1 récup ~${paceAt(60)} · Z2 endurance ~${paceAt(70)} · seuil ~${paceAt(85)} · VMA ~${paceAt(100)} (min/km)` : null;
   // Chronos théoriques au potentiel actuel (% VMA soutenable par distance) → réalisme + allures.
   const predict = (km: number, pct: number) => { if (!vma) return "?"; const sec = km / (vma * pct / 100) * 3600; const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = Math.round(sec % 60); return h ? `${h}h${String(m).padStart(2, "0")}` : `${m}'${String(s).padStart(2, "0")}`; };
@@ -445,7 +464,7 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // La vitesse critique est ajustée sur les efforts RÉELS de l'athlète : c'est un
   // seuil mesuré, là où `paceAt(86)` n'est qu'un pourcentage d'une VMA elle-même
   // souvent estimée. Quand elle existe, elle prime.
-  const pc = (p?.pace_curve ?? null) as { best?: { m: number; sec: number }[]; criticalSpeed?: number | null; dPrime?: number | null } | null;
+  const pc = paceCurve;
   const csMs = num(pc?.criticalSpeed);
   const fmtPace = (secPerKm: number) => `${Math.floor(secPerKm / 60)}'${String(Math.round(secPerKm % 60)).padStart(2, "0")}`;
   const thresholdPace = csMs && csMs > 1 ? fmtPace(1000 / csMs) : null;
@@ -570,10 +589,10 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const pick = (arr: string[]) => arr[variant % arr.length];
 
   const qVMA = { type: "VMA", desc: pick([
-    `VMA courte : 12×400 m à ~${paceAt(104)}/km, récup 45 s trottinés → aiguise la vitesse et la foulée`,
-    `VMA moyenne : 8×500 m à ~${paceAt(102)}/km, récup 1 min trottinée → tenue de la vitesse`,
-    `VMA longue : 6×800 m à ~${paceAt(100)}/km, récup 1 min 30 trottinée → soutien du VO2max`,
-    `VMA longue : 5×1000 m à ~${paceAt(100)}/km, récup 2 min trottinée → le format le plus proche de la course`,
+    `VMA courte : 12×400 m à ~${repPace(104, 400)}/km, récup 45 s trottinés → aiguise la vitesse et la foulée`,
+    `VMA moyenne : 8×500 m à ~${repPace(102, 500)}/km, récup 1 min trottinée → tenue de la vitesse`,
+    `VMA longue : 6×800 m à ~${repPace(100, 800)}/km, récup 1 min 30 trottinée → soutien du VO2max`,
+    `VMA longue : 5×1000 m à ~${repPace(100, 1000)}/km, récup 2 min trottinée → le format le plus proche de la course`,
   ]) };
   // Allure seuil : la vitesse critique MESURÉE prime sur le pourcentage de VMA estimée.
   const sPace = thresholdPace ?? paceAt(86);

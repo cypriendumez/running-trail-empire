@@ -125,12 +125,45 @@ export function loadRisk(workouts: { date: string; type?: string | null; duratio
 
 // Meilleure VMA estimée depuis l'historique : UNIQUEMENT des efforts réellement
 // soutenus (FC élevée), sinon on surestime (un footing rapide n'est pas un max).
+/**
+ * VMA déduite des MEILLEURS EFFORTS mesurés (courbe d'allure intervals.icu, 42 j).
+ *
+ * De loin la source la plus fiable, et pour une raison simple : une moyenne d'activité
+ * divise la distance totale par la durée totale, échauffement et retour au calme
+ * compris — elle sous-estime l'effort réel. La courbe d'allure, elle, retient le
+ * meilleur segment continu à chaque distance.
+ *
+ * On prend le MAXIMUM des VMA implicites : chaque effort n'est un révélateur que s'il
+ * a été maximal, et un effort non maximal ne peut que sous-estimer. Le plus favorable
+ * est donc le plus proche de la vérité.
+ */
+export function vmaFromPaceCurve(best: { m: number; sec: number }[] | null | undefined): number | null {
+  if (!best?.length) return null;
+  let top: number | null = null;
+  for (const b of best) {
+    if (!(b.m > 0) || !(b.sec > 0)) continue;
+    const v = vmaFromEffort(b.m / 1000, b.sec);
+    if (v != null && (top == null || v > top)) top = v;
+  }
+  return top;
+}
+
 export function bestVmaFromWorkouts(
-  workouts: { distance_km?: number | null; duration_seconds?: number | null; type?: string | null; avg_hr?: number | null }[],
+  workouts: { date?: string; distance_km?: number | null; duration_seconds?: number | null; type?: string | null; avg_hr?: number | null }[],
   maxHr?: number | null,
+  /**
+   * Fenêtre de FORME (jours). Sans elle, un record vieux de cinq mois sert encore de
+   * base aux allures prescrites. Constaté en production : une VMA de 19,8 km/h issue
+   * d'un 10 km de mars pilotait encore les séances d'août, produisant des fractionnés
+   * plus rapides que le record de l'athlète sur la distance. On prescrit sur la forme
+   * du moment, pas sur le souvenir du pic.
+   */
+  windowDays = 120,
 ): number | null {
   let best: number | null = null;
+  const now = Date.now();
   for (const w of workouts) {
+    if (w.date && (now - new Date(w.date).getTime()) > windowDays * 86400000) continue;
     if (!w.distance_km || w.distance_km < 2 || !w.duration_seconds) continue;
     if (/strength|renfo|muscu/i.test(String(w.type ?? ""))) continue;
     // Effort vraiment maximal exigé : si on a la FC, il faut ≥ 85 % de la FC max.
