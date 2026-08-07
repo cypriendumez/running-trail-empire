@@ -468,7 +468,10 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
     ? `${tooFastEasy}/${easyRuns.length} footings au-dessus du plafond facile (~${easyCeiling} bpm)${tooFastEasy / easyRuns.length >= 0.34 ? " ⚠️ tendance à courir TROP VITE en facile → fais-le RALENTIR (frein n°1 à la progression)" : tooFastEasy === 0 ? " ✅ excellente discipline" : " ✅ discipline correcte"}`
     : "n/c (FC ou séances manquantes)";
   const todayStr = new Date().toISOString().slice(0, 10);
-  const doneDates = new Set(workouts.map(w => String(w.date).slice(0, 10)));
+  // Jours où il a COURU. Compter toutes les activités faisait passer une journée de
+  // randonnée pour une séance de course honorée : l'adhérence était surestimée et les
+  // jours réellement ratés — ceux que la boucle doit justement détecter — invisibles.
+  const doneDates = new Set(runs.map(w => String(w.date).slice(0, 10)));
   const pastPrescribed = coachSessions.filter(c => c.date && c.date <= todayStr && now - new Date(c.date).getTime() <= 14 * 86400000);
   // ── JOURS SYSTÉMATIQUEMENT RATÉS (boucle d'adhérence) ──
   // Un plan qu'on ne suit pas ne sert à rien. Si un jour de la semaine est prescrit

@@ -174,7 +174,10 @@ export function stepsForType(type: string, durationMin: number, vmaKmh?: number 
     const main = Math.max(10, d - warm - cool);
     return [
       zoneStep(warm, 1, v, "Échauffement", null, true),
-      block ?? zoneStep(bodyMin ?? main, quality, v, quality === 5 ? "VMA" : "Seuil", p),
+      // Bloc continu : en CÔTE on pilote à la fréquence cardiaque, jamais à l'allure —
+      // une allure au km ne veut rien dire en montée. Les répétitions le faisaient déjà,
+      // le bloc continu, non : le drapeau `hill` ne lui était pas transmis.
+      block ?? zoneStep(bodyMin ?? main, quality, v, quality === 5 ? "VMA" : "Seuil", hill ? null : p, hill),
       zoneStep(cool, 1, v, "Retour au calme", null, true),
     ].join("\n");
   }
