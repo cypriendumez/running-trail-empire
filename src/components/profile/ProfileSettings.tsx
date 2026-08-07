@@ -388,13 +388,17 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
       injury_zones: form.injury_zones,
       health_notes: form.health_notes.trim() || null,
       health_declared: form.health_declared,
-      days_per_week: form.days_per_week,
-      available_days: form.available_days,
       notif_workout: form.notif_workout,
       notif_goal: form.notif_goal,
       notif_league: form.notif_league,
       notif_coach: form.notif_coach,
     }).eq("id", userId);
+    // Disponibilités — écriture ISOLÉE (colonnes de la migration 011, cf. terrains).
+    await supabase.from("profiles").update({
+      days_per_week: form.days_per_week,
+      available_days: form.available_days,
+    }).eq("id", userId);
+
     // Terrains multiples — écriture ISOLÉE : si `main_terrains` n'existe pas encore en base,
     // seule cette ligne échoue au lieu d'emporter toute la sauvegarde du profil.
     await supabase.from("profiles").update({ main_terrains: form.main_terrains }).eq("id", userId);

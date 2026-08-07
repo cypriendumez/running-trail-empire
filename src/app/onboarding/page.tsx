@@ -208,6 +208,12 @@ export default function OnboardingPage() {
       injury_zones: profile.injury_zones,
       health_notes: profile.health_notes.trim() || null,
       health_declared: healthAnswered,
+    }).eq("id", user.id);
+
+    // Disponibilités — écriture ISOLÉE : ces colonnes arrivent avec la migration 011.
+    // Les laisser dans le bloc ci-dessus ferait échouer TOUTE la sauvegarde (ancienneté,
+    // dénivelé, santé) tant que la migration n'est pas passée.
+    await supabase.from("profiles").update({
       days_per_week: profile.days_per_week,
       available_days: profile.available_days,
     }).eq("id", user.id);
