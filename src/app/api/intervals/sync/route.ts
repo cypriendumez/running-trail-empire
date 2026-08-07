@@ -110,9 +110,14 @@ export async function GET(req: Request) {
         avg_cadence_spm: act.average_cadence ? Math.round(act.average_cadence * 2) : null,
         tss: act.icu_training_load ?? act.icu_tss ?? null,                 // « Charge » intervals.icu
         training_effect: act.aerobic_te ?? null,
-        vertical_oscillation_cm: act.avg_vertical_oscillation ?? null,
+        // ⚠️ Noms EXACTS de l'API intervals.icu. `avg_vertical_oscillation` et
+        // `avg_stride_length` n'existent pas : les vrais champs sont `average_*`.
+        // Résultat, ces deux colonnes sont restées vides à 100 % alors que la foulée est
+        // disponible sur CHAQUE course. L'oscillation est en MILLIMÈTRES côté API (88,6)
+        // et la colonne en centimètres — d'où la division.
+        vertical_oscillation_cm: act.average_vertical_oscillation != null ? Math.round(act.average_vertical_oscillation / 10 * 10) / 10 : null,
         ground_contact_ms: ri(act.avg_ground_contact_time),
-        stride_length_m: act.average_stride ?? (act.avg_stride_length ? act.avg_stride_length / 100 : null),
+        stride_length_m: act.average_stride ?? null,
         cardiac_decoupling: act.decoupling ?? null,
         // Champs disponibles chez intervals.icu mais jamais enregistrés jusqu'ici (recensement
         // du 7/08 : 0 % de remplissage côté base, 8/8 côté API). La température en particulier
@@ -376,6 +381,7 @@ interface IntervalsActivity {
   avg_ground_contact_time?: number;
   avg_stride_length?: number;
   decoupling?: number;
+  average_vertical_oscillation?: number;
   average_temp?: number;
   gap?: number;
   icu_hr_zone_times?: number[];
