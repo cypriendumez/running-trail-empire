@@ -380,5 +380,38 @@ test("aucune page du tableau de bord ne transmet le profil brut", () => {
   }
 });
 
+console.log("\nSÉCURITÉ — téléversement");
+test("seuls images et PDF sont acceptés, d'après le CONTENU", () => {
+  // Bug réel : le bucket est PUBLIC et le type MIME était repris tel quel du navigateur.
+  // Un compte pouvait déposer un .html contenant du script en imposant « text/html ».
+  const sniff = (b: Buffer): string | null => {
+    if (b.length < 12) return null;
+    if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "image/jpeg";
+    if (b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "image/png";
+    if (b.subarray(0, 6).toString("latin1").startsWith("GIF8")) return "image/gif";
+    if (b.subarray(0, 4).toString("latin1") === "RIFF" && b.subarray(8, 12).toString("latin1") === "WEBP") return "image/webp";
+    if (b.subarray(0, 4).toString("latin1") === "%PDF") return "application/pdf";
+    return null;
+  };
+  const pad = (s: string) => Buffer.concat([Buffer.from(s, "latin1"), Buffer.alloc(16)]);
+  assert.equal(sniff(pad("%PDF-1.7")), "application/pdf");
+  assert.equal(sniff(Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(8)])), "image/png");
+  // Un fichier HTML, même nommé « photo.png » et déclaré « image/png », est refusé.
+  assert.equal(sniff(pad("<html><script>alert(1)</script>")), null);
+  assert.equal(sniff(pad("<svg onload=alert(1)>")), null);
+});
+test("le code de téléversement ne fait pas confiance au type déclaré", () => {
+  const src = readFileSync("src/app/api/upload/route.ts", "utf8");
+  assert.ok(!/contentType:\s*file\.type/.test(src), "le type MIME du navigateur ne doit jamais être réutilisé tel quel");
+  assert.ok(/sniff/.test(src), "le type doit être déduit des premiers octets");
+});
+test("aucune route n'écrit dans les données d'un athlète sans preuve d'identité", () => {
+  // Bug réel : /api/terra/webhook acceptait un `user_id` arbitraire et insérait des
+  // séances et des données de VFC avec la clé service_role, sans signature ni secret —
+  // et Terra n'était même pas intégré. N'importe qui pouvait polluer l'historique d'un
+  // athlète, donc fausser toute l'analyse du coach.
+  assert.equal(existsSync("src/app/api/terra"), false, "la route Terra non signée est de retour");
+});
+
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log(`  ✗ ${f}`); process.exit(1); }
