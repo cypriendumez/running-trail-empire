@@ -154,3 +154,41 @@ export function windAdvice(windKmh: number | null): { penaltySecPerKm: number; n
     note: `💨 Vent de ${Math.round(windKmh)} km/h : ~10 s/km de plus dans les portions face au vent. Le retour dans le dos ne compense pas l'aller, n'en attends rien.`,
   };
 }
+
+/** Températures maximales quotidiennes passées à une position — UN seul appel pour
+ *  toute la période. Sert à mesurer l'exposition réelle à la chaleur. */
+export async function archiveDailyMax(lat: number, lon: number, days: number): Promise<Map<string, number>> {
+  const end = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
+  const start = new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);
+  const url = `${ARCHIVE}?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}`
+    + `&start_date=${start}&end_date=${end}&daily=temperature_2m_max&timezone=auto`;
+  const out = new Map<string, number>();
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return out;
+    const j = await r.json() as { daily?: { time?: string[]; temperature_2m_max?: number[] } };
+    (j.daily?.time ?? []).forEach((d, i) => {
+      const t = num(j.daily?.temperature_2m_max?.[i]);
+      if (t != null) out.set(d, t);
+    });
+    return out;
+  } catch { return out; }
+}
+
+/**
+ * ACCLIMATATION À LA CHALEUR.
+ *
+ * L'adaptation (expansion du volume plasmatique, sudation plus précoce et plus diluée)
+ * s'installe en 10 à 14 jours d'exposition répétée et récupère l'essentiel — mais pas
+ * la totalité — de la performance perdue. Appliquer la même pénalité au premier et au
+ * quinzième jour de canicule fait donc courir trop lentement un athlète déjà adapté.
+ *
+ * On compte les JOURS D'ENTRAÎNEMENT réellement passés dans la chaleur, pas les jours
+ * calendaires : rester au frais deux semaines pendant une canicule n'acclimate personne.
+ */
+export function heatAcclimation(hotTrainingDays: number): { factor: number; label: string } {
+  if (hotTrainingDays >= 12) return { factor: 0.55, label: "bien acclimaté" };
+  if (hotTrainingDays >= 8) return { factor: 0.7, label: "acclimatation avancée" };
+  if (hotTrainingDays >= 4) return { factor: 0.85, label: "acclimatation en cours" };
+  return { factor: 1, label: "non acclimaté" };
+}

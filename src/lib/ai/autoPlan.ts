@@ -105,7 +105,9 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
     const f = ctx.forecast.find((x) => x.date === iso(dates[i]));
     if (!m || !f) return base;
     // Chaleur ET vent : les deux ralentissent, et ils se cumulent.
-    const penalty = heatAdvice(f.tempMax, f.humidity).penaltySecPerKm + windAdvice(f.windMaxKmh).penaltySecPerKm;
+    // La chaleur s'apprivoise (10-14 j d'exposition) ; le vent, non.
+    const penalty = Math.round(heatAdvice(f.tempMax, f.humidity).penaltySecPerKm * ctx.heatAcclim.factor)
+      + windAdvice(f.windMaxKmh).penaltySecPerKm;
     if (!penalty) return base;
     const sec = Number(m[1]) * 60 + Number(m[2]) + penalty;
     return `${Math.floor(sec / 60)}'${String(sec % 60).padStart(2, "0")}`;
@@ -124,7 +126,8 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   const heatAdjustDesc = (desc: string, i: number): string => {
     const f = ctx.forecast.find((x) => x.date === iso(dates[i]));
     if (!f) return desc;
-    const penalty = Math.round((heatAdvice(f.tempMax, f.humidity).penaltySecPerKm + windAdvice(f.windMaxKmh).penaltySecPerKm) / 2);
+    const penalty = Math.round((heatAdvice(f.tempMax, f.humidity).penaltySecPerKm * ctx.heatAcclim.factor
+      + windAdvice(f.windMaxKmh).penaltySecPerKm) / 2);
     if (!penalty) return desc;
     return desc.replace(/(\d+)['’](\d{2})\/km/g, (_m, mm: string, ss: string) => {
       const sec = Number(mm) * 60 + Number(ss) + penalty;

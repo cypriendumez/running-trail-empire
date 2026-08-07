@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthCoachLines } from "@/data/healthCatalog";
 import { terrainCoachBlock } from "@/data/terrainCatalog";
-import { forecastWithElevation, altitudeLossPct, heatAdvice, windAdvice, type DayWeather } from "@/lib/weather/openMeteo";
+import { forecastWithElevation, altitudeLossPct, heatAdvice, windAdvice, archiveDailyMax, heatAcclimation, type DayWeather } from "@/lib/weather/openMeteo";
 import { bestVmaFromWorkouts, vmaFromPaceCurve, vmaFromVo2max } from "@/lib/running/fitness";
 import { isRun } from "@/lib/intervals/sport";
 import { warmCoolMin } from "@/lib/watch/intervals";
@@ -165,6 +165,8 @@ export type AthleteContext = {
   /** Durées d'échauffement / retour au calme du profil — MÊMES valeurs que celles
    *  appliquées par la montre, pour que le texte et la séance envoyée coïncident. */
   warmCool: { warm: number; cool: number };
+  /** Acclimatation à la chaleur : facteur multiplicatif de la pénalité (1 = non acclimaté). */
+  heatAcclim: { hotDays: number; factor: number; label: string };
   /** % du temps passé en Z3+ s'il dépasse la cible (footings trop rapides), sinon null. */
   tooMuchIntensity: number | null;
   /** true si l'athlète s'entraîne réellement en terrain vallonné (D+ hebdo significatif). */
@@ -194,7 +196,7 @@ async function fetchWorkouts(sb: SB, userId: string) {
 }
 
 export async function buildAthleteContext(sb: SB, userId: string): Promise<AthleteContext> {
-  const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, objRes, csRes] = await Promise.all([
+  const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, shoeRes, objRes, csRes] = await Promise.all([
     sb.from("profiles").select("*").eq("id", userId).single(),
     sb.from("performance_baselines").select("*").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).single(),
     sb.from("hrv_data").select("hrv_ms,physiological_state,date").eq("user_id", userId).order("date", { ascending: false }).limit(14),
@@ -204,6 +206,9 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
     // Douleurs déclarées depuis l'espace Santé (schéma corporel) — elles n'atteignaient
     // pas le coach, qui ne regardait que le formulaire post-séance.
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "pain_report").order("created_at", { ascending: false }).limit(10),
+    // Usure des chaussures : un des rares facteurs de blessure à la fois mesurable
+    // et actionnable. Silencieux tant qu'aucune paire n'est enregistrée.
+    sb.from("shoes").select("brand, model, current_km, km_at_purchase, max_km, purchase_date, terrain").eq("user_id", userId).eq("is_active", true),
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "race_objective").maybeSingle(),
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "coach_session").order("created_at", { ascending: false }).limit(40),
   ]);
@@ -763,6 +768,21 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // cette information, le coach juge des allures d'altitude à l'aune du niveau de la
   // mer et conclut à une perte de forme là où l'athlète est simplement en montagne.
   const elevationM = weather.elevationM;
+  // ── ACCLIMATATION À LA CHALEUR ───────────────────────────────────────────────
+  // On compte les jours où il a RÉELLEMENT COURU dans la chaleur, pas les jours
+  // calendaires chauds : rester au frais pendant une canicule n'acclimate personne.
+  // Un seul appel d'archive couvre les 21 jours.
+  const heatAcclim = await (async () => {
+    if (lat == null || lon == null) return { hotDays: 0, ...heatAcclimation(0) };
+    const past = await archiveDailyMax(lat, lon, 21).catch(() => new Map<string, number>());
+    if (!past.size) return { hotDays: 0, ...heatAcclimation(0) };
+    const runDays = new Set(runs
+      .filter(w => now - new Date(w.date).getTime() <= 21 * 86400000)
+      .map(w => String(w.date).slice(0, 10)));
+    let hot = 0;
+    for (const d of runDays) if ((past.get(d) ?? 0) >= 25) hot++;
+    return { hotDays: hot, ...heatAcclimation(hot) };
+  })();
   const altLoss = altitudeLossPct(elevationM);
   const todayFc = forecast[0] ?? null;
   const hotDays = forecast.filter(f => f.tempMax >= 28);
@@ -943,6 +963,56 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   const targetKm = macroPlan.length ? macroPlan[0].volumeKm
     : Math.round(baseKm * (taper ? 0.65 : deload ? 0.8 : growth));
   const longRunKm = macroPlan.length ? macroPlan[0].longRunKm : Math.round(targetKm * (taper ? 0.22 : 0.32));
+
+  // ── NUTRITION ET HYDRATATION CHIFFRÉES ───────────────────────────────────────
+  // « 30 à 60 g de glucides par heure » est un intervalle de manuel : il ne dit pas
+  // à CET athlète quoi emporter samedi. On le calcule sur la durée réelle de sa sortie
+  // longue, sa masse et la température prévue ce jour-là.
+  const longRunMin = vma && longRunKm ? Math.round((longRunKm / (vma * 0.70)) * 60) : null;
+  const weightKg = num(p?.weight_kg);
+  // Météo du jour de sortie longue : le prochain samedi ou dimanche de la fenêtre.
+  function ctx0Forecast(_km: number): DayWeather | undefined {
+    return forecast.find(f => [0, 6].includes(new Date(`${f.date}T12:00:00`).getDay())) ?? forecast[2];
+  }
+  // ── USURE DES CHAUSSURES ─────────────────────────────────────────────────────
+  // Au-delà de ~700-800 km, l'amorti est mort et le risque de blessure grimpe. Le
+  // kilométrage n'est alimenté que si les séances sont rattachées à une paire, ce qui
+  // n'arrive jamais via la synchronisation : quand UNE SEULE paire active existe pour
+  // un terrain, on lui attribue les kilomètres COURUS depuis son achat — c'est ce que
+  // l'athlète attend, et c'est vérifiable par lui. Avec plusieurs paires, l'attribution
+  // est inconnue : on s'en tient au compteur enregistré et on le dit.
+  const shoes = (shoeRes.data ?? []) as { brand: string; model: string; current_km: number | null; km_at_purchase: number | null; max_km: number | null; purchase_date: string; terrain: string | null }[];
+  const shoeLines = shoes.map(sh => {
+    const soleOfTerrain = shoes.filter(o => (o.terrain ?? "road") === (sh.terrain ?? "road")).length === 1;
+    const sincePurchase = runs
+      .filter(w => String(w.date).slice(0, 10) >= String(sh.purchase_date).slice(0, 10))
+      .reduce((a, w) => a + (w.distance_km ?? 0), 0);
+    const km = soleOfTerrain
+      ? Math.round(Number(sh.km_at_purchase ?? 0) + sincePurchase)
+      : Math.round(Number(sh.current_km ?? 0));
+    const max = Number(sh.max_km ?? 600);
+    const pct = max > 0 ? Math.round((km / max) * 100) : 0;
+    const verdict = pct >= 100 ? "⛔ À REMPLACER — l'amorti est mort, chaque sortie supplémentaire augmente le risque"
+      : pct >= 85 ? "⚠️ en fin de vie : prévois la paire suivante MAINTENANT et fais la transition progressivement"
+      : pct >= 60 ? "usure normale, surveille" : "✅ fraîches";
+    return `${sh.brand} ${sh.model} : ~${km} km / ${max} (${pct} %)${soleOfTerrain ? "" : " [compteur déclaré]"} → ${verdict}`;
+  });
+
+  const nutrition = (() => {
+    if (!longRunMin || longRunMin < 75) return null;   // en dessous, les réserves suffisent
+    const h = longRunMin / 60;
+    // 60 g/h au-delà de 2 h30 (glucides multi-transportables), 45 g/h en deçà.
+    const carbsPerH = longRunMin >= 150 ? 60 : 45;
+    const carbsTotal = Math.round(carbsPerH * Math.max(0, h - 1));   // rien à ingérer la 1re heure
+    // Le jour de la sortie longue conditionne l'hydratation.
+    const day = ctx0Forecast(longRunKm);
+    const t = day?.tempMax ?? null;
+    const mlPerH = t == null ? 500 : t >= 30 ? 800 : t >= 25 ? 650 : t >= 20 ? 550 : 450;
+    const sodium = t != null && t >= 25 ? 600 : 400;   // mg/L, pertes sudorales accrues
+    const preRun = weightKg ? Math.round(weightKg * 1.2) : null;  // ~1-1,5 g glucides/kg avant
+    return { longRunMin, carbsPerH, carbsTotal, mlPerH, sodium, preRun, tempC: t };
+  })();
+
   const cycleLabel = taper ? "AFFÛTAGE — volume fortement réduit, on garde l'intensité pour arriver frais"
     : deload ? "SEMAINE ALLÉGÉE (1 sur 4) — volume −20 %, c'est là que le corps assimile"
     : "montée en charge normale";
@@ -984,7 +1054,7 @@ CAPACITÉS (tests)
 - Zones FC : Z2 facile ${hrZone(0.6, 0.7) ?? "?"} · Z4 seuil ${hrZone(0.8, 0.9) ?? "?"}
 - Zones allure : ${paceZones ?? (computedPaces ? `(calculées depuis la VMA) ${computedPaces}` : "non renseignées")}
 - Chronos théoriques au potentiel actuel (depuis la VMA) : ${predictions ?? "?"}
-${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${plateau ? `- 🛑 PLATEAU DÉTECTÉ : sa capacité stagne (${vmaSlopePerWeek} km/h/sem sur ${Math.round((curvePts[curvePts.length - 1].t - curvePts[0].t) / 86400000)} j) ALORS QUE sa charge monte. N'AJOUTE PAS de volume ni de séances : c'est le réflexe qui blesse. CHANGE le stimulus — format de séance inédit, côtes, force, technique de foulée — ou impose une vraie semaine de décharge. Explique-lui pourquoi.\n` : vmaSlopePerWeek != null ? `- 📈 TRAJECTOIRE DE CAPACITÉ : ${vmaSlopePerWeek > 0 ? "+" : ""}${vmaSlopePerWeek} km/h de VMA par semaine sur ses efforts mesurés.\n` : ""}${vrLine ? `- 🦵 ÉCONOMIE DE COURSE (ratio vertical, ${vr!.n} séances) : ${vrLine}\n` : ""}${hrrLine ? `- ❤️‍🩹 RÉCUPÉRATION CARDIAQUE : ${hrrLine}\n` : ""}${thresholdPace ? `- 🎯 ALLURE SEUIL **MESURÉE** : ${thresholdPace}/km (vitesse critique ${(csMs! * 3.6).toFixed(2)} km/h, ajustée sur ses efforts réels)${pc?.dPrime ? ` · réserve anaérobie D' ${pc.dPrime} m` : ""}. UTILISE CETTE VALEUR pour les séances au seuil plutôt qu'un pourcentage de VMA estimée.\n` : ""}${qeLine ? `- 🔍 EXÉCUTION DE SA DERNIÈRE QUALITÉ : ${qeLine}${faded ? " → il a DÉCROCHÉ : la prochaine série doit être plus courte ou plus lente, pas plus dure. Ne répète pas la même erreur." : fade != null && fade <= -6 ? " → il a ACCÉLÉRÉ en fin de série : il en avait sous le pied, tu peux durcir (allure ou volume, pas les deux)." : ""}\n` : ""}- Repères physio : seuil lactique ~${thresholdPace ?? (vma ? paceAt(86) : "?")}/km · vitesse critique ~${vma ? r1(vma * 0.90) : "?"} km/h (${vma ? paceAt(90) : "?"}/km) · VO2max estimé ~${vo2 ?? "?"} ml/kg/min
+${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${nutrition ? `- 🍫 NUTRITION DE SA SORTIE LONGUE (${Math.round(nutrition.longRunMin / 60)} h ~${longRunKm} km${nutrition.tempC != null ? `, ${Math.round(nutrition.tempC)} °C prévus` : ""}) : ${nutrition.preRun ? `${nutrition.preRun} g de glucides 2-3 h avant, ` : ""}puis ${nutrition.carbsPerH} g/h À PARTIR DE LA 1re HEURE (soit ~${nutrition.carbsTotal} g sur la sortie, ~${Math.max(1, Math.round(nutrition.carbsTotal / 25))} gels ou équivalent), et ${nutrition.mlPerH} ml/h de boisson à ~${nutrition.sodium} mg/L de sodium. Donne-lui CES chiffres, pas une fourchette — et rappelle-lui de les TESTER à l'entraînement, jamais le jour J.\n` : ""}${shoeLines.length ? `- 👟 USURE DES CHAUSSURES : ${shoeLines.join(" · ")}\n` : ""}${plateau ? `- 🛑 PLATEAU DÉTECTÉ : sa capacité stagne (${vmaSlopePerWeek} km/h/sem sur ${Math.round((curvePts[curvePts.length - 1].t - curvePts[0].t) / 86400000)} j) ALORS QUE sa charge monte. N'AJOUTE PAS de volume ni de séances : c'est le réflexe qui blesse. CHANGE le stimulus — format de séance inédit, côtes, force, technique de foulée — ou impose une vraie semaine de décharge. Explique-lui pourquoi.\n` : vmaSlopePerWeek != null ? `- 📈 TRAJECTOIRE DE CAPACITÉ : ${vmaSlopePerWeek > 0 ? "+" : ""}${vmaSlopePerWeek} km/h de VMA par semaine sur ses efforts mesurés.\n` : ""}${vrLine ? `- 🦵 ÉCONOMIE DE COURSE (ratio vertical, ${vr!.n} séances) : ${vrLine}\n` : ""}${hrrLine ? `- ❤️‍🩹 RÉCUPÉRATION CARDIAQUE : ${hrrLine}\n` : ""}${thresholdPace ? `- 🎯 ALLURE SEUIL **MESURÉE** : ${thresholdPace}/km (vitesse critique ${(csMs! * 3.6).toFixed(2)} km/h, ajustée sur ses efforts réels)${pc?.dPrime ? ` · réserve anaérobie D' ${pc.dPrime} m` : ""}. UTILISE CETTE VALEUR pour les séances au seuil plutôt qu'un pourcentage de VMA estimée.\n` : ""}${qeLine ? `- 🔍 EXÉCUTION DE SA DERNIÈRE QUALITÉ : ${qeLine}${faded ? " → il a DÉCROCHÉ : la prochaine série doit être plus courte ou plus lente, pas plus dure. Ne répète pas la même erreur." : fade != null && fade <= -6 ? " → il a ACCÉLÉRÉ en fin de série : il en avait sous le pied, tu peux durcir (allure ou volume, pas les deux)." : ""}\n` : ""}- Repères physio : seuil lactique ~${thresholdPace ?? (vma ? paceAt(86) : "?")}/km · vitesse critique ~${vma ? r1(vma * 0.90) : "?"} km/h (${vma ? paceAt(90) : "?"}/km) · VO2max estimé ~${vo2 ?? "?"} ml/kg/min
 
 FORME & RÉCUPÉRATION (aujourd'hui)
 - État physiologique : ${state}
@@ -1047,6 +1117,7 @@ ${catalog}`;
     forecast,
     altitude: { elevationM, lossPct: altLoss },
     warmCool: warmCoolMin(num(p?.warmup_min), num(p?.cooldown_min)),
+    heatAcclim,
     tooMuchIntensity: hardTimePct != null && hardTimePct > 25 ? hardTimePct : null,
     hillyTraining: elevWeek >= 400 || terr.paceMeaningless,
     thresholdPace,
