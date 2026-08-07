@@ -27,7 +27,20 @@ export type PlanDay = {
 };
 
 /** Nombre de jours confirmés (verrouillés) en tête de plan. Au-delà : prévisionnel. */
-export const CONFIRMED_DAYS = 3;
+/**
+ * Jours poussés vers la montre — et donc affichés comme CONFIRMÉS.
+ *
+ * Porté de 3 à 5. La synchronisation Garmin Connect → montre passe par le Bluetooth du
+ * téléphone, sur le calendrier de Garmin : aucun serveur ne peut la déclencher (vérifié,
+ * intervals.icu n'expose aucun endpoint de renvoi). La seule variable qu'on maîtrise est
+ * l'AVANCE : plus une séance est posée tôt, plus la synchronisation naturelle a
+ * d'occasions de l'attraper avant le départ. Avec cinq jours, une séance a été déposée
+ * quatre nuits avant d'être courue — il faudrait rater quatre synchronisations
+ * consécutives pour la manquer.
+ *
+ * Les jours lointains restent provisoires : ils sont recalculés et corrigés chaque matin.
+ */
+export const CONFIRMED_DAYS = 5;
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const addDays = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
