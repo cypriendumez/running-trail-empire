@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { sportOf } from "@/lib/intervals/sport";
+import { buildWorkoutRow } from "@/lib/intervals/workoutRow";
 
 const BASE = "https://intervals.icu/api/v1";
 
@@ -92,46 +92,11 @@ export async function GET(req: Request) {
 
     for (const act of validActivities) {
       const workoutType = mapActivityType(act.type!);
-      const sport = sportOf(act.type);
       const date = act.start_date_local!.split("T")[0];
       const title = act.name ?? workoutType;
 
-      const payload: Record<string, unknown> = {
-        user_id: user.id, title, type: workoutType, sport, external_id: String(act.id), date,
-        duration_seconds: Math.max(1, Math.round(act.moving_time ?? act.elapsed_time ?? 1)),
-        distance_km: act.distance ? act.distance / 1000 : null,
-        elevation_gain_m: ri(act.total_elevation_gain),
-        elevation_loss_m: ri(act.total_elevation_loss),
-        avg_hr: ri(act.average_heartrate),
-        max_hr: ri(act.max_heartrate),
-        avg_pace_min_km: act.average_speed ? Math.min(999, 1000 / 60 / act.average_speed) : null,
-        avg_power_watts: ri(act.average_watts),
-        max_power_watts: ri(act.max_watts),
-        avg_cadence_spm: act.average_cadence ? Math.round(act.average_cadence * 2) : null,
-        tss: act.icu_training_load ?? act.icu_tss ?? null,                 // « Charge » intervals.icu
-        training_effect: act.aerobic_te ?? null,
-        // ⚠️ Noms EXACTS de l'API intervals.icu. `avg_vertical_oscillation` et
-        // `avg_stride_length` n'existent pas : les vrais champs sont `average_*`.
-        // Résultat, ces deux colonnes sont restées vides à 100 % alors que la foulée est
-        // disponible sur CHAQUE course. L'oscillation est en MILLIMÈTRES côté API (88,6)
-        // et la colonne en centimètres — d'où la division.
-        vertical_oscillation_cm: act.average_vertical_oscillation != null ? Math.round(act.average_vertical_oscillation / 10 * 10) / 10 : null,
-        ground_contact_ms: ri(act.avg_ground_contact_time),
-        stride_length_m: act.average_stride ?? null,
-        // Économie de course et récupération cardiaque : déjà présentes dans la réponse,
-        // jamais lues. `icu_hrr` est un objet — seule la chute de FC nous intéresse.
-        vertical_ratio_pct: act.average_vertical_ratio != null ? Math.round(act.average_vertical_ratio * 100) / 100 : null,
-        hrr_bpm: act.icu_hrr?.hrr != null ? Math.round(act.icu_hrr.hrr) : null,
-        cardiac_decoupling: act.decoupling ?? null,
-        // Champs disponibles chez intervals.icu mais jamais enregistrés jusqu'ici (recensement
-        // du 7/08 : 0 % de remplissage côté base, 8/8 côté API). La température en particulier
-        // rendait toute l'adaptation à la chaleur inopérante — 31 °C sur les sorties récentes.
-        weather_temp_c: act.average_temp ?? null,
-        gap_min_km: act.gap && act.gap > 0.3 ? Math.round((1000 / 60 / act.gap) * 100) / 100 : null,
-        hr_zone_seconds: Array.isArray(act.icu_hr_zone_times) ? act.icu_hr_zone_times : null,
-        intensity_pct: act.icu_intensity != null ? Math.round(act.icu_intensity) : null,
-        source: "garmin",
-      };
+      // Construction PARTAGÉE et testée : voir lib/intervals/workoutRow.
+      const payload = buildWorkoutRow(act, { userId: user.id, type: workoutType });
 
       const existingId = byExt.get(String(act.id)) ?? existingMap.get(`${date}__${title}`);
       if (existingId) toUpdate.push({ id: existingId, payload });

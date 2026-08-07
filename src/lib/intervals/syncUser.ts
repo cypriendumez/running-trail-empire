@@ -4,7 +4,7 @@
 //  déclencheur (l'ouverture de l'app et le cron quotidien s'en servent aussi).
 // ─────────────────────────────────────────────────────────────────────────────
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { sportOf } from "./sport";
+import { buildWorkoutRow, makeMatcher } from "./workoutRow";
 
 const BASE = "https://intervals.icu/api/v1";
 
@@ -74,17 +74,7 @@ export async function syncIntervalsForUser(
   // le même titre. On ne s'en sert donc QUE pour les lignes historiques encore sans
   // identifiant, et une ligne ne peut être revendiquée qu'UNE seule fois : la seconde
   // activité du jour crée sa propre ligne au lieu d'écraser la première.
-  const byExt = new Map<string, string>();
-  const unclaimed = new Map<string, string[]>();
-  for (const w of existing as { id: string; date: string; title: string; external_id?: string | null }[]) {
-    if (w.external_id) { byExt.set(w.external_id, w.id); continue; }
-    const k = `${w.date}__${w.title}`;
-    unclaimed.set(k, [...(unclaimed.get(k) ?? []), w.id]);
-  }
-  const claim = (key: string): string | undefined => {
-    const pool = unclaimed.get(key);
-    return pool?.length ? pool.shift() : undefined;
-  };
+  const match = makeMatcher(existing as { id: string; date: string; title: string; external_id?: string | null }[]);
 
   // Colonnes issues de migrations éventuellement non appliquées : PostgREST rejette
   // l'écriture ENTIÈRE si l'une d'elles manque (42703). On sonde une fois.
@@ -96,58 +86,19 @@ export async function syncIntervalsForUser(
     const workoutType = mapActivityType(act.type);
     const date = act.start_date_local.split("T")[0];
     const title = act.name ?? workoutType;
-    const payload: Record<string, unknown> = {
-      user_id: userId,
-      title,
-      type: workoutType,
-      date,
-      ...(hasNewCols ? {
-        sport: sportOf(act.type),
-        external_id: String(act.id),
-        vertical_ratio_pct: act.average_vertical_ratio != null ? Math.round(act.average_vertical_ratio * 100) / 100 : null,
-        hrr_bpm: act.icu_hrr?.hrr != null ? Math.round(act.icu_hrr.hrr) : null,
-      } : {}),
-      duration_seconds: Math.max(1, act.moving_time ?? act.elapsed_time ?? 1),
-      distance_km: act.distance ? act.distance / 1000 : null,
-      elevation_gain_m: ri(act.total_elevation_gain) ?? 0,
-      elevation_loss_m: ri(act.total_elevation_loss) ?? 0,
-      avg_hr: ri(act.average_heartrate),
-      max_hr: ri(act.max_heartrate),
-      avg_pace_min_km: act.average_speed ? 1000 / 60 / act.average_speed : null,
-      avg_power_watts: ri(act.average_watts),
-      avg_cadence_spm: act.average_cadence ? Math.round(act.average_cadence * 2) : null,
-      tss: act.icu_training_load ?? act.icu_tss ?? null,
-      training_effect: act.aerobic_te ?? null,
-      // ⚠️ Noms EXACTS de l'API intervals.icu. `avg_vertical_oscillation` et
-      // `avg_stride_length` n'existent pas : les vrais champs sont `average_*`.
-      // Résultat, ces deux colonnes sont restées vides à 100 % alors que la foulée est
-      // disponible sur CHAQUE course. L'oscillation est en MILLIMÈTRES côté API (88,6)
-      // et la colonne en centimètres — d'où la division.
-      vertical_oscillation_cm: act.average_vertical_oscillation != null ? Math.round(act.average_vertical_oscillation / 10 * 10) / 10 : null,
-      ground_contact_ms: ri(act.avg_ground_contact_time),
-      stride_length_m: act.average_stride ?? null,
-      // Économie de course et récupération cardiaque : déjà présentes dans la réponse,
-      // jamais lues. `icu_hrr` est un objet — seule la chute de FC nous intéresse.
+    // Construction PARTAGÉE avec l'autre chemin de synchronisation, et testée contre des
+    // activités réelles : c'est ici que se logeaient l'arrondi manquant et les noms de
+    // champs inexistants.
+    const payload = buildWorkoutRow(act, { userId, type: workoutType, hasNewCols });
 
-      cardiac_decoupling: act.decoupling ?? null,
-      // Champs disponibles chez intervals.icu mais jamais enregistrés jusqu'ici — dont
-      // la TEMPÉRATURE, sans laquelle toute l'adaptation à la chaleur restait lettre morte.
-      weather_temp_c: act.average_temp ?? null,
-      gap_min_km: act.gap && act.gap > 0.3 ? Math.round((1000 / 60 / act.gap) * 100) / 100 : null,
-      hr_zone_seconds: Array.isArray(act.icu_hr_zone_times) ? act.icu_hr_zone_times : null,
-      intensity_pct: act.icu_intensity != null ? Math.round(act.icu_intensity) : null,
-      source: "garmin",
-    };
-
-    const id = byExt.get(String(act.id)) ?? claim(`${date}__${title}`);
+    const id = match({ id: act.id, date, title });
     const { error } = id
       ? await admin.from("workouts").update(payload).eq("id", id)
       : await admin.from("workouts").insert(payload);
     // Ne JAMAIS avaler une erreur d'écriture : c'est précisément ce qui a masqué
     // pendant des mois le fait que ce chemin n'enregistrait rien du tout.
     if (error) { failures.push(`${date} « ${title} » : ${error.code ?? "?"} ${error.message}`); continue; }
-    // Seules les VRAIES nouveautés déclenchent une replanification : une mise à jour
-    // se produit à chaque sondage et republierait le plan en boucle.
+    // Seules les VRAIES nouveautés déclenchent une replanification.
     if (!id) synced++;
   }
 

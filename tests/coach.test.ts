@@ -215,5 +215,94 @@ test("chaque séance du plan produit une séance montre cohérente", () => {
   }
 });
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  SYNCHRONISATION — six des dix-neuf défauts s'y cachaient, aucun test ne la couvrait.
+//  Les activités de référence sont RÉELLES, capturées depuis l'API intervals.icu.
+// ─────────────────────────────────────────────────────────────────────────────
+import { buildWorkoutRow, makeMatcher, INTEGER_COLUMNS, type IcuActivity } from "../src/lib/intervals/workoutRow";
+import fixtures from "./fixtures/activities.json" with { type: "json" };
+
+const acts = fixtures as IcuActivity[];
+const run = acts.find((a) => a.type === "Run")!;
+const hike = acts.find((a) => a.type === "Hike")!;
+
+console.log("\nSYNCHRONISATION — écriture des séances");
+test("aucun flottant dans une colonne entière", () => {
+  // Bug réel : `average_cadence * 2` = 176.54 dans un smallint → Postgres rejetait la
+  // LIGNE ENTIÈRE (22P02). 98 séances n'ont jamais été enregistrées, en silence.
+  for (const a of acts) {
+    const row = buildWorkoutRow(a, { userId: "u", type: "easy" });
+    for (const col of INTEGER_COLUMNS) {
+      const v = row[col];
+      if (v == null) continue;
+      assert.ok(Number.isInteger(v), `${col} = ${v} (non entier) sur l'activité ${a.start_date_local}`);
+    }
+  }
+});
+test("les noms de champs de l'API sont les bons", () => {
+  // Bug réel : le code lisait `avg_stride_length` et `avg_vertical_oscillation`, qui
+  // n'existent pas. Deux colonnes vides à 100 % pendant que le coach devait les analyser.
+  const row = buildWorkoutRow(run, { userId: "u", type: "easy" });
+  assert.ok(row.stride_length_m != null, "foulée non lue — nom de champ probablement faux");
+  assert.ok(row.vertical_oscillation_cm != null, "oscillation non lue");
+  assert.ok(row.avg_cadence_spm != null, "cadence non lue");
+});
+test("l'oscillation verticale est convertie en centimètres", () => {
+  // L'API la donne en MILLIMÈTRES (88,6) ; la colonne est en centimètres.
+  const row = buildWorkoutRow(run, { userId: "u", type: "easy" });
+  assert.ok((row.vertical_oscillation_cm as number) < 20, `${row.vertical_oscillation_cm} cm : conversion manquante`);
+});
+test("la cadence est convertie en pas par minute", () => {
+  // L'API donne des cycles (une jambe) ; un coureur tourne à ~160-190 pas/min.
+  const row = buildWorkoutRow(run, { userId: "u", type: "easy" });
+  assert.ok((row.avg_cadence_spm as number) > 150, `${row.avg_cadence_spm} spm : conversion manquante`);
+});
+test("le sport est enregistré et distingué du rôle de la séance", () => {
+  assert.equal(buildWorkoutRow(run, { userId: "u", type: "easy" }).sport, "run");
+  assert.equal(buildWorkoutRow(hike, { userId: "u", type: "trail" }).sport, "hike");
+});
+test("l'identifiant d'origine est conservé", () => {
+  // Sans lui, une séance ne peut être reconnue que par (date, titre) — qui collisionne
+  // dès qu'on court deux fois le même jour.
+  assert.equal(buildWorkoutRow(run, { userId: "u", type: "easy" }).external_id, String(run.id));
+});
+test("les colonnes récentes sont omises si la migration est en retard", () => {
+  // PostgREST rejette l'écriture ENTIÈRE pour une seule colonne inconnue (42703).
+  const row = buildWorkoutRow(run, { userId: "u", type: "easy", hasNewCols: false });
+  for (const c of ["sport", "external_id", "vertical_ratio_pct", "hrr_bpm"]) {
+    assert.ok(!(c in row), `${c} présent alors que la migration n'est pas appliquée`);
+  }
+  assert.ok(row.duration_seconds != null, "le reste de la ligne doit rester écrivable");
+});
+test("une activité vide ne produit pas de valeur fabriquée", () => {
+  const row = buildWorkoutRow({}, { userId: "u", type: "easy" });
+  for (const [k, v] of Object.entries(row)) {
+    assert.ok(!Number.isNaN(v as number), `${k} = NaN`);
+    assert.notEqual(v, Infinity, `${k} = Infinity`);
+  }
+  assert.equal(row.distance_km, null);
+});
+
+console.log("\nSYNCHRONISATION — appariement des séances");
+test("l'identifiant d'origine prime sur (date, titre)", () => {
+  const match = makeMatcher([
+    { id: "A", date: "2026-08-07", title: "Lille Course à pied", external_id: "i1" },
+    { id: "B", date: "2026-08-07", title: "Lille Course à pied", external_id: null },
+  ]);
+  assert.equal(match({ id: "i1", date: "2026-08-07", title: "Lille Course à pied" }), "A");
+});
+test("une ligne ne peut être revendiquée qu'une seule fois", () => {
+  // Bug réel : deux sorties le même jour portent le même titre automatique Garmin ;
+  // la seconde écrasait la première au lieu de créer sa propre ligne.
+  const match = makeMatcher([{ id: "A", date: "2026-08-07", title: "Le Touquet Course à pied", external_id: null }]);
+  assert.equal(match({ id: "i1", date: "2026-08-07", title: "Le Touquet Course à pied" }), "A");
+  assert.equal(match({ id: "i2", date: "2026-08-07", title: "Le Touquet Course à pied" }), undefined);
+});
+test("une activité inconnue n'est appariée à rien", () => {
+  const match = makeMatcher([{ id: "A", date: "2026-08-01", title: "X", external_id: "i9" }]);
+  assert.equal(match({ id: "i123", date: "2026-08-07", title: "Y" }), undefined);
+});
+
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log(`  ✗ ${f}`); process.exit(1); }
