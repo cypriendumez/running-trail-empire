@@ -26,7 +26,7 @@ export async function GET(req: Request) {
   // Load credentials: user profile first, then global env vars
   const { data: profile } = await supabase
     .from("profiles")
-    .select("intervals_athlete_id, intervals_api_key")
+    .select("intervals_athlete_id, intervals_api_key, last_loc_at")
     .eq("id", user.id)
     .single();
 
@@ -231,6 +231,23 @@ export async function GET(req: Request) {
   // foulée. AutoSync appelle cette route au chargement, au retour sur l'onglet et
   // toutes les 2 min : le plan reflète donc la dernière sortie en quelques minutes,
   // sans attendre le cron de la nuit. Best-effort — un échec ici ne casse pas la sync.
+  // Position d'entraînement : rafraîchie au maximum une fois par jour depuis la
+  // dernière course avec trace GPS. Sert à interroger la météo RÉELLE (la température
+  // de la montre est mesurée au poignet, donc peu fiable).
+  if (freshWorkouts > 0) {
+    try {
+      const lastRun = validActivities.find((a) => /run/i.test(String(a.type ?? "")) && a.id);
+      if (lastRun?.id) {
+        const { refreshAthleteLocation } = await import("@/lib/intervals/location");
+        const { createAdminClient: adminFn } = await import("@/lib/supabase/admin");
+        await refreshAthleteLocation(adminFn(), {
+          userId: user.id, apiKey: API_KEY, activityId: String(lastRun.id),
+          lastLocAt: (profile as { last_loc_at?: string | null } | null)?.last_loc_at ?? null,
+        });
+      }
+    } catch { /* best-effort : la synchro n'échoue pas pour une position */ }
+  }
+
   let replanned = false;
   if (freshWorkouts > 0) {
     try {

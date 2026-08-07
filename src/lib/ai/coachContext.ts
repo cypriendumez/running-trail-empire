@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthCoachLines } from "@/data/healthCatalog";
 import { terrainCoachBlock } from "@/data/terrainCatalog";
+import { forecastWeek, heatAdvice, type DayWeather } from "@/lib/weather/openMeteo";
 import { bestVmaFromWorkouts, vmaFromVo2max } from "@/lib/running/fitness";
 
 type SB = Awaited<ReturnType<typeof createClient>>;
@@ -130,6 +131,10 @@ export type AthleteContext = {
   skippedWeekdays: number[];
   /** Disponibilités déclarées : nb de séances de course/semaine et jours praticables (0 = dim). */
   availability: { daysPerWeek: number; days: number[] };
+  /** Prévisions RÉELLES à 7 jours (Open-Meteo) — vide si la position est inconnue. */
+  forecast: DayWeather[];
+  /** % du temps passé en Z3+ s'il dépasse la cible (footings trop rapides), sinon null. */
+  tooMuchIntensity: number | null;
   // Plan macro périodisé semaine par semaine jusqu'au jour J.
   macroPlan: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[];
 };
@@ -206,6 +211,12 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
 
   const pains = [...new Set(feedback.flatMap(f => f.data?.pain ?? []).filter((p) => p && p !== "Aucune douleur"))];
   const lastRpe = feedback[0]?.data?.rpe ?? null;
+  // TENDANCE du ressenti, pas seulement la dernière valeur. Un athlète qui trouve ses
+  // 3 dernières séances difficiles est en train de sur-solliciter, même si sa VFC et son
+  // sommeil paraissent bons — le ressenti précède souvent les marqueurs physiologiques.
+  const recentRpe = feedback.map(f => f.data?.rpe).filter((r): r is number => typeof r === "number").slice(0, 3);
+  const rpeAvg = recentRpe.length >= 2 ? Math.round((recentRpe.reduce((a, b) => a + b, 0) / recentRpe.length) * 10) / 10 : null;
+  const rpeHigh = rpeAvg != null && rpeAvg >= 7;
   // Notes libres récentes de l'athlète (sensations, douleur précise…) → vues par le coach.
   const fbNotes = feedback.map(f => f.data?.note?.trim()).filter((n): n is string => !!n).slice(0, 3);
 
@@ -433,6 +444,11 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // On ne compte que la nuit dernière si la montre a été portée (sinon la donnée est absente,
   // pas mauvaise) — un score bas OU moins de 6 h coûtent une séance dure.
   const badNight = freshSleep && ((freshSleep.sleep_score != null && freshSleep.sleep_score < 60) || (lastSleepMin != null && lastSleepMin < 360));
+  // Trop d'intensité SUBIE : quand plus de 25 % du temps se passe en Z3+, l'athlète
+  // court ses footings trop vite. Ajouter de la qualité par-dessus l'enfoncerait ;
+  // on en retire une et on lui dit franchement quoi corriger.
+  if (rpeHigh) { qBudget -= 1; easeReasons.push(`ressenti élevé sur ses dernières séances (RPE moyen ${rpeAvg}/10)`); }
+  if (hardTimePct != null && hardTimePct > 25) { qBudget -= 1; easeReasons.push(`${hardTimePct} % du temps en Z3+ (footings courus trop vite)`); }
   if (badNight) { qBudget -= 1; easeReasons.push(`nuit dégradée (${freshSleep?.sleep_score ?? "?"}/100${lastSleepMin ? `, ${Math.floor(lastSleepMin / 60)}h${String(lastSleepMin % 60).padStart(2, "0")}` : ""})`); }
   // Pathologies interdisant l'effort maximal : on retire d'office la marche la plus haute.
   if (noMaxEffort) { qBudget = Math.min(qBudget, 1); }
@@ -465,6 +481,7 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   if (load.acr > 1.5 && load.acr <= 1.8) orangeFlags.push(`charge aiguë élevée (${r1(load.acr)})`);
   if (monotony > 2) orangeFlags.push(`monotonie ${monotony} (charge trop uniforme)`);
   if (lastRpe != null && lastRpe >= 8) orangeFlags.push(`dernière séance vécue très dure (RPE ${lastRpe}/10)`);
+  else if (rpeHigh) orangeFlags.push(`ressenti élevé sur la durée (RPE moyen ${rpeAvg}/10 sur ses 3 derniers retours)`);
   // Niveau calculé UNE seule fois : il alimente à la fois le prompt de l'IA et le bandeau
   // affiché au coach — les deux ne peuvent donc pas diverger.
   const readyLevel: "vert" | "jaune" | "orange" | "rouge" =
@@ -478,13 +495,23 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const readiness = READY.badge, readinessRule = READY.rule;
   const readinessBlock = `${readiness} — ${readinessRule}${redFlags.length ? `\n  • Signaux rouges : ${redFlags.join(" ; ")}` : ""}${orangeFlags.length ? `\n  • Signaux orange : ${orangeFlags.join(" ; ")}` : ""}${!redFlags.length && !orangeFlags.length ? "\n  • Aucun signal négatif : VFC, sommeil, charge et ressenti sont alignés." : ""}`;
 
-  // ── MÉTÉO — la chaleur dégrade l'allure à effort constant, le froid change l'échauffement ──
-  const tempRule = avgTemp == null ? null
-    : avgTemp >= 30 ? `🥵 ${avgTemp}°C : au-delà de 30°, déplace les séances tôt le matin ou tard le soir, et RENONCE au fractionné en pleine chaleur. Compte 30 à 45 s/km de plus à effort égal — juge la séance à la FC, jamais au chrono. Hydratation avec électrolytes obligatoire au-delà de 45 min.`
-    : avgTemp >= 25 ? `🌡️ ${avgTemp}°C : compte 15 à 30 s/km de plus à effort égal. Ne lui demande PAS de tenir ses allures habituelles — il se grillerait pour rien. Hydratation avant/pendant, et acclimatation progressive sur 10-14 jours.`
-    : avgTemp >= 18 ? `${avgTemp}°C : conditions correctes, allures de référence valables.`
-    : avgTemp >= 5 ? `${avgTemp}°C : conditions IDÉALES pour la performance — c'est le moment de placer les séances chronométrées et les tests.`
-    : `🥶 ${avgTemp}°C : échauffement rallongé (20 min minimum) et couvert, pas de fractionné court à froid (risque musculaire élevé). Attention aux voies respiratoires par temps sec et glacial.`;
+  // ── MÉTÉO RÉELLE ────────────────────────────────────────────────────────────
+  // Pas la température de la montre (capteur au poignet, jusqu'à 3 °C d'écart mesuré)
+  // mais le relevé réel à la position d'entraînement, et surtout les PRÉVISIONS :
+  // anticiper une canicule vaut mieux que la constater après la séance.
+  const lat = num(p?.last_lat), lon = num(p?.last_lon);
+  const forecast = lat != null && lon != null ? await forecastWeek(lat, lon).catch(() => []) : [];
+  const todayFc = forecast[0] ?? null;
+  const hotDays = forecast.filter(f => f.tempMax >= 28);
+
+  // ── MÉTÉO — désormais RÉELLE, plus celle de la montre ───────────────────────
+  // `avgTemp` (capteur au poignet) n'est gardé qu'en dernier recours, quand la
+  // position de l'athlète est inconnue et qu'aucune prévision n'est disponible.
+  const tempRule = todayFc
+    ? `${heatAdvice(todayFc.tempMax, todayFc.humidity).note}  [relevé réel à sa position, pas la montre]`
+    : avgTemp != null
+      ? `${heatAdvice(avgTemp, null).note}  ⚠️ valeur issue du capteur de la montre (au poignet) : peu fiable, à prendre avec prudence.`
+      : null;
 
   // ── MENU DE QUALITÉ — le stimulus PROGRESSE d'une semaine à l'autre ──────────
   // Prescrire « 6×1000 m » chaque semaine indéfiniment ennuie l'athlète et le fait
@@ -636,7 +663,7 @@ PASSIF, TERRAIN & DÉNIVELÉ (leviers d'individualisation — à respecter dans 
 ${terr.rules.length ? terr.rules.map((r) => `- ${r}`).join("\n") : "- Terrain habituel inconnu : privilégie des consignes en durée + FC tant que tu ne sais pas sur quelle surface il court."}
 ${terr.rules.length > 1 ? `- ⚖️ Il alterne PLUSIEURS terrains (${terr.labels.join(", ")}) : c'est un atout anti-blessure, exploite-le. Attribue chaque séance à la surface qui lui convient — les séances CHIFFRÉES à l'allure sur surface dure (route/piste), l'endurance et le long sur terrain souple.` : ""}${terr.paceMeaningless ? `- ⚠️ Au moins un de ses terrains rend l'allure /km NON PERTINENTE (sable, montagne ou neige). Sur ces surfaces : consignes en DURÉE + FRÉQUENCE CARDIAQUE uniquement, jamais d'allure cible. Précise explicitement dans chaque séance sur quelle surface elle doit se faire.` : ""}
 ${elev ? `- ${elev.rule}` : ""}
-${tempRule ? `- MÉTÉO RÉCENTE : ${tempRule}` : ""}
+${tempRule ? `- MÉTÉO AUJOURD'HUI : ${tempRule}` : ""}${hotDays.length ? `\n- 🔥 CHALEUR ANNONCÉE : ${hotDays.slice(0, 4).map(f => `${f.date.slice(8)}/${f.date.slice(5, 7)} ${Math.round(f.tempMax)}°C`).join(" · ")} → déplace les séances de qualité de ces jours-là tôt le matin, ou échange-les avec un jour plus frais de la semaine. Prévois-le MAINTENANT, pas la veille.` : ""}
 
 CAPACITÉS (tests)
 - VMA : ${vma ?? "?"} km/h${vmaIsEst ? ` ⚠️ ESTIMÉE depuis ses séances (aucun test VMA enregistré) → recommande-lui un test VMA pour affiner, et reste un cran prudent sur la 1re séance VMA` : ""} · FC max ${maxHr ?? (vmaIsEst && fcMaxEst ? `~${fcMaxEst} (obs.)` : "?")} · FC repos ${restHr ?? "?"} · FC seuil ${ltHr ?? "?"}
@@ -660,7 +687,7 @@ CHARGE D'ENTRAÎNEMENT
 - CTL ${Math.round(load.ctl)} (forme) · ATL ${Math.round(load.atl)} (fatigue) · TSB ${Math.round(load.tsb)} (fraîcheur) · ratio aigu:chronique ${r1(load.acr)}${load.acr > 1.5 ? " ⚠️ élevé (risque)" : ""}
 - Répartition d'intensité 14j : ${hardTimePct != null ? `**${hardTimePct} % du TEMPS passé en Z3+** (mesure réelle par zone FC — c'est CE chiffre qui compte, cible ≤ 20 %)${hardTimePct > 25 ? " ⚠️ trop d'intensité : il court ses footings trop vite ou empile les séances dures" : hardTimePct < 8 ? " ⚠️ presque aucune intensité : il ne progressera pas sans qualité" : " ✅ polarisation correcte"}` : `${hardShare ?? "?"} % de SÉANCES qualité (approximation : le temps par zone n'est pas encore remonté par sa montre)`}
 - 5 dernières séances : ${last5.join(" | ") || "aucune"}${(() => { const g = workouts.slice(0, 10).filter(w => w.gap_min_km != null && (w.elevation_gain_m ?? 0) > 150); return g.length ? `\n- ⛰️ ALLURE AJUSTÉE AU DÉNIVELÉ (GAP) sur ses sorties vallonnées : ${g.slice(0, 3).map(w => `${String(w.date).slice(5, 10)} ${w.gap_min_km}/km (D+${w.elevation_gain_m})`).join(" · ")} — juge sa performance là-dessus, PAS sur l'allure brute qui ne veut rien dire en montée.` : ""; })()}
-${pains.length ? `- ⚠️ DOULEUR(S) SIGNALÉE(S) par l'athlète (zone précise) : ${pains.join(", ")} → ADAPTE les prochaines séances à CETTE zone (voir consigne sécurité).` : ""}${fbNotes.length ? `\n- 🗣️ Notes récentes de l'athlète (ressenti/douleur — LIS-LES et tiens-en compte) : ${fbNotes.map(n => `« ${n} »`).join(" ; ")}` : ""}${lastRpe != null ? `\n- Dernier ressenti d'effort (RPE) : ${lastRpe}/10` : ""}
+${pains.length ? `- ⚠️ DOULEUR(S) SIGNALÉE(S) par l'athlète (zone précise) : ${pains.join(", ")} → ADAPTE les prochaines séances à CETTE zone (voir consigne sécurité).` : ""}${fbNotes.length ? `\n- 🗣️ Notes récentes de l'athlète (ressenti/douleur — LIS-LES et tiens-en compte) : ${fbNotes.map(n => `« ${n} »`).join(" ; ")}` : ""}${lastRpe != null ? `\n- Dernier ressenti d'effort (RPE) : ${lastRpe}/10${rpeAvg != null ? ` · moyenne des 3 derniers : ${rpeAvg}/10${rpeHigh ? " ⚠️ il trouve ses séances dures de façon RÉPÉTÉE — le ressenti précède souvent la VFC, allège avant que ça ne casse" : ""}` : ""}` : ""}
 
 ANALYSE APPROFONDIE (croise tous ces facteurs)
 - VO2max estimé : ${vo2 ?? "?"} ml/kg/min${efTrend ? ` · efficacité aérobie ${efTrend}` : ""}
@@ -703,6 +730,8 @@ ${catalog}`;
     cycle: { deload, taper, label: cycleLabel },
     skippedWeekdays,
     availability: { daysPerWeek: availDaysPerWeek, days: availDays },
+    forecast,
+    tooMuchIntensity: hardTimePct != null && hardTimePct > 25 ? hardTimePct : null,
     macroPlan,
   };
 }

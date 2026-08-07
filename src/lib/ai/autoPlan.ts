@@ -13,6 +13,7 @@
 //  séances dans la semaine sans violer les règles de récupération.
 // ─────────────────────────────────────────────────────────────────────────────
 import type { AthleteContext } from "@/lib/ai/coachContext";
+import { heatAdvice } from "@/lib/weather/openMeteo";
 
 export type PlanDay = {
   date: string;          // AAAA-MM-JJ
@@ -73,10 +74,22 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   const cycleNote = ctx.cycle.taper ? " ⚠️ Semaine d'AFFÛTAGE : on réduit le volume, pas l'intensité."
     : ctx.cycle.deload ? " ⚠️ Semaine ALLÉGÉE : c'est maintenant que le corps assimile le travail des 3 semaines précédentes." : "";
 
+  // Météo RÉELLE du jour concerné (prévisions Open-Meteo à la position de l'athlète).
+  // On n'ajoute la consigne que si elle change quelque chose : inutile d'alourdir une
+  // séance par 18 °C. Le repos et le renfo ne sont pas concernés.
+  const weatherFor = (i: number, type: string): string => {
+    if (/Repos|Renfo/.test(type)) return "";
+    const f = ctx.forecast.find((x) => x.date === iso(dates[i]));
+    if (!f) return "";
+    const a = heatAdvice(f.tempMax, f.humidity);
+    return a.penaltySecPerKm > 0 || f.tempMax < 5 ? `\n\n${a.note}` : "";
+  };
+
   const slot: (PlanDay | null)[] = Array(7).fill(null);
   const put = (i: number, d: Omit<PlanDay, "date" | "confirmed">) => {
     if (i < 0 || i > 6 || slot[i]) return false;
-    slot[i] = { ...d, date: iso(dates[i]), confirmed: i < CONFIRMED_DAYS };
+    slot[i] = { ...d, date: iso(dates[i]), confirmed: i < CONFIRMED_DAYS,
+                detail: d.detail + weatherFor(i, d.type) };
     return true;
   };
 
@@ -178,6 +191,14 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // La course, elle, agit comme un jour dur à ne pas approcher à moins de 48 h.
   const placed: number[] = ctx.lastHardDaysAgo != null ? [-ctx.lastHardDaysAgo] : [];
   if (raceIdx >= 0) placed.push(raceIdx);
+  // Un jour à 30 °C n'est pas un jour de qualité s'il existe une alternative plus fraîche
+  // dans la fenêtre : on ne sacrifie pas une séance clé à la canicule.
+  const tempOf = (i: number) => ctx.forecast.find((x) => x.date === iso(dates[i]))?.tempMax ?? null;
+  const coolerExists = (i: number) => {
+    const t = tempOf(i);
+    if (t == null || t < 28) return false;
+    return dates.some((_, j) => j !== i && !slot[j] && (tempOf(j) ?? 99) < t - 3);
+  };
   const okSpacing = (i: number) => placed.every((p) => Math.abs(p - i) >= gapDays)
     && (longIdx < 0 || Math.abs(i - longIdx) >= 2)
     && (raceIdx < 0 || Math.abs(i - raceIdx) >= 3);   // rien de dur dans les 48 h autour de la course
@@ -193,7 +214,8 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   const quality = wp.quality.slice(0, Math.min(wp.quality.length, maxByVolume, maxByFrequency));
   for (const q of quality) {
     let idx = -1;
-    for (let i = 0; i <= 6; i++) if (canRun(i) && okSpacing(i)) { idx = i; break; }
+    for (let i = 0; i <= 6; i++) if (canRun(i) && okSpacing(i) && !coolerExists(i)) { idx = i; break; }
+    if (idx < 0) for (let i = 0; i <= 6; i++) if (canRun(i) && okSpacing(i)) { idx = i; break; }
     if (idx < 0) break; // impossible sans violer la récupération ou le budget → on n'insiste pas
     const title = q.type === "VMA" ? "Séance VMA" : q.type === "Seuil" ? "Séance au seuil" : q.type === "Spécifique" ? "Allure spécifique objectif" : q.type;
     put(idx, {
@@ -222,7 +244,9 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   for (const i of easySlots) put(i, {
     type: "Endurance", title: "Footing en endurance",
     detail: `Échauffement 15 min progressif FC Z1→Z2 → Corps : ${kmAndTime(easyKm, pace)} en Z2${easy}, tu dois pouvoir tenir une conversation → Retour au calme 10 min FC Z1.${doubles ? " 💡 À ton volume, scinde en DEUX sorties dans la journée (matin + soir) plutôt qu'un seul footing interminable." : ""}${cycleNote}`,
-    why: `Le socle aérobie. Avec les autres séances, tu es sur ~${targetKm} km cette semaine — c'est le volume facile qui construit la forme de fond, pas les séances dures.`,
+    why: ctx.tooMuchIntensity
+      ? `⚠️ Tu passes ${ctx.tooMuchIntensity} % de ton temps de course en zone 3 et plus, alors que la cible est 20 %. Tes footings sont courus trop vite — c'est le frein n°1 à la progression. Ralentis jusqu'à pouvoir tenir une conversation complète : c'est censé paraître TROP facile.`
+      : `Le socle aérobie. Avec les autres séances, tu es sur ~${targetKm} km cette semaine — c'est le volume facile qui construit la forme de fond, pas les séances dures.`,
     tags: ["Endurance", "Z2", `${easyKm} km`],
   });
 
