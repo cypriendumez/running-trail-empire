@@ -902,6 +902,48 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const limiter = limiters[0] ?? null;
 
 
+  /**
+   * Volume de référence pour la semaine à venir.
+   *
+   * Il se déduit de la charge CHRONIQUE (moyenne 4 semaines), jamais du pic d'une
+   * seule semaine. `Math.max(weekKm, avg4wkKm)` gravait le pic dans le marbre :
+   * après 62 km sur une base de 23, le plan reproposait 62 km alors que le ratio
+   * aigu:chronique était déjà à 1,9, en pleine zone de blessure. Une semaine forte
+   * n'est pas un nouveau niveau — c'est une semaine forte.
+   *
+   * Progression ≤ 10 %, nulle si le ratio est déjà trop haut, et jamais un bond
+   * brutal par rapport à ce qui vient d'être couru.
+   */
+  const targetFrom = (floorKm: number) => {
+    const chronic = avg4wkKm > 0 ? avg4wkKm : weekKm;
+    // Part de la semaine écoulée que l'on considère acquise. Plus le ratio est haut,
+    // moins on entérine le pic — sans pour autant retomber sur la seule moyenne, qu'une
+    // période creuse (voyage, coupure) tire artificiellement vers le bas : prescrire
+    // 23 km à quelqu'un qui vient d'en courir 62 ne serait pas prudent, juste inutile.
+    const keep = load.acr > 1.5 ? 0.3 : load.acr > 1.3 ? 0.6 : 1;
+    const blended = chronic + Math.max(0, weekKm - chronic) * keep;
+    const growth = load.acr > 1.5 ? 1.0 : load.acr > 1.3 ? 1.05 : 1.1;
+    // Et jamais un bond brutal par rapport à ce qui vient d'être réellement couru
+    // (reprise après coupure : la moyenne des 4 semaines est alors trop optimiste).
+    const capped = Math.min(blended * growth, Math.max(weekKm * 1.4, floorKm));
+    return Math.max(floorKm, Math.round(capped));
+  };
+
+  // Repli quand rien n'est renseigné : on déduit du niveau, sans jamais dépasser
+  // ce qu'il fait DÉJÀ + 1 séance (on ne double pas sa fréquence du jour au lendemain).
+  const runsPerWeekNow = new Set(
+    // Jours où il a COURU : une journée de randonnée n'est pas une séance de course,
+    // et la compter gonflait la fréquence hebdomadaire déduite.
+    runs.filter(w => now - new Date(w.date).getTime() <= 7 * 86400000).map(w => String(w.date).slice(0, 10)),
+  ).size;
+  const declaredDpw = num(p?.days_per_week);
+  const availDaysPerWeek = declaredDpw && declaredDpw > 0
+    ? Math.min(7, Math.round(declaredDpw))
+    : Math.max(3, Math.min(libLevel === "debutant" ? 3 : libLevel === "intermediaire" ? 4 : 5, runsPerWeekNow + 1));
+  const availDays = Array.isArray(p?.available_days) && (p.available_days as unknown[]).length
+    ? (p.available_days as unknown[]).map(Number).filter(d => Number.isInteger(d) && d >= 0 && d <= 6)
+    : [0, 1, 2, 3, 4, 5, 6];
+
   // ── MENU DE QUALITÉ — le stimulus PROGRESSE d'une semaine à l'autre ──────────
   // Prescrire « 6×1000 m » chaque semaine indéfiniment ennuie l'athlète et le fait
   // plafonner physiologiquement. On fait tourner 4 variantes par type, du plus court
@@ -927,39 +969,67 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
    * vers des séances interminables.
    */
   const blockWeek = isoWeek % 4;                    // 0,1,2 = montée · 3 = assimilation
-  const prog = (base: number): number => {
-    if (blockWeek === 3) return Math.max(2, Math.round(base * 0.7));
-    return base + Math.min(2, blockWeek);
+
+  /**
+   * PLAFONDS DE VOLUME INTENSE — règles de Jack Daniels (Daniels' Running Formula).
+   *
+   * Le volume de travail dur se rapporte au KILOMÉTRAGE HEBDOMADAIRE, jamais au niveau
+   * ressenti. Une séance de 5×1000 m est un bon stimulus à 60 km/semaine et une
+   * surcharge à 25. Le moteur ne connaissait aucune de ces limites : il proposait
+   * 12×400 m — 4,8 km d'intervalles — à un athlète visant 35 km/semaine, soit près du
+   * double du maximum admis.
+   *
+   *   · intervalles (VO2max) : le PLUS PETIT de 10 km ou 8 % du volume hebdomadaire ;
+   *   · seuil : 10 % du volume hebdomadaire.
+   *
+   * C'est la règle la plus simple qui existe pour ne pas blesser un coureur : elle
+   * empêche mécaniquement de prescrire un volume dur que son kilométrage ne supporte pas.
+   */
+  const weeklyRef = targetFrom(15);
+  const capIntervalKm = Math.min(10, weeklyRef * 0.08);
+  const capThresholdKm = weeklyRef * 0.10;
+  const thrSecPerKm = (() => {
+    const m = (thresholdPace ?? "").match(/(\d+)['’](\d{2})/);
+    return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+  })();
+
+  /** Nombre de répétitions, plafonné par la règle des 8 % sur la distance travaillée. */
+  const prog = (base: number, repMeters?: number): number => {
+    const n = blockWeek === 3 ? Math.max(2, Math.round(base * 0.7)) : base + Math.min(2, blockWeek);
+    if (!repMeters || !(weeklyRef > 0)) return n;
+    return Math.min(n, Math.max(2, Math.floor((capIntervalKm * 1000) / repMeters)));
   };
-  /** Durée d'un bloc au seuil, même logique : on allonge, puis on assimile. */
-  const progMin = (base: number): number => {
-    if (blockWeek === 3) return Math.max(5, Math.round(base * 0.75));
-    return base + blockWeek * 2;
+  /** Durée d'un bloc au seuil, plafonnée par la règle des 10 % convertie en minutes. */
+  const progMin = (base: number, blocks = 1): number => {
+    const m = blockWeek === 3 ? Math.max(5, Math.round(base * 0.75)) : base + blockWeek * 2;
+    if (!thrSecPerKm || !(weeklyRef > 0)) return m;
+    const maxMinTotal = (capThresholdKm * thrSecPerKm) / 60;
+    return Math.max(5, Math.min(m, Math.floor(maxMinTotal / blocks)));
   };
   const progLabel = blockWeek === 3
     ? "SEMAINE D'ASSIMILATION (volume de qualité réduit — c'est ici que l'adaptation se produit, ne la saute pas)"
     : `semaine ${blockWeek + 1}/4 du bloc — le volume de qualité MONTE par rapport à la précédente`;
 
   const qVMA = { type: "VMA", desc: pick([
-    `VMA courte : ${prog(10)}×400 m à ~${repPace(104, 400)}/km, récup 45 s trottinés → aiguise la vitesse et la foulée`,
-    `VMA moyenne : ${prog(7)}×500 m à ~${repPace(102, 500)}/km, récup 1 min trottinée → tenue de la vitesse`,
-    `VMA longue : ${prog(5)}×800 m à ~${repPace(100, 800)}/km, récup 1 min 30 trottinée → soutien du VO2max`,
-    `VMA longue : ${prog(4)}×1000 m à ~${repPace(100, 1000)}/km, récup 2 min trottinée → le format le plus proche de la course`,
+    `VMA courte : ${prog(10, 400)}×400 m à ~${repPace(104, 400)}/km, récup 45 s trottinés → aiguise la vitesse et la foulée`,
+    `VMA moyenne : ${prog(7, 500)}×500 m à ~${repPace(102, 500)}/km, récup 1 min trottinée → tenue de la vitesse`,
+    `VMA longue : ${prog(5, 800)}×800 m à ~${repPace(100, 800)}/km, récup 1 min 30 trottinée → soutien du VO2max`,
+    `VMA longue : ${prog(4, 1000)}×1000 m à ~${repPace(100, 1000)}/km, récup 2 min trottinée → le format le plus proche de la course`,
     `Pyramide : 200-400-600-800-600-400-200 m à ~${repPace(102, 500)}/km, récup = temps de l'effort → varie la sollicitation, mentalement plus facile qu'une série uniforme`,
-    `30/30 : ${prog(12)}×(30 s vif / 30 s trottiné) à ~${repPace(105, 400)}/km → beaucoup de temps à VO2max pour peu de fatigue musculaire`,
-    `VMA fractionnée en 2 blocs : 2×(${prog(5)}×300 m) à ~${repPace(105, 400)}/km, récup 45 s, 3 min entre blocs → volume élevé sans effondrement de la qualité`,
-    `Fartlek libre : ${prog(8)}×1 min vif / 1 min facile en terrain varié, à la sensation → réapprend à jouer avec les allures, sans montre`,
+    `30/30 : ${prog(12, 150)}×(30 s vif / 30 s trottiné) à ~${repPace(105, 400)}/km → beaucoup de temps à VO2max pour peu de fatigue musculaire`,
+    `VMA fractionnée en 2 blocs : 2×(${prog(5, 600)}×300 m) à ~${repPace(105, 400)}/km, récup 45 s, 3 min entre blocs → volume élevé sans effondrement de la qualité`,
+    `Fartlek libre : ${prog(8, 300)}×1 min vif / 1 min facile en terrain varié, à la sensation → réapprend à jouer avec les allures, sans montre`,
   ]) };
   // Allure seuil : la vitesse critique MESURÉE prime sur le pourcentage de VMA estimée.
   const sPace = thresholdPace ?? paceAt(86);
   const qSeuil = { type: "Seuil", desc: pick([
-    `Seuil fractionné : ${prog(3)}×8 min à ~${sPace}/km, récup 2 min → accumule du temps au seuil sans casser`,
-    `Seuil long : 2×${progMin(13)} min à ~${sPace}/km, récup 3 min → apprend à tenir l'effort`,
-    `Seuil : ${prog(2)}×10 min à ~${sPace}/km, récup 2 min → le format de référence`,
-    `Seuil continu : ${progMin(21)} min d'un bloc à ~${sPace}/km → le plus exigeant mentalement, le plus payant`,
-    `Over-under : ${prog(3)}×6 min en alternant 1 min juste SOUS le seuil / 1 min juste AU-DESSUS, récup 3 min → apprend à recycler le lactate, la qualité qui sauve une fin de course`,
-    `Seuil progressif : ${progMin(18)} min en accélérant d'un cran tous les 6 min pour finir légèrement au-dessus du seuil → contrôle de l'allure et gestion de l'effort`,
-    `Tempo long : ${progMin(24)} min à ~${sPace}/km sur terrain roulant, sans regarder la montre après le 5e km → autonomie de l'athlète`,
+    `Seuil fractionné : ${prog(3)}×${progMin(8, 3)} min à ~${sPace}/km, récup 2 min → accumule du temps au seuil sans casser`,
+    `Seuil long : 2×${progMin(13, 2)} min à ~${sPace}/km, récup 3 min → apprend à tenir l'effort`,
+    `Seuil : ${prog(2)}×${progMin(10, 2)} min à ~${sPace}/km, récup 2 min → le format de référence`,
+    `Seuil continu : ${progMin(21, 1)} min d'un bloc à ~${sPace}/km → le plus exigeant mentalement, le plus payant`,
+    `Over-under : ${prog(3)}×${progMin(6, 3)} min en alternant 1 min juste SOUS le seuil / 1 min juste AU-DESSUS, récup 3 min → apprend à recycler le lactate, la qualité qui sauve une fin de course`,
+    `Seuil progressif : ${progMin(18, 1)} min en accélérant d'un cran tous les 6 min pour finir légèrement au-dessus du seuil → contrôle de l'allure et gestion de l'effort`,
+    `Tempo long : ${progMin(24, 1)} min à ~${sPace}/km sur terrain roulant, sans regarder la montre après le 5e km → autonomie de l'athlète`,
   ]) };
   const qSpec = { type: "Spécifique", desc: goalPace ? pick([
     `Allure spécifique ${raceShort ?? "objectif"} : ${prog(5)}×1 km à ${goalPace}/km, récup 1 min 30 → ancre l'allure`,
@@ -1017,48 +1087,6 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
 ⛔ PLAFOND LIÉ AU PASSIF : ${runYears != null && runYears < 1 ? "moins d'un an" : `${runYears} ans`} de course → maximum ${expCap} séance(s) de qualité/semaine, quel que soit l'objectif. Le cardio encaisse déjà, les tendons NON. Ce plafond n'est pas négociable, même si l'athlète se sent bien.` : ""}${easeReasons.length ? `\n⚠️ ALLÈGEMENT ce cycle (${easeReasons.join(" ; ")}) → qualité réduite, priorité récupération. La santé d'abord.` : ""}${daysSinceLast != null && daysSinceLast >= 3 && daysSinceLast <= 8 && !easeReasons.length ? `\nREPRISE : ${daysSinceLast} j de repos SANS perte de forme (3–8 j d'arrêt ne déconditionnent PAS). UN footing de remise en route suffit, PUIS on enchaîne la qualité normalement — ne transforme pas ça en semaine molle entière.` : ""}`;
 
   // ── PLAN MACRO PÉRIODISÉ — bloc complet jusqu'au jour J (base → dév → spécifique → affûtage) ──
-  /**
-   * Volume de référence pour la semaine à venir.
-   *
-   * Il se déduit de la charge CHRONIQUE (moyenne 4 semaines), jamais du pic d'une
-   * seule semaine. `Math.max(weekKm, avg4wkKm)` gravait le pic dans le marbre :
-   * après 62 km sur une base de 23, le plan reproposait 62 km alors que le ratio
-   * aigu:chronique était déjà à 1,9, en pleine zone de blessure. Une semaine forte
-   * n'est pas un nouveau niveau — c'est une semaine forte.
-   *
-   * Progression ≤ 10 %, nulle si le ratio est déjà trop haut, et jamais un bond
-   * brutal par rapport à ce qui vient d'être couru.
-   */
-  const targetFrom = (floorKm: number) => {
-    const chronic = avg4wkKm > 0 ? avg4wkKm : weekKm;
-    // Part de la semaine écoulée que l'on considère acquise. Plus le ratio est haut,
-    // moins on entérine le pic — sans pour autant retomber sur la seule moyenne, qu'une
-    // période creuse (voyage, coupure) tire artificiellement vers le bas : prescrire
-    // 23 km à quelqu'un qui vient d'en courir 62 ne serait pas prudent, juste inutile.
-    const keep = load.acr > 1.5 ? 0.3 : load.acr > 1.3 ? 0.6 : 1;
-    const blended = chronic + Math.max(0, weekKm - chronic) * keep;
-    const growth = load.acr > 1.5 ? 1.0 : load.acr > 1.3 ? 1.05 : 1.1;
-    // Et jamais un bond brutal par rapport à ce qui vient d'être réellement couru
-    // (reprise après coupure : la moyenne des 4 semaines est alors trop optimiste).
-    const capped = Math.min(blended * growth, Math.max(weekKm * 1.4, floorKm));
-    return Math.max(floorKm, Math.round(capped));
-  };
-
-  // Repli quand rien n'est renseigné : on déduit du niveau, sans jamais dépasser
-  // ce qu'il fait DÉJÀ + 1 séance (on ne double pas sa fréquence du jour au lendemain).
-  const runsPerWeekNow = new Set(
-    // Jours où il a COURU : une journée de randonnée n'est pas une séance de course,
-    // et la compter gonflait la fréquence hebdomadaire déduite.
-    runs.filter(w => now - new Date(w.date).getTime() <= 7 * 86400000).map(w => String(w.date).slice(0, 10)),
-  ).size;
-  const declaredDpw = num(p?.days_per_week);
-  const availDaysPerWeek = declaredDpw && declaredDpw > 0
-    ? Math.min(7, Math.round(declaredDpw))
-    : Math.max(3, Math.min(libLevel === "debutant" ? 3 : libLevel === "intermediaire" ? 4 : 5, runsPerWeekNow + 1));
-  const availDays = Array.isArray(p?.available_days) && (p.available_days as unknown[]).length
-    ? (p.available_days as unknown[]).map(Number).filter(d => Number.isInteger(d) && d >= 0 && d <= 6)
-    : [0, 1, 2, 3, 4, 5, 6];
-
   const macroPlan: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[] = (() => {
     if (!weeksToRace || weeksToRace < 1 || !vma) return [];
     const W = Math.min(weeksToRace, 26);
@@ -1077,7 +1105,9 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
       else if (wkUntil === 2) factor = 0.72;            // affûtage
       else { factor = Math.min(1.4, 1 + i * 0.06); if ((i + 1) % 4 === 0) factor *= 0.8; } // +6 %/sem, plafond +40 %, semaine allégée /4
       const volumeKm = Math.round(baseKm * factor);
-      const longRunKm = Math.round(volumeKm * (ph === "Affûtage" ? 0.22 : 0.32));
+      // Daniels : la sortie longue ne dépasse pas 25 % du volume hebdomadaire. 32 %
+      // faisait d'elle un tiers de la semaine, au détriment du reste.
+      const longRunKm = Math.round(volumeKm * (ph === "Affûtage" ? 0.20 : 0.25));
       // Semaine en cours : l'état de forme du jour compte. Semaines suivantes : on planifie
       // sur le budget structurel, sinon un ratio aigu:chronique élevé aujourd'hui viderait
       // toute la feuille de route de sa qualité jusqu'au jour J.
@@ -1121,7 +1151,7 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   const growth = (runYears != null && runYears < 1) || (Array.isArray(p?.injury_zones) && (p.injury_zones as unknown[]).map(String).includes("fracture_fatigue")) ? 1.05 : 1.10;
   const targetKm = macroPlan.length ? macroPlan[0].volumeKm
     : Math.round(baseKm * (taper ? 0.65 : deload ? 0.8 : growth));
-  const longRunKm = macroPlan.length ? macroPlan[0].longRunKm : Math.round(targetKm * (taper ? 0.22 : 0.32));
+  const longRunKm = macroPlan.length ? macroPlan[0].longRunKm : Math.round(targetKm * (taper ? 0.20 : 0.25));
 
   // ── NUTRITION ET HYDRATATION CHIFFRÉES ───────────────────────────────────────
   // « 30 à 60 g de glucides par heure » est un intervalle de manuel : il ne dit pas

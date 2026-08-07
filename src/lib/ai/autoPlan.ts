@@ -256,7 +256,10 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // Semaine de course : PAS de sortie longue. La course est déjà l'effort long et dur
   // de la semaine ; y ajouter 18 km trois jours avant saboterait la fraîcheur.
   const weekend = dates.map((d, i) => ({ i, day: d.getDay() })).filter((x) => (x.day === 0 || x.day === 6) && canRun(x.i));
-  const longIdx = raceIdx >= 0 ? -1
+  // Une « sortie longue » de moins de 4 km n'est pas une sortie longue. Cas rencontré
+  // sur un profil sans aucune donnée (volume cible nul) : le plan annonçait « Sortie
+  // longue : ~0 km (environ 0 min) ». Mieux vaut ne rien poser.
+  const longIdx = longRunKm < 4 ? -1 : raceIdx >= 0 ? -1
     : (weekend.find((x) => x.day === 0)?.i ?? weekend[0]?.i ?? [6, 5, 4, 3, 2, 1, 0].find((i) => canRun(i)) ?? -1);
   const bike = ctx.longRunMode === "bike";
   if (longIdx >= 0) {
