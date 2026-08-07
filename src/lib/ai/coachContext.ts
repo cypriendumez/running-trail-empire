@@ -1022,14 +1022,33 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   ]) };
   // Allure seuil : la vitesse critique MESURÉE prime sur le pourcentage de VMA estimée.
   const sPace = thresholdPace ?? paceAt(86);
+  /**
+   * ALLURE SOUS-SEUIL — le principe central de la méthode norvégienne (Bakken,
+   * Ingebrigtsen), qui manquait entièrement.
+   *
+   * La vitesse critique EST le seuil (LT2). Y placer des blocs longs, c'est faire une
+   * séance dure là où il faudrait accumuler du volume qualitatif. Bakken travaille
+   * 0,4 à 0,8 mmol EN DESSOUS : une allure qu'on peut répéter le lendemain, ce qui
+   * permet d'en faire beaucoup plus sur la semaine — et c'est le volume au seuil, pas
+   * son intensité, qui déplace le seuil.
+   *
+   * Traduit en allure : environ 8 s/km plus lent que la vitesse critique. Les blocs
+   * LONGS s'y tiennent ; les fractions COURTES peuvent toucher le seuil.
+   */
+  const subPace = (() => {
+    const m = sPace.match(/(\d+)['’](\d{2})/);
+    if (!m) return sPace;
+    const sec = Number(m[1]) * 60 + Number(m[2]) + 8;
+    return `${Math.floor(sec / 60)}'${String(sec % 60).padStart(2, "0")}`;
+  })();
   const qSeuil = { type: "Seuil", desc: pick([
     `Seuil fractionné : ${prog(3)}×${progMin(8, 3)} min à ~${sPace}/km, récup 2 min → accumule du temps au seuil sans casser`,
-    `Seuil long : 2×${progMin(13, 2)} min à ~${sPace}/km, récup 3 min → apprend à tenir l'effort`,
+    `Seuil long (SOUS-seuil) : 2×${progMin(13, 2)} min à ~${subPace}/km, récup 3 min → apprend à tenir l'effort`,
     `Seuil : ${prog(2)}×${progMin(10, 2)} min à ~${sPace}/km, récup 2 min → le format de référence`,
-    `Seuil continu : ${progMin(21, 1)} min d'un bloc à ~${sPace}/km → le plus exigeant mentalement, le plus payant`,
-    `Over-under : ${prog(3)}×${progMin(6, 3)} min en alternant 1 min juste SOUS le seuil / 1 min juste AU-DESSUS, récup 3 min → apprend à recycler le lactate, la qualité qui sauve une fin de course`,
-    `Seuil progressif : ${progMin(18, 1)} min en accélérant d'un cran tous les 6 min pour finir légèrement au-dessus du seuil → contrôle de l'allure et gestion de l'effort`,
-    `Tempo long : ${progMin(24, 1)} min à ~${sPace}/km sur terrain roulant, sans regarder la montre après le 5e km → autonomie de l'athlète`,
+    `Seuil continu (SOUS-seuil) : ${progMin(21, 1)} min d'un bloc à ~${subPace}/km → le plus exigeant mentalement, le plus payant`,
+    `Over-under : ${prog(3)}×${progMin(6, 3)} min en alternant 1 min à ~${subPace}/km (sous-seuil) / 1 min à ~${sPace}/km (au seuil), récup 3 min → apprend à recycler le lactate, la qualité qui sauve une fin de course`,
+    `Seuil progressif : ${progMin(18, 1)} min en partant à ~${subPace}/km et en accélérant tous les 6 min pour finir à ~${sPace}/km → contrôle de l'allure et gestion de l'effort`,
+    `Tempo long (SOUS-seuil) : ${progMin(24, 1)} min à ~${subPace}/km sur terrain roulant, sans regarder la montre après le 5e km → autonomie de l'athlète`,
   ]) };
   const qSpec = { type: "Spécifique", desc: goalPace ? pick([
     `Allure spécifique ${raceShort ?? "objectif"} : ${prog(5)}×1 km à ${goalPace}/km, récup 1 min 30 → ancre l'allure`,
@@ -1270,7 +1289,7 @@ ${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${lim
     + `Départ en négative split : c'est ce qui produit le plus de records, et ça se RÉPÈTE à l'entraînement — `
     + `${daysToRace > 14 ? "programme une SIMULATION à J-10/J-14 : 60-70 % de la distance à l'allure cible, mêmes chaussures, même petit-déjeuner, même heure." : "la simulation est passée : plus rien de nouveau d'ici le départ, on ne teste plus, on répète."} `
     + `Échauffement le jour J : ${objective.distanceKm <= 10 ? "20 min footing + gammes + 4-5 lignes droites, fini 10 min avant le départ" : "15 min footing léger + 3 lignes droites, on garde le carburant"}.\n`;
-})()}${nutrition ? `- 🍫 NUTRITION DE SA SORTIE LONGUE (${Math.round(nutrition.longRunMin / 60)} h ~${longRunKm} km${nutrition.tempC != null ? `, ${Math.round(nutrition.tempC)} °C prévus` : ""}) : ${nutrition.preRun ? `${nutrition.preRun} g de glucides 2-3 h avant, ` : ""}puis ${nutrition.carbsPerH} g/h À PARTIR DE LA 1re HEURE (soit ~${nutrition.carbsTotal} g sur la sortie, ~${Math.max(1, Math.round(nutrition.carbsTotal / 25))} gels ou équivalent), et ${nutrition.mlPerH} ml/h de boisson à ~${nutrition.sodium} mg/L de sodium. Donne-lui CES chiffres, pas une fourchette — et rappelle-lui de les TESTER à l'entraînement, jamais le jour J.\n` : ""}${shoeLines.length ? `- 👟 USURE DES CHAUSSURES : ${shoeLines.join(" · ")}\n` : ""}${plateau ? `- 🛑 PLATEAU DÉTECTÉ : sa capacité stagne (${vmaSlopePerWeek} km/h/sem sur ${Math.round((curvePts[curvePts.length - 1].t - curvePts[0].t) / 86400000)} j) ALORS QUE sa charge monte. N'AJOUTE PAS de volume ni de séances : c'est le réflexe qui blesse. CHANGE le stimulus — format de séance inédit, côtes, force, technique de foulée — ou impose une vraie semaine de décharge. Explique-lui pourquoi.\n` : vmaSlopePerWeek != null ? `- 📈 TRAJECTOIRE DE CAPACITÉ : ${vmaSlopePerWeek > 0 ? "+" : ""}${vmaSlopePerWeek} km/h de VMA par semaine sur ses efforts mesurés.\n` : ""}${vrLine ? `- 🦵 ÉCONOMIE DE COURSE (ratio vertical, ${vr!.n} séances) : ${vrLine}\n` : ""}${hrrLine ? `- ❤️‍🩹 RÉCUPÉRATION CARDIAQUE : ${hrrLine}\n` : ""}${thresholdPace ? `- 🎯 ALLURE SEUIL **MESURÉE** : ${thresholdPace}/km (vitesse critique ${(csMs! * 3.6).toFixed(2)} km/h, ajustée sur ses efforts réels)${pc?.dPrime ? ` · réserve anaérobie D' ${pc.dPrime} m` : ""}. UTILISE CETTE VALEUR pour les séances au seuil plutôt qu'un pourcentage de VMA estimée.\n` : ""}${qeLine ? `- 🔍 EXÉCUTION DE SA DERNIÈRE QUALITÉ : ${qeLine}${faded ? " → il a DÉCROCHÉ : la prochaine série doit être plus courte ou plus lente, pas plus dure. Ne répète pas la même erreur." : fade != null && fade <= -6 ? " → il a ACCÉLÉRÉ en fin de série : il en avait sous le pied, tu peux durcir (allure ou volume, pas les deux)." : ""}\n` : ""}- Repères physio : seuil lactique ~${thresholdPace ?? (vma ? paceAt(86) : "?")}/km · vitesse critique ~${vma ? r1(vma * 0.90) : "?"} km/h (${vma ? paceAt(90) : "?"}/km) · VO2max estimé ~${vo2 ?? "?"} ml/kg/min
+})()}${nutrition ? `- 🍫 NUTRITION DE SA SORTIE LONGUE (${Math.round(nutrition.longRunMin / 60)} h ~${longRunKm} km${nutrition.tempC != null ? `, ${Math.round(nutrition.tempC)} °C prévus` : ""}) : ${nutrition.preRun ? `${nutrition.preRun} g de glucides 2-3 h avant, ` : ""}puis ${nutrition.carbsPerH} g/h À PARTIR DE LA 1re HEURE (soit ~${nutrition.carbsTotal} g sur la sortie, ~${Math.max(1, Math.round(nutrition.carbsTotal / 25))} gels ou équivalent), et ${nutrition.mlPerH} ml/h de boisson à ~${nutrition.sodium} mg/L de sodium. Donne-lui CES chiffres, pas une fourchette — et rappelle-lui de les TESTER à l'entraînement, jamais le jour J.\n` : ""}${shoeLines.length ? `- 👟 USURE DES CHAUSSURES : ${shoeLines.join(" · ")}\n` : ""}${plateau ? `- 🛑 PLATEAU DÉTECTÉ : sa capacité stagne (${vmaSlopePerWeek} km/h/sem sur ${Math.round((curvePts[curvePts.length - 1].t - curvePts[0].t) / 86400000)} j) ALORS QUE sa charge monte. N'AJOUTE PAS de volume ni de séances : c'est le réflexe qui blesse. CHANGE le stimulus — format de séance inédit, côtes, force, technique de foulée — ou impose une vraie semaine de décharge. Explique-lui pourquoi.\n` : vmaSlopePerWeek != null ? `- 📈 TRAJECTOIRE DE CAPACITÉ : ${vmaSlopePerWeek > 0 ? "+" : ""}${vmaSlopePerWeek} km/h de VMA par semaine sur ses efforts mesurés.\n` : ""}${vrLine ? `- 🦵 ÉCONOMIE DE COURSE (ratio vertical, ${vr!.n} séances) : ${vrLine}\n` : ""}${hrrLine ? `- ❤️‍🩹 RÉCUPÉRATION CARDIAQUE : ${hrrLine}\n` : ""}${thresholdPace ? `- 🧊 ALLURE SOUS-SEUIL : ${subPace}/km — c'est ICI que se fait le VOLUME au seuil (méthode norvégienne, Bakken : 0,4 à 0,8 mmol sous le seuil). Une allure qu'il doit pouvoir répéter le lendemain. Les blocs LONGS s'y tiennent ; seules les fractions COURTES touchent le seuil réel. Beaucoup de volume sous-seuil DÉPLACE le seuil ; peu de volume AU seuil ne fait que fatiguer.\n` : ""}${thresholdPace ? `- 🎯 ALLURE SEUIL **MESURÉE** : ${thresholdPace}/km (vitesse critique ${(csMs! * 3.6).toFixed(2)} km/h, ajustée sur ses efforts réels)${pc?.dPrime ? ` · réserve anaérobie D' ${pc.dPrime} m` : ""}. UTILISE CETTE VALEUR pour les séances au seuil plutôt qu'un pourcentage de VMA estimée.\n` : ""}${qeLine ? `- 🔍 EXÉCUTION DE SA DERNIÈRE QUALITÉ : ${qeLine}${faded ? " → il a DÉCROCHÉ : la prochaine série doit être plus courte ou plus lente, pas plus dure. Ne répète pas la même erreur." : fade != null && fade <= -6 ? " → il a ACCÉLÉRÉ en fin de série : il en avait sous le pied, tu peux durcir (allure ou volume, pas les deux)." : ""}\n` : ""}- Repères physio : seuil lactique ~${thresholdPace ?? (vma ? paceAt(86) : "?")}/km · vitesse critique ~${vma ? r1(vma * 0.90) : "?"} km/h (${vma ? paceAt(90) : "?"}/km) · VO2max estimé ~${vo2 ?? "?"} ml/kg/min
 
 FORME & RÉCUPÉRATION (aujourd'hui)
 - État physiologique : ${state}
