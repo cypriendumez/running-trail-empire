@@ -232,18 +232,29 @@ export async function pushIntervalsWorkout(opts: {
     external_id: extId,
   };
   try {
-    let mine: { id: number; name?: string; description?: string }[] = [];
+    let mine: { id: number; name?: string; description?: string; updated?: string }[] = [];
     const existRes = await fetch(`${BASE}/athlete/${athleteId}/events?oldest=${date}&newest=${date}`, { headers: authHeader(apiKey) });
     if (existRes.ok) {
-      const existing = (await existRes.json()) as { id: number; external_id?: string; name?: string; description?: string }[];
+      const existing = (await existRes.json()) as { id: number; external_id?: string; name?: string; description?: string; updated?: string }[];
       // On ne touche QUE la séance coach du jour : elle n'écrase jamais un défi Ghost
       // Runner, et vice-versa (ils coexistent sur le calendrier).
       mine = existing.filter((e) => e.external_id === extId);
       // Séance inchangée → on ne réécrit RIEN. Le plan est recalculé plusieurs fois par
       // jour et retombe presque toujours sur la même séance ; toute écriture relance une
       // synchronisation Garmin inutile. Ne pas toucher est ici la bonne action.
+      // Séance inchangée → on ne réécrit RIEN. Le plan est recalculé plusieurs fois par
+      // jour et retombe presque toujours sur la même séance ; toute écriture relance une
+      // synchronisation Garmin inutile.
+      //
+      // SAUF une fois par jour. Ce court-circuit avait un effet pervers : si Garmin se
+      // désynchronise (constaté — une modification poussée par PUT n'était jamais
+      // parvenue à la montre, qui affichait encore la version du matin), l'application
+      // ne pouvait PLUS JAMAIS réparer, puisqu'elle considérait tout conforme. Une
+      // recréation quotidienne garantit que la montre finit toujours par recevoir la
+      // bonne version, sans revenir au va-et-vient permanent d'origine.
       const same = mine.find((e) => e.name === event.name && e.description === description);
-      if (same) return { ok: true, eventId: same.id, unchanged: true };
+      const staleH = same?.updated ? (Date.now() - new Date(same.updated).getTime()) / 3600_000 : Infinity;
+      if (same && staleH < 20) return { ok: true, eventId: same.id, unchanged: true };
     }
 
     // RECRÉATION UNIQUEMENT SI LA SÉANCE A CHANGÉ.
