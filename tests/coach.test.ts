@@ -471,5 +471,21 @@ test("les services externes gratuits ne sont pas ouverts aux anonymes", () => {
   }
 });
 
+console.log("\nBOUTIQUE — vraies offres ou rien");
+test("aucun catalogue fabriqué n'est rendu sans offres réelles", () => {
+  // Décision assumée : un avertissement sur des prix inventés est un pansement. La
+  // boutique n'apparaît QUE si `product_offers` contient de vraies offres importées
+  // depuis un flux marchand officiel.
+  const page = readFileSync("src/app/dashboard/shop/page.tsx", "utf8");
+  assert.ok(/product_offers/.test(page), "la page ne vérifie pas la présence d'offres réelles");
+  assert.ok(/ShopComingSoon/.test(page), "aucun écran d'attente en l'absence d'offres");
+  assert.ok(existsSync("src/components/shop/ShopComingSoon.tsx"));
+});
+test("l'importateur de flux reste protégé et ne scrape rien", () => {
+  const src = readFileSync("src/app/api/shop/import-feed/route.ts", "utf8");
+  assert.ok(/CRON_SECRET|ADMIN_SECRET/.test(src), "l'import de flux doit exiger un secret");
+  assert.ok(/searchParams\.get\("url"\)/.test(src), "le flux doit être fourni explicitement, jamais deviné");
+});
+
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log(`  ✗ ${f}`); process.exit(1); }
