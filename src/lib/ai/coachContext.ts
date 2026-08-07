@@ -364,7 +364,38 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const level = vma == null ? "à évaluer (VMA inconnue)" : vma < 13 ? "débutant" : vma < 16 ? "intermédiaire" : vma < 19 ? "confirmé" : "expert/élite";
 
   // Zones FC (Karvonen) si dispo
-  const hrZone = (lo: number, hi: number) => (maxHr != null && restHr != null) ? `${Math.round(restHr + (maxHr - restHr) * lo)}-${Math.round(restHr + (maxHr - restHr) * hi)} bpm` : null;
+  // ── ZONES DE FRÉQUENCE CARDIAQUE ─────────────────────────────────────────────
+  // Deux constats. D'abord, `performance_baselines` est vide pour la plupart des
+  // athlètes : `maxHr` valait null et le coach n'affichait AUCUNE zone (« ? »).
+  // Ensuite, la FC au seuil lactique est MESURÉE par intervals.icu sur les efforts
+  // réels — bien plus fiable qu'un « 220 − âge » dont l'écart-type dépasse 10 bpm.
+  //
+  // On ne bascule PAS pour autant sur les fractions de seuil à la Friel : sa zone
+  // « endurance » (85-89 % du seuil) tombe ici à 163-173 bpm alors que l'athlète court
+  // ses footings à 159. Prescrire cette zone l'aurait fait ACCÉLÉRER ses footings —
+  // l'exact contraire de la discipline 80/20 que le coach passe son temps à défendre.
+  //
+  // On garde donc la réserve cardiaque (Karvonen) pour les zones faciles, en
+  // l'alimentant avec la MEILLEURE FC max disponible ; et on réserve le seuil mesuré
+  // à la zone qu'il définit littéralement : le seuil.
+  const gm = (p as Record<string, unknown> | null)?.garmin_metrics as Record<string, unknown> | null | undefined;
+  const lthrMeasured = num(gm?.lthr) ?? ltHr;
+  const maxHrEff = maxHr
+    ?? (obsMaxHr0 > 150 ? obsMaxHr0 : null)
+    // Le seuil vaut ~92 % de la FC max chez un athlète entraîné : bien meilleur repli
+    // que l'âge (ici 209 déduit contre 209 réellement observés).
+    ?? (lthrMeasured != null && lthrMeasured > 120 ? Math.round(lthrMeasured / 0.92) : null)
+    ?? (num(p?.age) ? 220 - num(p!.age)! : null);
+  const restHrEff = restHr ?? num(gm?.restingHR) ?? null;
+  const hrZone = (lo: number, hi: number) => {
+    // Zone de seuil : ancrée sur la mesure, pas sur un pourcentage d'un maximum.
+    if (lo >= 0.8 && lthrMeasured != null && lthrMeasured > 120) {
+      return `${Math.round(lthrMeasured * 0.95)}-${Math.round(lthrMeasured * 0.99)} bpm`;
+    }
+    return (maxHrEff != null && restHrEff != null)
+      ? `${Math.round(restHrEff + (maxHrEff - restHrEff) * lo)}-${Math.round(restHrEff + (maxHrEff - restHrEff) * hi)} bpm`
+      : null;
+  };
   // Zones d'allure stockées (min/km)
   const paceZones = b && b.z2_min != null
     ? `Z1 ${num(b.z1_min)}-${num(b.z1_max)} · Z2 ${num(b.z2_min)}-${num(b.z2_max)} · Z3 ${num(b.z3_min)}-${num(b.z3_max)} · Z4 ${num(b.z4_min)}-${num(b.z4_max)} · Z5 ${num(b.z5_min)}-${num(b.z5_max)} (min/km)`
@@ -804,30 +835,57 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const variant = isoWeek % 4;
   const pick = (arr: string[]) => arr[variant % arr.length];
 
+  /**
+   * SURCHARGE PROGRESSIVE — le manque le plus coûteux du plan automatique.
+   *
+   * Le menu TOURNAIT (isoWeek % 4) : la même séance revenait à l'identique toutes les
+   * quatre semaines. Or un organisme ne progresse que si le stimulus AUGMENTE. Faire
+   * 4×8 min au seuil en semaine 1 puis exactement 4×8 min en semaine 5, c'est
+   * entretenir — pas entraîner.
+   *
+   * On ajoute donc un volume croissant sur les trois premières semaines du cycle, puis
+   * la quatrième REDESCEND : c'est la semaine d'assimilation, celle où l'adaptation se
+   * produit réellement. Le plafond de +2 répétitions évite qu'un cycle long ne dérive
+   * vers des séances interminables.
+   */
+  const blockWeek = variant;                       // 0,1,2 = montée · 3 = assimilation
+  const prog = (base: number): number => {
+    if (blockWeek === 3) return Math.max(2, Math.round(base * 0.7));
+    return base + Math.min(2, blockWeek);
+  };
+  /** Durée d'un bloc au seuil, même logique : on allonge, puis on assimile. */
+  const progMin = (base: number): number => {
+    if (blockWeek === 3) return Math.max(5, Math.round(base * 0.75));
+    return base + blockWeek * 2;
+  };
+  const progLabel = blockWeek === 3
+    ? "SEMAINE D'ASSIMILATION (volume de qualité réduit — c'est ici que l'adaptation se produit, ne la saute pas)"
+    : `semaine ${blockWeek + 1}/4 du bloc — le volume de qualité MONTE par rapport à la précédente`;
+
   const qVMA = { type: "VMA", desc: pick([
-    `VMA courte : 12×400 m à ~${repPace(104, 400)}/km, récup 45 s trottinés → aiguise la vitesse et la foulée`,
-    `VMA moyenne : 8×500 m à ~${repPace(102, 500)}/km, récup 1 min trottinée → tenue de la vitesse`,
-    `VMA longue : 6×800 m à ~${repPace(100, 800)}/km, récup 1 min 30 trottinée → soutien du VO2max`,
-    `VMA longue : 5×1000 m à ~${repPace(100, 1000)}/km, récup 2 min trottinée → le format le plus proche de la course`,
+    `VMA courte : ${prog(10)}×400 m à ~${repPace(104, 400)}/km, récup 45 s trottinés → aiguise la vitesse et la foulée`,
+    `VMA moyenne : ${prog(7)}×500 m à ~${repPace(102, 500)}/km, récup 1 min trottinée → tenue de la vitesse`,
+    `VMA longue : ${prog(5)}×800 m à ~${repPace(100, 800)}/km, récup 1 min 30 trottinée → soutien du VO2max`,
+    `VMA longue : ${prog(4)}×1000 m à ~${repPace(100, 1000)}/km, récup 2 min trottinée → le format le plus proche de la course`,
   ]) };
   // Allure seuil : la vitesse critique MESURÉE prime sur le pourcentage de VMA estimée.
   const sPace = thresholdPace ?? paceAt(86);
   const qSeuil = { type: "Seuil", desc: pick([
-    `Seuil fractionné : 4×8 min à ~${sPace}/km, récup 2 min → accumule du temps au seuil sans casser`,
-    `Seuil long : 2×15 min à ~${sPace}/km, récup 3 min → apprend à tenir l'effort`,
-    `Seuil : 3×10 min à ~${sPace}/km, récup 2 min → le format de référence`,
-    `Seuil continu : 25 min d'un bloc à ~${sPace}/km → le plus exigeant mentalement, le plus payant`,
+    `Seuil fractionné : ${prog(3)}×8 min à ~${sPace}/km, récup 2 min → accumule du temps au seuil sans casser`,
+    `Seuil long : 2×${progMin(13)} min à ~${sPace}/km, récup 3 min → apprend à tenir l'effort`,
+    `Seuil : ${prog(2)}×10 min à ~${sPace}/km, récup 2 min → le format de référence`,
+    `Seuil continu : ${progMin(21)} min d'un bloc à ~${sPace}/km → le plus exigeant mentalement, le plus payant`,
   ]) };
   const qSpec = { type: "Spécifique", desc: goalPace ? pick([
-    `Allure spécifique ${raceShort ?? "objectif"} : 6×1 km à ${goalPace}/km, récup 1 min 30 → ancre l'allure`,
-    `Allure spécifique ${raceShort ?? "objectif"} : 4×1500 m à ${goalPace}/km, récup 2 min → allonge les portions`,
-    `Allure spécifique ${raceShort ?? "objectif"} : 3×2 km à ${goalPace}/km, récup 2 min 30 → se rapproche des conditions de course`,
+    `Allure spécifique ${raceShort ?? "objectif"} : ${prog(5)}×1 km à ${goalPace}/km, récup 1 min 30 → ancre l'allure`,
+    `Allure spécifique ${raceShort ?? "objectif"} : ${prog(3)}×1500 m à ${goalPace}/km, récup 2 min → allonge les portions`,
+    `Allure spécifique ${raceShort ?? "objectif"} : ${prog(2)}×2 km à ${goalPace}/km, récup 2 min 30 → se rapproche des conditions de course`,
     `Allure spécifique ${raceShort ?? "objectif"} : 2×3 km à ${goalPace}/km, récup 3 min → simulation de course`,
   ]) : `Allure spécifique objectif (répétitions à l'allure visée)` };
   const qCote = { type: "VMA", desc: pick([
-    `Côtes courtes : 10×30 s en montée vive, récup descente trottinée → force et explosivité`,
-    `Côtes moyennes : 8×45 s en montée soutenue, récup descente → puissance en montée`,
-    `Côtes longues : 6×2 min en montée régulière (FC Z4), récup descente → endurance de force`,
+    `Côtes courtes : ${prog(8)}×30 s en montée vive, récup descente trottinée → force et explosivité`,
+    `Côtes moyennes : ${prog(6)}×45 s en montée soutenue, récup descente → puissance en montée`,
+    `Côtes longues : ${prog(4)}×2 min en montée régulière (FC Z4), récup descente → endurance de force`,
     `Côtes + descente : 5×3 min en montée, DESCENTE travaillée en souplesse → prépare l'excentrique du trail`,
   ]) };
   const qMara = { type: "Spécifique", desc: goalPace ? pick([
