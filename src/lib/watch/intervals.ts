@@ -246,27 +246,23 @@ export async function pushIntervalsWorkout(opts: {
       if (same) return { ok: true, eventId: same.id, unchanged: true };
     }
 
-    // MISE À JOUR EN PLACE plutôt que suppression + recréation.
+    // RECRÉATION UNIQUEMENT SI LA SÉANCE A CHANGÉ.
     //
-    // Le plan est republié à chaque synchronisation d'une nouvelle séance, plus une fois
-    // par jour via le cron. En supprimant l'événement, on demandait à intervals.icu de
-    // RETIRER l'entraînement de Garmin Connect, puis d'en pousser un nouveau. Chaque
-    // replanification cassait donc le lien avec la montre, et il fallait une nouvelle
-    // synchronisation Garmin pour que la séance réapparaisse — d'où une montre qui
-    // n'affiche « rien de prévu » une bonne partie du temps.
-    // Le PUT conserve l'identifiant de l'événement (vérifié : id inchangé, étapes
-    // reconstruites), donc l'entraînement Garmin reste en place et est simplement mis à jour.
+    // Deux écueils opposés, et il a fallu les deux pour trouver l'équilibre.
+    // · Supprimer-recréer à CHAQUE republication (le comportement d'origine) demandait à
+    //   intervals.icu de retirer l'entraînement de Garmin puis d'en pousser un neuf,
+    //   plusieurs fois par jour : la montre se retrouvait régulièrement sans séance.
+    // · Mettre à jour en place (PUT) supprime cette instabilité, mais l'API ne dit NULLE
+    //   PART si une modification est réellement renvoyée vers Garmin — aucun champ ne
+    //   l'expose, seul `push_errors` existe et reste nul. Impossible à vérifier de
+    //   l'extérieur, et une séance modifiée qui n'arrive pas sur la montre est pire
+    //   qu'une séance recréée.
+    // On recrée donc, mais SEULEMENT quand le contenu diffère — cas devenu rare depuis
+    // que les séances identiques sont court-circuitées plus haut. La création, elle, est
+    // le chemin dont on sait qu'il pousse vers Garmin.
     if (mine.length) {
-      const [keep, ...extra] = mine;
-      const res = await fetch(`${BASE}/athlete/${athleteId}/events/${keep.id}`, {
-        method: "PUT", headers: authHeader(apiKey), body: JSON.stringify(event),
-      });
-      // Doublons éventuels d'une ancienne version : on ne garde qu'une séance par jour.
-      await Promise.all(extra.map((e) =>
+      await Promise.all(mine.map((e) =>
         fetch(`${BASE}/athlete/${athleteId}/events/${e.id}`, { method: "DELETE", headers: authHeader(apiKey) }).catch(() => undefined)));
-      if (res.ok) return { ok: true, eventId: keep.id };
-      // Le PUT peut échouer si l'événement a été supprimé côté intervals.icu entre-temps :
-      // on retombe alors sur la création.
     }
 
     const res = await fetch(`${BASE}/athlete/${athleteId}/events`, { method: "POST", headers: authHeader(apiKey), body: JSON.stringify(event) });

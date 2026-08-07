@@ -73,6 +73,8 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // montre en envoyait 15, avec un corps de séance réduit de 25 à 10 min. Deux séances
   // différentes pour le même jour.
   const { warm, cool } = ctx.warmCool;
+  // Même position de cycle que la qualité : 0-2 montée, 3 assimilation.
+  const blockWeekRenfo = (() => { const d = new Date(start); const on = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const day = on.getUTCDay() || 7; on.setUTCDate(on.getUTCDate() + 4 - day); const ys = new Date(Date.UTC(on.getUTCFullYear(), 0, 1)); return Math.ceil(((on.getTime() - ys.getTime()) / 86400000 + 1) / 7) % 4; })();
   // Avant une séance de qualité, l'échauffement est allongé (mise en action progressive).
   const warmQ = Math.min(30, warm + 5);
   const pace = ctx.easyPace;
@@ -331,8 +333,26 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
     ?? [1, 2, 3, 4, 5, 6].find((i) => isFree(i) && avail(i));
   if (renfoIdx != null) put(renfoIdx, {
     type: "Renfo", title: "Renforcement musculaire",
-    detail: "30 à 40 min : gainage (planche, gainage latéral), squats, fentes, montées de mollets, ischios (nordic curls), proprioception sur une jambe. 3 séries de chaque, sans matériel.",
-    why: "La prévention de blessure n°1, et un gain direct d'économie de foulée. Non négociable sur le long terme.",
+    // Le renforcement était un texte UNIQUE, identique toute l'année. C'est pourtant le
+    // premier facteur de prévention des blessures, et il obéit aux mêmes lois que la
+    // course : il se périodise et il surcharge. Trois erreurs corrigées ici —
+    // aucune progression, aucune spécificité de phase, et de la force lourde maintenue
+    // pendant l'affûtage (où elle coûte de la fraîcheur sans plus rien apporter).
+    detail: (() => {
+      const phase = ctx.cycle.taper ? "affûtage" : ctx.macroPlan[0]?.phase ?? "Développement";
+      const sets = blockWeekRenfo === 3 ? 2 : 3 + Math.min(1, blockWeekRenfo);
+      if (phase === "affûtage" || ctx.cycle.taper) {
+        return `20 à 25 min, ENTRETIEN seulement : gainage 3×45 s, montées de mollets 2×15, proprioception 2×30 s par jambe, quelques bondissements courts. AUCUNE charge lourde ni série longue à l'approche de la course — on préserve la fraîcheur, la force est déjà acquise.`;
+      }
+      if (phase === "Base") {
+        return `35 à 45 min, FONDATIONS : gainage complet (planche, latéral, dos) ${sets}×45 s, squats ${sets}×12, fentes ${sets}×10 par jambe, montées de mollets ${sets}×15, ischios nordic curls ${sets}×6, proprioception sur une jambe ${sets}×30 s. Amplitude et contrôle avant tout — c'est la phase où l'on construit le tendon.`;
+      }
+      if (phase === "Spécifique") {
+        return `30 à 35 min, FORCE UTILE À LA COURSE : squats bulgares ${sets}×8 par jambe, fentes sautées ${sets}×8, montées de mollets sur une jambe ${sets}×12, nordic curls ${sets}×6, gainage dynamique ${sets}×40 s, bondissements ${sets}×10. Explosif et court : on transfère la force vers la foulée, on ne cherche plus le volume.`;
+      }
+      return `30 à 40 min, DÉVELOPPEMENT : gainage (planche, latéral) ${sets}×45 s, squats ${sets}×12, fentes ${sets}×10 par jambe, montées de mollets ${sets}×15, ischios nordic curls ${sets}×6, proprioception sur une jambe ${sets}×30 s. ${sets > 3 ? "Série supplémentaire par rapport à la semaine dernière — la surcharge vaut aussi pour le renfo." : "Charge maintenue cette semaine (assimilation)."}`;
+    })(),
+    why: "La prévention de blessure n°1, et un gain direct d'économie de foulée. Elle se périodise comme la course : fondations, puis force utile, puis simple entretien à l'approche du jour J.",
     tags: ["Renfo", "Prévention"],
   });
 

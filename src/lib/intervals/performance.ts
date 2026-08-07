@@ -176,12 +176,57 @@ export async function refreshPerformance(
   opts: { userId: string; athleteId: string; apiKey: string; lastQualityId?: string | null; lastQualityDate?: string | null; storedAt?: string | null; previous?: PaceCurve | null },
 ): Promise<void> {
   if (opts.storedAt && Date.now() - new Date(opts.storedAt).getTime() < 20 * 3600_000) return;
-  const [curve, exec] = await Promise.all([
-    fetchPaceCurve(opts.athleteId, opts.apiKey),
-    opts.lastQualityId && opts.lastQualityDate
-      ? analyseQualityExecution(opts.lastQualityId, opts.apiKey, opts.lastQualityDate)
-      : Promise.resolve(null),
-  ]);
+  // La séance de qualité à analyser n'est presque JAMAIS dans la fenêtre de synchro :
+  // le cron ne rapatrie qu'un jour d'activités, et une séance dure a lieu une à deux
+  // fois par semaine. `last_quality_exec` restait donc éternellement vide, et l'analyse
+  // répétition par répétition — pourtant écrite et testée — ne servait à rien.
+  // On va la chercher nous-mêmes sur 14 jours ; l'appel est de toute façon limité à un
+  // rafraîchissement par 20 h.
+  const quality = await (async () => {
+    if (opts.lastQualityId && opts.lastQualityDate) {
+      return analyseQualityExecution(opts.lastQualityId, opts.apiKey, opts.lastQualityDate);
+    }
+    const oldest = new Date(Date.now() - 14 * 86400_000).toISOString().slice(0, 10);
+    const newest = new Date().toISOString().slice(0, 10);
+    try {
+      const r = await fetch(`${BASE}/athlete/${opts.athleteId}/activities?oldest=${oldest}&newest=${newest}`, {
+        headers: auth(opts.apiKey), signal: AbortSignal.timeout(15000),
+      });
+      if (!r.ok) return null;
+      const acts = await r.json() as { id?: string; type?: string; start_date_local?: string; icu_intensity?: number; icu_training_load?: number }[];
+      // Les activités arrivent de la plus récente à la plus ancienne.
+      const hard = acts.find((a) => a.id && /run/i.test(String(a.type ?? ""))
+        && ((a.icu_intensity ?? 0) >= 85 || (a.icu_training_load ?? 0) >= 60));
+      if (!hard?.id || !hard.start_date_local) return null;
+      return analyseQualityExecution(String(hard.id), opts.apiKey, String(hard.start_date_local).slice(0, 10));
+    } catch { return null; }
+  })();
+
+  // ── DÉRIVE CARDIAQUE sur la dernière sortie CONTINUE ────────────────────────
+  // Uniquement sur un effort continu : sur un fractionné, l'alternance effort/récup rend
+  // le rapport allure/FC ininterprétable (+11,4 % mesuré sur une séance de VMA, ce qui ne
+  // dit rien de l'endurance). Le résultat va dans `workouts.cardiac_decoupling`, colonne
+  // qui existait depuis l'origine et n'avait jamais reçu la moindre valeur.
+  await (async () => {
+    const oldest = new Date(Date.now() - 14 * 86400_000).toISOString().slice(0, 10);
+    try {
+      const r = await fetch(`${BASE}/athlete/${opts.athleteId}/activities?oldest=${oldest}&newest=${new Date().toISOString().slice(0, 10)}`, {
+        headers: auth(opts.apiKey), signal: AbortSignal.timeout(15000),
+      });
+      if (!r.ok) return;
+      const acts = await r.json() as { id?: string; type?: string; moving_time?: number; icu_intensity?: number }[];
+      const cont = acts.find((a) => a.id && /run/i.test(String(a.type ?? ""))
+        && (a.moving_time ?? 0) >= 45 * 60 && (a.icu_intensity ?? 0) < 85);
+      if (!cont?.id) return;
+      const drift = await cardiacDrift(String(cont.id), opts.apiKey);
+      if (drift == null) return;
+      await admin.from("workouts").update({ cardiac_decoupling: drift })
+        .eq("user_id", opts.userId).eq("external_id", String(cont.id))
+        .then(() => {}, () => {});
+    } catch { /* best-effort */ }
+  })();
+
+  const [curve, exec] = [await fetchPaceCurve(opts.athleteId, opts.apiKey), quality];
   const patch: Record<string, unknown> = {};
   if (curve) {
     // ── HISTORIQUE ────────────────────────────────────────────────────────────
@@ -208,4 +253,55 @@ export async function refreshPerformance(
   if (exec) patch.last_quality_exec = exec;
   if (!Object.keys(patch).length) return;
   await admin.from("profiles").update(patch).eq("id", opts.userId).then(() => {}, () => {});
+}
+
+/**
+ * DÉRIVE CARDIAQUE (découplage aérobie).
+ *
+ * Rapport allure/FC sur la seconde moitié d'un effort continu comparé à la première.
+ * C'est le meilleur marqueur d'ENDURANCE AÉROBIE : il dit si l'athlète tient son allure
+ * sans que le cœur monte. Un coureur qui dérive de 8 % sur une heure explosera au 7e km
+ * de son 10 km ; un coureur sous 5 % est prêt à tenir son allure jusqu'au bout.
+ *
+ * Le champ `decoupling` d'intervals.icu est resté NUL sur 100 % des séances de ce
+ * compte. Les flux, eux, existent (3 000 points de FC et de vitesse par séance) : la
+ * mesure était disponible, elle n'était simplement pas calculée.
+ *
+ * Convention : positif = la FC monte à allure égale (dérive, mauvais signe).
+ */
+export async function cardiacDrift(activityId: string, apiKey: string): Promise<number | null> {
+  try {
+    const r = await fetch(`${BASE}/activity/${activityId}/streams?types=heartrate,velocity_smooth`, {
+      headers: auth(apiKey), signal: AbortSignal.timeout(15000),
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const arr = Array.isArray(j) ? j : [j];
+    const hr = arr.find((x) => x?.type === "heartrate")?.data as number[] | undefined;
+    const vel = arr.find((x) => x?.type === "velocity_smooth")?.data as number[] | undefined;
+    if (!hr?.length || !vel?.length) return null;
+    const n = Math.min(hr.length, vel.length);
+    if (n < 1800) return null;   // moins de 30 min : la dérive n'a pas le temps de s'exprimer
+
+    // On écarte les 5 premières minutes : la FC n'a pas fini de monter, le rapport y est
+    // artificiellement favorable et gonflerait mécaniquement la dérive.
+    const start = 300;
+    const usable = n - start;
+    const mid = start + Math.floor(usable / 2);
+    const ratio = (from: number, to: number) => {
+      let sv = 0, sh = 0, c = 0;
+      for (let i = from; i < to; i++) {
+        const v = vel[i], h = hr[i];
+        // Seuils : au repos ou à l'arrêt, le rapport n'a aucun sens.
+        if (typeof v !== "number" || typeof h !== "number" || v < 1.8 || h < 90) continue;
+        sv += v; sh += h; c++;
+      }
+      return c > 60 ? (sv / c) / (sh / c) : null;
+    };
+    const first = ratio(start, mid), second = ratio(mid, n);
+    if (first == null || second == null || first <= 0) return null;
+    // Le rapport allure/FC BAISSE quand on dérive → on inverse pour que positif = dérive.
+    const drift = ((first - second) / first) * 100;
+    return Math.abs(drift) > 40 ? null : Math.round(drift * 10) / 10;
+  } catch { return null; }
 }
