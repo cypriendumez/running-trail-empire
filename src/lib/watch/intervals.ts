@@ -60,9 +60,63 @@ export function parsePaceSec(text: string): number | null {
   return sec >= 150 && sec <= 600 ? sec : null; // garde-fou : 2'30–10'00/km
 }
 
+// ── FRACTIONNÉ RÉEL POUR LA MONTRE ──────────────────────────────────────────
+// Sans ça, « 12×400 m récup 45 s » partait sur la montre comme un unique bloc de
+// 10 min à l'allure VMA : l'athlète n'avait ni le décompte des répétitions, ni les
+// bips de récupération — c'est-à-dire l'essentiel de ce qui rend une séance de
+// fractionné suivable en courant.
+//
+// On lit nos PROPRES libellés (générés par le menu de qualité), dont le format est
+// stable : « N×DISTANCE à ALLURE, récup DURÉE » ou « N×DURÉE à ALLURE, récup DURÉE ».
+export type RepBlock = { reps: number; workSec: number; recSec: number; paceSec: number | null };
+
+export function parseReps(text: string, fallbackPaceSec: number | null): RepBlock | null {
+  const t = (text || "").replace(/\u00a0/g, " ").toLowerCase();
+  // N × valeur unité   (× ou x, avec ou sans espaces)
+  const m = t.match(/(\d{1,2})\s*[×x]\s*(\d{1,4}(?:[.,]\d+)?)\s*(m\b|km\b|min\b|mn\b|s\b|")/);
+  if (!m) return null;
+  const reps = Number(m[1]);
+  const val = Number(String(m[2]).replace(",", "."));
+  const unit = m[3].trim();
+  if (!(reps >= 2 && reps <= 30) || !(val > 0)) return null;
+
+  const paceSec = parsePaceSec(text) ?? fallbackPaceSec;
+
+  // Durée d'un effort. Une distance n'est convertie que si l'on connaît l'allure :
+  // envoyer une distance en pas de temps sans allure donnerait n'importe quoi.
+  let workSec: number;
+  if (unit === "min" || unit === "mn") workSec = val * 60;
+  else if (unit === "s" || unit === '"') workSec = val;
+  else if (unit === "km") { if (!paceSec) return null; workSec = val * paceSec; }
+  else { if (!paceSec) return null; workSec = (val / 1000) * paceSec; }  // mètres
+  workSec = Math.round(workSec);
+  if (workSec < 15 || workSec > 30 * 60) return null;
+
+  // Récupération : « récup 45 s », « récup 1 min 30 », « récup 2 min ». Une récup
+  // décrite sans durée (« récup descente trottinée ») retombe sur une valeur sûre.
+  let recSec = Math.min(180, Math.max(45, Math.round(workSec * 0.6)));
+  const r = t.match(/r[ée]cup[^.]{0,24}?(\d{1,3})\s*(min|mn|s\b)(?:\s*(\d{1,2}))?/);
+  if (r) {
+    const n = Number(r[1]);
+    recSec = /min|mn/.test(r[2]) ? n * 60 + (r[3] ? Number(r[3]) : 0) : n;
+    recSec = Math.min(600, Math.max(15, recSec));
+  }
+  return { reps, workSec, recSec, paceSec };
+}
+
+/** Bloc d'étapes répétées au format intervals.icu (`Nx` ouvre la répétition). */
+function repSteps(b: RepBlock, vmaKmh: number | null, zone: number, hill?: boolean): string {
+  const fmt = (sec: number) => (sec % 60 === 0 ? `${sec / 60}m` : `${sec}s`);
+  // En côte, une allure au km n'a aucun sens : on pilote à la fréquence cardiaque.
+  const range = hill ? `Z${zone} HR` : b.paceSec
+    ? `${fmtPace(Math.max(120, b.paceSec - 8))}-${fmtPace(b.paceSec + 8)} pace`
+    : (vmaKmh ? `${zonePaceRange(vmaKmh, zone)} pace` : `Z${zone} HR`);
+  return [`${b.reps}x`, `- ${fmt(b.workSec)} ${range} Effort`, `- ${fmt(b.recSec)} Z1 HR Récup`].join("\n");
+}
+
 // Étapes intervals.icu selon le type de séance. Allure prescrite (mainPaceSec) > allure de zone (VMA)
 // > repli cible FC. mainPaceSec s'applique à l'étape PRINCIPALE. null = pas de séance montre.
-export function stepsForType(type: string, durationMin: number, vmaKmh?: number | null, mainPaceSec?: number | null, warmMin?: number | null, coolMin?: number | null): string | null {
+export function stepsForType(type: string, durationMin: number, vmaKmh?: number | null, mainPaceSec?: number | null, warmMin?: number | null, coolMin?: number | null, reps?: RepBlock | null, rawDetail?: string): string | null {
   const s = (type || "").toLowerCase();
   const d = Math.max(15, Math.round(durationMin));
   const v = vmaKmh ?? null;
@@ -86,13 +140,26 @@ export function stepsForType(type: string, durationMin: number, vmaKmh?: number 
     const main = Math.max(15, d - warm - cool);
     return [zoneStep(warm, 1, v, "Échauffement", null, true), zoneStep(main, 2, v, "Endurance facile", p), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
   }
-  if (/spéci|specif|allure|objectif|seuil|tempo/.test(s)) {
+  // Durée explicitement annoncée pour le CORPS de séance : sans ça, « 25 min d'un bloc »
+  // se retrouvait amputé de l'échauffement et arrivait à 10 min sur la montre.
+  const bodyMin = (() => {
+    const m = (rawDetail || "").toLowerCase().match(/corps[^:]*:\s*[^→\n]*?(\d{1,3})\s*min/);
+    const n = m ? Number(m[1]) : 0;
+    return n >= 10 && n <= 180 ? n : null;
+  })();
+  const quality = /spéci|specif|allure|objectif|seuil|tempo/.test(s) ? 4
+    : /vma|fractionn|interval|piste|côte|cote|fartlek|30\/30/.test(s) ? 5 : 0;
+  if (quality) {
+    // Vraies répétitions quand le libellé en contient ; sinon bloc continu (seuil continu…).
+    // Le mot « côte » est dans le LIBELLÉ de la séance, pas dans son type (« VMA »).
+    const hill = /c[ôo]te|mont[ée]e|hill/.test(`${s} ${(rawDetail || "").toLowerCase()}`);
+    const block = reps ? repSteps(reps, v, quality, hill) : null;
     const main = Math.max(10, d - warm - cool);
-    return [zoneStep(warm, 1, v, "Échauffement", null, true), zoneStep(main, 4, v, "Seuil", p), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
-  }
-  if (/vma|fractionn|interval|piste|côte|cote|fartlek|30\/30/.test(s)) {
-    const main = Math.max(10, d - warm - cool);
-    return [zoneStep(warm, 1, v, "Échauffement", null, true), zoneStep(main, 5, v, "VMA", p), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
+    return [
+      zoneStep(warm, 1, v, "Échauffement", null, true),
+      block ?? zoneStep(bodyMin ?? main, quality, v, quality === 5 ? "VMA" : "Seuil", p),
+      zoneStep(cool, 1, v, "Retour au calme", null, true),
+    ].join("\n");
   }
   const main = Math.max(15, d - warm - cool);
   return [zoneStep(warm, 1, v, "Échauffement", null, true), zoneStep(main, 2, v, "Endurance facile", p), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
@@ -152,7 +219,9 @@ export function buildWorkoutDescription(
 ): { name: string; description: string; sport: "Run" | "Ride" } | null {
   const dur = parseDurationMin(`${title} ${detail} ${type}`) ?? durationForType(type);
   const mainPaceSec = parsePaceSec(`${title} ${detail}`);
-  const steps = stepsForType(type, dur, vmaKmh, mainPaceSec, warmMin, coolMin);
+  // Répétitions détectées dans le libellé de la séance (« 12×400 m … récup 45 s »).
+  const reps = parseReps(detail, mainPaceSec);
+  const steps = stepsForType(type, dur, vmaKmh, mainPaceSec, warmMin, coolMin, reps, detail);
   if (!steps) return null;
   // Séance vélo (cross-training) → exporte un workout "Ride" sur la montre (sinon "Run").
   const isBike = /vélo|velo|bike|cycl|home ?trainer|\bride\b/i.test(`${title} ${type}`);
