@@ -146,6 +146,44 @@ export async function syncIntervalsForUser(
     await admin.from("profiles").update({ garmin_vo2max: latestVo2, garmin_metrics: gm }).eq("id", profile.id).then(() => {}, () => {});
   }
 
+  // ── ANALYSES MESURÉES ───────────────────────────────────────────────────────
+  // Courbe d'allure (meilleurs efforts + vitesse critique), exécution de la dernière
+  // série, et position GPS pour la météo réelle.
+  //
+  // Elles ne vivaient que dans la route appelée depuis le navigateur : le coach
+  // autonome (cron, webhook) ne les rafraîchissait donc JAMAIS, et l'athlète devait
+  // ouvrir l'application pour que ses allures soient recalculées sur des données à
+  // jour. C'est précisément ce qu'il ne doit pas avoir à faire.
+  //
+  // Best-effort et fortement espacées (20 h / 24 h) : quelques appels réseau de plus,
+  // jamais à chaque synchronisation.
+  try {
+    const { data: prof } = await admin.from("profiles")
+      .select("pace_curve, last_loc_at").eq("id", userId).maybeSingle();
+    const stored = (prof as { pace_curve?: { at?: string } } | null)?.pace_curve;
+
+    const lastQ = activities.find((a) =>
+      /run/i.test(String(a.type ?? "")) && a.id &&
+      ((a.icu_intensity ?? 0) >= 85 || (a.icu_training_load ?? 0) >= 60));
+
+    const { refreshPerformance } = await import("./performance");
+    await refreshPerformance(admin, {
+      userId, athleteId, apiKey,
+      lastQualityId: lastQ?.id ? String(lastQ.id) : null,
+      lastQualityDate: lastQ?.start_date_local ? String(lastQ.start_date_local).slice(0, 10) : null,
+      storedAt: stored?.at ?? null,
+    });
+
+    const lastGps = activities.find((a) => a.id && /run|ride|hike|walk/i.test(String(a.type ?? "")));
+    if (lastGps?.id) {
+      const { refreshAthleteLocation } = await import("./location");
+      await refreshAthleteLocation(admin, {
+        userId, apiKey, activityId: String(lastGps.id),
+        lastLocAt: (prof as { last_loc_at?: string | null } | null)?.last_loc_at ?? null,
+      });
+    }
+  } catch { /* best-effort : une analyse ne fait jamais échouer la synchronisation */ }
+
   return { synced };
 }
 
@@ -168,6 +206,7 @@ interface IntervalsActivity {
   aerobic_te?: number; avg_vertical_oscillation?: number;
   avg_ground_contact_time?: number; avg_stride_length?: number; decoupling?: number;
   average_temp?: number; gap?: number; icu_hr_zone_times?: number[]; icu_intensity?: number;
+  icu_training_load?: number;
 }
 interface IntervalsWellness {
   id: string; hrv?: number; hrvSDNN?: number; sleepSecs?: number;
