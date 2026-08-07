@@ -99,6 +99,10 @@ export async function autoCoachForUser(
     plannedQuality: ctx.macroPlan[0]?.quality ?? [],
     nextWeekQuality: ctx.macroPlan[1]?.quality ?? [],
     targetKm: ctx.volume.targetKm,
+    longRunKm: ctx.volume.longRunKm,
+    // Avertissements de réalisme : ils ne vivaient que dans le prompt de l'IA, donc
+    // l'athlète ne les voyait jamais sur son calendrier.
+    warnings: ctx.objectiveWarnings.slice(0, 3),
   };
   const { data: stateRow } = await admin.from("notifications").select("id").eq("user_id", userId).eq("type", "auto_coach_state").maybeSingle();
   if (stateRow?.id) await admin.from("notifications").update({ data: stateData }).eq("id", stateRow.id);

@@ -23,6 +23,7 @@ import {
   buildWeightPlan, trendVerdict,
 } from "../src/lib/weight/energy";
 import { weightTrainingRules, weightCoachBlock } from "../src/lib/weight/coaching";
+import { robustWeeklyKm, longRunPeakKm, longRunForWeek, longRunGap } from "../src/lib/running/volume";
 
 let passed = 0;
 const fails: string[] = [];
@@ -698,6 +699,93 @@ test("la route /api/weight revérifie l'éligibilité côté serveur", () => {
   assert.ok(/weightModeEligibility/.test(src), "activation sans revérification serveur");
   assert.ok(!/from\("profiles"\)\.select\("\*"\)/.test(src), "le profil complet ne doit jamais être lu ici (secrets)");
   assert.ok(/createClient/.test(src) && !/createAdminClient/.test(src), "les lectures doivent passer par la RLS, pas par la clé de service");
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  VOLUME DE RÉFÉRENCE & SORTIE LONGUE
+//
+//  Défaut réel du 07/08/2026, relevé sur un compte de production. Un athlète rentre de
+//  24 jours sans courir, enchaîne 62 km en une semaine dont une sortie de 26 km, et
+//  bascule son objectif sur un marathon à 11 semaines. Le plan produit : 35 km/semaine,
+//  sortie longue 9 km, pic de préparation à 49 km avec 12 km de plus longue sortie —
+//  28 % de la distance de course. Aucune erreur, aucun écran ne signalait quoi que ce
+//  soit. La cause : « moyenne 4 semaines » = 23 km (la coupure écrasait la référence),
+//  et sortie longue = 25 % du volume, un plafond pris pour une prescription.
+// ─────────────────────────────────────────────────────────────────────────────
+console.log("\nVOLUME — une coupure n'est pas un niveau");
+test("la médiane ignore les semaines de coupure ET le pic de reprise", () => {
+  // Semaines (de la plus récente à la plus ancienne) : 62, 31, 0, 0, 0, 37, 40, 38.
+  const runs = [
+    ...[1, 3, 5].map((d) => ({ date: isoDay(d), distance_km: 62 / 3 })),
+    ...[8, 10, 12].map((d) => ({ date: isoDay(d), distance_km: 31 / 3 })),
+    ...[36, 38, 40].map((d) => ({ date: isoDay(d), distance_km: 37 / 3 })),
+    ...[43, 45, 47].map((d) => ({ date: isoDay(d), distance_km: 40 / 3 })),
+    ...[50, 52, 54].map((d) => ({ date: isoDay(d), distance_km: 38 / 3 })),
+  ];
+  const r = robustWeeklyKm(runs, NOW, 8)!;
+  assert.equal(r.weeksOff, 3, "les 3 semaines sans course doivent être comptées comme coupure");
+  // Moyenne brute sur 28 j = 23 km : un chiffre qui ne décrit AUCUNE de ses semaines.
+  assert.ok(r.km >= 35 && r.km <= 45, `médiane ${r.km} km — attendue entre 35 et 45, jamais 23 ni 62`);
+});
+test("moins de 3 semaines courues → aucune médiane, on garde l'ancien calcul", () => {
+  // Deux points ne décrivent pas un niveau d'entraînement : on refuse d'en déduire un.
+  const runs = [{ date: isoDay(2), distance_km: 40 }, { date: isoDay(9), distance_km: 35 }];
+  assert.equal(robustWeeklyKm(runs, NOW, 8), null);
+});
+test("une semaine à 1 km ne compte pas comme une semaine d'entraînement", () => {
+  const runs = [
+    { date: isoDay(2), distance_km: 40 }, { date: isoDay(9), distance_km: 38 },
+    { date: isoDay(16), distance_km: 1 }, { date: isoDay(23), distance_km: 42 },
+  ];
+  const r = robustWeeklyKm(runs, NOW, 8)!;
+  assert.equal(r.weeksRun, 3, "la semaine à 1 km doit être écartée");
+  assert.equal(r.km, 40);
+});
+
+console.log("\nSORTIE LONGUE — le plafond de Daniels n'est pas une prescription");
+test("le pic de sortie longue dépend de la distance visée", () => {
+  assert.equal(longRunPeakKm("marathon", 42.2), 32);   // ~75 %, plafonné à 32
+  assert.equal(longRunPeakKm("semi", 21.1), 19);       // ~90 %
+  assert.equal(longRunPeakKm("10k", 10), 15);          // on court PLUS long que la course
+  assert.equal(longRunPeakKm("ultra", 100), 40);       // jamais la distance : plafond 40
+  assert.equal(longRunPeakKm("general", null), null);  // sans course, aucun pic imposé
+});
+test("on ne prescrit JAMAIS moins long que ce que l'athlète court déjà", () => {
+  // Le défaut d'origine : 9 km prescrits deux jours après une sortie de 26 km.
+  const lr = longRunForWeek({ weekIndex: 0, weeksToPeak: 8, current: 26, peak: 32, weeklyKm: 44, share: 0.35, taper: false });
+  assert.ok(lr >= 26, `${lr} km prescrits alors qu'il en court déjà 26`);
+});
+test("la montée vers le pic reste bornée à +2 km/semaine", () => {
+  let prev = 10;
+  for (let i = 0; i < 8; i++) {
+    const lr = longRunForWeek({ weekIndex: i, weeksToPeak: 8, current: 10, peak: 32, weeklyKm: 70, share: 0.35, taper: false });
+    assert.ok(lr - prev <= 2.5, `bond de ${prev} à ${lr} km en une semaine`);
+    prev = lr;
+  }
+});
+test("la sortie longue ne dépasse jamais la moitié du volume hebdomadaire", () => {
+  // Un débutant à 25 km/semaine ne doit PAS se voir prescrire 30 km parce que le
+  // marathon l'exigerait : c'est la blessure assurée, pas une préparation.
+  const lr = longRunForWeek({ weekIndex: 10, weeksToPeak: 10, current: 8, peak: 32, weeklyKm: 25, share: 0.35, taper: false });
+  assert.ok(lr <= 13, `${lr} km pour 25 km/semaine — au-delà de la moitié du volume`);
+});
+test("quand la préparation ne suffit pas pour la distance, on le DIT", () => {
+  // C'est le cœur du correctif : plafonner en silence reviendrait à remplacer un
+  // mauvais chiffre par un autre. Le plan doit avouer qu'il ne prépare pas la course.
+  const gap = longRunGap(12, 32, 42.2);
+  assert.ok(gap && /PRÉPARATION INSUFFISANTE/.test(gap), "aucun avertissement sur une prépa marathon plafonnée à 12 km");
+  // Distance mise en forme en français : ce message s'AFFICHE, il ne part plus seulement
+  // au prompt de l'IA. « 42.2 km » au milieu d'une phrase française trahissait la sortie
+  // brute d'un calcul.
+  assert.ok(gap!.includes("42,2"), `distance non formatée en français : ${gap}`);
+  assert.ok(gap!.includes("32"));
+  // À l'inverse, une prépa qui atteint 28 km sur 32 visés est acceptable : pas d'alarme.
+  assert.equal(longRunGap(28, 32, 42.2), null);
+  assert.equal(longRunGap(10, null, null), null, "sans objectif, aucun avertissement");
+});
+test("l'affûtage coupe la sortie longue au lieu de la faire monter", () => {
+  const lr = longRunForWeek({ weekIndex: 10, weeksToPeak: 8, current: 30, peak: 32, weeklyKm: 25, share: 0.35, taper: true });
+  assert.ok(lr <= 6, `${lr} km en semaine d'affûtage — la fraîcheur prime`);
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

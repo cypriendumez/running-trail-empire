@@ -2,6 +2,7 @@ import type { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthCoachLines } from "@/data/healthCatalog";
+import { robustWeeklyKm, longRunForWeek, longRunPeakKm, longRunShare, longRunGap, type RaceGoal } from "@/lib/running/volume";
 import { buildWeightPlan, weightModeEligibility, type WeightPlan } from "@/lib/weight/energy";
 import { weightCoachBlock, weightTrainingRules, type WeightTrainingRules } from "@/lib/weight/coaching";
 import { terrainCoachBlock } from "@/data/terrainCatalog";
@@ -177,6 +178,10 @@ export type AthleteContext = {
   thresholdPace: string | null;
   // Plan macro périodisé semaine par semaine jusqu'au jour J.
   macroPlan: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[];
+  /** Avertissements sur l'objectif (chrono hors de portée, préparation trop courte pour
+   *  la distance). Destinés à l'ÉCRAN autant qu'à l'IA — ils ne servaient à rien tant
+   *  qu'ils ne quittaient pas le prompt. */
+  objectiveWarnings: string[];
   /** Mode perte de poids — `null` s'il n'est pas activé OU si le profil n'y est pas
    *  éligible. Quand il est présent, il PLAFONNE la qualité et la progression du volume
    *  dans le plan déterministe, il ne se contente pas d'informer l'IA. */
@@ -255,6 +260,12 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const runs = workouts.filter(w => isRun(w.sport));
   const kmIn = (days: number) => runs.filter(w => now - new Date(w.date).getTime() <= days * 86400000).reduce((s, w) => s + (w.distance_km ?? 0), 0);
   const weekKm = kmIn(7), avg4wkKm = kmIn(28) / 4;
+  // Volume représentatif (médiane des semaines courues) + plus longue sortie récente :
+  // les deux points de départ honnêtes du dimensionnement. Voir lib/running/volume.ts.
+  const robustWeekly = robustWeeklyKm(runs, now, 8);
+  const longestRecentKm = Math.max(0, ...runs
+    .filter(w => now - new Date(w.date).getTime() <= 42 * 86400000)
+    .map(w => w.distance_km ?? 0));
   const crossKm7 = workouts.filter(w => !isRun(w.sport) && now - new Date(w.date).getTime() <= 7 * 86400000)
     .reduce((s, w) => s + (w.distance_km ?? 0), 0);
   const load = computeLoad(workouts);
@@ -951,7 +962,13 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
    * brutal par rapport à ce qui vient d'être couru.
    */
   const targetFrom = (floorKm: number) => {
-    const chronic = avg4wkKm > 0 ? avg4wkKm : weekKm;
+    // Référence chronique : médiane des semaines RÉELLEMENT courues plutôt que moyenne
+    // sur 28 jours. Une coupure de trois semaines faisait tomber la référence à 23 km
+    // chez quelqu'un qui venait d'en courir 62 — un chiffre qui ne décrivait aucune de
+    // ses semaines, et qui dimensionnait pourtant tout son plan marathon.
+    // Repli sur l'ancien calcul si moins de 3 semaines courues : on ne déduit pas un
+    // niveau de deux points.
+    const chronic = robustWeekly?.km ?? (avg4wkKm > 0 ? avg4wkKm : weekKm);
     // Part de la semaine écoulée que l'on considère acquise. Plus le ratio est haut,
     // moins on entérine le pic — sans pour autant retomber sur la seule moyenne, qu'une
     // période creuse (voyage, coupure) tire artificiellement vers le bas : prescrire
@@ -1151,6 +1168,11 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
       : (libGoal === "trail" || libGoal === "ultra") ? ["Côtes", "Seuil", "Spécifique"]
       : libGoal === "semi" ? ["Seuil", "Allure spé", "VMA"]
       : ["VMA", "Seuil", "Allure spé"];
+    // Point de départ de la sortie longue : ce qu'il court DÉJÀ. Sans cette ancre, le plan
+    // prescrivait 9 km à un athlète qui venait d'en courir 26 deux jours plus tôt.
+    const lrCurrent = Math.max(longestRecentKm, Math.round(baseKm * 0.25));
+    const lrPeak = longRunPeakKm(libGoal as RaceGoal, objective?.distanceKm ?? null);
+    const lrShare = longRunShare(libGoal as RaceGoal, objective?.distanceKm ?? null);
     const out: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[] = [];
     for (let i = 0; i < W; i++) {
       const wkUntil = weeksToRace - i;                 // semaines restantes au début de cette semaine
@@ -1160,9 +1182,15 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
       else if (wkUntil === 2) factor = 0.72;            // affûtage
       else { factor = Math.min(1.4, 1 + i * 0.06); if ((i + 1) % 4 === 0) factor *= 0.8; } // +6 %/sem, plafond +40 %, semaine allégée /4
       const volumeKm = Math.round(baseKm * factor);
-      // Daniels : la sortie longue ne dépasse pas 25 % du volume hebdomadaire. 32 %
-      // faisait d'elle un tiers de la semaine, au détriment du reste.
-      const longRunKm = Math.round(volumeKm * (ph === "Affûtage" ? 0.20 : 0.25));
+      // La sortie longue se déduit de la DISTANCE VISÉE, plus seulement d'un pourcentage
+      // du volume. Le plafond de Daniels (25 %) empêche la sortie longue d'écraser la
+      // semaine ; il ne dit pas ce qu'il faut courir pour préparer un marathon. Employé
+      // seul, il produisait un pic de 12 km de sortie longue pour une course de 42,2 km.
+      const longRunKm = longRunForWeek({
+        weekIndex: i, weeksToPeak: Math.max(1, W - 3),
+        current: lrCurrent, peak: lrPeak,
+        weeklyKm: volumeKm, share: lrShare, taper: ph === "Affûtage",
+      });
       // Semaine en cours : l'état de forme du jour compte. Semaines suivantes : on planifie
       // sur le budget structurel, sinon un ratio aigu:chronique élevé aujourd'hui viderait
       // toute la feuille de route de sa qualité jusqu'au jour J.
@@ -1191,6 +1219,35 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
         : wkUntil <= 1 ? "Fraîcheur — repos, rappels d'allure" : "Volume −, on garde l'intensité (fraîcheur jour J)";
       out.push({ week: i + 1, phase: ph, volumeKm, quality, longRunKm, focus });
     }
+    return out;
+  })();
+
+  /**
+   * AVERTISSEMENTS SUR L'OBJECTIF — destinés à l'ÉCRAN, pas seulement au prompt de l'IA.
+   *
+   * Défaut réel : l'app détectait parfaitement qu'un chrono visé était hors de portée
+   * (« ce chrono demande une VMA ~19,8 km/h, il est à ~17,6 ») et qu'une préparation
+   * marathon plafonnerait à 12 km de sortie longue — mais ces deux constats ne
+   * partaient QUE dans le contexte du modèle de langage. L'athlète ne les découvrait
+   * qu'en ouvrant une conversation avec le coach. Sur son calendrier, rien.
+   */
+  const objectiveWarnings: string[] = (() => {
+    const out: string[] = [];
+    if (!objective) return out;
+    // 1. Le chrono visé est-il atteignable au potentiel actuel ?
+    if (vma && objective.targetSeconds > 0) {
+      const needKmh = objective.distanceKm / (objective.targetSeconds / 3600);
+      const pctVma = needKmh / vma;
+      // Un marathon se court ~80 % de VMA, un semi ~85 %, un 10 km ~90 %.
+      const usual = objective.distanceKm > 30 ? 0.80 : objective.distanceKm > 15 ? 0.85 : objective.distanceKm > 6 ? 0.90 : 0.93;
+      if (pctVma > usual + 0.06) {
+        out.push(`⚠️ CHRONO TRÈS AMBITIEUX : ${objective.targetTime} sur ${frNum(objective.distanceKm, 1)} km demande de tenir ${Math.round(pctVma * 100)} % de ta VMA, alors qu'on tient environ ${Math.round(usual * 100)} % sur cette distance. Au potentiel actuel (VMA ~${frNum(vma, 1)}), la projection est plutôt ${predict(objective.distanceKm, usual * 100)}. Objectif à retravailler, ou gros bloc de VMA d'ici là.`);
+      }
+    }
+    // 2. La préparation atteindra-t-elle une sortie longue à la hauteur de la distance ?
+    const plannedPeak = Math.max(0, ...macroPlan.map(w => w.longRunKm));
+    const gap = longRunGap(plannedPeak, longRunPeakKm(libGoal as RaceGoal, objective.distanceKm), objective.distanceKm);
+    if (gap) out.push(gap);
     return out;
   })();
 
@@ -1278,7 +1335,10 @@ ${p?.gender === "female" ? `- SEXE : femme → besoins en FER et disponibilité 
 
 ⚡ VERDICT DE FRAÎCHEUR DU JOUR (calculé à partir de la VFC, du sommeil, de la charge et du ressenti — CETTE CONCLUSION S'IMPOSE À TOI, ne la ré-arbitre pas)
 ${readinessBlock}
-
+${objectiveWarnings.length ? `
+RÉALISME DE L'OBJECTIF (dis-le-lui FRANCHEMENT — ne fais pas comme si le plan préparait la course)
+${objectiveWarnings.map((w) => `- ${w}`).join("\n")}
+` : ""}
 SANTÉ & ANTÉCÉDENTS (contraintes médicales — elles PRIMENT sur l'objectif de performance)
 ${cond.rules.length ? cond.rules.map((r) => `- ${r}`).join("\n")
   : p?.health_declared ? "- Aucune pathologie — l'athlète l'a CONFIRMÉ explicitement, tu peux t'y fier."
@@ -1398,6 +1458,7 @@ ${catalog}`;
     hillyTraining: elevWeek >= 400 || terr.paceMeaningless,
     thresholdPace,
     macroPlan,
+    objectiveWarnings,
     weightLoss,
   };
 }

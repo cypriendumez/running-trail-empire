@@ -30,7 +30,10 @@ export type CoachState = {
   at?: string; readiness?: "vert" | "jaune" | "orange" | "rouge"; reasons?: string[]; advice?: string;
   qBudget?: number; objective?: { race?: string; raceDate?: string; distanceKm?: number } | null;
   daysToRace?: number | null; phase?: string | null;
-  plannedQuality?: string[]; nextWeekQuality?: string[]; targetKm?: number;
+  plannedQuality?: string[]; nextWeekQuality?: string[]; targetKm?: number; longRunKm?: number;
+  /** Réalisme de l'objectif : chrono hors de portée, préparation trop courte pour la
+   *  distance visée. Affichés en clair — ils n'atteignaient jusqu'ici que l'IA. */
+  warnings?: string[];
 };
 
 // Catégorie canonique d'une séance (à partir du libellé libre du coach) → couleur + légende i18n.
@@ -572,8 +575,9 @@ function CoachWhy({ state, lang, t }: { state: CoachState | null; lang: string; 
   const noQuality = (state.qBudget ?? 1) === 0;
   const reasons = (state.reasons ?? []).filter(Boolean);
   const hasObjective = Boolean(state.objective?.race);
+  const warnings = (state.warnings ?? []).filter(Boolean);
   // Rien d'anormal ET pas d'objectif à rappeler → on se tait.
-  if (!noQuality && !hasObjective) return null;
+  if (!noQuality && !hasObjective && !warnings.length) return null;
 
   const tone = noQuality
     ? { border: "border-amber-200", bg: "bg-amber-50/70", dot: "text-amber-600", head: "text-amber-900", body: "text-amber-800" }
@@ -616,8 +620,23 @@ function CoachWhy({ state, lang, t }: { state: CoachState | null; lang: string; 
         <p className={`mt-1.5 text-sm ${tone.body}`}>
           <span className="font-semibold">{t("cal.why.plannedQuality")} :</span> {quality.join(" + ")}
           {state.targetKm ? ` · ${t("cal.why.volume")} ~${state.targetKm} km` : ""}
+          {state.longRunKm ? ` · ${t("cal.why.longRun")} ~${state.longRunKm} km` : ""}
         </p>
       ) : null}
+
+      {/* Réalisme de l'objectif — encadré à part, en rouge : ce n'est pas une nuance du
+          plan de la semaine mais un constat sur la préparation entière. Il ne quittait
+          jusqu'ici jamais le prompt de l'IA. */}
+      {warnings.length > 0 && (
+        <div className="mt-3 rounded-xl border border-red-200 bg-red-50/80 px-3.5 py-3">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-red-700">
+            <Flag className="h-3.5 w-3.5" /> {t("cal.why.realism")}
+          </div>
+          <ul className="mt-1.5 space-y-1.5 text-sm leading-relaxed text-red-900">
+            {warnings.map((w, i) => <li key={i}>{w}</li>)}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
