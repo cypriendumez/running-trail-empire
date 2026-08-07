@@ -566,6 +566,10 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   if (phase.startsWith("BASE")) qBudget = Math.min(qBudget, libLevel === "debutant" ? 1 : 2);
   else if (phase.startsWith("AFFÛTAGE")) qBudget = Math.min(qBudget, 2); // garde l'intensité, coupe le volume
   // Atténuations SÉCURITÉ selon l'état réel (chaque signal fort = −1 séance dure).
+  // Budget de qualité STRUCTUREL — celui que justifient le niveau, l'objectif et la
+  // phase, avant tout allègement lié à l'état du jour. La feuille de route des semaines
+  // à venir doit s'appuyer dessus : une fatigue passagère ne dicte pas deux mois de plan.
+  const structuralQBudget = Math.max(1, Math.min(3, qBudget));
   const easeReasons: string[] = [];
   if (pains.length) { qBudget -= 1; easeReasons.push("douleur signalée"); }
   if (hrvWeekTrend?.startsWith("↓")) { qBudget -= 1; easeReasons.push("VFC en baisse"); }
@@ -740,6 +744,21 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
     return Math.max(floorKm, Math.round(capped));
   };
 
+  // Repli quand rien n'est renseigné : on déduit du niveau, sans jamais dépasser
+  // ce qu'il fait DÉJÀ + 1 séance (on ne double pas sa fréquence du jour au lendemain).
+  const runsPerWeekNow = new Set(
+    // Jours où il a COURU : une journée de randonnée n'est pas une séance de course,
+    // et la compter gonflait la fréquence hebdomadaire déduite.
+    runs.filter(w => now - new Date(w.date).getTime() <= 7 * 86400000).map(w => String(w.date).slice(0, 10)),
+  ).size;
+  const declaredDpw = num(p?.days_per_week);
+  const availDaysPerWeek = declaredDpw && declaredDpw > 0
+    ? Math.min(7, Math.round(declaredDpw))
+    : Math.max(3, Math.min(libLevel === "debutant" ? 3 : libLevel === "intermediaire" ? 4 : 5, runsPerWeekNow + 1));
+  const availDays = Array.isArray(p?.available_days) && (p.available_days as unknown[]).length
+    ? (p.available_days as unknown[]).map(Number).filter(d => Number.isInteger(d) && d >= 0 && d <= 6)
+    : [0, 1, 2, 3, 4, 5, 6];
+
   const macroPlan: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[] = (() => {
     if (!weeksToRace || weeksToRace < 1 || !vma) return [];
     const W = Math.min(weeksToRace, 26);
@@ -758,9 +777,29 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
       else if (wkUntil === 2) factor = 0.72;            // affûtage
       else { factor = Math.min(1.4, 1 + i * 0.06); if ((i + 1) % 4 === 0) factor *= 0.8; } // +6 %/sem, plafond +40 %, semaine allégée /4
       const volumeKm = Math.round(baseKm * factor);
-      const qn = ph === "Affûtage" ? (wkUntil <= 1 ? 1 : 2) : ph === "Base" ? Math.min(qBudget || 2, 2) : (qBudget || 2);
-      const quality = (ph === "Base" ? ["VMA", "Seuil"] : menuTypes).slice(0, Math.max(1, qn));
       const longRunKm = Math.round(volumeKm * (ph === "Affûtage" ? 0.22 : 0.32));
+      // Semaine en cours : l'état de forme du jour compte. Semaines suivantes : on planifie
+      // sur le budget structurel, sinon un ratio aigu:chronique élevé aujourd'hui viderait
+      // toute la feuille de route de sa qualité jusqu'au jour J.
+      const qBase = i === 0 ? (qBudget || 1) : structuralQBudget;
+      // MÊME PLAFOND QUE LE PLAN HEBDOMADAIRE — sinon la feuille de route promet trois
+      // qualités que le planificateur, lui, ramène à deux faute de volume : deux
+      // documents contradictoires sous les yeux du même athlète.
+      // (~11 km par séance de qualité, échauffement et retour au calme compris.)
+      const roomForQuality = Math.max(1, Math.floor((volumeKm - longRunKm) / 11));
+      const byFrequency = availDaysPerWeek <= 3 ? 1 : availDaysPerWeek <= 5 ? 2 : 3;
+      const qn = Math.min(
+        ph === "Affûtage" ? (wkUntil <= 1 ? 1 : 2) : ph === "Base" ? Math.min(qBase, 2) : qBase,
+        roomForQuality, byFrequency,
+      );
+      // La priorité dépend de la PHASE. Prendre systématiquement le premier du menu
+      // donnait « VMA » à chaque semaine — y compris en phase spécifique, où c'est
+      // l'ALLURE DE COURSE qui doit primer.
+      const priority = ph === "Base" ? ["VMA", "Seuil"]
+        : ph === "Spécifique" || ph === "Affûtage"
+          ? [...menuTypes].sort((a, b) => Number(/allure|spécifique|spé/i.test(b)) - Number(/allure|spécifique|spé/i.test(a)))
+          : menuTypes;
+      const quality = priority.slice(0, Math.max(1, qn));
       const focus = ph === "Base" ? "Volume aérobie + pose de vitesse"
         : ph === "Développement" ? "VMA & seuil — montée en charge"
         : ph === "Spécifique" ? `Allure course${goalPace ? ` (${goalPace}/km)` : ""} + endurance spécifique`
@@ -790,19 +829,6 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // ── DISPONIBILITÉS DÉCLARÉES ────────────────────────────────────────────────
   // Sans elles, le plan remplissait 7 jours pour tout le monde. Un athlète qui peut
   // courir 3 fois par semaine recevait un plan inapplicable et décrochait.
-  // Repli quand rien n'est renseigné : on déduit du niveau, sans jamais dépasser
-  // ce qu'il fait DÉJÀ + 1 séance (on ne double pas sa fréquence du jour au lendemain).
-  const runsPerWeekNow = new Set(
-    workouts.filter(w => now - new Date(w.date).getTime() <= 7 * 86400000).map(w => String(w.date).slice(0, 10)),
-  ).size;
-  const declaredDpw = num(p?.days_per_week);
-  const availDaysPerWeek = declaredDpw && declaredDpw > 0
-    ? Math.min(7, Math.round(declaredDpw))
-    : Math.max(3, Math.min(libLevel === "debutant" ? 3 : libLevel === "intermediaire" ? 4 : 5, runsPerWeekNow + 1));
-  const availDays = Array.isArray(p?.available_days) && (p.available_days as unknown[]).length
-    ? (p.available_days as unknown[]).map(Number).filter(d => Number.isInteger(d) && d >= 0 && d <= 6)
-    : [0, 1, 2, 3, 4, 5, 6];
-
   const genderLabel = p?.gender === "female" ? "femme" : p?.gender === "male" ? "homme" : p?.gender ? String(p.gender) : "?";
   const text = `PROFIL
 - ${p?.full_name ?? "Athlète"} · ${p?.age ?? "?"} ans · ${genderLabel} · ${num(p?.weight_kg) ?? "?"} kg · ${num(p?.height_cm) ?? "?"} cm · chronotype ${p?.chronotype ?? "?"} · mode ${p?.mode ?? "?"}

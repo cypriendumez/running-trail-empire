@@ -194,6 +194,11 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // La dernière séance dure DÉJÀ EFFECTUÉE est traitée comme un jour dur d'index négatif :
   // si elle date d'hier, elle occupe l'index −1 et repousse d'autant la première qualité.
   // La course, elle, agit comme un jour dur à ne pas approcher à moins de 48 h.
+  // La séance d'aujourd'hui sera de toute façon remplacée par de la récupération si la
+  // fraîcheur est au rouge (étape 7). Placer la qualité sur le jour 0 revenait alors à la
+  // SUPPRIMER : une semaine entière sans qualité parce que l'athlète était fatigué ce
+  // matin-là. On la décale simplement plus loin dans la semaine.
+  const dayZeroDropped = ctx.readiness.level === "rouge" || ctx.lastHardDaysAgo === 0;
   const placed: number[] = ctx.lastHardDaysAgo != null ? [-ctx.lastHardDaysAgo] : [];
   if (raceIdx >= 0) placed.push(raceIdx);
   // Un jour à 30 °C n'est pas un jour de qualité s'il existe une alternative plus fraîche
@@ -219,7 +224,7 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   const quality = wp.quality.slice(0, Math.min(wp.quality.length, maxByVolume, maxByFrequency));
   for (const q of quality) {
     let idx = -1;
-    for (let i = 0; i <= 6; i++) if (canRun(i) && okSpacing(i) && !coolerExists(i)) { idx = i; break; }
+    for (let i = dayZeroDropped ? 1 : 0; i <= 6; i++) if (canRun(i) && okSpacing(i) && !coolerExists(i)) { idx = i; break; }
     if (idx < 0) for (let i = 0; i <= 6; i++) if (canRun(i) && okSpacing(i)) { idx = i; break; }
     if (idx < 0) break; // impossible sans violer la récupération ou le budget → on n'insiste pas
     const title = q.type === "VMA" ? "Séance VMA" : q.type === "Seuil" ? "Séance au seuil" : q.type === "Spécifique" ? "Allure spécifique objectif" : q.type;
@@ -235,12 +240,14 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
 
   // ── 5. Endurance sur les jours de course restants (budget non consommé).
   const easySlots: number[] = [];
+  // Le jour 0 RESTE un créneau de footing même quand la fraîcheur le convertit en
+  // récupération : une séance de récup est un footing court, elle porte du kilométrage.
+  // (À la différence d'une séance de qualité annulée, dont les 11 km, eux, se libèrent.)
   for (let i = 0; i <= 6; i++) if (canRun(i)) { easySlots.push(i); spend(); }
   // La séance du jour est arbitrée par la fraîcheur à l'étape 7. Si la qualité prévue
   // aujourd'hui va être remplacée par de la récupération, ses kilomètres ne doivent PAS
   // être décomptés du budget : sinon les footings de la semaine rétrécissent pour
   // financer une séance qui n'aura jamais lieu (constaté : footings ramenés à 4 km).
-  const dayZeroDropped = ctx.readiness.level === "rouge" || ctx.lastHardDaysAgo === 0;
   const qualityKept = placed.filter((i) => i >= 0 && i !== raceIdx && !(dayZeroDropped && i === 0));
   const usedKm = (longIdx >= 0 ? longRunKm : 0) + qualityKept.length * QUALITY_KM;
   const rawEasy = easySlots.length > 0 ? (targetKm - usedKm) / easySlots.length : 0;
