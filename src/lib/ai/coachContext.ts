@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthCoachLines } from "@/data/healthCatalog";
 import { terrainCoachBlock } from "@/data/terrainCatalog";
-import { forecastWeek, heatAdvice, type DayWeather } from "@/lib/weather/openMeteo";
+import { forecastWithElevation, altitudeLossPct, heatAdvice, type DayWeather } from "@/lib/weather/openMeteo";
 import { bestVmaFromWorkouts, vmaFromPaceCurve, vmaFromVo2max } from "@/lib/running/fitness";
 import { isRun } from "@/lib/intervals/sport";
 
@@ -159,6 +159,8 @@ export type AthleteContext = {
   availability: { daysPerWeek: number; days: number[] };
   /** Prévisions RÉELLES à 7 jours (Open-Meteo) — vide si la position est inconnue. */
   forecast: DayWeather[];
+  /** Altitude du lieu d'entraînement (m) et perte aérobie associée (%). */
+  altitude: { elevationM: number | null; lossPct: number };
   /** % du temps passé en Z3+ s'il dépasse la cible (footings trop rapides), sinon null. */
   tooMuchIntensity: number | null;
   /** true si l'athlète s'entraîne réellement en terrain vallonné (D+ hebdo significatif). */
@@ -681,7 +683,17 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // mais le relevé réel à la position d'entraînement, et surtout les PRÉVISIONS :
   // anticiper une canicule vaut mieux que la constater après la séance.
   const lat = num(p?.last_lat), lon = num(p?.last_lon);
-  const forecast = lat != null && lon != null ? await forecastWeek(lat, lon).catch(() => []) : [];
+  // Prévisions ET altitude en une seule requête : Open-Meteo renvoie les deux.
+  const weather = lat != null && lon != null
+    ? await forecastWithElevation(lat, lon).catch(() => ({ days: [], elevationM: null }))
+    : { days: [], elevationM: null };
+  const forecast = weather.days;
+  // ALTITUDE — facteur totalement absent jusqu'ici. Au-delà de ~500 m, la performance
+  // aérobie se dégrade d'environ 6 % par 1 000 m chez un athlète non acclimaté. Sans
+  // cette information, le coach juge des allures d'altitude à l'aune du niveau de la
+  // mer et conclut à une perte de forme là où l'athlète est simplement en montagne.
+  const elevationM = weather.elevationM;
+  const altLoss = altitudeLossPct(elevationM);
   const todayFc = forecast[0] ?? null;
   const hotDays = forecast.filter(f => f.tempMax >= 28);
 
@@ -927,7 +939,7 @@ ANALYSE APPROFONDIE (croise tous ces facteurs)
 - Monotonie de charge : ${monotony}${monotony > 2 ? " ⚠️ trop uniforme → varie l'intensité (risque surcharge/maladie)" : " (ok)"}
 - Forme de course : ${[cadence ? `cadence ${cadence} spm` : null, stride ? `foulée ${stride} m` : null, vosc ? `oscillation ${vosc} cm` : null, gct ? `contact sol ${gct} ms` : null, power ? `puissance ${power} W` : null, decoupling != null ? `dérive cardiaque ${decoupling}%${decoupling > 5 ? " (>5 % → endurance à renforcer)" : ""}` : null].filter(Boolean).join(" · ") || "n/c"}
 - Sommeil détaillé : ${[deepPct != null ? `profond ${deepPct}%` : null, remPct != null ? `REM ${remPct}%` : null, sl?.body_battery_end != null ? `énergie ${sl.body_battery_end}/100` : null, sl?.respiration_rate != null ? `respiration ${sl.respiration_rate}/min` : null].filter(Boolean).join(" · ") || "n/c"}
-- Terrain & environnement : ${elevWeek} m D+ cette semaine${avgTemp != null ? ` · ~${avgTemp}°C récemment${avgTemp >= 25 ? " (chaleur → ralentir l'allure, hydrater)" : ""}` : ""}${cycle ? `\n- Cycle menstruel : phase ${cycle} → adapte l'intensité (pousser en folliculaire, prudence en lutéale/prémenstruel)` : ""}
+${altLoss > 0 ? `- ⛰️ ALTITUDE : il s'entraîne à ~${Math.round(elevationM!)} m. À cette altitude, la performance aérobie d'un athlète non acclimaté baisse d'environ ${altLoss} % — soit ~${Math.round(altLoss * 2.8)} s/km sur ses allures habituelles. NE CONCLUS PAS à une perte de forme : ses chronos SONT censés être plus lents ici. Juge-le à la FC et au ressenti, et sache que le retour au niveau de la mer lui donnera un gain mécanique de quelques jours.\n` : ""}- Terrain & environnement : ${elevWeek} m D+ cette semaine${avgTemp != null ? ` · ~${avgTemp}°C récemment${avgTemp >= 25 ? " (chaleur → ralentir l'allure, hydrater)" : ""}` : ""}${cycle ? `\n- Cycle menstruel : phase ${cycle} → adapte l'intensité (pousser en folliculaire, prudence en lutéale/prémenstruel)` : ""}
 
 EXÉCUTION & ADHÉRENCE (boucle adaptative — fais ÉVOLUER la suite selon ce qu'il fait VRAIMENT)
 - Discipline des footings : ${easyDiscipline}
@@ -963,6 +975,7 @@ ${catalog}`;
     skippedWeekdays,
     availability: { daysPerWeek: availDaysPerWeek, days: availDays },
     forecast,
+    altitude: { elevationM, lossPct: altLoss },
     tooMuchIntensity: hardTimePct != null && hardTimePct > 25 ? hardTimePct : null,
     hillyTraining: elevWeek >= 400 || terr.paceMeaningless,
     thresholdPace,

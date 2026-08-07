@@ -82,6 +82,47 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // Météo RÉELLE du jour concerné (prévisions Open-Meteo à la position de l'athlète).
   // On n'ajoute la consigne que si elle change quelque chose : inutile d'alourdir une
   // séance par 18 °C. Le repos et le renfo ne sont pas concernés.
+  /**
+   * Allure du jour, CORRIGÉE DE LA CHALEUR.
+   *
+   * La météo n'était jusqu'ici qu'une note ajoutée au texte : l'allure prescrite restait
+   * la même par 12 °C et par 31 °C. Or c'est le CHIFFRE que la montre lit et transforme
+   * en alarme d'allure — l'athlète recevait donc une cible impossible, contredite deux
+   * lignes plus bas par une note lui disant de lever le pied. On corrige le nombre.
+   */
+  const paceFor = (i: number): string | null => {
+    const base = ctx.easyPace;
+    if (!base) return null;
+    const m = base.match(/(\d+)['’:](\d{2})/);
+    const f = ctx.forecast.find((x) => x.date === iso(dates[i]));
+    if (!m || !f) return base;
+    const penalty = heatAdvice(f.tempMax, f.humidity).penaltySecPerKm;
+    if (!penalty) return base;
+    const sec = Number(m[1]) * 60 + Number(m[2]) + penalty;
+    return `${Math.floor(sec / 60)}'${String(sec % 60).padStart(2, "0")}`;
+  };
+
+  /**
+   * Allures d'une séance de QUALITÉ, corrigées de la chaleur.
+   *
+   * Sans cela, la description annonçait « 12×400 m à ~3'20/km » un jour à 27 °C tout en
+   * ajoutant une note conseillant de lever le pied : le texte et le chiffre se
+   * contredisaient, et c'est le chiffre que la montre transforme en alarme d'allure.
+   * Correction à MOITIÉ de la pénalité : la chaleur pénalise surtout les efforts longs,
+   * beaucoup moins les répétitions courtes — appliquer la pénalité pleine sous-doserait
+   * le stimulus qu'on cherche précisément à produire.
+   */
+  const heatAdjustDesc = (desc: string, i: number): string => {
+    const f = ctx.forecast.find((x) => x.date === iso(dates[i]));
+    if (!f) return desc;
+    const penalty = Math.round(heatAdvice(f.tempMax, f.humidity).penaltySecPerKm / 2);
+    if (!penalty) return desc;
+    return desc.replace(/(\d+)['’](\d{2})\/km/g, (_m, mm: string, ss: string) => {
+      const sec = Number(mm) * 60 + Number(ss) + penalty;
+      return `${Math.floor(sec / 60)}'${String(sec % 60).padStart(2, "0")}/km`;
+    });
+  };
+
   const weatherFor = (i: number, type: string): string => {
     if (/Repos|Renfo/.test(type)) return "";
     const f = ctx.forecast.find((x) => x.date === iso(dates[i]));
@@ -173,10 +214,10 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   if (longIdx >= 0) {
     put(longIdx, bike
       ? { type: "Vélo", title: "Sortie longue à vélo",
-          detail: `Échauffement 15 min très facile → ${durationFor(longRunKm, pace) ?? "1h30"} à 2h en FC Z2, allure conversationnelle, cadence souple → 10 min de retour au calme. Pas d'allure cible : c'est du volume aérobie sans impact.${cycleNote}`,
+          detail: `Échauffement 15 min très facile → ${durationFor(longRunKm, paceFor(longIdx)) ?? "1h30"} à 2h en FC Z2, allure conversationnelle, cadence souple → 10 min de retour au calme. Pas d'allure cible : c'est du volume aérobie sans impact.${cycleNote}`,
           why: "Le volume aérobie de la semaine, sans les contraintes d'impact de la course.", tags: ["Vélo", "Z2", "Long"] }
       : { type: "Sortie longue", title: "Sortie longue",
-          detail: `Échauffement 15 min progressif FC Z1→Z2 → Corps : ${kmAndTime(longRunKm, pace)} en Z2${easy}, allure conversationnelle du début à la fin → Retour au calme 10 min FC Z1.${gapNote}${cycleNote}`,
+          detail: `Échauffement 15 min progressif FC Z1→Z2 → Corps : ${kmAndTime(longRunKm, paceFor(longIdx))} en Z2${paceFor(longIdx) ? ` (~${paceFor(longIdx)}/km)` : ""}, allure conversationnelle du début à la fin → Retour au calme 10 min FC Z1.${gapNote}${cycleNote}`,
           why: `C'est la séance qui construit ton endurance de fond — ${longRunKm} km, calés sur ton volume actuel. Elle doit rester facile : si tu finis cassé, elle était trop rapide.`,
           tags: ["Long", "Z2", `${longRunKm} km`] });
     spend();
@@ -230,7 +271,7 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
     const title = q.type === "VMA" ? "Séance VMA" : q.type === "Seuil" ? "Séance au seuil" : q.type === "Spécifique" ? "Allure spécifique objectif" : q.type;
     put(idx, {
       type: q.type, title,
-      detail: `Échauffement 20 min progressif FC Z1→Z2 + 3 à 5 lignes droites de 80 m → Corps : ${q.desc} → Retour au calme 10 min FC Z1.${ctx.cycle.taper ? " ⚠️ Affûtage : garde l'intensité mais coupe le nombre de répétitions d'un tiers." : ""}`,
+      detail: `Échauffement 20 min progressif FC Z1→Z2 + 3 à 5 lignes droites de 80 m → Corps : ${heatAdjustDesc(q.desc, idx)} → Retour au calme 10 min FC Z1.${ctx.cycle.taper ? " ⚠️ Affûtage : garde l'intensité mais coupe le nombre de répétitions d'un tiers." : ""}`,
       why: "La séance de qualité de ton bloc, calée sur ta VMA et ton objectif. C'est elle qui te fait progresser.",
       tags: [q.type, "Qualité"],
     });
@@ -261,7 +302,7 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   const doubles = rawEasy > easyCap && raceIdx < 0;
   for (const i of easySlots) put(i, {
     type: "Endurance", title: "Footing en endurance",
-    detail: `Échauffement 15 min progressif FC Z1→Z2 → Corps : ${kmAndTime(easyKm, pace)} en Z2${easy}, tu dois pouvoir tenir une conversation → Retour au calme 10 min FC Z1.${gapNote}${doubles ? " 💡 À ton volume, scinde en DEUX sorties dans la journée (matin + soir) plutôt qu'un seul footing interminable." : ""}${cycleNote}`,
+    detail: `Échauffement 15 min progressif FC Z1→Z2 → Corps : ${kmAndTime(easyKm, paceFor(i))} en Z2${paceFor(i) ? ` (~${paceFor(i)}/km)` : ""}, tu dois pouvoir tenir une conversation → Retour au calme 10 min FC Z1.${gapNote}${doubles ? " 💡 À ton volume, scinde en DEUX sorties dans la journée (matin + soir) plutôt qu'un seul footing interminable." : ""}${cycleNote}`,
     why: ctx.tooMuchIntensity
       ? `⚠️ Tu passes ${ctx.tooMuchIntensity} % de ton temps de course en zone 3 et plus, alors que la cible est 20 %. Tes footings sont courus trop vite — c'est le frein n°1 à la progression. Ralentis jusqu'à pouvoir tenir une conversation complète : c'est censé paraître TROP facile.`
       : `Le socle aérobie. Avec les autres séances, tu es sur ~${targetKm} km cette semaine — c'est le volume facile qui construit la forme de fond, pas les séances dures.`,

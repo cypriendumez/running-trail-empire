@@ -14,6 +14,13 @@
 const ARCHIVE = "https://archive-api.open-meteo.com/v1/archive";
 const FORECAST = "https://api.open-meteo.com/v1/forecast";
 
+/**
+ * Altitude du lieu d'entraînement, renvoyée gratuitement par Open-Meteo avec les
+ * prévisions. Elle change réellement la donne : au-delà de ~500 m, la performance
+ * aérobie se dégrade d'environ 6 % par 1 000 m de plus. Sans elle, le coach juge des
+ * allures d'altitude à l'aune du niveau de la mer et conclut à une perte de forme là
+ * où l'athlète est simplement en montagne.
+ */
 export type DayWeather = {
   date: string;        // AAAA-MM-JJ
   tempMax: number;     // °C
@@ -27,20 +34,32 @@ export type DayWeather = {
 const num = (v: unknown) => (typeof v === "number" && isFinite(v) ? v : null);
 
 /** Prévisions jour par jour pour les 7 prochains jours à une position donnée. */
-export async function forecastWeek(lat: number, lon: number): Promise<DayWeather[]> {
+export type WeekForecast = { days: DayWeather[]; elevationM: number | null };
+
+/** Perte de performance aérobie liée à l'altitude, en %. Nulle jusqu'à ~500 m, puis
+ *  ~6 % par 1 000 m — ordre de grandeur consensuel pour un athlète non acclimaté. */
+export function altitudeLossPct(elevationM: number | null): number {
+  if (elevationM == null || elevationM <= 500) return 0;
+  return Math.round(((elevationM - 500) / 1000) * 6 * 10) / 10;
+}
+
+/** Prévisions à 7 jours ET altitude du lieu — Open-Meteo renvoie les deux dans la
+ *  MÊME réponse (`elevation`). Une seule requête suffit donc pour les obtenir. */
+export async function forecastWithElevation(lat: number, lon: number): Promise<WeekForecast> {
   const url = `${FORECAST}?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}`
     + `&daily=temperature_2m_max,temperature_2m_min,apparent_temperature_max,precipitation_sum`
     + `&hourly=relative_humidity_2m&forecast_days=7&timezone=auto`;
   try {
     const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    if (!r.ok) return [];
+    if (!r.ok) return { days: [], elevationM: null };
     const j = await r.json() as {
+      elevation?: number;
       daily?: { time?: string[]; temperature_2m_max?: number[]; temperature_2m_min?: number[];
                 apparent_temperature_max?: number[]; precipitation_sum?: number[] };
       hourly?: { time?: string[]; relative_humidity_2m?: number[] };
     };
     const d = j.daily;
-    if (!d?.time?.length) return [];
+    if (!d?.time?.length) return { days: [], elevationM: num(j.elevation) };
     // Humidité : moyenne des heures de la journée (l'API ne la donne qu'en horaire).
     const humByDay = new Map<string, number[]>();
     (j.hourly?.time ?? []).forEach((t, i) => {
@@ -48,7 +67,7 @@ export async function forecastWeek(lat: number, lon: number): Promise<DayWeather
       const h = num(j.hourly?.relative_humidity_2m?.[i]);
       if (h != null) humByDay.set(day, [...(humByDay.get(day) ?? []), h]);
     });
-    return d.time.map((date, i) => {
+    const days = d.time.map((date, i) => {
       const hs = humByDay.get(date) ?? [];
       return {
         date,
@@ -59,7 +78,13 @@ export async function forecastWeek(lat: number, lon: number): Promise<DayWeather
         precipMm: num(d.precipitation_sum?.[i]),
       };
     });
-  } catch { return []; }
+    return { days, elevationM: num(j.elevation) };
+  } catch { return { days: [], elevationM: null }; }
+}
+
+/** Prévisions seules — conservé pour les appelants qui n'ont pas besoin de l'altitude. */
+export async function forecastWeek(lat: number, lon: number): Promise<DayWeather[]> {
+  return (await forecastWithElevation(lat, lon)).days;
 }
 
 /** Température réellement relevée à une position, un jour et une heure donnés (passé). */
