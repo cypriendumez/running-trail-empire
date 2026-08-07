@@ -38,9 +38,22 @@ create index if not exists product_offers_ean_idx on product_offers (ean) where 
 create index if not exists product_offers_search_idx on product_offers (category, brand, price);
 
 -- Catalogue public en lecture : aucune donnée personnelle.
+--
+-- La politique est créée dans un bloc conditionnel plutôt qu'avec un `drop policy` :
+-- PostgreSQL n'accepte pas `create policy if not exists`, et un `drop` — même
+-- parfaitement inoffensif ici — fait afficher à Supabase un avertissement d'opération
+-- destructive. Autant ne pas habituer l'œil à valider ce genre de fenêtre.
 alter table product_offers enable row level security;
-drop policy if exists "product_offers_read" on product_offers;
-create policy "product_offers_read" on product_offers for select using (true);
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'product_offers' and policyname = 'product_offers_read'
+  ) then
+    create policy "product_offers_read" on product_offers for select using (true);
+  end if;
+end $$;
 
 comment on table product_offers is
   'Offres issues de flux d''affiliation OFFICIELS. Aucune donnée inventée : si la table est vide, la boutique affiche un écran d''attente.';
