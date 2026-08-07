@@ -640,8 +640,12 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
     ? Math.max(0, Math.floor((now - new Date(String(lastHardWk.date) + "T00:00:00").getTime()) / 86400000))
     : null;
 
+  // Taux d'adhérence exploitable par le code, et sa formulation lisible. Ils étaient
+  // confondus dans une seule chaîne : impossible d'en tirer une décision.
+  const adherenceDone = pastPrescribed.filter(c => doneDates.has(String(c.date).slice(0, 10))).length;
+  const adherenceRate = pastPrescribed.length ? adherenceDone / pastPrescribed.length : null;
   const adherence = pastPrescribed.length
-    ? `${pastPrescribed.filter(c => doneDates.has(String(c.date).slice(0, 10))).length}/${pastPrescribed.length} séances prescrites réalisées (14 j)`
+    ? `${adherenceDone}/${pastPrescribed.length} séances prescrites réalisées (14 j)`
     : "pas de plan prescrit récent";
 
   // ── STRUCTURE CIBLE DE LA SEMAINE — squelette DÉTERMINISTE (l'IA l'habille) ──────
@@ -836,6 +840,68 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
       ? `${heatAdvice(avgTemp, null).note}  ⚠️ valeur issue du capteur de la montre (au poignet) : peu fiable, à prendre avec prudence.`
       : null;
 
+  // ── FACTEUR LIMITANT ─────────────────────────────────────────────────────────
+  // Ce qui sépare un entraîneur d'un générateur de séances : il ne déroule pas un
+  // menu, il identifie CE QUI BLOQUE et met le travail dessus. Deux coureurs de même
+  // VMA, l'un qui décroche en fin de course et l'autre qui manque de vitesse pure,
+  // n'ont pas besoin du même entraînement — et jusqu'ici ils recevaient le même.
+  //
+  // On classe les candidats par gravité. Chacun s'appuie sur une mesure, jamais sur une
+  // impression, et reste silencieux si la mesure manque.
+  const limiters: { key: string; severity: number; label: string; action: string }[] = [];
+
+  // 1. RÉGULARITÉ — avant toute physiologie. Un plan non suivi ne produit rien.
+  if (skippedWeekdays.length >= 2 || (adherenceRate != null && pastPrescribed.length >= 4 && adherenceRate < 0.5)) {
+    limiters.push({ key: "regularite", severity: 100,
+      label: "la RÉGULARITÉ, pas la physiologie",
+      action: "réduis le nombre de séances jusqu'à ce qu'il les tienne TOUTES pendant trois semaines. Un plan suivi à 60 % vaut moins qu'un plan deux fois plus léger suivi à 100 %." });
+  }
+  // 2. ENDURANCE AÉROBIE — la dérive cardiaque dit s'il tiendra la distance.
+  const driftW = runs.find(w => w.cardiac_decoupling != null);
+  const drift = driftW ? Number(driftW.cardiac_decoupling) : null;
+  if (drift != null && drift >= 8) {
+    limiters.push({ key: "endurance", severity: 90,
+      label: `l'ENDURANCE AÉROBIE (dérive cardiaque ${drift > 0 ? "+" : ""}${drift} %)`,
+      action: "volume facile et sorties longues progressives AVANT toute recherche de vitesse. À ce niveau de dérive, il perdra en fin de course ce qu'il aura gagné en fractionné." });
+  }
+  // 3. DISCIPLINE DES FOOTINGS — courir trop vite en facile bride tout le reste.
+  if (hardTimePct != null && hardTimePct > 25) {
+    limiters.push({ key: "discipline", severity: 80,
+      label: `la DISCIPLINE DES FOOTINGS (${hardTimePct} % du temps en Z3+)`,
+      action: "fais-le RALENTIR en facile. Tant que ses footings sont des tempos, il accumule de la fatigue sans stimulus — et sa qualité en pâtit." });
+  }
+  // 4. EXÉCUTION — décrocher sur ses séries signe une prescription mal calibrée.
+  if (fade != null && fade >= 12) {
+    limiters.push({ key: "execution", severity: 70,
+      label: `l'EXÉCUTION de ses séances de qualité (décrochage ${fade} s/km)`,
+      action: "il part trop vite. Raccourcis les séries et impose un premier tiers volontairement lent — savoir doser est une compétence qui s'entraîne." });
+  }
+  // 5. SEUIL vs VMA — un seuil bas pour la VMA signale un moteur sous-exploité.
+  if (csMs && vma) {
+    const ratio = (csMs * 3.6) / vma;   // vitesse critique rapportée à la VMA
+    if (ratio < 0.86) limiters.push({ key: "seuil", severity: 60,
+      label: `le SEUIL (vitesse critique à ${Math.round(ratio * 100)} % de sa VMA, contre 88-92 % attendus)`,
+      action: "il a de la cylindrée mais ne sait pas la tenir : privilégie le travail au seuil et les over-under à la VMA pure." });
+    else if (ratio > 0.93) limiters.push({ key: "vitesse", severity: 55,
+      label: `la VITESSE PURE (vitesse critique à ${Math.round(ratio * 100)} % de sa VMA, très proche du plafond)`,
+      action: "son seuil est excellent mais son plafond aérobie le limite : il faut du VO2max — VMA courte, 30/30, côtes." });
+  }
+  // 6. ÉCONOMIE DE COURSE — le ratio vertical, indépendant de la taille.
+  if (vr && vr.now >= 9) {
+    limiters.push({ key: "economie", severity: 50,
+      label: `l'ÉCONOMIE DE COURSE (ratio vertical ${vr.now} %)`,
+      action: "trop d'énergie part vers le haut : renforcement excentrique, éducatifs de projection, lignes droites en fin de footing." });
+  }
+  // 7. VOLUME — un volume faible plafonne tout le reste.
+  if (avg4wkKm > 0 && vma && avg4wkKm < vma * 2.2) {
+    limiters.push({ key: "volume", severity: 45,
+      label: `le VOLUME (${Math.round(avg4wkKm)} km/sem pour une VMA de ${vma})`,
+      action: "sa cylindrée dépasse son kilométrage : c'est le volume facile qui débloquera ses chronos, pas plus d'intensité." });
+  }
+  limiters.sort((a, b) => b.severity - a.severity);
+  const limiter = limiters[0] ?? null;
+
+
   // ── MENU DE QUALITÉ — le stimulus PROGRESSE d'une semaine à l'autre ──────────
   // Prescrire « 6×1000 m » chaque semaine indéfiniment ennuie l'athlète et le fait
   // plafonner physiologiquement. On fait tourner 4 variantes par type, du plus court
@@ -919,6 +985,22 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   else if (libGoal === "marathon") menu = [qSeuil, qMara, qVMA];
   else if (libGoal === "trail" || libGoal === "ultra") menu = [qCote, qSeuil, qVMA];
   else menu = [qVMA, qSeuil, qSpec];
+  // LE FACTEUR LIMITANT REMONTE EN TÊTE DE MENU.
+  // Sans cela il n'était qu'une phrase de plus dans le briefing : le plan continuait à
+  // dérouler l'ordre par défaut de l'objectif. Deux coureurs de même VMA, l'un qui
+  // décroche en fin de course et l'autre qui manque de vitesse pure, recevaient la même
+  // séance. C'est précisément ce qu'un entraîneur ne fait jamais.
+  if (limiter) {
+    const wanted = limiter.key === "seuil" ? "Seuil"
+      : limiter.key === "vitesse" ? "VMA"
+      : limiter.key === "endurance" || limiter.key === "volume" ? "Seuil"   // rien de plus dur qu'un seuil quand l'endurance manque
+      : limiter.key === "execution" ? "Spécifique"                          // réapprendre à doser sur une allure connue
+      : null;
+    if (wanted) {
+      const i = menu.findIndex(m => m.type === wanted);
+      if (i > 0) menu = [menu[i], ...menu.filter((_, k) => k !== i)];
+    }
+  }
   const chosen = menu.slice(0, qBudget);
   // Préférence athlète : remplacer la sortie longue course par du VÉLO (cross-training sans impact, comme beaucoup de pros).
   const bikeLong = String((p as Record<string, unknown> | null)?.long_run_mode ?? "run") === "bike";
@@ -1131,7 +1213,7 @@ CAPACITÉS (tests)
 - Zones FC : Z2 facile ${hrZone(0.6, 0.7) ?? "?"} · Z4 seuil ${hrZone(0.8, 0.9) ?? "?"}
 - Zones allure : ${paceZones ?? (computedPaces ? `(calculées depuis la VMA) ${computedPaces}` : "non renseignées")}
 - Chronos théoriques au potentiel actuel (depuis la VMA) : ${predictions ?? "?"}
-${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${noHistory ? "- 🆕 ATHLÈTE SANS HISTORIQUE : aucune séance enregistrée, aucune allure de référence. Cette semaine sert à OBSERVER, pas à performer : footings faciles pilotés à la sensation et à la conversation, aucune intensité, aucun chrono. Demande-lui son passé de coureur, ses éventuelles douleurs, et propose-lui un test simple (par exemple 6 min à effort maximal régulier) une fois qu'il aura couru trois ou quatre fois sans gêne. Prescrire du fractionné à quelqu'un dont on ignore tout, c'est le blesser.\n" : ""}${(() => { const d = runs.find(w => w.cardiac_decoupling != null); if (!d) return ""; const v = Number(d.cardiac_decoupling); const verdict = v < 3 ? "ENDURANCE AÉROBIE SOLIDE — il tiendra son allure jusqu'au bout, tu peux durcir le spécifique" : v < 5 ? "correcte" : v < 8 ? "PERFECTIBLE — il commence à décrocher sur la durée : plus de volume facile et des sorties longues progressives" : "ENDURANCE LIMITANTE — à ce niveau de dérive il explosera en fin de course. C'est SA priorité n°1 : volume facile et sorties longues AVANT toute recherche de vitesse"; return `- 💓 DÉRIVE CARDIAQUE (${String(d.date).slice(5, 10)}) : ${v > 0 ? "+" : ""}${v} % — ${verdict}. C'est le marqueur qui distingue un coureur qui TIENT son allure d'un qui la subit.\n`; })()}${(() => {
+${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${limiter ? `- 🎯 SON FACTEUR LIMITANT, à ce stade, c'est ${limiter.label}. ${limiter.action} C'est LA priorité : une séance qui ne s'adresse pas à ce point précis est une séance de perdue. ${limiters.length > 1 ? `Viennent ensuite : ${limiters.slice(1, 3).map(l => l.label).join(" ; ")}.` : ""}\n` : ""}${noHistory ? "- 🆕 ATHLÈTE SANS HISTORIQUE : aucune séance enregistrée, aucune allure de référence. Cette semaine sert à OBSERVER, pas à performer : footings faciles pilotés à la sensation et à la conversation, aucune intensité, aucun chrono. Demande-lui son passé de coureur, ses éventuelles douleurs, et propose-lui un test simple (par exemple 6 min à effort maximal régulier) une fois qu'il aura couru trois ou quatre fois sans gêne. Prescrire du fractionné à quelqu'un dont on ignore tout, c'est le blesser.\n" : ""}${(() => { const d = runs.find(w => w.cardiac_decoupling != null); if (!d) return ""; const v = Number(d.cardiac_decoupling); const verdict = v < 3 ? "ENDURANCE AÉROBIE SOLIDE — il tiendra son allure jusqu'au bout, tu peux durcir le spécifique" : v < 5 ? "correcte" : v < 8 ? "PERFECTIBLE — il commence à décrocher sur la durée : plus de volume facile et des sorties longues progressives" : "ENDURANCE LIMITANTE — à ce niveau de dérive il explosera en fin de course. C'est SA priorité n°1 : volume facile et sorties longues AVANT toute recherche de vitesse"; return `- 💓 DÉRIVE CARDIAQUE (${String(d.date).slice(5, 10)}) : ${v > 0 ? "+" : ""}${v} % — ${verdict}. C'est le marqueur qui distingue un coureur qui TIENT son allure d'un qui la subit.\n`; })()}${(() => {
   const lines: string[] = [];
   // Cadence : sous 170 pas/min, l'appui est long et la foulée « aérienne » — surcoût
   // d'impact et de temps de contact. On ne juge pas dans l'absolu (elle dépend de la
