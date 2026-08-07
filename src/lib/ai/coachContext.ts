@@ -195,7 +195,11 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
     return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
   })();
   const num = (v: unknown) => (v == null ? null : Number(v));
-  // VOLUME DE COURSE — le vélo, la randonnée et la marche n'en font PAS partie.
+  // COURSE À PIED UNIQUEMENT — référence de TOUTE l'analyse spécifique : volume,
+  // allures, forme de course, estimation de VMA, dénivelé couru, répartition 80/20.
+  // Le vélo, la randonnée et la marche en sont exclus (une sortie vélo à 30 km/h passe
+  // même le garde-fou de vitesse et produirait une VMA de 40 km/h). Seule la CHARGE
+  // continue de tout compter : une randonnée de 1 000 m de D+ fatigue réellement.
   // Les compter revenait à dimensionner les séances sur des kilomètres jamais courus
   // (relevé : 101,8 km comptés pour 35,8 km réellement courus pendant un séjour en
   // montagne, d'où une sortie longue de 33 km proposée pour un objectif 10 km).
@@ -206,9 +210,13 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const crossKm7 = workouts.filter(w => !isRun(w.sport) && now - new Date(w.date).getTime() <= 7 * 86400000)
     .reduce((s, w) => s + (w.distance_km ?? 0), 0);
   const load = computeLoad(workouts);
-  const daysSinceLast = workouts[0]?.date ? Math.floor((now - new Date(workouts[0].date).getTime()) / 86400000) : null;
+  // Jours sans COURIR : randonner tous les jours ne maintient pas la spécificité.
+  // Compter la rando ici masquait une coupure de course sous une fausse régularité.
+  const daysSinceLast = (() => { const r = workouts.find(w => isRun(w.sport)); return r?.date ? Math.floor((now - new Date(r.date).getTime()) / 86400000) : null; })();
   const restDays7 = Math.max(0, 7 - new Set(workouts.filter(w => now - new Date(w.date).getTime() <= 7 * 86400000).map(w => String(w.date).slice(0, 10))).size);
-  const recent14 = workouts.filter(w => now - new Date(w.date).getTime() <= 14 * 86400000);
+  // Répartition 80/20 : une randonnée soutenue passe du temps en Z3 sans être une
+  // séance intense. La compter retirerait à tort une qualité au budget de la semaine.
+  const recent14 = workouts.filter(w => isRun(w.sport) && now - new Date(w.date).getTime() <= 14 * 86400000);
   // FC max de repli (baseline → max observé en séance → formule d'âge) — sert à CLASSER l'effort
   // ET à estimer la VMA. Les imports intervals.icu étiquettent souvent TOUT en « easy » : on lit la FC.
   const obsMaxHr0 = Math.max(0, ...workouts.map(w => num(w.max_hr) ?? 0));
@@ -251,9 +259,6 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // Notes libres récentes de l'athlète (sensations, douleur précise…) → vues par le coach.
   const fbNotes = feedback.map(f => f.data?.note?.trim()).filter((n): n is string => !!n).slice(0, 3);
 
-  // Une sortie vélo à 30 km/h passe le garde-fou de vitesse et donnerait une VMA de
-  // 40 km/h : l'estimation ne doit voir QUE de la course.
-  const runsForVma = workouts.filter(w => isRun(w.sport));
   const maxHr = num(b?.max_hr), restHr = num(b?.resting_hr), ltHr = num(b?.lt_hr);
   const vmaStored = num(b?.vma_kmh);
   const garminVo2 = num((p as Record<string, unknown> | null)?.garmin_vo2max);
@@ -262,7 +267,7 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // Meilleurs efforts mesurés : disponibles avant tout le reste car ils fondent la VMA.
   const paceCurve = (p?.pace_curve ?? null) as { best?: { m: number; sec: number }[]; criticalSpeed?: number | null; dPrime?: number | null } | null;
   const vma = (vmaStored != null && vmaStored > 0) ? vmaStored
-    : (vmaFromPaceCurve(paceCurve?.best) ?? bestVmaFromWorkouts(runsForVma, fcMaxEst) ?? estimateVmaFromRuns(runsForVma, fcMaxEst, now)
+    : (vmaFromPaceCurve(paceCurve?.best) ?? bestVmaFromWorkouts(runs, fcMaxEst) ?? estimateVmaFromRuns(runs, fcMaxEst, now)
        ?? (garminVo2 != null && garminVo2 > 0 ? vmaFromVo2max(garminVo2) : null));
   const vmaIsEst = !(vmaStored != null && vmaStored > 0) && vma != null;
   const level = vma == null ? "à évaluer (VMA inconnue)" : vma < 13 ? "débutant" : vma < 16 ? "intermédiaire" : vma < 19 ? "confirmé" : "expert/élite";
@@ -306,7 +311,10 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
     }
   }
 
-  const last5 = workouts.slice(0, 5).map(w => {
+  // Historique présenté au coach : COURSE uniquement. Une randonnée de 2 h en montagne
+  // arrivait ici étiquetée « Sortie longue 10,2 km @13'31/km » — le coach y lisait un
+  // effondrement de forme là où l'athlète avait simplement marché en altitude.
+  const last5 = runs.slice(0, 5).map(w => {
     const pace = w.distance_km && w.duration_seconds ? `${Math.floor((w.duration_seconds / 60) / w.distance_km)}'${String(Math.round(((w.duration_seconds / 60) / w.distance_km % 1) * 60)).padStart(2, "0")}/km` : "?";
     return `${String(w.date).slice(5, 10)} ${classifyRun(w, fcMaxEst)} ${r1(w.distance_km ?? 0)}km @${pace}${w.avg_hr ? ` ${w.avg_hr}bpm` : ""}${w.elevation_gain_m ? ` D+${w.elevation_gain_m}` : ""}`;
   });
@@ -315,18 +323,21 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const vo2 = (garminVo2 != null && garminVo2 > 0) ? Math.round(garminVo2) : (vma ? Math.round(vma * 3.5) : null);
   // Efficacité aérobie : distance/min par battement sur séances faciles → tendance 21j vs 21j.
   const easyEF = (from: number, to: number) => {
-    const runs = workouts.filter(w => { const age = now - new Date(w.date).getTime(); return age > from * 86400000 && age <= to * 86400000 && !isHardType(w.type) && !!w.avg_hr && !!w.distance_km && !!w.duration_seconds; });
-    if (!runs.length) return null;
+    // Variable locale volontairement nommée `easyRuns` : un `runs` ici masquerait la
+    // référence globale et laisserait croire que le sport est déjà filtré. Il ne l'était
+    // pas — les randonnées entraient dans l'efficacité aérobie, dont elles ne disent rien.
+    const easyRuns = runs.filter(w => { const age = now - new Date(w.date).getTime(); return age > from * 86400000 && age <= to * 86400000 && !isHardType(w.type) && !!w.avg_hr && !!w.distance_km && !!w.duration_seconds; });
+    if (!easyRuns.length) return null;
     // Vitesse AJUSTÉE AU DÉNIVELÉ quand elle est disponible : comparer l'allure brute
     // d'une semaine en montagne à celle d'une semaine sur route ferait passer un athlète
     // en progression pour un athlète en train de s'effondrer.
     const speed = (w: Wk) => (w.gap_min_km && w.gap_min_km > 0)
       ? 1000 / w.gap_min_km
       : w.distance_km! * 1000 / (w.duration_seconds! / 60);
-    return runs.reduce((s, w) => s + speed(w) / w.avg_hr!, 0) / runs.length;
+    return easyRuns.reduce((s, w) => s + speed(w) / w.avg_hr!, 0) / easyRuns.length;
   };
   const efR = easyEF(0, 21), efP = easyEF(21, 42);
-  const efGap = workouts.slice(0, 20).some(w => w.gap_min_km != null);
+  const efGap = runs.slice(0, 20).some(w => w.gap_min_km != null);
   const efTrend = efR != null && efP != null ? `${efR > efP * 1.02 ? "↑ en hausse (plus efficace à FC égale → tu progresses)" : efR < efP * 0.98 ? "↓ en baisse (fatigue/forme à surveiller)" : "→ stable"}${efGap ? " [calculé sur l\u2019allure AJUSTÉE AU DÉNIVELÉ, donc comparable entre plat et montagne]" : ""}` : null;
   // VFC : moyenne 7 j vs 7 j précédents.
   const hrvAvg = (from: number, to: number) => { const v = hrv.filter(h => { const age = now - new Date(h.date).getTime(); return age > from * 86400000 && age <= to * 86400000 && h.hrv_ms != null; }).map(h => h.hrv_ms!); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
@@ -337,8 +348,10 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const tMean = dailyTss.reduce((a, b) => a + b, 0) / 7;
   const tSd = Math.sqrt(dailyTss.reduce((a, b) => a + (b - tMean) ** 2, 0) / 7) || 1;
   const monotony = tMean > 0 ? Math.round((tMean / tSd) * 10) / 10 : 0;
-  // Forme de course (moyenne ~10 dernières séances).
-  const recForm = workouts.slice(0, 10);
+  // Forme de course : mesurée sur des COURSES, évidemment. Mélanger randonnée et
+  // course donnait « cadence 142,7 spm » et « foulée 0,9 m » pour un athlète qui court
+  // à 176 spm et 1,16 m — le coach aurait corrigé un défaut technique inexistant.
+  const recForm = runs.slice(0, 10);
   const avgOf = (key: keyof Wk) => { const v = recForm.map(w => num(w[key])).filter((x): x is number => x != null && Number.isFinite(x)); return v.length ? Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 10) / 10 : null; };
   const cadence = avgOf("avg_cadence_spm"), power = avgOf("avg_power_watts"), vosc = avgOf("vertical_oscillation_cm"), gct = avgOf("ground_contact_ms"), stride = avgOf("stride_length_m"), decoupling = avgOf("cardiac_decoupling");
   // Sommeil détaillé + terrain + chaleur + cycle.
@@ -348,7 +361,9 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // manquante, pas un sommeil dégradé. On préfère ne rien dire que dire faux.
   const phaseMin = (v: number | null | undefined) => (v != null && v > 0 ? v : null);
   const deepPct = pctOf(phaseMin(sl?.deep_sleep_min), sl?.total_sleep_min), remPct = pctOf(phaseMin(sl?.rem_sleep_min), sl?.total_sleep_min);
-  const elevWeek = Math.round(workouts.filter(w => now - new Date(w.date).getTime() <= 7 * 86400000).reduce((s, w) => s + (w.elevation_gain_m ?? 0), 0));
+  // Dénivelé COURU : c'est lui qui rend l'allure incomparable. Le D+ d'une randonnée
+  // ne dit rien de la difficulté des footings.
+  const elevWeek = Math.round(runs.filter(w => now - new Date(w.date).getTime() <= 7 * 86400000).reduce((s, w) => s + (w.elevation_gain_m ?? 0), 0));
   const temps = recForm.map(w => num(w.weather_temp_c)).filter((x): x is number => x != null && Number.isFinite(x));
   const avgTemp = temps.length ? Math.round(temps.reduce((a, b) => a + b, 0) / temps.length) : null;
   const cycle = p?.is_female_cycle_sync && p?.current_phase ? String(p.current_phase) : null;
@@ -498,7 +513,7 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // la TENDANCE : c'est elle qui distingue une forme qui monte d'une fatigue qui
   // s'installe, et elle parle plus tôt que la VFC.
   const trendOf = (key: "vertical_ratio_pct" | "hrr_bpm") => {
-    const vals = runsForVma.filter(w => w[key] != null)
+    const vals = runs.filter(w => w[key] != null)
       .map(w => ({ d: new Date(w.date).getTime(), v: Number(w[key]) }));
     if (vals.length < 4) return null;
     const recent = vals.slice(0, Math.ceil(vals.length / 2));
