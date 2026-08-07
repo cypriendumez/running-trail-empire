@@ -110,5 +110,32 @@ STYLE : experte, humaine, structurée (titres courts / puces), CONCISE (pas de p
   if (!out.ok) {
     return NextResponse.json({ error: "Le kiné IA est très sollicité — réessayez dans quelques secondes 🙏" }, { status: 503 });
   }
+  // ── LA DOULEUR DÉCLARÉE DOIT ATTEINDRE LE COACH ──────────────────────────────
+  // Elle ne partait jusqu'ici que dans la conversation avec le kiné IA, où elle
+  // disparaissait. Le coach, lui, ne lisait les douleurs que dans le formulaire
+  // post-séance : un athlète pouvait donc signaler un genou douloureux sur le schéma
+  // corporel et recevoir une séance de VMA le lendemain — alors que la première règle
+  // du coach est que la santé prime sur la performance.
+  //
+  // Une seule déclaration conservée par zone et par jour : le chat envoie la zone à
+  // CHAQUE message, ce qui créerait sinon une entrée par phrase échangée.
+  if (zone && typeof painLevel === "number" && painLevel >= 4) {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data: existing } = await supabase.from("notifications")
+        .select("id, data").eq("user_id", user.id).eq("type", "pain_report")
+        .gte("created_at", `${today}T00:00:00Z`).limit(20);
+      const already = (existing ?? []).some((n) => (n.data as { zone?: string } | null)?.zone === zone);
+      if (!already) {
+        await supabase.from("notifications").insert({
+          user_id: user.id, type: "pain_report",
+          title: `Douleur signalée : ${zone}`,
+          body: `Intensité ${painLevel}/10 — déclarée depuis l'espace Santé.`,
+          data: { zone, level: painLevel, date: today },
+        });
+      }
+    } catch { /* best-effort : le kiné répond même si l'enregistrement échoue */ }
+  }
+
   return NextResponse.json({ reply: out.text });
 }

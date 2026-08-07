@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { GhostRunner } from "@/components/ghost-runner/GhostRunner";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import { oneSessionPerDate } from "@/lib/coach/sessions";
+import { getEffectiveVma } from "@/lib/ai/coachContext";
 
 export const metadata = { title: "Ghost Runner" };
 
@@ -11,7 +12,7 @@ export default async function GhostRunnerPage() {
   const { data: { user } } = await supabase.auth.getUser();
 
   const todayStr = new Date().toISOString().slice(0, 10);
-  const [profileRes, baselineRes, coachRes] = await Promise.all([
+  const [profileRes, baselineRes, coachRes, effectiveVma] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single(),
     supabase
       .from("performance_baselines")
@@ -24,6 +25,11 @@ export default async function GhostRunnerPage() {
     supabase.from("notifications").select("title,body,data,created_at")
       .eq("user_id", user!.id).eq("type", "coach_session")
       .order("created_at", { ascending: false }).limit(20),
+    // VMA EFFECTIVE — exactement celle du coach et du profil. `performance_baselines`
+    // est vide pour la plupart des athlètes (aucun test enregistré) : le Ghost Runner
+    // retombait alors sur 16 km/h CODÉ EN DUR, soit une troisième VMA dans l'application
+    // et des allures de défi ~10 % trop lentes.
+    getEffectiveVma(supabase, user!.id),
   ]);
 
   // Même source de vérité que le Calendrier : UNE séance par date (la plus récente), puis on ne
@@ -40,7 +46,7 @@ export default async function GhostRunnerPage() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <GhostRunner profile={stripProfileSecrets(profileRes.data)} baseline={baselineRes.data} coachSessions={coachSessions} />
+      <GhostRunner profile={stripProfileSecrets(profileRes.data)} baseline={baselineRes.data} effectiveVma={effectiveVma} coachSessions={coachSessions} />
     </div>
   );
 }

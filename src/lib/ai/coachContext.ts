@@ -45,11 +45,35 @@ const TYPE_TSS: Record<string, number> = { easy: 50, tempo: 75, interval: 90, vm
 const estimateTSS = (w: Wk) => w.tss != null ? Number(w.tss) : Math.round(((w.duration_seconds ?? 0) / 3600) * (TYPE_TSS[String(w.type ?? "")] ?? 60));
 
 // CTL/ATL/TSB (Banister) — identique au TaperingWidget, + ratio aigu:chronique.
+/**
+ * Charge d'entraînement (modèle de Banister) — CTL forme, ATL fatigue, TSB fraîcheur.
+ *
+ * TOUS LES SPORTS comptent ici, et c'est volontaire : une randonnée de 1 000 m de
+ * dénivelé fatigue réellement, même si elle n'entre pas dans le volume de course.
+ *
+ * L'amorce était fixée à `ctl = atl = 40`. Après 42 jours il en reste encore 37 %
+ * (e⁻¹), si bien qu'un athlète SANS AUCUNE séance affichait CTL 14,5 et TSB +14,5 —
+ * une forme sortie de nulle part, et un verdict « tu es frais, ose la qualité »
+ * adressé à quelqu'un qui n'a jamais couru. On amorce désormais sur SA charge
+ * moyenne réelle, et on déroule toute la fenêtre disponible pour que l'amorce
+ * s'efface d'elle-même.
+ */
 function computeLoad(workouts: Wk[]) {
   const tssMap: Record<string, number> = {};
-  for (const w of workouts) { const d = String(w.date).slice(0, 10); tssMap[d] = (tssMap[d] ?? 0) + estimateTSS(w); }
-  let ctl = 40, atl = 40;
-  for (let i = 41; i >= 0; i--) {
+  let oldest = 0;
+  for (const w of workouts) {
+    const d = String(w.date).slice(0, 10);
+    tssMap[d] = (tssMap[d] ?? 0) + estimateTSS(w);
+    oldest = Math.max(oldest, Math.floor((Date.now() - new Date(w.date).getTime()) / 86400000));
+  }
+  // Fenêtre : tout l'historique disponible, borné à 180 j (au-delà, l'amorce ne pèse plus).
+  const span = Math.min(180, Math.max(42, oldest));
+  // Amorce = charge quotidienne moyenne de l'athlète sur la période. Nulle s'il n'a
+  // rien fait, élevée s'il s'entraîne beaucoup : elle se calibre toute seule.
+  const total = Object.values(tssMap).reduce((a, b) => a + b, 0);
+  const seed = span > 0 ? total / span : 0;
+  let ctl = seed, atl = seed;
+  for (let i = span; i >= 0; i--) {
     const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
     const tss = tssMap[d] ?? 0;
     ctl += (tss - ctl) / 42; atl += (tss - atl) / 7;
@@ -164,13 +188,16 @@ async function fetchWorkouts(sb: SB, userId: string) {
 }
 
 export async function buildAthleteContext(sb: SB, userId: string): Promise<AthleteContext> {
-  const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, objRes, csRes] = await Promise.all([
+  const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, objRes, csRes] = await Promise.all([
     sb.from("profiles").select("*").eq("id", userId).single(),
     sb.from("performance_baselines").select("*").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).single(),
     sb.from("hrv_data").select("hrv_ms,physiological_state,date").eq("user_id", userId).order("date", { ascending: false }).limit(14),
     sb.from("sleep_data").select("sleep_score,total_sleep_min,deep_sleep_min,rem_sleep_min,body_battery_end,respiration_rate,date").eq("user_id", userId).order("date", { ascending: false }).limit(7),
     fetchWorkouts(sb, userId),
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "session_feedback").order("created_at", { ascending: false }).limit(5),
+    // Douleurs déclarées depuis l'espace Santé (schéma corporel) — elles n'atteignaient
+    // pas le coach, qui ne regardait que le formulaire post-séance.
+    sb.from("notifications").select("data").eq("user_id", userId).eq("type", "pain_report").order("created_at", { ascending: false }).limit(10),
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "race_objective").maybeSingle(),
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "coach_session").order("created_at", { ascending: false }).limit(40),
   ]);
@@ -248,7 +275,16 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const freshSleep = sleep[0]?.date && now - new Date(sleep[0].date + "T00:00:00").getTime() <= 2 * 86400000 ? sleep[0] : null;
   const lastSleepMin = freshSleep?.total_sleep_min ?? null;
 
-  const pains = [...new Set(feedback.flatMap(f => f.data?.pain ?? []).filter((p) => p && p !== "Aucune douleur"))];
+  // Douleurs = formulaire post-séance ET espace Santé. Une déclaration se périme au
+  // bout de 14 jours : une gêne signalée il y a un mois ne doit pas brider l'athlète
+  // indéfiniment s'il ne l'a pas re-signalée.
+  const declaredPains = ((painRes.data ?? []) as { data: { zone?: string; level?: number; date?: string } }[])
+    .filter(n => n.data?.zone && n.data?.date && now - new Date(`${n.data.date}T12:00:00`).getTime() <= 14 * 86400000)
+    .map(n => `${n.data.zone}${n.data.level ? ` (${n.data.level}/10)` : ""}`);
+  const pains = [...new Set([
+    ...feedback.flatMap(f => f.data?.pain ?? []).filter((p) => p && p !== "Aucune douleur"),
+    ...declaredPains,
+  ])];
   const lastRpe = feedback[0]?.data?.rpe ?? null;
   // TENDANCE du ressenti, pas seulement la dernière valeur. Un athlète qui trouve ses
   // 3 dernières séances difficiles est en train de sur-solliciter, même si sa VFC et son

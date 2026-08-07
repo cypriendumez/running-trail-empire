@@ -18,6 +18,9 @@ export interface CoachSess { title: string; detail: string; date: string; tags: 
 interface GhostRunnerProps {
   profile: UserProfile | null;
   baseline: PerformanceBaseline | null;
+  /** VMA effective, calculée comme celle du coach (courbe d'allure → efforts réels).
+   *  Prime sur la baseline, qui n'est renseignée que si l'athlète a fait un test. */
+  effectiveVma?: number | null;
   coachSessions?: CoachSess[];
 }
 
@@ -85,7 +88,10 @@ function ElevationProfile({ elevation, distance }: { elevation: number; distance
   );
 }
 
-export function GhostRunner({ baseline, coachSessions = [] }: GhostRunnerProps) {
+export function GhostRunner({ baseline, effectiveVma, coachSessions = [] }: GhostRunnerProps) {
+  // Une seule VMA dans toute l'application : test enregistré, sinon VMA effective,
+  // et seulement en tout dernier recours une valeur par défaut.
+  const vmaEff = baseline?.vma_kmh ?? effectiveVma ?? 16;
   const { lang } = useT();
   const d = GX[lang] ?? GX.fr;
   const tg = (k: string, p?: Record<string, string | number>) => fillG(d[k] ?? k, p);
@@ -156,7 +162,7 @@ export function GhostRunner({ baseline, coachSessions = [] }: GhostRunnerProps) 
   // pour pouvoir la faire SANS montre, guidé à la voix.
   const applyCoachSession = (s: CoachSess) => {
     const text = `${s.title} ${s.detail} ${(s.tags || []).join(" ")}`.toLowerCase();
-    const vmaLoc = baseline?.vma_kmh ?? 16;
+    const vmaLoc = vmaEff;
     const pm = text.match(/(\d)\s*['h:]\s*(\d{2})\s*\/?\s*km/) || text.match(/[àa]\s*(\d)\s*['h:]\s*(\d{2})/);
     const pace = pm ? (+pm[1]) + (+pm[2]) / 60 : null; // min/km
     const dm = text.match(/(\d{1,3}(?:[.,]\d)?)\s*km/);
@@ -535,7 +541,7 @@ export function GhostRunner({ baseline, coachSessions = [] }: GhostRunnerProps) 
   const paceDeltaSec = currentPace > 0 ? Math.round((currentPace - targetPace) * 60) : 0;
   const onPace = currentPace > 0 && Math.abs(paceDeltaSec) <= 3;
 
-  const vma = baseline?.vma_kmh ?? 16;
+  const vma = vmaEff;
   const maxHr = baseline?.max_hr ?? 190;
   // Zones d'allure = bandes de %VMA → fourchette d'allure (rapide → lent) + icône/teinte.
   const zoneBands = [
