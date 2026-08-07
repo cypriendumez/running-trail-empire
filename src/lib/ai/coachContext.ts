@@ -153,8 +153,10 @@ export type AthleteContext = {
   easyPace: string | null;
   /** Jours écoulés depuis la dernière séance DURE réellement effectuée (0 = aujourd'hui). */
   lastHardDaysAgo: number | null;
-  /** Volumes cibles de la semaine, en km. */
-  volume: { weekKm: number; avg4wkKm: number; targetKm: number; longRunKm: number };
+  /** Volumes cibles de la semaine, en km. `longRunPlanned` = ce que la périodisation
+   *  prévoyait AVANT réduction pour fatigue ; `longRunEased` dit si la coupe a eu lieu,
+   *  pour que la séance puisse l'expliquer au lieu d'afficher un chiffre inexpliqué. */
+  volume: { weekKm: number; avg4wkKm: number; targetKm: number; longRunKm: number; longRunPlanned: number; longRunEased: boolean };
   /** Où l'on se situe dans le cycle : semaine allégée, affûtage, ou montée en charge. */
   cycle: { deload: boolean; taper: boolean; label: string };
   /** Jours de la semaine (0 = dimanche) systématiquement prescrits ET jamais réalisés. */
@@ -1267,7 +1269,26 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   const growth = weightLoss ? Math.min(growthBase, 1 + weightLoss.rules.maxWeeklyProgressPct / 100) : growthBase;
   const targetKm = macroPlan.length ? macroPlan[0].volumeKm
     : Math.round(baseKm * (taper ? 0.65 : deload ? 0.8 : growth));
-  const longRunKm = macroPlan.length ? macroPlan[0].longRunKm : Math.round(targetKm * (taper ? 0.20 : 0.25));
+  const longRunPlanned = macroPlan.length ? macroPlan[0].longRunKm : Math.round(targetKm * (taper ? 0.20 : 0.25));
+
+  /**
+   * LA SORTIE LONGUE RÉPOND AU VERDICT DE FRAÎCHEUR, comme la qualité.
+   *
+   * Le feu rouge ne retirait jusqu'ici que le bloc d'allure À L'INTÉRIEUR de la sortie
+   * longue (autoPlan `canSpice`) : sa DISTANCE, elle, ne bougeait pas. Tant qu'elle
+   * valait 25 % du volume, l'oubli restait inoffensif — 9 km. Depuis qu'elle se déduit
+   * de la distance visée, il ne l'est plus : le plan proposait 26 km le dimanche à un
+   * athlète en ratio aigu:chronique 2,4 et TSB −44, deux jours après une sortie de
+   * 26 km, soit 72 % du volume de la semaine dans une seule séance.
+   *
+   * Les signaux qui déclenchent le rouge (ratio de charge, TSB, douleur) sont
+   * PERSISTANTS : ils ne se dissiperont pas d'ici au week-end, la coupe est donc
+   * justifiée même pour une séance placée dans 3 jours. L'orange, plus souvent dû à une
+   * mauvaise nuit, n'entraîne qu'une réduction légère.
+   */
+  const longRunEase = readyLevel === "rouge" ? 0.6 : readyLevel === "orange" ? 0.8 : easeReasons.length ? 0.85 : 1;
+  const longRunKm = Math.max(4, Math.round(longRunPlanned * longRunEase));
+  const longRunEased = longRunKm < longRunPlanned;
 
   // ── NUTRITION ET HYDRATATION CHIFFRÉES ───────────────────────────────────────
   // « 30 à 60 g de glucides par heure » est un intervalle de manuel : il ne dit pas
@@ -1446,7 +1467,7 @@ ${catalog}`;
     hardGapHours: hardGapH,
     easyPace: vma ? paceAt(70) : null,
     lastHardDaysAgo,
-    volume: { weekKm: Math.round(weekKm), avg4wkKm: Math.round(avg4wkKm), targetKm, longRunKm },
+    volume: { weekKm: Math.round(weekKm), avg4wkKm: Math.round(avg4wkKm), targetKm, longRunKm, longRunPlanned, longRunEased },
     cycle: { deload, taper, label: cycleLabel },
     skippedWeekdays,
     availability: { daysPerWeek: availDaysPerWeek, days: availDays },

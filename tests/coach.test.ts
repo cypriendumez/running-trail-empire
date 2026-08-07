@@ -783,6 +783,22 @@ test("quand la préparation ne suffit pas pour la distance, on le DIT", () => {
   assert.equal(longRunGap(28, 32, 42.2), null);
   assert.equal(longRunGap(10, null, null), null, "sans objectif, aucun avertissement");
 });
+test("le feu rouge de fraîcheur raccourcit la sortie longue, et l'explique", () => {
+  // Le rouge ne retirait que le bloc d'allure DANS la sortie longue, jamais sa distance.
+  // Inoffensif tant qu'elle valait 25 % du volume (9 km) ; plus du tout depuis qu'elle se
+  // déduit de la distance visée : 26 km prescrits le dimanche à un athlète en ratio
+  // aigu:chronique 2,4 et TSB −44, deux jours après une sortie de 26 km.
+  const c = ctx({
+    readiness: { level: "rouge", reasons: ["ratio aigu:chronique 2,4 (zone de risque de blessure)"], advice: "" },
+    volume: { weekKm: 62, avg4wkKm: 40, targetKm: 40, longRunKm: 16, longRunPlanned: 26, longRunEased: true },
+    weekPlan: { qBudget: 0, quality: [], easyPace: "4'52", eased: true },
+  });
+  const long = buildWeekPlan(c).find((d) => d.type === "Sortie longue");
+  assert.ok(long, "aucune sortie longue dans le plan");
+  assert.ok(/RACCOURCIE/.test(long!.why), "la réduction doit être expliquée, pas subie en silence");
+  assert.ok(/26 km prévus/.test(long!.why), "le chiffre initial doit être rappelé");
+  assert.ok(/ratio aigu:chronique/.test(long!.why), "le motif réel doit être cité");
+});
 test("l'affûtage coupe la sortie longue au lieu de la faire monter", () => {
   const lr = longRunForWeek({ weekIndex: 10, weeksToPeak: 8, current: 30, peak: 32, weeklyKm: 25, share: 0.35, taper: true });
   assert.ok(lr <= 6, `${lr} km en semaine d'affûtage — la fraîcheur prime`);

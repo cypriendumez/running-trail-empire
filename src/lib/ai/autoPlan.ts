@@ -303,7 +303,11 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
           }
           return { type: "Sortie longue", title: "Sortie longue",
             detail: `Échauffement ${warm} min progressif FC Z1→Z2 → Corps : ${kmAndTime(longRunKm, p)} en Z2${easyTag}, allure conversationnelle du début à la fin → Retour au calme ${cool} min FC Z1.${gapNote}${cycleNote}`,
-            why: `C'est la séance qui construit ton endurance de fond — ${longRunKm} km, calés sur ton volume actuel. Elle doit rester facile : si tu finis cassé, elle était trop rapide.`,
+            why: ctx.volume.longRunEased
+              // Une sortie longue raccourcie sans explication passe pour une erreur du plan :
+              // l'athlète voit un chiffre plus petit que la semaine d'avant et n'en sait rien.
+              ? `Sortie longue RACCOURCIE à ${longRunKm} km (${ctx.volume.longRunPlanned} km prévus) : ${ctx.readiness.reasons[0] ?? "signaux de fatigue"}. Ce n'est pas un recul — c'est ce qui permet d'enchaîner la suite du bloc. On remonte dès que la charge redescend.`
+              : `C'est la séance qui construit ton endurance de fond — ${longRunKm} km, calés sur ton volume actuel. Elle doit rester facile : si tu finis cassé, elle était trop rapide.`,
             tags: ["Long", "Z2", `${longRunKm} km`] };
         })());
     spend();
