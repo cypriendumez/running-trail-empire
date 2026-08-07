@@ -194,11 +194,18 @@ export async function refreshPerformance(
       });
       if (!r.ok) return null;
       const acts = await r.json() as { id?: string; type?: string; start_date_local?: string; icu_intensity?: number; icu_training_load?: number }[];
-      // Les activités arrivent de la plus récente à la plus ancienne.
-      const hard = acts.find((a) => a.id && /run/i.test(String(a.type ?? ""))
-        && ((a.icu_intensity ?? 0) >= 85 || (a.icu_training_load ?? 0) >= 60));
-      if (!hard?.id || !hard.start_date_local) return null;
-      return analyseQualityExecution(String(hard.id), opts.apiKey, String(hard.start_date_local).slice(0, 10));
+      // Les activités arrivent de la plus récente à la plus ancienne. On ne s'arrête PAS
+      // à la première « dure » : une sortie longue affiche une intensité élevée du seul
+      // fait de sa durée (26 km à 87), l'analyse échoue faute de répétitions, et la vraie
+      // séance de qualité — trois jours plus tôt — n'est jamais examinée. On essaie donc
+      // les candidates dans l'ordre jusqu'à ce que l'une livre une série exploitable.
+      const candidates = acts.filter((a) => a.id && a.start_date_local && /run/i.test(String(a.type ?? ""))
+        && ((a.icu_intensity ?? 0) >= 85 || (a.icu_training_load ?? 0) >= 60)).slice(0, 6);
+      for (const c of candidates) {
+        const res = await analyseQualityExecution(String(c.id), opts.apiKey, String(c.start_date_local).slice(0, 10));
+        if (res) return res;
+      }
+      return null;
     } catch { return null; }
   })();
 
@@ -215,8 +222,13 @@ export async function refreshPerformance(
       });
       if (!r.ok) return;
       const acts = await r.json() as { id?: string; type?: string; moving_time?: number; icu_intensity?: number }[];
-      const cont = acts.find((a) => a.id && /run/i.test(String(a.type ?? ""))
-        && (a.moving_time ?? 0) >= 45 * 60 && (a.icu_intensity ?? 0) < 85);
+      // On prend la PLUS LONGUE sortie d'au moins une heure. Filtrer sur l'intensité
+      // écartait justement le meilleur candidat : une sortie longue de 2 h affiche une
+      // intensité élevée sans être fractionnée. Au-delà d'une heure, une course est
+      // continue dans l'immense majorité des cas — et c'est là que la dérive parle.
+      const cont = acts
+        .filter((a) => a.id && /run/i.test(String(a.type ?? "")) && (a.moving_time ?? 0) >= 60 * 60)
+        .sort((a, b) => (b.moving_time ?? 0) - (a.moving_time ?? 0))[0];
       if (!cont?.id) return;
       const drift = await cardiacDrift(String(cont.id), opts.apiKey);
       if (drift == null) return;
