@@ -6,6 +6,7 @@ import { terrainCoachBlock } from "@/data/terrainCatalog";
 import { forecastWithElevation, altitudeLossPct, heatAdvice, windAdvice, type DayWeather } from "@/lib/weather/openMeteo";
 import { bestVmaFromWorkouts, vmaFromPaceCurve, vmaFromVo2max } from "@/lib/running/fitness";
 import { isRun } from "@/lib/intervals/sport";
+import { warmCoolMin } from "@/lib/watch/intervals";
 
 type SB = Awaited<ReturnType<typeof createClient>>;
 
@@ -161,6 +162,9 @@ export type AthleteContext = {
   forecast: DayWeather[];
   /** Altitude du lieu d'entraînement (m) et perte aérobie associée (%). */
   altitude: { elevationM: number | null; lossPct: number };
+  /** Durées d'échauffement / retour au calme du profil — MÊMES valeurs que celles
+   *  appliquées par la montre, pour que le texte et la séance envoyée coïncident. */
+  warmCool: { warm: number; cool: number };
   /** % du temps passé en Z3+ s'il dépasse la cible (footings trop rapides), sinon null. */
   tooMuchIntensity: number | null;
   /** true si l'athlète s'entraîne réellement en terrain vallonné (D+ hebdo significatif). */
@@ -1042,6 +1046,7 @@ ${catalog}`;
     availability: { daysPerWeek: availDaysPerWeek, days: availDays },
     forecast,
     altitude: { elevationM, lossPct: altLoss },
+    warmCool: warmCoolMin(num(p?.warmup_min), num(p?.cooldown_min)),
     tooMuchIntensity: hardTimePct != null && hardTimePct > 25 ? hardTimePct : null,
     hillyTraining: elevWeek >= 400 || terr.paceMeaningless,
     thresholdPace,

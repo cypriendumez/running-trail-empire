@@ -133,6 +133,19 @@ function repSteps(b: RepBlock, vmaKmh: number | null, zone: number, hill?: boole
 
 // Étapes intervals.icu selon le type de séance. Allure prescrite (mainPaceSec) > allure de zone (VMA)
 // > repli cible FC. mainPaceSec s'applique à l'étape PRINCIPALE. null = pas de séance montre.
+/**
+ * Bornes de l'échauffement et du retour au calme, réglage du profil.
+ * Exporté pour que le PLAN écrive dans son texte exactement les durées que la MONTRE
+ * appliquera : sans cela le site annonçait « échauffement 10 min » et la montre en
+ * envoyait 15 — deux séances différentes pour le même jour.
+ */
+export function warmCoolMin(warmMin?: number | null, coolMin?: number | null): { warm: number; cool: number } {
+  return {
+    warm: Math.min(30, Math.max(5, Math.round(warmMin ?? 15))),
+    cool: Math.min(30, Math.max(5, Math.round(coolMin ?? 10))),
+  };
+}
+
 export function stepsForType(type: string, durationMin: number, vmaKmh?: number | null, mainPaceSec?: number | null, warmMin?: number | null, coolMin?: number | null, reps?: RepBlock | null, rawDetail?: string): string | null {
   const s = (type || "").toLowerCase();
   const d = Math.max(15, Math.round(durationMin));
@@ -140,8 +153,26 @@ export function stepsForType(type: string, durationMin: number, vmaKmh?: number 
   const p = mainPaceSec ?? null;
   // Durées d'échauffement / retour au calme = réglage du profil de l'athlète (5–30 min), repli 15 / 10.
   // Échauffement & retour au calme toujours pilotés à la FRÉQUENCE CARDIAQUE Z1 (doux) ; seul le corps vise l'allure.
-  const warm = Math.min(30, Math.max(5, Math.round(warmMin ?? 15)));
-  const cool = Math.min(30, Math.max(5, Math.round(coolMin ?? 10)));
+  const { warm, cool } = warmCoolMin(warmMin, coolMin);
+  /**
+   * Durée du CORPS de séance, lue dans le texte du plan (« → Corps : … »).
+   *
+   * Sans elle, `parseDurationMin` renvoyait la PREMIÈRE durée du texte — celle de
+   * l'échauffement — et on lui soustrayait encore l'échauffement et le retour au calme.
+   * Résultat constaté : le site annonçait 25 min de récupération et la montre en
+   * envoyait 10 ; une sortie longue de 1 h 02 arrivait à 37 min. Le corps est désormais
+   * lu tel qu'il est écrit, ce qui garantit que les deux affichages coïncident.
+   */
+  const bodyMin = (() => {
+    const seg = (rawDetail || "").toLowerCase().split(/corps[^:]*:/)[1];
+    if (!seg) return null;
+    const head = seg.split(/→|\n/)[0];
+    const h = head.match(/(\d+)\s*h\s*(\d{1,2})?/);
+    const n = h ? Number(h[1]) * 60 + (h[2] ? Number(h[2]) : 0)
+      : Number(head.match(/(\d{1,3})\s*min/)?.[1] ?? 0);
+    return n >= 5 && n <= 300 ? n : null;
+  })();
+
   if (/repos|rest/.test(s)) return null;
   if (/renfo|muscu|gainage|force|ppg/.test(s)) return null; // pas une course
   if (/vélo|velo|bike|cycl|home ?trainer|\bride\b/.test(s)) {
@@ -150,20 +181,19 @@ export function stepsForType(type: string, durationMin: number, vmaKmh?: number 
     return [zoneStep(warm, 1, v, "Échauffement", null, true), zoneStep(main, 2, v, "Vélo endurance", null, true), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
   }
   if (/récup|recup/.test(s)) {
-    const main = Math.max(10, d - warm - cool);
-    return [zoneStep(warm, 1, v, "Échauffement", null, true), zoneStep(main, 1, v, "Récup", p), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
+    const main = bodyMin ?? Math.max(10, d - warm - cool);
+    // Récupération : pilotée à la FRÉQUENCE CARDIAQUE, comme l'annonce son propre texte
+    // (« Z1 très facile »). Y mettre une cible d'allure transformait une séance de
+    // récupération en séance à chrono — exactement ce qu'elle ne doit pas être.
+    return [zoneStep(warm, 1, v, "Échauffement", null, true), zoneStep(main, 1, v, "Récup", null, true), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
   }
   if (/long|endurance|footing|fond|easy/.test(s)) {
-    const main = Math.max(15, d - warm - cool);
+    const main = bodyMin ?? Math.max(15, d - warm - cool);
     return [zoneStep(warm, 1, v, "Échauffement", null, true), zoneStep(main, 2, v, "Endurance facile", p), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
   }
   // Durée explicitement annoncée pour le CORPS de séance : sans ça, « 25 min d'un bloc »
   // se retrouvait amputé de l'échauffement et arrivait à 10 min sur la montre.
-  const bodyMin = (() => {
-    const m = (rawDetail || "").toLowerCase().match(/corps[^:]*:\s*[^→\n]*?(\d{1,3})\s*min/);
-    const n = m ? Number(m[1]) : 0;
-    return n >= 10 && n <= 180 ? n : null;
-  })();
+
   const quality = /spéci|specif|allure|objectif|seuil|tempo/.test(s) ? 4
     : /vma|fractionn|interval|piste|côte|cote|fartlek|30\/30/.test(s) ? 5 : 0;
   if (quality) {

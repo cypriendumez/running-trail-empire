@@ -67,6 +67,14 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   const start = new Date(today); start.setHours(0, 0, 0, 0);
   const dates = Array.from({ length: 7 }, (_, i) => addDays(start, i));
   const gapDays = Math.max(2, Math.ceil(ctx.hardGapHours / 24));
+  // Échauffement / retour au calme : on écrit dans le texte EXACTEMENT les durées que la
+  // montre appliquera. Elles étaient codées en dur ici (10/15/20 et 5/10) pendant que la
+  // montre lisait le réglage du profil : le site annonçait « échauffement 10 min » et la
+  // montre en envoyait 15, avec un corps de séance réduit de 25 à 10 min. Deux séances
+  // différentes pour le même jour.
+  const { warm, cool } = ctx.warmCool;
+  // Avant une séance de qualité, l'échauffement est allongé (mise en action progressive).
+  const warmQ = Math.min(30, warm + 5);
   const pace = ctx.easyPace;
   const easy = pace ? ` (~${pace}/km)` : "";
   const wp = ctx.weekPlan;
@@ -217,10 +225,10 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   if (longIdx >= 0) {
     put(longIdx, bike
       ? { type: "Vélo", title: "Sortie longue à vélo",
-          detail: `Échauffement 15 min très facile → ${durationFor(longRunKm, paceFor(longIdx)) ?? "1h30"} à 2h en FC Z2, allure conversationnelle, cadence souple → 10 min de retour au calme. Pas d'allure cible : c'est du volume aérobie sans impact.${cycleNote}`,
+          detail: `Échauffement ${warm} min très facile → ${durationFor(longRunKm, paceFor(longIdx)) ?? "1h30"} à 2h en FC Z2, allure conversationnelle, cadence souple → 10 min de retour au calme. Pas d'allure cible : c'est du volume aérobie sans impact.${cycleNote}`,
           why: "Le volume aérobie de la semaine, sans les contraintes d'impact de la course.", tags: ["Vélo", "Z2", "Long"] }
       : { type: "Sortie longue", title: "Sortie longue",
-          detail: `Échauffement 15 min progressif FC Z1→Z2 → Corps : ${kmAndTime(longRunKm, paceFor(longIdx))} en Z2${paceFor(longIdx) ? ` (~${paceFor(longIdx)}/km)` : ""}, allure conversationnelle du début à la fin → Retour au calme 10 min FC Z1.${gapNote}${cycleNote}`,
+          detail: `Échauffement ${warm} min progressif FC Z1→Z2 → Corps : ${kmAndTime(longRunKm, paceFor(longIdx))} en Z2${paceFor(longIdx) ? ` (~${paceFor(longIdx)}/km)` : ""}, allure conversationnelle du début à la fin → Retour au calme ${cool} min FC Z1.${gapNote}${cycleNote}`,
           why: `C'est la séance qui construit ton endurance de fond — ${longRunKm} km, calés sur ton volume actuel. Elle doit rester facile : si tu finis cassé, elle était trop rapide.`,
           tags: ["Long", "Z2", `${longRunKm} km`] });
     spend();
@@ -274,7 +282,7 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
     const title = q.type === "VMA" ? "Séance VMA" : q.type === "Seuil" ? "Séance au seuil" : q.type === "Spécifique" ? "Allure spécifique objectif" : q.type;
     put(idx, {
       type: q.type, title,
-      detail: `Échauffement 20 min progressif FC Z1→Z2 + 3 à 5 lignes droites de 80 m → Corps : ${heatAdjustDesc(q.desc, idx)} → Retour au calme 10 min FC Z1.${ctx.cycle.taper ? " ⚠️ Affûtage : garde l'intensité mais coupe le nombre de répétitions d'un tiers." : ""}`,
+      detail: `Échauffement ${warmQ} min progressif FC Z1→Z2 + 3 à 5 lignes droites de 80 m → Corps : ${heatAdjustDesc(q.desc, idx)} → Retour au calme ${cool} min FC Z1.${ctx.cycle.taper ? " ⚠️ Affûtage : garde l'intensité mais coupe le nombre de répétitions d'un tiers." : ""}`,
       why: "La séance de qualité de ton bloc, calée sur ta VMA et ton objectif. C'est elle qui te fait progresser.",
       tags: [q.type, "Qualité"],
     });
@@ -305,7 +313,7 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   const doubles = rawEasy > easyCap && raceIdx < 0;
   for (const i of easySlots) put(i, {
     type: "Endurance", title: "Footing en endurance",
-    detail: `Échauffement 15 min progressif FC Z1→Z2 → Corps : ${kmAndTime(easyKm, paceFor(i))} en Z2${paceFor(i) ? ` (~${paceFor(i)}/km)` : ""}, tu dois pouvoir tenir une conversation → Retour au calme 10 min FC Z1.${gapNote}${doubles ? " 💡 À ton volume, scinde en DEUX sorties dans la journée (matin + soir) plutôt qu'un seul footing interminable." : ""}${cycleNote}`,
+    detail: `Échauffement ${warm} min progressif FC Z1→Z2 → Corps : ${kmAndTime(easyKm, paceFor(i))} en Z2${paceFor(i) ? ` (~${paceFor(i)}/km)` : ""}, tu dois pouvoir tenir une conversation → Retour au calme ${cool} min FC Z1.${gapNote}${doubles ? " 💡 À ton volume, scinde en DEUX sorties dans la journée (matin + soir) plutôt qu'un seul footing interminable." : ""}${cycleNote}`,
     why: ctx.tooMuchIntensity
       ? `⚠️ Tu passes ${ctx.tooMuchIntensity} % de ton temps de course en zone 3 et plus, alors que la cible est 20 %. Tes footings sont courus trop vite — c'est le frein n°1 à la progression. Ralentis jusqu'à pouvoir tenir une conversation complète : c'est censé paraître TROP facile.`
       : `Le socle aérobie. Avec les autres séances, tu es sur ~${targetKm} km cette semaine — c'est le volume facile qui construit la forme de fond, pas les séances dures.`,
@@ -341,7 +349,7 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
 
   if ((lvl === "rouge" || hardToday) && week[0].type !== "Repos") {
     week[0] = { ...week[0], type: "Récup", title: "Récupération",
-      detail: "Échauffement 10 min très doux FC Z1 → 20 à 25 min en Z1 très facile → 5 min de retour au calme. Ou repos complet si tu le sens mieux.",
+      detail: `Échauffement ${warm} min très doux FC Z1 → Corps : 25 min en Z1 très facile, piloté à la FRÉQUENCE CARDIAQUE (aucune allure à tenir) → Retour au calme ${cool} min FC Z1. Ou repos complet si tu le sens mieux.`,
       why: hardToday
         ? "Tu as déjà fait une séance exigeante aujourd'hui : on ne double pas. La progression se joue à la récupération."
         : `Aujourd'hui ton corps demande de la récupération : ${ctx.readiness.reasons.slice(0, 2).join(", ")}. Reporter une séance dure de 24 h ne coûte rien ; la forcer coûte des semaines.`,
