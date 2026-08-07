@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
+import { denyIfAnonymous } from "@/lib/api/adminGuard";
 
 // Géométrie GPS réelle chargée à la demande depuis OpenStreetMap (Overpass, ODbL).
 // Mise en cache mémoire : une géométrie de parcours ne change quasiment jamais.
@@ -121,6 +122,11 @@ function dedup(chain: [number, number][]): [number, number][] {
 }
 
 export async function GET(req: NextRequest) {
+  // Interroge Overpass, un service communautaire GRATUIT aux quotas stricts. Laisser la
+  // route ouverte aux requêtes anonymes, c'est risquer de faire bannir l'adresse IP de
+  // l'application pour tout le monde.
+  const denied = await denyIfAnonymous();
+  if (denied) return NextResponse.json({ error: denied }, { status: 401 });
   const id = req.nextUrl.searchParams.get("id");
   const type = req.nextUrl.searchParams.get("type") === "way" ? "way" : "relation";
   if (!id || !/^\d+$/.test(id)) return NextResponse.json({ error: "id invalide" }, { status: 400 });

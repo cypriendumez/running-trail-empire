@@ -451,5 +451,25 @@ test("l'athlète peut résilier son abonnement", () => {
   assert.ok(existsSync("src/app/api/stripe/portal/route.ts"), "aucun portail de gestion d'abonnement");
 });
 
+console.log("\nINTÉGRITÉ COMMERCIALE");
+test("le catalogue simulé est signalé comme tel à l'écran", () => {
+  // Bug réel : la boutique affichait des prix INVENTÉS attribués à de vraies enseignes
+  // (i-Run, Alltricks, Lepape, Ekosport, Décathlon) avec leurs vraies adresses, sans
+  // aucune mention visible. Le seul mot « simulé » vivait dans un commentaire de code.
+  const src = readFileSync("src/components/shop/ShoppingHub.tsx", "utf8");
+  assert.ok(/demo\.title/.test(src) && /demo\.body/.test(src), "aucun avertissement de démonstration rendu à l'écran");
+  for (const lang of ["Catalogue de démonstration", "Demo catalogue", "Demo-Katalog", "Catálogo de demostración", "Catálogo de demonstração"]) {
+    assert.ok(src.includes(lang), `avertissement manquant en une langue : ${lang}`);
+  }
+});
+test("les services externes gratuits ne sont pas ouverts aux anonymes", () => {
+  // Overpass et le géocodage sont des services communautaires à quotas stricts : une
+  // route ouverte, c'est l'adresse IP de l'application bannie pour TOUS les utilisateurs.
+  for (const f of ["src/app/api/parcours/geometry/route.ts", "src/app/api/races/geocode/route.ts"]) {
+    if (!existsSync(f)) continue;
+    assert.ok(/denyIfAnonymous|auth\.getUser/.test(readFileSync(f, "utf8")), `${f} est ouvert aux requêtes anonymes`);
+  }
+});
+
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log(`  ✗ ${f}`); process.exit(1); }

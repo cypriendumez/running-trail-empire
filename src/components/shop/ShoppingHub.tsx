@@ -633,6 +633,7 @@ const SX: Record<string, Record<string, string>> = {
     "cat.shoes_road": "Chaussures Route", "cat.shoes_trail": "Chaussures Trail", "cat.watches": "Montres GPS",
     "cat.clothing": "Vêtements", "cat.accessories": "Accessoires", "cat.nutrition": "Nutrition",
     "searchPh": "Rechercher un produit…", "reset": "Réinitialiser", "shop": "Boutique", "searchOf": "Recherche de «{q}»",
+    "demo.title": "Catalogue de démonstration.", "demo.body": "Les produits, les prix et les disponibilités affichés ici sont SIMULÉS et ne correspondent à aucune offre réelle. Les noms d\u2019enseignes servent uniquement d\u2019exemple : vérifie toujours le prix sur le site du marchand avant tout achat.",
     "filters": "Filtres", "f.cat": "Catégorie", "f.brand": "Marque", "f.price": "Prix", "f.score": "Score IA min", "f.avail": "Disponibilité",
     "all": "Tout", "inStockOnly": "En stock uniquement", "inStock": "En stock",
     "product": "produit", "products": "produits",
@@ -647,6 +648,7 @@ const SX: Record<string, Record<string, string>> = {
     "cat.shoes_road": "Road shoes", "cat.shoes_trail": "Trail shoes", "cat.watches": "GPS watches",
     "cat.clothing": "Clothing", "cat.accessories": "Accessories", "cat.nutrition": "Nutrition",
     "searchPh": "Search for a product…", "reset": "Reset", "shop": "Store", "searchOf": "Search for “{q}”",
+    "demo.title": "Demo catalogue.", "demo.body": "The products, prices and availability shown here are SIMULATED and match no real offer. Retailer names are examples only \u2014 always check the actual price on the merchant\u2019s site before buying.",
     "filters": "Filters", "f.cat": "Category", "f.brand": "Brand", "f.price": "Price", "f.score": "Min AI score", "f.avail": "Availability",
     "all": "All", "inStockOnly": "In stock only", "inStock": "In stock",
     "product": "product", "products": "products",
@@ -661,6 +663,7 @@ const SX: Record<string, Record<string, string>> = {
     "cat.shoes_road": "Straßenschuhe", "cat.shoes_trail": "Trailschuhe", "cat.watches": "GPS-Uhren",
     "cat.clothing": "Bekleidung", "cat.accessories": "Zubehör", "cat.nutrition": "Ernährung",
     "searchPh": "Produkt suchen…", "reset": "Zurücksetzen", "shop": "Shop", "searchOf": "Suche nach „{q}“",
+    "demo.title": "Demo-Katalog.", "demo.body": "Produkte, Preise und Verfügbarkeit sind SIMULIERT und entsprechen keinem realen Angebot. Händlernamen dienen nur als Beispiel \u2014 prüfe den Preis stets auf der Website des Händlers.",
     "filters": "Filter", "f.cat": "Kategorie", "f.brand": "Marke", "f.price": "Preis", "f.score": "Min. KI-Score", "f.avail": "Verfügbarkeit",
     "all": "Alle", "inStockOnly": "Nur auf Lager", "inStock": "Auf Lager",
     "product": "Produkt", "products": "Produkte",
@@ -675,6 +678,7 @@ const SX: Record<string, Record<string, string>> = {
     "cat.shoes_road": "Zapatillas asfalto", "cat.shoes_trail": "Zapatillas trail", "cat.watches": "Relojes GPS",
     "cat.clothing": "Ropa", "cat.accessories": "Accesorios", "cat.nutrition": "Nutrición",
     "searchPh": "Buscar un producto…", "reset": "Restablecer", "shop": "Tienda", "searchOf": "Búsqueda de «{q}»",
+    "demo.title": "Catálogo de demostración.", "demo.body": "Los productos, precios y disponibilidad mostrados aquí son SIMULADOS y no corresponden a ninguna oferta real. Los nombres de tiendas son solo un ejemplo: comprueba siempre el precio en la web del comercio antes de comprar.",
     "filters": "Filtros", "f.cat": "Categoría", "f.brand": "Marca", "f.price": "Precio", "f.score": "Score IA mín.", "f.avail": "Disponibilidad",
     "all": "Todo", "inStockOnly": "Solo en stock", "inStock": "En stock",
     "product": "producto", "products": "productos",
@@ -689,6 +693,7 @@ const SX: Record<string, Record<string, string>> = {
     "cat.shoes_road": "Sapatilhas estrada", "cat.shoes_trail": "Sapatilhas trail", "cat.watches": "Relógios GPS",
     "cat.clothing": "Vestuário", "cat.accessories": "Acessórios", "cat.nutrition": "Nutrição",
     "searchPh": "Pesquisar um produto…", "reset": "Repor", "shop": "Loja", "searchOf": "Pesquisa de «{q}»",
+    "demo.title": "Catálogo de demonstração.", "demo.body": "Os produtos, preços e disponibilidade aqui apresentados são SIMULADOS e não correspondem a nenhuma oferta real. Os nomes das lojas são apenas exemplos: confirma sempre o preço no site do comerciante antes de comprar.",
     "filters": "Filtros", "f.cat": "Categoria", "f.brand": "Marca", "f.price": "Preço", "f.score": "Score IA mín.", "f.avail": "Disponibilidade",
     "all": "Tudo", "inStockOnly": "Só em stock", "inStock": "Em stock",
     "product": "produto", "products": "produtos",
@@ -942,6 +947,22 @@ export function ShoppingHub() {
   // ── RESULTS MODE ──────────────────────────────────────────────────────────
   return (
     <div className="pb-10">
+      {/*
+        AVERTISSEMENT DE DÉMONSTRATION — non décoratif.
+        Le catalogue est GÉNÉRÉ : produits, prix et disponibilités sont inventés, et ils
+        étaient attribués à de VRAIES enseignes (i-Run, Alltricks, Lepape, Ekosport,
+        Décathlon) avec leurs vraies adresses. Aucun écran ne le signalait — seul un
+        commentaire dans le code le mentionnait. Un athlète pouvait donc croire à une
+        offre réelle et fonder un achat dessus, et les enseignes voir leur nom associé à
+        des prix qu'elles n'ont jamais pratiqués.
+      */}
+      <div className="mb-5 flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3">
+        <span className="mt-0.5 text-base leading-none" aria-hidden>⚠️</span>
+        <p className="text-[13px] leading-relaxed text-amber-900">
+          <strong>{d["demo.title"]}</strong> {d["demo.body"]}
+        </p>
+      </div>
+
       {/* Top search bar (compact) */}
       <div className="flex items-center gap-3 mb-6">
         <div ref={searchRef} className="relative flex-1">
