@@ -101,6 +101,13 @@ export async function GET(req: Request) {
         ground_contact_ms: ri(act.avg_ground_contact_time),
         stride_length_m: act.average_stride ?? (act.avg_stride_length ? act.avg_stride_length / 100 : null),
         cardiac_decoupling: act.decoupling ?? null,
+        // Champs disponibles chez intervals.icu mais jamais enregistrés jusqu'ici (recensement
+        // du 7/08 : 0 % de remplissage côté base, 8/8 côté API). La température en particulier
+        // rendait toute l'adaptation à la chaleur inopérante — 31 °C sur les sorties récentes.
+        weather_temp_c: act.average_temp ?? null,
+        gap_min_km: act.gap && act.gap > 0.3 ? Math.round((1000 / 60 / act.gap) * 100) / 100 : null,
+        hr_zone_seconds: Array.isArray(act.icu_hr_zone_times) ? act.icu_hr_zone_times : null,
+        intensity_pct: act.icu_intensity != null ? Math.round(act.icu_intensity) : null,
         source: "garmin",
       };
 
@@ -303,6 +310,9 @@ interface IntervalsActivity {
   avg_ground_contact_time?: number;
   avg_stride_length?: number;
   decoupling?: number;
+  average_temp?: number;
+  gap?: number;
+  icu_hr_zone_times?: number[];
   pace_z1?: number;
   pace_z2?: number;
   pace_z3?: number;

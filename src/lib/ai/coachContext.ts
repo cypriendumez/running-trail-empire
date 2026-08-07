@@ -35,6 +35,7 @@ type Wk = {
   tss?: number | null; avg_cadence_spm?: number | null; avg_power_watts?: number | null; max_hr?: number | null;
   vertical_oscillation_cm?: number | null; ground_contact_ms?: number | null; stride_length_m?: number | null;
   cardiac_decoupling?: number | null; weather_temp_c?: number | null;
+  gap_min_km?: number | null; hr_zone_seconds?: number[] | null; intensity_pct?: number | null;
 };
 
 const TYPE_TSS: Record<string, number> = { easy: 50, tempo: 75, interval: 90, vma: 100, long_run: 65, trail: 70, hill_repeat: 85, race: 110, recovery: 30, strength: 40 };
@@ -140,7 +141,7 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
     sb.from("performance_baselines").select("*").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).single(),
     sb.from("hrv_data").select("hrv_ms,physiological_state,date").eq("user_id", userId).order("date", { ascending: false }).limit(14),
     sb.from("sleep_data").select("sleep_score,total_sleep_min,deep_sleep_min,rem_sleep_min,body_battery_end,respiration_rate,date").eq("user_id", userId).order("date", { ascending: false }).limit(7),
-    sb.from("workouts").select("date,type,distance_km,duration_seconds,elevation_gain_m,avg_hr,max_hr,training_effect,tss,avg_cadence_spm,avg_power_watts,vertical_oscillation_cm,ground_contact_ms,stride_length_m,cardiac_decoupling,weather_temp_c").eq("user_id", userId).order("date", { ascending: false }).limit(60),
+    sb.from("workouts").select("date,type,distance_km,duration_seconds,elevation_gain_m,avg_hr,max_hr,training_effect,tss,avg_cadence_spm,avg_power_watts,vertical_oscillation_cm,ground_contact_ms,stride_length_m,cardiac_decoupling,weather_temp_c,gap_min_km,hr_zone_seconds,intensity_pct").eq("user_id", userId).order("date", { ascending: false }).limit(60),
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "session_feedback").order("created_at", { ascending: false }).limit(5),
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "race_objective").maybeSingle(),
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "coach_session").order("created_at", { ascending: false }).limit(40),
@@ -179,6 +180,19 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // Une séance est « dure » si son TYPE le dit OU si la FC révèle un effort élevé (≥ 90 % FCmax).
   const isHardWk = (w: Wk) => isHardType(w.type) || (fcMaxEst != null && w.avg_hr != null && w.avg_hr >= fcMaxEst * 0.90);
   const hardShare = recent14.length ? Math.round(recent14.filter(isHardWk).length / recent14.length * 100) : null;
+  // ── LE VRAI 80/20 : en TEMPS passé par zone, pas en nombre de séances ──
+  // Compter les séances est trompeur : deux fractionnés courts dans une semaine de
+  // plusieurs heures restent ~80 % facile. Seul le temps en zone tranche. Les secondes
+  // par zone arrivent désormais d'intervals.icu (Z1-Z2 = facile, Z3+ = intensité).
+  const zoneTotals = recent14.reduce((acc, w) => {
+    const z = Array.isArray(w.hr_zone_seconds) ? w.hr_zone_seconds : null;
+    if (!z) return acc;
+    acc.easy += (z[0] ?? 0) + (z[1] ?? 0);
+    acc.hard += z.slice(2).reduce((a, b) => a + (b ?? 0), 0);
+    return acc;
+  }, { easy: 0, hard: 0 });
+  const zoneTotal = zoneTotals.easy + zoneTotals.hard;
+  const hardTimePct = zoneTotal > 600 ? Math.round((zoneTotals.hard / zoneTotal) * 100) : null;
 
   const hrvVals = hrv.map(h => h.hrv_ms).filter((v): v is number => v != null);
   const hrvLatest = hrvVals[0] ?? null;
@@ -644,8 +658,8 @@ CHARGE D'ENTRAÎNEMENT
 - ⏱️ Dernière séance DURE réellement effectuée : ${lastHardDaysAgo == null ? "aucune trace récente" : lastHardDaysAgo === 0 ? "AUJOURD'HUI ⚠️ → pas de deuxième séance dure aujourd'hui ni demain" : `il y a ${lastHardDaysAgo} j`}${lastHardDaysAgo != null && lastHardDaysAgo * 24 < hardGapH ? ` ⚠️ moins de ${hardGapH} h se sont écoulées : la prochaine qualité doit attendre.` : ""}${skippedWeekdays.length ? `\n- 🚫 JOURS SYSTÉMATIQUEMENT RATÉS : ${skippedWeekdays.map(d => ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d]).join(", ")} — prescrits plusieurs fois, jamais courus. Ne t'obstine pas : place-y du repos ou rien, et redistribue ailleurs.` : ""}
 - Repos : dernière séance il y a ${daysSinceLast ?? "?"} j · ${restDays7} j sans courir sur les 7 derniers${daysSinceLast != null && daysSinceLast >= 3 ? " ⚠️ reprise après coupure : redémarre en douceur, pas de grosse séance d'emblée" : ""}
 - CTL ${Math.round(load.ctl)} (forme) · ATL ${Math.round(load.atl)} (fatigue) · TSB ${Math.round(load.tsb)} (fraîcheur) · ratio aigu:chronique ${r1(load.acr)}${load.acr > 1.5 ? " ⚠️ élevé (risque)" : ""}
-- Répartition d'intensité 14j : ${hardShare ?? "?"} % de séances qualité (cible polarisée ≤ 20 %)
-- 5 dernières séances : ${last5.join(" | ") || "aucune"}
+- Répartition d'intensité 14j : ${hardTimePct != null ? `**${hardTimePct} % du TEMPS passé en Z3+** (mesure réelle par zone FC — c'est CE chiffre qui compte, cible ≤ 20 %)${hardTimePct > 25 ? " ⚠️ trop d'intensité : il court ses footings trop vite ou empile les séances dures" : hardTimePct < 8 ? " ⚠️ presque aucune intensité : il ne progressera pas sans qualité" : " ✅ polarisation correcte"}` : `${hardShare ?? "?"} % de SÉANCES qualité (approximation : le temps par zone n'est pas encore remonté par sa montre)`}
+- 5 dernières séances : ${last5.join(" | ") || "aucune"}${(() => { const g = workouts.slice(0, 10).filter(w => w.gap_min_km != null && (w.elevation_gain_m ?? 0) > 150); return g.length ? `\n- ⛰️ ALLURE AJUSTÉE AU DÉNIVELÉ (GAP) sur ses sorties vallonnées : ${g.slice(0, 3).map(w => `${String(w.date).slice(5, 10)} ${w.gap_min_km}/km (D+${w.elevation_gain_m})`).join(" · ")} — juge sa performance là-dessus, PAS sur l'allure brute qui ne veut rien dire en montée.` : ""; })()}
 ${pains.length ? `- ⚠️ DOULEUR(S) SIGNALÉE(S) par l'athlète (zone précise) : ${pains.join(", ")} → ADAPTE les prochaines séances à CETTE zone (voir consigne sécurité).` : ""}${fbNotes.length ? `\n- 🗣️ Notes récentes de l'athlète (ressenti/douleur — LIS-LES et tiens-en compte) : ${fbNotes.map(n => `« ${n} »`).join(" ; ")}` : ""}${lastRpe != null ? `\n- Dernier ressenti d'effort (RPE) : ${lastRpe}/10` : ""}
 
 ANALYSE APPROFONDIE (croise tous ces facteurs)

@@ -71,6 +71,12 @@ export async function syncIntervalsForUser(
         ground_contact_ms: act.avg_ground_contact_time ?? null,
         stride_length_m: act.avg_stride_length ? act.avg_stride_length / 100 : null,
         cardiac_decoupling: act.decoupling ?? null,
+        // Champs disponibles chez intervals.icu mais jamais enregistrés jusqu'ici — dont
+        // la TEMPÉRATURE, sans laquelle toute l'adaptation à la chaleur restait lettre morte.
+        weather_temp_c: act.average_temp ?? null,
+        gap_min_km: act.gap && act.gap > 0.3 ? Math.round((1000 / 60 / act.gap) * 100) / 100 : null,
+        hr_zone_seconds: Array.isArray(act.icu_hr_zone_times) ? act.icu_hr_zone_times : null,
+        intensity_pct: act.icu_intensity != null ? Math.round(act.icu_intensity) : null,
         source: "garmin",
       },
       { onConflict: "user_id,date,title", ignoreDuplicates: false }
@@ -153,6 +159,7 @@ interface IntervalsActivity {
   average_watts?: number; average_cadence?: number; icu_tss?: number;
   aerobic_te?: number; avg_vertical_oscillation?: number;
   avg_ground_contact_time?: number; avg_stride_length?: number; decoupling?: number;
+  average_temp?: number; gap?: number; icu_hr_zone_times?: number[]; icu_intensity?: number;
 }
 interface IntervalsWellness {
   id: string; hrv?: number; hrvSDNN?: number; sleepSecs?: number;
