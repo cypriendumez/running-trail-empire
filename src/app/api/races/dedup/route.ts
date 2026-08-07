@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { denyIfNotAdmin } from "@/lib/api/adminGuard";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -24,7 +25,10 @@ async function fetchAllRaces() {
   return all;
 }
 
-export async function POST() {
+export async function POST(req: Request) {
+  // Route de MAINTENANCE : elle écrit avec la clé service_role.
+  const denied = await denyIfNotAdmin(req);
+  if (denied) return NextResponse.json({ error: denied }, { status: 403 });
   const all = await fetchAllRaces();
   const total = all.length;
 

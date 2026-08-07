@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { denyIfNotAdmin } from "@/lib/api/adminGuard";
 
 
 const SEED_RACES = [
@@ -116,7 +117,10 @@ const SEED_RACES = [
   },
 ];
 
-export async function GET() {
+export async function GET(req: Request) {
+  // Route de MAINTENANCE : elle écrit avec la clé service_role.
+  const denied = await denyIfNotAdmin(req);
+  if (denied) return NextResponse.json({ error: denied }, { status: 403 });
   // Check what's already in DB to avoid duplicates
   const { data: existing } = await createAdminClient().from("races").select("name,date");
   const existingKeys = new Set((existing || []).map(r => `${r.name}::${r.date}`));

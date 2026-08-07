@@ -16,6 +16,7 @@ import { vmaFromPaceCurve, bestVmaFromWorkouts } from "../src/lib/running/fitnes
 import { heatAdvice, windAdvice, altitudeLossPct, heatAcclimation } from "../src/lib/weather/openMeteo";
 import { parseReps, parsePaceSec, stepsForType, warmCoolMin, buildWorkoutDescription } from "../src/lib/watch/intervals";
 import { buildWeekPlan, CONFIRMED_DAYS } from "../src/lib/ai/autoPlan";
+import { stripProfileSecrets } from "../src/lib/profile/safe";
 import type { AthleteContext } from "../src/lib/ai/coachContext";
 
 let passed = 0;
@@ -333,6 +334,50 @@ test("une ligne ne peut être revendiquée qu'une seule fois", () => {
 test("une activité inconnue n'est appariée à rien", () => {
   const match = makeMatcher([{ id: "A", date: "2026-08-01", title: "X", external_id: "i9" }]);
   assert.equal(match({ id: "i123", date: "2026-08-07", title: "Y" }), undefined);
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  SÉCURITÉ — invariants vérifiés sur le CODE SOURCE, pas sur le comportement.
+//  Une route d'administration sans garde ne lève aucune erreur : elle répond 200.
+// ─────────────────────────────────────────────────────────────────────────────
+import { readdirSync, readFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
+
+console.log("\nSÉCURITÉ");
+test("toute route d'administration est protégée", () => {
+  // Constaté en production : POST /api/admin/migrate répondait 200 à une requête
+  // ANONYME, avec un client service_role et du DDL en dur. Inoffensif seulement parce
+  // que la fonction `exec_sql` n'existe pas — une protection par accident.
+  const dir = "src/app/api/admin";
+  if (!existsSync(dir)) return;
+  const unguarded: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const f = join(dir, entry.name, "route.ts");
+    if (!existsSync(f)) continue;
+    const src = readFileSync(f, "utf8");
+    // Deux mécanismes coexistent : en-tête secret (routes machine) et vérification de
+    // l'adresse du compte connecté (routes appelées depuis le panneau admin).
+    if (!/ADMIN_SECRET|x-admin-secret|ADMIN_EMAIL|is_admin|isAdmin/.test(src)) unguarded.push(entry.name);
+  }
+  assert.deepEqual(unguarded, [], `route(s) d'administration sans garde : ${unguarded.join(", ")}`);
+});
+test("le profil envoyé au navigateur ne contient jamais la clé intervals.icu", () => {
+  const stripped = stripProfileSecrets({ id: "x", intervals_api_key: "SECRET", intervals_athlete_id: "i1" });
+  assert.equal((stripped as Record<string, unknown>).intervals_api_key, undefined);
+  assert.equal((stripped as Record<string, unknown>).intervals_athlete_id, "i1", "l'identifiant n'est pas secret, l'UI en a besoin");
+});
+test("aucune page du tableau de bord ne transmet le profil brut", () => {
+  const pages = ["layout.tsx", "page.tsx", "settings/page.tsx", "ghost-runner/page.tsx", "profile/page.tsx"];
+  for (const p of pages) {
+    const f = join("src/app/dashboard", p);
+    if (!existsSync(f)) continue;
+    const src = readFileSync(f, "utf8");
+    if (/from\("profiles"\)\.select\("\*"\)/.test(src)) {
+      assert.ok(/stripProfileSecrets/.test(src), `${p} lit tout le profil sans le nettoyer`);
+    }
+  }
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

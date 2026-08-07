@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import * as cheerio from "cheerio";
+import { denyIfNotAdmin } from "@/lib/api/adminGuard";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -600,7 +601,10 @@ function toSupabaseRace(r: RaceEntry) {
 }
 
 // ─── GET: status ────────────────────────────────────────────────────────────
-export async function GET() {
+export async function GET(req: Request) {
+  // Route de MAINTENANCE : elle écrit avec la clé service_role.
+  const denied = await denyIfNotAdmin(req);
+  if (denied) return NextResponse.json({ error: denied }, { status: 403 });
   const { count } = await createAdminClient().from("races").select("*", { count:"exact", head:true });
   return NextResponse.json({ races_in_db: count || 0 });
 }
@@ -610,7 +614,10 @@ export async function GET() {
 // On bascule la date sur le marqueur 2099 (affiché « Date à venir ») au lieu de
 // supprimer. On ne supprime que les éditions périmées DÉJÀ remplacées par une
 // édition future de la même course (même nom + ville + distance).
-export async function DELETE() {
+export async function DELETE(req: Request) {
+  // Route de MAINTENANCE : elle écrit avec la clé service_role.
+  const denied = await denyIfNotAdmin(req);
+  if (denied) return NextResponse.json({ error: denied }, { status: 403 });
   const sb = createAdminClient();
   const today = new Date().toISOString().slice(0, 10);
 
@@ -653,7 +660,10 @@ export async function DELETE() {
 }
 
 // ─── POST: trigger sync ─────────────────────────────────────────────────────
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
+  // Route de MAINTENANCE : elle écrit avec la clé service_role.
+  const denied = await denyIfNotAdmin(req);
+  if (denied) return NextResponse.json({ error: denied }, { status: 403 });
   const body = await req.json().catch(() => ({}));
   const wpPages = Math.min(body.pages || 25, 113);
   const wpStartPage = Math.max(body.startPage || 1, 1);

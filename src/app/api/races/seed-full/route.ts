@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { denyIfNotAdmin } from "@/lib/api/adminGuard";
 
 export const runtime = "nodejs";
 
@@ -472,7 +473,10 @@ const RACES_2026 = [
   { name:"Trail du Massif Central 2027", city:"Clermont-Ferrand", dept:"63", date:"2027-04-18", km:42, elev:2200, type:"trail_m", diff:"red", terrain:["volcanic","single_track"], lat:45.7772, lng:3.0870, reg:"auvergne-rhone-alpes", org:"Trail Auvergne", url:"" },
 ];
 
-export async function POST() {
+export async function POST(req: Request) {
+  // Route de MAINTENANCE : elle écrit avec la clé service_role.
+  const denied = await denyIfNotAdmin(req);
+  if (denied) return NextResponse.json({ error: denied }, { status: 403 });
   const today = new Date().toISOString().slice(0, 10);
 
   // Get existing races to avoid duplicates
@@ -525,6 +529,9 @@ export async function POST() {
   return NextResponse.json({ inserted, total: count, message: `${inserted} courses ajoutées` });
 }
 
-export async function GET() {
-  return POST();
+export async function GET(req: Request) {
+  // Route de MAINTENANCE : elle écrit avec la clé service_role.
+  const denied = await denyIfNotAdmin(req);
+  if (denied) return NextResponse.json({ error: denied }, { status: 403 });
+  return POST(req);
 }

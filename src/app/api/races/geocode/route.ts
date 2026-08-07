@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { denyIfAnonymous } from "@/lib/api/adminGuard";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -27,7 +28,10 @@ async function nominatim(city: string, dept: string): Promise<{ lat: number; lon
   return null;
 }
 
-export async function POST() {
+export async function POST(req: Request) {
+  // Consomme un service de géocodage externe : réservé aux comptes connectés.
+  const denied = await denyIfAnonymous();
+  if (denied) return NextResponse.json({ error: denied }, { status: 401 });
   // Fetch races without GPS
   const { data: races, error } = await createAdminClient()
     .from("races")
@@ -71,6 +75,9 @@ export async function POST() {
   });
 }
 
-export async function GET() {
-  return POST();
+export async function GET(req: Request) {
+  // Consomme un service de géocodage externe : réservé aux comptes connectés.
+  const denied = await denyIfAnonymous();
+  if (denied) return NextResponse.json({ error: denied }, { status: 401 });
+  return POST(req);
 }
