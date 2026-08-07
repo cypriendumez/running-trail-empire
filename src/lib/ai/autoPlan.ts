@@ -174,6 +174,13 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // Sans ce bloc, le moteur pouvait poser une VMA la veille ou une sortie longue le
   // jour J — il ne consultait simplement jamais la date de course.
   const raceIdx = ctx.daysToRace != null && ctx.daysToRace >= 0 && ctx.daysToRace <= 6 ? ctx.daysToRace : -1;
+
+  // Budget de SORTIES de la semaine. Déclaré avant tout placement : la semaine de course
+  // pose elle aussi des footings (déblocage, avant-veille, reprise) qui doivent le
+  // consommer — les oublier donnait 6 séances à un athlète qui en déclare 3.
+  let runBudget = Math.max(1, ctx.availability.daysPerWeek - (raceIdx >= 0 ? 1 : 0));
+  const spend = () => { runBudget -= 1; };
+
   if (raceIdx >= 0) {
     const o = ctx.objective;
     put(raceIdx, {
@@ -186,25 +193,36 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
     for (const d of [1, 2]) {
       const i = raceIdx - d;
       if (i < 0) continue;
-      put(i, d === 1
+      // Ces jours-là sont des SORTIES : ils consomment le budget hebdomadaire au même
+      // titre qu'un footing. Les oublier donnait 6 séances à un athlète qui en déclare 3.
+      //
+      // Et le protocole complet — avant-veille + veille + reprise — suppose au moins
+      // quatre sorties dans la semaine. En dessous, on garde le seul déblocage de la
+      // veille : celui qui compte. Un coureur à trois sorties par semaine préfère du
+      // repos à un footing de plus juste avant sa course.
+      if (runBudget <= 0) continue;
+      if (put(i, d === 1
         ? { type: "Récup", title: "Déblocage — veille de course",
             detail: "20 min de footing très facile FC Z1 + 3 lignes droites de 80 m à l'allure de course. Rien de plus : on réveille les jambes, on ne les fatigue pas.",
             why: "La forme se construit avant, pas la veille. Une séance de plus ne t'apportera rien et peut te coûter la course.",
             tags: ["Récup", "Veille de course"] }
         : { type: "Récup", title: "Avant-veille de course",
             detail: "30 min de footing facile FC Z1-Z2, éventuellement 4×30 s à l'allure de course pour rester tonique.",
-            why: "On garde le contact avec l'allure sans entamer la fraîcheur.", tags: ["Récup", "Affûtage"] });
+            why: "On garde le contact avec l'allure sans entamer la fraîcheur.", tags: ["Récup", "Affûtage"] })) spend();
     }
     // Les jours qui suivent : récupération obligatoire.
     for (const d of [1, 2]) {
       const i = raceIdx + d;
       if (i > 6) continue;
-      put(i, d === 1
+      // Le footing de reprise n'a lieu que si le budget de sorties le permet.
+      if (d === 2 && runBudget <= 0) continue;
+      const placedRest = put(i, d === 1
         ? { type: "Repos", title: "Repos post-course", detail: "Repos complet. Marche, étirements doux, hydratation et alimentation soignées.",
             why: "Une course, c'est un effort maximal : le corps a besoin de plusieurs jours pour réparer.", tags: ["Repos"] }
         : { type: "Récup", title: "Récupération post-course",
             detail: "20 à 30 min de footing très facile FC Z1, ou repos si les jambes sont encore lourdes.",
             why: "Reprise en douceur : compte environ un jour de récupération par tranche de 3 km courus en course.", tags: ["Récup", "Z1"] });
+      if (placedRest && d === 2) spend();   // le footing de reprise est une sortie
     }
   }
 
@@ -231,9 +249,8 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   }
   // Budget de séances de COURSE pour la semaine (la course elle-même en consomme une).
   // C'est ce plafond qui empêche de prescrire 6 sorties à quelqu'un qui peut en faire 3.
-  let runBudget = Math.max(1, ctx.availability.daysPerWeek - (raceIdx >= 0 ? 1 : 0));
+
   const canRun = (i: number) => isFree(i) && avail(i) && runBudget > 0;
-  const spend = () => { runBudget -= 1; };
 
   // ── 2. Sortie longue : dimanche de préférence, sinon samedi, sinon un jour praticable.
   // Semaine de course : PAS de sortie longue. La course est déjà l'effort long et dur
@@ -326,13 +343,27 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // Le VOLUME plafonne aussi le nombre de qualités : une séance complète (20 min
   // d'échauffement + corps + 10 min de retour au calme) pèse ~11 km. En dessous de
   // 35 km/semaine, deux séances de ce type ne rentrent pas à côté de la sortie longue.
-  const QUALITY_KM = 11;
+  // Coût kilométrique d'une séance de qualité. C'était une CONSTANTE de 11 km, quel que
+  // soit le coureur : pour un débutant visant 18 km par semaine, une seule séance en
+  // consommait plus de la moitié, et le plan dépassait sa cible de 45 %. On le calcule
+  // sur SON allure : échauffement + retour au calme + ~25 min de corps.
+  const QUALITY_KM = (() => {
+    const p2 = ctx.easyPace?.match(/(\d+)['’](\d{2})/);
+    if (!p2) return 11;
+    const secPerKm = Number(p2[1]) * 60 + Number(p2[2]);
+    const minutes = warm + cool + 25;
+    return Math.max(5, Math.round((minutes * 60 / secPerKm) * 10) / 10);
+  })();
   const maxByVolume = Math.max(1, Math.floor((targetKm - longRunKm) / QUALITY_KM));
   // La FRÉQUENCE plafonne aussi : à 3 sorties par semaine, deux séances de qualité plus
   // la sortie longue ne laissent AUCUN footing facile — soit 100 % d'intensité, l'inverse
   // du modèle polarisé. Une qualité pour trois sorties, deux à partir de cinq.
   const maxByFrequency = ctx.availability.daysPerWeek <= 3 ? 1 : ctx.availability.daysPerWeek <= 5 ? 2 : 3;
-  const quality = wp.quality.slice(0, Math.min(wp.quality.length, maxByVolume, maxByFrequency));
+  // AFFÛTAGE : on garde l'intensité mais on coupe le VOLUME dur. Sans ce plafond, une
+  // semaine d'affûtage cumulait sortie longue + 3 qualités — quatre séances exigeantes
+  // à quinze jours de l'objectif, soit exactement ce que l'affûtage doit empêcher.
+  const maxByTaper = ctx.cycle.taper ? (longIdx >= 0 ? 1 : 2) : 99;
+  const quality = wp.quality.slice(0, Math.min(wp.quality.length, maxByVolume, maxByFrequency, maxByTaper));
   for (const q of quality) {
     let idx = -1;
     for (let i = dayZeroDropped ? 1 : 0; i <= 6; i++) if (canRun(i) && okSpacing(i) && !coolerExists(i)) { idx = i; break; }
@@ -365,14 +396,27 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // financer une séance qui n'aura jamais lieu (constaté : footings ramenés à 4 km).
   const qualityKept = placed.filter((i) => i >= 0 && i !== raceIdx && !(dayZeroDropped && i === 0));
   const usedKm = (longIdx >= 0 ? longRunKm : 0) + qualityKept.length * QUALITY_KM;
-  const rawEasy = easySlots.length > 0 ? (targetKm - usedKm) / easySlots.length : 0;
+  // Le budget restant ne suffit pas toujours à alimenter tous les créneaux libres. Plutôt
+  // que d'y poser des footings au rabais — ce qui faisait dépasser la cible hebdomadaire —
+  // on réduit le NOMBRE de sorties : un jour de repos vaut mieux qu'un footing de 2 km.
+  const remaining = Math.max(0, targetKm - usedKm);
+  const affordable = Math.max(0, Math.floor(remaining / 4));
+  if (easySlots.length > affordable) {
+    for (const i of easySlots.splice(affordable)) { slot[i] = null; runBudget += 1; }
+  }
+  const rawEasy = easySlots.length > 0 ? remaining / easySlots.length : 0;
   // Bornes de réalisme : en dessous de 4 km ce n'est plus une séance, au-dessus de 18 km
   // ce n'est plus un footing — un gros volume se couvre en DOUBLANT les sorties.
   // Semaine de course : les footings restent courts quoi qu'il arrive. Un « footing »
   // de 18 km trois jours avant un départ ruinerait la fraîcheur, même si le volume
   // cible n'a pas été correctement réduit en amont.
-  const easyCap = raceIdx >= 0 ? 10 : 18;
-  const easyKm = Math.min(easyCap, Math.max(4, Math.round(rawEasy)));
+  // Un footing plus long que la sortie longue n'a aucun sens : c'est la sortie longue qui
+  // porte le volume, et deux séances de même durée n'en font qu'une répétée. Constaté sur
+  // 3 sorties par semaine — 16 km de « footing » contre 13 km de sortie longue.
+  const easyCap = Math.min(raceIdx >= 0 ? 10 : 18, longIdx >= 0 ? Math.max(4, longRunKm * 0.85) : 18);
+  // Plancher à 4 km SAUF si le budget ne le permet pas : mieux vaut une sortie de moins
+  // qu'un dépassement de la cible hebdomadaire.
+  const easyKm = Math.min(easyCap, Math.max(rawEasy >= 3 ? 4 : 3, Math.round(rawEasy)));
   const doubles = rawEasy > easyCap && raceIdx < 0;
   for (const i of easySlots) put(i, {
     type: "Endurance", title: "Footing en endurance",
@@ -387,8 +431,13 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // Il ne consomme pas de budget de course : 30 min à la maison restent possibles
   // un jour de repos de course.
   const hardIdx = new Set<number>([...placed.filter((i) => i >= 0), longIdx].filter((i) => i >= 0));
+  // Le repli acceptait N'IMPORTE quel jour libre, y compris la veille d'une séance dure —
+  // ce que la règle principale interdit précisément. Constaté sur 164 scénarios : renfo
+  // le samedi, VMA le dimanche. Un renforcement la veille d'une qualité en gâche les
+  // deux : jambes lourdes le jour J, et bénéfice de force non assimilé.
+  // Mieux vaut PAS de renfo qu'un renfo mal placé — il n'est pas urgent à la journée près.
   const renfoIdx = [1, 2, 3, 4, 5, 6].find((i) => isFree(i) && avail(i) && !hardIdx.has(i + 1))
-    ?? [1, 2, 3, 4, 5, 6].find((i) => isFree(i) && avail(i));
+    ?? [1, 2, 3, 4, 5, 6].find((i) => isFree(i) && !hardIdx.has(i + 1));
   if (renfoIdx != null) put(renfoIdx, {
     type: "Renfo", title: "Renforcement musculaire",
     // Le renforcement était un texte UNIQUE, identique toute l'année. C'est pourtant le
