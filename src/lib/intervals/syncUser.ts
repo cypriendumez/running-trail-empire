@@ -19,7 +19,7 @@ function authHeader(apiKey: string) {
 export async function syncIntervalsForUser(
   admin: SupabaseClient,
   opts: { userId: string; athleteId: string; apiKey: string; days?: number },
-): Promise<{ synced: number; error?: string }> {
+): Promise<{ synced: number; error?: string; failures?: string[] }> {
   const { userId, athleteId, apiKey } = opts;
   const days = opts.days ?? 7;
   const profile = { id: userId, intervals_api_key: apiKey };
@@ -47,6 +47,7 @@ export async function syncIntervalsForUser(
   ]);
 
   let synced = 0;
+  const failures: string[] = [];
 
   // ── ÉCRITURE DES SÉANCES ────────────────────────────────────────────────────
   // On n'utilise PLUS `upsert(..., { onConflict: "user_id,date,title" })` : cette
@@ -57,16 +58,33 @@ export async function syncIntervalsForUser(
   //
   // On lit d'abord l'existant et on choisit explicitement insertion ou mise à jour,
   // comme le fait déjà le chemin appelé depuis le navigateur.
+  // Les colonnes entières (cadence, dénivelé, FC, puissance…) sont des smallint :
+  // y écrire un flottant fait échouer TOUTE la ligne (22P02). C'est ce qui se passait
+  // ici — `average_cadence * 2` donnait 176.54 — pendant que le chemin navigateur,
+  // lui, arrondissait. Deuxième raison, indépendante du ON CONFLICT, pour laquelle ce
+  // module n'a jamais rien enregistré.
+  const ri = (v: number | null | undefined) => (v != null ? Math.round(v) : null);
+
   const dates = [...new Set(activities.map(a => a.start_date_local?.split("T")[0]).filter(Boolean))] as string[];
   const existing = dates.length
     ? (await admin.from("workouts").select("id, date, title, external_id").eq("user_id", userId).in("date", dates)).data ?? []
     : [];
+  // Appariement. L'identifiant d'origine est exact ; (date, titre) ne l'est pas, car
+  // Garmin nomme les sorties d'après la ville et deux séances le même jour partagent
+  // le même titre. On ne s'en sert donc QUE pour les lignes historiques encore sans
+  // identifiant, et une ligne ne peut être revendiquée qu'UNE seule fois : la seconde
+  // activité du jour crée sa propre ligne au lieu d'écraser la première.
   const byExt = new Map<string, string>();
-  const byDateTitle = new Map<string, string>();
+  const unclaimed = new Map<string, string[]>();
   for (const w of existing as { id: string; date: string; title: string; external_id?: string | null }[]) {
-    if (w.external_id) byExt.set(w.external_id, w.id);
-    byDateTitle.set(`${w.date}__${w.title}`, w.id);
+    if (w.external_id) { byExt.set(w.external_id, w.id); continue; }
+    const k = `${w.date}__${w.title}`;
+    unclaimed.set(k, [...(unclaimed.get(k) ?? []), w.id]);
   }
+  const claim = (key: string): string | undefined => {
+    const pool = unclaimed.get(key);
+    return pool?.length ? pool.shift() : undefined;
+  };
 
   // Colonnes issues de migrations éventuellement non appliquées : PostgREST rejette
   // l'écriture ENTIÈRE si l'une d'elles manque (42703). On sonde une fois.
@@ -86,17 +104,17 @@ export async function syncIntervalsForUser(
       ...(hasNewCols ? { sport: sportOf(act.type), external_id: String(act.id) } : {}),
       duration_seconds: Math.max(1, act.moving_time ?? act.elapsed_time ?? 1),
       distance_km: act.distance ? act.distance / 1000 : null,
-      elevation_gain_m: act.total_elevation_gain ?? 0,
-      elevation_loss_m: act.total_elevation_loss ?? 0,
-      avg_hr: act.average_heartrate ?? null,
-      max_hr: act.max_heartrate ?? null,
+      elevation_gain_m: ri(act.total_elevation_gain) ?? 0,
+      elevation_loss_m: ri(act.total_elevation_loss) ?? 0,
+      avg_hr: ri(act.average_heartrate),
+      max_hr: ri(act.max_heartrate),
       avg_pace_min_km: act.average_speed ? 1000 / 60 / act.average_speed : null,
-      avg_power_watts: act.average_watts ?? null,
-      avg_cadence_spm: act.average_cadence ? act.average_cadence * 2 : null,
+      avg_power_watts: ri(act.average_watts),
+      avg_cadence_spm: act.average_cadence ? Math.round(act.average_cadence * 2) : null,
       tss: act.icu_training_load ?? act.icu_tss ?? null,
       training_effect: act.aerobic_te ?? null,
       vertical_oscillation_cm: act.avg_vertical_oscillation ?? null,
-      ground_contact_ms: act.avg_ground_contact_time ?? null,
+      ground_contact_ms: ri(act.avg_ground_contact_time),
       stride_length_m: act.avg_stride_length ? act.avg_stride_length / 100 : null,
       cardiac_decoupling: act.decoupling ?? null,
       // Champs disponibles chez intervals.icu mais jamais enregistrés jusqu'ici — dont
@@ -108,13 +126,16 @@ export async function syncIntervalsForUser(
       source: "garmin",
     };
 
-    const id = byExt.get(String(act.id)) ?? byDateTitle.get(`${date}__${title}`);
+    const id = byExt.get(String(act.id)) ?? claim(`${date}__${title}`);
     const { error } = id
       ? await admin.from("workouts").update(payload).eq("id", id)
       : await admin.from("workouts").insert(payload);
+    // Ne JAMAIS avaler une erreur d'écriture : c'est précisément ce qui a masqué
+    // pendant des mois le fait que ce chemin n'enregistrait rien du tout.
+    if (error) { failures.push(`${date} « ${title} » : ${error.code ?? "?"} ${error.message}`); continue; }
     // Seules les VRAIES nouveautés déclenchent une replanification : une mise à jour
     // se produit à chaque sondage et republierait le plan en boucle.
-    if (!error && !id) synced++;
+    if (!id) synced++;
   }
 
   for (const day of wellness) {
@@ -209,7 +230,7 @@ export async function syncIntervalsForUser(
     }
   } catch { /* best-effort : une analyse ne fait jamais échouer la synchronisation */ }
 
-  return { synced };
+  return { synced, ...(failures.length ? { failures } : {}) };
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

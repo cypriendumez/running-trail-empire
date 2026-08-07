@@ -671,10 +671,37 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
 ⛔ PLAFOND LIÉ AU PASSIF : ${runYears != null && runYears < 1 ? "moins d'un an" : `${runYears} ans`} de course → maximum ${expCap} séance(s) de qualité/semaine, quel que soit l'objectif. Le cardio encaisse déjà, les tendons NON. Ce plafond n'est pas négociable, même si l'athlète se sent bien.` : ""}${easeReasons.length ? `\n⚠️ ALLÈGEMENT ce cycle (${easeReasons.join(" ; ")}) → qualité réduite, priorité récupération. La santé d'abord.` : ""}${daysSinceLast != null && daysSinceLast >= 3 && daysSinceLast <= 8 && !easeReasons.length ? `\nREPRISE : ${daysSinceLast} j de repos SANS perte de forme (3–8 j d'arrêt ne déconditionnent PAS). UN footing de remise en route suffit, PUIS on enchaîne la qualité normalement — ne transforme pas ça en semaine molle entière.` : ""}`;
 
   // ── PLAN MACRO PÉRIODISÉ — bloc complet jusqu'au jour J (base → dév → spécifique → affûtage) ──
+  /**
+   * Volume de référence pour la semaine à venir.
+   *
+   * Il se déduit de la charge CHRONIQUE (moyenne 4 semaines), jamais du pic d'une
+   * seule semaine. `Math.max(weekKm, avg4wkKm)` gravait le pic dans le marbre :
+   * après 62 km sur une base de 23, le plan reproposait 62 km alors que le ratio
+   * aigu:chronique était déjà à 1,9, en pleine zone de blessure. Une semaine forte
+   * n'est pas un nouveau niveau — c'est une semaine forte.
+   *
+   * Progression ≤ 10 %, nulle si le ratio est déjà trop haut, et jamais un bond
+   * brutal par rapport à ce qui vient d'être couru.
+   */
+  const targetFrom = (floorKm: number) => {
+    const chronic = avg4wkKm > 0 ? avg4wkKm : weekKm;
+    // Part de la semaine écoulée que l'on considère acquise. Plus le ratio est haut,
+    // moins on entérine le pic — sans pour autant retomber sur la seule moyenne, qu'une
+    // période creuse (voyage, coupure) tire artificiellement vers le bas : prescrire
+    // 23 km à quelqu'un qui vient d'en courir 62 ne serait pas prudent, juste inutile.
+    const keep = load.acr > 1.5 ? 0.3 : load.acr > 1.3 ? 0.6 : 1;
+    const blended = chronic + Math.max(0, weekKm - chronic) * keep;
+    const growth = load.acr > 1.5 ? 1.0 : load.acr > 1.3 ? 1.05 : 1.1;
+    // Et jamais un bond brutal par rapport à ce qui vient d'être réellement couru
+    // (reprise après coupure : la moyenne des 4 semaines est alors trop optimiste).
+    const capped = Math.min(blended * growth, Math.max(weekKm * 1.4, floorKm));
+    return Math.max(floorKm, Math.round(capped));
+  };
+
   const macroPlan: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[] = (() => {
     if (!weeksToRace || weeksToRace < 1 || !vma) return [];
     const W = Math.min(weeksToRace, 26);
-    const baseKm = Math.max(Math.round(weekKm), Math.round(avg4wkKm), 20);
+    const baseKm = targetFrom(20);
     const menuTypes = (libGoal === "5k" || libGoal === "10k") ? ["VMA", "Allure spé", "Seuil"]
       : libGoal === "marathon" ? ["Seuil", "Allure mara", "VMA"]
       : (libGoal === "trail" || libGoal === "ultra") ? ["Côtes", "Seuil", "Spécifique"]
@@ -708,7 +735,7 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // numéro de semaine ISO (stable d'un jour à l'autre, contrairement à un compteur maison).
   const taper = weeksToRace != null && weeksToRace <= 2 && weeksToRace >= 0;
   const deload = !taper && (macroPlan.length ? macroPlan[0].phase !== "Affûtage" && isoWeek % 4 === 0 : isoWeek % 4 === 0);
-  const baseKm = Math.max(Math.round(weekKm), Math.round(avg4wkKm), 15);
+  const baseKm = targetFrom(15);
   // Progression plafonnée à +10 %/semaine (+5 % si passif court ou antécédent de fracture).
   const growth = (runYears != null && runYears < 1) || (Array.isArray(p?.injury_zones) && (p.injury_zones as unknown[]).map(String).includes("fracture_fatigue")) ? 1.05 : 1.10;
   const targetKm = macroPlan.length ? macroPlan[0].volumeKm

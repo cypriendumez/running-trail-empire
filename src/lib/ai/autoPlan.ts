@@ -236,7 +236,13 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // ── 5. Endurance sur les jours de course restants (budget non consommé).
   const easySlots: number[] = [];
   for (let i = 0; i <= 6; i++) if (canRun(i)) { easySlots.push(i); spend(); }
-  const usedKm = (longIdx >= 0 ? longRunKm : 0) + placed.filter((i) => i >= 0 && i !== raceIdx).length * QUALITY_KM;
+  // La séance du jour est arbitrée par la fraîcheur à l'étape 7. Si la qualité prévue
+  // aujourd'hui va être remplacée par de la récupération, ses kilomètres ne doivent PAS
+  // être décomptés du budget : sinon les footings de la semaine rétrécissent pour
+  // financer une séance qui n'aura jamais lieu (constaté : footings ramenés à 4 km).
+  const dayZeroDropped = ctx.readiness.level === "rouge" || ctx.lastHardDaysAgo === 0;
+  const qualityKept = placed.filter((i) => i >= 0 && i !== raceIdx && !(dayZeroDropped && i === 0));
+  const usedKm = (longIdx >= 0 ? longRunKm : 0) + qualityKept.length * QUALITY_KM;
   const rawEasy = easySlots.length > 0 ? (targetKm - usedKm) / easySlots.length : 0;
   // Bornes de réalisme : en dessous de 4 km ce n'est plus une séance, au-dessus de 18 km
   // ce n'est plus un footing — un gros volume se couvre en DOUBLANT les sorties.
