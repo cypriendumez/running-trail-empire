@@ -1,4 +1,5 @@
 export const dynamic = "force-dynamic";
+import { isRun } from "@/lib/intervals/sport";
 import { createClient } from "@/lib/supabase/server";
 import { LeaguesHub } from "@/components/gamification/LeaguesHub";
 
@@ -33,7 +34,7 @@ export default async function LeaguesPage() {
     // Workouts this year for badge computation
     supabase
       .from("workouts")
-      .select("id, date, distance_km, duration_seconds, elevation_gain_m, type, avg_pace_min_km")
+      .select("id, date, distance_km, duration_seconds, elevation_gain_m, type, sport, avg_pace_min_km")
       .eq("user_id", user.id)
       .gte("date", yearStart)
       .order("date", { ascending: false }),
@@ -65,12 +66,17 @@ export default async function LeaguesPage() {
   }
 
   // ── Métriques réelles (année en cours) ──
-  const allWorkouts = workouts ?? [];
+  // Badges et classements de COURSE : une sortie vélo de 60 km décrochait le badge
+  // « sortie longue ≥ 20 km » et gonflait le record de distance. Le vélo reste visible
+  // ailleurs, mais il ne concourt pas dans une ligue de course à pied.
+  const allWorkouts = (workouts ?? []).filter((w) => isRun((w as { sport?: string | null }).sport));
   const num = (v: unknown) => Number(v ?? 0);
   const totalKm = allWorkouts.reduce((s, w) => s + num(w.distance_km), 0);
   const totalElev = allWorkouts.reduce((s, w) => s + num(w.elevation_gain_m), 0);
   const sessions = allWorkouts.length;
   const maxRun = Math.max(0, ...allWorkouts.map((w) => num(w.distance_km)));
+  // Le trail est un TYPE de course, pas la randonnée : `allWorkouts` ne contient déjà
+  // plus que de la course à pied, le filtre de type suffit.
   const isTrail = (w: { type?: unknown }) => String(w.type ?? "").toLowerCase().includes("trail");
   const trailWorkouts = allWorkouts.filter(isTrail);
   const trailKm = trailWorkouts.reduce((s, w) => s + num(w.distance_km), 0);

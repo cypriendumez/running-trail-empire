@@ -72,11 +72,16 @@ export interface HRVData {
 export type WorkoutType = "easy" | "tempo" | "interval" | "long_run" | "race" | "recovery" | "strength" | "trail" | "vma" | "hill_repeat";
 export type TrailDifficulty = "green" | "blue" | "red" | "black";
 
+export type Sport = "run" | "bike" | "hike" | "walk" | "other";
+
 export interface Workout {
   id: string;
   user_id: string;
   title: string;
+  /** RÔLE de la séance dans l'entraînement — à ne pas confondre avec `sport`. */
   type: WorkoutType;
+  /** SPORT réellement pratiqué. Seul `run` entre dans le volume de course. */
+  sport?: Sport | null;
   date: string;
   duration_seconds: number;
   distance_km: number;

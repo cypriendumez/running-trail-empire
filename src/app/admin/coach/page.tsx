@@ -1,4 +1,5 @@
 export const dynamic = "force-dynamic";
+import { isRun } from "@/lib/intervals/sport";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CoachPanel, type CoachClient } from "@/components/admin/CoachPanel";
 
@@ -8,7 +9,7 @@ export default async function CoachPage() {
   const sb = createAdminClient();
   const [profilesRes, workoutsRes, sleepRes, hrvRes, unreadRes, objRes, msgRes] = await Promise.all([
     sb.from("profiles").select("id, full_name, email, league, discipline_score"),
-    sb.from("workouts").select("user_id, title, type, date, distance_km, tss").order("date", { ascending: false }).limit(3000),
+    sb.from("workouts").select("user_id, title, type, sport, date, distance_km, tss").order("date", { ascending: false }).limit(3000),
     sb.from("sleep_data").select("user_id, sleep_score, body_battery_end, date").order("date", { ascending: false }).limit(1500),
     sb.from("hrv_data").select("user_id, hrv_ms, physiological_state, date").order("date", { ascending: false }).limit(1500),
     sb.from("notifications").select("id", { count: "exact", head: true }).eq("type", "client_message").eq("read", false),
@@ -63,7 +64,9 @@ export default async function CoachPage() {
       league: (p.league as string) ?? "bronze",
       score: Math.round((p.discipline_score as number) ?? 0),
       lastRun: last ? { title: last.title || last.type || "Séance", date: last.date, km: last.distance_km ?? 0 } : null,
-      weekKm: Math.round(ws.filter((w) => new Date(w.date).getTime() > weekAgo).reduce((s, w) => s + (w.distance_km ?? 0), 0) * 10) / 10,
+      // Volume de COURSE, comme le coach : sinon la fiche client affiche un chiffre
+      // que le plan d'entraînement contredit.
+      weekKm: Math.round(ws.filter((w) => isRun((w as { sport?: string | null }).sport) && new Date(w.date).getTime() > weekAgo).reduce((s, w) => s + (w.distance_km ?? 0), 0) * 10) / 10,
       sleepScore,
       load14: Math.round(ws.filter((w) => new Date(w.date).getTime() > now - 14 * 86400000).reduce((s, w) => s + (w.tss ?? 0), 0)) || null,
       hrv: (lastHrv[p.id]?.hrv_ms as number) ?? null,

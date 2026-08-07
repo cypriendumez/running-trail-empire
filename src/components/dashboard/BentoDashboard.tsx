@@ -20,6 +20,7 @@ import { WeatherChip } from "@/components/dashboard/WeatherChip";
 import { SessionFeedback } from "@/components/dashboard/SessionFeedback";
 import { ObjectiveCard, type Objective } from "@/components/dashboard/ObjectiveCard";
 import { cleanActivityName } from "@/lib/utils/activityName";
+import { isRun } from "@/lib/intervals/sport";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { ProfileCompletionBanner } from "@/components/dashboard/ProfileCompletionBanner";
 
@@ -127,7 +128,12 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
   // Sommeil : on n'exploite/affiche que des données RÉCENTES (montre réellement portée).
   const freshSleep = sleep && sleep.date && Date.now() - new Date(sleep.date + "T00:00:00").getTime() <= 2 * 86400000 ? sleep : null;
 
-  const weeklyKm = workouts
+  // Volume de COURSE : le vélo et la randonnée n'en font pas partie. Sans ce filtre,
+  // le tableau de bord affichait 102 km là où le coach en comptait 62 — deux chiffres
+  // contradictoires sous les yeux du même athlète, et une séance recommandée calculée
+  // sur le mauvais volume.
+  const runs = workouts.filter(w => isRun(w.sport));
+  const weeklyKm = runs
     .filter(w => {
       const d = new Date(w.date);
       const now = new Date();
@@ -146,7 +152,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
   const weeklyData = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
-    const dayWorkouts = workouts.filter(w => new Date(w.date).toDateString() === d.toDateString());
+    const dayWorkouts = runs.filter(w => new Date(w.date).toDateString() === d.toDateString());
     return {
       day: d.toLocaleDateString(lang, { weekday: "short" }),
       km: dayWorkouts.reduce((s, w) => s + (w.distance_km ?? 0), 0),
@@ -1321,7 +1327,8 @@ function computeForme(
   workouts: Workout[], currentVma: number, recovery: number, regularity: number,
 ): { total: number; endurance: number; speed: number; recovery: number; regularity: number; hasData: boolean } {
   const now = Date.now();
-  const recent = workouts.filter(w => now - new Date(w.date).getTime() <= 42 * 86400000);
+  // Une sortie vélo de 60 km gonflerait l'axe endurance : on ne score que la course.
+  const recent = workouts.filter(w => isRun(w.sport) && now - new Date(w.date).getTime() <= 42 * 86400000);
   const hasData = workouts.length > 0;
   const longest = Math.max(0, ...recent.map(w => w.distance_km ?? 0));
   const weeklyKm = recent.reduce((s, w) => s + (w.distance_km ?? 0), 0) / 6;
@@ -1438,7 +1445,7 @@ function computeWeeklyTrend(workouts: Workout[], weeks = 6): { km: number; isCur
     const end = now - (weeks - 1 - i) * 7 * 86400000;
     const start = end - 7 * 86400000;
     const km = workouts
-      .filter(w => { const ts = new Date(w.date).getTime(); return ts > start && ts <= end; })
+      .filter(w => { const ts = new Date(w.date).getTime(); return isRun(w.sport) && ts > start && ts <= end; })
       .reduce((s, w) => s + (w.distance_km ?? 0), 0);
     return { km, isCurrent: i === weeks - 1 };
   });
@@ -1483,7 +1490,7 @@ function computeDistancePRs(workouts: Workout[], lang: string): { label: string;
 // Résumé de la semaine en cours (7 derniers jours).
 function computeWeekSummary(workouts: Workout[]): { sessions: number; km: number; elev: number; sec: number } {
   const weekAgo = Date.now() - 7 * 86400000;
-  const wk = workouts.filter(w => new Date(w.date).getTime() >= weekAgo);
+  const wk = workouts.filter(w => isRun(w.sport) && new Date(w.date).getTime() >= weekAgo);
   return {
     sessions: wk.length,
     km: wk.reduce((s, w) => s + (w.distance_km ?? 0), 0),

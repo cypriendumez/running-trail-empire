@@ -7,15 +7,6 @@ import { syncIntervalsForUser } from "@/lib/intervals/syncUser";
 export const runtime = "nodejs";
 export const maxDuration = 60; // 60s timeout (Vercel hobby = 10s, pro = 60s)
 
-const BASE = "https://intervals.icu/api/v1";
-
-function authHeader(apiKey: string) {
-  return {
-    Authorization: "Basic " + Buffer.from(`API_KEY:${apiKey}`).toString("base64"),
-    "Content-Type": "application/json",
-  };
-}
-
 // GET /api/cron/sync-all
 // Called by Vercel Cron every 30 minutes.
 // Secured with CRON_SECRET header.
@@ -92,35 +83,3 @@ function mapActivityType(type: string): string {
 
 // Classe la séance par intensité RÉELLE (FC) + distance + dénivelé → type canonique juste,
 // au lieu de tout marquer « easy ». Préserve le trail. enum workouts.type valide.
-function refineType(act: IntervalsActivity, fcMax: number | null): string {
-  if (/trail|hike/i.test(act.type ?? "")) return "trail";
-  const km = act.distance ? act.distance / 1000 : 0;
-  const sec = act.moving_time ?? act.elapsed_time ?? 0;
-  if (km <= 0 || sec <= 0) return mapActivityType(act.type ?? "");
-  if ((act.total_elevation_gain ?? 0) / km > 25) return "trail";
-  if (km >= 18 || sec >= 95 * 60) return "long_run";
-  const hr = act.average_heartrate;
-  if (hr && fcMax) {
-    const pct = hr / fcMax;
-    if (pct >= 0.90) return "vma";
-    if (pct >= 0.85) return "tempo";
-    if (pct >= 0.68) return "easy";
-    return "recovery";
-  }
-  return mapActivityType(act.type ?? "");
-}
-
-interface IntervalsActivity {
-  id: string; name?: string; type?: string; start_date_local?: string;
-  moving_time?: number; elapsed_time?: number; distance?: number;
-  total_elevation_gain?: number; total_elevation_loss?: number;
-  average_heartrate?: number; max_heartrate?: number; average_speed?: number;
-  average_watts?: number; max_watts?: number; average_cadence?: number;
-  icu_tss?: number; aerobic_te?: number; avg_vertical_oscillation?: number;
-  avg_ground_contact_time?: number; avg_stride_length?: number; decoupling?: number;
-}
-interface IntervalsWellness {
-  id: string; hrv?: number; hrvSDNN?: number; sleepSecs?: number;
-  deepSleepSecs?: number; lightSleepSecs?: number; remSleepSecs?: number;
-  sleepScore?: number; bb?: number; bbMax?: number; avgSpo2?: number;
-}
