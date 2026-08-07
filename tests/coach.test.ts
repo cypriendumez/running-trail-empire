@@ -413,5 +413,43 @@ test("aucune route n'écrit dans les données d'un athlète sans preuve d'identi
   assert.equal(existsSync("src/app/api/terra"), false, "la route Terra non signée est de retour");
 });
 
+console.log("\nPAIEMENT");
+test("le webhook refuse tout événement non signé", () => {
+  const src = readFileSync("src/app/api/stripe/webhook/route.ts", "utf8");
+  assert.ok(/constructEvent/.test(src), "la signature Stripe doit être vérifiée");
+  assert.ok(/STRIPE_WEBHOOK_SECRET/.test(src) && /503|400/.test(src),
+    "sans secret configuré, le webhook doit REFUSER — l'accepter reviendrait à laisser n'importe qui offrir un abonnement");
+  assert.ok(!/constructEvent\([^)]*!\)/.test(src), "le secret ne doit pas être forcé avec `!`");
+});
+test("l'abonnement n'est jamais accordé depuis le navigateur", () => {
+  // Le niveau d'abonnement ne doit être écrit que par le webhook, côté serveur, après
+  // vérification de signature. Une écriture depuis un composant client suffirait à
+  // s'offrir le Pro gratuitement.
+  for (const dir of ["src/components", "src/app/dashboard"]) {
+    if (!existsSync(dir)) continue;
+    const stack = [dir];
+    while (stack.length) {
+      const d = stack.pop()!;
+      for (const e of readdirSync(d, { withFileTypes: true })) {
+        const p = join(d, e.name);
+        if (e.isDirectory()) { stack.push(p); continue; }
+        if (!/\.tsx?$/.test(e.name)) continue;
+        const src = readFileSync(p, "utf8");
+        assert.ok(!/update\([\s\S]{0,80}subscription_tier/.test(src), `${p} écrit subscription_tier`);
+      }
+    }
+  }
+});
+test("le paiement se refuse proprement quand il n'est pas configuré", () => {
+  const src = readFileSync("src/app/api/stripe/checkout/route.ts", "utf8");
+  assert.ok(/stripeConfigured/.test(src), "un clic sur « Passe au Pro » ne doit pas finir en erreur 500 opaque");
+  assert.ok(/plan !== "monthly"/.test(src), "la formule reçue du client doit être validée");
+});
+test("l'athlète peut résilier son abonnement", () => {
+  // Obligation légale en Europe dès lors que la souscription s'est faite en ligne — et
+  // premier motif de litige bancaire quand elle manque.
+  assert.ok(existsSync("src/app/api/stripe/portal/route.ts"), "aucun portail de gestion d'abonnement");
+});
+
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log(`  ✗ ${f}`); process.exit(1); }
