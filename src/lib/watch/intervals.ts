@@ -68,7 +68,29 @@ export function parsePaceSec(text: string): number | null {
 //
 // On lit nos PROPRES libellés (générés par le menu de qualité), dont le format est
 // stable : « N×DISTANCE à ALLURE, récup DURÉE » ou « N×DURÉE à ALLURE, récup DURÉE ».
-export type RepBlock = { reps: number; workSec: number; recSec: number; paceSec: number | null };
+export type RepBlock = {
+  reps: number; workSec: number; recSec: number; paceSec: number | null;
+  /** Alternance interne à chaque répétition (over-under). Sans elle, la montre envoyait
+   *  un bloc UNIFORME à l'allure sous-seuil : l'athlète ne touchait jamais le seuil, et
+   *  le format perdait exactement ce qui en fait l'intérêt. */
+  alt?: { aSec: number; aPaceSec: number; bSec: number; bPaceSec: number };
+};
+
+/**
+ * Alternance « en alternant N min à ~A/km … / M min à ~B/km ».
+ * Format produit par le menu de qualité, donc stable et sûr à analyser.
+ */
+export function parseAlternation(text: string): RepBlock["alt"] | null {
+  const t = (text || "").replace(/\u00a0/g, " ").toLowerCase();
+  const m = t.match(/alternant\s+(\d{1,2})\s*(min|s)\b[^/]*?(\d)\s*['’:](\d{2})\s*\/\s*km[^/]*\/\s*(\d{1,2})\s*(min|s)\b[^,.]*?(\d)\s*['’:](\d{2})\s*\/\s*km/);
+  if (!m) return null;
+  const dur = (n: string, u: string) => (u === "min" ? Number(n) * 60 : Number(n));
+  const pace = (a: string, b: string) => Number(a) * 60 + Number(b);
+  const alt = { aSec: dur(m[1], m[2]), aPaceSec: pace(m[3], m[4]), bSec: dur(m[5], m[6]), bPaceSec: pace(m[7], m[8]) };
+  const ok = [alt.aSec, alt.bSec].every((x) => x >= 15 && x <= 900)
+    && [alt.aPaceSec, alt.bPaceSec].every((x) => x >= 120 && x <= 600);
+  return ok ? alt : null;
+}
 
 export function parseReps(text: string, fallbackPaceSec: number | null): RepBlock | null {
   const t = (text || "").replace(/\u00a0/g, " ").toLowerCase();
@@ -101,7 +123,7 @@ export function parseReps(text: string, fallbackPaceSec: number | null): RepBloc
     recSec = /min|mn/.test(r[2]) ? n * 60 + (r[3] ? Number(r[3]) : 0) : n;
     recSec = Math.min(600, Math.max(15, recSec));
   }
-  return { reps, workSec, recSec, paceSec };
+  return { reps, workSec, recSec, paceSec, alt: parseAlternation(text) ?? undefined };
 }
 
 /**
@@ -123,8 +145,19 @@ function repSteps(b: RepBlock, vmaKmh: number | null, zone: number, hill?: boole
     ? `${fmtPace(Math.max(120, b.paceSec - 8))}-${fmtPace(b.paceSec + 8)} pace`
     : (vmaKmh ? `${zonePaceRange(vmaKmh, zone)} pace` : `Z${zone} HR`);
   const out: string[] = [];
+  const rangeAt = (sec: number) => `${fmtPace(Math.max(120, sec - 6))}-${fmtPace(sec + 6)} pace`;
   for (let i = 1; i <= b.reps; i++) {
-    out.push(`- ${fmt(b.workSec)} ${range} Effort ${i}/${b.reps}`);
+    if (b.alt && !hill) {
+      // Over-under : on déroule l'alternance À L'INTÉRIEUR de la répétition. Un bloc
+      // uniforme à l'allure la plus lente aurait supprimé tout l'intérêt du format.
+      const cycles = Math.max(1, Math.round(b.workSec / (b.alt.aSec + b.alt.bSec)));
+      for (let c = 1; c <= cycles; c++) {
+        out.push(`- ${fmt(b.alt.aSec)} ${rangeAt(b.alt.aPaceSec)} Sous-seuil ${i}/${b.reps}`);
+        out.push(`- ${fmt(b.alt.bSec)} ${rangeAt(b.alt.bPaceSec)} Au seuil ${i}/${b.reps}`);
+      }
+    } else {
+      out.push(`- ${fmt(b.workSec)} ${range} Effort ${i}/${b.reps}`);
+    }
     // Pas de récupération après la dernière : le retour au calme enchaîne.
     if (i < b.reps) out.push(`- ${fmt(b.recSec)} Z1 HR Récup`);
   }

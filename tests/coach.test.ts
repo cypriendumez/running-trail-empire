@@ -140,6 +140,18 @@ test("les répétitions sont écrites une par une", () => {
   assert.equal(steps.length, 2 + 12 + 11, `attendu 25 étapes, obtenu ${steps.length}`);
   assert.ok(!/\d+x/i.test(out));
 });
+test("un over-under alterne réellement sur la montre", () => {
+  // Bug réel : la montre envoyait un bloc UNIFORME de 5 min à l'allure sous-seuil.
+  // L'athlète ne touchait jamais le seuil, et le format perdait tout son intérêt.
+  const d = "Corps : Over-under : 3×5 min en alternant 1 min à ~4'10/km (sous-seuil) / 1 min à ~4'02/km (au seuil), récup 3 min";
+  const out = stepsForType("Seuil", 55, 17.6, parsePaceSec(d), 15, 10, parseReps(d, parsePaceSec(d)), d)!;
+  const lines = out.split("\n").filter((l) => l.startsWith("- "));
+  assert.ok(lines.some((l) => /Sous-seuil/.test(l)), "aucune portion sous-seuil");
+  assert.ok(lines.some((l) => /Au seuil/.test(l)), "aucune portion au seuil");
+  const paces = new Set(lines.filter((l) => /pace/.test(l)).map((l) => l.match(/(\d+:\d{2})-/)?.[1]));
+  assert.ok(paces.size >= 2, "les deux allures doivent être distinctes sur la montre");
+});
+
 test("les durées d'échauffement suivent le profil", () => {
   assert.deepEqual(warmCoolMin(20, 12), { warm: 20, cool: 12 });
   assert.deepEqual(warmCoolMin(null, null), { warm: 15, cool: 10 });
