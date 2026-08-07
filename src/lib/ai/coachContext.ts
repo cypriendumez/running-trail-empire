@@ -714,7 +714,16 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // phase, avant tout allègement lié à l'état du jour. La feuille de route des semaines
   // à venir doit s'appuyer dessus : une fatigue passagère ne dicte pas deux mois de plan.
   const structuralQBudget = Math.max(1, Math.min(3, qBudget));
+  // ── ATHLÈTE INCONNU : PAS DE QUALITÉ ─────────────────────────────────────────
+  // Un compte neuf n'a ni historique, ni VMA, ni signal de fatigue — donc aucun motif
+  // d'allègement, un verdict « vert » par défaut et un budget de qualité hérité du
+  // niveau. Résultat constaté sur un profil vide : SÉANCE DE VMA DÈS LE PREMIER JOUR.
+  // Aucun coach ne prescrit du fractionné à quelqu'un qu'il n'a jamais vu courir : sans
+  // allure de référence, la séance est à la fois inutilisable et dangereuse. La première
+  // semaine sert à observer.
+  const noHistory = runs.length === 0;
   const easeReasons: string[] = [];
+  if (noHistory) { qBudget = 0; easeReasons.push("aucun historique d'entraînement : semaine d'observation avant toute intensité"); }
   if (pains.length) { qBudget -= 1; easeReasons.push("douleur signalée"); }
   if (hrvWeekTrend?.startsWith("↓")) { qBudget -= 1; easeReasons.push("VFC en baisse"); }
   if (load.acr > 1.5) { qBudget -= 1; easeReasons.push(`charge aiguë élevée (ratio ${r1(load.acr)})`); }
@@ -752,8 +761,8 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // Plancher : sans signal de fatigue, un objectif chrono garde ≥ 2 qualités (sauf débutant).
   // Le plafond « passif » reste prioritaire : il n'est jamais franchi par un plancher.
   const floor = (v: number) => { qBudget = Math.max(qBudget, expCap != null ? Math.min(v, expCap) : v); };
-  if (!easeReasons.length && objective && isShortGoal && libLevel !== "debutant") floor(2);
-  if (!easeReasons.length && qBudget === 0 && libLevel !== "debutant") floor(1);
+  if (!noHistory && !easeReasons.length && objective && isShortGoal && libLevel !== "debutant") floor(2);
+  if (!noHistory && !easeReasons.length && qBudget === 0 && libLevel !== "debutant") floor(1);
 
   // ── VERDICT DE FRAÎCHEUR DU JOUR — calculé, pas laissé à l'appréciation de l'IA ──
   // Un modèle de langage a tendance à « sentir » l'état de forme au fil du texte ; ici on
@@ -1112,7 +1121,7 @@ CAPACITÉS (tests)
 - Zones FC : Z2 facile ${hrZone(0.6, 0.7) ?? "?"} · Z4 seuil ${hrZone(0.8, 0.9) ?? "?"}
 - Zones allure : ${paceZones ?? (computedPaces ? `(calculées depuis la VMA) ${computedPaces}` : "non renseignées")}
 - Chronos théoriques au potentiel actuel (depuis la VMA) : ${predictions ?? "?"}
-${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${(() => { const d = runs.find(w => w.cardiac_decoupling != null); if (!d) return ""; const v = Number(d.cardiac_decoupling); const verdict = v < 3 ? "ENDURANCE AÉROBIE SOLIDE — il tiendra son allure jusqu'au bout, tu peux durcir le spécifique" : v < 5 ? "correcte" : v < 8 ? "PERFECTIBLE — il commence à décrocher sur la durée : plus de volume facile et des sorties longues progressives" : "ENDURANCE LIMITANTE — à ce niveau de dérive il explosera en fin de course. C'est SA priorité n°1 : volume facile et sorties longues AVANT toute recherche de vitesse"; return `- 💓 DÉRIVE CARDIAQUE (${String(d.date).slice(5, 10)}) : ${v > 0 ? "+" : ""}${v} % — ${verdict}. C'est le marqueur qui distingue un coureur qui TIENT son allure d'un qui la subit.\n`; })()}${(() => {
+${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${noHistory ? "- 🆕 ATHLÈTE SANS HISTORIQUE : aucune séance enregistrée, aucune allure de référence. Cette semaine sert à OBSERVER, pas à performer : footings faciles pilotés à la sensation et à la conversation, aucune intensité, aucun chrono. Demande-lui son passé de coureur, ses éventuelles douleurs, et propose-lui un test simple (par exemple 6 min à effort maximal régulier) une fois qu'il aura couru trois ou quatre fois sans gêne. Prescrire du fractionné à quelqu'un dont on ignore tout, c'est le blesser.\n" : ""}${(() => { const d = runs.find(w => w.cardiac_decoupling != null); if (!d) return ""; const v = Number(d.cardiac_decoupling); const verdict = v < 3 ? "ENDURANCE AÉROBIE SOLIDE — il tiendra son allure jusqu'au bout, tu peux durcir le spécifique" : v < 5 ? "correcte" : v < 8 ? "PERFECTIBLE — il commence à décrocher sur la durée : plus de volume facile et des sorties longues progressives" : "ENDURANCE LIMITANTE — à ce niveau de dérive il explosera en fin de course. C'est SA priorité n°1 : volume facile et sorties longues AVANT toute recherche de vitesse"; return `- 💓 DÉRIVE CARDIAQUE (${String(d.date).slice(5, 10)}) : ${v > 0 ? "+" : ""}${v} % — ${verdict}. C'est le marqueur qui distingue un coureur qui TIENT son allure d'un qui la subit.\n`; })()}${(() => {
   const lines: string[] = [];
   // Cadence : sous 170 pas/min, l'appui est long et la foulée « aérienne » — surcoût
   // d'impact et de temps de contact. On ne juge pas dans l'absolu (elle dépend de la
