@@ -55,6 +55,39 @@ export function robustWeeklyKm(
   return { km: Math.round(km * 10) / 10, weeksRun: run.length, weeksOff: off };
 }
 
+/**
+ * CAPACITÉ DÉMONTRÉE — le volume hebdomadaire que l'athlète a DÉJÀ tenu, en km.
+ *
+ * DÉFAUT RÉEL CORRIGÉ. Le coach ne regardait que les 8 dernières semaines (et ne
+ * chargeait même que 60 séances, soit ~10 à 13 semaines). Un athlète de 20 ans qui
+ * tournait à 71-80 km/semaine quatre mois plus tôt était donc décrit comme un coureur
+ * à 31 km/semaine, et son plan marathon plafonné en conséquence. Or un système
+ * musculo-tendineux qui a encaissé 80 km/semaine y revient BEAUCOUP plus vite qu'il n'y
+ * est monté la première fois : ignorer cet historique, c'est le faire repartir de zéro.
+ *
+ * Médiane des 4 MEILLEURES semaines sur la fenêtre (26 semaines par défaut) : une seule
+ * semaine exceptionnelle ne suffit pas à « démontrer » une capacité, quatre oui.
+ *
+ * ⚠️ Ce nombre relève le PLAFOND de la montée en charge, jamais la cible immédiate.
+ * Avoir tenu 80 km il y a quatre mois ne dit rien de ce qu'on encaisse cette semaine —
+ * c'est le ratio aigu:chronique et la VFC qui en décident, et eux ne regardent que le
+ * présent.
+ */
+export function demonstratedWeeklyKm(runs: RunLike[], now = Date.now(), weeks = 26): number | null {
+  const buckets = new Array(weeks).fill(0);
+  for (const r of runs) {
+    const t = new Date(r.date).getTime();
+    if (!Number.isFinite(t)) continue;
+    const ageDays = (now - t) / 86400000;
+    if (ageDays < 0 || ageDays >= weeks * 7) continue;
+    buckets[Math.floor(ageDays / 7)] += Math.max(0, r.distance_km ?? 0);
+  }
+  const top = buckets.filter((k) => k >= 2).sort((a, b) => b - a).slice(0, 4);
+  if (top.length < 4) return null; // moins de 4 semaines réelles : rien n'est « démontré »
+  const med = (top[1] + top[2]) / 2; // médiane des 4 meilleures
+  return Math.round(med);
+}
+
 // ── Sortie longue ────────────────────────────────────────────────────────────
 
 export type RaceGoal = "5k" | "10k" | "semi" | "marathon" | "trail" | "ultra" | "general";

@@ -2,7 +2,7 @@ import type { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthCoachLines } from "@/data/healthCatalog";
-import { robustWeeklyKm, longRunForWeek, longRunPeakKm, longRunShare, longRunGap, type RaceGoal } from "@/lib/running/volume";
+import { robustWeeklyKm, demonstratedWeeklyKm, longRunForWeek, longRunPeakKm, longRunShare, longRunGap, type RaceGoal } from "@/lib/running/volume";
 import { buildWeightPlan, weightModeEligibility, type WeightPlan } from "@/lib/weight/energy";
 import { weightCoachBlock, weightTrainingRules, type WeightTrainingRules } from "@/lib/weight/coaching";
 import { terrainCoachBlock } from "@/data/terrainCatalog";
@@ -209,7 +209,7 @@ async function fetchWorkouts(sb: SB, userId: string) {
 }
 
 export async function buildAthleteContext(sb: SB, userId: string): Promise<AthleteContext> {
-  const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, shoeRes, objRes, csRes, wlRes] = await Promise.all([
+  const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, shoeRes, objRes, csRes, wlRes, histRes] = await Promise.all([
     sb.from("profiles").select("*").eq("id", userId).single(),
     sb.from("performance_baselines").select("*").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).single(),
     sb.from("hrv_data").select("hrv_ms,physiological_state,date").eq("user_id", userId).order("date", { ascending: false }).limit(14),
@@ -228,6 +228,14 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
     // n'est pas passée : supabase-js renvoie alors `{ error }` sans lever d'exception,
     // donc `Promise.all` tient et le reste du contexte coach est intact.
     sb.from("weight_logs").select("date, weight_kg").eq("user_id", userId).order("date", { ascending: false }).limit(60),
+    // HISTORIQUE LONG, volontairement séparé et minimal (3 colonnes, 180 jours).
+    // `fetchWorkouts` s'arrête à 60 séances, soit ~10 à 13 semaines : la capacité déjà
+    // démontrée par l'athlète quatre à six mois plus tôt lui était donc INVISIBLE. Un
+    // coureur habitué à 80 km/semaine était traité comme un débutant à 31 km après une
+    // coupure. Trois colonnes sur 180 jours coûtent moins qu'un plan sous-dimensionné.
+    sb.from("workouts").select("date, sport, distance_km").eq("user_id", userId)
+      .gte("date", new Date(Date.now() - 190 * 86400000).toISOString().slice(0, 10))
+      .order("date", { ascending: false }).limit(400),
   ]);
 
   const p = profileRes.data as Record<string, unknown> | null;
@@ -265,6 +273,11 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // Volume représentatif (médiane des semaines courues) + plus longue sortie récente :
   // les deux points de départ honnêtes du dimensionnement. Voir lib/running/volume.ts.
   const robustWeekly = robustWeeklyKm(runs, now, 8);
+  // Capacité déjà tenue, sur 26 semaines. Relève le PLAFOND de la montée en charge —
+  // jamais la cible immédiate, qui reste pilotée par le ratio aigu:chronique et la VFC.
+  const histRuns = ((histRes.data ?? []) as { date: string; sport?: string | null; distance_km?: number | null }[])
+    .filter(w => isRun(w.sport));
+  const demonstratedKm = demonstratedWeeklyKm(histRuns.length ? histRuns : runs, now, 26);
   const longestRecentKm = Math.max(0, ...runs
     .filter(w => now - new Date(w.date).getTime() <= 42 * 86400000)
     .map(w => w.distance_km ?? 0));
@@ -1182,7 +1195,17 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
       let factor: number;
       if (wkUntil <= 1) factor = 0.55;                  // semaine de course
       else if (wkUntil === 2) factor = 0.72;            // affûtage
-      else { factor = Math.min(1.4, 1 + i * 0.06); if ((i + 1) % 4 === 0) factor *= 0.8; } // +6 %/sem, plafond +40 %, semaine allégée /4
+      else {
+        // Plafond de montée en charge : +40 % au-dessus du volume de départ… SAUF si
+        // l'athlète a DÉJÀ tenu davantage. Un coureur de 20 ans revenu à 40 km après une
+        // coupure, mais qui tournait à 77 km/semaine quatre mois plus tôt, était plafonné
+        // à 56 km — bien en dessous de ce que son propre passé démontre, et sans qu'aucun
+        // écran ne le dise. Le RYTHME de progression (+6 %/semaine) ne bouge pas : seul
+        // le toit se lève, et le ratio aigu:chronique continue de piloter le présent.
+        const ceilFactor = demonstratedKm && baseKm > 0 ? Math.max(1.4, demonstratedKm / baseKm) : 1.4;
+        factor = Math.min(ceilFactor, 1 + i * 0.06);
+        if ((i + 1) % 4 === 0) factor *= 0.8; // semaine allégée 1 sur 4
+      }
       const volumeKm = Math.round(baseKm * factor);
       // La sortie longue se déduit de la DISTANCE VISÉE, plus seulement d'un pourcentage
       // du volume. Le plafond de Daniels (25 %) empêche la sortie longue d'écraser la
@@ -1419,7 +1442,7 @@ FORME & RÉCUPÉRATION (aujourd'hui)
 - Sommeil : ${freshSleep ? `${freshSleep.sleep_score ?? "?"}/100 cette nuit${lastSleepMin ? ` (${Math.floor(lastSleepMin / 60)}h${String(lastSleepMin % 60).padStart(2, "0")})` : ""}` : "montre non portée la nuit dernière (donnée ignorée)"} · moyenne 7j ${sleepAvg ?? "?"}/100
 
 CHARGE D'ENTRAÎNEMENT
-- Volume : ${Math.round(weekKm)} km COURUS cette semaine${crossKm7 > 3 ? ` (+ ${Math.round(crossKm7)} km d'autres sports — vélo/rando/marche : ça fatigue et ça compte dans la charge, mais ce N'EST PAS du volume de course, ne dimensionne rien dessus)` : ""} · ~${Math.round(avg4wkKm)} km/sem (moy. 4 sem.)
+${demonstratedKm ? `- 📈 CAPACITÉ DÉJÀ DÉMONTRÉE : ${demonstratedKm} km/semaine tenus sur ses meilleures semaines des 6 derniers mois. Son système musculo-tendineux CONNAÎT ce volume — il y reviendra bien plus vite qu'il n'y est monté la première fois. Ne le traite pas comme un débutant sous prétexte que ses dernières semaines sont basses ; mais ne t'en sers pas non plus pour justifier une charge élevée AUJOURD'HUI : c'est la fraîcheur du moment qui en décide.\n` : ""}- Volume : ${Math.round(weekKm)} km COURUS cette semaine${crossKm7 > 3 ? ` (+ ${Math.round(crossKm7)} km d'autres sports — vélo/rando/marche : ça fatigue et ça compte dans la charge, mais ce N'EST PAS du volume de course, ne dimensionne rien dessus)` : ""} · ~${Math.round(avg4wkKm)} km/sem (moy. 4 sem.)
 - 🎯 VOLUME CIBLE de la semaine à venir : ~${targetKm} km, dont une sortie longue de ~${longRunKm} km. Dimensionne les séances sur CES chiffres, pas sur des durées passe-partout.
 - 🔄 PHASE DU CYCLE : ${cycleLabel}.
 - 📆 DISPONIBILITÉS : ${availDaysPerWeek} séance(s) de course par semaine${availDays.length < 7 ? `, uniquement les ${availDays.map(d => ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d]).join(", ")}` : ""}${declaredDpw ? " (déclaré par l'athlète)" : " (déduit de son niveau et de sa pratique actuelle — demande-lui de le préciser)"}. NE DÉPASSE PAS ce nombre : un plan qu'il ne peut pas suivre ne vaut rien.

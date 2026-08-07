@@ -23,7 +23,7 @@ import {
   buildWeightPlan, trendVerdict,
 } from "../src/lib/weight/energy";
 import { weightTrainingRules, weightCoachBlock } from "../src/lib/weight/coaching";
-import { robustWeeklyKm, longRunPeakKm, longRunForWeek, longRunGap } from "../src/lib/running/volume";
+import { robustWeeklyKm, demonstratedWeeklyKm, longRunPeakKm, longRunForWeek, longRunGap } from "../src/lib/running/volume";
 
 let passed = 0;
 const fails: string[] = [];
@@ -740,6 +740,29 @@ test("une semaine à 1 km ne compte pas comme une semaine d'entraînement", () =
   const r = robustWeeklyKm(runs, NOW, 8)!;
   assert.equal(r.weeksRun, 3, "la semaine à 1 km doit être écartée");
   assert.equal(r.km, 40);
+});
+
+test("un passé à 80 km/semaine n'est pas effacé par 8 semaines creuses", () => {
+  // Défaut réel : athlète de 20 ans tournant à 71-80 km/sem quatre mois plus tôt, décrit
+  // comme un coureur à 31 km/sem parce que le coach ne chargeait que 60 séances (~12 sem.).
+  // Son plan marathon plafonnait à 56 km/sem alors qu'il avait déjà tenu 77.
+  const recent = [0, 1, 5, 6, 7].flatMap((w) => [0, 2, 4].map((d) => ({ date: isoDay(w * 7 + d), distance_km: 10 })));
+  const past = [16, 17, 19, 20, 21, 26].flatMap((w) => [0, 2, 4, 6].map((d) => ({ date: isoDay(w * 7 + d), distance_km: 19 })));
+  const runs = [...recent, ...past];
+  // Sur 8 semaines, seules les semaines récentes existent : la fonction répond, mais bas.
+  const court = demonstratedWeeklyKm(runs, NOW, 8)!;
+  assert.ok(court < 40, `fenêtre courte : ${court} km — le passé à 76 km doit être invisible`);
+  // Sur 26 semaines, la capacité réellement démontrée ressort.
+  const demo = demonstratedWeeklyKm(runs, NOW, 26)!;
+  assert.ok(demo >= 70, `capacité démontrée ${demo} km — les semaines à 76 km doivent ressortir`);
+});
+test("une seule grosse semaine ne « démontre » aucune capacité", () => {
+  // Quatre semaines sont exigées : un exploit isolé n'est pas un niveau tenu.
+  const runs = [
+    ...[0, 2, 4].map((d) => ({ date: isoDay(d), distance_km: 30 })),
+    ...[10, 12].map((d) => ({ date: isoDay(d), distance_km: 5 })),
+  ];
+  assert.equal(demonstratedWeeklyKm(runs, NOW, 26), null);
 });
 
 console.log("\nSORTIE LONGUE — le plafond de Daniels n'est pas une prescription");
