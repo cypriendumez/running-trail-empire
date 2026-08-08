@@ -1057,6 +1057,25 @@ test("la clé API n'entre JAMAIS dans le prompt", () => {
   const diag = readFileSync("src/lib/support/diagnose.ts", "utf8");
   assert.ok(!/intervals_api_key/.test(diag), "le module de diagnostic ne doit jamais voir la clé");
 });
+test("le plan est généré à la FIN DE L'ONBOARDING, pas seulement par le cron", () => {
+  // Un athlète inscrit à 10 h attendait 3 h 30 du matin pour voir son calendrier. Pire :
+  // tant qu'aucune séance n'existe, le tableau de bord interroge Gemini à CHAQUE affichage
+  // (BentoDashboard : `if (coachSession) return`) — sur un quota de 20 requêtes/jour,
+  // quelques inscriptions le même après-midi épuisaient toute l'IA de l'app.
+  const ob = readFileSync("src/app/onboarding/page.tsx", "utf8");
+  assert.ok(/\/api\/coach\/generate/.test(ob), "l'onboarding doit déclencher la génération");
+  assert.ok(existsSync("src/app/api/coach/generate/route.ts"));
+});
+test("la génération ne peut pas être déclenchée pour AUTRUI", () => {
+  // Une route acceptant un `userId` du corps laisserait écraser le plan d'un autre —
+  // exactement la faille trouvée sur quatre routes pendant l'audit.
+  const code = readFileSync("src/app/api/coach/generate/route.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/\/\/.*$/, "")).join("\n");
+  assert.ok(/userId: user\.id/.test(code), "l'identifiant doit venir de la session");
+  assert.ok(!/req\.json\(\)|body\./.test(code), "la route ne doit lire aucun corps de requête");
+  assert.ok(/COOLDOWN_MS/.test(code), "un délai anti-martèlement protège intervals.icu");
+});
 test("la chaîne de repli ne contient aucun modèle mort", () => {
   // `gemini-2.0-flash` : annoncé arrêté par Google le 1ᵉʳ juin 2026 et absent du tableau
   // de bord des limites du projet — quota inconnu ou nul. Sur un palier gratuit plafonné

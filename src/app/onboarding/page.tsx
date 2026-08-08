@@ -235,6 +235,21 @@ export default function OnboardingPage() {
     }
 
     if (profileError) { toast.error(tr("tSaveError")); setLoading(false); return; }
+
+    // ── PLAN GÉNÉRÉ TOUT DE SUITE, sans attendre le cron de 3 h 30 ──────────────
+    //
+    // Deux problèmes réglés d'un coup. D'abord l'expérience : un athlète inscrit à 10 h
+    // découvrait un calendrier VIDE jusqu'au lendemain matin. Ensuite le quota : tant
+    // qu'aucune séance n'existe, le tableau de bord interroge Gemini à chaque affichage
+    // pour proposer une séance de remplacement — et le palier gratuit ne tolère que
+    // 20 requêtes par jour. Quelques inscriptions le même après-midi épuisaient tout.
+    //
+    // `await` volontaire : la génération est déterministe et rapide, et on veut que le
+    // calendrier soit prêt AVANT que l'athlète n'y arrive. `catch` silencieux : le profil
+    // est déjà enregistré, et le cron de la nuit rattrapera de toute façon — un échec ici
+    // ne doit pas retenir l'écran de fin.
+    await fetch("/api/coach/generate", { method: "POST" }).catch(() => { /* le cron rattrapera */ });
+
     setStep("done");
     setLoading(false);
   }
