@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateContent } from "@/lib/ai/gemini";
 import { oneSessionPerDate } from "@/lib/coach/sessions";
+import { sniffImage } from "@/lib/upload/sniff";
 
 type Msg = { role: "user" | "model"; text: string };
 
@@ -11,12 +12,45 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { message, zone, painLevel, history } = await req.json() as {
+  const { message, zone, painLevel, history, photo } = await req.json() as {
     message: string;
     zone?: string | null;
     painLevel?: number | null;
     history?: Msg[];
+    /** Photo envoyée pour CETTE question. Jamais stockée — voir plus bas. */
+    photo?: { data?: string; mime?: string } | null;
   };
+
+  // ── PHOTO : validée puis transmise, JAMAIS ÉCRITE NULLE PART ────────────────
+  //
+  // Décision assumée : l'image ne touche aucun bucket, aucune table, aucun disque. Elle
+  // transite en mémoire jusqu'à Gemini et disparaît avec la requête.
+  //
+  // La route /api/upload existante écrit dans un bucket PUBLIC (`getPublicUrl`) : correct
+  // pour une pièce jointe de messagerie, inacceptable pour une cheville gonflée ou une
+  // irritation — l'URL resterait accessible à vie, sans authentification. Un bucket privé
+  // aurait réglé l'accès mais pas la conservation. Ne rien garder règle les deux, et
+  // supprime au passage toute question de durée de rétention sur une donnée de santé.
+  //
+  // Le type est déduit des OCTETS (même contrôle que /api/upload) : un `mime` déclaré par
+  // le client ne prouve rien, et on ne veut pas relayer un fichier arbitraire à Gemini.
+  let imagePart: { inline_data: { mime_type: string; data: string } } | null = null;
+  if (photo?.data) {
+    const b64 = String(photo.data).replace(/^data:[^;]+;base64,/, "");
+    // ~4/3 d'expansion en base64 : 8 Mo de base64 ≈ 6 Mo d'image. Le client redimensionne
+    // déjà à 1280 px (~200 Ko) ; cette borne n'attrape qu'un appel direct à l'API.
+    if (b64.length > 8_000_000) {
+      return NextResponse.json({ error: "Photo trop lourde (6 Mo maximum)." }, { status: 413 });
+    }
+    let bytes: Uint8Array;
+    try { bytes = Uint8Array.from(Buffer.from(b64, "base64")); }
+    catch { return NextResponse.json({ error: "Photo illisible." }, { status: 400 }); }
+    const mime = sniffImage(bytes);
+    if (!mime) {
+      return NextResponse.json({ error: "Format non accepté. Images uniquement (JPEG, PNG, GIF, WebP)." }, { status: 415 });
+    }
+    imagePart = { inline_data: { mime_type: mime, data: b64 } };
+  }
 
   const [profileRes, workoutsRes, sleepRes, hrvRes, fbRes, raceRes, coachSessRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
@@ -97,17 +131,35 @@ MÉTHODE DE CONSULTATION (fluide, n'affiche pas les numéros) :
 7. CRITÈRES DE REPRISE objectifs ("tu reprends quand tu fais X sans douleur ni le lendemain").
 8. Encouragement final + filet de sécurité : consulte en présentiel si pas d'amélioration sous ~7-10 jours.
 
-STYLE : experte, humaine, structurée (titres courts / puces), CONCISE (pas de pavé indigeste). N'invente jamais un chiffre médical. Reste dans ton champ (kiné, prépa physique, biomécanique, charge du coureur) — pour le médicamenteux/l'imagerie, renvoie au médecin.`;
+${imagePart ? `
+📷 UNE PHOTO T'EST ENVOYÉE AVEC CE MESSAGE — LIS CE CADRE AVANT DE L'INTERPRÉTER.
+Une image invite à affirmer plus que ce qu'elle montre : c'est le risque principal ici, pas l'erreur de lecture.
+CE QU'UNE PHOTO PERMET RAISONNABLEMENT : un gonflement ou une asymétrie VISIBLE (compare avec le côté sain si les deux sont dans le cadre), une rougeur, un hématome et son étendue, l'état de la peau (ampoule, échauffement, ongle noir, corne, fissure), l'usure d'une semelle et son schéma (pronation/supination, usure latérale du talon), une déformation évidente, une posture statique grossière.
+CE QU'UNE PHOTO NE PERMET PAS, ET QUE TU NE DOIS PAS PRÉTENDRE : palper, tester une amplitude ou une force, localiser un point osseux exquis, distinguer une périostite d'une fracture de fatigue, évaluer la profondeur d'une plaie, juger un tendon sous la peau. Dis-le explicitement plutôt que de contourner.
+MÉTHODE : décris D'ABORD ce que tu observes réellement, puis ce que tu ne peux PAS conclure de l'image, et seulement ensuite pose tes questions ou propose des hypothèses. Une photo ne remplace jamais l'anamnèse : ce que la personne raconte reste ta source principale.
+⛔ SI L'IMAGE ÉVOQUE UNE URGENCE, tu arrêtes tout le reste — pas d'exercices, pas de plan de charge, orientation médicale IMMÉDIATE et sans ambiguïté : mollet gonflé d'un seul côté avec rougeur, chaleur ou douleur au mollet (une PHLÉBITE est une urgence vitale, elle ne se rééduque pas), plaie ouverte avec pus, traînée rouge ou fièvre (infection), déformation d'un membre ou angulation anormale (fracture/luxation), gonflement massif immédiat après un traumatisme, orteil ou pied blanc/violacé (atteinte vasculaire).
+Si la photo est floue, trop sombre, trop éloignée ou ne montre pas la zone décrite, DIS-LE et demande une reprise — n'interprète pas une image que tu ne vois pas correctement.
+` : ""}STYLE : experte, humaine, structurée (titres courts / puces), CONCISE (pas de pavé indigeste). N'invente jamais un chiffre médical. Reste dans ton champ (kiné, prépa physique, biomécanique, charge du coureur) — pour le médicamenteux/l'imagerie, renvoie au médecin.`;
 
   const contents = [
     { role: "user", parts: [{ text: systemPrompt }] },
     { role: "model", parts: [{ text: "Bonjour 👋 Je suis votre kiné du sport. Décrivez-moi ce que vous ressentez (zone, depuis quand, à l'effort ou au repos) et je vous aide." }] },
     ...(history ?? []).slice(-8).map((m) => ({ role: m.role, parts: [{ text: m.text }] })),
-    { role: "user", parts: [{ text: message }] },
+    // La photo accompagne le message de CE tour uniquement. Elle n'est pas conservée :
+    // aux tours suivants, c'est la réponse écrite du modèle qui porte le contexte.
+    { role: "user", parts: imagePart ? [{ text: message }, imagePart] : [{ text: message }] },
   ];
 
   const out = await generateContent(contents, { temperature: 0.45, maxOutputTokens: 1600, thinkingConfig: { thinkingBudget: 1536 } });
   if (!out.ok) {
+    // Les filtres de sécurité de Gemini refusent régulièrement les images corporelles et
+    // renvoient une réponse VIDE. Sans ce cas particulier, l'utilisateur lisait « Le kiné
+    // IA est très sollicité » et réessayait indéfiniment une photo qui ne passera jamais.
+    if (imagePart && out.status === 502) {
+      return NextResponse.json({
+        error: "Le modèle a refusé d'analyser cette photo (filtre de sécurité sur les images corporelles). Décris-moi la zone par écrit — c'est de toute façon ce qui compte le plus — ou envoie un cadrage plus serré sur la zone, sans le reste du corps.",
+      }, { status: 422 });
+    }
     return NextResponse.json({ error: "Le kiné IA est très sollicité — réessayez dans quelques secondes 🙏" }, { status: 503 });
   }
   // ── LA DOULEUR DÉCLARÉE DOIT ATTEINDRE LE COACH ──────────────────────────────

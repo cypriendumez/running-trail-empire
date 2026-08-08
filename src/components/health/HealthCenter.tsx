@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence, useMotionValue, animate as fmAnimate } from "framer-motion";
 import {
   Shield, Heart, Utensils, Stethoscope, AlertTriangle,
-  Phone, CheckCircle2, Zap, Droplets, BookOpen, Send, Loader2, Sparkles, Scale,
+  Phone, CheckCircle2, Zap, Droplets, BookOpen, Send, Loader2, Sparkles, Scale, Camera, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { SmartJournal } from "@/components/journal/SmartJournal";
@@ -27,7 +27,7 @@ const H: Record<string, Record<string, string>> = {
     "k.protoExpress": "Protocole express", "k.protoWait": "Protocole d'attente — pour un plan précis, décris ta douleur au kiné IA ci-contre.",
     "chat.title": "Kiné IA", "chat.sub": "Réponses personnalisées selon ta charge & ta récup",
     "chat.seed": "Bonjour 👋 Je suis votre kiné du sport. Décrivez-moi ce que vous ressentez — zone, depuis quand, à l'effort ou au repos — ou cliquez une zone sur le schéma, et je vous aide.",
-    "chat.thinking": "Le kiné réfléchit…", "chat.placeholder": "Ex : douleur au genou après mes sorties longues…",
+    "chat.thinking": "Le kiné réfléchit…", "chat.placeholder": "Ex : douleur au genou après mes sorties longues…", "chat.photoAdd": "Ajouter une photo", "chat.photoRemove": "Retirer la photo", "chat.photoReady": "Photo prête. Elle est analysée puis oubliée : rien n'est enregistré. Cadre serré sur la zone, en pleine lumière.", "chat.photoBadType": "Image illisible. Formats acceptés : JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Peux-tu regarder cette photo ?",
     "chat.disclaimer": "⚕️ Conseils informatifs — ne remplacent pas un avis médical. Douleur forte / persistante → consultez.",
     "chat.errNoReply": "Je n'ai pas pu répondre, réessayez.", "chat.errConn": "Connexion impossible au kiné IA. Réessayez.",
     "k.askPrompt": "J'ai une douleur au niveau : {zone} (intensité {n}/10). Qu'est-ce que ça peut être, et que dois-je faire concrètement ?",
@@ -64,7 +64,7 @@ const H: Record<string, Record<string, string>> = {
     "k.protoExpress": "Express protocol", "k.protoWait": "Stopgap protocol — for a precise plan, describe your pain to the AI physio on the right.",
     "chat.title": "AI Physio", "chat.sub": "Answers tailored to your load & recovery",
     "chat.seed": "Hello 👋 I'm your sports physio. Tell me what you feel — area, since when, on exertion or at rest — or click a zone on the diagram, and I'll help.",
-    "chat.thinking": "The physio is thinking…", "chat.placeholder": "E.g. knee pain after my long runs…",
+    "chat.thinking": "The physio is thinking…", "chat.placeholder": "E.g. knee pain after my long runs…", "chat.photoAdd": "Add a photo", "chat.photoRemove": "Remove photo", "chat.photoReady": "Photo ready. It is analysed then forgotten: nothing is stored. Frame the area closely, in good light.", "chat.photoBadType": "Unreadable image. Accepted: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Could you look at this photo?",
     "chat.disclaimer": "⚕️ Informational advice — not a substitute for medical care. Severe / persistent pain → see a doctor.",
     "chat.errNoReply": "I couldn't reply, please try again.", "chat.errConn": "Couldn't connect to the AI physio. Try again.",
     "k.askPrompt": "I have pain in: {zone} (intensity {n}/10). What could it be, and what should I concretely do?",
@@ -101,7 +101,7 @@ const H: Record<string, Record<string, string>> = {
     "k.protoExpress": "Express-Protokoll", "k.protoWait": "Überbrückungs-Protokoll — für einen genauen Plan beschreibe deine Schmerzen rechts dem KI-Physio.",
     "chat.title": "KI-Physio", "chat.sub": "Antworten passend zu deiner Belastung & Erholung",
     "chat.seed": "Hallo 👋 Ich bin dein Sportphysio. Beschreibe mir, was du spürst — Bereich, seit wann, bei Belastung oder in Ruhe — oder klicke eine Zone im Schema an, und ich helfe dir.",
-    "chat.thinking": "Der Physio überlegt…", "chat.placeholder": "Z. B. Knieschmerzen nach langen Läufen…",
+    "chat.thinking": "Der Physio überlegt…", "chat.placeholder": "Z. B. Knieschmerzen nach langen Läufen…", "chat.photoAdd": "Foto hinzufügen", "chat.photoRemove": "Foto entfernen", "chat.photoReady": "Foto bereit. Es wird analysiert und dann verworfen: nichts wird gespeichert. Bereich nah und gut ausgeleuchtet aufnehmen.", "chat.photoBadType": "Bild nicht lesbar. Erlaubt: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Kannst du dir dieses Foto ansehen?",
     "chat.disclaimer": "⚕️ Informative Hinweise — kein Ersatz für ärztlichen Rat. Starke / anhaltende Schmerzen → zum Arzt.",
     "chat.errNoReply": "Ich konnte nicht antworten, bitte erneut versuchen.", "chat.errConn": "Keine Verbindung zum KI-Physio. Versuche es erneut.",
     "k.askPrompt": "Ich habe Schmerzen im Bereich: {zone} (Intensität {n}/10). Was könnte es sein, und was soll ich konkret tun?",
@@ -138,7 +138,7 @@ const H: Record<string, Record<string, string>> = {
     "k.protoExpress": "Protocolo exprés", "k.protoWait": "Protocolo de espera — para un plan preciso, describe tu dolor al fisio IA a la derecha.",
     "chat.title": "Fisio IA", "chat.sub": "Respuestas adaptadas a tu carga y recuperación",
     "chat.seed": "Hola 👋 Soy tu fisio del deporte. Cuéntame qué sientes — zona, desde cuándo, en esfuerzo o en reposo — o haz clic en una zona del esquema, y te ayudo.",
-    "chat.thinking": "El fisio está pensando…", "chat.placeholder": "Ej.: dolor de rodilla tras mis tiradas largas…",
+    "chat.thinking": "El fisio está pensando…", "chat.placeholder": "Ej.: dolor de rodilla tras mis tiradas largas…", "chat.photoAdd": "Añadir una foto", "chat.photoRemove": "Quitar la foto", "chat.photoReady": "Foto lista. Se analiza y se descarta: no se guarda nada. Encuadra la zona de cerca y con buena luz.", "chat.photoBadType": "Imagen ilegible. Formatos: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "¿Puedes mirar esta foto?",
     "chat.disclaimer": "⚕️ Consejos informativos — no sustituyen un consejo médico. Dolor fuerte / persistente → consulta.",
     "chat.errNoReply": "No he podido responder, inténtalo de nuevo.", "chat.errConn": "No se pudo conectar con el fisio IA. Inténtalo de nuevo.",
     "k.askPrompt": "Tengo dolor en: {zone} (intensidad {n}/10). ¿Qué puede ser y qué debo hacer concretamente?",
@@ -175,7 +175,7 @@ const H: Record<string, Record<string, string>> = {
     "k.protoExpress": "Protocolo expresso", "k.protoWait": "Protocolo de espera — para um plano preciso, descreve a tua dor ao fisio IA à direita.",
     "chat.title": "Fisio IA", "chat.sub": "Respostas adaptadas à tua carga e recuperação",
     "chat.seed": "Olá 👋 Sou o teu fisio do desporto. Conta-me o que sentes — zona, desde quando, em esforço ou em repouso — ou clica numa zona no esquema, e eu ajudo.",
-    "chat.thinking": "O fisio está a pensar…", "chat.placeholder": "Ex.: dor no joelho após os meus treinos longos…",
+    "chat.thinking": "O fisio está a pensar…", "chat.placeholder": "Ex.: dor no joelho após os meus treinos longos…", "chat.photoAdd": "Adicionar uma foto", "chat.photoRemove": "Remover a foto", "chat.photoReady": "Foto pronta. É analisada e depois descartada: nada é guardado. Enquadra a zona de perto e com boa luz.", "chat.photoBadType": "Imagem ilegível. Formatos: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Podes olhar para esta foto?",
     "chat.disclaimer": "⚕️ Conselhos informativos — não substituem aconselhamento médico. Dor forte / persistente → consulta.",
     "chat.errNoReply": "Não consegui responder, tenta novamente.", "chat.errConn": "Não foi possível ligar ao fisio IA. Tenta novamente.",
     "k.askPrompt": "Tenho dor em: {zone} (intensidade {n}/10). O que pode ser e o que devo fazer concretamente?",
@@ -265,7 +265,7 @@ const SHAPES: { slot: string; tag: "ellipse" | "rect"; p: Record<string, number>
 ];
 
 type Tab = "kine" | "journal" | "guardian" | "nutrition" | "poids";
-type ChatMsg = { role: "user" | "model"; text: string };
+type ChatMsg = { role: "user" | "model"; text: string; photo?: string };
 
 // Nombre qui s'anime en douceur quand sa valeur change (cartes nutrition).
 function AnimatedNumber({ value, className }: { value: number; className?: string }) {
@@ -299,6 +299,42 @@ export function HealthCenter() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  /** Photo en attente, en data-URL. Elle ne quitte le navigateur qu'à l'envoi, et n'est
+   *  jamais stockée côté serveur — voir le commentaire de /api/ai/physio. */
+  const [photo, setPhoto] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * Redimensionne la photo AVANT tout envoi : une photo de téléphone pèse 3 à 8 Mo, ce
+   * qui ferait un corps de requête de 10 Mo en base64 pour aucun gain — au-delà de
+   * ~1280 px, un modèle de vision ne voit rien de plus. On tombe à ~200 Ko.
+   * Le redimensionnement passe par un canvas, ce qui SUPPRIME au passage les métadonnées
+   * EXIF de la photo d'origine : sur une image de santé, la géolocalisation du cliché
+   * n'a aucune raison de partir avec.
+   */
+  const attachPhoto = useCallback((file: File) => {
+    if (!file.type.startsWith("image/")) { toast.error(tr("chat.photoBadType")); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1280;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { toast.error(tr("chat.photoBadType")); return; }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        setPhoto(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      img.onerror = () => toast.error(tr("chat.photoBadType"));
+      img.src = String(reader.result);
+    };
+    reader.onerror = () => toast.error(tr("chat.photoBadType"));
+    reader.readAsDataURL(file);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang]);
 
   const zoneMap = VIEW_ZONES[view];
   const selectedZone = selectedSlot ? zoneMap[selectedSlot] : null;
@@ -312,16 +348,27 @@ export function HealthCenter() {
 
   const send = useCallback(async (text: string) => {
     const msg = text.trim();
-    if (!msg || sending) return;
+    // Une photo seule est un message valable : « regarde ça » se passe de mots.
+    if ((!msg && !photo) || sending) return;
     const history = messages;
-    setMessages((m) => [...m, { role: "user", text: msg }]);
+    const sentPhoto = photo;
+    setMessages((m) => [...m, { role: "user", text: msg, photo: sentPhoto ?? undefined }]);
     setInput("");
+    setPhoto(null);
     setSending(true);
     try {
       const res = await fetch("/api/ai/physio", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: msg, zone: selectedSlot ? tr(VIEW_ZONES[view][selectedSlot]?.labelKey ?? "") || null : null, painLevel: selectedSlot ? painLevel : null, history }),
+        body: JSON.stringify({
+          message: msg || (sentPhoto ? tr("chat.photoOnly") : ""),
+          zone: selectedSlot ? tr(VIEW_ZONES[view][selectedSlot]?.labelKey ?? "") || null : null,
+          painLevel: selectedSlot ? painLevel : null,
+          // L'historique n'emporte que du texte : les photos ne sont pas rejouées à
+          // chaque tour (poids inutile, et rien n'est conservé côté serveur).
+          history: history.map((h) => ({ role: h.role, text: h.text })),
+          photo: sentPhoto ? { data: sentPhoto } : null,
+        }),
       });
       const json = await res.json();
       if (json.reply) setMessages((m) => [...m, { role: "model", text: json.reply }]);
@@ -331,7 +378,7 @@ export function HealthCenter() {
     } finally {
       setSending(false);
     }
-  }, [messages, sending, selectedSlot, view, painLevel, lang]);
+  }, [messages, sending, selectedSlot, view, painLevel, lang, photo]);
 
   const askAboutZone = () => {
     if (!selectedZone) return;
@@ -489,9 +536,14 @@ export function HealthCenter() {
               <div ref={scrollRef} className="flex-1 overflow-y-auto py-4 space-y-3" style={{ maxHeight: 440 }}>
                 {messages.map((m, i) => (
                   <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-sm whitespace-pre-wrap leading-relaxed ${
+                    <div className={`max-w-[85%] overflow-hidden rounded-2xl text-sm leading-relaxed ${
                       m.role === "user" ? "bg-zinc-900 text-white rounded-br-md" : "bg-zinc-100 text-zinc-800 rounded-bl-md"
-                    }`}>{m.text}</div>
+                    }`}>
+                      {/* La photo n'est affichée QUE localement : elle n'a été ni stockée
+                          ni renvoyée par le serveur, elle vit dans l'état du composant. */}
+                      {m.photo && <img src={m.photo} alt="" className="max-h-52 w-full object-cover" />}
+                      {m.text && <div className="whitespace-pre-wrap px-3.5 py-2.5">{m.text}</div>}
+                    </div>
                   </div>
                 ))}
                 {sending && (
@@ -503,11 +555,30 @@ export function HealthCenter() {
                 )}
               </div>
 
+              {/* Photo en attente d'envoi */}
+              {photo && (
+                <div className="mt-3 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-2.5">
+                  <img src={photo} alt="" className="h-14 w-14 flex-shrink-0 rounded-xl object-cover" />
+                  <p className="flex-1 text-xs leading-relaxed text-emerald-900">{tr("chat.photoReady")}</p>
+                  <button type="button" onClick={() => setPhoto(null)} aria-label={tr("chat.photoRemove")}
+                    className="flex-shrink-0 rounded-lg p-1.5 text-emerald-700 transition-colors hover:bg-emerald-100">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+
               <form onSubmit={(e) => { e.preventDefault(); send(input); }} className="pt-3 border-t border-zinc-100 flex items-center gap-2">
+                {/* `capture` fait ouvrir l'appareil photo directement sur mobile. */}
+                <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" capture="environment"
+                  className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) attachPhoto(f); e.target.value = ""; }} />
+                <button type="button" onClick={() => fileRef.current?.click()} disabled={sending} title={tr("chat.photoAdd")} aria-label={tr("chat.photoAdd")}
+                  className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl border border-zinc-200 text-zinc-500 transition-colors hover:bg-zinc-50 hover:text-zinc-700 disabled:opacity-40">
+                  <Camera className="h-4 w-4" />
+                </button>
                 <input value={input} onChange={(e) => setInput(e.target.value)} disabled={sending}
                   placeholder={tr("chat.placeholder")}
                   className="flex-1 px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-400" />
-                <button type="submit" disabled={sending || !input.trim()}
+                <button type="submit" disabled={sending || (!input.trim() && !photo)}
                   className="w-11 h-11 flex items-center justify-center rounded-2xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40 transition-colors flex-shrink-0">
                   <Send className="w-4 h-4" />
                 </button>

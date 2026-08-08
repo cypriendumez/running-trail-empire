@@ -24,6 +24,7 @@ import {
 } from "../src/lib/weight/energy";
 import { weightTrainingRules, weightCoachBlock } from "../src/lib/weight/coaching";
 import { robustWeeklyKm, demonstratedWeeklyKm, longRunPeakKm, longRunForWeek, longRunGap } from "../src/lib/running/volume";
+import { sniffType, sniffImage } from "../src/lib/upload/sniff";
 
 let passed = 0;
 const fails: string[] = [];
@@ -825,6 +826,86 @@ test("le feu rouge de fraîcheur raccourcit la sortie longue, et l'explique", ()
 test("l'affûtage coupe la sortie longue au lieu de la faire monter", () => {
   const lr = longRunForWeek({ weekIndex: 10, weeksToPeak: 8, current: 30, peak: 32, weeklyKm: 25, share: 0.35, taper: true });
   assert.ok(lr <= 6, `${lr} km en semaine d'affûtage — la fraîcheur prime`);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  PHOTOS ENVOYÉES AU KINÉ IA
+//
+//  Une image invite le modèle à affirmer plus que ce qu'elle montre : c'est le risque
+//  principal, pas l'erreur de lecture. Et une photo de blessure est une donnée de santé —
+//  ce qui n'est jamais écrit ne peut jamais fuiter.
+// ─────────────────────────────────────────────────────────────────────────────
+console.log("\nPHOTOS KINÉ — le type vient des octets, jamais de ce qu'on déclare");
+const bytesOf = (...n: number[]) => Uint8Array.from([...n, ...new Array(16).fill(0)]);
+test("les signatures réelles sont reconnues", () => {
+  assert.equal(sniffType(bytesOf(0xff, 0xd8, 0xff)), "image/jpeg");
+  assert.equal(sniffType(bytesOf(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)), "image/png");
+  assert.equal(sniffType(Uint8Array.from([...Buffer.from("RIFF0000WEBP"), ...new Array(8).fill(0)])), "image/webp");
+  assert.equal(sniffType(Uint8Array.from([...Buffer.from("%PDF-1.7"), ...new Array(8).fill(0)])), "application/pdf");
+});
+test("un fichier HTML déguisé en image est refusé", () => {
+  // L'extension et l'en-tête Content-Type sont sous le contrôle de l'appelant ; les
+  // octets, non. C'est ce contrôle qui a fermé le téléversement de fichiers arbitraires.
+  const html = Uint8Array.from(Buffer.from("<html><script>alert(1)</script>"));
+  assert.equal(sniffType(html), null);
+  assert.equal(sniffImage(html), null);
+});
+test("le kiné accepte des images mais JAMAIS un PDF", () => {
+  // Gemini lit les PDF : sans ce filtre, on relaierait un document arbitraire au modèle.
+  const pdf = Uint8Array.from([...Buffer.from("%PDF-1.7"), ...new Array(8).fill(0)]);
+  assert.equal(sniffType(pdf), "application/pdf");
+  assert.equal(sniffImage(pdf), null, "le PDF ne doit pas passer par le chat kiné");
+  assert.equal(sniffImage(bytesOf(0xff, 0xd8, 0xff)), "image/jpeg");
+});
+test("un fichier tronqué ne passe pas", () => {
+  assert.equal(sniffType(Uint8Array.from([0xff, 0xd8])), null);
+});
+
+console.log("\nPHOTOS KINÉ — rien n'est stocké, et le modèle est cadré");
+test("la photo ne touche aucun stockage", () => {
+  // Une photo de cheville gonflée dans un bucket PUBLIC (ce que fait /api/upload) resterait
+  // accessible à vie sans authentification. Ne rien garder règle accès ET rétention.
+  //
+  // Les COMMENTAIRES sont retirés avant l'analyse : la première version de ce test
+  // échouait sur le commentaire qui explique justement pourquoi on ne stocke rien — il y
+  // cite « /api/upload » et « getPublicUrl ». Un test qui lit la prose et pas le code se
+  // déclenche sur des mots, pas sur des faits.
+  const code = readFileSync("src/app/api/ai/physio/route.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/\/\/.*$/, "")).join("\n");
+  assert.ok(!/storage|getPublicUrl|createAdminClient/.test(code), "la route kiné ne doit rien écrire ni publier");
+  // La route enregistre bien UNE chose : le signalement de douleur (zone + intensité),
+  // fonctionnalité antérieure qui fait remonter la douleur jusqu'au coach. On vérifie donc
+  // le CONTENU des écritures, pas leur existence — interdire tout `insert` aurait fait
+  // échouer le test sur une écriture parfaitement légitime.
+  const payloads = [...code.matchAll(/\.(insert|upsert)\(([\s\S]{0,400}?)\)/g)].map((m) => m[2]);
+  assert.ok(payloads.length > 0, "le signalement de douleur doit toujours être enregistré");
+  for (const pl of payloads) {
+    assert.ok(!/photo|b64|imagePart|inline_data|base64/i.test(pl), `une écriture embarque la photo : ${pl.slice(0, 60)}`);
+  }
+  assert.ok(/inline_data/.test(code), "la photo doit partir en inline_data, pas par une URL");
+});
+test("le modèle reçoit les limites de ce qu'une photo permet", () => {
+  const src = readFileSync("src/app/api/ai/physio/route.ts", "utf8");
+  assert.ok(/CE QU'UNE PHOTO NE PERMET PAS/.test(src), "sans ce cadre, une image rend le modèle affirmatif à tort");
+  // La phlébite est le drapeau rouge qui compte ici : un mollet gonflé d'un seul côté
+  // ressemble à une contracture et se rééduque… jusqu'à l'embolie pulmonaire.
+  assert.ok(/PHLÉBITE/.test(src), "le drapeau rouge vasculaire doit être explicite");
+  assert.ok(/floue|trop sombre/.test(src), "une image inexploitable doit être signalée, pas interprétée");
+});
+test("un refus du filtre de sécurité ne se déguise pas en surcharge", () => {
+  // Gemini refuse souvent les images corporelles et renvoie du VIDE. Sans ce cas,
+  // l'utilisateur lisait « le kiné est très sollicité » et réessayait sans fin.
+  const src = readFileSync("src/app/api/ai/physio/route.ts", "utf8");
+  assert.ok(/filtre de sécurité sur les images corporelles/.test(src));
+  assert.ok(/status: 422/.test(src), "le refus doit être distinct du 503 de saturation");
+});
+test("la photo est redimensionnée côté client, EXIF compris", () => {
+  // 3 à 8 Mo par photo de téléphone, et des coordonnées GPS dans les métadonnées d'une
+  // image de santé. Le passage par canvas règle les deux.
+  const src = readFileSync("src/components/health/HealthCenter.tsx", "utf8");
+  assert.ok(/createElement\("canvas"\)/.test(src), "aucun redimensionnement avant envoi");
+  assert.ok(/EXIF/.test(src), "la suppression des métadonnées doit être documentée, pas accidentelle");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
