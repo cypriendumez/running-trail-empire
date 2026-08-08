@@ -1057,6 +1057,26 @@ test("la clé API n'entre JAMAIS dans le prompt", () => {
   const diag = readFileSync("src/lib/support/diagnose.ts", "utf8");
   assert.ok(!/intervals_api_key/.test(diag), "le module de diagnostic ne doit jamais voir la clé");
 });
+test("la chaîne de repli ne contient aucun modèle mort", () => {
+  // `gemini-2.0-flash` : annoncé arrêté par Google le 1ᵉʳ juin 2026 et absent du tableau
+  // de bord des limites du projet — quota inconnu ou nul. Sur un palier gratuit plafonné
+  // à 20 requêtes/jour/modèle, chaque tentative vers lui gaspillait 5 % de la capacité.
+  // Commentaires retirés avant l'analyse : le commentaire qui EXPLIQUE le retrait cite
+  // forcément le modèle. Deuxième fois que ce piège se présente dans cette suite.
+  const code = readFileSync("src/lib/ai/gemini.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/\/\/.*$/, "")).join("\n");
+  assert.ok(!/gemini-2\.0-flash/.test(code), "un modèle arrêté ne doit pas rester dans la chaîne");
+});
+test("la chaîne garde PLUSIEURS modèles — les quotas sont par modèle", () => {
+  // Erreur de raisonnement évitée ici : réduire la chaîne à un seul modèle semblait
+  // économiser des requêtes, alors que les quotas sont comptés PAR MODÈLE (20 + 20).
+  // Basculer vers le second DOUBLE la capacité ; n'en garder qu'un la diviserait par deux.
+  const src = readFileSync("src/lib/ai/gemini.ts", "utf8");
+  const defaults = (src.match(/GEMINI_MODELS \?\? "([^"]+)"/) || [])[1] ?? "";
+  assert.ok(defaults.split(",").length >= 2, `chaîne trop courte : « ${defaults} »`);
+  assert.ok(/GEMINI_MODELS/.test(src), "la liste doit être ajustable sans redéploiement");
+});
 test("un quota JOURNALIER épuisé ne déclenche aucun réessai", () => {
   // Un 429 « par minute » se dissipe en secondes : réessayer a du sens. Un 429 « par
   // jour » ne se libère qu'à minuit Pacifique — chaque réessai est une requête brûlée

@@ -7,8 +7,26 @@
 
 const KEY = process.env.GEMINI_API_KEY;
 
-// Du meilleur au plus dispo : on dégrade proprement si saturation.
-const DEFAULT_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-flash-lite"];
+/**
+ * Chaîne de repli : du meilleur au plus disponible.
+ *
+ * `gemini-2.0-flash` RETIRÉ (08/08/2026). Google l'annonce arrêté depuis le 1ᵉʳ juin 2026
+ * et il n'apparaît plus dans le tableau de bord des limites du projet — donc son quota
+ * journalier est inconnu, voire nul. Chaque tentative vers lui coûtait un aller-retour
+ * réseau pour rien, sur un palier gratuit où le plafond est de 20 requêtes par jour et
+ * par modèle : un gaspillage de 5 % de la capacité quotidienne à chaque question.
+ *
+ * ⚠️ POURQUOI ON GARDE DEUX MODÈLES, ET PAS UN SEUL.
+ * Les quotas sont comptés PAR MODÈLE : 20 requêtes/jour sur 2.5-flash ET 20 sur
+ * flash-lite. Basculer vers le second quand le premier est épuisé ne consomme donc rien
+ * de plus — cela DOUBLE la capacité réelle (40/jour au lieu de 20). Réduire la chaîne à
+ * un seul modèle la diviserait par deux. Ne pas « optimiser » dans ce sens.
+ *
+ * `GEMINI_MODELS` permet de changer l'ordre ou la liste sans redéploiement — utile pour
+ * ajouter un modèle le jour du passage au palier payant, ou en retirer un qui déraille.
+ */
+const DEFAULT_MODELS = (process.env.GEMINI_MODELS ?? "gemini-2.5-flash,gemini-2.5-flash-lite")
+  .split(",").map((m) => m.trim()).filter(Boolean);
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
