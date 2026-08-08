@@ -1057,6 +1057,19 @@ test("la clé API n'entre JAMAIS dans le prompt", () => {
   const diag = readFileSync("src/lib/support/diagnose.ts", "utf8");
   assert.ok(!/intervals_api_key/.test(diag), "le module de diagnostic ne doit jamais voir la clé");
 });
+test("un quota JOURNALIER épuisé ne déclenche aucun réessai", () => {
+  // Un 429 « par minute » se dissipe en secondes : réessayer a du sens. Un 429 « par
+  // jour » ne se libère qu'à minuit Pacifique — chaque réessai est une requête brûlée
+  // pour rien. L'ancien comportement consommait jusqu'à 6 requêtes par question au lieu
+  // de 3, une fois le quota atteint : il creusait le trou qu'il prétendait combler.
+  const src = readFileSync("src/lib/ai/gemini.ts", "utf8");
+  assert.ok(/PerDay\|per day/i.test(src), "le quota journalier doit être distingué du quota par minute");
+  const iDaily = src.indexOf("dailyExhausted");
+  const iRetry = src.indexOf("if (attempt < retries)");
+  assert.ok(iDaily > 0 && iDaily < iRetry, "le court-circuit doit précéder la boucle de réessai");
+  // La bascule vers un AUTRE modèle reste utile : il a son propre quota journalier.
+  assert.ok(/for \(const model of models\)/.test(src), "la bascule de modèle doit être conservée");
+});
 test("la réponse est optimisée pour la VITESSE", () => {
   const src = readFileSync("src/app/api/ai/support/route.ts", "utf8");
   assert.ok(/thinkingBudget: 0/.test(src), "aucun budget de réflexion sur une question de support");

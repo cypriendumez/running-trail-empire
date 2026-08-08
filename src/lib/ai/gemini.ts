@@ -63,7 +63,21 @@ export async function generateContent(
         lastStatus = res.status;
         lastErr = (await res.text().catch(() => "")).slice(0, 160) || `HTTP ${res.status}`;
 
-        // Transitoire (saturation / throttle / erreur serveur) → backoff puis réessai.
+        // ── QUOTA JOURNALIER : ne JAMAIS réessayer le même modèle ──────────────
+        //
+        // Un 429 recouvre deux situations opposées. Le plafond PAR MINUTE se dissipe en
+        // quelques secondes : réessayer a du sens. Le plafond PAR JOUR, lui, ne se libère
+        // qu'à minuit heure du Pacifique — chaque réessai est alors une requête consommée
+        // pour rien, qui creuse le trou qu'elle prétend combler.
+        //
+        // Coût mesuré de l'ancien comportement : 3 modèles × 2 tentatives = jusqu'à
+        // 6 requêtes brûlées par question d'utilisateur une fois le quota atteint, contre
+        // 3 nécessaires. On garde la bascule VERS UN AUTRE modèle (il a son propre quota
+        // journalier, c'est le seul recours utile), on supprime le réessai inutile.
+        const dailyExhausted = res.status === 429 && /PerDay|per day/i.test(lastErr);
+        if (dailyExhausted) break; // modèle suivant, sans insister
+
+        // Transitoire (saturation par minute / erreur serveur) → backoff puis réessai.
         if (res.status === 429 || res.status >= 500) {
           if (attempt < retries) {
             await sleep(450 * (attempt + 1) + Math.floor(Math.random() * 300));
