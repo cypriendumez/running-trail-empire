@@ -613,6 +613,31 @@ test("la cible calorique ne descend JAMAIS sous le métabolisme de base", () => 
     assert.ok(plan.targetKcal >= (body.gender === "female" ? 1200 : 1500), `cible ${plan.targetKcal} sous le plancher absolu`);
   }
 });
+test("le mode SAIT S'ARRÊTER : aucun déficit sous IMC 21", () => {
+  // Défaut réel, relevé sur un compte de production. Le refus d'activation se joue à
+  // IMC 20, mais une fois le mode actif plus RIEN ne bornait la descente : un coureur de
+  // 20 ans, 70 kg pour 1,85 m (IMC 20,5), recevait 440 kcal/jour de déficit et −0,4
+  // kg/semaine — soit un passage sous IMC 19 en sept semaines, très en dessous du seuil
+  // qui aurait refusé l'activation. Le garde-fou d'entrée ne servait à rien une fois la
+  // porte franchie.
+  const plan = buildWeightPlan({
+    body: { weightKg: 70, heightCm: 185, age: 20, gender: "male" },
+    goalKg: null, logs: [], workouts: [], now: NOW,
+  })!;
+  assert.equal(plan.deficitKcal, 0, `déficit de ${plan.deficitKcal} kcal à IMC ${plan.bmi}`);
+  assert.equal(plan.plannedRatePerWeek, 0, "aucune perte ne doit être projetée");
+  assert.equal(plan.targetKcal, plan.tdee, "la cible doit être le maintien");
+  assert.ok(plan.capCodes.some((c) => c.code === "maintien_imc_bas"), "le passage en maintien doit être expliqué");
+});
+test("au-dessus d'IMC 21, le déficit reprend normalement", () => {
+  // Garde-fou du garde-fou : le plancher ne doit pas neutraliser le mode pour ceux à qui
+  // il est destiné.
+  const plan = buildWeightPlan({
+    body: { weightKg: 95, heightCm: 178, age: 40, gender: "male" },
+    goalKg: 80, logs: [], workouts: [], now: NOW,
+  })!;
+  assert.ok(plan.deficitKcal > 200, `déficit ${plan.deficitKcal} kcal à IMC ${plan.bmi} — le mode doit fonctionner`);
+});
 test("la perte prévue ne dépasse jamais 0,75 %/semaine du poids", () => {
   const plan = buildWeightPlan({
     body: { weightKg: 140, heightCm: 170, age: 35, gender: "male" },

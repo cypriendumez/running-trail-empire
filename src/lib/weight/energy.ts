@@ -379,9 +379,28 @@ export function buildWeightPlan(args: {
   //    le muscle, et chez un coureur ça se paie en blessures et en performance.
   const maxRate = currentKg * 0.0075;
   let deficit = (maxRate * KCAL_PER_KG_FAT) / 7;
+
+  /**
+   * PLANCHER DE TRAJECTOIRE — le mode doit savoir s'ARRÊTER.
+   *
+   * DÉFAUT RÉEL. Le refus d'activation se joue à IMC 20, mais une fois le mode actif plus
+   * rien ne bornait la descente : sans poids cible, un déficit était prescrit
+   * indéfiniment. Constaté en production sur un coureur de 20 ans, 70 kg pour 1,85 m
+   * (IMC 20,5) : mode actif, 440 kcal/jour de déficit, −0,4 kg/semaine — soit un passage
+   * sous IMC 19 en sept semaines, très en dessous du seuil qui aurait refusé l'activation.
+   * Le garde-fou d'entrée ne servait à rien une fois la porte franchie.
+   *
+   * Entre 20 et 21, il n'y a rien à perdre sainement pour un coureur : le mode reste
+   * consultable (dépense, protéines) mais passe en MAINTIEN, déficit nul.
+   */
+  if (bmi < 21) {
+    deficit = 0;
+    caps.push(`IMC de ${fr1(bmi)} : aucun déficit prescrit. À ce niveau il n'y a plus de masse grasse à perdre sans entamer le muscle et l'os — le mode passe en maintien. Pour changer ta composition corporelle, ce sont le renforcement et les protéines qui agissent, pas les calories en moins.`);
+    capCodes.push({ code: "maintien_imc_bas", params: { bmi } });
+  }
   // Sur un IMC déjà proche de la normale, on ralentit : les derniers kilos se perdent
   // lentement, et un déficit agressif à IMC 26 n'apporte rien.
-  if (bmi < 27) { deficit = Math.min(deficit, (0.4 * KCAL_PER_KG_FAT) / 7); caps.push("IMC proche de la normale : perte volontairement limitée à ~0,4 kg/semaine."); capCodes.push({ code: "imc_proche_normale" }); }
+  else if (bmi < 27) { deficit = Math.min(deficit, (0.4 * KCAL_PER_KG_FAT) / 7); caps.push("IMC proche de la normale : perte volontairement limitée à ~0,4 kg/semaine."); capCodes.push({ code: "imc_proche_normale" }); }
 
   // 2. Proportion : jamais plus de 25 % de la dépense totale.
   if (deficit > tdee * 0.25) { deficit = tdee * 0.25; caps.push("Déficit plafonné à 25 % de ta dépense totale."); capCodes.push({ code: "pct_tdee" }); }
@@ -395,7 +414,9 @@ export function buildWeightPlan(args: {
 
   const targetKcal = r0(tdee - deficit);
   const deficitKcal = r0(deficit);
-  const plannedRatePerWeek = r1(-(deficitKcal * 7) / KCAL_PER_KG_FAT);
+  // `-(0 * 7) / 7700` vaut −0 en JavaScript, ce qui s'affiche « −0,0 kg/semaine » :
+  // un signe négatif sur une absence de perte. Le cas nul est traité à part.
+  const plannedRatePerWeek = deficitKcal === 0 ? 0 : r1(-(deficitKcal * 7) / KCAL_PER_KG_FAT);
 
   // ── Protéines ─────────────────────────────────────────────────────────────
   // En déficit calorique, l'apport protéique est le principal levier CONTRE la fonte

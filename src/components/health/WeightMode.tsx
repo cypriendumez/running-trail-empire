@@ -401,7 +401,7 @@ export function WeightMode() {
                 <div className="mt-4 rounded-xl bg-emerald-50 p-3">
                   <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-emerald-700"><ShieldCheck className="h-3.5 w-3.5" /> {tr("caps")}</div>
                   <ul className="space-y-1 text-xs leading-relaxed text-emerald-900">
-                    {plan.capCodes.map((c, i) => <li key={i}>· {tr(`c.${c.code}`, c.params)}</li>)}
+                    {plan.capCodes.map((c, i) => <li key={i}>· {tr(`c.${c.code}`, c.params && { ...c.params, bmi: c.params.bmi != null ? dec(Number(c.params.bmi)) : "" })}</li>)}
                   </ul>
                 </div>
               )}
