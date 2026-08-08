@@ -629,6 +629,26 @@ test("le mode SAIT S'ARRÊTER : aucun déficit sous IMC 21", () => {
   assert.equal(plan.targetKcal, plan.tdee, "la cible doit être le maintien");
   assert.ok(plan.capCodes.some((c) => c.code === "maintien_imc_bas"), "le passage en maintien doit être expliqué");
 });
+test("suivi seul : dépense et protéines SANS déficit", () => {
+  // Tout était derrière un unique interrupteur « perte de poids ». Un coureur mince qui
+  // voulait juste suivre son poids devait donc activer un mode de PERTE ; et le désactiver
+  // lui retirait la pesée, la tendance et sa cible protéines — ce qui compte le plus en
+  // préparation. Le suivi ne doit dépendre d'aucune activation.
+  const body = { weightKg: 95, heightCm: 178, age: 40, gender: "male" };
+  const suivi = buildWeightPlan({ body, goalKg: 80, logs: [], workouts: [], now: NOW, applyDeficit: false })!;
+  assert.equal(suivi.deficitKcal, 0, "aucun déficit en suivi seul");
+  assert.equal(suivi.targetKcal, suivi.tdee, "la cible doit être le maintien");
+  assert.equal(suivi.weeksToGoal, null, "aucune échéance ne doit être projetée sans déficit");
+  // …mais tout le reste RESTE calculé : c'est l'intérêt du suivi.
+  assert.ok(suivi.bmr > 0 && suivi.tdee > 0 && suivi.proteinG > 0, "la dépense et les protéines doivent rester disponibles");
+  assert.ok(suivi.capCodes.some((c) => c.code === "suivi_seul"), "l'absence de déficit doit être expliquée");
+});
+test("un déficit nul ne s'affiche pas « −0 kcal »", () => {
+  // Le signe moins était codé en dur dans le gabarit de la ligne : à IMC 20,5, où le
+  // déficit est volontairement nul, l'écran affichait « Déficit −0 kcal ».
+  const src = readFileSync("src/components/health/WeightMode.tsx", "utf8");
+  assert.ok(/deficitOn && plan\.deficitKcal > 0 &&/.test(src), "la ligne Déficit doit disparaître quand il est nul");
+});
 test("au-dessus d'IMC 21, le déficit reprend normalement", () => {
   // Garde-fou du garde-fou : le plancher ne doit pas neutraliser le mode pour ceux à qui
   // il est destiné.

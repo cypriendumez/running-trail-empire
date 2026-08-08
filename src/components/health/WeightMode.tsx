@@ -39,7 +39,7 @@ const W: Record<string, Record<string, string>> = {
     introBullet1: "Cible calculée sur ton métabolisme de base et tes séances réelles des 28 derniers jours",
     introBullet2: "Déficit plafonné : jamais sous ton métabolisme de base, jamais plus de 0,75 %/semaine",
     introBullet3: "Séances adaptées à l'impact : alternance course/marche et volume sans impact si nécessaire",
-    disabled: "Mode désactivé", disable: "Désactiver le mode",
+    disabled: "Mode désactivé", disable: "Désactiver l'objectif de perte", lossTitle: "Objectif de perte de poids", lossOn: "Actif : la cible calorique ci-dessus inclut un déficit, et tes séances sont adaptées à l'impact. Le suivi du poids, lui, reste disponible quoi qu'il arrive.", lossOff: "Inactif : ci-dessus, la cible affichée est ton MAINTIEN — ce qu'il faut manger pour ne pas bouger. Active-le seulement si tu veux réellement perdre du poids.",
     notEligible: "Mode indisponible",
     migration: "Migration à exécuter",
     migrationTxt: "Le fichier supabase/migrations/018_perte_de_poids.sql n'a pas encore été exécuté sur cette base. Le mode ne peut pas enregistrer de pesée tant que c'est le cas.",
@@ -71,7 +71,7 @@ const W: Record<string, Record<string, string>> = {
     introBullet1: "Target computed from your basal metabolic rate and your actual sessions over the last 28 days",
     introBullet2: "Capped deficit: never below your basal metabolic rate, never more than 0.75 %/week",
     introBullet3: "Impact-aware sessions: run/walk alternation and low-impact volume when needed",
-    disabled: "Mode disabled", disable: "Disable mode",
+    disabled: "Mode disabled", disable: "Turn off the loss goal", lossTitle: "Weight-loss goal", lossOn: "Active: the calorie target above includes a deficit, and your sessions are impact-adapted. Weight tracking stays available either way.", lossOff: "Inactive: the target above is your MAINTENANCE — what to eat to stay put. Only turn this on if you really want to lose weight.",
     notEligible: "Mode unavailable",
     migration: "Migration required",
     migrationTxt: "The file supabase/migrations/018_perte_de_poids.sql has not been run on this database yet. No weigh-in can be saved until it is.",
@@ -103,7 +103,7 @@ const W: Record<string, Record<string, string>> = {
     introBullet1: "Ziel berechnet aus Grundumsatz und deinen tatsächlichen Einheiten der letzten 28 Tage",
     introBullet2: "Begrenztes Defizit: nie unter dem Grundumsatz, nie mehr als 0,75 %/Woche",
     introBullet3: "Belastungsgerechte Einheiten: Lauf-Geh-Wechsel und gelenkschonendes Volumen bei Bedarf",
-    disabled: "Modus deaktiviert", disable: "Modus deaktivieren",
+    disabled: "Modus deaktiviert", disable: "Abnehmziel ausschalten", lossTitle: "Abnehmziel", lossOn: "Aktiv: das Kalorienziel oben enthält ein Defizit, und deine Einheiten sind belastungsgerecht angepasst. Die Gewichtsverfolgung bleibt in jedem Fall verfügbar.", lossOff: "Inaktiv: das Ziel oben ist dein ERHALT — was du isst, um dein Gewicht zu halten. Aktiviere es nur, wenn du wirklich abnehmen willst.",
     notEligible: "Modus nicht verfügbar",
     migration: "Migration erforderlich",
     migrationTxt: "Die Datei supabase/migrations/018_perte_de_poids.sql wurde auf dieser Datenbank noch nicht ausgeführt. Bis dahin kann kein Wiegen gespeichert werden.",
@@ -135,7 +135,7 @@ const W: Record<string, Record<string, string>> = {
     introBullet1: "Objetivo calculado con tu metabolismo basal y tus sesiones reales de los últimos 28 días",
     introBullet2: "Déficit limitado: nunca por debajo de tu metabolismo basal, nunca más del 0,75 %/semana",
     introBullet3: "Sesiones adaptadas al impacto: alternancia carrera/marcha y volumen sin impacto si hace falta",
-    disabled: "Modo desactivado", disable: "Desactivar el modo",
+    disabled: "Modo desactivado", disable: "Desactivar el objetivo de pérdida", lossTitle: "Objetivo de pérdida de peso", lossOn: "Activo: el objetivo calórico de arriba incluye un déficit, y tus sesiones están adaptadas al impacto. El seguimiento del peso sigue disponible en todo caso.", lossOff: "Inactivo: el objetivo de arriba es tu MANTENIMIENTO — lo que hay que comer para no moverte. Actívalo solo si realmente quieres perder peso.",
     notEligible: "Modo no disponible",
     migration: "Migración pendiente",
     migrationTxt: "El archivo supabase/migrations/018_perte_de_poids.sql aún no se ha ejecutado en esta base. Hasta entonces no se puede guardar ningún pesaje.",
@@ -167,7 +167,7 @@ const W: Record<string, Record<string, string>> = {
     introBullet1: "Objetivo calculado com o teu metabolismo basal e as sessões reais dos últimos 28 dias",
     introBullet2: "Défice limitado: nunca abaixo do metabolismo basal, nunca mais de 0,75 %/semana",
     introBullet3: "Sessões adaptadas ao impacto: alternância corrida/marcha e volume sem impacto se necessário",
-    disabled: "Modo desativado", disable: "Desativar o modo",
+    disabled: "Modo desativado", disable: "Desativar o objetivo de perda", lossTitle: "Objetivo de perda de peso", lossOn: "Ativo: o objetivo calórico acima inclui um défice, e as tuas sessões estão adaptadas ao impacto. O acompanhamento do peso mantém-se disponível de qualquer forma.", lossOff: "Inativo: o objetivo acima é a tua MANUTENÇÃO — o que comer para te manteres. Ativa-o apenas se quiseres mesmo perder peso.",
     notEligible: "Modo indisponível",
     migration: "Migração pendente",
     migrationTxt: "O ficheiro supabase/migrations/018_perte_de_poids.sql ainda não foi executado nesta base. Até lá nenhuma pesagem pode ser guardada.",
@@ -212,7 +212,8 @@ type Rules = {
 type ApiState = {
   migrated: boolean; enabled: boolean; goalKg: number | null; bmi?: number | null;
   eligibility: { ok: true } | { ok: false; reason: string; detail: string; params?: Record<string, string | number> };
-  plan: Plan | null; verdict?: { status: string; message: string; params?: Record<string, string | number> }; rules?: Rules;
+  plan: Plan | null; applyDeficit?: boolean;
+  verdict?: { status: string; message: string; params?: Record<string, string | number> }; rules?: Rules | null;
   logs: { date: string; weight_kg: number; note?: string | null }[];
 };
 
@@ -275,6 +276,9 @@ export function WeightMode() {
   if (!state) return null;
 
   const { plan, rules, verdict } = state;
+  // La perte est-elle réellement en cours ? Le suivi (pesée, dépense, protéines) ne dépend
+  // PAS de ce drapeau — c'est tout l'objet de la séparation.
+  const deficitOn = state.applyDeficit === true;
 
   // Les nombres sont mis en forme ICI, dans la locale affichée, avant d'entrer dans les
   // phrases traduites : sinon chaque traduction devrait connaître la convention décimale
@@ -311,27 +315,7 @@ export function WeightMode() {
         </div>
       )}
 
-      {/* Éligible mais pas encore activé : présentation + bouton. */}
-      {state.eligibility.ok && !state.enabled && (
-        <div className="bento-card">
-          <div className="mb-4 flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600"><Scale className="h-[18px] w-[18px]" /></span>
-            <h3 className="font-semibold text-zinc-900">{tr("title")}</h3>
-          </div>
-          <p className="text-sm leading-relaxed text-zinc-600">{tr("intro")}</p>
-          <ul className="mt-3 space-y-1.5 text-sm text-zinc-600">
-            {["introBullet1", "introBullet2", "introBullet3"].map((k) => (
-              <li key={k} className="flex gap-2"><span className="mt-1.5 h-1 w-1 flex-shrink-0 rounded-full bg-emerald-500" />{tr(k)}</li>
-            ))}
-          </ul>
-          <button onClick={() => post({ enabled: true })} disabled={busy}
-            className="mt-5 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50">
-            {busy ? tr("activating") : tr("activate")}
-          </button>
-        </div>
-      )}
-
-      {state.enabled && plan && (
+      {plan && (
         <>
           {/* ── Chiffres clés ── */}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -366,7 +350,7 @@ export function WeightMode() {
               </div>
               <p className="mt-2 text-xs leading-relaxed text-zinc-500">{tr("weighInHint")}</p>
 
-              <div className="mt-5 border-t border-zinc-100 pt-4">
+              {deficitOn && <div className="mt-5 border-t border-zinc-100 pt-4">
                 <h4 className="mb-2 text-sm font-semibold text-zinc-900">{tr("goal")}</h4>
                 <div className="flex gap-2">
                   <input type="number" step="0.5" min="30" max="299" value={goalInput} onChange={(e) => setGoalInput(e.target.value)}
@@ -384,7 +368,7 @@ export function WeightMode() {
                     <span><strong>{plan.weeksToGoal}</strong> {tr("weeks")} — <span className="text-zinc-500">{plan.weeksToGoalBasis === "mesure" ? tr("basisMeasured") : tr("basisTheory")}</span></span>
                   </p>
                 )}
-              </div>
+              </div>}
             </div>
 
             {/* ── Décomposition énergétique ── */}
@@ -394,7 +378,7 @@ export function WeightMode() {
                 <Row label={tr("bmr")} value={`${plan.bmr.toLocaleString(lang)} kcal`} />
                 <Row label={tr("sport")} value={`${plan.training.kcalPerDay.toLocaleString(lang)} kcal`} sub={tr("sessionsOver28d", { n: plan.training.counted })} />
                 <Row label={tr("tdee")} value={`${plan.tdee.toLocaleString(lang)} kcal`} strong />
-                <Row label={tr("deficit")} value={`−${plan.deficitKcal.toLocaleString(lang)} kcal`} />
+                {deficitOn && plan.deficitKcal > 0 && <Row label={tr("deficit")} value={`−${plan.deficitKcal.toLocaleString(lang)} kcal`} />}
                 <Row label={tr("target")} value={`${plan.targetKcal.toLocaleString(lang)} kcal`} strong accent />
               </div>
               {plan.caps.length > 0 && (
@@ -409,7 +393,7 @@ export function WeightMode() {
           </div>
 
           {/* ── Ce que ça change à l'entraînement ── */}
-          {rules && (
+          {deficitOn && rules && (
             <div className="bento-card">
               <h3 className="mb-3 font-semibold text-zinc-900">{tr("training")}</h3>
               <p className="text-sm leading-relaxed text-zinc-600">{tr(rationaleKey(plan.band))}</p>
@@ -467,10 +451,37 @@ export function WeightMode() {
 
           <p className="px-1 text-xs leading-relaxed text-zinc-400">{tr("disclaimer")}</p>
 
-          <button onClick={() => post({ enabled: false })} disabled={busy}
-            className="text-xs font-medium text-zinc-400 underline-offset-2 hover:text-zinc-600 hover:underline">
-            {tr("disable")}
-          </button>
+          {/* ── Objectif de perte : réglage SÉPARÉ du suivi ci-dessus ── */}
+          {state.eligibility.ok ? (
+            <div className="bento-card">
+              <div className="mb-2 flex items-center gap-2">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600"><Scale className="h-[18px] w-[18px]" /></span>
+                <h3 className="font-semibold text-zinc-900">{tr("lossTitle")}</h3>
+              </div>
+              {deficitOn ? (
+                <>
+                  <p className="text-sm leading-relaxed text-zinc-600">{tr("lossOn")}</p>
+                  <button onClick={() => post({ enabled: false })} disabled={busy}
+                    className="mt-4 rounded-xl border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50">
+                    {tr("disable")}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm leading-relaxed text-zinc-600">{tr("lossOff")}</p>
+                  <ul className="mt-3 space-y-1.5 text-sm text-zinc-600">
+                    {["introBullet1", "introBullet2", "introBullet3"].map((k) => (
+                      <li key={k} className="flex gap-2"><span className="mt-1.5 h-1 w-1 flex-shrink-0 rounded-full bg-emerald-500" />{tr(k)}</li>
+                    ))}
+                  </ul>
+                  <button onClick={() => post({ enabled: true })} disabled={busy}
+                    className="mt-4 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50">
+                    {busy ? tr("activating") : tr("activate")}
+                  </button>
+                </>
+              )}
+            </div>
+          ) : null}
         </>
       )}
     </motion.div>

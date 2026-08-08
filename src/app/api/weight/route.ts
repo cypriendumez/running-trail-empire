@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import {
-  buildWeightPlan, weightModeEligibility, trendVerdict, bmiOf,
+  buildWeightPlan, weightModeEligibility, trendVerdict,
   type WeightLog, type EnergyWorkout,
 } from "@/lib/weight/energy";
 import { weightTrainingRules } from "@/lib/weight/coaching";
@@ -81,18 +81,19 @@ export async function GET() {
   const enabled = Boolean(profile.weight_mode_enabled);
   const goalKg = profile.weight_goal_kg != null ? Number(profile.weight_goal_kg) : null;
 
-  // Le mode n'est pas activé, ou le profil n'y est pas éligible : on renvoie l'état sans
-  // aucun calcul. Afficher une cible calorique à quelqu'un qui n'a rien demandé serait
-  // précisément ce qu'on a choisi d'éviter.
-  if (!eligibility.ok || !enabled) {
-    return NextResponse.json({
-      migrated, enabled, eligibility, goalKg, plan: null, logs: logs ?? [],
-      bmi: bmiOf(body.weightKg, body.heightCm),
-    });
-  }
-
+  // ── SUIVI vs DÉFICIT : deux choses distinctes ──────────────────────────────
+  //
+  // Tout était derrière l'unique interrupteur `enabled`. Conséquence : un coureur mince
+  // qui voulait juste suivre son poids et connaître sa cible protéique devait activer un
+  // mode de PERTE de poids ; et le désactiver lui retirait la pesée, la tendance, sa
+  // dépense réelle ET ses protéines — précisément ce qui compte le plus en préparation.
+  //
+  // Désormais : la dépense, les protéines et le suivi de poids sont TOUJOURS calculés
+  // dès que le profil le permet. Seul le DÉFICIT dépend d'une activation volontaire et
+  // des garde-fous d'éligibilité.
+  const applyDeficit = enabled && eligibility.ok;
   const workouts = await fetchWorkouts(sb, user.id);
-  const plan = buildWeightPlan({ body, goalKg, logs: logs ?? [], workouts });
+  const plan = buildWeightPlan({ body, goalKg, logs: logs ?? [], workouts, applyDeficit });
   if (!plan) {
     return NextResponse.json({
       migrated, enabled, goalKg, plan: null, logs: logs ?? [],
@@ -101,8 +102,10 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    migrated, enabled, eligibility, goalKg, plan,
-    verdict: trendVerdict(plan), rules: weightTrainingRules(plan),
+    migrated, enabled, eligibility, goalKg, plan, applyDeficit,
+    verdict: trendVerdict(plan),
+    // Les règles d'entraînement liées au poids n'ont de sens qu'en perte assumée.
+    rules: applyDeficit ? weightTrainingRules(plan) : null,
     logs: logs ?? [],
   });
 }

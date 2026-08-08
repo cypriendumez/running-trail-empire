@@ -341,6 +341,17 @@ export function buildWeightPlan(args: {
   logs: WeightLog[];
   workouts: EnergyWorkout[];
   now?: number;
+  /**
+   * `false` = SUIVI SEUL : dépense, protéines, pesées et tendance, mais aucun déficit.
+   *
+   * Tout était auparavant derrière un unique interrupteur « mode perte de poids ». Un
+   * coureur mince qui voulait simplement suivre son poids et connaître sa cible
+   * protéique devait donc activer un mode de PERTE — lequel, à IMC 20,5, refusait
+   * ensuite de faire perdre quoi que ce soit. Et le désactiver lui retirait la pesée,
+   * la tendance et les protéines : justement ce qui compte le plus en préparation.
+   * Deux besoins distincts, deux réglages.
+   */
+  applyDeficit?: boolean;
 }): WeightPlan | null {
   const now = args.now ?? Date.now();
   const trend = weightTrend(args.logs, 42, now);
@@ -393,7 +404,13 @@ export function buildWeightPlan(args: {
    * Entre 20 et 21, il n'y a rien à perdre sainement pour un coureur : le mode reste
    * consultable (dépense, protéines) mais passe en MAINTIEN, déficit nul.
    */
-  if (bmi < 21) {
+  // Suivi seul : aucun déficit, la cible est le maintien. Prioritaire sur tout le reste.
+  if (args.applyDeficit === false) {
+    deficit = 0;
+    caps.push("Suivi seul : aucun déficit calorique. La cible affichée est ta dépense — ce qu'il faut manger pour maintenir ton poids actuel.");
+    capCodes.push({ code: "suivi_seul" });
+  }
+  else if (bmi < 21) {
     deficit = 0;
     caps.push(`IMC de ${fr1(bmi)} : aucun déficit prescrit. À ce niveau il n'y a plus de masse grasse à perdre sans entamer le muscle et l'os — le mode passe en maintien. Pour changer ta composition corporelle, ce sont le renforcement et les protéines qui agissent, pas les calories en moins.`);
     capCodes.push({ code: "maintien_imc_bas", params: { bmi } });
@@ -432,7 +449,7 @@ export function buildWeightPlan(args: {
   const toLoseKg = goalKg != null ? r1(currentKg - goalKg) : null;
   let weeksToGoal: number | null = null;
   let weeksToGoalBasis: "mesure" | "theorique" | null = null;
-  if (toLoseKg != null && toLoseKg > 0) {
+  if (toLoseKg != null && toLoseKg > 0 && args.applyDeficit !== false) {
     // On projette d'abord sur ce qui est MESURÉ. La projection théorique suppose que la
     // cible calorique est tenue tous les jours — ce que l'app ne sait pas.
     if (trend && trend.ratePerWeek < -0.05) { weeksToGoal = Math.ceil(toLoseKg / -trend.ratePerWeek); weeksToGoalBasis = "mesure"; }
