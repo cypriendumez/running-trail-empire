@@ -5,6 +5,7 @@ import { generateContent } from "@/lib/ai/gemini";
 import { HELP_PAGES, HELP_FACTS, HELP_PROBLEMS, HEALTH_TABS } from "@/data/helpKb";
 import { diagnoseAccount, findingsBlock, type AccountState } from "@/lib/support/diagnose";
 import { T, normLang } from "@/lib/i18n/translations";
+import { fallbackAnswer, FALLBACK_MISS, FALLBACK_PREFIX } from "@/lib/support/fallback";
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  ASSISTANT DE SUPPORT — répond aux questions sur l'app, dans la langue de l'athlète.
@@ -89,7 +90,9 @@ export async function POST(req: Request) {
   const sitemap = HELP_PAGES.map((x) => {
     const shown = x.navKey ? dict[x.navKey] ?? x.name : x.name;
     const extra = x.path === "/dashboard/health" ? ` Onglets, dans l'ordre : ${tabs}.` : "";
-    return `- « ${shown} » (${x.path}) : ${x.what}${extra}`;
+    // « Accès » porte le chemin de clics exact : c'est LUI qui rend la réponse actionnable.
+    const how = x.how ? `\n    Accès : ${x.how}` : "";
+    return `- « ${shown} » (${x.path}) : ${x.what}${extra}${how}`;
   }).join("\n");
   const problems = HELP_PROBLEMS.map((x) => `Q: ${x.q}\nR: ${x.a}`).join("\n\n");
 
@@ -99,7 +102,13 @@ export async function POST(req: Request) {
 
 🌍 LANGUE : réponds ENTIÈREMENT en ${LANGS[lang]}, quelle que soit la langue de la question. Les noms de pages entre guillemets « » ci-dessous sont EXACTEMENT ceux qu'il voit dans son menu : reprends-les tels quels, ne les traduis pas toi-même. Les SOUS-ONGLETS à l'intérieur d'une page (par exemple les onglets de la page Santé) sont eux aussi traduits dans l'interface : nomme-les dans sa langue, pas en français.
 
-✍️ FORME : va DROIT AU BUT. Deux à cinq phrases, ou une courte liste d'étapes numérotées quand il s'agit d'une manipulation. Pas de préambule, pas de « bien sûr, je vais vous expliquer », pas de conclusion de politesse. Nomme précisément la page et l'onglet. Tutoiement.
+✍️ FORME — UTILE ET GUIDANT, pas télégraphique. Une première version répondait « tu peux changer la langue dans Paramètres » : exact, et parfaitement inutile puisque la personne ne sait toujours pas où cliquer. Structure attendue :
+1. UNE phrase de réponse directe, d'emblée — jamais de préambule ni de « bien sûr ».
+2. LE CHEMIN DE CLICS, repris tel quel du champ « Accès » ci-dessous quand il existe. Sois littéral : « barre latérale gauche › Santé › onglet Poids ». Ne le devine JAMAIS ; si aucun chemin n'est fourni, dis simplement où se trouve la page sans inventer de sous-menu.
+3. Pour une manipulation, des ÉTAPES NUMÉROTÉES (2 à 5), chacune commençant par un verbe d'action.
+4. CE QUI SE PASSE ENSUITE, en une ligne : ce que la personne va voir, ou le délai à prévoir. C'est ce qui évite le deuxième message « et maintenant ? ».
+5. UNE anticipation utile quand elle s'impose : « si ça ne change rien, c'est probablement que… ». Une seule, la plus probable — pas une liste de tout ce qui pourrait clocher.
+Tutoiement. Pas de conclusion de politesse. Mets en gras (**…**) le nom des pages et des boutons pour qu'ils sautent aux yeux. Ne dépasse pas ~12 lignes.
 
 🔧 DÉPANNAGE : si l'état du compte ci-dessous contient un point BLOQUANT, commence par lui — n'énumère pas des causes possibles alors que tu SAIS laquelle s'applique. Si tout est en ordre de ce côté, dis-le et cherche ailleurs.
 
@@ -125,11 +134,21 @@ ${findingsBlock(diagnoseAccount(state))}`;
 
   // Vitesse d'abord : pas de budget de réflexion, réponse courte, modèle rapide en tête.
   const out = await generateContent(contents, {
-    temperature: 0.2, maxOutputTokens: 700, thinkingConfig: { thinkingBudget: 0 },
+    // 700 tokens tronquaient les réponses en étapes. 1200 laisse la place à un vrai
+    // guidage tout en restant sous la seconde en pratique (mesuré : 0,5 à 1,4 s).
+    temperature: 0.2, maxOutputTokens: 1200, thinkingConfig: { thinkingBudget: 0 },
   }, { models: ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"] });
 
   if (!out.ok) {
-    return NextResponse.json({ error: "L'assistant est momentanément indisponible. Réessaie dans quelques secondes, ou écris au coach depuis la Messagerie." }, { status: 503 });
+    // Toute l'IA de l'app partage UNE clé Gemini en palier gratuit, plafonnée à la
+    // journée : quand elle est épuisée, les trois modèles répondent 429 en même temps et
+    // la bascule du wrapper n'y peut rien. Plutôt que « momentanément indisponible » —
+    // autrement dit plus de support du tout — on répond depuis la base de connaissances.
+    const canned = fallbackAnswer(message, lang);
+    if (canned) {
+      return NextResponse.json({ reply: (FALLBACK_PREFIX[lang] ?? FALLBACK_PREFIX.fr) + canned, degraded: true });
+    }
+    return NextResponse.json({ reply: FALLBACK_MISS[lang] ?? FALLBACK_MISS.fr, degraded: true });
   }
   return NextResponse.json({ reply: out.text });
 }

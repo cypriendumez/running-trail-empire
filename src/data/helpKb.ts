@@ -26,27 +26,62 @@ export type HelpPage = {
    * inutile qu'un chemin inventé. `/pricing` n'est pas dans le menu : pas de clé.
    */
   navKey?: string;
+  /**
+   * Mots-clés du REPLI sans IA : ce que les gens tapent réellement, qui n'est presque
+   * jamais le nom de la page. Le fuzz a montré que « où je vois mon poids » ne trouvait
+   * rien — deux mots utiles ne peuvent pas atteindre le seuil sur le seul nom « Santé ».
+   */
+  keys?: string[];
+  /**
+   * CHEMIN DE CLICS exact, de l'écran d'accueil jusqu'à l'endroit précis.
+   *
+   * Sans lui, l'assistant répondait « tu peux changer la langue dans Paramètres » : exact,
+   * mais l'utilisateur ne sait toujours pas où cliquer. Lui demander d'être plus détaillé
+   * sans lui donner la structure de la page reviendrait à l'inviter à l'inventer — ce que
+   * tout le reste de ce fichier s'emploie à empêcher.
+   */
+  how?: string;
+  /**
+   * Dossier réel sous `src/app` quand il diffère de l'URL : groupe de routes `(auth)`,
+   * segment dynamique `[id]`. Sans ce champ, le test d'existence chercherait
+   * `src/app/login/page.tsx` et échouerait sur une page pourtant bien présente.
+   */
+  dir?: string;
   name: string;
   what: string;
 };
 
 /** Carte du site. Chaque `path` DOIT correspondre à un dossier réel de src/app. */
 export const HELP_PAGES: HelpPage[] = [
-  { path: "/dashboard", navKey: "nav.dashboard", name: "Tableau de bord", what: "Vue d'ensemble : forme du jour, charge, séance du jour, prédictions de chrono, tendance de volume." },
-  { path: "/dashboard/calendrier", navKey: "nav.calendar", name: "Calendrier", what: "Le plan préparé par le coach, en vue Mois ou Agenda. Cliquer un jour ouvre le détail de la séance (échauffement, corps, retour au calme, le POURQUOI). Un bandeau « pourquoi ce plan » explique les décisions de la semaine et rappelle l'objectif de course." },
-  { path: "/dashboard/races", navKey: "nav.races", name: "Courses", what: "Recherche de courses (~17 000 épreuves), carte, filtres par distance et région. Le bouton « M'entraîner pour cette course » fixe l'objectif et régénère aussitôt le plan." },
-  { path: "/dashboard/trail", navKey: "nav.trail", name: "Trail Builder", what: "Construction et exploration de parcours trail." },
-  { path: "/dashboard/ghost-runner", navKey: "nav.ghost", name: "Ghost Runner", what: "Comparaison de l'allure à un adversaire virtuel calé sur l'objectif." },
-  { path: "/dashboard/cours", navKey: "nav.courses", name: "Cours", what: "Contenus pédagogiques sur l'entraînement." },
-  { path: "/dashboard/health", navKey: "nav.health", name: "Santé", what: "Cinq onglets — voir la liste TRADUITE ci-dessous : chat kiné avec schéma corporel (accepte les photos), journal, contact d'urgence, nutrition de course, suivi du poids." },
-  { path: "/dashboard/messages", navKey: "nav.messaging", name: "Messagerie", what: "Échange avec le coach humain." },
-  { path: "/dashboard/sync", navKey: "nav.sync", name: "Sync Montre", what: "Connexion à intervals.icu (identifiant athlète + clé API) : c'est par là que les activités entrent et que les séances partent vers la montre." },
-  { path: "/dashboard/communaute", navKey: "nav.community", name: "Communauté", what: "Actualité running agrégée." },
-  { path: "/dashboard/leagues", navKey: "nav.leagues", name: "Ligues", what: "Classements et progression par ligue." },
-  { path: "/dashboard/shop", navKey: "nav.shop", name: "Boutique", what: "Équipement. Elle n'affiche que de VRAIES offres importées d'un flux marchand ; tant qu'aucun flux n'est branché, un écran d'attente s'affiche à la place — ce n'est pas une panne." },
-  { path: "/dashboard/profile", navKey: "nav.profile", name: "Profil", what: "Âge, taille, poids, sexe, passif de course, terrains, disponibilités, santé (pathologies et zones de blessure), durées d'échauffement et de retour au calme." },
-  { path: "/dashboard/settings", navKey: "nav.settings", name: "Paramètres", what: "Langue, unités, début de semaine, préférences d'affichage." },
-  { path: "/pricing", name: "Abonnement", what: "Formules et tarifs." },
+  { path: "/dashboard", how: "Barre latérale gauche › Tableau de bord, ou le logo Pacevo en haut à gauche.", keys: ["forme", "charge", "resume", "accueil", "apercu", "dashboard", "tableau", "bord"], navKey: "nav.dashboard", name: "Tableau de bord", what: "Vue d'ensemble : forme du jour, charge, séance du jour, prédictions de chrono, tendance de volume." },
+  { path: "/dashboard/calendrier", how: "Barre latérale gauche › Calendrier. Bascule Mois / Agenda en haut à droite ; cliquer un jour ouvre le détail de la séance dans le bandeau vert du haut.", keys: ["calendrier", "seance", "seances", "plan", "semaine", "programme", "calendar", "planning", "entrainement"], navKey: "nav.calendar", name: "Calendrier", what: "Le plan préparé par le coach, en vue Mois ou Agenda. Cliquer un jour ouvre le détail de la séance (échauffement, corps, retour au calme, le POURQUOI). Un bandeau « pourquoi ce plan » explique les décisions de la semaine et rappelle l'objectif de course." },
+  { path: "/dashboard/races", how: "Barre latérale gauche › Courses. Filtres de distance et de région en haut ; sur la fiche d'une course, le bouton « M'entraîner pour cette course » fixe l'objectif.", keys: ["course", "courses", "race", "inscription", "epreuve", "marathon", "trail", "chercher", "trouver"], navKey: "nav.races", name: "Courses", what: "Recherche de courses (~17 000 épreuves), carte, filtres par distance et région. Le bouton « M'entraîner pour cette course » fixe l'objectif et régénère aussitôt le plan." },
+  { path: "/dashboard/trail", how: "Barre latérale gauche › Trail Builder.", keys: ["parcours", "trail", "carte", "itineraire", "suivi", "direct", "partager", "position", "proche"], navKey: "nav.trail", name: "Trail Builder", what: "Exploration et construction de parcours trail sur carte, avec profil de dénivelé. C'est aussi d'ici que se génère le lien de SUIVI EN DIRECT à partager à un proche." },
+  { path: "/dashboard/ghost-runner", how: "Barre latérale gauche › Ghost Runner.", keys: ["ghost", "fantome", "adversaire", "virtuel", "comparer"], navKey: "nav.ghost", name: "Ghost Runner", what: "Adversaire virtuel calé sur l'allure de l'objectif de course : sert à visualiser l'écart entre l'allure tenue et celle qu'il faudrait tenir le jour J." },
+  { path: "/dashboard/cours", how: "Barre latérale gauche › Cours.", keys: ["cours", "apprendre", "pedagogie", "physiologie", "formation"], navKey: "nav.courses", name: "Cours", what: "Contenus pédagogiques sur l'entraînement (physiologie, allures, planification), avec un chat pour poser des questions sur le cours." },
+  { path: "/dashboard/health", how: "Barre latérale gauche › Santé, puis choisir l'onglet voulu dans la rangée du haut (Kiné IA, Journal, Guardian, Nutrition, Poids).", keys: ["sante", "poids", "pesee", "peser", "balance", "imc", "blessure", "douleur", "mal", "kine", "physio", "journal", "guardian", "nutrition", "ravitaillement", "weight", "pain", "gesundheit", "salud", "saude"], navKey: "nav.health", name: "Santé", what: "Regroupe cinq espaces : le chat Kiné IA avec schéma corporel (il accepte les photos), le journal d'entraînement, le contact d'urgence Guardian, la nutrition de course et le suivi du poids." },
+  { path: "/dashboard/messages", how: "Barre latérale gauche › Messagerie.", keys: ["message", "messagerie", "coach", "ecrire", "contacter", "discuter", "humain"], navKey: "nav.messaging", name: "Messagerie", what: "Échange avec le coach humain." },
+  { path: "/dashboard/sync", how: "Barre latérale gauche › Sync Montre. Coller l'identifiant athlète et la clé API d'intervals.icu, puis enregistrer. Le guide en 4 étapes et le dépôt de fichier GPX / FIT se trouvent sur la même page.", keys: ["montre", "garmin", "watch", "uhr", "reloj", "relogio", "sync", "synchro", "synchronisation", "intervals", "icu", "cle", "api", "connecter", "appairer", "strava", "polar", "coros", "suunto", "gpx", "fit", "importer", "fichier"], navKey: "nav.sync", name: "Sync Montre", what: "Connexion à intervals.icu (identifiant athlète + clé API) : c'est par là que les activités entrent et que les séances partent vers la montre. La page contient un guide pas à pas en 4 étapes et permet aussi d'importer un fichier GPX ou FIT à la main." },
+  { path: "/dashboard/communaute", how: "Barre latérale gauche › Communauté.", keys: ["communaute", "actualite", "news", "feed", "articles"], navKey: "nav.community", name: "Communauté", what: "Fil d'actualité running agrégé depuis des sources publiques. La visibilité de son profil s'y règle dans Paramètres › Confidentialité." },
+  { path: "/dashboard/leagues", how: "Barre latérale gauche › Ligues.", keys: ["ligue", "ligues", "classement", "league", "ranking", "points", "xp", "gamification"], navKey: "nav.leagues", name: "Ligues", what: "Classements hebdomadaires et progression par ligue. Pour ne pas y apparaître, décocher la visibilité dans Paramètres › Confidentialité." },
+  { path: "/dashboard/shop", how: "Barre latérale gauche › Boutique.", keys: ["boutique", "shop", "chaussures", "equipement", "materiel", "acheter", "produits"], navKey: "nav.shop", name: "Boutique", what: "Équipement. Elle n'affiche que de VRAIES offres importées d'un flux marchand ; tant qu'aucun flux n'est branché, un écran d'attente s'affiche à la place — ce n'est pas une panne." },
+  { path: "/dashboard/profile", how: "Barre latérale gauche, tout en bas › Profil. Les champs sont regroupés par blocs : identité, pratique, terrains, disponibilités, santé, échauffement / retour au calme. Ne pas oublier d'enregistrer.", keys: ["profil", "age", "taille", "poids", "sexe", "echauffement", "retour", "calme", "disponibilites", "terrains", "passif", "pathologie"], navKey: "nav.profile", name: "Profil", what: "Âge, taille, poids, sexe, passif de course, terrains, disponibilités, santé (pathologies et zones de blessure), durées d'échauffement et de retour au calme." },
+  { path: "/dashboard/settings", how: "Barre latérale gauche, tout en bas › Paramètres. On y trouve la langue, les unités, le premier jour de la semaine, les préférences de notification et la confidentialité.", keys: ["parametres", "reglages", "langue", "unites", "miles", "semaine", "notifications", "confidentialite", "settings", "einstellungen", "ajustes", "definicoes", "supprimer", "compte"], navKey: "nav.settings", name: "Paramètres", what: "Langue, unités, début de semaine, préférences d'affichage." },
+  { path: "/dashboard/activite", how: "Depuis le Tableau de bord, cliquer sur une activité de la liste. Il n'y a pas d'entrée de menu : on y accède toujours par une séance.", keys: ["detail", "activite", "seance", "metriques", "tours", "zones", "courbes", "analyse"], dir: "dashboard/activite", name: "Détail d'une séance", what: "Toutes les données d'une séance réalisée : métriques, zones de fréquence cardiaque, courbes, tours. On y arrive en CLIQUANT une activité depuis le tableau de bord — ce n'est pas une entrée du menu, et l'adresse exige une date." },
+  { path: "/suivre/<identifiant>", how: "Depuis Trail Builder, générer le lien de suivi puis l'envoyer au proche. Il ouvre la page dans son navigateur, sans compte ni installation.", keys: ["suivi", "direct", "live", "partager", "position", "famille", "proche", "femme", "mari", "tracker"], dir: "suivre/[id]", name: "Suivi en direct", what: "Page PUBLIQUE (accessible sans compte) permettant à un proche de suivre le coureur en temps réel. Le lien se génère depuis Trail Builder ; toute personne qui l'a peut voir la position." },
+  { path: "/onboarding", how: "S'affiche automatiquement après l'inscription, et tant qu'il n'est pas terminé.", keys: ["onboarding", "inscription", "questionnaire", "demarrage", "refaire"], dir: "onboarding", name: "Onboarding", what: "Questionnaire d'inscription : profil, passif de course, terrains, disponibilités, santé. Il se rejoue automatiquement tant qu'il n'est pas terminé." },
+  { path: "/login", how: "Bouton de connexion depuis la page d'accueil publique.", keys: ["connexion", "connecter", "login", "identifiant", "google", "apple"], dir: "(auth)/login", name: "Connexion", what: "Connexion par e-mail et mot de passe, ou via Google / Apple. En cas d'oubli, le lien « mot de passe oublié » envoie un e-mail de réinitialisation." },
+  { path: "/signup", how: "Bouton d'inscription depuis la page d'accueil publique.", keys: ["inscription", "creer", "compte", "signup", "sinscrire"], dir: "(auth)/signup", name: "Inscription", what: "Création de compte par e-mail ou via Google / Apple, avec consentement santé. Un e-mail de confirmation est envoyé." },
+  { path: "/forgot-password", how: "Lien « Mot de passe oublié » sous le formulaire de connexion.", keys: ["oublie", "mot", "passe", "password", "reinitialiser"], dir: "(auth)/forgot-password", name: "Mot de passe oublié", what: "Saisie de l'adresse e-mail pour recevoir un lien de réinitialisation du mot de passe." },
+  { path: "/reset-password", keys: ["nouveau", "mot", "passe", "reinitialisation", "reset"], dir: "(auth)/reset-password", name: "Nouveau mot de passe", what: "Saisie du nouveau mot de passe, après avoir cliqué le lien reçu par e-mail." },
+  { path: "/dashboard/journal", dir: "dashboard/journal", name: "Journal", what: "Redirige vers l'onglet Journal de la page Santé : le journal y a été intégré. Une ancienne adresse en circulation continue donc de fonctionner." },
+  { path: "/blog", keys: ["blog", "articles", "lire"], dir: "blog", name: "Blog", what: "Articles publics sur l'entraînement, la physiologie et la préparation de course. Accessible sans compte." },
+  { path: "/avis", keys: ["avis", "temoignage", "review"], dir: "avis", name: "Avis", what: "Témoignages d'utilisateurs de Pacevo. Page publique, accessible sans compte." },
+  { path: "/contact", how: "Lien « Contact » dans le pied de page.", keys: ["contact", "equipe", "joindre", "support"], dir: "contact", name: "Contact", what: "Formulaire pour joindre l'équipe Pacevo. Pour une question sur l'entraînement, la Messagerie du tableau de bord est plus directe." },
+  { path: "/mentions-legales", how: "Lien « Mentions légales » dans le pied de page.", keys: ["mentions", "legales", "editeur", "hebergeur"], dir: "mentions-legales", name: "Mentions légales", what: "Éditeur du site, hébergeur et responsabilités légales. Page publique." },
+  { path: "/confidentialite", how: "Lien « Confidentialité » dans le pied de page.", keys: ["confidentialite", "donnees", "rgpd", "privacy", "personnelles"], dir: "confidentialite", name: "Confidentialité", what: "Traitement des données personnelles et marche à suivre pour les exercer." },
+  { path: "/terms", how: "Lien « CGU » dans le pied de page.", keys: ["cgu", "conditions", "utilisation", "terms"], dir: "terms", name: "Conditions d'utilisation", what: "Conditions générales d'utilisation du service : ce que couvre l'abonnement, les responsabilités de chacun, et le rappel que les conseils fournis ne remplacent pas un avis médical." },
+  { path: "/pricing", how: "Encart « Passe au Pro » dans la barre latérale, ou pied de page du site.", keys: ["abonnement", "prix", "tarif", "payer", "pro", "premium", "pricing"], dir: "pricing", name: "Abonnement", what: "Formules et tarifs. Le paiement n'est pas encore ouvert : la page s'affiche, mais aucun abonnement ne peut être souscrit pour l'instant." },
 ];
 
 /**
@@ -83,6 +118,16 @@ export const HELP_FACTS: string[] = [
   "KINÉ IA : le chat accepte une photo. Elle est analysée puis oubliée — elle n'est enregistrée NULLE PART. Une photo permet de voir un gonflement, une asymétrie, l'état de la peau ou l'usure d'une semelle ; elle ne permet ni de palper, ni de distinguer une périostite d'une fracture de fatigue.",
   "ABONNEMENT : le paiement n'est pas encore ouvert. Le message « le paiement n'est pas encore ouvert » est le comportement attendu, pas une panne.",
   "LANGUES : l'interface existe en français, anglais, allemand, espagnol et portugais. Elle se change dans Paramètres. Certaines analyses rédigées par l'IA peuvent encore revenir en français.",
+  "INTÉGRATIONS : Pacevo ne se connecte qu'à intervals.icu. C'est intervals.icu qui gère l'authentification officielle avec Garmin, COROS, Polar, Suunto ou Strava — Pacevo n'accède jamais directement à ces comptes. Aucun bouton « connecter Strava » n'existe donc dans l'app, et c'est volontaire.",
+  "IMPORT MANUEL : la page Sync Montre accepte aussi un fichier GPX ou FIT déposé à la main, utile pour une sortie enregistrée sur un appareil non connecté.",
+  "PARAMÈTRES : on y règle la langue, les unités (métrique/impérial), le premier jour de la semaine, les PRÉFÉRENCES DE NOTIFICATION (rappels de séance, résumé hebdomadaire du lundi par e-mail, alertes de récupération si la VFC chute, conseils du coach IA) et la CONFIDENTIALITÉ (apparaître ou non dans les classements des Ligues et dans la Communauté).",
+  "PROFIL : âge, taille, poids, sexe, années de course, terrains pratiqués, préférence de dénivelé, nombre de séances par semaine et jours disponibles, section santé (pathologies, zones de blessure, note libre), durées d'échauffement et de retour au calme — ces deux dernières sont EXACTEMENT celles que la montre appliquera.",
+  "DÉTAIL D'UNE SÉANCE : cliquer une activité depuis le tableau de bord ouvre sa fiche complète (métriques, zones de FC, courbes, tours). Ce n'est pas une entrée du menu.",
+  "SUIVI EN DIRECT : un lien de suivi se génère depuis Trail Builder. La page est PUBLIQUE — quiconque possède le lien voit la position en temps réel, sans avoir de compte. À ne partager qu'avec des proches.",
+  "GUARDIAN (Santé › Guardian) : sécurité en course — détection de chute, alerte GPS automatique, contact d'urgence à renseigner. Il s'active depuis cet onglet.",
+  "ÉCHAUFFEMENT ET RETOUR AU CALME : leurs durées viennent du Profil et sont reprises À L'IDENTIQUE dans le texte de la séance et dans ce que reçoit la montre.",
+  "LIGUES : classements et progression. La visibilité dans les classements se coupe depuis Paramètres › Confidentialité.",
+  "COMPTE ET DONNÉES : la suppression du compte et les demandes relatives aux données personnelles passent par Paramètres et la page Confidentialité.",
   "DONNÉES MANQUANTES : quand une information manque, l'app le DIT au lieu d'afficher un chiffre plausible. Un « — » ou un « pas encore mesurable » est un choix, pas un bug.",
 ];
 
@@ -104,6 +149,8 @@ export const HELP_PROBLEMS: { q: string; a: string }[] = [
     a: "Elle n'affiche que de vraies offres importées d'un flux marchand officiel. Tant qu'aucun flux n'est branché, un écran d'attente s'affiche — choix assumé plutôt qu'un catalogue aux prix inventés." },
   { q: "Mon objectif de course n'a rien changé à mes séances",
     a: "Le type des séances change bien (par exemple Seuil et Allure marathon au lieu de VMA), mais le VOLUME reste calé sur ce que tu cours réellement. Et si la fatigue est élevée, aucune séance de qualité n'est posée cette semaine-là, ce qui donne l'impression que rien n'a bougé. Le bandeau « pourquoi ce plan » du calendrier détaille l'état réel." },
+  { q: "Puis-je connecter Strava, Polar, COROS ou Suunto ?",
+    a: "Pacevo ne se connecte qu'à UNE plateforme : intervals.icu. C'est intervals.icu qui se relie ensuite à Garmin, COROS, Polar, Suunto ou Strava via leurs connexions officielles — Pacevo n'accède jamais directement à ces comptes. Il n'existe donc pas de bouton « connecter Strava » dans l'app : relie Strava à intervals.icu, puis intervals.icu à Pacevo depuis Sync Montre. À défaut, un fichier GPX ou FIT s'importe à la main depuis cette même page." },
   { q: "Comment supprimer mon compte ou mes données",
     a: "Depuis Paramètres. Pour toute demande relative aux données personnelles, la page Confidentialité indique la marche à suivre." },
 ];

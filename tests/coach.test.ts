@@ -11,6 +11,7 @@
  *   npx tsx tests/coach.test.ts
  */
 import assert from "node:assert/strict";
+import { execSync } from "node:child_process";
 import { isRun, sportOf } from "../src/lib/intervals/sport";
 import { vmaFromPaceCurve, bestVmaFromWorkouts } from "../src/lib/running/fitness";
 import { heatAdvice, windAdvice, altitudeLossPct, heatAcclimation } from "../src/lib/weather/openMeteo";
@@ -25,7 +26,8 @@ import {
 import { weightTrainingRules, weightCoachBlock } from "../src/lib/weight/coaching";
 import { robustWeeklyKm, demonstratedWeeklyKm, longRunPeakKm, longRunForWeek, longRunGap } from "../src/lib/running/volume";
 import { sniffType, sniffImage } from "../src/lib/upload/sniff";
-import { HELP_PAGES, HEALTH_TABS } from "../src/data/helpKb";
+import { HELP_PAGES, HEALTH_TABS, HELP_PROBLEMS } from "../src/data/helpKb";
+import { PROBLEM_KEYS, PROBLEM_T } from "../src/data/helpProblemsI18n";
 import { diagnoseAccount, findingsBlock } from "../src/lib/support/diagnose";
 
 let passed = 0;
@@ -967,10 +969,38 @@ test("chaque page citée existe VRAIMENT dans l'app", () => {
   // C'est LE test qui protège de l'invention : si une page est renommée ou supprimée
   // sans mettre à jour helpKb, l'assistant enverrait les gens dans le vide.
   for (const p of HELP_PAGES) {
-    const rel = p.path.replace(/^\//, "");
-    const dir = rel === "dashboard" ? "src/app/dashboard" : `src/app/${rel}`;
+    const rel = p.dir ?? p.path.replace(/^\//, "");
+    const dir = `src/app/${rel}`;
     assert.ok(existsSync(`${dir}/page.tsx`), `${p.path} cité dans helpKb mais ${dir}/page.tsx n'existe pas`);
   }
+});
+test("aucune consigne de prompt ne fuit dans un texte affiché", () => {
+  // Les champs de helpKb servent DEUX usages : le prompt du modèle et, quand l'IA est
+  // indisponible, l'affichage direct à l'utilisateur. Un « voir la liste ci-dessous »
+  // rédigé pour le modèle s'affichait tel quel dans une réponse de repli.
+  const LEAK = /ci-dessous|ci-dessus|voir la liste|TRADUITE|tu as le droit|n'invente|prompt/i;
+  for (const p of HELP_PAGES) {
+    assert.ok(!LEAK.test(p.what), `consigne de prompt visible dans « ${p.path} » : ${p.what.slice(0, 70)}`);
+    if (p.how) assert.ok(!LEAK.test(p.how), `consigne de prompt visible dans l'accès de « ${p.path} »`);
+  }
+  for (const pb of HELP_PROBLEMS) assert.ok(!LEAK.test(pb.a), `consigne de prompt visible dans « ${pb.q} »`);
+});
+test("chaque page du menu porte un chemin de clics", () => {
+  // « Tu peux changer la langue dans Paramètres » est exact et inutile : la personne ne
+  // sait pas où cliquer. Rendre l'assistant plus détaillé SANS lui fournir la structure
+  // reviendrait à l'inviter à l'inventer.
+  const sansAcces = HELP_PAGES.filter((p) => p.navKey && !p.how).map((p) => p.path);
+  assert.deepEqual(sansAcces, [], `pages du menu sans chemin d'accès : ${sansAcces.join(", ")}`);
+  for (const p of HELP_PAGES) {
+    if (p.how) assert.ok(p.how.length > 15, `chemin trop vague pour ${p.path}`);
+  }
+});
+test("le prompt impose un guidage, pas un télégramme", () => {
+  const src = readFileSync("src/app/api/ai/support/route.ts", "utf8");
+  assert.ok(/CHEMIN DE CLICS/.test(src), "le chemin de clics doit être exigé");
+  assert.ok(/Ne le devine JAMAIS/.test(src), "le détail supplémentaire ne doit pas ouvrir la porte à l'invention");
+  assert.ok(/ÉTAPES NUMÉROTÉES/.test(src));
+  assert.ok(/x\.how/.test(src), "le champ « Accès » doit être injecté dans le prompt");
 });
 test("les onglets Santé cités correspondent aux VRAIS libellés de l'écran", () => {
   // Deux sources de vérité (helpKb et le dictionnaire local de HealthCenter) ne peuvent
@@ -981,6 +1011,35 @@ test("les onglets Santé cités correspondent aux VRAIS libellés de l'écran", 
     assert.equal(labels.length, 5, `${lg} : 5 onglets attendus`);
     for (const label of labels) {
       assert.ok(hc.includes(`"${label}"`), `onglet « ${label} » (${lg}) absent de HealthCenter.tsx`);
+    }
+  }
+});
+test("AUCUNE page utilisateur n'est absente de la base de connaissances", () => {
+  // Le test précédent attrape l'INVENTION (une page citée qui n'existe pas). Celui-ci
+  // attrape l'OMISSION, qui est passée inaperçue : /dashboard/activite et /suivre/[id]
+  // existaient sans être documentés, donc l'assistant répondait « je ne connais pas »
+  // sur des écrans bien réels. Un support qui ignore la moitié de l'app est inutile.
+  const known = new Set(HELP_PAGES.map((p) => p.dir ?? p.path.replace(/^\//, "")));
+  const found = execSync("find src/app -name page.tsx", { encoding: "utf8" })
+    .split("\n").filter(Boolean)
+    .map((f) => f.replace(/^src\/app\/?/, "").replace(/\/?page\.tsx$/, ""))
+    // Hors périmètre : l'accueil public, l'espace admin (réservé au coach) et les routes
+    // jetables de prévisualisation.
+    .filter((d) => d !== "" && !d.startsWith("admin") && !d.startsWith("preview-"));
+  const missing = found.filter((d) => !known.has(d));
+  assert.deepEqual(missing, [], `pages absentes de helpKb : ${missing.join(", ")}`);
+});
+test("le repli traduit couvre EXACTEMENT les problèmes de la base", () => {
+  // Deux fichiers, une seule vérité. Lors de l'écriture, une entrée « Strava » s'est
+  // retrouvée dans les traductions sans exister dans HELP_PROBLEMS : le repli l'aurait
+  // ignorée en silence. Ce test rend la divergence impossible.
+  const qs = new Set(HELP_PROBLEMS.map((p) => p.q));
+  for (const k of Object.keys(PROBLEM_KEYS)) assert.ok(qs.has(k), `PROBLEM_KEYS orphelin : « ${k} »`);
+  for (const k of Object.keys(PROBLEM_T)) assert.ok(qs.has(k), `PROBLEM_T orphelin : « ${k} »`);
+  for (const p of HELP_PROBLEMS) {
+    assert.ok(PROBLEM_KEYS[p.q]?.length, `aucun mot-clé de repli pour « ${p.q} »`);
+    for (const lg of ["en", "de", "es", "pt"]) {
+      assert.ok(PROBLEM_T[p.q]?.[lg]?.length > 30, `traduction ${lg} manquante pour « ${p.q} »`);
     }
   }
 });
@@ -1001,7 +1060,7 @@ test("la clé API n'entre JAMAIS dans le prompt", () => {
 test("la réponse est optimisée pour la VITESSE", () => {
   const src = readFileSync("src/app/api/ai/support/route.ts", "utf8");
   assert.ok(/thinkingBudget: 0/.test(src), "aucun budget de réflexion sur une question de support");
-  assert.ok(/maxOutputTokens: 700/.test(src), "la réponse doit rester courte");
+  assert.ok(/maxOutputTokens: 1200/.test(src), "la réponse doit rester bornée");
 });
 
 console.log("\nSUPPORT — le diagnostic lit le compte réel, il ne récite pas");
