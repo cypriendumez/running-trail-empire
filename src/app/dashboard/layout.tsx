@@ -5,6 +5,7 @@ import { TopBar } from "@/components/layout/TopBar";
 import { MedicalDisclaimer } from "@/components/layout/MedicalDisclaimer";
 import { AutoSync } from "@/components/AutoSync";
 import { MessageNotifier } from "@/components/messages/MessageNotifier";
+import { SupportBubble } from "@/components/support/SupportBubble";
 import { LanguageProvider } from "@/lib/i18n/LanguageProvider";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -37,6 +38,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </main>
           <MedicalDisclaimer />
         </div>
+        {/* Bulle d'aide : hors du flux, disponible sur TOUTES les pages — une question de
+            support naît devant l'écran qui pose problème, pas dans un menu séparé. */}
+        <SupportBubble />
       </div>
     </LanguageProvider>
   );

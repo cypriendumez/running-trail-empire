@@ -25,6 +25,8 @@ import {
 import { weightTrainingRules, weightCoachBlock } from "../src/lib/weight/coaching";
 import { robustWeeklyKm, demonstratedWeeklyKm, longRunPeakKm, longRunForWeek, longRunGap } from "../src/lib/running/volume";
 import { sniffType, sniffImage } from "../src/lib/upload/sniff";
+import { HELP_PAGES, HEALTH_TABS } from "../src/data/helpKb";
+import { diagnoseAccount, findingsBlock } from "../src/lib/support/diagnose";
 
 let passed = 0;
 const fails: string[] = [];
@@ -951,6 +953,89 @@ test("la photo est redimensionnée côté client, EXIF compris", () => {
   const src = readFileSync("src/components/health/HealthCenter.tsx", "utf8");
   assert.ok(/createElement\("canvas"\)/.test(src), "aucun redimensionnement avant envoi");
   assert.ok(/EXIF/.test(src), "la suppression des métadonnées doit être documentée, pas accidentelle");
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  ASSISTANT DE SUPPORT
+//
+//  Le risque n'est pas la panne : c'est la réponse fluide et FAUSSE. « Va dans Réglages ›
+//  Appareils » à propos d'un écran qui n'existe pas fait chercher dix minutes puis
+//  conclure que l'app est cassée — sans qu'aucune erreur soit levée.
+// ─────────────────────────────────────────────────────────────────────────────
+console.log("\nSUPPORT — la base de connaissances ne peut pas mentir");
+test("chaque page citée existe VRAIMENT dans l'app", () => {
+  // C'est LE test qui protège de l'invention : si une page est renommée ou supprimée
+  // sans mettre à jour helpKb, l'assistant enverrait les gens dans le vide.
+  for (const p of HELP_PAGES) {
+    const rel = p.path.replace(/^\//, "");
+    const dir = rel === "dashboard" ? "src/app/dashboard" : `src/app/${rel}`;
+    assert.ok(existsSync(`${dir}/page.tsx`), `${p.path} cité dans helpKb mais ${dir}/page.tsx n'existe pas`);
+  }
+});
+test("les onglets Santé cités correspondent aux VRAIS libellés de l'écran", () => {
+  // Deux sources de vérité (helpKb et le dictionnaire local de HealthCenter) ne peuvent
+  // pas diverger sans être signalées. Sans cette copie traduite, l'assistant recopiait le
+  // nom français : « no separador "Poids" » à un lusophone dont l'onglet affiche « Peso ».
+  const hc = readFileSync("src/components/health/HealthCenter.tsx", "utf8");
+  for (const [lg, labels] of Object.entries(HEALTH_TABS)) {
+    assert.equal(labels.length, 5, `${lg} : 5 onglets attendus`);
+    for (const label of labels) {
+      assert.ok(hc.includes(`"${label}"`), `onglet « ${label} » (${lg}) absent de HealthCenter.tsx`);
+    }
+  }
+});
+test("l'assistant a l'interdiction explicite d'inventer", () => {
+  const src = readFileSync("src/app/api/ai/support/route.ts", "utf8");
+  assert.ok(/NE RIEN INVENTER/.test(src), "la consigne anti-invention doit être dans le prompt");
+  assert.ok(/Je ne trouve pas cette fonctionnalité/.test(src), "aucune formule de repli prévue");
+  assert.ok(/HELP_PAGES/.test(src) && /HELP_FACTS/.test(src), "le prompt doit être ancré sur la base de connaissances");
+});
+test("la clé API n'entre JAMAIS dans le prompt", () => {
+  // Elle est lue pour en déduire un booléen ; l'envoyer à un service tiers serait la
+  // même faute que celle corrigée par stripProfileSecrets.
+  const src = readFileSync("src/app/api/ai/support/route.ts", "utf8");
+  assert.ok(/hasIntervalsKey: Boolean\(p\?\.intervals_api_key\)/.test(src), "la clé doit être réduite à un booléen");
+  const diag = readFileSync("src/lib/support/diagnose.ts", "utf8");
+  assert.ok(!/intervals_api_key/.test(diag), "le module de diagnostic ne doit jamais voir la clé");
+});
+test("la réponse est optimisée pour la VITESSE", () => {
+  const src = readFileSync("src/app/api/ai/support/route.ts", "utf8");
+  assert.ok(/thinkingBudget: 0/.test(src), "aucun budget de réflexion sur une question de support");
+  assert.ok(/maxOutputTokens: 700/.test(src), "la réponse doit rester courte");
+});
+
+console.log("\nSUPPORT — le diagnostic lit le compte réel, il ne récite pas");
+const okState = {
+  age: 30, heightCm: 180, weightKg: 72, onboardingCompleted: true, healthDeclared: true,
+  hasIntervalsKey: true, hasIntervalsAthleteId: true, lastWorkoutDate: isoDay(1),
+  workoutCount30d: 14, upcomingSessions: 7, lastAutoCoachAt: isoDay(0),
+  objective: { race: "Marathon", raceDate: isoDay(-60) }, weighInCount: 0, weightModeEnabled: false,
+};
+test("un compte sain ne produit AUCUN constat", () => {
+  // Sinon l'assistant commenterait des problèmes inexistants — l'inverse du but.
+  assert.deepEqual(diagnoseAccount(okState, NOW), []);
+});
+test("montre non connectée = constat BLOQUANT prioritaire", () => {
+  const f = diagnoseAccount({ ...okState, hasIntervalsKey: false }, NOW);
+  assert.equal(f[0].code, "montre_non_connectee");
+  assert.equal(f[0].severity, "bloquant");
+  assert.ok(/Sync Montre/.test(f[0].fact), "le constat doit nommer la page où agir");
+});
+test("le diagnostic distingue « jamais synchronisé » de « synchronisation en retard »", () => {
+  const jamais = diagnoseAccount({ ...okState, workoutCount30d: 0, lastWorkoutDate: null }, NOW);
+  assert.ok(jamais.some((x) => x.code === "aucune_activite"));
+  const retard = diagnoseAccount({ ...okState, lastWorkoutDate: isoDay(12) }, NOW);
+  assert.ok(retard.some((x) => x.code === "sync_en_retard"), "12 jours sans import doit être signalé");
+  assert.ok(!retard.some((x) => x.code === "aucune_activite"), "il a bien des activités : ne pas dire le contraire");
+});
+test("un objectif dépassé est signalé, pas ignoré", () => {
+  const f = diagnoseAccount({ ...okState, objective: { race: "Semi", raceDate: isoDay(30) } }, NOW);
+  assert.ok(f.some((x) => x.code === "objectif_passe"));
+});
+test("le bloc de constats pousse à traiter le bloquant d'abord", () => {
+  const block = findingsBlock(diagnoseAccount({ ...okState, hasIntervalsKey: false }, NOW));
+  assert.ok(/BLOQUANT/.test(block));
+  assert.equal(findingsBlock([]), "", "un compte sain ne doit rien ajouter au prompt");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
