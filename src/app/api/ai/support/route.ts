@@ -137,7 +137,11 @@ ${findingsBlock(diagnoseAccount(state))}`;
     // 700 tokens tronquaient les réponses en étapes. 1200 laisse la place à un vrai
     // guidage tout en restant sous la seconde en pratique (mesuré : 0,5 à 1,4 s).
     temperature: 0.2, maxOutputTokens: 1200, thinkingConfig: { thinkingBudget: 0 },
-  }, { models: ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"] });
+  });
+  // Plus de liste de modèles en dur ici : elle contenait encore `gemini-2.0-flash`,
+  // arrêté par Google, longtemps après son retrait de la chaîne commune. Une question de
+  // support partait donc systématiquement taper un modèle mort avant d'obtenir sa
+  // réponse. On s'aligne sur `DEFAULT_MODELS`, qui reste pilotable par `GEMINI_MODELS`.
 
   if (!out.ok) {
     // Toute l'IA de l'app partage UNE clé Gemini en palier gratuit, plafonnée à la

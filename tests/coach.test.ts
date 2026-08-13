@@ -29,6 +29,13 @@ import { sniffType, sniffImage } from "../src/lib/upload/sniff";
 import { HELP_PAGES, HEALTH_TABS, HELP_PROBLEMS } from "../src/data/helpKb";
 import { PROBLEM_KEYS, PROBLEM_T } from "../src/data/helpProblemsI18n";
 import { diagnoseAccount, findingsBlock } from "../src/lib/support/diagnose";
+import {
+  canonical, fingerprint, isCacheUsable, PROFILE_FINGERPRINT_COLUMNS, type SessionSignals,
+} from "../src/lib/ai/sessionCache";
+import {
+  nextQuotaResetUtc, markExhausted, isExpired, selectModels, isDailyQuotaError, PROBE_INTERVAL_MS,
+} from "../src/lib/ai/quotaMemory";
+import { generateContent, __resetQuotaMemory, __quotaMemory, __setQuotaMark } from "../src/lib/ai/gemini";
 
 let passed = 0;
 const fails: string[] = [];
@@ -1082,10 +1089,27 @@ test("la chaîne de repli ne contient aucun modèle mort", () => {
   // à 20 requêtes/jour/modèle, chaque tentative vers lui gaspillait 5 % de la capacité.
   // Commentaires retirés avant l'analyse : le commentaire qui EXPLIQUE le retrait cite
   // forcément le modèle. Deuxième fois que ce piège se présente dans cette suite.
-  const code = readFileSync("src/lib/ai/gemini.ts", "utf8")
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .split("\n").map((l) => l.replace(/\/\/.*$/, "")).join("\n");
-  assert.ok(!/gemini-2\.0-flash/.test(code), "un modèle arrêté ne doit pas rester dans la chaîne");
+  //
+  // ⚠️ ET SURTOUT : on ne regarde plus le SEUL wrapper. La version précédente de ce test
+  // ne lisait que `gemini.ts` — pendant ce temps, `/api/ai/support` passait sa PROPRE
+  // liste en dur, `gemini-2.0-flash` compris. Le test était vert et le modèle mort était
+  // appelé à chaque question de support. Un invariant qui ne couvre qu'un fichier ne
+  // protège que ce fichier.
+  const files = ["src/lib/ai/gemini.ts", ...readdirSync("src/app/api/ai")
+    .map((d) => `src/app/api/ai/${d}/route.ts`).filter((p) => existsSync(p))];
+  assert.ok(files.length >= 4, "la liste des routes IA à contrôler ne doit pas être vide");
+  for (const f of files) {
+    assert.ok(!/gemini-2\.0-flash/.test(codeOf(f)), `${f} référence un modèle arrêté par Google`);
+  }
+});
+test("aucune route IA ne fige sa propre liste de modèles", () => {
+  // C'est la cause RACINE du point précédent : une liste locale ne suit ni les retraits
+  // de modèles ni la variable GEMINI_MODELS, et diverge en silence de la chaîne commune.
+  for (const d of readdirSync("src/app/api/ai")) {
+    const p = `src/app/api/ai/${d}/route.ts`;
+    if (!existsSync(p)) continue;
+    assert.ok(!/models:\s*\[/.test(codeOf(p)), `${p} impose ses modèles au lieu de suivre la chaîne commune`);
+  }
 });
 test("la chaîne garde PLUSIEURS modèles — les quotas sont par modèle", () => {
   // Erreur de raisonnement évitée ici : réduire la chaîne à un seul modèle semblait
@@ -1101,9 +1125,14 @@ test("un quota JOURNALIER épuisé ne déclenche aucun réessai", () => {
   // jour » ne se libère qu'à minuit Pacifique — chaque réessai est une requête brûlée
   // pour rien. L'ancien comportement consommait jusqu'à 6 requêtes par question au lieu
   // de 3, une fois le quota atteint : il creusait le trou qu'il prétendait combler.
-  const src = readFileSync("src/lib/ai/gemini.ts", "utf8");
-  assert.ok(/PerDay\|per day/i.test(src), "le quota journalier doit être distingué du quota par minute");
-  const iDaily = src.indexOf("dailyExhausted");
+  // La distinction par-jour / par-minute a été extraite dans `quotaMemory.ts`
+  // (`isDailyQuotaError`) et elle est désormais vérifiée sur le COMPORTEMENT, plus haut,
+  // avec un `fetch` factice — ce qui vaut mieux qu'un grep de regex. Ici on ne fige plus
+  // que ce qui doit rester vrai DANS LA BOUCLE : le court-circuit avant tout réessai.
+  const src = codeOf("src/lib/ai/gemini.ts");
+  // On vise le SITE D'APPEL, pas l'import en tête de fichier : ancré sur le simple nom,
+  // l'assertion serait trivialement vraie et ne pourrait plus jamais échouer.
+  const iDaily = src.indexOf("if (isDailyQuotaError(");
   const iRetry = src.indexOf("if (attempt < retries)");
   assert.ok(iDaily > 0 && iDaily < iRetry, "le court-circuit doit précéder la boucle de réessai");
   // La bascule vers un AUTRE modèle reste utile : il a son propre quota journalier.
@@ -1149,5 +1178,326 @@ test("le bloc de constats pousse à traiter le bloquant d'abord", () => {
   assert.equal(findingsBlock([]), "", "un compte sain ne doit rien ajouter au prompt");
 });
 
-console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
-if (fails.length) { for (const f of fails) console.log(`  ✗ ${f}`); process.exit(1); }
+/**
+ * Source d'un fichier DÉBARRASSÉE DE SES COMMENTAIRES, pour les tests qui lisent le code.
+ *
+ * Deux pièges, rencontrés l'un après l'autre :
+ *  1. sans retirer les commentaires, le test se déclenche sur la prose qui explique
+ *     justement la correction (celle de la route cite « gemini-2.5-flash » en toutes lettres) ;
+ *  2. retirer bêtement tout ce qui suit `//` MUTILE LES URL du code : `https://…` devient
+ *     `https:`. L'assertion « aucune URL de modèle en dur » devenait alors increvable —
+ *     elle passait même sur le code fautif. On ne coupe donc pas sur `://`.
+ */
+function codeOf(path: string): string {
+  return readFileSync(path, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+}
+
+console.log("\nSÉANCE IA — mémorisée un jour, périmée dès que le contexte bouge");
+// Le tableau de bord appelait /api/ai/session à CHAQUE montage : trois visites =
+// trois requêtes Gemini, sur un palier gratuit plafonné à 20 par jour et par modèle.
+// Ces tests figent les deux moitiés du contrat : ça doit servir le cache quand rien
+// n'a changé, et SURTOUT le jeter dès qu'un fait de la prescription a changé.
+const SIG: SessionSignals = {
+  day: "2026-08-08",
+  lastWorkoutDate: "2026-08-07", workoutCount: 412,
+  lastHrvDate: "2026-08-08", lastHrvMs: 71,
+  lastSleepDate: "2026-08-08", lastSleepScore: 82,
+  objective: { race: "Marathon de Paris", raceDate: "2027-04-11", targetSeconds: 10800 },
+  baselineTestedAt: "2026-06-01T00:00:00Z",
+  profile: { age: 34, weight_kg: 72, health_notes: "", main_terrains: ["route", "trail"], days_per_week: 5 },
+};
+const fpOf = (over: Partial<SessionSignals> = {}) => fingerprint({ ...SIG, ...over });
+
+test("mêmes signaux = même empreinte (sinon le cache ne sert jamais)", () => {
+  assert.equal(fpOf(), fpOf());
+});
+test("l'ordre des clés d'un objet jsonb ne change pas l'empreinte", () => {
+  // PostgREST peut rendre les clés dans un autre ordre d'une lecture à l'autre. Sans
+  // canonicalisation, l'empreinte changerait toute seule et on rappellerait Gemini
+  // à chaque visite — le cache aurait coûté du code sans économiser une requête.
+  assert.equal(
+    canonical({ b: 1, a: { d: 2, c: [3, { f: 4, e: 5 }] } }),
+    canonical({ a: { c: [3, { e: 5, f: 4 }], d: 2 }, b: 1 }),
+  );
+  assert.equal(fpOf({ objective: { raceDate: "2027-04-11", targetSeconds: 10800, race: "Marathon de Paris" } }), fpOf());
+});
+test("le changement de jour périme la mémorisation", () => {
+  assert.notEqual(fpOf({ day: "2026-08-09" }), fpOf());
+});
+test("une séance importée périme la recommandation", () => {
+  // Le vrai défaut de l'ancien cache mémoire : indexé sur utilisateur+jour seulement,
+  // il servait jusqu'au soir un conseil calculé AVANT la sortie du matin.
+  assert.notEqual(fpOf({ lastWorkoutDate: "2026-08-08", workoutCount: 413 }), fpOf());
+  assert.notEqual(fpOf({ workoutCount: 413 }), fpOf(), "même à date égale, une séance de plus compte");
+});
+test("la VFC et le sommeil du matin périment la recommandation", () => {
+  // Ils arrivent souvent APRÈS la première ouverture du tableau de bord, et c'est
+  // d'eux que sort le verdict « fatigué → récupération ». Les ignorer, ce serait
+  // servir toute la journée un conseil donné sans savoir comment il avait dormi.
+  assert.notEqual(fpOf({ lastHrvMs: 58 }), fpOf());
+  assert.notEqual(fpOf({ lastSleepDate: "2026-08-08", lastSleepScore: 41 }), fpOf());
+});
+test("un nouvel objectif ou un nouveau test de VMA périme la recommandation", () => {
+  assert.notEqual(fpOf({ objective: { race: "Semi de Boulogne", raceDate: "2026-11-15" } }), fpOf());
+  assert.notEqual(fpOf({ objective: null }), fpOf());
+  assert.notEqual(fpOf({ baselineTestedAt: "2026-08-08T09:00:00Z" }), fpOf());
+});
+test("une donnée de santé ou de disponibilité périme la recommandation", () => {
+  assert.notEqual(fpOf({ profile: { ...SIG.profile, health_notes: "douleur tendon d'Achille droit" } }), fpOf());
+  assert.notEqual(fpOf({ profile: { ...SIG.profile, days_per_week: 3 } }), fpOf());
+  assert.notEqual(fpOf({ profile: { ...SIG.profile, weight_kg: 69 } }), fpOf());
+});
+test("les colonnes réécrites à chaque synchro NE périment PAS la mémorisation", () => {
+  // Le piège inverse : empreindre la position GPS, la courbe d'allure ou le score de
+  // discipline ferait sauter le cache plusieurs fois par jour sans qu'aucun conseil
+  // ne change. Un cache qui ne sert jamais est un cache inutile.
+  assert.equal(fpOf({ profile: { ...SIG.profile, last_lat: 48.85, last_lon: 2.35, last_loc_at: "2026-08-08T11:00:00Z" } }), fpOf());
+  assert.equal(fpOf({ profile: { ...SIG.profile, pace_curve: { at: "2026-08-08T11:00:00Z", pts: [1, 2, 3] } } }), fpOf());
+  assert.equal(fpOf({ profile: { ...SIG.profile, discipline_score: 88, xp_points: 1240 } }), fpOf());
+});
+test("la clé intervals.icu n'entre JAMAIS dans l'empreinte", () => {
+  assert.equal(fpOf({ profile: { ...SIG.profile, intervals_api_key: "secret-abc" } }), fpOf());
+  assert.ok(!PROFILE_FINGERPRINT_COLUMNS.includes("intervals_api_key" as never));
+});
+test("une entrée mémorisée n'est réutilisée que si jour ET empreinte collent", () => {
+  const good = { day: "2026-08-08", fp: "abc", session: { title: "Seuil 3×8'", subtitle: "", tags: ["Z4"], why: "" } };
+  assert.equal(isCacheUsable(good, "2026-08-08", "abc"), true);
+  assert.equal(isCacheUsable(good, "2026-08-09", "abc"), false, "le lendemain, on recalcule");
+  assert.equal(isCacheUsable(good, "2026-08-08", "xyz"), false, "empreinte différente = contexte changé");
+  assert.equal(isCacheUsable(null, "2026-08-08", "abc"), false);
+});
+test("une entrée à moitié écrite provoque un nouvel appel, pas une carte vide", () => {
+  const day = "2026-08-08";
+  assert.equal(isCacheUsable({ day, fp: "abc", session: null }, day, "abc"), false);
+  assert.equal(isCacheUsable({ day, fp: "abc", session: { title: "", tags: [] } }, day, "abc"), false);
+  assert.equal(isCacheUsable({ day, fp: "abc", session: { title: "Seuil" } }, day, "abc"), false, "sans tags, la carte s'affiche cassée");
+});
+test("la route mémorise en base et passe par la chaîne de repli", () => {
+  const code = codeOf("src/app/api/ai/session/route.ts");
+  assert.ok(!/generativelanguage\.googleapis\.com/.test(code),
+    "la route ne doit pas appeler un modèle en dur : elle se priverait de la bascule vers flash-lite, donc de la moitié du quota");
+  assert.ok(/generateContent\(/.test(code), "l'appel doit passer par la chaîne de repli commune");
+  assert.ok(!/new Map\(/.test(code),
+    "un cache mémoire ne survit pas à une instance Vercel et ignore les changements de contexte");
+  assert.ok(/SESSION_CACHE_TYPE/.test(code) && /fingerprint\(/.test(code),
+    "la mémorisation doit être en base et empreinte au contexte");
+  // La lecture du cache doit précéder la construction du contexte : celle-ci coûte une
+  // quinzaine de requêtes DB et un appel météo, tout ça pour préparer l'appel évité.
+  assert.ok(code.indexOf("isCacheUsable") < code.indexOf("buildAthleteContext(supabase"),
+    "on doit rendre la réponse mémorisée AVANT de construire le contexte complet");
+});
+test("deux appareils simultanés ne cassent pas le cache définitivement", () => {
+  const code = readFileSync("src/app/api/ai/session/route.ts", "utf8");
+  const read = code.slice(code.indexOf(`eq("type", SESSION_CACHE_TYPE)`));
+  assert.ok(/limit\(1\)/.test(read.slice(0, 200)) && !/maybeSingle/.test(read.slice(0, 200)),
+    "maybeSingle() échouerait DÉFINITIVEMENT si deux onglets ont inséré deux lignes");
+});
+
+console.log("\nQUOTA ÉPUISÉ — mémorisé jusqu'à minuit AU PACIFIQUE, pas à minuit UTC");
+// Sans mémoire, chaque ouverture du tableau de bord refaisait la découverte : un
+// aller-retour réseau par modèle, pour un échec connu d'avance. Et mémoriser « pour la
+// journée » avec la clé UTC utilisée ailleurs dans l'app aurait été faux deux fois.
+const laStamp = (d: Date) => new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Los_Angeles", hourCycle: "h23",
+  year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+}).format(d);
+
+test("la réinitialisation tombe TOUJOURS à minuit à Los Angeles", () => {
+  for (const iso of ["2026-08-09T12:00:00Z", "2026-01-15T12:00:00Z", "2026-05-01T03:00:00Z", "2026-12-31T23:59:00Z"]) {
+    const now = new Date(iso);
+    const reset = nextQuotaResetUtc(now);
+    assert.ok(laStamp(reset).endsWith("00:00"), `${iso} → ${laStamp(reset)} n'est pas minuit au Pacifique`);
+    assert.ok(reset > now, "la réinitialisation doit être dans le futur");
+    assert.ok(reset.getTime() - now.getTime() <= 25 * 3600_000, "jamais plus de 25 h d'attente");
+  }
+});
+test("l'heure d'été est prise en compte (07 h UTC l'été, 08 h l'hiver)", () => {
+  assert.equal(nextQuotaResetUtc(new Date("2026-08-09T12:00:00Z")).toISOString(), "2026-08-10T07:00:00.000Z");
+  assert.equal(nextQuotaResetUtc(new Date("2026-01-15T12:00:00Z")).toISOString(), "2026-01-16T08:00:00.000Z");
+  // Jours de bascule : minuit tombe AVANT le changement d'heure (2 h du matin), donc
+  // c'est encore l'ancien décalage qui s'applique. Un calcul naïf se trompe d'une heure.
+  assert.equal(nextQuotaResetUtc(new Date("2026-03-07T20:00:00Z")).toISOString(), "2026-03-08T08:00:00.000Z");
+  assert.equal(nextQuotaResetUtc(new Date("2026-03-08T20:00:00Z")).toISOString(), "2026-03-09T07:00:00.000Z");
+  assert.equal(nextQuotaResetUtc(new Date("2026-10-31T20:00:00Z")).toISOString(), "2026-11-01T07:00:00.000Z");
+  assert.equal(nextQuotaResetUtc(new Date("2026-11-01T20:00:00Z")).toISOString(), "2026-11-02T08:00:00.000Z");
+});
+test("LE POINT CENTRAL : le marqueur SURVIT à minuit UTC", () => {
+  // Posé à 23 h 50 UTC (16 h 50 au Pacifique), il doit tenir jusqu'à 07 h UTC. Une
+  // mémorisation indexée sur le jour UTC aurait rouvert le robinet à 00 h 00 pour
+  // sept heures d'échecs supplémentaires, en croyant bien faire.
+  const mark = markExhausted(new Date("2026-08-08T23:50:00Z"));
+  assert.equal(isExpired(mark, Date.parse("2026-08-09T00:30:00Z")), false, "à 00 h 30 UTC il reste 6 h 30 de disette");
+  assert.equal(isExpired(mark, Date.parse("2026-08-09T06:59:00Z")), false);
+  assert.equal(isExpired(mark, Date.parse("2026-08-09T07:00:00Z")), true, "minuit au Pacifique : le quota est rendu");
+});
+test("un plafond PAR MINUTE ne se confond pas avec un plafond PAR JOUR", () => {
+  // Confondre les deux couperait l'IA pour la journée à cause d'une bourrasque de
+  // quelques secondes — un dégât sans commune mesure avec l'économie visée.
+  assert.equal(isDailyQuotaError(429, "Quota exceeded for quota metric GenerateRequestsPerDay"), true);
+  assert.equal(isDailyQuotaError(429, "limit: 20 per day"), true);
+  assert.equal(isDailyQuotaError(429, "GenerateRequestsPerMinute exceeded"), false);
+  assert.equal(isDailyQuotaError(503, "model overloaded, per day irrelevant"), false, "un 503 n'est pas un quota");
+});
+const CHAIN2 = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
+const T0 = Date.parse("2026-08-08T18:00:00Z");
+const memWith = (models: string[], now: number, nextProbeAt = 0) => ({
+  marks: new Map(models.map((m) => [m, markExhausted(new Date(now))] as const)),
+  nextProbeAt,
+});
+
+test("un modèle épuisé est écarté, l'autre garde sa chance", () => {
+  const sel = selectModels(CHAIN2, memWith(["gemini-2.5-flash"], T0), T0);
+  assert.deepEqual(sel.models, ["gemini-2.5-flash-lite"], "inutile de retoquer un modèle déjà à sec");
+  assert.equal(sel.probing, false);
+});
+test("tous épuisés : plus aucun appel, mais une sonde périodique", () => {
+  const mem = memWith(CHAIN2, T0, T0 + PROBE_INTERVAL_MS);
+  assert.deepEqual(selectModels(CHAIN2, mem, T0).models, [], "rien à tenter dans l'immédiat");
+  // Quinze minutes plus tard, UNE sonde repart : un faux positif ne peut pas nous
+  // rendre aveugles jusqu'au lendemain.
+  const later = T0 + PROBE_INTERVAL_MS + 1;
+  const probe = selectModels(CHAIN2, mem, later);
+  assert.deepEqual(probe.models, ["gemini-2.5-flash"], "on sonde le modèle le moins récemment sondé");
+  assert.equal(probe.probing, true);
+});
+test("la sonde ALTERNE entre les modèles au lieu de toujours tester le même", () => {
+  // Sinon un modèle marqué à tort resterait exclu jusqu'à la réinitialisation, sans
+  // qu'on lui redonne jamais sa chance.
+  const mem = memWith(CHAIN2, T0, 0);
+  const first = T0 + PROBE_INTERVAL_MS;
+  assert.deepEqual(selectModels(CHAIN2, mem, first).models, ["gemini-2.5-flash"]);
+  mem.marks.set("gemini-2.5-flash", { ...mem.marks.get("gemini-2.5-flash")!, probedAt: first });
+  mem.nextProbeAt = first + PROBE_INTERVAL_MS;
+  const second = first + PROBE_INTERVAL_MS + 1;
+  assert.deepEqual(selectModels(CHAIN2, mem, second).models, ["gemini-2.5-flash-lite"], "au tour de l'autre");
+});
+test("une seule sonde par quart d'heure pour TOUTE la chaîne", () => {
+  // Avec un droit de sonde par modèle, deux modèles marqués produisaient deux sondes
+  // coup sur coup : autant de requêtes inutiles qu'il y a de modèles, exactement ce
+  // qu'on prétendait supprimer.
+  const mem = memWith(CHAIN2, T0, 0);
+  const at = T0 + PROBE_INTERVAL_MS;
+  assert.equal(selectModels(CHAIN2, mem, at).probing, true);
+  mem.nextProbeAt = at + PROBE_INTERVAL_MS; // ce que fait la chaîne avant d'appeler
+  assert.deepEqual(selectModels(CHAIN2, mem, at + 1).models, [], "pas de seconde sonde dans la foulée");
+});
+test("après la réinitialisation, la chaîne complète revient d'elle-même", () => {
+  const mem = memWith(CHAIN2, T0, 0);
+  const after = Date.parse("2026-08-09T07:30:00Z");
+  assert.deepEqual(selectModels(CHAIN2, mem, after).models, CHAIN2, "aucun modèle ne doit rester exclu");
+});
+
+console.log("\nQUOTA ÉPUISÉ — la chaîne cesse vraiment d'appeler le réseau");
+// Ces tests-là passent par generateContent avec un `fetch` factice : ils vérifient le
+// COMPORTEMENT (combien d'appels partent), pas seulement les fonctions pures.
+process.env.GEMINI_API_KEY ??= "cle-de-test";
+const realFetch = globalThis.fetch;
+let calls: string[] = [];
+function stubFetch(reply: (model: string, n: number) => { status: number; body: string }) {
+  calls = [];
+  globalThis.fetch = (async (url: unknown) => {
+    const model = String(url).match(/models\/([^:]+):/)?.[1] ?? "?";
+    calls.push(model);
+    const { status, body } = reply(model, calls.length);
+    return { ok: status === 200, status, json: async () => JSON.parse(body), text: async () => body } as unknown as Response;
+  }) as typeof fetch;
+}
+const perDay = { status: 429, body: "Quota exceeded for GenerateRequestsPerDay, limit: 20" };
+const okBody = { status: 200, body: JSON.stringify({ candidates: [{ content: { parts: [{ text: "séance" }] } }] }) };
+const CHAIN = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
+const gen = () => generateContent([{ role: "user", parts: [{ text: "x" }] }], {}, { models: CHAIN, retriesPerModel: 1 });
+
+/** Variante asynchrone de `test` — sans elle, un échec dans une promesse passerait inaperçu. */
+async function atest(name: string, fn: () => Promise<void>) {
+  try { await fn(); passed++; console.log(`  ✓ ${name}`); }
+  catch (e) { fails.push(`${name} — ${(e as Error).message.split("\n")[0]}`); console.log(`  ✗ ${name}`); }
+}
+
+// Pas de `await` au sommet du fichier (tsx compile ce test en CJS) : le résumé final
+// est donc rattaché à la suite du bloc, sans quoi il s'afficherait avant les résultats.
+void (async () => {
+  await atest("quota épuisé sur toute la chaîne → l'appel suivant ne touche PAS le réseau", async () => {
+    __resetQuotaMemory();
+    stubFetch(() => perDay);
+    const first = await gen();
+    assert.equal(first.ok, false);
+    assert.deepEqual(calls, CHAIN, "un essai par modèle, sans réessai sur un plafond journalier");
+    assert.equal((first as { dailyExhausted?: boolean }).dailyExhausted, true);
+
+    calls = [];
+    const second = await gen();
+    assert.deepEqual(calls, [], "AUCUNE requête : c'est tout l'objet de la mémorisation");
+    assert.equal(second.ok, false);
+    assert.equal((second as { dailyExhausted?: boolean }).dailyExhausted, true);
+    // Et on dit la VÉRITÉ à l'appelant : un quota journalier n'est pas une panne
+    // « momentanée ». Annoncer « réessayez » à quelqu'un qui ne peut pas avant
+    // minuit au Pacifique, c'est inventer une disponibilité qui n'existe pas.
+    assert.equal(second.status, 429, "un quota épuisé n'est pas un 503 de saturation");
+    assert.match((second as { error: string }).error, /journalier/i);
+  });
+
+  await atest("un seul modèle épuisé → l'appel suivant part DIRECTEMENT sur l'autre", async () => {
+    __resetQuotaMemory();
+    stubFetch((model) => (model === "gemini-2.5-flash" ? perDay : okBody));
+    const first = await gen();
+    assert.equal(first.ok, true);
+    assert.deepEqual(calls, CHAIN, "la première fois, il faut bien découvrir que le premier est à sec");
+
+    calls = [];
+    const second = await gen();
+    assert.equal(second.ok, true);
+    assert.deepEqual(calls, ["gemini-2.5-flash-lite"], "le modèle à sec ne doit plus être retoqué");
+  });
+
+  await atest("un plafond PAR MINUTE ne fait poser aucun marqueur", async () => {
+    __resetQuotaMemory();
+    stubFetch(() => ({ status: 429, body: "GenerateRequestsPerMinute exceeded" }));
+    const r = await gen();
+    assert.equal(r.ok, false);
+    assert.equal(__quotaMemory().size, 0, "une bourrasque d'une minute ne doit pas couper la journée");
+    assert.equal((r as { dailyExhausted?: boolean }).dailyExhausted, undefined);
+  });
+
+  await atest("la sonde repart après 15 min et réhabilite le modèle qui répond", async () => {
+    // Les deux modèles marqués, mais l'heure de sonde est passée : une détection
+    // erronée ne doit pas nous rendre aveugles jusqu'au lendemain.
+    __resetQuotaMemory();
+    const now = Date.now();
+    for (const m of CHAIN) __setQuotaMark(m, { until: now + 3600_000, probedAt: now - 3600_000 });
+    stubFetch(() => okBody);
+    const r = await gen();
+    assert.equal(r.ok, true);
+    assert.deepEqual(calls, ["gemini-2.5-flash"], "UNE seule sonde, sur le modèle prioritaire");
+    assert.equal(__quotaMemory().has("gemini-2.5-flash"), false, "le modèle qui répond est réhabilité");
+  });
+
+  await atest("deux visites simultanées ne sondent qu'une fois", async () => {
+    // Le droit de sonde est consommé AVANT l'appel : sinon la sonde coûte autant de
+    // requêtes qu'il y a d'onglets ouverts, et l'économie disparaît.
+    __resetQuotaMemory();
+    const now = Date.now();
+    for (const m of CHAIN) __setQuotaMark(m, { until: now + 3600_000, probedAt: now - 3600_000 });
+    stubFetch(() => perDay);
+    await gen();
+    const afterProbe = calls.length;
+    calls = [];
+    await gen();
+    assert.equal(afterProbe, 1, "la sonde ne teste QU'UN modèle, pas toute la chaîne");
+    assert.deepEqual(calls, [], "la seconde visite ne re-sonde pas dans la foulée");
+  });
+
+  await atest("sans quota épuisé, le comportement d'avant est inchangé", async () => {
+    __resetQuotaMemory();
+    stubFetch(() => okBody);
+    const r = await gen();
+    assert.equal(r.ok, true);
+    assert.deepEqual(calls, ["gemini-2.5-flash"], "le modèle prioritaire répond, on s'arrête là");
+    assert.equal(__quotaMemory().size, 0);
+  });
+})().then(() => {
+  globalThis.fetch = realFetch;
+  console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
+  if (fails.length) { for (const f of fails) console.log(`  ✗ ${f}`); process.exit(1); }
+});

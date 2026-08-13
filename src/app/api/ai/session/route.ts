@@ -1,25 +1,71 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { buildAthleteContext, COACH_SYSTEM } from "@/lib/ai/coachContext";
+import { generateContent } from "@/lib/ai/gemini";
+import {
+  SESSION_CACHE_TYPE, PROFILE_FINGERPRINT_COLUMNS, fingerprint, isCacheUsable, serverDay,
+  type SessionSignals, type AiSession,
+} from "@/lib/ai/sessionCache";
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-
-// Cache mémoire : 1 séance IA / utilisateur / jour → on ne rappelle pas Gemini à chaque
-// rafraîchissement du dashboard (économise le quota). Réinitialisé au redémarrage serveur.
-const CACHE = new Map<string, { title: string; subtitle: string; tags: string[]; why: string }>();
-
+/**
+ * Séance-clé du jour proposée par l'IA.
+ *
+ * Déroulé en deux temps, et l'ordre compte : on lit d'ABORD les signaux qui décident
+ * la séance (7 petites requêtes indexées) et on rend la réponse mémorisée si rien n'a
+ * bougé. Le contexte coach complet n'est construit qu'en cas de besoin réel — il coûte
+ * une quinzaine de requêtes ET un appel à l'API météo, tout ça pour alimenter un
+ * appel Gemini qu'on cherche justement à éviter.
+ */
 export async function POST() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const today = new Date().toISOString().split("T")[0];
-  const cacheKey = `${user.id}:${today}`;
-  const cached = CACHE.get(cacheKey);
-  if (cached) return NextResponse.json({ session: cached, cached: true });
+  const day = serverDay();
 
+  // ── 1. Signaux + entrée mémorisée, en parallèle ───────────────────────────────
+  const [profileRow, workoutRow, hrvRow, sleepRow, objectiveRow, baselineRow, cacheRow] = await Promise.all([
+    supabase.from("profiles").select(PROFILE_FINGERPRINT_COLUMNS.join(",")).eq("id", user.id).maybeSingle(),
+    // `count: exact` + la dernière date : une séance importée fait bouger l'un des deux au
+    // moins. Une simple RETOUCHE d'une séance déjà là (même date, même compte) ne périme
+    // rien — c'est assumé : elle ne change pas la charge sur laquelle se cale le conseil.
+    supabase.from("workouts").select("date", { count: "exact" }).eq("user_id", user.id).order("date", { ascending: false }).limit(1),
+    supabase.from("hrv_data").select("date,hrv_ms").eq("user_id", user.id).order("date", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("sleep_data").select("date,sleep_score").eq("user_id", user.id).order("date", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "race_objective").maybeSingle(),
+    supabase.from("performance_baselines").select("tested_at").eq("user_id", user.id).order("tested_at", { ascending: false }).limit(1).maybeSingle(),
+    // Volontairement `limit(1)` et non `maybeSingle()` : deux appareils qui ouvrent le
+    // tableau de bord en même temps peuvent insérer deux lignes avant que l'une soit
+    // visible de l'autre. `maybeSingle()` échouerait alors DÉFINITIVEMENT sur « plusieurs
+    // lignes », et le cache serait cassé pour de bon. Là, on garde simplement la plus
+    // récente et la mise à jour suivante réécrit celle-là.
+    supabase.from("notifications").select("id,data").eq("user_id", user.id).eq("type", SESSION_CACHE_TYPE)
+      .order("created_at", { ascending: false }).limit(1),
+  ]);
+  const cached = (cacheRow.data?.[0] ?? null) as { id?: string; data?: unknown } | null;
+
+  const signals: SessionSignals = {
+    day,
+    lastWorkoutDate: (workoutRow.data?.[0] as { date?: string } | undefined)?.date ?? null,
+    workoutCount: workoutRow.count ?? 0,
+    lastHrvDate: (hrvRow.data as { date?: string } | null)?.date ?? null,
+    lastHrvMs: (hrvRow.data as { hrv_ms?: number } | null)?.hrv_ms ?? null,
+    lastSleepDate: (sleepRow.data as { date?: string } | null)?.date ?? null,
+    lastSleepScore: (sleepRow.data as { sleep_score?: number } | null)?.sleep_score ?? null,
+    objective: (objectiveRow.data as { data?: unknown } | null)?.data ?? null,
+    baselineTestedAt: (baselineRow.data as { tested_at?: string } | null)?.tested_at ?? null,
+    profile: (profileRow.data as Record<string, unknown> | null) ?? null,
+  };
+  const fp = fingerprint(signals);
+
+  const entry = cached?.data as { day?: string; fp?: string; session?: AiSession } | null | undefined;
+  if (isCacheUsable(entry, day, fp)) {
+    return NextResponse.json({ session: entry.session, cached: true });
+  }
+
+  // ── 2. Rien de mémorisé d'utilisable : on paie l'appel ────────────────────────
   const ctx = await buildAthleteContext(supabase, user.id);
   const jour = new Date().toLocaleDateString("fr-FR", { weekday: "long" });
 
@@ -38,29 +84,44 @@ Réponds UNIQUEMENT par un objet JSON valide (aucun texte autour) :
 {"title":"nom court de la séance","subtitle":"description concrète : structure, allure/zone, durée/distance","tags":["2 à 3 tags très courts ex Z2, 10 km, VMA, Allure marathon"],"why":"1 phrase de justification personnalisée citant une donnée clé (VFC, sommeil, charge ou objectif)"}`;
 
   try {
-    const res = await fetch(GEMINI_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature: 0.8, maxOutputTokens: 600, responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } } }),
-    });
+    // Passe par la chaîne de repli commune : la route appelait `gemini-2.5-flash` en dur,
+    // donc sans bascule vers `flash-lite`. Les quotas étant comptés PAR MODÈLE, elle se
+    // privait de la moitié de la capacité disponible dès que le premier modèle saturait.
+    const res = await generateContent(
+      [{ role: "user", parts: [{ text: prompt }] }],
+      { temperature: 0.8, maxOutputTokens: 600, responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } },
+    );
     if (!res.ok) {
-      const status = res.status;
-      return NextResponse.json({ error: status === 429 ? "Quota IA atteint" : `IA indisponible (${status})` }, { status: 502 });
+      return NextResponse.json(
+        { error: res.status === 429 ? "Quota IA atteint" : `IA indisponible (${res.status})` },
+        { status: 502 },
+      );
     }
-    const data = await res.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-    const m = text.match(/\{[\s\S]*\}/);
+    const m = res.text.match(/\{[\s\S]*\}/);
     if (!m) return NextResponse.json({ error: "Réponse IA illisible" }, { status: 502 });
     const parsed = JSON.parse(m[0]);
     if (!parsed.title || !Array.isArray(parsed.tags)) return NextResponse.json({ error: "Format IA invalide" }, { status: 502 });
-    const session = {
+    const session: AiSession = {
       title: String(parsed.title).slice(0, 60),
       subtitle: String(parsed.subtitle ?? "").slice(0, 140),
       tags: parsed.tags.slice(0, 3).map((t: unknown) => String(t).slice(0, 16)),
       why: String(parsed.why ?? "").slice(0, 170),
     };
-    CACHE.set(cacheKey, session);
-    if (CACHE.size > 5000) CACHE.clear();
+
+    // ── 3. Mémorisation (une seule ligne par athlète, réécrite) ─────────────────
+    // `read: true` : cette ligne est de l'état, pas une notification. La cloche ne
+    // compte que les `coach_message` non lus, mais autant ne pas compter dessus.
+    const payload = { day, fp, session, at: new Date().toISOString() };
+    const admin = createAdminClient();
+    const existingId = cached?.id;
+    if (existingId) {
+      await admin.from("notifications").update({ data: payload }).eq("id", existingId);
+    } else {
+      await admin.from("notifications").insert({
+        user_id: user.id, type: SESSION_CACHE_TYPE, title: "Séance IA du jour", body: "", read: true, data: payload,
+      });
+    }
+
     return NextResponse.json({ session });
   } catch (e) {
     return NextResponse.json({ error: `Erreur IA: ${(e as Error).message}` }, { status: 502 });

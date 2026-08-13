@@ -123,6 +123,12 @@ RÈGLES :
 
   const out = await generateContent(contents, { temperature: 0.55, maxOutputTokens: 1400, thinkingConfig: { thinkingBudget: 1024 } });
   if (!out.ok) {
+    // Un quota JOURNALIER épuisé ne se dissipe pas « dans quelques secondes » : il tient
+    // jusqu'à minuit heure du Pacifique. Inviter à réessayer, c'était promettre une
+    // disponibilité qui n'existe pas — et faire réessayer l'athlète pour rien.
+    if (out.dailyExhausted) {
+      return NextResponse.json({ error: "Le quota IA du jour est épuisé — il se réinitialise cette nuit. Réessaie demain 🙏" }, { status: 429 });
+    }
     return NextResponse.json({ error: "Le coach IA est très sollicité en ce moment — réessaie dans quelques secondes 🙏" }, { status: 503 });
   }
   return NextResponse.json({ reply: out.text });

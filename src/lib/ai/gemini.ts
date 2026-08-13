@@ -5,7 +5,32 @@
 //  Garantit que le coach / kiné IA répond presque toujours.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const KEY = process.env.GEMINI_API_KEY;
+import {
+  markExhausted, selectModels, isDailyQuotaError, emptyQuotaMemory,
+  PROBE_INTERVAL_MS, type QuotaMark, type QuotaMemory,
+} from "./quotaMemory";
+
+
+/**
+ * Modèles réputés à court de quota JOURNALIER, et jusqu'à quand.
+ *
+ * En mémoire, et c'est un choix : ce marqueur est une AIDE, jamais une source de
+ * vérité. S'il disparaît (instance Vercel recyclée), on retombe simplement sur le
+ * comportement d'avant — un aller-retour perdu. À l'inverse, le cache de séance est
+ * en base parce que l'y oublier ferait resservir une recommandation périmée : une
+ * erreur de contenu, autrement plus grave qu'une erreur de vitesse.
+ *
+ * L'état est GLOBAL au processus, et non par utilisateur, parce que le quota l'est :
+ * Google le compte par PROJET. Un athlète qui épuise le quota le referme pour tous.
+ */
+const quota: QuotaMemory = emptyQuotaMemory();
+
+/** Réservé aux tests : repartir d'une mémoire vierge. */
+export function __resetQuotaMemory(): void { quota.marks.clear(); quota.nextProbeAt = 0; }
+/** Réservé aux tests : inspecter les marqueurs posés (copie, non modifiable). */
+export function __quotaMemory(): Map<string, QuotaMark> { return new Map(quota.marks); }
+/** Réservé aux tests : forcer un marqueur, notamment pour déclencher une sonde. */
+export function __setQuotaMark(model: string, mark: QuotaMark): void { quota.marks.set(model, mark); }
 
 /**
  * Chaîne de repli : du meilleur au plus disponible.
@@ -32,7 +57,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export type GeminiResult =
   | { ok: true; text: string; model: string }
-  | { ok: false; error: string; status: number };
+  /** `dailyExhausted` : plus AUCUN modèle n'a de quota jusqu'à minuit au Pacifique.
+   *  Permet à l'appelant de dire « revenez demain » plutôt que « réessayez ». */
+  | { ok: false; error: string; status: number; dailyExhausted?: boolean };
 
 type GenConfig = Record<string, unknown>;
 
@@ -46,9 +73,35 @@ export async function generateContent(
   generationConfig: GenConfig,
   opts: { models?: string[]; retriesPerModel?: number } = {},
 ): Promise<GeminiResult> {
-  if (!KEY) return { ok: false, error: "Clé IA manquante (configuration serveur).", status: 500 };
+  // Lue À L'APPEL et non au chargement du module : c'est ce qui rend la chaîne
+  // testable sans réseau, et ça reste exact en serverless (l'environnement est prêt).
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return { ok: false, error: "Clé IA manquante (configuration serveur).", status: 500 };
 
-  const models = opts.models ?? DEFAULT_MODELS;
+  const allModels = opts.models ?? DEFAULT_MODELS;
+  const startedAt = Date.now();
+
+  // ── Modèles encore crédibles à cette heure-ci ────────────────────────────────
+  // Écarter un modèle dont le plafond journalier est connu épuisé économise un
+  // aller-retour AVANT CHAQUE réponse jusqu'au soir : c'est de l'attente rendue à
+  // l'athlète, pas du quota (une requête refusée ne consomme rien).
+  const { models, probing } = selectModels(allModels, quota, startedAt);
+  if (!models.length) {
+    return {
+      ok: false, status: 429, dailyExhausted: true,
+      error: "Quota IA journalier atteint — il se réinitialise à minuit heure du Pacifique.",
+    };
+  }
+  if (probing) {
+    // On consomme le droit de sonde AVANT l'appel : sinon deux visites simultanées
+    // sondent toutes les deux et la sonde coûte autant de requêtes qu'il y a d'onglets.
+    quota.nextProbeAt = startedAt + PROBE_INTERVAL_MS;
+    for (const m of models) {
+      const mark = quota.marks.get(m);
+      if (mark) quota.marks.set(m, { ...mark, probedAt: startedAt });
+    }
+  }
+
   const retries = opts.retriesPerModel ?? 1;
   let lastStatus = 503;
   let lastErr = "Service IA momentanément indisponible.";
@@ -57,7 +110,7 @@ export async function generateContent(
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
         const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${KEY}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -71,7 +124,12 @@ export async function generateContent(
             .map((p: { text?: string }) => p?.text ?? "")
             .join("")
             .trim();
-          if (text) return { ok: true, text, model };
+          if (text) {
+            // Le modèle répond : tout marqueur le concernant était périmé ou erroné.
+            // C'est ce qui rattrape une détection trop zélée — la sonde a servi.
+            quota.marks.delete(model);
+            return { ok: true, text, model };
+          }
           // Réponse vide (filtre de sécurité, etc.) → on tente le modèle suivant.
           lastErr = "Réponse vide du modèle.";
           lastStatus = 502;
@@ -92,8 +150,18 @@ export async function generateContent(
         // 6 requêtes brûlées par question d'utilisateur une fois le quota atteint, contre
         // 3 nécessaires. On garde la bascule VERS UN AUTRE modèle (il a son propre quota
         // journalier, c'est le seul recours utile), on supprime le réessai inutile.
-        const dailyExhausted = res.status === 429 && /PerDay|per day/i.test(lastErr);
-        if (dailyExhausted) break; // modèle suivant, sans insister
+        //
+        // On le MÉMORISE en plus : sans ça, la découverte se refaisait à chaque visite du
+        // tableau de bord, au prix d'un aller-retour par modèle et par visite.
+        if (isDailyQuotaError(res.status, lastErr)) {
+          const at = Date.now();
+          quota.marks.set(model, markExhausted(new Date(at)));
+          // Poser le marqueur OUVRE aussi la fenêtre de sonde. Sans cette ligne, la
+          // toute première requête suivant la découverte repartait sonder aussitôt :
+          // on mémorisait l'épuisement sans jamais en tirer la moindre économie.
+          quota.nextProbeAt = Math.max(quota.nextProbeAt, at + PROBE_INTERVAL_MS);
+          break; // modèle suivant, sans insister
+        }
 
         // Transitoire (saturation par minute / erreur serveur) → backoff puis réessai.
         if (res.status === 429 || res.status >= 500) {
@@ -116,5 +184,9 @@ export async function generateContent(
     }
   }
 
-  return { ok: false, error: lastErr, status: lastStatus };
+  // Épuisement journalier COMPLET = tous les modèles de la chaîne sont marqués, pas
+  // seulement celui qui vient d'échouer. Tant qu'un modèle garde du quota, l'appelant
+  // doit pouvoir réessayer : annoncer « revenez demain » à tort serait une invention.
+  const allExhausted = allModels.every((m) => quota.marks.has(m));
+  return { ok: false, error: lastErr, status: lastStatus, ...(allExhausted ? { dailyExhausted: true } : {}) };
 }

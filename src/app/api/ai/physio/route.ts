@@ -160,6 +160,12 @@ Si la photo est floue, trop sombre, trop éloignée ou ne montre pas la zone dé
         error: "Le modèle a refusé d'analyser cette photo (filtre de sécurité sur les images corporelles). Décris-moi la zone par écrit — c'est de toute façon ce qui compte le plus — ou envoie un cadrage plus serré sur la zone, sans le reste du corps.",
       }, { status: 422 });
     }
+    // Même honnêteté que sur le coach : quand le quota du jour est épuisé, « réessayez
+    // dans quelques secondes » est faux et fait réessayer pour rien jusqu'à minuit
+    // heure du Pacifique.
+    if (out.dailyExhausted) {
+      return NextResponse.json({ error: "Le quota IA du jour est épuisé — il se réinitialise cette nuit. Réessayez demain 🙏" }, { status: 429 });
+    }
     return NextResponse.json({ error: "Le kiné IA est très sollicité — réessayez dans quelques secondes 🙏" }, { status: 503 });
   }
   // ── LA DOULEUR DÉCLARÉE DOIT ATTEINDRE LE COACH ──────────────────────────────
