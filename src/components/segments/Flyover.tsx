@@ -52,6 +52,7 @@ export function Flyover({ polyline, altitudes, stats }: {
   const anim = useRef<number | null>(null);
   const depart = useRef<number>(0);
   const ecoule = useRef<number>(0);
+  const capRef = useRef<number>(0);
 
   const [pret, setPret] = useState(false);
   const [joue, setJoue] = useState(false);
@@ -59,6 +60,10 @@ export function Flyover({ polyline, altitudes, stats }: {
   const [erreur, setErreur] = useState<string | null>(null);
 
   const points = decodePolyline(polyline);
+  // Cap de départ : sinon la première image part cap au nord et pivote brutalement.
+  const capInitial = points.length > 1
+    ? (Math.atan2(points[1].lon - points[0].lon, points[1].lat - points[0].lat) * 180) / Math.PI
+    : 0;
 
   useEffect(() => {
     if (!conteneur.current || points.length < 2) return;
@@ -145,14 +150,32 @@ export function Flyover({ polyline, altitudes, stats }: {
     ecoule.current = t - depart.current;
     setAvance(p);
 
-    const i = Math.min(points.length - 1, Math.floor(p * (points.length - 1)));
-    const suivant = points[Math.min(points.length - 1, i + 3)];
-    const ici = points[i];
-    // Le cap suit la direction RÉELLE de course : sans lui, la caméra glisse de côté
-    // et le survol ressemble à un travelling, pas à une course.
-    const cap = (Math.atan2(suivant.lon - ici.lon, suivant.lat - ici.lat) * 180) / Math.PI;
+    // ── POSITION INTERPOLÉE, PAS LE POINT GPS LE PLUS PROCHE ──────────────────
+    // Le défaut visible à l'écran : avec ~150 points étalés sur 26 s, se caler sur le
+    // point le plus proche fige la caméra puis la téléporte six fois par seconde. On
+    // interpole donc ENTRE les deux points encadrants, ce qui donne un déplacement
+    // continu à 60 images/s au lieu d'une succession de sauts.
+    const brut = p * (points.length - 1);
+    const i = Math.min(points.length - 2, Math.floor(brut));
+    const f = brut - i;                       // 0 → 1 entre les deux points
+    const a = points[i], b = points[i + 1];
+    const lat = a.lat + (b.lat - a.lat) * f;
+    const lon = a.lon + (b.lon - a.lon) * f;
 
-    map.jumpTo({ center: [ici.lon, ici.lat], zoom: 15.4, pitch: 66, bearing: cap });
+    // Le cap suit la direction RÉELLE de course, mesurée sur quelques points d'avance
+    // pour ne pas osciller à chaque zigzag du GPS.
+    const loin = points[Math.min(points.length - 1, i + 4)];
+    const capBrut = (Math.atan2(loin.lon - a.lon, loin.lat - a.lat) * 180) / Math.PI;
+
+    // Lissage angulaire du cap. Sans passer par le plus court chemin, le virage qui
+    // franchit 0°/360° fait pivoter la caméra d'un tour complet — l'à-coup le plus
+    // spectaculaire, et le plus facile à prendre pour un plantage.
+    const precedent = capRef.current;
+    let ecart = ((capBrut - precedent + 540) % 360) - 180;
+    const cap = precedent + ecart * 0.12;
+    capRef.current = cap;
+
+    map.jumpTo({ center: [lon, lat], zoom: 15.6, pitch: 64, bearing: cap });
 
     if (p < 1) anim.current = requestAnimationFrame(boucle);
     else { setJoue(false); depart.current = 0; ecoule.current = 0; }
@@ -165,6 +188,7 @@ export function Flyover({ polyline, altitudes, stats }: {
       setJoue(false);
       return;
     }
+    if (!ecoule.current) capRef.current = capInitial;
     setJoue(true);
     anim.current = requestAnimationFrame(boucle);
   }
@@ -172,7 +196,7 @@ export function Flyover({ polyline, altitudes, stats }: {
   function rejouer() {
     if (anim.current) cancelAnimationFrame(anim.current);
     depart.current = 0; ecoule.current = 0;
-    setAvance(0); setJoue(true);
+    setAvance(0); setJoue(true); capRef.current = capInitial;
     anim.current = requestAnimationFrame(boucle);
   }
 

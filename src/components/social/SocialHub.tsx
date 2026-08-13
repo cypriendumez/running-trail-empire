@@ -65,13 +65,24 @@ export function SocialHub({ recentWorkouts }: { recentWorkouts: Workout[] }) {
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 pb-16">
-      <header className="pt-6 pb-4">
-        <h1 className="text-3xl font-black tracking-tight text-zinc-900">Le Club</h1>
-        <p className="mt-1 text-sm text-zinc-500">Les sorties de ceux que tu suis, et les tiennes.</p>
+      {/* Le bouton « Ajouter des amis » est PERMANENT et dans l'en-tête. Il n'était
+          auparavant accessible que par l'onglet « Athlètes », ou par le message du fil
+          vide : deux chemins qu'il fallait deviner. Une action aussi centrale ne doit
+          pas dépendre d'un onglet qu'on pense à ouvrir. */}
+      <header className="flex flex-wrap items-center justify-between gap-3 pt-6 pb-4">
+        <div>
+          <h1 className="text-3xl font-black tracking-tight text-zinc-900">Le Club</h1>
+          <p className="mt-1 text-sm text-zinc-500">Les sorties de ceux que tu suis, et les tiennes.</p>
+        </div>
+        <button onClick={() => setTab("athletes")}
+          className="flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700">
+          <UserPlus className="h-4 w-4" />
+          Ajouter des amis
+        </button>
       </header>
 
       <div className="mb-5 flex gap-1 rounded-xl bg-zinc-100 p-1">
-        {([["feed", "Fil"], ["athletes", "Athlètes"]] as const).map(([k, label]) => (
+        {([["feed", "Fil"], ["athletes", followingCount > 0 ? `Athlètes · ${followingCount}` : "Trouver des athlètes"]] as const).map(([k, label]) => (
           <button key={k} onClick={() => setTab(k)}
             className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition ${
               tab === k ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}>
