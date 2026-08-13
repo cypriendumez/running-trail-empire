@@ -13,7 +13,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from "react";
 import { Heart, MessageCircle, Search, UserPlus, UserCheck, Trash2, Send, Users, Sparkles } from "lucide-react";
-import { timeAgo, statLine, kudosLabel } from "@/lib/social/feed";
+import { timeAgo, statLine, likesLabel } from "@/lib/social/feed";
 
 type Author = { id: string; full_name?: string | null; avatar_url?: string | null };
 type Workout = {
@@ -221,7 +221,7 @@ function PostCard({ post, onChange }: { post: Post; onChange: () => void }) {
   const stats = post.workout ? statLine(post.workout) : [];
 
   async function toggleKudos() {
-    // Bascule optimiste : l'encouragement doit répondre à l'instant. En cas d'échec
+    // Bascule optimiste : le « j'aime » doit répondre à l'instant. En cas d'échec
     // réseau on REVIENT en arrière — laisser un cœur allumé sur un encouragement qui
     // n'a pas été enregistré serait un mensonge à l'écran.
     const next = !kudoed;
@@ -285,7 +285,7 @@ function PostCard({ post, onChange }: { post: Post; onChange: () => void }) {
           className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition ${
             kudoed ? "text-emerald-600" : "text-zinc-500 hover:bg-zinc-50"}`}>
           <Heart className={`h-4 w-4 ${kudoed ? "fill-emerald-600" : ""}`} />
-          {kudosLabel(count)}
+          {likesLabel(count)}
         </button>
         <button onClick={() => setShowComments((v) => !v)}
           className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-zinc-500 transition hover:bg-zinc-50">

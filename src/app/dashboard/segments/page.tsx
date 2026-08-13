@@ -18,7 +18,7 @@ export default async function SegmentsPage() {
   if (!user) redirect("/login");
 
   const { data: segments, error } = await sb.from("segments")
-    .select("id, name, distance_m, elevation_gain_m, polyline")
+    .select("id, name, distance_m, elevation_gain_m, avg_grade_pct, polyline")
     .order("distance_m", { ascending: false }).limit(50);
 
   // Le socle n'est pas encore activé en base : on le DIT, au lieu d'afficher une
@@ -46,13 +46,14 @@ export default async function SegmentsPage() {
   }
 
   const vues: SegmentVue[] = (segments ?? []).map((s) => {
-    const seg = s as unknown as { id: string; name: string; distance_m: number; elevation_gain_m: number };
+    const seg = s as unknown as { id: string; name: string; distance_m: number; elevation_gain_m: number; avg_grade_pct: number | null; polyline: string | null };
     const es = parSegment.get(seg.id) ?? [];
     const classement = leaderboard(es);
     const maitre = maitreDuSegment(es);
     const mien = classement.findIndex((e) => e.user_id === user.id);
     return {
       id: seg.id, name: seg.name, distance_m: seg.distance_m, elevation_gain_m: seg.elevation_gain_m,
+      polyline: seg.polyline, avg_grade_pct: seg.avg_grade_pct,
       passages: es.length,
       coureurs: classement.length,
       record: classement[0]?.elapsed_seconds ?? null,

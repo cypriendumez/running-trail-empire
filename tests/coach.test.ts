@@ -37,14 +37,14 @@ import {
 } from "../src/lib/ai/quotaMemory";
 import { generateContent, __resetQuotaMemory, __quotaMemory, __setQuotaMark } from "../src/lib/ai/gemini";
 import {
-  canSee, cleanBody, isPublishable, statLine, paceOf, suggestable, timeAgo, kudosLabel,
+  canSee, cleanBody, isPublishable, statLine, paceOf, suggestable, timeAgo, likesLabel,
   type Post as SocialPost,
 } from "../src/lib/social/feed";
 import {
   computeTrophies, chronoRecords, longestStreak, type TrophyWorkout as TW,
 } from "../src/lib/trophies/compute";
 import {
-  haversine, simplify, encodePolyline, decodePolyline, bboxOverlap, type TrackPoint as TP,
+  haversine, simplify, encodePolyline, decodePolyline, bboxOverlap, elevationGain, type TrackPoint as TP,
 } from "../src/lib/segments/geo";
 import { findEfforts, leaderboard, maitreDuSegment } from "../src/lib/segments/match";
 
@@ -1336,6 +1336,30 @@ test("la simplification garde TOUJOURS le dernier point", () => {
   assert.deepEqual(light[light.length - 1], droite[droite.length - 1]);
   assert.deepEqual(light[0], droite[0]);
   assert.deepEqual(simplify([droite[0]], 10), [droite[0]], "une trace d'un point reste intacte");
+});
+test("le bruit GPS ne fabrique PAS de dénivelé", () => {
+  // LE défaut à empêcher : l'altitude GPS oscille de ±2-3 m à l'arrêt. Sommer
+  // naïvement toutes les hausses transforme une sortie plate en 300 m de D+ —
+  // un chiffre plausible, faux, et flatteur. Lille est plat : ses segments doivent
+  // afficher 0, pas un relief inventé.
+  const plat: TP[] = Array.from({ length: 300 }, (_, i) => ({
+    lat: 50.64, lon: 3.03, t: i, alt: 20 + Math.sin(i) * 2.5,   // ±2,5 m de bruit
+  }));
+  assert.equal(elevationGain(plat), 0, "une oscillation sous le seuil n'est pas une montée");
+
+  // Une vraie côte de 50 m doit être vue.
+  const cote: TP[] = Array.from({ length: 100 }, (_, i) => ({ lat: 50.64, lon: 3.03, t: i, alt: 20 + i * 0.5 }));
+  const g = elevationGain(cote);
+  assert.ok(g != null && Math.abs(g - 49.5) < 4, `attendu ~50 m, obtenu ${g}`);
+});
+test("« je ne sais pas » et « c'est plat » ne se confondent pas", () => {
+  // Renvoyer 0 pour une trace sans altitude afficherait « plat » sur une montagne.
+  const sansAlt: TP[] = Array.from({ length: 50 }, (_, i) => ({ lat: 50.64, lon: 3.03, t: i }));
+  assert.equal(elevationGain(sansAlt), null, "aucune altitude ⇒ null, jamais 0");
+  assert.equal(elevationGain([]), null);
+  // Altitude trop partielle : on refuse plutôt que d'extrapoler sur une minorité.
+  const partiel: TP[] = sansAlt.map((p, i) => (i < 5 ? { ...p, alt: 20 + i } : p));
+  assert.equal(elevationGain(partiel), null, "5 points sur 50 ne suffisent pas à conclure");
 });
 test("le préfiltre par zone écarte ce qui est loin, garde ce qui est proche", () => {
   const paris = { minLat: 48.85, maxLat: 48.86, minLon: 2.35, maxLon: 2.36 };

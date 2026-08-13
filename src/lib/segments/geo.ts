@@ -7,8 +7,54 @@
 //  testée sur des distances réelles connues.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Un point de trace : latitude, longitude, et secondes écoulées depuis le départ. */
-export type TrackPoint = { lat: number; lon: number; t: number };
+/**
+ * Un point de trace : latitude, longitude, secondes écoulées, et altitude si connue.
+ * `alt` est OPTIONNEL et le reste : une trace importée avant l'ajout de l'altitude
+ * n'en a pas, et doit continuer à fonctionner sans dénivelé plutôt qu'avec un zéro
+ * présenté comme une mesure.
+ */
+export type TrackPoint = { lat: number; lon: number; t: number; alt?: number };
+
+/**
+ * Dénivelé positif cumulé, en mètres — `null` si aucune altitude n'est disponible.
+ *
+ * ⚠️ LE SEUIL N'EST PAS UN DÉTAIL. L'altitude GPS oscille de ±2 à 3 m à l'arrêt.
+ * Sommer naïvement toutes les hausses transforme une sortie parfaitement plate en
+ * 300 m de D+ : un chiffre plausible, faux, et flatteur. On ne compte donc une montée
+ * qu'une fois qu'elle dépasse `seuilM` par rapport au dernier creux retenu.
+ *
+ * Renvoyer `null` plutôt que 0 est délibéré : « je ne sais pas » et « c'est plat »
+ * sont deux informations différentes, et l'écran doit pouvoir les distinguer.
+ */
+export function elevationGain(points: TrackPoint[], seuilM = 3): number | null {
+  const alts = points.map((p) => p.alt).filter((a): a is number => typeof a === "number" && Number.isFinite(a));
+  if (alts.length < 2 || alts.length < points.length / 2) return null;
+
+  // ── LISSER D'ABORD, SEUILLER ENSUITE ────────────────────────────────────────
+  // Le seuil seul ne suffit PAS, et c'est contre-intuitif : avec un bruit de ±2,5 m,
+  // l'écart entre un creux et la bosse suivante atteint 5 m, et franchit donc un
+  // seuil de 3 m. Chaque oscillation ajoutait ainsi 5 m — près de 240 m de dénivelé
+  // inventé sur une sortie parfaitement plate. La moyenne glissante efface
+  // l'oscillation (quelques points de période) sans toucher à une vraie côte, qui
+  // s'étale sur des centaines de mètres.
+  const FENETRE = 9;
+  const lisse: number[] = [];
+  for (let i = 0; i < alts.length; i++) {
+    const d = Math.max(0, i - (FENETRE >> 1));
+    const f = Math.min(alts.length, i + (FENETRE >> 1) + 1);
+    let s = 0;
+    for (let k = d; k < f; k++) s += alts[k];
+    lisse.push(s / (f - d));
+  }
+
+  let gain = 0;
+  let reference = lisse[0];
+  for (const a of lisse) {
+    if (a > reference + seuilM) { gain += a - reference; reference = a; }
+    else if (a < reference) { reference = a; } // nouveau creux : on repart de là
+  }
+  return Math.round(gain);
+}
 
 const R_TERRE = 6_371_000; // rayon moyen, en mètres
 const rad = (d: number) => (d * Math.PI) / 180;

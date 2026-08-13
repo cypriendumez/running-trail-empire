@@ -110,9 +110,15 @@ export function statLine(w: WorkoutSummary): { label: string; value: string }[] 
   return out;
 }
 
-/** Libellé d'encouragement, au pluriel correct. */
-export function kudosLabel(n: number): string {
-  return n <= 0 ? "Encourager" : `${n} encouragement${n > 1 ? "s" : ""}`;
+/**
+ * Libellé du bouton « j'aime », au pluriel correct.
+ *
+ * Le mot « kudos » reste le nom des COLONNES en base (`post_kudos`, `kudos_count`) :
+ * les renommer imposerait une migration pour un gain nul côté athlète, qui ne voit
+ * que ce libellé. On sépare donc le vocabulaire de l'écran de celui du schéma.
+ */
+export function likesLabel(n: number): string {
+  return n <= 0 ? "J'aime" : `${n} j'aime`;
 }
 
 /**

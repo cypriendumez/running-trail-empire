@@ -6,10 +6,12 @@
 //  le seul titre qu'un coureur du dimanche peut prendre à un élite, et c'est
 //  précisément ce qui le rend motivant.
 // ─────────────────────────────────────────────────────────────────────────────
-import { Crown, Timer, Users, Repeat } from "lucide-react";
+import { Crown, Timer, Users, Repeat, TrendingUp } from "lucide-react";
+import { SegmentMapLazy } from "./SegmentMapLazy";
 
 export type SegmentVue = {
   id: string; name: string; distance_m: number; elevation_gain_m: number;
+  polyline: string | null; avg_grade_pct: number | null;
   passages: number; coureurs: number;
   record: number | null;
   monRang: number | null; monTemps: number | null;
@@ -41,6 +43,11 @@ export function SegmentList({ segments }: { segments: SegmentVue[] }) {
       {segments.map((s) => (
         <article key={s.id} className="overflow-hidden rounded-2xl border border-zinc-200 bg-white transition hover:shadow-md">
           <div className="flex flex-wrap items-center gap-4 p-4">
+            {s.polyline && (
+              <div className="w-full sm:w-[200px] sm:shrink-0">
+                <SegmentMapLazy polyline={s.polyline} height={120} />
+              </div>
+            )}
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <h2 className="truncate font-bold text-zinc-900">{s.name}</h2>
@@ -52,7 +59,9 @@ export function SegmentList({ segments }: { segments: SegmentVue[] }) {
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-500">
                 <span>{(s.distance_m / 1000).toFixed(2).replace(".", ",")} km</span>
-                {s.elevation_gain_m > 0 && <span>{s.elevation_gain_m} m D+</span>}
+                {s.elevation_gain_m > 0
+                  ? <span className="inline-flex items-center gap-1"><TrendingUp className="h-3 w-3" />{s.elevation_gain_m} m D+{s.avg_grade_pct ? ` · ${String(s.avg_grade_pct).replace(".", ",")} %` : ""}</span>
+                  : <span>plat</span>}
                 <span className="inline-flex items-center gap-1"><Repeat className="h-3 w-3" /> {s.passages} passages</span>
                 <span className="inline-flex items-center gap-1"><Users className="h-3 w-3" /> {s.coureurs} coureur{s.coureurs > 1 ? "s" : ""}</span>
               </div>
