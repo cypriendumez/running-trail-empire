@@ -1380,6 +1380,26 @@ test("l'échelle de chaleur reste lisible quand un trajet écrase les autres", (
   assert.ok(intensity(1, 200) < 0.1, "un passage unique reste discret");
   assert.equal(intensity(5, 1), 1, "sans écart de fréquentation, tout est à pleine intensité");
 });
+test("le survol 3D reste GRATUIT — aucun verrou d'abonnement", () => {
+  // Décision produit du 13/08/2026 : chez Strava le survol est réservé aux abonnés
+  // (c'est l'écran de la vidéo de référence). Sur Pacevo il est ouvert à tous, et
+  // c'est la différence revendiquée. Un test le fige, sinon un futur écran de paywall
+  // pourrait l'enfermer par simple cohérence apparente avec le reste.
+  for (const f of ["src/components/segments/Flyover.tsx", "src/app/dashboard/survol/page.tsx"]) {
+    const code = codeOf(f);
+    assert.ok(!/subscription_tier|isPro|premium|paywall|checkout/i.test(code),
+      `${f} introduit un verrou d'abonnement sur le survol 3D`);
+  }
+});
+test("le survol n'affiche pas d'altitude qu'il ne connaît pas", () => {
+  // L'altitude n'est passée que si TOUS les points en portent une : un zéro affiché
+  // en gros au-dessus d'une trace sans altimétrie passerait pour une mesure.
+  const code = codeOf("src/app/dashboard/survol/page.tsx");
+  assert.ok(/every\(\(p\) => p\.length >= 4\)/.test(code),
+    "l'altitude ne doit partir que si la trace en porte réellement");
+  const vue = codeOf("src/components/segments/Flyover.tsx");
+  assert.ok(/altAct != null &&/.test(vue), "le bandeau doit taire l'altitude inconnue");
+});
 test("quelques sorties lointaines ne font PAS ouvrir la carte sur l'Europe", () => {
   // Mesuré sur l'historique réel : 72 % des passages dans 5 km, mais 19 % à plus de
   // 200 km (courses, vacances). Cadrer sur le tout donnait une fenêtre de 987 × 1 756 km

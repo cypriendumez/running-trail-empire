@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, MapPin, Mountain, Heart, ShoppingBag,
   User, Trophy, Settings, LogOut, ChevronLeft,
-  Ghost, Watch, GraduationCap, CalendarDays, MessagesSquare, Newspaper, Crown, Medal, Route, Flame,
+  Ghost, Watch, GraduationCap, CalendarDays, MessagesSquare, Newspaper, Crown, Medal, Route, Flame, Orbit,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -46,6 +46,7 @@ const groups: { titleKey: string | null; items: { href: string; icon: typeof Lay
       { href: "/dashboard/trophees", icon: Trophy, tk: "nav.trophies" },
       { href: "/dashboard/segments", icon: Route, tk: "nav.segments" },
       { href: "/dashboard/heatmap", icon: Flame, tk: "nav.heatmap" },
+      { href: "/dashboard/survol", icon: Orbit, tk: "nav.flyover" },
       { href: "/dashboard/leagues", icon: Medal, tk: "nav.leagues" },
       { href: "/dashboard/shop", icon: ShoppingBag, tk: "nav.shop" },
     ],
