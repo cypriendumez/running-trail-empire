@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { PerfTabs } from "@/components/segments/PerfTabs";
 import { heatCells, topCells, denseBounds } from "@/lib/segments/heatmap";
 import type { TrackPoint } from "@/lib/segments/geo";
 import { HeatmapLazy } from "@/components/segments/HeatmapLazy";
@@ -42,6 +43,7 @@ export default async function HeatmapPage() {
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-8">
+      <PerfTabs />
       <header className="mb-5">
         <h1 className="text-3xl font-black tracking-tight text-zinc-900">Carte de chaleur</h1>
         <p className="mt-1 text-sm text-zinc-500">

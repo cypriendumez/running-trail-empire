@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, MapPin, Mountain, Heart, ShoppingBag,
   User, Trophy, Settings, LogOut, ChevronLeft,
-  Ghost, Watch, GraduationCap, CalendarDays, MessagesSquare, Newspaper, Crown, Medal, Route, Flame, Orbit,
+  Ghost, Watch, GraduationCap, CalendarDays, MessagesSquare, Newspaper, Crown, Medal,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -43,10 +43,11 @@ const groups: { titleKey: string | null; items: { href: string; icon: typeof Lay
     titleKey: "group.club",
     items: [
       { href: "/dashboard/communaute", icon: Newspaper, tk: "nav.community" },
-      { href: "/dashboard/trophees", icon: Trophy, tk: "nav.trophies" },
-      { href: "/dashboard/segments", icon: Route, tk: "nav.segments" },
-      { href: "/dashboard/heatmap", icon: Flame, tk: "nav.heatmap" },
-      { href: "/dashboard/survol", icon: Orbit, tk: "nav.flyover" },
+      // Vitrine, Segments, Carte de chaleur et Survol 3D partagent UNE entrée : ce
+      // sont quatre lectures du même sujet — ce que l'athlète a parcouru. Ils se
+      // choisissent par la rangée d'onglets en haut de page (comme l'onglet Santé),
+      // au lieu d'occuper quatre lignes de menu.
+      { href: "/dashboard/trophees", icon: Trophy, tk: "nav.performances" },
       { href: "/dashboard/leagues", icon: Medal, tk: "nav.leagues" },
       { href: "/dashboard/shop", icon: ShoppingBag, tk: "nav.shop" },
     ],

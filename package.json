@@ -11,7 +11,8 @@
     "db:push": "supabase db push",
     "db:types": "supabase gen types typescript --linked > src/types/supabase.ts",
     "test": "npx --yes tsx tests/coach.test.ts && npx --yes tsx tests/scenarios.test.ts && npx --yes tsx tests/crash.test.ts && npx --yes tsx tests/support.crash.test.ts",
-    "verify": "npx tsc --noEmit && npm test"
+    "verify": "npx tsc --noEmit && npm test",
+    "sync:maplibre": "cp node_modules/maplibre-gl/dist/maplibre-gl-csp-worker.js public/maplibre-gl-csp-worker.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -38,7 +39,7 @@
     "leaflet": "^1.9.4",
     "lucide-react": "^0.447.0",
     "mapbox-gl": "^3.6.0",
-    "maplibre-gl": "^6.3.0",
+    "maplibre-gl": "^5.24.0",
     "next": "^16.2.4",
     "next-intl": "^4.9.1",
     "next-themes": "^0.4.0",

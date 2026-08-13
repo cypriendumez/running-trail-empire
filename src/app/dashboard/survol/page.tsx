@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { PerfTabs } from "@/components/segments/PerfTabs";
 import { encodePolyline, type TrackPoint } from "@/lib/segments/geo";
 import { paceOf } from "@/lib/social/feed";
 import { SurvolChoix } from "@/components/segments/SurvolChoix";
@@ -81,6 +82,7 @@ export default async function SurvolPage({ searchParams }: { searchParams: Promi
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-8">
+      <PerfTabs />
       <header className="mb-5">
         <h1 className="text-3xl font-black tracking-tight text-zinc-900">Survol 3D</h1>
         <p className="mt-1 text-sm text-zinc-500">

@@ -12,12 +12,29 @@
 //  test d'abonnement dans ce fichier, et il ne doit pas y en avoir.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from "react";
-import { Map as MapLibreMap, type LngLatBoundsLike } from "maplibre-gl";
+import { Map as MapLibreMap, setWorkerUrl, type LngLatBoundsLike } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Play, Pause, RotateCcw, Loader2 } from "lucide-react";
 import { decodePolyline } from "@/lib/segments/geo";
 
 const MAPTILER = process.env.NEXT_PUBLIC_MAPTILER_KEY || "";
+
+/**
+ * ⚠️ WORKER AUTO-HÉBERGÉ — sans ça, la carte reste NOIRE, en silence.
+ *
+ * MapLibre délègue le chargement et le décodage des tuiles à un Web Worker. Sous
+ * Turbopack, le module du worker n'est pas servi correctement : le navigateur reçoit
+ * du HTML à la place du script (« non-JavaScript MIME type text/html »). Le style se
+ * parse quand même — d'où l'illusion que tout va bien — mais AUCUNE source ne finit
+ * de charger : `isStyleLoaded()` reste faux, l'événement `load` ne part jamais, et
+ * pas une seule tuile n'est demandée. Diagnostic obtenu en créant une carte minimale
+ * dans la même page : elle échouait pareil, ce qui a écarté ma configuration.
+ *
+ * On sert donc le worker fourni par le paquet depuis /public. Le fichier est copié
+ * par `npm run sync:maplibre` — À RELANCER après toute mise à jour de maplibre-gl,
+ * un worker d'une autre version que la bibliothèque ne fonctionnerait pas.
+ */
+if (typeof window !== "undefined") setWorkerUrl("/maplibre-gl-csp-worker.js");
 
 export type FlyoverStats = { title: string; distanceKm: number | null; paceLabel: string | null };
 
@@ -62,7 +79,17 @@ export function Flyover({ polyline, altitudes, stats }: {
 
     map.on("error", (e: { error?: { message?: string } }) => setErreur(e?.error?.message ?? "La carte n'a pas pu se charger."));
 
+    // Un spinner éternel est le pire état possible : l'athlète attend une carte qui
+    // ne viendra pas, sans jamais savoir pourquoi. Au bout de 15 s sans événement
+    // `load`, on l'annonce franchement.
+    const minuteur = setTimeout(() => {
+      if (!carte.current?.isStyleLoaded()) {
+        setErreur("La carte 3D n'a pas réussi à se charger dans ce navigateur. Les cartes 2D (Segments, Carte de chaleur) fonctionnent normalement.");
+      }
+    }, 15000);
+
     map.on("load", () => {
+      clearTimeout(minuteur);
       // ── RELIEF ────────────────────────────────────────────────────────────
       map.addSource("relief", {
         type: "raster-dem",
@@ -72,7 +99,8 @@ export function Flyover({ polyline, altitudes, stats }: {
       // Exagération 1,5 : à l'échelle 1, une région plate comme les Flandres paraît
       // strictement plate en 3D et le survol perd tout intérêt. Au-delà de 2, une
       // colline devient une falaise — on montrerait un relief qui n'existe pas.
-      map.setTerrain({ source: "relief", exaggeration: 1.5 });
+      try { map.setTerrain({ source: "relief", exaggeration: 1.5 }); }
+      catch { /* sans relief, le survol reste utile en 2,5D */ }
 
       map.addSource("trace", {
         type: "geojson",
@@ -96,6 +124,7 @@ export function Flyover({ polyline, altitudes, stats }: {
     });
 
     return () => {
+      clearTimeout(minuteur);
       if (anim.current) cancelAnimationFrame(anim.current);
       map.remove();
       carte.current = null;
@@ -163,7 +192,13 @@ export function Flyover({ polyline, altitudes, stats }: {
 
   return (
     <div className="relative overflow-hidden rounded-2xl bg-zinc-900" style={{ height: 520 }}>
-      <div ref={conteneur} className="absolute inset-0" />
+      {/* ⚠️ DIMENSIONS EN STYLE EN LIGNE, PAS EN CLASSES. `maplibre-gl.css` impose
+          `position: relative` sur `.maplibregl-map` ; à spécificité égale et chargée
+          après Tailwind, elle écrasait le `absolute` de `absolute inset-0`. Le
+          conteneur retombait alors à 0 pixel de haut — et une carte sans hauteur ne
+          demande AUCUNE tuile : écran noir, `load` qui n'aboutit jamais, spinner
+          éternel. Symptôme muet : aucune erreur, ni console, ni réseau. */}
+      <div ref={conteneur} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
 
       {!pret && (
         <div className="absolute inset-0 flex items-center justify-center bg-zinc-900/80">

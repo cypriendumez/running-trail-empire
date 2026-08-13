@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { PerfTabs } from "@/components/segments/PerfTabs";
 import { leaderboard, maitreDuSegment, type StoredEffort } from "@/lib/segments/match";
 import { SegmentList, type SegmentVue } from "@/components/segments/SegmentList";
 
@@ -67,6 +68,7 @@ export default async function SegmentsPage() {
 
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-8">
+      <PerfTabs />
       <header className="mb-6">
         <h1 className="text-3xl font-black tracking-tight text-zinc-900">Segments</h1>
         <p className="mt-1 text-sm text-zinc-500">

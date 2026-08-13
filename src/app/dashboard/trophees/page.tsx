@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { PerfTabs } from "@/components/segments/PerfTabs";
 import { computeTrophies } from "@/lib/trophies/compute";
 import { TrophyWall } from "@/components/trophies/TrophyWall";
 
@@ -30,6 +31,7 @@ export default async function TropheesPage() {
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-8">
+      <PerfTabs />
       <header className="mb-8">
         <h1 className="text-3xl font-black tracking-tight text-zinc-900">Vitrine</h1>
         <p className="mt-1 text-sm text-zinc-500">
