@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, MapPin, Mountain, Heart, ShoppingBag,
   User, Trophy, Settings, LogOut, ChevronLeft,
-  Ghost, Watch, GraduationCap, CalendarDays, MessagesSquare, Newspaper, Crown,
+  Ghost, Watch, GraduationCap, CalendarDays, MessagesSquare, Newspaper, Crown, Medal, Route,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -43,7 +43,9 @@ const groups: { titleKey: string | null; items: { href: string; icon: typeof Lay
     titleKey: "group.club",
     items: [
       { href: "/dashboard/communaute", icon: Newspaper, tk: "nav.community" },
-      { href: "/dashboard/leagues", icon: Trophy, tk: "nav.leagues" },
+      { href: "/dashboard/trophees", icon: Trophy, tk: "nav.trophies" },
+      { href: "/dashboard/segments", icon: Route, tk: "nav.segments" },
+      { href: "/dashboard/leagues", icon: Medal, tk: "nav.leagues" },
       { href: "/dashboard/shop", icon: ShoppingBag, tk: "nav.shop" },
     ],
   },

@@ -36,6 +36,17 @@ import {
   nextQuotaResetUtc, markExhausted, isExpired, selectModels, isDailyQuotaError, PROBE_INTERVAL_MS,
 } from "../src/lib/ai/quotaMemory";
 import { generateContent, __resetQuotaMemory, __quotaMemory, __setQuotaMark } from "../src/lib/ai/gemini";
+import {
+  canSee, cleanBody, isPublishable, statLine, paceOf, suggestable, timeAgo, kudosLabel,
+  type Post as SocialPost,
+} from "../src/lib/social/feed";
+import {
+  computeTrophies, chronoRecords, longestStreak, type TrophyWorkout as TW,
+} from "../src/lib/trophies/compute";
+import {
+  haversine, simplify, encodePolyline, decodePolyline, bboxOverlap, type TrackPoint as TP,
+} from "../src/lib/segments/geo";
+import { findEfforts, leaderboard, maitreDuSegment } from "../src/lib/segments/match";
 
 let passed = 0;
 const fails: string[] = [];
@@ -1293,6 +1304,275 @@ test("deux appareils simultanés ne cassent pas le cache définitivement", () =>
   const read = code.slice(code.indexOf(`eq("type", SESSION_CACHE_TYPE)`));
   assert.ok(/limit\(1\)/.test(read.slice(0, 200)) && !/maybeSingle/.test(read.slice(0, 200)),
     "maybeSingle() échouerait DÉFINITIVEMENT si deux onglets ont inséré deux lignes");
+});
+
+console.log("\nSEGMENTS — un chrono attribué à tort est pire qu'aucun chrono");
+// Cette brique ne plante jamais : elle se trompe en silence, et le mensonge s'affiche
+// dans un classement public où d'autres se comparent.
+
+test("la distance géodésique colle à des repères RÉELS", () => {
+  // Paris (Notre-Dame) → Lyon (Bellecour) : 391 km à vol d'oiseau, valeur connue.
+  const parisLyon = haversine(48.8530, 2.3499, 45.7578, 4.8320) / 1000;
+  assert.ok(Math.abs(parisLyon - 391) < 6, `attendu ~391 km, obtenu ${parisLyon.toFixed(1)} km`);
+  // Un degré de latitude vaut ~111,2 km partout sur le globe.
+  assert.ok(Math.abs(haversine(45, 5, 46, 5) / 1000 - 111.2) < 0.5);
+  assert.equal(haversine(48.85, 2.35, 48.85, 2.35), 0, "un point avec lui-même : zéro");
+});
+test("l'encodage polyline survit à l'aller-retour", () => {
+  const pts = [{ lat: 48.8566, lon: 2.3522 }, { lat: 48.8570, lon: 2.3530 }, { lat: 48.8580, lon: 2.3510 }];
+  const back = decodePolyline(encodePolyline(pts));
+  assert.equal(back.length, pts.length);
+  for (let i = 0; i < pts.length; i++) {
+    assert.ok(Math.abs(back[i].lat - pts[i].lat) < 1e-5, "la latitude doit survivre au décodage");
+    assert.ok(Math.abs(back[i].lon - pts[i].lon) < 1e-5);
+  }
+  assert.equal(decodePolyline(encodePolyline([])).length, 0);
+});
+test("la simplification garde TOUJOURS le dernier point", () => {
+  // Perdre le point final déplacerait l'arrivée du segment, donc fausserait le chrono.
+  const droite: TP[] = Array.from({ length: 200 }, (_, i) => ({ lat: 48.85 + i * 0.00002, lon: 2.35, t: i }));
+  const light = simplify(droite, 10);
+  assert.ok(light.length < droite.length, "une ligne droite doit se compresser");
+  assert.deepEqual(light[light.length - 1], droite[droite.length - 1]);
+  assert.deepEqual(light[0], droite[0]);
+  assert.deepEqual(simplify([droite[0]], 10), [droite[0]], "une trace d'un point reste intacte");
+});
+test("le préfiltre par zone écarte ce qui est loin, garde ce qui est proche", () => {
+  const paris = { minLat: 48.85, maxLat: 48.86, minLon: 2.35, maxLon: 2.36 };
+  const lyon = { minLat: 45.75, maxLat: 45.76, minLon: 4.83, maxLon: 4.84 };
+  assert.equal(bboxOverlap(paris, lyon), false, "Paris et Lyon ne partagent aucun segment");
+  assert.equal(bboxOverlap(paris, { ...paris, minLat: 48.8505 }), true);
+});
+
+// Un segment droit de ~500 m, et une trace qui le parcourt à vitesse constante.
+const SEG = { id: "s1", distance_m: 556, start_lat: 48.8500, start_lon: 2.3500, end_lat: 48.8550, end_lon: 2.3500 };
+const traceDroite = (secParPoint = 3): TP[] =>
+  Array.from({ length: 51 }, (_, i) => ({ lat: 48.8500 + i * 0.0001, lon: 2.35, t: i * secParPoint }));
+
+test("un passage réel produit un chrono juste", () => {
+  const efforts = findEfforts(traceDroite(3), SEG);
+  assert.equal(efforts.length, 1);
+  assert.equal(efforts[0].elapsed_seconds, 150, "51 points espacés de 3 s = 150 s du premier au dernier");
+  assert.ok(Math.abs(efforts[0].covered_m - SEG.distance_m) < 30);
+});
+test("passer PRÈS du départ et de l'arrivée ne suffit pas", () => {
+  // LE faux positif à empêcher : entrer dans le portique, filer ailleurs, revenir
+  // près de l'arrivée. La distance parcourue trahit le détour.
+  const detour: TP[] = [
+    { lat: 48.8500, lon: 2.3500, t: 0 },      // au départ
+    { lat: 48.8600, lon: 2.3800, t: 300 },    // très loin
+    { lat: 48.8550, lon: 2.3500, t: 600 },    // à l'arrivée
+  ];
+  assert.deepEqual(findEfforts(detour, SEG), [], "un itinéraire différent ne mérite aucun chrono");
+});
+test("une trace sans horodatage exploitable ne produit AUCUN chrono", () => {
+  // Mieux vaut pas d'effort qu'un effort inventé à partir d'un temps nul.
+  const figee = traceDroite(0).map((p) => ({ ...p, t: 0 }));
+  assert.deepEqual(findEfforts(figee, SEG), []);
+});
+test("une boucle parcourue deux fois donne DEUX efforts, jamais un chrono négatif", () => {
+  const aller = traceDroite(3);
+  const retour = aller.map((p, i) => ({ ...p, t: 200 + i * 3 }));
+  const efforts = findEfforts([...aller, ...retour], SEG);
+  assert.equal(efforts.length, 2, "chaque passage doit compter");
+  for (const e of efforts) assert.ok(e.elapsed_seconds > 0, "un chrono négatif signale une sortie cherchée avant l'entrée");
+});
+test("le classement retient le MEILLEUR temps de chacun, pas tous ses passages", () => {
+  // Sinon celui qui court le segment tous les jours occupe les dix premières places.
+  const efforts = [
+    { user_id: "a", elapsed_seconds: 200, started_at: "2026-08-01T10:00:00Z" },
+    { user_id: "a", elapsed_seconds: 180, started_at: "2026-08-05T10:00:00Z" },
+    { user_id: "b", elapsed_seconds: 190, started_at: "2026-08-03T10:00:00Z" },
+  ];
+  const l = leaderboard(efforts);
+  assert.deepEqual(l.map((e) => e.user_id), ["a", "b"]);
+  assert.equal(l[0].elapsed_seconds, 180);
+  assert.equal(l.filter((e) => e.user_id === "a").length, 1, "un athlète n'apparaît qu'une fois");
+});
+test("le Maître du segment récompense la RÉGULARITÉ, pas la vitesse", () => {
+  const now = new Date("2026-08-13T12:00:00Z");
+  const efforts = [
+    // « b » est plus lent mais y va bien plus souvent : c'est lui le maître.
+    ...Array.from({ length: 5 }, (_, i) => ({ user_id: "b", elapsed_seconds: 300, started_at: `2026-08-0${i + 1}T10:00:00Z` })),
+    { user_id: "a", elapsed_seconds: 120, started_at: "2026-08-02T10:00:00Z" },
+    { user_id: "a", elapsed_seconds: 121, started_at: "2026-08-04T10:00:00Z" },
+  ];
+  const m = maitreDuSegment(efforts, now);
+  assert.deepEqual(m?.userIds, ["b"]);
+  assert.equal(m?.count, 5);
+});
+test("hors des 90 jours, les passages ne comptent plus", () => {
+  const now = new Date("2026-08-13T12:00:00Z");
+  const vieux = Array.from({ length: 9 }, (_, i) => ({ user_id: "a", elapsed_seconds: 300, started_at: `2026-01-0${i + 1}T10:00:00Z` }));
+  assert.equal(maitreDuSegment(vieux, now), null, "un titre ne se garde pas sur des passages de janvier");
+});
+test("une égalité ne désigne PAS un vainqueur inventé", () => {
+  const now = new Date("2026-08-13T12:00:00Z");
+  const efforts = ["a", "b"].flatMap((u) =>
+    [1, 2].map((d) => ({ user_id: u, elapsed_seconds: u === "a" ? 100 : 300, started_at: `2026-08-0${d}T10:00:00Z` })));
+  const m = maitreDuSegment(efforts, now);
+  assert.deepEqual(m?.userIds.sort(), ["a", "b"], "départager par le chrono serait inventer un critère");
+});
+test("un seul passage ne fait pas un maître", () => {
+  const now = new Date("2026-08-13T12:00:00Z");
+  assert.equal(maitreDuSegment([{ user_id: "a", elapsed_seconds: 100, started_at: "2026-08-10T10:00:00Z" }], now), null);
+});
+test("l'import de traces ne renvoie JAMAIS la clé intervals.icu", () => {
+  const code = codeOf("src/app/api/tracks/import/route.ts");
+  const reponses = [...code.matchAll(/NextResponse\.json\(([\s\S]{0,300}?)\)/g)].map((m) => m[1]);
+  assert.ok(reponses.length > 0);
+  for (const r of reponses) assert.ok(!/apiKey|intervals_api_key/.test(r), `une réponse expose la clé : ${r.slice(0, 60)}`);
+});
+
+console.log("\nTROPHÉES — aucun trophée sans preuve");
+// Le risque d'une vitrine, ce n'est pas de planter : c'est de décerner. Un mur de
+// médailles offertes ne récompense plus rien et ment sur le niveau de l'athlète.
+const W = (o: Partial<TW>): TW => ({ date: "2026-03-08", sport: "Run", ...o }) as TW;
+
+test("un compte vide ne reçoit AUCUN trophée", () => {
+  assert.deepEqual(computeTrophies([]), []);
+  assert.deepEqual(computeTrophies([W({ distance_km: 0, duration_seconds: 0 })]).filter(t => t.kind !== "palier"), []);
+});
+test("les sports qui ne sont pas de la course ne décernent rien", () => {
+  // 200 km de vélo ne font pas un coureur de 200 km.
+  assert.deepEqual(computeTrophies([W({ sport: "Ride", distance_km: 200, duration_seconds: 25000 })]), []);
+  assert.deepEqual(computeTrophies([W({ sport: "Swim", distance_km: 5, duration_seconds: 6000 })]), []);
+});
+test("un chrono de référence exige la distance RÉELLE, pas une approchante", () => {
+  // Le défaut à éviter : faire passer un 9,2 km pour un record sur 10 km. Sans les
+  // découpes kilométriques (elles vivent dans les flux GPS non importés), on ne peut
+  // pas connaître le temps de passage au 10ᵉ km d'une sortie plus longue.
+  assert.deepEqual(chronoRecords([W({ distance_km: 9.2, duration_seconds: 2400 })]), [], "9,2 km n'est pas un 10 km");
+  assert.deepEqual(chronoRecords([W({ distance_km: 14, duration_seconds: 3600 })]), [], "14 km non plus : +40 % hors tolérance");
+  const ok = chronoRecords([W({ distance_km: 10.1, duration_seconds: 2038 })]);
+  assert.equal(ok.length, 1);
+  assert.equal(ok[0].label, "10 km");
+  assert.equal(ok[0].value, "33 min 58", "chrono réel relevé sur les 314 séances");
+  assert.ok(/10,1 km/.test(ok[0].detail ?? ""), "la distance réelle doit être AFFICHÉE, pas masquée");
+});
+test("seul le palier le plus haut s'affiche, pas l'escalier", () => {
+  const runs = Array.from({ length: 120 }, (_, i) => W({ date: `2026-0${(i % 9) + 1}-01`, distance_km: 20 }));
+  const paliers = computeTrophies(runs).filter((t) => t.id.startsWith("palier-km-"));
+  assert.equal(paliers.length, 1, "2 400 km ne doivent pas produire 4 médailles empilées");
+  assert.equal(paliers[0].id, "palier-km-1000");
+});
+test("un palier n'est jamais décerné par anticipation", () => {
+  const presque = computeTrophies([W({ distance_km: 99 })]).filter((t) => t.id.startsWith("palier-km-"));
+  assert.deepEqual(presque, [], "99 km ne valent pas le palier des 100 km");
+});
+test("la série se compte en SEMAINES, jamais en jours", () => {
+  // Une série quotidienne pousse à courir blessé : un coach ne récompense pas ça.
+  const troisSemaines = ["2026-01-05", "2026-01-13", "2026-01-19"].map((d) => W({ date: d, distance_km: 10 }));
+  const s = longestStreak(troisSemaines);
+  assert.equal(s?.value, "3 semaines");
+  assert.equal(longestStreak([W({ distance_km: 10 })]), null, "une semaine isolée n'est pas une série");
+  const trouee = ["2026-01-05", "2026-02-16"].map((d) => W({ date: d, distance_km: 10 }));
+  assert.equal(longestStreak(trouee), null, "deux semaines non consécutives ne font pas une série");
+});
+test("les trophées ne sont écrits dans AUCUNE table", () => {
+  // Persister une conclusion, c'est risquer qu'elle survive à la séance qui l'a
+  // produite : une vitrine qui affiche une performance effacée.
+  const code = codeOf("src/lib/trophies/compute.ts") + codeOf("src/app/dashboard/trophees/page.tsx");
+  assert.ok(!/\.insert\(|\.upsert\(|\.update\(/.test(code), "les trophées doivent rester calculés à la lecture");
+});
+
+console.log("\nSOCIAL — qui voit quoi, et rien d'inventé sur les cartes");
+const P = (over: Partial<SocialPost> = {}): SocialPost =>
+  ({ id: "p1", user_id: "alice", visibility: "followers", created_at: "2026-08-13T10:00:00Z", ...over });
+
+test("« privé » ne souffre AUCUNE exception", () => {
+  // Même un abonné accepté ne doit pas voir une publication privée : c'est le seul
+  // réglage qui doit être absolu, sinon il ne veut rien dire.
+  assert.equal(canSee(P({ visibility: "private" }), "bob", new Set(["alice"])), false);
+  assert.equal(canSee(P({ visibility: "private" }), "alice", new Set()), true, "son auteur la voit toujours");
+});
+test("« mes abonnés » exige un abonnement RÉEL, pas un drapeau porté par la publication", () => {
+  // La relation fait foi et peut avoir été rompue APRÈS la publication.
+  assert.equal(canSee(P(), "bob", new Set(["alice"])), true);
+  assert.equal(canSee(P(), "bob", new Set()), false, "ne plus suivre doit refermer l'accès");
+  assert.equal(canSee(P({ visibility: "public" }), "bob", new Set()), true);
+  assert.equal(canSee(P({ visibility: "public" }), null, new Set()), true);
+});
+test("un texte fait d'espaces ne crée pas de publication fantôme", () => {
+  assert.equal(cleanBody("   \n\n  "), null);
+  assert.equal(cleanBody("  "), null, "les espaces insécables aussi");
+  assert.equal(cleanBody("  Belle sortie  "), "Belle sortie");
+  assert.equal(cleanBody("x".repeat(2000))?.length, 1000, "le texte doit rester borné");
+  assert.equal(cleanBody(42), null, "une valeur non textuelle n'est pas un texte");
+});
+test("publier exige un contenu : un texte OU une séance", () => {
+  assert.equal(isPublishable(null, null), false);
+  assert.equal(isPublishable("Sortie tranquille", null), true);
+  assert.equal(isPublishable(null, "w1"), true);
+});
+test("la carte n'affiche QUE les chiffres qui existent", () => {
+  // Le défaut à éviter : une séance sans distance affichée « 0,0 km », qui ment sur
+  // la sortie de quelqu'un devant ses abonnés.
+  assert.deepEqual(statLine({}), []);
+  assert.deepEqual(statLine({ distance_km: 0, duration_seconds: 0 }), [], "zéro n'est pas une mesure");
+  // Chiffres repris de la vidéo Strava : 11,8 km à 4:34/km. Si notre calcul retombe
+  // dessus, c'est qu'il est juste sur un cas réel et non sur un cas inventé.
+  const s = statLine({ distance_km: 11.8, duration_seconds: 3234 });
+  assert.equal(s[0].value, "11,8 km");
+  assert.equal(s[1].value, "54 min", "3 234 s = 53 min 54 s, arrondi à 54");
+  assert.equal(s[2].value, "4'34\"/km");
+});
+test("l'allure n'est calculée que si elle a un sens", () => {
+  assert.equal(paceOf(3600, 0), null, "aucune distance = aucune allure");
+  assert.equal(paceOf(null, 10), null);
+  assert.equal(paceOf(3600, 0.5), null, "2 h/km : donnée aberrante, on ne l'affiche pas");
+  assert.equal(paceOf(600, 2), "5'00\"");
+  assert.equal(paceOf(359.4, 1), "5'59\"");
+  assert.equal(paceOf(359.6, 1), "6'00\"", "59,6 s ne doit pas s'afficher 5'60\"");
+});
+test("les suggestions ne proposent jamais quelqu'un de déjà suivi", () => {
+  // Sinon le bouton « Suivre » semble cassé : on clique, rien ne change à l'écran.
+  const out = suggestable([{ id: "moi" }, { id: "alice" }, { id: "bob" }], "moi", new Set(["alice"]));
+  assert.deepEqual(out.map((a) => a.id), ["bob"]);
+});
+test("les temps relatifs basculent sur une date au-delà d'une semaine", () => {
+  const now = new Date("2026-08-13T12:00:00Z");
+  assert.equal(timeAgo("2026-08-13T11:59:30Z", now), "à l'instant");
+  assert.equal(timeAgo("2026-08-13T11:30:00Z", now), "il y a 30 min");
+  assert.equal(timeAgo("2026-08-13T06:00:00Z", now), "il y a 6 h");
+  assert.equal(timeAgo("2026-08-10T12:00:00Z", now), "il y a 3 j");
+  assert.ok(!/il y a/.test(timeAgo("2025-09-01T12:00:00Z", now)), "« il y a 346 j » n'apprend rien");
+  assert.equal(timeAgo("pas-une-date", now), "");
+});
+test("les compteurs sociaux ne sont JAMAIS écrits par les routes", () => {
+  // Ils sont tenus par trigger (migration 019). Une route qui oublie de décrémenter
+  // laisse un compteur faux à l'écran pour toujours.
+  for (const f of ["interact", "post", "feed", "follow"]) {
+    const code = codeOf(`src/app/api/social/${f}/route.ts`);
+    // On vise l'ÉCRITURE (`kudos_count: …` dans un objet), pas la lecture : le fil
+    // sélectionne légitimement ces colonnes pour les afficher. Un motif plus large
+    // aurait interdit de les lire, ce qui n'a aucun sens.
+    assert.ok(!/(kudos_count|comments_count)\s*:/.test(code),
+      `src/app/api/social/${f}/route.ts écrit un compteur que le trigger tient déjà`);
+  }
+});
+test("aucune route sociale ne renvoie un profil en select(*)", () => {
+  // Une colonne sensible ajoutée demain au profil (clé intervals.icu, e-mail,
+  // identifiants Stripe) se retrouverait exposée sans que personne ne le voie.
+  for (const f of ["interact", "post", "feed", "follow"]) {
+    const code = codeOf(`src/app/api/social/${f}/route.ts`);
+    assert.ok(!/from\("profiles"\)\s*\.\s*select\("\*"\)/.test(code), `${f} expose tout le profil`);
+    assert.ok(!/intervals_api_key/.test(code), `${f} manipule la clé intervals.icu`);
+  }
+});
+test("la publication par défaut n'est PAS publique", () => {
+  // Une séance porte une trace GPS qui part du domicile : le défaut doit protéger.
+  const code = codeOf("src/app/api/social/post/route.ts");
+  assert.ok(/:\s*"followers"/.test(code), "le repli de visibilité doit être « followers »");
+  const ui = codeOf("src/components/social/SocialHub.tsx");
+  assert.ok(/useState<[^>]*>\("followers"\)/.test(ui), "le compositeur doit s'ouvrir sur « Mes abonnés »");
+});
+test("publier la séance d'autrui est impossible", () => {
+  const code = codeOf("src/app/api/social/post/route.ts");
+  // La vérification d'appartenance doit précéder l'insertion, sinon elle ne protège rien.
+  const iCheck = code.indexOf('eq("user_id", user.id)');
+  const iInsert = code.indexOf('.insert(');
+  assert.ok(iCheck > 0 && iCheck < iInsert, "la séance doit être vérifiée AVANT la publication");
 });
 
 console.log("\nQUOTA ÉPUISÉ — mémorisé jusqu'à minuit AU PACIFIQUE, pas à minuit UTC");
