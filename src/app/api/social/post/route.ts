@@ -4,6 +4,26 @@ import { createClient } from "@/lib/supabase/server";
 import { cleanBody, isPublishable, MAX_BODY, type Visibility } from "@/lib/social/feed";
 
 const VISIBILITIES: Visibility[] = ["public", "followers", "private"];
+const MAX_PHOTOS = 4;
+
+/**
+ * N'accepte que des URL issues de NOTRE stockage Supabase.
+ *
+ * Sans ce filtre, le champ serait une porte ouverte : n'importe quelle URL passée
+ * dans le corps de la requête s'afficherait dans le fil sous le nom de l'auteur —
+ * image d'un autre site, pixel espion mesurant qui lit la publication, ou contenu
+ * changé après coup par un tiers. On ne rend que ce qu'on héberge.
+ */
+function cleanPhotoUrls(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const prefixe = base ? `${base.replace(/\/$/, "")}/storage/v1/object/public/` : null;
+  return input
+    .filter((u): u is string => typeof u === "string")
+    .map((u) => u.trim())
+    .filter((u) => !!prefixe && u.startsWith(prefixe))
+    .slice(0, MAX_PHOTOS);
+}
 
 /** POST { workoutId?, body?, visibility? } → publie une séance ou un billet. */
 export async function POST(req: Request) {
@@ -18,8 +38,10 @@ export async function POST(req: Request) {
     ? raw.visibility as Visibility
     : "followers"; // défaut prudent : une trace GPS part du domicile
 
-  if (!isPublishable(body, workoutId)) {
-    return NextResponse.json({ error: "Écris quelque chose ou choisis une séance" }, { status: 400 });
+  const photoUrls = cleanPhotoUrls(raw.photoUrls);
+
+  if (!isPublishable(body, workoutId) && photoUrls.length === 0) {
+    return NextResponse.json({ error: "Écris quelque chose, ajoute une photo ou choisis une séance" }, { status: 400 });
   }
 
   if (workoutId) {
@@ -32,7 +54,7 @@ export async function POST(req: Request) {
   }
 
   const { data, error } = await sb.from("activity_posts")
-    .insert({ user_id: user.id, workout_id: workoutId, body, visibility })
+    .insert({ user_id: user.id, workout_id: workoutId, body, visibility, photo_urls: photoUrls })
     .select("id").single();
 
   if (error) {

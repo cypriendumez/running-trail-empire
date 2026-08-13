@@ -12,7 +12,7 @@
 //  mentirait sur la sortie de quelqu'un.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from "react";
-import { Heart, MessageCircle, Search, UserPlus, UserCheck, Trash2, Send, Users, Sparkles } from "lucide-react";
+import { Heart, MessageCircle, Search, UserPlus, UserCheck, Trash2, Send, Users, Sparkles, ImagePlus, X, Loader2 } from "lucide-react";
 import { timeAgo, statLine, likesLabel } from "@/lib/social/feed";
 
 type Author = { id: string; full_name?: string | null; avatar_url?: string | null };
@@ -21,7 +21,7 @@ type Workout = {
   distance_km?: number | null; duration_seconds?: number | null; elevation_gain_m?: number | null;
 };
 type Post = {
-  id: string; user_id: string; body?: string | null; created_at: string;
+  id: string; user_id: string; body?: string | null; created_at: string; photo_urls?: string[] | null;
   kudos_count: number; comments_count: number; kudoed: boolean; mine: boolean;
   author?: Author | null; workout?: Workout | null;
 };
@@ -135,6 +135,8 @@ function Composer({ workouts, onPublished }: { workouts: Workout[]; onPublished:
   const [body, setBody] = useState("");
   const [workoutId, setWorkoutId] = useState<string | null>(null);
   const [visibility, setVisibility] = useState<"public" | "followers" | "private">("followers");
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -143,13 +145,32 @@ function Composer({ workouts, onPublished }: { workouts: Workout[]; onPublished:
     try {
       const r = await fetch("/api/social/post", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body, workoutId, visibility }),
+        body: JSON.stringify({ body, workoutId, visibility, photoUrls: photos }),
       });
       const j = await r.json();
       if (!r.ok) { setErr(j.error ?? "Publication impossible"); setBusy(false); return; }
-      setBody(""); setWorkoutId(null); setOpen(false); onPublished();
+      setBody(""); setWorkoutId(null); setPhotos([]); setOpen(false); onPublished();
     } catch { setErr("Publication impossible"); }
     setBusy(false);
+  }
+
+
+  async function addPhotos(files: FileList | null) {
+    if (!files?.length) return;
+    setUploading(true); setErr(null);
+    for (const f of Array.from(files).slice(0, 4 - photos.length)) {
+      const fd = new FormData();
+      fd.append("file", f);
+      try {
+        const r = await fetch("/api/upload", { method: "POST", body: fd });
+        const j = await r.json();
+        // On n'ajoute la vignette QUE si le serveur a bien renvoyé une URL : afficher
+        // une image locale « en attente » ferait croire à un envoi réussi qui ne l'est pas.
+        if (r.ok && j.url) setPhotos((p) => [...p, j.url].slice(0, 4));
+        else setErr(j.error ?? "Photo refusée");
+      } catch { setErr("Envoi de la photo impossible"); }
+    }
+    setUploading(false);
   }
 
   if (!open) {
@@ -169,6 +190,22 @@ function Composer({ workouts, onPublished }: { workouts: Workout[]; onPublished:
       <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={3} autoFocus
         placeholder="Comment s'est passée cette sortie ?"
         className="w-full resize-none rounded-xl border border-zinc-200 p-3 text-sm outline-none focus:border-emerald-400" />
+
+
+      {photos.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {photos.map((u) => (
+            <div key={u} className="relative">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={u} alt="" className="h-20 w-20 rounded-lg object-cover" />
+              <button onClick={() => setPhotos((p) => p.filter((x) => x !== u))}
+                className="absolute -right-1.5 -top-1.5 rounded-full bg-zinc-900 p-1 text-white shadow">
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {workouts.length > 0 && (
         <div className="mt-3">
@@ -195,6 +232,12 @@ function Composer({ workouts, onPublished }: { workouts: Workout[]; onPublished:
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         {/* Le défaut est « Mes abonnés » et non « Public » : une séance porte une trace
             qui part du domicile. Le réglage par défaut ne doit jamais exposer ça. */}
+        <label className={`flex cursor-pointer items-center gap-1.5 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs text-zinc-600 transition hover:border-emerald-300 ${photos.length >= 4 ? "pointer-events-none opacity-40" : ""}`}>
+          {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />}
+          {photos.length ? `${photos.length}/4` : "Photo"}
+          <input type="file" accept="image/*" multiple className="hidden"
+            onChange={(e) => { void addPhotos(e.target.files); e.target.value = ""; }} />
+        </label>
         <select value={visibility} onChange={(e) => setVisibility(e.target.value as typeof visibility)}
           className="rounded-lg border border-zinc-200 px-2 py-1.5 text-xs text-zinc-600 outline-none">
           <option value="followers">Mes abonnés</option>
@@ -203,12 +246,23 @@ function Composer({ workouts, onPublished }: { workouts: Workout[]; onPublished:
         </select>
         <div className="flex items-center gap-2">
           <button onClick={() => { setOpen(false); setErr(null); }} className="rounded-lg px-3 py-1.5 text-xs text-zinc-500 hover:text-zinc-700">Annuler</button>
-          <button onClick={publish} disabled={busy || (!body.trim() && !workoutId)}
+          <button onClick={publish} disabled={busy || uploading || (!body.trim() && !workoutId && photos.length === 0)}
             className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-40">
             {busy ? "Publication…" : "Publier"}
           </button>
         </div>
       </div>
+      {/* ⚠️ Le bucket de stockage est PUBLIC (partagé avec les pièces jointes de la
+          messagerie). Restreindre la publication à ses abonnés ne rend donc PAS la
+          photo secrète : son URL reste atteignable par qui la possède. Le taire
+          laisserait croire à une confidentialité qui n'existe pas. */}
+      {photos.length > 0 && visibility !== "public" && (
+        <p className="mt-2 text-xs text-amber-700">
+          La publication sera limitée à tes abonnés, mais le fichier photo reste
+          accessible à qui possède son adresse. Évite les images que tu ne montrerais
+          pas publiquement.
+        </p>
+      )}
       {err && <p className="mt-2 text-xs text-red-600">{err}</p>}
     </div>
   );
@@ -258,6 +312,16 @@ function PostCard({ post, onChange }: { post: Post; onChange: () => void }) {
       </div>
 
       {post.body && <p className="px-4 pb-3 text-sm leading-relaxed text-zinc-700">{post.body}</p>}
+
+      {!!post.photo_urls?.length && (
+        <div className={`mb-3 grid gap-1 px-4 ${post.photo_urls.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+          {post.photo_urls.map((u) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={u} src={u} alt="" loading="lazy"
+              className={`w-full rounded-xl object-cover ${post.photo_urls!.length > 1 ? "h-40" : "max-h-96"}`} />
+          ))}
+        </div>
+      )}
 
       {post.workout && (
         <div className="mx-4 mb-3 rounded-xl bg-gradient-to-br from-zinc-900 to-zinc-800 p-4 text-white">
