@@ -78,6 +78,8 @@ export function Flyover({ polyline, altitudes, paces, stats }: {
   const capRef = useRef<number>(0);
   const etapeRef = useRef<number>(0);
   const enCours = useRef<boolean>(false);
+  /** Filet de sécurité de l'enchaînement — voir `allerA`. */
+  const filet = useRef<number | null>(null);
 
   const [pret, setPret] = useState(false);
   const [joue, setJoue] = useState(false);
@@ -238,10 +240,6 @@ export function Flyover({ polyline, altitudes, paces, stats }: {
     const cap = capRef.current + ecart * 0.4;
     capRef.current = cap;
 
-    // `once` : l'écouteur se retire de lui-même. Sans ça, chaque étape en empilerait
-    // un de plus et la fin du survol déclencherait quarante-quatre suites d'un coup.
-    map.once("moveend", () => { if (enCours.current) allerA(etape + 1); });
-
     const vue = ANGLES[angleRef.current];
     // ⚠️ ENTRÉE EN DOUCEUR. Au lancement, la caméra vient du cadrage d'ensemble
     // (toute la trace visible, très dézoomée) et devait rejoindre le point de départ
@@ -262,6 +260,25 @@ export function Flyover({ polyline, altitudes, paces, stats }: {
       easing: entree ? undefined : (x: number) => x,
       essential: true,            // ne pas être désactivé par « réduire les animations »
     });
+
+    // ── ENCHAÎNEMENT ────────────────────────────────────────────────────────────
+    // ⚠️ L'écouteur se pose APRÈS `easeTo`, et une seule avance est autorisée.
+    //
+    // Posé AVANT, il captait n'importe quel `moveend` qui traînait — celui du cadrage
+    // initial, ou celui d'un déplacement de la carte par l'athlète — et faisait sauter
+    // une étape à chaque fois. Et si deux points de la trace sont identiques, `easeTo`
+    // ne bouge pas : `moveend` ne vient JAMAIS et le survol se fige définitivement.
+    // D'où le filet de sécurité, réglé un peu au-delà de la durée du mouvement.
+    const duree = entree ? 1600 : (DUREE_MS * VITESSES[vitesseRef.current].facteur) / ETAPES;
+    let avancee = false;
+    const suite = () => {
+      if (avancee || !enCours.current) return;
+      avancee = true;
+      if (filet.current) { clearTimeout(filet.current); filet.current = null; }
+      allerA(etape + 1);
+    };
+    map.once("moveend", suite);
+    filet.current = window.setTimeout(suite, duree + 400);
   }
 
   /**
@@ -288,6 +305,7 @@ export function Flyover({ polyline, altitudes, paces, stats }: {
   async function basculer() {
     if (enCours.current) {
       enCours.current = false;
+      if (filet.current) { clearTimeout(filet.current); filet.current = null; }
       carte.current?.stop();
       setJoue(false);
       return;

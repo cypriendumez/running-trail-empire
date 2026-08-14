@@ -1343,6 +1343,22 @@ test("le survol n'anime plus la caméra image par image", () => {
   assert.ok(!/jumpTo/.test(code.slice(code.indexOf("function allerA"), code.indexOf("function prechauffer"))),
     "aucun jumpTo pendant la lecture");
 });
+test("l'enchaînement du survol ne peut ni sauter ni se figer", () => {
+  // Deux défauts réels, introduits puis corrigés :
+  //  1. l'écouteur `moveend` posé AVANT `easeTo` captait des événements parasites —
+  //     celui du cadrage initial, ou un déplacement de carte par l'athlète — et
+  //     faisait sauter une étape à chaque fois ;
+  //  2. si deux points de la trace sont identiques, `easeTo` ne bouge pas, `moveend`
+  //     ne vient jamais, et le survol se fige définitivement.
+  const code = codeOf("src/components/segments/Flyover.tsx");
+  const bloc = code.slice(code.indexOf("function allerA"), code.indexOf("function prechauffer"));
+  const iEase = bloc.indexOf("map.easeTo");
+  const iOnce = bloc.indexOf('map.once("moveend"');
+  assert.ok(iEase > 0 && iOnce > iEase, "l'écouteur doit être posé APRÈS easeTo");
+  assert.ok(/let avancee = false/.test(bloc), "une seule avance par étape");
+  assert.ok(/filet\.current = window\.setTimeout/.test(bloc), "un filet doit rattraper l'absence de moveend");
+});
+
 test("le survol entre en douceur, il ne saute pas sur le départ", () => {
   // Bug constaté au lancement : la caméra venait du cadrage d'ensemble (toute la
   // trace, très dézoomée) et devait rejoindre le point de départ en une durée
@@ -1401,7 +1417,13 @@ test("les étapes du survol s'enchaînent sur la FIN du mouvement, pas sur un mi
   const code = codeOf("src/components/segments/Flyover.tsx");
   const boucle = code.slice(code.indexOf("function allerA"), code.indexOf("function prechauffer"));
   assert.ok(/once\("moveend"/.test(boucle), "l'étape suivante doit partir sur moveend");
-  assert.ok(!/setTimeout/.test(boucle), "aucun minuteur ne doit piloter l'enchaînement");
+  // Un minuteur reste autorisé comme FILET, jamais comme moteur : il doit donc être
+  // réglé APRÈS la fin du mouvement (durée + marge), sinon il interromprait
+  // l'animation en cours — le défaut d'origine. La marge est ce qui distingue les deux.
+  const minuteurs = [...boucle.matchAll(/setTimeout\(([^;]{0,120})\)/g)].map((m) => m[1]);
+  for (const t of minuteurs) {
+    assert.ok(/duree \+ 400/.test(t), `un minuteur pilote l'enchaînement sans marge : ${t.slice(0, 50)}`);
+  }
   assert.ok(/fadeDuration: 0/.test(code), "le fondu des tuiles produit un scintillement permanent");
 });
 
