@@ -17,6 +17,7 @@ import { summarizeCross } from "../src/lib/coach/crossTraining";
 import { computeQualityBudget } from "../src/lib/coach/qualityBudget";
 import { shardForPass, replanIfFresh } from "../src/lib/intervals/syncAndCoach";
 import { buildPlanReadyEmail } from "../src/lib/notify/planReady";
+import { poseAt, capLisse } from "../src/lib/segments/flyover";
 import { vmaFromPaceCurve, bestVmaFromWorkouts } from "../src/lib/running/fitness";
 import { heatAdvice, windAdvice, altitudeLossPct, heatAcclimation } from "../src/lib/weather/openMeteo";
 import { parseReps, parsePaceSec, stepsForType, warmCoolMin, buildWorkoutDescription } from "../src/lib/watch/intervals";
@@ -1387,16 +1388,26 @@ test("le survol est piloté par une HORLOGE, pas par un enchaînement d'événem
   const code = codeOf("src/components/segments/Flyover.tsx");
   assert.ok(/requestAnimationFrame\(boucle\)/.test(code), "l'animation doit être pilotée par le temps");
   assert.ok(!/once\("moveend"/.test(code), "plus aucun enchaînement sur moveend");
-  assert.ok(/performance\.now\(\) - depuis/.test(code), "la reprise après pause ne doit rien perdre");
+  // `depuis` a été renommé `depart0` en devenant une valeur ASSAINIE (une reprise ne
+  // peut plus partir d'une position non finie). L'invariant est le même : la reprise
+  // se date à partir du temps déjà écoulé.
+  assert.ok(/performance\.now\(\) - depart0/.test(code), "la reprise après pause ne doit rien perdre");
+  assert.ok(/Number\.isFinite\(depuis\)/.test(code), "une reprise à une position non finie relançait le plantage");
   assert.ok(/fadeDuration: 0/.test(code), "le fondu des tuiles produit un scintillement permanent");
 });
 test("la caméra du survol interpole entre les points", () => {
   // Se caler sur le point GPS le plus proche fige la caméra puis la téléporte : avec
   // 150 points sur 26 s, cela produit six sauts par seconde.
+  //
+  // Le calcul a quitté le composant pour `lib/segments/flyover` : il était intestable
+  // dans une boucle d'animation React, et c'est précisément là qu'un index non fini a
+  // produit un plantage en production. Les deux règles sont désormais vérifiées sur le
+  // COMPORTEMENT (voir « SURVOL 3D » plus bas) et non sur la présence d'une formule ;
+  // il ne reste ici que l'ORDRE des appels, qui, lui, vit toujours dans le composant.
   const code = codeOf("src/components/segments/Flyover.tsx");
   const boucle = code.slice(code.indexOf("function boucle"), code.indexOf("function prechauffer"));
-  assert.ok(/a\.lat \+ \(b\.lat - a\.lat\) \* f/.test(boucle), "la position doit être interpolée");
-  assert.ok(/\+ 540\) % 360\) - 180/.test(boucle), "le cap doit passer par le plus court chemin");
+  assert.ok(/poseAt\(points, p\)/.test(boucle), "la position doit venir du calcul partagé et testé");
+  assert.ok(/capLisse\(/.test(boucle), "le cap doit passer par le lissage partagé et testé");
   assert.ok(boucle.indexOf("setData") < boucle.indexOf("map.jumpTo"), "le marqueur avance avant la caméra");
 });
 test("le survol s'ouvre sur une vue PANORAMIQUE, pas collée au sol", () => {
@@ -2386,6 +2397,58 @@ test("la chaîne sync → analyse → replanification → montre n'existe qu'à 
     assert.ok(!/autoCoachForUser/.test(src), `${f} rappelle le coach directement au lieu de passer par replanIfFresh`);
     assert.ok(!/importMissingTracks/.test(src), `${f} garde sa propre importation de traces`);
   }
+});
+
+console.log("\nSURVOL 3D — un index non fini ne doit plus tuer le lecteur");
+// Erreur RÉELLE relevée dans error_logs le 14/08 sur /dashboard/survol :
+// « Cannot read properties of undefined (reading 'lat') ». Le calcul vivait dans la
+// boucle d'animation d'un composant React — donc hors de portée de tout test.
+const trace = [
+  { lat: 45.0, lon: 6.0 }, { lat: 45.001, lon: 6.001 },
+  { lat: 45.002, lon: 6.002 }, { lat: 45.003, lon: 6.003 },
+];
+test("un avancement NON FINI renvoie null au lieu de planter", () => {
+  // `Math.floor(NaN)` vaut NaN, `Math.min(n, NaN)` vaut NaN, et `points[NaN]` vaut
+  // `undefined` : c'est la chaîne exacte qui a produit l'erreur en production.
+  for (const p of [NaN, Infinity, -Infinity]) {
+    assert.equal(poseAt(trace, p), null, `avancement ${p} : devrait renvoyer null`);
+  }
+});
+test("une trace trop courte ne produit aucune position", () => {
+  // Sur un seul point, `points.length - 2` vaut −1 : sans ce contrôle, l'index
+  // deviendrait négatif — l'autre porte d'entrée du même plantage.
+  assert.equal(poseAt([{ lat: 45, lon: 6 }], 0.5), null);
+  assert.equal(poseAt([], 0.5), null);
+  assert.equal(poseAt(null as unknown as typeof trace, 0.5), null);
+});
+test("des coordonnées corrompues n'atteignent jamais la caméra", () => {
+  // Une trace peut être décodée de travers ; MapLibre, lui, plante sur un NaN.
+  assert.equal(poseAt([{ lat: NaN, lon: 6 }, { lat: 45, lon: 6 }], 0), null);
+  assert.equal(poseAt([{ lat: 45, lon: 6 }, { lat: 45, lon: undefined as unknown as number }], 0.9), null);
+});
+test("aux bornes, la position reste sur la trace", () => {
+  const debut = poseAt(trace, 0)!, fin = poseAt(trace, 1)!;
+  assert.ok(debut && fin, "les bornes doivent produire une position");
+  assert.equal(debut.lat, 45.0);
+  assert.ok(Math.abs(fin.lat - 45.003) < 1e-9, `fin à ${fin.lat}`);
+  // Hors bornes : on borne, on ne plante pas et on ne sort pas de la trace.
+  assert.deepEqual(poseAt(trace, -5), poseAt(trace, 0));
+  assert.deepEqual(poseAt(trace, 42), poseAt(trace, 1));
+});
+test("la position est INTERPOLÉE, pas calée sur le point le plus proche", () => {
+  // Se caler sur le point le plus proche fige la caméra puis la téléporte : la trace
+  // est régulière, mais le survol se lit comme une saccade.
+  const p = poseAt(trace, 1 / 6)!;
+  assert.ok(p.lat > 45.0 && p.lat < 45.001, `position non interpolée : ${p.lat}`);
+});
+test("le cap prend le PLUS COURT chemin angulaire", () => {
+  // De 350° à 10°, la différence brute vaut −340° : la caméra faisait un tour complet
+  // à chaque virage franchissant le nord.
+  const c = capLisse(350, 10, 1);
+  assert.ok(Math.abs(c - 370) < 1e-9, `${c} : la caméra repart en arrière`);
+  // Et un cap corrompu ne doit pas contaminer le cap courant.
+  assert.equal(capLisse(120, NaN), 120);
+  assert.equal(capLisse(NaN, 45), 45);
 });
 
 console.log("\nE-MAIL « TON PLAN EST À JOUR » — un envoi ne se rattrape pas");

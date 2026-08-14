@@ -16,6 +16,7 @@ import { Map as MapLibreMap, setWorkerUrl, type LngLatBoundsLike } from "maplibr
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Play, Pause, RotateCcw, Loader2 } from "lucide-react";
 import { decodePolyline } from "@/lib/segments/geo";
+import { poseAt, capLisse } from "@/lib/segments/flyover";
 
 const MAPTILER = process.env.NEXT_PUBLIC_MAPTILER_KEY || "";
 
@@ -257,25 +258,20 @@ export function Flyover({ polyline, altitudes, paces, stats }: {
     const map = carte.current;
     if (!map || !enCours.current) return;
 
+    // ── UN INDEX NON FINI NE DOIT PLUS TUER LE LECTEUR ─────────────────────────
+    // Relevé en production (14/08, /dashboard/survol) :
+    // « Cannot read properties of undefined (reading 'lat') ». Le calcul de position
+    // vit désormais dans `lib/segments/flyover` : il est PUR, donc testable, et il
+    // renvoie `null` au lieu de lever. Voir l'en-tête du module pour le raisonnement.
+    // Ici on se contente d'arrêter proprement — un lecteur qui s'arrête vaut infiniment
+    // mieux qu'un lecteur qui explose et ne repart qu'au rechargement de la page.
     const duree = DUREE_MS * VITESSES[vitesseRef.current].facteur;
     const p = Math.min(1, (maintenant - depart.current) / duree);
+    const pose = poseAt(points, p);
+    if (!pose) { arreter(); return; }
     setAvance(p);
-
-    // Position interpolée ENTRE deux points : se caler sur le point le plus proche
-    // figerait la caméra puis la téléporterait, ce qui se lit comme une saccade.
-    const brut = p * (points.length - 1);
-    const i = Math.min(points.length - 2, Math.floor(brut));
-    const f = brut - i;
-    const a = points[i], b = points[i + 1];
-    const lat = a.lat + (b.lat - a.lat) * f;
-    const lon = a.lon + (b.lon - a.lon) * f;
-
-    // Cap lissé par le plus court chemin angulaire : sans ça, un virage franchissant
-    // 0°/360° fait pivoter la caméra d'un tour complet.
-    const loin = points[Math.min(points.length - 1, i + 4)];
-    const capBrut = (Math.atan2(loin.lon - a.lon, loin.lat - a.lat) * 180) / Math.PI;
-    const ecart = ((capBrut - capRef.current + 540) % 360) - 180;
-    capRef.current += ecart * 0.06;
+    const { lat, lon } = pose;
+    capRef.current = capLisse(capRef.current, pose.capDeg);
 
     const src = map.getSource("position") as { setData?: (d: unknown) => void } | undefined;
     src?.setData?.({ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [lon, lat] } });
@@ -322,14 +318,30 @@ export function Flyover({ polyline, altitudes, paces, stats }: {
     });
   }
 
+  /** Arrêt PROPRE : la lecture s'interrompt sans laisser de valeur corrompue derrière
+   *  elle. Sans la remise à zéro, un `avance` non fini repartirait dans `demarrer` au
+   *  clic suivant et le lecteur replanterait aussitôt. */
+  function arreter() {
+    enCours.current = false;
+    if (anim.current) cancelAnimationFrame(anim.current);
+    anim.current = null;
+    ecoule.current = 0;
+    depart.current = 0;
+    setAvance(0);
+    setJoue(false);
+  }
+
   function demarrer(depuis: number) {
     if (anim.current) cancelAnimationFrame(anim.current);
-    ecoule.current = depuis;
+    // Une reprise ne peut pas partir d'une position non finie : c'est exactement par là
+    // qu'un NaN s'installait durablement dans la lecture.
+    const depart0 = Number.isFinite(depuis) ? Math.min(1, Math.max(0, depuis)) : 0;
+    ecoule.current = depart0;
     enCours.current = true;
     setJoue(true);
     // `depart` est daté de façon à ce que l'avancement reprenne exactement où il en
     // était : une pause ne doit rien faire perdre.
-    depart.current = performance.now() - depuis * DUREE_MS * VITESSES[vitesseRef.current].facteur;
+    depart.current = performance.now() - depart0 * DUREE_MS * VITESSES[vitesseRef.current].facteur;
     anim.current = requestAnimationFrame(boucle);
   }
 
