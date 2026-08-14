@@ -1343,6 +1343,31 @@ test("le survol n'anime plus la caméra image par image", () => {
   assert.ok(!/jumpTo/.test(code.slice(code.indexOf("function allerA"), code.indexOf("function prechauffer"))),
     "aucun jumpTo pendant la lecture");
 });
+test("le survol entre en douceur, il ne saute pas sur le départ", () => {
+  // Bug constaté au lancement : la caméra venait du cadrage d'ensemble (toute la
+  // trace, très dézoomée) et devait rejoindre le point de départ en une durée
+  // d'étape — 433 ms pour traverser des kilomètres et zoomer de six niveaux.
+  const code = codeOf("src/components/segments/Flyover.tsx");
+  assert.ok(/const entree = etape === 0/.test(code), "la première étape doit être traitée à part");
+  assert.ok(/entree \? 1600/.test(code), "l'entrée doit durer bien plus qu'une étape");
+  assert.ok(/easing: entree \? undefined/.test(code), "l'entrée garde un amorti, la croisière reste linéaire");
+});
+test("l'allure du survol est celle du MOMENT, pas la moyenne figée", () => {
+  // Le bandeau affichait la moyenne de toute la sortie à un emplacement qui suggère
+  // une valeur instantanée — l'altitude et la distance, elles, défilaient.
+  const code = codeOf("src/components/segments/Flyover.tsx");
+  assert.ok(/paceAct/.test(code), "une allure instantanée doit exister");
+  assert.ok(/paceAct != null \? "Allure" : "Allure moy\."/.test(code),
+    "à défaut d'allure instantanée, le libellé doit DIRE que c'est une moyenne");
+});
+test("l'allure instantanée écarte les valeurs aberrantes", () => {
+  // À l'arrêt le GPS produit des allures délirantes ; les afficher ferait passer une
+  // pause pour un sprint ou une marche pour un arrêt.
+  const code = codeOf("src/app/dashboard/survol/page.tsx");
+  assert.ok(/secParKm > 1200 \|\| secParKm < 120/.test(code), "bornes d'allure attendues");
+  assert.ok(/d < 5 \|\| dt <= 0/.test(code), "aucune allure ne doit être calculée à l'arrêt");
+});
+
 test("les réglages du survol s'appliquent IMMÉDIATEMENT, même en pleine lecture", () => {
   // Si la boucle lisait l'état React plutôt que des refs, une étape déjà lancée
   // continuerait avec les anciens réglages : changer la vitesse ne ferait rien

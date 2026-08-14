@@ -53,6 +53,7 @@ const VITESSES = [
   { label: "×0,5", facteur: 2 },
   { label: "×1", facteur: 1 },
   { label: "×2", facteur: 0.5 },
+  { label: "×4", facteur: 0.25 },
 ] as const;
 
 const ANGLES = [
@@ -61,10 +62,12 @@ const ANGLES = [
   { label: "Rasant", pitch: 74, zoom: 15.2 }, // relief marqué, horizon visible
 ] as const;
 
-export function Flyover({ polyline, altitudes, stats }: {
+export function Flyover({ polyline, altitudes, paces, stats }: {
   polyline: string;
   /** Altitudes alignées sur les points, si connues — sinon le bandeau les tait. */
   altitudes?: number[] | null;
+  /** Allure instantanée (s/km) par point ; `null` aux endroits sans allure fiable. */
+  paces?: (number | null)[] | null;
   stats: FlyoverStats;
 }) {
   const conteneur = useRef<HTMLDivElement | null>(null);
@@ -240,14 +243,23 @@ export function Flyover({ polyline, altitudes, stats }: {
     map.once("moveend", () => { if (enCours.current) allerA(etape + 1); });
 
     const vue = ANGLES[angleRef.current];
+    // ⚠️ ENTRÉE EN DOUCEUR. Au lancement, la caméra vient du cadrage d'ensemble
+    // (toute la trace visible, très dézoomée) et devait rejoindre le point de départ
+    // en une durée d'étape — 433 ms pour traverser plusieurs kilomètres et zoomer de
+    // six niveaux. D'où le bond brutal au début, pris pour un bug. La première étape
+    // reçoit donc une transition longue et amortie ; les suivantes restent linéaires.
+    const entree = etape === 0;
     map.easeTo({
       center: [lon, lat],
       // Le zoom de base dépend de l'inclinaison choisie : un angle rasant demande de
       // reculer, sinon on ne voit plus que le bitume devant soi.
       zoom: vue.zoom + zoomRef.current,
       pitch: vue.pitch, bearing: cap,
-      duration: (DUREE_MS * VITESSES[vitesseRef.current].facteur) / ETAPES,
-      easing: (x: number) => x,   // linéaire : le défaut freine à chaque étape
+      duration: entree ? 1600 : (DUREE_MS * VITESSES[vitesseRef.current].facteur) / ETAPES,
+      // Croisière LINÉAIRE (le défaut freine à chaque étape, soit soixante à-coups) ;
+      // l'ENTRÉE garde l'amorti par défaut — c'est le seul moment où un mouvement
+      // doit se sentir, puisqu'il fait franchir des kilomètres et six niveaux de zoom.
+      easing: entree ? undefined : (x: number) => x,
       essential: true,            // ne pas être désactivé par « réduire les animations »
     });
   }
@@ -308,6 +320,12 @@ export function Flyover({ polyline, altitudes, stats }: {
   // Altitude au point courant — affichée SEULEMENT si elle est connue.
   const iAct = Math.min(points.length - 1, Math.floor(avance * (points.length - 1)));
   const altAct = altitudes && altitudes.length === points.length ? altitudes[iAct] : null;
+  // Allure du MOMENT si on la connaît, moyenne de la sortie sinon — et on le dit
+  // dans le libellé, pour qu'un chiffre figé ne passe pas pour une valeur du moment.
+  const paceAct = paces && paces.length === points.length ? paces[iAct] : null;
+  const paceTexte = paceAct != null
+    ? `${Math.floor(paceAct / 60)}'${String(Math.round(paceAct % 60)).padStart(2, "0")}"`
+    : stats.paceLabel;
   const kmParcourus = stats.distanceKm != null ? stats.distanceKm * avance : null;
 
   if (erreur) {
@@ -340,8 +358,8 @@ export function Flyover({ polyline, altitudes, stats }: {
       <div className="pointer-events-none absolute inset-x-0 top-0 bg-gradient-to-b from-black/70 to-transparent p-5 text-white">
         <div className="text-center text-sm font-semibold drop-shadow">{stats.title}</div>
         <div className="mt-3 flex justify-center gap-10">
-          {stats.paceLabel && (
-            <Chiffre libelle="Allure" valeur={stats.paceLabel} unite="/km" />
+          {paceTexte && (
+            <Chiffre libelle={paceAct != null ? "Allure" : "Allure moy."} valeur={paceTexte} unite="/km" />
           )}
           {altAct != null && <Chiffre libelle="Altitude" valeur={String(Math.round(altAct))} unite="m" />}
           {kmParcourus != null && (

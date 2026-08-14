@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PerfTabs } from "@/components/segments/PerfTabs";
-import { encodePolyline, type TrackPoint } from "@/lib/segments/geo";
+import { encodePolyline, haversine, type TrackPoint } from "@/lib/segments/geo";
 import { paceOf } from "@/lib/social/feed";
 import { SurvolChoix } from "@/components/segments/SurvolChoix";
 
@@ -78,6 +78,26 @@ export default async function SurvolPage({ searchParams }: { searchParams: Promi
   // l'altitude plutôt que d'afficher un zéro qui passerait pour une mesure.
   const altitudes = echantillon.every((p) => p.length >= 4) ? echantillon.map((p) => p[3]) : null;
 
+  // ── ALLURE INSTANTANÉE ──────────────────────────────────────────────────────
+  // Le bandeau affichait l'allure MOYENNE de toute la sortie : un chiffre figé, à un
+  // emplacement qui suggère pourtant une valeur du moment — l'altitude et la distance,
+  // elles, défilent. On calcule donc l'allure réelle en chaque point.
+  //
+  // Lissée sur une fenêtre de 5 points : le GPS fait osciller la vitesse d'un point à
+  // l'autre, et une allure qui saute de 3'50 à 6'20 chaque demi-seconde serait
+  // illisible — et fausse, puisque personne ne court comme ça.
+  const paces: (number | null)[] | null = pts.length > 5 ? pts.map((_, i) => {
+    const a = Math.max(0, i - 2), b = Math.min(pts.length - 1, i + 2);
+    let d = 0;
+    for (let k = a + 1; k <= b; k++) d += haversine(pts[k - 1].lat, pts[k - 1].lon, pts[k].lat, pts[k].lon);
+    const dt = pts[b].t - pts[a].t;
+    if (d < 5 || dt <= 0) return null;          // à l'arrêt : aucune allure à afficher
+    const secParKm = dt / (d / 1000);
+    // Garde-fous : au-delà de 20 min/km on marche ou on est arrêté, en deçà de 2 min/km
+    // c'est une aberration GPS. Dans les deux cas on préfère ne rien afficher.
+    return secParKm > 1200 || secParKm < 120 ? null : secParKm;
+  }) : null;
+
   const pace = paceOf(choisie.duration_seconds, choisie.distance_km);
 
   return (
@@ -101,6 +121,7 @@ export default async function SurvolPage({ searchParams }: { searchParams: Promi
         choisie={choisie.id}
         polyline={pts.length >= 2 ? encodePolyline(pts) : ""}
         altitudes={altitudes}
+        paces={paces}
         stats={{
           title: choisie.title || choisie.type || "Sortie",
           distanceKm: choisie.distance_km ?? null,

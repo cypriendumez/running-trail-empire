@@ -8,16 +8,16 @@ import type { FlyoverStats } from "./Flyover";
 
 type Sortie = { id: string; label: string; date: string; km: number | null };
 
-export function SurvolChoix({ sorties, choisie, polyline, altitudes, stats }: {
+export function SurvolChoix({ sorties, choisie, polyline, altitudes, paces, stats }: {
   sorties: Sortie[]; choisie: string; polyline: string;
-  altitudes: number[] | null; stats: FlyoverStats;
+  altitudes: number[] | null; paces?: (number | null)[] | null; stats: FlyoverStats;
 }) {
   const router = useRouter();
 
   return (
     <div className="space-y-4">
       {polyline ? (
-        <FlyoverLazy polyline={polyline} altitudes={altitudes} stats={stats} />
+        <FlyoverLazy polyline={polyline} altitudes={altitudes} paces={paces} stats={stats} />
       ) : (
         // Trace trop courte pour un survol : on le dit, plutôt que d'afficher une
         // carte figée que l'athlète prendrait pour un bug.

@@ -9,6 +9,6 @@ const Flyover = dynamic(() => import("./Flyover").then((m) => m.Flyover), {
   loading: () => <div className="h-[520px] animate-pulse rounded-2xl bg-zinc-200" />,
 });
 
-export function FlyoverLazy(props: { polyline: string; altitudes?: number[] | null; stats: FlyoverStats }) {
+export function FlyoverLazy(props: { polyline: string; altitudes?: number[] | null; paces?: (number | null)[] | null; stats: FlyoverStats }) {
   return <Flyover {...props} />;
 }
