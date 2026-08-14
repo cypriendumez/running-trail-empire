@@ -17,13 +17,29 @@ export async function GET(req: Request) {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-  const limit = Math.min(50, Number(new URL(req.url).searchParams.get("limit") ?? 20));
+  const url = new URL(req.url);
+  const limit = Math.min(50, Number(url.searchParams.get("limit") ?? 20));
+  const clubId = url.searchParams.get("club") || null;
 
   const { data: following } = await sb.from("follows")
     .select("following_id").eq("follower_id", user.id).eq("status", "accepted");
   const followingIds = new Set((following ?? []).map((f) => String((f as { following_id: string }).following_id)));
 
-  const authors = [user.id, ...followingIds];
+  let authors = [user.id, ...followingIds];
+
+  // ── Filtre par club ─────────────────────────────────────────────────────────
+  // On restreint aux MEMBRES du club, et on n'y inclut l'utilisateur que s'il en est
+  // lui-même membre : voir ses propres sorties dans le fil d'un club qu'on ne suit
+  // pas laisserait croire qu'on y a publié.
+  if (clubId) {
+    const { data: membres, error: errMembres } = await sb.from("club_members")
+      .select("user_id").eq("club_id", clubId);
+    if (errMembres) return NextResponse.json({ error: "Club indisponible" }, { status: 400 });
+    authors = (membres ?? []).map((m) => String((m as { user_id: string }).user_id));
+    // Un club sans membre visible ne doit pas retomber sur le fil général : mieux
+    // vaut un fil vide, qui dit la vérité, qu'un fil qui montre autre chose.
+    if (!authors.length) return NextResponse.json({ posts: [], followingCount: followingIds.size, clubId });
+  }
   const { data: rows, error } = await sb.from("activity_posts")
     // ⚠️ La contrainte de clé étrangère est NOMMÉE explicitement, et ce n'est pas
     // du zèle : `profiles` est atteignable depuis `activity_posts` par DEUX chemins
@@ -56,5 +72,6 @@ export async function GET(req: Request) {
     // « tu ne suis personne » appelle l'annuaire, « personne n'a rien publié »
     // appelle la publication. Confondre les deux, c'est un cul-de-sac pour l'athlète.
     followingCount: followingIds.size,
+    clubId,
   });
 }

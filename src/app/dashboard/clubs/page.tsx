@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { challengeProgress, daysLeft, notStarted, type Challenge, type ChallengeWorkout } from "@/lib/challenges/progress";
+import { challengeProgress, challengeLeaderboard, daysLeft, notStarted, type Challenge, type ChallengeWorkout } from "@/lib/challenges/progress";
 import { ClubsHub, type ClubVue, type DefiVue } from "@/components/clubs/ClubsHub";
 
 export const metadata = { title: "Clubs & Défis | Pacevo" };
@@ -55,6 +55,44 @@ export default async function ClubsPage() {
   const inscrits = new Set((partsRes.data ?? []).map((p) => String((p as { challenge_id: string }).challenge_id)));
   const workouts = (workoutsRes.data ?? []) as unknown as ChallengeWorkout[];
 
+  // ── CLASSEMENTS ─────────────────────────────────────────────────────────────
+  // Calculés ici, sur les séances RÉELLES de chaque participant. Rien n'est stocké :
+  // un classement figé survivrait à une séance corrigée ou supprimée.
+  const defiIds = (defisRes.data ?? []).map((d) => String((d as { id: string }).id));
+  const classements = new Map<string, { userId: string; name: string; value: number; rank: number; done: boolean }[]>();
+  if (defiIds.length) {
+    const { data: tousParts } = await sb.from("challenge_participants")
+      .select("challenge_id, user_id").in("challenge_id", defiIds);
+    const participants = (tousParts ?? []) as { challenge_id: string; user_id: string }[];
+    const userIds = [...new Set(participants.map((p) => String(p.user_id)))];
+
+    if (userIds.length) {
+      // Colonnes ÉNUMÉRÉES : jamais select("*") sur les profils d'autrui.
+      const [{ data: noms }, { data: seances }] = await Promise.all([
+        sb.from("profiles").select("id, full_name").in("id", userIds),
+        sb.from("workouts").select("user_id, date, sport, type, distance_km, elevation_gain_m")
+          .in("user_id", userIds).limit(20000),
+      ]);
+      const nomDe = new Map((noms ?? []).map((n) => {
+        const x = n as { id: string; full_name: string | null };
+        return [String(x.id), x.full_name || "Athlète"];
+      }));
+      const parAthlete = new Map<string, ChallengeWorkout[]>();
+      for (const w of (seances ?? []) as Record<string, unknown>[]) {
+        const k = String(w.user_id);
+        parAthlete.set(k, [...(parAthlete.get(k) ?? []), w as unknown as ChallengeWorkout]);
+      }
+      for (const d of defisRes.data ?? []) {
+        const ch = d as unknown as Challenge;
+        const inscritsDefi = participants.filter((p) => String(p.challenge_id) === ch.id).map((p) => String(p.user_id));
+        const lignes = challengeLeaderboard(ch, inscritsDefi.map((uid) => ({ userId: uid, workouts: parAthlete.get(uid) ?? [] })));
+        classements.set(ch.id, lignes.map((l) => ({
+          userId: l.userId, name: nomDe.get(l.userId) ?? "Athlète", value: l.value, rank: l.rank, done: l.done,
+        })));
+      }
+    }
+  }
+
   const defis: DefiVue[] = (defisRes.data ?? []).map((d) => {
     const ch = d as unknown as Challenge & { description: string | null; club_id: string | null };
     const p = challengeProgress(ch, workouts);
@@ -66,6 +104,8 @@ export default async function ClubsPage() {
       joined: inscrits.has(ch.id),
       daysLeft: daysLeft(ch),
       notStarted: notStarted(ch),
+      classement: classements.get(ch.id) ?? [],
+      moi: user.id,
     };
   });
 

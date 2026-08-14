@@ -53,6 +53,9 @@ export function Flyover({ polyline, altitudes, stats }: {
   const depart = useRef<number>(0);
   const ecoule = useRef<number>(0);
   const capRef = useRef<number>(0);
+  const etapeRef = useRef<number>(0);
+  const minuteurEtape = useRef<number | null>(null);
+  const enCours = useRef<boolean>(false);
 
   const [pret, setPret] = useState(false);
   const [joue, setJoue] = useState(false);
@@ -124,12 +127,15 @@ export function Flyover({ polyline, altitudes, stats }: {
         paint: { "line-color": "#10b981", "line-width": 4.5 },
       });
 
-      map.fitBounds(bornes(coords), { padding: 60, pitch: 60, duration: 0 });
+      capRef.current = capInitial;
+      map.fitBounds(bornes(coords), { padding: 60, pitch: 52, duration: 0 });
       setPret(true);
     });
 
     return () => {
       clearTimeout(minuteur);
+      enCours.current = false;
+      if (minuteurEtape.current) clearTimeout(minuteurEtape.current);
       if (anim.current) cancelAnimationFrame(anim.current);
       map.remove();
       carte.current = null;
@@ -142,65 +148,81 @@ export function Flyover({ polyline, altitudes, stats }: {
     return [[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]];
   }
 
-  function boucle(t: number) {
+  /**
+   * ⚠️ ON N'APPELLE PLUS `jumpTo` À CHAQUE IMAGE.
+   *
+   * C'était la cause des saccades restantes : à 60 images par seconde, chaque appel
+   * force un recalcul complet de la vue et une nouvelle salve de tuiles. MapLibre ne
+   * suit pas ce rythme avec le relief activé — il rend une image sur trois, et le
+   * mouvement paraît haché alors que le calcul de position, lui, est juste.
+   *
+   * On découpe donc le parcours en ÉTAPES et on enchaîne des `easeTo` linéaires :
+   * MapLibre interpole lui-même entre deux étapes, à son rythme, et précharge les
+   * tuiles de la suite. C'est le motif prévu pour ça.
+   */
+  const ETAPES = 60;
+
+  function allerA(etape: number) {
     const map = carte.current;
-    if (!map) return;
-    if (!depart.current) depart.current = t - ecoule.current;
-    const p = Math.min(1, (t - depart.current) / DUREE_MS);
-    ecoule.current = t - depart.current;
+    if (!map || etape >= ETAPES) {
+      setJoue(false); etapeRef.current = 0; setAvance(1);
+      return;
+    }
+    etapeRef.current = etape;
+
+    const p = etape / (ETAPES - 1);
     setAvance(p);
 
-    // ── POSITION INTERPOLÉE, PAS LE POINT GPS LE PLUS PROCHE ──────────────────
-    // Le défaut visible à l'écran : avec ~150 points étalés sur 26 s, se caler sur le
-    // point le plus proche fige la caméra puis la téléporte six fois par seconde. On
-    // interpole donc ENTRE les deux points encadrants, ce qui donne un déplacement
-    // continu à 60 images/s au lieu d'une succession de sauts.
     const brut = p * (points.length - 1);
     const i = Math.min(points.length - 2, Math.floor(brut));
-    const f = brut - i;                       // 0 → 1 entre les deux points
+    const f = brut - i;
     const a = points[i], b = points[i + 1];
     const lat = a.lat + (b.lat - a.lat) * f;
     const lon = a.lon + (b.lon - a.lon) * f;
 
-    // Le cap suit la direction RÉELLE de course, mesurée sur quelques points d'avance
-    // pour ne pas osciller à chaque zigzag du GPS.
     const loin = points[Math.min(points.length - 1, i + 4)];
     const capBrut = (Math.atan2(loin.lon - a.lon, loin.lat - a.lat) * 180) / Math.PI;
-
-    // Lissage angulaire du cap. Sans passer par le plus court chemin, le virage qui
-    // franchit 0°/360° fait pivoter la caméra d'un tour complet — l'à-coup le plus
-    // spectaculaire, et le plus facile à prendre pour un plantage.
-    const precedent = capRef.current;
-    let ecart = ((capBrut - precedent + 540) % 360) - 180;
-    const cap = precedent + ecart * 0.12;
+    // Lissage par le plus court chemin angulaire : sans lui, un virage franchissant
+    // 0°/360° fait pivoter la caméra d'un tour complet.
+    const ecart = ((capBrut - capRef.current + 540) % 360) - 180;
+    const cap = capRef.current + ecart * 0.35;
     capRef.current = cap;
 
-    // Cadrage reculé et moins incliné qu'au premier jet (15,6 / 64°) : en virage
-    // serré, la trace sortait du champ. À 14,9 et 52°, le virage entier reste visible
-    // — on perd un peu de sensation de vitesse, on gagne de ne jamais perdre le fil.
-    map.jumpTo({ center: [lon, lat], zoom: 14.9, pitch: 52, bearing: cap });
+    map.easeTo({
+      center: [lon, lat], zoom: 14.9, pitch: 52, bearing: cap,
+      duration: DUREE_MS / ETAPES,
+      // Easing LINÉAIRE : le défaut de MapLibre accélère puis freine à chaque étape,
+      // ce qui produirait soixante petits à-coups sur un parcours censé être continu.
+      easing: (x: number) => x,
+    });
 
-    if (p < 1) anim.current = requestAnimationFrame(boucle);
-    else { setJoue(false); depart.current = 0; ecoule.current = 0; }
+    minuteurEtape.current = window.setTimeout(() => {
+      if (enCours.current) allerA(etape + 1);
+    }, DUREE_MS / ETAPES);
   }
 
   function basculer() {
-    if (joue) {
-      if (anim.current) cancelAnimationFrame(anim.current);
-      depart.current = 0;
+    if (enCours.current) {
+      enCours.current = false;
+      if (minuteurEtape.current) clearTimeout(minuteurEtape.current);
+      carte.current?.stop();
       setJoue(false);
       return;
     }
-    if (!ecoule.current) capRef.current = capInitial;
+    enCours.current = true;
     setJoue(true);
-    anim.current = requestAnimationFrame(boucle);
+    allerA(etapeRef.current >= ETAPES - 1 ? 0 : etapeRef.current);
   }
 
   function rejouer() {
-    if (anim.current) cancelAnimationFrame(anim.current);
-    depart.current = 0; ecoule.current = 0;
-    setAvance(0); setJoue(true); capRef.current = capInitial;
-    anim.current = requestAnimationFrame(boucle);
+    if (minuteurEtape.current) clearTimeout(minuteurEtape.current);
+    carte.current?.stop();
+    etapeRef.current = 0;
+    capRef.current = capInitial;
+    setAvance(0);
+    enCours.current = true;
+    setJoue(true);
+    allerA(0);
   }
 
   // Altitude au point courant — affichée SEULEMENT si elle est connue.

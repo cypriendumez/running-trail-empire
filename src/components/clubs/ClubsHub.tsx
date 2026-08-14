@@ -21,6 +21,8 @@ export type DefiVue = {
   starts_on: string; ends_on: string; clubName: string | null;
   value: number; ratio: number; done: boolean; joined: boolean;
   daysLeft: number | null; notStarted: boolean;
+  classement: { userId: string; name: string; value: number; rank: number; done: boolean }[];
+  moi: string;
 };
 
 const nb = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1).replace(".", ","));
@@ -121,7 +123,7 @@ function CarteDefi({ d }: { d: DefiVue }) {
         </button>
       </div>
 
-      <div className="px-4 pb-4">
+      <div className="px-4 pb-3">
         <div className="mb-1 flex items-baseline justify-between text-xs">
           {/* La valeur RÉELLE, jamais plafonnée : 150 km sur un défi de 100 doit
               s'afficher 150, même si la barre, elle, est pleine. */}
@@ -133,6 +135,36 @@ function CarteDefi({ d }: { d: DefiVue }) {
             style={{ width: `${d.ratio * 100}%` }} />
         </div>
       </div>
+
+      {/* Classement — affiché seulement s'il y a QUELQU'UN. Un tableau à une ligne
+          annonçant « 1er sur 1 » serait exact mais ridicule ; on le tait tant qu'il
+          n'y a pas d'adversaire, et on le dit franchement. */}
+      {d.classement.length > 1 ? (
+        <div className="border-t border-zinc-100">
+          <div className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
+            Classement · {d.classement.length} participants
+          </div>
+          <div className="divide-y divide-zinc-50">
+            {d.classement.slice(0, 8).map((l) => (
+              <div key={l.userId} className={`flex items-center gap-3 px-4 py-2 text-sm ${
+                l.userId === d.moi ? "bg-emerald-50/60" : ""}`}>
+                <span className="w-6 shrink-0 text-center font-bold text-zinc-400">{l.rank}</span>
+                <span className="min-w-0 flex-1 truncate text-zinc-800">
+                  {l.name}{l.userId === d.moi && <span className="ml-1 text-xs text-emerald-600">(toi)</span>}
+                </span>
+                {l.done && <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" />}
+                <span className="shrink-0 tabular-nums font-semibold text-zinc-900">
+                  {nb(l.value)} <span className="text-xs font-normal text-zinc-400">{metricUnit(d.metric)}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : d.joined && (
+        <p className="border-t border-zinc-100 px-4 py-2 text-[11px] text-zinc-400">
+          Tu es seul inscrit — le classement apparaîtra dès qu&apos;un autre athlète participera.
+        </p>
+      )}
     </article>
   );
 }

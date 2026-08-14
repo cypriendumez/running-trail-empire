@@ -44,22 +44,27 @@ function Avatar({ author, size = 40 }: { author?: Author | null; size?: number }
   );
 }
 
-export function SocialHub({ recentWorkouts }: { recentWorkouts: Workout[] }) {
+export function SocialHub({ recentWorkouts, clubs = [] }: {
+  recentWorkouts: Workout[];
+  /** Clubs dont l'athlète est membre — seuls ceux-là peuvent filtrer son fil. */
+  clubs?: { id: string; name: string }[];
+}) {
   const [tab, setTab] = useState<"feed" | "athletes">("feed");
   const [posts, setPosts] = useState<Post[]>([]);
   const [followingCount, setFollowingCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [club, setClub] = useState<string>("");
 
   const loadFeed = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch("/api/social/feed");
+      const r = await fetch(`/api/social/feed${club ? `?club=${club}` : ""}`);
       const j = await r.json();
       setPosts(j.posts ?? []);
       setFollowingCount(j.followingCount ?? 0);
     } catch { /* le fil reste vide, l'écran le dit explicitement */ }
     setLoading(false);
-  }, []);
+  }, [club]);
 
   useEffect(() => { void loadFeed(); }, [loadFeed]);
 
@@ -91,6 +96,19 @@ export function SocialHub({ recentWorkouts }: { recentWorkouts: Workout[] }) {
         ))}
       </div>
 
+      {tab === "feed" && clubs.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {[{ id: "", name: "Tout le fil" }, ...clubs].map((c) => (
+            <button key={c.id || "tout"} onClick={() => setClub(c.id)}
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                club === c.id ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                              : "border-zinc-200 text-zinc-500 hover:border-zinc-300"}`}>
+              {c.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       {tab === "feed" ? (
         <>
           <Composer workouts={recentWorkouts} onPublished={loadFeed} />
@@ -99,7 +117,7 @@ export function SocialHub({ recentWorkouts }: { recentWorkouts: Workout[] }) {
               <div key={i} className="h-44 animate-pulse rounded-2xl bg-zinc-100" />
             ))}</div>
           ) : posts.length === 0 ? (
-            <EmptyFeed followingCount={followingCount} onFind={() => setTab("athletes")} />
+            <EmptyFeed followingCount={followingCount} club={club ? clubs.find((c) => c.id === club)?.name ?? null : null} onFind={() => setTab("athletes")} />
           ) : (
             <div className="space-y-4">
               {posts.map((p) => <PostCard key={p.id} post={p} onChange={loadFeed} />)}
@@ -118,8 +136,18 @@ export function SocialHub({ recentWorkouts }: { recentWorkouts: Workout[] }) {
  * personne » appelle l'annuaire, « personne n'a rien publié » appelle la publication.
  * Un message unique « rien à afficher » serait un cul-de-sac.
  */
-function EmptyFeed({ followingCount, onFind }: { followingCount: number; onFind: () => void }) {
-  const seul = followingCount === 0;
+function EmptyFeed({ followingCount, club, onFind }: { followingCount: number; club?: string | null; onFind: () => void }) {
+  const seul = followingCount === 0 && !club;
+  if (club) {
+    return (
+      <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-10 text-center">
+        <p className="font-semibold text-zinc-900">Rien dans {club}</p>
+        <p className="mx-auto mt-1 max-w-sm text-sm text-zinc-500">
+          Aucun membre de ce club n&apos;a publié de séance visible pour toi.
+        </p>
+      </div>
+    );
+  }
   return (
     <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-10 text-center">
       <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50">

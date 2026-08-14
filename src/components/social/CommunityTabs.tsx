@@ -27,7 +27,7 @@ type Workout = {
   distance_km?: number | null; duration_seconds?: number | null; elevation_gain_m?: number | null;
 };
 
-export function CommunityTabs({ recentWorkouts, socialReady = true }: { recentWorkouts: Workout[]; socialReady?: boolean }) {
+export function CommunityTabs({ recentWorkouts, socialReady = true, clubs = [] }: { recentWorkouts: Workout[]; socialReady?: boolean; clubs?: { id: string; name: string }[] }) {
   // Si le socle social n'est pas encore activé en base, on ouvre sur l'Actualité :
   // mieux vaut montrer ce qui marche que la coquille de ce qui n'existe pas encore.
   const [vue, setVue] = useState<"club" | "actu">(socialReady ? "club" : "actu");
@@ -46,7 +46,7 @@ export function CommunityTabs({ recentWorkouts, socialReady = true }: { recentWo
       </div>
       {vue === "club"
         ? (socialReady
-            ? <SocialHub recentWorkouts={recentWorkouts} />
+            ? <SocialHub recentWorkouts={recentWorkouts} clubs={clubs} />
             : <SocleEnAttente />)
         : <CommunityFeed />}
     </div>

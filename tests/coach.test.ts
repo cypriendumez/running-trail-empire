@@ -1316,6 +1316,33 @@ test("deux appareils simultanés ne cassent pas le cache définitivement", () =>
 });
 
 console.log("\nDÉFIS — la progression se mesure, elle ne se stocke pas");
+test("le fil filtré par club ne retombe JAMAIS sur le fil général", () => {
+  // Un club sans membre visible doit donner un fil VIDE, qui dit la vérité, et non
+  // les publications de nos abonnements — l'athlète croirait que le club publie.
+  const code = codeOf("src/app/api/social/feed/route.ts");
+  const i = code.indexOf("if (clubId)");
+  assert.ok(i > 0, "le filtre par club doit exister");
+  const bloc = code.slice(i, i + 700);
+  assert.ok(/authors = \(membres/.test(bloc), "les auteurs doivent être REMPLACÉS par les membres du club");
+  assert.ok(/!authors\.length/.test(bloc), "un club sans membre doit court-circuiter vers un fil vide");
+});
+test("le classement des défis n'expose pas les profils en entier", () => {
+  // Une colonne sensible ajoutée demain (e-mail, clé API) se retrouverait publiée
+  // dans un classement visible de tous les participants.
+  const code = codeOf("src/app/dashboard/clubs/page.tsx");
+  assert.ok(!/from\("profiles"\)\s*\.\s*select\("\*"\)/.test(code), "colonnes de profil à énumérer");
+  assert.ok(/select\("id, full_name"\)/.test(code), "seuls l'identifiant et le nom sont nécessaires");
+});
+test("le survol n'anime plus la caméra image par image", () => {
+  // `jumpTo` à 60 images/s forçait un recalcul complet et une salve de tuiles à
+  // chaque image : MapLibre n'en rendait qu'une sur trois, d'où les saccades.
+  const code = codeOf("src/components/segments/Flyover.tsx");
+  assert.ok(!/jumpTo/.test(code), "jumpTo par image doit avoir disparu");
+  assert.ok(/easeTo/.test(code), "la caméra doit enchaîner des easeTo");
+  assert.ok(/easing:/.test(code), "un easing LINÉAIRE évite 60 petits à-coups");
+});
+
+
 const DEFI = (o: Partial<Challenge> = {}): Challenge =>
   ({ id: "d1", name: "100 km", metric: "distance", target: 100, starts_on: "2026-08-01", ends_on: "2026-08-31", ...o });
 const W2 = (date: string, km: number, dplus = 0, sport = "Run") =>

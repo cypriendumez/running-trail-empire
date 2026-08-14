@@ -20,11 +20,14 @@ export default async function CommunautePage() {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: workouts }, published] = await Promise.all([
+  const [{ data: workouts }, published, mesClubs] = await Promise.all([
     sb.from("workouts")
       .select("id, title, type, sport, date, distance_km, duration_seconds, elevation_gain_m")
       .eq("user_id", user.id).order("date", { ascending: false }).limit(12),
     sb.from("activity_posts").select("workout_id").eq("user_id", user.id).not("workout_id", "is", null),
+    // Seuls les clubs dont l'athlète est MEMBRE peuvent filtrer son fil : proposer
+    // un club qu'il n'a pas rejoint donnerait un filtre systématiquement vide.
+    sb.from("club_members").select("club_id, clubs!inner(id, name)").eq("user_id", user.id),
   ]);
 
   // Les tables sociales arrivent par une migration MANUELLE (019). Tant qu'elle n'est
@@ -36,5 +39,14 @@ export default async function CommunautePage() {
   const dejaPublie = new Set((published.data ?? []).map((p) => String((p as { workout_id: string }).workout_id)));
   const recent = (workouts ?? []).filter((w) => !dejaPublie.has(String((w as { id: string }).id))).slice(0, 8);
 
-  return <CommunityTabs recentWorkouts={recent as never} socialReady={socialReady} />;
+  // PostgREST rend la relation imbriquée sous forme de TABLEAU même pour un
+  // « à-un » : on aplatit plutôt que de supposer un objet, sinon le filtre
+  // resterait vide sans la moindre erreur.
+  const clubs = (mesClubs.data ?? []).flatMap((m) => {
+    const rel = (m as unknown as { clubs?: unknown }).clubs;
+    const liste = Array.isArray(rel) ? rel : rel ? [rel] : [];
+    return liste.map((c) => ({ id: String((c as { id: string }).id), name: String((c as { name: string }).name) }));
+  });
+
+  return <CommunityTabs recentWorkouts={recent as never} socialReady={socialReady} clubs={clubs} />;
 }
