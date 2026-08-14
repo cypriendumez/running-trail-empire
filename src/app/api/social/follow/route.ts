@@ -11,6 +11,21 @@ import { suggestable } from "@/lib/social/feed";
  */
 const ATHLETE_COLS = "id, full_name, avatar_url, league, discipline_score";
 
+/**
+ * On lit `athletes_publics` (migration 022) et NON `profiles`.
+ *
+ * Défaut réel : `profiles` n'expose que `profiles_select_own` (auth.uid() = id).
+ * Cette route lisait donc uniquement la ligne de l'utilisateur lui-même, que
+ * `suggestable` écarte ensuite — la liste d'athlètes était VIDE pour tout le monde
+ * et la recherche ne trouvait jamais personne. Indétectable tant qu'il n'y a qu'un
+ * seul inscrit : une liste vide ressemble à « personne à suggérer ».
+ *
+ * La vue n'expose que les colonnes publiques ; ouvrir la RLS de `profiles` aurait
+ * exposé la clé intervals.icu, l'e-mail et les identifiants Stripe, la RLS
+ * travaillant par LIGNE et non par colonne.
+ */
+const TABLE_ATHLETES = "athletes_publics";
+
 /** Athlètes ayant explicitement refusé d'apparaître dans la Communauté. */
 async function hiddenAthletes(sb: Awaited<ReturnType<typeof createClient>>): Promise<Set<string>> {
   const { data } = await sb.from("notifications").select("user_id, data").eq("type", "user_settings");
@@ -32,7 +47,7 @@ export async function GET(req: Request) {
 
   const q = new URL(req.url).searchParams.get("q")?.trim() ?? "";
 
-  let query = sb.from("profiles").select(ATHLETE_COLS).eq("onboarding_completed", true).limit(30);
+  let query = sb.from(TABLE_ATHLETES).select(ATHLETE_COLS).eq("onboarding_completed", true).limit(30);
   if (q) query = query.ilike("full_name", `%${q}%`);
   const [{ data: rows }, { data: following }, hidden] = await Promise.all([
     query,

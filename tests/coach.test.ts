@@ -2473,6 +2473,32 @@ test("la règle vit AUSSI en base, pas seulement dans la route", () => {
   assert.ok(/f1\.follower_id = auth\.uid\(\)/.test(sql) && /f2\.follower_id = p\.user_id/.test(sql),
     "la réciprocité du suivi n'est pas vérifiée en base");
 });
+test("une politique RLS ne joint JAMAIS profiles", () => {
+  // Piège trouvé en production : une sous-requête dans une politique RLS est elle-même
+  // soumise à la RLS de la table jointe. `profiles` n'expose que `profiles_select_own`,
+  // donc `join profiles` dans une politique ne renvoie rien dès qu'il s'agit d'autrui —
+  // et la condition devient fausse. La migration 021 refusait ainsi TOUT commentaire
+  // sur la publication d'un autre, y compris sur un compte public.
+  const sql = readFileSync("supabase/migrations/022_lecture_athletes.sql", "utf8")
+    .split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
+  assert.ok(!/join\s+profiles/i.test(sql), "la politique joint encore profiles");
+  assert.ok(/security definer/i.test(sql), "la lecture du drapeau doit passer par une fonction security definer");
+  assert.ok(/set search_path = public/i.test(sql), "une fonction security definer sans search_path figé est détournable");
+  assert.ok(/revoke all on function/i.test(sql), "la fonction doit être fermée avant d'être ouverte aux inscrits");
+});
+test("la vitrine des athlètes n'expose AUCUNE colonne sensible", () => {
+  // La RLS travaille par LIGNE, pas par colonne : ouvrir `profiles` aurait exposé la
+  // clé intervals.icu, l'e-mail et les identifiants Stripe à tout inscrit via PostgREST.
+  const sql = readFileSync("supabase/migrations/022_lecture_athletes.sql", "utf8");
+  const vue = sql.slice(sql.indexOf("create or replace view"), sql.indexOf("comment on view"));
+  for (const secret of ["intervals_api_key", "email", "stripe", "last_lat", "last_lon", "health"]) {
+    assert.ok(!new RegExp(secret, "i").test(vue), `la vue expose « ${secret} »`);
+  }
+  assert.ok(!/select\s+\*/i.test(vue), "les colonnes doivent être énumérées, jamais select *");
+  // Et l'application doit réellement lire la vue, pas la table.
+  const route = codeOf("src/app/api/social/follow/route.ts");
+  assert.ok(!/from\("profiles"\)/.test(route), "la route lit encore profiles au lieu de la vue");
+});
 test("les migrations récentes ne contiennent AUCUNE instruction DROP", () => {
   // L'éditeur SQL de Supabase signale toute instruction DROP comme destructive et
   // impose une confirmation « Potential issue detected ». Cette migration a été écrite

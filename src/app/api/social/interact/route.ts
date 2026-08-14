@@ -47,7 +47,11 @@ export async function POST(req: Request) {
     // Compte privé : uniquement les amis, c'est-à-dire un suivi dans les DEUX sens.
     const auteurId = String((post as { user_id: string }).user_id);
     const [{ data: auteur }, { data: jeSuis }, { data: ilMeSuit }] = await Promise.all([
-      sb.from("profiles").select("is_private").eq("id", auteurId).maybeSingle(),
+      // `athletes_publics` et non `profiles` : la RLS de `profiles` ne laisse lire
+      // que sa propre ligne, si bien que le drapeau d'un AUTRE athlète revenait
+      // toujours nul — et le repli « compte public » s'appliquait à tout le monde.
+      // La règle privée n'aurait donc jamais mordu, en silence.
+      sb.from("athletes_publics").select("is_private").eq("id", auteurId).maybeSingle(),
       sb.from("follows").select("following_id").eq("follower_id", user.id).eq("following_id", auteurId).eq("status", "accepted").maybeSingle(),
       sb.from("follows").select("following_id").eq("follower_id", auteurId).eq("following_id", user.id).eq("status", "accepted").maybeSingle(),
     ]);
