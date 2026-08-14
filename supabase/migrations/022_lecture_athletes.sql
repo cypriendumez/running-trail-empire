@@ -8,7 +8,7 @@
 --     sous-requête dans une politique RLS est ELLE-MÊME soumise à la RLS de la table
 --     jointe, et `profiles` n'expose que `profiles_select_own` (auth.uid() = id).
 --     La jointure ne renvoie donc RIEN dès qu'il s'agit du profil d'un autre :
---     l'condition devient fausse et TOUT commentaire sur la publication d'autrui est
+--     la condition devient fausse et TOUT commentaire sur la publication d'autrui est
 --     refusé — y compris sur un compte public. Invisible aujourd'hui : un seul
 --     inscrit, aucune publication en base.
 --
@@ -100,7 +100,7 @@ create or replace view public.athletes_publics as
 comment on view public.athletes_publics is
   'Colonnes PUBLIQUES d''un athlète. profiles reste fermée (clé intervals.icu, e-mail, Stripe).';
 
--- La vue s''exécute avec les droits de son propriétaire (comportement par défaut) :
+-- La vue s'exécute avec les droits de son propriétaire (comportement par défaut) :
 -- elle traverse donc la RLS de `profiles`, ce qui est tout son objet. Seuls les
 -- inscrits peuvent la lire.
 revoke all on public.athletes_publics from public;
