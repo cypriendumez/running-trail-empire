@@ -2220,7 +2220,7 @@ test("sans cross-training, on ne dit rien du tout", () => {
 console.log("\nBUDGET DE QUALITÉ — la fatigue ne doit pas vider une préparation");
 const qb = (o: Partial<Parameters<typeof computeQualityBudget>[0]> = {}) => computeQualityBudget({
   level: "confirme", goal: "marathon", phase: "DÉVELOPPEMENT", noHistory: false, pains: [],
-  hrvDown: false, badNight: false, acr: 1.0, tsb: 0, rpeHigh: false, rpeAvg: null,
+  hrvDown: false, hrvUp: false, badNight: false, acr: 1.0, tsb: 0, rpeHigh: false, rpeAvg: null,
   hardTimePct: null, fadeSec: null, plateau: false, noMaxEffort: false, runYears: 5,
   weightLossMaxQuality: null, hasObjective: true, daysToRace: 72, isShortGoal: false, ...o,
 });
@@ -2286,6 +2286,39 @@ test("une séance déjà allégée ne l'est pas deux fois", () => {
   // Et la mention doit tout de même être là une fois : la séance EST raccourcie.
   const q = buildWeekPlan(c).find((d) => d.type === "Seuil");
   assert.ok(q && /\(allégée\)/.test(q.title), "la séance raccourcie doit être annoncée comme telle");
+});
+test("la VFC peut RENDRE ce qu'elle prend : le corps contredit l'arithmétique", () => {
+  // La VFC ne servait qu'à punir : une baisse coûtait une séance, une hausse ne rendait
+  // jamais rien. Cas réel, 14/08/2026 : VFC 7 j à +22 % et au plus haut de tout
+  // l'historique, sommeil ~7 h, aucune douleur — et le plan proposait quatre footings de
+  // 25 min d'affilée à un athlète qui courait 73 km cette semaine-là, parce que le ratio
+  // aigu:chronique était à 2,0 APRÈS TROIS SEMAINES D'ARRÊT. Ce ratio n'est pas une
+  // mesure de fatigue : c'est un indicateur de risque calculé sur une charge de fond
+  // effondrée par la coupure. La VFC, elle, mesure l'état réel du système nerveux.
+  const r = qb({ acr: 1.92, tsb: -35, hrvUp: true });
+  assert.equal(r.qBudget, 2, "la qualité doit être maintenue quand le corps dit qu'il va bien");
+  assert.equal(r.easeReasons.length, 0, "aucun allègement : ce n'est pas une fatigue mesurée");
+  assert.equal(r.bodySaysFresh, true);
+  // Mais on ne fait pas SEMBLANT de ne pas avoir vu la charge.
+  assert.equal(r.notes.length, 1, "la charge élevée doit être ANNONCÉE, même si elle ne coûte rien");
+  assert.ok(/ratio aigu:chronique/.test(r.notes[0]) && /VFC/.test(r.notes[0]), r.notes[0]);
+});
+test("une VFC haute n'excuse NI une douleur NI une nuit dégradée", () => {
+  // Le risque du correctif précédent : que la VFC devienne un laissez-passer permanent.
+  assert.equal(qb({ acr: 1.92, tsb: -35, hrvUp: true, pains: ["tendon d'Achille"] }).bodySaysFresh, false);
+  assert.equal(qb({ acr: 1.92, tsb: -35, hrvUp: true, badNight: true }).bodySaysFresh, false);
+  // …et dans ces deux cas la charge redevient un motif d'allègement.
+  assert.ok(qb({ acr: 1.92, tsb: -35, hrvUp: true, pains: ["mollet"] }).easeReasons.some((x) => /charge récente/.test(x)));
+  assert.ok(qb({ acr: 1.92, tsb: -35, hrvUp: true, badNight: true }).easeReasons.some((x) => /charge récente/.test(x)));
+});
+test("sans VFC en hausse, la charge coûte toujours une séance", () => {
+  // Le comportement de référence ne doit pas bouger : le correctif n'ouvre une porte
+  // QUE sur une preuve physiologique positive, pas par défaut.
+  const r = qb({ acr: 1.92, tsb: -35 });
+  assert.equal(r.bodySaysFresh, false);
+  assert.equal(r.qBudget, 1);
+  assert.equal(r.easeReasons.length, 1);
+  assert.equal(r.notes.length, 0);
 });
 test("le budget STRUCTUREL ignore la fatigue du moment", () => {
   // Il porte la feuille de route des semaines suivantes : une mauvaise nuit ne doit pas

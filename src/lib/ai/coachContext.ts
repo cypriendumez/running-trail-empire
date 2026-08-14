@@ -801,6 +801,7 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const qb = computeQualityBudget({
     level: libLevel, goal: libGoal, phase, noHistory, pains,
     hrvDown: !!hrvWeekTrend?.startsWith("↓"),
+    hrvUp: !!hrvWeekTrend?.startsWith("↑"),
     badNight,
     badNightLabel: `${freshSleep?.sleep_score ?? "?"}/100${lastSleepMin ? `, ${Math.floor(lastSleepMin / 60)}h${String(lastSleepMin % 60).padStart(2, "0")}` : ""}`,
     acr: load.acr, tsb: load.tsb,
@@ -828,8 +829,23 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // Quand une part notable de la charge vient d'un autre sport, on le NOMME.
   const crossBlame = cross.sharePct >= 20 && cross.label ? `, dont ${cross.sharePct} % venant d'un autre sport (${cross.label})` : "";
   if (pains.length) redFlags.push(`douleur en cours (${pains.join(", ")})`);
-  if (load.acr > 1.8) redFlags.push(`ratio aigu:chronique ${frNum(load.acr, 1)} (zone de risque de blessure)${crossBlame}`);
-  if (load.tsb < -30) redFlags.push(`TSB ${frNum(load.tsb)} (fatigue profonde)${crossBlame}`);
+  // ── LA CHARGE SEULE NE SUFFIT PLUS À DÉCLARER ROUGE ─────────────────────────
+  // Le feu rouge annule l'intensité du JOUR. Comme le plan est republié chaque jour et
+  // que le ratio aigu:chronique met des semaines à redescendre après une coupure, CHAQUE
+  // journée devenait « Récupération » : quatre footings de 25 min d'affilée relevés sur
+  // le calendrier d'un athlète qui courait 73 km cette semaine-là, VFC au plus haut de
+  // son historique. Un plan qu'on ignore ne protège plus personne.
+  //
+  // Quand la physiologie (VFC nettement au-dessus de sa base, sommeil correct, aucune
+  // douleur) contredit l'arithmétique de charge, le verdict passe donc en ORANGE —
+  // séance allégée, pas séance annulée — et la contradiction est ÉCRITE. Douleur, VFC en
+  // baisse et double signal gardent, eux, le feu rouge.
+  const loadRedOnly = qb.bodySaysFresh;
+  const loadFlag = (msg: string) => { if (loadRedOnly) orangeFlags.push(msg); else redFlags.push(msg); };
+  if (load.acr > 1.8) loadFlag(`ratio aigu:chronique ${frNum(load.acr, 1)} (zone de risque de blessure)${crossBlame}`);
+  if (load.tsb < -30) loadFlag(`TSB ${frNum(load.tsb)} (fatigue profonde)${crossBlame}`);
+  // La contradiction est un CONSTAT, pas un signal négatif : elle est affichée à part.
+  for (const n of qb.notes) orangeFlags.push(n);
   if (hrvWeekTrend?.startsWith("↓") && badNight) redFlags.push("VFC en baisse ET nuit dégradée (double signal)");
   if (hrvWeekTrend?.startsWith("↓")) orangeFlags.push("VFC sous sa base");
   if (badNight) orangeFlags.push(`sommeil dégradé (${freshSleep?.sleep_score ?? "?"}/100)`);

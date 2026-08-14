@@ -45,6 +45,15 @@ export type QualityBudgetInput = {
   pains: string[];
   /** VFC sous sa ligne de base. */
   hrvDown: boolean;
+  /** VFC NETTEMENT au-dessus de sa base (7 j vs 7 j précédents).
+   *
+   *  La VFC ne servait qu'à PUNIR : une baisse coûtait une séance, une hausse ne rendait
+   *  jamais rien. Le corps n'avait donc aucun moyen de contredire l'arithmétique de
+   *  charge. Cas réel : VFC à +22 % sur sept jours, au plus haut de tout l'historique,
+   *  sommeil correct, aucune douleur — et le plan proposait quatre jours de footing de
+   *  25 min d'affilée parce que le ratio aigu:chronique était à 2,0 après trois semaines
+   *  d'arrêt. L'athlète a évidemment ignoré le plan, ce qui ne protège plus personne. */
+  hrvUp: boolean;
   /** Nuit dégradée (score < 60 ou moins de 6 h), avec son libellé déjà formaté. */
   badNight: boolean;
   badNightLabel?: string;
@@ -88,6 +97,13 @@ export type QualityBudget = {
   /** La séance a-t-elle été SAUVÉE par le plancher « objectif » ? Si oui elle doit être
    *  prescrite RACCOURCIE, et le plan doit dire pourquoi. */
   floored: boolean;
+  /** Ce qu'on a décidé de NE PAS retenir contre l'athlète, et pourquoi. Un allègement
+   *  annulé doit se dire : sinon le coach paraît ignorer une charge qu'il a bien vue. */
+  notes: string[];
+  /** La physiologie a-t-elle contredit l'arithmétique de charge (VFC nettement au-dessus
+   *  de sa base, sommeil correct, aucune douleur) ? Le verdict de fraîcheur du jour doit
+   *  en tenir compte, sinon il continue de transformer chaque journée en récupération. */
+  bodySaysFresh: boolean;
 };
 
 /** Un objectif à plus de 16 semaines laisse le temps d'une vraie coupure ; en deçà,
@@ -122,13 +138,30 @@ export function computeQualityBudget(i: QualityBudgetInput): QualityBudget {
   // Ratio aigu:chronique et TSB décrivent le même phénomène par deux bouts. Les
   // additionner, c'est punir deux fois une montée en charge normale (cf. en-tête).
   const acrHigh = i.acr > 1.5, tsbLow = i.tsb < -25;
+  // ── ET LE CORPS A LE DROIT DE CONTREDIRE L'ARITHMÉTIQUE ──────────────────────
+  // Le ratio aigu:chronique n'est pas une mesure de fatigue : c'est un indicateur
+  // statistique de RISQUE, calculé sur une charge de fond. Après trois semaines
+  // d'arrêt, cette charge de fond est effondrée — n'importe quelle reprise saine
+  // affiche alors un ratio « de risque », y compris chez quelqu'un de parfaitement
+  // frais. La VFC, elle, mesure vraiment l'état du système nerveux autonome.
+  // Quand les deux se contredisent, on croit le corps, pas la division.
+  // (Relevé : VFC +22 % sur 7 j, au plus haut de tout l'historique, sommeil ~7 h,
+  // aucune douleur — et zéro qualité prescrite pendant que l'athlète courait 73 km.)
+  const bodySaysFresh = i.hrvUp && !i.badNight && i.pains.length === 0;
+  const notes: string[] = [];
   if (acrHigh || tsbLow) {
-    qBudget -= 1;
     const parts = [
       acrHigh ? `ratio aigu:chronique ${frNum(r1(i.acr), 1)}` : null,
       tsbLow ? `TSB ${frNum(Math.round(i.tsb))}` : null,
     ].filter(Boolean);
-    easeReasons.push(`charge récente très supérieure à la charge de fond (${parts.join(", ")})`);
+    if (bodySaysFresh) {
+      // On ne fait pas SEMBLANT de ne pas avoir vu la charge : on l'annonce, et on dit
+      // pourquoi elle ne coûte rien cette fois.
+      notes.push(`charge récente élevée (${parts.join(", ")}) MAIS VFC nettement au-dessus de sa base, sommeil correct et aucune douleur : la qualité est maintenue. À surveiller si la VFC redescend.`);
+    } else {
+      qBudget -= 1;
+      easeReasons.push(`charge récente très supérieure à la charge de fond (${parts.join(", ")})`);
+    }
   }
 
   if (i.rpeHigh) { qBudget -= 1; easeReasons.push(`ressenti élevé sur ses dernières séances (RPE moyen ${i.rpeAvg}/10)`); }
@@ -171,6 +204,8 @@ export function computeQualityBudget(i: QualityBudgetInput): QualityBudget {
   if (i.weightLossMaxQuality != null) qBudget = Math.min(qBudget, i.weightLossMaxQuality);
 
   return {
+    notes,
+    bodySaysFresh,
     qBudget,
     structuralQBudget,
     easeReasons,
