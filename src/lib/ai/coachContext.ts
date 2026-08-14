@@ -9,6 +9,8 @@ import { terrainCoachBlock } from "@/data/terrainCatalog";
 import { forecastWithElevation, altitudeLossPct, heatAdvice, windAdvice, archiveDailyMax, heatAcclimation, type DayWeather } from "@/lib/weather/openMeteo";
 import { bestVmaFromWorkouts, vmaFromPaceCurve, vmaFromVo2max } from "@/lib/running/fitness";
 import { isRun } from "@/lib/intervals/sport";
+import { summarizeCross, fmtMinutes, type CrossSummary } from "@/lib/coach/crossTraining";
+import { computeQualityBudget } from "@/lib/coach/qualityBudget";
 import { warmCoolMin } from "@/lib/watch/intervals";
 
 type SB = Awaited<ReturnType<typeof createClient>>;
@@ -143,7 +145,17 @@ export type AthleteContext = {
   athleteName: string;
   vma: number | null; // VMA km/h (test enregistré ou estimée) — pour les cibles d'allure montre.
   // Squelette de semaine déterministe → permet de VALIDER/corriger le plan de l'IA.
-  weekPlan: { qBudget: number; quality: { type: string; desc: string }[]; easyPace: string | null; eased: boolean };
+  weekPlan: {
+    qBudget: number; quality: { type: string; desc: string }[]; easyPace: string | null; eased: boolean;
+    /** La dernière qualité n'a survécu que grâce au plancher « préparation en cours » :
+     *  elle doit être prescrite RACCOURCIE, et le plan doit dire pourquoi. Sans ce
+     *  drapeau, le plan afficherait une séance normale au milieu d'une semaine allégée. */
+    floored: boolean;
+  };
+  /** Sport pratiqué EN DEHORS de la course sur 7 jours, en minutes et en TSS.
+   *  Exposé au plan déterministe (et pas seulement au prompt de l'IA) pour qu'un
+   *  allègement dû à une semaine de vélo ou de randonnée puisse le DIRE. */
+  cross: CrossSummary;
   longRunMode: "run" | "bike"; // préférence : sortie longue en course ou remplacée par du vélo (cross-training)
   // Verdict de fraîcheur du jour (déterministe) — affiché au coach et imposé à l'IA.
   readiness: { level: "vert" | "jaune" | "orange" | "rouge"; reasons: string[]; advice: string };
@@ -281,8 +293,10 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const longestRecentKm = Math.max(0, ...runs
     .filter(w => now - new Date(w.date).getTime() <= 42 * 86400000)
     .map(w => w.distance_km ?? 0));
-  const crossKm7 = workouts.filter(w => !isRun(w.sport) && now - new Date(w.date).getTime() <= 7 * 86400000)
-    .reduce((s, w) => s + (w.distance_km ?? 0), 0);
+  // CROSS-TRAINING — en MINUTES et en TSS, jamais en kilomètres : 40 km de vélo et 2 km
+  // de bassin ne s'additionnent pas, et une heure de home-trainer ou de renfo (aucune
+  // distance) valait zéro donc restait invisible. Voir lib/coach/crossTraining.
+  const cross = summarizeCross(workouts, now, 7);
   const load = computeLoad(workouts);
   // Jours sans COURIR : randonner tous les jours ne maintient pas la spécificité.
   // Compter la rando ici masquait une coupure de course sous une fausse régularité.
@@ -760,70 +774,31 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
         : "✅ Allure tenue du début à la fin : la charge était bien calibrée."}`
     : null;
 
-  let qBudget = libLevel === "debutant" ? 1 : libLevel === "intermediaire" ? 2 : 3;
-  if (libGoal === "marathon" || libGoal === "ultra") qBudget -= 1; // le volume prime → un cran de moins
-  if (phase.startsWith("BASE")) qBudget = Math.min(qBudget, libLevel === "debutant" ? 1 : 2);
-  else if (phase.startsWith("AFFÛTAGE")) qBudget = Math.min(qBudget, 2); // garde l'intensité, coupe le volume
-  // Atténuations SÉCURITÉ selon l'état réel (chaque signal fort = −1 séance dure).
-  // Budget de qualité STRUCTUREL — celui que justifient le niveau, l'objectif et la
-  // phase, avant tout allègement lié à l'état du jour. La feuille de route des semaines
-  // à venir doit s'appuyer dessus : une fatigue passagère ne dicte pas deux mois de plan.
-  const structuralQBudget = Math.max(1, Math.min(3, qBudget));
-  // ── ATHLÈTE INCONNU : PAS DE QUALITÉ ─────────────────────────────────────────
-  // Un compte neuf n'a ni historique, ni VMA, ni signal de fatigue — donc aucun motif
-  // d'allègement, un verdict « vert » par défaut et un budget de qualité hérité du
-  // niveau. Résultat constaté sur un profil vide : SÉANCE DE VMA DÈS LE PREMIER JOUR.
-  // Aucun coach ne prescrit du fractionné à quelqu'un qu'il n'a jamais vu courir : sans
-  // allure de référence, la séance est à la fois inutilisable et dangereuse. La première
-  // semaine sert à observer.
-  const noHistory = runs.length === 0;
-  const easeReasons: string[] = [];
-  if (noHistory) { qBudget = 0; easeReasons.push("aucun historique d'entraînement : semaine d'observation avant toute intensité"); }
-  if (pains.length) { qBudget -= 1; easeReasons.push("douleur signalée"); }
-  if (hrvWeekTrend?.startsWith("↓")) { qBudget -= 1; easeReasons.push("VFC en baisse"); }
-  if (load.acr > 1.5) { qBudget -= 1; easeReasons.push(`charge aiguë élevée (ratio ${r1(load.acr)})`); }
-  if (load.tsb < -25) { qBudget -= 1; easeReasons.push(`TSB très négatif (${Math.round(load.tsb)})`); }
   // SOMMEIL : une nuit courte dégrade la tolérance à l'intensité AVANT de se voir sur la VFC.
   // On ne compte que la nuit dernière si la montre a été portée (sinon la donnée est absente,
   // pas mauvaise) — un score bas OU moins de 6 h coûtent une séance dure.
-  const badNight = freshSleep && ((freshSleep.sleep_score != null && freshSleep.sleep_score < 60) || (lastSleepMin != null && lastSleepMin < 360));
-  // Trop d'intensité SUBIE : quand plus de 25 % du temps se passe en Z3+, l'athlète
-  // court ses footings trop vite. Ajouter de la qualité par-dessus l'enfoncerait ;
-  // on en retire une et on lui dit franchement quoi corriger.
-  if (rpeHigh) { qBudget -= 1; easeReasons.push(`ressenti élevé sur ses dernières séances (RPE moyen ${rpeAvg}/10)`); }
-  if (hardTimePct != null && hardTimePct > 25) { qBudget -= 1; easeReasons.push(`${hardTimePct} % du temps en Z3+ (footings courus trop vite)`); }
-  // Prescrit vs réalisé : le décrochage sur la dernière série est le signal le plus
-  // direct qu'on ait. S'il a perdu du temps au fil des répétitions, la séance était
-  // au-dessus de ses moyens du moment — on n'en rajoute pas une couche la semaine
-  // suivante. Seuil à 10 s/km : en deçà, c'est du bruit de mesure et de terrain.
+  const badNight = !!freshSleep && ((freshSleep.sleep_score != null && freshSleep.sleep_score < 60) || (lastSleepMin != null && lastSleepMin < 360));
+  const noHistory = runs.length === 0;
   const fade = qe?.fadeSec ?? null;
   const faded = fade != null && fade >= 10;
-  if (faded) { qBudget -= 1; easeReasons.push(`décrochage de ${fade} s/km sur sa dernière série (séance trop ambitieuse)`); }
-  // PLATEAU : stagner pendant que la charge monte ne se soigne pas avec plus de charge.
-  // Un plan automatique ne sait qu'ajouter — c'est exactement ainsi qu'il blesse.
-  if (plateau) { easeReasons.push("plateau de progression malgré une charge en hausse"); }
-  if (badNight) { qBudget -= 1; easeReasons.push(`nuit dégradée (${freshSleep?.sleep_score ?? "?"}/100${lastSleepMin ? `, ${Math.floor(lastSleepMin / 60)}h${String(lastSleepMin % 60).padStart(2, "0")}` : ""})`); }
-  // Pathologies interdisant l'effort maximal : on retire d'office la marche la plus haute.
-  if (noMaxEffort) { qBudget = Math.min(qBudget, 1); }
-  // Le PASSIF plafonne la qualité : un cardio de confirmé sur des tendons de 8 mois = blessure.
-  // (Volontairement hors `easeReasons` : ce n'est pas un allègement passager mais une limite
-  // structurelle — le message affiché diffère, et le plancher « objectif chrono » ne doit pas
-  // pouvoir le contourner.)
-  const expCap = runYears == null ? null : runYears < 1 ? 1 : runYears < 3 ? 2 : null;
-  const expCapped = expCap != null && qBudget > expCap;
-  if (expCapped) qBudget = expCap!;
-  qBudget = Math.max(0, Math.min(3, qBudget));
-  // Plancher : sans signal de fatigue, un objectif chrono garde ≥ 2 qualités (sauf débutant).
-  // Le plafond « passif » reste prioritaire : il n'est jamais franchi par un plancher.
-  const floor = (v: number) => { qBudget = Math.max(qBudget, expCap != null ? Math.min(v, expCap) : v); };
-  if (!noHistory && !easeReasons.length && objective && isShortGoal && libLevel !== "debutant") floor(2);
-  if (!noHistory && !easeReasons.length && qBudget === 0 && libLevel !== "debutant") floor(1);
-  // Plafond « perte de poids » — appliqué APRÈS les planchers, donc jamais contournable.
-  // Un athlète en obésité de classe II avec un objectif chrono déclencherait sinon le
-  // plancher « 2 qualités » : deux séances de fractionné par semaine sur des articulations
-  // qui encaissent près de 300 kg par appui, alors que son cardio, lui, suivrait sans
-  // broncher. C'est le scénario type de la périostite de la troisième semaine.
-  if (weightLoss) qBudget = Math.min(qBudget, weightLoss.rules.maxQualityPerWeek);
+  // ── ARBITRAGE DU BUDGET DE QUALITÉ ───────────────────────────────────────────
+  // Extrait dans `lib/coach/qualityBudget` : c'est la décision la plus lourde du coach
+  // et elle était intestable au milieu des requêtes. Deux défauts y ont été corrigés —
+  // la charge comptée deux fois (ratio ET TSB) et le plancher de préparation qui ne
+  // s'appliquait jamais en cas de fatigue. Voir l'en-tête du module.
+  const qb = computeQualityBudget({
+    level: libLevel, goal: libGoal, phase, noHistory, pains,
+    hrvDown: !!hrvWeekTrend?.startsWith("↓"),
+    badNight,
+    badNightLabel: `${freshSleep?.sleep_score ?? "?"}/100${lastSleepMin ? `, ${Math.floor(lastSleepMin / 60)}h${String(lastSleepMin % 60).padStart(2, "0")}` : ""}`,
+    acr: load.acr, tsb: load.tsb,
+    rpeHigh, rpeAvg,
+    hardTimePct, fadeSec: fade, plateau, noMaxEffort, runYears,
+    weightLossMaxQuality: weightLoss ? weightLoss.rules.maxQualityPerWeek : null,
+    hasObjective: !!objective, daysToRace, isShortGoal,
+  });
+  const qBudget = qb.qBudget;
+  const { structuralQBudget, easeReasons, expCapped, expCap } = qb;
 
   // ── VERDICT DE FRAÎCHEUR DU JOUR — calculé, pas laissé à l'appréciation de l'IA ──
   // Un modèle de langage a tendance à « sentir » l'état de forme au fil du texte ; ici on
@@ -836,9 +811,13 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // (bandeau « pourquoi ce plan ») — « 2.4 » et « -44 » au milieu d'une phrase française
   // trahissent une chaîne de débogage, pas une explication.
   const frNum = (n: number, d = 0) => n.toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d }).replace("-", "−");
+  // D'OÙ VIENT LA FATIGUE. Un athlète qui lit « charge aiguë élevée » après une semaine
+  // de randonnée en montagne croit que le coach lui reproche ses kilomètres courus.
+  // Quand une part notable de la charge vient d'un autre sport, on le NOMME.
+  const crossBlame = cross.sharePct >= 20 && cross.label ? `, dont ${cross.sharePct} % venant d'un autre sport (${cross.label})` : "";
   if (pains.length) redFlags.push(`douleur en cours (${pains.join(", ")})`);
-  if (load.acr > 1.8) redFlags.push(`ratio aigu:chronique ${frNum(load.acr, 1)} (zone de risque de blessure)`);
-  if (load.tsb < -30) redFlags.push(`TSB ${frNum(load.tsb)} (fatigue profonde)`);
+  if (load.acr > 1.8) redFlags.push(`ratio aigu:chronique ${frNum(load.acr, 1)} (zone de risque de blessure)${crossBlame}`);
+  if (load.tsb < -30) redFlags.push(`TSB ${frNum(load.tsb)} (fatigue profonde)${crossBlame}`);
   if (hrvWeekTrend?.startsWith("↓") && badNight) redFlags.push("VFC en baisse ET nuit dégradée (double signal)");
   if (hrvWeekTrend?.startsWith("↓")) orangeFlags.push("VFC sous sa base");
   if (badNight) orangeFlags.push(`sommeil dégradé (${freshSleep?.sleep_score ?? "?"}/100)`);
@@ -1442,7 +1421,7 @@ FORME & RÉCUPÉRATION (aujourd'hui)
 - Sommeil : ${freshSleep ? `${freshSleep.sleep_score ?? "?"}/100 cette nuit${lastSleepMin ? ` (${Math.floor(lastSleepMin / 60)}h${String(lastSleepMin % 60).padStart(2, "0")})` : ""}` : "montre non portée la nuit dernière (donnée ignorée)"} · moyenne 7j ${sleepAvg ?? "?"}/100
 
 CHARGE D'ENTRAÎNEMENT
-${demonstratedKm ? `- 📈 CAPACITÉ DÉJÀ DÉMONTRÉE : ${demonstratedKm} km/semaine tenus sur ses meilleures semaines des 6 derniers mois. Son système musculo-tendineux CONNAÎT ce volume — il y reviendra bien plus vite qu'il n'y est monté la première fois. Ne le traite pas comme un débutant sous prétexte que ses dernières semaines sont basses ; mais ne t'en sers pas non plus pour justifier une charge élevée AUJOURD'HUI : c'est la fraîcheur du moment qui en décide.\n` : ""}- Volume : ${Math.round(weekKm)} km COURUS cette semaine${crossKm7 > 3 ? ` (+ ${Math.round(crossKm7)} km d'autres sports — vélo/rando/marche : ça fatigue et ça compte dans la charge, mais ce N'EST PAS du volume de course, ne dimensionne rien dessus)` : ""} · ~${Math.round(avg4wkKm)} km/sem (moy. 4 sem.)
+${demonstratedKm ? `- 📈 CAPACITÉ DÉJÀ DÉMONTRÉE : ${demonstratedKm} km/semaine tenus sur ses meilleures semaines des 6 derniers mois. Son système musculo-tendineux CONNAÎT ce volume — il y reviendra bien plus vite qu'il n'y est monté la première fois. Ne le traite pas comme un débutant sous prétexte que ses dernières semaines sont basses ; mais ne t'en sers pas non plus pour justifier une charge élevée AUJOURD'HUI : c'est la fraîcheur du moment qui en décide.\n` : ""}- Volume : ${Math.round(weekKm)} km COURUS cette semaine${cross.label ? ` (+ ${fmtMinutes(cross.minutes)} d'AUTRES SPORTS, ${cross.tss} TSS = ${cross.sharePct} % de sa charge : ${cross.label}${cross.impactMinutes > 0 ? ` — dont ${fmtMinutes(cross.impactMinutes)} avec impact sur les jambes, qui s'ajoutent à l'usure de la course` : " — sans impact sur les jambes : ça fatigue le cardio, pas les tendons"}. Ça compte dans la charge, mais ce N'EST PAS du volume de course : ne dimensionne AUCUNE séance dessus)` : ""} · ~${Math.round(avg4wkKm)} km/sem (moy. 4 sem.)
 - 🎯 VOLUME CIBLE de la semaine à venir : ~${targetKm} km, dont une sortie longue de ~${longRunKm} km. Dimensionne les séances sur CES chiffres, pas sur des durées passe-partout.
 - 🔄 PHASE DU CYCLE : ${cycleLabel}.
 - 📆 DISPONIBILITÉS : ${availDaysPerWeek} séance(s) de course par semaine${availDays.length < 7 ? `, uniquement les ${availDays.map(d => ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d]).join(", ")}` : ""}${declaredDpw ? " (déclaré par l'athlète)" : " (déduit de son niveau et de sa pratique actuelle — demande-lui de le préciser)"}. NE DÉPASSE PAS ce nombre : un plan qu'il ne peut pas suivre ne vaut rien.
@@ -1484,7 +1463,8 @@ ${catalog}`;
 
   return {
     text, objective, daysToRace, weeksToRace, athleteName: String(p?.full_name ?? "Athlète"), vma,
-    weekPlan: { qBudget, quality: chosen, easyPace: vma ? paceAt(70) : null, eased: easeReasons.length > 0 },
+    weekPlan: { qBudget, quality: chosen, easyPace: vma ? paceAt(70) : null, eased: easeReasons.length > 0, floored: qb.floored },
+    cross,
     longRunMode: bikeLong ? "bike" : "run",
     readiness: { level: readyLevel, reasons: [...redFlags, ...orangeFlags], advice: readinessRule },
     hardGapHours: hardGapH,

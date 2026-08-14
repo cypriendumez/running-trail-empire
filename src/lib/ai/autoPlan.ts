@@ -103,6 +103,13 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
     : "";
   const cycleNote = ctx.cycle.taper ? " ⚠️ Semaine d'AFFÛTAGE : on réduit le volume, pas l'intensité."
     : ctx.cycle.deload ? " ⚠️ Semaine ALLÉGÉE : c'est maintenant que le corps assimile le travail des 3 semaines précédentes." : "";
+  // D'OÙ VIENT LA FATIGUE, quand une part notable ne vient pas de la course. Un athlète
+  // qui rentre d'une semaine de randonnée en montagne doit lire « ta charge vient aussi
+  // de tes 12 h de rando », pas un allègement inexpliqué de ses séances de course.
+  // Optionnel : un `auto_coach_state` sérialisé avant cette version n'a pas ce champ.
+  const crossNote = ctx.cross && ctx.cross.sharePct >= 20 && ctx.cross.label
+    ? ` (dont ${ctx.cross.sharePct} % venant d'un autre sport : ${ctx.cross.label})`
+    : "";
 
   // Météo RÉELLE du jour concerné (prévisions Open-Meteo à la position de l'athlète).
   // On n'ajoute la consigne que si elle change quelque chose : inutile d'alourdir une
@@ -381,11 +388,20 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
     if (idx < 0) for (let i = dayZeroDropped ? 1 : 0; i <= 6; i++) if (canRun(i) && okSpacing(i)) { idx = i; break; }
     if (idx < 0) break; // impossible sans violer la récupération ou le budget → on n'insiste pas
     const title = q.type === "VMA" ? "Séance VMA" : q.type === "Seuil" ? "Séance au seuil" : q.type === "Spécifique" ? "Allure spécifique objectif" : q.type;
+    // ── SÉANCE SAUVÉE PAR LE PLANCHER « PRÉPARATION EN COURS » ──────────────────
+    // Le budget de qualité tombait à zéro dès qu'une montée en charge se voyait dans
+    // les chiffres — c'est-à-dire pendant toute une préparation. Résultat vécu à 72 jours
+    // d'un marathon : semaine entière en footings lents, alors que c'est la période où
+    // l'allure spécifique se construit. On garde donc UNE séance, mais RACCOURCIE et
+    // annoncée comme telle : une qualité allégée n'est pas une qualité normale.
+    const rescued = ctx.weekPlan.floored;
     put(idx, {
-      type: q.type, title,
-      detail: `Échauffement ${warmQ} min progressif FC Z1→Z2 + 3 à 5 lignes droites de 80 m → Corps : ${heatAdjustDesc(q.desc, idx)} → Retour au calme ${cool} min FC Z1.${ctx.cycle.taper ? " ⚠️ Affûtage : garde l'intensité mais coupe le nombre de répétitions d'un tiers." : ""}`,
-      why: "La séance de qualité de ton bloc, calée sur ta VMA et ton objectif. C'est elle qui te fait progresser.",
-      tags: [q.type, "Qualité"],
+      type: q.type, title: rescued ? `${title} (allégée)` : title,
+      detail: `Échauffement ${warmQ} min progressif FC Z1→Z2 + 3 à 5 lignes droites de 80 m → Corps : ${heatAdjustDesc(q.desc, idx)} → Retour au calme ${cool} min FC Z1.${ctx.cycle.taper ? " ⚠️ Affûtage : garde l'intensité mais coupe le nombre de répétitions d'un tiers." : ""}${rescued ? " ⚠️ Version allégée : coupe le nombre de répétitions d'un tiers et garde l'allure. On préserve le stimulus, pas le volume." : ""}`,
+      why: rescued
+        ? `Ta charge récente est très au-dessus de ta charge de fond${crossNote} — mais ton échéance approche et une semaine sans la moindre allure spécifique se paie le jour J. Donc : UNE séance, raccourcie, plutôt que zéro. Si les sensations ne viennent pas à l'échauffement, transforme-la en footing sans culpabiliser.`
+        : "La séance de qualité de ton bloc, calée sur ta VMA et ton objectif. C'est elle qui te fait progresser.",
+      tags: [q.type, "Qualité", ...(rescued ? ["Allégée"] : [])],
     });
     placed.push(idx);
     spend();
@@ -492,7 +508,12 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
         : `Aujourd'hui ton corps demande de la récupération : ${ctx.readiness.reasons.slice(0, 2).join(", ")}. Reporter une séance dure de 24 h ne coûte rien ; la forcer coûte des semaines.`,
       tags: ["Récup", "Z1"] };
   } else if (lvl === "orange" && isHardToday) {
-    week[0] = { ...week[0], title: `${week[0].title} (allégée)`,
+    // Le suffixe n'est ajouté QUE s'il n'y est pas déjà : la séance sauvée par le plancher
+    // « préparation en cours » est posée alléguée dès l'étape 4, et le verdict orange du
+    // jour la ré-annotait — « Séance au seuil (allégée) (allégée) » sur le calendrier
+    // ET sur la montre.
+    const dejaAllegee = / \(allégée\)$/.test(week[0].title);
+    week[0] = { ...week[0], title: dejaAllegee ? week[0].title : `${week[0].title} (allégée)`,
       detail: `${week[0].detail}\n\n⚠️ Version ALLÉGÉE aujourd'hui : réduis le corps de séance d'environ un tiers.`,
       why: `Séance maintenue mais raccourcie : ${ctx.readiness.reasons.slice(0, 2).join(", ")}.` };
   }

@@ -7,6 +7,8 @@
 //  Vitrine des trophées.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { isRun as isRunSport } from "@/lib/intervals/sport";
+
 export type Metric = "distance" | "elevation" | "sessions" | "longest_run";
 
 export type Challenge = {
@@ -27,10 +29,17 @@ export type ChallengeWorkout = {
   elevation_gain_m?: number | null;
 };
 
-/** Seules les séances de course comptent : une sortie vélo ne remplit pas un défi de course. */
+/** Seules les séances de course comptent : une sortie vélo ne remplit pas un défi de course.
+ *
+ *  Le filtre était une liste de mots interdits. Depuis que la table des sports couvre
+ *  toute la nomenclature des montres, ce qui n'y figurait pas passait pour de la course :
+ *  une séance de ski de fond, de renfo ou de tennis remplissait un défi « 100 km ».
+ *  On liste maintenant ce qui EST de la course, pas ce qui ne l'est pas — l'oubli
+ *  d'un sport exclut au lieu d'inclure. Le repli par mots-clés ne sert plus qu'aux
+ *  lignes antérieures à la migration 015, qui n'ont pas de `sport`. */
 const isRun = (w: ChallengeWorkout) => {
-  const s = `${w.sport ?? ""} ${w.type ?? ""}`.toLowerCase();
-  return !/ride|bike|velo|vélo|swim|natation|row|elliptical|hike|rando/.test(s);
+  if (w.sport != null) return isRunSport(w.sport);
+  return !/ride|bike|velo|vélo|swim|natation|row|elliptical|hike|rando/.test(String(w.type ?? "").toLowerCase());
 };
 
 /**

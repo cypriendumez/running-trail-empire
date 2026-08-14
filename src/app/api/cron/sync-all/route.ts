@@ -73,13 +73,8 @@ export async function GET(req: Request) {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function mapActivityType(type: string): string {
-  const map: Record<string, string> = {
-    Run: "easy", TrailRun: "trail", VirtualRun: "easy",
-    Workout: "interval", Ride: "easy", Walk: "recovery", Hike: "trail",
-  };
-  return map[type] ?? "easy";
-}
+// Le rôle de la séance vient de `lib/intervals/sport` — table UNIQUE. Trois copies
+// vivaient ici, dans /api/intervals/sync et dans syncUser, et divergeaient déjà.
 
 // Classe la séance par intensité RÉELLE (FC) + distance + dénivelé → type canonique juste,
 // au lieu de tout marquer « easy ». Préserve le trail. enum workouts.type valide.

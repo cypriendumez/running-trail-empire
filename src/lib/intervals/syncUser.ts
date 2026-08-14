@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildWorkoutRow, makeMatcher } from "./workoutRow";
+import { roleOf } from "./sport";
 
 const BASE = "https://intervals.icu/api/v1";
 
@@ -83,7 +84,7 @@ export async function syncIntervalsForUser(
 
   for (const act of activities) {
     if (!act.type || !act.start_date_local) continue;
-    const workoutType = mapActivityType(act.type);
+    const workoutType = roleOf(act.type);
     const date = act.start_date_local.split("T")[0];
     const title = act.name ?? workoutType;
     // Construction PARTAGÉE avec l'autre chemin de synchronisation, et testée contre des
@@ -203,14 +204,6 @@ export async function syncIntervalsForUser(
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-function mapActivityType(type: string): string {
-  const map: Record<string, string> = {
-    Run: "easy", TrailRun: "trail", VirtualRun: "easy",
-    Workout: "interval", Ride: "easy", Walk: "recovery", Hike: "trail",
-  };
-  return map[type] ?? "easy";
-}
 
 interface IntervalsActivity {
   id: string; name?: string; type?: string; start_date_local?: string;

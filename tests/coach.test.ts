@@ -12,7 +12,9 @@
  */
 import assert from "node:assert/strict";
 import { execSync } from "node:child_process";
-import { isRun, sportOf } from "../src/lib/intervals/sport";
+import { isRun, sportOf, impactOf, roleOf } from "../src/lib/intervals/sport";
+import { summarizeCross } from "../src/lib/coach/crossTraining";
+import { computeQualityBudget } from "../src/lib/coach/qualityBudget";
 import { vmaFromPaceCurve, bestVmaFromWorkouts } from "../src/lib/running/fitness";
 import { heatAdvice, windAdvice, altitudeLossPct, heatAcclimation } from "../src/lib/weather/openMeteo";
 import { parseReps, parsePaceSec, stepsForType, warmCoolMin, buildWorkoutDescription } from "../src/lib/watch/intervals";
@@ -731,9 +733,11 @@ test("le plafond de qualité du mode est appliqué APRÈS les planchers du coach
   // Sans cet ordre, le plancher « objectif chrono → 2 qualités » redonnait deux séances
   // de fractionné par semaine à quelqu'un dont les articulations encaissent près de
   // 300 kg par appui. Le cardio suivait ; les tendons, non.
-  const src = readFileSync("src/lib/ai/coachContext.ts", "utf8");
-  const iFloor = src.indexOf("qBudget === 0 && libLevel !== \"debutant\") floor(1)");
-  const iCap = src.indexOf("weightLoss.rules.maxQualityPerWeek");
+  // L'arbitrage a été extrait de coachContext vers lib/coach/qualityBudget pour être
+  // testable ; l'ordre à protéger, lui, est le même.
+  const src = readFileSync("src/lib/coach/qualityBudget.ts", "utf8");
+  const iFloor = src.indexOf("if (inPrep && !i.noHistory && !alarm");
+  const iCap = src.indexOf("i.weightLossMaxQuality");
   assert.ok(iFloor > 0 && iCap > 0, "plancher ou plafond introuvable");
   assert.ok(iCap > iFloor, "le plafond perte de poids doit venir après les planchers");
 });
@@ -885,7 +889,7 @@ test("le feu rouge de fraîcheur raccourcit la sortie longue, et l'explique", ()
   const c = ctx({
     readiness: { level: "rouge", reasons: ["ratio aigu:chronique 2,4 (zone de risque de blessure)"], advice: "" },
     volume: { weekKm: 62, avg4wkKm: 40, targetKm: 40, longRunKm: 16, longRunPlanned: 26, longRunEased: true },
-    weekPlan: { qBudget: 0, quality: [], easyPace: "4'52", eased: true },
+    weekPlan: { qBudget: 0, quality: [], easyPace: "4'52", eased: true, floored: false },
   });
   const long = buildWeekPlan(c).find((d) => d.type === "Sortie longue");
   assert.ok(long, "aucune sortie longue dans le plan");
@@ -2079,6 +2083,204 @@ test("après la réinitialisation, la chaîne complète revient d'elle-même", (
   const mem = memWith(CHAIN2, T0, 0);
   const after = Date.parse("2026-08-09T07:30:00Z");
   assert.deepEqual(selectModels(CHAIN2, mem, after).models, CHAIN2, "aucun modèle ne doit rester exclu");
+});
+
+console.log("\nSPORTS — une montre en enregistre cinquante, la table n'en connaissait que quatre");
+// La table ne couvrait que course, vélo, rando et marche. Tout le reste — natation,
+// rameur, ski, elliptique, renfo, yoga, raquette — tombait en « other ».
+test("les sports Garmin/Coros sont nommés, pas rangés en « autre »", () => {
+  const attendu: Record<string, string> = {
+    Swim: "swim", OpenWaterSwim: "swim",
+    Rowing: "row", Kayaking: "row", StandUpPaddling: "row",
+    NordicSki: "ski", AlpineSki: "ski", Snowshoe: "ski", InlineSkate: "ski",
+    WeightTraining: "strength", Crossfit: "strength", HighIntensityIntervalTraining: "strength",
+    Elliptical: "cardio", StairStepper: "cardio",
+    Yoga: "mobility", Pilates: "mobility",
+    Tennis: "ballsport", Soccer: "ballsport", Padel: "ballsport",
+    VirtualRide: "bike", EBikeRide: "bike", GravelRide: "bike",
+  };
+  for (const [type, sport] of Object.entries(attendu)) {
+    assert.equal(sportOf(type), sport, `${type} devrait être « ${sport} »`);
+  }
+  // Ce qu'on ne connaît pas reste « other » — au pire on l'exclut du volume de course,
+  // ce qui est le sens prudent.
+  assert.equal(sportOf("Quidditch"), "other");
+});
+test("aucun de ces sports ne compte comme de la course", () => {
+  // C'est le point : une séance de ski ou de renfo ne doit pas gonfler le volume
+  // hebdomadaire, ni servir à estimer une VMA.
+  for (const t of ["Swim", "Rowing", "NordicSki", "WeightTraining", "Elliptical", "Yoga", "Tennis", "Workout"]) {
+    assert.equal(isRun(sportOf(t)), false, `${t} compté comme de la course`);
+  }
+  for (const t of ["Run", "TrailRun", "VirtualRun"]) assert.equal(isRun(sportOf(t)), true);
+});
+test("l'impact sur les jambes distingue le vélo de la randonnée", () => {
+  // Deux heures de vélo et deux heures de rando coûtent le même cardio ; seule la
+  // seconde partage le compteur d'usure des mollets et des tendons.
+  assert.equal(impactOf("bike"), "aucun");
+  assert.equal(impactOf("swim"), "aucun");
+  assert.equal(impactOf("hike"), "modéré");
+  assert.equal(impactOf("run"), "élevé");
+});
+test("une séance de salle n'est plus lue comme du fractionné", () => {
+  // « Workout » est le fourre-tout que Garmin envoie pour une séance de salle. Il était
+  // rangé en sport COURSE et en rôle « interval » : le renfo entrait donc dans le volume
+  // de course ET comptait comme une séance dure, ce qui bloquait la qualité du lendemain.
+  assert.equal(sportOf("Workout"), "strength");
+  assert.notEqual(roleOf("Workout"), "interval");
+  assert.equal(roleOf("Workout"), "strength");
+  // Les rôles historiques ne bougent pas : c'est ce qui rend le changement sûr.
+  assert.equal(roleOf("Run"), "easy");
+  assert.equal(roleOf("TrailRun"), "trail");
+  assert.equal(roleOf("Hike"), "trail");
+  assert.equal(roleOf("Walk"), "recovery");
+  assert.equal(roleOf("Ride"), "easy");
+});
+test("la table des rôles n'existe qu'à UN endroit", () => {
+  // Elle vivait en trois copies (sync, cron/sync-all, syncUser) qui divergeaient déjà :
+  // « Workout » y était corrigé à un endroit et pas aux deux autres.
+  for (const f of ["src/app/api/intervals/sync/route.ts", "src/app/api/cron/sync-all/route.ts", "src/lib/intervals/syncUser.ts"]) {
+    assert.ok(!/function mapActivityType/.test(codeOf(f)), `${f} garde sa propre table de rôles`);
+  }
+});
+test("les sports qui ne sont pas de la course ne remplissent pas un défi", () => {
+  // Le filtre listait les sports INTERDITS : ce qui n'y figurait pas passait pour de la
+  // course. Depuis l'élargissement de la table, le ski ou le renfo remplissaient un
+  // défi « 100 km ». On teste maintenant l'appartenance à la course.
+  const defi = { id: "d", name: "100 km", metric: "distance" as const, target: 100, starts_on: "2026-08-01", ends_on: "2026-08-31" };
+  const jour = { date: "2026-08-10", distance_km: 30 };
+  for (const sport of ["ski", "strength", "cardio", "ballsport", "swim", "row"]) {
+    assert.equal(challengeProgress(defi, [{ ...jour, sport }]).value, 0, `${sport} compté dans un défi de course`);
+  }
+  assert.equal(challengeProgress(defi, [{ ...jour, sport: "run" }]).value, 30);
+});
+
+console.log("\nCROSS-TRAINING — en minutes et en TSS, jamais en kilomètres additionnés");
+const CROSS_NOW = Date.parse("2026-08-14T12:00:00Z");
+const cw = (o: Partial<{ date: string; sport: string; type: string; duration_seconds: number; tss: number; elevation_gain_m: number }>) =>
+  ({ date: "2026-08-13", sport: "run", type: "easy", duration_seconds: 3600, tss: 60, ...o });
+test("une séance SANS distance est enfin visible", () => {
+  // Le défaut : le résumé se comptait en kilomètres. Un home-trainer, un rameur, du
+  // renfo ou du yoga n'ont pas de distance — ils valaient donc zéro et n'apparaissaient
+  // nulle part, alors qu'ils pesaient bien dans la charge. Le coach commentait une
+  // fatigue dont il ne voyait pas la cause.
+  const s = summarizeCross([
+    cw({ sport: "bike", type: "easy", duration_seconds: 5400, tss: 90 }),   // home-trainer, 0 km
+    cw({ sport: "strength", duration_seconds: 2400, tss: 30 }),
+  ], CROSS_NOW);
+  assert.equal(s.minutes, 130, "les minutes doivent être comptées même sans distance");
+  assert.equal(s.tss, 120);
+  assert.equal(s.sessions, 2);
+  assert.ok(s.label && /vélo/.test(s.label) && /renforcement/.test(s.label), `libellé incomplet : ${s.label}`);
+});
+test("les kilomètres de natation ne s'additionnent pas à ceux du vélo", () => {
+  // 40 km de vélo + 2 km de bassin faisaient « 42 km d'autres sports » : une somme qui
+  // ne veut rien dire. Chaque sport est désormais compté séparément.
+  const s = summarizeCross([
+    cw({ sport: "bike", duration_seconds: 7200, tss: 120 }),
+    cw({ sport: "swim", duration_seconds: 2700, tss: 45 }),
+  ], CROSS_NOW);
+  assert.equal(s.bySport.length, 2, "les sports doivent rester distincts");
+  assert.ok(!/\d+\s*km/.test(s.label ?? ""), `le résumé ne doit plus parler en km : ${s.label}`);
+  assert.equal(s.bySport[0].sport, "bike", "le sport le plus chargeant vient en premier");
+});
+test("la part de charge hors course est calculée, pas devinée", () => {
+  const s = summarizeCross([
+    cw({ sport: "run", tss: 300 }),
+    cw({ sport: "hike", tss: 100, duration_seconds: 7200 }),
+  ], CROSS_NOW);
+  assert.equal(s.sharePct, 25, "100 TSS sur 400 = 25 %");
+  assert.equal(s.impactMinutes, 120, "la randonnée charge les jambes, elle compte dans l'impact");
+});
+test("le vélo ne compte pas dans les minutes avec impact", () => {
+  const s = summarizeCross([cw({ sport: "bike", duration_seconds: 3600, tss: 60 })], CROSS_NOW);
+  assert.equal(s.impactMinutes, 0, "le vélo fatigue le cardio, pas les tendons");
+});
+test("sans cross-training, on ne dit rien du tout", () => {
+  // Un contexte de coach rempli de « 0 min de cross-training » est du bruit.
+  const s = summarizeCross([cw({ sport: "run" })], CROSS_NOW);
+  assert.equal(s.label, null);
+  assert.equal(s.minutes, 0);
+  // Les séances hors fenêtre ne comptent pas : une rando d'il y a trois semaines n'est
+  // pas la charge de cette semaine.
+  const vieux = summarizeCross([cw({ sport: "hike", date: "2026-07-01", tss: 200 })], CROSS_NOW);
+  assert.equal(vieux.label, null);
+});
+
+console.log("\nBUDGET DE QUALITÉ — la fatigue ne doit pas vider une préparation");
+const qb = (o: Partial<Parameters<typeof computeQualityBudget>[0]> = {}) => computeQualityBudget({
+  level: "confirme", goal: "marathon", phase: "DÉVELOPPEMENT", noHistory: false, pains: [],
+  hrvDown: false, badNight: false, acr: 1.0, tsb: 0, rpeHigh: false, rpeAvg: null,
+  hardTimePct: null, fadeSec: null, plateau: false, noMaxEffort: false, runYears: 5,
+  weightLossMaxQuality: null, hasObjective: true, daysToRace: 72, isShortGoal: false, ...o,
+});
+test("le ratio aigu:chronique et le TSB ne sont plus comptés deux fois", () => {
+  // Cas RÉEL du compte de production : confirmé, marathon dans 72 jours, 73 km courus
+  // dans la semaine après trois semaines d'arrêt → ratio 1,9 et TSB −35. Ce sont DEUX
+  // lectures de la même série de charge : quand la charge récente dépasse la charge de
+  // fond, le ratio monte ET le TSB plonge, mécaniquement. Chacun retirait une séance :
+  // budget structurel 2 → 0. Une montée en charge — c'est-à-dire une préparation —
+  // coûtait donc toute la qualité de la semaine.
+  const r = qb({ acr: 1.92, tsb: -35 });
+  assert.ok(r.qBudget >= 1, `qBudget ${r.qBudget} : la même fatigue est encore comptée deux fois`);
+  assert.equal(r.easeReasons.length, 1, "un seul motif pour un seul phénomène");
+  assert.ok(/ratio aigu:chronique/.test(r.easeReasons[0]) && /TSB/.test(r.easeReasons[0]),
+    `les deux chiffres doivent rester visibles : ${r.easeReasons[0]}`);
+});
+test("une préparation ne descend pas à zéro qualité sur une fatigue de charge", () => {
+  // Zéro qualité pendant des semaines, à dix semaines d'un marathon, est une erreur
+  // d'entraînement — pas une précaution. On garde UNE séance, raccourcie.
+  const r = qb({ acr: 1.92, tsb: -35, rpeHigh: true, rpeAvg: 8, hardTimePct: 40 });
+  assert.equal(r.qBudget, 1, "le plancher « préparation en cours » n'a pas joué");
+  assert.equal(r.floored, true, "la séance sauvée doit être signalée comme allégée");
+});
+test("le plancher ne s'applique QUE si une échéance approche", () => {
+  assert.equal(qb({ acr: 1.92, tsb: -35, hasObjective: false, daysToRace: null, rpeHigh: true, rpeAvg: 8, hardTimePct: 40 }).qBudget, 0);
+  assert.equal(qb({ acr: 1.92, tsb: -35, daysToRace: 300, rpeHigh: true, rpeAvg: 8, hardTimePct: 40 }).qBudget, 0);
+});
+test("douleur, double signal VFC+sommeil et interdiction médicale gardent le dernier mot", () => {
+  // Le plancher ne doit JAMAIS passer devant un vrai signal d'alerte. C'est la ligne
+  // rouge de tout ce correctif.
+  assert.equal(qb({ acr: 1.92, tsb: -35, pains: ["mollet droit"], rpeHigh: true, rpeAvg: 8, hardTimePct: 40 }).qBudget, 0, "une douleur doit tout arrêter");
+  assert.equal(qb({ acr: 1.92, tsb: -35, hrvDown: true, badNight: true, hardTimePct: 40, rpeHigh: true, rpeAvg: 8 }).qBudget, 0, "VFC en baisse ET nuit dégradée = alerte");
+  assert.equal(qb({ noHistory: true }).qBudget, 0, "un athlète sans historique n'a pas de plancher");
+});
+test("le passif de coureur plafonne même le plancher", () => {
+  // Un cardio de confirmé sur des tendons de huit mois : le plafond n'est pas négociable.
+  const r = qb({ acr: 1.92, tsb: -35, runYears: 0.5, rpeHigh: true, rpeAvg: 8 });
+  assert.ok(r.qBudget <= 1, `${r.qBudget} qualité(s) pour moins d'un an de course`);
+  assert.equal(qb({ runYears: 0.5 }).qBudget, 1, "moins d'un an → une seule qualité, même frais");
+});
+test("le plafond perte de poids reste infranchissable", () => {
+  const r = qb({ acr: 1.92, tsb: -35, weightLossMaxQuality: 0, rpeHigh: true, rpeAvg: 8 });
+  assert.equal(r.qBudget, 0, "le plancher a contourné le plafond perte de poids");
+});
+test("sans fatigue, rien ne change pour un athlète frais", () => {
+  // Un correctif qui déplacerait le comportement normal serait pire que le défaut.
+  const r = qb();
+  assert.equal(r.qBudget, 2, "confirmé + marathon = 2 qualités");
+  assert.equal(r.easeReasons.length, 0);
+  assert.equal(r.floored, false, "aucune séance à raccourcir quand rien n'est allégé");
+});
+test("une séance déjà allégée ne l'est pas deux fois", () => {
+  // Trouvé en vérifiant le plan réel : la séance sauvée par le plancher est posée
+  // « (allégée) » dès sa création, et le verdict orange du jour la ré-annotait —
+  // « Séance au seuil (allégée) (allégée) », sur le calendrier ET sur la montre.
+  const c = ctx({
+    weekPlan: { qBudget: 1, quality: [{ type: "Seuil", desc: "Seuil : 3×10 min à ~4'00/km, récup 2 min" }], easyPace: "5'20", eased: true, floored: true },
+    readiness: { level: "orange", reasons: ["charge récente très supérieure à la charge de fond"], advice: "" },
+  });
+  for (const d of buildWeekPlan(c)) {
+    assert.ok(!/\(allégée\).*\(allégée\)/.test(d.title), `titre annoté deux fois : « ${d.title} »`);
+  }
+  // Et la mention doit tout de même être là une fois : la séance EST raccourcie.
+  const q = buildWeekPlan(c).find((d) => d.type === "Seuil");
+  assert.ok(q && /\(allégée\)/.test(q.title), "la séance raccourcie doit être annoncée comme telle");
+});
+test("le budget STRUCTUREL ignore la fatigue du moment", () => {
+  // Il porte la feuille de route des semaines suivantes : une mauvaise nuit ne doit pas
+  // vider deux mois de plan.
+  assert.equal(qb({ acr: 2.4, tsb: -44, pains: ["genou"] }).structuralQBudget, 2);
 });
 
 console.log("\nQUOTA ÉPUISÉ — la chaîne cesse vraiment d'appeler le réseau");

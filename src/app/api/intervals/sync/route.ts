@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { buildWorkoutRow } from "@/lib/intervals/workoutRow";
+import { roleOf } from "@/lib/intervals/sport";
 
 const BASE = "https://intervals.icu/api/v1";
 
@@ -91,7 +92,7 @@ export async function GET(req: Request) {
     const ri = (v: number | null | undefined) => v != null ? Math.round(v) : null;
 
     for (const act of validActivities) {
-      const workoutType = mapActivityType(act.type!);
+      const workoutType = roleOf(act.type);
       const date = act.start_date_local!.split("T")[0];
       const title = act.name ?? workoutType;
 
@@ -331,18 +332,7 @@ function derivePhysiologicalState(hrv: number, sdnn?: number): "recovery" | "opt
   return "optimal";
 }
 
-function mapActivityType(type: string): string {
-  const map: Record<string, string> = {
-    Run: "easy",
-    TrailRun: "trail",
-    VirtualRun: "easy",
-    Workout: "interval",
-    Ride: "easy",
-    Walk: "recovery",
-    Hike: "trail",
-  };
-  return map[type] ?? "easy";
-}
+// Le rôle de la séance vient de `lib/intervals/sport` — table UNIQUE (`roleOf`).
 
 // ─── Intervals.icu Types (partial) ─────────────────────────
 

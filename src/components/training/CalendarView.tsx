@@ -34,6 +34,12 @@ export type CoachState = {
   /** Réalisme de l'objectif : chrono hors de portée, préparation trop courte pour la
    *  distance visée. Affichés en clair — ils n'atteignaient jusqu'ici que l'IA. */
   warnings?: string[];
+  /** La séance de qualité a été SAUVÉE par le plancher « préparation en cours » : elle
+   *  est raccourcie. Sans ce champ, l'athlète lisait « (allégée) » sans savoir pourquoi. */
+  qualityFloored?: boolean;
+  /** Ce qui a été fait hors course cette semaine — souvent l'explication d'un allègement
+   *  que le calendrier, qui ne montre que la course, rendait incompréhensible. */
+  cross?: { label?: string; minutes?: number; tss?: number; sharePct?: number } | null;
 };
 
 // Catégorie canonique d'une séance (à partir du libellé libre du coach) → couleur + légende i18n.
@@ -573,13 +579,16 @@ export function CalendarView({ sessions, notes: notesProp = [], races: racesProp
 function CoachWhy({ state, lang, t }: { state: CoachState | null; lang: string; t: (k: string, p?: Record<string, string | number>) => string }) {
   if (!state) return null;
   const noQuality = (state.qBudget ?? 1) === 0;
+  // Qualité maintenue mais RACCOURCIE : cas intermédiaire qui n'existait pas. L'athlète
+  // voyait « Séance au seuil (allégée) » dans son calendrier sans une ligne d'explication.
+  const easedQuality = !noQuality && Boolean(state.qualityFloored);
   const reasons = (state.reasons ?? []).filter(Boolean);
   const hasObjective = Boolean(state.objective?.race);
   const warnings = (state.warnings ?? []).filter(Boolean);
   // Rien d'anormal ET pas d'objectif à rappeler → on se tait.
-  if (!noQuality && !hasObjective && !warnings.length) return null;
+  if (!noQuality && !easedQuality && !hasObjective && !warnings.length) return null;
 
-  const tone = noQuality
+  const tone = noQuality || easedQuality
     ? { border: "border-amber-200", bg: "bg-amber-50/70", dot: "text-amber-600", head: "text-amber-900", body: "text-amber-800" }
     : { border: "border-emerald-200", bg: "bg-emerald-50/60", dot: "text-emerald-600", head: "text-emerald-900", body: "text-emerald-800" };
 
@@ -605,13 +614,19 @@ function CoachWhy({ state, lang, t }: { state: CoachState | null; lang: string; 
         </p>
       )}
 
-      {noQuality ? (
+      {noQuality || easedQuality ? (
         <div className={`mt-2 text-sm leading-relaxed ${tone.body}`}>
-          <p>{t("cal.why.noQuality")}</p>
+          <p>{t(noQuality ? "cal.why.noQuality" : "cal.why.easedQuality")}</p>
           <ul className="mt-1 space-y-0.5">
             {reasons.map((r, i) => <li key={i}>· {r}</li>)}
+            {/* La charge d'un autre sport est la cause la plus souvent invisible : le
+                calendrier ne montre que la course, donc une semaine de randonnée ne
+                laissait aucune trace expliquant l'allègement. */}
+            {state.cross?.label && (
+              <li>· {t("cal.why.cross")} : {state.cross.label}{state.cross.sharePct ? ` (${state.cross.sharePct} %)` : ""}</li>
+            )}
           </ul>
-          {hasObjective && <p className="mt-1.5">{t("cal.why.noQualityTail", { race })}</p>}
+          {hasObjective && <p className="mt-1.5">{t(noQuality ? "cal.why.noQualityTail" : "cal.why.easedQualityTail", { race })}</p>}
           {nextQuality.length > 0 && (
             <p className="mt-1.5"><span className="font-semibold">{t("cal.why.nextWeek")} :</span> {nextQuality.join(" + ")}</p>
           )}

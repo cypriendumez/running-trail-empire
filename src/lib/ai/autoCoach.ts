@@ -91,6 +91,13 @@ export async function autoCoachForUser(
     reasons: ctx.readiness.reasons.slice(0, 4),
     advice: ctx.readiness.advice.slice(0, 400),
     qBudget: ctx.weekPlan.qBudget,
+    // La dernière qualité n'a survécu que grâce au plancher « préparation en cours » :
+    // le bandeau doit le dire, sinon l'athlète voit une séance allégée sans savoir
+    // qu'elle a failli disparaître, ni pourquoi elle est raccourcie.
+    qualityFloored: ctx.weekPlan.floored,
+    // Sport pratiqué hors course : c'est souvent LUI qui explique un allègement, et
+    // l'athlète n'avait aucun moyen de le savoir (le calendrier ne montre que la course).
+    cross: ctx.cross.label ? { label: ctx.cross.label, minutes: ctx.cross.minutes, tss: ctx.cross.tss, sharePct: ctx.cross.sharePct } : null,
     // L'objectif tel qu'il a RÉELLEMENT été pris en compte : c'est ce qui permet à
     // l'athlète de vérifier que son changement a bien été enregistré.
     objective: ctx.objective ? { race: ctx.objective.race, raceDate: ctx.objective.raceDate, distanceKm: ctx.objective.distanceKm } : null,

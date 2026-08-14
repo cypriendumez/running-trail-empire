@@ -13,6 +13,8 @@
 //  offerts ne récompense plus rien et ment sur le niveau de l'athlète.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { isRun as isRunSport } from "@/lib/intervals/sport";
+
 export type Tier = "bronze" | "argent" | "or" | "platine";
 
 export type Trophy = {
@@ -50,11 +52,16 @@ export function hms(seconds: number): string {
   return `${s} s`;
 }
 
-/** Seules les séances de course comptent : une sortie vélo n'est pas un record de course. */
+/** Seules les séances de course comptent : une sortie vélo n'est pas un record de course.
+ *
+ *  Le filtre listait les sports INTERDITS. Depuis l'élargissement de la table des sports,
+ *  tout ce qui n'était pas dans la liste passait pour de la course : 2 h de ski de fond
+ *  ou une séance de renfo pouvaient décrocher un record de « plus longue sortie ».
+ *  On teste maintenant l'appartenance à la course, et la liste de mots ne sert plus
+ *  qu'aux lignes sans `sport` (antérieures à la migration 015). */
 const isRunLike = (w: TrophyWorkout) => {
-  const s = `${w.sport ?? ""} ${w.type ?? ""}`.toLowerCase();
-  if (/ride|bike|velo|vélo|swim|natation|row|elliptical|walk|marche|hike|rando/.test(s)) return false;
-  return true;
+  if (w.sport != null) return isRunSport(w.sport);
+  return !/ride|bike|velo|vélo|swim|natation|row|elliptical|walk|marche|hike|rando/.test(String(w.type ?? "").toLowerCase());
 };
 
 /** Distances de référence, avec la TOLÉRANCE assumée et affichée. */
