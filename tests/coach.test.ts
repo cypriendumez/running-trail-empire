@@ -1343,6 +1343,28 @@ test("le survol n'anime plus la caméra image par image", () => {
   assert.ok(!/jumpTo/.test(code.slice(code.indexOf("function allerA"), code.indexOf("function prechauffer"))),
     "aucun jumpTo pendant la lecture");
 });
+test("le survol s'ouvre sur une vue PANORAMIQUE, pas collée au sol", () => {
+  // Comparaison image par image avec la référence Strava : elle filme de très haut,
+  // horizon et ciel dans le cadre, ce qui fait lire l'image comme un survol. Au ras
+  // du sol, on ne voit qu'un fond de carte qui défile.
+  const code = codeOf("src/components/segments/Flyover.tsx");
+  const angles = code.slice(code.indexOf("const ANGLES"), code.indexOf("const ANGLE_DEFAUT"));
+  assert.ok(/Panorama/.test(angles), "une vue panoramique doit exister");
+  const zooms = [...angles.matchAll(/zoom: ([\d.]+)/g)].map((m) => Number(m[1]));
+  assert.ok(Math.min(...zooms) < 12.5, `la vue large doit vraiment reculer (min ${Math.min(...zooms)})`);
+  assert.ok(/const ANGLE_DEFAUT = 2/.test(code), "c'est le panorama qu'on vient voir : il est par défaut");
+});
+test("le survol affiche un ciel et un marqueur de position", () => {
+  // Sans ciel, le haut du cadre est un vide gris une fois la caméra relevée. Sans
+  // marqueur, sur une vue large, on ne sait plus où l'on se trouve sur la trace.
+  const code = codeOf("src/components/segments/Flyover.tsx");
+  assert.ok(/setSky/.test(code), "le dégradé atmosphérique fait lire l'image comme une vue aérienne");
+  assert.ok(/addSource\("position"/.test(code) && /position-point/.test(code), "un marqueur doit suivre la progression");
+  // Le marqueur doit être mis à jour AVANT le mouvement, sinon il traîne d'une étape.
+  const boucle = code.slice(code.indexOf("function allerA"), code.indexOf("function prechauffer"));
+  assert.ok(boucle.indexOf("setData") < boucle.indexOf("map.easeTo"), "le marqueur avance avant la caméra");
+});
+
 test("l'enchaînement du survol ne peut ni sauter ni se figer", () => {
   // Deux défauts réels, introduits puis corrigés :
   //  1. l'écouteur `moveend` posé AVANT `easeTo` captait des événements parasites —
@@ -1405,7 +1427,10 @@ test("chaque inclinaison a son propre recul", () => {
   const code = codeOf("src/components/segments/Flyover.tsx");
   const angles = code.slice(code.indexOf("const ANGLES"), code.indexOf("] as const;", code.indexOf("const ANGLES")));
   assert.ok(/pitch: 0/.test(angles), "une vue carte doit rester disponible");
-  assert.ok(/pitch: 74/.test(angles), "une vue rasante doit être proposée");
+  // On vérifie qu'une vue TRÈS inclinée existe, sans figer sa valeur exacte : c'est
+  // l'inclinaison qui fait entrer l'horizon dans le cadre, pas le nombre 74.
+  const pitches = [...angles.matchAll(/pitch: (\d+)/g)].map((m) => Number(m[1]));
+  assert.ok(Math.max(...pitches) >= 70, `une vue très inclinée doit être proposée (max ${Math.max(...pitches)}°)`);
   assert.equal((angles.match(/zoom:/g) ?? []).length, 3, "chaque angle porte SON zoom");
 });
 

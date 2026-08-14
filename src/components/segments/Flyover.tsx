@@ -57,10 +57,17 @@ const VITESSES = [
 ] as const;
 
 const ANGLES = [
-  { label: "Carte", pitch: 0, zoom: 15.4 },   // vue du dessus, lecture du tracé
-  { label: "3D", pitch: 52, zoom: 14.9 },     // compromis par défaut
-  { label: "Rasant", pitch: 74, zoom: 15.2 }, // relief marqué, horizon visible
+  { label: "Carte", pitch: 0, zoom: 15.4 },      // vue du dessus, lecture du tracé
+  { label: "Suivi", pitch: 52, zoom: 14.9 },     // caméra rapprochée, on voit la rue
+  // « Panorama » reproduit le rendu de référence : caméra HAUTE et très reculée, si
+  // bien que l'horizon et le ciel entrent dans le cadre. C'est ce qui donne
+  // l'impression de survol — au ras du sol, on ne voit qu'un fond de carte qui défile.
+  // Le zoom faible fait aussi apparaître les noms de villes, qui situent la sortie.
+  { label: "Panorama", pitch: 72, zoom: 11.6 },
 ] as const;
+
+/** Vue ouverte par défaut : le panorama, c'est lui qu'on vient voir. */
+const ANGLE_DEFAUT = 2;
 
 export function Flyover({ polyline, altitudes, paces, stats }: {
   polyline: string;
@@ -87,14 +94,14 @@ export function Flyover({ polyline, altitudes, paces, stats }: {
   const [erreur, setErreur] = useState<string | null>(null);
   const [prechauffe, setPrechauffe] = useState(false);
   const [vitesse, setVitesse] = useState(1);   // index dans VITESSES
-  const [angle, setAngle] = useState(1);       // index dans ANGLES
+  const [angle, setAngle] = useState(ANGLE_DEFAUT);
   const [zoomDelta, setZoomDelta] = useState(0);
 
   // La boucle d'animation lit des REFS et non l'état : sans ça, une étape déjà
   // lancée continuerait avec les anciens réglages, et le changement ne prendrait
   // effet qu'au bout de plusieurs secondes.
   const vitesseRef = useRef(1);
-  const angleRef = useRef(1);
+  const angleRef = useRef(ANGLE_DEFAUT);
   const zoomRef = useRef(0);
   vitesseRef.current = vitesse; angleRef.current = angle; zoomRef.current = zoomDelta;
 
@@ -170,8 +177,58 @@ export function Flyover({ polyline, altitudes, paces, stats }: {
         paint: { "line-color": "#10b981", "line-width": 4.5 },
       });
 
+      // CIEL — sans lui, le haut du cadre est un vide gris une fois la caméra
+      // relevée : c'est le dégradé atmosphérique qui fait lire l'image comme une
+      // vue aérienne plutôt que comme une carte inclinée.
+      try {
+        (map as unknown as { setSky?: (o: unknown) => void }).setSky?.({
+          "sky-color": "#1e3a5f", "horizon-color": "#a8c4dd",
+          "fog-color": "#cfe0ee", "sky-horizon-blend": 0.6, "horizon-fog-blend": 0.7,
+        });
+      } catch { /* sans ciel, le survol reste lisible */ }
+
+      // MARQUEUR DE POSITION — le point qui avance. Sans lui, sur une vue large, on
+      // ne sait plus OÙ l'on se trouve sur la trace : c'est le repère qui manquait.
+      map.addSource("position", {
+        type: "geojson",
+        data: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: coords[0] } },
+      });
+      map.addLayer({
+        id: "position-halo", type: "circle", source: "position",
+        paint: { "circle-radius": 13, "circle-color": "#10b981", "circle-opacity": 0.28 },
+      });
+      map.addLayer({
+        id: "position-point", type: "circle", source: "position",
+        paint: { "circle-radius": 6, "circle-color": "#10b981", "circle-stroke-width": 2.5, "circle-stroke-color": "#ffffff" },
+      });
+
+      // CIEL — sans lui, le haut du cadre est un vide gris une fois la caméra
+      // relevée : c'est le dégradé atmosphérique qui fait lire l'image comme une
+      // vue aérienne plutôt que comme une carte inclinée.
+      try {
+        (map as unknown as { setSky?: (o: unknown) => void }).setSky?.({
+          "sky-color": "#1e3a5f", "horizon-color": "#a8c4dd",
+          "fog-color": "#cfe0ee", "sky-horizon-blend": 0.6, "horizon-fog-blend": 0.7,
+        });
+      } catch { /* sans ciel, le survol reste lisible */ }
+
+      // MARQUEUR DE POSITION — le point qui avance. Sans lui, sur une vue large, on
+      // ne sait plus OÙ l'on se trouve sur la trace : c'est le repère qui manquait.
+      map.addSource("position", {
+        type: "geojson",
+        data: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: coords[0] } },
+      });
+      map.addLayer({
+        id: "position-halo", type: "circle", source: "position",
+        paint: { "circle-radius": 13, "circle-color": "#10b981", "circle-opacity": 0.28 },
+      });
+      map.addLayer({
+        id: "position-point", type: "circle", source: "position",
+        paint: { "circle-radius": 6, "circle-color": "#10b981", "circle-stroke-width": 2.5, "circle-stroke-color": "#ffffff" },
+      });
+
       capRef.current = capInitial;
-      map.fitBounds(bornes(coords), { padding: 60, pitch: ANGLES[1].pitch, duration: 0 });
+      map.fitBounds(bornes(coords), { padding: 60, pitch: ANGLES[ANGLE_DEFAUT].pitch, duration: 0 });
       setPret(true);
     });
 
@@ -239,6 +296,11 @@ export function Flyover({ polyline, altitudes, paces, stats }: {
     const ecart = ((capBrut - capRef.current + 540) % 360) - 180;
     const cap = capRef.current + ecart * 0.4;
     capRef.current = cap;
+
+    // Le marqueur avance AVANT le mouvement de caméra : il doit déjà être au bon
+    // endroit quand l'image commence à bouger, sinon il traîne d'une étape.
+    const src = map.getSource("position") as { setData?: (d: unknown) => void } | undefined;
+    src?.setData?.({ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [lon, lat] } });
 
     const vue = ANGLES[angleRef.current];
     // ⚠️ ENTRÉE EN DOUCEUR. Au lancement, la caméra vient du cadrage d'ensemble
