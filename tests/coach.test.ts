@@ -1333,15 +1333,26 @@ test("le classement des défis n'expose pas les profils en entier", () => {
   assert.ok(!/from\("profiles"\)\s*\.\s*select\("\*"\)/.test(code), "colonnes de profil à énumérer");
   assert.ok(/select\("id, full_name"\)/.test(code), "seuls l'identifiant et le nom sont nécessaires");
 });
-test("le survol n'anime plus la caméra image par image", () => {
-  // `jumpTo` à 60 images/s forçait un recalcul complet et une salve de tuiles à
-  // chaque image : MapLibre n'en rendait qu'une sur trois, d'où les saccades.
+test("le survol est piloté par une HORLOGE, pas par un enchaînement d'événements", () => {
+  // Les versions précédentes enchaînaient les étapes sur `moveend` avec un minuteur de
+  // secours. Trois mécanismes qui peuvent se perdre — événement capté au mauvais
+  // moment, `easeTo` qui ne bouge pas, double démarrage — et la lecture se figeait à
+  // l'étape 0 : bouton en pause, barre à zéro, aucune erreur. Le temps écoulé, lui,
+  // ne se perd pas.
   const code = codeOf("src/components/segments/Flyover.tsx");
-  assert.ok(/easeTo/.test(code), "la caméra doit enchaîner des easeTo");
-  assert.ok(/easing:/.test(code), "un easing LINÉAIRE évite des à-coups à chaque étape");
-  // Le `jumpTo` ne subsiste QUE pour le préchauffage, hors lecture.
-  assert.ok(!/jumpTo/.test(code.slice(code.indexOf("function allerA"), code.indexOf("function prechauffer"))),
-    "aucun jumpTo pendant la lecture");
+  assert.ok(/requestAnimationFrame\(boucle\)/.test(code), "l'animation doit être pilotée par le temps");
+  assert.ok(!/once\("moveend"/.test(code), "plus aucun enchaînement sur moveend");
+  assert.ok(/performance\.now\(\) - depuis/.test(code), "la reprise après pause ne doit rien perdre");
+  assert.ok(/fadeDuration: 0/.test(code), "le fondu des tuiles produit un scintillement permanent");
+});
+test("la caméra du survol interpole entre les points", () => {
+  // Se caler sur le point GPS le plus proche fige la caméra puis la téléporte : avec
+  // 150 points sur 26 s, cela produit six sauts par seconde.
+  const code = codeOf("src/components/segments/Flyover.tsx");
+  const boucle = code.slice(code.indexOf("function boucle"), code.indexOf("function prechauffer"));
+  assert.ok(/a\.lat \+ \(b\.lat - a\.lat\) \* f/.test(boucle), "la position doit être interpolée");
+  assert.ok(/\+ 540\) % 360\) - 180/.test(boucle), "le cap doit passer par le plus court chemin");
+  assert.ok(boucle.indexOf("setData") < boucle.indexOf("map.jumpTo"), "le marqueur avance avant la caméra");
 });
 test("le survol s'ouvre sur une vue PANORAMIQUE, pas collée au sol", () => {
   // Comparaison image par image avec la référence Strava : elle filme de très haut,
@@ -1361,35 +1372,11 @@ test("le survol affiche un ciel et un marqueur de position", () => {
   assert.ok(/setSky/.test(code), "le dégradé atmosphérique fait lire l'image comme une vue aérienne");
   assert.ok(/addSource\("position"/.test(code) && /position-point/.test(code), "un marqueur doit suivre la progression");
   // Le marqueur doit être mis à jour AVANT le mouvement, sinon il traîne d'une étape.
-  const boucle = code.slice(code.indexOf("function allerA"), code.indexOf("function prechauffer"));
-  assert.ok(boucle.indexOf("setData") < boucle.indexOf("map.easeTo"), "le marqueur avance avant la caméra");
+  const boucle = code.slice(code.indexOf("function boucle"), code.indexOf("function prechauffer"));
+  assert.ok(boucle.indexOf("setData") < boucle.indexOf("map.jumpTo"), "le marqueur avance avant la caméra");
 });
 
-test("l'enchaînement du survol ne peut ni sauter ni se figer", () => {
-  // Deux défauts réels, introduits puis corrigés :
-  //  1. l'écouteur `moveend` posé AVANT `easeTo` captait des événements parasites —
-  //     celui du cadrage initial, ou un déplacement de carte par l'athlète — et
-  //     faisait sauter une étape à chaque fois ;
-  //  2. si deux points de la trace sont identiques, `easeTo` ne bouge pas, `moveend`
-  //     ne vient jamais, et le survol se fige définitivement.
-  const code = codeOf("src/components/segments/Flyover.tsx");
-  const bloc = code.slice(code.indexOf("function allerA"), code.indexOf("function prechauffer"));
-  const iEase = bloc.indexOf("map.easeTo");
-  const iOnce = bloc.indexOf('map.once("moveend"');
-  assert.ok(iEase > 0 && iOnce > iEase, "l'écouteur doit être posé APRÈS easeTo");
-  assert.ok(/let avancee = false/.test(bloc), "une seule avance par étape");
-  assert.ok(/filet\.current = window\.setTimeout/.test(bloc), "un filet doit rattraper l'absence de moveend");
-});
 
-test("le survol entre en douceur, il ne saute pas sur le départ", () => {
-  // Bug constaté au lancement : la caméra venait du cadrage d'ensemble (toute la
-  // trace, très dézoomée) et devait rejoindre le point de départ en une durée
-  // d'étape — 433 ms pour traverser des kilomètres et zoomer de six niveaux.
-  const code = codeOf("src/components/segments/Flyover.tsx");
-  assert.ok(/const entree = etape === 0/.test(code), "la première étape doit être traitée à part");
-  assert.ok(/entree \? 1600/.test(code), "l'entrée doit durer bien plus qu'une étape");
-  assert.ok(/easing: entree \? undefined/.test(code), "l'entrée garde un amorti, la croisière reste linéaire");
-});
 test("l'allure du survol est celle du MOMENT, pas la moyenne figée", () => {
   // Le bandeau affichait la moyenne de toute la sortie à un emplacement qui suggère
   // une valeur instantanée — l'altitude et la distance, elles, défilaient.
@@ -1411,7 +1398,7 @@ test("les réglages du survol s'appliquent IMMÉDIATEMENT, même en pleine lectu
   // continuerait avec les anciens réglages : changer la vitesse ne ferait rien
   // pendant plusieurs secondes, et l'athlète croirait le bouton cassé.
   const code = codeOf("src/components/segments/Flyover.tsx");
-  const boucle = code.slice(code.indexOf("function allerA"), code.indexOf("function prechauffer"));
+  const boucle = code.slice(code.indexOf("function boucle"), code.indexOf("function prechauffer"));
   assert.ok(/vitesseRef\.current/.test(boucle) && /angleRef\.current/.test(boucle),
     "la boucle doit lire les refs, pas l'état");
   assert.ok(!/\bvitesse\b(?!Ref)/.test(boucle), "l'état ne doit pas être lu dans la boucle");
@@ -1434,23 +1421,6 @@ test("chaque inclinaison a son propre recul", () => {
   assert.equal((angles.match(/zoom:/g) ?? []).length, 3, "chaque angle porte SON zoom");
 });
 
-test("les étapes du survol s'enchaînent sur la FIN du mouvement, pas sur un minuteur", () => {
-  // La saccade régulière venait de là : un setTimeout réglé sur la même durée que
-  // l'easeTo déclenchait l'étape suivante pile à la fin de la précédente — ou juste
-  // avant. MapLibre interrompait alors une animation en cours, et l'interruption se
-  // voyait : un heurt toutes les 400 ms, régulier comme un métronome.
-  const code = codeOf("src/components/segments/Flyover.tsx");
-  const boucle = code.slice(code.indexOf("function allerA"), code.indexOf("function prechauffer"));
-  assert.ok(/once\("moveend"/.test(boucle), "l'étape suivante doit partir sur moveend");
-  // Un minuteur reste autorisé comme FILET, jamais comme moteur : il doit donc être
-  // réglé APRÈS la fin du mouvement (durée + marge), sinon il interromprait
-  // l'animation en cours — le défaut d'origine. La marge est ce qui distingue les deux.
-  const minuteurs = [...boucle.matchAll(/setTimeout\(([^;]{0,120})\)/g)].map((m) => m[1]);
-  for (const t of minuteurs) {
-    assert.ok(/duree \+ 400/.test(t), `un minuteur pilote l'enchaînement sans marge : ${t.slice(0, 50)}`);
-  }
-  assert.ok(/fadeDuration: 0/.test(code), "le fondu des tuiles produit un scintillement permanent");
-});
 
 
 const DEFI = (o: Partial<Challenge> = {}): Challenge =>

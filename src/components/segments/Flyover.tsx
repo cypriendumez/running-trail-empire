@@ -83,10 +83,7 @@ export function Flyover({ polyline, altitudes, paces, stats }: {
   const depart = useRef<number>(0);
   const ecoule = useRef<number>(0);
   const capRef = useRef<number>(0);
-  const etapeRef = useRef<number>(0);
   const enCours = useRef<boolean>(false);
-  /** Filet de sécurité de l'enchaînement — voir `allerA`. */
-  const filet = useRef<number | null>(null);
 
   const [pret, setPret] = useState(false);
   const [joue, setJoue] = useState(false);
@@ -245,42 +242,27 @@ export function Flyover({ polyline, altitudes, paces, stats }: {
   }
 
   /**
-   * ⚠️ ON N'APPELLE PLUS `jumpTo` À CHAQUE IMAGE.
+   * ⚠️ UNE HORLOGE, PAS UNE CHAÎNE.
    *
-   * C'était la cause des saccades restantes : à 60 images par seconde, chaque appel
-   * force un recalcul complet de la vue et une nouvelle salve de tuiles. MapLibre ne
-   * suit pas ce rythme avec le relief activé — il rend une image sur trois, et le
-   * mouvement paraît haché alors que le calcul de position, lui, est juste.
+   * Les versions précédentes enchaînaient les étapes sur `moveend`, avec un minuteur
+   * de secours. Trois mécanismes qui peuvent se perdre — un `moveend` capté au mauvais
+   * moment, un `easeTo` qui ne bouge pas, un double démarrage — et la lecture se
+   * figeait à l'étape 0 : bouton en pause, barre à zéro, aucune erreur.
    *
-   * On découpe donc le parcours en ÉTAPES et on enchaîne des `easeTo` linéaires :
-   * MapLibre interpole lui-même entre deux étapes, à son rythme, et précharge les
-   * tuiles de la suite. C'est le motif prévu pour ça.
+   * Désormais une seule source de vérité : le TEMPS ÉCOULÉ. À chaque image, on calcule
+   * l'avancement, on place la caméra et le marqueur. Rien à enchaîner, rien à perdre —
+   * et la pause n'est qu'une soustraction.
    */
-  const ETAPES = 44;
-
-  /**
-   * ⚠️ ON N'ENCHAÎNE PLUS AU MINUTEUR, MAIS SUR LA FIN DU MOUVEMENT.
-   *
-   * C'était la saccade restante, et elle venait de mon propre chaînage : un
-   * `setTimeout` réglé sur la MÊME durée que l'`easeTo` déclenche l'étape suivante
-   * pile au moment où la précédente s'achève — ou juste avant. MapLibre interrompt
-   * alors une animation en cours pour en démarrer une autre, et chaque interruption
-   * se voit : un heurt toutes les 400 ms, régulier comme un métronome.
-   *
-   * En écoutant `moveend`, l'étape suivante ne part QUE lorsque la précédente est
-   * réellement terminée. Aucune interruption, donc aucun heurt.
-   */
-  function allerA(etape: number) {
+  function boucle(maintenant: number) {
     const map = carte.current;
-    if (!map || !enCours.current || etape >= ETAPES) {
-      if (etape >= ETAPES) { setJoue(false); etapeRef.current = 0; setAvance(1); enCours.current = false; }
-      return;
-    }
-    etapeRef.current = etape;
+    if (!map || !enCours.current) return;
 
-    const p = etape / (ETAPES - 1);
+    const duree = DUREE_MS * VITESSES[vitesseRef.current].facteur;
+    const p = Math.min(1, (maintenant - depart.current) / duree);
     setAvance(p);
 
+    // Position interpolée ENTRE deux points : se caler sur le point le plus proche
+    // figerait la caméra puis la téléporterait, ce qui se lit comme une saccade.
     const brut = p * (points.length - 1);
     const i = Math.min(points.length - 2, Math.floor(brut));
     const f = brut - i;
@@ -288,62 +270,37 @@ export function Flyover({ polyline, altitudes, paces, stats }: {
     const lat = a.lat + (b.lat - a.lat) * f;
     const lon = a.lon + (b.lon - a.lon) * f;
 
+    // Cap lissé par le plus court chemin angulaire : sans ça, un virage franchissant
+    // 0°/360° fait pivoter la caméra d'un tour complet.
     const loin = points[Math.min(points.length - 1, i + 4)];
     const capBrut = (Math.atan2(loin.lon - a.lon, loin.lat - a.lat) * 180) / Math.PI;
     const ecart = ((capBrut - capRef.current + 540) % 360) - 180;
-    const cap = capRef.current + ecart * 0.4;
-    capRef.current = cap;
+    capRef.current += ecart * 0.06;
 
-    // Le marqueur avance AVANT le mouvement de caméra : il doit déjà être au bon
-    // endroit quand l'image commence à bouger, sinon il traîne d'une étape.
     const src = map.getSource("position") as { setData?: (d: unknown) => void } | undefined;
     src?.setData?.({ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [lon, lat] } });
 
     const vue = ANGLES[angleRef.current];
-    // ⚠️ ENTRÉE EN DOUCEUR. Au lancement, la caméra vient du cadrage d'ensemble
-    // (toute la trace visible, très dézoomée) et devait rejoindre le point de départ
-    // en une durée d'étape — 433 ms pour traverser plusieurs kilomètres et zoomer de
-    // six niveaux. D'où le bond brutal au début, pris pour un bug. La première étape
-    // reçoit donc une transition longue et amortie ; les suivantes restent linéaires.
-    const entree = etape === 0;
-    map.easeTo({
+    map.jumpTo({
       center: [lon, lat],
-      // Le zoom de base dépend de l'inclinaison choisie : un angle rasant demande de
-      // reculer, sinon on ne voit plus que le bitume devant soi.
       zoom: vue.zoom + zoomRef.current,
-      pitch: vue.pitch, bearing: cap,
-      duration: entree ? 1600 : (DUREE_MS * VITESSES[vitesseRef.current].facteur) / ETAPES,
-      // Croisière LINÉAIRE (le défaut freine à chaque étape, soit soixante à-coups) ;
-      // l'ENTRÉE garde l'amorti par défaut — c'est le seul moment où un mouvement
-      // doit se sentir, puisqu'il fait franchir des kilomètres et six niveaux de zoom.
-      easing: entree ? undefined : (x: number) => x,
-      essential: true,            // ne pas être désactivé par « réduire les animations »
+      pitch: vue.pitch,
+      bearing: capRef.current,
     });
 
-    // ── ENCHAÎNEMENT ────────────────────────────────────────────────────────────
-    // ⚠️ L'écouteur se pose APRÈS `easeTo`, et une seule avance est autorisée.
-    //
-    // Posé AVANT, il captait n'importe quel `moveend` qui traînait — celui du cadrage
-    // initial, ou celui d'un déplacement de la carte par l'athlète — et faisait sauter
-    // une étape à chaque fois. Et si deux points de la trace sont identiques, `easeTo`
-    // ne bouge pas : `moveend` ne vient JAMAIS et le survol se fige définitivement.
-    // D'où le filet de sécurité, réglé un peu au-delà de la durée du mouvement.
-    const duree = entree ? 1600 : (DUREE_MS * VITESSES[vitesseRef.current].facteur) / ETAPES;
-    let avancee = false;
-    const suite = () => {
-      if (avancee || !enCours.current) return;
-      avancee = true;
-      if (filet.current) { clearTimeout(filet.current); filet.current = null; }
-      allerA(etape + 1);
-    };
-    map.once("moveend", suite);
-    filet.current = window.setTimeout(suite, duree + 400);
+    if (p < 1) {
+      anim.current = requestAnimationFrame(boucle);
+    } else {
+      enCours.current = false;
+      setJoue(false);
+      ecoule.current = 0;
+    }
   }
 
   /**
-   * Préchauffage : on parcourt la trace une fois, sans afficher, pour que les tuiles
-   * soient déjà en cache au lancement. Une tuile demandée pendant le survol arrive
-   * trop tard — elle apparaît en cours de route, et c'est vu comme un à-coup.
+   * Préchauffage : on parcourt la trace une fois, sans la montrer, pour que les tuiles
+   * soient déjà en cache au lancement. Une tuile réclamée pendant le survol arrive trop
+   * tard — elle apparaît en cours de route, et c'est lu comme un à-coup.
    */
   function prechauffer(): Promise<void> {
     const map = carte.current;
@@ -351,47 +308,59 @@ export function Flyover({ polyline, altitudes, paces, stats }: {
     return new Promise((resolve) => {
       let k = 0;
       const pas = () => {
-        if (!map || k >= 6) { resolve(); return; }
+        if (!carte.current || k > 5) { resolve(); return; }
         const idx = Math.floor((k / 5) * (points.length - 1));
-        map.jumpTo({ center: [points[idx].lon, points[idx].lat], zoom: ANGLES[angleRef.current].zoom + zoomRef.current, pitch: ANGLES[angleRef.current].pitch });
+        const vue = ANGLES[angleRef.current];
+        carte.current.jumpTo({
+          center: [points[idx].lon, points[idx].lat],
+          zoom: vue.zoom + zoomRef.current, pitch: vue.pitch,
+        });
         k++;
-        setTimeout(pas, 120);
+        setTimeout(pas, 110);
       };
       pas();
     });
   }
 
+  function demarrer(depuis: number) {
+    if (anim.current) cancelAnimationFrame(anim.current);
+    ecoule.current = depuis;
+    enCours.current = true;
+    setJoue(true);
+    // `depart` est daté de façon à ce que l'avancement reprenne exactement où il en
+    // était : une pause ne doit rien faire perdre.
+    depart.current = performance.now() - depuis * DUREE_MS * VITESSES[vitesseRef.current].facteur;
+    anim.current = requestAnimationFrame(boucle);
+  }
+
   async function basculer() {
     if (enCours.current) {
       enCours.current = false;
-      if (filet.current) { clearTimeout(filet.current); filet.current = null; }
-      carte.current?.stop();
+      if (anim.current) cancelAnimationFrame(anim.current);
       setJoue(false);
       return;
     }
-    setJoue(true);
-    if (etapeRef.current === 0) {
+    // Préchauffage au premier lancement seulement : il fait défiler la trace sans
+    // l'afficher pour que les tuiles soient déjà en cache. Une tuile réclamée pendant
+    // le survol arrive trop tard et apparaît en cours de route.
+    if (avance === 0 || avance >= 1) {
       setPrechauffe(true);
       await prechauffer();
       setPrechauffe(false);
       capRef.current = capInitial;
     }
-    enCours.current = true;
-    allerA(etapeRef.current >= ETAPES - 1 ? 0 : etapeRef.current);
+    demarrer(avance >= 1 ? 0 : avance);
   }
 
   async function rejouer() {
     enCours.current = false;
-    carte.current?.stop();
-    etapeRef.current = 0;
-    capRef.current = capInitial;
+    if (anim.current) cancelAnimationFrame(anim.current);
     setAvance(0);
-    setJoue(true);
+    capRef.current = capInitial;
     setPrechauffe(true);
     await prechauffer();
     setPrechauffe(false);
-    enCours.current = true;
-    allerA(0);
+    demarrer(0);
   }
 
   // Altitude au point courant — affichée SEULEMENT si elle est connue.
