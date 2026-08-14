@@ -65,7 +65,7 @@ export async function importTracksBestEffort(
 export async function replanIfFresh(
   admin: SupabaseClient,
   opts: { userId: string; athleteId?: string | null; apiKey?: string | null; fresh: number },
-): Promise<{ replanned: boolean; skipped: SyncReport["skipped"] }> {
+): Promise<{ replanned: boolean; skipped: SyncReport["skipped"]; emailed?: boolean; emailSkipped?: string }> {
   if (opts.fresh <= 0) return { replanned: false, skipped: "rien de neuf" };
   try {
     const { data: st } = await admin.from("notifications").select("data")
@@ -75,8 +75,11 @@ export async function replanIfFresh(
       return { replanned: false, skipped: "republié il y a moins de 10 min" };
     }
     const { autoCoachForUser } = await import("@/lib/ai/autoCoach");
-    const r = await autoCoachForUser(admin, { userId: opts.userId, athleteId: opts.athleteId, apiKey: opts.apiKey });
-    return { replanned: !!r.processed, skipped: r.processed ? null : "erreur" };
+    // `notify` : on n'arrive ici QUE parce qu'une séance inédite vient d'être importée.
+    // C'est exactement le moment où l'athlète attend une nouvelle — et le seul. Le filet
+    // de nuit, lui, appelle `autoCoachForUser` sans ce drapeau.
+    const r = await autoCoachForUser(admin, { userId: opts.userId, athleteId: opts.athleteId, apiKey: opts.apiKey, notify: true });
+    return { replanned: !!r.processed, skipped: r.processed ? null : "erreur", emailed: r.emailed, emailSkipped: r.emailSkipped };
   } catch {
     // Le plan sera de toute façon recalculé au passage suivant : on ne fait pas échouer
     // la synchronisation pour une replanification.

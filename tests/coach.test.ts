@@ -16,6 +16,7 @@ import { isRun, sportOf, impactOf, roleOf } from "../src/lib/intervals/sport";
 import { summarizeCross } from "../src/lib/coach/crossTraining";
 import { computeQualityBudget } from "../src/lib/coach/qualityBudget";
 import { shardForPass, replanIfFresh } from "../src/lib/intervals/syncAndCoach";
+import { buildPlanReadyEmail } from "../src/lib/notify/planReady";
 import { vmaFromPaceCurve, bestVmaFromWorkouts } from "../src/lib/running/fitness";
 import { heatAdvice, windAdvice, altitudeLossPct, heatAcclimation } from "../src/lib/weather/openMeteo";
 import { parseReps, parsePaceSec, stepsForType, warmCoolMin, buildWorkoutDescription } from "../src/lib/watch/intervals";
@@ -2385,6 +2386,97 @@ test("la chaîne sync → analyse → replanification → montre n'existe qu'à 
     assert.ok(!/autoCoachForUser/.test(src), `${f} rappelle le coach directement au lieu de passer par replanIfFresh`);
     assert.ok(!/importMissingTracks/.test(src), `${f} garde sa propre importation de traces`);
   }
+});
+
+console.log("\nE-MAIL « TON PLAN EST À JOUR » — un envoi ne se rattrape pas");
+const iso0 = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+const mailIn = (o: Partial<Parameters<typeof buildPlanReadyEmail>[0]> = {}) => buildPlanReadyEmail({
+  lang: "fr", firstName: "Cyprien",
+  lastSession: { date: iso0(0), label: "Seuil/Tempo · 15 km · 64 min · 4'19/km", shows: ["allure tenue du début à la fin"], effect: "Fraîcheur orange → 1 séance de qualité." },
+  days: [
+    { date: iso0(0), type: "Seuil", title: "Séance au seuil", detail: "" },
+    { date: iso0(1), type: "Endurance", title: "Footing en endurance", detail: "" },
+    { date: iso0(2), type: "Sortie longue", title: "Sortie longue", detail: "" },
+    { date: iso0(3), type: "Repos", title: "Repos complet", detail: "" },
+  ],
+  objective: { race: "Marathon de Lille", daysToRace: 72 },
+  appUrl: "https://exemple.test", ...o,
+});
+test("le sujet annonce la prochaine séance, pas celle d'aujourd'hui", () => {
+  // Un sujet « ton plan est à jour » sans rien d'autre ne se lit pas dans une boîte de
+  // réception. Et annoncer la séance du jour, déjà faite, serait une information morte.
+  const m = mailIn();
+  assert.ok(/Demain/.test(m.subject), `sujet sans repère de temps : ${m.subject}`);
+  assert.ok(/Footing en endurance/.test(m.subject), `sujet sans la prochaine séance : ${m.subject}`);
+});
+test("le repos n'est jamais annoncé comme la prochaine séance", () => {
+  const m = mailIn({ days: [
+    { date: iso0(0), type: "Repos", title: "Repos complet", detail: "" },
+    { date: iso0(1), type: "Repos", title: "Repos complet", detail: "" },
+    { date: iso0(2), type: "VMA", title: "Séance VMA", detail: "" },
+  ] });
+  assert.ok(/VMA/.test(m.subject), `« repos » annoncé comme prochaine séance : ${m.subject}`);
+});
+test("rien n'est inventé quand l'analyse manque", () => {
+  // Un e-mail qui affirme quelque chose de faux sur l'entraînement de quelqu'un est
+  // pire que pas d'e-mail du tout.
+  const m = mailIn({ lastSession: null });
+  assert.ok(!/dernière séance/i.test(m.text), "un bloc d'analyse vide ne doit pas apparaître");
+  assert.ok(!/undefined|null|NaN/.test(m.text + m.html), "valeur technique visible dans l'e-mail");
+  // …et sans objectif non plus.
+  const m2 = mailIn({ objective: null, lastSession: null });
+  assert.ok(!/Objectif/.test(m2.text), "objectif inventé alors qu'il n'y en a pas");
+});
+test("l'e-mail existe dans les 5 langues et ne retombe jamais sur une clé", () => {
+  for (const lang of ["fr", "en", "de", "es", "pt"] as const) {
+    const m = mailIn({ lang });
+    assert.ok(m.subject.length > 10, `${lang} : sujet vide`);
+    assert.ok(!/undefined/.test(m.subject + m.text), `${lang} : trou de traduction`);
+    assert.ok(/dashboard\/calendrier/.test(m.text), `${lang} : lien manquant`);
+  }
+});
+test("un titre de séance ne peut pas casser le HTML", () => {
+  // Les titres viennent d'intervals.icu, donc du nom que Garmin a donné à la sortie —
+  // une chaîne que nous ne contrôlons pas et qui finit dans une page HTML.
+  const m = mailIn({ firstName: `<script>alert(1)</script>`, days: [
+    { date: iso0(1), type: "Seuil", title: `Séance "test" <b>gras</b>`, detail: "" },
+  ] });
+  assert.ok(!/<script>/.test(m.html), "balise script non échappée dans l'e-mail");
+  assert.ok(!/<b>gras<\/b>/.test(m.html), "balisage non échappé dans un titre de séance");
+  assert.ok(/&lt;script&gt;/.test(m.html), "l'échappement doit conserver le texte, pas le supprimer");
+});
+test("l'e-mail dit comment s'en débarrasser", () => {
+  // Un e-mail automatique sans porte de sortie est un e-mail qu'on signale comme spam,
+  // ce qui abîme la délivrabilité de TOUS les autres.
+  //
+  // Le mot attendu est propre à chaque langue : chercher « Notif » partout passait en
+  // français, en anglais, en espagnol et en portugais, et échouait en allemand
+  // (« Benachrichtigungen ») — un test qui ne tient que par la parenté des langues
+  // latines ne vérifie pas grand-chose.
+  const motDeSortie = { fr: "Notifications", en: "Notifications", de: "Benachrichtigungen", es: "Notificaciones", pt: "Notificações" } as const;
+  for (const [lang, mot] of Object.entries(motDeSortie) as [keyof typeof motDeSortie, string][]) {
+    const m = mailIn({ lang });
+    assert.ok(m.text.includes(mot), `${lang} : le pied de page ne dit pas où se désinscrire (« ${mot} » attendu)`);
+  }
+});
+test("le silence est proscrit côté envoi, comme ailleurs", () => {
+  // `sendPlanReadyEmail` doit toujours dire pourquoi il n'a rien envoyé.
+  const src = codeOf("src/lib/notify/planReady.ts");
+  for (const motif of ["RESEND_API_KEY absente", "notifications du coach désactivées", "aucune adresse e-mail"]) {
+    assert.ok(src.includes(motif), `motif de non-envoi manquant : ${motif}`);
+  }
+  // Le consentement est vérifié AVANT toute construction d'e-mail.
+  assert.ok(src.indexOf("notif_coach") < src.indexOf("api.resend.com"), "le consentement doit précéder l'envoi");
+});
+test("seule une séance NOUVELLE déclenche un e-mail", () => {
+  // Le filet de nuit repasse à 3 h 30 sans qu'il se soit rien produit : écrire à cette
+  // heure-là pour dire « ton plan est à jour » serait du bruit qui réveille.
+  const auto = codeOf("src/lib/ai/autoCoach.ts");
+  assert.ok(/if \(opts\.notify\)/.test(auto), "l'envoi n'est pas conditionné au drapeau notify");
+  const chain = codeOf("src/lib/intervals/syncAndCoach.ts");
+  assert.ok(/notify: true/.test(chain), "la chaîne « séance inédite » ne demande pas la notification");
+  // Le cron de nuit, lui, ne doit PAS demander de notification.
+  assert.ok(!/notify: true/.test(codeOf("src/app/api/cron/auto-coach/route.ts")), "le filet de nuit envoie des e-mails");
 });
 
 console.log("\nQUOTA ÉPUISÉ — la chaîne cesse vraiment d'appeler le réseau");

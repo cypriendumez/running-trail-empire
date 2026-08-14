@@ -13,11 +13,22 @@ import { buildWeekPlan, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
 import { pushIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace } from "@/lib/watch/intervals";
 
 type Admin = SupabaseClient;
-export type AutoResult = { processed: boolean; days?: number; pushed?: number; reason?: string };
+export type AutoResult = {
+  processed: boolean; days?: number; pushed?: number; reason?: string;
+  /** E-mail « ton plan est à jour » : envoyé, ou motif de non-envoi. Jamais silencieux. */
+  emailed?: boolean; emailSkipped?: string;
+};
 
 export async function autoCoachForUser(
   admin: Admin,
-  opts: { userId: string; athleteId?: string | null; apiKey?: string | null },
+  opts: {
+    userId: string; athleteId?: string | null; apiKey?: string | null;
+    /** Prévenir l'athlète par e-mail. VRAI uniquement quand la republication est
+     *  déclenchée par une séance RÉELLEMENT nouvelle. Le filet de nuit, lui, repasse
+     *  à 3 h 30 sans qu'il se soit rien produit : écrire à cette heure-là pour dire
+     *  « ton plan est à jour » serait du bruit, et du bruit qui réveille. */
+    notify?: boolean;
+  },
 ): Promise<AutoResult> {
   const { userId } = opts;
 
@@ -93,7 +104,35 @@ export async function autoCoachForUser(
     } catch { /* best effort : le calendrier reste publié même si Garmin est injoignable */ }
   }
 
-  // 4) Trace du dernier passage + POURQUOI le plan ressemble à ça.
+  // 4) PRÉVENIR L'ATHLÈTE — sinon la replanification instantanée ne sert à rien.
+  //
+  // Le plan est prêt bien avant qu'il pense à ouvrir l'application : sans un mot, on a
+  // résolu un problème que personne ne voit. L'envoi est encadré par trois règles
+  // (consentement, rythme, rien d'inventé) : voir lib/notify/planReady.
+  //
+  // On lit l'état PRÉCÉDENT avant de l'écraser : c'est lui qui porte la date du dernier
+  // e-mail, ce qui évite une colonne dédiée en base.
+  const { data: prevState } = await admin.from("notifications").select("id, data")
+    .eq("user_id", userId).eq("type", "auto_coach_state").maybeSingle();
+  const lastEmailAt = (prevState?.data as { lastPlanEmailAt?: string } | null)?.lastPlanEmailAt ?? null;
+  let emailed = false;
+  let emailSkipped: string | undefined = opts.notify ? undefined : "replanification sans séance nouvelle";
+  if (opts.notify) {
+    const { sendPlanReadyEmail } = await import("@/lib/notify/planReady");
+    const r = await sendPlanReadyEmail(admin, {
+      userId,
+      lastSession: ctx.lastSession ? { ...ctx.lastSession, shows: ctx.lastSession.shows.slice(0, 4) } : null,
+      // Ce qui reste À VENIR : une séance déjà courue n'a rien à faire dans un e-mail
+      // qui annonce la suite.
+      days: week.filter((d) => d.date >= from).map((d) => ({ date: d.date, type: d.type, title: d.title, detail: d.detail })),
+      objective: ctx.objective ? { race: ctx.objective.race, daysToRace: ctx.daysToRace } : null,
+      lastEmailAt,
+    }).catch(() => ({ sent: false, skipped: "erreur inattendue" }));
+    emailed = r.sent;
+    emailSkipped = r.skipped;
+  }
+
+  // 5) Trace du dernier passage + POURQUOI le plan ressemble à ça.
   //
   // Défaut réel corrigé ici : un athlète venait de basculer son objectif d'un 10 km vers
   // un marathon et voyait sept footings identiques dans son calendrier. Il en a conclu que
@@ -137,10 +176,13 @@ export async function autoCoachForUser(
     // Avertissements de réalisme : ils ne vivaient que dans le prompt de l'IA, donc
     // l'athlète ne les voyait jamais sur son calendrier.
     warnings: ctx.objectiveWarnings.slice(0, 3),
+    // Date du dernier e-mail RÉELLEMENT parti — c'est elle qui espace les envois. Elle
+    // est reportée telle quelle quand rien n'a été envoyé : l'écraser remettrait le
+    // compteur à zéro et autoriserait un e-mail toutes les dix minutes.
+    lastPlanEmailAt: emailed ? new Date().toISOString() : lastEmailAt,
   };
-  const { data: stateRow } = await admin.from("notifications").select("id").eq("user_id", userId).eq("type", "auto_coach_state").maybeSingle();
-  if (stateRow?.id) await admin.from("notifications").update({ data: stateData }).eq("id", stateRow.id);
+  if (prevState?.id) await admin.from("notifications").update({ data: stateData }).eq("id", prevState.id);
   else await admin.from("notifications").insert({ user_id: userId, type: "auto_coach_state", title: "auto-coach", body: "", data: stateData });
 
-  return { processed: true, days: rows.length, pushed };
+  return { processed: true, days: rows.length, pushed, emailed, emailSkipped };
 }

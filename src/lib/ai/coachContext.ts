@@ -1536,10 +1536,12 @@ ${catalog}`;
       // Ce que ça CHANGE : sans cette phrase, le constat reste un bulletin météo.
       // Nombres à la française (« −36 », « 2,0 ») : ce texte est LU par l'athlète, un
       // « -36 » et un « 2 » au milieu d'une phrase trahissent une chaîne de débogage.
+      // « 1 séance(s) » se lit comme une chaîne de débogage. Ce texte part dans un
+      // e-mail et s'affiche sur le calendrier : il s'accorde.
       effect: `Fraîcheur ${readyLevel} (TSB ${frNum(Math.round(load.tsb))}, ratio ${frNum(r1(load.acr), 1)}) → ${
         qBudget === 0 ? "aucune séance de qualité cette semaine"
         : qb.floored ? `${qBudget} séance de qualité, raccourcie`
-        : `${qBudget} séance(s) de qualité cette semaine`}.`,
+        : `${qBudget} séance${qBudget > 1 ? "s" : ""} de qualité cette semaine`}.`,
     };
   })();
 
