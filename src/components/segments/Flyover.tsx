@@ -175,7 +175,10 @@ export function Flyover({ polyline, altitudes, stats }: {
     const cap = precedent + ecart * 0.12;
     capRef.current = cap;
 
-    map.jumpTo({ center: [lon, lat], zoom: 15.6, pitch: 64, bearing: cap });
+    // Cadrage reculé et moins incliné qu'au premier jet (15,6 / 64°) : en virage
+    // serré, la trace sortait du champ. À 14,9 et 52°, le virage entier reste visible
+    // — on perd un peu de sensation de vitesse, on gagne de ne jamais perdre le fil.
+    map.jumpTo({ center: [lon, lat], zoom: 14.9, pitch: 52, bearing: cap });
 
     if (p < 1) anim.current = requestAnimationFrame(boucle);
     else { setJoue(false); depart.current = 0; ecoule.current = 0; }

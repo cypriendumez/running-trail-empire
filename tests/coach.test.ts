@@ -48,6 +48,7 @@ import {
 } from "../src/lib/segments/geo";
 import { findEfforts, leaderboard, maitreDuSegment } from "../src/lib/segments/match";
 import { heatCells, intensity, denseBounds, heatBounds, type HeatCell as HC } from "../src/lib/segments/heatmap";
+import { computeSplits, splitPace, elevationProfile } from "../src/lib/segments/splits";
 
 let passed = 0;
 const fails: string[] = [];
@@ -1400,6 +1401,75 @@ test("le survol n'affiche pas d'altitude qu'il ne connaît pas", () => {
   const vue = codeOf("src/components/segments/Flyover.tsx");
   assert.ok(/altAct != null &&/.test(vue), "le bandeau doit taire l'altitude inconnue");
 });
+test("un arrêt au ravitaillement ne devient PAS une allure", () => {
+  // Trouvé sur un ultra réel de 61 km : le kilomètre d'un ravitaillement s'affichait
+  // « 91:32 /km ». Exact — c'est bien le temps écoulé — mais absurde présenté comme
+  // une allure de course. On compte donc le temps EN MOUVEMENT.
+  const pas = 0.0001;
+  const pts: TP[] = [];
+  let t = 0;
+  for (let i = 0; i < 90; i++) { pts.push({ lat: 50 + i * pas, lon: 3, t }); t += 5; }
+  // Arrêt de 10 minutes, sur place.
+  for (let k = 0; k < 20; k++) { pts.push({ lat: 50 + 89 * pas, lon: 3, t }); t += 30; }
+  for (let i = 90; i < 120; i++) { pts.push({ lat: 50 + i * pas, lon: 3, t }); t += 5; }
+
+  const s = computeSplits(pts)[0];
+  assert.ok(s.stoppedSeconds > 500, `arrêt détecté : ${s.stoppedSeconds} s`);
+  assert.ok(s.seconds > 1000, "le temps ÉCOULÉ inclut bien l'arrêt");
+  const p = splitPace(s) ?? 0;
+  assert.ok(p < 700, `l'allure doit ignorer l'arrêt, obtenu ${Math.round(p)} s/km`);
+  assert.ok(s.movingSeconds < s.seconds, "temps en mouvement < temps écoulé");
+});
+test("sans arrêt, temps en mouvement et temps écoulé coïncident", () => {
+  const pts: TP[] = Array.from({ length: 120 }, (_, i) => ({ lat: 50 + i * 0.0001, lon: 3, t: i * 5 }));
+  const s = computeSplits(pts)[0];
+  assert.equal(s.stoppedSeconds, 0, "aucune pause ne doit être inventée");
+  assert.equal(s.movingSeconds, s.seconds);
+});
+
+test("le dernier tronçon d'une sortie est SIGNALÉ comme partiel", () => {
+  // Une sortie de 12,01 km finit sur 10 mètres. Présenter ce reste comme un
+  // kilomètre plein afficherait un chrono aberrant en bas de tableau — souvent
+  // spectaculairement rapide. Strava masque ce détail, on préfère le dire.
+  // Trace synthétique : ligne droite plein nord, 1 point tous les ~11,1 m à 1 Hz.
+  const pas = 0.0001; // ≈ 11,1 m de latitude
+  const pts: TP[] = Array.from({ length: 250 }, (_, i) => ({ lat: 50 + i * pas, lon: 3, t: i * 4 }));
+  const splits = computeSplits(pts);
+  assert.ok(splits.length >= 2, `attendu au moins 2 tronçons, obtenu ${splits.length}`);
+  assert.equal(splits[0].partial, false);
+  assert.equal(splits[splits.length - 1].partial, true, "le reliquat doit être étiqueté");
+  assert.ok(splits[splits.length - 1].distanceKm < 1, "un tronçon partiel fait moins d'un km");
+});
+test("un kilomètre mesuré fait bien un kilomètre", () => {
+  const pas = 0.0001;
+  const pts: TP[] = Array.from({ length: 120 }, (_, i) => ({ lat: 50 + i * pas, lon: 3, t: i * 5 }));
+  const s = computeSplits(pts)[0];
+  assert.ok(Math.abs(s.distanceKm - 1) < 0.02, `tronçon de ${s.distanceKm.toFixed(3)} km`);
+  // 1 km à 11,1 m toutes les 5 s ⇒ ~450 s. On vérifie l'ordre de grandeur, pas le hasard.
+  assert.ok(Math.abs(s.seconds - 450) < 20, `${s.seconds} s`);
+  assert.ok(Math.abs((splitPace(s) ?? 0) - s.seconds) < 15, "l'allure doit coller à la durée sur 1 km");
+});
+test("l'allure d'un tronçon partiel est RAMENÉE au kilomètre", () => {
+  // Sinon un reliquat de 200 m parcouru en 60 s s'afficherait « 1:00 /km » —
+  // un record du monde apparent, en bas de chaque sortie.
+  const partiel = { km: 13, seconds: 60, movingSeconds: 60, stoppedSeconds: 0, elevation: null, distanceKm: 0.2, partial: true };
+  assert.equal(Math.round(splitPace(partiel) ?? 0), 300, "60 s pour 200 m = 5:00/km, pas 1:00");
+});
+test("sans altitude, pas de profil inventé", () => {
+  // Un profil plat affiché sur une trace sans altimétrie ferait passer une montagne
+  // pour une plaine.
+  const sansAlt: TP[] = Array.from({ length: 60 }, (_, i) => ({ lat: 50 + i * 0.0001, lon: 3, t: i }));
+  assert.equal(elevationProfile(sansAlt), null);
+  const avecAlt = sansAlt.map((p, i) => ({ ...p, alt: 20 + i * 0.5 }));
+  const prof = elevationProfile(avecAlt);
+  assert.ok(prof && prof.length > 3);
+  assert.equal(prof![prof!.length - 1].alt, avecAlt[avecAlt.length - 1].alt, "le dernier point doit être conservé");
+});
+test("le dénivelé d'un tronçon reste null quand la trace n'en porte pas", () => {
+  const pts: TP[] = Array.from({ length: 120 }, (_, i) => ({ lat: 50 + i * 0.0001, lon: 3, t: i * 5 }));
+  assert.equal(computeSplits(pts)[0].elevation, null, "« inconnu » n'est pas « plat »");
+});
+
 test("quelques sorties lointaines ne font PAS ouvrir la carte sur l'Europe", () => {
   // Mesuré sur l'historique réel : 72 % des passages dans 5 km, mais 19 % à plus de
   // 200 km (courses, vacances). Cadrer sur le tout donnait une fenêtre de 987 × 1 756 km
