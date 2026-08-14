@@ -287,36 +287,23 @@ export async function GET(req: Request) {
   //
   // Best-effort et borné : une trace manquante ne doit jamais faire échouer une
   // synchronisation, et le reliquat est repris à la synchro suivante.
-  let tracks = { imported: 0, withoutGps: 0, failed: 0, remaining: 0 };
-  try {
-    const { createAdminClient } = await import("@/lib/supabase/admin");
-    const { importMissingTracks } = await import("@/lib/intervals/tracks");
-    tracks = await importMissingTracks(createAdminClient(), { userId: user.id, apiKey: API_KEY, max: 8 });
-  } catch { /* les traces seront reprises à la prochaine synchronisation */ }
-
-  let replanned = false;
-  if (freshWorkouts > 0) {
-    try {
-      const { createAdminClient } = await import("@/lib/supabase/admin");
-      const admin = createAdminClient();
-      // Garde-fou supplémentaire : jamais deux republications à moins de 10 min
-      // d'intervalle (chaque republication pousse aussi des séances sur la montre).
-      const { data: st } = await admin.from("notifications").select("data")
-        .eq("user_id", user.id).eq("type", "auto_coach_state").maybeSingle();
-      const lastAt = (st?.data as { at?: string } | null)?.at;
-      if (!lastAt || Date.now() - new Date(lastAt).getTime() > 10 * 60000) {
-        const { autoCoachForUser } = await import("@/lib/ai/autoCoach");
-        const r = await autoCoachForUser(admin, { userId: user.id, athleteId: ATHLETE_ID, apiKey: API_KEY });
-        replanned = !!r.processed;
-      }
-    } catch { /* le plan sera de toute façon recalculé par le cron */ }
-  }
+  // Traces GPS + replanification : chaîne PARTAGÉE avec le balayage serveur
+  // (lib/intervals/syncAndCoach). Les deux chemins en avaient leur propre version, et
+  // celle du cron n'importait aucune trace ni ne respectait le garde-fou de 10 min.
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const { importTracksBestEffort, replanIfFresh } = await import("@/lib/intervals/syncAndCoach");
+  const admin = createAdminClient();
+  const tracks = await importTracksBestEffort(admin, { userId: user.id, apiKey: API_KEY });
+  const { replanned, skipped } = await replanIfFresh(admin, {
+    userId: user.id, athleteId: ATHLETE_ID, apiKey: API_KEY, fresh: freshWorkouts,
+  });
 
   return NextResponse.json({
     synced,
     freshWorkouts,
     tracks,
     replanned,
+    replanSkipped: skipped,
     period: { oldest, newest },
     fetched: { activities: activities.length, wellness: wellness.length },
     valid_activities: validActivities.length,

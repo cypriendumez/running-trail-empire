@@ -40,6 +40,10 @@ export type CoachState = {
   /** Ce qui a été fait hors course cette semaine — souvent l'explication d'un allègement
    *  que le calendrier, qui ne montre que la course, rendait incompréhensible. */
   cross?: { label?: string; minutes?: number; tss?: number; sharePct?: number } | null;
+  /** Ce que la dernière séance a montré, et ce que ça change. Depuis que le plan se
+   *  republie juste après une séance, le calendrier bouge sous les yeux de l'athlète :
+   *  il doit pouvoir lire la raison sans ouvrir une page d'analyse. */
+  lastSession?: { date?: string; label?: string; shows?: string[]; effect?: string } | null;
 };
 
 // Catégorie canonique d'une séance (à partir du libellé libre du coach) → couleur + légende i18n.
@@ -585,8 +589,9 @@ function CoachWhy({ state, lang, t }: { state: CoachState | null; lang: string; 
   const reasons = (state.reasons ?? []).filter(Boolean);
   const hasObjective = Boolean(state.objective?.race);
   const warnings = (state.warnings ?? []).filter(Boolean);
-  // Rien d'anormal ET pas d'objectif à rappeler → on se tait.
-  if (!noQuality && !easedQuality && !hasObjective && !warnings.length) return null;
+  // Rien d'anormal, pas d'objectif à rappeler ET rien à dire d'une séance récente → on
+  // se tait. Un bandeau permanent redevient un décor qu'on ne lit plus.
+  if (!noQuality && !easedQuality && !hasObjective && !warnings.length && !state.lastSession?.label) return null;
 
   const tone = noQuality || easedQuality
     ? { border: "border-amber-200", bg: "bg-amber-50/70", dot: "text-amber-600", head: "text-amber-900", body: "text-amber-800" }
@@ -597,6 +602,7 @@ function CoachWhy({ state, lang, t }: { state: CoachState | null; lang: string; 
   const dLeft = state.daysToRace;
   const quality = (state.plannedQuality ?? []).filter(Boolean);
   const nextQuality = (state.nextWeekQuality ?? []).filter(Boolean);
+  const lastSession = state.lastSession ?? null;
 
   return (
     <div className={`mb-4 rounded-2xl border ${tone.border} ${tone.bg} px-4 py-3.5`}>
@@ -612,6 +618,25 @@ function CoachWhy({ state, lang, t }: { state: CoachState | null; lang: string; 
           {dLeft != null && dLeft >= 0 && ` · ${t("cal.why.daysLeft", { n: dLeft })}`}
           {state.phase && ` · ${t("cal.why.phase")} ${state.phase}`}
         </p>
+      )}
+
+      {/* CE QUE LA DERNIÈRE SÉANCE A MONTRÉ. Le plan est désormais republié dans la
+          minute qui suit une séance : le calendrier change sous les yeux de l'athlète.
+          Sans cette section, il constate le mouvement sans jamais en lire la cause. */}
+      {lastSession?.label && (
+        <div className={`mt-2 rounded-xl bg-white/60 px-3 py-2 text-sm ${tone.body}`}>
+          <p>
+            <span className="font-semibold">{t("cal.why.lastSession")}</span>
+            {lastSession.date && ` · ${new Date(lastSession.date + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "long" })}`}
+            {" : "}{lastSession.label}
+          </p>
+          {(lastSession.shows ?? []).length > 0 && (
+            <ul className="mt-1 space-y-0.5">
+              {(lastSession.shows ?? []).map((s, i) => <li key={i}>· {s}</li>)}
+            </ul>
+          )}
+          {lastSession.effect && <p className="mt-1 font-medium">{lastSession.effect}</p>}
+        </div>
       )}
 
       {noQuality || easedQuality ? (

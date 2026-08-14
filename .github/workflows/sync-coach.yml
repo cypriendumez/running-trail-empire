@@ -1,0 +1,67 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  BALAYAGE « juste après la séance » — toutes les 10 minutes.
+#
+#  POURQUOI ICI ET PAS DANS vercel.json : le compte Vercel est en plan HOBBY (vérifié
+#  le 14/08/2026 : équipe `cyprien-dumez-s-projects` → plan `hobby`), et Hobby plafonne
+#  les tâches planifiées à UNE exécution par jour. C'est la seule raison pour laquelle
+#  le coach ne repassait qu'à 3 h 30 : ce n'était pas un choix d'entraînement.
+#  Le cron Vercel reste en place comme filet de nuit ; la cadence réelle vient d'ici.
+#
+#  COÛT : 0 €. Le dépôt est public, donc les minutes GitHub Actions sont illimitées.
+#  Si le dépôt repassait en privé, 6 exécutions/heure × 24 h × 30 j = 4 320 exécutions,
+#  facturées à la minute entamée, soit au-delà des 2 000 minutes gratuites : il faudrait
+#  alors passer à toutes les 30 minutes, ou payer Vercel Pro.
+#
+#  DEUX LIMITES À CONNAÎTRE, elles sont de GitHub et on ne peut rien y faire :
+#   • une planification peut être retardée de plusieurs minutes aux heures de pointe —
+#     la garantie est « au moins toutes les 10 min », pas « pile toutes les 10 min » ;
+#   • un dépôt sans activité pendant 60 jours voit ses planifications désactivées.
+#
+#  SECRETS À CRÉER (Settings → Secrets and variables → Actions) :
+#   • PACEVO_URL   = https://running-trail-empire-woad.vercel.app
+#   • CRON_SECRET  = la MÊME valeur que la variable d'environnement CRON_SECRET sur Vercel
+# ─────────────────────────────────────────────────────────────────────────────
+name: Synchronisation et replanification
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  # Permet de déclencher un passage à la main depuis l'onglet Actions — indispensable
+  # pour vérifier la chaîne sans attendre dix minutes.
+  workflow_dispatch:
+
+# Deux passages ne doivent jamais se chevaucher : ils synchroniseraient les mêmes
+# athlètes en double et doubleraient les appels à intervals.icu.
+concurrency:
+  group: sync-coach
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Appeler le balayage
+        env:
+          PACEVO_URL: ${{ secrets.PACEVO_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PACEVO_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::PACEVO_URL ou CRON_SECRET manquant dans les secrets du dépôt."
+            exit 1
+          fi
+          # --fail-with-body : un 401 ou un 500 doit FAIRE ÉCHOUER le passage et se voir
+          # dans l'onglet Actions. Un balayage qui échoue en silence est pire que pas de
+          # balayage du tout : on croit le plan à jour alors qu'il ne l'est pas.
+          curl --fail-with-body --silent --show-error --max-time 120 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${PACEVO_URL}/api/cron/sync-all" | tee reponse.json
+          echo
+          # La réponse ne doit JAMAIS contenir de clé API : la route renvoie un compte
+          # rendu par athlète, et une régression qui y glisserait `intervals_api_key`
+          # publierait la clé dans des journaux d'exécution publics.
+          if grep -qiE '"?intervals_api_key"?|API_KEY:' reponse.json; then
+            echo "::error::La réponse contient un secret — arrêt immédiat."
+            exit 1
+          fi

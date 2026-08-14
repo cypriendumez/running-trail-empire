@@ -156,6 +156,18 @@ export type AthleteContext = {
    *  Exposé au plan déterministe (et pas seulement au prompt de l'IA) pour qu'un
    *  allègement dû à une semaine de vélo ou de randonnée puisse le DIRE. */
   cross: CrossSummary;
+  /** Ce que la séance des 3 derniers jours a montré, et ce que ça change au plan.
+   *  `null` s'il n'y a rien de récent — on n'affiche pas un constat sur une sortie
+   *  d'il y a deux semaines en la présentant comme « ta dernière séance ». */
+  lastSession: {
+    date: string;
+    /** « Seuil/Tempo · 15,0 km · 72 min · 4'48/km · 152 bpm » — champs présents seulement. */
+    label: string;
+    /** Constats mesurés, jamais déduits d'une donnée absente. */
+    shows: string[];
+    /** L'effet sur le plan : sans ça, le constat n'est qu'un bulletin. */
+    effect: string;
+  } | null;
   longRunMode: "run" | "bike"; // préférence : sortie longue en course ou remplacée par du vélo (cross-training)
   // Verdict de fraîcheur du jour (déterministe) — affiché au coach et imposé à l'IA.
   readiness: { level: "vert" | "jaune" | "orange" | "rouge"; reasons: string[]; advice: string };
@@ -1461,6 +1473,60 @@ GARDE-FOUS ANTI-BLESSURE (à respecter ABSOLUMENT — la santé prime sur la per
 PALETTE DE SÉANCES (niveau ${libLevel} · objectif ${libGoal}) — pioche les plus pertinentes et ADAPTE allures/durées/volume à CE coureur ; combine-les avec logique (périodisation, 80/20), ne les empile pas :
 ${catalog}`;
 
+  // ── CE QUE LA DERNIÈRE SÉANCE A MONTRÉ ──────────────────────────────────────
+  // Tout ceci était DÉJÀ calculé — allure, FC, décrochage de la dernière série, effet
+  // sur la charge — et ne partait qu'au prompt de l'IA. L'athlète, lui, voyait son plan
+  // changer sans jamais lire pourquoi. Quand la replanification se déclenche dans la
+  // minute qui suit une séance, l'absence d'explication devient le défaut principal :
+  // le calendrier bouge sous ses yeux sans un mot.
+  //
+  // Rien n'est fabriqué ici : chaque ligne n'apparaît que si sa donnée existe.
+  const lastSession = (() => {
+    const w = runs[0];
+    if (!w?.date) return null;
+    const km = w.distance_km ?? 0, sec = w.duration_seconds ?? 0;
+    const ageDays = Math.floor((now - new Date(w.date).getTime()) / 86400000);
+    // Au-delà de 3 jours ce n'est plus « la séance qui vient d'être faite » : afficher
+    // « ta dernière séance » à propos d'une sortie d'il y a deux semaines induit en erreur.
+    if (ageDays > 3) return null;
+    const paceStr = km > 0 && sec > 0 ? fmtPace(sec / (km / 1)) : null;
+    const bits = [
+      km > 0 ? `${r1(km)} km` : null,
+      sec > 0 ? `${Math.floor(sec / 60)} min` : null,
+      paceStr ? `${paceStr}/km` : null,
+      w.avg_hr ? `${w.avg_hr} bpm` : null,
+      w.elevation_gain_m ? `D+ ${w.elevation_gain_m} m` : null,
+    ].filter(Boolean);
+    const shows: string[] = [];
+    // Exécution de la série : le signal le plus direct qu'on ait sur le dosage.
+    if (qe?.repsSec?.length && qe.fadeSec != null) {
+      shows.push(qe.fadeSec >= 12
+        ? `décrochage de ${qe.fadeSec} s/km entre le début et la fin de la série : elle était trop ambitieuse`
+        : qe.fadeSec <= -6
+        ? `tu as accéléré de ${-qe.fadeSec} s/km sur la fin : il en restait sous le pied`
+        : "allure tenue du début à la fin de la série : la charge était bien calibrée");
+    }
+    if (w.gap_min_km != null && (w.elevation_gain_m ?? 0) > 150) {
+      shows.push(`allure ajustée au dénivelé ${w.gap_min_km}/km — c'est elle qui compte sur ce terrain, pas l'allure brute`);
+    }
+    if (w.avg_hr != null && fcMaxEst) {
+      shows.push(`effort à ${Math.round((w.avg_hr / fcMaxEst) * 100)} % de ta FC max estimée`);
+    }
+    if (w.tss != null) shows.push(`${Math.round(Number(w.tss))} points de charge`);
+    return {
+      date: String(w.date).slice(0, 10),
+      label: `${classifyRun(w, fcMaxEst)}${bits.length ? ` · ${bits.join(" · ")}` : ""}`,
+      shows,
+      // Ce que ça CHANGE : sans cette phrase, le constat reste un bulletin météo.
+      // Nombres à la française (« −36 », « 2,0 ») : ce texte est LU par l'athlète, un
+      // « -36 » et un « 2 » au milieu d'une phrase trahissent une chaîne de débogage.
+      effect: `Fraîcheur ${readyLevel} (TSB ${frNum(Math.round(load.tsb))}, ratio ${frNum(r1(load.acr), 1)}) → ${
+        qBudget === 0 ? "aucune séance de qualité cette semaine"
+        : qb.floored ? `${qBudget} séance de qualité, raccourcie`
+        : `${qBudget} séance(s) de qualité cette semaine`}.`,
+    };
+  })();
+
   return {
     text, objective, daysToRace, weeksToRace, athleteName: String(p?.full_name ?? "Athlète"), vma,
     weekPlan: { qBudget, quality: chosen, easyPace: vma ? paceAt(70) : null, eased: easeReasons.length > 0, floored: qb.floored },
@@ -1484,6 +1550,7 @@ ${catalog}`;
     macroPlan,
     objectiveWarnings,
     weightLoss,
+    lastSession,
   };
 }
 

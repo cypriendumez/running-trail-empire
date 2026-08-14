@@ -28,12 +28,29 @@ export async function autoCoachForUser(
   const week = buildWeekPlan(ctx);
   const today = week[0].date;
 
+  // ── LA SÉANCE DÉJÀ COURUE NE SE RÉÉCRIT PAS ─────────────────────────────────
+  // L'effacement portait sur « date >= aujourd'hui ». Tant que le plan n'était
+  // republié qu'à 3 h 30, personne ne s'en apercevait. En replanifiant JUSTE APRÈS
+  // une séance, la prescription du jour est réécrite dans la seconde qui suit son
+  // exécution : l'athlète qui vient de faire sa séance au seuil voit sa journée se
+  // transformer en « Récupération » — parce que le verdict de fraîcheur, lui, tient
+  // désormais compte de l'effort qu'il vient de fournir. On lui réécrit son passé.
+  //
+  // Dès qu'une séance est enregistrée aujourd'hui, le jour 0 est donc GELÉ : on ne
+  // touche qu'à partir de demain. Le suivi d'adhérence (prescrit vs réalisé) en
+  // dépend aussi — comparer le réalisé à une prescription réécrite après coup ne
+  // mesure plus rien.
+  const { data: doneToday } = await admin.from("workouts")
+    .select("id").eq("user_id", userId).eq("date", today).limit(1);
+  const dayZeroFrozen = (doneToday?.length ?? 0) > 0;
+  const from = dayZeroFrozen ? week[1].date : today;
+
   // 2) Remplace le plan à venir. On n'efface QUE le futur : l'historique des séances
   //    déjà passées reste intact pour le suivi d'adhérence.
   await admin.from("notifications").delete()
-    .eq("user_id", userId).eq("type", "coach_session").gte("data->>date", today);
+    .eq("user_id", userId).eq("type", "coach_session").gte("data->>date", from);
 
-  const rows = week.map((d: PlanDay) => ({
+  const rows = week.filter((d: PlanDay) => d.date >= from).map((d: PlanDay) => ({
     user_id: userId,
     type: "coach_session",
     title: d.title.slice(0, 80),
@@ -65,7 +82,9 @@ export async function autoCoachForUser(
       const warmMin = (prof?.warmup_min as number | null | undefined) ?? null;
       const coolMin = (prof?.cooldown_min as number | null | undefined) ?? null;
       await ensureRunThresholdPace({ athleteId, apiKey, vmaKmh: ctx.vma });
-      for (const d of week.slice(0, CONFIRMED_DAYS)) {
+      // Même règle que pour le calendrier : on ne pousse pas sur la montre une séance
+      // pour un jour déjà couru. Elle y remplacerait, après coup, celle qui a servi.
+      for (const d of week.slice(0, CONFIRMED_DAYS).filter((x) => x.date >= from)) {
         const built = buildWorkoutDescription(d.title, d.detail, `${d.type} ${d.tags.join(" ")}`, objectiveRace, ctx.vma, warmMin, coolMin);
         if (!built) continue;
         const r = await pushIntervalsWorkout({ athleteId, apiKey, userId, name: built.name, date: d.date, description: built.description, sport: built.sport });
@@ -98,6 +117,14 @@ export async function autoCoachForUser(
     // Sport pratiqué hors course : c'est souvent LUI qui explique un allègement, et
     // l'athlète n'avait aucun moyen de le savoir (le calendrier ne montre que la course).
     cross: ctx.cross.label ? { label: ctx.cross.label, minutes: ctx.cross.minutes, tss: ctx.cross.tss, sharePct: ctx.cross.sharePct } : null,
+    // CE QUE LA DERNIÈRE SÉANCE A MONTRÉ. Depuis que le plan est republié dans la minute
+    // qui suit une séance, l'athlète voit son calendrier bouger : il doit lire pourquoi,
+    // sans avoir à ouvrir une page d'analyse.
+    lastSession: ctx.lastSession
+      ? { ...ctx.lastSession, shows: ctx.lastSession.shows.slice(0, 4) }
+      : null,
+    // Le jour 0 a-t-il été gelé parce qu'une séance y était déjà enregistrée ?
+    dayZeroFrozen,
     // L'objectif tel qu'il a RÉELLEMENT été pris en compte : c'est ce qui permet à
     // l'athlète de vérifier que son changement a bien été enregistré.
     objective: ctx.objective ? { race: ctx.objective.race, raceDate: ctx.objective.raceDate, distanceKm: ctx.objective.distanceKm } : null,

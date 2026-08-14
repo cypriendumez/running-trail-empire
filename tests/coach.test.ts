@@ -15,6 +15,7 @@ import { execSync } from "node:child_process";
 import { isRun, sportOf, impactOf, roleOf } from "../src/lib/intervals/sport";
 import { summarizeCross } from "../src/lib/coach/crossTraining";
 import { computeQualityBudget } from "../src/lib/coach/qualityBudget";
+import { shardForPass, replanIfFresh } from "../src/lib/intervals/syncAndCoach";
 import { vmaFromPaceCurve, bestVmaFromWorkouts } from "../src/lib/running/fitness";
 import { heatAdvice, windAdvice, altitudeLossPct, heatAcclimation } from "../src/lib/weather/openMeteo";
 import { parseReps, parsePaceSec, stepsForType, warmCoolMin, buildWorkoutDescription } from "../src/lib/watch/intervals";
@@ -1342,12 +1343,21 @@ test("la synchronisation importe les traces des NOUVELLES séances", () => {
   // à la main. Les sorties synchronisées ensuite entraient bien en base mais restaient
   // SANS trace — donc absentes du survol, de la carte de chaleur et de l'appariement
   // de segments, sans que rien ne le signale. Deux sorties manquaient déjà.
-  const code = codeOf("src/app/api/intervals/sync/route.ts");
-  assert.ok(/importMissingTracks/.test(code), "la synchro doit importer les traces manquantes");
+  //
+  // L'import vivait dans la route appelée par le navigateur ; il est désormais dans la
+  // chaîne PARTAGÉE, parce que le balayage serveur ne l'appelait pas du tout — un
+  // athlète qui n'ouvre jamais l'app n'avait donc jamais de trace. L'invariant est le
+  // même, l'endroit a changé : c'est le test qui devait suivre, pas le code reculer.
+  const code = codeOf("src/lib/intervals/syncAndCoach.ts");
+  assert.ok(/importMissingTracks/.test(code), "la chaîne doit importer les traces manquantes");
   // Best-effort : une trace indisponible ne doit jamais faire échouer la synchro.
   const i = code.indexOf("importMissingTracks");
   assert.ok(/try \{/.test(code.slice(Math.max(0, i - 400), i)), "l'import doit être protégé");
-  assert.ok(/max: \d+/.test(code.slice(i - 100, i + 200)), "l'import doit être BORNÉ par synchro");
+  assert.ok(/max: opts\.max \?\? TRACKS_PER_PASS/.test(code), "l'import doit être BORNÉ par passage");
+  // Et les DEUX chemins doivent réellement y passer.
+  for (const f of ["src/app/api/intervals/sync/route.ts", "src/lib/intervals/syncAndCoach.ts"]) {
+    assert.ok(/importTracksBestEffort/.test(codeOf(f)), `${f} n'importe aucune trace`);
+  }
 });
 test("une séance sans GPS est mémorisée comme telle", () => {
   // Sinon la synchro la redemanderait à intervals.icu à chaque passage, indéfiniment.
@@ -2283,6 +2293,67 @@ test("le budget STRUCTUREL ignore la fatigue du moment", () => {
   assert.equal(qb({ acr: 2.4, tsb: -44, pains: ["genou"] }).structuralQBudget, 2);
 });
 
+console.log("\nBALAYAGE PÉRIODIQUE — le seul chemin qui marche app fermée");
+// Le sondage navigateur (AutoSync) ne tourne que tant qu'un onglet est ouvert. Un
+// athlète qui termine à 18 h et ne rouvre pas l'app attendait le passage de 3 h 30.
+const ath = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `u${String(i).padStart(3, "0")}` }));
+test("tout le monde est balayé, et personne deux fois dans le même passage", () => {
+  const all = ath(120);
+  const vus = new Set<string>();
+  // 6 passages = une heure à 10 min d'intervalle. 120 athlètes / 25 par passage = 5
+  // tranches : tout le monde doit être vu au moins une fois dans l'heure.
+  for (let k = 0; k < 6; k++) {
+    const { batch } = shardForPass(all, { perPass: 25, everyMinutes: 10, now: k * 10 * 60_000 });
+    assert.equal(new Set(batch.map((a) => a.id)).size, batch.length, "un athlète traité deux fois dans le même passage");
+    for (const a of batch) vus.add(a.id);
+  }
+  assert.equal(vus.size, all.length, `${all.length - vus.size} athlète(s) jamais balayé(s) en une heure`);
+});
+test("le découpage ne dépend d'aucun état stocké", () => {
+  // Un curseur en base peut se corrompre ou se figer ; l'horloge, non. Deux appels au
+  // même instant doivent donner exactement la même tranche.
+  const all = ath(60);
+  const a = shardForPass(all, { perPass: 25, everyMinutes: 10, now: 1_000_000 });
+  const b = shardForPass(all, { perPass: 25, everyMinutes: 10, now: 1_000_000 });
+  assert.deepEqual(a.batch.map((x) => x.id), b.batch.map((x) => x.id));
+  // Et l'ordre d'arrivée des profils ne doit rien changer : sans tri, deux passages
+  // pourraient traiter deux fois le même athlète et jamais un autre.
+  const melange = shardForPass([...all].reverse(), { perPass: 25, everyMinutes: 10, now: 1_000_000 });
+  assert.deepEqual(melange.batch.map((x) => x.id), a.batch.map((x) => x.id));
+});
+test("un seul athlète est balayé à CHAQUE passage", () => {
+  // Cas d'aujourd'hui : une seule personne inscrite. Le découpage ne doit pas la faire
+  // attendre 50 minutes sur six.
+  const { batch, shards } = shardForPass(ath(1), { perPass: 25, everyMinutes: 10 });
+  assert.equal(shards, 1);
+  assert.equal(batch.length, 1);
+});
+
+console.log("\nREPLANIFICATION — jamais en rafale, jamais sans raison");
+test("la séance DÉJÀ COURUE aujourd'hui n'est pas réécrite", () => {
+  // Défaut invisible tant que le plan n'était republié qu'à 3 h 30 : en replanifiant
+  // juste après une séance, la prescription du jour est réécrite dans la seconde qui
+  // suit son exécution — la séance au seuil que l'athlète vient de faire devient
+  // « Récupération », parce que la fraîcheur tient compte de l'effort qu'il vient de
+  // fournir. L'effacement ET l'insertion ET la poussée montre doivent partir de la
+  // MÊME date, sans quoi le calendrier et la montre divergent.
+  const src = codeOf("src/lib/ai/autoCoach.ts");
+  assert.ok(/const from = dayZeroFrozen \? week\[1\]\.date : today/.test(src), "le gel du jour 0 a disparu");
+  assert.ok(/\.gte\("data->>date", from\)/.test(src), "l'effacement ne part pas de la date gelée");
+  assert.ok(/week\.filter\(\(d: PlanDay\) => d\.date >= from\)/.test(src), "l'insertion ne part pas de la date gelée");
+  assert.ok(/filter\(\(x\) => x\.date >= from\)/.test(src), "la poussée montre ne part pas de la date gelée");
+});
+test("la chaîne sync → analyse → replanification → montre n'existe qu'à un endroit", () => {
+  // Elle a existé en trois exemplaires divergents. Le cron n'importait aucune trace GPS
+  // et ignorait le garde-fou anti-rafale : invisible à raison d'un passage par nuit,
+  // ruineux à raison d'un passage toutes les 10 minutes.
+  for (const f of ["src/app/api/cron/sync-all/route.ts", "src/app/api/intervals/sync/route.ts"]) {
+    const src = codeOf(f);
+    assert.ok(!/autoCoachForUser/.test(src), `${f} rappelle le coach directement au lieu de passer par replanIfFresh`);
+    assert.ok(!/importMissingTracks/.test(src), `${f} garde sa propre importation de traces`);
+  }
+});
+
 console.log("\nQUOTA ÉPUISÉ — la chaîne cesse vraiment d'appeler le réseau");
 // Ces tests-là passent par generateContent avec un `fetch` factice : ils vérifient le
 // COMPORTEMENT (combien d'appels partent), pas seulement les fonctions pures.
@@ -2312,6 +2383,45 @@ async function atest(name: string, fn: () => Promise<void>) {
 // Pas de `await` au sommet du fichier (tsx compile ce test en CJS) : le résumé final
 // est donc rattaché à la suite du bloc, sans quoi il s'afficherait avant les résultats.
 void (async () => {
+  // ── GARDE-FOU ANTI-RAFALE DE LA REPLANIFICATION ────────────────────────────
+  // Client Supabase minimal : seule la lecture de `auto_coach_state` compte ici.
+  console.log("\nGARDE-FOU ANTI-RAFALE — une republication pousse 5 séances sur la montre");
+  const sbStub = (lastAt: string | null) => ({
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          eq: () => ({ maybeSingle: async () => ({ data: lastAt ? { data: { at: lastAt } } : null }) }),
+        }),
+      }),
+    }),
+  }) as unknown as Parameters<typeof replanIfFresh>[0];
+
+  await atest("aucune séance inédite → aucune republication", async () => {
+    // `synced.workouts` compte aussi les MISES À JOUR : la synchro rafraîchit les
+    // derniers jours à chaque passage, ce qui republierait le plan toutes les 10 min.
+    const r = await replanIfFresh(sbStub(null), { userId: "u", fresh: 0 });
+    assert.equal(r.replanned, false);
+    assert.equal(r.skipped, "rien de neuf");
+  });
+  await atest("deux séances coup sur coup ne republient qu'une fois", async () => {
+    const r = await replanIfFresh(sbStub(new Date(Date.now() - 60_000).toISOString()), { userId: "u", fresh: 1 });
+    assert.equal(r.replanned, false);
+    assert.equal(r.skipped, "republié il y a moins de 10 min");
+  });
+  await atest("le garde-fou laisse passer au-delà de 10 minutes", async () => {
+    // On ne vérifie pas la republication elle-même (elle appelle toute la chaîne coach) :
+    // on vérifie le POINT DE BASCULE, qui est la seule chose que le garde-fou décide.
+    const r = await replanIfFresh(sbStub(new Date(Date.now() - 11 * 60_000).toISOString()), { userId: "u", fresh: 1 });
+    assert.notEqual(r.skipped, "republié il y a moins de 10 min");
+  });
+  await atest("on sait TOUJOURS pourquoi on n'a pas republié", async () => {
+    // C'est le silence qui a masqué pendant des mois qu'un chemin n'écrivait rien.
+    for (const [lastAt, fresh] of [[null, 0], [new Date().toISOString(), 1]] as [string | null, number][]) {
+      const r = await replanIfFresh(sbStub(lastAt), { userId: "u", fresh });
+      assert.ok(r.replanned || r.skipped, "ni republication ni motif : personne ne saura ce qui s'est passé");
+    }
+  });
+
   await atest("quota épuisé sur toute la chaîne → l'appel suivant ne touche PAS le réseau", async () => {
     __resetQuotaMemory();
     stubFetch(() => perDay);

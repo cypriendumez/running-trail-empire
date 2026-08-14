@@ -1,17 +1,31 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { autoCoachForUser } from "@/lib/ai/autoCoach";
-import { syncIntervalsForUser } from "@/lib/intervals/syncUser";
+import { syncAndCoachForUser, shardForPass } from "@/lib/intervals/syncAndCoach";
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // 60s timeout (Vercel hobby = 10s, pro = 60s)
 
-// GET /api/cron/sync-all
-// Called by Vercel Cron every 30 minutes.
-// Secured with CRON_SECRET header.
+/**
+ * GET /api/cron/sync-all — BALAYAGE PÉRIODIQUE, authentifié par CRON_SECRET.
+ *
+ * C'est le SEUL chemin qui fonctionne quand l'athlète n'ouvre pas l'application.
+ * Le sondage côté navigateur (`AutoSync`) ne tourne que tant qu'un onglet est ouvert :
+ * un athlète qui termine sa séance à 18 h et ne rouvre pas l'app attendait jusqu'au
+ * passage de nuit pour voir son plan et recevoir ses séances sur sa montre.
+ *
+ * ⚠️ FRÉQUENCE RÉELLE : le commentaire d'origine annonçait « every 30 minutes ». C'était
+ * FAUX — `vercel.json` déclarait `0 3 * * *`, soit UNE FOIS PAR JOUR, parce que le plan
+ * Vercel Hobby plafonne les tâches planifiées à une exécution quotidienne (vérifié :
+ * l'équipe `cyprien-dumez-s-projects` est en `hobby`). La cadence réelle vient donc d'un
+ * déclencheur externe (voir .github/workflows/sync-coach.yml) ; le cron Vercel reste en
+ * filet de nuit. Ne remets pas une planification infra-journalière dans vercel.json :
+ * en Hobby, Vercel la ramène silencieusement à une exécution par jour.
+ */
+const EVERY_MINUTES = 10;  // cadence du déclencheur externe — sert au découpage en tranches
+const PER_PASS = 25;       // athlètes traités par passage (intervals.icu : ~200 requêtes)
+
 export async function GET(req: Request) {
-  // Verify the cron secret
   const secret = req.headers.get("authorization")?.replace("Bearer ", "");
   if (secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -19,7 +33,9 @@ export async function GET(req: Request) {
 
   const admin = createAdminClient();
 
-  // Fetch all users with Intervals.icu credentials
+  // Une activité peut arriver à N'IMPORTE QUELLE heure (séance de nuit, décalage
+  // horaire, import différé). On ne filtre donc PAS sur une plage horaire : le seul
+  // critère est « cet athlète a des identifiants intervals.icu ».
   const { data: profiles, error } = await admin
     .from("profiles")
     .select("id, intervals_athlete_id, intervals_api_key")
@@ -31,44 +47,37 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const days = 1; // sync last 24h for the cron (lightweight)
-  const oldest = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-  const newest = new Date().toISOString().split("T")[0];
+  const eligible = (profiles ?? []).filter((p) => p.intervals_athlete_id && p.intervals_api_key);
+  // Tranche déduite de l'horloge : aucun curseur en base, donc aucun état à corrompre.
+  const { batch, shard, shards } = shardForPass(eligible, { perPass: PER_PASS, everyMinutes: EVERY_MINUTES });
 
-  const results: { userId: string; ok: boolean; workouts?: number; coached?: boolean; error?: string }[] = [];
+  const days = 1; // 24 h suffisent pour un balayage fréquent ; le filet de nuit ratisse plus large
+  const results: { userId: string; ok: boolean; workouts?: number; coached?: boolean; skipped?: string | null; error?: string }[] = [];
 
-  for (const profile of profiles ?? []) {
-    if (!profile.intervals_athlete_id || !profile.intervals_api_key) continue;
-
+  for (const profile of batch) {
     try {
-      // Chemin de synchronisation PARTAGÉ. Ce cron avait sa propre copie de la logique :
-      // elle ignorait les champs récents (température, GAP, temps en zone, sport), ne
-      // lançait aucune des analyses mesurées, et faisait un upsert sur une contrainte
-      // inexistante — donc n'écrivait rien. Trois implémentations divergentes pour une
-      // seule tâche, c'est deux de trop.
-      const { synced, error: syncErr } = await syncIntervalsForUser(admin, {
+      // Chaîne PARTAGÉE (lib/intervals/syncAndCoach) : import, analyses, traces GPS,
+      // republication sous garde-fou, poussée montre. Ce cron en avait sa propre
+      // version, sans les traces et sans garde-fou anti-rafale.
+      const r = await syncAndCoachForUser(admin, {
         userId: profile.id,
-        athleteId: profile.intervals_athlete_id,
-        apiKey: profile.intervals_api_key,
+        athleteId: profile.intervals_athlete_id as string,
+        apiKey: profile.intervals_api_key as string,
         days,
       });
-      if (syncErr) { results.push({ userId: profile.id, ok: false, error: syncErr }); continue; }
-
-      // Coach AUTONOME : du nouveau → recalcule et publie la prochaine séance.
-      let coached = false;
-      if (synced > 0) {
-        const r = await autoCoachForUser(admin, { userId: profile.id, athleteId: profile.intervals_athlete_id, apiKey: profile.intervals_api_key }).catch(() => null);
-        coached = !!r?.processed;
-      }
-      results.push({ userId: profile.id, ok: true, workouts: synced, coached });
+      results.push({ userId: profile.id, ok: !r.error, workouts: r.fresh, coached: r.replanned, skipped: r.skipped, error: r.error });
     } catch (err) {
       results.push({ userId: profile.id, ok: false, error: String(err) });
     }
   }
 
   const total = results.reduce((a, r) => a + (r.workouts ?? 0), 0);
-  console.log(`[cron/sync-all] Synced ${total} activities for ${results.length} users`);
-  return NextResponse.json({ ok: true, users: results.length, total_activities: total, results });
+  const coached = results.filter((r) => r.coached).length;
+  console.log(`[cron/sync-all] tranche ${shard + 1}/${shards} · ${results.length} athlète(s) · ${total} séance(s) inédite(s) · ${coached} replanification(s)`);
+  return NextResponse.json({
+    ok: true, shard: shard + 1, shards, eligible: eligible.length,
+    users: results.length, total_activities: total, replanned: coached, results,
+  });
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
