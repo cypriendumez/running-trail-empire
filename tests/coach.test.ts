@@ -49,6 +49,7 @@ import {
 import { findEfforts, leaderboard, maitreDuSegment } from "../src/lib/segments/match";
 import { heatCells, intensity, denseBounds, heatBounds, type HeatCell as HC } from "../src/lib/segments/heatmap";
 import { computeSplits, splitPace, elevationProfile, metricSeries } from "../src/lib/segments/splits";
+import { challengeProgress, challengeLeaderboard, daysLeft, notStarted, inWindow, type Challenge } from "../src/lib/challenges/progress";
 
 let passed = 0;
 const fails: string[] = [];
@@ -1201,6 +1202,12 @@ test("le bloc de constats pousse à traiter le bloquant d'abord", () => {
  *     `https:`. L'assertion « aucune URL de modèle en dur » devenait alors increvable —
  *     elle passait même sur le code fautif. On ne coupe donc pas sur `://`.
  */
+/** Source SQL débarrassée de ses commentaires `--`, même raison que `codeOf`. */
+function sqlOf(path: string): string {
+  return readFileSync(path, "utf8")
+    .split("\n").map((l) => l.replace(/--.*$/, "")).join("\n");
+}
+
 function codeOf(path: string): string {
   return readFileSync(path, "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "")
@@ -1306,6 +1313,91 @@ test("deux appareils simultanés ne cassent pas le cache définitivement", () =>
   const read = code.slice(code.indexOf(`eq("type", SESSION_CACHE_TYPE)`));
   assert.ok(/limit\(1\)/.test(read.slice(0, 200)) && !/maybeSingle/.test(read.slice(0, 200)),
     "maybeSingle() échouerait DÉFINITIVEMENT si deux onglets ont inséré deux lignes");
+});
+
+console.log("\nDÉFIS — la progression se mesure, elle ne se stocke pas");
+const DEFI = (o: Partial<Challenge> = {}): Challenge =>
+  ({ id: "d1", name: "100 km", metric: "distance", target: 100, starts_on: "2026-08-01", ends_on: "2026-08-31", ...o });
+const W2 = (date: string, km: number, dplus = 0, sport = "Run") =>
+  ({ date, distance_km: km, elevation_gain_m: dplus, sport });
+
+test("les bornes du défi sont INCLUSES des deux côtés", () => {
+  // Exclure le jour de clôture priverait l'athlète de son dernier effort, souvent
+  // celui qui décide du résultat.
+  const d = DEFI();
+  assert.equal(inWindow("2026-08-01", d), true, "le premier jour compte");
+  assert.equal(inWindow("2026-08-31", d), true, "le dernier jour aussi");
+  assert.equal(inWindow("2026-07-31", d), false);
+  assert.equal(inWindow("2026-09-01", d), false);
+});
+test("une séance hors période ne compte pas", () => {
+  const p = challengeProgress(DEFI(), [W2("2026-07-20", 50), W2("2026-08-10", 30)]);
+  assert.equal(p.value, 30, "seuls les 30 km d'août comptent");
+});
+test("le vélo ne remplit pas un défi de course", () => {
+  const p = challengeProgress(DEFI(), [W2("2026-08-10", 200, 0, "Ride"), W2("2026-08-11", 10)]);
+  assert.equal(p.value, 10);
+});
+test("la valeur affichée n'est JAMAIS plafonnée, seule la barre l'est", () => {
+  // 150 km sur un défi de 100 doit s'afficher 150 : rogner la performance réelle
+  // pour faire tenir une barre serait effacer un effort.
+  const p = challengeProgress(DEFI(), [W2("2026-08-10", 150)]);
+  assert.equal(p.value, 150);
+  assert.equal(p.ratio, 1, "la barre, elle, est bornée");
+  assert.equal(p.done, true);
+});
+test("un défi de régularité ignore les séances à zéro kilomètre", () => {
+  // Un enregistrement lancé puis arrêté aussitôt gonflerait le compteur sans effort.
+  const d = DEFI({ metric: "sessions", target: 3 });
+  const p = challengeProgress(d, [W2("2026-08-02", 0), W2("2026-08-03", 5), W2("2026-08-04", 6)]);
+  assert.equal(p.value, 2);
+  assert.equal(p.done, false);
+});
+test("« plus longue sortie » retient le maximum, pas la somme", () => {
+  const d = DEFI({ metric: "longest_run", target: 20 });
+  const p = challengeProgress(d, [W2("2026-08-02", 12), W2("2026-08-03", 15)]);
+  assert.equal(p.value, 15, "12 + 15 ne fait pas une sortie de 27 km");
+});
+test("un défi terminé ne dit pas « 0 jour restant »", () => {
+  // Ce serait pousser l'athlète à sortir courir pour rien.
+  const d = DEFI();
+  assert.equal(daysLeft(d, new Date("2026-09-05T10:00:00Z")), null, "terminé ⇒ null, pas 0");
+  assert.equal(daysLeft(d, new Date("2026-08-31T10:00:00Z")), 0, "le dernier jour vaut bien 0");
+  assert.ok((daysLeft(d, new Date("2026-08-25T10:00:00Z")) ?? -1) >= 5);
+});
+test("un défi à venir se distingue d'un défi raté", () => {
+  const d = DEFI();
+  assert.equal(notStarted(d, new Date("2026-07-15T10:00:00Z")), true);
+  assert.equal(notStarted(d, new Date("2026-08-15T10:00:00Z")), false);
+});
+test("les ex æquo partagent le même rang, on n'invente pas de départage", () => {
+  const d = DEFI();
+  const cl = challengeLeaderboard(d, [
+    { userId: "a", workouts: [W2("2026-08-02", 50)] },
+    { userId: "b", workouts: [W2("2026-08-02", 50)] },
+    { userId: "c", workouts: [W2("2026-08-02", 80)] },
+  ]);
+  assert.equal(cl[0].userId, "c");
+  assert.equal(cl[0].rank, 1);
+  assert.equal(cl[1].rank, 2);
+  assert.equal(cl[2].rank, 2, "les deux à 50 km partagent la 2e place");
+});
+test("la progression des défis n'est écrite dans AUCUNE table", () => {
+  // La stocker, ce serait risquer qu'elle survive à la séance qui l'a produite.
+  const code = codeOf("src/lib/challenges/progress.ts") + codeOf("src/app/dashboard/clubs/page.tsx");
+  assert.ok(!/\.insert\(|\.upsert\(|\.update\(/.test(code), "la progression doit rester calculée à la lecture");
+  // ⚠️ Commentaires SQL retirés avant l'analyse : le commentaire qui EXPLIQUE
+  // l'absence de colonne de progression contient forcément le mot « progression ».
+  // Même piège que sur les greps de code TypeScript, en dialecte SQL cette fois.
+  const sql = sqlOf("supabase/migrations/020_clubs_et_defis.sql");
+  assert.ok(!/progress|current_value/i.test(sql), "aucune colonne de progression en base");
+});
+test("la migration 020 ne contient AUCUNE instruction destructive", () => {
+  // L'éditeur Supabase avait signalé la 019 pour deux « drop trigger ».
+  const sql = sqlOf("supabase/migrations/020_clubs_et_defis.sql");
+  // `on delete cascade` est une clause de clé étrangère, pas un ordre de suppression :
+  // on vise les INSTRUCTIONS destructives, pas le mot « delete » partout.
+  assert.ok(!/\bdrop\b|\btruncate\b|delete\s+from/i.test(sql), "aucun DROP / TRUNCATE / DELETE FROM");
 });
 
 console.log("\nSEGMENTS — un chrono attribué à tort est pire qu'aucun chrono");

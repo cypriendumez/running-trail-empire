@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, MapPin, Mountain, Heart, ShoppingBag,
   User, Trophy, Settings, LogOut, ChevronLeft,
-  Ghost, Watch, GraduationCap, CalendarDays, MessagesSquare, Newspaper, Crown, Medal, Users,
+  Ghost, Watch, GraduationCap, CalendarDays, MessagesSquare, Newspaper, Crown, Medal, Users, Target,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -43,6 +43,7 @@ const groups: { titleKey: string | null; items: { href: string; icon: typeof Lay
     titleKey: "group.club",
     items: [
       { href: "/dashboard/communaute", icon: Users, tk: "nav.community" },
+      { href: "/dashboard/clubs", icon: Target, tk: "nav.clubs" },
       // Vitrine, Segments, Carte de chaleur et Survol 3D partagent UNE entrée : ce
       // sont quatre lectures du même sujet — ce que l'athlète a parcouru. Ils se
       // choisissent par la rangée d'onglets en haut de page (comme l'onglet Santé),
