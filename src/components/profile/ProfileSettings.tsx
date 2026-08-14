@@ -373,6 +373,10 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
     notif_goal: Boolean(profile?.notif_goal ?? true),
     notif_league: Boolean(profile?.notif_league ?? true),
     notif_coach: Boolean(profile?.notif_coach ?? false),
+    // Compte privé : défaut FAUX, comme en base. Un profil chargé avant la migration
+    // 021 n'a pas la colonne — il vaut donc « public », c'est-à-dire le comportement
+    // actuel, et non un compte verrouillé par surprise.
+    is_private: Boolean(profile?.is_private ?? false),
   });
 
   const [newGoal, setNewGoal] = useState({ type: "race", label: "", target_value: "", target_date: "" });
@@ -410,6 +414,11 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
       notif_league: form.notif_league,
       notif_coach: form.notif_coach,
     }).eq("id", userId);
+    // Confidentialité — écriture ISOLÉE : `is_private` vient de la migration 021, qui
+    // peut être en retard sur le code déployé. PostgREST rejette TOUT l'update pour une
+    // seule colonne inconnue (42703) : groupée, elle emporterait la sauvegarde entière
+    // du profil, et en silence. Même piège que les terrains et les disponibilités.
+    await supabase.from("profiles").update({ is_private: form.is_private }).eq("id", userId);
     // Disponibilités — écriture ISOLÉE (colonnes de la migration 011, cf. terrains).
     await supabase.from("profiles").update({
       days_per_week: form.days_per_week,
@@ -939,6 +948,16 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
               <Toggle enabled={form.notif_goal} onToggle={() => setForm(f => ({...f, notif_goal: !f.notif_goal}))} label={tr("notif.goal")} />
               <Toggle enabled={form.notif_league} onToggle={() => setForm(f => ({...f, notif_league: !f.notif_league}))} label={tr("notif.league")} />
               <Toggle enabled={form.notif_coach} onToggle={() => setForm(f => ({...f, notif_coach: !f.notif_coach}))} label={tr("notif.coach")} />
+              {/* CONFIDENTIALITÉ DU COMPTE — placée ici parce que c'est le même
+                  geste : « qui peut m'atteindre ». La conséquence est écrite en
+                  toutes lettres sous la bascule : un réglage dont on ne comprend
+                  pas l'effet ne se touche jamais. */}
+              <div className="mt-3 border-t border-zinc-200 pt-3">
+                <Toggle enabled={form.is_private} onToggle={() => setForm(f => ({...f, is_private: !f.is_private}))} label={tr("privacy.private")} />
+                <p className="mt-1 text-xs text-zinc-500">
+                  {form.is_private ? tr("privacy.privateHint") : tr("privacy.publicHint")}
+                </p>
+              </div>
               <div className="pt-3">
                 <button onClick={save} disabled={saving} className="text-sm text-emerald-600 font-semibold hover:underline">
                   {tr("notif.save")}

@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { cleanBody, isPublishable, MAX_BODY, type Visibility } from "@/lib/social/feed";
+import { premierGrosMot } from "@/lib/social/moderation";
 
 const VISIBILITIES: Visibility[] = ["public", "followers", "private"];
 const MAX_PHOTOS = 4;
@@ -42,6 +43,17 @@ export async function POST(req: Request) {
 
   if (!isPublishable(body, workoutId) && photoUrls.length === 0) {
     return NextResponse.json({ error: "Écris quelque chose, ajoute une photo ou choisis une séance" }, { status: 400 });
+  }
+
+  // Grossièretés : même règle qu'en commentaire. Filtrer les commentaires en laissant
+  // passer les publications aurait été une demi-mesure — c'est la publication qui est
+  // la plus vue.
+  const fautif = body ? premierGrosMot(body) : null;
+  if (fautif) {
+    return NextResponse.json(
+      { error: `Publication refusée : « ${fautif} » n'a pas sa place ici.`, motif: "grossierete" },
+      { status: 422 },
+    );
   }
 
   if (workoutId) {

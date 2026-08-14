@@ -18,6 +18,7 @@ import { computeQualityBudget } from "../src/lib/coach/qualityBudget";
 import { shardForPass, replanIfFresh } from "../src/lib/intervals/syncAndCoach";
 import { buildPlanReadyEmail } from "../src/lib/notify/planReady";
 import { poseAt, capLisse } from "../src/lib/segments/flyover";
+import { contientGrosMot, premierGrosMot, NB_FORMES_SURVEILLEES } from "../src/lib/social/moderation";
 import { vmaFromPaceCurve, bestVmaFromWorkouts } from "../src/lib/running/fitness";
 import { heatAdvice, windAdvice, altitudeLossPct, heatAcclimation } from "../src/lib/weather/openMeteo";
 import { parseReps, parsePaceSec, stepsForType, warmCoolMin, buildWorkoutDescription } from "../src/lib/watch/intervals";
@@ -42,7 +43,7 @@ import {
 } from "../src/lib/ai/quotaMemory";
 import { generateContent, __resetQuotaMemory, __quotaMemory, __setQuotaMark } from "../src/lib/ai/gemini";
 import {
-  canSee, cleanBody, isPublishable, statLine, paceOf, suggestable, timeAgo, likesLabel,
+  canSee, canComment, cleanBody, isPublishable, statLine, paceOf, suggestable, timeAgo, likesLabel,
   type Post as SocialPost,
 } from "../src/lib/social/feed";
 import {
@@ -2397,6 +2398,80 @@ test("la chaîne sync → analyse → replanification → montre n'existe qu'à 
     assert.ok(!/autoCoachForUser/.test(src), `${f} rappelle le coach directement au lieu de passer par replanIfFresh`);
     assert.ok(!/importMissingTracks/.test(src), `${f} garde sa propre importation de traces`);
   }
+});
+
+console.log("\nMODÉRATION — bloquer les insultes SANS punir les innocents");
+test("les gros mots sont bloqués, dans les six langues", () => {
+  for (const t of [
+    "va te faire enculer", "quel connard", "c'est de la merde",
+    "what the fuck man", "you are a bitch", "eres un gilipollas",
+    "so ein arschloch", "que porra é essa", "vaffanculo",
+  ]) assert.equal(contientGrosMot(t), true, `laissé passer : « ${t} »`);
+});
+test("LE PROBLÈME DE SCUNTHORPE — les mots innocents passent", () => {
+  // C'est le vrai risque d'un filtre : chercher un gros mot comme sous-chaîne bloque
+  // « connexion » (con), « assez » (ass), « députe » (pute), « Bitterfeld » (bitte).
+  // Un athlète dont le commentaire légitime est refusé ne réessaie pas : il s'en va.
+  for (const t of [
+    "super connexion GPS aujourd'hui", "j'ai assez couru cette semaine",
+    "le député a coupé le ruban", "belle côte à Bitterfeld", "analyse concentrée",
+    "un footing tranquille", "j'ai fait une contre-performance", "classement final",
+    "Grande-Synthe", "cette montée est un vrai mur", "bravo pour ta régularité",
+  ]) assert.equal(contientGrosMot(t), false, `faux positif sur : « ${t} »`);
+});
+test("les contournements les plus courants ne passent pas", () => {
+  // Sans normalisation, un filtre n'embête que les gens honnêtes.
+  for (const t of ["c0nnard", "ÇÔNNARD", "puuuute", "m e r d e", "sh1t", "f*ck", "b!tch"]) {
+    assert.equal(contientGrosMot(t), true, `contournement accepté : « ${t} »`);
+  }
+});
+test("le mot fautif est NOMMÉ, pour que l'auteur comprenne", () => {
+  // Un refus sans motif se lit comme une panne : l'auteur réessaie à l'identique.
+  assert.equal(premierGrosMot("tu es un connard fini"), "connard");
+  assert.equal(premierGrosMot("belle sortie, bravo"), null);
+});
+test("la liste n'a pas été vidée par une édition malheureuse", () => {
+  // Un filtre vide accepte tout, en silence — exactement le défaut qu'on traque.
+  assert.ok(NB_FORMES_SURVEILLEES > 300, `seulement ${NB_FORMES_SURVEILLEES} formes surveillées`);
+});
+
+console.log("\nCOMPTE PRIVÉ — voir et commenter sont deux droits distincts");
+const post = (o: Partial<{ id: string; user_id: string; visibility: "public" | "followers" | "private"; created_at: string }> = {}) =>
+  ({ id: "p", user_id: "auteur", visibility: "public" as const, created_at: "2026-08-14", ...o });
+const SEUL = { suit: false, estSuivi: false };
+const AMI = { suit: true, estSuivi: true };
+const ABONNE = { suit: true, estSuivi: false };
+test("compte PUBLIC : un inconnu peut commenter", () => {
+  // C'est le comportement voulu, comme sur Strava : un passant félicite une perf.
+  assert.equal(canComment(post(), "inconnu", false, SEUL), true);
+});
+test("compte PRIVÉ : seuls les AMIS, c'est-à-dire le suivi réciproque", () => {
+  // L'amitié est définie par la migration 019 comme un suivi dans les deux sens ;
+  // en inventer une autre ici aurait créé deux notions d'ami concurrentes.
+  assert.equal(canComment(post(), "inconnu", true, SEUL), false, "un inconnu commente un compte privé");
+  assert.equal(canComment(post(), "abonne", true, ABONNE), false, "suivre ne suffit pas : il faut être suivi en retour");
+  assert.equal(canComment(post(), "ami", true, AMI), true, "un ami doit pouvoir commenter");
+});
+test("on ne commente jamais ce qu'on n'a pas le droit de VOIR", () => {
+  // Sinon le refus lui-même trahit l'existence d'une publication privée.
+  assert.equal(canComment(post({ visibility: "private" }), "ami", true, AMI), false);
+  assert.equal(canComment(post({ visibility: "private" }), "inconnu", false, SEUL), false);
+  assert.equal(canComment(post({ visibility: "followers" }), "inconnu", false, SEUL), false);
+  assert.equal(canComment(post({ visibility: "followers" }), "abonne", false, ABONNE), true);
+});
+test("chez soi, toujours ; et jamais sans être identifié", () => {
+  assert.equal(canComment(post({ visibility: "private" }), "auteur", true, SEUL), true);
+  assert.equal(canComment(post(), null, false, SEUL), false);
+});
+test("la règle vit AUSSI en base, pas seulement dans la route", () => {
+  // La clé publique permet d'écrire directement dans PostgREST : une règle appliquée
+  // uniquement dans /api/social/interact se contournerait avec un curl.
+  const sql = readFileSync("supabase/migrations/021_compte_prive.sql", "utf8")
+    .split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
+  assert.ok(/create policy comments_ecriture/.test(sql), "aucune politique d'écriture des commentaires");
+  assert.ok(/is_private/.test(sql), "la politique ignore le compte privé");
+  assert.ok(/f1\.follower_id = auth\.uid\(\)/.test(sql) && /f2\.follower_id = p\.user_id/.test(sql),
+    "la réciprocité du suivi n'est pas vérifiée en base");
 });
 
 console.log("\nSURVOL 3D — un index non fini ne doit plus tuer le lecteur");

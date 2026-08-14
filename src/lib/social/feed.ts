@@ -32,6 +32,40 @@ export function canSee(post: Post, viewerId: string | null, followingIds: Set<st
   return followingIds.has(post.user_id);
 }
 
+/**
+ * Le lecteur a-t-il le droit de COMMENTER cette publication ?
+ *
+ * Voir et commenter sont deux droits distincts, et les confondre était le défaut :
+ * n'importe quel inscrit pouvait commenter n'importe quelle publication visible.
+ * Sur un compte PUBLIC c'est voulu — un inconnu peut féliciter une performance, comme
+ * sur Strava. Sur un compte PRIVÉ, non : seuls les amis.
+ *
+ * L'AMITIÉ EST UN SUIVI DANS LES DEUX SENS. C'est la définition que pose déjà la
+ * migration 019 (« l'amitié se déduit simplement d'un suivi dans les deux sens ») ;
+ * en inventer une autre ici aurait créé deux notions concurrentes d'ami dans la même
+ * application. Aucune file de demandes à traiter : suivre en retour suffit.
+ *
+ * @param auteurPrive  le compte de l'AUTEUR de la publication est-il privé
+ * @param relation     `suit` = le lecteur suit l'auteur ; `estSuivi` = l'auteur suit le lecteur
+ */
+export function canComment(
+  post: Post,
+  viewerId: string | null,
+  auteurPrive: boolean,
+  relation: { suit: boolean; estSuivi: boolean },
+): boolean {
+  if (!viewerId) return false;                 // commenter exige d'être identifié
+  if (post.user_id === viewerId) return true;  // toujours chez soi
+  // On ne commente jamais ce qu'on n'a pas le droit de voir. Le contraire permettrait
+  // de deviner l'existence d'une publication privée par le refus qu'elle renvoie.
+  if (post.visibility === "private") return false;
+  if (post.visibility === "followers" && !relation.suit) return false;
+  // Compte public : n'importe qui peut commenter ce qu'il voit.
+  if (!auteurPrive) return true;
+  // Compte privé : réservé aux amis, c'est-à-dire au suivi réciproque.
+  return relation.suit && relation.estSuivi;
+}
+
 /** Longueur maximale d'un commentaire ou d'un texte de publication. */
 export const MAX_BODY = 1000;
 export const MAX_COMMENT = 500;
