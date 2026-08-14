@@ -11,7 +11,7 @@
 //  d'ailleurs l'écran de la vidéo de référence. Ici elle est ouverte à tous : aucun
 //  test d'abonnement dans ce fichier, et il ne doit pas y en avoir.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Map as MapLibreMap, setWorkerUrl, type LngLatBoundsLike } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Play, Pause, RotateCcw, Loader2 } from "lucide-react";
@@ -38,8 +38,28 @@ if (typeof window !== "undefined") setWorkerUrl("/maplibre-gl-csp-worker.js");
 
 export type FlyoverStats = { title: string; distanceKm: number | null; paceLabel: string | null };
 
-/** Durée du survol, quelle que soit la longueur de la trace. */
+/** Durée de référence du survol (vitesse ×1), quelle que soit la longueur de la trace. */
 const DUREE_MS = 26_000;
+
+/**
+ * Réglages proposés à l'athlète.
+ *
+ * L'INCLINAISON est là pour une raison précise : à 52° au-dessus d'une côte plate
+ * comme Ajaccio, le rendu ressemble à une vue du dessus et le relief ne se lit pas.
+ * Plutôt que de choisir un compromis à sa place — un angle rasant est spectaculaire
+ * en montagne mais illisible en ville — on lui donne la main.
+ */
+const VITESSES = [
+  { label: "×0,5", facteur: 2 },
+  { label: "×1", facteur: 1 },
+  { label: "×2", facteur: 0.5 },
+] as const;
+
+const ANGLES = [
+  { label: "Carte", pitch: 0, zoom: 15.4 },   // vue du dessus, lecture du tracé
+  { label: "3D", pitch: 52, zoom: 14.9 },     // compromis par défaut
+  { label: "Rasant", pitch: 74, zoom: 15.2 }, // relief marqué, horizon visible
+] as const;
 
 export function Flyover({ polyline, altitudes, stats }: {
   polyline: string;
@@ -61,6 +81,17 @@ export function Flyover({ polyline, altitudes, stats }: {
   const [avance, setAvance] = useState(0); // 0 → 1
   const [erreur, setErreur] = useState<string | null>(null);
   const [prechauffe, setPrechauffe] = useState(false);
+  const [vitesse, setVitesse] = useState(1);   // index dans VITESSES
+  const [angle, setAngle] = useState(1);       // index dans ANGLES
+  const [zoomDelta, setZoomDelta] = useState(0);
+
+  // La boucle d'animation lit des REFS et non l'état : sans ça, une étape déjà
+  // lancée continuerait avec les anciens réglages, et le changement ne prendrait
+  // effet qu'au bout de plusieurs secondes.
+  const vitesseRef = useRef(1);
+  const angleRef = useRef(1);
+  const zoomRef = useRef(0);
+  vitesseRef.current = vitesse; angleRef.current = angle; zoomRef.current = zoomDelta;
 
   const points = decodePolyline(polyline);
   // Cap de départ : sinon la première image part cap au nord et pivote brutalement.
@@ -135,7 +166,7 @@ export function Flyover({ polyline, altitudes, stats }: {
       });
 
       capRef.current = capInitial;
-      map.fitBounds(bornes(coords), { padding: 60, pitch: 52, duration: 0 });
+      map.fitBounds(bornes(coords), { padding: 60, pitch: ANGLES[1].pitch, duration: 0 });
       setPret(true);
     });
 
@@ -208,9 +239,14 @@ export function Flyover({ polyline, altitudes, stats }: {
     // un de plus et la fin du survol déclencherait quarante-quatre suites d'un coup.
     map.once("moveend", () => { if (enCours.current) allerA(etape + 1); });
 
+    const vue = ANGLES[angleRef.current];
     map.easeTo({
-      center: [lon, lat], zoom: 14.9, pitch: 52, bearing: cap,
-      duration: DUREE_MS / ETAPES,
+      center: [lon, lat],
+      // Le zoom de base dépend de l'inclinaison choisie : un angle rasant demande de
+      // reculer, sinon on ne voit plus que le bitume devant soi.
+      zoom: vue.zoom + zoomRef.current,
+      pitch: vue.pitch, bearing: cap,
+      duration: (DUREE_MS * VITESSES[vitesseRef.current].facteur) / ETAPES,
       easing: (x: number) => x,   // linéaire : le défaut freine à chaque étape
       essential: true,            // ne pas être désactivé par « réduire les animations »
     });
@@ -229,7 +265,7 @@ export function Flyover({ polyline, altitudes, stats }: {
       const pas = () => {
         if (!map || k >= 6) { resolve(); return; }
         const idx = Math.floor((k / 5) * (points.length - 1));
-        map.jumpTo({ center: [points[idx].lon, points[idx].lat], zoom: 14.9, pitch: 52 });
+        map.jumpTo({ center: [points[idx].lon, points[idx].lat], zoom: ANGLES[angleRef.current].zoom + zoomRef.current, pitch: ANGLES[angleRef.current].pitch });
         k++;
         setTimeout(pas, 120);
       };
@@ -314,6 +350,29 @@ export function Flyover({ polyline, altitudes, stats }: {
         </div>
       </div>
 
+      {/* Réglages — appliqués IMMÉDIATEMENT, même en pleine lecture. */}
+      <div className="absolute inset-x-0 bottom-16 flex flex-wrap items-center justify-center gap-2 px-4">
+        <Groupe titre="Vitesse">
+          {VITESSES.map((v, i) => (
+            <Pastille key={v.label} actif={i === vitesse} onClick={() => setVitesse(i)}>{v.label}</Pastille>
+          ))}
+        </Groupe>
+        <Groupe titre="Vue">
+          {ANGLES.map((a, i) => (
+            <Pastille key={a.label} actif={i === angle} onClick={() => setAngle(i)}>{a.label}</Pastille>
+          ))}
+        </Groupe>
+        <Groupe titre="Zoom">
+          {/* Bornes serrées : au-delà de ±1,5 on ne distingue plus la trace, ou on ne
+              voit plus que le sol. Laisser un zoom libre inviterait à se perdre. */}
+          <Pastille actif={false} onClick={() => setZoomDelta((z) => Math.max(-1.5, z - 0.5))}>−</Pastille>
+          <span className="px-1 text-[11px] tabular-nums text-white/80">
+            {zoomDelta === 0 ? "0" : (zoomDelta > 0 ? "+" : "") + zoomDelta.toString().replace(".", ",")}
+          </span>
+          <Pastille actif={false} onClick={() => setZoomDelta((z) => Math.min(1.5, z + 0.5))}>+</Pastille>
+        </Groupe>
+      </div>
+
       <div className="absolute inset-x-0 bottom-0 flex items-center gap-3 bg-gradient-to-t from-black/70 to-transparent p-4">
         <button onClick={basculer}
           className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg transition hover:bg-emerald-400">
@@ -329,6 +388,25 @@ export function Flyover({ polyline, altitudes, stats }: {
         </div>
       </div>
     </div>
+  );
+}
+
+function Groupe({ titre, children }: { titre: string; children: ReactNode }) {
+  return (
+    <div className="flex items-center gap-1 rounded-full bg-black/45 px-2 py-1 backdrop-blur">
+      <span className="px-1 text-[10px] font-semibold uppercase tracking-wide text-white/50">{titre}</span>
+      {children}
+    </div>
+  );
+}
+
+function Pastille({ actif, onClick, children }: { actif: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button onClick={onClick}
+      className={`rounded-full px-2.5 py-1 text-[11px] font-bold transition ${
+        actif ? "bg-emerald-500 text-white" : "text-white/70 hover:bg-white/15"}`}>
+      {children}
+    </button>
   );
 }
 

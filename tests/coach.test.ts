@@ -1343,6 +1343,31 @@ test("le survol n'anime plus la caméra image par image", () => {
   assert.ok(!/jumpTo/.test(code.slice(code.indexOf("function allerA"), code.indexOf("function prechauffer"))),
     "aucun jumpTo pendant la lecture");
 });
+test("les réglages du survol s'appliquent IMMÉDIATEMENT, même en pleine lecture", () => {
+  // Si la boucle lisait l'état React plutôt que des refs, une étape déjà lancée
+  // continuerait avec les anciens réglages : changer la vitesse ne ferait rien
+  // pendant plusieurs secondes, et l'athlète croirait le bouton cassé.
+  const code = codeOf("src/components/segments/Flyover.tsx");
+  const boucle = code.slice(code.indexOf("function allerA"), code.indexOf("function prechauffer"));
+  assert.ok(/vitesseRef\.current/.test(boucle) && /angleRef\.current/.test(boucle),
+    "la boucle doit lire les refs, pas l'état");
+  assert.ok(!/\bvitesse\b(?!Ref)/.test(boucle), "l'état ne doit pas être lu dans la boucle");
+});
+test("le zoom du survol reste borné", () => {
+  // Un zoom libre invite à se perdre : trop loin la trace disparaît, trop près on ne
+  // voit plus que le sol et le survol n'apprend plus rien.
+  const code = codeOf("src/components/segments/Flyover.tsx");
+  assert.ok(/Math\.max\(-1\.5/.test(code) && /Math\.min\(1\.5/.test(code), "bornes de zoom attendues");
+});
+test("chaque inclinaison a son propre recul", () => {
+  // Un angle rasant sans recul ne montre que le bitume devant soi.
+  const code = codeOf("src/components/segments/Flyover.tsx");
+  const angles = code.slice(code.indexOf("const ANGLES"), code.indexOf("] as const;", code.indexOf("const ANGLES")));
+  assert.ok(/pitch: 0/.test(angles), "une vue carte doit rester disponible");
+  assert.ok(/pitch: 74/.test(angles), "une vue rasante doit être proposée");
+  assert.equal((angles.match(/zoom:/g) ?? []).length, 3, "chaque angle porte SON zoom");
+});
+
 test("les étapes du survol s'enchaînent sur la FIN du mouvement, pas sur un minuteur", () => {
   // La saccade régulière venait de là : un setTimeout réglé sur la même durée que
   // l'easeTo déclenchait l'étape suivante pile à la fin de la précédente — ou juste
