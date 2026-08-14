@@ -148,6 +148,12 @@ export function Flyover({ polyline, altitudes, paces, stats }: {
 
     map.on("load", () => {
       clearTimeout(minuteur);
+      // ⚠️ TOUT L'HABILLAGE EST ENVELOPPÉ. Une seule exception ici — source déjà
+      // déclarée, style incomplet, relief indisponible — empêchait `setPret(true)`
+      // de s'exécuter : la carte restait masquée par le voile de chargement alors
+      // qu'elle fonctionnait dessous. Le survol doit s'afficher même amputé d'un
+      // ornement ; c'est la carte qui compte, pas le ciel.
+      try {
       // ── RELIEF ────────────────────────────────────────────────────────────
       map.addSource("relief", {
         type: "raster-dem",
@@ -177,58 +183,49 @@ export function Flyover({ polyline, altitudes, paces, stats }: {
         paint: { "line-color": "#10b981", "line-width": 4.5 },
       });
 
-      // CIEL — sans lui, le haut du cadre est un vide gris une fois la caméra
-      // relevée : c'est le dégradé atmosphérique qui fait lire l'image comme une
-      // vue aérienne plutôt que comme une carte inclinée.
+      // CIEL — dégradé atmosphérique, pour que le haut du cadre ne soit pas un vide
+      // gris une fois la caméra relevée.
+      //
+      // ⚠️ AUCUN BROUILLARD. La première version passait `fog-color` et
+      // `horizon-fog-blend` : le brouillard s'appliquait à TOUTE la scène et
+      // délavait la carte au point de la rendre presque noire. Un ciel se peint
+      // au-dessus de l'horizon, il n'a pas à teinter le sol.
       try {
         (map as unknown as { setSky?: (o: unknown) => void }).setSky?.({
-          "sky-color": "#1e3a5f", "horizon-color": "#a8c4dd",
-          "fog-color": "#cfe0ee", "sky-horizon-blend": 0.6, "horizon-fog-blend": 0.7,
+          "sky-color": "#7fb2e5", "horizon-color": "#dbeafe", "sky-horizon-blend": 0.5,
         });
       } catch { /* sans ciel, le survol reste lisible */ }
 
-      // MARQUEUR DE POSITION — le point qui avance. Sans lui, sur une vue large, on
-      // ne sait plus OÙ l'on se trouve sur la trace : c'est le repère qui manquait.
-      map.addSource("position", {
-        type: "geojson",
-        data: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: coords[0] } },
-      });
-      map.addLayer({
-        id: "position-halo", type: "circle", source: "position",
-        paint: { "circle-radius": 13, "circle-color": "#10b981", "circle-opacity": 0.28 },
-      });
-      map.addLayer({
-        id: "position-point", type: "circle", source: "position",
-        paint: { "circle-radius": 6, "circle-color": "#10b981", "circle-stroke-width": 2.5, "circle-stroke-color": "#ffffff" },
-      });
-
-      // CIEL — sans lui, le haut du cadre est un vide gris une fois la caméra
-      // relevée : c'est le dégradé atmosphérique qui fait lire l'image comme une
-      // vue aérienne plutôt que comme une carte inclinée.
-      try {
-        (map as unknown as { setSky?: (o: unknown) => void }).setSky?.({
-          "sky-color": "#1e3a5f", "horizon-color": "#a8c4dd",
-          "fog-color": "#cfe0ee", "sky-horizon-blend": 0.6, "horizon-fog-blend": 0.7,
+      // MARQUEUR DE POSITION — le point qui avance. Sur une vue large, sans lui, on
+      // ne sait plus OÙ l'on se trouve sur la trace.
+      //
+      // `getSource` avant `addSource` : ce bloc s'est retrouvé DUPLIQUÉ lors d'une
+      // édition, et le second `addSource` levait « source already exists ». Cette
+      // exception interrompait le gestionnaire `load` avant `setPret(true)` — la
+      // carte restait donc masquée par le voile de chargement alors qu'elle était
+      // parfaitement chargée dessous. Rien dans la console, rien dans le réseau.
+      if (!map.getSource("position")) {
+        map.addSource("position", {
+          type: "geojson",
+          data: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: coords[0] } },
         });
-      } catch { /* sans ciel, le survol reste lisible */ }
+        map.addLayer({
+          id: "position-halo", type: "circle", source: "position",
+          paint: { "circle-radius": 13, "circle-color": "#10b981", "circle-opacity": 0.28 },
+        });
+        map.addLayer({
+          id: "position-point", type: "circle", source: "position",
+          paint: { "circle-radius": 6, "circle-color": "#10b981", "circle-stroke-width": 2.5, "circle-stroke-color": "#ffffff" },
+        });
+      }
 
-      // MARQUEUR DE POSITION — le point qui avance. Sans lui, sur une vue large, on
-      // ne sait plus OÙ l'on se trouve sur la trace : c'est le repère qui manquait.
-      map.addSource("position", {
-        type: "geojson",
-        data: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: coords[0] } },
-      });
-      map.addLayer({
-        id: "position-halo", type: "circle", source: "position",
-        paint: { "circle-radius": 13, "circle-color": "#10b981", "circle-opacity": 0.28 },
-      });
-      map.addLayer({
-        id: "position-point", type: "circle", source: "position",
-        paint: { "circle-radius": 6, "circle-color": "#10b981", "circle-stroke-width": 2.5, "circle-stroke-color": "#ffffff" },
-      });
+      } catch (e) {
+        console.warn("Survol : habillage partiel", e);
+      }
 
+      // HORS du try : ces deux lignes doivent s'exécuter quoi qu'il arrive au-dessus.
       capRef.current = capInitial;
-      map.fitBounds(bornes(coords), { padding: 60, pitch: ANGLES[ANGLE_DEFAUT].pitch, duration: 0 });
+      try { map.fitBounds(bornes(coords), { padding: 60, pitch: ANGLES[ANGLE_DEFAUT].pitch, duration: 0 }); } catch { /* cadrage best-effort */ }
       setPret(true);
     });
 
