@@ -54,13 +54,13 @@ export function Flyover({ polyline, altitudes, stats }: {
   const ecoule = useRef<number>(0);
   const capRef = useRef<number>(0);
   const etapeRef = useRef<number>(0);
-  const minuteurEtape = useRef<number | null>(null);
   const enCours = useRef<boolean>(false);
 
   const [pret, setPret] = useState(false);
   const [joue, setJoue] = useState(false);
   const [avance, setAvance] = useState(0); // 0 → 1
   const [erreur, setErreur] = useState<string | null>(null);
+  const [prechauffe, setPrechauffe] = useState(false);
 
   const points = decodePolyline(polyline);
   // Cap de départ : sinon la première image part cap au nord et pivote brutalement.
@@ -79,6 +79,13 @@ export function Flyover({ polyline, altitudes, stats }: {
       center: coords[0],
       zoom: 14, pitch: 60, bearing: 0,
       attributionControl: false,
+      // Aucun fondu à l'apparition des tuiles : par défaut MapLibre les fait
+      // apparaître en 300 ms, ce qui produit un scintillement permanent quand la
+      // caméra avance sans arrêt — lu comme une saccade alors que c'en est l'inverse.
+      fadeDuration: 0,
+      // Cache élargi : le parcours repasse par les mêmes tuiles au retour, et une
+      // tuile réclamée deux fois est une tuile rechargée deux fois.
+      maxTileCacheSize: 800,
       // La trace est le sujet : on empêche l'utilisateur de la perdre par un
       // déplacement accidentel pendant la lecture.
       interactive: true,
@@ -135,7 +142,6 @@ export function Flyover({ polyline, altitudes, stats }: {
     return () => {
       clearTimeout(minuteur);
       enCours.current = false;
-      if (minuteurEtape.current) clearTimeout(minuteurEtape.current);
       if (anim.current) cancelAnimationFrame(anim.current);
       map.remove();
       carte.current = null;
@@ -160,12 +166,24 @@ export function Flyover({ polyline, altitudes, stats }: {
    * MapLibre interpole lui-même entre deux étapes, à son rythme, et précharge les
    * tuiles de la suite. C'est le motif prévu pour ça.
    */
-  const ETAPES = 60;
+  const ETAPES = 44;
 
+  /**
+   * ⚠️ ON N'ENCHAÎNE PLUS AU MINUTEUR, MAIS SUR LA FIN DU MOUVEMENT.
+   *
+   * C'était la saccade restante, et elle venait de mon propre chaînage : un
+   * `setTimeout` réglé sur la MÊME durée que l'`easeTo` déclenche l'étape suivante
+   * pile au moment où la précédente s'achève — ou juste avant. MapLibre interrompt
+   * alors une animation en cours pour en démarrer une autre, et chaque interruption
+   * se voit : un heurt toutes les 400 ms, régulier comme un métronome.
+   *
+   * En écoutant `moveend`, l'étape suivante ne part QUE lorsque la précédente est
+   * réellement terminée. Aucune interruption, donc aucun heurt.
+   */
   function allerA(etape: number) {
     const map = carte.current;
-    if (!map || etape >= ETAPES) {
-      setJoue(false); etapeRef.current = 0; setAvance(1);
+    if (!map || !enCours.current || etape >= ETAPES) {
+      if (etape >= ETAPES) { setJoue(false); etapeRef.current = 0; setAvance(1); enCours.current = false; }
       return;
     }
     etapeRef.current = etape;
@@ -182,46 +200,72 @@ export function Flyover({ polyline, altitudes, stats }: {
 
     const loin = points[Math.min(points.length - 1, i + 4)];
     const capBrut = (Math.atan2(loin.lon - a.lon, loin.lat - a.lat) * 180) / Math.PI;
-    // Lissage par le plus court chemin angulaire : sans lui, un virage franchissant
-    // 0°/360° fait pivoter la caméra d'un tour complet.
     const ecart = ((capBrut - capRef.current + 540) % 360) - 180;
-    const cap = capRef.current + ecart * 0.35;
+    const cap = capRef.current + ecart * 0.4;
     capRef.current = cap;
+
+    // `once` : l'écouteur se retire de lui-même. Sans ça, chaque étape en empilerait
+    // un de plus et la fin du survol déclencherait quarante-quatre suites d'un coup.
+    map.once("moveend", () => { if (enCours.current) allerA(etape + 1); });
 
     map.easeTo({
       center: [lon, lat], zoom: 14.9, pitch: 52, bearing: cap,
       duration: DUREE_MS / ETAPES,
-      // Easing LINÉAIRE : le défaut de MapLibre accélère puis freine à chaque étape,
-      // ce qui produirait soixante petits à-coups sur un parcours censé être continu.
-      easing: (x: number) => x,
+      easing: (x: number) => x,   // linéaire : le défaut freine à chaque étape
+      essential: true,            // ne pas être désactivé par « réduire les animations »
     });
-
-    minuteurEtape.current = window.setTimeout(() => {
-      if (enCours.current) allerA(etape + 1);
-    }, DUREE_MS / ETAPES);
   }
 
-  function basculer() {
+  /**
+   * Préchauffage : on parcourt la trace une fois, sans afficher, pour que les tuiles
+   * soient déjà en cache au lancement. Une tuile demandée pendant le survol arrive
+   * trop tard — elle apparaît en cours de route, et c'est vu comme un à-coup.
+   */
+  function prechauffer(): Promise<void> {
+    const map = carte.current;
+    if (!map) return Promise.resolve();
+    return new Promise((resolve) => {
+      let k = 0;
+      const pas = () => {
+        if (!map || k >= 6) { resolve(); return; }
+        const idx = Math.floor((k / 5) * (points.length - 1));
+        map.jumpTo({ center: [points[idx].lon, points[idx].lat], zoom: 14.9, pitch: 52 });
+        k++;
+        setTimeout(pas, 120);
+      };
+      pas();
+    });
+  }
+
+  async function basculer() {
     if (enCours.current) {
       enCours.current = false;
-      if (minuteurEtape.current) clearTimeout(minuteurEtape.current);
       carte.current?.stop();
       setJoue(false);
       return;
     }
-    enCours.current = true;
     setJoue(true);
+    if (etapeRef.current === 0) {
+      setPrechauffe(true);
+      await prechauffer();
+      setPrechauffe(false);
+      capRef.current = capInitial;
+    }
+    enCours.current = true;
     allerA(etapeRef.current >= ETAPES - 1 ? 0 : etapeRef.current);
   }
 
-  function rejouer() {
-    if (minuteurEtape.current) clearTimeout(minuteurEtape.current);
+  async function rejouer() {
+    enCours.current = false;
     carte.current?.stop();
     etapeRef.current = 0;
     capRef.current = capInitial;
     setAvance(0);
-    enCours.current = true;
     setJoue(true);
+    setPrechauffe(true);
+    await prechauffer();
+    setPrechauffe(false);
+    enCours.current = true;
     allerA(0);
   }
 
@@ -273,7 +317,7 @@ export function Flyover({ polyline, altitudes, stats }: {
       <div className="absolute inset-x-0 bottom-0 flex items-center gap-3 bg-gradient-to-t from-black/70 to-transparent p-4">
         <button onClick={basculer}
           className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg transition hover:bg-emerald-400">
-          {joue ? <Pause className="h-5 w-5" /> : <Play className="ml-0.5 h-5 w-5" />}
+          {prechauffe ? <Loader2 className="h-5 w-5 animate-spin" /> : joue ? <Pause className="h-5 w-5" /> : <Play className="ml-0.5 h-5 w-5" />}
         </button>
         <button onClick={rejouer} title="Recommencer"
           className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur transition hover:bg-white/25">

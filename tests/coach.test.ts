@@ -1337,9 +1337,22 @@ test("le survol n'anime plus la caméra image par image", () => {
   // `jumpTo` à 60 images/s forçait un recalcul complet et une salve de tuiles à
   // chaque image : MapLibre n'en rendait qu'une sur trois, d'où les saccades.
   const code = codeOf("src/components/segments/Flyover.tsx");
-  assert.ok(!/jumpTo/.test(code), "jumpTo par image doit avoir disparu");
   assert.ok(/easeTo/.test(code), "la caméra doit enchaîner des easeTo");
-  assert.ok(/easing:/.test(code), "un easing LINÉAIRE évite 60 petits à-coups");
+  assert.ok(/easing:/.test(code), "un easing LINÉAIRE évite des à-coups à chaque étape");
+  // Le `jumpTo` ne subsiste QUE pour le préchauffage, hors lecture.
+  assert.ok(!/jumpTo/.test(code.slice(code.indexOf("function allerA"), code.indexOf("function prechauffer"))),
+    "aucun jumpTo pendant la lecture");
+});
+test("les étapes du survol s'enchaînent sur la FIN du mouvement, pas sur un minuteur", () => {
+  // La saccade régulière venait de là : un setTimeout réglé sur la même durée que
+  // l'easeTo déclenchait l'étape suivante pile à la fin de la précédente — ou juste
+  // avant. MapLibre interrompait alors une animation en cours, et l'interruption se
+  // voyait : un heurt toutes les 400 ms, régulier comme un métronome.
+  const code = codeOf("src/components/segments/Flyover.tsx");
+  const boucle = code.slice(code.indexOf("function allerA"), code.indexOf("function prechauffer"));
+  assert.ok(/once\("moveend"/.test(boucle), "l'étape suivante doit partir sur moveend");
+  assert.ok(!/setTimeout/.test(boucle), "aucun minuteur ne doit piloter l'enchaînement");
+  assert.ok(/fadeDuration: 0/.test(code), "le fondu des tuiles produit un scintillement permanent");
 });
 
 
