@@ -1333,6 +1333,25 @@ test("le classement des défis n'expose pas les profils en entier", () => {
   assert.ok(!/from\("profiles"\)\s*\.\s*select\("\*"\)/.test(code), "colonnes de profil à énumérer");
   assert.ok(/select\("id, full_name"\)/.test(code), "seuls l'identifiant et le nom sont nécessaires");
 });
+test("la synchronisation importe les traces des NOUVELLES séances", () => {
+  // Défaut constaté : l'import initial des 314 traces était un script lancé une fois
+  // à la main. Les sorties synchronisées ensuite entraient bien en base mais restaient
+  // SANS trace — donc absentes du survol, de la carte de chaleur et de l'appariement
+  // de segments, sans que rien ne le signale. Deux sorties manquaient déjà.
+  const code = codeOf("src/app/api/intervals/sync/route.ts");
+  assert.ok(/importMissingTracks/.test(code), "la synchro doit importer les traces manquantes");
+  // Best-effort : une trace indisponible ne doit jamais faire échouer la synchro.
+  const i = code.indexOf("importMissingTracks");
+  assert.ok(/try \{/.test(code.slice(Math.max(0, i - 400), i)), "l'import doit être protégé");
+  assert.ok(/max: \d+/.test(code.slice(i - 100, i + 200)), "l'import doit être BORNÉ par synchro");
+});
+test("une séance sans GPS est mémorisée comme telle", () => {
+  // Sinon la synchro la redemanderait à intervals.icu à chaque passage, indéfiniment.
+  const code = codeOf("src/lib/intervals/tracks.ts");
+  assert.ok(/has_gps: false/.test(code), "une séance de tapis doit être enregistrée sans GPS");
+  assert.ok(/data2/.test(code), "les longitudes vivent dans data2, pas dans des paires");
+});
+
 test("le préchauffage du survol ne se voit JAMAIS", () => {
   // Il fait défiler la trace en six bonds pour mettre les tuiles en cache : utile,
   // mais si on le laisse visible, la caméra se téléporte à travers tout le parcours

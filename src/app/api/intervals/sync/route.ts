@@ -277,6 +277,22 @@ export async function GET(req: Request) {
     } catch { /* best-effort : la synchro n'échoue pas pour une analyse */ }
   }
 
+  // ── TRACES GPS ──────────────────────────────────────────────────────────────
+  // ⚠️ SANS CE BLOC, LES NOUVELLES SÉANCES N'ONT JAMAIS DE TRACE. L'import initial
+  // était un script lancé une fois à la main : les sorties synchronisées ensuite
+  // entraient bien en base, mais disparaissaient du survol, de la carte de chaleur et
+  // de l'appariement de segments — sans que rien ne le signale. Constaté sur deux
+  // sorties (13 et 14 août) absentes du sélecteur de survol.
+  //
+  // Best-effort et borné : une trace manquante ne doit jamais faire échouer une
+  // synchronisation, et le reliquat est repris à la synchro suivante.
+  let tracks = { imported: 0, withoutGps: 0, failed: 0, remaining: 0 };
+  try {
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const { importMissingTracks } = await import("@/lib/intervals/tracks");
+    tracks = await importMissingTracks(createAdminClient(), { userId: user.id, apiKey: API_KEY, max: 8 });
+  } catch { /* les traces seront reprises à la prochaine synchronisation */ }
+
   let replanned = false;
   if (freshWorkouts > 0) {
     try {
@@ -298,6 +314,7 @@ export async function GET(req: Request) {
   return NextResponse.json({
     synced,
     freshWorkouts,
+    tracks,
     replanned,
     period: { oldest, newest },
     fetched: { activities: activities.length, wellness: wellness.length },
