@@ -2,9 +2,12 @@ import Link from "next/link";
 import { SessionDetail } from "@/components/admin/SessionDetail";
 import { cleanActivityName } from "@/lib/utils/activityName";
 import { createClient } from "@/lib/supabase/server";
-import { computeSplits, elevationProfile } from "@/lib/segments/splits";
+import { computeSplits, elevationProfile, metricSeries } from "@/lib/segments/splits";
 import { encodePolyline, simplify, type TrackPoint } from "@/lib/segments/geo";
 import { StravaBlocks, type Chiffre } from "@/components/activity/StravaBlocks";
+import { MetricChart } from "@/components/activity/MetricChart";
+import { SessionSegments, type EffortVue } from "@/components/activity/SessionSegments";
+import { leaderboard, type StoredEffort } from "@/lib/segments/match";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +49,8 @@ export default async function ActivitePage({ searchParams }: { searchParams: Pro
   let splits: ReturnType<typeof computeSplits> = [];
   let profil: ReturnType<typeof elevationProfile> = null;
   const chiffres: Chiffre[] = [];
+  let courbes: { titre: string; unite: string; couleur: string; points: { d: number; v: number }[]; resume: { label: string; value: string }[] }[] = [];
+  let effortsVus: EffortVue[] = [];
 
   try {
     const sb = await createClient();
@@ -72,12 +77,75 @@ export default async function ActivitePage({ searchParams }: { searchParams: Pro
           .select("points").eq("workout_id", String(wk.id)).maybeSingle();
         const bruts = ((tr as { points?: number[][] } | null)?.points ?? []);
         if (bruts.length >= 10) {
-          const pts: TrackPoint[] = bruts.map(([lat, lon, t, alt]) => ({ lat, lon, t, alt }));
+          // Positions du tableau `points` : 0 lat, 1 lon, 2 temps, 3 altitude, 4 FC,
+          // 5 cadence, 6 puissance. Les traces importées avant l'ajout des flux
+          // n'ont que les quatre premières — les courbes se taisent alors d'elles-mêmes.
+          const pts: TrackPoint[] = bruts.map(([lat, lon, t, alt, hr, cad, pw]) =>
+            ({ lat, lon, t, alt: alt ?? undefined, hr: hr ?? undefined, cad: cad ?? undefined, pw: pw ?? undefined } as TrackPoint));
           splits = computeSplits(pts);
           profil = elevationProfile(pts);
           // Tracé allégé pour la carte : la précision au mètre n'apporte rien à
           // cette échelle et alourdirait la page pour rien.
           polyline = encodePolyline(simplify(pts, 25));
+
+          // ── Courbes FC / cadence / puissance ────────────────────────────────
+          // Les flux sont stockés aux positions 4, 5 et 6 des points. Chaque courbe
+          // n'apparaît que si la métrique existe VRAIMENT sur la sortie.
+          const moy = (v: { d: number; v: number }[]) => v.reduce((a, b) => a + b.v, 0) / v.length;
+          const defs = [
+            { titre: "Fréquence cardiaque", unite: "bpm", couleur: "#ef4444", lire: (q: TrackPoint) => (q as unknown as { hr?: number }).hr },
+            // ⚠️ FACTEUR 2 SUR LA CADENCE. intervals.icu renvoie des TOURS par minute (une
+            // jambe), alors que la montre, la base (`avg_cadence_spm` = 174) et le reste
+            // de l'app raisonnent en PAS par minute (deux jambes). Sans cette conversion,
+            // la courbe affichait 89 sous une carte annonçant 174 : l'athlète aurait cru
+            // sa cadence effondrée, et les seuils du coach (« sous 170, cadence basse »)
+            // se seraient déclenchés à tort.
+            { titre: "Cadence", unite: "ppm", couleur: "#ec4899", lire: (q: TrackPoint) => { const c = (q as unknown as { cad?: number }).cad; return typeof c === "number" ? c * 2 : undefined; } },
+            { titre: "Puissance", unite: "W", couleur: "#a855f7", lire: (q: TrackPoint) => (q as unknown as { pw?: number }).pw },
+          ];
+          courbes = defs.flatMap((d) => {
+            const serie = metricSeries(pts, d.lire as never);
+            if (!serie) return [];
+            const vals = serie.map((x) => x.v);
+            return [{
+              titre: d.titre, unite: d.unite, couleur: d.couleur, points: serie,
+              resume: [
+                { label: `${d.titre} moy.`, value: `${Math.round(moy(serie))} ${d.unite}` },
+                { label: `${d.titre} max.`, value: `${Math.round(Math.max(...vals))} ${d.unite}` },
+              ],
+            }];
+          });
+
+          // ── Segments franchis pendant CETTE sortie ──────────────────────────
+          const { data: mes } = await sb.from("segment_efforts")
+            .select("id, segment_id, elapsed_seconds").eq("workout_id", String(wk.id));
+          const segIds = [...new Set((mes ?? []).map((e) => String((e as { segment_id: string }).segment_id)))];
+          if (segIds.length) {
+            const [{ data: segs }, { data: tous }] = await Promise.all([
+              sb.from("segments").select("id, name, distance_m").in("id", segIds),
+              sb.from("segment_efforts").select("segment_id, user_id, elapsed_seconds, started_at").in("segment_id", segIds),
+            ]);
+            const parSeg = new Map<string, StoredEffort[]>();
+            for (const e of (tous ?? []) as Record<string, unknown>[]) {
+              const k = String(e.segment_id);
+              parSeg.set(k, [...(parSeg.get(k) ?? []), {
+                user_id: String(e.user_id), elapsed_seconds: Number(e.elapsed_seconds), started_at: String(e.started_at),
+              }]);
+            }
+            effortsVus = (mes ?? []).map((e) => {
+              const ef = e as unknown as { id: string; segment_id: string; elapsed_seconds: number };
+              const seg = (segs ?? []).find((x) => String((x as { id: string }).id) === ef.segment_id) as
+                { id: string; name: string; distance_m: number } | undefined;
+              const cl = leaderboard(parSeg.get(ef.segment_id) ?? []);
+              const rang = cl.findIndex((x) => x.user_id === user.id);
+              return {
+                id: ef.id, name: seg?.name ?? "Segment", distance_m: seg?.distance_m ?? 0,
+                elapsed_seconds: ef.elapsed_seconds,
+                rang: rang >= 0 ? rang + 1 : null, total: cl.length,
+                record: cl[0]?.elapsed_seconds === ef.elapsed_seconds,
+              };
+            }).sort((a, b) => b.distance_m - a.distance_m);
+          }
         }
       }
     }
@@ -86,9 +154,11 @@ export default async function ActivitePage({ searchParams }: { searchParams: Pro
   return (
     <div className="space-y-6">
       <SessionDetail clientMode user="" date={date} dist={sp.dist} title={cleanActivityName(sp.title) || undefined} />
-      {(polyline || splits.length > 0 || chiffres.length > 0) && (
-        <div className="mx-auto w-full max-w-4xl px-4 pb-10">
+      {(polyline || splits.length > 0 || chiffres.length > 0 || courbes.length > 0 || effortsVus.length > 0) && (
+        <div className="mx-auto w-full max-w-4xl space-y-6 px-4 pb-10">
           <StravaBlocks polyline={polyline} chiffres={chiffres} splits={splits} profil={profil} />
+          <SessionSegments efforts={effortsVus} />
+          {courbes.map((c) => <MetricChart key={c.titre} {...c} />)}
         </div>
       )}
     </div>

@@ -48,7 +48,7 @@ import {
 } from "../src/lib/segments/geo";
 import { findEfforts, leaderboard, maitreDuSegment } from "../src/lib/segments/match";
 import { heatCells, intensity, denseBounds, heatBounds, type HeatCell as HC } from "../src/lib/segments/heatmap";
-import { computeSplits, splitPace, elevationProfile } from "../src/lib/segments/splits";
+import { computeSplits, splitPace, elevationProfile, metricSeries } from "../src/lib/segments/splits";
 
 let passed = 0;
 const fails: string[] = [];
@@ -1401,6 +1401,37 @@ test("le survol n'affiche pas d'altitude qu'il ne connaît pas", () => {
   const vue = codeOf("src/components/segments/Flyover.tsx");
   assert.ok(/altAct != null &&/.test(vue), "le bandeau doit taire l'altitude inconnue");
 });
+test("la cadence est convertie en PAS par minute, pas laissée en tours", () => {
+  // Défaut trouvé sur les données réelles : intervals.icu renvoie ~89 tours/min (une
+  // jambe) là où la base stocke 174 pas/min (deux jambes). La courbe affichait donc 89
+  // sous une carte annonçant 174 — l'athlète aurait cru sa cadence effondrée.
+  const code = codeOf("src/app/dashboard/activite/page.tsx");
+  const ligne = code.split("\n").find((l) => /titre: "Cadence"/.test(l)) ?? "";
+  assert.ok(/\*\s*2/.test(ligne), "la cadence doit être doublée pour passer en pas/min");
+});
+test("le détail d'une séance ne bloque jamais sur ses blocs facultatifs", () => {
+  // Carte, courbes et segments sont un BONUS : une trace absente ou une requête en
+  // échec ne doit jamais empêcher l'affichage du détail existant (zones FC, courbes).
+  const code = codeOf("src/app/dashboard/activite/page.tsx");
+  assert.ok(/try \{/.test(code) && /\} catch/.test(code), "la section enrichie doit être protégée");
+  const iCatch = code.indexOf("} catch");
+  const iDetail = code.indexOf("<SessionDetail");
+  assert.ok(iCatch > 0 && iCatch < iDetail, "le détail existant doit être rendu APRÈS la section facultative");
+});
+
+test("une courbe n'est tracée que si la mesure existe vraiment", () => {
+  // Reconstituer une courbe à partir de quelques valeurs éparses serait une invention
+  // graphique, pas une mesure : mieux vaut un bloc absent qu'une ligne inventée.
+  const base: TP[] = Array.from({ length: 60 }, (_, i) => ({ lat: 50 + i * 0.0001, lon: 3, t: i * 5 }));
+  assert.equal(metricSeries(base, (p) => p.hr), null, "aucune FC ⇒ aucune courbe");
+  const epars = base.map((p, i) => (i % 10 === 0 ? { ...p, hr: 150 } : p));
+  assert.equal(metricSeries(epars, (p) => p.hr), null, "6 points sur 60 ne font pas une courbe");
+  const complet = base.map((p, i) => ({ ...p, hr: 140 + (i % 20) }));
+  const serie = metricSeries(complet, (p) => p.hr);
+  assert.ok(serie && serie.length > 3, "une mesure continue doit produire une courbe");
+  assert.ok(serie!.every((x) => x.v >= 140 && x.v <= 160), "les valeurs doivent rester dans la plage réelle");
+});
+
 test("un arrêt au ravitaillement ne devient PAS une allure", () => {
   // Trouvé sur un ultra réel de 61 km : le kilomètre d'un ravitaillement s'affichait
   // « 91:32 /km ». Exact — c'est bien le temps écoulé — mais absurde présenté comme

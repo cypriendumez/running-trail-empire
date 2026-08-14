@@ -13,7 +13,14 @@
  * n'en a pas, et doit continuer à fonctionner sans dénivelé plutôt qu'avec un zéro
  * présenté comme une mesure.
  */
-export type TrackPoint = { lat: number; lon: number; t: number; alt?: number };
+export type TrackPoint = {
+  lat: number; lon: number; t: number;
+  /** Altitude, fréquence cardiaque, cadence, puissance — toutes OPTIONNELLES.
+   *  Une trace importée avant l'ajout d'un flux ne la porte pas, et l'écran doit
+   *  alors taire la métrique plutôt que d'afficher un zéro qui passerait pour une
+   *  mesure. */
+  alt?: number; hr?: number; cad?: number; pw?: number;
+};
 
 /**
  * Dénivelé positif cumulé, en mètres — `null` si aucune altitude n'est disponible.

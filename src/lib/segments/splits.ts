@@ -123,3 +123,38 @@ export function elevationProfile(points: TrackPoint[], cible = 120): { d: number
   if (out[out.length - 1] !== bruts[bruts.length - 1]) out.push(bruts[bruts.length - 1]);
   return out;
 }
+
+/**
+ * Série lissée d'une métrique le long de la sortie, pour tracer une courbe.
+ *
+ * Renvoie `null` si la métrique est absente de plus de la moitié des points : une
+ * courbe reconstituée à partir de quelques valeurs éparses serait une invention
+ * graphique, pas une mesure.
+ */
+export function metricSeries(
+  points: TrackPoint[],
+  lire: (p: TrackPoint) => number | null | undefined,
+  cible = 120,
+): { d: number; v: number }[] | null {
+  const connus = points.filter((p) => typeof lire(p) === "number");
+  if (connus.length < points.length / 2 || connus.length < 4) return null;
+
+  let cumul = 0;
+  const bruts: { d: number; v: number }[] = [];
+  for (let i = 0; i < points.length; i++) {
+    if (i > 0) cumul += haversine(points[i - 1].lat, points[i - 1].lon, points[i].lat, points[i].lon);
+    const v = lire(points[i]);
+    if (typeof v === "number") bruts.push({ d: cumul / 1000, v });
+  }
+  if (bruts.length < 4) return null;
+
+  // Moyenne par tranche : garde la forme de la courbe sans son bruit seconde par
+  // seconde, qui rendrait le tracé illisible sur 3 000 points.
+  const parTranche = Math.max(1, Math.ceil(bruts.length / cible));
+  const out: { d: number; v: number }[] = [];
+  for (let i = 0; i < bruts.length; i += parTranche) {
+    const t = bruts.slice(i, i + parTranche);
+    out.push({ d: t[t.length - 1].d, v: t.reduce((s, x) => s + x.v, 0) / t.length });
+  }
+  return out;
+}
