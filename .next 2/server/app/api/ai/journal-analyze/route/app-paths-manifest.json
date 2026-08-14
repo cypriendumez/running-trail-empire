@@ -1,0 +1,3 @@
+{
+  "/api/ai/journal-analyze/route": "app/api/ai/journal-analyze/route.js"
+}

@@ -2468,10 +2468,27 @@ test("la règle vit AUSSI en base, pas seulement dans la route", () => {
   // uniquement dans /api/social/interact se contournerait avec un curl.
   const sql = readFileSync("supabase/migrations/021_compte_prive.sql", "utf8")
     .split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
-  assert.ok(/create policy comments_ecriture/.test(sql), "aucune politique d'écriture des commentaires");
+  assert.ok(/alter policy comments_ecriture/.test(sql), "aucune politique d'écriture des commentaires");
   assert.ok(/is_private/.test(sql), "la politique ignore le compte privé");
   assert.ok(/f1\.follower_id = auth\.uid\(\)/.test(sql) && /f2\.follower_id = p\.user_id/.test(sql),
     "la réciprocité du suivi n'est pas vérifiée en base");
+});
+test("les migrations récentes ne contiennent AUCUNE instruction DROP", () => {
+  // L'éditeur SQL de Supabase signale toute instruction DROP comme destructive et
+  // impose une confirmation « Potential issue detected ». Cette migration a été écrite
+  // avec un `drop policy` : rien n'était détruit — on resserrait une règle de sécurité —
+  // mais l'avertissement oblige à trancher soi-même le risque au moment de l'exécuter.
+  // `alter policy` fait le même travail sans l'alerte, et sans fenêtre pendant laquelle
+  // la table serait dépourvue de politique d'écriture.
+  //
+  // Périmètre : à partir de la migration 007. La 006 en contient douze, écrites avant
+  // cette règle — les réécrire n'apporterait rien, elles sont déjà passées.
+  for (const f of readdirSync("supabase/migrations").filter((x) => x.endsWith(".sql") && x >= "007")) {
+    const lignes = readFileSync(`supabase/migrations/${f}`, "utf8").split("\n")
+      .filter((l) => !l.trim().startsWith("--"));
+    const drops = lignes.filter((l) => /^\s*drop\b/i.test(l));
+    assert.deepEqual(drops, [], `${f} contient une instruction DROP : ${drops[0]?.trim()}`);
+  }
 });
 
 console.log("\nSURVOL 3D — un index non fini ne doit plus tuer le lecteur");

@@ -1,0 +1,3 @@
+{
+  "/api/admin/claude-advice/route": "app/api/admin/claude-advice/route.js"
+}

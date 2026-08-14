@@ -30,10 +30,13 @@ comment on column profiles.is_private is
 -- la publication visée. On la remplace par la même règle que la route, exprimée en
 -- SQL. Elle reste volontairement PERMISSIVE en cas d'absence de relation sur un
 -- compte public : c'est tout l'intérêt d'un compte public.
-drop policy if exists comments_ecriture on post_comments;
-
-create policy comments_ecriture on post_comments
-  for all
+--
+-- ⚠️ `alter policy` ET NON `drop` + `create`. L'éditeur Supabase signale toute
+-- instruction DROP comme destructive et impose une confirmation — alors qu'ici rien
+-- n'est détruit, on ne fait que resserrer une règle. `alter policy` obtient le même
+-- résultat sans l'avertissement, et surtout sans fenêtre pendant laquelle la table
+-- serait dépourvue de politique d'écriture.
+alter policy comments_ecriture on post_comments
   using (auth.uid() = user_id)
   with check (
     auth.uid() = user_id

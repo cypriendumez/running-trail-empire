@@ -1,0 +1,3 @@
+{
+  "/api/webhooks/intervals/route": "app/api/webhooks/intervals/route.js"
+}

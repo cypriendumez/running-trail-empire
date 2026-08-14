@@ -1,0 +1,3 @@
+module.exports=[33441,a=>{"use strict";let b=(0,a.i(70106).default)("Check",[["path",{d:"M20 6 9 17l-5-5",key:"1gmf2c"}]]);a.s(["Check",0,b],33441)},15618,a=>{"use strict";let b=(0,a.i(70106).default)("Plus",[["path",{d:"M5 12h14",key:"1ays0h"}],["path",{d:"M12 5v14",key:"s699le"}]]);a.s(["Plus",0,b],15618)},3356,a=>{"use strict";a.s(["isRun",0,a=>null==a||"run"===String(a).toLowerCase()])}];
+
+//# sourceMappingURL=_01j2pb8._.js.map

@@ -1,0 +1,3 @@
+{
+  "/api/admin/read-messages/route": "app/api/admin/read-messages/route.js"
+}
