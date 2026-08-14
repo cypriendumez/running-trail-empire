@@ -399,6 +399,20 @@ export function Flyover({ polyline, altitudes, paces, stats }: {
         </div>
       )}
 
+      {/* ⚠️ LE PRÉCHAUFFAGE SE CACHE. Il fait défiler la trace en six bonds pour
+          mettre les tuiles en cache, puis revient au départ. Utile — sans lui, les
+          tuiles arrivent en cours de survol et cela se lit comme un à-coup — mais
+          spectaculairement moche à voir : la caméra se téléporte à travers tout le
+          parcours dès qu'on appuie sur Lecture. On le masque donc, et on DIT ce qui
+          se passe : un état de préparation annoncé n'est plus un bug. */}
+      {prechauffe && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-zinc-900/95">
+          <Loader2 className="h-6 w-6 animate-spin text-emerald-400" />
+          <p className="text-sm font-semibold text-white">Préparation du survol…</p>
+          <p className="text-xs text-white/60">Chargement du relief et des images satellite</p>
+        </div>
+      )}
+
       {/* Bandeau de chiffres — même esprit que la vidéo de référence, mais on
           n'affiche QUE ce qui est mesuré : pas d'altitude si la trace n'en porte pas. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 bg-gradient-to-b from-black/70 to-transparent p-5 text-white">

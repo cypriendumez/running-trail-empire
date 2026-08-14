@@ -1333,6 +1333,17 @@ test("le classement des défis n'expose pas les profils en entier", () => {
   assert.ok(!/from\("profiles"\)\s*\.\s*select\("\*"\)/.test(code), "colonnes de profil à énumérer");
   assert.ok(/select\("id, full_name"\)/.test(code), "seuls l'identifiant et le nom sont nécessaires");
 });
+test("le préchauffage du survol ne se voit JAMAIS", () => {
+  // Il fait défiler la trace en six bonds pour mettre les tuiles en cache : utile,
+  // mais si on le laisse visible, la caméra se téléporte à travers tout le parcours
+  // dès qu'on appuie sur Lecture — ce qui se lit comme un plantage.
+  const code = codeOf("src/components/segments/Flyover.tsx");
+  assert.ok(/\{prechauffe && \(/.test(code), "un voile doit couvrir le préchauffage");
+  const voile = code.slice(code.indexOf("{prechauffe && ("), code.indexOf("{prechauffe && (") + 500);
+  assert.ok(/bg-zinc-900\/9\d/.test(voile), "le voile doit être opaque, pas translucide");
+  assert.ok(/Préparation du survol/.test(voile), "un état de préparation doit être ANNONCÉ");
+});
+
 test("le survol est piloté par une HORLOGE, pas par un enchaînement d'événements", () => {
   // Les versions précédentes enchaînaient les étapes sur `moveend` avec un minuteur de
   // secours. Trois mécanismes qui peuvent se perdre — événement capté au mauvais
