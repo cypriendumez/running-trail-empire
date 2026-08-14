@@ -2499,6 +2499,29 @@ test("la vitrine des athlètes n'expose AUCUNE colonne sensible", () => {
   const route = codeOf("src/app/api/social/follow/route.ts");
   assert.ok(!/from\("profiles"\)/.test(route), "la route lit encore profiles au lieu de la vue");
 });
+test("toute vue exposée est FERMÉE au rôle anon, nommément", () => {
+  // Défaut trouvé en testant la 022 avec la clé publique : la vue répondait 200 et
+  // livrait nom, avatar, ligue et score de tous les athlètes à un visiteur sans compte.
+  // `revoke ... from public` n'y suffit pas : Supabase accorde d'office les droits à
+  // `anon` sur tout nouvel objet du schéma public, et `public` (le pseudo-rôle) n'est
+  // PAS `anon`.
+  //
+  // ⚠️ UNE VUE N'A PAS DE RLS. Sur une table, la RLS rattrape un grant trop large —
+  // c'est pourquoi `profiles` ne fuyait pas. Sur une vue, le grant est la SEULE barrière.
+  const migrations = readdirSync("supabase/migrations").filter((f) => f.endsWith(".sql"));
+  for (const f of migrations) {
+    const sql = readFileSync(`supabase/migrations/${f}`, "utf8")
+      .split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
+    for (const m of sql.matchAll(/create\s+or\s+replace\s+view\s+(?:public\.)?(\w+)/gi)) {
+      const vue = m[1];
+      const ferme = migrations.some((g) => {
+        const s = readFileSync(`supabase/migrations/${g}`, "utf8");
+        return new RegExp(`revoke\\s+all\\s+on\\s+(?:public\\.)?${vue}\\s+from\\s+anon`, "i").test(s);
+      });
+      assert.ok(ferme, `la vue « ${vue} » (${f}) n'est jamais révoquée nommément au rôle anon`);
+    }
+  }
+});
 test("les migrations récentes ne contiennent AUCUNE instruction DROP", () => {
   // L'éditeur SQL de Supabase signale toute instruction DROP comme destructive et
   // impose une confirmation « Potential issue detected ». Cette migration a été écrite
