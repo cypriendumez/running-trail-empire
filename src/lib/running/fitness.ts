@@ -148,6 +148,55 @@ export function vmaFromPaceCurve(best: { m: number; sec: number }[] | null | und
   return top;
 }
 
+/**
+ * LA VMA EFFECTIVE — un seul calcul, pour toute l'application.
+ *
+ * DÉFAUT RÉEL CORRIGÉ. Quatre chaînes distinctes calculaient la VMA : le coach, le
+ * tableau de bord, le profil et `getEffectiveVma`. Elles ne consultaient ni les mêmes
+ * sources ni dans le même ordre — le tableau de bord ignorait purement et simplement la
+ * courbe d'allure. Relevé sur le compte de production : coach 17,3 km/h, tableau de bord
+ * 18,7 km/h, profil 17,3, pour le même athlète au même instant. Chaque commentaire de
+ * chaque chaîne affirmait pourtant « garantit le MÊME chiffre côté coach et côté client ».
+ *
+ * CE QUI A CHANGÉ EN PLUS : LA COURBE ET LA VO2max SE CROISENT.
+ * La courbe d'allure ne connaît que ce que l'athlète A COURU. Sans effort maximal récent,
+ * son meilleur 5 000 m est une sortie d'entraînement, et la VMA qu'on en déduit est
+ * plancher, pas plafond. Constaté : courbe → 17,3 km/h alors que la VO2max mesurée par la
+ * montre (63) en donne 18,0 et que le meilleur 10 000 m de la courbe (41'08) est très
+ * au-dessous de ce qu'une VO2max de 63 permet. La VO2max n'était jamais consultée : elle
+ * était en dernier recours, derrière une courbe qui répond toujours.
+ *
+ * On retient donc la PLUS HAUTE des deux. Ce n'est pas de l'optimisme : les deux sources
+ * ne peuvent que SOUS-estimer (un effort non maximal ne révèle pas le maximum), donc la
+ * plus favorable est la plus proche de la vérité. Le même raisonnement que
+ * `vmaFromPaceCurve` applique déjà entre ses propres points.
+ *
+ * Un test enregistré garde la priorité absolue : c'est la seule valeur MESURÉE.
+ */
+export type VmaSource = "test" | "courbe" | "vo2max" | "séances" | null;
+
+export function effectiveVma(i: {
+  /** `performance_baselines.vma_kmh` — un vrai test, s'il existe. */
+  vmaStored?: number | null;
+  /** `profiles.pace_curve.best` — meilleurs efforts continus. */
+  paceCurveBest?: { m: number; sec: number }[] | null;
+  /** VO2max mesurée par la montre (`profiles.garmin_vo2max`). */
+  garminVo2?: number | null;
+  /** Repli quand ni courbe ni VO2max : les efforts soutenus de l'historique. */
+  fromRuns?: number | null;
+}): { vma: number | null; source: VmaSource } {
+  if (i.vmaStored != null && i.vmaStored > 0) return { vma: i.vmaStored, source: "test" };
+  const curve = vmaFromPaceCurve(i.paceCurveBest);
+  const vo2 = i.garminVo2 != null && i.garminVo2 > 0 ? vmaFromVo2max(i.garminVo2) : null;
+  if (curve != null || vo2 != null) {
+    // La plus haute des deux gagne — et on NOMME celle qui a gagné, pour que l'athlète
+    // puisse vérifier d'où sort son chiffre au lieu de le subir.
+    if (curve != null && (vo2 == null || curve >= vo2)) return { vma: curve, source: "courbe" };
+    return { vma: vo2, source: "vo2max" };
+  }
+  return i.fromRuns != null && i.fromRuns > 0 ? { vma: i.fromRuns, source: "séances" } : { vma: null, source: null };
+}
+
 export function bestVmaFromWorkouts(
   workouts: { date?: string; distance_km?: number | null; duration_seconds?: number | null; type?: string | null; avg_hr?: number | null }[],
   maxHr?: number | null,

@@ -7,7 +7,7 @@ import { buildWeightPlan, weightModeEligibility, type WeightPlan } from "@/lib/w
 import { weightCoachBlock, weightTrainingRules, type WeightTrainingRules } from "@/lib/weight/coaching";
 import { terrainCoachBlock } from "@/data/terrainCatalog";
 import { forecastWithElevation, altitudeLossPct, heatAdvice, windAdvice, archiveDailyMax, heatAcclimation, type DayWeather } from "@/lib/weather/openMeteo";
-import { bestVmaFromWorkouts, vmaFromPaceCurve, vmaFromVo2max } from "@/lib/running/fitness";
+import { bestVmaFromWorkouts, vmaFromPaceCurve, effectiveVma } from "@/lib/running/fitness";
 import { isRun } from "@/lib/intervals/sport";
 import { summarizeCross, fmtMinutes, type CrossSummary } from "@/lib/coach/crossTraining";
 import { computeQualityBudget } from "@/lib/coach/qualityBudget";
@@ -17,6 +17,7 @@ import { warmCoolMin } from "@/lib/watch/intervals";
 import { tr, nLoc, nRaw, type I18nText } from "@/lib/i18n/multi";
 import type { Lang } from "@/lib/i18n/translations";
 import { MOTIF_T } from "@/lib/coach/reasonsI18n";
+import { traduireDouleur } from "@/lib/coach/painZonesI18n";
 import { QUALITE_T } from "@/lib/ai/qualityI18n";
 
 type SB = Awaited<ReturnType<typeof createClient>>;
@@ -411,10 +412,13 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // VO2max Garmin (repli) → repli FC. Garantit le MÊME chiffre côté coach et côté client.
   // Meilleurs efforts mesurés : disponibles avant tout le reste car ils fondent la VMA.
   const paceCurve = (p?.pace_curve ?? null) as import("@/lib/intervals/performance").PaceCurve | null;
-  const vma = (vmaStored != null && vmaStored > 0) ? vmaStored
-    : (vmaFromPaceCurve(paceCurve?.best) ?? bestVmaFromWorkouts(runs, fcMaxEst) ?? estimateVmaFromRuns(runs, fcMaxEst, now)
-       ?? (garminVo2 != null && garminVo2 > 0 ? vmaFromVo2max(garminVo2) : null));
-  const vmaIsEst = !(vmaStored != null && vmaStored > 0) && vma != null;
+  // UN SEUL calcul de VMA pour toute l'application (cf. lib/running/fitness.ts) : quatre
+  // chaînes divergentes coexistaient, et le tableau de bord ignorait la courbe d'allure.
+  const { vma, source: vmaSource } = effectiveVma({
+    vmaStored, paceCurveBest: paceCurve?.best, garminVo2,
+    fromRuns: bestVmaFromWorkouts(runs, fcMaxEst) ?? estimateVmaFromRuns(runs, fcMaxEst, now),
+  });
+  const vmaIsEst = vmaSource !== "test" && vma != null;
 
   // ── TRAJECTOIRE DE CAPACITÉ — plateau et projection au jour J ────────────────
   // La courbe d'allure disait « où il en est » ; l'historique dit « où il va ».
@@ -869,7 +873,9 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // Quand une part notable de la charge vient d'un autre sport, on le NOMME.
   const crossBlame = (l: Lang) => cross.sharePct >= 20 && cross.labelAll
     ? MOTIF_T[l].origineCross(cross.sharePct, cross.labelAll[l]) : "";
-  if (pains.length) redFlags.push(tr((l) => MOTIF_T[l].douleur(pains.join(", "))));
+  // La ZONE de douleur est stockée en français (l'IA et le budget de qualité la
+  // reconnaissent par mots-clés français) : on la traduit à l'affichage seulement.
+  if (pains.length) redFlags.push(tr((l) => MOTIF_T[l].douleur(pains.map((x) => traduireDouleur(x, l)).join(", "))));
   // ── LA CHARGE SEULE NE SUFFIT PLUS À DÉCLARER ROUGE ─────────────────────────
   // Le feu rouge annule l'intensité du JOUR. Comme le plan est republié chaque jour et
   // que le ratio aigu:chronique met des semaines à redescendre après une coupure, CHAQUE
@@ -1671,18 +1677,16 @@ export async function getEffectiveVma(sb: SupabaseClient, userId: string): Promi
     fetchWorkouts(sb, userId),
     sb.from("profiles").select("*").eq("id", userId).maybeSingle(),
   ]);
-  const stored = Number((baseRes.data as { vma_kmh?: number } | null)?.vma_kmh) || 0;
-  if (stored > 0) return stored;
-  // MÊME ORDRE DE FIABILITÉ QUE LE COACH — sans quoi la montre recevrait des allures
-  // calculées autrement que celles affichées dans l'application.
   const prof = profRes.data as { garmin_vo2max?: number | null; pace_curve?: { best?: { m: number; sec: number }[] } | null } | null;
-  const fromCurve = vmaFromPaceCurve(prof?.pace_curve?.best);
-  if (fromCurve && fromCurve > 0) return fromCurve;
   // Course à pied uniquement : une sortie vélo produirait une VMA fantaisiste.
   const wks = ((woRes.data ?? []) as Wk[]).filter(w => isRun(w.sport));
   const obsMaxHr = Math.max(0, ...wks.map((w) => Number(w.max_hr ?? 0)));
-  const fromRuns = bestVmaFromWorkouts(wks, obsMaxHr > 120 ? obsMaxHr : null);
-  if (fromRuns && fromRuns > 0) return fromRuns;
-  const garminVo2 = Number(prof?.garmin_vo2max) || 0;
-  return garminVo2 > 0 ? vmaFromVo2max(garminVo2) : null;
+  // EXACTEMENT le calcul du coach — c'est la même fonction, pas « la même logique »
+  // recopiée. Les deux ne peuvent donc plus diverger, ce qui était le cas ici.
+  return effectiveVma({
+    vmaStored: Number((baseRes.data as { vma_kmh?: number } | null)?.vma_kmh) || null,
+    paceCurveBest: prof?.pace_curve?.best,
+    garminVo2: Number(prof?.garmin_vo2max) || null,
+    fromRuns: bestVmaFromWorkouts(wks, obsMaxHr > 120 ? obsMaxHr : null),
+  }).vma;
 }

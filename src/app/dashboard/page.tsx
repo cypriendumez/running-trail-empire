@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { BentoDashboard } from "@/components/dashboard/BentoDashboard";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import type { Objective } from "@/components/dashboard/ObjectiveCard";
-import { bestVmaFromWorkouts, loadRisk, vmaFromVo2max } from "@/lib/running/fitness";
+import { bestVmaFromWorkouts, loadRisk, effectiveVma } from "@/lib/running/fitness";
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 
 export const dynamic = "force-dynamic";
@@ -37,9 +37,15 @@ export default async function DashboardPage() {
   const obsMaxHr = Math.max(0, ...wks.map(w => Number(w.max_hr ?? 0)));
   const garminVo2 = Number((profileRes.data as { garmin_vo2max?: number | null } | null)?.garmin_vo2max) || 0;
   // VMA : test → efforts réels (reflète l'allure de course) → dérivée de la VO2max Garmin (repli).
-  const currentVma = Number((baseRes.data as { vma_kmh?: number } | null)?.vma_kmh ?? 0)
-    || bestVmaFromWorkouts(wks, obsMaxHr > 120 ? obsMaxHr : null)
-    || (garminVo2 > 0 ? vmaFromVo2max(garminVo2) : 0);
+  // MÊME calcul que le coach — la même fonction, pas une chaîne parallèle. Celle-ci
+  // ignorait purement et simplement la courbe d'allure : le tableau de bord annonçait
+  // 18,7 km/h pendant que le plan était calé sur 17,3, pour le même athlète.
+  const currentVma = effectiveVma({
+    vmaStored: Number((baseRes.data as { vma_kmh?: number } | null)?.vma_kmh) || null,
+    paceCurveBest: ((profileRes.data as { pace_curve?: { best?: { m: number; sec: number }[] } | null } | null)?.pace_curve)?.best,
+    garminVo2: garminVo2 || null,
+    fromRuns: bestVmaFromWorkouts(wks, obsMaxHr > 120 ? obsMaxHr : null),
+  }).vma ?? 0;
   const risk = loadRisk(wks);
 
   // Prochaine séance prescrite par le coach (aujourd'hui ou à venir) → prioritaire sur l'IA/l'algo.

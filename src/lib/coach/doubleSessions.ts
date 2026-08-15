@@ -44,6 +44,7 @@ export const ANNEES_MINI_DOUBLE_SEUIL = 4;
 import type { Lang } from "@/lib/i18n/translations";
 import { DOUBLE_T } from "@/lib/coach/doubleSessionsI18n";
 import { LOCALE } from "@/lib/i18n/multi";
+import { traduireDouleur } from "@/lib/coach/painZonesI18n";
 
 export type EtatDouble = {
   /** Le plan peut-il poser une deuxième séance ? */
@@ -76,7 +77,7 @@ export function etatDouble(i: {
   const T = DOUBLE_T[i.lang && DOUBLE_T[i.lang] ? i.lang : "fr"];
   const manque: string[] = [];
   if (!i.optIn) manque.push(T.optIn);
-  if (i.pains.length) manque.push(T.douleur(i.pains.join(", ")));
+  if (i.pains.length) manque.push(T.douleur(i.pains.map((x) => traduireDouleur(x, i.lang && DOUBLE_T[i.lang] ? i.lang : "fr")).join(", ")));
   if (i.readiness === "rouge") manque.push(T.rouge);
   if (i.taper) manque.push(T.affutage);
   if (!(i.weeklyKm >= VOLUME_MINI_DOUBLE_KM)) {

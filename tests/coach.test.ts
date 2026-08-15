@@ -22,11 +22,11 @@ import { contientGrosMot, premierGrosMot, NB_FORMES_SURVEILLEES } from "../src/l
 import { avertissementAge, avertissementsAge, kmEffort } from "../src/lib/coach/ageDistance";
 import { etatDouble, scinderFacile, seanceDoubleSeuil, AVERTISSEMENT_LACTATE } from "../src/lib/coach/doubleSessions";
 import { oneSessionPerSlot, slotKey } from "../src/lib/coach/sessions";
-import { vmaFromPaceCurve, bestVmaFromWorkouts } from "../src/lib/running/fitness";
+import { vmaFromPaceCurve, bestVmaFromWorkouts, effectiveVma } from "../src/lib/running/fitness";
 import { heatAdvice, windAdvice, altitudeLossPct, heatAcclimation } from "../src/lib/weather/openMeteo";
 import { parseReps, parsePaceSec, stepsForType, warmCoolMin, buildWorkoutDescription } from "../src/lib/watch/intervals";
 import { buildWeekPlan, CONFIRMED_DAYS } from "../src/lib/ai/autoPlan";
-import { tr, ALL_LANGS } from "../src/lib/i18n/multi";
+import { tr, ALL_LANGS, nRaw } from "../src/lib/i18n/multi";
 import { PLAN_T } from "../src/lib/ai/planI18n";
 import { QUALITE_T } from "../src/lib/ai/qualityI18n";
 import { stripProfileSecrets } from "../src/lib/profile/safe";
@@ -1433,12 +1433,114 @@ test("les nombres restent DANS la phrase traduite", () => {
   }
 });
 
+test("les décimales françaises s'écrivent avec une VIRGULE, et la montre les lit encore", () => {
+  // Le plan écrivait « ~17.85 km » à un lecteur français : le point décimal de
+  // JavaScript, invisible tant que les distances tombent rondes — ce qui est le cas la
+  // plupart du temps, et exactement pourquoi personne ne l'avait vu.
+  assert.equal(nRaw(17.85, "fr"), "17,85");
+  assert.equal(nRaw(17.85, "en"), "17.85");
+  assert.equal(nRaw(17.85, "de"), "17,85");
+  assert.equal(nRaw(21, "fr"), "21", "un entier ne gagne pas de décimale");
+  // Pas de séparateur de milliers : c'est une espace insécable fine en français, qui
+  // couperait le motif en deux au moment de l'analyse.
+  assert.ok(!/\s/.test(nRaw(1200, "fr")), `« ${nRaw(1200, "fr")} » contient une espace`);
+
+  // LE POINT QUI COMPTE : les deux analyseurs de prose acceptent la virgule.
+  const b = parseReps("Corps : 3×2,5 km à ~4'00/km, récup 2 min", null);
+  assert.ok(b && b.reps === 3, "parseReps ne lit plus une distance à virgule");
+  assert.equal(Math.round(b!.workSec), 600, "2,5 km à 4'00/km = 600 s");
+});
+
+test("une sortie longue à distance décimale produit les MÊMES étapes montre", () => {
+  // La virgule ne doit rien changer à ce que reçoit Garmin.
+  const virgule = buildWorkoutDescription("Sortie longue",
+    "Échauffement 15 min progressif FC Z1→Z2 → Corps : ~17,85 km (environ 1h35) en Z2 (~5'20/km) → Retour au calme 10 min FC Z1.",
+    "Sortie longue Long Z2", null, 17.6, 15, 10);
+  const point = buildWorkoutDescription("Sortie longue",
+    "Échauffement 15 min progressif FC Z1→Z2 → Corps : ~17.85 km (environ 1h35) en Z2 (~5'20/km) → Retour au calme 10 min FC Z1.",
+    "Sortie longue Long Z2", null, 17.6, 15, 10);
+  assert.ok(virgule && point);
+  assert.equal(virgule!.description.split("\n\n")[1], point!.description.split("\n\n")[1],
+    "les étapes de montre diffèrent selon le séparateur décimal");
+});
+
+test("le catalogue de séances n'alimente QUE le prompt du modèle", () => {
+  // Pourquoi ce test existe : `data/workoutLibrary.ts` ressemble à un catalogue
+  // affichable, et il ne l'est pas — il n'est lu que par `buildSessionCatalog`, dont la
+  // sortie part dans `ctx.text`, c'est-à-dire dans le prompt. Le traduire n'aurait aucun
+  // intérêt et dégraderait les réponses du modèle. Si un écran vient un jour s'y brancher,
+  // il faudra le traduire : ce test le signalera au lieu de laisser passer du français.
+  const consommateurs = execSync("grep -rl 'workoutLibrary' src --include='*.ts' --include='*.tsx' || true")
+    .toString().trim().split("\n").filter(Boolean).filter((f) => f !== "src/data/workoutLibrary.ts");
+  assert.deepEqual(consommateurs, ["src/lib/ai/coachContext.ts"],
+    `le catalogue a de nouveaux lecteurs : ${consommateurs.join(", ")} — s'ils affichent, il faut le traduire`);
+  const src = codeOf("src/lib/ai/coachContext.ts");
+  assert.ok(/const catalog = buildSessionCatalog\(/.test(src) && /\$\{catalog\}/.test(src),
+    "le catalogue doit rester une variable injectée dans le prompt, pas exposée au contexte");
+  assert.ok(!/catalog,/.test(src), "le catalogue ne doit pas être exposé dans AthleteContext (donc pas à l'écran)");
+});
+
 test("une langue inconnue retombe sur le français, jamais sur du vide", () => {
   assert.equal(PLAN_T["fr"].reposTitre, "Repos");
   assert.equal(heatAdvice(31, 80, "kl" as never).note, heatAdvice(31, 80).note,
     "une langue inconnue doit donner la note française, pas une note vide");
   assert.ok(heatAdvice(31, 80, "de").note.length > 0 && heatAdvice(31, 80, "de").note !== heatAdvice(31, 80).note,
     "l'allemand doit bien donner une autre note");
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+console.log("\nVMA EFFECTIVE — un seul calcul pour toute l'application");
+// Défaut réel : QUATRE chaînes distinctes calculaient la VMA (coach, tableau de bord,
+// profil, getEffectiveVma), avec des sources et un ordre différents — le tableau de bord
+// ignorait la courbe d'allure. Relevé sur le compte de production : coach 17,3 km/h,
+// tableau de bord 18,7 km/h, pour le même athlète au même instant.
+
+/** Courbe d'allure dont le meilleur point donne ~17,3 km/h (le 5 000 m réel de prod). */
+const COURBE = [{ m: 400, sec: 75 }, { m: 1000, sec: 205 }, { m: 3000, sec: 662 },
+                { m: 5000, sec: 1107 }, { m: 10000, sec: 2468 }];
+
+test("un test VMA enregistré prime sur tout le reste", () => {
+  // C'est la seule valeur MESURÉE ; les autres sont des déductions.
+  const r = effectiveVma({ vmaStored: 16, paceCurveBest: COURBE, garminVo2: 63, fromRuns: 18.7 });
+  assert.equal(r.vma, 16);
+  assert.equal(r.source, "test");
+});
+
+test("la VO2max de la montre est CROISÉE avec la courbe, plus reléguée au dernier recours", () => {
+  // Défaut réel : la courbe répond toujours, donc la VO2max n'était JAMAIS consultée.
+  // Or la courbe ne connaît que ce que l'athlète a couru : sans effort maximal récent,
+  // son meilleur 5 000 m est une sortie d'entraînement. Constaté en production :
+  // courbe 17,3 km/h contre VO2max 63 → 18,0, et un « meilleur » 10 000 m à 41'08.
+  const r = effectiveVma({ paceCurveBest: COURBE, garminVo2: 63, fromRuns: null });
+  assert.equal(vmaFromPaceCurve(COURBE), 17.3, "la courbe donne bien 17,3");
+  assert.equal(r.vma, 18, "la VO2max (63 → 18,0) doit l'emporter sur la courbe");
+  assert.equal(r.source, "vo2max", "et la source doit le DIRE, sinon l'athlète subit le chiffre");
+});
+
+test("quand la courbe est la meilleure, c'est elle qui gagne", () => {
+  // Le croisement n'est pas « la VO2max gagne toujours » : les deux sources ne peuvent
+  // que sous-estimer, donc on retient la plus favorable, d'où qu'elle vienne.
+  const r = effectiveVma({ paceCurveBest: COURBE, garminVo2: 45, fromRuns: null });
+  assert.equal(r.vma, 17.3);
+  assert.equal(r.source, "courbe");
+});
+
+test("sans courbe ni VO2max, on retombe sur les séances — jamais sur zéro", () => {
+  assert.deepEqual(effectiveVma({ fromRuns: 15.4 }), { vma: 15.4, source: "séances" });
+  // Aucune source du tout : `null`, pas `0`. Un zéro se propagerait en allures absurdes.
+  assert.deepEqual(effectiveVma({}), { vma: null, source: null });
+});
+
+test("aucune chaîne parallèle ne recalcule la VMA dans son coin", () => {
+  // C'est la cause RACINE des quatre chiffres divergents : chaque écran refaisait la
+  // chaîne à la main, et chaque commentaire jurait pourtant qu'elle était identique.
+  for (const f of ["src/app/dashboard/page.tsx", "src/app/dashboard/profile/page.tsx", "src/lib/ai/coachContext.ts"]) {
+    const src = codeOf(f);
+    assert.ok(/effectiveVma\(/.test(src), `${f} ne passe pas par effectiveVma`);
+    // `vmaFromVo2max` ne doit plus être appelée hors de la fonction commune : c'est
+    // exactement ainsi qu'une chaîne parallèle réapparaît.
+    assert.ok(!/vmaFromVo2max\(/.test(src), `${f} rebâtit une chaîne de VMA à la main`);
+  }
 });
 
 function codeOf(path: string): string {

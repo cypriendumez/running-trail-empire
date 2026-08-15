@@ -149,7 +149,12 @@ export async function autoCoachForUser(
       lastSession: ctx.lastSession ? { ...ctx.lastSession, shows: ctx.lastSession.shows.slice(0, 4) } : null,
       // Ce qui reste À VENIR : une séance déjà courue n'a rien à faire dans un e-mail
       // qui annonce la suite.
-      days: week.filter((d) => d.date >= from).map((d) => ({ date: d.date, type: d.type, title: d.title, detail: d.detail })),
+      // `type` et `detail` restent français (ils sont filtrés par mots-clés) ; `i18n`
+      // permet à l'e-mail d'écrire le NOM des séances dans la langue de l'athlète.
+      days: week.filter((d) => d.date >= from).map((d) => ({
+        date: d.date, type: d.type, title: d.title, detail: d.detail,
+        ...(d.i18n ? { i18n: Object.fromEntries(Object.entries(d.i18n).map(([l, t]) => [l, { title: t.title }])) } : {}),
+      })),
       objective: ctx.objective ? { race: ctx.objective.race, daysToRace: ctx.daysToRace } : null,
       lastEmailAt,
     }).catch(() => ({ sent: false, skipped: "erreur inattendue" }));

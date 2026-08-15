@@ -25,7 +25,15 @@ import type { Lang } from "@/lib/i18n/translations";
 /** Deux séances dans la même matinée ne valent pas deux e-mails. */
 export const EMAIL_MIN_INTERVAL_MS = 3 * 60 * 60 * 1000;
 
-export type PlanDayLite = { date: string; type: string; title: string; detail: string };
+export type PlanDayLite = {
+  date: string; type: string;
+  /** Titre FRANÇAIS canonique — celui qui part sur la montre. */
+  title: string; detail: string;
+  /** Le même jour dans les autres langues (cf. lib/ai/planI18n.ts). Sans lui, l'e-mail
+   *  était traduit… sauf le nom des séances, c'est-à-dire son seul contenu utile :
+   *  « Nächste Tage : Footing en endurance ». */
+  i18n?: Partial<Record<Lang, { title: string }>>;
+};
 
 export type PlanReadyInput = {
   lang: Lang;
@@ -140,7 +148,9 @@ export function buildPlanReadyEmail(i: PlanReadyInput): { subject: string; text:
   // Le sujet annonce la PROCHAINE séance qui n'est ni du repos ni aujourd'hui : c'est
   // la seule information que l'athlète lit vraiment dans sa liste d'e-mails.
   const next = days.find((d) => d.date !== today && !/repos|rest/i.test(d.type)) ?? days[0] ?? null;
-  const subject = next ? t.subject(`${dayLabel(next.date)} · ${next.title}`) : t.subjectNoNext;
+  // Le TYPE reste français (c'est lui qu'on filtre) ; le TITRE, lui, est ce que l'athlète lit.
+  const titre = (d: PlanDayLite) => d.i18n?.[i.lang]?.title ?? d.title;
+  const subject = next ? t.subject(`${dayLabel(next.date)} · ${titre(next)}`) : t.subjectNoNext;
 
   const objLine = i.objective && i.objective.daysToRace != null && i.objective.daysToRace >= 0
     ? t.objective(i.objective.race, i.objective.daysToRace)
@@ -157,7 +167,7 @@ export function buildPlanReadyEmail(i: PlanReadyInput): { subject: string; text:
   }
   if (days.length) {
     lines.push(`${t.nextDaysTitle} :`);
-    for (const d of days) lines.push(`  ${dayLabel(d.date)} — ${d.title}`);
+    for (const d of days) lines.push(`  ${dayLabel(d.date)} — ${titre(d)}`);
     lines.push("");
   }
   lines.push(`${t.cta} : ${i.appUrl}/dashboard/calendrier`, "", "—", t.footer);
@@ -182,7 +192,7 @@ export function buildPlanReadyEmail(i: PlanReadyInput): { subject: string; text:
   ${days.length ? card(
     `<div style="font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:#64748b">${esc(t.nextDaysTitle)}</div>
      <table style="width:100%;border-collapse:collapse;margin-top:8px">
-     ${days.map((d) => `<tr><td style="padding:6px 0;color:#64748b;white-space:nowrap;vertical-align:top">${esc(dayLabel(d.date))}</td><td style="padding:6px 0 6px 12px;font-weight:600">${esc(d.title)}</td></tr>`).join("")}
+     ${days.map((d) => `<tr><td style="padding:6px 0;color:#64748b;white-space:nowrap;vertical-align:top">${esc(dayLabel(d.date))}</td><td style="padding:6px 0 6px 12px;font-weight:600">${esc(titre(d))}</td></tr>`).join("")}
      </table>`,
   ) : ""}
   <p style="margin:24px 0">

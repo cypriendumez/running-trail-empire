@@ -42,12 +42,21 @@ export const nLoc = (v: number, lang: Lang, d = 0): string =>
   v.toLocaleString(LOCALE[lang], { minimumFractionDigits: d, maximumFractionDigits: d }).replace("-", "−");
 
 /**
- * Nombre INTERPOLÉ BRUT dans la phrase (`${km}`).
+ * Nombre interpolé dans la phrase (« ~17,85 km »), AU FORMAT DE LA LOCALE.
  *
- * Le français est rendu tel quel — c'est-à-dire exactement comme aujourd'hui, y compris
- * son point décimal quand le calcul en produit un (« 17.85 km »). Le corriger serait un
- * changement de comportement du plan français, et le plan français ne doit pas bouger
- * d'un caractère. Les autres langues, elles, suivent leur locale (« 17,85 » en allemand).
+ * Le français passait auparavant par une interpolation brute (`${km}`), donc par le
+ * point décimal de JavaScript : le plan écrivait « ~17.85 km » à un lecteur français.
+ * C'était invisible tant que les distances tombaient rondes — et elles tombent rondes la
+ * plupart du temps, ce qui est exactement pourquoi personne ne l'avait vu. La borne
+ * haute des footings (`longRunKm × 0,85`) produit pourtant des décimales.
+ *
+ * ⚠️ CE FORMAT EST RELU PAR LES MACHINES. `intervals.ts` (`parseReps`) et
+ * `GhostRunner.applyCoachSession` acceptent tous deux la virgule comme le point
+ * (`[.,]`), et convertissent avant de calculer : le changement est donc sûr — c'est
+ * vérifié par un test, pas supposé.
  */
 export const nRaw = (v: number, lang: Lang): string =>
-  lang === "fr" ? String(v) : v.toLocaleString(LOCALE[lang], { maximumFractionDigits: 2 });
+  // `useGrouping: false` est délibéré : le séparateur de milliers français est une
+  // ESPACE INSÉCABLE FINE, qui couperait « 1 200 km » en plein milieu d'un motif
+  // analysé par la montre. Aucune distance ne le justifie de toute façon.
+  v.toLocaleString(LOCALE[lang], { maximumFractionDigits: 2, useGrouping: false });

@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { createClient } from "@/lib/supabase/server";
 import { ProfileSettings } from "@/components/profile/ProfileSettings";
 import { stripProfileSecrets } from "@/lib/profile/safe";
-import { bestVmaFromWorkouts, vmaFromPaceCurve } from "@/lib/running/fitness";
+import { bestVmaFromWorkouts, effectiveVma } from "@/lib/running/fitness";
 import { isRun } from "@/lib/intervals/sport";
 
 export const metadata = { title: "Mon Profil | Pacevo" };
@@ -41,7 +41,14 @@ export default async function ProfilePage() {
   // course à pied uniquement. Sans cela le profil affichait une VMA que le plan
   // d'entraînement contredisait — et une sortie vélo pouvait la produire.
   const paceCurveBest = ((profile as { pace_curve?: { best?: { m: number; sec: number }[] } | null } | null)?.pace_curve)?.best;
-  const estimatedVma = vmaFromPaceCurve(paceCurveBest) ?? bestVmaFromWorkouts(rw.filter(w => isRun(w.sport)), obsMaxHr);
+  // MÊME calcul que le coach (lib/running/fitness → effectiveVma). Cette chaîne-ci
+  // ignorait la VO2max de la montre : le profil affichait une VMA que le plan ne
+  // partageait pas. `vmaSource` dit laquelle des sources a gagné.
+  const { vma: estimatedVma, source: vmaSource } = effectiveVma({
+    paceCurveBest,
+    garminVo2: Number((profile as { garmin_vo2max?: number | null } | null)?.garmin_vo2max) || null,
+    fromRuns: bestVmaFromWorkouts(rw.filter(w => isRun(w.sport)), obsMaxHr),
+  });
 
   // ── STATISTIQUES PAR SPORT ────────────────────────────────────────────────────
   // Additionner course, vélo et randonnée dans un même total n'a pas de sens sportif :
@@ -85,7 +92,7 @@ export default async function ProfilePage() {
       shoes={shoes ?? []}
       goals={goals ?? []}
       stats={{ kmYear, kmMonth, sessionsMonth, longestRun, streak, bySport }}
-      fitness={{ estimatedVma, obsMaxHr, garminVo2max: Number((profile as { garmin_vo2max?: number | null } | null)?.garmin_vo2max) || null, garmin: ((profile as { garmin_metrics?: Record<string, number | null> | null } | null)?.garmin_metrics) ?? null }}
+      fitness={{ estimatedVma, vmaSource, obsMaxHr, garminVo2max: Number((profile as { garmin_vo2max?: number | null } | null)?.garmin_vo2max) || null, garmin: ((profile as { garmin_metrics?: Record<string, number | null> | null } | null)?.garmin_metrics) ?? null }}
       userId={user!.id}
     />
   );
