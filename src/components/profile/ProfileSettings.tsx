@@ -856,6 +856,15 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                   <p className="text-[11px] text-zinc-400 mt-1.5">{tr("f.dpwHint")}</p>
                 </div>
 
+                {/* DEUX SÉANCES PAR JOUR — placé ici, à côté du nombre de séances par
+                    semaine, et non dans les Notifications : c'est un réglage
+                    D'ENTRAÎNEMENT. Rangé au milieu des rappels et des classements, il
+                    se lisait comme une préférence d'alerte. */}
+                <div className="col-span-2 rounded-2xl border border-zinc-200 bg-zinc-50/60 p-3">
+                  <Toggle enabled={form.double_sessions} onToggle={() => setForm(f => ({ ...f, double_sessions: !f.double_sessions }))} label={tr("double.title")} />
+                  <p className="text-[11px] text-zinc-400 mt-1.5">{tr("double.hint")}</p>
+                </div>
+
                 <div className="col-span-2">
                   <label className="text-xs font-medium text-zinc-500 block mb-1.5">{tr("f.days")}</label>
                   <div className="grid grid-cols-7 gap-1.5">
@@ -963,10 +972,6 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                   geste : « qui peut m'atteindre ». La conséquence est écrite en
                   toutes lettres sous la bascule : un réglage dont on ne comprend
                   pas l'effet ne se touche jamais. */}
-              <div className="mt-3 border-t border-zinc-200 pt-3">
-                <Toggle enabled={form.double_sessions} onToggle={() => setForm(f => ({...f, double_sessions: !f.double_sessions}))} label={tr("double.title")} />
-                <p className="mt-1 text-xs text-zinc-500">{tr("double.hint")}</p>
-              </div>
               <div className="mt-3 border-t border-zinc-200 pt-3">
                 <Toggle enabled={form.is_private} onToggle={() => setForm(f => ({...f, is_private: !f.is_private}))} label={tr("privacy.private")} />
                 <p className="mt-1 text-xs text-zinc-500">
