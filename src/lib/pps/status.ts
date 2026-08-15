@@ -39,7 +39,17 @@ export const PPS_VALIDITE_MOIS = 12;
  * pour les comptes qui n'ont jamais ouvert le sujet.
  */
 export type PpsStatus = {
-  /** Date de délivrance, AAAA-MM-JJ. `null` = pas encore fait / pas renseigné. */
+  /**
+   * Date d'EXPIRATION, AAAA-MM-JJ — celle qui est IMPRIMÉE sur le pass (« EXPIRE LE
+   * 24/03/2027 »). C'est la source de vérité quand elle est renseignée.
+   *
+   * Pourquoi elle et pas la date d'obtention : le pass n'affiche que l'expiration. Le
+   * premier écran demandait la délivrance, donc obligeait l'athlète à retrancher douze
+   * mois de tête pour saisir une donnée que la fédération lui donne déjà toute faite.
+   * Une friction inutile sur le seul geste que l'app lui demande.
+   */
+  expiresAt?: string | null;
+  /** Date de délivrance, AAAA-MM-JJ. Repli historique : l'expiration s'en déduit. */
   obtainedAt: string | null;
   /** Numéro de pass, si l'athlète a voulu le garder sous la main. Jamais obligatoire. */
   number?: string | null;
@@ -96,7 +106,9 @@ export function ppsVerdict(
   today: Date = new Date(),
 ): PpsVerdict {
   if (status?.licensed) return { kind: "licencie" };
-  const expiresAt = ppsExpiration(status?.obtainedAt);
+  // L'expiration IMPRIMÉE sur le pass prime : elle est exacte, alors que la déduction
+  // « délivrance + 12 mois » suppose que la règle n'a pas changé entre-temps.
+  const expiresAt = parseJour(status?.expiresAt) ? status!.expiresAt! : ppsExpiration(status?.obtainedAt);
   if (!expiresAt) return { kind: "inconnu" };
 
   const now = new Date(iso(today) + "T12:00:00").getTime();

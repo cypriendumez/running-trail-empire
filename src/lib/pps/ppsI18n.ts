@@ -32,6 +32,7 @@ export type TextesPps = {
   suiviTitre: string;
   suiviIntro: string;
   champDate: string;
+  champDateAide: string;
   champNumero: string;
   champNumeroAide: string;
   licencieCase: string;
@@ -80,7 +81,8 @@ export const PPS_T: Record<Lang, TextesPps> = {
 
     suiviTitre: "Garde-le à l'œil",
     suiviIntro: "Note ici la date à laquelle tu l'as obtenu. On te préviendra s'il expire avant une de tes courses — c'est le piège classique d'une préparation longue.",
-    champDate: "Date d'obtention",
+    champDate: "Expire le (indiqué sur ton pass)",
+    champDateAide: "Recopie la date affichée sur ton pass — pas besoin de calculer quoi que ce soit.",
     champNumero: "Numéro de pass (facultatif)",
     champNumeroAide: "Pour l'avoir sous la main le jour de l'inscription.",
     licencieCase: "Je suis licencié FFA",
@@ -124,7 +126,8 @@ export const PPS_T: Record<Lang, TextesPps> = {
 
     suiviTitre: "Keep an eye on it",
     suiviIntro: "Record the date you got it. We will warn you if it runs out before one of your races — the classic trap of a long build-up.",
-    champDate: "Date obtained",
+    champDate: "Expires on (shown on your pass)",
+    champDateAide: "Copy the date printed on your pass — no arithmetic needed.",
     champNumero: "Pass number (optional)",
     champNumeroAide: "So you have it to hand when you enter.",
     licencieCase: "I hold an FFA licence",
@@ -168,7 +171,8 @@ export const PPS_T: Record<Lang, TextesPps> = {
 
     suiviTitre: "Behalte ihn im Blick",
     suiviIntro: "Trage hier ein, wann du ihn bekommen hast. Wir warnen dich, wenn er vor einem deiner Wettkämpfe abläuft — die klassische Falle einer langen Vorbereitung.",
-    champDate: "Ausstellungsdatum",
+    champDate: "Gültig bis (auf deinem Pass)",
+    champDateAide: "Übertrage das Datum von deinem Pass — du musst nichts ausrechnen.",
     champNumero: "Passnummer (optional)",
     champNumeroAide: "Damit du sie bei der Anmeldung zur Hand hast.",
     licencieCase: "Ich habe eine FFA-Lizenz",
@@ -212,7 +216,8 @@ export const PPS_T: Record<Lang, TextesPps> = {
 
     suiviTitre: "No lo pierdas de vista",
     suiviIntro: "Anota aquí la fecha en que lo obtuviste. Te avisaremos si caduca antes de una de tus carreras — la trampa clásica de una preparación larga.",
-    champDate: "Fecha de obtención",
+    champDate: "Caduca el (indicado en tu pase)",
+    champDateAide: "Copia la fecha impresa en tu pase — no hay que calcular nada.",
     champNumero: "Número de pase (opcional)",
     champNumeroAide: "Para tenerlo a mano al inscribirte.",
     licencieCase: "Tengo licencia FFA",
@@ -256,7 +261,8 @@ export const PPS_T: Record<Lang, TextesPps> = {
 
     suiviTitre: "Não o percas de vista",
     suiviIntro: "Regista aqui a data em que o obtiveste. Avisamos-te se expirar antes de uma das tuas corridas — a armadilha clássica de uma preparação longa.",
-    champDate: "Data de obtenção",
+    champDate: "Expira a (indicado no teu passe)",
+    champDateAide: "Copia a data impressa no teu passe — não tens de calcular nada.",
     champNumero: "Número do passe (opcional)",
     champNumeroAide: "Para o teres à mão na inscrição.",
     licencieCase: "Tenho licença FFA",

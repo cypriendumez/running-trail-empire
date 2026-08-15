@@ -15,7 +15,7 @@ import { useMemo, useState } from "react";
 import { ShieldCheck, ShieldAlert, ShieldQuestion, ExternalLink, Loader2, Check } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { PPS_T } from "@/lib/pps/ppsI18n";
-import { PPS_URL, PPS_PRIX_EUR, PPS_VALIDITE_MOIS, ppsVerdict, type PpsStatus, type PpsVerdict } from "@/lib/pps/status";
+import { PPS_URL, ppsVerdict, ppsExpiration, type PpsStatus, type PpsVerdict } from "@/lib/pps/status";
 
 /** Palette par verdict : le vert ne doit jamais servir à annoncer une échéance ratée. */
 const TON: Record<PpsVerdict["kind"], { bg: string; ring: string; fg: string; icon: typeof ShieldCheck }> = {
@@ -86,18 +86,19 @@ export function PpsStatusCard({
  */
 export function PpsTracker({ initial }: { initial: PpsStatus | null }) {
   const { t } = usePpsTextes();
-  const [obtainedAt, setObtainedAt] = useState(initial?.obtainedAt ?? "");
+  const [expiresAt, setExpiresAt] = useState(initial?.expiresAt ?? ppsExpiration(initial?.obtainedAt) ?? "");
   const [numero, setNumero] = useState(initial?.number ?? "");
   const [licensed, setLicensed] = useState(initial?.licensed === true);
   const [etat, setEtat] = useState<"repos" | "envoi" | "ok">("repos");
 
+  // Une expiration est par nature DANS LE FUTUR : on borne le champ en conséquence.
   const aujourdhui = new Date().toISOString().slice(0, 10);
 
   const enregistrer = async () => {
     setEtat("envoi");
     await fetch("/api/pps", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ obtainedAt: obtainedAt || null, number: numero || null, licensed }),
+      body: JSON.stringify({ expiresAt: expiresAt || null, number: numero || null, licensed }),
     }).catch(() => undefined);
     setEtat("ok");
     // On rafraîchit pour que le verdict affiché plus haut reparte de la valeur ENREGISTRÉE
@@ -120,9 +121,10 @@ export function PpsTracker({ initial }: { initial: PpsStatus | null }) {
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="pps-date" className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wide text-zinc-500">{t.champDate}</label>
-            <input id="pps-date" type="date" value={obtainedAt} max={aujourdhui}
-                   onChange={(e) => setObtainedAt(e.target.value)}
+            <input id="pps-date" type="date" value={expiresAt} min={aujourdhui}
+                   onChange={(e) => setExpiresAt(e.target.value)}
                    className="w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+            <p className="mt-1 text-[11.5px] text-zinc-400">{t.champDateAide}</p>
           </div>
           <div>
             <label htmlFor="pps-num" className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wide text-zinc-500">{t.champNumero}</label>

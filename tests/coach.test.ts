@@ -1641,6 +1641,36 @@ test("rien de déclaré = « inconnu », et on le DIT au lieu de le deviner", ()
   assert.equal(ppsDemandeAction(v), true, "un PPS non renseigné doit provoquer une action");
 });
 
+test("la date IMPRIMÉE sur le pass prime sur la déduction", () => {
+  // Défaut vécu : l'athlète avait un pass valide affichant « EXPIRE LE 24/03/2027 », et
+  // l'app lui réclamait sa date d'OBTENTION — donc une soustraction de douze mois de
+  // tête, pour une donnée que la fédération lui donne déjà toute faite. Résultat : il
+  // n'a rien saisi, et l'app affichait « PPS non renseigné » à quelqu'un qui en avait un.
+  const today = new Date("2026-08-15T12:00:00");
+  const v = ppsVerdict({ expiresAt: "2027-03-24", obtainedAt: null }, "2026-10-25", today);
+  assert.equal(v.kind, "valide");
+  assert.equal(v.kind === "valide" && v.expiresAt, "2027-03-24");
+
+  // Si les deux sont là et se contredisent, l'IMPRIMÉE gagne : la déduction
+  // « délivrance + 12 mois » suppose que la règle n'a pas changé entre-temps.
+  const both = ppsVerdict({ expiresAt: "2027-03-24", obtainedAt: "2020-01-01" }, null, today);
+  assert.equal(both.kind, "valide", "une vieille date d'obtention ne doit pas périmer un pass valide");
+
+  // L'ancien format continue de fonctionner : les comptes enregistrés avant ce
+  // changement ne doivent pas voir leur pass disparaître.
+  const legacy = ppsVerdict({ obtainedAt: "2026-03-04" }, null, today);
+  assert.equal(legacy.kind, "valide");
+  assert.equal(legacy.kind === "valide" && legacy.expiresAt, "2027-03-04");
+
+  // Une expiration bancale ne fait pas taire un repli valable — et surtout, elle ne
+  // doit pas se PROPAGER : une date illisible produit un compte à rebours `NaN`, donc
+  // « encore NaN jours » à l'écran, avec un verdict « valide » d'apparence normale.
+  const bancal = ppsVerdict({ expiresAt: "pas-une-date", obtainedAt: "2026-03-04" }, null, today);
+  assert.equal(bancal.kind, "valide");
+  assert.equal(bancal.kind === "valide" && bancal.expiresAt, "2027-03-04", "la date illisible a été retenue au lieu du repli");
+  assert.ok(bancal.kind === "valide" && Number.isFinite(bancal.joursRestants), "compte à rebours non calculable");
+});
+
 test("les faits réglementaires ne sont écrits QU'UNE fois", () => {
   // Une adresse ou un tarif recopié dans trois composants finit par diverger — et sur un
   // sujet réglementaire, diverger veut dire afficher une information fausse.

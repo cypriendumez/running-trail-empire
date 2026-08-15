@@ -34,17 +34,20 @@ export async function POST(req: Request) {
   // Une date malformée est REFUSÉE, pas rattrapée : un « 2026-13-45 » silencieusement
   // corrigé produirait une échéance fausse, et c'est exactement ce qu'on cherche à
   // éviter — l'athlète croirait son pass valide le jour de sa course.
+  const jour = /^\d{4}-\d{2}-\d{2}$/;
+  const expiresAt = body.expiresAt ?? null;
   const obtainedAt = body.obtainedAt ?? null;
-  if (obtainedAt !== null && !/^\d{4}-\d{2}-\d{2}$/.test(obtainedAt)) {
-    return NextResponse.json({ error: "date invalide" }, { status: 400 });
+  for (const [nom, v] of [["expiresAt", expiresAt], ["obtainedAt", obtainedAt]] as const) {
+    if (v !== null && !jour.test(v)) return NextResponse.json({ error: `${nom} invalide` }, { status: 400 });
   }
-  // Une date dans le futur n'a pas de sens pour une délivrance : elle décalerait
-  // l'expiration d'autant et rendrait le verdict optimiste.
+  // Une date de DÉLIVRANCE dans le futur décalerait l'expiration d'autant et rendrait le
+  // verdict optimiste. L'expiration, elle, est par nature à venir : on ne la borne pas.
   if (obtainedAt && obtainedAt > new Date().toISOString().slice(0, 10)) {
     return NextResponse.json({ error: "date dans le futur" }, { status: 400 });
   }
 
   const status: PpsStatus = {
+    expiresAt,
     obtainedAt,
     number: typeof body.number === "string" ? body.number.trim().slice(0, 40) || null : null,
     licensed: body.licensed === true,
