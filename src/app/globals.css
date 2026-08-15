@@ -39,11 +39,35 @@
 
   ::selection { @apply bg-green-200 text-green-900; }
 
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  /* ── BARRE DE DÉFILEMENT ────────────────────────────────────────────────────
+     Sur macOS réglé sur « Afficher les barres de défilement : toujours », Chrome
+     réserve une gouttière à droite de la page. Cette gouttière est peinte par le
+     NAVIGATEUR avec le fond du document — donc en blanc — et elle apparaissait
+     comme une bande claire le long du hero sombre de la page d'accueil.
+
+     `::-webkit-scrollbar` était déjà stylé, mais les propriétés STANDARD
+     (`scrollbar-width` / `scrollbar-color`) manquaient : Firefox et les Chrome
+     récents suivent celles-là, et retombaient donc sur la barre par défaut du
+     système. On déclare les deux, avec la même teinte.
+
+     ⚠️ La gouttière elle-même reste du ressort du navigateur : on peut la rendre
+     discrète, pas la supprimer. C'est le fond du document qui la colore. */
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: theme("colors.zinc.400") transparent;
+  }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { @apply bg-transparent; }
-  ::-webkit-scrollbar-thumb { @apply bg-zinc-300 rounded-full; }
-  ::-webkit-scrollbar-thumb:hover { @apply bg-zinc-400; }
+  /* La bordure transparente + `background-clip` amincissent le pouce sans réduire
+     la zone cliquable : il reste attrapable à la souris tout en restant fin. */
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full;
+    background-color: theme("colors.zinc.400");
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover { background-color: theme("colors.zinc.500"); }
+  ::-webkit-scrollbar-corner { @apply bg-transparent; }
 }
 
 @layer components {
