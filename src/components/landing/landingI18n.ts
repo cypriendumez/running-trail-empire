@@ -39,7 +39,7 @@ const fr: LandingDict = {
       speed: { title: "AMÉLIORER SA VITESSE", subtitle: "De 4 à 12 semaines" },
       endurance: { title: "ENDURANCE DE BASE", subtitle: "De 6 semaines à 6 mois" },
       injury: { title: "REPRENDRE APRÈS BLESSURE", subtitle: "De 4 à 16 semaines" },
-      weightloss: { title: "COURIR POUR PERDRE DU POIDS", subtitle: "De 8 semaines à 12 mois" },
+      weightloss: { title: "COURIR POUR PERDRE DU POIDS", subtitle: "Au maximum 0,75 % du poids par semaine" },
     },
   },
   features: {
@@ -94,7 +94,7 @@ const en: LandingDict = {
       speed: { title: "IMPROVE YOUR SPEED", subtitle: "From 4 to 12 weeks" },
       endurance: { title: "BASE ENDURANCE", subtitle: "From 6 weeks to 6 months" },
       injury: { title: "RETURN FROM INJURY", subtitle: "From 4 to 16 weeks" },
-      weightloss: { title: "RUN TO LOSE WEIGHT", subtitle: "From 8 weeks to 12 months" },
+      weightloss: { title: "RUN TO LOSE WEIGHT", subtitle: "At most 0.75% of body weight per week" },
     },
   },
   features: {
@@ -149,7 +149,7 @@ const de: LandingDict = {
       speed: { title: "TEMPO VERBESSERN", subtitle: "Von 4 bis 12 Wochen" },
       endurance: { title: "GRUNDLAGENAUSDAUER", subtitle: "Von 6 Wochen bis 6 Monate" },
       injury: { title: "COMEBACK NACH VERLETZUNG", subtitle: "Von 4 bis 16 Wochen" },
-      weightloss: { title: "LAUFEN, UM ABZUNEHMEN", subtitle: "Von 8 Wochen bis 12 Monaten" },
+      weightloss: { title: "LAUFEN, UM ABZUNEHMEN", subtitle: "Höchstens 0,75 % des Körpergewichts pro Woche" },
     },
   },
   features: {
@@ -204,7 +204,7 @@ const es: LandingDict = {
       speed: { title: "MEJORAR TU VELOCIDAD", subtitle: "De 4 a 12 semanas" },
       endurance: { title: "RESISTENCIA DE BASE", subtitle: "De 6 semanas a 6 meses" },
       injury: { title: "VOLVER TRAS UNA LESIÓN", subtitle: "De 4 a 16 semanas" },
-      weightloss: { title: "CORRER PARA PERDER PESO", subtitle: "De 8 semanas a 12 meses" },
+      weightloss: { title: "CORRER PARA PERDER PESO", subtitle: "Como máximo 0,75 % del peso por semana" },
     },
   },
   features: {
@@ -259,7 +259,7 @@ const pt: LandingDict = {
       speed: { title: "MELHORAR A VELOCIDADE", subtitle: "De 4 a 12 semanas" },
       endurance: { title: "RESISTÊNCIA DE BASE", subtitle: "De 6 semanas a 6 meses" },
       injury: { title: "REGRESSAR DE LESÃO", subtitle: "De 4 a 16 semanas" },
-      weightloss: { title: "CORRER PARA PERDER PESO", subtitle: "De 8 semanas a 12 meses" },
+      weightloss: { title: "CORRER PARA PERDER PESO", subtitle: "No máximo 0,75 % do peso por semana" },
     },
   },
   features: {

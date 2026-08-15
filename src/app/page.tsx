@@ -28,7 +28,11 @@ const PROGRAMS: { key: string; category: string; img: string }[] = [
   { key: "semi", category: "SEMI", img: "https://images.unsplash.com/photo-1667781838690-5f32ea0ccea6?w=600&q=80&fit=crop" },
   { key: "marathon", category: "MARATHON", img: "https://images.unsplash.com/photo-1682367905664-e36b30f15b19?w=600&q=80&fit=crop" },
   { key: "trail", category: "TRAIL", img: "https://images.unsplash.com/photo-1504025468847-0e438279542c?w=600&q=80&fit=crop" },
-  { key: "beginner", category: "BEGINNER", img: "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=600&q=80&fit=crop" },
+  // Débuter : c'était un gros plan de pieds sur des marches, interchangeable avec
+  // n'importe quelle carte de n'importe quel site de sport. Remplacé par deux coureurs
+  // ensemble en plein jour — la carte doit dire « c'est accessible, et tu n'es pas
+  // seul », pas montrer un détail anatomique.
+  { key: "beginner", category: "BEGINNER", img: "https://images.unsplash.com/photo-1781726956705-038cab091bc6?w=600&q=80&fit=crop" },
   { key: "speed", category: "SPEED", img: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=600&q=80&fit=crop" },
   // Endurance : la photo montrait un coureur plié en deux, mains sur les genoux — de
   // l'épuisement, soit l'inverse exact du message d'une base aérobie. Remplacée par une
