@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
-  ArrowRight, ChevronRight, Play, Check, Menu, X,
+  ArrowRight, ChevronRight, Check, Menu, X,
   Bot, Heart, Map, Trophy, Ghost, Moon, CloudRain, ShoppingBag, BookOpen, Shield, Activity, Zap,
   type LucideIcon,
 } from "lucide-react";
@@ -19,10 +19,14 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 import { LANDING, CATEGORY_CODES } from "@/components/landing/landingI18n";
 
 // Données visuelles (non traduisibles). Les libellés viennent de LANDING[lang].
-const PROGRAMS: { key: string; category: string; img?: string; gradient?: string; label?: string }[] = [
+// Chaque programme porte une VRAIE photo. Le semi et le marathon retombaient sur un
+// aplat dégradé avec « 21.1 » et « 42.2 » écrits dessus : au milieu de six photographies,
+// les deux cartes les plus vendeuses étaient les deux seules à ressembler à un
+// emplacement vide. `img` est donc obligatoire — plus de repli silencieux possible.
+const PROGRAMS: { key: string; category: string; img: string }[] = [
   { key: "km10", category: "10KM", img: "https://images.unsplash.com/photo-1571008887538-b36bb32f4571?w=600&q=80&fit=crop" },
-  { key: "semi", category: "SEMI", gradient: "linear-gradient(135deg,#0f172a,#1e293b 60%,#059669)", label: "21.1" },
-  { key: "marathon", category: "MARATHON", gradient: "linear-gradient(135deg,#0a0a0a,#1c1917 55%,#047857)", label: "42.2" },
+  { key: "semi", category: "SEMI", img: "https://images.unsplash.com/photo-1667781838690-5f32ea0ccea6?w=600&q=80&fit=crop" },
+  { key: "marathon", category: "MARATHON", img: "https://images.unsplash.com/photo-1682367905664-e36b30f15b19?w=600&q=80&fit=crop" },
   { key: "trail", category: "TRAIL", img: "https://images.unsplash.com/photo-1504025468847-0e438279542c?w=600&q=80&fit=crop" },
   { key: "beginner", category: "BEGINNER", img: "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=600&q=80&fit=crop" },
   { key: "speed", category: "SPEED", img: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=600&q=80&fit=crop" },
@@ -32,7 +36,18 @@ const PROGRAMS: { key: string; category: string; img?: string; gradient?: string
 
 const FEATURE_ICONS: LucideIcon[] = [Bot, Heart, Ghost, Map, Zap, Moon, Activity, CloudRain, BookOpen, Trophy, ShoppingBag, Shield];
 
-const STAT_VALUES = ["10k+", "4.9★", "98%", "17k+"];
+// ── CHIFFRES DU BANDEAU — chacun est VÉRIFIABLE, aucun n'est décoratif ──────
+//  « 10k+ coureurs actifs », « 4,9 ★ de note moyenne » et « 98 % de satisfaction »
+//  ont été retirés : la base compte UN profil, et il n'existe ni note ni enquête de
+//  satisfaction — trois chiffres inventés sur quatre, affichés au-dessus de la ligne
+//  de flottaison d'un site qui vend de la mesure honnête.
+//
+//  Ce qui reste se recompte :
+//   · 14 520 courses portent une date à venir (17 027 en base, dont 2 507 passées) ;
+//   · data/parcours_certifies.json contient 15 708 parcours vérifiés par le crawl ;
+//   · buildWeekPlan pose 7 jours de plan glissant ;
+//   · .github/workflows/sync-coach.yml tourne toutes les 10 minutes.
+const STAT_VALUES = ["14 000+", "15 700", "7 j", "10 min"];
 const SYNC = ["Garmin", "Coros", "Strava", "Suunto", "Polar"];
 const PLAN_VISUALS = [
   { price: "0€", href: "/signup", featured: false },
@@ -59,7 +74,7 @@ export default function LandingPage() {
   const navLink = solidNav ? "hover:text-zinc-900 transition-colors" : "hover:text-white transition-colors";
 
   const filtered = activeCategory === "ALL" ? PROGRAMS : PROGRAMS.filter((p) => p.category === activeCategory);
-  const stats = [L.stats.runners, L.stats.rating, L.stats.satisfaction, L.stats.races];
+  const stats = [L.stats.races, L.stats.routes, L.stats.plan, L.stats.replan];
 
   return (
     <div className="min-h-screen bg-white font-sans text-zinc-900 antialiased">
@@ -134,10 +149,7 @@ export default function LandingPage() {
 
         <Container className="relative z-10 pb-20 pt-28 sm:pb-24">
           <div className="max-w-2xl">
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-white ring-1 ring-inset ring-white/20 backdrop-blur">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#34d399]" /> {L.hero.badge}
-            </span>
-            <h1 className="mt-5 text-5xl font-bold leading-[1.02] tracking-tight text-white sm:text-6xl lg:text-7xl">
+            <h1 className="text-5xl font-bold leading-[1.02] tracking-tight text-white sm:text-6xl lg:text-7xl">
               {L.hero.titleA}<br />{L.hero.titleB}<span className="text-[#34d399]">{L.hero.accent}</span>.
             </h1>
             <p className="mt-6 max-w-lg text-lg leading-relaxed text-white/75">
@@ -146,9 +158,6 @@ export default function LandingPage() {
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link href="/signup" className="inline-flex items-center gap-2 rounded-xl bg-white px-7 py-3.5 text-base font-semibold text-zinc-900 transition-colors hover:bg-white/90">
                 {L.hero.ctaPrimary} <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link href="/login" className="inline-flex items-center gap-2 rounded-xl px-7 py-3.5 text-base font-semibold text-white ring-1 ring-inset ring-white/30 transition-colors hover:bg-white/10">
-                <Play className="h-4 w-4" /> {L.hero.ctaSecondary}
               </Link>
             </div>
             <div className="mt-10 flex flex-wrap items-center gap-x-5 gap-y-2">
@@ -207,15 +216,8 @@ export default function LandingPage() {
               const it = L.programs.items[p.key];
               return (
                 <Link href="/signup" key={p.key} className="group relative block aspect-[3/4] overflow-hidden rounded-2xl">
-                  {p.img ? (
-                    <img src={p.img} alt={it.title} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
-                  ) : (
-                    <div className="h-full w-full transition-transform duration-700 group-hover:scale-105" style={{ background: p.gradient }} />
-                  )}
+                  <img src={p.img} alt={it.title} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-                  {p.label && (
-                    <span className="absolute left-5 top-5 font-sport text-5xl leading-none text-white/25">{p.label}</span>
-                  )}
                   <div className="absolute inset-x-0 bottom-0 p-6">
                     <h3 className="text-2xl font-bold uppercase leading-tight text-white">{it.title}</h3>
                     <p className="mt-1 text-xs font-medium uppercase tracking-wider text-white/60">{it.subtitle}</p>
