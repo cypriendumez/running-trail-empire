@@ -2407,6 +2407,27 @@ test("la chaîne sync → analyse → replanification → montre n'existe qu'à 
   }
 });
 
+console.log("\nTRADUCTIONS — une clé manquante s'affiche telle quelle, sans rien casser");
+test("le profil traduit TOUTES les clés qu'il utilise, dans les 5 langues", () => {
+  // Défaut vu en production : l'écran Profil affichait « double.title » et
+  // « privacy.private » en toutes lettres. Les clés avaient été ajoutées au
+  // dictionnaire GLOBAL, alors que ce composant porte le SIEN, en interne.
+  // Rien n'avait planté : `tr()` retombe sur la clé brute, donc le défaut s'affiche
+  // sans jamais se signaler — et il aura fallu une capture d'écran pour le voir.
+  const src = readFileSync("src/components/profile/ProfileSettings.tsx", "utf8");
+  const utilisees = [...new Set([...src.matchAll(/\btr\("([^"]+)"/g)].map((m) => m[1]))];
+  assert.ok(utilisees.length > 20, `seulement ${utilisees.length} clés trouvées : l'extraction a dû casser`);
+  // Le dictionnaire interne : on vérifie chaque langue, pas seulement le français.
+  const blocs = src.split(/^\s{2}(fr|en|de|es|pt):\s*\{/m);
+  const parLangue: Record<string, string> = {};
+  for (let i = 1; i < blocs.length; i += 2) parLangue[blocs[i]] = blocs[i + 1];
+  assert.equal(Object.keys(parLangue).length, 5, "les 5 langues doivent être présentes");
+  for (const [lang, bloc] of Object.entries(parLangue)) {
+    const manquantes = utilisees.filter((k) => !bloc.includes(`"${k}":`));
+    assert.deepEqual(manquantes, [], `${lang} : clés absentes du dictionnaire → ${manquantes.join(", ")}`);
+  }
+});
+
 console.log("\nDOUBLES SÉANCES — scinder, jamais empiler");
 const dbl = (o: Partial<Parameters<typeof etatDouble>[0]> = {}) => etatDouble({
   optIn: true, weeklyKm: 80, runYears: 5, readiness: "vert", pains: [], taper: false, ...o,
