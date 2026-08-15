@@ -1523,7 +1523,13 @@ test("le calendrier n'affiche AUCUN type brut", () => {
   const src = codeOf("src/components/training/CalendarView.tsx");
   assert.ok(!/>\{s\.type\}</.test(src) && !/\{coach\.type\}/.test(src),
     "un type de séance est rendu brut : il s'affichera en français dans les 5 langues");
-  assert.ok(/libelleType\(/.test(src), "le calendrier doit passer par libelleType");
+  // Le calendrier affiche DEUX types : celui de la séance et celui de la prescription du
+  // coach. Chercher « libelleType( » n'importe où laissait passer la régression de l'un
+  // des deux — et c'était exactement le défaut d'origine, un seul des deux affichages
+  // restant en français dans les cinq langues.
+  assert.equal((src.match(/libelleType\(/g) ?? []).length, 2, "les DEUX types affichés doivent être traduits");
+  assert.ok(/libelleType\(s\.type/.test(src), "le type de la séance n'est plus traduit");
+  assert.ok(/libelleType\(coach\.type/.test(src), "le type prescrit par le coach n'est plus traduit");
 });
 
 test("une langue inconnue retombe sur le français, jamais sur du vide", () => {
@@ -2027,6 +2033,11 @@ test("la route mémorise en base et passe par la chaîne de repli", () => {
   assert.ok(/generateContent\(/.test(code), "l'appel doit passer par la chaîne de repli commune");
   assert.ok(!/new Map\(/.test(code),
     "un cache mémoire ne survit pas à une instance Vercel et ignore les changements de contexte");
+  // La constante apparaît trois fois : import, lecture, écriture. Chercher son nom seul
+  // laissait supprimer l'ÉCRITURE — le cache n'aurait plus jamais été rempli, donc plus
+  // jamais servi, sans que rien ne rougisse.
+  assert.ok(/\.eq\("type", SESSION_CACHE_TYPE\)/.test(code), "le cache n'est plus RELU");
+  assert.ok(/type: SESSION_CACHE_TYPE/.test(code), "le cache n'est plus ÉCRIT");
   assert.ok(/SESSION_CACHE_TYPE/.test(code) && /fingerprint\(/.test(code),
     "la mémorisation doit être en base et empreinte au contexte");
   // La lecture du cache doit précéder la construction du contexte : celle-ci coûte une
@@ -2070,7 +2081,10 @@ test("la synchronisation importe les traces des NOUVELLES séances", () => {
   // athlète qui n'ouvre jamais l'app n'avait donc jamais de trace. L'invariant est le
   // même, l'endroit a changé : c'est le test qui devait suivre, pas le code reculer.
   const code = codeOf("src/lib/intervals/syncAndCoach.ts");
-  assert.ok(/importMissingTracks/.test(code), "la chaîne doit importer les traces manquantes");
+  // Deux occurrences : la déstructuration de l'import dynamique, et l'appel. Chercher le
+  // nom seul laissait supprimer l'APPEL en gardant l'import — les traces n'auraient plus
+  // jamais été importées, test au vert.
+  assert.ok(/importMissingTracks\(admin,/.test(code), "la chaîne importe le module mais ne l'APPELLE plus");
   // Best-effort : une trace indisponible ne doit jamais faire échouer la synchro.
   const i = code.indexOf("importMissingTracks");
   assert.ok(/try \{/.test(code.slice(Math.max(0, i - 400), i)), "l'import doit être protégé");
@@ -2084,7 +2098,9 @@ test("une séance sans GPS est mémorisée comme telle", () => {
   // Sinon la synchro la redemanderait à intervals.icu à chaque passage, indéfiniment.
   const code = codeOf("src/lib/intervals/tracks.ts");
   assert.ok(/has_gps: false/.test(code), "une séance de tapis doit être enregistrée sans GPS");
-  assert.ok(/data2/.test(code), "les longitudes vivent dans data2, pas dans des paires");
+  // `data2` figure aussi dans l'annotation de type : le chercher seul laissait supprimer
+  // la LECTURE du champ sans que le test bronche.
+  assert.ok(/latlng\?\.data2/.test(code), "les longitudes doivent être LUES dans data2, pas seulement déclarées");
 });
 
 test("le préchauffage du survol ne se voit JAMAIS", () => {
@@ -2105,7 +2121,11 @@ test("le survol est piloté par une HORLOGE, pas par un enchaînement d'événem
   // l'étape 0 : bouton en pause, barre à zéro, aucune erreur. Le temps écoulé, lui,
   // ne se perd pas.
   const code = codeOf("src/components/segments/Flyover.tsx");
-  assert.ok(/requestAnimationFrame\(boucle\)/.test(code), "l'animation doit être pilotée par le temps");
+  // Deux sites indispensables : celui qui DÉMARRE l'animation et celui qui la relance à
+  // chaque image. En supprimer un laissait l'autre satisfaire le motif — sans le premier
+  // rien ne part, sans le second l'animation dure une seule image.
+  assert.equal((code.match(/requestAnimationFrame\(boucle\)/g) ?? []).length, 2,
+    "il faut le démarrage ET la relance de boucle : l'un des deux a disparu");
   assert.ok(!/once\("moveend"/.test(code), "plus aucun enchaînement sur moveend");
   // `depuis` a été renommé `depart0` en devenant une valeur ASSAINIE (une reprise ne
   // peut plus partir d'une position non finie). L'invariant est le même : la reprise
@@ -2144,7 +2164,9 @@ test("le survol affiche un ciel et un marqueur de position", () => {
   // Sans ciel, le haut du cadre est un vide gris une fois la caméra relevée. Sans
   // marqueur, sur une vue large, on ne sait plus où l'on se trouve sur la trace.
   const code = codeOf("src/components/segments/Flyover.tsx");
-  assert.ok(/setSky/.test(code), "le dégradé atmosphérique fait lire l'image comme une vue aérienne");
+  // `setSky` apparaît deux fois sur la même ligne : dans le typage de la conversion et
+  // dans l'appel. Seul l'appel dessine quelque chose.
+  assert.ok(/\.setSky\?\.\(/.test(code), "le dégradé atmosphérique n'est plus APPLIQUÉ (un type ne dessine rien)");
   assert.ok(/addSource\("position"/.test(code) && /position-point/.test(code), "un marqueur doit suivre la progression");
   // Le marqueur doit être mis à jour AVANT le mouvement, sinon il traîne d'une étape.
   const boucle = code.slice(code.indexOf("function boucle"), code.indexOf("function prechauffer"));
@@ -2156,7 +2178,10 @@ test("l'allure du survol est celle du MOMENT, pas la moyenne figée", () => {
   // Le bandeau affichait la moyenne de toute la sortie à un emplacement qui suggère
   // une valeur instantanée — l'altitude et la distance, elles, défilaient.
   const code = codeOf("src/components/segments/Flyover.tsx");
-  assert.ok(/paceAct/.test(code), "une allure instantanée doit exister");
+  // Le calcul et l'affichage, séparément : cinq occurrences rendaient l'assertion
+  // insensible à la disparition de l'une d'elles.
+  assert.ok(/const paceAct = /.test(code), "l'allure instantanée n'est plus CALCULÉE");
+  assert.ok(/valeur=\{paceTexte\}/.test(code), "l'allure instantanée n'est plus AFFICHÉE");
   assert.ok(/paceAct != null \? "Allure" : "Allure moy\."/.test(code),
     "à défaut d'allure instantanée, le libellé doit DIRE que c'est une moyenne");
 });
@@ -4109,7 +4134,16 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     // garderait une prescription périmée, donc un mauvais verdict.
     assert.ok(/coach_session"\)\.gte\("data->>date", streakFrom\)\s*\n?\s*\.order\("created_at", \{ ascending: false \}\)/.test(page),
       "les prescriptions de la série doivent être triées par created_at décroissant");
-    assert.ok(/oneSessionPerSlot\(/.test(page), "la déduplication par créneau n'est pas appliquée");
+    // ⚠️ Le tableau de bord appelle `oneSessionPerSlot` DEUX fois : pour la prochaine
+    // séance affichée, et pour les prescriptions de la série. Chercher le nom seul
+    // laissait retirer celui de la série sans rougir.
+    assert.ok(/prescriptions: oneSessionPerSlot\(/.test(page),
+      "les prescriptions de la série ne sont plus dédoublonnées par créneau");
+    // Et l'AUTRE appel — celui qui choisit la prochaine séance affichée — doit rester,
+    // sinon le tableau de bord réafficherait les doublons du plan republié. Deux appels,
+    // deux rôles : on fige le compte plutôt que la simple présence du nom.
+    assert.equal((page.match(/oneSessionPerSlot\(/g) ?? []).length, 2,
+      "le tableau de bord doit dédoublonner DEUX fois : la prochaine séance, et la série");
   });
 }
 
