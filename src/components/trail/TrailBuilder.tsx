@@ -600,7 +600,13 @@ export function TrailBuilder() {
         toast.success(d["t.savedDb"]);
         loadSavedRoutes();
       } else {
-        // Save to localStorage as fallback
+        // ── REPLI LOCAL — ET ON LE DIT ─────────────────────────────────────────
+        // Ce repli a masqué pendant des mois que la table `user_routes` n'avait
+        // jamais été créée : l'écriture échouait, le parcours partait dans le
+        // `localStorage` du navigateur, et l'athlète lisait un message de succès.
+        // Ses parcours « enregistrés » vivaient donc dans un seul navigateur —
+        // perdus au vidage du cache, invisibles depuis le téléphone, absents de
+        // toute sauvegarde. Un repli qui se félicite est pire qu'une erreur franche.
         const routes = JSON.parse(localStorage.getItem("trail_routes") || "[]");
         routes.unshift({
           id: Date.now().toString(),
@@ -614,7 +620,8 @@ export function TrailBuilder() {
         });
         localStorage.setItem("trail_routes", JSON.stringify(routes.slice(0, 20)));
         setSavedRoutes(routes);
-        toast.success(d["t.savedLocal"]);
+        // `warning` et non `success` : rien n'a été enregistré en ligne.
+        toast.warning(d["t.savedLocal"], { duration: 8000 });
       }
     } catch {
       toast.error(d["t.saveErr"]);

@@ -2682,6 +2682,26 @@ test("toute vue exposée est FERMÉE au rôle anon, nommément", () => {
     }
   }
 });
+test("un repli local ne se félicite JAMAIS", () => {
+  // Défaut réel, tenu des mois : la table `user_routes` n'avait jamais été créée.
+  // L'écriture échouait, le parcours partait dans le localStorage du navigateur, et
+  // l'athlète lisait « Parcours sauvegardé localement ! » — un succès. Ses parcours
+  // vivaient donc dans un seul navigateur : perdus au vidage du cache, invisibles
+  // depuis le téléphone, absents de toute sauvegarde. Un repli silencieux qui se
+  // félicite est pire qu'une erreur franche.
+  const code = codeOf("src/components/trail/TrailBuilder.tsx");
+  const i = code.indexOf('d["t.savedLocal"]');
+  assert.ok(i > 0, "le message de repli local a disparu");
+  assert.ok(/toast\.warning/.test(code.slice(i - 60, i)), "le repli local est annoncé comme un succès");
+  // Et le texte lui-même doit dire que rien n'est parti en ligne, dans les 5 langues.
+  const i18n = readFileSync("src/components/trail/trailI18n.ts", "utf8");
+  const messages = [...i18n.matchAll(/"t\.savedLocal": "([^"]+)"/g)].map((m) => m[1]);
+  assert.equal(messages.length, 5, "les 5 langues doivent avoir le message");
+  for (const m of messages) {
+    assert.ok(/⚠️/.test(m), `message de repli sans avertissement : « ${m} »`);
+    assert.ok(!/^(Parcours sauvegardé localement|Route saved locally)/.test(m), `message trop rassurant : « ${m} »`);
+  }
+});
 test("les migrations récentes ne contiennent AUCUNE instruction DROP", () => {
   // L'éditeur SQL de Supabase signale toute instruction DROP comme destructive et
   // impose une confirmation « Potential issue detected ». Cette migration a été écrite
