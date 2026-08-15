@@ -27,6 +27,8 @@ import { heatAdvice, windAdvice, altitudeLossPct, heatAcclimation } from "../src
 import { parseReps, parsePaceSec, stepsForType, warmCoolMin, buildWorkoutDescription } from "../src/lib/watch/intervals";
 import { buildWeekPlan, CONFIRMED_DAYS } from "../src/lib/ai/autoPlan";
 import { tr, ALL_LANGS, nRaw } from "../src/lib/i18n/multi";
+import { ppsExpiration, ppsVerdict, ppsDemandeAction, PPS_URL, PPS_PRIX_EUR, PPS_VALIDITE_MOIS } from "../src/lib/pps/status";
+import { PPS_T } from "../src/lib/pps/ppsI18n";
 import { PLAN_T } from "../src/lib/ai/planI18n";
 import { QUALITE_T } from "../src/lib/ai/qualityI18n";
 import { stripProfileSecrets } from "../src/lib/profile/safe";
@@ -1540,6 +1542,99 @@ test("aucune chaîne parallèle ne recalcule la VMA dans son coin", () => {
     // `vmaFromVo2max` ne doit plus être appelée hors de la fonction commune : c'est
     // exactement ainsi qu'une chaîne parallèle réapparaît.
     assert.ok(!/vmaFromVo2max\(/.test(src), `${f} rebâtit une chaîne de VMA à la main`);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+console.log("\nPPS — le pass ne sert à rien s'il expire AVANT la course");
+// Depuis le 1er septembre 2024, un majeur non licencié ne peut plus s'inscrire à une
+// course chronométrée en France sans PPS. Depuis janvier 2026 il dure UN AN — or une
+// préparation marathon en dure six. Le piège n'est donc pas d'oublier de le faire :
+// c'est de le faire trop tôt et de le découvrir la veille du retrait des dossards.
+
+test("l'expiration tombe douze mois après la délivrance, pas 365 jours", () => {
+  // « +365 jours » décalerait l'échéance d'un jour sur une année bissextile — et c'est
+  // exactement un jour d'écart qui fait basculer un verdict à la veille d'une course.
+  assert.equal(ppsExpiration("2026-03-04"), "2027-03-04");
+  assert.equal(ppsExpiration("2028-02-29"), "2029-03-01", "année bissextile : 29 février + 12 mois");
+  assert.equal(ppsExpiration(null), null);
+  assert.equal(ppsExpiration("pas-une-date"), null, "une date bancale ne produit pas d'échéance inventée");
+});
+
+test("le verdict répond pour LE JOUR DE LA COURSE, pas pour aujourd'hui", () => {
+  const today = new Date("2026-08-15T12:00:00");
+  const status = { obtainedAt: "2026-03-04" };   // expire le 04/03/2027
+  // Course AVANT l'expiration : rien à signaler.
+  const ok = ppsVerdict(status, "2027-02-01", today);
+  assert.equal(ok.kind, "valide");
+  // Course APRÈS l'expiration : c'est le cas qui coûte un dossard.
+  const ko = ppsVerdict(status, "2027-04-25", today);
+  assert.equal(ko.kind, "expireAvantCourse");
+  assert.equal(ko.kind === "expireAvantCourse" && ko.expiresAt, "2027-03-04");
+});
+
+test("sans date de course, on ne prétend pas répondre à la question de la course", () => {
+  const v = ppsVerdict({ obtainedAt: "2026-03-04" }, null, new Date("2026-08-15T12:00:00"));
+  assert.equal(v.kind, "valide");
+  assert.equal(v.kind === "valide" && v.joursRestants, 201);
+});
+
+test("un pass déjà périmé est annoncé périmé, même sans course prévue", () => {
+  assert.equal(ppsVerdict({ obtainedAt: "2024-01-10" }, null, new Date("2026-08-15T12:00:00")).kind, "expire");
+});
+
+test("une course DÉJÀ PASSÉE ne déclenche pas d'alerte", () => {
+  // Alarmer quelqu'un sur une échéance qu'il a déjà franchie, c'est le meilleur moyen
+  // de lui apprendre à ignorer nos alertes.
+  const v = ppsVerdict({ obtainedAt: "2026-03-04" }, "2025-05-01", new Date("2026-08-15T12:00:00"));
+  assert.equal(v.kind, "valide");
+});
+
+test("un licencié FFA n'est jamais embêté avec le PPS", () => {
+  // Sa licence en tient lieu. Lui réclamer un pass qu'il n'a pas à prendre, c'est le
+  // pousser à payer 5 € pour rien.
+  const v = ppsVerdict({ obtainedAt: null, licensed: true }, "2027-04-25", new Date("2026-08-15T12:00:00"));
+  assert.equal(v.kind, "licencie");
+  assert.equal(ppsDemandeAction(v), false);
+});
+
+test("rien de déclaré = « inconnu », et on le DIT au lieu de le deviner", () => {
+  const v = ppsVerdict(null, "2027-04-25", new Date("2026-08-15T12:00:00"));
+  assert.equal(v.kind, "inconnu");
+  assert.equal(ppsDemandeAction(v), true, "un PPS non renseigné doit provoquer une action");
+});
+
+test("les faits réglementaires ne sont écrits QU'UNE fois", () => {
+  // Une adresse ou un tarif recopié dans trois composants finit par diverger — et sur un
+  // sujet réglementaire, diverger veut dire afficher une information fausse.
+  assert.equal(PPS_URL, "https://pps.athle.fr");
+  assert.equal(PPS_PRIX_EUR, 5);
+  assert.equal(PPS_VALIDITE_MOIS, 12);
+  // On vise la CONSTANTE (avec protocole) : un libellé qui cite « pps.athle.fr » en
+  // toutes lettres est du texte, pas une seconde source de vérité.
+  const dur = execSync(`grep -rl 'https://pps.athle.fr' src --include='*.ts' --include='*.tsx' || true`)
+    .toString().trim().split("\n").filter(Boolean);
+  assert.deepEqual(dur, ["src/lib/pps/status.ts"],
+    `l'adresse officielle est recopiée hors du module PPS : ${dur.join(", ")}`);
+});
+
+test("les 5 langues disent la même chose, et aucune ne promet une aptitude", () => {
+  // RÈGLE DE RÉDACTION : nous ne vérifions RIEN auprès de la fédération. Aucun texte ne
+  // doit laisser croire à l'athlète qu'il est « apte » ou « en règle » parce que notre
+  // pastille est verte — l'autorité, c'est l'organisateur.
+  const interdits = /\bapte\b|\ben règle\b|autoris[ée] à courir|cleared to race|fit to race/i;
+  for (const l of ALL_LANGS) {
+    const T = PPS_T[l];
+    assert.ok(T, `langue ${l} absente du dictionnaire PPS`);
+    for (const [k, v] of Object.entries(T)) {
+      const texte = typeof v === "function" ? (v as (...a: never[]) => string)(5 as never, 12 as never)
+        : Array.isArray(v) ? v.join(" ") : String(v);
+      assert.ok(texte.trim().length > 0, `${l}/${k} : vide`);
+      assert.ok(!/undefined|\$\{/.test(texte), `${l}/${k} : reste technique — « ${texte.slice(0, 80)} »`);
+      assert.ok(!interdits.test(texte), `${l}/${k} promet une aptitude : « ${texte.slice(0, 100) }»`);
+    }
+    assert.equal(T.etapes.length, 4, `${l} : le parcours officiel compte 4 étapes`);
+    assert.ok(T.avertissement.length > 30, `${l} : l'avertissement « on ne vérifie rien » doit être explicite`);
   }
 });
 

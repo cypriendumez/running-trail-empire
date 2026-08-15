@@ -5,6 +5,7 @@ import { RacesHub } from "@/components/races/RacesHub";
 import { fmtDistance } from "@/lib/units";
 import { Flag } from "lucide-react";
 import { normLang } from "@/lib/i18n/translations";
+import type { PpsStatus } from "@/lib/pps/status";
 
 export const metadata = { title: "Courses France" };
 
@@ -42,12 +43,16 @@ export default async function RacesPage({ searchParams }: { searchParams: Promis
   let planned: { id: string; name: string; location: string; distanceKm: number | null; date: string }[] = [];
   let units: "metric" | "imperial" = "metric";
   let lang = "fr";
+  // État du PPS : c'est sur CETTE page qu'on s'inscrit, donc là qu'il doit se rappeler.
+  let pps: PpsStatus | null = null;
   if (user) {
-    const [{ data }, { data: settingsRow }, { data: profileRow }] = await Promise.all([
+    const [{ data }, { data: settingsRow }, { data: profileRow }, { data: ppsRow }] = await Promise.all([
       sb.from("notifications").select("id, title, data").eq("user_id", user.id).eq("type", "planned_race").order("created_at", { ascending: false }).limit(50),
       sb.from("notifications").select("data").eq("user_id", user.id).eq("type", "user_settings").maybeSingle(),
       sb.from("profiles").select("preferred_language").eq("id", user.id).single(),
+      sb.from("notifications").select("data").eq("user_id", user.id).eq("type", "pps_status").maybeSingle(),
     ]);
+    pps = (ppsRow?.data ?? null) as PpsStatus | null;
     units = String(((settingsRow?.data ?? {}) as Record<string, unknown>).unitSystem ?? "metric") === "imperial" ? "imperial" : "metric";
     lang = normLang(profileRow?.preferred_language ?? "fr");
     planned = (data ?? []).map((r) => {
@@ -92,7 +97,7 @@ export default async function RacesPage({ searchParams }: { searchParams: Promis
           </div>
         </div>
       )}
-      <RacesHub races={(initialRaces ?? []) as never[]} totalCount={totalCount ?? 0} units={units} planned={planned} initialSearch={q ?? ""} />
+      <RacesHub races={(initialRaces ?? []) as never[]} totalCount={totalCount ?? 0} units={units} planned={planned} initialSearch={q ?? ""} pps={pps} />
     </>
   );
 }

@@ -13,7 +13,7 @@ type Dict = Record<string, string>;
 
 export const T: Record<Lang, Dict> = {
   fr: {
-    "nav.dashboard": "Tableau de bord", "nav.calendar": "Calendrier", "nav.races": "Courses",
+    "nav.dashboard": "Tableau de bord", "nav.calendar": "Calendrier", "nav.pps": "PPS course", "nav.races": "Courses",
     "nav.trail": "Trail Builder", "nav.ghost": "Ghost Runner", "nav.courses": "Cours",
     "nav.health": "Santé", "nav.messaging": "Messagerie", "nav.sync": "Sync Montre",
     "nav.flyover": "Survol 3D", "nav.heatmap": "Carte de chaleur", "nav.segments": "Segments", "nav.performances": "Mes activités", "nav.trophies": "Vitrine", "nav.leagues": "Ligues", "nav.shop": "Boutique", "nav.clubs": "Clubs & Défis", "nav.community": "Le Club", "nav.profile": "Profil",
@@ -207,7 +207,7 @@ export const T: Record<Lang, Dict> = {
     "renfo.gym.b4.e3.name": "Équilibre Bosu", "renfo.gym.b4.e3.dose": "3 × 30 s", "renfo.gym.b4.e3.cue": "Debout sur un Bosu, stabilise. Proprioception avancée.",
   },
   en: {
-    "nav.dashboard": "Dashboard", "nav.calendar": "Calendar", "nav.races": "Races",
+    "nav.dashboard": "Dashboard", "nav.calendar": "Calendar", "nav.pps": "Race health pass", "nav.races": "Races",
     "nav.trail": "Trail Builder", "nav.ghost": "Ghost Runner", "nav.courses": "Lessons",
     "nav.health": "Health", "nav.messaging": "Messages", "nav.sync": "Watch Sync",
     "nav.flyover": "3D Flyover", "nav.heatmap": "Heatmap", "nav.segments": "Segments", "nav.performances": "My activities", "nav.trophies": "Trophies", "nav.leagues": "Leagues", "nav.shop": "Shop", "nav.clubs": "Clubs & Challenges", "nav.community": "The Club", "nav.profile": "Profile",
@@ -401,7 +401,7 @@ export const T: Record<Lang, Dict> = {
     "renfo.gym.b4.e3.name": "Bosu balance", "renfo.gym.b4.e3.dose": "3 × 30 s", "renfo.gym.b4.e3.cue": "Standing on a Bosu, stabilise. Advanced proprioception.",
   },
   de: {
-    "nav.dashboard": "Übersicht", "nav.calendar": "Kalender", "nav.races": "Rennen",
+    "nav.dashboard": "Übersicht", "nav.calendar": "Kalender", "nav.pps": "Gesundheitspass", "nav.races": "Rennen",
     "nav.trail": "Trail Builder", "nav.ghost": "Ghost Runner", "nav.courses": "Kurse",
     "nav.health": "Gesundheit", "nav.messaging": "Nachrichten", "nav.sync": "Uhr-Sync",
     "nav.flyover": "3D-Überflug", "nav.heatmap": "Heatmap", "nav.segments": "Segmente", "nav.performances": "Meine Aktivitäten", "nav.trophies": "Trophäen", "nav.leagues": "Ligen", "nav.shop": "Shop", "nav.clubs": "Clubs & Challenges", "nav.community": "Der Club", "nav.profile": "Profil",
@@ -595,7 +595,7 @@ export const T: Record<Lang, Dict> = {
     "renfo.gym.b4.e3.name": "Bosu-Gleichgewicht", "renfo.gym.b4.e3.dose": "3 × 30 s", "renfo.gym.b4.e3.cue": "Auf einem Bosu stehen, stabilisieren. Fortgeschrittene Propriozeption.",
   },
   es: {
-    "nav.dashboard": "Panel", "nav.calendar": "Calendario", "nav.races": "Carreras",
+    "nav.dashboard": "Panel", "nav.calendar": "Calendario", "nav.pps": "Pase de salud", "nav.races": "Carreras",
     "nav.trail": "Trail Builder", "nav.ghost": "Ghost Runner", "nav.courses": "Cursos",
     "nav.health": "Salud", "nav.messaging": "Mensajes", "nav.sync": "Sincronizar reloj",
     "nav.flyover": "Vuelo 3D", "nav.heatmap": "Mapa de calor", "nav.segments": "Segmentos", "nav.performances": "Mis actividades", "nav.trophies": "Vitrina", "nav.leagues": "Ligas", "nav.shop": "Tienda", "nav.clubs": "Clubes y retos", "nav.community": "El Club", "nav.profile": "Perfil",
@@ -789,7 +789,7 @@ export const T: Record<Lang, Dict> = {
     "renfo.gym.b4.e3.name": "Equilibrio en Bosu", "renfo.gym.b4.e3.dose": "3 × 30 s", "renfo.gym.b4.e3.cue": "De pie sobre un Bosu, estabiliza. Propiocepción avanzada.",
   },
   pt: {
-    "nav.dashboard": "Painel", "nav.calendar": "Calendário", "nav.races": "Provas",
+    "nav.dashboard": "Painel", "nav.calendar": "Calendário", "nav.pps": "Passe de saúde", "nav.races": "Provas",
     "nav.trail": "Trail Builder", "nav.ghost": "Ghost Runner", "nav.courses": "Aulas",
     "nav.health": "Saúde", "nav.messaging": "Mensagens", "nav.sync": "Sincronizar relógio",
     "nav.flyover": "Sobrevoo 3D", "nav.heatmap": "Mapa de calor", "nav.segments": "Segmentos", "nav.performances": "As minhas atividades", "nav.trophies": "Vitrine", "nav.leagues": "Ligas", "nav.shop": "Loja", "nav.clubs": "Clubes e desafios", "nav.community": "O Clube", "nav.profile": "Perfil",

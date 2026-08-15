@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, MapPin, Mountain, Heart, ShoppingBag,
   User, Trophy, Settings, LogOut, ChevronLeft,
-  Ghost, Watch, GraduationCap, CalendarDays, MessagesSquare, Newspaper, Crown, Medal, Users, Target,
+  Ghost, Watch, GraduationCap, CalendarDays, MessagesSquare, Newspaper, Crown, Medal, Users, Target, ShieldCheck,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -26,6 +26,9 @@ const groups: { titleKey: string | null; items: { href: string; icon: typeof Lay
     items: [
       { href: "/dashboard/calendrier", icon: CalendarDays, tk: "nav.calendar" },
       { href: "/dashboard/races", icon: MapPin, tk: "nav.races" },
+      // Juste SOUS « Courses » : le PPS ne se cherche pas pour lui-même, on y pense au
+      // moment de s'inscrire. Le voisinage fait la moitié du travail de découverte.
+      { href: "/dashboard/pps", icon: ShieldCheck, tk: "nav.pps" },
       { href: "/dashboard/trail", icon: Mountain, tk: "nav.trail" },
       { href: "/dashboard/ghost-runner", icon: Ghost, tk: "nav.ghost" },
       { href: "/dashboard/cours", icon: GraduationCap, tk: "nav.courses" },

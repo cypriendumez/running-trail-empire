@@ -10,6 +10,9 @@ import { fmtDistance, type UnitSystem } from "@/lib/units";
 import { correctedRaceType } from "@/lib/raceType";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { RX, fillR } from "./racesI18n";
+import { PpsStatusCard } from "@/components/pps/PpsStatusCard";
+import { PPS_T } from "@/lib/pps/ppsI18n";
+import { ppsVerdict, type PpsStatus } from "@/lib/pps/status";
 
 // La carte (mapbox-gl + leaflet) est LOURDE : on la charge à la demande (quand l'utilisateur
 // ouvre la carte), pas au chargement de la page → liste des courses bien plus rapide.
@@ -64,7 +67,7 @@ export type PlannedRace = { id: string; name: string; location: string; distance
 
 const normName = (s: string) => (s || "").toLowerCase().trim().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
-export function RacesHub({ races: initialRaces, totalCount, units = "metric", planned: plannedProp = [], initialSearch = "" }: { races: Race[]; totalCount?: number; units?: UnitSystem; planned?: PlannedRace[]; initialSearch?: string }) {
+export function RacesHub({ races: initialRaces, totalCount, units = "metric", planned: plannedProp = [], initialSearch = "", pps = null }: { races: Race[]; totalCount?: number; units?: UnitSystem; planned?: PlannedRace[]; initialSearch?: string; pps?: PpsStatus | null }) {
   const { lang } = useT();
   const d = RX[lang] ?? RX.fr;
   const tr = (k: string, p?: Record<string, string | number>) => fillR(d[k] ?? k, p);
@@ -182,8 +185,25 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
 
   const handleFilterChange = useCallback((fn: () => void) => { fn(); setPage(0); }, []);
 
+  // Le bandeau PPS n'apparaît QUE s'il y a quelque chose à faire : rappeler « tout va
+  // bien » à chaque visite est le meilleur moyen de rendre l'alerte invisible le jour
+  // où elle compte. On le confronte à la PROCHAINE course planifiée, pas à aujourd'hui.
+  const prochaineCourse = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return plannedProp.map((p) => p.date).filter((x) => x && x >= today).sort()[0] ?? null;
+  }, [plannedProp]);
+  const ppsAlerte = useMemo(() => {
+    const v = ppsVerdict(pps, prochaineCourse);
+    return v.kind === "inconnu" || v.kind === "expire" || v.kind === "expireAvantCourse";
+  }, [pps, prochaineCourse]);
+
   return (
     <div className="flex flex-col gap-4 h-full">
+      {ppsAlerte && (
+        <div className="px-0">
+          <PpsStatusCard status={pps} raceDate={prochaineCourse} compact />
+        </div>
+      )}
       {/* Map overlay — partage l'état « planifiée » avec la liste */}
       <AnimatePresence>
         {showMap && (
@@ -477,15 +497,28 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                   </button>
                 )}
                 {details[selected.id]?.registration_url && (
-                  <a
-                    href={details[selected.id]?.registration_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn-secondary w-full justify-center text-sm"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    {d["register"]}
-                  </a>
+                  <>
+                    {/* LE MOMENT DE VÉRITÉ. Un lien vers pps.athle.fr posé sur une page
+                        d'aide ne sert à personne : c'est ICI, la main sur le bouton
+                        d'inscription, que l'information change une décision. Et on ne
+                        dit pas « il te faut un PPS » — on dit s'il tiendra JUSQU'AU JOUR
+                        DE CETTE COURSE, ce que le site de la fédération ne peut pas savoir. */}
+                    <div className="w-full">
+                      <div className="mb-1.5 text-[11px] font-bold uppercase tracking-widest text-zinc-400">
+                        {(PPS_T[lang] ?? PPS_T.fr).avantInscription}
+                      </div>
+                      <PpsStatusCard status={pps} raceDate={selected.date ?? null} compact />
+                    </div>
+                    <a
+                      href={details[selected.id]?.registration_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-secondary w-full justify-center text-sm"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      {d["register"]}
+                    </a>
+                  </>
                 )}
               </div>
             </motion.div>
