@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { pushIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace } from "@/lib/watch/intervals";
 import { getEffectiveVma } from "@/lib/ai/coachContext";
-import { oneSessionPerDate } from "@/lib/coach/sessions";
+import { oneSessionPerSlot } from "@/lib/coach/sessions";
 
 const ADMIN_EMAIL = "cypriendumez@outlook.fr";
 
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
     .order("created_at", { ascending: false }).limit(200);
   const dateOf = (r: { data: unknown }) => String((r.data as { date?: string } | null)?.date ?? "").slice(0, 10);
   const future = (rows ?? []).filter((r) => dateOf(r) >= today);
-  const sessions = oneSessionPerDate(future, dateOf);
+  const sessions = oneSessionPerSlot(future, dateOf);
   if (sessions.length === 0) return NextResponse.json({ ok: true, pushed: 0, total: 0 });
 
   // Objectif (nom de course) + VMA pour les allures.

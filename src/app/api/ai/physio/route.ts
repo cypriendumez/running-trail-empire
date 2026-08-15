@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateContent } from "@/lib/ai/gemini";
-import { oneSessionPerDate } from "@/lib/coach/sessions";
+import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 import { sniffImage } from "@/lib/upload/sniff";
 
 type Msg = { role: "user" | "model"; text: string };
@@ -91,7 +91,7 @@ export async function POST(req: Request) {
     .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0] ?? null;
   // Séances prescrites par le coach humain (à venir) → l'ajustement de charge cite les VRAIES séances.
   type CoachRow = { title: string; body: string | null; data: { date?: string; subtitle?: string } };
-  const upcomingSess = oneSessionPerDate((coachSessRes.data ?? []) as CoachRow[], (r) => String(r.data?.date ?? "").slice(0, 10))
+  const upcomingSess = oneSessionPerSlot((coachSessRes.data ?? []) as CoachRow[], (r) => slotKey(r.data))
     .filter((r) => String(r.data?.date ?? "") >= todayStr)
     .sort((a, b) => String(a.data?.date ?? "").localeCompare(String(b.data?.date ?? "")))
     .slice(0, 4)

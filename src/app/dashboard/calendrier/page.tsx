@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CalendarView, type Planned, type CalNote, type CalRace, type CoachState } from "@/components/training/CalendarView";
-import { oneSessionPerDate } from "@/lib/coach/sessions";
+import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Calendrier" };
@@ -35,9 +35,9 @@ export default async function CalendrierPage() {
 
   const rows = data ?? [];
   // UNE séance par date (la plus récente) → même plan que Dashboard & Ghost Runner.
-  const coachRows = oneSessionPerDate(
+  const coachRows = oneSessionPerSlot(
     rows.filter((r) => r.type === "coach_session"),
-    (r) => String((r.data as { date?: string } | null)?.date ?? "").slice(0, 10),
+    (r) => slotKey(r.data as { date?: string; moment?: string } | null),
   );
   const sessions: Planned[] = coachRows.map((r) => {
     const d = (r.data ?? {}) as { date?: string; sessionType?: string; subtitle?: string; why?: string; feel?: string; tags?: string[]; confirmed?: boolean };

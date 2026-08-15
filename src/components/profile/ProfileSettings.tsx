@@ -377,6 +377,10 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
     // 021 n'a pas la colonne — il vaut donc « public », c'est-à-dire le comportement
     // actuel, et non un compte verrouillé par surprise.
     is_private: Boolean(profile?.is_private ?? false),
+    // Deux séances par jour : OPTION, pas automatisme. Le coach ne l'applique que si le
+    // volume, la fraîcheur et l'absence de douleur le permettent — et il DIT ce qui
+    // manque le cas échéant (une case cochée sans effet est un mensonge silencieux).
+    double_sessions: Boolean(profile?.double_sessions ?? false),
   });
 
   const [newGoal, setNewGoal] = useState({ type: "race", label: "", target_value: "", target_date: "" });
@@ -419,6 +423,8 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
     // seule colonne inconnue (42703) : groupée, elle emporterait la sauvegarde entière
     // du profil, et en silence. Même piège que les terrains et les disponibilités.
     await supabase.from("profiles").update({ is_private: form.is_private }).eq("id", userId);
+    // Écriture ISOLÉE aussi : `double_sessions` vient de la migration 026.
+    await supabase.from("profiles").update({ double_sessions: form.double_sessions }).eq("id", userId);
     // Disponibilités — écriture ISOLÉE (colonnes de la migration 011, cf. terrains).
     await supabase.from("profiles").update({
       days_per_week: form.days_per_week,
@@ -952,6 +958,10 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                   geste : « qui peut m'atteindre ». La conséquence est écrite en
                   toutes lettres sous la bascule : un réglage dont on ne comprend
                   pas l'effet ne se touche jamais. */}
+              <div className="mt-3 border-t border-zinc-200 pt-3">
+                <Toggle enabled={form.double_sessions} onToggle={() => setForm(f => ({...f, double_sessions: !f.double_sessions}))} label={tr("double.title")} />
+                <p className="mt-1 text-xs text-zinc-500">{tr("double.hint")}</p>
+              </div>
               <div className="mt-3 border-t border-zinc-200 pt-3">
                 <Toggle enabled={form.is_private} onToggle={() => setForm(f => ({...f, is_private: !f.is_private}))} label={tr("privacy.private")} />
                 <p className="mt-1 text-xs text-zinc-500">

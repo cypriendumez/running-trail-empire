@@ -12,6 +12,7 @@ import { isRun } from "@/lib/intervals/sport";
 import { summarizeCross, fmtMinutes, type CrossSummary } from "@/lib/coach/crossTraining";
 import { computeQualityBudget } from "@/lib/coach/qualityBudget";
 import { avertissementsAge } from "@/lib/coach/ageDistance";
+import { etatDouble, type EtatDouble } from "@/lib/coach/doubleSessions";
 import { warmCoolMin } from "@/lib/watch/intervals";
 
 type SB = Awaited<ReturnType<typeof createClient>>;
@@ -153,6 +154,10 @@ export type AthleteContext = {
      *  drapeau, le plan afficherait une séance normale au milieu d'une semaine allégée. */
     floored: boolean;
   };
+  /** Doubles séances (matin + soir) : autorisées ou non, et ce qui manque le cas
+   *  échéant. Une case cochée qui ne produit rien est un mensonge silencieux —
+   *  l'athlète doit pouvoir lire POURQUOI son plan n'a pas changé. */
+  doubles: EtatDouble;
   /** Sport pratiqué EN DEHORS de la course sur 7 jours, en minutes et en TSS.
    *  Exposé au plan déterministe (et pas seulement au prompt de l'IA) pour qu'un
    *  allègement dû à une semaine de vélo ou de randonnée puisse le DIRE. */
@@ -1568,6 +1573,17 @@ ${catalog}`;
   return {
     text, objective, daysToRace, weeksToRace, athleteName: String(p?.full_name ?? "Athlète"), vma,
     weekPlan: { qBudget, quality: chosen, easyPace: vma ? paceAt(70) : null, eased: easeReasons.length > 0, floored: qb.floored },
+    // Doubles séances : on tranche ICI, avec le volume REPRÉSENTATIF (médiane des
+    // semaines courues) et non le pic — une semaine à 90 km ne fait pas un athlète
+    // qui double, et doubler sur un pic isolé est la meilleure façon de le payer.
+    doubles: etatDouble({
+      optIn: Boolean((p as Record<string, unknown> | null)?.double_sessions),
+      // `robustWeeklyKm` renvoie un objet ({ km, weeksRun, weeksOff }) : le confondre
+      // avec un nombre donnait un volume `[object Object]` — donc jamais supérieur au
+      // seuil, donc des doubles refusés en silence chez un athlète qui y avait droit.
+      weeklyKm: robustWeekly?.km ?? (avg4wkKm > 0 ? avg4wkKm : weekKm),
+      runYears, readiness: readyLevel, pains, taper,
+    }),
     cross,
     longRunMode: bikeLong ? "bike" : "run",
     readiness: { level: readyLevel, reasons: [...redFlags, ...orangeFlags], advice: readinessRule },

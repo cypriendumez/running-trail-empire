@@ -14,6 +14,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import type { AthleteContext } from "@/lib/ai/coachContext";
 import { heatAdvice, windAdvice } from "@/lib/weather/openMeteo";
+import { scinderFacile, seanceMatinFacile } from "@/lib/coach/doubleSessions";
 
 export type PlanDay = {
   date: string;          // AAAA-MM-JJ
@@ -24,6 +25,10 @@ export type PlanDay = {
   tags: string[];
   /** false = jour prévisionnel, susceptible d'être réajusté par le cron des jours suivants. */
   confirmed: boolean;
+  /** Créneau dans la journée, quand l'athlète double. Absent = séance unique, et tout
+   *  se comporte alors exactement comme avant. La déduplication des écrans porte sur
+   *  `date#moment` : sans ce champ, la seconde séance du jour disparaîtrait. */
+  moment?: "matin" | "soir";
 };
 
 /** Nombre de jours confirmés (verrouillés) en tête de plan. Au-delà : prévisionnel. */
@@ -516,6 +521,51 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
     week[0] = { ...week[0], title: dejaAllegee ? week[0].title : `${week[0].title} (allégée)`,
       detail: `${week[0].detail}\n\n⚠️ Version ALLÉGÉE aujourd'hui : réduis le corps de séance d'environ un tiers.`,
       why: `Séance maintenue mais raccourcie : ${ctx.readiness.reasons.slice(0, 2).join(", ")}.` };
+  }
+
+  // ── 8. DOUBLES SÉANCES — matin + soir ────────────────────────────────────────
+  // On SCINDE, on n'ajoute pas. Une sortie facile devenue trop longue pour un seul
+  // bloc est répartie sur la journée : même volume, mieux absorbé. Le plan se
+  // contentait jusqu'ici d'un conseil dans le texte (« scinde en deux sorties »), que
+  // rien ne transformait en séances réelles — ni sur le calendrier, ni sur la montre.
+  //
+  // Les conditions (option cochée, volume, fraîcheur, absence de douleur, hors
+  // affûtage) sont décidées dans lib/coach/doubleSessions et arrivent ici tranchées :
+  // ce module POSE les séances, il ne juge pas de leur opportunité.
+  if (ctx.doubles?.autorise) {
+    const doubles: PlanDay[] = [];
+    // Au plus deux jours doublés par semaine : au-delà, la contrainte d'organisation
+    // dépasse le bénéfice, et c'est le premier motif d'abandon de la méthode.
+    let restants = 2;
+    for (let i = 0; i < week.length && restants > 0; i++) {
+      const j = week[i];
+      if (j.type !== "Endurance") continue;               // on ne scinde qu'un footing
+      const km = Number(/(\d+(?:[.,]\d+)?)\s*km/.exec(j.detail)?.[1]?.replace(",", ".") ?? 0);
+      const part = scinderFacile(km);
+      if (!part) continue;                                // trop court pour valoir deux sorties
+      week[i] = {
+        ...j, moment: "soir",
+        title: `${j.title} (soir)`,
+        detail: j.detail.replace(/(\d+(?:[.,]\d+)?)\s*km/, `${part.soirKm} km`),
+        why: `${j.why} Journée doublée : la sortie principale reste le soir.`,
+        tags: [...j.tags.slice(0, 3), "Soir"],
+      };
+      doubles.push({
+        date: j.date, type: "Endurance", moment: "matin",
+        title: "Footing du matin",
+        detail: seanceMatinFacile(part.matinKm, ctx.easyPace),
+        why: "Deuxième sortie de la journée : le même volume qu'en une fois, mieux absorbé. C'est du volume gratuit sur le plan de la fatigue, à condition de le courir vraiment lentement.",
+        tags: ["Endurance", "Z1", "Matin"],
+        confirmed: j.confirmed,
+      });
+      restants--;
+    }
+    // Le matin AVANT le soir : les écrans trient par date, et deux séances de même
+    // date doivent s'afficher dans l'ordre où elles se courent.
+    if (doubles.length) {
+      return [...week, ...doubles].sort((a, b) =>
+        a.date.localeCompare(b.date) || (a.moment === "matin" ? -1 : b.moment === "matin" ? 1 : 0));
+    }
   }
 
   return week;

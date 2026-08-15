@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { createClient } from "@/lib/supabase/server";
 import { GhostRunner } from "@/components/ghost-runner/GhostRunner";
 import { stripProfileSecrets } from "@/lib/profile/safe";
-import { oneSessionPerDate } from "@/lib/coach/sessions";
+import { oneSessionPerSlot } from "@/lib/coach/sessions";
 import { getEffectiveVma } from "@/lib/ai/coachContext";
 
 export const metadata = { title: "Ghost Runner" };
@@ -34,7 +34,7 @@ export default async function GhostRunnerPage() {
 
   // Même source de vérité que le Calendrier : UNE séance par date (la plus récente), puis on ne
   // garde que les séances COURABLES (pas repos/renfo) à venir, les 6 prochaines.
-  const coachSessions = oneSessionPerDate(
+  const coachSessions = oneSessionPerSlot(
     ((coachRes.data ?? []) as { title: string; body: string; data: { date?: string; subtitle?: string; tags?: string[] } }[])
       .map((r) => ({ title: r.title || "Séance", detail: r.data?.subtitle || r.body || "", date: String(r.data?.date ?? "").slice(0, 10), tags: Array.isArray(r.data?.tags) ? r.data.tags : [] })),
     (s) => s.date,

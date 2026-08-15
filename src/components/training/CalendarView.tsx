@@ -12,7 +12,9 @@ import { fmtDistance, type UnitSystem } from "@/lib/units";
 import { useT } from "@/lib/i18n/LanguageProvider";
 
 // `confirmed: false` = jour prévisionnel, que le coach automatique réajustera d'ici là.
-export type Planned = { date: string; type: string; title: string; detail: string; why: string; feel: string; tags: string[]; confirmed?: boolean };
+export type Planned = { date: string; type: string; title: string; detail: string; why: string; feel: string; tags: string[]; confirmed?: boolean;
+  /** Créneau, quand la journée est doublée. Absent = séance unique. */
+  moment?: "matin" | "soir" };
 export type CalNote = { id: string; date: string; text: string };
 export type CalRace = { id: string; date: string; name: string; location: string; distanceKm: number | null; isObjective?: boolean };
 
@@ -123,6 +125,10 @@ export function CalendarView({ sessions, notes: notesProp = [], races: racesProp
   const [noteText, setNoteText] = useState("");
   const [race, setRace] = useState({ name: "", location: "", distanceKm: "" });
   const [busy, setBusy] = useState(false);
+  /** Créneau affiché quand la journée est doublée (0 = matin, 1 = soir). Remis à zéro
+   *  à chaque changement de jour : garder l'index du jour précédent afficherait le soir
+   *  d'une journée qui n'a qu'une séance. */
+  const [momentIdx, setMomentIdx] = useState(0);
   const [suggest, setSuggest] = useState<{ name: string; city: string; distanceKm: number | null; date: string; type: string }[]>([]);
   const [view, setView] = useState<"month" | "agenda">("month");
   const [offset, setOffset] = useState(0); // décalage en blocs de 4 semaines
@@ -146,8 +152,15 @@ export function CalendarView({ sessions, notes: notesProp = [], races: racesProp
     setSuggest([]);
   };
 
-  const coachByDate: Record<string, Planned> = {};
-  for (const s of sessions) if (!coachByDate[s.date]) coachByDate[s.date] = s;
+  // Une journée peut porter DEUX séances (matin + soir). Ce dictionnaire ne gardait que
+  // la première : la seconde disparaissait de l'écran alors qu'elle existait en base et
+  // partait bien sur la montre — un plan qui se contredit d'un support à l'autre.
+  const coachByDate: Record<string, Planned[]> = {};
+  for (const s of sessions) (coachByDate[s.date] ??= []).push(s);
+  // Le matin avant le soir, quel que soit l'ordre d'arrivée des lignes.
+  for (const k of Object.keys(coachByDate)) {
+    coachByDate[k].sort((a, b) => (a.moment === "matin" ? -1 : b.moment === "matin" ? 1 : 0));
+  }
   const notesByDate: Record<string, CalNote[]> = {};
   for (const n of notes) (notesByDate[n.date] ??= []).push(n);
   const racesByDate: Record<string, CalRace[]> = {};
@@ -188,7 +201,10 @@ export function CalendarView({ sessions, notes: notesProp = [], races: racesProp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessions, notes, races]);
 
-  const coach = sel ? coachByDate[sel] : null;
+  const daySessions = sel ? coachByDate[sel] ?? [] : [];
+  // Quand la journée est doublée, le panneau affiche UNE séance à la fois avec un
+  // sélecteur : entasser deux descriptifs complets rendrait l'écran illisible.
+  const coach = daySessions[Math.min(momentIdx, Math.max(0, daySessions.length - 1))] ?? null;
   const selNotes = sel ? (notesByDate[sel] ?? []) : [];
   const selRaces = sel ? (racesByDate[sel] ?? []) : [];
 
@@ -206,8 +222,9 @@ export function CalendarView({ sessions, notes: notesProp = [], races: racesProp
 
   const openDay = (key: string) => {
     setSel(key); setAdding(null); setNoteText(""); setRace({ name: "", location: "", distanceKm: "" }); setSuggest([]);
+    setMomentIdx(0);   // on ouvre toujours sur la première séance du jour
     // Si le jour a une séance, on remonte vers le hero pour y afficher son détail.
-    if (coachByDate[key]) heroRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if ((coachByDate[key] ?? []).length) heroRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
   const weekLabel = (n: number) => (n > 1 ? t("cal.week.many", { n }) : t("cal.week.one", { n }));
 
@@ -295,6 +312,22 @@ export function CalendarView({ sessions, notes: notesProp = [], races: racesProp
               </div>
               {coach.confirmed === false && (
                 <p className="mt-2 text-[12px] leading-relaxed text-white/60">{t("cal.provisional.hint")}</p>
+              )}
+              {/* JOURNÉE DOUBLÉE — sélecteur matin / soir.
+                  Empiler deux descriptifs complets rendrait le panneau illisible ; sans
+                  sélecteur, la seconde séance resterait invisible alors qu'elle est bien
+                  publiée et poussée sur la montre. */}
+              {daySessions.length > 1 && (
+                <div className="mt-3 inline-flex rounded-full bg-white/10 p-0.5 ring-1 ring-white/20 backdrop-blur-md">
+                  {daySessions.map((ds, i) => (
+                    <button key={i} onClick={() => setMomentIdx(i)}
+                      aria-pressed={i === momentIdx}
+                      className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] transition-colors ${
+                        i === momentIdx ? "bg-white text-zinc-900" : "text-white/70 hover:text-white"}`}>
+                      {ds.moment === "matin" ? t("cal.morning") : ds.moment === "soir" ? t("cal.evening") : `#${i + 1}`}
+                    </button>
+                  ))}
+                </div>
               )}
               <h1 className="mt-2 text-2xl font-bold tracking-tight drop-shadow-sm sm:text-3xl">{coach.title}</h1>
               {phases ? (
@@ -384,7 +417,7 @@ export function CalendarView({ sessions, notes: notesProp = [], races: racesProp
 
               <div className="space-y-4">
                 {weeks.map((week, wi) => {
-                  const cats = week.map((d) => coachByDate[fmtKey(d)]).filter(Boolean).map((s) => categoryOf((s as Planned).type));
+                  const cats = week.flatMap((d) => coachByDate[fmtKey(d)] ?? []).map((s) => categoryOf(s.type));
                   const count = cats.length;
                   const uniqueCats = [...new Set(cats)];
                   return (
@@ -405,12 +438,12 @@ export function CalendarView({ sessions, notes: notesProp = [], races: racesProp
                       <div className="grid grid-cols-7 gap-2 sm:gap-3">
                         {week.map((d) => {
                           const key = fmtKey(d);
-                          const s = coachByDate[key];
+                          const daySess = coachByDate[key] ?? [];
                           const nNotes = (notesByDate[key] ?? []).length;
                           const dayRaces = racesByDate[key] ?? [];
                           const isToday = key === todayKey;
                           const active = sel === key;
-                          const empty = !s && dayRaces.length === 0 && nNotes === 0;
+                          const empty = daySess.length === 0 && dayRaces.length === 0 && nNotes === 0;
                           return (
                             <button key={key} onClick={() => openDay(key)}
                               className={`group flex min-h-[136px] flex-col rounded-2xl border p-2 text-left transition-all duration-200
@@ -420,7 +453,7 @@ export function CalendarView({ sessions, notes: notesProp = [], races: racesProp
                                 <span className={isToday ? "flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-[13px] text-white shadow-sm" : ""}>{d.getDate()}</span>
                               </div>
                               <div className="flex flex-1 flex-col gap-1">
-                                {s && <SessionCard s={s} dense />}
+                                {daySess.map((s, i) => <SessionCard key={i} s={s} dense />)}
                                 {dayRaces.map((r) => (
                                   <div key={r.id} className="flex items-center gap-1 rounded-lg bg-amber-100 px-1.5 py-1 text-[10px] font-bold text-amber-800"><Flag className="h-3 w-3 flex-shrink-0" /><span className="truncate">{r.name}</span></div>
                                 ))}
@@ -450,7 +483,7 @@ export function CalendarView({ sessions, notes: notesProp = [], races: racesProp
             <div className="space-y-1">
               {agendaDates.map((key) => {
                 const d = new Date(key + "T00:00:00");
-                const s = coachByDate[key];
+                const daySess = coachByDate[key] ?? [];
                 const dayRaces = racesByDate[key] ?? [];
                 const dayNotes = notesByDate[key] ?? [];
                 const isToday = key === todayKey;
@@ -463,7 +496,7 @@ export function CalendarView({ sessions, notes: notesProp = [], races: racesProp
                     </div>
                     <div className="flex-1 space-y-2 border-l border-zinc-100 pb-4 pl-3 sm:pl-4">
                       {isToday && <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">{t("cal.today")}</span>}
-                      {s && <button onClick={() => openDay(key)} className="block w-full transition-transform hover:-translate-y-0.5"><SessionCard s={s} /></button>}
+                      {daySess.map((s, i) => <button key={i} onClick={() => openDay(key)} className="block w-full transition-transform hover:-translate-y-0.5"><SessionCard s={s} /></button>)}
                       {dayRaces.map((r) => (
                         <button key={r.id} onClick={() => openDay(key)} className="flex w-full items-center gap-2.5 rounded-xl bg-amber-50 px-3.5 py-2.5 text-left ring-1 ring-amber-100 transition-colors hover:bg-amber-100/70">
                           <Flag className="h-4 w-4 flex-shrink-0 text-amber-600" />

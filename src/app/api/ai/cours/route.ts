@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateContent } from "@/lib/ai/gemini";
-import { oneSessionPerDate } from "@/lib/coach/sessions";
+import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 
 type Msg = { role: "user" | "model"; text: string };
 
@@ -57,9 +57,9 @@ export async function POST(req: Request) {
 
   // ── Plan du coach humain (espace /admin) : une séance par date, à venir + récentes ──
   type CoachRow = { title: string; body: string | null; data: { date?: string; subtitle?: string; tags?: string[]; why?: string } };
-  const coachRows = oneSessionPerDate(
+  const coachRows = oneSessionPerSlot(
     (coachSessRes.data ?? []) as CoachRow[],
-    (r) => String(r.data?.date ?? "").slice(0, 10),
+    (r) => slotKey(r.data),
   ).sort((a, b) => String(a.data?.date ?? "").localeCompare(String(b.data?.date ?? "")));
   const fmtSess = (r: CoachRow) => `${String(r.data?.date ?? "").slice(0, 10)} : ${r.title}${r.data?.subtitle ? ` — ${String(r.data.subtitle).slice(0, 90)}` : ""}`;
   const weekAgoStr = new Date(now - 7 * 86400000).toISOString().slice(0, 10);

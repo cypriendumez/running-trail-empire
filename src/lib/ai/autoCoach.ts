@@ -75,6 +75,10 @@ export async function autoCoachForUser(
       feel: "",
       tags: d.tags.slice(0, 4),
       confirmed: d.confirmed,
+      // Créneau de la journée. SANS lui, la déduplication des écrans (qui porte sur
+      // `date#moment`) confondrait les deux séances d'un jour doublé et n'en garderait
+      // qu'une — celle qui a été écrite en dernier, au hasard de l'insertion.
+      ...(d.moment ? { moment: d.moment } : {}),
     },
   }));
   const { error } = await admin.from("notifications").insert(rows);
@@ -95,10 +99,19 @@ export async function autoCoachForUser(
       await ensureRunThresholdPace({ athleteId, apiKey, vmaKmh: ctx.vma });
       // Même règle que pour le calendrier : on ne pousse pas sur la montre une séance
       // pour un jour déjà couru. Elle y remplacerait, après coup, celle qui a servi.
-      for (const d of week.slice(0, CONFIRMED_DAYS).filter((x) => x.date >= from)) {
+      // ⚠️ CONFIRMED_DAYS compte des JOURS, pas des entrées. `slice(0, 5)` était juste
+      // tant qu'il y avait une séance par jour ; avec un jour doublé, il aurait poussé
+      // quatre jours au lieu de cinq — en silence, et seulement pour les athlètes qui
+      // doublent. On sélectionne donc les dates, puis toutes leurs séances.
+      const datesConfirmees = [...new Set(week.map((x) => x.date))].sort().slice(0, CONFIRMED_DAYS);
+      for (const d of week.filter((x) => x.date >= from && datesConfirmees.includes(x.date))) {
         const built = buildWorkoutDescription(d.title, d.detail, `${d.type} ${d.tags.join(" ")}`, objectiveRace, ctx.vma, warmMin, coolMin);
         if (!built) continue;
-        const r = await pushIntervalsWorkout({ athleteId, apiKey, userId, name: built.name, date: d.date, description: built.description, sport: built.sport });
+        // Le créneau entre dans le NOM : deux séances le même jour, sur la montre, ne
+        // se distinguent autrement que par leur contenu — et on ne lit pas un descriptif
+        // dans une liste de séances à 6 h du matin.
+        const nom = d.moment ? `${built.name} — ${d.moment === "matin" ? "matin" : "soir"}` : built.name;
+        const r = await pushIntervalsWorkout({ athleteId, apiKey, userId, name: nom, date: d.date, description: built.description, sport: built.sport });
         if (r.ok) pushed++;
       }
     } catch { /* best effort : le calendrier reste publié même si Garmin est injoignable */ }

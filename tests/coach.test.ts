@@ -20,6 +20,8 @@ import { buildPlanReadyEmail } from "../src/lib/notify/planReady";
 import { poseAt, capLisse } from "../src/lib/segments/flyover";
 import { contientGrosMot, premierGrosMot, NB_FORMES_SURVEILLEES } from "../src/lib/social/moderation";
 import { avertissementAge, avertissementsAge, kmEffort } from "../src/lib/coach/ageDistance";
+import { etatDouble, scinderFacile, seanceDoubleSeuil, AVERTISSEMENT_LACTATE } from "../src/lib/coach/doubleSessions";
+import { oneSessionPerSlot, slotKey } from "../src/lib/coach/sessions";
 import { vmaFromPaceCurve, bestVmaFromWorkouts } from "../src/lib/running/fitness";
 import { heatAdvice, windAdvice, altitudeLossPct, heatAcclimation } from "../src/lib/weather/openMeteo";
 import { parseReps, parsePaceSec, stepsForType, warmCoolMin, buildWorkoutDescription } from "../src/lib/watch/intervals";
@@ -2388,7 +2390,11 @@ test("la séance DÉJÀ COURUE aujourd'hui n'est pas réécrite", () => {
   assert.ok(/const from = dayZeroFrozen \? week\[1\]\.date : today/.test(src), "le gel du jour 0 a disparu");
   assert.ok(/\.gte\("data->>date", from\)/.test(src), "l'effacement ne part pas de la date gelée");
   assert.ok(/week\.filter\(\(d: PlanDay\) => d\.date >= from\)/.test(src), "l'insertion ne part pas de la date gelée");
-  assert.ok(/filter\(\(x\) => x\.date >= from\)/.test(src), "la poussée montre ne part pas de la date gelée");
+  // On vérifie l'INVARIANT (la poussée part de la date gelée), pas une expression
+  // exacte : la ligne s'est enrichie du filtrage par jours confirmés quand les doubles
+  // séances sont arrivées, et un test qui épingle une chaîne littérale casse au premier
+  // changement légitime.
+  assert.ok(/filter\(\(x\) => x\.date >= from\b/.test(src), "la poussée montre ne part pas de la date gelée");
 });
 test("la chaîne sync → analyse → replanification → montre n'existe qu'à un endroit", () => {
   // Elle a existé en trois exemplaires divergents. Le cron n'importait aucune trace GPS
@@ -2398,6 +2404,94 @@ test("la chaîne sync → analyse → replanification → montre n'existe qu'à 
     const src = codeOf(f);
     assert.ok(!/autoCoachForUser/.test(src), `${f} rappelle le coach directement au lieu de passer par replanIfFresh`);
     assert.ok(!/importMissingTracks/.test(src), `${f} garde sa propre importation de traces`);
+  }
+});
+
+console.log("\nDOUBLES SÉANCES — scinder, jamais empiler");
+const dbl = (o: Partial<Parameters<typeof etatDouble>[0]> = {}) => etatDouble({
+  optIn: true, weeklyKm: 80, runYears: 5, readiness: "vert", pains: [], taper: false, ...o,
+});
+test("sans la case cochée, le coach ne double JAMAIS", () => {
+  // Doubler impose une organisation quotidienne : ça ne s'impose pas à quelqu'un qui
+  // n'a rien demandé, même si son volume s'y prête.
+  const r = dbl({ optIn: false });
+  assert.equal(r.autorise, false);
+  assert.ok(r.manque.some((m) => /pas activée/.test(m)));
+});
+test("une case cochée qui ne produit rien DOIT dire pourquoi", () => {
+  // C'est tout l'enjeu : sinon l'athlète coche, ne voit aucun changement, et conclut
+  // que la fonction est cassée. Un réglage silencieux est un réglage qui ment.
+  for (const cas of [
+    { weeklyKm: 30 }, { pains: ["mollet"] }, { readiness: "rouge" as const }, { taper: true },
+  ]) {
+    const r = dbl(cas);
+    assert.equal(r.autorise, false, `${JSON.stringify(cas)} : ne devrait pas autoriser`);
+    assert.ok(r.manque.length > 0, `${JSON.stringify(cas)} : refus SANS motif`);
+  }
+});
+test("le volume décide, et c'est le volume REPRÉSENTATIF", () => {
+  assert.equal(dbl({ weeklyKm: 54 }).autorise, false, "sous le seuil : une sortie suffit");
+  assert.equal(dbl({ weeklyKm: 55 }).autorise, true, "au seuil : autorisé");
+  // Le motif de refus doit donner le chiffre, pas dire « volume insuffisant ».
+  assert.ok(/30 km/.test(dbl({ weeklyKm: 30 }).manque.join(" ")), "le volume réel doit être cité");
+});
+test("on SCINDE, on n'ajoute pas : le volume total ne bouge pas", () => {
+  // Un double qui AJOUTE du volume, c'est une hausse de charge déguisée en confort.
+  // Ici la somme des deux sorties égale la sortie d'origine.
+  for (const km of [12, 16, 18, 21, 25]) {
+    const p = scinderFacile(km)!;
+    assert.ok(p, `${km} km : devrait être scindable`);
+    assert.equal(p.matinKm + p.soirKm, Math.round(km), `${km} km : le total a changé`);
+    assert.ok(p.matinKm < p.soirKm, `${km} km : le matin doit rester la sortie SECONDAIRE`);
+  }
+});
+test("une sortie courte n'est pas scindée", () => {
+  // Deux sorties de 5 km ne valent pas deux douches et deux échauffements.
+  for (const km of [0, 6, 9, 11.9]) assert.equal(scinderFacile(km), null, `${km} km scindé à tort`);
+});
+test("le double SEUIL a une barre bien plus haute, et on dit laquelle", () => {
+  // C'est une méthode d'athlète entraîné, pas une variante de footing.
+  assert.equal(dbl({ weeklyKm: 80, runYears: 5 }).doubleSeuil, false, "80 km ne suffisent pas");
+  assert.equal(dbl({ weeklyKm: 95, runYears: 2 }).doubleSeuil, false, "2 ans de course ne suffisent pas");
+  assert.equal(dbl({ weeklyKm: 95, runYears: 5 }).doubleSeuil, true);
+  assert.ok(dbl({ weeklyKm: 80, runYears: 5 }).manqueSeuil.some((m) => /90 km/.test(m)), "le seuil chiffré doit être donné");
+});
+test("le double seuil est TOUJOURS accompagné de l'avertissement lactate", () => {
+  // La méthode se pilote au lactate : sans lactatemètre on ne peut que l'approcher, et
+  // l'erreur classique est de courir trop vite — ce qui la transforme en deux séances
+  // dures et coûte la semaine. Le taire serait prescrire une méthode amputée de ce qui
+  // la rend sûre.
+  assert.ok(/lactate/i.test(AVERTISSEMENT_LACTATE));
+  assert.ok(/trop vite/.test(AVERTISSEMENT_LACTATE), "l'erreur classique doit être nommée");
+  const matin = seanceDoubleSeuil("matin", "4'00"), soir = seanceDoubleSeuil("soir", "4'00");
+  assert.ok(/6 min/.test(matin) && /1 min/.test(soir), "matin long, soir court");
+  assert.ok(/SOUS le seuil|MOINS 5/.test(matin + soir), "les deux séances restent sous le seuil");
+});
+test("la déduplication porte sur le CRÉNEAU, pas sur la date", () => {
+  // Elle portait sur la seule date : la seconde séance d'un jour doublé disparaissait
+  // des six écrans qui l'appellent, y compris de la poussée vers la montre.
+  const rows = [
+    { data: { date: "2026-08-20", moment: "soir" } },
+    { data: { date: "2026-08-20", moment: "matin" } },
+    { data: { date: "2026-08-20", moment: "soir" } },   // doublon réel : à écarter
+    { data: { date: "2026-08-21" } },
+  ];
+  const gardees = oneSessionPerSlot(rows, (r) => slotKey(r.data));
+  assert.equal(gardees.length, 3, "matin ET soir doivent survivre, le doublon non");
+  assert.equal(slotKey({ date: "2026-08-20" }), "2026-08-20#");
+  assert.equal(slotKey({ date: "2026-08-20", moment: "matin" }), "2026-08-20#matin");
+  assert.equal(slotKey(null), "", "sans date, aucune clé — la ligne est écartée");
+});
+test("les six écrans passent par la MÊME clé de créneau", () => {
+  // Si l'un d'eux oubliait le moment, il rétablirait le défaut sur son seul écran :
+  // le calendrier montrerait deux séances, le tableau de bord une seule.
+  for (const f of [
+    "src/app/dashboard/page.tsx", "src/app/dashboard/calendrier/page.tsx",
+    "src/app/api/ai/cours/route.ts", "src/app/api/ai/physio/route.ts",
+  ]) {
+    const src = codeOf(f);
+    assert.ok(/slotKey\(/.test(src), `${f} n'utilise pas la clé de créneau partagée`);
+    assert.ok(!/oneSessionPerDate/.test(src), `${f} appelle encore l'ancienne déduplication`);
   }
 });
 

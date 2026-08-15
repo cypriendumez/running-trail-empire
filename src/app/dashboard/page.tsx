@@ -4,7 +4,7 @@ import { BentoDashboard } from "@/components/dashboard/BentoDashboard";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import type { Objective } from "@/components/dashboard/ObjectiveCard";
 import { bestVmaFromWorkouts, loadRisk, vmaFromVo2max } from "@/lib/running/fitness";
-import { oneSessionPerDate } from "@/lib/coach/sessions";
+import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard" };
@@ -45,7 +45,7 @@ export default async function DashboardPage() {
   // Prochaine séance prescrite par le coach (aujourd'hui ou à venir) → prioritaire sur l'IA/l'algo.
   const today = new Date().toISOString().split("T")[0];
   type CoachRow = { title: string; body: string; data: { date?: string; subtitle?: string; tags?: string[]; why?: string } };
-  const cn = oneSessionPerDate((coachRes.data ?? []) as CoachRow[], (r) => String(r.data?.date ?? "").slice(0, 10))
+  const cn = oneSessionPerSlot((coachRes.data ?? []) as CoachRow[], (r) => slotKey(r.data))
     .filter((r) => (r.data?.date ?? "") >= today)
     .sort((a, b) => (a.data?.date ?? "").localeCompare(b.data?.date ?? ""))[0];
   const coachSession = cn
