@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect, useMemo, type ReactNode } fro
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Undo2, Redo2, Trash2, Download, Save, Loader2,
-  ChevronDown, X, MapPin, Mountain, Search, Layers, Bookmark,
+  ChevronDown, X, MapPin, Mountain, Search, Layers, Bookmark, Heart,
   SlidersHorizontal, Gauge, Navigation, Share2
 } from "lucide-react";
 import { toast } from "sonner";
@@ -23,6 +23,9 @@ interface SavedRoute {
   duration_min: number;
   difficulty: string;
   created_at: string;
+  /** Cœur : le parcours remonte en tête de liste. Optionnel — un parcours enregistré
+   *  avant la migration 024 n'a pas la colonne, et vaut alors « non favori ». */
+  is_favorite?: boolean;
 }
 
 // ─── Tile layers ──────────────────────────────────────────────────────────────
@@ -672,6 +675,37 @@ export function TrailBuilder() {
     toast.success(d["t.deleted"]);
   }, [d]);
 
+  // ── Cœur : mettre / retirer des favoris ────────────────────────────────────
+  // Les favoris remontent en tête : la liste est triée par date, et le parcours qu'on
+  // refait chaque semaine descendait d'un cran à chaque nouveau tracé.
+  //
+  // On envoie la valeur VOULUE, pas une bascule : deux clics rapides ou deux onglets
+  // ouverts, et une bascule aveugle laisserait le cœur plein à l'écran alors que la
+  // base dit le contraire. Et si l'écriture échoue, on REVIENT en arrière — un cœur
+  // qui reste plein sur un favori non enregistré est un mensonge à l'écran.
+  const handleToggleFavorite = useCallback(async (route: SavedRoute) => {
+    const voulu = !route.is_favorite;
+    const trier = (rs: SavedRoute[]) => [...rs].sort((a, b) =>
+      Number(b.is_favorite ?? false) - Number(a.is_favorite ?? false)
+      || (b.created_at ?? "").localeCompare(a.created_at ?? ""));
+    setSavedRoutes(prev => trier(prev.map(r => r.id === route.id ? { ...r, is_favorite: voulu } : r)));
+    try {
+      const r = await fetch("/api/routes", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: route.id, isFavorite: voulu }),
+      });
+      if (!r.ok) throw new Error(String(r.status));
+      // Le miroir local sert de repli quand la base est indisponible : le laisser
+      // diverger ferait réapparaître l'ancien état au rechargement.
+      const local = JSON.parse(localStorage.getItem("trail_routes") || "[]") as SavedRoute[];
+      localStorage.setItem("trail_routes", JSON.stringify(
+        local.map((x) => x.id === route.id ? { ...x, is_favorite: voulu } : x)));
+    } catch {
+      setSavedRoutes(prev => trier(prev.map(r => r.id === route.id ? { ...r, is_favorite: !voulu } : r)));
+      toast.error(d["t.favErr"] ?? "Favori non enregistré");
+    }
+  }, [d]);
+
   // ── Fly to a famous French trail ───────────────────────────────────────────
   const flyToPlace = useCallback((r: FamousRoute) => {
     if (!mapRef.current) return;
@@ -1059,6 +1093,20 @@ export function TrailBuilder() {
                           <button type="button" className="flex-1 min-w-0 text-left" onClick={() => { handleLoadRoute(r); setShowRoutesPanel(false); }}>
                             <div className="text-sm font-medium text-zinc-900 truncate">{r.name}</div>
                             <div className="text-xs text-zinc-400">{r.distance_km.toFixed(1)} km · +{r.elevation_gain_m}m</div>
+                          </button>
+                          {/* Le cœur reste TOUJOURS visible quand il est plein : le
+                              masquer hors survol cacherait précisément l'information
+                              qu'on est venu chercher — lequel de mes parcours est mon
+                              favori. Vide, il n'apparaît qu'au survol pour ne pas
+                              encombrer la liste. */}
+                          <button type="button" onClick={() => handleToggleFavorite(r)}
+                            aria-label={tb(r.is_favorite ? "unfavRoute" : "favRoute", { name: r.name })}
+                            aria-pressed={!!r.is_favorite}
+                            className={`p-1 transition-all focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+                              r.is_favorite
+                                ? "text-rose-500 opacity-100"
+                                : "text-zinc-300 hover:text-rose-400 opacity-0 group-hover:opacity-100"}`}>
+                            <Heart className="w-3.5 h-3.5" fill={r.is_favorite ? "currentColor" : "none"} />
                           </button>
                           <button type="button" onClick={() => handleDeleteRoute(r.id)} aria-label={tb("delRoute", { name: r.name })} className="p-1 text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
                             <X className="w-3.5 h-3.5" />

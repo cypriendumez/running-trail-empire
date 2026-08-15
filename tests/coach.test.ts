@@ -2508,6 +2508,44 @@ test("on n'affirme PLUS que ces limites protègent le cartilage de croissance", 
   assert.ok(/pas de lésion de façon constante|ne sont pas le cartilage/.test(tous),
     "la nuance de l'AAP doit être dite, pas tue");
 });
+test("les avertissements existent dans les 5 langues, sans trou ni français résiduel", () => {
+  // Ils étaient en français uniquement. Passable pour un chrono, plus du tout quand on
+  // cite un RÈGLEMENT FRANÇAIS à un athlète allemand ou portugais.
+  const attendus: Record<string, RegExp> = {
+    fr: /Fédération française/, en: /French athletics federation/,
+    de: /französische Leichtathletikverband/, es: /federación francesa/, pt: /federação francesa/,
+  };
+  for (const [lang, motif] of Object.entries(attendus)) {
+    const a = avertissementsAge({ age: 16, distanceKm: 42.2, lang: lang as "fr" });
+    assert.equal(a.length, 2, `${lang} : les deux autorités doivent parler`);
+    assert.ok(motif.test(a[0].texte), `${lang} : texte non traduit — ${a[0].texte.slice(0, 70)}`);
+    assert.ok(!/undefined/.test(a[0].texte + a[1].texte), `${lang} : trou de traduction`);
+    assert.ok(a.every((x) => x.sources.length > 0), `${lang} : sources manquantes`);
+  }
+  // Les paliers aussi : « Le semi-marathon t'est ouvert » ne doit pas arriver à moitié
+  // en français chez un athlète anglophone.
+  assert.ok(/half marathon/.test(avertissementsAge({ age: 18, distanceKm: 42.2, lang: "en" })[0].texte));
+  assert.ok(/Halbmarathon/.test(avertissementsAge({ age: 18, distanceKm: 42.2, lang: "de" })[0].texte));
+});
+test("la limite française est annoncée COMME française aux étrangers", () => {
+  // La limite FFA s'applique aux épreuves organisées EN FRANCE. Laisser croire à un
+  // athlète allemand qu'elle est universelle serait faux — traduire ne suffit pas.
+  for (const lang of ["en", "de", "es", "pt"] as const) {
+    const t = avertissementsAge({ age: 16, distanceKm: 42.2, lang })[0].texte;
+    assert.ok(/France|Frankreich|Francia|França/.test(t), `${lang} : le pays n'est pas nommé`);
+    assert.ok(/federation|Verband|federación|federação/i.test(t), `${lang} : on n'invite pas à vérifier sa propre fédération`);
+  }
+});
+test("les nombres suivent la locale de l'athlète", () => {
+  assert.ok(/42,2/.test(avertissementsAge({ age: 18, distanceKm: 42.2, lang: "fr" })[0].texte));
+  assert.ok(/42\.2/.test(avertissementsAge({ age: 18, distanceKm: 42.2, lang: "en" })[0].texte));
+  assert.ok(/42,2/.test(avertissementsAge({ age: 18, distanceKm: 42.2, lang: "de" })[0].texte));
+});
+test("une langue inconnue retombe sur le français, jamais sur du vide", () => {
+  const a = avertissementsAge({ age: 18, distanceKm: 42.2, lang: "kl" as "fr" });
+  assert.equal(a.length, 1);
+  assert.ok(/Fédération française/.test(a[0].texte));
+});
 test("on n'invente AUCUN seuil médical", () => {
   // « Le marathon, c'est mieux après 25 ans » circule beaucoup, mais aucune source
   // consultée ne l'établit. La règle vérifiable est fédérale : 20 ans. Affirmer une

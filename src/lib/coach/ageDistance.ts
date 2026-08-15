@@ -47,6 +47,9 @@
 //  sens physiologique — grimper coûte, ça n'allège pas.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import type { Lang } from "@/lib/i18n/translations";
+import { AGE_T, PALIER_NOM, CAT_SUFFIXE } from "@/lib/coach/ageDistanceI18n";
+
 export type CategorieFfa = {
   /** Nom de la catégorie, tel qu'il figure au règlement. */
   nom: string;
@@ -61,7 +64,7 @@ export type CategorieFfa = {
  * l'application ne s'adresse de toute façon pas à l'athlète directement.
  */
 const CATEGORIES: CategorieFfa[] = [
-  { nom: "Espoir / U23 et au-delà", ageMin: 20, maxKm: null },
+  { nom: "Espoir / U23", ageMin: 20, maxKm: null },
   { nom: "Junior / U20", ageMin: 18, maxKm: 25 },
   { nom: "Cadet / U18", ageMin: 16, maxKm: 15 },
   { nom: "Minime / U16", ageMin: 14, maxKm: 5 },
@@ -108,11 +111,13 @@ export type AvertissementAge = {
  *  fédérale française qui, elle, fixe 20 ans. */
 const AGE_MEDICAL_MARATHON = 18;
 
-/** Distances de référence, pour nommer l'étape suivante plutôt que de dire « plus court ». */
-const PALIERS = [
-  { km: 10, nom: "10 km" },
-  { km: 21.1, nom: "semi-marathon" },
-  { km: 42.2, nom: "marathon" },
+/** Distances de référence, pour nommer l'étape suivante plutôt que de dire « plus court ».
+ *  Le nom est traduit à l'affichage : « Le semi-marathon t'est ouvert » ne doit pas
+ *  arriver à moitié en français chez un athlète allemand. */
+const PALIERS: { km: number; cle: "p10" | "p21" | "p42" }[] = [
+  { km: 10, cle: "p10" },
+  { km: 21.1, cle: "p21" },
+  { km: 42.2, cle: "p42" },
 ];
 
 /**
@@ -145,18 +150,25 @@ export function avertissementsAge(input: {
   distanceKm: number;
   deniveleM?: number | null;
   trail?: boolean;
+  /** Langue de l'athlète. Par défaut le français — c'était la SEULE langue disponible
+   *  jusqu'ici, ce qui revenait à citer un règlement français, en français, à un
+   *  athlète allemand. */
+  lang?: Lang;
 }): AvertissementAge[] {
   const cat = categorieFfa(input.age);
   if (!cat || !Number.isFinite(input.distanceKm) || input.distanceKm <= 0) return [];
 
+  const lang: Lang = input.lang && AGE_T[input.lang] ? input.lang : "fr";
+  const T = AGE_T[lang];
+  const catNom = cat.maxKm == null ? cat.nom + CAT_SUFFIXE[lang] : cat.nom;
+
   const effort = kmEffort(input.distanceKm, input.deniveleM);
   const brut = Math.round(input.distanceKm * 10) / 10;
-  // Nombres à la française : ce texte est lu par l'athlète. « 42.2 km » au milieu d'une
-  // phrase française trahit une chaîne de débogage, et abîme la confiance dans le reste.
-  const fr = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
-  const mentionEffort = effort > brut
-    ? ` (${fr(effort)} km effort : le dénivelé ajoute 1 km par tranche de 100 m de D+)`
-    : "";
+  // Nombres dans la locale de l'athlète : « 42,2 km » en français, « 42.2 km » en
+  // anglais. Un séparateur décimal étranger au milieu d'une phrase trahit une chaîne
+  // de débogage, et abîme la confiance dans le reste du message.
+  const nb = (n: number) => n.toLocaleString(T.locale, { maximumFractionDigits: 1 });
+  const mentionEffort = effort > brut ? T.mentionEffort(nb(effort)) : "";
 
   const out: AvertissementAge[] = [];
 
@@ -165,20 +177,16 @@ export function avertissementsAge(input: {
     // On nomme le palier atteignable AUJOURD'HUI plutôt que de dire « plus court » :
     // un conseil qu'on ne peut pas suivre n'est pas un conseil.
     const possible = [...PALIERS].reverse().find((p) => p.km <= cat.maxKm!);
-    const suite = possible ? ` Le ${possible.nom} t'est ouvert dès maintenant` : " Des distances plus courtes te sont ouvertes";
-    const ouverture = cat.ageMin === 18
-      ? ", et le marathon s'ouvrira à tes 20 ans."
-      : cat.ageMin === 16
-      ? ", le semi à 18 ans et le marathon à 20 ans."
-      : ".";
+    const suite = possible ? T.palier(PALIER_NOM[lang][possible.cle]) : T.palierAucun;
+    const ouverture = cat.ageMin === 18 ? T.ouverture18 : cat.ageMin === 16 ? T.ouverture16 : ".";
     out.push({
       niveau: "reglement",
-      categorie: cat.nom,
+      categorie: catNom,
       // ⚠️ On énonce la règle SANS lui prêter de justification physiologique. La
       // première version affirmait « ces limites protègent un squelette en croissance » :
       // extrapolation. Les motifs médicaux ont leur propre encadré, avec leur source.
-      texte: `⚠️ DISTANCE NON AUTORISÉE À TON ÂGE : en catégorie ${cat.nom}, la Fédération française d'athlétisme limite les épreuves à ${cat.maxKm} km${input.trail ? " en km effort" : ""}, et ton objectif fait ${fr(brut)} km${mentionEffort}. Tu ne pourras donc pas t'inscrire à une épreuve officielle en France.${suite}${ouverture} Ton plan est construit quand même — mais parles-en à un médecin du sport avant de viser cette distance.`,
-      sources: ["Fédération française d'athlétisme — règlement des manifestations running"],
+      texte: `${T.regleTitre} : ${T.regle({ categorie: catNom, maxKm: cat.maxKm, effort: !!input.trail, distance: nb(brut), mentionEffort })}${suite}${ouverture}${T.regleFin}`,
+      sources: [T.sourceFfa],
     });
   }
 
@@ -188,12 +196,9 @@ export function avertissementsAge(input: {
   if (input.age != null && input.age < AGE_MEDICAL_MARATHON && effort >= 42) {
     out.push({
       niveau: "medical",
-      categorie: cat.nom,
-      texte: `🩺 AVIS MÉDICAL : l'association internationale des directeurs médicaux de marathons (IMMDA) recommande de réserver le marathon aux athlètes ayant atteint leurs 18 ans. Les motifs qu'elle invoque ne sont pas le cartilage de croissance — les études n'y retrouvent pas de lésion de façon constante — mais le cumul des blessures de surmenage sur un corps encore en développement, une thermorégulation moins efficace qu'à l'âge adulte, le risque de carences nutritionnelles et la charge psychologique de la distance. L'Académie américaine de pédiatrie ajoute qu'au-delà d'environ 5 km chez l'enfant, c'est un avis médical INDIVIDUEL qui doit trancher, pas une règle générale : va voir un médecin du sport avant de t'engager.`,
-      sources: [
-        "IMMDA — déclaration sur les enfants et le marathon",
-        "American Academy of Pediatrics — rapport clinique sur la course de fond chez l'enfant",
-      ],
+      categorie: catNom,
+      texte: T.medical,
+      sources: [T.sourceImmda, T.sourceAap],
     });
   }
   if (out.length) return out;
@@ -209,19 +214,17 @@ export function avertissementsAge(input: {
     // ne correspond pas à ce qu'on a demandé se lit comme un message automatique, et
     // c'est exactement ce qu'il ne faut pas être.
     const marathonEtPlus = effort >= 42;
-    const quoi = marathonEtPlus ? (input.trail ? "Un ultra" : "Un marathon")
-      : input.trail ? "Un trail long" : "Un semi-marathon";
-    const pourquoi = marathonEtPlus
-      ? "c'est l'effort le plus exigeant de la course à pied, et rien ne presse : la plupart des coureurs atteignent leur meilleur niveau sur cette distance entre 28 et 35 ans"
-      : "c'est un vrai palier d'endurance, et il se prépare mieux qu'il ne s'improvise";
-    const paliers = marathonEtPlus
-      ? "un 10 km solide, puis un semi, puis la distance visée"
-      : "un 10 km solide avant de doubler la distance";
+    const quoi = marathonEtPlus ? (input.trail ? T.quoiUltra : T.quoiMarathon)
+      : input.trail ? T.quoiTrailLong : T.quoiSemi;
     out.push({
       niveau: "progression",
-      categorie: cat.nom,
-      texte: `💡 ${quoi} à ${input.age} ans, c'est autorisé (catégorie ${cat.nom}) et parfaitement faisable — mais ${pourquoi}. Le chemin le plus sûr passe par des paliers : ${paliers}. Ton plan est construit pour l'objectif que tu as choisi ; si tu n'as jamais couru la moitié de cette distance, envisage un palier intermédiaire d'abord.`,
-      sources: ["Association of Road Racing Statisticians — âge du pic de performance"],
+      categorie: catNom,
+      texte: T.progression({
+        quoi, age: input.age, categorie: catNom,
+        pourquoi: marathonEtPlus ? T.pourquoiLong : T.pourquoiCourt,
+        paliers: marathonEtPlus ? T.paliersLong : T.paliersCourt,
+      }),
+      sources: [T.sourceArrs],
     });
   }
 

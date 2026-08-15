@@ -67,11 +67,18 @@ export async function POST(req: Request) {
   // c'est le sien. On informe, on ne décide pas à sa place.
   const alerteAge = await (async () => {
     try {
-      const { data: prof } = await sb.from("profiles").select("age").eq("id", user.id).maybeSingle();
-      const age = (prof as { age?: number | null } | null)?.age ?? null;
+      const { data: prof } = await sb.from("profiles").select("age, preferred_language").eq("id", user.id).maybeSingle();
+      const p = prof as { age?: number | null; preferred_language?: string | null } | null;
+      const age = p?.age ?? null;
       const { avertissementsAge } = await import("@/lib/coach/ageDistance");
+      // La langue de l'athlète : citer un règlement FRANÇAIS, en français, à un athlète
+      // allemand ne l'informe de rien. Les versions étrangères précisent d'ailleurs que
+      // la limite vaut « en France » et invitent à vérifier le règlement local.
+      const langues = ["fr", "en", "de", "es", "pt"] as const;
+      const lang = langues.includes((p?.preferred_language ?? "") as typeof langues[number])
+        ? (p!.preferred_language as typeof langues[number]) : "fr";
       return avertissementsAge({
-        age, distanceKm,
+        age, distanceKm, lang,
         trail: /trail|utmb|ultra|vertical|\bkv\b|montagne/i.test(race) || distanceKm > 45,
       });
     } catch { return []; }

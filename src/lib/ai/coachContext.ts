@@ -1289,8 +1289,11 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
     // TOUS les avertissements, pas seulement le plus grave : à 16 ans, un objectif
     // marathon se heurte à la règle fédérale ET à l'avis médical de l'IMMDA. Ce ne
     // sont pas deux formulations du même argument, ce sont deux faits différents.
+    const langues = ["fr", "en", "de", "es", "pt"] as const;
+    const langAthlete = langues.includes(String(p?.preferred_language ?? "") as typeof langues[number])
+      ? (String(p?.preferred_language) as typeof langues[number]) : "fr";
     for (const a of avertissementsAge({
-      age: num(p?.age), distanceKm: objective.distanceKm,
+      age: num(p?.age), distanceKm: objective.distanceKm, lang: langAthlete,
       // Le D+ de l'épreuve n'est pas connu ; en trail, la limite fédérale s'exprime en
       // km effort, donc l'avertissement est PRUDENT (il sous-estime plutôt que d'inventer).
       trail: libGoal === "trail" || libGoal === "ultra",
