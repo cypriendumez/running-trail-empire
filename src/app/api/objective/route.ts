@@ -60,5 +60,22 @@ export async function POST(req: Request) {
     } catch { /* e-mail best-effort : l'objectif est déjà enregistré */ }
   }
 
-  return NextResponse.json({ ok: true, objective: data });
+  // ── AVERTISSEMENT D'ÂGE, AU MOMENT OÙ IL COMPTE ─────────────────────────────
+  // Le calendrier l'affiche déjà, mais trois jours plus tard. L'instant utile est
+  // CELUI-CI : l'athlète vient de choisir sa course, il peut encore en changer.
+  // On n'a JAMAIS bloqué l'enregistrement — l'objectif est déjà écrit ci-dessus,
+  // c'est le sien. On informe, on ne décide pas à sa place.
+  const alerteAge = await (async () => {
+    try {
+      const { data: prof } = await sb.from("profiles").select("age").eq("id", user.id).maybeSingle();
+      const age = (prof as { age?: number | null } | null)?.age ?? null;
+      const { avertissementAge } = await import("@/lib/coach/ageDistance");
+      return avertissementAge({
+        age, distanceKm,
+        trail: /trail|utmb|ultra|vertical|\bkv\b|montagne/i.test(race) || distanceKm > 45,
+      });
+    } catch { return null; }
+  })();
+
+  return NextResponse.json({ ok: true, objective: data, avertissementAge: alerteAge });
 }

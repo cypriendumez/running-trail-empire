@@ -11,6 +11,7 @@ import { bestVmaFromWorkouts, vmaFromPaceCurve, vmaFromVo2max } from "@/lib/runn
 import { isRun } from "@/lib/intervals/sport";
 import { summarizeCross, fmtMinutes, type CrossSummary } from "@/lib/coach/crossTraining";
 import { computeQualityBudget } from "@/lib/coach/qualityBudget";
+import { avertissementAge } from "@/lib/coach/ageDistance";
 import { warmCoolMin } from "@/lib/watch/intervals";
 
 type SB = Awaited<ReturnType<typeof createClient>>;
@@ -1280,6 +1281,18 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
     const plannedPeak = Math.max(0, ...macroPlan.map(w => w.longRunKm));
     const gap = longRunGap(plannedPeak, longRunPeakKm(libGoal as RaceGoal, objective.distanceKm), objective.distanceKm);
     if (gap) out.push(gap);
+    // 3. L'ÂGE autorise-t-il cette distance ? Un athlète de 18 ans qui vise un marathon
+    // ne pourra pas s'inscrire à une épreuve officielle en France (limite Junior : 25 km).
+    // On ne le bloque pas — c'est son objectif, son plan est construit — mais le lui
+    // taire serait le laisser préparer une course à laquelle il n'a pas accès.
+    // Voir lib/coach/ageDistance : la règle vient du règlement fédéral, pas d'une opinion.
+    const alerteAge = avertissementAge({
+      age: num(p?.age), distanceKm: objective.distanceKm,
+      // Le D+ de l'épreuve n'est pas connu ; en trail, la limite fédérale s'exprime en
+      // km effort, donc l'avertissement est PRUDENT (il sous-estime plutôt que d'inventer).
+      trail: libGoal === "trail" || libGoal === "ultra",
+    });
+    if (alerteAge) out.push(alerteAge.texte);
     return out;
   })();
 

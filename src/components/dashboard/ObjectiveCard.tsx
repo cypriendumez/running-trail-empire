@@ -48,6 +48,9 @@ export function ObjectiveCard({ objective, currentVma }: { objective: Objective 
   const [ts, setTs] = useState(s0 % 60 ? String(s0 % 60) : "");
   const [date, setDate] = useState(objective?.raceDate ?? "");
   const [saving, setSaving] = useState(false);
+  /** Avertissement lié à l'âge, renvoyé par l'API au moment de l'enregistrement.
+   *  Affiché SOUS l'objectif, et refermable : c'est une information, pas une punition. */
+  const [avertissement, setAvertissement] = useState<{ niveau: string; texte: string } | null>(null);
 
   // Autocomplétion des courses (catalogue) → sélection auto-remplit distance + date.
   const [sug, setSug] = useState<RaceSug[]>([]);
@@ -89,7 +92,20 @@ export function ObjectiveCard({ objective, currentVma }: { objective: Objective 
         body: JSON.stringify({ race: race.trim(), distanceKm: Number(distance), targetTime: `${Number(th) || 0}:${Number(tm) || 0}:${Number(ts) || 0}`, raceDate: date }),
       });
       const j = await r.json();
-      if (j.ok) { toast.success(t("obj.ok")); setEditing(false); router.refresh(); }
+      if (j.ok) {
+        toast.success(t("obj.ok"));
+        // ── AVERTISSEMENT D'ÂGE ────────────────────────────────────────────────
+        // L'objectif est ENREGISTRÉ quoi qu'il arrive : c'est le sien, on ne décide
+        // pas à sa place. Mais un athlète de 18 ans qui vise un marathon ne pourra
+        // pas s'inscrire à une épreuve officielle en France, et l'apprendre après
+        // douze semaines de préparation serait cruel. On le lui dit maintenant,
+        // pendant qu'il peut encore choisir une autre course.
+        if (j.avertissementAge?.texte) {
+          setAvertissement(j.avertissementAge as { niveau: string; texte: string });
+        }
+        setEditing(false);
+        router.refresh();
+      }
       else toast.error(j.error || t("obj.fail"));
     } catch { toast.error(t("obj.saveFail")); }
     finally { setSaving(false); }
@@ -120,6 +136,21 @@ export function ObjectiveCard({ objective, currentVma }: { objective: Objective 
             <Pencil className="h-3 w-3" /> {t("obj.edit")}
           </button>
         </div>
+        {/* Avertissement d'âge. Ambre pour un conseil de progression, rouge quand la
+            distance n'est pas autorisée par le règlement fédéral — la nuance compte :
+            l'un se discute, l'autre empêche de s'inscrire. */}
+        {avertissement && (
+          <div className={`mt-2.5 rounded-xl border px-3 py-2 text-xs leading-relaxed ${
+            avertissement.niveau === "reglement"
+              ? "border-red-200 bg-red-50 text-red-900"
+              : "border-amber-200 bg-amber-50 text-amber-900"}`}>
+            <p>{avertissement.texte}</p>
+            <button onClick={() => setAvertissement(null)}
+              className="mt-1.5 text-[11px] font-semibold underline underline-offset-2 opacity-70 hover:opacity-100">
+              {t("obj.warnClose")}
+            </button>
+          </div>
+        )}
       </motion.div>
     );
   }

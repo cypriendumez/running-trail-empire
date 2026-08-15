@@ -19,6 +19,7 @@ import { shardForPass, replanIfFresh } from "../src/lib/intervals/syncAndCoach";
 import { buildPlanReadyEmail } from "../src/lib/notify/planReady";
 import { poseAt, capLisse } from "../src/lib/segments/flyover";
 import { contientGrosMot, premierGrosMot, NB_FORMES_SURVEILLEES } from "../src/lib/social/moderation";
+import { avertissementAge, kmEffort } from "../src/lib/coach/ageDistance";
 import { vmaFromPaceCurve, bestVmaFromWorkouts } from "../src/lib/running/fitness";
 import { heatAdvice, windAdvice, altitudeLossPct, heatAcclimation } from "../src/lib/weather/openMeteo";
 import { parseReps, parsePaceSec, stepsForType, warmCoolMin, buildWorkoutDescription } from "../src/lib/watch/intervals";
@@ -2398,6 +2399,93 @@ test("la chaîne sync → analyse → replanification → montre n'existe qu'à 
     assert.ok(!/autoCoachForUser/.test(src), `${f} rappelle le coach directement au lieu de passer par replanIfFresh`);
     assert.ok(!/importMissingTracks/.test(src), `${f} garde sa propre importation de traces`);
   }
+});
+
+console.log("\nÂGE & DISTANCE — avertir un jeune athlète sans jamais le bloquer");
+test("18 ans + marathon : la distance n'est PAS autorisée, et on le dit", () => {
+  // Règlement FFA : Junior/U20 (18-19 ans) est limité à 25 km ; le marathon n'ouvre
+  // qu'à partir d'Espoir/U23, soit 20 ans. Un athlète de 18 ans qui prépare un
+  // marathon pendant douze semaines ne pourra pas s'inscrire — le lui taire serait
+  // le laisser courir après une course à laquelle il n'a pas accès.
+  const a = avertissementAge({ age: 18, distanceKm: 42.2 });
+  assert.equal(a?.niveau, "reglement");
+  assert.ok(/Junior/.test(a!.texte), "la catégorie doit être nommée");
+  assert.ok(/25 km/.test(a!.texte), "la limite chiffrée doit figurer");
+  assert.ok(/20 ans/.test(a!.texte), "on doit dire QUAND ça s'ouvre");
+  assert.ok(/semi-marathon/.test(a!.texte), "on doit nommer le palier accessible AUJOURD'HUI");
+});
+test("18 ans + semi : autorisé — on n'invente pas d'interdiction", () => {
+  // 21,1 km passe sous la limite des 25 km. Un avertissement de règlement ici serait
+  // FAUX, et un athlète à qui on interdit à tort ne fait plus confiance au reste.
+  const a = avertissementAge({ age: 18, distanceKm: 21.1 });
+  assert.equal(a?.niveau, "progression", "le semi doit rester autorisé à 18 ans");
+  assert.ok(!/NON AUTORISÉE/.test(a!.texte));
+});
+test("16 ans : la limite descend à 15 km", () => {
+  assert.equal(avertissementAge({ age: 16, distanceKm: 21.1 })?.niveau, "reglement");
+  assert.ok(/15 km/.test(avertissementAge({ age: 16, distanceKm: 21.1 })!.texte));
+  assert.ok(/10 km/.test(avertissementAge({ age: 16, distanceKm: 21.1 })!.texte), "le palier accessible est le 10 km");
+  assert.equal(avertissementAge({ age: 16, distanceKm: 10 }), null, "un 10 km à 16 ans ne mérite aucune alerte");
+});
+test("le TRAIL compte en km effort : le dénivelé alourdit, il n'allège pas", () => {
+  // 20 km avec 1 000 m de D+ valent 30 km effort — au-dessus de la limite Junior,
+  // alors que 20 km de plat passent. C'est le sens physiologique : grimper coûte.
+  assert.equal(kmEffort(20, 1000), 30);
+  assert.equal(kmEffort(23, 300), 26);
+  assert.equal(avertissementAge({ age: 18, distanceKm: 20, deniveleM: 1000, trail: true })?.niveau, "reglement");
+  assert.equal(avertissementAge({ age: 18, distanceKm: 20, deniveleM: 0, trail: true }), null);
+  // Sans dénivelé connu, on ne majore RIEN : on n'invente pas le profil d'une course.
+  assert.equal(kmEffort(20, null), 20);
+});
+test("un adulte n'est jamais sermonné", () => {
+  // Le risque de ce genre de garde-fou est de devenir un moralisateur permanent.
+  for (const age of [23, 30, 45, 60]) {
+    assert.equal(avertissementAge({ age, distanceKm: 42.2 }), null, `${age} ans : avertissement injustifié`);
+    assert.equal(avertissementAge({ age, distanceKm: 160 }), null, `${age} ans : ultra injustement signalé`);
+  }
+});
+test("20-22 ans + marathon : autorisé, avec un CONSEIL clairement annoncé comme tel", () => {
+  const a = avertissementAge({ age: 20, distanceKm: 42.2 });
+  assert.equal(a?.niveau, "progression");
+  assert.ok(/autorisé/.test(a!.texte), "il faut dire que c'est permis, sinon on décourage à tort");
+  assert.ok(/paliers/.test(a!.texte), "le conseil doit être actionnable");
+});
+test("le conseil PARLE de la distance demandée, pas d'une autre", () => {
+  // Défaut vu en lisant le rendu réel : le texte servi pour un SEMI parlait du marathon
+  // (« l'effort le plus exigeant », « meilleur niveau entre 28 et 35 ans »). Un conseil
+  // qui ne correspond pas à la question posée se lit comme un message automatique.
+  const semi = avertissementAge({ age: 20, distanceKm: 21.1 })!.texte;
+  assert.ok(/semi-marathon/.test(semi), "le semi doit être nommé");
+  assert.ok(!/28 et 35 ans/.test(semi), "l'âge du pic MARATHON n'a rien à faire dans un conseil sur le semi");
+  const mara = avertissementAge({ age: 20, distanceKm: 42.2 })!.texte;
+  assert.ok(/28 et 35 ans/.test(mara), "sur marathon, le repère d'âge est pertinent");
+  const ultra = avertissementAge({ age: 21, distanceKm: 80, trail: true })!.texte;
+  assert.ok(/ultra/i.test(ultra), "un ultra ne s'appelle pas « marathon »");
+});
+test("les nombres sont écrits en français", () => {
+  // « 42.2 km » au milieu d'une phrase française trahit une chaîne de débogage.
+  const t = avertissementAge({ age: 18, distanceKm: 42.2 })!.texte;
+  assert.ok(/42,2 km/.test(t), `séparateur décimal anglais : ${t.slice(0, 160)}`);
+  assert.ok(!/42\.2/.test(t));
+});
+test("sans âge connu, on se tait", () => {
+  // Deviner une catégorie pour avertir quelqu'un serait avertir sur une supposition.
+  for (const age of [null, undefined, NaN, 0, 200]) {
+    assert.equal(avertissementAge({ age: age as number, distanceKm: 42.2 }), null, `âge ${age} : avertissement fabriqué`);
+  }
+});
+test("on n'invente AUCUN seuil médical", () => {
+  // « Le marathon, c'est mieux après 25 ans » circule beaucoup, mais aucune source
+  // consultée ne l'établit. La règle vérifiable est fédérale : 20 ans. Affirmer une
+  // recommandation médicale inexistante, sur un sujet de santé, serait le pire défaut
+  // possible dans cette application.
+  const textes = [18, 20, 22].map((age) => avertissementAge({ age, distanceKm: 42.2 })?.texte ?? "");
+  for (const t of textes) {
+    assert.ok(!/25 ans/.test(t), "un seuil médical de 25 ans est affirmé sans source");
+    assert.ok(!/les médecins (disent|recommandent|déconseillent)/i.test(t), "prêter un avis collectif aux médecins sans source");
+  }
+  // Et la source de la règle, elle, doit être NOMMÉE.
+  assert.ok(/Fédération française d'athlétisme/.test(textes[0]), "la source de la règle doit être citée");
 });
 
 console.log("\nMODÉRATION — bloquer les insultes SANS punir les innocents");
