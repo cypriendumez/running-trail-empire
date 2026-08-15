@@ -2,6 +2,8 @@ export const dynamic = "force-dynamic";
 import { isRun } from "@/lib/intervals/sport";
 import { createClient } from "@/lib/supabase/server";
 import { LeaguesHub } from "@/components/gamification/LeaguesHub";
+import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
+import { computeStreak, jourLocal, decaleJour, type StreakWorkout, type StreakPrescription } from "@/lib/streak/compute";
 
 export const metadata = { title: "Ligues & Gamification | Pacevo" };
 
@@ -19,6 +21,8 @@ export default async function LeaguesPage() {
     { data: workouts },
     { data: userBadges },
     { data: challenges },
+    { data: streakPlan },
+    { data: streakFeedback },
   ] = await Promise.all([
     supabase.from("profiles").select("full_name, avatar_url, discipline_score, league").eq("id", user.id).single(),
 
@@ -34,7 +38,7 @@ export default async function LeaguesPage() {
     // Workouts this year for badge computation
     supabase
       .from("workouts")
-      .select("id, date, distance_km, duration_seconds, elevation_gain_m, type, sport, avg_pace_min_km")
+      .select("id, date, distance_km, duration_seconds, elevation_gain_m, type, sport, avg_pace_min_km, tss, training_effect")
       .eq("user_id", user.id)
       .gte("date", yearStart)
       .order("date", { ascending: false }),
@@ -50,6 +54,17 @@ export default async function LeaguesPage() {
       .from("challenge_members")
       .select("km_contributed, team_challenges(id, name, description, total_km, current_km, end_date)")
       .eq("user_id", user.id),
+
+    // Prescriptions et ressentis : LA SÉRIE se juge sur le plan, pas sur la course brute.
+    // Triées par created_at décroissant — `oneSessionPerSlot` garde la première vue de
+    // chaque créneau, donc la décision la plus récente.
+    supabase.from("notifications").select("created_at, data")
+      .eq("user_id", user.id).eq("type", "coach_session")
+      .gte("data->>date", decaleJour(jourLocal(), -119))
+      .order("created_at", { ascending: false }).limit(600),
+    supabase.from("notifications").select("data")
+      .eq("user_id", user.id).eq("type", "session_feedback")
+      .order("created_at", { ascending: false }).limit(200),
   ]);
 
   // If in a league, fetch all members of that league
@@ -84,12 +99,11 @@ export default async function LeaguesPage() {
   const paces = allWorkouts.map((w) => num(w.avg_pace_min_km)).filter((p) => p > 2.5 && p < 12);
   const bestPace = paces.length ? Math.min(...paces) : 0; // min/km — plus bas = plus rapide
 
-  // Série en cours (jours consécutifs), avec tolérance « pas encore couru aujourd'hui ».
+  // Jours DIFFÉRENTS courus dans l'année — une somme, pas une chaîne : elle ne pousse
+  // personne à enchaîner. Le décompte de jours consécutifs COURUS qui vivait ici a été
+  // retiré : il alimentait sept badges et calculait « aujourd'hui » en UTC
+  // (`toISOString()`), donc un cran à côté passé minuit à l'est de Greenwich.
   const dates = new Set(allWorkouts.map((w) => String(w.date).slice(0, 10)));
-  let streak = 0;
-  const d = new Date();
-  if (!dates.has(d.toISOString().slice(0, 10))) d.setDate(d.getDate() - 1);
-  while (dates.has(d.toISOString().slice(0, 10))) { streak++; d.setDate(d.getDate() - 1); }
   const distinctDays = dates.size;
 
   // Volume mensuel
@@ -125,9 +139,28 @@ export default async function LeaguesPage() {
   const winterRun = [12, 1, 2].some((m) => monthSet.has(m));
   const allSeasons = [12, 1, 2].some((m) => monthSet.has(m)) && [3, 4, 5].some((m) => monthSet.has(m)) && [6, 7, 8].some((m) => monthSet.has(m)) && [9, 10, 11].some((m) => monthSet.has(m));
   const fastRuns = paces.filter((p) => p <= 5).length;
-  const sortedDayTs = [...dates].map((ds) => new Date(ds + "T00:00:00").getTime()).sort((a, b) => a - b);
-  let longestStreak = 0, curStreak = 0; let prevTs: number | null = null;
-  for (const t of sortedDayTs) { curStreak = prevTs !== null && t - prevTs === 86400000 ? curStreak + 1 : 1; longestStreak = Math.max(longestStreak, curStreak); prevTs = t; }
+  // ── SÉRIE — jours consécutifs EN ACCORD AVEC LE PLAN ────────────────────────
+  // Le décompte précédent comptait les jours COURUS d'affilée, et deux badges
+  // « légendaires » récompensaient 50 puis 100 jours consécutifs de course. Dans une
+  // application qui prescrit deux journées sans course par semaine (vérifié sur le
+  // compte de production : Repos + Renfo), ces badges n'étaient atteignables qu'en
+  // désobéissant au coach sept à quatorze semaines de suite. On mesure désormais la
+  // même chose que la carte du tableau de bord : une seule définition de « série »
+  // dans toute l'application, et elle récompense la régularité, pas l'entêtement.
+  const serie = computeStreak({
+    // `workouts` BRUT, pas `allWorkouts` : ce dernier est filtré aux seules courses.
+    // L'utiliser ici ferait casser la série par une journée de vélo sur cette page
+    // pendant qu'elle la tiendrait sur le tableau de bord — deux réponses différentes
+    // à la même question, dans la même application.
+    workouts: (workouts ?? []) as unknown as StreakWorkout[],
+    prescriptions: oneSessionPerSlot(
+      (streakPlan ?? []) as { data: StreakPrescription }[],
+      (r) => slotKey(r.data as { date?: unknown; moment?: unknown }),
+    ).map((r) => r.data),
+    feedbacks: ((streakFeedback ?? []) as { data: { date?: unknown; pain?: unknown } }[]).map((r) => r.data),
+    today: jourLocal(),
+  });
+  const longestStreak = serie.best;
 
   type Rarity = "common" | "rare" | "epic" | "legendary";
   const badge = (id: string, name: string, icon: string, rarity: Rarity, description: string, unlocked: boolean, progress: number, max: number) =>
@@ -150,11 +183,14 @@ export default async function LeaguesPage() {
     // Volume mensuel
     badge("month_100", "100 km en un mois", "💪", "epic", "Courir 100 km sur un seul mois", maxMonthKm >= 100, maxMonthKm, 100),
     badge("month_200", "Machine de guerre", "🔱", "legendary", "Courir 200 km sur un seul mois", maxMonthKm >= 200, maxMonthKm, 200),
-    // Régularité / séries
-    badge("streak_3", "Sur la lancée", "✨", "common", "Courir 3 jours d'affilée", streak >= 3, streak, 3),
-    badge("streak_7", "7 jours de feu", "🔥", "rare", "Courir 7 jours d'affilée", streak >= 7, streak, 7),
-    badge("streak_14", "Inarrêtable", "⚡", "epic", "Courir 14 jours d'affilée", streak >= 14, streak, 14),
-    badge("streak_30", "Mois de feu", "🌋", "legendary", "Courir 30 jours d'affilée", streak >= 30, streak, 30),
+    // ── Régularité / séries — mesurées SUR LE PLAN, jamais sur des jours de course
+    //    enchaînés. Un jour de repos prescrit et respecté fait avancer ces badges au
+    //    même titre qu'une séance : c'est la seule façon qu'ils soient atteignables
+    //    sans désobéir au coach. Le record (`longestStreak`) sert de progression, pour
+    //    qu'une série passée reste acquise.
+    badge("plan_streak_3", "Sur la lancée", "✨", "common", "Trois jours d'affilée en accord avec ton plan", longestStreak >= 3, longestStreak, 3),
+    badge("plan_streak_7", "Une semaine pleine", "🔥", "rare", "Sept jours d'affilée en accord avec ton plan — repos prescrits compris", longestStreak >= 7, longestStreak, 7),
+    badge("plan_streak_14", "Deux semaines", "⚡", "epic", "Quatorze jours d'affilée en accord avec ton plan", longestStreak >= 14, longestStreak, 14),
     badge("days_50", "Habitué", "📆", "rare", "Courir 50 jours différents dans l'année", distinctDays >= 50, distinctDays, 50),
     badge("days_100", "Centaine de jours", "🗓️", "epic", "Courir 100 jours différents dans l'année", distinctDays >= 100, distinctDays, 100),
     // Séances
@@ -181,8 +217,6 @@ export default async function LeaguesPage() {
     badge("month_150", "150 km en un mois", "🦾", "legendary", "Courir 150 km sur un seul mois", maxMonthKm >= 150, maxMonthKm, 150),
     badge("bigweek_100", "Grosse semaine", "🌪️", "epic", "100 km sur 7 jours glissants", bigWeek >= 100, bigWeek, 100),
     badge("hours_100", "100 heures", "⏱️", "epic", "Cumuler 100 h de course sur l'année", totalHours >= 100, totalHours, 100),
-    // Régularité
-    badge("streak_21", "21 jours d'affilée", "🧱", "epic", "Courir 21 jours consécutifs", streak >= 21, streak, 21),
     badge("sessions_50", "50 séances", "📋", "common", "Compléter 50 séances", sessions >= 50, sessions, 50),
     badge("sessions_250", "250 séances", "🏵️", "legendary", "Compléter 250 séances", sessions >= 250, sessions, 250),
     badge("days_200", "200 jours courus", "🗓️", "legendary", "Courir 200 jours différents dans l'année", distinctDays >= 200, distinctDays, 200),
@@ -210,8 +244,8 @@ export default async function LeaguesPage() {
     badge("month_300", "300 km en un mois", "☄️", "legendary", "Courir 300 km sur un seul mois", maxMonthKm >= 300, maxMonthKm, 300),
     badge("months100_6", "Six mois à 100", "📚", "legendary", "6 mois différents à plus de 100 km", monthsOver100 >= 6, monthsOver100, 6),
     // Régularité / séries
-    badge("streak_50", "50 jours d'affilée", "🧊", "legendary", "Courir 50 jours consécutifs", longestStreak >= 50, longestStreak, 50),
-    badge("streak_100", "100 jours d'affilée", "💠", "legendary", "Courir 100 jours consécutifs", longestStreak >= 100, longestStreak, 100),
+    badge("plan_streak_30", "30 jours en accord", "🧊", "epic", "Trente jours d'affilée en accord avec ton plan — jours de repos prescrits compris", longestStreak >= 30, longestStreak, 30),
+    badge("plan_streak_90", "90 jours en accord", "💠", "legendary", "Quatre-vingt-dix jours d'affilée en accord avec ton plan", longestStreak >= 90, longestStreak, 90),
     badge("weeks_10", "10 semaines actives", "📊", "rare", "Courir sur 10 semaines différentes", weeksActive >= 10, weeksActive, 10),
     badge("weeks_26", "Demi-saison", "🌗", "epic", "Courir sur 26 semaines différentes", weeksActive >= 26, weeksActive, 26),
     badge("weeks_52", "Toute l'année", "♾️", "legendary", "Courir sur 52 semaines différentes", weeksActive >= 52, weeksActive, 52),
@@ -315,7 +349,7 @@ export default async function LeaguesPage() {
       myChallenges={(challenges ?? []) as Record<string, unknown>[]}
       availableChallenges={(availableChallenges ?? []) as Record<string, unknown>[]}
       autoChallenges={autoChallenges}
-      stats={{ totalKm: Math.round(totalKm), streak, sessions: allWorkouts.length, elevation: Math.round(totalElev) }}
+      stats={{ totalKm: Math.round(totalKm), streak: serie.current, sessions: allWorkouts.length, elevation: Math.round(totalElev) }}
       records={records}
     />
   );

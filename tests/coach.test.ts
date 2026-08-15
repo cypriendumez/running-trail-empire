@@ -27,6 +27,8 @@ import { heatAdvice, windAdvice, altitudeLossPct, heatAcclimation } from "../src
 import { parseReps, parsePaceSec, stepsForType, warmCoolMin, buildWorkoutDescription } from "../src/lib/watch/intervals";
 import { buildWeekPlan, CONFIRMED_DAYS } from "../src/lib/ai/autoPlan";
 import { tr, ALL_LANGS, nRaw } from "../src/lib/i18n/multi";
+// `T` est déjà pris plus bas dans ce fichier (une date) → alias explicite.
+import { T as T_UI } from "../src/lib/i18n/translations";
 import { ppsExpiration, ppsVerdict, ppsDemandeAction, couvertureCourses, PPS_URL, PPS_PRIX_EUR, PPS_VALIDITE_MOIS } from "../src/lib/pps/status";
 import { PPS_T } from "../src/lib/pps/ppsI18n";
 import { PLAN_T, libelleType } from "../src/lib/ai/planI18n";
@@ -64,6 +66,10 @@ import { findEfforts, leaderboard, maitreDuSegment } from "../src/lib/segments/m
 import { heatCells, intensity, denseBounds, heatBounds, type HeatCell as HC } from "../src/lib/segments/heatmap";
 import { computeSplits, splitPace, elevationProfile, metricSeries } from "../src/lib/segments/splits";
 import { challengeProgress, challengeLeaderboard, daysLeft, notStarted, inWindow, type Challenge } from "../src/lib/challenges/progress";
+import {
+  computeStreak, decaleJour, ecartJours, acwrAu, jourLocal,
+  type StreakWorkout as SW,
+} from "../src/lib/streak/compute";
 
 let passed = 0;
 const fails: string[] = [];
@@ -3706,6 +3712,333 @@ test("seule une séance NOUVELLE déclenche un e-mail", () => {
   // Le cron de nuit, lui, ne doit PAS demander de notification.
   assert.ok(!/notify: true/.test(codeOf("src/app/api/cron/auto-coach/route.ts")), "le filet de nuit envoie des e-mails");
 });
+
+console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le coach");
+// Une flamme à la Duolingo qui compterait « avoir couru » casserait le premier jour de
+// repos venu. Sur le compte de production, le plan pose 2 journées sans course sur 7
+// (Repos 17/08, Renfo 21/08) : une série naïve valait 3 jours et allait casser le
+// surlendemain, sur le jour de repos PRESCRIT. Ces tests figent l'inverse.
+{
+  const AUJ = "2026-08-15";
+  /** Séance enregistrée : 45 min de footing par défaut. */
+  const wk = (date: string, over: Partial<SW> = {}): SW =>
+    ({ date, sport: "run", type: "easy", duration_seconds: 45 * 60, distance_km: 9, tss: 50, ...over });
+  /** Prescription du coach pour une date. */
+  const px = (date: string, sessionType: string, moment?: string) => ({ date, sessionType, ...(moment ? { moment } : {}) });
+  /** Une semaine pleine de footings prescrits ET réalisés, du plus ancien au plus récent. */
+  const semaine = (fin: string, n: number) => {
+    const w: SW[] = [], p: { date: string; sessionType: string }[] = [];
+    for (let i = n - 1; i >= 0; i--) { const d = decaleJour(fin, -i); w.push(wk(d)); p.push(px(d, "Endurance")); }
+    return { w, p };
+  };
+
+  test("un jour de REPOS prescrit et respecté ENTRETIENT la série", () => {
+    // Le cœur du modèle. Sans cette règle, l'app pousserait à courir un jour où son
+    // propre coach a écrit « repos complet » — elle deviendrait la cause des blessures
+    // qu'elle prétend prévenir.
+    const base = semaine(decaleJour(AUJ, -1), 6);
+    const r = computeStreak({
+      today: AUJ,
+      workouts: base.w,                                   // AUCUNE séance aujourd'hui
+      prescriptions: [...base.p, px(AUJ, "Repos")],
+      feedbacks: [],
+    });
+    assert.equal(r.today?.verdict, "tenu", "le repos respecté doit TENIR la journée");
+    assert.equal(r.today?.reason, "repos-respecte");
+    assert.equal(r.current, 7, "6 jours courus + le repos respecté = 7");
+  });
+
+  test("un jour de repos où l'athlète court quand même ne CASSE pas la série", () => {
+    // On ne récompense pas la désobéissance au coach (le jour ne compte pas), mais
+    // aucune mécanique de cette app ne doit SANCTIONNER le fait de courir.
+    const base = semaine(decaleJour(AUJ, -1), 6);
+    const r = computeStreak({
+      today: AUJ,
+      workouts: [...base.w, wk(AUJ, { duration_seconds: 110 * 60, distance_km: 22 })],
+      prescriptions: [...base.p, px(AUJ, "Repos")],
+      feedbacks: [],
+    });
+    assert.equal(r.today?.verdict, "hors", "une grosse sortie un jour de repos n'est pas « tenue »");
+    assert.equal(r.today?.reason, "repos-charge");
+    assert.equal(r.current, 6, "la série d'avant est intacte, elle n'est simplement pas incrémentée");
+  });
+
+  test("un jour de fraîcheur ROUGE ne casse pas la série", () => {
+    // Constaté sur le compte réel le 08/08 : ratio aigu:chronique 3,16, séance de
+    // récupération prescrite, rien d'enregistré. Le tableau de bord affichait
+    // « Déload recommandé » le même jour — casser la série pour avoir obéi aurait été
+    // une contradiction pure entre deux cartes du même écran.
+    const rouge = decaleJour(AUJ, -6);
+    const w: SW[] = [];
+    // Base chronique crédible : 27 journées de charge modérée…
+    for (let i = 40; i >= 14; i--) w.push(wk(decaleJour(AUJ, -i), { tss: 40, duration_seconds: 40 * 60 }));
+    // …puis une semaine très chargée → au jour rouge, le ratio dépasse 2.
+    for (let i = 13; i >= 7; i--) w.push(wk(decaleJour(AUJ, -i), { tss: 200, duration_seconds: 110 * 60 }));
+    // AUJ-6 : RIEN. Puis la reprise.
+    for (let i = 5; i >= 0; i--) w.push(wk(decaleJour(AUJ, -i)));
+    const p = Array.from({ length: 14 }, (_, i) => px(decaleJour(AUJ, -i), "Endurance"));
+    const r = computeStreak({ today: AUJ, workouts: w, prescriptions: p, feedbacks: [] });
+    const jr = r.days.find((d) => d.date === rouge);
+    assert.equal(jr?.verdict, "protege", "un jour manqué en surcharge doit être protégé");
+    assert.equal(jr?.reason, "protege-charge");
+    // 13 journées prescrites et honorées, DE PART ET D'AUTRE du jour rouge : le jour
+    // protégé fait le PONT au lieu de couper.
+    assert.equal(r.current, 13, "le jour rouge ne coupe pas la série, il l'enjambe");
+  });
+
+  test("une séance synchronisée 2 jours en retard ne casse PAS la série rétroactivement", () => {
+    // LE défaut le plus grave de ce genre de mécanique : intervals.icu livre par
+    // balayage, avec 0 à 3 jours de retard mesurés sur le compte de production. Un
+    // compteur PERSISTÉ serait décrémenté à minuit et la casse serait déjà écrite quand
+    // la séance arriverait. Ici, la série est recalculée depuis les faits : la séance
+    // retardée RÉPARE la journée au lieu de la perdre.
+    const base = semaine(decaleJour(AUJ, -3), 6);           // AUJ-8 … AUJ-3, contigus
+    const retard = decaleJour(AUJ, -2);
+    const presc = [...base.p, px(retard, "Seuil"), px(decaleJour(AUJ, -1), "Endurance"), px(AUJ, "Endurance")];
+    const suite = [wk(decaleJour(AUJ, -1)), wk(AUJ)];
+
+    const avant = computeStreak({ today: AUJ, workouts: [...base.w, ...suite], prescriptions: presc, feedbacks: [] });
+    assert.equal(avant.days.find((d) => d.date === retard)?.verdict, "attente",
+      "tant qu'elle n'est pas synchronisée, la journée attend — elle n'est pas jugée");
+    assert.equal(avant.current, 8, "la journée en attente n'entame RIEN de la série existante");
+
+    const apres = computeStreak({
+      today: AUJ, workouts: [...base.w, wk(retard), ...suite], prescriptions: presc, feedbacks: [],
+    });
+    assert.equal(apres.days.find((d) => d.date === retard)?.verdict, "tenu");
+    assert.ok(apres.current > avant.current, "la séance en retard doit ALLONGER la série, pas la casser");
+    assert.equal(apres.current, 9, "elle vaut exactement un jour de plus, deux jours après coup");
+  });
+
+  test("une journée en attente de synchro n'est jamais annoncée comme une menace si elle est protégée", () => {
+    // La carte annonçait « le 12/08 sera jugé le 16/08 » pour une journée qui sortait à
+    // un ratio de 1,82 : elle allait être PROTÉGÉE, pas rompue. On annonçait une casse
+    // qui n'aurait jamais eu lieu — exactement le compte à rebours anxiogène proscrit.
+    const w: SW[] = [];
+    for (let i = 34; i >= 8; i--) w.push(wk(decaleJour(AUJ, -i), { tss: 40, duration_seconds: 40 * 60 }));
+    for (let i = 7; i >= 2; i--) w.push(wk(decaleJour(AUJ, -i), { tss: 240, duration_seconds: 120 * 60 }));
+    const p = Array.from({ length: 12 }, (_, i) => px(decaleJour(AUJ, -i), "Endurance"));
+    const r = computeStreak({ today: AUJ, workouts: w, prescriptions: p, feedbacks: [] });
+    assert.ok(r.pending > 0, "il faut bien des journées en attente pour que le test ait un sens");
+    assert.equal(r.threat, null, "une journée déjà protégée par la charge ne menace rien");
+  });
+
+  test("une journée doublée (matin + soir) ne compte que pour UN jour", () => {
+    // Le calendrier déduplique par `date#moment`. Une série qui compterait les séances
+    // afficherait 2 jours pour une seule journée — et sur-récompenserait le doublage,
+    // à rebours de tout le modèle de charge.
+    const j = decaleJour(AUJ, -1);
+    const r = computeStreak({
+      today: AUJ,
+      workouts: [wk(j, { duration_seconds: 30 * 60 }), wk(j, { duration_seconds: 40 * 60 }), wk(AUJ)],
+      prescriptions: [px(j, "Endurance", "matin"), px(j, "Récup", "soir"), px(AUJ, "Endurance")],
+      feedbacks: [],
+    });
+    assert.equal(r.current, 2, "deux séances le même jour font UNE journée tenue");
+    assert.equal(r.days.filter((d) => d.date === j).length, 1, "une seule entrée par date");
+  });
+
+  test("un jour sans aucune prescription ne casse rien", () => {
+    // Sur le compte réel, SEPT SEMAINES (25/06 → 05/08) n'ont reçu aucun plan : le cron
+    // ne tournait pas. Juger ces jours-là aurait fabriqué 49 jours manqués imputés à
+    // l'athlète pour une panne d'infrastructure.
+    const r = computeStreak({
+      today: AUJ,
+      workouts: [wk(decaleJour(AUJ, -20)), wk(decaleJour(AUJ, -19)), wk(AUJ)],
+      prescriptions: [px(decaleJour(AUJ, -20), "Endurance"), px(decaleJour(AUJ, -19), "Endurance"), px(AUJ, "Endurance")],
+      feedbacks: [],
+    });
+    assert.ok(r.days.slice(-19, -1).every((d) => d.verdict === "hors"), "sans plan, les jours sont hors contrat");
+    assert.equal(r.current, 1, "la série repart à la première journée tenue, sans casse imputée");
+  });
+
+  test("une semaine ENTIÈRE sans un seul jour tenu arrête la série", () => {
+    // Sans ce garde-fou, la série du compte réel traversait les sept semaines sans plan
+    // et affichait plus de deux mois : une série qu'aucun comportement ne peut
+    // interrompre ne veut plus rien dire.
+    const vieux = semaine(decaleJour(AUJ, -20), 5);
+    const r = computeStreak({
+      today: AUJ, workouts: [...vieux.w, wk(AUJ)],
+      prescriptions: [...vieux.p, px(AUJ, "Endurance")], feedbacks: [],
+    });
+    assert.equal(r.current, 1, "le trou de 19 jours coupe : seul aujourd'hui compte");
+    assert.equal(r.best, 5, "le record d'avant reste lisible");
+  });
+
+  test("le renfo prescrit est accordé — il n'arrive JAMAIS dans les activités", () => {
+    // Même raison que dans coachContext, qui l'exclut déjà de son calcul d'adhérence :
+    // une séance de gainage au salon n'entre dans `workouts` par aucun chemin. La juger
+    // fabriquerait un jour manqué chaque semaine, pour tout le monde.
+    const base = semaine(decaleJour(AUJ, -1), 3);
+    const r = computeStreak({
+      today: AUJ, workouts: base.w, prescriptions: [...base.p, px(AUJ, "Renfo")], feedbacks: [],
+    });
+    assert.equal(r.today?.verdict, "tenu");
+    assert.equal(r.today?.reason, "renfo");
+  });
+
+  test("une douleur déclarée protège les jours qui suivent", () => {
+    // `session_feedback` est la SEULE source de douleur déclarée qui existe en base :
+    // la table `pain_report` n'existe pas (vérifié sur la base de production).
+    const base = semaine(decaleJour(AUJ, -6), 4);
+    const p = [...base.p, px(decaleJour(AUJ, -5), "Endurance"), px(decaleJour(AUJ, -4), "Endurance"), px(AUJ, "Endurance")];
+    const r = computeStreak({
+      today: AUJ, workouts: [...base.w, wk(AUJ)], prescriptions: p,
+      feedbacks: [{ date: decaleJour(AUJ, -6), pain: ["Genou droit"] }],
+    });
+    assert.equal(r.days.find((d) => d.date === decaleJour(AUJ, -5))?.reason, "protege-douleur");
+    assert.equal(r.days.find((d) => d.date === decaleJour(AUJ, -4))?.reason, "protege-douleur");
+    assert.equal(r.current, 5, "se reposer sur une douleur déclarée ne coûte pas la série");
+  });
+
+  test("« Aucune douleur » n'est pas une douleur", () => {
+    // Le ressenti stocke littéralement `pain: ["Aucune douleur"]` quand tout va bien
+    // (12 lignes sur le compte réel). Le lire comme une douleur rendrait la série
+    // incassable pour quiconque remplit ses ressentis.
+    const base = semaine(decaleJour(AUJ, -6), 4);
+    const r = computeStreak({
+      today: AUJ, workouts: [...base.w, wk(AUJ)],
+      prescriptions: [...base.p, px(decaleJour(AUJ, -5), "Endurance"), px(AUJ, "Endurance")],
+      feedbacks: [{ date: decaleJour(AUJ, -6), pain: ["Aucune douleur"] }],
+    });
+    assert.equal(r.days.find((d) => d.date === decaleJour(AUJ, -5))?.verdict, "rompu");
+  });
+
+  test("une séance prescrite, manquée, sans excuse, casse bien la série", () => {
+    // Le pendant indispensable : une série que rien ne peut casser n'est pas une série.
+    const base = semaine(decaleJour(AUJ, -7), 4);
+    const r = computeStreak({
+      today: AUJ, workouts: [...base.w, wk(decaleJour(AUJ, -1)), wk(AUJ)],
+      prescriptions: [...base.p, px(decaleJour(AUJ, -6), "Endurance"), px(decaleJour(AUJ, -1), "Endurance"), px(AUJ, "Endurance")],
+      feedbacks: [],
+    });
+    assert.equal(r.days.find((d) => d.date === decaleJour(AUJ, -6))?.verdict, "rompu");
+    assert.equal(r.current, 2, "la série repart après la casse");
+  });
+
+  test("le cross-training honore un jour d'entraînement prescrit", () => {
+    // Décision assumée : la série mesure la PRÉSENCE au rendez-vous, pas le contenu —
+    // le contenu reste l'affaire du coach, dont l'adhérence continue de ne compter que
+    // les courses. Punir 1 h de vélo parce que le plan disait « footing » serait le
+    // faux négatif qui tue la confiance dans la mécanique.
+    const r = computeStreak({
+      today: AUJ,
+      workouts: [wk(AUJ, { sport: "bike", type: "ride", duration_seconds: 70 * 60, tss: 60 })],
+      prescriptions: [px(AUJ, "Endurance")], feedbacks: [],
+    });
+    assert.equal(r.today?.verdict, "tenu");
+  });
+
+  test("une activité de 5 minutes ne tient pas la journée", () => {
+    // Garde-fou anti-artefact : un enregistrement GPS oublié 4 minutes dans une poche
+    // ne doit pas valider une séance de seuil.
+    const r = computeStreak({
+      today: AUJ, workouts: [wk(AUJ, { duration_seconds: 5 * 60, distance_km: 0.4 })],
+      prescriptions: [px(AUJ, "Seuil")], feedbacks: [],
+    });
+    assert.equal(r.today?.verdict, "attente", "trop courte pour compter, trop récente pour être jugée");
+  });
+
+  test("un ratio calculé sur une base chronique vide ne protège personne", () => {
+    // Constaté sur le compte réel : après sept semaines sans données, la fenêtre
+    // chronique ne contenait plus que trois journées et le ratio sortait à 4,00. Toute
+    // la reprise se serait déclarée « protégée par la surcharge » — série incassable
+    // pour cause de division par presque rien.
+    const w = [wk(decaleJour(AUJ, -20)), wk(decaleJour(AUJ, -19)), wk(decaleJour(AUJ, -18))];
+    const tss = new Map<string, number>();
+    for (const x of w) tss.set(x.date, 300);
+    assert.equal(acwrAu(decaleJour(AUJ, -18), tss), 0, "3 journées actives ne font pas une base chronique");
+  });
+
+  test("la série ne se calcule jamais en UTC — le repère est la date LOCALE", () => {
+    // `iso()` (autoPlan) écrit les prescriptions en heure LOCALE ; `toISOString()` est en
+    // UTC. Mélanger les deux décale la journée d'un cran passé minuit à l'est de
+    // Greenwich : la série casse chez les uns et pas chez les autres, sans rien signaler.
+    const src = codeOf("src/lib/streak/compute.ts");
+    assert.ok(!/toISOString\(\)/.test(src), "aucune date ne doit passer par toISOString() dans ce module");
+    assert.ok(/getFullYear\(\)/.test(src), "la date locale doit être construite par les accesseurs locaux");
+    // Et le décalage de jours doit rester juste au changement d'heure (ancrage à midi UTC).
+    assert.equal(decaleJour("2026-03-29", 1), "2026-03-30", "passage à l'heure d'été");
+    assert.equal(decaleJour("2026-10-25", 1), "2026-10-26", "retour à l'heure d'hiver");
+    assert.equal(decaleJour("2026-01-01", -1), "2025-12-31", "changement d'année");
+    assert.equal(ecartJours("2026-08-12", "2026-08-15"), 3);
+  });
+
+  test("aucune donnée = aucune série inventée", () => {
+    const r = computeStreak({ today: AUJ, workouts: [], prescriptions: [], feedbacks: [] });
+    assert.equal(r.current, 0);
+    assert.equal(r.since, null, "on ne prétend pas observer une fenêtre qu'on n'a pas");
+  });
+
+  test("la carte n'affiche que des clés de traduction qui EXISTENT", () => {
+    // Une clé absente ne lève rien : `t()` renvoie la clé elle-même, et l'athlète lit
+    // « streak.today.rest » à l'écran. C'est précisément le genre de défaut qu'aucune
+    // relecture n'attrape et qu'aucune exception ne signale.
+    const src = codeOf("src/components/dashboard/StreakCard.tsx");
+    const cles = [...new Set([...src.matchAll(/"(streak\.[a-zA-Z0-9.]+)"/g)].map((m) => m[1]))];
+    assert.ok(cles.length >= 12, `trop peu de clés détectées (${cles.length}) : le test ne prouverait rien`);
+    for (const k of cles) assert.ok(k in T_UI.fr, `clé absente des traductions : ${k}`);
+  });
+
+  test("la série parle les 5 langues, sans trou", () => {
+    // 5 langues obligatoires. Une langue incomplète retomberait sur le français au
+    // milieu d'une carte espagnole, sans que rien ne le signale.
+    const cles = Object.keys(T_UI.fr).filter((k) => k.startsWith("streak."));
+    assert.ok(cles.length >= 18, "le jeu de clés de référence est trop maigre");
+    for (const l of ALL_LANGS) {
+      const manquantes = cles.filter((k) => !(k in T_UI[l]));
+      assert.deepEqual(manquantes, [], `${l} : ${manquantes.length} clé(s) manquante(s)`);
+    }
+  });
+
+  test("aucun badge ne récompense de courir N jours d'affilée", () => {
+    // Défaut RÉEL trouvé en inventoriant l'existant : `/dashboard/leagues` distribuait
+    // deux badges « légendaires » pour 50 puis 100 jours de course consécutifs. Dans une
+    // application qui prescrit deux journées sans course par semaine, ces badges
+    // n'étaient atteignables qu'en désobéissant au coach pendant sept à quatorze
+    // semaines. Les tables `badges` et `user_badges` étant vides en production, ils
+    // n'existaient que dans ce fichier.
+    const src = codeOf("src/app/dashboard/leagues/page.tsx");
+    // Sept badges vivaient là : 3, 7, 14, 21, 30, 50 et 100 jours de COURSE d'affilée.
+    assert.deepEqual([...src.matchAll(/badge\("(streak_\d+)"/g)].map((m) => m[1]), [],
+      "un badge récompense à nouveau des jours de course consécutifs");
+    for (const mort of ["jours consécutifs", "jours d'affilée\", \"🔥\", \"rare\", \"Courir"]) {
+      assert.ok(!src.includes(mort), `formulation « cours tous les jours » réintroduite : ${mort}`);
+    }
+    // Le décompte naïf lui-même doit avoir disparu : il calculait « aujourd'hui » en UTC.
+    assert.ok(!/while \(dates\.has\(/.test(src), "le décompte naïf de jours courus d'affilée est de retour");
+    // Et la série de cette page doit être LA MÊME que celle du tableau de bord.
+    assert.ok(/computeStreak\(/.test(src), "la page ligues ne calcule plus la série sur le plan");
+    assert.ok(/workouts: \(workouts \?\? \[\]\)/.test(src),
+      "la série doit lire les activités BRUTES : `allWorkouts` est filtré aux courses, "
+      + "le vélo casserait la série ici et la tiendrait sur le tableau de bord");
+    assert.ok(/streak: serie\.current/.test(src), "la statistique d'en-tête doit être la même série");
+    // Chaque badge affiché doit être traduit dans les 4 langues (le français est le
+    // repli codé dans page.tsx). Une clé manquante afficherait l'anglais à un Allemand.
+    const i18n = codeOf("src/components/gamification/leaguesBadgesI18n.ts");
+    const ids = [...new Set([...src.matchAll(/badge\("(plan_streak_\d+)"/g)].map((m) => m[1]))];
+    assert.ok(ids.length >= 5, `échelle de série trop courte (${ids.length})`);
+    for (const id of ids) {
+      assert.equal((i18n.match(new RegExp(`${id}:`, "g")) ?? []).length, 4, `${id} n'est pas traduit dans les 4 langues`);
+    }
+    assert.ok(!/\bstreak_\d+:/.test(i18n), "traductions des anciens badges laissées derrière");
+  });
+
+  test("le tableau de bord charge VRAIMENT la fenêtre de la série", () => {
+    // Les requêtes existantes sont plafonnées à 40 lignes : l'auto-coach accumule ~1
+    // prescription par jour écoulé, donc 40 lignes ne couvrent qu'un mois. Réutiliser
+    // ces requêtes aurait tronqué la série au-delà, en silence.
+    const page = codeOf("src/app/dashboard/page.tsx");
+    assert.ok(/computeStreak\(/.test(page), "la série n'est pas calculée sur le tableau de bord");
+    assert.ok(/streakFrom/.test(page) && /gte\("data->>date", streakFrom\)/.test(page),
+      "les prescriptions ne sont pas chargées sur la fenêtre de la série");
+    // Le tri par created_at décroissant conditionne `oneSessionPerSlot` : trier par date
+    // garderait une prescription périmée, donc un mauvais verdict.
+    assert.ok(/coach_session"\)\.gte\("data->>date", streakFrom\)\s*\n?\s*\.order\("created_at", \{ ascending: false \}\)/.test(page),
+      "les prescriptions de la série doivent être triées par created_at décroissant");
+    assert.ok(/oneSessionPerSlot\(/.test(page), "la déduplication par créneau n'est pas appliquée");
+  });
+}
 
 console.log("\nQUOTA ÉPUISÉ — la chaîne cesse vraiment d'appeler le réseau");
 // Ces tests-là passent par generateContent avec un `fetch` factice : ils vérifient le

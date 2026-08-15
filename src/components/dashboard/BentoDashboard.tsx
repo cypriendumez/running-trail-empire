@@ -23,6 +23,8 @@ import { cleanActivityName } from "@/lib/utils/activityName";
 import { isRun } from "@/lib/intervals/sport";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { ProfileCompletionBanner } from "@/components/dashboard/ProfileCompletionBanner";
+import { StreakCard } from "@/components/dashboard/StreakCard";
+import type { StreakResult } from "@/lib/streak/compute";
 
 // Fonction de traduction (avec interpolation {clé}) passée aux helpers.
 type TFn = (k: string, params?: Record<string, string | number>) => string;
@@ -43,6 +45,8 @@ interface Props {
   currentVma?: number | null;
   loadRisk?: { acwr: number; monotony: number; deload: boolean; level: string; reason: string };
   newMembersWeek?: number;
+  /** Série calculée à la lecture (lib/streak) — jamais stockée, donc réparable. */
+  streak?: StreakResult | null;
 }
 
 // Libellés courts des KPI de l'en-tête (multilingues).
@@ -123,7 +127,7 @@ const HR_ZONE_DEFS = [
 
 // La forme du jour est calculée à partir de données réelles : voir computeReadiness().
 
-export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplineHistory, sleep, coachSession, pendingFeedback, objective, currentVma, loadRisk, newMembersWeek }: Props) {
+export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplineHistory, sleep, coachSession, pendingFeedback, objective, currentVma, loadRisk, newMembersWeek, streak }: Props) {
   const { t, lang } = useT();
   const state = hrv[0]?.physiological_state ?? "optimal";
 
@@ -452,6 +456,13 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
               <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200/70 bg-white/70 px-3 py-1 text-xs font-medium text-zinc-600">
                 <Activity className="h-3.5 w-3.5 text-[#059669]" /> {weeklyKm.toFixed(0)} km · 7 j
               </span>
+              {/* Série du jour — visible dès le premier coup d'œil, sans quitter l'en-tête. */}
+              {streak && streak.current > 0 && (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200/80 bg-amber-50/80 px-3 py-1 text-xs font-semibold text-amber-700">
+                  <Flame className="h-3.5 w-3.5 text-amber-500" />
+                  {streak.current} {streak.current === 1 ? t("streak.unit1") : t("streak.unit")}
+                </span>
+              )}
               <WeatherChip />
             </div>
           </div>
@@ -511,6 +522,9 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
           </div>
         </div>
       )}
+
+      {/* La série — la boucle quotidienne, alignée sur le plan et non contre lui. */}
+      <StreakCard streak={streak ?? null} />
 
       {/* Objectif de course — saisi par le client → e-mail coach + perso IA */}
       <ObjectiveCard objective={objective ?? null} currentVma={currentVma ?? null} />

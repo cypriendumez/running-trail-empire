@@ -55,3 +55,4 @@ Capture*.png
 !/data/parcours_certifies.json
 !/data/dataset_france.json
 !/data/dataset.json
+.verif/
