@@ -3987,18 +3987,36 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     assert.ok(cles.length >= 8, `PROGRAM_KEYS illisible (${cles.length})`);
 
     // Chaque programme déclaré possède une entrée dans PROGRAMS, avec une photo.
-    const entrees = [...page.matchAll(/\{ key: "([a-z0-9]+)", category: "([A-Z0-9]+)", img: "(https:[^"]+)" \}/g)]
-      .map((m) => ({ key: m[1], cat: m[2], img: m[3] }));
+    const entrees = [...page.matchAll(/\{ key: "([a-z0-9]+)", category: "([A-Z0-9]+)", photo: "(photo-[\w-]+)" \}/g)]
+      .map((m) => ({ key: m[1], cat: m[2], photo: m[3] }));
     assert.deepEqual(entrees.map((e) => e.key).sort(), [...cles].sort(),
       "PROGRAM_KEYS et le tableau PROGRAMS de page.tsx ne décrivent pas les mêmes programmes");
-    for (const e of entrees) {
-      assert.ok(/images\.unsplash\.com\/photo-/.test(e.img), `${e.key} : photo absente ou invalide`);
-      assert.ok(cats.includes(e.cat), `${e.key} : catégorie « ${e.cat} » absente de CATEGORY_CODES`);
-    }
+    for (const e of entrees) assert.ok(cats.includes(e.cat), `${e.key} : catégorie « ${e.cat} » absente de CATEGORY_CODES`);
 
     // Aucune photo en double : deux cartes identiques dans une même grille se voient.
-    const imgs = entrees.map((e) => e.img.replace(/\?.*$/, ""));
-    assert.equal(new Set(imgs).size, imgs.length, "deux programmes partagent la même photo");
+    const photos = entrees.map((e) => e.photo);
+    assert.equal(new Set(photos).size, photos.length, "deux programmes partagent la même photo");
+
+    // ── LE RECADRAGE EST IMPOSÉ, ET IL VAUT LE FORMAT DE LA CARTE ──────────────
+    // Les URL étaient écrites à la main en « ?w=600&fit=crop » : une largeur SANS
+    // hauteur laisse Unsplash choisir son cadrage, et il rendait un panoramique
+    // 600×275 pour une tuile en 3/4. Le navigateur en étirait une tranche centrale sur
+    // 699 px en Retina — 3,4× d'agrandissement, d'où le flou. Rien ne signalait quoi que
+    // ce soit : l'image se chargeait, la carte s'affichait.
+    assert.ok(!/images\.unsplash\.com\/\$\{?[\w.]*\}?photo-|img: "https:\/\/images\.unsplash\.com/.test(page)
+      || /const photoCarte/.test(page), "les URL de photos sont reconstruites à la main");
+    const helper = page.match(/const photoCarte = \([^)]*\) =>\s*`([^`]+)`/)?.[1] ?? "";
+    assert.ok(/w=\$\{largeur\}/.test(helper) && /h=\$\{[^}]*largeur[^}]*\}/.test(helper),
+      "photoCarte doit imposer la LARGEUR ET LA HAUTEUR, sinon Unsplash recadre comme il veut");
+    assert.ok(/largeur \* 4\) \/ 3/.test(helper), "le recadrage doit valoir le 3/4 de la carte (aspect-[3/4])");
+    // ⚠️ Ancré sur la balise <img> DES CARTES, et pas sur le fichier entier : le hero
+    // porte lui aussi un srcSet et un sizes. Chercher « srcSet= » n'importe où laissait
+    // le test au vert alors qu'on venait de le retirer des cartes — vérifié par mutation.
+    const deb = page.indexOf("photoCarte(p.photo");
+    assert.ok(deb > 0, "la balise <img> des cartes n'utilise plus photoCarte");
+    const balise = page.slice(page.lastIndexOf("<img", deb), page.indexOf("/>", deb) + 2);
+    assert.ok(/srcSet=/.test(balise), "sans srcset, un téléphone télécharge l'image du grand écran");
+    assert.ok(/sizes=/.test(balise), "un srcset sans `sizes` fait choisir au navigateur la plus grande image");
 
     // La grille est en 3 colonnes : un nombre non multiple de 3 laisse un trou dans la
     // dernière rangée. C'est ce trou qui a motivé le neuvième programme.

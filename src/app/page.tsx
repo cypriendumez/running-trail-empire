@@ -19,36 +19,59 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 import { LANDING, CATEGORY_CODES } from "@/components/landing/landingI18n";
 
 // Données visuelles (non traduisibles). Les libellés viennent de LANDING[lang].
-// Chaque programme porte une VRAIE photo. Le semi et le marathon retombaient sur un
-// aplat dégradé avec « 21.1 » et « 42.2 » écrits dessus : au milieu de six photographies,
-// les deux cartes les plus vendeuses étaient les deux seules à ressembler à un
-// emplacement vide. `img` est donc obligatoire — plus de repli silencieux possible.
-const PROGRAMS: { key: string; category: string; img: string }[] = [
-  { key: "km10", category: "10KM", img: "https://images.unsplash.com/photo-1571008887538-b36bb32f4571?w=600&q=80&fit=crop" },
-  { key: "semi", category: "SEMI", img: "https://images.unsplash.com/photo-1667781838690-5f32ea0ccea6?w=600&q=80&fit=crop" },
-  { key: "marathon", category: "MARATHON", img: "https://images.unsplash.com/photo-1682367905664-e36b30f15b19?w=600&q=80&fit=crop" },
-  { key: "trail", category: "TRAIL", img: "https://images.unsplash.com/photo-1504025468847-0e438279542c?w=600&q=80&fit=crop" },
+// ── PHOTOS DES PROGRAMMES ────────────────────────────────────────────────────
+// Chaque programme porte une VRAIE photo (`photo` est obligatoire : le semi et le
+// marathon retombaient sur un aplat dégradé, et au milieu de six photographies les deux
+// cartes les plus vendeuses ressemblaient à un emplacement vide).
+//
+// ⚠️ ON NE STOCKE QUE L'IDENTIFIANT, PAS L'URL. Les URL étaient écrites à la main en
+// `?w=600&fit=crop`, ce qui demandait à Unsplash une largeur SANS hauteur : le service
+// renvoyait alors le recadrage de son choix — 600×275 pour la carte « endurance », soit
+// un panoramique de ratio 2,18 pour une tuile en 3/4. Le navigateur en gardait une
+// tranche centrale de 206 px de large puis l'étirait sur 699 px en écran Retina : un
+// agrandissement de 3,4×, d'où le flou. Le recadrage est donc CENTRALISÉ ci-dessous, au
+// format exact de la carte, et décliné en srcset pour qu'un téléphone ne télécharge pas
+// l'image du grand écran.
+const PROGRAMS: { key: string; category: string; photo: string }[] = [
+  { key: "km10", category: "10KM", photo: "photo-1571008887538-b36bb32f4571" },
+  { key: "semi", category: "SEMI", photo: "photo-1667781838690-5f32ea0ccea6" },
+  { key: "marathon", category: "MARATHON", photo: "photo-1682367905664-e36b30f15b19" },
+  { key: "trail", category: "TRAIL", photo: "photo-1504025468847-0e438279542c" },
   // Débuter : c'était un gros plan de pieds sur des marches, interchangeable avec
   // n'importe quelle carte de n'importe quel site de sport. Remplacé par deux coureurs
   // ensemble en plein jour — la carte doit dire « c'est accessible, et tu n'es pas
   // seul », pas montrer un détail anatomique.
-  { key: "beginner", category: "BEGINNER", img: "https://images.unsplash.com/photo-1781726956705-038cab091bc6?w=600&q=80&fit=crop" },
-  { key: "speed", category: "SPEED", img: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=600&q=80&fit=crop" },
-  // Endurance : la photo montrait un coureur plié en deux, mains sur les genoux — de
-  // l'épuisement, soit l'inverse exact du message d'une base aérobie. Remplacée par une
-  // route ouverte à la lumière rasante.
-  { key: "endurance", category: "ENDURANCE", img: "https://images.unsplash.com/photo-1581889470536-467bdbe30cd0?w=600&q=80&fit=crop" },
+  { key: "beginner", category: "BEGINNER", photo: "photo-1781726956705-038cab091bc6" },
+  { key: "speed", category: "SPEED", photo: "photo-1461896836934-ffe607ba8211" },
+  // Endurance : reprise DEUX fois. D'abord un coureur plié en deux, mains sur les
+  // genoux — de l'épuisement, soit l'inverse du message d'une base aérobie. Puis un
+  // coureur en contre-jour, dont le cadrage large ne disait rien de la notion. Un chemin
+  // forestier qui file vers le fond dit ce que le texte annonce : de la DURÉE, à allure
+  // facile. Les troncs verticaux tiennent en plus le format 3/4 de la carte.
+  { key: "endurance", category: "ENDURANCE", photo: "photo-1646867802148-b3ccd7ebf76d" },
   // Blessure : c'était un portrait de médecin en blouse, souriant face objectif. Au
   // milieu de sept photographies de course, une photo de banque d'images posée cassait
   // la grille entière. Remplacée par des mains qui relacent une chaussure — « je repars ».
-  { key: "injury", category: "INJURY", img: "https://images.unsplash.com/photo-1600712662084-e54770a9668e?w=600&q=80&fit=crop" },
+  { key: "injury", category: "INJURY", photo: "photo-1600712662084-e54770a9668e" },
   // NEUVIÈME programme. Deux raisons, et la mise en page n'est que la seconde :
   //  1. le mode perte de poids EXISTE (src/lib/weight, /api/weight,
   //     profiles.weight_mode_enabled) — il était vendu nulle part ;
   //  2. huit cartes sur trois colonnes donnent 3+3+2, donc un trou dans la dernière
   //     rangée sur tout écran large. Neuf la ferment.
-  { key: "weightloss", category: "WEIGHT", img: "https://images.unsplash.com/photo-1480179087180-d9f0ec044897?w=600&q=80&fit=crop" },
+  { key: "weightloss", category: "WEIGHT", photo: "photo-1480179087180-d9f0ec044897" },
 ];
+
+/**
+ * URL Unsplash au format EXACT de la carte (3/4 portrait).
+ *
+ * La hauteur est IMPOSÉE : sans elle, `fit=crop` laisse Unsplash choisir son recadrage,
+ * et il rend le plus souvent un panoramique. C'est ce qui rendait les cartes floues.
+ */
+const photoCarte = (id: string, largeur: number) =>
+  `https://images.unsplash.com/${id}?w=${largeur}&h=${Math.round((largeur * 4) / 3)}&fit=crop&q=82`;
+
+/** Paliers du srcset : 1 colonne (mobile), 2 colonnes, puis 3 colonnes en Retina. */
+const LARGEURS_CARTE = [400, 600, 900];
 
 const FEATURE_ICONS: LucideIcon[] = [Bot, Heart, Ghost, Map, Zap, Moon, Activity, CloudRain, BookOpen, Trophy, ShoppingBag, Shield];
 
@@ -232,7 +255,13 @@ export default function LandingPage() {
               const it = L.programs.items[p.key];
               return (
                 <Link href="/signup" key={p.key} className="group relative block aspect-[3/4] overflow-hidden rounded-2xl">
-                  <img src={p.img} alt={it.title} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                  <img
+                    src={photoCarte(p.photo, 900)}
+                    srcSet={LARGEURS_CARTE.map((w) => `${photoCarte(p.photo, w)} ${w}w`).join(", ")}
+                    sizes="(min-width:1024px) 32vw, (min-width:640px) 48vw, 92vw"
+                    alt={it.title} loading="lazy" decoding="async"
+                    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
                   <div className="absolute inset-x-0 bottom-0 p-6">
                     <h3 className="text-2xl font-bold uppercase leading-tight text-white">{it.title}</h3>
