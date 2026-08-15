@@ -35,7 +35,9 @@ interface Props {
   league: Record<string, unknown> | null;
   disciplineHistory: Record<string, unknown>[];
   sleep?: { total_sleep_min: number; sleep_score: number; body_battery_end: number; deep_sleep_min: number; rem_sleep_min: number; date: string } | null;
-  coachSession?: { title: string; subtitle: string; tags: string[]; why: string } | null;
+  /** `i18n` = le même jour dans les autres langues (cf. lib/ai/planI18n.ts). Le français
+   *  reste au premier niveau : c'est lui qui part sur la montre et sert aux analyses. */
+  coachSession?: { title: string; subtitle: string; tags: string[]; why: string; i18n?: Record<string, { title?: string; subtitle?: string; tags?: string[]; why?: string }> } | null;
   pendingFeedback?: { date: string; title: string } | null;
   objective?: Objective | null;
   currentVma?: number | null;
@@ -178,7 +180,11 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
   // Séance-clé du jour : l'algo s'affiche INSTANTANÉMENT (repli fiable),
   // puis la version IA (Gemini) le remplace dès qu'elle répond (badge ✨).
   const keySession = recommendSession({ state, weeklyKm, workouts, sleep, raceDate, t });
-  const coachKey = coachSession ? aiToSession(coachSession) : null;   // séance prescrite par le coach = prioritaire
+  // Séance prescrite par le coach = prioritaire, et affichée dans la langue de l'athlète.
+  // La résolution se fait ici, côté client : le sélecteur de langue est instantané.
+  const coachKey = coachSession
+    ? aiToSession({ ...coachSession, ...(coachSession.i18n?.[lang] ?? {}) })
+    : null;
   const [aiSession, setAiSession] = useState<KeySession | null>(null);
   const [aiTried, setAiTried] = useState(false);
   useEffect(() => {

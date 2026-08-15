@@ -26,6 +26,9 @@ import { vmaFromPaceCurve, bestVmaFromWorkouts } from "../src/lib/running/fitnes
 import { heatAdvice, windAdvice, altitudeLossPct, heatAcclimation } from "../src/lib/weather/openMeteo";
 import { parseReps, parsePaceSec, stepsForType, warmCoolMin, buildWorkoutDescription } from "../src/lib/watch/intervals";
 import { buildWeekPlan, CONFIRMED_DAYS } from "../src/lib/ai/autoPlan";
+import { tr, ALL_LANGS } from "../src/lib/i18n/multi";
+import { PLAN_T } from "../src/lib/ai/planI18n";
+import { QUALITE_T } from "../src/lib/ai/qualityI18n";
 import { stripProfileSecrets } from "../src/lib/profile/safe";
 import type { AthleteContext } from "../src/lib/ai/coachContext";
 import {
@@ -72,9 +75,9 @@ function ctx(over: Partial<AthleteContext> = {}): AthleteContext {
   const base = {
     text: "", objective: null, daysToRace: null, weeksToRace: null, athleteName: "Test",
     vma: 17.6, thresholdPace: "3'45", easyPace: "4'52", hardGapHours: 48, lastHardDaysAgo: null,
-    weekPlan: { qBudget: 2, quality: [{ type: "VMA", desc: "VMA courte : 10×400 m à ~3'20/km, récup 45 s" }], easyPace: "4'52", eased: false },
+    weekPlan: { qBudget: 2, quality: [qual("VMA", "VMA courte : 10×400 m à ~3'20/km, récup 45 s")], easyPace: "4'52", eased: false },
     longRunMode: "run", macroPlan: [{ week: 1, phase: "Développement", volumeKm: 50, quality: ["VMA"], longRunKm: 16, focus: "" }],
-    readiness: { level: "vert", reasons: [], advice: "" },
+    readiness: { level: "vert", ...motifs(), advice: "" },
     volume: { weekKm: 50, avg4wkKm: 48, targetKm: 50, longRunKm: 16 },
     cycle: { deload: false, taper: false, label: "" }, skippedWeekdays: [],
     availability: { daysPerWeek: 6, days: [0, 1, 2, 3, 4, 5, 6] },
@@ -84,6 +87,17 @@ function ctx(over: Partial<AthleteContext> = {}): AthleteContext {
   } as unknown as AthleteContext;
   return { ...base, ...over };
 }
+/** Motifs de fraîcheur d'un contexte de test : français canonique + les 4 traductions.
+ *  Sans `reasonsAll`, le plan retomberait sur le français dans toutes les langues et un
+ *  test « aucune phrase à moitié française » passerait pour de mauvaises raisons. */
+const motifs = (...xs: string[]) => ({ reasons: xs, reasonsAll: xs.map((x) => tr(() => x)) });
+/** Séance de qualité de test SANS traduction — modélise un contexte sérialisé par une
+ *  version antérieure : le plan doit alors retomber sur le français, pas sur du vide. */
+const qual = (type: string, desc: string) => ({ type, desc, descAll: tr(() => desc) });
+/** Séance de qualité de test issue du VRAI menu, donc réellement traduite. */
+const qualT = (type: string, gabarit: (l: "fr" | "en" | "de" | "es" | "pt") => string) =>
+  ({ type, desc: gabarit("fr"), descAll: tr(gabarit) });
+
 const bodyMinOf = (txt: string): number | null => {
   const seg = txt.toLowerCase().split(/corps[^:]*:/)[1];
   if (!seg) return null;
@@ -211,11 +225,11 @@ test("aucune qualité quand le budget est nul", () => {
   assert.equal(p.filter((d) => /VMA|Seuil|Spécifique/.test(d.type)).length, 0);
 });
 test("fraîcheur rouge : rien de dur aujourd'hui", () => {
-  const p = buildWeekPlan(ctx({ readiness: { level: "rouge", reasons: ["test"], advice: "" } } as never), new Date());
+  const p = buildWeekPlan(ctx({ readiness: { level: "rouge", ...motifs("test"), advice: "" } } as never), new Date());
   assert.ok(!/VMA|Seuil|Spécifique|Sortie longue/.test(p[0].type), `jour 0 = ${p[0].type}`);
 });
 test("une qualité annulée par la fraîcheur est DÉCALÉE, pas supprimée", () => {
-  const p = buildWeekPlan(ctx({ readiness: { level: "rouge", reasons: ["test"], advice: "" } } as never), new Date());
+  const p = buildWeekPlan(ctx({ readiness: { level: "rouge", ...motifs("test"), advice: "" } } as never), new Date());
   assert.ok(p.filter((d) => /VMA|Seuil|Spécifique/.test(d.type)).length >= 1, "la semaine ne doit pas perdre sa qualité");
 });
 test("une semaine entièrement caniculaire n'efface pas la qualité", () => {
@@ -894,7 +908,7 @@ test("le feu rouge de fraîcheur raccourcit la sortie longue, et l'explique", ()
   // déduit de la distance visée : 26 km prescrits le dimanche à un athlète en ratio
   // aigu:chronique 2,4 et TSB −44, deux jours après une sortie de 26 km.
   const c = ctx({
-    readiness: { level: "rouge", reasons: ["ratio aigu:chronique 2,4 (zone de risque de blessure)"], advice: "" },
+    readiness: { level: "rouge", ...motifs("ratio aigu:chronique 2,4 (zone de risque de blessure)"), advice: "" },
     volume: { weekKm: 62, avg4wkKm: 40, targetKm: 40, longRunKm: 16, longRunPlanned: 26, longRunEased: true },
     weekPlan: { qBudget: 0, quality: [], easyPace: "4'52", eased: true, floored: false },
   });
@@ -1218,6 +1232,214 @@ function sqlOf(path: string): string {
   return readFileSync(path, "utf8")
     .split("\n").map((l) => l.replace(/--.*$/, "")).join("\n");
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+console.log("\nPLAN TRADUIT — l'athlète lit sa langue, la montre lit le français");
+// Défaut corrigé : l'interface était traduite en 5 langues et le PLAN restait
+// intégralement français — c'est-à-dire la seule chose que l'athlète vient lire.
+// Le piège, lui, est que `lib/watch/intervals.ts` FABRIQUE la séance Garmin en
+// analysant cette prose française (« corps : », « récup », « seuil », « N×D à A »).
+// Traduire le texte lu par la montre casserait la poussée EN SILENCE.
+
+/** Contexte de test riche : qualité, sortie longue, météo, doubles, motifs de fatigue. */
+const ctxTraduit = () => ctx({
+  weekPlan: { qBudget: 2, quality: [
+    qualT("VMA", (l) => QUALITE_T[l].vmaCourte(10, "3'20")),
+    qualT("Seuil", (l) => QUALITE_T[l].seuilReference(3, 10, "4'00")),
+  ], easyPace: "4'52", eased: false, floored: false },
+  hillyTraining: true,
+  cycle: { deload: true, taper: false, label: "" },
+  tooMuchIntensity: 29,
+  forecast: Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() + i);
+    return { date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
+      tempMax: 31, tempMin: 20, feelsMax: 33, humidity: 75, precipMm: 0, windMaxKmh: 38 };
+  }),
+} as never);
+
+/** Ce qu'`autoCoach` envoie réellement à la montre pour un jour donné. */
+const versMontre = (d: { title: string; detail: string; type: string; tags: string[] }) =>
+  buildWorkoutDescription(d.title, d.detail, `${d.type} ${d.tags.join(" ")}`, null, 17.6, 15, 10);
+
+test("les champs poussés sur la montre restent en FRANÇAIS, quelle que soit la langue", () => {
+  // `lib/watch/intervals.ts` fabrique les étapes Garmin en analysant cette prose :
+  // « corps : », « récup », « seuil », « repos », « N×DISTANCE à ALLURE ». Si `detail`
+  // ou `title` bascule un jour dans la langue de l'athlète, la poussée montre se met à
+  // renvoyer null ou des étapes fausses — sans lever la moindre erreur.
+  const semaine = buildWeekPlan(ctxTraduit(), new Date());
+  for (const j of semaine) {
+    const canon = `${j.title} ${j.detail}`;
+    assert.ok(/Échauffement|Repos|Corps :|Récupération|Renforcement|Sortie longue|Footing|Séance/.test(canon),
+      `${j.type} : le texte canonique n'est plus français — « ${canon.slice(0, 100)} »`);
+    for (const l of ["en", "de", "es", "pt"] as const) {
+      assert.notEqual(j.i18n?.[l]?.detail, j.detail,
+        `${l}/${j.type} : la traduction est identique au canonique — soit elle manque, soit le canonique a été traduit`);
+    }
+  }
+});
+
+test("le coach autonome pousse les champs CANONIQUES, jamais la traduction", () => {
+  // C'est le seul endroit où la confusion serait fatale : `autoCoach` construit la
+  // séance Garmin. Elle doit lire `d.title`/`d.detail`, jamais `d.i18n`.
+  const src = codeOf("src/lib/ai/autoCoach.ts");
+  const appel = src.match(/buildWorkoutDescription\(([\s\S]*?)\)/)?.[1] ?? "";
+  assert.ok(appel.includes("d.title") && appel.includes("d.detail"),
+    `la poussée montre doit partir des champs canoniques — trouvé « ${appel.slice(0, 120)} »`);
+  assert.ok(!/i18n/.test(appel), "la poussée montre ne doit JAMAIS lire une traduction");
+});
+
+
+
+test("pousser le texte TRADUIT sur la montre casserait bien quelque chose", () => {
+  // Sans ce test, le précédent serait vrai pour de mauvaises raisons : il faut
+  // démontrer que la séparation est PORTEUSE, pas décorative. On vérifie donc qu'au
+  // moins une séance perd ses étapes ou en change si on pousse la version allemande.
+  const semaine = buildWeekPlan(ctxTraduit(), new Date());
+  const casse = semaine.some((j) => {
+    const de = j.i18n?.de;
+    if (!de) return false;
+    const attendu = versMontre(j);
+    const obtenu = versMontre({ title: de.title, detail: de.detail, type: j.type, tags: j.tags });
+    return JSON.stringify(attendu) !== JSON.stringify(obtenu);
+  });
+  assert.ok(casse, "si traduire le detail ne changeait rien pour la montre, l'analyseur ne lirait plus la prose — vérifier lib/watch/intervals.ts");
+});
+
+test("le français n'est jamais dupliqué dans les traductions", () => {
+  // Deux copies du français = deux vérités, et celle qu'on oublie de mettre à jour
+  // finit par contredire l'autre. Le français vit dans les champs de premier niveau.
+  for (const j of buildWeekPlan(ctxTraduit(), new Date())) {
+    assert.ok(j.i18n && !("fr" in j.i18n), `${j.type} : le français est dupliqué dans i18n`);
+    for (const l of ["en", "de", "es", "pt"] as const) {
+      assert.ok(j.i18n?.[l], `${j.type} : traduction ${l} manquante`);
+    }
+  }
+});
+
+test("aucune langue ne laisse passer « undefined », une clé brute ou du vide", () => {
+  for (const j of buildWeekPlan(ctxTraduit(), new Date())) {
+    // Le français d'abord : c'est lui qui part sur la montre, une étiquette vide y
+    // passerait inaperçue jusque sur le calendrier de l'athlète.
+    for (const [champ, v] of [["title", j.title], ["detail", j.detail], ["why", j.why]] as const) {
+      assert.ok(v && v.trim().length > 0, `fr/${j.type} : ${champ} vide`);
+      assert.ok(!/undefined|\bNaN\b|\[object |\$\{/.test(v), `fr/${j.type} : ${champ} contient un reste technique`);
+    }
+    assert.ok(j.tags.length > 0 && j.tags.every((x) => x.trim().length > 0), `fr/${j.type} : étiquette vide`);
+    for (const l of ["en", "de", "es", "pt"] as const) {
+      const t = j.i18n![l]!;
+      for (const [champ, v] of [["title", t.title], ["detail", t.detail], ["why", t.why]] as const) {
+        assert.ok(v && v.trim().length > 0, `${l}/${j.type} : ${champ} vide`);
+        assert.ok(!/undefined|\bNaN\b|\[object |\$\{/.test(v), `${l}/${j.type} : ${champ} contient un reste technique — « ${v.slice(0, 90)} »`);
+      }
+      assert.ok(t.tags.length > 0 && t.tags.every((x) => x.trim().length > 0), `${l}/${j.type} : étiquette vide`);
+    }
+  }
+});
+
+/** Mots qui n'existent QUE dans la version française : les voir ailleurs, c'est une
+ *  phrase à moitié traduite — le défaut le plus probable d'une traduction par gabarits. */
+const MARQUEURS_FR = [
+  "Échauffement", "Retour au calme", "Corps :", "séance", "footing", "allure",
+  "récup", "jambes", "environ", "d'un tiers", "Repos.", "tenir une conversation",
+  "ratio aigu:chronique", "sommeil dégradé", "Vent de", "renonce au fractionné",
+  "trottin", "montée", "Côtes", "en partant à", "alternant", "d'un bloc", "sortie longue",
+];
+
+test("aucune phrase à moitié française dans les autres langues", () => {
+  // Le vrai risque de cette traduction : un « pourquoi » allemand qui bascule en
+  // français au milieu, parce qu'un motif de fatigue ou une note météo n'a pas suivi.
+  const marqueursFr = MARQUEURS_FR;
+  const c = ctxTraduit();
+  (c as unknown as { readiness: { reasons: string[]; reasonsAll: unknown[] } }).readiness =
+    { level: "orange", ...motifs("ratio aigu:chronique 1,9 (zone de risque de blessure)", "sommeil dégradé (58/100)"), advice: "" } as never;
+  for (const j of buildWeekPlan(c, new Date())) {
+    for (const l of ["en", "de", "es", "pt"] as const) {
+      const t = j.i18n![l]!;
+      const texte = `${t.title} ${t.detail} ${t.why} ${t.tags.join(" ")}`;
+      for (const m of marqueursFr) {
+        assert.ok(!texte.includes(m), `${l}/${j.type} : reste du français (« ${m} ») dans « ${texte.slice(0, 120)}… »`);
+      }
+    }
+  }
+});
+
+/** Libellés identiques d'une langue à l'autre POUR DE BONNES RAISONS : ce sont des noms
+ *  de format universels, pas des oublis de traduction. Toute autre égalité est un oubli. */
+const LIBELLES_PARTAGES = new Set(["30/30", "Over-under", "Pyramide", "Fartlek libre"]);
+
+test("les 27 séances de qualité existent dans les 5 langues, et disent autre chose", () => {
+  // Le menu de qualité tourne : un variant non traduit ne se verrait qu'une semaine
+  // sur huit, en production, chez un athlète étranger.
+  const cles = Object.keys(QUALITE_T.fr).filter((k) => k !== "objectif");
+  assert.ok(cles.length >= 27, `menu de qualité incomplet : ${cles.length} formats`);
+  for (const k of cles) {
+    const rendus = ALL_LANGS.map((l) => {
+      const v = (QUALITE_T[l] as unknown as Record<string, unknown>)[k];
+      return typeof v === "function" ? String((v as (...a: unknown[]) => string)(6, 10, "4'00", "3'50")) : String(v);
+    });
+    for (const [i, r] of rendus.entries()) {
+      const l = ALL_LANGS[i];
+      assert.ok(r.trim().length > 0 && !/undefined/.test(r), `${k}/${l} : rendu vide ou incomplet`);
+      if (l === "fr") continue;
+      // Unicité ne suffit pas : une phrase à MOITIÉ traduite reste unique. On compare
+      // donc au LIBELLÉ FRANÇAIS du même format — dérivé du dictionnaire, pas d'une
+      // liste écrite à la main qui prendrait du retard à chaque format ajouté.
+      const libelleFr = rendus[0].split(/\s*[:：]/)[0].trim();
+      if (!LIBELLES_PARTAGES.has(libelleFr)) {
+        assert.notEqual(r.split(/\s*[:：]/)[0].trim(), libelleFr,
+          `${k}/${l} : le libellé est resté en français — « ${r.slice(0, 90)} »`);
+      }
+      for (const m of MARQUEURS_FR) {
+        assert.ok(!r.includes(m), `${k}/${l} : reste du français (« ${m} ») dans « ${r.slice(0, 90)} »`);
+      }
+      // L'anglais et l'allemand n'ont aucune raison de porter un accent français.
+      if (l === "en" || l === "de") {
+        assert.ok(!/[àâçèéêëîïôùûœ]/i.test(r), `${k}/${l} : accent français dans « ${r.slice(0, 90)} »`);
+      }
+    }
+    assert.equal(new Set(rendus).size, 5, `${k} : deux langues rendent le même texte — traduction manquante`);
+  }
+});
+
+test("le vocabulaire traduit reste lisible par l'affichage du calendrier", () => {
+  // `CalendarView.extractBody()` isole l'échauffement et le retour au calme par
+  // expression régulière, dans les 5 langues. Une traduction qui s'en écarterait
+  // ferait réapparaître l'échauffement au milieu du corps de séance affiché —
+  // sans erreur, juste un texte faux.
+  const isWarm = /échauff|warm[- ]?up|aufwärm|calent|aquec/i;
+  const isCool = /retour au calme|cool[- ]?down|auslauf|vuelta a la calma|retorno|à la calma|\bcalma\b/i;
+  const corps = /(?:corps|main\s*set|hauptteil|parte\s+principal)\s*[:：]/i;
+  for (const j of buildWeekPlan(ctxTraduit(), new Date())) {
+    if (!/Endurance|Sortie longue|VMA|Seuil|Spécifique|Récup/.test(j.type)) continue;
+    for (const l of ["en", "de", "es", "pt"] as const) {
+      const segs = j.i18n![l]!.detail.split("→").map((x) => x.trim());
+      assert.ok(isWarm.test(segs[0]), `${l}/${j.type} : échauffement non reconnu — « ${segs[0].slice(0, 60)} »`);
+      assert.ok(segs.some((x) => corps.test(x)), `${l}/${j.type} : libellé du corps de séance non reconnu`);
+      assert.ok(segs.some((x) => isCool.test(x)), `${l}/${j.type} : retour au calme non reconnu`);
+    }
+  }
+});
+
+test("les nombres restent DANS la phrase traduite", () => {
+  // Une consigne privée de ses chiffres n'apprend rien : « fais des fractionnés »
+  // n'est pas une séance. C'est la règle qui distingue une traduction d'un résumé.
+  const semaine = buildWeekPlan(ctxTraduit(), new Date());
+  const qualite = semaine.find((d) => /VMA|Seuil/.test(d.type));
+  assert.ok(qualite, "le contexte de test doit poser une séance de qualité");
+  for (const l of ["en", "de", "es", "pt"] as const) {
+    const d = qualite!.i18n![l]!.detail;
+    assert.ok(/\d+×\d+/.test(d), `${l} : les répétitions ont disparu — « ${d.slice(0, 100)} »`);
+    assert.ok(/\d+['’:]\d{2}\/km/.test(d), `${l} : l'allure a disparu — « ${d.slice(0, 100)} »`);
+  }
+});
+
+test("une langue inconnue retombe sur le français, jamais sur du vide", () => {
+  assert.equal(PLAN_T["fr"].reposTitre, "Repos");
+  assert.equal(heatAdvice(31, 80, "kl" as never).note, heatAdvice(31, 80).note,
+    "une langue inconnue doit donner la note française, pas une note vide");
+  assert.ok(heatAdvice(31, 80, "de").note.length > 0 && heatAdvice(31, 80, "de").note !== heatAdvice(31, 80).note,
+    "l'allemand doit bien donner une autre note");
+});
 
 function codeOf(path: string): string {
   return readFileSync(path, "utf8")
@@ -2293,8 +2515,8 @@ test("une séance déjà allégée ne l'est pas deux fois", () => {
   // « (allégée) » dès sa création, et le verdict orange du jour la ré-annotait —
   // « Séance au seuil (allégée) (allégée) », sur le calendrier ET sur la montre.
   const c = ctx({
-    weekPlan: { qBudget: 1, quality: [{ type: "Seuil", desc: "Seuil : 3×10 min à ~4'00/km, récup 2 min" }], easyPace: "5'20", eased: true, floored: true },
-    readiness: { level: "orange", reasons: ["charge récente très supérieure à la charge de fond"], advice: "" },
+    weekPlan: { qBudget: 1, quality: [qual("Seuil", "Seuil : 3×10 min à ~4'00/km, récup 2 min")], easyPace: "5'20", eased: true, floored: true },
+    readiness: { level: "orange", ...motifs("charge récente très supérieure à la charge de fond"), advice: "" },
   });
   for (const d of buildWeekPlan(c)) {
     assert.ok(!/\(allégée\).*\(allégée\)/.test(d.title), `titre annoté deux fois : « ${d.title} »`);

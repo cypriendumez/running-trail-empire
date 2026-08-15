@@ -14,6 +14,10 @@ import { computeQualityBudget } from "@/lib/coach/qualityBudget";
 import { avertissementsAge } from "@/lib/coach/ageDistance";
 import { etatDouble, type EtatDouble } from "@/lib/coach/doubleSessions";
 import { warmCoolMin } from "@/lib/watch/intervals";
+import { tr, nLoc, nRaw, type I18nText } from "@/lib/i18n/multi";
+import type { Lang } from "@/lib/i18n/translations";
+import { MOTIF_T } from "@/lib/coach/reasonsI18n";
+import { QUALITE_T } from "@/lib/ai/qualityI18n";
 
 type SB = Awaited<ReturnType<typeof createClient>>;
 
@@ -21,6 +25,17 @@ export type CoachObjective = {
   race: string; distanceKm: number; raceDate: string;
   targetSeconds: number; targetTime: string; targetPace: string;
 };
+
+/**
+ * Une séance de qualité du menu de la semaine.
+ *
+ * `desc` est la version FRANÇAISE, et elle est canonique : c'est elle que le plan
+ * insère dans le corps de séance, donc celle que `lib/watch/intervals.ts` analyse pour
+ * fabriquer les étapes Garmin (« N×DISTANCE à ALLURE, récup DURÉE »). `descAll` porte
+ * les 5 langues et ne sert QU'À L'AFFICHAGE — la traduire dans `desc` casserait la
+ * poussée montre en silence.
+ */
+export type QualitySession = { type: string; desc: string; descAll: I18nText };
 
 // ── Persona coach élite — réutilisé par toutes les IA d'entraînement ────────────
 export const COACH_SYSTEM = `Tu es un entraîneur de course à pied et de trail de niveau INTERNATIONAL, capable de coacher aussi bien un grand débutant qu'un athlète élite. Tu raisonnes en scientifique de l'entraînement :
@@ -148,7 +163,7 @@ export type AthleteContext = {
   vma: number | null; // VMA km/h (test enregistré ou estimée) — pour les cibles d'allure montre.
   // Squelette de semaine déterministe → permet de VALIDER/corriger le plan de l'IA.
   weekPlan: {
-    qBudget: number; quality: { type: string; desc: string }[]; easyPace: string | null; eased: boolean;
+    qBudget: number; quality: QualitySession[]; easyPace: string | null; eased: boolean;
     /** La dernière qualité n'a survécu que grâce au plancher « préparation en cours » :
      *  elle doit être prescrite RACCOURCIE, et le plan doit dire pourquoi. Sans ce
      *  drapeau, le plan afficherait une séance normale au milieu d'une semaine allégée. */
@@ -176,7 +191,15 @@ export type AthleteContext = {
   } | null;
   longRunMode: "run" | "bike"; // préférence : sortie longue en course ou remplacée par du vélo (cross-training)
   // Verdict de fraîcheur du jour (déterministe) — affiché au coach et imposé à l'IA.
-  readiness: { level: "vert" | "jaune" | "orange" | "rouge"; reasons: string[]; advice: string };
+  readiness: {
+    level: "vert" | "jaune" | "orange" | "rouge";
+    /** Motifs en FRANÇAIS — version canonique (prompt du modèle, bandeau du calendrier). */
+    reasons: string[];
+    /** Les mêmes motifs dans les 5 langues : le plan les recopie dans le « pourquoi »
+     *  des séances, qui doit être entièrement dans la langue de l'athlète. */
+    reasonsAll: I18nText[];
+    advice: string;
+  };
   /** Heures minimales entre deux séances dures pour CET athlète (calculé sur son âge). */
   hardGapHours: number;
   /** Allure d'endurance facile (~70 % VMA), en min/km — null si VMA inconnue. */
@@ -830,8 +853,12 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // Un modèle de langage a tendance à « sentir » l'état de forme au fil du texte ; ici on
   // tranche de façon déterministe et on lui impose la conclusion. Feu rouge = pas d'intensité,
   // point final.
-  const redFlags: string[] = [];
-  const orangeFlags: string[] = [];
+  // Les motifs sont MATÉRIALISÉS dans les 5 langues dès leur création : ils finissent
+  // recopiés dans le « pourquoi » des séances, et un « pourquoi » allemand ne peut pas
+  // basculer en français au milieu de la phrase. Le français reste la version canonique
+  // (prompt du modèle, bandeau « pourquoi ce plan »).
+  const redFlags: I18nText[] = [];
+  const orangeFlags: I18nText[] = [];
   // Mise en forme française : ces motifs ne partaient qu'au prompt de l'IA, où le format
   // était sans importance. Ils sont désormais AFFICHÉS à l'athlète sur son calendrier
   // (bandeau « pourquoi ce plan ») — « 2.4 » et « -44 » au milieu d'une phrase française
@@ -840,8 +867,9 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // D'OÙ VIENT LA FATIGUE. Un athlète qui lit « charge aiguë élevée » après une semaine
   // de randonnée en montagne croit que le coach lui reproche ses kilomètres courus.
   // Quand une part notable de la charge vient d'un autre sport, on le NOMME.
-  const crossBlame = cross.sharePct >= 20 && cross.label ? `, dont ${cross.sharePct} % venant d'un autre sport (${cross.label})` : "";
-  if (pains.length) redFlags.push(`douleur en cours (${pains.join(", ")})`);
+  const crossBlame = (l: Lang) => cross.sharePct >= 20 && cross.labelAll
+    ? MOTIF_T[l].origineCross(cross.sharePct, cross.labelAll[l]) : "";
+  if (pains.length) redFlags.push(tr((l) => MOTIF_T[l].douleur(pains.join(", "))));
   // ── LA CHARGE SEULE NE SUFFIT PLUS À DÉCLARER ROUGE ─────────────────────────
   // Le feu rouge annule l'intensité du JOUR. Comme le plan est republié chaque jour et
   // que le ratio aigu:chronique met des semaines à redescendre après une coupure, CHAQUE
@@ -854,18 +882,18 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // séance allégée, pas séance annulée — et la contradiction est ÉCRITE. Douleur, VFC en
   // baisse et double signal gardent, eux, le feu rouge.
   const loadRedOnly = qb.bodySaysFresh;
-  const loadFlag = (msg: string) => { if (loadRedOnly) orangeFlags.push(msg); else redFlags.push(msg); };
-  if (load.acr > 1.8) loadFlag(`ratio aigu:chronique ${frNum(load.acr, 1)} (zone de risque de blessure)${crossBlame}`);
-  if (load.tsb < -30) loadFlag(`TSB ${frNum(load.tsb)} (fatigue profonde)${crossBlame}`);
+  const loadFlag = (msg: I18nText) => { if (loadRedOnly) orangeFlags.push(msg); else redFlags.push(msg); };
+  if (load.acr > 1.8) loadFlag(tr((l) => MOTIF_T[l].ratioRisque(nLoc(load.acr, l, 1), crossBlame(l))));
+  if (load.tsb < -30) loadFlag(tr((l) => MOTIF_T[l].tsbProfond(nLoc(load.tsb, l), crossBlame(l))));
   // La contradiction est un CONSTAT, pas un signal négatif : elle est affichée à part.
-  for (const n of qb.notes) orangeFlags.push(n);
-  if (hrvWeekTrend?.startsWith("↓") && badNight) redFlags.push("VFC en baisse ET nuit dégradée (double signal)");
-  if (hrvWeekTrend?.startsWith("↓")) orangeFlags.push("VFC sous sa base");
-  if (badNight) orangeFlags.push(`sommeil dégradé (${freshSleep?.sleep_score ?? "?"}/100)`);
-  if (load.acr > 1.5 && load.acr <= 1.8) orangeFlags.push(`charge aiguë élevée (${frNum(load.acr, 1)})`);
-  if (monotony > 2) orangeFlags.push(`monotonie ${monotony} (charge trop uniforme)`);
-  if (lastRpe != null && lastRpe >= 8) orangeFlags.push(`dernière séance vécue très dure (RPE ${lastRpe}/10)`);
-  else if (rpeHigh) orangeFlags.push(`ressenti élevé sur la durée (RPE moyen ${rpeAvg}/10 sur ses 3 derniers retours)`);
+  for (const n of qb.notesAll) orangeFlags.push(n);
+  if (hrvWeekTrend?.startsWith("↓") && badNight) redFlags.push(tr((l) => MOTIF_T[l].vfcEtNuit));
+  if (hrvWeekTrend?.startsWith("↓")) orangeFlags.push(tr((l) => MOTIF_T[l].vfcBasse));
+  if (badNight) orangeFlags.push(tr((l) => MOTIF_T[l].sommeilDegrade(String(freshSleep?.sleep_score ?? "?"))));
+  if (load.acr > 1.5 && load.acr <= 1.8) orangeFlags.push(tr((l) => MOTIF_T[l].chargeAigue(nLoc(load.acr, l, 1))));
+  if (monotony > 2) orangeFlags.push(tr((l) => MOTIF_T[l].monotonie(nRaw(monotony, l))));
+  if (lastRpe != null && lastRpe >= 8) orangeFlags.push(tr((l) => MOTIF_T[l].rpeDerniere(nRaw(lastRpe, l))));
+  else if (rpeHigh) orangeFlags.push(tr((l) => MOTIF_T[l].rpeDuree(nRaw(rpeAvg, l))));
   // Niveau calculé UNE seule fois : il alimente à la fois le prompt de l'IA et le bandeau
   // affiché au coach — les deux ne peuvent donc pas diverger.
   const readyLevel: "vert" | "jaune" | "orange" | "rouge" =
@@ -877,7 +905,9 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
     vert: { badge: "🟢 VERT", rule: "Il est frais : c'est le jour pour placer la séance exigeante prévue. Ne sous-dose pas par excès de prudence, ce serait du potentiel perdu." },
   }[readyLevel];
   const readiness = READY.badge, readinessRule = READY.rule;
-  const readinessBlock = `${readiness} — ${readinessRule}${redFlags.length ? `\n  • Signaux rouges : ${redFlags.join(" ; ")}` : ""}${orangeFlags.length ? `\n  • Signaux orange : ${orangeFlags.join(" ; ")}` : ""}${!redFlags.length && !orangeFlags.length ? "\n  • Aucun signal négatif : VFC, sommeil, charge et ressenti sont alignés." : ""}`;
+  // Le prompt du modèle reste INTÉGRALEMENT en français : il n'est pas lu par l'athlète.
+  const redFr = redFlags.map((f) => f.fr), orangeFr = orangeFlags.map((f) => f.fr);
+  const readinessBlock = `${readiness} — ${readinessRule}${redFr.length ? `\n  • Signaux rouges : ${redFr.join(" ; ")}` : ""}${orangeFr.length ? `\n  • Signaux orange : ${orangeFr.join(" ; ")}` : ""}${!redFr.length && !orangeFr.length ? "\n  • Aucun signal négatif : VFC, sommeil, charge et ressenti sont alignés." : ""}`;
 
   // ── MÉTÉO RÉELLE ────────────────────────────────────────────────────────────
   // Pas la température de la montre (capteur au poignet, jusqu'à 3 °C d'écart mesuré)
@@ -1041,7 +1071,14 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // distinctes. `variant = isoWeek % 4` servait aux deux : quelle que soit la longueur
   // du menu, seuls les quatre premiers formats étaient jamais tirés — les suivants
   // n'existaient que sur le papier. On découple.
-  const pick = (arr: string[]) => arr[isoWeek % arr.length];
+  // Le tirage porte désormais sur le GABARIT, pas sur la phrase rendue : c'est ce qui
+  // garantit que les 5 langues décrivent LA MÊME séance, et pas un variant chacune.
+  const pickT = <T,>(arr: T[]): T => arr[isoWeek % arr.length];
+  /** Une séance de qualité + sa description dans les 5 langues (le français est canonique). */
+  const quali = (type: string, gabarit: (l: Lang) => string): QualitySession => {
+    const descAll = tr(gabarit);
+    return { type, desc: descAll.fr, descAll };
+  };
 
   /**
    * SURCHARGE PROGRESSIVE — le manque le plus coûteux du plan automatique.
@@ -1098,16 +1135,20 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
     ? "SEMAINE D'ASSIMILATION (volume de qualité réduit — c'est ici que l'adaptation se produit, ne la saute pas)"
     : `semaine ${blockWeek + 1}/4 du bloc — le volume de qualité MONTE par rapport à la précédente`;
 
-  const qVMA = { type: "VMA", desc: pick([
-    `VMA courte : ${prog(10, 400)}×400 m à ~${repPace(104, 400)}/km, récup 45 s trottinés → aiguise la vitesse et la foulée`,
-    `VMA moyenne : ${prog(7, 500)}×500 m à ~${repPace(102, 500)}/km, récup 1 min trottinée → tenue de la vitesse`,
-    `VMA longue : ${prog(5, 800)}×800 m à ~${repPace(100, 800)}/km, récup 1 min 30 trottinée → soutien du VO2max`,
-    `VMA longue : ${prog(4, 1000)}×1000 m à ~${repPace(100, 1000)}/km, récup 2 min trottinée → le format le plus proche de la course`,
-    `Pyramide : 200-400-600-800-600-400-200 m à ~${repPace(102, 500)}/km, récup = temps de l'effort → varie la sollicitation, mentalement plus facile qu'une série uniforme`,
-    `30/30 : ${prog(12, 150)}×(30 s vif / 30 s trottiné) à ~${repPace(105, 400)}/km → beaucoup de temps à VO2max pour peu de fatigue musculaire`,
-    `VMA fractionnée en 2 blocs : 2×(${prog(5, 600)}×300 m) à ~${repPace(105, 400)}/km, récup 45 s, 3 min entre blocs → volume élevé sans effondrement de la qualité`,
-    `Fartlek libre : ${prog(8, 300)}×1 min vif / 1 min facile en terrain varié, à la sensation → réapprend à jouer avec les allures, sans montre`,
-  ]) };
+  // ── LES DESCRIPTIONS DE QUALITÉ SONT MATÉRIALISÉES DANS LES 5 LANGUES ────────
+  // Le variant choisi doit être LE MÊME dans toutes les langues : on tire donc le
+  // GABARIT (une fonction), pas la phrase déjà rendue. Le français sort du même
+  // gabarit que les quatre autres — il ne peut plus diverger au fil des retouches.
+  const qVMA = quali("VMA", pickT<(l: Lang) => string>([
+    (l) => QUALITE_T[l].vmaCourte(prog(10, 400), repPace(104, 400)),
+    (l) => QUALITE_T[l].vmaMoyenne(prog(7, 500), repPace(102, 500)),
+    (l) => QUALITE_T[l].vmaLongue800(prog(5, 800), repPace(100, 800)),
+    (l) => QUALITE_T[l].vmaLongue1000(prog(4, 1000), repPace(100, 1000)),
+    (l) => QUALITE_T[l].pyramide(repPace(102, 500)),
+    (l) => QUALITE_T[l].trenteTrente(prog(12, 150), repPace(105, 400)),
+    (l) => QUALITE_T[l].vmaDeuxBlocs(prog(5, 600), repPace(105, 400)),
+    (l) => QUALITE_T[l].fartlek(prog(8, 300)),
+  ]));
   // Allure seuil : la vitesse critique MESURÉE prime sur le pourcentage de VMA estimée.
   const sPace = thresholdPace ?? paceAt(86);
   /**
@@ -1129,34 +1170,37 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
     const sec = Number(m[1]) * 60 + Number(m[2]) + 8;
     return `${Math.floor(sec / 60)}'${String(sec % 60).padStart(2, "0")}`;
   })();
-  const qSeuil = { type: "Seuil", desc: pick([
-    `Seuil fractionné : ${prog(3)}×${progMin(8, 3)} min à ~${sPace}/km, récup 2 min → accumule du temps au seuil sans casser`,
-    `Seuil long (SOUS-seuil) : 2×${progMin(13, 2)} min à ~${subPace}/km, récup 3 min → apprend à tenir l'effort`,
-    `Seuil : ${prog(2)}×${progMin(10, 2)} min à ~${sPace}/km, récup 2 min → le format de référence`,
-    `Seuil continu (SOUS-seuil) : ${progMin(21, 1)} min d'un bloc à ~${subPace}/km → le plus exigeant mentalement, le plus payant`,
-    `Over-under : ${prog(3)}×${progMin(6, 3)} min en alternant 1 min à ~${subPace}/km (sous-seuil) / 1 min à ~${sPace}/km (au seuil), récup 3 min → apprend à recycler le lactate, la qualité qui sauve une fin de course`,
-    `Seuil progressif : ${progMin(18, 1)} min en partant à ~${subPace}/km et en accélérant tous les 6 min pour finir à ~${sPace}/km → contrôle de l'allure et gestion de l'effort`,
-    `Tempo long (SOUS-seuil) : ${progMin(24, 1)} min à ~${subPace}/km sur terrain roulant, sans regarder la montre après le 5e km → autonomie de l'athlète`,
-  ]) };
-  const qSpec = { type: "Spécifique", desc: goalPace ? pick([
-    `Allure spécifique ${raceShort ?? "objectif"} : ${prog(5)}×1 km à ${goalPace}/km, récup 1 min 30 → ancre l'allure`,
-    `Allure spécifique ${raceShort ?? "objectif"} : ${prog(3)}×1500 m à ${goalPace}/km, récup 2 min → allonge les portions`,
-    `Allure spécifique ${raceShort ?? "objectif"} : ${prog(2)}×2 km à ${goalPace}/km, récup 2 min 30 → se rapproche des conditions de course`,
-    `Allure spécifique ${raceShort ?? "objectif"} : 2×3 km à ${goalPace}/km, récup 3 min → simulation de course`,
-  ]) : `Allure spécifique objectif (répétitions à l'allure visée)` };
-  const qCote = { type: "VMA", desc: pick([
-    `Côtes courtes : ${prog(8)}×30 s en montée vive, récup descente trottinée → force et explosivité`,
-    `Côtes moyennes : ${prog(6)}×45 s en montée soutenue, récup descente → puissance en montée`,
-    `Côtes longues : ${prog(4)}×2 min en montée régulière (FC Z4), récup descente → endurance de force`,
-    `Côtes + descente : 5×3 min en montée, DESCENTE travaillée en souplesse → prépare l'excentrique du trail`,
-  ]) };
-  const qMara = { type: "Spécifique", desc: goalPace ? pick([
-    `Bloc allure marathon : 2×20 min à ${goalPace}/km, intégré à la sortie longue`,
-    `Bloc allure marathon : 3×15 min à ${goalPace}/km, récup 3 min`,
-    `Finish rapide : sortie longue dont les 30 dernières minutes à ${goalPace}/km`,
-    `Bloc long : 1×40 min à ${goalPace}/km au cœur de la sortie longue`,
-  ]) : `Allure marathon en sortie longue` };
-  let menu: { type: string; desc: string }[];
+  const qSeuil = quali("Seuil", pickT<(l: Lang) => string>([
+    (l) => QUALITE_T[l].seuilFractionne(prog(3), progMin(8, 3), sPace),
+    (l) => QUALITE_T[l].seuilLongSous(progMin(13, 2), subPace),
+    (l) => QUALITE_T[l].seuilReference(prog(2), progMin(10, 2), sPace),
+    (l) => QUALITE_T[l].seuilContinuSous(progMin(21, 1), subPace),
+    (l) => QUALITE_T[l].overUnder(prog(3), progMin(6, 3), subPace, sPace),
+    (l) => QUALITE_T[l].seuilProgressif(progMin(18, 1), subPace, sPace),
+    (l) => QUALITE_T[l].tempoLongSous(progMin(24, 1), subPace),
+  ]));
+  // Le nom de la course est un NOM PROPRE : il n'est jamais traduit. Seul son
+  // remplaçant quand l'athlète n'a pas d'objectif l'est (« objectif » / « goal » / …).
+  const nomCourse = (l: Lang) => raceShort ?? QUALITE_T[l].objectif;
+  const qSpec = quali("Spécifique", goalPace ? pickT<(l: Lang) => string>([
+    (l) => QUALITE_T[l].spec1km(nomCourse(l), prog(5), goalPace),
+    (l) => QUALITE_T[l].spec1500(nomCourse(l), prog(3), goalPace),
+    (l) => QUALITE_T[l].spec2km(nomCourse(l), prog(2), goalPace),
+    (l) => QUALITE_T[l].spec3km(nomCourse(l), goalPace),
+  ]) : (l) => QUALITE_T[l].specSansAllure);
+  const qCote = quali("VMA", pickT<(l: Lang) => string>([
+    (l) => QUALITE_T[l].cotesCourtes(prog(8)),
+    (l) => QUALITE_T[l].cotesMoyennes(prog(6)),
+    (l) => QUALITE_T[l].cotesLongues(prog(4)),
+    (l) => QUALITE_T[l].cotesDescente,
+  ]));
+  const qMara = quali("Spécifique", goalPace ? pickT<(l: Lang) => string>([
+    (l) => QUALITE_T[l].maraBloc20(goalPace),
+    (l) => QUALITE_T[l].maraBloc15(goalPace),
+    (l) => QUALITE_T[l].maraFinish(goalPace),
+    (l) => QUALITE_T[l].maraBlocLong(goalPace),
+  ]) : (l) => QUALITE_T[l].maraSansAllure);
+  let menu: QualitySession[];
   if (libGoal === "5k" || libGoal === "10k") menu = [qVMA, qSpec, qSeuil];
   else if (libGoal === "semi") menu = [qSeuil, qSpec, qVMA];
   else if (libGoal === "marathon") menu = [qSeuil, qMara, qVMA];
@@ -1590,7 +1634,14 @@ ${catalog}`;
     }),
     cross,
     longRunMode: bikeLong ? "bike" : "run",
-    readiness: { level: readyLevel, reasons: [...redFlags, ...orangeFlags], advice: readinessRule },
+    readiness: {
+      level: readyLevel,
+      // Français canonique — inchangé pour tous les consommateurs existants.
+      reasons: [...redFr, ...orangeFr],
+      // Les mêmes motifs dans les 5 langues, pour le « pourquoi » des séances.
+      reasonsAll: [...redFlags, ...orangeFlags],
+      advice: readinessRule,
+    },
     hardGapHours: hardGapH,
     easyPace: vma ? paceAt(70) : null,
     lastHardDaysAgo,

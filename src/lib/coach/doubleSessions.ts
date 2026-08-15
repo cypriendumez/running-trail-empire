@@ -43,6 +43,7 @@ export const ANNEES_MINI_DOUBLE_SEUIL = 4;
 
 import type { Lang } from "@/lib/i18n/translations";
 import { DOUBLE_T } from "@/lib/coach/doubleSessionsI18n";
+import { LOCALE } from "@/lib/i18n/multi";
 
 export type EtatDouble = {
   /** Le plan peut-il poser une deuxième séance ? */
@@ -115,9 +116,17 @@ export function scinderFacile(kmTotal: number): { matinKm: number; soirKm: numbe
   return { matinKm: matin, soirKm: Math.max(4, Math.round(total - matin)) };
 }
 
-/** Description de la séance du matin d'un double FACILE. */
-export function seanceMatinFacile(km: number, allure: string | null): string {
-  return `Réveil musculaire : ${km} km très faciles en FC Z1-Z2${allure ? ` (~${allure}/km, voire plus lent)` : ""}, sans montre si tu peux. Le seul objectif est de faire circuler, pas de préparer la séance du soir — si tu finis essoufflé, c'était trop vite.`;
+/**
+ * Description de la séance du matin d'un double FACILE.
+ *
+ * `lang` par défaut = français : c'est la version CANONIQUE, celle qui est écrite dans
+ * `PlanDay.detail` et que la montre analyse. Les autres langues ne sont demandées que
+ * pour l'affichage, et sortent du même gabarit — elles ne peuvent donc pas décrire
+ * une séance différente.
+ */
+export function seanceMatinFacile(km: number, allure: string | null, lang: Lang = "fr"): string {
+  const T = DOUBLE_T[lang] ?? DOUBLE_T.fr;
+  return T.matinFacile(lang === "fr" ? String(km) : km.toLocaleString(LOCALE[lang]), allure);
 }
 
 /**

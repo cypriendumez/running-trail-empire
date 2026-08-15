@@ -11,10 +11,17 @@ import { RenfoGuide } from "@/components/training/RenfoGuide";
 import { fmtDistance, type UnitSystem } from "@/lib/units";
 import { useT } from "@/lib/i18n/LanguageProvider";
 
+/** Le même jour dans une autre langue — affichage seulement (cf. lib/ai/planI18n.ts). */
+export type PlannedText = { title?: string; subtitle?: string; why?: string; tags?: string[] };
+
 // `confirmed: false` = jour prévisionnel, que le coach automatique réajustera d'ici là.
 export type Planned = { date: string; type: string; title: string; detail: string; why: string; feel: string; tags: string[]; confirmed?: boolean;
   /** Créneau, quand la journée est doublée. Absent = séance unique. */
-  moment?: "matin" | "soir" };
+  moment?: "matin" | "soir";
+  /** Traductions du plan. `type` n'y figure pas : il reste français partout, parce que
+   *  c'est lui qui décide de la catégorie, de la couleur et de la séance poussée sur la
+   *  montre. Une langue absente retombe sur le français, jamais sur du vide. */
+  i18n?: Record<string, PlannedText> };
 export type CalNote = { id: string; date: string; text: string };
 export type CalRace = { id: string; date: string; name: string; location: string; distanceKm: number | null; isObjective?: boolean };
 
@@ -116,8 +123,18 @@ function sessionDetail(type: string, detail: string): SessionDetail | null {
   return { mode: "wrapped", body: extractBody(raw) };
 }
 
-export function CalendarView({ sessions, notes: notesProp = [], races: racesProp = [], coachState = null, weekStart = "mon", units = "metric", warmupMin = 15, cooldownMin = 10 }: { sessions: Planned[]; notes?: CalNote[]; races?: CalRace[]; coachState?: CoachState | null; weekStart?: "mon" | "sun"; units?: UnitSystem; warmupMin?: number; cooldownMin?: number }) {
+export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], races: racesProp = [], coachState = null, weekStart = "mon", units = "metric", warmupMin = 15, cooldownMin = 10 }: { sessions: Planned[]; notes?: CalNote[]; races?: CalRace[]; coachState?: CoachState | null; weekStart?: "mon" | "sun"; units?: UnitSystem; warmupMin?: number; cooldownMin?: number }) {
   const { t, lang } = useT();
+  // LA SÉANCE EST AFFICHÉE DANS LA LANGUE DE L'ATHLÈTE, résolue ICI et pas au serveur :
+  // le sélecteur de langue est instantané et ne recharge pas la page. `type` n'est jamais
+  // traduit — il pilote la catégorie, la couleur et la séance poussée sur la montre.
+  const sessions = useMemo(() => sessionsProp.map((s) => {
+    const tr = s.i18n?.[lang];
+    if (!tr) return s;   // français, ou séance publiée avant la traduction du plan
+    return { ...s,
+      title: tr.title ?? s.title, detail: tr.subtitle ?? s.detail,
+      why: tr.why ?? s.why, tags: tr.tags ?? s.tags };
+  }), [sessionsProp, lang]);
   const [sel, setSel] = useState<string | null>(null);
   const [notes, setNotes] = useState<CalNote[]>(notesProp);
   const [races, setRaces] = useState<CalRace[]>(racesProp);

@@ -20,7 +20,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { asSport, impactOf, isRun, SPORT_LABEL, type Impact, type Sport } from "@/lib/intervals/sport";
+import { SPORT_LABEL_T, DUREE_INCONNUE } from "@/lib/intervals/sportI18n";
 import { estimateTSS } from "@/lib/running/fitness";
+import { tr, LOCALE, type I18nText } from "@/lib/i18n/multi";
+import type { Lang } from "@/lib/i18n/translations";
 
 export type CrossWorkout = {
   date: string;
@@ -56,6 +59,11 @@ export type CrossSummary = {
   /** Phrase prête à afficher, ou null s'il n'y a rien à dire. On ne remplit pas le
    *  contexte du coach avec « 0 min de cross-training ». */
   label: string | null;
+  /** Le même résumé dans les 5 langues. `label` (français) reste la version canonique :
+   *  c'est elle qui part dans le prompt du modèle. Celle-ci ne sert qu'à l'affichage —
+   *  ce résumé se retrouve dans le « pourquoi » d'une séance, et une séance espagnole ne
+   *  peut pas se terminer par « 3 × randonnée ». */
+  labelAll: I18nText | null;
 };
 
 /** « 4 h 10 », « 45 min » — jamais « 250 min », qu'un humain doit convertir de tête. */
@@ -67,7 +75,7 @@ export function fmtMinutes(min: number): string {
 }
 
 const EMPTY: CrossSummary = {
-  minutes: 0, tss: 0, sessions: 0, sharePct: 0, impactMinutes: 0, bySport: [], label: null,
+  minutes: 0, tss: 0, sessions: 0, sharePct: 0, impactMinutes: 0, bySport: [], label: null, labelAll: null,
 };
 
 /**
@@ -113,15 +121,17 @@ export function summarizeCross(
   const impactMinutes = bySport.filter((x) => x.impact !== "aucun").reduce((s, x) => s + x.minutes, 0);
 
   // « 3 sorties vélo (4 h 10, 294 TSS) · 2 randonnées (5 h, 148 TSS, D+ 1 400 m) »
-  const label = bySport.map((x) => {
-    const dur = x.minutes > 0 ? fmtMinutes(x.minutes) : "durée non renseignée";
-    const elev = x.elevationM >= 300 ? `, D+ ${x.elevationM.toLocaleString("fr-FR")} m` : "";
-    return `${x.sessions} × ${x.label} (${dur}, ${Math.round(x.tss)} TSS${elev})`;
+  // Le rendu français est produit par le MÊME gabarit que les autres langues : il ne
+  // peut donc pas diverger de ce qui est affiché à un athlète anglophone.
+  const labelIn = (lang: Lang) => bySport.map((x) => {
+    const dur = x.minutes > 0 ? fmtMinutes(x.minutes) : DUREE_INCONNUE[lang];
+    const elev = x.elevationM >= 300 ? `, D+ ${x.elevationM.toLocaleString(LOCALE[lang])} m` : "";
+    return `${x.sessions} × ${SPORT_LABEL_T[lang][x.sport]} (${dur}, ${Math.round(x.tss)} TSS${elev})`;
   }).join(" · ");
 
   return {
     minutes, tss: Math.round(tss), sessions,
     sharePct: totalTss > 0 ? Math.round((tss / totalTss) * 100) : 0,
-    impactMinutes, bySport, label,
+    impactMinutes, bySport, label: labelIn("fr"), labelAll: tr(labelIn),
   };
 }

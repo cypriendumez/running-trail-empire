@@ -35,8 +35,10 @@ export default async function GhostRunnerPage() {
   // Même source de vérité que le Calendrier : UNE séance par date (la plus récente), puis on ne
   // garde que les séances COURABLES (pas repos/renfo) à venir, les 6 prochaines.
   const coachSessions = oneSessionPerSlot(
-    ((coachRes.data ?? []) as { title: string; body: string; data: { date?: string; subtitle?: string; tags?: string[] } }[])
-      .map((r) => ({ title: r.title || "Séance", detail: r.data?.subtitle || r.body || "", date: String(r.data?.date ?? "").slice(0, 10), tags: Array.isArray(r.data?.tags) ? r.data.tags : [] })),
+    ((coachRes.data ?? []) as { title: string; body: string; data: { date?: string; subtitle?: string; tags?: string[]; i18n?: Record<string, { title?: string; subtitle?: string }> } }[])
+      // Le texte reste FRANÇAIS : `applyCoachSession` l'analyse pour régler le défi.
+      // `i18n` l'accompagne et ne sert qu'à l'affichage.
+      .map((r) => ({ title: r.title || "Séance", detail: r.data?.subtitle || r.body || "", date: String(r.data?.date ?? "").slice(0, 10), tags: Array.isArray(r.data?.tags) ? r.data.tags : [], i18n: r.data?.i18n })),
     (s) => s.date,
   )
     .filter((s) => s.date && s.date >= todayStr)

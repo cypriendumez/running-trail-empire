@@ -30,6 +30,8 @@
 //  (tendons), le plafond du mode perte de poids, et le verdict de fraîcheur du JOUR
 //  (qui, lui, peut encore transformer la séance du jour en repos).
 // ─────────────────────────────────────────────────────────────────────────────
+import { tr, nLoc, type I18nText } from "@/lib/i18n/multi";
+import { MOTIF_T } from "@/lib/coach/reasonsI18n";
 
 export type QBLevel = "debutant" | "intermediaire" | "confirme" | "elite";
 export type QBGoal = "5k" | "10k" | "semi" | "marathon" | "trail" | "ultra" | "general";
@@ -100,6 +102,10 @@ export type QualityBudget = {
   /** Ce qu'on a décidé de NE PAS retenir contre l'athlète, et pourquoi. Un allègement
    *  annulé doit se dire : sinon le coach paraît ignorer une charge qu'il a bien vue. */
   notes: string[];
+  /** Les mêmes notes dans les 5 langues. `notes` (français) reste la version canonique.
+   *  Ces notes finissent recopiées dans le « pourquoi » d'une séance : sans traduction,
+   *  un athlète espagnol lisait une explication à moitié française. */
+  notesAll: I18nText[];
   /** La physiologie a-t-elle contredit l'arithmétique de charge (VFC nettement au-dessus
    *  de sa base, sommeil correct, aucune douleur) ? Le verdict de fraîcheur du jour doit
    *  en tenir compte, sinon il continue de transformer chaque journée en récupération. */
@@ -148,7 +154,7 @@ export function computeQualityBudget(i: QualityBudgetInput): QualityBudget {
   // (Relevé : VFC +22 % sur 7 j, au plus haut de tout l'historique, sommeil ~7 h,
   // aucune douleur — et zéro qualité prescrite pendant que l'athlète courait 73 km.)
   const bodySaysFresh = i.hrvUp && !i.badNight && i.pains.length === 0;
-  const notes: string[] = [];
+  const notesAll: I18nText[] = [];
   if (acrHigh || tsbLow) {
     const parts = [
       acrHigh ? `ratio aigu:chronique ${frNum(r1(i.acr), 1)}` : null,
@@ -157,7 +163,10 @@ export function computeQualityBudget(i: QualityBudgetInput): QualityBudget {
     if (bodySaysFresh) {
       // On ne fait pas SEMBLANT de ne pas avoir vu la charge : on l'annonce, et on dit
       // pourquoi elle ne coûte rien cette fois.
-      notes.push(`charge récente élevée (${parts.join(", ")}) MAIS VFC nettement au-dessus de sa base, sommeil correct et aucune douleur : la qualité est maintenue. À surveiller si la VFC redescend.`);
+      notesAll.push(tr((l) => MOTIF_T[l].chargeVueMaisMaintenue([
+        acrHigh ? MOTIF_T[l].partRatio(nLoc(r1(i.acr), l, 1)) : null,
+        tsbLow ? MOTIF_T[l].partTsb(nLoc(Math.round(i.tsb), l)) : null,
+      ].filter(Boolean).join(", "))));
     } else {
       qBudget -= 1;
       easeReasons.push(`charge récente très supérieure à la charge de fond (${parts.join(", ")})`);
@@ -204,7 +213,10 @@ export function computeQualityBudget(i: QualityBudgetInput): QualityBudget {
   if (i.weightLossMaxQuality != null) qBudget = Math.min(qBudget, i.weightLossMaxQuality);
 
   return {
-    notes,
+    // Le français sort du MÊME gabarit que les autres langues : les deux ne peuvent
+    // donc pas diverger au fil des retouches.
+    notes: notesAll.map((n) => n.fr),
+    notesAll,
     bodySaysFresh,
     qBudget,
     structuralQBudget,

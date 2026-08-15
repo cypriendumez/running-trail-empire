@@ -64,6 +64,9 @@ export async function autoCoachForUser(
   const rows = week.filter((d: PlanDay) => d.date >= from).map((d: PlanDay) => ({
     user_id: userId,
     type: "coach_session",
+    // ⚠️ `title` et `body` restent en FRANÇAIS : ce sont les champs canoniques, ceux
+    // que la montre analyse et que l'IA relit. La version lue par l'athlète est dans
+    // `data.i18n`, et l'écran choisit la sienne. Voir lib/ai/planI18n.ts.
     title: d.title.slice(0, 80),
     body: d.detail.slice(0, 200),
     data: {
@@ -75,6 +78,15 @@ export async function autoCoachForUser(
       feel: "",
       tags: d.tags.slice(0, 4),
       confirmed: d.confirmed,
+      // Le même jour dans les autres langues — mêmes troncatures que le français, sinon
+      // une langue afficherait une phrase coupée là où une autre la termine.
+      // Le français n'y est pas : il est déjà au-dessus (une seule vérité).
+      ...(d.i18n ? { i18n: Object.fromEntries(Object.entries(d.i18n).map(([lang, t]) => [lang, {
+        title: t.title.slice(0, 80),
+        subtitle: t.detail.slice(0, 500),
+        why: t.why.slice(0, 400),
+        tags: t.tags.slice(0, 4),
+      }])) } : {}),
       // Créneau de la journée. SANS lui, la déduplication des écrans (qui porte sur
       // `date#moment`) confondrait les deux séances d'un jour doublé et n'en garderait
       // qu'une — celle qui a été écrite en dernier, au hasard de l'insertion.

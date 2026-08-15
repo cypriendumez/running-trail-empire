@@ -10,6 +10,8 @@
 //
 //  On garde la valeur de la montre en dernier recours, jamais en priorité.
 // ─────────────────────────────────────────────────────────────────────────────
+import type { Lang } from "@/lib/i18n/translations";
+import { METEO_T } from "@/lib/weather/openMeteoI18n";
 
 const ARCHIVE = "https://archive-api.open-meteo.com/v1/archive";
 const FORECAST = "https://api.open-meteo.com/v1/forecast";
@@ -109,26 +111,19 @@ export async function pastTempAt(lat: number, lon: number, dateISO: string, hour
  * Seuils issus de la littérature sur la performance en chaleur : la dégradation
  * devient nette au-delà de 20 °C et s'accélère au-delà de 25 °C.
  */
-export function heatAdvice(tempC: number, humidity: number | null): { penaltySecPerKm: number; note: string } {
+export function heatAdvice(tempC: number, humidity: number | null, lang: Lang = "fr"): { penaltySecPerKm: number; note: string } {
+  // Une langue inconnue retombe sur le FRANÇAIS, jamais sur une note vide : une consigne
+  // de canicule qui disparaît parce que la langue n'est pas reconnue est pire qu'une
+  // consigne dans la mauvaise langue.
+  const T = METEO_T[lang] ?? METEO_T.fr;
   const humid = humidity != null && humidity >= 70;
-  if (tempC >= 30) return {
-    penaltySecPerKm: humid ? 60 : 45,
-    note: `🥵 ${Math.round(tempC)} °C${humid ? " et humide" : ""} : renonce au fractionné, déplace la séance tôt le matin ou tard le soir. Compte ${humid ? "1 min" : "45 s"}/km de plus à effort égal — juge à la FC, jamais au chrono. Électrolytes obligatoires au-delà de 45 min.`,
-  };
-  if (tempC >= 25) return {
-    penaltySecPerKm: humid ? 40 : 25,
-    note: `🌡️ ${Math.round(tempC)} °C${humid ? " et humide" : ""} : compte ~${humid ? 40 : 25} s/km de plus à effort égal. Ne cherche pas tes allures habituelles, tu te grillerais pour rien.`,
-  };
-  if (tempC >= 20) return {
-    penaltySecPerKm: 10,
-    note: `${Math.round(tempC)} °C : légère dégradation, compte ~10 s/km. Hydrate-toi avant de partir.`,
-  };
-  if (tempC >= 5) return { penaltySecPerKm: 0, note: `${Math.round(tempC)} °C : conditions idéales, c'est le moment des séances chronométrées.` };
-  if (tempC >= 0) return { penaltySecPerKm: 0, note: `🧥 ${Math.round(tempC)} °C : échauffement rallongé et couvert.` };
-  return {
-    penaltySecPerKm: 0,
-    note: `🥶 ${Math.round(tempC)} °C : échauffement de 20 min minimum, pas de fractionné court à froid (risque musculaire). Attention aux voies respiratoires par temps sec et glacial.`,
-  };
+  const t = String(Math.round(tempC));
+  if (tempC >= 30) return { penaltySecPerKm: humid ? 60 : 45, note: T.chaleurExtreme(t, humid) };
+  if (tempC >= 25) return { penaltySecPerKm: humid ? 40 : 25, note: T.chaleurForte(t, humid) };
+  if (tempC >= 20) return { penaltySecPerKm: 10, note: T.chaleurLegere(t) };
+  if (tempC >= 5) return { penaltySecPerKm: 0, note: T.ideal(t) };
+  if (tempC >= 0) return { penaltySecPerKm: 0, note: T.frais(t) };
+  return { penaltySecPerKm: 0, note: T.froid(t) };
 }
 
 /**
@@ -139,20 +134,13 @@ export function heatAdvice(tempC: number, humidity: number | null): { penaltySec
  * ne rend JAMAIS ce que l'aller a coûté — la pénalité est donc nette, pas nulle.
  * On raisonne sur environ la moitié du parcours face au vent, d'où le coefficient.
  */
-export function windAdvice(windKmh: number | null): { penaltySecPerKm: number; note: string } {
+export function windAdvice(windKmh: number | null, lang: Lang = "fr"): { penaltySecPerKm: number; note: string } {
+  const T = METEO_T[lang] ?? METEO_T.fr;
   if (windKmh == null || windKmh < 20) return { penaltySecPerKm: 0, note: "" };
-  if (windKmh >= 45) return {
-    penaltySecPerKm: 25,
-    note: `💨 Vent de ${Math.round(windKmh)} km/h : renonce à toute séance chronométrée, tu ne tiendras aucune allure de référence. Si tu sors, fais l'aller face au vent et le retour dans le dos, et juge-toi à la FC. En terrain découvert, prudence sur les rafales.`,
-  };
-  if (windKmh >= 35) return {
-    penaltySecPerKm: 18,
-    note: `💨 Vent de ${Math.round(windKmh)} km/h : compte ~18 s/km de plus face au vent. Une séance de qualité devient très difficile à piloter à l'allure — bascule sur la FC, ou déplace-la.`,
-  };
-  return {
-    penaltySecPerKm: 10,
-    note: `💨 Vent de ${Math.round(windKmh)} km/h : ~10 s/km de plus dans les portions face au vent. Le retour dans le dos ne compense pas l'aller, n'en attends rien.`,
-  };
+  const v = String(Math.round(windKmh));
+  if (windKmh >= 45) return { penaltySecPerKm: 25, note: T.ventFort(v) };
+  if (windKmh >= 35) return { penaltySecPerKm: 18, note: T.ventModere(v) };
+  return { penaltySecPerKm: 10, note: T.ventLeger(v) };
 }
 
 /** Températures maximales quotidiennes passées à une position — UN seul appel pour

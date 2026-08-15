@@ -44,12 +44,15 @@ export default async function DashboardPage() {
 
   // Prochaine séance prescrite par le coach (aujourd'hui ou à venir) → prioritaire sur l'IA/l'algo.
   const today = new Date().toISOString().split("T")[0];
-  type CoachRow = { title: string; body: string; data: { date?: string; subtitle?: string; tags?: string[]; why?: string } };
+  type CoachText = { title?: string; subtitle?: string; tags?: string[]; why?: string };
+  type CoachRow = { title: string; body: string; data: { date?: string; subtitle?: string; tags?: string[]; why?: string; i18n?: Record<string, CoachText> } };
   const cn = oneSessionPerSlot((coachRes.data ?? []) as CoachRow[], (r) => slotKey(r.data))
     .filter((r) => (r.data?.date ?? "") >= today)
     .sort((a, b) => (a.data?.date ?? "").localeCompare(b.data?.date ?? ""))[0];
   const coachSession = cn
-    ? { title: cn.title, subtitle: cn.data.subtitle || cn.body || "", tags: cn.data.tags ?? [], why: cn.data.why ?? "" }
+    // Le français reste ici ; `i18n` voyage à côté et c'est le composant client qui
+    // choisit la langue (le sélecteur est instantané, il ne recharge pas la page).
+    ? { title: cn.title, subtitle: cn.data.subtitle || cn.body || "", tags: cn.data.tags ?? [], why: cn.data.why ?? "", i18n: cn.data.i18n }
     : null;
 
   // Demande de ressenti après la dernière séance (si non donné et séance récente ≤ 4 j).

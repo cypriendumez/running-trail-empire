@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { CalendarView, type Planned, type CalNote, type CalRace, type CoachState } from "@/components/training/CalendarView";
+import { CalendarView, type Planned, type PlannedText, type CalNote, type CalRace, type CoachState } from "@/components/training/CalendarView";
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 
 export const dynamic = "force-dynamic";
@@ -40,8 +40,11 @@ export default async function CalendrierPage() {
     (r) => slotKey(r.data as { date?: string; moment?: string } | null),
   );
   const sessions: Planned[] = coachRows.map((r) => {
-    const d = (r.data ?? {}) as { date?: string; sessionType?: string; subtitle?: string; why?: string; feel?: string; tags?: string[]; confirmed?: boolean };
+    const d = (r.data ?? {}) as { date?: string; sessionType?: string; subtitle?: string; why?: string; feel?: string; tags?: string[]; confirmed?: boolean; i18n?: Record<string, PlannedText> };
     return { date: String(d.date ?? "").slice(0, 10), type: d.sessionType || "Séance", title: r.title || "Séance", detail: d.subtitle || "", why: d.why || "", feel: d.feel || "", tags: Array.isArray(d.tags) ? d.tags : [],
+      // Traductions du plan : c'est le composant client qui choisit la langue, pour que
+      // le sélecteur de langue s'applique sans recharger la page.
+      i18n: d.i18n,
       // Les séances publiées à la main par le coach n'ont pas ce champ → considérées confirmées.
       confirmed: d.confirmed !== false };
   }).filter((s) => s.date);

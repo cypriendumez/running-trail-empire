@@ -13,7 +13,16 @@ import type { UserProfile, PerformanceBaseline } from "@/types";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { GX, GUIDE, GUIDE_TIP, SPEECH_LANG, fillG } from "./ghostI18n";
 
-export interface CoachSess { title: string; detail: string; date: string; tags: string[] }
+/**
+ * ⚠️ `title`, `detail` et `tags` sont en FRANÇAIS, et doivent le rester :
+ * `applyCoachSession` les analyse (« seuil », « récup », « côte », « N×DISTANCE ») pour
+ * régler l'allure, la distance et la zone du défi. Les traduire changerait la séance
+ * fabriquée ici, en silence. `i18n` ne sert qu'à ce que l'athlète LIT.
+ */
+export interface CoachSess {
+  title: string; detail: string; date: string; tags: string[];
+  i18n?: Record<string, { title?: string; subtitle?: string }>;
+}
 
 interface GhostRunnerProps {
   profile: UserProfile | null;
@@ -622,10 +631,10 @@ export function GhostRunner({ baseline, effectiveVma, coachSessions = [] }: Ghos
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="truncate font-semibold text-zinc-900">{s.title}</span>
+                            <span className="truncate font-semibold text-zinc-900">{s.i18n?.[lang]?.title ?? s.title}</span>
                             {isToday && <span className="rounded-full bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold text-white">{d["co.today"]}</span>}
                           </div>
-                          <p className="mt-0.5 line-clamp-2 text-xs text-zinc-500">{s.detail || d["co.fallback"]}</p>
+                          <p className="mt-0.5 line-clamp-2 text-xs text-zinc-500">{s.i18n?.[lang]?.subtitle || s.detail || d["co.fallback"]}</p>
                         </div>
                         <span className="self-center whitespace-nowrap text-xs font-semibold text-emerald-600 opacity-0 transition-opacity group-hover:opacity-100">{d["co.load"]}</span>
                       </button>
