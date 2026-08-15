@@ -20,8 +20,8 @@ export type LandingDict = {
   cta: { title: string; subtitle: string; primary: string; secondary: string; note: string };
 };
 
-export const PROGRAM_KEYS = ["km10", "semi", "marathon", "trail", "beginner", "speed", "endurance", "injury"] as const;
-export const CATEGORY_CODES = ["ALL", "10KM", "SEMI", "MARATHON", "TRAIL", "BEGINNER", "SPEED", "ENDURANCE", "INJURY"] as const;
+export const PROGRAM_KEYS = ["km10", "semi", "marathon", "trail", "beginner", "speed", "endurance", "injury", "weightloss"] as const;
+export const CATEGORY_CODES = ["ALL", "10KM", "SEMI", "MARATHON", "TRAIL", "BEGINNER", "SPEED", "ENDURANCE", "INJURY", "WEIGHT"] as const;
 
 const fr: LandingDict = {
   nav: { programs: "Programmes", features: "Fonctionnalités", pricing: "Tarifs", blog: "Blog", reviews: "Avis", login: "Connexion", trial: "Essai gratuit" },
@@ -29,7 +29,7 @@ const fr: LandingDict = {
   stats: { races: "Courses à venir", routes: "Parcours cartographiés", plan: "De plan glissant", replan: "Entre deux replanifications" },
   programs: {
     eyebrow: "Entraînement", title: "Des programmes pour chaque objectif", subtitle: "Du premier 5 km à l'ultra-trail — chaque plan s'adapte ensuite à tes données réelles.", viewAll: "Voir tout",
-    cats: { ALL: "Tout voir", "10KM": "10 km", SEMI: "Semi", MARATHON: "Marathon", TRAIL: "Trail", BEGINNER: "Débutant", SPEED: "Vitesse", ENDURANCE: "Endurance", INJURY: "Blessure" },
+    cats: { ALL: "Tout voir", "10KM": "10 km", SEMI: "Semi", MARATHON: "Marathon", TRAIL: "Trail", BEGINNER: "Débutant", SPEED: "Vitesse", ENDURANCE: "Endurance", INJURY: "Blessure", WEIGHT: "Perte de poids" },
     items: {
       km10: { title: "10 KILOMÈTRES", subtitle: "De 6 semaines à 4 mois" },
       semi: { title: "SEMI-MARATHON", subtitle: "De 8 semaines à 12 mois" },
@@ -39,6 +39,7 @@ const fr: LandingDict = {
       speed: { title: "AMÉLIORER SA VITESSE", subtitle: "De 4 à 12 semaines" },
       endurance: { title: "ENDURANCE DE BASE", subtitle: "De 6 semaines à 6 mois" },
       injury: { title: "REPRENDRE APRÈS BLESSURE", subtitle: "De 4 à 16 semaines" },
+      weightloss: { title: "COURIR POUR PERDRE DU POIDS", subtitle: "De 8 semaines à 12 mois" },
     },
   },
   features: {
@@ -83,7 +84,7 @@ const en: LandingDict = {
   stats: { races: "Upcoming races", routes: "Mapped routes", plan: "Rolling plan", replan: "Between two replans" },
   programs: {
     eyebrow: "Training", title: "A program for every goal", subtitle: "From your first 5K to ultra-trail — each plan then adapts to your real data.", viewAll: "View all",
-    cats: { ALL: "View all", "10KM": "10K", SEMI: "Half", MARATHON: "Marathon", TRAIL: "Trail", BEGINNER: "Beginner", SPEED: "Speed", ENDURANCE: "Endurance", INJURY: "Injury" },
+    cats: { ALL: "View all", "10KM": "10K", SEMI: "Half", MARATHON: "Marathon", TRAIL: "Trail", BEGINNER: "Beginner", SPEED: "Speed", ENDURANCE: "Endurance", INJURY: "Injury", WEIGHT: "Weight loss" },
     items: {
       km10: { title: "10 KILOMETRES", subtitle: "From 6 weeks to 4 months" },
       semi: { title: "HALF MARATHON", subtitle: "From 8 weeks to 12 months" },
@@ -93,6 +94,7 @@ const en: LandingDict = {
       speed: { title: "IMPROVE YOUR SPEED", subtitle: "From 4 to 12 weeks" },
       endurance: { title: "BASE ENDURANCE", subtitle: "From 6 weeks to 6 months" },
       injury: { title: "RETURN FROM INJURY", subtitle: "From 4 to 16 weeks" },
+      weightloss: { title: "RUN TO LOSE WEIGHT", subtitle: "From 8 weeks to 12 months" },
     },
   },
   features: {
@@ -137,7 +139,7 @@ const de: LandingDict = {
   stats: { races: "Kommende Rennen", routes: "Kartierte Strecken", plan: "Rollierender Plan", replan: "Zwischen zwei Neuplanungen" },
   programs: {
     eyebrow: "Training", title: "Ein Programm für jedes Ziel", subtitle: "Vom ersten 5-km-Lauf bis zum Ultra-Trail — jeder Plan passt sich dann an deine echten Daten an.", viewAll: "Alle ansehen",
-    cats: { ALL: "Alle", "10KM": "10 km", SEMI: "Halb", MARATHON: "Marathon", TRAIL: "Trail", BEGINNER: "Einsteiger", SPEED: "Tempo", ENDURANCE: "Ausdauer", INJURY: "Verletzung" },
+    cats: { ALL: "Alle", "10KM": "10 km", SEMI: "Halb", MARATHON: "Marathon", TRAIL: "Trail", BEGINNER: "Einsteiger", SPEED: "Tempo", ENDURANCE: "Ausdauer", INJURY: "Verletzung", WEIGHT: "Abnehmen" },
     items: {
       km10: { title: "10 KILOMETER", subtitle: "Von 6 Wochen bis 4 Monate" },
       semi: { title: "HALBMARATHON", subtitle: "Von 8 Wochen bis 12 Monate" },
@@ -147,6 +149,7 @@ const de: LandingDict = {
       speed: { title: "TEMPO VERBESSERN", subtitle: "Von 4 bis 12 Wochen" },
       endurance: { title: "GRUNDLAGENAUSDAUER", subtitle: "Von 6 Wochen bis 6 Monate" },
       injury: { title: "COMEBACK NACH VERLETZUNG", subtitle: "Von 4 bis 16 Wochen" },
+      weightloss: { title: "LAUFEN, UM ABZUNEHMEN", subtitle: "Von 8 Wochen bis 12 Monaten" },
     },
   },
   features: {
@@ -191,7 +194,7 @@ const es: LandingDict = {
   stats: { races: "Carreras próximas", routes: "Rutas cartografiadas", plan: "De plan deslizante", replan: "Entre dos replanificaciones" },
   programs: {
     eyebrow: "Entrenamiento", title: "Un programa para cada objetivo", subtitle: "Desde tu primer 5K hasta el ultra-trail — cada plan se adapta luego a tus datos reales.", viewAll: "Ver todo",
-    cats: { ALL: "Ver todo", "10KM": "10 km", SEMI: "Media", MARATHON: "Maratón", TRAIL: "Trail", BEGINNER: "Principiante", SPEED: "Velocidad", ENDURANCE: "Resistencia", INJURY: "Lesión" },
+    cats: { ALL: "Ver todo", "10KM": "10 km", SEMI: "Media", MARATHON: "Maratón", TRAIL: "Trail", BEGINNER: "Principiante", SPEED: "Velocidad", ENDURANCE: "Resistencia", INJURY: "Lesión", WEIGHT: "Pérdida de peso" },
     items: {
       km10: { title: "10 KILÓMETROS", subtitle: "De 6 semanas a 4 meses" },
       semi: { title: "MEDIA MARATÓN", subtitle: "De 8 semanas a 12 meses" },
@@ -201,6 +204,7 @@ const es: LandingDict = {
       speed: { title: "MEJORAR TU VELOCIDAD", subtitle: "De 4 a 12 semanas" },
       endurance: { title: "RESISTENCIA DE BASE", subtitle: "De 6 semanas a 6 meses" },
       injury: { title: "VOLVER TRAS UNA LESIÓN", subtitle: "De 4 a 16 semanas" },
+      weightloss: { title: "CORRER PARA PERDER PESO", subtitle: "De 8 semanas a 12 meses" },
     },
   },
   features: {
@@ -245,7 +249,7 @@ const pt: LandingDict = {
   stats: { races: "Provas futuras", routes: "Percursos cartografados", plan: "De plano deslizante", replan: "Entre duas replanificações" },
   programs: {
     eyebrow: "Treino", title: "Um programa para cada objetivo", subtitle: "Do teu primeiro 5K ao ultra-trail — cada plano adapta-se depois aos teus dados reais.", viewAll: "Ver tudo",
-    cats: { ALL: "Ver tudo", "10KM": "10 km", SEMI: "Meia", MARATHON: "Maratona", TRAIL: "Trail", BEGINNER: "Iniciante", SPEED: "Velocidade", ENDURANCE: "Resistência", INJURY: "Lesão" },
+    cats: { ALL: "Ver tudo", "10KM": "10 km", SEMI: "Meia", MARATHON: "Maratona", TRAIL: "Trail", BEGINNER: "Iniciante", SPEED: "Velocidade", ENDURANCE: "Resistência", INJURY: "Lesão", WEIGHT: "Perda de peso" },
     items: {
       km10: { title: "10 QUILÓMETROS", subtitle: "De 6 semanas a 4 meses" },
       semi: { title: "MEIA MARATONA", subtitle: "De 8 semanas a 12 meses" },
@@ -255,6 +259,7 @@ const pt: LandingDict = {
       speed: { title: "MELHORAR A VELOCIDADE", subtitle: "De 4 a 12 semanas" },
       endurance: { title: "RESISTÊNCIA DE BASE", subtitle: "De 6 semanas a 6 meses" },
       injury: { title: "REGRESSAR DE LESÃO", subtitle: "De 4 a 16 semanas" },
+      weightloss: { title: "CORRER PARA PERDER PESO", subtitle: "De 8 semanas a 12 meses" },
     },
   },
   features: {

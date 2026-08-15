@@ -29,6 +29,7 @@ import { buildWeekPlan, CONFIRMED_DAYS } from "../src/lib/ai/autoPlan";
 import { tr, ALL_LANGS, nRaw } from "../src/lib/i18n/multi";
 // `T` est déjà pris plus bas dans ce fichier (une date) → alias explicite.
 import { T as T_UI } from "../src/lib/i18n/translations";
+import { LANDING as LANDING_T } from "../src/components/landing/landingI18n";
 import { ppsExpiration, ppsVerdict, ppsDemandeAction, couvertureCourses, PPS_URL, PPS_PRIX_EUR, PPS_VALIDITE_MOIS } from "../src/lib/pps/status";
 import { PPS_T } from "../src/lib/pps/ppsI18n";
 import { PLAN_T, libelleType } from "../src/lib/ai/planI18n";
@@ -3968,6 +3969,60 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     const r = computeStreak({ today: AUJ, workouts: [], prescriptions: [], feedbacks: [] });
     assert.equal(r.current, 0);
     assert.equal(r.since, null, "on ne prétend pas observer une fenêtre qu'on n'a pas");
+  });
+
+  test("la vitrine des programmes est complète : photo, catégorie, 5 langues", () => {
+    // Trois défauts SILENCIEUX possibles sur cette grille, et elle est la première
+    // chose qu'un client voit :
+    //  · un programme sans traduction affiche `undefined` comme titre ;
+    //  · un programme sans photo laissait un aplat dégradé au milieu de photographies ;
+    //  · une catégorie sans libellé rend une puce de filtre vide.
+    const page = codeOf("src/app/page.tsx");
+    const i18n = codeOf("src/components/landing/landingI18n.ts");
+
+    const cles = [...(i18n.match(/export const PROGRAM_KEYS = \[([\s\S]*?)\]/)?.[1] ?? "")
+      .matchAll(/"([a-z0-9]+)"/g)].map((m) => m[1]);
+    const cats = [...(i18n.match(/export const CATEGORY_CODES = \[([\s\S]*?)\]/)?.[1] ?? "")
+      .matchAll(/"([A-Z0-9]+)"/g)].map((m) => m[1]);
+    assert.ok(cles.length >= 8, `PROGRAM_KEYS illisible (${cles.length})`);
+
+    // Chaque programme déclaré possède une entrée dans PROGRAMS, avec une photo.
+    const entrees = [...page.matchAll(/\{ key: "([a-z0-9]+)", category: "([A-Z0-9]+)", img: "(https:[^"]+)" \}/g)]
+      .map((m) => ({ key: m[1], cat: m[2], img: m[3] }));
+    assert.deepEqual(entrees.map((e) => e.key).sort(), [...cles].sort(),
+      "PROGRAM_KEYS et le tableau PROGRAMS de page.tsx ne décrivent pas les mêmes programmes");
+    for (const e of entrees) {
+      assert.ok(/images\.unsplash\.com\/photo-/.test(e.img), `${e.key} : photo absente ou invalide`);
+      assert.ok(cats.includes(e.cat), `${e.key} : catégorie « ${e.cat} » absente de CATEGORY_CODES`);
+    }
+
+    // Aucune photo en double : deux cartes identiques dans une même grille se voient.
+    const imgs = entrees.map((e) => e.img.replace(/\?.*$/, ""));
+    assert.equal(new Set(imgs).size, imgs.length, "deux programmes partagent la même photo");
+
+    // La grille est en 3 colonnes : un nombre non multiple de 3 laisse un trou dans la
+    // dernière rangée. C'est ce trou qui a motivé le neuvième programme.
+    //
+    // ⚠️ On ancre la vérification sur le conteneur qui rend RÉELLEMENT les programmes
+    // (celui juste avant `filtered.map`). Chercher « lg:grid-cols-3 » n'importe où dans
+    // le fichier ne prouvait rien : la page en contient deux, et faire passer la grille
+    // des programmes en 2 colonnes laissait le test au vert — vérifié par mutation.
+    const avantGrille = page.slice(0, page.indexOf("filtered.map"));
+    const conteneur = avantGrille.slice(avantGrille.lastIndexOf("<div className="));
+    assert.ok(/lg:grid-cols-3/.test(conteneur),
+      `la grille des programmes n'est plus en 3 colonnes : ${conteneur.slice(0, 90)}`);
+    assert.equal(entrees.length % 3, 0,
+      `${entrees.length} programmes sur 3 colonnes laissent ${3 - (entrees.length % 3)} case(s) vide(s)`);
+
+    // Et tout cela existe dans les 5 langues.
+    for (const l of ALL_LANGS) {
+      const dict = LANDING_T[l];
+      for (const k of cles) {
+        assert.ok(dict.programs.items[k]?.title, `${l} : titre manquant pour « ${k} »`);
+        assert.ok(dict.programs.items[k]?.subtitle, `${l} : sous-titre manquant pour « ${k} »`);
+      }
+      for (const c of cats) assert.ok(dict.programs.cats[c], `${l} : libellé manquant pour la catégorie « ${c} »`);
+    }
   });
 
   test("la carte n'affiche que des clés de traduction qui EXISTENT", () => {

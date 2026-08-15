@@ -30,8 +30,20 @@ const PROGRAMS: { key: string; category: string; img: string }[] = [
   { key: "trail", category: "TRAIL", img: "https://images.unsplash.com/photo-1504025468847-0e438279542c?w=600&q=80&fit=crop" },
   { key: "beginner", category: "BEGINNER", img: "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=600&q=80&fit=crop" },
   { key: "speed", category: "SPEED", img: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=600&q=80&fit=crop" },
-  { key: "endurance", category: "ENDURANCE", img: "https://images.unsplash.com/photo-1483721310020-03333e577078?w=600&q=80&fit=crop" },
-  { key: "injury", category: "INJURY", img: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=600&q=80&fit=crop" },
+  // Endurance : la photo montrait un coureur plié en deux, mains sur les genoux — de
+  // l'épuisement, soit l'inverse exact du message d'une base aérobie. Remplacée par une
+  // route ouverte à la lumière rasante.
+  { key: "endurance", category: "ENDURANCE", img: "https://images.unsplash.com/photo-1581889470536-467bdbe30cd0?w=600&q=80&fit=crop" },
+  // Blessure : c'était un portrait de médecin en blouse, souriant face objectif. Au
+  // milieu de sept photographies de course, une photo de banque d'images posée cassait
+  // la grille entière. Remplacée par des mains qui relacent une chaussure — « je repars ».
+  { key: "injury", category: "INJURY", img: "https://images.unsplash.com/photo-1600712662084-e54770a9668e?w=600&q=80&fit=crop" },
+  // NEUVIÈME programme. Deux raisons, et la mise en page n'est que la seconde :
+  //  1. le mode perte de poids EXISTE (src/lib/weight, /api/weight,
+  //     profiles.weight_mode_enabled) — il était vendu nulle part ;
+  //  2. huit cartes sur trois colonnes donnent 3+3+2, donc un trou dans la dernière
+  //     rangée sur tout écran large. Neuf la ferment.
+  { key: "weightloss", category: "WEIGHT", img: "https://images.unsplash.com/photo-1480179087180-d9f0ec044897?w=600&q=80&fit=crop" },
 ];
 
 const FEATURE_ICONS: LucideIcon[] = [Bot, Heart, Ghost, Map, Zap, Moon, Activity, CloudRain, BookOpen, Trophy, ShoppingBag, Shield];
