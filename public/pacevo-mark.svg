@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    MARQUE PACEVO — source VECTORIELLE de toutes les icônes.
+
+    Concept : le « P » dont la hampe se prolonge en sentier qui s'éloigne. Il remplace
+    le « P + flèche ascendante » : une flèche de courbe boursière disait la performance,
+    le sentier dit la course.
+
+    Pourquoi du SVG et plus un PNG : le master était un raster sans source. Impossible
+    de le retoucher, de le décliner sur fond clair ou d'en tirer un favicon net à 32 px
+    sans repasser par un outil externe. gen-icons.js rastérise désormais CE fichier.
+
+    Carré bord à bord, sans transparence ni coins arrondis : c'est l'exigence des icônes
+    « maskable » iOS/Android. L'arrondi est appliqué en CSS pour l'affichage in-app
+    (Logo.tsx) et par le système pour l'icône d'application.
+
+    GÉOMÉTRIE — le sentier est construit sur trois points de sa ligne médiane, du plus
+    loin au plus près : (615,505) large de 26, (450,722) large de 105, (540,1024) large
+    de 200. C'est cet élargissement régulier qui donne la perspective ; un sentier de
+    largeur constante ressemblait à une coulée. Sa sortie est ramenée vers le centre du
+    cadre : plus à droite et plus large, il déséquilibrait la tuile et laissait un vide
+    dans l'angle inférieur droit.
+  -->
+  <defs>
+    <linearGradient id="tuile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1d8a63"/>
+      <stop offset="0.52" stop-color="#116349"/>
+      <stop offset="1" stop-color="#083b2a"/>
+    </linearGradient>
+    <!-- Le sentier s'éclaircit en se rapprochant : c'est ce dégradé qui crée la
+         profondeur, pas un flou — un flou disparaîtrait à 32 px. -->
+    <linearGradient id="sentier" x1="0.5" y1="0.47" x2="0.5" y2="1">
+      <stop offset="0" stop-color="#a9bdb1"/>
+      <stop offset="0.40" stop-color="#dfe4db"/>
+      <stop offset="1" stop-color="#ffffff"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#tuile)"/>
+
+  <!-- Ombre du sentier, côté intérieur du virage : le relief sans recourir à un flou. -->
+  <path fill="#04291d" opacity="0.30"
+        d="M602 505 C560 570 420 622 398 715 C380 800 424 900 440 1024 L398 1024
+           C382 892 334 796 354 706 C376 606 556 566 590 498 Z"/>
+
+  <!-- Le sentier -->
+  <path fill="url(#sentier)"
+        d="M602 505
+           C560 570 420 622 398 715
+           C380 800 424 900 440 1024
+           L640 1024
+           C624 892 548 806 503 728
+           C466 660 596 570 628 505
+           Z"/>
+
+  <!-- Le P : silhouette et contrepoinçon dans une seule forme (evenodd). -->
+  <path fill="#f5f4ed" fill-rule="evenodd"
+        d="M300 255
+           H520
+           A 145 145 0 0 1 520 545
+           H410
+           V 640
+           L 355 726
+           L 300 640
+           Z
+           M410 338
+           H520
+           A 62 62 0 0 1 520 462
+           H410
+           Z"/>
+</svg>
