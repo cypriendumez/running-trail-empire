@@ -7,7 +7,7 @@ import { buildWeightPlan, weightModeEligibility, type WeightPlan } from "@/lib/w
 import { weightCoachBlock, weightTrainingRules, type WeightTrainingRules } from "@/lib/weight/coaching";
 import { terrainCoachBlock } from "@/data/terrainCatalog";
 import { forecastWithElevation, altitudeLossPct, heatAdvice, windAdvice, archiveDailyMax, heatAcclimation, type DayWeather } from "@/lib/weather/openMeteo";
-import { bestVmaFromWorkouts, vmaFromPaceCurve, effectiveVma } from "@/lib/running/fitness";
+import { bestVmaFromWorkouts, vmaFromPaceCurve, effectiveVma, easyPaceFromHeartRate } from "@/lib/running/fitness";
 import { isRun } from "@/lib/intervals/sport";
 import { summarizeCross, fmtMinutes, type CrossSummary } from "@/lib/coach/crossTraining";
 import { computeQualityBudget } from "@/lib/coach/qualityBudget";
@@ -429,6 +429,23 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   });
   const vmaIsEst = vmaSource !== "test" && vma != null;
 
+  /**
+   * ALLURE D'ENDURANCE : MESURÉE en zone 2, pas déduite d'un pourcentage de VMA.
+   *
+   * Une allure facile se définit par la FRÉQUENCE CARDIAQUE. Le rapport FC↔allure varie
+   * trop d'un coureur à l'autre pour qu'un « 70 % de VMA » convienne à tout le monde :
+   * mesuré sur le compte de production, l'écart était de 33 s/km, ce qui plaçait le
+   * « footing » prescrit en zone 3 — et l'application reprochait ensuite à l'athlète de
+   * courir trop vite. `null` si l'historique ne permet pas de conclure : on retombe
+   * alors sur le pourcentage de VMA, et le briefing le dit.
+   */
+  const easyPaceMesure = easyPaceFromHeartRate(
+    runs,
+    num(b?.max_hr) ?? (obsMaxHr0 > 150 ? obsMaxHr0 : null),
+    num(b?.resting_hr) ?? num((((p as Record<string, unknown> | null)?.garmin_metrics) as Record<string, unknown> | null)?.restingHR),
+    acclimVma,
+  );
+
   // ── TRAJECTOIRE DE CAPACITÉ — plateau et projection au jour J ────────────────
   // La courbe d'allure disait « où il en est » ; l'historique dit « où il va ».
   // Deux usages, tous deux impossibles sans série temporelle :
@@ -700,6 +717,16 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
 
   // Allures cibles calculées depuis la VMA (repli si zones non stockées).
   const paceAt = (pct: number) => { if (!vma) return "?"; const s = 3600 / (vma * pct / 100); return `${Math.floor(s / 60)}'${String(Math.round(s % 60)).padStart(2, "0")}`; };
+  /**
+   * L'allure de footing affichée et prescrite : la MESURE d'abord, le modèle ensuite.
+   * `easyPaceSource` dit laquelle a servi — un athlète doit pouvoir savoir si son
+   * allure vient de ce qu'il court ou de ce qu'un pourcentage suppose.
+   */
+  const easyPaceSource: "mesurée" | "modèle" | null =
+    easyPaceMesure != null ? "mesurée" : vma ? "modèle" : null;
+  const easyPaceLisible = easyPaceMesure != null
+    ? `${Math.floor(easyPaceMesure / 60)}'${String(Math.round(easyPaceMesure % 60)).padStart(2, "0")}`
+    : vma ? paceAt(70) : null;
   /**
    * Allure d'une RÉPÉTITION, plafonnée par ce que l'athlète a réellement produit.
    *
@@ -1635,7 +1662,7 @@ ${catalog}`;
 
   return {
     text, objective, daysToRace, weeksToRace, athleteName: String(p?.full_name ?? "Athlète"), vma,
-    weekPlan: { qBudget, quality: chosen, easyPace: vma ? paceAt(70) : null, eased: easeReasons.length > 0, floored: qb.floored },
+    weekPlan: { qBudget, quality: chosen, easyPace: easyPaceLisible, eased: easeReasons.length > 0, floored: qb.floored },
     // Doubles séances : on tranche ICI, avec le volume REPRÉSENTATIF (médiane des
     // semaines courues) et non le pic — une semaine à 90 km ne fait pas un athlète
     // qui double, et doubler sur un pic isolé est la meilleure façon de le payer.
@@ -1658,7 +1685,7 @@ ${catalog}`;
       advice: readinessRule,
     },
     hardGapHours: hardGapH,
-    easyPace: vma ? paceAt(70) : null,
+    easyPace: easyPaceLisible,
     lastHardDaysAgo,
     volume: { weekKm: Math.round(weekKm), avg4wkKm: Math.round(avg4wkKm), targetKm, longRunKm, longRunPlanned, longRunEased },
     cycle: { deload, taper, label: cycleLabel },

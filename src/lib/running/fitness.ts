@@ -10,7 +10,7 @@ export const RACE_DISTANCES: { label: string; km: number }[] = [
 ];
 
 // Fraction de VMA tenable selon la distance.
-export function pctVmaForDistance(km: number): number {
+function pctVmaBrut(km: number): number {
   if (km <= 0.4) return 1.18;
   if (km <= 0.8) return 1.12;
   if (km <= 1.5) return 1.06;
@@ -34,6 +34,39 @@ export function pctVmaForDistance(km: number): number {
   if (km <= 30) return 0.79;
   if (km <= 43) return 0.75;
   return 0.74;
+}
+
+/**
+ * SOCLE D'ENDURANCE — ce qui manquait vraiment au modèle de pronostic.
+ *
+ * `pctVmaForDistance` traite le pourcentage tenable comme une constante physiologique.
+ * Il n'en est pas une : sur marathon, un coureur à 150 km/semaine avec des sorties de
+ * 32 km tient nettement plus que le même cardio à 80 km/semaine dont la plus longue
+ * sortie fait 21 km. C'est exactement ce que modélise le prédicteur de Garmin, et
+ * c'est pourquoi nos pronostics longue distance s'en écartaient toujours dans le même
+ * sens — l'optimiste, le plus coûteux pour qui cale son allure de course dessus.
+ *
+ * DEUX ANCRES, PAS UN AJUSTEMENT LIBRE :
+ *   · 32 km de sortie longue = référence classique de préparation marathon aboutie ;
+ *   · 21 km (un semi) = plancher en dessous duquel on ne prépare pas un marathon.
+ * Entre les deux, on interpole. Au-delà, on plafonne : une sortie de 40 km ne rend pas
+ * le marathon plus facile que ce que la physiologie permet.
+ *
+ * N'intervient QUE au-delà du semi : en deçà, c'est la VMA qui décide, et nos
+ * coefficients courte distance tombent déjà à 8 et 20 s des pronostics Garmin.
+ */
+export const LONG_RUN_PRET_KM = 32;
+export const LONG_RUN_PLANCHER_KM = 21;
+
+export function pctVmaForDistance(km: number, longRunKm?: number | null): number {
+  const base = pctVmaBrut(km);
+  // Sans sortie longue connue, on ne suppose RIEN : on garde la valeur de référence.
+  if (km <= 22 || longRunKm == null || !(longRunKm > 0)) return base;
+  const pret = Math.min(1, Math.max(0, (longRunKm - LONG_RUN_PLANCHER_KM) / (LONG_RUN_PRET_KM - LONG_RUN_PLANCHER_KM)));
+  // Un athlète prêt retrouve le coefficient d'avant (marathon 79 %) ; un athlète au
+  // plancher reste sur la valeur mesurée contre Garmin (75 %).
+  const bonus = km > 30 ? 0.04 : 0.02;
+  return Math.round((base + bonus * pret) * 1000) / 1000;
 }
 
 // VMA depuis un test de 6 min (demi-Cooper) : distance(m) parcourue / 100.
@@ -86,6 +119,56 @@ export function vmaFromEffort(distanceKm: number, durationSec: number): number |
   return Math.round((speed / pctVmaForDistance(distanceKm)) * 10) / 10;
 }
 
+/**
+ * ALLURE D'ENDURANCE MESURÉE — celle que l'athlète tient RÉELLEMENT en zone 2.
+ *
+ * DÉFAUT RÉEL, ET IL SE MORDAIT LA QUEUE. L'allure de footing était déduite d'un
+ * pourcentage de VMA (70 %). Or une allure facile ne se définit pas par un pourcentage
+ * de vitesse : elle se définit par la FRÉQUENCE CARDIAQUE. Le rapport entre les deux
+ * dépend de l'économie de course, du terrain, de la fraîcheur — il varie d'un coureur
+ * à l'autre bien plus que le modèle ne le suppose.
+ *
+ * Mesuré sur le compte de production, 99 séances en zone 2 (146-163 bpm, Karvonen) :
+ * allure réelle 4'59/km. Le modèle en prescrivait 4'26 — soit 33 s/km trop vite, ce qui
+ * situe le « footing » en zone 3. L'application reprochait donc à l'athlète de courir
+ * ses footings trop vite (« 31 % du temps en Z3+ ») TOUT EN LUI PRESCRIVANT une allure
+ * qui l'y envoyait. Elle causait le défaut qu'elle signalait.
+ *
+ * On lit l'allure DANS SES CONDITIONS (correction de chaleur) et on renvoie une valeur
+ * NEUTRE : le plan ré-applique ensuite la pénalité météo du jour prescrit. Sans cela,
+ * la chaleur serait comptée deux fois.
+ *
+ * `null` si l'historique ne permet pas de conclure — l'appelant retombe alors sur le
+ * pourcentage de VMA, et doit le dire.
+ */
+export const MIN_SEANCES_ALLURE_Z2 = 5;
+
+export function easyPaceFromHeartRate(
+  runs: { distance_km?: number | null; duration_seconds?: number | null; avg_hr?: number | null; weather_temp_c?: number | null }[],
+  maxHr: number | null | undefined,
+  restHr: number | null | undefined,
+  acclimFactor = 1,
+): number | null {
+  if (!(maxHr && maxHr > 120) || !(restHr && restHr > 20) || maxHr <= restHr) return null;
+  // Zone 2 « facile » au sens de l'application elle-même : réserve cardiaque 60-70 %
+  // (Karvonen), la définition déjà utilisée pour afficher les zones à l'athlète.
+  const bas = restHr + (maxHr - restHr) * 0.6;
+  const haut = restHr + (maxHr - restHr) * 0.7;
+  const allures: number[] = [];
+  for (const w of runs) {
+    // 4 km minimum : sur plus court, l'échauffement pèse trop dans la moyenne.
+    if (!w.distance_km || w.distance_km < 4 || !w.duration_seconds || w.avg_hr == null) continue;
+    if (w.avg_hr < bas || w.avg_hr >= haut) continue;
+    const sec = dureeEnConditionsNeutres(w.duration_seconds, w.distance_km, w.weather_temp_c, acclimFactor);
+    allures.push(sec / w.distance_km);
+  }
+  if (allures.length < MIN_SEANCES_ALLURE_Z2) return null;
+  // MÉDIANE et pas moyenne : une seule sortie en montagne ou un GPS qui déraille
+  // déplacerait la moyenne, jamais la médiane.
+  allures.sort((a, b) => a - b);
+  return Math.round(allures[Math.floor(allures.length / 2)]);
+}
+
 // VO2max (ml/kg/min) à partir de plusieurs sources, comme Garmin combine les données.
 //  • VMA × 3.5 (Léger)  • 15.3 × FCmax/FCrepos (Uth-Sørensen)
 // VMA (km/h) déduite d'une VO2max (formule de Léger : VO2max ≈ 3,5 × VMA).
@@ -105,8 +188,8 @@ export const vo2maxLabel = (v: number): string =>
   v >= 65 ? "🏆 Élite" : v >= 56 ? "✅ Excellent" : v >= 46 ? "👍 Bon" : v >= 36 ? "📈 Moyen" : "🌱 En progression";
 
 // Temps prédit (secondes) sur une distance, depuis la VMA.
-export function predictRaceSec(vma: number, distanceKm: number): number {
-  const speed = vma * pctVmaForDistance(distanceKm); // km/h
+export function predictRaceSec(vma: number, distanceKm: number, longRunKm?: number | null): number {
+  const speed = vma * pctVmaForDistance(distanceKm, longRunKm); // km/h
   return (distanceKm / speed) * 3600;
 }
 
@@ -118,9 +201,9 @@ export const fmtPaceSec = (secPerKm: number): string =>
   `${Math.floor(secPerKm / 60)}'${String(Math.round(secPerKm % 60)).padStart(2, "0")}`;
 
 // Prédictions complètes par distance depuis la VMA.
-export function racePredictions(vma: number): { label: string; km: number; time: string; pace: string }[] {
+export function racePredictions(vma: number, longRunKm?: number | null): { label: string; km: number; time: string; pace: string }[] {
   return RACE_DISTANCES.map(d => {
-    const sec = predictRaceSec(vma, d.km);
+    const sec = predictRaceSec(vma, d.km, longRunKm);
     return { label: d.label, km: d.km, time: fmtTime(sec), pace: fmtPaceSec(sec / d.km) + "/km" };
   });
 }

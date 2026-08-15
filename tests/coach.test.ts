@@ -22,7 +22,7 @@ import { contientGrosMot, premierGrosMot, NB_FORMES_SURVEILLEES } from "../src/l
 import { avertissementAge, avertissementsAge, kmEffort } from "../src/lib/coach/ageDistance";
 import { etatDouble, scinderFacile, seanceDoubleSeuil, AVERTISSEMENT_LACTATE } from "../src/lib/coach/doubleSessions";
 import { oneSessionPerSlot, slotKey } from "../src/lib/coach/sessions";
-import { vmaFromPaceCurve, bestVmaFromWorkouts, effectiveVma, dureeEnConditionsNeutres, PART_PENALITE_CHALEUR, pctVmaForDistance } from "../src/lib/running/fitness";
+import { vmaFromPaceCurve, bestVmaFromWorkouts, effectiveVma, dureeEnConditionsNeutres, PART_PENALITE_CHALEUR, pctVmaForDistance, easyPaceFromHeartRate, MIN_SEANCES_ALLURE_Z2, LONG_RUN_PRET_KM, LONG_RUN_PLANCHER_KM } from "../src/lib/running/fitness";
 import { heatAdvice, windAdvice, altitudeLossPct, heatAcclimation } from "../src/lib/weather/openMeteo";
 import { parseReps, parsePaceSec, stepsForType, warmCoolMin, buildWorkoutDescription } from "../src/lib/watch/intervals";
 import { buildWeekPlan, CONFIRMED_DAYS } from "../src/lib/ai/autoPlan";
@@ -1528,6 +1528,88 @@ test("une langue inconnue retombe sur le français, jamais sur du vide", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+console.log("\nALLURE DE FOOTING — définie par la FC, pas par un % de VMA");
+// Défaut réel qui se mordait la queue : l'allure facile était déduite de 70 % de VMA.
+// Mesuré sur 99 séances en zone 2 du compte de production : l'athlète y court à 4'59/km
+// quand le modèle lui en prescrivait 4'26 — soit sa zone 3. L'application lui reprochait
+// donc de « courir ses footings trop vite » TOUT EN lui prescrivant l'allure qui l'y
+// envoyait.
+
+const Z2 = (n: number, secParKm: number, temp: number | null = 15) =>
+  Array.from({ length: n }, () => ({ distance_km: 10, duration_seconds: secParKm * 10, avg_hr: 155, weather_temp_c: temp }));
+
+test("l'allure facile sort des séances RÉELLEMENT courues en zone 2", () => {
+  // FC max 212, repos 47 → zone 2 Karvonen = 146-163 bpm. 155 bpm est dedans.
+  assert.equal(easyPaceFromHeartRate(Z2(10, 300), 212, 47), 300);
+});
+
+test("les séances hors zone 2 ne comptent pas", () => {
+  // 175 bpm = zone 3 : une allure tenue là n'est pas une allure de footing.
+  const z3 = Array.from({ length: 10 }, () => ({ distance_km: 10, duration_seconds: 2600, avg_hr: 175, weather_temp_c: 15 }));
+  assert.equal(easyPaceFromHeartRate(z3, 212, 47), null, "la zone 3 ne doit pas définir le footing");
+});
+
+test("sans assez d'historique, on ne conclut pas — on le dit", () => {
+  assert.equal(easyPaceFromHeartRate(Z2(MIN_SEANCES_ALLURE_Z2 - 1, 300), 212, 47), null);
+  assert.ok(easyPaceFromHeartRate(Z2(MIN_SEANCES_ALLURE_Z2, 300), 212, 47) != null);
+  // Sans FC max ou FC repos, aucune zone n'est calculable : pas de mesure inventée.
+  assert.equal(easyPaceFromHeartRate(Z2(10, 300), null, 47), null);
+  assert.equal(easyPaceFromHeartRate(Z2(10, 300), 212, null), null);
+});
+
+test("une valeur aberrante ne déplace pas l'allure (médiane, pas moyenne)", () => {
+  // Un GPS qui déraille sur une sortie ne doit pas fausser l'allure de tout un plan.
+  const avec = [...Z2(9, 300), { distance_km: 10, duration_seconds: 60, avg_hr: 155, weather_temp_c: 15 }];
+  assert.equal(easyPaceFromHeartRate(avec, 212, 47), 300);
+});
+
+test("l'allure renvoyée est NEUTRE — le plan rajoute la météo du jour par-dessus", () => {
+  // Sinon la chaleur serait comptée deux fois : une fois dans la mesure, une fois dans
+  // la prescription. L'athlète recevrait une allure doublement ralentie.
+  const chaud = easyPaceFromHeartRate(Z2(10, 300, 31), 212, 47)!;
+  assert.ok(chaud < 300, "un footing tenu à 31 °C valait mieux que son chrono");
+});
+
+console.log("\nPRONOSTIC LONGUE DISTANCE — le socle d'endurance décide");
+test("le marathon dépend de la plus longue sortie, pas d'une constante", () => {
+  // Un coureur à 150 km/sem avec des sorties de 32 km ne tient pas le même pourcentage
+  // qu'un cardio équivalent dont la plus longue sortie fait 21 km. C'est ce que modélise
+  // le prédicteur Garmin, et c'est pourquoi nos pronostics s'en écartaient toujours du
+  // même côté — l'optimiste.
+  const bas = pctVmaForDistance(42.195, LONG_RUN_PLANCHER_KM);
+  const pret = pctVmaForDistance(42.195, LONG_RUN_PRET_KM);
+  assert.ok(pret > bas, "une préparation aboutie doit valoir mieux qu'un plancher");
+  assert.equal(Math.round(bas * 1000) / 10, 75);
+  assert.equal(Math.round(pret * 1000) / 10, 79);
+  // Au-delà de la référence, on plafonne : 40 km de sortie longue ne rend pas le
+  // marathon plus facile que la physiologie ne le permet.
+  assert.equal(pctVmaForDistance(42.195, 40), pret);
+  // En dessous du plancher non plus, on ne descend pas indéfiniment.
+  assert.equal(pctVmaForDistance(42.195, 10), bas);
+});
+
+test("sans sortie longue connue, on ne suppose RIEN", () => {
+  // Supposer une préparation aboutie serait le sens d'erreur le plus coûteux.
+  assert.equal(pctVmaForDistance(42.195), pctVmaForDistance(42.195, LONG_RUN_PLANCHER_KM));
+  assert.equal(pctVmaForDistance(42.195, null), pctVmaForDistance(42.195, LONG_RUN_PLANCHER_KM));
+});
+
+test("les courtes distances ne dépendent PAS du socle d'endurance", () => {
+  // Sur 5 et 10 km c'est la VMA qui décide, et nos coefficients y tombent déjà à 8 et
+  // 20 s des pronostics Garmin : y toucher dégraderait ce qui marche.
+  for (const km of [1, 5, 10, 21.0975]) {
+    assert.equal(pctVmaForDistance(km, 15), pctVmaForDistance(km, 40), `${km} km ne doit pas bouger avec la sortie longue`);
+  }
+});
+
+test("lire une performance ne suppose aucune préparation", () => {
+  // `vmaFromEffort` ne doit pas appliquer le bonus de socle : on lit ce qui a été fait,
+  // on ne récompense pas l'athlète d'avoir un gros volume.
+  const code = codeOf("src/lib/running/fitness.ts");
+  const appel = code.match(/speed \/ pctVmaForDistance\(([^)]*)\)/)?.[1] ?? "";
+  assert.equal(appel.trim(), "distanceKm", `vmaFromEffort passe « ${appel} » à pctVmaForDistance`);
+});
+
 console.log("\nCHALEUR — une performance se lit DANS SES CONDITIONS");
 // Défaut réel : l'app corrigeait les allures qu'elle PRESCRIT pour la chaleur, mais
 // jamais celles qu'elle LIT. Un 10 km à 31,8 °C valait 16,1 km/h de VMA estimée là où le
