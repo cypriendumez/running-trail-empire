@@ -288,6 +288,13 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
     return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
   })();
   const num = (v: unknown) => (v == null ? null : Number(v));
+  // Langue de l'athlète, utilisée par tous les textes calculés côté serveur (motifs de
+  // refus des doubles, avertissements d'âge). Déclarée UNE fois : deux calculs séparés
+  // finissaient par diverger dès qu'on ajoutait une langue.
+  const LANGUES = ["fr", "en", "de", "es", "pt"] as const;
+  const langAthlete: (typeof LANGUES)[number] =
+    LANGUES.includes(String((p as Record<string, unknown> | null)?.preferred_language ?? "") as (typeof LANGUES)[number])
+      ? (String((p as Record<string, unknown> | null)?.preferred_language) as (typeof LANGUES)[number]) : "fr";
   // COURSE À PIED UNIQUEMENT — référence de TOUTE l'analyse spécifique : volume,
   // allures, forme de course, estimation de VMA, dénivelé couru, répartition 80/20.
   // Le vélo, la randonnée et la marche en sont exclus (une sortie vélo à 30 km/h passe
@@ -1294,9 +1301,6 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
     // TOUS les avertissements, pas seulement le plus grave : à 16 ans, un objectif
     // marathon se heurte à la règle fédérale ET à l'avis médical de l'IMMDA. Ce ne
     // sont pas deux formulations du même argument, ce sont deux faits différents.
-    const langues = ["fr", "en", "de", "es", "pt"] as const;
-    const langAthlete = langues.includes(String(p?.preferred_language ?? "") as typeof langues[number])
-      ? (String(p?.preferred_language) as typeof langues[number]) : "fr";
     for (const a of avertissementsAge({
       age: num(p?.age), distanceKm: objective.distanceKm, lang: langAthlete,
       // Le D+ de l'épreuve n'est pas connu ; en trail, la limite fédérale s'exprime en
@@ -1582,7 +1586,7 @@ ${catalog}`;
       // avec un nombre donnait un volume `[object Object]` — donc jamais supérieur au
       // seuil, donc des doubles refusés en silence chez un athlète qui y avait droit.
       weeklyKm: robustWeekly?.km ?? (avg4wkKm > 0 ? avg4wkKm : weekKm),
-      runYears, readiness: readyLevel, pains, taper,
+      runYears, readiness: readyLevel, pains, taper, lang: langAthlete,
     }),
     cross,
     longRunMode: bikeLong ? "bike" : "run",

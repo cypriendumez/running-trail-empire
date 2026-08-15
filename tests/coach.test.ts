@@ -2432,6 +2432,27 @@ console.log("\nDOUBLES SÉANCES — scinder, jamais empiler");
 const dbl = (o: Partial<Parameters<typeof etatDouble>[0]> = {}) => etatDouble({
   optIn: true, weeklyKm: 80, runYears: 5, readiness: "vert", pains: [], taper: false, ...o,
 });
+test("les motifs de refus existent dans les 5 langues", () => {
+  // Ils s'affichent dans le PROFIL, à la seconde où l'athlète coche la case. Les servir
+  // en français à un écran allemand revient à traduire l'étiquette et pas la réponse.
+  const attendus: Record<string, RegExp> = {
+    fr: /volume hebdomadaire/, en: /weekly volume/, de: /Wochenumfang/,
+    es: /volumen semanal/, pt: /volume semanal/,
+  };
+  for (const [lang, motif] of Object.entries(attendus)) {
+    const r = etatDouble({ optIn: true, weeklyKm: 30, runYears: 2, readiness: "vert", pains: [], taper: false, lang: lang as "fr" });
+    assert.equal(r.autorise, false);
+    assert.ok(motif.test(r.manque.join(" ")), `${lang} : motif non traduit — ${r.manque[0]?.slice(0, 60)}`);
+    assert.ok(!/undefined/.test(r.manque.join(" ") + r.manqueSeuil.join(" ")), `${lang} : trou de traduction`);
+    // Le chiffre doit rester : « ton volume est insuffisant » sans le nombre n'apprend rien.
+    assert.ok(/30/.test(r.manque.join(" ")), `${lang} : le volume réel a disparu du motif`);
+  }
+});
+test("une langue inconnue retombe sur le français, jamais sur du vide", () => {
+  const r = etatDouble({ optIn: false, weeklyKm: 30, runYears: 2, readiness: "vert", pains: [], taper: false, lang: "kl" as "fr" });
+  assert.ok(r.manque.length >= 2);
+  assert.ok(/n'est pas activée/.test(r.manque[0]));
+});
 test("sans la case cochée, le coach ne double JAMAIS", () => {
   // Doubler impose une organisation quotidienne : ça ne s'impose pas à quelqu'un qui
   // n'a rien demandé, même si son volume s'y prête.

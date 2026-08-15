@@ -41,6 +41,9 @@ export const VOLUME_MINI_DOUBLE_KM = 55;
 export const VOLUME_MINI_DOUBLE_SEUIL_KM = 90;
 export const ANNEES_MINI_DOUBLE_SEUIL = 4;
 
+import type { Lang } from "@/lib/i18n/translations";
+import { DOUBLE_T } from "@/lib/coach/doubleSessionsI18n";
+
 export type EtatDouble = {
   /** Le plan peut-il poser une deuxième séance ? */
   autorise: boolean;
@@ -64,25 +67,30 @@ export function etatDouble(i: {
   pains: string[];
   /** Semaine d'affûtage : on ne multiplie pas les séances quand on cherche la fraîcheur. */
   taper: boolean;
+  /** Langue de l'athlète. Ces motifs s'affichent dans son profil à la seconde où il
+   *  coche la case : les lui servir en français quand son écran est en allemand
+   *  reviendrait à traduire l'étiquette et pas la réponse. */
+  lang?: Lang;
 }): EtatDouble {
+  const T = DOUBLE_T[i.lang && DOUBLE_T[i.lang] ? i.lang : "fr"];
   const manque: string[] = [];
-  if (!i.optIn) manque.push("l'option « deux séances par jour » n'est pas activée dans ton profil");
-  if (i.pains.length) manque.push(`douleur en cours (${i.pains.join(", ")})`);
-  if (i.readiness === "rouge") manque.push("fraîcheur au rouge : on ne double pas un jour où le corps demande du repos");
-  if (i.taper) manque.push("semaine d'affûtage : on cherche la fraîcheur, pas le volume");
+  if (!i.optIn) manque.push(T.optIn);
+  if (i.pains.length) manque.push(T.douleur(i.pains.join(", ")));
+  if (i.readiness === "rouge") manque.push(T.rouge);
+  if (i.taper) manque.push(T.affutage);
   if (!(i.weeklyKm >= VOLUME_MINI_DOUBLE_KM)) {
-    manque.push(`volume hebdomadaire de ${Math.round(i.weeklyKm)} km : en dessous de ${VOLUME_MINI_DOUBLE_KM} km, une seule sortie par jour suffit et doubler n'ajoute que de la logistique`);
+    manque.push(T.volume(Math.round(i.weeklyKm), VOLUME_MINI_DOUBLE_KM));
   }
   const autorise = manque.length === 0;
 
   // ── Le double SEUIL : barre nettement plus haute ────────────────────────────
   const manqueSeuil: string[] = [];
-  if (!autorise) manqueSeuil.push("les conditions du double facile ne sont pas réunies");
+  if (!autorise) manqueSeuil.push(T.seuilPrealable);
   if (!(i.weeklyKm >= VOLUME_MINI_DOUBLE_SEUIL_KM)) {
-    manqueSeuil.push(`le double seuil demande un socle d'environ ${VOLUME_MINI_DOUBLE_SEUIL_KM} km/semaine (tu es à ${Math.round(i.weeklyKm)})`);
+    manqueSeuil.push(T.seuilVolume(VOLUME_MINI_DOUBLE_SEUIL_KM, Math.round(i.weeklyKm)));
   }
   if (i.runYears == null || i.runYears < ANNEES_MINI_DOUBLE_SEUIL) {
-    manqueSeuil.push(`il demande aussi environ ${ANNEES_MINI_DOUBLE_SEUIL} ans de pratique (tu en as ${i.runYears ?? "?"})`);
+    manqueSeuil.push(T.seuilAnnees(ANNEES_MINI_DOUBLE_SEUIL, String(i.runYears ?? "?")));
   }
   // Le lactate n'est pas une condition qu'on peut vérifier : c'est un AVERTISSEMENT
   // qu'on doit donner même à celui qui remplit tout le reste.
