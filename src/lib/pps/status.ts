@@ -127,3 +127,40 @@ export function ppsVerdict(
 /** Le verdict demande-t-il une action ? Sert à décider d'afficher, ou non, une alerte. */
 export const ppsDemandeAction = (v: PpsVerdict): boolean =>
   v.kind === "inconnu" || v.kind === "expire" || v.kind === "expireAvantCourse";
+
+/**
+ * COUVERTURE COURSE PAR COURSE — la seule chose que nous puissions dire d'utile.
+ *
+ * ⚠️ NOUS NE VÉRIFIONS PAS L'AUTHENTICITÉ D'UN PASS, et c'est une limite de droit, pas
+ * de code : l'API de contrôle de la FFA est réservée aux entreprises LABELLISÉES qui
+ * répondent à son cahier des charges (source : support-pps.athle.fr). Les organisateurs,
+ * eux, scannent le QR code ou vérifient à l'œil. Prétendre valider un numéro serait un
+ * mensonge dangereux — l'athlète se présenterait au retrait des dossards en confiance.
+ *
+ * Ce que nous savons et que la fédération ignore, en revanche, ce sont SES COURSES. On
+ * répond donc à la question qu'il se pose vraiment : « jusqu'à quand puis-je courir, et
+ * lesquelles de mes courses sont couvertes ? »
+ */
+export type CourseCouverte = { date: string; nom: string; couverte: boolean };
+
+export function couvertureCourses(
+  status: PpsStatus | null | undefined,
+  courses: { date: string; nom: string }[],
+  today: Date = new Date(),
+): { derniereDate: string | null; courses: CourseCouverte[] } {
+  const v = ppsVerdict(status, null, today);
+  // Un licencié est couvert par sa licence : aucune date d'expiration à opposer.
+  if (v.kind === "licencie") {
+    return { derniereDate: null, courses: courses.map((c) => ({ ...c, couverte: true })) };
+  }
+  const fin = v.kind === "valide" ? v.expiresAt : v.kind === "expire" ? v.expiresAt : null;
+  const aVenir = courses
+    .filter((c) => parseJour(c.date) && c.date >= iso(today))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  return {
+    derniereDate: fin,
+    // Le pass couvre la course s'il est encore valable CE JOUR-LÀ. Sans pass, rien n'est
+    // couvert — on ne laisse pas une liste vide passer pour une liste de courses en règle.
+    courses: aVenir.map((c) => ({ ...c, couverte: fin != null && c.date <= fin })),
+  };
+}

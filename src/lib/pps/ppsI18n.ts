@@ -56,6 +56,20 @@ export type TextesPps = {
   pastilleAlerte: string;
   /** Bandeau au moment de s'inscrire. */
   avantInscription: string;
+
+  // ── Vérification du pass ────────────────────────────────────────────────────
+  verifTitre: string;
+  /** « Tu peux courir jusqu'au 24 mars 2027 inclus. » */
+  jusquA: (date: string) => string;
+  jusquALicencie: string;
+  jusquAInconnu: string;
+  /** Pourquoi nous ne validons PAS le numéro — limite de droit, pas d'oubli. */
+  pasDeVerification: string;
+  mesCourses: string;
+  aucuneCourse: string;
+  couverte: string;
+  nonCouverte: string;
+  numeroFormat: string;
 };
 
 export const PPS_T: Record<Lang, TextesPps> = {
@@ -102,6 +116,16 @@ export const PPS_T: Record<Lang, TextesPps> = {
     pastilleOk: "PPS valable ce jour-là",
     pastilleAlerte: "PPS à refaire",
     avantInscription: "Avant de t'inscrire",
+    verifTitre: "Vérifier mon pass",
+    jusquA: (d) => `Tu peux courir toute course jusqu'au ${d} inclus.`,
+    jusquALicencie: "Ta licence FFA te couvre : aucune date d'expiration à surveiller.",
+    jusquAInconnu: "Renseigne la date d'expiration de ton pass pour savoir jusqu'à quand tu peux courir.",
+    pasDeVerification: "Nous ne pouvons PAS contrôler l'authenticité de ton numéro : l'API de vérification de la FFA est réservée aux entreprises labellisées. Le jour J, c'est l'organisateur qui scanne ton QR code. On vérifie seulement la forme du numéro et on suit ta date.",
+    mesCourses: "Tes courses à venir",
+    aucuneCourse: "Aucune course prévue pour l'instant — ajoute-en une depuis l'onglet Courses.",
+    couverte: "couverte",
+    nonCouverte: "après expiration",
+    numeroFormat: "Ce numéro ne ressemble pas à un numéro de pass — vérifie la copie.",
   },
 
   en: {
@@ -147,6 +171,16 @@ export const PPS_T: Record<Lang, TextesPps> = {
     pastilleOk: "PPS valid that day",
     pastilleAlerte: "PPS to renew",
     avantInscription: "Before you enter",
+    verifTitre: "Check my pass",
+    jusquA: (d) => `You can enter any race up to and including ${d}.`,
+    jusquALicencie: "Your FFA licence covers you: no expiry date to watch.",
+    jusquAInconnu: "Enter your pass expiry date to find out how far ahead you are covered.",
+    pasDeVerification: "We CANNOT check whether your number is genuine: the federation's verification API is reserved for labelled companies. On race day the organiser scans your QR code. We only check the shape of the number and track your date.",
+    mesCourses: "Your upcoming races",
+    aucuneCourse: "No race planned yet — add one from the Races tab.",
+    couverte: "covered",
+    nonCouverte: "after expiry",
+    numeroFormat: "That does not look like a pass number — check what you pasted.",
   },
 
   de: {
@@ -192,6 +226,16 @@ export const PPS_T: Record<Lang, TextesPps> = {
     pastilleOk: "PPS an dem Tag gültig",
     pastilleAlerte: "PPS erneuern",
     avantInscription: "Vor der Anmeldung",
+    verifTitre: "Pass prüfen",
+    jusquA: (d) => `Du kannst bis einschließlich ${d} an jedem Wettkampf teilnehmen.`,
+    jusquALicencie: "Deine FFA-Lizenz deckt dich ab: kein Ablaufdatum im Blick zu behalten.",
+    jusquAInconnu: "Trage das Ablaufdatum deines Passes ein, um zu sehen, wie weit du abgedeckt bist.",
+    pasDeVerification: "Wir können die Echtheit deiner Nummer NICHT prüfen: Die Prüf-API des Verbands ist zertifizierten Unternehmen vorbehalten. Am Wettkampftag scannt der Veranstalter deinen QR-Code. Wir prüfen nur die Form der Nummer und verfolgen dein Datum.",
+    mesCourses: "Deine kommenden Wettkämpfe",
+    aucuneCourse: "Noch kein Wettkampf geplant — füge einen über den Reiter Wettkämpfe hinzu.",
+    couverte: "abgedeckt",
+    nonCouverte: "nach Ablauf",
+    numeroFormat: "Das sieht nicht nach einer Passnummer aus — prüfe, was du eingefügt hast.",
   },
 
   es: {
@@ -237,6 +281,16 @@ export const PPS_T: Record<Lang, TextesPps> = {
     pastilleOk: "PPS válido ese día",
     pastilleAlerte: "PPS a renovar",
     avantInscription: "Antes de inscribirte",
+    verifTitre: "Comprobar mi pase",
+    jusquA: (d) => `Puedes inscribirte en cualquier carrera hasta el ${d} incluido.`,
+    jusquALicencie: "Tu licencia FFA te cubre: ninguna fecha de caducidad que vigilar.",
+    jusquAInconnu: "Indica la fecha de caducidad de tu pase para saber hasta cuándo estás cubierto.",
+    pasDeVerification: "NO podemos comprobar la autenticidad de tu número: la API de verificación de la federación está reservada a empresas homologadas. El día de la carrera, el organizador escanea tu código QR. Nosotros solo comprobamos la forma del número y seguimos tu fecha.",
+    mesCourses: "Tus próximas carreras",
+    aucuneCourse: "Ninguna carrera prevista todavía — añade una desde la pestaña Carreras.",
+    couverte: "cubierta",
+    nonCouverte: "tras la caducidad",
+    numeroFormat: "Esto no parece un número de pase — revisa lo que has pegado.",
   },
 
   pt: {
@@ -282,5 +336,15 @@ export const PPS_T: Record<Lang, TextesPps> = {
     pastilleOk: "PPS válido nesse dia",
     pastilleAlerte: "PPS a renovar",
     avantInscription: "Antes de te inscreveres",
+    verifTitre: "Verificar o meu passe",
+    jusquA: (d) => `Podes inscrever-te em qualquer corrida até ${d} inclusive.`,
+    jusquALicencie: "A tua licença FFA cobre-te: nenhuma data de expiração a vigiar.",
+    jusquAInconnu: "Indica a data de expiração do teu passe para saberes até quando estás coberto.",
+    pasDeVerification: "NÃO podemos verificar a autenticidade do teu número: a API de verificação da federação está reservada a empresas certificadas. No dia da corrida, é o organizador que lê o teu código QR. Nós só verificamos a forma do número e seguimos a tua data.",
+    mesCourses: "As tuas próximas corridas",
+    aucuneCourse: "Ainda não há corridas previstas — adiciona uma no separador Corridas.",
+    couverte: "coberta",
+    nonCouverte: "após a expiração",
+    numeroFormat: "Isto não parece um número de passe — confere o que colaste.",
   },
 };

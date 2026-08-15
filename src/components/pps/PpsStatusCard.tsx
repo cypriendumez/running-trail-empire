@@ -11,11 +11,11 @@
 //  dit rien à quelqu'un qui court dans sept mois. Avec la date, on répond à la vraie
 //  question — « est-ce que ça tiendra jusqu'au jour J ? ».
 // ─────────────────────────────────────────────────────────────────────────────
-import { useMemo, useState } from "react";
-import { ShieldCheck, ShieldAlert, ShieldQuestion, ExternalLink, Loader2, Check } from "lucide-react";
+import { useMemo } from "react";
+import { ShieldCheck, ShieldAlert, ShieldQuestion, ExternalLink } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { PPS_T } from "@/lib/pps/ppsI18n";
-import { PPS_URL, ppsVerdict, ppsExpiration, type PpsStatus, type PpsVerdict } from "@/lib/pps/status";
+import { PPS_URL, ppsVerdict, type PpsStatus, type PpsVerdict } from "@/lib/pps/status";
 
 /** Palette par verdict : le vert ne doit jamais servir à annoncer une échéance ratée. */
 const TON: Record<PpsVerdict["kind"], { bg: string; ring: string; fg: string; icon: typeof ShieldCheck }> = {
@@ -76,70 +76,6 @@ export function PpsStatusCard({
         {/* Le tarif et la durée sont annoncés par le bandeau de la page PPS : les répéter
             sur la carte d'état ferait lire deux fois la même chose au même écran. */}
       </div>
-    </div>
-  );
-}
-
-/**
- * Le formulaire de suivi. Volontairement minimal : une date, un numéro facultatif,
- * une case « licencié ». Demander plus serait demander ce dont on n'a pas l'usage.
- */
-export function PpsTracker({ initial }: { initial: PpsStatus | null }) {
-  const { t } = usePpsTextes();
-  const [expiresAt, setExpiresAt] = useState(initial?.expiresAt ?? ppsExpiration(initial?.obtainedAt) ?? "");
-  const [numero, setNumero] = useState(initial?.number ?? "");
-  const [licensed, setLicensed] = useState(initial?.licensed === true);
-  const [etat, setEtat] = useState<"repos" | "envoi" | "ok">("repos");
-
-  // Une expiration est par nature DANS LE FUTUR : on borne le champ en conséquence.
-  const aujourdhui = new Date().toISOString().slice(0, 10);
-
-  const enregistrer = async () => {
-    setEtat("envoi");
-    await fetch("/api/pps", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ expiresAt: expiresAt || null, number: numero || null, licensed }),
-    }).catch(() => undefined);
-    setEtat("ok");
-    // On rafraîchit pour que le verdict affiché plus haut reparte de la valeur ENREGISTRÉE
-    // et non de l'état local : deux sources d'affichage finiraient par se contredire.
-    setTimeout(() => window.location.reload(), 500);
-  };
-
-  return (
-    <div className="space-y-4">
-      <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-zinc-200 p-3.5 transition-colors hover:bg-zinc-50">
-        <input type="checkbox" checked={licensed} onChange={(e) => setLicensed(e.target.checked)}
-               className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500" />
-        <span>
-          <span className="block text-sm font-semibold text-zinc-900">{t.licencieCase}</span>
-          <span className="block text-[12.5px] text-zinc-500">{t.licencieAide}</span>
-        </span>
-      </label>
-
-      {!licensed && (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="pps-date" className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wide text-zinc-500">{t.champDate}</label>
-            <input id="pps-date" type="date" value={expiresAt} min={aujourdhui}
-                   onChange={(e) => setExpiresAt(e.target.value)}
-                   className="w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
-            <p className="mt-1 text-[11.5px] text-zinc-400">{t.champDateAide}</p>
-          </div>
-          <div>
-            <label htmlFor="pps-num" className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wide text-zinc-500">{t.champNumero}</label>
-            <input id="pps-num" type="text" value={numero} onChange={(e) => setNumero(e.target.value)}
-                   placeholder="—"
-                   className="w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
-            <p className="mt-1 text-[11.5px] text-zinc-400">{t.champNumeroAide}</p>
-          </div>
-        </div>
-      )}
-
-      <button onClick={enregistrer} disabled={etat === "envoi"} className="btn-brand disabled:opacity-60">
-        {etat === "envoi" ? <Loader2 className="h-4 w-4 animate-spin" /> : etat === "ok" ? <Check className="h-4 w-4" /> : null}
-        {etat === "ok" ? t.enregistre : t.enregistrer}
-      </button>
     </div>
   );
 }

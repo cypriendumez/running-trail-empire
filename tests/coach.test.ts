@@ -27,7 +27,7 @@ import { heatAdvice, windAdvice, altitudeLossPct, heatAcclimation } from "../src
 import { parseReps, parsePaceSec, stepsForType, warmCoolMin, buildWorkoutDescription } from "../src/lib/watch/intervals";
 import { buildWeekPlan, CONFIRMED_DAYS } from "../src/lib/ai/autoPlan";
 import { tr, ALL_LANGS, nRaw } from "../src/lib/i18n/multi";
-import { ppsExpiration, ppsVerdict, ppsDemandeAction, PPS_URL, PPS_PRIX_EUR, PPS_VALIDITE_MOIS } from "../src/lib/pps/status";
+import { ppsExpiration, ppsVerdict, ppsDemandeAction, couvertureCourses, PPS_URL, PPS_PRIX_EUR, PPS_VALIDITE_MOIS } from "../src/lib/pps/status";
 import { PPS_T } from "../src/lib/pps/ppsI18n";
 import { PLAN_T, libelleType } from "../src/lib/ai/planI18n";
 import { QUALITE_T } from "../src/lib/ai/qualityI18n";
@@ -1796,6 +1796,71 @@ test("rien de déclaré = « inconnu », et on le DIT au lieu de le deviner", ()
   const v = ppsVerdict(null, "2027-04-25", new Date("2026-08-15T12:00:00"));
   assert.equal(v.kind, "inconnu");
   assert.equal(ppsDemandeAction(v), true, "un PPS non renseigné doit provoquer une action");
+});
+
+console.log("\nPPS — jusqu'à quand puis-je courir, et quelles courses sont couvertes");
+// L'athlète ne demande pas « mon pass est-il valide » dans l'abstrait : il demande
+// « est-ce que je peux m'inscrire à CETTE course ». Nous ne pouvons pas authentifier son
+// numéro — l'API de contrôle de la FFA est réservée aux entreprises labellisées — mais
+// nous connaissons ses courses, ce que la fédération ignore.
+
+const T = new Date("2026-08-15T12:00:00");
+const COURSES = [
+  { date: "2026-10-25", nom: "Marathon de Lille" },
+  { date: "2027-05-10", nom: "Trail des Collines" },
+  { date: "2026-01-01", nom: "Course déjà passée" },
+];
+
+test("la dernière date de course est l'expiration du pass", () => {
+  const r = couvertureCourses({ expiresAt: "2027-03-24", obtainedAt: null }, COURSES, T);
+  assert.equal(r.derniereDate, "2027-03-24");
+});
+
+test("chaque course est jugée sur SA date, pas sur aujourd'hui", () => {
+  const r = couvertureCourses({ expiresAt: "2027-03-24", obtainedAt: null }, COURSES, T);
+  assert.deepEqual(r.courses.map((c) => [c.nom, c.couverte]), [
+    ["Marathon de Lille", true],     // avant l'expiration
+    ["Trail des Collines", false],   // après → il faudra refaire le pass
+  ]);
+});
+
+test("les courses passées ne sont pas listées", () => {
+  const r = couvertureCourses({ expiresAt: "2027-03-24", obtainedAt: null }, COURSES, T);
+  assert.ok(!r.courses.some((c) => c.nom === "Course déjà passée"), "une course franchie n'appelle plus de décision");
+});
+
+test("sans pass, AUCUNE course n'est déclarée couverte", () => {
+  // Le piège serait de renvoyer une liste vide et de la laisser passer pour « tout va
+  // bien ». Un athlète sans pass n'est couvert pour rien.
+  const r = couvertureCourses(null, COURSES, T);
+  assert.equal(r.derniereDate, null);
+  assert.ok(r.courses.every((c) => !c.couverte), "sans pass, rien ne peut être couvert");
+});
+
+test("un licencié est couvert partout, sans date à surveiller", () => {
+  const r = couvertureCourses({ expiresAt: null, obtainedAt: null, licensed: true }, COURSES, T);
+  assert.equal(r.derniereDate, null, "une licence n'oppose pas de date d'expiration");
+  assert.ok(r.courses.every((c) => c.couverte));
+});
+
+test("un pass expiré ne couvre plus aucune course à venir", () => {
+  const r = couvertureCourses({ expiresAt: "2026-06-01", obtainedAt: null }, COURSES, T);
+  assert.ok(r.courses.every((c) => !c.couverte), "un pass périmé ne couvre rien");
+});
+
+test("on n'affirme JAMAIS avoir vérifié le pass auprès de la fédération", () => {
+  // L'API de contrôle est réservée aux entreprises labellisées FFA : prétendre valider
+  // un numéro ferait se présenter l'athlète au retrait des dossards en confiance sur la
+  // foi d'une pastille qui ne vaut rien.
+  const interdits = /pass vérifié|numéro validé|verified with|authentifié|certifié par la FFA/i;
+  for (const l of ALL_LANGS) {
+    const T2 = PPS_T[l];
+    assert.ok(T2.pasDeVerification.length > 40, `${l} : l'avertissement doit être explicite`);
+    for (const v of Object.values(T2)) {
+      const txt = typeof v === "function" ? "" : Array.isArray(v) ? v.join(" ") : String(v);
+      assert.ok(!interdits.test(txt), `${l} prétend vérifier le pass : « ${txt.slice(0, 80)} »`);
+    }
+  }
 });
 
 test("la date IMPRIMÉE sur le pass prime sur la déduction", () => {

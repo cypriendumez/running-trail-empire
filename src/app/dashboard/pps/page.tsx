@@ -11,7 +11,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { PpsStatusCard, PpsTracker } from "@/components/pps/PpsStatusCard";
+import { PpsStatusCard } from "@/components/pps/PpsStatusCard";
+import { PpsVerifier } from "@/components/pps/PpsVerifier";
 import { PPS_T } from "@/lib/pps/ppsI18n";
 import { PPS_URL, PPS_PRIX_EUR, PPS_VALIDITE_MOIS, type PpsStatus } from "@/lib/pps/status";
 import { normLang } from "@/lib/i18n/translations";
@@ -39,6 +40,18 @@ export default async function PpsPage() {
 
   // LA PROCHAINE ÉCHÉANCE, objectif ou course simplement notée : c'est contre ELLE que
   // le pass doit tenir. Sans cette date, le verdict n'est qu'un compte à rebours.
+  const obj = (objRow?.data ?? {}) as { race?: string; raceDate?: string };
+  // Les courses de l'athlète, objectif compris : c'est contre ELLES que le pass doit tenir.
+  const coursesAVenir = [
+    ...(obj.raceDate ? [{ date: String(obj.raceDate).slice(0, 10), nom: obj.race || "Objectif" }] : []),
+    ...(plannedRows ?? []).map((r) => {
+      const d = (r.data ?? {}) as { date?: string; name?: string };
+      return { date: String(d.date ?? "").slice(0, 10), nom: d.name || "Course" };
+    }),
+  ].filter((c) => /^\d{4}-\d{2}-\d{2}$/.test(c.date) && c.date >= today)
+   .filter((c, i, a) => a.findIndex((x) => x.date === c.date && x.nom === c.nom) === i)
+   .sort((a, b) => a.date.localeCompare(b.date));
+
   const dates = [
     String(((objRow?.data ?? {}) as { raceDate?: string }).raceDate ?? "").slice(0, 10),
     ...(plannedRows ?? []).map((r) => String(((r.data ?? {}) as { date?: string }).date ?? "").slice(0, 10)),
@@ -102,13 +115,9 @@ export default async function PpsPage() {
         </div>
       </section>
 
-      {/* ── Suivi ────────────────────────────────────────────────────────────── */}
-      <section className="mt-8 rounded-3xl border border-zinc-200/70 bg-white p-6">
-        <h2 className="text-[17px] font-bold tracking-tight text-zinc-900">{t.suiviTitre}</h2>
-        <p className="mt-1.5 max-w-2xl text-[13.5px] leading-relaxed text-zinc-500">{t.suiviIntro}</p>
-        <div className="mt-5">
-          <PpsTracker initial={status} />
-        </div>
+      {/* ── Mon pass : coller son numéro, savoir jusqu'à quand ───────────────── */}
+      <section className="mt-8">
+        <PpsVerifier initial={status} courses={coursesAVenir} />
       </section>
 
       <a href="/dashboard/races" className="mt-6 inline-flex items-center gap-1.5 text-[13px] font-semibold text-zinc-500 transition-colors hover:text-zinc-900">
