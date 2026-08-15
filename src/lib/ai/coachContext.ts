@@ -412,11 +412,20 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // VO2max Garmin (repli) → repli FC. Garantit le MÊME chiffre côté coach et côté client.
   // Meilleurs efforts mesurés : disponibles avant tout le reste car ils fondent la VMA.
   const paceCurve = (p?.pace_curve ?? null) as import("@/lib/intervals/performance").PaceCurve | null;
+  // ACCLIMATATION À LA CHALEUR, calculée ICI et pas plus bas : elle sert à relire les
+  // performances, et la VMA se calcule avant le bloc météo. On la déduit des séances
+  // elles-mêmes, qui portent toutes leur température — aucune requête supplémentaire.
+  // Un athlète acclimaté souffre moins : on corrige donc MOINS son chrono.
+  const acclimVma = heatAcclimation(
+    new Set(workouts.filter((w) => num(w.weather_temp_c) != null && (num(w.weather_temp_c) as number) >= 25
+      && now - new Date(w.date).getTime() <= 30 * 86400000).map((w) => String(w.date).slice(0, 10))).size,
+  ).factor;
+
   // UN SEUL calcul de VMA pour toute l'application (cf. lib/running/fitness.ts) : quatre
   // chaînes divergentes coexistaient, et le tableau de bord ignorait la courbe d'allure.
   const { vma, source: vmaSource } = effectiveVma({
     vmaStored, paceCurveBest: paceCurve?.best, garminVo2,
-    fromRuns: bestVmaFromWorkouts(runs, fcMaxEst) ?? estimateVmaFromRuns(runs, fcMaxEst, now),
+    fromRuns: bestVmaFromWorkouts(runs, fcMaxEst, 120, acclimVma) ?? estimateVmaFromRuns(runs, fcMaxEst, now),
   });
   const vmaIsEst = vmaSource !== "test" && vma != null;
 

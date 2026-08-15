@@ -3,6 +3,7 @@
 //  chrono par distance. Calculs purs, réutilisables (profil, onboarding, IA).
 //  Repères % VMA soutenable par distance (empirique, proche de Daniels/Riegel).
 // ─────────────────────────────────────────────────────────────────────────────
+import { heatAdvice } from "@/lib/weather/openMeteo";
 
 export const RACE_DISTANCES: { label: string; km: number }[] = [
   { label: "5 km", km: 5 }, { label: "10 km", km: 10 }, { label: "Semi", km: 21.0975 }, { label: "Marathon", km: 42.195 },
@@ -16,15 +17,66 @@ export function pctVmaForDistance(km: number): number {
   if (km <= 3.2) return 1.0;
   if (km <= 5.5) return 0.94;
   if (km <= 11) return 0.90;
-  if (km <= 22) return 0.85;
-  if (km <= 30) return 0.82;
-  if (km <= 43) return 0.79;
+  // ── LONGUES DISTANCES : coefficients ramenés dans la moyenne ────────────────
+  // Ils étaient en HAUT de la fourchette de la littérature (semi 83-88 %, marathon
+  // 75-80 % de la vitesse à VO2max chez un amateur entraîné) : 85 % et 79 % décrivaient
+  // un marathonien à gros volume, pas le coureur moyen. Confronté au prédicteur Garmin
+  // (Firstbeat, largement validé) sur un compte réel, l'écart était de +2,4 min sur semi
+  // et +10,5 min sur marathon — toujours dans le sens optimiste, le plus coûteux pour
+  // quelqu'un qui cale son allure de course dessus.
+  //
+  // ⚠️ CE QUI RESTE FAUX, ET QU'IL FAUDRA CORRIGER. Ce pourcentage n'est pas une
+  // constante physiologique : il dépend du SOCLE D'ENDURANCE. Un coureur à 150 km/sem
+  // tient 80 % sur marathon, un coureur à 80 km/sem avec 21 km de plus longue sortie n'y
+  // arrive pas. Une valeur fixe est un compromis, pas une vérité — la vraie correction
+  // est de la faire dépendre du volume et de la sortie longue réels.
+  if (km <= 22) return 0.83;
+  if (km <= 30) return 0.79;
+  if (km <= 43) return 0.75;
   return 0.74;
 }
 
 // VMA depuis un test de 6 min (demi-Cooper) : distance(m) parcourue / 100.
 export const vmaFrom6min = (meters: number): number | null =>
   meters > 0 ? Math.round((meters / 100) * 10) / 10 : null;
+
+/**
+ * PART DE LA PÉNALITÉ DE CHALEUR RETENUE POUR RELIRE UNE PERFORMANCE.
+ *
+ * Pas une constante inventée : c'est EXACTEMENT la fraction que `autoPlan` applique déjà
+ * pour corriger les allures de qualité par temps chaud (`heatAdjustDesc` divise par 2),
+ * avec sa justification — la chaleur pénalise surtout les efforts longs et continus,
+ * beaucoup moins un effort dur et court, où l'athlète compense en partie.
+ *
+ * Vérifié sur le compte de production : la pénalité PLEINE donne 21,2 km/h depuis un
+ * 10 km à 29,6 °C, ce qu'aucune autre source ne corrobore. La moitié donne 19,9 —
+ * exactement ce que valent les efforts du même athlète par 13 °C (19,7-19,8).
+ */
+export const PART_PENALITE_CHALEUR = 0.5;
+
+/**
+ * Durée qu'aurait valu cet effort EN CONDITIONS NEUTRES.
+ *
+ * DÉFAUT RÉEL CORRIGÉ. L'application corrigeait les allures qu'elle PRESCRIT pour la
+ * chaleur, mais jamais celles qu'elle LIT. Un 10 km couru à 31 °C était donc interprété
+ * comme s'il avait eu lieu à 13 °C : la VMA estimée s'effondrait chaque été, et avec
+ * elle toutes les allures de l'athlète — au moment précis où il avait le plus besoin
+ * qu'on ne le sous-estime pas. Constaté : 16,1 km/h lus sur une sortie à 31,8 °C contre
+ * 19,7 sur la même distance à 13,5 °C, chez le même coureur à trois mois d'écart.
+ *
+ * `acclimFactor` ≤ 1 : un athlète acclimaté souffre moins, donc on corrige moins.
+ * Sans température connue, on ne corrige RIEN — on ne devine pas la météo d'un jour.
+ */
+export function dureeEnConditionsNeutres(
+  durationSec: number, distanceKm: number, tempC: number | null | undefined, acclimFactor = 1,
+): number {
+  if (tempC == null || !(distanceKm > 0) || !(durationSec > 0)) return durationSec;
+  const penalite = heatAdvice(tempC, null).penaltySecPerKm * acclimFactor * PART_PENALITE_CHALEUR;
+  if (!(penalite > 0)) return durationSec;
+  const secParKm = durationSec / distanceKm;
+  // Garde-fou : une correction ne peut pas rendre un effort plus de deux fois plus rapide.
+  return Math.max(durationSec / 2, (secParKm - penalite) * distanceKm);
+}
 
 // VMA estimée depuis une performance (course ou séance dure) : vitesse / %VMA.
 export function vmaFromEffort(distanceKm: number, durationSec: number): number | null {
@@ -188,17 +240,28 @@ export function effectiveVma(i: {
   if (i.vmaStored != null && i.vmaStored > 0) return { vma: i.vmaStored, source: "test" };
   const curve = vmaFromPaceCurve(i.paceCurveBest);
   const vo2 = i.garminVo2 != null && i.garminVo2 > 0 ? vmaFromVo2max(i.garminVo2) : null;
-  if (curve != null || vo2 != null) {
-    // La plus haute des deux gagne — et on NOMME celle qui a gagné, pour que l'athlète
-    // puisse vérifier d'où sort son chiffre au lieu de le subir.
-    if (curve != null && (vo2 == null || curve >= vo2)) return { vma: curve, source: "courbe" };
-    return { vma: vo2, source: "vo2max" };
-  }
-  return i.fromRuns != null && i.fromRuns > 0 ? { vma: i.fromRuns, source: "séances" } : { vma: null, source: null };
+  const runs = i.fromRuns != null && i.fromRuns > 0 ? i.fromRuns : null;
+  // LES TROIS SOURCES SE COMPARENT, la plus haute gagne — et on NOMME celle qui a gagné,
+  // pour que l'athlète puisse vérifier d'où sort son chiffre au lieu de le subir.
+  //
+  // Les efforts réels ne sont plus un simple REPLI : depuis qu'ils sont relus dans leurs
+  // conditions (chaleur), ils redeviennent la mesure la plus directe qu'on ait. Les
+  // reléguer derrière une courbe d'allure polluée par un été à 31 °C revenait à jeter
+  // la meilleure donnée disponible.
+  const candidats: { v: number; s: VmaSource }[] = [
+    ...(curve != null ? [{ v: curve, s: "courbe" as const }] : []),
+    ...(vo2 != null ? [{ v: vo2, s: "vo2max" as const }] : []),
+    ...(runs != null ? [{ v: runs, s: "séances" as const }] : []),
+  ];
+  if (!candidats.length) return { vma: null, source: null };
+  const gagnant = candidats.reduce((a, b) => (b.v > a.v ? b : a));
+  return { vma: gagnant.v, source: gagnant.s };
 }
 
 export function bestVmaFromWorkouts(
-  workouts: { date?: string; distance_km?: number | null; duration_seconds?: number | null; type?: string | null; avg_hr?: number | null }[],
+  workouts: { date?: string; distance_km?: number | null; duration_seconds?: number | null; type?: string | null; avg_hr?: number | null;
+    /** Température du jour de la séance. Sans elle, aucune correction n'est appliquée. */
+    weather_temp_c?: number | null }[],
   maxHr?: number | null,
   /**
    * Fenêtre de FORME (jours). Sans elle, un record vieux de cinq mois sert encore de
@@ -208,6 +271,8 @@ export function bestVmaFromWorkouts(
    * du moment, pas sur le souvenir du pic.
    */
   windowDays = 120,
+  /** Acclimatation à la chaleur (≤ 1) : un athlète acclimaté souffre moins, on corrige moins. */
+  heatFactor = 1,
 ): number | null {
   let best: number | null = null;
   const now = Date.now();
@@ -217,7 +282,10 @@ export function bestVmaFromWorkouts(
     if (/strength|renfo|muscu/i.test(String(w.type ?? ""))) continue;
     // Effort vraiment maximal exigé : si on a la FC, il faut ≥ 85 % de la FC max.
     if (maxHr && maxHr > 120 && w.avg_hr != null && w.avg_hr < maxHr * 0.85) continue;
-    const v = vmaFromEffort(w.distance_km, w.duration_seconds);
+    // L'effort est relu DANS SES CONDITIONS : un 10 km à 31 °C ne vaut pas le même
+    // chrono qu'à 13 °C, et le lire brut faisait s'effondrer la VMA chaque été.
+    const sec = dureeEnConditionsNeutres(w.duration_seconds, w.distance_km, w.weather_temp_c, heatFactor);
+    const v = vmaFromEffort(w.distance_km, sec);
     if (v != null && (best == null || v > best)) best = v;
   }
   return best;

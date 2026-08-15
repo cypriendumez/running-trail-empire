@@ -22,7 +22,7 @@ import { contientGrosMot, premierGrosMot, NB_FORMES_SURVEILLEES } from "../src/l
 import { avertissementAge, avertissementsAge, kmEffort } from "../src/lib/coach/ageDistance";
 import { etatDouble, scinderFacile, seanceDoubleSeuil, AVERTISSEMENT_LACTATE } from "../src/lib/coach/doubleSessions";
 import { oneSessionPerSlot, slotKey } from "../src/lib/coach/sessions";
-import { vmaFromPaceCurve, bestVmaFromWorkouts, effectiveVma } from "../src/lib/running/fitness";
+import { vmaFromPaceCurve, bestVmaFromWorkouts, effectiveVma, dureeEnConditionsNeutres, PART_PENALITE_CHALEUR, pctVmaForDistance } from "../src/lib/running/fitness";
 import { heatAdvice, windAdvice, altitudeLossPct, heatAcclimation } from "../src/lib/weather/openMeteo";
 import { parseReps, parsePaceSec, stepsForType, warmCoolMin, buildWorkoutDescription } from "../src/lib/watch/intervals";
 import { buildWeekPlan, CONFIRMED_DAYS } from "../src/lib/ai/autoPlan";
@@ -1528,6 +1528,81 @@ test("une langue inconnue retombe sur le français, jamais sur du vide", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+console.log("\nCHALEUR — une performance se lit DANS SES CONDITIONS");
+// Défaut réel : l'app corrigeait les allures qu'elle PRESCRIT pour la chaleur, mais
+// jamais celles qu'elle LIT. Un 10 km à 31,8 °C valait 16,1 km/h de VMA estimée là où le
+// même coureur en donnait 19,7 sur la même distance à 13,5 °C. La VMA — et donc TOUTES
+// les allures — s'effondrait chaque été, au moment où l'athlète a le plus besoin qu'on
+// ne le sous-estime pas.
+
+test("un effort par temps chaud est relu comme s'il avait eu lieu au frais", () => {
+  const sec = 36 * 60;                       // 10 km en 36 min
+  assert.equal(dureeEnConditionsNeutres(sec, 10, 13), sec, "à 13 °C il n'y a rien à corriger");
+  const chaud = dureeEnConditionsNeutres(sec, 10, 31);
+  assert.ok(chaud < sec, "à 31 °C, l'effort valait mieux que le chrono");
+  // 45 s/km de pénalité à 30 °C, dont on retient LA MOITIÉ → 22,5 s/km sur 10 km.
+  assert.equal(Math.round(sec - chaud), 225);
+});
+
+test("la correction ne s'invente jamais une météo", () => {
+  const sec = 2160;
+  assert.equal(dureeEnConditionsNeutres(sec, 10, null), sec, "sans température, aucune correction");
+  assert.equal(dureeEnConditionsNeutres(sec, 10, undefined), sec);
+});
+
+test("un athlète acclimaté est MOINS corrigé — il souffre moins", () => {
+  const sec = 36 * 60;
+  const brut = dureeEnConditionsNeutres(sec, 10, 31, 1);
+  const acclimate = dureeEnConditionsNeutres(sec, 10, 31, 0.55);
+  assert.ok(acclimate > brut, "l'acclimaté doit être moins corrigé que le non-acclimaté");
+  assert.ok(acclimate < sec, "mais il reste corrigé");
+});
+
+test("on ne retient que la MOITIÉ de la pénalité — la pleine donne des VMA irréelles", () => {
+  // Mesuré sur le compte de production : la pénalité pleine transforme un 10 km à
+  // 29,6 °C en une VMA de 21,2 km/h, que rien d'autre ne corrobore. La moitié donne
+  // 19,9, soit exactement ce que vaut le même coureur par 13 °C.
+  assert.equal(PART_PENALITE_CHALEUR, 0.5);
+  const pleine = dureeEnConditionsNeutres(36 * 60, 10, 31, 1) ;
+  const sansCorrection = 36 * 60;
+  assert.ok(sansCorrection - pleine < 45 * 10, "on corrige moins que la pénalité pleine");
+});
+
+test("une séance à la distance corrompue ne produit pas un chrono de fiction", () => {
+  // Le garde-fou n'existe pas pour la météo — aucune température réelle ne peut le
+  // déclencher — mais pour les DONNÉES ABERRANTES, qui, elles, arrivent : une trace GPS
+  // qui déraille donne 100 km en une heure. Sans borne, on retrancherait encore la
+  // pénalité de chaleur à un chrono déjà impossible et on en tirerait une VMA de fiction.
+  const corrompu = dureeEnConditionsNeutres(3600, 100, 31);   // 36 s/km : impossible
+  assert.equal(corrompu, 1800, "la correction doit être bornée à la moitié du chrono");
+  // Et sur une séance NORMALE, la borne ne s'applique jamais.
+  assert.equal(dureeEnConditionsNeutres(36 * 60, 10, 31), 36 * 60 - 225);
+});
+
+test("les efforts réels CONCOURENT avec la courbe et la VO2max", () => {
+  // Avant : ils n'étaient qu'un repli, donc une courbe d'allure polluée par un été à
+  // 31 °C écrasait la meilleure donnée disponible. Depuis qu'ils sont relus dans leurs
+  // conditions, ce sont eux la mesure la plus directe.
+  const r = effectiveVma({ paceCurveBest: [{ m: 5000, sec: 1107 }], garminVo2: 63, fromRuns: 19.3 });
+  assert.equal(r.vma, 19.3);
+  assert.equal(r.source, "séances");
+  // Et ils ne gagnent que s'ils sont RÉELLEMENT meilleurs.
+  assert.equal(effectiveVma({ paceCurveBest: [{ m: 5000, sec: 1107 }], garminVo2: 63, fromRuns: 15 }).source, "vo2max");
+});
+
+test("les coefficients de longue distance restent dans la fourchette de la littérature", () => {
+  // Semi 83-88 % et marathon 75-80 % de la vitesse à VO2max chez un amateur entraîné.
+  // Ils étaient en HAUT de la fourchette (85 % / 79 %), donc toujours optimistes — le
+  // sens d'erreur le plus coûteux pour qui cale son allure de course dessus.
+  assert.ok(pctVmaForDistance(21.0975) >= 0.83 && pctVmaForDistance(21.0975) <= 0.88);
+  assert.ok(pctVmaForDistance(42.195) >= 0.75 && pctVmaForDistance(42.195) <= 0.80);
+  // Et l'ordre reste strictement décroissant : plus c'est long, plus le % baisse.
+  const d = [1, 5, 10, 21.0975, 30, 42.195, 80];
+  for (let i = 1; i < d.length; i++) {
+    assert.ok(pctVmaForDistance(d[i]) < pctVmaForDistance(d[i - 1]), `${d[i]} km n'est pas plus dur que ${d[i - 1]} km`);
+  }
+});
+
 console.log("\nVMA EFFECTIVE — un seul calcul pour toute l'application");
 // Défaut réel : QUATRE chaînes distinctes calculaient la VMA (coach, tableau de bord,
 // profil, getEffectiveVma), avec des sources et un ordre différents — le tableau de bord
