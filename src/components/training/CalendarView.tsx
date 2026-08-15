@@ -10,6 +10,7 @@ import {
 import { RenfoGuide } from "@/components/training/RenfoGuide";
 import { fmtDistance, type UnitSystem } from "@/lib/units";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { libelleType } from "@/lib/ai/planI18n";
 
 /** Le même jour dans une autre langue — affichage seulement (cf. lib/ai/planI18n.ts). */
 export type PlannedText = { title?: string; subtitle?: string; why?: string; tags?: string[] };
@@ -286,7 +287,10 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
         <div className="h-1.5" style={{ background: c.bg }} />
         <div className={dense ? "p-1.5" : "p-2.5"}>
           <div className="flex items-center gap-1">
-            <div className={`font-extrabold uppercase tracking-wide ${dense ? "text-[9px]" : "text-[10px]"}`} style={{ color: c.fg }}>{s.type}</div>
+            {/* Le TYPE reste français dans la donnée (catégorie, couleur, séance montre) ;
+                seul son LIBELLÉ suit la langue — sinon un écran allemand affichait
+                « SORTIE LONGUE » au-dessus d'un texte allemand. */}
+            <div className={`font-extrabold uppercase tracking-wide ${dense ? "text-[9px]" : "text-[10px]"}`} style={{ color: c.fg }}>{libelleType(s.type, lang)}</div>
             {s.confirmed === false && (
               <span title={t("cal.provisional.hint")} className={`rounded bg-white/80 px-1 font-bold text-zinc-400 ${dense ? "text-[8px]" : "text-[9px]"}`}>~</span>
             )}
@@ -316,7 +320,7 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] ring-1 ring-white/20 backdrop-blur-md">
                   <span className="h-2 w-2 rounded-full" style={{ background: typeColor(coach.type).bg }} />
-                  {coach.type}
+                  {libelleType(coach.type, lang)}
                 </span>
                 <span className="text-[12px] font-semibold uppercase tracking-wide text-white/70 first-letter:uppercase">
                   {sel && new Date(sel + "T00:00:00").toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long" })}

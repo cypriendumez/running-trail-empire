@@ -134,6 +134,17 @@ export type TextesPlan = {
     | "Renfo" | "Prévention" | "VMA" | "Seuil" | "Soir" | "Matin", string>;
   /** « 21 km » — l'unité suit la langue, le nombre reste celui du plan. */
   tagKm: (km: string) => string;
+  /**
+   * Libellé AFFICHÉ du type de séance.
+   *
+   * `PlanDay.type` reste le français canonique — il décide de la catégorie, de la
+   * couleur et de la séance poussée sur la montre. Mais le calendrier l'affichait TEL
+   * QUEL : un athlète allemand lisait « SORTIE LONGUE » au-dessus d'un texte allemand.
+   * Les libellés de catégorie existants (`cal.cat.*`) ne suffisent pas : « Spécifique »
+   * et « Course » y retombent tous deux sur « Endurance », ce qui serait moins précis
+   * qu'avant. On traduit donc le type lui-même.
+   */
+  types: Record<string, string>;
 };
 
 export const PLAN_T: Record<Lang, TextesPlan> = {
@@ -226,6 +237,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
       "Soir": "Soir", "Matin": "Matin",
     },
     tagKm: (km) => `${km} km`,
+    types: { "Course": "Course", "Récup": "Récup", "Repos": "Repos", "Vélo": "Vélo", "Sortie longue": "Sortie longue", "VMA": "VMA", "Seuil": "Seuil", "Spécifique": "Spécifique", "Endurance": "Endurance", "Renfo": "Renfo" },
   },
 
   en: {
@@ -317,6 +329,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
       "Soir": "Evening", "Matin": "Morning",
     },
     tagKm: (km) => `${km} km`,
+    types: { "Course": "Race", "Récup": "Recovery", "Repos": "Rest", "Vélo": "Bike", "Sortie longue": "Long run", "VMA": "VO2max", "Seuil": "Threshold", "Spécifique": "Race pace", "Endurance": "Easy", "Renfo": "Strength" },
   },
 
   de: {
@@ -408,6 +421,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
       "Soir": "Abends", "Matin": "Morgens",
     },
     tagKm: (km) => `${km} km`,
+    types: { "Course": "Wettkampf", "Récup": "Erholung", "Repos": "Ruhe", "Vélo": "Rad", "Sortie longue": "Langer Lauf", "VMA": "VO2max", "Seuil": "Schwelle", "Spécifique": "Wettkampftempo", "Endurance": "Locker", "Renfo": "Kraft" },
   },
 
   es: {
@@ -499,6 +513,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
       "Soir": "Tarde", "Matin": "Mañana",
     },
     tagKm: (km) => `${km} km`,
+    types: { "Course": "Carrera", "Récup": "Recuperación", "Repos": "Descanso", "Vélo": "Bici", "Sortie longue": "Tirada larga", "VMA": "VAM", "Seuil": "Umbral", "Spécifique": "Ritmo específico", "Endurance": "Suave", "Renfo": "Fuerza" },
   },
 
   pt: {
@@ -590,5 +605,14 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
       "Soir": "Tarde", "Matin": "Manhã",
     },
     tagKm: (km) => `${km} km`,
+    types: { "Course": "Prova", "Récup": "Recuperação", "Repos": "Descanso", "Vélo": "Bicicleta", "Sortie longue": "Longo", "VMA": "VAM", "Seuil": "Limiar", "Spécifique": "Ritmo específico", "Endurance": "Fácil", "Renfo": "Reforço" },
   },
 };
+
+/**
+ * Libellé affiché d'un type de séance. Un type inconnu (séance publiée à la main par
+ * le coach) est rendu TEL QUEL : mieux vaut un mot français qu'une étiquette vide.
+ */
+export function libelleType(type: string, lang: Lang): string {
+  return (PLAN_T[lang] ?? PLAN_T.fr).types[type] ?? PLAN_T.fr.types[type] ?? type;
+}

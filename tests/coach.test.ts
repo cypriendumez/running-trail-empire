@@ -29,7 +29,7 @@ import { buildWeekPlan, CONFIRMED_DAYS } from "../src/lib/ai/autoPlan";
 import { tr, ALL_LANGS, nRaw } from "../src/lib/i18n/multi";
 import { ppsExpiration, ppsVerdict, ppsDemandeAction, PPS_URL, PPS_PRIX_EUR, PPS_VALIDITE_MOIS } from "../src/lib/pps/status";
 import { PPS_T } from "../src/lib/pps/ppsI18n";
-import { PLAN_T } from "../src/lib/ai/planI18n";
+import { PLAN_T, libelleType } from "../src/lib/ai/planI18n";
 import { QUALITE_T } from "../src/lib/ai/qualityI18n";
 import { stripProfileSecrets } from "../src/lib/profile/safe";
 import type { AthleteContext } from "../src/lib/ai/coachContext";
@@ -1480,6 +1480,43 @@ test("le catalogue de séances n'alimente QUE le prompt du modèle", () => {
   assert.ok(/const catalog = buildSessionCatalog\(/.test(src) && /\$\{catalog\}/.test(src),
     "le catalogue doit rester une variable injectée dans le prompt, pas exposée au contexte");
   assert.ok(!/catalog,/.test(src), "le catalogue ne doit pas être exposé dans AthleteContext (donc pas à l'écran)");
+});
+
+test("le TYPE de séance est affiché traduit, alors qu'il reste français en donnée", () => {
+  // Défaut réel, trouvé en regardant l'écran et pas le code : le calendrier affichait
+  // `s.type` BRUT. Un athlète allemand lisait « SORTIE LONGUE » en gras au-dessus d'un
+  // texte entièrement allemand. La donnée, elle, doit rester française — c'est elle qui
+  // décide de la catégorie, de la couleur et de la séance poussée sur la montre.
+  const TYPES = ["Course", "Récup", "Repos", "Vélo", "Sortie longue", "VMA", "Seuil", "Spécifique", "Endurance", "Renfo"];
+  for (const t of TYPES) {
+    for (const l of ALL_LANGS) {
+      const v = libelleType(t, l);
+      assert.ok(v && v.trim().length > 0, `${l}/${t} : libellé vide`);
+    }
+    // Chaque type doit être RÉELLEMENT traduit en allemand — sinon c'est un oubli, pas
+    // un choix. (Les sigles VO2max/VAM sont volontairement identiques dans plusieurs
+    // langues, on ne les compare donc pas au français.)
+    if (!["VMA"].includes(t)) {
+      assert.notEqual(libelleType(t, "de"), libelleType(t, "fr"), `« ${t} » n'est pas traduit en allemand`);
+    }
+  }
+  // Un type inconnu (séance publiée à la main) est rendu tel quel, jamais vide.
+  assert.equal(libelleType("Séance", "de"), "Séance");
+  // Et la précision ne régresse pas : « Spécifique » et « Course » ne doivent pas
+  // retomber sur le même libellé que « Endurance », ce que ferait la catégorie seule.
+  for (const l of ALL_LANGS) {
+    assert.notEqual(libelleType("Spécifique", l), libelleType("Endurance", l), `${l} : Spécifique confondu avec Endurance`);
+    assert.notEqual(libelleType("Course", l), libelleType("Endurance", l), `${l} : Course confondue avec Endurance`);
+  }
+});
+
+test("le calendrier n'affiche AUCUN type brut", () => {
+  // C'est la cause racine : `{s.type}` posé directement dans le JSX. Le test lit la
+  // source parce qu'aucune assertion de données ne peut attraper une erreur de rendu.
+  const src = codeOf("src/components/training/CalendarView.tsx");
+  assert.ok(!/>\{s\.type\}</.test(src) && !/\{coach\.type\}/.test(src),
+    "un type de séance est rendu brut : il s'affichera en français dans les 5 langues");
+  assert.ok(/libelleType\(/.test(src), "le calendrier doit passer par libelleType");
 });
 
 test("une langue inconnue retombe sur le français, jamais sur du vide", () => {
