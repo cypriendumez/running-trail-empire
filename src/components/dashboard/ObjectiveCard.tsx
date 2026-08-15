@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Target, Loader2, Check, Pencil, Search, MapPin } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import type { AvertissementAge as Avertissement } from "@/lib/coach/ageDistance";
 
 export type Objective = {
   race: string; distanceKm: number; raceDate: string;
@@ -48,9 +49,9 @@ export function ObjectiveCard({ objective, currentVma }: { objective: Objective 
   const [ts, setTs] = useState(s0 % 60 ? String(s0 % 60) : "");
   const [date, setDate] = useState(objective?.raceDate ?? "");
   const [saving, setSaving] = useState(false);
-  /** Avertissement lié à l'âge, renvoyé par l'API au moment de l'enregistrement.
-   *  Affiché SOUS l'objectif, et refermable : c'est une information, pas une punition. */
-  const [avertissement, setAvertissement] = useState<{ niveau: string; texte: string } | null>(null);
+  /** Avertissements liés à l'âge, renvoyés par l'API au moment de l'enregistrement.
+   *  Affichés SOUS l'objectif, et refermables : c'est une information, pas une punition. */
+  const [avertissements, setAvertissements] = useState<Avertissement[]>([]);
 
   // Autocomplétion des courses (catalogue) → sélection auto-remplit distance + date.
   const [sug, setSug] = useState<RaceSug[]>([]);
@@ -100,8 +101,10 @@ export function ObjectiveCard({ objective, currentVma }: { objective: Objective 
         // pas s'inscrire à une épreuve officielle en France, et l'apprendre après
         // douze semaines de préparation serait cruel. On le lui dit maintenant,
         // pendant qu'il peut encore choisir une autre course.
-        if (j.avertissementAge?.texte) {
-          setAvertissement(j.avertissementAge as { niveau: string; texte: string });
+        // Plusieurs autorités peuvent parler en même temps : à 16 ans, un marathon
+        // se heurte à la règle fédérale ET à l'avis médical. On les affiche toutes.
+        if (Array.isArray(j.avertissementsAge) && j.avertissementsAge.length) {
+          setAvertissements(j.avertissementsAge as Avertissement[]);
         }
         setEditing(false);
         router.refresh();
@@ -139,18 +142,25 @@ export function ObjectiveCard({ objective, currentVma }: { objective: Objective 
         {/* Avertissement d'âge. Ambre pour un conseil de progression, rouge quand la
             distance n'est pas autorisée par le règlement fédéral — la nuance compte :
             l'un se discute, l'autre empêche de s'inscrire. */}
-        {avertissement && (
-          <div className={`mt-2.5 rounded-xl border px-3 py-2 text-xs leading-relaxed ${
-            avertissement.niveau === "reglement"
-              ? "border-red-200 bg-red-50 text-red-900"
+        {avertissements.map((a, i) => (
+          <div key={i} className={`mt-2.5 rounded-xl border px-3 py-2 text-xs leading-relaxed ${
+            a.niveau === "reglement" ? "border-red-200 bg-red-50 text-red-900"
+              : a.niveau === "medical" ? "border-orange-200 bg-orange-50 text-orange-900"
               : "border-amber-200 bg-amber-50 text-amber-900"}`}>
-            <p>{avertissement.texte}</p>
-            <button onClick={() => setAvertissement(null)}
-              className="mt-1.5 text-[11px] font-semibold underline underline-offset-2 opacity-70 hover:opacity-100">
-              {t("obj.warnClose")}
-            </button>
+            <p>{a.texte}</p>
+            {/* La SOURCE est affichée. Un avertissement de santé qu'on ne peut pas
+                vérifier ne se discute pas — et finit par ne plus se croire. */}
+            {a.sources?.length > 0 && (
+              <p className="mt-1 text-[11px] italic opacity-75">Source : {a.sources.join(" · ")}</p>
+            )}
+            {i === avertissements.length - 1 && (
+              <button onClick={() => setAvertissements([])}
+                className="mt-1.5 text-[11px] font-semibold underline underline-offset-2 opacity-70 hover:opacity-100">
+                {t("obj.warnClose")}
+              </button>
+            )}
           </div>
-        )}
+        ))}
       </motion.div>
     );
   }

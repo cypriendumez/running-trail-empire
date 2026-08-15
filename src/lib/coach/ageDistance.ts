@@ -15,16 +15,36 @@
 //  2. UN CONSEIL, annoncé comme tel : construire par paliers (10 km, puis semi, puis
 //     marathon). Ce n'est pas une règle médicale et on ne le présente pas comme telle.
 //
-//  ⚠️ CE QU'ON NE DIT PAS. « Le marathon, c'est mieux après 25 ans » circule beaucoup,
-//  mais aucune source médicale consultée ne l'établit comme un seuil. La règle
-//  vérifiable est celle de la fédération : 20 ans. Inventer un seuil médical pour
-//  appuyer un conseil, même bien intentionné, serait exactement le genre d'affirmation
-//  fausse que cette application refuse — et sur un sujet de santé, en plus.
+//  IL EXISTE AUSSI UN AVIS MÉDICAL, et il est chiffré. L'IMMDA — l'association
+//  internationale des directeurs médicaux de marathons — écrit, dans une déclaration
+//  adoptée à l'unanimité et révisée depuis : « Marathon running should be reserved only
+//  for those individuals who have reached their eighteenth birthday. » Le seuil médical
+//  est donc DIX-HUIT ans, pas vingt ni vingt-cinq.
+//
+//  ⚠️ DEUX CHOSES QU'ON NE DIT PAS, PARCE QU'ELLES SONT FAUSSES.
+//
+//  • « Le marathon, c'est mieux après 25 ans. » Aucune source consultée ne l'établit.
+//    Le seuil médical est 18 ans (IMMDA), la limite fédérale française 20 ans (FFA).
+//    À 20 ans, un athlète est au-dessus des deux : il n'y a PAS d'interdiction, il n'y
+//    a qu'un conseil de progression.
+//
+//  • « Ces limites protègent le cartilage de croissance. » C'était écrit dans la
+//    première version de ce module, et c'est une extrapolation : l'Académie américaine
+//    de pédiatrie constate au contraire que les lésions du cartilage de conjugaison
+//    liées à la course N'ONT PAS été retrouvées de façon constante dans les études.
+//    Les motifs réellement invoqués par l'IMMDA sont autres : blessures de surmenage
+//    sur un corps en croissance, thermorégulation moins efficace avant l'âge adulte,
+//    carences nutritionnelles, charge psychologique.
+//
+//  Sur un sujet de santé, une raison inventée décrédibilise l'avertissement entier.
+//  On cite donc ce que les sources disent, et on les NOMME dans le message.
 //
 //  Sources : règlement des manifestations running FFA (catégories d'âge et distances
-//  maximales hors stade et trail). Le « km effort » y ajoute 1 km par tranche de 100 m
-//  de dénivelé positif : une course de trail compte donc pour PLUS que sa distance,
-//  ce qui est le sens physiologique — grimper coûte, ça n'allège pas.
+//  maximales hors stade et trail) ; déclaration IMMDA sur les enfants et le marathon ;
+//  rapport clinique de l'American Academy of Pediatrics sur la course de fond chez
+//  l'enfant. Le « km effort » de la FFA ajoute 1 km par tranche de 100 m de dénivelé
+//  positif : une course de trail compte donc pour PLUS que sa distance, ce qui est le
+//  sens physiologique — grimper coûte, ça n'allège pas.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type CategorieFfa = {
@@ -71,13 +91,22 @@ export function kmEffort(distanceKm: number, denivelePositifM?: number | null): 
 
 export type AvertissementAge = {
   /** `reglement` : la distance dépasse la limite de sa catégorie — inscription
-   *  impossible sur une épreuve officielle. `progression` : autorisé, mais on
-   *  recommande d'y venir par paliers. */
-  niveau: "reglement" | "progression";
+   *  impossible sur une épreuve officielle.
+   *  `medical` : un organisme médical déconseille explicitement cette distance à cet âge.
+   *  `progression` : autorisé, mais on recommande d'y venir par paliers. */
+  niveau: "reglement" | "medical" | "progression";
   categorie: string;
   /** Texte prêt à afficher, en français, sans jargon. */
   texte: string;
+  /** Qui le dit. Affiché à l'athlète : un avertissement de santé sans source nommée
+   *  ne se vérifie pas, donc ne se discute pas — et finit par ne plus se croire. */
+  sources: string[];
 };
+
+/** Âge minimal recommandé pour le marathon par l'IMMDA (association internationale des
+ *  directeurs médicaux de marathons). C'est un avis MÉDICAL, distinct de la règle
+ *  fédérale française qui, elle, fixe 20 ans. */
+const AGE_MEDICAL_MARATHON = 18;
 
 /** Distances de référence, pour nommer l'étape suivante plutôt que de dire « plus court ». */
 const PALIERS = [
@@ -100,8 +129,25 @@ export function avertissementAge(input: {
   /** L'épreuve est-elle un trail ? Change le vocabulaire, pas la règle. */
   trail?: boolean;
 }): AvertissementAge | null {
+  return avertissementsAge(input)[0] ?? null;
+}
+
+/**
+ * TOUS les avertissements applicables, du plus contraignant au plus consultatif.
+ *
+ * Deux autorités DISTINCTES peuvent parler en même temps, et il serait malhonnête de
+ * n'en montrer qu'une : à 16 ans, un objectif marathon se heurte à la fois à la règle
+ * fédérale (inscription impossible) ET à l'avis médical de l'IMMDA. Ce ne sont pas
+ * deux formulations du même argument, ce sont deux faits différents.
+ */
+export function avertissementsAge(input: {
+  age: number | null | undefined;
+  distanceKm: number;
+  deniveleM?: number | null;
+  trail?: boolean;
+}): AvertissementAge[] {
   const cat = categorieFfa(input.age);
-  if (!cat || !Number.isFinite(input.distanceKm) || input.distanceKm <= 0) return null;
+  if (!cat || !Number.isFinite(input.distanceKm) || input.distanceKm <= 0) return [];
 
   const effort = kmEffort(input.distanceKm, input.deniveleM);
   const brut = Math.round(input.distanceKm * 10) / 10;
@@ -112,7 +158,9 @@ export function avertissementAge(input: {
     ? ` (${fr(effort)} km effort : le dénivelé ajoute 1 km par tranche de 100 m de D+)`
     : "";
 
-  // ── 1. LA RÈGLE : la distance dépasse-t-elle la limite de sa catégorie ? ──────
+  const out: AvertissementAge[] = [];
+
+  // ── 1. LA RÈGLE FÉDÉRALE : inscription possible, oui ou non ? ────────────────
   if (cat.maxKm != null && effort > cat.maxKm) {
     // On nomme le palier atteignable AUJOURD'HUI plutôt que de dire « plus court » :
     // un conseil qu'on ne peut pas suivre n'est pas un conseil.
@@ -123,16 +171,37 @@ export function avertissementAge(input: {
       : cat.ageMin === 16
       ? ", le semi à 18 ans et le marathon à 20 ans."
       : ".";
-    return {
+    out.push({
       niveau: "reglement",
       categorie: cat.nom,
-      texte: `⚠️ DISTANCE NON AUTORISÉE À TON ÂGE : en catégorie ${cat.nom}, la Fédération française d'athlétisme limite les épreuves à ${cat.maxKm} km${input.trail ? " en km effort" : ""}, et ton objectif fait ${fr(brut)} km${mentionEffort}. Tu ne pourras pas t'inscrire à une épreuve officielle en France, et ces limites existent pour protéger un squelette encore en croissance.${suite}${ouverture} Ton plan est construit quand même — mais parles-en à un médecin du sport avant de viser cette distance.`,
-    };
+      // ⚠️ On énonce la règle SANS lui prêter de justification physiologique. La
+      // première version affirmait « ces limites protègent un squelette en croissance » :
+      // extrapolation. Les motifs médicaux ont leur propre encadré, avec leur source.
+      texte: `⚠️ DISTANCE NON AUTORISÉE À TON ÂGE : en catégorie ${cat.nom}, la Fédération française d'athlétisme limite les épreuves à ${cat.maxKm} km${input.trail ? " en km effort" : ""}, et ton objectif fait ${fr(brut)} km${mentionEffort}. Tu ne pourras donc pas t'inscrire à une épreuve officielle en France.${suite}${ouverture} Ton plan est construit quand même — mais parles-en à un médecin du sport avant de viser cette distance.`,
+      sources: ["Fédération française d'athlétisme — règlement des manifestations running"],
+    });
   }
 
-  // ── 2. LE CONSEIL : autorisé, mais très exigeant pour un jeune athlète ────────
+  // ── 2. L'AVIS MÉDICAL : ce que disent les médecins de marathon ───────────────
+  // Distinct de la règle fédérale, et il ne dit PAS la même chose : le seuil médical
+  // est 18 ans, celui de la FFA 20 ans. Les deux peuvent s'appliquer en même temps.
+  if (input.age != null && input.age < AGE_MEDICAL_MARATHON && effort >= 42) {
+    out.push({
+      niveau: "medical",
+      categorie: cat.nom,
+      texte: `🩺 AVIS MÉDICAL : l'association internationale des directeurs médicaux de marathons (IMMDA) recommande de réserver le marathon aux athlètes ayant atteint leurs 18 ans. Les motifs qu'elle invoque ne sont pas le cartilage de croissance — les études n'y retrouvent pas de lésion de façon constante — mais le cumul des blessures de surmenage sur un corps encore en développement, une thermorégulation moins efficace qu'à l'âge adulte, le risque de carences nutritionnelles et la charge psychologique de la distance. L'Académie américaine de pédiatrie ajoute qu'au-delà d'environ 5 km chez l'enfant, c'est un avis médical INDIVIDUEL qui doit trancher, pas une règle générale : va voir un médecin du sport avant de t'engager.`,
+      sources: [
+        "IMMDA — déclaration sur les enfants et le marathon",
+        "American Academy of Pediatrics — rapport clinique sur la course de fond chez l'enfant",
+      ],
+    });
+  }
+  if (out.length) return out;
+
+  // ── 3. LE CONSEIL : autorisé, mais très exigeant pour un jeune athlète ────────
   // Seuil à 23 ans (fin de la catégorie Espoir) et distances de semi et au-delà.
-  // C'est un CONSEIL de progression, pas une règle : formulé comme tel.
+  // C'est un CONSEIL de progression, pas une règle : formulé comme tel, et sans
+  // prétendre à une interdiction médicale qui n'existe pas au-delà de 18 ans.
   if (input.age != null && input.age < 23 && effort >= 21) {
     // Le texte s'ADAPTE à la distance. Une première version parlait du marathon même
     // pour un semi — « l'effort le plus exigeant de la course à pied » à propos de
@@ -148,12 +217,13 @@ export function avertissementAge(input: {
     const paliers = marathonEtPlus
       ? "un 10 km solide, puis un semi, puis la distance visée"
       : "un 10 km solide avant de doubler la distance";
-    return {
+    out.push({
       niveau: "progression",
       categorie: cat.nom,
       texte: `💡 ${quoi} à ${input.age} ans, c'est autorisé (catégorie ${cat.nom}) et parfaitement faisable — mais ${pourquoi}. Le chemin le plus sûr passe par des paliers : ${paliers}. Ton plan est construit pour l'objectif que tu as choisi ; si tu n'as jamais couru la moitié de cette distance, envisage un palier intermédiaire d'abord.`,
-    };
+      sources: ["Association of Road Racing Statisticians — âge du pic de performance"],
+    });
   }
 
-  return null;
+  return out;
 }

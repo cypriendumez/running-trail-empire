@@ -11,7 +11,7 @@ import { bestVmaFromWorkouts, vmaFromPaceCurve, vmaFromVo2max } from "@/lib/runn
 import { isRun } from "@/lib/intervals/sport";
 import { summarizeCross, fmtMinutes, type CrossSummary } from "@/lib/coach/crossTraining";
 import { computeQualityBudget } from "@/lib/coach/qualityBudget";
-import { avertissementAge } from "@/lib/coach/ageDistance";
+import { avertissementsAge } from "@/lib/coach/ageDistance";
 import { warmCoolMin } from "@/lib/watch/intervals";
 
 type SB = Awaited<ReturnType<typeof createClient>>;
@@ -1286,13 +1286,17 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
     // On ne le bloque pas — c'est son objectif, son plan est construit — mais le lui
     // taire serait le laisser préparer une course à laquelle il n'a pas accès.
     // Voir lib/coach/ageDistance : la règle vient du règlement fédéral, pas d'une opinion.
-    const alerteAge = avertissementAge({
+    // TOUS les avertissements, pas seulement le plus grave : à 16 ans, un objectif
+    // marathon se heurte à la règle fédérale ET à l'avis médical de l'IMMDA. Ce ne
+    // sont pas deux formulations du même argument, ce sont deux faits différents.
+    for (const a of avertissementsAge({
       age: num(p?.age), distanceKm: objective.distanceKm,
       // Le D+ de l'épreuve n'est pas connu ; en trail, la limite fédérale s'exprime en
       // km effort, donc l'avertissement est PRUDENT (il sous-estime plutôt que d'inventer).
       trail: libGoal === "trail" || libGoal === "ultra",
-    });
-    if (alerteAge) out.push(alerteAge.texte);
+    })) {
+      out.push(`${a.texte} [source : ${a.sources.join(" ; ")}]`);
+    }
     return out;
   })();
 

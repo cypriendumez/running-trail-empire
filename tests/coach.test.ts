@@ -19,7 +19,7 @@ import { shardForPass, replanIfFresh } from "../src/lib/intervals/syncAndCoach";
 import { buildPlanReadyEmail } from "../src/lib/notify/planReady";
 import { poseAt, capLisse } from "../src/lib/segments/flyover";
 import { contientGrosMot, premierGrosMot, NB_FORMES_SURVEILLEES } from "../src/lib/social/moderation";
-import { avertissementAge, kmEffort } from "../src/lib/coach/ageDistance";
+import { avertissementAge, avertissementsAge, kmEffort } from "../src/lib/coach/ageDistance";
 import { vmaFromPaceCurve, bestVmaFromWorkouts } from "../src/lib/running/fitness";
 import { heatAdvice, windAdvice, altitudeLossPct, heatAcclimation } from "../src/lib/weather/openMeteo";
 import { parseReps, parsePaceSec, stepsForType, warmCoolMin, buildWorkoutDescription } from "../src/lib/watch/intervals";
@@ -2473,6 +2473,40 @@ test("sans âge connu, on se tait", () => {
   for (const age of [null, undefined, NaN, 0, 200]) {
     assert.equal(avertissementAge({ age: age as number, distanceKm: 42.2 }), null, `âge ${age} : avertissement fabriqué`);
   }
+});
+test("l'AVIS MÉDICAL existe, il est chiffré à 18 ans, et il est cité", () => {
+  // Vérifié en ligne : l'IMMDA (directeurs médicaux de marathons) écrit que le marathon
+  // doit être réservé aux 18 ans révolus. C'est un avis MÉDICAL, distinct de la règle
+  // fédérale française qui, elle, fixe 20 ans.
+  const a = avertissementsAge({ age: 16, distanceKm: 42.2 });
+  const medical = a.find((x) => x.niveau === "medical");
+  assert.ok(medical, "aucun avis médical à 16 ans sur un marathon");
+  assert.ok(/IMMDA/.test(medical!.texte), "l'organisme doit être nommé");
+  assert.ok(/18 ans/.test(medical!.texte), "le seuil chiffré doit figurer");
+  assert.ok(medical!.sources.length > 0, "un avertissement de santé sans source ne se vérifie pas");
+});
+test("les DEUX autorités parlent quand elles ont chacune quelque chose à dire", () => {
+  // À 16 ans, un marathon se heurte à la règle fédérale (inscription impossible) ET à
+  // l'avis médical. Ce ne sont pas deux formulations du même argument : n'en montrer
+  // qu'une reviendrait à cacher un fait.
+  const a = avertissementsAge({ age: 16, distanceKm: 42.2 });
+  assert.deepEqual(a.map((x) => x.niveau), ["reglement", "medical"]);
+  // À 19 ans en revanche : la FFA bloque encore (25 km), mais l'avis médical est levé.
+  const b = avertissementsAge({ age: 19, distanceKm: 42.2 });
+  assert.deepEqual(b.map((x) => x.niveau), ["reglement"], "l'avis médical ne vaut plus à 19 ans");
+});
+test("on n'affirme PLUS que ces limites protègent le cartilage de croissance", () => {
+  // C'était écrit dans la première version de ce module — et c'est une extrapolation :
+  // l'Académie américaine de pédiatrie constate que les lésions du cartilage de
+  // conjugaison liées à la course n'ont PAS été retrouvées de façon constante. Sur un
+  // sujet de santé, une raison inventée décrédibilise l'avertissement entier.
+  const tous = [
+    ...avertissementsAge({ age: 16, distanceKm: 42.2 }),
+    ...avertissementsAge({ age: 18, distanceKm: 42.2 }),
+  ].map((x) => x.texte).join(" ");
+  assert.ok(!/protéger un squelette/.test(tous), "affirmation non sourcée sur le squelette");
+  assert.ok(/pas de lésion de façon constante|ne sont pas le cartilage/.test(tous),
+    "la nuance de l'AAP doit être dite, pas tue");
 });
 test("on n'invente AUCUN seuil médical", () => {
   // « Le marathon, c'est mieux après 25 ans » circule beaucoup, mais aucune source

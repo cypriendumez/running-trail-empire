@@ -69,13 +69,13 @@ export async function POST(req: Request) {
     try {
       const { data: prof } = await sb.from("profiles").select("age").eq("id", user.id).maybeSingle();
       const age = (prof as { age?: number | null } | null)?.age ?? null;
-      const { avertissementAge } = await import("@/lib/coach/ageDistance");
-      return avertissementAge({
+      const { avertissementsAge } = await import("@/lib/coach/ageDistance");
+      return avertissementsAge({
         age, distanceKm,
         trail: /trail|utmb|ultra|vertical|\bkv\b|montagne/i.test(race) || distanceKm > 45,
       });
-    } catch { return null; }
+    } catch { return []; }
   })();
 
-  return NextResponse.json({ ok: true, objective: data, avertissementAge: alerteAge });
+  return NextResponse.json({ ok: true, objective: data, avertissementsAge: alerteAge ?? [] });
 }
