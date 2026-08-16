@@ -16,8 +16,11 @@ export const metadata: Metadata = {
     default: "Pacevo",
     template: "%s | Pacevo",
   },
+  // Description remaniée avec le slogan : c'est la ligne que Google affiche sous le titre.
+  // L'ancienne énumérait des fonctions (« Plans IA, analyse biomécanique… ») sans jamais
+  // dire ce que l'app FAIT concrètement pour le coureur, ni d'où vient le nom.
   description:
-    "Le compagnon intelligent pour les coureurs et traileurs. Plans IA, analyse biomécanique, courses France, Trail Builder.",
+    "Trouve ton allure, repousse ta VO₂max. Pacevo réécrit ta séance du jour à partir de ta VFC, de ton sommeil et de ta charge réelle, puis l'envoie sur ta montre.",
   keywords: [
     "running", "trail", "course à pied", "entraînement", "plan d'entraînement",
     "VMA", "biomécanique", "GPX", "Garmin", "Coros", "UTMB",
@@ -33,14 +36,18 @@ export const metadata: Metadata = {
     type: "website",
     locale: "fr_FR",
     url: process.env.NEXT_PUBLIC_APP_URL,
-    title: "Pacevo",
-    description: "L'application hégémonique du running et du trail.",
+    title: "Pacevo — Trouve ton allure, repousse ta VO₂max.",
+    // « L'application hégémonique du running et du trail » : une affirmation que rien ne
+    // soutient, servie à chaque partage de lien. Remplacée par ce que fait le produit.
+    description: "Ta séance du jour, réécrite à partir de ta VFC, de ton sommeil et de ta charge réelle — puis envoyée sur ta montre.",
     siteName: "Pacevo",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Pacevo",
-    description: "L'application hégémonique du running et du trail.",
+    title: "Pacevo — Trouve ton allure, repousse ta VO₂max.",
+    // « L'application hégémonique du running et du trail » : une affirmation que rien ne
+    // soutient, servie à chaque partage de lien. Remplacée par ce que fait le produit.
+    description: "Ta séance du jour, réécrite à partir de ta VFC, de ton sommeil et de ta charge réelle — puis envoyée sur ta montre.",
   },
 };
 

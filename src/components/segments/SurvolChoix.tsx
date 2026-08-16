@@ -3,6 +3,7 @@
 // lourde, on ne la charge donc que pour la sortie demandée, côté serveur, plutôt que
 // d'envoyer les 312 traces au navigateur pour n'en afficher qu'une.
 import { useRouter } from "next/navigation";
+import { useT } from "@/lib/i18n/LanguageProvider";
 import { FlyoverLazy } from "./FlyoverLazy";
 import type { FlyoverStats } from "./Flyover";
 
@@ -12,6 +13,7 @@ export function SurvolChoix({ sorties, choisie, polyline, altitudes, paces, stat
   sorties: Sortie[]; choisie: string; polyline: string;
   altitudes: number[] | null; paces?: (number | null)[] | null; stats: FlyoverStats;
 }) {
+  const { t, lang } = useT();
   const router = useRouter();
 
   return (
@@ -22,13 +24,13 @@ export function SurvolChoix({ sorties, choisie, polyline, altitudes, paces, stat
         // Trace trop courte pour un survol : on le dit, plutôt que d'afficher une
         // carte figée que l'athlète prendrait pour un bug.
         <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-10 text-center">
-          <p className="font-semibold text-zinc-900">Trace trop courte</p>
-          <p className="mt-1 text-sm text-zinc-500">Cette sortie ne contient pas assez de points GPS pour un survol.</p>
+          <p className="font-semibold text-zinc-900">{t("fly.short.title")}</p>
+          <p className="mt-1 text-sm text-zinc-500">{t("fly.short.sub")}</p>
         </div>
       )}
 
       <div>
-        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">Choisir une sortie</div>
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">{t("fly.pick")}</div>
         <div className="flex gap-2 overflow-x-auto pb-2">
           {sorties.map((s) => {
             const active = s.id === choisie;
@@ -38,7 +40,7 @@ export function SurvolChoix({ sorties, choisie, polyline, altitudes, paces, stat
                   active ? "border-emerald-500 bg-emerald-50" : "border-zinc-200 bg-white hover:border-zinc-300"}`}>
                 <div className="font-semibold text-zinc-800">{s.label}</div>
                 <div className="text-zinc-500">
-                  {new Date(s.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "2-digit" })}
+                  {new Date(s.date).toLocaleDateString(lang, { day: "numeric", month: "short", year: "2-digit" })}
                   {s.km ? ` · ${s.km.toFixed(1).replace(".", ",")} km` : ""}
                 </div>
               </button>

@@ -8,6 +8,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { Crown, Timer, Users, Repeat, TrendingUp } from "lucide-react";
 import { SegmentMapLazy } from "./SegmentMapLazy";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
 export type SegmentVue = {
   id: string; name: string; distance_m: number; elevation_gain_m: number;
@@ -26,6 +27,7 @@ function chrono(sec: number): string {
 }
 
 export function SegmentList({ segments }: { segments: SegmentVue[] }) {
+  const { t } = useT();
   if (!segments.length) {
     return (
       <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-12 text-center">
@@ -76,12 +78,12 @@ export function SegmentList({ segments }: { segments: SegmentVue[] }) {
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Mon temps</div>
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">{t("seg.myTime")}</div>
                 <div className="text-xl font-black text-emerald-600">
                   {s.monTemps != null ? chrono(s.monTemps) : <span className="text-sm font-medium text-zinc-400">—</span>}
                 </div>
                 {s.monRang != null && (
-                  <div className="text-[10px] text-zinc-400">{s.monRang}ᵉ sur {s.coureurs}</div>
+                  <div className="text-[10px] text-zinc-400">{t("seg.rank", { n: s.monRang, total: s.coureurs })}</div>
                 )}
               </div>
             </div>
@@ -91,7 +93,7 @@ export function SegmentList({ segments }: { segments: SegmentVue[] }) {
             <div className="flex items-center gap-2 border-t border-zinc-100 bg-amber-50/50 px-4 py-2 text-xs text-amber-800">
               <Timer className="h-3.5 w-3.5" />
               <span>
-                <strong>Maître du segment</strong> — {s.maitreCount} passages sur 90 jours
+                <strong>{t("seg.master")}</strong> — {t("seg.masterCount", { n: s.maitreCount })}
                 {s.jeSuisMaitre ? " (c'est toi)" : ""}
                 {s.maitreExAequo ? " · plusieurs ex æquo" : ""}
               </span>

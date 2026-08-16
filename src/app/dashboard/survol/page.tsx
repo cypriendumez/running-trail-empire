@@ -5,6 +5,8 @@ import { PerfTabs } from "@/components/segments/PerfTabs";
 import { encodePolyline, haversine, type TrackPoint } from "@/lib/segments/geo";
 import { paceOf } from "@/lib/social/feed";
 import { SurvolChoix } from "@/components/segments/SurvolChoix";
+import { getAccountLang } from "@/lib/i18n/serverLang";
+import { T, fill } from "@/lib/i18n/translations";
 
 export const metadata = { title: "Survol 3D | Pacevo" };
 
@@ -25,6 +27,8 @@ export default async function SurvolPage({ searchParams }: { searchParams: Promi
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect("/login");
+  const lang = await getAccountLang(sb, user.id);
+  const d = T[lang];
 
   const { w } = await searchParams;
 
@@ -35,8 +39,8 @@ export default async function SurvolPage({ searchParams }: { searchParams: Promi
   if (error) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-16 text-center">
-        <p className="text-lg font-bold text-zinc-900">Survol indisponible</p>
-        <p className="mt-2 text-sm text-zinc-500">Les traces GPS ne sont pas accessibles pour le moment.</p>
+        <p className="text-lg font-bold text-zinc-900">{d["fly.down.title"]}</p>
+        <p className="mt-2 text-sm text-zinc-500">{d["gps.unavailable"]}</p>
       </div>
     );
   }
@@ -56,10 +60,9 @@ export default async function SurvolPage({ searchParams }: { searchParams: Promi
   if (!sorties.length) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-16 text-center">
-        <p className="text-lg font-bold text-zinc-900">Aucune sortie à survoler</p>
+        <p className="text-lg font-bold text-zinc-900">{d["fly.none.title"]}</p>
         <p className="mx-auto mt-2 max-w-md text-sm text-zinc-500">
-          Le survol se construit sur les traces GPS importées depuis ta montre.
-          Lance une synchronisation, puis reviens.
+          {d["heat.none.sub"]}
         </p>
       </div>
     );
@@ -104,10 +107,10 @@ export default async function SurvolPage({ searchParams }: { searchParams: Promi
     <div className="mx-auto w-full max-w-5xl px-4 py-8">
       <PerfTabs />
       <header className="mb-5">
-        <h1 className="text-3xl font-black tracking-tight text-zinc-900">Survol 3D</h1>
+        <h1 className="text-3xl font-black tracking-tight text-zinc-900">{d["fly.title"]}</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          Rejoue ta sortie vue du ciel, relief compris.{" "}
-          <span className="font-semibold text-emerald-700">Inclus, sans abonnement.</span>
+          {d["fly.sub"]}{" "}
+          <span className="font-semibold text-emerald-700">{d["fly.free"]}</span>
         </p>
       </header>
 

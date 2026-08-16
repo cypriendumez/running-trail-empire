@@ -9,7 +9,11 @@ export type LandingDict = {
   // `badge` (« Nouveau · Ghost Runner vocal ») et `ctaSecondary` (« Voir la démo »,
   // qui menait à /login et non à une démo) ont été retirés du hero : une clé sans
   // rendu se traduit dans cinq langues et ne s'affiche nulle part.
-  hero: { titleA: string; titleB: string; accent: string; subtitle: string; ctaPrimary: string; sync: string };
+  // `eyebrow` porte l'ÉQUATION DE MARQUE (« Pace + VO₂ max »). Le nom du produit ne
+  // s'expliquait nulle part : un visiteur lisait « Pacevo » sans savoir ce qu'il désigne,
+  // alors que le nom DIT le produit — l'allure et le plafond aérobie. Le titre reprend
+  // les deux moitiés, et le « v » émeraude du logo devient la même promesse.
+  hero: { eyebrow: string; titleA: string; titleB: string; accent: string; subtitle: string; ctaPrimary: string; sync: string };
   // Un libellé par chiffre VÉRIFIABLE. `runners`, `rating` et `satisfaction`
   // n'existent plus : ils n'avaient aucune source.
   stats: { races: string; routes: string; plan: string; replan: string };
@@ -41,7 +45,7 @@ export const CATEGORY_CODES = ["ALL", "10KM", "SEMI", "MARATHON", "TRAIL", "BEGI
 
 const fr: LandingDict = {
   nav: { programs: "Programmes", features: "Fonctionnalités", pricing: "Tarifs", blog: "Blog", reviews: "Avis", login: "Connexion", trial: "Essai gratuit" },
-  hero: { titleA: "Cours plus loin,", titleB: "récupère ", accent: "plus vite", subtitle: "Un plan d'entraînement qui s'ajuste chaque jour à ta VFC, ton sommeil et ta charge réelle. Le coach intelligent du coureur exigeant.", ctaPrimary: "Commencer gratuitement", sync: "Synchro" },
+  hero: { eyebrow: "Pace + VO₂ max", titleA: "Trouve ton allure,", titleB: "repousse ta ", accent: "VO₂max", subtitle: "Ta montre se synchronise, Pacevo relit ta VFC, ton sommeil et ta charge réelle, puis réécrit la séance du jour et te la renvoie au poignet. Un plan vivant, pas un tableau figé.", ctaPrimary: "Commencer gratuitement", sync: "Synchro" },
   stats: { races: "Courses à venir", routes: "Parcours cartographiés", plan: "De plan glissant", replan: "Entre deux replanifications" },
   programs: {
     eyebrow: "Entraînement", title: "Des programmes pour chaque objectif", subtitle: "Du premier 5 km à l'ultra-trail — chaque plan s'adapte ensuite à tes données réelles.", viewAll: "Voir tout",
@@ -102,7 +106,7 @@ const fr: LandingDict = {
 
 const en: LandingDict = {
   nav: { programs: "Programs", features: "Features", pricing: "Pricing", blog: "Blog", reviews: "Reviews", login: "Log in", trial: "Free trial" },
-  hero: { titleA: "Run farther,", titleB: "recover ", accent: "faster", subtitle: "A training plan that adapts every day to your HRV, sleep and real load. The smart coach for serious runners.", ctaPrimary: "Start for free", sync: "Syncs with" },
+  hero: { eyebrow: "Pace + VO₂ max", titleA: "Find your pace,", titleB: "raise your ", accent: "VO₂max", subtitle: "Your watch syncs, Pacevo reads your HRV, your sleep and your real load, rewrites today's session and sends it straight back to your wrist. A living plan, not a frozen spreadsheet.", ctaPrimary: "Start for free", sync: "Syncs with" },
   stats: { races: "Upcoming races", routes: "Mapped routes", plan: "Rolling plan", replan: "Between two replans" },
   programs: {
     eyebrow: "Training", title: "A program for every goal", subtitle: "From your first 5K to ultra-trail — each plan then adapts to your real data.", viewAll: "View all",
@@ -163,7 +167,7 @@ const en: LandingDict = {
 
 const de: LandingDict = {
   nav: { programs: "Programme", features: "Funktionen", pricing: "Preise", blog: "Blog", reviews: "Bewertungen", login: "Anmelden", trial: "Gratis testen" },
-  hero: { titleA: "Lauf weiter,", titleB: "erhol dich ", accent: "schneller", subtitle: "Ein Trainingsplan, der sich täglich an deine HRV, deinen Schlaf und deine echte Belastung anpasst. Der smarte Coach für ambitionierte Läufer.", ctaPrimary: "Kostenlos starten", sync: "Synchron mit" },
+  hero: { eyebrow: "Pace + VO₂ max", titleA: "Finde dein Tempo,", titleB: "steigere deine ", accent: "VO₂max", subtitle: "Deine Uhr synchronisiert, Pacevo liest deine HRV, deinen Schlaf und deine echte Belastung, schreibt die heutige Einheit neu und schickt sie zurück ans Handgelenk. Ein lebendiger Plan statt einer starren Tabelle.", ctaPrimary: "Kostenlos starten", sync: "Synchron mit" },
   stats: { races: "Kommende Rennen", routes: "Kartierte Strecken", plan: "Rollierender Plan", replan: "Zwischen zwei Neuplanungen" },
   programs: {
     eyebrow: "Training", title: "Ein Programm für jedes Ziel", subtitle: "Vom ersten 5-km-Lauf bis zum Ultra-Trail — jeder Plan passt sich dann an deine echten Daten an.", viewAll: "Alle ansehen",
@@ -224,7 +228,7 @@ const de: LandingDict = {
 
 const es: LandingDict = {
   nav: { programs: "Programas", features: "Funciones", pricing: "Precios", blog: "Blog", reviews: "Opiniones", login: "Iniciar sesión", trial: "Prueba gratis" },
-  hero: { titleA: "Corre más lejos,", titleB: "recupérate ", accent: "más rápido", subtitle: "Un plan de entrenamiento que se ajusta cada día a tu VFC, tu sueño y tu carga real. El entrenador inteligente del corredor exigente.", ctaPrimary: "Empezar gratis", sync: "Sincroniza con" },
+  hero: { eyebrow: "Pace + VO₂ max", titleA: "Encuentra tu ritmo,", titleB: "sube tu ", accent: "VO₂máx", subtitle: "Tu reloj sincroniza, Pacevo lee tu VFC, tu sueño y tu carga real, reescribe la sesión de hoy y te la devuelve a la muñeca. Un plan vivo, no una tabla congelada.", ctaPrimary: "Empezar gratis", sync: "Sincroniza con" },
   stats: { races: "Carreras próximas", routes: "Rutas cartografiadas", plan: "De plan deslizante", replan: "Entre dos replanificaciones" },
   programs: {
     eyebrow: "Entrenamiento", title: "Un programa para cada objetivo", subtitle: "Desde tu primer 5K hasta el ultra-trail — cada plan se adapta luego a tus datos reales.", viewAll: "Ver todo",
@@ -285,7 +289,7 @@ const es: LandingDict = {
 
 const pt: LandingDict = {
   nav: { programs: "Programas", features: "Funcionalidades", pricing: "Preços", blog: "Blog", reviews: "Avaliações", login: "Entrar", trial: "Teste grátis" },
-  hero: { titleA: "Corre mais longe,", titleB: "recupera ", accent: "mais rápido", subtitle: "Um plano de treino que se ajusta todos os dias à tua VFC, ao teu sono e à tua carga real. O treinador inteligente do corredor exigente.", ctaPrimary: "Começar grátis", sync: "Sincroniza com" },
+  hero: { eyebrow: "Pace + VO₂ max", titleA: "Encontra o teu ritmo,", titleB: "aumenta a tua ", accent: "VO₂máx", subtitle: "O teu relógio sincroniza, a Pacevo lê a tua VFC, o teu sono e a tua carga real, reescreve o treino de hoje e devolve-o ao teu pulso. Um plano vivo, não uma tabela congelada.", ctaPrimary: "Começar grátis", sync: "Sincroniza com" },
   stats: { races: "Provas futuras", routes: "Percursos cartografados", plan: "De plano deslizante", replan: "Entre duas replanificações" },
   programs: {
     eyebrow: "Treino", title: "Um programa para cada objetivo", subtitle: "Do teu primeiro 5K ao ultra-trail — cada plano adapta-se depois aos teus dados reais.", viewAll: "Ver tudo",

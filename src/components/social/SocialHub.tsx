@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Heart, MessageCircle, Search, UserPlus, UserCheck, Trash2, Send, Users, Sparkles, ImagePlus, X, Loader2 } from "lucide-react";
 import { timeAgo, statLine, likesLabel } from "@/lib/social/feed";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
 type Author = { id: string; full_name?: string | null; avatar_url?: string | null };
 type Workout = {
@@ -49,6 +50,7 @@ export function SocialHub({ recentWorkouts, clubs = [] }: {
   /** Clubs dont l'athlète est membre — seuls ceux-là peuvent filtrer son fil. */
   clubs?: { id: string; name: string }[];
 }) {
+  const { t, lang } = useT();
   const [tab, setTab] = useState<"feed" | "athletes">("feed");
   const [posts, setPosts] = useState<Post[]>([]);
   const [followingCount, setFollowingCount] = useState(0);
@@ -76,18 +78,18 @@ export function SocialHub({ recentWorkouts, clubs = [] }: {
           pas dépendre d'un onglet qu'on pense à ouvrir. */}
       <header className="flex flex-wrap items-center justify-between gap-3 pt-6 pb-4">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-zinc-900">Le Club</h1>
-          <p className="mt-1 text-sm text-zinc-500">Les sorties de ceux que tu suis, et les tiennes.</p>
+          <h1 className="text-3xl font-black tracking-tight text-zinc-900">{t("club.title")}</h1>
+          <p className="mt-1 text-sm text-zinc-500">{t("club.sub")}</p>
         </div>
         <button onClick={() => setTab("athletes")}
           className="flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700">
           <UserPlus className="h-4 w-4" />
-          Ajouter des amis
+          {t("club.addFriends")}
         </button>
       </header>
 
       <div className="mb-5 flex gap-1 rounded-xl bg-zinc-100 p-1">
-        {([["feed", "Fil"], ["athletes", followingCount > 0 ? `Athlètes · ${followingCount}` : "Trouver des athlètes"]] as const).map(([k, label]) => (
+        {([["feed", t("club.tab.feed")], ["athletes", followingCount > 0 ? t("club.tab.athletes", { n: followingCount }) : t("club.tab.findShort")]] as const).map(([k, label]) => (
           <button key={k} onClick={() => setTab(k)}
             className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition ${
               tab === k ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}>
@@ -98,7 +100,7 @@ export function SocialHub({ recentWorkouts, clubs = [] }: {
 
       {tab === "feed" && clubs.length > 0 && (
         <div className="mb-4 flex flex-wrap gap-2">
-          {[{ id: "", name: "Tout le fil" }, ...clubs].map((c) => (
+          {[{ id: "", name: t("club.allFeed") }, ...clubs].map((c) => (
             <button key={c.id || "tout"} onClick={() => setClub(c.id)}
               className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                 club === c.id ? "border-emerald-500 bg-emerald-50 text-emerald-700"
@@ -137,13 +139,14 @@ export function SocialHub({ recentWorkouts, clubs = [] }: {
  * Un message unique « rien à afficher » serait un cul-de-sac.
  */
 function EmptyFeed({ followingCount, club, onFind }: { followingCount: number; club?: string | null; onFind: () => void }) {
+  const { t } = useT();
   const seul = followingCount === 0 && !club;
   if (club) {
     return (
       <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-10 text-center">
-        <p className="font-semibold text-zinc-900">Rien dans {club}</p>
+        <p className="font-semibold text-zinc-900">{t("club.empty.inClub", { club: club ?? "" })}</p>
         <p className="mx-auto mt-1 max-w-sm text-sm text-zinc-500">
-          Aucun membre de ce club n&apos;a publié de séance visible pour toi.
+          {t("club.empty.inClubSub")}
         </p>
       </div>
     );
@@ -153,16 +156,14 @@ function EmptyFeed({ followingCount, club, onFind }: { followingCount: number; c
       <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50">
         {seul ? <Users className="h-6 w-6 text-emerald-600" /> : <Sparkles className="h-6 w-6 text-emerald-600" />}
       </div>
-      <p className="font-semibold text-zinc-900">{seul ? "Tu ne suis encore personne" : "Rien de neuf pour l'instant"}</p>
+      <p className="font-semibold text-zinc-900">{seul ? t("club.empty.alone") : t("club.empty.quiet")}</p>
       <p className="mx-auto mt-1 max-w-sm text-sm text-zinc-500">
-        {seul
-          ? "Trouve des athlètes à suivre : leurs sorties apparaîtront ici."
-          : "Les athlètes que tu suis n'ont rien publié. Ouvre le bal avec ta dernière séance."}
+        {seul ? t("club.empty.aloneSub") : t("club.empty.quietSub")}
       </p>
       {seul && (
         <button onClick={onFind}
           className="mt-5 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700">
-          Trouver des athlètes
+          {t("club.find")}
         </button>
       )}
     </div>
@@ -170,6 +171,7 @@ function EmptyFeed({ followingCount, club, onFind }: { followingCount: number; c
 }
 
 function Composer({ workouts, onPublished }: { workouts: Workout[]; onPublished: () => void }) {
+  const { t, lang } = useT();
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState("");
   const [workoutId, setWorkoutId] = useState<string | null>(null);
@@ -187,9 +189,9 @@ function Composer({ workouts, onPublished }: { workouts: Workout[]; onPublished:
         body: JSON.stringify({ body, workoutId, visibility, photoUrls: photos }),
       });
       const j = await r.json();
-      if (!r.ok) { setErr(j.error ?? "Publication impossible"); setBusy(false); return; }
+      if (!r.ok) { setErr(j.error ?? t("club.err.publish")); setBusy(false); return; }
       setBody(""); setWorkoutId(null); setPhotos([]); setOpen(false); onPublished();
-    } catch { setErr("Publication impossible"); }
+    } catch { setErr(t("club.err.publish")); }
     setBusy(false);
   }
 
@@ -206,8 +208,8 @@ function Composer({ workouts, onPublished }: { workouts: Workout[]; onPublished:
         // On n'ajoute la vignette QUE si le serveur a bien renvoyé une URL : afficher
         // une image locale « en attente » ferait croire à un envoi réussi qui ne l'est pas.
         if (r.ok && j.url) setPhotos((p) => [...p, j.url].slice(0, 4));
-        else setErr(j.error ?? "Photo refusée");
-      } catch { setErr("Envoi de la photo impossible"); }
+        else setErr(j.error ?? t("club.err.photo"));
+      } catch { setErr(t("club.err.upload")); }
     }
     setUploading(false);
   }
@@ -219,7 +221,7 @@ function Composer({ workouts, onPublished }: { workouts: Workout[]; onPublished:
         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50">
           <Sparkles className="h-4 w-4 text-emerald-600" />
         </div>
-        <span className="text-sm text-zinc-500">Partager une séance…</span>
+        <span className="text-sm text-zinc-500">{t("club.share")}</span>
       </button>
     );
   }
@@ -227,7 +229,7 @@ function Composer({ workouts, onPublished }: { workouts: Workout[]; onPublished:
   return (
     <div className="mb-5 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
       <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={3} autoFocus
-        placeholder="Comment s'est passée cette sortie ?"
+        placeholder={t("club.bodyPh")}
         className="w-full resize-none rounded-xl border border-zinc-200 p-3 text-sm outline-none focus:border-emerald-400" />
 
 
@@ -248,7 +250,7 @@ function Composer({ workouts, onPublished }: { workouts: Workout[]; onPublished:
 
       {workouts.length > 0 && (
         <div className="mt-3">
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">Joindre une séance</div>
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">{t("club.attach")}</div>
           <div className="flex gap-2 overflow-x-auto pb-1">
             {workouts.map((w) => {
               const sel = workoutId === w.id;
@@ -256,9 +258,9 @@ function Composer({ workouts, onPublished }: { workouts: Workout[]; onPublished:
                 <button key={w.id} onClick={() => setWorkoutId(sel ? null : w.id)}
                   className={`shrink-0 rounded-xl border px-3 py-2 text-left text-xs transition ${
                     sel ? "border-emerald-500 bg-emerald-50" : "border-zinc-200 hover:border-zinc-300"}`}>
-                  <div className="font-semibold text-zinc-800">{w.title || w.type || "Séance"}</div>
+                  <div className="font-semibold text-zinc-800">{w.title || w.type || t("club.session")}</div>
                   <div className="text-zinc-500">
-                    {w.date ? new Date(w.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) : ""}
+                    {w.date ? new Date(w.date).toLocaleDateString(lang, { day: "numeric", month: "short" }) : ""}
                     {w.distance_km ? ` · ${w.distance_km.toFixed(1).replace(".", ",")} km` : ""}
                   </div>
                 </button>
@@ -273,21 +275,21 @@ function Composer({ workouts, onPublished }: { workouts: Workout[]; onPublished:
             qui part du domicile. Le réglage par défaut ne doit jamais exposer ça. */}
         <label className={`flex cursor-pointer items-center gap-1.5 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs text-zinc-600 transition hover:border-emerald-300 ${photos.length >= 4 ? "pointer-events-none opacity-40" : ""}`}>
           {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />}
-          {photos.length ? `${photos.length}/4` : "Photo"}
+          {photos.length ? `${photos.length}/4` : t("club.photo")}
           <input type="file" accept="image/*" multiple className="hidden"
             onChange={(e) => { void addPhotos(e.target.files); e.target.value = ""; }} />
         </label>
         <select value={visibility} onChange={(e) => setVisibility(e.target.value as typeof visibility)}
           className="rounded-lg border border-zinc-200 px-2 py-1.5 text-xs text-zinc-600 outline-none">
-          <option value="followers">Mes abonnés</option>
-          <option value="public">Tout le monde</option>
-          <option value="private">Moi seul</option>
+          <option value="followers">{t("club.vis.followers")}</option>
+          <option value="public">{t("club.vis.public")}</option>
+          <option value="private">{t("club.vis.private")}</option>
         </select>
         <div className="flex items-center gap-2">
-          <button onClick={() => { setOpen(false); setErr(null); }} className="rounded-lg px-3 py-1.5 text-xs text-zinc-500 hover:text-zinc-700">Annuler</button>
+          <button onClick={() => { setOpen(false); setErr(null); }} className="rounded-lg px-3 py-1.5 text-xs text-zinc-500 hover:text-zinc-700">{t("club.cancel")}</button>
           <button onClick={publish} disabled={busy || uploading || (!body.trim() && !workoutId && photos.length === 0)}
             className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-40">
-            {busy ? "Publication…" : "Publier"}
+            {busy ? t("club.publishing") : t("club.publish")}
           </button>
         </div>
       </div>
@@ -297,9 +299,7 @@ function Composer({ workouts, onPublished }: { workouts: Workout[]; onPublished:
           laisserait croire à une confidentialité qui n'existe pas. */}
       {photos.length > 0 && visibility !== "public" && (
         <p className="mt-2 text-xs text-amber-700">
-          La publication sera limitée à tes abonnés, mais le fichier photo reste
-          accessible à qui possède son adresse. Évite les images que tu ne montrerais
-          pas publiquement.
+          {t("club.photoWarn")}
         </p>
       )}
       {err && <p className="mt-2 text-xs text-red-600">{err}</p>}
@@ -308,10 +308,11 @@ function Composer({ workouts, onPublished }: { workouts: Workout[]; onPublished:
 }
 
 function PostCard({ post, onChange }: { post: Post; onChange: () => void }) {
+  const { t, lang } = useT();
   const [kudoed, setKudoed] = useState(post.kudoed);
   const [count, setCount] = useState(post.kudos_count);
   const [showComments, setShowComments] = useState(false);
-  const stats = post.workout ? statLine(post.workout) : [];
+  const stats = post.workout ? statLine(post.workout, lang) : [];
 
   async function toggleKudos() {
     // Bascule optimiste : le « j'aime » doit répondre à l'instant. En cas d'échec
@@ -340,11 +341,11 @@ function PostCard({ post, onChange }: { post: Post; onChange: () => void }) {
       <div className="flex items-center gap-3 p-4 pb-3">
         <Avatar author={post.author} />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold text-zinc-900">{post.author?.full_name || "Athlète"}</div>
-          <div className="text-xs text-zinc-400">{timeAgo(post.created_at)}</div>
+          <div className="truncate text-sm font-semibold text-zinc-900">{post.author?.full_name || t("club.athlete")}</div>
+          <div className="text-xs text-zinc-400">{timeAgo(post.created_at, lang)}</div>
         </div>
         {post.mine && (
-          <button onClick={remove} title="Supprimer" className="rounded-lg p-2 text-zinc-300 transition hover:bg-red-50 hover:text-red-500">
+          <button onClick={remove} title={t("club.delete")} className="rounded-lg p-2 text-zinc-300 transition hover:bg-red-50 hover:text-red-500">
             <Trash2 className="h-4 w-4" />
           </button>
         )}
@@ -365,7 +366,7 @@ function PostCard({ post, onChange }: { post: Post; onChange: () => void }) {
       {post.workout && (
         <div className="mx-4 mb-3 rounded-xl bg-gradient-to-br from-zinc-900 to-zinc-800 p-4 text-white">
           <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-emerald-400">
-            {post.workout.title || post.workout.type || "Séance"}
+            {post.workout.title || post.workout.type || t("club.session")}
           </div>
           {stats.length > 0 ? (
             <div className="grid grid-cols-3 gap-2">
@@ -378,7 +379,7 @@ function PostCard({ post, onChange }: { post: Post; onChange: () => void }) {
             </div>
           ) : (
             // Aucune mesure exploitable : on le DIT au lieu d'aligner des tirets.
-            <p className="text-xs text-zinc-400">Séance enregistrée sans mesure détaillée.</p>
+            <p className="text-xs text-zinc-400">{t("club.noMetrics")}</p>
           )}
         </div>
       )}
@@ -388,12 +389,12 @@ function PostCard({ post, onChange }: { post: Post; onChange: () => void }) {
           className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition ${
             kudoed ? "text-emerald-600" : "text-zinc-500 hover:bg-zinc-50"}`}>
           <Heart className={`h-4 w-4 ${kudoed ? "fill-emerald-600" : ""}`} />
-          {likesLabel(count)}
+          {likesLabel(count, lang)}
         </button>
         <button onClick={() => setShowComments((v) => !v)}
           className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-zinc-500 transition hover:bg-zinc-50">
           <MessageCircle className="h-4 w-4" />
-          {post.comments_count > 0 ? post.comments_count : "Commenter"}
+          {post.comments_count > 0 ? post.comments_count : t("club.comment")}
         </button>
       </div>
 
@@ -403,6 +404,7 @@ function PostCard({ post, onChange }: { post: Post; onChange: () => void }) {
 }
 
 function Comments({ postId }: { postId: string }) {
+  const { t } = useT();
   const [items, setItems] = useState<Comment[] | null>(null);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -429,14 +431,14 @@ function Comments({ postId }: { postId: string }) {
       {items === null ? (
         <div className="h-8 animate-pulse rounded bg-zinc-200" />
       ) : items.length === 0 ? (
-        <p className="mb-3 text-xs text-zinc-400">Aucun commentaire — sois le premier.</p>
+        <p className="mb-3 text-xs text-zinc-400">{t("club.noComment")}</p>
       ) : (
         <div className="mb-3 space-y-3">
           {items.map((c) => (
             <div key={c.id} className="flex gap-2">
               <Avatar author={c.author} size={28} />
               <div className="min-w-0 flex-1 rounded-xl bg-white px-3 py-2">
-                <div className="text-xs font-semibold text-zinc-800">{c.author?.full_name || "Athlète"}</div>
+                <div className="text-xs font-semibold text-zinc-800">{c.author?.full_name || t("club.athlete")}</div>
                 <p className="text-xs text-zinc-600">{c.body}</p>
               </div>
             </div>
@@ -446,7 +448,7 @@ function Comments({ postId }: { postId: string }) {
       <div className="flex gap-2">
         <input value={text} onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }}
-          placeholder="Écrire un commentaire…"
+          placeholder={t("club.commentPh")}
           className="flex-1 rounded-full border border-zinc-200 px-4 py-2 text-xs outline-none focus:border-emerald-400" />
         <button onClick={send} disabled={busy || !text.trim()}
           className="rounded-full bg-emerald-600 p-2 text-white transition hover:bg-emerald-700 disabled:opacity-40">
@@ -458,6 +460,7 @@ function Comments({ postId }: { postId: string }) {
 }
 
 function AthleteFinder({ onFollowChange }: { onFollowChange: () => void }) {
+  const { t } = useT();
   const [q, setQ] = useState("");
   const [athletes, setAthletes] = useState<Athlete[] | null>(null);
 
@@ -490,7 +493,7 @@ function AthleteFinder({ onFollowChange }: { onFollowChange: () => void }) {
     <div>
       <div className="relative mb-4">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Chercher un athlète par son nom…"
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("club.searchPh")}
           className="w-full rounded-full border border-zinc-200 py-3 pl-10 pr-4 text-sm outline-none focus:border-emerald-400" />
       </div>
 
@@ -498,21 +501,21 @@ function AthleteFinder({ onFollowChange }: { onFollowChange: () => void }) {
         <div className="space-y-2">{[0, 1, 2].map((i) => <div key={i} className="h-16 animate-pulse rounded-xl bg-zinc-100" />)}</div>
       ) : athletes.length === 0 ? (
         <p className="py-10 text-center text-sm text-zinc-400">
-          {q ? `Aucun athlète ne correspond à « ${q} ».` : "Aucun athlète à suggérer pour l'instant."}
+          {q ? t("club.noMatch", { q }) : t("club.noSuggestion")}
         </p>
       ) : (
         <div className="space-y-2">
-          {!q && <p className="px-1 pb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">Suggestions</p>}
+          {!q && <p className="px-1 pb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">{t("club.suggestions")}</p>}
           {athletes.map((a) => (
             <div key={a.id} className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3">
               <Avatar author={a} />
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-zinc-900">{a.full_name || "Athlète"}</div>
+                <div className="truncate text-sm font-semibold text-zinc-900">{a.full_name || t("club.athlete")}</div>
                 {/* On n'affiche la ligue et le score QUE s'ils existent : un « Ligue —,
                     score 0 » ferait passer un compte neuf pour un compte à l'abandon. */}
                 {(a.league || (a.discipline_score ?? 0) > 0) && (
                   <div className="text-xs text-zinc-400">
-                    {[a.league, (a.discipline_score ?? 0) > 0 ? `Discipline ${a.discipline_score}` : null]
+                    {[a.league, (a.discipline_score ?? 0) > 0 ? t("club.discipline", { n: a.discipline_score ?? 0 }) : null]
                       .filter(Boolean).join(" · ")}
                   </div>
                 )}
@@ -522,7 +525,7 @@ function AthleteFinder({ onFollowChange }: { onFollowChange: () => void }) {
                   a.following
                     ? "border border-zinc-200 text-zinc-600 hover:border-red-200 hover:text-red-600"
                     : "bg-emerald-600 text-white hover:bg-emerald-700"}`}>
-                {a.following ? <><UserCheck className="h-3.5 w-3.5" /> Suivi</> : <><UserPlus className="h-3.5 w-3.5" /> Suivre</>}
+                {a.following ? <><UserCheck className="h-3.5 w-3.5" /> {t("club.following")}</> : <><UserPlus className="h-3.5 w-3.5" /> {t("club.follow")}</>}
               </button>
             </div>
           ))}

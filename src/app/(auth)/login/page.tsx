@@ -19,7 +19,7 @@ export default function LoginPage() {
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<null | "google" | "apple">(null);
-  const { lang } = useT();
+  const { t, lang } = useT();
   const L = (AUTH[lang] ?? AUTH.fr).login;
 
   // Surface une erreur renvoyée par /auth/callback ou /auth/confirm
@@ -128,7 +128,7 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="vous@exemple.com"
+              placeholder={t("auth.emailPh")}
               required
               className="w-full px-4 py-3 rounded-xl border border-zinc-200 bg-white text-sm
                          focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent

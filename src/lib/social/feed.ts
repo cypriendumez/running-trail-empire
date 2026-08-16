@@ -88,23 +88,20 @@ export function isPublishable(body: string | null, workoutId: string | null): bo
   return !!body || !!workoutId;
 }
 
-/**
- * Temps écoulé, en français courant. On s'arrête à « il y a 7 j » puis on bascule
- * sur la date : « il y a 340 j » n'apprend rien à personne.
- */
-export function timeAgo(iso: string, now: Date = new Date()): string {
-  const t = new Date(iso).getTime();
-  if (!Number.isFinite(t)) return "";
-  const sec = Math.max(0, Math.floor((now.getTime() - t) / 1000));
-  if (sec < 60) return "à l'instant";
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `il y a ${min} min`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `il y a ${h} h`;
-  const d = Math.floor(h / 24);
-  if (d <= 7) return `il y a ${d} j`;
-  return new Date(t).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
-}
+// `timeAgo` vivait ici, en français seulement, alors que `lib/utils/time.ts` en tenait
+// déjà une version traduite dans les 5 langues. Deux implémentations de la même notion,
+// dont une seule traduite : le fil du Club affichait « il y a 3 j » à un lecteur
+// allemand. La copie est supprimée, tout passe par `lib/utils/time`.
+export { timeAgo } from "@/lib/utils/time";
+
+/** Libellés des chiffres d'une séance publiée. */
+const STAT_T: Record<string, { distance: string; time: string; pace: string; elev: string; like: string; likes: string }> = {
+  fr: { distance: "Distance", time: "Temps", pace: "Allure", elev: "D+", like: "J'aime", likes: "{n} j'aime" },
+  en: { distance: "Distance", time: "Time", pace: "Pace", elev: "Elev.", like: "Like", likes: "{n} likes" },
+  de: { distance: "Distanz", time: "Zeit", pace: "Tempo", elev: "Höhenm.", like: "Gefällt mir", likes: "{n}× gefällt mir" },
+  es: { distance: "Distancia", time: "Tiempo", pace: "Ritmo", elev: "Desnivel", like: "Me gusta", likes: "{n} me gusta" },
+  pt: { distance: "Distância", time: "Tempo", pace: "Ritmo", elev: "Desnível", like: "Gosto", likes: "{n} gostos" },
+};
 
 /** Format d'allure à partir d'une durée et d'une distance — jamais inventé. */
 export function paceOf(durationSeconds?: number | null, distanceKm?: number | null): string | null {
@@ -126,20 +123,21 @@ export type WorkoutSummary = {
  * Les 3 chiffres d'une séance publiée. On n'affiche QUE ce qui existe : une carte
  * qui montrerait « 0,0 km » pour une séance sans distance mentirait sur la sortie.
  */
-export function statLine(w: WorkoutSummary): { label: string; value: string }[] {
+export function statLine(w: WorkoutSummary, lang = "fr"): { label: string; value: string }[] {
+  const T = STAT_T[lang] ?? STAT_T.fr;
   const out: { label: string; value: string }[] = [];
   if (w.distance_km && w.distance_km > 0) {
-    out.push({ label: "Distance", value: `${w.distance_km.toFixed(1).replace(".", ",")} km` });
+    out.push({ label: T.distance, value: `${w.distance_km.toFixed(1).replace(".", ",")} km` });
   }
   if (w.duration_seconds && w.duration_seconds > 0) {
     const h = Math.floor(w.duration_seconds / 3600);
     const m = Math.round((w.duration_seconds % 3600) / 60);
-    out.push({ label: "Temps", value: h > 0 ? `${h} h ${String(m).padStart(2, "0")}` : `${m} min` });
+    out.push({ label: T.time, value: h > 0 ? `${h} h ${String(m).padStart(2, "0")}` : `${m} min` });
   }
   const pace = paceOf(w.duration_seconds, w.distance_km);
-  if (pace) out.push({ label: "Allure", value: `${pace}/km` });
+  if (pace) out.push({ label: T.pace, value: `${pace}/km` });
   else if (w.elevation_gain_m && w.elevation_gain_m > 0) {
-    out.push({ label: "D+", value: `${Math.round(w.elevation_gain_m)} m` });
+    out.push({ label: T.elev, value: `${Math.round(w.elevation_gain_m)} m` });
   }
   return out;
 }
@@ -151,8 +149,9 @@ export function statLine(w: WorkoutSummary): { label: string; value: string }[] 
  * les renommer imposerait une migration pour un gain nul côté athlète, qui ne voit
  * que ce libellé. On sépare donc le vocabulaire de l'écran de celui du schéma.
  */
-export function likesLabel(n: number): string {
-  return n <= 0 ? "J'aime" : `${n} j'aime`;
+export function likesLabel(n: number, lang = "fr"): string {
+  const T = STAT_T[lang] ?? STAT_T.fr;
+  return n <= 0 ? T.like : T.likes.replace("{n}", String(n));
 }
 
 /**

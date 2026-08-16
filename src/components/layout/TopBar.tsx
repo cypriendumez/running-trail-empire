@@ -8,6 +8,7 @@ import { colorOf } from "@/lib/avatarColors";
 // « Date à venir » existe déjà, traduit, dans le dictionnaire de l'onglet Courses : le
 // redéclarer ici créerait deux libellés pour une même notion, qui divergeraient un jour.
 import { RX } from "@/components/races/racesI18n";
+import { timeAgo } from "@/lib/utils/time";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { createClient } from "@/lib/supabase/client";
 
@@ -127,13 +128,10 @@ export function TopBar({ profile, avatarColor }: { profile: Record<string, unkno
     /coach|session|s[ée]ance/i.test(type) ? "🏃" : /race|objectif/i.test(type) ? "🎯"
     : /feedback|ressenti/i.test(type) ? "💬" : /badge|league|ligue|d[ée]fi/i.test(type) ? "🏆" : "🔔";
 
-  const timeAgo = (iso: string) => {
-    const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-    if (s < 60) return t("time.now");
-    if (s < 3600) return t("time.min", { n: Math.floor(s / 60) });
-    if (s < 86400) return t("time.hour", { n: Math.floor(s / 3600) });
-    return t("time.day", { n: Math.floor(s / 86400) });
-  };
+  // L'horodatage des notifications était calculé ICI, en français en dur — une TROISIÈME
+  // copie de `timeAgo`, alors que `lib/utils/time` en tient déjà une version traduite.
+  // On l'appelle au lieu de la réécrire : trois implémentations d'une même phrase, c'est
+  // trois occasions d'en oublier une le jour où on ajoute une langue.
 
   return (
     <header className="h-16 border-b border-zinc-100 bg-white/80 backdrop-blur-sm flex items-center px-6 gap-4 sticky top-0 z-30">
@@ -240,7 +238,7 @@ export function TopBar({ profile, avatarColor }: { profile: Record<string, unkno
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-medium text-zinc-900 truncate">{n.title}</div>
                           {n.body && <div className="text-xs text-zinc-500 line-clamp-2">{n.body}</div>}
-                          <div className="text-[11px] text-zinc-400 mt-0.5">{timeAgo(n.created_at)}</div>
+                          <div className="text-[11px] text-zinc-400 mt-0.5">{timeAgo(n.created_at, lang)}</div>
                         </div>
                       </li>
                     ))}

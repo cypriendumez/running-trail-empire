@@ -7,12 +7,23 @@ const REL: Record<string, { now: string; min: string; h: string; d: string; yest
   pt: { now: "agora mesmo", min: "há {n} min", h: "há {n} h", d: "há {n} d", yesterday: "ontem" },
 };
 
-export function timeAgo(ts: string, lang = "fr"): string {
+/**
+ * SEULE implémentation de l'horodatage relatif de l'app.
+ *
+ * Il en existait TROIS : celle-ci, une copie française sans traduction dans
+ * `lib/social/feed.ts`, et une troisième écrite à la main dans la barre du haut. Les
+ * deux autres ne parlaient que français — un athlète allemand lisait « il y a 3 j » sous
+ * chaque publication du Club et chaque notification. Les deux copies ont été supprimées.
+ *
+ * `now` est INJECTABLE parce que les tests de `feed.ts` figent l'horloge : sans ce
+ * paramètre, fusionner les implémentations aurait rendu ces assertions intestables.
+ */
+export function timeAgo(ts: string, lang = "fr", now: Date = new Date()): string {
   if (!ts) return "";
   const t = new Date(ts).getTime();
   if (isNaN(t)) return "";
   const r = REL[lang] ?? REL.fr;
-  const s = Math.floor((Date.now() - t) / 1000);
+  const s = Math.floor((now.getTime() - t) / 1000);
   if (s < 0) return r.now;
   if (s < 45) return r.now;
   if (s < 90) return r.min.replace("{n}", "1");

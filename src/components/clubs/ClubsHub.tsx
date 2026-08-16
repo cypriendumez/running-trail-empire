@@ -10,6 +10,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Users, Target, Plus, Check, MapPin, Loader2 } from "lucide-react";
 import { metricLabel, metricUnit, type Metric } from "@/lib/challenges/progress";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
 export type ClubVue = {
   id: string; name: string; description: string | null; city: string | null;
@@ -28,6 +29,7 @@ export type DefiVue = {
 const nb = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1).replace(".", ","));
 
 export function ClubsHub({ clubs, defis }: { clubs: ClubVue[]; defis: DefiVue[] }) {
+  const { t } = useT();
   const [tab, setTab] = useState<"defis" | "clubs">("defis");
   const [form, setForm] = useState(false);
 
@@ -35,18 +37,18 @@ export function ClubsHub({ clubs, defis }: { clubs: ClubVue[]; defis: DefiVue[] 
     <div>
       <header className="flex flex-wrap items-center justify-between gap-3 pb-4">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-zinc-900">Clubs &amp; Défis</h1>
-          <p className="mt-1 text-sm text-zinc-500">Cours en groupe, et donne-toi des objectifs datés.</p>
+          <h1 className="text-3xl font-black tracking-tight text-zinc-900">{t("clubs.title")}</h1>
+          <p className="mt-1 text-sm text-zinc-500">{t("clubs.sub")}</p>
         </div>
         <button onClick={() => setForm((v) => !v)}
           className="flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700">
           <Plus className="h-4 w-4" />
-          {tab === "defis" ? "Créer un défi" : "Créer un club"}
+          {tab === "defis" ? t("clubs.newDefi") : t("clubs.newClub")}
         </button>
       </header>
 
       <div className="mb-5 flex gap-1 rounded-xl bg-zinc-100 p-1">
-        {([["defis", `Défis${defis.length ? ` · ${defis.length}` : ""}`], ["clubs", `Clubs${clubs.length ? ` · ${clubs.length}` : ""}`]] as const).map(([k, label]) => (
+        {([["defis", `${t("clubs.tab.defis")}${defis.length ? ` · ${defis.length}` : ""}`], ["clubs", `${t("clubs.tab.clubs")}${clubs.length ? ` · ${clubs.length}` : ""}`]] as const).map(([k, label]) => (
           <button key={k} onClick={() => { setTab(k); setForm(false); }}
             className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition ${
               tab === k ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}>
@@ -58,24 +60,29 @@ export function ClubsHub({ clubs, defis }: { clubs: ClubVue[]; defis: DefiVue[] 
       {form && (tab === "defis" ? <FormDefi clubs={clubs} onDone={() => setForm(false)} /> : <FormClub onDone={() => setForm(false)} />)}
 
       {tab === "defis"
-        ? (defis.length ? <div className="space-y-3">{defis.map((d) => <CarteDefi key={d.id} d={d} />)}</div> : <Vide quoi="défi" />)
-        : (clubs.length ? <div className="space-y-3">{clubs.map((c) => <CarteClub key={c.id} c={c} />)}</div> : <Vide quoi="club" />)}
+        ? (defis.length ? <div className="space-y-3">{defis.map((d) => <CarteDefi key={d.id} d={d} />)}</div> : <Vide titre={t("clubs.empty.defi")} />)
+        : (clubs.length ? <div className="space-y-3">{clubs.map((c) => <CarteClub key={c.id} c={c} />)}</div> : <Vide titre={t("clubs.empty.club")} />)}
     </div>
   );
 }
 
-function Vide({ quoi }: { quoi: string }) {
+// La phrase vide se construisait par CONCATÉNATION (« Aucun » + « défi » + « pour
+// l'instant ») : un montage qui ne survit pas à la traduction, l'allemand et l'espagnol
+// n'accordant ni ne plaçant les mots dans cet ordre. On passe la phrase entière.
+function Vide({ titre }: { titre: string }) {
+  const { t } = useT();
   return (
     <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-10 text-center">
-      <p className="font-semibold text-zinc-900">Aucun {quoi} pour l&apos;instant</p>
+      <p className="font-semibold text-zinc-900">{titre}</p>
       <p className="mx-auto mt-1 max-w-sm text-sm text-zinc-500">
-        Crée le premier avec le bouton en haut de page.
+        {t("clubs.empty.sub")}
       </p>
     </div>
   );
 }
 
 function CarteDefi({ d }: { d: DefiVue }) {
+  const { t, lang } = useT();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [joined, setJoined] = useState(d.joined);
@@ -92,10 +99,10 @@ function CarteDefi({ d }: { d: DefiVue }) {
 
   // Trois états bien distincts. « 0 jour restant » sur un défi clos pousserait à
   // sortir courir pour rien ; « 0 % » sur un défi à venir ressemblerait à un échec.
-  const etat = d.notStarted ? "À venir"
-    : d.daysLeft == null ? "Terminé"
-    : d.daysLeft === 0 ? "Dernier jour"
-    : `${d.daysLeft} j restants`;
+  const etat = d.notStarted ? t("clubs.state.soon")
+    : d.daysLeft == null ? t("clubs.state.over")
+    : d.daysLeft === 0 ? t("clubs.state.lastDay")
+    : t("clubs.state.left", { n: d.daysLeft });
 
   return (
     <article className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
@@ -107,11 +114,11 @@ function CarteDefi({ d }: { d: DefiVue }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-bold text-zinc-900">{d.name}</h2>
-            {d.done && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700">Réussi</span>}
+            {d.done && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700">{t("clubs.done")}</span>}
             {d.clubName && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-500">{d.clubName}</span>}
           </div>
           <p className="mt-0.5 text-xs text-zinc-500">
-            {metricLabel(d.metric)} · objectif {nb(d.target)} {metricUnit(d.metric)} · {etat}
+            {metricLabel(d.metric, lang)} · {t("clubs.goal")} {nb(d.target)} {metricUnit(d.metric, lang)} · {etat}
           </p>
           {d.description && <p className="mt-1 text-sm text-zinc-600">{d.description}</p>}
         </div>
@@ -119,7 +126,7 @@ function CarteDefi({ d }: { d: DefiVue }) {
           className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold transition ${
             joined ? "border border-zinc-200 text-zinc-600 hover:border-red-200 hover:text-red-600"
                    : "bg-emerald-600 text-white hover:bg-emerald-700"} disabled:opacity-40`}>
-          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : joined ? "Inscrit" : "Participer"}
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : joined ? t("clubs.joined") : t("clubs.join")}
         </button>
       </div>
 
@@ -127,7 +134,7 @@ function CarteDefi({ d }: { d: DefiVue }) {
         <div className="mb-1 flex items-baseline justify-between text-xs">
           {/* La valeur RÉELLE, jamais plafonnée : 150 km sur un défi de 100 doit
               s'afficher 150, même si la barre, elle, est pleine. */}
-          <span className="font-bold text-zinc-900">{nb(d.value)} {metricUnit(d.metric)}</span>
+          <span className="font-bold text-zinc-900">{nb(d.value)} {metricUnit(d.metric, lang)}</span>
           <span className="text-zinc-400">{Math.round(d.ratio * 100)} %</span>
         </div>
         <div className="h-2 overflow-hidden rounded-full bg-zinc-100">
@@ -142,7 +149,7 @@ function CarteDefi({ d }: { d: DefiVue }) {
       {d.classement.length > 1 ? (
         <div className="border-t border-zinc-100">
           <div className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
-            Classement · {d.classement.length} participants
+            {t("clubs.ranking", { n: d.classement.length })}
           </div>
           <div className="divide-y divide-zinc-50">
             {d.classement.slice(0, 8).map((l) => (
@@ -150,11 +157,11 @@ function CarteDefi({ d }: { d: DefiVue }) {
                 l.userId === d.moi ? "bg-emerald-50/60" : ""}`}>
                 <span className="w-6 shrink-0 text-center font-bold text-zinc-400">{l.rank}</span>
                 <span className="min-w-0 flex-1 truncate text-zinc-800">
-                  {l.name}{l.userId === d.moi && <span className="ml-1 text-xs text-emerald-600">(toi)</span>}
+                  {l.name}{l.userId === d.moi && <span className="ml-1 text-xs text-emerald-600">{t("clubs.you")}</span>}
                 </span>
                 {l.done && <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" />}
                 <span className="shrink-0 tabular-nums font-semibold text-zinc-900">
-                  {nb(l.value)} <span className="text-xs font-normal text-zinc-400">{metricUnit(d.metric)}</span>
+                  {nb(l.value)} <span className="text-xs font-normal text-zinc-400">{metricUnit(d.metric, lang)}</span>
                 </span>
               </div>
             ))}
@@ -162,7 +169,7 @@ function CarteDefi({ d }: { d: DefiVue }) {
         </div>
       ) : d.joined && (
         <p className="border-t border-zinc-100 px-4 py-2 text-[11px] text-zinc-400">
-          Tu es seul inscrit — le classement apparaîtra dès qu&apos;un autre athlète participera.
+          {t("clubs.alone")}
         </p>
       )}
     </article>
@@ -170,6 +177,7 @@ function CarteDefi({ d }: { d: DefiVue }) {
 }
 
 function CarteClub({ c }: { c: ClubVue }) {
+  const { t } = useT();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [joined, setJoined] = useState(c.joined);
@@ -182,7 +190,7 @@ function CarteClub({ c }: { c: ClubVue }) {
       body: JSON.stringify({ clubId: c.id }),
     });
     const j = await r.json();
-    if (r.ok) { setJoined((v) => !v); router.refresh(); } else setErr(j.error ?? "Action impossible");
+    if (r.ok) { setJoined((v) => !v); router.refresh(); } else setErr(j.error ?? t("clubs.err.action"));
     setBusy(false);
   }
 
@@ -195,22 +203,22 @@ function CarteClub({ c }: { c: ClubVue }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-bold text-zinc-900">{c.name}</h2>
-            {c.role === "owner" && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700">Propriétaire</span>}
-            {c.visibility === "private" && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-500">Privé</span>}
+            {c.role === "owner" && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700">{t("clubs.owner")}</span>}
+            {c.visibility === "private" && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-500">{t("clubs.private")}</span>}
           </div>
           <p className="mt-0.5 flex items-center gap-2 text-xs text-zinc-500">
-            {c.member_count} membre{c.member_count > 1 ? "s" : ""}
+            {c.member_count > 1 ? t("clubs.members", { n: c.member_count }) : t("clubs.member1", { n: c.member_count })}
             {c.city && <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{c.city}</span>}
           </p>
           {c.description && <p className="mt-1 text-sm text-zinc-600">{c.description}</p>}
           {err && <p className="mt-1 text-xs text-red-600">{err}</p>}
         </div>
         <button onClick={toggle} disabled={busy || c.role === "owner"}
-          title={c.role === "owner" ? "Le propriétaire ne peut pas quitter son club" : undefined}
+          title={c.role === "owner" ? t("clubs.ownerCantLeave") : undefined}
           className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold transition ${
             joined ? "border border-zinc-200 text-zinc-600" : "bg-emerald-600 text-white hover:bg-emerald-700"} disabled:opacity-40`}>
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            : joined ? <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" />Membre</span> : "Rejoindre"}
+            : joined ? <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" />{t("clubs.memberBtn")}</span> : t("clubs.joinClub")}
         </button>
       </div>
     </article>
@@ -218,6 +226,7 @@ function CarteClub({ c }: { c: ClubVue }) {
 }
 
 function FormClub({ onDone }: { onDone: () => void }) {
+  const { t } = useT();
   const router = useRouter();
   const [name, setName] = useState(""); const [city, setCity] = useState("");
   const [desc, setDesc] = useState(""); const [prive, setPrive] = useState(false);
@@ -230,28 +239,28 @@ function FormClub({ onDone }: { onDone: () => void }) {
       body: JSON.stringify({ name, city, description: desc, visibility: prive ? "private" : "public" }),
     });
     const j = await r.json();
-    if (!r.ok) { setErr(j.error ?? "Création impossible"); setBusy(false); return; }
+    if (!r.ok) { setErr(j.error ?? t("clubs.err.create")); setBusy(false); return; }
     onDone(); router.refresh(); setBusy(false);
   }
 
   return (
     <div className="mb-5 space-y-3 rounded-2xl border border-zinc-200 bg-white p-4">
-      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom du club" autoFocus
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("clubs.f.name")} autoFocus
         className="w-full rounded-xl border border-zinc-200 p-3 text-sm outline-none focus:border-emerald-400" />
-      <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ville (facultatif)"
+      <input value={city} onChange={(e) => setCity(e.target.value)} placeholder={t("clubs.f.city")}
         className="w-full rounded-xl border border-zinc-200 p-3 text-sm outline-none focus:border-emerald-400" />
-      <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} placeholder="Description (facultatif)"
+      <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} placeholder={t("clubs.f.desc")}
         className="w-full resize-none rounded-xl border border-zinc-200 p-3 text-sm outline-none focus:border-emerald-400" />
       <label className="flex items-center gap-2 text-xs text-zinc-600">
         <input type="checkbox" checked={prive} onChange={(e) => setPrive(e.target.checked)} />
-        Club privé (invisible dans l&apos;annuaire)
+        {t("clubs.f.private")}
       </label>
       {err && <p className="text-xs text-red-600">{err}</p>}
       <div className="flex justify-end gap-2">
-        <button onClick={onDone} className="rounded-lg px-3 py-1.5 text-xs text-zinc-500">Annuler</button>
+        <button onClick={onDone} className="rounded-lg px-3 py-1.5 text-xs text-zinc-500">{t("club.cancel")}</button>
         <button onClick={creer} disabled={busy || name.trim().length < 2}
           className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">
-          {busy ? "Création…" : "Créer le club"}
+          {busy ? t("clubs.creating") : t("clubs.createClub")}
         </button>
       </div>
     </div>
@@ -259,6 +268,7 @@ function FormClub({ onDone }: { onDone: () => void }) {
 }
 
 function FormDefi({ clubs, onDone }: { clubs: ClubVue[]; onDone: () => void }) {
+  const { t, lang } = useT();
   const router = useRouter();
   const aujourdhui = new Date().toISOString().slice(0, 10);
   const dansUnMois = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
@@ -275,25 +285,25 @@ function FormDefi({ clubs, onDone }: { clubs: ClubVue[]; onDone: () => void }) {
       body: JSON.stringify({ name, metric, target: Number(target), startsOn, endsOn, clubId: clubId || undefined }),
     });
     const j = await r.json();
-    if (!r.ok) { setErr(j.error ?? "Création impossible"); setBusy(false); return; }
+    if (!r.ok) { setErr(j.error ?? t("clubs.err.create")); setBusy(false); return; }
     onDone(); router.refresh(); setBusy(false);
   }
 
   return (
     <div className="mb-5 space-y-3 rounded-2xl border border-zinc-200 bg-white p-4">
-      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom du défi — ex. 100 km en janvier" autoFocus
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("clubs.f.defiName")} autoFocus
         className="w-full rounded-xl border border-zinc-200 p-3 text-sm outline-none focus:border-emerald-400" />
       <div className="grid gap-3 sm:grid-cols-2">
         <select value={metric} onChange={(e) => setMetric(e.target.value as Metric)}
           className="rounded-xl border border-zinc-200 p-3 text-sm outline-none">
           {(["distance", "elevation", "sessions", "longest_run"] as Metric[]).map((m) => (
-            <option key={m} value={m}>{metricLabel(m)}</option>
+            <option key={m} value={m}>{metricLabel(m, lang)}</option>
           ))}
         </select>
         <div className="flex items-center gap-2">
           <input value={target} onChange={(e) => setTarget(e.target.value)} type="number" min="1"
             className="w-full rounded-xl border border-zinc-200 p-3 text-sm outline-none focus:border-emerald-400" />
-          <span className="shrink-0 text-xs text-zinc-500">{metricUnit(metric)}</span>
+          <span className="shrink-0 text-xs text-zinc-500">{metricUnit(metric, lang)}</span>
         </div>
         <input type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)}
           className="rounded-xl border border-zinc-200 p-3 text-sm outline-none" />
@@ -303,16 +313,16 @@ function FormDefi({ clubs, onDone }: { clubs: ClubVue[]; onDone: () => void }) {
       {clubs.some((c) => c.joined) && (
         <select value={clubId} onChange={(e) => setClubId(e.target.value)}
           className="w-full rounded-xl border border-zinc-200 p-3 text-sm outline-none">
-          <option value="">Ouvert à tous</option>
-          {clubs.filter((c) => c.joined).map((c) => <option key={c.id} value={c.id}>Réservé au club {c.name}</option>)}
+          <option value="">{t("clubs.openAll")}</option>
+          {clubs.filter((c) => c.joined).map((c) => <option key={c.id} value={c.id}>{t("clubs.reserved", { name: c.name })}</option>)}
         </select>
       )}
       {err && <p className="text-xs text-red-600">{err}</p>}
       <div className="flex justify-end gap-2">
-        <button onClick={onDone} className="rounded-lg px-3 py-1.5 text-xs text-zinc-500">Annuler</button>
+        <button onClick={onDone} className="rounded-lg px-3 py-1.5 text-xs text-zinc-500">{t("club.cancel")}</button>
         <button onClick={creer} disabled={busy || name.trim().length < 2 || !(Number(target) > 0)}
           className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">
-          {busy ? "Création…" : "Créer le défi"}
+          {busy ? t("clubs.creating") : t("clubs.createDefi")}
         </button>
       </div>
     </div>

@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
 // Page publique : reçoit en temps réel la position d'un coureur qui partage sa
 // sortie (Supabase Realtime broadcast) et l'affiche bouger sur la carte.
 export function LiveViewer({ id }: { id: string }) {
+  const { t } = useT();
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<unknown>(null);
   const dotRef = useRef<unknown>(null);
@@ -90,7 +92,7 @@ export function LiveViewer({ id }: { id: string }) {
         )}
       </div>
       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000] text-[11px] text-zinc-500 bg-white/90 px-3 py-1 rounded-full">
-        Pacevo · données © OpenStreetMap
+        {t("map.osm")}
       </div>
     </div>
   );

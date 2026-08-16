@@ -6,7 +6,8 @@ import { Search, X, CornerDownLeft } from "lucide-react";
 export type SearchItem = { slug: string; term: string; short?: string; chapter: string; color: string };
 
 // Recherche instantanée dans toutes les notions du cours → saute à la carte (avec flash).
-export function CoursSearch({ items, placeholder = "Chercher une notion…", emptyText = "Aucune notion trouvée." }: { items: SearchItem[]; placeholder?: string; emptyText?: string }) {
+// Même raison qu'AskCoachButton : les défauts français n'étaient jamais atteints.
+export function CoursSearch({ items, placeholder, emptyText }: { items: SearchItem[]; placeholder: string; emptyText: string }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);

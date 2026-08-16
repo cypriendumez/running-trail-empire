@@ -79,7 +79,7 @@ function Favicon({ src, name, className = "h-4 w-4" }: { src?: string; name: str
 }
 
 export function CommunityFeed() {
-  const { lang } = useT();
+  const { t, lang } = useT();
   const tr = (k: string) => L[lang]?.[k] ?? L.fr[k] ?? k;
   const [cat, setCat] = useState<Cat>("all");
   const [items, setItems] = useState<Item[]>([]);
@@ -165,8 +165,8 @@ export function CommunityFeed() {
         <div className="mb-3 flex items-start gap-3 sm:mb-0">
           <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-emerald-100"><Mail className="h-5 w-5 text-emerald-600" /></span>
           <div>
-            <h3 className="font-bold text-zinc-900">Reçois nos articles & conseils course</h3>
-            <p className="text-sm text-zinc-500">Entraînement, trail, matériel, nutrition — dans ta boîte mail. Désinscription en un clic.</p>
+            <h3 className="font-bold text-zinc-900">{t("news.title")}</h3>
+            <p className="text-sm text-zinc-500">{t("news.sub")}</p>
           </div>
         </div>
         <div className="w-full sm:max-w-sm"><NewsletterSignup /></div>

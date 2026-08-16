@@ -135,24 +135,50 @@ export default function LandingPage() {
 
       {/* ── NAV ── */}
       <nav className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${solidNav ? "bg-white/90 backdrop-blur-xl border-b border-zinc-200/70" : "bg-transparent"}`}>
-        <Container className="flex h-16 items-center justify-between gap-3">
-          <Link href="/" className="flex items-center gap-2.5" onClick={() => setMenuOpen(false)}>
+        {/* Grille en TROIS colonnes plutôt que `justify-between` : les deux colonnes
+            extérieures ont la même largeur (`1fr`), donc le groupe de liens est
+            optiquement centré dans la barre. Avec `justify-between`, sa position
+            dépendait de la longueur des libellés — elle changeait à chaque langue, et
+            « Fonctionnalités » (FR) contre « Features » (EN) suffisait à décaler tout le
+            bloc. C'est ce désalignement qui donnait l'impression de rangement bâclé. */}
+        <Container className="grid h-16 grid-cols-[auto_1fr_auto] items-center gap-4 md:grid-cols-[1fr_auto_1fr]">
+          <Link href="/" className="flex items-center gap-2.5 justify-self-start" onClick={() => setMenuOpen(false)}>
             <Logo size={30} />
             <Wordmark tone={solidNav ? "dark" : "light"} className="text-xl" />
           </Link>
-          <div className={`hidden md:flex items-center gap-8 text-sm font-medium ${solidNav ? "text-zinc-500" : "text-white/80"}`}>
+          <div className={`hidden md:flex items-center justify-center gap-7 text-sm font-medium ${solidNav ? "text-zinc-500" : "text-white/80"}`}>
             <a href="#programmes" className={navLink}>{L.nav.programs}</a>
             <a href="#features" className={navLink}>{L.nav.features}</a>
             <a href="#tarifs" className={navLink}>{L.nav.pricing}</a>
             <Link href="/blog" className={navLink}>{L.nav.blog}</Link>
             <Link href="/avis" className={navLink}>{L.nav.reviews}</Link>
           </div>
-          <div className="flex items-center gap-1 sm:gap-2">
+          {/* Espacement RÉGULIER (gap-2 partout) et un filet vertical qui sépare le choix
+              de langue des actions de compte — trois éléments de natures différentes
+              collés au même pas se lisaient comme une liste sans hiérarchie. */}
+          <div className="flex items-center justify-self-end gap-2">
             <LanguageSwitcher light={!solidNav} />
-            <Link href="/login" className={`hidden sm:inline-flex px-3 py-2 text-sm font-medium transition-colors ${solidNav ? "text-zinc-600 hover:text-zinc-900" : "text-white/90 hover:text-white"}`}>
+            <span aria-hidden className={`hidden sm:block h-4 w-px ${solidNav ? "bg-zinc-200" : "bg-white/25"}`} />
+            <Link href="/login" className={`hidden sm:inline-flex rounded-lg px-2.5 py-2 text-sm font-medium transition-colors ${solidNav ? "text-zinc-600 hover:text-zinc-900" : "text-white/90 hover:text-white"}`}>
               {L.nav.login}
             </Link>
-            <Link href="/signup" className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-semibold transition-colors ${solidNav ? "bg-zinc-900 text-white hover:bg-zinc-800" : "bg-white text-zinc-900 hover:bg-white/90"}`}>
+            {/* Sur la photo, ce bouton était un rectangle BLANC PLEIN posé en haut à
+                droite : il découpait un trou dans l'image et masquait l'ombre du coureur
+                qui passe à cet endroit. En verre dépoli, il reste parfaitement lisible
+                (bord blanc + flou) tout en laissant voir la piste au travers. Il ne
+                devient plein — et sombre — qu'une fois la barre solide au défilement,
+                là où il n'y a plus de photo à cacher. */}
+            <Link
+              href="/signup"
+              // `whitespace-nowrap` : sur 375 px, la colonne de droite se resserrait
+              // assez pour couper « Essai gratuit » en deux lignes, ce qui gonflait la
+              // barre à 80 px de haut et écrasait tout le reste.
+              className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition-all duration-300 sm:px-4 sm:py-2 sm:text-[13px] ${
+                solidNav
+                  ? "bg-zinc-900 text-white hover:bg-zinc-800"
+                  : "border border-white/45 bg-white/10 text-white backdrop-blur-md hover:border-white/70 hover:bg-white/20"
+              }`}
+            >
               {L.nav.trial} <ArrowRight className="h-3.5 w-3.5" />
             </Link>
             <button
@@ -202,11 +228,30 @@ export default function LandingPage() {
         <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/50 to-transparent" />
 
         <Container className="relative z-10 pb-20 pt-28 sm:pb-24">
-          <div className="max-w-2xl">
-            <h1 className="text-5xl font-bold leading-[1.02] tracking-tight text-white sm:text-6xl lg:text-7xl">
-              {L.hero.titleA}<br />{L.hero.titleB}<span className="text-[#34d399]">{L.hero.accent}</span>.
+          {/* `max-w-3xl` et non `2xl` : la seconde ligne du titre (« repousse ta VO₂max. »)
+              débordait de 672 px et repartait à la ligne — trois lignes au lieu de deux,
+              par ACCIDENT et non par choix. Le point de rupture variait en plus selon la
+              langue : « steigere deine VO₂max. » est un tiers plus long que l'espagnol.
+              Largeur portée à 768 px et corps ramené à 68 px : les cinq langues tiennent. */}
+          <div className="max-w-3xl">
+            {/* L'équation de marque, en surtitre : elle explique le nom AVANT que le
+                titre ne le reprenne. Le point émeraude fait le lien visuel avec le « v »
+                du logo, juste au-dessus dans la barre. */}
+            <p className="mb-5 flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/55">
+              <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full bg-[#34d399]" />
+              {L.hero.eyebrow}
+            </p>
+            {/* Corps mobile ramené à 34 px : à 42 px, « Trouve ton allure, » ne tenait pas
+                dans les 327 px utiles d'un iPhone et se coupait en « Trouve ton / allure, »
+                — une césure au milieu du groupe de mots, là où la ligne devrait respirer. */}
+            <h1 className="text-[2.1rem] font-bold leading-[1.06] tracking-tight text-white sm:text-5xl md:text-6xl lg:text-[4.25rem]">
+              {L.hero.titleA}<br />{L.hero.titleB}
+              {/* Le mot accentué porte le nom du produit : on lui donne le vert du logo
+                  et une ombre portée, sans quoi l'émeraude sur une piste rouge perd son
+                  contraste dès que le soleil de la photo passe derrière. */}
+              <span className="text-[#34d399] [text-shadow:0_2px_24px_rgba(0,0,0,0.45)]">{L.hero.accent}</span>.
             </h1>
-            <p className="mt-6 max-w-lg text-lg leading-relaxed text-white/75">
+            <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/80">
               {L.hero.subtitle}
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">

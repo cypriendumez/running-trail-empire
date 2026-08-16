@@ -14,7 +14,14 @@ export function Wordmark({
   style?: CSSProperties;
 }) {
   const base = tone === "light" ? "text-white" : "text-zinc-900";
-  const accent = tone === "light" ? "text-[#34d399]" : "text-[#059669]";
+  // Le « v » ÉTAIT déjà en émeraude, mais il ne se LISAIT pas comme tel : #34d399 est un
+  // vert menthe pâle, et posé en Anton à 20 px au milieu de capitales blanches, sur la
+  // piste rouge chaude du hero, l'œil le range avec le blanc. On monte donc la saturation
+  // (#10d68a) et on décolle la lettre du fond par une ombre portée sur fond sombre — la
+  // couleur ne suffit pas, c'est le CONTRASTE avec les lettres voisines qui manquait.
+  const accent = tone === "light"
+    ? "text-[#10d68a] [text-shadow:0_1px_10px_rgba(0,0,0,0.35)]"
+    : "text-[#059669]";
   return (
     <span
       className={`font-sport uppercase tracking-[-0.01em] leading-none select-none ${base} ${className}`}

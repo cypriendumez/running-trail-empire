@@ -12,7 +12,7 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 import { AUTH } from "@/components/auth/authI18n";
 
 export default function ForgotPasswordPage() {
-  const { lang } = useT();
+  const { t, lang } = useT();
   const L = (AUTH[lang] ?? AUTH.fr).forgot;
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -57,7 +57,7 @@ export default function ForgotPasswordPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="vous@exemple.com"
+                placeholder={t("auth.emailPh")}
                 required
                 className="w-full px-4 py-3 rounded-xl border border-zinc-200 bg-white text-sm
                            focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent

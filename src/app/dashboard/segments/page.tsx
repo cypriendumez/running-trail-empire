@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { PerfTabs } from "@/components/segments/PerfTabs";
 import { leaderboard, maitreDuSegment, type StoredEffort } from "@/lib/segments/match";
 import { SegmentList, type SegmentVue } from "@/components/segments/SegmentList";
+import { getAccountLang } from "@/lib/i18n/serverLang";
+import { T, fill } from "@/lib/i18n/translations";
 
 export const metadata = { title: "Segments | Pacevo" };
 
@@ -17,6 +19,7 @@ export default async function SegmentsPage() {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect("/login");
+  const d = T[await getAccountLang(sb, user.id)];
 
   const { data: segments, error } = await sb.from("segments")
     .select("id, name, distance_m, elevation_gain_m, avg_grade_pct, polyline")
@@ -27,8 +30,8 @@ export default async function SegmentsPage() {
   if (error) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-16 text-center">
-        <p className="text-lg font-bold text-zinc-900">Segments en attente d&apos;activation</p>
-        <p className="mt-2 text-sm text-zinc-500">La base de données des segments n&apos;est pas encore en place.</p>
+        <p className="text-lg font-bold text-zinc-900">{d["seg.off.title"]}</p>
+        <p className="mt-2 text-sm text-zinc-500">{d["seg.off.sub"]}</p>
       </div>
     );
   }
@@ -70,11 +73,11 @@ export default async function SegmentsPage() {
     <div className="mx-auto w-full max-w-4xl px-4 py-8">
       <PerfTabs />
       <header className="mb-6">
-        <h1 className="text-3xl font-black tracking-tight text-zinc-900">Segments</h1>
+        <h1 className="text-3xl font-black tracking-tight text-zinc-900">{d["seg.title"]}</h1>
         <p className="mt-1 text-sm text-zinc-500">
           {vues.length > 0
-            ? `${vues.length} portions détectées dans ton historique, chacune parcourue plusieurs fois.`
-            : "Aucun segment détecté pour l'instant."}
+            ? fill(d["seg.sub"], { n: vues.length })
+            : d["seg.empty"]}
         </p>
       </header>
       <SegmentList segments={vues} />

@@ -109,66 +109,30 @@ function chainesVisibles(code: string): string[] {
 }
 
 /**
- * DETTE CONNUE — relevée le 16/08/2026, à résorber écran par écran.
+ * FRANÇAIS DÉLIBÉRÉ — ces chaînes NE DOIVENT PAS être traduites, et la raison est écrite
+ * en face de chacune. Elles sont listées ici plutôt que dans la dette parce que ce ne
+ * sont pas des oublis : les confondre reviendrait à porter au débit du produit un choix
+ * assumé, et à pousser un jour quelqu'un à « corriger » une mention légale.
+ */
+const HORS_TRADUCTION: Record<string, string> = {
+  "Trouve ton allure,": "image de partage social, unique et statique, déclarée locale fr_FR",
+  "Plan réécrit à chaque synchro · VFC, sommeil, charge · Sur ta montre": "même image de partage",
+  "14 000+ courses · 15 700 parcours": "même image de partage",
+  "Tracé © les contributeurs OpenStreetMap (ODbL)": "mention légale ÉCRITE DANS LE FICHIER GPX exporté, pas à l'écran — la licence ODbL impose l'attribution, la traduire l'affaiblirait",
+};
+
+/**
+ * DETTE CONNUE — chaînes françaises en dur qu'on accepte TEMPORAIREMENT.
+ *
+ * Elle est VIDE, et c'est tout l'intérêt : les 52 chaînes relevées le 16/08/2026 ont été
+ * traduites. Toute chaîne française qui apparaît désormais dans un écran athlète fait
+ * échouer la suite, sans exception à négocier.
  *
  * ⚠️ N'AJOUTE RIEN ICI pour faire passer le test. Une entrée de plus, c'est une chaîne de
  * plus qu'un athlète allemand lira en français. Traduis-la ; puis retire-la de cette
  * liste, ce que le test t'obligera de toute façon à faire.
  */
-const DETTE_CONNUE: string[] = [
-  "Ajouter des amis",  // src/components/social/SocialHub.tsx
-  "Approfondir avec le coach",  // src/components/cours/AskCoachButton.tsx
-  "Athlètes ·",  // src/components/social/SocialHub.tsx
-  "Aucun athlète ne correspond à «",  // src/components/social/SocialHub.tsx
-  "Aucun commentaire — sois le premier.",  // src/components/social/SocialHub.tsx
-  "Carte de chaleur",  // src/app/dashboard/heatmap/page.tsx
-  "Cette sortie ne contient pas assez de points GPS pour un survol.",  // src/components/segments/SurvolChoix.tsx
-  "Chercher un athlète par son nom…",  // src/components/social/SocialHub.tsx
-  "Chercher une notion…",  // src/components/cours/CoursSearch.tsx
-  "Choisir une sortie",  // src/components/segments/SurvolChoix.tsx
-  "Courez plus loin.",  // src/app/opengraph-image.tsx
-  "Cours en groupe, et donne-toi des objectifs datés.",  // src/components/clubs/ClubsHub.tsx
-  "Crée le premier avec le bouton en haut de page.",  // src/components/clubs/ClubsHub.tsx
-  "Entraînement, trail, matériel, nutrition — dans ta boîte mail. Désinscription en un clic.",  // src/components/community/CommunityFeed.tsx
-  "Inclus, sans abonnement.",  // src/app/dashboard/survol/page.tsx
-  "Inscription confirmée — tu recevras nos articles par e-mail.",  // src/components/NewsletterSignup.tsx
-  "Joindre une séance",  // src/components/social/SocialHub.tsx
-  "L'APP RUNNING LA PLUS AVANCÉE · 2026",  // src/app/opengraph-image.tsx
-  "La carte se construit à partir des traces GPS importées depuis ta montre. Lance une synchronisation, puis reviens.",  // src/app/dashboard/heatmap/page.tsx
-  "Le Club",  // src/components/social/SocialHub.tsx
-  "Le coach IA approfondit ce chapitre avec TES données",  // src/components/cours/AskCoachButton.tsx
-  "Les sorties de ceux que tu suis, et les tiennes.",  // src/components/social/SocialHub.tsx
-  "Les traces GPS ne sont pas accessibles pour le moment.",  // src/app/dashboard/heatmap/page.tsx
-  "Maître du segment",  // src/components/segments/SegmentList.tsx
-  "Mon temps",  // src/components/segments/SegmentList.tsx
-  "Nom du club",  // src/components/clubs/ClubsHub.tsx
-  "Nom du défi — ex. 100 km en janvier",  // src/components/clubs/ClubsHub.tsx
-  "Ouvert à tous",  // src/components/clubs/ClubsHub.tsx
-  "Pacevo · données © OpenStreetMap",  // src/components/parcours/LiveViewer.tsx
-  "Partager une séance…",  // src/components/social/SocialHub.tsx
-  "Rejoue ta sortie vue du ciel, relief compris.",  // src/app/dashboard/survol/page.tsx
-  "Reçois nos articles & conseils course",  // src/components/community/CommunityFeed.tsx
-  "Rien dans",  // src/components/social/SocialHub.tsx
-  "Rien à afficher",  // src/app/dashboard/heatmap/page.tsx
-  "Réservé au club",  // src/components/clubs/ClubsHub.tsx
-  "Séance enregistrée sans mesure détaillée.",  // src/components/social/SocialHub.tsx
-  "Temps intermédiaires",  // src/components/activity/StravaBlocks.tsx
-  "Tracé © les contributeurs OpenStreetMap (ODbL)",  // src/components/parcours/ParcoursBrowser.tsx
-  "Trouver des athlètes",  // src/components/social/SocialHub.tsx
-  "arrêt",  // src/components/activity/StravaBlocks.tsx
-  "passages au même endroit.",  // src/app/dashboard/heatmap/page.tsx
-  "passages sur 90 jours",  // src/components/segments/SegmentList.tsx
-  "portions détectées dans ton historique, chacune parcourue plusieurs fois.",  // src/app/dashboard/segments/page.tsx
-  "portions parcourues · jusqu'à",  // src/app/dashboard/heatmap/page.tsx
-  "sorties superposées ·",  // src/app/dashboard/heatmap/page.tsx
-  "ton@email.com",  // src/components/NewsletterSignup.tsx
-  "trophées, tous calculés sur tes séances réelles.",  // src/app/dashboard/trophees/page.tsx
-  "vous@exemple.com",  // src/app/(auth)/forgot-password/page.tsx
-  "· objectif",  // src/components/clubs/ClubsHub.tsx
-  "Écrire un commentaire…",  // src/components/social/SocialHub.tsx
-  "Élév.",  // src/components/activity/StravaBlocks.tsx
-  "ᵉ sur",  // src/components/activity/SessionSegments.tsx
-];
+const DETTE_CONNUE: string[] = [];
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log("\nI18N — aucun texte français en dur dans un écran athlète");
@@ -187,8 +151,37 @@ if (process.env.I18N_DUMP) {
   process.exit(0);
 }
 
+test("toute clé APPELÉE existe dans le dictionnaire", () => {
+  // Le repli de `t()` renvoie la CLÉ quand elle est absente : une faute de frappe
+  // n'échoue pas, elle affiche « club.tite » à l'athlète. C'est le mode de panne le plus
+  // silencieux de tout le système de traduction, et rien ne le surveillait.
+  //
+  // On couvre les deux façons d'appeler : `t("clé")` côté client, et `d["clé"]` dans les
+  // pages serveur, qui lisent `T[lang]` directement faute de provider.
+  // ⚠️ Chaque motif est restreint à SON idiome, sinon il attrape des homonymes : la
+  // moitié des écrans ont un dictionnaire LOCAL rangé dans une variable `d`, et le Ghost
+  // Runner écrit `d["t.saved"]` pour sa propre table. Un premier jet sans ces gardes
+  // signalait 302 fausses clés manquantes — le test aurait été mis à la poubelle.
+  const VIENT_DE_USET = /const\s*\{[^}]*\bt\b[^}]*\}\s*=\s*useT\(\)/;
+  const D_EST_LE_DICO = /const\s+d\s*=\s*T\[/;
+
+  const inconnues: string[] = [];
+  for (const f of fichiersEcrans(SRC)) {
+    const code = sansCommentaires(readFileSync(f, "utf8"));
+    const cles: string[] = [];
+    if (VIENT_DE_USET.test(code)) cles.push(...[...code.matchAll(/\bt\(\s*"([\w.]+)"/g)].map((m) => m[1]));
+    if (D_EST_LE_DICO.test(code)) cles.push(...[...code.matchAll(/\bd\[\s*"([\w.]+)"\s*\]/g)].map((m) => m[1]));
+    for (const k of cles) {
+      // Une clé porte toujours un point : `t("x")` sans point est autre chose.
+      if (!k.includes(".")) continue;
+      if (T.fr[k] === undefined) inconnues.push(`${k}  →  ${relative(ROOT, f)}`);
+    }
+  }
+  assert.equal(inconnues.length, 0, `${inconnues.length} clé(s) appelée(s) sans entrée française :\n    ${inconnues.slice(0, 10).join("\n    ")}`);
+});
+
 test("aucune chaîne française en dur hors de la dette recensée", () => {
-  const connues = new Set(DETTE_CONNUE);
+  const connues = new Set([...DETTE_CONNUE, ...Object.keys(HORS_TRADUCTION)]);
   const nouvelles = [...releve.entries()].filter(([s]) => !connues.has(s));
   const detail = nouvelles.slice(0, 12).map(([s, fs]) => `\n    « ${s} »  →  ${fs[0]}`).join("");
   assert.equal(
@@ -198,10 +191,10 @@ test("aucune chaîne française en dur hors de la dette recensée", () => {
 });
 
 test("la dette ne contient rien de périmé (la liste ne peut que rétrécir)", () => {
-  const perimees = DETTE_CONNUE.filter((s) => !releve.has(s));
+  const perimees = [...DETTE_CONNUE, ...Object.keys(HORS_TRADUCTION)].filter((s) => !releve.has(s));
   assert.equal(
     perimees.length, 0,
-    `${perimees.length} entrée(s) de DETTE_CONNUE ne sont plus dans le code : retire-les.${perimees.slice(0, 8).map((s) => `\n    « ${s} »`).join("")}`,
+    `${perimees.length} entrée(s) recensée(s) ne sont plus dans le code : retire-les.${perimees.slice(0, 8).map((s) => `\n    « ${s} »`).join("")}`,
   );
 });
 

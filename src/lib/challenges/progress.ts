@@ -89,14 +89,37 @@ export function challengeProgress(
 }
 
 /** Libellé d'unité, pour ne jamais afficher un nombre nu. */
-export const metricUnit = (m: Metric): string =>
-  m === "distance" ? "km" : m === "elevation" ? "m D+" : m === "sessions" ? "séances" : "km";
+// Libellés des métriques de défi — l'écran Clubs & Défis les affichait en français quelle
+// que soit la langue du compte. Table locale (même parti pris que les autres domaines) :
+// ces quatre libellés n'ont de sens que dans cet écran.
+const METRIC_T: Record<string, { unit: Record<Metric, string>; label: Record<Metric, string> }> = {
+  fr: {
+    unit: { distance: "km", elevation: "m D+", sessions: "séances", longest_run: "km" },
+    label: { distance: "Distance cumulée", elevation: "Dénivelé cumulé", sessions: "Nombre de séances", longest_run: "Plus longue sortie" },
+  },
+  en: {
+    unit: { distance: "km", elevation: "m elev", sessions: "sessions", longest_run: "km" },
+    label: { distance: "Total distance", elevation: "Total elevation", sessions: "Number of sessions", longest_run: "Longest run" },
+  },
+  de: {
+    unit: { distance: "km", elevation: "Hm", sessions: "Einheiten", longest_run: "km" },
+    label: { distance: "Gesamtdistanz", elevation: "Gesamthöhenmeter", sessions: "Anzahl Einheiten", longest_run: "Längster Lauf" },
+  },
+  es: {
+    unit: { distance: "km", elevation: "m D+", sessions: "sesiones", longest_run: "km" },
+    label: { distance: "Distancia acumulada", elevation: "Desnivel acumulado", sessions: "Número de sesiones", longest_run: "Salida más larga" },
+  },
+  pt: {
+    unit: { distance: "km", elevation: "m D+", sessions: "treinos", longest_run: "km" },
+    label: { distance: "Distância acumulada", elevation: "Desnível acumulado", sessions: "Número de treinos", longest_run: "Treino mais longo" },
+  },
+};
 
-export const metricLabel = (m: Metric): string =>
-  m === "distance" ? "Distance cumulée"
-  : m === "elevation" ? "Dénivelé cumulé"
-  : m === "sessions" ? "Nombre de séances"
-  : "Plus longue sortie";
+export const metricUnit = (m: Metric, lang = "fr"): string =>
+  (METRIC_T[lang] ?? METRIC_T.fr).unit[m];
+
+export const metricLabel = (m: Metric, lang = "fr"): string =>
+  (METRIC_T[lang] ?? METRIC_T.fr).label[m];
 
 /**
  * Jours restants — `null` si le défi est terminé, 0 le dernier jour.

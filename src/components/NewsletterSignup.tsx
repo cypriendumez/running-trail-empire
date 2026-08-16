@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { Mail, Check, Loader2 } from "lucide-react";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
 // Formulaire d'inscription à la newsletter. Variante "dark" pour le footer sombre.
 export function NewsletterSignup({ variant = "light" }: { variant?: "light" | "dark" }) {
+  const { t } = useT();
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [msg, setMsg] = useState("");
@@ -28,7 +30,7 @@ export function NewsletterSignup({ variant = "light" }: { variant?: "light" | "d
   if (state === "done") {
     return (
       <div className={`flex items-center gap-2 text-sm font-medium ${dark ? "text-emerald-300" : "text-emerald-700"}`}>
-        <Check className="h-4 w-4" /> Inscription confirmée — tu recevras nos articles par e-mail.
+        <Check className="h-4 w-4" /> {t("news.confirmed")}
       </div>
     );
   }
@@ -38,7 +40,7 @@ export function NewsletterSignup({ variant = "light" }: { variant?: "light" | "d
         <div className="relative flex-1">
           <Mail className={`pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 ${dark ? "text-zinc-500" : "text-zinc-300"}`} />
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
-            placeholder="ton@email.com"
+            placeholder={t("news.emailPh")}
             className={`w-full rounded-xl border px-3 py-2.5 pl-9 text-sm outline-none transition-colors ${
               dark
                 ? "border-white/15 bg-white/10 text-white placeholder:text-zinc-500 focus:border-emerald-400 focus:bg-white/15"

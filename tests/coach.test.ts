@@ -2774,12 +2774,12 @@ test("les suggestions ne proposent jamais quelqu'un de déjà suivi", () => {
 });
 test("les temps relatifs basculent sur une date au-delà d'une semaine", () => {
   const now = new Date("2026-08-13T12:00:00Z");
-  assert.equal(timeAgo("2026-08-13T11:59:30Z", now), "à l'instant");
-  assert.equal(timeAgo("2026-08-13T11:30:00Z", now), "il y a 30 min");
-  assert.equal(timeAgo("2026-08-13T06:00:00Z", now), "il y a 6 h");
-  assert.equal(timeAgo("2026-08-10T12:00:00Z", now), "il y a 3 j");
-  assert.ok(!/il y a/.test(timeAgo("2025-09-01T12:00:00Z", now)), "« il y a 346 j » n'apprend rien");
-  assert.equal(timeAgo("pas-une-date", now), "");
+  assert.equal(timeAgo("2026-08-13T11:59:30Z", "fr", now), "à l'instant");
+  assert.equal(timeAgo("2026-08-13T11:30:00Z", "fr", now), "il y a 30 min");
+  assert.equal(timeAgo("2026-08-13T06:00:00Z", "fr", now), "il y a 6 h");
+  assert.equal(timeAgo("2026-08-10T12:00:00Z", "fr", now), "il y a 3 j");
+  assert.ok(!/il y a/.test(timeAgo("2025-09-01T12:00:00Z", "fr", now)), "« il y a 346 j » n'apprend rien");
+  assert.equal(timeAgo("pas-une-date", "fr", now), "");
 });
 test("les compteurs sociaux ne sont JAMAIS écrits par les routes", () => {
   // Ils sont tenus par trigger (migration 019). Une route qui oublie de décrémenter

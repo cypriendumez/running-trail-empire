@@ -7,6 +7,7 @@
 //  des efforts qui n'ont pas eu lieu.
 // ─────────────────────────────────────────────────────────────────────────────
 import { Medal, Crown } from "lucide-react";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
 export type EffortVue = {
   id: string;
@@ -28,6 +29,7 @@ const allure = (sec: number, m: number) => {
 };
 
 export function SessionSegments({ efforts }: { efforts: EffortVue[] }) {
+  const { t } = useT();
   if (!efforts.length) return null;
   return (
     <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
@@ -47,7 +49,7 @@ export function SessionSegments({ efforts }: { efforts: EffortVue[] }) {
                 {(e.distance_m / 1000).toFixed(2).replace(".", ",")} km · {allure(e.elapsed_seconds, e.distance_m)}
                 {/* Le rang n'est affiché QUE s'il existe ; « 1er sur 1 » resterait
                     exact mais flatteur, donc on précise toujours le total. */}
-                {e.rang != null && ` · ${e.rang}ᵉ sur ${e.total}`}
+                {e.rang != null && ` · ${t("seg.rank", { n: e.rang, total: e.total })}`}
               </div>
             </div>
             <span className="shrink-0 text-lg font-black tabular-nums text-zinc-900">{chrono(e.elapsed_seconds)}</span>

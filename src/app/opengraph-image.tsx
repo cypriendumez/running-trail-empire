@@ -50,25 +50,41 @@ export default function OpengraphImage() {
           >
             <span style={{ color: "#fff", fontSize: 50, fontWeight: 800 }}>P</span>
           </div>
-          <span style={{ color: "#fff", fontSize: 30, fontWeight: 700 }}>Pacevo</span>
+          {/* Le « v » émeraude, comme dans le wordmark du site : l'aperçu partagé et la
+              page doivent porter la même marque. */}
+          <span style={{ color: "#fff", fontSize: 30, fontWeight: 700, display: "flex" }}>
+            Pace<span style={{ color: "#10d68a" }}>v</span>o
+          </span>
         </div>
 
         {/* milieu : accroche */}
         <div style={{ display: "flex", flexDirection: "column" }}>
-          <span style={{ color: "#34d399", fontSize: 26, fontWeight: 700, letterSpacing: 2, marginBottom: 18 }}>
-            L'APP RUNNING LA PLUS AVANCÉE · 2026
+          {/* Ce surtitre annonçait « L'APP RUNNING LA PLUS AVANCÉE · 2026 » : un superlatif
+              que rien ne fonde, sur la SEULE image que voient WhatsApp, iMessage et X. La
+              landing avait été purgée de ce genre d'affirmation, pas l'aperçu social.
+              Remplacé par l'équation de marque, qui elle est vraie et explique le nom. */}
+          <span style={{ color: "#34d399", fontSize: 26, fontWeight: 700, letterSpacing: 3, marginBottom: 18 }}>
+            PACE + VO₂ MAX
           </span>
-          <span style={{ color: "#fff", fontSize: 92, fontWeight: 800, lineHeight: 1.0, letterSpacing: -2 }}>
-            Courez plus loin.
+          <span style={{ color: "#fff", fontSize: 78, fontWeight: 800, lineHeight: 1.05, letterSpacing: -2, display: "flex", flexDirection: "column" }}>
+            <span>Trouve ton allure,</span>
+            <span style={{ display: "flex" }}>
+              repousse ta&nbsp;<span style={{ color: "#10d68a" }}>VO₂max.</span>
+            </span>
           </span>
-          <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 34, marginTop: 24, lineHeight: 1.3 }}>
-            Coaching IA · Analyse VFC · Ghost Runner · Trail Builder SIG
+          {/* Tenu sur UNE ligne : à 83 caractères, la phrase repartait à la ligne pour y
+              laisser deux mots isolés, ce qui déséquilibrait le bas de l'image. */}
+          <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 30, marginTop: 24, lineHeight: 1.3 }}>
+            Plan réécrit à chaque synchro · VFC, sommeil, charge · Sur ta montre
           </span>
         </div>
 
         {/* bas : url + chips */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 26 }}>pacevo</span>
+          {/* Le nom figurait déjà en haut : le répéter ici ne disait rien. On met à la
+              place les deux seuls chiffres du site qui soient VÉRIFIABLES — ceux du
+              bandeau de la landing (`STAT_VALUES`), pas une promesse de plus. */}
+          <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 26 }}>14 000+ courses · 15 700 parcours</span>
           <div style={{ display: "flex", gap: 12 }}>
             {["Garmin", "Coros", "intervals.icu"].map(s => (
               <span

@@ -12,6 +12,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { splitPace, type Split } from "@/lib/segments/splits";
 import { SegmentMapLazy } from "@/components/segments/SegmentMapLazy";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
 export type Chiffre = { label: string; value: string };
 
@@ -26,6 +27,7 @@ export function StravaBlocks({ polyline, chiffres, splits, profil }: {
   splits: Split[];
   profil: { d: number; alt: number }[] | null;
 }) {
+  const { t } = useT();
   // Barres proportionnelles à l'allure : la plus rapide occupe toute la largeur.
   const allures = splits.map(splitPace).filter((v): v is number => v != null);
   const meilleure = allures.length ? Math.min(...allures) : 0;
@@ -54,9 +56,9 @@ export function StravaBlocks({ polyline, chiffres, splits, profil }: {
 
       {splits.length > 0 && (
         <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
-          <h2 className="border-b border-zinc-100 px-4 py-3 text-sm font-bold text-zinc-900">Temps intermédiaires</h2>
+          <h2 className="border-b border-zinc-100 px-4 py-3 text-sm font-bold text-zinc-900">{t("act.splits")}</h2>
           <div className="grid grid-cols-[2.5rem_3.5rem_1fr_3rem] gap-2 border-b border-zinc-100 px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
-            <span>Km</span><span>Allure</span><span /><span className="text-right">Élév.</span>
+            <span>Km</span><span>Allure</span><span /><span className="text-right">{t("act.elev")}</span>
           </div>
           <div className="divide-y divide-zinc-50">
             {splits.map((s) => {
@@ -83,7 +85,7 @@ export function StravaBlocks({ polyline, chiffres, splits, profil }: {
                         somme des allures. */}
                     {s.stoppedSeconds > 30 && (
                       <span className="shrink-0 text-[10px] text-amber-600">
-                        arrêt {Math.floor(s.stoppedSeconds / 60)} min
+                        {t("act.stopped", { n: Math.floor(s.stoppedSeconds / 60) })}
                       </span>
                     )}
                   </span>

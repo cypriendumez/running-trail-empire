@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { PerfTabs } from "@/components/segments/PerfTabs";
 import { computeTrophies } from "@/lib/trophies/compute";
 import { TrophyWall } from "@/components/trophies/TrophyWall";
+import { getAccountLang } from "@/lib/i18n/serverLang";
+import { T, fill } from "@/lib/i18n/translations";
 
 export const metadata = { title: "Vitrine | Pacevo" };
 
@@ -20,6 +22,7 @@ export default async function TropheesPage() {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect("/login");
+  const d = T[await getAccountLang(sb, user.id)];
 
   const { data: workouts } = await sb.from("workouts")
     .select("date, title, type, sport, distance_km, duration_seconds, elevation_gain_m")
@@ -33,11 +36,11 @@ export default async function TropheesPage() {
     <div className="mx-auto w-full max-w-5xl px-4 py-8">
       <PerfTabs />
       <header className="mb-8">
-        <h1 className="text-3xl font-black tracking-tight text-zinc-900">Vitrine</h1>
+        <h1 className="text-3xl font-black tracking-tight text-zinc-900">{d["nav.trophies"]}</h1>
         <p className="mt-1 text-sm text-zinc-500">
           {trophies.length > 0
-            ? `${trophies.length} trophées, tous calculés sur tes séances réelles.`
-            : "Tes trophées se calculent sur tes séances enregistrées."}
+            ? fill(d["tro.sub"], { n: trophies.length })
+            : d["tro.empty"]}
         </p>
       </header>
       <TrophyWall trophies={trophies} />
