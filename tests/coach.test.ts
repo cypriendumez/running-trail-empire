@@ -30,6 +30,7 @@ import { tr, ALL_LANGS, nRaw } from "../src/lib/i18n/multi";
 // `T` est déjà pris plus bas dans ce fichier (une date) → alias explicite.
 import { T as T_UI } from "../src/lib/i18n/translations";
 import { LANDING as LANDING_T } from "../src/components/landing/landingI18n";
+import { accesDe, peut, motifRefus, JOURS_ESSAI } from "../src/lib/billing/access";
 import { ppsExpiration, ppsVerdict, ppsDemandeAction, couvertureCourses, PPS_URL, PPS_PRIX_EUR, PPS_VALIDITE_MOIS } from "../src/lib/pps/status";
 import { PPS_T } from "../src/lib/pps/ppsI18n";
 import { PLAN_T, libelleType } from "../src/lib/ai/planI18n";
@@ -4024,6 +4025,111 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     const r = computeStreak({ today: AUJ, workouts: [], prescriptions: [], feedbacks: [] });
     assert.equal(r.current, 0);
     assert.equal(r.since, null, "on ne prétend pas observer une fenêtre qu'on n'a pas");
+  });
+
+  test("l'essai dure 30 jours, et le dernier jour compte encore", () => {
+    const J = 86_400_000;
+    const cree = (jours: number) => ({ created_at: new Date(Date.now() - jours * J).toISOString(), subscription_tier: "free" });
+    assert.equal(accesDe(cree(0)).etat, "essai", "premier jour");
+    assert.equal(accesDe(cree(29)).etat, "essai", "29 jours : encore en essai");
+    // 29 j et 23 h ne font pas 30 jours écoulés : l'athlète a droit à sa journée entière.
+    assert.equal(accesDe({ created_at: new Date(Date.now() - (29 * J + 23 * 3600_000)).toISOString(), subscription_tier: "free" }).etat,
+      "essai", "29 j 23 h : l'essai n'est pas fini");
+    assert.equal(accesDe(cree(30)).etat, "consultation", "30 jours révolus : essai terminé");
+    assert.equal(accesDe(cree(0)).joursRestants, JOURS_ESSAI);
+    assert.equal(accesDe(cree(29)).joursRestants, 1, "il reste un jour");
+    assert.equal(accesDe(cree(45)).essaiExpire, true, "l'expiration doit être signalable");
+  });
+
+  test("à l'expiration on garde la LECTURE, on ne coupe pas tout", () => {
+    // C'est le cœur de la décision produit : une coupure sèche fait désinstaller
+    // l'app, alors qu'un compte en consultation revient à la préparation suivante.
+    // Et servir l'historique ne coûte rien.
+    assert.equal(peut("consultation", "lecture"), true, "l'historique doit rester consultable");
+    assert.equal(peut("consultation", "plan"), false, "plus de nouveau plan sans abonnement");
+    assert.equal(peut("consultation", "ia"), false);
+    for (const e of ["essai", "essentiel", "complet", "consultation"] as const) {
+      assert.equal(peut(e, "lecture"), true, `${e} : la lecture ne se refuse jamais`);
+    }
+  });
+
+  test("l'écart entre les deux formules est exactement le coût de l'IA", () => {
+    // `autoPlan` et `autoCoach` sont déterministes : le plan ne consomme aucun jeton.
+    // Essentiel donne donc tout ce qui ne coûte rien, Complet ajoute ce qui coûte.
+    assert.equal(peut("essentiel", "plan"), true, "le plan est dans la formule de base");
+    assert.equal(peut("essentiel", "ia"), false, "l'IA conversationnelle est ce qu'on facture en plus");
+    assert.equal(peut("complet", "ia"), true);
+    assert.equal(motifRefus("essentiel", "ia"), "formule_insuffisante");
+    assert.equal(motifRefus("consultation", "plan"), "essai_expire",
+      "un essai fini et une formule trop courte ne se résolvent pas par le même geste");
+    assert.equal(motifRefus("complet", "ia"), null, "aucun refus quand le droit existe");
+  });
+
+  test("l'essai donne l'IA, sinon personne ne peut juger ce qu'il achète", () => {
+    assert.equal(peut("essai", "ia"), true);
+    assert.equal(peut("essai", "plan"), true);
+  });
+
+  test("un abonnement payant prime toujours sur la date de création", () => {
+    // Un client qui paie depuis deux ans a forcément un compte de plus de 30 jours :
+    // faire passer la date d'abord l'aurait rétrogradé en consultation.
+    const vieux = new Date(Date.now() - 800 * 86_400_000).toISOString();
+    assert.equal(accesDe({ created_at: vieux, subscription_tier: "complet" }).etat, "complet");
+    assert.equal(accesDe({ created_at: vieux, subscription_tier: "essentiel" }).etat, "essentiel");
+    // « pro » est l'ancien palier unique : le retirer ferait rétrograder en silence
+    // tous les comptes déjà payants.
+    assert.equal(accesDe({ created_at: vieux, subscription_tier: "pro" }).etat, "complet",
+      "les abonnés historiques « pro » perdent leur accès");
+    assert.equal(accesDe({ created_at: vieux, subscription_tier: "PRO" }).etat, "complet", "la casse ne doit pas décider");
+    assert.equal(accesDe({ created_at: vieux, subscription_tier: " complet " }).etat, "complet", "les espaces non plus");
+  });
+
+  test("une donnée manquante n'enferme JAMAIS personne dehors", () => {
+    // Le pire défaut possible ici n'est pas de laisser passer un fraudeur, c'est de
+    // verrouiller un client légitime sur une colonne vide, sans qu'il comprenne.
+    for (const p of [null, undefined, {}, { created_at: null }, { created_at: "" },
+                     { created_at: "pas une date" }, { subscription_tier: "inconnu" }]) {
+      assert.equal(accesDe(p as never).etat, "essai", `profil ${JSON.stringify(p)} : verrouillé à tort`);
+    }
+  });
+
+  test("TOUTE route qui fait parler un modèle est verrouillée côté serveur", () => {
+    // Le verrou n'existait pas : `subscription_tier` servait à afficher un badge et
+    // chaque route servait tout le monde. Une formule payante qui ne verrouille rien
+    // n'est pas une formule.
+    //
+    // ⚠️ Ce test se fonde sur la CONSOMMATION RÉELLE, pas sur une liste recopiée :
+    // il balaie les routes, garde celles qui appellent Gemini, et exige le verrou.
+    // Une nouvelle route IA sera donc couverte le jour où elle est écrite, sans que
+    // personne ait à penser à l'ajouter ici.
+    const dossier = "src/app/api/ai";
+    const routes = readdirSync(dossier)
+      .filter((d) => existsSync(`${dossier}/${d}/route.ts`))
+      .map((d) => ({ nom: d, code: codeOf(`${dossier}/${d}/route.ts`) }))
+      // ⚠️ Deux façons d'appeler Gemini coexistent dans ce projet : le client partagé
+      // `generateContent` (qui porte la mémoire de quota et la bascule de modèle) et,
+      // dans trois routes, un `fetch` vers une URL construite à la main. On détecte les
+      // DEUX — sinon le balayage laisserait passer précisément les routes qui échappent
+      // déjà au reste des garde-fous.
+      .filter((r) => /generateContent\(|generativelanguage\.googleapis\.com/.test(r.code));
+    assert.ok(routes.length >= 6, `seulement ${routes.length} routes IA trouvées : le balayage est cassé`);
+
+    // L'assistant de support reste OUVERT, et c'est un choix assumé : c'est par lui
+    // qu'un compte en consultation demande comment se réabonner. Le fermer reviendrait
+    // à couper la parole à quelqu'un qui cherche à payer.
+    const OUVERTES = new Set(["support"]);
+    for (const r of routes) {
+      if (OUVERTES.has(r.nom)) {
+        assert.ok(!/exigeAcces\(/.test(r.code), `${r.nom} : cette route doit rester ouverte (voir le commentaire)`);
+        continue;
+      }
+      assert.ok(/exigeAcces\(supabase, user\.id, "ia"\)/.test(r.code), `${r.nom} : route IA NON verrouillée`);
+      // Et le verrou doit précéder l'appel au modèle, sinon il ne protège pas la dépense.
+      const appel = Math.min(...[r.code.indexOf("generateContent("), r.code.indexOf("await fetch(")]
+        .filter((i) => i >= 0).concat([Number.MAX_SAFE_INTEGER]));
+      assert.ok(r.code.indexOf("exigeAcces(") < appel,
+        `${r.nom} : le verrou est posé APRÈS l'appel au modèle — la dépense a déjà eu lieu`);
+    }
   });
 
   test("la landing ne vend AUCUNE fonctionnalité qui n'existe pas", () => {

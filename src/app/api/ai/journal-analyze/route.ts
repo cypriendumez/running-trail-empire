@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { exigeAcces } from "@/lib/billing/guard";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
@@ -10,6 +11,14 @@ export async function POST(req: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // ── VERROU D'ABONNEMENT ──────────────────────────────────────────────────
+  // Cette route fait PARLER un modèle : c'est exactement ce que la formule Complet
+  // facture, parce que c'est la seule partie du produit dont le coût grandit avec
+  // le nombre d'athlètes. Masquer le bouton côté interface ne suffirait pas — la
+  // route resterait appelable à la main, et c'est l'appel qui coûte.
+  const refus = await exigeAcces(supabase, user.id, "ia");
+  if (refus) return refus.reponse;
 
   const { text } = await req.json() as { text: string };
   if (!text?.trim()) return NextResponse.json({ error: "text required" }, { status: 400 });
