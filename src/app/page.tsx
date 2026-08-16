@@ -153,12 +153,14 @@ export default function LandingPage() {
             <Link href="/blog" className={navLink}>{L.nav.blog}</Link>
             <Link href="/avis" className={navLink}>{L.nav.reviews}</Link>
           </div>
-          {/* Espacement RÉGULIER (gap-2 partout) et un filet vertical qui sépare le choix
-              de langue des actions de compte — trois éléments de natures différentes
-              collés au même pas se lisaient comme une liste sans hiérarchie. */}
+          {/* ORDRE : Connexion → Essai gratuit → Langue, comme sur les barres de nav qui
+              fonctionnent (campus.coach entre autres). Le sélecteur de langue était
+              coincé ENTRE les liens de navigation et les actions de compte : il coupait
+              en deux un groupe qui doit se lire d'un bloc (« je me connecte / je
+              m'inscris »), et donnait le premier rang à un réglage qu'on ouvre une fois
+              dans sa vie. Il passe en bout de chaîne, après le bouton, où l'œil le
+              trouve quand il le cherche sans le heurter quand il ne le cherche pas. */}
           <div className="flex items-center justify-self-end gap-2">
-            <LanguageSwitcher light={!solidNav} />
-            <span aria-hidden className={`hidden sm:block h-4 w-px ${solidNav ? "bg-zinc-200" : "bg-white/25"}`} />
             <Link href="/login" className={`hidden sm:inline-flex rounded-lg px-2.5 py-2 text-sm font-medium transition-colors ${solidNav ? "text-zinc-600 hover:text-zinc-900" : "text-white/90 hover:text-white"}`}>
               {L.nav.login}
             </Link>
@@ -181,6 +183,8 @@ export default function LandingPage() {
             >
               {L.nav.trial} <ArrowRight className="h-3.5 w-3.5" />
             </Link>
+            <span aria-hidden className={`hidden sm:block h-4 w-px ${solidNav ? "bg-zinc-200" : "bg-white/25"}`} />
+            <LanguageSwitcher light={!solidNav} />
             <button
               type="button"
               onClick={() => setMenuOpen((v) => !v)}
@@ -228,12 +232,14 @@ export default function LandingPage() {
         <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/50 to-transparent" />
 
         <Container className="relative z-10 pb-20 pt-28 sm:pb-24">
-          {/* `max-w-3xl` et non `2xl` : la seconde ligne du titre débordait de 672 px et
-              repartait à la ligne — trois lignes au lieu de deux, par ACCIDENT et non par
-              choix. Le point de rupture varie en plus selon la langue : l'allemand est
-              couramment un tiers plus long que l'espagnol. Largeur portée à 768 px et
-              corps ramené à 68 px : les cinq langues tiennent en deux lignes. */}
-          <div className="max-w-3xl">
+          {/* Largeur et corps DIMENSIONNÉS SUR LE PIRE CAS, mesuré et non estimé. À 68 px
+              dans 768 px, la première ligne allemande (« Dein Plan schreibt sich neu. »)
+              réclame 872 px et repartait à la ligne : trois lignes au lieu de deux, en
+              allemand et en espagnol seulement. Le français, lui, tient dans 602 px — le
+              caler sur le français revenait à casser deux langues sur cinq à chaque
+              changement de slogan. 896 px et 64 px : la pire ligne retombe à 821 px, avec
+              75 px de marge pour la prochaine formulation. */}
+          <div className="max-w-4xl">
             {/* L'équation de marque, en surtitre : elle explique le nom AVANT que le
                 titre ne le reprenne. Le point émeraude fait le lien visuel avec le « e »
                 du wordmark, juste au-dessus dans la barre — la lettre que « Pace » et
@@ -245,7 +251,7 @@ export default function LandingPage() {
             {/* Corps mobile ramené à 34 px : à 42 px, « Trouve ton allure, » ne tenait pas
                 dans les 327 px utiles d'un iPhone et se coupait en « Trouve ton / allure, »
                 — une césure au milieu du groupe de mots, là où la ligne devrait respirer. */}
-            <h1 className="text-[2.1rem] font-bold leading-[1.06] tracking-tight text-white sm:text-5xl md:text-6xl lg:text-[4.25rem]">
+            <h1 className="text-[2.1rem] font-bold leading-[1.06] tracking-tight text-white sm:text-5xl md:text-6xl lg:text-[4rem]">
               {L.hero.titleA}<br />{L.hero.titleB}
               {/* Le mot accentué porte la seconde moitié du nom (« Evo ») : on lui donne
                   le vert du wordmark et une ombre portée, sans quoi l'émeraude sur une
@@ -253,7 +259,7 @@ export default function LandingPage() {
                   derrière. */}
               <span className="text-[#34d399] [text-shadow:0_2px_24px_rgba(0,0,0,0.45)]">{L.hero.accent}</span>.
             </h1>
-            <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/80">
+            <p className="mt-6 max-w-2xl text-lg leading-relaxed text-white/80">
               {L.hero.subtitle}
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">

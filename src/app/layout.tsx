@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   // L'ancienne énumérait des fonctions (« Plans IA, analyse biomécanique… ») sans jamais
   // dire ce que l'app FAIT concrètement pour le coureur, ni d'où vient le nom.
   description:
-    "Trouve ton allure, fais-la progresser. Pacevo réécrit ta séance du jour à partir de ta VFC, de ton sommeil et de ta charge réelle, puis l'envoie sur ta montre.",
+    "Ton plan se réécrit, toi tu cours. À chaque synchronisation de ta montre, Pacevo relit ta VFC, ton sommeil et ta charge, puis réécrit tes sept prochains jours.",
   keywords: [
     "running", "trail", "course à pied", "entraînement", "plan d'entraînement",
     "VMA", "biomécanique", "GPX", "Garmin", "Coros", "UTMB",
@@ -36,18 +36,18 @@ export const metadata: Metadata = {
     type: "website",
     locale: "fr_FR",
     url: process.env.NEXT_PUBLIC_APP_URL,
-    title: "Pacevo — Trouve ton allure, fais-la progresser.",
+    title: "Pacevo — Ton plan se réécrit. Toi, tu cours.",
     // « L'application hégémonique du running et du trail » : une affirmation que rien ne
     // soutient, servie à chaque partage de lien. Remplacée par ce que fait le produit.
-    description: "Ta séance du jour, réécrite à partir de ta VFC, de ton sommeil et de ta charge réelle — puis envoyée sur ta montre.",
+    description: "À chaque synchronisation de ta montre, Pacevo relit ta VFC, ton sommeil et ta charge, puis réécrit tes sept prochains jours.",
     siteName: "Pacevo",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Pacevo — Trouve ton allure, fais-la progresser.",
+    title: "Pacevo — Ton plan se réécrit. Toi, tu cours.",
     // « L'application hégémonique du running et du trail » : une affirmation que rien ne
     // soutient, servie à chaque partage de lien. Remplacée par ce que fait le produit.
-    description: "Ta séance du jour, réécrite à partir de ta VFC, de ton sommeil et de ta charge réelle — puis envoyée sur ta montre.",
+    description: "À chaque synchronisation de ta montre, Pacevo relit ta VFC, ton sommeil et ta charge, puis réécrit tes sept prochains jours.",
   },
 };
 

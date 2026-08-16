@@ -115,12 +115,14 @@ function chainesVisibles(code: string): string[] {
  * assumé, et à pousser un jour quelqu'un à « corriger » une mention légale.
  */
 const HORS_TRADUCTION: Record<string, string> = {
-  "Trouve ton allure,": "image de partage social, unique et statique, déclarée locale fr_FR",
-  // Ajouté après coup : l'ancien surtitre « PACE + VO₂ MAX » ne portait ni accent ni mot
-  // français, il passait donc sous le radar. « PACE + ÉVOLUTION » a un É — le test l'a
-  // attrapé au premier `npm run verify` suivant, ce qui est précisément l'objet.
+  // L'image de partage social : une seule image, statique, déclarée locale fr_FR dans les
+  // métadonnées. Ses chaînes suivent le slogan de la landing et changent avec lui — c'est
+  // normal qu'il faille les mettre à jour ici quand le slogan bouge, et c'est même le but :
+  // le test rappelle qu'un slogan modifié doit l'être AUX DEUX endroits.
+  "Ton plan se réécrit.": "image de partage social, unique et statique, déclarée locale fr_FR",
+  "tu cours.": "même image de partage",
   "PACE + ÉVOLUTION": "même image de partage",
-  "Plan réécrit à chaque synchro · VFC, sommeil, charge · Sur ta montre": "même image de partage",
+  "VFC, sommeil et charge relus à chaque synchro · Allures sur ta montre": "même image de partage",
   "14 000+ courses · 15 700 parcours": "même image de partage",
   "Tracé © les contributeurs OpenStreetMap (ODbL)": "mention légale ÉCRITE DANS LE FICHIER GPX exporté, pas à l'écran — la licence ODbL impose l'attribution, la traduire l'affaiblirait",
 };

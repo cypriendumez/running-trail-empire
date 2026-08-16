@@ -68,15 +68,15 @@ export default function OpengraphImage() {
             PACE + ÉVOLUTION
           </span>
           <span style={{ color: "#fff", fontSize: 78, fontWeight: 800, lineHeight: 1.05, letterSpacing: -2, display: "flex", flexDirection: "column" }}>
-            <span>Trouve ton allure,</span>
+            <span>Ton plan se réécrit.</span>
             <span style={{ display: "flex" }}>
-              fais-la&nbsp;<span style={{ color: "#10d68a" }}>progresser.</span>
+              Toi,&nbsp;<span style={{ color: "#10d68a" }}>tu cours.</span>
             </span>
           </span>
           {/* Tenu sur UNE ligne : à 83 caractères, la phrase repartait à la ligne pour y
               laisser deux mots isolés, ce qui déséquilibrait le bas de l'image. */}
           <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 30, marginTop: 24, lineHeight: 1.3 }}>
-            Plan réécrit à chaque synchro · VFC, sommeil, charge · Sur ta montre
+            VFC, sommeil et charge relus à chaque synchro · Allures sur ta montre
           </span>
         </div>
 
