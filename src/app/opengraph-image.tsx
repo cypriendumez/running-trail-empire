@@ -60,23 +60,21 @@ export default function OpengraphImage() {
 
         {/* milieu : accroche */}
         <div style={{ display: "flex", flexDirection: "column" }}>
-          {/* Ce surtitre annonçait « L'APP RUNNING LA PLUS AVANCÉE · 2026 » : un superlatif
-              que rien ne fonde, sur la SEULE image que voient WhatsApp, iMessage et X. La
-              landing avait été purgée de ce genre d'affirmation, pas l'aperçu social.
-              Remplacé par l'équation de marque, qui elle est vraie et explique le nom. */}
-          <span style={{ color: "#34d399", fontSize: 26, fontWeight: 700, letterSpacing: 3, marginBottom: 18 }}>
-            PACE + ÉVOLUTION
-          </span>
+          {/* Le surtitre est SUPPRIMÉ : il portait « PACE + ÉVOLUTION », que le titre
+              ci-dessous dit désormais en toutes lettres. Il avait auparavant remplacé un
+              « L'APP RUNNING LA PLUS AVANCÉE · 2026 » que rien ne fondait — cette image
+              est la seule que voient WhatsApp, iMessage et X, elle n'a pas droit à un
+              superlatif ni à un doublon. */}
           <span style={{ color: "#fff", fontSize: 78, fontWeight: 800, lineHeight: 1.05, letterSpacing: -2, display: "flex", flexDirection: "column" }}>
-            <span>Tes données servent</span>
+            <span>Pace Your</span>
             <span style={{ display: "flex" }}>
-              enfin à&nbsp;<span style={{ color: "#10d68a" }}>quelque chose.</span>
+              <span style={{ color: "#10d68a" }}>Evolution.</span>
             </span>
           </span>
           {/* Tenu sur UNE ligne : à 83 caractères, la phrase repartait à la ligne pour y
               laisser deux mots isolés, ce qui déséquilibrait le bas de l'image. */}
           <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 30, marginTop: 24, lineHeight: 1.3 }}>
-            VFC, sommeil, charge · Une séance sur ta montre à chaque synchro
+            VFC au réveil, sommeil profond, fréquence cardiaque, dénivelé, charge
           </span>
         </div>
 

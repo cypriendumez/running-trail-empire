@@ -9,10 +9,11 @@ export type LandingDict = {
   // `badge` (« Nouveau · Ghost Runner vocal ») et `ctaSecondary` (« Voir la démo »,
   // qui menait à /login et non à une démo) ont été retirés du hero : une clé sans
   // rendu se traduit dans cinq langues et ne s'affiche nulle part.
-  // Le surtitre « Pace + Évolution » a été RETIRÉ du hero : il expliquait le nom au-dessus
-  // d'un titre qui, lui, vend la boucle produit — deux messages superposés dans les trois
-  // premières secondes de lecture. L'équation de marque survit là où elle est utile, sur
-  // l'image de partage social, qui n'a pas de titre pour la porter.
+  // ⚠️ LE TITRE EST UNE LIGNE DE MARQUE, IDENTIQUE DANS LES CINQ LANGUES : « Pace Your
+  // Evolution ». Ce n'est pas un oubli de traduction — c'est le nom du produit déplié
+  // (PAC·EVO), et le traduire le briserait. Seul le sous-titre change de langue. Effet de
+  // bord heureux : le titre ne dépend plus de la longueur d'une langue, la contrainte de
+  // mise en page qui imposait 64 px disparaît.
   // ⚠️ Le nom se découpe PAC·EVO (« Pace » + « Evo(lution) », qui partagent le E) — pas
   // « Pace + VO₂max », contresens d'une version antérieure de ce fichier.
   hero: { titleA: string; titleB: string; accent: string; subtitle: string; ctaPrimary: string; sync: string };
@@ -47,7 +48,7 @@ export const CATEGORY_CODES = ["ALL", "10KM", "SEMI", "MARATHON", "TRAIL", "BEGI
 
 const fr: LandingDict = {
   nav: { programs: "Programmes", features: "Fonctionnalités", pricing: "Tarifs", blog: "Blog", reviews: "Avis", login: "Connexion", trial: "Essai gratuit" },
-  hero: { titleA: "Tes données servent", titleB: "enfin à ", accent: "quelque chose", subtitle: "Ta montre mesure déjà tout : VFC, sommeil, charge, allures. Pacevo en fait une séance — durée, intensité, récupération — recalculée à chaque synchronisation.", ctaPrimary: "Commencer gratuitement", sync: "Synchro" },
+  hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "Pacevo relit ta VFC au réveil, ton sommeil profond et paradoxal, et tes dernières séances — allure, fréquence cardiaque, temps par zone, dénivelé. Il en déduit ta séance du jour : type, durée, allures cibles, envoyée sur ta montre.", ctaPrimary: "Commencer gratuitement", sync: "Synchro" },
   stats: { races: "Courses à venir", routes: "Parcours cartographiés", plan: "De plan glissant", replan: "Entre deux replanifications" },
   programs: {
     eyebrow: "Entraînement", title: "Des programmes pour chaque objectif", subtitle: "Du premier 5 km à l'ultra-trail — chaque plan s'adapte ensuite à tes données réelles.", viewAll: "Voir tout",
@@ -108,7 +109,7 @@ const fr: LandingDict = {
 
 const en: LandingDict = {
   nav: { programs: "Programs", features: "Features", pricing: "Pricing", blog: "Blog", reviews: "Reviews", login: "Log in", trial: "Free trial" },
-  hero: { titleA: "Your data finally", titleB: "does ", accent: "something", subtitle: "Your watch already measures everything: HRV, sleep, load, paces. Pacevo turns it into a session — duration, intensity, recovery — recalculated on every sync.", ctaPrimary: "Start for free", sync: "Syncs with" },
+  hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "Pacevo reads your morning HRV, your deep and REM sleep, and your latest sessions — pace, heart rate, time in zone, elevation. From that it works out today's session: type, duration, target paces, sent to your watch.", ctaPrimary: "Start for free", sync: "Syncs with" },
   stats: { races: "Upcoming races", routes: "Mapped routes", plan: "Rolling plan", replan: "Between two replans" },
   programs: {
     eyebrow: "Training", title: "A program for every goal", subtitle: "From your first 5K to ultra-trail — each plan then adapts to your real data.", viewAll: "View all",
@@ -169,7 +170,7 @@ const en: LandingDict = {
 
 const de: LandingDict = {
   nav: { programs: "Programme", features: "Funktionen", pricing: "Preise", blog: "Blog", reviews: "Bewertungen", login: "Anmelden", trial: "Gratis testen" },
-  hero: { titleA: "Deine Daten werden", titleB: "endlich ", accent: "nützlich", subtitle: "Deine Uhr misst längst alles: HRV, Schlaf, Belastung, Tempo. Pacevo macht daraus eine Einheit — Dauer, Intensität, Erholung — bei jeder Synchronisation neu berechnet.", ctaPrimary: "Kostenlos starten", sync: "Synchron mit" },
+  hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "Pacevo liest deine morgendliche HRV, deinen Tief- und REM-Schlaf und deine letzten Einheiten — Tempo, Herzfrequenz, Zeit pro Zone, Höhenmeter. Daraus leitet es die heutige Einheit ab: Art, Dauer, Zieltempo — direkt auf deine Uhr.", ctaPrimary: "Kostenlos starten", sync: "Synchron mit" },
   stats: { races: "Kommende Rennen", routes: "Kartierte Strecken", plan: "Rollierender Plan", replan: "Zwischen zwei Neuplanungen" },
   programs: {
     eyebrow: "Training", title: "Ein Programm für jedes Ziel", subtitle: "Vom ersten 5-km-Lauf bis zum Ultra-Trail — jeder Plan passt sich dann an deine echten Daten an.", viewAll: "Alle ansehen",
@@ -230,7 +231,7 @@ const de: LandingDict = {
 
 const es: LandingDict = {
   nav: { programs: "Programas", features: "Funciones", pricing: "Precios", blog: "Blog", reviews: "Opiniones", login: "Iniciar sesión", trial: "Prueba gratis" },
-  hero: { titleA: "Tus datos sirven", titleB: "por fin de ", accent: "algo", subtitle: "Tu reloj ya lo mide todo: VFC, sueño, carga, ritmos. Pacevo lo convierte en una sesión — duración, intensidad, recuperación — recalculada en cada sincronización.", ctaPrimary: "Empezar gratis", sync: "Sincroniza con" },
+  hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "Pacevo lee tu VFC al despertar, tu sueño profundo y REM, y tus últimas sesiones — ritmo, frecuencia cardíaca, tiempo por zona, desnivel. De ahí deduce la sesión de hoy: tipo, duración, ritmos objetivo, enviada a tu reloj.", ctaPrimary: "Empezar gratis", sync: "Sincroniza con" },
   stats: { races: "Carreras próximas", routes: "Rutas cartografiadas", plan: "De plan deslizante", replan: "Entre dos replanificaciones" },
   programs: {
     eyebrow: "Entrenamiento", title: "Un programa para cada objetivo", subtitle: "Desde tu primer 5K hasta el ultra-trail — cada plan se adapta luego a tus datos reales.", viewAll: "Ver todo",
@@ -291,7 +292,7 @@ const es: LandingDict = {
 
 const pt: LandingDict = {
   nav: { programs: "Programas", features: "Funcionalidades", pricing: "Preços", blog: "Blog", reviews: "Avaliações", login: "Entrar", trial: "Teste grátis" },
-  hero: { titleA: "Os teus dados servem", titleB: "finalmente para ", accent: "algo", subtitle: "O teu relógio já mede tudo: VFC, sono, carga, ritmos. A Pacevo transforma isso num treino — duração, intensidade, recuperação — recalculado a cada sincronização.", ctaPrimary: "Começar grátis", sync: "Sincroniza com" },
+  hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "A Pacevo lê a tua VFC ao acordar, o teu sono profundo e REM, e os teus últimos treinos — ritmo, frequência cardíaca, tempo por zona, desnível. Daí deduz o treino de hoje: tipo, duração, ritmos alvo, enviado para o teu relógio.", ctaPrimary: "Começar grátis", sync: "Sincroniza com" },
   stats: { races: "Provas futuras", routes: "Percursos cartografados", plan: "De plano deslizante", replan: "Entre duas replanificações" },
   programs: {
     eyebrow: "Treino", title: "Um programa para cada objetivo", subtitle: "Do teu primeiro 5K ao ultra-trail — cada plano adapta-se depois aos teus dados reais.", viewAll: "Ver tudo",

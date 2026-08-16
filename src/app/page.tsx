@@ -239,18 +239,15 @@ export default function LandingPage() {
         <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/50 to-transparent" />
 
         <Container className="relative z-10 pb-20 pt-28 sm:pb-24">
-          {/* Largeur et corps DIMENSIONNÉS SUR LE PIRE CAS, mesuré et non estimé. À 68 px
-              dans 768 px, la première ligne allemande (« Dein Plan schreibt sich neu. »)
-              réclame 872 px et repartait à la ligne : trois lignes au lieu de deux, en
-              allemand et en espagnol seulement. Le français, lui, tient dans 602 px — le
-              caler sur le français revenait à casser deux langues sur cinq à chaque
-              changement de slogan. 896 px et 64 px : la pire ligne retombe à 821 px, avec
-              75 px de marge pour la prochaine formulation. */}
+          {/* Le titre est désormais une LIGNE DE MARQUE identique dans les cinq langues, ce
+              qui supprime la contrainte qui gouvernait cette mise en page : il fallait
+              auparavant dimensionner sur le pire cas (l'allemand réclamait 872 px là où le
+              français tenait dans 602), d'où un corps rabattu à 64 px. Deux mots courts et
+              invariants tiennent partout — le titre peut donc reprendre la taille qu'un
+              hero mérite. Le sous-titre, lui, change toujours de langue et garde sa
+              largeur de lecture. */}
           <div className="max-w-4xl">
-            {/* Corps mobile ramené à 34 px : à 42 px, « Trouve ton allure, » ne tenait pas
-                dans les 327 px utiles d'un iPhone et se coupait en « Trouve ton / allure, »
-                — une césure au milieu du groupe de mots, là où la ligne devrait respirer. */}
-            <h1 className="text-[2.1rem] font-bold leading-[1.06] tracking-tight text-white sm:text-5xl md:text-6xl lg:text-[4rem]">
+            <h1 className="text-[2.9rem] font-bold leading-[1.03] tracking-tight text-white sm:text-6xl md:text-7xl lg:text-[5.25rem]">
               {L.hero.titleA}<br />{L.hero.titleB}
               {/* Le mot accentué porte la seconde moitié du nom (« Evo ») : on lui donne
                   le vert du wordmark et une ombre portée, sans quoi l'émeraude sur une
