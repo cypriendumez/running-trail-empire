@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   // L'ancienne énumérait des fonctions (« Plans IA, analyse biomécanique… ») sans jamais
   // dire ce que l'app FAIT concrètement pour le coureur, ni d'où vient le nom.
   description:
-    "Pace Your Evolution. Pacevo lit ta VFC au réveil, ton sommeil profond et paradoxal et tes dernières séances, puis en déduit ta séance du jour et l'envoie sur ta montre.",
+    "Pace Your Evolution. Ta montre mesure déjà tout : VFC, sommeil, charge, allures. Pacevo en fait une séance recalculée à chaque synchronisation.",
   keywords: [
     "running", "trail", "course à pied", "entraînement", "plan d'entraînement",
     "VMA", "biomécanique", "GPX", "Garmin", "Coros", "UTMB",
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     title: "Pacevo — Pace Your Evolution",
     // « L'application hégémonique du running et du trail » : une affirmation que rien ne
     // soutient, servie à chaque partage de lien. Remplacée par ce que fait le produit.
-    description: "VFC au réveil, sommeil profond et paradoxal, fréquence cardiaque et charge de tes dernières séances : Pacevo en déduit ta séance du jour et l'envoie sur ta montre.",
+    description: "Ta montre mesure déjà tout : VFC, sommeil, charge, allures. Pacevo en fait une séance — durée, intensité, récupération — recalculée à chaque synchronisation.",
     siteName: "Pacevo",
   },
   twitter: {
@@ -47,7 +47,7 @@ export const metadata: Metadata = {
     title: "Pacevo — Pace Your Evolution",
     // « L'application hégémonique du running et du trail » : une affirmation que rien ne
     // soutient, servie à chaque partage de lien. Remplacée par ce que fait le produit.
-    description: "VFC au réveil, sommeil profond et paradoxal, fréquence cardiaque et charge de tes dernières séances : Pacevo en déduit ta séance du jour et l'envoie sur ta montre.",
+    description: "Ta montre mesure déjà tout : VFC, sommeil, charge, allures. Pacevo en fait une séance — durée, intensité, récupération — recalculée à chaque synchronisation.",
   },
 };
 

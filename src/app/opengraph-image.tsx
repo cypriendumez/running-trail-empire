@@ -68,7 +68,7 @@ export default function OpengraphImage() {
           <span style={{ color: "#fff", fontSize: 78, fontWeight: 800, lineHeight: 1.05, letterSpacing: -2, display: "flex", flexDirection: "column" }}>
             <span>Pace Your</span>
             <span style={{ display: "flex" }}>
-              <span style={{ color: "#10d68a" }}>Evolution.</span>
+              <span style={{ color: "#10d68a" }}>Evolution</span>
             </span>
           </span>
           {/* Tenu sur UNE ligne : à 83 caractères, la phrase repartait à la ligne pour y

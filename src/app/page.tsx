@@ -236,7 +236,23 @@ export default function LandingPage() {
           className="absolute inset-0 h-full w-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/10" />
-        <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/50 to-transparent" />
+        {/* VOILE LATÉRAL — il manquait, et c'est toute l'explication du texte « qui dépasse
+            sur les coureurs ». Le hero n'avait qu'un dégradé du BAS et un bandeau du HAUT :
+            au milieu de l'image, à hauteur du titre et du paragraphe, la photo était à nu.
+            Les silhouettes passent précisément là. Ce voile assombrit les deux tiers
+            GAUCHES, où vit le texte, et s'éteint avant les coureurs — la photo n'est pas
+            retouchée, on lui pose seulement un fond de lecture.
+
+            ⚠️ SUR MOBILE il ne peut pas s'éteindre : à 375 px le texte occupe toute la
+            largeur, donc il TOMBE sur les silhouettes quoi qu'on fasse. Le voile garde
+            donc un plancher (`to-black/40`) en dessous de `sm`, et ne va vers le
+            transparent qu'à partir du moment où la colonne de texte s'arrête avant les
+            coureurs. */}
+        <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-black/80 via-black/60 to-black/40 sm:w-[72%] sm:via-black/45 sm:to-transparent" />
+        {/* Bandeau du haut renforcé (0,50 → 0,68) : « Connexion » tombait sur l'ombre d'un
+            coureur, et du blanc sur une silhouette noire posée sur une piste rouge n'a plus
+            de contraste stable — il change à chaque pixel de l'image. */}
+        <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/68 via-black/30 to-transparent" />
 
         <Container className="relative z-10 pb-20 pt-28 sm:pb-24">
           {/* Le titre est désormais une LIGNE DE MARQUE identique dans les cinq langues, ce
@@ -246,16 +262,22 @@ export default function LandingPage() {
               invariants tiennent partout — le titre peut donc reprendre la taille qu'un
               hero mérite. Le sous-titre, lui, change toujours de langue et garde sa
               largeur de lecture. */}
-          <div className="max-w-4xl">
+          <div className="max-w-xl lg:max-w-2xl">
             <h1 className="text-[2.9rem] font-bold leading-[1.03] tracking-tight text-white sm:text-6xl md:text-7xl lg:text-[5.25rem]">
               {L.hero.titleA}<br />{L.hero.titleB}
               {/* Le mot accentué porte la seconde moitié du nom (« Evo ») : on lui donne
                   le vert du wordmark et une ombre portée, sans quoi l'émeraude sur une
                   piste rouge perd son contraste dès que le soleil de la photo passe
                   derrière. */}
-              <span className="text-[#34d399] [text-shadow:0_2px_24px_rgba(0,0,0,0.45)]">{L.hero.accent}</span>.
+              {/* Plus de point final : « Pace Your Evolution » est une ligne de marque,
+                  pas une phrase. Un point la referme comme une affirmation banale. */}
+              <span className="text-[#34d399] [text-shadow:0_2px_24px_rgba(0,0,0,0.45)]">{L.hero.accent}</span>
             </h1>
-            <p className="mt-6 max-w-2xl text-lg leading-relaxed text-white/80">
+            {/* Largeur MESURÉE, pas choisie : à `lg:max-w-xl` la plus longue ligne finissait à
+                750 px alors que la première silhouette commence vers 738. `max-w-lg` la
+                ramène à 688 px — le texte s'arrête avant les coureurs, sans dépendre du
+                voile pour rester lisible. */}
+            <p className="mt-6 max-w-lg text-[17px] leading-relaxed text-white/85">
               {L.hero.subtitle}
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
