@@ -135,18 +135,23 @@ export default function LandingPage() {
 
       {/* ── NAV ── */}
       <nav className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${solidNav ? "bg-white/90 backdrop-blur-xl border-b border-zinc-200/70" : "bg-transparent"}`}>
-        {/* Grille en TROIS colonnes plutôt que `justify-between` : les deux colonnes
-            extérieures ont la même largeur (`1fr`), donc le groupe de liens est
-            optiquement centré dans la barre. Avec `justify-between`, sa position
-            dépendait de la longueur des libellés — elle changeait à chaque langue, et
-            « Fonctionnalités » (FR) contre « Features » (EN) suffisait à décaler tout le
-            bloc. C'est ce désalignement qui donnait l'impression de rangement bâclé. */}
-        <Container className="grid h-16 grid-cols-[auto_1fr_auto] items-center gap-4 md:grid-cols-[1fr_auto_1fr]">
-          <Link href="/" className="flex items-center gap-2.5 justify-self-start" onClick={() => setMenuOpen(false)}>
+        {/* `max-w-none` : la barre ne suit PLUS la largeur de contenu du site. Le
+            `Container` est en `max-w-6xl` centré, soit 1 152 px — sur un écran de 1 440 il
+            restait 144 px de marge AVANT les 32 px de padding, et le logo démarrait à
+            176 px du bord. Une barre de navigation n'est pas du contenu : elle borde la
+            page, elle doit donc partir du bord.
+
+            Le groupe de liens était par ailleurs CENTRÉ sur la fenêtre, ce qui creusait un
+            trou entre lui et le logo. Il est désormais collé au logo, et seules les
+            actions de compte restent à droite (`ml-auto`) — la disposition de la plupart
+            des barres modernes, et surtout celle qui remplit le bord gauche au lieu de le
+            laisser vide. */}
+        <Container className="flex h-16 max-w-none items-center gap-4 px-4 sm:gap-8 sm:px-6 lg:px-8">
+          <Link href="/" className="flex shrink-0 items-center gap-2.5" onClick={() => setMenuOpen(false)}>
             <Logo size={30} />
             <Wordmark tone={solidNav ? "dark" : "light"} className="text-xl" />
           </Link>
-          <div className={`hidden md:flex items-center justify-center gap-7 text-sm font-medium ${solidNav ? "text-zinc-500" : "text-white/80"}`}>
+          <div className={`hidden md:flex items-center gap-7 text-sm font-medium ${solidNav ? "text-zinc-500" : "text-white/80"}`}>
             <a href="#programmes" className={navLink}>{L.nav.programs}</a>
             <a href="#features" className={navLink}>{L.nav.features}</a>
             <a href="#tarifs" className={navLink}>{L.nav.pricing}</a>
@@ -160,7 +165,7 @@ export default function LandingPage() {
               m'inscris »), et donnait le premier rang à un réglage qu'on ouvre une fois
               dans sa vie. Il passe en bout de chaîne, après le bouton, où l'œil le
               trouve quand il le cherche sans le heurter quand il ne le cherche pas. */}
-          <div className="flex items-center justify-self-end gap-2">
+          <div className="ml-auto flex items-center gap-2">
             <Link href="/login" className={`hidden sm:inline-flex rounded-lg px-2.5 py-2 text-sm font-medium transition-colors ${solidNav ? "text-zinc-600 hover:text-zinc-900" : "text-white/90 hover:text-white"}`}>
               {L.nav.login}
             </Link>
@@ -240,14 +245,6 @@ export default function LandingPage() {
               changement de slogan. 896 px et 64 px : la pire ligne retombe à 821 px, avec
               75 px de marge pour la prochaine formulation. */}
           <div className="max-w-4xl">
-            {/* L'équation de marque, en surtitre : elle explique le nom AVANT que le
-                titre ne le reprenne. Le point émeraude fait le lien visuel avec le « e »
-                du wordmark, juste au-dessus dans la barre — la lettre que « Pace » et
-                « Evo » se partagent. */}
-            <p className="mb-5 flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/55">
-              <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full bg-[#34d399]" />
-              {L.hero.eyebrow}
-            </p>
             {/* Corps mobile ramené à 34 px : à 42 px, « Trouve ton allure, » ne tenait pas
                 dans les 327 px utiles d'un iPhone et se coupait en « Trouve ton / allure, »
                 — une césure au milieu du groupe de mots, là où la ligne devrait respirer. */}
