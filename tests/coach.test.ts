@@ -49,6 +49,7 @@ import { sniffType, sniffImage } from "../src/lib/upload/sniff";
 import { HELP_PAGES, HEALTH_TABS, HELP_PROBLEMS } from "../src/data/helpKb";
 import { PROBLEM_KEYS, PROBLEM_T } from "../src/data/helpProblemsI18n";
 import { diagnoseAccount, findingsBlock } from "../src/lib/support/diagnose";
+import { reponseImmediate } from "../src/lib/support/fallback";
 import {
   canonical, fingerprint, isCacheUsable, PROFILE_FINGERPRINT_COLUMNS, type SessionSignals,
 } from "../src/lib/ai/sessionCache";
@@ -409,6 +410,7 @@ test("une activité inconnue n'est appariée à rien", () => {
 //  Une route d'administration sans garde ne lève aucune erreur : elle répond 200.
 // ─────────────────────────────────────────────────────────────────────────────
 import { readdirSync, readFileSync, existsSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 
 console.log("\nSÉCURITÉ");
@@ -4289,6 +4291,93 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     assert.ok(src.indexOf("profilPeut(") < src.indexOf("buildWeekPlan("),
       "le verrou est posé APRÈS la construction du plan");
     assert.ok(/reason: "essai_expire"/.test(src), "le refus doit être motivé, pas silencieux");
+  });
+
+  test("le support répond sans jeton — mais JAMAIS sur un dépannage", () => {
+    // Économiser des jetons est facile ; économiser sans rien dégrader ne l'est pas.
+    // La base sait déjà répondre aux questions de NAVIGATION : le chemin de clics vient
+    // de `helpKb`, le modèle ne fait que le recopier. En revanche, sur un dépannage,
+    // l'assistant lit l'état RÉEL du compte (`diagnoseAccount`) et sait, lui, que la clé
+    // intervals.icu est absente. Servir la fiche générique économiserait un appel en
+    // détruisant exactement ce qui fait la valeur de l'assistant.
+    for (const q of ["où je vois le détail d'une séance", "comment connecter ma montre",
+                     "c'est quoi le ghost runner", "comment partager ma position en direct"]) {
+      assert.ok(reponseImmediate(q), `navigation non pré-emptée : « ${q} » — un appel payé pour rien`);
+    }
+    for (const q of ["mes séances n'arrivent pas sur ma montre", "la synchronisation ne marche pas",
+                     "mes activités n'apparaissent pas", "je ne peux pas m'abonner",
+                     "pourquoi pas de fractionné cette semaine", "mon kilométrage compte mes randonnées"]) {
+      assert.equal(reponseImmediate(q), null,
+        `DÉPANNAGE pré-empté : « ${q} » — la réponse générique remplace un diagnostic du compte réel`);
+    }
+    // Et rien hors périmètre : une pré-emption sur « j'ai mal au genou » serait pire
+    // qu'un appel au modèle.
+    for (const q of ["quelle est la capitale du japon", "j'ai mal au genou", "raconte-moi une blague",
+                     "azertyuiop", "quel est mon TSB"]) {
+      assert.equal(reponseImmediate(q), null, `hors périmètre pré-empté : « ${q} »`);
+    }
+    // La garantie est STRUCTURELLE, pas affaire de seuil : le code doit vérifier la source.
+    const src = codeOf("src/lib/support/fallback.ts");
+    assert.ok(/t\.source !== "page"/.test(src),
+      "la pré-emption ne vérifie plus la SOURCE : un dépannage pourrait passer");
+  });
+
+  test("la route de support interroge la base AVANT le modèle", () => {
+    // La base savait déjà répondre, mais n'était consultée qu'APRÈS l'échec du modèle,
+    // en dernier recours : on payait l'appel avant de découvrir qu'on n'en avait pas
+    // besoin. L'ordre est tout l'intérêt du changement.
+    const src = codeOf("src/app/api/ai/support/route.ts");
+    assert.ok(/reponseImmediate\(/.test(src), "le support n'interroge plus la base avant le modèle");
+    assert.ok(src.indexOf("reponseImmediate(") < src.indexOf("generateContent("),
+      "la base est interrogée APRÈS le modèle — l'appel est déjà payé");
+    // Et le repli de dernier recours doit rester : ce sont deux chemins distincts.
+    assert.ok(/fallbackAnswer\(/.test(src), "le repli en cas de modèle indisponible a disparu");
+  });
+
+  test("deux routes ne peuvent pas être le MÊME fichier", () => {
+    // DÉFAUT RÉEL, ET C'EST MOI QUI L'AI CAUSÉ. Une moulinette de mutation sauvegardait
+    // les fichiers dans /tmp par NOM DE BASE : `coach/route.ts` et `training-plan/route.ts`
+    // s'appellent tous deux « route.ts ». La sauvegarde de l'un a écrasé l'autre, puis la
+    // restauration a recopié le même contenu dans les deux chemins. `/api/ai/coach` a été
+    // commité ET DÉPLOYÉ en servant le code du plan d'entraînement.
+    //
+    // Rien ne pouvait le voir : les deux fichiers compilent, les deux répondent 200, et
+    // les tests de couverture passaient puisque le contenu recopié portait lui aussi son
+    // verrou et son appel au modèle. Seule une empreinte les distingue.
+    const empreintes = new Map<string, string>();
+    for (const d of readdirSync("src/app/api/ai")) {
+      const f = `src/app/api/ai/${d}/route.ts`;
+      if (!existsSync(f)) continue;
+      const h = createHash("md5").update(readFileSync(f)).digest("hex");
+      const jumeau = empreintes.get(h);
+      assert.ok(!jumeau, `« ${d} » et « ${jumeau} » sont le MÊME fichier — l'une des deux routes a été écrasée`);
+      empreintes.set(h, d);
+    }
+    assert.ok(empreintes.size >= 7, `seulement ${empreintes.size} routes IA : le balayage est cassé`);
+  });
+
+  test("le budget de sortie de chaque route reste proportionné", () => {
+    // La sortie coûte HUIT FOIS l'entrée au jeton : c'est elle qui décide de la facture,
+    // pas la taille du contexte. Un `maxOutputTokens` large ne rend pas la réponse
+    // meilleure, il la rend plus chère — et `coach` est le cas d'école : son propre
+    // prompt demande « max 4 phrases ».
+    const PLAFONDS: Record<string, number> = {
+      coach: 600, session: 600, "journal-analyze": 500, support: 1200, cours: 1400,
+      physio: 1600,
+      // Le plan complet rend un JSON de plusieurs semaines : c'est la seule route qui
+      // justifie un budget large, et elle n'est appelée qu'à la demande.
+      "training-plan": 8192,
+    };
+    for (const d of readdirSync("src/app/api/ai")) {
+      const f = `src/app/api/ai/${d}/route.ts`;
+      if (!existsSync(f)) continue;
+      const m = codeOf(f).match(/maxOutputTokens:\s*(\d+)/);
+      if (!m) continue;
+      const attendu = PLAFONDS[d];
+      assert.ok(attendu != null, `${d} : route IA inconnue de la table des budgets`);
+      assert.ok(Number(m[1]) <= attendu,
+        `${d} : ${m[1]} jetons de sortie autorisés pour un budget de ${attendu} — la sortie coûte 8× l'entrée`);
+    }
   });
 
   test("TOUTE route qui fait parler un modèle est verrouillée côté serveur", () => {

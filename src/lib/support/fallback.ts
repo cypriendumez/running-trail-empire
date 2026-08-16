@@ -35,10 +35,27 @@ const words = (s: string) => norm(s).split(" ").filter((w) => w.length > 2 && !S
  * mieux vaut avouer qu'on n'a pas compris que servir une réponse hors sujet.
  */
 export function fallbackAnswer(question: string, lang = "fr"): string | null {
+  return chercherSansIA(question, lang)?.text ?? null;
+}
+
+/** D'où vient la réponse — et c'est ce qui décide si on peut s'en contenter. */
+export type SourceSansIA = "probleme" | "page";
+
+export type TrouvailleSansIA = { text: string; source: SourceSansIA; score: number };
+
+/**
+ * La même recherche, mais qui DIT ce qu'elle a trouvé et avec quelle confiance.
+ *
+ * `fallbackAnswer` renvoie juste un texte : suffisant quand on l'appelle en dernier
+ * recours, où n'importe quelle réponse vaut mieux que « indisponible ». Insuffisant
+ * pour décider de NE PAS appeler le modèle, parce que les deux sources n'ont pas la
+ * même valeur — voir `reponseImmediate`.
+ */
+export function chercherSansIA(question: string, lang = "fr"): TrouvailleSansIA | null {
   const qw = words(question);
   if (!qw.length) return null;
 
-  let best: { score: number; text: string } | null = null;
+  let best: { score: number; text: string; source: SourceSansIA } | null = null;
 
   // 1. Problèmes fréquents — ce sont les vraies questions de support.
   for (const p of HELP_PROBLEMS) {
@@ -51,7 +68,7 @@ export function fallbackAnswer(question: string, lang = "fr"): string | null {
     const qHits = qw.filter((w) => words(p.q).includes(w)).length;
     const score = hits + qHits * 2 + keyHits * 3;
     if (score >= 3 && (!best || score > best.score)) {
-      best = { score, text: PROBLEM_T[p.q]?.[lang] ?? p.a };
+      best = { score, text: PROBLEM_T[p.q]?.[lang] ?? p.a, source: "probleme" };
     }
   }
 
@@ -65,11 +82,43 @@ export function fallbackAnswer(question: string, lang = "fr"): string | null {
       // Le chemin de clics est ce qui rend la réponse actionnable : sans lui, on répond
       // « c'est dans Santé » à quelqu'un qui cherche justement où cliquer.
       const how = page.how ? `\n\n➜ ${page.how}` : "";
-      best = { score, text: `**${page.name}** — ${page.what}${how}` };
+      best = { score, text: `**${page.name}** — ${page.what}${how}`, source: "page" };
     }
   }
 
-  return best?.text ?? null;
+  return best;
+}
+
+/**
+ * SEUIL de pré-emption : au-dessus, on répond sans appeler le modèle du tout.
+ *
+ * Plus haut que le seuil de repli (3), et volontairement : un repli sert quand il n'y a
+ * plus rien d'autre, une pré-emption REMPLACE une réponse qui aurait été meilleure.
+ *
+ * MESURÉ sur le corpus de 13 680 formulations du fuzz : 21 % de pré-emption à 6, 32 % à
+ * 4, et rien de plus en descendant à 3. On prend 4. La sûreté ne vient de toute façon
+ * PAS de ce seuil mais de la source — un dépannage n'est jamais pré-empté, quel que soit
+ * son score.
+ */
+export const SEUIL_IMMEDIAT = 4;
+
+/**
+ * Réponse servie SANS aucun appel au modèle, ou `null` s'il vaut mieux le laisser parler.
+ *
+ * ⚠️ ON NE PRÉ-EMPTE QUE LA NAVIGATION, JAMAIS LE DÉPANNAGE — et c'est la décision
+ * centrale de ce module. « Où je change la langue » a une réponse identique pour tout
+ * le monde : un chemin de clics, que la base connaît mieux qu'un modèle. « Mes séances
+ * n'arrivent pas sur ma montre » n'en a pas : l'assistant lit l'état RÉEL du compte
+ * (`diagnoseAccount`) et sait, lui, que la clé intervals.icu est absente. Servir la
+ * fiche générique à sa place ferait économiser un appel en dégradant très exactement
+ * ce qui fait la valeur de l'assistant.
+ *
+ * Autrement dit : on n'économise que là où l'IA n'apportait rien.
+ */
+export function reponseImmediate(question: string, lang = "fr"): string | null {
+  const t = chercherSansIA(question, lang);
+  if (!t || t.source !== "page" || t.score < SEUIL_IMMEDIAT) return null;
+  return t.text;
 }
 
 /** Message servi quand l'IA est indisponible ET qu'aucune correspondance n'est trouvée.

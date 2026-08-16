@@ -5,7 +5,7 @@ import { generateContent } from "@/lib/ai/gemini";
 import { HELP_PAGES, HELP_FACTS, HELP_PROBLEMS, HEALTH_TABS } from "@/data/helpKb";
 import { diagnoseAccount, findingsBlock, type AccountState } from "@/lib/support/diagnose";
 import { T, normLang } from "@/lib/i18n/translations";
-import { fallbackAnswer, FALLBACK_MISS, FALLBACK_PREFIX } from "@/lib/support/fallback";
+import { fallbackAnswer, reponseImmediate, FALLBACK_MISS, FALLBACK_PREFIX } from "@/lib/support/fallback";
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  ASSISTANT DE SUPPORT — répond aux questions sur l'app, dans la langue de l'athlète.
@@ -41,6 +41,24 @@ export async function POST(req: Request) {
   const message = String(body.message ?? "").trim().slice(0, 1000);
   if (!message) return NextResponse.json({ error: "Question vide" }, { status: 400 });
   const lang = LANGS[String(body.lang ?? "fr")] ? String(body.lang) : "fr";
+
+  // ── RÉPONSE IMMÉDIATE, SANS AUCUN JETON ─────────────────────────────────────
+  //  La base de connaissances savait déjà répondre — mais on ne l'interrogeait qu'APRÈS
+  //  l'échec du modèle, en dernier recours. Sur une question de navigation (« où je vois
+  //  le détail d'une séance », « comment connecter ma montre »), elle répond mieux et en
+  //  0 ms : le chemin de clics vient de `helpKb`, le modèle ne fait que le recopier.
+  //
+  //  ⚠️ NAVIGATION SEULEMENT, JAMAIS UN DÉPANNAGE. « Mes séances n'arrivent pas sur ma
+  //  montre » a l'air d'une question fréquente, mais l'assistant y répond en lisant
+  //  l'état RÉEL du compte : il sait, lui, que la clé intervals.icu est absente. Servir
+  //  la fiche générique à sa place économiserait un appel en détruisant précisément ce
+  //  qui fait la valeur de l'assistant. La garantie est STRUCTURELLE (la source doit
+  //  être une page), pas affaire de seuil.
+  //
+  //  Mesuré sur les 13 680 formulations du fuzz : 32 % des questions sont servies sans
+  //  appel, et aucune question de dépannage ni hors-sujet n'est capturée.
+  const immediate = reponseImmediate(message, lang);
+  if (immediate) return NextResponse.json({ reply: immediate, source: "base" });
 
   // ── État du compte ──
   // `intervals_api_key` n'est lu QUE pour en déduire un booléen ; la clé elle-même ne
