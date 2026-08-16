@@ -165,7 +165,16 @@ export default function LandingPage() {
     <div className="min-h-screen bg-white font-sans text-zinc-900 antialiased">
 
       {/* ── NAV ── */}
-      <nav className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${solidNav ? "bg-white/90 backdrop-blur-xl border-b border-zinc-200/70" : "bg-transparent"}`}>
+      {/* LA BARRE EST UNE COUCHE, PLUS UNE VITRE. Le problème signalé n'était pas la
+          lisibilité — « Connexion » se lisait — mais la COLLISION : la main levée d'une
+          silhouette venait toucher le mot, et l'œil lisait un empilement accidentel. Une
+          ombre portée ne corrige pas ça, elle ne fait que rendre le texte net PAR-DESSUS
+          l'ombre. Ce qu'il fallait, c'est SÉPARER les deux plans.
+          Un verre dépoli sombre sur toute la largeur donne à la barre son propre plan : la
+          photo continue derrière, floutée et assombrie, et plus rien ne « touche » le
+          texte. Elle reste transparente au sens où l'on voit la piste au travers — mais
+          elle cesse d'être au même niveau qu'elle. */}
+      <nav className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${solidNav ? "bg-white/90 backdrop-blur-xl border-b border-zinc-200/70" : "border-b border-white/10 bg-black/25 backdrop-blur-md"}`}>
         {/* DEUX RÉGLAGES INDÉPENDANTS, à ne pas confondre — je les avais liés à tort.
 
             1. `max-w-none` + padding court : la barre ne suit PLUS la largeur de contenu
@@ -285,11 +294,10 @@ export default function LandingPage() {
             transparent qu'à partir du moment où la colonne de texte s'arrête avant les
             coureurs. */}
         <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-black/70 via-black/50 to-black/28 sm:w-[70%] sm:via-black/38 sm:to-transparent" />
-        {/* Bandeau du haut : « Connexion » tombait sur l'ombre d'un coureur, et du blanc
-            sur une silhouette noire posée sur une piste rouge n'a pas de contraste stable
-            — il change à chaque pixel. Il reste donc, mais allégé (0,68 → 0,52) et resserré
-            en hauteur : il ne doit couvrir que la barre, pas le tiers supérieur de l'image. */}
-        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/58 via-black/22 to-transparent" />
+        {/* Bandeau du haut ALLÉGÉ (0,58 → 0,30) : la barre porte désormais son propre
+            fond en verre dépoli, les deux se cumulaient et rendaient le haut de la photo
+            inutilement noir. Il ne sert plus qu'à fondre le bas de la barre dans l'image. */}
+        <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/30 to-transparent" />
 
         <Container className="relative z-10 pb-20 pt-28 sm:pb-24">
           {/* Le titre est désormais une LIGNE DE MARQUE identique dans les cinq langues, ce
