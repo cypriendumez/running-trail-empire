@@ -93,7 +93,20 @@ const STAT_VALUES = ["14 000+", "15 700", "7 j", "10 min"];
 // Plateformes réellement synchronisables — chacune est justifiée dans le commentaire de
 // la section « SYNCHRONISATION » plus bas. Ne rien ajouter ici sans preuve dans le code :
 // une marque affichée est une promesse d'intégration.
-const SYNC = ["Garmin", "COROS", "Polar", "Suunto", "Wahoo", "Strava"];
+//
+// `logo` désigne un fichier de `public/brands/`. Il est OPTIONNEL À DESSEIN : un logo de
+// marque est un ACTIF, pas du code, et il appartient à son titulaire. Tant que le fichier
+// n'est pas là, la tuile affiche le nom — jamais une image cassée, jamais un logo redessiné
+// « à peu près », qui rendrait moins bien que le mot et poserait en plus un problème de
+// marque. Déposer le fichier suffit à basculer la tuile en logo, sans toucher au code.
+const SYNC: { nom: string; logo?: string }[] = [
+  { nom: "Garmin" },
+  { nom: "COROS" },
+  { nom: "Polar" },
+  { nom: "Suunto" },
+  { nom: "Wahoo" },
+  { nom: "Strava" },
+];
 // ── PRIX AFFICHÉS ────────────────────────────────────────────────────────────
 //  En CENTIMES, et rigoureusement identiques à `TARIFS` (lib/stripe/client.ts), qui
 //  est ce qui sera réellement débité. Un test vérifie l'égalité : afficher un prix
@@ -238,11 +251,12 @@ export default function LandingPage() {
           decoding="async"
           className="absolute inset-0 h-full w-full object-cover"
         />
-        {/* Les trois voiles ont été ALLÉGÉS d'environ un tiers : empilés, ils rendaient
-            0,85 + 0,60 + 0,68 par endroits, et la piste virait au brun-noir — on ne voyait
-            plus la photo qu'on avait choisie. Le retrait du bandeau de synchro sous le CTA
-            a libéré le bas du hero, qui n'a plus besoin d'être aussi couvert. */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/62 via-black/18 to-transparent" />
+        {/* Les trois voiles avaient été ALLÉGÉS d'un tiers (ils rendaient 0,85 + 0,60 + 0,68
+            empilés, et la piste virait au brun-noir). Ils sont ici remontés de 8 points —
+            un cran, pas un retour en arrière : la photo reste lisible comme photo, mais le
+            texte blanc regagne la marge de contraste que l'éclaircissement lui avait prise
+            sur les zones de piste les plus claires. */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/24 to-transparent" />
         {/* VOILE LATÉRAL — il manquait, et c'est toute l'explication du texte « qui dépasse
             sur les coureurs ». Le hero n'avait qu'un dégradé du BAS et un bandeau du HAUT :
             au milieu de l'image, à hauteur du titre et du paragraphe, la photo était à nu.
@@ -255,12 +269,12 @@ export default function LandingPage() {
             donc un plancher (`to-black/40`) en dessous de `sm`, et ne va vers le
             transparent qu'à partir du moment où la colonne de texte s'arrête avant les
             coureurs. */}
-        <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-black/62 via-black/42 to-black/22 sm:w-[70%] sm:via-black/30 sm:to-transparent" />
+        <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-black/70 via-black/50 to-black/28 sm:w-[70%] sm:via-black/38 sm:to-transparent" />
         {/* Bandeau du haut : « Connexion » tombait sur l'ombre d'un coureur, et du blanc
             sur une silhouette noire posée sur une piste rouge n'a pas de contraste stable
             — il change à chaque pixel. Il reste donc, mais allégé (0,68 → 0,52) et resserré
             en hauteur : il ne doit couvrir que la barre, pas le tiers supérieur de l'image. */}
-        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/52 via-black/18 to-transparent" />
+        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/58 via-black/22 to-transparent" />
 
         <Container className="relative z-10 pb-20 pt-28 sm:pb-24">
           {/* Le titre est désormais une LIGNE DE MARQUE identique dans les cinq langues, ce
@@ -317,12 +331,15 @@ export default function LandingPage() {
           {L.sync.title}
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5 sm:gap-3">
-          {SYNC.map((s) => (
+          {SYNC.map((m) => (
             <span
-              key={s}
-              className="inline-flex h-14 items-center rounded-2xl border border-zinc-200 bg-white px-5 text-sm font-bold uppercase tracking-wide text-zinc-700 shadow-sm transition-colors hover:border-zinc-300"
+              key={m.nom}
+              className="inline-flex h-14 items-center justify-center rounded-2xl border border-zinc-200 bg-white px-5 text-sm font-bold uppercase tracking-wide text-zinc-700 shadow-sm transition-colors hover:border-zinc-300"
             >
-              {s}
+              {m.logo
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={`/brands/${m.logo}`} alt={m.nom} className="h-6 w-auto object-contain" loading="lazy" />
+                : m.nom}
             </span>
           ))}
         </div>
