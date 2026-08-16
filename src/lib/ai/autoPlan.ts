@@ -323,12 +323,28 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // ── 2. Sortie longue : dimanche de préférence, sinon samedi, sinon un jour praticable.
   // Semaine de course : PAS de sortie longue. La course est déjà l'effort long et dur
   // de la semaine ; y ajouter 18 km trois jours avant saboterait la fraîcheur.
-  const weekend = dates.map((d, i) => ({ i, day: d.getDay() })).filter((x) => (x.day === 0 || x.day === 6) && canRun(x.i));
+  // ── LE JOUR 0 SERA ÉCRASÉ PAR LA FRAÎCHEUR : ON N'Y POSE RIEN QUI COMPTE ──────
+  //  L'étape 7 remplace la séance du jour par de la récupération quand la fraîcheur est
+  //  au rouge (ou qu'une séance dure a déjà eu lieu aujourd'hui). Ce drapeau existait
+  //  déjà plus bas pour les séances de QUALITÉ, avec ce constat : « placer la qualité
+  //  sur le jour 0 revenait à la SUPPRIMER ». Le même piège valait pour la sortie
+  //  longue, et il n'y avait jamais été traité.
+  //
+  //  DÉFAUT RÉEL, resté invisible parce qu'il ne se produit QUE le dimanche : la sortie
+  //  longue va de préférence sur un dimanche, or un dimanche le dimanche EST le jour 0.
+  //  Un athlète au rouge ce jour-là perdait sa sortie longue pour les sept jours — pas
+  //  décalée, pas raccourcie, pas expliquée : absente. Six jours sur sept, personne ne
+  //  pouvait le voir. Sept jours consécutifs contenant toujours exactement un samedi et
+  //  un dimanche, l'écarter laisse forcément l'autre jour de week-end disponible.
+  const dayZeroDropped = ctx.readiness.level === "rouge" || ctx.lastHardDaysAgo === 0;
+  const weekend = dates.map((d, i) => ({ i, day: d.getDay() }))
+    .filter((x) => (x.day === 0 || x.day === 6) && canRun(x.i) && !(dayZeroDropped && x.i === 0));
   // Une « sortie longue » de moins de 4 km n'est pas une sortie longue. Cas rencontré
   // sur un profil sans aucune donnée (volume cible nul) : le plan annonçait « Sortie
   // longue : ~0 km (environ 0 min) ». Mieux vaut ne rien poser.
   const longIdx = longRunKm < 4 ? -1 : raceIdx >= 0 ? -1
-    : (weekend.find((x) => x.day === 0)?.i ?? weekend[0]?.i ?? [6, 5, 4, 3, 2, 1, 0].find((i) => canRun(i)) ?? -1);
+    : (weekend.find((x) => x.day === 0)?.i ?? weekend[0]?.i
+      ?? [6, 5, 4, 3, 2, 1, 0].find((i) => canRun(i) && !(dayZeroDropped && i === 0)) ?? -1);
   const bike = ctx.longRunMode === "bike";
   if (longIdx >= 0) {
     put(longIdx, bike
@@ -395,11 +411,8 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // La dernière séance dure DÉJÀ EFFECTUÉE est traitée comme un jour dur d'index négatif :
   // si elle date d'hier, elle occupe l'index −1 et repousse d'autant la première qualité.
   // La course, elle, agit comme un jour dur à ne pas approcher à moins de 48 h.
-  // La séance d'aujourd'hui sera de toute façon remplacée par de la récupération si la
-  // fraîcheur est au rouge (étape 7). Placer la qualité sur le jour 0 revenait alors à la
-  // SUPPRIMER : une semaine entière sans qualité parce que l'athlète était fatigué ce
-  // matin-là. On la décale simplement plus loin dans la semaine.
-  const dayZeroDropped = ctx.readiness.level === "rouge" || ctx.lastHardDaysAgo === 0;
+  // (`dayZeroDropped` est déclaré plus haut : il sert d'abord à la sortie longue, puis
+  //  ici à la qualité. Deux déclarations auraient fini par diverger.)
   const placed: number[] = ctx.lastHardDaysAgo != null ? [-ctx.lastHardDaysAgo] : [];
   if (raceIdx >= 0) placed.push(raceIdx);
   // Un jour à 30 °C n'est pas un jour de qualité s'il existe une alternative plus fraîche
