@@ -36,11 +36,15 @@ const PROGRAMS: { key: string; category: string; photo: string }[] = [
   { key: "semi", category: "SEMI", photo: "photo-1667781838690-5f32ea0ccea6" },
   { key: "marathon", category: "MARATHON", photo: "photo-1682367905664-e36b30f15b19" },
   { key: "trail", category: "TRAIL", photo: "photo-1504025468847-0e438279542c" },
-  // Débuter : c'était un gros plan de pieds sur des marches, interchangeable avec
-  // n'importe quelle carte de n'importe quel site de sport. Remplacé par deux coureurs
-  // ensemble en plein jour — la carte doit dire « c'est accessible, et tu n'es pas
-  // seul », pas montrer un détail anatomique.
-  { key: "beginner", category: "BEGINNER", photo: "photo-1781726956705-038cab091bc6" },
+  // Débuter : TROISIÈME photo pour cette carte, et cette fois pour une raison juridique,
+  // pas esthétique. La précédente montrait DEUX VISAGES de face, nets et parfaitement
+  // identifiables (plus une troisième personne au second plan). La licence Unsplash ne
+  // couvre que le DROIT D'AUTEUR du photographe : Unsplash écrit noir sur blanc qu'elle
+  // ne garantit aucune autorisation de droit à l'image. Sur un site qui vend un
+  // abonnement, un visage reconnaissable est un risque que rien ne compense.
+  // La remplaçante tient le même message — « c'est accessible, tu n'es pas seul » : un
+  // groupe qui court ensemble, tous DE DOS, aucun visage, aucune marque lisible.
+  { key: "beginner", category: "BEGINNER", photo: "photo-1645238426817-8c3e7d1396cf" },
   { key: "speed", category: "SPEED", photo: "photo-1461896836934-ffe607ba8211" },
   // Endurance : reprise DEUX fois. D'abord un coureur plié en deux, mains sur les
   // genoux — de l'épuisement, soit l'inverse du message d'une base aérobie. Puis un
