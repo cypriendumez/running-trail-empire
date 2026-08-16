@@ -4387,6 +4387,22 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     assert.ok(empreintes.size >= 7, `seulement ${empreintes.size} routes IA : le balayage est cassé`);
   });
 
+  test("l'historique renvoyé au modèle est borné en NOMBRE et en LONGUEUR", () => {
+    // Les routes à conversation renvoient l'historique à chaque question. Leur
+    // profondeur était bornée (6 à 10 messages), pas la longueur de chaque message :
+    // une description de douleur de 4 000 caractères repartait en entier à CHAQUE tour.
+    // Mesuré : jusqu'à 10 000 jetons d'historique par question — plus que le contexte
+    // complet de l'athlète, et payés à chaque fois.
+    for (const d of ["physio", "cours", "support"]) {
+      const src = codeOf(`src/app/api/ai/${d}/route.ts`);
+      const m = src.match(/history[^\n]*\)\.slice\(-(\d+)\)/);
+      assert.ok(m, `${d} : l'historique n'est plus borné en nombre de messages`);
+      assert.ok(Number(m![1]) <= 10, `${d} : ${m![1]} messages d'historique, c'est trop`);
+      assert.ok(/String\(m\.text\)\.slice\(0, \d+\)|String\(m\.text\)\.slice\(0, 1500\)/.test(src),
+        `${d} : chaque message d'historique doit être TRONQUÉ, pas seulement compté`);
+    }
+  });
+
   test("le budget de sortie de chaque route reste proportionné", () => {
     // La sortie coûte HUIT FOIS l'entrée au jeton : c'est elle qui décide de la facture,
     // pas la taille du contexte. Un `maxOutputTokens` large ne rend pas la réponse

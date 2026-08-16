@@ -153,7 +153,12 @@ Si la photo est floue, trop sombre, trop éloignée ou ne montre pas la zone dé
   const contents = [
     { role: "user", parts: [{ text: systemPrompt }] },
     { role: "model", parts: [{ text: "Bonjour 👋 Je suis votre kiné du sport. Décrivez-moi ce que vous ressentez (zone, depuis quand, à l'effort ou au repos) et je vous aide." }] },
-    ...(history ?? []).slice(-8).map((m) => ({ role: m.role, parts: [{ text: m.text }] })),
+    // ⚠️ CHAQUE message d'historique est TRONQUÉ, pas seulement leur nombre. Le tour
+    // précédent bornait la profondeur mais pas la longueur : un message de 4 000
+    // caractères — une description de douleur détaillée, un copier-coller — repart en
+    // entier À CHAQUE nouvelle question. Mesuré : jusqu'à 8000 jetons d'historique par
+    // tour, soit plus que le contexte complet de l'athlète. Le support le faisait déjà.
+    ...(history ?? []).slice(-8).map((m) => ({ role: m.role, parts: [{ text: String(m.text).slice(0, 1500) }] })),
     // La photo accompagne le message de CE tour uniquement. Elle n'est pas conservée :
     // aux tours suivants, c'est la réponse écrite du modèle qui porte le contexte.
     { role: "user", parts: imagePart ? [{ text: message }, imagePart] : [{ text: message }] },
