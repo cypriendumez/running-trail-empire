@@ -165,16 +165,11 @@ export default function LandingPage() {
     <div className="min-h-screen bg-white font-sans text-zinc-900 antialiased">
 
       {/* ── NAV ── */}
-      {/* LA BARRE EST UNE COUCHE, PLUS UNE VITRE. Le problème signalé n'était pas la
-          lisibilité — « Connexion » se lisait — mais la COLLISION : la main levée d'une
-          silhouette venait toucher le mot, et l'œil lisait un empilement accidentel. Une
-          ombre portée ne corrige pas ça, elle ne fait que rendre le texte net PAR-DESSUS
-          l'ombre. Ce qu'il fallait, c'est SÉPARER les deux plans.
-          Un verre dépoli sombre sur toute la largeur donne à la barre son propre plan : la
-          photo continue derrière, floutée et assombrie, et plus rien ne « touche » le
-          texte. Elle reste transparente au sens où l'on voit la piste au travers — mais
-          elle cesse d'être au même niveau qu'elle. */}
-      <nav className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${solidNav ? "bg-white/90 backdrop-blur-xl border-b border-zinc-200/70" : "border-b border-white/10 bg-black/25 backdrop-blur-md"}`}>
+      {/* La barre reste TRANSPARENTE sur le hero. Un fond en verre dépoli sombre avait été
+          essayé pour séparer le texte des silhouettes : il réglait la collision, mais posait
+          un bandeau brun en travers du haut de l'image — le remède se voyait plus que le
+          mal. Le décalage de « Connexion » ci-dessous suffit. */}
+      <nav className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${solidNav ? "bg-white/90 backdrop-blur-xl border-b border-zinc-200/70" : "bg-transparent"}`}>
         {/* DEUX RÉGLAGES INDÉPENDANTS, à ne pas confondre — je les avais liés à tort.
 
             1. `max-w-none` + padding court : la barre ne suit PLUS la largeur de contenu
@@ -208,7 +203,12 @@ export default function LandingPage() {
               dans sa vie. Il passe en bout de chaîne, après le bouton, où l'œil le
               trouve quand il le cherche sans le heurter quand il ne le cherche pas. */}
           <div className="flex items-center justify-self-end gap-2">
-            <Link href="/login" className={`hidden sm:inline-flex rounded-lg px-2.5 py-2 text-sm font-medium transition-colors ${solidNav ? "text-zinc-600 hover:text-zinc-900" : `text-white hover:text-white ${navOmbre}`}`}>
+            {/* `mr-6` : « Connexion » tombait pile sur le bras levé d'une silhouette. On
+                l'écarte du bouton, ce qui le décale d'autant vers la gauche et le sort de
+                l'ombre. ⚠️ Ce réglage vaut pour une fenêtre large : la photo est en
+                `object-cover`, donc la silhouette se déplace avec la taille de l'écran. Ce
+                n'est pas une garantie à toutes les largeurs, c'est un cadrage. */}
+            <Link href="/login" className={`hidden sm:inline-flex rounded-lg px-2.5 py-2 text-sm font-medium transition-colors sm:mr-4 lg:mr-6 ${solidNav ? "text-zinc-600 hover:text-zinc-900" : `text-white hover:text-white ${navOmbre}`}`}>
               {L.nav.login}
             </Link>
             {/* Sur la photo, ce bouton était un rectangle BLANC PLEIN posé en haut à
@@ -294,10 +294,9 @@ export default function LandingPage() {
             transparent qu'à partir du moment où la colonne de texte s'arrête avant les
             coureurs. */}
         <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-black/70 via-black/50 to-black/28 sm:w-[70%] sm:via-black/38 sm:to-transparent" />
-        {/* Bandeau du haut ALLÉGÉ (0,58 → 0,30) : la barre porte désormais son propre
-            fond en verre dépoli, les deux se cumulaient et rendaient le haut de la photo
-            inutilement noir. Il ne sert plus qu'à fondre le bas de la barre dans l'image. */}
-        <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/30 to-transparent" />
+        {/* Bandeau du haut : il donne au texte de la barre un fond assez sombre pour tenir,
+            sans couvrir plus que la barre elle-même. */}
+        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/58 via-black/22 to-transparent" />
 
         <Container className="relative z-10 pb-20 pt-28 sm:pb-24">
           {/* Le titre est désormais une LIGNE DE MARQUE identique dans les cinq langues, ce
