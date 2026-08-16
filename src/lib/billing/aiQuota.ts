@@ -41,8 +41,14 @@ export const TYPE_QUOTA = "ai_quota";
  * CHIFFRÉ POUR RESTER RENTABLE, en partant du coût mesuré (0,29 centime l'appel) et
  * du revenu NET (après TVA 20 % et commission Stripe) :
  *
- *   Essentiel  9,99 € TTC → 7,83 € net → 15 appels/j = 1,30 €/mois au pire = 17 %
- *   Complet   19,99 € TTC → 15,93 € net → 40 appels/j = 3,48 €/mois au pire = 22 %
+ *   Starter  9,99 €/mois (99,90 €/an) → 10 appels/j = 0,87 €/mois au pire
+ *              = 11 % du net mensuel, 13 % du net ANNUEL — marge brute 87 %
+ *   Premium 14,99 €/mois (149,90 €/an) → 30 appels/j = 2,61 €/mois au pire
+ *              = 22 % du net mensuel, 26 % du net ANNUEL — marge brute 74 %
+ *
+ * ⚠️ C'est le tarif ANNUEL qui contraint, pas le mensuel : deux mois offerts diminuent
+ * le revenu sans diminuer le plafond. Une remise de −33 % (80 €/an, comme envisagé un
+ * moment) aurait ramené Starter à 12 appels/jour maximum pour tenir la marge.
  *
  * Ce sont des PIRES CAS : un athlète qui saturerait son plafond tous les jours du
  * mois. L'usage réel tourne autour de quatre appels par jour, soit 0,35 €/mois. Le
@@ -50,12 +56,15 @@ export const TYPE_QUOTA = "ai_quota";
  * et l'abus, qui sont exactement ce qui rend une clé payante dangereuse sans lui.
  */
 export const PLAFOND_JOUR: Record<Acces, number> = {
-  // L'essai montre ce que donne Complet : sinon l'athlète juge un produit qu'il
-  // n'achètera pas, et choisit la formule basse par méconnaissance.
-  essai: 40,
-  complet: 40,
-  essentiel: 15,
-  consultation: 0,
+  // Le palier gratuit permanent n'a AUCUN crédit, et c'est tout le modèle : il reçoit
+  // gratuitement tout ce qui ne coûte rien (le plan, la synchro, les courses) et rien
+  // de ce qui coûte. C'est ce qui protège la marge sans fermer la porte à personne.
+  gratuit: 0,
+  // L'essai montre le niveau Premium : juger le module sur la formule basse ferait
+  // choisir Starter par méconnaissance, ou renoncer.
+  essai: 30,
+  starter: 10,
+  premium: 30,
 };
 
 /**

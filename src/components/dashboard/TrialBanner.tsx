@@ -25,7 +25,10 @@ export function TrialBanner({ acces }: { acces: EtatAcces | null }) {
   const { t } = useT();
   if (!acces) return null;
 
-  if (acces.etat === "consultation") {
+  // ⚠️ Plus de « consultation » : l'essai fini retombe sur le palier GRATUIT permanent.
+  // On ne prévient donc que si l'essai vient de se terminer — et le message dit ce qui
+  // CONTINUE (le plan, la synchro, les courses), pas ce qui est perdu.
+  if (acces.etat === "gratuit" && acces.essaiExpire) {
     return (
       <div className="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-3.5">
         <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-500">

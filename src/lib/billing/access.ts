@@ -27,10 +27,10 @@ export const COLONNES_ACCES = "created_at, subscription_tier";
 
 /** Ce à quoi un compte a droit, à un instant donné. */
 export type Acces =
-  | "essai"         // 30 premiers jours : tout est ouvert, sans carte bancaire
-  | "essentiel"     // le coach et les données, tout ce qui ne coûte pas de jetons
-  | "complet"       // + l'IA conversationnelle
-  | "consultation"; // essai fini, pas d'abonnement : on LIT, on ne produit plus
+  | "gratuit"    // permanent, sans carte : TOUT le produit déterministe, zéro IA
+  | "essai"      // 7 jours d'IA au niveau Premium, pour juger le module payant
+  | "starter"    // + 10 appels IA par jour
+  | "premium";   // + 30 appels IA par jour
 
 /** Ce qu'on cherche à faire. */
 export type Capacite =
@@ -39,24 +39,33 @@ export type Capacite =
   | "ia";      // faire parler un modèle (analyse, kiné, journal, assistant)
 
 /**
- * Durée de l'essai, en jours.
+ * Durée de l'essai du module IA, en jours.
  *
- * TRENTE, et pas quatorze. Ce n'est pas un choix commercial mais une contrainte du
- * produit : `computeLoad` travaille sur une fenêtre d'au moins 42 jours, le ratio
- * aigu:chronique sur 28, et la protection de charge de la série exige 8 journées
- * actives. Un athlète qui arrive SANS historique ne peut pas voir le produit
- * fonctionner en deux semaines — il verrait deux sorties longues et aucun cycle
- * d'allègement. On lui facturerait exactement ce qu'il n'a pas pu constater.
+ * SEPT, et c'est cohérent PARCE QU'IL EXISTE UN PALIER GRATUIT PERMANENT.
+ *
+ * L'argument qui imposait trente jours tenait tant que l'essai devait démontrer le
+ * COACH : `computeLoad` travaille sur au moins 42 jours, le ratio aigu:chronique sur
+ * 28, la protection de charge de la série exige 8 journées actives — un athlète sans
+ * historique ne peut pas juger un plan adaptatif en une semaine.
+ *
+ * Mais le coach n'est plus derrière l'essai : il est GRATUIT, pour toujours, parce
+ * qu'il ne coûte rien à servir (`autoPlan` et `autoCoach` sont déterministes, aucun
+ * appel de modèle). L'essai ne démontre donc plus que le module IA — et sept jours
+ * suffisent largement à poser vingt questions à un assistant et à se faire un avis.
+ *
+ * L'athlète a tout le temps du monde pour juger le plan : il ne paie pas pour lui.
  */
-export const JOURS_ESSAI = 30;
+export const JOURS_ESSAI = 7;
 
 /** Ce que le webhook Stripe a pu écrire, plus ce que l'historique a laissé. */
-const TIERS_PAYANTS: Record<string, Extract<Acces, "essentiel" | "complet">> = {
-  essentiel: "essentiel",
-  complet: "complet",
-  // « pro » est l'ancien palier unique, qui donnait tout : il devient « complet ».
-  // Le supprimer ferait rétrograder en silence les comptes déjà payants.
-  pro: "complet",
+const TIERS_PAYANTS: Record<string, Extract<Acces, "starter" | "premium">> = {
+  starter: "starter",
+  premium: "premium",
+  // Les paliers historiques donnaient tout : ils atterrissent sur le plus généreux.
+  // Les supprimer ferait rétrograder en silence des comptes déjà payants.
+  pro: "premium",
+  complet: "premium",
+  essentiel: "starter",
 };
 
 export type ProfilAcces = {
@@ -93,7 +102,11 @@ export function accesDe(p: ProfilAcces | null | undefined, maintenant: number = 
   const ecoules = Math.floor((maintenant - debut) / 86_400_000);
   const restants = JOURS_ESSAI - ecoules;
   if (restants > 0) return { etat: "essai", joursRestants: restants, essaiExpire: false };
-  return { etat: "consultation", joursRestants: 0, essaiExpire: true };
+  // ⚠️ L'essai fini ne ferme RIEN d'autre que l'IA. On retombe sur le palier gratuit
+  // permanent : le plan continue d'être republié, la montre d'être alimentée, les
+  // courses d'être consultables. C'est ce qui distingue ce modèle d'un mur payant —
+  // et ça ne coûte rien, puisque tout cela est déterministe.
+  return { etat: "gratuit", joursRestants: 0, essaiExpire: true };
 }
 
 /**
@@ -106,16 +119,23 @@ export function accesDe(p: ProfilAcces | null | undefined, maintenant: number = 
  * Servir ces pages ne coûte rien, et une coupure sèche fait désinstaller l'app —
  * alors qu'un compte en consultation revient de lui-même à la préparation suivante.
  */
+/**
+ * ⚠️ LA FRONTIÈRE PASSE EXACTEMENT LÀ OÙ PASSE LE COÛT, et nulle part ailleurs.
+ *
+ * `plan` est GRATUIT POUR TOUJOURS, y compris après l'essai. Ce n'est pas de la
+ * générosité : `autoPlan` et `autoCoach` sont déterministes, republier sept jours ne
+ * consomme aucun jeton. Le mettre derrière un péage coûterait des inscriptions sans
+ * économiser un centime — et c'est justement la meilleure partie du produit, donc
+ * celle qui doit servir d'hameçon.
+ *
+ * `ia` est la seule capacité dont la dépense grandit avec le nombre d'athlètes. C'est
+ * donc la seule qui se facture, et son volume (PLAFOND_JOUR) sépare les deux formules.
+ */
 const DROITS: Record<Acces, Capacite[]> = {
+  gratuit: ["lecture", "plan"],
   essai: ["lecture", "plan", "ia"],
-  complet: ["lecture", "plan", "ia"],
-  // ⚠️ Essentiel a DÉSORMAIS l'IA. Ce qui sépare les deux formules est le nombre
-  // d'appels par jour (voir PLAFOND_JOUR), pas la présence de la fonctionnalité :
-  // une formule privée d'IA se vend mal, parce que l'acheteur ne sait pas ce qu'il
-  // rate. Le coût reste borné par le plafond, et il l'est bien plus sûrement qu'en
-  // fermant la porte — un athlète qui ne peut pas essayer ne monte jamais en gamme.
-  essentiel: ["lecture", "plan", "ia"],
-  consultation: ["lecture"],
+  starter: ["lecture", "plan", "ia"],
+  premium: ["lecture", "plan", "ia"],
 };
 
 export function peut(etat: Acces, quoi: Capacite): boolean {
@@ -136,5 +156,7 @@ export function profilPeut(p: ProfilAcces | null | undefined, quoi: Capacite, ma
  */
 export function motifRefus(etat: Acces, quoi: Capacite): "essai_expire" | "formule_insuffisante" | null {
   if (peut(etat, quoi)) return null;
-  return etat === "consultation" ? "essai_expire" : "formule_insuffisante";
+  // Le seul refus possible désormais : l'IA sur un compte gratuit. Le plan, lui, n'est
+  // jamais refusé à personne.
+  return etat === "gratuit" ? "essai_expire" : "formule_insuffisante";
 }

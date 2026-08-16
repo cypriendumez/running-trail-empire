@@ -532,12 +532,12 @@ test("la formule vendue est celle qui est ACCORDÉE", () => {
   for (const f of FORMULES) for (const p of ["mois", "an"] as const) {
     assert.ok(TARIFS[f][p].env.startsWith("STRIPE_PRICE_"), `${f}/${p} : variable de tarif mal nommée`);
   }
-  assert.equal(TARIFS.essentiel.acces, "essentiel");
-  assert.equal(TARIFS.complet.acces, "complet");
+  assert.equal(TARIFS.starter.acces, "starter");
+  assert.equal(TARIFS.premium.acces, "premium");
   // Un tarif inconnu retombe sur « complet », JAMAIS sur un accès vide : quelqu'un qui a
   // payé ne doit pas se retrouver sans rien parce qu'une variable d'environnement manque.
-  assert.equal(accesDuPrice(null), "complet");
-  assert.equal(accesDuPrice("price_inconnu"), "complet");
+  assert.equal(accesDuPrice(null), "premium");
+  assert.equal(accesDuPrice("price_inconnu"), "premium");
 });
 test("l'athlète peut résilier son abonnement", () => {
   // Obligation légale en Europe dès lors que la souscription s'est faite en ligne — et
@@ -4056,29 +4056,34 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     assert.equal(r.since, null, "on ne prétend pas observer une fenêtre qu'on n'a pas");
   });
 
-  test("l'essai dure 30 jours, et le dernier jour compte encore", () => {
+  test("l'essai dure 7 jours, et le dernier jour compte encore", () => {
+    // SEPT et non trente, et c'est cohérent PARCE QU'IL EXISTE un palier gratuit
+    // permanent : l'essai ne démontre plus le coach (gratuit pour toujours, il ne coûte
+    // rien à servir) mais le seul module IA. Sept jours suffisent à poser vingt
+    // questions à un assistant ; ils ne suffiraient pas à juger un plan adaptatif, dont
+    // les fenêtres de mesure font 28 et 42 jours.
     const J = 86_400_000;
     const cree = (jours: number) => ({ created_at: new Date(Date.now() - jours * J).toISOString(), subscription_tier: "free" });
     assert.equal(accesDe(cree(0)).etat, "essai", "premier jour");
-    assert.equal(accesDe(cree(29)).etat, "essai", "29 jours : encore en essai");
-    // 29 j et 23 h ne font pas 30 jours écoulés : l'athlète a droit à sa journée entière.
-    assert.equal(accesDe({ created_at: new Date(Date.now() - (29 * J + 23 * 3600_000)).toISOString(), subscription_tier: "free" }).etat,
-      "essai", "29 j 23 h : l'essai n'est pas fini");
-    assert.equal(accesDe(cree(30)).etat, "consultation", "30 jours révolus : essai terminé");
+    assert.equal(accesDe(cree(6)).etat, "essai", "6 jours : encore en essai");
+    assert.equal(accesDe({ created_at: new Date(Date.now() - (6 * J + 23 * 3600_000)).toISOString(), subscription_tier: "free" }).etat,
+      "essai", "6 j 23 h : l'essai n'est pas fini");
+    assert.equal(accesDe(cree(7)).etat, "gratuit", "7 jours révolus : retour au palier gratuit");
     assert.equal(accesDe(cree(0)).joursRestants, JOURS_ESSAI);
-    assert.equal(accesDe(cree(29)).joursRestants, 1, "il reste un jour");
-    assert.equal(accesDe(cree(45)).essaiExpire, true, "l'expiration doit être signalable");
+    assert.equal(accesDe(cree(6)).joursRestants, 1, "il reste un jour");
+    assert.equal(accesDe(cree(45)).essaiExpire, true, "l'expiration doit rester signalable");
   });
 
-  test("à l'expiration on garde la LECTURE, on ne coupe pas tout", () => {
-    // C'est le cœur de la décision produit : une coupure sèche fait désinstaller
-    // l'app, alors qu'un compte en consultation revient à la préparation suivante.
-    // Et servir l'historique ne coûte rien.
-    assert.equal(peut("consultation", "lecture"), true, "l'historique doit rester consultable");
-    assert.equal(peut("consultation", "plan"), false, "plus de nouveau plan sans abonnement");
-    assert.equal(peut("consultation", "ia"), false);
-    for (const e of ["essai", "essentiel", "complet", "consultation"] as const) {
+  test("à l'expiration, le COACH continue — seule l'IA s'arrête", () => {
+    // C'est tout le modèle. Le plan de sept jours est DÉTERMINISTE : le republier ne
+    // consomme aucun jeton. Le mettre derrière un péage coûterait des inscriptions sans
+    // économiser un centime, et priverait le produit de son meilleur hameçon.
+    assert.equal(peut("gratuit", "lecture"), true);
+    assert.equal(peut("gratuit", "plan"), true, "le plan doit rester gratuit POUR TOUJOURS : il ne coûte rien");
+    assert.equal(peut("gratuit", "ia"), false, "l'IA est la seule capacité dont la dépense grandit avec les athlètes");
+    for (const e of ["gratuit", "essai", "starter", "premium"] as const) {
       assert.equal(peut(e, "lecture"), true, `${e} : la lecture ne se refuse jamais`);
+      assert.equal(peut(e, "plan"), true, `${e} : le plan ne se refuse jamais`);
     }
   });
 
@@ -4086,20 +4091,20 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     // Le modèle a changé volontairement : les deux formules ont l'IA, ce qui les sépare
     // est le plafond quotidien. Une formule privée d'IA se vend mal — l'acheteur ne sait
     // pas ce qu'il rate, donc il ne monte jamais en gamme.
-    assert.equal(peut("essentiel", "plan"), true, "le plan est dans les deux formules");
-    assert.equal(peut("essentiel", "ia"), true, "Essentiel doit avoir l'IA, en quantité limitée");
-    assert.equal(peut("complet", "ia"), true);
-    assert.ok(PLAFOND_JOUR.complet > PLAFOND_JOUR.essentiel,
+    assert.equal(peut("starter", "plan"), true, "le plan est dans toutes les formules");
+    assert.equal(peut("starter", "ia"), true, "Starter doit avoir l'IA, en quantité limitée");
+    assert.equal(peut("premium", "ia"), true);
+    assert.ok(PLAFOND_JOUR.premium > PLAFOND_JOUR.starter,
       "sans écart de plafond, les deux formules sont identiques et l'écart de prix est arbitraire");
     // Essentiel n'est plus refusé sur le DROIT — il l'est sur le plafond, et c'est un
     // refus 429, pas 402 : « reviens demain » et « change de formule » ne se résolvent
     // pas du même geste, et le message ne doit pas les confondre.
-    assert.equal(motifRefus("essentiel", "ia"), null, "Essentiel a le droit d'appeler l'IA");
-    assert.equal(motifRefus("consultation", "plan"), "essai_expire",
+    assert.equal(motifRefus("starter", "ia"), null, "Starter a le droit d'appeler l'IA");
+    assert.equal(motifRefus("gratuit", "ia"), "essai_expire",
       "un essai fini et un plafond atteint ne se résolvent pas par le même geste");
-    assert.equal(motifRefus("complet", "ia"), null, "aucun refus quand le droit existe");
-    // Le seul état qui refuse encore sur le droit est la consultation.
-    assert.equal(motifRefus("consultation", "ia"), "essai_expire");
+    assert.equal(motifRefus("premium", "ia"), null, "aucun refus quand le droit existe");
+    // Le seul état qui refuse encore sur le droit est le palier gratuit, et seulement pour l'IA.
+    assert.equal(motifRefus("gratuit", "plan"), null, "le plan ne se refuse à personne");
   });
 
   test("l'essai donne l'IA, sinon personne ne peut juger ce qu'il achète", () => {
@@ -4111,14 +4116,14 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     // Un client qui paie depuis deux ans a forcément un compte de plus de 30 jours :
     // faire passer la date d'abord l'aurait rétrogradé en consultation.
     const vieux = new Date(Date.now() - 800 * 86_400_000).toISOString();
-    assert.equal(accesDe({ created_at: vieux, subscription_tier: "complet" }).etat, "complet");
-    assert.equal(accesDe({ created_at: vieux, subscription_tier: "essentiel" }).etat, "essentiel");
+    assert.equal(accesDe({ created_at: vieux, subscription_tier: "premium" }).etat, "premium");
+    assert.equal(accesDe({ created_at: vieux, subscription_tier: "starter" }).etat, "starter");
     // « pro » est l'ancien palier unique : le retirer ferait rétrograder en silence
     // tous les comptes déjà payants.
-    assert.equal(accesDe({ created_at: vieux, subscription_tier: "pro" }).etat, "complet",
+    assert.equal(accesDe({ created_at: vieux, subscription_tier: "pro" }).etat, "premium",
       "les abonnés historiques « pro » perdent leur accès");
-    assert.equal(accesDe({ created_at: vieux, subscription_tier: "PRO" }).etat, "complet", "la casse ne doit pas décider");
-    assert.equal(accesDe({ created_at: vieux, subscription_tier: " complet " }).etat, "complet", "les espaces non plus");
+    assert.equal(accesDe({ created_at: vieux, subscription_tier: "PRO" }).etat, "premium", "la casse ne doit pas décider");
+    assert.equal(accesDe({ created_at: vieux, subscription_tier: " premium " }).etat, "premium", "les espaces non plus");
   });
 
   test("une donnée manquante n'enferme JAMAIS personne dehors", () => {
@@ -4143,7 +4148,7 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     // On rejoue la décision du module SANS base : `accorde` ne doit dépendre que du
     // compteur et du plafond, et c'est cette comparaison-là qui était fausse.
     const accorde = (utilises: number, plafond: number) => utilises < plafond;
-    const P = PLAFOND_JOUR.complet;
+    const P = PLAFOND_JOUR.premium;
     assert.equal(accorde(P - 1, P), true, `le ${P}e appel doit passer`);
     assert.equal(accorde(P, P), false, `le ${P + 1}e appel doit être refusé`);
     // Le compteur cesse d'avancer une fois le plafond atteint : c'est ce gel qui
@@ -4159,6 +4164,23 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
       "le compteur ne se réinitialise plus au changement de jour");
   });
 
+  test("le palier gratuit donne TOUT le déterministe, et rien qui coûte", () => {
+    // La décision structurante du modèle, et elle repose sur une mesure : `autoPlan` et
+    // `autoCoach` n'appellent aucun modèle. Republier sept jours de plan pour un athlète
+    // gratuit coûte donc zéro. Le mettre derrière un péage ferait perdre des inscriptions
+    // sans économiser un centime — et priverait le produit de son meilleur hameçon.
+    const auto = codeOf("src/lib/ai/autoPlan.ts") + codeOf("src/lib/ai/autoCoach.ts");
+    assert.ok(!/generateContent\(/.test(auto),
+      "le plan appelle désormais un modèle : il ne peut plus être gratuit, tout le modèle économique change");
+    assert.equal(peut("gratuit", "plan"), true);
+    assert.equal(PLAFOND_JOUR.gratuit, 0);
+    // Et l'essai ne verrouille RIEN d'autre que l'IA : à son terme on retombe au gratuit.
+    const J = 86_400_000;
+    const expire = accesDe({ created_at: new Date(Date.now() - 60 * J).toISOString(), subscription_tier: "free" });
+    assert.equal(expire.etat, "gratuit", "un essai fini ne doit pas fermer le coach");
+    assert.equal(peut(expire.etat, "plan"), true, "le plan doit survivre à l'essai");
+  });
+
   test("chaque plafond reste RENTABLE dans son pire cas", () => {
     // L'invariant qui protège vraiment Cyprien. Un plafond n'est pas un curseur de
     // confort : c'est ce qui borne la facture Gemini quand un athlète, une boucle ou un
@@ -4171,7 +4193,7 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     const net = (ttc: number) => { const ht = ttc / 1.2; return ht - (ht * 0.029 + 0.25); };
     const PART_MAX = 0.25;   // au-delà d'un quart du net, la marge ne tient plus
 
-    for (const [formule, etat] of [["essentiel", "essentiel"], ["complet", "complet"]] as const) {
+    for (const [formule, etat] of [["starter", "starter"], ["premium", "premium"]] as const) {
       const ttc = TARIFS[formule].mois.centimes / 100;
       const pireCas = PLAFOND_JOUR[etat] * 30 * COUT_APPEL;
       const part = pireCas / net(ttc);
@@ -4179,9 +4201,9 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
         `${formule} : ${PLAFOND_JOUR[etat]} appels/j coûtent ${pireCas.toFixed(2)} €/mois au pire, `
         + `soit ${(part * 100).toFixed(0)} % des ${net(ttc).toFixed(2)} € nets — au-delà de ${PART_MAX * 100} %, la marge ne tient plus`);
     }
-    assert.equal(PLAFOND_JOUR.consultation, 0, "un compte expiré ne doit consommer aucun jeton");
+    assert.equal(PLAFOND_JOUR.gratuit, 0, "le palier gratuit ne doit consommer aucun jeton");
     assert.ok(PLAFOND_JOUR.essai > 0, "sans crédits pendant l'essai, personne ne peut juger ce qu'il achète");
-    assert.equal(PLAFOND_JOUR.essai, PLAFOND_JOUR.complet, "l'essai doit montrer exactement ce que Complet donne");
+    assert.equal(PLAFOND_JOUR.essai, PLAFOND_JOUR.premium, "l'essai doit montrer le niveau Premium");
   });
 
   test("le plafond annoncé sur la vitrine est celui qui est APPLIQUÉ", () => {
@@ -4196,6 +4218,11 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     const CHIFFRE = /(\d+)\s+(?:[\w'’-]+[\s-]){0,2}(échanges|questions|exchanges|Dialoge|Fragen|intercambios|preguntas|trocas|perguntas)/gi;
     for (const l of ALL_LANGS) {
       for (const plan of LANDING_T[l].pricing.plans) {
+        // Le palier gratuit n'annonce aucun crédit : il n'en a pas, et c'est le message.
+        if (plan.cle === "gratuit") {
+          assert.equal(PLAFOND_JOUR.gratuit, 0, "le palier gratuit ne doit accorder aucun appel IA");
+          continue;
+        }
         const n = PLAFOND_JOUR[plan.cle];
         const texte = `${plan.pitch} ${plan.features.join(" ")}`;
         const annonces = [...texte.matchAll(CHIFFRE)].map((m) => Number(m[1]));
@@ -4234,7 +4261,8 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     // centimes — et c'est exactement le genre de copie qui dérive en silence.
     for (const f of ["src/app/page.tsx", "src/app/pricing/page.tsx"]) {
       const src = codeOf(f);
-      const bloc = src.slice(src.indexOf("const PRIX ="), src.indexOf("} as const;", src.indexOf("const PRIX =")));
+      const debut = src.indexOf("const PRIX");
+      const bloc = src.slice(debut, src.indexOf("};", debut));
       assert.ok(bloc.length > 20, `${f} : bloc PRIX introuvable`);
       for (const formule of FORMULES) {
         for (const [cle, periode] of [["mois", "mois"], ["an", "an"]] as const) {
@@ -4252,9 +4280,9 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
       assert.equal(TARIFS[f].an.centimes, TARIFS[f].mois.centimes * 10,
         `${f} : la remise annuelle ne vaut pas deux mois offerts`);
     }
-    // Et l'écart entre les deux formules doit rester positif — Complet contient Essentiel.
-    assert.ok(TARIFS.complet.mois.centimes > TARIFS.essentiel.mois.centimes,
-      "Complet doit coûter plus cher qu'Essentiel");
+    // Et l'écart entre les deux formules doit rester positif — Premium contient Starter.
+    assert.ok(TARIFS.premium.mois.centimes > TARIFS.starter.mois.centimes,
+      "Premium doit coûter plus cher que Starter");
   });
 
   test("les deux vitrines de tarifs racontent la MÊME chose", () => {
@@ -4269,8 +4297,11 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     // Deux formules et pas trois : « annuel » est une périodicité, pas un palier.
     for (const l of ALL_LANGS) {
       const p = LANDING_T[l].pricing;
-      assert.equal(p.plans.length, 2, `${l} : ${p.plans.length} formules — « annuel » est-il redevenu un palier ?`);
-      assert.deepEqual(p.plans.map((x) => x.cle), ["essentiel", "complet"], `${l} : clés de formule inattendues`);
+      // TROIS paliers, dont un gratuit permanent — et « annuel » n'en est toujours pas un :
+      // c'est une périodicité, et le sélecteur reste là pour ça.
+      assert.equal(p.plans.length, 3, `${l} : ${p.plans.length} formules attendues (gratuit, starter, premium)`);
+      assert.deepEqual(p.plans.map((x) => x.cle), ["gratuit", "starter", "premium"], `${l} : clés de formule inattendues`);
+      assert.ok(p.gratuitNote.length > 10, `${l} : le palier gratuit n'annonce pas qu'il ne demande pas de carte`);
       for (const plan of p.plans) {
         assert.ok(plan.name && plan.pitch && plan.cta && plan.features.length >= 4, `${l}/${plan.cle} : formule incomplète`);
       }

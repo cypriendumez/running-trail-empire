@@ -98,10 +98,11 @@ const SYNC = ["Garmin", "Coros", "Strava", "Suunto", "Polar"];
 //
 //  On ne peut pas importer `TARIFS` ici : ce module tire le SDK Stripe et la clé
 //  secrète, qui n'ont rien à faire dans un composant client.
-const PRIX = {
-  essentiel: { mois: 999, an: 9990 },
-  complet: { mois: 1999, an: 19990 },
-} as const;
+const PRIX: Record<string, { mois: number; an: number }> = {
+  gratuit: { mois: 0, an: 0 },
+  starter: { mois: 999, an: 9990 },
+  premium: { mois: 1499, an: 14990 },
+};
 
 /** « 9,99 € » dans la locale de l'athlète. */
 const euros = (centimes: number, lang: string) =>
@@ -381,14 +382,14 @@ export default function LandingPage() {
 
           <p className="mt-4 text-center text-sm text-zinc-500">{L.pricing.essai}</p>
 
-          <div className="mx-auto mt-10 grid max-w-3xl gap-6 md:grid-cols-2">
+          <div className="mx-auto mt-10 grid max-w-5xl gap-6 md:grid-cols-3">
             {L.pricing.plans.map((plan) => {
               const centimes = PRIX[plan.cle][periode];
               // À l'année on affiche l'équivalent MENSUEL en grand et le total en dessous :
               // c'est le chiffre que l'acheteur compare, et le masquer derrière un total
               // annuel fait paraître l'offre plus chère qu'elle n'est.
               const grand = periode === "an" ? Math.round(centimes / 12) : centimes;
-              const vedette = plan.cle === "complet";
+              const vedette = plan.cle === "premium";
               return (
                 <div key={plan.cle}
                   className={`relative flex flex-col rounded-3xl p-8 ${vedette ? "bg-zinc-950 text-white ring-2 ring-[#059669]" : "bg-white ring-1 ring-inset ring-zinc-200"}`}>
@@ -399,11 +400,11 @@ export default function LandingPage() {
                   )}
                   <div className={`text-sm font-semibold ${vedette ? "text-white/50" : "text-zinc-400"}`}>{plan.name}</div>
                   <div className="mt-2 flex items-baseline gap-1">
-                    <span className="text-5xl font-bold tracking-tight">{euros(grand, lang)}</span>
-                    <span className={`text-sm ${vedette ? "text-white/40" : "text-zinc-400"}`}>{L.pricing.parMois}</span>
+                    <span className="text-5xl font-bold tracking-tight">{plan.cle === "gratuit" ? euros(0, lang) : euros(grand, lang)}</span>
+                    <span className={`text-sm ${vedette ? "text-white/40" : "text-zinc-400"}`}>{plan.cle === "gratuit" ? "" : L.pricing.parMois}</span>
                   </div>
                   <div className={`mt-1 h-5 text-xs ${vedette ? "text-white/40" : "text-zinc-400"}`}>
-                    {periode === "an" ? `${euros(centimes, lang)} / ${L.pricing.an.toLowerCase()}` : ""}
+                    {plan.cle === "gratuit" ? L.pricing.gratuitNote : periode === "an" ? `${euros(centimes, lang)} / ${L.pricing.an.toLowerCase()}` : ""}
                   </div>
                   <p className={`mt-4 text-sm ${vedette ? "text-white/70" : "text-zinc-500"}`}>{plan.pitch}</p>
                   <ul className="mt-6 flex-1 space-y-3">
@@ -414,7 +415,7 @@ export default function LandingPage() {
                       </li>
                     ))}
                   </ul>
-                  <Link href={`/signup?formule=${plan.cle}&periode=${periode}`}
+                  <Link href={plan.cle === "gratuit" ? "/signup" : `/signup?formule=${plan.cle}&periode=${periode}`}
                     className={btnClass(vedette ? "secondary" : "primary", "md", "mt-8 w-full")}>
                     {plan.cta}
                   </Link>

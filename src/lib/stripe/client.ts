@@ -9,7 +9,7 @@ import type { Acces } from "@/lib/billing/access";
  * c'est de là que venaient « Posture Lab » et « Accès API développeur », deux
  * fonctionnalités qui n'existent pas. Deux formules, un sélecteur.
  *
- * L'écart de 5 € suit le COÛT RÉEL et rien d'autre : `autoPlan` et `autoCoach` sont
+ * L'écart de prix suit le COÛT RÉEL et rien d'autre : `autoPlan` et `autoCoach` sont
  * déterministes, donc Essentiel ne coûte quasiment rien à servir ; Complet ajoute l'IA
  * qui parle, seule partie dont la dépense grandit avec le nombre d'athlètes.
  *
@@ -17,15 +17,15 @@ import type { Acces } from "@/lib/billing/access";
  * bradait l'abonnement sans raison.
  */
 export const TARIFS = {
-  essentiel: {
-    acces: "essentiel" as Extract<Acces, "essentiel" | "complet">,
-    mois:  { centimes:  999, env: "STRIPE_PRICE_ESSENTIEL_MONTHLY" },
-    an:    { centimes: 9990, env: "STRIPE_PRICE_ESSENTIEL_YEARLY" },
+  starter: {
+    acces: "starter" as Extract<Acces, "starter" | "premium">,
+    mois:  { centimes:  999, env: "STRIPE_PRICE_STARTER_MONTHLY" },
+    an:    { centimes: 9990, env: "STRIPE_PRICE_STARTER_YEARLY" },
   },
-  complet: {
-    acces: "complet" as Extract<Acces, "essentiel" | "complet">,
-    mois:  { centimes: 1999, env: "STRIPE_PRICE_COMPLET_MONTHLY" },
-    an:    { centimes: 19990, env: "STRIPE_PRICE_COMPLET_YEARLY" },
+  premium: {
+    acces: "premium" as Extract<Acces, "starter" | "premium">,
+    mois:  { centimes: 1499, env: "STRIPE_PRICE_PREMIUM_MONTHLY" },
+    an:    { centimes: 14990, env: "STRIPE_PRICE_PREMIUM_YEARLY" },
   },
 } as const;
 
@@ -49,16 +49,16 @@ export const priceIdDe = (f: Formule, p: Periode): string => process.env[TARIFS[
  * quelqu'un qui a payé ne doit pas se retrouver sans accès parce qu'une variable
  * d'environnement manque.
  */
-export function accesDuPrice(priceId: string | null | undefined): Extract<Acces, "essentiel" | "complet"> {
+export function accesDuPrice(priceId: string | null | undefined): Extract<Acces, "starter" | "premium"> {
   const id = String(priceId ?? "");
-  if (!id) return "complet";
+  if (!id) return "premium";
   for (const f of FORMULES) {
     for (const p of ["mois", "an"] as const) {
       if (priceIdDe(f, p) && priceIdDe(f, p) === id) return TARIFS[f].acces;
     }
   }
-  // Les deux anciens tarifs uniques donnaient tout : ils restent « complet ».
-  return "complet";
+  // Les anciens tarifs uniques donnaient tout : ils restent au niveau le plus haut.
+  return "premium";
 }
 
 /**

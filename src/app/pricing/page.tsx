@@ -27,10 +27,11 @@ import { LANDING } from "@/components/landing/landingI18n";
 
 /** En CENTIMES, identiques à `TARIFS` (lib/stripe/client.ts) — un test l'exige.
  *  Ce module ne peut pas être importé ici : il tire le SDK Stripe et la clé secrète. */
-const PRIX = {
-  essentiel: { mois: 999, an: 9990 },
-  complet: { mois: 1999, an: 19990 },
-} as const;
+const PRIX: Record<string, { mois: number; an: number }> = {
+  gratuit: { mois: 0, an: 0 },
+  starter: { mois: 999, an: 9990 },
+  premium: { mois: 1499, an: 14990 },
+};
 
 const euros = (centimes: number, lang: string) =>
   (centimes / 100).toLocaleString(lang, { style: "currency", currency: "EUR", minimumFractionDigits: 2 });
@@ -41,7 +42,7 @@ export default function PricingPage() {
   const [periode, setPeriode] = useState<"mois" | "an">("mois");
   const [loading, setLoading] = useState<string | null>(null);
 
-  async function souscrire(formule: "essentiel" | "complet") {
+  async function souscrire(formule: "starter" | "premium") {
     setLoading(formule);
     try {
       const res = await fetch("/api/stripe/checkout", {
@@ -85,11 +86,11 @@ export default function PricingPage() {
 
           <p className="mt-4 text-center text-sm text-zinc-500">{P.essai}</p>
 
-          <div className="mx-auto mt-10 grid max-w-3xl gap-6 md:grid-cols-2">
+          <div className="mx-auto mt-10 grid max-w-5xl gap-6 md:grid-cols-3">
             {P.plans.map((plan) => {
               const centimes = PRIX[plan.cle][periode];
               const grand = periode === "an" ? Math.round(centimes / 12) : centimes;
-              const vedette = plan.cle === "complet";
+              const vedette = plan.cle === "premium";
               return (
                 <div key={plan.cle}
                   className={`relative flex flex-col rounded-3xl p-8 ${vedette ? "bg-zinc-950 text-white ring-2 ring-[#059669]" : "bg-white ring-1 ring-inset ring-zinc-200"}`}>
@@ -100,11 +101,11 @@ export default function PricingPage() {
                   )}
                   <div className={`text-sm font-semibold ${vedette ? "text-white/50" : "text-zinc-400"}`}>{plan.name}</div>
                   <div className="mt-2 flex items-baseline gap-1">
-                    <span className="text-5xl font-bold tracking-tight">{euros(grand, lang)}</span>
-                    <span className={`text-sm ${vedette ? "text-white/40" : "text-zinc-400"}`}>{P.parMois}</span>
+                    <span className="text-5xl font-bold tracking-tight">{plan.cle === "gratuit" ? euros(0, lang) : euros(grand, lang)}</span>
+                    <span className={`text-sm ${vedette ? "text-white/40" : "text-zinc-400"}`}>{plan.cle === "gratuit" ? "" : P.parMois}</span>
                   </div>
                   <div className={`mt-1 h-5 text-xs ${vedette ? "text-white/40" : "text-zinc-400"}`}>
-                    {periode === "an" ? `${euros(centimes, lang)} / ${P.an.toLowerCase()}` : ""}
+                    {plan.cle === "gratuit" ? P.gratuitNote : periode === "an" ? `${euros(centimes, lang)} / ${P.an.toLowerCase()}` : ""}
                   </div>
                   <p className={`mt-4 text-sm ${vedette ? "text-white/70" : "text-zinc-500"}`}>{plan.pitch}</p>
                   <ul className="mt-6 flex-1 space-y-3">
@@ -115,7 +116,7 @@ export default function PricingPage() {
                       </li>
                     ))}
                   </ul>
-                  <button onClick={() => souscrire(plan.cle)} disabled={loading !== null}
+                  <button onClick={() => plan.cle === "gratuit" ? (window.location.href = "/signup") : souscrire(plan.cle as "starter" | "premium")} disabled={loading !== null}
                     className={btnClass(vedette ? "secondary" : "primary", "md", "mt-8 w-full disabled:opacity-60")}>
                     {loading === plan.cle ? <Loader2 className="h-4 w-4 animate-spin" /> : plan.cta}
                   </button>
