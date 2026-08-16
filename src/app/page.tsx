@@ -293,7 +293,14 @@ export default function LandingPage() {
             donc un plancher (`to-black/40`) en dessous de `sm`, et ne va vers le
             transparent qu'à partir du moment où la colonne de texte s'arrête avant les
             coureurs. */}
-        <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-black/70 via-black/50 to-black/28 sm:w-[70%] sm:via-black/38 sm:to-transparent" />
+        {/* VOILE LATÉRAL RETIRÉ SUR GRAND ÉCRAN. C'était lui, et lui seul, qui rendait la
+            gauche plus sombre que la droite : un dégradé noir de 70 % posé sur les deux
+            tiers gauches pour asseoir le texte. Le titre et le paragraphe portent désormais
+            leur propre ombre portée — elle suit la lettre au lieu d'éteindre un tiers de la
+            photo, et c'est suffisant. La piste a la même lumière d'un bord à l'autre.
+            ⚠️ Il reste SOUS `sm` : à 375 px le texte occupe toute la largeur et passe sur
+            les silhouettes ; sans fond, une ligne sur deux devient illisible. */}
+        <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-black/70 via-black/55 to-black/40 sm:hidden" />
         {/* Bandeau du haut : il donne au texte de la barre un fond assez sombre pour tenir,
             sans couvrir plus que la barre elle-même. */}
         <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/58 via-black/22 to-transparent" />
@@ -311,7 +318,7 @@ export default function LandingPage() {
                 l'image (demandé) et garder du contraste sont contradictoires tant qu'on
                 traite le fond. L'ombre agit là où il faut — sous les lettres — et laisse la
                 piste lumineuse partout ailleurs. */}
-            <h1 className="text-[2.9rem] font-bold leading-[1.03] tracking-tight text-white [text-shadow:0_2px_18px_rgba(0,0,0,0.5)] sm:text-6xl md:text-7xl lg:text-[5.25rem]">
+            <h1 className="text-[2.9rem] font-bold leading-[1.03] tracking-tight text-white [text-shadow:0_2px_20px_rgba(0,0,0,0.65)] sm:text-6xl md:text-7xl lg:text-[5.25rem]">
               {L.hero.titleA}<br />{L.hero.titleB}
               {/* Le mot accentué porte la seconde moitié du nom (« Evo ») : on lui donne
                   le vert du wordmark et une ombre portée, sans quoi l'émeraude sur une
@@ -325,7 +332,7 @@ export default function LandingPage() {
                 750 px alors que la première silhouette commence vers 738. `max-w-lg` la
                 ramène à 688 px — le texte s'arrête avant les coureurs, sans dépendre du
                 voile pour rester lisible. */}
-            <p className="mt-6 max-w-lg text-[17px] leading-relaxed text-white [text-shadow:0_1px_10px_rgba(0,0,0,0.65)]">
+            <p className="mt-6 max-w-lg text-[17px] leading-relaxed text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.8)]">
               {L.hero.subtitle}
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
