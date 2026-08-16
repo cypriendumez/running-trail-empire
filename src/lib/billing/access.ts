@@ -27,7 +27,7 @@ export const COLONNES_ACCES = "created_at, subscription_tier";
 
 /** Ce à quoi un compte a droit, à un instant donné. */
 export type Acces =
-  | "gratuit"    // permanent, sans carte : TOUT le produit déterministe, zéro IA
+  | "gratuit"    // permanent, sans carte : ses données, son historique, les courses
   | "essai"      // 7 jours d'IA au niveau Premium, pour juger le module payant
   | "starter"    // + 10 appels IA par jour
   | "premium";   // + 30 appels IA par jour
@@ -102,10 +102,10 @@ export function accesDe(p: ProfilAcces | null | undefined, maintenant: number = 
   const ecoules = Math.floor((maintenant - debut) / 86_400_000);
   const restants = JOURS_ESSAI - ecoules;
   if (restants > 0) return { etat: "essai", joursRestants: restants, essaiExpire: false };
-  // ⚠️ L'essai fini ne ferme RIEN d'autre que l'IA. On retombe sur le palier gratuit
-  // permanent : le plan continue d'être republié, la montre d'être alimentée, les
-  // courses d'être consultables. C'est ce qui distingue ce modèle d'un mur payant —
-  // et ça ne coûte rien, puisque tout cela est déterministe.
+  // L'essai fini retombe sur le palier gratuit permanent : rien n'est effacé, les
+  // activités continuent d'être synchronisées, l'historique et les courses restent
+  // consultables. Ce qui s'arrête, c'est la production de nouvelles prescriptions et
+  // les échanges avec l'IA.
   return { etat: "gratuit", joursRestants: 0, essaiExpire: true };
 }
 
@@ -120,19 +120,25 @@ export function accesDe(p: ProfilAcces | null | undefined, maintenant: number = 
  * alors qu'un compte en consultation revient de lui-même à la préparation suivante.
  */
 /**
- * ⚠️ LA FRONTIÈRE PASSE EXACTEMENT LÀ OÙ PASSE LE COÛT, et nulle part ailleurs.
+ * ⚠️ LE PLAN EST PAYANT — DÉCISION COMMERCIALE, PAS TECHNIQUE, ET IL FAUT LE SAVOIR.
  *
- * `plan` est GRATUIT POUR TOUJOURS, y compris après l'essai. Ce n'est pas de la
- * générosité : `autoPlan` et `autoCoach` sont déterministes, republier sept jours ne
- * consomme aucun jeton. Le mettre derrière un péage coûterait des inscriptions sans
- * économiser un centime — et c'est justement la meilleure partie du produit, donc
- * celle qui doit servir d'hameçon.
+ * `autoPlan` et `autoCoach` sont DÉTERMINISTES : republier sept jours ne consomme aucun
+ * jeton et ne coûte donc rien à servir. Le mettre derrière l'abonnement ne protège
+ * aucune dépense — c'est un choix d'ACQUISITION assumé par Cyprien : le coach adaptatif
+ * est ce que le produit a de meilleur, donc c'est lui qui doit décider quelqu'un à
+ * payer, pas seulement l'IA conversationnelle.
  *
- * `ia` est la seule capacité dont la dépense grandit avec le nombre d'athlètes. C'est
- * donc la seule qui se facture, et son volume (PLAFOND_JOUR) sépare les deux formules.
+ * Ce que ça coûte, en revanche : le palier gratuit devient un CONSULTATEUR. Il garde
+ * ses activités (la synchronisation intervals.icu tourne indépendamment du verrou,
+ * vérifié dans syncAndCoach), son historique, ses courses et ses trophées — mais plus
+ * de prescription. Si les inscriptions se tarissent, c'est la première ligne à
+ * réexaminer : remettre `plan` ici ne coûterait toujours rien.
+ *
+ * `ia` reste la seule capacité dont la dépense grandit avec le nombre d'athlètes, et
+ * son volume (PLAFOND_JOUR) sépare les deux formules payantes.
  */
 const DROITS: Record<Acces, Capacite[]> = {
-  gratuit: ["lecture", "plan"],
+  gratuit: ["lecture"],
   essai: ["lecture", "plan", "ia"],
   starter: ["lecture", "plan", "ia"],
   premium: ["lecture", "plan", "ia"],
@@ -156,7 +162,7 @@ export function profilPeut(p: ProfilAcces | null | undefined, quoi: Capacite, ma
  */
 export function motifRefus(etat: Acces, quoi: Capacite): "essai_expire" | "formule_insuffisante" | null {
   if (peut(etat, quoi)) return null;
-  // Le seul refus possible désormais : l'IA sur un compte gratuit. Le plan, lui, n'est
-  // jamais refusé à personne.
+  // Un compte gratuit se voit refuser le plan ET l'IA : dans les deux cas le geste qui
+  // débloque est le même — prendre une formule.
   return etat === "gratuit" ? "essai_expire" : "formule_insuffisante";
 }

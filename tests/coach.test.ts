@@ -4074,17 +4074,30 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     assert.equal(accesDe(cree(45)).essaiExpire, true, "l'expiration doit rester signalable");
   });
 
-  test("à l'expiration, le COACH continue — seule l'IA s'arrête", () => {
-    // C'est tout le modèle. Le plan de sept jours est DÉTERMINISTE : le republier ne
-    // consomme aucun jeton. Le mettre derrière un péage coûterait des inscriptions sans
-    // économiser un centime, et priverait le produit de son meilleur hameçon.
-    assert.equal(peut("gratuit", "lecture"), true);
-    assert.equal(peut("gratuit", "plan"), true, "le plan doit rester gratuit POUR TOUJOURS : il ne coûte rien");
-    assert.equal(peut("gratuit", "ia"), false, "l'IA est la seule capacité dont la dépense grandit avec les athlètes");
+  test("à l'expiration, les DONNÉES restent — le coach et l'IA s'arrêtent", () => {
+    // Décision commerciale assumée : le plan est payant, bien qu'il ne coûte rien à
+    // servir (`autoPlan` est déterministe). Il sert d'argument de conversion, pas de
+    // protection de marge. Ce qu'un compte gratuit conserve doit rester substantiel,
+    // sinon il n'y a plus de raison de s'inscrire du tout.
+    assert.equal(peut("gratuit", "lecture"), true, "un compte gratuit garde ses données, son historique et les courses");
+    assert.equal(peut("gratuit", "plan"), false, "le plan est derrière l'abonnement");
+    assert.equal(peut("gratuit", "ia"), false);
+    for (const e of ["essai", "starter", "premium"] as const) {
+      assert.equal(peut(e, "plan"), true, `${e} : le plan doit être servi`);
+      assert.equal(peut(e, "ia"), true, `${e} : l'IA doit être servie`);
+    }
     for (const e of ["gratuit", "essai", "starter", "premium"] as const) {
       assert.equal(peut(e, "lecture"), true, `${e} : la lecture ne se refuse jamais`);
-      assert.equal(peut(e, "plan"), true, `${e} : le plan ne se refuse jamais`);
     }
+    // ⚠️ La SYNCHRONISATION doit rester indépendante du verrou : sans elle, un compte
+    // gratuit n'aurait plus aucune donnée à consulter et la formule gratuite serait
+    // vide. `syncIntervalsForUser` est appelé hors de `autoCoachForUser`, qui porte le
+    // verrou — c'est ce qui garde le palier gratuit habité.
+    const chaine = codeOf("src/lib/intervals/syncAndCoach.ts");
+    assert.ok(/syncIntervalsForUser\(/.test(chaine), "la synchronisation a disparu de la chaîne");
+    assert.ok(chaine.indexOf("syncIntervalsForUser(") > 0 &&
+      !/autoCoachForUser[\s\S]{0,200}syncIntervalsForUser/.test(chaine),
+      "la synchronisation est devenue dépendante du coach : un compte gratuit n'aurait plus de données");
   });
 
   test("l'écart entre les deux formules est un NOMBRE d'appels, pas une porte fermée", () => {
@@ -4103,8 +4116,9 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     assert.equal(motifRefus("gratuit", "ia"), "essai_expire",
       "un essai fini et un plafond atteint ne se résolvent pas par le même geste");
     assert.equal(motifRefus("premium", "ia"), null, "aucun refus quand le droit existe");
-    // Le seul état qui refuse encore sur le droit est le palier gratuit, et seulement pour l'IA.
-    assert.equal(motifRefus("gratuit", "plan"), null, "le plan ne se refuse à personne");
+    // Le palier gratuit refuse le plan ET l'IA : dans les deux cas, le geste qui débloque
+    // est le même — prendre une formule.
+    assert.equal(motifRefus("gratuit", "plan"), "essai_expire");
   });
 
   test("l'essai donne l'IA, sinon personne ne peut juger ce qu'il achète", () => {
@@ -4164,21 +4178,15 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
       "le compteur ne se réinitialise plus au changement de jour");
   });
 
-  test("le palier gratuit donne TOUT le déterministe, et rien qui coûte", () => {
-    // La décision structurante du modèle, et elle repose sur une mesure : `autoPlan` et
-    // `autoCoach` n'appellent aucun modèle. Republier sept jours de plan pour un athlète
-    // gratuit coûte donc zéro. Le mettre derrière un péage ferait perdre des inscriptions
-    // sans économiser un centime — et priverait le produit de son meilleur hameçon.
+  test("le plan reste DÉTERMINISTE, même s'il est devenu payant", () => {
+    // Le plan est facturé pour pousser à l'abonnement, pas parce qu'il coûte : `autoPlan`
+    // et `autoCoach` n'appellent aucun modèle. Cette assertion garde la distinction
+    // vivante — le jour où le plan se mettrait à consommer des jetons, le calcul de
+    // rentabilité change du tout au tout et il faut le refaire.
     const auto = codeOf("src/lib/ai/autoPlan.ts") + codeOf("src/lib/ai/autoCoach.ts");
     assert.ok(!/generateContent\(/.test(auto),
-      "le plan appelle désormais un modèle : il ne peut plus être gratuit, tout le modèle économique change");
-    assert.equal(peut("gratuit", "plan"), true);
-    assert.equal(PLAFOND_JOUR.gratuit, 0);
-    // Et l'essai ne verrouille RIEN d'autre que l'IA : à son terme on retombe au gratuit.
-    const J = 86_400_000;
-    const expire = accesDe({ created_at: new Date(Date.now() - 60 * J).toISOString(), subscription_tier: "free" });
-    assert.equal(expire.etat, "gratuit", "un essai fini ne doit pas fermer le coach");
-    assert.equal(peut(expire.etat, "plan"), true, "le plan doit survivre à l'essai");
+      "le plan appelle désormais un modèle : la marge par formule doit être recalculée");
+    assert.equal(PLAFOND_JOUR.gratuit, 0, "le palier gratuit ne consomme aucun jeton");
   });
 
   test("chaque plafond reste RENTABLE dans son pire cas", () => {
@@ -4204,6 +4212,27 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     assert.equal(PLAFOND_JOUR.gratuit, 0, "le palier gratuit ne doit consommer aucun jeton");
     assert.ok(PLAFOND_JOUR.essai > 0, "sans crédits pendant l'essai, personne ne peut juger ce qu'il achète");
     assert.equal(PLAFOND_JOUR.essai, PLAFOND_JOUR.premium, "l'essai doit montrer le niveau Premium");
+  });
+
+  test("la vitrine ne promet pas au gratuit ce que le code lui refuse", () => {
+    // Même famille de faute que « prix affiché ≠ prix débité » : une carte qui annonce
+    // le plan à un palier qui ne l'a pas fabrique un client déçu dès la première
+    // journée. La capacité `plan` a basculé côté payant — la vitrine doit suivre, dans
+    // les cinq langues, et pas seulement en français.
+    const PLAN = /replanifi|repl(a|â)n|neu geplant|continuously replanned|poussées sur la montre|pushed to your watch|auf die Uhr|enviadas al reloj|para o rel[óo]gio|Einheiten direkt/i;
+    // Premium n'a pas à répéter le plan : sa liste commence par « Tout le Starter », qui
+    // l'inclut. On vérifie donc les deux bornes qui comptent — le gratuit ne doit pas le
+    // promettre, la première formule payante doit l'annoncer.
+    for (const l of ALL_LANGS) {
+      const par = Object.fromEntries(LANDING_T[l].pricing.plans.map((p) => [p.cle, `${p.pitch} ${p.features.join(" ")}`]));
+      assert.equal(peut("gratuit", "plan"), false, "le modèle a changé : ce test protège le mauvais sens");
+      assert.ok(!PLAN.test(par.gratuit ?? ""),
+        `${l}/gratuit : la vitrine promet le plan à un palier qui ne l'a pas`);
+      assert.ok(PLAN.test(par.starter ?? ""),
+        `${l}/starter : la formule DONNE le plan mais ne l'annonce nulle part`);
+      assert.ok(/Starter/i.test(par.premium ?? ""),
+        `${l}/premium : la carte doit dire qu'elle reprend tout le Starter, sinon le plan y est invisible`);
+    }
   });
 
   test("le plafond annoncé sur la vitrine est celui qui est APPLIQUÉ", () => {
