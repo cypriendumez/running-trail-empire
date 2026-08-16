@@ -90,7 +90,10 @@ const FEATURE_ICONS: LucideIcon[] = [Heart, Activity, CloudRain, Map, BookOpen, 
 //   · buildWeekPlan pose 7 jours de plan glissant ;
 //   · .github/workflows/sync-coach.yml tourne toutes les 10 minutes.
 const STAT_VALUES = ["14 000+", "15 700", "7 j", "10 min"];
-const SYNC = ["Garmin", "Coros", "Strava", "Suunto", "Polar"];
+// Plateformes réellement synchronisables — chacune est justifiée dans le commentaire de
+// la section « SYNCHRONISATION » plus bas. Ne rien ajouter ici sans preuve dans le code :
+// une marque affichée est une promesse d'intégration.
+const SYNC = ["Garmin", "COROS", "Polar", "Suunto", "Wahoo", "Strava"];
 // ── PRIX AFFICHÉS ────────────────────────────────────────────────────────────
 //  En CENTIMES, et rigoureusement identiques à `TARIFS` (lib/stripe/client.ts), qui
 //  est ce qui sera réellement débité. Un test vérifie l'égalité : afficher un prix
@@ -235,7 +238,11 @@ export default function LandingPage() {
           decoding="async"
           className="absolute inset-0 h-full w-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/10" />
+        {/* Les trois voiles ont été ALLÉGÉS d'environ un tiers : empilés, ils rendaient
+            0,85 + 0,60 + 0,68 par endroits, et la piste virait au brun-noir — on ne voyait
+            plus la photo qu'on avait choisie. Le retrait du bandeau de synchro sous le CTA
+            a libéré le bas du hero, qui n'a plus besoin d'être aussi couvert. */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/62 via-black/18 to-transparent" />
         {/* VOILE LATÉRAL — il manquait, et c'est toute l'explication du texte « qui dépasse
             sur les coureurs ». Le hero n'avait qu'un dégradé du BAS et un bandeau du HAUT :
             au milieu de l'image, à hauteur du titre et du paragraphe, la photo était à nu.
@@ -248,11 +255,12 @@ export default function LandingPage() {
             donc un plancher (`to-black/40`) en dessous de `sm`, et ne va vers le
             transparent qu'à partir du moment où la colonne de texte s'arrête avant les
             coureurs. */}
-        <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-black/80 via-black/60 to-black/40 sm:w-[72%] sm:via-black/45 sm:to-transparent" />
-        {/* Bandeau du haut renforcé (0,50 → 0,68) : « Connexion » tombait sur l'ombre d'un
-            coureur, et du blanc sur une silhouette noire posée sur une piste rouge n'a plus
-            de contraste stable — il change à chaque pixel de l'image. */}
-        <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/68 via-black/30 to-transparent" />
+        <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-black/62 via-black/42 to-black/22 sm:w-[70%] sm:via-black/30 sm:to-transparent" />
+        {/* Bandeau du haut : « Connexion » tombait sur l'ombre d'un coureur, et du blanc
+            sur une silhouette noire posée sur une piste rouge n'a pas de contraste stable
+            — il change à chaque pixel. Il reste donc, mais allégé (0,68 → 0,52) et resserré
+            en hauteur : il ne doit couvrir que la barre, pas le tiers supérieur de l'image. */}
+        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/52 via-black/18 to-transparent" />
 
         <Container className="relative z-10 pb-20 pt-28 sm:pb-24">
           {/* Le titre est désormais une LIGNE DE MARQUE identique dans les cinq langues, ce
@@ -263,7 +271,11 @@ export default function LandingPage() {
               hero mérite. Le sous-titre, lui, change toujours de langue et garde sa
               largeur de lecture. */}
           <div className="max-w-xl lg:max-w-2xl">
-            <h1 className="text-[2.9rem] font-bold leading-[1.03] tracking-tight text-white sm:text-6xl md:text-7xl lg:text-[5.25rem]">
+            {/* Ombre portée sur le TEXTE plutôt qu'un voile plus sombre sur la photo : éclaircir
+                l'image (demandé) et garder du contraste sont contradictoires tant qu'on
+                traite le fond. L'ombre agit là où il faut — sous les lettres — et laisse la
+                piste lumineuse partout ailleurs. */}
+            <h1 className="text-[2.9rem] font-bold leading-[1.03] tracking-tight text-white [text-shadow:0_2px_18px_rgba(0,0,0,0.5)] sm:text-6xl md:text-7xl lg:text-[5.25rem]">
               {L.hero.titleA}<br />{L.hero.titleB}
               {/* Le mot accentué porte la seconde moitié du nom (« Evo ») : on lui donne
                   le vert du wordmark et une ombre portée, sans quoi l'émeraude sur une
@@ -277,7 +289,7 @@ export default function LandingPage() {
                 750 px alors que la première silhouette commence vers 738. `max-w-lg` la
                 ramène à 688 px — le texte s'arrête avant les coureurs, sans dépendre du
                 voile pour rester lisible. */}
-            <p className="mt-6 max-w-lg text-[17px] leading-relaxed text-white/85">
+            <p className="mt-6 max-w-lg text-[17px] leading-relaxed text-white [text-shadow:0_1px_10px_rgba(0,0,0,0.65)]">
               {L.hero.subtitle}
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -285,15 +297,42 @@ export default function LandingPage() {
                 {L.hero.ctaPrimary} <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
-            <div className="mt-10 flex flex-wrap items-center gap-x-5 gap-y-2">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/40">{L.hero.sync}</span>
-              {SYNC.map((s) => (
-                <span key={s} className="text-xs font-bold uppercase tracking-wide text-white/35">{s}</span>
-              ))}
-            </div>
           </div>
         </Container>
       </section>
+
+      {/* ── SYNCHRONISATION ── une bande dédiée plutôt qu'une ligne de texte pâle noyée
+          sous le CTA, où elle passait pour une mention légale.
+
+          ⚠️ CETTE LISTE EST VÉRIFIÉE, MARQUE PAR MARQUE, dans le code :
+           · Garmin  — import ET poussée de séance (`lib/watch/intervals.ts`) ;
+           · COROS, Polar, Suunto — nommés par le guide Sync Montre de l'app elle-même ;
+           · Wahoo, Strava — nommés par `lib/intervals/sport.ts` et la politique de
+             confidentialité, qui décrivent les sources d'intervals.icu.
+          APPLE N'Y FIGURE PAS : `mobile/app.json` déclare bien l'autorisation
+          `com.apple.developer.healthkit`, mais AUCUNE ligne de code n'appelle HealthKit.
+          Afficher ce logo serait vendre une intégration qui n'existe pas. */}
+      <Container className="pt-14 sm:pt-16">
+        <p className="text-center text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-400">
+          {L.sync.title}
+        </p>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5 sm:gap-3">
+          {SYNC.map((s) => (
+            <span
+              key={s}
+              className="inline-flex h-14 items-center rounded-2xl border border-zinc-200 bg-white px-5 text-sm font-bold uppercase tracking-wide text-zinc-700 shadow-sm transition-colors hover:border-zinc-300"
+            >
+              {s}
+            </span>
+          ))}
+        </div>
+        {/* La phrase que l'app dit déjà à ses propres athlètes dans l'onglet Sync Montre :
+            elle répond à la question qu'un lecteur se pose en voyant six marques, et elle
+            rassure plus qu'elle n'inquiète — aucun mot de passe constructeur ne transite. */}
+        <p className="mx-auto mt-5 max-w-xl text-center text-xs leading-relaxed text-zinc-400">
+          {L.sync.note}
+        </p>
+      </Container>
 
       {/* ── STATS ── */}
       <Container className="py-16 sm:py-20">
