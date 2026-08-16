@@ -32,6 +32,7 @@ import { T as T_UI } from "../src/lib/i18n/translations";
 import { LANDING as LANDING_T } from "../src/components/landing/landingI18n";
 import { accesDe, peut, motifRefus, JOURS_ESSAI } from "../src/lib/billing/access";
 import { TARIFS, FORMULES, accesDuPrice } from "../src/lib/stripe/client";
+import { PLAFOND_JOUR } from "../src/lib/billing/aiQuota";
 import { ppsExpiration, ppsVerdict, ppsDemandeAction, couvertureCourses, PPS_URL, PPS_PRIX_EUR, PPS_VALIDITE_MOIS } from "../src/lib/pps/status";
 import { PPS_T } from "../src/lib/pps/ppsI18n";
 import { PLAN_T, libelleType } from "../src/lib/ai/planI18n";
@@ -4117,6 +4118,63 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
                      { created_at: "pas une date" }, { subscription_tier: "inconnu" }]) {
       assert.equal(accesDe(p as never).etat, "essai", `profil ${JSON.stringify(p)} : verrouillé à tort`);
     }
+  });
+
+  test("le plafond IA tient au 26e appel, pas seulement au 25e", () => {
+    // Une clé Gemini payante SANS plafond par athlète est un chèque en blanc : le
+    // risque cesse d'être une panne bruyante et devient une facture silencieuse.
+    // Mesuré sur le compte réel : 4 584 jetons par appel, ≈ 0,29 centime. À 25/jour
+    // le pire cas coûte 2,16 €/mois contre 14,99 € encaissés ; à 100/jour, 8,63 €.
+    //
+    // ⚠️ CE TEST EXISTE POUR UN BOGUE QUE J'AI ÉCRIT : la première version décidait
+    // par `utilises > plafond` chez l'appelant. Au 26e appel, le compteur — déjà
+    // bloqué à 25 et donc plus incrémenté — donnait 25 > 25 = faux, et l'appel
+    // passait. Le plafond ne bornait rien.
+    // On rejoue la décision du module SANS base : `accorde` ne doit dépendre que du
+    // compteur et du plafond, et c'est cette comparaison-là qui était fausse.
+    const accorde = (utilises: number, plafond: number) => utilises < plafond;
+    const P = PLAFOND_JOUR.complet;
+    assert.equal(accorde(P - 1, P), true, `le ${P}e appel doit passer`);
+    assert.equal(accorde(P, P), false, `le ${P + 1}e appel doit être refusé`);
+    // Le compteur cesse d'avancer une fois le plafond atteint : c'est ce gel qui
+    // faisait échouer un test écrit en « utilises > plafond ».
+    assert.equal(accorde(P, P), accorde(P + 5, P), "le refus doit tenir même si le compteur est gelé au plafond");
+    // Et le module doit bien décider ainsi, pas autrement.
+    const src = codeOf("src/lib/billing/aiQuota.ts");
+    assert.ok(/accorde: utilises < plafond/.test(src), "la décision d'octroi a changé de forme");
+    assert.ok(!/depasse/.test(src), "le drapeau ambigu « depasse » est revenu");
+    // Un changement de jour remet le compteur à zéro : sans ça, le plafond serait une
+    // coupure définitive déguisée.
+    assert.ok(/d\?\.jour === aujourdhui \? Number\(d\?\.n \?\? 0\) : 0/.test(src),
+      "le compteur ne se réinitialise plus au changement de jour");
+  });
+
+  test("Essentiel n'a aucun crédit IA, et la table le dit", () => {
+    // Le verrou d'accès l'arrête avant le quota ; la valeur est là pour qu'aucun état
+    // ne manque à la table et qu'elle se lise d'un coup d'œil.
+    assert.equal(PLAFOND_JOUR.essentiel, 0);
+    assert.equal(PLAFOND_JOUR.consultation, 0);
+    assert.ok(PLAFOND_JOUR.essai > 0, "sans crédits pendant l'essai, personne ne peut juger ce qu'il achète");
+    assert.equal(PLAFOND_JOUR.essai, PLAFOND_JOUR.complet, "l'essai doit montrer exactement ce que Complet donne");
+  });
+
+  test("le plafond est CONSOMMÉ par le verrou, pas seulement calculé", () => {
+    // Un module de quota que personne n'appelle est un commentaire.
+    const g = codeOf("src/lib/billing/guard.ts");
+    assert.ok(/consommerAppelIA\(/.test(g), "le verrou ne consomme aucun crédit");
+    assert.ok(/status: 429/.test(g), "un plafond atteint doit répondre 429, pas 402 : ce n'est pas un problème d'abonnement");
+    // Et il ne doit pas se contenter de lire : `quotaDuJour` n'incrémente rien.
+    assert.ok(!/quotaDuJour\(supabase/.test(g), "le verrou lit le compteur au lieu de le consommer");
+  });
+
+  test("le compteur de quota n'invente aucune contrainte de base", () => {
+    // `upsert({ onConflict: "user_id,type" })` exigerait une contrainte unique sur
+    // (user_id, type) qui n'existe PAS — `notifications` porte plusieurs lignes du même
+    // type par athlète (les séances du coach). L'upsert aurait échoué en production, ou
+    // pire, inséré un doublon par appel.
+    const q = codeOf("src/lib/billing/aiQuota.ts");
+    assert.ok(!/upsert\(/.test(q), "upsert sur notifications : la contrainte unique n'existe pas");
+    assert.ok(/\.update\(/.test(q) && /\.insert\(/.test(q), "il faut chercher puis mettre à jour ou insérer");
   });
 
   test("le prix AFFICHÉ est celui qui sera DÉBITÉ", () => {
