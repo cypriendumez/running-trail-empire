@@ -99,13 +99,21 @@ const STAT_VALUES = ["14 000+", "15 700", "7 j", "10 min"];
 // n'est pas là, la tuile affiche le nom — jamais une image cassée, jamais un logo redessiné
 // « à peu près », qui rendrait moins bien que le mot et poserait en plus un problème de
 // marque. Déposer le fichier suffit à basculer la tuile en logo, sans toucher au code.
-const SYNC: { nom: string; logo?: string }[] = [
+const SYNC: { nom: string; logo?: string; passerelle?: boolean }[] = [
   { nom: "Garmin", logo: "garmin.svg" },
   { nom: "COROS", logo: "coros.png" },
   { nom: "Polar", logo: "polar.svg" },
   { nom: "Suunto", logo: "suunto.svg" },
   { nom: "Wahoo", logo: "wahoo.svg" },
   { nom: "Strava", logo: "strava.svg" },
+  // Apple Watch fonctionne, mais PAS par le même chemin, et le taire serait mentir par
+  // omission : les six marques ci-dessus sont des connexions OFFICIELLES d'intervals.icu,
+  // en un clic. Apple n'en a pas — les données passent par une application passerelle
+  // (HealthFit, Intervals Companion…) qui verse Santé dans intervals.icu. Vérifié sur le
+  // forum officiel intervals.icu, où c'est la réponse constante depuis des années. D'où
+  // `passerelle`, qui ajoute une astérisque et une phrase d'explication : la montre est
+  // supportée, l'utilisateur sait à quoi s'attendre avant de s'inscrire.
+  { nom: "Apple Watch", logo: "apple-watch.svg", passerelle: true },
 ];
 // ── PRIX AFFICHÉS ────────────────────────────────────────────────────────────
 //  En CENTIMES, et rigoureusement identiques à `TARIFS` (lib/stripe/client.ts), qui
@@ -141,7 +149,14 @@ export default function LandingPage() {
 
   // Nav adaptative : transparente sur le hero, solide au scroll OU menu mobile ouvert.
   const solidNav = scrolled || menuOpen;
-  const navLink = solidNav ? "hover:text-zinc-900 transition-colors" : "hover:text-white transition-colors";
+  // OMBRE PORTÉE SUR LE TEXTE DE LA BARRE, pas un voile plus sombre sur la photo. Le
+  // bandeau du haut avait déjà été monté à 0,68 pour « Connexion », puis redescendu à 0,58
+  // quand il a fallu éclaircir l'image : deux exigences qui se contredisent tant qu'on
+  // traite le FOND. Une silhouette noire sur une piste rouge n'a de toute façon aucun
+  // contraste stable — il change à chaque pixel, et aucun réglage de voile ne le rattrape
+  // partout. L'ombre, elle, suit la lettre.
+  const navOmbre = solidNav ? "" : "[text-shadow:0_1px_8px_rgba(0,0,0,0.75)]";
+  const navLink = solidNav ? "hover:text-zinc-900 transition-colors" : `hover:text-white transition-colors ${navOmbre}`;
 
   const filtered = activeCategory === "ALL" ? PROGRAMS : PROGRAMS.filter((p) => p.category === activeCategory);
   const stats = [L.stats.races, L.stats.routes, L.stats.plan, L.stats.replan];
@@ -167,7 +182,7 @@ export default function LandingPage() {
         <Container className="grid h-16 max-w-none grid-cols-[auto_1fr_auto] items-center gap-4 px-4 sm:px-6 md:grid-cols-[1fr_auto_1fr] lg:px-8">
           <Link href="/" className="flex shrink-0 items-center gap-2.5 justify-self-start" onClick={() => setMenuOpen(false)}>
             <Logo size={30} />
-            <Wordmark tone={solidNav ? "dark" : "light"} className="text-xl" />
+            <Wordmark tone={solidNav ? "dark" : "light"} className={`text-xl ${navOmbre}`} />
           </Link>
           <div className={`hidden md:flex items-center justify-center gap-7 text-sm font-medium ${solidNav ? "text-zinc-500" : "text-white/80"}`}>
             <a href="#programmes" className={navLink}>{L.nav.programs}</a>
@@ -184,7 +199,7 @@ export default function LandingPage() {
               dans sa vie. Il passe en bout de chaîne, après le bouton, où l'œil le
               trouve quand il le cherche sans le heurter quand il ne le cherche pas. */}
           <div className="flex items-center justify-self-end gap-2">
-            <Link href="/login" className={`hidden sm:inline-flex rounded-lg px-2.5 py-2 text-sm font-medium transition-colors ${solidNav ? "text-zinc-600 hover:text-zinc-900" : "text-white/90 hover:text-white"}`}>
+            <Link href="/login" className={`hidden sm:inline-flex rounded-lg px-2.5 py-2 text-sm font-medium transition-colors ${solidNav ? "text-zinc-600 hover:text-zinc-900" : `text-white hover:text-white ${navOmbre}`}`}>
               {L.nav.login}
             </Link>
             {/* Sur la photo, ce bouton était un rectangle BLANC PLEIN posé en haut à
@@ -201,7 +216,7 @@ export default function LandingPage() {
               className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition-all duration-300 sm:px-4 sm:py-2 sm:text-[13px] ${
                 solidNav
                   ? "bg-zinc-900 text-white hover:bg-zinc-800"
-                  : "border border-white/45 bg-white/10 text-white backdrop-blur-md hover:border-white/70 hover:bg-white/20"
+                  : "border border-white/55 bg-white/15 text-white backdrop-blur-md hover:border-white/80 hover:bg-white/25"
               }`}
             >
               {L.nav.trial} <ArrowRight className="h-3.5 w-3.5" />
@@ -345,13 +360,14 @@ export default function LandingPage() {
                 // perçue, ce qui est le seul réglage qui compte dans une rangée.
                 ? <img src={`/brands/${m.logo}`} alt={m.nom} className="h-6 w-auto max-w-[112px] object-contain" loading="lazy" />
                 : m.nom}
+              {m.passerelle && <span className="ml-1 -translate-y-1 text-[11px] font-semibold text-zinc-400">*</span>}
             </span>
           ))}
         </div>
         {/* La phrase que l'app dit déjà à ses propres athlètes dans l'onglet Sync Montre :
             elle répond à la question qu'un lecteur se pose en voyant six marques, et elle
             rassure plus qu'elle n'inquiète — aucun mot de passe constructeur ne transite. */}
-        <p className="mx-auto mt-5 max-w-xl text-center text-xs leading-relaxed text-zinc-400">
+        <p className="mx-auto mt-5 max-w-2xl text-center text-xs leading-relaxed text-zinc-400">
           {L.sync.note}
         </p>
       </Container>

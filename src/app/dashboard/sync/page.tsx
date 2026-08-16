@@ -638,6 +638,12 @@ export default function SyncPage() {
                   <p className="text-sm text-zinc-500 mt-1">
                     {d["s1.desc"]}
                   </p>
+                  {/* La landing affiche désormais le logo Apple Watch. Sans cette ligne,
+                      l'athlète venu pour ça arrivait sur un guide qui ne nomme que Garmin,
+                      COROS, Polar et Suunto — et repartait. */}
+                  <p className="mt-2 rounded-lg bg-zinc-50 px-3 py-2 text-xs leading-relaxed text-zinc-500">
+                    {d["s1.apple"]}
+                  </p>
                   <a href="https://intervals.icu" target="_blank" rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-zinc-900 hover:bg-zinc-700 px-3 py-2 rounded-lg mt-3 transition-colors">
                     {d["s1.cta"]} <ExternalLink className="w-3.5 h-3.5" />

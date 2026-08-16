@@ -54,7 +54,7 @@ export const CATEGORY_CODES = ["ALL", "10KM", "SEMI", "MARATHON", "TRAIL", "BEGI
 const fr: LandingDict = {
   nav: { programs: "Programmes", features: "Fonctionnalités", pricing: "Tarifs", blog: "Blog", reviews: "Avis", login: "Connexion", trial: "Essai gratuit" },
   hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "Ta montre mesure déjà tout : VFC, sommeil, charge, allures. Pacevo en fait une séance — durée, intensité, récupération — recalculée à chaque synchronisation.", ctaPrimary: "Commencer gratuitement" },
-  sync: { title: "Synchronisation avec", note: "Tout passe par intervals.icu, qui gère les connexions officielles de chaque constructeur. Pacevo n'accède jamais directement à tes comptes Garmin ou COROS." },
+  sync: { title: "Synchronisation avec", note: "Tout passe par intervals.icu, qui gère les connexions officielles de chaque constructeur. Pacevo n'accède jamais directement à tes comptes. * Apple Watch n'a pas de connexion officielle : ses données arrivent via une application passerelle (HealthFit, Intervals Companion) qui verse Santé dans intervals.icu." },
   stats: { races: "Courses à venir", routes: "Parcours cartographiés", plan: "De plan glissant", replan: "Entre deux replanifications" },
   programs: {
     eyebrow: "Entraînement", title: "Des programmes pour chaque objectif", subtitle: "Du premier 5 km à l'ultra-trail — chaque plan s'adapte ensuite à tes données réelles.", viewAll: "Voir tout",
@@ -116,7 +116,7 @@ const fr: LandingDict = {
 const en: LandingDict = {
   nav: { programs: "Programs", features: "Features", pricing: "Pricing", blog: "Blog", reviews: "Reviews", login: "Log in", trial: "Free trial" },
   hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "Your watch already measures everything: HRV, sleep, load, paces. Pacevo turns it into a session — duration, intensity, recovery — recalculated on every sync.", ctaPrimary: "Start for free" },
-  sync: { title: "Syncs with", note: "Everything goes through intervals.icu, which handles each manufacturer's official connection. Pacevo never accesses your Garmin or COROS accounts directly." },
+  sync: { title: "Syncs with", note: "Everything goes through intervals.icu, which handles each manufacturer's official connection. Pacevo never accesses your accounts directly. * Apple Watch has no official connection: its data arrives through a bridge app (HealthFit, Intervals Companion) that feeds Health into intervals.icu." },
   stats: { races: "Upcoming races", routes: "Mapped routes", plan: "Rolling plan", replan: "Between two replans" },
   programs: {
     eyebrow: "Training", title: "A program for every goal", subtitle: "From your first 5K to ultra-trail — each plan then adapts to your real data.", viewAll: "View all",
@@ -178,7 +178,7 @@ const en: LandingDict = {
 const de: LandingDict = {
   nav: { programs: "Programme", features: "Funktionen", pricing: "Preise", blog: "Blog", reviews: "Bewertungen", login: "Anmelden", trial: "Gratis testen" },
   hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "Deine Uhr misst längst alles: HRV, Schlaf, Belastung, Tempo. Pacevo macht daraus eine Einheit — Dauer, Intensität, Erholung — bei jeder Synchronisation neu berechnet.", ctaPrimary: "Kostenlos starten" },
-  sync: { title: "Synchronisiert mit", note: "Alles läuft über intervals.icu, das die offiziellen Verbindungen jedes Herstellers verwaltet. Pacevo greift nie direkt auf deine Garmin- oder COROS-Konten zu." },
+  sync: { title: "Synchronisiert mit", note: "Alles läuft über intervals.icu, das die offiziellen Verbindungen jedes Herstellers verwaltet. Pacevo greift nie direkt auf deine Konten zu. * Die Apple Watch hat keine offizielle Verbindung: Ihre Daten kommen über eine Brücken-App (HealthFit, Intervals Companion), die Health an intervals.icu weitergibt." },
   stats: { races: "Kommende Rennen", routes: "Kartierte Strecken", plan: "Rollierender Plan", replan: "Zwischen zwei Neuplanungen" },
   programs: {
     eyebrow: "Training", title: "Ein Programm für jedes Ziel", subtitle: "Vom ersten 5-km-Lauf bis zum Ultra-Trail — jeder Plan passt sich dann an deine echten Daten an.", viewAll: "Alle ansehen",
@@ -240,7 +240,7 @@ const de: LandingDict = {
 const es: LandingDict = {
   nav: { programs: "Programas", features: "Funciones", pricing: "Precios", blog: "Blog", reviews: "Opiniones", login: "Iniciar sesión", trial: "Prueba gratis" },
   hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "Tu reloj ya lo mide todo: VFC, sueño, carga, ritmos. Pacevo lo convierte en una sesión — duración, intensidad, recuperación — recalculada en cada sincronización.", ctaPrimary: "Empezar gratis" },
-  sync: { title: "Sincroniza con", note: "Todo pasa por intervals.icu, que gestiona las conexiones oficiales de cada fabricante. Pacevo nunca accede directamente a tus cuentas de Garmin o COROS." },
+  sync: { title: "Sincroniza con", note: "Todo pasa por intervals.icu, que gestiona las conexiones oficiales de cada fabricante. Pacevo nunca accede directamente a tus cuentas. * El Apple Watch no tiene conexión oficial: sus datos llegan mediante una app puente (HealthFit, Intervals Companion) que vuelca Salud en intervals.icu." },
   stats: { races: "Carreras próximas", routes: "Rutas cartografiadas", plan: "De plan deslizante", replan: "Entre dos replanificaciones" },
   programs: {
     eyebrow: "Entrenamiento", title: "Un programa para cada objetivo", subtitle: "Desde tu primer 5K hasta el ultra-trail — cada plan se adapta luego a tus datos reales.", viewAll: "Ver todo",
@@ -302,7 +302,7 @@ const es: LandingDict = {
 const pt: LandingDict = {
   nav: { programs: "Programas", features: "Funcionalidades", pricing: "Preços", blog: "Blog", reviews: "Avaliações", login: "Entrar", trial: "Teste grátis" },
   hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "O teu relógio já mede tudo: VFC, sono, carga, ritmos. A Pacevo transforma isso num treino — duração, intensidade, recuperação — recalculado a cada sincronização.", ctaPrimary: "Começar grátis" },
-  sync: { title: "Sincroniza com", note: "Tudo passa pelo intervals.icu, que gere as ligações oficiais de cada fabricante. A Pacevo nunca acede diretamente às tuas contas Garmin ou COROS." },
+  sync: { title: "Sincroniza com", note: "Tudo passa pelo intervals.icu, que gere as ligações oficiais de cada fabricante. A Pacevo nunca acede diretamente às tuas contas. * O Apple Watch não tem ligação oficial: os dados chegam por uma app ponte (HealthFit, Intervals Companion) que envia a Saúde para o intervals.icu." },
   stats: { races: "Provas futuras", routes: "Percursos cartografados", plan: "De plano deslizante", replan: "Entre duas replanificações" },
   programs: {
     eyebrow: "Treino", title: "Um programa para cada objetivo", subtitle: "Do teu primeiro 5K ao ultra-trail — cada plano adapta-se depois aos teus dados reais.", viewAll: "Ver tudo",
