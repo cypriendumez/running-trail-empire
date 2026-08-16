@@ -116,7 +116,7 @@ export function Sidebar({ profile, unreadMessages = 0 }: { profile: Record<strin
       {/* Logo → retour au tableau de bord */}
       <Link
         href="/dashboard"
-        title="Tableau de bord"
+        title={t("nav.dashboard")}
         className="h-16 flex items-center px-4 border-b border-zinc-100 hover:bg-zinc-50 transition-colors"
       >
         <Logo size={36} className="flex-shrink-0" />

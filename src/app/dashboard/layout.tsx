@@ -36,7 +36,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <main className="flex-1 overflow-auto p-6">
             {children}
           </main>
-          <MedicalDisclaimer />
+          <MedicalDisclaimer lang={String(profile?.preferred_language ?? "fr")} />
         </div>
         {/* Bulle d'aide : hors du flux, disponible sur TOUTES les pages — une question de
             support naît devant l'écran qui pose problème, pas dans un menu séparé. */}

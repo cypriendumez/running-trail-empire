@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bell, Search, User, Settings, LogOut, CheckCheck, Flag, Route as RouteIcon, Loader2 } from "lucide-react";
 import { colorOf } from "@/lib/avatarColors";
+// « Date à venir » existe déjà, traduit, dans le dictionnaire de l'onglet Courses : le
+// redéclarer ici créerait deux libellés pour une même notion, qui divergeraient un jour.
+import { RX } from "@/components/races/racesI18n";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { createClient } from "@/lib/supabase/client";
 
@@ -126,10 +129,10 @@ export function TopBar({ profile, avatarColor }: { profile: Record<string, unkno
 
   const timeAgo = (iso: string) => {
     const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-    if (s < 60) return "à l'instant";
-    if (s < 3600) return `il y a ${Math.floor(s / 60)} min`;
-    if (s < 86400) return `il y a ${Math.floor(s / 3600)} h`;
-    return `il y a ${Math.floor(s / 86400)} j`;
+    if (s < 60) return t("time.now");
+    if (s < 3600) return t("time.min", { n: Math.floor(s / 60) });
+    if (s < 86400) return t("time.hour", { n: Math.floor(s / 3600) });
+    return t("time.day", { n: Math.floor(s / 86400) });
   };
 
   return (
@@ -154,12 +157,12 @@ export function TopBar({ profile, avatarColor }: { profile: Record<string, unkno
         {openSearch && (
           <div className="absolute left-0 right-0 top-full mt-2 max-h-[26rem] overflow-y-auto rounded-2xl border border-zinc-200 bg-white shadow-xl z-50">
             {raceHits.length === 0 && parcoursHits.length === 0 ? (
-              <div className="px-4 py-6 text-center text-sm text-zinc-400">Aucun résultat pour « {q.trim()} »</div>
+              <div className="px-4 py-6 text-center text-sm text-zinc-400">{t("topbar.noResult", { q: q.trim() })}</div>
             ) : (
               <>
                 {raceHits.length > 0 && (
                   <div>
-                    <div className="px-4 pt-3 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-400">Courses</div>
+                    <div className="px-4 pt-3 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-400">{t("nav.races")}</div>
                     {raceHits.map((r, i) => (
                       <button key={i} onClick={() => goRace(r.name)}
                         className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-zinc-50">
@@ -167,7 +170,7 @@ export function TopBar({ profile, avatarColor }: { profile: Record<string, unkno
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-semibold text-zinc-800">{r.name}</span>
                           <span className="block truncate text-[11px] text-zinc-400">
-                            {[r.city, r.distanceKm != null ? `${r.distanceKm} km` : "", r.date && !r.date.startsWith("2099") ? new Date(r.date + "T00:00:00").toLocaleDateString("fr", { day: "numeric", month: "short", year: "numeric" }) : "Date à venir"].filter(Boolean).join(" · ")}
+                            {[r.city, r.distanceKm != null ? `${r.distanceKm} km` : "", r.date && !r.date.startsWith("2099") ? new Date(r.date + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "short", year: "numeric" }) : (RX[lang] ?? RX.fr).dateTBD].filter(Boolean).join(" · ")}
                           </span>
                         </span>
                       </button>
@@ -176,7 +179,7 @@ export function TopBar({ profile, avatarColor }: { profile: Record<string, unkno
                 )}
                 {parcoursHits.length > 0 && (
                   <div className={raceHits.length > 0 ? "border-t border-zinc-100" : ""}>
-                    <div className="px-4 pt-3 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-400">Parcours</div>
+                    <div className="px-4 pt-3 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-400">{t("topbar.routes")}</div>
                     {parcoursHits.map((p) => (
                       <button key={p.id} onClick={() => goParcours(p.nom)}
                         className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-zinc-50">
@@ -190,7 +193,7 @@ export function TopBar({ profile, avatarColor }: { profile: Record<string, unkno
                   </div>
                 )}
                 <button onClick={() => goRace()} className="block w-full border-t border-zinc-100 px-4 py-2.5 text-center text-xs font-semibold text-emerald-600 transition-colors hover:bg-emerald-50">
-                  Voir tous les résultats →
+                  {t("topbar.seeAll")} →
                 </button>
               </>
             )}
@@ -218,17 +221,17 @@ export function TopBar({ profile, avatarColor }: { profile: Record<string, unkno
               <div className="fixed inset-0 z-40" onClick={() => setOpenNotif(false)} />
               <div className="absolute right-0 mt-2 w-80 max-h-[26rem] overflow-y-auto rounded-2xl border border-zinc-200 bg-white shadow-xl z-50">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-100 sticky top-0 bg-white">
-                  <span className="font-semibold text-sm text-zinc-900">Notifications</span>
+                  <span className="font-semibold text-sm text-zinc-900">{t("topbar.notifs")}</span>
                   {unread > 0 && (
                     <button onClick={markAllRead} className="text-xs text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
-                      <CheckCheck className="w-3.5 h-3.5" /> Tout lire
+                      <CheckCheck className="w-3.5 h-3.5" /> {t("topbar.markAll")}
                     </button>
                   )}
                 </div>
                 {loadingNotif ? (
-                  <div className="p-6 text-center text-sm text-zinc-400">Chargement…</div>
+                  <div className="p-6 text-center text-sm text-zinc-400">{t("topbar.loading")}</div>
                 ) : notifs.length === 0 ? (
-                  <div className="p-8 text-center text-sm text-zinc-400"><Bell className="w-8 h-8 mx-auto mb-2 text-zinc-200" />Aucune notification</div>
+                  <div className="p-8 text-center text-sm text-zinc-400"><Bell className="w-8 h-8 mx-auto mb-2 text-zinc-200" />{t("topbar.noNotif")}</div>
                 ) : (
                   <ul className="divide-y divide-zinc-50">
                     {notifs.map((n) => (
@@ -272,17 +275,17 @@ export function TopBar({ profile, avatarColor }: { profile: Record<string, unkno
               <div className="fixed inset-0 z-40" onClick={() => setOpenMenu(false)} />
               <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-zinc-200 bg-white shadow-xl z-50 overflow-hidden">
                 <div className="px-4 py-3 border-b border-zinc-100">
-                  <div className="text-sm font-semibold text-zinc-900 truncate">{name || "Mon compte"}</div>
+                  <div className="text-sm font-semibold text-zinc-900 truncate">{name || t("topbar.account")}</div>
                   {email && <div className="text-xs text-zinc-400 truncate">{email}</div>}
                 </div>
                 <Link href="/dashboard/profile" onClick={() => setOpenMenu(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-zinc-700 hover:bg-zinc-50 transition-colors">
-                  <User className="w-4 h-4 text-zinc-400" /> Profil
+                  <User className="w-4 h-4 text-zinc-400" /> {t("nav.profile")}
                 </Link>
                 <Link href="/dashboard/settings" onClick={() => setOpenMenu(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-zinc-700 hover:bg-zinc-50 transition-colors">
-                  <Settings className="w-4 h-4 text-zinc-400" /> Paramètres
+                  <Settings className="w-4 h-4 text-zinc-400" /> {t("nav.settings")}
                 </Link>
                 <button onClick={signOut} className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 border-t border-zinc-100 transition-colors">
-                  <LogOut className="w-4 h-4" /> Déconnexion
+                  <LogOut className="w-4 h-4" /> {t("nav.logout")}
                 </button>
               </div>
             </>
