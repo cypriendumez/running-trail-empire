@@ -21,12 +21,7 @@
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Running & Trail Empire utilise votre position en arrière-plan pour le Guardian Mode de sécurité.",
         "NSMotionUsageDescription": "Détection de chute pour le Guardian Mode.",
         "NSCameraUsageDescription": "Analyse de foulée pour le Posture Lab.",
-        "NSMicrophoneUsageDescription": "Smart Journaling vocal post-course.",
-        "NSHealthShareUsageDescription": "Import de vos données santé Apple Health.",
-        "NSHealthUpdateUsageDescription": "Synchronisation des entraînements vers Apple Health."
-      },
-      "entitlements": {
-        "com.apple.developer.healthkit": true
+        "NSMicrophoneUsageDescription": "Smart Journaling vocal post-course."
       }
     },
     "android": {

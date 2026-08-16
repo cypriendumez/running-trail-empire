@@ -100,12 +100,12 @@ const STAT_VALUES = ["14 000+", "15 700", "7 j", "10 min"];
 // « à peu près », qui rendrait moins bien que le mot et poserait en plus un problème de
 // marque. Déposer le fichier suffit à basculer la tuile en logo, sans toucher au code.
 const SYNC: { nom: string; logo?: string }[] = [
-  { nom: "Garmin" },
-  { nom: "COROS" },
-  { nom: "Polar" },
-  { nom: "Suunto" },
-  { nom: "Wahoo" },
-  { nom: "Strava" },
+  { nom: "Garmin", logo: "garmin.svg" },
+  { nom: "COROS", logo: "coros.png" },
+  { nom: "Polar", logo: "polar.svg" },
+  { nom: "Suunto", logo: "suunto.svg" },
+  { nom: "Wahoo", logo: "wahoo.svg" },
+  { nom: "Strava", logo: "strava.svg" },
 ];
 // ── PRIX AFFICHÉS ────────────────────────────────────────────────────────────
 //  En CENTIMES, et rigoureusement identiques à `TARIFS` (lib/stripe/client.ts), qui
@@ -338,7 +338,12 @@ export default function LandingPage() {
             >
               {m.logo
                 // eslint-disable-next-line @next/next/no-img-element
-                ? <img src={`/brands/${m.logo}`} alt={m.nom} className="h-6 w-auto object-contain" loading="lazy" />
+                // Hauteur ET largeur bornées : les six mots-symboles vont d'un rapport 3,1
+                // (Suunto) à 6,1 (Polar). À hauteur constante, Polar paraîtrait deux fois
+                // plus imposant que les autres ; à largeur constante, il serait deux fois
+                // plus petit. Borner les DEUX avec `object-contain` égalise la surface
+                // perçue, ce qui est le seul réglage qui compte dans une rangée.
+                ? <img src={`/brands/${m.logo}`} alt={m.nom} className="h-6 w-auto max-w-[112px] object-contain" loading="lazy" />
                 : m.nom}
             </span>
           ))}
