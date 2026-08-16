@@ -119,10 +119,9 @@ const HORS_TRADUCTION: Record<string, string> = {
   // métadonnées. Ses chaînes suivent le slogan de la landing et changent avec lui — c'est
   // normal qu'il faille les mettre à jour ici quand le slogan bouge, et c'est même le but :
   // le test rappelle qu'un slogan modifié doit l'être AUX DEUX endroits.
-  "Ton plan se réécrit.": "image de partage social, unique et statique, déclarée locale fr_FR",
-  "tu cours.": "même image de partage",
+  "Tes données servent": "image de partage social, unique et statique, déclarée locale fr_FR",
   "PACE + ÉVOLUTION": "même image de partage",
-  "VFC, sommeil et charge relus à chaque synchro · Allures sur ta montre": "même image de partage",
+  "VFC, sommeil, charge · Une séance sur ta montre à chaque synchro": "même image de partage",
   "14 000+ courses · 15 700 parcours": "même image de partage",
   "Tracé © les contributeurs OpenStreetMap (ODbL)": "mention légale ÉCRITE DANS LE FICHIER GPX exporté, pas à l'écran — la licence ODbL impose l'attribution, la traduire l'affaiblirait",
 };

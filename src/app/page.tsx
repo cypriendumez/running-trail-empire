@@ -135,23 +135,25 @@ export default function LandingPage() {
 
       {/* ── NAV ── */}
       <nav className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${solidNav ? "bg-white/90 backdrop-blur-xl border-b border-zinc-200/70" : "bg-transparent"}`}>
-        {/* `max-w-none` : la barre ne suit PLUS la largeur de contenu du site. Le
-            `Container` est en `max-w-6xl` centré, soit 1 152 px — sur un écran de 1 440 il
-            restait 144 px de marge AVANT les 32 px de padding, et le logo démarrait à
-            176 px du bord. Une barre de navigation n'est pas du contenu : elle borde la
-            page, elle doit donc partir du bord.
+        {/* DEUX RÉGLAGES INDÉPENDANTS, à ne pas confondre — je les avais liés à tort.
 
-            Le groupe de liens était par ailleurs CENTRÉ sur la fenêtre, ce qui creusait un
-            trou entre lui et le logo. Il est désormais collé au logo, et seules les
-            actions de compte restent à droite (`ml-auto`) — la disposition de la plupart
-            des barres modernes, et surtout celle qui remplit le bord gauche au lieu de le
-            laisser vide. */}
-        <Container className="flex h-16 max-w-none items-center gap-4 px-4 sm:gap-8 sm:px-6 lg:px-8">
-          <Link href="/" className="flex shrink-0 items-center gap-2.5" onClick={() => setMenuOpen(false)}>
+            1. `max-w-none` + padding court : la barre ne suit PLUS la largeur de contenu
+               du site. Le `Container` vaut `max-w-6xl` centré (1 152 px) ; sur un écran de
+               1 440 il restait 144 px de marge AVANT les 32 px de padding, et le logo
+               démarrait à 176 px du bord. Une barre de navigation n'est pas du contenu :
+               elle borde la page, elle part donc du bord. Le logo tombe à 32 px.
+
+            2. Les liens restent CENTRÉS SUR LA FENÊTRE, via une grille à trois colonnes
+               dont les deux extérieures ont la même largeur (`1fr`). Les coller au logo
+               les faisait dépendre de la longueur des libellés : « Fonctionnalités » (FR)
+               contre « Features » (EN) déplaçait tout le bloc à chaque langue. Le centre
+               géométrique, lui, ne bouge pas. */}
+        <Container className="grid h-16 max-w-none grid-cols-[auto_1fr_auto] items-center gap-4 px-4 sm:px-6 md:grid-cols-[1fr_auto_1fr] lg:px-8">
+          <Link href="/" className="flex shrink-0 items-center gap-2.5 justify-self-start" onClick={() => setMenuOpen(false)}>
             <Logo size={30} />
             <Wordmark tone={solidNav ? "dark" : "light"} className="text-xl" />
           </Link>
-          <div className={`hidden md:flex items-center gap-7 text-sm font-medium ${solidNav ? "text-zinc-500" : "text-white/80"}`}>
+          <div className={`hidden md:flex items-center justify-center gap-7 text-sm font-medium ${solidNav ? "text-zinc-500" : "text-white/80"}`}>
             <a href="#programmes" className={navLink}>{L.nav.programs}</a>
             <a href="#features" className={navLink}>{L.nav.features}</a>
             <a href="#tarifs" className={navLink}>{L.nav.pricing}</a>
@@ -165,7 +167,7 @@ export default function LandingPage() {
               m'inscris »), et donnait le premier rang à un réglage qu'on ouvre une fois
               dans sa vie. Il passe en bout de chaîne, après le bouton, où l'œil le
               trouve quand il le cherche sans le heurter quand il ne le cherche pas. */}
-          <div className="ml-auto flex items-center gap-2">
+          <div className="flex items-center justify-self-end gap-2">
             <Link href="/login" className={`hidden sm:inline-flex rounded-lg px-2.5 py-2 text-sm font-medium transition-colors ${solidNav ? "text-zinc-600 hover:text-zinc-900" : "text-white/90 hover:text-white"}`}>
               {L.nav.login}
             </Link>

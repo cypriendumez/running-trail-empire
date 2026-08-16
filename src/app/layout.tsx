@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   // L'ancienne énumérait des fonctions (« Plans IA, analyse biomécanique… ») sans jamais
   // dire ce que l'app FAIT concrètement pour le coureur, ni d'où vient le nom.
   description:
-    "Ton plan se réécrit, toi tu cours. À chaque synchronisation de ta montre, Pacevo relit ta VFC, ton sommeil et ta charge, puis réécrit tes sept prochains jours.",
+    "Tes données servent enfin à quelque chose. Ta montre mesure VFC, sommeil et charge : Pacevo en fait une séance recalculée à chaque synchronisation.",
   keywords: [
     "running", "trail", "course à pied", "entraînement", "plan d'entraînement",
     "VMA", "biomécanique", "GPX", "Garmin", "Coros", "UTMB",
@@ -36,18 +36,18 @@ export const metadata: Metadata = {
     type: "website",
     locale: "fr_FR",
     url: process.env.NEXT_PUBLIC_APP_URL,
-    title: "Pacevo — Ton plan se réécrit. Toi, tu cours.",
+    title: "Pacevo — Tes données servent enfin à quelque chose.",
     // « L'application hégémonique du running et du trail » : une affirmation que rien ne
     // soutient, servie à chaque partage de lien. Remplacée par ce que fait le produit.
-    description: "À chaque synchronisation de ta montre, Pacevo relit ta VFC, ton sommeil et ta charge, puis réécrit tes sept prochains jours.",
+    description: "Ta montre mesure déjà tout : VFC, sommeil, charge, allures. Pacevo en fait une séance recalculée à chaque synchronisation.",
     siteName: "Pacevo",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Pacevo — Ton plan se réécrit. Toi, tu cours.",
+    title: "Pacevo — Tes données servent enfin à quelque chose.",
     // « L'application hégémonique du running et du trail » : une affirmation que rien ne
     // soutient, servie à chaque partage de lien. Remplacée par ce que fait le produit.
-    description: "À chaque synchronisation de ta montre, Pacevo relit ta VFC, ton sommeil et ta charge, puis réécrit tes sept prochains jours.",
+    description: "Ta montre mesure déjà tout : VFC, sommeil, charge, allures. Pacevo en fait une séance recalculée à chaque synchronisation.",
   },
 };
 
