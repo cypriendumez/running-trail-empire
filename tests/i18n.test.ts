@@ -116,6 +116,10 @@ function chainesVisibles(code: string): string[] {
  */
 const HORS_TRADUCTION: Record<string, string> = {
   "Trouve ton allure,": "image de partage social, unique et statique, déclarée locale fr_FR",
+  // Ajouté après coup : l'ancien surtitre « PACE + VO₂ MAX » ne portait ni accent ni mot
+  // français, il passait donc sous le radar. « PACE + ÉVOLUTION » a un É — le test l'a
+  // attrapé au premier `npm run verify` suivant, ce qui est précisément l'objet.
+  "PACE + ÉVOLUTION": "même image de partage",
   "Plan réécrit à chaque synchro · VFC, sommeil, charge · Sur ta montre": "même image de partage",
   "14 000+ courses · 15 700 parcours": "même image de partage",
   "Tracé © les contributeurs OpenStreetMap (ODbL)": "mention légale ÉCRITE DANS LE FICHIER GPX exporté, pas à l'écran — la licence ODbL impose l'attribution, la traduire l'affaiblirait",

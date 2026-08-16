@@ -228,15 +228,16 @@ export default function LandingPage() {
         <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/50 to-transparent" />
 
         <Container className="relative z-10 pb-20 pt-28 sm:pb-24">
-          {/* `max-w-3xl` et non `2xl` : la seconde ligne du titre (« repousse ta VO₂max. »)
-              débordait de 672 px et repartait à la ligne — trois lignes au lieu de deux,
-              par ACCIDENT et non par choix. Le point de rupture variait en plus selon la
-              langue : « steigere deine VO₂max. » est un tiers plus long que l'espagnol.
-              Largeur portée à 768 px et corps ramené à 68 px : les cinq langues tiennent. */}
+          {/* `max-w-3xl` et non `2xl` : la seconde ligne du titre débordait de 672 px et
+              repartait à la ligne — trois lignes au lieu de deux, par ACCIDENT et non par
+              choix. Le point de rupture varie en plus selon la langue : l'allemand est
+              couramment un tiers plus long que l'espagnol. Largeur portée à 768 px et
+              corps ramené à 68 px : les cinq langues tiennent en deux lignes. */}
           <div className="max-w-3xl">
             {/* L'équation de marque, en surtitre : elle explique le nom AVANT que le
-                titre ne le reprenne. Le point émeraude fait le lien visuel avec le « v »
-                du logo, juste au-dessus dans la barre. */}
+                titre ne le reprenne. Le point émeraude fait le lien visuel avec le « e »
+                du wordmark, juste au-dessus dans la barre — la lettre que « Pace » et
+                « Evo » se partagent. */}
             <p className="mb-5 flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/55">
               <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full bg-[#34d399]" />
               {L.hero.eyebrow}
@@ -246,9 +247,10 @@ export default function LandingPage() {
                 — une césure au milieu du groupe de mots, là où la ligne devrait respirer. */}
             <h1 className="text-[2.1rem] font-bold leading-[1.06] tracking-tight text-white sm:text-5xl md:text-6xl lg:text-[4.25rem]">
               {L.hero.titleA}<br />{L.hero.titleB}
-              {/* Le mot accentué porte le nom du produit : on lui donne le vert du logo
-                  et une ombre portée, sans quoi l'émeraude sur une piste rouge perd son
-                  contraste dès que le soleil de la photo passe derrière. */}
+              {/* Le mot accentué porte la seconde moitié du nom (« Evo ») : on lui donne
+                  le vert du wordmark et une ombre portée, sans quoi l'émeraude sur une
+                  piste rouge perd son contraste dès que le soleil de la photo passe
+                  derrière. */}
               <span className="text-[#34d399] [text-shadow:0_2px_24px_rgba(0,0,0,0.45)]">{L.hero.accent}</span>.
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/80">

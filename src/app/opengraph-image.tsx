@@ -50,10 +50,11 @@ export default function OpengraphImage() {
           >
             <span style={{ color: "#fff", fontSize: 50, fontWeight: 800 }}>P</span>
           </div>
-          {/* Le « v » émeraude, comme dans le wordmark du site : l'aperçu partagé et la
-              page doivent porter la même marque. */}
+          {/* Le « e » émeraude, comme dans le wordmark du site : l'aperçu partagé et la
+              page doivent porter la même marque. C'est la lettre que « Pace » et « Evo »
+              se partagent — voir components/brand/Wordmark.tsx. */}
           <span style={{ color: "#fff", fontSize: 30, fontWeight: 700, display: "flex" }}>
-            Pace<span style={{ color: "#10d68a" }}>v</span>o
+            Pac<span style={{ color: "#10d68a" }}>e</span>vo
           </span>
         </div>
 
@@ -64,12 +65,12 @@ export default function OpengraphImage() {
               landing avait été purgée de ce genre d'affirmation, pas l'aperçu social.
               Remplacé par l'équation de marque, qui elle est vraie et explique le nom. */}
           <span style={{ color: "#34d399", fontSize: 26, fontWeight: 700, letterSpacing: 3, marginBottom: 18 }}>
-            PACE + VO₂ MAX
+            PACE + ÉVOLUTION
           </span>
           <span style={{ color: "#fff", fontSize: 78, fontWeight: 800, lineHeight: 1.05, letterSpacing: -2, display: "flex", flexDirection: "column" }}>
             <span>Trouve ton allure,</span>
             <span style={{ display: "flex" }}>
-              repousse ta&nbsp;<span style={{ color: "#10d68a" }}>VO₂max.</span>
+              fais-la&nbsp;<span style={{ color: "#10d68a" }}>progresser.</span>
             </span>
           </span>
           {/* Tenu sur UNE ligne : à 83 caractères, la phrase repartait à la ligne pour y
