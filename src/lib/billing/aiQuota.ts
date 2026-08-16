@@ -32,14 +32,29 @@ export const TYPE_QUOTA = "ai_quota";
 /**
  * Appels IA autorisés par jour, selon l'accès.
  *
- * Essentiel est à ZÉRO et ce n'est pas une punition : c'est la définition même de la
- * formule. Le verrou d'accès l'arrête déjà avant d'arriver ici ; la valeur est
- * présente pour que la table soit lisible d'un coup d'œil et qu'aucun état n'y manque.
+ * ⚠️ LES DEUX FORMULES ONT L'IA — ce qui les sépare est le NOMBRE d'appels, pas la
+ * présence de la fonctionnalité. C'est le modèle des assistants (Claude, ChatGPT) et
+ * il vaut mieux ici : tout le monde peut juger la meilleure partie du produit, et
+ * l'écart de prix se justifie par un usage, pas par une case cochée. Une formule
+ * privée d'IA se vend mal parce que l'acheteur ne sait pas ce qu'il rate.
+ *
+ * CHIFFRÉ POUR RESTER RENTABLE, en partant du coût mesuré (0,29 centime l'appel) et
+ * du revenu NET (après TVA 20 % et commission Stripe) :
+ *
+ *   Essentiel  9,99 € TTC → 7,83 € net → 15 appels/j = 1,30 €/mois au pire = 17 %
+ *   Complet   19,99 € TTC → 15,93 € net → 40 appels/j = 3,48 €/mois au pire = 22 %
+ *
+ * Ce sont des PIRES CAS : un athlète qui saturerait son plafond tous les jours du
+ * mois. L'usage réel tourne autour de quatre appels par jour, soit 0,35 €/mois. Le
+ * plafond ne borne que la queue de distribution — c'est-à-dire la boucle, le script
+ * et l'abus, qui sont exactement ce qui rend une clé payante dangereuse sans lui.
  */
 export const PLAFOND_JOUR: Record<Acces, number> = {
-  essai: 25,
-  complet: 25,
-  essentiel: 0,
+  // L'essai montre ce que donne Complet : sinon l'athlète juge un produit qu'il
+  // n'achètera pas, et choisit la formule basse par méconnaissance.
+  essai: 40,
+  complet: 40,
+  essentiel: 15,
   consultation: 0,
 };
 

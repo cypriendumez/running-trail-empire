@@ -4080,16 +4080,24 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     }
   });
 
-  test("l'écart entre les deux formules est exactement le coût de l'IA", () => {
-    // `autoPlan` et `autoCoach` sont déterministes : le plan ne consomme aucun jeton.
-    // Essentiel donne donc tout ce qui ne coûte rien, Complet ajoute ce qui coûte.
-    assert.equal(peut("essentiel", "plan"), true, "le plan est dans la formule de base");
-    assert.equal(peut("essentiel", "ia"), false, "l'IA conversationnelle est ce qu'on facture en plus");
+  test("l'écart entre les deux formules est un NOMBRE d'appels, pas une porte fermée", () => {
+    // Le modèle a changé volontairement : les deux formules ont l'IA, ce qui les sépare
+    // est le plafond quotidien. Une formule privée d'IA se vend mal — l'acheteur ne sait
+    // pas ce qu'il rate, donc il ne monte jamais en gamme.
+    assert.equal(peut("essentiel", "plan"), true, "le plan est dans les deux formules");
+    assert.equal(peut("essentiel", "ia"), true, "Essentiel doit avoir l'IA, en quantité limitée");
     assert.equal(peut("complet", "ia"), true);
-    assert.equal(motifRefus("essentiel", "ia"), "formule_insuffisante");
+    assert.ok(PLAFOND_JOUR.complet > PLAFOND_JOUR.essentiel,
+      "sans écart de plafond, les deux formules sont identiques et l'écart de prix est arbitraire");
+    // Essentiel n'est plus refusé sur le DROIT — il l'est sur le plafond, et c'est un
+    // refus 429, pas 402 : « reviens demain » et « change de formule » ne se résolvent
+    // pas du même geste, et le message ne doit pas les confondre.
+    assert.equal(motifRefus("essentiel", "ia"), null, "Essentiel a le droit d'appeler l'IA");
     assert.equal(motifRefus("consultation", "plan"), "essai_expire",
-      "un essai fini et une formule trop courte ne se résolvent pas par le même geste");
+      "un essai fini et un plafond atteint ne se résolvent pas par le même geste");
     assert.equal(motifRefus("complet", "ia"), null, "aucun refus quand le droit existe");
+    // Le seul état qui refuse encore sur le droit est la consultation.
+    assert.equal(motifRefus("consultation", "ia"), "essai_expire");
   });
 
   test("l'essai donne l'IA, sinon personne ne peut juger ce qu'il achète", () => {
@@ -4149,13 +4157,53 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
       "le compteur ne se réinitialise plus au changement de jour");
   });
 
-  test("Essentiel n'a aucun crédit IA, et la table le dit", () => {
-    // Le verrou d'accès l'arrête avant le quota ; la valeur est là pour qu'aucun état
-    // ne manque à la table et qu'elle se lise d'un coup d'œil.
-    assert.equal(PLAFOND_JOUR.essentiel, 0);
-    assert.equal(PLAFOND_JOUR.consultation, 0);
+  test("chaque plafond reste RENTABLE dans son pire cas", () => {
+    // L'invariant qui protège vraiment Cyprien. Un plafond n'est pas un curseur de
+    // confort : c'est ce qui borne la facture Gemini quand un athlète, une boucle ou un
+    // script sature son quota tous les jours du mois. Sans lui, une clé payante est un
+    // chèque en blanc.
+    //
+    // Coût MESURÉ sur le compte de production : 4 584 jetons d'entrée + ~700 de sortie,
+    // soit ≈ 0,29 centime l'appel. Revenu NET après TVA 20 % et commission Stripe.
+    const COUT_APPEL = 0.0029;
+    const net = (ttc: number) => { const ht = ttc / 1.2; return ht - (ht * 0.029 + 0.25); };
+    const PART_MAX = 0.25;   // au-delà d'un quart du net, la marge ne tient plus
+
+    for (const [formule, etat] of [["essentiel", "essentiel"], ["complet", "complet"]] as const) {
+      const ttc = TARIFS[formule].mois.centimes / 100;
+      const pireCas = PLAFOND_JOUR[etat] * 30 * COUT_APPEL;
+      const part = pireCas / net(ttc);
+      assert.ok(part <= PART_MAX,
+        `${formule} : ${PLAFOND_JOUR[etat]} appels/j coûtent ${pireCas.toFixed(2)} €/mois au pire, `
+        + `soit ${(part * 100).toFixed(0)} % des ${net(ttc).toFixed(2)} € nets — au-delà de ${PART_MAX * 100} %, la marge ne tient plus`);
+    }
+    assert.equal(PLAFOND_JOUR.consultation, 0, "un compte expiré ne doit consommer aucun jeton");
     assert.ok(PLAFOND_JOUR.essai > 0, "sans crédits pendant l'essai, personne ne peut juger ce qu'il achète");
     assert.equal(PLAFOND_JOUR.essai, PLAFOND_JOUR.complet, "l'essai doit montrer exactement ce que Complet donne");
+  });
+
+  test("le plafond annoncé sur la vitrine est celui qui est APPLIQUÉ", () => {
+    // Vendre « 40 échanges par jour » et en accorder 25 est la même faute que d'afficher
+    // un prix différent de celui qu'on débite.
+    // ⚠️ Ancré sur CHAQUE formule et sur le motif « <N> échanges / questions », pas sur
+    // le blob des deux cartes : chercher « 40 » quelque part laissait passer une liste de
+    // fonctionnalités annonçant 100, parce que l'accroche de la même carte disait encore
+    // 40 — constaté par mutation.
+    // Un ou deux mots peuvent s'intercaler entre le nombre et le nom : « 15 AI exchanges »,
+    // « 15 KI-Dialoge », « 15 échanges avec l'IA ».
+    const CHIFFRE = /(\d+)\s+(?:[\w'’-]+[\s-]){0,2}(échanges|questions|exchanges|Dialoge|Fragen|intercambios|preguntas|trocas|perguntas)/gi;
+    for (const l of ALL_LANGS) {
+      for (const plan of LANDING_T[l].pricing.plans) {
+        const n = PLAFOND_JOUR[plan.cle];
+        const texte = `${plan.pitch} ${plan.features.join(" ")}`;
+        const annonces = [...texte.matchAll(CHIFFRE)].map((m) => Number(m[1]));
+        assert.ok(annonces.length >= 1, `${l}/${plan.cle} : la vitrine n'annonce aucun nombre d'échanges IA`);
+        for (const a of annonces) {
+          assert.equal(a, n,
+            `${l}/${plan.cle} : la vitrine annonce ${a} échanges par jour, le code en accorde ${n}`);
+        }
+      }
+    }
   });
 
   test("le plafond est CONSOMMÉ par le verrou, pas seulement calculé", () => {
@@ -4267,6 +4315,16 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     // L'assistant de support reste OUVERT, et c'est un choix assumé : c'est par lui
     // qu'un compte en consultation demande comment se réabonner. Le fermer reviendrait
     // à couper la parole à quelqu'un qui cherche à payer.
+    // ── PLUS AUCUNE URL GEMINI BÂTIE À LA MAIN ───────────────────────────────
+    // Trois routes construisaient l'URL elles-mêmes : elles échappaient à la mémoire de
+    // quota (elles rappelaient donc Google après épuisement, pour rien) et à la bascule
+    // de modèle, en codant `gemini-2.5-flash` en dur. Google a déjà retiré `2.0-flash` ;
+    // le jour où `2.5` suivra, une URL figée tombe en silence.
+    for (const r of routes) {
+      assert.ok(!/generativelanguage\.googleapis\.com/.test(r.code),
+        `${r.nom} : URL Gemini codée en dur — cette route échappe au client partagé`);
+    }
+
     const OUVERTES = new Set(["support"]);
     for (const r of routes) {
       if (OUVERTES.has(r.nom)) {

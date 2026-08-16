@@ -109,7 +109,12 @@ export function accesDe(p: ProfilAcces | null | undefined, maintenant: number = 
 const DROITS: Record<Acces, Capacite[]> = {
   essai: ["lecture", "plan", "ia"],
   complet: ["lecture", "plan", "ia"],
-  essentiel: ["lecture", "plan"],
+  // ⚠️ Essentiel a DÉSORMAIS l'IA. Ce qui sépare les deux formules est le nombre
+  // d'appels par jour (voir PLAFOND_JOUR), pas la présence de la fonctionnalité :
+  // une formule privée d'IA se vend mal, parce que l'acheteur ne sait pas ce qu'il
+  // rate. Le coût reste borné par le plafond, et il l'est bien plus sûrement qu'en
+  // fermant la porte — un athlète qui ne peut pas essayer ne monte jamais en gamme.
+  essentiel: ["lecture", "plan", "ia"],
   consultation: ["lecture"],
 };
 

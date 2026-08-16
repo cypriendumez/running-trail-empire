@@ -2,11 +2,10 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { generateContent } from "@/lib/ai/gemini";
 import { exigeAcces } from "@/lib/billing/guard";
 import { buildAthleteContext, COACH_SYSTEM } from "@/lib/ai/coachContext";
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -66,22 +65,19 @@ MISSION : construis un plan d'entraînement PÉRIODISÉ de ${planWeeks} semaines
 Réponds UNIQUEMENT par du JSON valide (sans markdown), structure EXACTE :
 {"summary":"2 phrases : logique du plan et points de vigilance pour cet athlète","weeks":[{"week_number":1,"phase":"base|development|specific|taper","start_date":"YYYY-MM-DD","total_km":50,"total_elevation_m":500,"ctl":45,"atl":48,"tsb":-3,"sessions":[{"day_of_week":1,"type":"easy|tempo|interval|long_run|trail|vma|hill_repeat|recovery","title":"Titre court","description":"Détail STRUCTURÉ séparé par ' → ' : Échauffement (≥15 min footing à la FC Z1→Z2) → Corps (allure /km ; format chiffré pour la qualité) → Retour au calme (≥10 min FC Z1). Allure /km UNIQUEMENT sur le corps ; échauffement/retour au calme en FC. Repos/Renfo = pas d'échauffement course, juste les exercices clés","target_duration_min":60,"target_distance_km":10,"target_elevation_m":0,"intensity_zone":"Z1|Z2|Z3|Z4|Z5","is_key_session":false}]}]}`;
 
-  const response = await fetch(GEMINI_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.5, maxOutputTokens: 8192, responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } },
-    }),
-  });
-
-  if (!response.ok) {
-    const status = response.status;
-    return NextResponse.json({ error: status === 429 ? "Quota IA atteint" : `IA indisponible (${status})` }, { status: 502 });
-  }
-
-  const data = await response.json();
-  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
+  // ⚠️ CLIENT PARTAGÉ, et plus un `fetch` vers une URL bâtie à la main. Cette route
+  // écrivait le nom du modèle DANS son URL : elle échappait à la mémoire de quota (elle
+  // continuait donc d'appeler Google après épuisement) et à la bascule de modèle. Google
+  // a déjà retiré `gemini-2.0-flash` ; le jour où `2.5` suivra, une URL codée en dur
+  // tomberait en silence.
+  const r = await generateContent(
+    [{ role: "user", parts: [{ text: prompt }] }],
+    { temperature: 0.5, maxOutputTokens: 8192, responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } },
+  );
+  // `r.error` porte déjà le bon message, y compris « quota journalier atteint — il se
+  // réinitialise à minuit heure du Pacifique », que cette route réécrivait moins bien.
+  if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
+  const rawText = r.text || "{}";
   let planJson: Record<string, unknown>;
   try { planJson = JSON.parse(rawText); }
   catch { const match = rawText.match(/\{[\s\S]*\}/); planJson = match ? JSON.parse(match[0]) : {}; }

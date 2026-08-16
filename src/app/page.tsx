@@ -100,7 +100,7 @@ const SYNC = ["Garmin", "Coros", "Strava", "Suunto", "Polar"];
 //  secrète, qui n'ont rien à faire dans un composant client.
 const PRIX = {
   essentiel: { mois: 999, an: 9990 },
-  complet: { mois: 1499, an: 14990 },
+  complet: { mois: 1999, an: 19990 },
 } as const;
 
 /** « 9,99 € » dans la locale de l'athlète. */

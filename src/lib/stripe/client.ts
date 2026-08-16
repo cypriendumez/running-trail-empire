@@ -24,8 +24,8 @@ export const TARIFS = {
   },
   complet: {
     acces: "complet" as Extract<Acces, "essentiel" | "complet">,
-    mois:  { centimes: 1499, env: "STRIPE_PRICE_COMPLET_MONTHLY" },
-    an:    { centimes: 14990, env: "STRIPE_PRICE_COMPLET_YEARLY" },
+    mois:  { centimes: 1999, env: "STRIPE_PRICE_COMPLET_MONTHLY" },
+    an:    { centimes: 19990, env: "STRIPE_PRICE_COMPLET_YEARLY" },
   },
 } as const;
 

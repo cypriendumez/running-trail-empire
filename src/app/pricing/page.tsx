@@ -29,7 +29,7 @@ import { LANDING } from "@/components/landing/landingI18n";
  *  Ce module ne peut pas être importé ici : il tire le SDK Stripe et la clé secrète. */
 const PRIX = {
   essentiel: { mois: 999, an: 9990 },
-  complet: { mois: 1499, an: 14990 },
+  complet: { mois: 1999, an: 19990 },
 } as const;
 
 const euros = (centimes: number, lang: string) =>

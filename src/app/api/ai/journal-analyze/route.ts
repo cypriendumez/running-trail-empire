@@ -2,10 +2,9 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { generateContent } from "@/lib/ai/gemini";
 import { exigeAcces } from "@/lib/billing/guard";
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -38,19 +37,17 @@ Retourne UNIQUEMENT du JSON valide:
   "ai_insights": "Conseil court et bienveillant basé sur l'état détecté (1-2 phrases max)"
 }`;
 
-  const response = await fetch(GEMINI_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.3, maxOutputTokens: 500, responseMimeType: "application/json" },
-    }),
-  });
-
-  if (!response.ok) return NextResponse.json({ error: "Gemini error" }, { status: 502 });
-
-  const data = await response.json();
-  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
+  // ⚠️ CLIENT PARTAGÉ, et plus un `fetch` vers une URL bâtie à la main. Cette route
+  // écrivait le nom du modèle DANS son URL : elle échappait à la mémoire de quota (elle
+  // continuait donc d'appeler Google après épuisement) et à la bascule de modèle. Google
+  // a déjà retiré `gemini-2.0-flash` ; le jour où `2.5` suivra, une URL codée en dur
+  // tomberait en silence.
+  const r = await generateContent(
+    [{ role: "user", parts: [{ text: prompt }] }],
+    { temperature: 0.3, maxOutputTokens: 500, responseMimeType: "application/json" },
+  );
+  if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
+  const rawText = r.text || "{}";
   let analysis: Record<string, unknown>;
   try {
     analysis = JSON.parse(rawText);
