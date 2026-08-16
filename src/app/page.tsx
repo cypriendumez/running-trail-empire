@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   ArrowRight, ChevronRight, Check, Menu, X,
-  Bot, Heart, Map, Trophy, Ghost, Moon, CloudRain, ShoppingBag, BookOpen, Shield, Activity, Zap,
+  Bot, Heart, Map, Trophy, Ghost, Moon, CloudRain, ShoppingBag, BookOpen, Shield, Activity, Zap, Flag, Flame, Scale,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
@@ -13,7 +13,6 @@ import { SiteFooter } from "@/components/layout/SiteFooter";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 import { Container, Section, SectionHeading } from "@/components/ui/Container";
 import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
 import { btnClass } from "@/components/ui/Button";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { LANDING, CATEGORY_CODES } from "@/components/landing/landingI18n";
@@ -73,7 +72,11 @@ const photoCarte = (id: string, largeur: number) =>
 /** Paliers du srcset : 1 colonne (mobile), 2 colonnes, puis 3 colonnes en Retina. */
 const LARGEURS_CARTE = [400, 600, 900];
 
-const FEATURE_ICONS: LucideIcon[] = [Bot, Heart, Ghost, Map, Zap, Moon, Activity, CloudRain, BookOpen, Trophy, ShoppingBag, Shield];
+// Les icônes suivent l'ORDRE des dictionnaires. Elles ne sont plus posées sur une tuile
+// menthe arrondie : c'est le motif le plus reconnaissable des pages « générées », et
+// c'est lui qui faisait amateur bien plus que les textes.
+const PILLAR_ICONS: LucideIcon[] = [Bot, Ghost, Zap];
+const FEATURE_ICONS: LucideIcon[] = [Heart, Activity, CloudRain, Map, BookOpen, Flag, Flame, Scale, Trophy];
 
 // ── CHIFFRES DU BANDEAU — chacun est VÉRIFIABLE, aucun n'est décoratif ──────
 //  « 10k+ coureurs actifs », « 4,9 ★ de note moyenne » et « 98 % de satisfaction »
@@ -285,58 +288,61 @@ export default function LandingPage() {
             title={L.features.title}
             subtitle={L.features.subtitle}
           />
-          <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {/* ── TROIS PILIERS ─────────────────────────────────────────────────
+              Douze cartes de poids RIGOUREUSEMENT identique ne hiérarchisent rien :
+              l'œil ne sait pas par où commencer et la page se lit comme du papier
+              peint. On met donc en avant ce qui distingue réellement le produit, avec
+              un chiffre vérifiable par pilier, et la première carte en sombre pour
+              créer le point d'entrée qui manquait. */}
+          <div className="mt-14 grid gap-4 lg:grid-cols-3">
+            {L.features.pillars.map((p, i) => {
+              const Icon = PILLAR_ICONS[i];
+              const sombre = i === 0;
+              return (
+                <div key={p.title}
+                  className={`rounded-2xl border p-7 ${sombre ? "border-transparent bg-[#0b1f1a] text-white" : "border-zinc-200 bg-white"}`}>
+                  <Icon className={sombre ? "h-5 w-5 text-[#34d399]" : "h-5 w-5 text-[#059669]"} strokeWidth={1.6} />
+                  <div className="mt-7 text-[1.75rem] font-bold leading-none tracking-tight">{p.metric}</div>
+                  <div className={`mt-2 text-[10px] font-semibold uppercase tracking-[0.16em] ${sombre ? "text-white/45" : "text-zinc-400"}`}>
+                    {p.metricLabel}
+                  </div>
+                  <h3 className="mt-6 text-[17px] font-semibold tracking-tight">{p.title}</h3>
+                  <p className={`mt-2 text-sm leading-relaxed ${sombre ? "text-white/65" : "text-zinc-500"}`}>{p.desc}</p>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ── LE RESTE : UNE LISTE, PAS DES CARTES ──────────────────────────
+              Neuf cadres de plus rejoueraient exactement le défaut qu'on vient de
+              corriger. Des filets et de l'air suffisent — et l'ancienne pastille d'un
+              mot (« Essentiel », « Santé », « Exclusif »…) disparaît : douze catégories
+              employées chacune UNE fois ne classent rien, elles décorent. */}
+          <div className="mt-12 grid border-t border-zinc-200 sm:grid-cols-2 sm:gap-x-12 lg:grid-cols-3">
             {L.features.items.map((f, i) => {
               const Icon = FEATURE_ICONS[i];
               return (
-                <Card key={f.title} hover className="p-5">
-                  <div className="flex items-center justify-between">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#ecfdf5] text-[#059669]">
-                      <Icon className="h-5 w-5" />
-                    </span>
-                    <Badge>{f.badge}</Badge>
+                <div key={f.title} className="flex gap-3.5 border-b border-zinc-200 py-5">
+                  <Icon className="mt-0.5 h-[18px] w-[18px] flex-shrink-0 text-[#059669]" strokeWidth={1.7} />
+                  <div className="min-w-0">
+                    <h3 className="text-[15px] font-semibold tracking-tight text-zinc-900">{f.title}</h3>
+                    <p className="mt-1 text-[13px] leading-relaxed text-zinc-500">{f.desc}</p>
                   </div>
-                  <h3 className="mt-4 text-base font-semibold">{f.title}</h3>
-                  <p className="mt-1.5 text-sm leading-relaxed text-zinc-500">{f.desc}</p>
-                </Card>
+                </div>
               );
             })}
           </div>
         </Container>
       </Section>
 
-      {/* ── COACHING IA (highlight) ── */}
-      <Section>
-        <Container>
-          <div className="overflow-hidden rounded-3xl bg-zinc-950 px-8 py-14 sm:px-14 sm:py-20">
-            <div className="grid items-center gap-12 lg:grid-cols-2">
-              <div>
-                <Badge tone="brand" dot>{L.coaching.badge}</Badge>
-                <h2 className="mt-5 text-3xl sm:text-4xl lg:text-5xl font-bold leading-[1.05] tracking-tight text-white">
-                  {L.coaching.title}
-                </h2>
-                <p className="mt-5 max-w-lg text-lg leading-relaxed text-white/55">
-                  {L.coaching.subtitle}
-                </p>
-                <Link href="/signup" className={btnClass("secondary", "lg", "mt-8")}>
-                  {L.coaching.cta} <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
-              <div className="grid gap-3">
-                {L.coaching.pills.map((f) => (
-                  <div key={f.t} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                    <div className="flex items-center gap-2.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#34d399]" />
-                      <h3 className="font-semibold text-white">{f.t}</h3>
-                    </div>
-                    <p className="mt-2 text-sm leading-relaxed text-white/45">{f.d}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </Container>
-      </Section>
+      {/* La section « Coaching IA » vivait ici. Elle a été SUPPRIMÉE : ses trois
+          encarts répétaient mot pour mot les trois piliers ci-dessus — « Ghost Runner
+          vocal » apparaissait deux fois à l'identique en un seul écran, et « Plan
+          adaptatif » redisait « Le plan se replanifie seul ». Son titre
+          (« L'intelligence au cœur de ta préparation ») ne portait aucune information,
+          et son argument (« plus réactif qu'un coach humain ») était une comparaison
+          invérifiable. Deux aplats sombres s'enchaînaient en prime. Une page qui dit
+          chaque chose UNE fois convainc mieux qu'une page qui se répète. */}
 
       {/* ── TARIFS ── */}
       <Section id="tarifs" className="bg-zinc-50">

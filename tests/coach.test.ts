@@ -921,7 +921,18 @@ test("le feu rouge de fraîcheur raccourcit la sortie longue, et l'explique", ()
     volume: { weekKm: 62, avg4wkKm: 40, targetKm: 40, longRunKm: 16, longRunPlanned: 26, longRunEased: true },
     weekPlan: { qBudget: 0, quality: [], easyPace: "4'52", eased: true, floored: false },
   });
-  const long = buildWeekPlan(c).find((d) => d.type === "Sortie longue");
+  // DÉFAUT RÉEL trouvé un dimanche : la sortie longue va de préférence sur un dimanche,
+  // or un dimanche le dimanche EST le jour 0 — que l'étape 7 convertit en récupération
+  // quand la fraîcheur est au rouge. L'athlète perdait sa sortie longue pour les sept
+  // jours, en silence, et seulement un jour sur sept. On vérifie donc les SEPT jours de
+  // départ possibles, pas celui de l'exécution.
+  for (const depart of ["2026-08-16", "2026-08-17", "2026-08-18", "2026-08-19", "2026-08-20", "2026-08-21", "2026-08-22"]) {
+    const p = buildWeekPlan(c, new Date(`${depart}T09:00:00`));
+    const jour = new Date(`${depart}T09:00:00`).toLocaleDateString("fr-FR", { weekday: "long" });
+    assert.ok(p.some((d) => d.type === "Sortie longue"), `départ ${jour} : la sortie longue a disparu de la semaine`);
+    assert.ok(p[0].type !== "Sortie longue", `départ ${jour} : la sortie longue est posée sur le jour 0, que le rouge va écraser`);
+  }
+  const long = buildWeekPlan(c, new Date("2026-08-19T09:00:00")).find((d) => d.type === "Sortie longue");
   assert.ok(long, "aucune sortie longue dans le plan");
   assert.ok(/RACCOURCIE/.test(long!.why), "la réduction doit être expliquée, pas subie en silence");
   assert.ok(/26 km prévus/.test(long!.why), "le chiffre initial doit être rappelé");
@@ -1359,9 +1370,28 @@ test("aucune phrase à moitié française dans les autres langues", () => {
   // français au milieu, parce qu'un motif de fatigue ou une note météo n'a pas suivi.
   const marqueursFr = MARQUEURS_FR;
   const c = ctxTraduit();
-  (c as unknown as { readiness: { reasons: string[]; reasonsAll: unknown[] } }).readiness =
-    { level: "orange", ...motifs("ratio aigu:chronique 1,9 (zone de risque de blessure)", "sommeil dégradé (58/100)"), advice: "" } as never;
-  for (const j of buildWeekPlan(c, new Date())) {
+  // ⚠️ PAS le helper `motifs()` ici : il recopie la phrase FRANÇAISE dans les cinq
+  // langues (son commentaire l'assume). Le plan cite ces motifs dans le « pourquoi »
+  // d'une sortie longue raccourcie — le test trouvait donc le français qu'il avait
+  // lui-même injecté, et accusait le produit. Il faut de vraies traductions pour que
+  // l'assertion porte sur ce qu'elle prétend.
+  const trad = (fr: string, en: string, de: string, es: string, pt: string) => ({ fr, en, de, es, pt });
+  (c as unknown as { readiness: { level: string; reasons: string[]; reasonsAll: unknown[]; advice: string } }).readiness = {
+    level: "orange",
+    reasons: ["ratio aigu:chronique 1,9 (zone de risque de blessure)", "sommeil dégradé (58/100)"],
+    reasonsAll: [
+      trad("ratio aigu:chronique 1,9 (zone de risque de blessure)", "acute:chronic ratio 1.9 (injury risk zone)",
+           "Akut-zu-chronisch-Verhältnis 1,9 (Verletzungsrisiko)", "ratio agudo:crónico 1,9 (zona de riesgo de lesión)",
+           "rácio agudo:crónico 1,9 (zona de risco de lesão)"),
+      trad("sommeil dégradé (58/100)", "degraded sleep (58/100)", "verschlechterter Schlaf (58/100)",
+           "sueño degradado (58/100)", "sono degradado (58/100)"),
+    ],
+    advice: "",
+  } as never;
+  // Date FIGÉE. Avec `new Date()`, ce test ne voyait le chemin « sortie longue
+  // raccourcie » que les jours où la sortie longue tombe hors du jour 0 : il ne
+  // rougissait donc qu'un jour sur sept, au hasard du calendrier de l'exécution.
+  for (const j of buildWeekPlan(c, new Date("2026-08-19T09:00:00"))) {
     for (const l of ["en", "de", "es", "pt"] as const) {
       const t = j.i18n![l]!;
       const texte = `${t.title} ${t.detail} ${t.why} ${t.tags.join(" ")}`;
@@ -3994,6 +4024,53 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     const r = computeStreak({ today: AUJ, workouts: [], prescriptions: [], feedbacks: [] });
     assert.equal(r.current, 0);
     assert.equal(r.since, null, "on ne prétend pas observer une fenêtre qu'on n'a pas");
+  });
+
+  test("la landing ne vend AUCUNE fonctionnalité qui n'existe pas", () => {
+    // Deux cartes annonçaient des choses que le code ne fait pas. Sur un site vendu à
+    // des milliers de personnes, et sur le Play Store, c'est plus grave qu'un design daté.
+    //
+    //  · « Guardian Mode — Détection de chute, alerte des contacts d'urgence avec ta
+    //    position GPS ». Vérifié : `guardian_mode_enabled` et `emergency_contact_*` ne
+    //    sont lus QUE par ProfileSettings. Aucun accéléromètre, aucun DeviceMotion,
+    //    aucune détection, aucun envoi d'alerte. C'était une promesse de SÉCURITÉ.
+    //  · « Shopping Hub — Comparateur i-Run, Alltricks, Lepape ». Les prix sont
+    //    codés en dur avec `simulated: true` dans api/shop/prices : des tarifs inventés
+    //    attribués à des enseignes nommées, avec des liens vers leurs sites.
+    for (const l of ALL_LANGS) {
+      const t = JSON.stringify(LANDING_T[l].features);
+      for (const promesse of [/détection de chute/i, /fall detection/i, /Sturzerkennung/i,
+                              /detección de caídas/i, /deteção de quedas/i,
+                              /Guardian Mode/i, /Shopping Hub/i,
+                              /i-Run|Alltricks|Lepape/i]) {
+        assert.ok(!promesse.test(t), `${l} : la landing annonce à nouveau « ${promesse.source} »`);
+      }
+    }
+    // Et la preuve que ces fonctions restent absentes du produit : le jour où elles
+    // existeront, ce test devra être mis à jour EN MÊME TEMPS que la vitrine.
+    // ⚠️ Sentinelle. Elle doit rougir le JOUR où un prix cesse d'être simulé, pour
+    // qu'on revienne rouvrir la vitrine. Chercher « simulated: true » quelque part ne
+    // le faisait pas : le motif apparaît 68 fois, en changer un laissait les 67 autres
+    // satisfaire l'assertion. On fige donc le RAPPORT, pas la présence.
+    // ⚠️ Précision : la boutique n'est pas ENTIÈREMENT inventée. `tryDecathlonPrices`
+    // interroge une vraie API et marque `simulated: false`. Ce sont les quatre autres
+    // enseignes, calculées par un simple multiplicateur, qui sont fictives — et c'était
+    // exactement celles que la vitrine citait nommément.
+    //
+    // La liste interdite est donc DÉRIVÉE DU CODE plutôt que recopiée : le jour où une
+    // enseigne quitte la table simulée, elle devient citable sans qu'on ait à y penser,
+    // et le jour où la table disparaît, ce test le dit.
+    const shop = codeOf("src/app/api/shop/prices/route.ts");
+    const fictives = [...shop.matchAll(/retailer_name: "([^"]+)",\s*multiplier:/g)].map((m) => m[1]);
+    assert.ok(fictives.length >= 4,
+      "la table de prix simulés a disparu : la boutique devient réelle, la vitrine peut "
+      + "à nouveau en parler et ce test doit être rouvert");
+    for (const nom of fictives) {
+      for (const l of ALL_LANGS) {
+        assert.ok(!JSON.stringify(LANDING_T[l].features).includes(nom),
+          `${l} : la vitrine cite « ${nom} », dont le prix est calculé par multiplicateur`);
+      }
+    }
   });
 
   test("la vitrine des programmes est complète : photo, catégorie, 5 langues", () => {

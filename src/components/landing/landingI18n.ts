@@ -14,8 +14,14 @@ export type LandingDict = {
   // n'existent plus : ils n'avaient aucune source.
   stats: { races: string; routes: string; plan: string; replan: string };
   programs: { eyebrow: string; title: string; subtitle: string; viewAll: string; cats: Record<string, string>; items: Record<string, { title: string; subtitle: string }> };
-  features: { eyebrow: string; title: string; subtitle: string; items: { title: string; desc: string; badge: string }[] };
-  coaching: { badge: string; title: string; subtitle: string; cta: string; pills: { t: string; d: string }[] };
+  // `badge` a disparu : douze pastilles d'un mot, chacune employée UNE fois, ne forment
+  // pas une taxonomie — c'était de la décoration. Les fonctionnalités se répartissent
+  // désormais entre trois PILIERS (ce qui distingue le produit) et des lignes.
+  features: {
+    eyebrow: string; title: string; subtitle: string;
+    pillars: { title: string; desc: string; metric: string; metricLabel: string }[];
+    items: { title: string; desc: string }[];
+  };
   pricing: { eyebrow: string; title: string; subtitle: string; plans: { name: string; period: string; badge?: string; cta: string; features: string[] }[] };
   cta: { title: string; subtitle: string; primary: string; secondary: string; note: string };
 };
@@ -43,28 +49,26 @@ const fr: LandingDict = {
     },
   },
   features: {
-    eyebrow: "Plateforme complète", title: "Tout ce dont un coureur a besoin", subtitle: "Une suite d'outils pensés pour la performance — de l'analyse physiologique au coaching vocal en temps réel.",
-    items: [
-      { title: "Coaching IA", desc: "Un plan recalculé chaque semaine selon ta VFC, ton sommeil et ta charge réelle.", badge: "Essentiel" },
-      { title: "Analyse VFC & HRV", desc: "HRV quotidien, Body Battery, score de récupération. Sync Garmin & Coros.", badge: "Santé" },
-      { title: "Ghost Runner vocal", desc: "Coach audio en temps réel : allure cible, écart au plan, chrono live km/km.", badge: "Exclusif" },
-      { title: "Trail Builder SIG", desc: "Carte IGN, tracé snap-to-path, dénivelé auto, export GPX Garmin/Coros.", badge: "Trail" },
-      { title: "Affûtage Banister", desc: "CTL/ATL/TSB en temps réel. TSB optimal le jour de course, automatiquement.", badge: "Élite" },
-      { title: "Suivi du sommeil", desc: "Deep / REM / Light, Body Battery au réveil. L'IA décide si tu peux pousser.", badge: "Récup" },
-      { title: "Sync Garmin & Coros", desc: "Activités, puissance, zones cardio et wellness synchronisés en continu.", badge: "Connecté" },
-      { title: "Météo & performance", desc: "Impact chaleur, humidité et vent. Objectifs de séance ajustés en direct.", badge: "Intelligent" },
-      { title: "Smart Journal vocal", desc: "Raconte ta séance, l'IA détecte ta fatigue mentale et adapte ton plan.", badge: "Mental" },
-      { title: "Ligues & badges", desc: "Compétition hebdo, classement Bronze → Élite, score de discipline.", badge: "Social" },
-      { title: "Shopping Hub", desc: "Comparateur i-Run, Alltricks, Lepape. La chaussure idéale pour ta foulée.", badge: "Équipement" },
-      { title: "Guardian Mode", desc: "Détection de chute, alerte des contacts d'urgence avec ta position GPS.", badge: "Sécurité" },
+    eyebrow: "Ce que fait Pacevo", title: "Le plan se refait tout seul. Toi, tu cours.",
+    subtitle: "Chaque nuit et après chaque séance synchronisée, Pacevo relit ta charge, ta fraîcheur et ton objectif, puis réécrit les sept jours qui viennent.",
+    pillars: [
+      { metric: "10 min", metricLabel: "entre deux replanifications", title: "Le plan se replanifie seul",
+        desc: "Une séance arrive de ta montre, le calcul repart : charge, fraîcheur, jours de repos, sortie longue. Sept jours glissants, toujours à jour." },
+      { metric: "km / km", metricLabel: "coaching audio en direct", title: "Ghost Runner vocal",
+        desc: "Une voix dans l'oreille pendant la séance : allure cible, écart au plan et chrono projeté, annoncés à chaque kilomètre." },
+      { metric: "CTL · ATL · TSB", metricLabel: "modèle de Banister", title: "Charge et affûtage",
+        desc: "Le ratio aigu:chronique déclenche l'allègement AVANT la blessure, et l'affûtage vise une fraîcheur positive le jour de la course." },
     ],
-  },
-  coaching: {
-    badge: "Coaching IA", title: "L'intelligence au cœur de ta préparation.", subtitle: "Pacevo analyse ta VFC, ton sommeil et ta charge d'entraînement pour adapter ton plan en temps réel — plus réactif qu'un coach humain.", cta: "Commencer gratuitement",
-    pills: [
-      { t: "Analyse VFC quotidienne", d: "HRV, Body Battery et score de récupération synchronisés Garmin & Coros." },
-      { t: "Plan adaptatif", d: "Ajustement automatique de la charge selon ton état physiologique du jour." },
-      { t: "Ghost Runner vocal", d: "Coaching audio temps réel avec prédiction de chrono kilomètre par kilomètre." },
+    items: [
+      { title: "VFC et sommeil", desc: "VFC au réveil, sommeil profond et paradoxal, Body Battery : la fraîcheur du jour vient de mesures, pas d'un ressenti." },
+      { title: "Sync Garmin, Coros, Strava", desc: "Activités, puissance, zones cardio et données de bien-être récupérées en continu via intervals.icu." },
+      { title: "Météo réelle à ta position", desc: "Chaleur, humidité, vent et altitude : les allures cibles sont corrigées avant la séance, pas expliquées après." },
+      { title: "Trail Builder", desc: "Tracé accroché aux sentiers réels, dénivelé calculé, export GPX vers la montre." },
+      { title: "Smart Journal vocal", desc: "Raconte ta séance à voix haute : ce que tu dis pèse sur la prescription du lendemain." },
+      { title: "14 000 courses à venir", desc: "Dates, distances et lien d'inscription — et ta préparation se cale sur la date que tu choisis." },
+      { title: "Série et régularité", desc: "Un jour de repos prescrit et respecté entretient ta série au même titre qu'une séance faite." },
+      { title: "Perte de poids encadrée", desc: "Déficit plafonné à 0,75 % du poids par semaine, et nul en dessous d'un IMC de 21." },
+      { title: "Ligues et badges", desc: "Classement hebdomadaire Bronze → Élite, assis sur ta régularité et non sur ton volume." },
     ],
   },
   pricing: {
@@ -98,28 +102,26 @@ const en: LandingDict = {
     },
   },
   features: {
-    eyebrow: "Complete platform", title: "Everything a runner needs", subtitle: "A suite of tools built for performance — from physiological analysis to real-time voice coaching.",
-    items: [
-      { title: "AI Coaching", desc: "A plan recomputed every week from your HRV, sleep and real training load.", badge: "Essential" },
-      { title: "HRV & Recovery", desc: "Daily HRV, Body Battery, recovery score. Syncs with Garmin & Coros.", badge: "Health" },
-      { title: "Voice Ghost Runner", desc: "Real-time audio coach: target pace, gap to plan, live splits km by km.", badge: "Exclusive" },
-      { title: "GIS Trail Builder", desc: "Topo map, snap-to-path routing, auto elevation, GPX export to Garmin/Coros.", badge: "Trail" },
-      { title: "Banister Tapering", desc: "Real-time CTL/ATL/TSB. Optimal TSB on race day, automatically.", badge: "Elite" },
-      { title: "Sleep tracking", desc: "Deep / REM / Light, Body Battery on waking. The AI decides if you can push.", badge: "Recovery" },
-      { title: "Garmin & Coros sync", desc: "Activities, power, heart-rate zones and wellness synced continuously.", badge: "Connected" },
-      { title: "Weather & performance", desc: "Heat, humidity and wind impact. Session targets adjusted live.", badge: "Smart" },
-      { title: "Voice Smart Journal", desc: "Talk through your session; the AI detects mental fatigue and adapts your plan.", badge: "Mental" },
-      { title: "Leagues & badges", desc: "Weekly competition, Bronze → Elite ranking, discipline score.", badge: "Social" },
-      { title: "Shopping Hub", desc: "Compare i-Run, Alltricks, Lepape. The right shoe for your stride.", badge: "Gear" },
-      { title: "Guardian Mode", desc: "Fall detection, alerts your emergency contacts with your GPS location.", badge: "Safety" },
+    eyebrow: "What Pacevo does", title: "The plan rewrites itself. You just run.",
+    subtitle: "Every night and after every synced session, Pacevo re-reads your load, your freshness and your goal, then rewrites the next seven days.",
+    pillars: [
+      { metric: "10 min", metricLabel: "between two replans", title: "The plan replans itself",
+        desc: "A session lands from your watch and the maths restarts: load, freshness, rest days, long run. Seven rolling days, always current." },
+      { metric: "km / km", metricLabel: "live audio coaching", title: "Voice Ghost Runner",
+        desc: "A voice in your ear during the session: target pace, gap to plan and projected finish, called out every kilometre." },
+      { metric: "CTL · ATL · TSB", metricLabel: "Banister model", title: "Load and tapering",
+        desc: "The acute:chronic ratio triggers the cutback BEFORE the injury, and the taper aims for positive freshness on race day." },
     ],
-  },
-  coaching: {
-    badge: "AI Coaching", title: "Intelligence at the heart of your prep.", subtitle: "Pacevo analyses your HRV, sleep and training load to adapt your plan in real time — more responsive than a human coach.", cta: "Start for free",
-    pills: [
-      { t: "Daily HRV analysis", d: "HRV, Body Battery and recovery score synced from Garmin & Coros." },
-      { t: "Adaptive plan", d: "Load automatically adjusted to your physiological state of the day." },
-      { t: "Voice Ghost Runner", d: "Real-time audio coaching with finish-time prediction, km by km." },
+    items: [
+      { title: "HRV and sleep", desc: "Morning HRV, deep and REM sleep, Body Battery: today's freshness comes from measurements, not from a feeling." },
+      { title: "Garmin, Coros, Strava sync", desc: "Activities, power, heart-rate zones and wellness data pulled continuously through intervals.icu." },
+      { title: "Real weather at your location", desc: "Heat, humidity, wind and altitude: target paces are corrected before the session, not explained after it." },
+      { title: "Trail Builder", desc: "Route snapped to real paths, elevation computed, GPX export straight to your watch." },
+      { title: "Voice Smart Journal", desc: "Talk through your session out loud: what you say weighs on tomorrow's prescription." },
+      { title: "14,000 upcoming races", desc: "Dates, distances and the sign-up link — and your build lines up with the date you pick." },
+      { title: "Streak and consistency", desc: "A prescribed rest day you respect keeps your streak alive exactly like a session done." },
+      { title: "Guard-railed weight loss", desc: "Deficit capped at 0.75% of body weight per week, and zero below a BMI of 21." },
+      { title: "Leagues and badges", desc: "Weekly Bronze to Elite ranking, built on your consistency rather than your mileage." },
     ],
   },
   pricing: {
@@ -153,28 +155,26 @@ const de: LandingDict = {
     },
   },
   features: {
-    eyebrow: "Komplette Plattform", title: "Alles, was ein Läufer braucht", subtitle: "Ein Werkzeugkasten für Leistung — von der physiologischen Analyse bis zum Echtzeit-Sprachcoaching.",
-    items: [
-      { title: "KI-Coaching", desc: "Ein Plan, der wöchentlich aus HRV, Schlaf und echter Belastung neu berechnet wird.", badge: "Essenziell" },
-      { title: "HRV & Erholung", desc: "Tägliche HRV, Body Battery, Erholungs-Score. Sync mit Garmin & Coros.", badge: "Gesundheit" },
-      { title: "Voice Ghost Runner", desc: "Echtzeit-Audiocoach: Zieltempo, Abweichung, Live-Splits km für km.", badge: "Exklusiv" },
-      { title: "GIS Trail Builder", desc: "Topo-Karte, Snap-to-Path, Auto-Höhenmeter, GPX-Export zu Garmin/Coros.", badge: "Trail" },
-      { title: "Banister-Tapering", desc: "CTL/ATL/TSB in Echtzeit. Optimaler TSB am Wettkampftag, automatisch.", badge: "Elite" },
-      { title: "Schlaf-Tracking", desc: "Tief / REM / Leicht, Body Battery beim Aufwachen. Die KI entscheidet, ob du pushen kannst.", badge: "Erholung" },
-      { title: "Garmin- & Coros-Sync", desc: "Aktivitäten, Leistung, Herzfrequenzzonen und Wellness laufend synchronisiert.", badge: "Verbunden" },
-      { title: "Wetter & Leistung", desc: "Hitze, Feuchtigkeit und Wind. Trainingsziele live angepasst.", badge: "Smart" },
-      { title: "Voice Smart Journal", desc: "Erzähl von deinem Training; die KI erkennt mentale Müdigkeit und passt den Plan an.", badge: "Mental" },
-      { title: "Ligen & Abzeichen", desc: "Wöchentlicher Wettbewerb, Rang Bronze → Elite, Disziplin-Score.", badge: "Sozial" },
-      { title: "Shopping Hub", desc: "Vergleich i-Run, Alltricks, Lepape. Der richtige Schuh für deinen Schritt.", badge: "Ausrüstung" },
-      { title: "Guardian Mode", desc: "Sturzerkennung, alarmiert deine Notfallkontakte mit deiner GPS-Position.", badge: "Sicherheit" },
+    eyebrow: "Was Pacevo tut", title: "Der Plan schreibt sich neu. Du läufst einfach.",
+    subtitle: "Jede Nacht und nach jeder synchronisierten Einheit liest Pacevo deine Belastung, deine Frische und dein Ziel neu — und schreibt die nächsten sieben Tage neu.",
+    pillars: [
+      { metric: "10 Min", metricLabel: "zwischen zwei Neuplanungen", title: "Der Plan plant sich selbst",
+        desc: "Eine Einheit trifft von der Uhr ein, die Rechnung startet neu: Belastung, Frische, Ruhetage, langer Lauf. Sieben rollierende Tage, immer aktuell." },
+      { metric: "km / km", metricLabel: "Audio-Coaching in Echtzeit", title: "Ghost Runner mit Stimme",
+        desc: "Eine Stimme im Ohr während der Einheit: Zieltempo, Abweichung vom Plan und Hochrechnung — bei jedem Kilometer angesagt." },
+      { metric: "CTL · ATL · TSB", metricLabel: "Banister-Modell", title: "Belastung und Tapering",
+        desc: "Das Akut-zu-chronisch-Verhältnis löst die Entlastung VOR der Verletzung aus, und das Tapering zielt auf positive Frische am Wettkampftag." },
     ],
-  },
-  coaching: {
-    badge: "KI-Coaching", title: "Intelligenz im Kern deiner Vorbereitung.", subtitle: "Pacevo analysiert HRV, Schlaf und Trainingsbelastung und passt deinen Plan in Echtzeit an — reaktiver als ein menschlicher Coach.", cta: "Kostenlos starten",
-    pills: [
-      { t: "Tägliche HRV-Analyse", d: "HRV, Body Battery und Erholungs-Score von Garmin & Coros synchronisiert." },
-      { t: "Adaptiver Plan", d: "Belastung automatisch an deinen physiologischen Tageszustand angepasst." },
-      { t: "Voice Ghost Runner", d: "Echtzeit-Audiocoaching mit Zielzeit-Prognose, km für km." },
+    items: [
+      { title: "HRV und Schlaf", desc: "HRV am Morgen, Tief- und REM-Schlaf, Body Battery: die Frische des Tages kommt aus Messungen, nicht aus einem Gefühl." },
+      { title: "Sync mit Garmin, Coros, Strava", desc: "Aktivitäten, Leistung, Herzfrequenzzonen und Wellness-Daten laufend über intervals.icu geholt." },
+      { title: "Echtes Wetter an deinem Ort", desc: "Hitze, Feuchte, Wind und Höhe: Zieltempi werden vor der Einheit korrigiert, nicht danach erklärt." },
+      { title: "Trail Builder", desc: "Strecke auf echte Wege gerastet, Höhenmeter berechnet, GPX-Export direkt auf die Uhr." },
+      { title: "Smart Journal per Stimme", desc: "Erzähl deine Einheit laut: was du sagst, wiegt in der Verordnung von morgen." },
+      { title: "14 000 kommende Rennen", desc: "Termine, Distanzen und Anmeldelink — und dein Aufbau richtet sich nach dem Datum, das du wählst." },
+      { title: "Serie und Regelmäßigkeit", desc: "Ein verordneter und eingehaltener Ruhetag hält deine Serie genauso am Leben wie eine absolvierte Einheit." },
+      { title: "Abnehmen mit Leitplanken", desc: "Defizit gedeckelt auf 0,75 % des Körpergewichts pro Woche, und null unter einem BMI von 21." },
+      { title: "Ligen und Abzeichen", desc: "Wöchentliche Wertung Bronze bis Elite, gebaut auf deine Regelmäßigkeit statt auf deine Kilometer." },
     ],
   },
   pricing: {
@@ -208,28 +208,26 @@ const es: LandingDict = {
     },
   },
   features: {
-    eyebrow: "Plataforma completa", title: "Todo lo que un corredor necesita", subtitle: "Un conjunto de herramientas pensadas para el rendimiento — del análisis fisiológico al coaching por voz en tiempo real.",
-    items: [
-      { title: "Coaching con IA", desc: "Un plan recalculado cada semana según tu VFC, tu sueño y tu carga real.", badge: "Esencial" },
-      { title: "VFC y recuperación", desc: "VFC diaria, Body Battery, puntuación de recuperación. Sincroniza Garmin y Coros.", badge: "Salud" },
-      { title: "Ghost Runner por voz", desc: "Entrenador de audio en tiempo real: ritmo objetivo, desvío, parciales km a km.", badge: "Exclusivo" },
-      { title: "Trail Builder SIG", desc: "Mapa topográfico, trazado snap-to-path, desnivel automático, exporta GPX a Garmin/Coros.", badge: "Trail" },
-      { title: "Afinamiento Banister", desc: "CTL/ATL/TSB en tiempo real. TSB óptimo el día de la carrera, automáticamente.", badge: "Élite" },
-      { title: "Seguimiento del sueño", desc: "Profundo / REM / Ligero, Body Battery al despertar. La IA decide si puedes apretar.", badge: "Recuperación" },
-      { title: "Sync Garmin y Coros", desc: "Actividades, potencia, zonas de FC y bienestar sincronizados en continuo.", badge: "Conectado" },
-      { title: "Clima y rendimiento", desc: "Impacto de calor, humedad y viento. Objetivos de sesión ajustados en directo.", badge: "Inteligente" },
-      { title: "Smart Journal por voz", desc: "Cuenta tu sesión; la IA detecta tu fatiga mental y adapta tu plan.", badge: "Mental" },
-      { title: "Ligas e insignias", desc: "Competición semanal, ranking Bronce → Élite, puntuación de disciplina.", badge: "Social" },
-      { title: "Shopping Hub", desc: "Compara i-Run, Alltricks, Lepape. La zapatilla ideal para tu pisada.", badge: "Equipo" },
-      { title: "Guardian Mode", desc: "Detección de caídas, avisa a tus contactos de emergencia con tu ubicación GPS.", badge: "Seguridad" },
+    eyebrow: "Lo que hace Pacevo", title: "El plan se rehace solo. Tú solo corres.",
+    subtitle: "Cada noche y tras cada sesión sincronizada, Pacevo relee tu carga, tu frescura y tu objetivo, y reescribe los siete días siguientes.",
+    pillars: [
+      { metric: "10 min", metricLabel: "entre dos replanificaciones", title: "El plan se replanifica solo",
+        desc: "Llega una sesión desde tu reloj y el cálculo vuelve a empezar: carga, frescura, días de descanso, tirada larga. Siete días deslizantes, siempre al día." },
+      { metric: "km / km", metricLabel: "coaching de voz en directo", title: "Ghost Runner por voz",
+        desc: "Una voz al oído durante la sesión: ritmo objetivo, desvío del plan y crono proyectado, anunciados en cada kilómetro." },
+      { metric: "CTL · ATL · TSB", metricLabel: "modelo de Banister", title: "Carga y afinamiento",
+        desc: "La ratio agudo:crónico dispara la descarga ANTES de la lesión, y el afinamiento busca frescura positiva el día de la carrera." },
     ],
-  },
-  coaching: {
-    badge: "Coaching con IA", title: "La inteligencia en el centro de tu preparación.", subtitle: "Pacevo analiza tu VFC, tu sueño y tu carga de entrenamiento para adaptar tu plan en tiempo real — más reactivo que un entrenador humano.", cta: "Empezar gratis",
-    pills: [
-      { t: "Análisis VFC diario", d: "VFC, Body Battery y puntuación de recuperación sincronizados de Garmin y Coros." },
-      { t: "Plan adaptativo", d: "Carga ajustada automáticamente a tu estado fisiológico del día." },
-      { t: "Ghost Runner por voz", d: "Coaching de audio en tiempo real con predicción de tiempo, km a km." },
+    items: [
+      { title: "VFC y sueño", desc: "VFC al despertar, sueño profundo y REM, Body Battery: la frescura del día sale de medidas, no de una sensación." },
+      { title: "Sync Garmin, Coros, Strava", desc: "Actividades, potencia, zonas cardio y datos de bienestar recogidos en continuo vía intervals.icu." },
+      { title: "Meteo real en tu posición", desc: "Calor, humedad, viento y altitud: los ritmos objetivo se corrigen antes de la sesión, no se explican después." },
+      { title: "Trail Builder", desc: "Trazado pegado a senderos reales, desnivel calculado, exportación GPX directa al reloj." },
+      { title: "Smart Journal por voz", desc: "Cuenta tu sesión en voz alta: lo que dices pesa en la prescripción de mañana." },
+      { title: "14 000 carreras próximas", desc: "Fechas, distancias y enlace de inscripción — y tu preparación se ajusta a la fecha que elijas." },
+      { title: "Racha y regularidad", desc: "Un día de descanso prescrito y respetado mantiene tu racha igual que una sesión hecha." },
+      { title: "Pérdida de peso con límites", desc: "Déficit limitado al 0,75 % del peso por semana, y nulo por debajo de un IMC de 21." },
+      { title: "Ligas e insignias", desc: "Clasificación semanal Bronce a Élite, basada en tu regularidad y no en tu volumen." },
     ],
   },
   pricing: {
@@ -263,28 +261,26 @@ const pt: LandingDict = {
     },
   },
   features: {
-    eyebrow: "Plataforma completa", title: "Tudo o que um corredor precisa", subtitle: "Um conjunto de ferramentas pensadas para o desempenho — da análise fisiológica ao coaching por voz em tempo real.",
-    items: [
-      { title: "Coaching com IA", desc: "Um plano recalculado todas as semanas com base na tua VFC, sono e carga real.", badge: "Essencial" },
-      { title: "VFC e recuperação", desc: "VFC diária, Body Battery, pontuação de recuperação. Sincroniza Garmin e Coros.", badge: "Saúde" },
-      { title: "Ghost Runner por voz", desc: "Treinador de áudio em tempo real: ritmo-alvo, desvio, parciais km a km.", badge: "Exclusivo" },
-      { title: "Trail Builder SIG", desc: "Mapa topográfico, traçado snap-to-path, desnível automático, exporta GPX para Garmin/Coros.", badge: "Trail" },
-      { title: "Afinamento Banister", desc: "CTL/ATL/TSB em tempo real. TSB ótimo no dia da prova, automaticamente.", badge: "Elite" },
-      { title: "Monitorização do sono", desc: "Profundo / REM / Leve, Body Battery ao acordar. A IA decide se podes forçar.", badge: "Recuperação" },
-      { title: "Sync Garmin e Coros", desc: "Atividades, potência, zonas de FC e bem-estar sincronizados em contínuo.", badge: "Ligado" },
-      { title: "Clima e desempenho", desc: "Impacto de calor, humidade e vento. Objetivos da sessão ajustados ao vivo.", badge: "Inteligente" },
-      { title: "Smart Journal por voz", desc: "Conta a tua sessão; a IA deteta a fadiga mental e adapta o teu plano.", badge: "Mental" },
-      { title: "Ligas e medalhas", desc: "Competição semanal, ranking Bronze → Elite, pontuação de disciplina.", badge: "Social" },
-      { title: "Shopping Hub", desc: "Compara i-Run, Alltricks, Lepape. O ténis ideal para a tua passada.", badge: "Equipamento" },
-      { title: "Guardian Mode", desc: "Deteção de quedas, alerta os teus contactos de emergência com a tua posição GPS.", badge: "Segurança" },
+    eyebrow: "O que o Pacevo faz", title: "O plano refaz-se sozinho. Tu só corres.",
+    subtitle: "Todas as noites e após cada sessão sincronizada, o Pacevo relê a tua carga, a tua frescura e o teu objetivo, e reescreve os sete dias seguintes.",
+    pillars: [
+      { metric: "10 min", metricLabel: "entre duas replanificações", title: "O plano replanifica-se sozinho",
+        desc: "Chega uma sessão do teu relógio e o cálculo recomeça: carga, frescura, dias de descanso, tirada longa. Sete dias deslizantes, sempre atuais." },
+      { metric: "km / km", metricLabel: "treino por voz em direto", title: "Ghost Runner por voz",
+        desc: "Uma voz ao ouvido durante a sessão: ritmo alvo, desvio ao plano e tempo projetado, anunciados a cada quilómetro." },
+      { metric: "CTL · ATL · TSB", metricLabel: "modelo de Banister", title: "Carga e afinamento",
+        desc: "O rácio agudo:crónico despoleta o alívio ANTES da lesão, e o afinamento procura frescura positiva no dia da prova." },
     ],
-  },
-  coaching: {
-    badge: "Coaching com IA", title: "A inteligência no centro da tua preparação.", subtitle: "A Pacevo analisa a tua VFC, o teu sono e a tua carga de treino para adaptar o plano em tempo real — mais reativa do que um treinador humano.", cta: "Começar grátis",
-    pills: [
-      { t: "Análise VFC diária", d: "VFC, Body Battery e pontuação de recuperação sincronizados da Garmin e Coros." },
-      { t: "Plano adaptativo", d: "Carga ajustada automaticamente ao teu estado fisiológico do dia." },
-      { t: "Ghost Runner por voz", d: "Coaching de áudio em tempo real com previsão de tempo, km a km." },
+    items: [
+      { title: "VFC e sono", desc: "VFC ao acordar, sono profundo e REM, Body Battery: a frescura do dia vem de medições, não de uma sensação." },
+      { title: "Sync Garmin, Coros, Strava", desc: "Atividades, potência, zonas cardio e dados de bem-estar recolhidos em contínuo via intervals.icu." },
+      { title: "Meteorologia real na tua posição", desc: "Calor, humidade, vento e altitude: os ritmos alvo são corrigidos antes da sessão, não explicados depois." },
+      { title: "Trail Builder", desc: "Traçado colado a trilhos reais, desnível calculado, exportação GPX direta para o relógio." },
+      { title: "Smart Journal por voz", desc: "Conta a tua sessão em voz alta: o que dizes pesa na prescrição de amanhã." },
+      { title: "14 000 provas futuras", desc: "Datas, distâncias e link de inscrição — e a tua preparação alinha-se pela data que escolheres." },
+      { title: "Série e regularidade", desc: "Um dia de descanso prescrito e cumprido mantém a tua série tal como uma sessão feita." },
+      { title: "Perda de peso com limites", desc: "Défice limitado a 0,75 % do peso por semana, e nulo abaixo de um IMC de 21." },
+      { title: "Ligas e distintivos", desc: "Classificação semanal Bronze a Elite, assente na tua regularidade e não no teu volume." },
     ],
   },
   pricing: {
