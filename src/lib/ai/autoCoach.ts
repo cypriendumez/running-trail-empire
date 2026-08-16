@@ -11,6 +11,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildAthleteContext } from "@/lib/ai/coachContext";
 import { buildWeekPlan, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
 import { pushIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace } from "@/lib/watch/intervals";
+import { profilPeut, COLONNES_ACCES } from "@/lib/billing/access";
 
 type Admin = SupabaseClient;
 export type AutoResult = {
@@ -33,6 +34,20 @@ export async function autoCoachForUser(
   const { userId } = opts;
 
   // 1) Contexte complet de l'athlète → squelette de semaine personnalisé.
+  // ── VERROU D'ABONNEMENT ─────────────────────────────────────────────────────
+  //  Posé ICI, et pas dans les routes : `autoCoachForUser` a QUATRE appelants
+  //  (la génération manuelle, le webhook intervals.icu, le cron de nuit et la chaîne
+  //  de synchronisation). Garder chacun aurait laissé exactement la même occasion
+  //  d'en oublier un — et un seul oubli suffit à republier gratuitement un plan.
+  //
+  //  Un compte en consultation garde tout ce qu'il a déjà : historique, courses,
+  //  trophées, série, et le plan qui était en place. Il ne reçoit simplement plus de
+  //  NOUVELLE prescription. On ne détruit rien, on cesse de produire.
+  const { data: profilAcces } = await admin.from("profiles").select(COLONNES_ACCES).eq("id", userId).maybeSingle();
+  if (!profilPeut(profilAcces as Parameters<typeof profilPeut>[0], "plan")) {
+    return { processed: false, reason: "essai_expire" };
+  }
+
   const ctx = await buildAthleteContext(admin as unknown as Parameters<typeof buildAthleteContext>[0], userId).catch(() => null);
   if (!ctx) return { processed: false, reason: "ctx_failed" };
 

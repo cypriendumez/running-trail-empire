@@ -24,6 +24,8 @@ import { isRun } from "@/lib/intervals/sport";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { ProfileCompletionBanner } from "@/components/dashboard/ProfileCompletionBanner";
 import { StreakCard } from "@/components/dashboard/StreakCard";
+import { TrialBanner } from "@/components/dashboard/TrialBanner";
+import type { EtatAcces } from "@/lib/billing/access";
 import type { StreakResult } from "@/lib/streak/compute";
 
 // Fonction de traduction (avec interpolation {clé}) passée aux helpers.
@@ -47,6 +49,8 @@ interface Props {
   newMembersWeek?: number;
   /** Série calculée à la lecture (lib/streak) — jamais stockée, donc réparable. */
   streak?: StreakResult | null;
+  /** État d'abonnement, déduit du profil (lib/billing/access). */
+  acces?: EtatAcces | null;
 }
 
 // Libellés courts des KPI de l'en-tête (multilingues).
@@ -127,7 +131,7 @@ const HR_ZONE_DEFS = [
 
 // La forme du jour est calculée à partir de données réelles : voir computeReadiness().
 
-export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplineHistory, sleep, coachSession, pendingFeedback, objective, currentVma, loadRisk, newMembersWeek, streak }: Props) {
+export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplineHistory, sleep, coachSession, pendingFeedback, objective, currentVma, loadRisk, newMembersWeek, streak, acces }: Props) {
   const { t, lang } = useT();
   const state = hrv[0]?.physiological_state ?? "optimal";
 
@@ -522,6 +526,11 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
           </div>
         </div>
       )}
+
+      {/* L'état de l'abonnement, AVANT le reste : le pire moment pour apprendre qu'un
+          essai existait, c'est le jour où il se termine. Le composant se tait de
+          lui-même tant qu'il reste plus d'une semaine. */}
+      <TrialBanner acces={acces ?? null} />
 
       {/* La série — la boucle quotidienne, alignée sur le plan et non contre lui. */}
       <StreakCard streak={streak ?? null} />

@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
-import { stripe, PLANS, stripeConfigured } from "@/lib/stripe/client";
+import { stripe, priceIdDe, estFormule, estPeriode, stripeConfigured } from "@/lib/stripe/client";
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST(req: Request) {
@@ -8,9 +8,12 @@ export async function POST(req: Request) {
     if (!stripeConfigured) {
       return NextResponse.json({ error: "Le paiement n'est pas encore ouvert. Reviens très bientôt." }, { status: 503 });
     }
-    const { plan } = await req.json() as { plan: "monthly" | "yearly" };
-    if (plan !== "monthly" && plan !== "yearly") {
-      return NextResponse.json({ error: "Formule inconnue" }, { status: 400 });
+    // Deux formules × deux périodicités. L'ancien contrat n'acceptait que
+    // « monthly » / « yearly » : une périodicité seule ne suffit plus à désigner un
+    // tarif depuis qu'il y a deux formules.
+    const { formule, periode } = await req.json() as { formule?: unknown; periode?: unknown };
+    if (!estFormule(formule) || !estPeriode(periode)) {
+      return NextResponse.json({ error: "Formule ou périodicité inconnue" }, { status: 400 });
     }
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -37,7 +40,7 @@ export async function POST(req: Request) {
       // moins cher en commission ET convertissent mieux dans leur pays d'origine.
       // Sans ce champ, Stripe propose automatiquement ceux qui sont activés sur le compte
       // et pertinents pour le pays de l'acheteur.
-      line_items: [{ price: PLANS[plan].priceId, quantity: 1 }],
+      line_items: [{ price: priceIdDe(formule, periode), quantity: 1 }],
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?success=true`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing?cancelled=true`,
       subscription_data: { metadata: { supabase_user_id: user.id } },

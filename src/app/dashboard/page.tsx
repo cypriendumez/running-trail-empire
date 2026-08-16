@@ -6,6 +6,7 @@ import type { Objective } from "@/components/dashboard/ObjectiveCard";
 import { bestVmaFromWorkouts, loadRisk, effectiveVma } from "@/lib/running/fitness";
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 import { computeStreak, jourLocal, decaleJour, type StreakWorkout, type StreakPrescription } from "@/lib/streak/compute";
+import { accesDe } from "@/lib/billing/access";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard" };
@@ -46,6 +47,10 @@ export default async function DashboardPage() {
       .eq("user_id", user!.id).eq("type", "coach_session").gte("data->>date", streakFrom)
       .order("created_at", { ascending: false }).limit(600),
   ]);
+
+  // L'état d'abonnement se déduit du profil déjà chargé : `created_at` donne l'essai,
+  // `subscription_tier` la formule. Aucune requête de plus.
+  const acces = accesDe(profileRes.data as { created_at?: string | null; subscription_tier?: string | null } | null);
 
   // La série est calculée À LA LECTURE, jamais stockée : une séance qui arrive avec
   // deux jours de retard répare la journée au lieu de la perdre. Voir lib/streak.
@@ -115,6 +120,7 @@ export default async function DashboardPage() {
       loadRisk={risk}
       newMembersWeek={newMembersWeek}
       streak={streak}
+      acces={acces}
     />
   );
 }

@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { stripe } from "@/lib/stripe/client";
+import { stripe, accesDuPrice } from "@/lib/stripe/client";
 import type Stripe from "stripe";
 
 
@@ -48,10 +48,14 @@ export async function POST(req: Request) {
       const sub = event.data.object as Stripe.Subscription;
       const userId = await findUser(sub);
       if (!userId) { console.error("[stripe] abonnement sans athlète identifiable", sub.id); break; }
+      // ⚠️ La formule se lit sur le TARIF ACHETÉ. Écrire « pro » en dur donnait l'IA à
+      // quelqu'un qui avait payé Essentiel : l'écart de 5 € entre les deux formules ne
+      // voulait plus rien dire, et le verrou d'accès n'avait rien à verrouiller.
+      const priceId = sub.items?.data?.[0]?.price?.id ?? null;
       await admin.from("profiles").update({
-        // `trialing` donne droit au Pro : ne retenir que `active` coupait l'accès pendant
-        // la période d'essai, à un moment où l'athlète découvre justement le produit.
-        subscription_tier: ["active", "trialing"].includes(sub.status) ? "pro" : "free",
+        // `trialing` donne droit à la formule : ne retenir que `active` coupait l'accès
+        // pendant la période d'essai, au moment où l'athlète découvre justement le produit.
+        subscription_tier: ["active", "trialing"].includes(sub.status) ? accesDuPrice(priceId) : "free",
         stripe_subscription_id: sub.id,
       }).eq("id", userId);
       break;

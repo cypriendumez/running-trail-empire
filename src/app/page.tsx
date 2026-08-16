@@ -91,16 +91,27 @@ const FEATURE_ICONS: LucideIcon[] = [Heart, Activity, CloudRain, Map, BookOpen, 
 //   · .github/workflows/sync-coach.yml tourne toutes les 10 minutes.
 const STAT_VALUES = ["14 000+", "15 700", "7 j", "10 min"];
 const SYNC = ["Garmin", "Coros", "Strava", "Suunto", "Polar"];
-const PLAN_VISUALS = [
-  { price: "0€", href: "/signup", featured: false },
-  { price: "10€", href: "/signup?plan=pro", featured: true },
-  { price: "80€", href: "/signup?plan=yearly", featured: false },
-];
+// ── PRIX AFFICHÉS ────────────────────────────────────────────────────────────
+//  En CENTIMES, et rigoureusement identiques à `TARIFS` (lib/stripe/client.ts), qui
+//  est ce qui sera réellement débité. Un test vérifie l'égalité : afficher un prix
+//  différent de celui qu'on prélève n'est pas un défaut d'affichage, c'est un litige.
+//
+//  On ne peut pas importer `TARIFS` ici : ce module tire le SDK Stripe et la clé
+//  secrète, qui n'ont rien à faire dans un composant client.
+const PRIX = {
+  essentiel: { mois: 999, an: 9990 },
+  complet: { mois: 1499, an: 14990 },
+} as const;
+
+/** « 9,99 € » dans la locale de l'athlète. */
+const euros = (centimes: number, lang: string) =>
+  (centimes / 100).toLocaleString(lang, { style: "currency", currency: "EUR", minimumFractionDigits: 2 });
 
 export default function LandingPage() {
   const { lang } = useT();
   const L = LANDING[lang] ?? LANDING.fr;
   const [activeCategory, setActiveCategory] = useState("ALL");
+  const [periode, setPeriode] = useState<"mois" | "an">("mois");
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -352,42 +363,71 @@ export default function LandingPage() {
             title={L.pricing.title}
             subtitle={L.pricing.subtitle}
           />
-          <div className="mx-auto mt-14 grid max-w-5xl gap-6 md:grid-cols-3">
-            {L.pricing.plans.map((plan, i) => {
-              const v = PLAN_VISUALS[i];
+          {/* Sélecteur de périodicité — « Annuel » n'est pas une formule. En faire une
+              troisième carte obligeait à lui inventer des exclusivités pour la remplir :
+              c'est de là que venaient « Posture Lab » et « Accès API développeur ». */}
+          <div className="mt-12 flex justify-center">
+            <div className="inline-flex items-center rounded-full border border-zinc-200 bg-white p-1">
+              {(["mois", "an"] as const).map((p) => (
+                <button key={p} onClick={() => setPeriode(p)}
+                  className={`rounded-full px-5 py-2 text-sm font-semibold transition-colors ${
+                    periode === p ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-900"}`}>
+                  {p === "mois" ? L.pricing.mois : L.pricing.an}
+                  {p === "an" && <span className={`ml-2 text-[11px] font-bold ${periode === "an" ? "text-[#34d399]" : "text-[#059669]"}`}>{L.pricing.economie}</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <p className="mt-4 text-center text-sm text-zinc-500">{L.pricing.essai}</p>
+
+          <div className="mx-auto mt-10 grid max-w-3xl gap-6 md:grid-cols-2">
+            {L.pricing.plans.map((plan) => {
+              const centimes = PRIX[plan.cle][periode];
+              // À l'année on affiche l'équivalent MENSUEL en grand et le total en dessous :
+              // c'est le chiffre que l'acheteur compare, et le masquer derrière un total
+              // annuel fait paraître l'offre plus chère qu'elle n'est.
+              const grand = periode === "an" ? Math.round(centimes / 12) : centimes;
+              const vedette = plan.cle === "complet";
               return (
-                <div
-                  key={plan.name}
-                  className={`relative flex flex-col rounded-3xl p-8 ${v.featured ? "bg-zinc-950 text-white ring-2 ring-[#059669]" : "bg-white ring-1 ring-inset ring-zinc-200"}`}
-                >
+                <div key={plan.cle}
+                  className={`relative flex flex-col rounded-3xl p-8 ${vedette ? "bg-zinc-950 text-white ring-2 ring-[#059669]" : "bg-white ring-1 ring-inset ring-zinc-200"}`}>
                   {plan.badge && (
-                    <span className={`absolute -top-3 left-8 rounded-full px-3 py-1 text-[11px] font-bold ${v.featured ? "bg-[#10b981] text-[#04120c]" : "bg-zinc-900 text-white"}`}>
+                    <span className="absolute -top-3 left-8 rounded-full bg-[#10b981] px-3 py-1 text-[11px] font-bold text-[#04120c]">
                       {plan.badge}
                     </span>
                   )}
-                  <div className={`text-sm font-semibold ${v.featured ? "text-white/50" : "text-zinc-400"}`}>{plan.name}</div>
+                  <div className={`text-sm font-semibold ${vedette ? "text-white/50" : "text-zinc-400"}`}>{plan.name}</div>
                   <div className="mt-2 flex items-baseline gap-1">
-                    <span className="text-5xl font-bold tracking-tight">{v.price}</span>
-                    <span className={`text-sm ${v.featured ? "text-white/40" : "text-zinc-400"}`}>{plan.period}</span>
+                    <span className="text-5xl font-bold tracking-tight">{euros(grand, lang)}</span>
+                    <span className={`text-sm ${vedette ? "text-white/40" : "text-zinc-400"}`}>{L.pricing.parMois}</span>
                   </div>
-                  <ul className="mt-7 flex-1 space-y-3">
+                  <div className={`mt-1 h-5 text-xs ${vedette ? "text-white/40" : "text-zinc-400"}`}>
+                    {periode === "an" ? `${euros(centimes, lang)} / ${L.pricing.an.toLowerCase()}` : ""}
+                  </div>
+                  <p className={`mt-4 text-sm ${vedette ? "text-white/70" : "text-zinc-500"}`}>{plan.pitch}</p>
+                  <ul className="mt-6 flex-1 space-y-3">
                     {plan.features.map((f) => (
-                      <li key={f} className={`flex items-center gap-2.5 text-sm ${v.featured ? "text-white/75" : "text-zinc-600"}`}>
-                        <Check className={`h-4 w-4 flex-shrink-0 ${v.featured ? "text-[#34d399]" : "text-[#059669]"}`} />
+                      <li key={f} className={`flex items-start gap-2.5 text-sm ${vedette ? "text-white/75" : "text-zinc-600"}`}>
+                        <Check className={`mt-0.5 h-4 w-4 flex-shrink-0 ${vedette ? "text-[#34d399]" : "text-[#059669]"}`} />
                         {f}
                       </li>
                     ))}
                   </ul>
-                  <Link
-                    href={v.href}
-                    className={btnClass(v.featured ? "secondary" : "primary", "md", "mt-8 w-full")}
-                  >
+                  <Link href={`/signup?formule=${plan.cle}&periode=${periode}`}
+                    className={btnClass(vedette ? "secondary" : "primary", "md", "mt-8 w-full")}>
                     {plan.cta}
                   </Link>
                 </div>
               );
             })}
           </div>
+
+          {/* Ce qui se passe APRÈS l'essai, écrit noir sur blanc. Une app qui coupe tout
+              sans prévenir se fait désinstaller ; le dire à l'avance rassure, et c'est vrai. */}
+          <p className="mx-auto mt-8 max-w-2xl text-center text-sm leading-relaxed text-zinc-500">
+            {L.pricing.apres}
+          </p>
         </Container>
       </Section>
 

@@ -12,11 +12,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { accesDe, peut, motifRefus, type Capacite, type EtatAcces } from "@/lib/billing/access";
+import { accesDe, peut, motifRefus, COLONNES_ACCES, type Capacite, type EtatAcces } from "@/lib/billing/access";
 
-/** Les seules colonnes nécessaires pour trancher. Aucune autre n'est lue : une
- *  requête large ici ferait transiter `intervals_api_key` pour rien. */
-export const COLONNES_ACCES = "created_at, subscription_tier";
+// Réexporté pour que les appelants n'aient qu'un import à faire.
+export { COLONNES_ACCES };
 
 export type Refus = { reponse: NextResponse; acces: EtatAcces };
 

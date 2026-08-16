@@ -22,7 +22,16 @@ export type LandingDict = {
     pillars: { title: string; desc: string; metric: string; metricLabel: string }[];
     items: { title: string; desc: string }[];
   };
-  pricing: { eyebrow: string; title: string; subtitle: string; plans: { name: string; period: string; badge?: string; cta: string; features: string[] }[] };
+  // « Annuel » n'est pas une formule mais une PÉRIODICITÉ. En faire une troisième carte
+  // obligeait à lui inventer des exclusivités pour la remplir — c'est de là que venaient
+  // « Posture Lab » et « Accès API développeur », qui n'existent pas. Deux formules, un
+  // sélecteur, et l'essai annoncé au-dessus plutôt que déguisé en offre.
+  pricing: {
+    eyebrow: string; title: string; subtitle: string;
+    mois: string; an: string; economie: string; parMois: string; essai: string;
+    plans: { cle: "essentiel" | "complet"; name: string; pitch: string; badge?: string; cta: string; features: string[] }[];
+    apres: string;
+  };
   cta: { title: string; subtitle: string; primary: string; secondary: string; note: string };
 };
 
@@ -72,12 +81,16 @@ const fr: LandingDict = {
     ],
   },
   pricing: {
-    eyebrow: "Tarification", title: "Simple et transparent", subtitle: "Commence gratuitement. Passe au Pro quand tu es prêt à performer.",
+    eyebrow: "Tarifs", title: "Trente jours pour juger, sans carte bancaire",
+    subtitle: "Le plan se refait tout seul dès le premier jour. Tu ne décides qu'au bout d'un mois — le temps qu'un cycle d'entraînement veuille dire quelque chose.",
+    mois: "Mensuel", an: "Annuel", economie: "2 mois offerts", parMois: "/mois", essai: "30 jours d'essai, sans carte bancaire",
     plans: [
-      { name: "Gratuit", period: "pour toujours", cta: "Commencer", features: ["Dashboard complet", "5 plans IA / mois", "Hub courses France", "Coaching basique"] },
-      { name: "Pro", period: "/mois", badge: "Populaire", cta: "Essai 30 jours gratuit", features: ["Plans IA illimités", "Ghost Runner vocal", "Trail Builder SIG", "Sync Garmin / Coros", "Smart Journal", "Affûtage Banister"] },
-      { name: "Annuel", period: "/an", badge: "−33%", cta: "Choisir l'annuel", features: ["Tout le Pro inclus", "Posture Lab Vision IA", "Accès API développeur", "Support prioritaire"] },
+      { cle: "essentiel", name: "Essentiel", pitch: "Le coach et tes données.", cta: "Commencer l'essai",
+        features: ["Plan de 7 jours replanifié en continu", "VFC, sommeil, charge, affûtage Banister", "Sync Garmin, Coros, Strava", "Ghost Runner vocal", "Trail Builder et export GPX", "14 000 courses à venir", "Série, ligues et trophées"] },
+      { cle: "complet", name: "Complet", pitch: "Tout Essentiel, plus l'IA qui te répond.", badge: "Le plus complet", cta: "Commencer l'essai",
+        features: ["Tout l'Essentiel", "Analyse IA de chaque séance", "Kiné IA, avec photo", "Smart Journal vocal", "Plans IA à la demande"] },
     ],
+    apres: "À la fin de l'essai, rien n'est effacé : ton historique, tes courses et tes trophées restent consultables. Seule la production de nouveaux plans s'arrête.",
   },
   cta: { title: "Prêt à performer ?", subtitle: "Rejoins les coureurs qui s'entraînent plus intelligemment avec Pacevo.", primary: "Créer un compte gratuit", secondary: "Se connecter", note: "Gratuit · Sans carte bancaire · Annulable à tout moment" },
 };
@@ -125,12 +138,16 @@ const en: LandingDict = {
     ],
   },
   pricing: {
-    eyebrow: "Pricing", title: "Simple and transparent", subtitle: "Start for free. Go Pro when you're ready to perform.",
+    eyebrow: "Pricing", title: "Thirty days to judge, no card required",
+    subtitle: "The plan rewrites itself from day one. You only decide after a month — the time it takes for a training cycle to mean anything.",
+    mois: "Monthly", an: "Yearly", economie: "2 months free", parMois: "/month", essai: "30-day trial, no card required",
     plans: [
-      { name: "Free", period: "forever", cta: "Get started", features: ["Full dashboard", "5 AI plans / month", "France race hub", "Basic coaching"] },
-      { name: "Pro", period: "/month", badge: "Popular", cta: "30-day free trial", features: ["Unlimited AI plans", "Voice Ghost Runner", "GIS Trail Builder", "Garmin / Coros sync", "Smart Journal", "Banister Tapering"] },
-      { name: "Annual", period: "/year", badge: "−33%", cta: "Choose annual", features: ["Everything in Pro", "Posture Lab AI Vision", "Developer API access", "Priority support"] },
+      { cle: "essentiel", name: "Essential", pitch: "The coach and your data.", cta: "Start the trial",
+        features: ["7-day plan, continuously replanned", "HRV, sleep, load, Banister tapering", "Garmin, Coros, Strava sync", "Voice Ghost Runner", "Trail Builder and GPX export", "14,000 upcoming races", "Streak, leagues and trophies"] },
+      { cle: "complet", name: "Complete", pitch: "All of Essential, plus the AI that answers you.", badge: "Most complete", cta: "Start the trial",
+        features: ["Everything in Essential", "AI analysis of every session", "AI physio, with photo", "Voice Smart Journal", "On-demand AI plans"] },
     ],
+    apres: "When the trial ends nothing is deleted: your history, your races and your trophies stay readable. Only the production of new plans stops.",
   },
   cta: { title: "Ready to perform?", subtitle: "Join the runners training smarter with Pacevo.", primary: "Create a free account", secondary: "Log in", note: "Free · No credit card · Cancel anytime" },
 };
@@ -178,12 +195,16 @@ const de: LandingDict = {
     ],
   },
   pricing: {
-    eyebrow: "Preise", title: "Einfach und transparent", subtitle: "Starte kostenlos. Wechsle zu Pro, wenn du bereit bist zu performen.",
+    eyebrow: "Preise", title: "Dreißig Tage zum Urteilen, ohne Karte",
+    subtitle: "Der Plan schreibt sich ab dem ersten Tag neu. Du entscheidest erst nach einem Monat — so lange braucht ein Trainingszyklus, um etwas zu bedeuten.",
+    mois: "Monatlich", an: "Jährlich", economie: "2 Monate geschenkt", parMois: "/Monat", essai: "30 Tage testen, ohne Karte",
     plans: [
-      { name: "Gratis", period: "für immer", cta: "Loslegen", features: ["Komplettes Dashboard", "5 KI-Pläne / Monat", "Rennen-Hub Frankreich", "Basis-Coaching"] },
-      { name: "Pro", period: "/Monat", badge: "Beliebt", cta: "30 Tage gratis testen", features: ["Unbegrenzte KI-Pläne", "Voice Ghost Runner", "GIS Trail Builder", "Garmin- / Coros-Sync", "Smart Journal", "Banister-Tapering"] },
-      { name: "Jährlich", period: "/Jahr", badge: "−33%", cta: "Jährlich wählen", features: ["Alles aus Pro", "Posture Lab KI-Vision", "Entwickler-API-Zugang", "Priorisierter Support"] },
+      { cle: "essentiel", name: "Essenziell", pitch: "Der Coach und deine Daten.", cta: "Test starten",
+        features: ["7-Tage-Plan, laufend neu geplant", "HRV, Schlaf, Belastung, Banister-Tapering", "Sync mit Garmin, Coros, Strava", "Ghost Runner mit Stimme", "Trail Builder und GPX-Export", "14 000 kommende Rennen", "Serie, Ligen und Trophäen"] },
+      { cle: "complet", name: "Komplett", pitch: "Alles aus Essenziell, plus die KI, die dir antwortet.", badge: "Am vollständigsten", cta: "Test starten",
+        features: ["Alles aus Essenziell", "KI-Analyse jeder Einheit", "KI-Physio, mit Foto", "Smart Journal per Stimme", "KI-Pläne auf Abruf"] },
     ],
+    apres: "Am Ende des Tests wird nichts gelöscht: Verlauf, Rennen und Trophäen bleiben lesbar. Nur die Erstellung neuer Pläne endet.",
   },
   cta: { title: "Bereit für Leistung?", subtitle: "Schließe dich den Läufern an, die mit Pacevo smarter trainieren.", primary: "Kostenloses Konto erstellen", secondary: "Anmelden", note: "Gratis · Keine Kreditkarte · Jederzeit kündbar" },
 };
@@ -231,12 +252,16 @@ const es: LandingDict = {
     ],
   },
   pricing: {
-    eyebrow: "Precios", title: "Simple y transparente", subtitle: "Empieza gratis. Pasa a Pro cuando estés listo para rendir.",
+    eyebrow: "Precios", title: "Treinta días para juzgar, sin tarjeta",
+    subtitle: "El plan se rehace solo desde el primer día. Solo decides al cabo de un mes — el tiempo que un ciclo de entrenamiento tarda en significar algo.",
+    mois: "Mensual", an: "Anual", economie: "2 meses gratis", parMois: "/mes", essai: "30 días de prueba, sin tarjeta",
     plans: [
-      { name: "Gratis", period: "para siempre", cta: "Empezar", features: ["Dashboard completo", "5 planes IA / mes", "Hub de carreras Francia", "Coaching básico"] },
-      { name: "Pro", period: "/mes", badge: "Popular", cta: "Prueba 30 días gratis", features: ["Planes IA ilimitados", "Ghost Runner por voz", "Trail Builder SIG", "Sync Garmin / Coros", "Smart Journal", "Afinamiento Banister"] },
-      { name: "Anual", period: "/año", badge: "−33%", cta: "Elegir anual", features: ["Todo lo de Pro", "Posture Lab IA Visión", "Acceso API desarrollador", "Soporte prioritario"] },
+      { cle: "essentiel", name: "Esencial", pitch: "El entrenador y tus datos.", cta: "Empezar la prueba",
+        features: ["Plan de 7 días replanificado en continuo", "VFC, sueño, carga, afinamiento Banister", "Sync Garmin, Coros, Strava", "Ghost Runner por voz", "Trail Builder y exportación GPX", "14 000 carreras próximas", "Racha, ligas y trofeos"] },
+      { cle: "complet", name: "Completo", pitch: "Todo lo Esencial, más la IA que te responde.", badge: "El más completo", cta: "Empezar la prueba",
+        features: ["Todo lo Esencial", "Análisis IA de cada sesión", "Fisio IA, con foto", "Smart Journal por voz", "Planes IA a demanda"] },
     ],
+    apres: "Al terminar la prueba no se borra nada: tu historial, tus carreras y tus trofeos siguen consultables. Solo se detiene la creación de nuevos planes.",
   },
   cta: { title: "¿Listo para rendir?", subtitle: "Únete a los corredores que entrenan de forma más inteligente con Pacevo.", primary: "Crear cuenta gratis", secondary: "Iniciar sesión", note: "Gratis · Sin tarjeta · Cancela cuando quieras" },
 };
@@ -284,12 +309,16 @@ const pt: LandingDict = {
     ],
   },
   pricing: {
-    eyebrow: "Preços", title: "Simples e transparente", subtitle: "Começa grátis. Passa para Pro quando estiveres pronto para performar.",
+    eyebrow: "Preços", title: "Trinta dias para julgar, sem cartão",
+    subtitle: "O plano refaz-se sozinho desde o primeiro dia. Só decides ao fim de um mês — o tempo que um ciclo de treino leva a significar alguma coisa.",
+    mois: "Mensal", an: "Anual", economie: "2 meses grátis", parMois: "/mês", essai: "30 dias de teste, sem cartão",
     plans: [
-      { name: "Grátis", period: "para sempre", cta: "Começar", features: ["Dashboard completo", "5 planos IA / mês", "Hub de provas França", "Coaching básico"] },
-      { name: "Pro", period: "/mês", badge: "Popular", cta: "Teste 30 dias grátis", features: ["Planos IA ilimitados", "Ghost Runner por voz", "Trail Builder SIG", "Sync Garmin / Coros", "Smart Journal", "Afinamento Banister"] },
-      { name: "Anual", period: "/ano", badge: "−33%", cta: "Escolher anual", features: ["Tudo do Pro", "Posture Lab IA Visão", "Acesso API programador", "Suporte prioritário"] },
+      { cle: "essentiel", name: "Essencial", pitch: "O treinador e os teus dados.", cta: "Começar o teste",
+        features: ["Plano de 7 dias replanificado em contínuo", "VFC, sono, carga, afinamento Banister", "Sync Garmin, Coros, Strava", "Ghost Runner por voz", "Trail Builder e exportação GPX", "14 000 provas futuras", "Série, ligas e troféus"] },
+      { cle: "complet", name: "Completo", pitch: "Tudo o Essencial, mais a IA que te responde.", badge: "O mais completo", cta: "Começar o teste",
+        features: ["Tudo o Essencial", "Análise IA de cada sessão", "Fisio IA, com foto", "Smart Journal por voz", "Planos IA a pedido"] },
     ],
+    apres: "No fim do teste nada é apagado: o teu histórico, as tuas provas e os teus troféus continuam consultáveis. Só para a criação de novos planos.",
   },
   cta: { title: "Pronto para performar?", subtitle: "Junta-te aos corredores que treinam de forma mais inteligente com a Pacevo.", primary: "Criar conta grátis", secondary: "Entrar", note: "Grátis · Sem cartão · Cancela quando quiseres" },
 };

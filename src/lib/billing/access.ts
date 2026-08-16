@@ -19,6 +19,12 @@
 //  d'appliquer — et une date de fin stockée diverge du jour où on la recalcule.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Les seules colonnes nécessaires pour trancher. Aucune autre n'est lue : une requête
+ *  large ici ferait transiter `intervals_api_key` pour rien. Déclarée dans ce module
+ *  PUR pour que la chaîne du coach n'ait pas à charger `NextResponse` afin de lire
+ *  deux noms de colonnes. */
+export const COLONNES_ACCES = "created_at, subscription_tier";
+
 /** Ce à quoi un compte a droit, à un instant donné. */
 export type Acces =
   | "essai"         // 30 premiers jours : tout est ouvert, sans carte bancaire

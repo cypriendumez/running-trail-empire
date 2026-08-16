@@ -31,6 +31,7 @@ import { tr, ALL_LANGS, nRaw } from "../src/lib/i18n/multi";
 import { T as T_UI } from "../src/lib/i18n/translations";
 import { LANDING as LANDING_T } from "../src/components/landing/landingI18n";
 import { accesDe, peut, motifRefus, JOURS_ESSAI } from "../src/lib/billing/access";
+import { TARIFS, FORMULES, accesDuPrice } from "../src/lib/stripe/client";
 import { ppsExpiration, ppsVerdict, ppsDemandeAction, couvertureCourses, PPS_URL, PPS_PRIX_EUR, PPS_VALIDITE_MOIS } from "../src/lib/pps/status";
 import { PPS_T } from "../src/lib/pps/ppsI18n";
 import { PLAN_T, libelleType } from "../src/lib/ai/planI18n";
@@ -508,7 +509,32 @@ test("l'abonnement n'est jamais accordé depuis le navigateur", () => {
 test("le paiement se refuse proprement quand il n'est pas configuré", () => {
   const src = readFileSync("src/app/api/stripe/checkout/route.ts", "utf8");
   assert.ok(/stripeConfigured/.test(src), "un clic sur « Passe au Pro » ne doit pas finir en erreur 500 opaque");
-  assert.ok(/plan !== "monthly"/.test(src), "la formule reçue du client doit être validée");
+  // Le contrat a changé : une périodicité seule ne désigne plus un tarif depuis qu'il y
+  // a DEUX formules. Le client envoie donc `formule` ET `periode`, et les deux doivent
+  // être validées — un `priceId` construit à partir d'une entrée non vérifiée laisserait
+  // choisir son tarif à l'acheteur.
+  assert.ok(/estFormule\(formule\)/.test(src) && /estPeriode\(periode\)/.test(src),
+    "la formule ET la périodicité reçues du client doivent être validées");
+  assert.ok(/priceIdDe\(formule, periode\)/.test(src), "le tarif doit être résolu côté serveur");
+});
+test("la formule vendue est celle qui est ACCORDÉE", () => {
+  // Le webhook écrivait « pro » EN DUR quelle que soit la formule payée : un athlète qui
+  // prenait Essentiel obtenait l'IA, et l'écart de 5 € entre les deux formules ne voulait
+  // plus rien dire. Un abonnement encaissé, un accès offert.
+  const wh = codeOf("src/app/api/stripe/webhook/route.ts");
+  assert.ok(!/subscription_tier: \[[^\]]*\]\.includes\(sub\.status\) \? "pro"/.test(wh),
+    "le webhook accorde encore « pro » en dur, sans regarder le tarif acheté");
+  assert.ok(/accesDuPrice\(/.test(wh), "la formule doit se lire sur le tarif acheté");
+  // Et la correspondance tarif → accès doit exister pour les quatre combinaisons.
+  for (const f of FORMULES) for (const p of ["mois", "an"] as const) {
+    assert.ok(TARIFS[f][p].env.startsWith("STRIPE_PRICE_"), `${f}/${p} : variable de tarif mal nommée`);
+  }
+  assert.equal(TARIFS.essentiel.acces, "essentiel");
+  assert.equal(TARIFS.complet.acces, "complet");
+  // Un tarif inconnu retombe sur « complet », JAMAIS sur un accès vide : quelqu'un qui a
+  // payé ne doit pas se retrouver sans rien parce qu'une variable d'environnement manque.
+  assert.equal(accesDuPrice(null), "complet");
+  assert.equal(accesDuPrice("price_inconnu"), "complet");
 });
 test("l'athlète peut résilier son abonnement", () => {
   // Obligation légale en Europe dès lors que la souscription s'est faite en ligne — et
@@ -4091,6 +4117,72 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
                      { created_at: "pas une date" }, { subscription_tier: "inconnu" }]) {
       assert.equal(accesDe(p as never).etat, "essai", `profil ${JSON.stringify(p)} : verrouillé à tort`);
     }
+  });
+
+  test("le prix AFFICHÉ est celui qui sera DÉBITÉ", () => {
+    // Afficher un montant différent de celui qu'on prélève n'est pas un défaut
+    // d'affichage, c'est un litige. Les vitrines ne peuvent pas importer `TARIFS`
+    // (ce module tire le SDK Stripe et la clé secrète), elles recopient donc les
+    // centimes — et c'est exactement le genre de copie qui dérive en silence.
+    for (const f of ["src/app/page.tsx", "src/app/pricing/page.tsx"]) {
+      const src = codeOf(f);
+      const bloc = src.slice(src.indexOf("const PRIX ="), src.indexOf("} as const;", src.indexOf("const PRIX =")));
+      assert.ok(bloc.length > 20, `${f} : bloc PRIX introuvable`);
+      for (const formule of FORMULES) {
+        for (const [cle, periode] of [["mois", "mois"], ["an", "an"]] as const) {
+          const attendu = TARIFS[formule][periode].centimes;
+          const m = new RegExp(`${formule}: \\{[^}]*${cle}: (\\d+)`).exec(bloc);
+          assert.ok(m, `${f} : ${formule}/${cle} absent de la vitrine`);
+          assert.equal(Number(m![1]), attendu,
+            `${f} : ${formule}/${cle} affiche ${m![1]} centimes alors que Stripe débitera ${attendu}`);
+        }
+      }
+    }
+    // La remise annuelle doit valoir DEUX MOIS OFFERTS, ni plus ni moins : l'ancien
+    // « −33 % » (80 € contre 120 €) bradait l'abonnement sans raison.
+    for (const f of FORMULES) {
+      assert.equal(TARIFS[f].an.centimes, TARIFS[f].mois.centimes * 10,
+        `${f} : la remise annuelle ne vaut pas deux mois offerts`);
+    }
+    // Et l'écart entre les deux formules doit rester positif — Complet contient Essentiel.
+    assert.ok(TARIFS.complet.mois.centimes > TARIFS.essentiel.mois.centimes,
+      "Complet doit coûter plus cher qu'Essentiel");
+  });
+
+  test("les deux vitrines de tarifs racontent la MÊME chose", () => {
+    // `/pricing` avait son propre dictionnaire, et les deux avaient divergé au point de
+    // ne plus vendre le même produit : trois paliers d'un côté, trois autres de l'autre,
+    // et une liste de fonctionnalités inexistantes (« Nutrition Lab », « Posture Lab »,
+    // « API Access », « Dashboard équipe », « Life Stress Sync »…).
+    assert.ok(!existsSync("src/app/pricing/pricingI18n.ts"), "le dictionnaire de tarifs en double est revenu");
+    const pricing = codeOf("src/app/pricing/page.tsx");
+    assert.ok(/from "@\/components\/landing\/landingI18n"/.test(pricing),
+      "la page /pricing doit lire le dictionnaire de la landing, pas le sien");
+    // Deux formules et pas trois : « annuel » est une périodicité, pas un palier.
+    for (const l of ALL_LANGS) {
+      const p = LANDING_T[l].pricing;
+      assert.equal(p.plans.length, 2, `${l} : ${p.plans.length} formules — « annuel » est-il redevenu un palier ?`);
+      assert.deepEqual(p.plans.map((x) => x.cle), ["essentiel", "complet"], `${l} : clés de formule inattendues`);
+      for (const plan of p.plans) {
+        assert.ok(plan.name && plan.pitch && plan.cta && plan.features.length >= 4, `${l}/${plan.cle} : formule incomplète`);
+      }
+      // Ce qui se passe APRÈS l'essai doit être écrit, dans chaque langue.
+      assert.ok(p.apres.length > 40, `${l} : la dégradation en consultation n'est pas expliquée`);
+      assert.ok(p.essai.length > 10, `${l} : la durée d'essai n'est pas annoncée`);
+    }
+  });
+
+  test("le plan ne se régénère plus pour un compte en consultation", () => {
+    // `autoCoachForUser` a QUATRE appelants (génération manuelle, webhook intervals.icu,
+    // cron de nuit, chaîne de synchronisation). Le verrou est posé dans la fonction, pas
+    // dans les routes : garder chacune aurait laissé la même occasion d'en oublier une,
+    // et un seul oubli suffit à republier gratuitement un plan.
+    const src = codeOf("src/lib/ai/autoCoach.ts");
+    assert.ok(/profilPeut\(.*"plan"\)/.test(src), "aucun contrôle d'abonnement avant de produire un plan");
+    // Et il doit précéder la construction du plan, sinon on paie le calcul pour rien.
+    assert.ok(src.indexOf("profilPeut(") < src.indexOf("buildWeekPlan("),
+      "le verrou est posé APRÈS la construction du plan");
+    assert.ok(/reason: "essai_expire"/.test(src), "le refus doit être motivé, pas silencieux");
   });
 
   test("TOUTE route qui fait parler un modèle est verrouillée côté serveur", () => {
