@@ -4849,6 +4849,51 @@ void (async () => {
     assert.deepEqual(calls, ["gemini-2.5-flash"], "le modèle prioritaire répond, on s'arrête là");
     assert.equal(__quotaMemory().size, 0);
   });
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  LA PAGE ET L'APP DOIVENT DÉSIGNER LES MÊMES MONTRES
+//
+//  La landing affiche « Envoi de la séance sur ta montre : … » à partir du drapeau
+//  `pousse` de `SYNC`. L'app, elle, décide d'allumer la pastille verte du Ghost Runner à
+//  partir des champs `*_upload_workouts` lus sur l'API intervals.icu. RIEN ne forçait les
+//  deux listes à coïncider — et elles ne coïncidaient pas : Suunto était annoncé sur la
+//  page et absent du contrôle, si bien qu'un porteur de Suunto voyait une pastille orange
+//  l'invitant à configurer une montre déjà configurée.
+//
+//  Ce test lie les deux. Promettre l'envoi à une marque que l'app ne sait pas reconnaître
+//  est un mensonge commercial ; reconnaître une marque qu'on ne promet pas est du code mort.
+// ─────────────────────────────────────────────────────────────────────────────
+console.log("\nMONTRES — la promesse de la landing et le contrôle de l'app disent la même chose");
+test("les marques annoncées comme recevant la séance sont exactement celles que l'app détecte", () => {
+  const landing = codeOf("src/app/page.tsx");
+  const route = codeOf("src/app/api/watch/status/route.ts");
+
+  // Côté page : toute entrée de SYNC portant `pousse: true`.
+  const promises = [...landing.matchAll(/\{\s*nom:\s*"([^"]+)"[^}]*pousse:\s*true[^}]*\}/g)]
+    .map((m) => m[1].toLowerCase()).sort();
+  // Côté app : tout appareil listé dans `devices`.
+  const detectees = [...route.matchAll(/\{\s*name:\s*"([^"]+)",\s*on:/g)]
+    .map((m) => m[1].toLowerCase()).sort();
+
+  assert.ok(promises.length >= 4, `la landing ne promet plus que ${promises.length} marque(s) — anomalie`);
+  assert.deepEqual(detectees, promises,
+    `l'app détecte [${detectees}] mais la page promet [${promises}]`);
+});
+test("chaque marque détectée lit le champ intervals.icu qui lui correspond", () => {
+  // Le préfixe n'est pas uniforme côté intervals.icu (`icu_garmin_*` contre `coros_*`) :
+  // recopier le mauvais préfixe donne `undefined`, donc « pas prête », SANS erreur.
+  const route = codeOf("src/app/api/watch/status/route.ts");
+  for (const [marque, champ] of [
+    ["Garmin", "icu_garmin_upload_workouts"],
+    ["Coros", "coros_upload_workouts"],
+    ["Suunto", "suunto_upload_workouts"],
+    ["Wahoo", "wahoo_upload_workouts"],
+  ] as const) {
+    assert.ok(route.includes(`name: "${marque}", on: !!a.${champ}`),
+      `${marque} ne lit pas \`a.${champ}\``);
+  }
+});
+
 })().then(() => {
   globalThis.fetch = realFetch;
   console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
