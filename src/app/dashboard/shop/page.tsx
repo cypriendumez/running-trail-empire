@@ -1,26 +1,32 @@
-export const dynamic = "force-dynamic";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { ShoppingHub } from "@/components/shop/ShoppingHub";
 import { ShopComingSoon } from "@/components/shop/ShopComingSoon";
 
 export const metadata = { title: "Shopping Hub" };
 
 /**
- * La boutique n'apparaît QUE si de vraies offres ont été importées.
+ * On ne montre AUCUN prix qui ne vienne pas d'un marchand.
  *
- * Le catalogue historique était généré de bout en bout — prix et disponibilités
- * inventés, attribués à de vraies enseignes avec leurs vraies adresses, sans que rien
- * ne le signale. Un avertissement aurait été un pansement : on ne montre plus de prix
- * qui ne vienne pas d'un marchand. Tant que `product_offers` est vide (table absente ou
- * flux non encore importé), l'athlète voit un écran d'attente honnête.
+ * ⚠️ CETTE PORTE ÉTAIT INVERSÉE DANS SES EFFETS (corrigé le 20/08/2026).
+ *
+ * Elle comptait les lignes de `product_offers` puis faisait :
+ *     `return hasRealOffers ? <ShoppingHub /> : <ShopComingSoon />;`
+ * en croyant n'ouvrir que sur de vraies offres. Or `ShoppingHub` ne lit JAMAIS
+ * `product_offers` — vérifié : ses seuls appels Supabase portent sur la table `shoes`
+ * de l'athlète. Son catalogue est un `const PRODUCTS` généré dans le fichier :
+ * 1 167 références aux prix INVENTÉS, attribuées à de vraies enseignes (i-run,
+ * Alltricks, Lepape, Ekosport, Décathlon).
+ *
+ * Conséquence : importer un vrai flux d'affiliation — le but même de
+ * `/api/shop/import-feed` — aurait ALLUMÉ le catalogue simulé et ÉTEINT l'écran
+ * d'attente honnête. Exactement l'inverse de l'intention écrite ici. Le défaut est resté
+ * invisible parce que `product_offers` est vide : la branche fautive n'a jamais tourné.
+ *
+ * Tant qu'aucun composant ne RENDU réellement `product_offers`, cette page affiche
+ * l'écran d'attente, sans condition. Le travail restant n'est pas de rebrancher
+ * `ShoppingHub` : c'est d'écrire la vue qui lit les offres importées (elles portent déjà
+ * leur propre `image_url` fournie par le marchand, cf. `/api/shop/import-feed`).
+ *
+ * `tests/photos.test.ts` verrouille : cette page ne doit pas mentionner `ShoppingHub`.
  */
-export default async function ShopPage() {
-  let hasRealOffers = false;
-  try {
-    const { count, error } = await createAdminClient()
-      .from("product_offers").select("id", { count: "exact", head: true }).limit(1);
-    hasRealOffers = !error && (count ?? 0) > 0;
-  } catch { hasRealOffers = false; }
-
-  return hasRealOffers ? <ShoppingHub /> : <ShopComingSoon />;
+export default function ShopPage() {
+  return <ShopComingSoon />;
 }

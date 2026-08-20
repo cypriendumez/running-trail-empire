@@ -1,5 +1,26 @@
 "use client";
 
+// ⚠️ CE COMPOSANT N'EST PLUS RENDU NULLE PART (20/08/2026).
+//
+// `app/dashboard/shop/page.tsx` l'affichait dès que `product_offers` cessait d'être
+// vide, en croyant n'ouvrir que sur de vraies offres. Mais il ne lit JAMAIS cette table :
+// son `const PRODUCTS` est généré ici même — 1 167 références aux prix INVENTÉS,
+// attribuées à de vraies enseignes. Importer un vrai flux aurait donc allumé les faux
+// prix. La page affiche désormais `ShopComingSoon` sans condition, et
+// `tests/photos.test.ts` refuse qu'on rebranche ce composant.
+//
+// Ses ~36 images n'ont jamais été auditées non plus. Regardées le 20/08/2026 en
+// planches-contacts, on y trouve : une Apple Watch (×3), une enceinte JBL, un verre de
+// VIN, une Tesla en charge, une raquette de TENNIS, un combi Volkswagen, un MOUTON, des
+// cyclistes, un skieur, et des chaussures ASICS / Nike / ON aux logos nets. Le vivier
+// `ROAD_GENERIC`, commenté « without visible brand », contient deux ASICS. Deux
+// identifiants renvoient même 404 (dont la vignette de la catégorie « Vêtements »).
+//
+// LE TRAVAIL RESTANT n'est pas de nettoyer ces images : c'est d'écrire la vue qui lit
+// `product_offers`. Les offres importées portent déjà leur propre `image_url` fournie
+// par le marchand (cf. `/api/shop/import-feed`), donc ces viviers codés en dur sont
+// obsolètes par construction. Ce fichier est du poids mort à supprimer à ce moment-là.
+
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";

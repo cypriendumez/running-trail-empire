@@ -210,6 +210,22 @@ test("la liste des auditées ne contient rien de périmé", () => {
   assert.equal(morts.length, 0, `identifiant(s) audité(s) mais plus utilisé(s) : ${morts.join(", ")}`);
 });
 
+// ── 4. Le catalogue SIMULÉ ne peut pas être rebranché ────────────────────────
+// `ShoppingHub` affiche 1 167 références aux prix INVENTÉS attribuées à de vraies
+// enseignes, et ses ~36 images n'ont jamais été auditées (on y a trouvé une Apple Watch,
+// une enceinte JBL, du vin, une Tesla, une raquette de tennis et un mouton). La page
+// boutique le rendait dès que `product_offers` cessait d'être vide — donc importer un
+// vrai flux aurait allumé les faux prix. Cette page doit rester sur l'écran d'attente.
+test("la page boutique ne rend pas le catalogue simulé", () => {
+  const f = TOUS.find((x) => relative(SRC, x.p).replace(/\\/g, "/") === "app/dashboard/shop/page.tsx");
+  assert.ok(f, "app/dashboard/shop/page.tsx introuvable");
+  assert.ok(f!.code.includes("ShopComingSoon"), "la page ne rend plus l'écran d'attente");
+  assert.ok(
+    !f!.code.includes("ShoppingHub"),
+    "la page boutique référence à nouveau ShoppingHub — elle afficherait des prix inventés",
+  );
+});
+
 test("une photo ne peut pas être à la fois bannie et auditée", () => {
   const deux = Object.keys(AUDITEES).filter((id) => BANNIES[id]);
   assert.equal(deux.length, 0, `contradiction : ${deux.join(", ")}`);
