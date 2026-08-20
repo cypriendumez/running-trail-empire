@@ -8,7 +8,9 @@
 /coverage
 
 # Next.js
-/.next/
+# ⚠️ iCloud duplique les dossiers en « .next 2 », « .next 3 »… que « /.next/ »
+# ne couvre PAS : 2 106 fichiers de build s'étaient ainsi retrouvés commités.
+/.next*
 /out/
 
 # Production
