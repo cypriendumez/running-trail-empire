@@ -440,7 +440,7 @@ export default function LandingPage() {
       </Container>
 
       {/* ── PROGRAMMES ── */}
-      <Section id="programmes">
+      <Section id="programmes" className="scroll-mt-20">
         <Container>
           <div className="flex flex-wrap items-end justify-between gap-4">
             <SectionHeading
@@ -496,7 +496,15 @@ export default function LandingPage() {
       </Section>
 
       {/* ── FEATURES ── */}
-      <Section className="bg-zinc-50">
+      {/* ⚠️ `id` MANQUANT : la barre et le menu mobile pointaient tous deux sur
+          « #features » alors qu'aucune section ne portait cet identifiant. Le clic
+          changeait l'URL et ne défilait NULLE PART — le visiteur restait sur la section
+          des programmes, en croyant que le lien était cassé. Les deux voisines,
+          « #programmes » et « #tarifs », avaient bien le leur : c'est le genre d'oubli
+          qu'aucun typage ne voit, puisqu'une ancre morte est du HTML parfaitement
+          valide. `tests/chiffres.test.ts` vérifie désormais que toute ancre interne
+          vise un `id` qui existe. */}
+      <Section id="features" className="scroll-mt-20 bg-zinc-50">
         <Container>
           <SectionHeading
             eyebrow={L.features.eyebrow}
@@ -560,7 +568,7 @@ export default function LandingPage() {
           chaque chose UNE fois convainc mieux qu'une page qui se répète. */}
 
       {/* ── TARIFS ── */}
-      <Section id="tarifs" className="bg-zinc-50">
+      <Section id="tarifs" className="scroll-mt-20 bg-zinc-50">
         <Container>
           <SectionHeading
             eyebrow={L.pricing.eyebrow}

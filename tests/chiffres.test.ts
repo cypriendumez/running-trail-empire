@@ -121,5 +121,27 @@ test("aucune durée d'essai n'est écrite en dur dans un écran", () => {
   assert.equal(vus.length, 0, `durée(s) d'essai recopiée(s) :\n    ${vus.join("\n    ")}`);
 });
 
+// ── 4. Aucune ancre interne ne vise le vide ──────────────────────────────────
+// La barre et le menu mobile pointaient sur « #features » alors qu'aucune section ne
+// portait cet identifiant : le clic changeait l'URL et ne défilait nulle part. Rien ne
+// pouvait le voir — une ancre morte est du HTML parfaitement valide, le typage et le
+// build passent. Seul un test qui CONFRONTE les deux listes l'attrape.
+test("toute ancre interne vise un id qui existe", () => {
+  const ancres = new Map<string, Set<string>>();
+  const ids = new Set<string>();
+  for (const { rel, code } of TOUS) {
+    for (const m of code.matchAll(/href="#([A-Za-z][\w-]*)"/g)) {
+      ancres.set(m[1], (ancres.get(m[1]) ?? new Set()).add(rel));
+    }
+    for (const m of code.matchAll(/\bid="([A-Za-z][\w-]*)"/g)) ids.add(m[1]);
+  }
+  assert.ok(ancres.size > 0, "aucune ancre trouvée — la regex ne mord plus");
+  assert.ok(ids.size > 0, "aucun id trouvé — la regex ne mord plus");
+  const mortes = [...ancres.entries()]
+    .filter(([a]) => !ids.has(a))
+    .map(([a, fs]) => `#${a} → ${[...fs].join(", ")}`);
+  assert.equal(mortes.length, 0, `ancre(s) qui ne mènent nulle part :\n    ${mortes.join("\n    ")}`);
+});
+
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log(`  ✗ ${f}`); process.exit(1); }
