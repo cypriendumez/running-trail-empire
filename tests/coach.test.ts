@@ -24,7 +24,7 @@ import { etatDouble, scinderFacile, seanceDoubleSeuil, AVERTISSEMENT_LACTATE } f
 import { oneSessionPerSlot, slotKey } from "../src/lib/coach/sessions";
 import { vmaFromPaceCurve, bestVmaFromWorkouts, effectiveVma, dureeEnConditionsNeutres, PART_PENALITE_CHALEUR, pctVmaForDistance, easyPaceFromHeartRate, MIN_SEANCES_ALLURE_Z2, LONG_RUN_PRET_KM, LONG_RUN_PLANCHER_KM } from "../src/lib/running/fitness";
 import { heatAdvice, windAdvice, altitudeLossPct, heatAcclimation } from "../src/lib/weather/openMeteo";
-import { parseReps, parsePaceSec, stepsForType, warmCoolMin, buildWorkoutDescription } from "../src/lib/watch/intervals";
+import { parseReps, parsePaceSec, stepsForType, warmCoolMin, buildWorkoutDescription, montreDe, metriquesMixtesSupportees, DESTINATIONS_MONTRE } from "../src/lib/watch/intervals";
 import { buildWeekPlan, CONFIRMED_DAYS } from "../src/lib/ai/autoPlan";
 import { tr, ALL_LANGS, nRaw } from "../src/lib/i18n/multi";
 // `T` est déjà pris plus bas dans ce fichier (une date) → alias explicite.
@@ -4865,33 +4865,106 @@ void (async () => {
 // ─────────────────────────────────────────────────────────────────────────────
 console.log("\nMONTRES — la promesse de la landing et le contrôle de l'app disent la même chose");
 test("les marques annoncées comme recevant la séance sont exactement celles que l'app détecte", () => {
+  // ⚠️ ANCRAGE : ce test visait auparavant le tableau EN LIGNE de `/api/watch/status`.
+  // Ce tableau a été extrait dans `lib/watch/intervals.ts` pour servir de source unique —
+  // et le test est devenu vert-aveugle sur une liste vide. On vise donc la source, qu'on
+  // IMPORTE au lieu de la grepper : plus rien à réancrer au prochain déplacement.
   const landing = codeOf("src/app/page.tsx");
-  const route = codeOf("src/app/api/watch/status/route.ts");
-
-  // Côté page : toute entrée de SYNC portant `pousse: true`.
   const promises = [...landing.matchAll(/\{\s*nom:\s*"([^"]+)"[^}]*pousse:\s*true[^}]*\}/g)]
     .map((m) => m[1].toLowerCase()).sort();
-  // Côté app : tout appareil listé dans `devices`.
-  const detectees = [...route.matchAll(/\{\s*name:\s*"([^"]+)",\s*on:/g)]
-    .map((m) => m[1].toLowerCase()).sort();
-
+  const detectees = DESTINATIONS_MONTRE.map((d) => d.nom.toLowerCase()).sort();
   assert.ok(promises.length >= 4, `la landing ne promet plus que ${promises.length} marque(s) — anomalie`);
-  assert.deepEqual(detectees, promises,
-    `l'app détecte [${detectees}] mais la page promet [${promises}]`);
+  assert.deepEqual(detectees, promises, `l'app détecte [${detectees}] mais la page promet [${promises}]`);
 });
-test("chaque marque détectée lit le champ intervals.icu qui lui correspond", () => {
-  // Le préfixe n'est pas uniforme côté intervals.icu (`icu_garmin_*` contre `coros_*`) :
-  // recopier le mauvais préfixe donne `undefined`, donc « pas prête », SANS erreur.
+test("la route d'état délègue à la table partagée plutôt que de la recopier", () => {
+  // Deux copies de la liste avaient déjà divergé une fois : Suunto était annoncé sur la
+  // landing et absent du contrôle, et l'athlète voyait une pastille orange à tort.
   const route = codeOf("src/app/api/watch/status/route.ts");
-  for (const [marque, champ] of [
-    ["Garmin", "icu_garmin_upload_workouts"],
-    ["Coros", "coros_upload_workouts"],
-    ["Suunto", "suunto_upload_workouts"],
-    ["Wahoo", "wahoo_upload_workouts"],
-  ] as const) {
-    assert.ok(route.includes(`name: "${marque}", on: !!a.${champ}`),
-      `${marque} ne lit pas \`a.${champ}\``);
+  assert.match(route, /montreDe\(/, "la route n'appelle plus `montreDe` — la liste risque de diverger à nouveau");
+  assert.ok(!/upload_workouts/.test(route), "la route recopie des champs intervals.icu au lieu d'utiliser la table");
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  UNE SÉANCE N'EST JAMAIS À MÉTRIQUES MIXTES SUR UNE MONTRE QUI NE SAIT PAS LES LIRE
+//
+//  intervals.icu n'exporte QU'UNE métrique directrice par séance : les blocs portant
+//  l'autre partent SANS AUCUNE cible. Documenté sur leur forum (avril-mai 2026, « Coros
+//  Integration: Mixed Pace & HR Intervals »), toujours sans correctif. Nos séances de
+//  course mélangeaient FC (échauffement, récup, retour au calme) et allure (le corps) :
+//  sur une COROS, c'est donc LE CORPS qui perdait sa cible — le seul bloc qui compte.
+//
+//  Garmin, lui, lit le mélange correctement, et le pilotage FC de l'échauffement y est
+//  meilleur. D'où deux formats selon la montre détectée. Ces tests figent les deux.
+// ─────────────────────────────────────────────────────────────────────────────
+console.log("\nMONTRE — le format de séance s'adapte à ce que la montre sait lire");
+
+const etapesDe = (titre: string, detail: string, type: string, montre: string | null) =>
+  (buildWorkoutDescription(titre, detail, type, null, 17.6, 15, 10, montre)?.description ?? "")
+    .split("\n").filter((l) => l.startsWith("- "));
+const metriques = (etapes: string[]) => ({
+  fc: etapes.some((l) => /\bHR\b/.test(l)),
+  allure: etapes.some((l) => /pace/.test(l)),
+});
+
+test("aucune séance de course n'est mixte sur une montre non-Garmin", () => {
+  const cas: [string, string, string][] = [
+    ["Footing", "Corps : 40 min en Z2 (~5'42/km)", "endurance"],
+    ["VMA courte", "VMA courte : 10×400 m à 3'20/km, récup 45 s", "vma"],
+    ["Seuil", "Corps : 3×10 min à 4'05/km, récup 2 min", "seuil"],
+    ["Sortie longue", "Corps : 1 h 45 en Z2 (~5'50/km)", "sortie longue"],
+    ["Côte", "Corps : 8×45 s en côte, récup descente", "cote"],
+  ];
+  for (const montre of ["Coros", "Suunto", "Wahoo"]) {
+    for (const [t, d, ty] of cas) {
+      const m = metriques(etapesDe(t, d, ty, montre));
+      assert.ok(!(m.fc && m.allure), `« ${t} » est encore mixte sur ${montre} — le corps y perdra sa cible`);
+    }
   }
+});
+
+test("Garmin garde son échauffement en fréquence cardiaque", () => {
+  // C'est la meilleure prescription (on monte en température par le cœur, pas au chrono)
+  // et elle est prouvée en production. La corriger « pour uniformiser » serait une perte.
+  const e = etapesDe("Footing", "Corps : 40 min en Z2 (~5'42/km)", "endurance", "Garmin");
+  assert.match(e[0], /Z1 HR Échauffement/, "l'échauffement Garmin doit rester en FC");
+  assert.match(e[1], /pace/, "le corps doit rester à l'allure");
+});
+
+test("une montre indéterminée est traitée comme une Garmin", () => {
+  // Ne jamais dégrader ce qui marche au motif qu'on n'a pas su lire l'API.
+  const inconnue = etapesDe("Footing", "Corps : 40 min en Z2 (~5'42/km)", "endurance", null);
+  const garmin = etapesDe("Footing", "Corps : 40 min en Z2 (~5'42/km)", "endurance", "Garmin");
+  assert.deepEqual(inconnue, garmin);
+});
+
+test("la récup d'une séance de qualité suit la métrique du reste", () => {
+  // Elle était en FC au milieu de blocs d'allure : à elle seule elle rendait toute la
+  // séance mixte, et c'était invisible tant qu'on ne regardait que l'échauffement.
+  const e = etapesDe("VMA", "VMA : 10×400 m à 3'20/km, récup 45 s", "vma", "Coros");
+  const recups = e.filter((l) => /Récup/.test(l));
+  assert.ok(recups.length > 0, "la séance doit contenir des récups");
+  for (const r of recups) assert.match(r, /pace/, `récup en FC au milieu de blocs d'allure : ${r}`);
+});
+
+test("les côtes restent en FC dans les DEUX modes", () => {
+  // Une allure au km n'a aucun sens en montée. L'homogénéité s'y obtient en FC.
+  for (const montre of ["Garmin", "Coros"]) {
+    const m = metriques(etapesDe("Côte", "Corps : 8×45 s en côte, récup descente", "cote", montre));
+    assert.ok(m.fc && !m.allure, `les côtes doivent rester en FC (${montre})`);
+  }
+});
+
+test("la table des destinations et la détection disent la même chose", () => {
+  assert.equal(metriquesMixtesSupportees("Garmin"), true);
+  for (const m of ["Coros", "Suunto", "Wahoo", null]) {
+    assert.equal(metriquesMixtesSupportees(m as string | null), false, `${m} ne lit pas les métriques mixtes`);
+  }
+  // Le préfixe n'est PAS uniforme côté intervals.icu : le figer évite un `undefined` muet.
+  assert.equal(montreDe({ icu_garmin_upload_workouts: true })?.nom, "Garmin");
+  assert.equal(montreDe({ suunto_upload_workouts: true })?.nom, "Suunto");
+  assert.equal(montreDe({ polar_upload_workouts: true }), null, "Polar n'a pas ce champ chez intervals.icu");
+  assert.equal(montreDe({}), null);
+  assert.deepEqual(DESTINATIONS_MONTRE.map((d) => d.nom), ["Garmin", "Coros", "Suunto", "Wahoo"]);
 });
 
 })().then(() => {

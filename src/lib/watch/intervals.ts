@@ -6,6 +6,62 @@
 
 const BASE = "https://intervals.icu/api/v1";
 
+/**
+ * LES PLATEFORMES QUI REÇOIVENT UNE SÉANCE, et le champ intervals.icu qui le dit.
+ *
+ * Relevé sur l'API d'un compte réel le 17/08/2026 : les champs `*_upload_workouts`
+ * existent pour garmin, coros, wahoo, suunto et zwift. Polar n'en a AUCUN (son API
+ * n'accepte pas les séances planifiées), Strava non plus (c'est un journal, pas une
+ * montre). Zwift en a un mais reste écarté : ce n'est pas une montre.
+ *
+ * ⚠️ LE PRÉFIXE N'EST PAS UNIFORME : Garmin est `icu_garmin_*`, les autres n'ont pas ce
+ * préfixe. Recopier le mauvais donne `undefined`, donc « pas prête », SANS erreur.
+ *
+ * Cette table est la SOURCE UNIQUE : `/api/watch/status` l'importe, et la construction
+ * de séance s'en sert pour savoir si la montre supporte les métriques mixtes.
+ */
+export const DESTINATIONS_MONTRE = [
+  { nom: "Garmin", actif: "icu_garmin_upload_workouts", dernier: "icu_garmin_last_upload" },
+  { nom: "Coros", actif: "coros_upload_workouts", dernier: "coros_last_upload" },
+  { nom: "Suunto", actif: "suunto_upload_workouts", dernier: "suunto_last_upload" },
+  { nom: "Wahoo", actif: "wahoo_upload_workouts", dernier: "wahoo_last_upload" },
+] as const;
+
+/** La première montre prête à recevoir, ou `null`. Pure — testable sans réseau. */
+export function montreDe(athlete: Record<string, unknown>): { nom: string; dernier: string | null } | null {
+  for (const d of DESTINATIONS_MONTRE) {
+    if (athlete[d.actif]) return { nom: d.nom, dernier: (athlete[d.dernier] as string | null) ?? null };
+  }
+  return null;
+}
+
+/**
+ * ⚠️ SEULE GARMIN INTERPRÈTE CORRECTEMENT UNE SÉANCE À MÉTRIQUES MIXTES.
+ *
+ * Nos séances de course s'écrivent « échauffement en zone FC → corps à l'allure → retour
+ * au calme en zone FC ». C'est un mélange de deux métriques directrices, et intervals.icu
+ * n'en exporte QU'UNE : les blocs portant l'autre partent SANS AUCUNE cible. Documenté sur
+ * leur forum en avril-mai 2026 (« Coros Integration: Mixed Pace & HR Intervals »), toujours
+ * sans correctif à la clôture du fil le 15/05/2026 — un bloc d'allure y arrive « not set ».
+ *
+ * Sur une COROS, c'est donc le CORPS de séance qui perd sa cible : le seul bloc qui compte.
+ * On émet alors tout en ALLURE, y compris l'échauffement, pour qu'il n'y ait plus rien à
+ * choisir. Sur Garmin on ne touche à rien : le pilotage FC de l'échauffement y fonctionne
+ * et il est meilleur (on monte en température par le cœur, pas en visant un chrono).
+ */
+export function metriquesMixtesSupportees(montre: string | null): boolean {
+  return montre === "Garmin";
+}
+
+/** État de la montre du client, lu sur l'API. `null` si indéterminable. */
+export async function litMontre(opts: { athleteId: string; apiKey: string }): Promise<string | null> {
+  try {
+    const res = await fetch(`${BASE}/athlete/${opts.athleteId}`, { headers: authHeader(opts.apiKey), cache: "no-store" });
+    if (!res.ok) return null;
+    return montreDe(await res.json())?.nom ?? null;
+  } catch { return null; }
+}
+
 function authHeader(apiKey: string) {
   return {
     Authorization: "Basic " + Buffer.from(`API_KEY:${apiKey}`).toString("base64"),
@@ -138,7 +194,7 @@ export function parseReps(text: string, fallbackPaceSec: number | null): RepBloc
  * Elles sont numérotées (« Effort 3/12 ») : sur la montre, savoir où l'on en est
  * pendant un fractionné vaut largement les quelques lignes supplémentaires.
  */
-function repSteps(b: RepBlock, vmaKmh: number | null, zone: number, hill?: boolean): string {
+function repSteps(b: RepBlock, vmaKmh: number | null, zone: number, hill?: boolean, recupPace?: string | null): string {
   const fmt = (sec: number) => (sec % 60 === 0 ? `${sec / 60}m` : `${sec}s`);
   // En côte, une allure au km n'a aucun sens : on pilote à la fréquence cardiaque.
   const range = hill ? `Z${zone} HR` : b.paceSec
@@ -159,7 +215,10 @@ function repSteps(b: RepBlock, vmaKmh: number | null, zone: number, hill?: boole
       out.push(`- ${fmt(b.workSec)} ${range} Effort ${i}/${b.reps}`);
     }
     // Pas de récupération après la dernière : le retour au calme enchaîne.
-    if (i < b.reps) out.push(`- ${fmt(b.recSec)} Z1 HR Récup`);
+    // La RÉCUP suit la même métrique que le reste de la séance. En FC au milieu de blocs
+    // d'allure, elle recréait le mélange que `toutEnAllure` cherche à supprimer — et ce
+    // sont justement les séances de qualité, où perdre la cible d'allure coûte le plus.
+    if (i < b.reps) out.push(`- ${fmt(b.recSec)} ${recupPace ?? "Z1 HR"} Récup`);
   }
   return out.join("\n");
 }
@@ -179,7 +238,7 @@ export function warmCoolMin(warmMin?: number | null, coolMin?: number | null): {
   };
 }
 
-export function stepsForType(type: string, durationMin: number, vmaKmh?: number | null, mainPaceSec?: number | null, warmMin?: number | null, coolMin?: number | null, reps?: RepBlock | null, rawDetail?: string): string | null {
+export function stepsForType(type: string, durationMin: number, vmaKmh?: number | null, mainPaceSec?: number | null, warmMin?: number | null, coolMin?: number | null, reps?: RepBlock | null, rawDetail?: string, toutEnAllure?: boolean): string | null {
   const s = (type || "").toLowerCase();
   const d = Math.max(15, Math.round(durationMin));
   const v = vmaKmh ?? null;
@@ -187,6 +246,33 @@ export function stepsForType(type: string, durationMin: number, vmaKmh?: number 
   // Durées d'échauffement / retour au calme = réglage du profil de l'athlète (5–30 min), repli 15 / 10.
   // Échauffement & retour au calme toujours pilotés à la FRÉQUENCE CARDIAQUE Z1 (doux) ; seul le corps vise l'allure.
   const { warm, cool } = warmCoolMin(warmMin, coolMin);
+  /**
+   * Échauffement et retour au calme : FC sur Garmin, ALLURE partout ailleurs.
+   *
+   * `hrOnly` produit une cible FC ; en le désactivant, `zoneStep` calcule une plage
+   * d'allure depuis la VMA. Si la VMA manque, on dérive l'allure douce du corps de séance
+   * (+60 s/km) : sans ce repli, `zoneStep` retomberait sur la FC et on recréerait
+   * exactement le mélange qu'on cherche à éviter.
+   */
+  /**
+   * ⚠️ LES CÔTES RESTENT EN FC, MÊME SUR UNE COROS. Une allure au km n'a aucun sens en
+   * montée : le corps de séance y est piloté à la fréquence cardiaque (voir `repSteps`).
+   * Passer l'échauffement à l'allure y RECRÉERAIT le mélange qu'on cherche à supprimer,
+   * juste dans l'autre sens. L'homogénéité s'obtient ici en restant en FC de bout en bout.
+   */
+  const enCote = /c[ôo]te|mont[ée]e|hill/.test(`${s} ${(rawDetail || "").toLowerCase()}`);
+  const douxHr = !toutEnAllure || enCote;
+  const alluredouce = toutEnAllure && !v && p ? p + 60 : null;
+  const echauffement = (label: string, min: number) => zoneStep(min, 1, v, label, alluredouce, douxHr);
+  /**
+   * La plage d'allure douce, réutilisée pour les RÉCUPS entre répétitions.
+   * On la relit sur l'étape d'échauffement plutôt que de recalculer : deux formules pour
+   * une même notion finissent par diverger, et une récup plus rapide que l'échauffement
+   * serait une prescription absurde. `null` en mode Garmin → la récup reste en FC.
+   */
+  const recupPace = toutEnAllure && !enCote
+    ? (echauffement("x", 1).match(/\d+:\d+-\d+:\d+ pace/)?.[0] ?? null)
+    : null;
   /**
    * Durée du CORPS de séance, lue dans le texte du plan (« → Corps : … »).
    *
@@ -222,7 +308,7 @@ export function stepsForType(type: string, durationMin: number, vmaKmh?: number 
   }
   if (/long|endurance|footing|fond|easy/.test(s)) {
     const main = bodyMin ?? Math.max(15, d - warm - cool);
-    return [zoneStep(warm, 1, v, "Échauffement", null, true), zoneStep(main, 2, v, "Endurance facile", p), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
+    return [echauffement("Échauffement", warm), zoneStep(main, 2, v, "Endurance facile", p), echauffement("Retour au calme", cool)].join("\n");
   }
   // Durée explicitement annoncée pour le CORPS de séance : sans ça, « 25 min d'un bloc »
   // se retrouvait amputé de l'échauffement et arrivait à 10 min sur la montre.
@@ -232,20 +318,20 @@ export function stepsForType(type: string, durationMin: number, vmaKmh?: number 
   if (quality) {
     // Vraies répétitions quand le libellé en contient ; sinon bloc continu (seuil continu…).
     // Le mot « côte » est dans le LIBELLÉ de la séance, pas dans son type (« VMA »).
-    const hill = /c[ôo]te|mont[ée]e|hill/.test(`${s} ${(rawDetail || "").toLowerCase()}`);
-    const block = reps ? repSteps(reps, v, quality, hill) : null;
+    const hill = enCote;
+    const block = reps ? repSteps(reps, v, quality, hill, recupPace) : null;
     const main = Math.max(10, d - warm - cool);
     return [
-      zoneStep(warm, 1, v, "Échauffement", null, true),
+      echauffement("Échauffement", warm),
       // Bloc continu : en CÔTE on pilote à la fréquence cardiaque, jamais à l'allure —
       // une allure au km ne veut rien dire en montée. Les répétitions le faisaient déjà,
       // le bloc continu, non : le drapeau `hill` ne lui était pas transmis.
       block ?? zoneStep(bodyMin ?? main, quality, v, quality === 5 ? "VMA" : "Seuil", hill ? null : p, hill),
-      zoneStep(cool, 1, v, "Retour au calme", null, true),
+      echauffement("Retour au calme", cool),
     ].join("\n");
   }
   const main = Math.max(15, d - warm - cool);
-  return [zoneStep(warm, 1, v, "Échauffement", null, true), zoneStep(main, 2, v, "Endurance facile", p), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
+  return [echauffement("Échauffement", warm), zoneStep(main, 2, v, "Endurance facile", p), echauffement("Retour au calme", cool)].join("\n");
 }
 
 // Crée (en remplaçant l'éventuelle séance coach déjà présente) une séance dans le
@@ -334,12 +420,21 @@ export function parseDurationMin(text: string): number | null {
 export function buildWorkoutDescription(
   title: string, detail: string, type: string, objectiveRace?: string | null, vmaKmh?: number | null,
   warmMin?: number | null, coolMin?: number | null,
+  /**
+   * Montre destinataire, telle que `litMontre` la renvoie. Sert UNIQUEMENT à savoir si les
+   * métriques mixtes passeront : Garmin oui, le reste non (voir `metriquesMixtesSupportees`).
+   * `null`/absent ⇒ on garde le comportement Garmin, le seul qui soit prouvé en production.
+   */
+  montre?: string | null,
 ): { name: string; description: string; sport: "Run" | "Ride" } | null {
   const dur = parseDurationMin(`${title} ${detail} ${type}`) ?? durationForType(type);
   const mainPaceSec = parsePaceSec(`${title} ${detail}`);
   // Répétitions détectées dans le libellé de la séance (« 12×400 m … récup 45 s »).
   const reps = parseReps(detail, mainPaceSec);
-  const steps = stepsForType(type, dur, vmaKmh, mainPaceSec, warmMin, coolMin, reps, detail);
+  // Une montre inconnue est traitée comme une Garmin : ne jamais dégrader ce qui marche
+  // au motif qu'on n'a pas su lire l'API.
+  const toutEnAllure = montre != null && !metriquesMixtesSupportees(montre);
+  const steps = stepsForType(type, dur, vmaKmh, mainPaceSec, warmMin, coolMin, reps, detail, toutEnAllure);
   if (!steps) return null;
   // Séance vélo (cross-training) → exporte un workout "Ride" sur la montre (sinon "Run").
   const isBike = /vélo|velo|bike|cycl|home ?trainer|\bride\b/i.test(`${title} ${type}`);

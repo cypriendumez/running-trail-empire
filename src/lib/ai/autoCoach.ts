@@ -10,7 +10,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildAthleteContext } from "@/lib/ai/coachContext";
 import { buildWeekPlan, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
-import { pushIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace } from "@/lib/watch/intervals";
+import { pushIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
 import { profilPeut, COLONNES_ACCES } from "@/lib/billing/access";
 
 type Admin = SupabaseClient;
@@ -124,6 +124,9 @@ export async function autoCoachForUser(
       const warmMin = (prof?.warmup_min as number | null | undefined) ?? null;
       const coolMin = (prof?.cooldown_min as number | null | undefined) ?? null;
       await ensureRunThresholdPace({ athleteId, apiKey, vmaKmh: ctx.vma });
+      // UNE seule lecture pour toute la semaine : la montre ne change pas entre deux jours
+      // du même plan, et un appel par jour ferait sept requêtes pour une seule réponse.
+      const montre = await litMontre({ athleteId, apiKey });
       // Même règle que pour le calendrier : on ne pousse pas sur la montre une séance
       // pour un jour déjà couru. Elle y remplacerait, après coup, celle qui a servi.
       // ⚠️ CONFIRMED_DAYS compte des JOURS, pas des entrées. `slice(0, 5)` était juste
@@ -132,7 +135,7 @@ export async function autoCoachForUser(
       // doublent. On sélectionne donc les dates, puis toutes leurs séances.
       const datesConfirmees = [...new Set(week.map((x) => x.date))].sort().slice(0, CONFIRMED_DAYS);
       for (const d of week.filter((x) => x.date >= from && datesConfirmees.includes(x.date))) {
-        const built = buildWorkoutDescription(d.title, d.detail, `${d.type} ${d.tags.join(" ")}`, objectiveRace, ctx.vma, warmMin, coolMin);
+        const built = buildWorkoutDescription(d.title, d.detail, `${d.type} ${d.tags.join(" ")}`, objectiveRace, ctx.vma, warmMin, coolMin, montre);
         if (!built) continue;
         // Le créneau entre dans le NOM : deux séances le même jour, sur la montre, ne
         // se distinguent autrement que par leur contenu — et on ne lit pas un descriptif

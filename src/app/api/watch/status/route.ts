@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { montreDe } from "@/lib/watch/intervals";
 
 const BASE = "https://intervals.icu/api/v1";
 const auth = (k: string) => ({ Authorization: "Basic " + Buffer.from(`API_KEY:${k}`).toString("base64") });
@@ -44,21 +45,15 @@ export async function GET() {
     const res = await fetch(`${BASE}/athlete/${ATHLETE_ID}`, { headers: auth(API_KEY), cache: "no-store" });
     if (!res.ok) return NextResponse.json({ connected: false, pushReady: false, device: null });
     const a = await res.json();
-    // ⚠️ Le préfixe n'est PAS uniforme côté intervals.icu : Garmin est `icu_garmin_*`,
-    // les autres n'ont pas ce préfixe. Le recopier partout donnerait des champs
-    // `undefined` — donc `on: false` — sans la moindre erreur pour le signaler.
-    const devices = [
-      { name: "Garmin", on: !!a.icu_garmin_upload_workouts, last: a.icu_garmin_last_upload ?? null },
-      { name: "Coros", on: !!a.coros_upload_workouts, last: a.coros_last_upload ?? null },
-      { name: "Suunto", on: !!a.suunto_upload_workouts, last: a.suunto_last_upload ?? null },
-      { name: "Wahoo", on: !!a.wahoo_upload_workouts, last: a.wahoo_last_upload ?? null },
-    ];
-    const ready = devices.find((d) => d.on) ?? null;
+    // La table des destinations vit dans `lib/watch/intervals.ts` : la MÊME sert à décider
+    // du format de la séance envoyée. Deux copies auraient divergé — c'est précisément
+    // comme ça que Suunto était annoncé sur la landing et absent d'ici.
+    const ready = montreDe(a);
     return NextResponse.json({
       connected: true,
       pushReady: !!ready,
-      device: ready?.name ?? null,
-      lastUpload: ready?.last ?? null,
+      device: ready?.nom ?? null,
+      lastUpload: ready?.dernier ?? null,
     });
   } catch {
     return NextResponse.json({ connected: false, pushReady: false, device: null });

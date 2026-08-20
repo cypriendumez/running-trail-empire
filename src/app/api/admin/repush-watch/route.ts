@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { pushIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace } from "@/lib/watch/intervals";
+import { pushIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
 import { getEffectiveVma } from "@/lib/ai/coachContext";
 import { oneSessionPerSlot } from "@/lib/coach/sessions";
 
@@ -47,13 +47,16 @@ export async function POST(req: Request) {
   const vma = await getEffectiveVma(admin, user_id);
   await ensureRunThresholdPace({ athleteId, apiKey, vmaKmh: vma }); // pour que Garmin transmette l'allure du corps
 
+  // Détection UNE fois : les séances repoussées partent en parallèle, un appel chacune
+  // ferait autant de requêtes que de séances pour une réponse qui ne change pas.
+  const montre = await litMontre({ athleteId, apiKey });
   const results = await Promise.all(sessions.map(async (r) => {
     const d = (r.data ?? {}) as { date?: string; sessionType?: string; subtitle?: string };
     const date = String(d.date ?? "").slice(0, 10);
     if (!date) return false;
     const built = buildWorkoutDescription(
       r.title || d.sessionType || "Séance", d.subtitle || "",
-      `${d.sessionType || ""} ${r.title || ""}`, objectiveRace, vma, warmMin, coolMin,
+      `${d.sessionType || ""} ${r.title || ""}`, objectiveRace, vma, warmMin, coolMin, montre,
     );
     if (!built) return false; // repos / renfo : pas de séance montre
     const res = await pushIntervalsWorkout({ athleteId, apiKey, userId: user_id, name: built.name, date, description: built.description, sport: built.sport });

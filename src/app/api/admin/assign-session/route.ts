@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { pushIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace } from "@/lib/watch/intervals";
+import { pushIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
 import { getEffectiveVma } from "@/lib/ai/coachContext";
 
 const ADMIN_EMAIL = "cypriendumez@outlook.fr";
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
       const vma = await getEffectiveVma(admin, user_id);
       await ensureRunThresholdPace({ athleteId, apiKey, vmaKmh: vma }); // pour que Garmin transmette l'allure
       const sessionType = `${title} ${(Array.isArray(tags) ? tags.join(" ") : "")}`;
-      const built = buildWorkoutDescription(title, subtitle ?? "", sessionType, objectiveRace, vma, warmMin, coolMin);
+      const built = buildWorkoutDescription(title, subtitle ?? "", sessionType, objectiveRace, vma, warmMin, coolMin, await litMontre({ athleteId, apiKey }));
       if (built) {
         const r = await pushIntervalsWorkout({ athleteId, apiKey, userId: user_id, name: built.name, date: today, description: built.description, sport: built.sport });
         watchSent = r.ok;
