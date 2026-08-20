@@ -103,13 +103,28 @@ const STAT_VALUES = ["14 000+", "15 700", "7 j", "10 min"];
 // n'est pas là, la tuile affiche le nom — jamais une image cassée, jamais un logo redessiné
 // « à peu près », qui rendrait moins bien que le mot et poserait en plus un problème de
 // marque. Déposer le fichier suffit à basculer la tuile en logo, sans toucher au code.
-const SYNC: { nom: string; logo?: string; passerelle?: boolean }[] = [
-  { nom: "Garmin", logo: "garmin.svg" },
-  { nom: "COROS", logo: "coros.png" },
-  { nom: "Polar", logo: "polar.svg" },
-  { nom: "Suunto", logo: "suunto.svg" },
-  { nom: "Wahoo", logo: "wahoo.svg" },
-  { nom: "Strava", logo: "strava.svg" },
+// `pousse` = la plateforme peut RECEVOIR la séance du jour, pas seulement livrer les
+// données. Les deux sens sont distincts et la page les confondait : sous un titre unique,
+// « Synchronisation avec », Strava se lisait comme une montre alors qu'on ne peut rien
+// lui envoyer. Vérifié plateforme par plateforme sur le forum officiel intervals.icu.
+const SYNC: { nom: string; logo?: string; passerelle?: boolean; pousse: boolean }[] = [
+  // Poussée documentée dans notre propre code (`lib/watch/intervals.ts`).
+  { nom: "Garmin", logo: "garmin.svg", pousse: true },
+  // « Coros support added », « Pushing to Coros Calendar? » — forum intervals.icu.
+  { nom: "COROS", logo: "coros.png", pousse: true },
+  // ❌ POLAR NE REÇOIT PAS. Réponse de `david`, développeur d'intervals.icu, le
+  // 23/12/2023 : « d'après la documentation de l'API Polar, il n'est pas possible
+  // d'envoyer des séances planifiées ». Le fil est resté ouvert : en novembre 2025 un
+  // utilisateur a revérifié l'API publique Polar, toujours pas documentée. La LECTURE,
+  // elle, fonctionne — Polar est mis en avant sur la page d'accueil d'intervals.icu.
+  { nom: "Polar", logo: "polar.svg", pousse: false },
+  // « HIIT Workouts are synced as running guides in Suunto » — forum intervals.icu.
+  { nom: "Suunto", logo: "suunto.svg", pousse: true },
+  // « [IMPLEMENTED] Push workout to Wahoo » — forum intervals.icu.
+  { nom: "Wahoo", logo: "wahoo.svg", pousse: true },
+  // ❌ Strava n'est pas une montre mais un JOURNAL d'activités : il n'y a rien à y
+  // envoyer. Il lit parfaitement, il ne prescrit rien.
+  { nom: "Strava", logo: "strava.svg", pousse: false },
   // Apple Watch fonctionne, mais PAS par le même chemin, et le taire serait mentir par
   // omission : les six marques ci-dessus sont des connexions OFFICIELLES d'intervals.icu,
   // en un clic. Apple n'en a pas — les données passent par une application passerelle
@@ -117,7 +132,7 @@ const SYNC: { nom: string; logo?: string; passerelle?: boolean }[] = [
   // forum officiel intervals.icu, où c'est la réponse constante depuis des années. D'où
   // `passerelle`, qui ajoute une astérisque et une phrase d'explication : la montre est
   // supportée, l'utilisateur sait à quoi s'attendre avant de s'inscrire.
-  { nom: "Apple Watch", logo: "apple-watch.svg", passerelle: true },
+  { nom: "Apple Watch", logo: "apple-watch.svg", passerelle: true, pousse: false },
 ];
 // ── PRIX AFFICHÉS ────────────────────────────────────────────────────────────
 //  En CENTIMES, et rigoureusement identiques à `TARIFS` (lib/stripe/client.ts), qui
@@ -351,14 +366,12 @@ export default function LandingPage() {
       {/* ── SYNCHRONISATION ── une bande dédiée plutôt qu'une ligne de texte pâle noyée
           sous le CTA, où elle passait pour une mention légale.
 
-          ⚠️ CETTE LISTE EST VÉRIFIÉE, MARQUE PAR MARQUE, dans le code :
-           · Garmin  — import ET poussée de séance (`lib/watch/intervals.ts`) ;
-           · COROS, Polar, Suunto — nommés par le guide Sync Montre de l'app elle-même ;
-           · Wahoo, Strava — nommés par `lib/intervals/sport.ts` et la politique de
-             confidentialité, qui décrivent les sources d'intervals.icu.
-          APPLE N'Y FIGURE PAS : `mobile/app.json` déclare bien l'autorisation
-          `com.apple.developer.healthkit`, mais AUCUNE ligne de code n'appelle HealthKit.
-          Afficher ce logo serait vendre une intégration qui n'existe pas. */}
+          ⚠️ CHAQUE MARQUE EST VÉRIFIÉE À LA SOURCE, dans les DEUX SENS — voir le détail
+          plateforme par plateforme sur `SYNC` en haut de ce fichier. Les preuves viennent
+          du forum officiel intervals.icu et de notre propre code, jamais d'une supposition.
+          Ne jamais ajouter une marque ici sans avoir vérifié les deux sens : afficher un
+          logo, c'est promettre une intégration, et promettre l'envoi d'une séance à une
+          plateforme qui ne peut pas la recevoir est le pire des deux mensonges. */}
       <Container className="pt-14 sm:pt-16">
         <p className="text-center text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-400">
           {L.sync.title}
@@ -382,10 +395,24 @@ export default function LandingPage() {
             </span>
           ))}
         </div>
-        {/* La phrase que l'app dit déjà à ses propres athlètes dans l'onglet Sync Montre :
-            elle répond à la question qu'un lecteur se pose en voyant six marques, et elle
-            rassure plus qu'elle n'inquiète — aucun mot de passe constructeur ne transite. */}
-        <p className="mx-auto mt-5 max-w-2xl text-center text-xs leading-relaxed text-zinc-400">
+        {/* LES DEUX SENS, DITS SÉPARÉMENT. Sous un titre unique, les sept logos laissaient
+            croire que chacun fait la même chose. C'est faux dans un sens sur deux : Strava
+            est un journal d'activités (rien à lui envoyer) et l'API publique de Polar
+            n'accepte pas les séances planifiées. Les taire, c'est promettre à un porteur de
+            Polar une séance qui n'arrivera jamais à son poignet.
+            La liste des marques est DÉRIVÉE de `SYNC`, jamais recopiée : ajouter demain une
+            plateforme qui reçoit met la ligne à jour toute seule. */}
+        <div className="mx-auto mt-7 max-w-2xl space-y-2 text-center text-xs leading-relaxed text-zinc-500">
+          <p>
+            <span className="font-semibold text-zinc-700">{L.sync.read}</span>{" "}
+            {L.sync.readValue.replace("{n}", String(SYNC.length))}
+          </p>
+          <p>
+            <span className="font-semibold text-zinc-700">{L.sync.push}</span>{" "}
+            {SYNC.filter((m) => m.pousse).map((m) => m.nom).join(", ")}
+          </p>
+        </div>
+        <p className="mx-auto mt-4 max-w-2xl text-center text-xs leading-relaxed text-zinc-400">
           {L.sync.note}
         </p>
       </Container>
