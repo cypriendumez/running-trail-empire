@@ -68,16 +68,19 @@ const PRODUCTS: Product[] = (() => {
 
   // Image pools per category — verified Unsplash IDs
   const IMGS = {
-    // Road running shoes — uniquement chaussures running performance (vérifiées CDN 200)
+    // Road running shoes.
+    // ⚠️ Le « ✓ » de ces lignes signifiait « l'URL renvoie 200 », PAS « le contenu a
+    // été regardé » — une coche qui se lisait comme une approbation. Les deux entrées
+    // Nike Free RN et Adidas 10K étaient bannies ailleurs dans l'app : retirées ici le
+    // 20/08/2026. Les restantes n'ont PAS été auditées visuellement (code mort tant que
+    // `product_offers` est vide) ; ne pas rétablir de coche qui laisse croire le contraire.
     road: [
-      "photo-1542291026-7eec264c27ff",      // Nike Free RN Flyknit rouge ✓
-      "photo-1491553895911-0055eca6402d",   // Nike Zoom course sur route ✓
-      "photo-1571008887538-b36bb32f4571",   // Adidas route 10K race ✓
-      "photo-1581888748626-2a3f240a6f9f",   // Nike sur route montagne ✓
-      "photo-1575456456278-936c89ccdb7b",   // ASICS Gel produit ✓
-      "photo-1644001992668-3b9ed080533a",   // ASICS noir/bleu/orange ✓
-      "photo-1765914448113-ebf0ce8cb918",   // Pieds running bitume marathon ✓
-      "photo-1765914448116-587acf59e3f3",   // Chaussure orange sur piste sprint ✓
+      "photo-1491553895911-0055eca6402d",   // Nike Zoom course sur route
+      "photo-1581888748626-2a3f240a6f9f",   // Nike sur route montagne
+      "photo-1575456456278-936c89ccdb7b",   // ASICS Gel produit
+      "photo-1644001992668-3b9ed080533a",   // ASICS noir/bleu/orange
+      "photo-1765914448113-ebf0ce8cb918",   // Pieds running bitume marathon
+      "photo-1765914448116-587acf59e3f3",   // Chaussure orange sur piste sprint
     ],
     // Trail running shoes (chaussures de trail)
     trail: [
@@ -133,17 +136,19 @@ const PRODUCTS: Product[] = (() => {
   // ti (model) + cwi (colorway) drive variety WITHIN that brand's pool.
   const brandHash = (b: string) => b.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
 
-  // Verified photos per brand — running shoes only, no lifestyle
-  const BRAND_ROAD: Record<string, string[]> = {
-    "Nike":         ["photo-1542291026-7eec264c27ff",    // Nike Free RN rouge
-                     "photo-1491553895911-0055eca6402d", // Nike Zoom course
-                     "photo-1581888748626-2a3f240a6f9f"],// Nike montagne
-    "Adidas":       ["photo-1571008887538-b36bb32f4571", // Adidas 10K race
-                     "photo-1575456456278-936c89ccdb7b"],// ASICS-style produit (neutral)
-    "ASICS":        ["photo-1575456456278-936c89ccdb7b", // ASICS Gel produit
-                     "photo-1644001992668-3b9ed080533a"],// ASICS noir/bleu/orange
-  };
-  // Generic running shoes without visible brand — used for all other brands
+  // ⚠️ UN TABLEAU `BRAND_ROAD` ASSOCIAIT CHAQUE MARQUE À UNE PHOTO DE SES PROPRES
+  // PRODUITS — « Nike » → chaussure Nike, « Adidas » → chaussure Adidas. Retiré le
+  // 20/08/2026. Le catalogue affiche des prix SIMULÉS (voir l'encart « demo. » plus
+  // bas) : illustrer une fiche au prix inventé avec la vraie photo produit de la
+  // marque, c'est le pas de trop entre « exemple » et contrefaçon de présentation.
+  // Deux de ces images étaient d'ailleurs les pires du projet (la photo produit Nike
+  // plein cadre, et la photo aux trois bandes Adidas), toutes deux bannies ailleurs.
+  //
+  // Aujourd'hui inoffensif — `product_offers` est VIDE, donc `ShopComingSoon` s'affiche
+  // et ce composant n'est jamais rendu. C'est précisément pour ça qu'il fallait le
+  // corriger maintenant : le jour où un flux est importé, ça partait en production.
+  // Toutes les marques tombent désormais sur le même vivier générique.
+  // Generic running shoes without visible brand — used for all brands
   const ROAD_GENERIC = [
     "photo-1765914448113-ebf0ce8cb918", // Pieds running sur bitume (marathon)
     "photo-1765914448116-587acf59e3f3", // Chaussure orange sur piste sprint
@@ -152,9 +157,9 @@ const PRODUCTS: Product[] = (() => {
     "photo-1644001992668-3b9ed080533a", // Chaussure sport performance
   ];
   const imgRoad = (brand: string, ti: number, cwi: number): string => {
-    const pool = BRAND_ROAD[brand] ?? ROAD_GENERIC;
-    // ti gives model variation, cwi gives colorway variation — both within brand's pool
-    const id = pool[(ti + cwi) % pool.length];
+    // `brand` ne sert plus qu'à VARIER l'image de façon déterministe, jamais à choisir
+    // la photo de cette marque-là — exactement comme imgTrail juste en dessous.
+    const id = ROAD_GENERIC[(brandHash(brand) + ti + cwi) % ROAD_GENERIC.length];
     return `https://images.unsplash.com/${id}?w=500&h=350&fit=crop&q=80`;
   };
   const imgTrail = (brand: string, ti: number, cwi: number): string => {
@@ -614,7 +619,7 @@ const RETAILERS: Record<string, { name: string; color: string; logo?: string }> 
 };
 
 const CATEGORIES: { key: Category | "all"; label: string; emoji: string; img: string }[] = [
-  { key: "shoes_road",  label: "Chaussures Route", emoji: "🏃", img: "photo-1542291026-7eec264c27ff" },
+  { key: "shoes_road",  label: "Chaussures Route", emoji: "🏃", img: "photo-1765914448113-ebf0ce8cb918" },
   { key: "shoes_trail", label: "Chaussures Trail",  emoji: "🏔", img: "photo-1553361371-9b22f78e8b1d" },
   { key: "watches",     label: "Montres GPS",       emoji: "⌚", img: "photo-1508685096489-7aacd43bd3b1" },
   { key: "clothing",    label: "Vêtements",          emoji: "👕", img: "photo-1556906781-9a412961a28c" },

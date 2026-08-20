@@ -14,15 +14,45 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 import { BLOG, BLOG_CATS } from "./blogI18n";
 
 // Données visuelles (non traduisibles). Titres/extraits/catégories viennent de BLOG[lang].
+//
+// ── AUDIT DES VISUELS, 20/08/2026 ────────────────────────────────────────────
+// Le blog est PUBLIC. Ses huit images n'avaient jamais été passées au crible ;
+// quatre l'ont été et sont remplacées :
+//
+//  · p3 « Entraînement » : portrait STUDIO, visage de face entièrement identifiable,
+//    et sans rapport avec la course. → jambes sur piste, aucun visage.
+//  · p4 « Santé » : femme en BLOUSE BLANCHE, visage identifiable. Double défaut —
+//    le droit à l'image, et une autorité MÉDICALE implicite au-dessus d'un article
+//    de santé, alors que l'app s'interdit partout ailleurs de dire « apte ».
+//    → silhouette d'étirement, aucun trait discernable.
+//  · p6 « IA » : c'était la photo aux TROIS BANDES ADIDAS, la même que la carte
+//    « 10 km » de la landing. La retirer d'un seul des deux emplacements ne servait
+//    à rien. → motif abstrait, ni personne ni marque.
+//  · p8 « Matériel » : photo PRODUIT Nike sur fond rouge, logotype ET swoosh nets,
+//    plein cadre. Le pire cas du projet : ce n'est plus un logo incident, ça se lit
+//    comme une publicité Nike. → gros plan de chaussure dans l'herbe. ⚠️ Elle porte
+//    un petit drapeau britannique de marque au talon (~30 px à l'affichage) : sous
+//    le seuil de proéminence retenu, mais ce n'est PAS « aucune marque ». Écrit ici
+//    parce qu'un commentaire qui embellit vaut moins que pas de commentaire.
+//
+// Conservées après vérification : p1 (robot Pepper — produit de marque mais discret),
+// p5 (piste vue de haut, aucun visage), p7 (assiette, rien à signaler).
+// ⚠️ RESTE : p2 « IA » est une photo de SKIEUR sur le blog d'une app de course.
+// Défaut de pertinence, pas de droit — laissé à l'arbitrage de Cyprien.
+//
+// Les huit URL demandaient une largeur SANS hauteur, alors que les tuiles sont en
+// `aspect-[4/3]` : Unsplash renvoyait le recadrage de son choix (400, 900 puis 316 px
+// de haut pour la même tuile), que le navigateur étirait ensuite. C'est le défaut de
+// flou déjà corrigé sur la landing, jamais reporté ici. Hauteur désormais IMPOSÉE.
 const POSTS = [
-  { id: 1, key: "p1", cat: "AI", img: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=600&q=80&fit=crop", date: "19 avr. 2026", readTime: "8 min", featured: true },
-  { id: 2, key: "p2", cat: "AI", img: "https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=600&q=80&fit=crop", date: "16 avr. 2026", readTime: "12 min", featured: false },
-  { id: 3, key: "p3", cat: "TRAINING", img: "https://images.unsplash.com/photo-1544717305-2782549b5136?w=600&q=80&fit=crop", date: "14 avr. 2026", readTime: "10 min", featured: false },
-  { id: 4, key: "p4", cat: "HEALTH", img: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=600&q=80&fit=crop", date: "11 avr. 2026", readTime: "6 min", featured: false },
-  { id: 5, key: "p5", cat: "RACES", img: "https://images.unsplash.com/photo-1502904550040-7534597429ae?w=600&q=80&fit=crop", date: "9 avr. 2026", readTime: "15 min", featured: false },
-  { id: 6, key: "p6", cat: "AI", img: "https://images.unsplash.com/photo-1571008887538-b36bb32f4571?w=600&q=80&fit=crop", date: "7 avr. 2026", readTime: "9 min", featured: false },
-  { id: 7, key: "p7", cat: "NUTRITION", img: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=600&q=80&fit=crop", date: "4 avr. 2026", readTime: "11 min", featured: false },
-  { id: 8, key: "p8", cat: "GEAR", img: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&q=80&fit=crop", date: "1 avr. 2026", readTime: "14 min", featured: false },
+  { id: 1, key: "p1", cat: "AI", img: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=600&h=450&fit=crop&q=80", date: "19 avr. 2026", readTime: "8 min", featured: true },
+  { id: 2, key: "p2", cat: "AI", img: "https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=600&h=450&fit=crop&q=80", date: "16 avr. 2026", readTime: "12 min", featured: false },
+  { id: 3, key: "p3", cat: "TRAINING", img: "https://images.unsplash.com/photo-1526676537331-7747bf8278fc?w=600&h=450&fit=crop&q=80", date: "14 avr. 2026", readTime: "10 min", featured: false },
+  { id: 4, key: "p4", cat: "HEALTH", img: "https://images.unsplash.com/photo-1560233026-ad254fa8da38?w=600&h=450&fit=crop&q=80", date: "11 avr. 2026", readTime: "6 min", featured: false },
+  { id: 5, key: "p5", cat: "RACES", img: "https://images.unsplash.com/photo-1502904550040-7534597429ae?w=600&h=450&fit=crop&q=80", date: "9 avr. 2026", readTime: "15 min", featured: false },
+  { id: 6, key: "p6", cat: "AI", img: "https://images.unsplash.com/photo-1761078739194-75cccb8e3195?w=600&h=450&fit=crop&q=80", date: "7 avr. 2026", readTime: "9 min", featured: false },
+  { id: 7, key: "p7", cat: "NUTRITION", img: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=600&h=450&fit=crop&q=80", date: "4 avr. 2026", readTime: "11 min", featured: false },
+  { id: 8, key: "p8", cat: "GEAR", img: "https://images.unsplash.com/photo-1555972635-8a10402b49b2?w=600&h=450&fit=crop&q=80", date: "1 avr. 2026", readTime: "14 min", featured: false },
 ];
 
 function ReadTime({ t }: { t: string }) {
