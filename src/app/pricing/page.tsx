@@ -17,6 +17,7 @@
 
 import { useState } from "react";
 import { JOURS_ESSAI } from "@/lib/billing/access";
+import { PRIX_AFFICHES as PRIX, euros } from "@/lib/billing/prix";
 import { Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { SiteHeader } from "@/components/layout/SiteHeader";
@@ -26,16 +27,6 @@ import { btnClass } from "@/components/ui/Button";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { LANDING } from "@/components/landing/landingI18n";
 
-/** En CENTIMES, identiques à `TARIFS` (lib/stripe/client.ts) — un test l'exige.
- *  Ce module ne peut pas être importé ici : il tire le SDK Stripe et la clé secrète. */
-const PRIX: Record<string, { mois: number; an: number }> = {
-  gratuit: { mois: 0, an: 0 },
-  starter: { mois: 999, an: 9990 },
-  premium: { mois: 1499, an: 14990 },
-};
-
-const euros = (centimes: number, lang: string) =>
-  (centimes / 100).toLocaleString(lang, { style: "currency", currency: "EUR", minimumFractionDigits: 2 });
 
 export default function PricingPage() {
   const { lang } = useT();

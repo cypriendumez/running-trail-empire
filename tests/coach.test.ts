@@ -32,6 +32,7 @@ import { T as T_UI } from "../src/lib/i18n/translations";
 import { LANDING as LANDING_T } from "../src/components/landing/landingI18n";
 import { accesDe, peut, motifRefus, JOURS_ESSAI } from "../src/lib/billing/access";
 import { TARIFS, FORMULES, accesDuPrice } from "../src/lib/stripe/client";
+import { PRIX_AFFICHES, REMISE_ANNUELLE_PCT, MOIS_FACTURES_PAR_AN, MOIS_OFFERTS, economieAnnuelle } from "../src/lib/billing/prix";
 import { PLAFOND_JOUR } from "../src/lib/billing/aiQuota";
 import { ppsExpiration, ppsVerdict, ppsDemandeAction, couvertureCourses, PPS_URL, PPS_PRIX_EUR, PPS_VALIDITE_MOIS } from "../src/lib/pps/status";
 import { PPS_T } from "../src/lib/pps/ppsI18n";
@@ -4288,21 +4289,39 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     // d'affichage, c'est un litige. Les vitrines ne peuvent pas importer `TARIFS`
     // (ce module tire le SDK Stripe et la clé secrète), elles recopient donc les
     // centimes — et c'est exactement le genre de copie qui dérive en silence.
-    for (const f of ["src/app/page.tsx", "src/app/pricing/page.tsx"]) {
-      const src = codeOf(f);
-      const debut = src.indexOf("const PRIX");
-      const bloc = src.slice(debut, src.indexOf("};", debut));
-      assert.ok(bloc.length > 20, `${f} : bloc PRIX introuvable`);
-      for (const formule of FORMULES) {
-        for (const [cle, periode] of [["mois", "mois"], ["an", "an"]] as const) {
-          const attendu = TARIFS[formule][periode].centimes;
-          const m = new RegExp(`${formule}: \\{[^}]*${cle}: (\\d+)`).exec(bloc);
-          assert.ok(m, `${f} : ${formule}/${cle} absent de la vitrine`);
-          assert.equal(Number(m![1]), attendu,
-            `${f} : ${formule}/${cle} affiche ${m![1]} centimes alors que Stripe débitera ${attendu}`);
-        }
+    // Les vitrines recopiaient chacune les centimes ; une TROISIÈME copie, fausse,
+    // vivait dans les réglages (« 10 € /mois, ou 84 €/an (-30 %) », palier « Pro »).
+    // Une seule copie désormais : `lib/billing/prix`. On l'IMPORTE — la greper
+    // laisserait le test devenir vert sur un bloc disparu.
+    for (const formule of FORMULES) {
+      for (const periode of ["mois", "an"] as const) {
+        assert.equal(PRIX_AFFICHES[formule][periode], TARIFS[formule][periode].centimes,
+          `${formule}/${periode} : la vitrine affiche ${PRIX_AFFICHES[formule][periode]} centimes ` +
+          `alors que Stripe débitera ${TARIFS[formule][periode].centimes}`);
       }
     }
+    // Et AUCUNE vitrine ne doit refaire sa propre copie : elles importent toutes la source.
+    for (const f of [
+      "src/app/page.tsx",
+      "src/app/pricing/page.tsx",
+      "src/components/profile/ProfileSettings.tsx",
+    ]) {
+      const src = codeOf(f);
+      assert.ok(/from "@\/lib\/billing\/prix"/.test(src),
+        `${f} : n'importe plus lib/billing/prix — il a sûrement recopié les montants`);
+      assert.ok(!/const PRIX(_AFFICHES)? *[:=]/.test(src),
+        `${f} : redéclare des prix en local au lieu d'importer la source`);
+    }
+    // La remise annoncée doit être celle qu'on applique vraiment. On affiche « 2 mois
+    // offerts » — exact — et JAMAIS un pourcentage : 1 − 10/12 vaut 16,67 %, qu'un
+    // arrondi à « −17 % » surestimerait sur une promesse commerciale.
+    assert.equal(MOIS_FACTURES_PAR_AN, 10, "la remise annuelle n'est plus de deux mois offerts");
+    assert.equal(MOIS_OFFERTS, 2);
+    for (const f of FORMULES) {
+      assert.equal(economieAnnuelle(f), TARIFS[f].mois.centimes * 2,
+        `${f} : l'économie annoncée ne vaut pas deux mensualités`);
+    }
+    assert.ok(REMISE_ANNUELLE_PCT < 17, "on ne doit jamais afficher une remise arrondie vers le HAUT");
     // La remise annuelle doit valoir DEUX MOIS OFFERTS, ni plus ni moins : l'ancien
     // « −33 % » (80 € contre 120 €) bradait l'abonnement sans raison.
     for (const f of FORMULES) {

@@ -13,7 +13,10 @@ import type { Acces } from "@/lib/billing/access";
  * déterministes, donc Essentiel ne coûte quasiment rien à servir ; Complet ajoute l'IA
  * qui parle, seule partie dont la dépense grandit avec le nombre d'athlètes.
  *
- * Remise annuelle : deux mois offerts (−17 %). L'ancien « −33 % » (80 € contre 120 €)
+ * Remise annuelle : DEUX MOIS OFFERTS — douze mois d'accès pour dix payés, soit
+ * −16,67 % exactement. On affiche « 2 mois offerts » partout plutôt qu'un pourcentage :
+ * arrondir 16,67 à « −17 % » surestime la remise sur une promesse commerciale.
+ * L'ancien « −33 % » (80 € contre 120 €)
  * bradait l'abonnement sans raison.
  */
 export const TARIFS = {

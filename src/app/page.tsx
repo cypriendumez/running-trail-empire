@@ -18,6 +18,9 @@ import { btnClass } from "@/components/ui/Button";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { LANDING, CATEGORY_CODES } from "@/components/landing/landingI18n";
 import { CHIFFRES_LANDING } from "@/lib/brand/stats";
+// Les montants et le formatage viennent de `lib/billing/prix` — ils étaient
+// recopiés ici, dans /pricing, et une TROISIÈME fois (faux) dans les réglages.
+import { PRIX_AFFICHES as PRIX, euros } from "@/lib/billing/prix";
 
 // Données visuelles (non traduisibles). Les libellés viennent de LANDING[lang].
 // ── PHOTOS DES PROGRAMMES ────────────────────────────────────────────────────
@@ -158,23 +161,6 @@ const SYNC: { nom: string; logo?: string; passerelle?: boolean; pousse: boolean 
   // supportée, l'utilisateur sait à quoi s'attendre avant de s'inscrire.
   { nom: "Apple Watch", logo: "apple-watch.svg", passerelle: true, pousse: false },
 ];
-// ── PRIX AFFICHÉS ────────────────────────────────────────────────────────────
-//  En CENTIMES, et rigoureusement identiques à `TARIFS` (lib/stripe/client.ts), qui
-//  est ce qui sera réellement débité. Un test vérifie l'égalité : afficher un prix
-//  différent de celui qu'on prélève n'est pas un défaut d'affichage, c'est un litige.
-//
-//  On ne peut pas importer `TARIFS` ici : ce module tire le SDK Stripe et la clé
-//  secrète, qui n'ont rien à faire dans un composant client.
-const PRIX: Record<string, { mois: number; an: number }> = {
-  gratuit: { mois: 0, an: 0 },
-  starter: { mois: 999, an: 9990 },
-  premium: { mois: 1499, an: 14990 },
-};
-
-/** « 9,99 € » dans la locale de l'athlète. */
-const euros = (centimes: number, lang: string) =>
-  (centimes / 100).toLocaleString(lang, { style: "currency", currency: "EUR", minimumFractionDigits: 2 });
-
 export default function LandingPage() {
   const { lang } = useT();
   const L = LANDING[lang] ?? LANDING.fr;
