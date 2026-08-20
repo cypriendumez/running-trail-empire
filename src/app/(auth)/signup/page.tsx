@@ -10,6 +10,7 @@ import { Logo } from "@/components/brand/Logo";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { AUTH } from "@/components/auth/authI18n";
+import { JOURS_ESSAI } from "@/lib/billing/access";
 
 export default function SignupPage() {
   const { lang } = useT();
@@ -94,7 +95,9 @@ export default function SignupPage() {
             <Wordmark className="text-xl" />
           </Link>
           <h1 className="text-2xl font-bold text-zinc-900">{L.title}</h1>
-          <p className="text-zinc-500 text-sm mt-1">{L.subtitle}</p>
+          {/* La durée vient de JOURS_ESSAI, jamais d'une constante recopiée : la page
+              annonçait « 30 jours », la page d'accueil « 7 », les réglages « 14 ». */}
+          <p className="text-zinc-500 text-sm mt-1">{L.subtitle.replace("{n}", String(JOURS_ESSAI))}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">

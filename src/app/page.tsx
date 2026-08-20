@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { JOURS_ESSAI } from "@/lib/billing/access";
 import { useEffect, useState } from "react";
 import {
   ArrowRight, ChevronRight, Check, Menu, X,
@@ -16,6 +17,7 @@ import { Card } from "@/components/ui/Card";
 import { btnClass } from "@/components/ui/Button";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { LANDING, CATEGORY_CODES } from "@/components/landing/landingI18n";
+import { CHIFFRES_LANDING } from "@/lib/brand/stats";
 
 // Données visuelles (non traduisibles). Les libellés viennent de LANDING[lang].
 // ── PHOTOS DES PROGRAMMES ────────────────────────────────────────────────────
@@ -112,7 +114,10 @@ const FEATURE_ICONS: LucideIcon[] = [Heart, Activity, CloudRain, Map, BookOpen, 
 //   · data/parcours_certifies.json contient 15 708 parcours vérifiés par le crawl ;
 //   · buildWeekPlan pose 7 jours de plan glissant ;
 //   · .github/workflows/sync-coach.yml tourne toutes les 10 minutes.
-const STAT_VALUES = ["14 000+", "15 700", "7 j", "10 min"];
+// Les valeurs vivent dans `lib/brand/stats` — elles étaient recopiées ici ET dans le
+// panneau des pages d'auth, qui affichait encore trois chiffres INVENTÉS longtemps
+// après leur retrait d'ici. Une seule source, importée des deux côtés.
+const STAT_VALUES = CHIFFRES_LANDING;
 // Plateformes réellement synchronisables — chacune est justifiée dans le commentaire de
 // la section « SYNCHRONISATION » plus bas. Ne rien ajouter ici sans preuve dans le code :
 // une marque affichée est une promesse d'intégration.
@@ -592,7 +597,7 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <p className="mt-4 text-center text-sm text-zinc-500">{L.pricing.essai}</p>
+          <p className="mt-4 text-center text-sm text-zinc-500">{L.pricing.essai.replace("{n}", String(JOURS_ESSAI))}</p>
 
           <div className="mx-auto mt-10 grid max-w-5xl gap-6 md:grid-cols-3">
             {L.pricing.plans.map((plan) => {

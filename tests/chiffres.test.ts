@@ -1,0 +1,125 @@
+/**
+ * L'APP N'AFFICHE QUE DES CHIFFRES QUI SE RECOMPTENT.
+ *
+ * Trois chiffres inventés — « 10k+ coureurs », « 4.9★ de note moyenne », « 98 % de
+ * satisfaction » — avaient été retirés de la page d'accueil : la base compte UN profil,
+ * et il n'existe ni note ni enquête de satisfaction. Personne n'était venu les retirer
+ * du panneau des pages de CONNEXION et d'INSCRIPTION, qui portaient leur propre copie.
+ * Ils y sont donc restés affichés, sur la page même où l'on demande une adresse et un
+ * mot de passe, jusqu'au 20/08/2026.
+ *
+ * Deuxième défaut de la même famille : la durée de l'essai était recopiée à la main et
+ * avait divergé en TROIS valeurs contradictoires — « 30 jours » à l'inscription,
+ * « 7 jours » sur l'accueil, « 14 jours » dans les réglages. Seul `JOURS_ESSAI` fait foi.
+ *
+ * Ce test importe les sources plutôt que de les greper quand il le peut, et vérifie que
+ * rien ne recopie ce qui doit venir d'un seul endroit.
+ *
+ *   npx tsx tests/chiffres.test.ts
+ */
+import assert from "node:assert/strict";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
+import { CHIFFRES, CHIFFRES_LANDING, CHIFFRES_AUTH } from "../src/lib/brand/stats";
+import { JOURS_ESSAI } from "../src/lib/billing/access";
+
+const ROOT = join(import.meta.dirname, "..");
+const SRC = join(ROOT, "src");
+
+let passed = 0;
+const fails: string[] = [];
+function test(name: string, fn: () => void) {
+  try { fn(); passed++; console.log(`  ✓ ${name}`); }
+  catch (e) { fails.push(`${name} — ${(e as Error).message.split("\n")[0]}`); console.log(`  ✗ ${name}`); }
+}
+
+function fichiers(dir: string, out: string[] = []): string[] {
+  for (const e of readdirSync(dir)) {
+    const p = join(dir, e);
+    if (statSync(p).isDirectory()) fichiers(p, out);
+    else if (/\.tsx?$/.test(p)) out.push(p);
+  }
+  return out;
+}
+/** ⚠️ On ne coupe pas un « // » précédé de « : » — sinon les URL seraient tronquées. */
+function sansCommentaires(src: string): string {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .split("\n")
+    .map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1"))
+    .join("\n");
+}
+const TOUS = fichiers(SRC).map((p) => ({
+  rel: relative(SRC, p).replace(/\\/g, "/"),
+  code: sansCommentaires(readFileSync(p, "utf8")),
+}));
+
+// ── Garde-fou du garde-fou ───────────────────────────────────────────────────
+test("le scanner voit réellement le source", () => {
+  assert.ok(TOUS.length > 100, `seulement ${TOUS.length} fichiers scannés`);
+  for (const f of ["app/page.tsx", "components/auth/AuthShell.tsx", "components/auth/authI18n.ts"]) {
+    assert.ok(TOUS.some((x) => x.rel === f), `${f} n'a pas été scanné`);
+  }
+});
+
+// ── 1. Les chiffres inventés ne peuvent pas revenir ──────────────────────────
+// Motifs volontairement larges : c'est la FORME du chiffre inventé qu'on interdit,
+// pas une chaîne exacte qu'il suffirait de réécrire « 10 000+ » pour contourner.
+const INVENTES: [RegExp, string][] = [
+  [/\b10k\+/i,                         "« 10k+ coureurs » — la base compte UN profil"],
+  [/\b4[.,]9\s*★/,                     "« 4,9 ★ » — aucune note n'existe dans l'app"],
+  [/\b98\s*%/,                         "« 98 % de satisfaction » — aucune enquête n'existe"],
+  [/\b\d[\d\s]*\+?\s*(coureurs actifs|active runners)\b/i, "un nombre d'utilisateurs inventé"],
+];
+
+test("aucun chiffre inventé n'est affiché", () => {
+  const vus: string[] = [];
+  for (const { rel, code } of TOUS) {
+    for (const [motif, motif_txt] of INVENTES) {
+      if (motif.test(code)) vus.push(`${rel} → ${motif_txt}`);
+    }
+  }
+  assert.equal(vus.length, 0, `chiffre(s) invérifiable(s) affiché(s) :\n    ${vus.join("\n    ")}`);
+});
+
+// ── 2. Une seule source pour les chiffres vérifiables ────────────────────────
+test("l'accueil et les pages d'auth lisent la MÊME source", () => {
+  for (const f of ["app/page.tsx", "components/auth/AuthShell.tsx"]) {
+    const x = TOUS.find((t) => t.rel === f)!;
+    assert.ok(
+      /from "@\/lib\/brand\/stats"/.test(x.code),
+      `${f} n'importe plus lib/brand/stats — il a sûrement recopié les valeurs`,
+    );
+  }
+});
+
+test("les chiffres publiés sont ceux de la source", () => {
+  assert.equal(CHIFFRES_LANDING.length, 4);
+  assert.equal(CHIFFRES_AUTH.length, 3);
+  for (const v of [...CHIFFRES_LANDING, ...CHIFFRES_AUTH]) {
+    assert.ok(Object.values(CHIFFRES).includes(v as never), `« ${v} » ne vient pas de CHIFFRES`);
+  }
+});
+
+// ── 3. La durée d'essai ne se recopie pas ────────────────────────────────────
+test("JOURS_ESSAI reste la seule définition de la durée d'essai", () => {
+  assert.equal(typeof JOURS_ESSAI, "number");
+  assert.ok(JOURS_ESSAI > 0 && JOURS_ESSAI < 60, `valeur improbable : ${JOURS_ESSAI}`);
+});
+
+test("aucune durée d'essai n'est écrite en dur dans un écran", () => {
+  // Formulations d'essai des 5 langues, avec un nombre COLLÉ à la place du gabarit {n}.
+  // ⚠️ Ne PAS accepter un simple « N jours de … » : « 4 jours de repos » n'est pas une
+  // durée d'essai. Premier jet du test, trois faux positifs — c'était le test qui avait tort.
+  const ecrit = /\b(\d+)[\s-]*(jours? (?:gratuits?|d'essai)|day[\s-]*free|days? free|Tage kostenlos|días? (?:gratis|de (?:prueba|la prueba))|dias? (?:grátis|do teste|de teste))/i;
+  const vus: string[] = [];
+  for (const { rel, code } of TOUS) {
+    if (rel.startsWith("lib/billing/")) continue; // c'est LÀ que la durée se définit
+    const m = code.match(ecrit);
+    if (m) vus.push(`${rel} → « ${m[0].trim()} » (utiliser le gabarit {n} + JOURS_ESSAI)`);
+  }
+  assert.equal(vus.length, 0, `durée(s) d'essai recopiée(s) :\n    ${vus.join("\n    ")}`);
+});
+
+console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
+if (fails.length) { for (const f of fails) console.log(`  ✗ ${f}`); process.exit(1); }

@@ -16,6 +16,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState } from "react";
+import { JOURS_ESSAI } from "@/lib/billing/access";
 import { Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { SiteHeader } from "@/components/layout/SiteHeader";
@@ -84,7 +85,7 @@ export default function PricingPage() {
             </div>
           </div>
 
-          <p className="mt-4 text-center text-sm text-zinc-500">{P.essai}</p>
+          <p className="mt-4 text-center text-sm text-zinc-500">{P.essai.replace("{n}", String(JOURS_ESSAI))}</p>
 
           <div className="mx-auto mt-10 grid max-w-5xl gap-6 md:grid-cols-3">
             {P.plans.map((plan) => {

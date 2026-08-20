@@ -102,7 +102,7 @@ const fr: LandingDict = {
     eyebrow: "Tarifs", title: "Tes données restent gratuites. Le coach s'abonne.",
     subtitle: "Crée ton compte, branche ta montre, garde ton historique et le calendrier des courses sans payer. Le plan qui se replanifie tout seul et les échanges avec l'IA, eux, sont dans les formules.",
     mois: "Mensuel", an: "Annuel", economie: "2 mois offerts", parMois: "/mois",
-    essai: "7 jours d'essai de l'IA, sans engagement",
+    essai: "{n} jours d'essai de l'IA, sans engagement",
     gratuitNote: "Aucune carte bancaire pour le palier gratuit.",
     plans: [
       { cle: "gratuit", name: "Gratuit", pitch: "Tes données, tes courses, ton historique.", cta: "Créer mon compte",
@@ -164,7 +164,7 @@ const en: LandingDict = {
     eyebrow: "Pricing", title: "Your data stays free. The coach is a subscription.",
     subtitle: "Create your account, connect your watch, keep your history and the race calendar without paying. The self-replanning plan and the AI exchanges live in the paid tiers.",
     mois: "Monthly", an: "Yearly", economie: "2 months free", parMois: "/month",
-    essai: "7-day AI trial, cancel anytime",
+    essai: "{n}-day AI trial, cancel anytime",
     gratuitNote: "No card needed for the free tier.",
     plans: [
       { cle: "gratuit", name: "Free", pitch: "Your data, your races, your history.", cta: "Create my account",
@@ -226,7 +226,7 @@ const de: LandingDict = {
     eyebrow: "Preise", title: "Deine Daten bleiben gratis. Der Coach ist ein Abo.",
     subtitle: "Konto erstellen, Uhr verbinden, Verlauf und Rennkalender behalten — ohne zu zahlen. Der sich selbst neu planende Plan und die KI-Dialoge stecken in den Abos.",
     mois: "Monatlich", an: "Jährlich", economie: "2 Monate geschenkt", parMois: "/Monat",
-    essai: "7 Tage KI testen, jederzeit kündbar",
+    essai: "{n} Tage KI testen, jederzeit kündbar",
     gratuitNote: "Keine Karte nötig für die Gratis-Stufe.",
     plans: [
       { cle: "gratuit", name: "Gratis", pitch: "Deine Daten, deine Rennen, dein Verlauf.", cta: "Konto erstellen",
@@ -288,7 +288,7 @@ const es: LandingDict = {
     eyebrow: "Precios", title: "Tus datos siguen gratis. El entrenador se suscribe.",
     subtitle: "Crea tu cuenta, conecta tu reloj, conserva tu historial y el calendario de carreras sin pagar. El plan que se replanifica solo y los intercambios con la IA están en las fórmulas.",
     mois: "Mensual", an: "Anual", economie: "2 meses gratis", parMois: "/mes",
-    essai: "7 días de prueba de la IA, sin compromiso",
+    essai: "{n} días de prueba de la IA, sin compromiso",
     gratuitNote: "Sin tarjeta para el nivel gratuito.",
     plans: [
       { cle: "gratuit", name: "Gratis", pitch: "Tus datos, tus carreras, tu historial.", cta: "Crear mi cuenta",
@@ -350,7 +350,7 @@ const pt: LandingDict = {
     eyebrow: "Preços", title: "Os teus dados continuam grátis. O treinador é uma subscrição.",
     subtitle: "Cria a tua conta, liga o teu relógio, guarda o teu histórico e o calendário de provas sem pagar. O plano que se replanifica sozinho e as trocas com a IA estão nas fórmulas.",
     mois: "Mensal", an: "Anual", economie: "2 meses grátis", parMois: "/mês",
-    essai: "7 dias de teste da IA, sem compromisso",
+    essai: "{n} dias de teste da IA, sem compromisso",
     gratuitNote: "Sem cartão para o nível gratuito.",
     plans: [
       { cle: "gratuit", name: "Grátis", pitch: "Os teus dados, as tuas provas, o teu histórico.", cta: "Criar a minha conta",
