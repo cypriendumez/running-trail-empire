@@ -1,7 +1,12 @@
 import { ImageResponse } from "next/og";
+import { CHIFFRES } from "@/lib/brand/stats";
 
 // Aperçu social (lien partagé sur WhatsApp, X, LinkedIn, iMessage…). 1200×630.
-export const alt = "Pacevo — Coaching IA, analyse VFC, Trail Builder";
+// ⚠️ Le texte alternatif DÉCRIT L'IMAGE, il ne vend pas le produit. Il annonçait
+// « Coaching IA, analyse VFC, Trail Builder » : « Trail Builder » ne figure NULLE PART
+// dans l'image, et l'accroche qui la domine — « Pace Your Evolution » — n'y était pas.
+// Un lecteur d'écran recevait donc une description fausse.
+export const alt = "Pacevo — « Pace Your Evolution » : VFC au réveil, sommeil, fréquence cardiaque, dénivelé, charge";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -83,7 +88,7 @@ export default function OpengraphImage() {
           {/* Le nom figurait déjà en haut : le répéter ici ne disait rien. On met à la
               place les deux seuls chiffres du site qui soient VÉRIFIABLES — ceux du
               bandeau de la landing (`STAT_VALUES`), pas une promesse de plus. */}
-          <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 26 }}>14 000+ courses · 15 700 parcours</span>
+          <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 26 }}>{`${CHIFFRES.courses} courses · ${CHIFFRES.parcours} parcours`}</span>
           <div style={{ display: "flex", gap: 12 }}>
             {["Garmin", "Coros", "intervals.icu"].map(s => (
               <span

@@ -120,7 +120,16 @@ const HORS_TRADUCTION: Record<string, string> = {
   // normal qu'il faille les mettre à jour ici quand le slogan bouge, et c'est même le but :
   // le test rappelle qu'un slogan modifié doit l'être AUX DEUX endroits.
   "VFC au réveil, sommeil profond, fréquence cardiaque, dénivelé, charge": "image de partage social, unique et statique, déclarée locale fr_FR",
-  "14 000+ courses · 15 700 parcours": "même image de partage",
+  // Le texte ALTERNATIF de cette image. Il annonçait « Coaching IA, analyse VFC, Trail
+  // Builder » — or « Trail Builder » ne figure nulle part dans l'image, et l'accroche qui
+  // la domine n'y était pas : un lecteur d'écran recevait une description fausse.
+  "Pacevo — « Pace Your Evolution » : VFC au réveil, sommeil, fréquence cardiaque, dénivelé, charge":
+    "texte alternatif de la même image de partage — il DÉCRIT l'image, il ne vend pas le produit",
+  // ⚠️ Ce n'était PAS un fragment mais la chaîne entière, « 14 000+ courses · 15 700
+  // parcours », recopiée à la main alors que le commentaire du fichier prétendait tenir
+  // les chiffres du bandeau de la landing. Elle lit maintenant `CHIFFRES`
+  // (lib/brand/stats) : les nombres ne peuvent plus dériver, seuls les mots restent ici.
+  "courses ·": "libellé du gabarit de l'image de partage ; les nombres viennent de CHIFFRES",
   "Tracé © les contributeurs OpenStreetMap (ODbL)": "mention légale ÉCRITE DANS LE FICHIER GPX exporté, pas à l'écran — la licence ODbL impose l'attribution, la traduire l'affaiblirait",
 };
 
