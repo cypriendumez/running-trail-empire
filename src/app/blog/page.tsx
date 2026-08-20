@@ -35,10 +35,13 @@ import { BLOG, BLOG_CATS } from "./blogI18n";
 //    le seuil de proéminence retenu, mais ce n'est PAS « aucune marque ». Écrit ici
 //    parce qu'un commentaire qui embellit vaut moins que pas de commentaire.
 //
+//  · p2 « IA » : c'était une photo de SKIEUR, sur le blog d'une app de course. Défaut
+//    de PERTINENCE, pas de droit — mais un visuel hors sujet sur une page publique
+//    coûte au moment de vendre. → motif d'onde abstrait, dans la même famille que p6
+//    sans en être le doublon.
+//
 // Conservées après vérification : p1 (robot Pepper — produit de marque mais discret),
 // p5 (piste vue de haut, aucun visage), p7 (assiette, rien à signaler).
-// ⚠️ RESTE : p2 « IA » est une photo de SKIEUR sur le blog d'une app de course.
-// Défaut de pertinence, pas de droit — laissé à l'arbitrage de Cyprien.
 //
 // Les huit URL demandaient une largeur SANS hauteur, alors que les tuiles sont en
 // `aspect-[4/3]` : Unsplash renvoyait le recadrage de son choix (400, 900 puis 316 px
@@ -46,7 +49,7 @@ import { BLOG, BLOG_CATS } from "./blogI18n";
 // flou déjà corrigé sur la landing, jamais reporté ici. Hauteur désormais IMPOSÉE.
 const POSTS = [
   { id: 1, key: "p1", cat: "AI", img: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=600&h=450&fit=crop&q=80", date: "19 avr. 2026", readTime: "8 min", featured: true },
-  { id: 2, key: "p2", cat: "AI", img: "https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=600&h=450&fit=crop&q=80", date: "16 avr. 2026", readTime: "12 min", featured: false },
+  { id: 2, key: "p2", cat: "AI", img: "https://images.unsplash.com/photo-1762281429414-5ee5f2dbb243?w=600&h=450&fit=crop&q=80", date: "16 avr. 2026", readTime: "12 min", featured: false },
   { id: 3, key: "p3", cat: "TRAINING", img: "https://images.unsplash.com/photo-1526676537331-7747bf8278fc?w=600&h=450&fit=crop&q=80", date: "14 avr. 2026", readTime: "10 min", featured: false },
   { id: 4, key: "p4", cat: "HEALTH", img: "https://images.unsplash.com/photo-1560233026-ad254fa8da38?w=600&h=450&fit=crop&q=80", date: "11 avr. 2026", readTime: "6 min", featured: false },
   { id: 5, key: "p5", cat: "RACES", img: "https://images.unsplash.com/photo-1502904550040-7534597429ae?w=600&h=450&fit=crop&q=80", date: "9 avr. 2026", readTime: "15 min", featured: false },

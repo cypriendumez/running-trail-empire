@@ -74,13 +74,32 @@ const AUDITEES: Record<string, string> = {
   "photo-1516398810565-0cb4310bb8ea": "perte de poids : silhouette pleine, aucun trait discernable",
   // Blog — les 8 tuiles.
   "photo-1485827404703-89b55fcc595e": "IA : robot Pepper — produit de marque, discret",
-  "photo-1551698618-1dfe5d97d256":    "IA : skieur — HORS SUJET, à arbitrer ; aucun visage (casque + masque)",
+  "photo-1762281429414-5ee5f2dbb243": "IA : motif d'onde abstrait, ni personne ni marque",
   "photo-1526676537331-7747bf8278fc": "entraînement : jambes sur piste, aucun visage ni marque lisible",
   "photo-1560233026-ad254fa8da38":    "santé : silhouette d'étirement, aucun trait discernable",
   "photo-1761078739194-75cccb8e3195": "IA : motif abstrait, ni personne ni marque",
   "photo-1490645935967-10de6ba17061": "nutrition : assiette, rien à signaler",
   "photo-1555972635-8a10402b49b2":    "matériel : chaussure dans l'herbe ; petit drapeau de marque au talon (~30 px)",
 };
+
+// ── 3. Les Pexels validées du fil Communauté ─────────────────────────────────
+// Les 154 identifiants Pexels ont été regardés le 20/08/2026 en planches-contacts ;
+// 74 ont été retirés (dossards lisibles, athlètes élite identifiables — dont KIPLIMO
+// nommé sur son dossard —, bandeaux sponsors EDP/Adidas, visages nets). Voici les 80
+// qui restent. Tout PX() absent d'ici fait échouer la suite : c'est le but.
+const PEXELS_VALIDEES = new Set<string>([
+  "2402734", "3763869", "4348640", "4422913", "4606708", "4920448", "5198385", "5319325",
+  "6455591", "6455667", "6778610", "7026516", "7879913", "8454900", "8454901", "8454904",
+  "8456074", "8497536", "8533790", "9207813", "9563709", "9790261", "10168171", "10516108",
+  "10615641", "10615645", "12360284", "12562821", "12698200", "13631464", "16949283",
+  "16980804", "19439272", "19783892", "19881117", "20789142", "23857950", "25078526",
+  "28768323", "29116008", "30144519", "30416813", "30652598", "30932855", "30932860",
+  "31238485", "31675724", "31805881", "32130258", "32145212", "32381195", "32798744",
+  "32798745", "32798746", "32798754", "32798757", "32962276", "33076361", "33284135",
+  "33284136", "33378482", "33491424", "33522755", "33874843", "34210063", "34730429",
+  "35115744", "35206081", "35425192", "35527724", "35684458", "35718700", "35765666",
+  "36645343", "36665709", "36732202", "37046063", "37718409", "37993134", "38074682",
+]);
 
 // ── Lecture du source ────────────────────────────────────────────────────────
 function fichiers(dir: string, out: string[] = []): string[] {
@@ -161,6 +180,28 @@ test("toute photo d'une page publique a été auditée", () => {
     `photo(s) jamais regardée(s) sur une page publique :\n    ${inconnus.join("\n    ")}\n` +
     `    → ouvrir l'image au format servi, la REGARDER, puis l'ajouter à AUDITEES avec son motif.`,
   );
+});
+
+test("le fil Communauté n'utilise que des Pexels validées", () => {
+  assert.ok(PEXELS_VALIDEES.size > 50, `seulement ${PEXELS_VALIDEES.size} Pexels validées`);
+  const f = TOUS.find((x) => relative(SRC, x.p).replace(/\\/g, "/") === "components/community/CommunityFeed.tsx");
+  assert.ok(f, "CommunityFeed.tsx introuvable");
+  const px = f!.code.match(/PX\((\d+)\)/g) ?? [];
+  assert.ok(px.length > 50, `seulement ${px.length} appels PX() vus — la regex ne mord plus`);
+  const inconnus = [...new Set(px.map((m) => m.replace(/\D/g, "")))].filter((id) => !PEXELS_VALIDEES.has(id));
+  assert.equal(
+    inconnus.length, 0,
+    `photo(s) Pexels jamais regardée(s) : ${inconnus.join(", ")}\n` +
+    `    → ouvrir https://images.pexels.com/photos/<id>/pexels-photo-<id>.jpeg , la REGARDER,\n` +
+    `      puis l'ajouter à PEXELS_VALIDEES. Ne jamais l'ajouter sans l'avoir vue.`,
+  );
+});
+
+test("la liste des Pexels validées ne contient rien de périmé", () => {
+  const f = TOUS.find((x) => relative(SRC, x.p).replace(/\\/g, "/") === "components/community/CommunityFeed.tsx");
+  const utilises = new Set((f!.code.match(/PX\((\d+)\)/g) ?? []).map((m) => m.replace(/\D/g, "")));
+  const morts = [...PEXELS_VALIDEES].filter((id) => !utilises.has(id));
+  assert.equal(morts.length, 0, `Pexels validée(s) mais plus utilisée(s) : ${morts.join(", ")}`);
 });
 
 test("la liste des auditées ne contient rien de périmé", () => {
