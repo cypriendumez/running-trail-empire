@@ -32,8 +32,17 @@ import { LANDING, CATEGORY_CODES } from "@/components/landing/landingI18n";
 // format exact de la carte, et décliné en srcset pour qu'un téléphone ne télécharge pas
 // l'image du grand écran.
 const PROGRAMS: { key: string; category: string; photo: string }[] = [
-  { key: "km10", category: "10KM", photo: "photo-1571008887538-b36bb32f4571" },
-  { key: "semi", category: "SEMI", photo: "photo-1667781838690-5f32ea0ccea6" },
+  // 10 km : la précédente montrait les TROIS BANDES ADIDAS, nettes, sur les deux
+  // chaussures, au centre du cadre. Remplacée par un coureur DE DOS et petit dans
+  // l'image, en t-shirt blanc uni : aucune marque, aucun visage, et la route qui file
+  // vers l'horizon dit la distance mieux qu'un gros plan de chaussure.
+  { key: "km10", category: "10KM", photo: "photo-1560052767-406e947cc273" },
+  // Semi : la précédente n'était pas qu'un problème de marque. On y lisait le DOSSARD
+  // 21221 et le logo TCS du marathon de New York — or les résultats de course sont
+  // publics, donc ce numéro remonte à un NOM. C'est une donnée personnelle, pas un
+  // détail esthétique. La remplaçante est vue DE DOS : les dossards se portent devant,
+  // ils sortent donc du cadre par construction, et aucun visage n'apparaît.
+  { key: "semi", category: "SEMI", photo: "photo-1590333748338-d629e4564ad9" },
   { key: "marathon", category: "MARATHON", photo: "photo-1682367905664-e36b30f15b19" },
   { key: "trail", category: "TRAIL", photo: "photo-1504025468847-0e438279542c" },
   // Débuter : TROISIÈME photo pour cette carte, et cette fois pour une raison juridique,
@@ -45,7 +54,12 @@ const PROGRAMS: { key: string; category: string; photo: string }[] = [
   // La remplaçante tient le même message — « c'est accessible, tu n'es pas seul » : un
   // groupe qui court ensemble, tous DE DOS, aucun visage, aucune marque lisible.
   { key: "beginner", category: "BEGINNER", photo: "photo-1645238426817-8c3e7d1396cf" },
-  { key: "speed", category: "SPEED", photo: "photo-1461896836934-ffe607ba8211" },
+  // Vitesse : c'était la pire des quatre. Un swoosh Nike vert vif occupait le centre
+  // optique de la carte, et « BROO(KS) » se lisait au second plan — DEUX marques, dont
+  // une en point de mire. À cette proéminence, l'image ne se lit plus comme une
+  // illustration mais comme une caution commerciale. Remplacée par un coureur à
+  // contre-jour sur piste : le visage est une ombre, les chaussures n'ont aucun logo.
+  { key: "speed", category: "SPEED", photo: "photo-1744060204728-f68e434a3edf" },
   // Endurance : reprise DEUX fois. D'abord un coureur plié en deux, mains sur les
   // genoux — de l'épuisement, soit l'inverse du message d'une base aérobie. Puis un
   // coureur en contre-jour, dont le cadrage large ne disait rien de la notion. Un chemin
@@ -61,7 +75,12 @@ const PROGRAMS: { key: string; category: string; photo: string }[] = [
   //     profiles.weight_mode_enabled) — il était vendu nulle part ;
   //  2. huit cartes sur trois colonnes donnent 3+3+2, donc un trou dans la dernière
   //     rangée sur tout écran large. Neuf la ferment.
-  { key: "weightloss", category: "WEIGHT", photo: "photo-1480179087180-d9f0ec044897" },
+  //  Photo reprise : la première montrait un VISAGE DE PROFIL net. Les lunettes de
+  //  soleil ne masquent pas un profil, et le flou de filé ne portait que sur le corps.
+  //  Même raison que « Débuter » plus haut : la licence Unsplash couvre le droit
+  //  d'auteur, jamais le droit à l'image. La remplaçante est une silhouette pleine à
+  //  contre-jour — aucun trait discernable, aucune marque.
+  { key: "weightloss", category: "WEIGHT", photo: "photo-1516398810565-0cb4310bb8ea" },
 ];
 
 /**
