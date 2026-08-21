@@ -4314,7 +4314,7 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     assert.ok(!chiffresVerifies("50 % de hausse et 4 200 inscrits.", source), "un mélange vrai/faux doit être refusé");
   });
 
-  test("la rubrique Nutrition ne se remplit pas de chaussures", () => {
+  test("aucune rubrique étroite ne se remplit de hors-sujet", () => {
     // Un flux entre dans une rubrique EN BLOC. Marathon Handbook publie de l'alimentation
     // et des tests de chaussures : sans filtre, « Nutrition » afficherait une chaussure.
     // Le filtre existe — et il a lui-même failli échouer sur trois pièges de vocabulaire,
@@ -4332,6 +4332,23 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     assert.ok(nutrition.test("Carb loading: how much do you really need?"), "« carbs » doit passer");
     assert.ok(nutrition.test("Gérer son ravitaillement sur un 100 km"), "le ravitaillement doit passer");
     assert.ok(nutrition.test("Le jeûne intermittent chez le coureur"), "« jeûne » doit passer");
+
+    // ── MATÉRIEL ──
+    // La rubrique n'avait pas de filtre : Runner's World y déversait tout, et la lettre
+    // a réellement affiché « Jenny Simpson met fin à sa carrière après un arrêt
+    // cardiaque » sous le titre « Matériel & chaussures ».
+    const gear = FILTRES.gear;
+    assert.ok(gear, "la rubrique Matériel n'a plus de filtre : elle prendrait tout");
+    assert.ok(!gear.test("Olympian Jenny Simpson Says Her Running Career Is Over After Cardiac Arrest"), "une fin de carrière n'est pas du matériel");
+    // ⚠️ « testing » n'est pas « test » : sans limite de mot, un contrôle antidopage
+    // devenait un test de chaussure.
+    assert.ok(!gear.test("UTMB extends anti-doping testing across entire field"), "un contrôle antidopage n'est pas un test produit");
+    // ⚠️ ET LE PIÈGE INVERSE : un test de chaussure s'intitule souvent par le seul nom du
+    // modèle, sans aucun mot générique. Exiger « chaussure » ou « test » vidait la
+    // rubrique de ses vrais articles.
+    assert.ok(gear.test("Nnormal Kjerag 02 Keeps the Kilian-Level Agility, Fixes the Harsh Ride"), "un modèle nommé seul doit passer");
+    assert.ok(gear.test("Adidas just unveiled a brand-new Evo for the trails"), "une marque doit passer");
+    assert.ok(gear.test("Les 5 meilleures montres GPS de trail en 2026"), "une montre doit passer");
 
     const elite = FILTRES.elite;
     assert.ok(elite, "la rubrique Élites n'a plus de filtre");

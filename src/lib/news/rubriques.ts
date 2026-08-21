@@ -51,6 +51,13 @@ export const FILTRES: Partial<Record<Cat, RegExp>> = {
   // sans l'accent, « le jeune coureur » atterrissait en nutrition.
   nutrition:
     /nutrition|alimentation|aliment|hydrat|glucide|carbohydrate|\bcarbs?\b|prot[ée]in|energy gels?|ravitaillement|boisson|\bfuel(l?ing)?\b|calorie|di[èe]te|estomac|intestin|vitamin|sucre|[ée]lectrolyte|electrolyte|je[û]ne|micronutri|caf[ée]ine|caffeine|\\brepas\\b|d[îi]ner|petit[- ]d[ée]jeuner|collation|grignot/i,
+  // « Matériel » n'avait pas de filtre, et Runner's World y déversait tout : la rubrique
+  // a affiché « Jenny Simpson met fin à sa carrière après un arrêt cardiaque » sous le
+  // titre « Matériel & chaussures ». ⚠️ Exiger un mot générique ne suffit PAS : un test
+  // de chaussure s'intitule souvent par le seul nom du modèle (« Nnormal Kjerag 02 Keeps
+  // the Kilian-Level Agility »). Les marques font donc partie du filtre.
+  gear:
+    /chaussure|\bshoes?\b|sneaker|basket|montre|\bwatch\b|cardio|capteur|\btests?\b|comparatif|mat[ée]riel|[ée]quipement|\bgear\b|review|semelle|midsole|outsole|\bdrop\b|carbon plate|\bfoam\b|\bsacs?\b|b[âa]tons?\b|veste|nike|adidas|asics|hoka|salomon|saucony|brooks|new balance|altra|la sportiva|nnormal|mizuno|\bpuma\b|garmin|coros|suunto|polar|merrell|inov-?8|dynafit|topo athletic|scarpa|vaporfly|alphafly|kayano|nimbus|speedgoat/i,
   elite:
     /jornet|walmsley|dauwalter|kipchoge|record|championnat|mondiaux|world championship|vainqueur|remporte|\bwins\b|victoire|podium|r[ée]sultats?|results|utmb|western states|golden trail|diamond league|olympi|champion/i,
 };
