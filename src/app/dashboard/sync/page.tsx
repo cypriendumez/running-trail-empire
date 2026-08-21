@@ -828,6 +828,12 @@ export default function SyncPage() {
                   { logo: "S", name: "Suunto", color: "bg-teal-600", models: "Race, Vertical, 9 Peak, 5 Peak" },
                   { logo: "W", name: "Wahoo", color: "bg-emerald-600", models: "ELEMNT, ROAM" },
                   { logo: "A", name: "Apple Health", color: "bg-zinc-800", models: "Apple Watch, iPhone" },
+                  // Ajoutés le 21/08/2026 : leurs champs existent bel et bien chez
+                  // intervals.icu (`zepp_*`, `huawei_*`), relevé sur l'API. Sans eux, un
+                  // coureur en Amazfit ne trouvait pas sa marque dans le guide et
+                  // concluait qu'elle n'était pas prise en charge.
+                  { logo: "Z", name: "Amazfit", color: "bg-red-500", models: "Cheetah, T-Rex, Balance" },
+                  { logo: "H", name: "Huawei", color: "bg-rose-600", models: "Watch GT, Watch Ultimate" },
                 ].map(d => (
                   <div key={d.name} className="flex items-start gap-2.5 p-3 rounded-xl bg-zinc-50">
                     <div className={`w-8 h-8 ${d.color} text-white rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0`}>{d.logo}</div>

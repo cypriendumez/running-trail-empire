@@ -134,7 +134,7 @@ const STAT_VALUES = CHIFFRES_LANDING;
 // données. Les deux sens sont distincts et la page les confondait : sous un titre unique,
 // « Synchronisation avec », Strava se lisait comme une montre alors qu'on ne peut rien
 // lui envoyer. Vérifié plateforme par plateforme sur le forum officiel intervals.icu.
-const SYNC: { nom: string; logo?: string; passerelle?: boolean; pousse: boolean }[] = [
+const SYNC: { nom: string; logo?: string; passerelle?: boolean; appli?: boolean; pousse: boolean }[] = [
   // Poussée documentée dans notre propre code (`lib/watch/intervals.ts`).
   { nom: "Garmin", logo: "garmin.svg", pousse: true },
   // « Coros support added », « Pushing to Coros Calendar? » — forum intervals.icu.
@@ -149,6 +149,18 @@ const SYNC: { nom: string; logo?: string; passerelle?: boolean; pousse: boolean 
   { nom: "Suunto", logo: "suunto.svg", pousse: true },
   // « [IMPLEMENTED] Push workout to Wahoo » — forum intervals.icu.
   { nom: "Wahoo", logo: "wahoo.svg", pousse: true },
+  // ── Ajoutées le 21/08/2026, après relevé DIRECT de l'API intervals.icu (et non du
+  // forum) : `zepp_upload_workouts`, `huawei_upload_workouts` et `zwift_upload_workouts`
+  // existent, tout comme leurs `*_sync_activities`. Elles lisent ET reçoivent. Sans
+  // elles, un coureur en Amazfit voyait « aucune montre détectée » et ne recevait jamais
+  // son plan, alors qu'intervals.icu savait le lui envoyer. Pas de fichier de logo : la
+  // pastille affiche alors le nom en toutes lettres, ce qui évite d'aller chercher des
+  // marques déposées dont on n'a pas besoin.
+  { nom: "Amazfit", pousse: true },
+  { nom: "Huawei", pousse: true },
+  // `appli` : Zwift REÇOIT la séance mais ne se porte pas au poignet. Elle est donc
+  // annoncée sur sa propre ligne — l'écrire sous « sur ta montre » serait faux.
+  { nom: "Zwift", appli: true, pousse: true },
   // ❌ Strava n'est pas une montre mais un JOURNAL d'activités : il n'y a rien à y
   // envoyer. Il lit parfaitement, il ne prescrit rien.
   { nom: "Strava", logo: "strava.svg", pousse: false },
@@ -419,7 +431,13 @@ export default function LandingPage() {
           </p>
           <p>
             <span className="font-semibold text-zinc-700">{L.sync.push}</span>{" "}
-            {SYNC.filter((m) => m.pousse).map((m) => m.nom).join(", ")}
+            {SYNC.filter((m) => m.pousse && !m.appli).map((m) => m.nom).join(", ")}
+          </p>
+          {/* Une ligne à part pour ce qui reçoit la séance SANS être une montre : Zwift
+              la reçoit vraiment, mais l'annoncer « sur ta montre » serait faux. */}
+          <p>
+            <span className="font-semibold text-zinc-700">{L.sync.pushApp}</span>{" "}
+            {SYNC.filter((m) => m.appli).map((m) => m.nom).join(", ")}
           </p>
         </div>
         <p className="mx-auto mt-4 max-w-2xl text-center text-xs leading-relaxed text-zinc-400">

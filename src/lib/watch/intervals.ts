@@ -9,13 +9,22 @@ const BASE = "https://intervals.icu/api/v1";
 /**
  * LES PLATEFORMES QUI REÇOIVENT UNE SÉANCE, et le champ intervals.icu qui le dit.
  *
- * Relevé sur l'API d'un compte réel le 17/08/2026 : les champs `*_upload_workouts`
- * existent pour garmin, coros, wahoo, suunto et zwift. Polar n'en a AUCUN (son API
- * n'accepte pas les séances planifiées), Strava non plus (c'est un journal, pas une
- * montre). Zwift en a un mais reste écarté : ce n'est pas une montre.
+ * ⚠️ RELEVÉ SUR L'API D'UN COMPTE RÉEL LE 21/08/2026 — pas sur le forum, pas de mémoire.
+ * Les champs `*_upload_workouts` existent pour : garmin, coros, suunto, wahoo, zepp
+ * (Amazfit), huawei et zwift. Polar n'en a AUCUN (son API n'accepte pas les séances
+ * planifiées), Strava non plus (c'est un journal, pas une montre), Apple non plus
+ * (aucun champ, nulle part : ses données passent par une application passerelle).
+ *
+ * Trois destinations MANQUAIENT — Amazfit, Huawei et Zwift. Elles ne provoquaient pas
+ * d'erreur : le porteur d'une Amazfit voyait simplement « aucune montre détectée » et
+ * n'a jamais reçu son plan au poignet, alors qu'intervals.icu savait le lui envoyer.
  *
  * ⚠️ LE PRÉFIXE N'EST PAS UNIFORME : Garmin est `icu_garmin_*`, les autres n'ont pas ce
  * préfixe. Recopier le mauvais donne `undefined`, donc « pas prête », SANS erreur.
+ *
+ * ⚠️ ET `*_last_upload` N'EXISTE PAS PARTOUT : seuls Garmin, Suunto et Coros l'exposent.
+ * La table annonçait `wahoo_last_upload`, un champ qui n'existe pas — la lecture rendait
+ * `undefined` en silence. `null` dit la même chose, mais honnêtement.
  *
  * Cette table est la SOURCE UNIQUE : `/api/watch/status` l'importe, et la construction
  * de séance s'en sert pour savoir si la montre supporte les métriques mixtes.
@@ -24,13 +33,27 @@ export const DESTINATIONS_MONTRE = [
   { nom: "Garmin", actif: "icu_garmin_upload_workouts", dernier: "icu_garmin_last_upload" },
   { nom: "Coros", actif: "coros_upload_workouts", dernier: "coros_last_upload" },
   { nom: "Suunto", actif: "suunto_upload_workouts", dernier: "suunto_last_upload" },
-  { nom: "Wahoo", actif: "wahoo_upload_workouts", dernier: "wahoo_last_upload" },
-] as const;
+  { nom: "Wahoo", actif: "wahoo_upload_workouts", dernier: null },
+  { nom: "Amazfit", actif: "zepp_upload_workouts", dernier: null },
+  { nom: "Huawei", actif: "huawei_upload_workouts", dernier: null },
+  // ⚠️ `montre: false` — Zwift REÇOIT la séance mais ne se porte pas au poignet. Sans ce
+  // drapeau, `/api/watch/status` allumerait une pastille verte « ta montre est prête » à
+  // quelqu'un qui n'a pas de montre du tout. Il est dans la table pour que la page puisse
+  // l'annoncer honnêtement, sur une ligne à part — pas pour être pris pour une montre.
+  { nom: "Zwift", actif: "zwift_upload_workouts", dernier: null, montre: false },
+] as const satisfies readonly { nom: string; actif: string; dernier: string | null; montre?: boolean }[];
 
-/** La première montre prête à recevoir, ou `null`. Pure — testable sans réseau. */
+/**
+ * La première MONTRE prête à recevoir, ou `null`. Pure — testable sans réseau.
+ *
+ * ⚠️ Les destinations marquées `montre: false` sont sautées : elles reçoivent la séance
+ * sans se porter au poignet. Les inclure ferait répondre « ta montre est prête » à
+ * quelqu'un qui n'en a pas.
+ */
 export function montreDe(athlete: Record<string, unknown>): { nom: string; dernier: string | null } | null {
   for (const d of DESTINATIONS_MONTRE) {
-    if (athlete[d.actif]) return { nom: d.nom, dernier: (athlete[d.dernier] as string | null) ?? null };
+    if ((d as { montre?: boolean }).montre === false) continue;
+    if (athlete[d.actif]) return { nom: d.nom, dernier: d.dernier ? ((athlete[d.dernier] as string | null) ?? null) : null };
   }
   return null;
 }

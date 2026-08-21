@@ -5197,15 +5197,37 @@ test("les côtes restent en FC dans les DEUX modes", () => {
 
 test("la table des destinations et la détection disent la même chose", () => {
   assert.equal(metriquesMixtesSupportees("Garmin"), true);
-  for (const m of ["Coros", "Suunto", "Wahoo", null]) {
+  for (const m of ["Coros", "Suunto", "Wahoo", "Amazfit", "Huawei", "Zwift", null]) {
     assert.equal(metriquesMixtesSupportees(m as string | null), false, `${m} ne lit pas les métriques mixtes`);
   }
   // Le préfixe n'est PAS uniforme côté intervals.icu : le figer évite un `undefined` muet.
   assert.equal(montreDe({ icu_garmin_upload_workouts: true })?.nom, "Garmin");
   assert.equal(montreDe({ suunto_upload_workouts: true })?.nom, "Suunto");
+  // ⚠️ Ces trois-là MANQUAIENT jusqu'au 21/08/2026, et leur absence ne provoquait aucune
+  // erreur : le porteur d'une Amazfit lisait « aucune montre détectée » et ne recevait
+  // jamais son plan, alors qu'intervals.icu savait le lui envoyer. Le nom du champ n'est
+  // pas celui de la marque — Amazfit se dit `zepp_*` — donc il se fige ici.
+  assert.equal(montreDe({ zepp_upload_workouts: true })?.nom, "Amazfit", "Amazfit s'appelle `zepp` chez intervals.icu");
+  assert.equal(montreDe({ huawei_upload_workouts: true })?.nom, "Huawei");
+  // ⚠️ Zwift REÇOIT la séance, mais ce n'est PAS une montre. La route d'état allumerait
+  // « ta montre est prête » à quelqu'un qui court sur tapis sans rien au poignet.
+  assert.equal(montreDe({ zwift_upload_workouts: true }), null, "Zwift reçoit la séance mais n'est pas une montre");
   assert.equal(montreDe({ polar_upload_workouts: true }), null, "Polar n'a pas ce champ chez intervals.icu");
+  assert.equal(montreDe({ strava_upload_workouts: true }), null, "Strava n'a pas ce champ chez intervals.icu");
   assert.equal(montreDe({}), null);
-  assert.deepEqual(DESTINATIONS_MONTRE.map((d) => d.nom), ["Garmin", "Coros", "Suunto", "Wahoo"]);
+
+  // ⚠️ `*_last_upload` N'EXISTE PAS partout : seuls Garmin, Suunto et Coros l'exposent
+  // (relevé sur l'API le 21/08/2026). La table annonçait `wahoo_last_upload`, un champ
+  // inexistant, et la lecture rendait `undefined` en silence. `null` dit la même chose
+  // sans prétendre lire quoi que ce soit.
+  const avecDate = DESTINATIONS_MONTRE.filter((d) => d.dernier).map((d) => d.nom);
+  assert.deepEqual(avecDate, ["Garmin", "Coros", "Suunto"], "une destination annonce une date que l'API n'expose pas");
+  assert.equal(montreDe({ wahoo_upload_workouts: true })?.dernier, null, "Wahoo n'a pas de date de dernier envoi");
+
+  assert.deepEqual(
+    DESTINATIONS_MONTRE.map((d) => d.nom),
+    ["Garmin", "Coros", "Suunto", "Wahoo", "Amazfit", "Huawei", "Zwift"],
+  );
 });
 
 })().then(() => {

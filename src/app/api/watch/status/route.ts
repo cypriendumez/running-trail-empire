@@ -23,9 +23,13 @@ const auth = (k: string) => ({ Authorization: "Basic " + Buffer.from(`API_KEY:${
  *  · POLAR N'EN A PAS — cohérent avec la réponse du développeur d'intervals.icu (23/12/2023,
  *    « l'API Polar ne permet pas d'envoyer des séances planifiées »), encore vraie fin 2025.
  *  · STRAVA N'EN A PAS non plus : c'est un journal d'activités, pas une montre.
- *  · ZWIFT en a un, mais est délibérément absent ici : ce n'est pas une montre, et Pacevo
- *    prescrit de la course à pied. L'ajouter ferait dire « ta montre est prête » à
- *    quelqu'un qui n'en porte pas.
+ *  · ZWIFT en a un, et figure désormais dans la table — mais avec `montre: false`, si bien
+ *    que `montreDe` le SAUTE. Il reçoit la séance (la page d'accueil l'annonce sur une
+ *    ligne à part), il n'allume pas « ta montre est prête » : ce n'est pas une montre, et
+ *    le dire à quelqu'un qui court sur tapis sans rien au poignet serait faux.
+ *  · AMAZFIT (`zepp_*`) ET HUAWEI ont été AJOUTÉS le 21/08/2026 après relevé direct de
+ *    l'API. Leur absence ne provoquait aucune erreur : la pastille restait orange et la
+ *    séance partait au format Garmin, que ces montres ne savent pas lire.
  */
 export async function GET() {
   const supabase = await createClient();
