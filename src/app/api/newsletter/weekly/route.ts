@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { lienDesinscription } from "@/lib/newsletter/token";
 import { resumerArticles, traduireResumes, type ArticleResume } from "@/lib/newsletter/resume";
-import { construireEmail, estLang, type Lang } from "@/lib/newsletter/email";
+import { construireEmail, estLang, type Lang, type Section, type Course } from "@/lib/newsletter/email";
 
 /**
  * LE RÉSUMÉ DU LUNDI MATIN.
@@ -53,18 +53,25 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "RESEND_API_KEY, RESEND_FROM ou NEXT_PUBLIC_APP_URL manquant" }, { status: 500 });
   }
 
-  // ── 1. L'actualité de la semaine ───────────────────────────────────────────
-  let items: Item[] = [];
-  try {
-    const r = await fetch(`${BASE}/api/community/news?cat=all`, { signal: AbortSignal.timeout(25000) });
-    if (r.ok) items = ((await r.json()) as { items?: Item[] }).items ?? [];
-  } catch { /* traité juste en dessous */ }
-
+  // ── 1. L'actualité, PAR RUBRIQUE ───────────────────────────────────────────
+  // Une seule liste à plat mélangeait un test de chaussure et un résultat d'ultra. Les
+  // rubriques existent déjà dans l'agrégateur du fil Communauté : on les réutilise plutôt
+  // que d'inventer un classement, qui serait forcément approximatif.
   const ilYaUneSemaine = Date.now() - 7 * 24 * 3600 * 1000;
-  const recents = items.filter((it) => {
-    const t = new Date(it.date).getTime();
-    return Number.isFinite(t) && t >= ilYaUneSemaine;
-  });
+  const recentsDe = async (cat: string): Promise<Item[]> => {
+    try {
+      const r = await fetch(`${BASE}/api/community/news?cat=${cat}`, { signal: AbortSignal.timeout(25000) });
+      if (!r.ok) return [];
+      const items = ((await r.json()) as { items?: Item[] }).items ?? [];
+      return items.filter((it) => {
+        const t = new Date(it.date).getTime();
+        return Number.isFinite(t) && t >= ilYaUneSemaine;
+      });
+    } catch { return []; }
+  };
+
+  const [tout, trail, materiel] = await Promise.all([recentsDe("all"), recentsDe("trail"), recentsDe("gear")]);
+  const recents = tout;
 
   if (recents.length < MINIMUM_ARTICLES) {
     return NextResponse.json({
@@ -105,6 +112,38 @@ export async function GET(req: Request) {
     recents.slice(0, ARTICLES_MAX).map((it) => ({ title: it.title, source: it.source, link: it.link })),
   );
 
+  // ── 3 bis. Les courses à venir, depuis la BASE ─────────────────────────────
+  // La seule rubrique qui ne passe par aucun modèle : nom, date, ville et distance sont
+  // des faits stockés. On dédoublonne par nom+ville — une même épreuve existe en base
+  // autant de fois qu'elle propose de distances, et lister « Le Bélier » quatre fois
+  // remplirait la rubrique sans rien apprendre.
+  let courses: Course[] = [];
+  try {
+    const aujourdhui = new Date().toISOString().slice(0, 10);
+    const { data } = await admin
+      .from("races")
+      .select("name, date, city, distance_km, registration_url")
+      .gte("date", aujourdhui)
+      .order("date", { ascending: true })
+      .limit(60);
+    const vues = new Set<string>();
+    for (const r of data ?? []) {
+      const nom = String(r.name ?? "").trim();
+      if (!nom) continue;
+      const cle = `${nom.toLowerCase()}::${String(r.city ?? "").toLowerCase()}`;
+      if (vues.has(cle)) continue;
+      vues.add(cle);
+      courses.push({
+        nom,
+        date: String(r.date),
+        ville: r.city ? String(r.city) : null,
+        distance: typeof r.distance_km === "number" ? r.distance_km : null,
+        url: r.registration_url ? String(r.registration_url) : null,
+      });
+      if (courses.length >= 6) break;
+    }
+  } catch { courses = []; }
+
   // ── 4. Les traductions, une seule fois par langue RÉELLEMENT présente ──────
   // On ne traduit pas dans le vide : sans abonné allemand, pas d'appel allemand. Le
   // palier gratuit de Gemini se compte en dizaines de requêtes par jour pour TOUTE l'app.
@@ -127,13 +166,38 @@ export async function GET(req: Request) {
     parLangue.set(lg, traduits);
   }
 
+  // ── 4 bis. Répartir en rubriques, SANS doublon ─────────────────────────────
+  // Un article de « trail » figure aussi dans « all » : sans déduplication il
+  // apparaîtrait deux fois dans la même lettre. « À la une » garde la priorité, les
+  // rubriques suivantes ne prennent que ce qui reste.
+  const rubriquesDe = (articles: ArticleResume[]): Section[] => {
+    const parLien = new Map(articles.map((a) => [a.link, a]));
+    const pris = new Set<string>();
+    const prendre = (source: Item[], max: number) => {
+      const out: ArticleResume[] = [];
+      for (const it of source) {
+        const a = parLien.get(it.link);
+        if (!a || pris.has(a.link)) continue;
+        pris.add(a.link);
+        out.push(a);
+        if (out.length >= max) break;
+      }
+      return out;
+    };
+    return [
+      { cle: "une" as const, articles: prendre(tout, 5) },
+      { cle: "trail" as const, articles: prendre(trail, 3) },
+      { cle: "materiel" as const, articles: prendre(materiel, 3) },
+    ];
+  };
+
   // ── 5. L'envoi ─────────────────────────────────────────────────────────────
   let envoye = 0;
   const parLangueEnvoye: Record<string, number> = {};
   for (const { email, lang } of abonnes) {
     const articles = parLangue.get(lang) ?? base;
     const lien = lienDesinscription(email, BASE);
-    const { objet, html, texte } = construireEmail(lang, articles, lien);
+    const { objet, html, texte } = construireEmail(lang, rubriquesDe(articles), courses, lien, BASE);
     try {
       const r = await fetch("https://api.resend.com/emails", {
         method: "POST",

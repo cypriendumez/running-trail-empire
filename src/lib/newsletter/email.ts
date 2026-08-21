@@ -15,6 +15,17 @@ import type { ArticleResume } from "./resume";
  * plume pour la newsletter. Dire ce que c'est coûte trois mots et évite de mentir.
  */
 
+/** Une rubrique de la lettre. Elle n'est rendue QUE si elle a du contenu — une section
+ *  vide qui s'affiche quand même donne une lettre creuse, ce qu'on refuse par ailleurs. */
+export type Section = { cle: CleSection; articles: ArticleResume[] };
+export type CleSection = "une" | "trail" | "materiel";
+
+/** Une course à venir, telle qu'elle sort de la base — jamais inventée. */
+export type Course = {
+  nom: string; date: string; ville: string | null;
+  distance: number | null; url: string | null;
+};
+
 export type Lang = "fr" | "en" | "de" | "es" | "pt";
 export const LANGS: Lang[] = ["fr", "en", "de", "es", "pt"];
 export const estLang = (v: unknown): v is Lang => LANGS.includes(v as Lang);
@@ -28,6 +39,10 @@ type Chrome = {
   pourquoi: string;
   desinscrire: string;
   locale: string;
+  sections: Record<CleSection, string>;
+  courses: string;
+  coursesNote: string;
+  voirCourses: string;
 };
 
 const T: Record<Lang, Chrome> = {
@@ -39,6 +54,10 @@ const T: Record<Lang, Chrome> = {
     auto: "Résumés produits automatiquement à partir des articles cités. Tout chiffre absent de la source d'origine est retiré avant l'envoi.",
     pourquoi: "Tu reçois cet e-mail parce que tu t'es inscrit sur Pacevo.",
     desinscrire: "Se désinscrire en un clic",
+    sections: { une: "À la une", trail: "Trail & ultra", materiel: "Matériel & chaussures" },
+    courses: "Les courses qui approchent",
+    coursesNote: "Extraites du calendrier de Pacevo. Les modalités font foi sur le site de l'organisateur.",
+    voirCourses: "Voir toutes les courses",
     locale: "fr-FR",
   },
   en: {
@@ -49,6 +68,10 @@ const T: Record<Lang, Chrome> = {
     auto: "Summaries are produced automatically from the articles cited. Any figure absent from the original source is removed before sending.",
     pourquoi: "You're receiving this because you subscribed on Pacevo.",
     desinscrire: "Unsubscribe in one click",
+    sections: { une: "Headlines", trail: "Trail & ultra", materiel: "Gear & shoes" },
+    courses: "Races coming up",
+    coursesNote: "Taken from Pacevo's race calendar. The organiser's site is the authority on entry terms.",
+    voirCourses: "See all races",
     locale: "en-GB",
   },
   de: {
@@ -59,6 +82,10 @@ const T: Record<Lang, Chrome> = {
     auto: "Die Zusammenfassungen entstehen automatisch aus den genannten Artikeln. Jede Zahl, die in der Originalquelle fehlt, wird vor dem Versand entfernt.",
     pourquoi: "Du erhältst diese E-Mail, weil du dich auf Pacevo angemeldet hast.",
     desinscrire: "Mit einem Klick abmelden",
+    sections: { une: "Schlagzeilen", trail: "Trail & Ultra", materiel: "Ausrüstung & Schuhe" },
+    courses: "Anstehende Rennen",
+    coursesNote: "Aus dem Rennkalender von Pacevo. Maßgeblich sind die Angaben des Veranstalters.",
+    voirCourses: "Alle Rennen ansehen",
     locale: "de-DE",
   },
   es: {
@@ -69,6 +96,10 @@ const T: Record<Lang, Chrome> = {
     auto: "Los resúmenes se generan automáticamente a partir de los artículos citados. Toda cifra ausente de la fuente original se elimina antes del envío.",
     pourquoi: "Recibes este correo porque te suscribiste en Pacevo.",
     desinscrire: "Darse de baja en un clic",
+    sections: { une: "Titulares", trail: "Trail y ultra", materiel: "Material y zapatillas" },
+    courses: "Carreras que se acercan",
+    coursesNote: "Extraídas del calendario de Pacevo. La web del organizador es la referencia para inscribirse.",
+    voirCourses: "Ver todas las carreras",
     locale: "es-ES",
   },
   pt: {
@@ -79,6 +110,10 @@ const T: Record<Lang, Chrome> = {
     auto: "Os resumos são gerados automaticamente a partir dos artigos citados. Qualquer número ausente da fonte original é removido antes do envio.",
     pourquoi: "Recebes este e-mail porque te inscreveste no Pacevo.",
     desinscrire: "Cancelar a subscrição num clique",
+    sections: { une: "Destaques", trail: "Trail e ultra", materiel: "Equipamento e sapatilhas" },
+    courses: "Provas que se aproximam",
+    coursesNote: "Retiradas do calendário do Pacevo. O site do organizador é a referência para inscrição.",
+    voirCourses: "Ver todas as provas",
     locale: "pt-PT",
   },
 };
@@ -89,32 +124,70 @@ const ech = (s: string) =>
 export const semaineDe = (lang: Lang, d = new Date()) =>
   d.toLocaleDateString(T[lang].locale, { day: "numeric", month: "long" });
 
-export function construireEmail(
-  lang: Lang,
-  articles: ArticleResume[],
-  lienDesinscription: string,
-): { objet: string; html: string; texte: string } {
-  const t = T[lang];
-  const semaine = semaineDe(lang);
-  // Un résumé au moins quelque part : sinon la mention « produits automatiquement »
-  // n'a rien à qualifier et n'est que du bruit en bas de page.
-  const auMoinsUnResume = articles.some((a) => a.resume);
-
-  const corps = articles
+const listeArticles = (articles: ArticleResume[]) =>
+  articles
     .map(
-      (a) => `<li style="margin:0 0 1.5rem;padding:0">
-  <a href="${ech(a.link)}" style="color:#18181b;text-decoration:none;font-weight:650;font-size:1.02rem;line-height:1.4">${ech(a.title)}</a>
-  <div style="margin:.2rem 0 0;font-size:.76rem;color:#a1a1aa">${ech(a.source)}</div>
-  ${a.resume ? `<p style="margin:.55rem 0 0;font-size:.92rem;line-height:1.65;color:#52525b">${ech(a.resume)}</p>` : ""}
+      (a) => `<li style="margin:0 0 1.4rem;padding:0">
+  <a href="${ech(a.link)}" style="color:#18181b;text-decoration:none;font-weight:650;font-size:1rem;line-height:1.4">${ech(a.title)}</a>
+  <div style="margin:.2rem 0 0;font-size:.74rem;color:#a1a1aa">${ech(a.source)}</div>
+  ${a.resume ? `<p style="margin:.5rem 0 0;font-size:.9rem;line-height:1.65;color:#52525b">${ech(a.resume)}</p>` : ""}
 </li>`,
     )
     .join("");
 
+const titreRubrique = (texte: string) =>
+  `<h2 style="margin:2.25rem 0 1rem;font-size:.72rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#059669">${ech(texte)}</h2>`;
+
+/**
+ * Construit la lettre.
+ *
+ * ⚠️ Une rubrique VIDE n'est pas rendue. La lettre refuse déjà de partir quand la semaine
+ * compte moins de cinq articles ; afficher « Matériel & chaussures » suivi de rien serait
+ * la même faute en plus petit — annoncer un contenu qu'on n'a pas.
+ */
+export function construireEmail(
+  lang: Lang,
+  sections: Section[],
+  courses: Course[],
+  lienDesinscription: string,
+  base: string,
+): { objet: string; html: string; texte: string } {
+  const t = T[lang];
+  const semaine = semaineDe(lang);
+  const tous = sections.flatMap((sec) => sec.articles);
+  const auMoinsUnResume = tous.some((a) => a.resume);
+  const pleines = sections.filter((sec) => sec.articles.length);
+
+  const corpsSections = pleines
+    .map((sec) => `${titreRubrique(t.sections[sec.cle])}<ul style="margin:0;padding:0;list-style:none">${listeArticles(sec.articles)}</ul>`)
+    .join("");
+
+  // Les courses viennent de la base, jamais d'un modèle : nom, date, ville et distance
+  // sont des faits. C'est la seule rubrique de la lettre qui ne dépend d'aucune IA.
+  const dateCourse = (iso: string) =>
+    new Date(`${iso}T00:00:00`).toLocaleDateString(T[lang].locale, { day: "numeric", month: "short" });
+
+  const corpsCourses = courses.length
+    ? `${titreRubrique(t.courses)}
+<ul style="margin:0;padding:0;list-style:none">${courses
+        .map(
+          (c) => `<li style="margin:0 0 .85rem;font-size:.92rem;line-height:1.5">
+  <span style="color:#a1a1aa;font-variant-numeric:tabular-nums">${ech(dateCourse(c.date))}</span>
+  ${c.url ? `<a href="${ech(c.url)}" style="color:#18181b;text-decoration:none;font-weight:600">${ech(c.nom)}</a>` : `<span style="font-weight:600">${ech(c.nom)}</span>`}
+  <span style="color:#71717a">${[c.ville, c.distance ? `${c.distance} km` : null].filter((x): x is string => Boolean(x)).map(ech).join(" · ")}</span>
+</li>`,
+        )
+        .join("")}</ul>
+<p style="margin:.9rem 0 0;font-size:.74rem;color:#a1a1aa;line-height:1.55">${ech(t.coursesNote)}
+  <a href="${ech(base)}/dashboard/races" style="color:#059669">${ech(t.voirCourses)}</a></p>`
+    : "";
+
   const html = `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:37rem;margin:0 auto;padding:2rem 1.5rem;color:#18181b;background:#fff">
   <div style="font-size:.7rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:#059669">Pacevo · ${ech(t.surtitre(semaine))}</div>
   <h1 style="margin:.9rem 0 .4rem;font-size:1.4rem;line-height:1.25">${ech(t.titre)}</h1>
-  <p style="margin:0 0 2rem;font-size:.88rem;line-height:1.6;color:#71717a">${ech(t.chapo)}</p>
-  <ul style="margin:0;padding:0;list-style:none">${corps}</ul>
+  <p style="margin:0;font-size:.88rem;line-height:1.6;color:#71717a">${ech(t.chapo)}</p>
+  ${corpsSections}
+  ${corpsCourses}
   <div style="margin:2.25rem 0 0;padding-top:1.25rem;border-top:1px solid #e4e4e7;font-size:.74rem;color:#a1a1aa;line-height:1.65">
     ${auMoinsUnResume ? `<p style="margin:0 0 .75rem">${ech(t.auto)}</p>` : ""}
     <p style="margin:0">${ech(t.pourquoi)}<br>
@@ -122,11 +195,16 @@ export function construireEmail(
   </div>
 </div>`;
 
+  const texteSections = pleines
+    .map((sec) => `\n\n## ${t.sections[sec.cle].toUpperCase()}\n\n${sec.articles.map((a) => `• ${a.title}\n  ${a.source} — ${a.link}${a.resume ? `\n  ${a.resume}` : ""}`).join("\n\n")}`)
+    .join("");
+  const texteCourses = courses.length
+    ? `\n\n## ${t.courses.toUpperCase()}\n\n${courses.map((c) => `• ${dateCourse(c.date)} — ${c.nom}${c.ville ? ` (${c.ville})` : ""}${c.distance ? ` · ${c.distance} km` : ""}${c.url ? `\n  ${c.url}` : ""}`).join("\n")}\n\n${t.coursesNote}`
+    : "";
+
   const texte = `PACEVO — ${t.surtitre(semaine)}
 ${t.titre}
-${t.chapo}
-
-${articles.map((a) => `• ${a.title}\n  ${a.source} — ${a.link}${a.resume ? `\n  ${a.resume}` : ""}`).join("\n\n")}
+${t.chapo}${texteSections}${texteCourses}
 
 —
 ${auMoinsUnResume ? `${t.auto}\n` : ""}${t.pourquoi}

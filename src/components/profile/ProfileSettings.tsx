@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -42,7 +42,7 @@ const P: Record<string, Record<string, string>> = {
     "h.title": "Santé & antécédents", "h.sub": "Privé. Sert à ton coach IA pour ne jamais te prescrire une séance qui te mettrait en danger.", "h.cond": "Pathologies", "h.inj": "Zones de blessure récurrentes", "h.notes": "Autre chose à signaler ?", "h.notesPh": "Traitement en cours, opération, contre-indication du médecin…", "h.disc": "Pacevo ne remplace pas un avis médical. En cas de doute, consulte un professionnel de santé.",
     "h.none": "Rien à signaler, je suis en bonne santé",
     "f.terrMulti": "plusieurs choix possibles",
-    "notif.title": "Notifications", "notif.workout": "Rappels de séance", "notif.goal": "Objectifs atteints", "notif.league": "Classement ligue", "notif.coach": "Conseils du coach IA", "notif.save": "Sauvegarder les préférences",
+    "notif.title": "Notifications", "notif.workout": "Rappels de séance", "notif.goal": "Objectifs atteints", "notif.league": "Classement ligue", "notif.coach": "Conseils du coach IA", "notif.save": "Sauvegarder les préférences", "notif.news": "Résumé du lundi matin", "notif.newsHint": "L'actualité running et trail de la semaine, une fois par semaine. Rien d'autre.", "notif.newsOff": "Tu ne reçois plus le résumé hebdomadaire.",
     "double.title": "Deux séances par jour", "double.checking": "Vérification de ton volume et de ta forme…", "double.checkFail": "Impossible de vérifier maintenant — le réglage est bien enregistré, le coach appliquera ses propres critères.", "double.ok": "✅ C'est bon : le coach pourra scinder une sortie facile en deux dès que ce sera utile.", "double.blocked": "⚠️ Enregistré, mais le coach ne doublera pas encore :", "double.kept": "Ton réglage est conservé : dès que ce point sera levé, le plan se scindera tout seul.", "double.noThreshold": "Le double SEUIL (méthode norvégienne) reste hors de portée pour l'instant :", "double.hint": "Le coach pourra scinder une sortie facile en deux (matin + soir) quand ton volume le justifie. Même volume, mieux absorbé — il te dira ce qui manque tant qu'il ne le fait pas.", "privacy.private": "Compte privé", "privacy.privateHint": "Seuls tes amis (vous vous suivez tous les deux) peuvent commenter tes publications.", "privacy.publicHint": "N'importe qui peut commenter les publications que tu rends visibles.",
     "guard.title": "Mode Guardian", "guard.desc": "Bloque automatiquement les séances à haute intensité en cas de surentraînement détecté par l'IA (HRV, fatigue mentale).", "guard.active": "Actif — votre santé est protégée",
     "gdpr.title": "Données & confidentialité", "gdpr.desc": "Conformément au RGPD, tu peux récupérer toutes tes données à tout moment.", "gdpr.export": "Exporter mes données (JSON)", "gdpr.exporting": "Export…", "gdpr.privacy": "Politique de confidentialité", "gdpr.delPre": "Pour supprimer ton compte et toutes tes données, écris à ", "gdpr.delPost": " — suppression sous 30 jours.",
@@ -77,7 +77,7 @@ const P: Record<string, Record<string, string>> = {
     "h.title": "Health & history", "h.sub": "Private. Used by your AI coach to never prescribe a session that could put you at risk.", "h.cond": "Conditions", "h.inj": "Recurring injury areas", "h.notes": "Anything else we should know?", "h.notesPh": "Current medication, surgery, doctor's restriction…", "h.disc": "Pacevo is not a substitute for medical advice. When in doubt, consult a healthcare professional.",
     "h.none": "Nothing to report, I'm in good health",
     "f.terrMulti": "select all that apply",
-    "notif.title": "Notifications", "notif.workout": "Workout reminders", "notif.goal": "Goals achieved", "notif.league": "League ranking", "notif.coach": "AI coach tips", "notif.save": "Save preferences",
+    "notif.title": "Notifications", "notif.workout": "Workout reminders", "notif.goal": "Goals achieved", "notif.league": "League ranking", "notif.coach": "AI coach tips", "notif.save": "Save preferences", "notif.news": "Monday morning digest", "notif.newsHint": "The week in running and trail, once a week. Nothing else.", "notif.newsOff": "You no longer receive the weekly digest.",
     "double.title": "Two sessions a day", "double.checking": "Checking your volume and form…", "double.checkFail": "Cannot check right now — the setting is saved, and the coach will apply its own criteria.", "double.ok": "✅ All set: the coach may split an easy run in two as soon as it helps.", "double.blocked": "⚠️ Saved, but the coach will not double yet:", "double.kept": "Your setting is kept: as soon as this is cleared, the plan will split on its own.", "double.noThreshold": "Double THRESHOLD (Norwegian method) is out of reach for now:", "double.hint": "The coach may split an easy run in two (morning + evening) when your volume justifies it. Same volume, better absorbed — it will tell you what is missing until then.", "privacy.private": "Private account", "privacy.privateHint": "Only your friends (you follow each other) can comment on your posts.", "privacy.publicHint": "Anyone can comment on the posts you make visible.",
     "guard.title": "Guardian Mode", "guard.desc": "Automatically blocks high-intensity sessions when the AI detects overtraining (HRV, mental fatigue).", "guard.active": "Active — your health is protected",
     "gdpr.title": "Data & privacy", "gdpr.desc": "Under GDPR, you can retrieve all your data at any time.", "gdpr.export": "Export my data (JSON)", "gdpr.exporting": "Exporting…", "gdpr.privacy": "Privacy policy", "gdpr.delPre": "To delete your account and all your data, email ", "gdpr.delPost": " — deletion within 30 days.",
@@ -112,7 +112,7 @@ const P: Record<string, Record<string, string>> = {
     "h.title": "Gesundheit & Vorgeschichte", "h.sub": "Privat. Dein KI-Coach nutzt dies, um dir nie eine riskante Einheit zu verordnen.", "h.cond": "Erkrankungen", "h.inj": "Wiederkehrende Verletzungsbereiche", "h.notes": "Sonst noch etwas?", "h.notesPh": "Laufende Medikation, Operation, ärztliche Einschränkung…", "h.disc": "Pacevo ersetzt keine ärztliche Beratung. Im Zweifel wende dich an medizinisches Fachpersonal.",
     "h.none": "Nichts zu melden, ich bin gesund",
     "f.terrMulti": "Mehrfachauswahl möglich",
-    "notif.title": "Benachrichtigungen", "notif.workout": "Trainings-Erinnerungen", "notif.goal": "Erreichte Ziele", "notif.league": "Liga-Ranking", "notif.coach": "Tipps des KI-Coachs", "notif.save": "Einstellungen speichern",
+    "notif.title": "Benachrichtigungen", "notif.workout": "Trainings-Erinnerungen", "notif.goal": "Erreichte Ziele", "notif.league": "Liga-Ranking", "notif.coach": "Tipps des KI-Coachs", "notif.save": "Einstellungen speichern", "notif.news": "Montagmorgen-Überblick", "notif.newsHint": "Die Laufwoche, einmal pro Woche. Sonst nichts.", "notif.newsOff": "Du erhältst den wöchentlichen Überblick nicht mehr.",
     "double.title": "Zwei Einheiten pro Tag", "double.checking": "Umfang und Form werden geprüft…", "double.checkFail": "Prüfung derzeit nicht möglich — die Einstellung ist gespeichert, der Coach wendet seine eigenen Kriterien an.", "double.ok": "✅ Passt: Der Coach kann einen lockeren Lauf teilen, sobald es sinnvoll ist.", "double.blocked": "⚠️ Gespeichert, aber der Coach verdoppelt noch nicht:", "double.kept": "Deine Einstellung bleibt erhalten: Sobald das erfüllt ist, teilt sich der Plan von selbst.", "double.noThreshold": "Doppelte SCHWELLE (norwegische Methode) ist vorerst außer Reichweite:", "double.hint": "Der Coach kann einen lockeren Lauf teilen (morgens + abends), wenn dein Umfang es rechtfertigt. Gleicher Umfang, besser verkraftet — bis dahin sagt er dir, was fehlt.", "privacy.private": "Privates Konto", "privacy.privateHint": "Nur deine Freunde (ihr folgt euch gegenseitig) können deine Beiträge kommentieren.", "privacy.publicHint": "Jede Person kann die Beiträge kommentieren, die du sichtbar machst.",
     "guard.title": "Guardian-Modus", "guard.desc": "Blockiert automatisch intensive Einheiten, wenn die KI Übertraining erkennt (HRV, mentale Ermüdung).", "guard.active": "Aktiv — deine Gesundheit ist geschützt",
     "gdpr.title": "Daten & Datenschutz", "gdpr.desc": "Gemäß DSGVO kannst du jederzeit alle deine Daten abrufen.", "gdpr.export": "Meine Daten exportieren (JSON)", "gdpr.exporting": "Export…", "gdpr.privacy": "Datenschutzerklärung", "gdpr.delPre": "Um dein Konto und alle Daten zu löschen, schreibe an ", "gdpr.delPost": " — Löschung innerhalb von 30 Tagen.",
@@ -147,7 +147,7 @@ const P: Record<string, Record<string, string>> = {
     "h.title": "Salud y antecedentes", "h.sub": "Privado. Tu entrenador IA lo usa para no prescribirte nunca una sesión que te ponga en riesgo.", "h.cond": "Patologías", "h.inj": "Zonas de lesión recurrentes", "h.notes": "¿Algo más que debamos saber?", "h.notesPh": "Tratamiento en curso, operación, contraindicación médica…", "h.disc": "Pacevo no sustituye el consejo médico. Ante la duda, consulta a un profesional sanitario.",
     "h.none": "Nada que señalar, estoy bien de salud",
     "f.terrMulti": "varias opciones posibles",
-    "notif.title": "Notificaciones", "notif.workout": "Recordatorios de sesión", "notif.goal": "Objetivos logrados", "notif.league": "Clasificación de liga", "notif.coach": "Consejos del entrenador IA", "notif.save": "Guardar preferencias",
+    "notif.title": "Notificaciones", "notif.workout": "Recordatorios de sesión", "notif.goal": "Objetivos logrados", "notif.league": "Clasificación de liga", "notif.coach": "Consejos del entrenador IA", "notif.save": "Guardar preferencias", "notif.news": "Resumen del lunes por la mañana", "notif.newsHint": "La semana del running y el trail, una vez por semana. Nada más.", "notif.newsOff": "Ya no recibes el resumen semanal.",
     "double.title": "Dos sesiones al día", "double.checking": "Comprobando tu volumen y tu forma…", "double.checkFail": "No se puede comprobar ahora — el ajuste está guardado y el entrenador aplicará sus criterios.", "double.ok": "✅ Listo: el entrenador podrá dividir una tirada suave en cuanto sea útil.", "double.blocked": "⚠️ Guardado, pero el entrenador aún no doblará:", "double.kept": "Tu ajuste se conserva: en cuanto se resuelva, el plan se dividirá solo.", "double.noThreshold": "El doble UMBRAL (método noruego) queda fuera de alcance por ahora:", "double.hint": "El entrenador podrá dividir una tirada suave en dos (mañana + tarde) cuando tu volumen lo justifique. Mismo volumen, mejor asimilado — hasta entonces te dirá qué falta.", "privacy.private": "Cuenta privada", "privacy.privateHint": "Solo tus amigos (os seguís mutuamente) pueden comentar tus publicaciones.", "privacy.publicHint": "Cualquiera puede comentar las publicaciones que hagas visibles.",
     "guard.title": "Modo Guardian", "guard.desc": "Bloquea automáticamente las sesiones de alta intensidad cuando la IA detecta sobreentrenamiento (VFC, fatiga mental).", "guard.active": "Activo — tu salud está protegida",
     "gdpr.title": "Datos y privacidad", "gdpr.desc": "Conforme al RGPD, puedes recuperar todos tus datos en cualquier momento.", "gdpr.export": "Exportar mis datos (JSON)", "gdpr.exporting": "Exportando…", "gdpr.privacy": "Política de privacidad", "gdpr.delPre": "Para eliminar tu cuenta y todos tus datos, escribe a ", "gdpr.delPost": " — eliminación en 30 días.",
@@ -182,7 +182,7 @@ const P: Record<string, Record<string, string>> = {
     "h.title": "Saúde e antecedentes", "h.sub": "Privado. O teu treinador IA usa isto para nunca te prescrever uma sessão que te ponha em risco.", "h.cond": "Patologias", "h.inj": "Zonas de lesão recorrentes", "h.notes": "Mais alguma coisa a assinalar?", "h.notesPh": "Medicação em curso, operação, contraindicação médica…", "h.disc": "A Pacevo não substitui aconselhamento médico. Na dúvida, consulta um profissional de saúde.",
     "h.none": "Nada a assinalar, estou de boa saúde",
     "f.terrMulti": "várias opções possíveis",
-    "notif.title": "Notificações", "notif.workout": "Lembretes de sessão", "notif.goal": "Objetivos alcançados", "notif.league": "Classificação da liga", "notif.coach": "Conselhos do treinador IA", "notif.save": "Guardar preferências",
+    "notif.title": "Notificações", "notif.workout": "Lembretes de sessão", "notif.goal": "Objetivos alcançados", "notif.league": "Classificação da liga", "notif.coach": "Conselhos do treinador IA", "notif.save": "Guardar preferências", "notif.news": "Resumo de segunda de manhã", "notif.newsHint": "A semana da corrida e do trail, uma vez por semana. Nada mais.", "notif.newsOff": "Já não recebes o resumo semanal.",
     "double.title": "Duas sessões por dia", "double.checking": "A verificar o teu volume e a tua forma…", "double.checkFail": "Não é possível verificar agora — a definição está guardada e o treinador aplicará os seus critérios.", "double.ok": "✅ Tudo certo: o treinador poderá dividir um treino leve assim que for útil.", "double.blocked": "⚠️ Guardado, mas o treinador ainda não vai duplicar:", "double.kept": "A tua definição fica guardada: assim que isto for resolvido, o plano divide-se sozinho.", "double.noThreshold": "O duplo LIMIAR (método norueguês) está fora de alcance por agora:", "double.hint": "O treinador pode dividir um treino leve em dois (manhã + tarde) quando o teu volume o justificar. Mesmo volume, melhor absorvido — até lá dir-te-á o que falta.", "privacy.private": "Conta privada", "privacy.privateHint": "Só os teus amigos (seguem-se mutuamente) podem comentar as tuas publicações.", "privacy.publicHint": "Qualquer pessoa pode comentar as publicações que tornares visíveis.",
     "guard.title": "Modo Guardian", "guard.desc": "Bloqueia automaticamente as sessões de alta intensidade quando a IA deteta excesso de treino (VFC, fadiga mental).", "guard.active": "Ativo — a tua saúde está protegida",
     "gdpr.title": "Dados e privacidade", "gdpr.desc": "Em conformidade com o RGPD, podes recuperar todos os teus dados a qualquer momento.", "gdpr.export": "Exportar os meus dados (JSON)", "gdpr.exporting": "A exportar…", "gdpr.privacy": "Política de privacidade", "gdpr.delPre": "Para eliminar a tua conta e todos os dados, escreve para ", "gdpr.delPost": " — eliminação em 30 dias.",
@@ -339,6 +339,18 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
   userId: string;
 }) {
   const { lang, setLang } = useT();
+  // Abonnement au résumé hebdomadaire. Il ne vit PAS dans `form` : les champs de `form`
+  // attendent le bouton « Sauvegarder », alors qu'un consentement e-mail doit prendre
+  // effet au clic. On le charge donc à part, depuis la table des abonnés.
+  const [newsAbonne, setNewsAbonne] = useState(false);
+  useEffect(() => {
+    let vivant = true;
+    fetch("/api/newsletter/preference")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (vivant && d?.ok) setNewsAbonne(Boolean(d.abonne)); })
+      .catch(() => { /* l'écran reste utilisable sans cette information */ });
+    return () => { vivant = false; };
+  }, []);
   const tr: Tr = (k, p) => fill(P[lang]?.[k] ?? P.fr[k] ?? k, p);
   const [tab, setTab] = useState("profile");
   const [saving, setSaving] = useState(false);
@@ -1023,6 +1035,35 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
               <Toggle enabled={form.notif_goal} onToggle={() => setForm(f => ({...f, notif_goal: !f.notif_goal}))} label={tr("notif.goal")} />
               <Toggle enabled={form.notif_league} onToggle={() => setForm(f => ({...f, notif_league: !f.notif_league}))} label={tr("notif.league")} />
               <Toggle enabled={form.notif_coach} onToggle={() => setForm(f => ({...f, notif_coach: !f.notif_coach}))} label={tr("notif.coach")} />
+              {/* RÉSUMÉ HEBDOMADAIRE — séparé des notifications de l'app parce que ce
+                  n'est PAS la même chose : les bascules ci-dessus se sauvegardent avec
+                  le bouton du bas, celle-ci s'applique IMMÉDIATEMENT. Un réglage de
+                  consentement e-mail qui attendrait un « Sauvegarder » laisserait
+                  partir la lettre du lundi à quelqu'un qui croit s'être désabonné.
+                  La désinscription vaut aussi pour une adresse abonnée AVANT la
+                  création du compte : la route apparie par e-mail, pas par identifiant. */}
+              <div className="mt-3 border-t border-zinc-200 pt-3">
+                <Toggle
+                  enabled={newsAbonne}
+                  onToggle={async () => {
+                    const cible = !newsAbonne;
+                    setNewsAbonne(cible);
+                    try {
+                      const r = await fetch("/api/newsletter/preference", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ abonne: cible }),
+                      });
+                      if (!r.ok) setNewsAbonne(!cible);
+                    } catch { setNewsAbonne(!cible); }
+                  }}
+                  label={tr("notif.news")}
+                />
+                <p className="mt-1 text-xs text-zinc-500">
+                  {newsAbonne ? tr("notif.newsHint") : tr("notif.newsOff")}
+                </p>
+              </div>
+
               {/* CONFIDENTIALITÉ DU COMPTE — placée ici parce que c'est le même
                   geste : « qui peut m'atteindre ». La conséquence est écrite en
                   toutes lettres sous la bascule : un réglage dont on ne comprend
