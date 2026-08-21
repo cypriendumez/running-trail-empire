@@ -33,6 +33,7 @@ import { LANDING as LANDING_T } from "../src/components/landing/landingI18n";
 import { accesDe, peut, motifRefus, JOURS_ESSAI } from "../src/lib/billing/access";
 import { TARIFS, FORMULES, accesDuPrice } from "../src/lib/stripe/client";
 import { PRIX_AFFICHES, REMISE_ANNUELLE_PCT, MOIS_FACTURES_PAR_AN, MOIS_OFFERTS, economieAnnuelle } from "../src/lib/billing/prix";
+import { jetonDesinscription, jetonValide } from "../src/lib/newsletter/token";
 import { PLAFOND_JOUR } from "../src/lib/billing/aiQuota";
 import { ppsExpiration, ppsVerdict, ppsDemandeAction, couvertureCourses, PPS_URL, PPS_PRIX_EUR, PPS_VALIDITE_MOIS } from "../src/lib/pps/status";
 import { PPS_T } from "../src/lib/pps/ppsI18n";
@@ -4284,6 +4285,40 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     assert.ok(/\.update\(/.test(q) && /\.insert\(/.test(q), "il faut chercher puis mettre à jour ou insérer");
   });
 
+  test("le jeton de désinscription ne se laisse pas deviner", () => {
+    // Le pied de page promettait « désinscription en un clic » alors qu'AUCUNE route
+    // n'existait. Elle existe désormais, et elle s'appuie sur un HMAC : c'est du code de
+    // sécurité, il ne doit pas se dégrader en silence.
+    const avant = process.env.CRON_SECRET;
+    process.env.CRON_SECRET = "secret-de-test";
+    try {
+      const email = "coureur@exemple.fr";
+      const jeton = jetonDesinscription(email);
+      assert.ok(jeton.length >= 32, "jeton trop court pour résister à une recherche exhaustive");
+      assert.ok(jetonValide(email, jeton), "le jeton légitime doit être accepté");
+      // La casse ne doit pas produire deux jetons différents pour la même personne.
+      assert.ok(jetonValide("Coureur@Exemple.FR", jeton), "l'adresse doit être normalisée");
+      // Le point qui compte : sans cela, on désinscrirait n'importe qui en devinant son
+      // adresse, puisque le lien porte l'adresse en clair.
+      assert.ok(!jetonValide("autre@exemple.fr", jeton), "un jeton ne doit valoir que pour SON adresse");
+      assert.ok(!jetonValide(email, "0".repeat(32)), "un jeton inventé doit être refusé");
+      assert.ok(!jetonValide(email, ""), "un jeton vide doit être refusé");
+      // Sans secret, on refuse TOUT plutôt que de tout accepter.
+      // ⚠️ L'assertion évidente — « le jeton d'avant ne passe plus » — est FAUSSE au sens
+      // où elle passerait même sans garde-fou : un HMAC à clé vide diffère simplement
+      // d'un HMAC à clé « secret-de-test ». Le vrai risque est ailleurs : une clé vide
+      // est DEVINABLE, donc n'importe qui pourrait forger le jeton de n'importe quelle
+      // adresse. Il faut donc générer le jeton AVEC la clé vide et vérifier qu'il est
+      // quand même refusé. Trouvé par mutation : sans cette formulation, retirer le
+      // garde-fou laissait le test vert.
+      process.env.CRON_SECRET = "";
+      const jetonSansSecret = jetonDesinscription(email);
+      assert.ok(!jetonValide(email, jetonSansSecret), "sans CRON_SECRET, même un jeton cohérent doit être refusé");
+    } finally {
+      if (avant === undefined) delete process.env.CRON_SECRET;
+      else process.env.CRON_SECRET = avant;
+    }
+  });
   test("le prix AFFICHÉ est celui qui sera DÉBITÉ", () => {
     // Afficher un montant différent de celui qu'on prélève n'est pas un défaut
     // d'affichage, c'est un litige. Les vitrines ne peuvent pas importer `TARIFS`

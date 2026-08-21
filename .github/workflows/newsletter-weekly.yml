@@ -1,0 +1,69 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  RÉSUMÉ HEBDOMADAIRE DE L'ACTUALITÉ — tous les lundis matin.
+#
+#  POURQUOI ICI ET PAS DANS vercel.json : même raison que la synchronisation du coach.
+#  Le compte Vercel est en plan HOBBY, qui plafonne les tâches planifiées à UNE par jour
+#  — or ce créneau est déjà pris. GitHub Actions n'a pas cette limite.
+#
+#  HORAIRE : 6 h 30 UTC. En heure de Paris cela donne 8 h 30 l'été (CEST) et 7 h 30
+#  l'hiver (CET) — GitHub ne connaît que l'UTC, il n'y a pas de « 8 h 30 toute l'année ».
+#  Le décalage d'une heure entre saisons est assumé : sur un e-mail hebdomadaire il ne
+#  change rien, et une bascule automatique demanderait deux planifications concurrentes.
+#
+#  UNE LIMITE DE GITHUB, à connaître : une planification peut être retardée de plusieurs
+#  minutes aux heures de pointe, et le lundi matin en est une. La garantie est « lundi
+#  matin », pas « 8 h 30 pile ». Et un dépôt sans activité pendant 60 jours voit ses
+#  planifications désactivées.
+#
+#  CE QUE FAIT LA ROUTE APPELÉE :
+#   • elle n'envoie qu'aux abonnés `unsubscribed = false`, jamais aux simples comptes ;
+#   • elle N'ENVOIE RIEN si la semaine compte moins de 5 articles — un e-mail creux
+#     coûte des désinscriptions, il ne rapporte rien ;
+#   • chaque message porte son lien de désinscription et les en-têtes List-Unsubscribe.
+#
+#  SECRETS REQUIS (Settings → Secrets and variables → Actions) — les MÊMES que le
+#  workflow de synchronisation, rien à créer si celui-ci fonctionne déjà :
+#   • PACEVO_URL   = https://running-trail-empire-woad.vercel.app
+#   • CRON_SECRET  = la MÊME valeur que la variable CRON_SECRET sur Vercel
+# ─────────────────────────────────────────────────────────────────────────────
+name: Résumé hebdomadaire de l'actualité
+
+on:
+  schedule:
+    - cron: "30 6 * * 1"
+  # Indispensable pour vérifier la chaîne sans attendre lundi.
+  workflow_dispatch:
+
+# Deux passages ne doivent jamais se chevaucher : ils enverraient l'e-mail en double.
+concurrency:
+  group: newsletter-weekly
+  cancel-in-progress: false
+
+jobs:
+  envoyer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Envoyer le résumé
+        env:
+          PACEVO_URL: ${{ secrets.PACEVO_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PACEVO_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::PACEVO_URL ou CRON_SECRET manquant dans les secrets du dépôt."
+            exit 1
+          fi
+          reponse=$(curl -sS --max-time 120 -w '\n%{http_code}' \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${PACEVO_URL}/api/newsletter/weekly")
+          corps=$(printf '%s' "$reponse" | sed '$d')
+          code=$(printf '%s' "$reponse" | tail -n1)
+          echo "HTTP ${code}"
+          echo "${corps}"
+          # Un « 0 envoyé » n'est PAS une erreur : c'est le comportement voulu quand la
+          # semaine est pauvre en actualité ou qu'il n'y a pas encore d'abonné.
+          if [ "${code}" != "200" ]; then
+            echo "::error::L'envoi a échoué (HTTP ${code})."
+            exit 1
+          fi
