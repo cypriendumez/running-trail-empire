@@ -3,23 +3,24 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { FILTRES } from "@/lib/news/rubriques";
 import {
   Newspaper, ExternalLink, RefreshCw,
-  Footprints, Mountain, Flame, Medal, Watch, Mail, type LucideIcon,
+  Footprints, Mountain, Flame, Medal, Watch, Mail, Apple, Trophy, type LucideIcon,
 } from "lucide-react";
 import { NewsletterSignup } from "@/components/NewsletterSignup";
 
 type Item = { title: string; source: string; link: string; date: string; domain?: string; favicon?: string };
-type Cat = "all" | "running" | "trail" | "ultra" | "marathon" | "gear";
-const CATS: Cat[] = ["all", "running", "trail", "ultra", "marathon", "gear"];
+type Cat = "all" | "running" | "trail" | "ultra" | "marathon" | "gear" | "nutrition" | "elite";
+const CATS: Cat[] = ["all", "running", "trail", "ultra", "marathon", "gear", "nutrition", "elite"];
 
 // i18n local de la page (5 langues) — la page naît traduite.
 const L: Record<string, Record<string, string>> = {
-  fr: { title: "Communauté & Actualité", subtitle: "Toute l'actu running & trail, en direct des médias spécialisés.", all: "Tout", running: "Running", trail: "Trail", ultra: "Ultra", marathon: "Marathon", gear: "Matériel", read: "Lire", loading: "Chargement de l'actu…", empty: "Aucune actualité pour le moment.", via: "Revue de presse : titre, éditeur et lien. Aucun article ni photo n'est reproduit — clique pour lire chez la source.", refresh: "Actualiser" },
-  en: { title: "Community & News", subtitle: "All the running & trail news, live from specialist media.", all: "All", running: "Running", trail: "Trail", ultra: "Ultra", marathon: "Marathon", gear: "Gear", read: "Read", loading: "Loading news…", empty: "No news right now.", via: "Press review: headline, publisher and link. No article or photo is reproduced — click to read at the source.", refresh: "Refresh" },
-  de: { title: "Community & News", subtitle: "Alle Lauf- & Trail-News, live aus den Fachmedien.", all: "Alle", running: "Laufen", trail: "Trail", ultra: "Ultra", marathon: "Marathon", gear: "Ausrüstung", read: "Lesen", loading: "News werden geladen…", empty: "Aktuell keine News.", via: "Pressespiegel: Titel, Verlag und Link. Kein Artikel und kein Foto wird wiedergegeben — zum Lesen auf die Quelle klicken.", refresh: "Aktualisieren" },
-  es: { title: "Comunidad y Actualidad", subtitle: "Toda la actualidad de running y trail, en directo de los medios especializados.", all: "Todo", running: "Running", trail: "Trail", ultra: "Ultra", marathon: "Maratón", gear: "Material", read: "Leer", loading: "Cargando noticias…", empty: "No hay noticias por ahora.", via: "Revista de prensa: titular, editor y enlace. No se reproduce ningún artículo ni foto — haz clic para leer en la fuente.", refresh: "Actualizar" },
-  pt: { title: "Comunidade e Atualidade", subtitle: "Todas as notícias de corrida e trail, ao vivo da mídia especializada.", all: "Tudo", running: "Corrida", trail: "Trail", ultra: "Ultra", marathon: "Maratona", gear: "Material", read: "Ler", loading: "A carregar notícias…", empty: "Nenhuma notícia por agora.", via: "Revista de imprensa: título, editor e ligação. Nenhum artigo ou foto é reproduzido — clica para ler na fonte.", refresh: "Atualizar" },
+  fr: { title: "Communauté & Actualité", subtitle: "Toute l'actu running & trail, en direct des médias spécialisés.", all: "Tout", running: "Running", trail: "Trail", ultra: "Ultra", marathon: "Marathon", gear: "Matériel", nutrition: "Nutrition", elite: "Élites", read: "Lire", loading: "Chargement de l'actu…", empty: "Aucune actualité pour le moment.", via: "Revue de presse : titre, éditeur et lien. Aucun article ni photo n'est reproduit — clique pour lire chez la source.", refresh: "Actualiser" },
+  en: { title: "Community & News", subtitle: "All the running & trail news, live from specialist media.", all: "All", running: "Running", trail: "Trail", ultra: "Ultra", marathon: "Marathon", gear: "Gear", nutrition: "Nutrition", elite: "Elites", read: "Read", loading: "Loading news…", empty: "No news right now.", via: "Press review: headline, publisher and link. No article or photo is reproduced — click to read at the source.", refresh: "Refresh" },
+  de: { title: "Community & News", subtitle: "Alle Lauf- & Trail-News, live aus den Fachmedien.", all: "Alle", running: "Laufen", trail: "Trail", ultra: "Ultra", marathon: "Marathon", gear: "Ausrüstung", nutrition: "Ernährung", elite: "Elite", read: "Lesen", loading: "News werden geladen…", empty: "Aktuell keine News.", via: "Pressespiegel: Titel, Verlag und Link. Kein Artikel und kein Foto wird wiedergegeben — zum Lesen auf die Quelle klicken.", refresh: "Aktualisieren" },
+  es: { title: "Comunidad y Actualidad", subtitle: "Toda la actualidad de running y trail, en directo de los medios especializados.", all: "Todo", running: "Running", trail: "Trail", ultra: "Ultra", marathon: "Maratón", gear: "Material", nutrition: "Nutrición", elite: "Élites", read: "Leer", loading: "Cargando noticias…", empty: "No hay noticias por ahora.", via: "Revista de prensa: titular, editor y enlace. No se reproduce ningún artículo ni foto — haz clic para leer en la fuente.", refresh: "Actualizar" },
+  pt: { title: "Comunidade e Atualidade", subtitle: "Todas as notícias de corrida e trail, ao vivo da mídia especializada.", all: "Tudo", running: "Corrida", trail: "Trail", ultra: "Ultra", marathon: "Maratona", gear: "Material", nutrition: "Nutrição", elite: "Elites", read: "Ler", loading: "A carregar notícias…", empty: "Nenhuma notícia por agora.", via: "Revista de imprensa: título, editor e ligação. Nenhum artigo ou foto é reproduzido — clica para ler na fonte.", refresh: "Atualizar" },
 };
 const LOCALE: Record<string, string> = { fr: "fr-FR", en: "en-GB", de: "de-DE", es: "es-ES", pt: "pt-PT" };
 
@@ -31,6 +32,8 @@ const THEME: Record<Cat, { grad: string; icon: LucideIcon }> = {
   ultra: { grad: "from-orange-500 to-red-600", icon: Flame },
   marathon: { grad: "from-sky-500 to-indigo-600", icon: Medal },
   gear: { grad: "from-violet-500 to-fuchsia-600", icon: Watch },
+  nutrition: { grad: "from-amber-500 to-orange-600", icon: Apple },
+  elite: { grad: "from-yellow-500 to-amber-600", icon: Trophy },
 };
 
 // Photos d'illustration par catégorie — sources LÉGALES pour usage COMMERCIAL, sans
@@ -72,14 +75,24 @@ const PHOTOS: Record<Cat, string[]> = {
   ultra: [PX(33284135), PX(25078526), PX(30932860), PX(31805881), PX(33522755), PX(38074682), PX(29116008), PX(32798754), PX(32962276), UN("1551632811-561732d1e306")],
   marathon: [PX(2402734), PX(4606708), PX(10168171), PX(19783892), PX(19881117), PX(23857950), PX(30144519), PX(32381195), PX(33378482), PX(35115744), PX(35718700), PX(37046063), PX(10516108), PX(10615641), PX(12360284), PX(28768323), PX(36645343), PX(36732202), UN("1590333748338-d629e4564ad9")],
   gear: [PX(8454904), PX(8497536), PX(3763869), PX(32145212), PX(9207813), PX(8454901), PX(8456074)],
+  // ⚠️ Aucune photo NOUVELLE ici : ces identifiants sont déjà dans le lot audité (voir
+  // `tests/photos.test.ts`). Introduire une image non auditée pour deux rubriques
+  // décoratives ne vaut pas le risque — une photo vit à plusieurs endroits.
+  nutrition: [PX(8454901), PX(37718409), PX(35115744), PX(8454900)],
+  elite: [PX(2402734), PX(4606708), PX(10168171), PX(33284135), PX(25078526)],
 };
 
 // Déduit la catégorie d'un article depuis son titre → choisit une photo en LIEN avec
 // le sujet (mots-clés enrichis FR + EN). Ordre = du plus spécifique au plus général.
 function catOf(title: string): Cat {
   const s = title.toLowerCase();
-  // Matériel d'abord (un test de chaussure peut contenir "trail" ou "marathon").
-  if (/chaussure|sneaker|basket|montre|gps|cardio|capteur|\btest\b|comparatif|mat[ée]riel|[ée]quipement|gel\b|nutrition|hydratation|ravitaillement|sac\b|b[âa]ton|veste|review|garmin|coros|suunto|polar|\bshoe|gear|watch/.test(s)) return "gear";
+  // ⚠️ Ce vocabulaire était RECOPIÉ ici, et la copie avait divergé : « nutrition » et
+  // « ravitaillement » y renvoyaient vers « Matériel », si bien qu'un article sur
+  // l'alimentation s'affichait sous « Matériel & chaussures ». Les filtres viennent
+  // maintenant de `lib/news/rubriques`, la même source que l'agrégateur et la lettre.
+  if (FILTRES.nutrition?.test(title)) return "nutrition";
+  // Matériel avant le reste : un test de chaussure peut contenir « trail » ou « marathon ».
+  if (FILTRES.gear?.test(title)) return "gear";
   if (/ultra|utmb|\b100\s?km\b|\b100\s?miles\b|ultramarathon|ultra-?trail|backyard|diagonale des fous|grand raid|tor des|western states|barkley|hardrock|\b6000d\b|\b160\s?km|endurance extr/.test(s)) return "ultra";
   if (/trail|sentier|montagne|\bmont\b|kilom[èe]tre vertical|\bkv\b|verticale|skyrace|sky\s?running|d[ée]nivel[ée]|single\s?track|for[êe]t|cross\b/.test(s)) return "trail";
   if (/marathon|semi[- ]?marathon|\bsemi\b|42\s?km|42[.,]195|21\s?km|21[.,]1|record.*(marathon|route)/.test(s)) return "marathon";
