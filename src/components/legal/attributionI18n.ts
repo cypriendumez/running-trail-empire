@@ -18,10 +18,13 @@ export const ATTRIBUTION_GARMIN: Record<string, string> = {
   pt: "Os gráficos podem incluir dados de dispositivos Garmin.",
 };
 
-/** Les vues qui affichent des activités ou du bien-être — donc soumises à l'article 1.1. */
-export const PAGES_ATTRIBUTION = [
-  "src/app/dashboard/page.tsx",
-  "src/app/dashboard/activite/page.tsx",
-  "src/app/dashboard/calendrier/page.tsx",
-  "src/app/dashboard/health/page.tsx",
-] as const;
+/**
+ * Où la mention DOIT être rendue.
+ *
+ * ⚠️ C'était une liste de quatre pages choisies à la main, et huit autres vues lisaient
+ * les mêmes tables sans rien afficher — heatmap, survol, trophées, clubs, ligues, profil,
+ * cours, communauté. Une liste tenue à la main s'oublie, et une obligation contractuelle
+ * ne peut pas dépendre de la mémoire de celui qui ajoute la page suivante. Elle vit donc
+ * dans le LAYOUT : toute page du tableau de bord, présente et à venir, la porte.
+ */
+export const PAGES_ATTRIBUTION = ["src/app/dashboard/layout.tsx"] as const;

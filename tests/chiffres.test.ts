@@ -18,7 +18,7 @@
  *   npx tsx tests/chiffres.test.ts
  */
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { CHIFFRES, CHIFFRES_LANDING, CHIFFRES_AUTH } from "../src/lib/brand/stats";
 import { JOURS_ESSAI } from "../src/lib/billing/access";
@@ -266,6 +266,22 @@ test("l'attribution Garmin ne peut pas disparaître d'une vue de données", () =
     const src = readFileSync(join(ROOT, rel), "utf8");
     assert.match(src, /<AttributionGarmin/, `${rel} affiche des données sans attribution Garmin`);
   }
+});
+
+test("aucun logo de marque n'est redistribué avec le site", () => {
+  // ⚠️ Citer « Garmin » pour dire la compatibilité est un usage nominatif admis.
+  // Reproduire son LOGO ne l'est pas de la même façon : Garmin, Apple et Suunto publient
+  // des chartes qui l'encadrent, et Apple est particulièrement strict sur son symbole.
+  // Le site part à la vente ; sept images ne valent pas ce risque, et le nom en toutes
+  // lettres dit la même chose. Les fichiers ont été retirés le 21/08/2026 — ce test
+  // existe pour qu'ils ne reviennent pas sans qu'on y pense.
+  const marques = join(ROOT, "public/brands");
+  assert.ok(!existsSync(marques), "public/brands est revenu : des logos de marques sont redistribués avec le site");
+
+  // ⚠️ Sur le CODE, pas sur les commentaires : le commentaire qui explique le retrait
+  // cite forcément `public/brands/`, et le test se déclenchait sur sa propre explication.
+  const landing = sansCommentaires(readFileSync(join(ROOT, "src/app/page.tsx"), "utf8"));
+  assert.ok(!/\/brands\//.test(landing), "la page d'accueil référence à nouveau un fichier de logo");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

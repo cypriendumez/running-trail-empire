@@ -9,6 +9,7 @@ import { SupportBubble } from "@/components/support/SupportBubble";
 import { LanguageProvider } from "@/lib/i18n/LanguageProvider";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { AttributionGarmin } from "@/components/legal/AttributionGarmin";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -36,6 +37,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <main className="flex-1 overflow-auto p-6">
             {children}
           </main>
+          {/* ⚠️ ICI, ET PAS PAGE PAR PAGE. L'article 1.1 des conditions d'API
+              d'intervals.icu impose d'attribuer à Garmin toute information dérivée de ses
+              données. Elle était posée sur quatre pages choisies à la main — et HUIT
+              autres vues lisaient les mêmes tables sans rien afficher (heatmap, survol,
+              trophées, clubs, ligues, profil…). Une liste tenue à la main s'oublie ; le
+              layout, non : toute page présente et à venir la porte. */}
+          <AttributionGarmin className="pb-3" />
           <MedicalDisclaimer lang={String(profile?.preferred_language ?? "fr")} />
         </div>
         {/* Bulle d'aide : hors du flux, disponible sur TOUTES les pages — une question de

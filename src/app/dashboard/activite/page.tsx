@@ -8,7 +8,6 @@ import { StravaBlocks, type Chiffre } from "@/components/activity/StravaBlocks";
 import { MetricChart } from "@/components/activity/MetricChart";
 import { SessionSegments, type EffortVue } from "@/components/activity/SessionSegments";
 import { leaderboard, type StoredEffort } from "@/lib/segments/match";
-import { AttributionGarmin } from "@/components/legal/AttributionGarmin";
 
 export const dynamic = "force-dynamic";
 
@@ -162,8 +161,6 @@ export default async function ActivitePage({ searchParams }: { searchParams: Pro
           {courbes.map((c) => <MetricChart key={c.titre} {...c} />)}
         </div>
       )}
-      {/* Obligation de l'article 1.1 des conditions d'API d'intervals.icu. */}
-      <AttributionGarmin className="mt-8" />
     </div>
   );
 }
