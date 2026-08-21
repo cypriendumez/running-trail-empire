@@ -18,7 +18,7 @@ import type { ArticleResume } from "./resume";
 /** Une rubrique de la lettre. Elle n'est rendue QUE si elle a du contenu — une section
  *  vide qui s'affiche quand même donne une lettre creuse, ce qu'on refuse par ailleurs. */
 export type Section = { cle: CleSection; articles: ArticleResume[] };
-export type CleSection = "une" | "trail" | "materiel";
+export type CleSection = "une" | "trail" | "elite" | "materiel" | "nutrition";
 
 /** Une course à venir, telle qu'elle sort de la base — jamais inventée. */
 export type Course = {
@@ -54,7 +54,7 @@ const T: Record<Lang, Chrome> = {
     auto: "Résumés produits automatiquement à partir des articles cités. Tout chiffre absent de la source d'origine est retiré avant l'envoi.",
     pourquoi: "Tu reçois cet e-mail parce que tu t'es inscrit sur Pacevo.",
     desinscrire: "Se désinscrire en un clic",
-    sections: { une: "À la une", trail: "Trail & ultra", materiel: "Matériel & chaussures" },
+    sections: { une: "À la une", trail: "Trail & ultra", elite: "Élites & résultats", materiel: "Matériel & chaussures", nutrition: "Nutrition" },
     courses: "Les courses qui approchent",
     coursesNote: "Extraites du calendrier de Pacevo. Les modalités font foi sur le site de l'organisateur.",
     voirCourses: "Voir toutes les courses",
@@ -68,7 +68,7 @@ const T: Record<Lang, Chrome> = {
     auto: "Summaries are produced automatically from the articles cited. Any figure absent from the original source is removed before sending.",
     pourquoi: "You're receiving this because you subscribed on Pacevo.",
     desinscrire: "Unsubscribe in one click",
-    sections: { une: "Headlines", trail: "Trail & ultra", materiel: "Gear & shoes" },
+    sections: { une: "Headlines", trail: "Trail & ultra", elite: "Elites & results", materiel: "Gear & shoes", nutrition: "Nutrition" },
     courses: "Races coming up",
     coursesNote: "Taken from Pacevo's race calendar. The organiser's site is the authority on entry terms.",
     voirCourses: "See all races",
@@ -82,7 +82,7 @@ const T: Record<Lang, Chrome> = {
     auto: "Die Zusammenfassungen entstehen automatisch aus den genannten Artikeln. Jede Zahl, die in der Originalquelle fehlt, wird vor dem Versand entfernt.",
     pourquoi: "Du erhältst diese E-Mail, weil du dich auf Pacevo angemeldet hast.",
     desinscrire: "Mit einem Klick abmelden",
-    sections: { une: "Schlagzeilen", trail: "Trail & Ultra", materiel: "Ausrüstung & Schuhe" },
+    sections: { une: "Schlagzeilen", trail: "Trail & Ultra", elite: "Elite & Ergebnisse", materiel: "Ausrüstung & Schuhe", nutrition: "Ernährung" },
     courses: "Anstehende Rennen",
     coursesNote: "Aus dem Rennkalender von Pacevo. Maßgeblich sind die Angaben des Veranstalters.",
     voirCourses: "Alle Rennen ansehen",
@@ -96,7 +96,7 @@ const T: Record<Lang, Chrome> = {
     auto: "Los resúmenes se generan automáticamente a partir de los artículos citados. Toda cifra ausente de la fuente original se elimina antes del envío.",
     pourquoi: "Recibes este correo porque te suscribiste en Pacevo.",
     desinscrire: "Darse de baja en un clic",
-    sections: { une: "Titulares", trail: "Trail y ultra", materiel: "Material y zapatillas" },
+    sections: { une: "Titulares", trail: "Trail y ultra", elite: "Élites y resultados", materiel: "Material y zapatillas", nutrition: "Nutrición" },
     courses: "Carreras que se acercan",
     coursesNote: "Extraídas del calendario de Pacevo. La web del organizador es la referencia para inscribirse.",
     voirCourses: "Ver todas las carreras",
@@ -110,7 +110,7 @@ const T: Record<Lang, Chrome> = {
     auto: "Os resumos são gerados automaticamente a partir dos artigos citados. Qualquer número ausente da fonte original é removido antes do envio.",
     pourquoi: "Recebes este e-mail porque te inscreveste no Pacevo.",
     desinscrire: "Cancelar a subscrição num clique",
-    sections: { une: "Destaques", trail: "Trail e ultra", materiel: "Equipamento e sapatilhas" },
+    sections: { une: "Destaques", trail: "Trail e ultra", elite: "Elites e resultados", materiel: "Equipamento e sapatilhas", nutrition: "Nutrição" },
     courses: "Provas que se aproximam",
     coursesNote: "Retiradas do calendário do Pacevo. O site do organizador é a referência para inscrição.",
     voirCourses: "Ver todas as provas",

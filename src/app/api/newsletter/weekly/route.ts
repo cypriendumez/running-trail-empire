@@ -3,8 +3,9 @@ export const maxDuration = 300;
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { lienDesinscription } from "@/lib/newsletter/token";
-import { resumerArticles, traduireResumes, type ArticleResume } from "@/lib/newsletter/resume";
+import { resumerArticles, traduireResumes, RESUMES_MAX, type ArticleResume } from "@/lib/newsletter/resume";
 import { construireEmail, estLang, type Lang, type Section, type Course } from "@/lib/newsletter/email";
+import { RUBRIQUES_LETTRE } from "@/lib/news/rubriques";
 
 /**
  * LE RÉSUMÉ DU LUNDI MATIN.
@@ -38,7 +39,8 @@ import { construireEmail, estLang, type Lang, type Section, type Course } from "
 type Item = { title: string; source: string; link: string; date: string };
 
 const MINIMUM_ARTICLES = 5;
-const ARTICLES_MAX = 10;
+// Le plafond n'appartient pas à cette route : c'est celui du résumeur. Un plafond local
+// aurait pu le dépasser sans erreur — et les articles en trop disparaissaient du rendu.
 
 export async function GET(req: Request) {
   const secret = req.headers.get("authorization")?.replace("Bearer ", "");
@@ -70,8 +72,11 @@ export async function GET(req: Request) {
     } catch { return []; }
   };
 
-  const [tout, trail, materiel] = await Promise.all([recentsDe("all"), recentsDe("trail"), recentsDe("gear")]);
-  const recents = tout;
+  // Le sommaire vit dans `lib/news/rubriques` : la lettre ne nomme plus ses rubriques
+  // à la main, elle parcourt la liste. Une rubrique inexistante y serait refusée par le
+  // typage, plus seulement silencieusement remplacée par l'actualité générale.
+  const parRubrique = await Promise.all(RUBRIQUES_LETTRE.map((r) => recentsDe(r.cat)));
+  const recents = parRubrique[0];
 
   if (recents.length < MINIMUM_ARTICLES) {
     return NextResponse.json({
@@ -107,9 +112,32 @@ export async function GET(req: Request) {
   abonnes = abonnes.filter((a) => a.email);
   if (!abonnes.length) return NextResponse.json({ ok: true, envoye: 0, raison: "aucun abonné" });
 
-  // ── 3. Les résumés, une seule fois, en français ────────────────────────────
+  // ── 3. Le plan des rubriques, ÉTABLI AVANT LE RÉSUMÉ ──────────────────────
+  // ⚠️ L'ordre comptait, et il était faux : on résumait les 10 premiers articles de
+  // « all », puis on remplissait les rubriques dans ce vivier-là. Une rubrique dont les
+  // articles ne figuraient pas dans ce top 10 ressortait VIDE — ce qui restait invisible
+  // tant qu'il n'y avait que « Trail » et « Matériel », deux rubriques larges bien
+  // représentées dans « all ». Nutrition et Élites ne l'auraient jamais été.
+  // On choisit donc d'abord, on résume ensuite ce qui a été choisi.
+  // Un même article peut appartenir à plusieurs rubriques : la première servie le garde.
+  const pris = new Set<string>();
+  const plan: { cle: Section["cle"]; liens: string[] }[] = [];
+  const vivier: Item[] = [];
+  for (const [n, { cle, max }] of RUBRIQUES_LETTRE.entries()) {
+    const liens: string[] = [];
+    for (const it of parRubrique[n]) {
+      if (!it.link || pris.has(it.link) || vivier.length >= RESUMES_MAX) continue;
+      pris.add(it.link);
+      liens.push(it.link);
+      vivier.push(it);
+      if (liens.length >= max) break;
+    }
+    plan.push({ cle, liens });
+  }
+
+  // ── 3 bis. Les résumés, une seule fois, en français ────────────────────────
   const { articles: base, diagnostic } = await resumerArticles(
-    recents.slice(0, ARTICLES_MAX).map((it) => ({ title: it.title, source: it.source, link: it.link })),
+    vivier.map((it) => ({ title: it.title, source: it.source, link: it.link })),
   );
 
   // ── 3 bis. Les courses à venir, depuis la BASE ─────────────────────────────
@@ -166,29 +194,16 @@ export async function GET(req: Request) {
     parLangue.set(lg, traduits);
   }
 
-  // ── 4 bis. Répartir en rubriques, SANS doublon ─────────────────────────────
-  // Un article de « trail » figure aussi dans « all » : sans déduplication il
-  // apparaîtrait deux fois dans la même lettre. « À la une » garde la priorité, les
-  // rubriques suivantes ne prennent que ce qui reste.
+  // ── 4 bis. Rendre les rubriques telles qu'elles ont été planifiées ────────
+  // Le choix est déjà fait (étape 3) : ici on ne fait que retrouver chaque article avec
+  // son résumé dans la langue voulue. Une rubrique dont aucun article n'a survécu au
+  // contrôle sort vide, et le gabarit ne l'affiche pas.
   const rubriquesDe = (articles: ArticleResume[]): Section[] => {
     const parLien = new Map(articles.map((a) => [a.link, a]));
-    const pris = new Set<string>();
-    const prendre = (source: Item[], max: number) => {
-      const out: ArticleResume[] = [];
-      for (const it of source) {
-        const a = parLien.get(it.link);
-        if (!a || pris.has(a.link)) continue;
-        pris.add(a.link);
-        out.push(a);
-        if (out.length >= max) break;
-      }
-      return out;
-    };
-    return [
-      { cle: "une" as const, articles: prendre(tout, 5) },
-      { cle: "trail" as const, articles: prendre(trail, 3) },
-      { cle: "materiel" as const, articles: prendre(materiel, 3) },
-    ];
+    return plan.map(({ cle, liens }) => ({
+      cle,
+      articles: liens.map((l) => parLien.get(l)).filter((a): a is ArticleResume => Boolean(a)),
+    }));
   };
 
   // ── 5. L'envoi ─────────────────────────────────────────────────────────────

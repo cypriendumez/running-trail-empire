@@ -34,7 +34,8 @@ import { accesDe, peut, motifRefus, JOURS_ESSAI } from "../src/lib/billing/acces
 import { TARIFS, FORMULES, accesDuPrice } from "../src/lib/stripe/client";
 import { PRIX_AFFICHES, REMISE_ANNUELLE_PCT, MOIS_FACTURES_PAR_AN, MOIS_OFFERTS, economieAnnuelle } from "../src/lib/billing/prix";
 import { jetonDesinscription, jetonValide } from "../src/lib/newsletter/token";
-import { chiffresVerifies } from "../src/lib/newsletter/resume";
+import { chiffresVerifies, rendreTous, RESUMES_MAX } from "../src/lib/newsletter/resume";
+import { FILTRES, QUERIES, RUBRIQUES_LETTRE, estCat } from "../src/lib/news/rubriques";
 import { PLAFOND_JOUR } from "../src/lib/billing/aiQuota";
 import { ppsExpiration, ppsVerdict, ppsDemandeAction, couvertureCourses, PPS_URL, PPS_PRIX_EUR, PPS_VALIDITE_MOIS } from "../src/lib/pps/status";
 import { PPS_T } from "../src/lib/pps/ppsI18n";
@@ -4308,6 +4309,64 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     // Un résumé partiellement faux est entièrement jeté : on ne sait pas quelle phrase
     // ment, donc on n'en garde aucune.
     assert.ok(!chiffresVerifies("50 % de hausse et 4 200 inscrits.", source), "un mélange vrai/faux doit être refusé");
+  });
+
+  test("la rubrique Nutrition ne se remplit pas de chaussures", () => {
+    // Un flux entre dans une rubrique EN BLOC. Marathon Handbook publie de l'alimentation
+    // et des tests de chaussures : sans filtre, « Nutrition » afficherait une chaussure.
+    // Le filtre existe — et il a lui-même failli échouer sur trois pièges de vocabulaire,
+    // tous tirés de modèles réellement testés chaque mois par la presse running.
+    const nutrition = FILTRES.nutrition;
+    assert.ok(nutrition, "la rubrique Nutrition n'a plus de filtre : elle prendrait tout");
+
+    // Les trois pièges : « carb » est dans carbon, « gel » dans GEL-Kayano, « fuel » dans
+    // FuelCell. Et en français, « jeûne » ne diffère de « jeune » que par un accent.
+    assert.ok(!nutrition.test("Carbon plate shoes: the 2026 lineup"), "« carbon » n'est pas « carb »");
+    assert.ok(!nutrition.test("Asics GEL-Kayano 32 review"), "le GEL-Kayano est une chaussure");
+    assert.ok(!nutrition.test("New Balance FuelCell Rebel v5 tested"), "le FuelCell est une chaussure");
+    assert.ok(!nutrition.test("Le jeune coureur et la charge d'entraînement"), "« jeune » n'est pas « jeûne »");
+    // Et il doit toujours attraper ce pour quoi il existe.
+    assert.ok(nutrition.test("Carb loading: how much do you really need?"), "« carbs » doit passer");
+    assert.ok(nutrition.test("Gérer son ravitaillement sur un 100 km"), "le ravitaillement doit passer");
+    assert.ok(nutrition.test("Le jeûne intermittent chez le coureur"), "« jeûne » doit passer");
+
+    const elite = FILTRES.elite;
+    assert.ok(elite, "la rubrique Élites n'a plus de filtre");
+    assert.ok(elite.test("Kilian Jornet remporte la Sierre-Zinal"), "une victoire doit passer");
+    assert.ok(!elite.test("Comment améliorer sa VMA en six semaines"), "un conseil d'entraînement n'est pas un résultat");
+  });
+
+  test("la lettre ne peut pas perdre un article en route", () => {
+    // ⚠️ Le défaut le plus coûteux de cette lettre, et le plus silencieux : le résumeur
+    // rendait l'entrée TRONQUÉE à son plafond. L'appelant qui lui donnait plus d'articles
+    // que le plafond n'en recevait pas moins de résumés — il en recevait moins d'ARTICLES,
+    // et la rubrique qui comptait dessus s'affichait vide, sans erreur, sans trace.
+    const entrees = Array.from({ length: RESUMES_MAX + 4 }, (_, i) => ({
+      title: `Article ${i}`, source: "Source", link: `https://exemple.fr/${i}`,
+    }));
+    const rendu = rendreTous(entrees, new Map([["https://exemple.fr/2", "Un résumé."]]));
+    assert.equal(rendu.length, entrees.length, "des articles ont disparu du rendu");
+    assert.deepEqual(rendu.map((a) => a.link), entrees.map((e) => e.link), "l'ordre a changé");
+    assert.equal(rendu[2].resume, "Un résumé.", "le résumé doit suivre SON article");
+    // Un article sans résumé sort avec son titre, jamais absent.
+    assert.equal(rendu[RESUMES_MAX + 3].resume, null, "un article non résumé doit rester présent");
+  });
+
+  test("le sommaire de la lettre tient dans le plafond du résumeur", () => {
+    // C'est l'inégalité qui s'est retournée : le sommaire réclamait 16 articles pendant
+    // que le résumeur en rendait 10. Rien ne l'a signalé — deux nombres dans deux
+    // fichiers, aucun lien entre eux.
+    const demande = RUBRIQUES_LETTRE.reduce((n, r) => n + r.max, 0);
+    assert.ok(
+      demande <= RESUMES_MAX,
+      `le sommaire réclame ${demande} articles, le résumeur en traite ${RESUMES_MAX}`,
+    );
+    // Et chaque rubrique doit exister côté agrégateur : une rubrique inconnue y était
+    // servie EN SILENCE avec l'actualité générale, sous le titre demandé.
+    for (const r of RUBRIQUES_LETTRE) {
+      assert.ok(estCat(r.cat), `rubrique inconnue de l'agrégateur : ${r.cat}`);
+      assert.ok(QUERIES[r.cat]?.length > 5, `la rubrique ${r.cat} n'a pas de requête`);
+    }
   });
 
   test("le jeton de désinscription ne se laisse pas deviner", () => {

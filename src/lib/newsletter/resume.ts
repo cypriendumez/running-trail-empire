@@ -51,7 +51,18 @@ export type Diagnostic =
 /** Longueur de texte source retenue par article. Au-delà, on n'apprend plus grand-chose. */
 const SOURCE_MAX = 2600;
 /** Au-delà, le coût de l'appel monte sans que le résumé s'améliore. */
-const RESUMES_MAX = 10;
+/**
+ * Combien d'articles on résume au plus.
+ *
+ * ⚠️ Ce plafond a failli vider des rubriques. La lettre choisit désormais jusqu'à 16
+ * articles (5 à la une + 3 trail + 3 élites + 3 matériel + 2 nutrition) ; tant qu'il
+ * valait 10, les six derniers n'étaient pas seulement privés de résumé — ils étaient
+ * ABSENTS du tableau rendu, et les rubriques correspondantes sortaient vides sans que
+ * rien ne le signale. Le plafond est relevé ET la fonction rend maintenant TOUS les
+ * articles reçus (voir plus bas) : un décalage de plafond ne peut plus faire disparaître
+ * une rubrique, au pire elle s'affiche en titres seuls.
+ */
+export const RESUMES_MAX = 16;
 
 function decoder(t: string): string {
   return t
@@ -166,10 +177,26 @@ Réponds UNIQUEMENT par un tableau JSON : [{"i":0,"r":"…"},{"i":1,"r":"…"}]`
  * (20 requêtes/jour et par modèle, pour toute l'app) : la lettre du lundi épuiserait à
  * elle seule le quota de l'assistant et du coach.
  */
+/**
+ * LE RENDU — le seul endroit qui construit la liste sortante.
+ *
+ * ⚠️ Il y avait quatre `return` (trois replis + le chemin nominal) et trois d'entre eux
+ * rendaient `retenus`, c'est-à-dire l'entrée TRONQUÉE au plafond. Un appelant qui
+ * demandait plus d'articles que le plafond n'en recevait pas moins de résumés : il
+ * recevait moins d'ARTICLES, et la rubrique qui comptait dessus s'affichait vide sans
+ * un mot. Un seul rendu, qui part toujours de `articles`, rend la faute impossible.
+ */
+export function rendreTous(articles: Article[], resumes: Map<string, string>): ArticleResume[] {
+  return articles.map((a) => ({ ...a, resume: resumes.get(a.link) ?? null }));
+}
+
 export async function resumerArticles(
   articles: Article[],
 ): Promise<{ articles: ArticleResume[]; diagnostic: Diagnostic }> {
   const retenus = articles.slice(0, RESUMES_MAX);
+  // Les articles au-delà du plafond ne sont pas résumés, mais ils restent dans le rendu :
+  // un titre sans résumé se lit, une rubrique disparue ne se voit pas.
+  const nus = (): ArticleResume[] => rendreTous(articles, new Map());
   const sources = await Promise.all(retenus.map((a) => texteArticle(a.link)));
 
   const lisibles = retenus
@@ -177,7 +204,7 @@ export async function resumerArticles(
     .filter((x): x is { a: Article; i: number; src: string } => Boolean(x.src));
 
   // Aucun article accessible (sites qui bloquent, réseau) : on rend les titres seuls.
-  if (!lisibles.length) return { articles: retenus.map((a) => ({ ...a, resume: null })), diagnostic: "aucun-article-lisible" };
+  if (!lisibles.length) return { articles: nus(), diagnostic: "aucun-article-lisible" };
 
   const bloc = lisibles
     .map((x, n) => `### ARTICLE ${n}\nTitre : ${x.a.title}\nSource : ${x.a.source}\nTexte : ${x.src}`)
@@ -189,18 +216,18 @@ export async function resumerArticles(
   // budget en raisonnement interne AVANT d'écrire : il faut compter large.
   const res = await generateContent(
     [{ role: "user", parts: [{ text: `${CONSIGNE}\n\n${bloc}` }] }],
-    { temperature: 0.2, maxOutputTokens: 6000 },
+    { temperature: 0.2, maxOutputTokens: 9000 },
   );
 
   // Gemini indisponible ou quota épuisé : la lettre part quand même, en titres seuls.
-  if (!res.ok) return { articles: retenus.map((a) => ({ ...a, resume: null })), diagnostic: "modele-indisponible" };
+  if (!res.ok) return { articles: nus(), diagnostic: "modele-indisponible" };
 
   let brut: { i: number; r: string }[] = [];
   try {
     const j = res.text.match(/\[[\s\S]*\]/);
     brut = j ? (JSON.parse(j[0]) as { i: number; r: string }[]) : [];
   } catch {
-    return { articles: retenus.map((a) => ({ ...a, resume: null })), diagnostic: "reponse-illisible" };
+    return { articles: nus(), diagnostic: "reponse-illisible" };
   }
 
   const parIndex = new Map<number, string>();
@@ -217,7 +244,7 @@ export async function resumerArticles(
   }
 
   return {
-    articles: retenus.map((a) => ({ ...a, resume: resumes.get(a.link) ?? null })),
+    articles: rendreTous(articles, resumes),
     // Tout rejeté alors que le modèle a répondu : soit il a refusé de résumer, soit le
     // contrôle des chiffres a tout écarté. Dans les deux cas ça mérite d'être vu.
     diagnostic: resumes.size ? "ok" : "tous-rejetes",
