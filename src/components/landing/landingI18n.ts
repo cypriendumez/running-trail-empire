@@ -88,7 +88,7 @@ const fr: LandingDict = {
     ],
     items: [
       { title: "VFC et sommeil", desc: "VFC au réveil, sommeil profond et paradoxal, Body Battery : la fraîcheur du jour vient de mesures, pas d'un ressenti." },
-      { title: "Sync Garmin, Coros, Strava", desc: "Activités, puissance, zones cardio et données de bien-être récupérées en continu via intervals.icu." },
+      { title: "Sync Garmin, Coros, Polar", desc: "Activités, puissance, zones cardio et données de bien-être récupérées en continu via intervals.icu." },
       { title: "Météo réelle à ta position", desc: "Chaleur, humidité, vent et altitude : les allures cibles sont corrigées avant la séance, pas expliquées après." },
       { title: "Trail Builder", desc: "Tracé accroché aux sentiers réels, dénivelé calculé, export GPX vers la montre." },
       { title: "Smart Journal vocal", desc: "Raconte ta séance à voix haute : ce que tu dis pèse sur la prescription du lendemain." },
@@ -106,7 +106,7 @@ const fr: LandingDict = {
     gratuitNote: "Aucune carte bancaire pour le palier gratuit.",
     plans: [
       { cle: "gratuit", name: "Gratuit", pitch: "Tes données, tes courses, ton historique.", cta: "Créer mon compte",
-        features: ["Sync Garmin, Coros, Strava", "VFC, sommeil et charge d'entraînement", "Historique complet de tes séances", "14 000 courses à venir", "Série, ligues et trophées", "Trail Builder et export GPX"] },
+        features: ["Sync Garmin, Coros, Polar", "VFC, sommeil et charge d'entraînement", "Historique complet de tes séances", "14 000 courses à venir", "Série, ligues et trophées", "Trail Builder et export GPX"] },
       { cle: "starter", name: "Starter", pitch: "Le coach qui se replanifie, plus 10 questions à l'IA par jour.", cta: "Essayer 7 jours",
         features: ["Tout le gratuit", "Plan de 7 jours replanifié en continu", "Séances poussées sur la montre", "10 échanges avec l'IA par jour", "Analyse IA de tes séances", "Kiné IA, avec photo"] },
       { cle: "premium", name: "Premium", pitch: "Le même coach, plus 30 questions à l'IA par jour.", badge: "Le plus demandé", cta: "Essayer 7 jours",
@@ -150,7 +150,7 @@ const en: LandingDict = {
     ],
     items: [
       { title: "HRV and sleep", desc: "Morning HRV, deep and REM sleep, Body Battery: today's freshness comes from measurements, not from a feeling." },
-      { title: "Garmin, Coros, Strava sync", desc: "Activities, power, heart-rate zones and wellness data pulled continuously through intervals.icu." },
+      { title: "Garmin, Coros, Polar sync", desc: "Activities, power, heart-rate zones and wellness data pulled continuously through intervals.icu." },
       { title: "Real weather at your location", desc: "Heat, humidity, wind and altitude: target paces are corrected before the session, not explained after it." },
       { title: "Trail Builder", desc: "Route snapped to real paths, elevation computed, GPX export straight to your watch." },
       { title: "Voice Smart Journal", desc: "Talk through your session out loud: what you say weighs on tomorrow's prescription." },
@@ -168,7 +168,7 @@ const en: LandingDict = {
     gratuitNote: "No card needed for the free tier.",
     plans: [
       { cle: "gratuit", name: "Free", pitch: "Your data, your races, your history.", cta: "Create my account",
-        features: ["Garmin, Coros, Strava sync", "HRV, sleep and training load", "Full history of your sessions", "14,000 upcoming races", "Streak, leagues and trophies", "Trail Builder and GPX export"] },
+        features: ["Garmin, Coros, Polar sync", "HRV, sleep and training load", "Full history of your sessions", "14,000 upcoming races", "Streak, leagues and trophies", "Trail Builder and GPX export"] },
       { cle: "starter", name: "Starter", pitch: "The self-replanning coach, plus 10 AI questions a day.", cta: "Try 7 days",
         features: ["Everything in Free", "7-day plan, continuously replanned", "Sessions pushed to your watch", "10 AI exchanges per day", "AI analysis of your sessions", "AI physio, with photo"] },
       { cle: "premium", name: "Premium", pitch: "The same coach, plus 30 AI questions a day.", badge: "Most popular", cta: "Try 7 days",
@@ -212,7 +212,7 @@ const de: LandingDict = {
     ],
     items: [
       { title: "HRV und Schlaf", desc: "HRV am Morgen, Tief- und REM-Schlaf, Body Battery: die Frische des Tages kommt aus Messungen, nicht aus einem Gefühl." },
-      { title: "Sync mit Garmin, Coros, Strava", desc: "Aktivitäten, Leistung, Herzfrequenzzonen und Wellness-Daten laufend über intervals.icu geholt." },
+      { title: "Sync mit Garmin, Coros, Polar", desc: "Aktivitäten, Leistung, Herzfrequenzzonen und Wellness-Daten laufend über intervals.icu geholt." },
       { title: "Echtes Wetter an deinem Ort", desc: "Hitze, Feuchte, Wind und Höhe: Zieltempi werden vor der Einheit korrigiert, nicht danach erklärt." },
       { title: "Trail Builder", desc: "Strecke auf echte Wege gerastet, Höhenmeter berechnet, GPX-Export direkt auf die Uhr." },
       { title: "Smart Journal per Stimme", desc: "Erzähl deine Einheit laut: was du sagst, wiegt in der Verordnung von morgen." },
@@ -230,7 +230,7 @@ const de: LandingDict = {
     gratuitNote: "Keine Karte nötig für die Gratis-Stufe.",
     plans: [
       { cle: "gratuit", name: "Gratis", pitch: "Deine Daten, deine Rennen, dein Verlauf.", cta: "Konto erstellen",
-        features: ["Sync mit Garmin, Coros, Strava", "HRV, Schlaf und Trainingsbelastung", "Vollständiger Verlauf deiner Einheiten", "14 000 kommende Rennen", "Serie, Ligen und Trophäen", "Trail Builder und GPX-Export"] },
+        features: ["Sync mit Garmin, Coros, Polar", "HRV, Schlaf und Trainingsbelastung", "Vollständiger Verlauf deiner Einheiten", "14 000 kommende Rennen", "Serie, Ligen und Trophäen", "Trail Builder und GPX-Export"] },
       { cle: "starter", name: "Starter", pitch: "Der Coach, der sich neu plant, plus 10 KI-Fragen pro Tag.", cta: "7 Tage testen",
         features: ["Alles aus Gratis", "7-Tage-Plan, laufend neu geplant", "Einheiten direkt auf die Uhr", "10 KI-Dialoge pro Tag", "KI-Analyse deiner Einheiten", "KI-Physio, mit Foto"] },
       { cle: "premium", name: "Premium", pitch: "Derselbe Coach, plus 30 KI-Fragen pro Tag.", badge: "Am beliebtesten", cta: "7 Tage testen",
@@ -274,7 +274,7 @@ const es: LandingDict = {
     ],
     items: [
       { title: "VFC y sueño", desc: "VFC al despertar, sueño profundo y REM, Body Battery: la frescura del día sale de medidas, no de una sensación." },
-      { title: "Sync Garmin, Coros, Strava", desc: "Actividades, potencia, zonas cardio y datos de bienestar recogidos en continuo vía intervals.icu." },
+      { title: "Sync Garmin, Coros, Polar", desc: "Actividades, potencia, zonas cardio y datos de bienestar recogidos en continuo vía intervals.icu." },
       { title: "Meteo real en tu posición", desc: "Calor, humedad, viento y altitud: los ritmos objetivo se corrigen antes de la sesión, no se explican después." },
       { title: "Trail Builder", desc: "Trazado pegado a senderos reales, desnivel calculado, exportación GPX directa al reloj." },
       { title: "Smart Journal por voz", desc: "Cuenta tu sesión en voz alta: lo que dices pesa en la prescripción de mañana." },
@@ -292,7 +292,7 @@ const es: LandingDict = {
     gratuitNote: "Sin tarjeta para el nivel gratuito.",
     plans: [
       { cle: "gratuit", name: "Gratis", pitch: "Tus datos, tus carreras, tu historial.", cta: "Crear mi cuenta",
-        features: ["Sync Garmin, Coros, Strava", "VFC, sueño y carga de entrenamiento", "Historial completo de tus sesiones", "14 000 carreras próximas", "Racha, ligas y trofeos", "Trail Builder y exportación GPX"] },
+        features: ["Sync Garmin, Coros, Polar", "VFC, sueño y carga de entrenamiento", "Historial completo de tus sesiones", "14 000 carreras próximas", "Racha, ligas y trofeos", "Trail Builder y exportación GPX"] },
       { cle: "starter", name: "Starter", pitch: "El entrenador que se replanifica, más 10 preguntas a la IA al día.", cta: "Probar 7 días",
         features: ["Todo lo gratuito", "Plan de 7 días replanificado en continuo", "Sesiones enviadas al reloj", "10 intercambios con la IA al día", "Análisis IA de tus sesiones", "Fisio IA, con foto"] },
       { cle: "premium", name: "Premium", pitch: "El mismo entrenador, más 30 preguntas a la IA al día.", badge: "El más elegido", cta: "Probar 7 días",
@@ -336,7 +336,7 @@ const pt: LandingDict = {
     ],
     items: [
       { title: "VFC e sono", desc: "VFC ao acordar, sono profundo e REM, Body Battery: a frescura do dia vem de medições, não de uma sensação." },
-      { title: "Sync Garmin, Coros, Strava", desc: "Atividades, potência, zonas cardio e dados de bem-estar recolhidos em contínuo via intervals.icu." },
+      { title: "Sync Garmin, Coros, Polar", desc: "Atividades, potência, zonas cardio e dados de bem-estar recolhidos em contínuo via intervals.icu." },
       { title: "Meteorologia real na tua posição", desc: "Calor, humidade, vento e altitude: os ritmos alvo são corrigidos antes da sessão, não explicados depois." },
       { title: "Trail Builder", desc: "Traçado colado a trilhos reais, desnível calculado, exportação GPX direta para o relógio." },
       { title: "Smart Journal por voz", desc: "Conta a tua sessão em voz alta: o que dizes pesa na prescrição de amanhã." },
@@ -354,7 +354,7 @@ const pt: LandingDict = {
     gratuitNote: "Sem cartão para o nível gratuito.",
     plans: [
       { cle: "gratuit", name: "Grátis", pitch: "Os teus dados, as tuas provas, o teu histórico.", cta: "Criar a minha conta",
-        features: ["Sync Garmin, Coros, Strava", "VFC, sono e carga de treino", "Histórico completo das tuas sessões", "14 000 provas futuras", "Série, ligas e troféus", "Trail Builder e exportação GPX"] },
+        features: ["Sync Garmin, Coros, Polar", "VFC, sono e carga de treino", "Histórico completo das tuas sessões", "14 000 provas futuras", "Série, ligas e troféus", "Trail Builder e exportação GPX"] },
       { cle: "starter", name: "Starter", pitch: "O treinador que se replanifica, mais 10 perguntas à IA por dia.", cta: "Testar 7 dias",
         features: ["Tudo o gratuito", "Plano de 7 dias replanificado em contínuo", "Sessões enviadas para o relógio", "10 trocas com a IA por dia", "Análise IA das tuas sessões", "Fisio IA, com foto"] },
       { cle: "premium", name: "Premium", pitch: "O mesmo treinador, mais 30 perguntas à IA por dia.", badge: "O mais escolhido", cta: "Testar 7 dias",
