@@ -77,6 +77,28 @@ export function lectureDe(activites: readonly Record<string, unknown>[]): Lectur
 }
 
 /**
+ * L'ATHLÈTE COURT-IL EN APPLE WATCH ?
+ *
+ * On ne peut pas le savoir par les réglages : Apple n'a AUCUN champ chez intervals.icu,
+ * dans aucun sens. La seule trace est le nom de l'appareil déclaré par les activités —
+ * une Apple Watch s'annonce « Apple Watch », « Apple Watch Series 9 », etc.
+ *
+ * Pourquoi le distinguer des autres montres qui ne reçoivent pas : parce que pour elle,
+ * il EXISTE une solution. Polar ne peut pas recevoir de séance, point final — son API ne
+ * le permet pas. Une Apple Watch, si : « Intervals Companion » (application iOS tierce,
+ * forum intervals.icu sujet 124208) convertit les séances planifiées et les envoie à la
+ * montre depuis sa version 3. Dire à un porteur d'Apple Watch « cette montre ne peut pas
+ * recevoir » serait donc exact hier et faux aujourd'hui : on lui indique le chemin.
+ *
+ * ⚠️ Ce n'est PAS équivalent à Garmin, et l'app ne doit pas le laisser croire : le chemin
+ * passe par une troisième application, que l'athlète doit installer lui-même, et que ni
+ * Pacevo ni intervals.icu ne contrôlent.
+ */
+export function estAppleWatch(l: Lecture | null | undefined): boolean {
+  return /apple/i.test(l?.appareil ?? "");
+}
+
+/**
  * La première MONTRE prête à recevoir, ou `null`. Pure — testable sans réseau.
  *
  * ⚠️ Les destinations marquées `montre: false` sont sautées : elles reçoivent la séance

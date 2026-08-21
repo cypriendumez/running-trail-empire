@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import type { UserProfile, PerformanceBaseline } from "@/types";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { GX, GUIDE, GUIDE_TIP, SPEECH_LANG, fillG } from "./ghostI18n";
+import { estAppleWatch } from "@/lib/watch/intervals";
 
 /**
  * ⚠️ `title`, `detail` et `tags` sont en FRANÇAIS, et doivent le rester :
@@ -872,7 +873,7 @@ export function GhostRunner({ baseline, effectiveVma, coachSessions = [] }: Ghos
                   {sendingWatch ? <Loader2 className="w-5 h-5 animate-spin" /> : <Watch className="w-5 h-5" />}
                   {sendingWatch ? d["watch.sending"] : d["watch.send"]}
                   {!sendingWatch && watchStatus && (
-                    <span title={watchStatus.pushReady ? tg("watch.okTitle", { d: watchStatus.device ?? "" }) : watchStatus.lecture ? tg("acc.readonly", { d: nomLecture(watchStatus.lecture) }) : d["watch.setupTitle"]}
+                    <span title={watchStatus.pushReady ? tg("watch.okTitle", { d: watchStatus.device ?? "" }) : watchStatus.lecture ? tg(estAppleWatch(watchStatus.lecture) ? "acc.apple" : "acc.readonly", { d: nomLecture(watchStatus.lecture) }) : d["watch.setupTitle"]}
                       className={`h-2 w-2 rounded-full ${watchStatus.pushReady ? "bg-emerald-400" : watchStatus.lecture ? "bg-sky-400" : watchStatus.connected ? "bg-amber-400" : "bg-zinc-400"}`} />
                   )}
                 </button>
@@ -904,7 +905,10 @@ export function GhostRunner({ baseline, effectiveVma, coachSessions = [] }: Ghos
                       {watchStatus.pushReady
                         ? tg("acc.ok", { d: watchStatus.device ?? "" })
                         : watchStatus.lecture
-                        ? tg("acc.readonly", { d: nomLecture(watchStatus.lecture) })
+                        // Apple est le seul cas « lecture seule » qui ait une issue :
+                        // on indique l'app qui convertit le plan, au lieu de laisser
+                        // croire à une impasse.
+                        ? tg(estAppleWatch(watchStatus.lecture) ? "acc.apple" : "acc.readonly", { d: nomLecture(watchStatus.lecture) })
                         : watchStatus.connected
                         ? d["acc.almost"]
                         : d["acc.no"]}

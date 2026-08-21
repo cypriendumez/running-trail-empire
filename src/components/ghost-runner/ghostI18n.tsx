@@ -34,6 +34,9 @@ export const GX: Record<string, Record<string, string>> = {
     // correctement lisait « configure ta montre ». Apple n'a aucun champ d'envoi chez
     // intervals.icu — il n'y a rien à configurer, et le lui réclamer est une erreur.
     "acc.readonly": "On lit bien tes données ({d}) — cette montre ne peut pas recevoir de séance planifiée. Ton plan reste dans le calendrier.",
+    // Apple est le SEUL cas « lecture seule » qui ait une issue : on l'indique au lieu
+    // de laisser croire à une impasse.
+    "acc.apple": "On lit bien tes données ({d}). Pour recevoir aussi tes séances au poignet, installe « Intervals Companion » sur ton iPhone : elle convertit le plan pour l'Apple Watch.",
     "acc.no": "Montre pas encore connectée — ouvre le mode d'emploi",
     "acc.cta": "Connecter ma montre maintenant →",
     "st.gps": "GPS actif", "st.search": "Recherche du signal GPS…",
@@ -86,6 +89,7 @@ export const GX: Record<string, Record<string, string>> = {
     "acc.ok": "Watch connected ({d}) — your sessions arrive automatically",
     "acc.almost": "Almost there: enable “Push planned workouts” in intervals.icu",
     "acc.readonly": "We do receive your data ({d}) — this watch cannot accept planned sessions. Your plan stays in the calendar.",
+    "acc.apple": "We do receive your data ({d}). To also get your sessions on your wrist, install “Intervals Companion” on your iPhone: it converts the plan for Apple Watch.",
     "acc.no": "Watch not connected yet — open the guide",
     "acc.cta": "Connect my watch now →",
     "st.gps": "GPS active", "st.search": "Searching for GPS signal…",
@@ -138,6 +142,7 @@ export const GX: Record<string, Record<string, string>> = {
     "acc.ok": "Uhr verbunden ({d}) — deine Einheiten kommen automatisch an",
     "acc.almost": "Fast geschafft: aktiviere „Push planned workouts“ in intervals.icu",
     "acc.readonly": "Deine Daten kommen an ({d}) — diese Uhr kann keine geplanten Einheiten empfangen. Dein Plan bleibt im Kalender.",
+    "acc.apple": "Deine Daten kommen an ({d}). Damit deine Einheiten auch am Handgelenk ankommen, installiere „Intervals Companion“ auf dem iPhone: Sie wandelt den Plan für die Apple Watch um.",
     "acc.no": "Uhr noch nicht verbunden — öffne die Anleitung",
     "acc.cta": "Meine Uhr jetzt verbinden →",
     "st.gps": "GPS aktiv", "st.search": "Suche GPS-Signal…",
@@ -190,6 +195,7 @@ export const GX: Record<string, Record<string, string>> = {
     "acc.ok": "Reloj conectado ({d}): tus sesiones llegan automáticamente",
     "acc.almost": "Casi: activa «Push planned workouts» en intervals.icu",
     "acc.readonly": "Sí recibimos tus datos ({d}): este reloj no puede recibir sesiones planificadas. Tu plan permanece en el calendario.",
+    "acc.apple": "Sí recibimos tus datos ({d}). Para recibir también tus sesiones en la muñeca, instala «Intervals Companion» en tu iPhone: convierte el plan para el Apple Watch.",
     "acc.no": "Reloj aún sin conectar: abre la guía",
     "acc.cta": "Conectar mi reloj ahora →",
     "st.gps": "GPS activo", "st.search": "Buscando señal GPS…",
@@ -242,6 +248,7 @@ export const GX: Record<string, Record<string, string>> = {
     "acc.ok": "Relógio ligado ({d}) — as tuas sessões chegam automaticamente",
     "acc.almost": "Quase: ativa «Push planned workouts» no intervals.icu",
     "acc.readonly": "Recebemos os teus dados ({d}) — este relógio não pode receber treinos planeados. O teu plano fica no calendário.",
+    "acc.apple": "Recebemos os teus dados ({d}). Para receberes também os treinos no pulso, instala a «Intervals Companion» no iPhone: converte o plano para o Apple Watch.",
     "acc.no": "Relógio ainda não ligado — abre o guia",
     "acc.cta": "Ligar o meu relógio agora →",
     "st.gps": "GPS ativo", "st.search": "À procura de sinal GPS…",

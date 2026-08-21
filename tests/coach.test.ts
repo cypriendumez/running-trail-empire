@@ -24,7 +24,7 @@ import { etatDouble, scinderFacile, seanceDoubleSeuil, AVERTISSEMENT_LACTATE } f
 import { oneSessionPerSlot, slotKey } from "../src/lib/coach/sessions";
 import { vmaFromPaceCurve, bestVmaFromWorkouts, effectiveVma, dureeEnConditionsNeutres, PART_PENALITE_CHALEUR, pctVmaForDistance, easyPaceFromHeartRate, MIN_SEANCES_ALLURE_Z2, LONG_RUN_PRET_KM, LONG_RUN_PLANCHER_KM } from "../src/lib/running/fitness";
 import { heatAdvice, windAdvice, altitudeLossPct, heatAcclimation } from "../src/lib/weather/openMeteo";
-import { parseReps, parsePaceSec, stepsForType, warmCoolMin, buildWorkoutDescription, montreDe, metriquesMixtesSupportees, DESTINATIONS_MONTRE , lectureDe } from "../src/lib/watch/intervals";
+import { parseReps, parsePaceSec, stepsForType, warmCoolMin, buildWorkoutDescription, montreDe, metriquesMixtesSupportees, DESTINATIONS_MONTRE , lectureDe, estAppleWatch } from "../src/lib/watch/intervals";
 import { buildWeekPlan, CONFIRMED_DAYS } from "../src/lib/ai/autoPlan";
 import { tr, ALL_LANGS, nRaw } from "../src/lib/i18n/multi";
 // `T` est déjà pris plus bas dans ce fichier (une date) → alias explicite.
@@ -5137,6 +5137,18 @@ test("on ne réclame pas un réglage à quelqu'un qui a déjà tout fait", () =>
   // rendre un objet vide, qui afficherait « On lit bien tes données () ».
   const muette = lectureDe([{ start_date_local: "2026-08-20" }, { source: "STRAVA", start_date_local: "2026-08-19" }]);
   assert.equal(muette?.source, "Strava", "une activité muette ne doit pas masquer la suivante");
+
+  // ⚠️ APPLE EST LE SEUL CAS « LECTURE SEULE » QUI AIT UNE ISSUE, et le confondre avec les
+  // autres serait décourager quelqu'un pour rien. Polar ne peut PAS recevoir de séance —
+  // son API ne le permet pas, point final. Une Apple Watch, si : « Intervals Companion »
+  // convertit le plan et l'envoie au poignet depuis sa v3 (forum intervals.icu, sujet
+  // 124208, utilisateurs actifs vérifiés le 11/08/2026). L'app doit donc indiquer le
+  // chemin, pas annoncer une impasse.
+  assert.ok(estAppleWatch({ appareil: "Apple Watch Series 9", source: "Upload", date: null }));
+  assert.ok(estAppleWatch({ appareil: "apple watch", source: null, date: null }), "la casse ne doit pas décider");
+  assert.ok(!estAppleWatch({ appareil: "Polar Vantage V3", source: null, date: null }), "Polar n'a AUCUNE issue : ne pas lui promettre une app");
+  assert.ok(!estAppleWatch({ appareil: "Garmin Forerunner 165", source: null, date: null }));
+  assert.ok(!estAppleWatch(null), "sans appareil, on n'affirme rien");
 
   // Aucune donnée = aucune affirmation. C'est là que « configure ta montre » est juste.
   assert.equal(lectureDe([]), null);
