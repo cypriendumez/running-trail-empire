@@ -66,6 +66,12 @@ const TIERS_PAYANTS: Record<string, Extract<Acces, "starter" | "premium">> = {
   pro: "premium",
   complet: "premium",
   essentiel: "starter",
+  // ⚠️ `elite` MANQUAIT, et ce n'était pas un alias décoratif : c'est l'une des TROIS
+  // seules valeurs que la colonne accepte réellement en base
+  // (`create type subscription_tier as enum ('free', 'pro', 'elite')`). Un compte porté
+  // à ce palier — le plus haut du schéma d'origine — retombait donc sur « gratuit » et
+  // se voyait refuser son plan, en silence, avec le motif « essai_expire ».
+  elite: "premium",
 };
 
 export type ProfilAcces = {

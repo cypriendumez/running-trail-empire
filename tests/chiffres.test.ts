@@ -25,6 +25,7 @@ import { JOURS_ESSAI } from "../src/lib/billing/access";
 import { ARTICLES } from "../src/app/blog/articles";
 import { ARTICLES_I18N } from "../src/app/blog/articlesI18n";
 import { LEGAL } from "../src/app/legalI18n";
+import { accesDe } from "../src/lib/billing/access";
 
 const ROOT = join(import.meta.dirname, "..");
 const SRC = join(ROOT, "src");
@@ -196,6 +197,36 @@ test("les mentions légales disent la même chose dans les 5 langues", () => {
       /particulier|individual|Privatperson|particular/i.test(restants[0]),
       `le trou restant en ${lg} n'est pas le statut juridique : ${restants[0]}`,
     );
+  }
+});
+
+test("chaque palier que la BASE accepte a un sens pour le code", () => {
+  // ⚠️ DÉFAUT RÉEL, trouvé le 21/08/2026 en cherchant pourquoi le coach s'était tu.
+  // `profiles.subscription_tier` n'est pas du texte libre : c'est un ENUM Postgres,
+  // `create type subscription_tier as enum ('free', 'pro', 'elite')`. Le code, lui,
+  // tenait sa propre liste de paliers payants — et `elite`, la valeur la plus haute du
+  // schéma, n'y figurait pas. Un compte porté à ce palier retombait donc sur
+  // « gratuit » : plus de plan, plus d'IA, et pour tout message « essai_expire ».
+  //
+  // Deux listes dans deux fichiers, aucune ne connaissant l'autre. Ce test les relie.
+  const sql = readFileSync(join(ROOT, "supabase/migrations/001_initial_schema.sql"), "utf8");
+  const m = sql.match(/create type subscription_tier as enum \(([^)]*)\)/i);
+  assert.ok(m, "l'enum subscription_tier n'est plus déclaré là où ce test le cherche");
+  const valeurs = [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
+  assert.ok(valeurs.length >= 2, `enum illisible : ${m[1]}`);
+
+  // Un compte assez ancien pour que l'essai soit fini : seul le palier décide encore.
+  const vieux = "2020-01-01T00:00:00.000Z";
+  for (const v of valeurs) {
+    const etat = accesDe({ created_at: vieux, subscription_tier: v }).etat;
+    if (v === "free") {
+      assert.equal(etat, "gratuit", "« free » doit rester le palier gratuit");
+    } else {
+      assert.notEqual(
+        etat, "gratuit",
+        `le palier « ${v} » existe en base mais le code le traite comme gratuit — un compte porté à ce palier serait verrouillé`,
+      );
+    }
   }
 });
 
