@@ -433,6 +433,404 @@ export const ARTICLES_I18N: Partial<Record<Lang, Record<string, TraductionArticl
       ],
     },
   },
+  de: {
+    "ravitaillement-marathon-quoi-quand-combien": {
+      chapo:
+        "Zur Kohlenhydratzufuhr während der Belastung gibt es in der Literatur einen recht stabilen Konsens. Hier steht, was er sagt, woher die Zahlen stammen — und warum der wichtigste Punkt nicht die Menge ist, sondern das Training deines Darms.",
+      avertissement:
+        "Dieser Artikel fasst allgemeine Empfehlungen aus wissenschaftlichen Publikationen zusammen. Er ersetzt nicht den Rat einer Ärztin oder eines Ernährungsberaters, insbesondere bei Verdauungsbeschwerden, Diabetes, Schwangerschaft oder laufender Behandlung.",
+      blocs: [
+        {
+          h: "Warum es das Thema gibt",
+          p: [
+            "Der Körper speichert eine begrenzte Menge Glykogen — in Leber und Muskulatur. Bei langer Ausdauerbelastung wird diese Reserve zum limitierenden Faktor, lange vor den Muskeln selbst. Das ist die physiologische Ursache dessen, was Läufer den Mann mit dem Hammer nennen.",
+            "Kohlenhydrate während der Belastung zuzuführen dient nicht dazu, vage „Energie zu haben\": Es dient dazu, eine Reserve zu schonen, die man am Wettkampftag nicht vergrößern kann.",
+          ],
+        },
+        {
+          h: "Wie viel: was der Konsens sagt",
+          p: [
+            "Asker Jeukendrups 2014 in Sports Med veröffentlichte Übersicht schlägt eine Skala nach Belastungsdauer vor statt einer einzigen Zahl. Etwa 30 bis 60 Gramm Kohlenhydrate pro Stunde bei ein bis zweieinhalb Stunden; bis zu rund 90 Gramm pro Stunde darüber hinaus, aber unter einer genauen Bedingung, die gleich folgt.",
+            "Das gemeinsame Positionspapier des American College of Sports Medicine zu Ernährung und Leistung aus demselben Jahr weist in dieselbe Richtung und ordnet diese Mengen in die Gesamternährung ein.",
+            "Diese Spannen sind bewusst weit. Gewicht, Tempo, Hitze und individuelle Verträglichkeit verschieben den Regler, und der Abstand zwischen zwei gleich starken Läufern ist beträchtlich.",
+          ],
+        },
+        {
+          h: "Die Bedingung, die alle vergessen: zwei Zucker, nicht einer",
+          p: [
+            "Glukose passiert die Darmwand über einen Transporter, der sättigt — das deckelt die Aufnahme bei etwa 60 Gramm pro Stunde. Fruktose nutzt einen anderen Transporter, der nicht gleichzeitig sättigt.",
+            "Deshalb beruhen hohe Zufuhren auf einer Mischung aus Glukose und Fruktose. 90 Gramm pro Stunde mit reiner Glukose gehen nicht durch: Der Überschuss bleibt im Darm, und genau dort entstehen die Verdauungsprobleme, die ein Rennende ruinieren.",
+            "Konkret heißt das: Etikett lesen. Ein Produkt mit ausgewiesenem Verhältnis von zwei zu eins zwischen Glukose und Fruktose ist dafür gemacht, ein anderes nicht.",
+          ],
+        },
+        {
+          h: "Wann: das Rennen beginnt vor dem Start",
+          p: [
+            "In den Tagen davor geht es darum, mit vollen Speichern anzutreten — also kohlenhydratreiche Ernährung und reduziertes Trainingsvolumen. Das Tapering zählt hier so viel wie der Teller.",
+            "Am Morgen eine verträgliche Mahlzeit einige Stunden vor dem Start, aus dem, was du schon getestet hast. Das ist nicht der Tag für ein neues Brot.",
+            "Während des Rennens ist die nützlichste Regel: früh anfangen und aufteilen. Zu warten, bis man Hunger hat, ist bereits zu spät — die Magenentleerung braucht Zeit, und das Aufholen in einer großen Portion ist genau das, was der Darm verweigert.",
+          ],
+        },
+        {
+          h: "Trinken: nach Durst, und an Natrium denken",
+          p: [
+            "Die Empfehlung, den Organismus zu fluten, ist aufgegeben. Nach Durst zu trinken bleibt für die meisten der sicherste Anhaltspunkt, und viel zu viel reines Wasser bei langer Belastung birgt eine echte Gefahr — die Hyponatriämie, eine Verdünnung des Blutnatriums.",
+            "Bei Hitze oder starkem Schwitzen zählt die Natriumzufuhr so viel wie die Trinkmenge. Die meisten Sportgetränke enthalten welches; reines Wasser nicht.",
+          ],
+        },
+        {
+          h: "Der wichtigste Punkt: den Darm trainieren",
+          p: [
+            "Der Darm passt sich an das an, was regelmäßig von ihm verlangt wird. Wer im Training nie isst und am Wettkampftag 90 Gramm pro Stunde aufnimmt, mutet seinem Magen im schlechtesten Moment eine unbekannte Last zu.",
+            "Die praktische Folge ist einfach und wird am wenigsten befolgt: Die langen Läufe sind der Ort, an dem die Verpflegung getestet wird. Gleiche Produkte, gleiche Mengen, gleiche Abstände wie am Wettkampftag. Der Ernährungsplan wird im Training geprobt, genau wie das Tempo.",
+          ],
+        },
+        {
+          h: "Danach",
+          p: [
+            "Die Wiederauffüllung des Glykogens ist in den Stunden nach der Belastung schneller, was zählt, wenn Wettkämpfe aufeinanderfolgen — deutlich weniger, wenn der nächste in drei Wochen ist.",
+            "Bei einem Zielwettkampf ist die eigentliche Frage danach nicht das Stoffwechselfenster, sondern die Belastung sinken zu lassen, bevor man wieder loslegt.",
+          ],
+        },
+      ],
+    },
+    "chaussure-de-trail-ce-qui-compte-avant-la-marque": {
+      chapo:
+        "Dieser Artikel versprach einmal einen „Vergleich nach deinem Laufstil\": Dafür hätte man konkrete Modelle bewerten müssen, nach Kriterien, die wir nicht messen — und die Rangliste wäre mit der nächsten Kollektion veraltet. Hier stehen stattdessen die vier Parameter, die wirklich entscheiden, und was die Literatur zu jedem sagt.",
+      blocs: [
+        {
+          h: "Das Gewicht, der einzige Parameter mit klar belegtem Zusammenhang",
+          p: [
+            "Hier ist die Datenlage am deutlichsten. Arbeiten von Wouter Hoogkamer und Kollegen zeigten, dass eine Veränderung der Laufökonomie sich direkt in der Leistung über die Distanz niederschlägt — und die Masse am Fuß ist einer der einfachsten Hebel dieser Ökonomie.",
+            "In der Praxis: Ein schwererer Schuh schützt mehr, kostet aber bei jedem Schritt, und der Preis wird umso länger bezahlt, je länger das Rennen ist. Eine Abwägung, keine Regel — auf grobem Gelände kann Schutz sein Gewicht wert sein.",
+          ],
+        },
+        {
+          h: "Die Sprengung: viel Gerede, wenig Belege",
+          p: [
+            "Die Sprengung ist der Höhenunterschied zwischen Ferse und Vorfuß. Sie ist das verbreitetste Marketingargument und eines der schwächsten.",
+            "Laurent Malisoux' im American Journal of Sports Medicine veröffentlichte Studie verglich Schuhe unterschiedlicher Sprengung bei Freizeitläufern: Ein Effekt der Sprengung auf das Verletzungsrisiko ließ sich in der Gesamtgruppe nicht nachweisen. Anders gesagt: Es gibt keine „richtige\" Sprengung, die für alle gilt.",
+            "Die praktische Folge befreit: Nimm die Sprengung, an die du gewöhnt bist, und wenn du wechseln willst, tu es schrittweise — der abrupte Wechsel ist das Problem, nicht der Wert selbst.",
+          ],
+        },
+        {
+          h: "Die Stollen: das Gelände entscheidet",
+          p: [
+            "Tiefe, weit stehende Stollen greifen in Schlamm und geben Erde frei; auf trockenem Fels sind sie unbequem und verschleißen schnell. Flache Stollen greifen auf Stein und rollen auf laufbaren Passagen gut; sobald es rutschig wird, verlieren sie.",
+            "Es gibt also keine beste Sohle, nur eine beste Sohle für DEIN übliches Gelände. Wer auf lehmigem Waldboden läuft und wer auf trockenem Kalk läuft, haben nicht denselben Bedarf, und kein generischer Test entscheidet das für sie.",
+          ],
+        },
+        {
+          h: "Dämpfung und Schutz: eine Frage der Dauer",
+          p: [
+            "Je länger die Belastung, desto mehr summieren sich die Stöße und desto mehr zählt die Dämpfung. Bei kurzem, schnellem Format gibt ein flacher, präziser Schuh besseres Bodengefühl.",
+            "Die Steinschutzplatte beurteilt man nicht nach Komfort, sondern nach Steinen: Auf steinigem Gelände wird ihr Fehlen spät im Rennen bezahlt, wenn die Fußsohle nichts mehr verzeiht.",
+          ],
+        },
+        {
+          h: "Was mehr zählt als alles andere: die Passform",
+          p: [
+            "Der auf dem Papier beste Schuh nützt nichts, wenn er nicht zu deinem Fuß passt. Vorfußbreite, Fersenhalt und Volumen schwanken zwischen Marken enorm — oft stärker als die technischen Parameter, über die alle reden.",
+            "Der Fuß schwillt bei langer Belastung an: am Abend anprobieren, mit den Wettkampfsocken, und vorne Platz lassen. Ein im Laden perfekt sitzender Schuh ist im 40. Kilometer zu klein.",
+          ],
+        },
+        {
+          h: "Die ehrliche Schlussfolgerung",
+          p: [
+            "Keine Rangliste kann dir sagen, welches Modell du nehmen sollst, weil die beiden entscheidenden Parameter — dein Gelände und dein Fuß — in keinem Test vorkommen.",
+            "Was sich hingegen tun lässt, ist den Verschleiß zu verfolgen. Pacevo erfasst die Kilometer pro Paar: Das ist eine gemessene Tatsache, keine Meinung, und sie schlägt jedes Bauchgefühl bei der Frage, wann ein Paar am Ende ist.",
+          ],
+        },
+      ],
+    },
+    "choisir-son-premier-ultra-ce-qui-distingue-les-epreuves": {
+      chapo:
+        "Dieser Artikel hieß einmal „die französischen Trails, die du 2026 nicht verpassen darfst\": eine datierte Liste, die in sechs Monaten falsch wäre. Hier stehen stattdessen die Kriterien, die entscheiden, ob ein Rennen zu dir passt — und die veralten nicht.",
+      blocs: [
+        {
+          h: "Die Distanz ist das schlechteste Kriterium",
+          p: [
+            "Zwei 80-km-Rennen haben fast nichts gemeinsam, wenn eines 1 500 Höhenmeter hat und das andere 5 000. Der Anstieg entscheidet über die Zeit auf den Beinen, den Anteil des Gehens, die Belastung der Abfahrten — und es ist die Abfahrt, nicht der Aufstieg, die die Oberschenkel zerstört.",
+            "Ein nützlicherer Anhaltspunkt als die Distanz allein ist das Verhältnis von Höhenmetern zu Kilometern. Ab einer gewissen mittleren Steigung läuft man nicht mehr wirklich: Man wandert schnell bergauf und steckt bergab ein. Weder besser noch schlechter, aber es verlangt einen anderen Aufbau.",
+            "Zweiter Anhaltspunkt: das vom Veranstalter gesetzte Zeitlimit. Es sagt weit besser als die Kilometerzahl, an welche Zielgruppe sich das Rennen richtet.",
+          ],
+        },
+        {
+          h: "Cut-offs, die Einschränkung, die man zu spät entdeckt",
+          p: [
+            "Die meisten Ultras schreiben Durchgangszeiten an Zwischenpunkten vor. An einer Verpflegung gestoppt zu werden, weil man zehn Minuten zu spät ist, ist das häufigste Scheitern — und das vermeidbarste.",
+            "Sie werden vor der Anmeldung gelesen, nicht am Vorabend. Vergleiche sie mit deinem echten Tempo im Gebirge, nicht mit dem auf der Straße: Der Unterschied ist erheblich, und genau daran zerschellen optimistische Hochrechnungen.",
+          ],
+        },
+        {
+          h: "Die Nacht ändert alles",
+          p: [
+            "Sobald ein Rennen in die Nacht reicht, wird es eine andere Übung: verminderte Wachsamkeit, schlechter lesbares Gelände, Kälte, und ein Schlafmanagement, das es in kurzen Formaten nicht gibt.",
+            "Ein erster Ultra, der vor Einbruch der Dunkelheit endet, ist eine vernünftigere Steigerung als ein Nachtformat gleicher Distanz. Ist die Nacht unvermeidbar, wird sie geprobt — mindestens ein langer Lauf mit Stirnlampe.",
+          ],
+        },
+        {
+          h: "Autonomie und Verpflegung",
+          p: [
+            "Manche Rennen verpflegen oft und reichlich, andere verlangen lange Autonomie, mitunter beim Wasser. Die Pflichtausrüstung folgt daraus, und sie wiegt.",
+            "Diese Angaben stehen im Reglement. Sie zu lesen heißt auch, vorwegzunehmen, was du tragen wirst — und was du folglich im langen Lauf getestet haben musst.",
+          ],
+        },
+        {
+          h: "Die Qualifikationssysteme",
+          p: [
+            "Mehrere große Rennen nehmen keine direkte Anmeldung an. Der UTMB-Zirkel etwa nutzt einen aus Ergebnissen berechneten Leistungsindex und auf gelabelten Rennen zu erwerbende Qualifikationssteine, um in die Auslosung bestimmter Events zu kommen.",
+            "Das sind offizielle Verfahren, deren Modalitäten sich von Jahr zu Jahr ändern. Maßgeblich ist allein die Seite des Veranstalters: Sie vor dem Saisonplan zu lesen erspart die Entdeckung im Januar, dass man im Vorjahr hätte anfangen müssen.",
+          ],
+        },
+        {
+          h: "Wie man das konkret nutzt",
+          p: [
+            "Der Kalender von Pacevo listet kommende Rennen mit Distanz, Datum und Anmeldelink. Ein Rennen als Ziel zu wählen richtet den Aufbau auf sein Datum aus.",
+            "Aber die App liest die Reglements nicht für dich. Höhenmeter, Cut-offs, Autonomie und Qualifikation prüft man auf der Seite des Veranstalters — er verpflichtet sich, nicht wir.",
+          ],
+        },
+      ],
+    },
+    "coach-vocal-en-course-ce-que-ca-change": {
+      chapo:
+        "Das eigentliche Problem im Rennen ist nicht die Geschwindigkeit, sondern die Tempoeinteilung. Was eine Stimme im Ohr ändert, was sie nicht wissen kann, und warum sie vor allem hilft, wenn du müde bist.",
+      blocs: [
+        {
+          h: "Das Problem, das es adressiert",
+          p: [
+            "Chester Abbiss und Paul Laursen haben die im Wettkampf gewählten Tempostrategien beschrieben und wie sie auf das Ergebnis wirken. Die durchgehende Schlussfolgerung dieser Literatur: Die Verteilung der Anstrengung zählt, und zu schnell zu starten ist der teuerste Fehler.",
+            "Das Problem ist, dass ein Läufer sein Tempo schlecht wahrnimmt — und immer schlechter, je müder er wird. Das Anstrengungsempfinden steigt, während die Geschwindigkeit fällt: Genau in dem Moment, in dem du langsamer wirst, fühlt es sich an, als würdest du beschleunigen.",
+          ],
+        },
+        {
+          h: "Was ein Display nicht löst",
+          p: [
+            "Eine Uhr zeigt das Tempo bereits an. Aber es zu lesen heißt: den Blick senken, scharfstellen und vor allem diese Zahl mit einem Ziel vergleichen, das man im Kopf behält — drei Vorgänge, die im 30. Kilometer teuer werden.",
+            "Schlimmer noch: Das Momentantempo schwankt stark, besonders in der Stadt oder unter Baumkronen, wo das Satellitensignal leidet. Wer bei jeder Schwankung korrigiert, läuft ein Ziehharmonika-Rennen — anstrengender als ein gleichmäßiges Tempo.",
+          ],
+        },
+        {
+          h: "Was der Ghost Runner ansagt",
+          p: [
+            "Bei jedem Kilometer nennt eine Stimme drei Dinge: das gelaufene Tempo, die Abweichung vom Plan und die Hochrechnung auf das Ziel, wenn du so weitermachst.",
+            "Das dritte ändert das Verhalten. „5:12\" ist eine Information; „in diesem Rhythmus kommst du vier Minuten über deinem Ziel an\" ist eine Entscheidung. Die Umrechnung wird für dich gemacht, in dem Moment, in dem du sie am wenigsten leisten kannst.",
+            "Und weil es Audio ist, verlangt es weder den Blick zur Seite noch einen Bruch im Laufrhythmus.",
+          ],
+        },
+        {
+          h: "Seine Grenzen, und sie sind real",
+          p: [
+            "Er kennt das Gelände nicht. Ein Anstieg verlangsamt zu Recht; die Ansage einer Abweichung ist dort kein Signal zu beschleunigen, es sei denn, man will die Beine am Berg verbrennen.",
+            "Er kennt auch deine Beine nicht. Er vergleicht eine Geschwindigkeit mit einem Ziel; dass dein Oberschenkel seit zehn Minuten zieht, weiß er nicht. Das beim Start gesetzte Ziel kann mitten im Rennen das falsche werden, und das zu entscheiden ist deine Sache.",
+            "Schließlich setzt Laufen mit Kopfhörer voraus, die Umgebung noch zu hören. Auf offener Straße nur ein Ohr — und bei manchen Rennen sind Kopfhörer laut Reglement verboten.",
+          ],
+        },
+        {
+          h: "Wann es am meisten hilft",
+          p: [
+            "Bei langen Belastungen im Zieltempo, wo das Abdriften langsam und daher von innen unsichtbar ist. Beim ersten Versuch über eine bestimmte Zeit, wenn das Gefühl noch nicht geeicht ist. Und im Training, um zu lernen, wie sich das Zieltempo wirklich anfühlt.",
+            "Bei kurzen Intervallen dagegen bringt er nichts: Die Belastungen sind zu kurz, als dass eine Ansage pro Kilometer überhaupt stattfände.",
+          ],
+        },
+      ],
+    },
+    "semi-en-moins-de-1h45-construire-le-plan": {
+      chapo:
+        "1:45 im Halbmarathon heißt, 4:59 pro Kilometer über 21,1 km zu halten. Hier steht, woher jede Einheit eines solchen Aufbaus kommt — und warum der Großteil der Arbeit deutlich langsamer stattfindet.",
+      blocs: [
+        {
+          h: "Was die Zeit rechnerisch verlangt",
+          p: [
+            "105 Minuten für 21,0975 km ergeben 4:59 pro Kilometer, also etwas mehr als 12 km/h. Das ist keine Meinung, sondern eine Division — und die einzige Zahl dieses Artikels, die eine Leistung beschreibt.",
+            "Die Schwierigkeit liegt nicht darin, dieses Tempo zu erreichen: Viele halten es über 5 km. Sie liegt darin, es eine Stunde fünfundvierzig zu halten, und das ist weit mehr ein Ausdauer- als ein Tempoproblem.",
+          ],
+        },
+        {
+          h: "Warum der Großteil des Volumens langsam gelaufen wird",
+          p: [
+            "Das ist der widersinnigste Teil des Aufbaus und der am häufigsten übersprungene. Stephen Seiler hat beschrieben, was Ausdauerathleten auf hohem Niveau tatsächlich tun: Der weit überwiegende Teil ihres Volumens liegt bei niedriger Intensität, nur ein kleiner Anteil bei hoher. Man nennt es polarisierte Verteilung.",
+            "Die Intuition sagt das Gegenteil: Wenn ich schnell laufen will, laufe ich schnell. Das Problem ist, dass Intensität Erholung kostet. Wer jede Einheit mittelhart läuft, ist dauerhaft mittelmüde und erholt sich nie genug für eine echte Qualitätseinheit.",
+            "In der Praxis muss der Grundlagenlauf wirklich locker sein: ein Tempo, bei dem du in ganzen Sätzen sprechen kannst. Wenn du zum Atmen abbrechen musst, bist du zu schnell.",
+          ],
+        },
+        {
+          h: "Die Schwellen-Einheit, das Herzstück",
+          p: [
+            "Die Schwelle ist etwa das Tempo, das man im Wettkampf rund eine Stunde halten kann. Für einen Halbmarathon in 1:45 liegt es logischerweise etwas über dem Renntempo selbst.",
+            "Man trainiert sie in Blöcken — lange Intervalle von mehreren Minuten mit kurzen Pausen — statt am Stück, was erlaubt, Zeit bei dieser Intensität zu sammeln, ohne dass die Einheit unbeherrschbar wird.",
+            "Auch höhere Intensität hat ihren Platz. Jan Helgeruds Vergleich von Trainingsformaten zeigte, dass hochintensive Intervalle die maximale Sauerstoffaufnahme stärker verbessern als moderates Dauertraining. Aber das ist Gewürz, nicht Hauptgericht.",
+          ],
+        },
+        {
+          h: "Der lange Lauf",
+          p: [
+            "Er baut auf, was schnelle Einheiten nicht aufbauen: die Fähigkeit durchzuhalten. Er wird locker gelaufen, und seine Dauer zählt mehr als seine Distanz — die Zeit auf den Beinen erzeugt die Anpassung.",
+            "Eine nützliche Variante gegen Ende: einen Teil im Zieltempo beenden. Das lehrt, dieses Tempo auf müden Beinen zu finden — genau die Situation im 15. Kilometer.",
+          ],
+        },
+        {
+          h: "Das Tapering",
+          p: [
+            "Die letzten Wochen senken das Volumen und behalten Spitzen an Intensität. Ziel ist positive Frische: Die jüngste Belastung sinkt, die Grundform bleibt.",
+            "Der klassische Fehler ist Aufholen zu wollen. Eine harte Einheit zehn Tage vor dem Start holt nichts auf — sie zerstört nur die Frische, die man gerade aufgebaut hat.",
+          ],
+        },
+        {
+          h: "Was den Plan unterwegs bewegt",
+          p: [
+            "Ein acht Wochen im Voraus geschriebener Plan unterstellt, dass diese acht Wochen wie geplant verlaufen. Das tun sie nie: eine harte Arbeitswoche, eine Erkältung, eine schlaflose Nacht, unerwartete Hitze.",
+            "Genau hier zahlt sich das tägliche Nachlesen der Werte aus. In Pacevo wandert oder schrumpft die Qualitätseinheit, wenn Frische und Herzratenvariabilität es sagen, und der Kalender erklärt die Entscheidung. Das Wochenvolumen bewegt sich wenig, seine Verteilung viel.",
+          ],
+        },
+      ],
+    },
+    "body-battery-basse-faut-il-courir": {
+      chapo:
+        "Ein Indikator am Tiefpunkt am Morgen ist weder grünes noch rotes Licht: Er ist eine Frage. Hier stehen die drei Dinge, mit denen man sie beantwortet — und der einzige Fall, in dem die Antwort ohne Diskussion Nein lautet.",
+      avertissement:
+        "Dieser Artikel handelt von Training, nicht von Medizin. Wochenlang anhaltende Müdigkeit, Schmerzen, ungewöhnliche Atemnot oder ein dauerhaft erhöhter Ruhepuls sind Gründe für einen Arztbesuch, unabhängig davon, was eine Uhr anzeigt.",
+      blocs: [
+        {
+          h: "Was der Indikator misst — und was nicht",
+          p: [
+            "Body Battery ist eine proprietäre Kennzahl von Garmin. Sie ist keine direkte Messung, sondern ein Komposit aus Herzratenvariabilität, geschätztem Stress, Aktivität und Schlaf. Andere Hersteller bieten Entsprechungen unter anderen Namen, anders konstruiert.",
+            "Die Folge ist wichtig: Ein solcher Wert misst nicht deine muskuläre Ermüdung. Er spiegelt den Zustand deines vegetativen Nervensystems, wie ihn ein Algorithmus aus Handgelenk-Sensoren ableitet. Deine Beine haben damit nichts zu tun.",
+            "Deshalb kann er niedrig sein, während du dich gut fühlst, und in Ordnung, während du Muskelkater hast. Beides ist normal und keines davon ein Fehler der Uhr.",
+          ],
+        },
+        {
+          h: "Erste Frage: ein Tag oder ein Trend?",
+          p: [
+            "Ein einzelner Wert sagt fast nichts. Diese Indikatoren schwanken bei derselben Person stark von Tag zu Tag, und Martin Buchheit erinnert daran, dass herzfrequenzbasierte Größen im Kontext und als Trend zu lesen sind, nie isoliert.",
+            "Ein niedriger Morgen nach einem späten Abend oder einer harten Einheit tags zuvor ist erwartbar — sogar ein Zeichen, dass die Messung funktioniert. Drei oder vier niedrige Morgen hintereinander ohne erkennbaren Grund sind eine andere Botschaft.",
+          ],
+        },
+        {
+          h: "Zweite Frage: warum ist er niedrig?",
+          p: [
+            "Der Algorithmus kennt die Ursache nicht. Schlafmangel, ein beginnender Infekt, Alkohol, ein zu warmes Zimmer, Jetlag, eine harte Arbeitswoche: Alles erzeugt dieselbe niedrige Zahl.",
+            "Der Schlaf verdient einen eigenen Platz. Hugh Fullagars Übersichtsarbeit zeigt, dass Schlafmangel die Leistung bei Belastung und kognitive Funktionen beeinträchtigt — und müde zu laufen senkt auch die Wachsamkeit, was auf technischem Gelände oder im Verkehr zählt.",
+            "Ist die Ursache erkennbar und einmalig, hat sie eine Behandlung: schlafen. Ist sie es nicht, oder sieht sie nach einem beginnenden Infekt aus, ist die Einheit nicht die Priorität.",
+          ],
+        },
+        {
+          h: "Dritte Frage: welche Einheit stand an?",
+          p: [
+            "Diese Frage wird vergessen, und sie ist die nützlichste. „Soll ich laufen?\" hat keine allgemeine Antwort; „soll ich DIESE Einheit machen?\" schon.",
+            "Ein lockerer Vierzig-Minuten-Lauf verlangt dem Nervensystem fast nichts ab, und viele fühlen sich danach besser als davor. Eine Schwellen- oder VO2max-Einheit dagegen verlangt, sie verkraften zu können — auf einem bereits mobilisierten Organismus erzeugt sie eine mittelmäßige Einheit UND eine verlängerte Erholung.",
+            "Die richtige Entscheidung ist also selten binär. Fast immer heißt sie: den Lauf behalten und die Intensität ändern, oder die Qualität um zwei Tage verschieben.",
+          ],
+        },
+        {
+          h: "Der einzige Fall, in dem es Nein heißt",
+          p: [
+            "Fieber, diffuser Muskelschmerz, Halsschmerzen, geschwollene Lymphknoten: Da läuft man nicht, was auch immer der Indikator sagt. Das ist keine Frage der Leistung, sondern des Risikos — intensive Belastung während eines Infekts ist alles andere als harmlos.",
+            "Außerhalb dieser Lage ist ein niedriger Wert eine Einladung zu reduzieren, kein Verbot. Und wenn der Zweifel mehrere Tage bleibt, entscheidet ein Arzt, keine Uhr.",
+          ],
+        },
+        {
+          h: "Was Pacevo damit macht",
+          p: [
+            "Diese Werte kommen über intervals.icu und fließen in den gleitenden Plan ein. Fallen sie im Trend ab, wird die Qualitätseinheit reduziert oder verschoben, und der Kalender schreibt auf, warum.",
+            "Aber die App hat nur Zugriff auf das, was durch einen Sensor geht. Sie weiß nicht, dass du etwas ausbrütest, und auch nicht, dass die Woche im Beruf hart war. Da geht dein Urteil vor.",
+          ],
+        },
+      ],
+    },
+    "ia-coach-ce-quun-humain-ne-fait-pas": {
+      chapo:
+        "Algorithmus und Trainer werden meist als Entweder-oder dargestellt. Die eigentliche Trennlinie ist nicht Intelligenz, sondern die Häufigkeit des Hinsehens. Hier steht, was jeder sieht — und was keiner von beiden sieht.",
+      blocs: [
+        {
+          h: "Was ein Trainer leistet und kein Programm ersetzt",
+          p: [
+            "Ein Trainer liest ein Gesicht. Er hört an einem Satz, dass die Trennung, der Umzug oder die schlaflose Nacht schwerer wiegen als die Trainingsbelastung. Er weiß, dass ein Athlet, der nach einer Schwellen-Einheit „alles gut\" sagt, in der Hälfte der Fälle lügt — und er weiß, in welcher Hälfte.",
+            "Er trägt außerdem den langen Blick. Er entscheidet, dass eine Saison der nächsten geopfert wird, dass ein Ziel verfrüht ist, dass dieses hier zählt, weil es dir am Herzen liegt — und dass ein motivierter Athlet wegsteckt, was ein resignierter verweigert. Nichts davon lässt sich aus einer Messreihe ableiten.",
+            "Schließlich passt er live an. Ein Anstieg, der härter ist als gedacht, eine Gruppe, die zu schnell losläuft, eine Wade, die im dritten Kilometer zickt: Er ändert die Einheit vor Ort, mit dem, was er sieht.",
+          ],
+        },
+        {
+          h: "Was ein Programm leistet und kein Trainer kann",
+          p: [
+            "Es schaut jede Nacht hin. Nicht am Montagabend am Telefon: jede Nacht, und nach jeder Einheit. Das ist der einzige Unterschied, der wirklich zählt, und er ist struktureller Natur — wer dreißig Athleten betreut, kann nicht jeden Morgen dreißig Schlafkurven durchsehen, wie gut er auch sei.",
+            "Es ermüdet nicht und hat kein Ego. Es überschätzt nicht die Einheit, die es selbst verordnet hat, erinnert sich nicht besser an das letzte gute Training als an die drei mittelmäßigen, und hat keinen Stolz zu verteidigen, wenn die Daten dem Plan widersprechen.",
+            "Es rechnet über Zeitfenster, die kein Gedächtnis hält. Die chronische Belastung baut sich über Wochen auf, das Verhältnis zwischen jüngster und Grundbelastung liest sich über einen gleitenden Monat. Das sind gleitende Mittelwerte: Sie werden berechnet, nicht erahnt.",
+          ],
+        },
+        {
+          h: "Die Trennlinie: Häufigkeit, nicht Intelligenz",
+          p: [
+            "Ein Trainer beobachtet episodisch — eine Einheit, ein Anruf, eine Nachricht. Ein Programm beobachtet durchgehend, sieht aber nur, was gemessen wird. Der erste hat Kontext und wenige Messpunkte, das zweite viele Messpunkte und keinen Kontext.",
+            "Deshalb ist die Gegenüberstellung falsch gestellt. Die Frage lautet nicht „wer entscheidet besser\", sondern „wer sieht was, und wie oft\". Ein Plan, der sich nur einmal pro Woche bewegt, ignoriert konstruktionsbedingt, was am Dienstagabend passiert ist.",
+          ],
+        },
+        {
+          h: "Was das in einer echten Woche ändert",
+          p: [
+            "Nimm eine gewöhnliche Woche. Dienstag, Schwellen-Einheit wie geplant. Mittwoch, kurze Nacht und Herzratenvariabilität deutlich unter der Norm. Donnerstag stand eine Qualitätseinheit im Plan.",
+            "Ohne tägliche Durchsicht bleibt der Donnerstag: Er wurde am Sonntag geschrieben. Mit täglicher Durchsicht wird er reduziert, und die Qualität wandert auf Samstag, wenn die Werte zurück sind. Das Wochenvolumen ändert sich kaum; seine Verteilung schon — und sie entscheidet über den Verschleiß.",
+            "Diese Logik — den Anstieg der Belastung steuern statt ihrer rohen Menge — steht im Zentrum von Tim Gabbetts Arbeit zum Paradox von Training und Verletzung: Oft sind es die schnellen Belastungssprünge, mehr als die hohe Belastung selbst, die den Athleten exponieren.",
+          ],
+        },
+        {
+          h: "Die Grenze, und sie gehört gesagt",
+          p: [
+            "Ein Programm entscheidet aus dem, was es misst. Was es nicht misst, existiert für es nicht: ein beginnender Schmerz, ein Trauerfall, mentale Last im Beruf, ein Schuh am Ende seines Lebens. Es wird sie nie sehen, und keine künftige Version auch, solange sie nicht durch einen Sensor gehen.",
+            "Auch die Indikatoren selbst verlangen Vorsicht. Martin Buchheit hat gezeigt, dass herzfrequenzbasierte Messgrößen je nach Kontext, Zeitpunkt und Belastungsart nicht dieselbe Geschichte erzählen: Ein isolierter Wert bedeutet nichts, es ist der Trend, der informiert.",
+            "Die ehrliche Schlussfolgerung lautet also nicht „der Algorithmus ersetzt\". Sondern: Er schaut täglich auf das, was ein Mensch nur punktuell betrachten kann, und versteht nichts von dem, was ein Mensch auf einen Blick erfasst. Wer besser wird, gibt jedem das, was er kann.",
+          ],
+        },
+      ],
+    },
+    "vfc-et-charge-voir-la-fatigue-arriver": {
+      chapo:
+        "Drei Kurven und eine Messung am Morgen. Was jede sagt, was sie nicht sagt, und warum erst ihre Kreuzung — nie ein einzelner Wert — erlaubt, zu reduzieren, bevor etwas bricht.",
+      blocs: [
+        {
+          h: "Die drei Kurven: was CTL, ATL und TSB bedeuten",
+          p: [
+            "Das Modell der meisten Trainingsplattformen geht auf Eric Banisters Arbeiten zur Belastungsantwort zurück. Es besteht aus drei Zahlen, alle aus derselben Reihe von Einheiten abgeleitet.",
+            "Die chronische Belastung, oft CTL genannt, ist ein langer gleitender Mittelwert — etwa sechs Wochen. Sie ist deine Grundform: Sie steigt langsam, fällt langsam und steht für das, was dein Körper gewohnt ist zu verkraften.",
+            "Die akute Belastung, ATL, ist dasselbe über ein kurzes Fenster von etwa einer Woche. Sie ist deine jüngste Ermüdung: Sie steigt nach einer harten Einheit schnell und fällt in Ruhe schnell.",
+            "Die Frische, TSB, ist schlicht die Differenz beider. Negativ heißt: Du verkraftest gerade mehr als üblich. Positiv heißt: Du bist erholt — und das ist es, was man am Wettkampftag will, nicht im Aufbau.",
+          ],
+        },
+        {
+          h: "Die Herzratenvariabilität: was sie wirklich misst",
+          p: [
+            "Die Herzratenvariabilität, kurz HRV, misst keine Ermüdung. Sie misst den Abstand zwischen aufeinanderfolgenden Schlägen, der das Gleichgewicht der beiden Äste des vegetativen Nervensystems widerspiegelt. Eine niedrige HRV zeigt an, dass dein Organismus mobilisiert ist; sie sagt nicht, warum.",
+            "Diese Unterscheidung ändert in der Praxis alles. Eine Nacht mit Alkohol, ein beginnender Infekt, ein zu warmes Zimmer, Jetlag oder Ärger im Beruf senken die HRV genauso wie ein zu hartes Training. Die Messung stimmt; die Deutung „ich bin übertrainiert\" nicht.",
+            "Zweite Vorsicht: Ein einzelner Wert taugt nichts. Die HRV schwankt bei derselben Person stark von Tag zu Tag. Was informiert, ist der Abstand zu DEINER Basis — dem Mittel deiner letzten Tage — und die Richtung des Trends. Buchheit betont genau das: Herzfrequenzbasierte Größen gehören im Kontext gelesen, nicht isoliert.",
+          ],
+        },
+        {
+          h: "Warum beide gekreuzt werden müssen",
+          p: [
+            "Getrennt betrachtet irren beide Indikatorenfamilien auf vorhersehbare Weise.",
+            "Die Belastung allein weiß nichts von deinem Leben. Sie sieht, dass du diese Woche dreimal gelaufen bist; dass du fünf Stunden pro Nacht geschlafen hast, entgeht ihr. Also verordnet sie weiter, als wäre alles in Ordnung.",
+            "Die HRV allein weiß nichts von deinem Training. Sie sieht einen niedrigen Wert; sie kann eine bewusst harte Woche — in der negative Frische normal und gewollt ist — nicht von einem Abgleiten in die Erschöpfung unterscheiden.",
+            "Gekreuzt korrigieren sie einander. Negative Frische bei stabiler HRV ist akzeptierte Belastung: Der Plan läuft weiter. Negative Frische mit mehrere Tage abfallender HRV ist ein Warnsignal: reduzieren. Eine niedrige HRV bei geringer Belastung hat vermutlich nichts mit dem Laufen zu tun.",
+          ],
+        },
+        {
+          h: "Was Pacevo konkret damit macht",
+          p: [
+            "Diese Werte kommen über intervals.icu von deiner Uhr — Schlaf, HRV, Ruhepuls, die Belastung jeder Einheit. Pacevo liest sie nach jeder Synchronisation neu und schreibt den gleitenden Sieben-Tage-Plan um, wenn sie sich ändern.",
+            "Reduzieren heißt nicht, die Woche zu streichen. In der Praxis wandert die Qualitätseinheit, ihr intensiver Teil wird gekürzt, oder ein Lauf wird durch einen ruhigen ersetzt — das Volumen bewegt sich wenig, die Intensität viel.",
+            "Und der Kalender schreibt das WARUM auf. Das ist im Alltag der wichtigste Punkt: Einen Plan, den man nicht versteht, umgeht man. Einen Plan, der sagt „deine Variabilität liegt seit drei Tagen unter deiner Basis, die Schwellen-Einheit wandert auf Samstag\", befolgt man.",
+          ],
+        },
+        {
+          h: "Was es nicht leistet",
+          p: [
+            "Es sagt keine Verletzung voraus. Der Belastungsanstieg ist ein Faktor unter mehreren — Biomechanik, Untergrund, Material, Verletzungsgeschichte und Schlaf zählen ebenso, und nichts davon passt in drei Kurven.",
+            "Es ersetzt dein Urteil nicht. Ein Schmerz, der sich festsetzt, ein Missempfinden, das deinen Laufstil verändert, eine Müdigkeit, die trotz normaler Werte bleibt: Das sind Gründe aufzuhören, was auch immer ein Dashboard sagt. Ein Modell hat immer recht über das, was es misst, und unrecht über alles andere.",
+          ],
+        },
+      ],
+    },
+  },
 };
 
 export const traductionArticle = (lang: Lang, slug: string) =>
