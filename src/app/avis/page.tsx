@@ -6,6 +6,9 @@ import { Container, Section } from "@/components/ui/Container";
 import { btnClass } from "@/components/ui/Button";
 import { getPublicLang } from "@/lib/i18n/serverLang";
 import { CHIFFRES } from "@/lib/brand/stats";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { TYPE_AVIS, litAvis } from "@/lib/avis/store";
+import { AvisForm } from "@/components/avis/AvisForm";
 import type { Lang } from "@/lib/i18n/translations";
 
 /**
@@ -38,6 +41,8 @@ import type { Lang } from "@/lib/i18n/translations";
 
 type Bloc = {
   titre: string; accent: string; chapo: string;
+  // Quand des avis existent, la page ne peut plus s'intituler « Aucun avis ».
+  titrePlein: string; accentPlein: string; chapoPlein: string;
   methodeTitre: string; methode: string[];
   preuveTitre: string; preuveSub: string;
   labelCourses: string; labelParcours: string; labelPlan: string; labelSynchro: string;
@@ -47,6 +52,7 @@ type Bloc = {
 const AV: Record<Lang, Bloc> = {
   fr: {
     titre: "Aucun avis. ", accent: "Pas encore.",
+    titrePlein: "Ce qu'ils en ", accentPlein: "disent.", chapoPlein: "Écrits par des coureurs qui ont un compte Pacevo, publiés tels quels.",
     chapo: "Pacevo vient d'ouvrir. Le jour où des coureurs écriront, ce sont leurs mots qui seront ici — pas les nôtres.",
     methodeTitre: "Ce qu'on s'engage à faire quand ils arriveront",
     methode: [
@@ -68,6 +74,7 @@ const AV: Record<Lang, Bloc> = {
   },
   en: {
     titre: "No reviews. ", accent: "Not yet.",
+    titrePlein: "What they ", accentPlein: "say.", chapoPlein: "Written by runners with a Pacevo account, published as written.",
     chapo: "Pacevo has just opened. The day runners write something, their words will be here — not ours.",
     methodeTitre: "What we commit to when they arrive",
     methode: [
@@ -89,6 +96,7 @@ const AV: Record<Lang, Bloc> = {
   },
   de: {
     titre: "Keine Bewertungen. ", accent: "Noch nicht.",
+    titrePlein: "Was sie ", accentPlein: "sagen.", chapoPlein: "Von Läufern mit einem Pacevo-Konto geschrieben, unverändert veröffentlicht.",
     chapo: "Pacevo ist gerade gestartet. Sobald Läufer etwas schreiben, stehen ihre Worte hier — nicht unsere.",
     methodeTitre: "Was wir versprechen, sobald sie kommen",
     methode: [
@@ -110,6 +118,7 @@ const AV: Record<Lang, Bloc> = {
   },
   es: {
     titre: "Sin opiniones. ", accent: "Todavía.",
+    titrePlein: "Lo que ", accentPlein: "dicen.", chapoPlein: "Escritas por corredores con cuenta Pacevo, publicadas tal cual.",
     chapo: "Pacevo acaba de abrir. El día en que los corredores escriban, estarán sus palabras aquí — no las nuestras.",
     methodeTitre: "A qué nos comprometemos cuando lleguen",
     methode: [
@@ -131,6 +140,7 @@ const AV: Record<Lang, Bloc> = {
   },
   pt: {
     titre: "Sem avaliações. ", accent: "Ainda.",
+    titrePlein: "O que eles ", accentPlein: "dizem.", chapoPlein: "Escritas por corredores com conta Pacevo, publicadas tal como escritas.",
     chapo: "A Pacevo acabou de abrir. No dia em que os corredores escreverem, estarão aqui as palavras deles — não as nossas.",
     methodeTitre: "O que prometemos quando chegarem",
     methode: [
@@ -152,11 +162,24 @@ const AV: Record<Lang, Bloc> = {
   },
 };
 
+export const dynamic = "force-dynamic";
 export const metadata = { title: "Avis — Pacevo" };
 
 export default async function AvisPage() {
   const lang = await getPublicLang();
   const A = AV[lang] ?? AV.fr;
+
+  // ⚠️ SEULS LES AVIS PUBLIÉS. `publie` est faux à la soumission et ne passe à vrai que
+  // par la modération, qui n'écarte que l'insulte et le spam — jamais une mauvaise note.
+  let publies: { note: number; texte: string; auteur: string; at: string }[] = [];
+  try {
+    const { data } = await createAdminClient()
+      .from("notifications").select("data, created_at")
+      .eq("type", TYPE_AVIS).order("created_at", { ascending: false }).limit(60);
+    publies = (data ?? [])
+      .map((r) => litAvis(r.data))
+      .filter((a): a is NonNullable<typeof a> => Boolean(a?.publie));
+  } catch { publies = []; }
   // Les quatre chiffres viennent de la SOURCE UNIQUE, jamais recopiés ici.
   const preuves = [
     { valeur: CHIFFRES.courses, label: A.labelCourses },
@@ -172,11 +195,11 @@ export default async function AvisPage() {
       <Section className="pt-16">
         <Container>
           <h1 className="mx-auto max-w-3xl text-center text-5xl font-bold leading-[1.05] tracking-tight text-zinc-900 sm:text-6xl">
-            {A.titre}
-            <span className="text-emerald-600">{A.accent}</span>
+            {publies.length ? A.titrePlein : A.titre}
+            <span className="text-emerald-600">{publies.length ? A.accentPlein : A.accent}</span>
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-center text-lg leading-relaxed text-zinc-500">
-            {A.chapo}
+            {publies.length ? A.chapoPlein : A.chapo}
           </p>
         </Container>
       </Section>
@@ -199,6 +222,40 @@ export default async function AvisPage() {
               ))}
             </ul>
           </div>
+        </Container>
+      </Section>
+
+      {publies.length > 0 && (
+        <Section>
+          <Container>
+            <div className="mx-auto grid max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {publies.map((a) => (
+                <div key={`${a.auteur}-${a.at}`} className="rounded-2xl bg-white p-5 ring-1 ring-inset ring-zinc-200">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">
+                      {a.auteur.charAt(0)}
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-zinc-900">{a.auteur}</div>
+                      <div className="text-xs text-zinc-400">{a.at.slice(0, 10)}</div>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex gap-0.5" aria-label={`${a.note}/5`}>
+                    {Array.from({ length: 5 }, (_, i) => (
+                      <span key={i} className={i < a.note ? "text-amber-400" : "text-zinc-200"}>★</span>
+                    ))}
+                  </div>
+                  <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-zinc-600">{a.texte}</p>
+                </div>
+              ))}
+            </div>
+          </Container>
+        </Section>
+      )}
+
+      <Section>
+        <Container>
+          <AvisForm />
         </Container>
       </Section>
 

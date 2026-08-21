@@ -186,6 +186,9 @@ export function AdminDashboard({ users }: { users: User[] }) {
             <span className="text-zinc-400 text-xs ml-2">Pacevo</span>
           </div>
           <a href="/admin/newsletter" className="ml-3 inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100">✉️ Newsletter</a>
+          {/* Sans ce lien, l'écran de modération existe mais personne n'y va — et aucun
+              avis ne sort jamais de la file d'attente. */}
+          <a href="/admin/avis" className="ml-2 inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100">★ Avis</a>
         </div>
 
         <div className="flex items-center gap-1 bg-zinc-100 rounded-xl p-1">

@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/Badge";
 import { NewsletterSignup } from "@/components/NewsletterSignup";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { CHROME } from "@/components/layout/chromeI18n";
+import { StoreBadges } from "@/components/layout/StoreBadges";
 
 // Pied de page marketing partagé (landing + pages publiques).
 export function SiteFooter({ newsletter = true }: { newsletter?: boolean }) {
@@ -24,6 +25,13 @@ export function SiteFooter({ newsletter = true }: { newsletter?: boolean }) {
             <div className="w-full max-w-md"><NewsletterSignup /></div>
           </div>
         )}
+        {/* Les badges des boutiques. Ils ne s'affichent QUE si les adresses sont
+            renseignées : l'application n'étant publiée nulle part à ce jour, un badge
+            visible mènerait à une page d'erreur. Le pied de page est présent sur toutes
+            les pages publiques — c'est l'endroit qui les rend visibles partout sans
+            encombrer la barre de navigation. */}
+        <StoreBadges className="mb-10 justify-center" />
+
         <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
           <Link href="/" className="flex items-center gap-2.5">
             <Logo size={28} />

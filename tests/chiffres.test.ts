@@ -29,6 +29,8 @@ import { LEGAL } from "../src/app/legalI18n";
 import { accesDe } from "../src/lib/billing/access";
 import { PRIX_AFFICHES } from "../src/lib/billing/prix";
 import { ATTRIBUTION_GARMIN, PAGES_ATTRIBUTION } from "../src/components/legal/attributionI18n";
+import { liensStore } from "../src/lib/brand/stores";
+import { nomAffiche, refusDe, avisDe, litAvis, TEXTE_MIN } from "../src/lib/avis/store";
 
 const ROOT = join(import.meta.dirname, "..");
 const SRC = join(ROOT, "src");
@@ -334,6 +336,56 @@ test("aucun avis de consommateur n'est fabriqué", () => {
   ] as [RegExp, string][]) {
     assert.ok(!motif.test(avis), `${quoi} est affiché alors qu'aucun avis n'existe en base`);
   }
+});
+
+test("aucun badge ne promet une application qui n'existe pas", () => {
+  // ⚠️ MÊME FAUTE QUE LES FAUX AVIS, sous une autre forme : un badge « Télécharger dans
+  // l'App Store » affiché avant publication mène à une page d'erreur. Il ne s'affiche
+  // donc que si l'adresse est renseignée, et chaque boutique est indépendante — publier
+  // d'abord sur Google Play doit montrer le badge Google seul.
+  assert.deepEqual(liensStore({}), { ios: null, android: null }, "sans adresse, aucun badge");
+  assert.deepEqual(liensStore({ NEXT_PUBLIC_APP_STORE_URL: "" }), { ios: null, android: null });
+  // Une valeur qui n'est pas une adresse ne doit pas produire un lien : un `href` vide
+  // ou relatif renverrait le visiteur sur le site lui-même, ce qui est pire que rien.
+  assert.equal(liensStore({ NEXT_PUBLIC_APP_STORE_URL: "bientôt" }).ios, null, "un texte n'est pas un lien");
+  assert.equal(liensStore({ NEXT_PUBLIC_PLAY_STORE_URL: "/telecharger" }).android, null, "un chemin relatif n'est pas un lien");
+
+  const l = liensStore({
+    NEXT_PUBLIC_APP_STORE_URL: "https://apps.apple.com/app/id123",
+    NEXT_PUBLIC_PLAY_STORE_URL: "https://play.google.com/store/apps/details?id=app.pacevo",
+  });
+  assert.equal(l.ios, "https://apps.apple.com/app/id123");
+  assert.equal(l.android, "https://play.google.com/store/apps/details?id=app.pacevo");
+  // Indépendance des deux boutiques.
+  assert.equal(liensStore({ NEXT_PUBLIC_PLAY_STORE_URL: "https://play.google.com/x" }).ios, null);
+});
+
+test("un avis ne peut pas être fabriqué depuis le navigateur", () => {
+  // La page promet « n'afficher que des avis de personnes ayant réellement un compte »
+  // et « ne jamais en écrire nous-mêmes ». Ce qui rend la promesse tenable, c'est que
+  // RIEN de ce que le client envoie n'atteint la base tel quel.
+  //
+  // ⚠️ LE POINT CRITIQUE : `publie` est forcé à faux à la construction. Un client qui
+  // enverrait `{publie: true}` publierait sinon directement sur la page d'accueil du
+  // site, sans relecture.
+  const a = avisDe(5, "  Un avis assez long pour franchir la validation du serveur.  ", "Cyprien Dumez");
+  assert.equal(a.publie, false, "un avis ne doit JAMAIS naître publié");
+  assert.equal(a.auteur, "Cyprien D.", "le nom complet ne doit pas être publié");
+  assert.equal(a.texte, "Un avis assez long pour franchir la validation du serveur.", "le texte doit être détouré");
+
+  // Le nom vient du profil ; sans profil, on n'invente pas d'identité.
+  assert.equal(nomAffiche(""), "Un coureur");
+  assert.equal(nomAffiche("Kilian"), "Kilian");
+
+  // Bornes du texte : trop court ce n'est pas un avis, trop long c'est un vecteur d'abus.
+  assert.ok(refusDe(5, "trop court"), "un texte trop court doit être refusé");
+  assert.ok(refusDe(5, "x".repeat(5000)), "un texte démesuré doit être refusé");
+  assert.equal(refusDe(5, "x".repeat(TEXTE_MIN)), null);
+  // La note est bornée AUSSI À LA LECTURE : une ligne écrite avant une correction, ou à
+  // la main dans la base, ne doit pas afficher onze étoiles.
+  assert.ok(refusDe(0, "x".repeat(TEXTE_MIN)), "la note 0 doit être refusée");
+  assert.ok(refusDe(6, "x".repeat(TEXTE_MIN)), "la note 6 doit être refusée");
+  assert.equal(litAvis({ note: 11, texte: "ok" })?.note, 5, "une note aberrante doit être ramenée à 5");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
