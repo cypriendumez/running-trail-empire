@@ -10,34 +10,42 @@ export const runtime = "nodejs";
 // que titre + source + lien (clic → site source). Aucun article copié → légal.
 
 // Médias spécialisés (flux RSS publics vérifiés). `cats` = catégories où le flux est pertinent.
-type Feed = { url: string; source: string; domain: string; cats: Cat[] };
+/**
+ * `langue` = celle dans laquelle CE MÉDIA écrit ses titres.
+ *
+ * ⚠️ Sans elle, un abonné français recevait des titres en anglais. Les résumés étaient
+ * bien traduits — les titres, jamais : ils sortaient du flux tels quels et personne ne
+ * savait dire s'il fallait les traduire. La moitié des sources d'« Élites » et de
+ * « Nutrition » écrivent en anglais.
+ */
+type Feed = { url: string; source: string; domain: string; cats: Cat[]; langue: "fr" | "en" };
 const FEEDS: Feed[] = [
   // — Francophones —
-  { url: "https://www.lepape-info.com/feed/", source: "Lepape Info", domain: "lepape-info.com", cats: ["all", "running", "marathon", "gear"] },
-  { url: "https://u-run.fr/feed", source: "U-Run", domain: "u-run.fr", cats: ["all", "running", "trail", "marathon"] },
-  { url: "https://www.jogging-international.net/feed", source: "Jogging International", domain: "jogging-international.net", cats: ["all", "running", "marathon"] },
-  { url: "https://running-addict.fr/feed/", source: "Running Addict", domain: "running-addict.fr", cats: ["all", "running", "gear"] },
-  { url: "https://esprit-trail.com/feed/", source: "Esprit Trail", domain: "esprit-trail.com", cats: ["all", "trail", "ultra"] },
-  { url: "https://nakan.ch/wp/feed/", source: "Nakan", domain: "nakan.ch", cats: ["all", "trail", "running", "gear"] },
+  { url: "https://www.lepape-info.com/feed/", source: "Lepape Info", domain: "lepape-info.com", cats: ["all", "running", "marathon", "gear"], langue: "fr" },
+  { url: "https://u-run.fr/feed", source: "U-Run", domain: "u-run.fr", cats: ["all", "running", "trail", "marathon"], langue: "fr" },
+  { url: "https://www.jogging-international.net/feed", source: "Jogging International", domain: "jogging-international.net", cats: ["all", "running", "marathon"], langue: "fr" },
+  { url: "https://running-addict.fr/feed/", source: "Running Addict", domain: "running-addict.fr", cats: ["all", "running", "gear"], langue: "fr" },
+  { url: "https://esprit-trail.com/feed/", source: "Esprit Trail", domain: "esprit-trail.com", cats: ["all", "trail", "ultra"], langue: "fr" },
+  { url: "https://nakan.ch/wp/feed/", source: "Nakan", domain: "nakan.ch", cats: ["all", "trail", "running", "gear"], langue: "fr" },
   // — Internationaux —
-  { url: "https://www.runnersworld.com/rss/all.xml/", source: "Runner's World", domain: "runnersworld.com", cats: ["all", "running", "marathon", "gear"] },
-  { url: "https://www.irunfar.com/feed", source: "iRunFar", domain: "irunfar.com", cats: ["all", "trail", "ultra", "elite"] },
-  { url: "https://www.trailrunnermag.com/feed", source: "Trail Runner", domain: "trailrunnermag.com", cats: ["all", "trail", "ultra", "elite"] },
-  { url: "https://believeintherun.com/feed/", source: "Believe in the Run", domain: "believeintherun.com", cats: ["all", "gear", "running"] },
+  { url: "https://www.runnersworld.com/rss/all.xml/", source: "Runner's World", domain: "runnersworld.com", cats: ["all", "running", "marathon", "gear"], langue: "en" },
+  { url: "https://www.irunfar.com/feed", source: "iRunFar", domain: "irunfar.com", cats: ["all", "trail", "ultra", "elite"], langue: "en" },
+  { url: "https://www.trailrunnermag.com/feed", source: "Trail Runner", domain: "trailrunnermag.com", cats: ["all", "trail", "ultra", "elite"], langue: "en" },
+  { url: "https://believeintherun.com/feed/", source: "Believe in the Run", domain: "believeintherun.com", cats: ["all", "gear", "running"], langue: "en" },
   // — Ajoutés pour la lettre du lundi (nutrition + élites), vérifiés un par un le 21/08/2026 —
   // podiumrunner.com et outsideonline.com/rss/running renvoyaient 404 : ils ne sont pas ici.
   // ⚠️ Pas dans « elite » : LetsRun couvre l'athlétisme sur PISTE (Diamond League, 1500 m)
   // et publie plusieurs fois par jour. Il remplissait les trois places de la rubrique
   // Élites avec du 1500 m, alors que cette rubrique existe pour les stars du trail.
-  { url: "https://www.letsrun.com/feed/", source: "LetsRun", domain: "letsrun.com", cats: ["all", "running", "marathon"] },
-  { url: "https://runningmagazine.ca/feed/", source: "Canadian Running", domain: "runningmagazine.ca", cats: ["all", "running", "marathon", "elite", "gear"] },
-  { url: "https://marathonhandbook.com/feed/", source: "Marathon Handbook", domain: "marathonhandbook.com", cats: ["all", "running", "marathon", "nutrition"] },
+  { url: "https://www.letsrun.com/feed/", source: "LetsRun", domain: "letsrun.com", cats: ["all", "running", "marathon"], langue: "en" },
+  { url: "https://runningmagazine.ca/feed/", source: "Canadian Running", domain: "runningmagazine.ca", cats: ["all", "running", "marathon", "elite", "gear"], langue: "en" },
+  { url: "https://marathonhandbook.com/feed/", source: "Marathon Handbook", domain: "marathonhandbook.com", cats: ["all", "running", "marathon", "nutrition"], langue: "en" },
   // Le blog d'Asker Jeukendrup, chercheur en nutrition sportive. Il publie peu — c'est
   // voulu de le garder : c'est la source la plus solide de la rubrique.
-  { url: "https://www.mysportscience.com/blog-feed.xml", source: "MySportScience", domain: "mysportscience.com", cats: ["nutrition"] },
+  { url: "https://www.mysportscience.com/blog-feed.xml", source: "MySportScience", domain: "mysportscience.com", cats: ["nutrition"], langue: "en" },
 ];
 
-type Item = { title: string; source: string; link: string; date: string; domain: string; favicon: string; texte?: string };
+type Item = { title: string; source: string; link: string; date: string; domain: string; favicon: string; texte?: string; langue: "fr" | "en" };
 const cache = new Map<string, { at: number; items: Item[] }>();
 const TTL = 30 * 60 * 1000; // 30 min — on ne sur-sollicite pas les sources.
 
@@ -46,7 +54,7 @@ function hostOf(u: string): string {
 }
 // Parse un flux RSS. Si defaultSource/Domain fournis (média spécialisé), on les utilise ;
 // sinon on lit la balise <source> (format Google News → vrai éditeur).
-function parseRss(xml: string, defaultSource?: string, defaultDomain?: string): Item[] {
+function parseRss(xml: string, defaultSource?: string, defaultDomain?: string, langue: "fr" | "en" = "fr"): Item[] {
   return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map((m) => {
     const b = m[1];
     const pick = (re: RegExp) => decode(b.match(re)?.[1] ?? "");
@@ -70,6 +78,8 @@ function parseRss(xml: string, defaultSource?: string, defaultDomain?: string): 
       // Servi UNIQUEMENT sur demande (voir plus bas) : 2 600 caractères par article
       // alourdiraient de plus de 100 ko la réponse que lit le fil Communauté.
       texte: texteDuFlux(b).slice(0, 2600) || undefined,
+      // Google News est interrogé en `hl=fr&gl=FR` : ce qu'il remonte est francophone.
+      langue,
     };
   }).filter((i) => i.title && i.link);
 }
@@ -104,7 +114,7 @@ export async function GET(req: Request) {
   // Google News + flux spécialisés pertinents, en parallèle (tolérant aux pannes).
   const jobs: Promise<Item[]>[] = [
     fetchFeed(gnUrl).then((x) => parseRss(x)).catch(() => []),
-    ...feeds.map((f) => fetchFeed(f.url).then((x) => parseRss(x, f.source, f.domain)).catch(() => [])),
+    ...feeds.map((f) => fetchFeed(f.url).then((x) => parseRss(x, f.source, f.domain, f.langue)).catch(() => [])),
   ];
   const results = await Promise.all(jobs);
 

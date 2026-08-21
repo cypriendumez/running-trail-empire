@@ -36,6 +36,14 @@ type Chrome = {
   titre: string;
   chapo: string;
   auto: string;
+  /**
+   * ⚠️ LA MENTION DE REVUE DE PRESSE. Elle n'est pas décorative : elle dit exactement ce
+   * que fait cette lettre — citer un titre, nommer l'éditeur, renvoyer chez lui, et
+   * résumer avec nos mots — et elle donne à un éditeur une adresse pour demander le
+   * retrait. Sans destinataire identifiable, une demande de retrait n'a nulle part où
+   * aller, et c'est ce silence qui transforme un désaccord en litige.
+   */
+  revuePresse: (contact: string) => string;
   pourquoi: string;
   desinscrire: string;
   locale: string;
@@ -45,6 +53,15 @@ type Chrome = {
   voirCourses: string;
 };
 
+/**
+ * L'adresse à laquelle un éditeur peut demander un retrait.
+ *
+ * ⚠️ C'est celle des MENTIONS LÉGALES (`app/legalI18n`), pas une adresse inventée pour
+ * l'occasion. Une mention de retrait qui pointe vers une boîte inexistante est pire que
+ * pas de mention : elle affiche une voie de recours qui n'aboutit nulle part.
+ */
+const CONTACT = "cypriendumez@outlook.fr";
+
 const T: Record<Lang, Chrome> = {
   fr: {
     objet: (s) => `Running & trail — la semaine du ${s}`,
@@ -52,6 +69,7 @@ const T: Record<Lang, Chrome> = {
     titre: "L'actualité running et trail",
     chapo: "Ce qu'il fallait retenir cette semaine. Chaque titre renvoie chez l'éditeur — on ne recopie aucun article.",
     auto: "Résumés produits automatiquement à partir des articles cités. Tout chiffre absent de la source d'origine est retiré avant l'envoi.",
+    revuePresse: (c) => `Revue de presse : chaque entrée cite le titre et l\u2019éditeur, renvoie vers son site, et le résumé est rédigé par nos soins. Aucun article ni aucune photo n\u2019est reproduit. Un éditeur peut demander le retrait de ses contenus à ${c}.`,
     pourquoi: "Tu reçois cet e-mail parce que tu t'es inscrit sur Pacevo.",
     desinscrire: "Se désinscrire en un clic",
     sections: { une: "À la une", trail: "Trail & ultra", elite: "Élites & résultats", materiel: "Matériel & chaussures", nutrition: "Nutrition" },
@@ -66,6 +84,7 @@ const T: Record<Lang, Chrome> = {
     titre: "This week in running and trail",
     chapo: "What mattered this week. Every headline links to the publisher — we don't reproduce any article.",
     auto: "Summaries are produced automatically from the articles cited. Any figure absent from the original source is removed before sending.",
+    revuePresse: (c) => `Press review: each entry cites the headline and the publisher, links to their site, and the summary is written by us. No article or photograph is reproduced. Publishers may request removal of their content at ${c}.`,
     pourquoi: "You're receiving this because you subscribed on Pacevo.",
     desinscrire: "Unsubscribe in one click",
     sections: { une: "Headlines", trail: "Trail & ultra", elite: "Elites & results", materiel: "Gear & shoes", nutrition: "Nutrition" },
@@ -80,6 +99,7 @@ const T: Record<Lang, Chrome> = {
     titre: "Die Woche im Laufsport",
     chapo: "Was diese Woche zählte. Jede Überschrift führt zum Verlag — wir geben keinen Artikel wieder.",
     auto: "Die Zusammenfassungen entstehen automatisch aus den genannten Artikeln. Jede Zahl, die in der Originalquelle fehlt, wird vor dem Versand entfernt.",
+    revuePresse: (c) => `Pressespiegel: Jeder Eintrag nennt Titel und Verlag, verlinkt auf dessen Website; die Zusammenfassung stammt von uns. Kein Artikel und kein Foto wird wiedergegeben. Verlage können die Entfernung ihrer Inhalte unter ${c} verlangen.`,
     pourquoi: "Du erhältst diese E-Mail, weil du dich auf Pacevo angemeldet hast.",
     desinscrire: "Mit einem Klick abmelden",
     sections: { une: "Schlagzeilen", trail: "Trail & Ultra", elite: "Elite & Ergebnisse", materiel: "Ausrüstung & Schuhe", nutrition: "Ernährung" },
@@ -94,6 +114,7 @@ const T: Record<Lang, Chrome> = {
     titre: "La actualidad del running y el trail",
     chapo: "Lo que ha contado esta semana. Cada titular lleva al editor — no reproducimos ningún artículo.",
     auto: "Los resúmenes se generan automáticamente a partir de los artículos citados. Toda cifra ausente de la fuente original se elimina antes del envío.",
+    revuePresse: (c) => `Revista de prensa: cada entrada cita el titular y el editor, enlaza a su sitio, y el resumen lo redactamos nosotros. No se reproduce ningún artículo ni fotografía. Los editores pueden solicitar la retirada de sus contenidos en ${c}.`,
     pourquoi: "Recibes este correo porque te suscribiste en Pacevo.",
     desinscrire: "Darse de baja en un clic",
     sections: { une: "Titulares", trail: "Trail y ultra", elite: "Élites y resultados", materiel: "Material y zapatillas", nutrition: "Nutrición" },
@@ -108,6 +129,7 @@ const T: Record<Lang, Chrome> = {
     titre: "A atualidade da corrida e do trail",
     chapo: "O que contou esta semana. Cada título leva ao editor — não reproduzimos nenhum artigo.",
     auto: "Os resumos são gerados automaticamente a partir dos artigos citados. Qualquer número ausente da fonte original é removido antes do envio.",
+    revuePresse: (c) => `Revista de imprensa: cada entrada cita o título e o editor, remete para o seu site, e o resumo é redigido por nós. Nenhum artigo ou fotografia é reproduzido. Os editores podem pedir a remoção dos seus conteúdos em ${c}.`,
     pourquoi: "Recebes este e-mail porque te inscreveste no Pacevo.",
     desinscrire: "Cancelar a subscrição num clique",
     sections: { une: "Destaques", trail: "Trail e ultra", elite: "Elites e resultados", materiel: "Equipamento e sapatilhas", nutrition: "Nutrição" },
@@ -190,6 +212,7 @@ export function construireEmail(
   ${corpsCourses}
   <div style="margin:2.25rem 0 0;padding-top:1.25rem;border-top:1px solid #e4e4e7;font-size:.74rem;color:#a1a1aa;line-height:1.65">
     ${auMoinsUnResume ? `<p style="margin:0 0 .75rem">${ech(t.auto)}</p>` : ""}
+    <p style="margin:0 0 .75rem">${ech(t.revuePresse(CONTACT))}</p>
     <p style="margin:0">${ech(t.pourquoi)}<br>
     <a href="${ech(lienDesinscription)}" style="color:#71717a">${ech(t.desinscrire)}</a></p>
   </div>
@@ -207,7 +230,7 @@ ${t.titre}
 ${t.chapo}${texteSections}${texteCourses}
 
 —
-${auMoinsUnResume ? `${t.auto}\n` : ""}${t.pourquoi}
+${auMoinsUnResume ? `${t.auto}\n` : ""}${t.revuePresse(CONTACT)}\n${t.pourquoi}
 ${t.desinscrire} : ${lienDesinscription}`;
 
   return { objet: t.objet(semaine), html, texte };

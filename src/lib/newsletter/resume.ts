@@ -1,4 +1,5 @@
 import { generateContent } from "@/lib/ai/gemini";
+import { pageAutorisee } from "@/lib/news/robots";
 
 /**
  * RÉSUMER L'ACTUALITÉ SANS RIEN INVENTER.
@@ -128,6 +129,10 @@ function texteBrut(html: string): string {
 
 /** Récupère le texte d'un article. `null` si le site refuse ou tarde — on n'insiste pas. */
 export async function texteArticle(url: string): Promise<string | null> {
+  // ⚠️ On ne va PAS chercher une page que l'éditeur a écrit ne pas vouloir voir
+  // parcourue. `robots.txt` est aussi, depuis la directive 2019/790, la façon dont il
+  // réserve ses droits contre la fouille automatique — et un résumé en est une.
+  if (!(await pageAutorisee(url))) return null;
   try {
     const r = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; PacevoNewsletter/1.0)" },
@@ -320,7 +325,7 @@ export async function resumerArticles(
 }
 
 const LANGUES: Record<string, string> = {
-  en: "anglais", de: "allemand", es: "espagnol", pt: "portugais (du Portugal)",
+  fr: "français", en: "anglais", de: "allemand", es: "espagnol", pt: "portugais (du Portugal)",
 };
 
 /**
@@ -331,7 +336,7 @@ const LANGUES: Record<string, string> = {
  * Et la consigne interdit explicitement de toucher aux nombres — une traduction qui
  * « arrondit » un chiffre sourcé le transforme en chiffre inventé.
  */
-export async function traduireResumes(
+export async function traduireTextes(
   resumes: string[],
   lang: string,
 ): Promise<(string | null)[] | null> {

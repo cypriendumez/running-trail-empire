@@ -3,7 +3,7 @@ export const maxDuration = 300;
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { lienDesinscription } from "@/lib/newsletter/token";
-import { resumerArticles, traduireResumes, RESUMES_MAX, type ArticleResume } from "@/lib/newsletter/resume";
+import { resumerArticles, traduireTextes, RESUMES_MAX, type ArticleResume } from "@/lib/newsletter/resume";
 import { construireEmail, estLang, type Lang, type Section, type Course } from "@/lib/newsletter/email";
 import { RUBRIQUES_LETTRE } from "@/lib/news/rubriques";
 
@@ -36,7 +36,7 @@ import { RUBRIQUES_LETTRE } from "@/lib/news/rubriques";
  * et rien n'est envoyé si la semaine est trop pauvre.
  */
 
-type Item = { title: string; source: string; link: string; date: string; texte?: string };
+type Item = { title: string; source: string; link: string; date: string; texte?: string; langue?: "fr" | "en" };
 
 const MINIMUM_ARTICLES = 5;
 // Le plafond n'appartient pas à cette route : c'est celui du résumeur. Un plafond local
@@ -172,28 +172,47 @@ export async function GET(req: Request) {
     }
   } catch { courses = []; }
 
-  // ── 4. Les traductions, une seule fois par langue RÉELLEMENT présente ──────
-  // On ne traduit pas dans le vide : sans abonné allemand, pas d'appel allemand. Le
-  // palier gratuit de Gemini se compte en dizaines de requêtes par jour pour TOUTE l'app.
-  const languesPresentes = [...new Set(abonnes.map((a) => a.lang))].filter((l) => l !== "fr");
+  // ── 4. La lettre dans LA LANGUE DE CHACUN ─────────────────────────────────
+  // ⚠️ LE FRANÇAIS N'ÉTAIT PAS TRAITÉ, et c'est lui qui allait le plus mal. Cette carte
+  // partait de `["fr", base]` : un abonné français recevait les articles TELS QUELS,
+  // c'est-à-dire les titres anglais de LetsRun, iRunFar ou Marathon Handbook. Les
+  // résumés, eux, étaient bien traduits — d'où une lettre moitié française moitié
+  // anglaise. Huit des quatorze sources écrivent en anglais, et ce sont celles qui
+  // alimentent « Élites » et « Nutrition ».
+  //
+  // Désormais : le titre de chaque article est traduit vers la langue de l'abonné dès
+  // que la source n'écrit pas déjà dans cette langue.
+  const langueDe = new Map(vivier.map((it) => [it.link, it.langue ?? "fr"]));
+  const languesPresentes = [...new Set(abonnes.map((a) => a.lang))];
   const indexAvecResume = base.map((a, i) => ({ a, i })).filter((x) => x.a.resume);
-  const parLangue = new Map<Lang, ArticleResume[]>([["fr", base]]);
+  const parLangue = new Map<Lang, ArticleResume[]>();
 
   for (const lg of languesPresentes) {
-    let traduits: ArticleResume[] = base.map((a) => ({ ...a, resume: null }));
-    if (indexAvecResume.length) {
-      const out = await traduireResumes(indexAvecResume.map((x) => x.a.resume as string), lg);
-      // `null` seulement si AUCUN lot n'a abouti : cette langue reçoit alors les titres
-      // seuls, plutôt qu'un mélange de français et de sa propre langue. Sinon, chaque
-      // résumé non traduit vaut `null` et son article part avec son titre — une phrase
-      // perdue, plus la lettre entière.
-      if (out) {
-        const copie = base.map((a) => ({ ...a, resume: null as string | null }));
-        indexAvecResume.forEach((x, n) => { copie[x.i].resume = out[n]; });
-        traduits = copie;
+    const copie = base.map((a) => ({ ...a }));
+
+    // 4a. Les titres — pour TOUTE langue, y compris le français.
+    const titresATraduire = base.map((a, i) => ({ a, i })).filter((x) => langueDe.get(x.a.link) !== lg);
+    if (titresATraduire.length) {
+      const out = await traduireTextes(titresATraduire.map((x) => x.a.title), lg);
+      // Un titre non traduit reste dans sa langue d'origine : c'est moins bon, mais
+      // c'est le titre exact de l'éditeur, et le lien mène chez lui.
+      if (out) titresATraduire.forEach((x, n) => { if (out[n]) copie[x.i].title = out[n] as string; });
+    }
+
+    // 4b. Les résumés — écrits en français, à traduire pour les autres langues.
+    if (lg !== "fr") {
+      for (const c of copie) c.resume = null;
+      if (indexAvecResume.length) {
+        const out = await traduireTextes(indexAvecResume.map((x) => x.a.resume as string), lg);
+        // `null` seulement si AUCUN lot n'a abouti : cette langue reçoit alors les titres
+        // seuls, plutôt qu'un mélange de français et de sa propre langue. Sinon, chaque
+        // résumé non traduit vaut `null` et son article part avec son titre — une phrase
+        // perdue, plus la lettre entière.
+        if (out) indexAvecResume.forEach((x, n) => { copie[x.i].resume = out[n]; });
       }
     }
-    parLangue.set(lg, traduits);
+
+    parLangue.set(lg, copie);
   }
 
   // ── 4 bis. Rendre les rubriques telles qu'elles ont été planifiées ────────

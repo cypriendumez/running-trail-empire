@@ -37,6 +37,8 @@ import { jetonDesinscription, jetonValide } from "../src/lib/newsletter/token";
 import { chiffresVerifies, rendreTous, extraireResumes, RESUMES_MAX } from "../src/lib/newsletter/resume";
 import { FILTRES, QUERIES, RUBRIQUES_LETTRE, estCat } from "../src/lib/news/rubriques";
 import { decodeEntites, texteDuFlux } from "../src/lib/news/rss";
+import { lireRobots } from "../src/lib/news/robots";
+import { construireEmail, LANGS as LANGS_MAIL, type Section as SectionMail } from "../src/lib/newsletter/email";
 import { PLAFOND_JOUR } from "../src/lib/billing/aiQuota";
 import { ppsExpiration, ppsVerdict, ppsDemandeAction, couvertureCourses, PPS_URL, PPS_PRIX_EUR, PPS_VALIDITE_MOIS } from "../src/lib/pps/status";
 import { PPS_T } from "../src/lib/pps/ppsI18n";
@@ -4335,6 +4337,43 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     assert.ok(elite, "la rubrique Élites n'a plus de filtre");
     assert.ok(elite.test("Kilian Jornet remporte la Sierre-Zinal"), "une victoire doit passer");
     assert.ok(!elite.test("Comment améliorer sa VMA en six semaines"), "un conseil d'entraînement n'est pas un résultat");
+  });
+
+  test("un e-mail ne peut pas partir sans dire ce qu'il fait ni à qui écrire", () => {
+    // Cette lettre cite des articles de presse. Ce qui la rend défendable tient en une
+    // phrase — titre, éditeur nommé, lien vers lui, résumé écrit par nous, aucune photo —
+    // et en une adresse où demander un retrait. Sans destinataire identifiable, une
+    // demande de retrait n'a nulle part où aller : c'est ce silence qui transforme un
+    // désaccord en litige. La mention doit donc être dans CHAQUE e-mail, CHAQUE langue.
+    const art = { title: "Titre", source: "Source", link: "https://ex.fr/a", resume: "Un résumé." };
+    for (const lg of LANGS_MAIL) {
+      const { html, texte } = construireEmail(
+        lg, [{ cle: "une", articles: [art] }] as SectionMail[], [], "https://ex.fr/u", "https://ex.fr",
+      );
+      for (const rendu of [html, texte]) {
+        assert.ok(/@/.test(rendu), `aucune adresse de contact en ${lg}`);
+        // ⚠️ L'adresse doit être celle des MENTIONS LÉGALES. Une boîte inventée pour
+        // l'occasion affiche une voie de recours qui n'aboutit nulle part — pire que
+        // pas de mention du tout. J'avais écrit « contact@pacevo.app », qui n'existe pas.
+        assert.ok(rendu.includes("cypriendumez@outlook.fr"), `adresse hors mentions légales en ${lg}`);
+        assert.ok(!rendu.includes("pacevo.app"), `domaine non enregistré cité en ${lg}`);
+      }
+    }
+  });
+
+  test("un refus écrit dans robots.txt est un refus", () => {
+    // Depuis la directive européenne 2019/790 (article 4), `robots.txt` est aussi la
+    // façon dont un éditeur RÉSERVE ses droits contre la fouille automatique de ses
+    // textes — ce qu'est un résumé produit par un modèle. L'ignorer, c'est passer outre.
+    assert.deepEqual(lireRobots("User-agent: *\nDisallow: /prive/\nDisallow: /admin"), ["/prive/", "/admin"]);
+    // Les commentaires ne sont pas des règles.
+    assert.deepEqual(lireRobots("User-agent: *\n# Disallow: /piege\nDisallow: /vrai"), ["/vrai"]);
+    // ⚠️ LE POINT QUI COMPTE : un refus adressé à QUELQU'UN D'AUTRE ne nous concerne pas,
+    // et le prendre pour nous couperait des sources qui nous acceptent. À l'inverse, un
+    // groupe qu'on lirait comme universel nous ferait ignorer notre propre interdiction.
+    assert.deepEqual(lireRobots("User-agent: Googlebot\nDisallow: /"), [], "un refus visant Googlebot ne nous vise pas");
+    assert.deepEqual(lireRobots("User-agent: PacevoNewsletter\nDisallow: /"), ["/"], "un refus qui nous NOMME s'applique");
+    assert.deepEqual(lireRobots("User-agent: *\nAllow: /\nDisallow:"), [], "un Disallow vide n'interdit rien");
   });
 
   test("on résume ce que l'éditeur syndique, jamais son chapeau", () => {
