@@ -9,7 +9,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // POST /api/newsletter/subscribe { email }
 // Inscription publique à la newsletter. Idempotent (upsert sur l'email). Lie au compte si connecté.
 export async function POST(req: Request) {
-  const { email } = (await req.json().catch(() => ({}))) as { email?: string };
+  const { email, lang } = (await req.json().catch(() => ({}))) as { email?: string; lang?: string };
+  const langue = ["fr", "en", "de", "es", "pt"].includes(String(lang)) ? String(lang) : "fr";
   const clean = String(email ?? "").trim().toLowerCase();
   if (!EMAIL_RE.test(clean) || clean.length > 200) {
     return NextResponse.json({ ok: false, error: "Adresse e-mail invalide" }, { status: 400 });
@@ -37,10 +38,21 @@ export async function POST(req: Request) {
     // c'est un nouveau consentement, il mérite d'être tracé côté destinataire aussi.
     nouvelle = !existant || existant.unsubscribed === true;
 
-    await admin.from("newsletter_subscribers").upsert(
-      { email: clean, user_id: userId, unsubscribed: false },
+    // ⚠️ On tente D'ABORD avec la langue. Si la colonne `lang` n'a pas encore été
+    // ajoutée à la main (le schéma se modifie manuellement sur ce projet), l'écriture
+    // échoue et on réécrit sans elle : une colonne en retard ne doit jamais empêcher
+    // quelqu'un de s'abonner. La lettre repart alors en français, ce qui est le repli.
+    const avecLangue = await admin.from("newsletter_subscribers").upsert(
+      { email: clean, user_id: userId, unsubscribed: false, lang: langue },
       { onConflict: "email" },
     );
+    if (avecLangue.error) {
+      const sansLangue = await admin.from("newsletter_subscribers").upsert(
+        { email: clean, user_id: userId, unsubscribed: false },
+        { onConflict: "email" },
+      );
+      if (sansLangue.error) throw new Error(sansLangue.error.message);
+    }
   } catch {
     return NextResponse.json({ ok: false, error: "Inscription impossible pour le moment" }, { status: 500 });
   }

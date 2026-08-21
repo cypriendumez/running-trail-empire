@@ -34,6 +34,7 @@ import { accesDe, peut, motifRefus, JOURS_ESSAI } from "../src/lib/billing/acces
 import { TARIFS, FORMULES, accesDuPrice } from "../src/lib/stripe/client";
 import { PRIX_AFFICHES, REMISE_ANNUELLE_PCT, MOIS_FACTURES_PAR_AN, MOIS_OFFERTS, economieAnnuelle } from "../src/lib/billing/prix";
 import { jetonDesinscription, jetonValide } from "../src/lib/newsletter/token";
+import { chiffresVerifies } from "../src/lib/newsletter/resume";
 import { PLAFOND_JOUR } from "../src/lib/billing/aiQuota";
 import { ppsExpiration, ppsVerdict, ppsDemandeAction, couvertureCourses, PPS_URL, PPS_PRIX_EUR, PPS_VALIDITE_MOIS } from "../src/lib/pps/status";
 import { PPS_T } from "../src/lib/pps/ppsI18n";
@@ -4283,6 +4284,30 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     const q = codeOf("src/lib/billing/aiQuota.ts");
     assert.ok(!/upsert\(/.test(q), "upsert sur notifications : la contrainte unique n'existe pas");
     assert.ok(/\.update\(/.test(q) && /\.insert\(/.test(q), "il faut chercher puis mettre à jour ou insérer");
+  });
+
+  test("un chiffre absent de la source condamne le résumé", () => {
+    // La lettre du lundi RÉSUME désormais chaque article, et résumer est précisément
+    // l'opération qui fabrique des faits. Ce blog a dû retirer « 2 300 coureurs »,
+    // « 94 % de précision » et « testé avec 80 coureurs » — trois phrases écrites de
+    // bonne foi, à l'allure du vrai. La lettre part le lundi matin sans relecture : ce
+    // contrôle est la seule chose entre un modèle et une liste d'abonnés.
+    const source =
+      "L'office a enregistré une hausse de 50 % de la fréquentation. Ils étaient 2 300 au départ. En 2025, 11 millions de nuitées.";
+
+    assert.ok(chiffresVerifies("La hausse atteint 50 %.", source), "un chiffre présent doit passer");
+    assert.ok(chiffresVerifies("La fréquentation a augmenté.", source), "un résumé sans chiffre doit passer");
+    // La typographie des milliers ne doit pas décider : « 2 300 » et « 2300 » sont le
+    // même nombre, y compris avec l'espace fine insécable du français.
+    assert.ok(chiffresVerifies("Ils étaient 2300 au départ.", source), "2300 doit valoir 2 300");
+    assert.ok(chiffresVerifies("Ils étaient 2\u202f300 au départ.", source), "l'espace fine ne doit pas bloquer");
+
+    // Le cœur du test : les fautes réellement commises.
+    assert.ok(!chiffresVerifies("Une précision de 94 %.", source), "un pourcentage inventé doit être refusé");
+    assert.ok(!chiffresVerifies("Testé avec 80 coureurs.", source), "une cohorte inventée doit être refusée");
+    // Un résumé partiellement faux est entièrement jeté : on ne sait pas quelle phrase
+    // ment, donc on n'en garde aucune.
+    assert.ok(!chiffresVerifies("50 % de hausse et 4 200 inscrits.", source), "un mélange vrai/faux doit être refusé");
   });
 
   test("le jeton de désinscription ne se laisse pas deviner", () => {

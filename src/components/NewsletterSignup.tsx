@@ -6,7 +6,7 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 
 // Formulaire d'inscription à la newsletter. Variante "dark" pour le footer sombre.
 export function NewsletterSignup({ variant = "light" }: { variant?: "light" | "dark" }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [msg, setMsg] = useState("");
@@ -18,7 +18,10 @@ export function NewsletterSignup({ variant = "light" }: { variant?: "light" | "d
     try {
       const r = await fetch("/api/newsletter/subscribe", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        // La langue de l'écran au moment de l'inscription : c'est la seule information
+        // dont on dispose pour un visiteur non connecté, et elle est fiable — il vient de
+        // lire la page dans cette langue.
+        body: JSON.stringify({ email, lang }),
       });
       const j = await r.json();
       if (j.ok) { setState("done"); setEmail(""); }
