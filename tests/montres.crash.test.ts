@@ -108,12 +108,11 @@ for (const marque of MARQUES) {
     // Partout ailleurs, les blocs portant la métrique secondaire perdent leur cible en
     // silence à l'export intervals.icu.
     //
-    // ⚠️ `montre === null` EST UNE EXCEPTION DÉLIBÉRÉE, et mon premier test avait tort de
-    // la traiter comme les autres. Quand la détection échoue (API injoignable), le code
-    // garde le comportement Garmin — « ne jamais dégrader ce qui marche au motif qu'on
-    // n'a pas su lire l'API ». C'est un ARBITRAGE, pas un oubli : il protège la majorité
-    // (Garmin) et laisse un porteur de Coros recevoir une séance amputée ce jour-là.
-    if (marque !== null && !mixteAutorise && metriques.size > 1) {
+    // ⚠️ `montre === null` NE FAIT PLUS EXCEPTION. Le repli était « traiter l'inconnu
+    // comme une Garmin » ; il laissait un porteur de Coros recevoir, le jour d'une panne
+    // de détection, une séance aux blocs sans cible. Basculé en tout-allure le
+    // 21/08/2026 : moins fin sur Garmin, jamais vide nulle part.
+    if (!mixteAutorise && metriques.size > 1) {
       soucis.push(`${s.nom} → ${[...metriques].join(" + ")} dans la MÊME séance : ${etiquette} n'en lit qu'une`);
     }
   }
@@ -126,7 +125,7 @@ for (const marque of MARQUES) {
     // non détectée, `metriquesMixtesSupportees` rend `false` alors que la construction
     // garde le mode Garmin. Afficher « tout-allure » ici serait faux.
     const mode = marque === null
-      ? "repli Garmin (détection impossible)"
+      ? "repli tout-allure (détection impossible)"
       : mixteAutorise ? "métriques mixtes autorisées" : "tout-allure ou tout-FC";
     console.log(`  ✓ ${etiquette} — ${mode}`);
   }

@@ -492,9 +492,24 @@ export function buildWorkoutDescription(
   const mainPaceSec = parsePaceSec(`${title} ${detail}`);
   // Répétitions détectées dans le libellé de la séance (« 12×400 m … récup 45 s »).
   const reps = parseReps(detail, mainPaceSec);
-  // Une montre inconnue est traitée comme une Garmin : ne jamais dégrader ce qui marche
-  // au motif qu'on n'a pas su lire l'API.
-  const toutEnAllure = montre != null && !metriquesMixtesSupportees(montre);
+  // ⚠️ MONTRE INCONNUE → TOUT-ALLURE. Ce repli a été RETOURNÉ le 21/08/2026, sur décision
+  // de Cyprien, et il vaut la peine de dire pourquoi il était dans l'autre sens.
+  //
+  // Il traitait une montre inconnue comme une Garmin, au nom de « ne jamais dégrader ce
+  // qui marche ». Le raisonnement protégeait la majorité en cassant les autres : quand
+  // la détection échoue, un porteur de Coros recevait une séance dont l'échauffement et
+  // les récups n'avaient AUCUNE cible — intervals.icu n'exportant qu'une métrique, les
+  // blocs en FC arrivaient nus. Il voyait « 8 min » et devait deviner l'intensité.
+  //
+  // Le tout-allure, lui, fonctionne PARTOUT, Garmin comprise. Ce qu'il coûte à un Garmin
+  // ce jour-là : un échauffement prescrit en allure plutôt qu'en fréquence cardiaque —
+  // moins fin, jamais vide. Une prescription moins raffinée vaut mieux qu'une
+  // prescription absente, et c'est le seul choix qui ne dépend pas d'un pari sur la
+  // marque qu'on n'a pas réussi à lire.
+  //
+  // Effet de bord bienvenu : `metriquesMixtesSupportees(null)` rend `false`, et la
+  // construction dit maintenant la même chose. Les deux fonctions ne divergent plus.
+  const toutEnAllure = !metriquesMixtesSupportees(montre ?? null);
   const steps = stepsForType(type, dur, vmaKmh, mainPaceSec, warmMin, coolMin, reps, detail, toutEnAllure);
   if (!steps) return null;
   // Séance vélo (cross-training) → exporte un workout "Ride" sur la montre (sinon "Run").

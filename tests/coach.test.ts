@@ -5196,11 +5196,28 @@ test("Garmin garde son échauffement en fréquence cardiaque", () => {
   assert.match(e[1], /pace/, "le corps doit rester à l'allure");
 });
 
-test("une montre indéterminée est traitée comme une Garmin", () => {
-  // Ne jamais dégrader ce qui marche au motif qu'on n'a pas su lire l'API.
+test("une montre indéterminée reçoit une séance qui marche PARTOUT", () => {
+  // ⚠️ CE TEST DISAIT L'INVERSE JUSQU'AU 21/08/2026 : « une montre indéterminée est
+  // traitée comme une Garmin », au nom de « ne jamais dégrader ce qui marche ». Le
+  // raisonnement protégeait la majorité en cassant les autres — quand la détection
+  // échoue, un porteur de Coros recevait une séance dont l'échauffement et les récups
+  // n'avaient AUCUNE cible, intervals.icu n'exportant qu'une métrique par séance. Il
+  // voyait « 8 min » et devait deviner l'intensité.
+  //
+  // Décision de Cyprien : le repli bascule en tout-allure, qui fonctionne sur TOUTES les
+  // montres. Ce qu'il coûte à un Garmin ce jour-là : un échauffement en allure plutôt
+  // qu'en fréquence cardiaque. Moins fin, jamais vide.
   const inconnue = etapesDe("Footing", "Corps : 40 min en Z2 (~5'42/km)", "endurance", null);
   const garmin = etapesDe("Footing", "Corps : 40 min en Z2 (~5'42/km)", "endurance", "Garmin");
-  assert.deepEqual(inconnue, garmin);
+  const coros = etapesDe("Footing", "Corps : 40 min en Z2 (~5'42/km)", "endurance", "Coros");
+
+  assert.deepEqual(inconnue, coros, "l'inconnu doit suivre le mode universel, pas le mode Garmin");
+  assert.notDeepEqual(inconnue, garmin, "si l'inconnu redevenait identique à Garmin, le repli serait revenu en arrière");
+
+  // Le point qui compte vraiment : aucune étape sans cible, et une seule métrique.
+  const m = metriques(inconnue);
+  assert.ok(!(m.fc && m.allure), "une montre indéterminée ne doit JAMAIS recevoir une séance mixte");
+  for (const l of inconnue) assert.match(l, /(pace|HR)/, `étape sans cible : ${l}`);
 });
 
 test("la récup d'une séance de qualité suit la métrique du reste", () => {
