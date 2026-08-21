@@ -101,7 +101,7 @@ export async function GET(req: Request) {
   if (!abonnes.length) return NextResponse.json({ ok: true, envoye: 0, raison: "aucun abonné" });
 
   // ── 3. Les résumés, une seule fois, en français ────────────────────────────
-  const base: ArticleResume[] = await resumerArticles(
+  const { articles: base, diagnostic } = await resumerArticles(
     recents.slice(0, ARTICLES_MAX).map((it) => ({ title: it.title, source: it.source, link: it.link })),
   );
 
@@ -154,6 +154,9 @@ export async function GET(req: Request) {
     destinataires: abonnes.length,
     articles: base.length,
     resumes: base.filter((a) => a.resume).length,
+    // ⚠️ Sans ce champ, « resumes: 0 » ne dit pas s'il faut s'inquiéter. C'est ce
+    // silence qui a laissé passer un budget de sortie trop bas pendant deux essais.
+    diagnostic,
     langues: parLangueEnvoye,
   });
 }
