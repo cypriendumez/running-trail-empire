@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { QUERIES, FILTRES, estCat, type Cat } from "@/lib/news/rubriques";
-import { decodeEntites as decode } from "@/lib/news/rss";
+import { decodeEntites as decode, texteDuFlux } from "@/lib/news/rss";
 
 export const runtime = "nodejs";
 
@@ -37,7 +37,7 @@ const FEEDS: Feed[] = [
   { url: "https://www.mysportscience.com/blog-feed.xml", source: "MySportScience", domain: "mysportscience.com", cats: ["nutrition"] },
 ];
 
-type Item = { title: string; source: string; link: string; date: string; domain: string; favicon: string };
+type Item = { title: string; source: string; link: string; date: string; domain: string; favicon: string; texte?: string };
 const cache = new Map<string, { at: number; items: Item[] }>();
 const TTL = 30 * 60 * 1000; // 30 min — on ne sur-sollicite pas les sources.
 
@@ -67,6 +67,9 @@ function parseRss(xml: string, defaultSource?: string, defaultDomain?: string): 
       date: pick(/<pubDate>([\s\S]*?)<\/pubDate>/) || pick(/<dc:date>([\s\S]*?)<\/dc:date>/) || pick(/<updated>([\s\S]*?)<\/updated>/),
       domain,
       favicon: domain ? `https://icons.duckduckgo.com/ip3/${domain}.ico` : "",
+      // Servi UNIQUEMENT sur demande (voir plus bas) : 2 600 caractères par article
+      // alourdiraient de plus de 100 ko la réponse que lit le fil Communauté.
+      texte: texteDuFlux(b).slice(0, 2600) || undefined,
     };
   }).filter((i) => i.title && i.link);
 }
@@ -88,8 +91,11 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: `Rubrique inconnue : ${demande}`, rubriques: Object.keys(QUERIES) }, { status: 400 });
   }
   const cat: Cat = demande;
+  // Le texte intégral du flux n'intéresse que la lettre du lundi, qui doit le résumer.
+  const avecTexte = new URL(req.url).searchParams.get("avecTexte") === "1";
+  const servir = (items: Item[]) => (avecTexte ? items : items.map(({ texte: _t, ...r }) => r));
   const hit = cache.get(cat);
-  if (hit && Date.now() - hit.at < TTL) return NextResponse.json({ items: hit.items, cat, cached: true });
+  if (hit && Date.now() - hit.at < TTL) return NextResponse.json({ items: servir(hit.items), cat, cached: true });
 
   const q = QUERIES[cat];
   const gnUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=fr&gl=FR&ceid=FR:fr`;
@@ -118,7 +124,7 @@ export async function GET(req: Request) {
   const filtre = FILTRES[cat];
   const items = (filtre ? merged.filter((it) => filtre.test(it.title)) : merged).slice(0, 48);
 
-  if (items.length === 0 && hit) return NextResponse.json({ items: hit.items, cat, stale: true });
+  if (items.length === 0 && hit) return NextResponse.json({ items: servir(hit.items), cat, stale: true });
   cache.set(cat, { at: Date.now(), items });
-  return NextResponse.json({ items, cat, sources: 1 + feeds.length });
+  return NextResponse.json({ items: servir(items), cat, sources: 1 + feeds.length });
 }

@@ -36,6 +36,7 @@ import { PRIX_AFFICHES, REMISE_ANNUELLE_PCT, MOIS_FACTURES_PAR_AN, MOIS_OFFERTS,
 import { jetonDesinscription, jetonValide } from "../src/lib/newsletter/token";
 import { chiffresVerifies, rendreTous, extraireResumes, RESUMES_MAX } from "../src/lib/newsletter/resume";
 import { FILTRES, QUERIES, RUBRIQUES_LETTRE, estCat } from "../src/lib/news/rubriques";
+import { decodeEntites, texteDuFlux } from "../src/lib/news/rss";
 import { PLAFOND_JOUR } from "../src/lib/billing/aiQuota";
 import { ppsExpiration, ppsVerdict, ppsDemandeAction, couvertureCourses, PPS_URL, PPS_PRIX_EUR, PPS_VALIDITE_MOIS } from "../src/lib/pps/status";
 import { PPS_T } from "../src/lib/pps/ppsI18n";
@@ -4334,6 +4335,29 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     assert.ok(elite, "la rubrique Élites n'a plus de filtre");
     assert.ok(elite.test("Kilian Jornet remporte la Sierre-Zinal"), "une victoire doit passer");
     assert.ok(!elite.test("Comment améliorer sa VMA en six semaines"), "un conseil d'entraînement n'est pas un résultat");
+  });
+
+  test("on résume ce que l'éditeur syndique, jamais son chapeau", () => {
+    // Mesuré : 13 pages téléchargeables depuis un poste, 9 seulement depuis Vercel. On
+    // ne se déguise pas en navigateur pour forcer le passage — on lit `content:encoded`,
+    // le champ que ces mêmes éditeurs remplissent EXPRÈS pour les agrégateurs.
+    const para = (n: number) => `<p>${"Phrase de contenu réel numéro " + n + ", assez longue pour compter comme un vrai paragraphe d'article. "}</p>`;
+    const bloc = `<description><![CDATA[Un chapeau court.]]></description><content:encoded><![CDATA[${para(1)}${para(2)}<p>Trop court.</p>]]></content:encoded>`;
+    const t = texteDuFlux(bloc);
+    assert.ok(t.includes("numéro 1") && t.includes("numéro 2"), "les paragraphes réels doivent être extraits");
+    assert.ok(!t.includes("Trop court"), "les fragments courts sont du bruit de gabarit");
+
+    // ⚠️ LE POINT QUI COMPTE. `description` fait 150 à 500 caractères : c'est un chapeau.
+    // « Résumer » un chapeau revient à le recopier — exactement ce que cette lettre
+    // s'interdit en ne publiant que titre, source et lien. Aucun repli dessus.
+    assert.equal(
+      texteDuFlux("<description><![CDATA[Un chapeau de deux lignes qui raconte déjà tout l'article et qu'il serait très tentant de resservir tel quel.]]></description>"),
+      "",
+      "le chapeau ne doit JAMAIS servir de source à un résumé",
+    );
+
+    // Les entités numériques des flux WordPress partaient en clair dans un e-mail.
+    assert.equal(decodeEntites("Hocker &#038; Kerr &#8212; Silesia"), "Hocker & Kerr — Silesia");
   });
 
   test("une réponse coupée ne fait pas perdre les résumés déjà écrits", () => {

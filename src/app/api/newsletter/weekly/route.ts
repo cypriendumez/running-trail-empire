@@ -36,7 +36,7 @@ import { RUBRIQUES_LETTRE } from "@/lib/news/rubriques";
  * et rien n'est envoyé si la semaine est trop pauvre.
  */
 
-type Item = { title: string; source: string; link: string; date: string };
+type Item = { title: string; source: string; link: string; date: string; texte?: string };
 
 const MINIMUM_ARTICLES = 5;
 // Le plafond n'appartient pas à cette route : c'est celui du résumeur. Un plafond local
@@ -62,7 +62,7 @@ export async function GET(req: Request) {
   const ilYaUneSemaine = Date.now() - 7 * 24 * 3600 * 1000;
   const recentsDe = async (cat: string): Promise<Item[]> => {
     try {
-      const r = await fetch(`${BASE}/api/community/news?cat=${cat}`, { signal: AbortSignal.timeout(25000) });
+      const r = await fetch(`${BASE}/api/community/news?cat=${cat}&avecTexte=1`, { signal: AbortSignal.timeout(25000) });
       if (!r.ok) return [];
       const items = ((await r.json()) as { items?: Item[] }).items ?? [];
       return items.filter((it) => {
@@ -137,7 +137,7 @@ export async function GET(req: Request) {
 
   // ── 3 bis. Les résumés, une seule fois, en français ────────────────────────
   const { articles: base, diagnostic, lisibles } = await resumerArticles(
-    vivier.map((it) => ({ title: it.title, source: it.source, link: it.link })),
+    vivier.map((it) => ({ title: it.title, source: it.source, link: it.link, texte: it.texte })),
   );
 
   // ── 3 bis. Les courses à venir, depuis la BASE ─────────────────────────────

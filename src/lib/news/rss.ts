@@ -28,3 +28,35 @@ export function decodeEntites(s: string): string {
 function sur(n: number): string {
   try { return String.fromCodePoint(n); } catch { return ""; }
 }
+
+/**
+ * LE TEXTE QUE L'ÉDITEUR PUBLIE LUI-MÊME DANS SON FLUX.
+ *
+ * ⚠️ Mesuré le 21/08/2026 : sur 16 articles, 13 pages étaient téléchargeables depuis un
+ * poste de travail et seulement 9 depuis Vercel. Plusieurs éditeurs refusent une requête
+ * venant d'un hébergeur là où ils acceptent un navigateur. On NE se fait PAS passer pour
+ * un navigateur : c'est leur choix, et le contourner reviendrait à le nier.
+ *
+ * On utilise à la place `content:encoded`, le champ que le format RSS réserve au texte
+ * intégral et que ces mêmes éditeurs remplissent EXPRÈS pour les agrégateurs — iRunFar y
+ * met 16 700 caractères, Trail Runner 18 200. C'est offert, pas pris.
+ *
+ * `description` n'est PAS un repli acceptable : elle fait 150 à 500 caractères, soit un
+ * chapeau. « Résumer » un chapeau revient à le recopier, ce que cette lettre s'interdit.
+ * Le seuil de longueur écarte ce cas de lui-même.
+ */
+export function texteDuFlux(bloc: string): string {
+  const m = bloc.match(/<content:encoded[^>]*>([\s\S]*?)<\/content:encoded>/i);
+  if (!m) return "";
+  const html = m[1].replace(/<!\[CDATA\[|\]\]>/g, "");
+  const sansBruit = html.replace(/<(script|style|figure|figcaption)[\s\S]*?<\/\1>/gi, "");
+
+  // Les paragraphes seulement : un flux WordPress embarque des blocs de partage, des
+  // encarts d'abonnement et des légendes qui ne disent rien de l'article.
+  const paras: string[] = [];
+  for (const p of sansBruit.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)) {
+    const t = decodeEntites(p[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " "));
+    if (t.length >= 90) paras.push(t);
+  }
+  return paras.join("\n\n").trim();
+}

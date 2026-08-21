@@ -30,7 +30,16 @@ import { generateContent } from "@/lib/ai/gemini";
  * ce qu'il est.
  */
 
-export type Article = { title: string; source: string; link: string };
+export type Article = {
+  title: string; source: string; link: string;
+  /**
+   * Le texte que l'ÉDITEUR publie lui-même dans son flux (`content:encoded`), quand il
+   * en publie un. Il évite d'aller chercher la page — et surtout il fonctionne là où
+   * l'éditeur refuse une requête venant d'un hébergeur, ce qui coûtait 4 articles sur
+   * 16 en production alors qu'aucun ne manquait depuis un poste de travail.
+   */
+  texte?: string;
+};
 export type ArticleResume = Article & { resume: string | null };
 
 /**
@@ -224,7 +233,14 @@ export async function resumerArticles(
   // Les articles au-delà du plafond ne sont pas résumés, mais ils restent dans le rendu :
   // un titre sans résumé se lit, une rubrique disparue ne se voit pas.
   const nus = (): ArticleResume[] => rendreTous(articles, new Map());
-  const sources = await Promise.all(retenus.map((a) => texteArticle(a.link)));
+  // Le texte du flux d'abord : il est offert par l'éditeur, il ne coûte aucune requête,
+  // et il passe là où la page est refusée. On ne va chercher la page que sans lui.
+  const sources = await Promise.all(
+    retenus.map((a) => {
+      const duFlux = (a.texte ?? "").trim();
+      return duFlux.length >= 320 ? Promise.resolve(duFlux.slice(0, SOURCE_MAX)) : texteArticle(a.link);
+    }),
+  );
 
   const lisibles = retenus
     .map((a, i) => ({ a, i, src: sources[i] }))
