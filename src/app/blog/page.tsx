@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/Badge";
 import { btnClass } from "@/components/ui/Button";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { BLOG, BLOG_CATS } from "./blogI18n";
+import { SLUG_PAR_CLE } from "./articles";
 
 // Données visuelles (non traduisibles). Titres/extraits/catégories viennent de BLOG[lang].
 //
@@ -51,6 +52,18 @@ import { BLOG, BLOG_CATS } from "./blogI18n";
 // `aspect-[4/3]` : Unsplash renvoyait le recadrage de son choix (400, 900 puis 316 px
 // de haut pour la même tuile), que le navigateur étirait ensuite. C'est le défaut de
 // flou déjà corrigé sur la landing, jamais reporté ici. Hauteur désormais IMPOSÉE.
+/**
+ * Où mène une carte.
+ *
+ * Les trois liens de cette page menaient TOUS à /signup, y compris le bouton
+ * « Lire l'article » — pour huit articles dont aucun n'existait. Désormais : si le texte
+ * est écrit (`articles.ts`), la carte mène à l'article ; sinon elle mène toujours à
+ * l'inscription, et garde son badge « Sujet à venir ». Le badge et la destination
+ * viennent donc de la MÊME source — ils ne peuvent plus se contredire.
+ */
+const lienDe = (cle: string) => (SLUG_PAR_CLE[cle] ? `/blog/${SLUG_PAR_CLE[cle]}` : "/signup");
+const estEcrit = (cle: string) => Boolean(SLUG_PAR_CLE[cle]);
+
 const POSTS = [
   { id: 1, key: "p1", cat: "AI", img: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=600&h=450&fit=crop&q=80", featured: true },
   { id: 2, key: "p2", cat: "AI", img: "https://images.unsplash.com/photo-1762281429414-5ee5f2dbb243?w=600&h=450&fit=crop&q=80", featured: false },
@@ -129,9 +142,9 @@ export default function BlogPage() {
           {/* FEATURED */}
           {showFeatured && (
             <div className="mb-16 grid items-center gap-10 lg:grid-cols-2">
-              <Link href="/signup" className="group relative block aspect-[4/3] overflow-hidden rounded-3xl">
+              <Link href={lienDe(featured.key)} className="group relative block aspect-[4/3] overflow-hidden rounded-3xl">
                 <img src={featured.img} alt={B.posts[featured.key].title} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
-                <BadgeAVenir t={B.bientot} />
+                {!estEcrit(featured.key) && <BadgeAVenir t={B.bientot} />}
               </Link>
               <div>
                 <CatBadge code={featured.cat} label={B.cats[featured.cat]} />
@@ -160,8 +173,8 @@ export default function BlogPage() {
                   </div>
                 </Card>
 
-                <Link href="/signup" className={btnClass("primary", "md", "mt-7")}>
-                  {B.readArticle} <ArrowRight className="h-4 w-4" />
+                <Link href={lienDe(featured.key)} className={btnClass("primary", "md", "mt-7")}>
+                  {estEcrit(featured.key) ? B.lireArticle : B.readArticle} <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
             </div>
@@ -170,10 +183,10 @@ export default function BlogPage() {
           {/* GRID */}
           <div className="grid gap-7 sm:grid-cols-2 lg:grid-cols-3">
             {grid.map((post) => (
-              <Link href="/signup" key={post.id} className="group">
+              <Link href={lienDe(post.key)} key={post.id} className="group">
                 <div className="relative mb-4 aspect-[4/3] overflow-hidden rounded-2xl">
                   <img src={post.img} alt={B.posts[post.key].title} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                  <BadgeAVenir t={B.bientot} />
+                  {!estEcrit(post.key) && <BadgeAVenir t={B.bientot} />}
                 </div>
                 <CatBadge code={post.cat} label={B.cats[post.cat]} />
                 <h3 className="mt-3 text-lg font-semibold leading-snug tracking-tight transition-colors group-hover:text-[#059669]">{B.posts[post.key].title}</h3>
