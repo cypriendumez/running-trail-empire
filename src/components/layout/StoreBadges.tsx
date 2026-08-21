@@ -20,6 +20,25 @@ const ALT: Record<string, { ios: string; android: string }> = {
 };
 
 /**
+ * CE QU'ON DIT TANT QU'IL N'Y A RIEN À TÉLÉCHARGER.
+ *
+ * ⚠️ La phrase commence par ce qui est VRAI AUJOURD'HUI — le site s'utilise déjà depuis
+ * un téléphone — avant de mentionner ce qui n'existe pas encore. Une annonce qui ne
+ * parlerait que de l'application à venir laisserait croire qu'il faut l'attendre pour
+ * s'en servir, ce qui est faux et coûte des inscriptions.
+ *
+ * ⚠️ AUCUNE DATE. « Bientôt » ou « cet automne » est une promesse qu'on ne peut pas
+ * tenir depuis un pied de page ; « en préparation » décrit un état, pas un engagement.
+ */
+const ATTENTE: Record<string, string> = {
+  fr: "Pacevo s'utilise depuis ton navigateur, sur téléphone comme sur ordinateur. L'application mobile est en préparation.",
+  en: "Pacevo runs in your browser, on phone and desktop alike. The mobile app is in preparation.",
+  de: "Pacevo läuft im Browser, auf dem Handy wie am Rechner. Die mobile App ist in Vorbereitung.",
+  es: "Pacevo funciona en tu navegador, tanto en el móvil como en el ordenador. La app móvil está en preparación.",
+  pt: "A Pacevo funciona no teu navegador, no telemóvel como no computador. A aplicação móvel está em preparação.",
+};
+
+/**
  * Les badges des boutiques d'applications.
  *
  * ⚠️ Ils n'apparaissent que si l'adresse correspondante est renseignée — l'application
@@ -38,7 +57,16 @@ export function StoreBadges({ className = "" }: { className?: string }) {
     NEXT_PUBLIC_APP_STORE_URL: process.env.NEXT_PUBLIC_APP_STORE_URL,
     NEXT_PUBLIC_PLAY_STORE_URL: process.env.NEXT_PUBLIC_PLAY_STORE_URL,
   });
-  if (!ios && !android) return null;
+  // ⚠️ PAS `null`. Un pied de page muet sur le mobile laisse le visiteur supposer qu'il
+  // n'y a rien pour lui — alors que le site fonctionne déjà sur son téléphone. On dit
+  // donc l'état réel, et cette phrase disparaît d'elle-même dès qu'un badge s'allume.
+  if (!ios && !android) {
+    return (
+      <p className={`text-center text-xs leading-relaxed text-zinc-400 ${className}`}>
+        {ATTENTE[lang] ?? ATTENTE.fr}
+      </p>
+    );
+  }
 
   return (
     <div className={`flex flex-wrap items-center gap-3 ${className}`}>
