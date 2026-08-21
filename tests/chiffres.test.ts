@@ -22,6 +22,8 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { CHIFFRES, CHIFFRES_LANDING, CHIFFRES_AUTH } from "../src/lib/brand/stats";
 import { JOURS_ESSAI } from "../src/lib/billing/access";
+import { ARTICLES } from "../src/app/blog/articles";
+import { ARTICLES_I18N } from "../src/app/blog/articlesI18n";
 
 const ROOT = join(import.meta.dirname, "..");
 const SRC = join(ROOT, "src");
@@ -141,6 +143,30 @@ test("toute ancre interne vise un id qui existe", () => {
     .filter(([a]) => !ids.has(a))
     .map(([a, fs]) => `#${a} → ${[...fs].join(", ")}`);
   assert.equal(mortes.length, 0, `ancre(s) qui ne mènent nulle part :\n    ${mortes.join("\n    ")}`);
+});
+
+// ── 5. Aucune traduction d'article ne vise un slug inexistant ────────────────
+// Le repli du blog est `trad ?? a` : une traduction dont le slug est mal orthographié
+// n'est jamais trouvée, donc jamais affichée — et le bandeau « pas encore traduit »
+// reste, alors que le texte existe. Rien ne le signale : ni le typage (les clés d'un
+// Record sont des chaînes), ni le build, ni l'écran. C'est un travail perdu en silence.
+test("chaque traduction d'article correspond à un article réel", () => {
+  const slugs = new Set(ARTICLES.map((a) => a.slug));
+  assert.ok(slugs.size >= 8, `seulement ${slugs.size} articles — la source ne se lit plus`);
+  const orphelines: string[] = [];
+  let total = 0;
+  for (const [lg, parSlug] of Object.entries(ARTICLES_I18N)) {
+    for (const slug of Object.keys(parSlug ?? {})) {
+      total++;
+      if (!slugs.has(slug)) orphelines.push(`${lg} → « ${slug} »`);
+    }
+  }
+  assert.ok(total > 0, "aucune traduction trouvée — l'import ne mord plus");
+  assert.equal(
+    orphelines.length, 0,
+    `traduction(s) rattachée(s) à un slug qui n'existe pas :\n    ${orphelines.join("\n    ")}\n` +
+    `    → elles ne s'afficheront JAMAIS et le bandeau « pas encore traduit » restera.`,
+  );
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

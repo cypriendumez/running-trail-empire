@@ -831,6 +831,802 @@ export const ARTICLES_I18N: Partial<Record<Lang, Record<string, TraductionArticl
       ],
     },
   },
+  es: {
+    "ravitaillement-marathon-quoi-quand-combien": {
+      chapo:
+        "Las recomendaciones de hidratos durante el esfuerzo son objeto de un consenso bastante estable en la literatura. Aquí está lo que dice, de dónde vienen las cifras, y por qué el punto más importante no es la cantidad sino el entrenamiento de tu intestino.",
+      avertissement:
+        "Este artículo resume recomendaciones generales procedentes de publicaciones científicas. No sustituye el consejo de un médico o un dietista, en particular en caso de trastorno digestivo, diabetes, embarazo o tratamiento en curso.",
+      blocs: [
+        {
+          h: "Por qué existe el tema",
+          p: [
+            "El cuerpo almacena una cantidad limitada de glucógeno — en el hígado y en los músculos. En un esfuerzo de resistencia prolongado, esa reserva se convierte en el factor limitante mucho antes que los propios músculos. Es la causa fisiológica de lo que los corredores llaman el muro.",
+            "Aportar hidratos durante el esfuerzo no sirve para «tener energía» en un sentido vago: sirve para ahorrar una reserva que no se puede agrandar el día de la carrera.",
+          ],
+        },
+        {
+          h: "Cuánto: lo que dice el consenso",
+          p: [
+            "La síntesis de Asker Jeukendrup publicada en Sports Med en 2014 propone una escala según la duración del esfuerzo más que una cifra única. En torno a 30 a 60 gramos de hidratos por hora para un esfuerzo de una a dos horas y media; hasta unos 90 gramos por hora más allá, pero con una condición precisa, desarrollada justo debajo.",
+            "El posicionamiento conjunto del American College of Sports Medicine sobre nutrición y rendimiento, publicado el mismo año, va en el mismo sentido y sitúa esos aportes en la alimentación general del atleta.",
+            "Estos rangos son amplios a propósito. El peso, el ritmo, el calor y la tolerancia individual mueven el cursor, y la diferencia entre dos corredores del mismo nivel es considerable.",
+          ],
+        },
+        {
+          h: "La condición que todo el mundo olvida: dos azúcares, no uno",
+          p: [
+            "La glucosa atraviesa la pared intestinal por un transportador que se satura — eso es lo que limita la absorción en torno a 60 gramos por hora. La fructosa usa un transportador distinto, que no se satura al mismo tiempo.",
+            "Por eso los aportes altos se basan en una mezcla de glucosa y fructosa. Buscar 90 gramos por hora solo con glucosa no los hará pasar: el excedente se queda en el intestino, y ahí nacen los problemas digestivos que arruinan un final de carrera.",
+            "En concreto, esto significa leer la etiqueta. Un producto que anuncia una proporción de dos a uno entre glucosa y fructosa está diseñado para eso; otro no.",
+          ],
+        },
+        {
+          h: "Cuándo: la carrera empieza antes de la salida",
+          p: [
+            "Los días previos, el objetivo es salir con las reservas llenas, lo que pasa por una alimentación rica en hidratos y un volumen de entrenamiento reducido — el afinamiento juega aquí tanto como el plato.",
+            "Por la mañana, una comida digestible unas horas antes de la salida, hecha de lo que ya has probado. No es el día de estrenar un pan nuevo.",
+            "Durante, la regla más útil es empezar pronto y fraccionar. Esperar a tener hambre ya es tarde: el vaciado gástrico lleva tiempo, y recuperar en una toma masiva es exactamente lo que el intestino rechaza.",
+          ],
+        },
+        {
+          h: "Beber: a la sed, y pensar en el sodio",
+          p: [
+            "La recomendación de inundar el organismo se ha abandonado. Beber a la sed sigue siendo la referencia más segura para la mayoría, y beber muchísima agua pura en un esfuerzo largo expone a un peligro real — la hiponatremia, una dilución del sodio sanguíneo.",
+            "Con calor fuerte o cuando sudas mucho, el aporte de sodio cuenta tanto como el volumen de bebida. La mayoría de bebidas deportivas lo contienen; el agua sola no.",
+          ],
+        },
+        {
+          h: "El punto más importante: entrenar el intestino",
+          p: [
+            "El intestino se adapta a lo que se le pide con regularidad. Un corredor que nunca se alimenta en el entrenamiento y absorbe 90 gramos por hora el día de la carrera expone su estómago a una carga inédita en el peor momento.",
+            "La consecuencia práctica es simple, y la que menos se sigue: las tiradas largas son el lugar donde se prueba el avituallamiento. Mismos productos, mismas cantidades, mismos intervalos que el día de la carrera. El plan de nutrición se ensaya en el entrenamiento, exactamente igual que el ritmo.",
+          ],
+        },
+        {
+          h: "Después",
+          p: [
+            "La reposición del glucógeno es más rápida en las horas siguientes al esfuerzo, lo que importa cuando se encadenan carreras, mucho menos cuando la siguiente es dentro de tres semanas.",
+            "Para una carrera objetivo, el verdadero tema del después no es la ventana metabólica: es dejar que baje la carga antes de volver a empezar.",
+          ],
+        },
+      ],
+    },
+    "chaussure-de-trail-ce-qui-compte-avant-la-marque": {
+      chapo:
+        "Este artículo anunciaba una «comparativa según tu pisada»: habría hecho falta puntuar modelos concretos, con criterios que no medimos, y la clasificación estaría caducada al salir la siguiente colección. Aquí están, en su lugar, los cuatro parámetros que deciden de verdad, y lo que la literatura dice de cada uno.",
+      blocs: [
+        {
+          h: "El peso, el único parámetro con un vínculo claramente establecido",
+          p: [
+            "Es el punto donde los datos son más nítidos. Los trabajos de Wouter Hoogkamer y su equipo mostraron que una modificación de la economía de carrera se traduce directamente en rendimiento sobre distancia — y la masa en los pies es una de las palancas más simples de esa economía.",
+            "En la práctica: una zapatilla más pesada protege más pero cuesta en cada zancada, y el coste se paga tanto más cuanto más larga es la carrera. Es un arbitraje, no una regla — en terreno rompepiernas, la protección puede valer su peso.",
+          ],
+        },
+        {
+          h: "El drop: mucho discurso, pocas pruebas",
+          p: [
+            "El drop es la diferencia de altura entre talón y antepié. Es el argumento de marketing más extendido, y uno de los más débiles.",
+            "El ensayo de Laurent Malisoux publicado en el American Journal of Sports Medicine comparó zapatillas de drops distintos en corredores populares: no puso de manifiesto un efecto del drop sobre el riesgo de lesión en el conjunto del grupo. Dicho de otro modo, no existe un drop «correcto» aplicable a todo el mundo.",
+            "La consecuencia práctica es liberadora: elige el drop al que estás acostumbrado, y si quieres cambiar, hazlo progresivamente — es la transición brusca la que plantea problema, no el valor en sí.",
+          ],
+        },
+        {
+          h: "Los tacos: decide el terreno",
+          p: [
+            "Tacos profundos y separados muerden el barro y evacúan la tierra; son incómodos y se desgastan rápido en seco y en piedra. Tacos bajos agarran la roca y ruedan bien en tramos corribles; patinan en cuanto resbala.",
+            "No existe, pues, una mejor suela, solo una mejor suela para TU terreno habitual. Un corredor de bosque arcilloso y uno de caliza seca no tienen la misma necesidad, y ningún test genérico lo dirá por ellos.",
+          ],
+        },
+        {
+          h: "La amortiguación y la protección: una cuestión de duración",
+          p: [
+            "Cuanto más largo es el esfuerzo, más se acumulan los impactos y más cuenta la amortiguación. En un formato corto y rápido, una zapatilla baja y precisa da mejor retorno del terreno.",
+            "La placa de protección no se juzga por la comodidad sino por las piedras: en terreno pedregoso, su ausencia se paga al final de la carrera, cuando la planta del pie ya no perdona.",
+          ],
+        },
+        {
+          h: "Lo que cuenta más que todo lo demás: la horma",
+          p: [
+            "La mejor zapatilla sobre el papel es inútil si no le va a tu pie. La anchura del antepié, la sujeción del talón y el volumen varían enormemente de una marca a otra — a menudo más que los parámetros técnicos de los que todos hablan.",
+            "El pie se hincha en un esfuerzo largo: probar al final del día, con los calcetines de carrera, y dejar margen por delante. Una zapatilla perfectamente ajustada en la tienda es una zapatilla pequeña en el kilómetro 40.",
+          ],
+        },
+        {
+          h: "La conclusión honesta",
+          p: [
+            "Ninguna clasificación puede decirte qué modelo comprar, porque los dos parámetros decisivos — tu terreno y tu pie — no figuran en ningún test.",
+            "Lo que sí se puede hacer es seguir el desgaste. Pacevo registra el kilometraje por par: es un hecho medido, no una opinión, y vale más que una intuición para decidir cuándo un par está al final de su vida.",
+          ],
+        },
+      ],
+    },
+    "choisir-son-premier-ultra-ce-qui-distingue-les-epreuves": {
+      chapo:
+        "Este artículo se titulaba «los trails franceses que no te puedes perder en 2026»: una lista con fecha que sería falsa en seis meses. Aquí están, en su lugar, los criterios que deciden si una carrera te conviene — y esos no caducan.",
+      blocs: [
+        {
+          h: "La distancia es el peor criterio",
+          p: [
+            "Dos carreras de 80 km no tienen casi nada en común si una tiene 1 500 m de desnivel positivo y la otra 5 000. El desnivel decide el tiempo de pie, la proporción de marcha, la exigencia de las bajadas — y es la bajada, no la subida, la que destroza los cuádriceps.",
+            "Una referencia más útil que la distancia sola es la relación entre desnivel y kilómetros. A partir de cierta pendiente media ya no se corre de verdad: se camina rápido en subida y se encaja en bajada. Ni mejor ni peor, pero exige otra preparación.",
+            "Segunda referencia: el tiempo límite previsto por la organización. Dice a qué público se dirige la prueba mucho mejor que el número de kilómetros.",
+          ],
+        },
+        {
+          h: "Las barreras horarias, la limitación que se descubre tarde",
+          p: [
+            "La mayoría de los ultras imponen horas de paso en puntos intermedios. Que te paren en un avituallamiento por diez minutos de retraso es el fracaso más frecuente — y el más evitable.",
+            "Se leen antes de inscribirse, no la víspera. Compáralas con tu ritmo real en montaña, no con tu ritmo en asfalto: la diferencia entre ambos es considerable, y ahí es donde se estrellan las proyecciones optimistas.",
+          ],
+        },
+        {
+          h: "La noche lo cambia todo",
+          p: [
+            "En cuanto una prueba se adentra en la noche se convierte en otro ejercicio: vigilancia degradada, terreno menos legible, frío, y una gestión del sueño que no existe en un formato corto.",
+            "Un primer ultra que termina antes de la noche es una progresión más razonable que un formato nocturno a igual distancia. Si la noche es inevitable, se ensaya en el entrenamiento — al menos una tirada larga con frontal.",
+          ],
+        },
+        {
+          h: "Autonomía y avituallamientos",
+          p: [
+            "Algunas pruebas avituallan a menudo y en abundancia; otras imponen una autonomía larga entre dos puntos, a veces de agua. El material obligatorio se deriva de ello, y pesa.",
+            "Esa información está en el reglamento. Leerla es también anticipar lo que tendrás que llevar — y por tanto lo que debes haber probado en tirada larga.",
+          ],
+        },
+        {
+          h: "Los sistemas de clasificación",
+          p: [
+            "Varias grandes pruebas no aceptan inscripción directa. El circuito UTMB, por ejemplo, usa un índice de rendimiento calculado sobre los resultados de los corredores, y piedras de clasificación que se obtienen en carreras con sello para entrar en el sorteo de ciertas pruebas.",
+            "Son dispositivos oficiales cuyas modalidades evolucionan de un año a otro. La única fuente que hace fe es la web del organizador: consultarla antes de armar un calendario de temporada evita descubrir en enero que había que empezar el año anterior.",
+          ],
+        },
+        {
+          h: "Cómo usarlo en concreto",
+          p: [
+            "El calendario de Pacevo recoge las pruebas próximas con su distancia, su fecha y el enlace de inscripción. Elegir una carrera como objetivo ajusta la preparación a su fecha.",
+            "Pero la app no lee los reglamentos por ti. El desnivel, las barreras horarias, la autonomía y las clasificaciones se comprueban en la web del organizador — es él quien se compromete, no nosotros.",
+          ],
+        },
+      ],
+    },
+    "coach-vocal-en-course-ce-que-ca-change": {
+      chapo:
+        "El verdadero problema de una carrera no es la velocidad: es la gestión del ritmo. Lo que cambia una voz en el oído, lo que no puede saber, y por qué sirve sobre todo cuando estás cansado.",
+      blocs: [
+        {
+          h: "El problema al que responde",
+          p: [
+            "Chester Abbiss y Paul Laursen describieron las estrategias de ritmo adoptadas en competición y cómo pesan en el resultado. La conclusión general de esa literatura es constante: el reparto del esfuerzo cuenta, y salir demasiado rápido es el error más caro.",
+            "El problema es que un corredor percibe mal su ritmo, y cada vez peor a medida que se cansa. La sensación de esfuerzo aumenta mientras la velocidad baja — así que en el momento exacto en que reduces, tienes la impresión de acelerar.",
+          ],
+        },
+        {
+          h: "Lo que una pantalla no resuelve",
+          p: [
+            "Un reloj ya muestra el ritmo. Pero leerlo exige bajar la vista, enfocar y sobre todo comparar mentalmente esa cifra con un objetivo que llevas en la cabeza — tres operaciones que se vuelven costosas en el kilómetro 30.",
+            "Hay algo peor: el ritmo instantáneo oscila mucho, sobre todo en ciudad o bajo arbolado, donde la señal satelital se degrada. Un corredor que corrige en cada oscilación produce una carrera en acordeón, más agotadora que un ritmo regular.",
+          ],
+        },
+        {
+          h: "Lo que anuncia el Ghost Runner",
+          p: [
+            "En cada kilómetro, una voz anuncia tres cosas: el ritmo mantenido, la diferencia respecto al plan y el crono proyectado en meta si sigues así.",
+            "El tercer elemento es el que cambia el comportamiento. «5:12» es una información; «a este ritmo llegas cuatro minutos por encima de tu objetivo» es una decisión. La conversión mental se hace por ti, en el momento en que menos capaz eres de hacerla.",
+            "Y como es audio, no exige mirar a otro lado ni romper la zancada.",
+          ],
+        },
+        {
+          h: "Sus límites, y son reales",
+          p: [
+            "No conoce el terreno. Un tramo en cuesta ralentiza legítimamente el ritmo; el anuncio de una diferencia no es ahí una señal para acelerar, salvo que quieras quemar las piernas en una subida.",
+            "Tampoco conoce tus piernas. Compara una velocidad con un objetivo; no sabe si el cuádriceps te tira desde hace diez minutos. El objetivo fijado en la salida puede volverse el objetivo equivocado a media carrera, y eso lo decides tú.",
+            "Por último, correr con auricular supone seguir oyendo lo que te rodea. En carretera abierta, un solo oído — y en algunas pruebas los auriculares están prohibidos por reglamento.",
+          ],
+        },
+        {
+          h: "Cuándo sirve más",
+          p: [
+            "En esfuerzos largos a ritmo objetivo, donde la deriva es lenta y por tanto invisible desde dentro. En un primer intento a un crono dado, cuando aún no tienes la sensación calibrada. Y en el entrenamiento, para aprender a qué se parece de verdad el ritmo objetivo.",
+            "En cambio, en series cortas no aporta nada: los esfuerzos son demasiado breves para que un anuncio por kilómetro llegue a existir.",
+          ],
+        },
+      ],
+    },
+    "semi-en-moins-de-1h45-construire-le-plan": {
+      chapo:
+        "1h45 en un medio maratón es sostener 4:59 por kilómetro durante 21,1 km. Aquí está de dónde sale cada sesión de una preparación que apunta a ese crono, y por qué lo esencial del trabajo se hace a un ritmo bastante más lento.",
+      blocs: [
+        {
+          h: "Lo que exige el crono, en aritmética",
+          p: [
+            "105 minutos para 21,0975 km dan 4:59 por kilómetro, algo más de 12 km/h. No es una opinión, es una división — y es la única cifra de este artículo que describe un rendimiento.",
+            "La dificultad no es alcanzar ese ritmo: muchos corredores lo sostienen en 5 km. Es sostenerlo una hora cuarenta y cinco, lo que es un problema de resistencia mucho más que de velocidad.",
+          ],
+        },
+        {
+          h: "Por qué la mayoría del volumen se corre despacio",
+          p: [
+            "Es la parte más contraintuitiva de la preparación, y la que más se salta. Stephen Seiler describió lo que hacen realmente los atletas de resistencia de alto nivel: la gran mayoría de su volumen está a baja intensidad, y solo una pequeña fracción a intensidad alta. Lo que se llama distribución polarizada.",
+            "La intuición dice lo contrario: si quiero correr rápido, corro rápido. El problema es que la intensidad cuesta recuperación. Correr todas las salidas a ritmo medianamente duro produce un corredor medianamente cansado de forma permanente, que nunca recupera lo suficiente para hacer una verdadera sesión de calidad.",
+            "En la práctica, la resistencia de base debe ser francamente fácil: un ritmo en el que puedas hablar con frases enteras. Si tienes que interrumpirte para respirar, vas demasiado rápido.",
+          ],
+        },
+        {
+          h: "La sesión de umbral, el corazón del dispositivo",
+          p: [
+            "El umbral es el ritmo que se puede sostener alrededor de una hora en competición. Para un medio a 1h45, es lógicamente algo más rápido que el propio ritmo de carrera.",
+            "Se trabaja por bloques — series largas, de varios minutos, con recuperaciones cortas — más que en continuo, lo que permite acumular tiempo a esa intensidad sin que la sesión se vuelva inmanejable.",
+            "El trabajo a intensidad más alta también tiene su sitio. Los trabajos de Jan Helgerud comparando formatos de entrenamiento mostraron que los intervalos de alta intensidad mejoran el consumo máximo de oxígeno más que un trabajo continuo moderado. Pero es un condimento, no el plato.",
+          ],
+        },
+        {
+          h: "La tirada larga",
+          p: [
+            "Construye lo que las sesiones rápidas no construyen: la capacidad de aguantar. Se corre en resistencia, y su duración cuenta más que su distancia — es el tiempo de pie el que produce la adaptación.",
+            "Una variante útil al final de la preparación consiste en terminar una parte al ritmo objetivo. Enseña a encontrar ese ritmo con las piernas ya cansadas, que es exactamente la situación del kilómetro 15.",
+          ],
+        },
+        {
+          h: "El afinamiento",
+          p: [
+            "Las últimas semanas reducen el volumen manteniendo toques de intensidad. El objetivo es llegar con una frescura positiva: la carga reciente baja, la condición de fondo se mantiene.",
+            "El error clásico es querer recuperar el tiempo perdido. Una sesión dura a diez días de la salida no recupera nada — solo degrada la frescura que se acaba de construir.",
+          ],
+        },
+        {
+          h: "Lo que mueve el plan sobre la marcha",
+          p: [
+            "Un plan escrito ocho semanas antes supone que esas ocho semanas transcurrirán según lo previsto. Nunca lo hacen: una semana dura de trabajo, un resfriado, una noche en blanco, un calor inesperado.",
+            "Ahí es donde la relectura diaria de los indicadores cobra sentido. En Pacevo, la sesión de calidad se desplaza o se aligera cuando la frescura y la variabilidad cardíaca lo dicen, y el calendario explica la decisión. El volumen de la semana se mueve poco; su reparto, mucho.",
+          ],
+        },
+      ],
+    },
+    "body-battery-basse-faut-il-courir": {
+      chapo:
+        "Un indicador en mínimos por la mañana no es ni luz verde ni luz roja: es una pregunta. Aquí están los tres elementos que permiten responderla, y el único caso en que la respuesta es no sin discusión.",
+      avertissement:
+        "Este artículo habla de entrenamiento, no de medicina. Una fatiga que persiste varias semanas, un dolor, una falta de aire inhabitual o una frecuencia cardíaca en reposo duraderamente elevada son motivos de consulta médica, sean cuales sean las cifras que muestre un reloj.",
+      blocs: [
+        {
+          h: "Lo que mide el indicador — y lo que no",
+          p: [
+            "Body Battery es un indicador propietario de Garmin. No es una medición directa: es un compuesto, calculado a partir de la variabilidad cardíaca, el nivel de estrés estimado, la actividad y el sueño. Otras marcas ofrecen equivalentes con otros nombres, construidos de otra forma.",
+            "La consecuencia importa: un valor así no mide tu fatiga muscular. Refleja el estado de tu sistema nervioso autónomo tal como un algoritmo lo deduce de sensores en la muñeca. Tus piernas no tienen nada que ver.",
+            "Por eso puede estar bajo mientras te encuentras bien, y correcto mientras tienes agujetas. Ambas situaciones son normales y ninguna es un error del reloj.",
+          ],
+        },
+        {
+          h: "Primera pregunta: ¿es un día o una tendencia?",
+          p: [
+            "Un valor aislado no dice casi nada. Estos indicadores varían mucho de un día a otro en la misma persona, y Martin Buchheit recuerda que las medidas derivadas de la frecuencia cardíaca deben leerse en su contexto y como tendencia, nunca aisladas.",
+            "Una mañana baja tras una noche tardía o una sesión dura la víspera es esperable — es incluso señal de que la medición funciona. Tres o cuatro mañanas bajas seguidas sin nada que lo justifique es otro mensaje.",
+          ],
+        },
+        {
+          h: "Segunda pregunta: ¿por qué está bajo?",
+          p: [
+            "El algoritmo no conoce la causa. Falta de sueño, el inicio de una infección, el alcohol, una habitación demasiado caliente, el jet lag, una semana dura en el trabajo: todo produce la misma cifra baja.",
+            "El sueño merece un lugar aparte. La revisión de Hugh Fullagar sobre el tema muestra que la privación de sueño afecta al rendimiento en el ejercicio y a las funciones cognitivas — y correr cansado degrada también la vigilancia, lo que cuenta en un sendero técnico o en ciudad.",
+            "Si la causa es identificable y puntual, tiene tratamiento: dormir. Si no lo es, o si se parece al inicio de una enfermedad, la sesión no es la prioridad.",
+          ],
+        },
+        {
+          h: "Tercera pregunta: ¿qué sesión estaba prevista?",
+          p: [
+            "Es la pregunta que se olvida, y la más útil. «¿Hay que correr?» no tiene respuesta general; «¿hay que hacer ESTA sesión?» sí la tiene.",
+            "Un rodaje suave de cuarenta minutos casi no exige nada al sistema nervioso, y muchos corredores se sienten mejor después que antes. Una sesión de umbral o de VO2máx, en cambio, exige estar en condiciones de encajarla — hacerla sobre un organismo ya movilizado produce una sesión mediocre Y una recuperación alargada.",
+            "La buena decisión rara vez es binaria. Casi siempre consiste en mantener la salida y cambiar su intensidad, o desplazar la calidad dos días.",
+          ],
+        },
+        {
+          h: "El único caso en que es no",
+          p: [
+            "Fiebre, dolores musculares difusos, garganta tomada, ganglios: no se corre, sea cual sea el indicador. No es una cuestión de rendimiento sino de riesgo — un esfuerzo intenso durante una infección no es anodino.",
+            "Fuera de esa situación, un indicador bajo es una invitación a aligerar, no una prohibición. Y si la duda persiste varios días, quien decide es un médico, no un reloj.",
+          ],
+        },
+        {
+          h: "Qué hace Pacevo con ello",
+          p: [
+            "Estos valores llegan vía intervals.icu y entran en el cálculo del plan móvil. Cuando caen en tendencia, la sesión de calidad se aligera o se aplaza, y el calendario escribe por qué.",
+            "Pero la app solo tiene acceso a lo que pasa por un sensor. No sabe que estás incubando algo, ni que la semana ha sido dura en el trabajo. En eso, tu juicio va por delante del suyo.",
+          ],
+        },
+      ],
+    },
+    "ia-coach-ce-quun-humain-ne-fait-pas": {
+      chapo:
+        "Se suele oponer el algoritmo al entrenador como si hubiera que elegir. La verdadera línea divisoria no es la inteligencia: es la frecuencia con la que cada uno mira. Esto es lo que ve cada uno, y lo que no ve ninguno de los dos.",
+      blocs: [
+        {
+          h: "Lo que hace un entrenador y ningún programa sustituye",
+          p: [
+            "Un entrenador lee una cara. Oye en una frase que la separación, la mudanza o la noche en blanco pesan más que la carga de entrenamiento. Sabe que un atleta que dice «estoy bien» al terminar una sesión de umbral miente una vez de cada dos, y sabe cuál de las dos.",
+            "Además tiene una visión larga. Decide que una temporada se sacrificará por la siguiente, que un objetivo es prematuro, que este importa porque te importa a ti — y que un atleta motivado encaja lo que uno resignado rechaza. Nada de eso se deduce de una serie de mediciones.",
+            "Por último, ajusta en directo. Una cuesta más dura de lo previsto, un grupo que sale demasiado rápido, un gemelo que tira en el tercer kilómetro: cambia la sesión sobre la marcha, con lo que ve.",
+          ],
+        },
+        {
+          h: "Lo que hace un programa y ningún entrenador puede hacer",
+          p: [
+            "Mira todas las noches. No el lunes por teléfono: todas las noches, y después de cada sesión. Es la única diferencia que cuenta de verdad, y es estructural — quien sigue a treinta atletas no puede releer treinta curvas de sueño cada mañana, por bueno que sea.",
+            "No se cansa y no tiene ego. No sobrevalora la sesión que él mismo prescribió, no recuerda mejor el último buen entrenamiento que los tres mediocres, y no tiene orgullo que defender cuando los datos contradicen el plan.",
+            "Calcula sobre ventanas que ninguna memoria sostiene. La carga crónica se construye durante semanas; la relación entre carga reciente y carga de fondo se lee sobre un mes móvil. Son medias móviles: se calculan, no se intuyen.",
+          ],
+        },
+        {
+          h: "La línea divisoria: la frecuencia, no la inteligencia",
+          p: [
+            "Un entrenador observa por episodios — una sesión, una llamada, un mensaje. Un programa observa en continuo, pero solo ve lo que se mide. El primero tiene contexto y pocos puntos de medida; el segundo, muchos puntos de medida y ningún contexto.",
+            "Por eso la oposición está mal planteada. La pregunta no es «quién decide mejor» sino «quién ve qué, y cada cuánto». Un plan que solo se mueve una vez por semana ignora por construcción lo que pasó el martes por la noche.",
+          ],
+        },
+        {
+          h: "Lo que cambia en una semana real",
+          p: [
+            "Tomemos una semana corriente. Martes, sesión de umbral tal como estaba prevista. Miércoles, noche corta y variabilidad cardíaca claramente por debajo de lo normal. Jueves, había una sesión de calidad programada.",
+            "Sin relectura diaria, el jueves se mantiene: se escribió el domingo. Con relectura diaria, se aligera y la calidad se traslada al sábado, cuando los indicadores han vuelto. El volumen de la semana casi no cambia; su reparto sí — y es el reparto el que decide el desgaste.",
+            "Esta lógica — pilotar la progresión de la carga en vez de su cantidad bruta — está en el centro del trabajo de Tim Gabbett sobre la paradoja entre entrenamiento y lesión: a menudo son las subidas rápidas de carga, más que la carga alta en sí, las que exponen al atleta.",
+          ],
+        },
+        {
+          h: "El límite, y hay que decirlo",
+          p: [
+            "Un programa decide a partir de lo que mide. Lo que no mide no existe para él: un dolor que empieza, un duelo, una carga mental en el trabajo, una zapatilla al final de su vida. Nunca los verá, y ninguna versión futura los verá mientras no pasen por un sensor.",
+            "Los propios indicadores exigen prudencia. Martin Buchheit mostró que las medidas derivadas de la frecuencia cardíaca no cuentan todas la misma historia según el contexto, el momento y el tipo de esfuerzo: un valor aislado no significa nada, es la tendencia la que informa.",
+            "La conclusión honesta no es, por tanto, «el algoritmo sustituye». Es: mira cada día lo que un humano solo puede mirar de vez en cuando, y no entiende nada de lo que un humano capta de un vistazo. El corredor que progresa es el que da a cada uno lo que sabe hacer.",
+          ],
+        },
+      ],
+    },
+    "vfc-et-charge-voir-la-fatigue-arriver": {
+      chapo:
+        "Tres curvas y una medición matinal. Lo que dice cada una, lo que no dice, y por qué es su cruce — nunca un valor aislado — lo que permite aligerar antes de que algo se rompa.",
+      blocs: [
+        {
+          h: "Las tres curvas: qué significan CTL, ATL y TSB",
+          p: [
+            "El modelo que usan la mayoría de plataformas de entrenamiento desciende de los trabajos de Eric Banister sobre la respuesta a la carga. Se resume en tres números, todos derivados de la misma serie de sesiones.",
+            "La carga crónica, a menudo escrita CTL, es una media móvil larga — del orden de seis semanas. Es tu condición de fondo: sube despacio, baja despacio, y representa lo que tu cuerpo está acostumbrado a encajar.",
+            "La carga aguda, ATL, es lo mismo sobre una ventana corta, del orden de la semana. Es tu fatiga reciente: sube rápido tras una sesión dura y baja rápido con el descanso.",
+            "La frescura, TSB, es simplemente la diferencia entre ambas. Negativa, estás encajando más de lo habitual. Positiva, estás descansado — y eso es lo que se busca el día de la carrera, no durante la preparación.",
+          ],
+        },
+        {
+          h: "La variabilidad cardíaca: qué mide realmente",
+          p: [
+            "La variabilidad de la frecuencia cardíaca, o VFC, no mide la fatiga. Mide el intervalo entre latidos sucesivos, que refleja el equilibrio entre las dos ramas del sistema nervioso autónomo. Una VFC baja indica que tu organismo está movilizado; no dice por qué.",
+            "Esa distinción lo cambia todo en la práctica. Una noche con alcohol, el inicio de un resfriado, una habitación demasiado caliente, el jet lag o un disgusto hacen bajar la VFC exactamente igual que un entrenamiento demasiado duro. La medición es cierta; la interpretación «estoy sobreentrenado» no.",
+            "Segunda precaución: un valor aislado no vale nada. La VFC varía mucho de un día a otro en la misma persona. Lo que informa es la diferencia respecto a TU base — la media de tus últimos días — y la dirección de la tendencia. Buchheit insiste en ello: los indicadores derivados de la frecuencia cardíaca deben leerse en contexto, no aislados.",
+          ],
+        },
+        {
+          h: "Por qué hay que cruzar ambos",
+          p: [
+            "Por separado, las dos familias de indicadores se equivocan de forma previsible.",
+            "La carga sola no sabe nada de tu vida. Ve que has corrido tres veces esta semana; ignora que has dormido cinco horas por noche. Seguirá prescribiendo como si todo fuera bien.",
+            "La VFC sola no sabe nada de tu entrenamiento. Ve un indicador bajo; no puede distinguir una semana dura asumida — donde una frescura negativa es normal y deseada — de una deriva hacia el agotamiento.",
+            "Cruzadas, se corrigen. Frescura negativa con VFC estable es carga aceptada: el plan continúa. Frescura negativa con VFC que cae varios días seguidos es una señal de alerta: se aligera. Una VFC baja con carga escasa probablemente no tiene nada que ver con correr.",
+          ],
+        },
+        {
+          h: "Qué hace Pacevo con ello, en concreto",
+          p: [
+            "Estos indicadores llegan desde tu reloj vía intervals.icu — sueño, VFC, frecuencia cardíaca en reposo, la carga de cada sesión. Pacevo los relee tras cada sincronización y reescribe el plan móvil de siete días cuando cambian.",
+            "Aligerar no significa suprimir la semana. En la práctica, desplaza la sesión de calidad, acorta su parte intensa o sustituye una salida por un rodaje suave — el volumen se mueve poco, la intensidad mucho.",
+            "Y el calendario escribe POR QUÉ. Es el punto que más cuenta en el uso diario: un plan que no se entiende se esquiva. Un plan que dice «tu variabilidad lleva tres días por debajo de tu base, la sesión de umbral pasa al sábado» se respeta.",
+          ],
+        },
+        {
+          h: "Lo que no hace",
+          p: [
+            "No predice una lesión. La progresión de la carga es un factor entre otros — la biomecánica, el terreno, el material, el historial de lesiones y el sueño también cuentan, y nada de eso cabe en tres curvas.",
+            "No sustituye tu juicio. Un dolor que se instala, una molestia que cambia tu zancada, una fatiga que persiste pese a indicadores normales: son motivos para parar, diga lo que diga un panel. Un modelo siempre tiene razón sobre lo que mide y se equivoca sobre todo lo demás.",
+          ],
+        },
+      ],
+    },
+  },
+  pt: {
+    "ravitaillement-marathon-quoi-quand-combien": {
+      chapo:
+        "As recomendações de hidratos durante o esforço são objeto de um consenso bastante estável na literatura. Eis o que diz, de onde vêm os números, e porque o ponto mais importante não é a quantidade mas o treino do teu intestino.",
+      avertissement:
+        "Este artigo resume recomendações gerais provenientes de publicações científicas. Não substitui o parecer de um médico ou de um nutricionista, em particular em caso de perturbação digestiva, diabetes, gravidez ou tratamento em curso.",
+      blocs: [
+        {
+          h: "Porque o tema existe",
+          p: [
+            "O corpo armazena uma quantidade limitada de glicogénio — no fígado e nos músculos. Num esforço de resistência prolongado, essa reserva torna-se o fator limitante muito antes dos próprios músculos. É a causa fisiológica daquilo a que os corredores chamam o muro.",
+            "Ingerir hidratos durante o esforço não serve para «ter energia» num sentido vago: serve para poupar uma reserva que não se pode aumentar no dia da prova.",
+          ],
+        },
+        {
+          h: "Quanto: o que diz o consenso",
+          p: [
+            "A síntese de Asker Jeukendrup publicada na Sports Med em 2014 propõe uma escala consoante a duração do esforço, em vez de um número único. Cerca de 30 a 60 gramas de hidratos por hora para um esforço de uma a duas horas e meia; até cerca de 90 gramas por hora acima disso, mas com uma condição precisa, desenvolvida logo abaixo.",
+            "A tomada de posição conjunta do American College of Sports Medicine sobre nutrição e desempenho, publicada no mesmo ano, vai no mesmo sentido e situa estes aportes na alimentação geral do atleta.",
+            "Estes intervalos são amplos de propósito. O peso, o ritmo, o calor e a tolerância individual deslocam o cursor, e a diferença entre dois corredores do mesmo nível é considerável.",
+          ],
+        },
+        {
+          h: "A condição que toda a gente esquece: dois açúcares, não um",
+          p: [
+            "A glicose atravessa a parede intestinal por um transportador que satura — é isso que limita a absorção por volta dos 60 gramas por hora. A frutose usa um transportador diferente, que não satura ao mesmo tempo.",
+            "É por isso que os aportes elevados assentam numa mistura de glicose e frutose. Procurar 90 gramas por hora só com glicose não os fará passar: o excedente fica no intestino, e é aí que nascem os problemas digestivos que arruínam um final de prova.",
+            "Em concreto, isto significa ler o rótulo. Um produto que anuncia uma proporção de dois para um entre glicose e frutose foi concebido para isso; outro não.",
+          ],
+        },
+        {
+          h: "Quando: a prova começa antes da partida",
+          p: [
+            "Nos dias anteriores, o objetivo é partir com as reservas cheias, o que passa por uma alimentação rica em hidratos e um volume de treino reduzido — o afinamento conta aqui tanto como o prato.",
+            "De manhã, uma refeição digerível algumas horas antes da partida, feita do que já testaste. Não é o dia para estrear um pão novo.",
+            "Durante, a regra mais útil é começar cedo e fracionar. Esperar até ter fome já é tarde: o esvaziamento gástrico leva tempo, e recuperar numa única toma maciça é exatamente o que o intestino recusa.",
+          ],
+        },
+        {
+          h: "Beber: à sede, e pensar no sódio",
+          p: [
+            "A recomendação de inundar o organismo foi abandonada. Beber à sede continua a ser a referência mais segura para a maioria, e beber demasiada água pura num esforço longo expõe a um perigo real — a hiponatremia, uma diluição do sódio sanguíneo.",
+            "Com calor forte ou quando transpiras muito, o aporte de sódio conta tanto como o volume de bebida. A maioria das bebidas desportivas contém-no; a água simples não.",
+          ],
+        },
+        {
+          h: "O ponto mais importante: treinar o intestino",
+          p: [
+            "O intestino adapta-se ao que lhe é pedido com regularidade. Um corredor que nunca se alimenta no treino e absorve 90 gramas por hora no dia da prova expõe o estômago a uma carga inédita no pior momento.",
+            "A consequência prática é simples, e a que menos se segue: as tiradas longas são o lugar onde se testa o abastecimento. Mesmos produtos, mesmas quantidades, mesmos intervalos que no dia da prova. O plano de nutrição ensaia-se no treino, exatamente como o ritmo.",
+          ],
+        },
+        {
+          h: "Depois",
+          p: [
+            "A reposição do glicogénio é mais rápida nas horas seguintes ao esforço, o que importa quando se encadeiam provas, muito menos quando a seguinte é daqui a três semanas.",
+            "Para uma prova objetivo, o verdadeiro tema do depois não é a janela metabólica: é deixar a carga descer antes de recomeçar.",
+          ],
+        },
+      ],
+    },
+    "chaussure-de-trail-ce-qui-compte-avant-la-marque": {
+      chapo:
+        "Este artigo anunciava uma «comparação segundo a tua passada»: teria sido preciso pontuar modelos concretos, com critérios que não medimos, e a classificação estaria desatualizada à saída da coleção seguinte. Eis, em vez disso, os quatro parâmetros que decidem mesmo, e o que a literatura diz de cada um.",
+      blocs: [
+        {
+          h: "O peso, o único parâmetro com uma ligação claramente estabelecida",
+          p: [
+            "É o ponto em que os dados são mais nítidos. Os trabalhos de Wouter Hoogkamer e da sua equipa mostraram que uma alteração da economia de corrida se traduz diretamente em desempenho na distância — e a massa aos pés é uma das alavancas mais simples dessa economia.",
+            "Na prática: uma sapatilha mais pesada protege mais mas custa a cada passada, e o custo paga-se tanto mais quanto mais longa for a prova. É um compromisso, não uma regra — em terreno partido, a proteção pode valer o seu peso.",
+          ],
+        },
+        {
+          h: "O drop: muito discurso, poucas provas",
+          p: [
+            "O drop é a diferença de altura entre calcanhar e antepé. É o argumento de marketing mais difundido, e um dos mais fracos.",
+            "O ensaio de Laurent Malisoux publicado no American Journal of Sports Medicine comparou sapatilhas de drops diferentes em corredores amadores: não evidenciou um efeito do drop no risco de lesão no conjunto do grupo. Por outras palavras, não existe um drop «correto» aplicável a toda a gente.",
+            "A consequência prática é libertadora: escolhe o drop a que estás habituado, e se quiseres mudar, fá-lo progressivamente — é a transição brusca que cria problema, não o valor em si.",
+          ],
+        },
+        {
+          h: "Os pitons: é o terreno que decide",
+          p: [
+            "Pitons profundos e espaçados mordem a lama e libertam a terra; são desconfortáveis e gastam-se depressa no seco e na pedra. Pitons baixos agarram a rocha e rolam bem nos troços corríveis; escorregam assim que fica escorregadio.",
+            "Não existe, pois, melhor sola, apenas melhor sola para O TEU terreno habitual. Quem corre em floresta argilosa e quem corre em calcário seco não têm a mesma necessidade, e nenhum teste genérico o dirá por eles.",
+          ],
+        },
+        {
+          h: "O amortecimento e a proteção: uma questão de duração",
+          p: [
+            "Quanto mais longo é o esforço, mais os impactos se acumulam e mais o amortecimento conta. Num formato curto e rápido, uma sapatilha baixa e precisa dá melhor retorno do terreno.",
+            "A placa de proteção não se julga pelo conforto mas pelas pedras: em terreno pedregoso, a sua ausência paga-se no fim da prova, quando a planta do pé deixa de perdoar.",
+          ],
+        },
+        {
+          h: "O que conta mais do que tudo o resto: a forma",
+          p: [
+            "A melhor sapatilha no papel é inútil se não servir ao teu pé. A largura do antepé, a fixação do calcanhar e o volume variam enormemente de marca para marca — muitas vezes mais do que os parâmetros técnicos de que toda a gente fala.",
+            "O pé incha num esforço longo: experimentar ao fim do dia, com as meias de prova, e deixar folga à frente. Uma sapatilha perfeitamente ajustada na loja é uma sapatilha pequena ao quilómetro 40.",
+          ],
+        },
+        {
+          h: "A conclusão honesta",
+          p: [
+            "Nenhuma classificação te pode dizer que modelo levar, porque os dois parâmetros decisivos — o teu terreno e o teu pé — não constam de nenhum teste.",
+            "O que se pode fazer, isso sim, é acompanhar o desgaste. O Pacevo regista a quilometragem por par: é um facto medido, não uma opinião, e vale mais do que uma intuição para decidir quando um par chegou ao fim.",
+          ],
+        },
+      ],
+    },
+    "choisir-son-premier-ultra-ce-qui-distingue-les-epreuves": {
+      chapo:
+        "Este artigo chamava-se «os trails franceses a não perder em 2026»: uma lista datada que estaria errada dentro de seis meses. Eis, em vez disso, os critérios que decidem se uma prova te serve — e esses não ficam desatualizados.",
+      blocs: [
+        {
+          h: "A distância é o pior critério",
+          p: [
+            "Duas provas de 80 km quase nada têm em comum se uma tiver 1 500 m de desnível positivo e a outra 5 000. O desnível decide o tempo em pé, a parte de marcha, a exigência das descidas — e é a descida, não a subida, que destrói os quadríceps.",
+            "Uma referência mais útil do que a distância isolada é a relação entre desnível e quilómetros. A partir de certa inclinação média já não se corre verdadeiramente: caminha-se depressa a subir e encaixa-se a descer. Nem melhor nem pior, mas exige outra preparação.",
+            "Segunda referência: o tempo limite previsto pela organização. Diz a que público se dirige a prova muito melhor do que o número de quilómetros.",
+          ],
+        },
+        {
+          h: "As barreiras horárias, a restrição que se descobre tarde",
+          p: [
+            "A maioria dos ultras impõe horas de passagem em pontos intermédios. Ser travado num abastecimento por dez minutos de atraso é o insucesso mais frequente — e o mais evitável.",
+            "Leem-se antes da inscrição, não na véspera. Compara-as com o teu ritmo real em montanha, não com o teu ritmo em estrada: a diferença é considerável, e é aí que as projeções otimistas se desfazem.",
+          ],
+        },
+        {
+          h: "A noite muda tudo",
+          p: [
+            "Assim que uma prova entra pela noite torna-se um exercício diferente: vigilância degradada, terreno menos legível, frio, e uma gestão do sono que não existe num formato curto.",
+            "Um primeiro ultra que termina antes da noite é uma progressão mais razoável do que um formato noturno à mesma distância. Se a noite é inevitável, ensaia-se no treino — pelo menos uma tirada longa com frontal.",
+          ],
+        },
+        {
+          h: "Autonomia e abastecimentos",
+          p: [
+            "Algumas provas abastecem com frequência e fartura; outras impõem longa autonomia entre dois pontos, por vezes de água. O material obrigatório decorre daí, e pesa.",
+            "Essa informação está no regulamento. Lê-la é também antecipar o que vais transportar — e portanto o que deves ter testado em tirada longa.",
+          ],
+        },
+        {
+          h: "Os sistemas de qualificação",
+          p: [
+            "Várias grandes provas não aceitam inscrição direta. O circuito UTMB, por exemplo, usa um índice de desempenho calculado sobre os resultados dos corredores, e pedras de qualificação obtidas em provas certificadas para entrar no sorteio de certas provas.",
+            "São dispositivos oficiais cujas modalidades evoluem de ano para ano. A única fonte que faz fé é o site do organizador: consultá-lo antes de montar um calendário de época evita descobrir em janeiro que era preciso ter começado no ano anterior.",
+          ],
+        },
+        {
+          h: "Como usar isto em concreto",
+          p: [
+            "O calendário do Pacevo reúne as provas futuras com a sua distância, data e ligação de inscrição. Escolher uma prova como objetivo alinha a preparação pela sua data.",
+            "Mas a app não lê os regulamentos por ti. O desnível, as barreiras horárias, a autonomia e as qualificações verificam-se no site do organizador — é ele que se compromete, não nós.",
+          ],
+        },
+      ],
+    },
+    "coach-vocal-en-course-ce-que-ca-change": {
+      chapo:
+        "O verdadeiro problema de uma prova não é a velocidade: é a gestão do ritmo. O que muda uma voz no ouvido, o que ela não pode saber, e porque serve sobretudo quando estás cansado.",
+      blocs: [
+        {
+          h: "O problema que resolve",
+          p: [
+            "Chester Abbiss e Paul Laursen descreveram as estratégias de ritmo adotadas em competição e como pesam no resultado. A conclusão geral dessa literatura é constante: a repartição do esforço conta, e partir depressa demais é o erro mais caro.",
+            "O problema é que um corredor percebe mal o seu ritmo, e cada vez pior à medida que se cansa. A sensação de esforço aumenta enquanto a velocidade baixa — ou seja, no momento exato em que abrandas, tens a impressão de acelerar.",
+          ],
+        },
+        {
+          h: "O que um ecrã não resolve",
+          p: [
+            "Um relógio já mostra o ritmo. Mas lê-lo exige baixar os olhos, focar e sobretudo comparar mentalmente esse número com um objetivo que guardas na cabeça — três operações que se tornam caras ao quilómetro 30.",
+            "Pior ainda: o ritmo instantâneo oscila muito, sobretudo na cidade ou sob copado, onde o sinal de satélite se degrada. Quem corrige a cada oscilação faz uma prova em acordeão, mais cansativa do que um ritmo regular.",
+          ],
+        },
+        {
+          h: "O que o Ghost Runner anuncia",
+          p: [
+            "A cada quilómetro, uma voz anuncia três coisas: o ritmo mantido, o desvio ao plano e o tempo projetado na meta se continuares assim.",
+            "O terceiro elemento é o que muda o comportamento. «5:12» é uma informação; «a este ritmo chegas quatro minutos acima do teu objetivo» é uma decisão. A conversão mental é feita por ti, no momento em que menos capaz és de a fazer.",
+            "E porque é áudio, não exige olhar para o lado nem partir a passada.",
+          ],
+        },
+        {
+          h: "Os seus limites, e são reais",
+          p: [
+            "Não conhece o terreno. Um troço a subir abranda legitimamente o ritmo; o anúncio de um desvio não é aí um sinal para acelerar, a não ser que queiras queimar as pernas numa subida.",
+            "Também não conhece as tuas pernas. Compara uma velocidade com um objetivo; não sabe se o teu quadríceps puxa há dez minutos. O objetivo fixado à partida pode tornar-se o objetivo errado a meio da prova, e isso decides tu.",
+            "Por fim, correr com auricular pressupõe continuar a ouvir o que te rodeia. Em estrada aberta, um só ouvido — e em algumas provas os auriculares são proibidos pelo regulamento.",
+          ],
+        },
+        {
+          h: "Quando serve mais",
+          p: [
+            "Em esforços longos a ritmo alvo, onde a deriva é lenta e portanto invisível por dentro. Numa primeira tentativa a um tempo dado, quando ainda não tens a sensação calibrada. E no treino, para aprender como é realmente o ritmo alvo.",
+            "Em séries curtas, pelo contrário, não acrescenta nada: os esforços são demasiado breves para que um anúncio ao quilómetro chegue a existir.",
+          ],
+        },
+      ],
+    },
+    "semi-en-moins-de-1h45-construire-le-plan": {
+      chapo:
+        "1h45 numa meia maratona é sustentar 4:59 por quilómetro durante 21,1 km. Eis de onde vem cada sessão de uma preparação com esse objetivo, e porque o essencial do trabalho se faz a um ritmo bem mais lento.",
+      blocs: [
+        {
+          h: "O que o tempo exige, em aritmética",
+          p: [
+            "105 minutos para 21,0975 km dão 4:59 por quilómetro, pouco mais de 12 km/h. Não é uma opinião, é uma divisão — e é o único número deste artigo que descreve um desempenho.",
+            "A dificuldade não é atingir esse ritmo: muitos corredores sustentam-no em 5 km. É sustentá-lo uma hora e quarenta e cinco, o que é um problema de resistência muito mais do que de velocidade.",
+          ],
+        },
+        {
+          h: "Porque a maioria do volume se corre devagar",
+          p: [
+            "É a parte mais contraintuitiva da preparação, e a que mais se salta. Stephen Seiler descreveu o que fazem realmente os atletas de resistência de alto nível: a grande maioria do seu volume situa-se em baixa intensidade, e apenas uma pequena fração em intensidade elevada. A chamada distribuição polarizada.",
+            "A intuição diz o contrário: se quero correr rápido, corro rápido. O problema é que a intensidade custa recuperação. Correr todas as saídas a ritmo medianamente duro produz um corredor permanentemente meio cansado, que nunca recupera o suficiente para fazer uma verdadeira sessão de qualidade.",
+            "Na prática, a resistência de base tem de ser francamente fácil: um ritmo em que consigas falar por frases inteiras. Se tens de interromper para respirar, vais depressa demais.",
+          ],
+        },
+        {
+          h: "A sessão de limiar, o coração do dispositivo",
+          p: [
+            "O limiar é o ritmo que se consegue sustentar cerca de uma hora em prova. Para uma meia em 1h45, é logicamente um pouco mais rápido do que o próprio ritmo de prova.",
+            "Trabalha-se por blocos — frações longas, de vários minutos, com recuperações curtas — em vez de contínuo, o que permite acumular tempo nessa intensidade sem que a sessão se torne ingerível.",
+            "O trabalho em intensidade mais elevada também tem lugar. Os trabalhos de Jan Helgerud comparando formatos de treino mostraram que os intervalos de alta intensidade melhoram o consumo máximo de oxigénio mais do que um trabalho contínuo moderado. Mas é um tempero, não o prato.",
+          ],
+        },
+        {
+          h: "A tirada longa",
+          p: [
+            "Constrói o que as sessões rápidas não constroem: a capacidade de aguentar. Corre-se em resistência, e a sua duração conta mais do que a distância — é o tempo em pé que produz a adaptação.",
+            "Uma variante útil no fim da preparação é terminar uma parte ao ritmo alvo. Ensina a encontrar esse ritmo com as pernas já cansadas, que é exatamente a situação do quilómetro 15.",
+          ],
+        },
+        {
+          h: "O afinamento",
+          p: [
+            "As últimas semanas reduzem o volume mantendo toques de intensidade. O objetivo é chegar com frescura positiva: a carga recente desce, a condição de fundo mantém-se.",
+            "O erro clássico é querer recuperar o atraso. Uma sessão dura a dez dias da partida não recupera nada — só degrada a frescura que se acabou de construir.",
+          ],
+        },
+        {
+          h: "O que mexe no plano pelo caminho",
+          p: [
+            "Um plano escrito oito semanas antes pressupõe que essas oito semanas decorrerão como previsto. Nunca decorrem: uma semana dura de trabalho, uma constipação, uma noite em claro, um calor inesperado.",
+            "É aí que a releitura diária dos indicadores ganha sentido. No Pacevo, a sessão de qualidade desloca-se ou alivia-se quando a frescura e a variabilidade cardíaca o dizem, e o calendário explica a decisão. O volume da semana mexe pouco; a sua repartição, muito.",
+          ],
+        },
+      ],
+    },
+    "body-battery-basse-faut-il-courir": {
+      chapo:
+        "Um indicador no mínimo de manhã não é luz verde nem vermelha: é uma pergunta. Eis os três elementos que permitem respondê-la, e o único caso em que a resposta é não sem discussão.",
+      avertissement:
+        "Este artigo fala de treino, não de medicina. Uma fadiga que persiste várias semanas, uma dor, uma falta de ar invulgar ou uma frequência cardíaca em repouso duradouramente elevada são motivos de consulta médica, sejam quais forem os números de um relógio.",
+      blocs: [
+        {
+          h: "O que o indicador mede — e o que não mede",
+          p: [
+            "Body Battery é um indicador proprietário da Garmin. Não é uma medição direta: é um compósito, calculado a partir da variabilidade cardíaca, do nível de stress estimado, da atividade e do sono. Outras marcas propõem equivalentes com outros nomes, construídos de forma diferente.",
+            "A consequência é importante: um valor destes não mede a tua fadiga muscular. Reflete o estado do teu sistema nervoso autónomo tal como um algoritmo o deduz de sensores no pulso. As tuas pernas não têm nada a ver.",
+            "Por isso pode estar baixo quando te sentes bem, e correto quando tens dores musculares. As duas situações são normais e nenhuma é um erro do relógio.",
+          ],
+        },
+        {
+          h: "Primeira pergunta: é um dia ou uma tendência?",
+          p: [
+            "Um valor isolado não diz quase nada. Estes indicadores variam muito de um dia para o outro na mesma pessoa, e Martin Buchheit lembra que as medidas derivadas da frequência cardíaca se leem no contexto e como tendência, nunca isoladas.",
+            "Uma manhã baixa depois de uma noite tardia ou de uma sessão dura na véspera é esperada — é até sinal de que a medição funciona. Três ou quatro manhãs baixas seguidas sem nada que o justifique é outra mensagem.",
+          ],
+        },
+        {
+          h: "Segunda pergunta: porque está baixo?",
+          p: [
+            "O algoritmo não conhece a causa. Falta de sono, o início de uma infeção, o álcool, um quarto demasiado quente, o jet lag, uma semana dura no trabalho: tudo produz o mesmo número baixo.",
+            "O sono merece lugar à parte. A revisão de Hugh Fullagar sobre o tema mostra que a privação de sono afeta o desempenho no exercício e as funções cognitivas — e correr cansado degrada também a vigilância, o que conta num trilho técnico ou na cidade.",
+            "Se a causa é identificável e pontual, tem tratamento: dormir. Se não é, ou se parece o início de uma doença, a sessão não é a prioridade.",
+          ],
+        },
+        {
+          h: "Terceira pergunta: que sessão estava prevista?",
+          p: [
+            "É a pergunta que se esquece, e a mais útil. «Devo correr?» não tem resposta geral; «devo fazer ESTA sessão?» tem.",
+            "Um trote fácil de quarenta minutos quase nada exige ao sistema nervoso, e muitos corredores sentem-se melhor depois do que antes. Uma sessão de limiar ou de VO2máx, pelo contrário, exige estar em condições de a encaixar — fazê-la num organismo já mobilizado produz uma sessão medíocre E uma recuperação alongada.",
+            "A boa decisão raramente é binária. Quase sempre consiste em manter a saída e mudar a intensidade, ou deslocar a qualidade dois dias.",
+          ],
+        },
+        {
+          h: "O único caso em que é não",
+          p: [
+            "Febre, dores musculares difusas, garganta inflamada, gânglios: não se corre, seja qual for o indicador. Não é uma questão de desempenho mas de risco — um esforço intenso durante uma infeção não é inócuo.",
+            "Fora dessa situação, um indicador baixo é um convite a aliviar, não uma proibição. E se a dúvida persistir vários dias, quem decide é um médico, não um relógio.",
+          ],
+        },
+        {
+          h: "O que o Pacevo faz com isso",
+          p: [
+            "Estes valores chegam via intervals.icu e entram no cálculo do plano móvel. Quando caem em tendência, a sessão de qualidade é aliviada ou adiada, e o calendário escreve porquê.",
+            "Mas a app só tem acesso ao que passa por um sensor. Não sabe que estás a incubar alguma coisa, nem que a semana foi dura no trabalho. Nesse ponto, o teu juízo vem antes do dela.",
+          ],
+        },
+      ],
+    },
+    "ia-coach-ce-quun-humain-ne-fait-pas": {
+      chapo:
+        "Costuma opor-se o algoritmo ao treinador como se fosse preciso escolher. A verdadeira linha divisória não é a inteligência: é a frequência com que cada um olha. Eis o que cada um vê — e o que nenhum dos dois vê.",
+      blocs: [
+        {
+          h: "O que um treinador faz e nenhum programa substitui",
+          p: [
+            "Um treinador lê um rosto. Percebe numa frase que a separação, a mudança de casa ou a noite mal dormida pesam mais do que a carga de treino. Sabe que um atleta que diz «estou bem» no fim de uma sessão de limiar mente uma vez em cada duas, e sabe qual das duas.",
+            "Tem também uma visão longa. Decide que uma época será sacrificada pela seguinte, que um objetivo é prematuro, que este conta porque te importa — e que um atleta motivado encaixa o que um resignado recusa. Nada disso se deduz de uma série de medições.",
+            "Por fim, ajusta em direto. Uma subida mais dura do que o previsto, um grupo que parte demasiado rápido, um gémeo que puxa ao terceiro quilómetro: muda a sessão no momento, com o que vê.",
+          ],
+        },
+        {
+          h: "O que um programa faz e nenhum treinador consegue",
+          p: [
+            "Olha todas as noites. Não à segunda-feira ao telefone: todas as noites, e depois de cada sessão. É a única diferença que conta mesmo, e é estrutural — quem acompanha trinta atletas não pode reler trinta curvas de sono todas as manhãs, por melhor que seja.",
+            "Não se cansa e não tem ego. Não sobrevaloriza a sessão que ele próprio prescreveu, não se lembra melhor do último bom treino do que dos três medianos, e não tem orgulho a defender quando os dados contradizem o plano.",
+            "Calcula sobre janelas que nenhuma memória sustenta. A carga crónica constrói-se ao longo de semanas; a relação entre carga recente e carga de fundo lê-se num mês móvel. São médias móveis: calculam-se, não se intuem.",
+          ],
+        },
+        {
+          h: "A linha divisória: a frequência, não a inteligência",
+          p: [
+            "Um treinador observa por episódios — uma sessão, uma chamada, uma mensagem. Um programa observa em contínuo, mas só vê o que é medido. O primeiro tem contexto e poucos pontos de medida; o segundo, muitos pontos de medida e nenhum contexto.",
+            "É por isso que a oposição está mal colocada. A pergunta não é «quem decide melhor» mas «quem vê o quê, e com que frequência». Um plano que só se mexe uma vez por semana ignora, por construção, o que aconteceu na terça à noite.",
+          ],
+        },
+        {
+          h: "O que muda numa semana real",
+          p: [
+            "Tomemos uma semana comum. Terça, sessão de limiar como previsto. Quarta, noite curta e variabilidade cardíaca claramente abaixo do normal. Quinta, estava marcada uma sessão de qualidade.",
+            "Sem releitura diária, a quinta mantém-se: foi escrita no domingo. Com releitura diária, é aliviada e a qualidade passa para sábado, quando os indicadores voltaram. O volume da semana quase não muda; a sua repartição sim — e é ela que decide o desgaste.",
+            "Esta lógica — pilotar a progressão da carga em vez da sua quantidade bruta — está no centro do trabalho de Tim Gabbett sobre o paradoxo entre treino e lesão: são muitas vezes as subidas rápidas de carga, mais do que a carga elevada em si, que expõem o atleta.",
+          ],
+        },
+        {
+          h: "O limite, e é preciso dizê-lo",
+          p: [
+            "Um programa decide a partir do que mede. O que não mede não existe para ele: uma dor que começa, um luto, uma carga mental no trabalho, um ténis no fim de vida. Nunca os verá, e nenhuma versão futura os verá enquanto não passarem por um sensor.",
+            "Os próprios indicadores pedem prudência. Martin Buchheit mostrou que as medidas derivadas da frequência cardíaca não contam todas a mesma história consoante o contexto, o momento e o tipo de esforço: um valor isolado não significa nada, é a tendência que informa.",
+            "A conclusão honesta não é, portanto, «o algoritmo substitui». É: olha todos os dias para o que um humano só consegue olhar de vez em quando, e não percebe nada do que um humano capta num relance. Quem progride é quem dá a cada um aquilo que sabe fazer.",
+          ],
+        },
+      ],
+    },
+    "vfc-et-charge-voir-la-fatigue-arriver": {
+      chapo:
+        "Três curvas e uma medição de manhã. O que cada uma diz, o que não diz, e porque é o seu cruzamento — nunca um valor isolado — que permite aliviar antes que algo parta.",
+      blocs: [
+        {
+          h: "As três curvas: o que significam CTL, ATL e TSB",
+          p: [
+            "O modelo usado pela maioria das plataformas de treino descende dos trabalhos de Eric Banister sobre a resposta à carga. Resume-se a três números, todos derivados da mesma série de sessões.",
+            "A carga crónica, muitas vezes escrita CTL, é uma média móvel longa — da ordem das seis semanas. É a tua condição de fundo: sobe devagar, desce devagar, e representa o que o teu corpo está habituado a encaixar.",
+            "A carga aguda, ATL, é o mesmo numa janela curta, da ordem da semana. É a tua fadiga recente: sobe depressa depois de uma sessão dura e desce depressa em repouso.",
+            "A frescura, TSB, é simplesmente a diferença entre as duas. Negativa, estás a encaixar mais do que o habitual. Positiva, estás descansado — e é isso que se procura no dia da prova, não durante a preparação.",
+          ],
+        },
+        {
+          h: "A variabilidade cardíaca: o que mede realmente",
+          p: [
+            "A variabilidade da frequência cardíaca, ou VFC, não mede a fadiga. Mede o intervalo entre batimentos sucessivos, que reflete o equilíbrio entre os dois ramos do sistema nervoso autónomo. Uma VFC baixa sinaliza que o organismo está mobilizado; não diz porquê.",
+            "Essa distinção muda tudo na prática. Uma noite com álcool, o início de uma constipação, um quarto demasiado quente, o jet lag ou um aborrecimento fazem baixar a VFC exatamente como um treino demasiado duro. A medição é verdadeira; a interpretação «estou sobretreinado» não é.",
+            "Segunda precaução: um valor isolado não vale nada. A VFC varia muito de um dia para o outro na mesma pessoa. O que informa é o desvio à TUA base — a média dos teus últimos dias — e a direção da tendência. Buchheit insiste nisso: os indicadores derivados da frequência cardíaca leem-se em contexto, não isolados.",
+          ],
+        },
+        {
+          h: "Porque é preciso cruzar os dois",
+          p: [
+            "Tomadas em separado, as duas famílias de indicadores enganam-se de forma previsível.",
+            "A carga sozinha não sabe nada da tua vida. Vê que correste três vezes esta semana; ignora que dormiste cinco horas por noite. Continuará a prescrever como se estivesse tudo bem.",
+            "A VFC sozinha não sabe nada do teu treino. Vê um indicador baixo; não distingue uma semana dura assumida — em que uma frescura negativa é normal e desejada — de uma deriva para o esgotamento.",
+            "Cruzadas, corrigem-se. Frescura negativa com VFC estável é carga aceite: o plano continua. Frescura negativa com VFC a cair vários dias seguidos é um sinal de alerta: alivia-se. Uma VFC baixa com carga fraca provavelmente nada tem a ver com correr.",
+          ],
+        },
+        {
+          h: "O que o Pacevo faz com isso, em concreto",
+          p: [
+            "Estes indicadores chegam do teu relógio via intervals.icu — sono, VFC, frequência cardíaca em repouso, a carga de cada sessão. O Pacevo relê-os após cada sincronização e reescreve o plano móvel dos sete dias seguintes quando mudam.",
+            "Aliviar não é suprimir a semana. Na prática, desloca a sessão de qualidade, encurta a sua parte intensa, ou substitui uma saída por um trote leve — o volume mexe pouco, a intensidade mexe muito.",
+            "E o calendário escreve PORQUÊ. É o ponto que mais conta no dia a dia: um plano que não se percebe, contorna-se. Um plano que diz «a tua variabilidade está abaixo da tua base há três dias, a sessão de limiar passa para sábado» cumpre-se.",
+          ],
+        },
+        {
+          h: "O que não faz",
+          p: [
+            "Não prevê uma lesão. A progressão da carga é um fator entre outros — a biomecânica, o terreno, o material, o histórico de lesões e o sono também contam, e nada disso cabe em três curvas.",
+            "Não substitui o teu juízo. Uma dor que se instala, um incómodo que altera a tua passada, uma fadiga que persiste apesar de indicadores normais: são motivos para parar, diga o que disser um painel. Um modelo tem sempre razão sobre o que mede e engana-se sobre tudo o resto.",
+          ],
+        },
+      ],
+    },
+  },
 };
 
 export const traductionArticle = (lang: Lang, slug: string) =>
