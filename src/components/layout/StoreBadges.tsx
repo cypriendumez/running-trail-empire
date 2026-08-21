@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { liensStore } from "@/lib/brand/stores";
 import { useT } from "@/lib/i18n/LanguageProvider";
 
@@ -41,18 +42,32 @@ export function StoreBadges({ className = "" }: { className?: string }) {
 
   return (
     <div className={`flex flex-wrap items-center gap-3 ${className}`}>
-      {ios && (
-        <a href={ios} target="_blank" rel="noopener noreferrer" aria-label="App Store">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/badges/app-store.svg" alt={alt.ios} className="h-11 w-auto" loading="lazy" />
-        </a>
-      )}
-      {android && (
-        <a href={android} target="_blank" rel="noopener noreferrer" aria-label="Google Play">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/badges/google-play.png" alt={alt.android} className="h-11 w-auto" loading="lazy" />
-        </a>
-      )}
+      {ios && <Badge href={ios} img="/badges/app-store.svg" label={alt.ios} />}
+      {android && <Badge href={android} img="/badges/google-play.png" label={alt.android} />}
     </div>
+  );
+}
+
+/**
+ * Un badge, avec REPLI SUR DU TEXTE si l'image officielle n'a pas été déposée.
+ *
+ * ⚠️ Sans ce repli, poser les adresses sans les fichiers affichait deux images cassées
+ * sur toutes les pages publiques — et rien ne l'aurait signalé, une image manquante
+ * n'étant pas une erreur. Deux conditions à réunir, c'est une de trop : le jour de la
+ * publication on pense aux liens, pas aux fichiers.
+ *
+ * Le repli n'est pas une reconstitution du badge — Apple comme Google l'interdisent :
+ * c'est un bouton de texte, ce que leurs chartes autorisent explicitement.
+ */
+function Badge({ href, img, label }: { href: string; img: string; label: string }) {
+  const [casse, setCasse] = useState(false);
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" aria-label={label}
+      className={casse ? "rounded-full bg-zinc-900 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-zinc-800" : ""}>
+      {casse ? label : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={img} alt={label} className="h-11 w-auto" loading="lazy" onError={() => setCasse(true)} />
+      )}
+    </a>
   );
 }
