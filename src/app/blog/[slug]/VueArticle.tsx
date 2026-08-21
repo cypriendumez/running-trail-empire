@@ -9,15 +9,15 @@ import { btnClass } from "@/components/ui/Button";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { BLOG } from "../blogI18n";
 import { articleParSlug } from "../articles";
+import { traductionArticle } from "../articlesI18n";
 
 /**
- * Avertissement affiché à un lecteur NON FRANCOPHONE.
+ * Avertissement affiché quand l'article N'EST PAS ENCORE TRADUIT dans la langue lue.
  *
- * Le corps des articles est en français uniquement (la raison est écrite en tête de
- * `articles.ts` : traduire à la chaîne du fond sur l'entraînement et la nutrition sans
- * relecture produirait le genre de texte approximatif que ce projet retire). Le taire
- * ferait buter le lecteur sur une langue qu'il n'a pas choisie, sans explication —
- * autant le dire, dans SA langue.
+ * Il n'est pas piloté par une liste tenue à la main — qui dériverait — mais par la
+ * PRÉSENCE RÉELLE de la traduction dans `articlesI18n.ts` : traduire un article le fait
+ * disparaître, sans qu'on ait à y penser. Le taire ferait buter le lecteur sur une
+ * langue qu'il n'a pas choisie, sans explication.
  */
 const SEULEMENT_FR: Record<string, string> = {
   en: "This article is only available in French for now. The rest of Pacevo speaks your language.",
@@ -58,7 +58,13 @@ export function VueArticle({ slug }: { slug: string }) {
   // Le TITRE et l'extrait restent traduits — ils existent déjà dans les cinq langues et
   // servent aussi la carte de l'index. Seul le corps est français.
   const t = (BLOG[lang] ?? BLOG.fr).posts[a.cle];
-  const avertLangue = SEULEMENT_FR[lang];
+
+  // Le corps traduit s'il existe, le français sinon. Le bandeau « seulement en
+  // français » ne s'affiche QUE dans le second cas : il est piloté par la présence
+  // réelle de la traduction, jamais par une liste tenue à la main qui dériverait.
+  const trad = traductionArticle(lang, a.slug);
+  const corps = trad ?? a;
+  const avertLangue = trad ? undefined : SEULEMENT_FR[lang];
 
   return (
     <div className="min-h-screen bg-white">
@@ -88,17 +94,17 @@ export function VueArticle({ slug }: { slug: string }) {
           )}
 
           <p className="mt-8 border-l-2 border-[#059669] pl-5 text-lg leading-relaxed text-zinc-700">
-            {a.chapo}
+            {corps.chapo}
           </p>
 
-          {a.avertissement && (
+          {corps.avertissement && (
             <p className="mt-8 rounded-xl bg-amber-50 px-5 py-4 text-sm leading-relaxed text-amber-900 ring-1 ring-inset ring-amber-200">
-              {a.avertissement}
+              {corps.avertissement}
             </p>
           )}
 
           <article className="mt-12">
-            {a.blocs.map((b, i) => (
+            {corps.blocs.map((b, i) => (
               <section key={i} className="mb-11">
                 {b.h && (
                   <h2 className="mb-4 text-xl font-semibold tracking-tight text-zinc-900">

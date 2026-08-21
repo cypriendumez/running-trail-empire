@@ -32,12 +32,15 @@
  *      curl -s "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&retmode=json&id=<PMID>"
  *
  * ── LANGUE ───────────────────────────────────────────────────────────────────
- * Ces textes sont en FRANÇAIS UNIQUEMENT, à dessein. Le reste de l'app vit en cinq
- * langues, et les titres, extraits et catégories du blog le sont aussi. Traduire à la
- * chaîne huit articles de fond sur l'entraînement, la nutrition et le matériel sans
- * relecture par un locuteur produirait exactement le genre de texte approximatif que ce
- * projet s'emploie à retirer. La page d'article le DIT au lecteur non francophone plutôt que
- * de le laisser buter sur du français sans prévenir.
+ * Ce fichier porte la version FRANÇAISE, qui est la SOURCE : c'est elle qu'on écrit
+ * d'abord, elle qui cite les publications, et elle qui sert de repli. Les traductions
+ * vivent dans `articlesI18n.ts`, et elles sont PARTIELLES à dessein : un article non
+ * traduit dans une langue s'affiche en français avec un bandeau qui le dit au lecteur
+ * dans SA langue. On ne retient donc jamais un article français en attendant ses quatre
+ * traductions, et on n'affiche jamais du français sans prévenir.
+ *
+ * ⚠️ Les SOURCES restent ici et NE SE TRADUISENT PAS : un titre de publication se cite
+ * dans sa langue d'origine, sinon le lecteur ne le retrouve pas.
  */
 
 export type Source = { label: string; url: string };
