@@ -24,6 +24,7 @@ import { CHIFFRES, CHIFFRES_LANDING, CHIFFRES_AUTH } from "../src/lib/brand/stat
 import { JOURS_ESSAI } from "../src/lib/billing/access";
 import { ARTICLES } from "../src/app/blog/articles";
 import { ARTICLES_I18N } from "../src/app/blog/articlesI18n";
+import { LEGAL } from "../src/app/legalI18n";
 
 const ROOT = join(import.meta.dirname, "..");
 const SRC = join(ROOT, "src");
@@ -167,6 +168,35 @@ test("chaque traduction d'article correspond à un article réel", () => {
     `traduction(s) rattachée(s) à un slug qui n'existe pas :\n    ${orphelines.join("\n    ")}\n` +
     `    → elles ne s'afficheront JAMAIS et le bandeau « pas encore traduit » restera.`,
   );
+});
+
+test("les mentions légales disent la même chose dans les 5 langues", () => {
+  // ⚠️ Une page légale se remplit langue par langue, et c'est exactement là qu'on
+  // s'arrête au milieu : j'ai renseigné l'hébergeur en fr/en/de, puis j'ai failli
+  // publier es et pt avec leur marqueur « [POR COMPLETAR] » encore en place. Un visiteur
+  // portugais aurait lu, sur la page qui l'informe de ses droits, une consigne interne
+  // non remplie.
+  //
+  // La LCEN impose de nommer l'hébergeur. Vercel Inc. est vérifié dans la politique de
+  // confidentialité de Vercel elle-même — pas déduit du fait qu'on déploie chez eux.
+  const MARQUEURS = /\[(À RENSEIGNER|TO COMPLETE|AUSZUFÜLLEN|POR COMPLETAR|A PREENCHER)[^\]]*\]/g;
+
+  for (const [lg, doc] of Object.entries(LEGAL)) {
+    const tout = JSON.stringify(doc);
+    assert.ok(tout.includes("Vercel Inc."), `l'hébergeur n'est pas nommé en ${lg}`);
+    assert.ok(tout.includes("Covina, CA 91723"), `l'adresse de l'hébergeur manque en ${lg}`);
+    assert.ok(tout.includes("cypriendumez@outlook.fr"), `aucun contact d'éditeur en ${lg}`);
+
+    // Il RESTE un marqueur légitime — le statut juridique, que seul l'éditeur connaît.
+    // Le test ne l'interdit pas ; il interdit tout AUTRE trou, et vérifie que le trou
+    // connu est bien le même dans chaque langue.
+    const restants = tout.match(MARQUEURS) ?? [];
+    assert.equal(restants.length, 1, `${restants.length} mentions à compléter en ${lg} : ${restants.join(" | ")}`);
+    assert.ok(
+      /particulier|individual|Privatperson|particular/i.test(restants[0]),
+      `le trou restant en ${lg} n'est pas le statut juridique : ${restants[0]}`,
+    );
+  }
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
