@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Clock } from "lucide-react";
-import { Logo } from "@/components/brand/Logo";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { Container, Section } from "@/components/ui/Container";
@@ -53,17 +52,29 @@ import { BLOG, BLOG_CATS } from "./blogI18n";
 // de haut pour la même tuile), que le navigateur étirait ensuite. C'est le défaut de
 // flou déjà corrigé sur la landing, jamais reporté ici. Hauteur désormais IMPOSÉE.
 const POSTS = [
-  { id: 1, key: "p1", cat: "AI", img: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=600&h=450&fit=crop&q=80", date: "19 avr. 2026", readTime: "8 min", featured: true },
-  { id: 2, key: "p2", cat: "AI", img: "https://images.unsplash.com/photo-1762281429414-5ee5f2dbb243?w=600&h=450&fit=crop&q=80", date: "16 avr. 2026", readTime: "12 min", featured: false },
-  { id: 3, key: "p3", cat: "TRAINING", img: "https://images.unsplash.com/photo-1526676537331-7747bf8278fc?w=600&h=450&fit=crop&q=80", date: "14 avr. 2026", readTime: "10 min", featured: false },
-  { id: 4, key: "p4", cat: "HEALTH", img: "https://images.unsplash.com/photo-1560233026-ad254fa8da38?w=600&h=450&fit=crop&q=80", date: "11 avr. 2026", readTime: "6 min", featured: false },
-  { id: 5, key: "p5", cat: "RACES", img: "https://images.unsplash.com/photo-1761027436967-63584b301a77?w=600&h=450&fit=crop&q=80", date: "9 avr. 2026", readTime: "15 min", featured: false },
-  { id: 6, key: "p6", cat: "AI", img: "https://images.unsplash.com/photo-1761078739194-75cccb8e3195?w=600&h=450&fit=crop&q=80", date: "7 avr. 2026", readTime: "9 min", featured: false },
-  { id: 7, key: "p7", cat: "NUTRITION", img: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=600&h=450&fit=crop&q=80", date: "4 avr. 2026", readTime: "11 min", featured: false },
-  { id: 8, key: "p8", cat: "GEAR", img: "https://images.unsplash.com/photo-1555972635-8a10402b49b2?w=600&h=450&fit=crop&q=80", date: "1 avr. 2026", readTime: "14 min", featured: false },
+  { id: 1, key: "p1", cat: "AI", img: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=600&h=450&fit=crop&q=80", featured: true },
+  { id: 2, key: "p2", cat: "AI", img: "https://images.unsplash.com/photo-1762281429414-5ee5f2dbb243?w=600&h=450&fit=crop&q=80", featured: false },
+  { id: 3, key: "p3", cat: "TRAINING", img: "https://images.unsplash.com/photo-1526676537331-7747bf8278fc?w=600&h=450&fit=crop&q=80", featured: false },
+  { id: 4, key: "p4", cat: "HEALTH", img: "https://images.unsplash.com/photo-1560233026-ad254fa8da38?w=600&h=450&fit=crop&q=80", featured: false },
+  { id: 5, key: "p5", cat: "RACES", img: "https://images.unsplash.com/photo-1761027436967-63584b301a77?w=600&h=450&fit=crop&q=80", featured: false },
+  { id: 6, key: "p6", cat: "AI", img: "https://images.unsplash.com/photo-1761078739194-75cccb8e3195?w=600&h=450&fit=crop&q=80", featured: false },
+  { id: 7, key: "p7", cat: "NUTRITION", img: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=600&h=450&fit=crop&q=80", featured: false },
+  { id: 8, key: "p8", cat: "GEAR", img: "https://images.unsplash.com/photo-1555972635-8a10402b49b2?w=600&h=450&fit=crop&q=80", featured: false },
 ];
 
-function ReadTime({ t }: { t: string }) {
+/**
+ * ⚠️ CE BADGE ANNONÇAIT UN TEMPS DE LECTURE — de 6 à 15 minutes selon la carte.
+ *
+ * Aucun de ces articles n'existe : `src/app/blog/` ne contient que cet index et son
+ * dictionnaire, il n'y a pas de page d'article, et les trois liens de la page mènent à
+ * /signup — y compris le bouton libellé « Lire l'article ». On promettait donc douze
+ * minutes de lecture d'un texte jamais écrit, puis on encaissait le clic sur un
+ * formulaire d'inscription. La date de publication et l'auteur « Équipe Pacevo »
+ * disaient la même chose : personne n'a écrit ces textes.
+ *
+ * Tant qu'ils ne sont pas écrits, la carte annonce ce qu'elle est : un SUJET à venir.
+ */
+function BadgeAVenir({ t }: { t: string }) {
   return (
     <span className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full bg-black/65 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
       <Clock className="h-3 w-3" /> {t}
@@ -120,7 +131,7 @@ export default function BlogPage() {
             <div className="mb-16 grid items-center gap-10 lg:grid-cols-2">
               <Link href="/signup" className="group relative block aspect-[4/3] overflow-hidden rounded-3xl">
                 <img src={featured.img} alt={B.posts[featured.key].title} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
-                <ReadTime t={featured.readTime} />
+                <BadgeAVenir t={B.bientot} />
               </Link>
               <div>
                 <CatBadge code={featured.cat} label={B.cats[featured.cat]} />
@@ -162,15 +173,12 @@ export default function BlogPage() {
               <Link href="/signup" key={post.id} className="group">
                 <div className="relative mb-4 aspect-[4/3] overflow-hidden rounded-2xl">
                   <img src={post.img} alt={B.posts[post.key].title} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                  <ReadTime t={post.readTime} />
+                  <BadgeAVenir t={B.bientot} />
                 </div>
                 <CatBadge code={post.cat} label={B.cats[post.cat]} />
                 <h3 className="mt-3 text-lg font-semibold leading-snug tracking-tight transition-colors group-hover:text-[#059669]">{B.posts[post.key].title}</h3>
                 <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-zinc-500">{B.posts[post.key].excerpt}</p>
-                <div className="mt-4 flex items-center gap-2 text-xs text-zinc-400">
-                  <Logo size={20} />
-                  <span>{B.author}</span><span>·</span><span>{post.date}</span>
-                </div>
+
               </Link>
             ))}
           </div>
