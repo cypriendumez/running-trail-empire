@@ -58,3 +58,8 @@ Capture*.png
 !/data/dataset_france.json
 !/data/dataset.json
 .verif/
+
+# iCloud restaure ce fichier tout seul : Strava a été retiré de la rangée le 21/08/2026
+# (c' est un journal d'activités, pas une montre). L'ignorer empêche un `git add -A`
+# de le remettre en ligne à notre insu.
+public/brands/strava.svg

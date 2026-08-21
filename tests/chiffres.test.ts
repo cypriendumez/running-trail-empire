@@ -20,6 +20,7 @@
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, relative } from "node:path";
+import { execSync } from "node:child_process";
 import { CHIFFRES, CHIFFRES_LANDING, CHIFFRES_AUTH } from "../src/lib/brand/stats";
 import { JOURS_ESSAI } from "../src/lib/billing/access";
 import { ARTICLES } from "../src/app/blog/articles";
@@ -289,8 +290,50 @@ test("chaque logo annoncé par la page existe vraiment", () => {
       `la page d'accueil affiche « ${f} » mais le fichier n'existe pas : image cassée en production`,
     );
   }
-  // Strava a été retiré de la rangée : son fichier ne doit pas traîner dans le dépôt.
-  assert.ok(!existsSync(join(ROOT, "public/brands/strava.svg")), "strava.svg est revenu alors que la marque a été retirée");
+  // ⚠️ Strava a été retiré de la rangée, et son fichier REVIENT TOUT SEUL : iCloud
+  // restaure les fichiers supprimés de ce dossier (permissions `-rw-------`, taille et
+  // date d'origine — vu le 21/08/2026). Ce qui compte n'est pas qu'il soit sur le disque
+  // mais qu'il parte en ligne : Vercel déploie ce que git suit. On interroge donc GIT,
+  // pas le système de fichiers — sinon le test rougit sur un fichier qui ne sera jamais
+  // publié, et on finirait par l'ignorer.
+  const suivis = execSync("git ls-files public/brands", { cwd: ROOT }).toString().trim().split("\n").filter(Boolean);
+  assert.ok(!suivis.some((f) => f.includes("strava")), "strava.svg est suivi par git : il serait déployé alors que la marque a été retirée");
+  for (const f of cites) {
+    assert.ok(suivis.includes(`public/brands/${f}`), `« ${f} » n'est pas suivi par git : absent du déploiement`);
+  }
+});
+
+test("aucun avis de consommateur n'est fabriqué", () => {
+  // ⚠️ LE DÉFAUT LE PLUS GRAVE TROUVÉ SUR CE SITE, et il était en ligne. La page /avis
+  // publiait VINGT-SIX témoignages entièrement inventés — prénoms, dates, notes, et des
+  // faits chiffrés dans le corps du texte (« m'a fait gagner 4 minutes sur mon semi »,
+  // « il m'a prédit 48:23, j'ai fini en 48:41 ») — surmontés de quatre compteurs du même
+  // bois : 4,9 de note moyenne, 26 avis, 92 % de 5 étoiles. Le titre promettait « leurs
+  // retours, sans filtre ».
+  //
+  // Publier de faux avis de consommateurs est une pratique commerciale réputée trompeuse
+  // EN TOUTES CIRCONSTANCES depuis la directive (UE) 2019/2161, transposée à l'article
+  // L121-4 du code de la consommation. Ce n'est pas une zone grise : la pratique est
+  // listée, et la sanction relève de l'article L132-2.
+  //
+  // Les mêmes trois chiffres — « 4,9 ★ », « 98 % de satisfaction » — avaient DÉJÀ été
+  // retirés de la page d'accueil et des pages d'auth. Personne n'était allé voir /avis.
+  const avis = sansCommentaires(readFileSync(join(ROOT, "src/app/avis/page.tsx"), "utf8"));
+
+  // La forme d'un témoignage noté : un nom, une note, un texte. Interdite tant qu'aucun
+  // avis réel n'est stocké — le jour où il y en aura, ils viendront de la base, pas d'un
+  // tableau écrit à la main dans le source.
+  assert.ok(!/\bstars\s*:/.test(avis), "des témoignages notés sont revenus dans le source de /avis");
+  assert.ok(!/\bname\s*:\s*"[^"]+"\s*,\s*(stars|rating)/.test(avis), "un avis nominatif est écrit en dur");
+
+  // Et les agrégats qui les accompagnaient : une note moyenne suppose des notes.
+  for (const [motif, quoi] of [
+    [/note moyenne|average rating|nota media|nota média|Bewertung\b/i, "une note moyenne"],
+    [/\bavis publiés|published reviews|opiniones publicadas/i, "un compteur d'avis publiés"],
+    [/\d\s*%\s*(de\s*)?5\s*étoiles|5\s*stars/i, "un pourcentage de 5 étoiles"],
+  ] as [RegExp, string][]) {
+    assert.ok(!motif.test(avis), `${quoi} est affiché alors qu'aucun avis n'existe en base`);
+  }
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
