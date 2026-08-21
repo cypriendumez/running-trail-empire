@@ -8,7 +8,14 @@ create extension if not exists "uuid-ossp";
 create extension if not exists "postgis";
 
 -- ─── ENUMS ──────────────────────────────────────────────────
-create type subscription_tier as enum ('free', 'pro', 'elite');
+-- ⚠️ 'starter' et 'premium' ont été AJOUTÉS À LA MAIN le 21/08/2026, après coup :
+--   alter type subscription_tier add value if not exists 'starter';
+--   alter type subscription_tier add value if not exists 'premium';
+-- Sans eux, le webhook Stripe écrivait `accesDuPrice()` = « starter » / « premium », que
+-- l'enum REFUSAIT (22P02). Un client aurait payé sans que son abonnement soit enregistré.
+-- Cette ligne est tenue à jour parce qu'un TEST y lit les valeurs de l'enum
+-- (tests/chiffres.test.ts) : la laisser périmée rendrait le garde-fou aveugle.
+create type subscription_tier as enum ('free', 'pro', 'elite', 'starter', 'premium');
 create type user_mode as enum ('ludique', 'elite');
 create type physiological_state as enum ('recovery', 'optimal', 'competition');
 create type chronotype as enum ('morning', 'evening', 'neutral');

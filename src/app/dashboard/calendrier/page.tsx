@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CalendarView, type Planned, type PlannedText, type CalNote, type CalRace, type CoachState } from "@/components/training/CalendarView";
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
+import { AttributionGarmin } from "@/components/legal/AttributionGarmin";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Calendrier" };
@@ -71,5 +72,11 @@ export default async function CalendrierPage() {
   const coachState = (stateRow?.data ?? null) as CoachState | null;
 
   // Le hero (présentation + détail réactif de la séance sélectionnée) vit désormais dans CalendarView.
-  return <CalendarView sessions={sessions} notes={notes} races={races} coachState={coachState} weekStart={weekStart} units={units} warmupMin={warmupMin} cooldownMin={cooldownMin} />;
+  return (
+    <>
+      <CalendarView sessions={sessions} notes={notes} races={races} coachState={coachState} weekStart={weekStart} units={units} warmupMin={warmupMin} cooldownMin={cooldownMin} />
+      {/* Obligation de l'article 1.1 des conditions d'API d'intervals.icu. */}
+      <AttributionGarmin className="mt-6 pb-6" />
+    </>
+  );
 }

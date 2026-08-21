@@ -7,6 +7,7 @@ import { bestVmaFromWorkouts, loadRisk, effectiveVma } from "@/lib/running/fitne
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 import { computeStreak, jourLocal, decaleJour, type StreakWorkout, type StreakPrescription } from "@/lib/streak/compute";
 import { accesDe } from "@/lib/billing/access";
+import { AttributionGarmin } from "@/components/legal/AttributionGarmin";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard" };
@@ -105,6 +106,7 @@ export default async function DashboardPage() {
     : null;
 
   return (
+    <>
     <BentoDashboard
       profile={stripProfileSecrets(profileRes.data)}
       hrv={hrvRes.data ?? []}
@@ -122,5 +124,8 @@ export default async function DashboardPage() {
       streak={streak}
       acces={acces}
     />
+      {/* Obligation de l'article 1.1 des conditions d'API d'intervals.icu. */}
+      <AttributionGarmin className="mt-6" />
+    </>
   );
 }

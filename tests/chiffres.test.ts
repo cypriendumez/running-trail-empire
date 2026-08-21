@@ -26,6 +26,8 @@ import { ARTICLES } from "../src/app/blog/articles";
 import { ARTICLES_I18N } from "../src/app/blog/articlesI18n";
 import { LEGAL } from "../src/app/legalI18n";
 import { accesDe } from "../src/lib/billing/access";
+import { PRIX_AFFICHES } from "../src/lib/billing/prix";
+import { ATTRIBUTION_GARMIN, PAGES_ATTRIBUTION } from "../src/components/legal/attributionI18n";
 
 const ROOT = join(import.meta.dirname, "..");
 const SRC = join(ROOT, "src");
@@ -215,6 +217,19 @@ test("chaque palier que la BASE accepte a un sens pour le code", () => {
   const valeurs = [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
   assert.ok(valeurs.length >= 2, `enum illisible : ${m[1]}`);
 
+  // ⚠️ L'ASSERTION INVERSE, ajoutée le 21/08/2026 une fois le SQL passé. Le webhook Stripe
+  // écrit le nom COMMERCIAL du palier (« starter », « premium »). Tant qu'ils manquaient
+  // à l'enum, la base les refusait (22P02) : un client aurait payé, et son abonnement
+  // n'aurait JAMAIS été enregistré — il serait resté verrouillé après paiement. Rien dans
+  // le code ne reliait la liste des tarifs à celle des valeurs stockables.
+  for (const formule of Object.keys(PRIX_AFFICHES)) {
+    if (formule === "gratuit") continue; // « gratuit » se stocke sous le nom « free ».
+    assert.ok(
+      valeurs.includes(formule),
+      `le palier VENDABLE « ${formule} » n'existe pas dans l'enum : un client le paierait sans que la base puisse l'enregistrer`,
+    );
+  }
+
   // Un compte assez ancien pour que l'essai soit fini : seul le palier décide encore.
   const vieux = "2020-01-01T00:00:00.000Z";
   for (const v of valeurs) {
@@ -227,6 +242,29 @@ test("chaque palier que la BASE accepte a un sens pour le code", () => {
         `le palier « ${v} » existe en base mais le code le traite comme gratuit — un compte porté à ce palier serait verrouillé`,
       );
     }
+  }
+});
+
+test("l'attribution Garmin ne peut pas disparaître d'une vue de données", () => {
+  // ⚠️ CE N'EST PAS UNE POLITESSE, C'EST UNE OBLIGATION CONTRACTUELLE. Pacevo lit tout
+  // via l'API d'intervals.icu, dont les conditions (publiées le 23/10/2025) autorisent
+  // explicitement l'usage COMMERCIAL — et posent une contrepartie à l'article 1.1 :
+  // toute application qui affiche des informations dérivées de données Garmin doit
+  // afficher l'attribution correspondante.
+  //
+  // Presque chaque activité de Pacevo vient d'une Garmin, et RIEN ne l'attribuait nulle
+  // part. Le produit tournait donc hors des conditions du seul service dont il dépend —
+  // exactement ce qu'un acheteur relève en due diligence.
+  for (const lang of ["fr", "en", "de", "es", "pt"]) {
+    const t = ATTRIBUTION_GARMIN[lang];
+    assert.ok(t && t.length > 20, `mention absente ou trop courte en ${lang}`);
+    // Le mot « Garmin » EST l'attribution : une phrase qui ne le nomme pas n'attribue rien.
+    assert.match(t, /Garmin/, `la mention en ${lang} ne nomme pas Garmin`);
+  }
+
+  for (const rel of PAGES_ATTRIBUTION) {
+    const src = readFileSync(join(ROOT, rel), "utf8");
+    assert.match(src, /<AttributionGarmin/, `${rel} affiche des données sans attribution Garmin`);
   }
 });
 
