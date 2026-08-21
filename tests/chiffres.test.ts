@@ -268,20 +268,29 @@ test("l'attribution Garmin ne peut pas disparaître d'une vue de données", () =
   }
 });
 
-test("aucun logo de marque n'est redistribué avec le site", () => {
-  // ⚠️ Citer « Garmin » pour dire la compatibilité est un usage nominatif admis.
-  // Reproduire son LOGO ne l'est pas de la même façon : Garmin, Apple et Suunto publient
-  // des chartes qui l'encadrent, et Apple est particulièrement strict sur son symbole.
-  // Le site part à la vente ; sept images ne valent pas ce risque, et le nom en toutes
-  // lettres dit la même chose. Les fichiers ont été retirés le 21/08/2026 — ce test
-  // existe pour qu'ils ne reviennent pas sans qu'on y pense.
-  const marques = join(ROOT, "public/brands");
-  assert.ok(!existsSync(marques), "public/brands est revenu : des logos de marques sont redistribués avec le site");
-
-  // ⚠️ Sur le CODE, pas sur les commentaires : le commentaire qui explique le retrait
-  // cite forcément `public/brands/`, et le test se déclenchait sur sa propre explication.
+test("chaque logo annoncé par la page existe vraiment", () => {
+  // ⚠️ CE TEST DISAIT L'INVERSE PENDANT UNE HEURE. Il interdisait tout logo de marque —
+  // les fichiers avaient été retirés parce que citer un NOM est un usage nominatif admis
+  // alors que reproduire un LOGO est encadré par la charte de chaque titulaire, Apple
+  // étant le plus strict des sept. Cyprien a été informé du risque et a choisi de les
+  // remettre : c'est son produit et sa décision, et le commentaire dans `app/page.tsx`
+  // le dit pour que personne ne les retire « pour bien faire » sans lui en reparler.
+  //
+  // Ce qui reste utile à garder, en revanche : un `logo` qui pointe vers un fichier
+  // absent n'échoue nulle part — il affiche une image cassée sur la page d'accueil, en
+  // production, sans que rien ne bronche. Amazfit et Huawei n'ont volontairement pas de
+  // fichier : la pastille affiche alors leur nom, ce qui est le comportement voulu.
   const landing = sansCommentaires(readFileSync(join(ROOT, "src/app/page.tsx"), "utf8"));
-  assert.ok(!/\/brands\//.test(landing), "la page d'accueil référence à nouveau un fichier de logo");
+  const cites = [...landing.matchAll(/logo:\s*"([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(cites.length >= 5, `seulement ${cites.length} logo(s) cité(s) — la rangée a-t-elle changé ?`);
+  for (const f of cites) {
+    assert.ok(
+      existsSync(join(ROOT, "public/brands", f)),
+      `la page d'accueil affiche « ${f} » mais le fichier n'existe pas : image cassée en production`,
+    );
+  }
+  // Strava a été retiré de la rangée : son fichier ne doit pas traîner dans le dépôt.
+  assert.ok(!existsSync(join(ROOT, "public/brands/strava.svg")), "strava.svg est revenu alors que la marque a été retirée");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

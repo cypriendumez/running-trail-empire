@@ -125,11 +125,15 @@ const STAT_VALUES = CHIFFRES_LANDING;
 // la section « SYNCHRONISATION » plus bas. Ne rien ajouter ici sans preuve dans le code :
 // une marque affichée est une promesse d'intégration.
 //
-// ⚠️ IL N'Y A PLUS DE FICHIERS DE LOGO, et le champ `logo` a disparu du type. Les sept
-// images de `public/brands/` ont été retirées du dépôt le 21/08/2026 : un logo de marque
-// est un ACTIF qui appartient à son titulaire, et le site part à la vente. Citer le nom
-// dit exactement la même chose sans demander l'autorisation de personne. Ne pas les
-// remettre — un test le vérifie.
+// `logo` désigne un fichier de `public/brands/`. Il reste OPTIONNEL : sans fichier, la
+// pastille affiche le NOM — c'est le cas d'Amazfit et Huawei.
+//
+// ⚠️ CES FICHIERS SONT DES MARQUES DÉPOSÉES. Ils ont été retirés le 21/08/2026, puis
+// REMIS le même jour sur décision explicite de Cyprien, après qu'il ait été informé du
+// risque : citer le NOM d'une marque pour dire la compatibilité est un usage nominatif
+// admis, reproduire son LOGO est encadré par la charte de chaque titulaire — Apple étant
+// le plus strict des sept sur son symbole. C'est un arbitrage assumé, pas un oubli : ne
+// pas les retirer « pour bien faire » sans lui en reparler.
 // `pousse` = la plateforme peut RECEVOIR la séance du jour, pas seulement livrer les
 // données. Les deux sens sont distincts et la page les confondait : sous un titre unique,
 /**
@@ -154,21 +158,21 @@ const STAT_VALUES = CHIFFRES_LANDING;
  * elle-même (champs `*_upload_workouts`), pas sur le forum. Un test relie cette liste à
  * `DESTINATIONS_MONTRE` : les deux ne peuvent plus diverger.
  */
-const SYNC: { nom: string; passerelle?: boolean; appli?: boolean; pousse: boolean }[] = [
-  { nom: "Garmin", pousse: true },
-  { nom: "COROS", pousse: true },
-  { nom: "Suunto", pousse: true },
-  { nom: "Wahoo", pousse: true },
+const SYNC: { nom: string; logo?: string; passerelle?: boolean; appli?: boolean; pousse: boolean }[] = [
+  { nom: "Garmin", logo: "garmin.svg", pousse: true },
+  { nom: "COROS", logo: "coros.png", pousse: true },
+  { nom: "Suunto", logo: "suunto.svg", pousse: true },
+  { nom: "Wahoo", logo: "wahoo.svg", pousse: true },
   { nom: "Amazfit", pousse: true },
   { nom: "Huawei", pousse: true },
   // ❌ POLAR NE REÇOIT PAS. Réponse de `david`, développeur d'intervals.icu, le
   // 23/12/2023 : « d'après la documentation de l'API Polar, il n'est pas possible
   // d'envoyer des séances planifiées ». Aucun champ `polar_upload_workouts` n'existe,
   // vérifié sur l'API. La LECTURE, elle, fonctionne (`polar_sync_activities`).
-  { nom: "Polar", pousse: false },
+  { nom: "Polar", logo: "polar.svg", pousse: false },
   // Apple n'a AUCUN champ chez intervals.icu, dans aucun sens : tout passe par une
   // application iOS tierce. `passerelle` ajoute l'astérisque et la phrase d'explication.
-  { nom: "Apple Watch", passerelle: true, pousse: false },
+  { nom: "Apple Watch", logo: "apple-watch.svg", passerelle: true, pousse: false },
   // Reçoit la séance sans être une montre : pas de pastille, ligne à part.
   { nom: "Zwift", appli: true, pousse: true },
 ];
@@ -403,7 +407,14 @@ export default function LandingPage() {
               key={m.nom}
               className="inline-flex h-14 items-center justify-center rounded-2xl border border-zinc-200 bg-white px-5 text-sm font-bold uppercase tracking-wide text-zinc-700 shadow-sm transition-colors hover:border-zinc-300"
             >
-              {m.nom}
+              {m.logo
+                // eslint-disable-next-line @next/next/no-img-element
+                // Hauteur ET largeur bornées : les mots-symboles vont d'un rapport 3,1
+                // (Suunto) à 6,1 (Polar). À hauteur constante, Polar paraîtrait deux fois
+                // plus imposant ; à largeur constante, deux fois plus petit. Borner les
+                // DEUX avec `object-contain` égalise la surface perçue.
+                ? <img src={`/brands/${m.logo}`} alt={m.nom} className="h-6 w-auto max-w-[112px] object-contain" loading="lazy" />
+                : m.nom}
               {m.passerelle && <span className="ml-1 -translate-y-1 text-[11px] font-semibold text-zinc-400">*</span>}
             </span>
           ))}
