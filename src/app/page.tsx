@@ -523,7 +523,7 @@ export default function LandingPage() {
               const sombre = i === 0;
               return (
                 <div key={p.title}
-                  className={`rounded-2xl border p-7 ${sombre ? "border-transparent bg-[#0b1f1a] text-white" : "border-zinc-200 bg-white"}`}>
+                  className={`rounded-2xl border p-7 ${sombre ? "surface-brand border-transparent" : "border-zinc-200 bg-white"}`}>
                   <Icon className={sombre ? "h-5 w-5 text-[#34d399]" : "h-5 w-5 text-[#059669]"} strokeWidth={1.6} />
                   <div className="mt-7 text-[1.75rem] font-bold leading-none tracking-tight">{p.metric}</div>
                   <div className={`mt-2 text-[10px] font-semibold uppercase tracking-[0.16em] ${sombre ? "text-white/45" : "text-zinc-400"}`}>
@@ -603,7 +603,7 @@ export default function LandingPage() {
               const vedette = plan.cle === "premium";
               return (
                 <div key={plan.cle}
-                  className={`relative flex flex-col rounded-3xl p-8 ${vedette ? "bg-zinc-950 text-white ring-2 ring-[#059669]" : "bg-white ring-1 ring-inset ring-zinc-200"}`}>
+                  className={`relative flex flex-col rounded-3xl p-8 ${vedette ? "surface-brand ring-2 ring-[#059669]" : "bg-white ring-1 ring-inset ring-zinc-200"}`}>
                   {plan.badge && (
                     <span className="absolute -top-3 left-8 rounded-full bg-[#10b981] px-3 py-1 text-[11px] font-bold text-[#04120c]">
                       {plan.badge}
@@ -646,7 +646,7 @@ export default function LandingPage() {
       {/* ── CTA FINAL ── */}
       <Section>
         <Container>
-          <div className="relative overflow-hidden rounded-3xl bg-zinc-950 px-8 py-20 text-center sm:py-24">
+          <div className="surface-brand relative overflow-hidden rounded-3xl px-8 py-20 text-center sm:py-24">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(80%_120%_at_50%_0%,rgba(16,185,129,.16),transparent_60%)]" />
             <div className="relative">
               <h2 className="mx-auto max-w-2xl text-4xl sm:text-5xl font-bold leading-[1.05] tracking-tight text-white">

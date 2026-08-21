@@ -40,8 +40,13 @@ import { BLOG, BLOG_CATS } from "./blogI18n";
 //    coûte au moment de vendre. → motif d'onde abstrait, dans la même famille que p6
 //    sans en être le doublon.
 //
+//  · p5 « Les courses » : l'article s'intitule « UTMB 2026 : les trails français à ne
+//    pas manquer » et était illustré par une PISTE D'ATHLÉTISME vue de haut — la photo
+//    du hero, réutilisée telle quelle. Aucun rapport avec l'ultra-trail en montagne.
+//    → arêtes alpines, sentier et silhouettes lointaines, aucun visage ni marque.
+//
 // Conservées après vérification : p1 (robot Pepper — produit de marque mais discret),
-// p5 (piste vue de haut, aucun visage), p7 (assiette, rien à signaler).
+// p7 (assiette, rien à signaler).
 //
 // Les huit URL demandaient une largeur SANS hauteur, alors que les tuiles sont en
 // `aspect-[4/3]` : Unsplash renvoyait le recadrage de son choix (400, 900 puis 316 px
@@ -52,7 +57,7 @@ const POSTS = [
   { id: 2, key: "p2", cat: "AI", img: "https://images.unsplash.com/photo-1762281429414-5ee5f2dbb243?w=600&h=450&fit=crop&q=80", date: "16 avr. 2026", readTime: "12 min", featured: false },
   { id: 3, key: "p3", cat: "TRAINING", img: "https://images.unsplash.com/photo-1526676537331-7747bf8278fc?w=600&h=450&fit=crop&q=80", date: "14 avr. 2026", readTime: "10 min", featured: false },
   { id: 4, key: "p4", cat: "HEALTH", img: "https://images.unsplash.com/photo-1560233026-ad254fa8da38?w=600&h=450&fit=crop&q=80", date: "11 avr. 2026", readTime: "6 min", featured: false },
-  { id: 5, key: "p5", cat: "RACES", img: "https://images.unsplash.com/photo-1502904550040-7534597429ae?w=600&h=450&fit=crop&q=80", date: "9 avr. 2026", readTime: "15 min", featured: false },
+  { id: 5, key: "p5", cat: "RACES", img: "https://images.unsplash.com/photo-1761027436967-63584b301a77?w=600&h=450&fit=crop&q=80", date: "9 avr. 2026", readTime: "15 min", featured: false },
   { id: 6, key: "p6", cat: "AI", img: "https://images.unsplash.com/photo-1761078739194-75cccb8e3195?w=600&h=450&fit=crop&q=80", date: "7 avr. 2026", readTime: "9 min", featured: false },
   { id: 7, key: "p7", cat: "NUTRITION", img: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=600&h=450&fit=crop&q=80", date: "4 avr. 2026", readTime: "11 min", featured: false },
   { id: 8, key: "p8", cat: "GEAR", img: "https://images.unsplash.com/photo-1555972635-8a10402b49b2?w=600&h=450&fit=crop&q=80", date: "1 avr. 2026", readTime: "14 min", featured: false },

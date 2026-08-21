@@ -147,6 +147,16 @@
            hover:bg-zinc-50 active:scale-95 transition-all duration-150;
   }
 
+  /* SURFACE DE MARQUE — les blocs sombres de la landing et le panneau des pages d'auth.
+     Ils étaient en aplat NOIR (`bg-zinc-950`, `bg-[#0b1f1a]`), recopié à trois endroits :
+     la carte pilier des fonctionnalités, la carte Premium des tarifs et le bloc d'appel
+     final. Un noir pur n'appartient à aucune marque ; ce dégradé vert profond, lui, est
+     le même que celui du panneau d'inscription. UNE définition, trois usages. */
+  .surface-brand {
+    @apply text-white;
+    background-image: linear-gradient(155deg, #064e3b 0%, #052e20 42%, #04120c 78%, #020806 100%);
+  }
+
   .btn-brand {
     @apply inline-flex items-center gap-2 px-5 py-2.5 rounded-xl
            bg-green-600 text-white text-sm font-semibold

@@ -78,6 +78,7 @@ const AUDITEES: Record<string, string> = {
   "photo-1526676537331-7747bf8278fc": "entraînement : jambes sur piste, aucun visage ni marque lisible",
   "photo-1560233026-ad254fa8da38":    "santé : silhouette d'étirement, aucun trait discernable",
   "photo-1761078739194-75cccb8e3195": "IA : motif abstrait, ni personne ni marque",
+  "photo-1761027436967-63584b301a77": "courses : arêtes alpines, sentier, silhouettes lointaines — ni visage ni marque",
   "photo-1490645935967-10de6ba17061": "nutrition : assiette, rien à signaler",
   "photo-1555972635-8a10402b49b2":    "matériel : chaussure dans l'herbe ; petit drapeau de marque au talon (~30 px)",
 };
