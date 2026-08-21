@@ -219,7 +219,7 @@ export function rendreTous(articles: Article[], resumes: Map<string, string>): A
 
 export async function resumerArticles(
   articles: Article[],
-): Promise<{ articles: ArticleResume[]; diagnostic: Diagnostic }> {
+): Promise<{ articles: ArticleResume[]; diagnostic: Diagnostic; lisibles: number }> {
   const retenus = articles.slice(0, RESUMES_MAX);
   // Les articles au-delà du plafond ne sont pas résumés, mais ils restent dans le rendu :
   // un titre sans résumé se lit, une rubrique disparue ne se voit pas.
@@ -231,7 +231,7 @@ export async function resumerArticles(
     .filter((x): x is { a: Article; i: number; src: string } => Boolean(x.src));
 
   // Aucun article accessible (sites qui bloquent, réseau) : on rend les titres seuls.
-  if (!lisibles.length) return { articles: nus(), diagnostic: "aucun-article-lisible" };
+  if (!lisibles.length) return { articles: nus(), diagnostic: "aucun-article-lisible", lisibles: 0 };
 
   // ── LES LOTS ───────────────────────────────────────────────────────────────
   // ⚠️ Un seul appel pour tous les articles NE TIENT PAS. Mesuré le 21/08/2026 : un
@@ -277,8 +277,8 @@ export async function resumerArticles(
   }
 
   // Aucun lot n'a abouti : le modèle est indisponible ou le quota est épuisé.
-  if (!auMoinsUnLot) return { articles: nus(), diagnostic: "modele-indisponible" };
-  if (!parIndex.size) return { articles: nus(), diagnostic: "reponse-illisible" };
+  if (!auMoinsUnLot) return { articles: nus(), diagnostic: "modele-indisponible", lisibles: lisibles.length };
+  if (!parIndex.size) return { articles: nus(), diagnostic: "reponse-illisible", lisibles: lisibles.length };
 
   const resumes = new Map<string, string>();
   for (const [n, x] of lisibles.entries()) {
@@ -295,6 +295,11 @@ export async function resumerArticles(
     // Tout rejeté alors que le modèle a répondu : soit il a refusé de résumer, soit le
     // contrôle des chiffres a tout écarté. Dans les deux cas ça mérite d'être vu.
     diagnostic: resumes.size ? "ok" : "tous-rejetes",
+    // ⚠️ Sans ce compte, « 6 résumés sur 16 » ne dit pas OÙ ils se perdent : des pages
+    // qu'on n'a pas pu télécharger, ou des résumés rejetés par le contrôle des chiffres ?
+    // Les deux se corrigent différemment, et le même code a rendu 9 en local contre 6
+    // depuis Vercel — un écart qu'on ne pouvait qu'imaginer.
+    lisibles: lisibles.length,
   };
 }
 

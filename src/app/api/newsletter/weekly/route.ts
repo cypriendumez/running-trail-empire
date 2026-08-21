@@ -136,7 +136,7 @@ export async function GET(req: Request) {
   }
 
   // ── 3 bis. Les résumés, une seule fois, en français ────────────────────────
-  const { articles: base, diagnostic } = await resumerArticles(
+  const { articles: base, diagnostic, lisibles } = await resumerArticles(
     vivier.map((it) => ({ title: it.title, source: it.source, link: it.link })),
   );
 
@@ -238,6 +238,9 @@ export async function GET(req: Request) {
     // ⚠️ Sans ce champ, « resumes: 0 » ne dit pas s'il faut s'inquiéter. C'est ce
     // silence qui a laissé passer un budget de sortie trop bas pendant deux essais.
     diagnostic,
+    // Combien de pages ont pu être téléchargées : distingue un blocage éditeur
+    // (l'hébergeur est refusé là où un navigateur passe) d'un rejet du contrôle.
+    lisibles,
     langues: parLangueEnvoye,
   });
 }
