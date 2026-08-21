@@ -183,8 +183,10 @@ export async function GET(req: Request) {
     let traduits: ArticleResume[] = base.map((a) => ({ ...a, resume: null }));
     if (indexAvecResume.length) {
       const out = await traduireResumes(indexAvecResume.map((x) => x.a.resume as string), lg);
-      // Traduction absente ou incohérente : cette langue reçoit les titres seuls plutôt
-      // qu'un mélange de français et de sa propre langue.
+      // `null` seulement si AUCUN lot n'a abouti : cette langue reçoit alors les titres
+      // seuls, plutôt qu'un mélange de français et de sa propre langue. Sinon, chaque
+      // résumé non traduit vaut `null` et son article part avec son titre — une phrase
+      // perdue, plus la lettre entière.
       if (out) {
         const copie = base.map((a) => ({ ...a, resume: null as string | null }));
         indexAvecResume.forEach((x, n) => { copie[x.i].resume = out[n]; });

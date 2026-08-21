@@ -161,6 +161,13 @@ l'article. Si le texte ne donne pas de chiffre, ton résumé n'en contient aucun
 un pourcentage crédible est la faute la plus grave possible ici : le lecteur ne peut pas
 la détecter, et elle est envoyée à toute une liste sans relecture.
 
+TU NE CONVERTIS AUCUNE UNITÉ. Si l'article dit 10 000 mètres de dénivelé, tu écris
+10 000 mètres — jamais 32 808 pieds. Une conversion est un nombre que l'article ne
+contient pas, et elle est traitée comme une invention.
+
+TU N'AJOUTES AUCUNE ANNÉE, même si tu la connais. Si l'article ne date pas la création
+d'une course, ton résumé ne la date pas non plus. Écris « à sa création », pas « en 2007 ».
+
 FORME — deux à trois phrases par article, en français, ton direct et concret. Tu dis ce
 que l'article apprend, pas ce qu'il promet. Pas de superlatif, pas d'accroche creuse, pas
 de formule de transition. Tu n'écris pas le titre : il est déjà affiché au-dessus.
@@ -186,6 +193,26 @@ Réponds UNIQUEMENT par un tableau JSON : [{"i":0,"r":"…"},{"i":1,"r":"…"}]`
  * recevait moins d'ARTICLES, et la rubrique qui comptait dessus s'affichait vide sans
  * un mot. Un seul rendu, qui part toujours de `articles`, rend la faute impossible.
  */
+/**
+ * LIT LES RÉSUMÉS D'UNE RÉPONSE, MÊME COUPÉE.
+ *
+ * ⚠️ `JSON.parse` sur le tableau entier est tout ou rien : une réponse tronquée en plein
+ * mot n'a pas de crochet fermant, l'analyse échoue, et les DIX résumés déjà écrits avant
+ * la coupure sont jetés avec elle. Mesuré : une réponse coupée à 1 099 caractères
+ * contenait deux résumés complets et parfaitement utilisables.
+ *
+ * On récupère donc chaque objet complet un par un. Un objet coupé est ignoré — lui seul.
+ */
+export function extraireResumes(texte: string): Map<number, string> {
+  const out = new Map<number, string>();
+  for (const m of texte.matchAll(/\{\s*"i"\s*:\s*(\d+)\s*,\s*"r"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}/g)) {
+    try {
+      out.set(Number(m[1]), JSON.parse(`"${m[2]}"`) as string);
+    } catch { /* échappement invalide : cette entrée seule est perdue */ }
+  }
+  return out;
+}
+
 export function rendreTous(articles: Article[], resumes: Map<string, string>): ArticleResume[] {
   return articles.map((a) => ({ ...a, resume: resumes.get(a.link) ?? null }));
 }
@@ -206,32 +233,52 @@ export async function resumerArticles(
   // Aucun article accessible (sites qui bloquent, réseau) : on rend les titres seuls.
   if (!lisibles.length) return { articles: nus(), diagnostic: "aucun-article-lisible" };
 
-  const bloc = lisibles
-    .map((x, n) => `### ARTICLE ${n}\nTitre : ${x.a.title}\nSource : ${x.a.source}\nTexte : ${x.src}`)
-    .join("\n\n");
+  // ── LES LOTS ───────────────────────────────────────────────────────────────
+  // ⚠️ Un seul appel pour tous les articles NE TIENT PAS. Mesuré le 21/08/2026 : un
+  // prompt de 36 000 caractères pour 13 articles a produit une réponse coupée à 1 099
+  // caractères — deux résumés sur treize — alors que le budget de sortie était de 9 000
+  // jetons. Les modèles Gemini 2.5 dépensent ce budget en raisonnement AVANT d'écrire,
+  // et le raisonnement grandit avec le prompt. Augmenter le budget ne fait que repousser
+  // la limite : c'est déjà ce qui avait été fait en passant de 1 400 à 6 000.
+  //
+  // On découpe donc. Chaque lot a son propre budget, et une réponse ratée ne coûte que
+  // son lot. Quatre appels hebdomadaires ne pèsent rien face au quota.
+  const TAILLE_LOT = 4;
+  const lots: (typeof lisibles)[] = [];
+  for (let i = 0; i < lisibles.length; i += TAILLE_LOT) lots.push(lisibles.slice(i, i + TAILLE_LOT));
 
-  // ⚠️ 1 400 JETONS DE SORTIE NE SUFFISENT PAS, et l'échec était INVISIBLE : la réponse
-  // se coupait en plein mot, le JSON ne s'analysait plus, et la fonction rendait
-  // silencieusement des titres seuls. Les modèles Gemini 2.5 dépensent une part de ce
-  // budget en raisonnement interne AVANT d'écrire : il faut compter large.
-  const res = await generateContent(
-    [{ role: "user", parts: [{ text: `${CONSIGNE}\n\n${bloc}` }] }],
-    { temperature: 0.2, maxOutputTokens: 9000 },
+  // ⚠️ EN SÉRIE, LA LETTRE N'AURAIT PAS TENU. Mesuré : 102 secondes pour une seule
+  // langue, quand la route coupe à 300. Avec des abonnés dans plusieurs langues (chaque
+  // langue ajoute ses propres lots de traduction), la fonction dépassait le temps
+  // imparti — et un dépassement ne dégrade pas la lettre, il l'annule POUR TOUT LE MONDE.
+  // Les lots sont indépendants : ils partent ensemble.
+  const reponses = await Promise.all(
+    lots.map((lot) => {
+      const bloc = lot
+        .map((x, n) => `### ARTICLE ${n}\nTitre : ${x.a.title}\nSource : ${x.a.source}\nTexte : ${x.src}`)
+        .join("\n\n");
+      return generateContent(
+        [{ role: "user", parts: [{ text: `${CONSIGNE}\n\n${bloc}` }] }],
+        { temperature: 0.2, maxOutputTokens: 9000 },
+      );
+    }),
   );
 
-  // Gemini indisponible ou quota épuisé : la lettre part quand même, en titres seuls.
-  if (!res.ok) return { articles: nus(), diagnostic: "modele-indisponible" };
-
-  let brut: { i: number; r: string }[] = [];
-  try {
-    const j = res.text.match(/\[[\s\S]*\]/);
-    brut = j ? (JSON.parse(j[0]) as { i: number; r: string }[]) : [];
-  } catch {
-    return { articles: nus(), diagnostic: "reponse-illisible" };
+  const parIndex = new Map<number, string>();
+  let auMoinsUnLot = false;
+  for (const [numLot, res] of reponses.entries()) {
+    if (!res.ok) continue; // Ce lot part en titres seuls, les autres continuent.
+    auMoinsUnLot = true;
+    // Lecture TOLÉRANTE : une réponse coupée garde ses résumés complets.
+    for (const [i, r] of extraireResumes(res.text)) {
+      const absolu = numLot * TAILLE_LOT + i;
+      if (absolu < lisibles.length) parIndex.set(absolu, r.trim());
+    }
   }
 
-  const parIndex = new Map<number, string>();
-  for (const e of brut) if (typeof e?.i === "number" && typeof e?.r === "string") parIndex.set(e.i, e.r.trim());
+  // Aucun lot n'a abouti : le modèle est indisponible ou le quota est épuisé.
+  if (!auMoinsUnLot) return { articles: nus(), diagnostic: "modele-indisponible" };
+  if (!parIndex.size) return { articles: nus(), diagnostic: "reponse-illisible" };
 
   const resumes = new Map<string, string>();
   for (const [n, x] of lisibles.entries()) {
@@ -266,35 +313,61 @@ const LANGUES: Record<string, string> = {
 export async function traduireResumes(
   resumes: string[],
   lang: string,
-): Promise<string[] | null> {
+): Promise<(string | null)[] | null> {
   const cible = LANGUES[lang];
   if (!cible || !resumes.length) return null;
 
-  const res = await generateContent(
-    [{
-      role: "user",
-      parts: [{
-        text: `Traduis en ${cible} chacun des textes suivants. Conserve EXACTEMENT les nombres, les noms propres et les unités — ne les convertis pas, ne les arrondis pas. Garde le ton direct et la longueur.
+  // ⚠️ CETTE FONCTION ÉTAIT DU TOUT OU RIEN, deux fois : un tableau de longueur
+  // inattendue, ou UN SEUL résumé dont un chiffre ne concordait pas, et elle rendait
+  // `null` — c'est-à-dire que TOUTE la langue retombait en titres seuls. Avec quatre
+  // résumés c'était improbable ; avec seize, c'est le cas courant. Un abonné allemand
+  // aurait perdu la lettre entière parce qu'une phrase sur seize posait problème.
+  //
+  // Désormais : des lots (même raison qu'au résumé — le raisonnement interne mange le
+  // budget de sortie et coupe la réponse), et un rejet ne condamne que SA phrase.
+  const TAILLE_LOT = 4;
+  const out: (string | null)[] = new Array(resumes.length).fill(null);
+  let auMoinsUnLot = false;
+
+  const decoupe: string[][] = [];
+  for (let d = 0; d < resumes.length; d += TAILLE_LOT) decoupe.push(resumes.slice(d, d + TAILLE_LOT));
+
+  // En parallèle, pour la même raison qu'au résumé : chaque langue ajoute ses lots, et
+  // la route entière coupe à 300 secondes.
+  const reponses = await Promise.all(
+    decoupe.map((lot) =>
+      generateContent(
+        [{
+          role: "user",
+          parts: [{
+            text: `Traduis en ${cible} chacun des textes suivants. Conserve EXACTEMENT les nombres, les noms propres et les unités — ne les convertis pas, ne les arrondis pas. Garde le ton direct et la longueur.
 Réponds UNIQUEMENT par un tableau JSON de chaînes, dans le même ordre.
 
-${JSON.stringify(resumes)}`,
-      }],
-    }],
-    // Même raison que ci-dessus : le raisonnement interne mange le budget de sortie.
-    { temperature: 0.1, maxOutputTokens: 6000 },
+${JSON.stringify(lot)}`,
+          }],
+        }],
+        { temperature: 0.1, maxOutputTokens: 6000 },
+      ),
+    ),
   );
-  if (!res.ok) return null;
 
-  try {
-    const j = res.text.match(/\[[\s\S]*\]/);
-    const arr = j ? (JSON.parse(j[0]) as unknown[]) : [];
-    if (arr.length !== resumes.length) return null;
-    const out = arr.map((x) => String(x ?? "").trim());
-    // Même contrôle, appliqué à la traduction contre son original français : c'est le
-    // seul moyen d'attraper un modèle qui « adapte » un nombre en changeant de langue.
-    for (const [i, t] of out.entries()) if (!t || !chiffresVerifies(t, resumes[i])) return null;
-    return out;
-  } catch {
-    return null;
+  for (const [k, res] of reponses.entries()) {
+    if (!res.ok) continue;
+    let arr: unknown[] = [];
+    try {
+      const j = res.text.match(/\[[\s\S]*\]/);
+      arr = j ? (JSON.parse(j[0]) as unknown[]) : [];
+    } catch { continue; }
+    if (!Array.isArray(arr)) continue;
+    auMoinsUnLot = true;
+
+    decoupe[k].forEach((original, n) => {
+      const t = String(arr[n] ?? "").trim();
+      // Le contrôle reste ENTIER : une traduction qui « adapte » un nombre est rejetée.
+      // Ce qui change, c'est le périmètre du rejet — cette phrase, pas la langue.
+      if (t && chiffresVerifies(t, original)) out[k * TAILLE_LOT + n] = t;
+    });
   }
+
+  return auMoinsUnLot ? out : null;
 }

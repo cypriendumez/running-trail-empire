@@ -34,7 +34,7 @@ import { accesDe, peut, motifRefus, JOURS_ESSAI } from "../src/lib/billing/acces
 import { TARIFS, FORMULES, accesDuPrice } from "../src/lib/stripe/client";
 import { PRIX_AFFICHES, REMISE_ANNUELLE_PCT, MOIS_FACTURES_PAR_AN, MOIS_OFFERTS, economieAnnuelle } from "../src/lib/billing/prix";
 import { jetonDesinscription, jetonValide } from "../src/lib/newsletter/token";
-import { chiffresVerifies, rendreTous, RESUMES_MAX } from "../src/lib/newsletter/resume";
+import { chiffresVerifies, rendreTous, extraireResumes, RESUMES_MAX } from "../src/lib/newsletter/resume";
 import { FILTRES, QUERIES, RUBRIQUES_LETTRE, estCat } from "../src/lib/news/rubriques";
 import { PLAFOND_JOUR } from "../src/lib/billing/aiQuota";
 import { ppsExpiration, ppsVerdict, ppsDemandeAction, couvertureCourses, PPS_URL, PPS_PRIX_EUR, PPS_VALIDITE_MOIS } from "../src/lib/pps/status";
@@ -4334,6 +4334,29 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     assert.ok(elite, "la rubrique Élites n'a plus de filtre");
     assert.ok(elite.test("Kilian Jornet remporte la Sierre-Zinal"), "une victoire doit passer");
     assert.ok(!elite.test("Comment améliorer sa VMA en six semaines"), "un conseil d'entraînement n'est pas un résultat");
+  });
+
+  test("une réponse coupée ne fait pas perdre les résumés déjà écrits", () => {
+    // ⚠️ Mesuré le 21/08/2026 : un prompt de 36 000 caractères a produit une réponse
+    // coupée à 1 099 caractères — deux résumés complets, puis la coupure en plein mot.
+    // `JSON.parse` sur le tableau entier est tout ou rien : pas de crochet fermant, pas
+    // de résumés du tout. Les deux qui étaient écrits partaient à la poubelle avec le
+    // troisième. C'est la troisième fois que le budget de sortie de Gemini 2.5 mord
+    // (1 400, puis 6 000, puis 9 000) : le lecteur doit survivre à la coupure.
+    const coupe = '```json\n[\n{"i":0,"r":"Premier résumé complet."},'
+      + '{"i":1,"r":"Deuxième, avec une \\"citation\\" dedans."},'
+      + '{"i":2,"r":"Troisième coupé en plein m';
+    const lu = extraireResumes(coupe);
+    assert.equal(lu.size, 2, "les résumés complets d'une réponse coupée doivent survivre");
+    assert.equal(lu.get(0), "Premier résumé complet.");
+    // L'échappement doit être défait, sinon les guillemets partent en clair dans l'e-mail.
+    assert.equal(lu.get(1), 'Deuxième, avec une "citation" dedans.');
+    assert.ok(!lu.has(2), "un objet coupé ne doit pas être rendu à moitié");
+
+    // Une réponse entière reste lue entièrement.
+    assert.equal(extraireResumes('[{"i":0,"r":"a"},{"i":1,"r":"b"},{"i":2,"r":"c"}]').size, 3);
+    // Et du bruit ne produit pas de faux résumé.
+    assert.equal(extraireResumes("Je ne peux pas répondre à cette demande.").size, 0);
   });
 
   test("la lettre ne peut pas perdre un article en route", () => {
