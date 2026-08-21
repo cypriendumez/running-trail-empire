@@ -97,6 +97,18 @@ function ElevationProfile({ elevation, distance }: { elevation: number; distance
   );
 }
 
+/**
+ * Comment NOMMER la source quand aucune montre ne peut recevoir.
+ *
+ * `device_name` est le modèle déclaré par la montre (« Apple Watch », « Polar Vantage »),
+ * `source` le canal d'entrée rendu lisible (« Garmin Connect »). On préfère le modèle :
+ * c'est le mot que la personne reconnaît. Jamais de chaîne vide — le message dirait
+ * « On lit bien tes données () », ce qui inquiète au lieu de rassurer.
+ */
+export function nomLecture(l: { appareil: string | null; source: string | null } | null | undefined): string {
+  return l?.appareil?.trim() || l?.source?.trim() || "intervals.icu";
+}
+
 export function GhostRunner({ baseline, effectiveVma, coachSessions = [] }: GhostRunnerProps) {
   // Une seule VMA dans toute l'application : test enregistré, sinon VMA effective,
   // et seulement en tout dernier recours une valeur par défaut.
@@ -123,7 +135,14 @@ export function GhostRunner({ baseline, effectiveVma, coachSessions = [] }: Ghos
   const [paused, setPaused] = useState(false);
   const [gpsStatus, setGpsStatus] = useState<"off" | "searching" | "live" | "sim">("off");
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
-  const [watchStatus, setWatchStatus] = useState<{ connected: boolean; pushReady: boolean; device: string | null } | null>(null);
+  // `lecture` : ce qui ARRIVE quand aucune montre ne peut recevoir. Sans lui, un porteur
+  // d'Apple Watch ayant tout branché lisait « configure ta montre » — un réglage qui
+  // n'existe pas, Apple n'ayant aucun champ d'envoi chez intervals.icu.
+  type EtatMontre = {
+    connected: boolean; pushReady: boolean; device: string | null;
+    lecture?: { appareil: string | null; source: string | null; date: string | null } | null;
+  };
+  const [watchStatus, setWatchStatus] = useState<EtatMontre | null>(null);
   const [showGuide, setShowGuide] = useState(false);
 
   // ── Mode FC guidé en direct : capteur Bluetooth (ceinture / montre) + annonces ──
@@ -853,8 +872,8 @@ export function GhostRunner({ baseline, effectiveVma, coachSessions = [] }: Ghos
                   {sendingWatch ? <Loader2 className="w-5 h-5 animate-spin" /> : <Watch className="w-5 h-5" />}
                   {sendingWatch ? d["watch.sending"] : d["watch.send"]}
                   {!sendingWatch && watchStatus && (
-                    <span title={watchStatus.pushReady ? tg("watch.okTitle", { d: watchStatus.device ?? "" }) : d["watch.setupTitle"]}
-                      className={`h-2 w-2 rounded-full ${watchStatus.pushReady ? "bg-emerald-400" : watchStatus.connected ? "bg-amber-400" : "bg-zinc-400"}`} />
+                    <span title={watchStatus.pushReady ? tg("watch.okTitle", { d: watchStatus.device ?? "" }) : watchStatus.lecture ? tg("acc.readonly", { d: nomLecture(watchStatus.lecture) }) : d["watch.setupTitle"]}
+                      className={`h-2 w-2 rounded-full ${watchStatus.pushReady ? "bg-emerald-400" : watchStatus.lecture ? "bg-sky-400" : watchStatus.connected ? "bg-amber-400" : "bg-zinc-400"}`} />
                   )}
                 </button>
                 <button
@@ -877,10 +896,15 @@ export function GhostRunner({ baseline, effectiveVma, coachSessions = [] }: Ghos
                 <div className="min-w-0 flex-1">
                   <span className="block text-sm font-bold text-zinc-900">{d["acc.title"]}</span>
                   {watchStatus && (
-                    <span className={`mt-0.5 flex items-center gap-1.5 text-xs font-semibold ${watchStatus.pushReady ? "text-emerald-700" : watchStatus.connected ? "text-amber-700" : "text-zinc-500"}`}>
-                      <span className={`h-2 w-2 flex-shrink-0 rounded-full ${watchStatus.pushReady ? "bg-emerald-500" : watchStatus.connected ? "bg-amber-500" : "bg-zinc-400"}`} />
+                    <span className={`mt-0.5 flex items-center gap-1.5 text-xs font-semibold ${watchStatus.pushReady ? "text-emerald-700" : watchStatus.lecture ? "text-sky-700" : watchStatus.connected ? "text-amber-700" : "text-zinc-500"}`}>
+                      <span className={`h-2 w-2 flex-shrink-0 rounded-full ${watchStatus.pushReady ? "bg-emerald-500" : watchStatus.lecture ? "bg-sky-500" : watchStatus.connected ? "bg-amber-500" : "bg-zinc-400"}`} />
+                      {/* ⚠️ L'ORDRE COMPTE : `lecture` avant `connected`. Les deux sont vrais
+                          en même temps, et l'ancien enchaînement affichait « configure ta
+                          montre » à quelqu'un dont les séances arrivaient déjà. */}
                       {watchStatus.pushReady
                         ? tg("acc.ok", { d: watchStatus.device ?? "" })
+                        : watchStatus.lecture
+                        ? tg("acc.readonly", { d: nomLecture(watchStatus.lecture) })
                         : watchStatus.connected
                         ? d["acc.almost"]
                         : d["acc.no"]}

@@ -44,6 +44,39 @@ export const DESTINATIONS_MONTRE = [
 ] as const satisfies readonly { nom: string; actif: string; dernier: string | null; montre?: boolean }[];
 
 /**
+ * CE QU'ON LIT, QUAND RIEN NE PEUT RECEVOIR.
+ *
+ * ⚠️ Une seule réponse existait pour deux situations opposées : « pastille orange,
+ * configure ta montre ». Elle est juste pour quelqu'un qui n'a rien branché. Elle est
+ * FAUSSE, et vexante, pour un porteur d'Apple Watch qui a payé HealthFit, installé la
+ * passerelle, et dont les séances arrivent parfaitement — on lui demandait de faire une
+ * chose déjà faite, et impossible : Apple n'a AUCUN champ d'envoi chez intervals.icu
+ * (vérifié sur l'API le 21/08/2026). Même chose pour Polar et Strava, qui lisent sans
+ * jamais pouvoir recevoir.
+ *
+ * On regarde donc ce qui ARRIVE. `device_name` est le modèle tel que la montre le
+ * déclare (« Garmin Forerunner 165 », « Apple Watch »), `source` le canal d'entrée
+ * (« GARMIN_CONNECT »). On ne traduit pas les codes source avec une table maison — on
+ * les rend lisibles, ce qui évite d'inventer un nom pour un canal qu'on ne connaît pas.
+ */
+export type Lecture = { appareil: string | null; source: string | null; date: string | null };
+
+export function lectureDe(activites: readonly Record<string, unknown>[]): Lecture | null {
+  for (const a of activites ?? []) {
+    const brut = typeof a.device_name === "string" ? a.device_name.trim() : "";
+    const appareil = brut || null;
+    const src = typeof a.source === "string" ? a.source.trim() : "";
+    const source = src
+      ? src.replace(/_/g, " ").toLowerCase().replace(/\b\p{L}/gu, (c) => c.toUpperCase())
+      : null;
+    const d = typeof a.start_date_local === "string" ? a.start_date_local.slice(0, 10) : null;
+    // La première activité qui dit d'où elle vient suffit : les suivantes n'ajoutent rien.
+    if (appareil || source) return { appareil, source, date: d };
+  }
+  return null;
+}
+
+/**
  * La première MONTRE prête à recevoir, ou `null`. Pure — testable sans réseau.
  *
  * ⚠️ Les destinations marquées `montre: false` sont sautées : elles reçoivent la séance
@@ -263,7 +296,12 @@ export function warmCoolMin(warmMin?: number | null, coolMin?: number | null): {
 
 export function stepsForType(type: string, durationMin: number, vmaKmh?: number | null, mainPaceSec?: number | null, warmMin?: number | null, coolMin?: number | null, reps?: RepBlock | null, rawDetail?: string, toutEnAllure?: boolean): string | null {
   const s = (type || "").toLowerCase();
-  const d = Math.max(15, Math.round(durationMin));
+  // ⚠️ BORNÉ EN HAUT AUSSI. `durationForType` plafonne à 90 min, mais la durée peut venir
+  // du TEXTE de la séance (`parseDurationMin`), qui est de la prose : « 600 min » y passait
+  // sans broncher et produisait une étape unique de 9 h 35 sur la montre. Aucune erreur —
+  // juste une prescription intenable. 300 min est la limite que les crash-tests du projet
+  // appliquent déjà à toute étape.
+  const d = Math.min(300, Math.max(15, Math.round(durationMin)));
   const v = vmaKmh ?? null;
   const p = mainPaceSec ?? null;
   // Durées d'échauffement / retour au calme = réglage du profil de l'athlète (5–30 min), repli 15 / 10.

@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { montreDe } from "@/lib/watch/intervals";
+import { montreDe, lectureDe, type Lecture } from "@/lib/watch/intervals";
 
 const BASE = "https://intervals.icu/api/v1";
 const auth = (k: string) => ({ Authorization: "Basic " + Buffer.from(`API_KEY:${k}`).toString("base64") });
@@ -12,6 +12,13 @@ const auth = (k: string) => ({ Authorization: "Basic " + Buffer.from(`API_KEY:${
  *  - connected : identifiants intervals.icu valides
  *  - pushReady : « envoyer les entraînements planifiés » est activé pour au moins une montre
  *  - device    : la montre prête
+ *  - lecture   : ce qui ARRIVE quand rien ne peut recevoir (appareil, canal, date)
+ *
+ * ⚠️ `lecture` existe parce qu'une seule réponse couvrait DEUX situations opposées. Un
+ * porteur d'Apple Watch ayant payé et installé HealthFit voyait « pastille orange,
+ * configure ta montre » : on lui demandait de faire une chose déjà faite — et impossible,
+ * Apple n'ayant aucun champ d'envoi chez intervals.icu. Idem pour Polar et Strava.
+ * L'appel supplémentaire n'a lieu QUE si aucune montre ne peut recevoir.
  *
  * ⚠️ SUUNTO MANQUAIT, et ça se voyait à l'écran. Le Ghost Runner allume une pastille VERTE
  * quand `pushReady` est vrai, ORANGE sinon avec une invitation à configurer sa montre. Un
@@ -53,11 +60,28 @@ export async function GET() {
     // du format de la séance envoyée. Deux copies auraient divergé — c'est précisément
     // comme ça que Suunto était annoncé sur la landing et absent d'ici.
     const ready = montreDe(a);
+
+    // Rien ne peut recevoir : on va voir ce qui ARRIVE, pour ne pas réclamer un réglage
+    // qui n'existe pas. Trois semaines suffisent — quelqu'un qui n'a rien synchronisé
+    // depuis trois semaines n'a de toute façon pas de flux à décrire.
+    let lecture: Lecture | null = null;
+    if (!ready) {
+      try {
+        const jour = (d: number) => new Date(Date.now() + d * 86_400_000).toISOString().slice(0, 10);
+        const r = await fetch(
+          `${BASE}/athlete/${ATHLETE_ID}/activities?oldest=${jour(-21)}&newest=${jour(1)}`,
+          { headers: auth(API_KEY), cache: "no-store" },
+        );
+        if (r.ok) lecture = lectureDe(await r.json());
+      } catch { /* l'état de base reste juste sans ce détail */ }
+    }
+
     return NextResponse.json({
       connected: true,
       pushReady: !!ready,
       device: ready?.nom ?? null,
       lastUpload: ready?.dernier ?? null,
+      lecture,
     });
   } catch {
     return NextResponse.json({ connected: false, pushReady: false, device: null });

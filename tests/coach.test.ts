@@ -24,7 +24,7 @@ import { etatDouble, scinderFacile, seanceDoubleSeuil, AVERTISSEMENT_LACTATE } f
 import { oneSessionPerSlot, slotKey } from "../src/lib/coach/sessions";
 import { vmaFromPaceCurve, bestVmaFromWorkouts, effectiveVma, dureeEnConditionsNeutres, PART_PENALITE_CHALEUR, pctVmaForDistance, easyPaceFromHeartRate, MIN_SEANCES_ALLURE_Z2, LONG_RUN_PRET_KM, LONG_RUN_PLANCHER_KM } from "../src/lib/running/fitness";
 import { heatAdvice, windAdvice, altitudeLossPct, heatAcclimation } from "../src/lib/weather/openMeteo";
-import { parseReps, parsePaceSec, stepsForType, warmCoolMin, buildWorkoutDescription, montreDe, metriquesMixtesSupportees, DESTINATIONS_MONTRE } from "../src/lib/watch/intervals";
+import { parseReps, parsePaceSec, stepsForType, warmCoolMin, buildWorkoutDescription, montreDe, metriquesMixtesSupportees, DESTINATIONS_MONTRE , lectureDe } from "../src/lib/watch/intervals";
 import { buildWeekPlan, CONFIRMED_DAYS } from "../src/lib/ai/autoPlan";
 import { tr, ALL_LANGS, nRaw } from "../src/lib/i18n/multi";
 // `T` est déjà pris plus bas dans ce fichier (une date) → alias explicite.
@@ -5116,6 +5116,31 @@ test("les marques annoncées comme recevant la séance sont exactement celles qu
   const detectees = DESTINATIONS_MONTRE.map((d) => d.nom.toLowerCase()).sort();
   assert.ok(promises.length >= 4, `la landing ne promet plus que ${promises.length} marque(s) — anomalie`);
   assert.deepEqual(detectees, promises, `l'app détecte [${detectees}] mais la page promet [${promises}]`);
+});
+test("on ne réclame pas un réglage à quelqu'un qui a déjà tout fait", () => {
+  // ⚠️ UNE SEULE RÉPONSE COUVRAIT DEUX SITUATIONS OPPOSÉES. « Pastille orange, configure
+  // ta montre » est juste pour qui n'a rien branché. C'était FAUX, et vexant, pour un
+  // porteur d'Apple Watch ayant payé HealthFit et dont les séances arrivent depuis des
+  // mois : on lui demandait une chose déjà faite — et impossible, Apple n'ayant AUCUN
+  // champ d'envoi chez intervals.icu (relevé sur l'API le 21/08/2026).
+  const g = lectureDe([{ device_name: "Garmin Forerunner 165", source: "GARMIN_CONNECT", start_date_local: "2026-08-21T07:57:19" }]);
+  assert.equal(g?.appareil, "Garmin Forerunner 165");
+  // Le code source est rendu LISIBLE, pas traduit par une table maison : inventer un nom
+  // pour un canal inconnu serait fabriquer une information.
+  assert.equal(g?.source, "Garmin Connect");
+  assert.equal(g?.date, "2026-08-21");
+
+  const a = lectureDe([{ device_name: "Apple Watch", source: "UPLOAD", start_date_local: "2026-08-20T06:00:00" }]);
+  assert.equal(a?.appareil, "Apple Watch", "l'appareil doit être nommé tel qu'il se déclare");
+
+  // ⚠️ Une activité peut ne rien dire d'elle-même : on passe à la suivante au lieu de
+  // rendre un objet vide, qui afficherait « On lit bien tes données () ».
+  const muette = lectureDe([{ start_date_local: "2026-08-20" }, { source: "STRAVA", start_date_local: "2026-08-19" }]);
+  assert.equal(muette?.source, "Strava", "une activité muette ne doit pas masquer la suivante");
+
+  // Aucune donnée = aucune affirmation. C'est là que « configure ta montre » est juste.
+  assert.equal(lectureDe([]), null);
+  assert.equal(lectureDe([{ start_date_local: "2026-08-20" }]), null, "sans appareil ni source, on n'affirme rien");
 });
 test("la route d'état délègue à la table partagée plutôt que de la recopier", () => {
   // Deux copies de la liste avaient déjà divergé une fois : Suunto était annoncé sur la

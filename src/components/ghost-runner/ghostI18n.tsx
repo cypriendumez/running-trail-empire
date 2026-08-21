@@ -30,6 +30,10 @@ export const GX: Record<string, Record<string, string>> = {
     "acc.title": "Envoyer l'entraînement sur ta montre",
     "acc.ok": "Montre connectée ({d}) — tes séances arrivent automatiquement",
     "acc.almost": "Presque : active « Push planned workouts » dans intervals.icu",
+    // ⚠️ Cet état existait sans message : un porteur d'Apple Watch qui avait TOUT fait
+    // correctement lisait « configure ta montre ». Apple n'a aucun champ d'envoi chez
+    // intervals.icu — il n'y a rien à configurer, et le lui réclamer est une erreur.
+    "acc.readonly": "On lit bien tes données ({d}) — cette montre ne peut pas recevoir de séance planifiée. Ton plan reste dans le calendrier.",
     "acc.no": "Montre pas encore connectée — ouvre le mode d'emploi",
     "acc.cta": "Connecter ma montre maintenant →",
     "st.gps": "GPS actif", "st.search": "Recherche du signal GPS…",
@@ -81,6 +85,7 @@ export const GX: Record<string, Record<string, string>> = {
     "acc.title": "Send the workout to your watch",
     "acc.ok": "Watch connected ({d}) — your sessions arrive automatically",
     "acc.almost": "Almost there: enable “Push planned workouts” in intervals.icu",
+    "acc.readonly": "We do receive your data ({d}) — this watch cannot accept planned sessions. Your plan stays in the calendar.",
     "acc.no": "Watch not connected yet — open the guide",
     "acc.cta": "Connect my watch now →",
     "st.gps": "GPS active", "st.search": "Searching for GPS signal…",
@@ -132,6 +137,7 @@ export const GX: Record<string, Record<string, string>> = {
     "acc.title": "Das Training auf deine Uhr senden",
     "acc.ok": "Uhr verbunden ({d}) — deine Einheiten kommen automatisch an",
     "acc.almost": "Fast geschafft: aktiviere „Push planned workouts“ in intervals.icu",
+    "acc.readonly": "Deine Daten kommen an ({d}) — diese Uhr kann keine geplanten Einheiten empfangen. Dein Plan bleibt im Kalender.",
     "acc.no": "Uhr noch nicht verbunden — öffne die Anleitung",
     "acc.cta": "Meine Uhr jetzt verbinden →",
     "st.gps": "GPS aktiv", "st.search": "Suche GPS-Signal…",
@@ -183,6 +189,7 @@ export const GX: Record<string, Record<string, string>> = {
     "acc.title": "Enviar el entrenamiento a tu reloj",
     "acc.ok": "Reloj conectado ({d}): tus sesiones llegan automáticamente",
     "acc.almost": "Casi: activa «Push planned workouts» en intervals.icu",
+    "acc.readonly": "Sí recibimos tus datos ({d}): este reloj no puede recibir sesiones planificadas. Tu plan permanece en el calendario.",
     "acc.no": "Reloj aún sin conectar: abre la guía",
     "acc.cta": "Conectar mi reloj ahora →",
     "st.gps": "GPS activo", "st.search": "Buscando señal GPS…",
@@ -234,6 +241,7 @@ export const GX: Record<string, Record<string, string>> = {
     "acc.title": "Enviar o treino para o teu relógio",
     "acc.ok": "Relógio ligado ({d}) — as tuas sessões chegam automaticamente",
     "acc.almost": "Quase: ativa «Push planned workouts» no intervals.icu",
+    "acc.readonly": "Recebemos os teus dados ({d}) — este relógio não pode receber treinos planeados. O teu plano fica no calendário.",
     "acc.no": "Relógio ainda não ligado — abre o guia",
     "acc.cta": "Ligar o meu relógio agora →",
     "st.gps": "GPS ativo", "st.search": "À procura de sinal GPS…",
