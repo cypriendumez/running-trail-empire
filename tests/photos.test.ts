@@ -81,6 +81,9 @@ const AUDITEES: Record<string, string> = {
   "photo-1761027436967-63584b301a77": "courses : arêtes alpines, sentier, silhouettes lointaines — ni visage ni marque",
   "photo-1490645935967-10de6ba17061": "nutrition : assiette, rien à signaler",
   "photo-1555972635-8a10402b49b2":    "matériel : chaussure dans l'herbe ; petit drapeau de marque au talon (~30 px)",
+  "photo-1543352632-5a4b24e4d2a6": "REDs : trois contenants repas vus de haut — ni visage ni marque",
+  "photo-1603077492579-39ff927823db": "renforcement : haltères sur un râtelier — ni visage ni marque lisible",
+  "photo-1774460261319-cdd3b2363143": "cycle : vagues pastel abstraites — ni personne ni marque",
 };
 
 // ── 3. Les Pexels validées du fil Communauté ─────────────────────────────────

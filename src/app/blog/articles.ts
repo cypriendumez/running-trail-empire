@@ -593,6 +593,201 @@ export const ARTICLES: Article[] = [
     ],
   },
 
+  // ══════════════════════════════════════════════════════════════════════════
+  {
+    slug: "deficit-energetique-relatif-reds-coureur",
+    cle: "p9",
+    maj: "21 août 2026",
+    chapo:
+      "Le sujet le plus important de ce blog, et le moins raconté. Quand ce qu'on mange ne couvre plus ce qu'on dépense, ce n'est pas la performance qui décroche en premier — c'est l'os, l'hormone et l'immunité.",
+    avertissement:
+      "Cet article décrit un syndrome médical reconnu. Il n'est ni un outil de diagnostic ni un substitut à une consultation. Si tu te reconnais dans plusieurs des signes décrits, parle-en à un médecin ou à un diététicien du sport — et si le rapport à l'alimentation est source de souffrance, à un professionnel de santé mentale.",
+    blocs: [
+      {
+        h: "De quoi on parle",
+        p: [
+          "Le Comité international olympique publie depuis 2014 un consensus sur ce qu'il appelle aujourd'hui les REDs — Relative Energy Deficiency in Sport. Sa version 2023 est la référence actuelle, et elle est explicite : le problème n'est pas le poids, c'est la DISPONIBILITÉ ÉNERGÉTIQUE.",
+          "La disponibilité énergétique, c'est ce qu'il reste à l'organisme pour vivre une fois l'entraînement payé. Un coureur peut manger beaucoup et être en déficit s'il s'entraîne davantage ; un autre peut manger peu et aller bien s'il court peu. Le chiffre sur la balance ne dit rien de tout cela.",
+          "C'est pourquoi le syndrome touche aussi des hommes, et des athlètes de poids parfaitement ordinaire. L'image du coureur maigre est une image, pas un critère.",
+        ],
+      },
+      {
+        h: "Ce que ça abîme, dans l'ordre",
+        p: [
+          "Le corps ne s'arrête pas d'un coup : il coupe des fonctions par ordre de priorité, et la performance n'est pas la première sacrifiée. Le consensus du CIO décrit une atteinte de multiples systèmes.",
+          "L'os d'abord, et c'est le plus coûteux : la densité minérale se dégrade, et les fractures de fatigue arrivent. Une fracture de fatigue à répétition chez un coureur par ailleurs sérieux doit faire poser la question de l'apport, pas seulement celle du volume.",
+          "Les hormones ensuite. Chez la femme, l'aménorrhée — l'arrêt des règles — est le signe le plus visible, et il n'est jamais normal chez une sportive. Chez l'homme, la baisse de testostérone est plus silencieuse mais pas moins réelle.",
+          "Puis l'immunité, le sommeil, l'humeur, la capacité à récupérer. À ce stade, l'athlète s'entraîne toujours autant et progresse de moins en moins — et sa conclusion habituelle est qu'il n'en fait pas assez.",
+        ],
+      },
+      {
+        h: "Les signes qui doivent alerter",
+        p: [
+          "Une stagnation ou une régression malgré un entraînement maintenu. Des blessures osseuses répétées. Une frilosité inhabituelle. Un sommeil qui se dégrade sans cause. Une libido en berne. Chez la femme, des règles irrégulières ou absentes.",
+          "Aucun de ces signes ne prouve quoi que ce soit isolément — ils ont tous d'autres causes possibles. C'est leur ACCUMULATION chez quelqu'un qui s'entraîne beaucoup et mange peu qui doit conduire à consulter.",
+          "Un piège fréquent : la variabilité cardiaque et la fréquence cardiaque au repos peuvent rester longtemps correctes. Une montre ne détecte pas ce syndrome, et l'absence d'alerte sur un tableau de bord ne vaut pas un feu vert.",
+        ],
+      },
+      {
+        h: "Le cas particulier de la perte de poids voulue",
+        p: [
+          "Vouloir perdre du poids en courant est légitime, et beaucoup le font sans problème. Le risque n'apparaît pas avec l'intention mais avec le RYTHME : c'est un déficit trop grand, tenu trop longtemps, en même temps qu'une charge d'entraînement qui monte, qui bascule dans les REDs.",
+          "D'où deux règles simples. Un déficit se creuse lentement, et jamais pendant un bloc d'entraînement dur ou juste avant une course. Et il existe un plancher en dessous duquel perdre encore n'apporte rien à la performance et coûte à la santé.",
+        ],
+      },
+      {
+        h: "Ce que Pacevo fait de ce sujet",
+        p: [
+          "Le mode perte de poids de l'app est construit sur cette logique plutôt que sur la seule vitesse de perte. Le déficit quotidien est plafonné, la perte visée est bornée en pourcentage du poids par semaine, et le calcul s'arrête à un plancher — le maintien est imposé en dessous d'un indice de masse corporelle de 21.",
+          "Le suivi du poids, celui de la dépense et celui des protéines sont séparés du déficit lui-même, pour qu'un athlète puisse se peser sans que cela déclenche mécaniquement une restriction.",
+          "Rien de tout cela ne remplace un professionnel. Ce que le logiciel peut faire, c'est refuser de proposer ce qui serait déraisonnable — et c'est déjà beaucoup, parce que le premier réflexe d'un coureur frustré est d'en faire plus et de manger moins.",
+        ],
+      },
+    ],
+    sources: [
+      {
+        label:
+          "Mountjoy M et al. 2023 International Olympic Committee's (IOC) consensus statement on Relative Energy Deficiency in Sport (REDs). Br J Sports Med, 2023",
+        url: "https://pubmed.ncbi.nlm.nih.gov/37752011/",
+      },
+      {
+        label:
+          "IOC consensus statement on relative energy deficiency in sport (RED-S): 2018 update. Br J Sports Med, 2018",
+        url: "https://pubmed.ncbi.nlm.nih.gov/29773536/",
+      },
+    ],
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  {
+    slug: "renforcement-courir-plus-vite-sans-courir",
+    cle: "p10",
+    maj: "21 août 2026",
+    chapo:
+      "C'est l'un des liens les mieux établis de la littérature de l'endurance, et c'est la séance que presque tout le monde saute. Ce qu'elle améliore, ce qu'elle n'améliore pas, et à quoi elle ressemble pour un coureur.",
+    blocs: [
+      {
+        h: "Ce que dit la revue de référence",
+        p: [
+          "La revue systématique de Richard Blagrove publiée dans Sports Med en 2018 a examiné l'effet de l'entraînement en force sur les déterminants physiologiques de la performance en demi-fond et fond. Sa conclusion est nette : le travail de force améliore l'économie de course, sans dégrader la consommation maximale d'oxygène.",
+          "L'économie de course, c'est le coût énergétique d'une allure donnée. Deux coureurs de même VO2max ne courent pas au même chrono si l'un dépense moins pour aller à la même vitesse. C'est un levier de performance à part entière, et il est plus accessible que la VO2max une fois qu'on a quelques années d'entraînement.",
+          "Deuxième effet, moins visible : le renforcement agit sur la tolérance aux contraintes répétées. Un coureur qui encaisse mieux s'entraîne plus régulièrement, et la régularité fait plus pour la progression que n'importe quelle séance isolée.",
+        ],
+      },
+      {
+        h: "Ce que ce n'est pas",
+        p: [
+          "Ce n'est pas de la musculation esthétique, et la crainte de « prendre du volume » n'a pas lieu d'être : les charges lourdes à faibles répétitions développent surtout la commande nerveuse.",
+          "Ce n'est pas non plus un substitut à la course. Le renforcement s'ajoute à un plan de course, il ne le remplace pas — et il ne remplace pas davantage l'endurance fondamentale.",
+          "Enfin, ce n'est pas une garantie contre la blessure. La progression de la charge, le sommeil, l'historique et le terrain comptent aussi. Le renforcement est un facteur parmi d'autres, simplement l'un des plus faciles à ajouter.",
+        ],
+      },
+      {
+        h: "À quoi ça ressemble concrètement",
+        p: [
+          "Une ou deux séances par semaine suffisent, et elles sont courtes. L'essentiel tient en quelques mouvements sur la chaîne postérieure et les appuis : squat, fente, soulevé de terre roumain, montée de marche, et du travail unilatéral — courir est un exercice sur une jambe à la fois.",
+          "Deux règles de placement, et elles évitent la plupart des ennuis. On ne met pas une séance de force lourde la veille d'une séance de qualité. Et on la place plutôt APRÈS une séance de course dans la journée qu'avant, pour ne pas courir sur des jambes déjà vidées.",
+          "En période de charge élevée, la séance se maintient mais s'allège. La supprimer entièrement pendant les huit semaines les plus dures, c'est perdre l'adaptation au moment où elle protège le plus.",
+        ],
+      },
+      {
+        h: "Le cas du trail",
+        p: [
+          "En descente, le muscle freine en s'allongeant — un mode de contraction particulièrement traumatisant, et c'est lui qui produit les cuisses en bois du lendemain.",
+          "C'est un cas où le renforcement se spécifie : du travail excentrique, et surtout des descentes à l'entraînement. Aucune salle ne remplace le fait d'avoir descendu, plusieurs fois, ce que la course te demandera de descendre.",
+        ],
+      },
+      {
+        h: "Où c'est dans l'app",
+        p: [
+          "Pacevo intègre le renforcement au programme plutôt que de le laisser à côté : le guide de renforcement est accessible depuis l'espace entraînement, et le contexte du coach prévoit une à deux séances par semaine dans la construction du plan.",
+          "La séance de force n'est pas poussée sur la montre — la montre reçoit les séances de course. C'est une limite de la chaîne de synchronisation, pas un oubli.",
+        ],
+      },
+    ],
+    sources: [
+      {
+        label:
+          "Blagrove RC et al. Effects of Strength Training on the Physiological Determinants of Middle- and Long-Distance Running Performance. Sports Med, 2018",
+        url: "https://pubmed.ncbi.nlm.nih.gov/29249083/",
+      },
+      {
+        label:
+          "Hoogkamer W et al. Altered Running Economy Directly Translates to Altered Distance-Running Performance. Med Sci Sports Exerc, 2016",
+        url: "https://pubmed.ncbi.nlm.nih.gov/27327023/",
+      },
+    ],
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  {
+    slug: "cycle-menstruel-et-entrainement-ce-que-dit-la-meta-analyse",
+    cle: "p11",
+    maj: "21 août 2026",
+    chapo:
+      "Beaucoup d'applications vendent une périodisation calée sur le cycle. La méta-analyse de référence est nettement plus prudente que ce discours, et cette prudence est en soi l'information la plus utile.",
+    avertissement:
+      "Cet article résume de la littérature scientifique générale. Des règles absentes, très douloureuses ou très abondantes ne relèvent pas de l'entraînement mais d'un avis médical.",
+    blocs: [
+      {
+        h: "Ce que la méta-analyse a trouvé",
+        p: [
+          "Kelly McNulty et son équipe ont publié en 2020 dans Sports Med une revue systématique avec méta-analyse sur l'effet de la phase du cycle menstruel sur la performance à l'exercice chez des femmes eumenorrhéiques — c'est-à-dire au cycle régulier et sans contraception hormonale.",
+          "Leur conclusion tient en deux points, et le second compte autant que le premier. Il existe un effet de la phase du cycle sur la performance, mais il est de FAIBLE AMPLITUDE. Et la qualité des études disponibles est globalement basse, ce qui impose de la prudence dans l'interprétation.",
+          "Surtout, la variabilité entre individus est considérable. Ce que le cycle fait à une athlète ne prédit pas ce qu'il fait à une autre, et c'est la raison pour laquelle une règle générale du type « pousser en phase folliculaire, lever le pied en lutéale » se trompe souvent.",
+        ],
+      },
+      {
+        h: "Pourquoi une périodisation rigide passe à côté",
+        p: [
+          "Une périodisation calée sur un calendrier suppose deux choses : que ton cycle est régulier, et que ta réponse ressemble à la moyenne. Les deux hypothèses sont fragiles, et la seconde est contredite par la variabilité observée.",
+          "Elle a aussi un coût : renoncer par principe à une séance de qualité pendant une partie du mois, mois après mois, retire une part non négligeable du travail intense de l'année. Sur la base d'un effet que la littérature qualifie de faible, c'est un mauvais échange.",
+          "Ajoutons que beaucoup de femmes utilisent une contraception hormonale, ce qui change la donne — la méta-analyse citée porte spécifiquement sur des femmes sans contraception hormonale, et une revue distincte s'est intéressée aux contraceptifs oraux.",
+        ],
+      },
+      {
+        h: "Ce qui marche mieux : observer plutôt que présumer",
+        p: [
+          "L'approche défendable est individuelle. Noter, cycle après cycle, où tombent les séances qui se passent mal, les sensations de jambes lourdes, le sommeil et l'appétit. Au bout de quelques mois, un motif apparaît — ou n'apparaît pas, et c'est aussi une réponse.",
+          "S'il apparaît, l'ajustement se fait sur TON motif, pas sur une moyenne de population. Et il porte souvent moins sur l'annulation d'une séance que sur son déplacement de quarante-huit heures.",
+          "Deux points pratiques sortent du débat sur la performance et méritent d'être traités pour eux-mêmes : le fer, dont les besoins sont accrus par les pertes menstruelles, et les symptômes douloureux, qui relèvent d'un avis médical et non d'un plan d'entraînement.",
+        ],
+      },
+      {
+        h: "Le lien avec les REDs",
+        p: [
+          "Un point n'est pas une nuance mais une alerte : l'absence de règles chez une sportive n'est jamais normale. C'est l'un des signes les plus visibles du déficit énergétique relatif décrit par le consensus du CIO.",
+          "Le raccourci « je m'entraîne beaucoup, c'est pour ça » est répandu et faux. Un cycle qui disparaît est un signal à porter à un médecin, pas une adaptation à l'entraînement.",
+        ],
+      },
+      {
+        h: "Ce que Pacevo propose, et ce qu'il ne fait pas",
+        p: [
+          "L'app permet d'activer un suivi du cycle : la phase entre alors dans le contexte du coach au même titre que le sommeil, la variabilité cardiaque ou la charge, et pèse sur la répartition de l'intensité.",
+          "Il est désactivé par défaut, et c'est délibéré. C'est une donnée de santé intime, et rien ne justifie de la collecter chez quelqu'un qui n'en a pas fait la demande explicite.",
+          "Ce que l'app ne fait pas : décider à ta place qu'une phase est mauvaise. Elle croise l'information avec le reste, et le calendrier explique sa décision — ce qui te laisse la possibilité de la contredire, et c'est bien le but.",
+        ],
+      },
+    ],
+    sources: [
+      {
+        label:
+          "McNulty KL et al. The Effects of Menstrual Cycle Phase on Exercise Performance in Eumenorrheic Women: A Systematic Review and Meta-Analysis. Sports Med, 2020",
+        url: "https://pubmed.ncbi.nlm.nih.gov/32661839/",
+      },
+      {
+        label:
+          "Elliott-Sale KJ et al. The Effects of Oral Contraceptives on Exercise Performance in Women: A Systematic Review and Meta-analysis. Sports Med, 2020",
+        url: "https://pubmed.ncbi.nlm.nih.gov/32666247/",
+      },
+      {
+        label:
+          "Mountjoy M et al. 2023 IOC consensus statement on Relative Energy Deficiency in Sport (REDs). Br J Sports Med, 2023",
+        url: "https://pubmed.ncbi.nlm.nih.gov/37752011/",
+      },
+    ],
+  },
+
 ];
 
 /** Clé d'article → slug, pour que l'index sache quelles cartes sont cliquables. */

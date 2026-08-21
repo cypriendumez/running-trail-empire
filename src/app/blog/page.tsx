@@ -73,6 +73,13 @@ const POSTS = [
   { id: 6, key: "p6", cat: "AI", img: "https://images.unsplash.com/photo-1761078739194-75cccb8e3195?w=600&h=450&fit=crop&q=80", featured: false },
   { id: 7, key: "p7", cat: "NUTRITION", img: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=600&h=450&fit=crop&q=80", featured: false },
   { id: 8, key: "p8", cat: "GEAR", img: "https://images.unsplash.com/photo-1555972635-8a10402b49b2?w=600&h=450&fit=crop&q=80", featured: false },
+  // Ajoutés le 21/08/2026. Chacun documente une fonctionnalité RÉELLE mais invisible :
+  // le plancher à IMC 21 du mode perte de poids, le guide de renforcement, et le suivi
+  // de cycle (`is_female_cycle_sync`, vérifié en base). Photos auditées, sans visage
+  // ni marque : conteneurs repas, haltères, vagues abstraites.
+  { id: 9, key: "p9", cat: "HEALTH", img: "https://images.unsplash.com/photo-1543352632-5a4b24e4d2a6?w=600&h=450&fit=crop&q=80", featured: false },
+  { id: 10, key: "p10", cat: "TRAINING", img: "https://images.unsplash.com/photo-1603077492579-39ff927823db?w=600&h=450&fit=crop&q=80", featured: false },
+  { id: 11, key: "p11", cat: "HEALTH", img: "https://images.unsplash.com/photo-1774460261319-cdd3b2363143?w=600&h=450&fit=crop&q=80", featured: false },
 ];
 
 /**
