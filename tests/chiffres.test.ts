@@ -424,5 +424,27 @@ test("ce que la page des tarifs promet, le verrou l'accorde vraiment", () => {
   assert.equal(premiumAvecGpx, 5, `le GPX n'est annoncé dans Premium que pour ${premiumAvecGpx} langue(s) sur 5`);
 });
 
+test("le détail d'une séance nomme l'appareil, jamais le canal de synchro", () => {
+  // ⚠️ OBLIGATION ÉCRITE, pas une préférence. L'article 1.1 des conditions d'API
+  // d'intervals.icu impose d'attribuer les données Garmin, et David Tinker a précisé par
+  // e-mail le 22/08/2026 : « If you have an activity detail page somewhere, it should
+  // include the device name. » L'écran de détail l'affiche donc — sur le chemin
+  // principal il vient tel quel d'intervals.icu (« Garmin Forerunner 165 »).
+  //
+  // ⚠️ CE QUE CE TEST EMPÊCHE : que le REPLI recolle le canal d'entrée dans ce champ.
+  // Il valait `w.source`, ce qui affichait « Appareil : GARMIN_CONNECT » — le nom
+  // d'aucune montre. Mieux vaut ne rien dire que nommer un appareil qui n'existe pas.
+  const route = sansCommentaires(readFileSync(join(ROOT, "src/app/api/activity-detail/route.ts"), "utf8"));
+  assert.match(route, /device_name:/, "le détail d'activité n'expose plus l'appareil");
+  assert.ok(
+    !/device_name:[^,\n]*w\.source \?\?/.test(route),
+    "le canal de synchronisation est renvoyé comme s'il était un nom d'appareil",
+  );
+
+  // Et l'écran doit toujours l'afficher : l'exposer sans le rendre ne vaut rien.
+  const ecran = sansCommentaires(readFileSync(join(ROOT, "src/components/admin/SessionDetail.tsx"), "utf8"));
+  assert.match(ecran, /a\.device_name/, "l'écran de détail n'affiche plus l'appareil");
+});
+
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log(`  ✗ ${f}`); process.exit(1); }

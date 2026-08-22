@@ -21,10 +21,37 @@ Conditions », publié par **david** (auteur et exploitant du service) le 22/10/
 - **§8 — Droit applicable :** Afrique du Sud.
 - **Contact :** support@intervals.icu
 
-## Ce qui RESTE à demander (courrier ci-dessous)
+## ✅ RÉPONSE ÉCRITE DE DAVID TINKER — 22/08/2026
 
-Les conditions ne disent rien de la **continuité du service** — le point qu'un acheteur
-soulèvera. Trois questions, aucune n'est bloquante mais chacune rassure.
+Les trois questions ont été posées à `support@intervals.icu` et répondues par l'auteur du
+service. **À joindre au dossier de cession** : c'est la pièce qu'un acheteur demandera.
+
+> **1.** *If you have an "activity detail page" somewhere, it should include the device
+> name. Otherwise, what you have done is fine. Tx.*
+>
+> **2.** *There is no issue with the app changing ownership.*
+>
+> **3.** *I can't predict the future, but Intervals.icu has been my full time job for
+> some time now and 4 of us work full time on the project. So I don't see it shutting
+> down anytime soon.*
+>
+> Cheers, David
+
+Ce que ça règle, point par point :
+
+- **Attribution** — l'attribution globale est validée (« what you have done is fine »).
+  ⚠️ Une réserve, TRAITÉE le 22/08/2026 : la page de détail d'une séance doit nommer
+  l'appareil. Elle le faisait déjà sur le chemin principal (`device_name` vient tel quel
+  d'intervals.icu, « Garmin Forerunner 165 », affiché sous « Appareil »). Le chemin de
+  REPLI, lui, recollait le canal de synchro et affichait « Appareil : GARMIN_CONNECT »,
+  qui n'est le nom d'aucune montre — corrigé, et verrouillé par un test.
+- **Transfert de propriété** — sans objet, réponse explicite. Le point de due diligence
+  le plus sensible est levé par écrit.
+- **Continuité** — ce n'est pas un projet de week-end : emploi à temps plein de l'auteur,
+  **quatre personnes à temps plein**. Aucune garantie contractuelle, mais un fait
+  vérifiable et daté, ce qui est tout ce qu'on pouvait obtenir.
+
+## Le courrier envoyé (pour mémoire)
 
 ## Courrier prêt à envoyer — support@intervals.icu
 

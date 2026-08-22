@@ -29,6 +29,19 @@ export type Course = {
 
 export type Lang = "fr" | "en" | "de" | "es" | "pt";
 export const LANGS: Lang[] = ["fr", "en", "de", "es", "pt"];
+/**
+ * Les libellés des rubriques, pour qui doit les CITER ailleurs.
+ *
+ * ⚠️ L'accusé d'inscription annonce ce que contient la lettre. S'il recopiait la liste,
+ * elle se périmerait au premier ajout — « Élites » et « Nutrition » sont apparues le
+ * 21/08/2026, et un accusé écrit la veille aurait promis moins que ce qu'on envoie.
+ */
+export const libellesSections = (lang: Lang): string[] =>
+  RUBRIQUES_CITEES.map((c) => (T[lang] ?? T.fr).sections[c]);
+
+/** Les rubriques qu'on ANNONCE — dans l'ordre où elles arrivent dans la lettre. */
+const RUBRIQUES_CITEES: CleSection[] = ["une", "trail", "elite", "materiel", "nutrition"];
+
 export const estLang = (v: unknown): v is Lang => LANGS.includes(v as Lang);
 
 type Chrome = {

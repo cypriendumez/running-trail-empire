@@ -28,7 +28,16 @@ async function fromWorkout(admin: ReturnType<typeof createAdminClient>, userId: 
     icu_training_load: w.tss, aerobic_te: w.training_effect,
     average_cadence: w.avg_cadence_spm != null ? Number(w.avg_cadence_spm) / 2 : null,
     average_temp: w.weather_temp_c,
-    device_name: w.source === "phone_gps" ? "Téléphone (GPS)" : (w.source ?? null),
+    // ⚠️ CE CHAMP EST L'ATTRIBUTION GARMIN, pas un libellé décoratif. David Tinker
+    // (intervals.icu) l'a demandé explicitement par écrit le 22/08/2026 : « If you have
+    // an activity detail page somewhere, it should include the device name. »
+    //
+    // Sur le chemin principal il vient tel quel d'intervals.icu (« Garmin Forerunner
+    // 165 »). Ici, dans le repli — une séance absente d'intervals.icu — on ne connaît
+    // que le CANAL d'entrée. Le montrer comme un appareil afficherait
+    // « Appareil : GARMIN_CONNECT », qui n'est le nom d'aucune montre. Une séance au
+    // téléphone, elle, dit vrai : l'appareil EST le téléphone.
+    device_name: w.source === "phone_gps" ? "Téléphone (GPS)" : null,
   };
   return { activity, series: null, power: null, laps: null, elevGain: w.elevation_gain_m ?? null, elevLoss: w.elevation_loss_m ?? null };
 }

@@ -35,7 +35,7 @@ import { TARIFS, FORMULES, accesDuPrice } from "../src/lib/stripe/client";
 import { PRIX_AFFICHES, REMISE_ANNUELLE_PCT, MOIS_FACTURES_PAR_AN, MOIS_OFFERTS, economieAnnuelle } from "../src/lib/billing/prix";
 import { jetonDesinscription, jetonValide } from "../src/lib/newsletter/token";
 import { emailConfirmation } from "../src/lib/newsletter/confirmation";
-import { construireEmail as courrierHebdo, LANGS as LANGS_MAIL2, type Section as SectionMail2 } from "../src/lib/newsletter/email";
+import { construireEmail as courrierHebdo, libellesSections, LANGS as LANGS_MAIL2, type Section as SectionMail2 } from "../src/lib/newsletter/email";
 import { chiffresVerifies, rendreTous, extraireResumes, RESUMES_MAX } from "../src/lib/newsletter/resume";
 import { FILTRES, QUERIES, RUBRIQUES_LETTRE, estCat } from "../src/lib/news/rubriques";
 import { decodeEntites, texteDuFlux } from "../src/lib/news/rss";
@@ -4511,6 +4511,19 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
         // lettres. Le lien est fait pour être cliqué, pas lu.
         assert.ok(!/>https?:\/\/[^<]{40,}</.test(e.html), `${quoi} affiche une URL brute en ${lg}`);
         assert.ok(e.objet.trim().length > 8, `${quoi} sans objet en ${lg}`);
+        // ⚠️ L'en-tête au-dessus de la carte porte DÉJÀ le logo et le mot PACEVO. Le
+        // répéter en sur-titre à trois centimètres donnait l'air d'un gabarit mal fini.
+        assert.ok(
+          (e.html.match(/PACEVO/g) ?? []).length === 1,
+          `${quoi} répète le nom de la marque en ${lg}`,
+        );
+      }
+      // ⚠️ L'accusé ANNONCE les rubriques de la lettre. S'il les recopiait, la liste se
+      // périmerait au premier ajout : « Élites » et « Nutrition » sont apparues le
+      // 21/08/2026, et un accusé écrit la veille aurait promis moins qu'on n'envoie.
+      // Elles viennent donc de `libellesSections`, et ce test le vérifie.
+      for (const r of libellesSections(lg)) {
+        assert.ok(c.texte.includes(r), `l'accusé n'annonce pas la rubrique « ${r} » en ${lg}`);
       }
       // L'accusé doit VRAIMENT changer de langue : cinq objets identiques trahiraient un
       // dictionnaire branché mais jamais consulté.
