@@ -28,15 +28,25 @@ export default function SignupPage() {
     if (form.password !== form.confirmPassword) { toast.error(L.pwMismatch); return; }
     if (form.password.length < 8) { toast.error(L.pwShort); return; }
     setLoading(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signUp({
-      email: form.email,
-      password: form.password,
-      options: {
-        data: { full_name: form.fullName },
-        emailRedirectTo: `${window.location.origin}/auth/confirm?next=/onboarding`,
-      },
+    // ⚠️ ON N'APPELLE PLUS `supabase.auth.signUp()` DIRECTEMENT, et ce n'est pas un
+    // détail : cet appel déclenche l'e-mail par DÉFAUT de Supabase — « Confirm your
+    // email address », en anglais, expédié par `noreply@mail.app.supabase.io`, sans
+    // logo. C'est le premier message qu'une personne reçoit après avoir donné son
+    // adresse et son mot de passe, et il ressemble à ce qu'on apprend à ne pas ouvrir.
+    //
+    // La route crée le compte via `generateLink`, qui N'ENVOIE RIEN, et expédie NOTRE
+    // message : logo, nom de l'app, et la langue choisie. Garder les deux ferait
+    // arriver DEUX e-mails de confirmation.
+    const rep = await fetch("/api/auth/confirmation", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: form.email, password: form.password, lang }),
     });
+    const j = await rep.json().catch(() => null);
+    // ⚠️ Un seul cas donne une vraie erreur : le mot de passe trop court. Tout le reste
+    // — adresse déjà prise, adresse inconnue — répond « c'est envoyé », sinon le
+    // formulaire deviendrait un annuaire : il suffirait d'essayer des adresses pour
+    // savoir qui a un compte. Même règle que « mot de passe oublié ».
+    const error = !rep.ok || !j?.ok ? { message: L.pwShort } : null;
     setLoading(false);
     if (error) { toast.error(error.message); return; }
     setStep("verify");
