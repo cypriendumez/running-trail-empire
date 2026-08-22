@@ -48,7 +48,13 @@ const ATTENTE: Record<string, string> = {
  * ⚠️ Les images sont les artworks OFFICIELS d'Apple et de Google, jamais des
  * reconstitutions : les deux chartes l'interdisent. Voir `public/badges/README.md`.
  */
-export function StoreBadges({ className = "" }: { className?: string }) {
+/**
+ * `ton` : « clair » sur fond sombre (le héros et sa photo de piste), « sombre » sur fond
+ * blanc (le pied de page). ⚠️ Sans ce réglage, le repli texte s'affichait en boutons
+ * NOIRS sur la photo du héros — présents dans le DOM, illisibles à l'œil. Une image de
+ * badge officielle, elle, se lit sur les deux fonds : le ton ne concerne que le repli.
+ */
+export function StoreBadges({ className = "", ton = "sombre" }: { className?: string; ton?: "clair" | "sombre" }) {
   const { lang } = useT();
   const alt = ALT[lang] ?? ALT.fr;
   // `liensStore()` lit `process.env`, remplacé à la compilation pour les clés
@@ -70,8 +76,8 @@ export function StoreBadges({ className = "" }: { className?: string }) {
 
   return (
     <div className={`flex flex-wrap items-center gap-3 ${className}`}>
-      {ios && <Badge href={ios} img="/badges/app-store.svg" label={alt.ios} />}
-      {android && <Badge href={android} img="/badges/google-play.png" label={alt.android} />}
+      {ios && <Badge href={ios} img="/badges/app-store.svg" label={alt.ios} ton={ton} />}
+      {android && <Badge href={android} img="/badges/google-play.png" label={alt.android} ton={ton} />}
     </div>
   );
 }
@@ -87,11 +93,11 @@ export function StoreBadges({ className = "" }: { className?: string }) {
  * Le repli n'est pas une reconstitution du badge — Apple comme Google l'interdisent :
  * c'est un bouton de texte, ce que leurs chartes autorisent explicitement.
  */
-function Badge({ href, img, label }: { href: string; img: string; label: string }) {
+function Badge({ href, img, label, ton }: { href: string; img: string; label: string; ton: "clair" | "sombre" }) {
   const [casse, setCasse] = useState(false);
   return (
     <a href={href} target="_blank" rel="noopener noreferrer" aria-label={label}
-      className={casse ? "rounded-full bg-zinc-900 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-zinc-800" : ""}>
+      className={casse ? `rounded-full px-5 py-3 text-sm font-semibold transition-colors ${ton === "clair" ? "bg-white text-zinc-900 hover:bg-white/90" : "bg-zinc-900 text-white hover:bg-zinc-800"}` : ""}>
       {casse ? label : (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={img} alt={label} className="h-11 w-auto" loading="lazy" onError={() => setCasse(true)} />

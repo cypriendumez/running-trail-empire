@@ -21,6 +21,7 @@ import { CHIFFRES_LANDING } from "@/lib/brand/stats";
 // Les montants et le formatage viennent de `lib/billing/prix` — ils étaient
 // recopiés ici, dans /pricing, et une TROISIÈME fois (faux) dans les réglages.
 import { PRIX_AFFICHES as PRIX, euros } from "@/lib/billing/prix";
+import { StoreBadges } from "@/components/layout/StoreBadges";
 
 // Données visuelles (non traduisibles). Les libellés viennent de LANDING[lang].
 // ── PHOTOS DES PROGRAMMES ────────────────────────────────────────────────────
@@ -384,6 +385,13 @@ export default function LandingPage() {
                 {L.hero.ctaPrimary} <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
+            {/* ⚠️ ICI, ET PAS SEULEMENT DANS LE PIED DE PAGE. Ils y étaient d'abord — à
+                16 030 pixels du haut sur une page qui en fait 17 467. Personne ne les
+                voyait, moi compris tant que je ne les avais pas cherchés au bon endroit.
+                Un lien de téléchargement qu'il faut dérouler toute la page pour trouver
+                ne sert à rien : sa place est sous le premier bouton. Ils restent AUSSI
+                en pied de page, comme sur la plupart des sites. */}
+            <StoreBadges className="mt-6" ton="clair" />
           </div>
         </Container>
       </section>
