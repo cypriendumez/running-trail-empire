@@ -1,3 +1,4 @@
+import { coquilleEmail, ligneDesinscription, ech } from "./gabarit";
 import type { ArticleResume } from "./resume";
 
 /**
@@ -140,8 +141,6 @@ const T: Record<Lang, Chrome> = {
   },
 };
 
-const ech = (s: string) =>
-  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 export const semaineDe = (lang: Lang, d = new Date()) =>
   d.toLocaleDateString(T[lang].locale, { day: "numeric", month: "long" });
@@ -204,19 +203,18 @@ export function construireEmail(
   <a href="${ech(base)}/dashboard/races" style="color:#059669">${ech(t.voirCourses)}</a></p>`
     : "";
 
-  const html = `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:37rem;margin:0 auto;padding:2rem 1.5rem;color:#18181b;background:#fff">
-  <div style="font-size:.7rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:#059669">Pacevo · ${ech(t.surtitre(semaine))}</div>
-  <h1 style="margin:.9rem 0 .4rem;font-size:1.4rem;line-height:1.25">${ech(t.titre)}</h1>
-  <p style="margin:0;font-size:.88rem;line-height:1.6;color:#71717a">${ech(t.chapo)}</p>
-  ${corpsSections}
-  ${corpsCourses}
-  <div style="margin:2.25rem 0 0;padding-top:1.25rem;border-top:1px solid #e4e4e7;font-size:.74rem;color:#a1a1aa;line-height:1.65">
-    ${auMoinsUnResume ? `<p style="margin:0 0 .75rem">${ech(t.auto)}</p>` : ""}
-    <p style="margin:0 0 .75rem">${ech(t.revuePresse(CONTACT))}</p>
-    <p style="margin:0">${ech(t.pourquoi)}<br>
-    <a href="${ech(lienDesinscription)}" style="color:#71717a">${ech(t.desinscrire)}</a></p>
-  </div>
-</div>`;
+  const corps = `
+      <h1 style="margin:14px 0 10px;font-size:22px;line-height:1.28;color:#18181b;font-weight:800">${ech(t.titre)}</h1>
+      <p style="margin:0;font-size:14px;line-height:1.65;color:#71717a">${ech(t.chapo)}</p>
+      ${corpsSections}
+      ${corpsCourses}`;
+
+  const pied = `
+      ${auMoinsUnResume ? `<p style="margin:0 0 8px">${ech(t.auto)}</p>` : ""}
+      <p style="margin:0 0 8px">${ech(t.revuePresse(CONTACT))}</p>
+      <p style="margin:0">${ech(t.pourquoi)}<br>${ligneDesinscription(t.desinscrire, lienDesinscription)}</p>`;
+
+  const html = coquilleEmail({ base, surtitre: ech(t.surtitre(semaine)), corps, pied });
 
   const texteSections = pleines
     .map((sec) => `\n\n## ${t.sections[sec.cle].toUpperCase()}\n\n${sec.articles.map((a) => `• ${a.title}\n  ${a.source} — ${a.link}${a.resume ? `\n  ${a.resume}` : ""}`).join("\n\n")}`)

@@ -34,6 +34,8 @@ import { accesDe, peut, motifRefus, JOURS_ESSAI } from "../src/lib/billing/acces
 import { TARIFS, FORMULES, accesDuPrice } from "../src/lib/stripe/client";
 import { PRIX_AFFICHES, REMISE_ANNUELLE_PCT, MOIS_FACTURES_PAR_AN, MOIS_OFFERTS, economieAnnuelle } from "../src/lib/billing/prix";
 import { jetonDesinscription, jetonValide } from "../src/lib/newsletter/token";
+import { emailConfirmation } from "../src/lib/newsletter/confirmation";
+import { construireEmail as courrierHebdo, LANGS as LANGS_MAIL2, type Section as SectionMail2 } from "../src/lib/newsletter/email";
 import { chiffresVerifies, rendreTous, extraireResumes, RESUMES_MAX } from "../src/lib/newsletter/resume";
 import { FILTRES, QUERIES, RUBRIQUES_LETTRE, estCat } from "../src/lib/news/rubriques";
 import { decodeEntites, texteDuFlux } from "../src/lib/news/rss";
@@ -4469,6 +4471,45 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     for (const r of RUBRIQUES_LETTRE) {
       assert.ok(estCat(r.cat), `rubrique inconnue de l'agrégateur : ${r.cat}`);
       assert.ok(QUERIES[r.cat]?.length > 5, `la rubrique ${r.cat} n'a pas de requête`);
+    }
+  });
+
+  test("aucun e-mail ne part sans logo, sans coquille ni sans lien de désinscription", () => {
+    // ⚠️ IL Y AVAIT DEUX HABILLAGES écrits séparément — l'accusé d'inscription et la
+    // lettre du lundi — et ils avaient déjà divergé : la lettre affichait un lien
+    // « Se désinscrire » propre, l'accusé collait l'URL BRUTE, jeton de soixante-dix
+    // caractères compris, soit trois lignes vertes illisibles au bas du message.
+    //
+    // ⚠️ Et l'accusé partait en FRANÇAIS pour tout le monde, alors que la ligne d'avant
+    // venait d'écrire la langue choisie en base. Le premier message qu'une personne
+    // reçoit décide si elle fait confiance à la suite.
+    const base = "https://exemple.fr";
+    const lien = `${base}/api/newsletter/unsubscribe?e=x%40y.fr&t=abc`;
+    // Le lien traverse un échappement HTML : c'est `&amp;` qu'on doit retrouver, pas `&`.
+    // Chercher la chaîne brute rendait ce test faussement rouge.
+    const lienEch = lien.replace(/&/g, "&amp;");
+
+    for (const lg of LANGS_MAIL2) {
+      const c = emailConfirmation(lg, base, lien);
+      const h = courrierHebdo(
+        lg, [{ cle: "une", articles: [{ title: "T & U", source: "S", link: "https://ex.fr", resume: "R." }] }] as SectionMail2[],
+        [], lien, base,
+      );
+      for (const [quoi, e] of [["accusé", c], ["hebdo", h]] as [string, { html: string; objet: string }][]) {
+        assert.ok(e.html.includes("/icon.png"), `${quoi} sans logo en ${lg}`);
+        assert.ok(e.html.includes("#f4f4f5"), `${quoi} sans coquille en ${lg}`);
+        assert.ok(!e.html.includes("undefined"), `${quoi} : une clé manque en ${lg}`);
+        assert.ok(e.html.includes(`href="${lienEch}"`), `${quoi} sans lien de désinscription cliquable en ${lg}`);
+        // ⚠️ Le point qui a motivé ce test : une URL de 70 caractères affichée en toutes
+        // lettres. Le lien est fait pour être cliqué, pas lu.
+        assert.ok(!/>https?:\/\/[^<]{40,}</.test(e.html), `${quoi} affiche une URL brute en ${lg}`);
+        assert.ok(e.objet.trim().length > 8, `${quoi} sans objet en ${lg}`);
+      }
+      // L'accusé doit VRAIMENT changer de langue : cinq objets identiques trahiraient un
+      // dictionnaire branché mais jamais consulté.
+      if (lg !== "fr") {
+        assert.notEqual(c.objet, emailConfirmation("fr", base, lien).objet, `l'accusé reste en français pour ${lg}`);
+      }
     }
   });
 

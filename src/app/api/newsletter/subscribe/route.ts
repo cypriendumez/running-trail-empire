@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { lienDesinscription } from "@/lib/newsletter/token";
+import { emailConfirmation } from "@/lib/newsletter/confirmation";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -71,27 +72,17 @@ export async function POST(req: Request) {
     const BASE = process.env.NEXT_PUBLIC_APP_URL;
     if (CLE && FROM && BASE) {
       const lien = lienDesinscription(clean, BASE);
-      const html = `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:34rem;margin:0 auto;padding:2rem 1.5rem;color:#18181b">
-  <div style="font-size:.72rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#059669">Pacevo</div>
-  <h1 style="margin:1rem 0 .5rem;font-size:1.4rem;line-height:1.3">Tu es bien inscrit</h1>
-  <p style="margin:0 0 1rem;color:#52525b;line-height:1.7">Chaque lundi matin, tu recevras un résumé de l'actualité running et trail : les titres de la semaine, leur source, et le lien pour lire chez l'éditeur. Rien d'autre.</p>
-  <p style="margin:0 0 1.5rem;color:#52525b;line-height:1.7">C'est notre seul envoi récurrent. Nous n'utilisons pas cette adresse pour autre chose.</p>
-  <p style="margin:0;font-size:.8rem;color:#a1a1aa;line-height:1.6">Tu peux te désinscrire à tout moment, en un clic :<br><a href="${lien}" style="color:#059669">${lien}</a></p>
-</div>`;
-      const texte = `Tu es bien inscrit.
-
-Chaque lundi matin, tu recevras un résumé de l'actualité running et trail : les titres de la semaine, leur source, et le lien pour lire chez l'éditeur. Rien d'autre.
-
-C'est notre seul envoi récurrent. Nous n'utilisons pas cette adresse pour autre chose.
-
-Se désinscrire en un clic : ${lien}`;
+      // ⚠️ L'accusé partait en FRANÇAIS pour tout le monde, alors que la ligne juste
+      // au-dessus vient d'écrire la langue choisie en base. Le tout premier message
+      // qu'une personne reçoit décide si elle fait confiance à la suite.
+      const { objet, html, texte } = emailConfirmation(langue, BASE, lien);
       try {
         await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: { Authorization: `Bearer ${CLE}`, "Content-Type": "application/json" },
           body: JSON.stringify({
             from: FROM, to: [clean],
-            subject: "Tu es inscrit au résumé Pacevo",
+            subject: objet,
             text: texte, html,
             headers: { "List-Unsubscribe": `<${lien}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
           }),
