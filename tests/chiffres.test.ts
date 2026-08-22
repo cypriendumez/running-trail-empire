@@ -459,5 +459,33 @@ test("le détail d'une séance nomme l'appareil, jamais le canal de synchro", ()
   assert.match(ecran, /a\.device_name/, "l'écran de détail n'affiche plus l'appareil");
 });
 
+test("l'alerte de ressenti se trie d'un coup d'œil", () => {
+  // ⚠️ ELLE PARTAIT EN TEXTE BRUT — une ligne de puces, sans logo, sans hiérarchie. Or
+  // ce message a une fonction précise : un coach ne LIT pas ses alertes, il les BALAIE.
+  // Ce qui compte est de distinguer en une seconde « séance normale » de « douleur
+  // signalée à 9/10 ». Rien dans l'ancien message ne permettait ce tri.
+  const r = sansCommentaires(readFileSync(join(ROOT, "src/app/api/feedback/route.ts"), "utf8"));
+
+  // Le logo et la mise en page viennent de la coquille COMMUNE : trois habillages écrits
+  // séparément finiraient par diverger, comme l'accusé et la lettre l'avaient déjà fait.
+  assert.match(r, /coquilleEmail\(/, "l'alerte n'utilise pas la coquille commune — pas de logo");
+  assert.match(r, /html:/, "l'alerte repart en texte brut");
+  assert.match(r, /text:/, "la version texte a disparu : certains clients n'affichent pas le HTML");
+
+  // ⚠️ LE SEUIL EST POSÉ UNE SEULE FOIS, et il décide À LA FOIS de la couleur et de
+  // l'objet. Deux seuils écrits séparément finiraient par se contredire — un objet
+  // alarmant sur un message vert.
+  const seuils = [...r.matchAll(/r >= 8/g)].length;
+  assert.equal(seuils, 1, `le seuil d'alerte est écrit ${seuils} fois — une seule doit exister`);
+  assert.match(r, /const alerte = /, "le verdict n'est pas nommé");
+
+  // Et il doit VOYAGER JUSQU'À L'OBJET : c'est la seule partie visible dans une liste de
+  // messages, donc le seul endroit où le tri se fait vraiment.
+  assert.match(r, /subject: `\$\{alerte \?/, "l'objet ne porte pas le verdict");
+
+  // Répondre à l'alerte doit écrire à l'ATHLÈTE, pas à la boîte d'envoi.
+  assert.match(r, /reply_to:/, "impossible de répondre directement à l'athlète");
+});
+
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log(`  ✗ ${f}`); process.exit(1); }
