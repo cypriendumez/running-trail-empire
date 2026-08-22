@@ -101,20 +101,31 @@ const fail = (rule: string, sample: string) => {
 
 for (const { name, ctx } of scenarios) {
   const p = buildWeekPlan(ctx, new Date());
-  const hardIdx = p.map((d, i) => (HARD.test(d.type) || d.type === "Sortie longue" ? i : -1)).filter((i) => i >= 0);
 
-  if (p.length !== 7) fail("le plan ne fait pas 7 jours", name);
+  // ⚠️ TOUT CE BLOC RAISONNAIT SUR L'INDEX DU TABLEAU comme s'il valait le jour. C'était
+  // vrai tant qu'une journée donnait exactement une entrée. Ça ne l'est plus dès qu'une
+  // journée est DOUBLÉE — un footing scindé matin/soir, ou un renforcement posé en second
+  // sur un footing facile : l'index glisse d'un cran et « la veille » désigne le mauvais
+  // jour. On travaille donc sur les DATES, qui ne mentent pas.
+  const jours = [...new Set(p.map((d) => d.date))].sort();
+  const veille = (date: string) => { const x = new Date(date + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() - 1); return x.toISOString().slice(0, 10); };
+  const ecart = (a: string, b: string) => Math.abs(jours.indexOf(a) - jours.indexOf(b));
+  /** Les DATES portant au moins une séance dure. */
+  const joursDurs = [...new Set(p.filter((d) => HARD.test(d.type) || d.type === "Sortie longue").map((d) => d.date))].sort();
+  const estDur = new Set(joursDurs);
 
-  // Espacement : jamais deux jours durs consécutifs.
-  for (let k = 1; k < hardIdx.length; k++) {
-    if (hardIdx[k] - hardIdx[k - 1] < 2) fail("deux jours durs consécutifs", `${name} → ${p[hardIdx[k - 1]].type} puis ${p[hardIdx[k]].type}`);
+  if (jours.length !== 7) fail("le plan ne couvre pas 7 jours", `${name} → ${jours.length}`);
+
+  // Espacement : jamais deux JOURS durs consécutifs.
+  for (let k = 1; k < joursDurs.length; k++) {
+    if (ecart(joursDurs[k], joursDurs[k - 1]) < 2) fail("deux jours durs consécutifs", `${name} → ${joursDurs[k - 1]} puis ${joursDurs[k]}`);
   }
-  // Fraîcheur rouge : rien de dur le jour même.
-  if (ctx.readiness.level === "rouge" && (HARD.test(p[0].type) || p[0].type === "Sortie longue")) {
-    fail("séance dure malgré une fraîcheur rouge", `${name} → ${p[0].type}`);
+  // Fraîcheur rouge : rien de dur le PREMIER JOUR.
+  if (ctx.readiness.level === "rouge" && estDur.has(jours[0])) {
+    fail("séance dure malgré une fraîcheur rouge", `${name} → ${p.find((d) => d.date === jours[0])?.type}`);
   }
-  // Budget de qualité respecté.
-  const qCount = p.filter((d) => HARD.test(d.type)).length;
+  // Budget de qualité respecté — compté en JOURS, une journée doublée n'en vaut qu'un.
+  const qCount = new Set(p.filter((d) => HARD.test(d.type)).map((d) => d.date)).size;
   if (qCount > ctx.weekPlan.qBudget) fail("plus de qualité que le budget", `${name} → ${qCount} > ${ctx.weekPlan.qBudget}`);
   // Une qualité disponible ne doit pas s'évaporer sans raison.
   if (ctx.weekPlan.qBudget > 0 && qCount === 0 && ctx.availability.daysPerWeek >= 4 && (ctx.daysToRace == null || ctx.daysToRace > 3)) {
@@ -122,18 +133,20 @@ for (const { name, ctx } of scenarios) {
   }
   // Jour de course : rien de dur à moins de 2 jours.
   if (ctx.objective) {
-    const ri = p.findIndex((d) => d.date === ctx.objective!.raceDate);
-    if (ri >= 0) for (const i of hardIdx) {
-      if (Math.abs(i - ri) < 2 && i !== ri) fail("séance dure trop près de la course", `${name} → ${p[i].type} à ${Math.abs(i - ri)} j`);
+    const rd = ctx.objective.raceDate;
+    if (jours.includes(rd)) for (const jd of joursDurs) {
+      if (jd !== rd && ecart(jd, rd) < 2) fail("séance dure trop près de la course", `${name} → ${jd} à ${ecart(jd, rd)} j`);
     }
   }
-  // Jours de course à pied ≤ disponibilité déclarée.
-  const runDays = p.filter((d) => !/Repos|Renfo/.test(d.type)).length;
+  // Jours de COURSE À PIED ≤ disponibilité déclarée. Deux footings le même jour restent
+  // un seul jour de course : compter les entrées surestimait la charge d'une journée
+  // doublée et faisait échouer des scénarios parfaitement valides.
+  const runDays = new Set(p.filter((d) => !/Repos|Renfo/.test(d.type)).map((d) => d.date)).size;
   if (runDays > ctx.availability.daysPerWeek) fail("plus de sorties que de jours disponibles", `${name} → ${runDays} > ${ctx.availability.daysPerWeek}`);
-  // Renfo jamais la veille d'un jour dur.
-  p.forEach((d, i) => {
-    if (d.type === "Renfo" && p[i + 1] && HARD.test(p[i + 1].type)) fail("renfo la veille d'un jour dur", name);
-  });
+  // Renfo jamais la veille d'un jour dur — sur les DATES, pas sur l'index.
+  for (const r of p.filter((d) => d.type === "Renfo")) {
+    if (joursDurs.some((jd) => veille(jd) === r.date)) fail("renfo la veille d'un jour dur", `${name} → ${r.date}`);
+  }
 
 
   // ── Invariants de dosage ────────────────────────────────────────────────────

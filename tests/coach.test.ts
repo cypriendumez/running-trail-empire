@@ -276,8 +276,15 @@ test("une semaine entièrement caniculaire n'efface pas la qualité", () => {
 
 test("le plan couvre 7 jours et en confirme assez pour la montre", () => {
   const p = buildWeekPlan(ctx(), new Date());
-  assert.equal(p.length, 7);
-  assert.equal(p.filter((d) => d.confirmed).length, CONFIRMED_DAYS);
+  // ⚠️ ON COMPTE LES JOURS, PAS LES ENTRÉES, et c'est ce que dit le nom de ce test.
+  // L'assertion portait sur `p.length` — vrai tant qu'une journée valait une entrée.
+  // Elle est devenue fausse dès qu'une journée peut être DOUBLÉE : un footing scindé
+  // matin/soir, ou un renforcement posé en second sur un footing facile. Le plan couvre
+  // toujours sept jours ; il peut contenir huit ou neuf séances.
+  const jours = new Set(p.map((d) => d.date));
+  assert.equal(jours.size, 7, `le plan couvre ${jours.size} jours au lieu de 7`);
+  const joursConfirmes = new Set(p.filter((d) => d.confirmed).map((d) => d.date));
+  assert.equal(joursConfirmes.size, CONFIRMED_DAYS);
   assert.ok(CONFIRMED_DAYS >= 3, "trop peu d'avance pour absorber la synchro Garmin");
 });
 test("aucune valeur fabriquée dans le plan", () => {
@@ -3838,6 +3845,56 @@ test("l'IA propose, mais ne peut pas rouvrir l'intensité que le plan a fermée"
   // mais dont l'un a été allégé pour fatigue n'appellent pas le même conseil.
   assert.equal(empreintePlan(week, 2), empreintePlan(week, 2));
   assert.notEqual(empreintePlan(week, 2), empreintePlan(week, 0), "le budget doit périmer la mémorisation");
+});
+
+test("le renforcement ne disparaît pas chez ceux qui en ont le plus besoin", () => {
+  // ⚠️ IL DISPARAISSAIT EXACTEMENT LÀ OÙ IL COMPTE. Le placement cherchait un jour
+  // LIBRE, c'est-à-dire un jour où rien n'avait été posé — or le repos l'est déjà, comme
+  // séance à part entière. Un coureur à sept jours sur sept n'avait donc plus un seul
+  // créneau : mesuré, ZÉRO renfo sur un profil élite à 70 km, le profil le plus exposé à
+  // la blessure. Et le commentaire du code annonçait l'inverse : « 30 min à la maison
+  // restent possibles un jour de repos de course ».
+  const base = {
+    text: "", objective: null, daysToRace: null, weeksToRace: null, athleteName: "T",
+    vma: 16, thresholdPace: "4'10", easyPace: "5'20", hardGapHours: 48, lastHardDaysAgo: null,
+    weekPlan: { qBudget: 2, quality: [{ type: "VMA", desc: "VMA : 10×400 m" }], easyPace: "5'20", eased: false },
+    longRunMode: "run",
+    macroPlan: [{ week: 1, phase: "Développement", volumeKm: 40, quality: ["VMA"], longRunKm: 13, focus: "" }],
+    readiness: { level: "vert", reasons: [], advice: "" },
+    volume: { weekKm: 40, avg4wkKm: 38, targetKm: 40, longRunKm: 13 },
+    cycle: { deload: false, taper: false, label: "" }, skippedWeekdays: [],
+    availability: { daysPerWeek: 5, days: [0, 1, 2, 3, 4, 5, 6] },
+    forecast: [], tooMuchIntensity: null, hillyTraining: false,
+    altitude: { elevationM: null, lossPct: 0 }, warmCool: { warm: 15, cool: 10 },
+    heatAcclim: { hotDays: 0, factor: 1, label: "x" },
+  };
+  const mk = (o: Record<string, unknown>) => ({ ...base, ...o }) as unknown as AthleteContext;
+  const profils: [string, AthleteContext][] = [
+    ["5 j/sem", mk({})],
+    ["3 j/sem", mk({ availability: { daysPerWeek: 3, days: [1, 3, 6] }, volume: { weekKm: 25, avg4wkKm: 25, targetKm: 25, longRunKm: 10 } })],
+    // Le cas qui a motivé le correctif.
+    ["7 j/sem, 70 km", mk({ availability: { daysPerWeek: 7, days: [0, 1, 2, 3, 4, 5, 6] }, volume: { weekKm: 70, avg4wkKm: 68, targetKm: 70, longRunKm: 21 } })],
+    ["2 jours sautés", mk({ skippedWeekdays: [2, 4] })],
+    ["affûtage", mk({ cycle: { deload: false, taper: true, label: "affûtage" } })],
+  ];
+
+  for (const [nom, ctx] of profils) {
+    const plan = buildWeekPlan(ctx);
+    const renfos = plan.filter((d) => d.type === "Renfo");
+    assert.ok(renfos.length >= 1, `${nom} : aucune séance de renforcement dans la semaine`);
+    assert.ok(renfos.length <= 1, `${nom} : ${renfos.length} renforcements — un par semaine suffit`);
+
+    // ⚠️ ET IL DOIT RESTER BIEN PLACÉ. Un renfo la veille d'une séance dure gâche les
+    // deux : jambes lourdes le jour J, bénéfice de force non assimilé. Le rattrapage ne
+    // doit pas rouvrir ce que la règle principale ferme.
+    const dur = new Set(plan.filter((d) => /VMA|Seuil|Sp[ée]cifique|Allure|C[oô]te|Sortie longue/i.test(d.type)).map((d) => d.date));
+    for (const r of renfos) {
+      const j = new Date(r.date + "T00:00:00Z");
+      j.setUTCDate(j.getUTCDate() + 1);
+      assert.ok(!dur.has(j.toISOString().slice(0, 10)), `${nom} : renfo la veille d'un jour dur`);
+      assert.ok(r.title.trim().length > 0 && r.detail.trim().length > 0, `${nom} : renfo sans contenu`);
+    }
+  }
 });
 
 test("seule une séance NOUVELLE déclenche un e-mail", () => {

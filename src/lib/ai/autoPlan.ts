@@ -663,10 +663,59 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
     // Le matin AVANT le soir : les écrans trient par date, et deux séances de même
     // date doivent s'afficher dans l'ordre où elles se courent.
     if (doubles.length) {
-      return [...week, ...doubles].sort((a, b) =>
-        a.date.localeCompare(b.date) || (a.moment === "matin" ? -1 : b.moment === "matin" ? 1 : 0));
+      return sortir([...week, ...doubles]);
     }
   }
 
-  return week;
+  return sortir(week);
+
+  /**
+   * ── LE RENFORCEMENT DE SECOURS ─────────────────────────────────────────────
+   *
+   * ⚠️ IL DISPARAISSAIT CHEZ CEUX QUI EN ONT LE PLUS BESOIN. L'étape 6 cherche un jour
+   * LIBRE — `isFree`, c'est-à-dire un jour où rien n'a été posé. Or à ce stade le repos
+   * l'est déjà, comme séance à part entière. Un coureur qui court sept jours sur sept
+   * n'avait donc plus un seul créneau : mesuré, 0 renfo sur un profil élite à 70 km,
+   * alors que c'est précisément le profil le plus exposé à la blessure. Le commentaire
+   * de l'étape 6 annonçait pourtant l'inverse — « 30 min à la maison restent possibles
+   * un jour de repos de course ».
+   *
+   * Quand aucun jour n'est libre, le renforcement se pose donc EN SECOND sur un footing
+   * facile — ce que fait tout coureur à haut volume : de la force après une sortie
+   * facile, jamais la veille d'une séance dure.
+   *
+   * ⚠️ Trois interdits maintenus : pas la veille d'un jour dur (jambes lourdes le jour J,
+   * force non assimilée), pas sur la sortie longue, pas un jour de repos complet — ce
+   * repos-là est prescrit, pas une case vide.
+   */
+  function sortir(jours: PlanDay[]): PlanDay[] {
+    if (jours.some((d) => d.type === "Renfo")) return jours;
+
+    const dur = new Set(jours.filter((d) => /VMA|Seuil|Sp[ée]cifique|Allure|C[oô]te|Sortie longue/i.test(d.type)).map((d) => d.date));
+    const veilleDeDur = (date: string) => {
+      const d = new Date(date + "T00:00:00Z");
+      d.setUTCDate(d.getUTCDate() + 1);
+      return dur.has(d.toISOString().slice(0, 10));
+    };
+    const hote = jours.find((d) => d.type === "Endurance" && d.moment !== "matin" && !veilleDeDur(d.date));
+    if (!hote) return jours;
+
+    const rendu = (l: Lang): PlanDayText => ({
+      title: PLAN_T[l].renfoTitre,
+      // ⚠️ La version ALLÉGÉE, volontairement. Ce renforcement-là s'ajoute à un footing
+      // le même jour : y mettre de la force lourde ferait deux séances dures en une
+      // journée, ce que le plan passe son temps à éviter ailleurs.
+      detail: PLAN_T[l].renfoAffutage,
+      why: PLAN_T[l].renfoWhy,
+      tags: [PLAN_T[l].tags["Renfo"], PLAN_T[l].tags["Prévention"]],
+    });
+    const renfo: PlanDay = {
+      date: hote.date, type: "Renfo", moment: "soir",
+      ...rendu("fr"),
+      i18n: Object.fromEntries(AUTRES_LANGUES.map((l) => [l, rendu(l)])) as Partial<Record<Lang, PlanDayText>>,
+      confirmed: hote.confirmed,
+    };
+    return [...jours, renfo].sort((a, b) =>
+      a.date.localeCompare(b.date) || (a.moment === "matin" ? -1 : b.moment === "matin" ? 1 : 0));
+  }
 }
