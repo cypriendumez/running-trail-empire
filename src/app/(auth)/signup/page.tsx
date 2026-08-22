@@ -39,7 +39,7 @@ export default function SignupPage() {
     // arriver DEUX e-mails de confirmation.
     const rep = await fetch("/api/auth/confirmation", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: form.email, password: form.password, lang }),
+      body: JSON.stringify({ email: form.email, password: form.password, fullName: form.fullName, lang }),
     });
     const j = await rep.json().catch(() => null);
     // ⚠️ Un seul cas donne une vraie erreur : le mot de passe trop court. Tout le reste

@@ -21,7 +21,7 @@ import { emailInscription } from "@/lib/auth/emailConfirmation";
  * il ne sort d'ici que par l'e-mail.
  */
 export async function POST(req: Request) {
-  const { email, password, lang } = (await req.json().catch(() => ({}))) as { email?: string; password?: string; lang?: string };
+  const { email, password, fullName, lang } = (await req.json().catch(() => ({}))) as { email?: string; password?: string; fullName?: string; lang?: string };
   const adresse = String(email ?? "").trim().toLowerCase();
   // Réponse volontairement identique : on ne renseigne pas un annuaire.
   const ok = () => NextResponse.json({ ok: true });
@@ -49,7 +49,16 @@ export async function POST(req: Request) {
       type: "signup",
       email: adresse,
       password: mdp,
-      options: { redirectTo: `${BASE}/auth/confirm?next=/onboarding` },
+      options: {
+        // ⚠️ LE NOM DOIT VOYAGER ICI, et son absence a été une VRAIE régression.
+        // L'ancien `supabase.auth.signUp()` passait `data: { full_name }` ; en le
+        // remplaçant par cette route j'avais oublié de reporter le champ. Résultat :
+        // tout nouvel inscrit arrivait sans nom — le coach voyait une adresse e-mail à
+        // la place d'une personne, et l'avis publié aurait signé « Un coureur ».
+        // C'est la métadonnée que reprend le profil à la création du compte.
+        data: { full_name: String(fullName ?? "").trim().slice(0, 80) },
+        redirectTo: `${BASE}/auth/confirm?next=/onboarding`,
+      },
     } as Parameters<typeof admin.auth.admin.generateLink>[0]);
 
     const lien = (data as { properties?: { action_link?: string } } | null)?.properties?.action_link;
