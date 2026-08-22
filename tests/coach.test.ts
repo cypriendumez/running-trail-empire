@@ -42,6 +42,7 @@ import { decodeEntites, texteDuFlux } from "../src/lib/news/rss";
 import { lireRobots } from "../src/lib/news/robots";
 import { construireEmail, LANGS as LANGS_MAIL, type Section as SectionMail } from "../src/lib/newsletter/email";
 import { PLAFOND_JOUR } from "../src/lib/billing/aiQuota";
+import { contraintesDe, validerAjustement, empreintePlan } from "../src/lib/ai/ajustement";
 import { ppsExpiration, ppsVerdict, ppsDemandeAction, couvertureCourses, PPS_URL, PPS_PRIX_EUR, PPS_VALIDITE_MOIS } from "../src/lib/pps/status";
 import { PPS_T } from "../src/lib/pps/ppsI18n";
 import { PLAN_T, libelleType } from "../src/lib/ai/planI18n";
@@ -3797,6 +3798,48 @@ test("le silence est proscrit côté envoi, comme ailleurs", () => {
   // Le consentement est vérifié AVANT toute construction d'e-mail.
   assert.ok(src.indexOf("notif_coach") < src.indexOf("api.resend.com"), "le consentement doit précéder l'envoi");
 });
+test("l'IA propose, mais ne peut pas rouvrir l'intensité que le plan a fermée", () => {
+  // ⚠️ C'EST LE TEST QUI REND CET AJOUT ACCEPTABLE. Le plan de 7 jours est déterministe
+  // précisément pour qu'un modèle ne puisse pas prescrire du VMA à quelqu'un d'épuisé :
+  // le budget qualité est un plancher calculé sur l'ACWR et le TSB. Brancher une IA
+  // dessus rouvrait cette porte — sauf si sa proposition est confrontée aux MÊMES bornes
+  // avant d'être montrée.
+  const week = [
+    { date: "2026-08-22", type: "Endurance", title: "Footing" },
+    { date: "2026-08-23", type: "Seuil", title: "Seuil 3×8" },
+    { date: "2026-08-24", type: "Repos", title: "Repos" },
+  ];
+  const ouvert = contraintesDe(week, 2, ["VFC basse"]);
+  const ferme = contraintesDe(week, 0, ["ratio aigu:chronique à 1,4"]);
+  const long = "Ton seuil tombe deux jours après ta course : le décaler au samedi te laisse un jour de récupération de plus.";
+
+  // Budget ouvert : déplacer une séance est un conseil légitime.
+  const a = validerAjustement({ date: "2026-08-23", action: "decaler", texte: long }, ouvert);
+  assert.ok(a.ok && a.ajustement.action === "decaler");
+
+  // ⚠️ LE CŒUR. Budget à ZÉRO — fatigue réelle — déplacer une séance de qualité, c'est
+  // la reposer ailleurs dans la semaine. Seul l'allègement reste recevable.
+  const refus = validerAjustement({ date: "2026-08-23", action: "decaler", texte: long }, ferme);
+  assert.ok(!refus.ok, "un déplacement sur budget nul doit être REFUSÉ");
+  const allege = validerAjustement({ date: "2026-08-23", action: "alleger", texte: long }, ferme);
+  assert.ok(allege.ok, "alléger reste possible quand le budget est nul");
+
+  // Tout ce qui n'est pas explicitement autorisé est refusé : un modèle produit
+  // l'imprévu par construction, la liste de ce qu'il peut inventer n'est pas finie.
+  assert.ok(!validerAjustement({ date: "2026-08-23", action: "ajouter", texte: long }, ouvert).ok, "une action inventée doit être refusée");
+  assert.ok(!validerAjustement({ date: "2026-09-30", action: "decaler", texte: long }, ouvert).ok, "un jour hors du plan doit être refusé");
+  assert.ok(!validerAjustement({ date: "2026-08-23", action: "alleger", texte: "Repose-toi." }, ouvert).ok, "un texte sans explication doit être refusé");
+  assert.ok(!validerAjustement(null, ouvert).ok);
+  // « Rien à changer » est une réponse légitime, et souvent la bonne.
+  assert.ok(validerAjustement({ action: "rien", texte: long }, ferme).ok, "« rien à changer » doit passer");
+
+  // ⚠️ L'EMPREINTE EST CE QUI REND L'AJOUT RENTABLE : tant que le plan ne bouge pas, la
+  // réponse est resservie. Elle inclut le BUDGET — deux plans identiques sur le papier
+  // mais dont l'un a été allégé pour fatigue n'appellent pas le même conseil.
+  assert.equal(empreintePlan(week, 2), empreintePlan(week, 2));
+  assert.notEqual(empreintePlan(week, 2), empreintePlan(week, 0), "le budget doit périmer la mémorisation");
+});
+
 test("seule une séance NOUVELLE déclenche un e-mail", () => {
   // Le filet de nuit repasse à 3 h 30 sans qu'il se soit rien produit : écrire à cette
   // heure-là pour dire « ton plan est à jour » serait du bruit qui réveille.
@@ -4745,6 +4788,11 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
       // Le plan complet rend un JSON de plusieurs semaines : c'est la seule route qui
       // justifie un budget large, et elle n'est appelée qu'à la demande.
       "training-plan": 8192,
+      // L'ajustement rend DEUX PHRASES et un champ d'action. Le budget couvre le
+      // raisonnement interne de Gemini 2.5, pas un essai : c'est la route la plus
+      // susceptible d'être appelée souvent — chaque ouverture du plan — donc celle où
+      // un budget large se paierait le plus vite.
+      ajustement: 700,
     };
     for (const d of readdirSync("src/app/api/ai")) {
       const f = `src/app/api/ai/${d}/route.ts`;

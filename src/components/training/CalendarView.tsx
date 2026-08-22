@@ -11,6 +11,7 @@ import { RenfoGuide } from "@/components/training/RenfoGuide";
 import { fmtDistance, type UnitSystem } from "@/lib/units";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { libelleType } from "@/lib/ai/planI18n";
+import { AvisCoach } from "@/components/training/AvisCoach";
 
 /** Le même jour dans une autre langue — affichage seulement (cf. lib/ai/planI18n.ts). */
 export type PlannedText = { title?: string; subtitle?: string; why?: string; tags?: string[] };
@@ -397,7 +398,7 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
 
       <div className="mx-auto max-w-6xl px-5 py-6">
       {/* Pourquoi le plan ressemble à ça — voir le commentaire du type CoachState. */}
-      <CoachWhy state={coachState} lang={lang} t={t} />
+      <CoachWhy state={coachState} lang={lang} t={t} sessions={sessionsProp} />
 
       {/* Barre de contrôle : navigation période + bascule de vue */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -634,7 +635,7 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
  * On n'affiche rien s'il n'y a rien de notable à dire : un bandeau permanent redevient
  * un décor qu'on ne lit plus.
  */
-function CoachWhy({ state, lang, t }: { state: CoachState | null; lang: string; t: (k: string, p?: Record<string, string | number>) => string }) {
+function CoachWhy({ state, lang, t, sessions }: { state: CoachState | null; lang: string; t: (k: string, p?: Record<string, string | number>) => string; sessions: Planned[] }) {
   if (!state) return null;
   const noQuality = (state.qBudget ?? 1) === 0;
   // Qualité maintenue mais RACCOURCIE : cas intermédiaire qui n'existait pas. L'athlète
@@ -643,9 +644,26 @@ function CoachWhy({ state, lang, t }: { state: CoachState | null; lang: string; 
   const reasons = (state.reasons ?? []).filter(Boolean);
   const hasObjective = Boolean(state.objective?.race);
   const warnings = (state.warnings ?? []).filter(Boolean);
+  // Les 7 jours à venir, tels qu'on les enverra au coach. On borne à 7 : au-delà, c'est
+  // du prévisionnel que le plan réajustera de toute façon.
+  const aujourdhui = new Date().toISOString().slice(0, 10);
+  const semaine = sessions
+    .filter((d) => d.date >= aujourdhui)
+    .slice(0, 7)
+    .map((d) => ({ date: d.date, type: d.type, title: d.title }));
+
   // Rien d'anormal, pas d'objectif à rappeler ET rien à dire d'une séance récente → on
-  // se tait. Un bandeau permanent redevient un décor qu'on ne lit plus.
-  if (!noQuality && !easedQuality && !hasObjective && !warnings.length && !state.lastSession?.label) return null;
+  // ne déploie PAS le bandeau. Un bandeau permanent redevient un décor qu'on ne lit plus.
+  //
+  // ⚠️ Mais on garde le bouton d'avis, seul et discret : sans ça, une semaine normale —
+  // c'est-à-dire la majorité — ne verrait jamais que cette fonction existe. C'était le
+  // défaut du premier jet : la fonction était livrée et invisible pour presque tout le
+  // monde.
+  if (!noQuality && !easedQuality && !hasObjective && !warnings.length && !state.lastSession?.label) {
+    return semaine.length
+      ? <div className="mb-4"><AvisCoach week={semaine} qBudget={state.qBudget ?? 0} raisons={reasons} /></div>
+      : null;
+  }
 
   const tone = noQuality || easedQuality
     ? { border: "border-amber-200", bg: "bg-amber-50/70", dot: "text-amber-600", head: "text-amber-900", body: "text-amber-800" }
@@ -664,6 +682,8 @@ function CoachWhy({ state, lang, t }: { state: CoachState | null; lang: string; 
         <Sparkles className="h-3.5 w-3.5" /> {t("cal.why.title")}
       </div>
 
+      {/* L'avis du coach s'affiche SOUS les raisons : il commente une décision déjà
+          expliquée, il ne la remplace pas. */}
       {hasObjective && (
         <p className={`mt-2 text-sm ${tone.head}`}>
           <span className="font-semibold">{t("cal.why.objective")} :</span>{" "}
@@ -731,6 +751,8 @@ function CoachWhy({ state, lang, t }: { state: CoachState | null; lang: string; 
           </ul>
         </div>
       )}
+
+      <AvisCoach week={semaine} qBudget={state.qBudget ?? 0} raisons={reasons} />
     </div>
   );
 }
