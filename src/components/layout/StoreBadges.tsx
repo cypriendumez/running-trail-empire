@@ -54,7 +54,16 @@ const ATTENTE: Record<string, string> = {
  * NOIRS sur la photo du héros — présents dans le DOM, illisibles à l'œil. Une image de
  * badge officielle, elle, se lit sur les deux fonds : le ton ne concerne que le repli.
  */
-export function StoreBadges({ className = "", ton = "sombre" }: { className?: string; ton?: "clair" | "sombre" }) {
+export function StoreBadges({ className = "", ton = "sombre", attente = true }: {
+  className?: string; ton?: "clair" | "sombre";
+  /**
+   * Faut-il afficher la phrase « application mobile en préparation » quand il n'y a rien
+   * à télécharger ? ⚠️ Oui dans le PIED DE PAGE, où elle informe. Non dans le HÉROS :
+   * elle y tomberait sur la photo, en petit gris illisible, et une phrase d'attente sous
+   * le bouton principal affaiblit l'appel à l'action au lieu de l'aider.
+   */
+  attente?: boolean;
+}) {
   const { lang } = useT();
   const alt = ALT[lang] ?? ALT.fr;
   // `liensStore()` lit `process.env`, remplacé à la compilation pour les clés
@@ -67,6 +76,7 @@ export function StoreBadges({ className = "", ton = "sombre" }: { className?: st
   // n'y a rien pour lui — alors que le site fonctionne déjà sur son téléphone. On dit
   // donc l'état réel, et cette phrase disparaît d'elle-même dès qu'un badge s'allume.
   if (!ios && !android) {
+    if (!attente) return null;
     return (
       <p className={`text-center text-xs leading-relaxed text-zinc-400 ${className}`}>
         {ATTENTE[lang] ?? ATTENTE.fr}
