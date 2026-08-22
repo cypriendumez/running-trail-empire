@@ -11,6 +11,7 @@ import { Logo } from "@/components/brand/Logo";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { AUTH } from "@/components/auth/authI18n";
+import { fournisseursActifs } from "@/lib/auth/fournisseurs";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,6 +20,10 @@ export default function LoginPage() {
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<null | "google" | "apple">(null);
+  // ⚠️ Ni Google ni Apple n'étaient activés côté Supabase (vérifié le 22/08/2026) : les
+  // deux boutons échouaient à chaque clic. Ils ne s'affichent plus que si on les
+  // DÉCLARE — voir `lib/auth/fournisseurs`.
+  const oauth = fournisseursActifs(process.env.NEXT_PUBLIC_OAUTH);
   const { t, lang } = useT();
   const L = (AUTH[lang] ?? AUTH.fr).login;
 
@@ -80,8 +85,9 @@ export default function LoginPage() {
         </div>
 
         {/* Social Login */}
-        <div className="space-y-3 mb-6">
-          <button
+        {oauth.length > 0 && (<>
+<div className="space-y-3 mb-6">
+          {oauth.includes("google") && <button
             onClick={() => handleOAuth("google")}
             disabled={oauthLoading !== null}
             className="w-full btn-secondary justify-center gap-3 py-3 disabled:opacity-60"
@@ -97,8 +103,8 @@ export default function LoginPage() {
               </svg>
             )}
             {L.google}
-          </button>
-          <button
+          </button>}
+          {oauth.includes("apple") && <button
             onClick={() => handleOAuth("apple")}
             disabled={oauthLoading !== null}
             className="w-full btn-secondary justify-center gap-3 py-3 disabled:opacity-60"
@@ -111,7 +117,7 @@ export default function LoginPage() {
               </svg>
             )}
             {L.apple}
-          </button>
+          </button>}
         </div>
 
         <div className="flex items-center gap-3 mb-6">
@@ -119,6 +125,7 @@ export default function LoginPage() {
           <span className="text-xs text-zinc-400">{L.or}</span>
           <div className="flex-1 h-px bg-zinc-200" />
         </div>
+        </>)}
 
         {/* Email form */}
         <form onSubmit={handleSubmit} className="space-y-4">

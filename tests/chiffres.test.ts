@@ -30,6 +30,7 @@ import { accesDe, peut, JOURS_APERCU } from "../src/lib/billing/access";
 import { PRIX_AFFICHES } from "../src/lib/billing/prix";
 import { ATTRIBUTION_GARMIN, PAGES_ATTRIBUTION } from "../src/components/legal/attributionI18n";
 import { liensStore } from "../src/lib/brand/stores";
+import { fournisseursActifs } from "../src/lib/auth/fournisseurs";
 import { nomAffiche, refusDe, avisDe, litAvis, TEXTE_MIN } from "../src/lib/avis/store";
 
 const ROOT = join(import.meta.dirname, "..");
@@ -485,6 +486,36 @@ test("l'alerte de ressenti se trie d'un coup d'œil", () => {
 
   // Répondre à l'alerte doit écrire à l'ATHLÈTE, pas à la boîte d'envoi.
   assert.match(r, /reply_to:/, "impossible de répondre directement à l'athlète");
+});
+
+test("aucun bouton de connexion ne mène à un fournisseur éteint", () => {
+  // ⚠️ VÉRIFIÉ SUR SUPABASE LE 22/08/2026 : ni Google ni Apple n'étaient activés.
+  // `GET /auth/v1/authorize?provider=google` répondait « Unsupported provider: provider
+  // is not enabled ». Les DEUX boutons, placés tout en haut de la page de connexion —
+  // avant même le champ e-mail — échouaient à chaque clic. C'est la même faute que les
+  // faux avis et que le badge App Store : proposer ce qu'on ne peut pas rendre.
+  assert.deepEqual(fournisseursActifs(undefined), [], "sans déclaration, aucun bouton");
+  assert.deepEqual(fournisseursActifs(""), []);
+
+  // Chaque fournisseur est INDÉPENDANT : activer Google seul ne doit pas faire
+  // réapparaître Apple, dont l'activation demande un compte développeur payant.
+  assert.deepEqual(fournisseursActifs("google"), ["google"]);
+  assert.deepEqual(fournisseursActifs("google,apple"), ["google", "apple"]);
+
+  // Espaces et casse ne doivent pas décider : une variable d'environnement se recopie
+  // à la main, et « Google » vaut « google ».
+  assert.deepEqual(fournisseursActifs(" Apple , GOOGLE "), ["apple", "google"]);
+
+  // ⚠️ Et un nom inconnu ne crée PAS de bouton : `handleOAuth` ne saurait pas quoi en
+  // faire, et le visiteur cliquerait sur un bouton mort d'un genre nouveau.
+  assert.deepEqual(fournisseursActifs("github"), [], "un fournisseur non géré ne doit rien afficher");
+  assert.deepEqual(fournisseursActifs("google,github"), ["google"]);
+
+  // La page doit VRAIMENT s'en servir : exposer la fonction sans la brancher ne vaut rien.
+  const page = sansCommentaires(readFileSync(join(ROOT, "src/app/(auth)/login/page.tsx"), "utf8"));
+  assert.match(page, /fournisseursActifs\(/, "la page de connexion n'utilise pas le filtre");
+  assert.match(page, /oauth\.includes\("google"\)/, "le bouton Google n'est pas conditionné");
+  assert.match(page, /oauth\.includes\("apple"\)/, "le bouton Apple n'est pas conditionné");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
