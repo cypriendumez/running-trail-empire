@@ -400,6 +400,19 @@ test("ce que la page des tarifs promet, le verrou l'accorde vraiment", () => {
   assert.ok(peut("gratuit", "lecture"), "l'historique reste ouvert : on ne prend personne en otage");
 
   assert.ok(peut("starter", "plan") && peut("starter", "ia"), "Starter, c'est le coach complet");
+
+  // ⚠️ TROIS PROMESSES « PREMIUM » N'ÉTAIENT VERROUILLÉES NULLE PART. La page réservait
+  // les plans IA à la demande, le Smart Journal et les analyses détaillées à Premium
+  // dans les cinq langues ; les routes n'exigeaient que `ia`, que Starter possède aussi.
+  // Un client à 14,99 € recevait donc ce qu'un client à 9,99 € avait déjà, et la seule
+  // différence réelle était le volume d'appels. Une formule qui ne verrouille rien n'est
+  // pas une formule — et c'est le genre d'écart qu'un acheteur vérifie ligne à ligne.
+  for (const c of ["plan_ia", "journal", "analyse_longue"] as const) {
+    assert.ok(!peut("starter", c), `« ${c} » est annoncé Premium mais ouvert à Starter`);
+    assert.ok(peut("premium", c), `« ${c} » est annoncé Premium mais fermé à Premium`);
+    assert.ok(peut("essai", c), `l'essai doit montrer « ${c} », sinon il fait choisir par méconnaissance`);
+    assert.ok(!peut("gratuit", c), `« ${c} » est ouvert au palier gratuit`);
+  }
   // ⚠️ CE QUI SÉPARE LES DEUX FORMULES PAYANTES. Si Starter gagnait le GPX, Premium ne
   // se distinguerait plus que par un volume d'IA — trop peu pour justifier 5 € de plus.
   assert.ok(!peut("starter", "gpx"), "le GPX doit rester à Premium");

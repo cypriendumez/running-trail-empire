@@ -4856,7 +4856,10 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     // bornes, un JSON de trois champs — ils ne servent à rien : mesuré le 22/08/2026,
     // sans `thinkingBudget: 0` les 700 jetons partaient en réflexion et la réponse
     // sortait COUPÉE en plein JSON ; avec, elle est complète en 85 jetons.
-    const SANS_REFLEXION = ["ajustement"];
+    // ⚠️ `ai/session` l'utilisait DÉJÀ avant `ajustement` : la technique n'est pas neuve
+    // dans ce dépôt, seule la mesure l'était. Les deux sont figées ici pour qu'aucune ne
+    // le perde en silence.
+    const SANS_REFLEXION = ["ajustement", "session"];
     for (const d of SANS_REFLEXION) {
       const f = `src/app/api/ai/${d}/route.ts`;
       assert.ok(existsSync(f), `${d} : route introuvable`);
@@ -4916,7 +4919,15 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
         assert.ok(!/exigeAcces\(/.test(r.code), `${r.nom} : cette route doit rester ouverte (voir le commentaire)`);
         continue;
       }
-      assert.ok(/exigeAcces\(supabase, user\.id, "ia"\)/.test(r.code), `${r.nom} : route IA NON verrouillée`);
+      // ⚠️ LE MOTIF EXIGEAIT LA CAPACITÉ « ia » À LA LETTRE, et il a rougi le jour où
+      // trois routes ont reçu une capacité PLUS RESTRICTIVE — `plan_ia`, `journal`,
+      // parce que la page les annonçait Premium alors qu'elles étaient ouvertes à
+      // Starter. Le verrou était devenu plus serré, et le test le déclarait absent.
+      // Ce qui compte n'est pas LAQUELLE des capacités est exigée, c'est qu'il y en ait
+      // une : la répartition par palier est vérifiée dans `tests/chiffres.test.ts`.
+      const m = r.code.match(/exigeAcces\(supabase, user\.id, "(\w+)"\)/);
+      assert.ok(m, `${r.nom} : route IA NON verrouillée`);
+      assert.ok(m![1] !== "lecture", `${r.nom} : verrouillée sur « lecture », que tout le monde possède`);
       // Et le verrou doit précéder l'appel au modèle, sinon il ne protège pas la dépense.
       const appel = Math.min(...[r.code.indexOf("generateContent("), r.code.indexOf("await fetch(")]
         .filter((i) => i >= 0).concat([Number.MAX_SAFE_INTEGER]));

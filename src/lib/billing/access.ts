@@ -38,7 +38,10 @@ export type Capacite =
   | "apercu"   // les 2 prochains jours du plan, sans replanification ni montre
   | "plan"     // le plan complet de 7 jours, replanifié à chaque synchronisation
   | "gpx"      // Trail Builder et export GPX
-  | "ia";      // faire parler un modèle (analyse, kiné, journal, assistant)
+  | "ia"       // faire parler un modèle (analyse, kiné, coach, assistant)
+  | "plan_ia"  // demander un plan complet écrit par le modèle
+  | "journal"  // le Smart Journal et son analyse
+  | "analyse_longue"; // l'analyse de séance en version développée
 
 /**
  * Durée de l'essai du module IA, en jours.
@@ -159,9 +162,15 @@ const DROITS: Record<Acces, Capacite[]> = {
   gratuit: ["lecture", "apercu"],
   // L'essai montre le niveau Premium, GPX compris : juger le produit sur la formule
   // basse ferait choisir Starter par méconnaissance, ou renoncer.
-  essai: ["lecture", "apercu", "plan", "ia", "gpx"],
+  essai: ["lecture", "apercu", "plan", "ia", "gpx", "plan_ia", "journal", "analyse_longue"],
   starter: ["lecture", "apercu", "plan", "ia"],
-  premium: ["lecture", "apercu", "plan", "ia", "gpx"],
+  // ⚠️ TROIS FONCTIONS ANNONCÉES « PREMIUM » N'ÉTAIENT VERROUILLÉES NULLE PART :
+  // les plans IA à la demande, le Smart Journal et les analyses détaillées. La page les
+  // réservait à Premium dans les cinq langues ; les routes, elles, n'exigeaient que
+  // `ia` — que Starter possède aussi. Un client à 14,99 € recevait donc exactement ce
+  // qu'un client à 9,99 € avait déjà, et la seule différence réelle était le volume
+  // d'appels. Une formule qui ne verrouille rien n'est pas une formule.
+  premium: ["lecture", "apercu", "plan", "ia", "gpx", "plan_ia", "journal", "analyse_longue"],
 };
 
 /**

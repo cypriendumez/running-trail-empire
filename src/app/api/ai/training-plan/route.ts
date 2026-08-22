@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   // facture, parce que c'est la seule partie du produit dont le coût grandit avec
   // le nombre d'athlètes. Masquer le bouton côté interface ne suffirait pas — la
   // route resterait appelable à la main, et c'est l'appel qui coûte.
-  const refus = await exigeAcces(supabase, user.id, "ia");
+  const refus = await exigeAcces(supabase, user.id, "plan_ia");
   if (refus) return refus.reponse;
 
   const body = await req.json().catch(() => ({})) as { race_id?: string; target_time?: number };

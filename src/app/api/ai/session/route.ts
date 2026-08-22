@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { exigeAcces } from "@/lib/billing/guard";
+import { COLONNES_ACCES, profilPeut } from "@/lib/billing/access";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildAthleteContext, COACH_SYSTEM } from "@/lib/ai/coachContext";
 import { generateContent } from "@/lib/ai/gemini";
@@ -35,7 +36,7 @@ export async function POST() {
   const day = serverDay();
 
   // ── 1. Signaux + entrée mémorisée, en parallèle ───────────────────────────────
-  const [profileRow, workoutRow, hrvRow, sleepRow, objectiveRow, baselineRow, cacheRow] = await Promise.all([
+  const [profileRow, workoutRow, hrvRow, sleepRow, objectiveRow, baselineRow, cacheRow, accesRow] = await Promise.all([
     supabase.from("profiles").select(PROFILE_FINGERPRINT_COLUMNS.join(",")).eq("id", user.id).maybeSingle(),
     // `count: exact` + la dernière date : une séance importée fait bouger l'un des deux au
     // moins. Une simple RETOUCHE d'une séance déjà là (même date, même compte) ne périme
@@ -52,7 +53,10 @@ export async function POST() {
     // récente et la mise à jour suivante réécrit celle-là.
     supabase.from("notifications").select("id,data").eq("user_id", user.id).eq("type", SESSION_CACHE_TYPE)
       .order("created_at", { ascending: false }).limit(1),
+    // Le palier, dans le MÊME lot que le reste : pas un aller-retour de plus.
+    supabase.from("profiles").select(COLONNES_ACCES).eq("id", user.id).maybeSingle(),
   ]);
+  const acces = accesRow.data as Parameters<typeof profilPeut>[0];
   const cached = (cacheRow.data?.[0] ?? null) as { id?: string; data?: unknown } | null;
 
   const signals: SessionSignals = {
@@ -98,7 +102,17 @@ Réponds UNIQUEMENT par un objet JSON valide (aucun texte autour) :
     // privait de la moitié de la capacité disponible dès que le premier modèle saturait.
     const res = await generateContent(
       [{ role: "user", parts: [{ text: prompt }] }],
-      { temperature: 0.8, maxOutputTokens: 600, responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } },
+      {
+        temperature: 0.8,
+        // ⚠️ « Analyses longues et détaillées » était annoncé sous Premium dans les cinq
+        // langues, et n'existait NULLE PART dans le code : les deux formules payantes
+        // recevaient exactement la même analyse. C'est ici que la promesse devient vraie.
+        // La longueur du texte est le seul levier honnête — on ne dégrade pas la
+        // PERTINENCE d'une analyse selon ce qu'on paie, on en donne plus ou moins.
+        maxOutputTokens: profilPeut(acces, "analyse_longue") ? 600 : 380,
+        responseMimeType: "application/json",
+        thinkingConfig: { thinkingBudget: 0 },
+      },
     );
     if (!res.ok) {
       return NextResponse.json(
