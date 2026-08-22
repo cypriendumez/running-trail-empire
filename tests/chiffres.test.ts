@@ -26,7 +26,7 @@ import { JOURS_ESSAI } from "../src/lib/billing/access";
 import { ARTICLES } from "../src/app/blog/articles";
 import { ARTICLES_I18N } from "../src/app/blog/articlesI18n";
 import { LEGAL } from "../src/app/legalI18n";
-import { accesDe } from "../src/lib/billing/access";
+import { accesDe, peut, JOURS_APERCU } from "../src/lib/billing/access";
 import { PRIX_AFFICHES } from "../src/lib/billing/prix";
 import { ATTRIBUTION_GARMIN, PAGES_ATTRIBUTION } from "../src/components/legal/attributionI18n";
 import { liensStore } from "../src/lib/brand/stores";
@@ -386,6 +386,42 @@ test("un avis ne peut pas être fabriqué depuis le navigateur", () => {
   assert.ok(refusDe(0, "x".repeat(TEXTE_MIN)), "la note 0 doit être refusée");
   assert.ok(refusDe(6, "x".repeat(TEXTE_MIN)), "la note 6 doit être refusée");
   assert.equal(litAvis({ note: 11, texte: "ok" })?.note, 5, "une note aberrante doit être ramenée à 5");
+});
+
+test("ce que la page des tarifs promet, le verrou l'accorde vraiment", () => {
+  // ⚠️ LA PAGE ET LE CODE SONT DEUX SOURCES, et c'est le défaut le plus cher d'un site
+  // qui vend : promettre une fonction dans une formule qui ne l'ouvre pas, ou la
+  // fermer dans une formule qui la facture. Ce test relie les deux là où c'est
+  // vérifiable — les capacités, pas la prose.
+  assert.ok(!peut("gratuit", "ia"), "le gratuit ne doit RIEN consommer en IA");
+  assert.ok(!peut("gratuit", "plan"), "le gratuit ne doit pas avoir le plan complet");
+  assert.ok(!peut("gratuit", "gpx"), "le gratuit ne doit pas avoir l'export GPX");
+  assert.ok(peut("gratuit", "apercu"), "le gratuit doit voir un aperçu, sinon il ne peut pas juger le produit");
+  assert.ok(peut("gratuit", "lecture"), "l'historique reste ouvert : on ne prend personne en otage");
+
+  assert.ok(peut("starter", "plan") && peut("starter", "ia"), "Starter, c'est le coach complet");
+  // ⚠️ CE QUI SÉPARE LES DEUX FORMULES PAYANTES. Si Starter gagnait le GPX, Premium ne
+  // se distinguerait plus que par un volume d'IA — trop peu pour justifier 5 € de plus.
+  assert.ok(!peut("starter", "gpx"), "le GPX doit rester à Premium");
+  assert.ok(peut("premium", "gpx") && peut("premium", "plan") && peut("premium", "ia"));
+  // L'essai doit montrer le niveau le PLUS HAUT, sinon il fait choisir par méconnaissance.
+  for (const c of ["apercu", "plan", "ia", "gpx"] as const) {
+    assert.ok(peut("essai", c), `l'essai doit ouvrir « ${c} »`);
+  }
+
+  // L'aperçu doit rester un aperçu : sept jours, et il n'y a plus rien à vendre.
+  assert.ok(JOURS_APERCU >= 1 && JOURS_APERCU <= 3, `aperçu de ${JOURS_APERCU} jours — trop généreux ou vide`);
+
+  // Et la page ne doit pas annoncer le GPX dans le gratuit, dans AUCUNE langue.
+  const tarifs = readFileSync(join(ROOT, "src/components/landing/landingI18n.ts"), "utf8");
+  for (const m of tarifs.matchAll(/cle: "gratuit"[^}]*?features: \[([^\]]*)\]/g)) {
+    assert.ok(!/GPX|Trail Builder/i.test(m[1]), `le gratuit annonce le GPX : ${m[1].slice(0, 70)}`);
+  }
+  let premiumAvecGpx = 0;
+  for (const m of tarifs.matchAll(/cle: "premium"[^}]*?features: \[([^\]]*)\]/g)) {
+    if (/GPX/i.test(m[1])) premiumAvecGpx++;
+  }
+  assert.equal(premiumAvecGpx, 5, `le GPX n'est annoncé dans Premium que pour ${premiumAvecGpx} langue(s) sur 5`);
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

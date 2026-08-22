@@ -35,7 +35,9 @@ export type Acces =
 /** Ce qu'on cherche à faire. */
 export type Capacite =
   | "lecture"  // historique, courses, trophées, séries — toujours ouvert
-  | "plan"     // produire ou replanifier un entraînement
+  | "apercu"   // les 2 prochains jours du plan, sans replanification ni montre
+  | "plan"     // le plan complet de 7 jours, replanifié à chaque synchronisation
+  | "gpx"      // Trail Builder et export GPX
   | "ia";      // faire parler un modèle (analyse, kiné, journal, assistant)
 
 /**
@@ -144,11 +146,33 @@ export function accesDe(p: ProfilAcces | null | undefined, maintenant: number = 
  * son volume (PLAFOND_JOUR) sépare les deux formules payantes.
  */
 const DROITS: Record<Acces, Capacite[]> = {
-  gratuit: ["lecture"],
-  essai: ["lecture", "plan", "ia"],
-  starter: ["lecture", "plan", "ia"],
-  premium: ["lecture", "plan", "ia"],
+  // ⚠️ LE GRATUIT NE RECEVAIT RIEN, et c'était une impasse commerciale : un compte qui
+  // ne voit jamais le produit ne peut pas décider de le payer. Il reçoit maintenant un
+  // APERÇU — les 2 prochains jours seulement, recalculés une fois par jour, sans
+  // poussée sur la montre et sans un mot d'IA. De quoi comprendre ce que fait le coach,
+  // pas de quoi s'en passer.
+  //
+  // ⚠️ L'aperçu est construit à partir DES VRAIES DONNÉES de l'athlète, pas d'un
+  // squelette générique. Servir un plan « standard » qui ignore la VFC et le sommeil
+  // reviendrait à prescrire une séance de VMA à quelqu'un d'épuisé : le produit tout
+  // entier repose sur l'inverse, et ce serait le seul endroit où il mentirait.
+  gratuit: ["lecture", "apercu"],
+  // L'essai montre le niveau Premium, GPX compris : juger le produit sur la formule
+  // basse ferait choisir Starter par méconnaissance, ou renoncer.
+  essai: ["lecture", "apercu", "plan", "ia", "gpx"],
+  starter: ["lecture", "apercu", "plan", "ia"],
+  premium: ["lecture", "apercu", "plan", "ia", "gpx"],
 };
+
+/**
+ * Combien de jours de plan voit un compte gratuit.
+ *
+ * ⚠️ DEUX, pas sept. Assez pour voir la logique — une séance de qualité suivie de sa
+ * récupération — trop peu pour organiser une semaine, ce qui est précisément le service
+ * qu'on vend. Un chiffre plus généreux ne convertirait pas davantage : il retirerait la
+ * raison de payer.
+ */
+export const JOURS_APERCU = 2;
 
 export function peut(etat: Acces, quoi: Capacite): boolean {
   return DROITS[etat].includes(quoi);

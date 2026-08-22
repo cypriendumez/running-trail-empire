@@ -20,25 +20,6 @@ const ALT: Record<string, { ios: string; android: string }> = {
 };
 
 /**
- * CE QU'ON DIT TANT QU'IL N'Y A RIEN À TÉLÉCHARGER.
- *
- * ⚠️ La phrase commence par ce qui est VRAI AUJOURD'HUI — le site s'utilise déjà depuis
- * un téléphone — avant de mentionner ce qui n'existe pas encore. Une annonce qui ne
- * parlerait que de l'application à venir laisserait croire qu'il faut l'attendre pour
- * s'en servir, ce qui est faux et coûte des inscriptions.
- *
- * ⚠️ AUCUNE DATE. « Bientôt » ou « cet automne » est une promesse qu'on ne peut pas
- * tenir depuis un pied de page ; « en préparation » décrit un état, pas un engagement.
- */
-const ATTENTE: Record<string, string> = {
-  fr: "Pacevo s'utilise depuis ton navigateur, sur téléphone comme sur ordinateur. L'application mobile est en préparation.",
-  en: "Pacevo runs in your browser, on phone and desktop alike. The mobile app is in preparation.",
-  de: "Pacevo läuft im Browser, auf dem Handy wie am Rechner. Die mobile App ist in Vorbereitung.",
-  es: "Pacevo funciona en tu navegador, tanto en el móvil como en el ordenador. La app móvil está en preparación.",
-  pt: "A Pacevo funciona no teu navegador, no telemóvel como no computador. A aplicação móvel está em preparação.",
-};
-
-/**
  * Les badges des boutiques d'applications.
  *
  * ⚠️ Ils n'apparaissent que si l'adresse correspondante est renseignée — l'application
@@ -54,16 +35,7 @@ const ATTENTE: Record<string, string> = {
  * NOIRS sur la photo du héros — présents dans le DOM, illisibles à l'œil. Une image de
  * badge officielle, elle, se lit sur les deux fonds : le ton ne concerne que le repli.
  */
-export function StoreBadges({ className = "", ton = "sombre", attente = true }: {
-  className?: string; ton?: "clair" | "sombre";
-  /**
-   * Faut-il afficher la phrase « application mobile en préparation » quand il n'y a rien
-   * à télécharger ? ⚠️ Oui dans le PIED DE PAGE, où elle informe. Non dans le HÉROS :
-   * elle y tomberait sur la photo, en petit gris illisible, et une phrase d'attente sous
-   * le bouton principal affaiblit l'appel à l'action au lieu de l'aider.
-   */
-  attente?: boolean;
-}) {
+export function StoreBadges({ className = "", ton = "sombre" }: { className?: string; ton?: "clair" | "sombre" }) {
   const { lang } = useT();
   const alt = ALT[lang] ?? ALT.fr;
   // `liensStore()` lit `process.env`, remplacé à la compilation pour les clés
@@ -72,17 +44,10 @@ export function StoreBadges({ className = "", ton = "sombre", attente = true }: 
     NEXT_PUBLIC_APP_STORE_URL: process.env.NEXT_PUBLIC_APP_STORE_URL,
     NEXT_PUBLIC_PLAY_STORE_URL: process.env.NEXT_PUBLIC_PLAY_STORE_URL,
   });
-  // ⚠️ PAS `null`. Un pied de page muet sur le mobile laisse le visiteur supposer qu'il
-  // n'y a rien pour lui — alors que le site fonctionne déjà sur son téléphone. On dit
-  // donc l'état réel, et cette phrase disparaît d'elle-même dès qu'un badge s'allume.
-  if (!ios && !android) {
-    if (!attente) return null;
-    return (
-      <p className={`text-center text-xs leading-relaxed text-zinc-400 ${className}`}>
-        {ATTENTE[lang] ?? ATTENTE.fr}
-      </p>
-    );
-  }
+  // ⚠️ RIEN tant qu'il n'y a rien à télécharger. Une phrase d'attente a été essayée puis
+  // retirée sur décision de Cyprien : un badge qui ne mène nulle part et une annonce
+  // « bientôt » racontent la même chose, et aucune des deux ne rend service.
+  if (!ios && !android) return null;
 
   return (
     <div className={`flex flex-wrap items-center gap-3 ${className}`}>

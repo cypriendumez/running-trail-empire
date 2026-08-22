@@ -391,7 +391,7 @@ export default function LandingPage() {
                 Un lien de téléchargement qu'il faut dérouler toute la page pour trouver
                 ne sert à rien : sa place est sous le premier bouton. Ils restent AUSSI
                 en pied de page, comme sur la plupart des sites. */}
-            <StoreBadges className="mt-6" ton="clair" attente={false} />
+            <StoreBadges className="mt-6" ton="clair" />
           </div>
         </Container>
       </section>

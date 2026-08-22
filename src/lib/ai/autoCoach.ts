@@ -11,7 +11,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildAthleteContext } from "@/lib/ai/coachContext";
 import { buildWeekPlan, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
 import { pushIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
-import { profilPeut, COLONNES_ACCES } from "@/lib/billing/access";
+import { profilPeut, COLONNES_ACCES, JOURS_APERCU } from "@/lib/billing/access";
 
 type Admin = SupabaseClient;
 export type AutoResult = {
@@ -44,14 +44,26 @@ export async function autoCoachForUser(
   //  trophées, série, et le plan qui était en place. Il ne reçoit simplement plus de
   //  NOUVELLE prescription. On ne détruit rien, on cesse de produire.
   const { data: profilAcces } = await admin.from("profiles").select(COLONNES_ACCES).eq("id", userId).maybeSingle();
-  if (!profilPeut(profilAcces as Parameters<typeof profilPeut>[0], "plan")) {
+  const acces = profilAcces as Parameters<typeof profilPeut>[0];
+  const planComplet = profilPeut(acces, "plan");
+  // ⚠️ LE GRATUIT NE RECEVAIT RIEN — impasse commerciale : un compte qui ne voit jamais
+  // le produit ne peut pas décider de le payer. Il reçoit désormais un APERÇU de deux
+  // jours. Ce n'est PAS un plan générique : il sort des mêmes données que le plan
+  // complet, parce qu'un « plan standard » qui ignore la VFC prescrirait de la VMA à
+  // quelqu'un d'épuisé — l'exact contraire de ce que ce produit défend.
+  const apercu = !planComplet && profilPeut(acces, "apercu");
+  if (!planComplet && !apercu) {
     return { processed: false, reason: "essai_expire" };
   }
 
   const ctx = await buildAthleteContext(admin as unknown as Parameters<typeof buildAthleteContext>[0], userId).catch(() => null);
   if (!ctx) return { processed: false, reason: "ctx_failed" };
 
-  const week = buildWeekPlan(ctx);
+  // ⚠️ Tronqué APRÈS construction, jamais pendant : le squelette de semaine tient compte
+  // de l'enchaînement qualité → récupération. Le raccourcir en amont donnerait deux
+  // séances qui n'ont plus de sens l'une par rapport à l'autre.
+  const semaineComplete = buildWeekPlan(ctx);
+  const week = apercu ? semaineComplete.slice(0, JOURS_APERCU) : semaineComplete;
   const today = week[0].date;
 
   // ── LA SÉANCE DÉJÀ COURUE NE SE RÉÉCRIT PAS ─────────────────────────────────
@@ -116,7 +128,7 @@ export async function autoCoachForUser(
   let pushed = 0;
   const athleteId = opts.athleteId || process.env.INTERVALS_ICU_ATHLETE_ID;
   const apiKey = opts.apiKey || process.env.INTERVALS_ICU_API_KEY;
-  if (athleteId && apiKey) {
+  if (athleteId && apiKey && !apercu) {
     try {
       const { data: objRow } = await admin.from("notifications").select("data").eq("user_id", userId).eq("type", "race_objective").maybeSingle();
       const objectiveRace = ((objRow?.data as { race?: string } | undefined)?.race) || null;
@@ -159,8 +171,12 @@ export async function autoCoachForUser(
     .eq("user_id", userId).eq("type", "auto_coach_state").maybeSingle();
   const lastEmailAt = (prevState?.data as { lastPlanEmailAt?: string } | null)?.lastPlanEmailAt ?? null;
   let emailed = false;
-  let emailSkipped: string | undefined = opts.notify ? undefined : "replanification sans séance nouvelle";
-  if (opts.notify) {
+  // ⚠️ L'e-mail « ton plan est à jour » annonce SEPT jours de prescription. L'envoyer
+  // pour un aperçu de deux jours promettrait un service qui n'est pas celui du palier.
+  let emailSkipped: string | undefined = apercu
+    ? "aperçu gratuit"
+    : opts.notify ? undefined : "replanification sans séance nouvelle";
+  if (opts.notify && !apercu) {
     const { sendPlanReadyEmail } = await import("@/lib/notify/planReady");
     const r = await sendPlanReadyEmail(admin, {
       userId,

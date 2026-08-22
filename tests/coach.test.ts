@@ -3801,7 +3801,14 @@ test("seule une séance NOUVELLE déclenche un e-mail", () => {
   // Le filet de nuit repasse à 3 h 30 sans qu'il se soit rien produit : écrire à cette
   // heure-là pour dire « ton plan est à jour » serait du bruit qui réveille.
   const auto = codeOf("src/lib/ai/autoCoach.ts");
-  assert.ok(/if \(opts\.notify\)/.test(auto), "l'envoi n'est pas conditionné au drapeau notify");
+  // ⚠️ Le motif visait `if (opts.notify)` À LA LETTRE, et il a rougi le jour où une
+  // SECONDE condition s'est ajoutée — `&& !apercu`, pour qu'un aperçu gratuit de deux
+  // jours ne déclenche pas un e-mail annonçant sept jours de plan. La condition était
+  // devenue plus RESTRICTIVE, donc l'intention du test était mieux respectée qu'avant,
+  // et le test rougissait quand même. On exige donc que `opts.notify` garde le
+  // dernier mot, sans figer ce qui l'accompagne.
+  assert.ok(/if \(opts\.notify[^)]*\)/.test(auto), "l'envoi n'est plus conditionné au drapeau notify");
+  assert.ok(!/if \(!opts\.notify/.test(auto), "la condition a été inversée");
   const chain = codeOf("src/lib/intervals/syncAndCoach.ts");
   assert.ok(/notify: true/.test(chain), "la chaîne « séance inédite » ne demande pas la notification");
   // Le cron de nuit, lui, ne doit PAS demander de notification.
