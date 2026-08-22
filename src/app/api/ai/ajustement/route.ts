@@ -77,7 +77,21 @@ export async function POST(req: Request) {
 
   const res = await generateContent(
     [{ role: "user", parts: [{ text: `${CONSIGNE_AJUSTEMENT}\n\n${contexte}` }] }],
-    { temperature: 0.3, maxOutputTokens: 700 },
+    {
+      temperature: 0.3,
+      maxOutputTokens: 700,
+      // ⚠️ RAISONNEMENT DÉSACTIVÉ, et c'est ce qui rend cette route rentable. Gemini 2.5
+      // « pense » avant d'écrire, et ces jetons de réflexion sont FACTURÉS comme de la
+      // sortie — laquelle coûte huit fois l'entrée. Mesuré le 22/08/2026 sur le vrai
+      // prompt : sans ce réglage, 700 jetons partaient en réflexion et la réponse était
+      // COUPÉE en plein JSON (59 caractères) ; avec, la réponse est complète et tient en
+      // 85 jetons. Même qualité, coût divisé par une dizaine.
+      //
+      // Ça marche ici parce que la tâche est fermée : un plan, des bornes, un objet JSON
+      // de trois champs. Ne pas recopier ce réglage sur une route qui demande une
+      // analyse ouverte — le raisonnement y sert à quelque chose.
+      thinkingConfig: { thinkingBudget: 0 },
+    },
   );
   if (!res.ok) return NextResponse.json({ ok: false, error: "Modèle indisponible" }, { status: 503 });
 

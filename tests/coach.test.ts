@@ -4794,6 +4794,19 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
       // un budget large se paierait le plus vite.
       ajustement: 700,
     };
+    // ⚠️ ET UN RÉGLAGE QUI COMPTE AUTANT QUE LE PLAFOND. Les jetons de « réflexion » de
+    // Gemini 2.5 sont facturés COMME DE LA SORTIE. Sur une tâche fermée — un plan, des
+    // bornes, un JSON de trois champs — ils ne servent à rien : mesuré le 22/08/2026,
+    // sans `thinkingBudget: 0` les 700 jetons partaient en réflexion et la réponse
+    // sortait COUPÉE en plein JSON ; avec, elle est complète en 85 jetons.
+    const SANS_REFLEXION = ["ajustement"];
+    for (const d of SANS_REFLEXION) {
+      const f = `src/app/api/ai/${d}/route.ts`;
+      assert.ok(existsSync(f), `${d} : route introuvable`);
+      assert.match(codeOf(f), /thinkingBudget:\s*0/, `${d} : le raisonnement facturé n'est pas désactivé`);
+    }
+    {
+    };
     for (const d of readdirSync("src/app/api/ai")) {
       const f = `src/app/api/ai/${d}/route.ts`;
       if (!existsSync(f)) continue;
