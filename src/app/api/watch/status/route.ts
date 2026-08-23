@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { montreDe, lectureDe, type Lecture } from "@/lib/watch/intervals";
+import { identifiantsDe } from "@/lib/intervals/identifiants";
 
 const BASE = "https://intervals.icu/api/v1";
 const auth = (k: string) => ({ Authorization: "Basic " + Buffer.from(`API_KEY:${k}`).toString("base64") });
@@ -48,8 +49,13 @@ export async function GET() {
     .select("intervals_athlete_id, intervals_api_key")
     .eq("id", user.id)
     .single();
-  const ATHLETE_ID = profile?.intervals_athlete_id || process.env.INTERVALS_ICU_ATHLETE_ID;
-  const API_KEY = profile?.intervals_api_key || process.env.INTERVALS_ICU_API_KEY;
+  // ⚠️ AUCUN REPLI SUR LES VARIABLES D'ENVIRONNEMENT — voir `lib/intervals/identifiants`.
+  // Le `|| process.env.INTERVALS_ICU_*` qui était ici donnait le compte de l'ÉDITEUR à
+  // tout athlète qui n'a pas branché sa montre : ses séances partaient sur le poignet
+  // de l'éditeur, et il lisait les sorties de l'éditeur comme les siennes.
+  const ids = identifiantsDe(profile);
+  const ATHLETE_ID = ids?.athleteId;
+  const API_KEY = ids?.apiKey;
   if (!ATHLETE_ID || !API_KEY) return NextResponse.json({ connected: false, pushReady: false, device: null });
 
   try {

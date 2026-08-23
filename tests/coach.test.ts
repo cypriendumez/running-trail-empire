@@ -5364,11 +5364,28 @@ void (async () => {
 //  page et absent du contrôle, si bien qu'un porteur de Suunto voyait une pastille orange
 //  l'invitant à configurer une montre déjà configurée.
 //
-//  Ce test lie les deux. Promettre l'envoi à une marque que l'app ne sait pas reconnaître
-//  est un mensonge commercial ; reconnaître une marque qu'on ne promet pas est du code mort.
+//  Ce test lie les deux — mais dans UN SEUL SENS depuis le 23/08/2026, et il faut dire
+//  pourquoi, car l'égalité stricte d'origine paraissait plus sûre.
+//
+//  · PROMETTRE SANS SAVOIR RECEVOIR reste interdit, sans exception : c'est un mensonge
+//    commercial, et c'est le bug qu'on a payé avec Suunto.
+//  · DÉTECTER SANS PROMETTRE est désormais AUTORISÉ, et voulu. Cyprien a retiré Wahoo,
+//    Amazfit et Huawei de la page d'accueil le 23/08/2026 — décision éditoriale avant la
+//    vente du site : chaque marque affichée est une intégration que l'acheteur devra
+//    maintenir. Leurs champs `*_upload_workouts` existent toujours chez intervals.icu
+//    (revérifiés sur l'API le 23/08/2026), et l'app continue de les reconnaître et de leur
+//    envoyer la séance. Un porteur d'Amazfit n'a RIEN perdu ; il n'est simplement plus
+//    démarché. Supprimer ces trois lignes de `DESTINATIONS_MONTRE` « pour faire propre »
+//    lui rendrait au contraire une pastille orange et une séance au format Garmin.
+//
+//  L'exception est donc NOMMÉE, pas générique : une marque tue doit figurer dans
+//  `TUES_VOLONTAIREMENT`. Sans cette liste, un test en inclusion serait devenu aveugle —
+//  retirer Garmin de la page ne l'aurait plus fait rougir.
 // ─────────────────────────────────────────────────────────────────────────────
 console.log("\nMONTRES — la promesse de la landing et le contrôle de l'app disent la même chose");
-test("les marques annoncées comme recevant la séance sont exactement celles que l'app détecte", () => {
+/** Marques que l'app SAIT servir mais que la page n'annonce plus. Décision du 23/08/2026. */
+const TUES_VOLONTAIREMENT = ["wahoo", "amazfit", "huawei"];
+test("tout ce que la page promet, l'app sait le reconnaître", () => {
   // ⚠️ ANCRAGE : ce test visait auparavant le tableau EN LIGNE de `/api/watch/status`.
   // Ce tableau a été extrait dans `lib/watch/intervals.ts` pour servir de source unique —
   // et le test est devenu vert-aveugle sur une liste vide. On vise donc la source, qu'on
@@ -5377,8 +5394,14 @@ test("les marques annoncées comme recevant la séance sont exactement celles qu
   const promises = [...landing.matchAll(/\{\s*nom:\s*"([^"]+)"[^}]*pousse:\s*true[^}]*\}/g)]
     .map((m) => m[1].toLowerCase()).sort();
   const detectees = DESTINATIONS_MONTRE.map((d) => d.nom.toLowerCase()).sort();
-  assert.ok(promises.length >= 4, `la landing ne promet plus que ${promises.length} marque(s) — anomalie`);
-  assert.deepEqual(detectees, promises, `l'app détecte [${detectees}] mais la page promet [${promises}]`);
+  assert.ok(promises.length >= 3, `la landing ne promet plus que ${promises.length} marque(s) — anomalie`);
+  // SENS 1 — le mensonge commercial. Aucune exception possible.
+  const promisesNonDetectees = promises.filter((m) => !detectees.includes(m));
+  assert.deepEqual(promisesNonDetectees, [], `la page promet l'envoi à [${promisesNonDetectees}] que l'app ne sait pas reconnaître`);
+  // SENS 2 — le silence volontaire, qui doit rester NOMMÉ.
+  const detecteesNonPromises = detectees.filter((m) => !promises.includes(m));
+  assert.deepEqual(detecteesNonPromises.sort(), [...TUES_VOLONTAIREMENT].sort(),
+    `l'app sert [${detecteesNonPromises}] sans l'annoncer : soit la page doit le dire, soit la liste TUES_VOLONTAIREMENT doit l'assumer`);
 });
 test("on ne réclame pas un réglage à quelqu'un qui a déjà tout fait", () => {
   // ⚠️ UNE SEULE RÉPONSE COUVRAIT DEUX SITUATIONS OPPOSÉES. « Pastille orange, configure

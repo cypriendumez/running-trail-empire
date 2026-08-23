@@ -7,6 +7,7 @@ import { buildAthleteContext, classifyRun, type AthleteContext } from "@/lib/ai/
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthCoachLines } from "@/data/healthCatalog";
 import { terrainCoachBlock } from "@/data/terrainCatalog";
 import { estAdmin } from "@/lib/admin/acces";
+import { identifiantsDe } from "@/lib/intervals/identifiants";
 
 const BASE = "https://intervals.icu/api/v1";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -67,8 +68,13 @@ export async function POST(req: Request) {
   // elevation_pref) sont optionnelles — les nommer ferait échouer la requête tant que
   // la migration 007 n'est pas passée. Rien ne quitte le serveur (pas de clé exposée).
   const { data: p } = await admin.from("profiles").select("*").eq("id", user_id).single();
-  const ATH = p?.intervals_athlete_id || process.env.INTERVALS_ICU_ATHLETE_ID;
-  const KEY = p?.intervals_api_key || process.env.INTERVALS_ICU_API_KEY;
+  // ⚠️ AUCUN REPLI SUR LES VARIABLES D'ENVIRONNEMENT — voir `lib/intervals/identifiants`.
+  // Le `|| process.env.INTERVALS_ICU_*` qui était ici donnait le compte de l'ÉDITEUR à
+  // tout athlète qui n'a pas branché sa montre : ses séances partaient sur le poignet
+  // de l'éditeur, et il lisait les sorties de l'éditeur comme les siennes.
+  const ids = identifiantsDe(p);
+  const ATH = ids?.athleteId;
+  const KEY = ids?.apiKey;
   const prenom = (p?.full_name as string | undefined)?.split(" ")[0] || "l'athlète";
   if (!ATH || !KEY) return NextResponse.json({ error: "Intervals.icu non configuré" }, { status: 503 });
   if (!GEMINI_API_KEY) return NextResponse.json({ error: "IA non configurée" }, { status: 503 });

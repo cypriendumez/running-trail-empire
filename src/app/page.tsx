@@ -127,13 +127,13 @@ const STAT_VALUES = CHIFFRES_LANDING;
 // une marque affichée est une promesse d'intégration.
 //
 // `logo` désigne un fichier de `public/brands/`. Il reste OPTIONNEL : sans fichier, la
-// pastille affiche le NOM — c'est le cas d'Amazfit et Huawei.
+// pastille affiche le NOM en toutes lettres.
 //
 // ⚠️ CES FICHIERS SONT DES MARQUES DÉPOSÉES. Ils ont été retirés le 21/08/2026, puis
 // REMIS le même jour sur décision explicite de Cyprien, après qu'il ait été informé du
 // risque : citer le NOM d'une marque pour dire la compatibilité est un usage nominatif
 // admis, reproduire son LOGO est encadré par la charte de chaque titulaire — Apple étant
-// le plus strict des sept sur son symbole. C'est un arbitrage assumé, pas un oubli : ne
+// le plus strict des cinq sur son symbole. C'est un arbitrage assumé, pas un oubli : ne
 // pas les retirer « pour bien faire » sans lui en reparler.
 // `pousse` = la plateforme peut RECEVOIR la séance du jour, pas seulement livrer les
 // données. Les deux sens sont distincts et la page les confondait : sous un titre unique,
@@ -147,29 +147,42 @@ const STAT_VALUES = CHIFFRES_LANDING;
  *    et Suunto publient des chartes qui l'encadrent, et Apple est particulièrement strict
  *    sur son symbole. Le nom en toutes lettres dit exactement la même chose et ne demande
  *    l'autorisation de personne. Le site est mis en vente : ce risque ne vaut pas la
- *    brillance de sept images.
+ *    brillance de quelques images.
  *
  * 2. STRAVA RETIRÉ. Ce n'est pas une montre — c'est un journal d'activités. Sa place dans
  *    une rangée de montres laissait croire à un poignet.
  *
+ * 3. TROIS MARQUES RETIRÉES LE 23/08/2026 : Wahoo, Amazfit et Huawei. Décision
+ *    ÉDITORIALE de Cyprien, pas une correction technique — leurs champs d'envoi existent
+ *    bel et bien chez intervals.icu (`wahoo_upload_workouts`, `zepp_upload_workouts`,
+ *    `huawei_upload_workouts`, relevés à nouveau sur l'API le 23/08/2026) et l'application
+ *    continue de les reconnaître et de leur envoyer la séance. Ce qui disparaît, c'est la
+ *    PROMESSE PUBLIQUE : le site est mis en vente, et chaque marque affichée est une
+ *    intégration que l'acheteur devra maintenir. On n'annonce plus que les cinq qu'un
+ *    coureur de fond porte réellement.
+ *
+ * ⚠️ CONSÉQUENCE SUR L'INVARIANT, à ne pas défaire par mégarde. La page et le code ne
+ * sont plus en ÉGALITÉ : ils sont en INCLUSION. Tout ce que la page promet doit être
+ * détecté par l'application — promettre l'envoi à une marque qu'on ne sait pas reconnaître
+ * reste un mensonge commercial. L'inverse est désormais permis et VOULU : l'application
+ * livre plus qu'elle n'annonce. Le test `tests/coach.test.ts` porte cette asymétrie avec
+ * la liste explicite des marques tues.
+ *
  * Zwift reste dans cette liste mais N'EST PAS une pastille (`appli: true`) : il reçoit la
  * séance sans se porter. Il est annoncé sur sa propre ligne.
  *
- * `pousse` = cette marque REÇOIT la séance. Vérifié le 21/08/2026 sur l'API intervals.icu
- * elle-même (champs `*_upload_workouts`), pas sur le forum. Un test relie cette liste à
- * `DESTINATIONS_MONTRE` : les deux ne peuvent plus diverger.
+ * `pousse` = cette marque REÇOIT la séance. Vérifié le 21/08/2026 puis le 23/08/2026 sur
+ * l'API intervals.icu elle-même (champs `*_upload_workouts`), pas sur le forum.
  */
 const SYNC: { nom: string; logo?: string; passerelle?: boolean; appli?: boolean; pousse: boolean }[] = [
   { nom: "Garmin", logo: "garmin.svg", pousse: true },
   { nom: "COROS", logo: "coros.png", pousse: true },
   { nom: "Suunto", logo: "suunto.svg", pousse: true },
-  { nom: "Wahoo", logo: "wahoo.svg", pousse: true },
-  { nom: "Amazfit", pousse: true },
-  { nom: "Huawei", pousse: true },
   // ❌ POLAR NE REÇOIT PAS. Réponse de `david`, développeur d'intervals.icu, le
   // 23/12/2023 : « d'après la documentation de l'API Polar, il n'est pas possible
   // d'envoyer des séances planifiées ». Aucun champ `polar_upload_workouts` n'existe,
-  // vérifié sur l'API. La LECTURE, elle, fonctionne (`polar_sync_activities`).
+  // revérifié sur l'API le 23/08/2026 : Polar n'expose que `polar_sync_activities`,
+  // `polar_download_wellness` et `polar_scope`. La LECTURE, elle, fonctionne.
   { nom: "Polar", logo: "polar.svg", pousse: false },
   // Apple n'a AUCUN champ chez intervals.icu, dans aucun sens : tout passe par une
   // application iOS tierce. `passerelle` ajoute l'astérisque et la phrase d'explication.
@@ -427,7 +440,7 @@ export default function LandingPage() {
             </span>
           ))}
         </div>
-        {/* LES DEUX SENS, DITS SÉPARÉMENT. Sous un titre unique, les sept logos laissaient
+        {/* LES DEUX SENS, DITS SÉPARÉMENT. Sous un titre unique, les logos alignés laissaient
             croire que chacun fait la même chose. C'est faux dans un sens sur deux : Strava
             est un journal d'activités (rien à lui envoyer) et l'API publique de Polar
             n'accepte pas les séances planifiées. Les taire, c'est promettre à un porteur de

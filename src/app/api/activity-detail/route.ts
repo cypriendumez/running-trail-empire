@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { identifiantsDe } from "@/lib/intervals/identifiants";
 
 const BASE = "https://intervals.icu/api/v1";
 const STREAM_TYPES = "time,distance,heartrate,watts,cadence,altitude,velocity_smooth";
@@ -54,8 +55,13 @@ export async function POST(req: Request) {
 
   const admin = createAdminClient();
   const { data: p } = await admin.from("profiles").select("intervals_athlete_id, intervals_api_key").eq("id", user.id).single();
-  const ATH = p?.intervals_athlete_id || process.env.INTERVALS_ICU_ATHLETE_ID;
-  const KEY = p?.intervals_api_key || process.env.INTERVALS_ICU_API_KEY;
+  // ⚠️ AUCUN REPLI SUR LES VARIABLES D'ENVIRONNEMENT — voir `lib/intervals/identifiants`.
+  // Le `|| process.env.INTERVALS_ICU_*` qui était ici donnait le compte de l'ÉDITEUR à
+  // tout athlète qui n'a pas branché sa montre : ses séances partaient sur le poignet
+  // de l'éditeur, et il lisait les sorties de l'éditeur comme les siennes.
+  const ids = identifiantsDe(p);
+  const ATH = ids?.athleteId;
+  const KEY = ids?.apiKey;
   if (!ATH || !KEY) {
     const fb = await fromWorkout(admin, user.id, date.slice(0, 10), distance_km);
     return fb ? NextResponse.json(fb) : NextResponse.json({ error: "Connecte ta montre (intervals.icu) pour le détail complet." }, { status: 503 });

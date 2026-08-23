@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { buildWorkoutRow } from "@/lib/intervals/workoutRow";
 import { roleOf } from "@/lib/intervals/sport";
+import { identifiantsDe } from "@/lib/intervals/identifiants";
 
 const BASE = "https://intervals.icu/api/v1";
 
@@ -32,8 +33,13 @@ export async function GET(req: Request) {
     .eq("id", user.id)
     .single();
 
-  const ATHLETE_ID = profile?.intervals_athlete_id || process.env.INTERVALS_ICU_ATHLETE_ID;
-  const API_KEY = profile?.intervals_api_key || process.env.INTERVALS_ICU_API_KEY;
+  // ⚠️ AUCUN REPLI SUR LES VARIABLES D'ENVIRONNEMENT — voir `lib/intervals/identifiants`.
+  // Le `|| process.env.INTERVALS_ICU_*` qui était ici donnait le compte de l'ÉDITEUR à
+  // tout athlète qui n'a pas branché sa montre : ses séances partaient sur le poignet
+  // de l'éditeur, et il lisait les sorties de l'éditeur comme les siennes.
+  const ids = identifiantsDe(profile);
+  const ATHLETE_ID = ids?.athleteId;
+  const API_KEY = ids?.apiKey;
 
   if (!ATHLETE_ID || !API_KEY) {
     return NextResponse.json({ error: "Intervals.icu non configuré — ajoutez vos identifiants dans l'onglet Configuration" }, { status: 503 });

@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { pushIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
 import { getEffectiveVma } from "@/lib/ai/coachContext";
 import { estAdmin } from "@/lib/admin/acces";
+import { identifiantsDe } from "@/lib/intervals/identifiants";
 
 
 type SessionIn = { date: string; type?: string; title?: string; detail?: string; why?: string; feel?: string; tags?: string[] };
@@ -73,8 +74,13 @@ export async function POST(req: Request) {
   if (auto) return NextResponse.json({ ok: true, auto: true, count: rows.length, watchSent: 0 });
   try {
     const { data: prof } = await admin.from("profiles").select("*").eq("id", user_id).single();
-    const athleteId = (prof?.intervals_athlete_id as string | undefined) || process.env.INTERVALS_ICU_ATHLETE_ID;
-    const apiKey = (prof?.intervals_api_key as string | undefined) || process.env.INTERVALS_ICU_API_KEY;
+    // ⚠️ AUCUN REPLI SUR LES VARIABLES D'ENVIRONNEMENT — voir `lib/intervals/identifiants`.
+    // Le `|| process.env.INTERVALS_ICU_*` qui était ici donnait le compte de l'ÉDITEUR à
+    // tout athlète qui n'a pas branché sa montre : ses séances partaient sur le poignet
+    // de l'éditeur, et il lisait les sorties de l'éditeur comme les siennes.
+    const ids = identifiantsDe(prof);
+    const athleteId = ids?.athleteId;
+    const apiKey = ids?.apiKey;
     const warmMin = (prof?.warmup_min as number | null | undefined) ?? null;
     const coolMin = (prof?.cooldown_min as number | null | undefined) ?? null;
     if (athleteId && apiKey) {

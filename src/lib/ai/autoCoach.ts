@@ -12,6 +12,7 @@ import { buildAthleteContext } from "@/lib/ai/coachContext";
 import { buildWeekPlan, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
 import { pushIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
 import { profilPeut, COLONNES_ACCES, JOURS_APERCU } from "@/lib/billing/access";
+import { identifiantsDePaire } from "@/lib/intervals/identifiants";
 
 type Admin = SupabaseClient;
 export type AutoResult = {
@@ -126,8 +127,17 @@ export async function autoCoachForUser(
   // 3) Montre : SEULEMENT les jours confirmés. Pousser du prévisionnel encombrerait
   //    Garmin de séances qui vont changer avant d'être courues.
   let pushed = 0;
-  const athleteId = opts.athleteId || process.env.INTERVALS_ICU_ATHLETE_ID;
-  const apiKey = opts.apiKey || process.env.INTERVALS_ICU_API_KEY;
+  // ⚠️ AUCUN REPLI SUR LES VARIABLES D'ENVIRONNEMENT — voir `lib/intervals/identifiants`.
+  // C'EST ICI que le défaut se voyait le mieux : le `|| process.env.INTERVALS_ICU_*`
+  // faisait pousser le plan de CHAQUE athlète sans montre branchée dans le calendrier
+  // intervals.icu de l'éditeur. Relevé le 23/08/2026 sur son compte : deux séances pour
+  // le 23/08, `rte-coach-ef60cb0c-…` (la sienne) et `rte-coach-19ab4adf-…` (celle d'un
+  // autre inscrit). L'`external_id` porte l'identifiant de l'athlète, donc elles ne
+  // s'écrasaient pas — elles s'EMPILAIENT sur le poignet de l'éditeur, pendant que le
+  // client, lui, ne recevait rien et voyait « plan poussé sur ta montre ».
+  const ids = identifiantsDePaire(opts.athleteId, opts.apiKey);
+  const athleteId = ids?.athleteId;
+  const apiKey = ids?.apiKey;
   if (athleteId && apiKey && !apercu) {
     try {
       const { data: objRow } = await admin.from("notifications").select("data").eq("user_id", userId).eq("type", "race_objective").maybeSingle();
