@@ -31,6 +31,7 @@ import { PRIX_AFFICHES } from "../src/lib/billing/prix";
 import { ATTRIBUTION_GARMIN, PAGES_ATTRIBUTION } from "../src/components/legal/attributionI18n";
 import { liensStore } from "../src/lib/brand/stores";
 import { estAdmin, adminsAutorises, emailEditeur, ADMIN_PAR_DEFAUT } from "../src/lib/admin/acces";
+import { EDITEUR, HEBERGEUR_APP, PAYS_APP, SOUS_TRAITANTS } from "../src/lib/brand/editeur";
 import { fournisseursActifs } from "../src/lib/auth/fournisseurs";
 import { nomAffiche, refusDe, avisDe, litAvis, TEXTE_MIN } from "../src/lib/avis/store";
 
@@ -187,7 +188,9 @@ test("les mentions légales disent la même chose dans les 5 langues", () => {
   //
   // La LCEN impose de nommer l'hébergeur. Vercel Inc. est vérifié dans la politique de
   // confidentialité de Vercel elle-même — pas déduit du fait qu'on déploie chez eux.
-  const MARQUEURS = /\[(À RENSEIGNER|TO COMPLETE|AUSZUFÜLLEN|POR COMPLETAR|A PREENCHER)[^\]]*\]/g;
+  // Les anciens marqueurs restent listés : réintroduire un trou à l'ancienne mode doit
+  // encore être détecté, même si la fiche unique n'en produit plus qu'un seul.
+  const MARQUEURS = /\[(À COMPLÉTER|TO BE COMPLETED|À RENSEIGNER|TO COMPLETE|AUSZUFÜLLEN|POR COMPLETAR|A PREENCHER)[^\]]*\]/g;
 
   for (const [lg, doc] of Object.entries(LEGAL)) {
     const tout = JSON.stringify(doc);
@@ -201,9 +204,12 @@ test("les mentions légales disent la même chose dans les 5 langues", () => {
     const restants = tout.match(MARQUEURS) ?? [];
     assert.equal(restants.length, 1, `${restants.length} mentions à compléter en ${lg} : ${restants.join(" | ")}`);
     assert.ok(
-      /particulier|individual|Privatperson|particular/i.test(restants[0]),
+      /statut juridique|SIREN/i.test(restants[0]),
       `le trou restant en ${lg} n'est pas le statut juridique : ${restants[0]}`,
     );
+    // Le repère vient maintenant d'UNE fiche : il doit être identique partout. Deux
+    // formulations différentes voudraient dire que quelqu'un l'a recopié.
+    assert.equal(restants[0], EDITEUR.statut, `le repère à compléter diverge en ${lg}`);
   }
 });
 
@@ -579,6 +585,108 @@ test("la liste des administrateurs se configure sans redéployer", () => {
   // La variable ne doit JAMAIS être exposée au navigateur.
   assert.ok(!readFileSync(join(ROOT, "src/lib/admin/acces.ts"), "utf8").includes("NEXT_PUBLIC_ADMIN"),
     "la liste des administrateurs est exposée au navigateur");
+});
+
+const LANGUES = ["fr", "en", "de", "es", "pt"] as const;
+const toutesLesChaines = (lg: (typeof LANGUES)[number]) => {
+  const d = LEGAL[lg];
+  const out: string[] = [];
+  for (const page of [d.mentions, d.terms, d.privacy]) {
+    out.push(page.heading, ...(page.intro ?? []));
+    for (const s of page.sections) out.push(s.title, ...(s.paras ?? []), ...(s.list ?? []));
+  }
+  return out;
+};
+
+test("aucune page légale n'affiche un gabarit non résolu", () => {
+  // ⚠️ EN SORTANT LES FAITS DANS UNE FICHE UNIQUE, TROIS LANGUES ONT AFFICHÉ
+  // « Adresse: ${EDITEUR.adresse}, ${PAYS_EDITEUR.de} » EN TOUTES LETTRES. La chaîne
+  // était restée entre guillemets au lieu de devenir un gabarit : le code compilait, les
+  // tests passaient, et la page publiée montrait du code source à la place de l'adresse
+  // légale. Seul le RENDU le montrait — c'est donc le rendu qu'on vérifie.
+  const fautifs: string[] = [];
+  for (const lg of LANGUES) {
+    for (const c of toutesLesChaines(lg)) {
+      if (c.includes("${")) fautifs.push(`${lg} : ${c.slice(0, 70)}`);
+    }
+  }
+  assert.deepEqual(fautifs, [], `gabarit non résolu affiché : ${fautifs.join(" | ")}`);
+});
+
+test("l'identité légale de l'éditeur ne vit qu'à un endroit", () => {
+  // ⚠️ ELLE ÉTAIT RECOPIÉE ~35 FOIS : mentions légales, CGU et confidentialité en cinq
+  // langues, page contact, pied des lettres, texte RGPD des réglages. Une identité qui
+  // vit en trente-cinq exemplaires ne se met pas à jour : elle se met à jour À MOITIÉ.
+  // Le jour d'une cession, il reste des pages qui ENGAGENT l'ancien éditeur.
+  //
+  // Deux fichiers ont le droit de la porter, et pour des raisons différentes :
+  //  - `brand/editeur.ts` : l'identité PUBLIÉE (LCEN) ;
+  //  - `admin/acces.ts`   : le COMPTE qui ouvre l'espace coach, propriétaire par défaut.
+  // Ce sont deux notions distinctes — un repreneur peut publier une identité et se
+  // connecter avec un autre compte. On ne les fusionne pas, on les autorise séparément.
+  const autorises = ["src/lib/brand/editeur.ts", "src/lib/admin/acces.ts"];
+  const recopies: string[] = [];
+  const parcourir = (dir: string) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const chemin = join(dir, e.name);
+      if (e.isDirectory()) { parcourir(chemin); continue; }
+      if (!/\.tsx?$/.test(e.name)) continue;
+      const rel = chemin.slice(ROOT.length + 1);
+      if (autorises.includes(rel)) continue;
+      const src = readFileSync(chemin, "utf8");
+      if (src.includes(EDITEUR.email) || src.includes(EDITEUR.adresse)) recopies.push(rel);
+    }
+  };
+  parcourir(join(ROOT, "src"));
+  assert.deepEqual(recopies, [], `identité légale recopiée : ${recopies.join(", ")}`);
+});
+
+test("tout sous-traitant déclaré est réellement appelé par le code", () => {
+  // ⚠️ DÉCLARER UN TIERS QU'ON N'APPELLE JAMAIS trompe le lecteur d'une page qui engage ;
+  // appeler un tiers qu'on ne déclare pas est une faute au sens du RGPD. Les deux dérives
+  // se produisent en silence : personne ne relit une politique de confidentialité.
+  const fichiers: string[] = [];
+  const parcourir = (dir: string) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const chemin = join(dir, e.name);
+      if (e.isDirectory()) { parcourir(chemin); continue; }
+      // ⚠️ SAUF LA FICHE DE DÉCLARATION ELLE-MÊME. Sans cette exclusion, déclarer un
+      // sous-traitant imaginaire écrivait son hôte dans `src/` — et le test en concluait
+      // qu'il était appelé. Trouvé en mutant : le fantôme n'a rougi que sur la seconde
+      // assertion, pas sur celle qui devait le voir.
+      if (/\.tsx?$/.test(e.name) && !chemin.endsWith("brand/editeur.ts")) fichiers.push(readFileSync(chemin, "utf8"));
+    }
+  };
+  parcourir(join(ROOT, "src"));
+  const code = fichiers.join("\n");
+  const fantomes = SOUS_TRAITANTS.filter((s) => s.preuve && !code.includes(s.preuve)).map((s) => s.nom);
+  assert.deepEqual(fantomes, [], `sous-traitant déclaré mais jamais appelé : ${fantomes.join(", ")}`);
+
+  // Et chacun doit être nommé dans la politique de confidentialité, dans les 5 langues.
+  const absents: string[] = [];
+  for (const lg of LANGUES) {
+    const texte = toutesLesChaines(lg).join(" ");
+    for (const st of SOUS_TRAITANTS) if (!texte.includes(st.nom)) absents.push(`${lg}/${st.nom}`);
+  }
+  assert.deepEqual(absents, [], `sous-traitant appelé mais non déclaré : ${absents.join(", ")}`);
+});
+
+test("les cinq langues disent où le code serveur s'exécute vraiment", () => {
+  // ⚠️ LA POLITIQUE DISAIT « tes données sont hébergées dans l'Union européenne » et
+  // n'évoquait, hors UE, que Google, Anthropic et Stripe. VÉRIFIÉ EN PRODUCTION :
+  // l'en-tête `x-vercel-id` renvoie `cdg1::iad1::…` — `cdg1` n'est que le point d'entrée
+  // parisien, `iad1` est la région où le CODE S'EXÉCUTE, en Virginie. Autrement dit,
+  // toute donnée qui traverse une route de l'application est traitée aux États-Unis, et
+  // la section « transferts hors UE » ne le disait pas.
+  const manques: string[] = [];
+  for (const lg of LANGUES) {
+    const sec = LEGAL[lg].privacy.sections.find((s) => /^6\./.test(s.title));
+    const texte = (sec?.paras ?? []).join(" ");
+    if (!texte.includes(HEBERGEUR_APP.region)) manques.push(`${lg} : région d'exécution absente`);
+    if (!texte.includes(PAYS_APP[lg])) manques.push(`${lg} : pays d'exécution absent`);
+    if (!texte.includes(HEBERGEUR_APP.nom)) manques.push(`${lg} : hébergeur de l'application absent`);
+  }
+  assert.deepEqual(manques, [], manques.join(" | "));
 });
 
 test("les alertes suivent l'éditeur, elles ne restent pas chez l'ancien", () => {

@@ -1,5 +1,6 @@
 import { coquilleEmail, ligneDesinscription, ech } from "./gabarit";
 import type { ArticleResume } from "./resume";
+import { EDITEUR } from "@/lib/brand/editeur";
 
 /**
  * L'HABILLAGE DE LA LETTRE, DANS LES CINQ LANGUES.
@@ -74,7 +75,7 @@ type Chrome = {
  * l'occasion. Une mention de retrait qui pointe vers une boîte inexistante est pire que
  * pas de mention : elle affiche une voie de recours qui n'aboutit nulle part.
  */
-const CONTACT = "cypriendumez@outlook.fr";
+const CONTACT = EDITEUR.email;
 
 const T: Record<Lang, Chrome> = {
   fr: {

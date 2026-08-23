@@ -3,6 +3,7 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { getPublicLang } from "@/lib/i18n/serverLang";
 import type { Lang } from "@/lib/i18n/translations";
+import { EDITEUR, PAYS_EDITEUR } from "@/lib/brand/editeur";
 
 export const metadata: Metadata = {
   title: "Contact | Pacevo",
@@ -19,7 +20,7 @@ const C: Record<Lang, { title: string; sla: string; intro: string; email: string
 
 // Page PUBLIQUE (sans connexion). Coordonnées identiques aux mentions légales / RGPD.
 export default async function ContactPage() {
-  const EMAIL = "cypriendumez@outlook.fr";
+  const EMAIL = EDITEUR.email;
   const lang = await getPublicLang();
   const t = C[lang] ?? C.fr;
   return (
@@ -47,7 +48,7 @@ export default async function ContactPage() {
             <div className="rounded-2xl border border-zinc-200 bg-white p-5">
               <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">{t.editor}</p>
               <p className="mt-1 font-semibold text-zinc-900">Cyprien Dumez</p>
-              <p className="mt-1 text-sm text-zinc-500">28 avenue Pasteur<br />59130 Lambersart, France</p>
+              <p className="mt-1 text-sm text-zinc-500">{EDITEUR.adresse}, {PAYS_EDITEUR[lang] ?? PAYS_EDITEUR.fr}</p>
             </div>
           </div>
 

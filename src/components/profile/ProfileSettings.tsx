@@ -14,6 +14,7 @@ import { TERRAINS, terrainLabel } from "@/data/terrainCatalog";
 import type { Lang } from "@/lib/i18n/translations";
 import { JOURS_ESSAI } from "@/lib/billing/access";
 import { PRIX_AFFICHES, euros, MOIS_OFFERTS } from "@/lib/billing/prix";
+import { EDITEUR } from "@/lib/brand/editeur";
 import {
   User, Activity, Footprints, CreditCard, Target, Bell,
   Flame, TrendingUp, Zap, Trophy, Calendar, Plus, Trash2,
@@ -1129,7 +1130,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                   {tr("gdpr.privacy")}
                 </a>
               </div>
-              <p className="text-xs text-zinc-400">{tr("gdpr.delPre")}<b>cypriendumez@outlook.fr</b>{tr("gdpr.delPost")}</p>
+              <p className="text-xs text-zinc-400">{tr("gdpr.delPre")}<b>{EDITEUR.email}</b>{tr("gdpr.delPost")}</p>
             </div>
           </motion.div>
         )}
