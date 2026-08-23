@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { stripe, priceIdDe, estFormule, estPeriode, stripeConfigured } from "@/lib/stripe/client";
 import { createClient } from "@/lib/supabase/server";
+import { JOURS_ESSAI } from "@/lib/billing/access";
 
 export async function POST(req: Request) {
   try {
@@ -43,7 +44,26 @@ export async function POST(req: Request) {
       line_items: [{ price: priceIdDe(formule, periode), quantity: 1 }],
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?success=true`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing?cancelled=true`,
-      subscription_data: { metadata: { supabase_user_id: user.id } },
+      subscription_data: {
+        metadata: { supabase_user_id: user.id },
+        // ⚠️ SANS CETTE LIGNE, LE BOUTON MENTAIT. La page annonce « Essayer {JOURS_ESSAI}
+        // jours » sur les deux formules payantes, et le clic ouvrait une session Stripe
+        // SANS période d'essai : l'athlète était prélevé de 9,99 € dans la seconde. Une
+        // promesse d'essai suivie d'un débit immédiat est une pratique commerciale
+        // trompeuse, et c'est le premier motif d'opposition bancaire.
+        //
+        // La durée vient de `JOURS_ESSAI`, la même constante que l'essai gratuit affiché
+        // partout ailleurs : recopier « 7 » ici aurait créé la quatrième valeur d'essai
+        // du projet, après les 30/7/14 jours qu'on a déjà eu à nettoyer.
+        trial_period_days: JOURS_ESSAI,
+        // À la fin de l'essai, sans moyen de paiement valide, on ANNULE plutôt que de
+        // laisser un abonnement impayé traîner : l'athlète retombe sur le palier gratuit,
+        // ce qui est exactement ce que l'application sait faire.
+        trial_settings: { end_behavior: { missing_payment_method: "cancel" } },
+      },
+      // La carte est demandée dès l'inscription à l'essai — sinon rien ne se déclenche au
+      // huitième jour et l'essai devient un abonnement gratuit permanent.
+      payment_method_collection: "always",
       allow_promotion_codes: true,
       billing_address_collection: "auto",
       // TVA automatique : indispensable pour vendre un abonnement numérique dans toute

@@ -551,6 +551,29 @@ test("le webhook refuse tout événement non signé", () => {
     "sans secret configuré, le webhook doit REFUSER — l'accepter reviendrait à laisser n'importe qui offrir un abonnement");
   assert.ok(!/constructEvent\([^)]*!\)/.test(src), "le secret ne doit pas être forcé avec `!`");
 });
+test("« Essayer 7 jours » ouvre un vrai essai, pas un prélèvement immédiat", () => {
+  // ⚠️ LE DÉFAUT LE PLUS DANGEREUX DE LA CHAÎNE DE PAIEMENT, trouvé le 23/08/2026 avant
+  // toute mise en service. Les deux cartes payantes de /pricing portent le bouton
+  // « Essayer 7 jours », et la session Stripe ne posait AUCUNE période d'essai :
+  // l'athlète était prélevé de 9,99 € dans la seconde qui suit le clic.
+  //
+  // Une promesse d'essai suivie d'un débit immédiat est une pratique commerciale
+  // trompeuse, et c'est le premier motif d'opposition bancaire — des oppositions qui
+  // coûtent des frais ET abîment la réputation du compte Stripe.
+  const src = codeOf("src/app/api/stripe/checkout/route.ts");
+  assert.match(src, /trial_period_days:\s*JOURS_ESSAI/,
+    "la session Stripe n'ouvre pas d'essai : le bouton « Essayer » prélèverait immédiatement");
+  // ⚠️ LA CONSTANTE, JAMAIS LE NOMBRE. Recopier « 7 » ici créerait la quatrième valeur
+  // d'essai du projet — on a déjà eu à nettoyer 30, 7 et 14 jours annoncés en parallèle.
+  assert.ok(!/trial_period_days:\s*\d/.test(src), "la durée d'essai est écrite en dur au lieu de venir de JOURS_ESSAI");
+  // Sans carte demandée, rien ne se déclenche au huitième jour : l'essai deviendrait un
+  // abonnement gratuit permanent.
+  assert.match(src, /payment_method_collection:\s*"always"/, "la carte n'est pas demandée à l'ouverture de l'essai");
+  // Et le webhook doit accorder l'accès PENDANT l'essai, sinon l'athlète paie d'avance
+  // pour un produit qu'il ne peut pas essayer.
+  assert.match(codeOf("src/app/api/stripe/webhook/route.ts"), /"trialing"/,
+    "le webhook ne reconnaît pas le statut d'essai : l'accès serait refusé pendant l'essai");
+});
 test("un abonné peut changer de formule et résilier depuis l'application", () => {
   // ⚠️ LE TROU LE PLUS COÛTEUX DE LA CHAÎNE DE PAIEMENT, trouvé le 23/08/2026. La route
   // `/api/stripe/portal` était écrite depuis longtemps — et AUCUN écran ne l'appelait :
