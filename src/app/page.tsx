@@ -178,11 +178,29 @@ const SYNC: { nom: string; logo?: string; passerelle?: boolean; passerelleApp?: 
   { nom: "Garmin", logo: "garmin.svg", pousse: true },
   { nom: "COROS", logo: "coros.png", pousse: true },
   { nom: "Suunto", logo: "suunto.svg", pousse: true },
-  // ❌ POLAR NE REÇOIT PAS. Réponse de `david`, développeur d'intervals.icu, le
-  // 23/12/2023 : « d'après la documentation de l'API Polar, il n'est pas possible
-  // d'envoyer des séances planifiées ». Aucun champ `polar_upload_workouts` n'existe,
-  // revérifié sur l'API le 23/08/2026 : Polar n'expose que `polar_sync_activities`,
-  // `polar_download_wellness` et `polar_scope`. La LECTURE, elle, fonctionne.
+  // ❌ POLAR NE REÇOIT PAS, et la question a été reposée le 23/08/2026 (« avec la nouvelle
+  // mise à jour, est-ce que ça marche maintenant ? »). Non — vérifié sous quatre angles :
+  //
+  //  1. API intervals.icu : cinq champs `polar_*`, tous en lecture
+  //     (`polar_sync_activities`, `polar_download_wellness`, `polar_scope`,
+  //     `polar_sync_activity_types`, `polar_wellness_keys`). Aucun `polar_upload_workouts`,
+  //     alors que SEPT autres plateformes l'exposent.
+  //  2. ⚠️ LA PREUVE QUI COMPTE, ET QUI REMPLACE LE MESSAGE DE FORUM DE 2023 : l'API la
+  //     plus récente de POLAR elle-même — AccessLink Dynamic API v4 — est intégralement
+  //     EN LECTURE SEULE. Toutes ses portées se terminent par `:read`. Il existe bien un
+  //     `training_targets:read` : on peut LIRE les séances planifiées d'un athlète, jamais
+  //     en créer une. Aucun point d'entrée d'écriture n'existe. Ce n'est donc pas une
+  //     lacune d'intervals.icu, et personne ne peut la contourner.
+  //  3. La seule chaîne qui fonctionne est l'accord PRIVÉ Polar↔TrainingPeaks (annoncé en
+  //     mars 2025, toujours en bêta), négocié d'entreprise à entreprise comme ceux de
+  //     Strava et komoot — pas une API ouverte. Ni intervals.icu ni Pacevo n'y ont accès.
+  //     Et même là, Polar ne gère pas les PLAGES de cible, contrairement à Garmin, Suunto,
+  //     COROS et Apple.
+  //  4. Aucune passerelle tierce n'existe, et c'est structurel : sur iOS, WorkoutKit est
+  //     une API ouverte, donc un tiers a pu bâtir « Intervals Companion ». Polar n'a aucune
+  //     porte équivalente côté montre.
+  //
+  // La LECTURE, elle, fonctionne. Ne pas réessayer avant que Polar publie une API d'écriture.
   { nom: "Polar", logo: "polar.svg", pousse: false },
   // Apple n'a AUCUN champ chez intervals.icu, dans aucun sens — revérifié sur l'API le
   // 23/08/2026 : 162 champs, pas un seul `apple*`. Mais « pas de champ » ne veut PAS dire

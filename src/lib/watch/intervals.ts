@@ -11,9 +11,16 @@ const BASE = "https://intervals.icu/api/v1";
  *
  * ⚠️ RELEVÉ SUR L'API D'UN COMPTE RÉEL LE 21/08/2026 — pas sur le forum, pas de mémoire.
  * Les champs `*_upload_workouts` existent pour : garmin, coros, suunto, wahoo, zepp
- * (Amazfit), huawei et zwift. Polar n'en a AUCUN (son API n'accepte pas les séances
- * planifiées), Strava non plus (c'est un journal, pas une montre), Apple non plus
- * (aucun champ, nulle part : ses données passent par une application passerelle).
+ * (Amazfit), huawei et zwift. Polar n'en a AUCUN, Strava non plus (c'est un journal, pas
+ * une montre), Apple non plus (aucun champ, nulle part : ses données passent par une
+ * application passerelle).
+ *
+ * ⚠️ POUR POLAR, LA CAUSE EST CHEZ POLAR — revérifié le 23/08/2026 sur SA documentation,
+ * pas sur celle d'intervals.icu. Son API la plus récente (AccessLink Dynamic API v4) est
+ * intégralement en LECTURE SEULE : toutes les portées se terminent par `:read`, et le
+ * `training_targets:read` permet de LIRE une séance planifiée, jamais d'en créer une.
+ * Aucune passerelle tierce ne peut donc exister, contrairement à Apple où WorkoutKit est
+ * une API ouverte. Inutile de re-tester tant que Polar n'a pas publié d'API d'écriture.
  *
  * Trois destinations MANQUAIENT — Amazfit, Huawei et Zwift. Elles ne provoquaient pas
  * d'erreur : le porteur d'une Amazfit voyait simplement « aucune montre détectée » et
