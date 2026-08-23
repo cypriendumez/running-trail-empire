@@ -41,7 +41,7 @@ export async function generateMetadata(): Promise<Metadata> {
  * ⚠️ ET LE FICHIER EST FACULTATIF, à dessein. Un `<img>` vers un fichier absent affiche
  * une image cassée en production sans qu'aucune erreur ne remonte — le projet a déjà un
  * test pour ce défaut sur les logos de marques. Ici on VÉRIFIE l'existence au rendu : si
- * le fichier n'est pas là, la page se referme proprement sur ses chiffres.
+ * le fichier n'est pas là, la compilation échoue avant tout déploiement.
  */
 export default async function NotreHistoirePage() {
   const H = HISTOIRE[await getPublicLang()] ?? HISTOIRE.fr;
@@ -93,7 +93,10 @@ export default async function NotreHistoirePage() {
           Le repère de gauche porte une DATE, pas un numéro d'étape décoratif :
           l'ordre a un sens ici, et c'est la date qui le donne. Un « 01 / 02 / 03 »
           n'aurait rien ajouté que la mise en page ne dise déjà. */}
-      <Section className="pt-0 sm:pt-0">
+      {/* Rappel du piège plus haut : toute surcharge doit être doublée en `sm:`, sinon
+          le `sm:py-28` de `Section` la reprend au-dessus de 640 px. Le `pb` réduit ferme
+          l'écart laissé par le retrait du bloc de chiffres — 144 px de vide mesurés. */}
+      <Section className="pt-0 sm:pt-0 pb-6 sm:pb-8">
         <Container>
           <ol className="mx-auto max-w-2xl">
             {H.etapes.map((e, i) => (
@@ -109,25 +112,6 @@ export default async function NotreHistoirePage() {
               </li>
             ))}
           </ol>
-        </Container>
-      </Section>
-
-      {/* ── LES CHIFFRES ─────────────────────────────────────────────────────
-          Ils remplacent le portrait : sur une page « à propos », ce sont eux la
-          preuve, et ils sont tous relevés dans le compte réel (cf. histoireI18n). */}
-      <Section className="pt-6 sm:pt-8">
-        <Container>
-          <div className="mx-auto max-w-3xl rounded-3xl bg-zinc-50 p-8 ring-1 ring-inset ring-zinc-200 sm:p-10">
-            <h2 className="text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-400">{H.chiffresTitre}</h2>
-            <div className="mt-7 grid gap-7 sm:grid-cols-2">
-              {H.chiffres.map((c) => (
-                <div key={c.label} className="text-center sm:text-left">
-                  <div className="text-2xl font-bold tracking-tight tabular-nums text-zinc-900 sm:text-[28px]">{c.valeur}</div>
-                  <div className="mt-1 text-sm leading-snug text-zinc-500">{c.label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
         </Container>
       </Section>
 

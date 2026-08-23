@@ -363,21 +363,25 @@ test("la page « notre histoire » ne contient aucun chiffre invérifiable", () 
   assert.ok(!/39:23|39 [A-Za-zéÀ-ÿ]+ 23/.test(sansCom), "l'ancien chrono 39:23 est revenu");
   const prose = (sansCom.match(/39 [A-Za-zéÀ-ÿ]+ 13/g) ?? []).length;
   assert.equal(prose, 5, `le chrono en toutes lettres apparaît ${prose} fois au lieu de 5`);
+  // ⚠️ ET LE BLOC DE CHIFFRES NE DOIT PAS REVENIR SANS DÉCISION. Il a été retiré à la
+  // demande de Cyprien : une page d'origine n'a pas besoin d'un tableau de bord. Le
+  // remettre au détour d'une refonte de mise en page rétablirait des affirmations
+  // chiffrées qu'il a explicitement voulu retirer.
+  const pageSrc = readFileSync(join(ROOT, "src/app/notre-histoire/page.tsx"), "utf8");
+  assert.ok(!/chiffres/.test(pageSrc.replace(/\{\/\*[\s\S]*?\*\/\}/g, " ").replace(/\/\*[\s\S]*?\*\//g, " ")),
+    "le bloc de chiffres est revenu sur la page : il avait été retiré sur décision");
+  assert.ok(!/33:58|2[  ,]?786/.test(sansCom), "les chiffres du bloc retiré sont revenus dans le dictionnaire");
   // Les cinq langues doivent porter les MÊMES chiffres : une traduction qui arrondit
   // « 2 786 » en « près de 3 000 » créerait deux vérités selon la langue du visiteur.
   //
-  // ⚠️ ON COMPTE SUR LE TEXTE SEUL, ET ON EXIGE EXACTEMENT CINQ. Deux erreurs corrigées
-  // ici : compter sur le fichier BRUT gonflait le total avec le commentaire d'en-tête,
-  // qui cite les mêmes chiffres pour les justifier ; et un seuil `>= 5` restait vert
-  // quand une langue arrondissait « 2 786 » en « près de 3 000 », puisqu'il restait
-  // encore assez d'occurrences ailleurs. Cinq langues, cinq occurrences, pas quatre.
-  for (const c of ["33:58", "39:13", "268"]) {
-    const n = (sansCom.match(new RegExp(c, "g")) ?? []).length;
-    assert.equal(n, 5, `« ${c} » apparaît ${n} fois au lieu de 5 : une langue l'a perdu ou modifié`);
-  }
-  // Le kilométrage s'écrit avec des séparateurs différents selon la langue.
-  const km = (sansCom.match(/2[  ,]?786/g) ?? []).length;
-  assert.equal(km, 5, `le kilométrage apparaît ${km} fois au lieu de 5 : une langue l'a arrondi`);
+  // ⚠️ LE BLOC DE CHIFFRES A ÉTÉ RETIRÉ le 23/08/2026, sur demande de Cyprien. Les
+  // assertions qui comptaient « 33:58 », « 2 786 km », « 268 » et « 3 pays » ont donc
+  // disparu avec lui — les garder aurait exigé la présence de valeurs que la page
+  // n'affiche plus, et j'aurais été tenté de les remettre pour faire passer le test.
+  // Un test ne dicte pas le contenu ; il garde ce que le contenu affirme.
+  //
+  // Ce qui reste vérifiable, et qui reste vérifié : le chrono du récit, sous ses DEUX
+  // formes, et l'absence des chiffres écartés faute de preuve.
 });
 test("la page dit POURQUOI l'application existe, pas seulement qu'elle existe", () => {
   // ⚠️ C'EST LE CŒUR ARGUMENTAIRE DE LA PAGE, et il n'était couvert par aucun test :

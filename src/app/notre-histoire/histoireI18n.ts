@@ -13,12 +13,16 @@ import type { Lang } from "@/lib/i18n/translations";
  * pourquoi il est construit comme ça. Le parcours du fondateur sert de preuve, il n'est
  * pas le sujet. Le texte reste vrai après la vente.
  *
- * ⚠️ CHAQUE CHIFFRE EST VÉRIFIÉ DANS LE COMPTE RÉEL, relevé sur intervals.icu le
- * 23/08/2026 : 268 sorties, 2 786 km depuis le 26/04/2025, un 10 km en 33:58 le
- * 04/04/2026, et le Tour du Mont-Blanc du 14 au 18/07/2025 — 83 km, D+6 087 m, 19 h de
- * marche sur 5 jours. Le 39:13 de septembre 2023 est antérieur à la synchronisation :
- * c'est le seul chiffre de cette page qui repose sur la parole de Cyprien, et il est
- * présenté comme un souvenir daté, pas comme une mesure.
+ * ⚠️ LE BLOC DE CHIFFRES A ÉTÉ RETIRÉ le 23/08/2026, sur demande de Cyprien. Il
+ * affichait « 39:13 → 33:58 », « 2 786 km », « 268 sorties » et « 3 pays ». Ne pas le
+ * remettre sans lui : une page d'origine n'a pas besoin d'un tableau de bord, et le récit
+ * porte déjà ce qu'il faut.
+ *
+ * Ce qui subsiste en chiffres, dans la PROSE, et ce qu'il vaut : le 39:13 de
+ * septembre 2023 est antérieur à la synchronisation intervals.icu (qui commence le
+ * 26/04/2025). C'est le seul chiffre de la page qui repose sur la parole de Cyprien, et
+ * il est présenté comme un souvenir daté, pas comme une mesure. Tout le reste du récit
+ * est qualitatif — donc invérifiable par nature, mais aussi inattaquable.
  *
  * ⚠️ LE TOUR DU MONT-BLANC : DEUX PRÉCAUTIONS, ET AUCUNE N'EST DÉCORATIVE.
  *
@@ -54,11 +58,7 @@ export type HistoirePage = {
   titre: string;
   accent: string;
   chapo: string;
-  /** Les repères, dans l'ordre. Le numéro d'étape n'est pas décoratif : c'est une
-   *  chronologie, et l'ordre porte le sens. */
   etapes: { annee: string; titre: string; texte: string }[];
-  chiffresTitre: string;
-  chiffres: { valeur: string; label: string }[];
   fermetureTitre: string;
   fermeture: string;
   cta: string;
@@ -100,13 +100,6 @@ export const HISTOIRE: Record<Lang, HistoirePage> = {
         texte: "Lille sera mon premier marathon, et là, s'informer ne suffisait plus. Tout ce que j'avais appris était général : des principes, des pourcentages, des semaines types. Ce dont j'avais besoin, c'était d'une séance précise pour demain, tenant compte de ma nuit, de ma fatigue et de ce que j'avais couru la veille. Ma montre mesurait déjà tout — variabilité cardiaque, sommeil, charge, allures — et rien ne transformait ces mesures en décision. Alors j'ai construit Pacevo, en apprenant à coder avec l'intelligence artificielle comme copilote.",
       },
     ],
-    chiffresTitre: "Ce que ça a donné",
-    chiffres: [
-      { valeur: "39:13 → 33:58", label: "sur 10 km, entre 2023 et avril 2026" },
-      { valeur: "2 786 km", label: "courus et synchronisés" },
-      { valeur: "268", label: "sorties enregistrées" },
-      { valeur: "3 pays", label: "le Tour du Mont-Blanc, juillet 2025" },
-    ],
     fermetureTitre: "Aujourd'hui",
     fermeture: "Le marathon de Lille approche, et l'application s'entraîne avec moi. C'est aussi la règle que je m'impose : aucune fonctionnalité n'est ajoutée si je ne m'en sers pas moi-même pour préparer une course.",
     cta: "Essayer Pacevo",
@@ -125,13 +118,6 @@ export const HISTOIRE: Record<Lang, HistoirePage> = {
       { annee: "July 2025", titre: "The Tour du Mont-Blanc, on a whim", texte: "With Louis we walked the whole Tour du Mont-Blanc, decided almost overnight. The complete loop around the massif, from Saint-Gervais to Courmayeur and on to Orsières: three countries in a week on foot. No race, no stopwatch — but that is where you understand what endurance means, and why recovery matters as much as training." },
       { annee: "No club, no coach", titre: "I wanted to improve, and nobody was there to tell me how", texte: "My business studies never left me time to join a club. No club meant no coach — and yet the urge to improve on every run, to push further at every start line. So I taught myself: books, hours of videos, and above all long conversations with the runners around me. I ended up understanding training, recovery and nutrition." },
       { annee: "My first marathon", titre: "I needed precise sessions, not theory", texte: "Lille will be my first marathon, and there, reading up was no longer enough. Everything I had learned was general: principles, percentages, template weeks. What I needed was a precise session for tomorrow, accounting for my night, my fatigue and what I had run the day before. My watch already measured everything — heart-rate variability, sleep, load, paces — and nothing turned those measurements into a decision. So I built Pacevo, learning to code with artificial intelligence as a copilot." },
-    ],
-    chiffresTitre: "What came of it",
-    chiffres: [
-      { valeur: "39:13 → 33:58", label: "over 10K, between 2023 and April 2026" },
-      { valeur: "2,786 km", label: "run and synced" },
-      { valeur: "268", label: "recorded runs" },
-      { valeur: "3 countries", label: "the Tour du Mont-Blanc, July 2025" },
     ],
     fermetureTitre: "Today",
     fermeture: "The Lille marathon is coming, and the app trains alongside me. That is the rule I hold myself to: no feature ships unless I use it myself to prepare for a race.",
@@ -152,13 +138,6 @@ export const HISTOIRE: Record<Lang, HistoirePage> = {
       { annee: "Ohne Verein, ohne Trainer", titre: "Ich wollte besser werden, und niemand sagte mir wie", texte: "Mein Wirtschaftsstudium ließ mir nie Zeit für einen Verein. Kein Verein hieß kein Trainer – und trotzdem der Wunsch, bei jedem Lauf besser zu werden und bei jedem Start über mich hinauszugehen. Also habe ich es mir selbst beigebracht: Bücher, stundenlange Videos und vor allem lange Gespräche mit den Läufern um mich herum. Nach und nach verstand ich Training, Erholung und Ernährung." },
       { annee: "Mein erster Marathon", titre: "Ich brauchte genaue Einheiten, keine Theorie", texte: "Lille wird mein erster Marathon, und da reichte Nachlesen nicht mehr. Alles Gelernte war allgemein: Prinzipien, Prozentwerte, Musterwochen. Gebraucht hätte ich eine genaue Einheit für morgen, die meine Nacht, meine Müdigkeit und den Lauf von gestern berücksichtigt. Meine Uhr maß längst alles – Herzratenvariabilität, Schlaf, Belastung, Tempo – und nichts machte daraus eine Entscheidung. Also habe ich Pacevo gebaut und dabei das Programmieren mit künstlicher Intelligenz als Kopilot gelernt." },
     ],
-    chiffresTitre: "Was daraus wurde",
-    chiffres: [
-      { valeur: "39:13 → 33:58", label: "über 10 km, zwischen 2023 und April 2026" },
-      { valeur: "2 786 km", label: "gelaufen und synchronisiert" },
-      { valeur: "268", label: "aufgezeichnete Läufe" },
-      { valeur: "3 Länder", label: "die Tour du Mont-Blanc, Juli 2025" },
-    ],
     fermetureTitre: "Heute",
     fermeture: "Der Marathon von Lille rückt näher, und die App trainiert mit. Das ist auch meine Regel: keine Funktion, die ich nicht selbst zur Wettkampfvorbereitung nutze.",
     cta: "Pacevo testen",
@@ -178,13 +157,6 @@ export const HISTOIRE: Record<Lang, HistoirePage> = {
       { annee: "Sin club, sin entrenador", titre: "Quería progresar y nadie estaba ahí para decirme cómo", texte: "Mis estudios de comercio nunca me dejaron tiempo para apuntarme a un club. Sin club no hay entrenador — y sin embargo las ganas de mejorar en cada salida, de superarme en cada dorsal. Así que me formé solo: libros, horas de vídeos y, sobre todo, largas conversaciones con los corredores de mi entorno. Acabé entendiendo el entrenamiento, la recuperación y la nutrición." },
       { annee: "Mi primer maratón", titre: "Necesitaba sesiones precisas, no teoría", texte: "Lille será mi primer maratón, y ahí informarse ya no bastaba. Todo lo aprendido era general: principios, porcentajes, semanas tipo. Lo que necesitaba era una sesión precisa para mañana, teniendo en cuenta mi noche, mi fatiga y lo que había corrido la víspera. Mi reloj ya lo medía todo — variabilidad cardíaca, sueño, carga, ritmos — y nada convertía esas medidas en una decisión. Así que construí Pacevo, aprendiendo a programar con la inteligencia artificial como copiloto." },
     ],
-    chiffresTitre: "Lo que dio de sí",
-    chiffres: [
-      { valeur: "39:13 → 33:58", label: "en 10 km, entre 2023 y abril de 2026" },
-      { valeur: "2 786 km", label: "corridos y sincronizados" },
-      { valeur: "268", label: "salidas registradas" },
-      { valeur: "3 países", label: "el Tour del Mont Blanc, julio de 2025" },
-    ],
     fermetureTitre: "Hoy",
     fermeture: "El maratón de Lille se acerca y la aplicación entrena conmigo. Es también la regla que me impongo: ninguna función se añade si yo mismo no la uso para preparar una carrera.",
     cta: "Probar Pacevo",
@@ -203,13 +175,6 @@ export const HISTOIRE: Record<Lang, HistoirePage> = {
       { annee: "Julho de 2025", titre: "A Volta ao Monte Branco, por impulso", texte: "Com o Louis fizemos a Volta ao Monte Branco inteira, a caminhar, decidida quase de um dia para o outro. A volta completa ao maciço, de Saint-Gervais a Courmayeur e depois Orsières: três países numa semana a pé. Nenhuma prova, nenhum crono — mas é ali que se percebe o que é a resistência, e porque a recuperação conta tanto como o treino." },
       { annee: "Sem clube, sem treinador", titre: "Queria progredir e ninguém estava lá para me dizer como", texte: "Os meus estudos de comércio nunca me deixaram tempo para entrar num clube. Sem clube não há treinador — e mesmo assim a vontade de melhorar em cada saída, de me superar em cada dorsal. Formei-me sozinho: livros, horas de vídeos e, sobretudo, longas conversas com os corredores à minha volta. Acabei por perceber o treino, a recuperação e a nutrição." },
       { annee: "A minha primeira maratona", titre: "Precisava de treinos precisos, não de teoria", texte: "Lille será a minha primeira maratona, e aí informar-me deixou de chegar. Tudo o que tinha aprendido era geral: princípios, percentagens, semanas-tipo. O que me faltava era um treino preciso para amanhã, a contar com a minha noite, o meu cansaço e o que tinha corrido na véspera. O meu relógio já media tudo — variabilidade cardíaca, sono, carga, ritmos — e nada transformava essas medidas numa decisão. Foi assim que construí a Pacevo, aprendendo a programar com a inteligência artificial como copiloto." },
-    ],
-    chiffresTitre: "O que daí resultou",
-    chiffres: [
-      { valeur: "39:13 → 33:58", label: "em 10 km, entre 2023 e abril de 2026" },
-      { valeur: "2 786 km", label: "corridos e sincronizados" },
-      { valeur: "268", label: "saídas registadas" },
-      { valeur: "3 países", label: "a Volta ao Monte Branco, julho de 2025" },
     ],
     fermetureTitre: "Hoje",
     fermeture: "A maratona de Lille aproxima-se e a aplicação treina comigo. É também a regra que me imponho: nenhuma funcionalidade entra se eu próprio não a usar para preparar uma prova.",
