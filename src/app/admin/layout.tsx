@@ -1,10 +1,11 @@
 export const dynamic = "force-dynamic";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { MessageNotifier } from "@/components/messages/MessageNotifier";
-import { MfaGate } from "@/components/admin/MfaGate";
+import { AppareilGate } from "@/components/admin/AppareilGate";
 import { estAdmin } from "@/lib/admin/acces";
-import { etatMfa } from "@/lib/admin/mfa";
+import { COOKIE_APPAREIL, appareilExige, verifierAppareil } from "@/lib/admin/appareil";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -15,23 +16,30 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   /**
-   * ⚠️ UN MOT DE PASSE SEUL NE LIE RIEN À UN APPAREIL. Cet espace ouvre les factures des
-   * clients, leurs données personnelles et le chiffre d'affaires : toute machine où la
-   * session reste ouverte y donne accès.
+   * ⚠️ UN MOT DE PASSE NE LIE RIEN À UNE MACHINE. Cet espace ouvre les factures des
+   * clients, leurs données personnelles et le chiffre d'affaires : toute session restée
+   * ouverte ailleurs y donne accès. L'appareil doit avoir été scellé une fois.
    *
-   * ⚠️ MAIS ON N'EXIGE LE CODE QUE SI UN FACTEUR EST DÉJÀ VÉRIFIÉ. L'imposer à quelqu'un
-   * qui n'en a jamais configuré le mettrait dehors de son propre espace, sans recours.
-   * Tant qu'il n'y en a pas, le bandeau insiste et laisse passer.
+   * ⚠️ MAIS TANT QUE LES SECRETS NE SONT PAS POSÉS, ON NE VÉRIFIE RIEN : exiger un jeton
+   * avant que la configuration existe enfermerait l'éditeur dehors, sans recours.
    */
-  const mfa = await etatMfa(supabase);
-  if (!mfa.ouvert) {
-    return <MfaGate configure={mfa.configure} ouvert={false} />;
+  const configure = appareilExige();
+  const verdict = configure
+    ? verifierAppareil({
+        secret: String(process.env.ADMIN_DEVICE_SECRET),
+        userId: user!.id,
+        jeton: (await cookies()).get(COOKIE_APPAREIL)?.value,
+      })
+    : ({ ok: true } as const);
+
+  if (configure && !verdict.ok) {
+    return <AppareilGate configure reconnu={false} motif={"motif" in verdict ? verdict.motif : undefined} />;
   }
 
   return (
     <>
       <MessageNotifier />
-      <MfaGate configure={mfa.configure} ouvert />
+      <AppareilGate configure={configure} reconnu />
       {children}
     </>
   );

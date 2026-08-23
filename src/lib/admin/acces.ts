@@ -87,20 +87,27 @@ export function emailEditeur(): string {
 }
 
 /**
- * LE CONTRÔLE COMPLET D'UNE ROUTE D'ADMINISTRATION : bonne adresse ET second facteur.
+ * LE CONTRÔLE COMPLET D'UNE ROUTE D'ADMINISTRATION : bonne adresse ET appareil scellé.
  *
- * ⚠️ SANS ÇA, LA DOUBLE AUTHENTIFICATION NE PROTÉGERAIT QUE LES PAGES. Les routes d'API
+ * ⚠️ SANS ÇA, LA PROTECTION PAR APPAREIL NE COUVRIRAIT QUE LES PAGES. Les routes d'API
  * s'appellent directement : une session restée ouverte sur une machine tierce ouvrirait
  * les factures et le chiffre d'affaires sans jamais croiser l'écran qui réclame le code.
  * Une porte verrouillée à côté d'une fenêtre ouverte ne protège rien.
  */
 export async function gardeAdmin(): Promise<{ id: string; email: string } | null> {
   const { createClient } = await import("@/lib/supabase/server");
-  const { etatMfa } = await import("@/lib/admin/mfa");
+  const { cookies } = await import("next/headers");
+  const { COOKIE_APPAREIL, appareilExige, verifierAppareil } = await import("@/lib/admin/appareil");
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!estAdmin(user?.email)) return null;
-  const mfa = await etatMfa(sb);
-  if (!mfa.ouvert) return null;
+  if (appareilExige()) {
+    const v = verifierAppareil({
+      secret: String(process.env.ADMIN_DEVICE_SECRET),
+      userId: user!.id,
+      jeton: (await cookies()).get(COOKIE_APPAREIL)?.value,
+    });
+    if (!v.ok) return null;
+  }
   return { id: user!.id, email: String(user!.email) };
 }

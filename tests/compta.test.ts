@@ -8,6 +8,7 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { createHmac } from "node:crypto";
 import { join } from "node:path";
 import {
   enCentimes, euros, valider, totaux, tvaDe, cotisationsEstimees, soldeCumule, versCSV,
@@ -17,7 +18,7 @@ import {
 import { ecrituresDeLEvenement, dateParis, type EvenementStripe } from "../src/lib/compta/stripe";
 import { validerFichier, cheminDe, cheminAppartientA, BUCKET, TAILLE_MAX } from "../src/lib/compta/pieces";
 import { interpreterLecture, jsonDeLaReponse, CONSIGNE_LECTURE } from "../src/lib/compta/lecture";
-import { aalDuJeton } from "../src/lib/admin/mfa";
+import { signerAppareil, verifierAppareil, codeValide, appareilExige } from "../src/lib/admin/appareil";
 
 const ROOT = join(__dirname, "..");
 let passed = 0;
@@ -668,51 +669,94 @@ test("la lecture ne peut rien enregistrer", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Second facteur
+//  Appareil de confiance
 // ─────────────────────────────────────────────────────────────────────────────
 
-const jeton = (charge: object) =>
-  "x." + Buffer.from(JSON.stringify(charge)).toString("base64url") + ".y";
+const SECRET = "secret-de-test-quelconque";
+const UID = "utilisateur-1";
 
-test("le niveau d'authentification se lit dans le jeton, sans le croire sur parole", () => {
-  assert.equal(aalDuJeton(jeton({ aal: "aal2" })), "aal2");
-  assert.equal(aalDuJeton(jeton({ aal: "aal1" })), "aal1");
-  // ⚠️ Une valeur inattendue ne vaut PAS « aal2 ». Un jeton sans revendication, ou avec
-  // une valeur inconnue, doit fermer la porte — pas l'ouvrir par défaut.
-  assert.equal(aalDuJeton(jeton({})), null);
-  assert.equal(aalDuJeton(jeton({ aal: "aal3" })), null);
-  assert.equal(aalDuJeton("pas-un-jeton"), null);
-  assert.equal(aalDuJeton(null), null);
-  assert.equal(aalDuJeton("a.b"), null);
+test("un jeton d'appareil n'est valable que pour le compte qui l'a obtenu", () => {
+  // ⚠️ Sans l'identifiant du compte dans la signature, un jeton délivré à l'un servirait
+  // à n'importe quel autre : il suffirait de le recopier.
+  const j = signerAppareil(SECRET, UID, "mac-1", Date.now());
+  assert.equal(verifierAppareil({ secret: SECRET, userId: UID, jeton: j }).ok, true);
+  assert.equal(verifierAppareil({ secret: SECRET, userId: "quelqu-un-dautre", jeton: j }).ok, false);
 });
 
-test("le second facteur protège les ROUTES autant que les pages", () => {
+test("un jeton retouché ou signé avec un autre secret est refusé", () => {
+  const j = signerAppareil(SECRET, UID, "mac-1", Date.now());
+  const [id, t, sig] = j.split(".");
+  assert.equal(verifierAppareil({ secret: SECRET, userId: UID, jeton: `${id}.${t}.${sig.slice(0, -1)}x` }).ok, false, "signature modifiée acceptée");
+  assert.equal(verifierAppareil({ secret: SECRET, userId: UID, jeton: `autre-mac.${t}.${sig}` }).ok, false, "identifiant d'appareil échangeable");
+  assert.equal(verifierAppareil({ secret: "autre-secret", userId: UID, jeton: j }).ok, false, "un autre secret ouvre la porte");
+  // ⚠️ UN SECRET VIDE REND TOUTE SIGNATURE TRIVIALE À FABRIQUER. Il faut forger le jeton
+  // comme le ferait un attaquant — avec la clé vide — sinon on teste un jeton signé avec
+  // le BON secret, qui échoue de toute façon : l'assertion serait décorative. Constaté en
+  // mutant : retirer le refus du secret vide ne faisait pas rougir la version précédente.
+  const emis = Date.now();
+  const forge = `mac-1.${emis}.${createHmac("sha256", "").update(`${UID}|mac-1|${emis}`).digest("base64url")}`;
+  assert.equal(verifierAppareil({ secret: "", userId: UID, jeton: forge }).ok, false, "un secret vide laisse passer un jeton forgé");
+  assert.equal(verifierAppareil({ secret: "", userId: UID, jeton: j }).ok, false);
+  assert.equal(verifierAppareil({ secret: SECRET, userId: UID, jeton: null }).ok, false);
+  assert.equal(verifierAppareil({ secret: SECRET, userId: UID, jeton: "n-importe-quoi" }).ok, false);
+});
+
+test("un appareil autorisé finit par expirer", () => {
+  // Un jeton éternel ne se révoque jamais tout seul : un Mac perdu resterait de confiance.
+  const vieux = signerAppareil(SECRET, UID, "mac-1", Date.now() - 200 * 86400000);
+  assert.equal(verifierAppareil({ secret: SECRET, userId: UID, jeton: vieux }).ok, false, "un jeton de 200 jours passe encore");
+  const recent = signerAppareil(SECRET, UID, "mac-1", Date.now() - 10 * 86400000);
+  assert.equal(verifierAppareil({ secret: SECRET, userId: UID, jeton: recent }).ok, true);
+  // Daté du futur : forcément fabriqué, ou l'horloge a été manipulée.
+  const futur = signerAppareil(SECRET, UID, "mac-1", Date.now() + 10 * 86400000);
+  assert.equal(verifierAppareil({ secret: SECRET, userId: UID, jeton: futur }).ok, false);
+});
+
+test("le code d'autorisation se compare sans laisser fuir sa longueur", () => {
+  assert.equal(codeValide("bon-code", "bon-code"), true);
+  assert.equal(codeValide("mauvais", "bon-code"), false);
+  // ⚠️ Un code attendu VIDE ne doit jamais valider : sinon une variable oubliée
+  // ouvrirait la porte à une saisie vide.
+  assert.equal(codeValide("", ""), false);
+  assert.equal(codeValide("quoi que ce soit", ""), false);
+});
+
+test("personne ne peut être enfermé dehors de son propre espace", () => {
+  // ⚠️ Tant que les secrets ne sont pas posés, on ne vérifie RIEN : exiger un jeton avant
+  // que la configuration existe mettrait l'éditeur dehors, sans recours.
+  assert.equal(appareilExige({}), false);
+  assert.equal(appareilExige({ ADMIN_DEVICE_SECRET: "x" }), false, "un seul secret suffit à verrouiller");
+  assert.equal(appareilExige({ ADMIN_DEVICE_CODE: "x" }), false);
+  assert.equal(appareilExige({ ADMIN_DEVICE_SECRET: "x", ADMIN_DEVICE_CODE: "y" }), true);
+  const src = codeSeul("src/app/admin/layout.tsx");
+  assert.match(src, /appareilExige\(\)/, "le layout vérifie sans se demander si c'est configuré");
+});
+
+test("l'appareil protège les ROUTES autant que les pages", () => {
   // ⚠️ Une porte verrouillée à côté d'une fenêtre ouverte ne protège rien : les routes
-  // d'API s'appellent directement, et une session restée ouverte sur une machine tierce
-  // ouvrirait les factures sans jamais croiser l'écran qui réclame le code.
+  // d'API s'appellent directement.
   for (const f of [
     "src/app/api/admin/compta/route.ts",
     "src/app/api/admin/compta/piece/route.ts",
     "src/app/api/admin/compta/lire/route.ts",
   ]) {
-    const src = codeSeul(f);
-    assert.match(src, /await gardeAdmin\(\)/, `${f} ne vérifie pas le second facteur`);
+    assert.match(codeSeul(f), /await gardeAdmin\(\)/, `${f} ne vérifie pas l'appareil`);
   }
-  // Et la garde doit vraiment enchaîner les deux contrôles.
   const garde = codeSeul("src/lib/admin/acces.ts");
   assert.match(garde, /estAdmin\(user\?\.email\)/, "la garde ne vérifie plus l'adresse");
-  assert.match(garde, /mfa\.ouvert/, "la garde ne vérifie plus le second facteur");
+  assert.match(garde, /verifierAppareil\(/, "la garde ne vérifie plus l'appareil");
 });
 
-test("personne ne peut être enfermé dehors de son propre espace", () => {
-  // ⚠️ Exiger un code à quelqu'un qui n'en a jamais configuré le mettrait dehors sans
-  // recours. Tant qu'aucun facteur vérifié n'existe, l'accès reste ouvert — l'écran
-  // insiste, il ne bloque pas.
-  const src = codeSeul("src/lib/admin/mfa.ts");
-  assert.match(src, /ouvert: !configure \|\| niveau === "aal2"/, "la règle d'ouverture a changé");
-  // Et une panne de lecture des facteurs ne doit pas verrouiller : le mot de passe
-  // reste exigé de toute façon.
-  assert.match(src, /catch \{[\s\S]{0,400}ouvert: true/, "une panne passagère enferme l'éditeur dehors");
+test("chaque tentative d'autorisation d'appareil est tracée, même refusée", () => {
+  // ⚠️ Une série d'échecs depuis une adresse inconnue est exactement le signal qu'on veut
+  // voir — et qu'aucun journal ne montrerait si l'on ne consignait que les succès.
+  const src = codeSeul("src/app/api/admin/appareil/route.ts");
+  const posTrace = src.indexOf('type: "admin_appareil"');
+  const posRefus = src.indexOf("if (!ok) return");
+  assert.ok(posTrace > 0, "aucune trace des tentatives");
+  assert.ok(posTrace < posRefus, "la trace est écrite APRÈS le refus : les échecs ne sont pas consignés");
+  assert.match(src, /httpOnly: true/, "le jeton d'appareil est lisible par un script de la page");
+  assert.match(src, /secure: true/, "le jeton peut circuler en clair");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
