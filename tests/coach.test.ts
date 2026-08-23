@@ -743,6 +743,32 @@ test("un abonné peut changer de formule et résilier depuis l'application", () 
   // Une réponse inattendue ne doit pas envoyer l'athlète sur « undefined ».
   assert.match(ui, /startsWith\("https:\/\/"\)/, "l'URL de redirection doit être vérifiée avant usage");
 });
+test("le script de mise en place ne peut pas toucher au compte réel par mégarde", () => {
+  // ⚠️ CE GARDE-FOU PROTÈGE UNE ERREUR IRRÉVERSIBLE. Un tarif créé chez Stripe ne se
+  // supprime PAS — il s'archive. Lancer le script en croyant travailler en test alors
+  // que la clé est celle du compte réel laisse donc des tarifs fantômes définitifs sur
+  // le compte qui encaisse, plus un webhook qui pointe au mauvais endroit.
+  const src = codeOf("scripts/stripe-setup.mjs");
+  assert.match(src, /sk_live_/, "le script ne reconnaît pas une clé de mode réel");
+  assert.match(src, /!live/, "le mode réel n'est pas conditionné à un drapeau explicite");
+  assert.match(src, /process\.exit\(1\)/, "le script ne s'arrête pas devant une clé de mode réel");
+  // Les montants ne doivent JAMAIS être recopiés : ils viennent de la même source que la
+  // page d'offres, sinon Stripe et le site finissent par annoncer deux prix différents.
+  assert.match(src, /PRIX_AFFICHES\[f\.cle\]\[p\.cle\]/, "les montants ne viennent pas de lib/billing/prix");
+  assert.ok(!/unit_amount:\s*\d/.test(src), "un montant est écrit en dur dans le script");
+  // Les six événements du webhook doivent être exactement ceux que le code traite.
+  const wh = codeOf("src/app/api/stripe/webhook/route.ts") + codeOf("src/lib/compta/stripe.ts");
+  for (const ev of ["customer.subscription.created", "customer.subscription.updated",
+                    "customer.subscription.deleted", "invoice.paid",
+                    "invoice.payment_failed", "charge.refunded"]) {
+    assert.ok(src.includes(ev), `${ev} manque dans le script`);
+    assert.ok(wh.includes(ev), `${ev} est demandé à Stripe mais le code ne le traite pas`);
+  }
+  // Et le portail doit résilier À LA FIN DE LA PÉRIODE : couper sur-le-champ revient à
+  // encaisser un mois puis fermer la porte.
+  assert.match(src, /mode: "at_period_end"/, "le portail résilierait immédiatement");
+  assert.match(src, /subscription_update[\s\S]{0,200}enabled: true/, "le portail ne permet pas de changer de formule");
+});
 test("les quatre tarifs attendus par le code sont ceux qu'on demande de renseigner", () => {
   // ⚠️ `.env.local` portait STRIPE_PRICE_MONTHLY et STRIPE_PRICE_YEARLY — deux noms que
   // le code ne lit NULLE PART (il compose `STRIPE_PRICE_<FORMULE>_<PÉRIODE>` à
