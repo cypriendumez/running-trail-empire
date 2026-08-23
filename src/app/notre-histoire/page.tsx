@@ -60,10 +60,20 @@ export default async function NotreHistoirePage() {
           {aLaPhoto && (
             <figure className="mx-auto mt-12 max-w-3xl">
               {/* eslint-disable-next-line @next/next/no-img-element */}
+              {/* ⚠️ RAPPORT NATUREL, PAS DE `object-cover`. La première version imposait
+                  un cadre 16/9 : la photo étant en 3/2, le recadrage mangeait le haut ET
+                  LE BAS — c'est-à-dire précisément le coin où vit la signature du
+                  photographe. J'aurais rogné le crédit par un choix de mise en page après
+                  avoir refusé de le faire à la main. Le rapport d'origine règle les deux
+                  problèmes : rien n'est coupé, et l'image reste nette.
+                  Dimensions déclarées pour réserver la place et éviter que le texte ne
+                  saute au chargement. */}
               <img
                 src={PHOTO}
                 alt=""
-                className="aspect-[16/9] w-full rounded-3xl object-cover ring-1 ring-inset ring-zinc-200"
+                width={1600}
+                height={1067}
+                className="h-auto w-full rounded-3xl ring-1 ring-inset ring-zinc-200"
                 loading="eager"
               />
               {/* Le crédit est DANS le flux, pas incrusté sur l'image : il reste lisible,

@@ -422,6 +422,24 @@ test("le crédit du photographe ne peut pas disparaître avec la photo", () => {
   // un fichier absent affiche une image cassée en production sans qu'aucune erreur ne
   // remonte. Le projet a déjà eu ce défaut sur les logos de marques.
   assert.match(page, /existsSync\(/, "la page rendrait un <img> même si le fichier est absent");
+  // ⚠️ ET LE CADRAGE NE DOIT PAS ROGNER LA SIGNATURE. La première mise en page imposait
+  // un cadre 16/9 avec `object-cover` ; la photo étant en 3/2, le recadrage mangeait le
+  // haut et LE BAS — le coin exact où se trouve la signature du photographe. On aurait
+  // supprimé le crédit par un choix de CSS après avoir refusé de le faire à la main.
+  //
+  // ⚠️ SUR LE CODE SEUL : le commentaire qui EXPLIQUE ce piège cite forcément
+  // `object-cover`, et le test rougissait sur sa propre documentation. Cinquième fois.
+  const pageSeule = page.replace(/\{\/\*[\s\S]*?\*\/\}/g, " ").replace(/\/\*[\s\S]*?\*\//g, " ");
+  assert.ok(!/object-cover/.test(pageSeule), "un recadrage `object-cover` couperait la signature du photographe");
+  assert.ok(!/aspect-\[16\/9\]/.test(pageSeule), "un cadre 16/9 rogne une photo 3/2 en haut et en bas");
+  // Le poids compte aussi : l'original faisait 8,1 Mo et 8256 px de large, soit trente
+  // fois trop pour une page web. Un test ne peut pas juger d'une photo, mais il peut
+  // refuser qu'on redéploie un fichier démesuré.
+  const photo = join(ROOT, "public/cyprien-course.jpg");
+  if (existsSync(photo)) {
+    const mo = statSync(photo).size / (1024 * 1024);
+    assert.ok(mo < 1, `la photo pèse ${mo.toFixed(1)} Mo : trop lourd pour une page publique`);
+  }
 });
 test("le Tour du Mont-Blanc est annoncé pour ce qu'il est : une randonnée", () => {
   // ⚠️ LE MOT « RANDONNÉE » N'EST PAS NÉGOCIABLE. Les cinq journées de juillet 2025 sont
