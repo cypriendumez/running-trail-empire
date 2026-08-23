@@ -3,8 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { buildAthleteContext } from "@/lib/ai/coachContext";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { estAdmin } from "@/lib/admin/acces";
 
-const ADMIN_EMAIL = "cypriendumez@outlook.fr";
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
 // gemini-2.5-flash = free tier, gemini-2.5-flash = requires billing
 const GEMINI_URL = (model: string = "gemini-2.5-flash") =>
@@ -18,7 +18,7 @@ function icuAuth(apiKey: string) {
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || user.email !== ADMIN_EMAIL) {
+  if (!user || !estAdmin(user?.email)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

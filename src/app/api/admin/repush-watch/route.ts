@@ -5,8 +5,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { pushIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
 import { getEffectiveVma } from "@/lib/ai/coachContext";
 import { oneSessionPerSlot } from "@/lib/coach/sessions";
+import { estAdmin } from "@/lib/admin/acces";
 
-const ADMIN_EMAIL = "cypriendumez@outlook.fr";
 
 // POST /api/admin/repush-watch {user_id}
 // → re-pousse sur la montre TOUTES les séances coach à venir DÉJÀ stockées (sans rien régénérer),
@@ -15,7 +15,7 @@ const ADMIN_EMAIL = "cypriendumez@outlook.fr";
 export async function POST(req: Request) {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
-  if (!user || user.email !== ADMIN_EMAIL) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!user || !estAdmin(user?.email)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { user_id } = (await req.json()) as { user_id?: string };
   if (!user_id) return NextResponse.json({ error: "user_id requis" }, { status: 400 });

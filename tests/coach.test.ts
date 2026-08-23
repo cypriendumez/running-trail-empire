@@ -439,16 +439,34 @@ test("toute route d'administration est protégée", () => {
   const dir = "src/app/api/admin";
   if (!existsSync(dir)) return;
   const unguarded: string[] = [];
+  const recopies: string[] = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     const f = join(dir, entry.name, "route.ts");
     if (!existsSync(f)) continue;
-    const src = readFileSync(f, "utf8");
+    // ⚠️ ON RETIRE LES LIGNES D'IMPORT AVANT DE CHERCHER. Sans ça, le test se contente
+    // de l'IMPORT du garde : retirer l'appel `estAdmin(user?.email)` en laissant
+    // `import { estAdmin }` laissait le test VERT sur une route grande ouverte. Vérifié
+    // par mutation — elle n'a pas rougi du premier coup, et c'est comme ça qu'on
+    // s'en est aperçu. Viser le site qui produit l'effet, jamais la déclaration.
+    const src = readFileSync(f, "utf8")
+      .split("\n").filter((l) => !/^\s*import\b/.test(l)).join("\n");
     // Deux mécanismes coexistent : en-tête secret (routes machine) et vérification de
     // l'adresse du compte connecté (routes appelées depuis le panneau admin).
-    if (!/ADMIN_SECRET|x-admin-secret|ADMIN_EMAIL|is_admin|isAdmin/.test(src)) unguarded.push(entry.name);
+    // ⚠️ `estAdmin` A DÛ ÊTRE AJOUTÉ ICI, et c'est la troisième fois aujourd'hui qu'un
+    // test fige une FORME plutôt qu'une intention : la route `conversation` était
+    // parfaitement gardée, mais par une fonction au nom français que ce motif ne
+    // connaissait pas. Le test l'a déclarée sans garde.
+    if (!/ADMIN_SECRET|x-admin-secret|ADMIN_EMAIL|is_admin|isAdmin|estAdmin/.test(src)) unguarded.push(entry.name);
+    // ⚠️ ET L'ADRESSE NE DOIT PLUS ÊTRE RECOPIÉE. Treize routes en portaient leur propre
+    // exemplaire. Le jour où l'éditeur change — une vente, par exemple — il faut les
+    // retrouver toutes : en manquer une laisse soit une porte ouverte à l'ancien
+    // propriétaire, soit une fonction morte pour le nouveau. Une seule définition, dans
+    // `lib/admin/acces`.
+    if (/@outlook\.fr|@gmail\.com/.test(src)) recopies.push(entry.name);
   }
   assert.deepEqual(unguarded, [], `route(s) d'administration sans garde : ${unguarded.join(", ")}`);
+  assert.deepEqual(recopies, [], `route(s) qui recopient l'adresse de l'éditeur : ${recopies.join(", ")}`);
 });
 test("le profil envoyé au navigateur ne contient jamais la clé intervals.icu", () => {
   const stripped = stripProfileSecrets({ id: "x", intervals_api_key: "SECRET", intervals_athlete_id: "i1" });
@@ -460,7 +478,13 @@ test("aucune page du tableau de bord ne transmet le profil brut", () => {
   for (const p of pages) {
     const f = join("src/app/dashboard", p);
     if (!existsSync(f)) continue;
-    const src = readFileSync(f, "utf8");
+    // ⚠️ ON RETIRE LES LIGNES D'IMPORT AVANT DE CHERCHER. Sans ça, le test se contente
+    // de l'IMPORT du garde : retirer l'appel `estAdmin(user?.email)` en laissant
+    // `import { estAdmin }` laissait le test VERT sur une route grande ouverte. Vérifié
+    // par mutation — elle n'a pas rougi du premier coup, et c'est comme ça qu'on
+    // s'en est aperçu. Viser le site qui produit l'effet, jamais la déclaration.
+    const src = readFileSync(f, "utf8")
+      .split("\n").filter((l) => !/^\s*import\b/.test(l)).join("\n");
     if (/from\("profiles"\)\.select\("\*"\)/.test(src)) {
       assert.ok(/stripProfileSecrets/.test(src), `${p} lit tout le profil sans le nettoyer`);
     }

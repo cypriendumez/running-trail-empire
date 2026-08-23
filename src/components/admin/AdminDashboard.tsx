@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Users, Activity, Crown, Search, Mail, BarChart3, TrendingUp, Watch, Send, CheckCircle2, AlertCircle, ChevronRight, Zap, UserCheck, RefreshCw, Calendar, Hash } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
+import { ConversationClient } from "@/components/admin/ConversationClient";
 
 interface User {
   id: string;
@@ -412,6 +413,15 @@ export function AdminDashboard({ users }: { users: User[] }) {
                       <div className="text-sm font-semibold text-zinc-800 truncate capitalize">{String(value)}</div>
                     </div>
                   ))}
+                </div>
+
+                {/* ⚠️ LA CONVERSATION EST ICI, PAS SUR UNE PAGE À PART. Elle vivait à
+                    /admin/messages : pour répondre à quelqu'un, il fallait quitter sa
+                    fiche — donc perdre de vue sa charge, ses séances et son ressenti,
+                    c'est-à-dire exactement ce dont on lui parle. Répondre « ta séance de
+                    jeudi » sans l'avoir sous les yeux, c'est répondre de mémoire. */}
+                <div className="mb-6">
+                  <ConversationClient userId={selected.id} nom={selected.full_name || selected.email || "ce coureur"} />
                 </div>
 
                 {/* Séances récentes + graphique de charge */}

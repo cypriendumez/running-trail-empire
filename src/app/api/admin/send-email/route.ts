@@ -1,14 +1,14 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { estAdmin } from "@/lib/admin/acces";
 
-const ADMIN_EMAIL = "cypriendumez@outlook.fr";
 
 export async function POST(req: NextRequest) {
   // Auth check — only admin can call this
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || user.email !== ADMIN_EMAIL) {
+  if (!user || !estAdmin(user?.email)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

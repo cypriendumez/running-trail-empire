@@ -4,15 +4,15 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { pushIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
 import { getEffectiveVma } from "@/lib/ai/coachContext";
+import { estAdmin } from "@/lib/admin/acces";
 
-const ADMIN_EMAIL = "cypriendumez@outlook.fr";
 
 // POST /api/admin/assign-session — le coach pousse la « séance du jour » à un client.
 // Stockée comme notification (type=coach_session) → lue par le dashboard du client.
 export async function POST(req: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || user.email !== ADMIN_EMAIL) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!user || !estAdmin(user?.email)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { user_id, title, subtitle, tags, why } = await req.json() as {
     user_id: string; title: string; subtitle?: string; tags?: string[]; why?: string;

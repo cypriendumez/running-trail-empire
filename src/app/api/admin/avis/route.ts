@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { TYPE_AVIS, litAvis } from "@/lib/avis/store";
+import { estAdmin } from "@/lib/admin/acces";
 
-const ADMIN_EMAIL = "cypriendumez@outlook.fr";
 
 /**
  * MODÉRATION — publier ou retirer un avis.
@@ -21,7 +21,7 @@ const ADMIN_EMAIL = "cypriendumez@outlook.fr";
 export async function POST(req: Request) {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
-  if (!user || user.email !== ADMIN_EMAIL) {
+  if (!user || !estAdmin(user?.email)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
 export async function GET() {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
-  if (!user || user.email !== ADMIN_EMAIL) {
+  if (!user || !estAdmin(user?.email)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { data } = await createAdminClient()
