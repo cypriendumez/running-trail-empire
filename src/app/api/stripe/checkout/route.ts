@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { stripe, priceIdDe, estFormule, estPeriode, stripeConfigured } from "@/lib/stripe/client";
 import { createClient } from "@/lib/supabase/server";
-import { JOURS_ESSAI } from "@/lib/billing/access";
+import { joursEssaiStripe } from "@/lib/billing/access";
 
 export async function POST(req: Request) {
   try {
@@ -20,7 +20,12 @@ export async function POST(req: Request) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { data: profile } = await supabase.from("profiles").select("stripe_customer_id, email, full_name").eq("id", user.id).single();
+    // `created_at` et `subscription_tier` servent à calculer les jours d'essai RESTANTS :
+    // sans eux, on ne peut pas distinguer un athlète qui vient de s'inscrire d'un autre
+    // dont l'essai gratuit est terminé depuis un mois.
+    const { data: profile } = await supabase
+      .from("profiles").select("stripe_customer_id, email, full_name, created_at, subscription_tier")
+      .eq("id", user.id).single();
 
     let customerId = profile?.stripe_customer_id;
     if (!customerId) {
@@ -32,6 +37,8 @@ export async function POST(req: Request) {
       customerId = customer.id;
       await supabase.from("profiles").update({ stripe_customer_id: customerId }).eq("id", user.id);
     }
+
+    const joursEssai = joursEssaiStripe(profile);
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -46,20 +53,21 @@ export async function POST(req: Request) {
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing?cancelled=true`,
       subscription_data: {
         metadata: { supabase_user_id: user.id },
-        // ⚠️ SANS CETTE LIGNE, LE BOUTON MENTAIT. La page annonce « Essayer {JOURS_ESSAI}
-        // jours » sur les deux formules payantes, et le clic ouvrait une session Stripe
-        // SANS période d'essai : l'athlète était prélevé de 9,99 € dans la seconde. Une
-        // promesse d'essai suivie d'un débit immédiat est une pratique commerciale
-        // trompeuse, et c'est le premier motif d'opposition bancaire.
+        // ⚠️ LES JOURS RESTANTS, PAS SEPT. Voir `joursEssaiStripe` : l'application offre
+        // déjà un essai gratuit sans carte qui démarre à l'inscription. Poser sept jours
+        // ici les AJOUTAIT aux premiers — quatorze jours avant le premier euro pour qui
+        // s'inscrivait et s'abonnait le même jour, sans que personne l'ait décidé.
         //
-        // La durée vient de `JOURS_ESSAI`, la même constante que l'essai gratuit affiché
-        // partout ailleurs : recopier « 7 » ici aurait créé la quatrième valeur d'essai
-        // du projet, après les 30/7/14 jours qu'on a déjà eu à nettoyer.
-        trial_period_days: JOURS_ESSAI,
-        // À la fin de l'essai, sans moyen de paiement valide, on ANNULE plutôt que de
-        // laisser un abonnement impayé traîner : l'athlète retombe sur le palier gratuit,
-        // ce qui est exactement ce que l'application sait faire.
-        trial_settings: { end_behavior: { missing_payment_method: "cancel" } },
+        // ⚠️ ET ON OMET LE CHAMP QUAND IL VAUT ZÉRO : Stripe REFUSE
+        // `trial_period_days: 0`. Le paiement est alors immédiat, ce que le bouton de
+        // /pricing annonce en changeant de libellé — sinon on retomberait exactement
+        // dans le mensonge qu'on vient de corriger.
+        ...(joursEssai > 0 ? {
+          trial_period_days: joursEssai,
+          // Sans moyen de paiement valide à la fin de l'essai, on annule plutôt que de
+          // laisser traîner un impayé : l'athlète retombe sur le palier gratuit.
+          trial_settings: { end_behavior: { missing_payment_method: "cancel" as const } },
+        } : {}),
       },
       // La carte est demandée dès l'inscription à l'essai — sinon rien ne se déclenche au
       // huitième jour et l'essai devient un abonnement gratuit permanent.

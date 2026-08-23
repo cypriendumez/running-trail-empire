@@ -55,6 +55,10 @@ export type LandingDict = {
   pricing: {
     eyebrow: string; title: string; subtitle: string;
     mois: string; an: string; economie: string; parMois: string; essai: string;
+    /** Libellé du bouton d'une formule payante, ADAPTÉ aux jours réellement accordés.
+     *  `ctaEssai` quand il reste des jours, `ctaAbo` quand l'essai est terminé : un
+     *  « Essayer 7 jours » figé mentirait dès le lendemain de l'inscription. */
+    ctaEssai: string; ctaAbo: string;
     gratuitNote: string;
     plans: { cle: "gratuit" | "starter" | "premium"; name: string; pitch: string; badge?: string; cta: string; features: string[] }[];
     apres: string;
@@ -113,6 +117,7 @@ const fr: LandingDict = {
     subtitle: "Crée ton compte, branche ta montre, garde ton historique et le calendrier des courses sans payer. Le plan qui se replanifie tout seul et les échanges avec l'IA, eux, sont dans les formules.",
     mois: "Mensuel", an: "Annuel", economie: "2 mois offerts", parMois: "/mois",
     essai: "{n} jours d'essai de l'IA, sans engagement",
+    ctaEssai: "Essayer {n} jours", ctaAbo: "S'abonner",
     gratuitNote: "Aucune carte bancaire pour le palier gratuit.",
     plans: [
       { cle: "gratuit", name: "Gratuit", pitch: "Tes données, tes courses, et un aperçu de ton plan.", cta: "Créer mon compte",
@@ -175,6 +180,7 @@ const en: LandingDict = {
     subtitle: "Create your account, connect your watch, keep your history and the race calendar without paying. The self-replanning plan and the AI exchanges live in the paid tiers.",
     mois: "Monthly", an: "Yearly", economie: "2 months free", parMois: "/month",
     essai: "{n}-day AI trial, cancel anytime",
+    ctaEssai: "Try {n} days", ctaAbo: "Subscribe",
     gratuitNote: "No card needed for the free tier.",
     plans: [
       { cle: "gratuit", name: "Free", pitch: "Your data, your races, and a preview of your plan.", cta: "Create my account",
@@ -237,6 +243,7 @@ const de: LandingDict = {
     subtitle: "Konto erstellen, Uhr verbinden, Verlauf und Rennkalender behalten — ohne zu zahlen. Der sich selbst neu planende Plan und die KI-Dialoge stecken in den Abos.",
     mois: "Monatlich", an: "Jährlich", economie: "2 Monate geschenkt", parMois: "/Monat",
     essai: "{n} Tage KI testen, jederzeit kündbar",
+    ctaEssai: "{n} Tage testen", ctaAbo: "Abonnieren",
     gratuitNote: "Keine Karte nötig für die Gratis-Stufe.",
     plans: [
       { cle: "gratuit", name: "Gratis", pitch: "Deine Daten, deine Rennen und ein Blick auf deinen Plan.", cta: "Konto erstellen",
@@ -299,6 +306,7 @@ const es: LandingDict = {
     subtitle: "Crea tu cuenta, conecta tu reloj, conserva tu historial y el calendario de carreras sin pagar. El plan que se replanifica solo y los intercambios con la IA están en las fórmulas.",
     mois: "Mensual", an: "Anual", economie: "2 meses gratis", parMois: "/mes",
     essai: "{n} días de prueba de la IA, sin compromiso",
+    ctaEssai: "Probar {n} días", ctaAbo: "Suscribirme",
     gratuitNote: "Sin tarjeta para el nivel gratuito.",
     plans: [
       { cle: "gratuit", name: "Gratis", pitch: "Tus datos, tus carreras y un adelanto de tu plan.", cta: "Crear mi cuenta",
@@ -361,6 +369,7 @@ const pt: LandingDict = {
     subtitle: "Cria a tua conta, liga o teu relógio, guarda o teu histórico e o calendário de provas sem pagar. O plano que se replanifica sozinho e as trocas com a IA estão nas fórmulas.",
     mois: "Mensal", an: "Anual", economie: "2 meses grátis", parMois: "/mês",
     essai: "{n} dias de teste da IA, sem compromisso",
+    ctaEssai: "Testar {n} dias", ctaAbo: "Subscrever",
     gratuitNote: "Sem cartão para o nível gratuito.",
     plans: [
       { cle: "gratuit", name: "Grátis", pitch: "Os teus dados, as tuas provas e uma amostra do teu plano.", cta: "Criar a minha conta",

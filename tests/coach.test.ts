@@ -17,6 +17,7 @@ import { summarizeCross } from "../src/lib/coach/crossTraining";
 import { computeQualityBudget } from "../src/lib/coach/qualityBudget";
 import { shardForPass, replanIfFresh } from "../src/lib/intervals/syncAndCoach";
 import { buildPlanReadyEmail } from "../src/lib/notify/planReady";
+import { joursEssaiStripe } from "../src/lib/billing/access";
 import { poseAt, capLisse } from "../src/lib/segments/flyover";
 import { contientGrosMot, premierGrosMot, NB_FORMES_SURVEILLEES } from "../src/lib/social/moderation";
 import { avertissementAge, avertissementsAge, kmEffort } from "../src/lib/coach/ageDistance";
@@ -551,6 +552,57 @@ test("le webhook refuse tout événement non signé", () => {
     "sans secret configuré, le webhook doit REFUSER — l'accepter reviendrait à laisser n'importe qui offrir un abonnement");
   assert.ok(!/constructEvent\([^)]*!\)/.test(src), "le secret ne doit pas être forcé avec `!`");
 });
+test("l'essai payant ne s'ajoute pas à l'essai gratuit", () => {
+  // ⚠️ DÉCISION DE CYPRIEN LE 23/08/2026, après qu'on lui ait montré le compte. Poser
+  // sept jours d'essai Stripe AJOUTAIT une seconde période à l'essai gratuit qui démarre
+  // à l'inscription : quatorze jours avant le premier euro pour qui s'inscrivait et
+  // s'abonnait le même jour. On ne donne que le RESTE.
+  const jour = 86_400_000;
+  const t0 = Date.parse("2026-08-23T12:00:00Z");
+  const profilNe = (ilYaJours: number, tier: string | null = "free") =>
+    ({ created_at: new Date(t0 - ilYaJours * jour).toISOString(), subscription_tier: tier });
+
+  assert.equal(joursEssaiStripe(profilNe(0), t0), JOURS_ESSAI, "inscrit aujourd'hui : essai complet");
+  assert.equal(joursEssaiStripe(profilNe(4), t0), JOURS_ESSAI - 4, "inscrit il y a 4 jours : il en reste 3");
+  assert.equal(joursEssaiStripe(profilNe(JOURS_ESSAI - 1), t0), 1, "dernier jour : un jour, pas zéro");
+  assert.equal(joursEssaiStripe(profilNe(JOURS_ESSAI), t0), 0, "essai terminé : paiement immédiat");
+  assert.equal(joursEssaiStripe(profilNe(400), t0), 0, "essai terminé depuis longtemps : rien");
+
+  // Un abonné qui repasse par le paiement ne se rouvre PAS un essai : il aurait des jours
+  // déjà payés offerts, et le changement de formule passe de toute façon par le portail.
+  for (const tier of ["starter", "premium", "pro"]) {
+    assert.equal(joursEssaiStripe(profilNe(0, tier), t0), 0, `un abonné ${tier} ne doit pas obtenir d'essai`);
+  }
+
+  // Bornes hostiles : une date illisible ne doit pas fermer la porte (l'app choisit
+  // l'essai en cas de doute), et une date dans le FUTUR ne doit pas allonger l'essai
+  // au-delà de ce qu'on annonce.
+  assert.equal(joursEssaiStripe({ created_at: "n'importe quoi", subscription_tier: "free" }, t0), JOURS_ESSAI);
+  assert.equal(joursEssaiStripe(null, t0), JOURS_ESSAI);
+  assert.equal(joursEssaiStripe(profilNe(-30), t0), JOURS_ESSAI, "une date future ne doit pas rallonger l'essai");
+});
+test("le bouton annonce le nombre de jours qu'il accorde vraiment", () => {
+  // ⚠️ LE MENSONGE DÉPLACÉ D'UN CRAN. Une fois l'essai réduit aux jours restants, un
+  // libellé figé « Essayer 7 jours » promet sept jours à quelqu'un qui n'en obtiendra
+  // que trois. Le bouton doit donc lire l'état réel, et dire « S'abonner » quand il ne
+  // reste rien.
+  const ui = codeOf("src/app/pricing/page.tsx");
+  assert.match(ui, /fetch\("\/api\/billing\/essai"\)/, "la page ne demande pas les jours réellement accordés");
+  assert.match(ui, /essai\.jours > 0 \? P\.ctaEssai[\s\S]{0,40}: P\.ctaAbo/,
+    "le libellé ne bascule pas sur « S'abonner » quand l'essai est terminé");
+  // Tant qu'on ne sait pas, on n'affiche pas un chiffre optimiste.
+  assert.match(ui, /if \(!essai\) return null/, "le bouton doit rester neutre tant que la réponse n'est pas là");
+  // Les cinq langues doivent porter les deux libellés, avec le nombre en gabarit.
+  const dict = readFileSync("src/components/landing/landingI18n.ts", "utf8");
+  const essais = [...dict.matchAll(/ctaEssai:\s*"([^"]+)"/g)].map((m) => m[1]);
+  const abos = [...dict.matchAll(/ctaAbo:\s*"([^"]+)"/g)].map((m) => m[1]);
+  assert.equal(essais.length, 5, `${essais.length} traduction(s) de « Essayer N jours », 5 attendues`);
+  assert.equal(abos.length, 5, `${abos.length} traduction(s) de « S'abonner », 5 attendues`);
+  for (const e of essais) {
+    assert.ok(e.includes("{n}"), `« ${e} » écrit le nombre de jours en dur`);
+    assert.ok(!/\d/.test(e.replace("{n}", "")), `« ${e} » contient un chiffre en dur`);
+  }
+});
 test("« Essayer 7 jours » ouvre un vrai essai, pas un prélèvement immédiat", () => {
   // ⚠️ LE DÉFAUT LE PLUS DANGEREUX DE LA CHAÎNE DE PAIEMENT, trouvé le 23/08/2026 avant
   // toute mise en service. Les deux cartes payantes de /pricing portent le bouton
@@ -561,11 +613,16 @@ test("« Essayer 7 jours » ouvre un vrai essai, pas un prélèvement immédiat"
   // trompeuse, et c'est le premier motif d'opposition bancaire — des oppositions qui
   // coûtent des frais ET abîment la réputation du compte Stripe.
   const src = codeOf("src/app/api/stripe/checkout/route.ts");
-  assert.match(src, /trial_period_days:\s*JOURS_ESSAI/,
+  assert.match(src, /trial_period_days:\s*joursEssai/,
     "la session Stripe n'ouvre pas d'essai : le bouton « Essayer » prélèverait immédiatement");
-  // ⚠️ LA CONSTANTE, JAMAIS LE NOMBRE. Recopier « 7 » ici créerait la quatrième valeur
-  // d'essai du projet — on a déjà eu à nettoyer 30, 7 et 14 jours annoncés en parallèle.
-  assert.ok(!/trial_period_days:\s*\d/.test(src), "la durée d'essai est écrite en dur au lieu de venir de JOURS_ESSAI");
+  // ⚠️ LA DURÉE EST CALCULÉE, JAMAIS ÉCRITE. Un « 7 » ici recréerait la quatrième valeur
+  // d'essai du projet — on a déjà eu à nettoyer 30, 7 et 14 jours annoncés en parallèle —
+  // ET rendrait quatorze jours gratuits à qui s'inscrit et s'abonne le même jour.
+  assert.ok(!/trial_period_days:\s*\d/.test(src), "la durée d'essai est écrite en dur au lieu d'être calculée");
+  assert.match(src, /joursEssaiStripe\(profile\)/, "les jours restants ne sont pas calculés depuis le profil");
+  // ⚠️ ZÉRO N'EST PAS UNE DURÉE : Stripe REFUSE `trial_period_days: 0`. Le champ doit
+  // être OMIS quand l'essai est terminé, sinon plus personne ne peut s'abonner.
+  assert.match(src, /joursEssai > 0 \? \{/, "le champ d'essai doit être omis quand il ne reste aucun jour");
   // Sans carte demandée, rien ne se déclenche au huitième jour : l'essai deviendrait un
   // abonnement gratuit permanent.
   assert.match(src, /payment_method_collection:\s*"always"/, "la carte n'est pas demandée à l'ouverture de l'essai");

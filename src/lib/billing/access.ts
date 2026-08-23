@@ -181,6 +181,38 @@ const DROITS: Record<Acces, Capacite[]> = {
  * qu'on vend. Un chiffre plus généreux ne convertirait pas davantage : il retirerait la
  * raison de payer.
  */
+/**
+ * COMBIEN DE JOURS D'ESSAI STRIPE ACCORDER À CET ATHLÈTE.
+ *
+ * ⚠️ PAS `JOURS_ESSAI` EN DUR. L'application offre déjà un essai gratuit, sans carte,
+ * qui démarre à l'inscription. Poser `trial_period_days: JOURS_ESSAI` au moment du
+ * paiement AJOUTAIT une seconde période à la première : quelqu'un qui s'inscrivait et
+ * s'abonnait le jour même obtenait quatorze jours avant le premier euro, sans que
+ * personne l'ait décidé. Décision de Cyprien le 23/08/2026 : on ne donne que le RESTE.
+ *
+ * Les trois cas, et pourquoi chacun rend ce qu'il rend :
+ *  · en cours d'essai → le nombre de jours qu'il lui reste, ni plus ni moins. Il ne perd
+ *    rien de ce qui lui avait été promis, et n'obtient pas deux fois la même faveur ;
+ *  · essai terminé → 0. Le paiement est immédiat, et le bouton doit le DIRE : c'est
+ *    l'appelant qui adapte son libellé sur ce zéro (voir /pricing) ;
+ *  · déjà abonné → 0. Il passe par le portail Stripe pour changer de formule, où la
+ *    proratisation s'applique — lui rouvrir un essai serait lui offrir des jours payés.
+ *
+ * ⚠️ ZÉRO N'EST PAS UNE DURÉE. Stripe refuse `trial_period_days: 0` ; l'appelant doit
+ * OMETTRE le champ, pas le passer à zéro. C'est pour ça que cette fonction rend un
+ * nombre et pas un objet : le site d'appel reste responsable de la forme.
+ *
+ * Fonction PURE : testable sans réseau ni base, comme `accesDe` dont elle dérive.
+ */
+export function joursEssaiStripe(p: ProfilAcces | null | undefined, maintenant?: number): number {
+  const { etat, joursRestants } = accesDe(p, maintenant);
+  // `joursRestants === null` signifie « hors période d'essai » : abonné actif.
+  if (etat !== "essai" || joursRestants === null) return 0;
+  // Borné des deux côtés : une date de création dans le FUTUR (import, fuseau, saisie
+  // manuelle) donnerait sinon un essai plus long que celui qu'on annonce.
+  return Math.max(0, Math.min(JOURS_ESSAI, joursRestants));
+}
+
 export const JOURS_APERCU = 2;
 
 export function peut(etat: Acces, quoi: Capacite): boolean {

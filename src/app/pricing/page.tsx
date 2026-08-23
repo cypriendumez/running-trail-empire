@@ -15,7 +15,7 @@
 //  fonctionnalité à un endroit les change aux deux.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { JOURS_ESSAI } from "@/lib/billing/access";
 import { PRIX_AFFICHES as PRIX, euros } from "@/lib/billing/prix";
 import { Check, Loader2 } from "lucide-react";
@@ -33,6 +33,30 @@ export default function PricingPage() {
   const P = (LANDING[lang] ?? LANDING.fr).pricing;
   const [periode, setPeriode] = useState<"mois" | "an">("mois");
   const [loading, setLoading] = useState<string | null>(null);
+  /**
+   * JOURS D'ESSAI RÉELLEMENT ACCORDÉS À CE VISITEUR.
+   *
+   * ⚠️ SANS ÇA, LE BOUTON MENT DÈS LE LENDEMAIN DE L'INSCRIPTION. L'essai Stripe ne dure
+   * plus que les jours RESTANTS de l'essai gratuit (voir `joursEssaiStripe`) : un libellé
+   * figé « Essayer 7 jours » promettrait sept jours à quelqu'un qui n'en obtiendra que
+   * trois — le même défaut que celui qu'on vient de corriger, déplacé d'un cran.
+   *
+   * `null` = on ne sait pas encore. Tant qu'on ne sait pas, le bouton reste NEUTRE : on
+   * n'affiche pas un chiffre optimiste en attendant la réponse.
+   */
+  const [essai, setEssai] = useState<{ connecte: boolean; jours: number } | null>(null);
+  useEffect(() => {
+    fetch("/api/billing/essai")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (j && typeof j.jours === "number") setEssai({ connecte: !!j.connecte, jours: j.jours }); })
+      .catch(() => { /* le bouton reste neutre : mieux qu'un chiffre inventé */ });
+  }, []);
+
+  /** Le libellé d'une formule payante, ou `null` tant qu'on ne sait pas quoi promettre. */
+  const libelleAbo = (): string | null => {
+    if (!essai) return null;
+    return essai.jours > 0 ? P.ctaEssai.replace("{n}", String(essai.jours)) : P.ctaAbo;
+  };
 
   async function souscrire(formule: "starter" | "premium") {
     setLoading(formule);
@@ -44,6 +68,11 @@ export default function PricingPage() {
         body: JSON.stringify({ formule, periode }),
       });
       const data = (await res.json()) as { url?: string; error?: string };
+      // ⚠️ 401 = pas de compte, pas une panne. Le message brut du serveur est
+      // « Unauthorized » — un mot anglais et technique, affiché à quelqu'un dont le seul
+      // tort est de ne pas être inscrit. On l'emmène s'inscrire, en gardant la formule
+      // qu'il visait pour qu'il la retrouve après création du compte.
+      if (res.status === 401) { window.location.href = `/signup?formule=${formule}&periode=${periode}`; return; }
       if (data.url) window.location.href = data.url;
       // Le message du serveur est affiché TEL QUEL : c'est lui qui sait pourquoi
       // ça a échoué — paiement pas encore ouvert, session expirée, tarif inconnu.
@@ -110,7 +139,11 @@ export default function PricingPage() {
                   </ul>
                   <button onClick={() => plan.cle === "gratuit" ? (window.location.href = "/signup") : souscrire(plan.cle as "starter" | "premium")} disabled={loading !== null}
                     className={btnClass(vedette ? "secondary" : "primary", "md", "mt-8 w-full disabled:opacity-60")}>
-                    {loading === plan.cle ? <Loader2 className="h-4 w-4 animate-spin" /> : plan.cta}
+                    {loading === plan.cle
+                      ? <Loader2 className="h-4 w-4 animate-spin" />
+                      // Le palier gratuit garde son libellé propre (« Créer mon compte ») :
+                      // il ne passe pas par Stripe et n'a donc aucun essai à annoncer.
+                      : plan.cle === "gratuit" ? plan.cta : (libelleAbo() ?? plan.cta)}
                   </button>
                 </div>
               );
