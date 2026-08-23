@@ -12,9 +12,9 @@
 //  compte administrateur connecté (appel depuis l'interface).
 // ─────────────────────────────────────────────────────────────────────────────
 import { createClient } from "@/lib/supabase/server";
+import { estAdmin } from "@/lib/admin/acces";
 
 const ADMIN_SECRET = process.env.ADMIN_SECRET;
-const ADMIN_EMAIL = "cypriendumez@outlook.fr";
 
 /** `null` si l'appel est autorisé, sinon le motif du refus. */
 export async function denyIfNotAdmin(req: Request): Promise<string | null> {
@@ -22,7 +22,7 @@ export async function denyIfNotAdmin(req: Request): Promise<string | null> {
   try {
     const sb = await createClient();
     const { data: { user } } = await sb.auth.getUser();
-    if (user?.email === ADMIN_EMAIL) return null;
+    if (estAdmin(user?.email)) return null;
   } catch { /* pas de session exploitable : refus */ }
   return "Forbidden";
 }

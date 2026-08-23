@@ -30,7 +30,7 @@ import { accesDe, peut, JOURS_APERCU } from "../src/lib/billing/access";
 import { PRIX_AFFICHES } from "../src/lib/billing/prix";
 import { ATTRIBUTION_GARMIN, PAGES_ATTRIBUTION } from "../src/components/legal/attributionI18n";
 import { liensStore } from "../src/lib/brand/stores";
-import { estAdmin, ADMIN_EMAIL } from "../src/lib/admin/acces";
+import { estAdmin, adminsAutorises, ADMIN_PAR_DEFAUT } from "../src/lib/admin/acces";
 import { fournisseursActifs } from "../src/lib/auth/fournisseurs";
 import { nomAffiche, refusDe, avisDe, litAvis, TEXTE_MIN } from "../src/lib/avis/store";
 
@@ -519,17 +519,26 @@ test("aucun bouton de connexion ne mène à un fournisseur éteint", () => {
   assert.match(page, /oauth\.includes\("apple"\)/, "le bouton Apple n'est pas conditionné");
 });
 
-test("l'espace coach est atteignable, et par une seule personne", () => {
+test("l'espace coach est atteignable, et par les seules adresses autorisées", () => {
   // ⚠️ IL EXISTAIT SANS QU'AUCUN LIEN N'Y MÈNE. Six pages fonctionnelles — clients,
   // séances, messagerie, avis, lettre — correctement protégées, et absentes de la barre
   // latérale : il fallait connaître l'adresse et la taper à la main. Une fonction qu'on
   // ne peut pas atteindre n'existe pas pour celui qui l'utilise.
   const sidebar = sansCommentaires(readFileSync(join(ROOT, "src/components/layout/Sidebar.tsx"), "utf8"));
-  assert.match(sidebar, /href="\/admin"/, "aucun lien vers l'espace coach dans la barre latérale");
+  const posLien = sidebar.indexOf('href="/admin"');
+  assert.ok(posLien > 0, "aucun lien vers l'espace coach dans la barre latérale");
 
   // ⚠️ ET IL DOIT RESTER CONDITIONNEL. Un lien affiché à tout le monde enverrait chaque
-  // athlète sur une page qui le renvoie aussitôt — une porte peinte sur un mur.
-  assert.match(sidebar, /estAdmin\(/, "le lien vers l'espace coach n'est plus conditionnel");
+  // athlète sur une page qui le renvoie aussitôt — une porte peinte sur un mur. On vise
+  // la condition qui ENTOURE le lien, pas la simple présence du mot ailleurs.
+  assert.match(sidebar.slice(Math.max(0, posLien - 200), posLien), /estEditeur\s*&&/,
+    "le lien vers l'espace coach n'est plus conditionnel");
+
+  // ⚠️ ET LA BARRE LATÉRALE NE DOIT PAS EN DÉCIDER ELLE-MÊME. C'est un composant CLIENT :
+  // dans le navigateur `process.env` est vide, donc relire la liste des administrateurs
+  // sur place retombe sur le seul propriétaire historique — et masque le lien à une
+  // adresse pourtant autorisée. Le serveur décide, elle affiche.
+  assert.ok(!sidebar.includes("admin/acces"), "la barre latérale recalcule l'accès dans le navigateur");
 
   // ⚠️ UNE SEULE DÉFINITION DE L'ADRESSE. Elle était écrite en dur dans le layout ;
   // ajouter le lien ailleurs en aurait créé une deuxième copie, donc deux vérités qui
@@ -543,10 +552,82 @@ test("l'espace coach est atteignable, et par une seule personne", () => {
   assert.match(layout, /redirect\(/, "le layout /admin ne renvoie plus les intrus");
 
   // Et la comparaison ne doit pas se laisser piéger par la casse ou les espaces.
-  assert.ok(estAdmin(ADMIN_EMAIL));
-  assert.ok(estAdmin("  CYPRIENDUMEZ@OUTLOOK.FR  "), "la casse ne doit pas fermer la porte au bon compte");
-  assert.ok(!estAdmin("autre@exemple.fr"));
-  assert.ok(!estAdmin(null) && !estAdmin(""), "une session vide n'est pas l'éditeur");
+  assert.ok(estAdmin(ADMIN_PAR_DEFAUT, ""));
+  assert.ok(estAdmin("  CYPRIENDUMEZ@OUTLOOK.FR  ", ""), "la casse ne doit pas fermer la porte au bon compte");
+  assert.ok(!estAdmin("autre@exemple.fr", ""));
+  assert.ok(!estAdmin(null, "") && !estAdmin("", ""), "une session vide n'est pas l'éditeur");
+});
+
+test("la liste des administrateurs se configure sans redéployer", () => {
+  // ⚠️ L'ADRESSE ÉTAIT ÉCRITE DANS LE CODE. Un acheteur n'aurait pas eu accès à son
+  // propre espace coach sans modifier les sources et redéployer — et l'ancien
+  // propriétaire aurait gardé la sienne. Elle se lit maintenant dans `ADMIN_EMAILS`.
+  assert.deepEqual(adminsAutorises(""), [ADMIN_PAR_DEFAUT], "sans variable, le propriétaire historique doit rester");
+
+  // Plusieurs adresses, séparateurs et casse tolérés : on ne perd pas l'accès sur une
+  // espace en trop.
+  const deux = adminsAutorises("Nouveau@Acheteur.com , cyprien.dumez@gwsp.fr");
+  assert.deepEqual(deux, ["nouveau@acheteur.com", "cyprien.dumez@gwsp.fr"]);
+  assert.ok(estAdmin("NOUVEAU@ACHETEUR.COM", "nouveau@acheteur.com"), "l'adresse configurée n'ouvre pas la porte");
+
+  // ⚠️ ET SURTOUT : UNE VARIABLE ILLISIBLE NE DOIT PAS ROUVRIR L'ANCIENNE PORTE. Un
+  // acheteur qui écrit son adresse de travers rendrait l'accès au vendeur sans que
+  // personne ne s'en aperçoive. On ferme pour tout le monde — le défaut se voit.
+  assert.deepEqual(adminsAutorises("acheteur.exemple.com"), [], "une variable illisible rouvre l'accès à l'ancien propriétaire");
+  assert.ok(!estAdmin(ADMIN_PAR_DEFAUT, "acheteur.exemple.com"), "le propriétaire historique garde l'accès malgré la configuration");
+
+  // La variable ne doit JAMAIS être exposée au navigateur.
+  assert.ok(!readFileSync(join(ROOT, "src/lib/admin/acces.ts"), "utf8").includes("NEXT_PUBLIC_ADMIN"),
+    "la liste des administrateurs est exposée au navigateur");
+});
+
+test("aucun fichier ne redéclare l'identité de l'éditeur", () => {
+  // ⚠️ SEIZE COPIES DE L'ADRESSE EXISTAIENT. Quatorze ont été unifiées hier — et j'ai
+  // annoncé que c'était fini. C'ÉTAIT FAUX : le test ne regardait que `api/admin`, alors
+  // que deux copies vivaient ailleurs (`lib/api/adminGuard.ts` et `api/messages/poll`).
+  // Une garde qui ne couvre qu'un dossier laisse croire que le problème est réglé.
+  //
+  // On vise donc les DEUX gestes qui produisent le défaut, où qu'ils soient écrits :
+  // déclarer une constante d'administration contenant une adresse, et comparer l'adresse
+  // d'un compte connecté à une chaîne littérale.
+  const declare: string[] = [];
+  const compare: string[] = [];
+  const parcourirSrc = (dir: string) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const chemin = join(dir, e.name);
+      if (e.isDirectory()) { parcourirSrc(chemin); continue; }
+      if (!/\.tsx?$/.test(e.name)) continue;
+      const rel = chemin.slice(ROOT.length + 1);
+      if (rel === "src/lib/admin/acces.ts") continue; // la seule définition légitime
+      const src = sansCommentaires(readFileSync(chemin, "utf8"));
+      if (/const\s+\w*ADMIN\w*\s*(?::[^=]+)?=\s*["'][^"']*@[^"']*["']/i.test(src)) declare.push(rel);
+      if (/\.email\s*===\s*["']/.test(src)) compare.push(rel);
+    }
+  };
+  parcourirSrc(join(ROOT, "src"));
+  assert.deepEqual(declare, [], `adresse d'administration redéclarée : ${declare.join(", ")}`);
+  assert.deepEqual(compare, [], `accès décidé en comparant une adresse littérale : ${compare.join(", ")}`);
+});
+
+test("aucun composant client ne décide de l'accès administrateur", () => {
+  // ⚠️ DANS LE NAVIGATEUR, `process.env` EST VIDE. Un composant client qui importe la
+  // source de vérité obtiendrait toujours la liste par défaut : il masquerait le lien à
+  // un administrateur légitime, ou pire, servirait de base à un contrôle qui n'en est
+  // pas un. Le calcul appartient au serveur, qui transmet un booléen.
+  const fautifs: string[] = [];
+  const parcourir = (dir: string) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const chemin = join(dir, e.name);
+      if (e.isDirectory()) { parcourir(chemin); continue; }
+      if (!/\.tsx?$/.test(e.name)) continue;
+      const src = readFileSync(chemin, "utf8");
+      if (/^\s*["']use client["']/m.test(src) && src.includes("admin/acces")) {
+        fautifs.push(chemin.slice(ROOT.length + 1));
+      }
+    }
+  };
+  parcourir(join(ROOT, "src"));
+  assert.deepEqual(fautifs, [], `composant(s) client important la source de vérité : ${fautifs.join(", ")}`);
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

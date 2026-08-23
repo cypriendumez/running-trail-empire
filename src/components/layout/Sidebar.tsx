@@ -14,7 +14,6 @@ import { useState } from "react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { Logo } from "@/components/brand/Logo";
 import { Wordmark } from "@/components/brand/Wordmark";
-import { estAdmin } from "@/lib/admin/acces";
 
 // Navigation groupée par univers — plus lisible et pro.
 const groups: { titleKey: string | null; items: { href: string; icon: typeof LayoutDashboard; tk: string }[] }[] = [
@@ -67,7 +66,15 @@ const PREMIUM_CARD: Record<string, { title: string; sub: string }> = {
   pt: { title: "Passa para Pro", sub: "Planos IA ilimitados, Ghost Runner, Trail Builder completo." },
 };
 
-export function Sidebar({ profile, unreadMessages = 0 }: { profile: Record<string, unknown> | null; unreadMessages?: number }) {
+/**
+ * `estEditeur` est calculé PAR LE SERVEUR et transmis — il n'est volontairement pas
+ * déduit ici. ⚠️ Ce composant s'exécute dans le navigateur, où `process.env` est vide :
+ * relire la liste des administrateurs sur place aurait retombé sur le seul propriétaire
+ * historique, et masqué le lien à une adresse pourtant autorisée. La propriété est
+ * OBLIGATOIRE pour qu'aucun futur appel ne puisse l'oublier et faire disparaître le lien
+ * en silence.
+ */
+export function Sidebar({ profile, unreadMessages = 0, estEditeur }: { profile: Record<string, unknown> | null; unreadMessages?: number; estEditeur: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const { t, lang } = useT();
@@ -77,7 +84,6 @@ export function Sidebar({ profile, unreadMessages = 0 }: { profile: Record<strin
   // absentes de cette barre, atteignables seulement en tapant l'adresse. Masquer ce lien
   // ne protège RIEN — la vraie barrière est le `redirect()` du layout /admin, côté
   // serveur. Il évite juste d'afficher une porte qu'on ne peut pas ouvrir.
-  const admin = estAdmin(profile?.email as string | undefined);
   const pc = PREMIUM_CARD[lang] ?? PREMIUM_CARD.fr;
 
   async function signOut() {
@@ -159,7 +165,7 @@ export function Sidebar({ profile, unreadMessages = 0 }: { profile: Record<strin
 
       {/* Footer */}
       <div className="p-3 border-t border-zinc-100 space-y-0.5">
-        {admin && (
+        {estEditeur && (
           <Link href="/admin"
             className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-all">
             <ShieldCheck className="w-[18px] h-[18px] flex-shrink-0" />

@@ -10,6 +10,7 @@ import { LanguageProvider } from "@/lib/i18n/LanguageProvider";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { AttributionGarmin } from "@/components/legal/AttributionGarmin";
+import { estAdmin } from "@/lib/admin/acces";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -31,7 +32,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <div className="flex h-screen bg-[#FAFAFA] overflow-hidden">
         <AutoSync />
         <MessageNotifier />
-        <Sidebar profile={stripProfileSecrets(profile)} unreadMessages={unreadMessages ?? 0} />
+        <Sidebar profile={stripProfileSecrets(profile)} unreadMessages={unreadMessages ?? 0} estEditeur={estAdmin(user.email)} />
         <div className="flex-1 flex flex-col min-w-0">
           <TopBar profile={stripProfileSecrets(profile)} avatarColor={avatarColor} />
           <main className="flex-1 overflow-auto p-6">
