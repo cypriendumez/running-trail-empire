@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { createClient } from "@/lib/supabase/server";
 import { ProfileSettings } from "@/components/profile/ProfileSettings";
 import { stripProfileSecrets } from "@/lib/profile/safe";
+import { TYPE_ETAT_ABO, litEtatAbo } from "@/lib/billing/etatAbonnement";
 import { bestVmaFromWorkouts, effectiveVma } from "@/lib/running/fitness";
 import { isRun } from "@/lib/intervals/sport";
 
@@ -23,6 +24,7 @@ export default async function ProfilePage() {
     { data: workoutsMonth },
     { data: goals },
     { data: recentWk },
+    { data: ligneAbo },
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single(),
     supabase.from("performance_baselines").select("*").eq("user_id", user!.id).order("tested_at", { ascending: false }).limit(1).single(),
@@ -31,6 +33,10 @@ export default async function ProfilePage() {
     supabase.from("workouts").select("distance_km, date, type, sport").eq("user_id", user!.id).gte("date", monthStart),
     supabase.from("user_goals").select("*").eq("user_id", user!.id).order("created_at", { ascending: false }),
     supabase.from("workouts").select("distance_km, duration_seconds, type, sport, avg_hr, max_hr").eq("user_id", user!.id).gte("date", new Date(Date.now() - 120 * 86400000).toISOString().slice(0, 10)).order("date", { ascending: false }).limit(150),
+    // État de l'abonnement écrit par le webhook Stripe : date de prélèvement, résiliation
+    // en cours, échec de paiement. Sans lui, l'écran ne peut répondre à aucune des trois
+    // questions que se pose un abonné (cf. `lib/billing/etatAbonnement`).
+    supabase.from("notifications").select("data").eq("user_id", user!.id).eq("type", TYPE_ETAT_ABO).maybeSingle(),
   ]);
 
   // VMA estimée depuis les meilleurs efforts SOUTENUS (FC élevée) + FC max observée.
@@ -94,6 +100,7 @@ export default async function ProfilePage() {
       stats={{ kmYear, kmMonth, sessionsMonth, longestRun, streak, bySport }}
       fitness={{ estimatedVma, vmaSource, obsMaxHr, garminVo2max: Number((profile as { garmin_vo2max?: number | null } | null)?.garmin_vo2max) || null, garmin: ((profile as { garmin_metrics?: Record<string, number | null> | null } | null)?.garmin_metrics) ?? null }}
       userId={user!.id}
+      etatAbo={litEtatAbo((ligneAbo as { data?: unknown } | null)?.data ?? null)}
     />
   );
 }

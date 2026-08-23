@@ -72,6 +72,21 @@ export async function POST(req: Request) {
       // La carte est demandée dès l'inscription à l'essai — sinon rien ne se déclenche au
       // huitième jour et l'essai devient un abonnement gratuit permanent.
       payment_method_collection: "always",
+      // ⚠️ ACCEPTATION EXPRESSE DES CONDITIONS, cochée par l'acheteur lui-même.
+      //
+      // Les CGV portent DÉJÀ une clause de rétractation (section 6, dans les cinq
+      // langues) : quatorze jours, sauf renonciation quand l'exécution commence tout de
+      // suite. Mais une clause que personne n'accepte n'oppose rien à personne — le
+      // renoncement doit être EXPRÈS. Sans cette case, la clause était écrite pour
+      // rien : en cas de litige, il n'existait aucune trace du consentement.
+      //
+      // Stripe horodate l'acceptation et la conserve sur la session : c'est la preuve.
+      consent_collection: { terms_of_service: "required" },
+      custom_text: {
+        terms_of_service_acceptance: {
+          message: `J'accepte les [conditions générales](${process.env.NEXT_PUBLIC_APP_URL}/terms) et je demande que l'accès démarre immédiatement.`,
+        },
+      },
       allow_promotion_codes: true,
       billing_address_collection: "auto",
       // TVA automatique : indispensable pour vendre un abonnement numérique dans toute

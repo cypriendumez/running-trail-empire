@@ -7,6 +7,7 @@ import { ecrituresDeLEvenement } from "@/lib/compta/stripe";
 import { enregistrerEcritures } from "@/lib/compta/enregistrer";
 import { emailEncaissement, emailAlerteCompta } from "@/lib/compta/alerte";
 import { emailEditeur } from "@/lib/admin/acces";
+import { TYPE_ETAT_ABO, type EtatAbonnement } from "@/lib/billing/etatAbonnement";
 
 
 export async function POST(req: Request) {
@@ -53,6 +54,30 @@ export async function POST(req: Request) {
     return (data as { id?: string } | null)?.id ?? null;
   };
 
+  /**
+   * Mémorise l'état de l'abonnement pour que l'écran puisse le DIRE.
+   *
+   * ⚠️ ÉCRITURE PAR REMPLACEMENT COMPLET, jamais par fusion. Stripe envoie l'état
+   * courant en entier à chaque notification : fusionner laisserait traîner un
+   * `echecPaiement: true` d'il y a trois semaines, et l'athlète verrait une alerte de
+   * paiement refusé alors que tout va bien depuis longtemps.
+   *
+   * Le fourre-tout `notifications` évite une migration : la donnée se reconstruit
+   * intégralement à la notification suivante.
+   */
+  const memoriserEtat = async (userId: string, etat: EtatAbonnement): Promise<void> => {
+    const { data: existant } = await admin.from("notifications").select("id")
+      .eq("user_id", userId).eq("type", TYPE_ETAT_ABO).maybeSingle();
+    if (existant?.id) await admin.from("notifications").update({ data: etat }).eq("id", existant.id);
+    else await admin.from("notifications").insert({ user_id: userId, type: TYPE_ETAT_ABO, title: "abonnement", body: "", data: etat });
+  };
+
+  /** La fin de période, en AAAA-MM-JJ. Stripe la donne en secondes UNIX. */
+  const finDe = (sub: Stripe.Subscription): string | null => {
+    const t = (sub as unknown as { current_period_end?: number }).current_period_end;
+    return typeof t === "number" && t > 0 ? new Date(t * 1000).toISOString().slice(0, 10) : null;
+  };
+
   switch (event.type) {
     case "customer.subscription.created":
     case "customer.subscription.updated": {
@@ -69,6 +94,17 @@ export async function POST(req: Request) {
         subscription_tier: ["active", "trialing"].includes(sub.status) ? accesDuPrice(priceId) : "free",
         stripe_subscription_id: sub.id,
       }).eq("id", userId);
+      // ⚠️ `cancel_at_period_end` est le SEUL moyen de savoir qu'une résiliation est en
+      // cours : le statut reste `active` jusqu'au dernier jour. Sans ce drapeau, l'écran
+      // afficherait « prochain prélèvement le 24/09 » à quelqu'un qui vient de résilier.
+      await memoriserEtat(userId, {
+        statut: sub.status,
+        periodeFin: finDe(sub),
+        annuleALaFin: sub.cancel_at_period_end === true,
+        // Un abonnement redevenu actif efface l'échec précédent : Stripe ne repasse pas
+        // en `active` tant que le paiement n'est pas passé.
+        echecPaiement: sub.status === "past_due" || sub.status === "unpaid",
+      });
       break;
     }
     case "customer.subscription.deleted": {
@@ -79,6 +115,37 @@ export async function POST(req: Request) {
         subscription_tier: "free",
         stripe_subscription_id: null,
       }).eq("id", userId);
+      await memoriserEtat(userId, { statut: "canceled", periodeFin: null, annuleALaFin: false, echecPaiement: false });
+      break;
+    }
+    /**
+     * ÉCHEC DE PAIEMENT — l'événement que l'application n'écoutait PAS.
+     *
+     * Une carte expire, Stripe réessaie pendant quelques jours, puis résilie. Jusqu'ici,
+     * l'athlète voyait son compte retomber en gratuit du jour au lendemain sans qu'aucun
+     * message ne lui ait dit qu'une carte à mettre à jour en était la cause. Un abonné
+     * perdu pour une raison qu'il n'a jamais connue — et un revenu perdu invisible.
+     *
+     * ⚠️ ON NE COUPE RIEN ICI. Le premier échec n'est pas une résiliation : Stripe
+     * réessaiera. On se contente de lever le drapeau pour que l'écran l'affiche, avec le
+     * lien vers le portail. C'est `customer.subscription.deleted` qui coupe, au bout.
+     */
+    case "invoice.payment_failed": {
+      const inv = event.data.object as Stripe.Invoice & { subscription?: string | { id: string } };
+      const subId = typeof inv.subscription === "string" ? inv.subscription : inv.subscription?.id;
+      if (!subId) break;
+      const { data } = await admin.from("profiles").select("id").eq("stripe_subscription_id", subId).maybeSingle();
+      const userId = (data as { id?: string } | null)?.id;
+      if (!userId) { console.error("[stripe] échec de paiement sans athlète identifiable", subId); break; }
+      const { data: ligne } = await admin.from("notifications").select("id, data")
+        .eq("user_id", userId).eq("type", TYPE_ETAT_ABO).maybeSingle();
+      const precedent = (ligne?.data ?? {}) as Partial<EtatAbonnement>;
+      await memoriserEtat(userId, {
+        statut: typeof precedent.statut === "string" ? precedent.statut : "past_due",
+        periodeFin: typeof precedent.periodeFin === "string" ? precedent.periodeFin : null,
+        annuleALaFin: precedent.annuleALaFin === true,
+        echecPaiement: true,
+      });
       break;
     }
   }

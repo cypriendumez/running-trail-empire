@@ -18,6 +18,7 @@ import { computeQualityBudget } from "../src/lib/coach/qualityBudget";
 import { shardForPass, replanIfFresh } from "../src/lib/intervals/syncAndCoach";
 import { buildPlanReadyEmail } from "../src/lib/notify/planReady";
 import { joursEssaiStripe } from "../src/lib/billing/access";
+import { messageAbo, litEtatAbo } from "../src/lib/billing/etatAbonnement";
 import { poseAt, capLisse } from "../src/lib/segments/flyover";
 import { contientGrosMot, premierGrosMot, NB_FORMES_SURVEILLEES } from "../src/lib/social/moderation";
 import { avertissementAge, avertissementsAge, kmEffort } from "../src/lib/coach/ageDistance";
@@ -630,6 +631,88 @@ test("« Essayer 7 jours » ouvre un vrai essai, pas un prélèvement immédiat"
   // pour un produit qu'il ne peut pas essayer.
   assert.match(codeOf("src/app/api/stripe/webhook/route.ts"), /"trialing"/,
     "le webhook ne reconnaît pas le statut d'essai : l'accès serait refusé pendant l'essai");
+});
+test("un paiement qui échoue est vu, et dit", () => {
+  // ⚠️ L'ÉVÉNEMENT QUE LE WEBHOOK N'ÉCOUTAIT PAS. Une carte expire, Stripe réessaie
+  // quelques jours, puis résilie : l'athlète voyait son compte retomber en gratuit du
+  // jour au lendemain, sans qu'aucun message ne lui ait dit qu'une carte à mettre à jour
+  // en était la cause. Un abonné perdu pour une raison qu'il n'a jamais connue.
+  const wh = codeOf("src/app/api/stripe/webhook/route.ts");
+  assert.match(wh, /case "invoice\.payment_failed"/, "le webhook ignore les échecs de paiement");
+  // ⚠️ ET IL NE DOIT RIEN COUPER. Le premier échec n'est pas une résiliation — Stripe
+  // réessaiera. Couper ici priverait d'accès quelqu'un dont la banque a simplement
+  // refusé une fois. C'est `subscription.deleted` qui coupe, au bout du compte.
+  //
+  // ⚠️ LE DÉCOUPAGE M'A PIÉGÉ. Première version : « du `case` jusqu'au premier
+  // `break;` ». Or le bloc commence par un `if (!subId) break;` — la tranche
+  // s'arrêtait donc au bout de trois lignes, et une coupure d'accès insérée plus bas
+  // passait inaperçue. Vérifié par mutation : le test restait VERT. On découpe
+  // maintenant jusqu'au `case` suivant ou à la fin du `switch`.
+  const debut = wh.indexOf('case "invoice.payment_failed"');
+  const suite = wh.slice(debut);
+  const fin = suite.slice(1).search(/\n {4}case "|\n {2}\}/);
+  const corps = fin >= 0 ? suite.slice(0, fin + 1) : suite;
+  assert.ok(corps.length > 200, "le corps du cas n'a pas été isolé : le test ne vérifie rien");
+  assert.ok(!/subscription_tier/.test(corps), "un échec de paiement ne doit PAS retirer l'accès immédiatement");
+});
+test("l'athlète sait quand il sera prélevé, et jusqu'à quand il a accès", () => {
+  // Trois questions auxquelles l'écran ne répondait à AUCUNE, alors que Stripe y répond
+  // à chaque notification. Le flou sur « jusqu'à quand ai-je accès après résiliation »
+  // est ce qui pousse quelqu'un à faire opposition auprès de sa banque « au cas où ».
+  const j = (d: string) => ({ statut: "active", periodeFin: d, annuleALaFin: false, echecPaiement: false });
+
+  assert.deepEqual(messageAbo(j("2026-09-24")), { cle: "renouvelle", date: "2026-09-24" });
+  assert.deepEqual(messageAbo({ ...j("2026-09-24"), statut: "trialing" }), { cle: "essai", date: "2026-09-24" });
+  assert.deepEqual(messageAbo({ ...j("2026-09-24"), annuleALaFin: true }), { cle: "annule", date: "2026-09-24" });
+
+  // ⚠️ L'ORDRE DES CAS N'EST PAS DÉCORATIF. Quelqu'un dont la carte a été refusée n'a
+  // que faire de sa date de renouvellement : il doit aller corriger sa carte, et c'est
+  // le seul cas où l'inaction lui coûte son abonnement. L'échec passe donc devant.
+  assert.equal(messageAbo({ ...j("2026-09-24"), echecPaiement: true, annuleALaFin: true })?.cle, "echec",
+    "l'échec de paiement doit primer sur toute autre information");
+
+  // Sans date, on se TAIT : « Prochain prélèvement le » est pire que rien.
+  assert.equal(messageAbo({ ...j("2026-09-24"), periodeFin: null }), null);
+  assert.equal(messageAbo(null), null);
+  assert.equal(messageAbo(undefined), null);
+
+  // Une date douteuse ne doit jamais devenir « Invalid Date » à l'écran.
+  for (const sale of ["24/09/2026", "2026-9-4", "", "demain", "2026-09-24T00:00:00Z"]) {
+    assert.equal(litEtatAbo({ statut: "active", periodeFin: sale })?.periodeFin, null, `« ${sale} » accepté à tort`);
+  }
+  assert.equal(litEtatAbo({ statut: "active", periodeFin: "2026-09-24" })?.periodeFin, "2026-09-24");
+  assert.equal(litEtatAbo({ periodeFin: "2026-09-24" }), null, "sans statut, ce n'est pas un état d'abonnement");
+
+  // Et l'écran doit vraiment l'afficher : une donnée mémorisée que personne ne rend est
+  // exactement le défaut du portail — du code mort qui rassure.
+  assert.match(codeOf("src/components/profile/ProfileSettings.tsx"), /messageAbo\(etatAbo\)/,
+    "l'écran ne rend pas l'état de l'abonnement");
+  assert.match(codeOf("src/app/dashboard/profile/page.tsx"), /litEtatAbo\(/, "la page ne charge pas l'état");
+});
+test("l'acheteur accepte expressément les conditions", () => {
+  // Les CGV portent DÉJÀ une clause de rétractation (section 6, cinq langues). Mais une
+  // clause que personne n'accepte n'oppose rien à personne : le renoncement au droit de
+  // rétractation doit être EXPRÈS. Sans cette case, la clause était écrite pour rien.
+  const src = codeOf("src/app/api/stripe/checkout/route.ts");
+  assert.match(src, /consent_collection:\s*\{\s*terms_of_service:\s*"required"\s*\}/,
+    "l'acheteur ne coche aucune acceptation des conditions");
+  assert.match(src, /terms_of_service_acceptance/, "aucun texte n'accompagne l'acceptation");
+  assert.match(src, /\/terms/, "l'acceptation ne renvoie pas aux conditions générales");
+  // La clause doit exister dans les cinq langues, sinon on fait accepter un texte absent.
+  //
+  // ⚠️ ON VISE LE TITRE DE CHAQUE LANGUE, PAS LE NUMÉRO. Première version :
+  // `/title:\s*"6\. /` — elle comptait QUINZE résultats, parce que les trois pages
+  // légales (mentions, CGV, confidentialité) ont chacune une section 6 dans chacune des
+  // cinq langues. Un numéro n'identifie rien ; le mot, si. Et un mot par langue, sinon
+  // le test ne tient que par la parenté des langues latines et laisse passer l'allemand.
+  const legal = readFileSync("src/app/legalI18n.ts", "utf8");
+  const motRetractation = {
+    fr: "Droit de rétractation", en: "Right of withdrawal", de: "Widerrufsrecht",
+    es: "Derecho de desistimiento", pt: "Direito de retratação",
+  } as const;
+  for (const [lg, mot] of Object.entries(motRetractation)) {
+    assert.ok(legal.includes(mot), `${lg} : aucune clause de rétractation (« ${mot} » attendu)`);
+  }
 });
 test("un abonné peut changer de formule et résilier depuis l'application", () => {
   // ⚠️ LE TROU LE PLUS COÛTEUX DE LA CHAÎNE DE PAIEMENT, trouvé le 23/08/2026. La route
