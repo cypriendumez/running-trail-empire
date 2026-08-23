@@ -174,7 +174,7 @@ const STAT_VALUES = CHIFFRES_LANDING;
  * `pousse` = cette marque REÇOIT la séance. Vérifié le 21/08/2026 puis le 23/08/2026 sur
  * l'API intervals.icu elle-même (champs `*_upload_workouts`), pas sur le forum.
  */
-const SYNC: { nom: string; logo?: string; passerelle?: boolean; appli?: boolean; pousse: boolean }[] = [
+const SYNC: { nom: string; logo?: string; passerelle?: boolean; passerelleApp?: string; appli?: boolean; pousse: boolean }[] = [
   { nom: "Garmin", logo: "garmin.svg", pousse: true },
   { nom: "COROS", logo: "coros.png", pousse: true },
   { nom: "Suunto", logo: "suunto.svg", pousse: true },
@@ -184,9 +184,23 @@ const SYNC: { nom: string; logo?: string; passerelle?: boolean; appli?: boolean;
   // revérifié sur l'API le 23/08/2026 : Polar n'expose que `polar_sync_activities`,
   // `polar_download_wellness` et `polar_scope`. La LECTURE, elle, fonctionne.
   { nom: "Polar", logo: "polar.svg", pousse: false },
-  // Apple n'a AUCUN champ chez intervals.icu, dans aucun sens : tout passe par une
-  // application iOS tierce. `passerelle` ajoute l'astérisque et la phrase d'explication.
-  { nom: "Apple Watch", logo: "apple-watch.svg", passerelle: true, pousse: false },
+  // Apple n'a AUCUN champ chez intervals.icu, dans aucun sens — revérifié sur l'API le
+  // 23/08/2026 : 162 champs, pas un seul `apple*`. Mais « pas de champ » ne veut PAS dire
+  // « ne reçoit pas », et la page l'a laissé croire jusqu'au 23/08/2026 : l'Apple Watch
+  // n'apparaissait que dans la ligne de LECTURE, si bien qu'un porteur d'Apple Watch
+  // pouvait conclure que sa montre ne recevrait jamais de séance. C'est faux depuis la v3
+  // d'« Intervals Companion » (application iOS TIERCE, auteur `spmcewen`, annoncée le
+  // 09/03/2026, v3.3.1 le 11/08/2026) : elle lit le calendrier intervals.icu, convertit la
+  // séance planifiée et l'envoie à la montre — donc celle que Pacevo y écrit.
+  //
+  // `passerelleApp` porte le nom de l'application. Il est là pour que la ligne affichée et
+  // la note du dessous ne puissent pas nommer deux applications différentes.
+  //
+  // ⚠️ `pousse` RESTE FAUX, et ce n'est pas une contradiction : ce drapeau dit « intervals.icu
+  // sait pousser vers cette plateforme ». Le mettre à vrai ferait entrer Apple dans la ligne
+  // des montres à côté de Garmin — une chaîne sans aucune étape à côté d'une chaîne qui
+  // exige d'installer une application tierce que ni Pacevo ni intervals.icu ne contrôlent.
+  { nom: "Apple Watch", logo: "apple-watch.svg", passerelle: true, passerelleApp: "Intervals Companion", pousse: false },
   // Reçoit la séance sans être une montre : pas de pastille, ligne à part.
   { nom: "Zwift", appli: true, pousse: true },
 ];
@@ -456,6 +470,20 @@ export default function LandingPage() {
             <span className="font-semibold text-zinc-700">{L.sync.push}</span>{" "}
             {SYNC.filter((m) => m.pousse && !m.appli).map((m) => m.nom).join(", ")}
           </p>
+          {/* ── LA PASSERELLE, SUR SA PROPRE LIGNE ──────────────────────────────────
+              Enterrer cette information dans la note grise revenait à la cacher : l'Apple
+              Watch ne figurait que dans la ligne de LECTURE, et son porteur en déduisait
+              que sa montre ne recevrait jamais rien. Elle reçoit — via une application
+              iOS tierce, et c'est cette réserve qui justifie une ligne SÉPARÉE plutôt
+              qu'une place dans la liste des montres : la chaîne dépend d'un tiers.
+              La ligne est DÉRIVÉE de `passerelle`, et le nom de l'application vient de
+              `passerelleApp` : rien n'est recopié, donc rien ne peut diverger. */}
+          {SYNC.filter((m) => m.passerelle).map((m) => (
+            <p key={m.nom}>
+              <span className="font-semibold text-zinc-700">{L.sync.pushBridge.replace("{marque}", m.nom)}</span>{" "}
+              {L.sync.pushBridgeValue.replace("{app}", m.passerelleApp ?? "")}
+            </p>
+          ))}
           {/* Une ligne à part pour ce qui reçoit la séance SANS être une montre : Zwift
               la reçoit vraiment, mais l'annoncer « sur ta montre » serait faux. */}
           <p>

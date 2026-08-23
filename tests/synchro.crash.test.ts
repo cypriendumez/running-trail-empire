@@ -404,7 +404,7 @@ console.log("\n📣 CE QUE LA PAGE PROMET — cinq marques, et rien de plus\n");
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Les pastilles de la page d'accueil, dans l'ordre où elles s'affichent. */
-function pastillesLanding(): { nom: string; pousse: boolean; appli: boolean; passerelle: boolean }[] {
+function pastillesLanding(): { nom: string; pousse: boolean; appli: boolean; passerelle: boolean; app: string | null }[] {
   const code = codeSeul("src/app/page.tsx");
   const bloc = code.slice(code.indexOf("const SYNC:"), code.indexOf("export default function LandingPage"));
   return [...bloc.matchAll(/\{\s*nom:\s*"([^"]+)"([^}]*)\}/g)].map((m) => ({
@@ -412,6 +412,7 @@ function pastillesLanding(): { nom: string; pousse: boolean; appli: boolean; pas
     pousse: /pousse:\s*true/.test(m[2]),
     appli: /appli:\s*true/.test(m[2]),
     passerelle: /passerelle:\s*true/.test(m[2]),
+    app: (m[2].match(/passerelleApp:\s*"([^"]+)"/) ?? [])[1] ?? null,
   }));
 }
 
@@ -483,6 +484,48 @@ test("les cinq langues disent toutes que Polar ne reçoit pas", () => {
       assert.ok(!n.includes(retiree), `« ${retiree} » subsiste dans une traduction`);
     }
   }
+});
+
+test("l'Apple Watch est annoncée comme RECEVANT la séance, sur sa propre ligne", () => {
+  // ⚠️ LE DÉFAUT QUE CE TEST FIGE. L'Apple Watch n'apparaissait que dans la ligne de
+  // LECTURE : son porteur en concluait que sa montre ne recevrait jamais de séance. C'est
+  // faux — « Intervals Companion » (application iOS tierce) lit le calendrier
+  // intervals.icu, convertit la séance planifiée et l'envoie au poignet. La capacité
+  // existait, la page la cachait dans une note grise.
+  const apple = pastillesLanding().find((p) => p.nom === "Apple Watch");
+  assert.ok(apple, "Apple Watch a disparu de la page");
+  assert.equal(apple!.passerelle, true, "sans `passerelle`, la ligne d'envoi ne s'affiche pas du tout");
+  assert.equal(apple!.app, "Intervals Companion", "l'application passerelle doit être nommée dans la table, pas dans une traduction");
+  // Et le drapeau `pousse` reste FAUX : cette chaîne dépend d'une application tierce, elle
+  // ne vaut pas celle de Garmin, qui ne demande rien à l'athlète.
+  assert.equal(apple!.pousse, false, "Apple ne doit pas rejoindre la liste des montres : intervals.icu n'a aucun champ Apple");
+});
+
+test("la ligne de passerelle est dérivée de la table, jamais recopiée", () => {
+  // Une ligne écrite en dur nommerait encore « Intervals Companion » le jour où la table
+  // désignerait une autre application — et la page vanterait un logiciel abandonné.
+  const page = codeSeul("src/app/page.tsx");
+  assert.match(page, /SYNC\.filter\(\(m\) => m\.passerelle\)/, "la ligne doit être dérivée de `passerelle`");
+  assert.match(page, /pushBridgeValue\.replace\("\{app\}",\s*m\.passerelleApp/, "le nom de l'application doit venir de `passerelleApp`");
+});
+
+test("aucune traduction ne nomme l'application ni ne lui invente un prix", () => {
+  // ⚠️ « GRATUITE » N'A PAS PU ÊTRE VÉRIFIÉ. L'App Store annonce l'application comme
+  // gratuite mais avec deux achats intégrés (« Yearly Supporter » 9,99 $, « Support Tip »
+  // 19,99 $), et ni la fiche ni le site de l'auteur ne disent si l'envoi des séances est
+  // ouvert à tous ou réservé au palier soutien. Écrire un prix qu'on n'a pas vérifié, sur
+  // un site mis en vente, est exactement ce que ce projet s'interdit.
+  const dict = readFileSync(join(ROOT, "src/components/landing/landingI18n.ts"), "utf8");
+  const valeurs = [...dict.matchAll(/pushBridgeValue:\s*"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1]);
+  assert.equal(valeurs.length, 5, `${valeurs.length} traduction(s) de la ligne de passerelle, 5 attendues`);
+  for (const v of valeurs) {
+    assert.ok(v.includes("{app}"), `« ${v} » écrit le nom de l'application en dur au lieu de {app}`);
+    assert.ok(!/gratuit|free|kostenlos|grátis|gratis|\$|€|\d/i.test(v),
+      `« ${v} » avance un prix ou une gratuité qu'on n'a pas pu vérifier à la source`);
+  }
+  const marques = [...dict.matchAll(/pushBridge:\s*"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1]);
+  assert.equal(marques.length, 5);
+  for (const m of marques) assert.ok(m.includes("{marque}"), `« ${m} » écrit la marque en dur au lieu de {marque}`);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
