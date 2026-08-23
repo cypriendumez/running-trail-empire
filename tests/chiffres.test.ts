@@ -30,6 +30,7 @@ import { accesDe, peut, JOURS_APERCU } from "../src/lib/billing/access";
 import { PRIX_AFFICHES } from "../src/lib/billing/prix";
 import { ATTRIBUTION_GARMIN, PAGES_ATTRIBUTION } from "../src/components/legal/attributionI18n";
 import { liensStore } from "../src/lib/brand/stores";
+import { estAdmin, ADMIN_EMAIL } from "../src/lib/admin/acces";
 import { fournisseursActifs } from "../src/lib/auth/fournisseurs";
 import { nomAffiche, refusDe, avisDe, litAvis, TEXTE_MIN } from "../src/lib/avis/store";
 
@@ -516,6 +517,36 @@ test("aucun bouton de connexion ne mène à un fournisseur éteint", () => {
   assert.match(page, /fournisseursActifs\(/, "la page de connexion n'utilise pas le filtre");
   assert.match(page, /oauth\.includes\("google"\)/, "le bouton Google n'est pas conditionné");
   assert.match(page, /oauth\.includes\("apple"\)/, "le bouton Apple n'est pas conditionné");
+});
+
+test("l'espace coach est atteignable, et par une seule personne", () => {
+  // ⚠️ IL EXISTAIT SANS QU'AUCUN LIEN N'Y MÈNE. Six pages fonctionnelles — clients,
+  // séances, messagerie, avis, lettre — correctement protégées, et absentes de la barre
+  // latérale : il fallait connaître l'adresse et la taper à la main. Une fonction qu'on
+  // ne peut pas atteindre n'existe pas pour celui qui l'utilise.
+  const sidebar = sansCommentaires(readFileSync(join(ROOT, "src/components/layout/Sidebar.tsx"), "utf8"));
+  assert.match(sidebar, /href="\/admin"/, "aucun lien vers l'espace coach dans la barre latérale");
+
+  // ⚠️ ET IL DOIT RESTER CONDITIONNEL. Un lien affiché à tout le monde enverrait chaque
+  // athlète sur une page qui le renvoie aussitôt — une porte peinte sur un mur.
+  assert.match(sidebar, /estAdmin\(/, "le lien vers l'espace coach n'est plus conditionnel");
+
+  // ⚠️ UNE SEULE DÉFINITION DE L'ADRESSE. Elle était écrite en dur dans le layout ;
+  // ajouter le lien ailleurs en aurait créé une deuxième copie, donc deux vérités qui
+  // divergent — le défaut le plus répété de ce projet.
+  const layout = sansCommentaires(readFileSync(join(ROOT, "src/app/admin/layout.tsx"), "utf8"));
+  assert.ok(!layout.includes("@outlook.fr"), "l'adresse admin est recopiée dans le layout");
+  assert.ok(!sidebar.includes("@outlook.fr"), "l'adresse admin est recopiée dans la barre latérale");
+  assert.match(layout, /estAdmin\(/, "le layout n'utilise plus la source unique");
+
+  // La vraie barrière reste le contrôle serveur : masquer un lien ne protège rien.
+  assert.match(layout, /redirect\(/, "le layout /admin ne renvoie plus les intrus");
+
+  // Et la comparaison ne doit pas se laisser piéger par la casse ou les espaces.
+  assert.ok(estAdmin(ADMIN_EMAIL));
+  assert.ok(estAdmin("  CYPRIENDUMEZ@OUTLOOK.FR  "), "la casse ne doit pas fermer la porte au bon compte");
+  assert.ok(!estAdmin("autre@exemple.fr"));
+  assert.ok(!estAdmin(null) && !estAdmin(""), "une session vide n'est pas l'éditeur");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

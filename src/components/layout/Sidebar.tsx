@@ -14,6 +14,7 @@ import { useState } from "react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { Logo } from "@/components/brand/Logo";
 import { Wordmark } from "@/components/brand/Wordmark";
+import { estAdmin } from "@/lib/admin/acces";
 
 // Navigation groupée par univers — plus lisible et pro.
 const groups: { titleKey: string | null; items: { href: string; icon: typeof LayoutDashboard; tk: string }[] }[] = [
@@ -72,6 +73,11 @@ export function Sidebar({ profile, unreadMessages = 0 }: { profile: Record<strin
   const { t, lang } = useT();
   const [collapsed, setCollapsed] = useState(false);
   const tier = String(profile?.subscription_tier ?? "free");
+  // ⚠️ L'espace coach existait sans qu'aucun lien n'y mène : six pages protégées,
+  // absentes de cette barre, atteignables seulement en tapant l'adresse. Masquer ce lien
+  // ne protège RIEN — la vraie barrière est le `redirect()` du layout /admin, côté
+  // serveur. Il évite juste d'afficher une porte qu'on ne peut pas ouvrir.
+  const admin = estAdmin(profile?.email as string | undefined);
   const pc = PREMIUM_CARD[lang] ?? PREMIUM_CARD.fr;
 
   async function signOut() {
@@ -153,6 +159,13 @@ export function Sidebar({ profile, unreadMessages = 0 }: { profile: Record<strin
 
       {/* Footer */}
       <div className="p-3 border-t border-zinc-100 space-y-0.5">
+        {admin && (
+          <Link href="/admin"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-all">
+            <ShieldCheck className="w-[18px] h-[18px] flex-shrink-0" />
+            {!collapsed && "Espace coach"}
+          </Link>
+        )}
         <NavItem href="/dashboard/profile" icon={User} label={t("nav.profile")} />
         <Link href="/dashboard/settings"
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition-all">
