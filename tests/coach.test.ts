@@ -35,6 +35,7 @@ import { TARIFS, FORMULES, accesDuPrice } from "../src/lib/stripe/client";
 import { PRIX_AFFICHES, REMISE_ANNUELLE_PCT, MOIS_FACTURES_PAR_AN, MOIS_OFFERTS, economieAnnuelle } from "../src/lib/billing/prix";
 import { jetonDesinscription, jetonValide } from "../src/lib/newsletter/token";
 import { emailConfirmation } from "../src/lib/newsletter/confirmation";
+import { emailNouvelInscrit } from "../src/lib/notify/nouvelInscrit";
 import { construireEmail as courrierHebdo, libellesSections, LANGS as LANGS_MAIL2, type Section as SectionMail2 } from "../src/lib/newsletter/email";
 import { chiffresVerifies, rendreTous, extraireResumes, RESUMES_MAX } from "../src/lib/newsletter/resume";
 import { FILTRES, QUERIES, RUBRIQUES_LETTRE, estCat } from "../src/lib/news/rubriques";
@@ -4631,6 +4632,35 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
         assert.notEqual(c.objet, emailConfirmation("fr", base, lien).objet, `l'accusé reste en français pour ${lg}`);
       }
     }
+  });
+
+  test("l'alerte d'inscription part une fois, à la confirmation, avec ce qu'il faut dedans", () => {
+    // Une alerte partait déjà quand un athlète notait son ressenti, mais RIEN à la
+    // création d'un compte : il fallait penser à ouvrir /admin pour s'en apercevoir.
+    const base = "https://exemple.fr";
+    const a = emailNouvelInscrit({ nom: "Cyprien Dumez", email: "c@exemple.fr", base, premier: true });
+    const b = emailNouvelInscrit({ nom: "Marie L.", email: "m@exemple.fr", base, premier: false });
+
+    for (const [quoi, e] of [["premier", a], ["suivant", b]] as [string, typeof a][]) {
+      assert.ok(e.html.includes("/icon.png"), `${quoi} : pas de logo`);
+      assert.ok(e.html.includes("#f4f4f5"), `${quoi} : pas de coquille`);
+      assert.ok(!e.html.includes("undefined"), `${quoi} : une valeur manque`);
+      // ⚠️ L'e-mail ET le nom doivent y être : une alerte qui dit « quelqu'un s'est
+      // inscrit » sans dire QUI oblige à ouvrir l'admin, donc ne sert à rien.
+      assert.ok(e.texte.includes("@exemple.fr"), `${quoi} : l'adresse n'apparaît pas`);
+      assert.ok(e.html.includes(`${base}/admin`), `${quoi} : aucun lien vers l'espace coach`);
+    }
+
+    // ⚠️ « Premier inscrit » n'est pas un ornement : sur un site qu'on vient de publier,
+    // c'est l'information. Elle ne doit apparaître QUE la première fois.
+    assert.match(a.objet, /Premier inscrit/, "le premier inscrit doit être signalé comme tel");
+    assert.ok(!/Premier/.test(b.objet), "le deuxième inscrit ne doit pas être annoncé comme le premier");
+    assert.ok(a.html.includes("Premier inscrit") && !b.html.includes("Premier inscrit"));
+
+    // Le nom doit survivre à un profil vide — on n'envoie jamais « undefined vient de
+    // créer un compte ».
+    const c = emailNouvelInscrit({ nom: "", email: "x@exemple.fr", base, premier: false });
+    assert.ok(c.objet.trim().endsWith(":") === false && c.objet.length > 12, "objet vide sur un nom manquant");
   });
 
   test("le jeton de désinscription ne se laisse pas deviner", () => {
