@@ -581,6 +581,23 @@ test("la liste des administrateurs se configure sans redéployer", () => {
     "la liste des administrateurs est exposée au navigateur");
 });
 
+test("un chemin d'API inconnu répond 404, quelle que soit la méthode", () => {
+  // ⚠️ EN PRODUCTION, `POST /api/chemin-inexistant` RÉPONDAIT 200 AVEC UNE PAGE HTML.
+  // En GET, 404 correctement. Les intégrations qui écrivent chez nous parlent en POST —
+  // Stripe, les webhooks de montre, les notifications de boutique : un chemin mal
+  // orthographié leur renvoyait « OK », elles considéraient l'événement livré et ne
+  // réessayaient jamais. Un encaissement sans abonnement activé, découvert par la
+  // réclamation du client.
+  const attrape = join(ROOT, "src/app/api/[...inconnu]/route.ts");
+  assert.ok(existsSync(attrape), "aucune route attrape-tout : les chemins d'API inconnus répondent 200 en POST");
+  const src = sansCommentaires(readFileSync(attrape, "utf8"));
+  assert.match(src, /status:\s*404/, "l'attrape-tout ne renvoie pas un vrai 404");
+  // Toutes les méthodes qui écrivent, pas seulement GET : c'est POST qui posait problème.
+  for (const m of ["GET", "POST", "PUT", "PATCH", "DELETE"]) {
+    assert.match(src, new RegExp(`export const ${m}\\b`), `la méthode ${m} n'est pas couverte`);
+  }
+});
+
 test("aucun fichier ne redéclare l'identité de l'éditeur", () => {
   // ⚠️ SEIZE COPIES DE L'ADRESSE EXISTAIENT. Quatorze ont été unifiées hier — et j'ai
   // annoncé que c'était fini. C'ÉTAIT FAUX : le test ne regardait que `api/admin`, alors
