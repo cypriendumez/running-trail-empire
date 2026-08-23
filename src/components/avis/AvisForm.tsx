@@ -3,7 +3,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Star, Loader2, Check } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
-import { TEXTE_MIN, TEXTE_MAX } from "@/lib/avis/store";
+// ⚠️ `lib/avis/bornes`, PAS `lib/avis/store` : le store importe le filtre de
+// grossièretés, et l'importer ici enverrait ses 106 racines dans le bundle public.
+import { TEXTE_MIN, TEXTE_MAX } from "@/lib/avis/bornes";
 
 /**
  * ÉCRIRE SON AVIS — réservé aux comptes existants.

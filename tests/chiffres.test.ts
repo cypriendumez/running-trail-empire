@@ -395,6 +395,114 @@ test("aucun badge ne promet une application qui n'existe pas", () => {
   assert.equal(liensStore({ NEXT_PUBLIC_PLAY_STORE_URL: "https://play.google.com/x" }).ios, null);
 });
 
+test("la liste de grossièretés ne part pas dans le navigateur", () => {
+  // ⚠️ DÉFAUT MESURÉ SUR LE BUILD, pas supposé. En branchant le filtre sur les avis,
+  // `lib/avis/store` s'est mis à importer `lib/social/moderation` — or le formulaire, qui
+  // est un composant CLIENT, importait `store` pour deux constantes de longueur. Résultat
+  // vérifié dans `.next/static/chunks/…js` : les 106 racines surveillées, insultes
+  // racistes comprises, en clair dans le JavaScript public du site.
+  //
+  // Ce n'est pas une faille — le refus s'applique côté serveur, connaître la liste ne le
+  // contourne pas. C'est un fichier de slurs consultable par n'importe qui dans le bundle
+  // d'un site mis en vente. Le tree-shaking ne l'enlève pas : `moderation.ts` construit un
+  // `Set` au chargement du module, effet de bord qu'un bundler n'a pas le droit de retirer.
+  //
+  // ⚠️ ON TESTE LE GRAPHE D'IMPORTS, PAS LE BUILD. Lire `.next/static` rendrait le test
+  // vert-aveugle partout où le build n'a pas encore tourné — c'est-à-dire pendant
+  // `npm run verify`, qui passe AVANT `npm run build`.
+  const SRC = join(ROOT, "src");
+  const lire = (f: string) => readFileSync(f, "utf8");
+  const resoudre = (depuis: string, spec: string): string | null => {
+    const base = spec.startsWith("@/") ? join(SRC, spec.slice(2))
+      : spec.startsWith(".") ? join(depuis, "..", spec) : null;
+    if (!base) return null;                       // paquet npm : hors du graphe du projet
+    for (const suf of [".ts", ".tsx", "/index.ts", "/index.tsx"]) {
+      if (existsSync(base + suf)) return base + suf;
+    }
+    return existsSync(base) && statSync(base).isFile() ? base : null;
+  };
+  const importsDe = (f: string): string[] =>
+    [...lire(f).matchAll(/from\s+["']([^"']+)["']/g)]
+      .map((m) => resoudre(f, m[1])).filter((x): x is string => !!x);
+
+  // Tous les composants clients, puis tout ce qu'ils atteignent transitivement.
+  const tousLesFichiers = (dir: string, out: string[] = []): string[] => {
+    for (const nom of readdirSync(dir)) {
+      const c = join(dir, nom);
+      if (statSync(c).isDirectory()) tousLesFichiers(c, out);
+      else if (/\.tsx?$/.test(nom)) out.push(c);
+    }
+    return out;
+  };
+  const clients = tousLesFichiers(SRC).filter((f) => /^\s*["']use client["']/.test(lire(f)));
+  assert.ok(clients.length > 20, `seulement ${clients.length} composants clients trouvés — la détection est cassée`);
+
+  const atteints = new Set<string>();
+  const pile = [...clients];
+  while (pile.length) {
+    const f = pile.pop()!;
+    if (atteints.has(f)) continue;
+    atteints.add(f);
+    for (const dep of importsDe(f)) if (!atteints.has(dep)) pile.push(dep);
+  }
+  // Preuve que la marche fonctionne : sans elle, un graphe vide passerait au vert.
+  assert.ok(atteints.has(join(SRC, "lib/avis/bornes.ts")),
+    "le parcours du graphe n'atteint même pas `lib/avis/bornes` : la résolution d'imports est cassée");
+
+  const fautif = join(SRC, "lib/social/moderation.ts");
+  assert.ok(!atteints.has(fautif),
+    "un composant client atteint `lib/social/moderation` : ses 106 racines partiront dans le bundle public");
+});
+
+test("un avis grossier est refusé, dans les six langues du filtre", () => {
+  // Décision de Cyprien le 23/08/2026 : le filtre de `lib/social/moderation`, qui ne
+  // servait qu'au fil communautaire, s'applique désormais aux avis. Avant, une insulte
+  // n'était arrêtée que par la relecture manuelle — donc jamais si elle était approuvée
+  // vite ou en série.
+  const long = (mot: string) => `${mot} ${"a".repeat(TEXTE_MIN)}`;   // franchit la longueur minimale
+  for (const [langue, mot] of [
+    ["fr", "connard"], ["en", "fuck"], ["es", "gilipollas"],
+    ["de", "arschloch"], ["pt", "caralho"], ["it", "stronzo"],
+  ] as const) {
+    const r = refusDe(5, long(mot));
+    assert.ok(r, `« ${mot} » (${langue}) passe le filtre des avis`);
+    assert.match(r!, new RegExp(mot, "i"), `le refus doit NOMMER le mot : un refus sans motif passe pour un bug`);
+  }
+});
+
+test("le filtre des avis ne refuse pas un texte honnête, ni un avis simplement négatif", () => {
+  // ⚠️ LES DEUX MOITIÉS DU CONTRAT, et la seconde est la plus importante juridiquement.
+  //
+  // 1. LE PROBLÈME DE SCUNTHORPE. « connexion » contient « con », « assez » contient
+  //    « ass », « députe » contient « pute ». Un athlète dont l'avis sincère est refusé
+  //    à cause de « super connexion GPS » ne recommence pas : il s'en va.
+  for (const texte of [
+    "Super connexion GPS avec ma montre, tout remonte sans que j'y pense.",
+    "J'en ai assez fait cette semaine, le plan s'est adapté tout seul, bravo.",
+    "Le député local court aussi avec, il paraît. Application vraiment bien pensée.",
+  ]) {
+    assert.equal(refusDe(5, texte), null, `texte honnête refusé à tort : « ${texte} »`);
+  }
+  // 2. UN AVIS NÉGATIF POLI DOIT PASSER. Refuser une critique argumentée tomberait sous
+  //    la même interdiction que fabriquer de faux avis — directive (UE) 2019/2161. Le
+  //    filtre porte sur les MOTS, jamais sur la note ni sur le fond.
+  const dur = "Plan trop dur pour un débutant, j'ai fini blessé au bout de trois semaines.";
+  assert.equal(refusDe(1, dur), null, "un avis d'une étoile, dur mais poli, doit passer");
+  assert.equal(refusDe(1, "x".repeat(TEXTE_MIN)), null, "la note ne doit jamais entrer dans le refus");
+});
+
+test("les contournements évidents ne passent pas non plus", () => {
+  // ⚠️ LE PIÈGE QUE J'AI FAILLI LAISSER. `premierGrosMot` seul aurait suffi à nommer le
+  // mot fautif — mais il ne recolle PAS les lettres espacées. Brancher cette seule
+  // fonction aurait laissé passer « m e r d e », le contournement le plus évident qui
+  // soit, sans que rien ne le signale. D'où l'appel à `contientGrosMot` en amont.
+  for (const ruse of ["c0nnard", "puuuutain", "f*ck", "CONNARD", "çonnard"]) {
+    assert.ok(refusDe(5, `${ruse} ${"a".repeat(TEXTE_MIN)}`), `« ${ruse} » passe le filtre`);
+  }
+  assert.ok(refusDe(5, `m e r d e ${"a".repeat(TEXTE_MIN)}`),
+    "les lettres espacées passent : `contientGrosMot` n'est pas appelé");
+});
+
 test("écrire un avis exige un compte, et rien ne le vérifiait", () => {
   // ⚠️ CE GARDE-FOU N'ÉTAIT PROTÉGÉ PAR AUCUN TEST — trouvé le 23/08/2026 en répondant à
   // « il faut bien un compte pour publier un avis ? ». Oui : `/api/avis` refuse toute

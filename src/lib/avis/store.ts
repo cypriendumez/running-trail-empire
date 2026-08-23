@@ -19,7 +19,22 @@
  * ⚠️ `publie` est faux au départ. La modération sert à écarter l'insulte et le spam,
  * JAMAIS à trier par note — filtrer les avis négatifs est précisément ce que la
  * directive (UE) 2019/2161 interdit, au même titre que les inventer.
+ *
+ * ── LES GROSSIÈRETÉS SONT REFUSÉES À LA SOUMISSION ───────────────────────────
+ * Décision de Cyprien le 23/08/2026. Jusque-là, le filtre de `lib/social/moderation`
+ * n'était branché QUE sur le fil communautaire : un avis pouvait contenir n'importe
+ * quelle insulte, seule la relecture manuelle l'arrêtait avant publication.
+ *
+ * ⚠️ CE QUE CE REFUS NE DOIT JAMAIS DEVENIR. Il porte sur les MOTS, jamais sur la note
+ * ni sur le fond. Un avis d'une étoile, dur, argumenté et poli passe exactement comme
+ * un avis de cinq. Le jour où ce filtre servirait à écarter une critique, il tomberait
+ * sous la même interdiction que les faux avis — directive (UE) 2019/2161. Le risque a
+ * été exposé à Cyprien avant qu'il tranche : un avis sincère mais énervé
+ * (« putain, c'est trop dur ») est refusé et son auteur doit le reformuler.
  */
+
+import { contientGrosMot, premierGrosMot } from "@/lib/social/moderation";
+import { TEXTE_MIN, TEXTE_MAX } from "./bornes";
 
 export type Avis = {
   note: number;      // 1 à 5
@@ -30,8 +45,9 @@ export type Avis = {
 };
 
 export const TYPE_AVIS = "avis";
-export const TEXTE_MIN = 40;
-export const TEXTE_MAX = 600;
+// Réexportées depuis `bornes.ts`, qui n'importe RIEN : c'est ce fichier-là que le
+// formulaire client importe, pour que la liste de grossièretés reste côté serveur.
+export { TEXTE_MIN, TEXTE_MAX } from "./bornes";
 
 /**
  * « Cyprien Dumez » → « Cyprien D. ». Un nom seul reste tel quel, un nom vide devient
@@ -58,6 +74,16 @@ export function refusDe(note: unknown, texte: unknown): string | null {
   const t = typeof texte === "string" ? texte.trim() : "";
   if (t.length < TEXTE_MIN) return `Ton avis doit faire au moins ${TEXTE_MIN} caractères.`;
   if (t.length > TEXTE_MAX) return `Ton avis ne doit pas dépasser ${TEXTE_MAX} caractères.`;
+  // ⚠️ LES DEUX FONCTIONS, PAS UNE SEULE. `premierGrosMot` sait NOMMER le mot fautif —
+  // un refus sans motif passe pour un bug — mais il ne rattrape PAS les lettres espacées
+  // (« m e r d e »), que seul `contientGrosMot` recolle. Ne garder que la première
+  // laisserait donc passer le contournement le plus évident, sans que rien ne le signale.
+  if (contientGrosMot(t)) {
+    const fautif = premierGrosMot(t);
+    return fautif
+      ? `Ton avis contient « ${fautif} » : reformule-le sans ce mot et il partira en relecture.`
+      : "Ton avis contient une grossièreté : reformule-le et il partira en relecture.";
+  }
   return null;
 }
 
