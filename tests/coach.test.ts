@@ -551,6 +551,57 @@ test("le webhook refuse tout événement non signé", () => {
     "sans secret configuré, le webhook doit REFUSER — l'accepter reviendrait à laisser n'importe qui offrir un abonnement");
   assert.ok(!/constructEvent\([^)]*!\)/.test(src), "le secret ne doit pas être forcé avec `!`");
 });
+test("un abonné peut changer de formule et résilier depuis l'application", () => {
+  // ⚠️ LE TROU LE PLUS COÛTEUX DE LA CHAÎNE DE PAIEMENT, trouvé le 23/08/2026. La route
+  // `/api/stripe/portal` était écrite depuis longtemps — et AUCUN écran ne l'appelait :
+  // `grep "api/stripe/portal"` ne renvoyait que le fichier de la route lui-même. Un
+  // abonné ne pouvait ni changer de formule, ni passer à l'annuel, ni mettre à jour sa
+  // carte, ni récupérer ses factures, ni RÉSILIER.
+  //
+  // Trois raisons pour lesquelles ce test doit rester :
+  //  · la résiliation en ligne est une OBLIGATION LÉGALE quand la souscription s'est
+  //    faite en ligne (art. L215-1-1 du code de la consommation) ;
+  //  · une carte expirée met fin à l'abonnement sans que le client puisse le corriger ;
+  //  · l'impossibilité de résilier est le premier motif d'opposition bancaire.
+  //
+  // ⚠️ ANCRAGE : on vise l'APPEL RÉSEAU, pas l'existence du fichier de route. Une route
+  // que personne n'appelle est exactement le défaut qu'on corrige ici.
+  const ecrans = ["src/components/profile/ProfileSettings.tsx"];
+  const appelants = ecrans.filter((f) => /fetch\(\s*["'`]\/api\/stripe\/portal["'`]/.test(codeOf(f)));
+  assert.deepEqual(appelants, ecrans, "aucun écran n'ouvre le portail de facturation Stripe");
+
+  const ui = codeOf("src/components/profile/ProfileSettings.tsx");
+  // Le bouton doit être lié au CLIENT Stripe, pas à la formule en cours : quelqu'un dont
+  // le paiement a échoué est repassé « free » et c'est justement lui qui doit pouvoir
+  // aller corriger sa carte. Le lier à la formule cacherait le bouton à celui qui en a
+  // le plus besoin — et priverait un ancien abonné de ses factures.
+  assert.match(ui, /Boolean\(profile\?\.stripe_customer_id\)/,
+    "le bouton doit s'afficher dès qu'un client Stripe existe, pas seulement pour un abonné actif");
+  // Une réponse inattendue ne doit pas envoyer l'athlète sur « undefined ».
+  assert.match(ui, /startsWith\("https:\/\/"\)/, "l'URL de redirection doit être vérifiée avant usage");
+});
+test("les quatre tarifs attendus par le code sont ceux qu'on demande de renseigner", () => {
+  // ⚠️ `.env.local` portait STRIPE_PRICE_MONTHLY et STRIPE_PRICE_YEARLY — deux noms que
+  // le code ne lit NULLE PART (il compose `STRIPE_PRICE_<FORMULE>_<PÉRIODE>` à
+  // l'exécution). Les remplir donnait un site répondant « le paiement n'est pas encore
+  // ouvert » sans dire pourquoi : `stripeConfigured` restait faux, et rien ne le
+  // signalait. C'est le genre de piège qui coûte une soirée le jour de la mise en route.
+  const attendus = ["STRIPE_PRICE_STARTER_MONTHLY", "STRIPE_PRICE_STARTER_YEARLY",
+                    "STRIPE_PRICE_PREMIUM_MONTHLY", "STRIPE_PRICE_PREMIUM_YEARLY"];
+  const src = codeOf("src/lib/stripe/client.ts");
+  for (const v of attendus) assert.ok(src.includes(v), `le code ne connaît pas ${v}`);
+  if (existsSync(".env.local")) {
+    const env = readFileSync(".env.local", "utf8");
+    for (const v of attendus) {
+      assert.ok(new RegExp(`^${v}=`, "m").test(env), `${v} manque dans .env.local : impossible à renseigner`);
+    }
+    // Et les anciens noms ne doivent pas revenir : leur seule présence fait croire que
+    // le paiement est configurable alors qu'ils ne sont lus par personne.
+    for (const mort of ["STRIPE_PRICE_MONTHLY", "STRIPE_PRICE_YEARLY"]) {
+      assert.ok(!new RegExp(`^${mort}=`, "m").test(env), `${mort} est un leurre : aucun code ne le lit`);
+    }
+  }
+});
 test("l'abonnement n'est jamais accordé depuis le navigateur", () => {
   // Le niveau d'abonnement ne doit être écrit que par le webhook, côté serveur, après
   // vérification de signature. Une écriture depuis un composant client suffirait à
@@ -600,10 +651,19 @@ test("la formule vendue est celle qui est ACCORDÉE", () => {
   assert.equal(accesDuPrice(null), "premium");
   assert.equal(accesDuPrice("price_inconnu"), "premium");
 });
-test("l'athlète peut résilier son abonnement", () => {
-  // Obligation légale en Europe dès lors que la souscription s'est faite en ligne — et
-  // premier motif de litige bancaire quand elle manque.
+test("le portail de résiliation est servi par une route, et pas seulement écrit", () => {
+  // ⚠️ CE TEST S'APPELAIT « l'athlète peut résilier son abonnement » ET IL ÉTAIT VERT
+  // ALORS QUE PERSONNE NE POUVAIT RÉSILIER. Il ne vérifiait qu'une chose : que le
+  // FICHIER de route existe. Or aucun écran n'appelait cette route — le portail était du
+  // code mort, et le test certifiait une conformité légale qui n'existait pas.
+  //
+  // Existence ≠ accessibilité. Le titre promettait la seconde, l'assertion mesurait la
+  // première. C'est renommé, et la vraie garantie est vérifiée par « un abonné peut
+  // changer de formule et résilier depuis l'application », qui vise l'APPEL RÉSEAU.
   assert.ok(existsSync("src/app/api/stripe/portal/route.ts"), "aucun portail de gestion d'abonnement");
+  const src = codeOf("src/app/api/stripe/portal/route.ts");
+  assert.match(src, /billingPortal\.sessions\.create/, "la route n'ouvre pas de session de portail");
+  assert.match(src, /auth\.getUser\(\)/, "la route n'exige pas de session : n'importe qui ouvrirait le portail d'autrui");
 });
 
 console.log("\nINTÉGRITÉ COMMERCIALE");

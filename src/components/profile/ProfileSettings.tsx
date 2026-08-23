@@ -60,7 +60,7 @@ const P: Record<string, Record<string, string>> = {
     "shoes.title": "Mon Garage", "shoes.count": "{n} paire active", "shoes.countP": "{n} paires actives", "shoes.new": "Nouvelle paire", "shoes.brand": "Marque", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Modèle", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Durée de vie (km)", "shoes.buyDate": "Date d'achat", "shoes.addGarage": "Ajouter au garage", "shoes.suggestHint": "Commence à taper la marque puis le modèle — on te suggère les modèles populaires.", "shoes.emptyTitle": "Aucune chaussure dans le garage", "shoes.emptyDesc": "Ajoutez vos paires pour suivre leur kilométrage", "shoes.replace": "À remplacer", "shoes.watch": "Surveiller", "shoes.good": "Bon état", "shoes.km": "{cur} km parcourus · {rem} km restants",
     "sub.title": "Abonnement actuel", "sub.plan": "Plan {tier}", "sub.freeDesc": "Accès limité aux fonctionnalités de base", "sub.proDesc": "Accès complet à toutes les fonctionnalités", "sub.active": "✓ Actif", "sub.free": "Gratuit", "sub.pro": "Pro",
     "feat.dash": "Dashboard & statistiques", "feat.journal": "Journal intelligent (NLP)", "feat.plans3": "Plans d'entraînement (3 max)", "feat.plansUnli": "Plans d'entraînement illimités", "feat.coach": "Coach IA personnalisé (Claude)", "feat.ghost": "Ghost Runner IA", "feat.vma": "Analyses VMA & zones cardiaques", "feat.sync": "Sync montres GPS (Garmin, Polar…)", "feat.shop": "Shopping Hub & recommandations", "feat.leagues": "Ligues & classements",
-    "sub.goPro": "Passer à Starter ou Premium", "sub.unlock": "Débloquez le module IA", "sub.perMonth": "/mois", "sub.yearly": "{an}/an · {mois} mois offerts", "sub.trial": "Commencer l'essai gratuit de {n} jours",
+    "sub.manage": "Gérer mon abonnement", "sub.manageDesc": "Changer de formule, passer au tarif annuel, mettre à jour ta carte, récupérer tes factures ou résilier.", "sub.manageCta": "Ouvrir mon espace de facturation", "sub.manageOpening": "Ouverture…", "sub.manageErr": "Impossible d'ouvrir l'espace de facturation. Réessaie dans un instant.", "sub.cancelNote": "Si tu résilies, ton accès reste ouvert jusqu'à la fin de la période déjà payée — aucun prélèvement ensuite.", "sub.secure": "Paiement et facturation gérés par Stripe. Pacevo ne voit jamais ton numéro de carte.", "sub.goPro": "Passer à Starter ou Premium", "sub.unlock": "Débloquez le module IA", "sub.perMonth": "/mois", "sub.yearly": "{an}/an · {mois} mois offerts", "sub.trial": "Commencer l'essai gratuit de {n} jours",
     "t.saveErr": "Erreur lors de la sauvegarde", "t.saveOk": "Profil mis à jour !", "t.uploadErr": "Erreur lors de l'upload", "t.photoOk": "Photo de profil mise à jour !", "t.netErr": "Erreur réseau", "t.goalsSql": "Objectifs pas encore activés — lance le SQL fourni dans Supabase.", "t.createErr": "Erreur lors de la création", "t.goalAdd": "Objectif ajouté !", "t.goalDel": "Objectif supprimé", "t.addErr": "Erreur lors de l'ajout", "t.shoeAdd": "Chaussure ajoutée !", "t.shoeDel": "Chaussure retirée du garage", "t.exportOk": "Tes données ont été exportées (JSON).", "t.exportErr": "Export impossible, réessaie.",
   },
   en: {
@@ -95,7 +95,7 @@ const P: Record<string, Record<string, string>> = {
     "shoes.title": "My Garage", "shoes.count": "{n} active pair", "shoes.countP": "{n} active pairs", "shoes.new": "New pair", "shoes.brand": "Brand", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Model", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Lifespan (km)", "shoes.buyDate": "Purchase date", "shoes.addGarage": "Add to garage", "shoes.suggestHint": "Start typing the brand then the model — we suggest popular models.", "shoes.emptyTitle": "No shoes in the garage", "shoes.emptyDesc": "Add your pairs to track their mileage", "shoes.replace": "Replace", "shoes.watch": "Watch", "shoes.good": "Good", "shoes.km": "{cur} km run · {rem} km left",
     "sub.title": "Current subscription", "sub.plan": "{tier} plan", "sub.freeDesc": "Limited access to basic features", "sub.proDesc": "Full access to all features", "sub.active": "✓ Active", "sub.free": "Free", "sub.pro": "Pro",
     "feat.dash": "Dashboard & stats", "feat.journal": "Smart journal (NLP)", "feat.plans3": "Training plans (3 max)", "feat.plansUnli": "Unlimited training plans", "feat.coach": "Personalized AI coach (Claude)", "feat.ghost": "AI Ghost Runner", "feat.vma": "vVO2max & HR-zone analysis", "feat.sync": "GPS watch sync (Garmin, Polar…)", "feat.shop": "Shopping Hub & recommendations", "feat.leagues": "Leagues & rankings",
-    "sub.goPro": "Upgrade to Starter or Premium", "sub.unlock": "Unlock the AI module", "sub.perMonth": "/mo", "sub.yearly": "{an}/yr · {mois} months free", "sub.trial": "Start the {n}-day free trial",
+    "sub.manage": "Manage my subscription", "sub.manageDesc": "Switch plan, move to yearly billing, update your card, download invoices or cancel.", "sub.manageCta": "Open my billing portal", "sub.manageOpening": "Opening…", "sub.manageErr": "Could not open the billing portal. Try again in a moment.", "sub.cancelNote": "If you cancel, your access stays open until the end of the period you already paid for — nothing is charged after that.", "sub.secure": "Payments and billing handled by Stripe. Pacevo never sees your card number.", "sub.goPro": "Upgrade to Starter or Premium", "sub.unlock": "Unlock the AI module", "sub.perMonth": "/mo", "sub.yearly": "{an}/yr · {mois} months free", "sub.trial": "Start the {n}-day free trial",
     "t.saveErr": "Error while saving", "t.saveOk": "Profile updated!", "t.uploadErr": "Upload error", "t.photoOk": "Profile photo updated!", "t.netErr": "Network error", "t.goalsSql": "Goals not enabled yet — run the provided SQL in Supabase.", "t.createErr": "Error while creating", "t.goalAdd": "Goal added!", "t.goalDel": "Goal deleted", "t.addErr": "Error while adding", "t.shoeAdd": "Shoe added!", "t.shoeDel": "Shoe removed from garage", "t.exportOk": "Your data has been exported (JSON).", "t.exportErr": "Export failed, try again.",
   },
   de: {
@@ -130,7 +130,7 @@ const P: Record<string, Record<string, string>> = {
     "shoes.title": "Meine Garage", "shoes.count": "{n} aktives Paar", "shoes.countP": "{n} aktive Paare", "shoes.new": "Neues Paar", "shoes.brand": "Marke", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Modell", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Lebensdauer (km)", "shoes.buyDate": "Kaufdatum", "shoes.addGarage": "Zur Garage hinzufügen", "shoes.suggestHint": "Tippe Marke und Modell — wir schlagen beliebte Modelle vor.", "shoes.emptyTitle": "Keine Schuhe in der Garage", "shoes.emptyDesc": "Füge deine Paare hinzu, um die Kilometer zu verfolgen", "shoes.replace": "Ersetzen", "shoes.watch": "Beobachten", "shoes.good": "Guter Zustand", "shoes.km": "{cur} km gelaufen · {rem} km übrig",
     "sub.title": "Aktuelles Abo", "sub.plan": "{tier}-Plan", "sub.freeDesc": "Eingeschränkter Zugang zu Basisfunktionen", "sub.proDesc": "Voller Zugang zu allen Funktionen", "sub.active": "✓ Aktiv", "sub.free": "Kostenlos", "sub.pro": "Pro",
     "feat.dash": "Dashboard & Statistiken", "feat.journal": "Intelligentes Tagebuch (NLP)", "feat.plans3": "Trainingspläne (max. 3)", "feat.plansUnli": "Unbegrenzte Trainingspläne", "feat.coach": "Personalisierter KI-Coach (Claude)", "feat.ghost": "KI Ghost Runner", "feat.vma": "vVO2max- & HF-Zonen-Analyse", "feat.sync": "GPS-Uhr-Sync (Garmin, Polar…)", "feat.shop": "Shopping-Hub & Empfehlungen", "feat.leagues": "Ligen & Ranglisten",
-    "sub.goPro": "Auf Starter oder Premium wechseln", "sub.unlock": "KI-Modul freischalten", "sub.perMonth": "/Monat", "sub.yearly": "{an}/Jahr · {mois} Monate geschenkt", "sub.trial": "{n} Tage kostenlos testen",
+    "sub.manage": "Abo verwalten", "sub.manageDesc": "Tarif wechseln, auf Jahreszahlung umstellen, Karte aktualisieren, Rechnungen laden oder kündigen.", "sub.manageCta": "Rechnungsbereich öffnen", "sub.manageOpening": "Wird geöffnet…", "sub.manageErr": "Der Rechnungsbereich lässt sich nicht öffnen. Versuch es gleich noch einmal.", "sub.cancelNote": "Bei einer Kündigung bleibt dein Zugang bis zum Ende des bereits bezahlten Zeitraums bestehen — danach wird nichts mehr abgebucht.", "sub.secure": "Zahlung und Abrechnung über Stripe. Pacevo sieht deine Kartennummer nie.", "sub.goPro": "Auf Starter oder Premium wechseln", "sub.unlock": "KI-Modul freischalten", "sub.perMonth": "/Monat", "sub.yearly": "{an}/Jahr · {mois} Monate geschenkt", "sub.trial": "{n} Tage kostenlos testen",
     "t.saveErr": "Fehler beim Speichern", "t.saveOk": "Profil aktualisiert!", "t.uploadErr": "Upload-Fehler", "t.photoOk": "Profilbild aktualisiert!", "t.netErr": "Netzwerkfehler", "t.goalsSql": "Ziele noch nicht aktiviert — führe das bereitgestellte SQL in Supabase aus.", "t.createErr": "Fehler beim Erstellen", "t.goalAdd": "Ziel hinzugefügt!", "t.goalDel": "Ziel gelöscht", "t.addErr": "Fehler beim Hinzufügen", "t.shoeAdd": "Schuh hinzugefügt!", "t.shoeDel": "Schuh aus der Garage entfernt", "t.exportOk": "Deine Daten wurden exportiert (JSON).", "t.exportErr": "Export fehlgeschlagen, versuche es erneut.",
   },
   es: {
@@ -165,7 +165,7 @@ const P: Record<string, Record<string, string>> = {
     "shoes.title": "Mi Garaje", "shoes.count": "{n} par activo", "shoes.countP": "{n} pares activos", "shoes.new": "Nuevo par", "shoes.brand": "Marca", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Modelo", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Vida útil (km)", "shoes.buyDate": "Fecha de compra", "shoes.addGarage": "Añadir al garaje", "shoes.suggestHint": "Empieza a escribir la marca y el modelo — te sugerimos modelos populares.", "shoes.emptyTitle": "Ninguna zapatilla en el garaje", "shoes.emptyDesc": "Añade tus pares para seguir su kilometraje", "shoes.replace": "Reemplazar", "shoes.watch": "Vigilar", "shoes.good": "Buen estado", "shoes.km": "{cur} km recorridos · {rem} km restantes",
     "sub.title": "Suscripción actual", "sub.plan": "Plan {tier}", "sub.freeDesc": "Acceso limitado a las funciones básicas", "sub.proDesc": "Acceso completo a todas las funciones", "sub.active": "✓ Activo", "sub.free": "Gratis", "sub.pro": "Pro",
     "feat.dash": "Panel y estadísticas", "feat.journal": "Diario inteligente (NLP)", "feat.plans3": "Planes de entrenamiento (máx. 3)", "feat.plansUnli": "Planes de entrenamiento ilimitados", "feat.coach": "Entrenador IA personalizado (Claude)", "feat.ghost": "Ghost Runner IA", "feat.vma": "Análisis de VAM y zonas cardíacas", "feat.sync": "Sync relojes GPS (Garmin, Polar…)", "feat.shop": "Shopping Hub y recomendaciones", "feat.leagues": "Ligas y clasificaciones",
-    "sub.goPro": "Pasar a Starter o Premium", "sub.unlock": "Desbloquea el módulo IA", "sub.perMonth": "/mes", "sub.yearly": "{an}/año · {mois} meses gratis", "sub.trial": "Empezar la prueba gratuita de {n} días",
+    "sub.manage": "Gestionar mi suscripción", "sub.manageDesc": "Cambiar de plan, pasar a la tarifa anual, actualizar tu tarjeta, descargar facturas o cancelar.", "sub.manageCta": "Abrir mi área de facturación", "sub.manageOpening": "Abriendo…", "sub.manageErr": "No se ha podido abrir el área de facturación. Inténtalo dentro de un momento.", "sub.cancelNote": "Si cancelas, tu acceso sigue abierto hasta el final del periodo ya pagado — después no se cobra nada.", "sub.secure": "Pagos y facturación gestionados por Stripe. Pacevo nunca ve el número de tu tarjeta.", "sub.goPro": "Pasar a Starter o Premium", "sub.unlock": "Desbloquea el módulo IA", "sub.perMonth": "/mes", "sub.yearly": "{an}/año · {mois} meses gratis", "sub.trial": "Empezar la prueba gratuita de {n} días",
     "t.saveErr": "Error al guardar", "t.saveOk": "¡Perfil actualizado!", "t.uploadErr": "Error al subir", "t.photoOk": "¡Foto de perfil actualizada!", "t.netErr": "Error de red", "t.goalsSql": "Objetivos aún no activados — ejecuta el SQL proporcionado en Supabase.", "t.createErr": "Error al crear", "t.goalAdd": "¡Objetivo añadido!", "t.goalDel": "Objetivo eliminado", "t.addErr": "Error al añadir", "t.shoeAdd": "¡Zapatilla añadida!", "t.shoeDel": "Zapatilla retirada del garaje", "t.exportOk": "Tus datos se han exportado (JSON).", "t.exportErr": "Exportación fallida, inténtalo de nuevo.",
   },
   pt: {
@@ -200,7 +200,7 @@ const P: Record<string, Record<string, string>> = {
     "shoes.title": "A minha Garagem", "shoes.count": "{n} par ativo", "shoes.countP": "{n} pares ativos", "shoes.new": "Novo par", "shoes.brand": "Marca", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Modelo", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Vida útil (km)", "shoes.buyDate": "Data de compra", "shoes.addGarage": "Adicionar à garagem", "shoes.suggestHint": "Começa a escrever a marca e o modelo — sugerimos modelos populares.", "shoes.emptyTitle": "Nenhum ténis na garagem", "shoes.emptyDesc": "Adiciona os teus pares para seguir a quilometragem", "shoes.replace": "Substituir", "shoes.watch": "Vigiar", "shoes.good": "Bom estado", "shoes.km": "{cur} km percorridos · {rem} km restantes",
     "sub.title": "Subscrição atual", "sub.plan": "Plano {tier}", "sub.freeDesc": "Acesso limitado às funcionalidades básicas", "sub.proDesc": "Acesso completo a todas as funcionalidades", "sub.active": "✓ Ativo", "sub.free": "Gratuito", "sub.pro": "Pro",
     "feat.dash": "Painel e estatísticas", "feat.journal": "Diário inteligente (NLP)", "feat.plans3": "Planos de treino (máx. 3)", "feat.plansUnli": "Planos de treino ilimitados", "feat.coach": "Treinador IA personalizado (Claude)", "feat.ghost": "Ghost Runner IA", "feat.vma": "Análise de VAM e zonas cardíacas", "feat.sync": "Sync relógios GPS (Garmin, Polar…)", "feat.shop": "Shopping Hub e recomendações", "feat.leagues": "Ligas e classificações",
-    "sub.goPro": "Passar a Starter ou Premium", "sub.unlock": "Desbloqueia o módulo IA", "sub.perMonth": "/mês", "sub.yearly": "{an}/ano · {mois} meses grátis", "sub.trial": "Começar o teste gratuito de {n} dias",
+    "sub.manage": "Gerir a minha subscrição", "sub.manageDesc": "Mudar de plano, passar à tarifa anual, atualizar o cartão, obter as faturas ou cancelar.", "sub.manageCta": "Abrir a minha área de faturação", "sub.manageOpening": "A abrir…", "sub.manageErr": "Não foi possível abrir a área de faturação. Tenta daqui a pouco.", "sub.cancelNote": "Se cancelares, o acesso fica aberto até ao fim do período já pago — depois não há qualquer cobrança.", "sub.secure": "Pagamentos e faturação geridos pela Stripe. A Pacevo nunca vê o número do teu cartão.", "sub.goPro": "Passar a Starter ou Premium", "sub.unlock": "Desbloqueia o módulo IA", "sub.perMonth": "/mês", "sub.yearly": "{an}/ano · {mois} meses grátis", "sub.trial": "Começar o teste gratuito de {n} dias",
     "t.saveErr": "Erro ao guardar", "t.saveOk": "Perfil atualizado!", "t.uploadErr": "Erro no envio", "t.photoOk": "Foto de perfil atualizada!", "t.netErr": "Erro de rede", "t.goalsSql": "Objetivos ainda não ativados — executa o SQL fornecido no Supabase.", "t.createErr": "Erro ao criar", "t.goalAdd": "Objetivo adicionado!", "t.goalDel": "Objetivo eliminado", "t.addErr": "Erro ao adicionar", "t.shoeAdd": "Ténis adicionado!", "t.shoeDel": "Ténis removido da garagem", "t.exportOk": "Os teus dados foram exportados (JSON).", "t.exportErr": "Exportação falhou, tenta novamente.",
   },
 };
@@ -340,6 +340,41 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
   userId: string;
 }) {
   const { lang, setLang } = useT();
+  /**
+   * OUVERTURE DU PORTAIL DE FACTURATION STRIPE.
+   *
+   * ⚠️ CE BOUTON N'EXISTAIT PAS, et c'est le trou le plus coûteux de la chaîne de
+   * paiement. La route `/api/stripe/portal` était écrite depuis longtemps — mais AUCUN
+   * écran ne l'appelait : `grep "api/stripe/portal"` ne renvoyait que le fichier de la
+   * route elle-même. Un abonné ne pouvait donc ni changer de formule, ni passer à
+   * l'annuel, ni mettre à jour sa carte, ni récupérer ses factures, ni RÉSILIER.
+   *
+   * Trois conséquences, par ordre de gravité :
+   *  · la résiliation en ligne est une OBLIGATION LÉGALE quand la souscription s'est
+   *    faite en ligne (art. L215-1-1 du code de la consommation) ;
+   *  · une carte qui expire met fin à l'abonnement sans que le client puisse rien y
+   *    faire — un revenu perdu qui ne se voit nulle part ;
+   *  · l'impossibilité de résilier est le premier motif d'opposition bancaire, et les
+   *    oppositions coûtent des frais ET abîment la réputation du compte Stripe.
+   *
+   * Le portail est hébergé par Stripe : aucune donnée bancaire ne transite par Pacevo.
+   */
+  const [portail, setPortail] = useState<"pret" | "ouverture" | "erreur">("pret");
+  async function ouvrirPortail() {
+    setPortail("ouverture");
+    try {
+      const r = await fetch("/api/stripe/portal", { method: "POST" });
+      const j = await r.json().catch(() => ({}));
+      // On ne redirige que si l'URL vient bien de Stripe : sans ce contrôle, une réponse
+      // inattendue enverrait l'athlète sur « undefined ».
+      if (r.ok && typeof j?.url === "string" && j.url.startsWith("https://")) {
+        window.location.href = j.url;
+        return;
+      }
+      setPortail("erreur");
+    } catch { setPortail("erreur"); }
+  }
+
   // Abonnement au résumé hebdomadaire. Il ne vit PAS dans `form` : les champs de `form`
   // attendent le bouton « Sauvegarder », alors qu'un consentement e-mail doit prendre
   // effet au clic. On le charge donc à part, depuis la table des abonnés.
@@ -1673,6 +1708,36 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                 <span>{tr("sub.free")}</span><span className="text-emerald-600">{tr("sub.pro")}</span>
               </div>
             </div>
+
+            {/* ⚠️ LA CONDITION PORTE SUR `stripe_customer_id`, PAS SUR LA FORMULE.
+                Quelqu'un qui a résilié garde son identifiant client Stripe : il doit
+                pouvoir rouvrir son espace pour retrouver ses anciennes factures — une
+                facture doit rester accessible bien après la fin de l'abonnement. Et
+                quelqu'un dont le paiement a échoué est repassé « free » alors qu'il a
+                justement besoin d'aller corriger sa carte : le lier à la formule aurait
+                caché le bouton exactement à celui qui en a le plus besoin. */}
+            {/* `Boolean(...)` et non la valeur brute : `profile` est typé
+                `Record<string, unknown>`, et rendre un `unknown` faux afficherait
+                la valeur elle-même au lieu de masquer le bloc. */}
+            {Boolean(profile?.stripe_customer_id) && (
+              <div className="bento-card">
+                <h3 className="font-semibold text-zinc-900">{tr("sub.manage")}</h3>
+                <p className="mt-1 text-sm text-zinc-500">{tr("sub.manageDesc")}</p>
+                <button
+                  onClick={ouvrirPortail}
+                  disabled={portail === "ouverture"}
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-zinc-700 disabled:opacity-40"
+                >
+                  {portail === "ouverture" ? tr("sub.manageOpening") : tr("sub.manageCta")}
+                  {portail !== "ouverture" && <ChevronRight className="w-4 h-4" />}
+                </button>
+                {portail === "erreur" && (
+                  <p className="mt-3 text-sm font-medium text-red-600">{tr("sub.manageErr")}</p>
+                )}
+                <p className="mt-4 text-xs leading-relaxed text-zinc-400">{tr("sub.cancelNote")}</p>
+                <p className="mt-1 text-xs leading-relaxed text-zinc-400">{tr("sub.secure")}</p>
+              </div>
+            )}
 
             {profile?.subscription_tier === "free" && (
               <div className="bento-card bg-gradient-to-br from-zinc-900 to-zinc-800 text-white">
