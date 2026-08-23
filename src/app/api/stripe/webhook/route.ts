@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { stripe, accesDuPrice } from "@/lib/stripe/client";
 import type Stripe from "stripe";
+import { ecrituresDeLEvenement } from "@/lib/compta/stripe";
+import { enregistrerEcritures } from "@/lib/compta/enregistrer";
+import { emailEncaissement, emailAlerteCompta } from "@/lib/compta/alerte";
+import { emailEditeur } from "@/lib/admin/acces";
 
 
 export async function POST(req: Request) {
@@ -22,6 +26,13 @@ export async function POST(req: Request) {
   }
 
   const admin = createAdminClient();
+
+  // ── COMPTABILITÉ ───────────────────────────────────────────────────────────
+  // ⚠️ AVANT le `switch`, et hors de lui. Le `switch` ne traite que le cycle de vie de
+  // l'abonnement ; l'ARGENT arrive par d'autres événements (`invoice.paid`,
+  // `charge.refunded`). Tant que la comptabilité vivait dans le switch, un encaissement
+  // passait sans laisser la moindre trace comptable.
+  await comptabiliser(event, req);
 
   /**
    * Retrouve l'athlète derrière un abonnement.
@@ -73,4 +84,74 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ received: true });
+}
+
+/**
+ * Enregistre l'événement au journal comptable et prévient l'éditeur.
+ *
+ * ⚠️ NE FAIT JAMAIS ÉCHOUER LE WEBHOOK. Si l'écriture ou l'e-mail échoue, Stripe ne doit
+ * pas recevoir une erreur : il réémettrait l'événement, l'abonnement serait ré-appliqué,
+ * et on risquerait le doublon qu'on cherche justement à éviter. L'accès de l'athlète et
+ * la tenue du journal sont deux sujets distincts — le premier ne doit pas dépendre du
+ * second.
+ */
+async function comptabiliser(event: Stripe.Event, req: Request): Promise<void> {
+  try {
+    const base = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin;
+
+    // Les frais Stripe ne sont pas dans la facture : ils vivent sur la transaction de
+    // solde du paiement. On va les chercher — et on continue sans si on ne peut pas,
+    // en le DISANT dans l'écriture plutôt qu'en laissant croire que l'encaissement n'a
+    // rien coûté.
+    let fraisCents: number | null = null;
+    if (event.type === "invoice.paid") {
+      try {
+        const inv = event.data.object as Stripe.Invoice & { charge?: string | { id: string } };
+        const chargeId = typeof inv.charge === "string" ? inv.charge : inv.charge?.id;
+        if (chargeId) {
+          const ch = await stripe.charges.retrieve(chargeId, { expand: ["balance_transaction"] });
+          const bt = ch.balance_transaction;
+          if (bt && typeof bt !== "string") fraisCents = bt.fee ?? null;
+        }
+      } catch (e) {
+        console.error("[compta] frais Stripe non récupérés :", (e as Error).message);
+      }
+    }
+
+    const conv = ecrituresDeLEvenement(
+      { id: event.id, type: event.type, data: { object: event.data.object as unknown as Record<string, unknown> } },
+      fraisCents,
+    );
+    if (conv.ignore) return;
+
+    const dest = emailEditeur();
+    const cle = process.env.RESEND_API_KEY;
+    const from = process.env.RESEND_FROM;
+    const envoyer = async (m: { objet: string; html: string; texte: string }) => {
+      if (!cle || !from || !dest) return;
+      await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${cle}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from, to: [dest], subject: m.objet, html: m.html, text: m.texte }),
+        signal: AbortSignal.timeout(8000),
+      });
+    };
+
+    if (conv.alerte) { await envoyer(emailAlerteCompta({ raison: conv.alerte, base })); return; }
+
+    const res = await enregistrerEcritures(conv.ecritures);
+    if (res.erreur) {
+      console.error("[compta]", res.erreur);
+      await envoyer(emailAlerteCompta({ raison: res.erreur, base }));
+      return;
+    }
+    // ⚠️ On ne prévient QUE pour une écriture réellement créée. Stripe réémet ses
+    // notifications : envoyer un e-mail à chaque passage annoncerait trois fois le même
+    // paiement, et on finirait par ne plus les lire.
+    if (res.creees > 0 && conv.ecritures.some((e) => e.sens === "entree")) {
+      await envoyer(emailEncaissement({ ecritures: conv.ecritures, base }));
+    }
+  } catch (e) {
+    console.error("[compta] échec du traitement comptable :", (e as Error).message);
+  }
 }

@@ -13,6 +13,7 @@ import {
   enCentimes, euros, valider, totaux, tvaDe, cotisationsEstimees, soldeCumule, versCSV,
   CATEGORIES, categorieDe, type Ecriture,
 } from "../src/lib/compta/model";
+import { ecrituresDeLEvenement, dateParis, type EvenementStripe } from "../src/lib/compta/stripe";
 
 const ROOT = join(__dirname, "..");
 let passed = 0;
@@ -21,6 +22,23 @@ function test(nom: string, fn: () => void) {
   try { fn(); passed++; console.log(`  ✓ ${nom}`); }
   catch (e) { fails.push(`${nom} — ${(e as Error).message}`); console.log(`  ✗ ${nom}`); }
 }
+
+/**
+ * Le code SANS ses commentaires ni ses imports.
+ *
+ * ⚠️ DEUX TESTS DE CE FICHIER ONT VALIDÉ MA PROPRE DOCUMENTATION. Commenter l'appel
+ * `await comptabiliser(event, req)` laissait le motif intact dans la ligne commentée ;
+ * remplacer `idEditeur()` par le compte connecté laissait le nom dans le commentaire
+ * qui l'explique. Les deux mutations sont restées VERTES sur du code cassé. On vise le
+ * site qui produit l'effet — jamais une déclaration, jamais une phrase.
+ */
+const codeSeul = (chemin: string): string =>
+  readFileSync(join(ROOT, chemin), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")          // blocs /* … */
+    .split("\n")
+    .filter((l) => !/^\s*(import\b|\/\/)/.test(l))
+    .map((l) => l.replace(/\s\/\/.*$/, ""))       // commentaire en fin de ligne
+    .join("\n");
 
 const ecr = (p: Partial<Ecriture>): Ecriture => ({
   id: Math.random().toString(36).slice(2), date: "2026-01-15", libelle: "x", sens: "sortie",
@@ -179,6 +197,125 @@ test("chaque catégorie a un sens, et aucun identifiant n'est en double", () => 
     assert.equal(categorieDe(c.id)?.label, c.label);
   }
   assert.ok(CATEGORIES.some((c) => c.sens === "entree") && CATEGORIES.some((c) => c.sens === "sortie"));
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Stripe → journal comptable
+//  Testé avec de VRAIS événements en fixture : ce code ne s'exécutera pour de bon qu'au
+//  premier encaissement, c'est-à-dire le jour où une erreur coûte de l'argent.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const facturePayee = (o: Record<string, unknown> = {}): EvenementStripe => ({
+  id: "evt_1", type: "invoice.paid",
+  data: { object: {
+    id: "in_123", number: "PACEVO-0001", amount_paid: 1499, currency: "eur",
+    status_transitions: { paid_at: Math.floor(Date.UTC(2026, 7, 20, 9, 0) / 1000) },
+    created: Math.floor(Date.UTC(2026, 7, 20, 9, 0) / 1000),
+    customer_email: "coureur@exemple.fr", charge: "ch_1", ...o } },
+});
+
+test("un abonnement encaissé produit la recette ET la commission, séparées", () => {
+  // ⚠️ LE MONTANT BRUT EST LA RECETTE, la commission est une CHARGE. N'enregistrer que ce
+  // qui arrive en banque sous-estimerait le chiffre d'affaires — et c'est le CA qu'on
+  // déclare, pas le solde du compte.
+  const { ecritures, alerte, ignore } = ecrituresDeLEvenement(facturePayee(), 67);
+  assert.equal(alerte, undefined); assert.equal(ignore, undefined);
+  assert.equal(ecritures.length, 2);
+  const recette = ecritures[0], frais = ecritures[1];
+  assert.equal(recette.sens, "entree");
+  assert.equal(recette.categorie, "abonnements");
+  assert.equal(recette.montantCents, 1499);
+  assert.equal(recette.piece, "PACEVO-0001");
+  assert.equal(recette.origine, "stripe");
+  assert.equal(frais.sens, "sortie");
+  assert.equal(frais.categorie, "frais_bancaires");
+  assert.equal(frais.montantCents, 67);
+  // Chaque écriture doit passer la MÊME validation qu'une saisie manuelle.
+  for (const e of ecritures) assert.deepEqual(valider(e), [], `écriture Stripe invalide : ${JSON.stringify(e)}`);
+});
+
+test("une commission introuvable est DITE, pas passée sous silence", () => {
+  // Laisser l'écriture muette ferait croire que l'encaissement n'a rien coûté.
+  const { ecritures } = ecrituresDeLEvenement(facturePayee(), null);
+  assert.equal(ecritures.length, 1);
+  assert.match(String(ecritures[0].note), /à saisir à la main/i);
+});
+
+test("Stripe réémet ses notifications : la clé d'unicité doit être stable", () => {
+  // ⚠️ Sans elle, un abonnement de 14,99 € serait compté deux ou trois fois — et trois
+  // lignes identiques ressemblent à trois vrais paiements.
+  const a = ecrituresDeLEvenement(facturePayee(), 67).ecritures;
+  const b = ecrituresDeLEvenement({ ...facturePayee(), id: "evt_2" }, 67).ecritures;
+  assert.equal(a[0].stripeId, b[0].stripeId, "la clé change d'un renvoi à l'autre : le doublon passera");
+  assert.notEqual(a[0].stripeId, a[1].stripeId, "recette et commission partagent la même clé : l'une écrasera l'autre");
+});
+
+test("le même paiement ne doit pas être compté deux fois par deux événements", () => {
+  // ⚠️ Stripe émet `invoice.paid` ET `invoice.payment_succeeded` pour la MÊME facture.
+  // Traiter les deux doublerait le chiffre d'affaires sans qu'aucune ligne n'ait l'air
+  // anormale.
+  const autre = ecrituresDeLEvenement({ ...facturePayee(), type: "invoice.payment_succeeded" }, 67);
+  assert.equal(autre.ecritures.length, 0);
+  assert.ok(autre.ignore, "un second événement pour la même facture a créé une écriture");
+});
+
+test("une facture à 0 € n'entre pas au journal", () => {
+  const r = ecrituresDeLEvenement(facturePayee({ amount_paid: 0 }), null);
+  assert.equal(r.ecritures.length, 0);
+  assert.ok(r.ignore);
+});
+
+test("un paiement en devise étrangère est signalé, jamais converti en douce", () => {
+  // ⚠️ Enregistrer 1499 « unités » de dollars comme 14,99 € fabriquerait une recette
+  // fausse. Une ligne manquante se répare, une ligne fausse ne se voit pas.
+  const r = ecrituresDeLEvenement(facturePayee({ currency: "usd" }), 67);
+  assert.equal(r.ecritures.length, 0);
+  assert.match(String(r.alerte), /devise|USD/i);
+});
+
+test("un remboursement est une sortie, il n'efface pas la recette d'origine", () => {
+  const r = ecrituresDeLEvenement({
+    id: "evt_r", type: "charge.refunded",
+    data: { object: { id: "ch_1", amount_refunded: 1499, currency: "eur",
+      created: Math.floor(Date.UTC(2026, 8, 1, 10, 0) / 1000),
+      billing_details: { email: "coureur@exemple.fr" } } },
+  });
+  assert.equal(r.ecritures.length, 1);
+  assert.equal(r.ecritures[0].sens, "sortie");
+  assert.equal(r.ecritures[0].categorie, "remboursements_verses");
+  assert.deepEqual(valider(r.ecritures[0]), []);
+});
+
+test("la date d'un encaissement est celle de Paris, pas celle d'UTC", () => {
+  // ⚠️ LE CAS QUI COÛTE UN EXERCICE. Un paiement à 00 h 30 le 1ᵉʳ janvier heure de Paris
+  // se produit le 31 décembre en UTC : compté en UTC, il tomberait sur l'ANNÉE
+  // PRÉCÉDENTE — mauvais exercice, mauvaise déclaration.
+  assert.equal(dateParis(Date.UTC(2026, 11, 31, 23, 30) / 1000), "2027-01-01");
+  // Et l'heure d'été décale de deux heures, pas d'une.
+  assert.equal(dateParis(Date.UTC(2026, 6, 1, 22, 30) / 1000), "2026-07-02");
+  assert.equal(dateParis(Date.UTC(2026, 7, 20, 9, 0) / 1000), "2026-08-20");
+});
+
+test("le webhook Stripe branche vraiment la comptabilité", () => {
+  // ⚠️ On vise l'APPEL, pas l'import : importer la conversion sans jamais l'appeler
+  // laisserait le test vert alors qu'aucun encaissement n'atteindrait le journal.
+  const src = codeSeul("src/app/api/stripe/webhook/route.ts");
+  assert.match(src, /await comptabiliser\(/, "le webhook n'appelle pas le traitement comptable");
+  assert.match(src, /ecrituresDeLEvenement\(/, "la conversion en écritures n'est pas appelée");
+  assert.match(src, /enregistrerEcritures\(/, "les écritures ne sont jamais enregistrées");
+  // La signature reste obligatoire : sans elle, n'importe qui pourrait écrire des
+  // recettes imaginaires dans la comptabilité.
+  assert.match(src, /constructEvent\(/, "la signature Stripe n'est plus vérifiée");
+});
+
+test("le journal appartient à l'entreprise, pas au compte connecté", () => {
+  // ⚠️ Rattacher les écritures à la session affichait une comptabilité différente selon
+  // l'adresse utilisée pour se connecter — deux journaux pour une seule entreprise.
+  const src = codeSeul("src/app/api/admin/compta/route.ts");
+  assert.match(src, /await idEditeur\(\)/, "le journal n'est plus rattaché à l'éditeur");
+  // ⚠️ Et l'identifiant de la SESSION ne doit servir à rien d'autre qu'au contrôle
+  // d'accès : `user.id` réapparaissant ailleurs, c'est le journal qui se rescinde.
+  assert.ok(!/user\.id/.test(src), "une écriture est encore rattachée au compte connecté");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

@@ -479,8 +479,9 @@ export function ComptaClient() {
             {ecritures.length === 0 && (
               <p className="mx-auto mt-2 max-w-md text-xs text-zinc-400">
                 Rien n'est pré-rempli et aucun exemple n'est affiché : un tableau de bord garni de chiffres
-                inventés ne se distingue pas d'un vrai. Les abonnements se saisiront ici tant que Stripe n'est pas
-                branché — aucun encaissement n'existe aujourd'hui.
+                inventés ne se distingue pas d'un vrai. Dès que tes clés Stripe seront en place, chaque
+                encaissement s'inscrira ici tout seul — montant brut et commission séparés — et tu recevras
+                un e-mail. En attendant, tout se saisit à la main.
               </p>
             )}
           </div>
@@ -502,7 +503,14 @@ export function ComptaClient() {
                   <tr key={e.id} className={`border-b border-zinc-50 last:border-0 ${e.annulee ? "bg-zinc-50/60 text-zinc-400" : "hover:bg-zinc-50/60"}`}>
                     <td className="whitespace-nowrap px-4 py-2.5 text-zinc-500">{e.date.split("-").reverse().join("/")}</td>
                     <td className="px-4 py-2.5">
-                      <div className={`font-medium ${e.annulee ? "line-through" : "text-zinc-800"}`}>{e.libelle}</div>
+                      <div className="flex items-center gap-2">
+                        <span className={`font-medium ${e.annulee ? "line-through" : "text-zinc-800"}`}>{e.libelle}</span>
+                        {/* Une écriture automatique et une écriture saisie à la main n'ont
+                            pas la même valeur de preuve : on doit les distinguer sans cliquer. */}
+                        {e.origine === "stripe" && (
+                          <span className="rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-600">Stripe</span>
+                        )}
+                      </div>
                       <div className="text-xs text-zinc-400">
                         {[e.tiers, e.piece && `pièce ${e.piece}`, e.recurrente && "mensuelle", e.note].filter(Boolean).join(" · ")}
                       </div>

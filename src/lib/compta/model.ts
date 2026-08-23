@@ -44,6 +44,7 @@ export const CATEGORIES: Categorie[] = [
   { id: "marketing", label: "Marketing & publicité", sens: "sortie" },
   { id: "honoraires", label: "Honoraires (avocat, expert-comptable)", sens: "sortie" },
   { id: "frais_bancaires", label: "Banque & frais de paiement", sens: "sortie" },
+  { id: "remboursements_verses", label: "Remboursements versés", sens: "sortie" },
   { id: "cotisations", label: "Cotisations sociales", sens: "sortie" },
   { id: "impots", label: "Impôts & taxes", sens: "sortie" },
   { id: "deplacements", label: "Déplacements", sens: "sortie" },
@@ -82,6 +83,17 @@ export type Ecriture = {
   annulee?: boolean;
   motifAnnulation?: string;
   annuleeLe?: string;
+  /** « stripe » = écriture créée par un encaissement réel, pas saisie à la main. */
+  origine?: "manuel" | "stripe";
+  /**
+   * Clé d'unicité de l'encaissement d'origine.
+   *
+   * ⚠️ STRIPE RÉÉMET SES NOTIFICATIONS quand il n'obtient pas de réponse — parfois
+   * plusieurs fois. Sans cette clé, un seul abonnement serait compté deux ou trois fois,
+   * et rien dans le journal n'aurait l'air anormal : trois lignes identiques ressemblent
+   * à trois vrais paiements.
+   */
+  stripeId?: string;
 };
 
 export type Reglages = {
