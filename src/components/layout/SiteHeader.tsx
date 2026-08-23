@@ -22,6 +22,7 @@ export function SiteHeader() {
     { href: "/pricing", label: c.pricing },
     { href: "/blog", label: c.blog },
     { href: "/avis", label: c.reviews },
+    { href: "/notre-histoire", label: c.story },
   ];
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200/70 bg-white/90 backdrop-blur-xl">

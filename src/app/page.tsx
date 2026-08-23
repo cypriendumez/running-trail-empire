@@ -292,6 +292,7 @@ export default function LandingPage() {
             <a href="#tarifs" className={navLink}>{L.nav.pricing}</a>
             <Link href="/blog" className={navLink}>{L.nav.blog}</Link>
             <Link href="/avis" className={navLink}>{L.nav.reviews}</Link>
+            <Link href="/notre-histoire" className={navLink}>{L.nav.story}</Link>
           </div>
           {/* ORDRE : Connexion → Essai gratuit → Langue, comme sur les barres de nav qui
               fonctionnent (campus.coach entre autres). Le sélecteur de langue était
@@ -351,6 +352,7 @@ export default function LandingPage() {
                 { href: "#tarifs", label: L.nav.pricing },
                 { href: "/blog", label: L.nav.blog },
                 { href: "/avis", label: L.nav.reviews },
+                { href: "/notre-histoire", label: L.nav.story },
                 { href: "/login", label: L.nav.login },
               ].map((l) => (
                 <a key={l.href} href={l.href} onClick={() => setMenuOpen(false)} className="py-2.5 hover:text-[#059669] transition-colors">

@@ -340,6 +340,57 @@ test("chaque logo annoncé par la page existe vraiment", () => {
   }
 });
 
+test("la page « notre histoire » ne contient aucun chiffre invérifiable", () => {
+  // ⚠️ C'EST LA PAGE OÙ LA TENTATION D'ENJOLIVER EST LA PLUS FORTE, et ce site a déjà
+  // publié vingt-six témoignages inventés. Chaque chiffre affiché ici a été relevé le
+  // 23/08/2026 dans le compte intervals.icu réel : 268 sorties, 2 786 km depuis le
+  // 26/04/2025, et un 10 km en 33:58 le 04/04/2026.
+  //
+  // ⚠️ CE QUI A ÉTÉ ÉCARTÉ : un semi-marathon annoncé en 1 h 15. Aucune sortie entre
+  // 20,5 et 21,7 km n'existe dans l'historique. Le chiffre est plausible au vu du 10 km,
+  // mais invérifiable — et sur une page qu'un acheteur ira contrôler, un chrono
+  // invérifiable à côté d'un chrono prouvé affaiblit les deux.
+  const src = readFileSync(join(ROOT, "src/app/notre-histoire/histoireI18n.ts"), "utf8");
+  // Les commentaires du fichier EXPLIQUENT pourquoi ce chrono est écarté et le citent
+  // donc forcément : les retirer avant de chercher, sinon le test rougit sur sa propre
+  // documentation — le projet s'est déjà fait prendre deux fois.
+  const sansCom = src.replace(/\/\*[\s\S]*?\*\//g, " ").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
+  assert.ok(!/1\s?h\s?15/.test(sansCom), "« 1 h 15 » est revenu : ce chrono n'existe pas dans les données synchronisées");
+  // Les cinq langues doivent porter les MÊMES chiffres : une traduction qui arrondit
+  // « 2 786 » en « près de 3 000 » créerait deux vérités selon la langue du visiteur.
+  //
+  // ⚠️ ON COMPTE SUR LE TEXTE SEUL, ET ON EXIGE EXACTEMENT CINQ. Deux erreurs corrigées
+  // ici : compter sur le fichier BRUT gonflait le total avec le commentaire d'en-tête,
+  // qui cite les mêmes chiffres pour les justifier ; et un seuil `>= 5` restait vert
+  // quand une langue arrondissait « 2 786 » en « près de 3 000 », puisqu'il restait
+  // encore assez d'occurrences ailleurs. Cinq langues, cinq occurrences, pas quatre.
+  for (const c of ["33:58", "39:23", "268"]) {
+    const n = (sansCom.match(new RegExp(c, "g")) ?? []).length;
+    assert.equal(n, 5, `« ${c} » apparaît ${n} fois au lieu de 5 : une langue l'a perdu ou modifié`);
+  }
+  // Le kilométrage s'écrit avec des séparateurs différents selon la langue.
+  const km = (sansCom.match(/2[  ,]?786/g) ?? []).length;
+  assert.equal(km, 5, `le kilométrage apparaît ${km} fois au lieu de 5 : une langue l'a arrondi`);
+});
+test("la page « notre histoire » est atteignable depuis les deux barres de navigation", () => {
+  // ⚠️ LE SITE A DEUX EN-TÊTES DISTINCTS, et c'est le piège de cette page : la landing
+  // dessine sa propre barre (elle a un hero transparent), les autres pages utilisent
+  // `SiteHeader`. N'en modifier qu'un laisse la page invisible depuis l'accueil — soit
+  // exactement la page que personne ne trouvera.
+  for (const f of ["src/components/layout/SiteHeader.tsx", "src/app/page.tsx"]) {
+    assert.match(readFileSync(join(ROOT, f), "utf8"), /\/notre-histoire/, `${f} ne mène pas à la page`);
+  }
+  // La landing a AUSSI un menu mobile, listé séparément : deux occurrences attendues.
+  const landing = readFileSync(join(ROOT, "src/app/page.tsx"), "utf8");
+  const n = (landing.match(/\/notre-histoire/g) ?? []).length;
+  assert.ok(n >= 2, `seulement ${n} lien sur l'accueil : le menu mobile ou le menu bureau a été oublié`);
+  // Le libellé doit exister dans les cinq langues des DEUX dictionnaires.
+  for (const f of ["src/components/layout/chromeI18n.ts", "src/components/landing/landingI18n.ts"]) {
+    const d = readFileSync(join(ROOT, f), "utf8");
+    const n2 = (d.match(/story:\s*"/g) ?? []).length;
+    assert.ok(n2 >= 5, `${f} : ${n2} libellé(s) de nav sur 5 langues`);
+  }
+});
 test("aucun avis de consommateur n'est fabriqué", () => {
   // ⚠️ LE DÉFAUT LE PLUS GRAVE TROUVÉ SUR CE SITE, et il était en ligne. La page /avis
   // publiait VINGT-SIX témoignages entièrement inventés — prénoms, dates, notes, et des
