@@ -12,10 +12,11 @@ import { join } from "node:path";
 import {
   enCentimes, euros, valider, totaux, tvaDe, cotisationsEstimees, soldeCumule, versCSV,
   CATEGORIES, categorieDe, type Ecriture,
-  numeroter, doublonsProbables, parTrimestre, modelesRecurrents, evolution, versLivreRecettes,
+  numeroter, doublonsProbables, parTrimestre, modelesRecurrents, evolution, versLivreRecettes, cotisations,
 } from "../src/lib/compta/model";
 import { ecrituresDeLEvenement, dateParis, type EvenementStripe } from "../src/lib/compta/stripe";
 import { validerFichier, cheminDe, cheminAppartientA, BUCKET, TAILLE_MAX } from "../src/lib/compta/pieces";
+import { interpreterLecture, jsonDeLaReponse, CONSIGNE_LECTURE } from "../src/lib/compta/lecture";
 
 const ROOT = join(__dirname, "..");
 let passed = 0;
@@ -165,6 +166,57 @@ test("aucun taux ni seuil légal n'est écrit en dur dans le code", () => {
       assert.ok(!re.test(src), `${f} contient un taux ou un seuil légal en dur : ${re}`);
     }
   }
+});
+
+test("le taux réduit ACRE ne déborde pas sur la période suivante", () => {
+  // ⚠️ L'ACRE dure une durée déterminée, puis le taux REMONTE. Appliquer le taux réduit
+  // à toute l'année annoncerait des cotisations sous-évaluées pendant des mois — et
+  // l'écart ne se découvre qu'à l'appel de cotisations, quand l'argent est dépensé.
+  const liste = [
+    ecr({ date: "2026-06-30", sens: "entree", categorie: "abonnements", montantCents: 100000 }),
+    ecr({ date: "2026-07-01", sens: "entree", categorie: "abonnements", montantCents: 100000 }),
+  ];
+  const c = cotisations(liste, { tauxCotisations: 11, acreJusquau: "2026-06-30", tauxApresAcre: 22 });
+  assert.equal(c.tranches[0].recettesCents, 100000);
+  assert.equal(c.tranches[1].recettesCents, 100000, "une recette du 1er juillet est passée du mauvais côté");
+  assert.equal(c.totalCents, 11000 + 22000);
+  assert.deepEqual(c.manquant, []);
+});
+
+test("un taux manquant rend le total impossible, pas approximatif", () => {
+  // ⚠️ Additionner ce qu'on sait calculer et taire le reste donnerait un montant plus
+  // petit que la réalité — avec l'apparence d'un vrai total.
+  const liste = [
+    ecr({ date: "2026-06-30", sens: "entree", categorie: "abonnements", montantCents: 100000 }),
+    ecr({ date: "2026-07-01", sens: "entree", categorie: "abonnements", montantCents: 100000 }),
+  ];
+  const c = cotisations(liste, { tauxCotisations: 11, acreJusquau: "2026-06-30" });
+  assert.equal(c.totalCents, null);
+  assert.deepEqual(c.manquant, ["le taux après l'ACRE"]);
+
+  // Mais tant qu'aucune recette n'a franchi la date, réclamer le taux suivant afficherait
+  // un manque permanent et inutile.
+  const avantSeulement = cotisations([liste[0]], { tauxCotisations: 11, acreJusquau: "2026-06-30" });
+  assert.deepEqual(avantSeulement.manquant, []);
+  assert.equal(avantSeulement.totalCents, 11000);
+});
+
+test("sans date d'ACRE, un seul taux et aucune invention", () => {
+  const liste = [ecr({ date: "2026-06-30", sens: "entree", categorie: "abonnements", montantCents: 100000 })];
+  assert.equal(cotisations(liste, { tauxCotisations: 22 }).totalCents, 22000);
+  const sansTaux = cotisations(liste, {});
+  assert.equal(sansTaux.totalCents, null);
+  assert.deepEqual(sansTaux.manquant, ["le taux de cotisations"]);
+  assert.equal(sansTaux.joursAvantFinAcre, null, "aucune date posée : aucun compte à rebours inventé");
+});
+
+test("le compte à rebours de l'ACRE compte de vrais jours", () => {
+  const c = cotisations([], { acreJusquau: "2026-09-02" }, new Date("2026-08-23T12:00:00Z"));
+  assert.equal(c.joursAvantFinAcre, 11);
+  // Une échéance passée doit devenir négative, pas se figer à zéro : « 0 jour » se lit
+  // comme « c'est aujourd'hui », alors que la bascule a déjà eu lieu.
+  const passe = cotisations([], { acreJusquau: "2026-08-01" }, new Date("2026-08-23T12:00:00Z"));
+  assert.ok(passe.joursAvantFinAcre !== null && passe.joursAvantFinAcre < 0);
 });
 
 test("le solde de trésorerie se cumule dans l'ordre des opérations", () => {
@@ -435,9 +487,32 @@ test("les factures ne peuvent pas atterrir dans un espace public", () => {
   assert.ok(!/avatars|message-attachments/.test(src), "la route vise un seau public");
   assert.match(src, /await seauPrive\(\)/, "le caractère privé du seau n'est pas vérifié");
   assert.match(src, /data\.public/, "rien ne teste si le seau est public");
-  // Et la lecture ne doit jamais servir le fichier en direct : URL signée, courte durée.
-  assert.match(src, /createSignedUrl\(/, "les pièces sont servies sans URL signée");
   assert.match(src, /cheminAppartientA\(/, "le chemin demandé n'est pas contrôlé");
+});
+
+test("aucune adresse de stockage réutilisable n'atteint le navigateur", () => {
+  // ⚠️ REDIRIGER VERS UNE URL SIGNÉE ÉTAIT UNE FAILLE. L'adresse atterrit dans
+  // l'historique du navigateur et reste valable POUR N'IMPORTE QUI pendant sa durée de
+  // vie : copiée, partagée, ou simplement relue sur une machine partagée, elle ouvre la
+  // facture d'un client sans compte ni mot de passe. Le fichier doit transiter PAR le
+  // serveur, qui vérifie la session à chaque octet.
+  const src = codeSeul("src/app/api/admin/compta/piece/route.ts");
+  assert.ok(!/redirect\(/.test(src), "la route redirige encore vers le stockage");
+  assert.ok(!/createSignedUrl\(/.test(src), "une URL signée est encore délivrée au navigateur");
+  assert.match(src, /storage\.from\(BUCKET\)\.download\(/, "le fichier n'est pas servi par le serveur");
+  assert.match(src, /no-store/, "une facture peut être mise en cache");
+});
+
+test("chaque consultation d'une facture laisse une trace", () => {
+  // ⚠️ Sans journal d'accès, la question « quelqu'un a-t-il vu mes factures ? » n'a
+  // aucune réponse possible. Et la trace ne doit jamais bloquer la lecture : une facture
+  // illisible parce que le journal a échoué serait une panne causée par la sécurité.
+  const src = codeSeul("src/app/api/admin/compta/piece/route.ts");
+  assert.match(src, /type: "compta_acces"/, "aucune trace n'est enregistrée");
+  assert.match(src, /user-agent|appareil/, "la trace ne dit pas depuis quel appareil");
+  assert.match(src, /x-forwarded-for|ip:/, "la trace ne dit pas depuis quelle adresse");
+  const bloc = src.slice(src.indexOf("compta_acces") - 400, src.indexOf("compta_acces") + 600);
+  assert.match(bloc, /try \{/, "l'échec de la trace peut empêcher de lire la facture");
 });
 
 test("le livre des recettes a la forme attendue en micro-entreprise", () => {
@@ -459,6 +534,95 @@ test("le livre des recettes a la forme attendue en micro-entreprise", () => {
   // ⚠️ L'annulée FIGURE, mentionnée. La retirer laisserait un numéro à trous sans
   // explication — exactement ce qu'un contrôle demande de justifier.
   assert.match(l[3], /oui — doublon/);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Lecture automatique d'une facture — la machine propose, l'humain confirme
+// ─────────────────────────────────────────────────────────────────────────────
+
+test("une facture bien lue pré-remplit l'écriture", () => {
+  const s2 = interpreterLecture({
+    date: "2026-08-20", montantTTC: 19.9, devise: "EUR", tiers: "Vercel Inc.",
+    piece: "F-2026-08", sens: "sortie", categorie: "hebergement", libelle: "Abonnement Vercel",
+  });
+  assert.equal(s2.date, "2026-08-20");
+  assert.equal(s2.montantCents, 1990);
+  assert.equal(s2.categorie, "hebergement");
+  assert.equal(s2.sens, "sortie");
+  assert.deepEqual(s2.avertissements, []);
+});
+
+test("ce qui n'est pas lisible reste VIDE et se dit", () => {
+  // ⚠️ Un champ deviné « pour rendre service » est pire qu'un champ vide : le vide se
+  // voit et se remplit, l'approximation se recopie dans une comptabilité.
+  const s2 = interpreterLecture({ tiers: "Boulangerie" });
+  assert.equal(s2.date, undefined);
+  assert.equal(s2.montantCents, undefined);
+  assert.ok(s2.avertissements.some((a) => /date/i.test(a)));
+  assert.ok(s2.avertissements.some((a) => /montant/i.test(a)));
+});
+
+test("une date impossible lue sur un ticket est rejetée", () => {
+  // « 2026-02-31 » a la bonne FORME et n'existe pas — JavaScript la reporterait au 2 mars.
+  const s2 = interpreterLecture({ date: "2026-02-31", montantTTC: 10 });
+  assert.equal(s2.date, undefined);
+  assert.ok(s2.avertissements.some((a) => /date/i.test(a)));
+});
+
+test("un montant en devise étrangère n'est pas repris", () => {
+  // ⚠️ Même règle que pour Stripe : on ne convertit rien. 19.90 USD enregistrés en euros
+  // seraient une recette fausse, et rien ne le montrerait.
+  const s2 = interpreterLecture({ date: "2026-08-20", montantTTC: 19.9, devise: "USD" });
+  assert.equal(s2.montantCents, undefined);
+  assert.ok(s2.avertissements.some((a) => /USD|devise/i.test(a)));
+});
+
+test("une catégorie inventée ou incohérente est écartée", () => {
+  // Le modèle propose parfois un libellé au lieu d'un identifiant, ou une catégorie de
+  // recette pour un achat : les deux fausseraient la ventilation par poste.
+  assert.equal(interpreterLecture({ categorie: "Hébergement OVH" }).categorie, undefined);
+  assert.equal(interpreterLecture({ sens: "sortie", categorie: "abonnements" }).categorie, undefined,
+    "une catégorie de recette a été acceptée pour une dépense");
+  assert.equal(interpreterLecture({ sens: "entree", categorie: "abonnements" }).categorie, "abonnements");
+});
+
+test("un montant à trois décimales ou illisible n'entre pas", () => {
+  assert.equal(interpreterLecture({ montantTTC: "12,505" }).montantCents, undefined);
+  assert.equal(interpreterLecture({ montantTTC: "gratuit" }).montantCents, undefined);
+  assert.equal(interpreterLecture({ montantTTC: 0 }).montantCents, undefined);
+  assert.equal(interpreterLecture({ montantTTC: -10 }).montantCents, undefined);
+});
+
+test("le JSON se retrouve même enrobé de texte", () => {
+  assert.deepEqual(jsonDeLaReponse('```json\n{"a":1}\n```'), { a: 1 });
+  assert.deepEqual(jsonDeLaReponse('Voici : {"a":1} — voilà.'), { a: 1 });
+  assert.equal(jsonDeLaReponse("pas de json ici"), null);
+  assert.equal(jsonDeLaReponse("{cassé"), null);
+});
+
+test("la consigne interdit d'inventer et ne cite que des catégories réelles", () => {
+  // ⚠️ Si la consigne listait une catégorie qui n'existe pas, le modèle la proposerait et
+  // l'interprétation l'écarterait en silence : on perdrait la suggestion sans savoir
+  // pourquoi.
+  assert.match(CONSIGNE_LECTURE, /OMETS la clé/);
+  assert.match(CONSIGNE_LECTURE, /TOUTES TAXES COMPRISES/);
+  for (const c of CATEGORIES) assert.ok(CONSIGNE_LECTURE.includes(c.id), `catégorie absente de la consigne : ${c.id}`);
+  const listee = CONSIGNE_LECTURE.split("liste EXACTE")[1] ?? "";
+  for (const mot of listee.split(/[,\s]+/).filter((m) => /^[a-z_]{4,}$/.test(m))) {
+    if (["categorie", "libelle", "omets"].includes(mot)) continue;
+    assert.ok(CATEGORIES.some((c) => c.id === mot), `la consigne cite une catégorie inexistante : ${mot}`);
+  }
+});
+
+test("la lecture ne peut rien enregistrer", () => {
+  // ⚠️ LA GARANTIE CENTRALE. Cette route propose, elle n'écrit pas : un total mal lu
+  // deviendrait une ligne comptable fausse, indiscernable d'une ligne juste.
+  const src = codeSeul("src/app/api/admin/compta/lire/route.ts");
+  assert.ok(!/\.insert\(|\.update\(|\.upsert\(|enregistrerEcritures/.test(src),
+    "la route de lecture écrit en base");
+  assert.ok(!/storage\.from\([^)]*\)\.upload/.test(src), "la route de lecture conserve l'image");
+  assert.match(src, /thinkingBudget: 0/, "le budget de réflexion se facture comme de la sortie");
+  assert.match(src, /temperature: 0\b/, "une température non nulle sur un montant");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

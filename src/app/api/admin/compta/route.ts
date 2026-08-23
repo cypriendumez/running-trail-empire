@@ -143,6 +143,9 @@ export async function PATCH(req: Request) {
     const propre: Reglages = {
       tauxCotisations: typeof r.tauxCotisations === "number" && r.tauxCotisations >= 0 && r.tauxCotisations <= 100 ? r.tauxCotisations : undefined,
       tva: Boolean(r.tva),
+      // ⚠️ Une date fantaisiste couperait les recettes au mauvais endroit sans rien dire.
+      acreJusquau: typeof r.acreJusquau === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.acreJusquau) ? r.acreJusquau : undefined,
+      tauxApresAcre: typeof r.tauxApresAcre === "number" && r.tauxApresAcre >= 0 && r.tauxApresAcre <= 100 ? r.tauxApresAcre : undefined,
       seuilCA: typeof r.seuilCA === "number" && r.seuilCA > 0 ? r.seuilCA : undefined,
       soldeInitialCents: Number.isInteger(r.soldeInitialCents) ? r.soldeInitialCents : undefined,
     };

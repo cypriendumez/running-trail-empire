@@ -62,9 +62,24 @@ export async function POST(req: Request) {
   return NextResponse.json({ ok: true, chemin, nom: fichier.name, taille: fichier.size });
 }
 
-/** Délivre une URL signée de courte durée pour consulter une pièce. */
+/**
+ * Sert la pièce — SANS jamais laisser d'adresse de stockage atteindre le navigateur.
+ *
+ * ⚠️ LA VERSION PRÉCÉDENTE REDIRIGEAIT VERS UNE URL SIGNÉE. Cette adresse atterrissait
+ * dans l'historique du navigateur, et surtout : elle reste valable pendant toute sa durée
+ * de vie POUR N'IMPORTE QUI. Copiée, partagée, ou simplement lue dans l'historique d'une
+ * machine partagée, elle ouvre la facture d'un client — sans compte, sans mot de passe.
+ * Le fichier transite maintenant PAR le serveur : rien de réutilisable ne sort.
+ *
+ * ⚠️ ET CHAQUE CONSULTATION EST TRACÉE. Qui, quand, quel document, depuis quelle adresse.
+ * Sans journal d'accès, une lecture illégitime ne laisse aucune trace — et la question
+ * « est-ce que quelqu'un a vu mes factures ? » n'a alors aucune réponse possible.
+ */
 export async function GET(req: Request) {
-  const id = await editeur();
+  const sb = await createClient();
+  const { data: { user } } = await sb.auth.getUser();
+  if (!estAdmin(user?.email)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const id = await idEditeur();
   if (!id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const chemin = new URL(req.url).searchParams.get("chemin") ?? "";
@@ -72,9 +87,33 @@ export async function GET(req: Request) {
   // pourrait réclamer n'importe quel objet du seau en fabriquant l'adresse.
   if (!cheminAppartientA(chemin, id)) return NextResponse.json({ error: "Chemin refusé" }, { status: 400 });
 
-  const { data, error } = await createAdminClient().storage.from(BUCKET).createSignedUrl(chemin, 120);
+  const admin = createAdminClient();
+  const { data, error } = await admin.storage.from(BUCKET).download(chemin);
   if (error || !data) return NextResponse.json({ error: error?.message ?? "Pièce introuvable" }, { status: 404 });
-  return NextResponse.redirect(data.signedUrl);
+
+  // Journal d'accès. Il ne doit JAMAIS empêcher la lecture : une facture illisible parce
+  // que la trace a échoué serait une panne provoquée par la sécurité elle-même.
+  try {
+    await admin.from("notifications").insert({
+      user_id: id, type: "compta_acces", title: "Consultation d'une pièce", read: true,
+      data: {
+        chemin, par: user?.email ?? "?", le: new Date().toISOString(),
+        ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
+        appareil: (req.headers.get("user-agent") ?? "").slice(0, 200),
+      },
+    });
+  } catch (e) { console.error("[compta] trace d'accès non enregistrée :", (e as Error).message); }
+
+  return new NextResponse(await data.arrayBuffer(), {
+    headers: {
+      "Content-Type": data.type || "application/octet-stream",
+      // `inline` pour lire sans télécharger ; `no-store` pour qu'aucun cache
+      // intermédiaire ne conserve une facture.
+      "Content-Disposition": `inline; filename="piece"`,
+      "Cache-Control": "private, no-store, max-age=0",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
 }
 
 export const runtime = "nodejs";

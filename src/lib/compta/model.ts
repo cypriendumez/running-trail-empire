@@ -104,8 +104,22 @@ export type Ecriture = {
 };
 
 export type Reglages = {
-  /** Taux de cotisations sociales en %, SAISI PAR L'ÉDITEUR (l'app n'en connaît aucun). */
+  /**
+   * Taux de cotisations sociales en % applicable AUJOURD'HUI, SAISI PAR L'ÉDITEUR.
+   * Pendant l'ACRE, c'est le taux réduit.
+   */
   tauxCotisations?: number;
+  /**
+   * Dernier jour du taux réduit (ACRE), au format AAAA-MM-JJ.
+   *
+   * ⚠️ L'ACRE dure une durée déterminée, puis le taux REMONTE. Un outil qui applique le
+   * taux réduit indéfiniment annonce des cotisations sous-évaluées pendant des mois —
+   * et l'écart ne se découvre qu'à l'appel de cotisations, quand l'argent est dépensé.
+   * Aucune durée n'est écrite dans le code : c'est une date que l'éditeur saisit.
+   */
+  acreJusquau?: string;
+  /** Taux plein applicable APRÈS cette date, SAISI PAR L'ÉDITEUR lui aussi. */
+  tauxApresAcre?: number;
   /** Assujetti à la TVA ? Change tout l'affichage. */
   tva?: boolean;
   /** Seuil de chiffre d'affaires à surveiller, en euros, SAISI PAR L'ÉDITEUR. */
@@ -159,7 +173,7 @@ export function euros(cents: number, avecSigne = false): string {
  * le regroupement mensuel — et daté de mars par tout calcul qui relit la date. Deux
  * vérités pour une même écriture, sans le moindre message. Trouvé par un test.
  */
-function dateReelle(iso: string): boolean {
+export function dateReelle(iso: string): boolean {
   const [a, m, j] = iso.split("-").map(Number);
   const d = new Date(Date.UTC(a, m - 1, j));
   return d.getUTCFullYear() === a && d.getUTCMonth() + 1 === m && d.getUTCDate() === j;
@@ -273,6 +287,66 @@ export function totaux(ecritures: Ecriture[]): Totaux {
 export function cotisationsEstimees(recettesCents: number, taux?: number): number | null {
   if (taux === undefined || !Number.isFinite(taux) || taux <= 0) return null;
   return Math.round((recettesCents * taux) / 100);
+}
+
+export type Cotisations = {
+  /** `null` tant qu'un taux nécessaire manque : on ne complète pas au taux voisin. */
+  totalCents: number | null;
+  tranches: { libelle: string; recettesCents: number; taux?: number; cotisationsCents: number | null }[];
+  /** Ce qu'il manque pour pouvoir totaliser, en clair. */
+  manquant: string[];
+  /** Jours restants avant la fin du taux réduit — `null` si aucune date n'est posée. */
+  joursAvantFinAcre: number | null;
+};
+
+/**
+ * Cotisations estimées EN TENANT COMPTE DU CHANGEMENT DE TAUX.
+ *
+ * ⚠️ Les recettes sont ventilées PAR DATE, pas globalement. Appliquer le taux du jour à
+ * l'ensemble de l'année fausse les deux périodes à la fois : trop peu sur celles d'avant
+ * la bascule, trop sur celles d'après.
+ *
+ * ⚠️ ET SI LE TAUX D'UNE PÉRIODE MANQUE, LE TOTAL VAUT `null`. Additionner ce qu'on sait
+ * calculer et taire le reste donnerait un montant plus petit que la réalité, qui a l'air
+ * d'un vrai total.
+ */
+export function cotisations(ecritures: Ecriture[], r: Reglages, aujourdhui = new Date()): Cotisations {
+  const fin = r.acreJusquau && /^\d{4}-\d{2}-\d{2}$/.test(r.acreJusquau) ? r.acreJusquau : null;
+  let avant = 0, apres = 0;
+  for (const e of ecritures) {
+    if (e.annulee || e.sens !== "entree") continue;
+    if (fin && e.date > fin) apres += e.montantCents; else avant += e.montantCents;
+  }
+
+  const utilisable = (t?: number) => (typeof t === "number" && Number.isFinite(t) && t > 0 ? t : undefined);
+  const tAvant = utilisable(r.tauxCotisations);
+  const tApres = utilisable(r.tauxApresAcre);
+
+  const tranches: Cotisations["tranches"] = [];
+  const manquant: string[] = [];
+  const calc = (cents: number, taux?: number) => (taux === undefined ? null : Math.round((cents * taux) / 100));
+
+  if (!fin) {
+    tranches.push({ libelle: "Recettes", recettesCents: avant, taux: tAvant, cotisationsCents: calc(avant, tAvant) });
+    if (tAvant === undefined) manquant.push("le taux de cotisations");
+  } else {
+    tranches.push({ libelle: `Jusqu'au ${fin}`, recettesCents: avant, taux: tAvant, cotisationsCents: calc(avant, tAvant) });
+    tranches.push({ libelle: `À partir du ${fin}`, recettesCents: apres, taux: tApres, cotisationsCents: calc(apres, tApres) });
+    if (tAvant === undefined && avant > 0) manquant.push("le taux réduit (ACRE)");
+    // ⚠️ Réclamé SEULEMENT s'il y a des recettes après la bascule : exiger un taux
+    // qu'aucune recette n'utilise encore afficherait un manque permanent et inutile.
+    if (tApres === undefined && apres > 0) manquant.push("le taux après l'ACRE");
+  }
+
+  const totalCents = tranches.some((t) => t.recettesCents > 0 && t.cotisationsCents === null)
+    ? null
+    : tranches.reduce((s2, t) => s2 + (t.cotisationsCents ?? 0), 0);
+
+  const joursAvantFinAcre = fin
+    ? Math.ceil((new Date(fin + "T23:59:59Z").getTime() - aujourdhui.getTime()) / 86400000)
+    : null;
+
+  return { totalCents, tranches, manquant, joursAvantFinAcre };
 }
 
 /** Solde de trésorerie cumulé, écriture par écriture, du plus ancien au plus récent. */

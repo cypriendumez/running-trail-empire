@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Wallet, TrendingUp, TrendingDown, Plus, Download, X, Settings2,
-  Search, Ban, AlertCircle, Check, Repeat, Loader2, FileText, PenLine, ArrowRight, Paperclip,
+  Search, Ban, AlertCircle, Check, Repeat, Loader2, FileText, PenLine, ArrowRight, Paperclip, Sparkles, CalendarClock,
 } from "lucide-react";
 import {
   CATEGORIES, MOYENS, categorieDe, enCentimes, euros, totaux, cotisationsEstimees,
   versCSV, versLivreRecettes, valider, soldeCumule, numeroter, doublonsProbables, parTrimestre,
-  modelesRecurrents, evolution, type Ecriture, type Reglages, type Sens,
+  modelesRecurrents, evolution, cotisations, type Ecriture, type Reglages, type Sens,
 } from "@/lib/compta/model";
 
 /**
@@ -54,6 +54,7 @@ export function ComptaClient() {
   const [erreursForm, setErreursForm] = useState<string[]>([]);
   const [envoi, setEnvoi] = useState(false);
   const [envoiPiece, setEnvoiPiece] = useState(false);
+  const [lecture, setLecture] = useState<string[] | null>(null);
 
   // Filtres
   const [annee, setAnnee] = useState<string>("toutes");
@@ -123,7 +124,8 @@ export function ComptaClient() {
     if (c === null || !b.libelle.trim()) return [];
     return doublonsProbables({ date: b.date, libelle: b.libelle, montantCents: c, sens: b.sens }, ecritures);
   }, [b.date, b.libelle, b.montant, b.sens, ecritures]);
-  const cotis = cotisationsEstimees(t.entreesCents, reglages.tauxCotisations);
+  const cot = useMemo(() => cotisations(duPerimetre, reglages), [duPerimetre, reglages]);
+  const cotis = cot.totalCents;
   const tresorerie = (reglages.soldeInitialCents ?? 0) + t.resultatCents;
 
   /** Périmètre du TABLEAU : les filtres d'affichage s'ajoutent au périmètre de calcul. */
@@ -154,6 +156,37 @@ export function ComptaClient() {
     setEnvoiPiece(false);
     if (!r.ok || !j.ok) { setErreursForm(j.erreurs ?? ["Dépôt refusé."]); return; }
     setB((prev) => ({ ...prev, pieceFichier: j.chemin, pieceNom: j.nom }));
+    await lirePiece(f);
+  }
+
+  /**
+   * Lit la facture et PRÉ-REMPLIT — sans jamais enregistrer, ni écraser ce qui est saisi.
+   *
+   * ⚠️ Seuls les champs LAISSÉS VIDES sont remplis. Écraser une valeur tapée à la main
+   * par une valeur lue ferait perdre une correction sans le dire — et la correction est
+   * justement ce que l'humain apporte à une lecture automatique.
+   */
+  async function lirePiece(f: File) {
+    setLecture([]);
+    const fd = new FormData(); fd.append("fichier", f);
+    const r = await fetch("/api/admin/compta/lire", { method: "POST", body: fd });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) { setLecture(j.erreurs ?? ["Lecture impossible — saisis l'écriture à la main."]); return; }
+    const g = j.suggestion as {
+      date?: string; libelle?: string; montantCents?: number; tiers?: string;
+      piece?: string; categorie?: string; sens?: Sens; avertissements: string[];
+    };
+    setB((prev) => ({
+      ...prev,
+      sens: g.sens ?? prev.sens,
+      date: g.date ?? prev.date,
+      libelle: prev.libelle || g.libelle || "",
+      montant: prev.montant || (g.montantCents ? (g.montantCents / 100).toFixed(2).replace(".", ",") : ""),
+      tiers: prev.tiers || g.tiers || "",
+      piece: prev.piece || g.piece || "",
+      categorie: g.categorie && !prev.libelle ? g.categorie : prev.categorie,
+    }));
+    setLecture(g.avertissements ?? []);
   }
 
   async function enregistrer() {
@@ -179,6 +212,7 @@ export function ComptaClient() {
     setEnvoi(false);
     if (!r.ok || !j.ok) { setErreursForm(j.erreurs ?? ["Enregistrement refusé."]); return; }
     setEcritures((prev) => [j.ecriture as Ecriture, ...prev]);
+    setLecture(null);
     // La pièce n'est PAS conservée d'une écriture à l'autre : rattacher par erreur la
     // facture précédente à une nouvelle ligne est pire que ne rien attacher.
     setB({ ...brouillonVide(), date: b.date, sens: b.sens, categorie: b.categorie, moyen: b.moyen });
@@ -321,6 +355,19 @@ export function ComptaClient() {
                 className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm" />
             </label>
             <label className="block">
+              <span className="text-xs font-semibold text-zinc-500">Taux réduit jusqu'au (ACRE)</span>
+              <input type="date" defaultValue={reglages.acreJusquau ?? ""}
+                onBlur={(e) => void sauverReglages({ ...reglages, acreJusquau: e.target.value || undefined })}
+                className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm" />
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-zinc-500">Taux après l'ACRE (%)</span>
+              <input type="number" step="0.1" min="0" max="100" defaultValue={reglages.tauxApresAcre ?? ""}
+                onBlur={(e) => void sauverReglages({ ...reglages, tauxApresAcre: e.target.value === "" ? undefined : Number(e.target.value) })}
+                placeholder="taux plein"
+                className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm" />
+            </label>
+            <label className="block">
               <span className="text-xs font-semibold text-zinc-500">Seuil de CA à surveiller (€)</span>
               <input type="number" min="0" defaultValue={reglages.seuilCA ?? ""}
                 onBlur={(e) => void sauverReglages({ ...reglages, seuilCA: e.target.value === "" ? undefined : Number(e.target.value) })}
@@ -413,7 +460,7 @@ export function ComptaClient() {
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) void deposerPiece(f); }}
                   className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-1.5 text-xs file:mr-2 file:rounded-lg file:border-0 file:bg-zinc-100 file:px-2 file:py-1 file:text-xs file:font-medium" />
               )}
-              {envoiPiece && <span className="mt-1 block text-xs text-zinc-400">Dépôt en cours…</span>}
+              {envoiPiece && <span className="mt-1 block text-xs text-zinc-400">Dépôt et lecture en cours…</span>}
             </label>
             {reglages.tva && (
               <label className="block"><span className="text-xs font-semibold text-zinc-500">TVA (%)</span>
@@ -436,6 +483,21 @@ export function ComptaClient() {
               vraiment ; refuser la seconde ligne pousserait à contourner l'outil. Mais
               saisir deux fois la même facture est l'erreur la plus banale d'une compta
               tenue à la main — et elle devient invisible une fois enregistrée. */}
+          {/* ⚠️ La lecture PROPOSE, elle n'enregistre rien. Un total mal lu deviendrait
+              une ligne comptable fausse, indiscernable d'une ligne juste une fois
+              enregistrée. Ce bandeau dit toujours de vérifier, même quand tout est lu. */}
+          {lecture !== null && (
+            <div className="mt-4 flex items-start gap-2 rounded-xl bg-violet-50 p-3 text-sm text-violet-800">
+              <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                <b>Lu sur la pièce — à vérifier.</b>{" "}
+                {lecture.length
+                  ? <>Non lu : {lecture.join(" ")}</>
+                  : "Tous les champs ont été proposés ; contrôle le montant et la date avant d'enregistrer."}
+              </span>
+            </div>
+          )}
+
           {doublons.length > 0 && (
             <div className="mt-4 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
               <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
@@ -459,7 +521,7 @@ export function ComptaClient() {
               {envoi ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}Enregistrer
             </button>
             <span className="text-xs text-zinc-400">⌘ + Entrée</span>
-            <button onClick={() => { setFormOuvert(false); setErreursForm([]); }}
+            <button onClick={() => { setFormOuvert(false); setErreursForm([]); setLecture(null); }}
               className="rounded-xl px-3 py-2 text-sm font-medium text-zinc-500 hover:bg-zinc-100">Annuler</button>
           </div>
         </div>
@@ -519,6 +581,27 @@ export function ComptaClient() {
         </div>
       </div>
 
+      {/* ─── Fin de l'ACRE ──────────────────────────────────────────────────
+          ⚠️ Le taux réduit s'arrête à une date précise, et le taux REMONTE. Sans rappel,
+          on continue de provisionner au taux réduit pendant des mois — l'écart ne se
+          découvre qu'à l'appel de cotisations, quand l'argent est déjà dépensé. */}
+      {cot.joursAvantFinAcre !== null && (
+        <div className={`flex items-start gap-2 rounded-2xl border p-4 text-sm ${
+          cot.joursAvantFinAcre < 0 ? "border-zinc-200 bg-zinc-50 text-zinc-600"
+            : cot.joursAvantFinAcre <= 60 ? "border-amber-200 bg-amber-50 text-amber-800"
+            : "border-blue-200 bg-blue-50 text-blue-800"}`}>
+          <CalendarClock className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            {cot.joursAvantFinAcre < 0
+              ? <>Ton taux réduit a pris fin le <b>{reglages.acreJusquau?.split("-").reverse().join("/")}</b>.
+                  Les recettes postérieures sont estimées au taux plein.</>
+              : <>Taux réduit jusqu'au <b>{reglages.acreJusquau?.split("-").reverse().join("/")}</b> —
+                  encore <b>{cot.joursAvantFinAcre} jour{cot.joursAvantFinAcre > 1 ? "s" : ""}</b>.
+                  {reglages.tauxApresAcre === undefined && " Pense à renseigner le taux qui s'appliquera ensuite."}</>}
+          </span>
+        </div>
+      )}
+
       {/* ─── Charges mensuelles à reporter ──────────────────────────────────
           La partie la plus fastidieuse d'une compta tenue à la main, donc celle qu'on
           oublie. Une charge déjà reportée ce mois-ci n'apparaît pas : c'est la façon la
@@ -548,16 +631,26 @@ export function ComptaClient() {
           <div className="text-xs font-semibold text-zinc-400">Cotisations estimées</div>
           {cotis === null ? (
             <>
-              <div className="mt-1 text-lg font-semibold text-zinc-400">Taux non renseigné</div>
+              <div className="mt-1 text-lg font-semibold text-zinc-400">
+                {cot.manquant.length ? "Calcul impossible" : "Taux non renseigné"}
+              </div>
               <p className="mt-2 text-xs text-zinc-500">
-                Aucun taux n'est appliqué par défaut : il change chaque année et dépend de ton statut.
-                Renseigne-le dans <b>Réglages</b> après l'avoir relevé sur urssaf.fr.
+                {cot.manquant.length
+                  ? <>Il manque <b>{cot.manquant.join(" et ")}</b>. Rien n'est estimé : additionner ce qui est calculable
+                      et taire le reste donnerait un montant plus petit que la réalité, avec l'apparence d'un vrai total.</>
+                  : <>Aucun taux n'est appliqué par défaut : il change chaque année et dépend de ton statut.
+                      Renseigne-le dans <b>Réglages</b> après l'avoir relevé sur urssaf.fr.</>}
               </p>
             </>
           ) : (
             <>
               <div className="mt-1 text-2xl font-bold text-zinc-900">{euros(cotis)}</div>
-              <p className="mt-1 text-xs text-zinc-400">{reglages.tauxCotisations} % des recettes ({euros(t.entreesCents)})</p>
+              {/* Détail par période : pendant l'ACRE et après, deux taux, deux assiettes. */}
+              {cot.tranches.filter((x) => x.recettesCents > 0).map((x) => (
+                <p key={x.libelle} className="mt-1 text-xs text-zinc-400">
+                  {x.libelle} — {x.taux} % de {euros(x.recettesCents)} = <b className="text-zinc-600">{euros(x.cotisationsCents ?? 0)}</b>
+                </p>
+              ))}
               <p className="mt-2 text-xs text-zinc-500">Après cotisations : <b>{euros(t.resultatCents - cotis, true)}</b></p>
             </>
           )}
