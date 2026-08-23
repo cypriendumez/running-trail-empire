@@ -12,9 +12,10 @@ import { join } from "node:path";
 import {
   enCentimes, euros, valider, totaux, tvaDe, cotisationsEstimees, soldeCumule, versCSV,
   CATEGORIES, categorieDe, type Ecriture,
-  numeroter, doublonsProbables, parTrimestre, modelesRecurrents, evolution,
+  numeroter, doublonsProbables, parTrimestre, modelesRecurrents, evolution, versLivreRecettes,
 } from "../src/lib/compta/model";
 import { ecrituresDeLEvenement, dateParis, type EvenementStripe } from "../src/lib/compta/stripe";
+import { validerFichier, cheminDe, cheminAppartientA, BUCKET, TAILLE_MAX } from "../src/lib/compta/pieces";
 
 const ROOT = join(__dirname, "..");
 let passed = 0;
@@ -388,6 +389,76 @@ test("le journal appartient à l'entreprise, pas au compte connecté", () => {
   // ⚠️ Et l'identifiant de la SESSION ne doit servir à rien d'autre qu'au contrôle
   // d'accès : `user.id` réapparaissant ailleurs, c'est le journal qui se rescinde.
   assert.ok(!/user\.id/.test(src), "une écriture est encore rattachée au compte connecté");
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Pièces justificatives — ce sont des factures de clients payants
+// ─────────────────────────────────────────────────────────────────────────────
+
+test("une pièce n'est ni un exécutable ni une vidéo", () => {
+  assert.deepEqual(validerFichier("application/pdf", 1000), []);
+  assert.deepEqual(validerFichier("image/jpeg", 1000), []);
+  assert.ok(validerFichier("text/html", 1000).some((e) => /format/i.test(e)));
+  assert.ok(validerFichier("application/x-sh", 1000).some((e) => /format/i.test(e)));
+  assert.ok(validerFichier("application/pdf", 0).some((e) => /vide/i.test(e)));
+  assert.ok(validerFichier("application/pdf", TAILLE_MAX + 1).some((e) => /lourd/i.test(e)));
+});
+
+test("le nom du fichier d'origine n'est jamais repris comme chemin", () => {
+  // ⚠️ « ../../avatars/moi.png » remonterait d'un dossier — vers un seau PUBLIC. Et deux
+  // écritures dont la facture s'appelle « facture.pdf » s'écraseraient l'une l'autre.
+  const c = cheminDe("ed-1", "application/pdf", "abc-123");
+  assert.match(c, /^ed-1\/\d{4}\/abc-123\.pdf$/);
+  // L'extension vient du TYPE DÉCLARÉ, pas du nom : un nom de fichier ment facilement.
+  assert.match(cheminDe("ed-1", "image/png", "x"), /\.png$/);
+  // Un identifiant tordu est nettoyé, jamais interpolé tel quel.
+  assert.ok(!cheminDe("ed-1", "image/png", "../../evasion").includes(".."));
+});
+
+test("un chemin venu du navigateur ne donne pas accès à tout le seau", () => {
+  // ⚠️ Sans ce contrôle, un administrateur — ou n'importe quoi qui emprunte sa session —
+  // pourrait réclamer une URL signée pour n'importe quel objet en fabriquant l'adresse.
+  assert.ok(cheminAppartientA("ed-1/2026/abc.pdf", "ed-1"));
+  assert.ok(!cheminAppartientA("ed-2/2026/abc.pdf", "ed-1"), "on lit le dossier d'un autre");
+  assert.ok(!cheminAppartientA("ed-1/../ed-2/abc.pdf", "ed-1"), "la remontée de dossier passe");
+  assert.ok(!cheminAppartientA("/ed-1/2026/abc.pdf", "ed-1"));
+  assert.ok(!cheminAppartientA("", "ed-1"));
+});
+
+test("les factures ne peuvent pas atterrir dans un espace public", () => {
+  // ⚠️ LE PROJET A DEUX SEAUX, `avatars` ET `message-attachments`, ET LES DEUX SONT
+  // PUBLICS. Y déposer une facture publierait le nom, l'adresse et le montant d'un
+  // client payant. La route doit viser un seau dédié ET vérifier qu'il est privé À
+  // CHAQUE DÉPÔT : un seau se bascule en public d'un clic, et personne ne le remarque.
+  assert.equal(BUCKET, "justificatifs");
+  const src = codeSeul("src/app/api/admin/compta/piece/route.ts");
+  assert.ok(!/avatars|message-attachments/.test(src), "la route vise un seau public");
+  assert.match(src, /await seauPrive\(\)/, "le caractère privé du seau n'est pas vérifié");
+  assert.match(src, /data\.public/, "rien ne teste si le seau est public");
+  // Et la lecture ne doit jamais servir le fichier en direct : URL signée, courte durée.
+  assert.match(src, /createSignedUrl\(/, "les pièces sont servies sans URL signée");
+  assert.match(src, /cheminAppartientA\(/, "le chemin demandé n'est pas contrôlé");
+});
+
+test("le livre des recettes a la forme attendue en micro-entreprise", () => {
+  // Uniquement les RECETTES, numérotées, dans l'ordre, avec la référence de la pièce,
+  // le client, la nature et le mode de règlement.
+  const csv = versLivreRecettes([
+    ecr({ id: "b", date: "2026-02-01", sens: "entree", categorie: "abonnements", montantCents: 1499, tiers: "Client A", piece: "F-002", moyen: "Stripe" }),
+    ecr({ id: "a", date: "2026-01-01", sens: "entree", categorie: "coaching", montantCents: 5000, tiers: "Client B", piece: "F-001", moyen: "Virement" }),
+    ecr({ id: "c", date: "2026-03-01", sens: "sortie", categorie: "hebergement", montantCents: 2000 }),
+    ecr({ id: "d", date: "2026-04-01", sens: "entree", categorie: "abonnements", montantCents: 999, annulee: true, motifAnnulation: "doublon" }),
+  ]);
+  const l = csv.split("\r\n");
+  assert.ok(l[0].startsWith("\ufeffN°;Date;Référence de la pièce;Client;Nature"), "en-tête inattendu : " + l[0]);
+  // La dépense n'y figure pas : ce livre ne recense QUE les recettes.
+  assert.ok(!csv.includes("Hébergement"), "une dépense s'est glissée dans le livre des recettes");
+  assert.equal(l.length, 4, "trois recettes attendues (dont l'annulée)");
+  assert.ok(l[1].startsWith("1;2026-01-01;F-001;Client B"), "ordre ou colonnes incorrects : " + l[1]);
+  assert.ok(l[2].startsWith("2;2026-02-01;F-002;Client A"));
+  // ⚠️ L'annulée FIGURE, mentionnée. La retirer laisserait un numéro à trous sans
+  // explication — exactement ce qu'un contrôle demande de justifier.
+  assert.match(l[3], /oui — doublon/);
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

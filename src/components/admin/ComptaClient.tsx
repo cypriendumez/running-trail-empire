@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Wallet, TrendingUp, TrendingDown, Plus, Download, X, Settings2,
-  Search, Ban, AlertCircle, Check, Repeat, Loader2, FileText, PenLine, ArrowRight,
+  Search, Ban, AlertCircle, Check, Repeat, Loader2, FileText, PenLine, ArrowRight, Paperclip,
 } from "lucide-react";
 import {
   CATEGORIES, MOYENS, categorieDe, enCentimes, euros, totaux, cotisationsEstimees,
-  versCSV, valider, soldeCumule, numeroter, doublonsProbables, parTrimestre,
+  versCSV, versLivreRecettes, valider, soldeCumule, numeroter, doublonsProbables, parTrimestre,
   modelesRecurrents, evolution, type Ecriture, type Reglages, type Sens,
 } from "@/lib/compta/model";
 
@@ -36,6 +36,7 @@ const aujourdhui = () => new Date().toISOString().slice(0, 10);
 type Brouillon = {
   date: string; libelle: string; sens: Sens; categorie: string; montant: string;
   moyen: string; tiers: string; piece: string; tvaTaux: string; note: string; recurrente: boolean;
+  pieceFichier?: string; pieceNom?: string;
 };
 const brouillonVide = (): Brouillon => ({
   date: aujourdhui(), libelle: "", sens: "sortie", categorie: "hebergement", montant: "",
@@ -52,6 +53,7 @@ export function ComptaClient() {
   const [b, setB] = useState<Brouillon>(brouillonVide());
   const [erreursForm, setErreursForm] = useState<string[]>([]);
   const [envoi, setEnvoi] = useState(false);
+  const [envoiPiece, setEnvoiPiece] = useState(false);
 
   // Filtres
   const [annee, setAnnee] = useState<string>("toutes");
@@ -137,6 +139,23 @@ export function ComptaClient() {
 
   const catsDuSens = CATEGORIES.filter((c) => c.sens === b.sens);
 
+  /**
+   * Dépose la pièce AVANT d'enregistrer l'écriture.
+   *
+   * ⚠️ L'inverse — créer l'écriture puis attacher — laisserait une ligne sans pièce si
+   * le dépôt échoue, et personne ne saurait qu'il manque quelque chose : c'est
+   * précisément le document qu'on doit pouvoir produire dix ans plus tard.
+   */
+  async function deposerPiece(f: File) {
+    setEnvoiPiece(true); setErreursForm([]);
+    const fd = new FormData(); fd.append("fichier", f);
+    const r = await fetch("/api/admin/compta/piece", { method: "POST", body: fd });
+    const j = await r.json();
+    setEnvoiPiece(false);
+    if (!r.ok || !j.ok) { setErreursForm(j.erreurs ?? ["Dépôt refusé."]); return; }
+    setB((prev) => ({ ...prev, pieceFichier: j.chemin, pieceNom: j.nom }));
+  }
+
   async function enregistrer() {
     const cents = enCentimes(b.montant);
     const projet: Partial<Ecriture> = {
@@ -145,6 +164,7 @@ export function ComptaClient() {
       tiers: b.tiers || undefined, piece: b.piece || undefined,
       tvaTaux: reglages.tva && b.tvaTaux ? Number(b.tvaTaux) : undefined,
       note: b.note || undefined, recurrente: b.recurrente,
+      pieceFichier: b.pieceFichier,
     };
     // ⚠️ « Montant illisible » plutôt que 0 : une faute de frappe transformée en zéro
     // entrerait dans le journal sans que personne ne la voie.
@@ -159,6 +179,8 @@ export function ComptaClient() {
     setEnvoi(false);
     if (!r.ok || !j.ok) { setErreursForm(j.erreurs ?? ["Enregistrement refusé."]); return; }
     setEcritures((prev) => [j.ecriture as Ecriture, ...prev]);
+    // La pièce n'est PAS conservée d'une écriture à l'autre : rattacher par erreur la
+    // facture précédente à une nouvelle ligne est pire que ne rien attacher.
     setB({ ...brouillonVide(), date: b.date, sens: b.sens, categorie: b.categorie, moyen: b.moyen });
     setFormOuvert(false);
   }
@@ -222,15 +244,20 @@ export function ComptaClient() {
     });
   }
 
+  function telecharger(contenu: string, nom: string) {
+    const url = URL.createObjectURL(new Blob([contenu], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = nom; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function exporterLivre() {
+    telecharger(versLivreRecettes(duPerimetre), `livre-des-recettes-${annee === "toutes" ? "tout" : annee}.csv`);
+  }
+
   function exporter() {
     // Les annulées SONT exportées, marquées : un export qui les masque ne justifie rien.
-    const csv = versCSV(duPerimetre);
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `pacevo-comptabilite-${annee === "toutes" ? "tout" : annee}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    telecharger(versCSV(duPerimetre), `pacevo-comptabilite-${annee === "toutes" ? "tout" : annee}.csv`);
   }
 
   const maxMois = Math.max(1, ...t.parMois.map((m) => Math.max(m.entreesCents, m.sortiesCents)));
@@ -265,9 +292,16 @@ export function ComptaClient() {
           className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50">
           <Settings2 className="w-4 h-4" />Réglages
         </button>
+        {/* Deux exports, deux usages : le livre des recettes est le document que tient un
+            micro-entrepreneur ; l'export complet sert à tout le reste. */}
+        <button onClick={exporterLivre} disabled={!t.entreesCents}
+          className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-40"
+          title="Le document obligatoire en micro-entreprise : recettes numérotées, dans l'ordre">
+          <FileText className="w-4 h-4" />Livre des recettes
+        </button>
         <button onClick={exporter} disabled={!duPerimetre.length}
           className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-40">
-          <Download className="w-4 h-4" />Export CSV
+          <Download className="w-4 h-4" />Export complet
         </button>
         <button onClick={() => { setFormOuvert((v) => !v); setErreursForm([]); }}
           className="inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800">
@@ -360,9 +394,27 @@ export function ComptaClient() {
             <label className="block"><span className="text-xs font-semibold text-zinc-500">Tiers (facultatif)</span>
               <input value={b.tiers} onChange={(e) => setB({ ...b, tiers: e.target.value })}
                 placeholder="Vercel Inc." className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm" /></label>
-            <label className="block"><span className="text-xs font-semibold text-zinc-500">Pièce justificative</span>
+            <label className="block"><span className="text-xs font-semibold text-zinc-500">Référence de la pièce</span>
               <input value={b.piece} onChange={(e) => setB({ ...b, piece: e.target.value })}
-                placeholder="N° de facture ou lien" className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm" /></label>
+                placeholder="N° de facture" className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm" /></label>
+            {/* ⚠️ L'obligation est de CONSERVER la facture, pas d'en noter le numéro :
+                un numéro sans document ne justifie rien. Le fichier va dans un espace
+                PRIVÉ — les deux autres seaux du projet sont publics. */}
+            <label className="block"><span className="text-xs font-semibold text-zinc-500">Facture (PDF ou photo)</span>
+              {b.pieceFichier ? (
+                <div className="mt-1 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                  <Paperclip className="h-3.5 w-3.5 shrink-0" />
+                  <span className="flex-1 truncate">{b.pieceNom}</span>
+                  <button onClick={() => setB({ ...b, pieceFichier: undefined, pieceNom: undefined })}
+                    className="text-emerald-600 hover:text-emerald-800" title="Retirer"><X className="h-3.5 w-3.5" /></button>
+                </div>
+              ) : (
+                <input type="file" accept="application/pdf,image/*" disabled={envoiPiece}
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) void deposerPiece(f); }}
+                  className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-1.5 text-xs file:mr-2 file:rounded-lg file:border-0 file:bg-zinc-100 file:px-2 file:py-1 file:text-xs file:font-medium" />
+              )}
+              {envoiPiece && <span className="mt-1 block text-xs text-zinc-400">Dépôt en cours…</span>}
+            </label>
             {reglages.tva && (
               <label className="block"><span className="text-xs font-semibold text-zinc-500">TVA (%)</span>
                 <input value={b.tvaTaux} onChange={(e) => setB({ ...b, tvaTaux: e.target.value })} inputMode="decimal"
@@ -438,7 +490,6 @@ export function ComptaClient() {
         </div>
       )}
 
-      {ecritures.length > 0 && (<>
       {/* ─── Chiffres clés ──────────────────────────────────────────────────
           ⚠️ Le RÉSULTAT domine, les autres l'expliquent. Quatre cartes de même poids
           obligent à chercher lequel des quatre chiffres compte — alors qu'un seul répond
@@ -489,8 +540,6 @@ export function ComptaClient() {
           </div>
         </div>
       )}
-
-      </>)}
 
       {ecritures.length > 0 && (
       <div className="grid gap-4 lg:grid-cols-3">
@@ -633,7 +682,10 @@ export function ComptaClient() {
         </div>
       )}
 
-      {/* ─── Journal ────────────────────────────────────────────────────── */}
+      {/* ─── Journal ──────────────────────────────────────────────────────
+          Masqué quand il n'y a rien : le premier pas guidé le remplace, et deux états
+          vides empilés disant la même chose font douter qu'ils parlent du même sujet. */}
+      {ecritures.length > 0 && (
       <div className="rounded-2xl border border-zinc-100 bg-white shadow-sm">
         <div className="flex flex-wrap items-center gap-2 border-b border-zinc-100 p-4">
           <h3 className="text-sm font-semibold text-zinc-700">Journal</h3>
@@ -709,6 +761,14 @@ export function ComptaClient() {
                       </div>
                       <div className="text-xs text-zinc-400">
                         {[e.tiers, e.piece && `pièce ${e.piece}`, e.recurrente && "mensuelle", e.note].filter(Boolean).join(" · ")}
+                        {e.pieceFichier && (
+                          <a href={`/api/admin/compta/piece?chemin=${encodeURIComponent(e.pieceFichier)}`}
+                            target="_blank" rel="noreferrer"
+                            className="ml-1 inline-flex items-center gap-0.5 font-medium text-blue-500 hover:text-blue-700"
+                            title="Ouvrir la facture (lien valable 2 minutes)">
+                            <Paperclip className="h-3 w-3" />facture
+                          </a>
+                        )}
                       </div>
                       {e.annulee && <div className="mt-0.5 text-xs text-rose-500">Annulée — {e.motifAnnulation}</div>}
                     </td>
@@ -748,11 +808,15 @@ export function ComptaClient() {
         )}
       </div>
 
+      )}
+
+      {ecritures.length > 0 && (
       <p className="flex items-start gap-2 px-1 text-xs text-zinc-400">
         <X className="mt-0.5 h-3 w-3 shrink-0" />
         Une écriture ne se supprime pas : elle s'annule, avec son motif, et reste au journal. Un livre de recettes
         dont on peut retirer une ligne ne prouve plus rien.
       </p>
+      )}
     </div>
   );
 }

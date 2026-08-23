@@ -67,8 +67,15 @@ export type Ecriture = {
   montantCents: number;
   moyen: Moyen;
   tiers?: string;
-  /** Numéro de facture, de reçu, ou lien : la pièce justificative. */
+  /** Numéro de facture, de reçu, ou lien : la référence de la pièce justificative. */
   piece?: string;
+  /**
+   * Chemin du FICHIER justificatif dans l'espace privé.
+   *
+   * ⚠️ Une référence texte ne remplace pas la pièce : l'obligation est de CONSERVER la
+   * facture, pas d'en noter le numéro. Un numéro sans document ne justifie rien.
+   */
+  pieceFichier?: string;
   /** TVA en points de pourcentage (20 = 20 %). Absente si non assujetti. */
   tvaTaux?: number;
   note?: string;
@@ -401,4 +408,34 @@ export function modelesRecurrents(ecritures: Ecriture[], mois: string): {
 export function evolution(actuelCents: number, precedentCents: number): number | null {
   if (precedentCents === 0) return null;
   return Math.round(((actuelCents - precedentCents) / Math.abs(precedentCents)) * 100);
+}
+
+/**
+ * LE LIVRE DES RECETTES — le document qu'un micro-entrepreneur doit tenir.
+ *
+ * Il n'a pas la même forme qu'un export général : uniquement les RECETTES, dans l'ordre
+ * chronologique, numérotées, avec pour chacune la date, la référence de la pièce,
+ * l'identité du client, la nature de la prestation et le mode de règlement.
+ *
+ * ⚠️ Les écritures ANNULÉES y figurent, barrées d'une mention. Un livre où les lignes
+ * annulées disparaissent présente des numéros à trous sans expliquer pourquoi — et c'est
+ * exactement ce qu'un contrôle demande de justifier.
+ */
+export function versLivreRecettes(ecritures: Ecriture[]): string {
+  const num = numeroter(ecritures);
+  const entete = ["N°", "Date", "Référence de la pièce", "Client", "Nature", "Montant (€)", "Mode de règlement", "Annulée"];
+  const lignes = ecritures
+    .filter((e) => e.sens === "entree")
+    .sort((a, b) => (num.get(a.id) ?? 0) - (num.get(b.id) ?? 0))
+    .map((e) => [
+      String(num.get(e.id) ?? ""),
+      e.date,
+      e.piece ?? (e.pieceFichier ? "pièce jointe" : ""),
+      e.tiers ?? "",
+      categorieDe(e.categorie)?.label ?? e.categorie,
+      (e.montantCents / 100).toFixed(2).replace(".", ","),
+      e.moyen,
+      e.annulee ? `oui — ${e.motifAnnulation ?? ""}` : "",
+    ].map((v) => echapper(String(v))).join(";"));
+  return "\ufeff" + [entete.join(";"), ...lignes].join("\r\n");
 }
