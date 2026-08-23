@@ -1,12 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  Users, Activity, Crown, Search, Mail,
-  ShieldCheck, BarChart3, TrendingUp, Watch,
-  Send, CheckCircle2, AlertCircle, ChevronRight,
-  Zap, UserCheck, RefreshCw, Calendar, Hash, Sparkles, Brain
-} from "lucide-react";
+import { Users, Activity, Crown, Search, Mail, BarChart3, TrendingUp, Watch, Send, CheckCircle2, AlertCircle, ChevronRight, Zap, UserCheck, RefreshCw, Calendar, Hash } from "lucide-react";
+import { Logo } from "@/components/brand/Logo";
 
 interface User {
   id: string;
@@ -42,7 +38,7 @@ function Avatar({ user, size = "md" }: { user: User; size?: "sm" | "md" | "lg" }
 export function AdminDashboard({ users }: { users: User[] }) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<User | null>(users[0] ?? null);
-  const [tab, setTab] = useState<"users" | "stats" | "coaching">("users");
+  const [tab, setTab] = useState<"users" | "stats">("users");
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
   const [sending, setSending] = useState(false);
@@ -178,14 +174,20 @@ export function AdminDashboard({ users }: { users: User[] }) {
       {/* Top bar */}
       <header className="bg-white border-b border-zinc-100 px-8 h-16 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-violet-600 rounded-xl flex items-center justify-center">
-            <ShieldCheck className="w-4 h-4 text-white" />
-          </div>
+          {/* ⚠️ LE LOGO, PAS UN BOUCLIER GÉNÉRIQUE. Cet écran ouvre sur les données
+              personnelles de vrais athlètes ; il doit ressembler au produit qui les
+              héberge, pas à un panneau d'administration anonyme. */}
+          <Logo size={32} />
           <div>
-            <span className="font-bold text-zinc-900 text-sm">Admin Panel</span>
+            <span className="font-bold text-zinc-900 text-sm">Espace coach</span>
             <span className="text-zinc-400 text-xs ml-2">Pacevo</span>
           </div>
-          <a href="/admin/newsletter" className="ml-3 inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100">✉️ Newsletter</a>
+          {/* ⚠️ LE LIEN « NEWSLETTER » A ÉTÉ RETIRÉ : la lettre part toute seule chaque
+              lundi (GitHub Actions → /api/newsletter/weekly). Garder un bouton d'envoi
+              manuel invitait à doubler un envoi automatique — le meilleur moyen
+              d'expédier deux fois la même lettre. La page existe toujours à
+              /admin/newsletter pour un envoi exceptionnel. */}
+          <a href="/admin/messages" className="ml-3 inline-flex items-center gap-1.5 rounded-lg bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 transition-colors hover:bg-violet-100">💬 Messagerie</a>
           {/* Sans ce lien, l'écran de modération existe mais personne n'y va — et aucun
               avis ne sort jamais de la file d'attente. */}
           <a href="/admin/avis" className="ml-2 inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100">★ Avis</a>
@@ -195,9 +197,8 @@ export function AdminDashboard({ users }: { users: User[] }) {
           {[
             { key: "users", label: "Utilisateurs", icon: Users },
             { key: "stats", label: "Statistiques", icon: BarChart3 },
-            { key: "coaching", label: "Coaching IA", icon: Sparkles },
           ].map(({ key, label, icon: Icon }) => (
-            <button key={key} onClick={() => setTab(key as "users" | "stats" | "coaching")}
+            <button key={key} onClick={() => setTab(key as "users" | "stats")}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 tab === key ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"
               }`}>
@@ -300,212 +301,15 @@ export function AdminDashboard({ users }: { users: User[] }) {
         </div>
       )}
 
-      {/* Coaching IA */}
-      {tab === "coaching" && (
-        <div className="p-8 max-w-4xl mx-auto w-full space-y-5">
+      {/* ⚠️ LE PANNEAU « COACHING IA » A ÉTÉ RETIRÉ. Il demandait de choisir un athlète,
+          un type de plan et de cliquer sur « Générer » — un plan écrit à la main, à la
+          demande. Le coach automatique fait désormais ce travail seul : plan déterministe
+          de 7 jours, replanifié à chaque synchronisation, plus l'ajustement proposé par
+          le modèle et validé contre le budget qualité. Deux chemins vers la même
+          prescription, dont un manuel qui ignore le plancher de fatigue, c'était un
+          risque sans contrepartie. Les analyses IA de séance restent accessibles depuis
+          la fiche de l'athlète (« Analyser »). */}
 
-          {/* Config card */}
-          <div className="bg-white border border-zinc-100 rounded-2xl p-6 shadow-sm">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-9 h-9 bg-violet-50 rounded-xl flex items-center justify-center">
-                <Brain className="w-5 h-5 text-violet-600" />
-              </div>
-              <div>
-                <h2 className="font-bold text-zinc-900">Coaching IA</h2>
-                <p className="text-xs text-zinc-400">Analyse des séances + génération du plan par Gemini</p>
-              </div>
-            </div>
-
-            {/* Row 1: Athlete + sessions */}
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wide block mb-2">Athlète</label>
-                <select value={coachingUser?.id ?? ""} onChange={e => { setCoachingUser(users.find(u => u.id === e.target.value) ?? null); setGeminiResult(null); setPlanResult(""); }}
-                  className="w-full border border-zinc-200 rounded-xl px-4 py-3 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white">
-                  <option value="">Sélectionner...</option>
-                  {users.map(u => <option key={u.id} value={u.id}>{u.full_name || u.email} ({u.workout_count} séances)</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wide block mb-2">Séances à analyser</label>
-                <select value={coachingSessions} onChange={e => setCoachingSessions(Number(e.target.value))}
-                  className="w-full border border-zinc-200 rounded-xl px-4 py-3 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white">
-                  {[1,2,3,5,8,10,15,20,30].map(n => <option key={n} value={n}>{n} dernière{n > 1 ? "s" : ""} séance{n > 1 ? "s" : ""}</option>)}
-                </select>
-              </div>
-            </div>
-
-            {/* Row 2: Plan type */}
-            <div className="mb-4">
-              <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wide block mb-2">Type de plan</label>
-              <div className="grid grid-cols-5 gap-2">
-                {[
-                  { v: "recuperation", l: "🛌 Récupération" },
-                  { v: "endurance", l: "🏃 Endurance base" },
-                  { v: "intensite", l: "⚡ Intensité" },
-                  { v: "pre-competition", l: "🎯 Pré-compet" },
-                  { v: "semaine", l: "📅 Semaine type" },
-                ].map(({ v, l }) => (
-                  <button key={v} onClick={() => setPlanType(v)}
-                    className={`py-2.5 px-2 rounded-xl text-xs font-medium border transition-all text-center ${planType === v ? "bg-violet-600 text-white border-violet-600" : "bg-white text-zinc-600 border-zinc-200 hover:border-violet-300"}`}>
-                    {l}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Row 3: Coach note */}
-            <div className="mb-5">
-              <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wide block mb-2">Note du coach (optionnel)</label>
-              <textarea value={coachNote} onChange={e => setCoachNote(e.target.value)} rows={2}
-                placeholder="Ex: il a une compétition dans 3 semaines, genou droit sensible, objectif sub-4h marathon..."
-                className="w-full border border-zinc-200 rounded-xl px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none" />
-            </div>
-
-            {coachingUser && (
-              <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-xl mb-3 ${
-                coachingUser.intervals_athlete_id
-                  ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
-                  : "bg-amber-50 text-amber-700 border border-amber-100"
-              }`}>
-                {coachingUser.intervals_athlete_id
-                  ? <><CheckCircle2 className="w-3.5 h-3.5" /> Données Intervals.icu en temps réel — {coachingUser.intervals_athlete_id}</>
-                  : <><AlertCircle className="w-3.5 h-3.5" /> Pas de montre connectée — analyse basée sur les données synchronisées</>
-                }
-              </div>
-            )}
-            <button onClick={generatePlan} disabled={generating || !coachingUser}
-              className="w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-xl transition-all text-sm">
-              {generating ? <><RefreshCw className="w-4 h-4 animate-spin" /> Récupération Intervals.icu + analyse…</> : <><Sparkles className="w-4 h-4" /> Générer le plan</>}
-            </button>
-
-            {coachingError && (
-              <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3 mt-4">
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />{coachingError}
-              </div>
-            )}
-          </div>
-
-          {/* Raw sessions fetched */}
-          {rawActivities.length > 0 && (
-            <div className="bg-white border border-zinc-100 rounded-2xl p-6 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 bg-emerald-50 rounded-lg flex items-center justify-center">
-                    <Activity className="w-4 h-4 text-emerald-500" />
-                  </div>
-                  <h3 className="font-semibold text-zinc-900 text-sm">{rawActivities.length} séances récupérées</h3>
-                </div>
-                <span className="text-xs text-zinc-400 bg-zinc-50 px-2 py-1 rounded-lg">{dataSource}</span>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-zinc-400 border-b border-zinc-100">
-                      <th className="text-left py-2 pr-4 font-medium">Date</th>
-                      <th className="text-left py-2 pr-4 font-medium">Nom</th>
-                      <th className="text-left py-2 pr-4 font-medium">Type</th>
-                      <th className="text-right py-2 pr-4 font-medium">Dist.</th>
-                      <th className="text-right py-2 pr-4 font-medium">Durée</th>
-                      <th className="text-right py-2 pr-4 font-medium">FC moy.</th>
-                      <th className="text-right py-2 pr-4 font-medium">Dénivelé</th>
-                      <th className="text-right py-2 pr-4 font-medium">TSS</th>
-                      <th className="text-right py-2 font-medium">Allure</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rawActivities.map((a: any, i: number) => (
-                      <tr key={i} className="border-b border-zinc-50 hover:bg-zinc-50">
-                        <td className="py-2 pr-4 text-zinc-500">{a.date}</td>
-                        <td className="py-2 pr-4 text-zinc-700 font-medium max-w-[140px] truncate">{a.name || "—"}</td>
-                        <td className="py-2 pr-4"><span className="bg-zinc-100 text-zinc-600 px-1.5 py-0.5 rounded">{a.type || "—"}</span></td>
-                        <td className="py-2 pr-4 text-right text-zinc-700">{a.distance_km ? `${a.distance_km}km` : "—"}</td>
-                        <td className="py-2 pr-4 text-right text-zinc-700">{a.duration_min ? `${a.duration_min}min` : "—"}</td>
-                        <td className="py-2 pr-4 text-right text-zinc-700">{a.avg_hr ? `${a.avg_hr}bpm` : "—"}</td>
-                        <td className="py-2 pr-4 text-right text-zinc-700">{a.elevation_m ? `${a.elevation_m}m` : "—"}</td>
-                        <td className="py-2 pr-4 text-right text-zinc-700">{a.tss ?? "—"}</td>
-                        <td className="py-2 text-right text-zinc-700">{a.avg_pace_min_km ? `${a.avg_pace_min_km}'/km` : "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* Analysis */}
-          {geminiResult && (
-            <div className="bg-white border border-zinc-100 rounded-2xl p-6 shadow-sm">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-7 h-7 bg-blue-50 rounded-lg flex items-center justify-center">
-                  <BarChart3 className="w-4 h-4 text-blue-500" />
-                </div>
-                <h3 className="font-semibold text-zinc-900 text-sm">Analyse des séances</h3>
-              </div>
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                {[
-                  { label: "Charge", value: geminiResult.training_load ?? "—" },
-                  { label: "Récupération", value: geminiResult.recovery_status ?? "—" },
-                  { label: "VFC trend", value: geminiResult.hrv_trend ?? "—" },
-                ].map(({ label, value }) => (
-                  <div key={label} className="bg-zinc-50 rounded-xl p-3">
-                    <div className="text-xs text-zinc-400 mb-1">{label}</div>
-                    <div className="text-sm font-semibold text-zinc-800 capitalize">{String(value)}</div>
-                  </div>
-                ))}
-              </div>
-              {geminiResult.summary && <p className="text-sm text-zinc-600 mb-3 leading-relaxed">{geminiResult.summary}</p>}
-              <div className="grid grid-cols-2 gap-4">
-                {Array.isArray(geminiResult.strengths) && geminiResult.strengths.length > 0 && (
-                  <div>
-                    <div className="text-xs font-semibold text-emerald-600 mb-1.5">✓ Points forts</div>
-                    {geminiResult.strengths.map((s, i) => <div key={i} className="text-xs text-zinc-600 mb-0.5">• {s}</div>)}
-                  </div>
-                )}
-                {Array.isArray(geminiResult.areas_to_improve) && geminiResult.areas_to_improve.length > 0 && (
-                  <div>
-                    <div className="text-xs font-semibold text-amber-600 mb-1.5">↗ À améliorer</div>
-                    {geminiResult.areas_to_improve.map((s, i) => <div key={i} className="text-xs text-zinc-600 mb-0.5">• {s}</div>)}
-                  </div>
-                )}
-              </div>
-              {Array.isArray(geminiResult.risk_flags) && geminiResult.risk_flags.length > 0 && (
-                <div className="mt-3 p-3 bg-red-50 rounded-xl">
-                  <div className="text-xs font-semibold text-red-500 mb-1">⚠ Vigilance</div>
-                  {geminiResult.risk_flags.map((s, i) => <div key={i} className="text-xs text-red-600">• {s}</div>)}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Plan */}
-          {planResult && (
-            <div className="bg-white border border-violet-100 rounded-2xl p-6 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 bg-violet-50 rounded-lg flex items-center justify-center">
-                    <Sparkles className="w-4 h-4 text-violet-500" />
-                  </div>
-                  <h3 className="font-semibold text-zinc-900 text-sm">Plan généré — {coachingUser?.full_name}</h3>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => navigator.clipboard.writeText(planResult)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-all">
-                    Copier
-                  </button>
-                  <button onClick={sendPlanByEmail} disabled={sendingPlan || planSent}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition-all">
-                    {sendingPlan ? <><RefreshCw className="w-3 h-3 animate-spin" /> Envoi…</> : planSent ? <><CheckCircle2 className="w-3 h-3" /> Envoyé !</> : <><Send className="w-3 h-3" /> Envoyer à l&apos;athlète</>}
-                  </button>
-                </div>
-              </div>
-              <div className="text-sm text-zinc-700 leading-relaxed whitespace-pre-wrap bg-zinc-50 rounded-xl p-4">{planResult}</div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Users view */}
       {tab === "users" && (
         <div className="flex flex-1 overflow-hidden" style={{ height: "calc(100vh - 64px)" }}>
           {/* Sidebar list */}
