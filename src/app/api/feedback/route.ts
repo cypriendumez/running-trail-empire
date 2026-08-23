@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { emailEditeur } from "@/lib/admin/acces";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { coquilleEmail, ech } from "@/lib/newsletter/gabarit";
 
@@ -41,9 +42,10 @@ export async function POST(req: Request) {
   // ⚠️ Le seuil est posé ici, une seule fois : RPE ≥ 8 OU une douleur. En dessous, le
   // message reste sobre — un bandeau rouge permanent ne veut plus rien dire.
   const RESEND_API_KEY = process.env.RESEND_API_KEY;
-  const COACH_EMAIL = process.env.COACH_EMAIL || "cypriendumez@outlook.fr";
+  const COACH_EMAIL = emailEditeur();
   const BASE = process.env.NEXT_PUBLIC_APP_URL || "https://running-trail-empire-woad.vercel.app";
-  if (RESEND_API_KEY) {
+  // Sans destinataire exploitable, on n'envoie PAS plutôt que d'écrire au mauvais.
+  if (RESEND_API_KEY && COACH_EMAIL) {
     try {
       const { data: prof } = await admin.from("profiles").select("full_name, email").eq("id", user.id).single();
       const name = (prof?.full_name as string) || (prof?.email as string) || "Un client";

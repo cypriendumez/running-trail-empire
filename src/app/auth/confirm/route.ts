@@ -1,6 +1,7 @@
 import { type EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { emailEditeur } from "@/lib/admin/acces";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { emailNouvelInscrit } from "@/lib/notify/nouvelInscrit";
 
@@ -70,8 +71,9 @@ async function alerterInscription(
   try {
     const CLE = process.env.RESEND_API_KEY;
     const FROM = process.env.RESEND_FROM;
-    const DEST = process.env.COACH_EMAIL || "cypriendumez@outlook.fr";
-    if (!CLE || !FROM) return;
+    const DEST = emailEditeur();
+    // Pas de destinataire exploitable → on n'envoie PAS (voir emailEditeur).
+    if (!CLE || !FROM || !DEST) return;
 
     const admin = createAdminClient();
     const [{ data: profil }, { count }] = await Promise.all([

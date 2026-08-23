@@ -1,9 +1,9 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { emailEditeur } from "@/lib/admin/acces";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-const COACH_EMAIL = process.env.COACH_EMAIL || "cypriendumez@outlook.fr";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 type Attachment = { url: string; name: string; type: string };
 
@@ -37,7 +37,9 @@ export async function POST(req: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const RESEND_API_KEY = process.env.RESEND_API_KEY;
-  if (RESEND_API_KEY) {
+  const COACH_EMAIL = emailEditeur();
+  // Sans destinataire exploitable, on n'envoie PAS plutôt que d'écrire au mauvais.
+  if (RESEND_API_KEY && COACH_EMAIL) {
     try {
       const { data: prof } = await admin.from("profiles").select("full_name, email").eq("id", user.id).single();
       const name = (prof?.full_name as string) || (prof?.email as string) || "Un client";

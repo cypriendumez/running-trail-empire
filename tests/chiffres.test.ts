@@ -30,7 +30,7 @@ import { accesDe, peut, JOURS_APERCU } from "../src/lib/billing/access";
 import { PRIX_AFFICHES } from "../src/lib/billing/prix";
 import { ATTRIBUTION_GARMIN, PAGES_ATTRIBUTION } from "../src/components/legal/attributionI18n";
 import { liensStore } from "../src/lib/brand/stores";
-import { estAdmin, adminsAutorises, ADMIN_PAR_DEFAUT } from "../src/lib/admin/acces";
+import { estAdmin, adminsAutorises, emailEditeur, ADMIN_PAR_DEFAUT } from "../src/lib/admin/acces";
 import { fournisseursActifs } from "../src/lib/auth/fournisseurs";
 import { nomAffiche, refusDe, avisDe, litAvis, TEXTE_MIN } from "../src/lib/avis/store";
 
@@ -579,6 +579,55 @@ test("la liste des administrateurs se configure sans redéployer", () => {
   // La variable ne doit JAMAIS être exposée au navigateur.
   assert.ok(!readFileSync(join(ROOT, "src/lib/admin/acces.ts"), "utf8").includes("NEXT_PUBLIC_ADMIN"),
     "la liste des administrateurs est exposée au navigateur");
+});
+
+test("les alertes suivent l'éditeur, elles ne restent pas chez l'ancien", () => {
+  // ⚠️ QUATRE ROUTES REPLIAIENT SUR L'ADRESSE DU PROPRIÉTAIRE HISTORIQUE, EN DUR :
+  // nouvelle inscription, message d'un athlète, ressenti douloureux, objectif de course.
+  // Un acheteur qui configure `ADMIN_EMAILS` sans penser à `COACH_EMAIL` aurait continué
+  // d'envoyer le nom, l'adresse et les douleurs de SES clients dans la boîte du vendeur —
+  // indéfiniment, et sans qu'aucun écran ne le montre. Transmission de données
+  // personnelles à un tiers, pas un défaut de confort.
+  const routes = [
+    "src/app/auth/confirm/route.ts",
+    "src/app/api/messages/route.ts",
+    "src/app/api/feedback/route.ts",
+    "src/app/api/objective/route.ts",
+  ];
+  const replis: string[] = [];
+  const sansGarde: string[] = [];
+  for (const r of routes) {
+    const src = sansCommentaires(readFileSync(join(ROOT, r), "utf8"));
+    // On vise le GESTE : un DESTINATAIRE qui se replie sur une adresse littérale.
+    // Attention à ne pas confondre avec `RESEND_FROM || "…@resend.dev"` — c'est
+    // l'EXPÉDITEUR de secours de Resend, pas l'identité de l'éditeur.
+    if (/\b(COACH_EMAIL|DEST|DESTINATAIRE)\b[^;\n]*\|\|\s*["'][^"']*@/i.test(src)) replis.push(r);
+    // Et l'envoi doit être CONDITIONNÉ au destinataire : appeler emailEditeur() puis
+    // écrire à une chaîne vide ne vaut rien.
+    if (!/emailEditeur\(\)/.test(src)) sansGarde.push(`${r} (n'utilise pas la source unique)`);
+    else if (!/&&\s*COACH_EMAIL|\|\|\s*!DEST/.test(src)) sansGarde.push(`${r} (envoie sans destinataire vérifié)`);
+  }
+  assert.deepEqual(replis, [], `repli en dur vers une adresse : ${replis.join(", ")}`);
+  assert.deepEqual(sansGarde, [], `envoi non conditionné : ${sansGarde.join(", ")}`);
+
+  // COACH_EMAIL explicite l'emporte ; sinon on suit la première adresse d'ADMIN_EMAILS.
+  const avant = { c: process.env.COACH_EMAIL, a: process.env.ADMIN_EMAILS };
+  try {
+    process.env.COACH_EMAIL = "  Coach@Exemple.FR ";
+    assert.equal(emailEditeur(), "coach@exemple.fr", "COACH_EMAIL explicite n'est pas respectée");
+
+    delete process.env.COACH_EMAIL;
+    process.env.ADMIN_EMAILS = "acheteur@exemple.com,second@exemple.com";
+    assert.equal(emailEditeur(), "acheteur@exemple.com", "les alertes ne suivent pas ADMIN_EMAILS");
+
+    // ⚠️ Rien d'exploitable → chaîne vide, donc AUCUN envoi. Ne pas prévenir se voit dans
+    // les journaux ; prévenir la mauvaise personne, non.
+    process.env.ADMIN_EMAILS = "pas-une-adresse";
+    assert.equal(emailEditeur(), "", "une configuration illisible désigne quand même un destinataire");
+  } finally {
+    if (avant.c === undefined) delete process.env.COACH_EMAIL; else process.env.COACH_EMAIL = avant.c;
+    if (avant.a === undefined) delete process.env.ADMIN_EMAILS; else process.env.ADMIN_EMAILS = avant.a;
+  }
 });
 
 test("un chemin d'API inconnu répond 404, quelle que soit la méthode", () => {

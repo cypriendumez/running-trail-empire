@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { emailEditeur } from "@/lib/admin/acces";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { setRaceObjective } from "@/lib/coach/objective";
 
@@ -38,8 +39,9 @@ export async function POST(req: Request) {
 
   // Alerte e-mail au coach (best-effort) — même pattern que /api/feedback.
   const RESEND_API_KEY = process.env.RESEND_API_KEY;
-  const COACH_EMAIL = process.env.COACH_EMAIL || "cypriendumez@outlook.fr";
-  if (RESEND_API_KEY) {
+  const COACH_EMAIL = emailEditeur();
+  // Sans destinataire exploitable, on n'envoie PAS plutôt que d'écrire au mauvais.
+  if (RESEND_API_KEY && COACH_EMAIL) {
     try {
       const { data: prof } = await admin.from("profiles").select("full_name, email").eq("id", user.id).single();
       const name = (prof?.full_name as string) || (prof?.email as string) || "Un client";

@@ -55,3 +55,33 @@ export function estAdmin(email: string | null | undefined, valeurEnv?: string): 
   const e = normalise(email);
   return EST_ADRESSE.test(e) && adminsAutorises(valeurEnv).includes(e);
 }
+
+/**
+ * OÙ L'ON PRÉVIENT L'ÉDITEUR — nouvelle inscription, message d'un athlète, ressenti
+ * douloureux, objectif de course. Ces envois transportent des DONNÉES PERSONNELLES :
+ * nom, adresse e-mail, douleurs, état de forme.
+ *
+ * ⚠️ QUATRE ROUTES REPLIAIENT SUR L'ADRESSE DU PROPRIÉTAIRE HISTORIQUE, ÉCRITE EN DUR.
+ * Le jour de la vente, un acheteur qui configure `ADMIN_EMAILS` sans penser à
+ * `COACH_EMAIL` aurait continué d'envoyer les données de SES clients dans la boîte du
+ * vendeur — sans le savoir, indéfiniment, et sans qu'aucun écran ne le montre. Ce n'est
+ * pas un défaut de confort : c'est une transmission de données personnelles à un tiers
+ * qui n'a plus rien à voir avec le service.
+ *
+ * Plus aucun repli en dur. `COACH_EMAIL` si elle est lisible, sinon la PREMIÈRE adresse
+ * d'`ADMIN_EMAILS` — configurer l'accès suffit donc à rediriger les alertes.
+ *
+ * ⚠️ ET SI RIEN N'EST EXPLOITABLE, CHAÎNE VIDE : l'appelant N'ENVOIE PAS. Ne pas prévenir
+ * se voit dans les journaux et se répare ; prévenir la mauvaise personne ne se répare
+ * pas, parce que personne ne l'apprend.
+ */
+export function emailEditeur(): string {
+  const explicite = normalise(process.env.COACH_EMAIL);
+  if (EST_ADRESSE.test(explicite)) return explicite;
+  const premier = adminsAutorises()[0] ?? "";
+  if (!EST_ADRESSE.test(premier)) {
+    console.error("[admin] aucun destinataire exploitable (ni COACH_EMAIL ni ADMIN_EMAILS) : l'alerte à l'éditeur n'est PAS envoyée.");
+    return "";
+  }
+  return premier;
+}
