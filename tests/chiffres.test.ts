@@ -305,12 +305,22 @@ test("chaque logo annoncé par la page existe vraiment", () => {
       `la page d'accueil affiche « ${f} » mais le fichier n'existe pas : image cassée en production`,
     );
   }
-  // ⚠️ Strava a été retiré de la rangée, et son fichier REVIENT TOUT SEUL : iCloud
-  // restaure les fichiers supprimés de ce dossier (permissions `-rw-------`, taille et
-  // date d'origine — vu le 21/08/2026). Ce qui compte n'est pas qu'il soit sur le disque
-  // mais qu'il parte en ligne : Vercel déploie ce que git suit. On interroge donc GIT,
-  // pas le système de fichiers — sinon le test rougit sur un fichier qui ne sera jamais
-  // publié, et on finirait par l'ignorer.
+  // ⚠️⚠️ CE TEST A ÉTÉ VERT SUR UN FICHIER EN LIGNE. Il affirmait « Vercel déploie ce que
+  // git suit » et n'interrogeait donc que git. C'est FAUX pour la commande de déploiement
+  // réellement utilisée sur ce projet : `vercel deploy --prod` téléverse le CONTENU DU
+  // DISQUE, pas le contenu du dépôt.
+  //
+  // Mesuré en production le 23/08/2026, juste après avoir retiré Polar de la vitrine et
+  // sorti son logo du suivi git :
+  //     /brands/polar.svg  → HTTP 200   (non suivi par git, mais PRÉSENT sur le disque)
+  //     /brands/strava.svg → HTTP 404   (non suivi ET absent du disque)
+  // Le test était vert, et le logo d'une marque déposée qu'on n'affiche plus était servi
+  // par le site. Sortir un fichier de git ne le retire PAS de la production : il faut le
+  // supprimer du disque. (Et il ne revient pas tout seul — la crainte iCloud notée le
+  // 21/08/2026 ne s'est pas vérifiée : strava.svg est bel et bien resté absent.)
+  //
+  // On vérifie donc les DEUX, puisque les deux chemins de déploiement existent : un build
+  // Vercel depuis GitHub publie ce que git suit, la commande locale publie le disque.
   const suivis = execSync("git ls-files public/brands", { cwd: ROOT }).toString().trim().split("\n").filter(Boolean);
   // ⚠️ GÉNÉRALISÉ AU-DELÀ DE STRAVA le 23/08/2026, quand Polar a quitté la vitrine. Un
   // logo de marque retirée est un fichier de MARQUE DÉPOSÉE qu'on déploierait sans plus
@@ -319,7 +329,11 @@ test("chaque logo annoncé par la page existe vraiment", () => {
   const RETIREES = ["strava", "polar"];
   for (const marque of RETIREES) {
     assert.ok(!suivis.some((f) => f.includes(marque)),
-      `${marque}.svg est suivi par git : il serait déployé alors que la marque a été retirée de la vitrine`);
+      `${marque}.svg est suivi par git : un build Vercel depuis GitHub le publierait alors que la marque a été retirée`);
+    // LA MOITIÉ QUI MANQUAIT, et qui est celle qui compte pour `vercel deploy --prod`.
+    const surLeDisque = readdirSync(join(ROOT, "public/brands")).filter((f) => f.includes(marque));
+    assert.deepEqual(surLeDisque, [],
+      `${marque}.svg est sur le disque : \`vercel deploy\` le téléverse, et il redevient accessible en ligne`);
   }
   for (const f of cites) {
     assert.ok(suivis.includes(`public/brands/${f}`), `« ${f} » n'est pas suivi par git : absent du déploiement`);
