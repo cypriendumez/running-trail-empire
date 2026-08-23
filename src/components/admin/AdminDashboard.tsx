@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Users, Activity, Crown, Search, Mail, BarChart3, TrendingUp, Watch, Send, CheckCircle2, AlertCircle, ChevronRight, Zap, UserCheck, RefreshCw, Calendar, Hash } from "lucide-react";
+import { Users, Activity, Crown, Search, Mail, BarChart3, TrendingUp, Watch, Send, CheckCircle2, AlertCircle, ChevronRight, Zap, UserCheck, RefreshCw, Calendar, Hash, Wallet,
+} from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { ConversationClient } from "@/components/admin/ConversationClient";
+import { ComptaClient } from "@/components/admin/ComptaClient";
 
 interface User {
   id: string;
@@ -39,7 +41,7 @@ function Avatar({ user, size = "md" }: { user: User; size?: "sm" | "md" | "lg" }
 export function AdminDashboard({ users }: { users: User[] }) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<User | null>(users[0] ?? null);
-  const [tab, setTab] = useState<"users" | "stats">("users");
+  const [tab, setTab] = useState<"users" | "stats" | "compta">("users");
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
   const [sending, setSending] = useState(false);
@@ -198,8 +200,9 @@ export function AdminDashboard({ users }: { users: User[] }) {
           {[
             { key: "users", label: "Utilisateurs", icon: Users },
             { key: "stats", label: "Statistiques", icon: BarChart3 },
+            { key: "compta", label: "Comptabilité", icon: Wallet },
           ].map(({ key, label, icon: Icon }) => (
-            <button key={key} onClick={() => setTab(key as "users" | "stats")}
+            <button key={key} onClick={() => setTab(key as "users" | "stats" | "compta")}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 tab === key ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"
               }`}>
@@ -212,6 +215,11 @@ export function AdminDashboard({ users }: { users: User[] }) {
           {users.length} compte{users.length > 1 ? "s" : ""}
         </div>
       </header>
+
+      {/* ⚠️ Monté SEULEMENT quand l'onglet est actif : ce panneau interroge le journal
+          comptable au montage. Le rendre en permanence ferait une requête sur le chiffre
+          d'affaires à chaque ouverture de l'espace coach, pour un écran non regardé. */}
+      {tab === "compta" && <ComptaClient />}
 
       {/* Stats view */}
       {tab === "stats" && (

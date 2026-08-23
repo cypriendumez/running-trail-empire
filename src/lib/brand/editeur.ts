@@ -50,12 +50,16 @@ export const HEBERGEUR_APP = {
 /**
  * Hébergeur de la base de données.
  *
- * ⚠️ RÉGION NON VÉRIFIABLE DEPUIS LE CODE. L'API Supabase répond derrière Cloudflare
- * (`cf-ray: …-CDG` désigne le point d'entrée parisien, pas la base) et aucun en-tête ne
- * nomme la région. La valeur ci-dessous vient de la rédaction initiale des mentions
- * légales : elle est PUBLIÉE comme un fait juridique et n'a jamais été confirmée.
- * À lire dans le tableau de bord Supabase → Project Settings → General → Region, et à
- * corriger ICI seulement — les cinq langues en découlent.
+ * ⚠️ RÉGION NON VÉRIFIABLE DEPUIS LE CODE — et il ne faut pas croire l'inverse. L'API
+ * Supabase répond derrière Cloudflare (`cf-ray: …-CDG` désigne le point d'entrée
+ * parisien, PAS la base), aucun en-tête ne nomme la région, `db.<ref>.supabase.co` ne
+ * résout pas, et tous les poolers régionaux existent quel que soit le projet.
+ *
+ * ✅ CONFIRMÉE LE 23/08/2026 par l'éditeur, dans le tableau de bord Supabase
+ * (Project Settings → General → Region) : `eu-central-1`. La phrase publiée dans les
+ * mentions légales et la politique de confidentialité est donc exacte.
+ *
+ * Si la base est un jour migrée, corriger ICI seulement — les cinq langues en découlent.
  */
 export const HEBERGEUR_BDD = {
   nom: "Supabase",
