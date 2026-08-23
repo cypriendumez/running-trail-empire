@@ -311,3 +311,94 @@ export function versCSV(ecritures: Ecriture[]): string {
   ].map((v) => echapper(String(v))).join(";"));
   return "﻿" + [entete.join(";"), ...lignes].join("\r\n");
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Ce qu'un livre de recettes doit savoir faire
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Numérote les écritures dans l'ordre chronologique.
+ *
+ * ⚠️ UN LIVRE DE RECETTES SE TIENT PAR NUMÉROS D'ORDRE CONTINUS. Sans eux, rien ne
+ * montre qu'il ne manque pas une ligne au milieu — et c'est précisément ce qu'un
+ * contrôle vérifie. Les écritures ANNULÉES gardent leur numéro : un numéro qui
+ * disparaît est un trou, et un trou se justifie.
+ *
+ * L'ordre est total et déterministe (date, puis heure de saisie, puis identifiant) :
+ * deux affichages successifs ne doivent jamais renuméroter les mêmes lignes.
+ */
+export function numeroter(ecritures: Ecriture[]): Map<string, number> {
+  const tri = ecritures.slice().sort((a, b) =>
+    a.date.localeCompare(b.date) ||
+    (a.saisieLe ?? "").localeCompare(b.saisieLe ?? "") ||
+    a.id.localeCompare(b.id));
+  return new Map(tri.map((e, i) => [e.id, i + 1]));
+}
+
+/**
+ * Écritures qui ressemblent assez à la nouvelle pour être la même, saisie deux fois.
+ *
+ * ⚠️ AVERTIR, JAMAIS BLOQUER. Deux abonnements identiques le même jour arrivent
+ * vraiment ; refuser la seconde ligne forcerait à la contourner. Mais saisir deux fois
+ * la même facture est l'erreur la plus banale d'une comptabilité tenue à la main, et
+ * elle est invisible une fois enregistrée.
+ */
+export function doublonsProbables(nouvelle: Partial<Ecriture>, existantes: Ecriture[]): Ecriture[] {
+  const lib = String(nouvelle.libelle ?? "").trim().toLowerCase();
+  return existantes.filter((e) =>
+    !e.annulee &&
+    e.date === nouvelle.date &&
+    e.montantCents === nouvelle.montantCents &&
+    e.sens === nouvelle.sens &&
+    e.libelle.trim().toLowerCase() === lib);
+}
+
+/**
+ * Totaux par trimestre civil — la maille des déclarations.
+ *
+ * ⚠️ On ne déclare pas « depuis le début » : on déclare une PÉRIODE. Recopier un cumul
+ * dans un formulaire trimestriel est une erreur qu'on ne découvre qu'au redressement.
+ */
+export function parTrimestre(ecritures: Ecriture[]): { periode: string; recettesCents: number; depensesCents: number }[] {
+  const m = new Map<string, { r: number; d: number }>();
+  for (const e of ecritures) {
+    if (e.annulee) continue;
+    const t = `${e.date.slice(0, 4)}-T${Math.floor((Number(e.date.slice(5, 7)) - 1) / 3) + 1}`;
+    const acc = m.get(t) ?? { r: 0, d: 0 };
+    if (e.sens === "entree") acc.r += e.montantCents; else acc.d += e.montantCents;
+    m.set(t, acc);
+  }
+  return [...m.entries()].sort(([a], [b]) => a.localeCompare(b))
+    .map(([periode, v]) => ({ periode, recettesCents: v.r, depensesCents: v.d }));
+}
+
+/**
+ * Les charges mensuelles connues, et si elles ont déjà été saisies pour un mois donné.
+ *
+ * Permet de reporter en un clic les frais qui reviennent — la partie la plus fastidieuse
+ * d'une comptabilité tenue à la main, et donc celle qu'on oublie.
+ */
+export function modelesRecurrents(ecritures: Ecriture[], mois: string): {
+  libelle: string; categorie: string; montantCents: number; moyen: Moyen; tiers?: string; dejaSaisi: boolean;
+}[] {
+  const vue = new Map<string, { e: Ecriture; date: string }>();
+  for (const e of ecritures) {
+    if (e.annulee || e.sens !== "sortie" || !e.recurrente) continue;
+    const cle = `${e.categorie}::${e.libelle.trim().toLowerCase()}`;
+    const prec = vue.get(cle);
+    if (!prec || e.date > prec.date) vue.set(cle, { e, date: e.date });
+  }
+  return [...vue.values()].map(({ e }) => ({
+    libelle: e.libelle, categorie: e.categorie, montantCents: e.montantCents, moyen: e.moyen, tiers: e.tiers,
+    // ⚠️ Un report déjà fait ne doit pas être reproposé à l'identique : c'est la façon
+    // la plus simple de créer un doublon en croyant bien faire.
+    dejaSaisi: ecritures.some((x) => !x.annulee && x.date.startsWith(mois) &&
+      x.categorie === e.categorie && x.libelle.trim().toLowerCase() === e.libelle.trim().toLowerCase()),
+  }));
+}
+
+/** Évolution en % entre deux montants. `null` quand la base est nulle : « +∞ % » ne veut rien dire. */
+export function evolution(actuelCents: number, precedentCents: number): number | null {
+  if (precedentCents === 0) return null;
+  return Math.round(((actuelCents - precedentCents) / Math.abs(precedentCents)) * 100);
+}

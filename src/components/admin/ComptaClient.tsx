@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Wallet, TrendingUp, TrendingDown, Plus, Download, X, Settings2,
-  Search, Ban, AlertCircle, Check, Repeat, Loader2, FileText,
+  Search, Ban, AlertCircle, Check, Repeat, Loader2, FileText, PenLine, ArrowRight,
 } from "lucide-react";
 import {
   CATEGORIES, MOYENS, categorieDe, enCentimes, euros, totaux, cotisationsEstimees,
-  versCSV, valider, type Ecriture, type Reglages, type Sens,
+  versCSV, valider, soldeCumule, numeroter, doublonsProbables, parTrimestre,
+  modelesRecurrents, evolution, type Ecriture, type Reglages, type Sens,
 } from "@/lib/compta/model";
 
 /**
@@ -86,6 +87,40 @@ export function ComptaClient() {
   );
 
   const t = useMemo(() => totaux(duPerimetre), [duPerimetre]);
+
+  /**
+   * La même période, un an plus tôt.
+   *
+   * ⚠️ Seulement quand UNE année est sélectionnée. Comparer « tout l'historique » à
+   * quelque chose n'a pas de sens, et un écart affiché sans période de référence se lit
+   * comme une performance.
+   */
+  const precedent = useMemo(() => {
+    if (annee === "toutes") return null;
+    const liste = ecritures.filter((e) => e.date.startsWith(String(Number(annee) - 1)));
+    return liste.length ? totaux(liste) : null;
+  }, [ecritures, annee]);
+
+  // ⚠️ Numérotés sur TOUT le journal, pas sur le périmètre affiché : un numéro d'ordre
+  // qui change selon le filtre ne désigne plus rien.
+  const numeros = useMemo(() => numeroter(ecritures), [ecritures]);
+
+  const soldes = useMemo(
+    () => new Map(soldeCumule(duPerimetre, reglages.soldeInitialCents ?? 0).map((x) => [x.id, x.soldeCents])),
+    [duPerimetre, reglages.soldeInitialCents],
+  );
+
+  const moisCourant = aujourdhui().slice(0, 7);
+  const modeles = useMemo(() => modelesRecurrents(ecritures, moisCourant), [ecritures, moisCourant]);
+  const aReporter = modeles.filter((m) => !m.dejaSaisi);
+  const trimestres = useMemo(() => parTrimestre(duPerimetre), [duPerimetre]);
+
+  // Doublon probable, calculé pendant la frappe : on avertit, on ne bloque pas.
+  const doublons = useMemo(() => {
+    const c = enCentimes(b.montant);
+    if (c === null || !b.libelle.trim()) return [];
+    return doublonsProbables({ date: b.date, libelle: b.libelle, montantCents: c, sens: b.sens }, ecritures);
+  }, [b.date, b.libelle, b.montant, b.sens, ecritures]);
   const cotis = cotisationsEstimees(t.entreesCents, reglages.tauxCotisations);
   const tresorerie = (reglages.soldeInitialCents ?? 0) + t.resultatCents;
 
@@ -128,18 +163,55 @@ export function ComptaClient() {
     setFormOuvert(false);
   }
 
-  async function annuler(e: Ecriture) {
-    const motif = window.prompt(`Annuler « ${e.libelle} » (${euros(e.montantCents)}) ?\n\nMotif — il restera dans le journal :`);
-    if (motif === null) return;
-    if (!motif.trim()) { window.alert("Un motif est obligatoire : une annulation sans raison est indiscernable d'une fausse manœuvre."); return; }
+  /**
+   * Corriger une écriture : on l'annule et on rouvre le formulaire pré-rempli.
+   *
+   * ⚠️ Il n'y a PAS de bouton « modifier », et ce n'est pas un oubli : réécrire une ligne
+   * déjà passée détruit la trace de ce qui avait été enregistré. La correction comptable,
+   * c'est une annulation motivée suivie d'une nouvelle écriture — les deux restent
+   * visibles. Ce bouton fait simplement les deux gestes d'un coup.
+   */
+  async function corriger(e: Ecriture) {
+    const ok = await annuler(e, "Erreur de saisie — remplacée par une nouvelle écriture");
+    if (!ok) return;
+    setB({
+      date: e.date, libelle: e.libelle, sens: e.sens, categorie: e.categorie,
+      montant: (e.montantCents / 100).toFixed(2).replace(".", ","),
+      moyen: e.moyen, tiers: e.tiers ?? "", piece: e.piece ?? "",
+      tvaTaux: e.tvaTaux === undefined ? "" : String(e.tvaTaux),
+      note: e.note ?? "", recurrente: Boolean(e.recurrente),
+    });
+    setErreursForm([]); setFormOuvert(true);
+  }
+
+  /** Reporte une charge mensuelle connue sur le mois en cours, en un clic. */
+  async function reporter(m: { libelle: string; categorie: string; montantCents: number; moyen: string; tiers?: string }) {
+    const projet: Partial<Ecriture> = {
+      date: aujourdhui(), libelle: m.libelle, sens: "sortie", categorie: m.categorie,
+      montantCents: m.montantCents, moyen: m.moyen as Ecriture["moyen"], tiers: m.tiers, recurrente: true,
+      note: "Report de la charge mensuelle précédente.",
+    };
+    const r = await fetch("/api/admin/compta", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(projet),
+    });
+    const j = await r.json();
+    if (!r.ok || !j.ok) { window.alert((j.erreurs ?? ["Report refusé."]).join("\n")); return; }
+    setEcritures((prev) => [j.ecriture as Ecriture, ...prev]);
+  }
+
+  async function annuler(e: Ecriture, motifPropose = "") {
+    const motif = window.prompt(`Annuler « ${e.libelle} » (${euros(e.montantCents)}) ?\n\nMotif — il restera dans le journal :`, motifPropose);
+    if (motif === null) return false;
+    if (!motif.trim()) { window.alert("Un motif est obligatoire : une annulation sans raison est indiscernable d'une fausse manœuvre."); return false; }
     const r = await fetch("/api/admin/compta", {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "annuler", id: e.id, motif }),
     });
     const j = await r.json();
-    if (!r.ok || !j.ok) { window.alert((j.erreurs ?? ["Annulation refusée."]).join("\n")); return; }
+    if (!r.ok || !j.ok) { window.alert((j.erreurs ?? ["Annulation refusée."]).join("\n")); return false; }
     setEcritures((prev) => prev.map((x) => x.id === e.id
       ? { ...x, annulee: true, motifAnnulation: motif, annuleeLe: new Date().toISOString() } : x));
+    return true;
   }
 
   async function sauverReglages(r: Reglages) {
@@ -249,7 +321,10 @@ export function ComptaClient() {
 
       {/* ─── Formulaire ─────────────────────────────────────────────────── */}
       {formOuvert && (
-        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+        <div
+          className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm"
+          onKeyDown={(ev) => { if ((ev.metaKey || ev.ctrlKey) && ev.key === "Enter") { ev.preventDefault(); void enregistrer(); } }}
+        >
           <div className="mb-4 inline-flex rounded-xl bg-zinc-100 p-1">
             {(["sortie", "entree"] as Sens[]).map((s) => (
               <button key={s}
@@ -305,6 +380,21 @@ export function ComptaClient() {
             )}
           </div>
 
+          {/* ⚠️ AVERTIR, PAS BLOQUER. Deux abonnements identiques le même jour arrivent
+              vraiment ; refuser la seconde ligne pousserait à contourner l'outil. Mais
+              saisir deux fois la même facture est l'erreur la plus banale d'une compta
+              tenue à la main — et elle devient invisible une fois enregistrée. */}
+          {doublons.length > 0 && (
+            <div className="mt-4 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                Une écriture identique existe déjà le {b.date.split("-").reverse().join("/")} —
+                <b> {doublons[0].libelle}</b>, {euros(doublons[0].montantCents)}.
+                Si c'est bien un second paiement, enregistre : rien ne t'en empêche.
+              </span>
+            </div>
+          )}
+
           {erreursForm.length > 0 && (
             <ul className="mt-4 space-y-1 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">
               {erreursForm.map((e) => <li key={e} className="flex items-start gap-2"><AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />{e}</li>)}
@@ -316,22 +406,93 @@ export function ComptaClient() {
               className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
               {envoi ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}Enregistrer
             </button>
+            <span className="text-xs text-zinc-400">⌘ + Entrée</span>
             <button onClick={() => { setFormOuvert(false); setErreursForm([]); }}
               className="rounded-xl px-3 py-2 text-sm font-medium text-zinc-500 hover:bg-zinc-100">Annuler</button>
           </div>
         </div>
       )}
 
-      {/* ─── Chiffres clés ──────────────────────────────────────────────── */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Carte titre="Recettes" valeur={euros(t.entreesCents)} icone={<TrendingUp className="w-4 h-4 text-emerald-600" />} fond="bg-emerald-50" />
-        <Carte titre="Dépenses" valeur={euros(t.sortiesCents)} icone={<TrendingDown className="w-4 h-4 text-rose-600" />} fond="bg-rose-50" />
-        <Carte titre="Résultat" valeur={euros(t.resultatCents, true)} icone={<FileText className="w-4 h-4 text-violet-600" />} fond="bg-violet-50"
-          accent={t.resultatCents < 0 ? "text-rose-600" : "text-emerald-700"} />
-        <Carte titre="Trésorerie" valeur={euros(tresorerie)} icone={<Wallet className="w-4 h-4 text-blue-600" />} fond="bg-blue-50"
-          sous={reglages.soldeInitialCents ? `dont ${euros(reglages.soldeInitialCents)} de solde de départ` : "solde de départ non renseigné"} />
+      {/* ─── Premier pas ────────────────────────────────────────────────────
+          ⚠️ À journal vide, quatre cartes de « 0,00 € », trois pavés d'explication et une
+          barre de filtres qui ne filtrent rien : le bruit cache la seule chose à faire.
+          Un tableau de bord n'a de sens qu'une fois qu'il y a quelque chose à montrer. */}
+      {ecritures.length === 0 && !formOuvert && (
+        <div className="rounded-2xl border border-zinc-200 bg-white p-8 text-center shadow-sm">
+          <Wallet className="mx-auto h-9 w-9 text-zinc-200" />
+          <h3 className="mt-4 text-lg font-bold text-zinc-900">Ton journal est vide</h3>
+          <p className="mx-auto mt-2 max-w-lg text-sm text-zinc-500">
+            Commence par ce que tu paies déjà : hébergement, nom de domaine, API. Coche « charge mensuelle » et
+            elles se reporteront en un clic chaque mois. Les encaissements Stripe, eux, s'inscriront tout seuls.
+          </p>
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+            <button onClick={() => { setB({ ...brouillonVide() }); setFormOuvert(true); }}
+              className="inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800">
+              <Plus className="h-4 w-4" />Première écriture
+            </button>
+            <button onClick={() => setReglagesOuverts(true)}
+              className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50">
+              <Settings2 className="h-4 w-4" />Renseigner mes taux<ArrowRight className="h-3 w-3" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {ecritures.length > 0 && (<>
+      {/* ─── Chiffres clés ──────────────────────────────────────────────────
+          ⚠️ Le RÉSULTAT domine, les autres l'expliquent. Quatre cartes de même poids
+          obligent à chercher lequel des quatre chiffres compte — alors qu'un seul répond
+          à la question qu'on se pose en ouvrant cet écran. */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm lg:col-span-1">
+          <div className="flex items-center gap-2 text-xs font-semibold text-zinc-400">
+            <FileText className="h-3.5 w-3.5" />Résultat {annee === "toutes" ? "" : annee}
+          </div>
+          <div className={`mt-2 text-4xl font-extrabold tracking-tight ${t.resultatCents < 0 ? "text-rose-600" : "text-emerald-700"}`}>
+            {euros(t.resultatCents, true)}
+          </div>
+          <Ecart actuel={t.resultatCents} precedent={precedent?.resultatCents} annee={annee} />
+          {cotis !== null && (
+            <div className="mt-3 border-t border-zinc-100 pt-3 text-xs text-zinc-500">
+              Après cotisations : <b className="text-zinc-800">{euros(t.resultatCents - cotis, true)}</b>
+            </div>
+          )}
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3 lg:col-span-2">
+          <Carte titre="Recettes" valeur={euros(t.entreesCents)} icone={<TrendingUp className="w-4 h-4 text-emerald-600" />} fond="bg-emerald-50"
+            ecart={<Ecart actuel={t.entreesCents} precedent={precedent?.entreesCents} annee={annee} />} />
+          <Carte titre="Dépenses" valeur={euros(t.sortiesCents)} icone={<TrendingDown className="w-4 h-4 text-rose-600" />} fond="bg-rose-50"
+            ecart={<Ecart actuel={t.sortiesCents} precedent={precedent?.sortiesCents} annee={annee} inverse />} />
+          <Carte titre="Trésorerie" valeur={euros(tresorerie)} icone={<Wallet className="w-4 h-4 text-blue-600" />} fond="bg-blue-50"
+            sous={reglages.soldeInitialCents ? `dont ${euros(reglages.soldeInitialCents)} de départ` : "solde de départ non renseigné"} />
+        </div>
       </div>
 
+      {/* ─── Charges mensuelles à reporter ──────────────────────────────────
+          La partie la plus fastidieuse d'une compta tenue à la main, donc celle qu'on
+          oublie. Une charge déjà reportée ce mois-ci n'apparaît pas : c'est la façon la
+          plus simple de créer un doublon en croyant bien faire. */}
+      {aReporter.length > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
+          <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-amber-800">
+            <Repeat className="h-3.5 w-3.5" />
+            {aReporter.length} charge{aReporter.length > 1 ? "s" : ""} mensuelle{aReporter.length > 1 ? "s" : ""} pas encore saisie{aReporter.length > 1 ? "s" : ""} ce mois-ci
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {aReporter.map((m) => (
+              <button key={m.libelle + m.categorie} onClick={() => void reporter(m)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-amber-300 hover:bg-amber-50">
+                <Plus className="h-3 w-3 text-amber-600" />{m.libelle}
+                <span className="text-zinc-400">{euros(m.montantCents)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      </>)}
+
+      {ecritures.length > 0 && (
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Cotisations */}
         <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
@@ -386,6 +547,8 @@ export function ComptaClient() {
           )}
         </div>
       </div>
+
+      )}
 
       {/* ─── TVA, seulement si assujetti ────────────────────────────────── */}
       {reglages.tva && (
@@ -444,12 +607,39 @@ export function ComptaClient() {
         </div>
       )}
 
+      {/* ─── Par trimestre ──────────────────────────────────────────────────
+          ⚠️ On ne déclare pas un cumul « depuis le début », on déclare une PÉRIODE.
+          Recopier un total général dans un formulaire trimestriel est une erreur qu'on
+          ne découvre qu'au redressement. Ces montants sont ceux qui se recopient. */}
+      {trimestres.length > 0 && (
+        <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
+          <div className="mb-1 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-zinc-700">Par trimestre</h3>
+            <span className="text-xs text-zinc-400">recettes encaissées, à recopier dans tes déclarations</span>
+          </div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {trimestres.map((q) => (
+              <div key={q.periode} className="rounded-xl border border-zinc-100 bg-zinc-50/60 p-3">
+                <div className="text-xs font-semibold text-zinc-400">{q.periode.replace("-", " ")}</div>
+                <div className="mt-1 text-lg font-bold text-zinc-900">{euros(q.recettesCents)}</div>
+                <div className="text-[11px] text-zinc-400">dépenses {euros(q.depensesCents)}</div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-zinc-500">
+            Ce sont les recettes <b>encaissées</b> sur la période. L'application ne remplit aucun formulaire et ne
+            connaît aucun taux : elle te donne le montant, tu le reportes.
+          </p>
+        </div>
+      )}
+
       {/* ─── Journal ────────────────────────────────────────────────────── */}
       <div className="rounded-2xl border border-zinc-100 bg-white shadow-sm">
         <div className="flex flex-wrap items-center gap-2 border-b border-zinc-100 p-4">
           <h3 className="text-sm font-semibold text-zinc-700">Journal</h3>
           <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500">{listees.length}</span>
           <div className="flex-1" />
+          {ecritures.length > 0 && (<>
           <div className="relative">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
             <input value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Rechercher…"
@@ -468,6 +658,7 @@ export function ComptaClient() {
             <input type="checkbox" checked={voirAnnulees} onChange={(e) => setVoirAnnulees(e.target.checked)} className="h-3.5 w-3.5 rounded border-zinc-300" />
             Voir les annulées{t.nbAnnulees > 0 ? ` (${t.nbAnnulees})` : ""}
           </label>
+          </>)}
         </div>
 
         {listees.length === 0 ? (
@@ -490,17 +681,22 @@ export function ComptaClient() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-zinc-100 text-left text-xs text-zinc-400">
+                  {/* Un livre de recettes se tient par numéros d'ordre continus : sans
+                      eux, rien ne montre qu'il ne manque pas une ligne au milieu. */}
+                  <th className="px-4 py-2 font-medium" title="Numéro d'ordre, continu et définitif">N°</th>
                   <th className="px-4 py-2 font-medium">Date</th>
                   <th className="px-4 py-2 font-medium">Libellé</th>
                   <th className="px-4 py-2 font-medium">Poste</th>
                   <th className="px-4 py-2 font-medium">Moyen</th>
                   <th className="px-4 py-2 text-right font-medium">Montant</th>
+                  <th className="px-4 py-2 text-right font-medium" title="Trésorerie après cette écriture">Solde</th>
                   <th className="px-4 py-2" />
                 </tr>
               </thead>
               <tbody>
                 {listees.map((e) => (
                   <tr key={e.id} className={`border-b border-zinc-50 last:border-0 ${e.annulee ? "bg-zinc-50/60 text-zinc-400" : "hover:bg-zinc-50/60"}`}>
+                    <td className="px-4 py-2.5 font-mono text-xs text-zinc-300">{numeros.get(e.id) ?? "—"}</td>
                     <td className="whitespace-nowrap px-4 py-2.5 text-zinc-500">{e.date.split("-").reverse().join("/")}</td>
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
@@ -522,12 +718,26 @@ export function ComptaClient() {
                       e.annulee ? "text-zinc-300 line-through" : e.sens === "entree" ? "text-emerald-600" : "text-rose-500"}`}>
                       {e.sens === "entree" ? "+" : "−"}{euros(e.montantCents).replace("−", "")}
                     </td>
-                    <td className="px-4 py-2.5 text-right">
+                    <td className={`whitespace-nowrap px-4 py-2.5 text-right text-xs ${e.annulee ? "text-zinc-300" : "text-zinc-500"}`}>
+                      {/* Le solde ne se calcule que sur les écritures vives, dans l'ordre
+                          des opérations : une annulée n'a pas de solde, elle n'a rien bougé. */}
+                      {e.annulee ? "—" : euros(soldes.get(e.id) ?? 0)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-right">
                       {!e.annulee && (
-                        <button onClick={() => void annuler(e)} title="Annuler cette écriture (elle reste au journal)"
-                          className="rounded-lg p-1.5 text-zinc-300 transition-colors hover:bg-rose-50 hover:text-rose-500">
-                          <Ban className="h-3.5 w-3.5" />
-                        </button>
+                        <>
+                          {/* ⚠️ Pas de bouton « modifier », et ce n'est pas un oubli :
+                              réécrire une ligne passée détruit la trace de ce qui avait
+                              été enregistré. Corriger = annuler puis ressaisir. */}
+                          <button onClick={() => void corriger(e)} title="Corriger : annule cette écriture et rouvre le formulaire pré-rempli"
+                            className="rounded-lg p-1.5 text-zinc-300 transition-colors hover:bg-blue-50 hover:text-blue-500">
+                            <PenLine className="h-3.5 w-3.5" />
+                          </button>
+                          <button onClick={() => void annuler(e)} title="Annuler cette écriture (elle reste au journal)"
+                            className="rounded-lg p-1.5 text-zinc-300 transition-colors hover:bg-rose-50 hover:text-rose-500">
+                            <Ban className="h-3.5 w-3.5" />
+                          </button>
+                        </>
                       )}
                     </td>
                   </tr>
@@ -547,15 +757,38 @@ export function ComptaClient() {
   );
 }
 
-function Carte({ titre, valeur, icone, fond, sous, accent }: {
-  titre: string; valeur: string; icone: React.ReactNode; fond: string; sous?: string; accent?: string;
+function Carte({ titre, valeur, icone, fond, sous, accent, ecart }: {
+  titre: string; valeur: string; icone: React.ReactNode; fond: string; sous?: string; accent?: string; ecart?: React.ReactNode;
 }) {
   return (
     <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
       <div className={`mb-3 flex h-8 w-8 items-center justify-center rounded-xl ${fond}`}>{icone}</div>
       <div className={`text-2xl font-bold ${accent ?? "text-zinc-900"}`}>{valeur}</div>
       <div className="mt-0.5 text-xs text-zinc-400">{titre}</div>
+      {ecart}
       {sous && <div className="mt-1 text-[11px] text-zinc-400">{sous}</div>}
+    </div>
+  );
+}
+
+/**
+ * L'écart avec la même période un an plus tôt.
+ *
+ * ⚠️ RIEN NE S'AFFICHE SANS BASE DE COMPARAISON. Un « +100 % » calculé à partir de zéro
+ * ne veut rien dire, et se lit pourtant comme une performance. Quand il n'y a pas
+ * d'année précédente, l'écran ne dit rien — c'est la seule réponse honnête.
+ *
+ * `inverse` : pour les DÉPENSES, une hausse n'est pas une bonne nouvelle. Colorer en vert
+ * une augmentation de charges parce que « la flèche monte » induirait en erreur.
+ */
+function Ecart({ actuel, precedent, annee, inverse }: { actuel: number; precedent?: number; annee: string; inverse?: boolean }) {
+  if (annee === "toutes" || precedent === undefined) return null;
+  const pct = evolution(actuel, precedent);
+  if (pct === null) return <div className="mt-1 text-[11px] text-zinc-400">rien en {Number(annee) - 1} : pas de comparaison</div>;
+  const bon = inverse ? pct <= 0 : pct >= 0;
+  return (
+    <div className={`mt-1 text-[11px] font-medium ${bon ? "text-emerald-600" : "text-rose-500"}`}>
+      {pct > 0 ? "+" : ""}{pct} % vs {Number(annee) - 1} ({euros(precedent)})
     </div>
   );
 }

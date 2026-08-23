@@ -12,6 +12,7 @@ import { join } from "node:path";
 import {
   enCentimes, euros, valider, totaux, tvaDe, cotisationsEstimees, soldeCumule, versCSV,
   CATEGORIES, categorieDe, type Ecriture,
+  numeroter, doublonsProbables, parTrimestre, modelesRecurrents, evolution,
 } from "../src/lib/compta/model";
 import { ecrituresDeLEvenement, dateParis, type EvenementStripe } from "../src/lib/compta/stripe";
 
@@ -197,6 +198,77 @@ test("chaque catégorie a un sens, et aucun identifiant n'est en double", () => 
     assert.equal(categorieDe(c.id)?.label, c.label);
   }
   assert.ok(CATEGORIES.some((c) => c.sens === "entree") && CATEGORIES.some((c) => c.sens === "sortie"));
+});
+
+test("les numéros d'ordre sont continus, stables, et survivent à une annulation", () => {
+  // ⚠️ Un livre de recettes se tient par numéros CONTINUS : sans eux, rien ne montre
+  // qu'il ne manque pas une ligne au milieu. Une écriture annulée GARDE son numéro —
+  // un numéro qui disparaît est un trou, et un trou se justifie.
+  const liste = [
+    ecr({ id: "c", date: "2026-03-01" }),
+    ecr({ id: "a", date: "2026-01-01" }),
+    ecr({ id: "b", date: "2026-02-01", annulee: true, motifAnnulation: "doublon" }),
+  ];
+  const n = numeroter(liste);
+  assert.deepEqual([n.get("a"), n.get("b"), n.get("c")], [1, 2, 3]);
+  // Deux affichages successifs ne doivent pas renuméroter les mêmes lignes.
+  assert.deepEqual([...numeroter(liste.slice().reverse()).entries()].sort(), [...n.entries()].sort());
+  // Même date : l'ordre reste total, jamais laissé au hasard du tri.
+  const memeJour = numeroter([
+    ecr({ id: "z", date: "2026-01-01", saisieLe: "2026-01-01T10:00:00Z" }),
+    ecr({ id: "y", date: "2026-01-01", saisieLe: "2026-01-01T09:00:00Z" }),
+  ]);
+  assert.deepEqual([memeJour.get("y"), memeJour.get("z")], [1, 2]);
+});
+
+test("une écriture saisie deux fois est signalée, jamais bloquée", () => {
+  // ⚠️ Deux abonnements identiques le même jour arrivent VRAIMENT : refuser la seconde
+  // forcerait à contourner l'outil. Mais saisir deux fois la même facture est l'erreur
+  // la plus banale d'une compta manuelle, et elle est invisible une fois enregistrée.
+  const deja = [ecr({ id: "1", date: "2026-01-05", libelle: "Vercel", montantCents: 2000 })];
+  assert.equal(doublonsProbables({ date: "2026-01-05", libelle: "vercel ", montantCents: 2000, sens: "sortie" }, deja).length, 1);
+  assert.equal(doublonsProbables({ date: "2026-01-06", libelle: "Vercel", montantCents: 2000, sens: "sortie" }, deja).length, 0);
+  assert.equal(doublonsProbables({ date: "2026-01-05", libelle: "Vercel", montantCents: 2500, sens: "sortie" }, deja).length, 0);
+  // Une écriture déjà annulée n'est pas un doublon : la ressaisir est justement la
+  // façon normale de corriger une erreur.
+  const annulee = [ecr({ id: "1", date: "2026-01-05", libelle: "Vercel", montantCents: 2000, annulee: true })];
+  assert.equal(doublonsProbables({ date: "2026-01-05", libelle: "Vercel", montantCents: 2000, sens: "sortie" }, annulee).length, 0);
+});
+
+test("les totaux trimestriels suivent le trimestre civil", () => {
+  // ⚠️ On ne déclare pas un cumul « depuis le début », on déclare une PÉRIODE.
+  const t = parTrimestre([
+    ecr({ date: "2026-03-31", sens: "entree", categorie: "abonnements", montantCents: 1000 }),
+    ecr({ date: "2026-04-01", sens: "entree", categorie: "abonnements", montantCents: 2000 }),
+    ecr({ date: "2026-06-30", sens: "sortie", montantCents: 500 }),
+    ecr({ date: "2026-07-01", sens: "entree", categorie: "abonnements", montantCents: 9999, annulee: true }),
+  ]);
+  assert.deepEqual(t.map((x) => x.periode), ["2026-T1", "2026-T2"]);
+  assert.equal(t[0].recettesCents, 1000);
+  assert.equal(t[1].recettesCents, 2000);
+  assert.equal(t[1].depensesCents, 500);
+});
+
+test("une charge déjà reportée n'est pas reproposée", () => {
+  // ⚠️ Reproposer un report déjà fait est la façon la plus simple de créer un doublon
+  // en croyant bien faire.
+  const base = [
+    ecr({ date: "2026-01-05", libelle: "Vercel", categorie: "hebergement", montantCents: 2000, recurrente: true }),
+    ecr({ date: "2026-01-05", libelle: "Supabase", categorie: "services", montantCents: 2500, recurrente: true }),
+    ecr({ date: "2026-02-05", libelle: "Vercel", categorie: "hebergement", montantCents: 2000, recurrente: true }),
+  ];
+  const m = modelesRecurrents(base, "2026-02");
+  assert.equal(m.length, 2, "les occurrences d'une même charge doivent être regroupées");
+  assert.equal(m.find((x) => x.libelle === "Vercel")?.dejaSaisi, true);
+  assert.equal(m.find((x) => x.libelle === "Supabase")?.dejaSaisi, false);
+});
+
+test("une évolution sans base de comparaison ne s'invente pas", () => {
+  // ⚠️ « +∞ % » ou « +100 % » à partir de zéro ne veut rien dire : l'écran doit dire
+  // qu'il n'y a pas de comparaison possible, pas afficher un pourcentage rassurant.
+  assert.equal(evolution(1000, 0), null);
+  assert.equal(evolution(1500, 1000), 50);
+  assert.equal(evolution(500, 1000), -50);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
