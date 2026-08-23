@@ -10,6 +10,12 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ["lucide-react", "framer-motion", "recharts", "date-fns"],
   },
   images: {
+    // ⚠️ NEXT 16 N'ACCEPTE QUE LES QUALITÉS DÉCLARÉES ICI. Sans cette liste, un
+    // `quality={82}` sur un composant `<Image>` est SILENCIEUSEMENT ramené à 75 : le
+    // code affiche une intention que le serveur ignore, et rien ne le signale. Constaté
+    // sur la page « Notre histoire » — les URL servies portaient toutes `q=75` alors que
+    // le composant demandait 82. Ajouter une valeur ici est le seul moyen de l'autoriser.
+    qualities: [75, 82],
     remotePatterns: [
       { hostname: "*.supabase.co" },
       { hostname: "images.unsplash.com" },

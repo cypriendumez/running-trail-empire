@@ -430,6 +430,18 @@ test("le crédit du photographe ne peut pas disparaître avec la photo", () => {
   // en pleine résolution — 1,1 Mo de JPEG là où l'AVIF généré en pèse moins de cent Ko.
   assert.match(page, /from "next\/image"/, "la photo n'est plus optimisée par Next");
   assert.match(page, /sizes=/, "sans `sizes`, Next sert la plus grande variante même aux téléphones");
+  // ⚠️ NEXT 16 IGNORE SILENCIEUSEMENT UNE QUALITÉ NON DÉCLARÉE. Constaté en production :
+  // le composant demandait `quality={82}`, toutes les URL servies portaient `q=75`. Le
+  // code affichait une intention que le serveur n'appliquait pas, et rien ne le signalait
+  // — ni erreur, ni avertissement au build. Toute qualité utilisée dans une page doit
+  // donc figurer dans `images.qualities` de `next.config`.
+  const conf = readFileSync(join(ROOT, "next.config.ts"), "utf8");
+  const demandees = [...page.matchAll(/quality=\{(\d+)\}/g)].map((m) => Number(m[1]));
+  assert.ok(demandees.length > 0, "aucune qualité déclarée sur la photo");
+  const autorisees = (conf.match(/qualities:\s*\[([^\]]*)\]/)?.[1] ?? "").split(",").map((x) => Number(x.trim()));
+  for (const q of demandees) {
+    assert.ok(autorisees.includes(q), `quality={${q}} est demandé mais absent de images.qualities : Next le ramènera à 75 sans le dire`);
+  }
   // ⚠️ ET LE CADRAGE NE DOIT PAS ROGNER LA SIGNATURE. La première mise en page imposait
   // un cadre 16/9 avec `object-cover` ; la photo étant en 3/2, le recadrage mangeait le
   // haut et LE BAS — le coin exact où se trouve la signature du photographe. On aurait
