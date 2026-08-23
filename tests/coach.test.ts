@@ -3826,6 +3826,52 @@ test("un titre de séance ne peut pas casser le HTML", () => {
   assert.ok(!/<b>gras<\/b>/.test(m.html), "balisage non échappé dans un titre de séance");
   assert.ok(/&lt;script&gt;/.test(m.html), "l'échappement doit conserver le texte, pas le supprimer");
 });
+test("l'e-mail porte le logo, une ligne d'aperçu et une mise en page qui tient dans Outlook", () => {
+  // Refonte du 23/08/2026, demandée par Cyprien (« fais plus pro et mets le logo »).
+  // Chaque assertion correspond à un défaut CONSTATÉ sur le message qu'il a reçu.
+  for (const lang of ["fr", "en", "de", "es", "pt"] as const) {
+    const m = mailIn({ lang });
+
+    // 1. LE LOGO — et le MÊME que les autres e-mails Pacevo. Deux fichiers finiraient
+    //    par diverger, et un client verrait deux marques selon le message reçu.
+    assert.ok(m.html.includes("/icon.png"), `${lang} : e-mail sans logo`);
+    // Une image distante est bloquée par défaut dans la plupart des messageries : sans
+    // texte de remplacement, l'en-tête devient un carré vide.
+    assert.match(m.html, /<img[^>]+alt="Pacevo"/, `${lang} : le logo n'a pas de texte de remplacement`);
+    assert.ok(m.html.includes("PACEVO"), `${lang} : le nom doit rester écrit à côté du logo`);
+
+    // 2. LA LIGNE D'APERÇU. Sans elle, la liste des messages affichait « PACEVO Salut
+    //    Cyprien, T… » : l'athlète devait ouvrir pour savoir de quoi il s'agissait.
+    assert.ok(m.html.includes("mso-hide:all"), `${lang} : pas de ligne d'aperçu masquée`);
+    const apercu = m.html.match(/mso-hide:all">([^&<]{6,})/);
+    assert.ok(apercu, `${lang} : la ligne d'aperçu est vide`);
+    assert.ok(!apercu![1].includes("undefined"), `${lang} : clé manquante dans l'aperçu`);
+
+    // 3. OUTLOOK. Cyprien lit ses e-mails dans Outlook, qui ignore `max-width` sur un
+    //    bloc : le message s'étalait sur toute la fenêtre. Seuls les TABLEAUX tiennent.
+    // ⚠️ ON COMPTE, ON NE CHERCHE PAS. `role="presentation"` apparaît une dizaine de
+    // fois : un `includes` reste vert si l'on n'en casse qu'un seul, et c'est ainsi
+    // qu'une mise en page se dégrade par morceaux sans qu'aucun test ne bronche. Le
+    // projet s'est déjà fait prendre trois fois par ce motif.
+    const tableaux = (m.html.match(/role="presentation"/g) ?? []).length;
+    // Le seuil est le compte EXACT du gabarit (8 avec les deux cartes). En mettre moins
+    // laisserait passer la disparition d'un tableau ; en `>=`, en AJOUTER reste vert.
+    assert.ok(tableaux >= 8, `${lang} : ${tableaux} tableaux de mise en page au lieu de 8 — un bloc est repassé en div, Outlook ne suivra pas`);
+    assert.ok(m.html.includes('width="600"'), `${lang} : largeur non fixée pour Outlook`);
+
+    // 4. AUCUNE RESSOURCE EXTERNE hors le logo, et AUCUNE feuille de style : les
+    //    messageries les suppriment, et le message arriverait sans aucune mise en forme.
+    assert.ok(!m.html.includes("<link"), `${lang} : feuille de style externe`);
+    assert.ok(!/<style/.test(m.html), `${lang} : bloc <style>, supprimé par certaines messageries`);
+
+    // 5. RIEN DE CASSÉ. Une clé absente donnerait « undefined » en pleine page.
+    assert.ok(!m.html.includes("undefined"), `${lang} : « undefined » dans le corps`);
+    // Et surtout PAS le gabarit juridique non rempli : `EDITEUR.statut` porte encore
+    // « [À COMPLÉTER] », qui n'a rien à faire dans la boîte d'un client.
+    assert.ok(!m.html.includes("COMPLÉTER"), `${lang} : gabarit juridique non résolu dans l'e-mail`);
+  }
+});
+
 test("l'e-mail dit comment s'en débarrasser", () => {
   // Un e-mail automatique sans porte de sortie est un e-mail qu'on signale comme spam,
   // ce qui abîme la délivrabilité de TOUS les autres.
@@ -3834,10 +3880,21 @@ test("l'e-mail dit comment s'en débarrasser", () => {
   // français, en anglais, en espagnol et en portugais, et échouait en allemand
   // (« Benachrichtigungen ») — un test qui ne tient que par la parenté des langues
   // latines ne vérifie pas grand-chose.
-  const motDeSortie = { fr: "Notifications", en: "Notifications", de: "Benachrichtigungen", es: "Notificaciones", pt: "Notificações" } as const;
+  const motDeSortie = { fr: "notifications", en: "notifications", de: "benachrichtigungen", es: "notificaciones", pt: "notificações" } as const;
   for (const [lang, mot] of Object.entries(motDeSortie) as [keyof typeof motDeSortie, string][]) {
     const m = mailIn({ lang });
-    assert.ok(m.text.includes(mot), `${lang} : le pied de page ne dit pas où se désinscrire (« ${mot} » attendu)`);
+    // ⚠️ CE QUI COMPTE EST L'ADRESSE, PAS LE MOT. Le test cherchait « Notifications »
+    // avec sa majuscule, parce que le pied de page épelait le chemin « Profil →
+    // Notifications ». Refondu le 23/08/2026, ce chemin est devenu un LIEN — plus
+    // exploitable pour l'athlète, mais le test est devenu rouge sur un e-mail meilleur.
+    // On vise donc la porte de sortie elle-même : une URL cliquable vers le réglage.
+    assert.ok(m.text.includes("/dashboard/profile"),
+      `${lang} : la version texte ne donne aucune adresse pour couper les e-mails`);
+    assert.ok(m.html.includes("/dashboard/profile"),
+      `${lang} : la version HTML n'a pas de lien vers le réglage`);
+    // Et le mot doit rester présent : une URL nue, sans phrase, ne se comprend pas.
+    assert.ok(m.text.toLowerCase().includes(mot),
+      `${lang} : le pied de page ne dit pas de QUOI on se désinscrit (« ${mot} » attendu)`);
   }
 });
 test("le silence est proscrit côté envoi, comme ailleurs", () => {

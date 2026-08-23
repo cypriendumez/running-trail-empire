@@ -21,6 +21,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Lang } from "@/lib/i18n/translations";
+// ⚠️ IMPORTÉE, jamais recopiée : `tests/chiffres.test.ts` interdit qu'un fichier
+// redéclare l'identité de l'éditeur. On n'utilise QUE `nom` — `statut` porte encore
+// le gabarit « [À COMPLÉTER] », qui n'a rien à faire dans la boîte d'un client.
+import { EDITEUR } from "@/lib/brand/editeur";
 
 /** Deux séances dans la même matinée ne valent pas deux e-mails. */
 export const EMAIL_MIN_INTERVAL_MS = 3 * 60 * 60 * 1000;
@@ -57,6 +61,14 @@ type Dict = {
   objective: (race: string, d: number) => string;
   today: string; tomorrow: string;
   footer: string;
+  /** Libellé du lien qui mène au réglage — « Profil → Notifications » en toutes lettres
+   *  oblige à chercher ; un lien y emmène en un clic. */
+  manage: string;
+  /** Ligne d'aperçu affichée dans la LISTE des messages, avant même l'ouverture. Sans
+   *  elle, la messagerie y met le début du corps : la boîte affichait « PACEVO Salut
+   *  Cyprien, T… », c'est-à-dire rien. */
+  preheader: (next: string) => string;
+  preheaderNoNext: string;
 };
 
 const T: Record<Lang, Dict> = {
@@ -70,7 +82,10 @@ const T: Record<Lang, Dict> = {
     cta: "Voir mon calendrier",
     objective: (race, d) => `Objectif : ${race} · J−${d}`,
     today: "Aujourd'hui", tomorrow: "Demain",
-    footer: "Tu reçois cet e-mail parce que les notifications du coach sont activées. Pour les désactiver : Profil → Notifications.",
+    footer: "Tu reçois cet e-mail parce que les notifications du coach sont activées.",
+    manage: "Gérer mes notifications",
+    preheader: (n) => `Prochaine séance : ${n}`,
+    preheaderNoNext: "Ton plan des 7 prochains jours vient d'être recalculé.",
   },
   en: {
     subject: (n) => `Your plan is updated — next session: ${n}`,
@@ -82,7 +97,10 @@ const T: Record<Lang, Dict> = {
     cta: "Open my calendar",
     objective: (race, d) => `Goal: ${race} · ${d} days to go`,
     today: "Today", tomorrow: "Tomorrow",
-    footer: "You receive this email because coach notifications are on. To turn them off: Profile → Notifications.",
+    footer: "You receive this email because coach notifications are on.",
+    manage: "Manage my notifications",
+    preheader: (n) => `Next session: ${n}`,
+    preheaderNoNext: "Your plan for the next 7 days has just been recalculated.",
   },
   de: {
     subject: (n) => `Dein Plan ist aktualisiert — nächste Einheit: ${n}`,
@@ -94,7 +112,10 @@ const T: Record<Lang, Dict> = {
     cta: "Kalender öffnen",
     objective: (race, d) => `Ziel: ${race} · noch ${d} Tage`,
     today: "Heute", tomorrow: "Morgen",
-    footer: "Du erhältst diese E-Mail, weil Coach-Benachrichtigungen aktiviert sind. Deaktivieren: Profil → Benachrichtigungen.",
+    footer: "Du erhältst diese E-Mail, weil Coach-Benachrichtigungen aktiviert sind.",
+    manage: "Benachrichtigungen verwalten",
+    preheader: (n) => `Nächste Einheit: ${n}`,
+    preheaderNoNext: "Dein Plan für die nächsten 7 Tage wurde soeben neu berechnet.",
   },
   es: {
     subject: (n) => `Tu plan está actualizado — próxima sesión: ${n}`,
@@ -106,7 +127,10 @@ const T: Record<Lang, Dict> = {
     cta: "Ver mi calendario",
     objective: (race, d) => `Objetivo: ${race} · faltan ${d} días`,
     today: "Hoy", tomorrow: "Mañana",
-    footer: "Recibes este correo porque las notificaciones del entrenador están activadas. Para desactivarlas: Perfil → Notificaciones.",
+    footer: "Recibes este correo porque las notificaciones del entrenador están activadas.",
+    manage: "Gestionar mis notificaciones",
+    preheader: (n) => `Próxima sesión: ${n}`,
+    preheaderNoNext: "Tu plan de los próximos 7 días acaba de recalcularse.",
   },
   pt: {
     subject: (n) => `O teu plano está atualizado — próxima sessão: ${n}`,
@@ -118,7 +142,10 @@ const T: Record<Lang, Dict> = {
     cta: "Ver o meu calendário",
     objective: (race, d) => `Objetivo: ${race} · faltam ${d} dias`,
     today: "Hoje", tomorrow: "Amanhã",
-    footer: "Recebes este e-mail porque as notificações do treinador estão ativas. Para desativar: Perfil → Notificações.",
+    footer: "Recebes este e-mail porque as notificações do treinador estão ativas.",
+    manage: "Gerir as minhas notificações",
+    preheader: (n) => `Próxima sessão: ${n}`,
+    preheaderNoNext: "O teu plano dos próximos 7 dias acabou de ser recalculado.",
   },
 };
 
@@ -170,36 +197,123 @@ export function buildPlanReadyEmail(i: PlanReadyInput): { subject: string; text:
     for (const d of days) lines.push(`  ${dayLabel(d.date)} — ${titre(d)}`);
     lines.push("");
   }
-  lines.push(`${t.cta} : ${i.appUrl}/dashboard/calendrier`, "", "—", t.footer);
+  // ⚠️ La version texte doit rester AUTOSUFFISANTE. `t.footer` ne dit plus où couper les
+  // e-mails — c'est devenu un lien dans le HTML — donc on écrit l'adresse en clair ici,
+  // sinon un lecteur en texte seul n'a plus aucun moyen de se désabonner.
+  lines.push(
+    `${t.cta} : ${i.appUrl}/dashboard/calendrier`, "", "—",
+    t.footer,
+    `${t.manage} : ${i.appUrl}/dashboard/profile`,
+    `Pacevo · ${EDITEUR.nom} · ${i.appUrl}`,
+  );
   const text = lines.join("\n");
 
-  // ── Version HTML : styles en ligne, aucune ressource externe (les messageries les
-  //    bloquent), une seule colonne pour rester lisible sur téléphone.
+  // ── Version HTML ────────────────────────────────────────────────────────────
+  //
+  //  ⚠️ REFAIT LE 23/08/2026. Le gabarit précédent était un `<div>` nu sur fond blanc,
+  //  sans en-tête ni pied de page : il ressemblait à une notification de service, pas au
+  //  produit qu'on vend. Quatre défauts, tous visibles dans une vraie boîte de réception.
+  //
+  //   1. AUCUNE LIGNE D'APERÇU. La messagerie prend alors le début du corps : la liste
+  //      affichait « PACEVO Salut Cyprien, T… » — l'athlète devait ouvrir pour savoir de
+  //      quoi il s'agissait. Le `preheader` ci-dessous, masqué dans le message, occupe
+  //      cette place et annonce la prochaine séance.
+  //   2. MISE EN PAGE EN `div`. Outlook (Windows) ignore `max-width` sur un bloc : le
+  //      message s'étalait sur toute la largeur de la fenêtre. On repasse en TABLEAUX,
+  //      seule structure que toutes les messageries respectent encore.
+  //   3. PAS DE LOGO. Demandé par Cyprien. L'image est distante — les messageries les
+  //      bloquent par défaut — donc le nom PACEVO reste écrit à côté, en texte : image
+  //      bloquée, l'en-tête tient quand même.
+  //   4. PIED DE PAGE MUET. « Pour les désactiver : Profil → Notifications » obligeait à
+  //      chercher. C'est un LIEN maintenant, et l'éditeur est nommé.
+  //
+  //  Contraintes qui ne changent pas : styles EN LIGNE (aucune feuille externe n'est
+  //  chargée), une seule colonne, et la version texte reste autosuffisante.
+  const B = "#059669";                 // émeraude de la marque
+  // ⚠️ LE MÊME FICHIER QUE LES AUTRES E-MAILS PACEVO (`/icon.png`, déjà utilisé par
+  // l'accusé d'inscription et la lettre du lundi). J'avais d'abord fabriqué un
+  // `email-logo.png` dédié, plus léger — mais deux logos finissent par diverger, et rien
+  // ne le signalerait : un client verrait deux marques différentes selon le message reçu.
+  const logo = `${i.appUrl}/icon.png`;
+  const preheader = next ? t.preheader(`${dayLabel(next.date)} · ${titre(next)}`) : t.preheaderNoNext;
+
   const card = (inner: string) =>
-    `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:16px 0">${inner}</div>`;
-  const html = `<!doctype html><html lang="${i.lang}"><body style="margin:0;padding:24px;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;line-height:1.6">
-<div style="max-width:560px;margin:0 auto">
-  <div style="font-weight:800;font-size:20px;letter-spacing:-0.02em;color:#059669">PACEVO</div>
-  <p style="margin:20px 0 4px">${esc(t.hello(i.firstName))}</p>
-  <p style="margin:0 0 8px">${esc(t.intro)}</p>
-  ${objLine ? `<p style="margin:0;color:#475569;font-size:14px">${esc(objLine)}</p>` : ""}
-  ${i.lastSession ? card(
-    `<div style="font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:#64748b">${esc(t.lastSessionTitle)}</div>
-     <div style="margin-top:6px;font-weight:600">${esc(i.lastSession.label)}</div>
-     ${i.lastSession.shows.length ? `<ul style="margin:8px 0 0;padding-left:18px;color:#334155">${i.lastSession.shows.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>` : ""}
-     <div style="margin-top:10px;font-weight:600;color:#0f172a">${esc(i.lastSession.effect)}</div>`,
-  ) : ""}
-  ${days.length ? card(
-    `<div style="font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:#64748b">${esc(t.nextDaysTitle)}</div>
-     <table style="width:100%;border-collapse:collapse;margin-top:8px">
-     ${days.map((d) => `<tr><td style="padding:6px 0;color:#64748b;white-space:nowrap;vertical-align:top">${esc(dayLabel(d.date))}</td><td style="padding:6px 0 6px 12px;font-weight:600">${esc(titre(d))}</td></tr>`).join("")}
-     </table>`,
-  ) : ""}
-  <p style="margin:24px 0">
-    <a href="${esc(i.appUrl)}/dashboard/calendrier" style="display:inline-block;background:#059669;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600">${esc(t.cta)}</a>
-  </p>
-  <p style="margin:24px 0 0;color:#94a3b8;font-size:12px;border-top:1px solid #e2e8f0;padding-top:12px">${esc(t.footer)}</p>
-</div></body></html>`;
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:18px 0">
+       <tr><td style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:18px 20px">${inner}</td></tr>
+     </table>`;
+  const titreBloc = (txt: string) =>
+    `<div style="font:600 11px/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;text-transform:uppercase;letter-spacing:.09em;color:#64748b">${esc(txt)}</div>`;
+
+  const html = `<!doctype html>
+<html lang="${i.lang}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>${esc(subject)}</title>
+</head>
+<body style="margin:0;padding:0;background:#eef2f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a">
+<!-- Ligne d'aperçu : lue par la liste des messages, invisible une fois ouvert. Les
+     espaces insécables qui suivent empêchent la messagerie d'y accoler le corps. -->
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all">${esc(preheader)}${"&#8199;&#65279;&nbsp;".repeat(60)}</div>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#eef2f6">
+<tr><td align="center" style="padding:32px 16px">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:100%;max-width:600px">
+
+    <!-- En-tête : logo + nom. Si l'image est bloquée, le nom reste. -->
+    <tr><td style="padding:0 4px 16px">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td style="padding-right:10px;vertical-align:middle">
+          <img src="${esc(logo)}" width="34" height="34" alt="Pacevo"
+               style="display:block;width:34px;height:34px;border:0;border-radius:9px">
+        </td>
+        <td style="vertical-align:middle;font:800 19px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;letter-spacing:-.02em;color:${B}">PACEVO</td>
+      </tr></table>
+    </td></tr>
+
+    <!-- Corps -->
+    <tr><td style="background:#ffffff;border:1px solid #e2e8f0;border-radius:18px;padding:28px 26px">
+      <div style="font:600 17px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a">${esc(t.hello(i.firstName))}</div>
+      <div style="margin-top:8px;font-size:15px;line-height:1.65;color:#334155">${esc(t.intro)}</div>
+      ${objLine ? `<div style="margin-top:14px"><span style="display:inline-block;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;color:#047857">${esc(objLine)}</span></div>` : ""}
+
+      ${i.lastSession ? card(
+        `${titreBloc(t.lastSessionTitle)}
+         <div style="margin-top:8px;font-size:15px;font-weight:700;color:#0f172a">${esc(i.lastSession.label)}</div>
+         ${i.lastSession.shows.length ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:10px">${i.lastSession.shows.map((x) => `<tr><td style="padding:3px 8px 3px 0;color:${B};font-size:14px;line-height:1.5;vertical-align:top">&bull;</td><td style="padding:3px 0;color:#334155;font-size:14px;line-height:1.5">${esc(x)}</td></tr>`).join("")}</table>` : ""}
+         <div style="margin-top:12px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:14px;font-weight:600;color:#0f172a">${esc(i.lastSession.effect)}</div>`,
+      ) : ""}
+
+      ${days.length ? card(
+        `${titreBloc(t.nextDaysTitle)}
+         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:6px">
+         ${days.map((d) => `<tr>
+            <td style="padding:7px 0;color:#64748b;font-size:14px;white-space:nowrap;vertical-align:top;width:38%">${esc(dayLabel(d.date))}</td>
+            <td style="padding:7px 0 7px 12px;font-size:14px;font-weight:600;color:#0f172a">${esc(titre(d))}</td>
+          </tr>`).join("")}
+         </table>`,
+      ) : ""}
+
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:22px">
+        <tr><td style="background:${B};border-radius:11px">
+          <a href="${esc(i.appUrl)}/dashboard/calendrier"
+             style="display:inline-block;padding:13px 26px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none">${esc(t.cta)}</a>
+        </td></tr>
+      </table>
+    </td></tr>
+
+    <!-- Pied de page : pourquoi ce message, comment l'arrêter, et qui l'envoie. -->
+    <tr><td style="padding:18px 8px 0;font-size:12px;line-height:1.6;color:#94a3b8">
+      ${esc(t.footer)}
+      <a href="${esc(i.appUrl)}/dashboard/profile" style="color:#64748b;text-decoration:underline">${esc(t.manage)}</a>
+      <div style="margin-top:8px">Pacevo &middot; ${esc(EDITEUR.nom)} &middot; <a href="${esc(i.appUrl)}/mentions-legales" style="color:#94a3b8;text-decoration:underline">${esc(i.appUrl.replace(/^https?:\/\//, ""))}</a></div>
+    </td></tr>
+
+  </table>
+</td></tr>
+</table>
+</body></html>`;
 
   return { subject, text, html };
 }
