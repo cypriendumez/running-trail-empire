@@ -421,7 +421,15 @@ test("le crédit du photographe ne peut pas disparaître avec la photo", () => {
   // ⚠️ ET LA PHOTO NE DOIT PAS ÊTRE RENDUE SANS VÉRIFIER QU'ELLE EXISTE : un `<img>` vers
   // un fichier absent affiche une image cassée en production sans qu'aucune erreur ne
   // remonte. Le projet a déjà eu ce défaut sur les logos de marques.
-  assert.match(page, /existsSync\(/, "la page rendrait un <img> même si le fichier est absent");
+  // ⚠️ L'IMPORT STATIQUE A REMPLACÉ LE GARDE `existsSync`, et c'est mieux : si le fichier
+  // disparaît, la COMPILATION échoue au lieu de déployer une image cassée en silence.
+  // Échouer bruyamment vaut mieux qu'un carré vide en production.
+  assert.match(page, /from "\.\.\/\.\.\/\.\.\/public\/cyprien-course\.jpg"/,
+    "la photo n'est plus importée statiquement : une disparition du fichier ne casserait plus le build");
+  // ⚠️ ET ELLE PASSE PAR `next/image`, sinon le navigateur télécharge le fichier source
+  // en pleine résolution — 1,1 Mo de JPEG là où l'AVIF généré en pèse moins de cent Ko.
+  assert.match(page, /from "next\/image"/, "la photo n'est plus optimisée par Next");
+  assert.match(page, /sizes=/, "sans `sizes`, Next sert la plus grande variante même aux téléphones");
   // ⚠️ ET LE CADRAGE NE DOIT PAS ROGNER LA SIGNATURE. La première mise en page imposait
   // un cadre 16/9 avec `object-cover` ; la photo étant en 3/2, le recadrage mangeait le
   // haut et LE BAS — le coin exact où se trouve la signature du photographe. On aurait
@@ -432,13 +440,17 @@ test("le crédit du photographe ne peut pas disparaître avec la photo", () => {
   const pageSeule = page.replace(/\{\/\*[\s\S]*?\*\/\}/g, " ").replace(/\/\*[\s\S]*?\*\//g, " ");
   assert.ok(!/object-cover/.test(pageSeule), "un recadrage `object-cover` couperait la signature du photographe");
   assert.ok(!/aspect-\[16\/9\]/.test(pageSeule), "un cadre 16/9 rogne une photo 3/2 en haut et en bas");
-  // Le poids compte aussi : l'original faisait 8,1 Mo et 8256 px de large, soit trente
-  // fois trop pour une page web. Un test ne peut pas juger d'une photo, mais il peut
-  // refuser qu'on redéploie un fichier démesuré.
+  // ⚠️ LE SEUIL A CHANGÉ DE SENS AVEC `next/image`, et le garder à 1 Mo aurait été un
+  // contresens. Ce fichier n'est plus ce que le visiteur télécharge : c'est la SOURCE
+  // dont Next dérive les variantes AVIF/WebP à la taille réellement affichée. Une source
+  // trop compressée dégraderait toutes les variantes ; une source démesurée (l'original
+  // faisait 8,1 Mo et 8256 px) alourdirait le dépôt et les déploiements pour rien.
+  // 2 Mo laisse la place à une source nette sans laisser passer un fichier d'appareil
+  // photo brut. Le poids RÉELLEMENT servi se vérifie en production, pas ici.
   const photo = join(ROOT, "public/cyprien-course.jpg");
   if (existsSync(photo)) {
     const mo = statSync(photo).size / (1024 * 1024);
-    assert.ok(mo < 1, `la photo pèse ${mo.toFixed(1)} Mo : trop lourd pour une page publique`);
+    assert.ok(mo < 2, `la source pèse ${mo.toFixed(1)} Mo : c'est un fichier d'appareil photo, pas une source web`);
   }
 });
 test("le Tour du Mont-Blanc est annoncé pour ce qu'il est : une randonnée", () => {

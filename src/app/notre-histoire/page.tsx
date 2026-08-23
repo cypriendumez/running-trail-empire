@@ -6,12 +6,15 @@ import { SiteFooter } from "@/components/layout/SiteFooter";
 import { Container, Section } from "@/components/ui/Container";
 import { btnClass } from "@/components/ui/Button";
 import { getPublicLang } from "@/lib/i18n/serverLang";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+import Image from "next/image";
 import { HISTOIRE } from "./histoireI18n";
+// ⚠️ IMPORT STATIQUE, pas une chaîne de chemin. Trois raisons :
+//  · Next connaît alors les dimensions et réserve la place — le texte ne saute plus ;
+//  · il peut servir de l'AVIF et du WebP redimensionnés à la volée ;
+//  · et surtout, si le fichier disparaît, la COMPILATION échoue. Un chemin en dur
+//    déployait une image cassée en silence. Échouer bruyamment vaut mieux.
+import photoCourse from "../../../public/cyprien-course.jpg";
 
-/** Le portrait, s'il est réellement présent dans `public/`. Voir l'avertissement ci-dessus. */
-const PHOTO = "/cyprien-course.jpg";
 const CREDIT_PHOTO = "Photo © François Pix";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -42,13 +45,18 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function NotreHistoirePage() {
   const H = HISTOIRE[await getPublicLang()] ?? HISTOIRE.fr;
-  const aLaPhoto = existsSync(join(process.cwd(), "public", PHOTO.replace(/^\//, "")));
-
   return (
     <div className="min-h-screen bg-white">
       <SiteHeader />
 
-      <Section className="pt-16">
+      {/* ⚠️ TOUTE SURCHARGE DOIT ÊTRE DOUBLÉE EN `sm:`, SANS EXCEPTION.
+          `Section` vaut `py-20 sm:py-28`. `twMerge` sait fusionner `sm:py-28` avec
+          `sm:pb-10`, mais PAS avec un `pb-8` non préfixé : les deux règles coexistent,
+          et au-dessus de 640 px c'est la règle sous media-query qui l'emporte. Un
+          `pt-0` seul est donc silencieusement ignoré sur ordinateur — c'est exactement
+          ce qui laissait 152 px de vide entre le crédit de la photo et la chronologie,
+          alors que le code demandait zéro. Mesuré, pas supposé. */}
+      <Section className="pt-16 sm:pt-20 pb-8 sm:pb-10">
         <Container>
           <p className="text-center text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-400">{H.eyebrow}</p>
           <h1 className="mx-auto mt-5 max-w-3xl text-balance text-center text-4xl font-bold leading-[1.06] tracking-tight text-zinc-900 sm:text-5xl">
@@ -57,30 +65,27 @@ export default async function NotreHistoirePage() {
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-center text-lg leading-relaxed text-zinc-500">{H.chapo}</p>
 
-          {aLaPhoto && (
-            <figure className="mx-auto mt-12 max-w-3xl">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              {/* ⚠️ RAPPORT NATUREL, PAS DE `object-cover`. La première version imposait
-                  un cadre 16/9 : la photo étant en 3/2, le recadrage mangeait le haut ET
-                  LE BAS — c'est-à-dire précisément le coin où vit la signature du
-                  photographe. J'aurais rogné le crédit par un choix de mise en page après
-                  avoir refusé de le faire à la main. Le rapport d'origine règle les deux
-                  problèmes : rien n'est coupé, et l'image reste nette.
-                  Dimensions déclarées pour réserver la place et éviter que le texte ne
-                  saute au chargement. */}
-              <img
-                src={PHOTO}
-                alt=""
-                width={1600}
-                height={1067}
-                className="h-auto w-full rounded-3xl ring-1 ring-inset ring-zinc-200"
-                loading="eager"
-              />
-              {/* Le crédit est DANS le flux, pas incrusté sur l'image : il reste lisible,
-                  copiable, et ne dépend pas du chargement du fichier. */}
-              <figcaption className="mt-3 text-center text-xs text-zinc-400">{CREDIT_PHOTO}</figcaption>
-            </figure>
-          )}
+          {/* ⚠️ RAPPORT NATUREL, JAMAIS DE RECADRAGE. La première version imposait un
+              cadre 16/9 : la photo étant en 3/2, le recadrage mangeait le haut ET LE BAS
+              — c'est-à-dire précisément le coin où vit la signature du photographe.
+              J'aurais rogné le crédit par un choix de mise en page après avoir refusé de
+              le faire à la main.
+              `sizes` dit à Next la largeur RÉELLEMENT affichée : sans lui, il sert la
+              plus grande variante à tout le monde, y compris aux téléphones. */}
+          <figure className="mx-auto mt-12 max-w-3xl">
+            <Image
+              src={photoCourse}
+              alt=""
+              sizes="(max-width: 768px) 100vw, 768px"
+              quality={82}
+              priority
+              placeholder="blur"
+              className="h-auto w-full rounded-3xl ring-1 ring-inset ring-zinc-200"
+            />
+            {/* Le crédit est DANS le flux, pas incrusté sur l'image : il reste lisible,
+                copiable, et ne dépend pas du chargement du fichier. */}
+            <figcaption className="mt-3 text-center text-xs text-zinc-400">{CREDIT_PHOTO}</figcaption>
+          </figure>
         </Container>
       </Section>
 
@@ -88,7 +93,7 @@ export default async function NotreHistoirePage() {
           Le repère de gauche porte une DATE, pas un numéro d'étape décoratif :
           l'ordre a un sens ici, et c'est la date qui le donne. Un « 01 / 02 / 03 »
           n'aurait rien ajouté que la mise en page ne dise déjà. */}
-      <Section className="pt-4">
+      <Section className="pt-0 sm:pt-0">
         <Container>
           <ol className="mx-auto max-w-2xl">
             {H.etapes.map((e, i) => (
@@ -110,7 +115,7 @@ export default async function NotreHistoirePage() {
       {/* ── LES CHIFFRES ─────────────────────────────────────────────────────
           Ils remplacent le portrait : sur une page « à propos », ce sont eux la
           preuve, et ils sont tous relevés dans le compte réel (cf. histoireI18n). */}
-      <Section className="pt-6">
+      <Section className="pt-6 sm:pt-8">
         <Container>
           <div className="mx-auto max-w-3xl rounded-3xl bg-zinc-50 p-8 ring-1 ring-inset ring-zinc-200 sm:p-10">
             <h2 className="text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-400">{H.chiffresTitre}</h2>
@@ -126,7 +131,7 @@ export default async function NotreHistoirePage() {
         </Container>
       </Section>
 
-      <Section className="pt-6">
+      <Section className="pt-6 sm:pt-8">
         <Container>
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-400">{H.fermetureTitre}</h2>
