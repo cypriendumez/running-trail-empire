@@ -623,6 +623,15 @@ test("les quatre tarifs attendus par le code sont ceux qu'on demande de renseign
     for (const mort of ["STRIPE_PRICE_MONTHLY", "STRIPE_PRICE_YEARLY"]) {
       assert.ok(!new RegExp(`^${mort}=`, "m").test(env), `${mort} est un leurre : aucun code ne le lit`);
     }
+    // ⚠️ ET LA CLÉ PUBLIABLE EST MORTE AUSSI. Le paiement passe par une page hébergée
+    // par Stripe : le navigateur ne voit jamais de clé. `@stripe/stripe-js` est dans les
+    // dépendances mais n'est importé nulle part. Si un jour quelqu'un l'importe, cette
+    // assertion rougit et il faudra retirer l'avertissement de `.env.local` — c'est le
+    // seul cas où la variable redeviendrait nécessaire.
+    // Ce fichier de tests s'exécute depuis la racine du dépôt (cf. `npm test`), donc
+    // pas de `cwd` à passer : les autres lectures de fichiers y sont déjà relatives.
+    const importee = execSync("grep -rl '@stripe/stripe-js' src/ || true").toString().trim();
+    assert.equal(importee, "", `@stripe/stripe-js est désormais importé (${importee}) : la clé publiable redevient nécessaire`);
   }
 });
 test("l'abonnement n'est jamais accordé depuis le navigateur", () => {
