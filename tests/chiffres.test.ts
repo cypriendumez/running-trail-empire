@@ -356,6 +356,13 @@ test("la page « notre histoire » ne contient aucun chiffre invérifiable", () 
   // documentation — le projet s'est déjà fait prendre deux fois.
   const sansCom = src.replace(/\/\*[\s\S]*?\*\//g, " ").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
   assert.ok(!/1\s?h\s?15/.test(sansCom), "« 1 h 15 » est revenu : ce chrono n'existe pas dans les données synchronisées");
+  // ⚠️ ET LE PREMIER 10 KM VAUT 39:13, PAS 39:23. Cyprien a corrigé le chiffre après la
+  // première rédaction. Le récit l'écrit en toutes lettres (« 39 minutes 13 ») et le
+  // bloc de chiffres en abrégé (« 39:13 ») : vérifier une seule des deux formes laissait
+  // l'autre dériver — la mutation « l'ancien chrono revient » restait verte.
+  assert.ok(!/39:23|39 [A-Za-zéÀ-ÿ]+ 23/.test(sansCom), "l'ancien chrono 39:23 est revenu");
+  const prose = (sansCom.match(/39 [A-Za-zéÀ-ÿ]+ 13/g) ?? []).length;
+  assert.equal(prose, 5, `le chrono en toutes lettres apparaît ${prose} fois au lieu de 5`);
   // Les cinq langues doivent porter les MÊMES chiffres : une traduction qui arrondit
   // « 2 786 » en « près de 3 000 » créerait deux vérités selon la langue du visiteur.
   //
@@ -364,13 +371,53 @@ test("la page « notre histoire » ne contient aucun chiffre invérifiable", () 
   // qui cite les mêmes chiffres pour les justifier ; et un seuil `>= 5` restait vert
   // quand une langue arrondissait « 2 786 » en « près de 3 000 », puisqu'il restait
   // encore assez d'occurrences ailleurs. Cinq langues, cinq occurrences, pas quatre.
-  for (const c of ["33:58", "39:23", "268"]) {
+  for (const c of ["33:58", "39:13", "268"]) {
     const n = (sansCom.match(new RegExp(c, "g")) ?? []).length;
     assert.equal(n, 5, `« ${c} » apparaît ${n} fois au lieu de 5 : une langue l'a perdu ou modifié`);
   }
   // Le kilométrage s'écrit avec des séparateurs différents selon la langue.
   const km = (sansCom.match(/2[  ,]?786/g) ?? []).length;
   assert.equal(km, 5, `le kilométrage apparaît ${km} fois au lieu de 5 : une langue l'a arrondi`);
+});
+test("le crédit du photographe ne peut pas disparaître avec la photo", () => {
+  // ⚠️ CYPRIEN AVAIT DEMANDÉ DE ROGNER LA SIGNATURE du photographe. Le droit d'auteur
+  // sur une photographie appartient au PHOTOGRAPHE, pas au coureur qui y figure, et le
+  // droit de paternité est inaliénable en droit français : effacer la signature est une
+  // atteinte distincte de la simple reproduction. On affiche donc le crédit à la place.
+  //
+  // Ce test existe pour qu'un futur « nettoyage » de la mise en page ne le fasse pas
+  // sauter en même temps que le recadrage : la photo et son crédit vivent ensemble.
+  const page = readFileSync(join(ROOT, "src/app/notre-histoire/page.tsx"), "utf8");
+  assert.match(page, /François Pix/, "le crédit du photographe a disparu de la page");
+  assert.match(page, /<figcaption/, "le crédit doit être dans le flux, pas incrusté sur l'image");
+  // ⚠️ ET LA PHOTO NE DOIT PAS ÊTRE RENDUE SANS VÉRIFIER QU'ELLE EXISTE : un `<img>` vers
+  // un fichier absent affiche une image cassée en production sans qu'aucune erreur ne
+  // remonte. Le projet a déjà eu ce défaut sur les logos de marques.
+  assert.match(page, /existsSync\(/, "la page rendrait un <img> même si le fichier est absent");
+});
+test("le Tour du Mont-Blanc est annoncé pour ce qu'il est : une randonnée", () => {
+  // ⚠️ LE MOT « RANDONNÉE » N'EST PAS NÉGOCIABLE. Les cinq journées de juillet 2025 sont
+  // enregistrées en type `Hike` dans intervals.icu, pas `Run`. Écrire « j'ai fait le
+  // TMB » sur un site de course serait lu par n'importe quel coureur comme l'ultra-trail
+  // de 170 km — un malentendu qui se retourne à la première vérification. Le trek se
+  // défend seul : 6 087 m de dénivelé en cinq jours n'ont pas besoin d'emprunter le
+  // prestige d'une course qui n'a pas été courue.
+  const src = readFileSync(join(ROOT, "src/app/notre-histoire/histoireI18n.ts"), "utf8");
+  const sansCom2 = src.replace(/\/\*[\s\S]*?\*\//g, " ").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
+  // Chaque langue doit qualifier la marche, avec son propre mot.
+  const motMarche = ["en randonnée", "walked", "erwandert", "caminando", "a caminhar"];
+  for (const m of motMarche) {
+    assert.ok(sansCom2.includes(m), `aucune mention de marche en une langue (« ${m} » attendu)`);
+  }
+  // Et les chiffres du trek. ⚠️ COMPTES EXACTS, pas des seuils : chaque valeur apparaît
+  // DEUX fois par langue (une fois dans le récit, une fois dans le bloc de chiffres) pour
+  // le dénivelé, et une ou deux fois pour le kilométrage. Un `>= 5` restait vert quand
+  // une langue remplaçait « 6 087 m » par « beaucoup de dénivelé » — il restait assez
+  // d'occurrences ailleurs. C'est la troisième fois que ce seuil me piège dans ce projet.
+  const dp = (sansCom2.match(/6[  ,]?087/g) ?? []).length;
+  assert.equal(dp, 10, `le dénivelé du TMB apparaît ${dp} fois au lieu de 10 (2 × 5 langues) : une langue l'a perdu`);
+  const km = (sansCom2.match(/83\s?(?:km|kilom)/g) ?? []).length;
+  assert.equal(km, 7, `le kilométrage du TMB apparaît ${km} fois au lieu de 7 : une langue l'a perdu`);
 });
 test("la page « notre histoire » est atteignable depuis les deux barres de navigation", () => {
   // ⚠️ LE SITE A DEUX EN-TÊTES DISTINCTS, et c'est le piège de cette page : la landing

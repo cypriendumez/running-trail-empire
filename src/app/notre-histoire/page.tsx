@@ -6,7 +6,13 @@ import { SiteFooter } from "@/components/layout/SiteFooter";
 import { Container, Section } from "@/components/ui/Container";
 import { btnClass } from "@/components/ui/Button";
 import { getPublicLang } from "@/lib/i18n/serverLang";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { HISTOIRE } from "./histoireI18n";
+
+/** Le portrait, s'il est réellement présent dans `public/`. Voir l'avertissement ci-dessus. */
+const PHOTO = "/cyprien-course.jpg";
+const CREDIT_PHOTO = "Photo © François Pix";
 
 export async function generateMetadata(): Promise<Metadata> {
   const H = HISTOIRE[await getPublicLang()] ?? HISTOIRE.fr;
@@ -21,16 +27,22 @@ export async function generateMetadata(): Promise<Metadata> {
  * sur le parcours du fondateur comme PREUVE et non comme sujet. Elle reste donc vraie,
  * et publiable, après la vente.
  *
- * ⚠️ PAS DE PHOTO POUR L'INSTANT, ET C'EST VOLONTAIRE. La seule disponible est un
- * cliché de course signé par un photographe professionnel (« François Pix »). Le droit
- * d'auteur sur la photographie appartient au photographe, pas au coureur qui y figure,
- * et le droit de paternité est inaliénable en droit français : retirer la signature
- * serait une atteinte distincte de la simple reproduction. La mise en page ci-dessous
- * est conçue pour tenir SANS portrait, et pour en accueillir un le jour où Cyprien
- * dispose d'un cliché dont il détient les droits.
+ * ⚠️ LA PHOTO PORTE SON CRÉDIT, ET CE CRÉDIT NE SE RETIRE PAS. Le cliché est signé par
+ * un photographe professionnel. Le droit d'auteur sur une photographie appartient au
+ * PHOTOGRAPHE, pas au coureur qui y figure, et le droit de paternité est inaliénable en
+ * droit français : effacer la signature serait une atteinte distincte de la simple
+ * reproduction. Cyprien avait demandé de la rogner ; on affiche la mention à la place,
+ * ce qui est l'usage normal pour une photo de course et reste plus élégant qu'un
+ * recadrage suspect. Ne pas « nettoyer » cette ligne.
+ *
+ * ⚠️ ET LE FICHIER EST FACULTATIF, à dessein. Un `<img>` vers un fichier absent affiche
+ * une image cassée en production sans qu'aucune erreur ne remonte — le projet a déjà un
+ * test pour ce défaut sur les logos de marques. Ici on VÉRIFIE l'existence au rendu : si
+ * le fichier n'est pas là, la page se referme proprement sur ses chiffres.
  */
 export default async function NotreHistoirePage() {
   const H = HISTOIRE[await getPublicLang()] ?? HISTOIRE.fr;
+  const aLaPhoto = existsSync(join(process.cwd(), "public", PHOTO.replace(/^\//, "")));
 
   return (
     <div className="min-h-screen bg-white">
@@ -44,6 +56,21 @@ export default async function NotreHistoirePage() {
             <span className="text-emerald-600">{H.accent}</span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-center text-lg leading-relaxed text-zinc-500">{H.chapo}</p>
+
+          {aLaPhoto && (
+            <figure className="mx-auto mt-12 max-w-3xl">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={PHOTO}
+                alt=""
+                className="aspect-[16/9] w-full rounded-3xl object-cover ring-1 ring-inset ring-zinc-200"
+                loading="eager"
+              />
+              {/* Le crédit est DANS le flux, pas incrusté sur l'image : il reste lisible,
+                  copiable, et ne dépend pas du chargement du fichier. */}
+              <figcaption className="mt-3 text-center text-xs text-zinc-400">{CREDIT_PHOTO}</figcaption>
+            </figure>
+          )}
         </Container>
       </Section>
 
