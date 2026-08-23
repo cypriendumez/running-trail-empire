@@ -112,9 +112,6 @@ export default async function NotreHistoirePage() {
                 </div>
               ))}
             </div>
-            <p className="mt-8 border-t border-zinc-200 pt-5 text-center text-xs leading-relaxed text-zinc-400 sm:text-left">
-              {H.chiffresNote}
-            </p>
           </div>
         </Container>
       </Section>

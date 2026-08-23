@@ -379,6 +379,34 @@ test("la page « notre histoire » ne contient aucun chiffre invérifiable", () 
   const km = (sansCom.match(/2[  ,]?786/g) ?? []).length;
   assert.equal(km, 5, `le kilométrage apparaît ${km} fois au lieu de 5 : une langue l'a arrondi`);
 });
+test("la page dit POURQUOI l'application existe, pas seulement qu'elle existe", () => {
+  // ⚠️ C'EST LE CŒUR ARGUMENTAIRE DE LA PAGE, et il n'était couvert par aucun test :
+  // la mutation « le premier marathon n'est plus dit » restait verte alors qu'elle
+  // vidait le récit de sa raison d'être.
+  //
+  // Le fil est en trois temps, et chacun doit survivre à une relecture : pas de club
+  // donc PAS D'ENTRAÎNEUR, l'envie de progresser quand même, et un PREMIER marathon qui
+  // demande des séances précises là où la théorie générale ne suffit plus. Sans ces
+  // trois-là, il ne reste qu'un parcours de coureur — sympathique, mais qui n'explique
+  // rien du produit, et qui ne survivrait pas à la vente du site.
+  const src = readFileSync(join(ROOT, "src/app/notre-histoire/histoireI18n.ts"), "utf8");
+  const sansCom3 = src.replace(/\/\*[\s\S]*?\*\//g, " ").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
+
+  // ⚠️ COMPTES EXACTS, encore. « premier marathon » apparaît DEUX fois par langue : dans
+  // le repère de l'étape ET dans la phrase qui l'explique. Un simple `includes` restait
+  // vert quand la mutation vidait la phrase, puisque le repère subsistait. C'est la
+  // quatrième fois que ce motif me piège : un `includes` ne prouve rien dès qu'une chaîne
+  // apparaît plus d'une fois.
+  const compte = (s: string) => (sansCom3.match(new RegExp(s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) ?? []).length;
+  const premierMarathon = { fr: "premier marathon", en: "first marathon", de: "erster Marathon", es: "primer maratón", pt: "primeira maratona" };
+  for (const [lg, m] of Object.entries(premierMarathon)) {
+    assert.equal(compte(m), 2, `${lg} : « ${m} » apparaît ${compte(m)} fois au lieu de 2 (le repère ET la phrase)`);
+  }
+  const sansCoach = { fr: "pas d'entraîneur", en: "no coach", de: "kein Trainer", es: "no hay entrenador", pt: "não há treinador" };
+  for (const [lg, m] of Object.entries(sansCoach)) {
+    assert.ok(compte(m) >= 1, `${lg} : l'absence d'entraîneur n'est plus dite (« ${m} » attendu)`);
+  }
+});
 test("le crédit du photographe ne peut pas disparaître avec la photo", () => {
   // ⚠️ CYPRIEN AVAIT DEMANDÉ DE ROGNER LA SIGNATURE du photographe. Le droit d'auteur
   // sur une photographie appartient au PHOTOGRAPHE, pas au coureur qui y figure, et le
@@ -405,19 +433,32 @@ test("le Tour du Mont-Blanc est annoncé pour ce qu'il est : une randonnée", ()
   const src = readFileSync(join(ROOT, "src/app/notre-histoire/histoireI18n.ts"), "utf8");
   const sansCom2 = src.replace(/\/\*[\s\S]*?\*\//g, " ").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
   // Chaque langue doit qualifier la marche, avec son propre mot.
-  const motMarche = ["en randonnée", "walked", "erwandert", "caminando", "a caminhar"];
-  for (const m of motMarche) {
-    assert.ok(sansCom2.includes(m), `aucune mention de marche en une langue (« ${m} » attendu)`);
+  // Chaque langue doit dire que le tour s'est fait À PIED, avec son propre mot. Un test
+  // qui chercherait un seul terme ne tiendrait que par la parenté des langues latines et
+  // laisserait passer l'allemand — c'est l'erreur déjà commise sur la désinscription.
+  const motMarche = { fr: "à pied", en: "walked", de: "erwandert", es: "caminando", pt: "a caminhar" };
+  for (const [lg, m] of Object.entries(motMarche)) {
+    assert.ok(sansCom2.includes(m), `${lg} : le TMB n'est pas annoncé comme fait à pied (« ${m} » attendu)`);
   }
-  // Et les chiffres du trek. ⚠️ COMPTES EXACTS, pas des seuils : chaque valeur apparaît
-  // DEUX fois par langue (une fois dans le récit, une fois dans le bloc de chiffres) pour
-  // le dénivelé, et une ou deux fois pour le kilométrage. Un `>= 5` restait vert quand
-  // une langue remplaçait « 6 087 m » par « beaucoup de dénivelé » — il restait assez
-  // d'occurrences ailleurs. C'est la troisième fois que ce seuil me piège dans ce projet.
-  const dp = (sansCom2.match(/6[  ,]?087/g) ?? []).length;
-  assert.equal(dp, 10, `le dénivelé du TMB apparaît ${dp} fois au lieu de 10 (2 × 5 langues) : une langue l'a perdu`);
-  const km = (sansCom2.match(/83\s?(?:km|kilom)/g) ?? []).length;
-  assert.equal(km, 7, `le kilométrage du TMB apparaît ${km} fois au lieu de 7 : une langue l'a perdu`);
+  // ⚠️ ET SURTOUT : AUCUN CHIFFRE DE DISTANCE OU DE DÉNIVELÉ SUR LE TMB.
+  //
+  // La première version affichait « 83 km, D+6 087 m » — le total des journées
+  // ENREGISTRÉES. Cyprien a précisé qu'il avait fait le tour ENTIER sans tout
+  // enregistrer : le chiffre sous-estimait donc la réalité tout en ayant l'air d'une
+  // mesure exacte. Le pire des deux mondes, et exactement le genre de chiffre qu'un
+  // acheteur recoupe.
+  //
+  // On ne le remplace pas non plus par les ~170 km du tour officiel : ce serait une
+  // donnée d'ITINÉRAIRE présentée comme une mesure personnelle. Ce qui est attesté par
+  // ses propres traces GPS, ce sont les trois pays traversés — et c'est tout.
+  assert.ok(!/6[  ,]?087/.test(sansCom2), "le dénivelé partiel du TMB est revenu : il sous-estime un tour fait en entier");
+  assert.ok(!/83\s?(?:km|kilom)/.test(sansCom2), "le kilométrage partiel du TMB est revenu");
+  assert.ok(!/170\s?(?:km|kilom)/.test(sansCom2), "les 170 km du tour officiel ne sont pas une mesure personnelle");
+  // Les trois pays, eux, sont attestés : Saint-Gervais, Courmayeur, Orsières.
+  for (const lieu of ["Saint-Gervais", "Courmayeur", "Orsières"]) {
+    const n = (sansCom2.match(new RegExp(lieu, "g")) ?? []).length;
+    assert.equal(n, 5, `« ${lieu} » apparaît ${n} fois au lieu de 5 : une langue a perdu l'itinéraire attesté`);
+  }
 });
 test("la page « notre histoire » est atteignable depuis les deux barres de navigation", () => {
   // ⚠️ LE SITE A DEUX EN-TÊTES DISTINCTS, et c'est le piège de cette page : la landing
