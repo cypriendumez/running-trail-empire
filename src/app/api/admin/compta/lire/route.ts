@@ -3,8 +3,7 @@ export const runtime = "nodejs";
 export const maxDuration = 30;
 
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { estAdmin } from "@/lib/admin/acces";
+import { estAdmin, gardeAdmin } from "@/lib/admin/acces";
 import { generateContent } from "@/lib/ai/gemini";
 import { CONSIGNE_LECTURE, interpreterLecture, jsonDeLaReponse } from "@/lib/compta/lecture";
 import { validerFichier, TYPES_OK } from "@/lib/compta/pieces";
@@ -21,9 +20,7 @@ import { validerFichier, TYPES_OK } from "@/lib/compta/pieces";
  * endroit, un seul contrôle d'accès.
  */
 export async function POST(req: Request) {
-  const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
-  if (!estAdmin(user?.email)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await gardeAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const form = await req.formData().catch(() => null);
   const fichier = form?.get("fichier");

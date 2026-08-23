@@ -22,6 +22,16 @@ export type Categorie = {
   sens: Sens;
   /** Charge qui revient chaque mois : sert à projeter les frais fixes annuels. */
   recurrenteParDefaut?: boolean;
+  /**
+   * Mouvement de TRÉSORERIE qui n'est ni une recette ni une charge.
+   *
+   * ⚠️ METTRE SON PROPRE ARGENT DANS L'ENTREPRISE N'EST PAS UN CHIFFRE D'AFFAIRES. Traité
+   * comme une recette, un apport de 500 € gonflerait le CA déclaré, ferait payer des
+   * cotisations sur de l'argent déjà gagné ailleurs, et rapprocherait d'un plafond sans
+   * qu'un seul euro ait été facturé. Symétriquement, se verser de l'argent n'est pas une
+   * charge déductible. Ces lignes bougent la trésorerie, et RIEN d'autre.
+   */
+  horsResultat?: boolean;
 };
 
 /** Les postes d'un éditeur d'application. Ordre = ordre d'affichage. */
@@ -33,6 +43,7 @@ export const CATEGORIES: Categorie[] = [
   { id: "partenariats", label: "Partenariats & publicité", sens: "entree" },
   { id: "aides", label: "Aides & subventions", sens: "entree" },
   { id: "remboursements", label: "Remboursements reçus", sens: "entree" },
+  { id: "apport", label: "Apport personnel (argent que tu mets)", sens: "entree", horsResultat: true },
   { id: "autre_entree", label: "Autre recette", sens: "entree" },
   // — Sorties —
   { id: "hebergement", label: "Hébergement & infrastructure", sens: "sortie", recurrenteParDefaut: true },
@@ -48,10 +59,15 @@ export const CATEGORIES: Categorie[] = [
   { id: "cotisations", label: "Cotisations sociales", sens: "sortie" },
   { id: "impots", label: "Impôts & taxes", sens: "sortie" },
   { id: "deplacements", label: "Déplacements", sens: "sortie" },
+  { id: "retrait", label: "Retrait personnel (argent que tu sors)", sens: "sortie", horsResultat: true },
   { id: "autre_sortie", label: "Autre dépense", sens: "sortie" },
 ];
 
 export const categorieDe = (id: string): Categorie | undefined => CATEGORIES.find((c) => c.id === id);
+
+/** Une écriture qui déplace de la trésorerie sans être ni recette ni charge. */
+export const horsResultat = (e: Pick<Ecriture, "categorie">): boolean =>
+  Boolean(categorieDe(e.categorie)?.horsResultat);
 
 export const MOYENS = ["Carte", "Virement", "Prélèvement", "Stripe", "Espèces", "Autre"] as const;
 export type Moyen = (typeof MOYENS)[number];
@@ -212,6 +228,10 @@ export type Totaux = {
   chargesFixesMensuellesCents: number;
   nbEcritures: number;
   nbAnnulees: number;
+  /** Argent personnel mis dans l'entreprise — hors résultat, hors CA, hors cotisations. */
+  apportsCents: number;
+  /** Argent sorti pour soi — hors résultat, non déductible. */
+  retraitsCents: number;
 };
 
 /** Part de TVA contenue dans un montant TTC, en centimes. */
@@ -231,7 +251,15 @@ export function totaux(ecritures: Ecriture[]): Totaux {
   const parMois = new Map<string, { e: number; s: number }>();
   let entrees = 0, sorties = 0, tvaC = 0, tvaD = 0, fixes = 0;
 
+  let apports = 0, retraits = 0;
   for (const e of vives) {
+    // ⚠️ Écarté de TOUT ce qui touche au résultat : totaux, ventilation par mois, par
+    // poste, TVA. Un apport n'est pas un chiffre d'affaires, et il ne doit apparaître
+    // nulle part comme tel.
+    if (horsResultat(e)) {
+      if (e.sens === "entree") apports += e.montantCents; else retraits += e.montantCents;
+      continue;
+    }
     const m = e.date.slice(0, 7);
     const acc = parMois.get(m) ?? { e: 0, s: 0 };
     if (e.sens === "entree") {
@@ -264,6 +292,8 @@ export function totaux(ecritures: Ecriture[]): Totaux {
     chargesFixesMensuellesCents: derniereOccurrence(vives),
     nbEcritures: vives.length,
     nbAnnulees: ecritures.length - vives.length,
+    apportsCents: apports,
+    retraitsCents: retraits,
   };
   function derniereOccurrence(list: Ecriture[]): number {
     const vue = new Map<string, { date: string; cents: number }>();
@@ -314,7 +344,8 @@ export function cotisations(ecritures: Ecriture[], r: Reglages, aujourdhui = new
   const fin = r.acreJusquau && /^\d{4}-\d{2}-\d{2}$/.test(r.acreJusquau) ? r.acreJusquau : null;
   let avant = 0, apres = 0;
   for (const e of ecritures) {
-    if (e.annulee || e.sens !== "entree") continue;
+    // Un apport n'est pas une recette : cotiser dessus serait payer sur son propre argent.
+    if (e.annulee || e.sens !== "entree" || horsResultat(e)) continue;
     if (fin && e.date > fin) apres += e.montantCents; else avant += e.montantCents;
   }
 
@@ -443,7 +474,7 @@ export function doublonsProbables(nouvelle: Partial<Ecriture>, existantes: Ecrit
 export function parTrimestre(ecritures: Ecriture[]): { periode: string; recettesCents: number; depensesCents: number }[] {
   const m = new Map<string, { r: number; d: number }>();
   for (const e of ecritures) {
-    if (e.annulee) continue;
+    if (e.annulee || horsResultat(e)) continue;
     const t = `${e.date.slice(0, 4)}-T${Math.floor((Number(e.date.slice(5, 7)) - 1) / 3) + 1}`;
     const acc = m.get(t) ?? { r: 0, d: 0 };
     if (e.sens === "entree") acc.r += e.montantCents; else acc.d += e.montantCents;
@@ -499,7 +530,8 @@ export function versLivreRecettes(ecritures: Ecriture[]): string {
   const num = numeroter(ecritures);
   const entete = ["N°", "Date", "Référence de la pièce", "Client", "Nature", "Montant (€)", "Mode de règlement", "Annulée"];
   const lignes = ecritures
-    .filter((e) => e.sens === "entree")
+    // ⚠️ Un apport personnel n'a rien à faire dans un livre des RECETTES.
+    .filter((e) => e.sens === "entree" && !horsResultat(e))
     .sort((a, b) => (num.get(a.id) ?? 0) - (num.get(b.id) ?? 0))
     .map((e) => [
       String(num.get(e.id) ?? ""),

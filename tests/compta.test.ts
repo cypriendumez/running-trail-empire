@@ -17,6 +17,7 @@ import {
 import { ecrituresDeLEvenement, dateParis, type EvenementStripe } from "../src/lib/compta/stripe";
 import { validerFichier, cheminDe, cheminAppartientA, BUCKET, TAILLE_MAX } from "../src/lib/compta/pieces";
 import { interpreterLecture, jsonDeLaReponse, CONSIGNE_LECTURE } from "../src/lib/compta/lecture";
+import { aalDuJeton } from "../src/lib/admin/mfa";
 
 const ROOT = join(__dirname, "..");
 let passed = 0;
@@ -166,6 +167,38 @@ test("aucun taux ni seuil légal n'est écrit en dur dans le code", () => {
       assert.ok(!re.test(src), `${f} contient un taux ou un seuil légal en dur : ${re}`);
     }
   }
+});
+
+test("mettre son propre argent dans l'entreprise n'est PAS un chiffre d'affaires", () => {
+  // ⚠️ LE DÉFAUT LE PLUS COÛTEUX DE CET ÉCRAN S'IL AVAIT ÉTÉ MANQUÉ. Un apport traité
+  // comme une recette gonfle le CA déclaré, fait payer des cotisations sur de l'argent
+  // déjà gagné ailleurs, et rapproche d'un plafond sans qu'un euro ait été facturé.
+  const liste = [
+    ecr({ date: "2026-01-10", sens: "entree", categorie: "abonnements", montantCents: 10000 }),
+    ecr({ date: "2026-01-11", sens: "entree", categorie: "apport", montantCents: 50000 }),
+    ecr({ date: "2026-01-12", sens: "sortie", categorie: "retrait", montantCents: 20000 }),
+    ecr({ date: "2026-01-13", sens: "sortie", categorie: "hebergement", montantCents: 2000 }),
+  ];
+  const t = totaux(liste);
+  assert.equal(t.entreesCents, 10000, "l'apport est compté comme une recette");
+  assert.equal(t.sortiesCents, 2000, "le retrait est compté comme une charge");
+  assert.equal(t.resultatCents, 8000);
+  assert.equal(t.apportsCents, 50000);
+  assert.equal(t.retraitsCents, 20000);
+  // Il ne doit apparaître NULLE PART comme recette : ni par poste, ni par mois.
+  assert.equal(t.parCategorie.find((c) => c.id === "apport"), undefined);
+  assert.equal(t.parMois[0].entreesCents, 10000);
+
+  // Ni dans l'assiette des cotisations : ce serait cotiser sur son propre argent.
+  assert.equal(cotisations(liste, { tauxCotisations: 10 }).totalCents, 1000);
+  // Ni dans les trimestres, qui servent à déclarer.
+  assert.equal(parTrimestre(liste)[0].recettesCents, 10000);
+  // Ni dans le livre des RECETTES.
+  assert.ok(!versLivreRecettes(liste).includes("Apport"), "un apport figure dans le livre des recettes");
+
+  // Mais la TRÉSORERIE, elle, les compte : l'argent a bien bougé.
+  const s2 = soldeCumule(liste, 0);
+  assert.equal(s2[s2.length - 1].soldeCents, 10000 + 50000 - 20000 - 2000);
 });
 
 test("le taux réduit ACRE ne déborde pas sur la période suivante", () => {
@@ -632,6 +665,54 @@ test("la lecture ne peut rien enregistrer", () => {
   assert.ok(!/storage\.from\([^)]*\)\.upload/.test(src), "la route de lecture conserve l'image");
   assert.match(src, /thinkingBudget: 0/, "le budget de réflexion se facture comme de la sortie");
   assert.match(src, /temperature: 0\b/, "une température non nulle sur un montant");
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Second facteur
+// ─────────────────────────────────────────────────────────────────────────────
+
+const jeton = (charge: object) =>
+  "x." + Buffer.from(JSON.stringify(charge)).toString("base64url") + ".y";
+
+test("le niveau d'authentification se lit dans le jeton, sans le croire sur parole", () => {
+  assert.equal(aalDuJeton(jeton({ aal: "aal2" })), "aal2");
+  assert.equal(aalDuJeton(jeton({ aal: "aal1" })), "aal1");
+  // ⚠️ Une valeur inattendue ne vaut PAS « aal2 ». Un jeton sans revendication, ou avec
+  // une valeur inconnue, doit fermer la porte — pas l'ouvrir par défaut.
+  assert.equal(aalDuJeton(jeton({})), null);
+  assert.equal(aalDuJeton(jeton({ aal: "aal3" })), null);
+  assert.equal(aalDuJeton("pas-un-jeton"), null);
+  assert.equal(aalDuJeton(null), null);
+  assert.equal(aalDuJeton("a.b"), null);
+});
+
+test("le second facteur protège les ROUTES autant que les pages", () => {
+  // ⚠️ Une porte verrouillée à côté d'une fenêtre ouverte ne protège rien : les routes
+  // d'API s'appellent directement, et une session restée ouverte sur une machine tierce
+  // ouvrirait les factures sans jamais croiser l'écran qui réclame le code.
+  for (const f of [
+    "src/app/api/admin/compta/route.ts",
+    "src/app/api/admin/compta/piece/route.ts",
+    "src/app/api/admin/compta/lire/route.ts",
+  ]) {
+    const src = codeSeul(f);
+    assert.match(src, /await gardeAdmin\(\)/, `${f} ne vérifie pas le second facteur`);
+  }
+  // Et la garde doit vraiment enchaîner les deux contrôles.
+  const garde = codeSeul("src/lib/admin/acces.ts");
+  assert.match(garde, /estAdmin\(user\?\.email\)/, "la garde ne vérifie plus l'adresse");
+  assert.match(garde, /mfa\.ouvert/, "la garde ne vérifie plus le second facteur");
+});
+
+test("personne ne peut être enfermé dehors de son propre espace", () => {
+  // ⚠️ Exiger un code à quelqu'un qui n'en a jamais configuré le mettrait dehors sans
+  // recours. Tant qu'aucun facteur vérifié n'existe, l'accès reste ouvert — l'écran
+  // insiste, il ne bloque pas.
+  const src = codeSeul("src/lib/admin/mfa.ts");
+  assert.match(src, /ouvert: !configure \|\| niveau === "aal2"/, "la règle d'ouverture a changé");
+  // Et une panne de lecture des facteurs ne doit pas verrouiller : le mot de passe
+  // reste exigé de toute façon.
+  assert.match(src, /catch \{[\s\S]{0,400}ouvert: true/, "une panne passagère enferme l'éditeur dehors");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

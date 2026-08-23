@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { estAdmin } from "@/lib/admin/acces";
+import { estAdmin, gardeAdmin } from "@/lib/admin/acces";
 import { valider, type Ecriture, type Reglages, MOYENS } from "@/lib/compta/model";
 import { idEditeur } from "@/lib/compta/enregistrer";
 
@@ -40,9 +40,8 @@ const TYPE_REGLAGES = "compta_reglages";
  * La comptabilité appartient à l'ENTREPRISE : `idEditeur()` désigne toujours le même.
  */
 async function admin(): Promise<{ id: string } | null> {
-  const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
-  if (!estAdmin(user?.email)) return null;
+  // Adresse autorisée ET second facteur présenté — la même exigence que pour les pages.
+  if (!(await gardeAdmin())) return null;
   const id = await idEditeur();
   return id ? { id } : null;
 }

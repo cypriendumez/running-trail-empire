@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { estAdmin } from "@/lib/admin/acces";
+import { estAdmin, gardeAdmin } from "@/lib/admin/acces";
 import { idEditeur } from "@/lib/compta/enregistrer";
 import { BUCKET, validerFichier, cheminDe, cheminAppartientA } from "@/lib/compta/pieces";
 
@@ -20,9 +20,7 @@ import { BUCKET, validerFichier, cheminDe, cheminAppartientA } from "@/lib/compt
  */
 
 async function editeur(): Promise<string | null> {
-  const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
-  if (!estAdmin(user?.email)) return null;
+  if (!(await gardeAdmin())) return null;
   return idEditeur();
 }
 
@@ -76,9 +74,8 @@ export async function POST(req: Request) {
  * « est-ce que quelqu'un a vu mes factures ? » n'a alors aucune réponse possible.
  */
 export async function GET(req: Request) {
-  const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
-  if (!estAdmin(user?.email)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const qui = await gardeAdmin();
+  if (!qui) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const id = await idEditeur();
   if (!id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -97,7 +94,7 @@ export async function GET(req: Request) {
     await admin.from("notifications").insert({
       user_id: id, type: "compta_acces", title: "Consultation d'une pièce", read: true,
       data: {
-        chemin, par: user?.email ?? "?", le: new Date().toISOString(),
+        chemin, par: qui.email, le: new Date().toISOString(),
         ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
         appareil: (req.headers.get("user-agent") ?? "").slice(0, 200),
       },

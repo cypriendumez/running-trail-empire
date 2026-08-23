@@ -127,7 +127,10 @@ export function ComptaClient() {
   }, [b.date, b.libelle, b.montant, b.sens, ecritures]);
   const cot = useMemo(() => cotisations(duPerimetre, reglages), [duPerimetre, reglages]);
   const cotis = cot.totalCents;
-  const tresorerie = (reglages.soldeInitialCents ?? 0) + t.resultatCents;
+  // ⚠️ La trésorerie N'EST PAS le résultat. Elle compte aussi l'argent personnel mis dans
+  // l'entreprise et celui qu'on en sort — deux mouvements qui ne sont ni des recettes ni
+  // des charges, mais qui déplacent bien de l'argent.
+  const tresorerie = (reglages.soldeInitialCents ?? 0) + t.resultatCents + t.apportsCents - t.retraitsCents;
 
   /** Périmètre du TABLEAU : les filtres d'affichage s'ajoutent au périmètre de calcul. */
   const listees = useMemo(() => {
@@ -490,6 +493,19 @@ export function ComptaClient() {
             <label className="block lg:col-span-2"><span className="text-xs font-semibold text-zinc-500">Note (facultatif)</span>
               <input value={b.note} onChange={(e) => setB({ ...b, note: e.target.value })}
                 className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm" /></label>
+            {/* ⚠️ Dit AU MOMENT DU CHOIX pourquoi cette ligne ne comptera pas dans le CA.
+                Le découvrir plus tard, en constatant que le chiffre d'affaires n'a pas
+                bougé, ferait douter du calcul plutôt que comprendre la règle. */}
+            {categorieDe(b.categorie)?.horsResultat && (
+              <p className="sm:col-span-2 lg:col-span-4 flex items-start gap-2 rounded-xl bg-blue-50 p-3 text-xs text-blue-800">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>
+                  Cette ligne bouge la <b>trésorerie</b> et rien d'autre : ni chiffre d'affaires, ni charge, ni
+                  cotisations. Ton propre argent n'est pas une recette — le compter comme telle te ferait cotiser
+                  dessus et te rapprocherait d'un plafond sans qu'un euro ait été facturé.
+                </span>
+              </p>
+            )}
             {b.sens === "sortie" && (
               <label className="flex items-center gap-2 self-end pb-2">
                 <input type="checkbox" checked={b.recurrente} onChange={(e) => setB({ ...b, recurrente: e.target.checked })}
@@ -596,8 +612,16 @@ export function ComptaClient() {
             ecart={<Ecart actuel={t.entreesCents} precedent={precedent?.entreesCents} annee={annee} />} />
           <Carte titre="Dépenses" valeur={euros(t.sortiesCents)} icone={<TrendingDown className="w-4 h-4 text-rose-600" />} fond="bg-rose-50"
             ecart={<Ecart actuel={t.sortiesCents} precedent={precedent?.sortiesCents} annee={annee} inverse />} />
-          <Carte titre="Trésorerie" valeur={euros(tresorerie)} icone={<Wallet className="w-4 h-4 text-blue-600" />} fond="bg-blue-50"
-            sous={reglages.soldeInitialCents ? `dont ${euros(reglages.soldeInitialCents)} de départ` : "solde de départ non renseigné"} />
+          {/* La carte OUVRE le réglage : « solde de départ non renseigné » sans moyen de
+              le renseigner depuis là est un constat qui ne mène à rien. */}
+          <button onClick={() => setReglagesOuverts(true)} className="text-left">
+            <Carte titre="Trésorerie" valeur={euros(tresorerie)} icone={<Wallet className="w-4 h-4 text-blue-600" />} fond="bg-blue-50"
+              sous={[
+                reglages.soldeInitialCents ? `${euros(reglages.soldeInitialCents)} de départ` : "solde de départ à renseigner →",
+                t.apportsCents ? `+${euros(t.apportsCents)} d'apports` : "",
+                t.retraitsCents ? `−${euros(t.retraitsCents)} de retraits` : "",
+              ].filter(Boolean).join(" · ")} />
+          </button>
         </div>
       </div>
 

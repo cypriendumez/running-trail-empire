@@ -440,10 +440,25 @@ test("toute route d'administration est protégée", () => {
   if (!existsSync(dir)) return;
   const unguarded: string[] = [];
   const recopies: string[] = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    const f = join(dir, entry.name, "route.ts");
-    if (!existsSync(f)) continue;
+  // ⚠️ ET ON DESCEND DANS LES SOUS-DOSSIERS. Cette boucle ne regardait QUE le premier
+  // niveau : `api/admin/compta/piece` et `api/admin/compta/lire` — l'une sert les
+  // factures des clients, l'autre appelle un service d'IA — n'ont jamais été contrôlées
+  // par ce test. Trouvé en mutant : retirer la garde de `lire` ne l'a pas fait rougir.
+  // Une garde qui s'arrête à un niveau de profondeur ment exactement comme une garde qui
+  // s'arrête à un dossier.
+  const routes: { nom: string; f: string }[] = [];
+  const parcourir = (d: string, prefixe: string) => {
+    for (const entry of readdirSync(d, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const sousDir = join(d, entry.name);
+      const nom = prefixe ? `${prefixe}/${entry.name}` : entry.name;
+      if (existsSync(join(sousDir, "route.ts"))) routes.push({ nom, f: join(sousDir, "route.ts") });
+      parcourir(sousDir, nom);
+    }
+  };
+  parcourir(dir, "");
+  for (const entry of routes.map((r) => ({ name: r.nom, chemin: r.f }))) {
+    const f = entry.chemin;
     // ⚠️ ON RETIRE LES LIGNES D'IMPORT AVANT DE CHERCHER. Sans ça, le test se contente
     // de l'IMPORT du garde : retirer l'appel `estAdmin(user?.email)` en laissant
     // `import { estAdmin }` laissait le test VERT sur une route grande ouverte. Vérifié
@@ -457,7 +472,11 @@ test("toute route d'administration est protégée", () => {
     // test fige une FORME plutôt qu'une intention : la route `conversation` était
     // parfaitement gardée, mais par une fonction au nom français que ce motif ne
     // connaissait pas. Le test l'a déclarée sans garde.
-    if (!/ADMIN_SECRET|x-admin-secret|ADMIN_EMAIL|is_admin|isAdmin|estAdmin/.test(src)) unguarded.push(entry.name);
+    // `gardeAdmin` est STRICTEMENT plus stricte qu'`estAdmin` : elle y ajoute le second
+    // facteur. L'omettre de cette liste faisait passer une route mieux gardée pour une
+    // route sans garde — quatrième fois qu'un test de ce projet fige une FORME au lieu
+    // d'une intention.
+    if (!/ADMIN_SECRET|x-admin-secret|ADMIN_EMAIL|is_admin|isAdmin|estAdmin|gardeAdmin/.test(src)) unguarded.push(entry.name);
     // ⚠️ ET L'ADRESSE NE DOIT PLUS ÊTRE RECOPIÉE. Treize routes en portaient leur propre
     // exemplaire. Le jour où l'éditeur change — une vente, par exemple — il faut les
     // retrouver toutes : en manquer une laisse soit une porte ouverte à l'ancien
