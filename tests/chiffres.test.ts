@@ -395,6 +395,57 @@ test("aucun badge ne promet une application qui n'existe pas", () => {
   assert.equal(liensStore({ NEXT_PUBLIC_PLAY_STORE_URL: "https://play.google.com/x" }).ios, null);
 });
 
+test("écrire un avis exige un compte, et rien ne le vérifiait", () => {
+  // ⚠️ CE GARDE-FOU N'ÉTAIT PROTÉGÉ PAR AUCUN TEST — trouvé le 23/08/2026 en répondant à
+  // « il faut bien un compte pour publier un avis ? ». Oui : `/api/avis` refuse toute
+  // soumission anonyme (vérifié en production, HTTP 401 sur GET comme sur POST). Mais les
+  // tests existants ne couvraient que la VALIDATION du contenu — note bornée, texte
+  // détouré, `publie` forcé à faux. Supprimer les trois lignes qui exigent une session
+  // les aurait tous laissés au vert, et ouvert la page d'avis à n'importe qui.
+  //
+  // Ce que ça coûterait : la page promet « n'afficher que des avis de personnes ayant
+  // réellement un compte ». Publier de faux avis de consommateurs est une pratique
+  // commerciale trompeuse EN TOUTES CIRCONSTANCES depuis la directive (UE) 2019/2161 —
+  // c'est le défaut le plus grave jamais trouvé sur ce site, et il y était déjà une fois.
+  //
+  // ⚠️ ANCRAGE : on isole le CORPS de chaque méthode, pas le fichier. Un `if (!user)`
+  // présent dans le GET aurait sinon couvert un POST laissé ouvert — c'est exactement
+  // l'erreur « un motif présent N fois ne rougit que si les N disparaissent ».
+  const corpsDe = (code: string, methode: string): string => {
+    const i = code.indexOf(`export async function ${methode}(`);
+    if (i < 0) return "";
+    const j = code.indexOf("\nexport async function", i + 1);
+    return code.slice(i, j < 0 ? undefined : j);
+  };
+  // Les DEUX portes : les témoignages du site, et les avis sur les parcours.
+  const PORTES: [string, string[]][] = [
+    ["src/app/api/avis/route.ts", ["GET", "POST"]],
+    ["src/app/api/community/reviews/route.ts", ["POST"]],
+  ];
+  for (const [chemin, methodes] of PORTES) {
+    const code = sansCommentaires(readFileSync(join(ROOT, chemin), "utf8"));
+    for (const m of methodes) {
+      const corps = corpsDe(code, m);
+      assert.ok(corps, `${m} introuvable dans ${chemin}`);
+      assert.match(corps, /auth\.getUser\(\)/, `${chemin} · ${m} ne lit pas la session`);
+      assert.match(corps, /if\s*\(!user\)/, `${chemin} · ${m} ne refuse pas un visiteur anonyme`);
+      assert.match(corps, /401/, `${chemin} · ${m} ne répond pas 401 sans session`);
+    }
+  }
+  // Et l'écran doit dire la même chose que le serveur : sans session, le formulaire cède
+  // la place à une invitation à se connecter. Sinon on laisse quelqu'un écrire 40
+  // caractères pour se prendre une erreur au moment de publier.
+  //
+  // ⚠️ ON VISE LE COUPLAGE, PAS LES DEUX MOTIFS SÉPARÉMENT. Première version de ce test :
+  // `assert.match(form, /setEtat\("anonyme"\)/)`. Elle est restée VERTE quand j'ai remplacé
+  // le `setEtat("anonyme")` de la branche 401 par `setEtat("pret")` — parce que l'appel
+  // subsiste dans le `.catch()` juste en dessous. Un motif présent deux fois ne rougit que
+  // si les deux disparaissent. Ce qui compte, c'est que le 401 MÈNE à l'invitation.
+  const form = sansCommentaires(readFileSync(join(ROOT, "src/components/avis/AvisForm.tsx"), "utf8"));
+  assert.match(form, /r\.status === 401\)\s*return setEtat\("anonyme"\)/,
+    "un refus du serveur (401) ne mène plus à l'invitation à se connecter : le visiteur anonyme verrait le formulaire");
+});
+
 test("un avis ne peut pas être fabriqué depuis le navigateur", () => {
   // La page promet « n'afficher que des avis de personnes ayant réellement un compte »
   // et « ne jamais en écrire nous-mêmes ». Ce qui rend la promesse tenable, c'est que
