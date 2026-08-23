@@ -78,10 +78,15 @@ export async function GET() {
   if (!editeur) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const sb = createAdminClient();
 
-  const [ecr, reg] = await Promise.all([
+  const [ecr, reg, acc] = await Promise.all([
     sb.from("notifications").select("id, user_id, data, created_at, title")
       .eq("user_id", editeur.id).eq("type", TYPE_ECRITURE).order("created_at", { ascending: false }).limit(5000),
     sb.from("notifications").select("data").eq("user_id", editeur.id).eq("type", TYPE_REGLAGES).maybeSingle(),
+    // ⚠️ Le journal d'accès aux factures est REMONTÉ À L'ÉCRAN. Une trace que personne ne
+    // peut lire ne répond à aucune question : « quelqu'un a-t-il consulté mes factures ? »
+    // resterait sans réponse alors même que la réponse est enregistrée.
+    sb.from("notifications").select("data, created_at").eq("user_id", editeur.id)
+      .eq("type", "compta_acces").order("created_at", { ascending: false }).limit(30),
   ]);
 
   // ⚠️ On REMONTE l'erreur au lieu de renvoyer une liste vide. Un journal comptable qui
@@ -93,6 +98,13 @@ export async function GET() {
     ok: true,
     ecritures: (ecr.data ?? []).map((l) => versEcriture(l as Ligne)),
     reglages: (reg.data?.data ?? {}) as Reglages,
+    acces: (acc.data ?? []).map((a) => {
+      const d = (a.data ?? {}) as Record<string, unknown>;
+      return {
+        le: String(d.le ?? a.created_at ?? ""), par: String(d.par ?? "?"),
+        ip: d.ip ? String(d.ip) : null, appareil: String(d.appareil ?? ""),
+      };
+    }),
   });
 }
 

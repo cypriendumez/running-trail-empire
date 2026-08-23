@@ -513,6 +513,15 @@ test("chaque consultation d'une facture laisse une trace", () => {
   assert.match(src, /x-forwarded-for|ip:/, "la trace ne dit pas depuis quelle adresse");
   const bloc = src.slice(src.indexOf("compta_acces") - 400, src.indexOf("compta_acces") + 600);
   assert.match(bloc, /try \{/, "l'échec de la trace peut empêcher de lire la facture");
+
+  // ⚠️ ET ELLE DOIT ÊTRE LISIBLE. Une trace enregistrée que personne ne peut consulter
+  // ne répond à aucune question : « quelqu'un a-t-il vu mes factures ? » resterait sans
+  // réponse alors même que la réponse est en base. Même défaut que l'espace coach sans
+  // lien — une fonction qu'on ne peut pas atteindre n'existe pas.
+  const lecture = codeSeul("src/app/api/admin/compta/route.ts");
+  assert.match(lecture, /"compta_acces"/, "le journal d'accès n'est jamais relu");
+  const ecran = codeSeul("src/components/admin/ComptaClient.tsx");
+  assert.match(ecran, /acces\.slice|acces\.map/, "le journal d'accès n'est pas affiché");
 });
 
 test("le livre des recettes a la forme attendue en micro-entreprise", () => {

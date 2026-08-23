@@ -55,6 +55,7 @@ export function ComptaClient() {
   const [envoi, setEnvoi] = useState(false);
   const [envoiPiece, setEnvoiPiece] = useState(false);
   const [lecture, setLecture] = useState<string[] | null>(null);
+  const [acces, setAcces] = useState<{ le: string; par: string; ip: string | null; appareil: string }[]>([]);
 
   // Filtres
   const [annee, setAnnee] = useState<string>("toutes");
@@ -71,7 +72,7 @@ export function ComptaClient() {
       // ⚠️ Une erreur de lecture doit se VOIR. Un journal qui s'affiche vide parce que la
       // requête a échoué se lit exactement comme un journal vide.
       if (!r.ok || !j.ok) { setErreur(j.error || "Lecture impossible."); setEcritures([]); }
-      else { setErreur(""); setEcritures(j.ecritures ?? []); setReglages(j.reglages ?? {}); }
+      else { setErreur(""); setEcritures(j.ecritures ?? []); setReglages(j.reglages ?? {}); setAcces(j.acces ?? []); }
     } catch { setErreur("Le serveur n'a pas répondu."); }
     setChargement(false);
   }, []);
@@ -388,6 +389,25 @@ export function ComptaClient() {
               <span className="text-sm font-medium text-zinc-700">Assujetti à la TVA</span>
             </label>
           </div>
+          {/* ─── Qui a ouvert une facture ────────────────────────────────────
+              Une trace que personne ne peut lire ne répond à aucune question. */}
+          <div className="mt-5 border-t border-zinc-100 pt-4">
+            <div className="text-xs font-semibold text-zinc-500">Consultations des factures</div>
+            {acces.length === 0 ? (
+              <p className="mt-1 text-xs text-zinc-400">Aucune facture n'a encore été ouverte.</p>
+            ) : (
+              <ul className="mt-2 space-y-1">
+                {acces.slice(0, 8).map((a, i) => (
+                  <li key={i} className="flex flex-wrap items-baseline gap-x-2 text-xs text-zinc-500">
+                    <span className="font-medium text-zinc-700">{new Date(a.le).toLocaleString("fr-FR")}</span>
+                    <span>{a.par}</span>
+                    {a.ip && <span className="text-zinc-400">depuis {a.ip}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           {/* ⚠️ Dit explicitement d'où viennent les taux. L'application n'en connaît aucun. */}
           <p className="mt-4 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">
             <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
