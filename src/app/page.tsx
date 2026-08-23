@@ -178,30 +178,38 @@ const SYNC: { nom: string; logo?: string; passerelle?: boolean; passerelleApp?: 
   { nom: "Garmin", logo: "garmin.svg", pousse: true },
   { nom: "COROS", logo: "coros.png", pousse: true },
   { nom: "Suunto", logo: "suunto.svg", pousse: true },
-  // ❌ POLAR NE REÇOIT PAS, et la question a été reposée le 23/08/2026 (« avec la nouvelle
-  // mise à jour, est-ce que ça marche maintenant ? »). Non — vérifié sous quatre angles :
+  // ❌❌ POLAR N'EST PLUS DANS CETTE LISTE — retiré de la vitrine le 23/08/2026, sur
+  // décision de Cyprien, après qu'on lui ait dit ce que ça coûte. La preuve reste ici :
+  // sans elle, quelqu'un remettra Polar dans six mois en constatant que la lecture marche.
   //
+  // ⚠️ POLAR FONCTIONNE, DANS LE SENS QUI PORTE LE PRODUIT. Ses sorties arrivent dans
+  // Pacevo (`polar_sync_activities`) : allures, zones cardio, VFC, sommeil, charge. Un
+  // porteur de Polar a sa VMA, sa fraîcheur, son plan glissant, son calendrier, le Ghost
+  // Runner et ses analyses. La seule chose qu'il n'a pas, c'est la séance AU POIGNET : il
+  // la lit dans l'application. Le retirer de la vitrine lui fait donc conclure que Pacevo
+  // ne lui sert à rien — c'est le coût assumé de la décision, pas un oubli.
+  //
+  // POURQUOI IL NE PEUT PAS RECEVOIR, vérifié sous quatre angles le 23/08/2026 :
   //  1. API intervals.icu : cinq champs `polar_*`, tous en lecture
   //     (`polar_sync_activities`, `polar_download_wellness`, `polar_scope`,
   //     `polar_sync_activity_types`, `polar_wellness_keys`). Aucun `polar_upload_workouts`,
   //     alors que SEPT autres plateformes l'exposent.
-  //  2. ⚠️ LA PREUVE QUI COMPTE, ET QUI REMPLACE LE MESSAGE DE FORUM DE 2023 : l'API la
-  //     plus récente de POLAR elle-même — AccessLink Dynamic API v4 — est intégralement
-  //     EN LECTURE SEULE. Toutes ses portées se terminent par `:read`. Il existe bien un
-  //     `training_targets:read` : on peut LIRE les séances planifiées d'un athlète, jamais
-  //     en créer une. Aucun point d'entrée d'écriture n'existe. Ce n'est donc pas une
-  //     lacune d'intervals.icu, et personne ne peut la contourner.
-  //  3. La seule chaîne qui fonctionne est l'accord PRIVÉ Polar↔TrainingPeaks (annoncé en
-  //     mars 2025, toujours en bêta), négocié d'entreprise à entreprise comme ceux de
-  //     Strava et komoot — pas une API ouverte. Ni intervals.icu ni Pacevo n'y ont accès.
-  //     Et même là, Polar ne gère pas les PLAGES de cible, contrairement à Garmin, Suunto,
-  //     COROS et Apple.
-  //  4. Aucune passerelle tierce n'existe, et c'est structurel : sur iOS, WorkoutKit est
-  //     une API ouverte, donc un tiers a pu bâtir « Intervals Companion ». Polar n'a aucune
-  //     porte équivalente côté montre.
+  //  2. ⚠️ LA PREUVE QUI COMPTE, chez POLAR et non chez intervals.icu : son API la plus
+  //     récente — AccessLink Dynamic API v4 — est intégralement EN LECTURE SEULE. Toutes
+  //     ses portées se terminent par `:read`. Il existe un `training_targets:read` : on
+  //     peut LIRE les séances planifiées d'un athlète, jamais en créer une. Aucun point
+  //     d'entrée d'écriture n'existe. Personne ne peut contourner ça.
+  //  3. La seule chaîne qui marche est l'accord PRIVÉ Polar↔TrainingPeaks (mars 2025,
+  //     toujours en bêta), négocié d'entreprise à entreprise comme ceux de Strava et
+  //     komoot — pas une API ouverte. Ni intervals.icu ni Pacevo n'y ont accès. Et même
+  //     là, Polar ne gère pas les PLAGES de cible, contrairement à Garmin, Suunto, COROS
+  //     et Apple.
+  //  4. Aucune passerelle tierce n'existe, et c'est STRUCTUREL : sur iOS, WorkoutKit est
+  //     une API ouverte, donc un tiers a pu bâtir « Intervals Companion ». Polar n'a
+  //     aucune porte équivalente côté montre. C'est toute la différence entre les deux.
   //
-  // La LECTURE, elle, fonctionne. Ne pas réessayer avant que Polar publie une API d'écriture.
-  { nom: "Polar", logo: "polar.svg", pousse: false },
+  // À QUELLE CONDITION LE REMETTRE : le jour où Polar publiera une API d'écriture. Pas
+  // avant, et pas « parce que la lecture marche » — c'est justement ce qu'on a tranché.
   // Apple n'a AUCUN champ chez intervals.icu, dans aucun sens — revérifié sur l'API le
   // 23/08/2026 : 162 champs, pas un seul `apple*`. Mais « pas de champ » ne veut PAS dire
   // « ne reçoit pas », et la page l'a laissé croire jusqu'au 23/08/2026 : l'Apple Watch
@@ -462,10 +470,11 @@ export default function LandingPage() {
             >
               {m.logo
                 // eslint-disable-next-line @next/next/no-img-element
-                // Hauteur ET largeur bornées : les mots-symboles vont d'un rapport 3,1
-                // (Suunto) à 6,1 (Polar). À hauteur constante, Polar paraîtrait deux fois
-                // plus imposant ; à largeur constante, deux fois plus petit. Borner les
-                // DEUX avec `object-contain` égalise la surface perçue.
+                // Hauteur ET largeur bornées : les mots-symboles n'ont pas du tout le même
+                // rapport (Suunto est deux fois plus ramassé que les plus longs). À hauteur
+                // constante, le plus large paraîtrait deux fois plus imposant ; à largeur
+                // constante, deux fois plus petit. Borner les DEUX avec `object-contain`
+                // égalise la surface perçue, quelle que soit la marque affichée.
                 ? <img src={`/brands/${m.logo}`} alt={m.nom} className="h-6 w-auto max-w-[112px] object-contain" loading="lazy" />
                 : m.nom}
               {m.passerelle && <span className="ml-1 -translate-y-1 text-[11px] font-semibold text-zinc-400">*</span>}
@@ -473,10 +482,14 @@ export default function LandingPage() {
           ))}
         </div>
         {/* LES DEUX SENS, DITS SÉPARÉMENT. Sous un titre unique, les logos alignés laissaient
-            croire que chacun fait la même chose. C'est faux dans un sens sur deux : Strava
-            est un journal d'activités (rien à lui envoyer) et l'API publique de Polar
-            n'accepte pas les séances planifiées. Les taire, c'est promettre à un porteur de
-            Polar une séance qui n'arrivera jamais à son poignet.
+            croire que chacun fait la même chose. C'était faux dans un sens sur deux, et deux
+            marques l'ont prouvé chacune à sa façon : Strava est un journal d'activités, il
+            n'y a rien à lui envoyer ; Polar lit sans jamais pouvoir recevoir. Les taire,
+            c'était promettre à leur porteur une séance qui n'arriverait jamais au poignet.
+            Depuis le 23/08/2026, la vitrine ne montre plus QUE des montres qui vont jusqu'au
+            poignet — voir le bloc de preuves sur `SYNC` en haut de ce fichier — mais les
+            trois lignes restent séparées : elles disent des choses différentes, et l'Apple
+            Watch y arrive par un chemin qui n'est pas celui de Garmin.
             La liste des marques est DÉRIVÉE de `SYNC`, jamais recopiée : ajouter demain une
             plateforme qui reçoit met la ligne à jour toute seule. */}
         <div className="mx-auto mt-7 max-w-2xl space-y-2 text-center text-xs leading-relaxed text-zinc-500">

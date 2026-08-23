@@ -63,3 +63,6 @@ Capture*.png
 # (c' est un journal d'activités, pas une montre). L'ignorer empêche un `git add -A`
 # de le remettre en ligne à notre insu.
 public/brands/strava.svg
+# Polar retiré de la vitrine le 23/08/2026 : son logo est une marque déposée, il n'a
+# plus rien à faire en production. Ignoré car iCloud restaure ce dossier tout seul.
+public/brands/polar.svg

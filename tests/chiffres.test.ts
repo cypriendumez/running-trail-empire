@@ -291,9 +291,14 @@ test("chaque logo annoncé par la page existe vraiment", () => {
   // absent n'échoue nulle part — il affiche une image cassée sur la page d'accueil, en
   // production, sans que rien ne bronche. Amazfit et Huawei n'ont volontairement pas de
   // fichier : la pastille affiche alors leur nom, ce qui est le comportement voulu.
+  //
+  // ⚠️ LE SEUIL EST DESCENDU DE 5 À 4 LE 23/08/2026, avec Polar. Ce n'est pas un seuil
+  // qu'on rabote à chaque retrait : il ne sert plus qu'à détecter une rangée qui se VIDE
+  // (une regex cassée, un tableau écrasé). La composition exacte, elle, est figée ailleurs,
+  // par `tests/synchro.crash.test.ts` — c'est LUI qui rougit si une marque entre ou sort.
   const landing = sansCommentaires(readFileSync(join(ROOT, "src/app/page.tsx"), "utf8"));
   const cites = [...landing.matchAll(/logo:\s*"([^"]+)"/g)].map((m) => m[1]);
-  assert.ok(cites.length >= 5, `seulement ${cites.length} logo(s) cité(s) — la rangée a-t-elle changé ?`);
+  assert.ok(cites.length >= 4, `seulement ${cites.length} logo(s) cité(s) — la rangée s'est-elle vidée ?`);
   for (const f of cites) {
     assert.ok(
       existsSync(join(ROOT, "public/brands", f)),
@@ -307,7 +312,15 @@ test("chaque logo annoncé par la page existe vraiment", () => {
   // pas le système de fichiers — sinon le test rougit sur un fichier qui ne sera jamais
   // publié, et on finirait par l'ignorer.
   const suivis = execSync("git ls-files public/brands", { cwd: ROOT }).toString().trim().split("\n").filter(Boolean);
-  assert.ok(!suivis.some((f) => f.includes("strava")), "strava.svg est suivi par git : il serait déployé alors que la marque a été retirée");
+  // ⚠️ GÉNÉRALISÉ AU-DELÀ DE STRAVA le 23/08/2026, quand Polar a quitté la vitrine. Un
+  // logo de marque retirée est un fichier de MARQUE DÉPOSÉE qu'on déploierait sans plus
+  // rien afficher avec : aucun bénéfice, un risque inutile sur un site mis en vente. La
+  // liste est nommée pour que le test reste lisible en cas d'échec.
+  const RETIREES = ["strava", "polar"];
+  for (const marque of RETIREES) {
+    assert.ok(!suivis.some((f) => f.includes(marque)),
+      `${marque}.svg est suivi par git : il serait déployé alors que la marque a été retirée de la vitrine`);
+  }
   for (const f of cites) {
     assert.ok(suivis.includes(`public/brands/${f}`), `« ${f} » n'est pas suivi par git : absent du déploiement`);
   }

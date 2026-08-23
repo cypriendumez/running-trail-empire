@@ -400,7 +400,7 @@ test("Apple Watch est le seul cas « lecture seule » qui ait une issue", () => 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-console.log("\n📣 CE QUE LA PAGE PROMET — cinq marques, et rien de plus\n");
+console.log("\n📣 CE QUE LA PAGE PROMET — quatre montres, et rien de plus\n");
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Les pastilles de la page d'accueil, dans l'ordre où elles s'affichent. */
@@ -417,10 +417,29 @@ function pastillesLanding(): { nom: string; pousse: boolean; appli: boolean; pas
 }
 
 test("la rangée de marques est exactement celle décidée le 23/08/2026", () => {
-  // Cinq marques : Garmin, COROS, Suunto (qui reçoivent), Polar et Apple Watch (lecture
-  // seule). Wahoo, Amazfit et Huawei restent SERVIS par l'app mais ne sont plus annoncés.
+  // QUATRE marques, et le critère est devenu unique : la séance arrive-t-elle AU POIGNET ?
+  // Garmin, COROS et Suunto par intervals.icu ; l'Apple Watch par une application tierce.
+  // Polar est parti le 23/08/2026 pour cette seule raison — il lit parfaitement, mais son
+  // API est en lecture seule. Wahoo, Amazfit et Huawei restent SERVIS sans être annoncés.
   const pastilles = pastillesLanding().filter((p) => !p.appli).map((p) => p.nom);
-  assert.deepEqual(pastilles, ["Garmin", "COROS", "Suunto", "Polar", "Apple Watch"]);
+  assert.deepEqual(pastilles, ["Garmin", "COROS", "Suunto", "Apple Watch"]);
+});
+
+test("Polar a quitté la VITRINE, pas l'application", () => {
+  // ⚠️ LE PIÈGE DE CE RETRAIT, et c'est le plus coûteux du lot. Polar n'a jamais été une
+  // destination d'envoi — il n'est donc dans AUCUNE table à nettoyer. Mais ses sorties
+  // arrivent bien dans Pacevo, et c'est ce qui fait tourner tout le produit : VMA, charge,
+  // fraîcheur, plan. Le jour où quelqu'un « finira le ménage » en retirant `polar` des
+  // sources d'activité ou du guide de connexion, un client Polar cessera de se synchroniser
+  // — sans erreur, comme d'habitude.
+  const sources = readFileSync(join(ROOT, "src/types/index.ts"), "utf8");
+  assert.match(sources, /"polar"/, "`polar` doit rester une source d'activité reconnue");
+  const guide = readFileSync(join(ROOT, "src/app/dashboard/sync/page.tsx"), "utf8");
+  assert.match(guide, /name: "Polar"/, "le guide de connexion doit continuer d'aider un porteur de Polar");
+  // Et la lecture reste agnostique de la marque : une activité Polar se décrit comme une autre.
+  const l = lectureDe([{ device_name: "Polar Vantage V3", source: "POLAR", start_date_local: "2026-08-21T07:00:00" }]);
+  assert.equal(l?.appareil, "Polar Vantage V3");
+  assert.equal(l?.source, "Polar");
 });
 
 test("les marques retirées de la page restent servies par l'application", () => {
@@ -436,11 +455,15 @@ test("les marques retirées de la page restent servies par l'application", () =>
   }
 });
 
-test("Polar et Apple ne sont jamais dans la ligne « envoi sur ta montre »", () => {
-  // La ligne est DÉRIVÉE de `pousse`, jamais recopiée. Promettre l'envoi à une plateforme
-  // qui ne peut pas le recevoir est le pire des deux mensonges possibles.
+test("l'Apple Watch n'est jamais dans la ligne « envoi sur ta montre »", () => {
+  // La ligne est DÉRIVÉE de `pousse`, jamais recopiée. Promettre l'envoi par intervals.icu
+  // à une plateforme qu'il ne sait pas atteindre est le pire des deux mensonges possibles.
   const pastilles = pastillesLanding();
-  for (const nom of ["Polar", "Apple Watch"]) {
+  // Polar ne doit plus figurer du tout : sa présence signalerait un retour en arrière non
+  // décidé, et il n'aurait alors aucune ligne d'envoi — donc une pastille sans promesse.
+  assert.equal(pastilles.find((x) => x.nom === "Polar"), undefined,
+    "Polar est revenu dans la vitrine : c'est une décision commerciale, pas un correctif");
+  for (const nom of ["Apple Watch"]) {
     const p = pastilles.find((x) => x.nom === nom);
     assert.ok(p, `${nom} a disparu de la page`);
     assert.equal(p!.pousse, false, `${nom} est annoncé comme recevant la séance — son API ne le permet pas`);
@@ -464,9 +487,11 @@ test("le compteur « les N plateformes » est calculé, jamais écrit en dur", (
   }
 });
 
-test("les cinq langues disent toutes que Polar ne reçoit pas", () => {
-  // Une traduction qui oublie la restriction promet à un porteur de Polar une séance qui
-  // n'arrivera jamais à son poignet — dans sa langue.
+test("les cinq notes disent la même chose, et ne parlent plus de Polar", () => {
+  // ⚠️ CE TEST A ÉTÉ RETOURNÉ LE 23/08/2026. Il exigeait auparavant que chaque note nomme
+  // Polar pour dire qu'il ne reçoit pas. Polar ayant quitté la vitrine, une note qui le
+  // nomme encore expliquerait une restriction sur une marque que la page n'affiche plus —
+  // et ferait surgir un nom de nulle part, en cinq langues.
   const dict = readFileSync(join(ROOT, "src/components/landing/landingI18n.ts"), "utf8");
   // ⚠️ ON VISE LA NOTE DE `sync`, PAS TOUTES LES CLÉS `note`. Un `/note:\s*"…"/` global
   // attrapait aussi les cinq `cta.note` — le test rougissait sur des traductions saines,
@@ -474,16 +499,24 @@ test("les cinq langues disent toutes que Polar ne reçoit pas", () => {
   const notes = [...dict.matchAll(/sync:\s*\{[^\n]*?note:\s*"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1]);
   assert.equal(notes.length, 5, `${notes.length} note(s) de synchronisation trouvée(s), 5 langues attendues`);
   for (const n of notes) {
-    assert.match(n, /Polar/, "une note ne mentionne pas Polar");
     assert.match(n, /Apple Watch/, "une note ne mentionne pas l'exception Apple Watch");
     assert.match(n, /intervals\.icu/, "une note ne dit pas par où tout passe");
   }
-  // Les marques retirées ne doivent plus apparaître dans aucune traduction.
+  // Les marques retirées de la vitrine ne doivent plus apparaître dans aucune traduction.
   for (const n of notes) {
-    for (const retiree of ["Wahoo", "Amazfit", "Huawei", "Zepp"]) {
+    for (const retiree of ["Wahoo", "Amazfit", "Huawei", "Zepp", "Polar"]) {
       assert.ok(!n.includes(retiree), `« ${retiree} » subsiste dans une traduction`);
     }
   }
+  // ET NULLE PART AILLEURS DANS LA VITRINE. La carte de fonctionnalité et la liste du
+  // palier gratuit annonçaient « Sync Garmin, Coros, Polar » en cinq langues — trois
+  // endroits pour une même promesse, et deux avaient survécu au premier nettoyage.
+  // ⚠️ SUR LE CODE SEUL, PAS SUR LE FICHIER BRUT. Le commentaire d'en-tête EXPLIQUE
+  // pourquoi Polar est parti, et le nomme forcément pour le dire. Grepper le fichier tel
+  // quel faisait rougir ce test sur sa propre documentation — et le réflexe aurait été de
+  // supprimer l'explication plutôt que la promesse.
+  assert.ok(!codeSeul("src/components/landing/landingI18n.ts").includes("Polar"),
+    "« Polar » subsiste dans une chaîne affichable de la landing");
 });
 
 test("l'Apple Watch est annoncée comme RECEVANT la séance, sur sa propre ligne", () => {
@@ -529,7 +562,7 @@ test("aucune traduction ne nomme l'application ni ne lui invente un prix", () =>
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-console.log("\n🏃 FORMAT DE SÉANCE — ce qui arrive au poignet des cinq marques\n");
+console.log("\n🏃 FORMAT DE SÉANCE — ce qui arrive au poignet de chaque marque\n");
 // ─────────────────────────────────────────────────────────────────────────────
 
 test("chaque marque annoncée produit une séance dont aucune étape n'est vide", () => {

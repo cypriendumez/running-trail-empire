@@ -23,8 +23,18 @@ export type LandingDict = {
   // n'en règlent (« Pacevo a-t-il mon mot de passe Garmin ? » — non, et on le dit).
   // `read` / `readValue` / `push` disent les DEUX SENS de la synchronisation. Sept logos
   // sous un titre unique laissaient croire que chacun fait la même chose : or Strava est un
-  // journal (rien à lui envoyer) et l'API publique de Polar n'accepte pas les séances
-  // planifiées. La liste des marques qui REÇOIVENT est dérivée du code, pas traduite.
+  // journal, il n'y a rien à lui envoyer.
+  //
+  // ⚠️ POLAR A QUITTÉ LA VITRINE LE 23/08/2026, sur décision de Cyprien, et la note ne parle
+  // donc plus de lui. Ce n'est PAS parce qu'il ne marche pas : il lit parfaitement, et un
+  // porteur de Polar a toujours ses sorties, sa VMA, sa charge et son plan. Ce qu'il n'a
+  // pas, c'est la séance au poignet — l'API la plus récente de Polar (AccessLink Dynamic
+  // v4) étant intégralement en lecture seule. Cyprien a choisi de n'exposer que les montres
+  // qui vont jusqu'au poignet, en connaissant le coût : un porteur de Polar peut conclure
+  // que Pacevo ne lui sert à rien. Ne pas remettre Polar ici sans lui en reparler.
+  //
+  // `pushBridge` couvre le cas Apple : reçoit la séance, mais via une application tierce.
+  // La liste des marques qui REÇOIVENT est dérivée du code, pas traduite.
   sync: { title: string; read: string; readValue: string; push: string; pushBridge: string; pushBridgeValue: string; pushApp: string; note: string };
   // Un libellé par chiffre VÉRIFIABLE. `runners`, `rating` et `satisfaction`
   // n'existent plus : ils n'avaient aucune source.
@@ -58,7 +68,7 @@ export const CATEGORY_CODES = ["ALL", "10KM", "SEMI", "MARATHON", "TRAIL", "BEGI
 const fr: LandingDict = {
   nav: { programs: "Programmes", features: "Fonctionnalités", pricing: "Tarifs", blog: "Blog", reviews: "Avis", login: "Connexion", trial: "Essai gratuit" },
   hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "Ta montre mesure déjà tout : VFC, sommeil, charge, allures. Pacevo en fait une séance — durée, intensité, récupération — recalculée à chaque synchronisation.", ctaPrimary: "Commencer gratuitement" },
-  sync: { title: "Synchronisation avec", read: "Lecture de tes données :", readValue: "les {n} plateformes.", push: "Envoi de la séance sur ta montre :", pushBridge: "Envoi sur {marque} :", pushBridgeValue: "via l'application iOS {app}.", pushApp: "Envoi vers une application d'entraînement :", note: "Tout passe par intervals.icu, qui gère les connexions officielles de chaque constructeur. Pacevo n'accède jamais directement à tes comptes. Polar lit tes sorties mais ne peut pas recevoir de séance : son API ne l'autorise pas. * Apple Watch n'a aucune connexion officielle — une application iOS tierce (Intervals Companion) fait les deux sens : elle envoie tes séances vers intervals.icu et convertit le plan pour ta montre." },
+  sync: { title: "Synchronisation avec", read: "Lecture de tes données :", readValue: "les {n} plateformes.", push: "Envoi de la séance sur ta montre :", pushBridge: "Envoi sur {marque} :", pushBridgeValue: "via l'application iOS {app}.", pushApp: "Envoi vers une application d'entraînement :", note: "Tout passe par intervals.icu, qui gère les connexions officielles de chaque constructeur. Pacevo n'accède jamais directement à tes comptes. * Apple Watch n'a aucune connexion officielle — une application iOS tierce (Intervals Companion) fait les deux sens : elle envoie tes séances vers intervals.icu et convertit le plan pour ta montre." },
   stats: { races: "Courses à venir", routes: "Parcours cartographiés", plan: "De plan glissant", replan: "Entre deux replanifications" },
   programs: {
     eyebrow: "Entraînement", title: "Des programmes pour chaque objectif", subtitle: "Du premier 5 km à l'ultra-trail — chaque plan s'adapte ensuite à tes données réelles.", viewAll: "Voir tout",
@@ -88,7 +98,7 @@ const fr: LandingDict = {
     ],
     items: [
       { title: "VFC et sommeil", desc: "VFC au réveil, sommeil profond et paradoxal, Body Battery : la fraîcheur du jour vient de mesures, pas d'un ressenti." },
-      { title: "Sync Garmin, Coros, Polar", desc: "Activités, puissance, zones cardio et données de bien-être récupérées en continu via intervals.icu." },
+      { title: "Sync Garmin, COROS, Suunto", desc: "Activités, puissance, zones cardio et données de bien-être récupérées en continu via intervals.icu." },
       { title: "Météo réelle à ta position", desc: "Chaleur, humidité, vent et altitude : les allures cibles sont corrigées avant la séance, pas expliquées après." },
       { title: "Trail Builder", desc: "Tracé accroché aux sentiers réels, dénivelé calculé, export GPX vers la montre." },
       { title: "Smart Journal vocal", desc: "Raconte ta séance à voix haute : ce que tu dis pèse sur la prescription du lendemain." },
@@ -106,7 +116,7 @@ const fr: LandingDict = {
     gratuitNote: "Aucune carte bancaire pour le palier gratuit.",
     plans: [
       { cle: "gratuit", name: "Gratuit", pitch: "Tes données, tes courses, et un aperçu de ton plan.", cta: "Créer mon compte",
-        features: ["Sync Garmin, Coros, Polar", "VFC, sommeil et charge d'entraînement", "Historique complet de tes séances", "14 000 courses à venir", "Les 2 prochains jours de ton plan", "Série, ligues et trophées"] },
+        features: ["Sync Garmin, COROS, Suunto", "VFC, sommeil et charge d'entraînement", "Historique complet de tes séances", "14 000 courses à venir", "Les 2 prochains jours de ton plan", "Série, ligues et trophées"] },
       { cle: "starter", name: "Starter", pitch: "Le plan complet de 7 jours, replanifié à chaque sortie.", cta: "Essayer 7 jours",
         features: ["Tout le gratuit", "Plan de 7 jours replanifié en continu", "Séances poussées sur la montre", "10 échanges avec l'IA par jour", "Analyse IA de tes séances", "Kiné IA, avec photo"] },
       { cle: "premium", name: "Premium", pitch: "Le coach complet, plus les outils de préparation.", badge: "Le plus demandé", cta: "Essayer 7 jours",
@@ -120,7 +130,7 @@ const fr: LandingDict = {
 const en: LandingDict = {
   nav: { programs: "Programs", features: "Features", pricing: "Pricing", blog: "Blog", reviews: "Reviews", login: "Log in", trial: "Free trial" },
   hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "Your watch already measures everything: HRV, sleep, load, paces. Pacevo turns it into a session — duration, intensity, recovery — recalculated on every sync.", ctaPrimary: "Start for free" },
-  sync: { title: "Syncs with", read: "Reading your data:", readValue: "all {n} platforms.", push: "Sending the session to your watch:", pushBridge: "Sending to {marque}:", pushBridgeValue: "through the {app} iOS app.", pushApp: "Sending to a training app:", note: "Everything goes through intervals.icu, which handles each manufacturer's official connection. Pacevo never accesses your accounts directly. Polar reads your runs but cannot receive a session: its API does not allow it. * Apple Watch has no official connection — a third-party iOS app (Intervals Companion) covers both directions: it sends your workouts to intervals.icu and converts the plan for your watch." },
+  sync: { title: "Syncs with", read: "Reading your data:", readValue: "all {n} platforms.", push: "Sending the session to your watch:", pushBridge: "Sending to {marque}:", pushBridgeValue: "through the {app} iOS app.", pushApp: "Sending to a training app:", note: "Everything goes through intervals.icu, which handles each manufacturer's official connection. Pacevo never accesses your accounts directly. * Apple Watch has no official connection — a third-party iOS app (Intervals Companion) covers both directions: it sends your workouts to intervals.icu and converts the plan for your watch." },
   stats: { races: "Upcoming races", routes: "Mapped routes", plan: "Rolling plan", replan: "Between two replans" },
   programs: {
     eyebrow: "Training", title: "A program for every goal", subtitle: "From your first 5K to ultra-trail — each plan then adapts to your real data.", viewAll: "View all",
@@ -150,7 +160,7 @@ const en: LandingDict = {
     ],
     items: [
       { title: "HRV and sleep", desc: "Morning HRV, deep and REM sleep, Body Battery: today's freshness comes from measurements, not from a feeling." },
-      { title: "Garmin, Coros, Polar sync", desc: "Activities, power, heart-rate zones and wellness data pulled continuously through intervals.icu." },
+      { title: "Garmin, COROS, Suunto sync", desc: "Activities, power, heart-rate zones and wellness data pulled continuously through intervals.icu." },
       { title: "Real weather at your location", desc: "Heat, humidity, wind and altitude: target paces are corrected before the session, not explained after it." },
       { title: "Trail Builder", desc: "Route snapped to real paths, elevation computed, GPX export straight to your watch." },
       { title: "Voice Smart Journal", desc: "Talk through your session out loud: what you say weighs on tomorrow's prescription." },
@@ -168,7 +178,7 @@ const en: LandingDict = {
     gratuitNote: "No card needed for the free tier.",
     plans: [
       { cle: "gratuit", name: "Free", pitch: "Your data, your races, and a preview of your plan.", cta: "Create my account",
-        features: ["Garmin, Coros, Polar sync", "HRV, sleep and training load", "Full history of your sessions", "14,000 upcoming races", "The next 2 days of your plan", "Streak, leagues and trophies"] },
+        features: ["Garmin, COROS, Suunto sync", "HRV, sleep and training load", "Full history of your sessions", "14,000 upcoming races", "The next 2 days of your plan", "Streak, leagues and trophies"] },
       { cle: "starter", name: "Starter", pitch: "The self-replanning coach, plus 10 AI questions a day.", cta: "Try 7 days",
         features: ["Everything in Free", "7-day plan, continuously replanned", "Sessions pushed to your watch", "10 AI exchanges per day", "AI analysis of your sessions", "AI physio, with photo"] },
       { cle: "premium", name: "Premium", pitch: "The same coach, plus 30 AI questions a day.", badge: "Most popular", cta: "Try 7 days",
@@ -182,7 +192,7 @@ const en: LandingDict = {
 const de: LandingDict = {
   nav: { programs: "Programme", features: "Funktionen", pricing: "Preise", blog: "Blog", reviews: "Bewertungen", login: "Anmelden", trial: "Gratis testen" },
   hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "Deine Uhr misst längst alles: HRV, Schlaf, Belastung, Tempo. Pacevo macht daraus eine Einheit — Dauer, Intensität, Erholung — bei jeder Synchronisation neu berechnet.", ctaPrimary: "Kostenlos starten" },
-  sync: { title: "Synchronisiert mit", read: "Deine Daten lesen:", readValue: "alle {n} Plattformen.", push: "Einheit auf deine Uhr senden:", pushBridge: "Senden an {marque}:", pushBridgeValue: "über die iOS-App {app}.", pushApp: "An eine Trainings-App senden:", note: "Alles läuft über intervals.icu, das die offiziellen Verbindungen jedes Herstellers verwaltet. Pacevo greift nie direkt auf deine Konten zu. Polar liest deine Läufe, kann aber keine Einheit empfangen: Die API lässt es nicht zu. * Die Apple Watch hat keine offizielle Verbindung — eine iOS-App von Drittanbietern (Intervals Companion) deckt beide Richtungen ab: Sie sendet deine Einheiten an intervals.icu und wandelt den Plan für deine Uhr um." },
+  sync: { title: "Synchronisiert mit", read: "Deine Daten lesen:", readValue: "alle {n} Plattformen.", push: "Einheit auf deine Uhr senden:", pushBridge: "Senden an {marque}:", pushBridgeValue: "über die iOS-App {app}.", pushApp: "An eine Trainings-App senden:", note: "Alles läuft über intervals.icu, das die offiziellen Verbindungen jedes Herstellers verwaltet. Pacevo greift nie direkt auf deine Konten zu. * Die Apple Watch hat keine offizielle Verbindung — eine iOS-App von Drittanbietern (Intervals Companion) deckt beide Richtungen ab: Sie sendet deine Einheiten an intervals.icu und wandelt den Plan für deine Uhr um." },
   stats: { races: "Kommende Rennen", routes: "Kartierte Strecken", plan: "Rollierender Plan", replan: "Zwischen zwei Neuplanungen" },
   programs: {
     eyebrow: "Training", title: "Ein Programm für jedes Ziel", subtitle: "Vom ersten 5-km-Lauf bis zum Ultra-Trail — jeder Plan passt sich dann an deine echten Daten an.", viewAll: "Alle ansehen",
@@ -212,7 +222,7 @@ const de: LandingDict = {
     ],
     items: [
       { title: "HRV und Schlaf", desc: "HRV am Morgen, Tief- und REM-Schlaf, Body Battery: die Frische des Tages kommt aus Messungen, nicht aus einem Gefühl." },
-      { title: "Sync mit Garmin, Coros, Polar", desc: "Aktivitäten, Leistung, Herzfrequenzzonen und Wellness-Daten laufend über intervals.icu geholt." },
+      { title: "Sync mit Garmin, COROS, Suunto", desc: "Aktivitäten, Leistung, Herzfrequenzzonen und Wellness-Daten laufend über intervals.icu geholt." },
       { title: "Echtes Wetter an deinem Ort", desc: "Hitze, Feuchte, Wind und Höhe: Zieltempi werden vor der Einheit korrigiert, nicht danach erklärt." },
       { title: "Trail Builder", desc: "Strecke auf echte Wege gerastet, Höhenmeter berechnet, GPX-Export direkt auf die Uhr." },
       { title: "Smart Journal per Stimme", desc: "Erzähl deine Einheit laut: was du sagst, wiegt in der Verordnung von morgen." },
@@ -230,7 +240,7 @@ const de: LandingDict = {
     gratuitNote: "Keine Karte nötig für die Gratis-Stufe.",
     plans: [
       { cle: "gratuit", name: "Gratis", pitch: "Deine Daten, deine Rennen und ein Blick auf deinen Plan.", cta: "Konto erstellen",
-        features: ["Sync mit Garmin, Coros, Polar", "HRV, Schlaf und Trainingsbelastung", "Vollständiger Verlauf deiner Einheiten", "14 000 kommende Rennen", "Die nächsten 2 Tage deines Plans", "Serie, Ligen und Trophäen"] },
+        features: ["Sync mit Garmin, COROS, Suunto", "HRV, Schlaf und Trainingsbelastung", "Vollständiger Verlauf deiner Einheiten", "14 000 kommende Rennen", "Die nächsten 2 Tage deines Plans", "Serie, Ligen und Trophäen"] },
       { cle: "starter", name: "Starter", pitch: "Der Coach, der sich neu plant, plus 10 KI-Fragen pro Tag.", cta: "7 Tage testen",
         features: ["Alles aus Gratis", "7-Tage-Plan, laufend neu geplant", "Einheiten direkt auf die Uhr", "10 KI-Dialoge pro Tag", "KI-Analyse deiner Einheiten", "KI-Physio, mit Foto"] },
       { cle: "premium", name: "Premium", pitch: "Derselbe Coach, plus 30 KI-Fragen pro Tag.", badge: "Am beliebtesten", cta: "7 Tage testen",
@@ -244,7 +254,7 @@ const de: LandingDict = {
 const es: LandingDict = {
   nav: { programs: "Programas", features: "Funciones", pricing: "Precios", blog: "Blog", reviews: "Opiniones", login: "Iniciar sesión", trial: "Prueba gratis" },
   hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "Tu reloj ya lo mide todo: VFC, sueño, carga, ritmos. Pacevo lo convierte en una sesión — duración, intensidad, recuperación — recalculada en cada sincronización.", ctaPrimary: "Empezar gratis" },
-  sync: { title: "Sincroniza con", read: "Lectura de tus datos:", readValue: "las {n} plataformas.", push: "Envío de la sesión a tu reloj:", pushBridge: "Envío al {marque}:", pushBridgeValue: "a través de la app para iOS {app}.", pushApp: "Envío a una app de entrenamiento:", note: "Todo pasa por intervals.icu, que gestiona las conexiones oficiales de cada fabricante. Pacevo nunca accede directamente a tus cuentas. Polar lee tus salidas pero no puede recibir sesiones: su API no lo permite. * El Apple Watch no tiene conexión oficial — una app iOS de terceros (Intervals Companion) cubre ambos sentidos: envía tus sesiones a intervals.icu y convierte el plan para tu reloj." },
+  sync: { title: "Sincroniza con", read: "Lectura de tus datos:", readValue: "las {n} plataformas.", push: "Envío de la sesión a tu reloj:", pushBridge: "Envío al {marque}:", pushBridgeValue: "a través de la app para iOS {app}.", pushApp: "Envío a una app de entrenamiento:", note: "Todo pasa por intervals.icu, que gestiona las conexiones oficiales de cada fabricante. Pacevo nunca accede directamente a tus cuentas. * El Apple Watch no tiene conexión oficial — una app iOS de terceros (Intervals Companion) cubre ambos sentidos: envía tus sesiones a intervals.icu y convierte el plan para tu reloj." },
   stats: { races: "Carreras próximas", routes: "Rutas cartografiadas", plan: "De plan deslizante", replan: "Entre dos replanificaciones" },
   programs: {
     eyebrow: "Entrenamiento", title: "Un programa para cada objetivo", subtitle: "Desde tu primer 5K hasta el ultra-trail — cada plan se adapta luego a tus datos reales.", viewAll: "Ver todo",
@@ -274,7 +284,7 @@ const es: LandingDict = {
     ],
     items: [
       { title: "VFC y sueño", desc: "VFC al despertar, sueño profundo y REM, Body Battery: la frescura del día sale de medidas, no de una sensación." },
-      { title: "Sync Garmin, Coros, Polar", desc: "Actividades, potencia, zonas cardio y datos de bienestar recogidos en continuo vía intervals.icu." },
+      { title: "Sync Garmin, COROS, Suunto", desc: "Actividades, potencia, zonas cardio y datos de bienestar recogidos en continuo vía intervals.icu." },
       { title: "Meteo real en tu posición", desc: "Calor, humedad, viento y altitud: los ritmos objetivo se corrigen antes de la sesión, no se explican después." },
       { title: "Trail Builder", desc: "Trazado pegado a senderos reales, desnivel calculado, exportación GPX directa al reloj." },
       { title: "Smart Journal por voz", desc: "Cuenta tu sesión en voz alta: lo que dices pesa en la prescripción de mañana." },
@@ -292,7 +302,7 @@ const es: LandingDict = {
     gratuitNote: "Sin tarjeta para el nivel gratuito.",
     plans: [
       { cle: "gratuit", name: "Gratis", pitch: "Tus datos, tus carreras y un adelanto de tu plan.", cta: "Crear mi cuenta",
-        features: ["Sync Garmin, Coros, Polar", "VFC, sueño y carga de entrenamiento", "Historial completo de tus sesiones", "14 000 carreras próximas", "Los 2 próximos días de tu plan", "Racha, ligas y trofeos"] },
+        features: ["Sync Garmin, COROS, Suunto", "VFC, sueño y carga de entrenamiento", "Historial completo de tus sesiones", "14 000 carreras próximas", "Los 2 próximos días de tu plan", "Racha, ligas y trofeos"] },
       { cle: "starter", name: "Starter", pitch: "El entrenador que se replanifica, más 10 preguntas a la IA al día.", cta: "Probar 7 días",
         features: ["Todo lo gratuito", "Plan de 7 días replanificado en continuo", "Sesiones enviadas al reloj", "10 intercambios con la IA al día", "Análisis IA de tus sesiones", "Fisio IA, con foto"] },
       { cle: "premium", name: "Premium", pitch: "El mismo entrenador, más 30 preguntas a la IA al día.", badge: "El más elegido", cta: "Probar 7 días",
@@ -306,7 +316,7 @@ const es: LandingDict = {
 const pt: LandingDict = {
   nav: { programs: "Programas", features: "Funcionalidades", pricing: "Preços", blog: "Blog", reviews: "Avaliações", login: "Entrar", trial: "Teste grátis" },
   hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "O teu relógio já mede tudo: VFC, sono, carga, ritmos. A Pacevo transforma isso num treino — duração, intensidade, recuperação — recalculado a cada sincronização.", ctaPrimary: "Começar grátis" },
-  sync: { title: "Sincroniza com", read: "Leitura dos teus dados:", readValue: "as {n} plataformas.", push: "Envio do treino para o teu relógio:", pushBridge: "Envio para o {marque}:", pushBridgeValue: "através da app iOS {app}.", pushApp: "Envio para uma app de treino:", note: "Tudo passa pelo intervals.icu, que gere as ligações oficiais de cada fabricante. A Pacevo nunca acede diretamente às tuas contas. A Polar lê os teus treinos mas não pode receber sessões: a API não o permite. * O Apple Watch não tem ligação oficial — uma app iOS de terceiros (Intervals Companion) cobre ambos os sentidos: envia os teus treinos para o intervals.icu e converte o plano para o teu relógio." },
+  sync: { title: "Sincroniza com", read: "Leitura dos teus dados:", readValue: "as {n} plataformas.", push: "Envio do treino para o teu relógio:", pushBridge: "Envio para o {marque}:", pushBridgeValue: "através da app iOS {app}.", pushApp: "Envio para uma app de treino:", note: "Tudo passa pelo intervals.icu, que gere as ligações oficiais de cada fabricante. A Pacevo nunca acede diretamente às tuas contas. * O Apple Watch não tem ligação oficial — uma app iOS de terceiros (Intervals Companion) cobre ambos os sentidos: envia os teus treinos para o intervals.icu e converte o plano para o teu relógio." },
   stats: { races: "Provas futuras", routes: "Percursos cartografados", plan: "De plano deslizante", replan: "Entre duas replanificações" },
   programs: {
     eyebrow: "Treino", title: "Um programa para cada objetivo", subtitle: "Do teu primeiro 5K ao ultra-trail — cada plano adapta-se depois aos teus dados reais.", viewAll: "Ver tudo",
@@ -336,7 +346,7 @@ const pt: LandingDict = {
     ],
     items: [
       { title: "VFC e sono", desc: "VFC ao acordar, sono profundo e REM, Body Battery: a frescura do dia vem de medições, não de uma sensação." },
-      { title: "Sync Garmin, Coros, Polar", desc: "Atividades, potência, zonas cardio e dados de bem-estar recolhidos em contínuo via intervals.icu." },
+      { title: "Sync Garmin, COROS, Suunto", desc: "Atividades, potência, zonas cardio e dados de bem-estar recolhidos em contínuo via intervals.icu." },
       { title: "Meteorologia real na tua posição", desc: "Calor, humidade, vento e altitude: os ritmos alvo são corrigidos antes da sessão, não explicados depois." },
       { title: "Trail Builder", desc: "Traçado colado a trilhos reais, desnível calculado, exportação GPX direta para o relógio." },
       { title: "Smart Journal por voz", desc: "Conta a tua sessão em voz alta: o que dizes pesa na prescrição de amanhã." },
@@ -354,7 +364,7 @@ const pt: LandingDict = {
     gratuitNote: "Sem cartão para o nível gratuito.",
     plans: [
       { cle: "gratuit", name: "Grátis", pitch: "Os teus dados, as tuas provas e uma amostra do teu plano.", cta: "Criar a minha conta",
-        features: ["Sync Garmin, Coros, Polar", "VFC, sono e carga de treino", "Histórico completo das tuas sessões", "14 000 provas futuras", "Os 2 próximos dias do teu plano", "Série, ligas e troféus"] },
+        features: ["Sync Garmin, COROS, Suunto", "VFC, sono e carga de treino", "Histórico completo das tuas sessões", "14 000 provas futuras", "Os 2 próximos dias do teu plano", "Série, ligas e troféus"] },
       { cle: "starter", name: "Starter", pitch: "O treinador que se replanifica, mais 10 perguntas à IA por dia.", cta: "Testar 7 dias",
         features: ["Tudo o gratuito", "Plano de 7 dias replanificado em contínuo", "Sessões enviadas para o relógio", "10 trocas com a IA por dia", "Análise IA das tuas sessões", "Fisio IA, com foto"] },
       { cle: "premium", name: "Premium", pitch: "O mesmo treinador, mais 30 perguntas à IA por dia.", badge: "O mais escolhido", cta: "Testar 7 dias",
