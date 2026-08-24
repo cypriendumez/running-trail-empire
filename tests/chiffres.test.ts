@@ -500,6 +500,17 @@ test("le Tour du Mont-Blanc est annoncé pour ce qu'il est : une randonnée", ()
   assert.ok(!/6[  ,]?087/.test(sansCom2), "le dénivelé partiel du TMB est revenu : il sous-estime un tour fait en entier");
   assert.ok(!/83\s?(?:km|kilom)/.test(sansCom2), "le kilométrage partiel du TMB est revenu");
   assert.ok(!/170\s?(?:km|kilom)/.test(sansCom2), "les 170 km du tour officiel ne sont pas une mesure personnelle");
+  // ⚠️ LA DURÉE EST DITE EN JOURS, ET IDENTIQUE DANS LES CINQ LANGUES. Elle est passée
+  // d'« une semaine » à « quatre jours » le 24/08/2026, sur correction de Cyprien. Une
+  // langue qui garderait l'ancienne formulation raconterait un autre voyage — et c'est
+  // typiquement ce qui survit à une correction faite langue par langue.
+  const duree = [/quatre jours de marche/, /four days on foot/, /vier Tagen zu Fuß/,
+                 /cuatro días a pie/, /quatro dias a pé/];
+  for (const d of duree) {
+    assert.match(sansCom2, d, `une langue n'annonce pas quatre jours (${d.source})`);
+  }
+  assert.ok(!/une semaine de marche|a week on foot|einer Woche zu Fuß|una semana a pie|numa semana a pé/.test(sansCom2),
+    "l'ancienne durée « une semaine » est revenue dans une langue");
   // Les trois pays, eux, sont attestés : Saint-Gervais, Courmayeur, Orsières.
   for (const lieu of ["Saint-Gervais", "Courmayeur", "Orsières"]) {
     const n = (sansCom2.match(new RegExp(lieu, "g")) ?? []).length;
