@@ -506,6 +506,60 @@ test("le Tour du Mont-Blanc est annoncé pour ce qu'il est : une randonnée", ()
     assert.equal(n, 5, `« ${lieu} » apparaît ${n} fois au lieu de 5 : une langue a perdu l'itinéraire attesté`);
   }
 });
+test("la newsletter n'explique plus sa politique éditoriale à ses abonnés", () => {
+  // Retirée le 24/08/2026 sur demande de Cyprien : « Chaque titre renvoie chez l'éditeur
+  // — on ne recopie aucun article » explique une règle interne dont l'abonné n'a que
+  // faire, en plein chapô. La règle, elle, tient toujours : les titres restent des liens.
+  const src = readFileSync(join(ROOT, "src/lib/newsletter/email.ts"), "utf8");
+  const chapos = [...src.matchAll(/chapo:\s*"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1]);
+  assert.equal(chapos.length, 5, `${chapos.length} chapô(s) trouvé(s), 5 langues attendues`);
+  for (const c of chapos) {
+    assert.ok(!/recopie|reproduc|reproduz|wieder/i.test(c), `la phrase éditoriale est revenue : « ${c} »`);
+    assert.ok(c.trim().length > 8, `chapô vide ou tronqué : « ${c} »`);
+  }
+});
+test("le lanceur du Bureau ouvre les adresses que le code utilise vraiment", () => {
+  // ⚠️ UN RACCOURCI QUI OUVRE UN SITE MORT EST PIRE QUE PAS DE RACCOURCI. Les adresses
+  // du lanceur macOS sont écrites à la main dans un script AppleScript, hors du champ du
+  // compilateur : rien ne les relie au reste du projet. Le jour d'un changement de
+  // domaine ou de projet Supabase, elles pointeraient dans le vide sans que rien ne le
+  // signale — et Cyprien découvrirait le problème en cliquant.
+  const chemin = join(ROOT, "outils/pacevo-liens.applescript");
+  if (!existsSync(chemin)) return; // le lanceur est optionnel : son absence n'est pas un défaut
+  const script = readFileSync(chemin, "utf8");
+
+  // 1. L'adresse de l'application doit être celle que le code sert par défaut.
+  const parDefaut = readFileSync(join(ROOT, "src/lib/notify/planReady.ts"), "utf8")
+    .match(/NEXT_PUBLIC_APP_URL \|\| "([^"]+)"/)?.[1];
+  assert.ok(parDefaut, "impossible de lire l'adresse par défaut du projet");
+
+  // 2. Le projet Supabase doit être celui de la configuration, pas un ancien.
+  const ref = readFileSync(join(ROOT, ".env.local"), "utf8")
+    .match(/NEXT_PUBLIC_SUPABASE_URL=https:\/\/([a-z0-9]+)\.supabase\.co/)?.[1];
+  assert.ok(ref, "impossible de lire la référence du projet Supabase");
+
+  // 3. Toutes les adresses sont en HTTPS et sans espace : une URL malformée dans un
+  //    AppleScript échoue silencieusement, la fenêtre se ferme sans rien ouvrir.
+  //
+  // ⚠️ ON VÉRIFIE CHAQUE ADRESSE, PAS LA PRÉSENCE DU DOMAINE. Première version :
+  // `script.includes(parDefaut)`. Le domaine apparaît SIX fois dans le fichier (site,
+  // admin, compta, histoire, et deux fois dans la liste « ouvrir tout ») : en changer une
+  // seule laissait le test vert. Vérifié par mutation. Septième fois que ce piège
+  // m'attrape dans ce projet — un motif présent N fois ne rougit que si les N tombent.
+  const toutes = [...script.matchAll(/"(https:\/\/[^"]*)"/g)].map((m) => m[1]);
+  assert.ok(toutes.length >= 12, `seulement ${toutes.length} adresse(s) dans le lanceur`);
+  for (const u of toutes) {
+    assert.match(u, /^https:\/\/\S+$/, `adresse malformée dans le lanceur : « ${u} »`);
+    // Toute adresse Pacevo doit viser le domaine que le code sert par défaut.
+    if (/vercel\.app/.test(u)) {
+      assert.ok(u.startsWith(parDefaut!), `« ${u} » ne vise pas ${parDefaut}`);
+    }
+    // Toute adresse Supabase doit viser le projet de la configuration.
+    if (/supabase\.com/.test(u)) {
+      assert.ok(u.includes(ref!), `« ${u} » ouvre un autre projet que ${ref}`);
+    }
+  }
+});
 test("la page « notre histoire » est atteignable depuis les deux barres de navigation", () => {
   // ⚠️ LE SITE A DEUX EN-TÊTES DISTINCTS, et c'est le piège de cette page : la landing
   // dessine sa propre barre (elle a un hero transparent), les autres pages utilisent
