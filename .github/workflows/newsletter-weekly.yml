@@ -57,6 +57,19 @@ jobs:
           reponse=$(curl -sS --max-time 120 -w '\n%{http_code}' \
             -H "Authorization: Bearer ${CRON_SECRET}" \
             "${PACEVO_URL}/api/newsletter/weekly")
+
+      # ⚠️ ÉTAPE INDÉPENDANTE, avec `if: always()`. Le résumé d'actualité et le plan de la
+      # semaine n'ont aucun rapport : si Gemini est en panne et fait échouer le premier,
+      # l'athlète doit quand même recevoir sa semaine.
+      - name: Envoyer le plan de la semaine
+        if: always()
+        env:
+          PACEVO_URL: ${{ secrets.PACEVO_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error --max-time 120 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${PACEVO_URL}/api/cron/plan-semaine"
           corps=$(printf '%s' "$reponse" | sed '$d')
           code=$(printf '%s' "$reponse" | tail -n1)
           echo "HTTP ${code}"

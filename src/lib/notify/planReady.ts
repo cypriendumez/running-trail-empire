@@ -24,6 +24,7 @@ import type { Lang } from "@/lib/i18n/translations";
 // ⚠️ IMPORTÉE, jamais recopiée : `tests/chiffres.test.ts` interdit qu'un fichier
 // redéclare l'identité de l'éditeur. On n'utilise QUE `nom` — `statut` porte encore
 // le gabarit « [À COMPLÉTER] », qui n'a rien à faire dans la boîte d'un client.
+import { coquille, carte, titreBloc, pastille, bouton, esc, VERT } from "@/lib/notify/gabarit";
 import { EDITEUR } from "@/lib/brand/editeur";
 
 /** Deux séances dans la même matinée ne valent pas deux e-mails. */
@@ -151,12 +152,6 @@ const T: Record<Lang, Dict> = {
 
 const LOCALE: Record<Lang, string> = { fr: "fr-FR", en: "en-GB", de: "de-DE", es: "es-ES", pt: "pt-PT" };
 
-/** Échappement HTML — le nom de l'athlète et les titres de séance viennent de la base
- *  et d'intervals.icu (donc du nom que Garmin a donné à la sortie). Un titre contenant
- *  un chevron casserait la mise en page, et pire, pourrait injecter du balisage. */
-const esc = (s: string) =>
-  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-
 /**
  * Construit l'e-mail. Fonction PURE : aucune requête, aucun envoi — c'est ce qui la
  * rend testable, et c'est là que vivent toutes les règles de contenu.
@@ -210,82 +205,27 @@ export function buildPlanReadyEmail(i: PlanReadyInput): { subject: string; text:
 
   // ── Version HTML ────────────────────────────────────────────────────────────
   //
-  //  ⚠️ REFAIT LE 23/08/2026. Le gabarit précédent était un `<div>` nu sur fond blanc,
-  //  sans en-tête ni pied de page : il ressemblait à une notification de service, pas au
-  //  produit qu'on vend. Quatre défauts, tous visibles dans une vraie boîte de réception.
-  //
-  //   1. AUCUNE LIGNE D'APERÇU. La messagerie prend alors le début du corps : la liste
-  //      affichait « PACEVO Salut Cyprien, T… » — l'athlète devait ouvrir pour savoir de
-  //      quoi il s'agissait. Le `preheader` ci-dessous, masqué dans le message, occupe
-  //      cette place et annonce la prochaine séance.
-  //   2. MISE EN PAGE EN `div`. Outlook (Windows) ignore `max-width` sur un bloc : le
-  //      message s'étalait sur toute la largeur de la fenêtre. On repasse en TABLEAUX,
-  //      seule structure que toutes les messageries respectent encore.
-  //   3. PAS DE LOGO. Demandé par Cyprien. L'image est distante — les messageries les
-  //      bloquent par défaut — donc le nom PACEVO reste écrit à côté, en texte : image
-  //      bloquée, l'en-tête tient quand même.
-  //   4. PIED DE PAGE MUET. « Pour les désactiver : Profil → Notifications » obligeait à
-  //      chercher. C'est un LIEN maintenant, et l'éditeur est nommé.
-  //
-  //  Contraintes qui ne changent pas : styles EN LIGNE (aucune feuille externe n'est
-  //  chargée), une seule colonne, et la version texte reste autosuffisante.
-  const B = "#059669";                 // émeraude de la marque
-  // ⚠️ LE MÊME FICHIER QUE LES AUTRES E-MAILS PACEVO (`/icon.png`, déjà utilisé par
-  // l'accusé d'inscription et la lettre du lundi). J'avais d'abord fabriqué un
-  // `email-logo.png` dédié, plus léger — mais deux logos finissent par diverger, et rien
-  // ne le signalerait : un client verrait deux marques différentes selon le message reçu.
-  const logo = `${i.appUrl}/icon.png`;
+  //  ⚠️ L'HABILLAGE VIT DANS `lib/notify/gabarit`, IL N'EST PLUS ÉCRIT ICI. Il l'était
+  //  jusqu'au 24/08/2026 ; en écrivant le deuxième e-mail de plan, le recopier aurait
+  //  produit exactement le défaut qu'on venait de corriger sur les logos — deux
+  //  habillages écrits séparément divergent, et le client reçoit deux marques selon le
+  //  message. Le raisonnement derrière chaque détail (ligne d'aperçu, tableaux pour
+  //  Outlook, texte de remplacement du logo) est documenté là-bas.
   const preheader = next ? t.preheader(`${dayLabel(next.date)} · ${titre(next)}`) : t.preheaderNoNext;
 
-  const card = (inner: string) =>
-    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:18px 0">
-       <tr><td style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:18px 20px">${inner}</td></tr>
-     </table>`;
-  const titreBloc = (txt: string) =>
-    `<div style="font:600 11px/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;text-transform:uppercase;letter-spacing:.09em;color:#64748b">${esc(txt)}</div>`;
-
-  const html = `<!doctype html>
-<html lang="${i.lang}">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="color-scheme" content="light">
-<meta name="supported-color-schemes" content="light">
-<title>${esc(subject)}</title>
-</head>
-<body style="margin:0;padding:0;background:#eef2f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a">
-<!-- Ligne d'aperçu : lue par la liste des messages, invisible une fois ouvert. Les
-     espaces insécables qui suivent empêchent la messagerie d'y accoler le corps. -->
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all">${esc(preheader)}${"&#8199;&#65279;&nbsp;".repeat(60)}</div>
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#eef2f6">
-<tr><td align="center" style="padding:32px 16px">
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:100%;max-width:600px">
-
-    <!-- En-tête : logo + nom. Si l'image est bloquée, le nom reste. -->
-    <tr><td style="padding:0 4px 16px">
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-        <td style="padding-right:10px;vertical-align:middle">
-          <img src="${esc(logo)}" width="34" height="34" alt="Pacevo"
-               style="display:block;width:34px;height:34px;border:0;border-radius:9px">
-        </td>
-        <td style="vertical-align:middle;font:800 19px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;letter-spacing:-.02em;color:${B}">PACEVO</td>
-      </tr></table>
-    </td></tr>
-
-    <!-- Corps -->
-    <tr><td style="background:#ffffff;border:1px solid #e2e8f0;border-radius:18px;padding:28px 26px">
+  const contenu = `
       <div style="font:600 17px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a">${esc(t.hello(i.firstName))}</div>
       <div style="margin-top:8px;font-size:15px;line-height:1.65;color:#334155">${esc(t.intro)}</div>
-      ${objLine ? `<div style="margin-top:14px"><span style="display:inline-block;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;color:#047857">${esc(objLine)}</span></div>` : ""}
+      ${objLine ? pastille(objLine) : ""}
 
-      ${i.lastSession ? card(
+      ${i.lastSession ? carte(
         `${titreBloc(t.lastSessionTitle)}
          <div style="margin-top:8px;font-size:15px;font-weight:700;color:#0f172a">${esc(i.lastSession.label)}</div>
-         ${i.lastSession.shows.length ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:10px">${i.lastSession.shows.map((x) => `<tr><td style="padding:3px 8px 3px 0;color:${B};font-size:14px;line-height:1.5;vertical-align:top">&bull;</td><td style="padding:3px 0;color:#334155;font-size:14px;line-height:1.5">${esc(x)}</td></tr>`).join("")}</table>` : ""}
+         ${i.lastSession.shows.length ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:10px">${i.lastSession.shows.map((x) => `<tr><td style="padding:3px 8px 3px 0;color:${VERT};font-size:14px;line-height:1.5;vertical-align:top">&bull;</td><td style="padding:3px 0;color:#334155;font-size:14px;line-height:1.5">${esc(x)}</td></tr>`).join("")}</table>` : ""}
          <div style="margin-top:12px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:14px;font-weight:600;color:#0f172a">${esc(i.lastSession.effect)}</div>`,
       ) : ""}
 
-      ${days.length ? card(
+      ${days.length ? carte(
         `${titreBloc(t.nextDaysTitle)}
          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:6px">
          ${days.map((d) => `<tr>
@@ -295,25 +235,12 @@ export function buildPlanReadyEmail(i: PlanReadyInput): { subject: string; text:
          </table>`,
       ) : ""}
 
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:22px">
-        <tr><td style="background:${B};border-radius:11px">
-          <a href="${esc(i.appUrl)}/dashboard/calendrier"
-             style="display:inline-block;padding:13px 26px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none">${esc(t.cta)}</a>
-        </td></tr>
-      </table>
-    </td></tr>
+      ${bouton(`${i.appUrl}/dashboard/calendrier`, t.cta)}`;
 
-    <!-- Pied de page : pourquoi ce message, comment l'arrêter, et qui l'envoie. -->
-    <tr><td style="padding:18px 8px 0;font-size:12px;line-height:1.6;color:#94a3b8">
-      ${esc(t.footer)}
-      <a href="${esc(i.appUrl)}/dashboard/profile" style="color:#64748b;text-decoration:underline">${esc(t.manage)}</a>
-      <div style="margin-top:8px">Pacevo &middot; ${esc(EDITEUR.nom)} &middot; <a href="${esc(i.appUrl)}/mentions-legales" style="color:#94a3b8;text-decoration:underline">${esc(i.appUrl.replace(/^https?:\/\//, ""))}</a></div>
-    </td></tr>
-
-  </table>
-</td></tr>
-</table>
-</body></html>`;
+  const html = coquille({
+    lang: i.lang, sujet: subject, apercu: preheader, contenu,
+    appUrl: i.appUrl, piedTexte: t.footer, piedLien: t.manage,
+  });
 
   return { subject, text, html };
 }

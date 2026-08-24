@@ -17,6 +17,7 @@ import { summarizeCross } from "../src/lib/coach/crossTraining";
 import { computeQualityBudget } from "../src/lib/coach/qualityBudget";
 import { shardForPass, replanIfFresh } from "../src/lib/intervals/syncAndCoach";
 import { buildPlanReadyEmail } from "../src/lib/notify/planReady";
+import { buildPlanSemaineEmail } from "../src/lib/notify/planSemaine";
 import { joursEssaiStripe } from "../src/lib/billing/access";
 import { messageAbo, litEtatAbo } from "../src/lib/billing/etatAbonnement";
 import { poseAt, capLisse } from "../src/lib/segments/flyover";
@@ -4083,6 +4084,98 @@ test("un titre de séance ne peut pas casser le HTML", () => {
   assert.ok(!/<script>/.test(m.html), "balise script non échappée dans l'e-mail");
   assert.ok(!/<b>gras<\/b>/.test(m.html), "balisage non échappé dans un titre de séance");
   assert.ok(/&lt;script&gt;/.test(m.html), "l'échappement doit conserver le texte, pas le supprimer");
+});
+test("le récapitulatif du lundi ne s'envoie pas vide, et dit le vrai", () => {
+  // ⚠️ IL REMPLACE CELUI D'INTERVALS.ICU. Comme Pacevo écrit les séances dans le
+  // calendrier intervals.icu, celui-ci envoyait son propre « Plan de la semaine » — son
+  // logo, son adresse à Londres, un « Bonjour running » tiré du nom de compte, et chez
+  // Cyprien il atterrissait dans les indésirables. La notification `PLAN_FOR_WEEK` a été
+  // retirée de son compte le 24/08/2026 ; ce mail prend sa place.
+  const jours = (titres: (string | null)[]) =>
+    titres.map((titre, k) => ({ date: `2026-08-${String(24 + k).padStart(2, "0")}`, titre }));
+  const base = { lang: "fr" as const, firstName: "Cyprien", objective: null, appUrl: "https://x.fr" };
+
+  // ⚠️ UNE SEMAINE SANS AUCUNE SÉANCE NE PART PAS. Sept lignes « repos » apprennent à
+  // l'athlète à ne plus ouvrir les suivants — et c'est l'e-mail hebdomadaire qui meurt.
+  assert.equal(buildPlanSemaineEmail({ ...base, jours: jours([null, null, null, null, null, null, null]) }), null,
+    "une semaine vide ne doit pas produire d'e-mail");
+
+  // ⚠️ UN REPOS PRESCRIT N'EST PAS UNE SÉANCE. L'e-mail annonçait « 7 séances » pour une
+  // semaine qui en contenait six plus un jour de repos, parce qu'un repos porte un titre
+  // (« Repos complet ») comme n'importe quelle autre journée. Constaté sur les vraies
+  // données de Cyprien avant tout envoi.
+  const avecRepos = [
+    { date: "2026-08-24", titre: "Footing", repos: false },
+    { date: "2026-08-25", titre: "Repos complet", repos: true },
+    { date: "2026-08-26", titre: "Seuil", repos: false },
+    { date: "2026-08-27", titre: null, repos: false },
+    { date: "2026-08-28", titre: null, repos: false },
+    { date: "2026-08-29", titre: "Sortie longue", repos: false },
+    { date: "2026-08-30", titre: null, repos: false },
+  ];
+  const r2 = buildPlanSemaineEmail({ ...base, jours: avecRepos })!;
+  assert.match(r2.subject, /3 séances/, `un repos prescrit ne doit pas être compté : ${r2.subject}`);
+  assert.ok(r2.text.includes("Repos complet"), "un repos prescrit doit rester AFFICHÉ, il fait partie du plan");
+  // ⚠️ ET LE LECTEUR EN BASE DOIT S'APPUYER SUR `sessionType`, PAS SUR LE TITRE. Les
+  // assertions ci-dessus fabriquent les journées à la main : elles ne touchent jamais le
+  // code qui les lit. Vérifié par mutation — remplacer le test de type par un
+  // `/repos/i.test(title)` restait VERT. Or le titre est TRADUIT : chercher le mot
+  // « repos » dans un titre allemand (« Ruhetag ») ne trouve rien, et l'athlète
+  // germanophone se verrait annoncer une séance de plus qu'il n'en a.
+  const lecteur = codeOf("src/lib/notify/planSemaine.ts");
+  assert.match(lecteur, /sessionType === "Repos"/, "le repos doit être lu sur le type canonique");
+  assert.ok(!/test\(r\.title/.test(lecteur), "le repos ne doit pas être deviné depuis un titre traduit");
+
+  const m = buildPlanSemaineEmail({ ...base, jours: jours(["Footing", null, "Seuil", null, null, "Sortie longue", null]) })!;
+  assert.ok(m, "une semaine avec des séances doit produire un e-mail");
+  // Le nombre annoncé est COMPTÉ, jamais approximé : trois séances, quatre repos.
+  assert.match(m.subject, /3 séances/, `sujet inattendu : ${m.subject}`);
+  assert.match(m.html, /3 séances et 4 jours de repos/, "la ligne d'aperçu doit compter juste");
+  // Les jours de repos sont AFFICHÉS comme tels, pas masqués : une semaine tronquée
+  // laisserait croire à un plan plus léger qu'il n'est.
+  assert.equal((m.text.match(/Repos/g) ?? []).length, 4, "les quatre jours de repos doivent apparaître");
+  // Sept lignes, toujours : le tableau couvre la semaine entière.
+  assert.equal((m.text.match(/^ {2}\w+ \d+/gm) ?? []).length, 7, "le tableau doit couvrir les sept jours");
+
+  // Il partage le gabarit de l'autre e-mail — logo, aperçu, tableaux Outlook.
+  assert.ok(m.html.includes("/icon.png"), "e-mail sans logo");
+  assert.match(m.html, /<img[^>]+alt="Pacevo"/, "le logo n'a pas de texte de remplacement");
+  assert.ok(m.html.includes("mso-hide:all"), "pas de ligne d'aperçu masquée");
+  assert.ok(m.html.includes('width="600"'), "largeur non fixée pour Outlook");
+  assert.ok(!m.html.includes("undefined"), "« undefined » dans le corps");
+  assert.ok(!m.html.includes("COMPLÉTER"), "gabarit juridique non résolu");
+  assert.ok(m.text.includes("/dashboard/profile"), "la version texte ne dit pas comment couper les e-mails");
+
+  // Les cinq langues répondent, et aucune ne retombe sur une clé.
+  for (const lang of ["fr", "en", "de", "es", "pt"] as const) {
+    const x = buildPlanSemaineEmail({ ...base, lang, jours: jours(["Footing", null, null, null, null, null, null] as (string | null)[]) })!;
+    assert.ok(x && x.subject.trim().length > 8, `${lang} : sujet vide`);
+    assert.ok(!x.html.includes("undefined"), `${lang} : clé manquante`);
+  }
+});
+test("le récapitulatif du lundi refuse de partir un autre jour", () => {
+  // ⚠️ LA ROUTE EST PUBLIQUE-PAR-SECRET. Un appel manuel un jeudi enverrait à TOUS les
+  // athlètes un « voici ta semaine » au milieu de leur semaine — et un e-mail ne se
+  // rattrape pas. La garde est dans la route, pas seulement dans le déclencheur.
+  const src = codeOf("src/app/api/cron/plan-semaine/route.ts");
+  assert.match(src, /getUTCDay\(\) !== 1/, "la route ne vérifie pas qu'on est lundi");
+  // ⚠️ `getUTCDay`, PAS `getDay` : le serveur tourne aux États-Unis (région iad1), où il
+  // est encore dimanche soir quand l'Europe est lundi matin.
+  assert.ok(!/\.getDay\(\)/.test(src), "`getDay()` dépend du fuseau du serveur, qui est américain");
+  assert.match(src, /CRON_SECRET/, "la route n'est pas protégée par le secret de cron");
+  // Et le déclencheur du lundi doit vraiment l'appeler, sinon la route est du code mort.
+  const wf = readFileSync("/Users/cypriendumez/Desktop/running-trail-empire/.github/workflows/newsletter-weekly.yml", "utf8");
+  assert.match(wf, /api\/cron\/plan-semaine/, "aucun déclencheur n'appelle la route");
+  // ⚠️ ON ISOLE L'ÉTAPE, ON NE CHERCHE PAS LE MOTIF DANS TOUT LE FICHIER. `if: always()`
+  // y figure DEUX fois — l'autre appartient à une étape sans rapport. Un `match` global
+  // restait donc vert alors que le plan de la semaine avait perdu sa garantie. Sixième
+  // fois que ce piège m'attrape dans ce projet : un motif présent N fois ne rougit que
+  // si les N disparaissent.
+  const debutEtape = wf.indexOf("Envoyer le plan de la semaine");
+  assert.ok(debutEtape > 0, "l'étape d'envoi du plan a disparu du déclencheur");
+  const etape = wf.slice(debutEtape, wf.indexOf("api/cron/plan-semaine", debutEtape));
+  assert.match(etape, /if: always\(\)/,
+    "une panne du résumé d'actualité priverait l'athlète de sa semaine : l'étape doit tourner quand même");
 });
 test("l'e-mail porte le logo, une ligne d'aperçu et une mise en page qui tient dans Outlook", () => {
   // Refonte du 23/08/2026, demandée par Cyprien (« fais plus pro et mets le logo »).
