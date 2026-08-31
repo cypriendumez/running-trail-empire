@@ -292,6 +292,14 @@ export async function sendPlanReadyEmail(
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         from: process.env.RESEND_FROM || "Pacevo <onboarding@resend.dev>",
+        // ⚠️ ADRESSE DE RÉPONSE — l'expéditeur n'est PAS une boîte qui reçoit.
+        // `RESEND_FROM` pointe aujourd'hui sur un domaine de test partagé ; répondre à ce
+        // message n'atteindrait personne. Sans `reply_to`, l'athlète qui clique sur
+        // « Répondre » écrit dans le vide et croit avoir été ignoré.
+        // Bénéfice secondaire, réel mais secondaire : un échange effectif est un signal
+        // positif pour le classement du courrier (Prioritaire plutôt qu'Autre).
+        // L'adresse vient de `EDITEUR`, jamais recopiée — un test l'interdit.
+        reply_to: EDITEUR.email,
         to: [p.email],
         subject: mail.subject,
         text: mail.text,

@@ -4153,6 +4153,35 @@ test("le récapitulatif du lundi ne s'envoie pas vide, et dit le vrai", () => {
     assert.ok(!x.html.includes("undefined"), `${lang} : clé manquante`);
   }
 });
+test("un athlète qui répond à un e-mail de Pacevo atteint quelqu'un", () => {
+  // ⚠️ L'EXPÉDITEUR N'EST PAS UNE BOÎTE QUI REÇOIT. `RESEND_FROM` pointe aujourd'hui sur
+  // `onboarding@resend.dev`, le domaine de test PARTAGÉ de Resend : répondre à un message
+  // Pacevo n'atteignait personne. L'athlète clique sur « Répondre », écrit, n'obtient
+  // jamais de retour, et en conclut qu'on l'ignore. C'est le pire des silences : celui
+  // qu'on ne sait même pas avoir provoqué.
+  //
+  // Bénéfice secondaire, réel mais secondaire : un échange effectif est un signal positif
+  // pour le classement du courrier chez le destinataire.
+  const ENVOIS = [
+    "src/lib/notify/planReady.ts",
+    "src/lib/notify/planSemaine.ts",
+    "src/app/api/newsletter/weekly/route.ts",
+  ];
+  for (const f of ENVOIS) {
+    const src = codeOf(f);
+    // On ne vise que les fichiers qui envoient VRAIMENT : un `from:` sans `reply_to`.
+    assert.match(src, /from: (?:FROM|process\.env\.RESEND_FROM)/, `${f} n'envoie plus d'e-mail`);
+    assert.match(src, /reply_to: EDITEUR\.email/,
+      `${f} envoie sans adresse de réponse : répondre à ce message n'atteint personne`);
+  }
+  // ⚠️ L'ADRESSE VIENT D'`EDITEUR`, JAMAIS RECOPIÉE. Une adresse en dur dans trois
+  // fichiers survivrait à un changement de contact et enverrait les réponses des clients
+  // vers une boîte abandonnée — un test du projet interdit déjà de redéclarer l'identité
+  // de l'éditeur, celui-ci le vérifie sur le chemin des e-mails.
+  for (const f of ENVOIS) {
+    assert.ok(!/reply_to: "/.test(codeOf(f)), `${f} écrit l'adresse de réponse en dur`);
+  }
+});
 test("chaque étape du lundi se suffit à elle-même", () => {
   // ⚠️ CE TEST NAÎT D'UNE PANNE RÉELLE QUE J'AI CAUSÉE, le 24/08/2026. En ajoutant
   // l'envoi du plan de la semaine, l'étape a été insérée juste après la ligne du `curl`

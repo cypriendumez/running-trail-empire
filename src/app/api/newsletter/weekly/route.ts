@@ -6,6 +6,7 @@ import { lienDesinscription } from "@/lib/newsletter/token";
 import { resumerArticles, traduireTextes, RESUMES_MAX, type ArticleResume } from "@/lib/newsletter/resume";
 import { construireEmail, estLang, type Lang, type Section, type Course } from "@/lib/newsletter/email";
 import { RUBRIQUES_LETTRE } from "@/lib/news/rubriques";
+import { EDITEUR } from "@/lib/brand/editeur";
 
 /**
  * LE RÉSUMÉ DU LUNDI MATIN.
@@ -240,6 +241,14 @@ export async function GET(req: Request) {
         headers: { Authorization: `Bearer ${CLE}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           from: FROM, to: [email], subject: objet, text: texte, html,
+          // ⚠️ ADRESSE DE RÉPONSE — l'expéditeur n'est PAS une boîte qui reçoit.
+          // `RESEND_FROM` pointe aujourd'hui sur un domaine de test partagé ; répondre à ce
+          // message n'atteindrait personne. Sans `reply_to`, l'athlète qui clique sur
+          // « Répondre » écrit dans le vide et croit avoir été ignoré.
+          // Bénéfice secondaire, réel mais secondaire : un échange effectif est un signal
+          // positif pour le classement du courrier (Prioritaire plutôt qu'Autre).
+          // L'adresse vient de `EDITEUR`, jamais recopiée — un test l'interdit.
+          reply_to: EDITEUR.email,
           headers: { "List-Unsubscribe": `<${lien}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
         }),
         signal: AbortSignal.timeout(10000),
