@@ -6098,8 +6098,10 @@ console.log("\nTABLEAU DE BORD — les chiffres affichés doivent venir de la me
 // Chacun de ces tests fige un chiffre qui était FAUX à l'écran, pas une préférence.
 
 test("les zones lisent le temps mesuré par la montre, jamais la FC moyenne", () => {
-  const src = codeOf("src/components/dashboard/BentoDashboard.tsx");
-  const fn = src.slice(src.indexOf("function computeHrZones"), src.indexOf("function computeHrZones") + 1600);
+  // Le calcul vit désormais dans `lib/dashboard/zones` : il devait être importable pour
+  // être crash-testé (voir tests/dashboard.crash.test.ts). Ce test-ci garde les deux
+  // invariants de SOURCE que les crash-tests ne peuvent pas voir.
+  const fn = codeOf("src/lib/dashboard/zones.ts");
   // La FC MOYENNE d'une séance ne dit pas où le temps a été passé : elle rangeait un
   // footing de 73 min — dont la montre avait mesuré 68 min en Z1 — entièrement en
   // « Tempo ». D'où les 10 % d'endurance facile affichés pour 47 à 89 km par semaine.
@@ -6180,6 +6182,50 @@ test("aucune carte n'annonce un pourcentage qui n'est calculé nulle part", () =
   // La carte du rail ne doit donc plus s'annoncer comme un « statut de préparation » :
   // le nombre qu'elle affiche est le Score Discipline, que la carte Ligue nomme déjà.
   assert.ok(!src.includes("{rl.prep}"), "la carte du rail réaffiche un « statut de préparation » qu'aucun calcul ne produit");
+});
+
+test("la charge n'est plus amorcée à une forme supposée", () => {
+  const src = codeOf("src/lib/dashboard/charge.ts");
+  const page = codeOf("src/app/dashboard/page.tsx");
+  // Le modèle est une moyenne mobile de constante 42 j amorcée à `ctl = 40` et tournée
+  // 42 jours : l'amorce pesait encore 36 % du résultat. Sur ce compte, 14,5 des 53,7
+  // points de « Forme » venaient du 40 de départ. La carte annonçait « Charge
+  // équilibrée » (Fraîcheur −4) là où le vrai calcul dit « Surcharge » (−11).
+  assert.match(src, /\n  let ctl = 0;\n  let atl = 0;/,
+    "la charge repart d'une forme supposée : un tiers du chiffre affiché redevient inventé");
+  // Et il lui faut de quoi converger : la requête d'un an est la moitié du correctif.
+  assert.match(page, /gte\("date", decaleJour\(streakToday, -365\)\)/,
+    "la charge n'est plus alimentée sur un an : le modèle n'a plus le temps de converger");
+  assert.match(codeOf("src/components/dashboard/BentoDashboard.tsx"), /<TaperingWidget workouts=\{chargeHistory\}/,
+    "la carte de charge relit la liste plafonnée à 40 activités");
+});
+
+test("une VFC périmée est datée, et ne décide plus de la forme du jour", () => {
+  const src = codeOf("src/components/dashboard/BentoDashboard.tsx");
+  // Le sommeil imposait déjà 2 jours de fraîcheur ; la VFC, rien. Constaté le
+  // 01/09/2026 : la dernière mesure datait du 26 août et s'affichait sans date, et
+  // c'est elle qui produisait « Tu es frais — bon jour pour une séance de qualité ».
+  assert.match(src, /const hrvFraiche = hrvJours != null && hrvJours <= 2;/,
+    "la fraîcheur de la VFC n'est plus contrôlée");
+  assert.match(src, /computeReadiness\(hrvFraiche \? hrvDelta : null, hrvFraiche \? hrvBaseline : null,/,
+    "la forme du jour se décide à nouveau sur une VFC qui peut être périmée");
+  assert.ok(src.includes('t(hrvJours > 1 ? "dash.hrv.stale" : "dash.hrv.stale1"'),
+    "la carte VFC n'affiche plus l'âge de la mesure");
+});
+
+test("« Tes meilleures sorties » ne couronne que des courses", () => {
+  const src = codeOf("src/components/dashboard/BentoDashboard.tsx");
+  // La variable s'appelait déjà `runs` mais ne filtrait que la distance : le « dénivelé
+  // max » affiché était 1267 m, mesuré en RANDONNÉE, et n'importe quelle sortie vélo
+  // aurait raflé la « meilleure allure ».
+  assert.match(src, /const runs = workouts\.filter\(w => isRun\(w\.sport\) && \(w\.distance_km \?\? 0\) > 0\);/,
+    "les meilleures sorties réacceptent le vélo et la randonnée");
+});
+
+test("les crash-tests du tableau de bord tournent dans npm test", () => {
+  // Un fichier de tests qui n'est pas dans la chaîne ne protège personne.
+  assert.ok(readFileSync("package.json", "utf8").includes("tests/dashboard.crash.test.ts"),
+    "tests/dashboard.crash.test.ts n'est plus lancé par npm test");
 });
 
 })().then(() => {

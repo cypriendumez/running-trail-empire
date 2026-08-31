@@ -10,7 +10,7 @@
     "lint": "next lint",
     "db:push": "supabase db push",
     "db:types": "supabase gen types typescript --linked > src/types/supabase.ts",
-    "test": "npx --yes tsx tests/coach.test.ts && npx --yes tsx tests/scenarios.test.ts && npx --yes tsx tests/crash.test.ts && npx --yes tsx tests/montres.crash.test.ts && npx --yes tsx tests/synchro.crash.test.ts && npx --yes tsx tests/auth.crash.test.ts && npx --yes tsx tests/support.crash.test.ts && npx --yes tsx tests/i18n.test.ts && npx --yes tsx tests/photos.test.ts && npx --yes tsx tests/compta.test.ts && npx --yes tsx tests/chiffres.test.ts",
+    "test": "npx --yes tsx tests/coach.test.ts && npx --yes tsx tests/scenarios.test.ts && npx --yes tsx tests/crash.test.ts && npx --yes tsx tests/dashboard.crash.test.ts && npx --yes tsx tests/montres.crash.test.ts && npx --yes tsx tests/synchro.crash.test.ts && npx --yes tsx tests/auth.crash.test.ts && npx --yes tsx tests/support.crash.test.ts && npx --yes tsx tests/i18n.test.ts && npx --yes tsx tests/photos.test.ts && npx --yes tsx tests/compta.test.ts && npx --yes tsx tests/chiffres.test.ts",
     "verify": "npx tsc --noEmit && npm test",
     "stripe:setup": "node scripts/stripe-setup.mjs",
     "sync:maplibre": "cp node_modules/maplibre-gl/dist/maplibre-gl-csp-worker.js public/maplibre-gl-csp-worker.js"

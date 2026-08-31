@@ -22,6 +22,8 @@ import { SessionFeedback } from "@/components/dashboard/SessionFeedback";
 import { ObjectiveCard, type Objective } from "@/components/dashboard/ObjectiveCard";
 import { cleanActivityName } from "@/lib/utils/activityName";
 import { isRun } from "@/lib/intervals/sport";
+import { computeHrZones } from "@/lib/dashboard/zones";
+import { computeDistancePRs } from "@/lib/dashboard/records";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { ProfileCompletionBanner } from "@/components/dashboard/ProfileCompletionBanner";
 import { StreakCard } from "@/components/dashboard/StreakCard";
@@ -42,6 +44,10 @@ interface Props {
    *  requête dédiée. La liste `workouts` est plafonnée à 40 lignes : s'en servir revenait
    *  à annoncer « record personnel » sur le meilleur temps des deux derniers mois. */
   prWorkouts: { date: string; distance_km: number | null; duration_seconds: number | null }[];
+  /** Un an de charge (date + TSS), chargé à part. Le modèle CTL/ATL a une constante de
+   *  42 jours : nourri de 40 activités il ne converge pas, et l'amorce reste visible
+   *  dans le chiffre affiché. Voir `computeLoad` dans TaperingWidget. */
+  chargeHistory: { date: string; tss: number | null; type: string | null; duration_seconds: number | null }[];
   sleep?: { total_sleep_min: number; sleep_score: number; body_battery_end: number; deep_sleep_min: number; rem_sleep_min: number; date: string } | null;
   /** `i18n` = le même jour dans les autres langues (cf. lib/ai/planI18n.ts). Le français
    *  reste au premier niveau : c'est lui qui part sur la montre et sert aux analyses. */
@@ -135,7 +141,7 @@ const HR_ZONE_DEFS = [
 
 // La forme du jour est calculée à partir de données réelles : voir computeReadiness().
 
-export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkouts, sleep, coachSession, pendingFeedback, objective, currentVma, loadRisk, newMembersWeek, streak, acces }: Props) {
+export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkouts, chargeHistory, sleep, coachSession, pendingFeedback, objective, currentVma, loadRisk, newMembersWeek, streak, acces }: Props) {
   const { t, lang } = useT();
   const state = hrv[0]?.physiological_state ?? "optimal";
 
@@ -179,13 +185,25 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
   const disc = computeDiscipline(workouts, hrv, freshSleep, state);
 
   // VFC : valeur du jour + base 14 j pour situer si elle est « bonne ».
+  // ⚠️ AUCUN CONTRÔLE DE FRAÎCHEUR ICI, alors que le sommeil juste au-dessus en impose
+  //    un de deux jours. Constaté le 01/09/2026 : la dernière mesure de VFC datait du
+  //    26 août, et la carte l'affichait sans date, comme la valeur du jour. Pire, cette
+  //    valeur périmée alimentait `computeReadiness`, donc la phrase « Tu es frais — bon
+  //    jour pour une séance de qualité » reposait sur une donnée vieille de six jours.
+  //    On garde la valeur (elle est vraie, elle est juste datée) mais on dit QUAND elle
+  //    a été prise dès qu'elle n'est plus d'hier, et elle cesse de décider de la forme
+  //    du jour au-delà de ce délai.
   const hrvLatest = hrv[0]?.hrv_ms ?? null;
+  const hrvJours = hrv[0]?.date
+    ? Math.floor((Date.now() - new Date(String(hrv[0].date).slice(0, 10) + "T00:00:00").getTime()) / 86400000)
+    : null;
+  const hrvFraiche = hrvJours != null && hrvJours <= 2;
   const hrvSeries = hrv.slice(0, 14).map(h => h.hrv_ms).filter((v): v is number => v != null);
   const hrvBaseline = hrvSeries.length ? Math.round(hrvSeries.reduce((a, b) => a + b, 0) / hrvSeries.length) : null;
   const hrvDelta = hrvLatest != null && hrvBaseline != null ? hrvLatest - hrvBaseline : null;
 
   // État du jour = lecture honnête de la forme (VFC vs base + sommeil récent), pas un label figé.
-  const readiness = computeReadiness(hrvDelta, hrvBaseline, freshSleep?.sleep_score ?? null, t);
+  const readiness = computeReadiness(hrvFraiche ? hrvDelta : null, hrvFraiche ? hrvBaseline : null, freshSleep?.sleep_score ?? null, t);
 
   const raceDate = (plan as { race_date?: string } | null)?.race_date ?? null;
 
@@ -777,6 +795,13 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
                   {hrvDelta != null && <span> · {hrvDelta >= 0 ? t("dash.hrv.above") : t("dash.hrv.below")}</span>}
                 </div>
               )}
+              {/* Une VFC affichée sans date se lit comme la mesure du matin. Quand elle
+                  ne l'est pas, on le dit — c'est ce qui distingue une donnée d'un chiffre. */}
+              {!hrvFraiche && hrvJours != null && (
+                <div className="mt-1 text-[11px] font-medium text-amber-600">
+                  {t(hrvJours > 1 ? "dash.hrv.stale" : "dash.hrv.stale1", { n: hrvJours })}
+                </div>
+              )}
             </div>
             <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-400"><Heart className="h-4 w-4 animate-heartbeat" /></span>
           </div>
@@ -871,7 +896,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
           className="col-span-12 md:col-span-6"
         >
-          <TaperingWidget workouts={workouts} raceDate={raceDate} />
+          <TaperingWidget workouts={chargeHistory} raceDate={raceDate} />
         </motion.div>
 
         {/* Charge aiguë / chronique (ACWR) — prévention blessure (modèle Gabbett) */}
@@ -1503,48 +1528,6 @@ function computeForme(
 // ── Zones d'entraînement (FC) — temps par zone sur 6 sem. ────────────────────────
 //  Chaque séance (avec FC moyenne) est rangée dans une zone selon FCmoy/FCmax, et sa
 //  durée y est ajoutée. Estimation honnête (intra-séance non détaillée) → libellé sobre.
-// ⚠️ CETTE FONCTION MENTAIT SUR DEUX PLANS, ET LE VERDICT « Trop d'intensité »
-//    AVEC ELLE. Constaté sur des données réelles, fenêtre du 20/07 au 31/08/2026 :
-//
-//    1. Elle rangeait TOUTE une séance dans UNE SEULE zone, d'après sa FC MOYENNE.
-//       Un footing de 73 min dont la montre a mesuré 68 min en Z1 était compté
-//       73 min en « Tempo », parce que sa FC moyenne tombait dans cette tranche.
-//       D'où l'aberration affichée : 10 % du temps de course en endurance facile
-//       pour quelqu'un qui court 47 à 89 km par semaine.
-//    2. Elle ne filtrait AUCUN sport. Les 1014 min de RANDONNÉE de la fenêtre
-//       atterrissaient en « Récupération » — c'est très exactement le « 1014 min »
-//       qu'affichait la carte, une donnée de marche présentée comme de la course.
-//
-//    Résultat : la carte annonçait 44 % de facile et « Trop d'intensité », alors que
-//    le temps en zone mesuré par la montre dit 71 % facile / 29 % dur. Le coach, lui,
-//    lisait DÉJÀ la bonne donnée (coachContext : Z1-Z2 = facile, Z3+ = intensité) :
-//    le tableau de bord contredisait donc le coach sur le même écran.
-//
-//    On lit désormais `hr_zone_seconds`, c'est-à-dire les seconds réellement passées
-//    dans chaque zone par la montre (intervals.icu → `icu_hr_zone_times`). Aucune
-//    estimation : quand la donnée manque, la séance est écartée du calcul et le
-//    nombre de séances retenues est annoncé sous le graphe.
-function computeHrZones(workouts: Workout[]): { secs: number[]; total: number; seances: number; ecartees: number } {
-  const now = Date.now();
-  const secs = [0, 0, 0, 0, 0];
-  let seances = 0, ecartees = 0;
-  for (const w of workouts) {
-    if (now - new Date(w.date).getTime() > 42 * 86400000) continue;
-    // Les zones de course ne décrivent que la COURSE. Une randonnée de 3 h à faible
-    // FC n'est pas du « footing de récupération » : la compter gonfle la part facile
-    // et fausse la règle des 80/20, qui ne porte que sur l'entraînement de course.
-    if (!isRun(w.sport)) continue;
-    const z = Array.isArray(w.hr_zone_seconds) ? w.hr_zone_seconds : null;
-    if (!z || !z.some((v) => Number(v) > 0)) { ecartees++; continue; }
-    seances++;
-    // La montre renvoie plus de tranches (jusqu'à 7) que les 5 bandes affichées :
-    // tout ce qui dépasse la VO₂max est agrégé dans la dernière, jamais perdu.
-    for (let i = 0; i < z.length; i++) {
-      secs[Math.min(i, secs.length - 1)] += Number(z[i]) || 0;
-    }
-  }
-  return { secs, total: secs.reduce((a, b) => a + b, 0), seances, ecartees };
-}
 
 // ── Score Discipline — modèle cohérent, documenté et ajustable ───────────────────
 //  Principes reconnus : répartition polarisée 80/20 (Seiler / « 80/20 Running »)
@@ -1643,7 +1626,12 @@ function computeWeeklyTrend(workouts: Workout[], weeks = 6): { km: number; isCur
 
 // Meilleures sorties récentes (sur l'historique chargé — honnête, pas « all-time »).
 function computeRecords(workouts: Workout[]): { longest: number; maxElev: number; longestSec: number; bestPace: number | null } | null {
-  const runs = workouts.filter(w => (w.distance_km ?? 0) > 0);
+  // ⚠️ CETTE VARIABLE S'APPELAIT DÉJÀ `runs` MAIS NE FILTRAIT AUCUN SPORT — seulement
+  //    la distance. Sur ce compte (69 sorties vélo et 23 randonnées sur 330), le
+  //    « dénivelé max » affiché était 1267 m, mesuré lors d'une RANDONNÉE, sur une carte
+  //    qui parle de tes meilleures SORTIES DE COURSE. La meilleure allure était tout
+  //    aussi exposée : un tour de vélo bat n'importe quelle foulée, toujours.
+  const runs = workouts.filter(w => isRun(w.sport) && (w.distance_km ?? 0) > 0);
   if (!runs.length) return null;
   const longest = Math.max(...runs.map(w => w.distance_km ?? 0));
   const maxElev = Math.max(0, ...runs.map(w => w.elevation_gain_m ?? 0));
@@ -1655,30 +1643,6 @@ function computeRecords(workouts: Workout[]): { longest: number; maxElev: number
   return { longest, maxElev, longestSec, bestPace };
 }
 
-// Records par distance — meilleur temps réel sur 5/10/semi/marathon (depuis les activités).
-function computeDistancePRs(
-  workouts: { date: string; distance_km: number | null; duration_seconds: number | null }[],
-  lang: string,
-): { label: string; time: string; date: string }[] {
-  const targets = [
-    { l: "5 km", lo: 4.7, hi: 5.4 },
-    { l: "10 km", lo: 9.4, hi: 10.6 },
-    { l: "Semi", lo: 20, hi: 22 },
-    { l: "Marathon", lo: 40.5, hi: 43.5 },
-  ];
-  const out: { label: string; time: string; date: string }[] = [];
-  for (const tgt of targets) {
-    const cands = workouts.filter((w) => (w.distance_km ?? 0) >= tgt.lo && (w.distance_km ?? 0) <= tgt.hi && (w.duration_seconds ?? 0) > 0);
-    if (!cands.length) continue;
-    const best = cands.reduce((a, b) => ((a.duration_seconds ?? 1e9) <= (b.duration_seconds ?? 1e9) ? a : b));
-    out.push({
-      label: tgt.l,
-      time: fmtTime(best.duration_seconds as number),
-      date: new Date(best.date).toLocaleDateString(lang, { day: "numeric", month: "short", year: "numeric" }),
-    });
-  }
-  return out;
-}
 
 // Résumé de la semaine en cours (7 derniers jours).
 function computeWeekSummary(workouts: Workout[]): { sessions: number; km: number; elev: number; sec: number } {

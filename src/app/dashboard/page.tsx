@@ -25,7 +25,7 @@ export default async function DashboardPage() {
   const streakToday = jourLocal();
   const streakFrom = decaleJour(streakToday, -119);
 
-  const [profileRes, hrvRes, workoutsRes, planRes, leagueRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, newMembersRes, prRes, streakWkRes, streakPlanRes] = await Promise.all([
+  const [profileRes, hrvRes, workoutsRes, planRes, leagueRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, newMembersRes, prRes, chargeRes, streakWkRes, streakPlanRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single(),
     supabase.from("hrv_data").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(14),
     supabase.from("workouts").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(40),
@@ -50,6 +50,18 @@ export default async function DashboardPage() {
       .eq("user_id", user!.id).eq("sport", "run").gt("duration_seconds", 0)
       .or("and(distance_km.gte.4.7,distance_km.lte.5.4),and(distance_km.gte.9.4,distance_km.lte.10.6),and(distance_km.gte.20,distance_km.lte.22),and(distance_km.gte.40.5,distance_km.lte.43.5)")
       .order("duration_seconds", { ascending: true }).limit(400),
+    // ── CHARGE (CTL/ATL/TSB) — requête DÉDIÉE, une année de mise en route ─────────
+    // Le modèle est une moyenne mobile exponentielle de constante 42 jours. Alimentée
+    // sur 42 jours seulement et amorcée à une valeur arbitraire, elle N'A PAS CONVERGÉ :
+    // l'amorce pèse encore (1−1/42)^42 ≈ 36 % du résultat. Mesuré sur ce compte, les
+    // 40 points d'amorce écrits en dur apportaient 14,5 des 53,7 de « Forme » affichés,
+    // et la « Fraîcheur » sortait à −3,6 au lieu de −10,8 — assez pour faire basculer
+    // le verdict de « charge lourde » à « charge équilibrée ».
+    // Une année d'historique rend l'amorce négligeable : (1−1/42)^365 ≈ 0,015 %.
+    // Tous sports confondus, volontairement : un tour de vélo fatigue aussi.
+    supabase.from("workouts").select("date,tss,type,duration_seconds")
+      .eq("user_id", user!.id).gte("date", decaleJour(streakToday, -365))
+      .order("date", { ascending: false }).limit(1000),
     supabase.from("workouts").select("date,sport,type,duration_seconds,distance_km,tss,training_effect")
       .eq("user_id", user!.id).gte("date", streakFrom).order("date", { ascending: false }).limit(500),
     // Trié par created_at DÉCROISSANT : `oneSessionPerSlot` garde la première vue de
@@ -125,6 +137,7 @@ export default async function DashboardPage() {
       plan={planRes.data}
       league={leagueRes.data}
       prWorkouts={prRes.data ?? []}
+      chargeHistory={chargeRes.data ?? []}
       sleep={sleepRes.data ?? null}
       coachSession={coachSession}
       pendingFeedback={pendingFeedback}

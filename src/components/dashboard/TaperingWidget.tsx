@@ -5,21 +5,19 @@ import { motion } from "framer-motion";
 import { TrendingUp, Target, Calendar, Zap, AlertTriangle } from "lucide-react";
 import type { Workout } from "@/types";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { computeLoad, type SeanceCharge } from "@/lib/dashboard/charge";
 
 interface TaperingWidgetProps {
-  workouts: Workout[];
+  /** Historique de charge sur un an, chargé par une requête dédiée. La liste
+   *  principale du tableau de bord est plafonnée à 40 activités : s'en servir ne
+   *  laissait pas au modèle le temps de converger (voir `computeLoad`). */
+  workouts: SeanceCharge[];
   raceDate?: string | null;
-}
-
-interface LoadMetrics {
-  ctl: number;
-  atl: number;
-  tsb: number;
 }
 
 export function TaperingWidget({ workouts, raceDate }: TaperingWidgetProps) {
   const { t } = useT();
-  const { ctl, atl, tsb, history } = useMemo(() => computeLoad(workouts), [workouts]);
+  const { ctl, atl, tsb, history, estimees } = useMemo(() => computeLoad(workouts), [workouts]);
 
   const daysToRace = raceDate
     ? Math.ceil((new Date(raceDate).getTime() - Date.now()) / 86400000)
@@ -151,37 +149,3 @@ function MetricCard({
 }
 
 // ── Banister model (simplified) ──────────────────────────────
-function computeLoad(workouts: Workout[]): { ctl: number; atl: number; tsb: number; history: LoadMetrics[] } {
-  const K_CTL = 42; // days
-  const K_ATL = 7;  // days
-
-  const tssMap: Record<string, number> = {};
-  for (const w of workouts) {
-    const tss = w.tss ?? estimateTSS(w);
-    tssMap[w.date] = (tssMap[w.date] ?? 0) + tss;
-  }
-
-  let ctl = 40; // typical starting fitness
-  let atl = 40;
-  const history: LoadMetrics[] = [];
-
-  for (let i = 41; i >= 0; i--) {
-    const d = new Date(Date.now() - i * 86400000).toISOString().split("T")[0];
-    const tss = tssMap[d] ?? 0;
-    ctl = ctl + (tss - ctl) / K_CTL;
-    atl = atl + (tss - atl) / K_ATL;
-    history.push({ ctl, atl, tsb: ctl - atl });
-  }
-
-  return { ctl, atl, tsb: ctl - atl, history };
-}
-
-function estimateTSS(w: Workout): number {
-  const durationHours = (w.duration_seconds ?? 0) / 3600;
-  const typeMultiplier: Record<string, number> = {
-    easy: 50, tempo: 75, interval: 90, vma: 100,
-    long_run: 65, trail: 70, hill_repeat: 85,
-    race: 110, recovery: 30, strength: 40,
-  };
-  return Math.round(durationHours * (typeMultiplier[w.type] ?? 60));
-}
