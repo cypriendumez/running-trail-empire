@@ -10,7 +10,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildAthleteContext } from "@/lib/ai/coachContext";
 import { buildWeekPlan, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
-import { pushIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
+import { pushIntervalsWorkout, supprimerIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
 import { profilPeut, COLONNES_ACCES, JOURS_APERCU } from "@/lib/billing/access";
 import { identifiantsDePaire } from "@/lib/intervals/identifiants";
 
@@ -158,7 +158,14 @@ export async function autoCoachForUser(
       const datesConfirmees = [...new Set(week.map((x) => x.date))].sort().slice(0, CONFIRMED_DAYS);
       for (const d of week.filter((x) => x.date >= from && datesConfirmees.includes(x.date))) {
         const built = buildWorkoutDescription(d.title, d.detail, `${d.type} ${d.tags.join(" ")}`, objectiveRace, ctx.vma, warmMin, coolMin, montre);
-        if (!built) continue;
+        // ⚠️ UN JOUR SANS SÉANCE COURABLE DOIT ÊTRE NETTOYÉ, PAS IGNORÉ. `continue` seul
+        // laissait sur la montre la séance poussée la veille, quand ce jour portait encore
+        // un footing. Résultat constaté le 31/08/2026 : plan « Repos », montre « Footing ».
+        // Le coureur suit sa montre — il court un jour de récupération prescrit.
+        if (!built) {
+          await supprimerIntervalsWorkout({ athleteId, apiKey, userId, date: d.date });
+          continue;
+        }
         // Le créneau entre dans le NOM : deux séances le même jour, sur la montre, ne
         // se distinguent autrement que par leur contenu — et on ne lit pas un descriptif
         // dans une liste de séances à 6 h du matin.

@@ -4153,6 +4153,16 @@ test("le récapitulatif du lundi ne s'envoie pas vide, et dit le vrai", () => {
     assert.ok(!x.html.includes("undefined"), `${lang} : clé manquante`);
   }
 });
+test("le coach nettoie la montre quand un jour n'a plus de séance", () => {
+  // ⚠️ ANCRAGE SUR LE SITE QUI PRODUIT L'EFFET, pas sur l'import. Le défaut n'était pas
+  // une fonction manquante : c'était un `continue` sec là où il fallait retirer l'ancienne
+  // séance. On vise donc le point exact où la construction échoue.
+  const src = codeOf("src/lib/ai/autoCoach.ts");
+  assert.match(src, /if \(!built\) \{[\s\S]{0,200}?supprimerIntervalsWorkout\(/,
+    "un jour sans séance courable laisse l'ancienne sur la montre au lieu de la retirer");
+  // Le retrait doit porter sur LE JOUR concerné, pas sur une date au hasard.
+  assert.match(src, /supprimerIntervalsWorkout\(\{[^}]*date: d\.date/, "le retrait ne vise pas le bon jour");
+});
 test("un athlète qui répond à un e-mail de Pacevo atteint quelqu'un", () => {
   // ⚠️ L'EXPÉDITEUR N'EST PAS UNE BOÎTE QUI REÇOIT. `RESEND_FROM` pointe aujourd'hui sur
   // `onboarding@resend.dev`, le domaine de test PARTAGÉ de Resend : répondre à un message

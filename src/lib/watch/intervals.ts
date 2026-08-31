@@ -494,6 +494,47 @@ export async function pushIntervalsWorkout(opts: {
   }
 }
 
+/**
+ * RETIRE la séance coach d'un jour donné du calendrier intervals.icu.
+ *
+ * ⚠️ CETTE FONCTION MANQUAIT, ET ÇA SE VOYAIT AU POIGNET. Le coach ne pousse que les
+ * jours qui portent une séance COURABLE : un jour devenu « Repos » ou « Renforcement »
+ * ne produit aucun entraînement, la boucle faisait `continue`, et l'ancienne séance —
+ * poussée la veille, quand ce jour portait encore un footing — RESTAIT sur la montre.
+ *
+ * Constaté le 31/08/2026 sur le compte de Cyprien : son plan disait « Repos » les 2 et
+ * 3 septembre, sa montre affichait « Footing » ces deux jours-là, et le 1er septembre
+ * annonçait une séance au seuil alors que le plan prescrivait du renforcement. Trois
+ * jours sur quatre faux, sans la moindre erreur nulle part.
+ *
+ * C'est le pire cas possible pour un coureur : il suit ce que dit sa montre, donc il
+ * court un jour où le coach avait décidé qu'il devait récupérer — exactement l'inverse
+ * de ce que l'application prétend faire.
+ *
+ * ⚠️ ON NE SUPPRIME QUE NOTRE PROPRE SÉANCE, reconnue à son `external_id`. Un défi Ghost
+ * Runner ou une séance ajoutée à la main par l'athlète le même jour ne doit pas partir
+ * avec — c'est le même garde-fou que pour l'écriture.
+ */
+export async function supprimerIntervalsWorkout(opts: {
+  athleteId: string; apiKey: string; userId: string; date: string;
+}): Promise<{ ok: boolean; supprimees: number; error?: string }> {
+  const { athleteId, apiKey, userId, date } = opts;
+  const extId = `rte-coach-${userId}-${date}`;
+  try {
+    const res = await fetch(`${BASE}/athlete/${athleteId}/events?oldest=${date}&newest=${date}`, { headers: authHeader(apiKey) });
+    if (!res.ok) return { ok: false, supprimees: 0, error: `HTTP ${res.status}` };
+    const existing = await res.json();
+    if (!Array.isArray(existing)) return { ok: false, supprimees: 0, error: "réponse inattendue" };
+    const miennes = (existing as { id: number; external_id?: string }[]).filter((e) => e.external_id === extId);
+    if (!miennes.length) return { ok: true, supprimees: 0 };
+    await Promise.all(miennes.map((e) =>
+      fetch(`${BASE}/athlete/${athleteId}/events/${e.id}`, { method: "DELETE", headers: authHeader(apiKey) }).catch(() => undefined)));
+    return { ok: true, supprimees: miennes.length };
+  } catch (e) {
+    return { ok: false, supprimees: 0, error: (e as Error).message };
+  }
+}
+
 // Extrait une durée (minutes) d'un texte de séance : « 40 min », « 1h00 », « 1h30 », « 45' ».
 export function parseDurationMin(text: string): number | null {
   const t = (text || "").toLowerCase();

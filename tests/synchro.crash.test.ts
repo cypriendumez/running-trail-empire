@@ -34,7 +34,7 @@ import { join } from "node:path";
 import { identifiantsDe, identifiantsDePaire } from "../src/lib/intervals/identifiants";
 import {
   DESTINATIONS_MONTRE, montreDe, lectureDe, estAppleWatch,
-  metriquesMixtesSupportees, pushIntervalsWorkout, buildWorkoutDescription,
+  metriquesMixtesSupportees, pushIntervalsWorkout, supprimerIntervalsWorkout, buildWorkoutDescription,
 } from "../src/lib/watch/intervals";
 
 const ROOT = join(__dirname, "..");
@@ -299,6 +299,45 @@ await atest("l'envoi ne touche QUE la séance coach de cet athlète, ce jour-là
   await pushIntervalsWorkout(SEANCE);
   const supprimes = appels.filter((a) => a.method === "DELETE").map((a) => a.url.split("/").pop());
   assert.deepEqual(supprimes, ["3"], `seule la séance 3 doit être supprimée, or ${supprimes} l'ont été`);
+});
+
+await atest("un jour devenu repos est RETIRÉ de la montre, pas seulement ignoré", async () => {
+  // ⚠️ DÉFAUT CONSTATÉ SUR LE COMPTE RÉEL DE CYPRIEN LE 31/08/2026. Le coach ne pousse
+  // que les jours portant une séance courable : un jour devenu « Repos » ou
+  // « Renforcement » ne produit aucun entraînement, la boucle faisait `continue`, et
+  // l'ancienne séance — poussée la veille — RESTAIT sur la montre.
+  //
+  // Relevé : plan « Repos » les 2 et 3 septembre, montre « Footing » ces deux jours-là ;
+  // plan « Renforcement » le 1er, montre « Séance au seuil ». Trois jours sur quatre
+  // faux, sans la moindre erreur nulle part. Le coureur suit sa montre — il court un jour
+  // où le coach avait décidé qu'il devait récupérer, soit l'inverse du service rendu.
+  const mienne = { id: 7, external_id: `rte-coach-${SEANCE.userId}-${SEANCE.date}`, name: "vieux footing" };
+  const autre = { id: 8, external_id: "ghost-runner-2026-08-25", name: "défi" };
+  const appels = stubFetch(() => rep(200, [mienne, autre]));
+  const r = await supprimerIntervalsWorkout({
+    athleteId: SEANCE.athleteId, apiKey: SEANCE.apiKey, userId: SEANCE.userId, date: SEANCE.date,
+  });
+  assert.equal(r.ok, true);
+  assert.equal(r.supprimees, 1);
+  // ⚠️ ON NE SUPPRIME QUE LA NÔTRE. Un défi Ghost Runner le même jour ne doit pas partir
+  // avec — même garde-fou que pour l'écriture.
+  const supprimes = appels.filter((a) => a.method === "DELETE").map((a) => a.url.split("/").pop());
+  assert.deepEqual(supprimes, ["7"], `seule la séance 7 devait partir, or ${supprimes} l'ont été`);
+});
+await atest("retirer une séance absente n'est pas une erreur", async () => {
+  // Le coach appelle ce retrait pour CHAQUE jour de repos, à chaque republication du
+  // plan — soit plusieurs fois par jour. Traiter « rien à supprimer » comme un échec
+  // remplirait les journaux d'erreurs sur le fonctionnement normal.
+  stubFetch(() => rep(200, []));
+  const r = await supprimerIntervalsWorkout({ ...SEANCE, date: SEANCE.date });
+  assert.equal(r.ok, true);
+  assert.equal(r.supprimees, 0);
+});
+await atest("un calendrier injoignable ne fait pas tomber la republication", async () => {
+  stubFetch(() => new Error("ECONNRESET"));
+  const r = await supprimerIntervalsWorkout({ ...SEANCE, date: SEANCE.date });
+  assert.equal(r.ok, false);
+  assert.ok(r.error, "un échec doit dire pourquoi");
 });
 
 await atest("un nom trop long est tronqué avant de partir, pas par la montre", async () => {
