@@ -4153,6 +4153,29 @@ test("le récapitulatif du lundi ne s'envoie pas vide, et dit le vrai", () => {
     assert.ok(!x.html.includes("undefined"), `${lang} : clé manquante`);
   }
 });
+test("chaque étape du lundi se suffit à elle-même", () => {
+  // ⚠️ CE TEST NAÎT D'UNE PANNE RÉELLE QUE J'AI CAUSÉE, le 24/08/2026. En ajoutant
+  // l'envoi du plan de la semaine, l'étape a été insérée juste après la ligne du `curl`
+  // du résumé — c'est-à-dire AU MILIEU du script `run:` de l'étape précédente. Le reste
+  // de ce script (lecture du code HTTP, vérification du 200) s'est retrouvé rattaché à
+  // la NOUVELLE étape, où la variable `$reponse` n'existe pas : le code lu était vide,
+  // la comparaison à « 200 » échouait, et le job tombait en 44 secondes — après avoir
+  // pourtant envoyé les deux e-mails. Un échec bruyant sur un travail réussi, et un
+  // lundi matin où Cyprien a cru que sa newsletter n'était pas partie.
+  //
+  // L'invariant qui l'aurait attrapé : un script qui LIT `$reponse` doit l'AVOIR DÉFINIE.
+  const wf = readFileSync("/Users/cypriendumez/Desktop/running-trail-empire/.github/workflows/newsletter-weekly.yml", "utf8");
+  const blocs = wf.split(/^ {6}- name: /m).slice(1);
+  assert.equal(blocs.length, 2, `${blocs.length} étape(s) dans le workflow du lundi, 2 attendues`);
+  for (const b of blocs) {
+    const nom = b.split("\n")[0];
+    if (!/\$reponse|\$\{reponse/.test(b)) continue;
+    assert.match(b, /reponse=\$\(/, `« ${nom} » lit $reponse sans jamais la définir : le script d'une autre étape a débordé ici`);
+    // Et chaque étape qui interroge une route doit VÉRIFIER le code renvoyé : un curl
+    // dont on ignore la réponse transforme une panne serveur en succès silencieux.
+    if (/curl/.test(b)) assert.match(b, /!= "200"/, `« ${nom} » ne vérifie pas le code HTTP`);
+  }
+});
 test("le récapitulatif du lundi refuse de partir un autre jour", () => {
   // ⚠️ LA ROUTE EST PUBLIQUE-PAR-SECRET. Un appel manuel un jeudi enverrait à TOUS les
   // athlètes un « voici ta semaine » au milieu de leur semaine — et un e-mail ne se

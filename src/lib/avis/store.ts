@@ -42,7 +42,26 @@ export type Avis = {
   auteur: string;    // « Prénom N. », figé à la soumission
   at: string;        // ISO
   publie: boolean;
+  /**
+   * LA RÉPONSE DE L'ÉDITEUR, publiée sous l'avis.
+   *
+   * ⚠️ UN CHAMP SÉPARÉ, ET C'EST TOUT L'INTÉRÊT. La page publique promet des avis
+   * « publiés tels qu'ils sont écrits, sans les retoucher ». Répondre en modifiant
+   * `texte` détruirait cette promesse en silence — on ne saurait plus ce que l'athlète
+   * avait écrit. La réponse vit à côté, elle est attribuée, et le texte d'origine reste
+   * intact et vérifiable.
+   *
+   * C'est aussi ce que font App Store, Google Play et Google : la réponse du
+   * professionnel s'affiche SOUS l'avis, jamais à sa place.
+   */
+  reponse?: string;
+  /** Horodatage de la réponse — une réponse sans date ne se distingue pas d'une
+   *  réponse d'il y a deux ans, et c'est justement ce qu'un lecteur regarde. */
+  reponseAt?: string;
 };
+
+/** Longueur maximale d'une réponse. Au-delà, ce n'est plus une réponse, c'est un billet. */
+export const REPONSE_MAX = 600;
 
 export const TYPE_AVIS = "avis";
 // Réexportées depuis `bornes.ts`, qui n'importe RIEN : c'est ce fichier-là que le
@@ -110,5 +129,25 @@ export function litAvis(data: unknown): Avis | null {
     auteur: typeof d.auteur === "string" && d.auteur.trim() ? d.auteur : "Un coureur",
     at: typeof d.at === "string" ? d.at : "",
     publie: d.publie === true,
+    // ⚠️ Une réponse vide n'est PAS une réponse : `""` afficherait un bloc « L'équipe
+    // Pacevo a répondu » suivi de rien, ce qui est pire que pas de réponse du tout.
+    ...(typeof d.reponse === "string" && d.reponse.trim()
+      ? { reponse: d.reponse.trim().slice(0, REPONSE_MAX), reponseAt: typeof d.reponseAt === "string" ? d.reponseAt : "" }
+      : {}),
   };
+}
+
+/**
+ * Valide une réponse avant de l'enregistrer. Rend le motif du refus, ou `null`.
+ *
+ * ⚠️ LA CHAÎNE VIDE EST UNE VALEUR LÉGITIME : elle SUPPRIME la réponse. C'est le seul
+ * moyen de revenir en arrière sur une réponse écrite trop vite, et une modération sans
+ * marche arrière pousse à ne jamais répondre.
+ */
+export function refusReponse(texte: unknown): string | null {
+  if (typeof texte !== "string") return "Réponse invalide.";
+  const t = texte.trim();
+  if (!t) return null;
+  if (t.length > REPONSE_MAX) return `Ta réponse ne doit pas dépasser ${REPONSE_MAX} caractères.`;
+  return null;
 }

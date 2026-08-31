@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { TYPE_AVIS, litAvis } from "@/lib/avis/store";
+import { TYPE_AVIS, litAvis, refusReponse, REPONSE_MAX } from "@/lib/avis/store";
 import { estAdmin } from "@/lib/admin/acces";
 
 
@@ -25,9 +25,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id, publie } = (await req.json().catch(() => ({}))) as { id?: string; publie?: boolean };
-  if (!id || typeof publie !== "boolean") {
-    return NextResponse.json({ ok: false, error: "id et publie attendus" }, { status: 400 });
+  const corps = (await req.json().catch(() => ({}))) as { id?: string; publie?: boolean; reponse?: unknown };
+  const { id, publie } = corps;
+  const veutRepondre = typeof corps.reponse === "string";
+  if (!id || (typeof publie !== "boolean" && !veutRepondre)) {
+    return NextResponse.json({ ok: false, error: "id, et publie ou reponse, attendus" }, { status: 400 });
+  }
+  if (veutRepondre) {
+    const refus = refusReponse(corps.reponse);
+    if (refus) return NextResponse.json({ ok: false, error: refus }, { status: 400 });
   }
 
   const admin = createAdminClient();
@@ -36,10 +42,23 @@ export async function POST(req: Request) {
   const avis = litAvis(ligne?.data ?? null);
   if (!avis) return NextResponse.json({ ok: false, error: "Avis introuvable" }, { status: 404 });
 
-  // On ne réécrit QUE le drapeau : le texte de l'athlète est reporté à l'identique.
-  const { error } = await admin.from("notifications").update({ data: { ...avis, publie } }).eq("id", id);
+  // ⚠️ LE TEXTE DE L'ATHLÈTE N'EST JAMAIS TOUCHÉ. On repart de l'avis relu, on ne
+  // modifie que le drapeau et/ou la réponse — deux champs qui appartiennent à l'éditeur.
+  // La page publique promet « publiés tels qu'ils sont écrits » : cette promesse tient
+  // par la construction de cette ligne, pas par une intention.
+  const maj: Record<string, unknown> = { ...avis };
+  if (typeof publie === "boolean") maj.publie = publie;
+  if (veutRepondre) {
+    const t = String(corps.reponse).trim();
+    // Une réponse vide SUPPRIME la réponse : c'est la marche arrière, et sans elle on
+    // n'ose plus répondre vite.
+    if (t) { maj.reponse = t.slice(0, REPONSE_MAX); maj.reponseAt = new Date().toISOString(); }
+    else { delete maj.reponse; delete maj.reponseAt; }
+  }
+
+  const { error } = await admin.from("notifications").update({ data: maj }).eq("id", id);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, publie });
+  return NextResponse.json({ ok: true, publie: maj.publie, reponse: maj.reponse ?? null, reponseAt: maj.reponseAt ?? null });
 }
 
 /** La liste complète, pour l'écran de modération. */

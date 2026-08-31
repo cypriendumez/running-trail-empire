@@ -57,19 +57,6 @@ jobs:
           reponse=$(curl -sS --max-time 120 -w '\n%{http_code}' \
             -H "Authorization: Bearer ${CRON_SECRET}" \
             "${PACEVO_URL}/api/newsletter/weekly")
-
-      # ⚠️ ÉTAPE INDÉPENDANTE, avec `if: always()`. Le résumé d'actualité et le plan de la
-      # semaine n'ont aucun rapport : si Gemini est en panne et fait échouer le premier,
-      # l'athlète doit quand même recevoir sa semaine.
-      - name: Envoyer le plan de la semaine
-        if: always()
-        env:
-          PACEVO_URL: ${{ secrets.PACEVO_URL }}
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
-        run: |
-          curl --fail-with-body --silent --show-error --max-time 120 \
-            -H "Authorization: Bearer ${CRON_SECRET}" \
-            "${PACEVO_URL}/api/cron/plan-semaine"
           corps=$(printf '%s' "$reponse" | sed '$d')
           code=$(printf '%s' "$reponse" | tail -n1)
           echo "HTTP ${code}"
@@ -78,5 +65,41 @@ jobs:
           # semaine est pauvre en actualité ou qu'il n'y a pas encore d'abonné.
           if [ "${code}" != "200" ]; then
             echo "::error::L'envoi a échoué (HTTP ${code})."
+            exit 1
+          fi
+
+      # ─────────────────────────────────────────────────────────────────────────
+      #  LE PLAN DE LA SEMAINE — une étape À PART, ajoutée après le résumé.
+      #
+      #  ⚠️ CETTE ÉTAPE A DÉJÀ CASSÉ LE WORKFLOW UNE FOIS, le 24/08/2026. Elle avait
+      #  été insérée juste après la ligne du `curl` du résumé — c'est-à-dire AU MILIEU
+      #  du script `run:` de l'étape précédente. Le reste de ce script (lecture du code
+      #  HTTP, vérification du 200) s'est retrouvé rattaché à CETTE étape, où la variable
+      #  `$reponse` n'existe pas : le code lu était vide, la comparaison à « 200 »
+      #  échouait, et le job entier tombait en 44 secondes — après avoir tout de même
+      #  envoyé les deux e-mails. Un échec bruyant sur un travail réussi.
+      #
+      #  Une étape s'ajoute À LA FIN de la liste, jamais au milieu d'un bloc `run:`.
+      #
+      #  `if: always()` : le résumé d'actualité dépend de Gemini et d'un flux RSS. S'il
+      #  tombe, l'athlète doit quand même recevoir sa semaine — les deux n'ont aucun
+      #  rapport.
+      # ─────────────────────────────────────────────────────────────────────────
+      - name: Envoyer le plan de la semaine
+        if: always()
+        env:
+          PACEVO_URL: ${{ secrets.PACEVO_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          reponse=$(curl -sS --max-time 120 -w '\n%{http_code}' \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${PACEVO_URL}/api/cron/plan-semaine")
+          corps=$(printf '%s' "$reponse" | sed '$d')
+          code=$(printf '%s' "$reponse" | tail -n1)
+          echo "HTTP ${code}"
+          echo "${corps}"
+          if [ "${code}" != "200" ]; then
+            echo "::error::L'envoi du plan de la semaine a échoué (HTTP ${code})."
             exit 1
           fi
