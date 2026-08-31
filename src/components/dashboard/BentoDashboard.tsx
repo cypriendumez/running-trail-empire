@@ -37,7 +37,6 @@ interface Props {
   workouts: Workout[];
   plan: Record<string, unknown> | null;
   league: Record<string, unknown> | null;
-  disciplineHistory: Record<string, unknown>[];
   sleep?: { total_sleep_min: number; sleep_score: number; body_battery_end: number; deep_sleep_min: number; rem_sleep_min: number; date: string } | null;
   /** `i18n` = le même jour dans les autres langues (cf. lib/ai/planI18n.ts). Le français
    *  reste au premier niveau : c'est lui qui part sur la montre et sert aux analyses. */
@@ -131,7 +130,7 @@ const HR_ZONE_DEFS = [
 
 // La forme du jour est calculée à partir de données réelles : voir computeReadiness().
 
-export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplineHistory, sleep, coachSession, pendingFeedback, objective, currentVma, loadRisk, newMembersWeek, streak, acces }: Props) {
+export function BentoDashboard({ profile, hrv, workouts, plan, league, sleep, coachSession, pendingFeedback, objective, currentVma, loadRisk, newMembersWeek, streak, acces }: Props) {
   const { t, lang } = useT();
   const state = hrv[0]?.physiological_state ?? "optimal";
 
@@ -222,10 +221,6 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
   const weekSummary = computeWeekSummary(workouts);
   const acwr = loadRisk?.acwr ?? 0;
   // Historique du Score Discipline (8 sem.) — du plus ancien au plus récent.
-  const discTrend = disciplineHistory
-    .map((h) => Number((h as Record<string, unknown>).total ?? (h as Record<string, unknown>).score ?? 0))
-    .filter((n) => n > 0)
-    .reverse();
   const coachMinimal = !!coachKey && coachKey.tags.length === 0 && !coachKey.why;
 
   // ── Cartes de droite : on garde toujours les 2 plus pertinentes (sommeil > séance-clé
@@ -997,12 +992,21 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
                       <span className="text-[9px] text-zinc-400">Z1–Z2</span>
                     </div>
                   </div>
-                  <div className="flex-1 space-y-1.5 text-[13px]">
+                  {/* ⚠️ `min-w-0` — SANS LUI, LES MINUTES SORTENT DE LA CARTE. Un élément
+                      flex a `min-width: auto` par défaut : il refuse de descendre sous la
+                      largeur de son contenu, donc `truncate` sur le libellé ne sert à rien
+                      et c'est la colonne entière qui déborde. Mesuré : 45 px hors de la
+                      carte dès qu'elle descend à 276 px de large — la valeur « 1014 min »
+                      s'affichait « 1014 m », coupée net par le bord.
+                      La valeur porte `flex-shrink-0` : c'est le LIBELLÉ qui doit céder,
+                      jamais le chiffre. « Récupé… 1014 min » se lit ; « Récupération 10 »
+                      ne veut rien dire. */}
+                  <div className="min-w-0 flex-1 space-y-1.5 text-[13px]">
                     {segs.map((sg, i) => sg.min > 0 && (
                       <div key={i} className="flex items-center gap-2">
                         <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ background: sg.color }} />
-                        <span className="flex-1 truncate text-zinc-500">{zl.z[i]}</span>
-                        <span className="font-semibold tabular-nums text-zinc-900">{sg.min}<span className="ml-0.5 text-[10px] font-normal text-zinc-400">{zl.min}</span></span>
+                        <span className="min-w-0 flex-1 truncate text-zinc-500">{zl.z[i]}</span>
+                        <span className="flex-shrink-0 font-semibold tabular-nums text-zinc-900">{sg.min}<span className="ml-0.5 text-[10px] font-normal text-zinc-400">{zl.min}</span></span>
                       </div>
                     ))}
                   </div>
@@ -1036,11 +1040,34 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
           <div className="mt-3 text-sm text-zinc-500">
             {t("dash.league.weekly")} : <strong className="tabular-nums text-zinc-900">{disc.hasData ? disc.total : "—"}</strong>
           </div>
-          {discTrend.length > 1 && (
-            <div className="mt-3 flex h-10 items-end gap-1">
-              {discTrend.map((s, i) => (
-                <div key={i} className={`flex-1 rounded-sm ${i === discTrend.length - 1 ? "bg-yellow-400" : "bg-yellow-200"}`}
-                  style={{ height: `${Math.max(8, (s / 100) * 40)}px` }} title={`${s}`} />
+          {/* ⚠️ ICI SE TROUVAIT UN TROU BLANC DE 85 px. La carte affichait une barre de
+              tendance sur 8 semaines lue dans `discipline_scores` — table VIDE pour
+              TOUS les comptes (0 ligne en base, vérifié), parce que rien n'appelle la
+              fonction SQL `calculate_discipline_score` : aucun cron, aucune route, aucun
+              script. Le graphe était donc du code qui ne s'affichait jamais, et son
+              `mt-auto` voisin poussait le lien tout en bas en laissant le vide au milieu.
+              Et même s'il avait tourné, cette fonction insère `v_consistency := 75`
+              écrit en dur — on aurait dessiné une courbe en partie inventée.
+
+              On montre à la place ce qui est RÉELLEMENT calculé, en direct, par
+              `computeDiscipline` juste au-dessus : les trois composantes du total déjà
+              affiché. Le chiffre « 90 » cessait d'être un score tombé du ciel : on lit
+              d'où il vient et ce qu'il faut travailler. Aucune donnée nouvelle n'est
+              nécessaire, aucune n'est inventée. */}
+          {disc.hasData && (
+            <div className="mt-3 space-y-2">
+              {([
+                ["dash.discipline.precision", disc.precision],
+                ["dash.discipline.consistency", disc.consistency],
+                ["dash.discipline.recovery", disc.recovery],
+              ] as const).map(([cle, valeur]) => (
+                <div key={cle} className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate text-[11px] text-zinc-500">{t(cle)}</span>
+                  <span className="h-1.5 w-16 flex-shrink-0 overflow-hidden rounded-full bg-zinc-100">
+                    <span className="block h-full rounded-full bg-yellow-400" style={{ width: `${Math.max(2, valeur)}%` }} />
+                  </span>
+                  <span className="w-7 flex-shrink-0 text-right text-[11px] font-semibold tabular-nums text-zinc-700">{valeur}</span>
+                </div>
               ))}
             </div>
           )}

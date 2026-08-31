@@ -6040,6 +6040,59 @@ test("la table des destinations et la détection disent la même chose", () => {
   );
 });
 
+console.log("\nTABLEAU DE BORD — deux trous que l'œil voyait et que rien ne testait");
+// Cyprien a signalé deux défauts sur capture. Les deux étaient invisibles au code seul :
+// il fallait MESURER le rendu. Ces tests figent la cause, pas le symptôme.
+test("la légende des zones peut rétrécir, sinon les minutes sortent de la carte", () => {
+  const src = codeOf("src/components/dashboard/BentoDashboard.tsx");
+  // On vise le SITE exact : la colonne de légende posée à côté du donut. Sans
+  // `min-w-0`, un enfant flex garde `min-width: auto` et refuse de descendre sous
+  // la largeur de son texte : `truncate` devient inopérant et la ligne déborde.
+  // Mesuré avant correction : +45 px HORS de la carte à 276 px de large, « 1014 min »
+  // coupé en « 1014 m ». Après : −25 px, donc à l'intérieur, à toutes les largeurs.
+  const legende = /className="min-w-0 flex-1 space-y-1\.5 text-\[13px\]"/.exec(src);
+  assert.ok(legende, "la colonne de légende des zones a perdu son min-w-0 : les minutes vont déborder");
+  // Et c'est le LIBELLÉ qui cède, jamais le chiffre : « Récupé… 1014 min » se lit,
+  // « Récupération 10 » ne veut rien dire.
+  assert.match(src, /flex-shrink-0 font-semibold tabular-nums text-zinc-900">\{sg\.min\}/,
+    "la valeur en minutes doit être flex-shrink-0, c'est au libellé de se tronquer");
+});
+
+test("la carte Ligue ne lit plus une table que personne ne remplit", () => {
+  // `discipline_scores` : 0 ligne en base pour TOUS les comptes. Rien n'appelle la
+  // fonction SQL qui l'alimente — ni cron, ni route, ni script. La barre de tendance
+  // 8 semaines ne s'affichait donc JAMAIS, et laissait 85 px de blanc dans la carte.
+  // Elle était même doublement morte : elle lisait `h.total ?? h.score`, alors que la
+  // colonne s'appelle `score_total` — avec des données, elle aurait affiché du vide.
+  for (const f of ["src/components/dashboard/BentoDashboard.tsx", "src/app/dashboard/page.tsx"]) {
+    assert.ok(!/from\("discipline_scores"\)/.test(codeOf(f)),
+      `${f} relit discipline_scores : la table est vide, le trou blanc revient`);
+  }
+});
+
+test("la carte Ligue montre les composantes RÉELLEMENT calculées", () => {
+  const src = codeOf("src/components/dashboard/BentoDashboard.tsx");
+  // Le trou est comblé par ce que `computeDiscipline` calcule en direct, à partir des
+  // séances et de la VFC : le total affiché cesse d'être un chiffre tombé du ciel.
+  // ⚠️ PREMIÈRE VERSION DE CE TEST : FAUSSE. Elle cherchait « disc.consistency »
+  // n'importe où dans le fichier — or la carte Score Discipline lit LES MÊMES champs.
+  // Retirer une composante de la carte Ligue laissait donc le test au VERT (mutation
+  // faite, mutation passée). On vise maintenant le COUPLE clé+valeur, qui n'existe
+  // que dans cette carte : retirer une seule ligne la fait rougir.
+  for (const c of ["precision", "consistency", "recovery"]) {
+    assert.ok(src.includes(`["dash.discipline.${c}", disc.${c}]`),
+      `la carte Ligue n'affiche plus la composante ${c} : le trou blanc revient`);
+  }
+  // Aucune de ces valeurs n'est inventée : elles sortent toutes du même calcul que le total.
+  assert.match(src, /const disc = computeDiscipline\(workouts, hrv, freshSleep, state\)/);
+});
+
+test("aucune route de mesure jetable n'est partie en production", () => {
+  // J'en recrée une à chaque diagnostic visuel (copie du dashboard sans garde de
+  // session). Oubliée, elle exposerait les données d'un compte en clair.
+  assert.ok(!existsSync("src/app/preview-dash-tmp"), "src/app/preview-dash-tmp est encore là : à supprimer avant tout déploiement");
+});
+
 })().then(() => {
   globalThis.fetch = realFetch;
   console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

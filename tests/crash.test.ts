@@ -60,6 +60,18 @@ const cases: [string, AthleteContext][] = [
   ["sortie longue plus grande que le volume hebdomadaire", mk({ volume: { weekKm: 30, avg4wkKm: 30, targetKm: 30, longRunKm: 45 } })],
   ["menu de qualité vide mais budget à 3", mk({ weekPlan: { qBudget: 3, quality: [], easyPace: "5'20", eased: false } })],
   ["altitude extrême (3500 m)", mk({ altitude: { elevationM: 3500, lossPct: 18 } })],
+  // ── DOUBLES SÉANCES ────────────────────────────────────────────────────────────
+  // Cette branche du plan (un footing scindé matin + soir) n'était couverte par AUCUN
+  // des 24 scénarios : `ctx.doubles.autorise` restait faux partout. C'est pourtant elle
+  // qui produit deux entrées sur une même date — exactement le cas que le comptage des
+  // jours doit savoir distinguer d'un doublon.
+  ["doubles autorisés, gros volume", mk({ doubles: { autorise: true, manque: [], doubleSeuil: true, manqueSeuil: [] },
+    volume: { weekKm: 90, avg4wkKm: 88, targetKm: 92, longRunKm: 28 } })],
+  ["doubles autorisés mais volume minuscule", mk({ doubles: { autorise: true, manque: [], doubleSeuil: false, manqueSeuil: [] },
+    volume: { weekKm: 12, avg4wkKm: 12, targetKm: 12, longRunKm: 6 } })],
+  ["doubles autorisés la semaine d'une course", mk({ ...race(4),
+    doubles: { autorise: true, manque: [], doubleSeuil: true, manqueSeuil: [] },
+    volume: { weekKm: 80, avg4wkKm: 78, targetKm: 60, longRunKm: 20 } })],
 ];
 
 let ko = 0;
@@ -67,7 +79,20 @@ for (const [name, ctx] of cases) {
   try {
     const p = buildWeekPlan(ctx, new Date());
     const problems: string[] = [];
-    if (p.length !== 7) problems.push(`${p.length} jours`);
+    // ⚠️ CETTE ASSERTION COMPTAIT LES ENTRÉES, PAS LES JOURS. Depuis que le plan
+    // gère les DOUBLES SÉANCES (un footing le matin + la séance le soir, même date),
+    // une semaine parfaitement valide contient 8 entrées sur 7 dates. Le test
+    // annonçait donc « 8 jours » sur 13 des 24 scénarios : `npm run verify` sortait
+    // en échec, et la règle « verify avant tout déploiement » était devenue
+    // ininterprétable — 13 rouges permanents qu'on finit par ignorer, ce qui aurait
+    // masqué le jour où un VRAI trou serait apparu dans le plan.
+    // Ce qui doit être vrai, c'est le nombre de DATES COUVERTES : 7, sans trou.
+    const dates = [...new Set(p.map((d) => d.date))];
+    if (dates.length !== 7) problems.push(`${dates.length} jours`);
+    // Et deux entrées de même date ne sont légitimes que si ce sont deux moments
+    // distincts de la journée : sinon c'est un doublon, pas une double séance.
+    const creneaux = p.map((d) => `${d.date}|${d.moment ?? ""}`);
+    if (new Set(creneaux).size !== p.length) problems.push("deux séances sur le même créneau");
     for (const d of p) {
       const txt = `${d.title} ${d.detail} ${d.why}`;
       for (const bad of [/undefined/, /NaN/, /\$\{/, /Infinity/, /\bnull\b/, /-\d+ (min|km)/, /~0 km/, /\b0 min\b/, /\b0 km\b/]) {

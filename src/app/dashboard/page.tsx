@@ -25,13 +25,12 @@ export default async function DashboardPage() {
   const streakToday = jourLocal();
   const streakFrom = decaleJour(streakToday, -119);
 
-  const [profileRes, hrvRes, workoutsRes, planRes, leagueRes, disciplineRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, newMembersRes, streakWkRes, streakPlanRes] = await Promise.all([
+  const [profileRes, hrvRes, workoutsRes, planRes, leagueRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, newMembersRes, streakWkRes, streakPlanRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single(),
     supabase.from("hrv_data").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(14),
     supabase.from("workouts").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(40),
     supabase.from("training_plans").select("*").eq("user_id", user!.id).eq("is_active", true).single(),
     supabase.from("league_members").select("*, leagues(*)").eq("user_id", user!.id).order("score", { ascending: false }).limit(1).single(),
-    supabase.from("discipline_scores").select("*").eq("user_id", user!.id).order("week_start", { ascending: false }).limit(8),
     supabase.from("sleep_data").select("total_sleep_min,sleep_score,body_battery_end,deep_sleep_min,rem_sleep_min,date").eq("user_id", user!.id).order("date", { ascending: false }).limit(1).single(),
     supabase.from("notifications").select("title,body,data,created_at").eq("user_id", user!.id).eq("type", "coach_session").order("created_at", { ascending: false }).limit(40),
     supabase.from("notifications").select("data").eq("user_id", user!.id).eq("type", "session_feedback").order("created_at", { ascending: false }).limit(60),
@@ -112,7 +111,6 @@ export default async function DashboardPage() {
       workouts={workoutsRes.data ?? []}
       plan={planRes.data}
       league={leagueRes.data}
-      disciplineHistory={disciplineRes.data ?? []}
       sleep={sleepRes.data ?? null}
       coachSession={coachSession}
       pendingFeedback={pendingFeedback}

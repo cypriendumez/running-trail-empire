@@ -697,7 +697,15 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
       d.setUTCDate(d.getUTCDate() + 1);
       return dur.has(d.toISOString().slice(0, 10));
     };
-    const hote = jours.find((d) => d.type === "Endurance" && d.moment !== "matin" && !veilleDeDur(d.date));
+    // ⚠️ NE JAMAIS GREFFER LE RENFO SUR UN JOUR DÉJÀ DOUBLÉ. `sortir` passe APRÈS la
+    // pose des doubles séances : un jour scindé matin + soir a déjà son créneau du soir
+    // occupé par un footing. Sans ce garde-fou, l'athlète recevait TROIS séances le même
+    // jour, dont deux annoncées au même moment — « Footing en endurance (soir) » ET
+    // « Renforcement musculaire », impossibles à faire toutes les deux. Constaté sur le
+    // scénario « doubles autorisés, gros volume » : 3 séances le 2 septembre.
+    const joursDoubles = new Set(jours.filter((d) => d.moment === "matin").map((d) => d.date));
+    const hote = jours.find((d) => d.type === "Endurance" && d.moment !== "matin"
+      && !joursDoubles.has(d.date) && !veilleDeDur(d.date));
     if (!hote) return jours;
 
     const rendu = (l: Lang): PlanDayText => ({
