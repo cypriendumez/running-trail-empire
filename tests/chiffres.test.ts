@@ -22,6 +22,7 @@ import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { execSync } from "node:child_process";
 import { CHIFFRES, CHIFFRES_LANDING, CHIFFRES_AUTH } from "../src/lib/brand/stats";
+import { refusReponse, REPONSE_MAX } from "../src/lib/avis/store";
 import { JOURS_ESSAI } from "../src/lib/billing/access";
 import { ARTICLES } from "../src/app/blog/articles";
 import { ARTICLES_I18N } from "../src/app/blog/articlesI18n";
@@ -804,6 +805,60 @@ test("écrire un avis exige un compte, et rien ne le vérifiait", () => {
     "un refus du serveur (401) ne mène plus à l'invitation à se connecter : le visiteur anonyme verrait le formulaire");
 });
 
+test("répondre à un avis ne réécrit jamais l'avis", () => {
+  // ⚠️ C'EST LA PROMESSE DE LA PAGE PUBLIQUE : « publiés tels qu'ils sont écrits, sans
+  // les retoucher ». Répondre en modifiant `texte` la détruirait en silence — on ne
+  // saurait plus ce que l'athlète avait écrit. La réponse vit dans un champ SÉPARÉ,
+  // attribué, affiché SOUS l'avis. C'est aussi ce que font App Store et Google Play.
+  const a = avisDe(5, "Le plan se recalcule vraiment après chaque sortie, c'est bluffant.", "Marc Dupont");
+  const relu = litAvis({ ...a, reponse: "  Merci Marc !  ", reponseAt: "2026-08-25T10:00:00Z" });
+  assert.equal(relu?.texte, a.texte, "le texte de l'athlète a bougé");
+  assert.equal(relu?.reponse, "Merci Marc !", "la réponse doit être détourée");
+  assert.equal(relu?.auteur, "Marc D.", "le nom complet ne doit toujours pas être publié");
+
+  // ⚠️ UNE RÉPONSE VIDE N'EST PAS UNE RÉPONSE. `""` afficherait un bloc « Réponse de
+  // Pacevo » suivi de rien, ce qui est pire que pas de réponse du tout.
+  assert.equal(litAvis({ ...a, reponse: "   " })?.reponse, undefined);
+  assert.equal(litAvis({ ...a, reponse: 42 })?.reponse, undefined, "une valeur non textuelle n'est pas une réponse");
+
+  // Bornes : trop long, ce n'est plus une réponse mais un billet.
+  assert.equal(refusReponse(""), null, "la chaîne vide est légitime : elle SUPPRIME la réponse");
+  assert.equal(refusReponse("Merci !"), null);
+  assert.ok(refusReponse("x".repeat(REPONSE_MAX + 1)), "une réponse démesurée doit être refusée");
+  assert.ok(refusReponse(42), "une valeur non textuelle doit être refusée");
+
+  // ⚠️ ET LA ROUTE NE DOIT PAS POUVOIR ÉCRIRE `texte`. Elle repart de l'avis relu et ne
+  // pose que le drapeau et la réponse : la promesse tient par la construction du code,
+  // pas par une intention.
+  const route = sansCommentaires(readFileSync(join(ROOT, "src/app/api/admin/avis/route.ts"), "utf8"));
+  assert.ok(!/maj\.texte|texte:/.test(route), "la route de modération peut réécrire le texte de l'athlète");
+  assert.match(route, /refusReponse\(/, "la réponse n'est pas validée avant enregistrement");
+});
+test("l'écran de modération ne trie pas par note, et n'édite pas les avis", () => {
+  // ⚠️ TRIER OU FILTRER PAR NOTE EST LE DÉFAUT QU'ON S'INTERDIT. Un écran qui présente
+  // les cinq étoiles en premier invite à ne publier que celles-là — ce que la directive
+  // (UE) 2019/2161 interdit explicitement, au même titre qu'inventer des avis.
+  const ui = sansCommentaires(readFileSync(join(ROOT, "src/components/admin/AvisModeration.tsx"), "utf8"));
+  // ⚠️ LA PREMIÈRE RÉGEX ÉTAIT TROP ÉTROITE : `/sort\([^)]*note/` s'arrête au premier
+  // `)`, or un comparateur s'écrit `.sort((a, b) => b.note - a.note)` — la parenthèse de
+  // `(a, b)` coupait la recherche avant « note ». Vérifié par mutation : le tri passait.
+  assert.ok(!/\.sort\([\s\S]{0,80}?\bnote\b/.test(ui), "l'écran trie par note");
+  assert.ok(!/filtre === "note|note >= |note <= |\bnote > /.test(ui), "l'écran filtre par note");
+  // Aucun champ d'édition sur le TEXTE de l'avis — seule la réponse est saisissable.
+  const zones = (ui.match(/<textarea/g) ?? []).length;
+  assert.equal(zones, 1, `${zones} zones de saisie : une seule est permise, celle de la réponse`);
+  assert.match(ui, /placeholder="Ta réponse/, "l'unique zone de saisie doit être celle de la réponse");
+  // La réponse doit être ANNULABLE : une modération sans marche arrière pousse à ne
+  // jamais répondre.
+  assert.match(ui, /Supprimer la réponse/, "aucun moyen de retirer une réponse écrite trop vite");
+  // Et la page publique doit vraiment l'afficher, sinon répondre ne sert à rien.
+  const pub = sansCommentaires(readFileSync(join(ROOT, "src/app/avis/page.tsx"), "utf8"));
+  // ⚠️ ON VISE LA CONDITION, PAS LA MENTION. `a.reponse` apparaît deux fois — dans le
+  // test d'affichage ET dans le texte rendu. Remplacer la condition par `false` laissait
+  // donc le test vert alors que plus aucune réponse ne s'affichait. Huitième fois.
+  assert.match(pub, /\{a\.reponse && \(/, "la page publique n'affiche plus les réponses");
+  assert.match(pub, /A\.reponseDe/, "la réponse n'est pas attribuée");
+});
 test("un avis ne peut pas être fabriqué depuis le navigateur", () => {
   // La page promet « n'afficher que des avis de personnes ayant réellement un compte »
   // et « ne jamais en écrire nous-mêmes ». Ce qui rend la promesse tenable, c'est que

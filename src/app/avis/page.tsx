@@ -46,6 +46,8 @@ type Bloc = {
   methodeTitre: string; methode: string[];
   preuveTitre: string; preuveSub: string;
   labelCourses: string; labelParcours: string; labelPlan: string; labelSynchro: string;
+  /** Attribution de la réponse de l'éditeur, affichée sous l'avis. */
+  reponseDe: string;
   ctaTitre: string; ctaSub: string; ctaBtn: string; ctaNote: string;
 };
 
@@ -63,6 +65,7 @@ const AV: Record<Lang, Bloc> = {
     ],
     preuveTitre: "En attendant, voici ce qui se vérifie",
     preuveSub: "Chacun de ces chiffres se recompte dans l'application. Aucun ne vient d'une enquête qu'on n'a pas faite.",
+    reponseDe: "Réponse de Pacevo",
     labelCourses: "Courses à venir en base",
     labelParcours: "Parcours cartographiés",
     labelPlan: "De plan glissant, recalculé",
@@ -85,6 +88,7 @@ const AV: Record<Lang, Bloc> = {
     ],
     preuveTitre: "In the meantime, here is what can be checked",
     preuveSub: "Every figure below can be recounted inside the app. None comes from a survey we never ran.",
+    reponseDe: "Pacevo replied",
     labelCourses: "Upcoming races in the database",
     labelParcours: "Mapped routes",
     labelSynchro: "Between two replans",
@@ -107,6 +111,7 @@ const AV: Record<Lang, Bloc> = {
     ],
     preuveTitre: "Bis dahin: das hier lässt sich nachprüfen",
     preuveSub: "Jede Zahl unten lässt sich in der App nachzählen. Keine stammt aus einer Umfrage, die es nie gab.",
+    reponseDe: "Antwort von Pacevo",
     labelCourses: "Kommende Rennen in der Datenbank",
     labelParcours: "Kartierte Strecken",
     labelPlan: "Rollierender Plan, neu berechnet",
@@ -129,6 +134,7 @@ const AV: Record<Lang, Bloc> = {
     ],
     preuveTitre: "Mientras tanto, esto sí se puede comprobar",
     preuveSub: "Cada cifra se puede volver a contar dentro de la app. Ninguna viene de una encuesta que no hicimos.",
+    reponseDe: "Respuesta de Pacevo",
     labelCourses: "Carreras próximas en la base",
     labelParcours: "Rutas cartografiadas",
     labelPlan: "De plan deslizante, recalculado",
@@ -151,6 +157,7 @@ const AV: Record<Lang, Bloc> = {
     ],
     preuveTitre: "Entretanto, isto verifica-se",
     preuveSub: "Cada número abaixo pode ser recontado dentro da app. Nenhum vem de um inquérito que nunca fizemos.",
+    reponseDe: "Resposta da Pacevo",
     labelCourses: "Provas futuras na base",
     labelParcours: "Percursos cartografados",
     labelPlan: "De plano deslizante, recalculado",
@@ -171,7 +178,7 @@ export default async function AvisPage() {
 
   // ⚠️ SEULS LES AVIS PUBLIÉS. `publie` est faux à la soumission et ne passe à vrai que
   // par la modération, qui n'écarte que l'insulte et le spam — jamais une mauvaise note.
-  let publies: { note: number; texte: string; auteur: string; at: string }[] = [];
+  let publies: { note: number; texte: string; auteur: string; at: string; reponse?: string; reponseAt?: string }[] = [];
   try {
     const { data } = await createAdminClient()
       .from("notifications").select("data, created_at")
@@ -246,6 +253,19 @@ export default async function AvisPage() {
                     ))}
                   </div>
                   <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-zinc-600">{a.texte}</p>
+                  {/* ⚠️ LA RÉPONSE S'AFFICHE SOUS L'AVIS, JAMAIS À SA PLACE. C'est ce que
+                      font App Store, Google Play et Google, et c'est ce qui permet de
+                      tenir la promesse « publiés tels qu'ils sont écrits » : le texte de
+                      l'athlète reste intact et vérifiable, la réponse est attribuée. */}
+                  {a.reponse && (
+                    <div className="mt-4 rounded-xl border-l-2 border-emerald-500 bg-zinc-50 py-3 pl-4 pr-3">
+                      <div className="text-xs font-semibold text-emerald-700">
+                        {A.reponseDe}
+                        {a.reponseAt ? <span className="ml-2 font-normal text-zinc-400">{a.reponseAt.slice(0, 10)}</span> : null}
+                      </div>
+                      <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-zinc-600">{a.reponse}</p>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

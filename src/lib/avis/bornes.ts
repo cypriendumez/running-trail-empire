@@ -23,3 +23,11 @@
 export const TEXTE_MIN = 40;
 /** Au-dessus, la carte devient illisible et le champ un vecteur d'abus. */
 export const TEXTE_MAX = 600;
+
+/**
+ * Longueur maximale d'une RÉPONSE de l'éditeur. Elle vit ici pour la même raison que les
+ * deux autres : l'écran de modération est un composant CLIENT, et importer `store.ts`
+ * pour une seule constante ferait revenir les 106 racines dans le bundle public.
+ * Au-delà de cette longueur, ce n'est plus une réponse, c'est un billet.
+ */
+export const REPONSE_MAX = 600;

@@ -34,7 +34,8 @@
  */
 
 import { contientGrosMot, premierGrosMot } from "@/lib/social/moderation";
-import { TEXTE_MIN, TEXTE_MAX } from "./bornes";
+import { TEXTE_MIN, TEXTE_MAX, REPONSE_MAX } from "./bornes";
+export { REPONSE_MAX };
 
 export type Avis = {
   note: number;      // 1 à 5
@@ -60,8 +61,7 @@ export type Avis = {
   reponseAt?: string;
 };
 
-/** Longueur maximale d'une réponse. Au-delà, ce n'est plus une réponse, c'est un billet. */
-export const REPONSE_MAX = 600;
+
 
 export const TYPE_AVIS = "avis";
 // Réexportées depuis `bornes.ts`, qui n'importe RIEN : c'est ce fichier-là que le
