@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import Link from "next/link";
 import type { UserProfile, HRVData, Workout } from "@/types";
+import { robustWeeklyKm } from "@/lib/running/volume";
 import { racePredictions, fmtPaceSec, fmtTime } from "@/lib/running/fitness";
 import { TaperingWidget } from "@/components/dashboard/TaperingWidget";
 import { WeatherChip } from "@/components/dashboard/WeatherChip";
@@ -37,6 +38,10 @@ interface Props {
   workouts: Workout[];
   plan: Record<string, unknown> | null;
   league: Record<string, unknown> | null;
+  /** Séances candidates aux records par distance, chargées sur TOUT l'historique par une
+   *  requête dédiée. La liste `workouts` est plafonnée à 40 lignes : s'en servir revenait
+   *  à annoncer « record personnel » sur le meilleur temps des deux derniers mois. */
+  prWorkouts: { date: string; distance_km: number | null; duration_seconds: number | null }[];
   sleep?: { total_sleep_min: number; sleep_score: number; body_battery_end: number; deep_sleep_min: number; rem_sleep_min: number; date: string } | null;
   /** `i18n` = le même jour dans les autres langues (cf. lib/ai/planI18n.ts). Le français
    *  reste au premier niveau : c'est lui qui part sur la montre et sert aux analyses. */
@@ -130,7 +135,7 @@ const HR_ZONE_DEFS = [
 
 // La forme du jour est calculée à partir de données réelles : voir computeReadiness().
 
-export function BentoDashboard({ profile, hrv, workouts, plan, league, sleep, coachSession, pendingFeedback, objective, currentVma, loadRisk, newMembersWeek, streak, acces }: Props) {
+export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkouts, sleep, coachSession, pendingFeedback, objective, currentVma, loadRisk, newMembersWeek, streak, acces }: Props) {
   const { t, lang } = useT();
   const state = hrv[0]?.physiological_state ?? "optimal";
 
@@ -216,7 +221,19 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, sleep, co
   const trendMax = Math.max(1, ...volumeTrend.map((v) => v.km));
   const prevWeeks = volumeTrend.slice(0, -1);
   const prevAvg = prevWeeks.length ? prevWeeks.reduce((s, v) => s + v.km, 0) / prevWeeks.length : 0;
-  const volumeDelta = prevAvg > 0 ? weeklyKm - prevAvg : null;
+  // ⚠️ L'ÉTIQUETTE DISAIT « vs moy. 4 sem. » ALORS QUE LE CODE MOYENNAIT 5 SEMAINES.
+  //    Et une moyenne est écrasée par une coupure : ici une semaine à 5 km tirait la
+  //    référence de 70,7 à 58 km. Sur ces données l'écart affiché tombait juste par
+  //    compensation, mais rien ne le garantissait — un athlète blessé trois semaines
+  //    se serait vu annoncer qu'il court « au-dessus de sa moyenne » en reprenant.
+  //    `robustWeeklyKm` est le module écrit pour ça : médiane des semaines RÉELLEMENT
+  //    courues, les semaines à zéro écartées. Fenêtre arrêtée il y a 7 jours pour ne
+  //    pas comparer la semaine en cours à une référence qui la contient déjà.
+  const volRef = robustWeeklyKm(runs, Date.now() - 7 * 86400000, 8);
+  // Moins de 3 semaines courues : une médiane ne veut rien dire, on garde l'ancien
+  // calcul plutôt que d'afficher une référence bâtie sur deux points.
+  const volumeDelta = volRef ? weeklyKm - volRef.km : prevAvg > 0 ? weeklyKm - prevAvg : null;
+  const volumeRefLabel = volRef ? "dash.volume.vsMedian" : "dash.volume.vsAvg";
   const records = computeRecords(workouts);
   const weekSummary = computeWeekSummary(workouts);
   const acwr = loadRisk?.acwr ?? 0;
@@ -315,27 +332,16 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, sleep, co
       </div>
     ) });
   }
-  fillerPool.push({ key: "summary", node: (
-    <div className="bento-card h-full">
-      <div className="mb-4 flex items-center justify-between">
-        <div className="metric-label">{t("dash.summary.title")}</div>
-        <Activity className="h-4 w-4 text-zinc-300" />
-      </div>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-4">
-        {[
-          { v: String(weekSummary.sessions), u: "", l: t("dash.summary.sessions") },
-          { v: weekSummary.km.toFixed(1), u: "km", l: t("dash.metric.distance") },
-          { v: String(Math.round(weekSummary.elev)), u: "m", l: t("dash.metric.elevation") },
-          { v: fmtTime(weekSummary.sec), u: "", l: t("dash.metric.duration") },
-        ].map((s) => (
-          <div key={s.l}>
-            <div className="text-2xl font-bold leading-none tabular-nums text-zinc-900">{s.v}<span className="ml-0.5 text-sm font-normal text-zinc-400">{s.u}</span></div>
-            <div className="mt-1.5 text-xs text-zinc-500">{s.l}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  ) });
+  // ⚠️ NE PAS REMETTRE « Cette semaine » ICI. Le rail de droite affiche déjà cette
+  //    carte, en permanence : les quatre mêmes chiffres (séances, distance, dénivelé,
+  //    durée) apparaissaient donc DEUX FOIS sur la même page, dans deux mises en forme
+  //    différentes — ce qui fait douter le lecteur de savoir laquelle est la bonne.
+  //    Le vivier de bouche-trous garde assez d'entrées sans elle.
+  // ⚠️ NE PAS REMETTRE ICI UNE CARTE « Cette semaine ». Le rail de droite l'affiche
+  //    déjà en permanence : les quatre mêmes chiffres (séances, distance, dénivelé,
+  //    durée) apparaissaient DEUX FOIS sur la même page, dans deux mises en forme
+  //    différentes — de quoi faire douter le lecteur de laquelle est la bonne.
+  //    Le vivier de bouche-trous garde assez d'entrées sans elle.
   fillerPool.push({ key: "ready", node: (
     <div className="bento-card flex h-full flex-col">
       <div className="mb-3 flex items-center justify-between">
@@ -400,12 +406,11 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, sleep, co
     return { fort, faible, plat: fort.val - faible.val < 5 };
   })();
 
-  // Zones d'entraînement (FC) — FCmax = test/profil → âge (220−âge) → max observé.
-  const profMaxHr = Number((profile as { max_hr?: number } | null)?.max_hr) || 0;
-  const profAge = Number((profile as { age?: number } | null)?.age) || 0;
-  const obsMaxHr = Math.max(0, ...workouts.map(w => Number(w.max_hr ?? 0)));
-  const maxHrRef = profMaxHr || (profAge > 0 ? 220 - profAge : 0) || obsMaxHr;
-  const hrZones = computeHrZones(workouts, maxHrRef);
+  // Zones d'entraînement : plus aucune FCmax de référence n'intervient. L'ancien calcul
+  // dérivait les zones de `profiles.max_hr` — COLONNE QUI N'EXISTE PAS EN BASE, donc
+  // toujours vide — puis retombait sur 220−âge, une estimation qui décale toutes les
+  // bornes. On lit maintenant le temps en zone mesuré par la montre elle-même.
+  const hrZones = computeHrZones(workouts);
 
   // KPI de l'en-tête « hero » — résumé exécutif (valeurs réelles, repli « — »).
   const kpi = KPI_LABELS[lang] ?? KPI_LABELS.fr;
@@ -419,7 +424,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, sleep, co
   const nx = NEXT_LABELS[lang] ?? NEXT_LABELS.fr;
   const vit = VITALS[lang] ?? VITALS.fr;
   const restingHr = Number((profile as { resting_hr?: number } | null)?.resting_hr) || Number(workouts[0]?.avg_hr) || 0;
-  const distancePRs = computeDistancePRs(workouts, lang);
+  const distancePRs = computeDistancePRs(prWorkouts, lang);
   const heroStats = [
     { label: kpi.form, value: disc.hasData ? String(disc.total) : "—", unit: disc.hasData ? "/100" : "" },
     { label: kpi.hrv, value: hrvLatest != null ? hrvLatest.toFixed(0) : "—", unit: hrvLatest != null ? "ms" : "" },
@@ -939,7 +944,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, sleep, co
               </span>
             )}
           </div>
-          <div className="text-[11px] text-zinc-400">{volumeDelta != null ? t("dash.volume.vsAvg") : " "}</div>
+          <div className="text-[11px] text-zinc-400">{volumeDelta != null ? t(volumeRefLabel) : " "}</div>
           <div className="mt-3 flex h-14 items-end gap-1.5">
             {volumeTrend.map((v, i) => (
               <div key={i} className="flex-1 rounded-t-md transition-all"
@@ -1011,7 +1016,13 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, sleep, co
                     ))}
                   </div>
                 </div>
-                <div className="mt-3 border-t border-zinc-100 pt-2.5 text-xs font-semibold" style={{ color: good ? "#059669" : "#EA580C" }}>
+                {/* Sur quoi ce graphe est calculé, écrit noir sur blanc. Un verdict
+                    « Trop d'intensité » qui n'annonce pas son échantillon n'est pas
+                    vérifiable — et celui-ci s'appuyait jusqu'ici sur des randonnées. */}
+                <div className="mt-2.5 text-[10px] text-zinc-400">
+                  {t(hrZones.seances > 1 ? "dash.zones.basis" : "dash.zones.basis1", { n: hrZones.seances })}
+                </div>
+                <div className="mt-2 border-t border-zinc-100 pt-2.5 text-xs font-semibold" style={{ color: good ? "#059669" : "#EA580C" }}>
                   {good ? t("dash.intensity.polarized") : easyPct < 75 ? t("dash.intensity.tooHard") : t("dash.intensity.tooEasy")}
                 </div>
               </>
@@ -1209,10 +1220,24 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, sleep, co
       </div>
 
       {/* ── Rail de droite ── */}
-      <aside className="mt-4 space-y-4 lg:mt-0">
-        {/* Statut de préparation */}
+      {/* ⚠️ `lg:sticky` — SANS LUI, LE RAIL LAISSAIT UN TROU BLANC. Il mesure 1371 px
+          quand la colonne principale en fait 2619 : une fois ses cartes passées, la
+          moitié droite de l'écran restait vide sur 1248 px de défilement. Rendu
+          collant, il accompagne la lecture au lieu de s'arrêter. La hauteur est
+          bornée à la fenêtre et il défile alors sur lui-même : c'est la seule forme
+          qui ne peut PAS recréer de vide, quel que soit le nombre de cartes — or
+          plusieurs d'entre elles sont conditionnelles.
+          PAS de `overscroll-contain` : le défilement doit se propager à la page une
+          fois le bas du rail atteint, sinon la molette se bloque dans le rail. */}
+      <aside className="mt-4 space-y-4 lg:sticky lg:top-6 lg:mt-0 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:pr-1">
+        {/* ⚠️ CETTE CARTE S'APPELAIT « Statut de préparation » ET AFFICHAIT « 90 % ».
+            Or `computeReadiness` ne produit AUCUN pourcentage — seulement une couleur et
+            une phrase. Le nombre dans l'anneau est `disc.total`, le Score Discipline :
+            le même 90 que la carte Ligue annonce sous le nom « Score hebdo ». Deux noms
+            différents pour un seul chiffre, sur un seul écran, dont un qui n'existe pas.
+            La carte porte désormais le nom de ce qu'elle montre. */}
         <div className="bento-card">
-          <div className="metric-label">{rl.prep}</div>
+          <div className="metric-label">{t("dash.discipline.title")}</div>
           <div className="mt-4 flex items-center gap-4">
             <div className="relative h-20 w-20 flex-shrink-0">
               <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
@@ -1478,19 +1503,47 @@ function computeForme(
 // ── Zones d'entraînement (FC) — temps par zone sur 6 sem. ────────────────────────
 //  Chaque séance (avec FC moyenne) est rangée dans une zone selon FCmoy/FCmax, et sa
 //  durée y est ajoutée. Estimation honnête (intra-séance non détaillée) → libellé sobre.
-function computeHrZones(workouts: Workout[], maxHr: number): { secs: number[]; total: number } {
+// ⚠️ CETTE FONCTION MENTAIT SUR DEUX PLANS, ET LE VERDICT « Trop d'intensité »
+//    AVEC ELLE. Constaté sur des données réelles, fenêtre du 20/07 au 31/08/2026 :
+//
+//    1. Elle rangeait TOUTE une séance dans UNE SEULE zone, d'après sa FC MOYENNE.
+//       Un footing de 73 min dont la montre a mesuré 68 min en Z1 était compté
+//       73 min en « Tempo », parce que sa FC moyenne tombait dans cette tranche.
+//       D'où l'aberration affichée : 10 % du temps de course en endurance facile
+//       pour quelqu'un qui court 47 à 89 km par semaine.
+//    2. Elle ne filtrait AUCUN sport. Les 1014 min de RANDONNÉE de la fenêtre
+//       atterrissaient en « Récupération » — c'est très exactement le « 1014 min »
+//       qu'affichait la carte, une donnée de marche présentée comme de la course.
+//
+//    Résultat : la carte annonçait 44 % de facile et « Trop d'intensité », alors que
+//    le temps en zone mesuré par la montre dit 71 % facile / 29 % dur. Le coach, lui,
+//    lisait DÉJÀ la bonne donnée (coachContext : Z1-Z2 = facile, Z3+ = intensité) :
+//    le tableau de bord contredisait donc le coach sur le même écran.
+//
+//    On lit désormais `hr_zone_seconds`, c'est-à-dire les seconds réellement passées
+//    dans chaque zone par la montre (intervals.icu → `icu_hr_zone_times`). Aucune
+//    estimation : quand la donnée manque, la séance est écartée du calcul et le
+//    nombre de séances retenues est annoncé sous le graphe.
+function computeHrZones(workouts: Workout[]): { secs: number[]; total: number; seances: number; ecartees: number } {
   const now = Date.now();
   const secs = [0, 0, 0, 0, 0];
-  if (!(maxHr > 0)) return { secs, total: 0 };
+  let seances = 0, ecartees = 0;
   for (const w of workouts) {
     if (now - new Date(w.date).getTime() > 42 * 86400000) continue;
-    const hr = Number(w.avg_hr ?? 0), dur = Number(w.duration_seconds ?? 0);
-    if (!(hr > 0) || !(dur > 0)) continue;
-    const frac = hr / maxHr;
-    const zi = HR_ZONE_DEFS.findIndex(z => frac >= z.lo && frac < z.hi);
-    if (zi >= 0) secs[zi] += dur;
+    // Les zones de course ne décrivent que la COURSE. Une randonnée de 3 h à faible
+    // FC n'est pas du « footing de récupération » : la compter gonfle la part facile
+    // et fausse la règle des 80/20, qui ne porte que sur l'entraînement de course.
+    if (!isRun(w.sport)) continue;
+    const z = Array.isArray(w.hr_zone_seconds) ? w.hr_zone_seconds : null;
+    if (!z || !z.some((v) => Number(v) > 0)) { ecartees++; continue; }
+    seances++;
+    // La montre renvoie plus de tranches (jusqu'à 7) que les 5 bandes affichées :
+    // tout ce qui dépasse la VO₂max est agrégé dans la dernière, jamais perdu.
+    for (let i = 0; i < z.length; i++) {
+      secs[Math.min(i, secs.length - 1)] += Number(z[i]) || 0;
+    }
   }
-  return { secs, total: secs.reduce((a, b) => a + b, 0) };
+  return { secs, total: secs.reduce((a, b) => a + b, 0), seances, ecartees };
 }
 
 // ── Score Discipline — modèle cohérent, documenté et ajustable ───────────────────
@@ -1603,7 +1656,10 @@ function computeRecords(workouts: Workout[]): { longest: number; maxElev: number
 }
 
 // Records par distance — meilleur temps réel sur 5/10/semi/marathon (depuis les activités).
-function computeDistancePRs(workouts: Workout[], lang: string): { label: string; time: string; date: string }[] {
+function computeDistancePRs(
+  workouts: { date: string; distance_km: number | null; duration_seconds: number | null }[],
+  lang: string,
+): { label: string; time: string; date: string }[] {
   const targets = [
     { l: "5 km", lo: 4.7, hi: 5.4 },
     { l: "10 km", lo: 9.4, hi: 10.6 },

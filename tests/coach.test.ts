@@ -6093,6 +6093,95 @@ test("aucune route de mesure jetable n'est partie en production", () => {
   assert.ok(!existsSync("src/app/preview-dash-tmp"), "src/app/preview-dash-tmp est encore là : à supprimer avant tout déploiement");
 });
 
+console.log("\nTABLEAU DE BORD — les chiffres affichés doivent venir de la mesure, pas d'un proxy");
+// Vérification faite sur les données réelles du compte (fenêtre 20/07 → 31/08/2026).
+// Chacun de ces tests fige un chiffre qui était FAUX à l'écran, pas une préférence.
+
+test("les zones lisent le temps mesuré par la montre, jamais la FC moyenne", () => {
+  const src = codeOf("src/components/dashboard/BentoDashboard.tsx");
+  const fn = src.slice(src.indexOf("function computeHrZones"), src.indexOf("function computeHrZones") + 1600);
+  // La FC MOYENNE d'une séance ne dit pas où le temps a été passé : elle rangeait un
+  // footing de 73 min — dont la montre avait mesuré 68 min en Z1 — entièrement en
+  // « Tempo ». D'où les 10 % d'endurance facile affichés pour 47 à 89 km par semaine.
+  assert.ok(fn.includes("hr_zone_seconds"), "computeHrZones n'utilise plus le temps en zone mesuré");
+  assert.ok(!fn.includes("avg_hr"), "computeHrZones est retombé sur la FC moyenne, qui ne mesure pas le temps en zone");
+  // Et les zones de COURSE ne décrivent que la course : les 1014 min de randonnée de
+  // la fenêtre atterrissaient en « Récupération », soit très exactement le nombre que
+  // la carte affichait — de la marche présentée comme du footing.
+  assert.ok(/if \(!isRun\(w\.sport\)\) continue;/.test(fn), "computeHrZones ne filtre plus les sports : la randonnée revient dans les zones de course");
+});
+
+test("les records par distance sont cherchés sur tout l'historique, pas sur 40 activités", () => {
+  const page = codeOf("src/app/dashboard/page.tsx");
+  const src = codeOf("src/components/dashboard/BentoDashboard.tsx");
+  // La liste principale est plafonnée à 40 lignes, soit deux mois. La carte annonçait
+  // donc « record personnel » sur le meilleur temps des deux derniers mois : 25:48 au
+  // 5 km alors que le vrai record est 16:07, 41:20 au 10 km contre 33:58 en réalité.
+  assert.match(src, /computeDistancePRs\(prWorkouts, lang\)/,
+    "les records repassent par `workouts`, plafonné à 40 lignes : ils redeviennent « les deux derniers mois »");
+  // La requête dédiée doit rester bornée à la COURSE : un tour de vélo de 21 km
+  // deviendrait sinon un record du semi-marathon.
+  const req = page.slice(page.indexOf('select("date,distance_km,duration_seconds")'), page.indexOf('select("date,distance_km,duration_seconds")') + 420);
+  assert.ok(req.includes('.eq("sport", "run")'), "la requête des records ne filtre plus la course à pied");
+  assert.ok(req.includes("distance_km.gte.4.7"), "la requête des records ne borne plus les distances");
+});
+
+test("le volume se compare à une médiane, et l'étiquette dit laquelle", () => {
+  const src = codeOf("src/components/dashboard/BentoDashboard.tsx");
+  // L'étiquette annonçait « vs moy. 4 sem. » alors que le code moyennait CINQ semaines,
+  // et une moyenne est écrasée par une coupure : une semaine à 5 km faisait tomber la
+  // référence de 70,7 à 58 km. `robustWeeklyKm` écarte les semaines non courues.
+  assert.match(src, /const volRef = robustWeeklyKm\(runs, Date\.now\(\) - 7 \* 86400000, 8\)/,
+    "la référence de volume n'est plus la médiane robuste, hors semaine en cours");
+  // L'étiquette doit SUIVRE le calcul, sinon elle ment à nouveau.
+  assert.match(src, /\{volumeDelta != null \? t\(volumeRefLabel\) :/,
+    "l'étiquette du volume est redevenue fixe : elle ne décrit plus le calcul réellement fait");
+});
+
+test("« Cette semaine » n'est affiché qu'une fois", () => {
+  const src = codeOf("src/components/dashboard/BentoDashboard.tsx");
+  // Les quatre mêmes chiffres apparaissaient dans le rail ET dans un bouche-trou de la
+  // grille, mis en forme différemment — de quoi douter de laquelle est la bonne.
+  const n = (src.match(/t\("dash\.summary\.title"\)/g) ?? []).length;
+  assert.equal(n, 1, `« Cette semaine » est rendu ${n} fois au lieu d'une`);
+});
+
+test("le rail de droite ne peut plus laisser de trou blanc", () => {
+  const src = codeOf("src/components/dashboard/BentoDashboard.tsx");
+  // Mesuré à 1440×900 : rail 1371 px contre 2619 px pour la colonne principale, donc
+  // 1248 px de moitié droite vide en fin de défilement. Collant et borné à la fenêtre,
+  // il accompagne la lecture quel que soit le nombre de cartes — plusieurs sont
+  // conditionnelles, donc aucune hauteur fixe ne réglerait le problème durablement.
+  const aside = src.slice(src.indexOf("<aside"), src.indexOf("<aside") + 260);
+  for (const cls of ["lg:sticky", "lg:top-6", "lg:max-h-[calc(100vh-3rem)]", "lg:overflow-y-auto"]) {
+    assert.ok(aside.includes(cls), `le rail a perdu ${cls} : le trou blanc de droite revient`);
+  }
+  // `overscroll-contain` bloquerait la molette dans le rail une fois son bas atteint.
+  assert.ok(!aside.includes("overscroll-contain"), "le défilement ne se propage plus du rail à la page");
+});
+
+test("aucune carte n'annonce un pourcentage qui n'est calculé nulle part", () => {
+  const src = codeOf("src/components/dashboard/BentoDashboard.tsx");
+  // La carte du rail s'appelait « Statut de préparation » et affichait « 90 % ». Or
+  // `computeReadiness` ne renvoie ni note ni pourcentage — seulement une couleur et une
+  // phrase. Le nombre était `disc.total`, le Score Discipline, que la carte Ligue
+  // nomme « Score hebdo » : deux noms pour un chiffre, dont un inexistant.
+  // ⚠️ PREMIÈRE VERSION DE CE TEST : FAUSSE. Elle cherchait « score » n'importe où dans
+  // la fonction — et tombait sur `sleepScore`, un simple nom de PARAMÈTRE. Un test qui
+  // rougit sur le vocabulaire au lieu du comportement ne prouve rien.
+  // Ce qui compte est ce que la fonction RENVOIE : uniquement une couleur et une phrase.
+  const readiness = src.slice(src.indexOf("function computeReadiness"), src.indexOf("function computeReadiness") + 700);
+  const retours = readiness.match(/return \{[^}]*\}/g) ?? [];
+  assert.ok(retours.length >= 3, "computeReadiness a changé de forme, ce test ne l'inspecte plus");
+  for (const r of retours) {
+    assert.ok(/accent:/.test(r) && /tagline:/.test(r) && !/\d\s*\}/.test(r.replace(/#[0-9a-fA-F]+/g, "")),
+      `computeReadiness renvoie autre chose qu'une couleur et une phrase : ${r.slice(0, 60)}`);
+  }
+  // La carte du rail ne doit donc plus s'annoncer comme un « statut de préparation » :
+  // le nombre qu'elle affiche est le Score Discipline, que la carte Ligue nomme déjà.
+  assert.ok(!src.includes("{rl.prep}"), "la carte du rail réaffiche un « statut de préparation » qu'aucun calcul ne produit");
+});
+
 })().then(() => {
   globalThis.fetch = realFetch;
   console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

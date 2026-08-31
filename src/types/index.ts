@@ -97,6 +97,10 @@ export interface Workout {
   training_effect?: number;             // 1-5 (aerobic)
   anaerobic_te?: number;                // 0-5 (anaerobic training effect)
   cardiac_decoupling?: number;          // %
+  /** Secondes passées dans chaque zone de FC, telles que la montre les a mesurées
+   *  (intervals.icu → `icu_hr_zone_times`). C'est la SEULE mesure honnête du temps
+   *  en zone : la FC moyenne d'une séance ne dit pas où le temps a été passé. */
+  hr_zone_seconds?: number[] | null;
   avg_ascent_speed_mh?: number;
   // Biomechanics (Garmin / Running Dynamics)
   vertical_oscillation_cm?: number;     // cm

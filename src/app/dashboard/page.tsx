@@ -25,7 +25,7 @@ export default async function DashboardPage() {
   const streakToday = jourLocal();
   const streakFrom = decaleJour(streakToday, -119);
 
-  const [profileRes, hrvRes, workoutsRes, planRes, leagueRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, newMembersRes, streakWkRes, streakPlanRes] = await Promise.all([
+  const [profileRes, hrvRes, workoutsRes, planRes, leagueRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, newMembersRes, prRes, streakWkRes, streakPlanRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single(),
     supabase.from("hrv_data").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(14),
     supabase.from("workouts").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(40),
@@ -37,6 +37,19 @@ export default async function DashboardPage() {
     supabase.from("notifications").select("data").eq("user_id", user!.id).eq("type", "race_objective").maybeSingle(),
     supabase.from("performance_baselines").select("vma_kmh,max_hr").eq("user_id", user!.id).order("tested_at", { ascending: false }).limit(1).single(),
     supabase.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", new Date(Date.now() - 7 * 86400000).toISOString()),
+    // ── RECORDS PAR DISTANCE — requête DÉDIÉE, sur TOUT l'historique ──────────────
+    // La liste principale est plafonnée à 40 activités, soit ici deux mois seulement.
+    // La carte « Records personnels » se calculait dessus et annonçait donc, avec le
+    // badge RP, le meilleur temps des DEUX DERNIERS MOIS. Constaté sur des données
+    // réelles : 25:48 affiché au 5 km alors que le vrai record est 16:07, et 41:20 au
+    // 10 km alors que le vrai est 33:58 — près de huit minutes d'écart, sur une carte
+    // qui dit « record ». On charge donc les seules séances candidates, sur toute la
+    // durée du compte : filtrées à la COURSE À PIED (un tour de vélo de 21 km serait
+    // sinon devenu un record du semi-marathon) et bornées aux quatre distances.
+    supabase.from("workouts").select("date,distance_km,duration_seconds")
+      .eq("user_id", user!.id).eq("sport", "run").gt("duration_seconds", 0)
+      .or("and(distance_km.gte.4.7,distance_km.lte.5.4),and(distance_km.gte.9.4,distance_km.lte.10.6),and(distance_km.gte.20,distance_km.lte.22),and(distance_km.gte.40.5,distance_km.lte.43.5)")
+      .order("duration_seconds", { ascending: true }).limit(400),
     supabase.from("workouts").select("date,sport,type,duration_seconds,distance_km,tss,training_effect")
       .eq("user_id", user!.id).gte("date", streakFrom).order("date", { ascending: false }).limit(500),
     // Trié par created_at DÉCROISSANT : `oneSessionPerSlot` garde la première vue de
@@ -111,6 +124,7 @@ export default async function DashboardPage() {
       workouts={workoutsRes.data ?? []}
       plan={planRes.data}
       league={leagueRes.data}
+      prWorkouts={prRes.data ?? []}
       sleep={sleepRes.data ?? null}
       coachSession={coachSession}
       pendingFeedback={pendingFeedback}
