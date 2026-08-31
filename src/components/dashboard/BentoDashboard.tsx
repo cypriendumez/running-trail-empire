@@ -105,12 +105,12 @@ const RAIL_LABELS: Record<string, { prep: string; goal: string; ai: string; read
 
 // Score de forme — 4 axes calculés du réel (endurance & vitesse dérivées des séances/VMA,
 // récup & régularité reprises du modèle discipline). Couleurs par axe comme la maquette.
-const FORME_LABELS: Record<string, { title: string; endurance: string; speed: string; recovery: string; regularity: string; of: string; rate: (n: number) => string }> = {
-  fr: { title: "Score de forme", endurance: "Endurance", speed: "Vitesse", recovery: "Récupération", regularity: "Régularité", of: "/ 100", rate: (n) => (n >= 80 ? "Excellent" : n >= 60 ? "Bonne forme" : n >= 40 ? "Correct" : "À développer") },
-  en: { title: "Fitness score", endurance: "Endurance", speed: "Speed", recovery: "Recovery", regularity: "Consistency", of: "/ 100", rate: (n) => (n >= 80 ? "Excellent" : n >= 60 ? "Good shape" : n >= 40 ? "Fair" : "Building up") },
-  de: { title: "Fitness-Score", endurance: "Ausdauer", speed: "Tempo", recovery: "Erholung", regularity: "Regelmäßigkeit", of: "/ 100", rate: (n) => (n >= 80 ? "Exzellent" : n >= 60 ? "Gute Form" : n >= 40 ? "Solide" : "Im Aufbau") },
-  es: { title: "Puntuación de forma", endurance: "Resistencia", speed: "Velocidad", recovery: "Recuperación", regularity: "Regularidad", of: "/ 100", rate: (n) => (n >= 80 ? "Excelente" : n >= 60 ? "Buena forma" : n >= 40 ? "Correcto" : "En progreso") },
-  pt: { title: "Pontuação de forma", endurance: "Resistência", speed: "Velocidade", recovery: "Recuperação", regularity: "Regularidade", of: "/ 100", rate: (n) => (n >= 80 ? "Excelente" : n >= 60 ? "Boa forma" : n >= 40 ? "Correto" : "Em progresso") },
+const FORME_LABELS: Record<string, { title: string; endurance: string; speed: string; recovery: string; regularity: string; of: string; rate: (n: number) => string; fort: string; faible: string; equilibre: string }> = {
+  fr: { title: "Score de forme", endurance: "Endurance", speed: "Vitesse", recovery: "Récupération", regularity: "Régularité", of: "/ 100", fort: "Point fort", faible: "À travailler", equilibre: "Profil équilibré", rate: (n) => (n >= 80 ? "Excellent" : n >= 60 ? "Bonne forme" : n >= 40 ? "Correct" : "À développer") },
+  en: { title: "Fitness score", endurance: "Endurance", speed: "Speed", recovery: "Recovery", regularity: "Consistency", of: "/ 100", fort: "Strength", faible: "To work on", equilibre: "Balanced profile", rate: (n) => (n >= 80 ? "Excellent" : n >= 60 ? "Good shape" : n >= 40 ? "Fair" : "Building up") },
+  de: { title: "Fitness-Score", endurance: "Ausdauer", speed: "Tempo", recovery: "Erholung", regularity: "Regelmäßigkeit", of: "/ 100", fort: "Stärke", faible: "Zu verbessern", equilibre: "Ausgewogenes Profil", rate: (n) => (n >= 80 ? "Exzellent" : n >= 60 ? "Gute Form" : n >= 40 ? "Solide" : "Im Aufbau") },
+  es: { title: "Puntuación de forma", endurance: "Resistencia", speed: "Velocidad", recovery: "Recuperación", regularity: "Regularidad", of: "/ 100", fort: "Punto fuerte", faible: "A mejorar", equilibre: "Perfil equilibrado", rate: (n) => (n >= 80 ? "Excelente" : n >= 60 ? "Buena forma" : n >= 40 ? "Correcto" : "En progreso") },
+  pt: { title: "Pontuação de forma", endurance: "Resistência", speed: "Velocidade", recovery: "Recuperação", regularity: "Regularidade", of: "/ 100", fort: "Ponto forte", faible: "A melhorar", equilibre: "Perfil equilibrado", rate: (n) => (n >= 80 ? "Excelente" : n >= 60 ? "Boa forma" : n >= 40 ? "Correto" : "Em progresso") },
 };
 
 // Zones d'entraînement (FC) — temps par zone, estimé du réel (FC moyenne / FC max).
@@ -380,6 +380,30 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
 
   // Score de forme — 4 axes réels (endurance + vitesse dérivées des séances/VMA).
   const forme = computeForme(workouts, currentVma ?? 0, disc.recovery, disc.consistency);
+  /**
+   * LE PLUS HAUT ET LE PLUS BAS DES QUATRE COMPOSANTES.
+   *
+   * Quatre barres presque égales ne se lisent pas d'un coup d'œil : nommer les deux
+   * extrêmes dit en une ligne ce que le graphique met dix secondes à révéler.
+   *
+   * ⚠️ `plat` EXISTE POUR NE PAS DÉSIGNER UN FAUX POINT FAIBLE. À 97/98/100/100, écrire
+   * « à travailler : Endurance » serait absurde : trois points d'écart ne sont pas une
+   * faiblesse. En dessous de 5 points, on dit que le profil est équilibré — ce qui est la
+   * vérité, et reste une information.
+   */
+  const formeExtremes = (() => {
+    // `fl` n'est déclaré que plus bas ; on relit la table ici plutôt que de déplacer
+    // un calcul au milieu d'un bloc qui n'a rien à voir.
+    const fl0 = FORME_LABELS[lang] ?? FORME_LABELS.fr;
+    const cs = [
+      { label: fl0.endurance, val: forme.endurance, c: "#059669" },
+      { label: fl0.speed, val: forme.speed, c: "#2563eb" },
+      { label: fl0.recovery, val: forme.recovery, c: "#7c3aed" },
+      { label: fl0.regularity, val: forme.regularity, c: "#ea580c" },
+    ].slice().sort((a, b) => b.val - a.val);
+    const fort = cs[0], faible = cs[cs.length - 1];
+    return { fort, faible, plat: fort.val - faible.val < 5 };
+  })();
 
   // Zones d'entraînement (FC) — FCmax = test/profil → âge (220−âge) → max observé.
   const profMaxHr = Number((profile as { max_hr?: number } | null)?.max_hr) || 0;
@@ -642,6 +666,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
             <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-zinc-100 text-zinc-500"><Target className="h-4 w-4" /></span>
           </div>
           {forme.hasData ? (
+            <>
             <div className="flex items-center gap-5">
               <div className="relative h-28 w-28 flex-shrink-0">
                 <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
@@ -677,6 +702,40 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
                 ))}
               </div>
             </div>
+            {/* ⚠️ CE BLOC COMBLE 106 px DE VIDE MESURÉ, avec de la DONNÉE, pas du
+                rembourrage. La carte affichait un score et quatre barres, puis s'arrêtait
+                — la rangée étant tirée par les deux cartes voisines (337 px contre 231 de
+                contenu), le tiers inférieur restait blanc.
+                Ce qu'on y met est dérivé des QUATRE VALEURS DÉJÀ CALCULÉES : rien de neuf
+                n'est inventé, on nomme seulement ce que l'athlète ne peut pas lire d'un
+                coup d'œil sur quatre barres presque égales.
+                ⚠️ HAUTEUR STABLE : le bloc s'affiche TOUJOURS. Le masquer quand le profil
+                est homogène ferait sauter la carte d'une visite à l'autre. Quand l'écart
+                est négligeable, on le DIT (« profil équilibré ») au lieu de désigner un
+                point faible qui n'en est pas un. */}
+            <div className="mt-4 grid grid-cols-2 gap-3 border-t border-zinc-100 pt-3.5">
+              <div>
+                <div className="text-[11px] font-medium text-zinc-400">{fl.fort}</div>
+                <div className="mt-0.5 flex items-baseline gap-1.5">
+                  <span className="text-sm font-semibold text-zinc-900">{formeExtremes.fort.label}</span>
+                  <span className="text-xs tabular-nums" style={{ color: formeExtremes.fort.c }}>{formeExtremes.fort.val}%</span>
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] font-medium text-zinc-400">{formeExtremes.plat ? "\u00a0" : fl.faible}</div>
+                <div className="mt-0.5 flex items-baseline gap-1.5">
+                  {formeExtremes.plat ? (
+                    <span className="text-sm font-semibold text-zinc-500">{fl.equilibre}</span>
+                  ) : (
+                    <>
+                      <span className="text-sm font-semibold text-zinc-900">{formeExtremes.faible.label}</span>
+                      <span className="text-xs tabular-nums" style={{ color: formeExtremes.faible.c }}>{formeExtremes.faible.val}%</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+            </>
           ) : (
             <div className="flex flex-col items-center justify-center py-6 text-center">
               <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-50">
@@ -688,10 +747,16 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
           )}
         </motion.div>
 
-        {/* HRV Chart */}
+        {/* HRV Chart.
+            ⚠️ COLONNE FLEXIBLE, et ce n'est pas cosmétique. La grille étire toutes les
+            cartes d'une rangée à la hauteur de la plus grande : ici 337 px, imposés par la
+            carte voisine. Le graphique était figé à 80 px, laissant 51 px de blanc mesuré
+            sous le pied de carte. Une courbe de VFC sur quatorze jours haute de 80 px
+            n'est pas lisible — c'est pourtant le seul contenu de cette carte. En
+            `flex-col`, le graphique prend la place que la rangée lui donne. */}
         <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.10 }}
-          className="col-span-12 md:col-span-4 bento-card"
+          className="col-span-12 md:col-span-4 bento-card flex flex-col"
         >
           <div className="flex items-start justify-between mb-3">
             <div>
@@ -715,8 +780,11 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
             </div>
             <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-400"><Heart className="h-4 w-4 animate-heartbeat" /></span>
           </div>
+          {/* `min-h` garde une courbe lisible quand la rangée est courte (mobile, cartes
+              voisines vides) ; `flex-1` absorbe le reste de la hauteur imposée. */}
           {hrvChartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={80}>
+            <div className="min-h-[80px] flex-1">
+            <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={hrvChartData}>
                 <defs>
                   <linearGradient id="hrv-grad" x1="0" y1="0" x2="0" y2="1">
@@ -732,6 +800,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
                 />
               </AreaChart>
             </ResponsiveContainer>
+            </div>
           ) : (
             <div className="h-20 flex items-center justify-center text-sm text-zinc-400">
               {t("dash.hrv.empty")}
@@ -983,7 +1052,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
         {/* Activité 7 jours — barres km/jour */}
         <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
-          className="col-span-12 md:col-span-8 bento-card"
+          className="col-span-12 md:col-span-8 bento-card flex flex-col"
         >
           <div className="mb-4 flex items-center justify-between">
             <div className="metric-label">{t("dash.weekly.title")}</div>
@@ -992,7 +1061,10 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
               <span className="text-zinc-400">{t("dash.chart.elevation")} <strong className="tabular-nums text-zinc-900">+{Math.round(weekSummary.elev)} m</strong></span>
             </div>
           </div>
-          <ResponsiveContainer width="100%" height={140}>
+          {/* Même raison que la carte VFC : la rangée impose sa hauteur, le graphique
+              était figé à 140 px et laissait 36 px de blanc mesuré sous lui. */}
+          <div className="min-h-[140px] flex-1">
+          <ResponsiveContainer width="100%" height="100%">
             <BarChart data={weeklyData} barCategoryGap="24%">
               <CartesianGrid strokeDasharray="3 3" stroke="#F4F4F5" vertical={false} />
               <XAxis dataKey="day" tick={{ fontSize: 11, fill: "#A1A1AA" }} axisLine={false} tickLine={false} />
@@ -1005,6 +1077,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+          </div>
         </motion.div>
 
         {/* Carte de droite n°1 — toujours remplie (pas de colonne vide) */}
@@ -1078,9 +1151,17 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, disciplin
                       {new Date(w.date).toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "short" })}
                     </div>
                   </div>
-                  <div className="flex gap-4 text-sm text-zinc-600 flex-shrink-0">
+                  {/* ⚠️ DÉBORDEMENT HORIZONTAL SUR TÉLÉPHONE, mesuré à 375 px : la page
+                      partait à 412 px de large et se faisait glisser latéralement. Cinq
+                      valeurs plus une pastille et un chevron ne tiennent pas sur une ligne
+                      de 375 px, et `flex-shrink-0` interdisait au bloc de céder.
+                      On garde donc les mesures qui décrivent l'EFFORT (distance, cardio,
+                      durée) et on masque le dénivelé sous 640 px — c'est la seule des
+                      quatre dont l'absence ne change pas la lecture d'une sortie, et elle
+                      reste disponible au clic sur la séance. */}
+                  <div className="flex gap-3 text-sm text-zinc-600 flex-shrink-0 sm:gap-4">
                     {w.distance_km && <span>{w.distance_km.toFixed(1)} km</span>}
-                    {w.elevation_gain_m ? <span>+{w.elevation_gain_m}m</span> : null}
+                    {w.elevation_gain_m ? <span className="hidden sm:inline">+{w.elevation_gain_m}m</span> : null}
                     {w.avg_hr && <span>{w.avg_hr} bpm</span>}
                     <span className="text-zinc-400">
                       {Math.floor(w.duration_seconds / 3600)}h{String(Math.floor((w.duration_seconds % 3600) / 60)).padStart(2, "0")}

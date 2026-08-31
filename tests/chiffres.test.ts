@@ -530,6 +530,26 @@ test("la newsletter n'explique plus sa politique éditoriale à ses abonnés", (
     assert.ok(c.trim().length > 8, `chapô vide ou tronqué : « ${c} »`);
   }
 });
+test("les graphiques du tableau de bord occupent la hauteur que la grille leur donne", () => {
+  // ⚠️ MESURÉ DANS LE NAVIGATEUR, PAS SUPPOSÉ, le 31/08/2026 sur les vraies données de
+  // Cyprien. La grille étire toutes les cartes d'une rangée à la hauteur de la plus
+  // grande. Deux graphiques étaient figés en pixels — 80 px pour la VFC, 140 pour
+  // l'activité — et laissaient respectivement 51 et 36 px de blanc sous eux. Une courbe
+  // de VFC sur quatorze jours haute de 80 px n'est pas lisible, et c'est pourtant le seul
+  // contenu de sa carte : le vide et l'illisibilité avaient la même cause.
+  //
+  // Total du blanc mesuré sur la grille : 193 px avant, 48 après.
+  const ui = sansCommentaires(readFileSync(join(ROOT, "src/components/dashboard/BentoDashboard.tsx"), "utf8"));
+  const figes = [...ui.matchAll(/<ResponsiveContainer[^>]*height=\{(\d+)\}/g)].map((m) => m[1]);
+  assert.deepEqual(figes, [],
+    `${figes.length} graphique(s) à hauteur figée (${figes.join(", ")}px) : ils laisseront du blanc dès que la rangée sera plus haute`);
+  // Chaque conteneur en hauteur libre doit avoir un plancher, sinon il s'écrase à zéro
+  // quand la rangée est courte — sur téléphone, où chaque carte est seule sur sa ligne.
+  const libres = (ui.match(/<ResponsiveContainer[^>]*height="100%"/g) ?? []).length;
+  const planchers = (ui.match(/min-h-\[\d+px\][^"]*flex-1|flex-1[^"]*min-h-\[\d+px\]/g) ?? []).length;
+  assert.ok(libres >= 2, `seulement ${libres} graphique(s) en hauteur libre`);
+  assert.ok(planchers >= libres, `${libres} graphiques libres pour ${planchers} plancher(s) : un graphique peut s'écraser à zéro`);
+});
 test("le lanceur du Bureau ouvre les adresses que le code utilise vraiment", () => {
   // ⚠️ UN RACCOURCI QUI OUVRE UN SITE MORT EST PIRE QUE PAS DE RACCOURCI. Les adresses
   // du lanceur macOS sont écrites à la main dans un script AppleScript, hors du champ du
