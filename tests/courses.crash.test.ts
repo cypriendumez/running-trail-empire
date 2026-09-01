@@ -21,6 +21,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { grouperEvenements, cleEvenement, normNom } from "../src/lib/races/groupes";
 import { idCourseValide } from "../src/lib/races/favoris";
 import { jourFrance } from "../src/lib/races/jourFrance";
+import { typeDepuisUrl, anneeDepuisUrl, choisirFiche, typeCorrige, motsCles } from "../src/lib/races/leSportif";
 import { joursAvant, sansAccents, correspond, domaineSource, ficheVerifiable } from "../src/lib/races/temps";
 import { normaliserHeure, afficherHeure } from "../src/lib/races/heure";
 import { dateDeLaFiche, doitMettreAJour } from "../src/lib/races/fiche";
@@ -775,6 +776,85 @@ test("les deux compteurs de la page ne se contredisent plus", () => {
     assert.ok(!/\{n\} (courses|races|carreras|corridas|Rennen)/.test(l),
       `la pagination compte encore des « courses » : ${l}`);
   }
+});
+
+console.log("\nTROISIÈME SOURCE — une mauvaise correspondance est pire que pas de correspondance");
+
+test("le type se lit dans l'URL, et « trail-course-nature » n'est pas de la route", () => {
+  // Piège d'ordre : « trail-course-nature » CONTIENT « course ». Testé après
+  // « course-a-pied-sur-route », il serait classé route — l'inverse du bon résultat.
+  assert.equal(typeDepuisUrl("/calendrier/230833/foulees-de-bondues-2027/course-a-pied-sur-route/"), "route");
+  assert.equal(typeDepuisUrl("/calendrier/221154/foulees-fressinoises-2026/trail-course-nature/"), "trail");
+  assert.equal(typeDepuisUrl("/calendrier/221564/les-coteaux-2026/trail-course-nature-marche/"), "trail");
+  assert.equal(typeDepuisUrl("/autre/page"), "inconnu");
+  assert.equal(typeDepuisUrl(""), "inconnu");
+  assert.equal(typeDepuisUrl(null), "inconnu");
+});
+
+test("la fiche d'une AUTRE ANNÉE n'est jamais retenue", () => {
+  // Une course annuelle a une fiche par édition. Corriger le type sur la mauvaise année
+  // écrirait une donnée qui n'a rien à voir.
+  const liens = ["/calendrier/230833/foulees-de-bondues-2026/course-a-pied-sur-route/"];
+  assert.equal(choisirFiche(liens, { name: "Foulées de Bondues", date: "2027-05-23" }), null);
+  assert.equal(anneeDepuisUrl("/calendrier/1/x-2027/route/"), "2027");
+  assert.equal(anneeDepuisUrl("/calendrier/1/x/route/"), null);
+});
+
+test("un seul mot en commun ne suffit pas à apparier", () => {
+  // « Foulées de Bondues » et « Foulées Argentées » partagent « foulees ». Les
+  // confondre écrirait le type de l'une sur l'autre — deux courses réelles, même ville.
+  const liens = ["/calendrier/1/les-foulees-argentees-2027/course-a-pied-sur-route/"];
+  assert.equal(choisirFiche(liens, { name: "Foulées de Bondues", date: "2027-05-23" }), null);
+});
+
+test("deux candidates : on ne tranche pas", () => {
+  const liens = [
+    "/calendrier/1/trail-des-cimes-2027/trail-course-nature/",
+    "/calendrier/2/trail-des-cimes-2027/course-a-pied-sur-route/",
+  ];
+  assert.equal(choisirFiche(liens, { name: "Trail des Cimes", date: "2027-05-23" }), null,
+    "une correspondance ambiguë a été retenue");
+});
+
+test("la bonne fiche est retenue quand elle est seule et cohérente", () => {
+  const liens = [
+    "/calendrier/230833/foulees-de-bondues-2027/course-a-pied-sur-route/",
+    "/calendrier/1/les-foulees-argentees-2027/course-a-pied-sur-route/",
+  ];
+  assert.equal(choisirFiche(liens, { name: "Foulées de Bondues", date: "2027-05-23" }),
+    "/calendrier/230833/foulees-de-bondues-2027/course-a-pied-sur-route/");
+});
+
+test("entrées vides : aucune correspondance, aucun plantage", () => {
+  for (const [l, n, d] of [[[], "X", "2027-01-01"], [["/x"], "", "2027-01-01"],
+                           [["/x"], "X", ""], [["/x"], "X", "pas-une-date"]] as [string[], string, string][]) {
+    assert.equal(choisirFiche(l, { name: n, date: d }), null);
+  }
+  assert.deepEqual(motsCles(""), []);
+  assert.deepEqual(motsCles("de la du des"), [], "les mots vides comptent comme significatifs");
+});
+
+test("la correction ne touche QUE la famille route/trail, jamais la distance", () => {
+  // Le cas réel : Foulées de Bondues, 10 km, classée `trail_s` par finishers alors que
+  // le-sportif dit « course à pied sur route ».
+  assert.equal(typeCorrige("trail_s", "route", 10), "road_10k");
+  assert.equal(typeCorrige("road_10k", "trail", 10), "trail_s");
+  assert.equal(typeCorrige("road_half", "trail", 21.1), "trail_s");
+  assert.equal(typeCorrige("trail_l", "trail", 60), null, "un type déjà cohérent est réécrit pour rien");
+  assert.equal(typeCorrige("road_10k", "route", 10), null);
+});
+
+test("on ne corrige rien quand la source ne sait pas non plus", () => {
+  assert.equal(typeCorrige("trail_s", "inconnu", 10), null);
+  assert.equal(typeCorrige("", "route", 10), null);
+  assert.equal(typeCorrige(null, "route", 10), null);
+});
+
+test("la famille de route suit la distance, comme partout ailleurs", () => {
+  assert.equal(typeCorrige("trail_s", "route", 5), "road_5k");
+  assert.equal(typeCorrige("trail_s", "route", 21.1), "road_half");
+  assert.equal(typeCorrige("trail_s", "route", 42.195), "road_marathon");
+  assert.equal(typeCorrige("road_10k", "trail", 100), "trail_xl");
 });
 
 console.log(`\n${passed} crash-test(s) du catalogue passé(s), ${fails.length} échec(s)`);

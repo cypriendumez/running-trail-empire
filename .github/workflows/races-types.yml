@@ -1,0 +1,57 @@
+# ──────────────────────────────────────────────────────────────────────────────
+#  TYPE DE COURSE — corrigé par une troisième source, une fois par jour.
+#
+#  POURQUOI : les deux sources du catalogue se contredisent. Sur « Foulées de
+#  Bondues », finishers.com annonce un TRAIL, le-sportif.com une COURSE SUR
+#  ROUTE — et c'est le-sportif qui a raison, sa fiche détaille les cinq épreuves
+#  et leurs horaires. Le type n'est pas cosmétique : il pilote l'icône, la
+#  couleur, et le filtre « Tous types » avec lequel un athlète cherche.
+#
+#  CE QU'ON S'AUTORISE : leur robots.txt dit `Allow: /` et n'interdit que cinq
+#  chemins d'administration — la page de recherche n'en fait pas partie et
+#  répond 200. UNE recherche ciblée par ville, 25 courses par passage, 1,5 s
+#  entre chacune. Pas de balayage du site.
+#
+#  ⚠️ ET ON N'ÉCRIT QUE SUR CORRESPONDANCE CERTAINE : fiche de la bonne année,
+#  au moins deux mots significatifs communs, et une seule candidate. Écrire le
+#  type d'une course sur une autre remplacerait une erreur visible par une
+#  erreur invisible.
+#
+#  SECRETS REQUIS : les mêmes que les autres workflows, rien à créer.
+# ──────────────────────────────────────────────────────────────────────────────
+name: Type de course — troisième source
+
+on:
+  schedule:
+    - cron: "25 1 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: races-types
+  cancel-in-progress: false
+
+jobs:
+  corriger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Corriger les types depuis le-sportif
+        env:
+          PACEVO_URL: ${{ secrets.PACEVO_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PACEVO_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::PACEVO_URL ou CRON_SECRET manquant dans les secrets du dépôt."
+            exit 1
+          fi
+          reponse=$(curl -sS --max-time 600 -w '\n%{http_code}' \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${PACEVO_URL}/api/cron/races-types")
+          corps=$(printf '%s' "$reponse" | sed '$d')
+          code=$(printf '%s' "$reponse" | tail -n1)
+          echo "$corps"
+          if [ "$code" != "200" ]; then
+            echo "::error::La correction a répondu $code."
+            exit 1
+          fi
