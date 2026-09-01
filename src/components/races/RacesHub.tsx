@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
 import { grouperEvenements } from "@/lib/races/groupes";
-import { joursAvant, correspond } from "@/lib/races/temps";
+import { joursAvant, correspond, domaineSource } from "@/lib/races/temps";
 import { fmtDistance, type UnitSystem } from "@/lib/units";
 import { correctedRaceType } from "@/lib/raceType";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -569,6 +569,22 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                       <ExternalLink className="w-4 h-4" />
                       {d["register"]}
                     </a>
+                    {/* ⚠️ D'OÙ VIENT CETTE FICHE. Le catalogue est repris de deux
+                        agrégateurs — il n'est pas vérifié course par course, et ne peut
+                        pas l'être : 17 027 fiches, et la source bloque les requêtes
+                        automatiques. Un contrôle sur 40 événements a trouvé 26 pages
+                        vivantes et 14 requêtes bloquées ; un contrôle antérieur avait
+                        trouvé une page disparue. Laisser croire à une vérification qui
+                        n'existe pas, juste avant un paiement d'inscription, serait le
+                        pire endroit de l'app pour le faire. */}
+                    {(() => {
+                      const dom = domaineSource(details[selected.id]?.registration_url);
+                      return dom ? (
+                        <p className="w-full text-center text-[11px] leading-relaxed text-zinc-400">
+                          {(d["source"] ?? "").replace("{d}", dom)}
+                        </p>
+                      ) : null;
+                    })()}
                   </>
                 )}
               </div>

@@ -40,3 +40,27 @@ export function correspond(champ: unknown, recherche: string): boolean {
   const q = sansAccents(recherche);
   return q === "" || sansAccents(champ).includes(q);
 }
+
+/**
+ * Domaine d'où provient une fiche de course, prêt à afficher.
+ *
+ * ⚠️ LE CATALOGUE N'EST PAS VÉRIFIÉ COURSE PAR COURSE, ET NE PEUT PAS L'ÊTRE.
+ * Les 17 027 fiches sont reprises de deux agrégateurs — finishers.com (78 %) et
+ * jogging-plus (22 %). Leur exactitude est celle de ces sources, pas la nôtre :
+ * un contrôle sur 40 événements tirés au hasard a trouvé 26 pages vivantes, aucune
+ * morte… mais 14 requêtes bloquées, sur lesquelles on ne peut rien conclure. Et un
+ * contrôle antérieur avait bien trouvé une page disparue (« Ultra Champsaur », 404).
+ *
+ * Puisqu'on ne peut pas garantir, on DIT d'où ça vient. L'athlète qui s'apprête à
+ * payer une inscription doit savoir qu'il lit une reprise, pas une vérification.
+ */
+export function domaineSource(url: unknown): string | null {
+  const brut = String(url ?? "").trim();
+  if (!brut) return null;
+  try {
+    const h = new URL(brut).hostname.replace(/^www\./, "");
+    return h || null;
+  } catch {
+    return null;
+  }
+}

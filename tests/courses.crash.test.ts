@@ -17,8 +17,9 @@
  *   npx tsx tests/courses.crash.test.ts
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { grouperEvenements, cleEvenement } from "../src/lib/races/groupes";
-import { joursAvant, sansAccents, correspond } from "../src/lib/races/temps";
+import { joursAvant, sansAccents, correspond, domaineSource } from "../src/lib/races/temps";
 
 let passed = 0;
 const fails: string[] = [];
@@ -217,6 +218,34 @@ test("champs absents : la recherche ne plante pas", () => {
 test("la casse et les espaces de bord sont ignorés", () => {
   assert.ok(correspond("  Trail des Cimes  ", "TRAIL"));
   assert.ok(correspond("Trail des Cimes", "  cimes  "));
+});
+
+console.log("\nPROVENANCE — le catalogue est repris, pas vérifié");
+
+test("le domaine source est extrait sans le « www. »", () => {
+  assert.equal(domaineSource("https://www.finishers.com/course/x"), "finishers.com");
+  assert.equal(domaineSource("https://jogging-plus.com/course/y"), "jogging-plus.com");
+  assert.equal(domaineSource("https://montblanc.utmb.world/races/ccc"), "montblanc.utmb.world");
+});
+
+test("une URL absente ou invalide n'affiche AUCUNE provenance", () => {
+  // Mieux vaut ne rien dire que d'afficher « Fiche reprise de  » : une mention de source
+  // vide se lit comme un bug et fait douter du reste de la fiche.
+  for (const v of ["", "   ", "pas une url", "javascript:alert(1)", null, undefined, 42 as never]) {
+    const r = domaineSource(v as never);
+    assert.ok(r === null || (typeof r === "string" && r.length > 0), `${JSON.stringify(v)} → ${JSON.stringify(r)}`);
+  }
+  assert.equal(domaineSource(""), null);
+  assert.equal(domaineSource("pas une url"), null);
+});
+
+test("la mention de provenance ne peut pas rester à trou", () => {
+  // Le libellé porte un {d} remplacé par le domaine. S'il manquait dans une langue, la
+  // phrase s'afficherait sans sa source — donc sans son intérêt.
+  const src = readFileSync("src/components/races/racesI18n.ts", "utf8");
+  const mentions = src.match(/"source": "[^"]*"/g) ?? [];
+  assert.equal(mentions.length, 5, `${mentions.length} langues au lieu de 5`);
+  for (const m of mentions) assert.ok(m.includes("{d}"), `mention sans emplacement de source : ${m.slice(0, 50)}`);
 });
 
 console.log(`\n${passed} crash-test(s) du catalogue passé(s), ${fails.length} échec(s)`);
