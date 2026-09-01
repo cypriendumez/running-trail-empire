@@ -82,6 +82,26 @@ export function choisirFiche(
  * `trail_s` ou l'inverse selon la source, mais un 10 km reste un 10 km. Et on ne corrige
  * rien si le-sportif ne sait pas non plus.
  */
+/**
+ * Type interne d'une course, déduit du sport vu à la source ET de sa distance.
+ *
+ * ⚠️ CETTE FONCTION EXISTE PARCE QUE J'AI INSÉRÉ DES TYPES FAUX. Pour créer une distance
+ * manquante, j'appelais `typeCorrige("road_5k", vu, d)` — or cette fonction ne corrige
+ * QUE les incohérences route/trail : « road_5k » face à une fiche de route lui paraissait
+ * déjà cohérent, elle rendait `null`, et mon repli ignorait la distance. Résultat en
+ * base : un semi-marathon de 21,1 km rangé en « road_5k », et un trail de 26 km aussi.
+ * Ici, le type se déduit des deux informations, sans repli.
+ */
+export function typePour(vu: TypeSportif, distanceKm: number | null): string | null {
+  if (vu === "inconnu") return null;
+  const d = Number(distanceKm) || 0;
+  if (vu === "trail") return d > 80 ? "trail_xl" : d > 50 ? "trail_l" : d > 30 ? "trail_m" : "trail_s";
+  if (d >= 40) return "road_marathon";
+  if (d >= 19) return "road_half";
+  if (d >= 8) return "road_10k";
+  return "road_5k";
+}
+
 export function typeCorrige(typeActuel: unknown, vu: TypeSportif, distanceKm: number | null): string | null {
   const t = String(typeActuel ?? "");
   if (vu === "inconnu" || !t) return null;
@@ -89,15 +109,8 @@ export function typeCorrige(typeActuel: unknown, vu: TypeSportif, distanceKm: nu
   if (vu === "trail" && estTrail) return null;
   if (vu === "route" && !estTrail) return null;
 
-  const d = Number(distanceKm) || 0;
-  if (vu === "trail") {
-    return d > 80 ? "trail_xl" : d > 50 ? "trail_l" : d > 30 ? "trail_m" : "trail_s";
-  }
-  // Route : la famille suit la distance, comme partout ailleurs dans l'app.
-  if (d >= 40) return "road_marathon";
-  if (d >= 19) return "road_half";
-  if (d >= 8) return "road_10k";
-  return "road_5k";
+  // Une seule table de correspondance dans ce fichier : deux copies divergeraient.
+  return typePour(vu, distanceKm);
 }
 
 

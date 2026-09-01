@@ -23,7 +23,11 @@ name: Type de course — troisième source
 
 on:
   schedule:
+    # DEUX passages par jour : la fonction s'arrête à 235 s pour enregistrer son
+    # avancement, ce qui plafonne un passage à ~50 courses. Deux créneaux amènent le
+    # rythme à ~100 courses par nuit sans jamais dépasser la durée maximale.
     - cron: "25 1 * * *"
+    - cron: "25 13 * * *"
   workflow_dispatch:
 
 concurrency:

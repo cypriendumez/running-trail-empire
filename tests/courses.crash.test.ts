@@ -21,7 +21,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { grouperEvenements, cleEvenement, normNom } from "../src/lib/races/groupes";
 import { idCourseValide } from "../src/lib/races/favoris";
 import { jourFrance } from "../src/lib/races/jourFrance";
-import { typeDepuisUrl, anneeDepuisUrl, choisirFiche, typeCorrige, motsCles, distancesDeFiche, distancesManquantes } from "../src/lib/races/leSportif";
+import { typeDepuisUrl, anneeDepuisUrl, choisirFiche, typeCorrige, motsCles, distancesDeFiche, distancesManquantes, typePour } from "../src/lib/races/leSportif";
 import { joursAvant, sansAccents, correspond, domaineSource, ficheVerifiable } from "../src/lib/races/temps";
 import { normaliserHeure, afficherHeure } from "../src/lib/races/heure";
 import { dateDeLaFiche, doitMettreAJour } from "../src/lib/races/fiche";
@@ -926,6 +926,58 @@ test("seules les distances réellement absentes sont signalées", () => {
   assert.deepEqual(distancesManquantes([], [5, 10]), [5, 10]);
   // Des distances corrompues chez nous ne doivent pas masquer un vrai manque.
   assert.deepEqual(distancesManquantes([null, NaN as never, 0], [5]), [5]);
+});
+
+test("le type d'une distance AJOUTÉE se déduit du sport ET de la distance", () => {
+  // ⚠️ DÉFAUT CONSTATÉ EN BASE. Pour créer une distance manquante j'appelais
+  // `typeCorrige("road_5k", vu, d)` — or cette fonction ne répare qu'une incohérence
+  // route/trail : « road_5k » face à une fiche de route lui paraissait cohérent, elle
+  // rendait null, et mon repli ignorait la distance. Un semi de 21,1 km s'est retrouvé
+  // enregistré en « road_5k », et un trail de 26 km aussi.
+  assert.equal(typePour("route", 21.1), "road_half");
+  assert.equal(typePour("route", 10), "road_10k");
+  assert.equal(typePour("route", 42.2), "road_marathon");
+  assert.equal(typePour("trail", 26), "trail_s");
+  assert.equal(typePour("trail", 60), "trail_l");
+  assert.equal(typePour("trail", 100), "trail_xl");
+});
+
+test("un sport inconnu ne produit AUCUN type — donc aucune insertion", () => {
+  // ⚠️ LE PIRE DÉFAUT DE LA SOIRÉE. le-sportif couvre aussi le vélo. « La Ronde
+  // Picarde » existe en course à pied ET en cyclosportive : même nom, même ville, même
+  // année. Mon appariement a pris la seconde et importé ses 41, 70, 75, 110 et 150 km
+  // dans un catalogue de course à pied. Un 110 km enregistré en « road_5k ».
+  assert.equal(typePour("inconnu", 10), null);
+  assert.equal(typePour("inconnu", 110), null);
+  // Et la route d'enrichissement doit s'arrêter AVANT de lire la fiche.
+  const src = readFileSync("src/app/api/cron/races-types/route.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  assert.ok(src.includes('const fichePage = vu === "inconnu" ? null'),
+    "on lit encore la fiche d'un sport inconnu : les distances d'une cyclosportive entreront dans le catalogue");
+  assert.ok(src.includes("const t = typePour(vu, d);"),
+    "le type inséré ne se déduit plus de la distance");
+});
+
+test("un passage long s'arrête à l'échéance en sauvant son avancement", () => {
+  // ⚠️ MESURÉ EN PRODUCTION : 115 s pour 25 courses, soit ~4,6 s chacune. Demander 100
+  // d'un coup dépasse les 300 s de la fonction : elle serait tuée en vol, le curseur ne
+  // serait JAMAIS enregistré, et les mêmes 100 courses seraient reprises chaque nuit
+  // indéfiniment — sans qu'aucune erreur ne le signale. C'est le mode de panne le plus
+  // coûteux : un travail qui paraît tourner et n'avance jamais.
+  const src = readFileSync("src/app/api/cron/races-types/route.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  assert.ok(/const ECHEANCE_MS = \d[\d_]*;/.test(src), "l'échéance a disparu");
+  const ech = Number((src.match(/const ECHEANCE_MS = ([\d_]+);/)?.[1] ?? "0").replace(/_/g, ""));
+  const max = Number(src.match(/maxDuration = (\d+)/)?.[1] ?? "0");
+  assert.ok(ech > 0 && max > 0, "échéance ou durée maximale illisible");
+  assert.ok(ech < max * 1000 - 30_000,
+    `l'échéance (${ech} ms) laisse moins de 30 s avant la coupure à ${max} s : l'enregistrement du curseur n'aura pas le temps`);
+  assert.ok(src.includes("if (Date.now() - debut > ECHEANCE_MS) break;"), "la boucle ne surveille plus le temps");
+  // Et le curseur doit refléter ce qui a été VRAIMENT parcouru.
+  assert.ok(src.includes("trancheAVerifier(ids, etat.curseur ?? 0, traitees)"),
+    "le curseur avance du lot DEMANDÉ et non du travail fait : les courses non traitées seraient sautées");
 });
 
 console.log(`\n${passed} crash-test(s) du catalogue passé(s), ${fails.length} échec(s)`);
