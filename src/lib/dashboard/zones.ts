@@ -8,6 +8,7 @@
  * doit pouvoir être crash-testé.
  */
 import { isRun } from "@/lib/intervals/sport";
+import { dansFenetre } from "./fenetre";
 
 export type SeanceZones = {
   date: string;
@@ -37,11 +38,11 @@ export type SeanceZones = {
 //    estimation : quand la donnée manque, la séance est écartée du calcul et le
 //    nombre de séances retenues est annoncé sous le graphe.
 export function computeHrZones(workouts: SeanceZones[]): { secs: number[]; total: number; seances: number; ecartees: number } {
-  const now = Date.now();
   const secs = [0, 0, 0, 0, 0];
   let seances = 0, ecartees = 0;
   for (const w of workouts) {
-    if (now - new Date(w.date).getTime() > 42 * 86400000) continue;
+    // Six semaines de CALENDRIER, pas 1008 heures glissantes : voir `fenetre.ts`.
+    if (!dansFenetre(w.date, 42)) continue;
     // Les zones de course ne décrivent que la COURSE. Une randonnée de 3 h à faible
     // FC n'est pas du « footing de récupération » : la compter gonfle la part facile
     // et fausse la règle des 80/20, qui ne porte que sur l'entraînement de course.

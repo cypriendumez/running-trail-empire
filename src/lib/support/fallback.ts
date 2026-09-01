@@ -115,7 +115,44 @@ export const SEUIL_IMMEDIAT = 4;
  *
  * Autrement dit : on n'économise que là où l'IA n'apportait rien.
  */
+/**
+ * Mots qui trahissent une demande de CONSEIL, jamais une demande de navigation.
+ *
+ * ⚠️ TROUVÉ PAR CRASH-TEST. « Comment choisir mes chaussures de trail » recevait la
+ * fiche de la page **Trail Builder** : le mot « trail » suffisait à faire gagner la
+ * page, et l'athlète repartait avec un chemin de clics au lieu d'une réponse. Le score
+ * ne pouvait pas trancher — le mot EST bien dans la question. C'est l'INTENTION qui
+ * diffère, et elle se lit à ces verbes-là.
+ *
+ * Aucun de ces mots n'apparaît dans une question de navigation (« où est… », « comment
+ * accéder à… », « comment fonctionne… »), qui reste servie sans appel comme avant.
+ */
+/** Racines : comparées en SOUS-CHAÎNE, elles couvrent toutes les conjugaisons. */
+const RACINES_CONSEIL = [
+  "choisi", "conseil", "recommand", "meilleur", "vaut mieux",
+  "choose", "advice", "recommend", "should i", "how many", "how much",
+  "empfehl", "sollte ich", "wie viele",
+  "elegir", "consejo", "recomiend", "escolher", "conselho", "recomend",
+];
+/** Mots courts : comparés en MOT ENTIER. « quel » en sous-chaîne attraperait
+ *  « quelque », et « best » attraperait « bestiaire » — un faux positif ici renvoie au
+ *  modèle une question que la base savait traiter en 0 ms. */
+const MOTS_CONSEIL = [
+  // « pourquoi » n'introduit JAMAIS une demande de navigation : c'est une demande
+  // d'explication, et servir une fiche de page à sa place est hors sujet par nature.
+  "pourquoi", "why", "warum", "porque", "porqué",
+  "quel", "quelle", "quels", "quelles", "lequel", "laquelle", "difference", "differences",
+  "combien", "faut", "dois", "best", "welche", "beste", "wahlen",
+  "mejor", "debo", "cuantos", "cuantas", "melhor", "devo", "quantos", "quantas",
+];
+
 export function reponseImmediate(question: string, lang = "fr"): string | null {
+  const n = norm(question);
+  // Une demande de conseil ne doit JAMAIS recevoir une fiche de navigation : elle part
+  // au modèle, qui sait, lui, répondre sur la course à pied.
+  if (RACINES_CONSEIL.some((m) => n.includes(m))) return null;
+  const jetons = new Set(n.split(" "));
+  if (MOTS_CONSEIL.some((m) => jetons.has(m))) return null;
   const t = chercherSansIA(question, lang);
   if (!t || t.source !== "page" || t.score < SEUIL_IMMEDIAT) return null;
   return t.text;

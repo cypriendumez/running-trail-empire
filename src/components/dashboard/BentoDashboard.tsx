@@ -23,6 +23,7 @@ import { ObjectiveCard, type Objective } from "@/components/dashboard/ObjectiveC
 import { cleanActivityName } from "@/lib/utils/activityName";
 import { isRun } from "@/lib/intervals/sport";
 import { computeHrZones } from "@/lib/dashboard/zones";
+import { dansFenetre } from "@/lib/dashboard/fenetre";
 import { computeDistancePRs } from "@/lib/dashboard/records";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { ProfileCompletionBanner } from "@/components/dashboard/ProfileCompletionBanner";
@@ -153,13 +154,13 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
   // contradictoires sous les yeux du même athlète, et une séance recommandée calculée
   // sur le mauvais volume.
   const runs = workouts.filter(w => isRun(w.sport));
+  // ⚠️ SEPT CASES DE CALENDRIER, PAS 168 HEURES GLISSANTES. La fenêtre était ancrée
+  //    sur l'heure exacte de la consultation : une séance vieille de sept jours entrait
+  //    et sortait selon le moment de la journée. Mesuré sur ce compte : 47,7 km affichés
+  //    à 00 h 30, 37,5 km le même jour quelques heures plus tard, sans qu'une seule
+  //    séance ait changé. Voir `lib/dashboard/fenetre`.
   const weeklyKm = runs
-    .filter(w => {
-      const d = new Date(w.date);
-      const now = new Date();
-      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      return d >= weekAgo;
-    })
+    .filter(w => dansFenetre(w.date, 7))
     .reduce((sum, w) => sum + (w.distance_km ?? 0), 0);
 
   const hrvChartData = hrv.slice(0, 14).reverse()
@@ -1515,7 +1516,7 @@ function computeForme(
 ): { total: number; endurance: number; speed: number; recovery: number; regularity: number; hasData: boolean } {
   const now = Date.now();
   // Une sortie vélo de 60 km gonflerait l'axe endurance : on ne score que la course.
-  const recent = workouts.filter(w => isRun(w.sport) && now - new Date(w.date).getTime() <= 42 * 86400000);
+  const recent = workouts.filter(w => isRun(w.sport) && dansFenetre(w.date, 42));
   const hasData = workouts.length > 0;
   const longest = Math.max(0, ...recent.map(w => w.distance_km ?? 0));
   const weeklyKm = recent.reduce((s, w) => s + (w.distance_km ?? 0), 0) / 6;
@@ -1646,8 +1647,7 @@ function computeRecords(workouts: Workout[]): { longest: number; maxElev: number
 
 // Résumé de la semaine en cours (7 derniers jours).
 function computeWeekSummary(workouts: Workout[]): { sessions: number; km: number; elev: number; sec: number } {
-  const weekAgo = Date.now() - 7 * 86400000;
-  const wk = workouts.filter(w => isRun(w.sport) && new Date(w.date).getTime() >= weekAgo);
+  const wk = workouts.filter(w => isRun(w.sport) && dansFenetre(w.date, 7));
   return {
     sessions: wk.length,
     km: wk.reduce((s, w) => s + (w.distance_km ?? 0), 0),

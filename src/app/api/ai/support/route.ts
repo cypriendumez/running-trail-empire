@@ -6,6 +6,8 @@ import { HELP_PAGES, HELP_FACTS, HELP_PROBLEMS, HEALTH_TABS } from "@/data/helpK
 import { diagnoseAccount, findingsBlock, type AccountState } from "@/lib/support/diagnose";
 import { T, normLang } from "@/lib/i18n/translations";
 import { fallbackAnswer, reponseImmediate, FALLBACK_MISS, FALLBACK_PREFIX } from "@/lib/support/fallback";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { normaliserQuestion, empreinteKb, utilisable, type EntreeMemoire } from "@/lib/support/memoire";
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  ASSISTANT DE SUPPORT — répond aux questions sur l'app, dans la langue de l'athlète.
@@ -100,6 +102,49 @@ export async function POST(req: Request) {
     weightModeEnabled: Boolean(p?.weight_mode_enabled),
   };
 
+  // ── MÉMOIRE DES QUESTIONS DÉJÀ TRAITÉES ────────────────────────────────────────
+  //  L'assistant repartait de zéro à chaque fois : la même question, posée par cent
+  //  personnes, coûtait cent appels. Elle est désormais resservie sans appel.
+  //
+  //  ⚠️ JAMAIS une réponse qui parlait d'un compte. L'assistant lit l'état réel du
+  //  compte ; rejouer « ta montre n'est pas connectée » chez quelqu'un d'autre serait
+  //  faux ET indiscret. La garantie est double : on n'ENREGISTRE que les réponses
+  //  produites sans aucun constat, et on ne RESSERT que si le compte qui redemande n'en
+  //  a aucun non plus. Voir `lib/support/memoire`.
+  const constats = diagnoseAccount(state);
+  const compteAvecConstats = constats.length > 0;
+  const cle = normaliserQuestion(message);
+  const kb = empreinteKb();
+  const admin = createAdminClient();
+
+  if (cle && !compteAvecConstats) {
+    const { data: memo } = await admin
+      .from("notifications").select("data")
+      .eq("type", "support_qa").eq("data->>cle", cle).eq("data->>lang", lang).eq("data->>kb", kb)
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const e = (memo?.data ?? null) as EntreeMemoire | null;
+    if (e && utilisable(e, { lang, kb, compteAvecConstats })) {
+      return NextResponse.json({ reply: e.a, source: "memoire" });
+    }
+  }
+
+  /** Conserve la question ET sa réponse. Silencieux par construction : si la mémoire
+   *  tombe en panne, le support continue de fonctionner — c'est une accélération, pas
+   *  une dépendance. La question est TOUJOURS conservée (elle te dit ce que tes clients
+   *  demandent) ; seule sa réutilisation est conditionnée. */
+  const memoriser = async (reponse: string, source: EntreeMemoire["source"]) => {
+    const entree: EntreeMemoire = {
+      q: message, cle, a: reponse, lang, kb,
+      generique: !compteAvecConstats, source, at: new Date().toISOString(),
+    };
+    await admin.from("notifications").insert({
+      user_id: user.id, type: "support_qa",
+      title: message.slice(0, 120),
+      body: reponse.slice(0, 2000),
+      data: entree as unknown as Record<string, unknown>,
+    });
+  };
+
   // Le libellé cité doit être CELUI QUE L'UTILISATEUR VOIT dans sa barre latérale, pas le
   // nom français. Sinon l'assistant renvoie un germanophone vers « Paramètres », introuvable
   // chez lui puisque son menu affiche « Einstellungen ».
@@ -116,7 +161,7 @@ export async function POST(req: Request) {
 
   const system = `Tu es l'assistant d'aide de Pacevo, une application de coaching de course à pied et de trail. Tu réponds aux questions des utilisateurs sur le FONCTIONNEMENT de l'application et tu les dépannes.
 
-⛔ RÈGLE ABSOLUE — NE RIEN INVENTER. Tu ne connais de l'application QUE ce qui figure ci-dessous. N'invente JAMAIS un écran, un bouton, un réglage ou un chemin de menu. Si la réponse n'est pas dans ces informations, dis-le franchement : « Je ne trouve pas cette fonctionnalité dans ce que je connais de l'app » et propose d'écrire au coach via la Messagerie. Une réponse fluide mais fausse fait perdre dix minutes à quelqu'un et lui fait croire que l'app est cassée — c'est pire que « je ne sais pas ».
+⛔ RÈGLE ABSOLUE — NE RIEN INVENTER SUR L'APPLICATION. Tu ne connais de l'application QUE ce qui figure ci-dessous. (Sur la course à pied en général, voir la case B plus bas : là, tes connaissances sont les bienvenues.) N'invente JAMAIS un écran, un bouton, un réglage ou un chemin de menu. Si la réponse n'est pas dans ces informations, dis-le franchement : « Je ne trouve pas cette fonctionnalité dans ce que je connais de l'app » et propose d'écrire au coach via la Messagerie. Une réponse fluide mais fausse fait perdre dix minutes à quelqu'un et lui fait croire que l'app est cassée — c'est pire que « je ne sais pas ».
 
 🌍 LANGUE : réponds ENTIÈREMENT en ${LANGS[lang]}, quelle que soit la langue de la question. Les noms de pages entre guillemets « » ci-dessous sont EXACTEMENT ceux qu'il voit dans son menu : reprends-les tels quels, ne les traduis pas toi-même. Les SOUS-ONGLETS à l'intérieur d'une page (par exemple les onglets de la page Santé) sont eux aussi traduits dans l'interface : nomme-les dans sa langue, pas en français.
 
@@ -130,7 +175,36 @@ Tutoiement. Pas de conclusion de politesse. Mets en gras (**…**) le nom des pa
 
 🔧 DÉPANNAGE : si l'état du compte ci-dessous contient un point BLOQUANT, commence par lui — n'énumère pas des causes possibles alors que tu SAIS laquelle s'applique. Si tout est en ordre de ce côté, dis-le et cherche ailleurs.
 
-🩺 HORS SUJET : pour une douleur ou une blessure, renvoie vers Santé › Kiné IA. Pour l'entraînement lui-même (« pourquoi cette séance ? »), renvoie vers le Calendrier et son bandeau « pourquoi ce plan ». Tu expliques l'APPLICATION, tu ne fais ni coaching ni médecine.
+🧭 TON CHAMP — TU RÉPONDS À TOUT, MAIS PAS DE LA MÊME FAÇON. Range mentalement chaque question dans l'une de ces trois cases, et applique la règle de la case :
+
+  A. L'APPLICATION (où cliquer, comment ça marche, pourquoi ça ne marche pas).
+     → UNIQUEMENT ce qui figure plus bas. L'interdiction d'inventer est ABSOLUE ici :
+       un chemin de menu plausible mais faux envoie la personne chercher un écran qui
+       n'existe pas, elle conclut que l'app est cassée, et rien n'a levé d'erreur.
+       Si ce n'est pas écrit plus bas, dis-le et propose la Messagerie.
+
+  B. LA COURSE À PIED EN GÉNÉRAL (entraînement, allures, VMA, seuil, récupération,
+     nutrition, chaussures, matériel, préparation d'une course, règles d'un dossard,
+     vocabulaire : « c'est quoi le seuil ? », « combien de gels sur un marathon ? »,
+     « comment s'échauffer ? »).
+     → RÉPONDS, avec tes propres connaissances. Ne renvoie pas la personne ailleurs
+       pour une question à laquelle tu sais répondre : c'est ce qui rend un support
+       utile plutôt que poli. Reste bref et concret, et quand la réponse dépend de
+       l'athlète, dis de quoi elle dépend au lieu d'un chiffre unique.
+     → NE PRÉSENTE JAMAIS une connaissance générale comme un fait de l'application.
+       « En général, on conseille… » n'est pas « Pacevo fait… ».
+     → Si Pacevo a un écran qui traite le sujet, ajoute-le APRÈS ta réponse, en une
+       ligne — pas à la place.
+
+  C. SANTÉ ET HORS SUJET.
+     → Douleur, blessure, symptôme : réponds ce qu'un non-médecin peut honnêtement
+       dire (repos, ce qui doit alerter), rappelle en une ligne que ce n'est pas un
+       avis médical, et renvoie vers Santé › Kiné IA. Jamais de diagnostic, jamais de
+       posologie, jamais « ce n'est rien ».
+     → « Pourquoi cette séance dans mon plan ? » : le Calendrier porte un bandeau
+       « pourquoi ce plan » qui l'explique avec les chiffres du compte — renvoie-y.
+     → Question sans aucun rapport avec la course ni avec l'app : dis-le en une
+       phrase, sans t'excuser longuement, et propose de revenir au sujet.
 
 CARTE DE L'APPLICATION (les seuls chemins que tu as le droit de citer) :
 ${sitemap}
@@ -141,7 +215,7 @@ ${HELP_FACTS.map((f) => `- ${f}`).join("\n")}
 PROBLÈMES FRÉQUENTS ET LEUR CAUSE RÉELLE :
 ${problems}
 
-${findingsBlock(diagnoseAccount(state))}`;
+${findingsBlock(constats)}`;
 
   const contents = [
     { role: "user", parts: [{ text: system }] },
@@ -172,5 +246,6 @@ ${findingsBlock(diagnoseAccount(state))}`;
     }
     return NextResponse.json({ reply: FALLBACK_MISS[lang] ?? FALLBACK_MISS.fr, degraded: true });
   }
+  await memoriser(out.text, "modele").catch(() => {});
   return NextResponse.json({ reply: out.text });
 }

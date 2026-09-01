@@ -7,6 +7,8 @@
  * écrite en dur. Un modèle qui décide d'un verdict d'entraînement doit être attaquable
  * par des tests, pas enfermé dans un composant client.
  */
+import { jourLocal, decaleJour, ecartJours } from "@/lib/streak/compute";
+
 export type SeanceCharge = {
   date: string;
   tss?: number | null;
@@ -44,7 +46,11 @@ export function computeLoad(
   const tssMap: Record<string, number> = {};
   let estimees = 0;
   let plusAncien = 0;
-  const now = Date.now();
+  // ⚠️ LES JOURS SONT LOCAUX, PAS UTC. En bucketant sur `toISOString()`, la journée
+  //    d'entraînement d'un athlète parisien basculait à 02 h du matin : entre minuit
+  //    et 2 h, la Fatigue (constante 7 jours) passait de 57 à 49 et le verdict de
+  //    charge changeait sous les yeux du lecteur. Voir `fenetre.ts`.
+  const aujourdhui = jourLocal();
   for (const w of workouts) {
     const jour = String(w.date).slice(0, 10);
     // ⚠️ `w.tss ?? estimateTSS(w)` NE PROTÉGEAIT PAS DE NaN : l'opérateur `??` ne
@@ -60,8 +66,8 @@ export function computeLoad(
     const mesure = Number.isFinite(brut) && brut >= 0 ? brut : null;
     if (mesure == null) estimees++;
     tssMap[jour] = (tssMap[jour] ?? 0) + (mesure ?? estimateTSS(w));
-    const age = Math.floor((now - new Date(jour).getTime()) / 86400000);
-    if (Number.isFinite(age)) plusAncien = Math.max(plusAncien, age);
+    const age = ecartJours(jour, aujourdhui);
+    if (Number.isFinite(age) && age >= 0) plusAncien = Math.max(plusAncien, age);
   }
 
   // Aucune forme supposée au départ : ce que la courbe montre doit venir des séances.
@@ -74,7 +80,7 @@ export function computeLoad(
   // route ne sont pas des données à montrer, seulement de quoi faire converger.
   const debut = Math.min(365, Math.max(41, plusAncien));
   for (let i = debut; i >= 0; i--) {
-    const d = new Date(now - i * 86400000).toISOString().split("T")[0];
+    const d = decaleJour(aujourdhui, -i);
     const tss = tssMap[d] ?? 0;
     ctl = ctl + (tss - ctl) / K_CTL;
     atl = atl + (tss - atl) / K_ATL;
