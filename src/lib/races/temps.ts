@@ -64,3 +64,27 @@ export function domaineSource(url: unknown): string | null {
     return null;
   }
 }
+
+
+/**
+ * UNE FICHE PEUT-ELLE ÊTRE VÉRIFIÉE AUTOMATIQUEMENT ?
+ *
+ * ⚠️ CE N'EST PAS UN DÉTAIL TECHNIQUE, C'EST UNE DIFFÉRENCE DE FIABILITÉ que l'athlète
+ * doit connaître avant de payer une inscription. Mesuré sur le catalogue :
+ *
+ *   · 78 % des fiches viennent de finishers.com, qui AUTORISE l'exploration et publie
+ *     des données structurées. Le contrôle nocturne y relit la date à la source et
+ *     corrige la nôtre : ces fiches se soignent toutes seules.
+ *   · 22 % viennent de jogging-plus.com, passé derrière un défi anti-robot JavaScript.
+ *     Il répond 403 à TOUTE requête automatique, `robots.txt` compris. Ces fiches ne
+ *     seront jamais revérifiées : elles sont figées à leur date d'import.
+ *
+ * Laisser croire que les deux se valent serait le mensonge le plus coûteux de l'app :
+ * il se paie en déplacement inutile un dimanche matin.
+ */
+const DOMAINES_VERIFIABLES = ["finishers.com"];
+
+export function ficheVerifiable(url: unknown): boolean {
+  const d = domaineSource(url);
+  return !!d && DOMAINES_VERIFIABLES.some((x) => d === x || d.endsWith(`.${x}`));
+}

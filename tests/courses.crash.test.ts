@@ -20,7 +20,7 @@ import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
 import { grouperEvenements, cleEvenement, normNom } from "../src/lib/races/groupes";
 import { idCourseValide } from "../src/lib/races/favoris";
-import { joursAvant, sansAccents, correspond, domaineSource } from "../src/lib/races/temps";
+import { joursAvant, sansAccents, correspond, domaineSource, ficheVerifiable } from "../src/lib/races/temps";
 import { normaliserHeure, afficherHeure } from "../src/lib/races/heure";
 import { dateDeLaFiche, doitMettreAJour } from "../src/lib/races/fiche";
 import { analyserReponse, promptRecherche, promptExtraction, libelleFormat, libelleDate, MARQUEUR_INCONNU } from "../src/lib/races/heureWeb";
@@ -688,6 +688,38 @@ test("le bandeau « mes courses à venir » ne revient pas sur le catalogue", ()
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
   assert.ok(!src.includes("plannedDisplay"), "le bandeau des courses planifiées est revenu en tête du catalogue");
+});
+
+console.log("\nVÉRIFIABILITÉ — dire ce qu'on ne peut PAS revérifier");
+
+test("finishers est vérifiable, jogging-plus ne l'est pas", () => {
+  // 78 % du catalogue vient de finishers.com, qui autorise l'exploration et publie du
+  // schema.org : le contrôle nocturne y relit la date et corrige la nôtre.
+  // 22 % vient de jogging-plus, passé derrière un défi anti-robot qui répond 403 à
+  // TOUTE requête automatique. Ces fiches sont figées à leur date d'import, pour
+  // toujours. Laisser croire que les deux se valent se paierait en déplacement inutile.
+  assert.equal(ficheVerifiable("https://www.finishers.com/course/x"), true);
+  assert.equal(ficheVerifiable("https://finishers.com/course/x"), true);
+  assert.equal(ficheVerifiable("https://jogging-plus.com/calendrier/"), false);
+  assert.equal(ficheVerifiable("https://www.jogging-plus.com/calendrier/"), false);
+});
+
+test("un domaine inconnu est traité comme NON vérifiable", () => {
+  // Le doute profite à l'avertissement : on ne prétend jamais avoir vérifié une source
+  // qu'on n'a jamais réussi à lire.
+  for (const u of ["https://exemple.fr/course", "https://finishers.com.faux.fr/x", "", null, undefined, 42]) {
+    assert.equal(ficheVerifiable(u as never), false, `${JSON.stringify(u)} déclaré vérifiable`);
+  }
+});
+
+test("la mise en garde est affichée quand la source ne peut pas être relue", () => {
+  const src = readFileSync("src/components/races/RacesHub.tsx", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  assert.ok(src.includes("!ficheVerifiable(details[selected.id]?.registration_url)"),
+    "la fiche ne dit plus quand sa source est invérifiable");
+  const i18n = readFileSync("src/components/races/racesI18n.ts", "utf8");
+  assert.equal((i18n.match(/"unverifiable": "/g) ?? []).length, 5, "la mise en garde manque dans une langue");
 });
 
 console.log(`\n${passed} crash-test(s) du catalogue passé(s), ${fails.length} échec(s)`);

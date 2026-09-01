@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
 import { grouperEvenements } from "@/lib/races/groupes";
-import { joursAvant, correspond, domaineSource } from "@/lib/races/temps";
+import { joursAvant, correspond, domaineSource, ficheVerifiable } from "@/lib/races/temps";
 import { fmtDistance, type UnitSystem } from "@/lib/units";
 import { correctedRaceType } from "@/lib/raceType";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -642,6 +642,17 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                     {liensMorts.includes(String(details[selected.id]?.registration_url ?? "")) && (
                       <p className="w-full rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] leading-relaxed text-amber-800">
                         {d["deadLink"]}
+                      </p>
+                    )}
+                    {/* ⚠️ CETTE SOURCE NE PEUT PAS ÊTRE REVÉRIFIÉE. jogging-plus (22 % du
+                        catalogue) répond 403 à toute requête automatique : sa fiche est
+                        figée à sa date d'import et le contrôle nocturne ne la corrigera
+                        jamais. Le dire est le minimum avant une inscription payante —
+                        laisser croire que toutes les fiches se valent se paierait en
+                        déplacement inutile un dimanche matin. */}
+                    {!ficheVerifiable(details[selected.id]?.registration_url) && (
+                      <p className="w-full rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] leading-relaxed text-amber-800">
+                        {d["unverifiable"]}
                       </p>
                     )}
                     {(() => {
