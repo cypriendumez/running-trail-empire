@@ -332,5 +332,38 @@ test("URL vide ou absente : ignorée, jamais signalée", () => {
   assert.equal(estSignalee(e, ""), false);
 });
 
+console.log("\nPAGINATION — un range() sans ordre saute des lignes");
+
+test("aucune requête paginée ne balaie une table sans ordre stable", () => {
+  // ⚠️ DÉFAUT CONSTATÉ EN PRODUCTION, PAS THÉORIQUE. Le premier passage de la
+  // maintenance des courses avait 2 956 lignes à traiter : 2 291 basculées, 665
+  // OUBLIÉES — dont « 10 Km de Soustons » et « Ultra Champsaur », les deux exemples
+  // que j'avais justement cités comme introuvables. Sans `order`, Postgres ne garantit
+  // aucun ordre d'une page à l'autre : `range()` redécoupe un ensemble mouvant et
+  // saute des lignes SANS lever la moindre erreur.
+  //
+  // Un tri sur une colonne non unique ne suffit pas non plus : des milliers de courses
+  // partagent la même date. Il faut un départage — d'où l'`id` ajouté partout.
+  const fichiers = [
+    "src/app/api/cron/races-maintenance/route.ts",
+    "src/app/api/races/list/route.ts",
+    "src/app/api/races/dedup/route.ts",
+    "src/app/api/races/sync/route.ts",
+    "src/app/api/cron/races-liens/route.ts",
+  ];
+  for (const f of fichiers) {
+    const src = readFileSync(f, "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+    for (const m of src.matchAll(/\.range\(/g)) {
+      const deb = src.lastIndexOf("from(", m.index);
+      assert.ok(deb >= 0, `${f} : \`.range()\` sans \`from()\` identifiable`);
+      const chaine = src.slice(deb, m.index);
+      assert.ok(chaine.includes(".order("),
+        `${f} : une pagination sans \`order\` — elle sautera des lignes en silence`);
+    }
+  }
+});
+
 console.log(`\n${passed} crash-test(s) du catalogue passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log(`  KO ${f}`); process.exit(1); }

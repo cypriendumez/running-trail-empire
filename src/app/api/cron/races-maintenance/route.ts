@@ -30,33 +30,55 @@ export async function GET(req: Request) {
   const sb = createAdminClient();
   const aujourdhui = new Date().toISOString().slice(0, 10);
 
-  // On ne lit QUE ce qui sert : id des courses à date passée, hors marqueur.
-  const aBasculer: string[] = [];
+  // ⚠️ PAGINER SANS `order` SAUTE DES LIGNES. Premier passage réel : 2 956 courses à
+  //    date passée, 2 291 basculées, 665 OUBLIÉES — dont « 10 Km de Soustons » et
+  //    « Ultra Champsaur », les deux exemples que j'avais donnés comme introuvables.
+  //    `range()` découpe un résultat dont l'ordre n'est PAS garanti sans `order` : d'une
+  //    page à l'autre Postgres peut renvoyer les mêmes lignes ou en omettre. Le tri par
+  //    `id` rend le découpage stable.
+  //
+  //    Et on RECOMMENCE tant qu'il en reste : une écriture concurrente, ou une course
+  //    importée pendant le passage, laisserait sinon des oubliées jusqu'au lendemain.
+  //    Borné à 5 tours — au-delà, c'est un problème qu'une boucle ne réglera pas.
   const PAGE = 1000;
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await sb.from("races").select("id")
-      .lt("date", aujourdhui).range(from, from + PAGE - 1);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    if (!data?.length) break;
-    aBasculer.push(...data.map((r) => r.id as string));
-    if (data.length < PAGE) break;
+  const LOT = 200;
+  let bascules = 0;
+  let tours = 0;
+
+  for (; tours < 5; tours++) {
+    const aBasculer: string[] = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await sb.from("races").select("id")
+        .lt("date", aujourdhui).order("id").range(from, from + PAGE - 1);
+      if (error) return NextResponse.json({ error: error.message, bascules }, { status: 500 });
+      if (!data?.length) break;
+      aBasculer.push(...data.map((r) => r.id as string));
+      if (data.length < PAGE) break;
+    }
+    if (!aBasculer.length) break;
+
+    for (let i = 0; i < aBasculer.length; i += LOT) {
+      const lot = aBasculer.slice(i, i + LOT);
+      const { error } = await sb.from("races")
+        .update({ date: "2099-01-01", updated_at: new Date().toISOString() })
+        .in("id", lot);
+      if (error) return NextResponse.json({ error: error.message, bascules }, { status: 500 });
+      bascules += lot.length;
+    }
   }
 
-  let bascules = 0;
-  const LOT = 200;
-  for (let i = 0; i < aBasculer.length; i += LOT) {
-    const { error } = await sb.from("races")
-      .update({ date: "2099-01-01", updated_at: new Date().toISOString() })
-      .in("id", aBasculer.slice(i, i + LOT));
-    if (error) return NextResponse.json({ error: error.message, bascules }, { status: 500 });
-    bascules += aBasculer.slice(i, i + LOT).length;
-  }
+  // On RELIT pour dire la vérité : annoncer « terminé » sans vérifier serait exactement
+  // le défaut qu'on vient de corriger.
+  const { count: restantes } = await sb.from("races").select("id", { count: "exact", head: true })
+    .lt("date", aujourdhui);
 
   return NextResponse.json({
     ok: true,
     bascules,
+    restantes: restantes ?? null,
+    tours,
     message: bascules
-      ? `${bascules} course(s) passée(s) rebasculée(s) en « Date à venir » — elles redeviennent visibles au catalogue.`
+      ? `${bascules} course(s) passée(s) rebasculée(s) en « Date à venir » — elles redeviennent visibles au catalogue. Restantes : ${restantes ?? "?"}.`
       : "Aucune course passée : le catalogue est à jour.",
   });
 }

@@ -16,6 +16,12 @@ async function fetchAllRaces() {
     const { data, error } = await createAdminClient()
       .from("races")
       .select("id,name,date,latitude")
+      // ⚠️ UN `range()` SANS ORDRE TOTAL SAUTE DES LIGNES. Constaté pour de vrai sur la
+      // maintenance des courses : 2 956 lignes à traiter, 2 291 vues, 665 OUBLIÉES.
+      // Sans `order`, Postgres ne garantit rien d'une page à l'autre ; et un tri sur une
+      // colonne non unique (la date, partagée par des milliers de courses) ne suffit pas
+      // non plus — il faut un départage stable, d'où l'`id`.
+      .order("id")
       .range(from, from + PAGE - 1);
     if (error || !data?.length) break;
     all.push(...data);

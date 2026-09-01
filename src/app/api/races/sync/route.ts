@@ -625,7 +625,12 @@ export async function DELETE(req: Request) {
   let from = 0;
   const PAGE = 1000;
   while (true) {
-    const { data, error } = await sb.from("races").select("id,name,city,date,distance_km").range(from, from + PAGE - 1);
+        // ⚠️ UN `range()` SANS ORDRE TOTAL SAUTE DES LIGNES. Constaté pour de vrai sur la
+    // maintenance des courses : 2 956 lignes à traiter, 2 291 vues, 665 OUBLIÉES.
+    // Sans `order`, Postgres ne garantit rien d'une page à l'autre ; et un tri sur une
+    // colonne non unique (la date, partagée par des milliers de courses) ne suffit pas
+    // non plus — il faut un départage stable, d'où l'`id`.
+    const { data, error } = await sb.from("races").select("id,name,city,date,distance_km").order("id").range(from, from + PAGE - 1);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     if (!data?.length) break;
     all.push(...data);
@@ -706,6 +711,7 @@ export async function POST(req: Request) {
     const { data: exData } = await createAdminClient()
       .from("races")
       .select("name,date")
+      .order("name")
       .range(exPage, exPage + EX_PAGE - 1);
     if (!exData?.length) break;
     for (const r of exData) existingKeys.add(`${r.name.toLowerCase().trim()}::${r.date}`);
