@@ -17,10 +17,11 @@
  *   npx tsx tests/courses.crash.test.ts
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { grouperEvenements, cleEvenement } from "../src/lib/races/groupes";
 import { joursAvant, sansAccents, correspond, domaineSource } from "../src/lib/races/temps";
 import { normaliserHeure, afficherHeure } from "../src/lib/races/heure";
+import { dateDeLaFiche, doitMettreAJour } from "../src/lib/races/fiche";
 import { trancheAVerifier, appliquerResultats, verdictDe, estSignalee, urlsSignalees, ETAT_VIDE } from "../src/lib/races/liens";
 
 let passed = 0;
@@ -408,17 +409,75 @@ test("aucune colonne d'heure n'a été ajoutée au catalogue", () => {
     "l'importateur écrit une heure que la source ne publie pas");
 });
 
-test("la synchronisation du catalogue est réellement déclenchée", () => {
-  // Elle n'était appelée par RIEN : la dernière course entrée en base datait du
-  // 10 juin 2026, soit trois mois de courses ignorées sans qu'un écran le signale.
-  const wf = readFileSync(".github/workflows/races-sync.yml", "utf8");
-  assert.ok(wf.includes("/api/races/sync"), "le workflow n'appelle plus la synchronisation");
-  assert.ok(wf.includes("schedule:"), "la synchronisation n'est plus planifiée");
-  // Hebdomadaire, pas quotidienne : on explore des sites tiers.
-  assert.ok(/cron: "\d+ \d+ \* \* 0"/.test(wf), "la cadence n'est plus hebdomadaire");
+test("la synchronisation morte n'est plus planifiée, et DIT pourquoi", () => {
+  // ⚠️ CE TEST A CHANGÉ DE SENS, ET C'EST VOULU. Il exigeait un workflow hebdomadaire.
+  // Le premier passage réel a répondu 422 en 5 secondes : `{"calendar":0,"wordpress":0,
+  // "ffa":0}`. jogging-plus est passé derrière un défi JavaScript anti-robot — il
+  // renvoie 403 à TOUTES les requêtes, `robots.txt` compris. Un serveur ne peut pas le
+  // résoudre. Planifier ça chaque dimanche aurait produit un échec hebdomadaire, et un
+  // rouge récurrent apprend seulement à ignorer le rouge.
+  assert.ok(!existsSync(".github/workflows/races-sync.yml"),
+    "une synchronisation qui ne peut que échouer est de nouveau planifiée");
   const route = readFileSync("src/app/api/races/sync/route.ts", "utf8");
-  assert.ok(route.includes("process.env.CRON_SECRET"),
-    "la route refuse le secret des tâches planifiées : le workflow ne pourra pas l'appeler");
+  assert.ok(/anti-robot/.test(route),
+    "la route ne dit pas pourquoi elle ne ramène rien : le prochain lecteur croira à une panne");
+});
+
+test("la date des courses se rafraîchit depuis les données structurées de la fiche", () => {
+  // Le vrai remplacement : on visite déjà ces pages pour contrôler les liens, on y lit
+  // la date au passage. finishers.com autorise l'exploration et publie du schema.org.
+  const src = readFileSync("src/app/api/cron/races-liens/route.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  assert.ok(src.includes("dateDeLaFiche("), "la date n'est plus lue sur la fiche");
+  assert.ok(src.includes("doitMettreAJour("), "la date lue est écrite sans garde-fou");
+  assert.ok(src.includes('method: "GET"'), "un HEAD ne renvoie aucun corps : rien à lire");
+});
+
+console.log("\nDATE LUE À LA SOURCE — seulement le balisage, jamais le texte");
+
+test("la date sort des données structurées, pas de la prose", () => {
+  const ok = `<script type="application/ld+json">{"@type":"SportsEvent","name":"X","startDate":"2026-10-25"}</script>`;
+  assert.equal(dateDeLaFiche(ok), "2026-10-25");
+  // Une date dans une phrase publicitaire ne doit RIEN écraser : « édition 2025 » a
+  // toutes les chances d'être l'édition précédente.
+  assert.equal(dateDeLaFiche("<p>Rendez-vous le 2025-06-01 pour l'édition 2025 !</p>"), null);
+});
+
+test("balisage absent, cassé ou vide : null, jamais une date inventée", () => {
+  for (const h of ["", "<html></html>", '<script type="application/ld+json">pas du json</script>',
+                   '<script type="application/ld+json">{"@type":"Article"}</script>']) {
+    assert.equal(dateDeLaFiche(h), null, `« ${h.slice(0, 30)} »`);
+  }
+});
+
+test("une date hors de tout bon sens est refusée", () => {
+  for (const d of ["1899-01-01", "2099-01-01", "3000-01-01", "pas-une-date"]) {
+    const h = `<script type="application/ld+json">{"@type":"Event","startDate":"${d}"}</script>`;
+    assert.equal(dateDeLaFiche(h), null, `${d} accepté`);
+  }
+});
+
+test("une date-heure ISO est ramenée au jour", () => {
+  const h = `<script type="application/ld+json">{"@type":"Event","startDate":"2026-10-25T09:30:00+02:00"}</script>`;
+  assert.equal(dateDeLaFiche(h), "2026-10-25");
+});
+
+test("on ne recule JAMAIS une course dans le passé", () => {
+  // Une fiche garde parfois l'ancienne édition en ligne des semaines après la course.
+  // Réécrire avec elle ferait redisparaître la course du catalogue — exactement le
+  // défaut qu'on vient de réparer sur 2 956 lignes.
+  assert.equal(doitMettreAJour("2026-10-25", "2026-06-01", "2026-09-01"), false);
+  assert.equal(doitMettreAJour("2099-01-01", "2026-06-01", "2026-09-01"), false);
+});
+
+test("le marqueur « date à venir » est bien remplacé par une vraie date future", () => {
+  assert.equal(doitMettreAJour("2099-01-01", "2026-10-25", "2026-09-01"), true);
+});
+
+test("une date identique n'écrit rien", () => {
+  assert.equal(doitMettreAJour("2026-10-25", "2026-10-25", "2026-09-01"), false);
+  assert.equal(doitMettreAJour(null, null, "2026-09-01"), false);
 });
 
 console.log(`\n${passed} crash-test(s) du catalogue passé(s), ${fails.length} échec(s)`);

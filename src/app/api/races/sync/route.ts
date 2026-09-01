@@ -702,8 +702,18 @@ export async function POST(req: Request) {
   races = races.filter(r => r.name && r.name.length > 2 && r.date.match(/^\d{4}-\d{2}-\d{2}$/));
 
   if (races.length === 0) {
+    // ⚠️ CE N'EST PLUS UN INCIDENT PASSAGER, C'EST L'ÉTAT NORMAL DEPUIS JUIN 2026.
+    //    jogging-plus est passé derrière une protection anti-robot JavaScript : il
+    //    répond 403 avec une page « Checking your browser » à TOUTES les requêtes, y
+    //    compris `robots.txt`. Un serveur ne peut pas résoudre ce défi. C'est pour cela
+    //    que le catalogue s'est figé au 10 juin, et qu'AUCUN workflow n'appelle plus
+    //    cette route : un travail planifié qui échoue chaque semaine apprend juste à
+    //    ignorer le rouge.
+    //    Le rafraîchissement passe désormais par `/api/cron/races-liens`, qui lit les
+    //    données structurées des fiches finishers.com — un site qui, lui, autorise
+    //    explicitement l'exploration et publie son sitemap.
     return NextResponse.json({
-      error: "Aucune course trouvée.",
+      error: "Aucune course trouvée — les sources explorées par cette route bloquent désormais les requêtes automatiques (défi anti-robot). Le rafraîchissement des dates passe par /api/cron/races-liens.",
       sources: {
         calendar: calRaces.status === "fulfilled" ? calRaces.value.length : "error",
         wordpress: wpRaces.status === "fulfilled" ? wpRaces.value.length : "error",
