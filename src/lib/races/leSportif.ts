@@ -99,3 +99,58 @@ export function typeCorrige(typeActuel: unknown, vu: TypeSportif, distanceKm: nu
   if (d >= 8) return "road_10k";
   return "road_5k";
 }
+
+
+/**
+ * DISTANCES D'UNE FICHE — lues dans un champ STRUCTURÉ, jamais dans la prose.
+ *
+ * ⚠️ LE PREMIER JET GRATTAIT TOUTE LA PAGE, et il se trompait : sur « 10 km d'Angers »
+ * il n'a rien trouvé, ailleurs il ramassait des kilomètres cités dans un texte
+ * publicitaire ou une adresse. Ajouter une distance inventée au catalogue serait pire
+ * que d'en manquer une : elle deviendrait une course à laquelle personne ne peut
+ * s'inscrire.
+ *
+ * le-sportif publie la liste dans son `<meta name="keywords">`, TOUJOURS à la fin et
+ * TOUJOURS après le type. Vérifié sur trois fiches de familles différentes :
+ *   « … course à pied (sur route), 10 km, 5 km, 1,5 km »
+ *   « … trail, course nature, 10 km, 5 km, 3 km, 1 km »
+ *   « … course à pied (sur route), 42,2 km, 21,1 km, 10 km »
+ * On ne lit donc que la QUEUE de cette liste, et on s'arrête au premier mot-clé qui
+ * n'est pas une distance.
+ */
+export function distancesDeFiche(html: string): number[] {
+  const m = String(html ?? "").match(/<meta name="keywords"[^>]*content="([^"]*)"/i);
+  if (!m) return [];
+  const kw = m[1]
+    .replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .trim();
+
+  // ⚠️ NE PAS DÉCOUPER SUR LA VIRGULE. Premier jet : « 1,5 km » a été coupé en « 1 » et
+  //    « 5 km », la liste s'est arrêtée là, et Bondues ne rendait qu'UNE distance sur
+  //    trois. En français la virgule est à la fois le séparateur de la liste ET la
+  //    virgule décimale. On capture donc la queue d'un seul coup, en laissant l'expression
+  //    régulière décider où la suite de distances commence.
+  const queue = kw.match(/((?:\d{1,3}(?:[.,]\d{1,2})?\s*km)(?:\s*,\s*\d{1,3}(?:[.,]\d{1,2})?\s*km)*)\s*$/i);
+  if (!queue) return [];
+
+  const out: number[] = [];
+  for (const d of queue[1].matchAll(/(\d{1,3}(?:[.,]\d{1,2})?)\s*km/gi)) {
+    const v = parseFloat(d[1].replace(",", "."));
+    // Bornes de bon sens : en dessous d'un kilomètre c'est une course d'enfants, au-delà
+    // de 200 km c'est une erreur de saisie. Ni l'une ni l'autre n'a sa place ici.
+    if (v >= 1 && v <= 200) out.push(Math.round(v * 100) / 100);
+  }
+  return [...new Set(out)].sort((a, b) => a - b);
+}
+
+/**
+ * Distances présentes à la source et ABSENTES de chez nous.
+ *
+ * ⚠️ TOLÉRANCE DE 100 m À LA COMPARAISON. Les sources arrondissent différemment : notre
+ * 42,2 km et leur 42,195 km sont la même course, et les traiter comme deux distances
+ * créerait un doublon à chaque marathon du catalogue.
+ */
+export function distancesManquantes(nos: (number | null)[], source: number[]): number[] {
+  const miennes = (nos ?? []).map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0);
+  return source.filter((d) => !miennes.some((m) => Math.abs(m - d) < 0.15));
+}

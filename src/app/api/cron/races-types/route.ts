@@ -3,7 +3,7 @@ export const maxDuration = 300;
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { idEditeur } from "@/lib/compta/enregistrer";
-import { typeDepuisUrl, choisirFiche, typeCorrige } from "@/lib/races/leSportif";
+import { typeDepuisUrl, choisirFiche, typeCorrige, distancesDeFiche, distancesManquantes } from "@/lib/races/leSportif";
 import { trancheAVerifier } from "@/lib/races/liens";
 import { jourFrance } from "@/lib/races/jourFrance";
 
@@ -49,10 +49,15 @@ export async function GET(req: Request) {
   //    venir — le curseur aurait tourné en rond sur le même millier, et les 90 % restants
   //    n'auraient JAMAIS été examinés. Aucune erreur n'est levée : la requête réussit,
   //    elle rend simplement moins que demandé.
-  const courses: { id: string; name: string; city: string | null; date: string; distance_km: number | null; type: string }[] = [];
+  type Course = {
+    id: string; name: string; city: string | null; date: string; distance_km: number | null; type: string;
+    difficulty: string | null; department: string | null; region: string | null;
+    registration_url: string | null; latitude: number | null; longitude: number | null; elevation_gain_m: number | null;
+  };
+  const courses: Course[] = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await sb.from("races")
-      .select("id,name,city,date,distance_km,type")
+      .select("id,name,city,date,distance_km,type,difficulty,department,region,registration_url,latitude,longitude,elevation_gain_m")
       .gte("date", aujourdhui).lt("date", "2099-01-01")
       .not("city", "is", null).order("id").range(from, from + 999);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -63,14 +68,15 @@ export async function GET(req: Request) {
 
   const { data: ligne } = await sb.from("notifications").select("id,data")
     .eq("user_id", proprietaire).eq("type", TYPE_ETAT).maybeSingle();
-  const etat = (ligne?.data ?? {}) as { curseur?: number; corrigees?: number; vues?: number };
+  const etat = (ligne?.data ?? {}) as { curseur?: number; corrigees?: number; vues?: number; ajoutees?: number };
 
   const ids = courses.map((c) => String(c.id));
   const { tranche, suivant } = trancheAVerifier(ids, etat.curseur ?? 0, LOT);
   const parId = new Map(courses.map((c) => [String(c.id), c]));
 
-  let corrigees = 0, vues = 0, appariees = 0;
+  let corrigees = 0, vues = 0, appariees = 0, ajoutees = 0;
   const details: { course: string; de: string; vers: string }[] = [];
+  const ajouts: { course: string; km: number }[] = [];
 
   // Le formulaire ASP.NET exige un VIEWSTATE frais : on le reprend à chaque passage.
   const page = await fetch(RECHERCHE, { headers: entetes(), signal: AbortSignal.timeout(20000) }).catch(() => null);
@@ -104,7 +110,8 @@ export async function GET(req: Request) {
         const fiche = choisirFiche(liens, { name: String(c.name ?? ""), date: String(c.date ?? "") });
         if (fiche) {
           appariees++;
-          const nouveau = typeCorrige(c.type, typeDepuisUrl(fiche), Number(c.distance_km) || null);
+          const vu = typeDepuisUrl(fiche);
+          const nouveau = typeCorrige(c.type, vu, Number(c.distance_km) || null);
           if (nouveau) {
             const { error: e } = await sb.from("races")
               .update({ type: nouveau, updated_at: new Date().toISOString() }).eq("id", id);
@@ -113,23 +120,54 @@ export async function GET(req: Request) {
               if (details.length < 20) details.push({ course: String(c.name), de: String(c.type), vers: nouveau });
             }
           }
+
+          // ── DISTANCES MANQUANTES ────────────────────────────────────────────────
+          //  Mesuré sur un échantillon : 3 événements sur 5 ont des formats absents du
+          //  catalogue. « 10 km d'Héricourt » n'existait qu'en 10 km alors que la course
+          //  en propose quatre. Un athlète qui cherche un 5 km ne la trouvait pas.
+          //
+          //  ⚠️ ON N'AJOUTE JAMAIS SANS LA FICHE STRUCTURÉE de la source, et on ne
+          //  SUPPRIME jamais rien. Une distance inventée deviendrait une course à
+          //  laquelle personne ne peut s'inscrire — pire que la distance manquante.
+          const fichePage = await fetch(BASE + fiche, { headers: entetes(), signal: AbortSignal.timeout(20000) }).catch(() => null);
+          if (fichePage?.ok) {
+            const dSource = distancesDeFiche(await fichePage.text());
+            if (dSource.length) {
+              // Toutes les lignes de CET événement, pas seulement celle qu'on traite :
+              // c'est l'ensemble des formats déjà connus qu'il faut comparer.
+              const memes = courses.filter((x) =>
+                x.name === c.name && x.city === c.city && x.date === c.date);
+              const aAjouter = distancesManquantes(memes.map((x) => x.distance_km), dSource);
+              for (const d of aAjouter) {
+                const t = typeCorrige("road_5k", vu, d) ?? (vu === "trail" ? "trail_s" : "road_5k");
+                const { error: e } = await sb.from("races").insert({
+                  name: c.name, city: c.city, department: c.department, region: c.region,
+                  date: c.date, distance_km: d, type: t, difficulty: c.difficulty,
+                  registration_url: c.registration_url,
+                  latitude: c.latitude, longitude: c.longitude,
+                });
+                if (!e) { ajoutees++; if (ajouts.length < 20) ajouts.push({ course: String(c.name), km: d }); }
+              }
+            }
+            await new Promise((r) => setTimeout(r, PAUSE_MS));
+          }
         }
       }
     } catch { /* réseau : on passe, le curseur avance quand même */ }
     await new Promise((r) => setTimeout(r, PAUSE_MS));
   }
 
-  const nouvelEtat = { curseur: suivant, corrigees: (etat.corrigees ?? 0) + corrigees, vues: (etat.vues ?? 0) + vues };
+  const nouvelEtat = { curseur: suivant, corrigees: (etat.corrigees ?? 0) + corrigees, vues: (etat.vues ?? 0) + vues, ajoutees: (etat.ajoutees ?? 0) + ajoutees };
   const charge = {
     user_id: proprietaire, type: TYPE_ETAT,
     title: "Type de course — troisième source",
-    body: `${nouvelEtat.vues} course(s) examinée(s) · ${nouvelEtat.corrigees} type(s) corrigé(s)`,
+    body: `${nouvelEtat.vues} course(s) examinée(s) · ${nouvelEtat.corrigees} type(s) corrigé(s) · ${nouvelEtat.ajoutees} distance(s) ajoutée(s)`,
     data: nouvelEtat as unknown as Record<string, unknown>,
   };
   if (ligne?.id) await sb.from("notifications").update(charge).eq("id", ligne.id);
   else await sb.from("notifications").insert(charge);
 
-  return NextResponse.json({ ok: true, total: ids.length, examinees: vues, appariees, corrigees, curseur: suivant, details });
+  return NextResponse.json({ ok: true, total: ids.length, examinees: vues, appariees, corrigees, ajoutees, curseur: suivant, details, ajouts });
 }
 
 function entetes(): Record<string, string> {

@@ -21,7 +21,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { grouperEvenements, cleEvenement, normNom } from "../src/lib/races/groupes";
 import { idCourseValide } from "../src/lib/races/favoris";
 import { jourFrance } from "../src/lib/races/jourFrance";
-import { typeDepuisUrl, anneeDepuisUrl, choisirFiche, typeCorrige, motsCles } from "../src/lib/races/leSportif";
+import { typeDepuisUrl, anneeDepuisUrl, choisirFiche, typeCorrige, motsCles, distancesDeFiche, distancesManquantes } from "../src/lib/races/leSportif";
 import { joursAvant, sansAccents, correspond, domaineSource, ficheVerifiable } from "../src/lib/races/temps";
 import { normaliserHeure, afficherHeure } from "../src/lib/races/heure";
 import { dateDeLaFiche, doitMettreAJour } from "../src/lib/races/fiche";
@@ -873,6 +873,59 @@ test("les routes qui balaient la table lisent AU-DELÀ de 1 000 lignes", () => {
       `${f} demande plus de 1 000 lignes en un coup : il en recevra 1 000 sans le savoir`);
     assert.ok(src.includes(".range("), `${f} ne pagine pas : il ne verra qu'une partie du catalogue`);
   }
+});
+
+console.log("\nDISTANCES DE LA SOURCE — une distance inventée serait une course fantôme");
+
+const meta = (kw: string) => `<html><head><meta name="keywords" lang="fr" content="${kw}" /></head></html>`;
+
+test("les distances se lisent dans le champ structuré, pas dans la prose", () => {
+  // Relevé sur trois vraies fiches, de familles différentes.
+  assert.deepEqual(distancesDeFiche(meta("bondues, 2027, course à pied (sur route), 10 km, 5 km, 1,5 km")), [1.5, 5, 10]);
+  assert.deepEqual(distancesDeFiche(meta("trail, course nature, 10 km, 5 km, 3 km, 1 km")), [1, 3, 5, 10]);
+  assert.deepEqual(distancesDeFiche(meta("course à pied (sur route), 42,2 km, 21,1 km, 10 km")), [10, 21.1, 42.2]);
+});
+
+test("« 1,5 km » n'est pas coupé en deux par sa propre virgule", () => {
+  // ⚠️ PREMIER JET FAUX. Je découpais la liste sur la virgule — or en français elle est
+  // AUSSI la virgule décimale. « 1,5 km » devenait « 1 » et « 5 km », la lecture
+  // s'arrêtait là, et Bondues ne rendait qu'UNE distance sur trois.
+  assert.deepEqual(distancesDeFiche(meta("x, 10 km, 5 km, 1,5 km")), [1.5, 5, 10]);
+  assert.deepEqual(distancesDeFiche(meta("x, 21,1 km")), [21.1]);
+});
+
+test("on ne remonte pas au-delà de la liste de distances", () => {
+  // Un « 2026 » ou un nom de ville plus haut dans les mots-clés ne doit jamais être pris
+  // pour une distance. On s'arrête au premier mot-clé qui n'en est pas une.
+  assert.deepEqual(distancesDeFiche(meta("marathon, 2026, ville, 10 km")), [10]);
+  assert.deepEqual(distancesDeFiche(meta("10 km de la ville, nature, trail")), []);
+});
+
+test("balisage absent ou vide : aucune distance, jamais une invention", () => {
+  for (const h of ["", "<html></html>", meta(""), meta("course, trail, nature"), meta("2026, 59, nord")]) {
+    assert.deepEqual(distancesDeFiche(h), [], `« ${h.slice(0, 40)} »`);
+  }
+});
+
+test("les distances aberrantes sont écartées", () => {
+  // Sous le kilomètre c'est une course d'enfants, au-delà de 200 km une erreur de saisie.
+  assert.deepEqual(distancesDeFiche(meta("x, 0,7 km, 500 km, 10 km")), [10]);
+});
+
+test("42,2 et 42,195 sont la MÊME distance", () => {
+  // Les sources arrondissent différemment. Les traiter comme deux distances créerait un
+  // doublon à chaque marathon du catalogue.
+  assert.deepEqual(distancesManquantes([42.2], [42.195]), []);
+  assert.deepEqual(distancesManquantes([21.1], [21.097]), []);
+  assert.deepEqual(distancesManquantes([10], [10.5]), [10.5], "un vrai écart de 500 m a été absorbé");
+});
+
+test("seules les distances réellement absentes sont signalées", () => {
+  assert.deepEqual(distancesManquantes([10], [5, 10]), [5]);
+  assert.deepEqual(distancesManquantes([5, 10], [5, 10]), []);
+  assert.deepEqual(distancesManquantes([], [5, 10]), [5, 10]);
+  // Des distances corrompues chez nous ne doivent pas masquer un vrai manque.
+  assert.deepEqual(distancesManquantes([null, NaN as never, 0], [5]), [5]);
 });
 
 console.log(`\n${passed} crash-test(s) du catalogue passé(s), ${fails.length} échec(s)`);
