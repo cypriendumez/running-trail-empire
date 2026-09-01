@@ -1,0 +1,59 @@
+# ──────────────────────────────────────────────────────────────────────────────
+#  CONTRÔLE DES LIENS D'INSCRIPTION — trois fois par jour, par petites tranches.
+#
+#  POURQUOI ÉTALÉ : le catalogue est repris de deux agrégateurs et compte ~8 600
+#  événements. Les vérifier d'un coup est impossible — la source répond 403 dès
+#  qu'on enchaîne (14 requêtes sur 40 lors du premier contrôle manuel). Chaque
+#  passage en contrôle 120, en repartant du curseur laissé par le précédent :
+#  360 par jour, soit le catalogue entier parcouru en ~24 jours, puis reparcouru.
+#
+#  CE QUI EST SIGNALÉ, ET CE QUI NE L'EST PAS : seuls 404 et 410 comptent, et il
+#  en faut DEUX de suite sur deux passages différents. Un 403 veut dire « tu es
+#  bloqué », pas « la page n'existe pas » ; un site en maintenance renvoie parfois
+#  404 pendant une heure. Une fausse alerte découragerait une inscription pour
+#  rien — c'est pire que pas d'alerte du tout.
+#
+#  SECRETS REQUIS : les mêmes que les autres workflows, rien à créer.
+#   • PACEVO_URL   = https://running-trail-empire-woad.vercel.app
+#   • CRON_SECRET  = la MÊME valeur que la variable CRON_SECRET sur Vercel
+# ──────────────────────────────────────────────────────────────────────────────
+name: Contrôle des liens d'inscription
+
+on:
+  schedule:
+    # Trois créneaux espacés, hors heures de pointe des sites visés.
+    - cron: "40 2 * * *"
+    - cron: "40 11 * * *"
+    - cron: "40 19 * * *"
+  workflow_dispatch:
+
+# Deux passages simultanés doubleraient le rythme des requêtes vers un site tiers.
+concurrency:
+  group: races-liens
+  cancel-in-progress: false
+
+jobs:
+  controler:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Contrôler une tranche de liens
+        env:
+          PACEVO_URL: ${{ secrets.PACEVO_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PACEVO_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::PACEVO_URL ou CRON_SECRET manquant dans les secrets du dépôt."
+            exit 1
+          fi
+          reponse=$(curl -sS --max-time 600 -w '\n%{http_code}' \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${PACEVO_URL}/api/cron/races-liens")
+          corps=$(printf '%s' "$reponse" | sed '$d')
+          code=$(printf '%s' "$reponse" | tail -n1)
+          echo "$corps"
+          if [ "$code" != "200" ]; then
+            echo "::error::Le contrôle a répondu $code."
+            exit 1
+          fi

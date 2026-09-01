@@ -5,6 +5,7 @@ import { RacesHub } from "@/components/races/RacesHub";
 import { fmtDistance } from "@/lib/units";
 import { Flag } from "lucide-react";
 import { normLang } from "@/lib/i18n/translations";
+import { urlsSignalees, ETAT_VIDE, type EtatLiens } from "@/lib/races/liens";
 import type { PpsStatus } from "@/lib/pps/status";
 
 export const metadata = { title: "Courses France" };
@@ -32,6 +33,15 @@ export default async function RacesPage({ searchParams }: { searchParams: Promis
   // via /api/races/list (caché au CDN Vercel). Avant : 17 requêtes paginées + ~5,5 Mo
   // sérialisés dans la page à CHAQUE visite = lenteur.
   const admin = createAdminClient();
+  // ── LIENS D'INSCRIPTION CONFIRMÉS MORTS ────────────────────────────────────────
+  //  Le catalogue est repris de deux agrégateurs : une fiche peut pointer vers une page
+  //  disparue sans que rien ne le signale. Un contrôle en tâche de fond en vérifie une
+  //  tranche trois fois par jour ; on ne descend ici QUE les URL confirmées (deux 404
+  //  d'affilée), c'est-à-dire une poignée — pas l'état complet du balayage.
+  const { data: etatLiens } = await admin.from("notifications").select("data")
+    .eq("type", "races_liens").order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const liensMorts = urlsSignalees({ ...ETAT_VIDE, ...((etatLiens?.data ?? {}) as Partial<EtatLiens>) });
+
   const [{ data: initialRaces }, { count: totalCount }] = await Promise.all([
     admin.from("races").select(RACE_COLS).gte("date", today).order("date", { ascending: true }).limit(90),
     admin.from("races").select("id", { count: "estimated", head: true }).gte("date", today),
@@ -97,7 +107,7 @@ export default async function RacesPage({ searchParams }: { searchParams: Promis
           </div>
         </div>
       )}
-      <RacesHub races={(initialRaces ?? []) as never[]} totalCount={totalCount ?? 0} units={units} planned={planned} initialSearch={q ?? ""} pps={pps} />
+      <RacesHub liensMorts={liensMorts} races={(initialRaces ?? []) as never[]} totalCount={totalCount ?? 0} units={units} planned={planned} initialSearch={q ?? ""} pps={pps} />
     </>
   );
 }

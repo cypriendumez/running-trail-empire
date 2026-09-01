@@ -20,6 +20,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { grouperEvenements, cleEvenement } from "../src/lib/races/groupes";
 import { joursAvant, sansAccents, correspond, domaineSource } from "../src/lib/races/temps";
+import { trancheAVerifier, appliquerResultats, verdictDe, estSignalee, urlsSignalees, ETAT_VIDE } from "../src/lib/races/liens";
 
 let passed = 0;
 const fails: string[] = [];
@@ -246,6 +247,89 @@ test("la mention de provenance ne peut pas rester à trou", () => {
   const mentions = src.match(/"source": "[^"]*"/g) ?? [];
   assert.equal(mentions.length, 5, `${mentions.length} langues au lieu de 5`);
   for (const m of mentions) assert.ok(m.includes("{d}"), `mention sans emplacement de source : ${m.slice(0, 50)}`);
+});
+
+console.log("\nCONTRÔLE DES LIENS — une fausse alerte est pire que pas d'alerte");
+
+test("seuls 404 et 410 prouvent l'absence — 403 veut dire « bloqué »", () => {
+  // 14 des 40 URL du premier contrôle manuel ont répondu 403 : le site refusait la
+  // requête, pas la course. Les compter comme mortes aurait signalé 35 % du catalogue.
+  assert.equal(verdictDe(404), "morte");
+  assert.equal(verdictDe(410), "morte");
+  assert.equal(verdictDe(403), "indetermine");
+  assert.equal(verdictDe(429), "indetermine");
+  assert.equal(verdictDe(500), "indetermine");
+  assert.equal(verdictDe(0), "indetermine");     // délai dépassé / réseau
+  assert.equal(verdictDe(200), "vivante");
+  assert.equal(verdictDe(301), "vivante");
+});
+
+test("il faut DEUX échecs de suite avant de signaler", () => {
+  // Un site en maintenance renvoie parfois 404 pendant une heure.
+  let e = appliquerResultats(ETAT_VIDE, [{ url: "u", code: 404 }], "t1");
+  assert.equal(estSignalee(e, "u"), false, "signalée dès le premier 404");
+  e = appliquerResultats(e, [{ url: "u", code: 404 }], "t2");
+  assert.equal(estSignalee(e, "u"), true, "toujours pas signalée après deux 404");
+});
+
+test("une page revenue en ligne cesse d'être signalée IMMÉDIATEMENT", () => {
+  let e = appliquerResultats(ETAT_VIDE, [{ url: "u", code: 404 }], "t1");
+  e = appliquerResultats(e, [{ url: "u", code: 404 }], "t2");
+  assert.equal(estSignalee(e, "u"), true);
+  e = appliquerResultats(e, [{ url: "u", code: 200 }], "t3");
+  assert.equal(estSignalee(e, "u"), false, "une course remise en ligne reste signalée");
+  assert.deepEqual(urlsSignalees(e), []);
+});
+
+test("un 403 entre deux 404 ne remet pas le compteur à zéro, mais ne le fait pas avancer", () => {
+  let e = appliquerResultats(ETAT_VIDE, [{ url: "u", code: 404 }], "t1");
+  e = appliquerResultats(e, [{ url: "u", code: 403 }], "t2");
+  assert.equal(estSignalee(e, "u"), false, "un blocage a suffi à signaler la page");
+  e = appliquerResultats(e, [{ url: "u", code: 404 }], "t3");
+  assert.equal(estSignalee(e, "u"), true);
+});
+
+test("le balayage reprend exactement où il s'est arrêté, et boucle", () => {
+  const urls = ["a", "b", "c", "d", "e"];
+  const t1 = trancheAVerifier(urls, 0, 2);
+  assert.deepEqual(t1.tranche, ["a", "b"]); assert.equal(t1.suivant, 2);
+  const t2 = trancheAVerifier(urls, t1.suivant, 2);
+  assert.deepEqual(t2.tranche, ["c", "d"]); assert.equal(t2.suivant, 4);
+  const t3 = trancheAVerifier(urls, t2.suivant, 2);
+  assert.deepEqual(t3.tranche, ["e", "a"], "le balayage ne reboucle pas au début");
+});
+
+test("curseur aberrant : on repart d'une position valide, jamais d'un plantage", () => {
+  const urls = ["a", "b", "c"];
+  for (const c of [-1, -99, 7, 1e9, NaN, 2.7]) {
+    const { tranche, suivant } = trancheAVerifier(urls, c as number, 2);
+    assert.equal(tranche.length, 2, `curseur ${c} → ${tranche.length} URL`);
+    assert.ok(suivant >= 0 && suivant < urls.length, `curseur suivant hors bornes : ${suivant}`);
+  }
+});
+
+test("catalogue vide ou lot nul : rien à faire, rien qui plante", () => {
+  assert.deepEqual(trancheAVerifier([], 0, 10).tranche, []);
+  assert.deepEqual(trancheAVerifier(["a"], 0, 0).tranche, []);
+});
+
+test("un lot plus grand que le catalogue ne vérifie pas deux fois la même URL", () => {
+  const { tranche } = trancheAVerifier(["a", "b"], 0, 50);
+  assert.equal(tranche.length, 2, `${tranche.length} URL pour un catalogue de 2`);
+  assert.equal(new Set(tranche).size, 2, "la même URL est contrôlée deux fois dans le même passage");
+});
+
+test("l'état ne descend au navigateur QUE les URL confirmées", () => {
+  let e = appliquerResultats(ETAT_VIDE, [{ url: "morte", code: 404 }, { url: "douteuse", code: 404 }], "t1");
+  e = appliquerResultats(e, [{ url: "morte", code: 404 }], "t2");
+  assert.deepEqual(urlsSignalees(e), ["morte"], "une URL à un seul échec est envoyée au navigateur");
+});
+
+test("URL vide ou absente : ignorée, jamais signalée", () => {
+  const e = appliquerResultats(ETAT_VIDE, [{ url: "", code: 404 }, { url: null as never, code: 404 }], "t1");
+  assert.deepEqual(urlsSignalees(e), []);
+  assert.equal(estSignalee(e, undefined), false);
+  assert.equal(estSignalee(e, ""), false);
 });
 
 console.log(`\n${passed} crash-test(s) du catalogue passé(s), ${fails.length} échec(s)`);

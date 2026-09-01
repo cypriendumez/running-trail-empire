@@ -65,7 +65,7 @@ export type PlannedRace = { id: string; name: string; location: string; distance
 
 const normName = (s: string) => (s || "").toLowerCase().trim().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
-export function RacesHub({ races: initialRaces, totalCount, units = "metric", planned: plannedProp = [], initialSearch = "", pps = null }: { races: Race[]; totalCount?: number; units?: UnitSystem; planned?: PlannedRace[]; initialSearch?: string; pps?: PpsStatus | null }) {
+export function RacesHub({ races: initialRaces, totalCount, units = "metric", planned: plannedProp = [], initialSearch = "", pps = null, liensMorts = [] }: { liensMorts?: string[]; races: Race[]; totalCount?: number; units?: UnitSystem; planned?: PlannedRace[]; initialSearch?: string; pps?: PpsStatus | null }) {
   const { lang } = useT();
   const d = RX[lang] ?? RX.fr;
   const tr = (k: string, p?: Record<string, string | number>) => fillR(d[k] ?? k, p);
@@ -577,6 +577,16 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                         trouvé une page disparue. Laisser croire à une vérification qui
                         n'existe pas, juste avant un paiement d'inscription, serait le
                         pire endroit de l'app pour le faire. */}
+                    {/* ⚠️ PAGE CONFIRMÉE DISPARUE. Signalée seulement après DEUX 404 sur
+                        deux passages différents du contrôle de fond : un 403 veut dire
+                        « bloqué », pas « absent », et un site en maintenance renvoie
+                        parfois 404 pendant une heure. Une fausse alerte découragerait
+                        une inscription pour rien — pire que pas d'alerte. */}
+                    {liensMorts.includes(String(details[selected.id]?.registration_url ?? "")) && (
+                      <p className="w-full rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] leading-relaxed text-amber-800">
+                        {d["deadLink"]}
+                      </p>
+                    )}
                     {(() => {
                       const dom = domaineSource(details[selected.id]?.registration_url);
                       return dom ? (
