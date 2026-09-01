@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { jourFrance } from "@/lib/races/jourFrance";
 
 // Catalogue PUBLIC des courses à venir — colonnes LÉGÈRES (liste + marqueurs carte).
 // Les champs lourds (description, time_limits, terrain…) sont chargés au clic via
@@ -9,7 +10,11 @@ const RACE_COLS =
 
 export async function GET() {
   const supabaseAdmin = createAdminClient();
-  const today = new Date().toISOString().slice(0, 10);
+  // ⚠️ LE JOUR EN FRANCE, PAS EN UTC NI CELUI DU SERVEUR. Constaté le 02/09/2026 à
+  //    00 h 49 heure de Paris : il était encore le 1er septembre en UTC, et le catalogue
+  //    proposait des courses déjà courues. Le serveur, lui, tourne à Washington — s'y
+  //    fier reculerait de six heures de plus. Voir `lib/races/jourFrance`.
+  const today = jourFrance();
   const allRaces: unknown[] = [];
   const PAGE = 1000;
   let from = 0;

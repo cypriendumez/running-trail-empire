@@ -5,6 +5,7 @@ import { RacesHub } from "@/components/races/RacesHub";
 import { normLang } from "@/lib/i18n/translations";
 import { urlsSignalees, ETAT_VIDE, type EtatLiens } from "@/lib/races/liens";
 import type { PpsStatus } from "@/lib/pps/status";
+import { jourFrance } from "@/lib/races/jourFrance";
 
 export const metadata = { title: "Courses France" };
 
@@ -24,7 +25,11 @@ const RACE_COLS = "id,name,type,region,department,city,date,distance_km,elevatio
 
 export default async function RacesPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const { q } = await searchParams;
-  const today = new Date().toISOString().slice(0, 10);
+  // ⚠️ LE JOUR EN FRANCE, PAS EN UTC NI CELUI DU SERVEUR. Constaté le 02/09/2026 à
+  //    00 h 49 heure de Paris : il était encore le 1er septembre en UTC, et le catalogue
+  //    proposait des courses déjà courues. Le serveur, lui, tourne à Washington — s'y
+  //    fier reculerait de six heures de plus. Voir `lib/races/jourFrance`.
+  const today = jourFrance();
   // Affichage INSTANTANÉ : on ne charge côté serveur que les ~90 premières courses
   // + le nombre total. Le catalogue complet (~16,5k) est récupéré ensuite côté client
   // via /api/races/list (caché au CDN Vercel). Avant : 17 requêtes paginées + ~5,5 Mo

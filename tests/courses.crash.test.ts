@@ -20,6 +20,7 @@ import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
 import { grouperEvenements, cleEvenement, normNom } from "../src/lib/races/groupes";
 import { idCourseValide } from "../src/lib/races/favoris";
+import { jourFrance } from "../src/lib/races/jourFrance";
 import { joursAvant, sansAccents, correspond, domaineSource, ficheVerifiable } from "../src/lib/races/temps";
 import { normaliserHeure, afficherHeure } from "../src/lib/races/heure";
 import { dateDeLaFiche, doitMettreAJour } from "../src/lib/races/fiche";
@@ -720,6 +721,60 @@ test("la mise en garde est affichée quand la source ne peut pas être relue", (
     "la fiche ne dit plus quand sa source est invérifiable");
   const i18n = readFileSync("src/components/races/racesI18n.ts", "utf8");
   assert.equal((i18n.match(/"unverifiable": "/g) ?? []).length, 5, "la mise en garde manque dans une langue");
+});
+
+console.log("\nLE JOUR EN FRANCE — ni UTC, ni l'heure du serveur");
+
+test("à 00 h 49 à Paris, le catalogue est déjà au lendemain", () => {
+  // ⚠️ DÉFAUT RÉEL, REPÉRÉ PAR CYPRIEN. Le 02/09/2026 à 00 h 49 heure de Paris, le
+  // catalogue proposait encore des courses du 1er septembre — déjà courues. Les trois
+  // routes calculaient « aujourd'hui » en UTC, où il était 22 h 49 la veille.
+  assert.equal(jourFrance(new Date("2026-09-01T22:49:00Z")), "2026-09-02");
+  assert.equal(jourFrance(new Date("2026-09-01T21:00:00Z")), "2026-09-01");
+});
+
+test("le résultat ne dépend PAS du fuseau du serveur", () => {
+  // Le code tourne sur un serveur Vercel à Washington : s'y fier reculerait de six
+  // heures de plus qu'UTC. Les courses ont lieu en France, c'est ce calendrier qui vaut.
+  const t = new Date("2026-09-01T22:49:00Z");
+  const attendu = jourFrance(t);
+  for (const tz of ["UTC", "America/New_York", "Pacific/Auckland"]) {
+    process.env.TZ = tz;
+    assert.equal(jourFrance(t), attendu, `résultat différent sous ${tz}`);
+  }
+  delete process.env.TZ;
+});
+
+test("le changement d'heure français est pris en compte", () => {
+  // Fin octobre la France passe de UTC+2 à UTC+1 : minuit local n'est plus au même
+  // instant UTC. Une bascule figée à « +2 h » se tromperait un jour sur deux en hiver.
+  assert.equal(jourFrance(new Date("2026-10-24T22:30:00Z")), "2026-10-25"); // encore UTC+2
+  assert.equal(jourFrance(new Date("2026-12-01T22:30:00Z")), "2026-12-01"); // UTC+1
+  assert.equal(jourFrance(new Date("2026-12-01T23:30:00Z")), "2026-12-02");
+});
+
+test("les trois routes du catalogue s'en servent", () => {
+  for (const f of ["src/app/dashboard/races/page.tsx", "src/app/api/races/list/route.ts",
+                   "src/app/api/races/search/route.ts"]) {
+    const src = readFileSync(f, "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+    assert.ok(src.includes("const today = jourFrance();"),
+      `${f} recalcule « aujourd'hui » autrement : des courses déjà courues réapparaîtront`);
+  }
+});
+
+test("les deux compteurs de la page ne se contredisent plus", () => {
+  // L'en-tête annonçait « 17 027 courses » et le bas de page « 8 860 courses » : le
+  // même mot pour deux nombres, sur le même écran. Une carte regroupe les distances
+  // d'un même week-end — c'est un ÉVÉNEMENT.
+  const i18n = readFileSync("src/components/races/racesI18n.ts", "utf8");
+  const lignes = i18n.match(/"pageInfo": "[^"]*"/g) ?? [];
+  assert.equal(lignes.length, 5, "la pagination manque dans une langue");
+  for (const l of lignes) {
+    assert.ok(!/\{n\} (courses|races|carreras|corridas|Rennen)/.test(l),
+      `la pagination compte encore des « courses » : ${l}`);
+  }
 });
 
 console.log(`\n${passed} crash-test(s) du catalogue passé(s), ${fails.length} échec(s)`);

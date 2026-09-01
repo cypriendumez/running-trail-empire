@@ -500,6 +500,11 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                 <ChevronLeft className="w-4 h-4" /> {d["prev"]}
               </button>
               <span className="text-sm text-zinc-500">
+                {/* ⚠️ « ÉVÉNEMENTS », PAS « COURSES ». Cette ligne comptait des cartes en
+                    les appelant « courses », juste sous un en-tête qui annonce
+                    17 027 courses : le même mot pour deux nombres, à deux endroits de
+                    la même page. Une carte regroupe toutes les distances d'un même
+                    week-end — c'est un événement, pas une course. */}
                 {tr("pageInfo", { p: page + 1, t: totalPages, n: evenements.length.toLocaleString(lang) })}
               </span>
               <button
