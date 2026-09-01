@@ -44,19 +44,30 @@ export async function GET(req: Request) {
 
   // Seules les courses À VENIR méritent une correction : le type d'une édition passée
   // n'intéresse plus personne, et le catalogue ne l'affiche pas.
-  const { data: courses, error } = await sb.from("races")
-    .select("id,name,city,date,distance_km,type")
-    .gte("date", aujourdhui).lt("date", "2099-01-01")
-    .not("city", "is", null).order("id").limit(20000);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // ⚠️ PostgREST PLAFONNE À 1 000 LIGNES, quel que soit le `limit` demandé. Premier
+  //    passage réel : `total: 1000` alors que le catalogue compte ~10 600 courses à
+  //    venir — le curseur aurait tourné en rond sur le même millier, et les 90 % restants
+  //    n'auraient JAMAIS été examinés. Aucune erreur n'est levée : la requête réussit,
+  //    elle rend simplement moins que demandé.
+  const courses: { id: string; name: string; city: string | null; date: string; distance_km: number | null; type: string }[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await sb.from("races")
+      .select("id,name,city,date,distance_km,type")
+      .gte("date", aujourdhui).lt("date", "2099-01-01")
+      .not("city", "is", null).order("id").range(from, from + 999);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!data?.length) break;
+    courses.push(...(data as typeof courses));
+    if (data.length < 1000) break;
+  }
 
   const { data: ligne } = await sb.from("notifications").select("id,data")
     .eq("user_id", proprietaire).eq("type", TYPE_ETAT).maybeSingle();
   const etat = (ligne?.data ?? {}) as { curseur?: number; corrigees?: number; vues?: number };
 
-  const ids = (courses ?? []).map((c) => String(c.id));
+  const ids = courses.map((c) => String(c.id));
   const { tranche, suivant } = trancheAVerifier(ids, etat.curseur ?? 0, LOT);
-  const parId = new Map((courses ?? []).map((c) => [String(c.id), c]));
+  const parId = new Map(courses.map((c) => [String(c.id), c]));
 
   let corrigees = 0, vues = 0, appariees = 0;
   const details: { course: string; de: string; vers: string }[] = [];

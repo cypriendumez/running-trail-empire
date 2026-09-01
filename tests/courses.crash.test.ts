@@ -857,5 +857,23 @@ test("la famille de route suit la distance, comme partout ailleurs", () => {
   assert.equal(typeCorrige("road_10k", "trail", 100), "trail_xl");
 });
 
+test("les routes qui balaient la table lisent AU-DELÀ de 1 000 lignes", () => {
+  // ⚠️ DÉFAUT CONSTATÉ AU PREMIER PASSAGE RÉEL. PostgREST plafonne à 1 000 lignes quel
+  // que soit le `limit` demandé : la route de correction des types annonçait
+  // `total: 1000` alors que le catalogue compte ~10 600 courses à venir. Le curseur
+  // aurait tourné en rond sur le même millier, et 90 % du catalogue n'aurait JAMAIS été
+  // examiné. Aucune erreur n'est levée — la requête réussit, elle rend moins que demandé.
+  for (const f of ["src/app/api/cron/races-types/route.ts",
+                   "src/app/api/cron/races-liens/route.ts",
+                   "src/app/api/cron/races-maintenance/route.ts"]) {
+    const src = readFileSync(f, "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+    assert.ok(!/\.limit\((?:[2-9]\d{3,}|1\d{4,})\)/.test(src),
+      `${f} demande plus de 1 000 lignes en un coup : il en recevra 1 000 sans le savoir`);
+    assert.ok(src.includes(".range("), `${f} ne pagine pas : il ne verra qu'une partie du catalogue`);
+  }
+});
+
 console.log(`\n${passed} crash-test(s) du catalogue passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log(`  KO ${f}`); process.exit(1); }
