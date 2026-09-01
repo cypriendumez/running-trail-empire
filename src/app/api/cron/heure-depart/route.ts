@@ -3,7 +3,7 @@ export const maxDuration = 300;
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateContent } from "@/lib/ai/gemini";
-import { promptHeure, analyserReponse } from "@/lib/races/heureWeb";
+import { promptRecherche, promptExtraction, analyserReponse } from "@/lib/races/heureWeb";
 import { jourLocal } from "@/lib/streak/compute";
 
 /**
@@ -53,24 +53,39 @@ export async function GET(req: Request) {
     if (o.heureCherchéeLe === aujourdhui) continue;
 
     cherchees++;
-    const out = await generateContent(
-      [{ role: "user", parts: [{ text: promptHeure({ race: o.race, raceDate: o.raceDate, distanceKm: o.distanceKm ?? null }) }] }],
-      { temperature: 0, maxOutputTokens: 800, thinkingConfig: { thinkingBudget: 0 } },
-      // La recherche web : sans elle, le modèle répondrait de mémoire, donc inventerait.
+    const demande = { race: o.race, raceDate: o.raceDate, distanceKm: o.distanceKm ?? null };
+
+    // ── ÉTAPE 1 : chercher LARGE, et laisser répondre en clair ──────────────────
+    //  Ma première version cadrait sur « le site officiel » et exigeait un HH:MM sec.
+    //  Résultat : INCONNU sur le marathon de Lille, alors que l'heure — 11h15 — était
+    //  annoncée depuis le 27 août. Le règlement officiel disait « Horaire à venir » ;
+    //  l'annonce était ailleurs. Contraindre la forme de la réponse tue même la
+    //  recherche : demander du JSON donne zéro source consultée. Vérifié.
+    const rech = await generateContent(
+      [{ role: "user", parts: [{ text: promptRecherche(demande) }] }],
+      { temperature: 0, maxOutputTokens: 2000 },
       { tools: [{ google_search: {} }] },
     );
 
     const majBase: Obj = { ...o, heureCherchéeLe: aujourdhui };
-    if (out.ok) {
-      const v = analyserReponse(out.text, out.sources);
+    if (!rech.ok) {
+      details.push({ race: o.race, verdict: "modèle indisponible" });
+    } else {
+      // ── ÉTAPE 2 : extraire l'heure DU FORMAT DEMANDÉ ─────────────────────────
+      //  Le texte trouvé contient presque toujours plusieurs départs (« le marathon à
+      //  11h15, le semi à 8h30 ») : prendre la première heure venue serait faux une
+      //  fois sur deux. Appel court, sans recherche ni raisonnement.
+      const ext = await generateContent(
+        [{ role: "user", parts: [{ text: promptExtraction(rech.text, demande) }] }],
+        { temperature: 0, maxOutputTokens: 40, thinkingConfig: { thinkingBudget: 0 } },
+      );
+      const v = ext.ok ? analyserReponse(ext.text, rech.sources) : { retenue: false as const, motif: "inconnu" as const };
       details.push({ race: o.race, verdict: v.retenue ? v.heure : v.motif });
       if (v.retenue) {
         majBase.heureDepart = v.heure;
         majBase.heureSource = v.sources;
         trouvees++;
       }
-    } else {
-      details.push({ race: o.race, verdict: "modèle indisponible" });
     }
     await sb.from("notifications").update({ data: majBase as unknown as Record<string, unknown> }).eq("id", l.id);
   }

@@ -22,7 +22,7 @@ import { grouperEvenements, cleEvenement } from "../src/lib/races/groupes";
 import { joursAvant, sansAccents, correspond, domaineSource } from "../src/lib/races/temps";
 import { normaliserHeure, afficherHeure } from "../src/lib/races/heure";
 import { dateDeLaFiche, doitMettreAJour } from "../src/lib/races/fiche";
-import { analyserReponse, promptHeure, MARQUEUR_INCONNU } from "../src/lib/races/heureWeb";
+import { analyserReponse, promptRecherche, promptExtraction, libelleFormat, libelleDate, MARQUEUR_INCONNU } from "../src/lib/races/heureWeb";
 import { trancheAVerifier, appliquerResultats, verdictDe, estSignalee, urlsSignalees, ETAT_VIDE } from "../src/lib/races/liens";
 
 let passed = 0;
@@ -520,11 +520,39 @@ test("une heure impossible reste refusée même sourcée", () => {
   }
 });
 
-test("le prompt autorise explicitement le modèle à dire qu'il ne sait pas", () => {
-  const p = promptHeure({ race: "Marathon de Lille", raceDate: "2026-10-25", distanceKm: 42.2 });
-  assert.ok(p.includes(MARQUEUR_INCONNU), "le modèle n'a pas d'échappatoire : il inventera");
-  assert.ok(/n'invente jamais/i.test(p), "l'interdiction d'inventer a disparu du prompt");
-  assert.ok(p.includes("42.2 km"), "le format demandé n'est pas précisé : on prendrait l'heure d'une autre distance");
+test("la recherche est LARGE — c'est le cadrage étroit qui avait fait manquer 11h15", () => {
+  // ⚠️ DÉFAUT RÉEL. Le 27/08/2026, La Voix du Nord annonçait « départ à 11h15 » pour le
+  // marathon de Lille. Ma première version répondait INCONNU parce qu'elle disait au
+  // modèle de chercher « en priorité le site officiel » — dont le règlement dit
+  // « Horaire à venir ». Reproduit, puis corrigé : la même question posée largement
+  // trouve 11h15, avec marathon-lille.com (section ACTUS) comme source.
+  const p = promptRecherche({ race: "Marathon de Lille", raceDate: "2026-10-25", distanceKm: 42.195 });
+  assert.ok(/ACTUALIT/i.test(p), "les actualités de l'organisateur sont de nouveau hors du champ");
+  assert.ok(/presse locale/i.test(p), "la presse locale est de nouveau exclue : c'est elle qui publie en premier");
+  assert.ok(/n'invente jamais/i.test(p), "l'interdiction d'inventer a disparu");
+  // Formulée comme un coureur, pas comme une machine : « 42.2 km » produisait des
+  // requêtes que personne n'écrirait.
+  assert.ok(p.includes("42,195 km (le marathon)"), "la distance est reformulée en machine");
+  assert.ok(p.includes("25 octobre 2026"), "la date est en ISO : une recherche web ne se formule pas ainsi");
+});
+
+test("l'extraction vise le format demandé, pas la première heure venue", () => {
+  // Le texte trouvé contient presque toujours plusieurs départs. Vérifié en vrai sur
+  // « le marathon partira à 11h15, le semi à 8h30 » : 11:15 / 08:30 / INCONNU.
+  const p = promptExtraction("le marathon à 11h15, le semi à 8h30", { race: "X", raceDate: "2026-10-25", distanceKm: 42.195 });
+  assert.ok(p.includes("EXACTEMENT"), "l'extraction n'exige plus le format exact");
+  assert.ok(p.includes("42,195 km (le marathon)"));
+  assert.ok(p.includes(MARQUEUR_INCONNU), "le modèle n'a pas d'échappatoire : il prendra l'heure du semi");
+});
+
+test("les libellés parlent français, comme une requête réelle", () => {
+  assert.equal(libelleFormat(42.195), "42,195 km (le marathon)");
+  assert.equal(libelleFormat(42.2), "42,195 km (le marathon)");
+  assert.equal(libelleFormat(21.1), "21,1 km (le semi-marathon)");
+  assert.equal(libelleFormat(10), "10 km");
+  assert.equal(libelleFormat(null), "la distance principale");
+  assert.equal(libelleDate("2026-10-25"), "25 octobre 2026");
+  assert.equal(libelleDate("pas-une-date"), "pas-une-date");
 });
 
 test("la recherche web est réellement activée, sinon le modèle répond de mémoire", () => {
@@ -532,7 +560,12 @@ test("la recherche web est réellement activée, sinon le modèle répond de mé
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
   assert.ok(src.includes("google_search"), "sans recherche web, le modèle invente une heure plausible");
-  assert.ok(src.includes("out.sources"), "les sources ne sont plus vérifiées");
+  // Les sources viennent de l'ÉTAPE 1 (celle qui a cherché), pas de l'extraction :
+  // une extraction sans recherche derrière serait une réponse de mémoire.
+  assert.ok(src.includes("analyserReponse(ext.text, rech.sources)"),
+    "les sources de la RECHERCHE ne sont plus vérifiées : une réponse de mémoire passerait");
+  assert.ok(src.includes("promptExtraction("),
+    "l'extraction par format a disparu : on prendrait l'heure du semi pour celle du marathon");
   // On n'écrase jamais ce que l'athlète a saisi lui-même.
   assert.ok(src.includes("if (o.heureDepart) continue;"),
     "la recherche écrase une heure saisie par l'athlète, qui en sait plus qu'elle");
