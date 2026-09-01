@@ -24,6 +24,7 @@ import { cleanActivityName } from "@/lib/utils/activityName";
 import { isRun } from "@/lib/intervals/sport";
 import { computeHrZones } from "@/lib/dashboard/zones";
 import { dansFenetre, ageJours } from "@/lib/dashboard/fenetre";
+import { computeForme } from "@/lib/dashboard/forme";
 import { computeDistancePRs } from "@/lib/dashboard/records";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { ProfileCompletionBanner } from "@/components/dashboard/ProfileCompletionBanner";
@@ -106,12 +107,12 @@ const LEVELS: Record<string, { elite: string; inter: string }> = {
 };
 
 // Libellés du rail de droite (multilingue).
-const RAIL_LABELS: Record<string, { prep: string; goal: string; ai: string; ready: string; badges: string; community: string; communitySub: string; see: string; newWeek: string; records: string; recommend: string; progress: string }> = {
-  fr: { prep: "Statut de préparation", goal: "Objectif principal", ai: "Analyse IA", ready: "Prêt à performer", badges: "Badges", community: "Communauté", communitySub: "Rejoins les coureurs Pacevo", see: "Voir", newWeek: "nouveaux cette semaine", records: "Records personnels", recommend: "Voir les recommandations", progress: "Préparation" },
-  en: { prep: "Readiness status", goal: "Main goal", ai: "AI analysis", ready: "Ready to perform", badges: "Badges", community: "Community", communitySub: "Join the Pacevo runners", see: "View", newWeek: "new this week", records: "Personal records", recommend: "View recommendations", progress: "Preparation" },
-  de: { prep: "Bereitschaftsstatus", goal: "Hauptziel", ai: "KI-Analyse", ready: "Bereit zu performen", badges: "Abzeichen", community: "Community", communitySub: "Triff die Pacevo-Läufer", see: "Ansehen", newWeek: "neue diese Woche", records: "Persönliche Rekorde", recommend: "Empfehlungen ansehen", progress: "Vorbereitung" },
-  es: { prep: "Estado de preparación", goal: "Objetivo principal", ai: "Análisis IA", ready: "Listo para rendir", badges: "Insignias", community: "Comunidad", communitySub: "Únete a los corredores Pacevo", see: "Ver", newWeek: "nuevos esta semana", records: "Records personales", recommend: "Ver recomendaciones", progress: "Preparación" },
-  pt: { prep: "Estado de preparação", goal: "Objetivo principal", ai: "Análise IA", ready: "Pronto para performar", badges: "Medalhas", community: "Comunidade", communitySub: "Junta-te aos corredores Pacevo", see: "Ver", newWeek: "novos esta semana", records: "Recordes pessoais", recommend: "Ver recomendações", progress: "Preparação" },
+const RAIL_LABELS: Record<string, { goal: string; ai: string; ready: string; badges: string; community: string; communitySub: string; see: string; newWeek: string; records: string; recommend: string; progress: string }> = {
+  fr: { goal: "Objectif principal", ai: "Analyse IA", ready: "Prêt à performer", badges: "Badges", community: "Communauté", communitySub: "Rejoins les coureurs Pacevo", see: "Voir", newWeek: "nouveaux cette semaine", records: "Records personnels", recommend: "Voir les recommandations", progress: "Préparation" },
+  en: { goal: "Main goal", ai: "AI analysis", ready: "Ready to perform", badges: "Badges", community: "Community", communitySub: "Join the Pacevo runners", see: "View", newWeek: "new this week", records: "Personal records", recommend: "View recommendations", progress: "Preparation" },
+  de: { goal: "Hauptziel", ai: "KI-Analyse", ready: "Bereit zu performen", badges: "Abzeichen", community: "Community", communitySub: "Triff die Pacevo-Läufer", see: "Ansehen", newWeek: "neue diese Woche", records: "Persönliche Rekorde", recommend: "Empfehlungen ansehen", progress: "Vorbereitung" },
+  es: { goal: "Objetivo principal", ai: "Análisis IA", ready: "Listo para rendir", badges: "Insignias", community: "Comunidad", communitySub: "Únete a los corredores Pacevo", see: "Ver", newWeek: "nuevos esta semana", records: "Records personales", recommend: "Ver recomendaciones", progress: "Preparación" },
+  pt: { goal: "Objetivo principal", ai: "Análise IA", ready: "Pronto para performar", badges: "Medalhas", community: "Comunidade", communitySub: "Junta-te aos corredores Pacevo", see: "Ver", newWeek: "novos esta semana", records: "Recordes pessoais", recommend: "Ver recomendações", progress: "Preparação" },
 };
 
 // Score de forme — 4 axes calculés du réel (endurance & vitesse dérivées des séances/VMA,
@@ -399,7 +400,8 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
     : null;
 
   // Score de forme — 4 axes réels (endurance + vitesse dérivées des séances/VMA).
-  const forme = computeForme(workouts, currentVma ?? 0, disc.recovery, disc.consistency);
+  const forme = computeForme(workouts, currentVma ?? 0, disc.recovery, disc.consistency,
+    objective ? { distanceKm: objective.distanceKm ?? null, targetSeconds: objective.targetSeconds ?? null } : null);
   /**
    * LE PLUS HAUT ET LE PLUS BAS DES QUATRE COMPOSANTES.
    *
@@ -721,6 +723,17 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
                 ))}
               </div>
             </div>
+            {/* ⚠️ UN SCORE SUR 100 DONT ON IGNORE LE DÉNOMINATEUR N'EST PAS UNE MESURE.
+                Les repères étaient universels et invisibles : 30 km de sortie longue et
+                50 km/semaine valaient 100 % pour tout le monde, si bien qu'un coureur de
+                10 km parfaitement préparé lisait 40 % d'endurance. La carte dit désormais
+                sur quoi elle compte — et quand elle n'a pas d'objectif, elle le dit aussi
+                au lieu de faire passer un repère générique pour la mesure de l'athlète. */}
+            <div className="mt-3 border-t border-zinc-100 pt-2.5 text-[10px] leading-relaxed text-zinc-400">
+              {forme.reference === "objectif" && forme.cibleLongueKm != null
+                ? t("dash.forme.ref", { l: forme.cibleLongueKm, v: forme.cibleVolumeKm ?? "—" })
+                : t("dash.forme.refGen")}
+            </div>
             {/* ⚠️ CE BLOC COMBLE 106 px DE VIDE MESURÉ, avec de la DONNÉE, pas du
                 rembourrage. La carte affichait un score et quatre barres, puis s'arrêtait
                 — la rangée étant tirée par les deux cartes voisines (337 px contre 231 de
@@ -982,7 +995,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
           <div className="mt-3 h-1.5 rounded-full bg-zinc-100">
             <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${Math.min((weeklyKm / 60) * 100, 100)}%` }} />
           </div>
-          <div className="mt-1 text-xs text-zinc-400">{t("dash.volume.goal")}: {plan ? t("dash.volume.perPlan") : "60 km"}</div>
+          <div className="mt-1 text-xs text-zinc-400">{t("dash.volume.goal")}: {plan ? t("dash.volume.perPlan") : forme.cibleVolumeKm != null ? `${forme.cibleVolumeKm} km` : t("dash.volume.goalNone")}</div>
         </motion.div>
 
         {/* Zones d'entraînement (FC) — temps par zone + verdict de polarisation 80/20 */}
@@ -1511,20 +1524,6 @@ function buildLastMetrics(w: Workout, t: TFn): { label: string; value: string | 
 //  sur 6 sem.) · Vitesse = VMA estimée placée sur une échelle 8→20 km/h · Récupération
 //  & Régularité reprises du modèle discipline (sommeil/VFC, assiduité). total = moyenne
 //  des 4 axes → l'anneau colle toujours aux barres affichées.
-function computeForme(
-  workouts: Workout[], currentVma: number, recovery: number, regularity: number,
-): { total: number; endurance: number; speed: number; recovery: number; regularity: number; hasData: boolean } {
-  const now = Date.now();
-  // Une sortie vélo de 60 km gonflerait l'axe endurance : on ne score que la course.
-  const recent = workouts.filter(w => isRun(w.sport) && dansFenetre(w.date, 42));
-  const hasData = workouts.length > 0;
-  const longest = Math.max(0, ...recent.map(w => w.distance_km ?? 0));
-  const weeklyKm = recent.reduce((s, w) => s + (w.distance_km ?? 0), 0) / 6;
-  const endurance = clamp(Math.round(0.6 * (longest / 30) * 100 + 0.4 * (weeklyKm / 50) * 100));
-  const speed = currentVma > 0 ? clamp(Math.round(((currentVma - 8) / 12) * 100)) : 0;
-  const total = Math.round((endurance + speed + recovery + regularity) / 4);
-  return { total, endurance, speed, recovery, regularity, hasData };
-}
 
 // ── Zones d'entraînement (FC) — temps par zone sur 6 sem. ────────────────────────
 //  Chaque séance (avec FC moyenne) est rangée dans une zone selon FCmoy/FCmax, et sa

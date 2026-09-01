@@ -15,6 +15,7 @@ import assert from "node:assert/strict";
 import { computeHrZones } from "../src/lib/dashboard/zones";
 import { computeLoad, estimateTSS } from "../src/lib/dashboard/charge";
 import { computeDistancePRs } from "../src/lib/dashboard/records";
+import { computeForme, butDe } from "../src/lib/dashboard/forme";
 
 let passed = 0;
 const fails: string[] = [];
@@ -166,6 +167,64 @@ test("estimateTSS ne renvoie jamais NaN, même sans type ni durée", () => {
     const v = estimateTSS(w as never);
     assert.ok(sain(v), `estimateTSS(${JSON.stringify(w)}) = ${v}`);
   }
+});
+
+console.log("\nSCORE DE FORME — un /100 doit dire contre quoi il mesure");
+
+const seances = (n: number, km: number) => Array.from({ length: n }, (_, i) => ({ date: jour(i * 2), sport: "run", distance_km: km }));
+
+test("sans objectif, le score annonce des repères GÉNÉRIQUES", () => {
+  const f = computeForme(seances(12, 10), 17, 80, 80, null);
+  assert.equal(f.reference, "general", "un repère générique est présenté comme la mesure de l'athlète");
+  assert.equal(f.cibleLongueKm, null);
+});
+
+test("avec un objectif, les repères suivent la distance visée", () => {
+  const dix = computeForme(seances(12, 10), 17, 80, 80, { distanceKm: 10, targetSeconds: null });
+  const mara = computeForme(seances(12, 10), 17, 80, 80, { distanceKm: 42.2, targetSeconds: null });
+  assert.equal(dix.reference, "objectif");
+  assert.ok((dix.cibleLongueKm ?? 0) < (mara.cibleLongueKm ?? 0),
+    `la cible de sortie longue ne dépend pas de l'objectif : ${dix.cibleLongueKm} vs ${mara.cibleLongueKm}`);
+  // Le défaut d'origine : un coureur de 10 km bien préparé était noté sur des repères
+  // de marathonien et lisait 40 % d'endurance.
+  assert.ok(dix.endurance > mara.endurance,
+    "à préparation égale, le coureur de 10 km n'est plus mieux noté que sur des repères marathon");
+});
+
+test("la vitesse se mesure au chrono visé quand il existe", () => {
+  const sansCible = computeForme(seances(12, 10), 17, 80, 80, { distanceKm: 10, targetSeconds: null });
+  const ambitieux = computeForme(seances(12, 10), 17, 80, 80, { distanceKm: 10, targetSeconds: 1800 });
+  const modeste = computeForme(seances(12, 10), 17, 80, 80, { distanceKm: 10, targetSeconds: 3600 });
+  assert.notEqual(ambitieux.speed, sansCible.speed, "le chrono visé ne change rien à l'axe vitesse");
+  assert.ok(modeste.speed >= ambitieux.speed,
+    `un objectif plus modeste doit être plus facilement atteint : ${modeste.speed} vs ${ambitieux.speed}`);
+});
+
+test("tous les axes restent bornés entre 0 et 100, quoi qu'on envoie", () => {
+  const cas = [
+    computeForme([], 0, 0, 0, null),
+    computeForme(seances(200, 60), 30, 100, 100, { distanceKm: 5, targetSeconds: 1 }),
+    computeForme(seances(1, 0), -5, -50, 500, { distanceKm: -10, targetSeconds: -1 }),
+    computeForme([{ date: "pas-une-date", sport: "run", distance_km: NaN }], NaN, NaN, NaN, { distanceKm: NaN, targetSeconds: NaN }),
+    computeForme([{ date: jour(1), sport: "bike", distance_km: 200 }], 17, 80, 80, null),
+  ];
+  for (const f of cas) {
+    for (const [k, v] of Object.entries({ total: f.total, endurance: f.endurance, speed: f.speed, recovery: f.recovery, regularity: f.regularity })) {
+      assert.ok(sain(v) && v >= 0 && v <= 100, `${k} vaut ${v}`);
+    }
+  }
+});
+
+test("le vélo n'entre pas dans le score d'un coureur", () => {
+  const velo = computeForme([{ date: jour(1), sport: "bike", distance_km: 120 }], 17, 80, 80, null);
+  assert.equal(velo.endurance, 0, "une sortie vélo de 120 km fait grimper l'endurance de course");
+});
+
+test("le classement des distances est cohérent", () => {
+  assert.deepEqual(
+    [null, 5, 10, 21.1, 42.2, 80].map((k) => butDe(k)),
+    ["general", "5k", "10k", "semi", "marathon", "ultra"],
+  );
 });
 
 console.log("\nRECORDS — un record est le meilleur de TOUT l'historique, ou rien");

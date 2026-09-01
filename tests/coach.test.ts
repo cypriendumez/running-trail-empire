@@ -6238,7 +6238,9 @@ test("aucun calcul du tableau de bord ne découpe le temps en millisecondes", ()
   const cibles: [string, string[]][] = [
     ["src/lib/dashboard/zones.ts", ["computeHrZones"]],
     ["src/lib/running/volume.ts", ["robustWeeklyKm", "demonstratedWeeklyKm"]],
-    ["src/components/dashboard/BentoDashboard.tsx", ["computeWeeklyTrend", "computeWeekSummary", "computeForme"]],
+    ["src/components/dashboard/BentoDashboard.tsx", ["computeWeeklyTrend", "computeWeekSummary"]],
+    ["src/lib/dashboard/forme.ts", ["computeForme"]],
+    ["src/lib/running/fitness.ts", ["loadRisk"]],
   ];
   for (const [fichier, fns] of cibles) {
     const src = codeOf(fichier);

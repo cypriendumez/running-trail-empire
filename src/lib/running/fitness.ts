@@ -1,3 +1,4 @@
+import { jourLocal, ecartJours } from "@/lib/streak/compute";
 // ─────────────────────────────────────────────────────────────────────────────
 //  Modèle de forme : VMA, VO2max (multi-sources, façon Garmin) et prédictions de
 //  chrono par distance. Calculs purs, réutilisables (profil, onboarding, IA).
@@ -238,15 +239,25 @@ export function estimateTSS(w: { duration_seconds?: number | null; type?: string
 }
 export type LoadRisk = { acwr: number; monotony: number; deload: boolean; level: "ok" | "vigilance" | "deload"; reason: string };
 export function loadRisk(workouts: { date: string; type?: string | null; duration_seconds?: number | null; tss?: number | null }[]): LoadRisk {
-  const now = Date.now();
-  const within = (d: number) => workouts.filter(w => now - new Date(w.date).getTime() <= d * 86400000);
+  // ⚠️ JOURS DE CALENDRIER, comme partout ailleurs sur le tableau de bord. Les fenêtres
+  //    étaient ancrées sur l'heure exacte de l'appel et le découpage quotidien se faisait
+  //    en UTC : le ratio bougeait selon le moment de la consultation, et la journée
+  //    d'entraînement d'un athlète parisien basculait à 02 h du matin. Le 0,58 affiché
+  //    était juste, mais il n'était pas STABLE — et il est lu à côté d'un volume et d'une
+  //    charge qui, eux, comptent en cases de calendrier.
+  const aujourdhui = jourLocal();
+  const ageDe = (w: { date: string }) => {
+    const j = String(w.date ?? "").slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(j)) return null;
+    const n = ecartJours(j, aujourdhui);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
+  const within = (d: number) => workouts.filter(w => { const a = ageDe(w); return a != null && a < d; });
   const tss7 = within(7).reduce((s, w) => s + estimateTSS(w), 0);
   const tss28 = within(28).reduce((s, w) => s + estimateTSS(w), 0);
   const acwr = tss28 > 0 ? Math.round((tss7 / (tss28 / 4)) * 100) / 100 : 0;
-  const daily = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(now - i * 86400000).toISOString().slice(0, 10);
-    return workouts.filter(w => String(w.date).slice(0, 10) === d).reduce((s, w) => s + estimateTSS(w), 0);
-  });
+  const daily = Array.from({ length: 7 }, (_, i) =>
+    workouts.filter(w => ageDe(w) === i).reduce((s, w) => s + estimateTSS(w), 0));
   const mean = daily.reduce((a, b) => a + b, 0) / 7;
   const sd = Math.sqrt(daily.reduce((a, b) => a + (b - mean) ** 2, 0) / 7) || 1;
   const monotony = mean > 0 ? Math.round((mean / sd) * 10) / 10 : 0;
