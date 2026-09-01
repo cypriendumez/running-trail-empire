@@ -35,10 +35,36 @@ export type Evenement<T extends CourseGroupable> = {
   formats: T[];
 };
 
+/**
+ * Nom réduit à ce qui l'identifie vraiment.
+ *
+ * ⚠️ LE MÊME ÉVÉNEMENT ARRIVE DE DEUX SOURCES SOUS DEUX NOMS. Mesuré sur le catalogue :
+ * 287 groupes (même ville, même distance) portent des noms différents venus de sites
+ * différents, et beaucoup ne diffèrent que par un détail typographique — « La Gambade
+ * Escalaise » et « Gambade Escalaise » le même jour, « La Foulée du Madiran » et
+ * « Foulée du Madiran ». Deux cartes pour une seule course, l'une sous l'autre.
+ *
+ * On retire donc l'article de tête, les accents et la ponctuation. On NE VA PAS plus
+ * loin : « Course de Bondues » et « Foulées de Bondues » sont peut-être le même
+ * événement, mais rien dans les données ne le prouve — et fusionner deux courses
+ * DIFFÉRENTES en ferait disparaître une du catalogue, ce qui est pire que d'en montrer
+ * une de trop.
+ */
+export function normNom(v: unknown): string {
+  return String(v ?? "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/^(les|le|la|l)\s+/i, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
 const norm = (v: unknown) => String(v ?? "").trim().toLowerCase();
+const normVille = (v: unknown) =>
+  String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
 export function cleEvenement(r: CourseGroupable): string {
-  return `${norm(r.name)}::${norm(r.city)}::${norm(r.date)}`;
+  return `${normNom(r.name)}::${normVille(r.city)}::${norm(r.date)}`;
 }
 
 /**

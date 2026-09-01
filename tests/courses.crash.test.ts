@@ -18,7 +18,7 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
-import { grouperEvenements, cleEvenement } from "../src/lib/races/groupes";
+import { grouperEvenements, cleEvenement, normNom } from "../src/lib/races/groupes";
 import { joursAvant, sansAccents, correspond, domaineSource } from "../src/lib/races/temps";
 import { normaliserHeure, afficherHeure } from "../src/lib/races/heure";
 import { dateDeLaFiche, doitMettreAJour } from "../src/lib/races/fiche";
@@ -94,6 +94,58 @@ test("aucune course n'est perdue en route", () => {
   const g = grouperEvenements(brut);
   const ids = g.flatMap((x) => x.formats.map((f) => f.id)).sort();
   assert.deepEqual(ids, ["a", "b", "d", "e"], "des courses ont disparu ou ont été dupliquées");
+});
+
+console.log("\nMÊME COURSE, DEUX NOMS — ce qu'on fusionne, et ce qu'on refuse de fusionner");
+
+test("un article de tête ne crée plus deux cartes", () => {
+  // ⚠️ MESURÉ SUR LE CATALOGUE : 287 groupes (même ville, même distance) portent des
+  // noms différents venus de deux sources. Beaucoup ne diffèrent que d'un article —
+  // « La Gambade Escalaise » et « Gambade Escalaise » le MÊME JOUR, deux cartes l'une
+  // sous l'autre. Repéré par Cyprien sur les courses de Bondues.
+  const g = grouperEvenements([
+    c("a", "La Gambade Escalaise", "L'Escale", "2026-09-26", 5),
+    c("b", "Gambade Escalaise", "L'Escale", "2026-09-26", 10),
+  ]);
+  assert.equal(g.length, 1, "l'article « La » suffit encore à dédoubler la carte");
+  assert.deepEqual(g[0].formats.map((f) => f.distance_km), [5, 10]);
+});
+
+test("accents et ponctuation ne dédoublent pas non plus", () => {
+  assert.equal(normNom("La Foulée du Madiran"), normNom("Foulée du Madiran"));
+  assert.equal(normNom("Les Foulées de Bondues"), normNom("Foulées de Bondues"));
+  assert.equal(normNom("Trail des Pénitents"), normNom("trail des penitents"));
+  assert.equal(normNom("La Gambade-Escalaise !"), normNom("Gambade Escalaise"));
+});
+
+test("une ville accentuée ou tiretée ne dédouble pas la course", () => {
+  const g = grouperEvenements([
+    c("a", "Trail X", "L'Escale", "2026-09-26", 5),
+    c("b", "Trail X", "l escale", "2026-09-26", 10),
+  ]);
+  assert.equal(g.length, 1, "la ville écrite autrement dédouble la carte");
+});
+
+test("on NE FUSIONNE PAS deux noms réellement différents", () => {
+  // « Course de Bondues » et « Foulées de Bondues » sont PEUT-ÊTRE le même événement,
+  // mais rien dans les données ne le prouve : sources différentes, dates différentes.
+  // Fusionner deux courses distinctes en ferait disparaître une du catalogue — pire
+  // que d'en montrer une de trop.
+  const g = grouperEvenements([
+    c("a", "Course de Bondues", "Bondues", "2027-05-23", 10),
+    c("b", "Foulées de Bondues", "Bondues", "2027-05-23", 10),
+  ]);
+  assert.equal(g.length, 2, "deux courses différentes ont fusionné : l'une disparaît");
+  assert.notEqual(normNom("Trail des Cimes"), normNom("Trail des Vignes"));
+});
+
+test("un nom réduit à un article ne devient pas une clé vide", () => {
+  // « Les » ou « La » seuls : la normalisation ne doit pas produire une chaîne vide qui
+  // ferait fusionner toutes ces courses entre elles.
+  for (const n of ["Les", "La", "L'", "   "]) {
+    const g = grouperEvenements([c("a", n, "V", "2026-01-01", 5), c("b", "Autre", "V", "2026-01-01", 5)]);
+    assert.equal(g.length, 2, `« ${n} » a fusionné avec une autre course`);
+  }
 });
 
 console.log("\nENTRÉES ABÎMÉES — le catalogue est importé, il contient de tout");
