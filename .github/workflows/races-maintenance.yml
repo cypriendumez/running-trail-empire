@@ -1,0 +1,59 @@
+# ──────────────────────────────────────────────────────────────────────────────
+#  COURSES PASSÉES → « Date à venir » — tous les jours.
+#
+#  POURQUOI CE WORKFLOW EXISTE : la maintenance existait depuis toujours dans
+#  `DELETE /api/races/sync`, mais RIEN NE L'APPELAIT. Constaté le 01/09/2026 —
+#  2 583 courses portaient une date passée, dont 2 454 sans édition future. Le
+#  catalogue ne montrant que `date >= aujourd'hui`, elles n'étaient pas périmées :
+#  elles étaient INVISIBLES. 1 125 noms de courses réelles introuvables.
+#
+#  POURQUOI ICI ET PAS DANS vercel.json : le compte Vercel est en plan HOBBY, qui
+#  plafonne les tâches planifiées à UNE par jour — le créneau est déjà pris.
+#
+#  HORAIRE : 4 h 10 UTC, avant le réveil des athlètes, et décalé des autres
+#  planifications pour ne pas charger la base au même moment.
+#
+#  CE QUE FAIT LA ROUTE — ET CE QU'ELLE NE FAIT PAS : elle bascule la date, elle
+#  ne SUPPRIME rien. Une suppression planifiée qui se trompe ne se rattrape pas.
+#  Le nettoyage des éditions remplacées reste manuel, via la route d'admin.
+#
+#  SECRETS REQUIS : les mêmes que les autres workflows, rien à créer.
+#   • PACEVO_URL   = https://running-trail-empire-woad.vercel.app
+#   • CRON_SECRET  = la MÊME valeur que la variable CRON_SECRET sur Vercel
+# ──────────────────────────────────────────────────────────────────────────────
+name: Courses passées → Date à venir
+
+on:
+  schedule:
+    - cron: "10 4 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: races-maintenance
+  cancel-in-progress: false
+
+jobs:
+  basculer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Basculer les courses passées
+        env:
+          PACEVO_URL: ${{ secrets.PACEVO_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PACEVO_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::PACEVO_URL ou CRON_SECRET manquant dans les secrets du dépôt."
+            exit 1
+          fi
+          reponse=$(curl -sS --max-time 300 -w '\n%{http_code}' \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${PACEVO_URL}/api/cron/races-maintenance")
+          corps=$(printf '%s' "$reponse" | sed '$d')
+          code=$(printf '%s' "$reponse" | tail -n1)
+          echo "$corps"
+          if [ "$code" != "200" ]; then
+            echo "::error::La maintenance a répondu $code."
+            exit 1
+          fi

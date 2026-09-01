@@ -9,7 +9,14 @@ import { T, normLang } from "@/lib/i18n/translations";
 export function MedicalDisclaimer({ lang }: { lang?: string }) {
   const d = T[normLang(lang)] ?? T.fr;
   return (
-    <footer className="shrink-0 border-t border-zinc-100 bg-white px-6 py-2.5">
+    /* ⚠️ RÉSERVE À DROITE POUR LA BULLE D'AIDE. Elle est en `fixed bottom-5 right-5`,
+       fait 56 px et flotte donc au-dessus de ce pied de page : sur une ligne pleine, elle
+       recouvrait le dernier lien — « Confidentialité », c'est-à-dire précisément celui
+       qu'un utilisateur cherche et qu'un contrôle RGPD vérifie. On réserve la place au
+       lieu de déplacer la bulle : sa position en bas à droite est la convention, c'est au
+       texte de céder. `pe-20` seulement à partir de `sm` — sur mobile la ligne se replie
+       sur plusieurs lignes et la dernière ne finit pas dans le coin. */
+    <footer className="shrink-0 border-t border-zinc-100 bg-white px-6 py-2.5 sm:pe-20">
       <p className="text-center text-[11px] leading-relaxed text-zinc-400">
         ⚕️ {d["med.intro"]}
         <b className="font-semibold text-zinc-500"> {d["med.strong"]}</b>. {d["med.after"]} ·{" "}

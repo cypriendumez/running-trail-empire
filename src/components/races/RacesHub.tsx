@@ -6,6 +6,7 @@ import type { Race } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
+import { grouperEvenements } from "@/lib/races/groupes";
 import { fmtDistance, type UnitSystem } from "@/lib/units";
 import { correctedRaceType } from "@/lib/raceType";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -180,8 +181,13 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
     finally { setPlanning(false); }
   };
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paginated = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  // ⚠️ ON PAGINE DES ÉVÉNEMENTS, PAS DES LIGNES. Une carte par distance faisait
+  //    apparaître « Boucles de Saint-Thonan » trois fois de suite (10, 9 et 5 km) — même
+  //    ville, même date, même inscription — et repoussait les vraies courses suivantes
+  //    hors de l'écran. Mesuré sur le catalogue : 15 000 lignes pour 8 613 événements.
+  const evenements = useMemo(() => grouperEvenements(filtered), [filtered]);
+  const totalPages = Math.ceil(evenements.length / PAGE_SIZE);
+  const paginated = evenements.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const handleFilterChange = useCallback((fn: () => void) => { fn(); setPage(0); }, []);
 
@@ -227,11 +233,16 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
           <span className="flex-shrink-0 text-right">
             <span className="flex items-center justify-end gap-1.5 text-sm font-semibold text-zinc-600">
               {loadingAll && <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />}
-              {(loadingAll && !search && region === "Toutes" && raceType === "all" && !dateFrom ? (totalCount ?? filtered.length) : filtered.length).toLocaleString(lang)} {filtered.length > 1 || loadingAll ? d["courses"] : d["course"]}
+              {/* ⚠️ CE COMPTEUR COMPTAIT DES LIGNES PENDANT QUE LA LISTE MONTRE DES
+                  ÉVÉNEMENTS. Depuis le regroupement, « 14 071 courses » au-dessus de
+                  8 613 cartes se contrediraient sous les yeux du lecteur. Le grand nombre
+                  compte donc ce qu'on voit, et la sous-ligne dit combien de distances
+                  cela représente — deux nombres qui décrivent deux choses distinctes. */}
+              {(loadingAll && !search && region === "Toutes" && raceType === "all" && !dateFrom ? (totalCount ?? evenements.length) : evenements.length).toLocaleString(lang)} {evenements.length > 1 || loadingAll ? d["courses"] : d["course"]}
             </span>
             {!loadingAll && (
               <span className="block text-[11px] text-zinc-400">
-                {races.filter(r => !r.date?.startsWith("2099")).length.toLocaleString(lang)} {d["dated"]} · {races.filter(r => r.date?.startsWith("2099")).length.toLocaleString(lang)} {d["toConfirm"]}
+                {filtered.length.toLocaleString(lang)} {d["formats"]} · {races.filter(r => r.date?.startsWith("2099")).length.toLocaleString(lang)} {d["toConfirm"]}
               </span>
             )}
           </span>
@@ -307,9 +318,11 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
               <p className="text-zinc-400 text-sm mt-1">{d["empty.sub"]}</p>
             </div>
           ) : (
-            paginated.map((race, i) => (
+            paginated.map((evt, i) => {
+              const race = evt.principale;
+              return (
               <motion.div
-                key={race.id}
+                key={evt.cle}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: Math.min(i * 0.015, 0.3) }}
@@ -351,9 +364,23 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                           {race.city ? `${race.city}${race.department ? ` (${race.department})` : ""}` : race.department}
                         </span>
                       )}
-                      <span className="flex items-center gap-1 font-semibold text-zinc-700">
+                      {/* Tous les formats de l'événement, du plus court au plus long.
+                          Chacun est cliquable : c'est la distance qui intéresse, pas
+                          l'événement en bloc. */}
+                      <span className="flex flex-wrap items-center gap-1">
                         <Zap className="w-3 h-3 text-emerald-500" />
-                        {fmtDistance(race.distance_km, units)}
+                        {evt.formats.map((f) => (
+                          <button key={f.id} type="button"
+                            onClick={(e) => { e.stopPropagation(); openRace(f); }}
+                            className={`rounded px-1.5 py-0.5 font-semibold transition-colors ${
+                              selected?.id === f.id
+                                ? "bg-emerald-600 text-white"
+                                : evt.formats.length > 1
+                                  ? "bg-zinc-100 text-zinc-700 hover:bg-emerald-100 hover:text-emerald-800"
+                                  : "text-zinc-700"}`}>
+                            {fmtDistance(f.distance_km, units)}
+                          </button>
+                        ))}
                       </span>
                       {(race.elevation_gain_m ?? 0) > 0 && (
                         <span className="flex items-center gap-1">
@@ -361,9 +388,22 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                           +{race.elevation_gain_m}m
                         </span>
                       )}
-                      <span className="px-1.5 py-0.5 bg-zinc-100 rounded text-zinc-600 font-medium">
-                        {d[`rt.${correctedRaceType(race.distance_km, race.type)}`] ?? race.type}
-                      </span>
+                      {/* ⚠️ L'ÉTIQUETTE DE TYPE RÉPÉTAIT LA DISTANCE. « 10 Km d'Houppeville »
+                          affichait « 10 km » (la distance) puis « 10 km » (la famille
+                          `road_10k`) : deux fois le même mot, dont le second n'apprend
+                          rien. On ne la montre que lorsqu'elle DIT autre chose — « Trail »,
+                          « Marathon », « Ultra » — c'est-à-dire quand elle informe.
+                          Sur un événement à plusieurs formats, les distances parlent
+                          d'elles-mêmes et une famille unique serait de toute façon fausse. */}
+                      {(() => {
+                        const lib = d[`rt.${correctedRaceType(race.distance_km, race.type)}`] ?? race.type;
+                        if (evt.formats.length > 1) return null;
+                        const distances = evt.formats.map((f) => fmtDistance(f.distance_km, units));
+                        if (distances.some((x) => x === lib)) return null;
+                        return (
+                          <span className="px-1.5 py-0.5 bg-zinc-100 rounded text-zinc-600 font-medium">{lib}</span>
+                        );
+                      })()}
                       {race.is_itra_certified && (
                         <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-medium">
                           ITRA {race.itra_points}pts
@@ -378,7 +418,8 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                   </div>
                 </div>
               </motion.div>
-            ))
+              );
+            })
           )}
 
           {/* Pagination */}
@@ -392,7 +433,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                 <ChevronLeft className="w-4 h-4" /> {d["prev"]}
               </button>
               <span className="text-sm text-zinc-500">
-                {tr("pageInfo", { p: page + 1, t: totalPages, n: filtered.length.toLocaleString(lang) })}
+                {tr("pageInfo", { p: page + 1, t: totalPages, n: evenements.length.toLocaleString(lang) })}
               </span>
               <button
                 onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}

@@ -8,7 +8,7 @@ export function fillR(s: string, p?: Record<string, string | number>): string {
 export const RX: Record<string, Record<string, string>> = {
   fr: {
     "searchPh": "Rechercher une course, ville, département, organisateur...",
-    "course": "course", "courses": "courses", "dated": "datées", "toConfirm": "à confirmer",
+    "course": "course", "courses": "courses", "dated": "datées", "toConfirm": "à confirmer", "formats": "distances",
     "map": "Carte", "allTypes": "Tous types", "allRegions": "Toutes",
     "sort.date": "Date", "sort.distance": "Distance", "sort.elevation": "Dénivelé", "reset": "Réinitialiser",
     "empty.title": "Aucune course trouvée", "empty.sub": "Essaie d'autres filtres ou un autre mot-clé.",
@@ -32,7 +32,7 @@ export const RX: Record<string, Record<string, string>> = {
   },
   en: {
     "searchPh": "Search a race, city, department, organizer...",
-    "course": "race", "courses": "races", "dated": "dated", "toConfirm": "to confirm",
+    "course": "race", "courses": "races", "dated": "dated", "toConfirm": "to confirm", "formats": "distances",
     "map": "Map", "allTypes": "All types", "allRegions": "All",
     "sort.date": "Date", "sort.distance": "Distance", "sort.elevation": "Elevation", "reset": "Reset",
     "empty.title": "No race found", "empty.sub": "Try other filters or another keyword.",
@@ -56,7 +56,7 @@ export const RX: Record<string, Record<string, string>> = {
   },
   de: {
     "searchPh": "Rennen, Stadt, Department, Veranstalter suchen...",
-    "course": "Rennen", "courses": "Rennen", "dated": "mit Datum", "toConfirm": "noch offen",
+    "course": "Rennen", "courses": "Rennen", "dated": "mit Datum", "toConfirm": "noch offen", "formats": "Distanzen",
     "map": "Karte", "allTypes": "Alle Typen", "allRegions": "Alle",
     "sort.date": "Datum", "sort.distance": "Distanz", "sort.elevation": "Höhenmeter", "reset": "Zurücksetzen",
     "empty.title": "Kein Rennen gefunden", "empty.sub": "Probier andere Filter oder ein anderes Stichwort.",
@@ -80,7 +80,7 @@ export const RX: Record<string, Record<string, string>> = {
   },
   es: {
     "searchPh": "Buscar una carrera, ciudad, departamento, organizador...",
-    "course": "carrera", "courses": "carreras", "dated": "con fecha", "toConfirm": "por confirmar",
+    "course": "carrera", "courses": "carreras", "dated": "con fecha", "toConfirm": "por confirmar", "formats": "distancias",
     "map": "Mapa", "allTypes": "Todos los tipos", "allRegions": "Todas",
     "sort.date": "Fecha", "sort.distance": "Distancia", "sort.elevation": "Desnivel", "reset": "Restablecer",
     "empty.title": "No se encontró ninguna carrera", "empty.sub": "Prueba otros filtros u otra palabra clave.",
@@ -104,7 +104,7 @@ export const RX: Record<string, Record<string, string>> = {
   },
   pt: {
     "searchPh": "Pesquisar uma corrida, cidade, distrito, organizador...",
-    "course": "corrida", "courses": "corridas", "dated": "com data", "toConfirm": "a confirmar",
+    "course": "corrida", "courses": "corridas", "dated": "com data", "toConfirm": "a confirmar", "formats": "distâncias",
     "map": "Mapa", "allTypes": "Todos os tipos", "allRegions": "Todas",
     "sort.date": "Data", "sort.distance": "Distância", "sort.elevation": "Desnível", "reset": "Repor",
     "empty.title": "Nenhuma corrida encontrada", "empty.sub": "Experimenta outros filtros ou outra palavra-chave.",
