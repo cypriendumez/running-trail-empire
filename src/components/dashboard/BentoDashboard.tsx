@@ -23,7 +23,7 @@ import { ObjectiveCard, type Objective } from "@/components/dashboard/ObjectiveC
 import { cleanActivityName } from "@/lib/utils/activityName";
 import { isRun } from "@/lib/intervals/sport";
 import { computeHrZones } from "@/lib/dashboard/zones";
-import { dansFenetre } from "@/lib/dashboard/fenetre";
+import { dansFenetre, ageJours } from "@/lib/dashboard/fenetre";
 import { computeDistancePRs } from "@/lib/dashboard/records";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { ProfileCompletionBanner } from "@/components/dashboard/ProfileCompletionBanner";
@@ -1613,13 +1613,22 @@ function isQualityWorkout(w: Workout): boolean {
 }
 
 // Tendance du volume : N blocs glissants de 7 jours (du plus ancien au plus récent).
+// ⚠️ CE GRAPHE CONTREDISAIT LE GROS CHIFFRE DE SA PROPRE CARTE.
+//    En alignant « Volume semaine » sur les jours de calendrier, j'avais laissé ces
+//    barres en fenêtres glissantes de 168 heures : la carte annonçait 37,5 km en grand
+//    et sa dernière barre en valait 47,7 — 10,2 km d'écart, côte à côte, pour la même
+//    semaine. Une seule définition du jour, ici comme ailleurs : `lib/dashboard/fenetre`.
 function computeWeeklyTrend(workouts: Workout[], weeks = 6): { km: number; isCurrent: boolean }[] {
-  const now = Date.now();
   return Array.from({ length: weeks }, (_, i) => {
-    const end = now - (weeks - 1 - i) * 7 * 86400000;
-    const start = end - 7 * 86400000;
+    // i = 0 est la semaine la plus ANCIENNE ; la dernière est celle en cours.
+    const recul = weeks - 1 - i;
     const km = workouts
-      .filter(w => { const ts = new Date(w.date).getTime(); return isRun(w.sport) && ts > start && ts <= end; })
+      .filter((w) => {
+        if (!isRun(w.sport)) return false;
+        const age = ageJours(w.date);
+        if (age == null || age < 0) return false;
+        return Math.floor(age / 7) === recul;
+      })
       .reduce((s, w) => s + (w.distance_km ?? 0), 0);
     return { km, isCurrent: i === weeks - 1 };
   });

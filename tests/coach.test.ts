@@ -6228,6 +6228,39 @@ test("les crash-tests du tableau de bord tournent dans npm test", () => {
     "tests/dashboard.crash.test.ts n'est plus lancé par npm test");
 });
 
+test("aucun calcul du tableau de bord ne découpe le temps en millisecondes", () => {
+  // ⚠️ CE TEST EXISTE PARCE QUE J'AI COMMIS EXACTEMENT CE DÉFAUT. En alignant
+  // « Volume semaine » sur les jours de calendrier, j'avais laissé le graphe des six
+  // semaines en fenêtres glissantes de 168 heures : la même carte affichait 37,5 km en
+  // grand et une dernière barre à 47,7 — 10,2 km d'écart, côte à côte.
+  // Une fenêtre en millisecondes est ancrée sur l'HEURE de la consultation ; une case
+  // de calendrier ne bouge pas de la journée. Les deux ne peuvent pas coexister.
+  const cibles: [string, string[]][] = [
+    ["src/lib/dashboard/zones.ts", ["computeHrZones"]],
+    ["src/lib/running/volume.ts", ["robustWeeklyKm", "demonstratedWeeklyKm"]],
+    ["src/components/dashboard/BentoDashboard.tsx", ["computeWeeklyTrend", "computeWeekSummary", "computeForme"]],
+  ];
+  for (const [fichier, fns] of cibles) {
+    const src = codeOf(fichier);
+    for (const fn of fns) {
+      const i = src.indexOf(`function ${fn}`);
+      assert.ok(i >= 0, `${fn} introuvable dans ${fichier}`);
+      // ⚠️ BORNER LE CORPS. Un `slice` de longueur fixe débordait sur la fonction
+      // SUIVANTE : le test rougissait pour du code qui n'était pas celui qu'il visait —
+      // il avait raison sur le fond, pour la mauvaise raison, ce qui est un test faux.
+      const apres = src.slice(i + 1);
+      const suivante = apres.search(/\n(export )?function /);
+      const corps = suivante >= 0 ? src.slice(i, i + 1 + suivante) : src.slice(i);
+      assert.ok(!corps.includes("86400000"),
+        `${fn} redécoupe le temps en millisecondes : sa fenêtre rebougera avec l'heure`);
+    }
+  }
+  // Et le gros chiffre de la carte Volume doit passer par le même helper que le reste.
+  const bento = codeOf("src/components/dashboard/BentoDashboard.tsx");
+  assert.match(bento, /const weeklyKm = runs\s*\n\s*\.filter\(w => dansFenetre\(w\.date, 7\)\)/,
+    "le volume de la semaine n'est plus compté en jours de calendrier");
+});
+
 })().then(() => {
   globalThis.fetch = realFetch;
   console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

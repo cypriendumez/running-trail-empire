@@ -1,3 +1,5 @@
+import { jourLocal, ecartJours } from "@/lib/streak/compute";
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  VOLUME DE RÉFÉRENCE & SORTIE LONGUE — calculs purs, donc testables.
 //
@@ -36,12 +38,18 @@ export function robustWeeklyKm(
   now = Date.now(),
   weeks = 8,
 ): { km: number; weeksRun: number; weeksOff: number } | null {
+  // ⚠️ SEMAINES DE CALENDRIER, PAS TRANCHES DE 168 HEURES. L'ancien découpage était
+  //    ancré sur l'heure exacte de l'appel : une séance vieille de sept jours changeait
+  //    de case selon le moment de la journée, et la médiane avec elle. Le tableau de
+  //    bord comparait alors une semaine en cours comptée en jours de calendrier à une
+  //    référence découpée autrement — deux règles pour un seul écart affiché.
+  const aujourdhui = jourLocal(new Date(now));
   const buckets = new Array(weeks).fill(0);
   for (const r of runs) {
-    const t = new Date(r.date).getTime();
-    if (!Number.isFinite(t)) continue;
-    const ageDays = (now - t) / 86400000;
-    if (ageDays < 0 || ageDays >= weeks * 7) continue;
+    const jour = String(r.date ?? "").slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(jour)) continue;
+    const ageDays = ecartJours(jour, aujourdhui);
+    if (!Number.isFinite(ageDays) || ageDays < 0 || ageDays >= weeks * 7) continue;
     buckets[Math.floor(ageDays / 7)] += Math.max(0, r.distance_km ?? 0);
   }
   // Une semaine « courue » demande un minimum réel : 2 km, c'est un test de chaussures,
@@ -74,12 +82,16 @@ export function robustWeeklyKm(
  * présent.
  */
 export function demonstratedWeeklyKm(runs: RunLike[], now = Date.now(), weeks = 26): number | null {
+  // Mêmes semaines de calendrier que `robustWeeklyKm` : ces deux nombres sont lus côte
+  // à côte par le coach (« tu tiens 58 km, tu as déjà tenu 80 »). Les découper
+  // autrement l'un que l'autre les rendrait incomparables.
+  const aujourdhui = jourLocal(new Date(now));
   const buckets = new Array(weeks).fill(0);
   for (const r of runs) {
-    const t = new Date(r.date).getTime();
-    if (!Number.isFinite(t)) continue;
-    const ageDays = (now - t) / 86400000;
-    if (ageDays < 0 || ageDays >= weeks * 7) continue;
+    const jour = String(r.date ?? "").slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(jour)) continue;
+    const ageDays = ecartJours(jour, aujourdhui);
+    if (!Number.isFinite(ageDays) || ageDays < 0 || ageDays >= weeks * 7) continue;
     buckets[Math.floor(ageDays / 7)] += Math.max(0, r.distance_km ?? 0);
   }
   const top = buckets.filter((k) => k >= 2).sort((a, b) => b - a).slice(0, 4);
