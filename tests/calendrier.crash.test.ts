@@ -181,5 +181,42 @@ test("l'avertissement est repliable, et sa phrase clé reste visible repliée", 
     "la phrase clé se répète juste au-dessus du texte complet une fois déplié");
 });
 
+test("le « pourquoi ce plan » est replié, mais garde la ligne actionnable visible", () => {
+  const src = readFileSync("src/components/training/CalendarView.tsx", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  // 123 mots de raisonnement dépliés en permanence, alors qu'on vient chercher CE QUI
+  // EST PRÉVU. Le résumé doit porter cette réponse-là, repliée comme dépliée.
+  const i = src.indexOf('t("cal.why.title")');
+  assert.ok(i > 0, "l'en-tête du bloc a disparu");
+  const entete = src.slice(Math.max(0, i - 400), i + 900);
+  assert.ok(entete.includes("<details"), "le bloc est de nouveau déplié en permanence");
+  assert.ok(entete.includes('t("cal.why.plannedQuality")'),
+    "la ligne « qualité prévue » n'est plus dans le résumé : replié, le bloc ne dit plus rien d'utile");
+});
+
+test("l'avertissement de réalisme n'est PAS enfermé dans ce repli", () => {
+  // Replier les faits est une économie de lecture ; replier une mise en garde DANS un
+  // autre repli la rendrait invisible en deux clics. Elle doit rester au premier niveau.
+  const src = readFileSync("src/components/training/CalendarView.tsx", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  const finRepli = src.indexOf("</details>");
+  const avertissement = src.indexOf("warnings.length > 0");
+  assert.ok(finRepli > 0 && avertissement > 0, "structure introuvable");
+  assert.ok(avertissement > finRepli,
+    "l'avertissement de réalisme est passé À L'INTÉRIEUR du bloc repliable : il faut deux clics pour le lire");
+});
+
+test("l'intro d'allègement n'est pas répétée au dépliage", () => {
+  // Elle est dans le résumé ; la laisser aussi dans le corps la ferait apparaître deux
+  // fois de suite dès qu'on déplie.
+  const src = readFileSync("src/components/training/CalendarView.tsx", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  const n = (src.match(/cal\.why\.noQuality"/g) ?? []).length;
+  assert.equal(n, 1, `l'intro d'allègement apparaît ${n} fois : elle sera affichée en double`);
+});
+
 console.log(`\n${passed} crash-test(s) du calendrier passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log(`  KO ${f}`); process.exit(1); }

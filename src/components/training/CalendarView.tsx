@@ -669,9 +669,33 @@ function CoachWhy({ state, lang, t, sessions }: { state: CoachState | null; lang
 
   return (
     <div className={`mb-4 rounded-2xl border ${tone.border} ${tone.bg} px-4 py-3.5`}>
-      <div className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider ${tone.dot}`}>
-        <Sparkles className="h-3.5 w-3.5" /> {t("cal.why.title")}
-      </div>
+      {/* ⚠️ 123 MOTS DE FAITS, DÉPLIÉS EN PERMANENCE. Ils sont justes et utiles, mais on
+          ne les relit pas : ce qu'on vient chercher chaque jour, c'est CE QUI EST PRÉVU.
+          Le raisonnement qui y mène — objectif, dernière séance, motifs d'allègement —
+          se consulte une fois, puis encombre. Il se replie donc, et la ligne actionnable
+          reste seule visible. L'avertissement de réalisme, lui, reste À L'EXTÉRIEUR de
+          ce repli : une mise en garde ne doit pas perdre en visibilité. */}
+      <details className="group">
+        <summary className="cursor-pointer list-none">
+          <span className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider ${tone.dot}`}>
+            <Sparkles className="h-3.5 w-3.5" /> {t("cal.why.title")}
+            <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
+          </span>
+          {/* La ligne actionnable, visible repliée COMME dépliée : c'est la réponse à
+              « qu'est-ce que je fais cette semaine ? ». */}
+          {quality.length > 0 && !noQuality && !easedQuality && (
+            <span className={`mt-1.5 block text-sm ${tone.body}`}>
+              <span className="font-semibold">{t("cal.why.plannedQuality")} :</span> {quality.join(" + ")}
+              {state.targetKm ? ` · ${t("cal.why.volume")} ~${state.targetKm} km` : ""}
+              {state.longRunKm ? ` · ${t("cal.why.longRun")} ~${state.longRunKm} km` : ""}
+            </span>
+          )}
+          {(noQuality || easedQuality) && (
+            <span className={`mt-1.5 block text-sm leading-relaxed ${tone.body}`}>
+              {t(noQuality ? "cal.why.noQuality" : "cal.why.easedQuality")}
+            </span>
+          )}
+        </summary>
 
       {/* L'avis du coach s'affiche SOUS les raisons : il commente une décision déjà
           expliquée, il ne la remplace pas. */}
@@ -706,7 +730,7 @@ function CoachWhy({ state, lang, t, sessions }: { state: CoachState | null; lang
 
       {noQuality || easedQuality ? (
         <div className={`mt-2 text-sm leading-relaxed ${tone.body}`}>
-          <p>{t(noQuality ? "cal.why.noQuality" : "cal.why.easedQuality")}</p>
+          {/* L'intro est déjà dans le résumé : la répéter ici ferait doublon au dépliage. */}
           <ul className="mt-1 space-y-0.5">
             {reasons.map((r, i) => <li key={i}>· {r}</li>)}
             {/* La charge d'un autre sport est la cause la plus souvent invisible : le
@@ -721,13 +745,8 @@ function CoachWhy({ state, lang, t, sessions }: { state: CoachState | null; lang
             <p className="mt-1.5"><span className="font-semibold">{t("cal.why.nextWeek")} :</span> {nextQuality.join(" + ")}</p>
           )}
         </div>
-      ) : quality.length > 0 ? (
-        <p className={`mt-1.5 text-sm ${tone.body}`}>
-          <span className="font-semibold">{t("cal.why.plannedQuality")} :</span> {quality.join(" + ")}
-          {state.targetKm ? ` · ${t("cal.why.volume")} ~${state.targetKm} km` : ""}
-          {state.longRunKm ? ` · ${t("cal.why.longRun")} ~${state.longRunKm} km` : ""}
-        </p>
       ) : null}
+      </details>
 
       {/* Réalisme de l'objectif — encadré à part, en rouge : ce n'est pas une nuance du
           plan de la semaine mais un constat sur la préparation entière. Il ne quittait
