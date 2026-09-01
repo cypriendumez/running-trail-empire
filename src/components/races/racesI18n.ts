@@ -8,7 +8,7 @@ export function fillR(s: string, p?: Record<string, string | number>): string {
 export const RX: Record<string, Record<string, string>> = {
   fr: {
     "searchPh": "Rechercher une course, ville, département, organisateur...",
-    "course": "course", "courses": "courses", "dated": "datées", "toConfirm": "à confirmer", "formats": "distances", "events": "événements", "source": "Fiche reprise de {d} — vérifie la date et le tarif auprès de l'organisateur avant de payer.", "deadLink": "⚠️ Cette page d'inscription ne répond plus (contrôlée deux fois). L'édition est peut-être terminée ou le lien a changé — cherche la course par son nom.",
+    "course": "course", "courses": "courses", "dated": "datées", "toConfirm": "à confirmer", "formats": "distances", "events": "événements", "fav.filter": "Mes favoris", "fav.add": "Ajouter aux favoris", "fav.remove": "Retirer des favoris", "source": "Fiche reprise de {d} — vérifie la date et le tarif auprès de l'organisateur avant de payer.", "deadLink": "⚠️ Cette page d'inscription ne répond plus (contrôlée deux fois). L'édition est peut-être terminée ou le lien a changé — cherche la course par son nom.",
     "map": "Carte", "allTypes": "Tous types", "allRegions": "Toutes",
     "sort.date": "Date", "sort.distance": "Distance", "sort.elevation": "Dénivelé", "reset": "Réinitialiser",
     "empty.title": "Aucune course trouvée", "empty.sub": "Essaie d'autres filtres ou un autre mot-clé.",
@@ -32,7 +32,7 @@ export const RX: Record<string, Record<string, string>> = {
   },
   en: {
     "searchPh": "Search a race, city, department, organizer...",
-    "course": "race", "courses": "races", "dated": "dated", "toConfirm": "to confirm", "formats": "distances", "events": "events", "source": "Listing sourced from {d} — check the date and price with the organiser before paying.", "deadLink": "⚠️ This registration page no longer responds (checked twice). The edition may be over or the link changed — search for the race by name.",
+    "course": "race", "courses": "races", "dated": "dated", "toConfirm": "to confirm", "formats": "distances", "events": "events", "fav.filter": "My favourites", "fav.add": "Add to favourites", "fav.remove": "Remove from favourites", "source": "Listing sourced from {d} — check the date and price with the organiser before paying.", "deadLink": "⚠️ This registration page no longer responds (checked twice). The edition may be over or the link changed — search for the race by name.",
     "map": "Map", "allTypes": "All types", "allRegions": "All",
     "sort.date": "Date", "sort.distance": "Distance", "sort.elevation": "Elevation", "reset": "Reset",
     "empty.title": "No race found", "empty.sub": "Try other filters or another keyword.",
@@ -56,7 +56,7 @@ export const RX: Record<string, Record<string, string>> = {
   },
   de: {
     "searchPh": "Rennen, Stadt, Department, Veranstalter suchen...",
-    "course": "Rennen", "courses": "Rennen", "dated": "mit Datum", "toConfirm": "noch offen", "formats": "Distanzen", "events": "Veranstaltungen", "source": "Eintrag von {d} übernommen — prüfe Datum und Preis beim Veranstalter, bevor du zahlst.", "deadLink": "⚠️ Diese Anmeldeseite antwortet nicht mehr (zweimal geprüft). Die Austragung ist vielleicht vorbei oder der Link hat sich geändert — such das Rennen über den Namen.",
+    "course": "Rennen", "courses": "Rennen", "dated": "mit Datum", "toConfirm": "noch offen", "formats": "Distanzen", "events": "Veranstaltungen", "fav.filter": "Meine Favoriten", "fav.add": "Zu Favoriten hinzufügen", "fav.remove": "Aus Favoriten entfernen", "source": "Eintrag von {d} übernommen — prüfe Datum und Preis beim Veranstalter, bevor du zahlst.", "deadLink": "⚠️ Diese Anmeldeseite antwortet nicht mehr (zweimal geprüft). Die Austragung ist vielleicht vorbei oder der Link hat sich geändert — such das Rennen über den Namen.",
     "map": "Karte", "allTypes": "Alle Typen", "allRegions": "Alle",
     "sort.date": "Datum", "sort.distance": "Distanz", "sort.elevation": "Höhenmeter", "reset": "Zurücksetzen",
     "empty.title": "Kein Rennen gefunden", "empty.sub": "Probier andere Filter oder ein anderes Stichwort.",
@@ -80,7 +80,7 @@ export const RX: Record<string, Record<string, string>> = {
   },
   es: {
     "searchPh": "Buscar una carrera, ciudad, departamento, organizador...",
-    "course": "carrera", "courses": "carreras", "dated": "con fecha", "toConfirm": "por confirmar", "formats": "distancias", "events": "eventos", "source": "Ficha tomada de {d} — comprueba la fecha y el precio con el organizador antes de pagar.", "deadLink": "⚠️ Esta página de inscripción ya no responde (comprobada dos veces). La edición puede haber terminado o el enlace ha cambiado — busca la carrera por su nombre.",
+    "course": "carrera", "courses": "carreras", "dated": "con fecha", "toConfirm": "por confirmar", "formats": "distancias", "events": "eventos", "fav.filter": "Mis favoritos", "fav.add": "Añadir a favoritos", "fav.remove": "Quitar de favoritos", "source": "Ficha tomada de {d} — comprueba la fecha y el precio con el organizador antes de pagar.", "deadLink": "⚠️ Esta página de inscripción ya no responde (comprobada dos veces). La edición puede haber terminado o el enlace ha cambiado — busca la carrera por su nombre.",
     "map": "Mapa", "allTypes": "Todos los tipos", "allRegions": "Todas",
     "sort.date": "Fecha", "sort.distance": "Distancia", "sort.elevation": "Desnivel", "reset": "Restablecer",
     "empty.title": "No se encontró ninguna carrera", "empty.sub": "Prueba otros filtros u otra palabra clave.",
@@ -104,7 +104,7 @@ export const RX: Record<string, Record<string, string>> = {
   },
   pt: {
     "searchPh": "Pesquisar uma corrida, cidade, distrito, organizador...",
-    "course": "corrida", "courses": "corridas", "dated": "com data", "toConfirm": "a confirmar", "formats": "distâncias", "events": "eventos", "source": "Ficha retirada de {d} — confirma a data e o preço com o organizador antes de pagar.", "deadLink": "⚠️ Esta página de inscrição já não responde (verificada duas vezes). A edição pode ter terminado ou o link mudou — procura a prova pelo nome.",
+    "course": "corrida", "courses": "corridas", "dated": "com data", "toConfirm": "a confirmar", "formats": "distâncias", "events": "eventos", "fav.filter": "Os meus favoritos", "fav.add": "Adicionar aos favoritos", "fav.remove": "Remover dos favoritos", "source": "Ficha retirada de {d} — confirma a data e o preço com o organizador antes de pagar.", "deadLink": "⚠️ Esta página de inscrição já não responde (verificada duas vezes). A edição pode ter terminado ou o link mudou — procura a prova pelo nome.",
     "map": "Mapa", "allTypes": "Todos os tipos", "allRegions": "Todas",
     "sort.date": "Data", "sort.distance": "Distância", "sort.elevation": "Desnível", "reset": "Repor",
     "empty.title": "Nenhuma corrida encontrada", "empty.sub": "Experimenta outros filtros ou outra palavra-chave.",

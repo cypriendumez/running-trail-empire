@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { Search, MapPin, Mountain, Clock, Calendar, ExternalLink, Zap, ChevronLeft, ChevronRight, Globe, Loader2, Map, Flag, ArrowDownUp, Footprints, X } from "lucide-react";
+import { Search, MapPin, Mountain, Clock, Calendar, ExternalLink, Zap, ChevronLeft, ChevronRight, Globe, Loader2, Map, Flag, ArrowDownUp, Footprints, X, Heart } from "lucide-react";
 import type { Race } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -65,7 +65,7 @@ export type PlannedRace = { id: string; name: string; location: string; distance
 
 const normName = (s: string) => (s || "").toLowerCase().trim().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
-export function RacesHub({ races: initialRaces, totalCount, units = "metric", planned: plannedProp = [], initialSearch = "", pps = null, liensMorts = [] }: { liensMorts?: string[]; races: Race[]; totalCount?: number; units?: UnitSystem; planned?: PlannedRace[]; initialSearch?: string; pps?: PpsStatus | null }) {
+export function RacesHub({ races: initialRaces, totalCount, units = "metric", planned: plannedProp = [], initialSearch = "", pps = null, liensMorts = [], favorisInitiaux = [] }: { favorisInitiaux?: string[]; liensMorts?: string[]; races: Race[]; totalCount?: number; units?: UnitSystem; planned?: PlannedRace[]; initialSearch?: string; pps?: PpsStatus | null }) {
   const { lang } = useT();
   const d = RX[lang] ?? RX.fr;
   const tr = (k: string, p?: Record<string, string | number>) => fillR(d[k] ?? k, p);
@@ -109,6 +109,30 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
 
   const [showMap, setShowMap] = useState(false);
 
+  // ── FAVORIS ────────────────────────────────────────────────────────────────────
+  //  Un catalogue de 17 027 courses ne se re-parcourt pas : on repère une course en
+  //  septembre et on la cherche encore en mars. Le cœur la retrouve en un clic.
+  const [favoris, setFavoris] = useState<Set<string>>(() => new Set(favorisInitiaux));
+  const [filtreFavoris, setFiltreFavoris] = useState(false);
+  const basculerFavori = useCallback(async (id: string) => {
+    // ⚠️ ON BASCULE L'AFFICHAGE D'ABORD. Un cœur qui attend la réponse du serveur donne
+    //    l'impression que le clic n'a pas pris, et on reclique — ce qui l'annule. En cas
+    //    d'échec on REVIENT en arrière : mentir sur un enregistrement qui n'a pas eu
+    //    lieu est pire que de faire attendre.
+    const avant = favoris.has(id);
+    setFavoris((f) => { const n = new Set(f); if (avant) n.delete(id); else n.add(id); return n; });
+    try {
+      const res = await fetch("/api/races/favori", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ raceId: id, on: !avant }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setFavoris((f) => { const n = new Set(f); if (avant) n.add(id); else n.delete(id); return n; });
+      toast.error(d["t.saveErr"]);
+    }
+  }, [favoris, d]);
+
   const filtered = useMemo(() => {
     const q = search;
     const list = races.filter(r => {
@@ -125,7 +149,8 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
         r.region?.toLowerCase().replace(/-/g, " ").includes(region.toLowerCase().replace(/-/g, " "));
       const matchType = raceType === "all" || correctedRaceType(r.distance_km, r.type) === raceType;
       const matchDate = !dateFrom || r.date.startsWith("2099") || new Date(r.date) >= new Date(dateFrom);
-      return matchSearch && matchRegion && matchType && matchDate;
+      const matchFavori = !filtreFavoris || favoris.has(r.id);
+      return matchSearch && matchRegion && matchType && matchDate && matchFavori;
     });
     return [...list].sort((a, b) => {
       if (sort === "distance") return (b.distance_km || 0) - (a.distance_km || 0);
@@ -134,7 +159,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
       const bd = b.date?.startsWith("2099") ? "9999-99-99" : b.date;
       return ad.localeCompare(bd);
     });
-  }, [races, search, region, raceType, dateFrom, sort]);
+  }, [races, search, region, raceType, dateFrom, sort, filtreFavoris, favoris]);
 
   // Courses déjà planifiées par l'athlète — partagé liste + carte (bouton vert ↔ rouge).
   const [plannedList, setPlannedList] = useState<PlannedRace[]>(plannedProp);
@@ -298,6 +323,21 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
               <option value="elevation">{d["sort.elevation"]}</option>
             </select>
           </div>
+          {/* Filtre « mes favoris » : c'est ce qui rend le cœur utile. Sans lui, on
+              marque des courses qu'on ne retrouve pas mieux qu'avant. */}
+          <button type="button" onClick={() => handleFilterChange(() => setFiltreFavoris((v) => !v))}
+            className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
+              filtreFavoris
+                ? "border-rose-300 bg-rose-50 text-rose-700"
+                : "border-zinc-200 text-zinc-600 hover:border-rose-200 hover:text-rose-600"}`}>
+            <Heart className="h-4 w-4" fill={filtreFavoris ? "currentColor" : "none"} />
+            {d["fav.filter"]}
+            {favoris.size > 0 && (
+              <span className={`rounded-full px-1.5 text-[11px] font-bold ${filtreFavoris ? "bg-rose-200 text-rose-800" : "bg-zinc-100 text-zinc-500"}`}>
+                {favoris.size}
+              </span>
+            )}
+          </button>
 
           {(search || region !== "Toutes" || raceType !== "all" || dateFrom) && (
             <button
@@ -346,11 +386,24 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                   <div className="flex-1 min-w-0 py-0.5">
                     <div className="flex items-start justify-between gap-2">
                       <h3 className="font-semibold text-zinc-900 text-sm leading-snug">{race.name}</h3>
-                      <span
-                        className="px-2 py-0.5 rounded-lg text-xs font-bold flex-shrink-0 text-white"
-                        style={{ backgroundColor: DIFF_COLORS[race.difficulty] || "#22c55e" }}
-                      >
-                        {d[`diff.${race.difficulty}`] || d["diff.green"]}
+                      <span className="flex flex-shrink-0 items-center gap-1.5">
+                        {/* Le cœur porte sur l'ÉVÉNEMENT, donc sur son format principal :
+                            mettre en favori « le 10 km » et pas « le 5 km » du même
+                            week-end n'aurait pas de sens à l'échelle d'une carte. */}
+                        <button type="button" aria-label={d[favoris.has(race.id) ? "fav.remove" : "fav.add"]}
+                          title={d[favoris.has(race.id) ? "fav.remove" : "fav.add"]}
+                          onClick={(e) => { e.stopPropagation(); basculerFavori(race.id); }}
+                          className={`rounded-lg p-1 transition-colors ${favoris.has(race.id)
+                            ? "text-rose-500 hover:bg-rose-50"
+                            : "text-zinc-300 hover:bg-zinc-100 hover:text-rose-400"}`}>
+                          <Heart className="h-4 w-4" fill={favoris.has(race.id) ? "currentColor" : "none"} />
+                        </button>
+                        <span
+                          className="px-2 py-0.5 rounded-lg text-xs font-bold text-white"
+                          style={{ backgroundColor: DIFF_COLORS[race.difficulty] || "#22c55e" }}
+                        >
+                          {d[`diff.${race.difficulty}`] || d["diff.green"]}
+                        </span>
                       </span>
                     </div>
                     <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 text-xs text-zinc-500">

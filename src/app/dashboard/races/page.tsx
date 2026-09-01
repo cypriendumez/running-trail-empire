@@ -2,8 +2,6 @@ export const dynamic = "force-dynamic";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { RacesHub } from "@/components/races/RacesHub";
-import { fmtDistance } from "@/lib/units";
-import { Flag } from "lucide-react";
 import { normLang } from "@/lib/i18n/translations";
 import { urlsSignalees, ETAT_VIDE, type EtatLiens } from "@/lib/races/liens";
 import type { PpsStatus } from "@/lib/pps/status";
@@ -11,12 +9,11 @@ import type { PpsStatus } from "@/lib/pps/status";
 export const metadata = { title: "Courses France" };
 
 // ── i18n local (5 langues) — bannière serveur « mes courses à venir ». ──
-const BL: Record<string, { upcoming: string; planned: string; jourJ: string; race: string }> = {
-  fr: { upcoming: "Mes courses à venir", planned: "· planifiées dans ton calendrier", jourJ: "Jour J", race: "Course" },
-  en: { upcoming: "My upcoming races", planned: "· planned in your calendar", jourJ: "Race day", race: "Race" },
-  de: { upcoming: "Meine kommenden Rennen", planned: "· in deinem Kalender geplant", jourJ: "Renntag", race: "Rennen" },
-  es: { upcoming: "Mis próximas carreras", planned: "· planificadas en tu calendario", jourJ: "Día de carrera", race: "Carrera" },
-  pt: { upcoming: "As minhas próximas corridas", planned: "· planeadas no teu calendário", jourJ: "Dia da corrida", race: "Corrida" },
+// Libellé de repli quand une course planifiée n'a pas de nom — le reste de ce tableau
+// servait au bandeau « Mes courses à venir », retiré : une course planifiée appartient
+// au calendrier, pas en tête du catalogue.
+const NOM_PAR_DEFAUT: Record<string, string> = {
+  fr: "Course", en: "Race", de: "Rennen", es: "Carrera", pt: "Corrida",
 };
 
 // Colonnes LÉGÈRES envoyées en masse (cartes de liste + marqueurs carte) — on exclut
@@ -55,59 +52,37 @@ export default async function RacesPage({ searchParams }: { searchParams: Promis
   let lang = "fr";
   // État du PPS : c'est sur CETTE page qu'on s'inscrit, donc là qu'il doit se rappeler.
   let pps: PpsStatus | null = null;
+  let favoris: string[] = [];
   if (user) {
-    const [{ data }, { data: settingsRow }, { data: profileRow }, { data: ppsRow }] = await Promise.all([
+    const [{ data }, { data: settingsRow }, { data: profileRow }, { data: ppsRow }, { data: favLignes }] = await Promise.all([
       sb.from("notifications").select("id, title, data").eq("user_id", user.id).eq("type", "planned_race").order("created_at", { ascending: false }).limit(50),
       sb.from("notifications").select("data").eq("user_id", user.id).eq("type", "user_settings").maybeSingle(),
       sb.from("profiles").select("preferred_language").eq("id", user.id).single(),
       sb.from("notifications").select("data").eq("user_id", user.id).eq("type", "pps_status").maybeSingle(),
+      // Favoris : chargés AVEC le reste, pour que le cœur soit déjà rempli au premier
+      // rendu. Un cœur qui se remplit une seconde après l'affichage donne l'impression
+      // d'un clic qui n'a pas pris, et on reclique — ce qui l'enlève.
+      sb.from("notifications").select("data").eq("user_id", user.id).eq("type", "race_favori").limit(2000),
     ]);
     pps = (ppsRow?.data ?? null) as PpsStatus | null;
+    favoris = (favLignes ?? [])
+      .map((r) => String((r.data as { raceId?: string } | null)?.raceId ?? ""))
+      .filter(Boolean);
     units = String(((settingsRow?.data ?? {}) as Record<string, unknown>).unitSystem ?? "metric") === "imperial" ? "imperial" : "metric";
     lang = normLang(profileRow?.preferred_language ?? "fr");
     planned = (data ?? []).map((r) => {
       const d = (r.data ?? {}) as { date?: string; name?: string; location?: string; distanceKm?: number | null };
-      return { id: String(r.id), name: d.name || (r.title as string) || (BL[lang] ?? BL.fr).race, location: d.location || "", distanceKm: d.distanceKm ?? null, date: String(d.date ?? "").slice(0, 10) };
+      return { id: String(r.id), name: d.name || (r.title as string) || (NOM_PAR_DEFAUT[lang] ?? NOM_PAR_DEFAUT.fr), location: d.location || "", distanceKm: d.distanceKm ?? null, date: String(d.date ?? "").slice(0, 10) };
     }).filter((p) => p.date >= today).sort((a, b) => a.date.localeCompare(b.date));
   }
-  const bl = BL[lang] ?? BL.fr;
-  // Bandeau : affichage dédoublonné (un double-clic accidentel crée 2 notifications
-  // identiques). La liste COMPLÈTE part au composant → « Annuler » supprime toutes les copies.
-  const seenPlanned = new Set<string>();
-  const plannedDisplay = planned.filter((p) => {
-    const k = `${p.name.toLowerCase().trim()}|${p.date}|${p.distanceKm ?? ""}`;
-    if (seenPlanned.has(k)) return false;
-    seenPlanned.add(k);
-    return true;
-  });
-
   return (
     <>
-      {plannedDisplay.length > 0 && (
-        <div className="mx-auto max-w-5xl px-4 pt-6">
-          <div className="rounded-3xl border border-amber-200 bg-amber-50/60 p-5">
-            <div className="mb-3 flex flex-wrap items-center gap-2 font-bold text-amber-900"><Flag className="h-5 w-5 text-amber-600" /> {bl.upcoming} <span className="text-xs font-normal text-amber-700/70">{bl.planned}</span></div>
-            <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-              {plannedDisplay.map((p, i) => {
-                const days = Math.ceil((new Date(p.date).getTime() - Date.now()) / 86400000);
-                return (
-                  <div key={i} className="rounded-2xl border border-amber-100 bg-white p-3.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="truncate font-bold text-zinc-900">{p.name}</span>
-                      <span className="flex-shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">{days <= 0 ? bl.jourJ : `J-${days}`}</span>
-                    </div>
-                    <div className="mt-1 text-xs text-zinc-500 first-letter:uppercase">
-                      {new Date(p.date).toLocaleDateString(lang, { weekday: "short", day: "numeric", month: "long" })}
-                      {p.location ? ` · ${p.location}` : ""}{p.distanceKm != null ? ` · ${fmtDistance(p.distanceKm, units)}` : ""}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-      <RacesHub liensMorts={liensMorts} races={(initialRaces ?? []) as never[]} totalCount={totalCount ?? 0} units={units} planned={planned} initialSearch={q ?? ""} pps={pps} />
+      {/* ⚠️ LE BANDEAU « MES COURSES À VENIR » A ÉTÉ RETIRÉ D'ICI. Une course planifiée
+          appartient au CALENDRIER — c'est là qu'on va voir ce qu'on a prévu, et le
+          calendrier l'affiche déjà avec le plan qui l'entoure. La répéter en tête du
+          catalogue poussait la recherche de courses, seule raison de venir sur cette
+          page, sous la ligne de flottaison. */}
+      <RacesHub favorisInitiaux={favoris} liensMorts={liensMorts} races={(initialRaces ?? []) as never[]} totalCount={totalCount ?? 0} units={units} planned={planned} initialSearch={q ?? ""} pps={pps} />
     </>
   );
 }

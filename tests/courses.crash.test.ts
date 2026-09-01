@@ -19,6 +19,7 @@
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
 import { grouperEvenements, cleEvenement, normNom } from "../src/lib/races/groupes";
+import { idCourseValide } from "../src/lib/races/favoris";
 import { joursAvant, sansAccents, correspond, domaineSource } from "../src/lib/races/temps";
 import { normaliserHeure, afficherHeure } from "../src/lib/races/heure";
 import { dateDeLaFiche, doitMettreAJour } from "../src/lib/races/fiche";
@@ -640,6 +641,53 @@ test("le compteur affiche le nombre de COURSES, pas le nombre de cartes", () => 
     "la sous-ligne n'annonce plus le nombre d'événements : l'écart avec les cartes devient inexplicable");
   const i18n = readFileSync("src/components/races/racesI18n.ts", "utf8");
   assert.equal((i18n.match(/"events": "/g) ?? []).length, 5, "le libellé « événements » manque dans une langue");
+});
+
+console.log("\nFAVORIS — un cœur qui ment est pire qu'un cœur absent");
+
+test("seul un identifiant de course réel est accepté", () => {
+  // `raceId` part dans un filtre PostgREST (`data->>raceId`) : ce qui vient du
+  // navigateur n'a rien à y faire sans contrôle.
+  assert.equal(idCourseValide("1e2a5909-a771-4854-8ce5-44a32830b694"), true);
+  for (const v of ["", "   ", "abc", "1e2a5909", "1e2a5909-a771-4854-8ce5-44a32830b69",
+                   "'; drop table races; --", "../../etc/passwd", null, undefined, 42]) {
+    assert.equal(idCourseValide(v as never), false, `${JSON.stringify(v)} accepté`);
+  }
+});
+
+test("le cœur bascule TOUT DE SUITE, et revient en arrière si l'enregistrement échoue", () => {
+  // Un cœur qui attend le serveur donne l'impression que le clic n'a pas pris, et on
+  // reclique — ce qui l'annule. Mais mentir sur un enregistrement qui n'a pas eu lieu
+  // est pire : en cas d'échec on remet l'état d'avant et on le dit.
+  const src = readFileSync("src/components/races/RacesHub.tsx", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  const i = src.indexOf("const basculerFavori");
+  assert.ok(i > 0, "la bascule du favori a disparu");
+  const fn = src.slice(i, i + 900);
+  assert.ok(fn.indexOf("setFavoris") < fn.indexOf("await fetch"),
+    "le cœur attend le serveur : le clic paraîtra sans effet");
+  assert.ok(/catch \{[\s\S]*setFavoris/.test(fn),
+    "un échec d'enregistrement laisse un cœur rempli qui ne correspond à rien en base");
+});
+
+test("le filtre « mes favoris » existe — sans lui le cœur ne sert à rien", () => {
+  const src = readFileSync("src/components/races/RacesHub.tsx", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  assert.ok(src.includes("const matchFavori = !filtreFavoris || favoris.has(r.id);"),
+    "le filtre favoris ne s'applique plus à la liste : on marque des courses qu'on ne retrouve pas mieux qu'avant");
+  assert.ok(src.includes('d["fav.filter"]'), "le bouton de filtre a disparu");
+});
+
+test("le bandeau « mes courses à venir » ne revient pas sur le catalogue", () => {
+  // Une course planifiée appartient au calendrier. Répétée en tête du catalogue, elle
+  // poussait la recherche de courses — seule raison de venir ici — sous la ligne de
+  // flottaison.
+  const src = readFileSync("src/app/dashboard/races/page.tsx", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  assert.ok(!src.includes("plannedDisplay"), "le bandeau des courses planifiées est revenu en tête du catalogue");
 });
 
 console.log(`\n${passed} crash-test(s) du catalogue passé(s), ${fails.length} échec(s)`);
