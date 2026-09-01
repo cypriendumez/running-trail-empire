@@ -125,7 +125,7 @@ RÈGLES :
 
   const contents = [
     { role: "user", parts: [{ text: systemPrompt }] },
-    { role: "model", parts: [{ text: "Salut 👋 Je suis ton coach. Pose-moi n'importe quelle question sur la course à pied ou le trail — j'explique tout simplement, et j'adapte à TON profil." }] },
+    { role: "model", parts: [{ text: "Salut ! Je suis ton coach. Pose-moi n'importe quelle question sur la course à pied ou le trail — j'explique tout simplement, et j'adapte à TON profil." }] },
     // ⚠️ CHAQUE message d'historique est TRONQUÉ, pas seulement leur nombre. Le tour
     // précédent bornait la profondeur mais pas la longueur : un message de 4 000
     // caractères — une description de douleur détaillée, un copier-coller — repart en

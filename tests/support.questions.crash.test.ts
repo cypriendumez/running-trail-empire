@@ -265,6 +265,27 @@ test("la bulle passe bien les réponses par ce découpage", () => {
     "le texte du modèle est injecté en HTML brut : tout ce qu'il renvoie devient du balisage");
 });
 
+test("aucune bulle de discussion ne salue avec un emoji de main", () => {
+  // Retiré à la demande de Cyprien, dans les TROIS assistants (support, Kiné IA,
+  // coach) et dans les 5 langues. Le test existe parce que ce genre de détail revient
+  // tout seul : la prochaine bulle sera écrite en recopiant une des existantes.
+  // Et parce que le retirer sans reponctuer donne « Bonjour Je suis votre kiné ».
+  const fichiers = [
+    "src/components/support/SupportBubble.tsx",
+    "src/components/health/HealthCenter.tsx",
+    "src/app/api/ai/physio/route.ts",
+    "src/app/api/ai/cours/route.ts",
+  ];
+  for (const f of fichiers) {
+    const src = readFileSync(f, "utf8");
+    assert.ok(!src.includes("\u{1F44B}"), `${f} salue de nouveau avec une main`);
+    // Une salutation doit rester ponctuée : c'est ce qui casse quand on retire l'emoji.
+    for (const m of src.matchAll(/(Salut|Bonjour|Hello|Hallo|Hola|Olá)\s+([A-ZÀ-ÿ])/g)) {
+      assert.fail(`${f} : « ${m[1]} ${m[2]}… » — salutation sans ponctuation`);
+    }
+  }
+});
+
 console.log(`\n${passed} crash-test(s) de questions passé(s), ${fails.length} échec(s)`);
 console.log(`  corpus : ${QUESTIONS_APP.length} questions app · ${QUESTIONS_COURSE.length} course à pied · ${QUESTIONS_SENSIBLES.length} sensibles`);
 if (fails.length) { for (const f of fails) console.log(`  KO ${f}`); process.exit(1); }

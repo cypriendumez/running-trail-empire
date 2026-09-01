@@ -152,7 +152,7 @@ Si la photo est floue, trop sombre, trop éloignée ou ne montre pas la zone dé
 
   const contents = [
     { role: "user", parts: [{ text: systemPrompt }] },
-    { role: "model", parts: [{ text: "Bonjour 👋 Je suis votre kiné du sport. Décrivez-moi ce que vous ressentez (zone, depuis quand, à l'effort ou au repos) et je vous aide." }] },
+    { role: "model", parts: [{ text: "Bonjour ! Je suis votre kiné du sport. Décrivez-moi ce que vous ressentez (zone, depuis quand, à l'effort ou au repos) et je vous aide." }] },
     // ⚠️ CHAQUE message d'historique est TRONQUÉ, pas seulement leur nombre. Le tour
     // précédent bornait la profondeur mais pas la longueur : un message de 4 000
     // caractères — une description de douleur détaillée, un copier-coller — repart en
