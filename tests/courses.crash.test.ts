@@ -18,6 +18,7 @@
  */
 import assert from "node:assert/strict";
 import { grouperEvenements, cleEvenement } from "../src/lib/races/groupes";
+import { joursAvant, sansAccents, correspond } from "../src/lib/races/temps";
 
 let passed = 0;
 const fails: string[] = [];
@@ -142,6 +143,80 @@ test("un très gros catalogue reste groupé correctement", () => {
   const g = grouperEvenements(gros);
   assert.equal(g.length, 1000, `${g.length} événements au lieu de 1000`);
   assert.equal(g.reduce((s, x) => s + x.formats.length, 0), 5000, "des courses ont été perdues");
+});
+
+console.log("\nCOMPTE À REBOURS — en nuits, pas en tranches de 86 400 000 ms");
+
+test("J−N ne dépend pas du passage à l'heure d'hiver", () => {
+  // L'ancien calcul divisait des millisecondes. Une semaine fait 169 h au passage à
+  // l'heure d'hiver : consulté le 20/10/2026 à 00 h 30, le catalogue affichait « J−7 »
+  // pour une course à J−6, et sur 35 courses d'affilée. À 8 h du même jour, rien.
+  assert.equal(joursAvant("2026-10-26", "2026-10-20"), 6);
+  assert.equal(joursAvant("2026-11-01", "2026-10-20"), 12);
+  // ... ni du passage à l'heure d'été.
+  assert.equal(joursAvant("2026-03-30", "2026-03-20"), 10);
+  assert.equal(joursAvant("2026-04-15", "2026-03-20"), 26);
+});
+
+test("le jour même vaut 0, la veille vaut 1, une date passée est négative", () => {
+  assert.equal(joursAvant("2026-09-01", "2026-09-01"), 0);
+  assert.equal(joursAvant("2026-09-02", "2026-09-01"), 1);
+  assert.ok((joursAvant("2026-08-30", "2026-09-01") ?? 0) < 0);
+});
+
+test("le marqueur « date inconnue » ne produit aucun compte à rebours", () => {
+  // 2099-01-01 signifie « Date à venir ». Afficher « J−26 780 » serait absurde.
+  assert.equal(joursAvant("2099-01-01", "2026-09-01"), null);
+});
+
+test("dates absentes ou illisibles : null, jamais NaN", () => {
+  for (const v of ["", "   ", "pas-une-date", "2026-13-45", null, undefined, 42 as never]) {
+    const r = joursAvant(v as never, "2026-09-01");
+    assert.ok(r === null || Number.isFinite(r), `${JSON.stringify(v)} → ${r}`);
+  }
+});
+
+test("une année bissextile ne décale rien", () => {
+  assert.equal(joursAvant("2028-03-01", "2028-02-28"), 2); // 2028 est bissextile
+  assert.equal(joursAvant("2027-03-01", "2027-02-28"), 1);
+});
+
+console.log("\nRECHERCHE — un catalogue français se cherche sans accents");
+
+test("chercher sans accent trouve les courses accentuées", () => {
+  // 4 425 noms (30 %) et 3 027 villes du catalogue portent un accent.
+  assert.ok(correspond("Foulées du paté aux pommes de terre", "foulees"));
+  assert.ok(correspond("Pénitents Endurance", "penitents"));
+  assert.ok(correspond("Trail Impérial de Bizy", "imperial"));
+  assert.ok(correspond("Nîmes", "nimes"));
+  assert.ok(correspond("Saint-Étienne", "saint-etienne"));
+});
+
+test("chercher AVEC l'accent fonctionne aussi", () => {
+  assert.ok(correspond("Foulées du paté", "Foulées"));
+  assert.ok(correspond("Nîmes", "Nîmes"));
+});
+
+test("la recherche reste discriminante — elle ne matche pas tout", () => {
+  assert.equal(correspond("Trail de la Pérouse", "marathon"), false);
+  assert.equal(correspond("10 Km d'Houppeville", "trail"), false);
+});
+
+test("une recherche vide laisse tout passer", () => {
+  for (const q of ["", "   "]) assert.ok(correspond("n'importe quoi", q), `« ${q} » filtre alors qu'il est vide`);
+});
+
+test("champs absents : la recherche ne plante pas", () => {
+  for (const v of [null, undefined, 0, {}, []]) {
+    assert.equal(typeof correspond(v as never, "test"), "boolean", `${JSON.stringify(v)}`);
+  }
+  assert.equal(sansAccents(null), "");
+  assert.equal(sansAccents(undefined), "");
+});
+
+test("la casse et les espaces de bord sont ignorés", () => {
+  assert.ok(correspond("  Trail des Cimes  ", "TRAIL"));
+  assert.ok(correspond("Trail des Cimes", "  cimes  "));
 });
 
 console.log(`\n${passed} crash-test(s) du catalogue passé(s), ${fails.length} échec(s)`);

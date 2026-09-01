@@ -9,6 +9,7 @@ import {
 import { RenfoGuide } from "@/components/training/RenfoGuide";
 import { fmtDistance, type UnitSystem } from "@/lib/units";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { jourLocal } from "@/lib/streak/compute";
 import { extractBody, premierePhrase } from "@/lib/calendar/texte";
 import { libelleType } from "@/lib/ai/planI18n";
 import { AvisCoach } from "@/components/training/AvisCoach";
@@ -175,7 +176,14 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
   const sow = new Date(today);
   sow.setDate(today.getDate() - (weekStart === "sun" ? today.getDay() : (today.getDay() + 6) % 7));
   const sowKey = fmtKey(sow);
-  const eowKey = fmtKey(new Date(sow.getTime() + 7 * 86400000));
+  // ⚠️ 7 × 86 400 000 ms NE FONT PAS TOUJOURS 7 JOURS. Au passage à l'heure d'hiver la
+  //    semaine en compte 169 : `sow + 168 h` retombait le DIMANCHE 23 h au lieu du lundi.
+  //    Comme le filtre est `date < eowKey`, la séance du dimanche sortait du compte
+  //    « N cette semaine ». Vérifié : semaine du 19 au 25 octobre 2026, fin calculée au
+  //    25 au lieu du 26 — et le 25 octobre 2026 est le jour du marathon de Cyprien.
+  //    `setDate` raisonne en jours de calendrier et ne connaît pas ce problème.
+  const eow = new Date(sow); eow.setDate(sow.getDate() + 7);
+  const eowKey = fmtKey(eow);
   const weekCount = sessions.filter((s) => s.date >= sowKey && s.date < eowKey).length;
   const upcomingCount = sessions.filter((s) => s.date >= todayKey).length;
   const nextRace = races.filter((r) => r.date >= todayKey).sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;
@@ -637,7 +645,12 @@ function CoachWhy({ state, lang, t, sessions }: { state: CoachState | null; lang
   const warnings = (state.warnings ?? []).filter(Boolean);
   // Les 7 jours à venir, tels qu'on les enverra au coach. On borne à 7 : au-delà, c'est
   // du prévisionnel que le plan réajustera de toute façon.
-  const aujourdhui = new Date().toISOString().slice(0, 10);
+  // ⚠️ JOUR LOCAL, PAS JOUR UTC. `toISOString()` bascule à minuit UTC : entre minuit et
+  //    2 h du matin à Paris, « aujourd'hui » désignait encore la veille et la semaine
+  //    résumée au coach commençait par une séance déjà passée. Le reste du calendrier
+  //    raisonne déjà en jours locaux (`fmtKey`) : deux définitions du jour sur le même
+  //    écran, c'est exactement ce qu'on vient de retirer du tableau de bord.
+  const aujourdhui = jourLocal();
   const semaine = sessions
     .filter((d) => d.date >= aujourdhui)
     .slice(0, 7)

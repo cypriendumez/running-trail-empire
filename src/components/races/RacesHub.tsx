@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
 import { grouperEvenements } from "@/lib/races/groupes";
+import { joursAvant, correspond } from "@/lib/races/temps";
 import { fmtDistance, type UnitSystem } from "@/lib/units";
 import { correctedRaceType } from "@/lib/raceType";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -55,13 +56,9 @@ function formatDate(dateStr: string, lang: string, tbd: string, style: "short" |
   return d.toLocaleDateString(lang, { day: "numeric", month: "short", year: "numeric" });
 }
 
-// Jours restants avant la course (null si date inconnue / passée invalide).
-function daysTo(dateStr: string): number | null {
-  if (!dateStr || dateStr.startsWith("2099")) return null;
-  const d = new Date(dateStr + "T00:00:00");
-  if (isNaN(d.getTime())) return null;
-  return Math.ceil((d.getTime() - Date.now()) / 86400000);
-}
+// Jours restants avant la course. Voir `lib/races/temps` : le calcul en millisecondes
+// donnait un « J−N » qui dépendait de l'HEURE de consultation, aux changements d'heure.
+const daysTo = (dateStr: string): number | null => joursAvant(dateStr);
 
 // Course planifiée par l'athlète (notification planned_race) — id requis pour l'annulation.
 export type PlannedRace = { id: string; name: string; location: string; distanceKm: number | null; date: string };
@@ -113,13 +110,17 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
   const [showMap, setShowMap] = useState(false);
 
   const filtered = useMemo(() => {
-    const q = search.toLowerCase();
+    const q = search;
     const list = races.filter(r => {
+      // ⚠️ CATALOGUE FRANÇAIS, RECHERCHE SANS ACCENTS. Comparer des minuscules brutes
+      //    rendait 4 425 noms (30 %) et 3 027 villes introuvables sans taper l'accent
+      //    au bon endroit : « foulees » ne trouvait pas « Foulées », « nimes » ne
+      //    trouvait pas « Nîmes ».
       const matchSearch = !q ||
-        r.name.toLowerCase().includes(q) ||
-        (r.organization?.toLowerCase() || "").includes(q) ||
-        (r.city?.toLowerCase() || "").includes(q) ||
-        (r.department?.toLowerCase() || "").includes(q);
+        correspond(r.name, q) ||
+        correspond(r.organization, q) ||
+        correspond(r.city, q) ||
+        correspond(r.department, q);
       const matchRegion = region === "Toutes" ||
         r.region?.toLowerCase().replace(/-/g, " ").includes(region.toLowerCase().replace(/-/g, " "));
       const matchType = raceType === "all" || correctedRaceType(r.distance_km, r.type) === raceType;
@@ -382,12 +383,21 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                           </button>
                         ))}
                       </span>
-                      {(race.elevation_gain_m ?? 0) > 0 && (
-                        <span className="flex items-center gap-1">
-                          <Mountain className="w-3 h-3" />
-                          +{race.elevation_gain_m}m
-                        </span>
-                      )}
+                      {/* ⚠️ LE DÉNIVELÉ DE L'ÉVÉNEMENT, PAS CELUI DU SEUL FORMAT PRINCIPAL.
+                          La carte porte la distance la plus longue, qui n'est pas
+                          forcément la plus montagneuse : sur 124 événements du catalogue,
+                          le format le plus long n'est pas le plus haut. Triée par
+                          dénivelé, la liste plaçait donc la carte selon une valeur
+                          qu'elle n'affichait pas. On montre le maximum du groupe. */}
+                      {(() => {
+                        const dplus = Math.max(0, ...evt.formats.map((f) => Number(f.elevation_gain_m) || 0));
+                        return dplus > 0 ? (
+                          <span className="flex items-center gap-1">
+                            <Mountain className="w-3 h-3" />
+                            +{dplus}m
+                          </span>
+                        ) : null;
+                      })()}
                       {/* ⚠️ L'ÉTIQUETTE DE TYPE RÉPÉTAIT LA DISTANCE. « 10 Km d'Houppeville »
                           affichait « 10 km » (la distance) puis « 10 km » (la famille
                           `road_10k`) : deux fois le même mot, dont le second n'apprend

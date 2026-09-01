@@ -218,5 +218,49 @@ test("l'intro d'allègement n'est pas répétée au dépliage", () => {
   assert.equal(n, 1, `l'intro d'allègement apparaît ${n} fois : elle sera affichée en double`);
 });
 
+console.log("\nDATES — une semaine ne fait pas toujours 168 heures");
+
+test("la fin de semaine ne se calcule plus en millisecondes", () => {
+  // ⚠️ DÉFAUT RÉEL. `sow.getTime() + 7 * 86400000` retombait le DIMANCHE 23 h au
+  // passage à l'heure d'hiver, où la semaine compte 169 heures. Le filtre étant
+  // `date < eowKey`, la séance du dimanche sortait du compte « N cette semaine ».
+  // Vérifié : semaine du 19 au 25 octobre 2026, fin calculée au 25 au lieu du 26 —
+  // et le 25 octobre 2026 est le jour du marathon.
+  const src = readFileSync("src/components/training/CalendarView.tsx", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  assert.ok(!/eowKey = fmtKey\(new Date\(sow\.getTime\(\) \+ 7 \* 86400000\)\)/.test(src),
+    "la fin de semaine repasse en millisecondes : le dimanche du changement d'heure sort du compte");
+  assert.ok(/eow\.setDate\(sow\.getDate\(\) \+ 7\)/.test(src),
+    "la fin de semaine n'est plus calculée en jours de calendrier");
+});
+
+test("le résumé de la semaine part du jour LOCAL, pas du jour UTC", () => {
+  // `toISOString()` bascule à minuit UTC : entre minuit et 2 h à Paris, « aujourd'hui »
+  // désignait la veille et la semaine envoyée au coach commençait par une séance passée.
+  const src = readFileSync("src/components/training/CalendarView.tsx", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  assert.ok(!/const aujourdhui = new Date\(\)\.toISOString\(\)/.test(src),
+    "le calendrier redéfinit « aujourd'hui » en UTC alors que le reste de l'écran est en local");
+  assert.ok(/const aujourdhui = jourLocal\(\)/.test(src), "jourLocal n'est plus utilisé");
+});
+
+test("une semaine de calendrier fait toujours 7 jours, changement d'heure compris", () => {
+  // La vérité que le code doit respecter, indépendamment de son implémentation.
+  const semaine = (lundi: string) => {
+    const d = new Date(lundi + "T00:00:00");
+    const fin = new Date(d); fin.setDate(d.getDate() + 7);
+    const ms = (fin.getTime() - d.getTime()) / 3600000;
+    return { heures: ms, jours: Math.round(ms / 24) };
+  };
+  // En UTC (l'environnement de test), toutes les semaines font 168 h — ce test vaut
+  // surtout par la MÉTHODE : `setDate` donne 7 jours quoi qu'il arrive au fuseau.
+  for (const lundi of ["2026-10-19", "2026-03-23", "2026-09-01"]) {
+    const { jours } = semaine(lundi);
+    assert.equal(jours, 7, `semaine du ${lundi} : ${jours} jours`);
+  }
+});
+
 console.log(`\n${passed} crash-test(s) du calendrier passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log(`  KO ${f}`); process.exit(1); }
