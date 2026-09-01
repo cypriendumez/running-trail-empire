@@ -66,3 +66,6 @@ public/brands/strava.svg
 # Polar retiré de la vitrine le 23/08/2026 : son logo est une marque déposée, il n'a
 # plus rien à faire en production. Ignoré car iCloud restaure ce dossier tout seul.
 public/brands/polar.svg
+
+# fichiers de travail jetables (audits ponctuels en base)
+/.scratch/

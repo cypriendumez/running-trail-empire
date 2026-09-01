@@ -84,6 +84,8 @@ export async function GET(req: Request) {
   let corrigees = 0, vues = 0, appariees = 0, ajoutees = 0;
   const details: { course: string; de: string; vers: string }[] = [];
   const ajouts: { course: string; km: number }[] = [];
+  let refusees = 0;
+  const erreurs: string[] = [];
 
   // Le formulaire ASP.NET exige un VIEWSTATE frais : on le reprend à chaque passage.
   const page = await fetch(RECHERCHE, { headers: entetes(), signal: AbortSignal.timeout(20000) }).catch(() => null);
@@ -172,7 +174,13 @@ export async function GET(req: Request) {
                   registration_url: c.registration_url,
                   latitude: c.latitude, longitude: c.longitude,
                 });
+                // ⚠️ UNE INSERTION REFUSÉE DOIT SE VOIR. Ce `if (!e)` seul a masqué
+                // pendant deux jours que `typePour` rendait des types absents de l'enum
+                // `race_type` : chaque semi et chaque marathon trouvés à la source
+                // étaient refusés par la base, le compteur restait à zéro sur ces
+                // lignes-là, et le rapport de fin annonçait un passage réussi.
                 if (!e) { ajoutees++; if (ajouts.length < 20) ajouts.push({ course: String(c.name), km: d }); }
+                else { refusees++; if (erreurs.length < 5) erreurs.push(`${c.name} ${d} km (${t}) : ${e.message}`); }
               }
             }
             await new Promise((r) => setTimeout(r, PAUSE_MS));
@@ -196,9 +204,9 @@ export async function GET(req: Request) {
   else await sb.from("notifications").insert(charge);
 
   return NextResponse.json({
-    ok: true, total: ids.length, demandees: tranche.length, traitees, examinees: vues,
-    appariees, corrigees, ajoutees, curseur: parcourus.suivant, secondes: Math.round((Date.now() - debut) / 1000),
-    details, ajouts,
+    ok: refusees === 0, total: ids.length, demandees: tranche.length, traitees, examinees: vues,
+    appariees, corrigees, ajoutees, refusees, curseur: parcourus.suivant, secondes: Math.round((Date.now() - debut) / 1000),
+    details, ajouts, erreurs,
   });
 }
 

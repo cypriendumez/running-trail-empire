@@ -21,7 +21,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { grouperEvenements, cleEvenement, normNom } from "../src/lib/races/groupes";
 import { idCourseValide } from "../src/lib/races/favoris";
 import { jourFrance } from "../src/lib/races/jourFrance";
-import { typeDepuisUrl, anneeDepuisUrl, choisirFiche, typeCorrige, motsCles, distancesDeFiche, distancesManquantes, typePour } from "../src/lib/races/leSportif";
+import { typeDepuisUrl, anneeDepuisUrl, choisirFiche, typeCorrige, motsCles, distancesDeFiche, distancesManquantes, typePour, segmentNom, motProche } from "../src/lib/races/leSportif";
 import { joursAvant, sansAccents, correspond, domaineSource, ficheVerifiable } from "../src/lib/races/temps";
 import { normaliserHeure, afficherHeure } from "../src/lib/races/heure";
 import { dateDeLaFiche, doitMettreAJour } from "../src/lib/races/fiche";
@@ -852,9 +852,9 @@ test("on ne corrige rien quand la source ne sait pas non plus", () => {
 
 test("la famille de route suit la distance, comme partout ailleurs", () => {
   assert.equal(typeCorrige("trail_s", "route", 5), "road_5k");
-  assert.equal(typeCorrige("trail_s", "route", 21.1), "road_half");
-  assert.equal(typeCorrige("trail_s", "route", 42.195), "road_marathon");
-  assert.equal(typeCorrige("road_10k", "trail", 100), "trail_xl");
+  assert.equal(typeCorrige("trail_s", "route", 21.1), "semi");
+  assert.equal(typeCorrige("trail_s", "route", 42.195), "marathon");
+  assert.equal(typeCorrige("road_10k", "trail", 100), "ultra");
 });
 
 test("les routes qui balaient la table lisent AU-DELÀ de 1 000 lignes", () => {
@@ -934,12 +934,37 @@ test("le type d'une distance AJOUTÉE se déduit du sport ET de la distance", ()
   // route/trail : « road_5k » face à une fiche de route lui paraissait cohérent, elle
   // rendait null, et mon repli ignorait la distance. Un semi de 21,1 km s'est retrouvé
   // enregistré en « road_5k », et un trail de 26 km aussi.
-  assert.equal(typePour("route", 21.1), "road_half");
+  assert.equal(typePour("route", 21.1), "semi");
   assert.equal(typePour("route", 10), "road_10k");
-  assert.equal(typePour("route", 42.2), "road_marathon");
+  assert.equal(typePour("route", 42.2), "marathon");
   assert.equal(typePour("trail", 26), "trail_s");
   assert.equal(typePour("trail", 60), "trail_l");
-  assert.equal(typePour("trail", 100), "trail_xl");
+  assert.equal(typePour("trail", 100), "ultra");
+});
+
+test("le type produit existe DANS L'ENUM de la base, sinon rien ne s'insère", () => {
+  // ⚠️ DÉFAUT SILENCIEUX MESURÉ EN BASE. `typePour` rendait « road_half » et
+  // « road_marathon » : deux noms que j'ai inventés, absents de l'enum `race_type`.
+  // PostgREST refusait l'insertion, le code ignorait l'erreur — donc AUCUN semi ni
+  // marathon trouvé à la source n'a jamais pu être ajouté au catalogue, et le rapport
+  // de fin annonçait quand même un passage réussi. Sans ce test, la seule façon de s'en
+  // apercevoir était de compter les semis manquants un par un.
+  const ENUM = new Set(["road_5k", "road_10k", "semi", "marathon", "trail_s", "trail_m", "trail_l", "trail_xl", "ultra"]);
+  for (const vu of ["route", "trail"] as const)
+    for (const d of [1, 5, 9, 15, 21.1, 30, 42.2, 55, 82, 110, 170]) {
+      const t = typePour(vu, d);
+      assert.ok(t && ENUM.has(t), `typePour(${vu}, ${d}) = ${t} — absent de l'enum race_type`);
+    }
+});
+
+test("l'enum attendu par les tests est bien celui de la migration", () => {
+  // Le test précédent compare à une liste recopiée : si la migration change, la copie
+  // doit changer avec elle, sinon le garde-fou garde une porte qui n'existe plus.
+  const sql = readFileSync("supabase/migrations/001_initial_schema.sql", "utf8");
+  const m = sql.match(/create type race_type as enum \(([^)]*)\)/);
+  assert.ok(m, "définition de race_type introuvable dans la migration");
+  const vraies = m![1].split(",").map((x) => x.trim().replace(/'/g, "")).sort().join(",");
+  assert.equal(vraies, "marathon,road_10k,road_5k,semi,trail_l,trail_m,trail_s,trail_xl,ultra");
 });
 
 test("un sport inconnu ne produit AUCUN type — donc aucune insertion", () => {
@@ -978,6 +1003,79 @@ test("un passage long s'arrête à l'échéance en sauvant son avancement", () =
   // Et le curseur doit refléter ce qui a été VRAIMENT parcouru.
   assert.ok(src.includes("trancheAVerifier(ids, etat.curseur ?? 0, traitees)"),
     "le curseur avance du lot DEMANDÉ et non du travail fait : les courses non traitées seraient sautées");
+});
+
+test("le CHEMIN DU SPORT ne fournit aucun mot à l'appariement", () => {
+  // ⚠️ FAUX IMPORT PROUVÉ EN BASE. Une URL le-sportif finit par le segment du sport :
+  // « /trail-course-nature/ ». En comparant l'URL ENTIÈRE, « Course Nature Via Agrippa »
+  // (Saint-Auvent, 87) trouvait « course » et « nature » dans ce chemin, sur N'IMPORTE
+  // quel trail. Elle a été appariée au « Saint-Jean-de-Védas Trail » (34) et en a
+  // importé les 8, 16 et 32 km — trois distances d'une course à 400 km de là.
+  assert.equal(segmentNom("/calendrier/230125/saint-jean-de-vedas-trail-2027/trail-course-nature/"),
+    "saint-jean-de-vedas-trail-2027");
+  assert.equal(choisirFiche(["/calendrier/230125/saint-jean-de-vedas-trail-2027/trail-course-nature/"],
+    { name: "Course Nature Via Agrippa", date: "2027-02-22" }), null,
+    "deux mots pris dans le chemin du sport ont suffi à importer les distances d'une autre course");
+});
+
+test("un mot du nom absent de la fiche interdit l'appariement", () => {
+  // ⚠️ « Les Foulées Lieu Saint Amandinoises » (59) a pris ses 5 et 10 km chez les
+  // « Foulées Saint-Pierroises » (58) : deux mots communs, « foulees » et « saint »,
+  // suffisaient. « lieu » et « amandinoises » — les deux qui désignent la course —
+  // étaient ignorés.
+  assert.equal(choisirFiche(["/calendrier/227031/foulees-saint-pierroises-2026-saint-pierre-le-moutier/course-a-pied-sur-route/"],
+    { name: "Les Foulées Lieu Saint Amandinoises", date: "2026-09-20" }), null);
+  // Et le cas fondateur : une course d'enfants n'est pas la course adulte du même lieu.
+  assert.equal(choisirFiche(["/calendrier/1/trail-d-antibes-2027/trail-course-nature/"],
+    { name: "Kids trail d'Antibes", date: "2027-03-20" }), null,
+    "sans le mot « kids », la fiche adulte aurait donné son 40 km à une course d'enfants");
+  assert.equal(choisirFiche(["/calendrier/229310/kids-trail-antibes-2027/trail-course-nature/"],
+    { name: "Kids trail d'Antibes", date: "2027-03-20" }),
+    "/calendrier/229310/kids-trail-antibes-2027/trail-course-nature/");
+});
+
+test("« st » vaut « saint », et le pluriel ne casse pas l'appariement", () => {
+  // Exiger le mot exact rejetait des appariements JUSTES : la source abrège
+  // « Saint-Saturnin » en « st-saturnin », et écrit parfois le singulier.
+  assert.ok(motProche("saint", "st") && motProche("foulee", "foulees") && motProche("amandinoise", "amandinoises"));
+  // …mais la tolérance reste bornée : sans la limite de deux lettres, « mont »
+  // avalerait « montigny » et l'exigence de mots entiers ne servirait plus à rien.
+  assert.ok(!motProche("mont", "montigny"));
+  assert.ok(!motProche("val", "vallee"), "trois lettres ne peuvent pas désigner un mot de six");
+  assert.equal(choisirFiche(["/calendrier/221248/corrida-de-noel-2026-st-saturnin/course-a-pied-sur-route/"],
+    { name: "Corrida de Noël de Saint-Saturnin", date: "2026-12-14" }),
+    "/calendrier/221248/corrida-de-noel-2026-st-saturnin/course-a-pied-sur-route/");
+});
+
+test("un mot de GENRE peut manquer de la fiche, un mot identifiant non", () => {
+  // Notre catalogue écrit « Trail La Cépienne » là où la source écrit « la-cepienne » :
+  // exiger « trail » rejetait un appariement pourtant juste (même ville, même année,
+  // 20 km présent à la source). Le mot de genre décrit le format, pas l'épreuve.
+  assert.equal(choisirFiche(["/calendrier/222665/la-cepienne-2026-st-jean-de-la-porte/trail-course-nature/"],
+    { name: "Trail La Cépienne", date: "2026-10-06" }),
+    "/calendrier/222665/la-cepienne-2026-st-jean-de-la-porte/trail-course-nature/");
+  // Mais un nom fait UNIQUEMENT de mots de genre n'identifie rien : on refuse plutôt
+  // que d'apparier au premier trail venu de la même ville.
+  assert.equal(choisirFiche(["/calendrier/9/le-grand-trail-2026-annecy/trail-course-nature/"],
+    { name: "Trail Nature", date: "2026-10-06" }), null);
+});
+
+test("une annotation entre parenthèses n'empêche pas l'appariement", () => {
+  // « Les Boucles Vauban (Decathlon) » : le sponsor est dans notre libellé, jamais dans
+  // le slug de la source. Sans ce nettoyage, la course perdait son semi.
+  assert.equal(choisirFiche(["/calendrier/9/les-boucles-vauban-2026-besancon/course-a-pied-sur-route/"],
+    { name: "Les Boucles Vauban (Decathlon)", date: "2026-09-20" }),
+    "/calendrier/9/les-boucles-vauban-2026-besancon/course-a-pied-sur-route/");
+});
+
+test("une insertion refusée par la base est SIGNALÉE, jamais avalée", () => {
+  // Commentaires retirés : sans cela le test se contenterait de sa propre explication.
+  const src = readFileSync("src/app/api/cron/races-types/route.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  assert.ok(src.includes("refusees++"), "une insertion refusée doit être comptée");
+  assert.ok(src.includes("ok: refusees === 0"),
+    "le rapport doit annoncer l'échec : c'est le `ok: true` inconditionnel qui a caché les types hors enum");
 });
 
 console.log(`\n${passed} crash-test(s) du catalogue passé(s), ${fails.length} échec(s)`);

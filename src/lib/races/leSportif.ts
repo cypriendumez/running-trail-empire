@@ -1,4 +1,6 @@
 import { normNom } from "./groupes";
+import { correctedRaceType } from "@/lib/raceType";
+import type { RaceType } from "@/types";
 
 /**
  * TROISIÈME SOURCE — le-sportif.com, pour corriger ce que les deux autres ont faux.
@@ -40,11 +42,61 @@ export function anneeDepuisUrl(url: unknown): string | null {
   return m ? m[1] : null;
 }
 
+/**
+ * Le SEGMENT DE NOM de la fiche, isolé du reste de l'URL.
+ *
+ * ⚠️ SANS CET ISOLEMENT, LE CHEMIN DU SPORT OFFRE DES MOTS GRATUITS. Une URL le-sportif
+ * s'écrit `/calendrier/{id}/{nom-annee-ville}/{sport}/`, et le segment de sport vaut
+ * « trail-course-nature », « course-a-pied-sur-route » ou « marche-gourmande ». Comparé
+ * à l'URL entière, « Course Nature Via Agrippa » trouvait « course » et « nature » dans
+ * le chemin de N'IMPORTE QUEL trail : deux mots communs sans qu'aucun ne vienne du nom
+ * de la course. Toute course nommée « Trail de X » ou « Course Nature X » pouvait ainsi
+ * s'apparier à une autre course de la même ville.
+ */
+export function segmentNom(url: unknown): string {
+  const parts = String(url ?? "").split("/").filter(Boolean);
+  // ["calendrier", "{id}", "{nom}", "{sport}"] — le nom est en troisième position.
+  return parts[0] === "calendrier" && parts.length >= 3 ? parts[2] : "";
+}
+
+/** « st » et « ste » sont la même chose que « saint » et « sainte » dans un slug. */
+const ABREGES: Record<string, string> = { st: "saint", ste: "sainte", sts: "saints" };
+
+/**
+ * Deux mots désignent-ils la même chose ? Égalité, ou préfixe à deux lettres près pour
+ * absorber le pluriel et le féminin (« foulee » / « foulees », « amandinoise » /
+ * « amandinoises »). L'écart est borné à deux : au-delà, « mont » avalerait
+ * « montigny » et rendrait l'exigence de mots complets inopérante.
+ */
+export function motProche(a: string, b: string): boolean {
+  const x = ABREGES[a] ?? a, y = ABREGES[b] ?? b;
+  if (x === y) return true;
+  const [court, long] = x.length <= y.length ? [x, y] : [y, x];
+  return court.length >= 4 && long.startsWith(court) && long.length - court.length <= 2;
+}
+
 /** Mots significatifs d'un nom de course, pour comparer deux libellés. */
 const VIDES = new Set(["de", "du", "des", "la", "le", "les", "l", "d", "et", "a", "au", "aux", "sur", "en"]);
 export function motsCles(nom: unknown): string[] {
-  return normNom(nom).split(" ").filter((m) => m.length > 2 && !VIDES.has(m));
+  // Les parenthèses portent le sponsor ou le lieu-dit, jamais l'identité de l'épreuve :
+  // « Les Boucles Vauban (Decathlon) » est la même course que « Les Boucles Vauban », et
+  // le slug de la source n'a évidemment pas le nom du sponsor.
+  const sansParentheses = String(nom ?? "").replace(/\([^)]*\)/g, " ");
+  return normNom(sansParentheses).split(" ").filter((m) => m.length > 2 && !VIDES.has(m));
 }
+
+/**
+ * Mots qui décrivent le FORMAT, pas l'identité de la course.
+ *
+ * ⚠️ CE N'EST PAS UNE LISTE DE MOTS COURANTS, C'EST UNE LISTE DE MOTS INTERCHANGEABLES.
+ * Notre catalogue écrit « Trail La Cépienne » là où la source écrit « la-cepienne » :
+ * exiger le mot « trail » rejetait un appariement pourtant juste. À l'inverse « kids »,
+ * « nocturne » ou « relais » ne sont PAS de ce genre — ce sont eux qui séparent deux
+ * épreuves d'un même week-end, et ils restent obligatoires. Mal remplir cette liste
+ * rouvre exactement la faille qu'on vient de fermer : n'y mettre qu'un mot dont
+ * l'absence ne change rien à l'épreuve désignée.
+ */
+const GENRES = new Set(["trail", "course", "courses", "nature", "marathon", "semi", "run", "running", "randonnee", "marche"]);
 
 /**
  * Choisit LA fiche qui correspond, ou rien.
@@ -64,13 +116,28 @@ export function choisirFiche(
   const annee = String(course.date ?? "").slice(0, 4);
   if (!/^20\d{2}$/.test(annee)) return null;
   const mots = motsCles(course.name);
-  if (!mots.length) return null;
+  // Les mots de genre peuvent manquer du slug ; tous les autres sont obligatoires. Une
+  // course qui n'aurait QUE des mots de genre (« Trail Nature ») n'identifie rien : on
+  // refuse plutôt que d'apparier au premier trail venu de la même ville.
+  const obligatoires = mots.filter((m) => !GENRES.has(m));
+  if (!obligatoires.length) return null;
 
   const retenus = (liens ?? []).filter((l) => {
     if (anneeDepuisUrl(l) !== annee) return false;
-    const slug = normNom(String(l).replace(/^\/calendrier\/\d+\//, "").replace(/\//g, " "));
-    const communs = mots.filter((m) => slug.includes(m)).length;
-    return mots.length === 1 ? communs === 1 : communs >= 2;
+    // On ne compare QUE le segment de nom, jamais le chemin du sport (cf. segmentNom).
+    const jetons = normNom(segmentNom(l)).split(" ").filter(Boolean);
+    // ⚠️ TOUS LES MOTS SIGNIFICATIFS, PAS DEUX. Avec un seuil à deux, « KIDS trail
+    //    d'Antibes » s'est apparié à la fiche « trail-d-antibes » : « trail » et
+    //    « antibes » suffisaient, et le mot qui distingue les deux courses — « kids » —
+    //    était ignoré. La course pour enfants a hérité d'un 40 km. Le mot en trop est
+    //    précisément celui qui compte : c'est lui qui sépare l'épreuve jeunes de
+    //    l'épreuve adulte, le nocturne du diurne, le relais de l'individuel.
+    //    Exiger TOUS les mots réduit le nombre d'appariements — c'est le but : mieux
+    //    vaut ne pas enrichir une course que l'enrichir avec les données d'une autre.
+    //    Et on compare des MOTS ENTIERS, pas des fragments : « Les Foulées Lieu Saint
+    //    Amandinoises » avait pris ses distances chez « Foulées Saint-Pierroises », à
+    //    400 km, sur la seule foi de « foulees » et « saint ».
+    return obligatoires.every((m) => jetons.some((j) => motProche(m, j)));
   });
   return retenus.length === 1 ? retenus[0] : null;
 }
@@ -92,24 +159,32 @@ export function choisirFiche(
  * base : un semi-marathon de 21,1 km rangé en « road_5k », et un trail de 26 km aussi.
  * Ici, le type se déduit des deux informations, sans repli.
  */
-export function typePour(vu: TypeSportif, distanceKm: number | null): string | null {
+export function typePour(vu: TypeSportif, distanceKm: number | null): RaceType | null {
   if (vu === "inconnu") return null;
   const d = Number(distanceKm) || 0;
-  if (vu === "trail") return d > 80 ? "trail_xl" : d > 50 ? "trail_l" : d > 30 ? "trail_m" : "trail_s";
-  if (d >= 40) return "road_marathon";
-  if (d >= 19) return "road_half";
+  if (!(d > 0)) return null;
+  // ⚠️ LES DEUX NOMS QUE J'AVAIS ÉCRITS N'EXISTENT PAS. Cette fonction rendait
+  // « road_half » et « road_marathon », absents de l'enum `race_type` de la base
+  // ('road_5k','road_10k','semi','marathon','trail_s','trail_m','trail_l','trail_xl',
+  // 'ultra'). PostgREST refusait l'insertion, le code ignorait l'erreur, et le compteur
+  // n'augmentait pas : AUCUN semi ni marathon trouvé à la source n'a jamais pu être
+  // ajouté, sans que rien ne le signale. C'est le défaut silencieux type : pas de
+  // plantage, pas de trace, juste une donnée qui n'arrive jamais.
+  if (vu === "trail") return correctedRaceType(d, "trail_s");
+  if (d >= 40) return "marathon";
+  if (d >= 19) return "semi";
   if (d >= 8) return "road_10k";
   return "road_5k";
 }
 
-export function typeCorrige(typeActuel: unknown, vu: TypeSportif, distanceKm: number | null): string | null {
+export function typeCorrige(typeActuel: unknown, vu: TypeSportif, distanceKm: number | null): RaceType | null {
   const t = String(typeActuel ?? "");
   if (vu === "inconnu" || !t) return null;
   const estTrail = t.startsWith("trail");
   if (vu === "trail" && estTrail) return null;
   if (vu === "route" && !estTrail) return null;
 
-  // Une seule table de correspondance dans ce fichier : deux copies divergeraient.
+  // Une seule table de correspondance : `correctedRaceType` fait foi pour les trails.
   return typePour(vu, distanceKm);
 }
 
