@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
+import { normaliserHeure } from "@/lib/races/heure";
 import { createClient } from "@/lib/supabase/server";
 import { emailEditeur } from "@/lib/admin/acces";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -22,11 +23,18 @@ export async function POST(req: Request) {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-  const body = await req.json().catch(() => ({})) as { race?: string; distanceKm?: number; targetTime?: string; raceDate?: string };
+  const body = await req.json().catch(() => ({})) as { race?: string; distanceKm?: number; targetTime?: string; raceDate?: string; startTime?: string };
   const race = String(body.race ?? "").trim().slice(0, 80);
   const distanceKm = Math.round(Number(body.distanceKm) * 100) / 100;
   const raceDate = String(body.raceDate ?? "").slice(0, 10);
   const targetSeconds = body.targetTime ? toSeconds(String(body.targetTime)) : null;
+  // ⚠️ FACULTATIVE, ET REFUSÉE PLUTÔT QUE DEVINÉE. Une heure de départ fausse est pire
+  //    qu'une heure absente : elle se planifie, et on rate son départ en s'y fiant.
+  //    Une saisie illisible n'enregistre donc RIEN, elle ne « corrige » pas.
+  const heureDepart = body.startTime ? normaliserHeure(body.startTime) : null;
+  if (body.startTime && !heureDepart) {
+    return NextResponse.json({ error: "Heure de départ invalide (ex. 9h30)" }, { status: 400 });
+  }
 
   if (!race) return NextResponse.json({ error: "Nom de la course requis" }, { status: 400 });
   if (!(distanceKm > 0) || distanceKm > 500) return NextResponse.json({ error: "Distance invalide" }, { status: 400 });
@@ -35,7 +43,7 @@ export async function POST(req: Request) {
 
   const admin = createAdminClient();
   // Écriture de l'objectif + re-synchronisation des séances (centralisé).
-  const data = await setRaceObjective(admin, user.id, { race, distanceKm, raceDate, targetSeconds });
+  const data = await setRaceObjective(admin, user.id, { race, distanceKm, raceDate, targetSeconds, heureDepart });
 
   // Alerte e-mail au coach (best-effort) — même pattern que /api/feedback.
   const RESEND_API_KEY = process.env.RESEND_API_KEY;

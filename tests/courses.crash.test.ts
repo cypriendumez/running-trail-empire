@@ -20,6 +20,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { grouperEvenements, cleEvenement } from "../src/lib/races/groupes";
 import { joursAvant, sansAccents, correspond, domaineSource } from "../src/lib/races/temps";
+import { normaliserHeure, afficherHeure } from "../src/lib/races/heure";
 import { trancheAVerifier, appliquerResultats, verdictDe, estSignalee, urlsSignalees, ETAT_VIDE } from "../src/lib/races/liens";
 
 let passed = 0;
@@ -363,6 +364,61 @@ test("aucune requête paginée ne balaie une table sans ordre stable", () => {
         `${f} : une pagination sans \`order\` — elle sautera des lignes en silence`);
     }
   }
+});
+
+console.log("\nHEURE DE DÉPART — refusée plutôt que devinée");
+
+test("les formes courantes d'une affiche de course sont acceptées", () => {
+  // On recopie l'heure depuis un mail d'organisateur : « 9h30 », « 9 h 30 », « 09:30 ».
+  for (const [saisi, attendu] of [["9h30", "09:30"], ["9 h 30", "09:30"], ["09:30", "09:30"],
+                                  ["9h", "09:00"], ["23:59", "23:59"], ["00:05", "00:05"]] as const) {
+    assert.equal(normaliserHeure(saisi), attendu, `« ${saisi} »`);
+  }
+});
+
+test("une heure impossible n'est JAMAIS corrigée en silence", () => {
+  // Une heure de départ fausse est pire qu'une heure absente : elle se planifie, et on
+  // rate son départ en s'y fiant. On refuse, on ne devine pas.
+  for (const v of ["24:00", "25:00", "9h60", "-1:00", "99h99", "midi", "9h30 ou 10h"]) {
+    assert.equal(normaliserHeure(v), null, `« ${v} » a été accepté`);
+  }
+});
+
+test("entrées vides ou corrompues : null, jamais une chaîne bancale", () => {
+  for (const v of ["", "   ", null, undefined, 42 as never, {} as never]) {
+    assert.equal(normaliserHeure(v as never), null, `${JSON.stringify(v)}`);
+    assert.equal(afficherHeure(v as never), null);
+  }
+});
+
+test("l'affichage français ne s'applique qu'à une heure valide", () => {
+  assert.equal(afficherHeure("9h30"), "9 h 30");
+  assert.equal(afficherHeure("09:05"), "9 h 05");
+  assert.equal(afficherHeure("24:00"), null, "une heure refusée est quand même affichée");
+});
+
+test("aucune colonne d'heure n'a été ajoutée au catalogue", () => {
+  // ⚠️ VÉRIFIÉ À LA SOURCE : la fiche finishers.com du Marathon de Lille publie
+  // `startDate: 2026-10-25` — une DATE, sans heure — et la page n'en contient aucune.
+  // Une colonne `start_time` sur `races` serait restée vide sur 17 027 lignes : le
+  // défaut « table jamais alimentée », qui finit par afficher un trou que rien ne
+  // signale. L'heure vit donc dans l'objectif de l'athlète, qui la connaît vraiment.
+  const src = readFileSync("src/app/api/races/sync/route.ts", "utf8");
+  assert.ok(!/start_time|startTime\s*:/.test(src),
+    "l'importateur écrit une heure que la source ne publie pas");
+});
+
+test("la synchronisation du catalogue est réellement déclenchée", () => {
+  // Elle n'était appelée par RIEN : la dernière course entrée en base datait du
+  // 10 juin 2026, soit trois mois de courses ignorées sans qu'un écran le signale.
+  const wf = readFileSync(".github/workflows/races-sync.yml", "utf8");
+  assert.ok(wf.includes("/api/races/sync"), "le workflow n'appelle plus la synchronisation");
+  assert.ok(wf.includes("schedule:"), "la synchronisation n'est plus planifiée");
+  // Hebdomadaire, pas quotidienne : on explore des sites tiers.
+  assert.ok(/cron: "\d+ \d+ \* \* 0"/.test(wf), "la cadence n'est plus hebdomadaire");
+  const route = readFileSync("src/app/api/races/sync/route.ts", "utf8");
+  assert.ok(route.includes("process.env.CRON_SECRET"),
+    "la route refuse le secret des tâches planifiées : le workflow ne pourra pas l'appeler");
 });
 
 console.log(`\n${passed} crash-test(s) du catalogue passé(s), ${fails.length} échec(s)`);

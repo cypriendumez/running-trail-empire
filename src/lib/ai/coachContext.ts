@@ -25,6 +25,9 @@ type SB = Awaited<ReturnType<typeof createClient>>;
 export type CoachObjective = {
   race: string; distanceKm: number; raceDate: string;
   targetSeconds: number; targetTime: string; targetPace: string;
+  /** Heure de départ « HH:MM », saisie par l'athlète. Absente du catalogue : les
+   *  agrégateurs qui l'alimentent ne publient pas d'heure (vérifié à la source). */
+  heureDepart?: string | null;
 };
 
 /**

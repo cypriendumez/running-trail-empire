@@ -10,6 +10,7 @@ import { RenfoGuide } from "@/components/training/RenfoGuide";
 import { fmtDistance, type UnitSystem } from "@/lib/units";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { jourLocal } from "@/lib/streak/compute";
+import { afficherHeure } from "@/lib/races/heure";
 import { extractBody, premierePhrase } from "@/lib/calendar/texte";
 import { libelleType } from "@/lib/ai/planI18n";
 import { AvisCoach } from "@/components/training/AvisCoach";
@@ -41,7 +42,7 @@ export type CalRace = { id: string; date: string; name: string; location: string
 export type CoachState = {
   at?: string; readiness?: "vert" | "jaune" | "orange" | "rouge"; reasons?: string[]; advice?: string;
   qBudget?: number; objective?: { race?: string; raceDate?: string; distanceKm?: number } | null;
-  daysToRace?: number | null; phase?: string | null;
+  daysToRace?: number | null; phase?: string | null; heureDepart?: string | null;
   plannedQuality?: string[]; nextWeekQuality?: string[]; targetKm?: number; longRunKm?: number;
   /** Réalisme de l'objectif : chrono hors de portée, préparation trop courte pour la
    *  distance visée. Affichés en clair — ils n'atteignaient jusqu'ici que l'IA. */
@@ -717,6 +718,10 @@ function CoachWhy({ state, lang, t, sessions }: { state: CoachState | null; lang
           <span className="font-semibold">{t("cal.why.objective")} :</span>{" "}
           {race}
           {raceDate && ` · ${new Date(raceDate + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "long", year: "numeric" })}`}
+          {/* L'heure de départ, quand l'athlète l'a saisie. Elle ne vient pas du
+              catalogue — les agrégateurs ne la publient pas — donc elle n'apparaît que
+              s'il la connaît vraiment. Voir `lib/races/heure`. */}
+          {afficherHeure(state.heureDepart) && ` · ${afficherHeure(state.heureDepart)}`}
           {dLeft != null && dLeft >= 0 && ` · ${t("cal.why.daysLeft", { n: dLeft })}`}
           {state.phase && ` · ${t("cal.why.phase")} ${state.phase}`}
         </p>

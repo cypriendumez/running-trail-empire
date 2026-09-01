@@ -249,6 +249,9 @@ export async function autoCoachForUser(
     // l'athlète de vérifier que son changement a bien été enregistré.
     objective: ctx.objective ? { race: ctx.objective.race, raceDate: ctx.objective.raceDate, distanceKm: ctx.objective.distanceKm } : null,
     daysToRace: ctx.daysToRace,
+    // Heure de départ saisie par l'athlète — absente du catalogue, les agrégateurs ne la
+    // publient pas. On la fait suivre jusqu'au calendrier, où elle sert vraiment.
+    heureDepart: ctx.objective?.heureDepart ?? null,
     phase: ctx.macroPlan[0]?.phase ?? null,
     plannedQuality: ctx.macroPlan[0]?.quality ?? [],
     nextWeekQuality: ctx.macroPlan[1]?.quality ?? [],

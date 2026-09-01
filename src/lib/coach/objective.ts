@@ -8,7 +8,9 @@ import { autoCoachForUser } from "@/lib/ai/autoCoach";
 //  et déclenche la même re-synchronisation des séances auto.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type ObjectiveInput = { race: string; distanceKm: number; raceDate: string; targetSeconds: number };
+export type ObjectiveInput = {
+  /** Heure de départ « HH:MM », saisie par l'athlète. `null` s'il ne l'a pas donnée. */
+  heureDepart?: string | null; race: string; distanceKm: number; raceDate: string; targetSeconds: number };
 export type ObjectiveData = ObjectiveInput & { targetTime: string; targetPace: string; ts: string };
 
 export const fmtObjectiveTime = (s: number) => {
@@ -38,6 +40,10 @@ export async function setRaceObjective(admin: SupabaseClient, userId: string, in
     race: input.race, distanceKm: input.distanceKm, raceDate: input.raceDate, targetSeconds: input.targetSeconds,
     targetTime: fmtObjectiveTime(input.targetSeconds),
     targetPace: fmtObjectivePace(input.targetSeconds / input.distanceKm),
+    // Heure de départ : SAISIE PAR L'ATHLÈTE, jamais importée. Les deux agrégateurs qui
+    // alimentent le catalogue ne la publient pas (vérifié à la source) ; elle vit donc
+    // ici, dans le JSON de l'objectif, et reste absente tant qu'il ne l'a pas donnée.
+    heureDepart: input.heureDepart ?? null,
     ts: new Date().toISOString(),
   };
 

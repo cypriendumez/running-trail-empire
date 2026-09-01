@@ -9,7 +9,7 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 import type { AvertissementAge as Avertissement } from "@/lib/coach/ageDistance";
 
 export type Objective = {
-  race: string; distanceKm: number; raceDate: string;
+  race: string; distanceKm: number; raceDate: string; heureDepart?: string | null;
   targetSeconds: number; targetTime: string; targetPace: string;
 };
 
@@ -48,6 +48,12 @@ export function ObjectiveCard({ objective, currentVma }: { objective: Objective 
   const [tm, setTm] = useState(s0 ? String(Math.floor((s0 % 3600) / 60)) : "");
   const [ts, setTs] = useState(s0 % 60 ? String(s0 % 60) : "");
   const [date, setDate] = useState(objective?.raceDate ?? "");
+  // ⚠️ SAISIE PAR L'ATHLÈTE, JAMAIS IMPORTÉE. Les deux agrégateurs qui alimentent le
+  //    catalogue ne publient pas l'heure de départ — vérifié à la source : la fiche du
+  //    Marathon de Lille donne `startDate: 2026-10-25`, sans heure. Elle est pourtant
+  //    dans le mail d'inscription de l'athlète. Facultative : un champ vide vaut mieux
+  //    qu'une heure devinée, qu'on planifierait et sur laquelle on raterait son départ.
+  const [heure, setHeure] = useState(objective?.heureDepart ?? "");
   const [saving, setSaving] = useState(false);
   /** Avertissements liés à l'âge, renvoyés par l'API au moment de l'enregistrement.
    *  Affichés SOUS l'objectif, et refermables : c'est une information, pas une punition. */
@@ -90,7 +96,7 @@ export function ObjectiveCard({ objective, currentVma }: { objective: Objective 
     try {
       const r = await fetch("/api/objective", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ race: race.trim(), distanceKm: Number(distance), targetTime: `${Number(th) || 0}:${Number(tm) || 0}:${Number(ts) || 0}`, raceDate: date }),
+        body: JSON.stringify({ race: race.trim(), distanceKm: Number(distance), targetTime: `${Number(th) || 0}:${Number(tm) || 0}:${Number(ts) || 0}`, raceDate: date , startTime: heure || undefined}),
       });
       const j = await r.json();
       if (j.ok) {
@@ -239,6 +245,11 @@ export function ObjectiveCard({ objective, currentVma }: { objective: Objective 
           <label className="block">
             <span className="mb-1 block text-xs font-semibold text-zinc-600">{t("obj.date")}</span>
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold text-zinc-600">{t("obj.startTime")}</span>
+            <input type="time" value={heure} onChange={(e) => setHeure(e.target.value)} className={inputCls} />
+            <span className="mt-1 block text-[11px] leading-snug text-zinc-400">{t("obj.startTimeHint")}</span>
           </label>
         </div>
 

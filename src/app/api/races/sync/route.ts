@@ -667,8 +667,19 @@ export async function DELETE(req: Request) {
 // ─── POST: trigger sync ─────────────────────────────────────────────────────
 export async function POST(req: Request) {
   // Route de MAINTENANCE : elle écrit avec la clé service_role.
-  const denied = await denyIfNotAdmin(req);
-  if (denied) return NextResponse.json({ error: denied }, { status: 403 });
+  //
+  // ⚠️ ELLE ACCEPTE AUSSI LE `CRON_SECRET`, ET C'EST NÉCESSAIRE. Cette synchronisation
+  //    n'était appelée par RIEN — ni cron, ni workflow : la dernière course entrée en
+  //    base datait du 10 juin 2026, soit près de trois mois de courses annoncées,
+  //    reportées ou annulées que le catalogue ignorait. Le garde-fou administrateur
+  //    suppose une session de navigateur, qu'un workflow n'a pas ; le `CRON_SECRET` est
+  //    déjà le niveau de confiance des autres tâches planifiées de l'app.
+  const secret = process.env.CRON_SECRET;
+  const parCron = !!secret && req.headers.get("authorization") === `Bearer ${secret}`;
+  if (!parCron) {
+    const denied = await denyIfNotAdmin(req);
+    if (denied) return NextResponse.json({ error: denied }, { status: 403 });
+  }
   const body = await req.json().catch(() => ({}));
   const wpPages = Math.min(body.pages || 25, 113);
   const wpStartPage = Math.max(body.startPage || 1, 1);

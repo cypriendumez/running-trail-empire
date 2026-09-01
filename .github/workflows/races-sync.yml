@@ -1,0 +1,59 @@
+# ──────────────────────────────────────────────────────────────────────────────
+#  SYNCHRONISATION DU CATALOGUE DE COURSES — une fois par semaine.
+#
+#  POURQUOI CE WORKFLOW EXISTE : la route de synchronisation n'était appelée par
+#  RIEN. Constaté le 01/09/2026 — la dernière course entrée en base datait du
+#  10 JUIN 2026. Près de trois mois de courses annoncées, reportées ou annulées
+#  que le catalogue ignorait, sans qu'aucun écran ne le signale.
+#
+#  POURQUOI HEBDOMADAIRE ET PAS QUOTIDIEN : cette route EXPLORE DES SITES TIERS.
+#  Un calendrier de courses françaises bouge de quelques dizaines de lignes par
+#  semaine, pas par heure — interroger plus souvent ne rapporterait rien et
+#  ferait porter une charge inutile sur des sites qui ne nous doivent rien.
+#  Le dimanche à 3 h 20 UTC : trafic minimal côté source, et le catalogue est à
+#  jour pour la semaine d'entraînement qui commence.
+#
+#  BORNÉ : `pages: 25` limite l'exploration paginée. Ce n'est pas un réglage de
+#  performance mais une limite de politesse — le maximum accepté par la route
+#  est 113, on ne s'en approche pas.
+#
+#  SECRETS REQUIS : les mêmes que les autres workflows, rien à créer.
+# ──────────────────────────────────────────────────────────────────────────────
+name: Synchronisation du catalogue de courses
+
+on:
+  schedule:
+    - cron: "20 3 * * 0"
+  workflow_dispatch:
+
+concurrency:
+  group: races-sync
+  cancel-in-progress: false
+
+jobs:
+  synchroniser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Synchroniser le catalogue
+        env:
+          PACEVO_URL: ${{ secrets.PACEVO_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PACEVO_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::PACEVO_URL ou CRON_SECRET manquant dans les secrets du dépôt."
+            exit 1
+          fi
+          reponse=$(curl -sS --max-time 900 -w '\n%{http_code}' -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            -d '{"pages":25}' \
+            "${PACEVO_URL}/api/races/sync")
+          corps=$(printf '%s' "$reponse" | sed '$d')
+          code=$(printf '%s' "$reponse" | tail -n1)
+          echo "$corps"
+          if [ "$code" != "200" ]; then
+            echo "::error::La synchronisation a répondu $code."
+            exit 1
+          fi
