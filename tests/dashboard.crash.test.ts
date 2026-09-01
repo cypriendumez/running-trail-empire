@@ -16,6 +16,7 @@ import { computeHrZones } from "../src/lib/dashboard/zones";
 import { computeLoad, estimateTSS } from "../src/lib/dashboard/charge";
 import { computeDistancePRs } from "../src/lib/dashboard/records";
 import { computeForme, butDe } from "../src/lib/dashboard/forme";
+import { decaleJour } from "../src/lib/streak/compute";
 
 let passed = 0;
 const fails: string[] = [];
@@ -23,7 +24,17 @@ function test(name: string, fn: () => void) {
   try { fn(); passed++; console.log(`  ✓ ${name}`); }
   catch (e) { fails.push(`${name} — ${(e as Error).message.split("\n")[0]}`); console.log(`  ✗ ${name}`); }
 }
-const jour = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+// ⚠️ LES DATES DE TEST DOIVENT SE COMPTER COMME LE CODE LES COMPTE. Ce helper utilisait
+// `toISOString()`, c'est-à-dire le jour UTC, alors que les calculs du tableau de bord
+// raisonnent en jours LOCAUX depuis qu'on a retiré les trois définitions du mot « jour ».
+// Passé minuit à Paris et pas encore à Londres, les deux divergent d'un cran : la série
+// se terminait la VEILLE du jour courant, laissant une journée vide en bout de course.
+// L'ATL, de constante 7 jours, tombait alors à 51,4 au lieu de 60 — et le test rougissait
+// pour une raison qui n'avait rien à voir avec le code qu'il surveille.
+// Jour de référence FIGÉ : ce fichier ne doit pas donner un résultat différent selon
+// l'heure à laquelle on le lance.
+const AUJOURD_HUI = "2026-09-02";
+const jour = (n: number) => decaleJour(AUJOURD_HUI, -n);
 const sain = (v: number) => Number.isFinite(v) && !Number.isNaN(v);
 
 console.log("\nZONES — le temps en zone ne s'invente pas");
@@ -95,7 +106,7 @@ test("une date illisible ne fait pas exploser le calcul", () => {
 console.log("\nCHARGE — un modèle qui ne suppose aucune forme de départ");
 
 test("sans aucune séance, la charge est nulle — pas « 40 par défaut »", () => {
-  const l = computeLoad([]);
+  const l = computeLoad([], AUJOURD_HUI);
   assert.equal(Math.round(l.ctl), 0, `CTL ${l.ctl} sur un historique vide : une amorce est revenue`);
   assert.equal(Math.round(l.atl), 0, `ATL ${l.atl} sur un historique vide`);
   assert.equal(Math.round(l.tsb), 0);
@@ -107,8 +118,8 @@ test("l'amorce ne pèse plus rien : deux longueurs d'historique donnent le même
   // même mois d'entraînement doit donner le même CTL, qu'on l'ait précédé de 60 jours
   // de repos ou de 300.
   const mois = Array.from({ length: 30 }, (_, i) => ({ date: jour(i), tss: 80 }));
-  const court = computeLoad([...mois, { date: jour(60), tss: 0 }]);
-  const long = computeLoad([...mois, { date: jour(360), tss: 0 }]);
+  const court = computeLoad([...mois, { date: jour(60), tss: 0 }], AUJOURD_HUI);
+  const long = computeLoad([...mois, { date: jour(360), tss: 0 }], AUJOURD_HUI);
   assert.ok(Math.abs(court.ctl - long.ctl) < 0.5,
     `la longueur de la mise en route change encore le CTL : ${court.ctl.toFixed(1)} vs ${long.ctl.toFixed(1)}`);
 });
@@ -117,15 +128,15 @@ test("le TSS de la montre est utilisé tel quel, et les estimations sont compté
   const l = computeLoad([
     { date: jour(1), tss: 100 },
     { date: jour(2), tss: null, type: "easy", duration_seconds: 3600 },
-  ]);
+  ], AUJOURD_HUI);
   assert.equal(l.estimees, 1, "une séance estimée n'est pas déclarée comme telle");
-  const l2 = computeLoad([{ date: jour(1), tss: 100 }]);
+  const l2 = computeLoad([{ date: jour(1), tss: 100 }], AUJOURD_HUI);
   assert.equal(l2.estimees, 0, "une séance mesurée est comptée comme estimée");
 });
 
 test("deux séances le même jour s'additionnent, elles ne s'écrasent pas", () => {
-  const un = computeLoad([{ date: jour(1), tss: 100 }]);
-  const deux = computeLoad([{ date: jour(1), tss: 50 }, { date: jour(1), tss: 50 }]);
+  const un = computeLoad([{ date: jour(1), tss: 100 }], AUJOURD_HUI);
+  const deux = computeLoad([{ date: jour(1), tss: 50 }, { date: jour(1), tss: 50 }], AUJOURD_HUI);
   assert.ok(Math.abs(un.ctl - deux.ctl) < 1e-9, "une double séance perd la moitié de sa charge");
 });
 
@@ -136,7 +147,7 @@ test("valeurs hostiles : TSS négatif, énorme, NaN, date absurde", () => {
     { date: jour(3), tss: NaN },
     { date: "pas-une-date", tss: 100 },
     { date: jour(4), tss: null, type: null, duration_seconds: null },
-  ]);
+  ], AUJOURD_HUI);
   for (const [k, v] of Object.entries({ ctl: l.ctl, atl: l.atl, tsb: l.tsb })) {
     assert.ok(sain(v), `${k} vaut ${v} sur des entrées corrompues`);
   }

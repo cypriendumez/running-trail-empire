@@ -39,6 +39,12 @@ export type LoadMetrics = { ctl: number; atl: number; tsb: number };
 //    pour pouvoir le DIRE au lieu de le taire.
 export function computeLoad(
   workouts: { date: string; tss?: number | null; type?: string | null; duration_seconds?: number | null }[],
+  /** Jour de référence « AAAA-MM-JJ ». Paramétrable UNIQUEMENT pour les tests : sans lui
+   *  ce calcul dépend de l'heure réelle, et le crash-test de convergence rougissait au
+   *  passage de minuit — le jour LOCAL avait basculé, pas le jour UTC avec lequel le test
+   *  construisait ses dates. Un test qui rougit selon l'heure qu'il est n'apprend rien :
+   *  on finit par le relancer jusqu'à ce qu'il passe. */
+  aujourdhuiRef?: string,
 ): { ctl: number; atl: number; tsb: number; history: LoadMetrics[]; estimees: number } {
   const K_CTL = 42; // jours
   const K_ATL = 7;  // jours
@@ -50,7 +56,7 @@ export function computeLoad(
   //    d'entraînement d'un athlète parisien basculait à 02 h du matin : entre minuit
   //    et 2 h, la Fatigue (constante 7 jours) passait de 57 à 49 et le verdict de
   //    charge changeait sous les yeux du lecteur. Voir `fenetre.ts`.
-  const aujourdhui = jourLocal();
+  const aujourdhui = aujourdhuiRef ?? jourLocal();
   for (const w of workouts) {
     const jour = String(w.date).slice(0, 10);
     // ⚠️ `w.tss ?? estimateTSS(w)` NE PROTÉGEAIT PAS DE NaN : l'opérateur `??` ne

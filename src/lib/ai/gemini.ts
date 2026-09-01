@@ -56,7 +56,10 @@ const DEFAULT_MODELS = (process.env.GEMINI_MODELS ?? "gemini-2.5-flash,gemini-2.
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export type GeminiResult =
-  | { ok: true; text: string; model: string }
+  | { ok: true; text: string; model: string;
+      /** Sources réellement consultées quand l'appel utilisait la recherche web.
+       *  Vide sans recherche. Sert à VÉRIFIER une réponse plutôt qu'à la croire. */
+      sources?: string[] }
   /** `dailyExhausted` : plus AUCUN modèle n'a de quota jusqu'à minuit au Pacifique.
    *  Permet à l'appelant de dire « revenez demain » plutôt que « réessayez ». */
   | { ok: false; error: string; status: number; dailyExhausted?: boolean };
@@ -71,7 +74,10 @@ type GenConfig = Record<string, unknown>;
 export async function generateContent(
   contents: unknown,
   generationConfig: GenConfig,
-  opts: { models?: string[]; retriesPerModel?: number } = {},
+  /** `tools` : passé tel quel à l'API. Sert à activer la recherche web
+   *  (`[{ google_search: {} }]`), la seule façon d'obtenir une information qui n'existe
+   *  ni dans notre base ni dans les connaissances figées du modèle. */
+  opts: { models?: string[]; retriesPerModel?: number; tools?: unknown } = {},
 ): Promise<GeminiResult> {
   // Lue À L'APPEL et non au chargement du module : c'est ce qui rend la chaîne
   // testable sans réseau, et ça reste exact en serverless (l'environnement est prêt).
@@ -114,7 +120,7 @@ export async function generateContent(
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ contents, generationConfig }),
+            body: JSON.stringify(opts.tools ? { contents, generationConfig, tools: opts.tools } : { contents, generationConfig }),
           },
         );
 
@@ -128,7 +134,15 @@ export async function generateContent(
             // Le modèle répond : tout marqueur le concernant était périmé ou erroné.
             // C'est ce qui rattrape une détection trop zélée — la sonde a servi.
             quota.marks.delete(model);
-            return { ok: true, text, model };
+            // Sources réellement consultées, quand la recherche web était activée. On les
+            // remonte parce qu'une réponse trouvée sur le web sans source vérifiable ne
+            // vaut pas mieux qu'une invention : c'est ce qui permet à l'appelant de la
+            // refuser, et à l'athlète d'aller vérifier lui-même.
+            const chunks = data?.candidates?.[0]?.groundingMetadata?.groundingChunks ?? [];
+            const sources: string[] = chunks
+              .map((c: { web?: { uri?: string; title?: string } }) => c?.web?.title || c?.web?.uri || "")
+              .filter((x: string) => !!x);
+            return { ok: true, text, model, sources };
           }
           // Réponse vide (filtre de sécurité, etc.) → on tente le modèle suivant.
           lastErr = "Réponse vide du modèle.";

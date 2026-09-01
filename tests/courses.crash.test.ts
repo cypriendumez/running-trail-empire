@@ -22,6 +22,7 @@ import { grouperEvenements, cleEvenement } from "../src/lib/races/groupes";
 import { joursAvant, sansAccents, correspond, domaineSource } from "../src/lib/races/temps";
 import { normaliserHeure, afficherHeure } from "../src/lib/races/heure";
 import { dateDeLaFiche, doitMettreAJour } from "../src/lib/races/fiche";
+import { analyserReponse, promptHeure, MARQUEUR_INCONNU } from "../src/lib/races/heureWeb";
 import { trancheAVerifier, appliquerResultats, verdictDe, estSignalee, urlsSignalees, ETAT_VIDE } from "../src/lib/races/liens";
 
 let passed = 0;
@@ -478,6 +479,63 @@ test("le marqueur « date à venir » est bien remplacé par une vraie date futu
 test("une date identique n'écrit rien", () => {
   assert.equal(doitMettreAJour("2026-10-25", "2026-10-25", "2026-09-01"), false);
   assert.equal(doitMettreAJour(null, null, "2026-09-01"), false);
+});
+
+console.log("\nHEURE CHERCHÉE SUR LE WEB — enregistrée seulement si elle est prouvée");
+
+test("une heure claire ET sourcée est retenue", () => {
+  for (const t of ["09:30", "9h30", "8 h 30"]) {
+    const v = analyserReponse(t, ["finishers.com", "lille.fr"]);
+    assert.equal(v.retenue, true, `« ${t} » refusé`);
+  }
+});
+
+test("une heure SANS SOURCE est refusée, même parfaitement formée", () => {
+  // Une réponse sans source consultée est une réponse de mémoire — donc une invention
+  // possible. Le modèle sonne aussi sûr dans les deux cas : seule la source distingue.
+  assert.deepEqual(analyserReponse("09:30", []), { retenue: false, motif: "sans_source" });
+  assert.deepEqual(analyserReponse("09:30", undefined), { retenue: false, motif: "sans_source" });
+});
+
+test("« INCONNU » est une réponse ACCEPTABLE, pas un échec", () => {
+  // C'est le cas le plus fréquent tant que l'organisateur n'a rien publié. Essai réel
+  // du 01/09/2026 : l'heure du marathon de Lille n'était pas encore communiquée.
+  const v = analyserReponse(MARQUEUR_INCONNU, ["a"]);
+  assert.equal(v.retenue, false);
+  assert.equal((v as { motif: string }).motif, "inconnu");
+});
+
+test("une PHRASE n'est jamais enregistrée comme une heure", () => {
+  // « probablement vers 9h » ne survit pas au stockage : on enregistrerait une
+  // supposition comme un fait, et l'athlète planifierait dessus.
+  for (const t of ["Le départ est probablement vers 9h", "vers 9h30 je pense",
+                   "9h30 pour le semi, inconnu pour le marathon"]) {
+    assert.equal(analyserReponse(t, ["a"]).retenue, false, `« ${t} » accepté`);
+  }
+});
+
+test("une heure impossible reste refusée même sourcée", () => {
+  for (const t of ["25:00", "9h60", "-1:00"]) {
+    assert.equal(analyserReponse(t, ["a"]).retenue, false, `« ${t} » accepté`);
+  }
+});
+
+test("le prompt autorise explicitement le modèle à dire qu'il ne sait pas", () => {
+  const p = promptHeure({ race: "Marathon de Lille", raceDate: "2026-10-25", distanceKm: 42.2 });
+  assert.ok(p.includes(MARQUEUR_INCONNU), "le modèle n'a pas d'échappatoire : il inventera");
+  assert.ok(/n'invente jamais/i.test(p), "l'interdiction d'inventer a disparu du prompt");
+  assert.ok(p.includes("42.2 km"), "le format demandé n'est pas précisé : on prendrait l'heure d'une autre distance");
+});
+
+test("la recherche web est réellement activée, sinon le modèle répond de mémoire", () => {
+  const src = readFileSync("src/app/api/cron/heure-depart/route.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  assert.ok(src.includes("google_search"), "sans recherche web, le modèle invente une heure plausible");
+  assert.ok(src.includes("out.sources"), "les sources ne sont plus vérifiées");
+  // On n'écrase jamais ce que l'athlète a saisi lui-même.
+  assert.ok(src.includes("if (o.heureDepart) continue;"),
+    "la recherche écrase une heure saisie par l'athlète, qui en sait plus qu'elle");
 });
 
 console.log(`\n${passed} crash-test(s) du catalogue passé(s), ${fails.length} échec(s)`);

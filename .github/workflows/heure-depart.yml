@@ -1,0 +1,54 @@
+# ──────────────────────────────────────────────────────────────────────────────
+#  HEURE DE DÉPART DES COURSES — recherchée seule, tous les jours.
+#
+#  POURQUOI : aucune des sources du catalogue ne publie l'heure de départ.
+#  finishers.com donne `startDate: 2026-10-25` (une date), son API répond 401, et
+#  sa fiche ne pointe même pas vers le site de l'organisateur ; jogging-plus est
+#  passé derrière un défi anti-robot. L'information existe pourtant sur le web.
+#
+#  La route interroge le modèle AVEC RECHERCHE WEB, une course à la fois — celle
+#  que l'athlète prépare. Elle n'écrit que si la réponse est une heure lisible ET
+#  accompagnée de sources réellement consultées, et s'arrête dès qu'elle a trouvé.
+#
+#  QUOTIDIEN, et une seule recherche par objectif et par jour : un organisateur ne
+#  publie pas deux fois dans la même journée, et le quota du modèle est partagé
+#  avec tout le reste de l'app.
+#
+#  SECRETS REQUIS : les mêmes que les autres workflows, rien à créer.
+# ──────────────────────────────────────────────────────────────────────────────
+name: Heure de départ des courses
+
+on:
+  schedule:
+    - cron: "50 5 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: heure-depart
+  cancel-in-progress: false
+
+jobs:
+  chercher:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Chercher les heures de départ manquantes
+        env:
+          PACEVO_URL: ${{ secrets.PACEVO_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PACEVO_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::PACEVO_URL ou CRON_SECRET manquant dans les secrets du dépôt."
+            exit 1
+          fi
+          reponse=$(curl -sS --max-time 600 -w '\n%{http_code}' \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${PACEVO_URL}/api/cron/heure-depart")
+          corps=$(printf '%s' "$reponse" | sed '$d')
+          code=$(printf '%s' "$reponse" | tail -n1)
+          echo "$corps"
+          if [ "$code" != "200" ]; then
+            echo "::error::La recherche a répondu $code."
+            exit 1
+          fi
