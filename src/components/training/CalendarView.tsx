@@ -5,11 +5,11 @@ import { toast } from "sonner";
 import {
   Target, X, Plus, StickyNote, Flag, Loader2, Trash2,
   ChevronLeft, ChevronRight, LayoutGrid, List, CalendarRange,
-  CalendarDays, CalendarClock, ListChecks, ArrowLeft, Sparkles,
-} from "lucide-react";
+  CalendarDays, CalendarClock, ListChecks, ArrowLeft, Sparkles, ChevronDown } from "lucide-react";
 import { RenfoGuide } from "@/components/training/RenfoGuide";
 import { fmtDistance, type UnitSystem } from "@/lib/units";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { extractBody, premierePhrase } from "@/lib/calendar/texte";
 import { libelleType } from "@/lib/ai/planI18n";
 import { AvisCoach } from "@/components/training/AvisCoach";
 
@@ -85,38 +85,13 @@ const typeColor = (t: string) => CAT_COLOR[categoryOf(t)];
 const isRenfo = (t: string) => categoryOf(t) === "renfo";
 const fmtKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-// Extrait le CORPS d'une séance : retire un éventuel échauffement en tête et un retour au calme en queue
-// (séparés par →), en recollant les fragments de simple progression de zone (« … FC Z1 → Z2 »).
-function stripBodyLabel(s: string): string {
-  return (s || "").replace(/^(?:corps(?:\s+de\s+s[ée]ance)?|main\s*set|hauptteil|parte\s+principal)\s*[:：]?\s*/i, "").trim();
-}
-function extractBody(raw: string): string {
-  let segs = raw.split("→").map((x) => x.trim()).filter(Boolean);
-  // Recolle « Z1 → Z2 » (progression interne d'une phase) au segment précédent — ce n'est pas une étape à part.
-  const merged: string[] = [];
-  for (const seg of segs) {
-    if (merged.length && /^z\d(?:\s*[-–]\s*z?\d)?$/i.test(seg)) merged[merged.length - 1] += ` → ${seg}`;
-    else merged.push(seg);
-  }
-  segs = merged;
-  if (segs.length <= 1) return stripBodyLabel(segs[0] ?? raw);
-  const isWarm = (x: string) => /échauff|warm[- ]?up|aufwärm|calent|aquec/i.test(x);
-  const isCool = (x: string) => /retour au calme|cool[- ]?down|auslauf|vuelta a la calma|retorno|à la calma|\bcalma\b/i.test(x);
-  let lo = 0, hi = segs.length - 1;
-  if (isWarm(segs[lo])) {
-    lo++;
-    while (lo < hi && /^z\d/i.test(segs[lo])) lo++; // absorbe la suite de l'échauffement (« Z2 + lignes droites »)
-  }
-  if (hi > lo && isCool(segs[hi])) hi--;
-  const mid = segs.slice(lo, hi + 1);
-  return stripBodyLabel((mid.length ? mid : segs).join(" → "));
-}
 
 // Détail d'une séance prêt à afficher. Comme la montre (cf. intervals.ts → stepsForType), pour une course
 // on reconstruit échauffement (FC, durée du profil) + corps + retour au calme (FC, durée du profil).
 type SessionDetail =
   | { mode: "plain"; text: string }     // repos / renfo : un seul bloc
   | { mode: "wrapped"; body: string };  // course : échauffement/retour au calme reconstruits autour du corps
+
 function sessionDetail(type: string, detail: string): SessionDetail | null {
   const raw = (detail || "").trim();
   if (!raw) return null;
@@ -297,7 +272,23 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
             )}
           </div>
           <div className={`font-bold leading-tight text-zinc-800 ${dense ? "line-clamp-2 text-[11.5px]" : "text-sm"}`}>{s.title}</div>
-          {s.detail && <div className={`mt-0.5 whitespace-pre-line leading-snug text-zinc-500 ${dense ? "line-clamp-3 text-[10px]" : "text-xs"}`}>{s.detail}</div>}
+          {/* ⚠️ EN VUE MOIS, ON AFFICHAIT LA PROSE ENTIÈRE, COUPÉE À 3 LIGNES. Or toute
+              séance de course commence par le même échauffement reconstruit
+              (« Échauffement 20 min progressif FC Z1→Z2 + 3 à 5 lignes droites… ») : les
+              trois lignes visibles étaient donc IDENTIQUES d'une case à l'autre, et la
+              coupure tombait juste avant ce qui les distingue. Mesuré sur cette page :
+              369 des 798 mots — 46 % — dans huit blocs dont aucun n'était lisible
+              jusqu'au bout, pour 328 px de hauteur.
+              On montre le CORPS de la séance, que `extractBody` sait déjà isoler pour la
+              vue détaillée : c'est la seule partie qui varie, et deux lignes suffisent.
+              La prose complète reste accessible au clic, comme le dit l'en-tête. */}
+          {s.detail && (() => {
+            const resume = dense ? (sessionDetail(s.type, s.detail)?.mode === "wrapped"
+              ? extractBody(s.detail) : s.detail) : s.detail;
+            return resume ? (
+              <div className={`mt-0.5 whitespace-pre-line leading-snug text-zinc-500 ${dense ? "line-clamp-2 text-[10px]" : "text-xs"}`}>{resume}</div>
+            ) : null;
+          })()}
           {s.tags.length > 0 && <div className="mt-1 flex flex-wrap gap-0.5">{s.tags.slice(0, dense ? 3 : 6).map((tg) => <span key={tg} className={`rounded bg-white/70 px-1 py-px font-semibold text-zinc-500 ${dense ? "text-[8.5px]" : "text-[10px]"}`}>{tg}</span>)}</div>}
         </div>
       </div>
@@ -741,15 +732,29 @@ function CoachWhy({ state, lang, t, sessions }: { state: CoachState | null; lang
       {/* Réalisme de l'objectif — encadré à part, en rouge : ce n'est pas une nuance du
           plan de la semaine mais un constat sur la préparation entière. Il ne quittait
           jusqu'ici jamais le prompt de l'IA. */}
+      {/* ⚠️ 113 MOTS AFFICHÉS À CHAQUE VISITE, soit 20 % de toute la page — mesuré.
+          C'est un constat sur la préparation entière, pas une nuance de la semaine : il
+          ne change pas d'un jour à l'autre, et on le relit donc en pure perte une fois
+          qu'on l'a lu. On ne le SUPPRIME pas pour autant : c'est de la mise en garde,
+          et la masquer serait pire que la répéter. La première phrase — celle qui porte
+          l'avertissement — reste toujours visible ; le raisonnement se déplie au clic. */}
       {warnings.length > 0 && (
-        <div className="mt-3 rounded-xl border border-red-200 bg-red-50/80 px-3.5 py-3">
-          <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-red-700">
-            <Flag className="h-3.5 w-3.5" /> {t("cal.why.realism")}
-          </div>
+        <details className="group mt-3 rounded-xl border border-red-200 bg-red-50/80 px-3.5 py-3">
+          <summary className="cursor-pointer list-none">
+            <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-red-700">
+              <Flag className="h-3.5 w-3.5" /> {t("cal.why.realism")}
+              <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
+            </span>
+            {/* La phrase clé, seule, quand c'est replié. `group-open:hidden` évite de la
+                répéter juste au-dessus du texte complet une fois déplié. */}
+            <span className="mt-1.5 block text-sm leading-relaxed text-red-900 group-open:hidden">
+              {premierePhrase(warnings[0])}
+            </span>
+          </summary>
           <ul className="mt-1.5 space-y-1.5 text-sm leading-relaxed text-red-900">
             {warnings.map((w, i) => <li key={i}>{w}</li>)}
           </ul>
-        </div>
+        </details>
       )}
 
       <AvisCoach week={semaine} qBudget={state.qBudget ?? 0} raisons={reasons} />
