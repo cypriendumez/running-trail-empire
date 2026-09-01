@@ -234,16 +234,20 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
           <span className="flex-shrink-0 text-right">
             <span className="flex items-center justify-end gap-1.5 text-sm font-semibold text-zinc-600">
               {loadingAll && <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />}
-              {/* ⚠️ CE COMPTEUR COMPTAIT DES LIGNES PENDANT QUE LA LISTE MONTRE DES
-                  ÉVÉNEMENTS. Depuis le regroupement, « 14 071 courses » au-dessus de
-                  8 613 cartes se contrediraient sous les yeux du lecteur. Le grand nombre
-                  compte donc ce qu'on voit, et la sous-ligne dit combien de distances
-                  cela représente — deux nombres qui décrivent deux choses distinctes. */}
-              {(loadingAll && !search && region === "Toutes" && raceType === "all" && !dateFrom ? (totalCount ?? evenements.length) : evenements.length).toLocaleString(lang)} {evenements.length > 1 || loadingAll ? d["courses"] : d["course"]}
+              {/* ⚠️ LE GRAND NOMBRE COMPTE LES COURSES, PAS LES CARTES. Une « course »
+                  pour un coureur, c'est un dossard : le 10 km et le 42 km d'un même
+                  week-end sont deux courses différentes, qu'on prépare différemment et
+                  qu'on ne peut pas courir toutes les deux. Afficher 8 975 (le nombre
+                  d'ÉVÉNEMENTS) donnait l'impression d'un catalogue deux fois plus
+                  pauvre qu'il n'est — alors que rien n'avait été retiré : le
+                  regroupement ne change que la mise en page des cartes.
+                  La sous-ligne dit combien d'événements cela représente, ce qui explique
+                  l'écart avec le nombre de cartes affichées. */}
+              {(loadingAll && !search && region === "Toutes" && raceType === "all" && !dateFrom ? (totalCount ?? filtered.length) : filtered.length).toLocaleString(lang)} {filtered.length > 1 || loadingAll ? d["courses"] : d["course"]}
             </span>
             {!loadingAll && (
               <span className="block text-[11px] text-zinc-400">
-                {filtered.length.toLocaleString(lang)} {d["formats"]} · {races.filter(r => r.date?.startsWith("2099")).length.toLocaleString(lang)} {d["toConfirm"]}
+                {evenements.length.toLocaleString(lang)} {d["events"]} · {races.filter(r => r.date?.startsWith("2099")).length.toLocaleString(lang)} {d["toConfirm"]}
               </span>
             )}
           </span>

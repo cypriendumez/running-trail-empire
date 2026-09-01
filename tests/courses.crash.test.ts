@@ -538,5 +538,24 @@ test("la recherche web est réellement activée, sinon le modèle répond de mé
     "la recherche écrase une heure saisie par l'athlète, qui en sait plus qu'elle");
 });
 
+test("le compteur affiche le nombre de COURSES, pas le nombre de cartes", () => {
+  // ⚠️ CE CHOIX A ÉTÉ REPRIS APRÈS COUP. Le regroupement des distances a fait tomber le
+  // compteur de 14 071 à 8 975 : Cyprien a lu ça comme une perte de la moitié du
+  // catalogue. Rien n'avait été retiré — seule la MISE EN PAGE des cartes changeait.
+  // Mais pour un coureur, une « course » est un dossard : le 10 km et le 42 km d'un même
+  // week-end sont deux courses, qu'on prépare différemment et qu'on ne peut pas courir
+  // toutes les deux. Le grand nombre compte donc les courses, et la sous-ligne dit
+  // combien d'événements cela représente — ce qui explique l'écart avec les cartes.
+  const src = readFileSync("src/components/races/RacesHub.tsx", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  assert.ok(/\(totalCount \?\? filtered\.length\) : filtered\.length\)\.toLocaleString/.test(src),
+    "le grand compteur est repassé sur le nombre de cartes : le catalogue paraîtra deux fois plus pauvre");
+  assert.ok(/\{evenements\.length\.toLocaleString\(lang\)\} \{d\["events"\]\}/.test(src),
+    "la sous-ligne n'annonce plus le nombre d'événements : l'écart avec les cartes devient inexplicable");
+  const i18n = readFileSync("src/components/races/racesI18n.ts", "utf8");
+  assert.equal((i18n.match(/"events": "/g) ?? []).length, 5, "le libellé « événements » manque dans une langue");
+});
+
 console.log(`\n${passed} crash-test(s) du catalogue passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log(`  KO ${f}`); process.exit(1); }
