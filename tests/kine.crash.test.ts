@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { analyser, segments, texteNu } from "../src/lib/ui/richText";
 import { suiviParZone, resumeDouleurs, ECART_SIGNIFICATIF, type Signalement } from "../src/lib/health/douleurs";
+import { budget, estTronquee } from "../src/lib/ai/gemini";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -176,6 +177,51 @@ test("le kiné IA lit vraiment l'historique et le garage", () => {
   // Et l'absence de donnée doit être DITE, pas comblée.
   assert.ok(src.includes("aucun antécédent enregistré"), "un historique vide laisse un blanc dans l'invite");
   assert.ok(src.includes("kilométrage non renseigné"), "un kilométrage absent serait lu comme une paire neuve");
+});
+
+// ── Budget de génération ────────────────────────────────────────────────────────
+test("le raisonnement ne mange plus le budget de la réponse", () => {
+  // ⚠️ MESURÉ EN PRODUCTION LE 02/09/2026 SUR LE COMPTE DE L'ÉDITEUR : réglé à
+  // `maxOutputTokens: 1600` avec `thinkingBudget: 1536`, le modèle a dépensé 1 534
+  // jetons à réfléchir et il ne lui en restait 62 pour répondre. La consultation
+  // s'arrêtait au milieu d'une question posée à l'athlète — en `ok: true`.
+  const b = budget(512, 1600) as { maxOutputTokens: number; thinkingConfig: { thinkingBudget: number } };
+  assert.equal(b.thinkingConfig.thinkingBudget, 512);
+  assert.equal(b.maxOutputTokens, 2112, "le budget de réponse n'est pas AJOUTÉ à celui du raisonnement");
+  assert.equal(b.maxOutputTokens - b.thinkingConfig.thinkingBudget, 1600, "la réponse n'a pas le budget annoncé");
+});
+
+test("aucun appel IA de l'athlète ne laisse la réponse à l'étroit", () => {
+  // Le garde-fou vise les routes que l'ATHLÈTE déclenche : c'est là qu'une réponse
+  // coupée se lit comme un avis terminé. `budget(r, n)` rend l'erreur impossible ;
+  // un réglage écrit à la main doit prouver qu'il laisse de la place.
+  const MINIMUM = 600;
+  for (const f of ["src/app/api/ai/physio/route.ts", "src/app/api/ai/cours/route.ts"]) {
+    const src = readFileSync(f, "utf8")
+      .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+    const parBudget = /\.\.\.budget\(\s*(\d+)\s*,\s*(\d+)\s*\)/.exec(src);
+    if (parBudget) {
+      assert.ok(Number(parBudget[2]) >= MINIMUM, `${f} ne laisse que ${parBudget[2]} jetons de réponse`);
+      continue;
+    }
+    const max = /maxOutputTokens:\s*(\d+)/.exec(src), pense = /thinkingBudget:\s*(\d+)/.exec(src);
+    assert.ok(max, `${f} n'a plus de budget de sortie lisible`);
+    const reste = Number(max![1]) - Number(pense?.[1] ?? 0);
+    assert.ok(reste >= MINIMUM, `${f} ne laisse que ${reste} jetons à la réponse (raisonnement compris)`);
+  }
+});
+
+test("une réponse coupée est signalée, jamais servie comme une conclusion", () => {
+  assert.equal(estTronquee({ finishReason: "MAX_TOKENS" }), true);
+  for (const c of [{ finishReason: "STOP" }, {}, null, undefined, "MAX_TOKENS"]) {
+    assert.equal(estTronquee(c), false, `${JSON.stringify(c)} est pris pour une troncature`);
+  }
+  // Et le kiné doit RÉAGIR au drapeau : le détecter sans rien en faire ne change rien
+  // pour l'athlète, qui lirait toujours une demi-phrase comme un avis terminé.
+  const src = readFileSync("src/app/api/ai/physio/route.ts", "utf8");
+  const i = src.indexOf("out.tronquee");
+  assert.ok(i > 0, "le kiné ignore le drapeau de troncature");
+  assert.ok(/Réponse interrompue/.test(src.slice(i, i + 300)), "le kiné ne dit pas que la réponse est incomplète");
 });
 
 console.log(`\n${passed} crash-test(s) du kiné passé(s), ${fails.length} échec(s)`);

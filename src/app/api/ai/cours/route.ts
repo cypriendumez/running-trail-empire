@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { exigeAcces } from "@/lib/billing/guard";
-import { generateContent } from "@/lib/ai/gemini";
+import { generateContent, budget } from "@/lib/ai/gemini";
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 
 type Msg = { role: "user" | "model"; text: string };
@@ -135,7 +135,9 @@ RÈGLES :
     { role: "user", parts: [{ text: message }] },
   ];
 
-  const out = await generateContent(contents, { temperature: 0.55, maxOutputTokens: 1400, thinkingConfig: { thinkingBudget: 1024 } });
+  // Même défaut que le kiné : 1400 au total dont 1024 de raisonnement ne laissaient que
+  // 376 jetons de cours. Le budget de la RÉPONSE est maintenant nommé.
+  const out = await generateContent(contents, { temperature: 0.55, ...budget(384, 1400) });
   if (!out.ok) {
     // Un quota JOURNALIER épuisé ne se dissipe pas « dans quelques secondes » : il tient
     // jusqu'à minuit heure du Pacifique. Inviter à réessayer, c'était promettre une

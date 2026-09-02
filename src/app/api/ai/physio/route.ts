@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { exigeAcces } from "@/lib/billing/guard";
-import { generateContent } from "@/lib/ai/gemini";
+import { generateContent, budget } from "@/lib/ai/gemini";
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 import { sniffImage } from "@/lib/upload/sniff";
 import { suiviParZone, resumeDouleurs, type Signalement } from "@/lib/health/douleurs";
@@ -209,7 +209,10 @@ Si la photo est floue, trop sombre, trop éloignée ou ne montre pas la zone dé
     { role: "user", parts: imagePart ? [{ text: message }, imagePart] : [{ text: message }] },
   ];
 
-  const out = await generateContent(contents, { temperature: 0.45, maxOutputTokens: 1600, thinkingConfig: { thinkingBudget: 1536 } });
+  // ⚠️ 512 POUR RÉFLÉCHIR, 1600 POUR RÉPONDRE. L'ancien réglage (1600 au total dont
+  // 1536 de raisonnement) ne laissait que 62 jetons à la consultation : mesuré en
+  // production, la réponse s'arrêtait au milieu d'une question posée à l'athlète.
+  const out = await generateContent(contents, { temperature: 0.45, ...budget(512, 1600) });
   if (!out.ok) {
     // Les filtres de sécurité de Gemini refusent régulièrement les images corporelles et
     // renvoient une réponse VIDE. Sans ce cas particulier, l'utilisateur lisait « Le kiné
@@ -260,5 +263,11 @@ Si la photo est floue, trop sombre, trop éloignée ou ne montre pas la zone dé
     } catch { /* best-effort : le kiné répond même si l'enregistrement échoue */ }
   }
 
-  return NextResponse.json({ reply: out.text });
+  // ⚠️ UNE RÉPONSE COUPÉE NE DOIT PAS PASSER POUR UNE CONCLUSION. On garde le texte —
+  // il reste utile — mais on dit qu'il manque la suite, plutôt que de laisser une
+  // demi-phrase ressembler à un avis terminé sur une douleur.
+  const reply = out.tronquee
+    ? `${out.text}\n\n_(Réponse interrompue avant la fin — redemande-moi la suite.)_`
+    : out.text;
+  return NextResponse.json({ reply });
 }

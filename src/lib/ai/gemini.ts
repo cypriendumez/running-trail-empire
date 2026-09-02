@@ -59,12 +59,42 @@ export type GeminiResult =
   | { ok: true; text: string; model: string;
       /** Sources réellement consultées quand l'appel utilisait la recherche web.
        *  Vide sans recherche. Sert à VÉRIFIER une réponse plutôt qu'à la croire. */
-      sources?: string[] }
+      sources?: string[];
+      /** ⚠️ LA RÉPONSE S'ARRÊTE EN PLEINE PHRASE. Le modèle a atteint `maxOutputTokens`
+       *  (`finishReason: "MAX_TOKENS"`). Sans ce drapeau, une réponse coupée revenait en
+       *  `ok: true` et l'athlète lisait une demi-phrase comme si c'était la conclusion —
+       *  mesuré en production sur le kiné le 02/09/2026. L'appelant doit le dire. */
+      tronquee?: boolean }
   /** `dailyExhausted` : plus AUCUN modèle n'a de quota jusqu'à minuit au Pacifique.
    *  Permet à l'appelant de dire « revenez demain » plutôt que « réessayez ». */
   | { ok: false; error: string; status: number; dailyExhausted?: boolean };
 
 type GenConfig = Record<string, unknown>;
+
+/**
+ * Budget de génération, raisonnement ET réponse.
+ *
+ * ⚠️ LE RAISONNEMENT SE PAIE SUR `maxOutputTokens`, IL NE S'Y AJOUTE PAS. Le kiné était
+ * réglé à `maxOutputTokens: 1600` avec `thinkingBudget: 1536` : mesuré en réel le
+ * 02/09/2026, le modèle a dépensé 1 534 jetons à réfléchir et il ne lui en restait
+ * 62 pour répondre. La consultation s'arrêtait au milieu d'une question, en `ok: true`.
+ *
+ * Écrire les deux nombres séparément rendait l'erreur invisible : « 1600 » avait l'air
+ * généreux. Cette fonction force à nommer ce qu'on laisse à la RÉPONSE.
+ */
+/**
+ * La réponse s'est-elle arrêtée faute de budget ?
+ *
+ * ⚠️ LE TEXTE NE LE DIT PAS. Une phrase coupée ressemble à une phrase : seul
+ * `finishReason` distingue « j'ai fini » de « je me suis arrêté net ».
+ */
+export function estTronquee(candidat: unknown): boolean {
+  return (candidat as { finishReason?: string } | null)?.finishReason === "MAX_TOKENS";
+}
+
+export function budget(raisonnement: number, reponse: number): GenConfig {
+  return { maxOutputTokens: raisonnement + reponse, thinkingConfig: { thinkingBudget: raisonnement } };
+}
 
 /**
  * Génère du texte avec Gemini, en réessayant et en basculant de modèle si besoin.
@@ -142,7 +172,10 @@ export async function generateContent(
             const sources: string[] = chunks
               .map((c: { web?: { uri?: string; title?: string } }) => c?.web?.title || c?.web?.uri || "")
               .filter((x: string) => !!x);
-            return { ok: true, text, model, sources };
+            // `MAX_TOKENS` est la seule façon de savoir que la phrase n'est pas finie :
+            // le texte, lui, n'a rien qui le signale.
+            const tronquee = estTronquee(data?.candidates?.[0]);
+            return { ok: true, text, model, sources, tronquee };
           }
           // Réponse vide (filtre de sécurité, etc.) → on tente le modèle suivant.
           lastErr = "Réponse vide du modèle.";
