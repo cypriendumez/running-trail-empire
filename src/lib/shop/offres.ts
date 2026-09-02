@@ -25,6 +25,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type Offre = {
   retailer: string;
+  /** Visuel fourni PAR LE FLUX du marchand, avec le droit de l'afficher. Jamais récupéré ailleurs. */
+  image_url?: string | null;
   price: number;
   currency: string;
   url: string;
@@ -36,7 +38,7 @@ export async function offresPour(sb: SupabaseClient, ean: string | undefined): P
   if (!ean) return [];
   const { data, error } = await sb
     .from("product_offers")
-    .select("retailer,price,currency,url,in_stock,updated_at")
+    .select("retailer,price,currency,url,in_stock,updated_at,image_url")
     .eq("ean", ean)
     .order("price", { ascending: true });
   // ⚠️ UNE ERREUR NE DOIT PAS SE LIRE COMME « AUCUNE OFFRE ». Les deux se soldent par une
@@ -83,7 +85,7 @@ export function remisePourcent(prix: number | null | undefined, conseille: numbe
 export async function offresParEan(sb: SupabaseClient): Promise<Record<string, Offre[]>> {
   const { data, error } = await sb
     .from("product_offers")
-    .select("retailer,price,currency,url,in_stock,updated_at,ean")
+    .select("retailer,price,currency,url,in_stock,updated_at,image_url,ean")
     .not("ean", "is", null)
     .order("price", { ascending: true })
     .limit(1000);

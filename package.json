@@ -15,6 +15,7 @@
     "gear:decouvrir": "npx tsx scripts/decouverte-irun.ts",
     "gear:prix": "npx tsx scripts/decouverte-irun.ts --prix && npx tsx scripts/import-offres.ts",
     "gear:normaliser": "npx tsx scripts/normaliser-catalogue.ts",
+    "gear:flux": "npx tsx scripts/import-flux.ts",
     "gear:irun": "npx tsx scripts/collecte-irun.ts",
     "gear:specs": "npx tsx scripts/collecte-specs.ts",
     "stripe:setup": "node scripts/stripe-setup.mjs",

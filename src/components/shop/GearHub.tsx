@@ -14,6 +14,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { SemelleProfil } from "./SemelleProfil";
 import { ChaussureDessin } from "./ChaussureDessin";
+import { PhotoMarchand, photoUtilisable } from "./PhotoMarchand";
 import { filtrer, trier, marques, type Filtres, type Tri } from "@/lib/shop/catalogue";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { texteShop } from "./shopI18n";
@@ -302,6 +303,20 @@ export function GearHub({ catalogue, profil, offres = {} }: {
                       erreurs ; le dessin, lui, montre la silhouette et HACHURE la mousse
                       quand son épaisseur n'est pas connue. L'absence se voit, elle ne se
                       comble pas. */}
+                  {/* ⚠️ LA PHOTO NE S'AFFICHE QUE SI ELLE VIENT D'UN FLUX. `image_url` est
+                      rempli par l'import d'un flux d'affiliation, qui accorde le droit de
+                      l'afficher ; tant qu'aucun flux n'est raccordé la colonne est vide et
+                      c'est le dessin aux cotes qui parle. */}
+                  {(() => {
+                    const photo = photoUtilisable(parModele.get(m.slug)?.offre.image_url);
+                    return photo ? (
+                      <div className="my-3 h-[110px]">
+                        <PhotoMarchand src={photo} alt={`${m.marque} ${m.nom}`}
+                          marchand={parModele.get(m.slug)!.offre.retailer} className="h-full" />
+                      </div>
+                    ) : null;
+                  })()}
+                  {!photoUtilisable(parModele.get(m.slug)?.offre.image_url) && (
                   <div className="my-3">
                     <ChaussureDessin marque={m.marque} stackTalonMm={m.stackTalonMm?.valeur}
                       dropMm={m.dropMm?.valeur} terrain={m.terrain} plaqueCarbone={m.plaqueCarbone?.valeur}
@@ -310,6 +325,7 @@ export function GearHub({ catalogue, profil, offres = {} }: {
                         ? tx("shop.dessin_alt", { marque: m.marque, talon: Math.round(m.stackTalonMm.valeur), avant: Math.round(m.stackTalonMm.valeur - (m.dropMm?.valeur ?? 0)) })
                         : tx("shop.profil_absent")} />
                   </div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-2 border-t border-zinc-100 pt-3">
                     <Spec label={tx("shop.spec.poids")} valeur={m.poidsG ? `${m.poidsG.valeur} g` : null} vide={tx("shop.non_communique")} />

@@ -21,12 +21,14 @@ import { meilleure, remisePourcent, estFraiche, ageEnJours, FRAICHEUR_JOURS, typ
 import { indexLeger, trouver, cotesPourGarage } from "../src/lib/shop/indexLeger";
 import { SHOP, texteShop, texteFoulee } from "../src/components/shop/shopI18n";
 import { tonDeMarque } from "../src/components/shop/ChaussureDessin";
+import { photoUtilisable } from "../src/components/shop/PhotoMarchand";
 import { choisirFiche, caracteristiques, nombreDe, normaliser } from "../scripts/collecte-irun";
 import { specsDe, desaccord, choisirProduit, nomDeUrl, TOLERANCE } from "../scripts/collecte-rw";
 import { prixConseilleDe, estFemme, terrainDeUrl, nomMarque, modeleDeNom, retirerPrefixe, vautLeCoup, familleDe, plaqueCarboneDe } from "../scripts/decouverte-irun";
 import { fusionner, contredit } from "../scripts/collecte-specs";
 import { normaliser as normaliserCatalogue, richesse } from "../scripts/normaliser-catalogue";
 import { utilisables } from "../scripts/import-offres";
+import { lignesUtilisables } from "../scripts/import-flux";
 import { mesureDeSection, pageCorrespond, dropIncoherent, variantesSlug, DROP_MESURE_MAX_MM, DROP_MESURE_MIN_MM } from "../scripts/collecte-runrepeat";
 import { parseFeed, normalizeFeed } from "../src/lib/shop/affiliateFeed";
 
@@ -126,16 +128,47 @@ test("la teinte d'une marque ne change pas d'une visite à l'autre", () => {
   assert.match(a.clair, /^hsl\(/);
 });
 
-test("aucune image de produit n'est référencée", () => {
-  // Les visuels produit appartiennent aux marques et aux marchands. Le jour où l'un
-  // d'eux réapparaît dans un composant, ce test doit rougir.
+test("une image ne peut venir QUE d'un flux d'affiliation", () => {
+  // ⚠️ UNE PHOTO PRODUIT EST UNE ŒUVRE, PAS UNE DONNÉE. La reprendre d'une page web serait
+  // une contrefaçon. Le seul cas licite est le FLUX d'affiliation, dont le contrat accorde
+  // le droit d'utiliser les visuels — c'est ce que fait tout comparateur affilié.
+  //
+  // La règle tient donc en deux points : une seule porte, et elle ne s'ouvre que sur
+  // `product_offers.image_url`.
   for (const f of ["src/components/shop/GearHub.tsx", "src/components/shop/SemelleProfil.tsx",
     "src/components/shop/ChaussureDessin.tsx", "src/components/shop/FicheModele.tsx",
     "src/app/dashboard/shop/page.tsx", "src/app/dashboard/shop/[slug]/page.tsx"]) {
     const src = codeOf(f);
-    assert.ok(!/<img\b/.test(src) && !/next\/image/.test(src), `${f} affiche une image`);
-    assert.ok(!/image_url/.test(src), `${f} lit une URL d'image de marchand`);
+    assert.ok(!/<img\b/.test(src), `${f} rend une image : seul PhotoMarchand en a le droit`);
+    // ⚠️ `next/image` optimiserait en RECOPIANT le visuel sur notre hébergeur. La licence
+    //    porte sur l'affichage du visuel du marchand, pas sur sa recopie.
+    assert.ok(!/next\/image/.test(src), `${f} recopierait le visuel sur notre hébergeur`);
   }
+  const porte = codeOf("src/components/shop/PhotoMarchand.tsx");
+  assert.ok(!/next\/image/.test(porte), "la photo ne doit pas être rapatriée sur notre hébergeur");
+  // Et la seule source admise est l'offre importée.
+  for (const f of ["src/components/shop/GearHub.tsx", "src/components/shop/FicheModele.tsx"]) {
+    const src = codeOf(f);
+    // ⚠️ ON NE CHERCHE PAS LA PARENTHÈSE FERMANTE. Deux tentatives s'y sont cassées :
+    //    `[^)]*` puis une version paresseuse s'arrêtaient toutes deux sur le `)` de
+    //    `parModele.get(m.slug)`, et faisaient rougir du code juste. On regarde simplement
+    //    ce qui suit l'appel : l'argument doit s'y trouver.
+    for (const m of src.matchAll(/photoUtilisable\(/g)) {
+      const suite = src.slice(m.index! + m[0].length, m.index! + m[0].length + 90);
+      assert.match(suite, /image_url/, `${f} passe autre chose qu'une image d'offre : ${suite.slice(0, 50)}`);
+    }
+  }
+});
+
+test("une adresse d'image douteuse n'est jamais affichée", () => {
+  // Un flux mal formé rend parfois un chemin relatif, une adresse `data:` ou du vide.
+  // Une image cassée vaut moins que le dessin, qui lui est toujours juste.
+  assert.equal(photoUtilisable("https://media.i-run.fr/x/y.jpg"), "https://media.i-run.fr/x/y.jpg");
+  assert.equal(photoUtilisable("http://media.i-run.fr/x.jpg"), null, "une image non chiffrée a été acceptée");
+  assert.equal(photoUtilisable("/local/x.jpg"), null);
+  assert.equal(photoUtilisable("data:image/png;base64,AAA"), null);
+  assert.equal(photoUtilisable(""), null);
+  assert.equal(photoUtilisable(undefined), null);
 });
 
 test("l'usage se déduit des cotes, et disparaît quand elles manquent", () => {
@@ -1153,6 +1186,31 @@ test("une hauteur mesurée est signalée comme telle", () => {
   // Et le catalogue contient bien les deux provenances : la note n'est pas décorative.
   const mesurees = CATALOGUE.filter((m) => m.stackTalonMm && m.sources.includes("runrepeat.com")).length;
   assert.ok(mesurees > 0, "aucune hauteur mesurée : la note ne s'afficherait jamais");
+});
+
+test("l'import d'un flux ne retient que ce qui pourra s'afficher", () => {
+  // ⚠️ C'EST LA COMMANDE QUI ALLUMERA LES PHOTOS le jour où un programme d'affiliation
+  // accepte le site. Elle doit être juste AVANT d'avoir jamais tourné sur un vrai flux :
+  // une ligne sans code-barres est orpheline (la fiche retrouve ses prix par `ean`), et
+  // un doublon de clé fait refuser le LOT ENTIER par PostgREST, pas la ligne fautive.
+  const csv = [
+    "aw_product_id,product_name,brand_name,merchant_name,search_price,currency,aw_deep_link,merchant_image_url,in_stock,category_name,ean",
+    // ⚠️ LE PRIX LE PLUS BAS EN PREMIER, exprès : avec l'ordre inverse, « garder le plus
+    //    bas » et « garder le dernier » donnent le même résultat et le test ne prouve rien.
+    '1,"Hoka Clifton 10",Hoka,"i-Run",119.00,EUR,https://www.awin1.com/y,https://img.i-run.fr/b.jpg,1,"Chaussures",198605659287',
+    '2,"Hoka Clifton 10 bis",Hoka,"i-Run",129.99,EUR,https://www.awin1.com/x,https://img.i-run.fr/a.jpg,1,"Chaussures",198605659287',
+    '3,"Sans code-barres",Nike,"i-Run",99.00,EUR,https://www.awin1.com/z,https://img.i-run.fr/c.jpg,1,"Chaussures",',
+    '4,"Sans prix",Nike,"i-Run",,EUR,https://www.awin1.com/w,,1,"Chaussures",111',
+  ].join("\n");
+  const l = lignesUtilisables(normalizeFeed(parseFeed(csv), "i-Run"), "i-Run", "2026-09-02T00:00:00Z");
+  assert.equal(l.length, 1, "le doublon de code-barres, la ligne sans EAN et celle sans prix doivent tomber");
+  assert.equal(l[0].price, 119, "à code-barres égal, c'est le prix le plus bas qui est retenu");
+  assert.equal(l[0].image_url, "https://img.i-run.fr/b.jpg", "le visuel du flux n'est pas repris");
+  // Et c'est bien `normalizeFeed` qui écarte prix manquant et lien absent, en amont.
+  const brut = normalizeFeed(parseFeed(csv), "i-Run");
+  assert.ok(brut.every((o) => o.price > 0 && /^https?:\/\//.test(o.url)),
+    "une ligne sans prix ou sans lien est arrivée jusqu'à l'import");
+  assert.equal(l[0].external_id, l[0].ean, "la clé d'unicité doit être le code-barres");
 });
 
 test("le catalogue existe et n'est pas vide", () => {

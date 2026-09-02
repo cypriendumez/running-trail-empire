@@ -13,6 +13,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { ChaussureDessin } from "@/components/shop/ChaussureDessin";
+import { PhotoMarchand, photoUtilisable } from "@/components/shop/PhotoMarchand";
 import { sourcesCitables, type Modele } from "@/lib/shop/modele";
 import { usageDe } from "@/lib/shop/usage";
 import type { Avis } from "@/lib/shop/pourToi";
@@ -56,6 +57,7 @@ export function FicheModele({ m, avis, bouts, manquantes, proches, offres, offre
   const nc = tx("shop.non_communique");
   const foulee = texteFoulee(langue, m.foulee);
   const usage = usageDe(m);
+  const photo = photoUtilisable(best?.image_url);
   return (
     <div className="mx-auto w-full max-w-[1180px] px-4 py-6 sm:px-6">
       <Link href="/dashboard/shop" className="text-[13px] text-zinc-500 hover:text-zinc-900">← {tx("shop.retour")}</Link>
@@ -73,6 +75,16 @@ export function FicheModele({ m, avis, bouts, manquantes, proches, offres, offre
 
       <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
         <div className="min-w-0 space-y-5">
+          {/* La photo du flux d'abord — le dessin reste dessous, il dit ce que la photo
+              ne montre pas : les épaisseurs réelles, à l'échelle. */}
+          {photo && (
+            <Card className="p-5">
+              <div className="h-[220px]">
+                <PhotoMarchand src={photo} alt={`${m.marque} ${m.nom}`} marchand={best!.retailer} className="h-full" />
+              </div>
+            </Card>
+          )}
+
           <Card className="p-5">
             <div className="mx-auto max-w-[420px]">
               <ChaussureDessin marque={m.marque} stackTalonMm={m.stackTalonMm?.valeur}
