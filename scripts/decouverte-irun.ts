@@ -42,6 +42,12 @@ export const MARQUES = [
   "Adidas", "Altra", "Asics", "Brooks", "Craft", "Hoka", "Inov-8", "Kiprun", "La Sportiva",
   "Merrell", "Mizuno", "New Balance", "Nike", "NNormal", "Norda", "On", "Puma",
   "Saucony", "Salomon", "Scott", "Topo Athletic", "Under Armour",
+  // ⚠️ AJOUTÉES APRÈS SONDAGE, PAS PAR ESPOIR. Vingt-deux marques candidates ont été
+  //    interrogées une par une : celles-ci sont les seules qui rendent des fiches de
+  //    chaussures de course chez ce marchand. Craft, Diadora, Karhu, Newton, Skechers,
+  //    Xero, Joma, Raidlight, Icebug, VJ, Veja, Kiprun et Decathlon en rendent ZÉRO —
+  //    les inscrire ici ferait tourner des recherches stériles à chaque passage.
+  "Reebok", "Dynafit", "Vibram", "Millet", "Arc'teryx",
 ] as const;
 
 /** Seules ces deux catégories du marchand nous intéressent : route et sentier. */

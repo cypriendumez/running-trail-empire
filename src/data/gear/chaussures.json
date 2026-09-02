@@ -7993,5 +7993,498 @@
     "sources": [
       "i-run.fr"
     ]
+  },
+  "saucony-guide-tr": {
+    "slug": "saucony-guide-tr",
+    "marque": "Saucony",
+    "nom": "Guide TR",
+    "terrain": "trail",
+    "poidsG": {
+      "valeur": 307,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 6,
+      "vu": "2026-09-02"
+    },
+    "ean": "195022044078",
+    "nomExact": "Saucony Guide TR",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "reebok-zignition": {
+    "slug": "reebok-zignition",
+    "marque": "Reebok",
+    "nom": "Zignition",
+    "terrain": "route",
+    "poidsG": {
+      "valeur": 340,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 12,
+      "vu": "2026-09-02"
+    },
+    "prixConseilleEur": {
+      "valeur": 110,
+      "vu": "2026-09-02"
+    },
+    "ean": "1200161891700",
+    "nomExact": "Reebok Zignition",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "reebok-floatzig-2": {
+    "slug": "reebok-floatzig-2",
+    "marque": "Reebok",
+    "nom": "FloatZig 2",
+    "terrain": "route",
+    "poidsG": {
+      "valeur": 298,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 6,
+      "vu": "2026-09-02"
+    },
+    "prixConseilleEur": {
+      "valeur": 130,
+      "vu": "2026-09-02"
+    },
+    "ean": "1200179276865",
+    "nomExact": "Reebok FloatZig 2",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "reebok-floatzig-double": {
+    "slug": "reebok-floatzig-double",
+    "marque": "Reebok",
+    "nom": "FloatZig Double",
+    "terrain": "route",
+    "poidsG": {
+      "valeur": 342,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 6,
+      "vu": "2026-09-02"
+    },
+    "prixConseilleEur": {
+      "valeur": 150,
+      "vu": "2026-09-02"
+    },
+    "ean": "1200179275011",
+    "nomExact": "Reebok FloatZig Double",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "reebok-floatzig-1": {
+    "slug": "reebok-floatzig-1",
+    "marque": "Reebok",
+    "nom": "Floatzig 1",
+    "terrain": "route",
+    "poidsG": {
+      "valeur": 280,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 6,
+      "vu": "2026-09-02"
+    },
+    "prixConseilleEur": {
+      "valeur": 130,
+      "vu": "2026-09-02"
+    },
+    "ean": "1200143536520",
+    "nomExact": "Reebok Floatzig 1",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 36.8,
+      "vu": "2026-09-02"
+    }
+  },
+  "dynafit-alpine-dna-2": {
+    "slug": "dynafit-alpine-dna-2",
+    "marque": "Dynafit",
+    "nom": "Alpine DNA 2",
+    "terrain": "trail",
+    "poidsG": {
+      "valeur": 254,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 6,
+      "vu": "2026-09-02"
+    },
+    "ean": "4053866690614",
+    "nomExact": "Dynafit Alpine DNA 2",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "dynafit-trail": {
+    "slug": "dynafit-trail",
+    "marque": "Dynafit",
+    "nom": "Trail",
+    "terrain": "trail",
+    "poidsG": {
+      "valeur": 314,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 4,
+      "vu": "2026-09-02"
+    },
+    "ean": "4053866883016",
+    "nomExact": "Dynafit Trail",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "dynafit-ultra-100-v3": {
+    "slug": "dynafit-ultra-100-v3",
+    "marque": "Dynafit",
+    "nom": "Ultra 100 V3",
+    "terrain": "trail",
+    "poidsG": {
+      "valeur": 291,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 6,
+      "vu": "2026-09-02"
+    },
+    "ean": "4053866881807",
+    "nomExact": "Dynafit Ultra 100 V3",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "dynafit-sky-dna": {
+    "slug": "dynafit-sky-dna",
+    "marque": "Dynafit",
+    "nom": "Sky DNA",
+    "terrain": "trail",
+    "poidsG": {
+      "valeur": 251,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 4,
+      "vu": "2026-09-02"
+    },
+    "ean": "4053866690096",
+    "nomExact": "Dynafit Sky DNA",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "dynafit-ultra-dna": {
+    "slug": "dynafit-ultra-dna",
+    "marque": "Dynafit",
+    "nom": "Ultra DNA",
+    "terrain": "trail",
+    "poidsG": {
+      "valeur": 311,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "ean": "4053866692649",
+    "nomExact": "Dynafit Ultra DNA",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "vibram-hoka-one-one-tecton-x-3": {
+    "slug": "vibram-hoka-one-one-tecton-x-3",
+    "marque": "Vibram",
+    "nom": "Hoka One One Tecton X 3",
+    "terrain": "trail",
+    "poidsG": {
+      "valeur": 259,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 5,
+      "vu": "2026-09-02"
+    },
+    "prixConseilleEur": {
+      "valeur": 250,
+      "vu": "2026-09-02"
+    },
+    "plaqueCarbone": {
+      "valeur": true,
+      "vu": "2026-09-02"
+    },
+    "ean": "198605546358",
+    "nomExact": "Hoka One One Tecton X 3",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "vibram-nike-zegama-trail-2": {
+    "slug": "vibram-nike-zegama-trail-2",
+    "marque": "Vibram",
+    "nom": "Nike Zegama Trail 2",
+    "terrain": "trail",
+    "poidsG": {
+      "valeur": 291,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 4,
+      "vu": "2026-09-02"
+    },
+    "prixConseilleEur": {
+      "valeur": 180,
+      "vu": "2026-09-02"
+    },
+    "ean": "197602595833",
+    "nomExact": "Nike Zegama Trail 2",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "vibram-nike-acg-ultrafly-trail": {
+    "slug": "vibram-nike-acg-ultrafly-trail",
+    "marque": "Vibram",
+    "nom": "Nike ACG Ultrafly Trail",
+    "terrain": "trail",
+    "poidsG": {
+      "valeur": 273,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "prixConseilleEur": {
+      "valeur": 250,
+      "vu": "2026-09-02"
+    },
+    "plaqueCarbone": {
+      "valeur": true,
+      "vu": "2026-09-02"
+    },
+    "ean": "198729771933",
+    "nomExact": "Nike ACG Ultrafly Trail",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "vibram-altra-lone-peak-9": {
+    "slug": "vibram-altra-lone-peak-9",
+    "marque": "Vibram",
+    "nom": "Altra Lone Peak 9+",
+    "terrain": "trail",
+    "poidsG": {
+      "valeur": 295,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 0,
+      "vu": "2026-09-02"
+    },
+    "prixConseilleEur": {
+      "valeur": 150,
+      "vu": "2026-09-02"
+    },
+    "ean": "197804640621",
+    "nomExact": "Altra Lone Peak 9+",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "vibram-hoka-one-one-speedgoat-7": {
+    "slug": "vibram-hoka-one-one-speedgoat-7",
+    "marque": "Vibram",
+    "nom": "Hoka One One Speedgoat 7",
+    "terrain": "trail",
+    "poidsG": {
+      "valeur": 264,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 5,
+      "vu": "2026-09-02"
+    },
+    "ean": "198605834745",
+    "nomExact": "Hoka One One Speedgoat 7",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "vibram-hoka-one-one-tecton-x-4": {
+    "slug": "vibram-hoka-one-one-tecton-x-4",
+    "marque": "Vibram",
+    "nom": "Hoka One One Tecton X 4",
+    "terrain": "trail",
+    "poidsG": {
+      "valeur": 250,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 5,
+      "vu": "2026-09-02"
+    },
+    "plaqueCarbone": {
+      "valeur": false,
+      "vu": "2026-09-02"
+    },
+    "ean": "198605952210",
+    "nomExact": "Hoka One One Tecton X 4",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "vibram-nike-ultrafly": {
+    "slug": "vibram-nike-ultrafly",
+    "marque": "Vibram",
+    "nom": "Nike Ultrafly",
+    "terrain": "trail",
+    "poidsG": {
+      "valeur": 273,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "prixConseilleEur": {
+      "valeur": 250,
+      "vu": "2026-09-02"
+    },
+    "plaqueCarbone": {
+      "valeur": true,
+      "vu": "2026-09-02"
+    },
+    "ean": "198486267755",
+    "nomExact": "Nike Ultrafly",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "millet-intense-light": {
+    "slug": "millet-intense-light",
+    "marque": "Millet",
+    "nom": "Intense Light",
+    "terrain": "trail",
+    "poidsG": {
+      "valeur": 228,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 4,
+      "vu": "2026-09-02"
+    },
+    "prixConseilleEur": {
+      "valeur": 170,
+      "vu": "2026-09-02"
+    },
+    "ean": "3515720677250",
+    "nomExact": "Millet Intense Light",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "millet-intense-ultra": {
+    "slug": "millet-intense-ultra",
+    "marque": "Millet",
+    "nom": "Intense Ultra",
+    "terrain": "trail",
+    "poidsG": {
+      "valeur": 318,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 6,
+      "vu": "2026-09-02"
+    },
+    "prixConseilleEur": {
+      "valeur": 170,
+      "vu": "2026-09-02"
+    },
+    "ean": "3515720671098",
+    "nomExact": "Millet Intense Ultra",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "millet-intense": {
+    "slug": "millet-intense",
+    "marque": "Millet",
+    "nom": "Intense",
+    "terrain": "trail",
+    "poidsG": {
+      "valeur": 274,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 6,
+      "vu": "2026-09-02"
+    },
+    "prixConseilleEur": {
+      "valeur": 190,
+      "vu": "2026-09-02"
+    },
+    "ean": "3515720404368",
+    "nomExact": "Millet Intense M",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "millet-intense-pro-boa": {
+    "slug": "millet-intense-pro-boa",
+    "marque": "Millet",
+    "nom": "Intense Pro BOA",
+    "terrain": "trail",
+    "poidsG": {
+      "valeur": 278,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 4,
+      "vu": "2026-09-02"
+    },
+    "prixConseilleEur": {
+      "valeur": 220,
+      "vu": "2026-09-02"
+    },
+    "ean": "3515720547461",
+    "nomExact": "Millet Intense Pro BOA",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
   }
 }
