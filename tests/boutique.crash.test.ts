@@ -25,6 +25,7 @@ import { specsDe, desaccord, choisirProduit, nomDeUrl, TOLERANCE } from "../scri
 import { prixConseilleDe, estFemme, terrainDeUrl, nomMarque, modeleDeNom, retirerPrefixe, vautLeCoup, familleDe, plaqueCarboneDe } from "../scripts/decouverte-irun";
 import { fusionner, contredit } from "../scripts/collecte-specs";
 import { normaliser as normaliserCatalogue, richesse } from "../scripts/normaliser-catalogue";
+import { utilisables } from "../scripts/import-offres";
 import { parseFeed, normalizeFeed } from "../src/lib/shop/affiliateFeed";
 
 let passed = 0; const fails: string[] = [];
@@ -981,6 +982,23 @@ test("la présence d'une plaque carbone se constate, jamais son absence", () => 
   assert.equal(plaqueCarboneDe("Elle est dépourvue de plaque carbone."), false);
   // Une plaque qui n'est pas en carbone n'est pas une plaque carbone.
   assert.equal(plaqueCarboneDe("La plaque en TPU rigidifie l'avant-pied."), undefined);
+});
+
+test("un lot d'offres ne contient jamais deux fois le même code-barres", () => {
+  // ⚠️ L'IMPORT ENTIER ÉCHOUAIT. Une offre s'identifie par (marchand, code-barres) ;
+  // PostgREST refuse TOUT le lot dès qu'une clé s'y répète — « ON CONFLICT DO UPDATE
+  // command cannot affect row a second time » — pas seulement la ligne fautive. Or le
+  // relevé est rangé par MODÈLE, et deux modèles peuvent porter le même code-barres tant
+  // que le catalogue n'a pas été remis à plat. Un doublon faisait donc perdre 267 prix.
+  const o = (slug: string, ean: string, prix: number) => ({ slug, ean, prix, dispo: true, url: "https://x.fr/a" });
+  const r = utilisables([o("a", "111", 120), o("b", "111", 99), o("c", "222", 80)]);
+  assert.equal(r.length, 2, "le doublon de code-barres n'a pas été fusionné");
+  // On garde le prix le plus bas : c'est celui que la page annoncera.
+  assert.equal(r.find((x) => x.ean === "111")?.prix, 99);
+  // Et les lignes inexploitables restent écartées.
+  assert.equal(utilisables([o("d", "", 50)]).length, 0, "une offre sans code-barres est orpheline, elle ne s'affichera jamais");
+  assert.equal(utilisables([{ slug: "e", ean: "333", prix: 0, dispo: true, url: "https://x.fr" }]).length, 0);
+  assert.equal(utilisables([{ slug: "f", ean: "444", prix: 50, dispo: true, url: "pas-une-url" }]).length, 0);
 });
 
 test("le catalogue existe et n'est pas vide", () => {

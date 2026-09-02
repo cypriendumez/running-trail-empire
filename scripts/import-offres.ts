@@ -35,7 +35,20 @@ export type OffreRelevee = { slug: string; ean?: string; prix: number; dispo: bo
  * jamais nulle part. On l'écarte en le disant plutôt que de gonfler un compteur.
  */
 export function utilisables(offres: OffreRelevee[]): OffreRelevee[] {
-  return offres.filter((o) => !!o.ean && Number.isFinite(o.prix) && o.prix > 0 && /^https?:\/\//.test(o.url));
+  const propres = offres.filter((o) => !!o.ean && Number.isFinite(o.prix) && o.prix > 0 && /^https?:\/\//.test(o.url));
+  // ⚠️ UN LOT NE PEUT PAS CONTENIR DEUX FOIS LA MÊME LIGNE. Une offre est identifiée par
+  //    (marchand, code-barres) ; PostgREST refuse tout le lot avec « ON CONFLICT DO UPDATE
+  //    command cannot affect row a second time » — et l'import entier échoue, pas
+  //    seulement le doublon. Le relevé est rangé par MODÈLE, or deux modèles peuvent
+  //    porter le même code-barres tant que le catalogue n'a pas été remis à plat.
+  //    On garde le prix le plus BAS : c'est celui que la page annoncera, autant qu'il soit
+  //    celui qu'on a vraiment vu.
+  const parEan = new Map<string, OffreRelevee>();
+  for (const o of propres) {
+    const ancien = parEan.get(o.ean!);
+    if (!ancien || o.prix < ancien.prix) parEan.set(o.ean!, o);
+  }
+  return [...parEan.values()];
 }
 
 async function principal(): Promise<void> {
@@ -43,7 +56,7 @@ async function principal(): Promise<void> {
   if (!fs.existsSync(f)) { console.log("aucun relevé à importer — lance d'abord `decouverte-irun`"); return; }
   const brutes = JSON.parse(fs.readFileSync(f, "utf8")) as OffreRelevee[];
   const offres = utilisables(brutes);
-  console.log(`${brutes.length} relevé(s) · ${offres.length} exploitable(s) (les autres n'ont pas de code-barres)`);
+  console.log(`${brutes.length} relevé(s) · ${offres.length} exploitable(s) (code-barres manquant ou doublon)`);
 
   const maintenant = new Date().toISOString();
   const rows = offres.map((o) => ({
@@ -56,8 +69,19 @@ async function principal(): Promise<void> {
   // Une offre = un produit chez un marchand : ré-importer met à jour, n'empile pas.
   const { error } = await sb.from("product_offers").upsert(rows, { onConflict: "retailer,external_id" });
   if (error) { console.log("ÉCHEC :", error.message); process.exitCode = 1; return; }
+  // ⚠️ LES OFFRES ORPHELINES NE DISPARAISSENT PAS TOUTES SEULES. Quand un modèle est
+  //    renommé ou fusionné par la remise à plat du catalogue, son code-barres peut ne
+  //    plus correspondre à aucune fiche : la ligne reste en base, invisible sur le site,
+  //    et fausse tous les comptages (« 275 offres » pour 253 réellement affichables).
+  //    On ne supprime QUE ce qu'aucune fiche ne peut plus afficher.
+  const catalogue = JSON.parse(fs.readFileSync(path.join(process.cwd(), "src/data/gear/chaussures.json"), "utf8")) as Record<string, { ean?: string }>;
+  const connus = new Set(Object.values(catalogue).map((m) => m.ean).filter(Boolean));
+  const { data: toutes } = await sb.from("product_offers").select("id,ean");
+  const orphelines = (toutes ?? []).filter((o: { ean: string | null }) => !o.ean || !connus.has(o.ean));
+  for (const o of orphelines as { id: string }[]) await sb.from("product_offers").delete().eq("id", o.id);
+
   const { count } = await sb.from("product_offers").select("*", { count: "exact", head: true });
-  console.log(`${rows.length} offre(s) écrite(s) · ${count} ligne(s) dans product_offers`);
+  console.log(`${rows.length} offre(s) écrite(s) · ${orphelines.length} orpheline(s) retirée(s) · ${count} ligne(s) dans product_offers`);
 }
 
 if (require.main === module) void principal();
