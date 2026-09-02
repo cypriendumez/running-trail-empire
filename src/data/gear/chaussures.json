@@ -1,0 +1,1985 @@
+{
+  "hoka-clifton-10": {
+    "slug": "hoka-clifton-10",
+    "marque": "Hoka",
+    "nom": "Clifton 10",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "quotidien",
+    "poidsG": {
+      "valeur": 260,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 42,
+      "vu": "2026-09-02"
+    },
+    "plaqueCarbone": {
+      "valeur": false,
+      "vu": "2026-09-02"
+    },
+    "prixConseilleEur": {
+      "valeur": 160,
+      "vu": "2026-09-02"
+    },
+    "dureeVieKm": {
+      "valeur": 800,
+      "vu": "2026-09-02"
+    },
+    "sources": [
+      "runninglab.fr",
+      "youtube.com",
+      "i-run.fr",
+      "running-conseil.com",
+      "rei.com",
+      "dickssportinggoods.com"
+    ],
+    "sourceFabricant": true,
+    "ean": "198605659287",
+    "nomExact": "Hoka One One Clifton 10",
+    "foulee": "Neutre"
+  },
+  "adidas-adizero-evo-sl": {
+    "slug": "adidas-adizero-evo-sl",
+    "marque": "Adidas",
+    "nom": "Adizero Evo SL",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "tempo",
+    "poidsG": {
+      "valeur": 217,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 6,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 38,
+      "vu": "2026-09-02"
+    },
+    "plaqueCarbone": {
+      "valeur": false,
+      "vu": "2026-09-02"
+    },
+    "prixConseilleEur": {
+      "valeur": 150,
+      "vu": "2026-09-02"
+    },
+    "dureeVieKm": {
+      "valeur": 600,
+      "vu": "2026-09-02"
+    },
+    "sources": [
+      "adidas.fr",
+      "runninglab.fr",
+      "alltricks.fr",
+      "adidas.com",
+      "i-run.fr",
+      "runnea.fr"
+    ],
+    "sourceFabricant": true,
+    "ean": "4069987090530",
+    "nomExact": "adidas adizero Evo SL",
+    "foulee": "Neutre"
+  },
+  "adidas-adizero-adios-pro-4": {
+    "slug": "adidas-adizero-adios-pro-4",
+    "marque": "Adidas",
+    "nom": "Adizero Adios Pro 4",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "competition",
+    "poidsG": {
+      "valeur": 193,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 6,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 39,
+      "vu": "2026-09-02"
+    },
+    "plaqueCarbone": {
+      "valeur": true,
+      "vu": "2026-09-02"
+    },
+    "prixConseilleEur": {
+      "valeur": 250,
+      "vu": "2026-09-02"
+    },
+    "sources": [
+      "solereview.com",
+      "sportsshoes.com",
+      "runmag.fr",
+      "i-run.fr",
+      "alastairrunning.com",
+      "theruntesters.com"
+    ],
+    "sourceFabricant": true,
+    "ean": "4068812168222",
+    "nomExact": "adidas adizero Adios Pro 4",
+    "foulee": "Neutre"
+  },
+  "adidas-adizero-boston-13": {
+    "slug": "adidas-adizero-boston-13",
+    "marque": "Adidas",
+    "nom": "Adizero Boston 13",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "tempo",
+    "poidsG": {
+      "valeur": 257,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 6,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 36,
+      "vu": "2026-09-02"
+    },
+    "plaqueCarbone": {
+      "valeur": false,
+      "vu": "2026-09-02"
+    },
+    "prixConseilleEur": {
+      "valeur": 160,
+      "vu": "2026-09-02"
+    },
+    "sources": [
+      "therunningcollective.fr",
+      "running-conseil.com",
+      "adidas.fr",
+      "21run.com",
+      "i-run.fr",
+      "adidas.ca"
+    ],
+    "sourceFabricant": true,
+    "ean": "4069987399725",
+    "nomExact": "adidas adizero Boston 13",
+    "foulee": "Neutre"
+  },
+  "adidas-terrex-agravic-speed-ultra": {
+    "slug": "adidas-terrex-agravic-speed-ultra",
+    "marque": "Adidas",
+    "nom": "Terrex Agravic Speed Ultra",
+    "annee": 2025,
+    "terrain": "trail",
+    "usage": "trail_long",
+    "poidsG": {
+      "valeur": 259,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 43,
+      "vu": "2026-09-02"
+    },
+    "plaqueCarbone": {
+      "valeur": true,
+      "vu": "2026-09-02"
+    },
+    "prixConseilleEur": {
+      "valeur": 230,
+      "vu": "2026-09-02"
+    },
+    "sources": [
+      "runnea.fr",
+      "runpack.fr",
+      "i-run.fr",
+      "chaussure-trail.com",
+      "adidas.fr",
+      "21run.com"
+    ],
+    "sourceFabricant": true,
+    "ean": "4067903206751",
+    "nomExact": "adidas Terrex Agravic Speed Ultra",
+    "foulee": "Neutre"
+  },
+  "adidas-terrex-agravic-sl": {
+    "slug": "adidas-terrex-agravic-sl",
+    "marque": "Adidas",
+    "nom": "Terrex Agravic Sl",
+    "annee": 2025,
+    "terrain": "trail",
+    "usage": "trail_court",
+    "poidsG": {
+      "valeur": 272,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 6,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 39,
+      "vu": "2026-09-02"
+    },
+    "plaqueCarbone": {
+      "valeur": false,
+      "vu": "2026-09-02"
+    },
+    "prixConseilleEur": {
+      "valeur": 160,
+      "vu": "2026-09-02"
+    },
+    "sources": [
+      "distance-store.com",
+      "21run.com",
+      "adidas.fr",
+      "adidas.com",
+      "youtube.com",
+      "i-run.fr"
+    ],
+    "sourceFabricant": true,
+    "ean": "4069989114180",
+    "nomExact": "adidas Terrex Agravic SL",
+    "foulee": "Neutre"
+  },
+  "asics-novablast-5": {
+    "slug": "asics-novablast-5",
+    "marque": "Asics",
+    "nom": "Novablast 5",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "quotidien",
+    "poidsG": {
+      "valeur": 243,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 41.5,
+      "vu": "2026-09-02"
+    },
+    "plaqueCarbone": {
+      "valeur": false,
+      "vu": "2026-09-02"
+    },
+    "prixConseilleEur": {
+      "valeur": 150,
+      "vu": "2026-09-02"
+    },
+    "sources": [
+      "boutiqueendurance.ca",
+      "therunningcollective.fr",
+      "asics.com",
+      "running-conseil.com",
+      "runninglab.fr",
+      "sportsdirect.fr",
+      "i-run.fr"
+    ],
+    "sourceFabricant": true,
+    "ean": "4571633471889",
+    "nomExact": "Asics Novablast 5",
+    "foulee": "Neutre"
+  },
+  "asics-novablast-6": {
+    "slug": "asics-novablast-6",
+    "marque": "Asics",
+    "nom": "Novablast 6",
+    "annee": 2026,
+    "terrain": "route",
+    "usage": "quotidien",
+    "poidsG": {
+      "valeur": 240,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 41.5,
+      "vu": "2026-09-02"
+    },
+    "plaqueCarbone": {
+      "valeur": false,
+      "vu": "2026-09-02"
+    },
+    "prixConseilleEur": {
+      "valeur": 160,
+      "vu": "2026-09-02"
+    },
+    "dureeVieKm": {
+      "valeur": 400,
+      "vu": "2026-09-02"
+    },
+    "sources": [
+      "therunningcollective.fr",
+      "quatorzerunning.com",
+      "asics.com",
+      "running-pirates.fr",
+      "i-run.fr",
+      "fflose.com"
+    ],
+    "sourceFabricant": true,
+    "ean": "4571633751882",
+    "nomExact": "Asics Novablast 6",
+    "foulee": "Neutre"
+  },
+  "salomon-speedcross-6": {
+    "slug": "salomon-speedcross-6",
+    "marque": "Salomon",
+    "nom": "Speedcross 6",
+    "annee": 2023,
+    "terrain": "trail",
+    "usage": "trail_court",
+    "poidsG": {
+      "valeur": 288,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 10,
+      "vu": "2026-09-02"
+    },
+    "ean": "198720097537",
+    "nomExact": "Salomon Speedcross 6",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "adidas-adizero-adios-9": {
+    "slug": "adidas-adizero-adios-9",
+    "marque": "Adidas",
+    "nom": "Adizero Adios 9",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "tempo",
+    "poidsG": {
+      "valeur": 168,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 7,
+      "vu": "2026-09-02"
+    },
+    "ean": "4069987296048",
+    "nomExact": "adidas adizero adios 9",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "adidas-adizero-takumi-sen-11": {
+    "slug": "adidas-adizero-takumi-sen-11",
+    "marque": "Adidas",
+    "nom": "Adizero Takumi Sen 11",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "competition",
+    "poidsG": {
+      "valeur": 181,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 7,
+      "vu": "2026-09-02"
+    },
+    "ean": "4068812258015",
+    "nomExact": "adidas adizero Takumi Sen 11",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "adidas-supernova-rise-2": {
+    "slug": "adidas-supernova-rise-2",
+    "marque": "Adidas",
+    "nom": "Supernova Rise 2",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "quotidien",
+    "poidsG": {
+      "valeur": 262,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 10,
+      "vu": "2026-09-02"
+    },
+    "ean": "4067906438906",
+    "nomExact": "adidas Supernova Rise 2",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "adidas-ultraboost-5": {
+    "slug": "adidas-ultraboost-5",
+    "marque": "Adidas",
+    "nom": "Ultraboost 5",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "quotidien",
+    "poidsG": {
+      "valeur": 283,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 10,
+      "vu": "2026-09-02"
+    },
+    "ean": "4067907738746",
+    "nomExact": "adidas UltraBOOST 5",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "asics-superblast-2": {
+    "slug": "asics-superblast-2",
+    "marque": "Asics",
+    "nom": "Superblast 2",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "polyvalent",
+    "poidsG": {
+      "valeur": 246,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "ean": "4570158685924",
+    "nomExact": "Asics Superblast 2",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "asics-gel-nimbus-28": {
+    "slug": "asics-gel-nimbus-28",
+    "marque": "Asics",
+    "nom": "Gel-Nimbus 28",
+    "annee": 2026,
+    "terrain": "route",
+    "usage": "amorti_max",
+    "poidsG": {
+      "valeur": 266,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "ean": "4571633785788",
+    "nomExact": "Asics Gel-Nimbus 28",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "asics-gel-kayano-32": {
+    "slug": "asics-gel-kayano-32",
+    "marque": "Asics",
+    "nom": "Gel-Kayano 32",
+    "annee": 2026,
+    "terrain": "route",
+    "usage": "quotidien",
+    "poidsG": {
+      "valeur": 291,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "ean": "4571633476921",
+    "nomExact": "Asics Gel-Kayano 32",
+    "foulee": "Renforcée",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "asics-gel-cumulus-27": {
+    "slug": "asics-gel-cumulus-27",
+    "marque": "Asics",
+    "nom": "Gel-Cumulus 27",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "quotidien",
+    "poidsG": {
+      "valeur": 258,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "ean": "4570158915250",
+    "nomExact": "Asics Gel-Cumulus 27",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "asics-metaspeed-sky-tokyo": {
+    "slug": "asics-metaspeed-sky-tokyo",
+    "marque": "Asics",
+    "nom": "Metaspeed Sky Tokyo",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "competition",
+    "poidsG": {
+      "valeur": 156,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 5,
+      "vu": "2026-09-02"
+    },
+    "ean": "4571633755828",
+    "nomExact": "Asics Metaspeed Sky Tokyo",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "asics-metaspeed-edge-tokyo": {
+    "slug": "asics-metaspeed-edge-tokyo",
+    "marque": "Asics",
+    "nom": "Metaspeed Edge Tokyo",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "competition",
+    "poidsG": {
+      "valeur": 157,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 5,
+      "vu": "2026-09-02"
+    },
+    "ean": "4571633770531",
+    "nomExact": "Asics Metaspeed Edge Tokyo",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "asics-magic-speed-5": {
+    "slug": "asics-magic-speed-5",
+    "marque": "Asics",
+    "nom": "Magic Speed 5",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "tempo",
+    "poidsG": {
+      "valeur": 195,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 7,
+      "vu": "2026-09-02"
+    },
+    "ean": "4571633469831",
+    "nomExact": "Asics Magic Speed 5",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "asics-fuji-lite-5": {
+    "slug": "asics-fuji-lite-5",
+    "marque": "Asics",
+    "nom": "Fuji Lite 5",
+    "annee": 2025,
+    "terrain": "trail",
+    "usage": "trail_court",
+    "poidsG": {
+      "valeur": 233,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 4,
+      "vu": "2026-09-02"
+    },
+    "ean": "4570158194464",
+    "nomExact": "Asics Fuji Lite 5",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "hoka-bondi-9": {
+    "slug": "hoka-bondi-9",
+    "marque": "Hoka",
+    "nom": "Bondi 9",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "amorti_max",
+    "poidsG": {
+      "valeur": 284,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 5,
+      "vu": "2026-09-02"
+    },
+    "ean": "198605552670",
+    "nomExact": "Hoka One One Bondi 9",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "hoka-mach-7": {
+    "slug": "hoka-mach-7",
+    "marque": "Hoka",
+    "nom": "Mach 7",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "tempo",
+    "poidsG": {
+      "valeur": 215,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 5,
+      "vu": "2026-09-02"
+    },
+    "ean": "198605909702",
+    "nomExact": "Hoka One One Mach 7",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "hoka-mach-x-3": {
+    "slug": "hoka-mach-x-3",
+    "marque": "Hoka",
+    "nom": "Mach X 3",
+    "annee": 2026,
+    "terrain": "route",
+    "usage": "tempo",
+    "poidsG": {
+      "valeur": 255,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 5,
+      "vu": "2026-09-02"
+    },
+    "ean": "198605896729",
+    "nomExact": "Hoka One One Mach X 3",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "hoka-rocket-x-3": {
+    "slug": "hoka-rocket-x-3",
+    "marque": "Hoka",
+    "nom": "Rocket X 3",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "competition",
+    "poidsG": {
+      "valeur": 193,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 7,
+      "vu": "2026-09-02"
+    },
+    "ean": "198605898563",
+    "nomExact": "Hoka One One Rocket X 3",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "hoka-cielo-x1-2-0": {
+    "slug": "hoka-cielo-x1-2-0",
+    "marque": "Hoka",
+    "nom": "Cielo X1 2.0",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "competition",
+    "poidsG": {
+      "valeur": 209,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 7,
+      "vu": "2026-09-02"
+    },
+    "ean": "198605173875",
+    "nomExact": "Hoka One One Cielo X1 2.0",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "hoka-speedgoat-6": {
+    "slug": "hoka-speedgoat-6",
+    "marque": "Hoka",
+    "nom": "Speedgoat 6",
+    "annee": 2024,
+    "terrain": "trail",
+    "usage": "trail_long",
+    "poidsG": {
+      "valeur": 245,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 5,
+      "vu": "2026-09-02"
+    },
+    "ean": "198605138867",
+    "nomExact": "Hoka One One Speedgoat 6",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "hoka-speedgoat-7": {
+    "slug": "hoka-speedgoat-7",
+    "marque": "Hoka",
+    "nom": "Speedgoat 7",
+    "annee": 2026,
+    "terrain": "trail",
+    "usage": "trail_long",
+    "poidsG": {
+      "valeur": 264,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 5,
+      "vu": "2026-09-02"
+    },
+    "ean": "198605834745",
+    "nomExact": "Hoka One One Speedgoat 7",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "hoka-mafate-5": {
+    "slug": "hoka-mafate-5",
+    "marque": "Hoka",
+    "nom": "Mafate 5",
+    "annee": 2025,
+    "terrain": "trail",
+    "usage": "trail_long",
+    "poidsG": {
+      "valeur": 298,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "ean": "198605566974",
+    "nomExact": "Hoka One One Mafate  5",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "hoka-tecton-x-3": {
+    "slug": "hoka-tecton-x-3",
+    "marque": "Hoka",
+    "nom": "Tecton X 3",
+    "annee": 2025,
+    "terrain": "trail",
+    "usage": "trail_long",
+    "poidsG": {
+      "valeur": 259,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 5,
+      "vu": "2026-09-02"
+    },
+    "ean": "198605546358",
+    "nomExact": "Hoka One One Tecton X 3",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "hoka-challenger-8": {
+    "slug": "hoka-challenger-8",
+    "marque": "Hoka",
+    "nom": "Challenger 8",
+    "annee": 2025,
+    "terrain": "trail",
+    "usage": "trail_court",
+    "poidsG": {
+      "valeur": 253,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "ean": "198605503283",
+    "nomExact": "Hoka One One Challenger 8",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "hoka-arahi-8": {
+    "slug": "hoka-arahi-8",
+    "marque": "Hoka",
+    "nom": "Arahi 8",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "quotidien",
+    "poidsG": {
+      "valeur": 256,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "ean": "198605182846",
+    "nomExact": "Hoka One One Arahi 8",
+    "foulee": "Modérée",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "nike-pegasus-41": {
+    "slug": "nike-pegasus-41",
+    "marque": "Nike",
+    "nom": "Pegasus 41",
+    "annee": 2024,
+    "terrain": "route",
+    "usage": "quotidien",
+    "poidsG": {
+      "valeur": 270,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 10,
+      "vu": "2026-09-02"
+    },
+    "ean": "197593766489",
+    "nomExact": "Nike Pegasus 41",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "nike-pegasus-42": {
+    "slug": "nike-pegasus-42",
+    "marque": "Nike",
+    "nom": "Pegasus 42",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "quotidien",
+    "poidsG": {
+      "valeur": 284,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 10,
+      "vu": "2026-09-02"
+    },
+    "ean": "198960831731",
+    "nomExact": "Nike Pegasus 42",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "nike-pegasus-premium": {
+    "slug": "nike-pegasus-premium",
+    "marque": "Nike",
+    "nom": "Pegasus Premium",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "quotidien",
+    "poidsG": {
+      "valeur": 309,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 10,
+      "vu": "2026-09-02"
+    },
+    "ean": "198729629128",
+    "nomExact": "Nike Pegasus Premium",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "nike-vomero-18": {
+    "slug": "nike-vomero-18",
+    "marque": "Nike",
+    "nom": "Vomero 18",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "amorti_max",
+    "poidsG": {
+      "valeur": 292,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 10,
+      "vu": "2026-09-02"
+    },
+    "ean": "198963088552",
+    "nomExact": "Nike Vomero 18",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "nike-zoom-fly-6": {
+    "slug": "nike-zoom-fly-6",
+    "marque": "Nike",
+    "nom": "Zoom Fly 6",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "tempo",
+    "poidsG": {
+      "valeur": 238,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "ean": "197863018904",
+    "nomExact": "Nike Zoom Fly 6",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "nike-structure-26": {
+    "slug": "nike-structure-26",
+    "marque": "Nike",
+    "nom": "Structure 26",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "quotidien",
+    "poidsG": {
+      "valeur": 294,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 10,
+      "vu": "2026-09-02"
+    },
+    "ean": "198959602373",
+    "nomExact": "Nike Structure 26",
+    "foulee": "Modérée",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "nike-pegasus-trail-5": {
+    "slug": "nike-pegasus-trail-5",
+    "marque": "Nike",
+    "nom": "Pegasus Trail 5",
+    "annee": 2024,
+    "terrain": "trail",
+    "usage": "trail_court",
+    "poidsG": {
+      "valeur": 275,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 9,
+      "vu": "2026-09-02"
+    },
+    "ean": "198487711165",
+    "nomExact": "Nike Pegasus Trail 5",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "new-balance-fuelcell-rebel-v5": {
+    "slug": "new-balance-fuelcell-rebel-v5",
+    "marque": "New Balance",
+    "nom": "FuelCell Rebel v5",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "tempo",
+    "poidsG": {
+      "valeur": 216,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 6,
+      "vu": "2026-09-02"
+    },
+    "ean": "198686831855",
+    "nomExact": "New Balance FuelCell Rebel V5",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "new-balance-fresh-foam-x-hierro-v9": {
+    "slug": "new-balance-fresh-foam-x-hierro-v9",
+    "marque": "New Balance",
+    "nom": "Fresh Foam X Hierro v9",
+    "annee": 2025,
+    "terrain": "trail",
+    "usage": "trail_court",
+    "poidsG": {
+      "valeur": 304,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 4,
+      "vu": "2026-09-02"
+    },
+    "ean": "199063562942",
+    "nomExact": "New Balance Fresh Foam X Hierro V9",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "saucony-endorphin-speed-5": {
+    "slug": "saucony-endorphin-speed-5",
+    "marque": "Saucony",
+    "nom": "Endorphin Speed 5",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "tempo",
+    "poidsG": {
+      "valeur": 235,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "ean": "195021629160",
+    "nomExact": "Saucony Endorphin Speed 5",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "saucony-endorphin-pro-5": {
+    "slug": "saucony-endorphin-pro-5",
+    "marque": "Saucony",
+    "nom": "Endorphin Pro 5",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "competition",
+    "poidsG": {
+      "valeur": 214,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "ean": "195021642886",
+    "nomExact": "Saucony Endorphin Pro 5",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "saucony-endorphin-elite-2": {
+    "slug": "saucony-endorphin-elite-2",
+    "marque": "Saucony",
+    "nom": "Endorphin Elite 2",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "competition",
+    "poidsG": {
+      "valeur": 196,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "ean": "195021136682",
+    "nomExact": "Saucony Endorphin Elite 2",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "saucony-ride-18": {
+    "slug": "saucony-ride-18",
+    "marque": "Saucony",
+    "nom": "Ride 18",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "quotidien",
+    "poidsG": {
+      "valeur": 267,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "ean": "195021163817",
+    "nomExact": "Saucony Ride 18",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "saucony-triumph-23": {
+    "slug": "saucony-triumph-23",
+    "marque": "Saucony",
+    "nom": "Triumph 23",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "amorti_max",
+    "poidsG": {
+      "valeur": 277,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 10,
+      "vu": "2026-09-02"
+    },
+    "ean": "195021631705",
+    "nomExact": "Saucony Triumph 23",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "saucony-peregrine-16": {
+    "slug": "saucony-peregrine-16",
+    "marque": "Saucony",
+    "nom": "Peregrine 16",
+    "annee": 2026,
+    "terrain": "trail",
+    "usage": "trail_court",
+    "poidsG": {
+      "valeur": 275,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 4,
+      "vu": "2026-09-02"
+    },
+    "ean": "195021643272",
+    "nomExact": "Saucony Peregrine 16",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "saucony-xodus-ultra-4": {
+    "slug": "saucony-xodus-ultra-4",
+    "marque": "Saucony",
+    "nom": "Xodus Ultra 4",
+    "annee": 2025,
+    "terrain": "trail",
+    "usage": "trail_long",
+    "poidsG": {
+      "valeur": 318,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 6,
+      "vu": "2026-09-02"
+    },
+    "ean": "195022008162",
+    "nomExact": "Saucony Xodus Ultra 4",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "saucony-kinvara-15": {
+    "slug": "saucony-kinvara-15",
+    "marque": "Saucony",
+    "nom": "Kinvara 15",
+    "annee": 2024,
+    "terrain": "route",
+    "usage": "tempo",
+    "poidsG": {
+      "valeur": 180,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 4,
+      "vu": "2026-09-02"
+    },
+    "ean": "195020771938",
+    "nomExact": "Saucony Kinvara 15",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "on-cloudmonster-2": {
+    "slug": "on-cloudmonster-2",
+    "marque": "On",
+    "nom": "Cloudmonster 2",
+    "annee": 2024,
+    "terrain": "route",
+    "usage": "quotidien",
+    "poidsG": {
+      "valeur": 279,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 6,
+      "vu": "2026-09-02"
+    },
+    "ean": "7615537197814",
+    "nomExact": "On-Running Cloudmonster 2",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "on-cloudsurfer-2": {
+    "slug": "on-cloudsurfer-2",
+    "marque": "On",
+    "nom": "Cloudsurfer 2",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "quotidien",
+    "poidsG": {
+      "valeur": 245,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 9,
+      "vu": "2026-09-02"
+    },
+    "ean": "7615537880945",
+    "nomExact": "On-Running Cloudsurfer 2",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "on-cloudboom-strike": {
+    "slug": "on-cloudboom-strike",
+    "marque": "On",
+    "nom": "Cloudboom Strike",
+    "annee": 2024,
+    "terrain": "route",
+    "usage": "competition",
+    "poidsG": {
+      "valeur": 202,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 4,
+      "vu": "2026-09-02"
+    },
+    "ean": "7615537217987",
+    "nomExact": "On-Running Cloudboom Strike",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "on-cloudvista-2": {
+    "slug": "on-cloudvista-2",
+    "marque": "On",
+    "nom": "Cloudvista 2",
+    "annee": 2025,
+    "terrain": "trail",
+    "usage": "trail_court",
+    "poidsG": {
+      "valeur": 279,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 6,
+      "vu": "2026-09-02"
+    },
+    "ean": "7615537571461",
+    "nomExact": "On-Running Cloudvista 2",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "puma-deviate-nitro-3": {
+    "slug": "puma-deviate-nitro-3",
+    "marque": "Puma",
+    "nom": "Deviate Nitro 3",
+    "annee": 2024,
+    "terrain": "route",
+    "usage": "tempo",
+    "poidsG": {
+      "valeur": 268,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 10,
+      "vu": "2026-09-02"
+    },
+    "ean": "4069157083690",
+    "nomExact": "Puma Deviate Nitro 3",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "puma-velocity-nitro-4": {
+    "slug": "puma-velocity-nitro-4",
+    "marque": "Puma",
+    "nom": "Velocity Nitro 4",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "quotidien",
+    "poidsG": {
+      "valeur": 235,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 10,
+      "vu": "2026-09-02"
+    },
+    "ean": "4069161395659",
+    "nomExact": "Puma Velocity Nitro 4",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "puma-fast-r-nitro-elite-3": {
+    "slug": "puma-fast-r-nitro-elite-3",
+    "marque": "Puma",
+    "nom": "Fast-R Nitro Elite 3",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "competition",
+    "poidsG": {
+      "valeur": 173,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "ean": "4069157146173",
+    "nomExact": "Puma Fast-R Nitro Elite 3",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "puma-deviate-nitro-elite-3": {
+    "slug": "puma-deviate-nitro-elite-3",
+    "marque": "Puma",
+    "nom": "Deviate Nitro Elite 3",
+    "annee": 2024,
+    "terrain": "route",
+    "usage": "competition",
+    "poidsG": {
+      "valeur": 185,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "ean": "4069157098908",
+    "nomExact": "Puma Deviate Nitro Elite 3",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "salomon-s-lab-genesis": {
+    "slug": "salomon-s-lab-genesis",
+    "marque": "Salomon",
+    "nom": "S/Lab Genesis",
+    "annee": 2024,
+    "terrain": "trail",
+    "usage": "trail_long",
+    "poidsG": {
+      "valeur": 252,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "ean": "195751917858",
+    "nomExact": "Salomon S-Lab Genesis",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "salomon-ultra-glide-3": {
+    "slug": "salomon-ultra-glide-3",
+    "marque": "Salomon",
+    "nom": "Ultra Glide 3",
+    "annee": 2024,
+    "terrain": "trail",
+    "usage": "trail_long",
+    "poidsG": {
+      "valeur": 268,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 6,
+      "vu": "2026-09-02"
+    },
+    "ean": "195751923774",
+    "nomExact": "Salomon Ultra Glide 3",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "salomon-thundercross": {
+    "slug": "salomon-thundercross",
+    "marque": "Salomon",
+    "nom": "Thundercross",
+    "annee": 2024,
+    "terrain": "trail",
+    "usage": "trail_court",
+    "poidsG": {
+      "valeur": 246,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 4,
+      "vu": "2026-09-02"
+    },
+    "ean": "195751422949",
+    "nomExact": "Salomon Thundercross",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "salomon-aero-glide-3": {
+    "slug": "salomon-aero-glide-3",
+    "marque": "Salomon",
+    "nom": "Aero Glide 3",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "quotidien",
+    "poidsG": {
+      "valeur": 230,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "ean": "198720093478",
+    "nomExact": "Salomon Aero Glide 3",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "brooks-ghost-17": {
+    "slug": "brooks-ghost-17",
+    "marque": "Brooks",
+    "nom": "Ghost 17",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "quotidien",
+    "poidsG": {
+      "valeur": 276,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 10,
+      "vu": "2026-09-02"
+    },
+    "ean": "195394759976",
+    "nomExact": "Brooks Ghost 17",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "brooks-glycerin-22": {
+    "slug": "brooks-glycerin-22",
+    "marque": "Brooks",
+    "nom": "Glycerin 22",
+    "annee": 2024,
+    "terrain": "route",
+    "usage": "amorti_max",
+    "poidsG": {
+      "valeur": 262,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 10,
+      "vu": "2026-09-02"
+    },
+    "ean": "195394677706",
+    "nomExact": "Brooks Glycerin 22",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "brooks-caldera-8": {
+    "slug": "brooks-caldera-8",
+    "marque": "Brooks",
+    "nom": "Caldera 8",
+    "annee": 2025,
+    "terrain": "trail",
+    "usage": "trail_long",
+    "poidsG": {
+      "valeur": 299,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 6,
+      "vu": "2026-09-02"
+    },
+    "ean": "195394756623",
+    "nomExact": "Brooks Caldera 8",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "brooks-cascadia-19": {
+    "slug": "brooks-cascadia-19",
+    "marque": "Brooks",
+    "nom": "Cascadia 19",
+    "annee": 2024,
+    "terrain": "trail",
+    "usage": "trail_court",
+    "poidsG": {
+      "valeur": 299,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 6,
+      "vu": "2026-09-02"
+    },
+    "ean": "195394757484",
+    "nomExact": "Brooks Cascadia 19",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "brooks-adrenaline-gts-24": {
+    "slug": "brooks-adrenaline-gts-24",
+    "marque": "Brooks",
+    "nom": "Adrenaline GTS 24",
+    "annee": 2024,
+    "terrain": "route",
+    "usage": "quotidien",
+    "poidsG": {
+      "valeur": 262,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 12,
+      "vu": "2026-09-02"
+    },
+    "ean": "195394668575",
+    "nomExact": "Brooks Adrenaline GTS 24",
+    "foulee": "Modérée",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "mizuno-wave-rider-29": {
+    "slug": "mizuno-wave-rider-29",
+    "marque": "Mizuno",
+    "nom": "Wave Rider 29",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "quotidien",
+    "poidsG": {
+      "valeur": 261,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 10,
+      "vu": "2026-09-02"
+    },
+    "ean": "5059882879216",
+    "nomExact": "Mizuno Wave Rider 29",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "mizuno-wave-sky-9": {
+    "slug": "mizuno-wave-sky-9",
+    "marque": "Mizuno",
+    "nom": "Wave Sky 9",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "amorti_max",
+    "poidsG": {
+      "valeur": 286,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 6,
+      "vu": "2026-09-02"
+    },
+    "ean": "5063264063797",
+    "nomExact": "Mizuno Wave Sky 9",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "mizuno-wave-rebellion-pro-3": {
+    "slug": "mizuno-wave-rebellion-pro-3",
+    "marque": "Mizuno",
+    "nom": "Wave Rebellion Pro 3",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "competition",
+    "poidsG": {
+      "valeur": 225,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 4,
+      "vu": "2026-09-02"
+    },
+    "ean": "5059882644371",
+    "nomExact": "Mizuno Wave Rebellion Pro 3",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "mizuno-neo-vista-2": {
+    "slug": "mizuno-neo-vista-2",
+    "marque": "Mizuno",
+    "nom": "Neo Vista 2",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "quotidien",
+    "poidsG": {
+      "valeur": 265,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "ean": "5059882880366",
+    "nomExact": "Mizuno Neo Vista 2",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "altra-lone-peak-9": {
+    "slug": "altra-lone-peak-9",
+    "marque": "Altra",
+    "nom": "Lone Peak 9",
+    "annee": 2025,
+    "terrain": "trail",
+    "usage": "trail_long",
+    "poidsG": {
+      "valeur": 295,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 0,
+      "vu": "2026-09-02"
+    },
+    "ean": "197804640621",
+    "nomExact": "Altra Lone Peak 9+",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "altra-torin-8": {
+    "slug": "altra-torin-8",
+    "marque": "Altra",
+    "nom": "Torin 8",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "quotidien",
+    "poidsG": {
+      "valeur": 259,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 0,
+      "vu": "2026-09-02"
+    },
+    "ean": "197642815014",
+    "nomExact": "Altra Torin 8",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "altra-escalante-4": {
+    "slug": "altra-escalante-4",
+    "marque": "Altra",
+    "nom": "Escalante 4",
+    "annee": 2024,
+    "terrain": "route",
+    "usage": "quotidien",
+    "poidsG": {
+      "valeur": 231,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 0,
+      "vu": "2026-09-02"
+    },
+    "ean": "198266743790",
+    "nomExact": "Altra Escalante 4",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "la-sportiva-bushido-iii": {
+    "slug": "la-sportiva-bushido-iii",
+    "marque": "La Sportiva",
+    "nom": "Bushido III",
+    "annee": 2024,
+    "terrain": "trail",
+    "usage": "trail_court",
+    "poidsG": {
+      "valeur": 301,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 6,
+      "vu": "2026-09-02"
+    },
+    "ean": "8058428276998",
+    "nomExact": "La Sportiva Bushido III",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "la-sportiva-prodigio": {
+    "slug": "la-sportiva-prodigio",
+    "marque": "La Sportiva",
+    "nom": "Prodigio",
+    "annee": 2024,
+    "terrain": "trail",
+    "usage": "trail_long",
+    "poidsG": {
+      "valeur": 268,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 6,
+      "vu": "2026-09-02"
+    },
+    "ean": "8058428053186",
+    "nomExact": "La Sportiva Prodigio",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "la-sportiva-prodigio-pro": {
+    "slug": "la-sportiva-prodigio-pro",
+    "marque": "La Sportiva",
+    "nom": "Prodigio Pro",
+    "annee": 2025,
+    "terrain": "trail",
+    "usage": "trail_long",
+    "poidsG": {
+      "valeur": 260,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 6,
+      "vu": "2026-09-02"
+    },
+    "ean": "801216898678",
+    "nomExact": "La Sportiva Prodigio Pro",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "la-sportiva-akasha-ii": {
+    "slug": "la-sportiva-akasha-ii",
+    "marque": "La Sportiva",
+    "nom": "Akasha II",
+    "annee": 2023,
+    "terrain": "trail",
+    "usage": "trail_long",
+    "poidsG": {
+      "valeur": 321,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 10,
+      "vu": "2026-09-02"
+    },
+    "ean": "8058428273799",
+    "nomExact": "La Sportiva Akasha II",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "scott-kinabalu-3": {
+    "slug": "scott-kinabalu-3",
+    "marque": "Scott",
+    "nom": "Kinabalu 3",
+    "annee": 2024,
+    "terrain": "trail",
+    "usage": "trail_court",
+    "poidsG": {
+      "valeur": 300,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 7,
+      "vu": "2026-09-02"
+    },
+    "ean": "7616185146032",
+    "nomExact": "Scott Kinabalu 3",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "norda-001": {
+    "slug": "norda-001",
+    "marque": "Norda",
+    "nom": "001",
+    "annee": 2023,
+    "terrain": "trail",
+    "usage": "trail_long",
+    "poidsG": {
+      "valeur": 309,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 5,
+      "vu": "2026-09-02"
+    },
+    "ean": "872236010852",
+    "nomExact": "norda 001",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "asics-trabuco-14": {
+    "slug": "asics-trabuco-14",
+    "marque": "Asics",
+    "nom": "Trabuco 14",
+    "annee": 2026,
+    "terrain": "trail",
+    "usage": "trail_court",
+    "poidsG": {
+      "valeur": 276,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "ean": "4571633491900",
+    "nomExact": "Asics Trabuco 14",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "nike-vaporfly-next-4": {
+    "slug": "nike-vaporfly-next-4",
+    "marque": "Nike",
+    "nom": "Vaporfly Next 4",
+    "annee": 2025,
+    "terrain": "route",
+    "usage": "competition",
+    "poidsG": {
+      "valeur": 164,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 6,
+      "vu": "2026-09-02"
+    },
+    "ean": "198959733503",
+    "nomExact": "Nike Vaporfly Next% 4",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "nike-air-zoom-alphafly-next-3": {
+    "slug": "nike-air-zoom-alphafly-next-3",
+    "marque": "Nike",
+    "nom": "Air Zoom Alphafly Next 3",
+    "annee": 2024,
+    "terrain": "route",
+    "usage": "competition",
+    "poidsG": {
+      "valeur": 196,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "ean": "198729832016",
+    "nomExact": "Nike Air Zoom Alphafly Next% 3",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  },
+  "inov-8-trailfly-ultra-g-280": {
+    "slug": "inov-8-trailfly-ultra-g-280",
+    "marque": "Inov-8",
+    "nom": "Trailfly Ultra G 280",
+    "annee": 2023,
+    "terrain": "trail",
+    "usage": "trail_long",
+    "poidsG": {
+      "valeur": 293,
+      "vu": "2026-09-02"
+    },
+    "dropMm": {
+      "valeur": 8,
+      "vu": "2026-09-02"
+    },
+    "ean": "5054167701787",
+    "nomExact": "Inov-8 TrailFly Ultra G 280 M",
+    "foulee": "Neutre",
+    "sources": [
+      "i-run.fr"
+    ]
+  }
+}

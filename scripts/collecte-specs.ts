@@ -1,0 +1,146 @@
+/**
+ * COLLECTE DES FICHES TECHNIQUES — un modèle de chaussure à la fois, sources à l'appui.
+ *
+ *   npx tsx scripts/collecte-specs.ts            # tous les modèles non encore renseignés
+ *   npx tsx scripts/collecte-specs.ts "Hoka Clifton 10"
+ *
+ * ⚠️ CE SCRIPT N'ÉCRIT JAMAIS UNE VALEUR QU'IL N'A PAS VÉRIFIÉE. Trois filtres avant
+ * d'accepter un nombre :
+ *   · il vient d'une réponse ADOSSÉE À LA RECHERCHE (sources listées, sinon on jette) ;
+ *   · il tombe dans les bornes physiques du champ (cf. BORNES) ;
+ *   · il est cohérent avec les autres (le stack talon dépasse le drop).
+ * Ce qui échoue reste VIDE et s'affichera « non communiqué ». Une case vide est honnête ;
+ * un poids inventé ne l'est pas.
+ *
+ * ⚠️ DEUX APPELS, PAS UN. Gemini 2.5 dépense son budget de sortie en raisonnement : un
+ * seul appel qui cherche ET met en forme rend une réponse tronquée au milieu d'un
+ * nombre. Le premier appel cherche en prose, le second — sans recherche, sans
+ * raisonnement — n'a plus qu'à recopier en JSON.
+ */
+import fs from "node:fs";
+import path from "node:path";
+for (const l of fs.readFileSync(".env.local", "utf8").split("\n")) {
+  const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m) process.env[m[1]] = m[2].replace(/^"|"$/g, "");
+}
+import { generateContent } from "../src/lib/ai/gemini";
+import { dansLesBornes, coherenceStackDrop, sourceValide, type Modele } from "../src/lib/shop/modele";
+import { MODELES_A_COLLECTER } from "./modeles-a-collecter";
+
+const SORTIE = path.join(process.cwd(), "src/data/gear/chaussures.json");
+
+function promptRecherche(m: { marque: string; nom: string }): string {
+  return `Fiche technique de la chaussure de running « ${m.marque} ${m.nom} », déclinaison homme.
+Consulte le site du fabricant et les revendeurs spécialisés français.
+Indique précisément :
+- le poids en grammes (taille de référence US 9 / EU 42)
+- le drop en millimètres
+- la hauteur de semelle au talon (stack) en millimètres
+- la présence ou l'absence d'une plaque carbone
+- le prix public conseillé en euros à sa sortie
+- la durée de vie annoncée en kilomètres
+Pour chaque valeur, cite le site où tu l'as lue. Si une valeur n'est publiée nulle part,
+écris explicitement « non communiqué » : n'estime jamais, ne déduis jamais d'un modèle voisin.
+
+Avant tout : si cette chaussure n'existe pas sous ce nom exact, réponds uniquement
+MODELE INCONNU. Ne réponds JAMAIS avec les caractéristiques d'un modèle voisin ou d'une
+autre génération — une fiche exacte pour un produit qui n'existe pas est le pire résultat
+possible.`;
+}
+
+function promptExtraction(prose: string): string {
+  return `Voici une fiche technique rédigée :
+
+${prose.slice(0, 6000)}
+
+Recopie-la en JSON strict, sans commentaire ni texte autour :
+{"poidsG":nombre|null,"dropMm":nombre|null,"stackTalonMm":nombre|null,"plaqueCarbone":true|false|null,"prixConseilleEur":nombre|null,"dureeVieKm":nombre|null}
+Mets null partout où le texte dit « non communiqué », hésite, ou ne donne pas la valeur.
+N'invente aucun nombre absent du texte.`;
+}
+
+function jsonDe(t: string): Record<string, unknown> | null {
+  const m = String(t).match(/\{[\s\S]*\}/);
+  if (!m) return null;
+  try { return JSON.parse(m[0]) as Record<string, unknown>; } catch { return null; }
+}
+
+export async function collecter(m: (typeof MODELES_A_COLLECTER)[number]): Promise<Modele | null> {
+  const rech = await generateContent(
+    [{ role: "user", parts: [{ text: promptRecherche(m) }] }],
+    { temperature: 0, maxOutputTokens: 2200 },
+    { tools: [{ google_search: {} }] },
+  );
+  if (!rech.ok || !rech.text.trim()) return null;
+  // ⚠️ UN NOM DE MODÈLE FAUX PRODUIT UNE FICHE VRAISEMBLABLE. Sans ce garde-fou, une
+  // coquille dans la liste ferait décrire la génération voisine, avec des sources
+  // authentiques à l'appui : la fiche paraîtrait irréprochable et serait fausse.
+  if (/MODELE INCONNU/i.test(rech.text)) return null;
+
+  // ⚠️ SANS SOURCE CONSULTÉE, LA RÉPONSE EST DE MÉMOIRE — donc invérifiable. On jette.
+  const sources = (rech.sources ?? []).map((s: unknown) =>
+    typeof s === "string" ? s : String((s as { url?: string; uri?: string })?.url ?? (s as { uri?: string })?.uri ?? "")
+  ).filter(sourceValide);
+  if (!sources.length) return null;
+
+  const ext = await generateContent(
+    [{ role: "user", parts: [{ text: promptExtraction(rech.text) }] }],
+    { temperature: 0, maxOutputTokens: 300, thinkingConfig: { thinkingBudget: 0 } },
+  );
+  if (!ext.ok) return null;
+  const j = jsonDe(ext.text);
+  if (!j) return null;
+
+  const vu = new Date().toISOString().slice(0, 10);
+  const mesure = <T,>(v: T | null | undefined) => (v == null ? undefined : { valeur: v, vu });
+  // Le site du fabricant parmi les sources = relevé de première main. On le signale sans
+  // l'exiger : beaucoup de marques ne publient pas le poids sur leur boutique française.
+  const marqueNormalisee = m.marque.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const sourceFabricant = sources.some((s) => s.toLowerCase().replace(/[^a-z0-9]/g, "").includes(marqueNormalisee));
+
+  const nombre = (champ: "poidsG" | "dropMm" | "stackTalonMm" | "prixConseilleEur" | "dureeVieKm") => {
+    const v = Number(j[champ]);
+    return dansLesBornes(champ, v) ? Math.round(v * 10) / 10 : undefined;
+  };
+  const poidsG = nombre("poidsG"), dropMm = nombre("dropMm");
+  let stackTalonMm = nombre("stackTalonMm");
+  // Une semelle avant d'épaisseur négative n'existe pas : c'est la valeur lue qui est fausse.
+  if (!coherenceStackDrop(stackTalonMm, dropMm)) stackTalonMm = undefined;
+
+  return {
+    slug: m.slug, marque: m.marque, nom: m.nom, annee: m.annee, terrain: m.terrain, usage: m.usage,
+    poidsG: mesure(poidsG), dropMm: mesure(dropMm), stackTalonMm: mesure(stackTalonMm),
+    plaqueCarbone: typeof j.plaqueCarbone === "boolean" ? mesure(j.plaqueCarbone) : undefined,
+    prixConseilleEur: mesure(nombre("prixConseilleEur")), dureeVieKm: mesure(nombre("dureeVieKm")),
+    sources: [...new Set(sources)].slice(0, 6), sourceFabricant,
+  };
+}
+
+async function principal(): Promise<void> {
+  const filtre = process.argv[2]?.toLowerCase();
+  const deja: Record<string, Modele> = fs.existsSync(SORTIE) ? JSON.parse(fs.readFileSync(SORTIE, "utf8")) : {};
+  const liste = MODELES_A_COLLECTER.filter((m) =>
+    filtre ? `${m.marque} ${m.nom}`.toLowerCase().includes(filtre) : !deja[m.slug]);
+  console.log(`${liste.length} modèle(s) à collecter · ${Object.keys(deja).length} déjà en fiche`);
+
+  let ok = 0, vides = 0;
+  for (const m of liste) {
+    try {
+      const fiche = await collecter(m);
+      if (!fiche) { vides++; console.log(`  ✗ ${m.marque} ${m.nom} — aucune donnée vérifiable`); continue; }
+      deja[m.slug] = fiche;
+      ok++;
+      const r = [
+        fiche.poidsG ? `${fiche.poidsG.valeur} g` : "poids ?",
+        fiche.dropMm ? `${fiche.dropMm.valeur} mm` : "drop ?",
+        fiche.stackTalonMm ? `stack ${fiche.stackTalonMm.valeur}` : "stack ?",
+        fiche.prixConseilleEur ? `${fiche.prixConseilleEur.valeur} €` : "prix ?",
+      ].join(" · ");
+      console.log(`  ✓ ${(m.marque + " " + m.nom).padEnd(34)} ${r}`);
+      fs.writeFileSync(SORTIE, JSON.stringify(deja, null, 2));
+    } catch (e) { vides++; console.log(`  ✗ ${m.marque} ${m.nom} — ${String(e).slice(0, 60)}`); }
+    await new Promise((r) => setTimeout(r, 1200));
+  }
+  console.log(`\n${ok} fiche(s) écrite(s), ${vides} sans donnée vérifiable · ${SORTIE}`);
+}
+
+if (require.main === module) void principal();

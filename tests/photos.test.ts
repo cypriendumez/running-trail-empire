@@ -221,13 +221,17 @@ test("la liste des auditées ne contient rien de périmé", () => {
 // boutique le rendait dès que `product_offers` cessait d'être vide — donc importer un
 // vrai flux aurait allumé les faux prix. Cette page doit rester sur l'écran d'attente.
 test("la page boutique ne rend pas le catalogue simulé", () => {
+  // ⚠️ L'ÉCRAN D'ATTENTE A ÉTÉ REMPLACÉ, PAS L'INTERDIT. La page affiche désormais un
+  // comparateur de CARACTÉRISTIQUES relevées et sourcées (`GearHub`), sans aucun prix
+  // marchand : ce qui était interdit reste interdit, mais la page n'est plus vide.
+  // Le détail des prix est verrouillé par `tests/boutique.crash.test.ts`.
   const f = TOUS.find((x) => relative(SRC, x.p).replace(/\\/g, "/") === "app/dashboard/shop/page.tsx");
   assert.ok(f, "app/dashboard/shop/page.tsx introuvable");
-  assert.ok(f!.code.includes("ShopComingSoon"), "la page ne rend plus l'écran d'attente");
   assert.ok(
     !f!.code.includes("ShoppingHub"),
     "la page boutique référence à nouveau ShoppingHub — elle afficherait des prix inventés",
   );
+  assert.ok(f!.code.includes("GearHub"), "la page ne rend plus le comparateur");
 });
 
 test("une photo ne peut pas être à la fois bannie et auditée", () => {

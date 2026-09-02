@@ -890,10 +890,22 @@ test("aucun catalogue fabriqué n'est rendu sans offres réelles", () => {
   // Décision assumée : un avertissement sur des prix inventés est un pansement. La
   // boutique n'apparaît QUE si `product_offers` contient de vraies offres importées
   // depuis un flux marchand officiel.
+  // ⚠️ LA RÈGLE N'A PAS CHANGÉ, SON APPLICATION SI. La page ne montrait rien du tout ;
+  // elle montre maintenant des caractéristiques relevées et sourcées, et laisse la case
+  // « offres » VIDE tant que `product_offers` ne contient pas de vraie offre importée.
+  // C'est la fiche modèle qui lit les offres, et elle seule.
   const page = readFileSync("src/app/dashboard/shop/page.tsx", "utf8");
-  assert.ok(/product_offers/.test(page), "la page ne vérifie pas la présence d'offres réelles");
-  assert.ok(/ShopComingSoon/.test(page), "aucun écran d'attente en l'absence d'offres");
-  assert.ok(existsSync("src/components/shop/ShopComingSoon.tsx"));
+  const route = readFileSync("src/app/dashboard/shop/[slug]/page.tsx", "utf8");
+  // Le corps de la fiche vit dans son propre composant : la route ne fait plus que lire.
+  const fiche = route + readFileSync("src/components/shop/FicheModele.tsx", "utf8");
+  assert.ok(/product_offers/.test(readFileSync("src/lib/shop/offres.ts", "utf8")),
+    "les offres ne sont plus lues dans product_offers");
+  assert.ok(/offresPour/.test(route), "la route ne lit aucune offre importée");
+  // L'état vide est un texte traduit : on vérifie que la fiche l'APPELLE. Sa formulation
+  // française vit dans `shopI18n`, et `tests/boutique.crash.test.ts` garde les 5 langues.
+  assert.ok(/shop\.offres_aucune/.test(fiche), "aucun état vide honnête quand il n'y a pas d'offre");
+  assert.ok(!/ShoppingHub/.test(page) && !/ShoppingHub/.test(fiche),
+    "le catalogue simulé aux 1 167 prix inventés est de retour");
 });
 test("l'importateur de flux reste protégé et ne scrape rien", () => {
   const src = readFileSync("src/app/api/shop/import-feed/route.ts", "utf8");
@@ -6088,9 +6100,15 @@ test("la carte Ligue montre les composantes RÉELLEMENT calculées", () => {
 });
 
 test("aucune route de mesure jetable n'est partie en production", () => {
-  // J'en recrée une à chaque diagnostic visuel (copie du dashboard sans garde de
-  // session). Oubliée, elle exposerait les données d'un compte en clair.
-  assert.ok(!existsSync("src/app/preview-dash-tmp"), "src/app/preview-dash-tmp est encore là : à supprimer avant tout déploiement");
+  // J'en recrée une à chaque diagnostic visuel (copie d'un écran sans garde de session).
+  // Oubliée, elle exposerait les données d'un compte en clair.
+  //
+  // ⚠️ CE TEST NE NOMMAIT QU'UN SEUL CHEMIN, « preview-dash-tmp ». Il a laissé passer
+  // « preview-boutique » et « preview-fiche », créées le 02/09/2026 pour regarder le
+  // comparateur : le garde-fou existait, il ne gardait qu'une porte. On refuse
+  // désormais TOUT dossier `preview-*`, quel que soit son nom.
+  const jetables = readdirSync("src/app").filter((d) => d.startsWith("preview-"));
+  assert.deepEqual(jetables, [], `route(s) de mesure encore en place : ${jetables.join(", ")} — à supprimer avant tout déploiement`);
 });
 
 console.log("\nTABLEAU DE BORD — les chiffres affichés doivent venir de la mesure, pas d'un proxy");
