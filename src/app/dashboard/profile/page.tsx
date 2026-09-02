@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { createClient } from "@/lib/supabase/server";
 import { ProfileSettings } from "@/components/profile/ProfileSettings";
+import { indexLeger } from "@/lib/shop/indexLeger";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import { TYPE_ETAT_ABO, litEtatAbo } from "@/lib/billing/etatAbonnement";
 import { bestVmaFromWorkouts, effectiveVma } from "@/lib/running/fitness";
@@ -100,6 +101,7 @@ export default async function ProfilePage() {
       stats={{ kmYear, kmMonth, sessionsMonth, longestRun, streak, bySport }}
       fitness={{ estimatedVma, vmaSource, obsMaxHr, garminVo2max: Number((profile as { garmin_vo2max?: number | null } | null)?.garmin_vo2max) || null, garmin: ((profile as { garmin_metrics?: Record<string, number | null> | null } | null)?.garmin_metrics) ?? null }}
       userId={user!.id}
+      catalogue={indexLeger()}
       etatAbo={litEtatAbo((ligneAbo as { data?: unknown } | null)?.data ?? null)}
     />
   );

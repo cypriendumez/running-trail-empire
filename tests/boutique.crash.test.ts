@@ -14,9 +14,10 @@ import { readFileSync, existsSync } from "node:fs";
 import { CATALOGUE, filtrer, trier, alternatives, normalise } from "../src/lib/shop/catalogue";
 import { dansLesBornes, coherenceStackDrop, sourceValide, sourceCitable, sourcesCitables, domaineDe, BORNES, type Modele } from "../src/lib/shop/modele";
 import { decrire, familleAmorti, familleMasse, familleDrop } from "../src/lib/shop/description";
-import { evaluer, verdictDe, type ProfilAthlete } from "../src/lib/shop/pourToi";
+import { evaluer, verdictDe, paireAremplacer, SEUIL_USURE, type ProfilAthlete } from "../src/lib/shop/pourToi";
 import { partTrail, sortieLongueKm, semainesAvant, construireProfil } from "../src/lib/shop/profilAthlete";
 import { meilleure, type Offre } from "../src/lib/shop/offres";
+import { indexLeger, trouver, cotesPourGarage } from "../src/lib/shop/indexLeger";
 import { SHOP, texteShop, texteFoulee } from "../src/components/shop/shopI18n";
 import { choisirFiche, caracteristiques, nombreDe, normaliser } from "../scripts/collecte-irun";
 import { specsDe, desaccord, choisirProduit, nomDeUrl, TOLERANCE } from "../scripts/collecte-rw";
@@ -544,6 +545,90 @@ test("une étiquette venue des DONNÉES se traduit aussi", () => {
   // Une valeur inconnue est rendue telle quelle : mieux vaut un mot en français qu'une
   // caractéristique qui disparaît sans explication.
   assert.equal(texteFoulee("de", "Supination"), "Supination");
+});
+
+console.log("\nGARAGE — les cotes viennent du catalogue, pas d'une saisie");
+
+test("une cote décimale ne fait pas échouer l'ajout d'une paire", () => {
+  // ⚠️ VÉRIFIÉ EN BASE le 02/09/2026 : `drop_mm`, `stack_mm` et `weight_g` sont des
+  // `smallint`. Insérer 38,5 ne tronque pas, ça ÉCHOUE (« invalid input syntax for type
+  // smallint »). Comme les cotes partent dans la MÊME insertion que la paire, deux
+  // modèles du catalogue auraient fait échouer tout l'ajout : l'athlète voyait
+  // « erreur » et perdait sa saisie.
+  const c = cotesPourGarage({ marque: "x", nom: "y", terrain: "route", stackMm: 38.5, dropMm: 6.5, poidsG: 224.4 });
+  for (const [k, v] of Object.entries(c))
+    assert.ok(v == null || Number.isInteger(v), `${k} = ${v} n'est pas un entier`);
+  assert.equal(c.stack_mm, 39);
+  assert.deepEqual(cotesPourGarage(undefined), { drop_mm: null, stack_mm: null, weight_g: null },
+    "un modèle inconnu doit laisser les colonnes vides, pas y mettre zéro");
+});
+
+test("le garage écrit bien les cotes, sinon l'avertissement de drop ne sert à rien", () => {
+  // La boucle complète : catalogue → garage → `shoes.drop_mm` → avertissement de
+  // transition dans le comparateur. Si le garage cesse d'écrire ces colonnes, la boucle
+  // se rouvre en silence — c'est l'état dans lequel l'app a vécu jusqu'ici.
+  const src = codeOf("src/components/profile/ProfileSettings.tsx");
+  assert.ok(/cotesPourGarage\(fiche\)/.test(src), "le garage n'enregistre plus les cotes du catalogue");
+  assert.ok(/trouver\(catalogue/.test(src), "le garage ne cherche plus le modèle dans le catalogue");
+});
+
+test("le catalogue réduit garde ce qu'il faut et rien de plus", () => {
+  const l = indexLeger();
+  assert.equal(l.length, CATALOGUE.length);
+  const m = l.find((x) => x.dropMm != null)!;
+  assert.ok(m && m.marque && m.nom && m.terrain, "une entrée réduite est incomplète");
+  assert.equal((m as unknown as { sources?: unknown }).sources, undefined,
+    "les sources partent dans le paquet JavaScript de la page Profil pour rien");
+  // La recherche doit tolérer casse et accents : c'est ce que l'athlète tape.
+  const ref = CATALOGUE.find((x) => x.dropMm)!;
+  assert.ok(trouver(l, ref.marque.toUpperCase(), ref.nom.toLowerCase()), "le modèle n'est pas retrouvé");
+  assert.equal(trouver(l, "Marque inexistante", "Modèle inexistant"), undefined);
+});
+
+test("aucun verdict d'usure tant que le kilométrage n'est pas renseigné", () => {
+  // ⚠️ DÉFAUT MESURÉ EN BASE le 02/09/2026 : AUCUN code n'écrit `shoes.current_km` —
+  // ni route, ni synchro, ni cron ; seul l'ajout d'une paire y met 0. La jauge d'usure
+  // restait donc à 0 % à vie et le badge affichait « Bon état » sur une paire qui
+  // pouvait avoir 900 km. Une jauge qui ne bouge pas n'est pas neutre : elle rassure à
+  // tort, exactement là où l'amorti lâche.
+  const src = codeOf("src/components/profile/ProfileSettings.tsx");
+  assert.ok(/const suivi = km > 0/.test(src), "le garage ne distingue plus le kilométrage renseigné du zéro par défaut");
+  assert.ok(/!suivi \? \{ color: "bg-zinc-300"/.test(src),
+    "un verdict d'état s'affiche de nouveau sur un kilométrage jamais renseigné");
+  assert.ok(/majKm\(/.test(src), "le kilométrage n'est plus modifiable : il resterait à zéro pour toujours");
+  for (const lang of ["fr", "en", "de", "es", "pt"] as const)
+    assert.ok(new RegExp(`"shoes.unknown": "[^"]+"`).test(readFileSync("src/components/profile/ProfileSettings.tsx", "utf8")),
+      `libellé d'état inconnu absent en ${lang}`);
+});
+
+test("seule une paire réellement en fin de vie déclenche le bandeau", () => {
+  assert.equal(paireAremplacer([{ marque: "A", modele: "B", km: 0, maxKm: 600 }]), null);
+  assert.equal(paireAremplacer([{ marque: "A", modele: "B", km: 300, maxKm: 600 }]), null,
+    "une paire à mi-vie a été signalée comme à remplacer");
+  assert.equal(paireAremplacer([{ marque: "A", modele: "B", km: 900, maxKm: 0 }]), null,
+    "une durée de vie nulle a produit une division par zéro déguisée en usure");
+  assert.equal(paireAremplacer([]), null);
+  assert.equal(paireAremplacer(undefined), null);
+  const usee = paireAremplacer([{ marque: "A", modele: "B", km: 520, maxKm: 600 }]);
+  assert.equal(usee?.modele, "B");
+  // La plus avancée passe devant : c'est celle qui presse.
+  const deux = paireAremplacer([
+    { marque: "A", modele: "B", km: 520, maxKm: 600 },
+    { marque: "C", modele: "D", km: 590, maxKm: 600 },
+  ]);
+  assert.equal(deux?.modele, "D");
+  assert.ok(SEUIL_USURE >= 0.8 && SEUIL_USURE < 1,
+    "le seuil doit précéder la panne d'amorti, pas la constater");
+});
+
+test("le bandeau de remplacement filtre sur le bon terrain", () => {
+  const src = codeOf("src/components/shop/GearHub.tsx");
+  assert.ok(/paireAremplacer\(profil\.rotation\)/.test(src), "le comparateur ne repère plus la paire usée");
+  assert.ok(/usee\.terrain === "trail"/.test(src),
+    "le bouton ne filtre pas sur le terrain de la paire remplacée : il proposerait de la route à un traileur");
+  for (const lang of ["fr", "en", "de", "es", "pt"] as const)
+    for (const k of ["shop.usure.titre", "shop.usure.corps", "shop.usure.action"])
+      assert.ok(SHOP[lang][k], `${k} absent en ${lang}`);
 });
 
 test("le catalogue existe et n'est pas vide", () => {

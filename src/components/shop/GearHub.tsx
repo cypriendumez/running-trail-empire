@@ -16,7 +16,7 @@ import { SemelleProfil } from "./SemelleProfil";
 import { filtrer, trier, marques, type Filtres, type Tri } from "@/lib/shop/catalogue";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { texteShop } from "./shopI18n";
-import { evaluer, classer, type ProfilAthlete } from "@/lib/shop/pourToi";
+import { evaluer, classer, paireAremplacer, type ProfilAthlete } from "@/lib/shop/pourToi";
 import type { Modele, Usage, Terrain } from "@/lib/shop/modele";
 
 const USAGES: Usage[] = ["quotidien", "polyvalent", "tempo", "competition", "trail_court", "trail_long", "amorti_max"];
@@ -56,6 +56,8 @@ export function GearHub({ catalogue, profil }: { catalogue: Modele[]; profil: Pr
   const liste = useMemo(() => trier(filtrer(catalogue, f), tri, pertinence), [catalogue, f, tri, pertinence]);
   const toutesMarques = useMemo(() => marques(catalogue), [catalogue]);
   const compares = compare.map((s) => catalogue.find((m) => m.slug === s)).filter(Boolean) as Modele[];
+  // Le bandeau n'apparaît que sur un kilométrage RENSEIGNÉ : voir `paireAremplacer`.
+  const usee = useMemo(() => paireAremplacer(profil.rotation), [profil.rotation]);
 
   const bascule = <K extends "marques" | "terrains" | "usages">(clef: K, v: string) =>
     setF((x) => {
@@ -150,6 +152,24 @@ export function GearHub({ catalogue, profil }: { catalogue: Modele[]; profil: Pr
             </select>
           </label>
         </div>
+
+        {usee && (
+          <Card className="mb-4 flex flex-wrap items-center justify-between gap-3 border-l-2 border-l-amber-400 p-4">
+            <div className="min-w-0">
+              <p className="text-[14px] font-semibold text-zinc-900">
+                {tx("shop.usure.titre", { marque: usee.marque, modele: usee.modele })}
+              </p>
+              <p className="mt-0.5 text-[12.5px] leading-snug text-zinc-500">
+                {tx("shop.usure.corps", { km: Math.round(usee.km), max: Math.round(usee.maxKm) })}
+              </p>
+            </div>
+            <button type="button"
+              onClick={() => setF((x) => ({ ...x, terrains: usee.terrain === "trail" ? ["trail"] : usee.terrain === "route" ? ["route"] : undefined }))}
+              className="shrink-0 rounded-xl bg-zinc-900 px-3.5 py-2 text-[13px] font-semibold text-white transition hover:bg-zinc-700">
+              {tx("shop.usure.action")}
+            </button>
+          </Card>
+        )}
 
         {compares.length > 0 && <Comparaison modeles={compares} profil={profil} onVider={() => setCompare([])} tx={tx} />}
 

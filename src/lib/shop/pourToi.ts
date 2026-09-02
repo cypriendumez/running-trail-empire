@@ -32,7 +32,7 @@ export type ProfilAthlete = {
   /** Drop des chaussures actuellement en rotation, en mm. */
   dropsEnRotation?: number[];
   /** Paires actives et leur usure : sert à repérer un manque dans la rotation. */
-  rotation?: { marque: string; modele: string; km: number; maxKm: number }[];
+  rotation?: { marque: string; modele: string; km: number; maxKm: number; terrain?: string }[];
 };
 
 export type Avis = {
@@ -43,6 +43,28 @@ export type Avis = {
   /** Ce qui n'a pas pu être pris en compte, faute de donnée. */
   inconnu: Bout[];
 };
+
+/**
+ * LES PAIRES À REMPLACER — et rien d'autre.
+ *
+ * Le seuil est à 85 % : un amorti se tasse AVANT que la semelle ne paraisse usée, et un
+ * remplacement se prépare, il ne se subit pas.
+ *
+ * ⚠️ UNE PAIRE À 0 KM NE PEUT PAS DÉCLENCHER CE BANDEAU — et ce n'est pas grâce à un
+ * garde-fou. J'avais écrit `r.km > 0 && …` en croyant protéger contre le zéro qui signifie
+ * « kilométrage non renseigné » ; la mutation a montré que cette condition était
+ * INATTEIGNABLE : un ratio de 0 est déjà sous le seuil de 85 %. Un garde qu'aucune
+ * mutation ne peut faire tomber n'est pas une protection, c'est du bruit qui fait croire
+ * qu'un cas est traité. Le vrai risque du zéro — un badge « Bon état » affiché sur une
+ * paire dont on ignore tout — se joue dans le garage, où il est traité explicitement.
+ */
+export const SEUIL_USURE = 0.85;
+
+export function paireAremplacer(rotation: ProfilAthlete["rotation"]): { marque: string; modele: string; km: number; maxKm: number; terrain?: string } | null {
+  const candidates = (rotation ?? []).filter((r) => r.maxKm > 0 && r.km / r.maxKm >= SEUIL_USURE);
+  // La plus avancée d'abord : c'est celle qui presse.
+  return candidates.sort((a, b) => b.km / b.maxKm - a.km / a.maxKm)[0] ?? null;
+}
 
 /** Les usages qui supposent qu'on court vite le jour J. */
 const USAGES_RAPIDES = new Set(["competition", "tempo"]);

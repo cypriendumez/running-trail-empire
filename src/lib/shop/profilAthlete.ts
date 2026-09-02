@@ -74,6 +74,10 @@ export function construireProfil(i: {
     dropsEnRotation: drops,
     rotation: i.paires
       .filter((p) => Number(p.current_km) >= 0 && Number(p.max_km) > 0)
-      .map((p) => ({ marque: String(p.brand ?? ""), modele: String(p.model ?? ""), km: Number(p.current_km) || 0, maxKm: Number(p.max_km) || 0 })),
+      .map((p) => ({
+        marque: String(p.brand ?? ""), modele: String(p.model ?? ""),
+        km: Number(p.current_km) || 0, maxKm: Number(p.max_km) || 0,
+        terrain: p.terrain === "trail" ? "trail" : p.terrain === "road" ? "route" : undefined,
+      })),
   };
 }

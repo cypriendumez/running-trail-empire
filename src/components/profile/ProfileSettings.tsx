@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { languageOptions } from "@/i18n/config";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { trouver, cotesPourGarage, type ModeleLeger } from "@/lib/shop/indexLeger";
 import { vo2maxEstimate, vo2maxLabel, racePredictions, predictRaceSec, type VmaSource } from "@/lib/running/fitness";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { stripProfileSecrets } from "@/lib/profile/safe";
@@ -58,7 +59,7 @@ const P: Record<string, Record<string, string>> = {
     "perf.loadTitle": "Forme & charge", "perf.fitness": "Condition", "perf.fatigue": "Fatigue", "perf.form": "Forme", "perf.loadHint": "Condition = forme de fond · Fatigue = charge récente · Forme = fraîcheur (positif = frais).", "perf.thresholdPace": "Allure seuil",
     "zone.z1": "Récupération", "zone.z1d": "Récupération active, ultra-endurance", "zone.z2": "Aérobie", "zone.z2d": "Base aérobie, sorties longues", "zone.z3": "Tempo", "zone.z3d": "Seuil aérobie, tempo", "zone.z4": "Seuil", "zone.z4d": "Seuil lactique, intervalles", "zone.z5": "VO2max", "zone.z5d": "Effort maximal, VMA",
     "pace.z2": "Z2 (endurance)", "pace.tempo": "Tempo (Z3-Z4)", "pace.seuil": "Seuil (Z4)", "pace.vma": "VMA (Z5)",
-    "shoes.title": "Mon Garage", "shoes.count": "{n} paire active", "shoes.countP": "{n} paires actives", "shoes.new": "Nouvelle paire", "shoes.brand": "Marque", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Modèle", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Durée de vie (km)", "shoes.buyDate": "Date d'achat", "shoes.addGarage": "Ajouter au garage", "shoes.suggestHint": "Commence à taper la marque puis le modèle — on te suggère les modèles populaires.", "shoes.emptyTitle": "Aucune chaussure dans le garage", "shoes.emptyDesc": "Ajoutez vos paires pour suivre leur kilométrage", "shoes.replace": "À remplacer", "shoes.watch": "Surveiller", "shoes.good": "Bon état", "shoes.km": "{cur} km parcourus · {rem} km restants",
+    "shoes.title": "Mon Garage", "shoes.unknown": "Kilométrage inconnu", "shoes.kmSet": "Indique les km parcourus", "shoes.kmPh": "km", "shoes.dropLabel": "de drop", "shoes.stackLabel": "de semelle", "shoes.fromCatalogue": "Cotes reprises de la fiche Pacevo : {cotes}.", "shoes.count": "{n} paire active", "shoes.countP": "{n} paires actives", "shoes.new": "Nouvelle paire", "shoes.brand": "Marque", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Modèle", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Durée de vie (km)", "shoes.buyDate": "Date d'achat", "shoes.addGarage": "Ajouter au garage", "shoes.suggestHint": "Commence à taper la marque puis le modèle — on te suggère les modèles populaires.", "shoes.emptyTitle": "Aucune chaussure dans le garage", "shoes.emptyDesc": "Ajoutez vos paires pour suivre leur kilométrage", "shoes.replace": "À remplacer", "shoes.watch": "Surveiller", "shoes.good": "Bon état", "shoes.km": "{cur} km parcourus · {rem} km restants",
     "sub.title": "Abonnement actuel", "sub.plan": "Plan {tier}", "sub.freeDesc": "Accès limité aux fonctionnalités de base", "sub.proDesc": "Accès complet à toutes les fonctionnalités", "sub.active": "✓ Actif", "sub.free": "Gratuit", "sub.pro": "Pro",
     "feat.dash": "Dashboard & statistiques", "feat.journal": "Journal intelligent (NLP)", "feat.plans3": "Plans d'entraînement (3 max)", "feat.plansUnli": "Plans d'entraînement illimités", "feat.coach": "Coach IA personnalisé (Claude)", "feat.ghost": "Ghost Runner IA", "feat.vma": "Analyses VMA & zones cardiaques", "feat.sync": "Sync montres GPS (Garmin, Polar…)", "feat.shop": "Shopping Hub & recommandations", "feat.leagues": "Ligues & classements",
     "sub.renouvelle": "Prochain prélèvement le {d}", "sub.annule": "Résilié — ton accès reste ouvert jusqu'au {d}", "sub.essai": "Essai gratuit jusqu'au {d}, aucun prélèvement d'ici là", "sub.echec": "Ton dernier paiement a échoué. Mets ta carte à jour pour ne pas perdre l'accès.", "sub.manage": "Gérer mon abonnement", "sub.manageDesc": "Changer de formule, passer au tarif annuel, mettre à jour ta carte, récupérer tes factures ou résilier.", "sub.manageCta": "Ouvrir mon espace de facturation", "sub.manageOpening": "Ouverture…", "sub.manageErr": "Impossible d'ouvrir l'espace de facturation. Réessaie dans un instant.", "sub.cancelNote": "Si tu résilies, ton accès reste ouvert jusqu'à la fin de la période déjà payée — aucun prélèvement ensuite.", "sub.secure": "Paiement et facturation gérés par Stripe. Pacevo ne voit jamais ton numéro de carte.", "sub.goPro": "Passer à Starter ou Premium", "sub.unlock": "Débloquez le module IA", "sub.perMonth": "/mois", "sub.yearly": "{an}/an · {mois} mois offerts", "sub.trial": "Commencer l'essai gratuit de {n} jours",
@@ -93,7 +94,7 @@ const P: Record<string, Record<string, string>> = {
     "perf.loadTitle": "Form & load", "perf.fitness": "Fitness", "perf.fatigue": "Fatigue", "perf.form": "Form", "perf.loadHint": "Fitness = long-term form · Fatigue = recent load · Form = freshness (positive = fresh).", "perf.thresholdPace": "Threshold pace",
     "zone.z1": "Recovery", "zone.z1d": "Active recovery, ultra-endurance", "zone.z2": "Aerobic", "zone.z2d": "Aerobic base, long runs", "zone.z3": "Tempo", "zone.z3d": "Aerobic threshold, tempo", "zone.z4": "Threshold", "zone.z4d": "Lactate threshold, intervals", "zone.z5": "VO2max", "zone.z5d": "Maximal effort, vVO2max",
     "pace.z2": "Z2 (endurance)", "pace.tempo": "Tempo (Z3-Z4)", "pace.seuil": "Threshold (Z4)", "pace.vma": "vVO2max (Z5)",
-    "shoes.title": "My Garage", "shoes.count": "{n} active pair", "shoes.countP": "{n} active pairs", "shoes.new": "New pair", "shoes.brand": "Brand", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Model", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Lifespan (km)", "shoes.buyDate": "Purchase date", "shoes.addGarage": "Add to garage", "shoes.suggestHint": "Start typing the brand then the model — we suggest popular models.", "shoes.emptyTitle": "No shoes in the garage", "shoes.emptyDesc": "Add your pairs to track their mileage", "shoes.replace": "Replace", "shoes.watch": "Watch", "shoes.good": "Good", "shoes.km": "{cur} km run · {rem} km left",
+    "shoes.title": "My Garage", "shoes.unknown": "Mileage unknown", "shoes.kmSet": "Enter the kilometres run", "shoes.kmPh": "km", "shoes.dropLabel": "drop", "shoes.stackLabel": "stack", "shoes.fromCatalogue": "Specs taken from the Pacevo entry: {cotes}.", "shoes.count": "{n} active pair", "shoes.countP": "{n} active pairs", "shoes.new": "New pair", "shoes.brand": "Brand", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Model", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Lifespan (km)", "shoes.buyDate": "Purchase date", "shoes.addGarage": "Add to garage", "shoes.suggestHint": "Start typing the brand then the model — we suggest popular models.", "shoes.emptyTitle": "No shoes in the garage", "shoes.emptyDesc": "Add your pairs to track their mileage", "shoes.replace": "Replace", "shoes.watch": "Watch", "shoes.good": "Good", "shoes.km": "{cur} km run · {rem} km left",
     "sub.title": "Current subscription", "sub.plan": "{tier} plan", "sub.freeDesc": "Limited access to basic features", "sub.proDesc": "Full access to all features", "sub.active": "✓ Active", "sub.free": "Free", "sub.pro": "Pro",
     "feat.dash": "Dashboard & stats", "feat.journal": "Smart journal (NLP)", "feat.plans3": "Training plans (3 max)", "feat.plansUnli": "Unlimited training plans", "feat.coach": "Personalized AI coach (Claude)", "feat.ghost": "AI Ghost Runner", "feat.vma": "vVO2max & HR-zone analysis", "feat.sync": "GPS watch sync (Garmin, Polar…)", "feat.shop": "Shopping Hub & recommendations", "feat.leagues": "Leagues & rankings",
     "sub.renouvelle": "Next charge on {d}", "sub.annule": "Cancelled — your access stays open until {d}", "sub.essai": "Free trial until {d}, nothing charged before then", "sub.echec": "Your last payment failed. Update your card to keep your access.", "sub.manage": "Manage my subscription", "sub.manageDesc": "Switch plan, move to yearly billing, update your card, download invoices or cancel.", "sub.manageCta": "Open my billing portal", "sub.manageOpening": "Opening…", "sub.manageErr": "Could not open the billing portal. Try again in a moment.", "sub.cancelNote": "If you cancel, your access stays open until the end of the period you already paid for — nothing is charged after that.", "sub.secure": "Payments and billing handled by Stripe. Pacevo never sees your card number.", "sub.goPro": "Upgrade to Starter or Premium", "sub.unlock": "Unlock the AI module", "sub.perMonth": "/mo", "sub.yearly": "{an}/yr · {mois} months free", "sub.trial": "Start the {n}-day free trial",
@@ -128,7 +129,7 @@ const P: Record<string, Record<string, string>> = {
     "perf.loadTitle": "Form & Belastung", "perf.fitness": "Fitness", "perf.fatigue": "Ermüdung", "perf.form": "Form", "perf.loadHint": "Fitness = langfristige Form · Ermüdung = jüngste Belastung · Form = Frische (positiv = frisch).", "perf.thresholdPace": "Schwellentempo",
     "zone.z1": "Erholung", "zone.z1d": "Aktive Erholung, Ultra-Ausdauer", "zone.z2": "Aerob", "zone.z2d": "Aerobe Basis, lange Läufe", "zone.z3": "Tempo", "zone.z3d": "Aerobe Schwelle, Tempo", "zone.z4": "Schwelle", "zone.z4d": "Laktatschwelle, Intervalle", "zone.z5": "VO2max", "zone.z5d": "Maximale Belastung, vVO2max",
     "pace.z2": "Z2 (Ausdauer)", "pace.tempo": "Tempo (Z3-Z4)", "pace.seuil": "Schwelle (Z4)", "pace.vma": "vVO2max (Z5)",
-    "shoes.title": "Meine Garage", "shoes.count": "{n} aktives Paar", "shoes.countP": "{n} aktive Paare", "shoes.new": "Neues Paar", "shoes.brand": "Marke", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Modell", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Lebensdauer (km)", "shoes.buyDate": "Kaufdatum", "shoes.addGarage": "Zur Garage hinzufügen", "shoes.suggestHint": "Tippe Marke und Modell — wir schlagen beliebte Modelle vor.", "shoes.emptyTitle": "Keine Schuhe in der Garage", "shoes.emptyDesc": "Füge deine Paare hinzu, um die Kilometer zu verfolgen", "shoes.replace": "Ersetzen", "shoes.watch": "Beobachten", "shoes.good": "Guter Zustand", "shoes.km": "{cur} km gelaufen · {rem} km übrig",
+    "shoes.title": "Meine Garage", "shoes.unknown": "Kilometerstand unbekannt", "shoes.kmSet": "Gelaufene Kilometer eintragen", "shoes.kmPh": "km", "shoes.dropLabel": "Sprengung", "shoes.stackLabel": "Sohlenhöhe", "shoes.fromCatalogue": "Maße aus dem Pacevo-Datenblatt übernommen: {cotes}.", "shoes.count": "{n} aktives Paar", "shoes.countP": "{n} aktive Paare", "shoes.new": "Neues Paar", "shoes.brand": "Marke", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Modell", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Lebensdauer (km)", "shoes.buyDate": "Kaufdatum", "shoes.addGarage": "Zur Garage hinzufügen", "shoes.suggestHint": "Tippe Marke und Modell — wir schlagen beliebte Modelle vor.", "shoes.emptyTitle": "Keine Schuhe in der Garage", "shoes.emptyDesc": "Füge deine Paare hinzu, um die Kilometer zu verfolgen", "shoes.replace": "Ersetzen", "shoes.watch": "Beobachten", "shoes.good": "Guter Zustand", "shoes.km": "{cur} km gelaufen · {rem} km übrig",
     "sub.title": "Aktuelles Abo", "sub.plan": "{tier}-Plan", "sub.freeDesc": "Eingeschränkter Zugang zu Basisfunktionen", "sub.proDesc": "Voller Zugang zu allen Funktionen", "sub.active": "✓ Aktiv", "sub.free": "Kostenlos", "sub.pro": "Pro",
     "feat.dash": "Dashboard & Statistiken", "feat.journal": "Intelligentes Tagebuch (NLP)", "feat.plans3": "Trainingspläne (max. 3)", "feat.plansUnli": "Unbegrenzte Trainingspläne", "feat.coach": "Personalisierter KI-Coach (Claude)", "feat.ghost": "KI Ghost Runner", "feat.vma": "vVO2max- & HF-Zonen-Analyse", "feat.sync": "GPS-Uhr-Sync (Garmin, Polar…)", "feat.shop": "Shopping-Hub & Empfehlungen", "feat.leagues": "Ligen & Ranglisten",
     "sub.renouvelle": "Nächste Abbuchung am {d}", "sub.annule": "Gekündigt — dein Zugang bleibt bis zum {d}", "sub.essai": "Kostenlos testen bis {d}, vorher wird nichts abgebucht", "sub.echec": "Deine letzte Zahlung ist fehlgeschlagen. Aktualisiere deine Karte, um den Zugang zu behalten.", "sub.manage": "Abo verwalten", "sub.manageDesc": "Tarif wechseln, auf Jahreszahlung umstellen, Karte aktualisieren, Rechnungen laden oder kündigen.", "sub.manageCta": "Rechnungsbereich öffnen", "sub.manageOpening": "Wird geöffnet…", "sub.manageErr": "Der Rechnungsbereich lässt sich nicht öffnen. Versuch es gleich noch einmal.", "sub.cancelNote": "Bei einer Kündigung bleibt dein Zugang bis zum Ende des bereits bezahlten Zeitraums bestehen — danach wird nichts mehr abgebucht.", "sub.secure": "Zahlung und Abrechnung über Stripe. Pacevo sieht deine Kartennummer nie.", "sub.goPro": "Auf Starter oder Premium wechseln", "sub.unlock": "KI-Modul freischalten", "sub.perMonth": "/Monat", "sub.yearly": "{an}/Jahr · {mois} Monate geschenkt", "sub.trial": "{n} Tage kostenlos testen",
@@ -163,7 +164,7 @@ const P: Record<string, Record<string, string>> = {
     "perf.loadTitle": "Forma y carga", "perf.fitness": "Condición", "perf.fatigue": "Fatiga", "perf.form": "Forma", "perf.loadHint": "Condición = forma de fondo · Fatiga = carga reciente · Forma = frescura (positivo = fresco).", "perf.thresholdPace": "Ritmo umbral",
     "zone.z1": "Recuperación", "zone.z1d": "Recuperación activa, ultra-resistencia", "zone.z2": "Aeróbico", "zone.z2d": "Base aeróbica, tiradas largas", "zone.z3": "Tempo", "zone.z3d": "Umbral aeróbico, tempo", "zone.z4": "Umbral", "zone.z4d": "Umbral láctico, intervalos", "zone.z5": "VO2máx", "zone.z5d": "Esfuerzo máximo, VAM",
     "pace.z2": "Z2 (resistencia)", "pace.tempo": "Tempo (Z3-Z4)", "pace.seuil": "Umbral (Z4)", "pace.vma": "VAM (Z5)",
-    "shoes.title": "Mi Garaje", "shoes.count": "{n} par activo", "shoes.countP": "{n} pares activos", "shoes.new": "Nuevo par", "shoes.brand": "Marca", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Modelo", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Vida útil (km)", "shoes.buyDate": "Fecha de compra", "shoes.addGarage": "Añadir al garaje", "shoes.suggestHint": "Empieza a escribir la marca y el modelo — te sugerimos modelos populares.", "shoes.emptyTitle": "Ninguna zapatilla en el garaje", "shoes.emptyDesc": "Añade tus pares para seguir su kilometraje", "shoes.replace": "Reemplazar", "shoes.watch": "Vigilar", "shoes.good": "Buen estado", "shoes.km": "{cur} km recorridos · {rem} km restantes",
+    "shoes.title": "Mi Garaje", "shoes.unknown": "Kilometraje desconocido", "shoes.kmSet": "Indica los km recorridos", "shoes.kmPh": "km", "shoes.dropLabel": "de drop", "shoes.stackLabel": "de mediasuela", "shoes.fromCatalogue": "Medidas tomadas de la ficha de Pacevo: {cotes}.", "shoes.count": "{n} par activo", "shoes.countP": "{n} pares activos", "shoes.new": "Nuevo par", "shoes.brand": "Marca", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Modelo", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Vida útil (km)", "shoes.buyDate": "Fecha de compra", "shoes.addGarage": "Añadir al garaje", "shoes.suggestHint": "Empieza a escribir la marca y el modelo — te sugerimos modelos populares.", "shoes.emptyTitle": "Ninguna zapatilla en el garaje", "shoes.emptyDesc": "Añade tus pares para seguir su kilometraje", "shoes.replace": "Reemplazar", "shoes.watch": "Vigilar", "shoes.good": "Buen estado", "shoes.km": "{cur} km recorridos · {rem} km restantes",
     "sub.title": "Suscripción actual", "sub.plan": "Plan {tier}", "sub.freeDesc": "Acceso limitado a las funciones básicas", "sub.proDesc": "Acceso completo a todas las funciones", "sub.active": "✓ Activo", "sub.free": "Gratis", "sub.pro": "Pro",
     "feat.dash": "Panel y estadísticas", "feat.journal": "Diario inteligente (NLP)", "feat.plans3": "Planes de entrenamiento (máx. 3)", "feat.plansUnli": "Planes de entrenamiento ilimitados", "feat.coach": "Entrenador IA personalizado (Claude)", "feat.ghost": "Ghost Runner IA", "feat.vma": "Análisis de VAM y zonas cardíacas", "feat.sync": "Sync relojes GPS (Garmin, Polar…)", "feat.shop": "Shopping Hub y recomendaciones", "feat.leagues": "Ligas y clasificaciones",
     "sub.renouvelle": "Próximo cobro el {d}", "sub.annule": "Cancelada — tu acceso sigue abierto hasta el {d}", "sub.essai": "Prueba gratuita hasta el {d}, sin ningún cobro antes", "sub.echec": "Tu último pago ha fallado. Actualiza tu tarjeta para no perder el acceso.", "sub.manage": "Gestionar mi suscripción", "sub.manageDesc": "Cambiar de plan, pasar a la tarifa anual, actualizar tu tarjeta, descargar facturas o cancelar.", "sub.manageCta": "Abrir mi área de facturación", "sub.manageOpening": "Abriendo…", "sub.manageErr": "No se ha podido abrir el área de facturación. Inténtalo dentro de un momento.", "sub.cancelNote": "Si cancelas, tu acceso sigue abierto hasta el final del periodo ya pagado — después no se cobra nada.", "sub.secure": "Pagos y facturación gestionados por Stripe. Pacevo nunca ve el número de tu tarjeta.", "sub.goPro": "Pasar a Starter o Premium", "sub.unlock": "Desbloquea el módulo IA", "sub.perMonth": "/mes", "sub.yearly": "{an}/año · {mois} meses gratis", "sub.trial": "Empezar la prueba gratuita de {n} días",
@@ -198,7 +199,7 @@ const P: Record<string, Record<string, string>> = {
     "perf.loadTitle": "Forma e carga", "perf.fitness": "Condição", "perf.fatigue": "Fadiga", "perf.form": "Forma", "perf.loadHint": "Condição = forma de fundo · Fadiga = carga recente · Forma = frescura (positivo = fresco).", "perf.thresholdPace": "Ritmo limiar",
     "zone.z1": "Recuperação", "zone.z1d": "Recuperação ativa, ultra-resistência", "zone.z2": "Aeróbico", "zone.z2d": "Base aeróbica, treinos longos", "zone.z3": "Tempo", "zone.z3d": "Limiar aeróbico, tempo", "zone.z4": "Limiar", "zone.z4d": "Limiar de lactato, intervalos", "zone.z5": "VO2máx", "zone.z5d": "Esforço máximo, VAM",
     "pace.z2": "Z2 (resistência)", "pace.tempo": "Tempo (Z3-Z4)", "pace.seuil": "Limiar (Z4)", "pace.vma": "VAM (Z5)",
-    "shoes.title": "A minha Garagem", "shoes.count": "{n} par ativo", "shoes.countP": "{n} pares ativos", "shoes.new": "Novo par", "shoes.brand": "Marca", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Modelo", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Vida útil (km)", "shoes.buyDate": "Data de compra", "shoes.addGarage": "Adicionar à garagem", "shoes.suggestHint": "Começa a escrever a marca e o modelo — sugerimos modelos populares.", "shoes.emptyTitle": "Nenhum ténis na garagem", "shoes.emptyDesc": "Adiciona os teus pares para seguir a quilometragem", "shoes.replace": "Substituir", "shoes.watch": "Vigiar", "shoes.good": "Bom estado", "shoes.km": "{cur} km percorridos · {rem} km restantes",
+    "shoes.title": "A minha Garagem", "shoes.unknown": "Quilometragem desconhecida", "shoes.kmSet": "Indica os km percorridos", "shoes.kmPh": "km", "shoes.dropLabel": "de drop", "shoes.stackLabel": "de entressola", "shoes.fromCatalogue": "Medidas retiradas da ficha Pacevo: {cotes}.", "shoes.count": "{n} par ativo", "shoes.countP": "{n} pares ativos", "shoes.new": "Novo par", "shoes.brand": "Marca", "shoes.brandPh": "Nike, Hoka, Salomon…", "shoes.model": "Modelo", "shoes.modelPh": "Vaporfly 3, Speedgoat…", "shoes.life": "Vida útil (km)", "shoes.buyDate": "Data de compra", "shoes.addGarage": "Adicionar à garagem", "shoes.suggestHint": "Começa a escrever a marca e o modelo — sugerimos modelos populares.", "shoes.emptyTitle": "Nenhum ténis na garagem", "shoes.emptyDesc": "Adiciona os teus pares para seguir a quilometragem", "shoes.replace": "Substituir", "shoes.watch": "Vigiar", "shoes.good": "Bom estado", "shoes.km": "{cur} km percorridos · {rem} km restantes",
     "sub.title": "Subscrição atual", "sub.plan": "Plano {tier}", "sub.freeDesc": "Acesso limitado às funcionalidades básicas", "sub.proDesc": "Acesso completo a todas as funcionalidades", "sub.active": "✓ Ativo", "sub.free": "Gratuito", "sub.pro": "Pro",
     "feat.dash": "Painel e estatísticas", "feat.journal": "Diário inteligente (NLP)", "feat.plans3": "Planos de treino (máx. 3)", "feat.plansUnli": "Planos de treino ilimitados", "feat.coach": "Treinador IA personalizado (Claude)", "feat.ghost": "Ghost Runner IA", "feat.vma": "Análise de VAM e zonas cardíacas", "feat.sync": "Sync relógios GPS (Garmin, Polar…)", "feat.shop": "Shopping Hub e recomendações", "feat.leagues": "Ligas e classificações",
     "sub.renouvelle": "Próxima cobrança a {d}", "sub.annule": "Cancelada — o teu acesso fica aberto até {d}", "sub.essai": "Teste grátis até {d}, sem qualquer cobrança antes", "sub.echec": "O teu último pagamento falhou. Atualiza o cartão para não perderes o acesso.", "sub.manage": "Gerir a minha subscrição", "sub.manageDesc": "Mudar de plano, passar à tarifa anual, atualizar o cartão, obter as faturas ou cancelar.", "sub.manageCta": "Abrir a minha área de faturação", "sub.manageOpening": "A abrir…", "sub.manageErr": "Não foi possível abrir a área de faturação. Tenta daqui a pouco.", "sub.cancelNote": "Se cancelares, o acesso fica aberto até ao fim do período já pago — depois não há qualquer cobrança.", "sub.secure": "Pagamentos e faturação geridos pela Stripe. A Pacevo nunca vê o número do teu cartão.", "sub.goPro": "Passar a Starter ou Premium", "sub.unlock": "Desbloqueia o módulo IA", "sub.perMonth": "/mês", "sub.yearly": "{an}/ano · {mois} meses grátis", "sub.trial": "Começar o teste gratuito de {n} dias",
@@ -330,7 +331,7 @@ const SHOE_MODELS: Record<string, string[]> = {
 };
 
 // ── Main Component ─────────────────────────────────────────────────────────────
-export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals, stats, fitness, userId, etatAbo }: {
+export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals, stats, fitness, userId, etatAbo, catalogue = [] }: {
   profile: Record<string, unknown> | null;
   baseline: Record<string, unknown> | null;
   shoes: Record<string, unknown>[];
@@ -341,6 +342,16 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
   userId: string;
   /** État Stripe mémorisé par le webhook : prélèvement, résiliation, échec. */
   etatAbo?: EtatAbonnement | null;
+  /**
+   * Le catalogue du comparateur, réduit aux cotes.
+   *
+   * ⚠️ CE QUE ÇA RÉPARE. Le garage n'enregistrait que marque, modèle, durée de vie et
+   * date d'achat : `drop_mm`, `stack_mm`, `weight_g` et `terrain` restaient NULS pour
+   * tout le monde, alors que les colonnes existent depuis la première migration. Le
+   * comparateur ne pouvait donc jamais prévenir d'une transition de drop brutale — il
+   * ignorait le drop des paires déjà portées. Personne ne saisit un drop à la main.
+   */
+  catalogue?: ModeleLeger[];
 }) {
   const { lang, setLang } = useT();
   /**
@@ -561,9 +572,37 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
     setGoals(g => g.map(x => x.id === goal.id ? { ...x, achieved: !x.achieved } : x));
   }
 
+  /**
+   * ⚠️ PERSONNE N'ÉCRIVAIT `shoes.current_km`. Vérifié le 02/09/2026 : aucune route,
+   * aucune synchro, aucun cron ne touche cette colonne — seul l'ajout d'une paire y met
+   * 0. La barre d'usure restait donc à 0 % à vie, le badge affichait « Bon état » sur
+   * une paire qui pouvait avoir 900 km, et l'avertissement d'usure du comparateur ne
+   * pouvait JAMAIS se déclencher. Une jauge qui ne bouge pas n'est pas neutre : elle
+   * rassure à tort, précisément sur le point où l'amorti lâche.
+   *
+   * Pacevo ne peut pas MESURER ce kilométrage : il faudrait savoir quelle paire a été
+   * portée à chaque sortie, information qu'aucune montre ne transmet ici. On demande
+   * donc à l'athlète, et on le dit — un chiffre déclaré vaut mieux qu'un zéro qui a
+   * l'air mesuré.
+   */
+  async function majKm(id: string, km: number) {
+    const valeur = Math.max(0, Math.round(km));
+    const supabase = createClient();
+    const { error } = await supabase.from("shoes").update({ current_km: valeur }).eq("id", id);
+    if (error) { toast.error(tr("t.saveErr")); return; }
+    setShoeList(l => l.map(s => (s.id === id ? { ...s, current_km: valeur } : s)));
+  }
+
   async function addShoe() {
     if (!newShoe.brand || !newShoe.model) return;
     const supabase = createClient();
+    // ⚠️ LES COTES VIENNENT DU CATALOGUE, PAS D'UNE SAISIE. Un athlète ne connaît pas le
+    //    drop de ses chaussures, et le formulaire ne le lui demande pas. Sans ce report,
+    //    `drop_mm` restait nul pour toutes les paires et l'avertissement de transition du
+    //    comparateur — celui qui protège le tendon d'Achille — ne se déclenchait jamais.
+    //    Un modèle absent du catalogue s'enregistre comme avant : les colonnes restent
+    //    nulles, ce qui est honnête, plutôt que remplies d'une valeur plausible.
+    const fiche = trouver(catalogue, newShoe.brand, newShoe.model);
     const { data, error } = await supabase.from("shoes").insert({
       user_id: userId,
       brand: newShoe.brand,
@@ -572,6 +611,11 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
       current_km: 0,
       purchase_date: newShoe.purchase_date || null,
       is_active: true,
+      ...cotesPourGarage(fiche),
+      // Le terrain n'est écrit que s'il est CONNU : la colonne a déjà « road » pour
+      // valeur par défaut, et forcer « road » sur un modèle inconnu inventerait un fait.
+      ...(fiche?.terrain === "trail" || fiche?.terrain === "route"
+        ? { terrain: fiche.terrain === "trail" ? "trail" : "road" } : {}),
     }).select().single();
     if (error) { toast.error(tr("t.addErr")); return; }
     setShoeList(s => [...s, data as unknown as Shoe]);
@@ -631,8 +675,15 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
 
   // Autocomplétion chaussures : filtre la marque puis les modèles de cette marque selon la saisie.
   const shoeBrandQ = newShoe.brand.trim().toLowerCase();
-  const shoeBrandOpts = SHOE_BRANDS.filter(b => b.toLowerCase().includes(shoeBrandQ) && b.toLowerCase() !== shoeBrandQ).slice(0, 8);
-  const shoeModelPool = SHOE_MODELS[shoeBrandQ] ?? Array.from(new Set(Object.values(SHOE_MODELS).flat()));
+  // ⚠️ LE CATALOGUE D'ABORD, LA LISTE HISTORIQUE ENSUITE — ET PAS À LA PLACE. Les modèles
+  //    du catalogue portent leurs cotes ; les ~100 noms écrits en dur n'en ont aucune,
+  //    mais ils couvrent des générations que le catalogue n'a pas encore. Les remplacer
+  //    ferait disparaître des modèles que des athlètes ont réellement au pied.
+  const marquesCat = Array.from(new Set(catalogue.map(m => m.marque)));
+  const toutesMarques = Array.from(new Set([...marquesCat, ...SHOE_BRANDS]));
+  const shoeBrandOpts = toutesMarques.filter(b => b.toLowerCase().includes(shoeBrandQ) && b.toLowerCase() !== shoeBrandQ).slice(0, 8);
+  const modelesCat = catalogue.filter(m => !shoeBrandQ || m.marque.toLowerCase() === shoeBrandQ).map(m => m.nom);
+  const shoeModelPool = Array.from(new Set([...modelesCat, ...(SHOE_MODELS[shoeBrandQ] ?? Object.values(SHOE_MODELS).flat())]));
   const shoeModelQ = newShoe.model.trim().toLowerCase();
   const shoeModelOpts = shoeModelPool.filter(m => m.toLowerCase().includes(shoeModelQ) && m.toLowerCase() !== shoeModelQ).slice(0, 10);
 
@@ -1577,7 +1628,13 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                         <div className="absolute z-30 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-zinc-200 bg-white py-1 shadow-xl">
                           {shoeModelOpts.map(m => (
                             <button key={m} type="button" onMouseDown={e => e.preventDefault()}
-                              onClick={() => { setNewShoe(s => ({ ...s, model: m })); setModelFocus(false); }}
+                              onClick={() => {
+                                // La durée de vie annoncée par le fabricant vaut mieux que
+                                // les 800 km par défaut, qui ne viennent d'aucune mesure.
+                                const f = trouver(catalogue, newShoe.brand, m);
+                                setNewShoe(s => ({ ...s, model: m, max_km: f?.dureeVieKm ? String(f.dureeVieKm) : s.max_km }));
+                                setModelFocus(false);
+                              }}
                               className="block w-full px-3 py-2 text-left text-sm font-medium text-zinc-700 transition-colors hover:bg-emerald-50">
                               {m}
                             </button>
@@ -1597,6 +1654,19 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                     </div>
                   </div>
                   <p className="mt-2 text-[11px] text-zinc-400">💡 {tr("shoes.suggestHint")}</p>
+                  {(() => {
+                    // Ce qui sera enregistré à partir de la fiche, annoncé AVANT l'ajout :
+                    // une donnée reprise ailleurs doit se voir, pas apparaître en douce.
+                    const f = trouver(catalogue, newShoe.brand, newShoe.model);
+                    const cotes = f && [
+                      f.dropMm != null ? `${f.dropMm} mm ${tr("shoes.dropLabel")}` : null,
+                      f.stackMm != null ? `${f.stackMm} mm ${tr("shoes.stackLabel")}` : null,
+                      f.poidsG != null ? `${f.poidsG} g` : null,
+                    ].filter(Boolean);
+                    return cotes?.length
+                      ? <p className="mt-1 text-[11px] text-emerald-700">✓ {tr("shoes.fromCatalogue", { cotes: cotes.join(" · ") })}</p>
+                      : null;
+                  })()}
                   <div className="mt-4 flex gap-2">
                     <button onClick={addShoe} disabled={!newShoe.brand.trim() || !newShoe.model.trim()}
                       className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50">
@@ -1619,18 +1689,29 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
             ) : (
               <div className="space-y-3">
                 {shoeList.map(shoe => {
-                  const pct = Number(shoe.current_km) / Number(shoe.max_km) * 100;
-                  const status = pct >= 90 ? { color: "bg-red-500", text: tr("shoes.replace"), badge: "bg-red-100 text-red-700" }
+                  const km = Number(shoe.current_km) || 0;
+                  const pct = km / Number(shoe.max_km) * 100;
+                  // ⚠️ TANT QUE LE KILOMÉTRAGE N'EST PAS RENSEIGNÉ, AUCUN VERDICT. Un
+                  //    badge vert « Bon état » posé sur un zéro qui n'a jamais été mesuré
+                  //    est un mensonge rassurant, et c'est le pire endroit pour en faire.
+                  const suivi = km > 0;
+                  const status = !suivi ? { color: "bg-zinc-300", text: tr("shoes.unknown"), badge: "bg-zinc-100 text-zinc-500" }
+                    : pct >= 90 ? { color: "bg-red-500", text: tr("shoes.replace"), badge: "bg-red-100 text-red-700" }
                     : pct >= 70 ? { color: "bg-orange-500", text: tr("shoes.watch"), badge: "bg-orange-100 text-orange-700" }
                     : { color: "bg-emerald-500", text: tr("shoes.good"), badge: "bg-emerald-100 text-emerald-700" };
-                  const remaining = Number(shoe.max_km) - Number(shoe.current_km);
+                  const remaining = Number(shoe.max_km) - km;
                   return (
                     <motion.div key={shoe.id} layout className="bento-card">
                       <div className="flex items-start justify-between mb-3">
                         <div>
                           <div className="font-semibold text-zinc-900">{shoe.brand} {shoe.model}</div>
-                          <div className="text-xs text-zinc-400 mt-0.5">
-                            {tr("shoes.km", { cur: Number(shoe.current_km).toFixed(0), rem: remaining.toFixed(0) })}
+                          <div className="mt-1 flex items-center gap-1.5 text-xs text-zinc-400">
+                            <input type="number" min={0} inputMode="numeric" defaultValue={suivi ? String(km) : ""}
+                              placeholder={tr("shoes.kmPh")} aria-label={tr("shoes.kmSet")}
+                              onBlur={e => { const v = Number(e.target.value); if (Number.isFinite(v) && v !== km) void majKm(String(shoe.id), v); }}
+                              onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                              className="w-16 rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-700 focus:border-emerald-400 focus:outline-none" />
+                            <span>{suivi ? tr("shoes.km", { cur: km.toFixed(0), rem: remaining.toFixed(0) }) : tr("shoes.kmSet")}</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
