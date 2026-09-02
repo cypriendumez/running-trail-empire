@@ -1078,5 +1078,68 @@ test("une insertion refusée par la base est SIGNALÉE, jamais avalée", () => {
     "le rapport doit annoncer l'échec : c'est le `ok: true` inconditionnel qui a caché les types hors enum");
 });
 
+test("une randonnée n'est pas une corrida, même dans la même ville", () => {
+  // ⚠️ FAUX IMPORT CONSTATÉ EN BASE le 02/09/2026. « Randonnée de Sassenage » a pris les
+  // 5 km et 11 km de la « Corrida de Sassenage » : j'avais rangé « randonnée » et
+  // « marche » parmi les mots de GENRE, facultatifs. Une fois « randonnee » écarté, il ne
+  // restait que « sassenage » — le nom de la ville, qui est déjà la clé de recherche et
+  // ne distingue donc RIEN. Une marche et une corrida ne sont pas deux façons de dire la
+  // même chose : ce sont deux épreuves, deux jours, deux publics.
+  assert.equal(choisirFiche(["/calendrier/222427/corrida-de-sassenage-2026/course-a-pied-sur-route/"],
+    { name: "Randonnée de Sassenage", date: "2026-09-26", city: "Sassenage" }), null);
+  assert.ok(choisirFiche(["/calendrier/222427/corrida-de-sassenage-2026/course-a-pied-sur-route/"],
+    { name: "Corrida de Sassenage", date: "2026-09-26", city: "Sassenage" }), "la vraie corrida doit s'apparier");
+
+  // ⚠️ CAS QUI ISOLE LA LISTE DES MOTS DE GENRE, et lui seul. Ici la commune n'est PAS le
+  // seul mot identifiant (« cretes » l'est aussi), donc la règle conditionnelle ne
+  // s'applique pas : si « randonnee » redevenait un mot de genre, une randonnée
+  // s'apparierait à un trail portant le même nom de lieu. Sans ce cas, les deux
+  // correctifs se recouvrent et aucune mutation ne les distingue.
+  assert.equal(choisirFiche(["/calendrier/9/trail-des-cretes-2026-gorbio/trail-course-nature/"],
+    { name: "Randonnée des Crêtes", date: "2026-10-04", city: "Gorbio" }), null,
+    "une randonnée s'est appariée au trail du même lieu");
+  assert.ok(choisirFiche(["/calendrier/9/trail-des-cretes-2026-gorbio/trail-course-nature/"],
+    { name: "Trail des Crêtes", date: "2026-10-04", city: "Gorbio" }));
+});
+
+test("un nom réduit à sa commune reste appariable par son mot de genre", () => {
+  // ⚠️ ET LE CORRECTIF NE DOIT PAS ÊTRE PIRE QUE LE DÉFAUT. Refuser tout nom dont le seul
+  // mot identifiant est la commune rejetait « Trail de Gorbio », « Le Montagrier Trail »
+  // et « Semi-Marathon d'Antony » — trois appariements JUSTES, vérifiés à la source. Le
+  // mot de genre n'est facultatif que tant qu'autre chose identifie l'épreuve ; dès qu'il
+  // est seul à le faire, il redevient obligatoire.
+  for (const [nom, ville, slug] of [
+    ["Trail de Gorbio", "Gorbio", "/calendrier/1/trail-de-gorbio-2026/trail-course-nature/"],
+    ["Le Montagrier Trail", "Montagrier", "/calendrier/1/le-montagrier-trail-2026/trail-course-nature/"],
+    ["Semi-Marathon d'Antony", "Antony", "/calendrier/1/semi-marathon-d-antony-2026/course-a-pied-sur-route/"],
+  ] as const) {
+    assert.ok(choisirFiche([slug], { name: nom, date: "2026-10-04", city: ville }), `${nom} rejeté à tort`);
+  }
+  // …et le mot de genre ne suffit évidemment pas seul.
+  assert.equal(choisirFiche(["/calendrier/1/trail-de-gorbio-2026/trail-course-nature/"],
+    { name: "Corrida de Gorbio", date: "2026-10-04", city: "Gorbio" }), null);
+
+  // ⚠️ CAS QUI ISOLE LA RÈGLE CONDITIONNELLE, et elle seule. « Course » EST un mot de
+  // genre ; la commune est le seul autre mot. Si le genre restait facultatif dans cette
+  // situation, il ne resterait plus rien pour distinguer « Course de Gorbio » du « Trail
+  // de Gorbio » — c'est exactement le mécanisme qui a fait entrer la corrida de
+  // Sassenage dans une randonnée. On préfère ne pas apparier.
+  assert.equal(choisirFiche(["/calendrier/1/trail-de-gorbio-2026/trail-course-nature/"],
+    { name: "Course de Gorbio", date: "2026-10-04", city: "Gorbio" }), null,
+    "sans mot distinctif hors la commune, le genre doit trancher");
+});
+
+test("la ville est bien transmise à l'appariement", () => {
+  // Sans elle, la règle conditionnelle ne peut pas savoir qu'un mot est le nom de la
+  // commune : elle retomberait sur le comportement qui a produit le faux import.
+  const src = readFileSync("src/app/api/cron/races-types/route.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  // ⚠️ `[^)]*` s'arrêtait à la première parenthèse fermante — celle de `String(...)` —
+  // et le test rougissait sur un code JUSTE. Un test faux coûte plus cher qu'un test
+  // absent : il fait douter du code correct.
+  assert.match(src, /choisirFiche\(liens,[\s\S]{0,240}?city:/, "la route n'envoie pas la ville à `choisirFiche`");
+});
+
 console.log(`\n${passed} crash-test(s) du catalogue passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log(`  KO ${f}`); process.exit(1); }

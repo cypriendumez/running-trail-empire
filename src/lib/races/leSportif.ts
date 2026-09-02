@@ -96,7 +96,14 @@ export function motsCles(nom: unknown): string[] {
  * rouvre exactement la faille qu'on vient de fermer : n'y mettre qu'un mot dont
  * l'absence ne change rien à l'épreuve désignée.
  */
-const GENRES = new Set(["trail", "course", "courses", "nature", "marathon", "semi", "run", "running", "randonnee", "marche"]);
+//  ⚠️ « RANDONNEE » ET « MARCHE » N'EN SONT PAS, ET LES Y AVOIR MIS A COÛTÉ CHER.
+//     « Randonnée de Sassenage » s'est retrouvée appariée à « Corrida de Sassenage » :
+//     une fois « randonnee » traité comme un mot de genre, il ne restait que le nom de
+//     la ville pour identifier l'épreuve. Or une randonnée et une corrida ne sont pas
+//     deux façons de dire la même chose — ce sont deux événements distincts, un jour
+//     différent, un public différent. Le critère à appliquer est celui écrit plus haut :
+//     un mot n'est de genre que si son absence ne change pas L'ÉPREUVE DÉSIGNÉE.
+const GENRES = new Set(["trail", "course", "courses", "nature", "marathon", "semi", "run", "running"]);
 
 /**
  * Choisit LA fiche qui correspond, ou rien.
@@ -111,7 +118,7 @@ const GENRES = new Set(["trail", "course", "courses", "nature", "marathon", "sem
  */
 export function choisirFiche(
   liens: string[],
-  course: { name: string; date: string },
+  course: { name: string; date: string; city?: string },
 ): string | null {
   const annee = String(course.date ?? "").slice(0, 4);
   if (!/^20\d{2}$/.test(annee)) return null;
@@ -121,6 +128,22 @@ export function choisirFiche(
   // refuse plutôt que d'apparier au premier trail venu de la même ville.
   const obligatoires = mots.filter((m) => !GENRES.has(m));
   if (!obligatoires.length) return null;
+  // ⚠️ QUAND LA VILLE EST LE SEUL MOT IDENTIFIANT, LE MOT DE GENRE REDEVIENT OBLIGATOIRE.
+  //    Toutes les fiches rendues concernent déjà cette ville : exiger son nom dans le slug
+  //    ne filtre rien. « Randonnée de Sassenage » n'avait plus que « sassenage » comme mot
+  //    obligatoire et s'est appariée à « Corrida de Sassenage » — deux épreuves
+  //    différentes, dont seul le mot de genre les sépare.
+  //
+  //    Mais refuser tout bonnement ces noms-là serait pire : « Trail de Gorbio », « Le
+  //    Montagrier Trail » et « Semi-Marathon d'Antony » portent légitimement le nom de
+  //    leur commune, et leurs fiches existent. Vérifié sur les trois : elles étaient
+  //    rejetées à tort par une règle qui écartait la ville sans rien mettre à la place.
+  //
+  //    La règle juste est donc conditionnelle : le mot de genre n'est facultatif que tant
+  //    qu'autre chose identifie l'épreuve. Dès qu'il est seul à le faire, il compte.
+  const ville = motsCles(course.city ?? "");
+  const distinctifs = obligatoires.filter((m) => !ville.some((v) => motProche(m, v)));
+  const exiges = distinctifs.length ? obligatoires : mots;
 
   const retenus = (liens ?? []).filter((l) => {
     if (anneeDepuisUrl(l) !== annee) return false;
@@ -137,7 +160,7 @@ export function choisirFiche(
     //    Et on compare des MOTS ENTIERS, pas des fragments : « Les Foulées Lieu Saint
     //    Amandinoises » avait pris ses distances chez « Foulées Saint-Pierroises », à
     //    400 km, sur la seule foi de « foulees » et « saint ».
-    return obligatoires.every((m) => jetons.some((j) => motProche(m, j)));
+    return exiges.every((m) => jetons.some((j) => motProche(m, j)));
   });
   return retenus.length === 1 ? retenus[0] : null;
 }

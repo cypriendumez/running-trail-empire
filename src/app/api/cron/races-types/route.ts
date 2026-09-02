@@ -122,7 +122,7 @@ export async function GET(req: Request) {
       if (rep.ok) {
         const res = await rep.text();
         const liens = [...new Set([...res.matchAll(/href="(\/calendrier\/[^"]+)"/g)].map((m) => m[1]))];
-        const fiche = choisirFiche(liens, { name: String(c.name ?? ""), date: String(c.date ?? "") });
+        const fiche = choisirFiche(liens, { name: String(c.name ?? ""), date: String(c.date ?? ""), city: String(c.city ?? "") });
         if (fiche) {
           appariees++;
           const vu = typeDepuisUrl(fiche);
