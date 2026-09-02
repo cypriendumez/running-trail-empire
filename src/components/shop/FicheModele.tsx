@@ -157,6 +157,15 @@ export function FicheModele({ m, avis, bouts, manquantes, proches, offres, offre
                 {tx("shop.releve", { date: dateLisible(m.poidsG?.vu ?? m.dropMm?.vu), sources: sourcesCitables(m.sources).join(", ") })}
               </p>
             )}
+            {/* ⚠️ MESURER ET ANNONCER NE DONNENT PAS LE MÊME CHIFFRE. Une partie des
+                hauteurs vient d'un laboratoire qui découpe la chaussure, l'autre du
+                fabricant : trois à cinq millimètres d'écart systématique. Les afficher
+                sans le dire ferait croire à une différence de conception. */}
+            {m.stackTalonMm && m.sources.includes("runrepeat.com") && (
+              <p className="mt-2 text-[11.5px] leading-snug text-zinc-400">
+                {tx("shop.mesuree")}
+              </p>
+            )}
           </Card>
 
           <Card className="p-5">

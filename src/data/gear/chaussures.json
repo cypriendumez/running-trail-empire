@@ -339,7 +339,6 @@
     "nom": "Speedcross 6",
     "annee": 2023,
     "terrain": "trail",
-    "usage": "trail_court",
     "poidsG": {
       "valeur": 288,
       "vu": "2026-09-02"
@@ -348,12 +347,23 @@
       "valeur": 10,
       "vu": "2026-09-02"
     },
+    "stackTalonMm": {
+      "valeur": 32,
+      "vu": "2026-09-02"
+    },
+    "sources": [
+      "i-run.fr",
+      "runningxpert.com",
+      "salomon.com",
+      "21run.com",
+      "trailpulseactive.com",
+      "cleverhiker.com",
+      "rei.com"
+    ],
+    "sourceFabricant": true,
     "ean": "198720097537",
     "nomExact": "Salomon Speedcross 6",
-    "foulee": "Neutre",
-    "sources": [
-      "i-run.fr"
-    ]
+    "foulee": "Neutre"
   },
   "adidas-adizero-adios-9": {
     "slug": "adidas-adizero-adios-9",
@@ -456,7 +466,6 @@
     "nom": "UltraBOOST 5",
     "annee": 2025,
     "terrain": "route",
-    "usage": "quotidien",
     "poidsG": {
       "valeur": 283,
       "vu": "2026-09-02"
@@ -465,12 +474,30 @@
       "valeur": 10,
       "vu": "2026-09-02"
     },
+    "stackTalonMm": {
+      "valeur": 39,
+      "vu": "2026-09-02"
+    },
+    "plaqueCarbone": {
+      "valeur": false,
+      "vu": "2026-09-02"
+    },
+    "prixConseilleEur": {
+      "valeur": 180,
+      "vu": "2026-09-02"
+    },
+    "sources": [
+      "i-run.fr",
+      "runpack.fr",
+      "findmyfootwear.com",
+      "driv-emotion.fr",
+      "adsport-shop.fr",
+      "youtube.com"
+    ],
+    "sourceFabricant": false,
     "ean": "4067907738746",
     "nomExact": "adidas UltraBOOST 5",
-    "foulee": "Neutre",
-    "sources": [
-      "i-run.fr"
-    ]
+    "foulee": "Neutre"
   },
   "asics-superblast-2": {
     "slug": "asics-superblast-2",
@@ -478,7 +505,6 @@
     "nom": "Superblast 2",
     "annee": 2025,
     "terrain": "route",
-    "usage": "polyvalent",
     "poidsG": {
       "valeur": 246,
       "vu": "2026-09-02"
@@ -487,14 +513,22 @@
       "valeur": 8,
       "vu": "2026-09-02"
     },
+    "prixConseilleEur": {
+      "valeur": 220,
+      "vu": "2026-09-02"
+    },
+    "sources": [
+      "i-run.fr",
+      "believeintherun.com",
+      "solereview.com",
+      "runrepeat.com"
+    ],
+    "sourceFabricant": false,
     "ean": "4570158685924",
     "nomExact": "Asics Superblast 2",
     "foulee": "Neutre",
-    "sources": [
-      "i-run.fr"
-    ],
-    "prixConseilleEur": {
-      "valeur": 220,
+    "stackTalonMm": {
+      "valeur": 42.8,
       "vu": "2026-09-02"
     }
   },
@@ -602,10 +636,15 @@
     "nomExact": "Asics Metaspeed Sky Tokyo",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "plaqueCarbone": {
       "valeur": true,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 38.7,
       "vu": "2026-09-02"
     }
   },
@@ -628,10 +667,15 @@
     "nomExact": "Asics Metaspeed Edge Tokyo",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "plaqueCarbone": {
       "valeur": true,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 38.9,
       "vu": "2026-09-02"
     }
   },
@@ -743,10 +787,15 @@
     "nomExact": "Hoka One One Mach 7",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "plaqueCarbone": {
       "valeur": false,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 35.6,
       "vu": "2026-09-02"
     }
   },
@@ -963,10 +1012,15 @@
     "nomExact": "Nike Pegasus 41",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "prixConseilleEur": {
       "valeur": 140,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 33.6,
       "vu": "2026-09-02"
     }
   },
@@ -1020,8 +1074,13 @@
     "nomExact": "Nike Pegasus Premium",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 42.8,
+      "vu": "2026-09-02"
+    }
   },
   "nike-vomero-18": {
     "slug": "nike-vomero-18",
@@ -1042,8 +1101,13 @@
     "nomExact": "Nike Vomero 18",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 42.5,
+      "vu": "2026-09-02"
+    }
   },
   "nike-zoom-fly-6": {
     "slug": "nike-zoom-fly-6",
@@ -1177,8 +1241,13 @@
     "nomExact": "New Balance Fresh Foam X Hierro V9",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 37.3,
+      "vu": "2026-09-02"
+    }
   },
   "saucony-endorphin-speed-5": {
     "slug": "saucony-endorphin-speed-5",
@@ -1300,10 +1369,15 @@
     "nomExact": "Saucony Ride 18",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "prixConseilleEur": {
       "valeur": 150,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 35,
       "vu": "2026-09-02"
     }
   },
@@ -1411,8 +1485,13 @@
     "nomExact": "Saucony Kinvara 15",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 27.9,
+      "vu": "2026-09-02"
+    }
   },
   "on-cloudmonster-2": {
     "slug": "on-cloudmonster-2",
@@ -1433,10 +1512,15 @@
     "nomExact": "On-Running Cloudmonster 2",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "prixConseilleEur": {
       "valeur": 190,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 37.9,
       "vu": "2026-09-02"
     }
   },
@@ -1490,7 +1574,8 @@
     "nomExact": "On-Running Cloudboom Strike",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "prixConseilleEur": {
       "valeur": 280,
@@ -1498,6 +1583,10 @@
     },
     "plaqueCarbone": {
       "valeur": true,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 38.1,
       "vu": "2026-09-02"
     }
   },
@@ -1520,10 +1609,15 @@
     "nomExact": "On-Running Cloudvista 2",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "prixConseilleEur": {
       "valeur": 160,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 31.7,
       "vu": "2026-09-02"
     }
   },
@@ -1546,7 +1640,8 @@
     "nomExact": "Puma Deviate Nitro 3",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "prixConseilleEur": {
       "valeur": 170,
@@ -1554,6 +1649,10 @@
     },
     "plaqueCarbone": {
       "valeur": true,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 37.4,
       "vu": "2026-09-02"
     }
   },
@@ -1576,7 +1675,8 @@
     "nomExact": "Puma Velocity Nitro 4",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "prixConseilleEur": {
       "valeur": 130,
@@ -1584,6 +1684,10 @@
     },
     "plaqueCarbone": {
       "valeur": true,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 33.7,
       "vu": "2026-09-02"
     }
   },
@@ -1606,7 +1710,8 @@
     "nomExact": "Puma Fast-R Nitro Elite 3",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "prixConseilleEur": {
       "valeur": 300,
@@ -1614,6 +1719,10 @@
     },
     "plaqueCarbone": {
       "valeur": true,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 38.5,
       "vu": "2026-09-02"
     }
   },
@@ -1636,8 +1745,13 @@
     "nomExact": "Puma Deviate Nitro Elite 3",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 39.2,
+      "vu": "2026-09-02"
+    }
   },
   "salomon-s-lab-genesis": {
     "slug": "salomon-s-lab-genesis",
@@ -1658,10 +1772,15 @@
     "nomExact": "Salomon S-Lab Genesis",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "prixConseilleEur": {
       "valeur": 200,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 31.9,
       "vu": "2026-09-02"
     }
   },
@@ -1706,8 +1825,13 @@
     "nomExact": "Salomon Thundercross",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 27.6,
+      "vu": "2026-09-02"
+    }
   },
   "salomon-aero-glide-3": {
     "slug": "salomon-aero-glide-3",
@@ -1728,8 +1852,13 @@
     "nomExact": "Salomon Aero Glide 3",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 42.2,
+      "vu": "2026-09-02"
+    }
   },
   "brooks-ghost-17": {
     "slug": "brooks-ghost-17",
@@ -1750,10 +1879,15 @@
     "nomExact": "Brooks Ghost 17",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "prixConseilleEur": {
       "valeur": 150,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 36.2,
       "vu": "2026-09-02"
     }
   },
@@ -1776,8 +1910,13 @@
     "nomExact": "Brooks Glycerin 22",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 38.5,
+      "vu": "2026-09-02"
+    }
   },
   "brooks-caldera-8": {
     "slug": "brooks-caldera-8",
@@ -1798,8 +1937,13 @@
     "nomExact": "Brooks Caldera 8",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 36.7,
+      "vu": "2026-09-02"
+    }
   },
   "brooks-cascadia-19": {
     "slug": "brooks-cascadia-19",
@@ -1820,8 +1964,13 @@
     "nomExact": "Brooks Cascadia 19",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 34.8,
+      "vu": "2026-09-02"
+    }
   },
   "brooks-adrenaline-gts-24": {
     "slug": "brooks-adrenaline-gts-24",
@@ -1842,8 +1991,13 @@
     "nomExact": "Brooks Adrenaline GTS 24",
     "foulee": "Modérée",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 39,
+      "vu": "2026-09-02"
+    }
   },
   "mizuno-wave-rider-29": {
     "slug": "mizuno-wave-rider-29",
@@ -1895,10 +2049,15 @@
     "nomExact": "Mizuno Wave Sky 9",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "prixConseilleEur": {
       "valeur": 190,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 44.3,
       "vu": "2026-09-02"
     }
   },
@@ -1921,7 +2080,8 @@
     "nomExact": "Mizuno Wave Rebellion Pro 3",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "prixConseilleEur": {
       "valeur": 240,
@@ -1929,6 +2089,10 @@
     },
     "plaqueCarbone": {
       "valeur": true,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 39.9,
       "vu": "2026-09-02"
     }
   },
@@ -1982,8 +2146,13 @@
     "nomExact": "Altra Lone Peak 9+",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 23.3,
+      "vu": "2026-09-02"
+    }
   },
   "altra-torin-8": {
     "slug": "altra-torin-8",
@@ -2124,10 +2293,15 @@
     "nomExact": "La Sportiva Prodigio Pro",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "prixConseilleEur": {
       "valeur": 200,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 29.4,
       "vu": "2026-09-02"
     }
   },
@@ -2345,8 +2519,13 @@
     "nomExact": "adidas Adizero Adios Pro Evo 2",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 38.4,
+      "vu": "2026-09-02"
+    }
   },
   "altra-torin-9": {
     "slug": "altra-torin-9",
@@ -2385,7 +2564,8 @@
     "nomExact": "Altra Vanish Carbon 2",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "prixConseilleEur": {
       "valeur": 260,
@@ -2393,6 +2573,10 @@
     },
     "plaqueCarbone": {
       "valeur": true,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 33.1,
       "vu": "2026-09-02"
     }
   },
@@ -2521,10 +2705,15 @@
     "nomExact": "Altra FWD Via 2",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "prixConseilleEur": {
       "valeur": 180,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 36.7,
       "vu": "2026-09-02"
     }
   },
@@ -2541,10 +2730,15 @@
     "nomExact": "Asics Metaspeed Ray",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "plaqueCarbone": {
       "valeur": true,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 39.8,
       "vu": "2026-09-02"
     }
   },
@@ -2565,8 +2759,13 @@
     "nomExact": "Asics Superblast 3",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 45.8,
+      "vu": "2026-09-02"
+    }
   },
   "asics-gel-pulse-16": {
     "slug": "asics-gel-pulse-16",
@@ -2585,10 +2784,15 @@
     "nomExact": "Asics Gel-Pulse 16",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "prixConseilleEur": {
       "valeur": 110,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 36.5,
       "vu": "2026-09-02"
     }
   },
@@ -2609,8 +2813,13 @@
     "nomExact": "Brooks Ghost Max 4",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 38.6,
+      "vu": "2026-09-02"
+    }
   },
   "brooks-launch-12": {
     "slug": "brooks-launch-12",
@@ -2629,8 +2838,13 @@
     "nomExact": "Brooks Launch 12",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 33.4,
+      "vu": "2026-09-02"
+    }
   },
   "brooks-ghost-max-3": {
     "slug": "brooks-ghost-max-3",
@@ -2649,10 +2863,15 @@
     "nomExact": "Brooks Ghost Max 3",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "prixConseilleEur": {
       "valeur": 160,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 38.5,
       "vu": "2026-09-02"
     }
   },
@@ -2673,8 +2892,13 @@
     "nomExact": "Brooks Glycerin Max 2",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 45.4,
+      "vu": "2026-09-02"
+    }
   },
   "hoka-cielo-x1": {
     "slug": "hoka-cielo-x1",
@@ -2727,7 +2951,8 @@
     "nomExact": "Hoka One One Mach 6",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "prixConseilleEur": {
       "valeur": 160,
@@ -2735,6 +2960,10 @@
     },
     "plaqueCarbone": {
       "valeur": true,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 36,
       "vu": "2026-09-02"
     }
   },
@@ -3032,10 +3261,15 @@
     "nomExact": "La Sportiva Ultra Raptor 3",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "prixConseilleEur": {
       "valeur": 165,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 35.4,
       "vu": "2026-09-02"
     }
   },
@@ -3208,8 +3442,13 @@
     "nomExact": "Merrell Agility Peak 6",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 36.1,
+      "vu": "2026-09-02"
+    }
   },
   "merrell-mtl-speedarc-peak": {
     "slug": "merrell-mtl-speedarc-peak",
@@ -3328,8 +3567,13 @@
     "nomExact": "Merrell Trail Glove 7 M",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 16.1,
+      "vu": "2026-09-02"
+    }
   },
   "mizuno-wave-rider-tt-3": {
     "slug": "mizuno-wave-rider-tt-3",
@@ -3577,10 +3821,15 @@
     "nomExact": "New Balance Fresh Foam X 1080 V14",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "prixConseilleEur": {
       "valeur": 190,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 37,
       "vu": "2026-09-02"
     }
   },
@@ -3909,10 +4158,15 @@
     "nomExact": "Puma Deviate Nitro Elite 4",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "plaqueCarbone": {
       "valeur": true,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 37.2,
       "vu": "2026-09-02"
     }
   },
@@ -3977,7 +4231,8 @@
     "nomExact": "Puma Fast-R Nitro Elite 2",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "prixConseilleEur": {
       "valeur": 260,
@@ -3985,6 +4240,10 @@
     },
     "plaqueCarbone": {
       "valeur": true,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 39.7,
       "vu": "2026-09-02"
     }
   },
@@ -4005,10 +4264,15 @@
     "nomExact": "Puma Deviate Nitro 4",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "plaqueCarbone": {
       "valeur": false,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 33.6,
       "vu": "2026-09-02"
     }
   },
@@ -4181,7 +4445,8 @@
     "nomExact": "Salomon S-Lab Spectur M",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "prixConseilleEur": {
       "valeur": 220,
@@ -4189,6 +4454,10 @@
     },
     "plaqueCarbone": {
       "valeur": true,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 36.9,
       "vu": "2026-09-02"
     }
   },
@@ -4233,10 +4502,15 @@
     "nomExact": "Salomon Aero Blaze 3 GRVL",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "prixConseilleEur": {
       "valeur": 140,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 35.5,
       "vu": "2026-09-02"
     }
   },
@@ -4313,10 +4587,15 @@
     "nomExact": "Salomon Aero Glide 4 GRVL",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "prixConseilleEur": {
       "valeur": 160,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 40.9,
       "vu": "2026-09-02"
     }
   },
@@ -4337,10 +4616,15 @@
     "nomExact": "Salomon Aero Glide 4",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "prixConseilleEur": {
       "valeur": 160,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 43.2,
       "vu": "2026-09-02"
     }
   },
@@ -4842,8 +5126,13 @@
     "nomExact": "On-Running Cloudboom Max",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 39.2,
+      "vu": "2026-09-02"
+    }
   },
   "on-cloudboom-volt": {
     "slug": "on-cloudboom-volt",
@@ -4930,8 +5219,13 @@
     "nomExact": "adidas adizero SL2",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 34.9,
+      "vu": "2026-09-02"
+    }
   },
   "altra-timp-5-boa": {
     "slug": "altra-timp-5-boa",
@@ -4978,8 +5272,13 @@
     "nomExact": "Altra Timp 5",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 28.6,
+      "vu": "2026-09-02"
+    }
   },
   "altra-experience-wild": {
     "slug": "altra-experience-wild",
@@ -5110,8 +5409,13 @@
     "nomExact": "Altra Experience Wild 2",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 32.3,
+      "vu": "2026-09-02"
+    }
   },
   "altra-olympus-275": {
     "slug": "altra-olympus-275",
@@ -5134,8 +5438,13 @@
     "nomExact": "Altra Olympus 275",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 30.8,
+      "vu": "2026-09-02"
+    }
   },
   "altra-superior-7": {
     "slug": "altra-superior-7",
@@ -5158,8 +5467,13 @@
     "nomExact": "Altra Superior 7",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 20.6,
+      "vu": "2026-09-02"
+    }
   },
   "altra-timp-6": {
     "slug": "altra-timp-6",
@@ -5317,8 +5631,13 @@
     "nomExact": "Asics Dynablast 5",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 39.4,
+      "vu": "2026-09-02"
+    }
   },
   "asics-gel-contend-9": {
     "slug": "asics-gel-contend-9",
@@ -5341,8 +5660,13 @@
     "nomExact": "Asics Gel-Contend 9",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 31.2,
+      "vu": "2026-09-02"
+    }
   },
   "asics-gel-contend-10": {
     "slug": "asics-gel-contend-10",
@@ -5440,8 +5764,13 @@
     "nomExact": "Asics Gel-Kayano 30 M",
     "foulee": "Renforcée",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 39.7,
+      "vu": "2026-09-02"
+    }
   },
   "asics-gt-2000-14": {
     "slug": "asics-gt-2000-14",
@@ -5571,8 +5900,13 @@
     "nomExact": "Asics Glideride Max",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 44.1,
+      "vu": "2026-09-02"
+    }
   },
   "asics-glideride-max-2": {
     "slug": "asics-glideride-max-2",
@@ -5595,8 +5929,13 @@
     "nomExact": "Asics Glideride Max 2",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 42.1,
+      "vu": "2026-09-02"
+    }
   },
   "brooks-ghost-amp": {
     "slug": "brooks-ghost-amp",
@@ -5635,10 +5974,15 @@
     "nomExact": "Brooks Ghost 18",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "plaqueCarbone": {
       "valeur": true,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 37.3,
       "vu": "2026-09-02"
     }
   },
@@ -5659,8 +6003,13 @@
     "nomExact": "Brooks Glycerin 23",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 37.2,
+      "vu": "2026-09-02"
+    }
   },
   "brooks-glycerin-flex": {
     "slug": "brooks-glycerin-flex",
@@ -5679,8 +6028,13 @@
     "nomExact": "Brooks Glycerin Flex",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 35.2,
+      "vu": "2026-09-02"
+    }
   },
   "hoka-cielo-x1-3-0": {
     "slug": "hoka-cielo-x1-3-0",
@@ -5727,8 +6081,13 @@
     "nomExact": "Hoka One One Rincon 4",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 36,
+      "vu": "2026-09-02"
+    }
   },
   "hoka-skyward-x-2": {
     "slug": "hoka-skyward-x-2",
@@ -5958,8 +6317,13 @@
     "nomExact": "Inov-8 Trailfly Max",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 37.1,
+      "vu": "2026-09-02"
+    }
   },
   "inov-8-trailfly-speed": {
     "slug": "inov-8-trailfly-speed",
@@ -6006,8 +6370,13 @@
     "nomExact": "Inov-8 TrailFly Zero",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 24.9,
+      "vu": "2026-09-02"
+    }
   },
   "inov-8-trailtalon": {
     "slug": "inov-8-trailtalon",
@@ -6030,8 +6399,13 @@
     "nomExact": "Inov-8 Trailtalon M",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 34.2,
+      "vu": "2026-09-02"
+    }
   },
   "inov-8-trailtalon-speed": {
     "slug": "inov-8-trailtalon-speed",
@@ -6210,8 +6584,13 @@
     "nomExact": "New Balance FuelCell Propel V5",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 35.2,
+      "vu": "2026-09-02"
+    }
   },
   "new-balance-fuelcell-supercomp-pacer-v2": {
     "slug": "new-balance-fuelcell-supercomp-pacer-v2",
@@ -6526,8 +6905,13 @@
     "nomExact": "Nike Pegasus EasyOn",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 33.6,
+      "vu": "2026-09-02"
+    }
   },
   "nike-pegasus-plus": {
     "slug": "nike-pegasus-plus",
@@ -6550,8 +6934,13 @@
     "nomExact": "Nike Pegasus Plus",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 33,
+      "vu": "2026-09-02"
+    }
   },
   "nike-zoomx-streakfly-2": {
     "slug": "nike-zoomx-streakfly-2",
@@ -6765,8 +7154,13 @@
     "nomExact": "On-Running Cloudsurfer Max",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 37.3,
+      "vu": "2026-09-02"
+    }
   },
   "on-cloudultra-peak": {
     "slug": "on-cloudultra-peak",
@@ -6809,8 +7203,13 @@
     "nomExact": "On-Running Cloudsurfer Next",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 33.8,
+      "vu": "2026-09-02"
+    }
   },
   "on-cloudultra-3": {
     "slug": "on-cloudultra-3",
@@ -6829,8 +7228,13 @@
     "nomExact": "On-Running Cloudultra 3",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 32.1,
+      "vu": "2026-09-02"
+    }
   },
   "on-cloudultra-pro": {
     "slug": "on-cloudultra-pro",
@@ -6853,8 +7257,13 @@
     "nomExact": "On-Running Cloudultra Pro",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 35.7,
+      "vu": "2026-09-02"
+    }
   },
   "on-cloudvista-3": {
     "slug": "on-cloudvista-3",
@@ -6941,8 +7350,13 @@
     "nomExact": "Puma MagMax Nitro",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 42.9,
+      "vu": "2026-09-02"
+    }
   },
   "puma-magnify-nitro-3": {
     "slug": "puma-magnify-nitro-3",
@@ -6961,8 +7375,13 @@
     "nomExact": "Puma Magnify Nitro 3",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 37.4,
+      "vu": "2026-09-02"
+    }
   },
   "puma-magmax-nitro-2": {
     "slug": "puma-magmax-nitro-2",
@@ -7179,8 +7598,13 @@
     "nomExact": "Saucony Triumph 22",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 38.6,
+      "vu": "2026-09-02"
+    }
   },
   "saucony-omni-23-st": {
     "slug": "saucony-omni-23-st",
@@ -7370,8 +7794,13 @@
     "nomExact": "Salomon S-Lab Ultra Glide",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 41,
+      "vu": "2026-09-02"
+    }
   },
   "salomon-s-lab-pulsar-4": {
     "slug": "salomon-s-lab-pulsar-4",
@@ -7394,8 +7823,13 @@
     "nomExact": "Salomon S-Lab Pulsar 4",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 32.6,
+      "vu": "2026-09-02"
+    }
   },
   "salomon-s-lab-genesis-spine": {
     "slug": "salomon-s-lab-genesis-spine",

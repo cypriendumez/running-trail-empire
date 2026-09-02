@@ -26,6 +26,7 @@ import { prixConseilleDe, estFemme, terrainDeUrl, nomMarque, modeleDeNom, retire
 import { fusionner, contredit } from "../scripts/collecte-specs";
 import { normaliser as normaliserCatalogue, richesse } from "../scripts/normaliser-catalogue";
 import { utilisables } from "../scripts/import-offres";
+import { mesureDeSection, pageCorrespond, dropIncoherent, DROP_MESURE_MAX_MM, DROP_MESURE_MIN_MM } from "../scripts/collecte-runrepeat";
 import { parseFeed, normalizeFeed } from "../src/lib/shop/affiliateFeed";
 
 let passed = 0; const fails: string[] = [];
@@ -999,6 +1000,89 @@ test("un lot d'offres ne contient jamais deux fois le même code-barres", () => 
   assert.equal(utilisables([o("d", "", 50)]).length, 0, "une offre sans code-barres est orpheline, elle ne s'affichera jamais");
   assert.equal(utilisables([{ slug: "e", ean: "333", prix: 0, dispo: true, url: "https://x.fr" }]).length, 0);
   assert.equal(utilisables([{ slug: "f", ean: "444", prix: 50, dispo: true, url: "pas-une-url" }]).length, 0);
+});
+
+test("une mesure se lit dans le tableau de résultats, pas dans la prose", () => {
+  // ⚠️ LA SECTION CONTIENT AUSSI DU TEXTE ET UN HISTOGRAMME. « It adds 1.1 mm over its
+  // predecessor, reaching 36.2 mm » : prendre le premier « N mm » venu donnerait 1,1 mm
+  // de hauteur de talon. Et l'histogramme affiche ses bornes (13,9 mm / 41,3 mm), qui ne
+  // décrivent aucune chaussure en particulier.
+  const html = `<section id="heel-stack"><p>It adds 1.1 mm over its predecessor.</p>
+    <div class="x-min">13.9 mm</div>
+    <table class="lab-measurements-table table"><tbody>
+      <tr><td>Ghost 17</td><td><span>36.2 mm</span></td></tr>
+      <tr><td>Average</td><td><span>35.5 mm</span></td></tr>
+    </tbody></table></section><section id="drop"></section>`;
+  assert.equal(mesureDeSection(html, "heel-stack"), 36.2);
+  // La moyenne n'est la mesure d'aucune chaussure : elle doit être écartée explicitement.
+  const sansShoe = html.replace("<tr><td>Ghost 17</td><td><span>36.2 mm</span></td></tr>", "");
+  assert.equal(mesureDeSection(sansShoe, "heel-stack"), null, "la moyenne a été prise pour une mesure");
+  assert.equal(mesureDeSection(html, "forefoot-stack"), null, "une section absente doit rendre null");
+  // ⚠️ ET SEUL LE TABLEAU DE LABORATOIRE COMPTE. Une section peut contenir un AUTRE
+  // tableau — guide des tailles, comparatif — dont les lignes ressemblent aux bonnes.
+  const autreTable = `<section id="heel-stack"><table class="size-guide"><tbody>
+      <tr><td>EU 42</td><td><span>27.5 mm</span></td></tr></tbody></table></section><section id="drop"></section>`;
+  assert.equal(mesureDeSection(autreTable, "heel-stack"), null,
+    "un tableau qui n'est pas celui des mesures a été lu comme tel");
+  // Les onces ne sont pas des grammes : on refuse plutôt que de convertir en silence.
+  const oz = `<section id="weight"><table class="lab-measurements-table"><tbody><tr><td>X</td><td><span>10.2 oz</span></td></tr></tbody></table></section>`;
+  assert.equal(mesureDeSection(oz, "weight"), null);
+});
+
+test("une adresse devinée qui répond 200 n'est pas une preuve d'identité", () => {
+  // Le site peut rediriger ou servir une page voisine. On exige que le titre porte tous
+  // les mots de la marque ET du modèle — même règle que pour le catalogue de courses,
+  // où deux mots communs avaient suffi à importer les distances d'une autre épreuve.
+  const h1 = (t: string) => `<h1 class="x">${t}</h1>`;
+  assert.ok(pageCorrespond(h1("Brooks Ghost 17 Review"), "Brooks", "Ghost 17"));
+  assert.ok(!pageCorrespond(h1("Brooks Ghost 16 Review"), "Brooks", "Ghost 17"), "une autre version a été acceptée");
+  assert.ok(!pageCorrespond(h1("Brooks Glycerin 22"), "Brooks", "Ghost 17"));
+  assert.ok(!pageCorrespond("<p>pas de titre</p>", "Brooks", "Ghost 17"), "une page sans titre ne prouve rien");
+  assert.ok(!pageCorrespond(h1("N'importe quoi"), "", ""), "un nom vide accepterait n'importe quelle page");
+});
+
+test("l'écart entre mesure et annonce est ORIENTÉ, la tolérance aussi", () => {
+  // ⚠️ MESURÉ SUR LES 20 REJETS D'UN PREMIER PASSAGE : 18 vont dans le même sens, le
+  // laboratoire trouvant de +2,6 à +6,7 mm de plus que la marque n'annonce — l'insemelle
+  // est en place et les points de mesure diffèrent. Ce n'est pas un désaccord, c'est une
+  // méthode. Les deux écarts restants étaient NÉGATIFS (−3,9 et −3,8), sans explication
+  // méthodologique : ceux-là signalent une autre chaussure.
+  //
+  // Une tolérance symétrique large laisserait passer les seconds ; une tolérance serrée
+  // rejetait 18 appariements justes.
+  assert.ok(!dropIncoherent(5, 9.4), "un écart +4,4 mm est la méthode, pas une erreur");
+  assert.ok(!dropIncoherent(6, 12.7), "un écart +6,7 mm reste dans la marge observée");
+  assert.ok(dropIncoherent(6, 14.5), "au-delà de sept millimètres ce n'est plus une méthode");
+  assert.ok(dropIncoherent(8, 4.1), "un laboratoire qui trouve MOINS que l'annonce est anormal");
+  assert.ok(dropIncoherent(6, 2.2));
+  assert.ok(!dropIncoherent(8, 8));
+  assert.ok(DROP_MESURE_MAX_MM > DROP_MESURE_MIN_MM, "la tolérance doit rester asymétrique");
+});
+
+test("seule la hauteur de semelle est reprise de la source de mesure", () => {
+  // ⚠️ Un drop MESURÉ cohabiterait avec des drops ANNONCÉS sur les autres fiches,
+  // décalés de trois à cinq millimètres, sans que rien ne les distingue à l'écran : deux
+  // chaussures paraîtraient différentes alors que seule la méthode change. La hauteur,
+  // elle, n'est publiée par personne d'autre.
+  const src = codeOf("scripts/collecte-runrepeat.ts");
+  assert.ok(/stackTalonMm: \{ valeur: stack, vu \}/.test(src));
+  assert.ok(!/dropMm: m\.dropMm \?\?/.test(src), "le drop mesuré est écrit dans le catalogue");
+  assert.ok(!/poidsG: m\.poidsG \?\?/.test(src), "le poids mesuré est écrit dans le catalogue");
+});
+
+test("une hauteur mesurée est signalée comme telle", () => {
+  // ⚠️ MESURER ET ANNONCER NE DONNENT PAS LE MÊME CHIFFRE : trois à cinq millimètres
+  // d'écart systématique. Le catalogue mélange les deux — 130 hauteurs viennent d'un
+  // marchand qui reprend le fabricant, 83 d'un laboratoire qui découpe la chaussure.
+  // Les afficher côte à côte sans le dire ferait croire à une différence de conception.
+  const fiche = codeOf("src/components/shop/FicheModele.tsx");
+  assert.ok(/sources\.includes\("runrepeat\.com"\)/.test(fiche),
+    "la fiche ne distingue pas une hauteur mesurée d'une hauteur annoncée");
+  for (const lang of ["fr", "en", "de", "es", "pt"] as const)
+    assert.ok(SHOP[lang]["shop.mesuree"], `note de méthode absente en ${lang}`);
+  // Et le catalogue contient bien les deux provenances : la note n'est pas décorative.
+  const mesurees = CATALOGUE.filter((m) => m.stackTalonMm && m.sources.includes("runrepeat.com")).length;
+  assert.ok(mesurees > 0, "aucune hauteur mesurée : la note ne s'afficherait jamais");
 });
 
 test("le catalogue existe et n'est pas vide", () => {

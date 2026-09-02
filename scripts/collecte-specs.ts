@@ -24,7 +24,6 @@ for (const l of fs.readFileSync(".env.local", "utf8").split("\n")) {
 }
 import { generateContent } from "../src/lib/ai/gemini";
 import { dansLesBornes, coherenceStackDrop, sourceValide, type Modele } from "../src/lib/shop/modele";
-import { MODELES_A_COLLECTER } from "./modeles-a-collecter";
 import { prendreVerrou } from "../src/lib/shop/verrou";
 
 const SORTIE = path.join(process.cwd(), "src/data/gear/chaussures.json");
@@ -118,31 +117,38 @@ export function fusionner(ancien: Modele | undefined, neuf: Modele): Modele {
   };
 }
 
-export async function collecter(m: (typeof MODELES_A_COLLECTER)[number]): Promise<Modele | null> {
+/** Pourquoi une collecte n'a rien produit. Le mot « rien » recouvrait trois causes. */
+export type Echec = "modèle indisponible" | "modèle inconnu à la source" | "aucune source citée" | "réponse illisible";
+
+export async function collecter(m: { slug: string; marque: string; nom: string; annee?: number; terrain: Modele["terrain"] }): Promise<Modele | Echec> {
   const rech = await generateContent(
     [{ role: "user", parts: [{ text: promptRecherche(m) }] }],
     { temperature: 0, maxOutputTokens: 2200 },
     { tools: [{ google_search: {} }] },
   );
-  if (!rech.ok || !rech.text.trim()) return null;
+  // ⚠️ « AUCUNE DONNÉE VÉRIFIABLE » RECOUVRAIT UN PLAFOND DE DÉBIT. Deux modèles ont
+  //    échoué d'affilée juste après un succès : ce n'était pas un manque d'information,
+  //    c'était le quota par minute. Confondre « la source ne sait pas » et « on m'a
+  //    coupé » fait renoncer à des modèles qui auraient répondu une minute plus tard.
+  if (!rech.ok || !rech.text.trim()) return "modèle indisponible";
   // ⚠️ UN NOM DE MODÈLE FAUX PRODUIT UNE FICHE VRAISEMBLABLE. Sans ce garde-fou, une
   // coquille dans la liste ferait décrire la génération voisine, avec des sources
   // authentiques à l'appui : la fiche paraîtrait irréprochable et serait fausse.
-  if (/MODELE INCONNU/i.test(rech.text)) return null;
+  if (/MODELE INCONNU/i.test(rech.text)) return "modèle inconnu à la source";
 
   // ⚠️ SANS SOURCE CONSULTÉE, LA RÉPONSE EST DE MÉMOIRE — donc invérifiable. On jette.
   const sources = (rech.sources ?? []).map((s: unknown) =>
     typeof s === "string" ? s : String((s as { url?: string; uri?: string })?.url ?? (s as { uri?: string })?.uri ?? "")
   ).filter(sourceValide);
-  if (!sources.length) return null;
+  if (!sources.length) return "aucune source citée";
 
   const ext = await generateContent(
     [{ role: "user", parts: [{ text: promptExtraction(rech.text) }] }],
     { temperature: 0, maxOutputTokens: 300, thinkingConfig: { thinkingBudget: 0 } },
   );
-  if (!ext.ok) return null;
+  if (!ext.ok) return "modèle indisponible";
   const j = jsonDe(ext.text);
-  if (!j) return null;
+  if (!j) return "réponse illisible";
 
   const vu = new Date().toISOString().slice(0, 10);
   const mesure = <T,>(v: T | null | undefined) => (v == null ? undefined : { valeur: v, vu });
@@ -178,22 +184,41 @@ async function principal(): Promise<void> {
   //    présence de plaque, NI prix conseillé, qui ne figurent sur aucune fiche produit.
   //    Filtrer sur l'absence de fiche laissait donc 48 modèles définitivement incomplets
   //    en n'en proposant que 25, sans que rien ne le signale.
-  const incomplet = (m: Modele | undefined) =>
-    !m || !m.stackTalonMm || !m.plaqueCarbone || !m.prixConseilleEur;
-  const liste = MODELES_A_COLLECTER.filter((m) =>
-    filtre ? `${m.marque} ${m.nom}`.toLowerCase().includes(filtre) : incomplet(deja[m.slug]));
+  const incomplet = (m: Modele) => !m.stackTalonMm || !m.plaqueCarbone || !m.prixConseilleEur;
+  // ⚠️ ON PARCOURT LE CATALOGUE, PAS LA LISTE DE DÉPART. Ce script itérait sur les 107
+  //    noms écrits à la main au tout début — le même défaut que la collecte des hauteurs.
+  //    Depuis que les modèles sont découverts chez le marchand, le catalogue en compte
+  //    près du triple, et les nouveaux ne pouvaient JAMAIS être complétés.
+  //
+  //    ⚠️ ET L'ORDRE COMPTE, parce que le quota de la recherche est petit et s'épuise en
+  //    cours de route : ce qui manque le plus — la hauteur de semelle, que personne
+  //    d'autre ne publie — passe en premier. Sinon le quota part sur des prix conseillés
+  //    qu'un marchand donne déjà.
+  const liste = Object.values(deja)
+    .filter((m) => (filtre ? `${m.marque} ${m.nom}`.toLowerCase().includes(filtre) : incomplet(m)))
+    .sort((a, b) => Number(!!a.stackTalonMm) - Number(!!b.stackTalonMm));
   console.log(`${liste.length} modèle(s) à collecter · ${Object.keys(deja).length} déjà en fiche`);
 
-  let ok = 0, vides = 0;
+  let ok = 0, vides = 0, coupes = 0;
   for (const m of liste) {
     try {
-      const fiche = await collecter(m);
-      if (!fiche) { vides++; console.log(`  ✗ ${m.marque} ${m.nom} — aucune donnée vérifiable`); continue; }
+      const issue = await collecter(m);
+      if (typeof issue === "string") {
+        vides++;
+        if (issue === "modèle indisponible") coupes++;
+        console.log(`  ✗ ${(m.marque + " " + m.nom).padEnd(34)} ${issue}`);
+        // Le plafond est PAR MINUTE : après trois coupures d'affilée, on souffle une
+        // minute plutôt que de brûler la suite de la liste en pure perte.
+        if (coupes >= 3) { console.log("  ⏸ pause d'une minute (plafond de débit)"); coupes = 0; await new Promise((x) => setTimeout(x, 60_000)); }
+        continue;
+      }
+      coupes = 0;
+      const fiche = issue;
       const litige = contredit(deja[m.slug], fiche);
       if (litige) {
         vides++;
         console.log(`  ⚠ ${m.marque} ${m.nom} — RÉPONSE REJETÉE : ${litige}`);
-        await new Promise((r) => setTimeout(r, 1200));
+        await new Promise((x) => setTimeout(x, 6000));
         continue;
       }
       deja[m.slug] = fusionner(deja[m.slug], fiche);
@@ -203,16 +228,18 @@ async function principal(): Promise<void> {
       // une fiche où 7 mm avaient été conservés. Un journal qui décrit autre chose que
       // l'état réel fait chercher des défauts qui n'existent pas — et masque les vrais.
       const e = deja[m.slug];
-      const r = [
+      const resume = [
         e.poidsG ? `${e.poidsG.valeur} g` : "poids ?",
         e.dropMm ? `${e.dropMm.valeur} mm` : "drop ?",
         e.stackTalonMm ? `stack ${e.stackTalonMm.valeur}` : "stack ?",
         e.prixConseilleEur ? `${e.prixConseilleEur.valeur} €` : "prix ?",
       ].join(" · ");
-      console.log(`  ✓ ${(m.marque + " " + m.nom).padEnd(34)} ${r}`);
+      console.log(`  ✓ ${(m.marque + " " + m.nom).padEnd(34)} ${resume}`);
       fs.writeFileSync(SORTIE, JSON.stringify(deja, null, 2));
     } catch (e) { vides++; console.log(`  ✗ ${m.marque} ${m.nom} — ${String(e).slice(0, 60)}`); }
-    await new Promise((r) => setTimeout(r, 1200));
+    // ⚠️ DEUX APPELS PAR MODÈLE : à 1,2 s on dépasse le plafond par minute en quelques
+    //    secondes. Six secondes tiennent le rythme dans la durée.
+    await new Promise((r) => setTimeout(r, 6000));
   }
   console.log(`\n${ok} fiche(s) écrite(s), ${vides} sans donnée vérifiable · ${SORTIE}`);
 }
