@@ -21,6 +21,7 @@ import { readFileSync } from "node:fs";
 import { reponseImmediate, fallbackAnswer } from "../src/lib/support/fallback";
 import { normaliserQuestion, utilisable, empreinteKb, type EntreeMemoire } from "../src/lib/support/memoire";
 import { segmenterGras } from "../src/lib/support/gras";
+import { segments } from "../src/lib/ui/richText";
 
 let passed = 0;
 const fails: string[] = [];
@@ -259,10 +260,31 @@ test("la bulle passe bien les réponses par ce découpage", () => {
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
   // Viser le SITE qui produit l'effet : le rendu du message, pas l'import.
-  assert.ok(src.includes("{m.role === \"user\" ? m.text : <Texte>{m.text}</Texte>}"),
-    "les réponses de l'assistant ne passent plus par <Texte> : les astérisques réapparaissent");
+  // ⚠️ LA BULLE PARTAGE MAINTENANT LE RENDU DU KINÉ. Elle avait son propre découpage du
+  // gras, qui laissait les ÉTAPES NUMÉROTÉES en texte plat — or l'invite les réclame
+  // explicitement pour toute manipulation, et c'est la partie qu'on suit du doigt.
+  assert.ok(src.includes("{m.role === \"user\" ? m.text : <RichText texte={m.text} />}"),
+    "les réponses de l'assistant ne passent plus par le rendu partagé : le balisage réapparaît");
   assert.ok(!src.includes("dangerouslySetInnerHTML"),
     "le texte du modèle est injecté en HTML brut : tout ce qu'il renvoie devient du balisage");
+});
+
+test("le gras du support et celui du kiné sortent du MÊME analyseur", () => {
+  // ⚠️ DEUX DÉCOUPAGES POUR UN SEUL BESOIN, C'EST UN SEUL DES DEUX ASSISTANTS RÉPARÉ le
+  // jour où l'un se trompe. `segmenterGras` reste le point d'entrée nommé du support,
+  // mais il délègue — et ce test tombe si quelqu'un réécrit une seconde version.
+  const src = readFileSync("src/lib/support/gras.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  assert.ok(/segments\(/.test(src), "le support a de nouveau son propre découpage du gras");
+  assert.ok(!/split\(/.test(src), "une seconde implémentation du gras est réapparue");
+  // Et les deux chemins doivent rendre la même chose sur le même texte.
+  const cas = "Ouvre **Sync Montre** puis **Synchroniser**.";
+  assert.deepEqual(
+    segmenterGras(cas).map((x) => [x.texte, x.gras]),
+    segments(cas).map((x) => [x.texte, x.gras]),
+    "le support et le kiné ne découpent plus le gras de la même façon",
+  );
 });
 
 test("aucune bulle de discussion ne salue avec un emoji de main", () => {

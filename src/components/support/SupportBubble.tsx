@@ -15,7 +15,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LifeBuoy, X, Send, ArrowRight } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
-import { segmenterGras } from "@/lib/support/gras";
+import { RichText } from "@/components/ui/RichText";
 
 type Msg = { role: "user" | "model"; text: string; source?: "base" | "memoire" };
 
@@ -54,18 +54,6 @@ const T: Record<string, Record<string, string>> = {
  * Découpage par segments et rendu en `<strong>` : pas de `dangerouslySetInnerHTML`,
  * donc rien de ce que renvoie le modèle ne peut être interprété comme du balisage.
  */
-function Texte({ children }: { children: string }) {
-  return (
-    <>
-      {segmenterGras(children).map((seg, i) =>
-        seg.gras
-          ? <strong key={i} className="font-semibold text-zinc-900">{seg.texte}</strong>
-          : <span key={i}>{seg.texte}</span>,
-      )}
-    </>
-  );
-}
-
 export function SupportBubble() {
   const { lang } = useT();
   const t = (k: string) => T[lang]?.[k] ?? T.fr[k] ?? k;
@@ -144,7 +132,14 @@ export function SupportBubble() {
                       ? "rounded-2xl rounded-br-md bg-zinc-900 px-3.5 py-2.5 text-white"
                       : "rounded-2xl rounded-bl-md border border-zinc-200/80 bg-white px-3.5 py-3 text-zinc-700 shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
                   }`}>
-                    {m.role === "user" ? m.text : <Texte>{m.text}</Texte>}
+                    {/* ⚠️ LE GRAS ÉTAIT DÉJÀ RENDU, PAS LES ÉTAPES. Mesuré le 02/09/2026 :
+                        sur « mes séances n'arrivent pas sur ma montre », le modèle renvoie
+                        2 passages en gras (affichés) et 2 étapes numérotées (affichées en
+                        texte plat). Or l'invite réclame précisément des étapes numérotées
+                        pour une manipulation — c'est la partie qu'on suit du doigt, et
+                        c'était la seule sans mise en forme. Le message de la personne,
+                        lui, reste brut : elle a tapé du texte, pas du balisage. */}
+                    {m.role === "user" ? m.text : <RichText texte={m.text} />}
                   </div>
                   {/* D'où vient la réponse. Une réponse servie sans appel arrive en 0 ms :
                       le dire évite qu'on la prenne pour une réponse bâclée, et c'est

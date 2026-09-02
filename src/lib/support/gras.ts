@@ -9,19 +9,20 @@
  * Fonction PURE et sortie du composant pour être testable : c'est elle qui décide de ce
  * qui est mis en valeur, et une erreur ici se voit sur chaque réponse.
  */
+import { segments } from "@/lib/ui/richText";
+
 export type Segment = { texte: string; gras: boolean };
 
+/**
+ * ⚠️ UNE SEULE IMPLÉMENTATION, DEUX APPELANTS. Le kiné IA a reçu son propre analyseur
+ * (`lib/ui/richText`) parce que ses réponses portent aussi des titres et des listes.
+ * Garder ici un second découpage du gras aurait voulu dire deux codes à corriger le jour
+ * où l'un se trompe, et un seul des deux assistants réparé. Cette fonction reste le point
+ * d'entrée nommé du support — et ses garanties (restitution sans perte, deux gras qui ne
+ * fusionnent pas) sont vérifiées sur l'analyseur partagé.
+ */
 export function segmenterGras(source: string): Segment[] {
   const brut = String(source ?? "");
   if (!brut) return [];
-  // `[^*]+` interdit à un segment d'enjamber un autre `*` : « **a** et **b** » donne
-  // deux passages en gras, pas un seul qui avale le texte du milieu.
-  const parts = brut.split(/(\*\*[^*]+\*\*)/g);
-  const out: Segment[] = [];
-  for (const p of parts) {
-    if (!p) continue;
-    const gras = p.length > 4 && p.startsWith("**") && p.endsWith("**");
-    out.push({ texte: gras ? p.slice(2, -2) : p, gras });
-  }
-  return out;
+  return segments(brut).map((s) => ({ texte: s.texte, gras: s.gras }));
 }
