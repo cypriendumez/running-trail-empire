@@ -4,12 +4,14 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence, useMotionValue, animate as fmAnimate } from "framer-motion";
 import {
   Shield, Heart, Utensils, Stethoscope, AlertTriangle,
-  Phone, CheckCircle2, Zap, Droplets, BookOpen, Send, Loader2, Sparkles, Scale, Camera, X,
+  Phone, CheckCircle2, Zap, Droplets, BookOpen, Send, Loader2, Sparkles, Scale, Camera, X, Activity,
 } from "lucide-react";
 import { toast } from "sonner";
 import { SmartJournal } from "@/components/journal/SmartJournal";
 import { WeightMode } from "@/components/health/WeightMode";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { RichText } from "@/components/ui/RichText";
+import type { SuiviZone, Tendance } from "@/lib/health/douleurs";
 
 // ── i18n local (5 langues) — la page Santé naît traduite. ───────────────────────
 type Tr = (k: string, p?: Record<string, string | number>) => string;
@@ -25,6 +27,7 @@ const H: Record<string, Record<string, string>> = {
     "k.pain": "Douleur", "k.painLight": "Gêne légère", "k.painHard": "Très douloureux",
     "k.ask": "Demander au kiné IA", "k.noZone": "Aucune zone sélectionnée",
     "k.protoExpress": "Protocole express", "k.protoWait": "Protocole d'attente — pour un plan précis, décris ta douleur au kiné IA ci-contre.",
+    "k.suivi": "Suivi de tes douleurs", "k.suiviNone": "Aucune douleur déclarée ces 60 derniers jours.", "k.suiviSince": "depuis {n} j", "k.suiviToday": "aujourd'hui", "k.suiviAgo": "il y a {n} j", "trend.amelioration": "en amélioration", "trend.aggravation": "en aggravation", "trend.stable": "stable", "trend.inconnue": "1re déclaration", "chat.starters": "Pour démarrer", "chat.s1": "J'ai une douleur qui revient à chaque sortie longue.", "chat.s2": "Comment adapter ma semaine avec cette douleur ?", "chat.s3": "Quels exercices de prévention pour mes tendons ?",
     "chat.title": "Kiné IA", "chat.sub": "Réponses personnalisées selon ta charge & ta récup",
     "chat.seed": "Bonjour ! Je suis votre kiné du sport. Décrivez-moi ce que vous ressentez — zone, depuis quand, à l'effort ou au repos — ou cliquez une zone sur le schéma, et je vous aide.",
     "chat.thinking": "Le kiné réfléchit…", "chat.placeholder": "Ex : douleur au genou après mes sorties longues…", "chat.photoAdd": "Ajouter une photo", "chat.photoRemove": "Retirer la photo", "chat.photoReady": "Photo prête. Elle est analysée puis oubliée : rien n'est enregistré. Cadre serré sur la zone, en pleine lumière.", "chat.photoBadType": "Image illisible. Formats acceptés : JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Peux-tu regarder cette photo ?",
@@ -62,6 +65,7 @@ const H: Record<string, Record<string, string>> = {
     "k.pain": "Pain", "k.painLight": "Mild discomfort", "k.painHard": "Very painful",
     "k.ask": "Ask the AI physio", "k.noZone": "No zone selected",
     "k.protoExpress": "Express protocol", "k.protoWait": "Stopgap protocol — for a precise plan, describe your pain to the AI physio on the right.",
+    "k.suivi": "Your pain history", "k.suiviNone": "No pain reported in the last 60 days.", "k.suiviSince": "for {n} d", "k.suiviToday": "today", "k.suiviAgo": "{n} d ago", "trend.amelioration": "improving", "trend.aggravation": "worsening", "trend.stable": "stable", "trend.inconnue": "1st report", "chat.starters": "Get started", "chat.s1": "I get a recurring pain on every long run.", "chat.s2": "How should I adjust my week with this pain?", "chat.s3": "Which prevention exercises for my tendons?",
     "chat.title": "AI Physio", "chat.sub": "Answers tailored to your load & recovery",
     "chat.seed": "Hello! I'm your sports physio. Tell me what you feel — area, since when, on exertion or at rest — or click a zone on the diagram, and I'll help.",
     "chat.thinking": "The physio is thinking…", "chat.placeholder": "E.g. knee pain after my long runs…", "chat.photoAdd": "Add a photo", "chat.photoRemove": "Remove photo", "chat.photoReady": "Photo ready. It is analysed then forgotten: nothing is stored. Frame the area closely, in good light.", "chat.photoBadType": "Unreadable image. Accepted: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Could you look at this photo?",
@@ -99,6 +103,7 @@ const H: Record<string, Record<string, string>> = {
     "k.pain": "Schmerz", "k.painLight": "Leichtes Unbehagen", "k.painHard": "Sehr schmerzhaft",
     "k.ask": "KI-Physio fragen", "k.noZone": "Keine Zone ausgewählt",
     "k.protoExpress": "Express-Protokoll", "k.protoWait": "Überbrückungs-Protokoll — für einen genauen Plan beschreibe deine Schmerzen rechts dem KI-Physio.",
+    "k.suivi": "Verlauf deiner Schmerzen", "k.suiviNone": "In den letzten 60 Tagen keine Schmerzen gemeldet.", "k.suiviSince": "seit {n} T", "k.suiviToday": "heute", "k.suiviAgo": "vor {n} T", "trend.amelioration": "bessert sich", "trend.aggravation": "verschlechtert sich", "trend.stable": "stabil", "trend.inconnue": "1. Meldung", "chat.starters": "Zum Einstieg", "chat.s1": "Bei jedem langen Lauf kommt derselbe Schmerz zurück.", "chat.s2": "Wie passe ich meine Woche mit diesem Schmerz an?", "chat.s3": "Welche Präventionsübungen für meine Sehnen?",
     "chat.title": "KI-Physio", "chat.sub": "Antworten passend zu deiner Belastung & Erholung",
     "chat.seed": "Hallo! Ich bin dein Sportphysio. Beschreibe mir, was du spürst — Bereich, seit wann, bei Belastung oder in Ruhe — oder klicke eine Zone im Schema an, und ich helfe dir.",
     "chat.thinking": "Der Physio überlegt…", "chat.placeholder": "Z. B. Knieschmerzen nach langen Läufen…", "chat.photoAdd": "Foto hinzufügen", "chat.photoRemove": "Foto entfernen", "chat.photoReady": "Foto bereit. Es wird analysiert und dann verworfen: nichts wird gespeichert. Bereich nah und gut ausgeleuchtet aufnehmen.", "chat.photoBadType": "Bild nicht lesbar. Erlaubt: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Kannst du dir dieses Foto ansehen?",
@@ -136,6 +141,7 @@ const H: Record<string, Record<string, string>> = {
     "k.pain": "Dolor", "k.painLight": "Molestia leve", "k.painHard": "Muy doloroso",
     "k.ask": "Preguntar al fisio IA", "k.noZone": "Ninguna zona seleccionada",
     "k.protoExpress": "Protocolo exprés", "k.protoWait": "Protocolo de espera — para un plan preciso, describe tu dolor al fisio IA a la derecha.",
+    "k.suivi": "Seguimiento de tus dolores", "k.suiviNone": "Ningún dolor declarado en los últimos 60 días.", "k.suiviSince": "desde hace {n} d", "k.suiviToday": "hoy", "k.suiviAgo": "hace {n} d", "trend.amelioration": "mejorando", "trend.aggravation": "empeorando", "trend.stable": "estable", "trend.inconnue": "1.ª declaración", "chat.starters": "Para empezar", "chat.s1": "Tengo un dolor que vuelve en cada tirada larga.", "chat.s2": "¿Cómo adapto mi semana con este dolor?", "chat.s3": "¿Qué ejercicios de prevención para mis tendones?",
     "chat.title": "Fisio IA", "chat.sub": "Respuestas adaptadas a tu carga y recuperación",
     "chat.seed": "¡Hola! Soy tu fisio del deporte. Cuéntame qué sientes — zona, desde cuándo, en esfuerzo o en reposo — o haz clic en una zona del esquema, y te ayudo.",
     "chat.thinking": "El fisio está pensando…", "chat.placeholder": "Ej.: dolor de rodilla tras mis tiradas largas…", "chat.photoAdd": "Añadir una foto", "chat.photoRemove": "Quitar la foto", "chat.photoReady": "Foto lista. Se analiza y se descarta: no se guarda nada. Encuadra la zona de cerca y con buena luz.", "chat.photoBadType": "Imagen ilegible. Formatos: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "¿Puedes mirar esta foto?",
@@ -173,6 +179,7 @@ const H: Record<string, Record<string, string>> = {
     "k.pain": "Dor", "k.painLight": "Desconforto ligeiro", "k.painHard": "Muito doloroso",
     "k.ask": "Perguntar ao fisio IA", "k.noZone": "Nenhuma zona selecionada",
     "k.protoExpress": "Protocolo expresso", "k.protoWait": "Protocolo de espera — para um plano preciso, descreve a tua dor ao fisio IA à direita.",
+    "k.suivi": "Acompanhamento das tuas dores", "k.suiviNone": "Nenhuma dor declarada nos últimos 60 dias.", "k.suiviSince": "há {n} d", "k.suiviToday": "hoje", "k.suiviAgo": "há {n} d", "trend.amelioration": "a melhorar", "trend.aggravation": "a piorar", "trend.stable": "estável", "trend.inconnue": "1.ª declaração", "chat.starters": "Para começar", "chat.s1": "Tenho uma dor que volta em cada treino longo.", "chat.s2": "Como adapto a minha semana com esta dor?", "chat.s3": "Que exercícios de prevenção para os meus tendões?",
     "chat.title": "Fisio IA", "chat.sub": "Respostas adaptadas à tua carga e recuperação",
     "chat.seed": "Olá! Sou o teu fisio do desporto. Conta-me o que sentes — zona, desde quando, em esforço ou em repouso — ou clica numa zona no esquema, e eu ajudo.",
     "chat.thinking": "O fisio está a pensar…", "chat.placeholder": "Ex.: dor no joelho após os meus treinos longos…", "chat.photoAdd": "Adicionar uma foto", "chat.photoRemove": "Remover a foto", "chat.photoReady": "Foto pronta. É analisada e depois descartada: nada é guardado. Enquadra a zona de perto e com boa luz.", "chat.photoBadType": "Imagem ilegível. Formatos: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Podes olhar para esta foto?",
@@ -264,6 +271,29 @@ const SHAPES: { slot: string; tag: "ellipse" | "rect"; p: Record<string, number>
   { slot: "footR", tag: "rect", p: { x: 106, y: 398, width: 22, height: 18, rx: 7 } },
 ];
 
+/** Un seul barème de couleur pour la douleur : la silhouette et le curseur doivent dire la même chose. */
+function teinteDouleur(n: number): string {
+  return n <= 3 ? "#fbbf24" : n <= 6 ? "#fb923c" : n <= 8 ? "#ef4444" : "#b91c1c";
+}
+
+/** La silhouette et la carte de suivi lisent le même barème de tendance. */
+const TEINTE_TENDANCE: Record<Tendance, { fond: string; trait: string }> = {
+  aggravation: { fond: "#fca5a5", trait: "#dc2626" },
+  amelioration: { fond: "#a7f3d0", trait: "#059669" },
+  // ⚠️ « Pas de tendance mesurable » N'EST PAS « rien à signaler » : c'est une douleur
+  // déclarée. En gris, elle se confondait avec le reste du corps et disparaissait de la
+  // silhouette alors que la liste juste à côté la signalait en ambre.
+  stable: { fond: "#fde68a", trait: "#f59e0b" },
+  inconnue: { fond: "#fde68a", trait: "#f59e0b" },
+};
+
+const TON_TENDANCE: Record<Tendance, string> = {
+  amelioration: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  aggravation: "bg-red-50 text-red-700 ring-red-200",
+  stable: "bg-amber-50 text-amber-700 ring-amber-200",
+  inconnue: "bg-zinc-100 text-zinc-500 ring-zinc-200",
+};
+
 type Tab = "kine" | "journal" | "guardian" | "nutrition" | "poids";
 type ChatMsg = { role: "user" | "model"; text: string; photo?: string };
 
@@ -279,7 +309,7 @@ function AnimatedNumber({ value, className }: { value: number; className?: strin
   return <span className={className}>{display.toLocaleString()}</span>;
 }
 
-export function HealthCenter() {
+export function HealthCenter({ suivi = [] }: { suivi?: SuiviZone[] }) {
   const { lang } = useT();
   const tr: Tr = (k, p) => fill(H[lang]?.[k] ?? H.fr[k] ?? k, p);
   const [tab, setTab] = useState<Tab>("kine");
@@ -363,6 +393,13 @@ export function HealthCenter() {
         body: JSON.stringify({
           message: msg || (sentPhoto ? tr("chat.photoOnly") : ""),
           zone: selectedSlot ? tr(VIEW_ZONES[view][selectedSlot]?.labelKey ?? "") || null : null,
+          // Le libellé part pour être lu par le modèle et réaffiché ; la CLÉ part pour
+          // être la seule chose sur laquelle on regroupe l'historique.
+          // ⚠️ LA VUE FAIT PARTIE DE LA CLÉ. Le même repère désigne deux parties du corps
+          // selon la face : `kneeL` est le genou de face et le creux poplité de dos
+          // (`zf.kneeL` / `zd.kneeL`). Une clé sans la vue aurait confondu les deux et
+          // surligné la mauvaise zone sur la silhouette.
+          zoneKey: selectedSlot ? `${view}:${selectedSlot}` : null,
           painLevel: selectedSlot ? painLevel : null,
           // L'historique n'emporte que du texte : les photos ne sont pas rejouées à
           // chaque tour (poids inutile, et rien n'est conservé côté serveur).
@@ -455,11 +492,19 @@ export function HealthCenter() {
                       </defs>
                       {SHAPES.map(({ slot, tag, p }) => {
                         const on = selectedSlot === slot;
+                        // La zone déjà déclarée reste visible sur le corps : c'est la même
+                        // mémoire que celle du kiné, pas une seconde source.
+                        const vu = suivi.find((z) => z.cle === `${view}:${slot}`);
+                        // ⚠️ LA COULEUR DOIT DIRE CE QUE DIT LE SUIVI. Une zone en
+                        // aggravation et une zone qui va mieux étaient peintes du même
+                        // ambre : le corps affichait « il s'est passé quelque chose ici »
+                        // là où la carte juste en dessous disait « ça empire ».
+                        const teinteVue = vu ? TEINTE_TENDANCE[vu.tendance] : null;
                         const common = {
-                          fill: on ? "#ef4444" : "url(#bodyGrad)",
-                          stroke: on ? "#dc2626" : "#cbd1d8",
-                          strokeWidth: 1,
-                          className: "cursor-pointer transition-opacity hover:opacity-70",
+                          fill: on ? teinteDouleur(painLevel) : teinteVue ? teinteVue.fond : "url(#bodyGrad)",
+                          stroke: on ? "#b91c1c" : teinteVue ? teinteVue.trait : "#cbd1d8",
+                          strokeWidth: on || vu ? 1.5 : 1,
+                          className: "cursor-pointer transition-all hover:opacity-70",
                           onClick: () => setSelectedSlot(on ? null : slot),
                         };
                         return tag === "ellipse"
@@ -476,7 +521,12 @@ export function HealthCenter() {
                         <div className="flex flex-wrap gap-1">
                           {Object.entries(zoneMap).filter(([, z]) => z.groupKey === g).map(([slot, z]) => (
                             <button key={slot} onClick={() => setSelectedSlot(selectedSlot === slot ? null : slot)}
-                              className={`px-2 py-1 rounded-lg text-[11px] font-medium transition-colors ${selectedSlot === slot ? "bg-red-500 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}>
+                              className={`px-2 py-1 rounded-lg text-[11px] font-medium transition-colors ${
+                                selectedSlot === slot ? "bg-red-500 text-white"
+                                  : suivi.some((v) => v.cle === `${view}:${slot}` && v.tendance === "aggravation") ? "bg-red-100 text-red-800 ring-1 ring-red-200 hover:bg-red-200"
+                                  : suivi.some((v) => v.cle === `${view}:${slot}` && v.tendance === "amelioration") ? "bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200 hover:bg-emerald-200"
+                                  : suivi.some((v) => v.cle === `${view}:${slot}`) ? "bg-amber-100 text-amber-800 ring-1 ring-amber-200 hover:bg-amber-200"
+                                  : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}>
                               {tr(z.labelKey)}
                             </button>
                           ))}
@@ -488,8 +538,11 @@ export function HealthCenter() {
 
                 {selectedZone ? (
                   <div className="mt-3 pt-3 border-t border-zinc-100">
-                    <label className="text-xs font-medium text-zinc-500 block mb-1.5">{tr("k.pain")} — <span className="font-semibold text-zinc-800">{tr(selectedZone.labelKey)}</span> : <span className="font-bold text-red-600">{painLevel}/10</span></label>
-                    <input type="range" min={1} max={10} value={painLevel} onChange={(e) => setPainLevel(+e.target.value)} className="w-full accent-red-500" />
+                    <label className="text-xs font-medium text-zinc-500 block mb-1.5">{tr("k.pain")} — <span className="font-semibold text-zinc-800">{tr(selectedZone.labelKey)}</span> : <span className="font-bold" style={{ color: teinteDouleur(painLevel) }}>{painLevel}/10</span></label>
+                    {/* Le curseur porte la MÊME couleur que la zone sur la silhouette : deux
+                        barèmes différents pour une seule douleur se contrediraient à l'écran. */}
+                    <input type="range" min={1} max={10} value={painLevel} onChange={(e) => setPainLevel(+e.target.value)}
+                      className="w-full" style={{ accentColor: teinteDouleur(painLevel) }} />
                     <div className="flex justify-between text-[10px] text-zinc-400 mt-0.5"><span>{tr("k.painLight")}</span><span>{tr("k.painHard")}</span></div>
                     <button onClick={askAboutZone} className="btn-brand w-full justify-center mt-3 text-sm">
                       <Sparkles className="w-4 h-4" /> {tr("k.ask")}
@@ -497,6 +550,48 @@ export function HealthCenter() {
                   </div>
                 ) : (
                   <p className="text-xs text-zinc-400 text-center mt-3 pt-3 border-t border-zinc-100">{tr("k.noZone")}</p>
+                )}
+              </div>
+
+              {/* ── SUIVI DES DOULEURS ────────────────────────────────────────────
+                  Ce que le kiné IA relit désormais avant de répondre. L'afficher n'est
+                  pas décoratif : si l'athlète voit « 7/10 → 4/10 » et que le modèle
+                  repart de zéro, l'un des deux se trompe et rien ne dit lequel. Les deux
+                  lisent le MÊME calcul (`suiviParZone`). */}
+              <div className="bento-card">
+                <div className="mb-2.5 flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-emerald-600" />
+                  <h3 className="text-sm font-semibold text-zinc-900">{tr("k.suivi")}</h3>
+                </div>
+                {suivi.length === 0 ? (
+                  <p className="text-xs text-zinc-400">{tr("k.suiviNone")}</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {suivi.slice(0, 5).map((z) => {
+                      const ton = TON_TENDANCE;
+                      return (
+                        <div key={z.zone} className="flex items-center gap-2 rounded-xl bg-zinc-50 px-2.5 py-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-[13px] font-medium text-zinc-900">{z.zone}</div>
+                            <div className="text-[11px] text-zinc-400">
+                              {z.derniereIlYaJours <= 0 ? tr("k.suiviToday") : tr("k.suiviAgo", { n: z.derniereIlYaJours })}
+                              {z.depuisJours > 0 && ` · ${tr("k.suiviSince", { n: z.depuisJours })}`}
+                            </div>
+                          </div>
+                          {/* ⚠️ On montre « 7 → 4 » seulement s'il y a DEUX déclarations.
+                              Avec une seule, une flèche laisserait croire à une évolution
+                              qui n'a jamais été mesurée. */}
+                          <div className="flex items-center gap-1 text-[13px] font-bold tabular-nums text-zinc-700">
+                            {z.signalements > 1 && <><span className="text-zinc-400">{z.premier}</span><span className="text-zinc-300">→</span></>}
+                            <span>{z.dernier}</span><span className="text-[11px] font-medium text-zinc-400">/10</span>
+                          </div>
+                          <span className={`rounded-lg px-1.5 py-0.5 text-[10px] font-semibold ring-1 ${ton[z.tendance]}`}>
+                            {tr("trend." + z.tendance)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
 
@@ -542,10 +637,32 @@ export function HealthCenter() {
                       {/* La photo n'est affichée QUE localement : elle n'a été ni stockée
                           ni renvoyée par le serveur, elle vit dans l'état du composant. */}
                       {m.photo && <img src={m.photo} alt="" className="max-h-52 w-full object-cover" />}
-                      {m.text && <div className="whitespace-pre-wrap px-3.5 py-2.5">{m.text}</div>}
+                      {/* ⚠️ LA RÉPONSE DU MODÈLE EST STRUCTURÉE, ON L'AFFICHAIT BRUTE. L'invite
+                          du kiné demande « titres courts / puces » ; sondé le 02/09/2026,
+                          le modèle renvoie bien du gras, des titres et des puces. En
+                          `whitespace-pre-wrap`, l'athlète lisait « ### Pour mieux
+                          comprendre » et « *   **Déclencheur :** ». Le message de
+                          l'athlète, lui, reste brut : il a tapé du texte, pas du balisage. */}
+                      {m.text && (m.role === "model"
+                        ? <RichText texte={m.text} className="px-3.5 py-2.5 text-zinc-800" />
+                        : <div className="whitespace-pre-wrap px-3.5 py-2.5">{m.text}</div>)}
                     </div>
                   </div>
                 ))}
+                {/* Une consultation commence par une phrase, pas par une page blanche. */}
+                {messages.length <= 1 && !sending && (
+                  <div className="pt-1">
+                    <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-zinc-400">{tr("chat.starters")}</div>
+                    <div className="flex flex-wrap gap-2">
+                      {(["chat.s1", "chat.s2", "chat.s3"] as const).map((k) => (
+                        <button key={k} onClick={() => send(tr(k))}
+                          className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-left text-[13px] text-zinc-600 transition-colors hover:border-emerald-300 hover:bg-emerald-50/60 hover:text-zinc-900">
+                          {tr(k)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {sending && (
                   <div className="flex justify-start">
                     <div className="bg-zinc-100 text-zinc-500 px-3.5 py-2.5 rounded-2xl rounded-bl-md text-sm flex items-center gap-2">

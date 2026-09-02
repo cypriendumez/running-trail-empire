@@ -5,6 +5,7 @@ import { exigeAcces } from "@/lib/billing/guard";
 import { generateContent } from "@/lib/ai/gemini";
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 import { sniffImage } from "@/lib/upload/sniff";
+import { suiviParZone, resumeDouleurs, type Signalement } from "@/lib/health/douleurs";
 
 type Msg = { role: "user" | "model"; text: string };
 
@@ -21,9 +22,11 @@ export async function POST(req: Request) {
   const refus = await exigeAcces(supabase, user.id, "ia");
   if (refus) return refus.reponse;
 
-  const { message, zone, painLevel, history, photo } = await req.json() as {
+  const { message, zone, zoneKey, painLevel, history, photo } = await req.json() as {
     message: string;
     zone?: string | null;
+    /** Clé stable du schéma corporel — voir `Signalement.cle`. Le libellé, lui, dépend de la langue. */
+    zoneKey?: string | null;
     painLevel?: number | null;
     history?: Msg[];
     /** Photo envoyée pour CETTE question. Jamais stockée — voir plus bas. */
@@ -61,7 +64,7 @@ export async function POST(req: Request) {
     imagePart = { inline_data: { mime_type: mime, data: b64 } };
   }
 
-  const [profileRes, workoutsRes, sleepRes, hrvRes, fbRes, raceRes, coachSessRes] = await Promise.all([
+  const [profileRes, workoutsRes, sleepRes, hrvRes, fbRes, raceRes, coachSessRes, painRes, shoesRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase.from("workouts").select("title,date,distance_km,elevation_gain_m,duration_seconds,avg_hr,max_hr,avg_cadence_spm,ground_contact_ms,vertical_oscillation_cm,stride_length_m,type").eq("user_id", user.id).order("date", { ascending: false }).limit(40),
     supabase.from("sleep_data").select("*").eq("user_id", user.id).order("date", { ascending: false }).limit(1).single(),
@@ -69,6 +72,17 @@ export async function POST(req: Request) {
     supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "session_feedback").order("created_at", { ascending: false }).limit(6),
     supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "planned_race").order("created_at", { ascending: false }).limit(20),
     supabase.from("notifications").select("title,body,data").eq("user_id", user.id).eq("type", "coach_session").order("created_at", { ascending: false }).limit(30),
+    // ⚠️ L'HISTORIQUE DE DOULEUR, QUE CETTE ROUTE N'AVAIT JAMAIS RELU. Elle écrivait des
+    // `pain_report` que seul le COACH relisait ; le kiné, lui, ne consultait que ceux du
+    // jour, et uniquement pour éviter un doublon d'écriture. Un genou à 7/10 lundi et
+    // 4/10 jeudi donnait donc deux consultations sans lien, dont aucune ne disait que ça
+    // allait mieux. 60 jours : au-delà, une douleur non redéclarée n'oriente plus rien.
+    supabase.from("notifications").select("data,created_at").eq("user_id", user.id).eq("type", "pain_report")
+      .gte("created_at", new Date(Date.now() - 60 * 86400000).toISOString())
+      .order("created_at", { ascending: false }).limit(120),
+    // Les chaussures : un kiné demande TOUJOURS le modèle et le kilométrage. La donnée
+    // existe déjà dans le garage — elle n'avait simplement jamais été transmise.
+    supabase.from("shoes").select("brand,model,current_km,max_km,drop_mm,terrain").eq("user_id", user.id).eq("is_active", true).limit(6),
   ]);
 
   const profile = profileRes.data;
@@ -93,6 +107,33 @@ export async function POST(req: Request) {
   const hrvLatest = hrvVals[0] ?? null;
   const hrvBase = hrvVals.length >= 3 ? Math.round(hrvVals.reduce((a, b) => a + b, 0) / hrvVals.length) : null;
   const pains = [...new Set(feedback.flatMap((f) => f.data?.pain ?? []).filter(Boolean))];
+
+  // ── MÉMOIRE DU KINÉ : l'évolution zone par zone sur 60 jours ────────────────────
+  const aujourdhui = new Date().toISOString().slice(0, 10);
+  const signalements: Signalement[] = ((painRes.data ?? []) as { data: { zone?: string; slot?: string; level?: number; date?: string } | null; created_at: string }[])
+    .map((r) => ({
+      zone: String(r.data?.zone ?? ""),
+      cle: r.data?.slot ? String(r.data.slot) : null,
+      level: Number(r.data?.level),
+      // La date porte l'information clinique ; `created_at` ne sert que de repli.
+      date: String(r.data?.date ?? r.created_at ?? "").slice(0, 10),
+    }));
+  const suivi = suiviParZone(signalements, aujourdhui);
+  const resumeSuivi = resumeDouleurs(suivi);
+
+  // ── GARAGE : modèle et kilométrage, sans verdict inventé ────────────────────────
+  // ⚠️ `current_km` peut valoir 0 parce que RIEN n'a jamais été saisi, pas parce que la
+  // paire est neuve. On l'écrit alors « kilométrage non renseigné » : un modèle à qui on
+  // annonce « 0 km » conclurait à une paire neuve et écarterait la piste de l'usure.
+  const chaussures = ((shoesRes.data ?? []) as { brand: string | null; model: string | null; current_km: number | null; max_km: number | null; drop_mm: number | null; terrain: string | null }[])
+    .map((c) => {
+      const km = Number(c.current_km);
+      const max = Number(c.max_km);
+      const usure = km > 0 && max > 0 ? Math.round((km / max) * 100) : null;
+      return `${[c.brand, c.model].filter(Boolean).join(" ") || "modèle non renseigné"}` +
+        (km > 0 ? ` — ${Math.round(km)} km${max > 0 ? `/${Math.round(max)}` : ""}${usure != null ? ` (${usure} % de la durée de vie annoncée${usure >= 85 ? ", À REMPLACER" : ""})` : ""}` : " — kilométrage non renseigné")
+        + (c.drop_mm != null ? ` · drop ${c.drop_mm} mm` : "") + (c.terrain ? ` · ${c.terrain}` : "");
+    });
   // Course à venir : un objectif proche change la stratégie (gestion vs guérison complète).
   const todayStr = new Date().toISOString().slice(0, 10);
   const nextRace = ((raceRes.data ?? []) as { data: { date?: string; name?: string; distanceKm?: number | null } }[])
@@ -113,7 +154,11 @@ DOSSIER DE L'ATHLÈTE (exploite-le finement — c'est ce qui te rend supérieure
 - Charge : ${weekKm.toFixed(0)} km cette semaine vs ${avg4wk.toFixed(0)} km/sem (moy. 4 sem.) → rampe ${rampPct > 0 ? "+" : ""}${rampPct}% ${rampPct > 30 ? "⚠️ PROGRESSION TROP RAPIDE = risque majeur de blessure de surcharge" : rampPct > 10 ? "(au-dessus des +10%/sem recommandés)" : "(progressive, ok)"} · ${elevWeek} m D+ /7j
 - Biomécanique récente : cadence ${cadence ?? "?"} spm ${cadence && cadence < 165 ? "(basse → suroscillation/impact, lien possible avec les douleurs)" : ""} · contact sol ${gct ?? "?"} ms · oscillation verticale ${vosc ?? "?"} cm
 - Récupération : ${sleep ? `sommeil ${Math.round(num(sleep.total_sleep_min) / 60)}h (score ${sleep.sleep_score ?? "?"}/100), énergie ${sleep.body_battery_end ?? "?"}/100` : "n/c"}${hrvLatest != null ? ` · VFC ${hrvLatest} ms (base ${hrvBase ?? "?"} → ${hrvBase && hrvLatest < hrvBase * 0.92 ? "BASSE = fatigue/stress, cicatrisation ralentie" : "ok"})` : ""}
-${pains.length ? `- Douleurs déjà signalées récemment : ${pains.join(", ")}` : ""}${zone ? `\n- Zone pointée sur le schéma : ${zone}${painLevel ? ` — douleur ${painLevel}/10` : ""}` : ""}${nextRace ? `\n- COURSE À VENIR : ${nextRace.name}${nextRace.distanceKm ? ` (${nextRace.distanceKm} km)` : ""} le ${nextRace.date} — intègre-la à ta stratégie (gérer pour courir vs guérir d'abord, et dis-le franchement si la course est compromise)` : ""}${upcomingSess.length ? `\n- SÉANCES PRESCRITES par son coach (à venir) : ${upcomingSess.join(" | ")} — quand tu ajustes la charge, cite CES séances par leur nom/date (garder, alléger, remplacer par vélo/aqua-jogging, ou décaler) et suggère d'en parler au coach via la Messagerie` : ""}
+${pains.length ? `- Douleurs déjà signalées récemment : ${pains.join(", ")}` : ""}
+- SUIVI DES DOULEURS DÉCLARÉES (60 derniers jours) : ${resumeSuivi || "aucun antécédent enregistré — ne suppose donc AUCUN historique, et ne dis pas que c'est nouveau : tu n'en sais rien."}${resumeSuivi ? `
+  → OUVRE la consultation par ce suivi quand il concerne la zone dont on te parle : « ton genou droit était à 7/10 il y a 5 jours, tu es à 4 aujourd'hui » est exactement ce qu'un kiné dit en revoyant quelqu'un. Une zone marquée EN AGGRAVATION prime sur tout le reste. Une évolution notée « une seule déclaration » n'est PAS une tendance : ne la commente pas comme telle.` : ""}
+- CHAUSSURES (garage) : ${chaussures.length ? chaussures.join(" | ") : "aucune paire enregistrée — DEMANDE le modèle et le kilométrage approximatif, c'est une cause fréquente et facile à corriger."}${chaussures.length ? `
+  → Une paire au-delà de ~85 % de sa durée de vie, un changement récent de modèle ou un drop très différent expliquent une part réelle des douleurs de tendon, de genou et de pied. Cite la paire par son nom. Un « kilométrage non renseigné » veut dire QU'ON NE SAIT PAS : demande-le, ne conclus pas que la paire est neuve.` : ""}${zone ? `\n- Zone pointée sur le schéma : ${zone}${painLevel ? ` — douleur ${painLevel}/10` : ""}` : ""}${nextRace ? `\n- COURSE À VENIR : ${nextRace.name}${nextRace.distanceKm ? ` (${nextRace.distanceKm} km)` : ""} le ${nextRace.date} — intègre-la à ta stratégie (gérer pour courir vs guérir d'abord, et dis-le franchement si la course est compromise)` : ""}${upcomingSess.length ? `\n- SÉANCES PRESCRITES par son coach (à venir) : ${upcomingSess.join(" | ")} — quand tu ajustes la charge, cite CES séances par leur nom/date (garder, alléger, remplacer par vélo/aqua-jogging, ou décaler) et suggère d'en parler au coach via la Messagerie` : ""}
 
 RÉFÉRENTIEL CLINIQUE EXPRESS (médecine fondée sur les preuves — adapte chaque dosage au cas) :
 • Tendinopathie d'ACHILLE — signature : raideur matinale, douleur qui « chauffe » à l'effort puis revient à froid. Corps du tendon : isométriques mollet (5 × 45 s) en phase irritable → excentriques type Alfredson (3 × 15, 2×/j, lent, charge progressive, ~12 sem). Insertionnelle : ÉVITER étirements et dorsiflexion complète (compression), talonnette temporaire. Reprise : sauts unipodaux indolores + raideur matinale < 5 min.
@@ -197,13 +242,19 @@ Si la photo est floue, trop sombre, trop éloignée ou ne montre pas la zone dé
       const { data: existing } = await supabase.from("notifications")
         .select("id, data").eq("user_id", user.id).eq("type", "pain_report")
         .gte("created_at", `${today}T00:00:00Z`).limit(20);
-      const already = (existing ?? []).some((n) => (n.data as { zone?: string } | null)?.zone === zone);
+      // Le dédoublonnage suit la CLÉ, pas le libellé : sinon changer de langue en cours
+      // de journée rouvrirait une seconde déclaration pour la même zone.
+      const cle = zoneKey || zone;
+      const already = (existing ?? []).some((n) => {
+        const d = n.data as { zone?: string; slot?: string } | null;
+        return (d?.slot || d?.zone) === cle;
+      });
       if (!already) {
         await supabase.from("notifications").insert({
           user_id: user.id, type: "pain_report",
           title: `Douleur signalée : ${zone}`,
           body: `Intensité ${painLevel}/10 — déclarée depuis l'espace Santé.`,
-          data: { zone, level: painLevel, date: today },
+          data: { zone, slot: zoneKey ?? null, level: painLevel, date: today },
         });
       }
     } catch { /* best-effort : le kiné répond même si l'enregistrement échoue */ }
