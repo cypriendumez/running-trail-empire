@@ -22,6 +22,7 @@ import { SHOP, texteShop, texteFoulee } from "../src/components/shop/shopI18n";
 import { choisirFiche, caracteristiques, nombreDe, normaliser } from "../scripts/collecte-irun";
 import { specsDe, desaccord, choisirProduit, nomDeUrl, TOLERANCE } from "../scripts/collecte-rw";
 import { fusionner } from "../scripts/collecte-specs";
+import { parseFeed, normalizeFeed } from "../src/lib/shop/affiliateFeed";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void): void {
@@ -134,6 +135,30 @@ test("la meilleure offre ignore les indisponibles et les prix illisibles", () =>
     "une offre en rupture a été présentée comme la meilleure");
   assert.equal(meilleure([o("A", "n/c", true)]), null, "un prix illisible a été retenu");
   assert.equal(meilleure([]), null);
+});
+
+test("un vrai flux d'affiliation produit des offres exploitables", () => {
+  // ⚠️ CE QUI DÉBLOQUE LES PRIX. Le comparateur n'affiche aucun prix marchand tant que
+  // `product_offers` est vide, et la table ne se remplit que par cet import. Vérifié
+  // bout en bout le 02/09/2026 avec les colonnes usuelles d'un flux Awin : lecture,
+  // normalisation, écriture en base, relecture, puis recoupement PAR CODE-BARRES avec
+  // une fiche du catalogue — l'offre est bien retrouvée. Ce test fige la partie qui ne
+  // dépend pas de la base.
+  const csv = [
+    "aw_product_id,product_name,brand_name,merchant_name,search_price,currency,aw_deep_link,merchant_image_url,in_stock,category_name,ean",
+    '123456,"Hoka Clifton 10",Hoka,"i-Run",129.99,EUR,https://www.awin1.com/cread.php?awinmid=1&p=x,https://img/x.jpg,1,"Chaussures running",198605659287',
+    '123457,"Salomon Speedcross 6",Salomon,"i-Run",109.00,EUR,https://www.awin1.com/cread.php?awinmid=1&p=y,https://img/y.jpg,0,"Chaussures trail",198720097537',
+    '999999,"Ligne sans prix",Nike,"i-Run",,EUR,https://x,,1,,',
+  ].join("\n");
+  const offres = normalizeFeed(parseFeed(csv), "i-Run");
+  assert.equal(offres.length, 2, "une ligne sans prix exploitable doit être écartée, pas importée à 0 €");
+  assert.equal(offres[0].ean, "198605659287", "le code-barres n'est pas repris : le recoupement serait impossible");
+  assert.equal(offres[0].price, 129.99);
+  assert.equal(offres[1].inStock, false, "une rupture de stock est devenue une disponibilité");
+  assert.ok(offres.every((o) => o.url.startsWith("http")), "une offre sans lien marchand n'est pas une offre");
+  // Le code-barres du flux doit correspondre à ceux du catalogue, sinon rien ne se recoupe.
+  assert.ok(CATALOGUE.some((m) => m.ean === offres[0].ean),
+    "aucun modèle du catalogue ne porte ce code-barres : le rapprochement flux ↔ fiche ne marcherait pas");
 });
 
 console.log("\nFILTRES ET TRI — l'inconnu n'est pas une valeur");
