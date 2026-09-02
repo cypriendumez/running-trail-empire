@@ -11,9 +11,11 @@
  *  · courses  → 14 430 lignes de `races` portent une date à venir (17 027 au total) ;
  *  · parcours → `data/parcours_certifies.json` contient 15 708 entrées ;
  *  · plan     → `buildWeekPlan` pose 7 jours de plan glissant ;
- *  · synchro  → `.github/workflows/sync-coach.yml` tourne toutes les 10 minutes
- *               (expression cron « slash-10 » — ne PAS l'écrire ici : le « étoile-slash »
- *                fermerait ce bloc de commentaire, ce qui vient d'arriver).
+ *  · synchro  → `.github/workflows/sync-coach.yml` DEMANDE deux passages par heure.
+ *               ⚠️ « demande » et non « tourne » : mesuré le 02/09/2026 sur l'API GitHub,
+ *               le fichier réclamait alors six passages par heure et n'en obtenait qu'un
+ *               toutes les ~100 minutes. Un fichier de planification n'est pas une preuve
+ *               d'exécution — c'est `total_count` des runs qui l'est.
  *
  * ⚠️ N'ajouter ici QUE ce qui se recompte par une requête ou une lecture de fichier.
  * Une note moyenne, un nombre d'utilisateurs ou un taux de satisfaction n'y ont leur

@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
-#  BALAYAGE « juste après la séance » — toutes les 10 minutes.
+#  BALAYAGE « juste après la séance » — deux fois par heure.
 #
 #  POURQUOI ICI ET PAS DANS vercel.json : le compte Vercel est en plan HOBBY (vérifié
 #  le 14/08/2026 : équipe `cyprien-dumez-s-projects` → plan `hobby`), et Hobby plafonne
@@ -8,13 +8,26 @@
 #  Le cron Vercel reste en place comme filet de nuit ; la cadence réelle vient d'ici.
 #
 #  COÛT : 0 €. Le dépôt est public, donc les minutes GitHub Actions sont illimitées.
-#  Si le dépôt repassait en privé, 6 exécutions/heure × 24 h × 30 j = 4 320 exécutions,
-#  facturées à la minute entamée, soit au-delà des 2 000 minutes gratuites : il faudrait
-#  alors passer à toutes les 30 minutes, ou payer Vercel Pro.
+#  Si le dépôt repassait en privé, 2 exécutions/heure × 24 h × 30 j = 1 440 exécutions,
+#  facturées à la minute entamée — sous les 2 000 minutes gratuites, ce qui n'était PAS
+#  le cas à six par heure.
 #
-#  DEUX LIMITES À CONNAÎTRE, elles sont de GitHub et on ne peut rien y faire :
+#  ⚠️ LA CADENCE DEMANDÉE ÉTAIT `*/10`, LA CADENCE OBTENUE ÉTAIT ~1 PASSAGE PAR 100 MIN.
+#  Mesuré le 02/09/2026 sur l'API GitHub (`/actions/workflows/sync-coach.yml/runs`) :
+#  599 exécutions, mais espacées de 1 h 30 à 2 h — 01 h 25, 23 h 43, 21 h 57. GitHub
+#  n'exécute pas ce qu'on demande, il exécute ce qu'il veut bien, et abandonne le reste
+#  sans rien signaler. Demander six passages par heure ne les obtenait pas ; ça saturait
+#  seulement la file du dépôt, au point que DEUX autres workflows — `races-types` et
+#  `heure-depart` — n'avaient JAMAIS tiré une seule fois depuis leur création.
+#
+#  Passer à 30 minutes ne dégrade donc RIEN du comportement réel : il était déjà plus
+#  lent que ça. En revanche cela rend la file crédible, et laisse une chance aux autres
+#  planifications de passer. Le vrai raccourci de réactivité n'est pas ce cron : c'est le
+#  webhook de synchronisation instantanée, qui replanifie dès qu'une séance arrive.
+#
+#  DEUX AUTRES LIMITES, elles aussi de GitHub :
 #   • une planification peut être retardée de plusieurs minutes aux heures de pointe —
-#     la garantie est « au moins toutes les 10 min », pas « pile toutes les 10 min » ;
+#     la garantie est « au plus une fois par créneau », jamais « pile à l'heure » ;
 #   • un dépôt sans activité pendant 60 jours voit ses planifications désactivées.
 #
 #  SECRETS À CRÉER (Settings → Secrets and variables → Actions) :
@@ -25,7 +38,9 @@ name: Synchronisation et replanification
 
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    # Minutes 7 et 37 : on évite les multiples de dix et les heures rondes, les créneaux
+    # les plus disputés chez GitHub — c'est là que les passages sont abandonnés.
+    - cron: "7,37 * * * *"
   # Permet de déclencher un passage à la main depuis l'onglet Actions — indispensable
   # pour vérifier la chaîne sans attendre dix minutes.
   workflow_dispatch:

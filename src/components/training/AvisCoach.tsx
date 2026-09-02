@@ -11,9 +11,9 @@ import { useT } from "@/lib/i18n/LanguageProvider";
  * que le plan avant de la rendre : sur un budget qualité nul, seul un allègement est
  * recevable. Ce qu'il propose ne s'applique jamais tout seul — l'athlète lit, et décide.
  *
- * ⚠️ À LA DEMANDE, ET C'EST CE QUI LE REND RENTABLE. Le plan se replanifie toutes les
- * dix minutes ; brancher un appel de modèle sur cette cadence coûterait cent quarante
- * appels par athlète et par jour. Ici, un clic = au plus un appel, et la réponse est
+ * ⚠️ À LA DEMANDE, ET C'EST CE QUI LE REND RENTABLE. Le plan se replanifie à chaque
+ * synchronisation ; brancher un appel de modèle sur cette cadence coûterait des dizaines
+ * d'appels par athlète et par jour. Ici, un clic = au plus un appel, et la réponse est
  * mémorisée tant que le plan ne bouge pas.
  */
 const T: Record<string, { bouton: string; charge: string; refus: string; indispo: string; quota: string }> = {
