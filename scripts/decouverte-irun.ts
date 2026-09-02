@@ -229,8 +229,14 @@ export function lireFiche(html: string, url: string, marque: string): Trouvaille
   const terrain = terrainDeUrl(url);
   if (!terrain) return null;
 
+  // ⚠️ LA MARQUE VIENT DE LA FICHE, PAS DE CE QU'ON A CHERCHÉ. « Vibram » fabrique des
+  //    SEMELLES : interroger ce nom rend des Hoka et des Altra, qui sont entrées au
+  //    catalogue sous « Vibram Hoka One One Speedgoat 7 » — un doublon de la vraie fiche
+  //    Hoka, avec le même code-barres. Le mot cherché est une question posée au moteur du
+  //    marchand ; la réponse, elle, porte sa propre marque.
+  const marqueFiche = nomMarque(String((prod.brand as { name?: string } | undefined)?.name ?? "").trim() || marque);
   const nomComplet = prod.name.trim();
-  const nom = modeleDeNom(nomComplet, marque);
+  const nom = modeleDeNom(nomComplet, marqueFiche);
   if (!nom || VARIANTES.test(nom)) return null;
 
   const c = caracteristiques(html);
@@ -243,12 +249,12 @@ export function lireFiche(html: string, url: string, marque: string): Trouvaille
   const conseille = prixConseilleDe(html);
   const plaque = plaqueCarboneDe(html);
 
-  const slug = `${marque}-${nom}`.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+  const slug = `${marqueFiche}-${nom}`.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
   return {
     fiche: {
-      slug, marque, nom, terrain,
+      slug, marque: marqueFiche, nom, terrain,
       poidsG: dansLesBornes("poidsG", poids) ? mesure(poids) : undefined,
       dropMm: dansLesBornes("dropMm", drop) ? mesure(drop) : undefined,
       prixConseilleEur: conseille != null ? mesure(conseille) : undefined,

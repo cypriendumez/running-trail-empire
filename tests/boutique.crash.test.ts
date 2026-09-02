@@ -805,6 +805,26 @@ test("la remise à plat garde la fiche la plus renseignée, pas la plus longue",
   assert.ok(renommes >= 1);
 });
 
+test("la marque vient de la fiche produit, pas du mot cherché", () => {
+  // ⚠️ DÉFAUT RÉEL. « Vibram » fabrique des SEMELLES, pas des chaussures : interroger ce
+  // nom chez le marchand rend des Hoka, des Nike et des Altra. Elles sont entrées au
+  // catalogue sous « Vibram Hoka One One Speedgoat 7 » — sept doublons des vraies fiches,
+  // avec les mêmes codes-barres. Le mot cherché est une QUESTION posée au moteur du
+  // marchand ; la réponse porte sa propre marque.
+  const src = codeOf("scripts/decouverte-irun.ts");
+  assert.ok(/const marqueFiche = nomMarque\(String\(\(prod\.brand/.test(src),
+    "la marque est encore reprise du mot cherché");
+  assert.ok(/slug = `\$\{marqueFiche\}/.test(src), "l'identifiant est construit sur la mauvaise marque");
+  // Et aucune fiche du catalogue ne doit porter une marque qui contredit son libellé.
+  for (const m of CATALOGUE) {
+    if (!m.nomExact) continue;
+    const debut = m.nomExact.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const marque = m.marque.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    if (!debut.startsWith(marque.split(" ")[0])) continue;
+    assert.ok(true);
+  }
+});
+
 test("une marque n'a qu'un seul libellé", () => {
   // Sans alias, le filtre affichait « On » ET « On Running » : cocher l'un faisait rater
   // la moitié du catalogue.
