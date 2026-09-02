@@ -21,6 +21,7 @@ import { indexLeger, trouver, cotesPourGarage } from "../src/lib/shop/indexLeger
 import { SHOP, texteShop, texteFoulee } from "../src/components/shop/shopI18n";
 import { choisirFiche, caracteristiques, nombreDe, normaliser } from "../scripts/collecte-irun";
 import { specsDe, desaccord, choisirProduit, nomDeUrl, TOLERANCE } from "../scripts/collecte-rw";
+import { fusionner } from "../scripts/collecte-specs";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void): void {
@@ -477,6 +478,32 @@ test("un refus de la source arrête la collecte au lieu d'insister", () => {
   const src = codeOf("scripts/collecte-rw.ts");
   assert.ok(/406/.test(src) && /429/.test(src), "les codes de refus ne sont pas reconnus");
   assert.ok(/class Refus/.test(src) && /instanceof Refus/.test(src), "le refus n'interrompt pas la boucle");
+});
+
+test("deux collectes s'additionnent, elles ne s'écrasent pas", () => {
+  // ⚠️ DÉGÂT CONSTATÉ SUR LA HOKA BONDI 9. La collecte adossée à la recherche
+  // reconstruisait la fiche à partir de zéro et l'écrivait par-dessus l'existante : la
+  // chaussure a perdu d'un coup son CODE-BARRES, son nom commercial exact et son type de
+  // foulée — trois données qui ne viennent QUE du marchand. Le code-barres est la seule
+  // clé qui permettra de recouper la même paire chez plusieurs enseignes.
+  const ancien = modele({ poidsG: mes(284), ean: "198605552670", foulee: "Neutre", nomExact: "Hoka Bondi 9", sources: ["i-run.fr"] });
+  const neuf = modele({ poidsG: mes(290), stackTalonMm: mes(43), prixConseilleEur: mes(180), sources: ["rei.com"] });
+  const f = fusionner(ancien, neuf);
+  assert.equal(f.ean, "198605552670", "le code-barres a été perdu");
+  assert.equal(f.foulee, "Neutre", "le type de foulée a été perdu");
+  assert.equal(f.nomExact, "Hoka Bondi 9");
+  assert.equal(f.poidsG?.valeur, 284, "la valeur relevée dans un champ structuré doit primer sur une recherche");
+  assert.equal(f.stackTalonMm?.valeur, 43, "la cote manquante n'a pas été complétée");
+  assert.deepEqual(f.sources, ["i-run.fr", "rei.com"], "les sources doivent s'additionner");
+  // Et une première collecte sur une fiche inexistante reste possible.
+  assert.equal(fusionner(undefined, neuf).stackTalonMm?.valeur, 43);
+
+  // ⚠️ ET LE SCRIPT DOIT L'APPELER. Tester la fonction seule laisse passer le vrai
+  // défaut : c'est l'ÉCRITURE qui écrasait, pas la fusion. Vérifié par mutation —
+  // remplacer l'appel par une affectation directe ne faisait rougir aucun test.
+  const src = codeOf("scripts/collecte-specs.ts");
+  assert.ok(/deja\[m\.slug\] = fusionner\(deja\[m\.slug\], fiche\)/.test(src),
+    "la collecte écrit la fiche sans la fusionner avec l'existante");
 });
 
 test("la collecte ne recopie ni prix, ni texte, ni note du marchand", () => {

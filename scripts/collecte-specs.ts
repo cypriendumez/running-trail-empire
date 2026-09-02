@@ -64,6 +64,37 @@ function jsonDe(t: string): Record<string, unknown> | null {
   try { return JSON.parse(m[0]) as Record<string, unknown>; } catch { return null; }
 }
 
+/**
+ * ⚠️ ON COMPLÈTE, ON N'ÉCRASE PAS. Premier jet : cette collecte reconstruisait la fiche à
+ * partir de zéro et l'écrivait par-dessus l'existante. Constaté sur la Hoka Bondi 9 —
+ * elle a perdu d'un coup son CODE-BARRES, son nom commercial exact et son type de
+ * foulée, tous relevés chez un marchand. Le code-barres est la seule clé qui permettra
+ * de recouper la même paire chez plusieurs enseignes : le perdre coûte bien plus que ce
+ * que cette collecte apporte. Deux collectes qui alimentent la même fiche doivent
+ * s'additionner, jamais se remplacer.
+ *
+ * Quand les deux sources donnent la même valeur, on garde CELLE DÉJÀ EN PLACE : elle a
+ * été relevée dans un champ structuré, pas déduite d'une recherche.
+ */
+export function fusionner(ancien: Modele | undefined, neuf: Modele): Modele {
+  const garder = <T,>(a: T | undefined, n: T | undefined) => a ?? n;
+  return {
+    ...neuf,
+    poidsG: garder(ancien?.poidsG, neuf.poidsG),
+    dropMm: garder(ancien?.dropMm, neuf.dropMm),
+    stackTalonMm: garder(ancien?.stackTalonMm, neuf.stackTalonMm),
+    plaqueCarbone: garder(ancien?.plaqueCarbone, neuf.plaqueCarbone),
+    prixConseilleEur: garder(ancien?.prixConseilleEur, neuf.prixConseilleEur),
+    dureeVieKm: garder(ancien?.dureeVieKm, neuf.dureeVieKm),
+    // Ces trois-là ne viennent QUE du marchand : rien ne peut les remplacer ici.
+    ean: ancien?.ean ?? neuf.ean,
+    nomExact: ancien?.nomExact ?? neuf.nomExact,
+    foulee: ancien?.foulee ?? neuf.foulee,
+    sources: [...new Set([...(ancien?.sources ?? []), ...neuf.sources])].slice(0, 8),
+    sourceFabricant: ancien?.sourceFabricant || neuf.sourceFabricant,
+  };
+}
+
 export async function collecter(m: (typeof MODELES_A_COLLECTER)[number]): Promise<Modele | null> {
   const rech = await generateContent(
     [{ role: "user", parts: [{ text: promptRecherche(m) }] }],
@@ -118,8 +149,15 @@ export async function collecter(m: (typeof MODELES_A_COLLECTER)[number]): Promis
 async function principal(): Promise<void> {
   const filtre = process.argv[2]?.toLowerCase();
   const deja: Record<string, Modele> = fs.existsSync(SORTIE) ? JSON.parse(fs.readFileSync(SORTIE, "utf8")) : {};
+  // ⚠️ « FICHE ABSENTE » N'EST PAS LE BON CRITÈRE. Une fiche peut exister — poids, drop,
+  //    code-barres relevés chez le marchand — et n'avoir NI hauteur de semelle, NI
+  //    présence de plaque, NI prix conseillé, qui ne figurent sur aucune fiche produit.
+  //    Filtrer sur l'absence de fiche laissait donc 48 modèles définitivement incomplets
+  //    en n'en proposant que 25, sans que rien ne le signale.
+  const incomplet = (m: Modele | undefined) =>
+    !m || !m.stackTalonMm || !m.plaqueCarbone || !m.prixConseilleEur;
   const liste = MODELES_A_COLLECTER.filter((m) =>
-    filtre ? `${m.marque} ${m.nom}`.toLowerCase().includes(filtre) : !deja[m.slug]);
+    filtre ? `${m.marque} ${m.nom}`.toLowerCase().includes(filtre) : incomplet(deja[m.slug]));
   console.log(`${liste.length} modèle(s) à collecter · ${Object.keys(deja).length} déjà en fiche`);
 
   let ok = 0, vides = 0;
@@ -127,7 +165,7 @@ async function principal(): Promise<void> {
     try {
       const fiche = await collecter(m);
       if (!fiche) { vides++; console.log(`  ✗ ${m.marque} ${m.nom} — aucune donnée vérifiable`); continue; }
-      deja[m.slug] = fiche;
+      deja[m.slug] = fusionner(deja[m.slug], fiche);
       ok++;
       const r = [
         fiche.poidsG ? `${fiche.poidsG.valeur} g` : "poids ?",

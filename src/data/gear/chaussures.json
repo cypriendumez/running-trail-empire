@@ -664,12 +664,30 @@
       "valeur": 5,
       "vu": "2026-09-02"
     },
+    "stackTalonMm": {
+      "valeur": 43,
+      "vu": "2026-09-02"
+    },
+    "plaqueCarbone": {
+      "valeur": false,
+      "vu": "2026-09-02"
+    },
+    "prixConseilleEur": {
+      "valeur": 180,
+      "vu": "2026-09-02"
+    },
+    "sources": [
+      "runninglab.fr",
+      "i-run.fr",
+      "therunningcollective.fr",
+      "rei.com",
+      "running-attitude.com",
+      "northernrunner.com"
+    ],
+    "sourceFabricant": true,
     "ean": "198605552670",
     "nomExact": "Hoka One One Bondi 9",
-    "foulee": "Neutre",
-    "sources": [
-      "i-run.fr"
-    ]
+    "foulee": "Neutre"
   },
   "hoka-mach-7": {
     "slug": "hoka-mach-7",
