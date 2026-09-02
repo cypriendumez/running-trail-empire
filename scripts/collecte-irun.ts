@@ -27,6 +27,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { MODELES_A_COLLECTER } from "./modeles-a-collecter";
 import { dansLesBornes, type Modele } from "../src/lib/shop/modele";
+import { prendreVerrou } from "../src/lib/shop/verrou";
 
 const BASE = "https://www.i-run.fr";
 const SORTIE = path.join(process.cwd(), "src/data/gear/chaussures.json");
@@ -122,6 +123,7 @@ export function jsonProduit(html: string): Record<string, unknown> | null {
 }
 
 async function principal(): Promise<void> {
+  prendreVerrou("collecte-irun");
   const filtre = process.argv[2]?.toLowerCase();
   const deja: Record<string, Modele> = fs.existsSync(SORTIE) ? JSON.parse(fs.readFileSync(SORTIE, "utf8")) : {};
   const liste = MODELES_A_COLLECTER.filter((m) =>

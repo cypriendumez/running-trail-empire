@@ -22,7 +22,7 @@ import { indexLeger, trouver, cotesPourGarage } from "../src/lib/shop/indexLeger
 import { SHOP, texteShop, texteFoulee } from "../src/components/shop/shopI18n";
 import { choisirFiche, caracteristiques, nombreDe, normaliser } from "../scripts/collecte-irun";
 import { specsDe, desaccord, choisirProduit, nomDeUrl, TOLERANCE } from "../scripts/collecte-rw";
-import { prixConseilleDe, estFemme, terrainDeUrl, nomMarque, modeleDeNom, retirerPrefixe } from "../scripts/decouverte-irun";
+import { prixConseilleDe, estFemme, terrainDeUrl, nomMarque, modeleDeNom, retirerPrefixe, vautLeCoup, familleDe } from "../scripts/decouverte-irun";
 import { fusionner, contredit } from "../scripts/collecte-specs";
 import { parseFeed, normalizeFeed } from "../src/lib/shop/affiliateFeed";
 
@@ -695,6 +695,66 @@ test("aucun nom de modèle ne commence par un résidu de marque", () => {
   for (const m of CATALOGUE)
     assert.ok(!/^(One One|Running|Athletic)\b/.test(m.nom),
       `« ${m.marque} ${m.nom} » garde un morceau de la forme longue de sa marque`);
+});
+
+test("une fiche sans intérêt n'est pas téléchargée pour rien", () => {
+  // ⚠️ 144 FICHES SUR 300 ÉTAIENT ÉCARTÉES APRÈS TÉLÉCHARGEMENT — variantes larges,
+  // Gore-Tex, déclinaisons femme. Le nom du produit figure déjà dans l'URL. Avec la
+  // recherche élargie, qui multiplie les candidates, ce gaspillage n'est tenable ni pour
+  // nous ni pour le serveur d'en face.
+  const h = "/chaussures_homme/Running_c23/Hoka-One-One_m143/";
+  assert.ok(vautLeCoup(h + "Hoka-One-One-Clifton-10_Hoka-One-One_fiche_1.html"));
+  assert.ok(!vautLeCoup(h + "Hoka-One-One-Clifton-10-Wide_Hoka-One-One_fiche_2.html"), "une variante large a été téléchargée");
+  assert.ok(!vautLeCoup("/chaussures_femme/Running_c24/x/y_fiche_3.html"), "une fiche femme a été téléchargée");
+  assert.ok(!vautLeCoup("/chaussures_homme/Randonnee_c1136/x/y_fiche_4.html"), "une chaussure de randonnée a été téléchargée");
+  assert.ok(!vautLeCoup("/chaussures_homme/Trail_c15/s/Salomon-Speedcross-6-Gore-Tex_Salomon_fiche_5.html"));
+});
+
+test("la famille d'un modèle est ce qui débloque le catalogue", () => {
+  // ⚠️ MESURÉ : interroger « Hoka » rend 16 fiches quelle que soit la taille de son
+  // catalogue — le marchand plafonne ses résultats. « Hoka Bondi », « Hoka Mach »,
+  // « Hoka Clifton »… cumulent 55. Les familles ne s'inventent pas : elles se lisent sur
+  // les modèles déjà trouvés, et chacune en révèle d'autres.
+  assert.equal(familleDe("Speedgoat 6"), "Speedgoat");
+  // On ne coupe PAS sur le trait d'union : « Gel » ne désigne rien et ramènerait tout
+  // le catalogue Asics sans distinction.
+  assert.equal(familleDe("Gel-Nimbus 28"), "Gel-Nimbus");
+  // « 1080v14 » est un modèle précis ; sa famille « 1080 » révèle les versions d'avant.
+  assert.equal(familleDe("Fresh Foam X 1080v14"), "Fresh");
+  assert.equal(familleDe("1080v14"), "1080");
+  // Trop court = du bruit, pas une famille.
+  assert.equal(familleDe("X 3"), null);
+  assert.equal(familleDe("SL 2"), null);
+});
+
+test("le relevé de prix ne peut pas se vider tout seul", () => {
+  // ⚠️ PERTE SILENCIEUSE CONSTATÉE. Le cache évite de retélécharger une fiche déjà lue —
+  // parfait pour élargir le catalogue, désastreux pour les prix : au second passage
+  // aucune fiche n'était rouverte, donc aucun prix relevé, et le fichier de sortie
+  // écrasait 248 prix par une liste vide. Un fichier qui rétrécit sans qu'on le remarque
+  // est une perte de données, pas un passage sans résultat.
+  const src = codeOf("scripts/decouverte-irun.ts");
+  assert.ok(/rafraichirPrix/.test(src), "aucun mode ne rouvre les fiches pour rafraîchir les prix");
+  assert.ok(/if \(vues\[f\] && !rafraichirPrix\)/.test(src), "le cache court-circuite encore le rafraîchissement");
+  assert.ok(/const offres: Record<string, OffreRelevee> = Object\.fromEntries\(/.test(src),
+    "le fichier d'offres est reconstruit de zéro au lieu d'être complété");
+});
+
+test("deux collectes ne peuvent pas écrire le catalogue en même temps", () => {
+  // ⚠️ ARRIVÉ DEUX FOIS. Chaque collecteur charge `chaussures.json` au démarrage, le
+  // garde en mémoire et le réécrit ENTIER à chaque modèle : le dernier à écrire efface
+  // ce que l'autre a trouvé, sans erreur et sans trace. Une fois des codes-barres
+  // effacés, une fois une déduplication de onze doublons annulée.
+  for (const f of ["scripts/decouverte-irun.ts", "scripts/collecte-irun.ts",
+    "scripts/collecte-rw.ts", "scripts/collecte-specs.ts"]) {
+    const src = codeOf(f);
+    assert.ok(/prendreVerrou\("/.test(src), `${f} peut tourner en parallèle d'un autre collecteur`);
+  }
+  // Et le verrou doit se rendre, y compris sur interruption : un verrou orphelin bloque
+  // tout, ce qui est un défaut aussi gênant que celui qu'il corrige.
+  const v = codeOf("src/lib/shop/verrou.ts");
+  assert.ok(/process\.on\("exit"/.test(v) && /SIGINT/.test(v), "le verrou ne se rend pas en sortie");
+  assert.ok(/process\.kill\(pid, 0\)/.test(v), "un verrou dont le propriétaire est mort doit pouvoir être repris");
 });
 
 test("une marque n'a qu'un seul libellé", () => {

@@ -21,6 +21,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { dansLesBornes, coherenceStackDrop, type Modele } from "../src/lib/shop/modele";
 import { normaliser } from "./collecte-irun";
+import { prendreVerrou } from "../src/lib/shop/verrou";
 
 const BASE = "https://www.runningwarehouse.eu";
 const SORTIE = path.join(process.cwd(), "src/data/gear/chaussures.json");
@@ -131,6 +132,8 @@ export function desaccord(ancien: Modele | undefined, rw: SpecsRw): string | nul
 }
 
 async function principal(): Promise<void> {
+  prendreVerrou("collecte-rw");
+
   const filtre = process.argv[2]?.toLowerCase();
   const deja: Record<string, Modele> = fs.existsSync(SORTIE) ? JSON.parse(fs.readFileSync(SORTIE, "utf8")) : {};
   // ⚠️ ON PARCOURT LE CATALOGUE, PAS UNE LISTE DE DÉPART. Ce script itérait sur les 107

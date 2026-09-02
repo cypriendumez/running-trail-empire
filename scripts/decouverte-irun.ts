@@ -20,6 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { dansLesBornes, type Modele, type Terrain } from "../src/lib/shop/modele";
 import { normaliser, caracteristiques, nombreDe, jsonProduit } from "./collecte-irun";
+import { prendreVerrou } from "../src/lib/shop/verrou";
 
 const BASE = "https://www.i-run.fr";
 const SORTIE = path.join(process.cwd(), "src/data/gear/chaussures.json");
@@ -108,13 +109,58 @@ export function modeleDeNom(nomComplet: string, marque: string): string {
   const prefixes = [...(FORMES_LONGUES[marque] ?? []), marque].sort((a, b) => b.length - a.length);
   for (const p of prefixes) {
     const reste = retirerPrefixe(nomComplet, p);
-    if (reste) return reste;
+    // ⚠️ LE « M » FINAL EST UN MARQUEUR DE DÉCLINAISON, PAS UN MORCEAU DU NOM. Le marchand
+    //    publie « TrailFly Ultra G 280 » ET « TrailFly Ultra G 280 M » pour la même
+    //    chaussure : deux entrées au catalogue, même code-barres, l'athlète la voit deux
+    //    fois. On le retire, comme on le fait déjà chez l'autre source.
+    if (reste) return reste.replace(/\s+M$/, "");
   }
   return nomComplet;
 }
 
 /** Les variantes qui ne sont pas le modèle nu. */
 const VARIANTES = /\b(wide|gtx|gore.?tex|w|femme|junior|kid|kids|large)\b/i;
+
+/**
+ * Faut-il seulement TÉLÉCHARGER cette fiche ?
+ *
+ * ⚠️ SANS CE TRI PRÉALABLE, ON PAIE UNE REQUÊTE POUR RIEN. Sur le premier recensement,
+ * 144 fiches sur 300 ont été écartées APRÈS téléchargement — variantes larges, Gore-Tex,
+ * déclinaisons femme. Le nom du produit figure déjà dans l'URL : autant s'en servir. La
+ * recherche élargie multiplie les candidates par quatre, ce gaspillage n'est plus tenable
+ * — ni pour nous, ni pour le serveur d'en face.
+ *
+ * On ne garde que le chemin HOMME : le même produit y est servi sous les deux chemins, et
+ * la vérification fine de la catégorie déclarée reste faite après lecture.
+ */
+export function vautLeCoup(url: string): boolean {
+  if (!/\/chaussures_homme\//.test(url)) return false;
+  if (!terrainDeUrl(url)) return false;
+  const fichier = url.split("/").pop() ?? "";
+  const nom = fichier.replace(/_fiche_\d+\.html.*$/, "").replace(/[-_]/g, " ");
+  return !VARIANTES.test(nom);
+}
+
+/**
+ * La FAMILLE d'un modèle : « Speedgoat 6 » → « Speedgoat ».
+ *
+ * ⚠️ C'EST ELLE QUI DÉBLOQUE LE VOLUME. Interroger la marque seule rend ~16 fiches, quelle
+ * que soit la taille de son catalogue : le marchand plafonne ses résultats. Mesuré sur
+ * Hoka : « Hoka » → 16, mais « Hoka Bondi », « Hoka Mach », « Hoka Clifton »… cumulent 55.
+ * Les familles ne s'inventent pas — elles se lisent sur les modèles déjà trouvés, et
+ * chacune en révèle d'autres. La recherche fait boule de neige à partir d'elle-même.
+ */
+export function familleDe(nom: string): string | null {
+  // ⚠️ ON NE COUPE PAS SUR LE TRAIT D'UNION : « Gel-Nimbus 28 » a pour famille
+  //    « Gel-Nimbus », pas « Gel » — qui ne désigne rien et ramènerait tout le catalogue
+  //    Asics sans distinction.
+  let mot = nom.trim().split(/\s+/)[0] ?? "";
+  // « 1080v14 » est un modèle précis ; sa famille est « 1080 », qui révèle les versions
+  // antérieures. Sans ce retrait, chaque version devient sa propre requête stérile.
+  mot = mot.replace(/v\d+$/i, "");
+  // Un mot de trois lettres ou moins n'est pas une famille, c'est du bruit (« X », « SL »).
+  return mot.length >= 4 ? mot : null;
+}
 
 /**
  * LE PRIX PUBLIC CONSEILLÉ, tel que le marchand l'affiche à côté de son propre prix.
@@ -182,50 +228,104 @@ export function lireFiche(html: string, url: string, marque: string): Trouvaille
   };
 }
 
+/** Le fichier qui retient les fiches déjà lues, pour qu'une relance ne les repaie pas. */
+const CACHE = path.join(process.cwd(), ".scratch/fiches-vues.json");
+
+/**
+ * ⚠️ TRENTE RECHERCHES PAR MARQUE, PAS PLUS. La boule de neige pourrait tourner
+ * longtemps : chaque modèle livre une famille, chaque famille d'autres modèles. Sans
+ * borne, un catalogue riche déclencherait des centaines de requêtes chez le marchand pour
+ * un rendement qui s'effondre — les derniers tours ne rapportent presque plus rien.
+ */
+const RECHERCHES_MAX = 30;
+
+type OffreRelevee = { slug: string; ean?: string; prix: number; dispo: boolean; url: string };
+
 async function principal(): Promise<void> {
-  const filtre = process.argv[2]?.toLowerCase();
+  prendreVerrou("decouverte-irun");
+  const args = process.argv.slice(2);
+  // ⚠️ DEUX MODES, PARCE QUE LE CACHE A UN EFFET DE BORD. Il évite de retélécharger une
+  //    fiche déjà lue — parfait pour élargir le catalogue, désastreux pour les prix : au
+  //    second passage, AUCUN prix n'était relevé (la fiche n'était plus ouverte) et le
+  //    fichier d'offres se retrouvait vide. `--prix` ignore le cache et rouvre tout.
+  const rafraichirPrix = args.includes("--prix");
+  const filtre = args.find((a) => !a.startsWith("--"))?.toLowerCase();
   const marques = MARQUES.filter((m) => !filtre || m.toLowerCase().includes(filtre));
   const deja: Record<string, Modele> = fs.existsSync(SORTIE) ? JSON.parse(fs.readFileSync(SORTIE, "utf8")) : {};
-  const offres: Record<string, { slug: string; ean?: string; prix: number; dispo: boolean; url: string }> = {};
+  const vues: Record<string, string> = fs.existsSync(CACHE) ? JSON.parse(fs.readFileSync(CACHE, "utf8")) : {};
 
-  let nouveaux = 0, revus = 0, ecartes = 0;
+  // ⚠️ ON FUSIONNE, ON N'ÉCRASE PAS. Le second passage a remplacé 248 prix relevés par une
+  //    liste vide : un fichier de sortie qui rétrécit sans qu'on le remarque est une perte
+  //    silencieuse de données.
+  const FICHIER_OFFRES = path.join(process.cwd(), ".scratch/offres-irun.json");
+  const offres: Record<string, OffreRelevee> = Object.fromEntries(
+    (fs.existsSync(FICHIER_OFFRES) ? JSON.parse(fs.readFileSync(FICHIER_OFFRES, "utf8")) as OffreRelevee[] : [])
+      .map((o) => [o.slug, o]));
+
+  let nouveaux = 0, revus = 0, ecartes = 0, recherches = 0;
   for (const brut of marques) {
     const marque = nomMarque(brut);
-    const rech = await page(`${BASE}/recherche.html?q=${encodeURIComponent(brut)}`);
-    if (!rech) { console.log(`· ${marque} — recherche injoignable`); continue; }
-    const fiches = [...new Set([...rech.matchAll(/href="(\/chaussures_[a-z]+\/[^"]*_fiche_\d+\.html)"/g)].map((m) => m[1].split("?")[0]))]
-      .filter((u) => terrainDeUrl(u));
-    console.log(`\n■ ${marque} — ${fiches.length} fiche(s) candidates`);
-    await pause();
+    const aChercher: string[] = [brut];
+    const faites = new Set<string>();
+    const famillesVues = new Set<string>();
+    let trouves = 0;
 
-    for (const f of fiches) {
-      const html = await page(BASE + f);
-      if (!html) { await pause(); continue; }
-      const t = lireFiche(html, f, marque);
-      if (!t) { ecartes++; await pause(); continue; }
-      const ancien = deja[t.fiche.slug];
-      deja[t.fiche.slug] = ancien ? {
-        ...ancien,
-        poidsG: ancien.poidsG ?? t.fiche.poidsG, dropMm: ancien.dropMm ?? t.fiche.dropMm,
-        // Le prix conseillé du marchand REMPLACE celui de la recherche : il est lu sur la
-        // même page que le prix du jour, à la même seconde, sans interprétation.
-        prixConseilleEur: t.fiche.prixConseilleEur ?? ancien.prixConseilleEur,
-        ean: ancien.ean ?? t.fiche.ean, nomExact: ancien.nomExact ?? t.fiche.nomExact,
-        foulee: ancien.foulee ?? t.fiche.foulee, terrain: t.fiche.terrain,
-        sources: [...new Set([...(ancien.sources ?? []), "i-run.fr"])],
-      } : t.fiche;
-      if (ancien) revus++; else nouveaux++;
-      if (t.prix != null && t.fiche.ean) {
-        offres[t.fiche.slug] = { slug: t.fiche.slug, ean: t.fiche.ean, prix: t.prix, dispo: t.dispo, url: BASE + f };
-      }
-      console.log(`   ${ancien ? "·" : "+"} ${(marque + " " + t.fiche.nom).padEnd(38).slice(0, 38)} ${t.fiche.poidsG?.valeur ?? "?"} g · ${t.fiche.dropMm?.valeur ?? "?"} mm · ${t.prix ?? "?"} €${conseilleTexte(t)} ${t.dispo ? "" : "(rupture)"}`);
-      fs.writeFileSync(SORTIE, JSON.stringify(deja, null, 2));
+    while (aChercher.length && faites.size < RECHERCHES_MAX) {
+      const q = aChercher.shift()!;
+      if (faites.has(q.toLowerCase())) continue;
+      faites.add(q.toLowerCase());
+      recherches++;
+
+      const rech = await page(`${BASE}/recherche.html?q=${encodeURIComponent(q)}`);
       await pause();
+      if (!rech) continue;
+      const fiches = [...new Set([...rech.matchAll(/href="(\/chaussures_[a-z]+\/[^"]*_fiche_\d+\.html)"/g)].map((m) => m[1].split("?")[0]))]
+        .filter(vautLeCoup);
+
+      for (const f of fiches) {
+        // Déjà lue lors d'un passage précédent : on ne repaie pas la requête, mais on
+        // relance quand même sa famille — elle peut ouvrir sur des modèles inconnus.
+        if (vues[f] && !rafraichirPrix) {
+          const fam = familleDe(vues[f]);
+          if (fam && !famillesVues.has(fam.toLowerCase())) { famillesVues.add(fam.toLowerCase()); aChercher.push(`${brut} ${fam}`); }
+          continue;
+        }
+        const html = await page(BASE + f);
+        await pause();
+        if (!html) continue;
+        const t = lireFiche(html, f, marque);
+        if (!t) { ecartes++; vues[f] = ""; continue; }
+        vues[f] = t.fiche.nom;
+
+        const ancien = deja[t.fiche.slug];
+        deja[t.fiche.slug] = ancien ? {
+          ...ancien,
+          poidsG: ancien.poidsG ?? t.fiche.poidsG, dropMm: ancien.dropMm ?? t.fiche.dropMm,
+          prixConseilleEur: t.fiche.prixConseilleEur ?? ancien.prixConseilleEur,
+          ean: ancien.ean ?? t.fiche.ean, nomExact: ancien.nomExact ?? t.fiche.nomExact,
+          foulee: ancien.foulee ?? t.fiche.foulee, terrain: t.fiche.terrain,
+          sources: [...new Set([...(ancien.sources ?? []), "i-run.fr"])],
+        } : t.fiche;
+        if (ancien) revus++; else { nouveaux++; trouves++; }
+        if (t.prix != null && t.fiche.ean) {
+          offres[t.fiche.slug] = { slug: t.fiche.slug, ean: t.fiche.ean, prix: t.prix, dispo: t.dispo, url: BASE + f };
+        }
+        console.log(`   ${ancien ? "·" : "+"} ${(marque + " " + t.fiche.nom).padEnd(38).slice(0, 38)} ${t.fiche.poidsG?.valeur ?? "?"} g · ${t.fiche.dropMm?.valeur ?? "?"} mm · ${t.prix ?? "?"} €${conseilleTexte(t)}`);
+
+        // La famille du modèle trouvé devient une nouvelle recherche.
+        const fam = familleDe(t.fiche.nom);
+        if (fam && !famillesVues.has(fam.toLowerCase())) { famillesVues.add(fam.toLowerCase()); aChercher.push(`${brut} ${fam}`); }
+
+        fs.writeFileSync(SORTIE, JSON.stringify(deja, null, 2));
+        fs.writeFileSync(CACHE, JSON.stringify(vues, null, 2));
+        fs.writeFileSync(FICHIER_OFFRES, JSON.stringify(Object.values(offres), null, 2));
+      }
     }
+    console.log(`■ ${marque} — ${faites.size} recherche(s), ${trouves} nouveau(x)`);
   }
-  fs.writeFileSync(path.join(process.cwd(), ".scratch/offres-irun.json"), JSON.stringify(Object.values(offres), null, 2));
-  console.log(`\n${nouveaux} modèle(s) découvert(s) · ${revus} complété(s) · ${ecartes} écarté(s) (variante, femme ou hors catégorie)`);
-  console.log(`${Object.keys(offres).length} prix relevés → .scratch/offres-irun.json`);
+  fs.writeFileSync(FICHIER_OFFRES, JSON.stringify(Object.values(offres), null, 2));
+  console.log(`\n${nouveaux} modèle(s) découvert(s) · ${revus} complété(s) · ${ecartes} écarté(s) · ${recherches} recherche(s)`);
+  console.log(`${Object.keys(offres).length} prix relevés · ${Object.keys(deja).length} modèles au catalogue`);
 }
 
 const conseilleTexte = (t: Trouvaille) =>

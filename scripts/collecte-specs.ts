@@ -25,6 +25,7 @@ for (const l of fs.readFileSync(".env.local", "utf8").split("\n")) {
 import { generateContent } from "../src/lib/ai/gemini";
 import { dansLesBornes, coherenceStackDrop, sourceValide, type Modele } from "../src/lib/shop/modele";
 import { MODELES_A_COLLECTER } from "./modeles-a-collecter";
+import { prendreVerrou } from "../src/lib/shop/verrou";
 
 const SORTIE = path.join(process.cwd(), "src/data/gear/chaussures.json");
 
@@ -169,6 +170,7 @@ export async function collecter(m: (typeof MODELES_A_COLLECTER)[number]): Promis
 }
 
 async function principal(): Promise<void> {
+  prendreVerrou("collecte-specs");
   const filtre = process.argv[2]?.toLowerCase();
   const deja: Record<string, Modele> = fs.existsSync(SORTIE) ? JSON.parse(fs.readFileSync(SORTIE, "utf8")) : {};
   // ⚠️ « FICHE ABSENTE » N'EST PAS LE BON CRITÈRE. Une fiche peut exister — poids, drop,
