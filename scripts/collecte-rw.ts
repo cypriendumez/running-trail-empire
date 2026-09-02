@@ -213,5 +213,12 @@ async function principal(): Promise<void> {
   console.log(`\n${remplis} hauteur(s) ajoutée(s) · ${refuses} rejeté(s) sur désaccord de drop · ${absents} absent(s)`);
 }
 
-const pause = () => new Promise((r) => setTimeout(r, 1500));
+/**
+ * ⚠️ QUATRE SECONDES, PAS UNE ET DEMIE. À 1,5 s cette source a répondu 406 après une
+ * centaine de requêtes — deux fois. Le refus n'était pas définitif : quelques heures plus
+ * tard elle répond 200 comme avant. C'est donc une limite de débit, et la réponse n'est
+ * pas de contourner mais d'aller au rythme qu'elle accepte. Un catalogue se complète en
+ * plusieurs nuits ; se faire bloquer ne complète rien du tout.
+ */
+const pause = () => new Promise((r) => setTimeout(r, 4000));
 if (require.main === module) void principal();

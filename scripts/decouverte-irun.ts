@@ -186,6 +186,34 @@ export function prixConseilleDe(html: string): number | null {
   return Number.isFinite(v) && v >= 40 && v <= 400 ? v : null;
 }
 
+/**
+ * LA PLAQUE CARBONE — on constate sa PRÉSENCE, jamais son absence.
+ *
+ * ⚠️ L'ASYMÉTRIE EST LE CŒUR DE CETTE FONCTION. Vérifié sur quatre fiches : celle de la
+ * Vaporfly 4 annonce « une plaque en fibre de carbone sur toute la longueur », mais celle
+ * de l'Adizero Adios Pro 4 — qui en a une, indiscutablement — n'en dit pas un mot. Le
+ * silence d'une fiche produit ne prouve rien : il signifie « non mentionné », pas
+ * « absente ». Conclure `false` sur un silence rangerait des chaussures de compétition
+ * parmi les chaussures d'entraînement, et l'avis « pour toi » s'en trouverait faussé.
+ *
+ * On ne rend donc `false` que sur une négation EXPLICITE (« sans plaque carbone »), et
+ * `undefined` — donc « non communiqué » à l'écran — dans tous les autres cas.
+ */
+export function plaqueCarboneDe(html: string): boolean | undefined {
+  const txt = html.replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ").replace(/&eacute;/g, "é").replace(/&egrave;/g, "è")
+    .replace(/&agrave;/g, "à").replace(/&ccedil;/g, "ç").replace(/\s+/g, " ");
+  // On travaille phrase par phrase : « sans plaque carbone » et « plaque carbone » ne
+  // doivent pas se confondre parce qu'ils partagent des mots.
+  for (const phrase of txt.split(/[.!?]/)) {
+    if (!/plaque/i.test(phrase)) continue;
+    if (!/carbone|carbon/i.test(phrase)) continue;
+    if (/\b(sans|pas de|aucune|dépourvues?|non pourvues?)\b[^.]{0,40}plaque/i.test(phrase)) return false;
+    return true;
+  }
+  return undefined;
+}
+
 export type Trouvaille = { fiche: Modele; prix: number | null; dispo: boolean; url: string };
 
 export function lireFiche(html: string, url: string, marque: string): Trouvaille | null {
@@ -207,6 +235,7 @@ export function lireFiche(html: string, url: string, marque: string): Trouvaille
   const offre = prod.offers as { price?: string; availability?: string } | undefined;
   const prix = offre?.price != null && Number.isFinite(Number(offre.price)) ? Number(offre.price) : null;
   const conseille = prixConseilleDe(html);
+  const plaque = plaqueCarboneDe(html);
 
   const slug = `${marque}-${nom}`.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -217,6 +246,7 @@ export function lireFiche(html: string, url: string, marque: string): Trouvaille
       poidsG: dansLesBornes("poidsG", poids) ? mesure(poids) : undefined,
       dropMm: dansLesBornes("dropMm", drop) ? mesure(drop) : undefined,
       prixConseilleEur: conseille != null ? mesure(conseille) : undefined,
+      plaqueCarbone: plaque != null ? mesure(plaque) : undefined,
       ean: typeof prod.gtin13 === "string" ? prod.gtin13 : undefined,
       nomExact: nomComplet,
       foulee: c.stability || undefined,
@@ -302,6 +332,7 @@ async function principal(): Promise<void> {
           ...ancien,
           poidsG: ancien.poidsG ?? t.fiche.poidsG, dropMm: ancien.dropMm ?? t.fiche.dropMm,
           prixConseilleEur: t.fiche.prixConseilleEur ?? ancien.prixConseilleEur,
+        plaqueCarbone: ancien.plaqueCarbone ?? t.fiche.plaqueCarbone,
           ean: ancien.ean ?? t.fiche.ean, nomExact: ancien.nomExact ?? t.fiche.nomExact,
           foulee: ancien.foulee ?? t.fiche.foulee, terrain: t.fiche.terrain,
           sources: [...new Set([...(ancien.sources ?? []), "i-run.fr"])],

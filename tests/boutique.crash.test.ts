@@ -10,7 +10,7 @@
  *   npx tsx tests/boutique.crash.test.ts
  */
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { CATALOGUE, filtrer, trier, alternatives, normalise } from "../src/lib/shop/catalogue";
 import { dansLesBornes, coherenceStackDrop, sourceValide, sourceCitable, sourcesCitables, domaineDe, BORNES, type Modele } from "../src/lib/shop/modele";
 import { decrire, familleAmorti, familleMasse, familleDrop } from "../src/lib/shop/description";
@@ -22,7 +22,7 @@ import { indexLeger, trouver, cotesPourGarage } from "../src/lib/shop/indexLeger
 import { SHOP, texteShop, texteFoulee } from "../src/components/shop/shopI18n";
 import { choisirFiche, caracteristiques, nombreDe, normaliser } from "../scripts/collecte-irun";
 import { specsDe, desaccord, choisirProduit, nomDeUrl, TOLERANCE } from "../scripts/collecte-rw";
-import { prixConseilleDe, estFemme, terrainDeUrl, nomMarque, modeleDeNom, retirerPrefixe, vautLeCoup, familleDe } from "../scripts/decouverte-irun";
+import { prixConseilleDe, estFemme, terrainDeUrl, nomMarque, modeleDeNom, retirerPrefixe, vautLeCoup, familleDe, plaqueCarboneDe } from "../scripts/decouverte-irun";
 import { fusionner, contredit } from "../scripts/collecte-specs";
 import { normaliser as normaliserCatalogue, richesse } from "../scripts/normaliser-catalogue";
 import { parseFeed, normalizeFeed } from "../src/lib/shop/affiliateFeed";
@@ -934,6 +934,53 @@ test("le bandeau de remplacement filtre sur le bon terrain", () => {
   for (const lang of ["fr", "en", "de", "es", "pt"] as const)
     for (const k of ["shop.usure.titre", "shop.usure.corps", "shop.usure.action"])
       assert.ok(SHOP[lang][k], `${k} absent en ${lang}`);
+});
+
+test("aucun caractère invisible ne s'est glissé dans le code", () => {
+  // ⚠️ DÉFAUT RÉEL, ET INVISIBLE À LA RELECTURE. En générant du code par script, un « \b »
+  // destiné à une expression régulière est devenu un caractère BACKSPACE (U+0008) dans le
+  // fichier. La regex exigeait alors un caractère de contrôle avant le mot : elle ne
+  // pouvait plus jamais correspondre, tout en s'affichant normalement dans l'éditeur et
+  // en compilant sans un mot. La détection de plaque carbone a rendu de mauvaises
+  // réponses pendant plusieurs essais, et j'ai cherché la cause ailleurs.
+  //
+  // Les fichiers de test sont exclus : certains envoient VOLONTAIREMENT des caractères de
+  // contrôle comme entrée hostile.
+  const dossiers = ["src", "scripts"];
+  const fautifs: string[] = [];
+  const parcourir = (d: string) => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      const p = `${d}/${e.name}`;
+      if (e.isDirectory()) { if (e.name !== "node_modules") parcourir(p); continue; }
+      if (!/\.tsx?$/.test(e.name)) continue;
+      const t = readFileSync(p, "utf8");
+      for (let i = 0; i < t.length; i++) {
+        const o = t.charCodeAt(i);
+        // On tolère \t (9), \n (10) et \r (13) ; tout le reste est un accident.
+        if (o < 9 || (o > 10 && o < 13) || (o > 13 && o < 32)) {
+          fautifs.push(`${p} ligne ${t.slice(0, i).split("\n").length} → U+${o.toString(16).padStart(4, "0").toUpperCase()}`);
+          break;
+        }
+      }
+    }
+  };
+  for (const d of dossiers) parcourir(d);
+  assert.deepEqual(fautifs, [], `caractère(s) de contrôle dans le code : ${fautifs.join(" ; ")}`);
+});
+
+test("la présence d'une plaque carbone se constate, jamais son absence", () => {
+  // ⚠️ L'ASYMÉTRIE EST LE CŒUR DE LA RÈGLE. Vérifié sur quatre fiches : celle de la
+  // Vaporfly 4 annonce sa plaque, celle de l'Adizero Adios Pro 4 — qui en a une,
+  // indiscutablement — n'en dit pas un mot. Le silence d'une fiche signifie « non
+  // mentionné », pas « absente ». Conclure `false` sur un silence rangerait des
+  // chaussures de compétition parmi les chaussures d'entraînement, et fausserait l'avis.
+  assert.equal(plaqueCarboneDe("Une propulsion maximale grâce à la plaque en fibre de carbone."), true);
+  assert.equal(plaqueCarboneDe("Amorti généreux et semelle accrocheuse."), undefined,
+    "le silence d'une fiche a été pris pour une absence de plaque");
+  assert.equal(plaqueCarboneDe("Chaussure souple sans plaque carbone."), false);
+  assert.equal(plaqueCarboneDe("Elle est dépourvue de plaque carbone."), false);
+  // Une plaque qui n'est pas en carbone n'est pas une plaque carbone.
+  assert.equal(plaqueCarboneDe("La plaque en TPU rigidifie l'avant-pied."), undefined);
 });
 
 test("le catalogue existe et n'est pas vide", () => {
