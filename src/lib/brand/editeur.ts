@@ -13,14 +13,40 @@ import type { Lang } from "@/lib/i18n/translations";
  * Ici : les FAITS. Les phrases qui les entourent restent dans `legalI18n.ts`, à leur
  * place, traduites. Un test interdit à toute page légale de réécrire un de ces faits.
  */
+/** Le repère affiché tant que l'identité légale n'est pas déclarée. */
+export const STATUT_A_COMPLETER = "[À COMPLÉTER / TO BE COMPLETED — statut juridique et n° SIREN/SIRET]";
+
+/**
+ * Le statut juridique publié, lu sur l'hébergement.
+ *
+ * ⚠️ ON NE PUBLIE QU'UNE VALEUR PLAUSIBLE. Une variable posée à « oui », « ok » ou à
+ * trois caractères remplirait la page d'un statut qui n'en est pas un, et la mention
+ * légale paraîtrait complète tout en étant fausse — pire que le repère visible qu'elle
+ * remplace. En dessous de dix caractères, on garde le repère.
+ */
+export function statutEditeur(env: Record<string, string | undefined> = process.env): string {
+  const v = (env.EDITEUR_STATUT ?? "").trim();
+  return v.length >= 10 ? v : STATUT_A_COMPLETER;
+}
+
 export const EDITEUR = {
   nom: "Cyprien Dumez",
   /**
    * ⚠️ À COMPLÉTER, ET VOLONTAIREMENT VISIBLE TANT QUE ÇA NE L'EST PAS. L'article 6-III
    * de la LCEN impose de publier le statut et, si l'éditeur est immatriculé, son numéro
    * SIREN/SIRET. Afficher un blanc discret laisserait croire que la page est complète.
+   *
+   * ⚠️ ET IL SE RENSEIGNE SANS TOUCHER AU CODE. La variable `EDITEUR_STATUT`, posée sur
+   * l'hébergement, remplace ce repère partout — mentions légales, CGU et politique de
+   * confidentialité, dans les cinq langues. C'est le même raisonnement que pour
+   * `ADMIN_EMAILS` : le jour d'une cession, l'acheteur doit pouvoir publier SA propre
+   * identité légale sans disposer du dépôt ni savoir redéployer. Une identité qui exige
+   * un développeur pour changer est une identité qui restera fausse.
+   *
+   * Ces textes sont rendus côté SERVEUR uniquement (vérifié : aucun composant `use
+   * client` ne les importe), donc la variable y est réellement lisible.
    */
-  statut: "[À COMPLÉTER / TO BE COMPLETED — statut juridique et n° SIREN/SIRET]",
+  statut: statutEditeur(),
   /** Sans le pays : il est TRADUIT (France / Frankreich / Francia / França) — voir PAYS_EDITEUR. */
   adresse: "28 avenue Pasteur, 59130 Lambersart",
   email: "cypriendumez@outlook.fr",

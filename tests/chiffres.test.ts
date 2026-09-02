@@ -32,7 +32,7 @@ import { PRIX_AFFICHES } from "../src/lib/billing/prix";
 import { ATTRIBUTION_GARMIN, PAGES_ATTRIBUTION } from "../src/components/legal/attributionI18n";
 import { liensStore } from "../src/lib/brand/stores";
 import { estAdmin, adminsAutorises, emailEditeur, ADMIN_PAR_DEFAUT } from "../src/lib/admin/acces";
-import { EDITEUR, HEBERGEUR_APP, PAYS_APP, SOUS_TRAITANTS } from "../src/lib/brand/editeur";
+import { EDITEUR, STATUT_A_COMPLETER, statutEditeur, HEBERGEUR_APP, PAYS_APP, SOUS_TRAITANTS } from "../src/lib/brand/editeur";
 import { fournisseursActifs } from "../src/lib/auth/fournisseurs";
 import { nomAffiche, refusDe, avisDe, litAvis, TEXTE_MIN } from "../src/lib/avis/store";
 
@@ -210,19 +210,49 @@ test("les mentions légales disent la même chose dans les 5 langues", () => {
     assert.ok(tout.includes("Covina, CA 91723"), `l'adresse de l'hébergeur manque en ${lg}`);
     assert.ok(tout.includes("cypriendumez@outlook.fr"), `aucun contact d'éditeur en ${lg}`);
 
-    // Il RESTE un marqueur légitime — le statut juridique, que seul l'éditeur connaît.
-    // Le test ne l'interdit pas ; il interdit tout AUTRE trou, et vérifie que le trou
-    // connu est bien le même dans chaque langue.
+    // Un marqueur peut RESTER — le statut juridique, que seul l'éditeur connaît. Le test
+    // n'en interdit aucun des deux états, il interdit tout AUTRE trou.
+    //
+    // ⚠️ ET IL DOIT ACCEPTER LE SITE UNE FOIS RENSEIGNÉ. Exiger « exactement un repère »
+    // rendait `npm run verify` ROUGE le jour où `EDITEUR_STATUT` est posée — c'est-à-dire
+    // sur un site enfin CONFORME. Un garde-fou qui punit la mise en conformité finit
+    // désarmé : on aurait supprimé le test plutôt que le SIREN.
     const restants = tout.match(MARQUEURS) ?? [];
-    assert.equal(restants.length, 1, `${restants.length} mentions à compléter en ${lg} : ${restants.join(" | ")}`);
-    assert.ok(
-      /statut juridique|SIREN/i.test(restants[0]),
-      `le trou restant en ${lg} n'est pas le statut juridique : ${restants[0]}`,
-    );
-    // Le repère vient maintenant d'UNE fiche : il doit être identique partout. Deux
-    // formulations différentes voudraient dire que quelqu'un l'a recopié.
-    assert.equal(restants[0], EDITEUR.statut, `le repère à compléter diverge en ${lg}`);
+    const attendus = statutEditeur() === STATUT_A_COMPLETER ? 1 : 0;
+    assert.equal(restants.length, attendus, `${restants.length} mentions à compléter en ${lg} : ${restants.join(" | ")}`);
+    const premier = restants[0] ?? "";
+    if (attendus) {
+      assert.ok(
+        /statut juridique|SIREN/i.test(premier),
+        `le trou restant en ${lg} n'est pas le statut juridique : ${premier}`,
+      );
+      // Le repère vient d'UNE fiche : il doit être identique partout. Deux formulations
+      // différentes voudraient dire que quelqu'un l'a recopié.
+      assert.equal(premier, EDITEUR.statut, `le repère à compléter diverge en ${lg}`);
+      assert.equal(premier, STATUT_A_COMPLETER, "le repère ne vient plus de la fiche unique");
+    } else {
+      // Renseigné : le statut déclaré doit RÉELLEMENT apparaître dans chaque langue.
+      // Sans cela, « zéro repère » se confondrait avec « la mention a disparu ».
+      assert.ok(tout.includes(statutEditeur()), `le statut déclaré n'apparaît pas en ${lg}`);
+    }
   }
+});
+
+test("le statut légal se renseigne sans toucher au code", () => {
+  // ⚠️ LE JOUR D'UNE CESSION, L'ACHETEUR DOIT POUVOIR PUBLIER SA PROPRE IDENTITÉ. Sans
+  // cela il lui faudrait le dépôt, un développeur et un redéploiement — autrement dit
+  // les mentions légales resteraient celles de l'ancien éditeur, ce qui ENGAGE celui-ci.
+  // Même raisonnement que pour `ADMIN_EMAILS`.
+  assert.equal(statutEditeur({ EDITEUR_STATUT: "Entrepreneur individuel — SIREN 123 456 789" }),
+    "Entrepreneur individuel — SIREN 123 456 789");
+  // ⚠️ MAIS ON NE PUBLIE QU'UNE VALEUR PLAUSIBLE : « oui » ou trois caractères
+  // rempliraient la mention d'un statut qui n'en est pas un, et la page paraîtrait
+  // complète tout en étant fausse — pire que le repère visible.
+  for (const v of [undefined, "", "   ", "oui", "SA"])
+    assert.equal(statutEditeur({ EDITEUR_STATUT: v }), STATUT_A_COMPLETER, `« ${v} » a été publié comme statut`);
+  // Et les textes légaux ne doivent lire le statut que par la fiche unique.
+  const legal = readFileSync("src/app/legalI18n.ts", "utf8");
+  assert.ok(!/\[À COMPLÉTER/.test(legal), "le repère est recopié dans les textes légaux au lieu d'être importé");
 });
 
 test("chaque palier que la BASE accepte a un sens pour le code", () => {
