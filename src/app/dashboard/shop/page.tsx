@@ -6,6 +6,7 @@ import { CATALOGUE } from "@/lib/shop/catalogue";
 import { construireProfil } from "@/lib/shop/profilAthlete";
 import { effectiveVma, bestVmaFromWorkouts } from "@/lib/running/fitness";
 import { texteShop } from "@/components/shop/shopI18n";
+import { offresParEan } from "@/lib/shop/offres";
 import { langueDuCompte } from "@/lib/shop/langue";
 
 export const metadata = { title: "Comparateur" };
@@ -51,6 +52,12 @@ export default async function ShopPage() {
     fromRuns: bestVmaFromWorkouts(seances as { distance_km?: number | null; duration_seconds?: number | null }[]),
   });
 
+  // ⚠️ UNE PANNE DE LECTURE N'EST PAS « AUCUNE OFFRE ». Si `product_offers` devient
+  //    illisible, la page continue de rendre le comparateur — sans prix — au lieu de
+  //    tomber en erreur : les caractéristiques restent utiles sans les tarifs.
+  let offres: Awaited<ReturnType<typeof offresParEan>> = {};
+  try { offres = await offresParEan(supabase); } catch { offres = {}; }
+
   const obj = (objRes.data?.data ?? null) as { distanceKm?: number; raceDate?: string } | null;
   const profil = construireProfil({ seances, paires: pairesRes.data ?? [], objectif: obj, vma });
 
@@ -62,7 +69,7 @@ export default async function ShopPage() {
           {tx("shop.sous_titre", { n: CATALOGUE.length })}
         </p>
       </header>
-      <GearHub catalogue={CATALOGUE} profil={profil} />
+      <GearHub catalogue={CATALOGUE} profil={profil} offres={offres} />
     </div>
   );
 }

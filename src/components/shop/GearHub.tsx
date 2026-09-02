@@ -17,6 +17,9 @@ import { filtrer, trier, marques, type Filtres, type Tri } from "@/lib/shop/cata
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { texteShop } from "./shopI18n";
 import { evaluer, classer, paireAremplacer, type ProfilAthlete } from "@/lib/shop/pourToi";
+import { usageDe } from "@/lib/shop/usage";
+import { meilleure, remisePourcent, type Offre } from "@/lib/shop/offres";
+import { PrixOffre } from "./PrixOffre";
 import type { Modele, Usage, Terrain } from "@/lib/shop/modele";
 
 const USAGES: Usage[] = ["quotidien", "polyvalent", "tempo", "competition", "trail_court", "trail_long", "amorti_max"];
@@ -45,7 +48,12 @@ function Spec({ label, valeur, vide }: { label: string; valeur: string | null; v
   );
 }
 
-export function GearHub({ catalogue, profil }: { catalogue: Modele[]; profil: ProfilAthlete }) {
+export function GearHub({ catalogue, profil, offres = {} }: {
+  catalogue: Modele[];
+  profil: ProfilAthlete;
+  /** Offres relevées chez les marchands, rangées par code-barres. */
+  offres?: Record<string, Offre[]>;
+}) {
   const { lang } = useT();
   const tx = (k: string, p?: Record<string, string | number>) => texteShop(lang, k, p);
   const [f, setF] = useState<Filtres>({});
@@ -53,9 +61,28 @@ export function GearHub({ catalogue, profil }: { catalogue: Modele[]; profil: Pr
   const [compare, setCompare] = useState<string[]>([]);
 
   const pertinence = useMemo(() => classer(catalogue, profil), [catalogue, profil]);
-  const liste = useMemo(() => trier(filtrer(catalogue, f), tri, pertinence), [catalogue, f, tri, pertinence]);
+  // La meilleure offre de chaque modèle, calculée une fois : elle sert au tri, aux
+  // cartes et au bandeau des promotions.
+  const parModele = useMemo(() => {
+    const m = new Map<string, { offre: Offre; prix: number; remise: number | null }>();
+    for (const x of catalogue) {
+      const best = x.ean ? meilleure(offres[x.ean] ?? []) : null;
+      if (best) m.set(x.slug, { offre: best, prix: Number(best.price), remise: remisePourcent(Number(best.price), x.prixConseilleEur?.valeur) });
+    }
+    return m;
+  }, [catalogue, offres]);
+  const liste = useMemo(() => trier(filtrer(catalogue, f), tri, pertinence, parModele), [catalogue, f, tri, pertinence, parModele]);
+  // Les plus fortes remises du moment, tous filtres confondus : c'est une vitrine, pas
+  // un résultat de recherche.
+  const promos = useMemo(() => [...parModele.entries()]
+    .filter(([, v]) => v.remise != null && v.remise >= 15)
+    .sort((a, b) => (b[1].remise ?? 0) - (a[1].remise ?? 0))
+    .slice(0, 4)
+    .map(([slug, v]) => ({ modele: catalogue.find((m) => m.slug === slug)!, ...v }))
+    .filter((x) => x.modele), [parModele, catalogue]);
   const toutesMarques = useMemo(() => marques(catalogue), [catalogue]);
   const compares = compare.map((s) => catalogue.find((m) => m.slug === s)).filter(Boolean) as Modele[];
+  const avecOffre = liste.filter((m) => parModele.has(m.slug)).length;
   // Le bandeau n'apparaît que sur un kilométrage RENSEIGNÉ : voir `paireAremplacer`.
   const usee = useMemo(() => paireAremplacer(profil.rotation), [profil.rotation]);
 
@@ -138,12 +165,15 @@ export function GearHub({ catalogue, profil }: { catalogue: Modele[]; profil: Pr
           <p className="text-[14px] text-zinc-500">
             {tx(liste.length > 1 ? "shop.n_modeles_plusieurs" : "shop.n_modeles_un", { n: liste.length })}
             {liste.length !== catalogue.length && <> {tx("shop.sur_total", { n: catalogue.length })}</>}
+            {avecOffre > 0 && <span className="text-zinc-400"> · {tx("shop.n_offres", { n: avecOffre })}</span>}
           </p>
           <label className="flex items-center gap-2 text-[13px] text-zinc-500">
             {tx("shop.trier")}
             <select value={tri} onChange={(e) => setTri(e.target.value as Tri)}
               className="rounded-lg bg-white px-2.5 py-1.5 text-[13px] text-zinc-900 ring-1 ring-inset ring-zinc-200 focus:outline-none">
               <option value="pertinence">{tx("shop.tri.pertinence")}</option>
+              <option value="remise">{tx("shop.tri.remise")}</option>
+              <option value="prix_bas">{tx("shop.tri.prix_bas")}</option>
               <option value="poids">{tx("shop.tri.poids")}</option>
               <option value="drop">{tx("shop.tri.drop")}</option>
               <option value="prix">{tx("shop.tri.prix")}</option>
@@ -152,6 +182,55 @@ export function GearHub({ catalogue, profil }: { catalogue: Modele[]; profil: Pr
             </select>
           </label>
         </div>
+
+        {/* ── ENTRÉES RAPIDES ──────────────────────────────────────────────────────
+            Quatre portes d'entrée, comme sur les comparateurs : elles POSENT un filtre,
+            elles ne remplacent pas la liste. Chacune se désactive d'un second clic. */}
+        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {([
+            ["shop.cat.route", () => ({ terrains: ["route"] as Terrain[] })],
+            ["shop.cat.trail", () => ({ terrains: ["trail"] as Terrain[] })],
+            ["shop.cat.competition", () => ({ usages: ["competition"] as Usage[] })],
+            ["shop.cat.amorti", () => ({ usages: ["amorti_max"] as Usage[] })],
+          ] as const).map(([cle, poser]) => {
+            const v = poser();
+            const actif = JSON.stringify({ ...f, q: undefined }) === JSON.stringify({ ...v, q: undefined });
+            return (
+              <button key={cle} type="button" onClick={() => setF(actif ? {} : v)}
+                className={`rounded-xl px-3 py-3 text-left text-[13px] font-semibold transition ${actif
+                  ? "bg-zinc-900 text-white"
+                  : "bg-white text-zinc-700 ring-1 ring-inset ring-zinc-200 hover:ring-zinc-400"}`}>
+                {tx(cle)}
+              </button>
+            );
+          })}
+        </div>
+
+        {promos.length > 0 && (
+          <Card className="mb-4 p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-[15px] font-semibold text-zinc-900">{tx("shop.meilleures")}</h2>
+              <button type="button" onClick={() => { setF({}); setTri("remise"); }}
+                className="text-[13px] text-zinc-500 underline underline-offset-2 hover:text-zinc-900">
+                {tx("shop.tout_voir")}
+              </button>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              {promos.map((p) => (
+                <Link key={p.modele.slug} href={`/dashboard/shop/${p.modele.slug}`}
+                  className="rounded-xl p-3 ring-1 ring-inset ring-zinc-200 transition hover:ring-zinc-400">
+                  <div className="text-[11px] uppercase tracking-wider text-zinc-400">{p.modele.marque}</div>
+                  <div className="truncate text-[14px] font-semibold text-zinc-900">{p.modele.nom}</div>
+                  <div className="mt-1.5 flex items-baseline gap-1.5">
+                    <span className="text-[16px] font-semibold text-zinc-900">{p.prix.toFixed(0)} €</span>
+                    <span className="text-[12px] text-zinc-400 line-through">{p.modele.prixConseilleEur?.valeur} €</span>
+                    <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11.5px] font-semibold text-emerald-700">−{p.remise} %</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </Card>
+        )}
 
         {usee && (
           <Card className="mb-4 flex flex-wrap items-center justify-between gap-3 border-l-2 border-l-amber-400 p-4">
@@ -203,19 +282,46 @@ export function GearHub({ catalogue, profil }: { catalogue: Modele[]; profil: Pr
 
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     <Badge tone="neutral">{tx(`shop.t.${m.terrain}`)}</Badge>
-                    <Badge tone="neutral">{tx(`shop.u.${m.usage}`)}</Badge>
+                    {(() => {
+                      // L'usage est DÉDUIT des cotes : sans cotes, pas d'étiquette — une
+                      // case vide vaut mieux qu'un classement inventé.
+                      const u = usageDe(m);
+                      return u ? <Badge tone="neutral">{tx(`shop.u.${u}`)}</Badge> : null;
+                    })()}
                     {m.plaqueCarbone?.valeur && <Badge tone="dark">{tx("shop.plaque")}</Badge>}
                   </div>
 
-                  <div className="my-3 h-[54px]">
-                    <SemelleProfil stackTalonMm={m.stackTalonMm?.valeur} dropMm={m.dropMm?.valeur} absent={tx("shop.profil_absent")} className="h-full w-full" />
-                  </div>
+                  {/* ⚠️ LE DESSIN NE S'AFFICHE QUE S'IL DIT QUELQUE CHOSE. La hauteur de
+                      semelle n'est publiée que pour une minorité des modèles : réserver
+                      54 px à un cadre vide sur quatre cartes sur cinq noyait les fiches
+                      renseignées, celles-là mêmes que le dessin sert à comparer.
+                      L'absence reste dite, sur une ligne, dans les caractéristiques. */}
+                  {m.stackTalonMm ? (
+                    <div className="my-3 h-[54px]">
+                      <SemelleProfil stackTalonMm={m.stackTalonMm.valeur} dropMm={m.dropMm?.valeur}
+                        absent={tx("shop.profil_absent")} className="h-full w-full" />
+                    </div>
+                  ) : <div className="my-2" />}
 
-                  <div className="grid grid-cols-3 gap-2 border-t border-zinc-100 pt-3">
+                  <div className="grid grid-cols-2 gap-2 border-t border-zinc-100 pt-3">
                     <Spec label={tx("shop.spec.poids")} valeur={m.poidsG ? `${m.poidsG.valeur} g` : null} vide={tx("shop.non_communique")} />
                     <Spec label={tx("shop.spec.drop")} valeur={m.dropMm ? `${m.dropMm.valeur} mm` : null} vide={tx("shop.non_communique")} />
-                    <Spec label={tx("shop.spec.conseille")} valeur={m.prixConseilleEur ? `${m.prixConseilleEur.valeur} €` : null} vide={tx("shop.non_communique")} />
                   </div>
+
+                  <div className="mt-3 border-t border-zinc-100 pt-3">
+                    <PrixOffre offre={parModele.get(m.slug)?.offre ?? null}
+                      conseille={m.prixConseilleEur?.valeur} tx={tx} compact />
+                  </div>
+
+                  {/* Le lien part CHEZ LE MARCHAND, en `nofollow sponsored` : on ne
+                      revendique pas cette page, on y renvoie. */}
+                  {parModele.get(m.slug) && (
+                    <a href={parModele.get(m.slug)!.offre.url} target="_blank"
+                      rel="nofollow sponsored noopener noreferrer"
+                      className="mt-2.5 inline-flex w-full items-center justify-center rounded-lg bg-zinc-900 px-3 py-2 text-[12.5px] font-semibold text-white transition hover:bg-zinc-700">
+                      {tx("shop.voir_offre")}
+                    </a>
+                  )}
 
                   {(avis.pour.length > 0 || avis.contre.length > 0) && (
                     <p className={`mt-3 text-[12.5px] leading-snug ${avis.score >= 60 ? "text-emerald-700" : avis.score < 45 ? "text-amber-700" : "text-zinc-500"}`}>
@@ -227,6 +333,10 @@ export function GearHub({ catalogue, profil }: { catalogue: Modele[]; profil: Pr
             })}
           </div>
         )}
+
+        <p className="mt-6 border-t border-zinc-100 pt-4 text-[11.5px] leading-snug text-zinc-400">
+          {tx("shop.provenance")}
+        </p>
       </div>
     </div>
   );
@@ -241,7 +351,7 @@ function Comparaison({ modeles, profil, onVider, tx }: { modeles: Modele[]; prof
     ["shop.spec.stack", (m) => m.stackTalonMm ? `${m.stackTalonMm.valeur} mm` : nc],
     ["shop.spec.plaque", (m) => m.plaqueCarbone ? tx(m.plaqueCarbone.valeur ? "shop.oui" : "shop.non") : nc],
     ["shop.spec.prix", (m) => m.prixConseilleEur ? `${m.prixConseilleEur.valeur} €` : nc],
-    ["shop.spec.usage", (m) => tx(`shop.u.${m.usage}`)],
+    ["shop.spec.usage", (m) => { const u = usageDe(m); return u ? tx(`shop.u.${u}`) : nc; }],
     ["shop.spec.verdict", (m) => tx(evaluer(m, profil).verdict)],
   ];
   return (

@@ -14,14 +14,16 @@ import { readFileSync, existsSync } from "node:fs";
 import { CATALOGUE, filtrer, trier, alternatives, normalise } from "../src/lib/shop/catalogue";
 import { dansLesBornes, coherenceStackDrop, sourceValide, sourceCitable, sourcesCitables, domaineDe, BORNES, type Modele } from "../src/lib/shop/modele";
 import { decrire, familleAmorti, familleMasse, familleDrop } from "../src/lib/shop/description";
+import { usageDe } from "../src/lib/shop/usage";
 import { evaluer, verdictDe, paireAremplacer, SEUIL_USURE, type ProfilAthlete } from "../src/lib/shop/pourToi";
 import { partTrail, sortieLongueKm, semainesAvant, construireProfil } from "../src/lib/shop/profilAthlete";
-import { meilleure, type Offre } from "../src/lib/shop/offres";
+import { meilleure, remisePourcent, estFraiche, ageEnJours, FRAICHEUR_JOURS, type Offre } from "../src/lib/shop/offres";
 import { indexLeger, trouver, cotesPourGarage } from "../src/lib/shop/indexLeger";
 import { SHOP, texteShop, texteFoulee } from "../src/components/shop/shopI18n";
 import { choisirFiche, caracteristiques, nombreDe, normaliser } from "../scripts/collecte-irun";
 import { specsDe, desaccord, choisirProduit, nomDeUrl, TOLERANCE } from "../scripts/collecte-rw";
-import { fusionner } from "../scripts/collecte-specs";
+import { prixConseilleDe, estFemme, terrainDeUrl, nomMarque, modeleDeNom, retirerPrefixe } from "../scripts/decouverte-irun";
+import { fusionner, contredit } from "../scripts/collecte-specs";
 import { parseFeed, normalizeFeed } from "../src/lib/shop/affiliateFeed";
 
 let passed = 0; const fails: string[] = [];
@@ -38,7 +40,7 @@ function codeOf(f: string): string {
 }
 
 const modele = (p: Partial<Modele> = {}): Modele => ({
-  slug: "x", marque: "Marque", nom: "Modèle", annee: 2025, terrain: "route", usage: "quotidien", sources: ["exemple.fr"], ...p,
+  slug: "x", marque: "Marque", nom: "Modèle", annee: 2025, terrain: "route", sources: ["exemple.fr"], ...p,
 });
 const mes = <T,>(v: T) => ({ valeur: v, vu: "2026-09-02" });
 
@@ -103,6 +105,30 @@ test("aucune image de produit n'est référencée", () => {
   }
 });
 
+test("l'usage se déduit des cotes, et disparaît quand elles manquent", () => {
+  // ⚠️ POURQUOI CE N'EST PLUS UN CHAMP. L'usage était saisi modèle par modèle. Dès lors
+  // que les modèles sont DÉCOUVERTS automatiquement chez le marchand, il n'y a plus
+  // personne pour les classer : « quotidien » par défaut serait une affirmation inventée
+  // sur chaque nouvelle paire. Déduit, il est reproductible — et absent quand on ne sait
+  // rien, ce qui est la seule réponse honnête.
+  assert.equal(usageDe(modele()), null, "un modèle sans aucune cote s'est vu attribuer un usage");
+  assert.equal(usageDe(modele({ plaqueCarbone: mes(true), poidsG: mes(210) })), "competition");
+  assert.equal(usageDe(modele({ stackTalonMm: mes(42), poidsG: mes(300) })), "amorti_max");
+  assert.equal(usageDe(modele({ poidsG: mes(225), stackTalonMm: mes(33) })), "tempo");
+  assert.equal(usageDe(modele({ poidsG: mes(280), stackTalonMm: mes(37) })), "quotidien");
+  assert.equal(usageDe(modele({ terrain: "trail", poidsG: mes(240), stackTalonMm: mes(24) })), "trail_court");
+  assert.equal(usageDe(modele({ terrain: "trail", stackTalonMm: mes(33) })), "trail_long");
+  assert.equal(usageDe(modele({ terrain: "trail" })), null, "un trail sans cote a été classé quand même");
+});
+
+test("un filtre d'usage n'invente pas de classement pour les modèles sans cote", () => {
+  const sansCote = modele({ slug: "vide" });
+  const tempo = modele({ slug: "t", poidsG: mes(220), stackTalonMm: mes(32) });
+  const r = filtrer([sansCote, tempo], { usages: ["tempo"] });
+  assert.deepEqual(r.map((m) => m.slug), ["t"],
+    "un modèle dont l'usage est indéterminable a été rangé dans une catégorie");
+});
+
 console.log("\nPRIX — une offre, ou rien");
 
 test("la page boutique n'affiche aucun prix hors product_offers", () => {
@@ -119,6 +145,22 @@ test("la page boutique n'affiche aucun prix hors product_offers", () => {
     assert.ok(!/\b\d{2,3}[.,]\d{2}\s*€/.test(codeOf(f)), `un montant est écrit en dur dans ${f}`);
 });
 
+test("un prix affiché porte toujours son marchand, sa date et son lien", () => {
+  // ⚠️ C'EST CE QUI SÉPARE UN COMPARATEUR D'UNE INVENTION. L'ancienne boutique affichait
+  // 1 167 prix fabriqués attribués à de vraies enseignes ; ce qui rend un prix honnête
+  // n'est pas sa source mais le fait qu'on puisse aller le VÉRIFIER : chez qui, quand, et
+  // sur quelle page. Un prix nu, même exact, ne se vérifie pas.
+  const src = codeOf("src/components/shop/PrixOffre.tsx");
+  assert.ok(/offre\.retailer/.test(src), "le nom du marchand n'accompagne pas le prix");
+  assert.ok(/dateCourte\(offre\.updated_at\)/.test(src), "la date du relevé n'accompagne pas le prix");
+  assert.ok(/rel="nofollow sponsored noopener noreferrer"/.test(src),
+    "le lien sortant doit être en nofollow sponsored : on renvoie chez le marchand, on ne revendique pas sa page");
+  for (const lang of ["fr", "en", "de", "es", "pt"] as const) {
+    assert.ok(SHOP[lang]["shop.offre.chez"]?.includes("{marchand}"), `${lang} : le marchand n'est pas nommé`);
+    assert.ok(SHOP[lang]["shop.offre.releve"]?.includes("{date}"), `${lang} : la date n'est pas affichée`);
+  }
+});
+
 test("une lecture d'offres en échec ne se lit pas comme « aucune offre »", () => {
   // Les deux se soldent par une liste vide : sans distinction, une panne de base
   // afficherait « aucune offre marchande » — une affirmation fausse.
@@ -128,9 +170,49 @@ test("une lecture d'offres en échec ne se lit pas comme « aucune offre »", ()
   assert.ok(/offresLisibles/.test(fiche), "la fiche ne distingue pas l'échec de lecture de l'absence d'offre");
 });
 
+test("un prix périmé n'est plus « la meilleure offre »", () => {
+  // ⚠️ UN TARIF RELEVÉ NE VAUT QUE QUELQUES JOURS. Sans cette borne, la page annoncerait
+  // une promotion terminée depuis un mois : le lecteur clique, découvre un autre prix, et
+  // ne revient pas. Un prix périmé est une information FAUSSE, pas une information vieille.
+  const jours = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
+  const o = (price: number, d: string): Offre => ({ retailer: "x", price, currency: "EUR", url: "https://x", in_stock: true, updated_at: d });
+  assert.ok(estFraiche(o(100, jours(3))));
+  assert.ok(!estFraiche(o(100, jours(FRAICHEUR_JOURS + 1))));
+  assert.ok(!estFraiche(o(100, "")), "une date illisible ne peut pas passer pour fraîche");
+  assert.equal(meilleure([o(80, jours(60)), o(120, jours(1))])?.price, 120,
+    "un prix vieux de deux mois a été présenté comme la meilleure offre");
+  assert.equal(meilleure([o(80, jours(60))]), null);
+  assert.equal(ageEnJours("pas une date"), null);
+});
+
+test("une remise ne s'annonce qu'avec ses deux chiffres", () => {
+  // Sans prix conseillé il n'y a pas de référence : afficher « −0 % », ou prendre le prix
+  // le plus haut du marché comme point de départ, fabriquerait une promotion.
+  assert.equal(remisePourcent(144, 160), 10);
+  assert.equal(remisePourcent(144, null), null, "une remise a été calculée sans prix de référence");
+  assert.equal(remisePourcent(170, 160), null, "un prix SUPÉRIEUR au conseillé a été présenté comme une remise");
+  assert.equal(remisePourcent(160, 160), null, "un prix égal au conseillé n'est pas une remise");
+  assert.equal(remisePourcent(0, 160), null);
+});
+
+test("les tris qui portent sur une offre laissent les modèles sans prix en dernier", () => {
+  const a = modele({ slug: "a" }), b = modele({ slug: "b" }), c = modele({ slug: "c" });
+  const offres = new Map([
+    ["a", { prix: 120, remise: 10 }],
+    ["c", { prix: 90, remise: 40 }],
+  ]);
+  assert.deepEqual(trier([a, b, c], "prix_bas", undefined, offres).map((m) => m.slug), ["c", "a", "b"]);
+  assert.deepEqual(trier([a, b, c], "remise", undefined, offres).map((m) => m.slug), ["c", "a", "b"],
+    "un modèle sans offre s'est classé parmi les meilleures remises");
+  // ⚠️ ASSERTION RETIRÉE : « une offre sans remise ne prend pas la tête » passait quelle
+  // que soit l'implémentation. Une remise est soit absente, soit strictement positive —
+  // le cas ne peut donc pas se produire, et le test faisait croire à une protection.
+});
+
 test("la meilleure offre ignore les indisponibles et les prix illisibles", () => {
+  const frais = new Date().toISOString();
   const o = (retailer: string, price: unknown, in_stock: boolean | null): Offre =>
-    ({ retailer, price: price as number, currency: "EUR", url: "https://x.fr", in_stock, updated_at: "" });
+    ({ retailer, price: price as number, currency: "EUR", url: "https://x.fr", in_stock, updated_at: frais });
   assert.equal(meilleure([o("A", 120, true), o("B", 90, false), o("C", 100, true)])?.retailer, "C",
     "une offre en rupture a été présentée comme la meilleure");
   assert.equal(meilleure([o("A", "n/c", true)]), null, "un prix illisible a été retenu");
@@ -252,10 +334,9 @@ test("aucune clé produite ne manque à une des cinq langues", () => {
       rotation: [{ marque: "A", modele: "B", km: 500, maxKm: 550 }] },
   ];
   for (const terrain of ["route", "trail"] as const)
-    for (const usage of ["quotidien", "tempo", "competition", "trail_court", "trail_long", "amorti_max", "polyvalent"] as const)
-      for (const stack of [undefined, mes(22), mes(45)])
+    for (const stack of [undefined, mes(22), mes(45)])
         for (const plaque of [undefined, mes(true), mes(false)]) {
-          const m = modele({ terrain, usage, stackTalonMm: stack, plaqueCarbone: plaque, poidsG: mes(240), dropMm: mes(6), dureeVieKm: mes(700) });
+          const m = modele({ terrain, stackTalonMm: stack, plaqueCarbone: plaque, poidsG: mes(240), dropMm: mes(6), dureeVieKm: mes(700) });
           for (const b of decrire(m).bouts) cles.add(b.cle);
           for (const x of decrire(m).manquantes) cles.add(x);
           for (const p of profils) {
@@ -331,16 +412,16 @@ test("une plaque carbone est déconseillée quand la VMA ne la rentabilise pas",
   // La plaque travaille par flexion : sous ~15 km/h de VMA elle rigidifie le pied sans
   // rendre l'économie de course qu'elle promet. Ce n'est pas un jugement, c'est mécanique.
   const p: ProfilAthlete = { vma: 12.5, partTrail: 0.1, volumeHebdoKm: 30, objectifKm: 10, semainesAvantCourse: 8, dropsEnRotation: [8] };
-  const lente = evaluer(modele({ plaqueCarbone: mes(true), usage: "competition" }), p);
+  const lente = evaluer(modele({ plaqueCarbone: mes(true) }), p);
   assert.ok(lente.contre.some((x) => x.cle === "shop.a.plaque_ko"), "aucune réserve sur la plaque à 12,5 km/h de VMA");
-  const rapide = evaluer(modele({ plaqueCarbone: mes(true), usage: "competition" }), { ...p, vma: 18 });
+  const rapide = evaluer(modele({ plaqueCarbone: mes(true) }), { ...p, vma: 18 });
   assert.ok(rapide.pour.some((x) => x.cle === "shop.a.plaque_ok"), "aucun argument pour la plaque à 18 km/h de VMA");
   assert.ok(rapide.score > lente.score, "la VMA ne change rien au score : le conseil n'est pas personnalisé");
 });
 
 test("une chaussure de trail est déconseillée à qui court sur route", () => {
   const route: ProfilAthlete = { partTrail: 0.05, volumeHebdoKm: 40 };
-  const a = evaluer(modele({ terrain: "trail", usage: "trail_court" }), route);
+  const a = evaluer(modele({ terrain: "trail", poidsG: mes(240), stackTalonMm: mes(24) }), route);
   assert.ok(a.contre.some((x) => x.cle === "shop.a.trail_ko"));
   assert.ok(evaluer(modele({ terrain: "trail" }), { partTrail: 0.8 }).score > a.score);
 });
@@ -529,6 +610,102 @@ test("deux collectes s'additionnent, elles ne s'écrasent pas", () => {
   const src = codeOf("scripts/collecte-specs.ts");
   assert.ok(/deja\[m\.slug\] = fusionner\(deja\[m\.slug\], fiche\)/.test(src),
     "la collecte écrit la fiche sans la fusionner avec l'existante");
+});
+
+test("une réponse qui se trompe sur une valeur vérifiable est rejetée en entier", () => {
+  // ⚠️ MESURÉ : pour l'« Adizero Adios 9 », la recherche a rendu « 0 mm de drop » alors
+  // que deux marchands s'accordent sur 7 mm. Or c'est CETTE source qui fournit la hauteur
+  // de semelle, la plaque carbone et le prix conseillé — trois valeurs qu'aucune fiche
+  // marchande ne publie et que personne ne peut donc recouper. Se tromper sur ce qui se
+  // vérifie disqualifie ce qui ne se vérifie pas.
+  const connu = modele({ dropMm: mes(7), poidsG: mes(215) });
+  assert.ok(contredit(connu, modele({ dropMm: mes(0) })), "un drop de 0 mm face à 7 mm a été accepté");
+  assert.ok(contredit(connu, modele({ poidsG: mes(120) })), "un poids écarté de 95 g a été accepté");
+  assert.equal(contredit(connu, modele({ dropMm: mes(7), poidsG: mes(235) })), null,
+    "vingt grammes d'écart suffisaient à rejeter : la pointure de référence n'est jamais publiée");
+  assert.equal(contredit(undefined, modele({ dropMm: mes(0) })), null,
+    "sans fiche existante il n'y a rien à contredire — la première collecte doit passer");
+  // Et le script doit APPELER ce contrôle, pas seulement le déclarer.
+  const src = codeOf("scripts/collecte-specs.ts");
+  assert.ok(/contredit\(deja\[m\.slug\], fiche\)/.test(src), "la collecte n'applique pas le contrôle croisé");
+});
+
+test("le prix conseillé s'ancre sur son libellé, pas sur sa position", () => {
+  // ⚠️ « LE SECOND MONTANT DE LA ZONE » MARCHERAIT AUJOURD'HUI ET CASSERAIT DEMAIN, EN
+  // SILENCE : la zone contient aussi la mensualité « 3× sans frais ». On exige les mots
+  // « prix conseillé », que la page écrit noir sur blanc à côté du prix pratiqué.
+  assert.equal(prixConseilleDe(`<div class="prdDtl__priceZone"><span>78&euro;</span><span>Vous économisez 40%</span><span>130&euro;</span>&nbsp;Prix conseillé</div>`), 130);
+  assert.equal(prixConseilleDe(`<div class="prdDtl__priceZone"><span>190&euro;</span><span>2X sans frais : 95&euro;</span></div>`), null,
+    "une mensualité a été prise pour un prix conseillé");
+  assert.equal(prixConseilleDe("<p>130&euro; Prix conseillé</p>"), null, "un montant hors de la zone de prix a été retenu");
+  assert.equal(prixConseilleDe(`<div class="prdDtl__priceZone">78&euro; 1300&euro; Prix conseillé</div>`), null,
+    "un prix aberrant n'a pas été écarté");
+});
+
+test("la déclinaison femme n'entre pas au catalogue par le chemin d'URL", () => {
+  // ⚠️ VÉRIFIÉ : la fiche 144265 est servie sous `/chaussures_homme/` alors que son
+  // JSON-LD annonce « Chaussures de sport femme Running ». Se fier au chemin ferait
+  // entrer des poids et des cotes de la version femme sous l'étiquette homme.
+  const femme = { offers: { category: "Chaussures de sport femme Running" } } as Record<string, unknown>;
+  const homme = { offers: { category: "Chaussures de sport homme Running" } } as Record<string, unknown>;
+  assert.equal(estFemme(femme, "/chaussures_homme/Running_c23/x_fiche_1.html"), true,
+    "la catégorie déclarée doit primer sur le chemin");
+  assert.equal(estFemme(homme, "/chaussures_femme/Running_c24/x_fiche_1.html"), false);
+  // Sans catégorie déclarée, le chemin sert de repli — faute de mieux.
+  assert.equal(estFemme({}, "/chaussures_femme/Running_c24/x_fiche_1.html"), true);
+});
+
+test("le terrain vient de la catégorie du marchand, pas d'un jugement", () => {
+  assert.equal(terrainDeUrl("/chaussures_homme/Trail_c15/x_fiche_1.html"), "trail");
+  assert.equal(terrainDeUrl("/chaussures_homme/Running_c23/x_fiche_1.html"), "route");
+  assert.equal(terrainDeUrl("/chaussures_homme/Randonnee_c1136/x_fiche_1.html"), null,
+    "une chaussure de randonnée est entrée dans un catalogue de course à pied");
+  assert.equal(terrainDeUrl("/chaussures_homme/Athletisme_c48/x_fiche_1.html"), null);
+});
+
+test("retirer la marque d'un nom respecte la ponctuation du marchand", () => {
+  // ⚠️ HUIT MODÈLES EN DOUBLE EN BASE. Le marchand écrit « On-Running Cloudmonster
+  // Hyper » : un seul mot pour un découpage sur les espaces, DEUX une fois normalisé.
+  // Retirer « deux mots » du libellé d'origine emportait « On-Running » ET
+  // « Cloudmonster », et le modèle entrait sous le nom « Hyper » — en plus de l'entrée
+  // correcte, avec le même code-barres.
+  assert.equal(modeleDeNom("On-Running Cloudmonster Hyper", "On"), "Cloudmonster Hyper");
+  assert.equal(modeleDeNom("On-Running Cloudflow 5", "On"), "Cloudflow 5");
+  // La forme longue de la marque passe avant la courte, sinon il reste « One One ».
+  assert.equal(modeleDeNom("Hoka One One Mach X 3", "Hoka"), "Mach X 3");
+  assert.equal(modeleDeNom("Topo Athletic Ultraventure 4", "Topo"), "Ultraventure 4");
+  // Et les traits d'union INTERNES au nom du modèle sont préservés.
+  assert.equal(modeleDeNom("Asics Gel-Nimbus 28", "Asics"), "Gel-Nimbus 28");
+  // Un nom qui ne commence pas par la marque est rendu tel quel plutôt que tronqué.
+  assert.equal(modeleDeNom("Speedcross 6", "Salomon"), "Speedcross 6");
+  assert.equal(retirerPrefixe("Speedcross 6", "Salomon"), null);
+});
+
+test("aucun modèle du catalogue ne partage son code-barres", () => {
+  // Deux entrées pour un code-barres, c'est le même produit compté deux fois : le
+  // compteur d'offres mentait (133 modèles pour 128 offres) et l'athlète voyait la même
+  // chaussure deux fois, dont une sous un nom tronqué.
+  const par = new Map<string, string[]>();
+  for (const m of CATALOGUE) if (m.ean) par.set(m.ean, [...(par.get(m.ean) ?? []), `${m.marque} ${m.nom}`]);
+  const doublons = [...par.entries()].filter(([, l]) => l.length > 1);
+  assert.equal(doublons.length, 0, `code(s)-barres partagé(s) : ${doublons.map(([e, l]) => `${e} → ${l.join(" / ")}`).join(" ; ")}`);
+});
+
+test("aucun nom de modèle ne commence par un résidu de marque", () => {
+  for (const m of CATALOGUE)
+    assert.ok(!/^(One One|Running|Athletic)\b/.test(m.nom),
+      `« ${m.marque} ${m.nom} » garde un morceau de la forme longue de sa marque`);
+});
+
+test("une marque n'a qu'un seul libellé", () => {
+  // Sans alias, le filtre affichait « On » ET « On Running » : cocher l'un faisait rater
+  // la moitié du catalogue.
+  assert.equal(nomMarque("On Running"), "On");
+  assert.equal(nomMarque("Hoka One One"), "Hoka");
+  assert.equal(nomMarque("Asics"), "Asics");
+  const marquesCat = new Set(CATALOGUE.map((m) => m.marque));
+  for (const m of marquesCat)
+    assert.equal(nomMarque(m), m, `le catalogue contient encore le libellé « ${m} », qui a un alias`);
 });
 
 test("la collecte ne recopie ni prix, ni texte, ni note du marchand", () => {

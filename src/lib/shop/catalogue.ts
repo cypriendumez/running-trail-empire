@@ -6,6 +6,7 @@
  */
 import fiches from "@/data/gear/chaussures.json";
 import { type Modele, type Terrain, type Usage } from "./modele";
+import { usageDe } from "./usage";
 
 export const CATALOGUE: Modele[] = Object.values(fiches as Record<string, Modele>);
 
@@ -21,7 +22,7 @@ export type Filtres = {
   plaqueCarbone?: boolean | null;
 };
 
-export type Tri = "pertinence" | "poids" | "drop" | "prix" | "nouveaute" | "nom";
+export type Tri = "pertinence" | "remise" | "prix_bas" | "poids" | "drop" | "prix" | "nouveaute" | "nom";
 
 /** Normalisation pour la recherche : sans accents, sans casse. */
 export function normalise(v: unknown): string {
@@ -51,7 +52,12 @@ export function filtrer(liste: Modele[], f: Filtres): Modele[] {
     }
     if (f.marques?.length && !f.marques.includes(m.marque)) return false;
     if (f.terrains?.length && !f.terrains.includes(m.terrain)) return false;
-    if (f.usages?.length && !f.usages.includes(m.usage)) return false;
+    if (f.usages?.length) {
+      // L'usage est DÉDUIT des cotes : un modèle dont on ne connaît ni le poids ni la
+      // semelle n'a pas d'usage, et un filtre d'usage ne peut pas le retenir.
+      const u = usageDe(m);
+      if (!u || !f.usages.includes(u)) return false;
+    }
     if (!passeBorne(m.dropMm?.valeur, f.dropMax)) return false;
     if (!passeBorne(m.poidsG?.valeur, f.poidsMax)) return false;
     if (!passeBorne(m.prixConseilleEur?.valeur, f.prixMax)) return false;
@@ -70,12 +76,21 @@ export function filtrer(liste: Modele[], f: Filtres): Modele[] {
  * une donnée absente n'est ni la plus légère ni la plus lourde, elle est inconnue, et la
  * placer en tête ferait passer une ignorance pour un record.
  */
-export function trier(liste: Modele[], tri: Tri, pertinence?: Map<string, number>): Modele[] {
+export function trier(liste: Modele[], tri: Tri, pertinence?: Map<string, number>, offres?: Map<string, { prix: number; remise: number | null }>): Modele[] {
   const clef = (m: Modele): number | undefined =>
-    tri === "poids" ? m.poidsG?.valeur
+    // ⚠️ LES TRIS QUI PORTENT SUR UNE OFFRE N'ONT DE SENS QUE S'IL Y EN A UNE. Un modèle
+    // sans prix relevé n'est ni le moins cher ni le mieux remisé : il n'a pas de rang, et
+    // part en fin de liste comme toute valeur inconnue.
+    // Une remise absente rend NaN, que le tri traite comme une valeur inconnue — donc en
+    // fin de liste, au même titre qu'un modèle sans offre du tout. Écrire un garde
+    // explicite ici serait trompeur : vérifié par mutation, il produit exactement le même
+    // ordre, parce qu'une remise est soit absente, soit strictement positive.
+    tri === "remise" ? -(offres?.get(m.slug)?.remise ?? Number.NaN)
+      : tri === "prix_bas" ? offres?.get(m.slug)?.prix
+      : tri === "poids" ? m.poidsG?.valeur
       : tri === "drop" ? m.dropMm?.valeur
       : tri === "prix" ? m.prixConseilleEur?.valeur
-      : tri === "nouveaute" ? -m.annee
+      : tri === "nouveaute" ? (m.annee != null ? -m.annee : undefined)
       : tri === "pertinence" ? -(pertinence?.get(m.slug) ?? Number.NaN)
       : undefined;
   const copie = [...liste];
@@ -133,7 +148,7 @@ export function alternatives(m: Modele, liste: Modele[] = CATALOGUE, n = 3): Mod
       if (!parts.length) return null;
       const base = parts.reduce((a, b) => a + b, 0) / parts.length;
       // Même usage : c'est le critère qui compte le plus pour un coureur.
-      return { modele: x, distance: base + (x.usage === m.usage ? 0 : 1.2) };
+      return { modele: x, distance: base + (usageDe(x) === usageDe(m) ? 0 : 1.2) };
     })
     .filter((v): v is { modele: Modele; distance: number } => v != null)
     .sort((a, b) => a.distance - b.distance);

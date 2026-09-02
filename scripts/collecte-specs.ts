@@ -76,6 +76,28 @@ function jsonDe(t: string): Record<string, unknown> | null {
  * Quand les deux sources donnent la même valeur, on garde CELLE DÉJÀ EN PLACE : elle a
  * été relevée dans un champ structuré, pas déduite d'une recherche.
  */
+/**
+ * LE CONTRÔLE CROISÉ DE LA RECHERCHE.
+ *
+ * ⚠️ MESURÉ : pour l'« Adizero Adios 9 », la recherche a rendu « 0 mm de drop » alors que
+ * deux marchands s'accordent sur 7 mm. Un modèle de langage qui se trompe sur une valeur
+ * VÉRIFIABLE n'est pas plus fiable sur celles qu'on ne peut pas vérifier — or c'est
+ * précisément lui qui fournit la hauteur de semelle, la plaque carbone et le prix
+ * conseillé, qu'aucune fiche marchande ne publie. On refuse donc TOUTE sa réponse pour ce
+ * modèle plutôt que d'en garder la partie invérifiable.
+ *
+ * La tolérance sur le poids est large (la pointure de référence n'est jamais publiée) ;
+ * celle sur le drop est serrée, c'est une cote de conception.
+ */
+export function contredit(ancien: Modele | undefined, neuf: Modele): string | null {
+  if (!ancien) return null;
+  const d = ancien.dropMm?.valeur, dn = neuf.dropMm?.valeur;
+  if (d != null && dn != null && Math.abs(d - dn) > 1) return `drop ${d} mm connu, ${dn} mm annoncé`;
+  const p = ancien.poidsG?.valeur, pn = neuf.poidsG?.valeur;
+  if (p != null && pn != null && Math.abs(p - pn) > 45) return `poids ${p} g connu, ${pn} g annoncé`;
+  return null;
+}
+
 export function fusionner(ancien: Modele | undefined, neuf: Modele): Modele {
   const garder = <T,>(a: T | undefined, n: T | undefined) => a ?? n;
   return {
@@ -138,7 +160,7 @@ export async function collecter(m: (typeof MODELES_A_COLLECTER)[number]): Promis
   if (!coherenceStackDrop(stackTalonMm, dropMm)) stackTalonMm = undefined;
 
   return {
-    slug: m.slug, marque: m.marque, nom: m.nom, annee: m.annee, terrain: m.terrain, usage: m.usage,
+      slug: m.slug, marque: m.marque, nom: m.nom, annee: m.annee, terrain: m.terrain,
     poidsG: mesure(poidsG), dropMm: mesure(dropMm), stackTalonMm: mesure(stackTalonMm),
     plaqueCarbone: typeof j.plaqueCarbone === "boolean" ? mesure(j.plaqueCarbone) : undefined,
     prixConseilleEur: mesure(nombre("prixConseilleEur")), dureeVieKm: mesure(nombre("dureeVieKm")),
@@ -165,13 +187,25 @@ async function principal(): Promise<void> {
     try {
       const fiche = await collecter(m);
       if (!fiche) { vides++; console.log(`  ✗ ${m.marque} ${m.nom} — aucune donnée vérifiable`); continue; }
+      const litige = contredit(deja[m.slug], fiche);
+      if (litige) {
+        vides++;
+        console.log(`  ⚠ ${m.marque} ${m.nom} — RÉPONSE REJETÉE : ${litige}`);
+        await new Promise((r) => setTimeout(r, 1200));
+        continue;
+      }
       deja[m.slug] = fusionner(deja[m.slug], fiche);
       ok++;
+      // ⚠️ ON JOURNALISE CE QUI EST RETENU, PAS CE QUI A ÉTÉ PROPOSÉ. Le premier jet
+      // affichait les valeurs brutes de la réponse : le journal annonçait « 0 mm » sur
+      // une fiche où 7 mm avaient été conservés. Un journal qui décrit autre chose que
+      // l'état réel fait chercher des défauts qui n'existent pas — et masque les vrais.
+      const e = deja[m.slug];
       const r = [
-        fiche.poidsG ? `${fiche.poidsG.valeur} g` : "poids ?",
-        fiche.dropMm ? `${fiche.dropMm.valeur} mm` : "drop ?",
-        fiche.stackTalonMm ? `stack ${fiche.stackTalonMm.valeur}` : "stack ?",
-        fiche.prixConseilleEur ? `${fiche.prixConseilleEur.valeur} €` : "prix ?",
+        e.poidsG ? `${e.poidsG.valeur} g` : "poids ?",
+        e.dropMm ? `${e.dropMm.valeur} mm` : "drop ?",
+        e.stackTalonMm ? `stack ${e.stackTalonMm.valeur}` : "stack ?",
+        e.prixConseilleEur ? `${e.prixConseilleEur.valeur} €` : "prix ?",
       ].join(" · ");
       console.log(`  ✓ ${(m.marque + " " + m.nom).padEnd(34)} ${r}`);
       fs.writeFileSync(SORTIE, JSON.stringify(deja, null, 2));

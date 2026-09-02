@@ -15,6 +15,7 @@
  * ⚠️ ON REND DES CLÉS, PAS DES PHRASES — voir `description.ts` pour le pourquoi.
  */
 import type { Modele } from "./modele";
+import { usageDe } from "./usage";
 import type { Bout } from "@/components/shop/shopI18n";
 
 export type ProfilAthlete = {
@@ -82,6 +83,7 @@ export const VMA_PLAQUE = 15;
 export function evaluer(m: Modele, p: ProfilAthlete): Avis {
   const pour: Bout[] = [], contre: Bout[] = [], inconnu: Bout[] = [];
   let score = 50;
+  const usage = usageDe(m);
 
   // ── TERRAIN ─────────────────────────────────────────────────────────────────────────
   if (p.partTrail == null) {
@@ -107,9 +109,9 @@ export function evaluer(m: Modele, p: ProfilAthlete): Avis {
   if (p.volumeHebdoKm == null) {
     inconnu.push({ cle: "shop.i.volume" });
   } else if (p.volumeHebdoKm >= 60) {
-    if (m.usage === "quotidien" || m.usage === "amorti_max") { score += 12; pour.push({ cle: "shop.a.volume_ok", params: { km: Math.round(p.volumeHebdoKm) } }); }
+    if (usage === "quotidien" || usage === "amorti_max") { score += 12; pour.push({ cle: "shop.a.volume_ok", params: { km: Math.round(p.volumeHebdoKm) } }); }
     if (stack != null && stack < 28) { score -= 10; contre.push({ cle: "shop.a.volume_fin", params: { stack, km: Math.round(p.volumeHebdoKm) } }); }
-  } else if (p.volumeHebdoKm < 25 && m.usage === "amorti_max") {
+  } else if (p.volumeHebdoKm < 25 && usage === "amorti_max") {
     score -= 5;
     contre.push({ cle: "shop.a.volume_petit", params: { km: Math.round(p.volumeHebdoKm) } });
   }
@@ -119,9 +121,9 @@ export function evaluer(m: Modele, p: ProfilAthlete): Avis {
     inconnu.push({ cle: "shop.i.objectif" });
   } else {
     const longue = p.objectifKm >= 30;
-    if (longue && m.usage === "trail_long") { score += 12; pour.push({ cle: "shop.a.objectif_long_ok", params: { km: p.objectifKm } }); }
-    if (longue && m.usage === "trail_court") { score -= 8; contre.push({ cle: "shop.a.objectif_long_ko", params: { km: p.objectifKm } }); }
-    if (!longue && USAGES_RAPIDES.has(m.usage) && p.semainesAvantCourse != null && p.semainesAvantCourse <= 12) {
+    if (longue && usage === "trail_long") { score += 12; pour.push({ cle: "shop.a.objectif_long_ok", params: { km: p.objectifKm } }); }
+    if (longue && usage === "trail_court") { score -= 8; contre.push({ cle: "shop.a.objectif_long_ko", params: { km: p.objectifKm } }); }
+    if (!longue && usage && USAGES_RAPIDES.has(usage) && p.semainesAvantCourse != null && p.semainesAvantCourse <= 12) {
       score += 10; pour.push({ cle: "shop.a.echeance", params: { semaines: p.semainesAvantCourse } });
     }
   }

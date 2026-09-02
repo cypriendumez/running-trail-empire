@@ -59,9 +59,23 @@ export type Modele = {
   slug: string;
   marque: string;
   nom: string;
-  annee: number;
+  /**
+   * Millésime du modèle, quand on le connaît.
+   *
+   * ⚠️ IL N'EST PAS DÉDUCTIBLE DE LA DATE DU JOUR. Mon script de découverte écrivait
+   * `new Date().getFullYear()` sur chaque modèle trouvé : une Speedcross 6 sortie en 2023
+   * se serait présentée comme un modèle 2026, et le tri « nouveauté » aurait classé tout
+   * le catalogue au même rang. Une année inconnue reste absente, et ce tri la range en
+   * fin de liste comme n'importe quelle valeur manquante.
+   */
+  annee?: number;
   terrain: Terrain;
-  usage: Usage;
+  /**
+   * ⚠️ CE CHAMP N'EXISTE PLUS COMME DONNÉE. L'usage se DÉDUIT des cotes (`lib/shop/usage`)
+   * et n'est jamais stocké : dès lors que les modèles sont découverts automatiquement
+   * chez le marchand, personne n'est là pour les classer, et une valeur par défaut serait
+   * une affirmation inventée sur chaque nouvelle paire.
+   */
   /** Poids en grammes, pour la déclinaison homme (US 9 / EU 42) sauf mention. */
   poidsG?: Mesure<number>;
   /** Différence talon-orteils, en mm. */

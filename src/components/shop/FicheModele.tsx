@@ -14,6 +14,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { SemelleProfil } from "@/components/shop/SemelleProfil";
 import { sourcesCitables, type Modele } from "@/lib/shop/modele";
+import { usageDe } from "@/lib/shop/usage";
 import type { Avis } from "@/lib/shop/pourToi";
 import { texteFoulee, type Bout } from "@/components/shop/shopI18n";
 import type { Offre } from "@/lib/shop/offres";
@@ -54,6 +55,7 @@ export function FicheModele({ m, avis, bouts, manquantes, proches, offres, offre
 }) {
   const nc = tx("shop.non_communique");
   const foulee = texteFoulee(langue, m.foulee);
+  const usage = usageDe(m);
   return (
     <div className="mx-auto w-full max-w-[1180px] px-4 py-6 sm:px-6">
       <Link href="/dashboard/shop" className="text-[13px] text-zinc-500 hover:text-zinc-900">← {tx("shop.retour")}</Link>
@@ -63,7 +65,7 @@ export function FicheModele({ m, avis, bouts, manquantes, proches, offres, offre
         <h1 className="text-[28px] font-semibold tracking-tight text-zinc-900 sm:text-[34px]">{m.nom}</h1>
         <div className="mt-2 flex flex-wrap gap-1.5">
           <Badge tone="neutral">{tx(`shop.t.${m.terrain}`)}</Badge>
-          <Badge tone="neutral">{tx(`shop.u.${m.usage}`)}</Badge>
+          {usage && <Badge tone="neutral">{tx(`shop.u.${usage}`)}</Badge>}
           {m.plaqueCarbone?.valeur && <Badge tone="dark">{tx("shop.plaque")}</Badge>}
           {foulee && <Badge tone="neutral">{foulee}</Badge>}
         </div>

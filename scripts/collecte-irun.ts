@@ -147,7 +147,7 @@ async function principal(): Promise<void> {
     const ancien = deja[m.slug];
     deja[m.slug] = {
       ...ancien,
-      slug: m.slug, marque: m.marque, nom: m.nom, annee: m.annee, terrain: m.terrain, usage: m.usage,
+      slug: m.slug, marque: m.marque, nom: m.nom, annee: m.annee, terrain: m.terrain,
       poidsG: dansLesBornes("poidsG", poids) ? mesure(poids) : ancien?.poidsG,
       dropMm: dansLesBornes("dropMm", drop) ? mesure(drop) : ancien?.dropMm,
       // Le stack et la plaque carbone ne figurent pas sur ces fiches : ils restent vides
