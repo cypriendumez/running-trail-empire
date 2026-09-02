@@ -25,6 +25,8 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const force = url.searchParams.get("force") === "1";
+  // Essai à blanc : tout le chemin, aucun courriel. Voir `sendPlanSemaineEmail`.
+  const blanc = url.searchParams.get("blanc") === "1";
   const now = new Date();
   // 1 = lundi. `getUTCDay` et non `getDay` : le serveur tourne aux États-Unis (région
   // iad1), où il est encore dimanche soir quand l'Europe est lundi matin.
@@ -45,11 +47,11 @@ export async function GET(req: Request) {
 
   const resultats: { userId: string; sent: boolean; skipped?: string }[] = [];
   for (const p of profiles ?? []) {
-    const r = await sendPlanSemaineEmail(admin, { userId: p.id as string, lundi: dateLundi })
+    const r = await sendPlanSemaineEmail(admin, { userId: p.id as string, lundi: dateLundi, blanc })
       .catch((e) => ({ sent: false, skipped: String((e as Error).message) }));
     resultats.push({ userId: p.id as string, ...r });
   }
 
   const envoyes = resultats.filter((r) => r.sent).length;
-  return NextResponse.json({ ok: true, lundi: dateLundi, athletes: resultats.length, envoyes, resultats });
+  return NextResponse.json({ ok: true, blanc, lundi: dateLundi, athletes: resultats.length, envoyes, resultats });
 }

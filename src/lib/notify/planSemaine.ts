@@ -185,7 +185,12 @@ export function septJours(depuis: Date): string[] {
   return out;
 }
 
-export type EnvoiSemaine = { sent: boolean; skipped?: string };
+export type EnvoiSemaine = {
+  sent: boolean;
+  skipped?: string;
+  /** Ce qui AURAIT été envoyé, en essai à blanc. Absent en envoi réel. */
+  apercu?: { to: string; subject: string; jours: number };
+};
 
 /**
  * Envoie le récapitulatif, si et seulement si les règles de l'en-tête sont réunies.
@@ -193,7 +198,15 @@ export type EnvoiSemaine = { sent: boolean; skipped?: string };
  */
 export async function sendPlanSemaineEmail(
   admin: SupabaseClient,
-  opts: { userId: string; lundi?: string },
+  /**
+   * ⚠️ `blanc` PARCOURT TOUT LE CHEMIN SANS ENVOYER. Le workflow hebdomadaire a échoué
+   * le 31/08/2026 sur l'étape « plan de la semaine », et il n'y avait aucune façon de
+   * reproduire la panne : appeler la route en vrai expédie un courriel à l'athlète, et
+   * les journaux d'exécution ne sont pas lisibles sans jeton. Un diagnostic qui oblige à
+   * envoyer un vrai message à un vrai destinataire n'est pas un diagnostic utilisable —
+   * on ne le fait qu'une fois, à contrecœur, et jamais quand il faudrait.
+   */
+  opts: { userId: string; lundi?: string; blanc?: boolean },
 ): Promise<EnvoiSemaine> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return { sent: false, skipped: "RESEND_API_KEY absente" };
@@ -241,6 +254,10 @@ export async function sendPlanSemaineEmail(
   const firstName = String(p.full_name ?? "").trim().split(/\s+/)[0] || p.email.split("@")[0];
   const mail = buildPlanSemaineEmail({ lang, firstName, jours, objective, appUrl });
   if (!mail) return { sent: false, skipped: "aucune séance prescrite sur les sept jours" };
+
+  if (opts.blanc) {
+    return { sent: false, skipped: "essai à blanc", apercu: { to: p.email, subject: mail.subject, jours: jours.filter((j) => j.titre).length } };
+  }
 
   try {
     const r = await fetch("https://api.resend.com/emails", {
