@@ -139,6 +139,11 @@ export function FicheModele({ m, avis, bouts, manquantes, proches, offres, offre
           <Card className="p-5">
             <h2 className="mb-2 text-[15px] font-semibold text-zinc-900">{tx("shop.caracteristiques")}</h2>
             <Ligne label={tx("shop.spec.poids")} valeur={m.poidsG ? `${m.poidsG.valeur} g` : null} vide={nc} />
+            {m.poidsG?.autre != null && (
+              <p className="-mt-1 pb-2 text-[11.5px] leading-snug text-zinc-400">
+                {tx("shop.poids_ecart", { autre: m.poidsG.autre })}
+              </p>
+            )}
             <Ligne label={tx("shop.spec.drop")} valeur={m.dropMm != null ? `${m.dropMm.valeur} mm` : null} vide={nc} />
             <Ligne label={tx("shop.spec.stack")} valeur={m.stackTalonMm ? `${m.stackTalonMm.valeur} mm` : null} vide={nc} />
             <Ligne label={tx("shop.spec.plaque")} valeur={m.plaqueCarbone ? tx(m.plaqueCarbone.valeur ? "shop.oui" : "shop.non") : null} vide={nc} />

@@ -39,7 +39,21 @@ export type Genre = "homme" | "femme" | "unisexe";
  * On énonce donc ce qui est vrai : ces valeurs ont été relevées ce jour-là, sur ces
  * sites-là.
  */
-export type Mesure<T> = { valeur: T; vu: string };
+export type Mesure<T> = {
+  valeur: T;
+  vu: string;
+  /**
+   * Ce qu'une SECONDE source annonce, quand elle ne dit pas la même chose.
+   *
+   * ⚠️ MESURÉ SUR SEPT MODÈLES : i-run et Running Warehouse donnent des poids écartés de
+   * 22 à 38 g pour la même chaussure — ni l'un ni l'autre ne publie la pointure de
+   * référence, et 30 g séparent une taille 40 d'une taille 45. Ce n'est donc pas une
+   * erreur à trancher, c'est une information à donner : afficher 245 g sans dire qu'une
+   * autre source en annonce 283 laisserait choisir sur un chiffre plus précis qu'il ne
+   * l'est. On garde la première valeur et on montre l'autre à côté.
+   */
+  autre?: number;
+};
 
 export type Modele = {
   slug: string;

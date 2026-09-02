@@ -15,7 +15,7 @@
       "vu": "2026-09-02"
     },
     "stackTalonMm": {
-      "valeur": 42,
+      "valeur": 43,
       "vu": "2026-09-02"
     },
     "plaqueCarbone": {
@@ -36,7 +36,8 @@
       "i-run.fr",
       "running-conseil.com",
       "rei.com",
-      "dickssportinggoods.com"
+      "dickssportinggoods.com",
+      "runningwarehouse.eu"
     ],
     "sourceFabricant": true,
     "ean": "198605659287",
@@ -373,8 +374,13 @@
     "nomExact": "adidas adizero adios 9",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 28,
+      "vu": "2026-09-02"
+    }
   },
   "adidas-adizero-takumi-sen-11": {
     "slug": "adidas-adizero-takumi-sen-11",
@@ -395,8 +401,13 @@
     "nomExact": "adidas adizero Takumi Sen 11",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 32,
+      "vu": "2026-09-02"
+    }
   },
   "adidas-supernova-rise-2": {
     "slug": "adidas-supernova-rise-2",
@@ -483,8 +494,13 @@
     "nomExact": "Asics Gel-Nimbus 28",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 42,
+      "vu": "2026-09-02"
+    }
   },
   "asics-gel-kayano-32": {
     "slug": "asics-gel-kayano-32",
@@ -505,8 +521,13 @@
     "nomExact": "Asics Gel-Kayano 32",
     "foulee": "Renforcée",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 40,
+      "vu": "2026-09-02"
+    }
   },
   "asics-gel-cumulus-27": {
     "slug": "asics-gel-cumulus-27",
@@ -527,8 +548,13 @@
     "nomExact": "Asics Gel-Cumulus 27",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 41,
+      "vu": "2026-09-02"
+    }
   },
   "asics-metaspeed-sky-tokyo": {
     "slug": "asics-metaspeed-sky-tokyo",
@@ -593,8 +619,13 @@
     "nomExact": "Asics Magic Speed 5",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 36,
+      "vu": "2026-09-02"
+    }
   },
   "asics-fuji-lite-5": {
     "slug": "asics-fuji-lite-5",
@@ -681,8 +712,13 @@
     "nomExact": "Hoka One One Mach X 3",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 46,
+      "vu": "2026-09-02"
+    }
   },
   "hoka-rocket-x-3": {
     "slug": "hoka-rocket-x-3",
@@ -703,8 +739,13 @@
     "nomExact": "Hoka One One Rocket X 3",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 40,
+      "vu": "2026-09-02"
+    }
   },
   "hoka-cielo-x1-2-0": {
     "slug": "hoka-cielo-x1-2-0",
@@ -769,8 +810,13 @@
     "nomExact": "Hoka One One Speedgoat 7",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 38,
+      "vu": "2026-09-02"
+    }
   },
   "hoka-mafate-5": {
     "slug": "hoka-mafate-5",
@@ -791,8 +837,13 @@
     "nomExact": "Hoka One One Mafate  5",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 44,
+      "vu": "2026-09-02"
+    }
   },
   "hoka-tecton-x-3": {
     "slug": "hoka-tecton-x-3",
@@ -813,8 +864,13 @@
     "nomExact": "Hoka One One Tecton X 3",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 40,
+      "vu": "2026-09-02"
+    }
   },
   "hoka-challenger-8": {
     "slug": "hoka-challenger-8",
@@ -857,8 +913,13 @@
     "nomExact": "Hoka One One Arahi 8",
     "foulee": "Modérée",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 41,
+      "vu": "2026-09-02"
+    }
   },
   "nike-pegasus-41": {
     "slug": "nike-pegasus-41",
@@ -901,8 +962,13 @@
     "nomExact": "Nike Pegasus 42",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 38,
+      "vu": "2026-09-02"
+    }
   },
   "nike-pegasus-premium": {
     "slug": "nike-pegasus-premium",
@@ -989,8 +1055,13 @@
     "nomExact": "Nike Structure 26",
     "foulee": "Modérée",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 38,
+      "vu": "2026-09-02"
+    }
   },
   "nike-pegasus-trail-5": {
     "slug": "nike-pegasus-trail-5",
@@ -1077,8 +1148,13 @@
     "nomExact": "Saucony Endorphin Speed 5",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 37,
+      "vu": "2026-09-02"
+    }
   },
   "saucony-endorphin-pro-5": {
     "slug": "saucony-endorphin-pro-5",
@@ -1099,8 +1175,13 @@
     "nomExact": "Saucony Endorphin Pro 5",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 39,
+      "vu": "2026-09-02"
+    }
   },
   "saucony-endorphin-elite-2": {
     "slug": "saucony-endorphin-elite-2",
@@ -1121,8 +1202,13 @@
     "nomExact": "Saucony Endorphin Elite 2",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 40,
+      "vu": "2026-09-02"
+    }
   },
   "saucony-ride-18": {
     "slug": "saucony-ride-18",
@@ -1165,8 +1251,13 @@
     "nomExact": "Saucony Triumph 23",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 42,
+      "vu": "2026-09-02"
+    }
   },
   "saucony-peregrine-16": {
     "slug": "saucony-peregrine-16",
@@ -1187,8 +1278,13 @@
     "nomExact": "Saucony Peregrine 16",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 33,
+      "vu": "2026-09-02"
+    }
   },
   "saucony-xodus-ultra-4": {
     "slug": "saucony-xodus-ultra-4",
@@ -1209,8 +1305,13 @@
     "nomExact": "Saucony Xodus Ultra 4",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 38,
+      "vu": "2026-09-02"
+    }
   },
   "saucony-kinvara-15": {
     "slug": "saucony-kinvara-15",
@@ -1275,8 +1376,13 @@
     "nomExact": "On-Running Cloudsurfer 2",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 37,
+      "vu": "2026-09-02"
+    }
   },
   "on-cloudboom-strike": {
     "slug": "on-cloudboom-strike",
@@ -1627,8 +1733,13 @@
     "nomExact": "Mizuno Wave Rider 29",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 38,
+      "vu": "2026-09-02"
+    }
   },
   "mizuno-wave-sky-9": {
     "slug": "mizuno-wave-sky-9",
@@ -1693,8 +1804,13 @@
     "nomExact": "Mizuno Neo Vista 2",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 51,
+      "vu": "2026-09-02"
+    }
   },
   "altra-lone-peak-9": {
     "slug": "altra-lone-peak-9",
@@ -1737,8 +1853,13 @@
     "nomExact": "Altra Torin 8",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 30,
+      "vu": "2026-09-02"
+    }
   },
   "altra-escalante-4": {
     "slug": "altra-escalante-4",
@@ -1803,8 +1924,13 @@
     "nomExact": "La Sportiva Prodigio",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 33,
+      "vu": "2026-09-02"
+    }
   },
   "la-sportiva-prodigio-pro": {
     "slug": "la-sportiva-prodigio-pro",
@@ -1913,8 +2039,13 @@
     "nomExact": "Asics Trabuco 14",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 36,
+      "vu": "2026-09-02"
+    }
   },
   "nike-vaporfly-next-4": {
     "slug": "nike-vaporfly-next-4",

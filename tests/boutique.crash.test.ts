@@ -19,6 +19,7 @@ import { partTrail, sortieLongueKm, semainesAvant, construireProfil } from "../s
 import { meilleure, type Offre } from "../src/lib/shop/offres";
 import { SHOP, texteShop, texteFoulee } from "../src/components/shop/shopI18n";
 import { choisirFiche, caracteristiques, nombreDe, normaliser } from "../scripts/collecte-irun";
+import { specsDe, desaccord, choisirProduit, nomDeUrl, TOLERANCE } from "../scripts/collecte-rw";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void): void {
@@ -413,6 +414,68 @@ test("les caractéristiques se lisent dans le balisage, pas dans la prose", () =
   assert.equal(nombreDe(c.weight), 255);
   assert.equal(nombreDe(undefined), undefined);
   assert.equal(nombreDe("non communiqué"), undefined);
+});
+
+test("les deux balisages de la seconde source sont lus", () => {
+  // ⚠️ DEUX BALISAGES COEXISTENT SUR LE MÊME SITE : liste pour les modèles récents,
+  // tableau pour les anciens. Un lecteur qui n'en connaît qu'un rend un objet vide sans
+  // erreur — la Clifton 10 était « sans hauteur publiée » alors que la page l'affichait.
+  const tableau = `<td>Weight:</td><td>9.1 oz<br />258 g</td><td>Heel Stack:</td><td>43 mm</td><td>Forefoot Stack:</td><td>35 mm</td><td>Heel-Toe Offset:</td><td>8 mm</td>`;
+  const liste = `<li><strong>Weight: </strong>9.2 oz | 261 g</li><li><strong>Heel Stack: </strong>43 mm</li><li><strong>Forefoot Stack: </strong>35 mm</li><li><strong>Heel-Toe Offset:</strong> 8 mm</li>`;
+  for (const [nom, html] of [["tableau", tableau], ["liste", liste]] as const) {
+    const r = specsDe(html);
+    assert.equal(r.stackTalonMm, 43, `${nom} : hauteur de talon non lue`);
+    assert.equal(r.dropMm, 8, `${nom} : drop non lu`);
+    assert.ok(r.poidsG === 258 || r.poidsG === 261, `${nom} : le poids en ONCES a été pris pour des grammes (${r.poidsG})`);
+  }
+});
+
+test("un champ absent ne prend pas la valeur du champ suivant", () => {
+  // Sans la borne au libellé suivant, « Heel Stack » vide aurait pris les 35 mm de
+  // « Forefoot Stack » : une hauteur de talon fausse, sans la moindre alerte.
+  const r = specsDe(`<li><strong>Weight: </strong>261 g</li><li><strong>Heel Stack: </strong>non publié</li><li><strong>Forefoot Stack: </strong>35 mm</li>`);
+  assert.equal(r.stackTalonMm, undefined, "la hauteur de talon a été prise sur le champ voisin");
+  assert.equal(r.stackAvantMm, 35);
+});
+
+test("le contrôle croisé porte sur le drop, pas sur le poids", () => {
+  // ⚠️ MESURÉ SUR SEPT MODÈLES : les deux sources donnent des poids écartés de 22 à 38 g
+  // pour la même chaussure, parce qu'aucune ne publie la pointure de référence. Rejeter
+  // là-dessus écartait des appariements JUSTES. Le drop, lui, est une cote de conception.
+  const m = modele({ poidsG: mes(245), dropMm: mes(4) });
+  assert.equal(desaccord(m, { poidsG: 283, dropMm: 4 }), null, "un écart de poids a rejeté un appariement juste");
+  assert.ok(desaccord(m, { poidsG: 246, dropMm: 8 }), "un drop de 8 mm face à 4 mm n'a pas été rejeté");
+  assert.equal(desaccord(undefined, { dropMm: 8 }), null);
+  assert.ok(TOLERANCE.dropMm <= 1, "la tolérance de drop doit rester serrée : c'est le seul contrôle d'identité");
+});
+
+test("une variante n'est pas prise pour le modèle chez la seconde source non plus", () => {
+  const urls = [
+    "https://x/HOKA_Clifton_11_Wide/descpage-A.html",
+    "https://x/HOKA_Clifton_11/descpage-B.html",
+    "https://x/HOKA_Clifton_11_GTX/descpage-C.html",
+  ];
+  assert.match(choisirProduit(urls, "Hoka", "Clifton 11")!, /descpage-B/);
+  assert.equal(choisirProduit([urls[0], urls[2]], "Hoka", "Clifton 11"), null, "une variante a été acceptée");
+  assert.equal(choisirProduit(["https://x/HOKA_Clifton_11_Womens/descpage-D.html"], "Hoka", "Clifton 11"), null,
+    "la déclinaison femme a été acceptée");
+  assert.equal(nomDeUrl("https://x/HOKA_Clifton_11/descpage-B.html"), "hoka clifton 11");
+});
+
+test("un écart de poids entre sources est AFFICHÉ, pas tranché en silence", () => {
+  const fiche = readFileSync("src/components/shop/FicheModele.tsx", "utf8");
+  assert.ok(/poidsG\?\.autre/.test(fiche), "la fiche ne signale pas qu'une autre source donne un autre poids");
+  for (const lang of ["fr", "en", "de", "es", "pt"] as const)
+    assert.ok(SHOP[lang]["shop.poids_ecart"]?.includes("{autre}"), `${lang} : la note d'écart n'affiche pas l'autre valeur`);
+});
+
+test("un refus de la source arrête la collecte au lieu d'insister", () => {
+  // ⚠️ APRÈS ~90 REQUÊTES, la source a répondu 406 sur les fiches produit alors que son
+  // accueil répondait 200 : c'est une limite de débit, donc un « non ». Le premier jet le
+  // traitait comme une panne et enchaînait les quarante suivantes.
+  const src = codeOf("scripts/collecte-rw.ts");
+  assert.ok(/406/.test(src) && /429/.test(src), "les codes de refus ne sont pas reconnus");
+  assert.ok(/class Refus/.test(src) && /instanceof Refus/.test(src), "le refus n'interrompt pas la boucle");
 });
 
 test("la collecte ne recopie ni prix, ni texte, ni note du marchand", () => {
