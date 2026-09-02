@@ -6,6 +6,25 @@ import { generateContent } from "@/lib/ai/gemini";
 import { exigeAcces } from "@/lib/billing/guard";
 
 
+/**
+ * Lit le JSON du modèle, ou `null` s'il n'y en a pas d'exploitable.
+ *
+ * Un objet SANS AUCUN des champs attendus n'est pas exploitable non plus : il
+ * s'afficherait comme une analyse dont tous les indicateurs seraient vides.
+ */
+export function analyserJson(brut: string): Record<string, unknown> | null {
+  const CHAMPS = ["mental_fatigue", "motivation_score", "stress_level", "sentiment", "keywords", "ai_insights"];
+  let objet: unknown = null;
+  try { objet = JSON.parse(brut); }
+  catch {
+    const m = String(brut ?? "").match(/\{[\s\S]*\}/);
+    if (m) { try { objet = JSON.parse(m[0]); } catch { return null; } }
+  }
+  if (!objet || typeof objet !== "object" || Array.isArray(objet)) return null;
+  const o = objet as Record<string, unknown>;
+  return CHAMPS.some((c) => o[c] !== undefined) ? o : null;
+}
+
 export async function POST(req: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -44,16 +63,23 @@ Retourne UNIQUEMENT du JSON valide:
   // tomberait en silence.
   const r = await generateContent(
     [{ role: "user", parts: [{ text: prompt }] }],
-    { temperature: 0.3, maxOutputTokens: 500, responseMimeType: "application/json" },
+    // ⚠️ `thinkingBudget: 0` EXPLICITE. Sans `thinkingConfig`, Gemini 2.5 raisonne par
+    // défaut avec un budget dynamique — pris SUR ces 500 jetons. Le JSON revenait alors
+    // coupé, donc illisible. Ici il n'y a rien à raisonner : on extrait des champs.
+    { temperature: 0.3, maxOutputTokens: 500, responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } },
   );
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
-  const rawText = r.text || "{}";
-  let analysis: Record<string, unknown>;
-  try {
-    analysis = JSON.parse(rawText);
-  } catch {
-    const match = rawText.match(/\{[\s\S]*\}/);
-    analysis = match ? JSON.parse(match[0]) : {};
+  // ⚠️ UNE ANALYSE VIDE N'EST PAS UNE ANALYSE. Mesuré en production le 02/09/2026 sur
+  // le compte de l'éditeur : cette route a répondu HTTP 200 avec `{}`. Le journal
+  // affichait donc une analyse « réussie » sans un seul indicateur, et l'entrée
+  // partait en base ainsi. Un JSON coupé n'a pas d'accolade fermante, la reprise par
+  // expression régulière ne trouvait rien, et le `{}` de repli passait pour un succès.
+  const analysis = analyserJson(r.text);
+  if (!analysis) {
+    return NextResponse.json(
+      { error: "L'analyse n'a pas abouti — réessaie dans un instant." },
+      { status: 502 },
+    );
   }
 
   return NextResponse.json({ analysis });

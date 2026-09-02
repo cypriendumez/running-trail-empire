@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Mic, MicOff, Send, Sparkles, Brain, Flame, Zap, Frown, Meh, Smile } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { toast } from "sonner";
 
 // ── i18n local (5 langues) — le journal naît traduit. ───────────────────────────
 type Tr = (k: string, p?: Record<string, string | number>) => string;
@@ -20,7 +21,8 @@ const J: Record<string, Record<string, string>> = {
     "title": "Smart Journal", "subtitle": "Analyse NLP de votre état mental · Détection de fatigue psychologique",
     "write": "Écrire", "history": "Historique",
     "placeholder": "Comment s'est passée votre séance ? Comment vous sentez-vous mentalement et physiquement ? Parlez librement…",
-    "stop": "Arrêter", "voice": "Vocal", "chars": "{n} caractères", "analyzing": "Analyse en cours…", "analyze": "Analyser",
+    "stop": "Arrêter", "voice": "Vocal", "chars": "{n} caractères", "analyzeFailed": "L'analyse n'a pas abouti — réessaie dans un instant.",
+ "analyzing": "Analyse en cours…", "analyze": "Analyser",
     "nlp": "Analyse NLP", "sent.positive": "Positif", "sent.neutral": "Neutre", "sent.negative": "Négatif",
     "score.fatigue": "Fatigue mentale", "score.motivation": "Motivation", "score.stress": "Stress",
     "keywords": "Mots-clés détectés", "insights": "Insights IA", "saved": "Sauvegardé ✓", "save": "Sauvegarder l'entrée",
@@ -31,7 +33,8 @@ const J: Record<string, Record<string, string>> = {
     "title": "Smart Journal", "subtitle": "NLP analysis of your mental state · Psychological fatigue detection",
     "write": "Write", "history": "History",
     "placeholder": "How did your session go? How do you feel mentally and physically? Speak freely…",
-    "stop": "Stop", "voice": "Voice", "chars": "{n} characters", "analyzing": "Analyzing…", "analyze": "Analyze",
+    "stop": "Stop", "voice": "Voice", "chars": "{n} characters", "analyzeFailed": "The analysis did not complete — try again in a moment.",
+ "analyzing": "Analyzing…", "analyze": "Analyze",
     "nlp": "NLP analysis", "sent.positive": "Positive", "sent.neutral": "Neutral", "sent.negative": "Negative",
     "score.fatigue": "Mental fatigue", "score.motivation": "Motivation", "score.stress": "Stress",
     "keywords": "Keywords detected", "insights": "AI insights", "saved": "Saved ✓", "save": "Save entry",
@@ -42,7 +45,8 @@ const J: Record<string, Record<string, string>> = {
     "title": "Smart Journal", "subtitle": "NLP-Analyse deines mentalen Zustands · Erkennung psychischer Ermüdung",
     "write": "Schreiben", "history": "Verlauf",
     "placeholder": "Wie war dein Training? Wie fühlst du dich mental und körperlich? Sprich frei…",
-    "stop": "Stopp", "voice": "Sprache", "chars": "{n} Zeichen", "analyzing": "Analyse läuft…", "analyze": "Analysieren",
+    "stop": "Stopp", "voice": "Sprache", "chars": "{n} Zeichen", "analyzeFailed": "Die Analyse ist nicht durchgelaufen — versuch es gleich nochmal.",
+ "analyzing": "Analyse läuft…", "analyze": "Analysieren",
     "nlp": "NLP-Analyse", "sent.positive": "Positiv", "sent.neutral": "Neutral", "sent.negative": "Negativ",
     "score.fatigue": "Mentale Ermüdung", "score.motivation": "Motivation", "score.stress": "Stress",
     "keywords": "Erkannte Schlüsselwörter", "insights": "KI-Insights", "saved": "Gespeichert ✓", "save": "Eintrag speichern",
@@ -53,7 +57,8 @@ const J: Record<string, Record<string, string>> = {
     "title": "Smart Journal", "subtitle": "Análisis NLP de tu estado mental · Detección de fatiga psicológica",
     "write": "Escribir", "history": "Historial",
     "placeholder": "¿Cómo fue tu sesión? ¿Cómo te sientes mental y físicamente? Habla con libertad…",
-    "stop": "Detener", "voice": "Voz", "chars": "{n} caracteres", "analyzing": "Analizando…", "analyze": "Analizar",
+    "stop": "Detener", "voice": "Voz", "chars": "{n} caracteres", "analyzeFailed": "El análisis no se completó — inténtalo de nuevo en un momento.",
+ "analyzing": "Analizando…", "analyze": "Analizar",
     "nlp": "Análisis NLP", "sent.positive": "Positivo", "sent.neutral": "Neutral", "sent.negative": "Negativo",
     "score.fatigue": "Fatiga mental", "score.motivation": "Motivación", "score.stress": "Estrés",
     "keywords": "Palabras clave detectadas", "insights": "Insights IA", "saved": "Guardado ✓", "save": "Guardar entrada",
@@ -64,7 +69,8 @@ const J: Record<string, Record<string, string>> = {
     "title": "Smart Journal", "subtitle": "Análise NLP do teu estado mental · Deteção de fadiga psicológica",
     "write": "Escrever", "history": "Histórico",
     "placeholder": "Como correu o teu treino? Como te sentes mental e fisicamente? Fala à vontade…",
-    "stop": "Parar", "voice": "Voz", "chars": "{n} caracteres", "analyzing": "A analisar…", "analyze": "Analisar",
+    "stop": "Parar", "voice": "Voz", "chars": "{n} caracteres", "analyzeFailed": "A análise não foi concluída — tenta novamente daqui a pouco.",
+ "analyzing": "A analisar…", "analyze": "Analisar",
     "nlp": "Análise NLP", "sent.positive": "Positivo", "sent.neutral": "Neutro", "sent.negative": "Negativo",
     "score.fatigue": "Fadiga mental", "score.motivation": "Motivação", "score.stress": "Stress",
     "keywords": "Palavras-chave detetadas", "insights": "Insights IA", "saved": "Guardado ✓", "save": "Guardar entrada",
@@ -141,9 +147,14 @@ export function SmartJournal() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
       });
-      if (res.ok) {
-        const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.analysis) {
         setAnalysis(data.analysis);
+      } else {
+        // ⚠️ L'ÉCHEC ÉTAIT MUET. La branche `if (res.ok)` sans `else` faisait que le
+        // bouton cessait simplement de tourner : rien n'apparaissait, et rien n'expliquait
+        // pourquoi. On ne remplit pas l'écran d'une analyse vide pour autant — on le dit.
+        toast.error(String(data.error || tr("analyzeFailed")));
       }
     } finally {
       setIsAnalyzing(false);

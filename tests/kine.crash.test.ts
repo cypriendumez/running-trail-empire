@@ -9,7 +9,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { analyser, segments, texteNu } from "../src/lib/ui/richText";
 import { suiviParZone, resumeDouleurs, ECART_SIGNIFICATIF, type Signalement } from "../src/lib/health/douleurs";
-import { budget, estTronquee } from "../src/lib/ai/gemini";
+import { budget, estTronquee, messageLisible } from "../src/lib/ai/gemini";
+import { analyserJson } from "../src/app/api/ai/journal-analyze/route";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -222,6 +223,56 @@ test("une réponse coupée est signalée, jamais servie comme une conclusion", (
   const i = src.indexOf("out.tronquee");
   assert.ok(i > 0, "le kiné ignore le drapeau de troncature");
   assert.ok(/Réponse interrompue/.test(src.slice(i, i + 300)), "le kiné ne dit pas que la réponse est incomplète");
+});
+
+// ── Erreurs du fournisseur ──────────────────────────────────────────────────────
+test("l'erreur brute de Google n'atteint jamais l'écran", () => {
+  // ⚠️ MESURÉ EN PRODUCTION LE 02/09/2026 : le coach a renvoyé au client le JSON de
+  // Google, avec le nom de la métrique de quota, le modèle appelé et des liens de
+  // facturation. `lastErr` recevait le corps brut de la réponse, et trois routes le
+  // transmettaient tel quel (coach, journal-analyze, training-plan).
+  for (const st of [400, 429, 500, 502, 503]) {
+    const m = messageLisible(st);
+    assert.ok(!/quota|metric|generativelanguage|http|billing|limit/i.test(m),
+      `le message pour ${st} décrit notre infrastructure : ${m}`);
+    assert.ok(m.length > 20, `le message pour ${st} est trop maigre : ${m}`);
+  }
+  // Un quota JOURNALIER ne se dissipe pas « dans quelques secondes ».
+  assert.ok(/demain|cette nuit/i.test(messageLisible(429, true)));
+  assert.ok(!/demain/i.test(messageLisible(429, false)), "un ralentissement passager renvoie à demain");
+
+  // Et les routes qui transmettent `error` doivent recevoir un message, pas le corps brut.
+  const src = readFileSync("src/lib/ai/gemini.ts", "utf8")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  const i = src.lastIndexOf("return {");
+  assert.ok(/error: messageLisible\(/.test(src.slice(i)), "le corps brut du fournisseur repart vers l'appelant");
+  assert.ok(/detail: lastErr/.test(src.slice(i)), "le corps brut n'est plus conservé pour les journaux du serveur");
+});
+
+test("une analyse de journal vide n'est pas servie comme un succès", () => {
+  // ⚠️ MESURÉ : cette route a répondu HTTP 200 avec `{}`. Le journal affichait une
+  // analyse « réussie » sans un seul indicateur, et l'entrée partait ainsi en base.
+  assert.equal(analyserJson('{"mental_fatigue":5,"sentiment":"neutral"}')?.mental_fatigue, 5);
+  // JSON coupé net : pas d'accolade fermante, donc rien de récupérable.
+  assert.equal(analyserJson('{"mental_fatigue": 5, "motiv'), null, "un JSON tronqué produit une analyse");
+  for (const brut of ["", "{}", "   ", "pas du json", "[]", '{"autre_chose": 1}', "null"]) {
+    assert.equal(analyserJson(brut), null, `« ${brut} » a produit une analyse exploitable`);
+  }
+  // Un objet enrobé de texte reste récupérable : c'est le cas courant, il ne faut pas
+  // le perdre en corrigeant le cas vide.
+  assert.equal(analyserJson('Voici :\n{"stress_level":3}\nvoilà')?.stress_level, 3);
+
+  // ⚠️ RETIRER LES COMMENTAIRES AVANT D'ASSERTIR. Premier jet : ce test restait VERT
+  // quand on supprimait le réglage, parce qu'il trouvait « thinkingBudget: 0 » dans le
+  // COMMENTAIRE qui explique pourquoi il est là. Un test qui lit la documentation valide
+  // la documentation. Trouvé par mutation. On coupe sans casser sur le « :// » d'une URL.
+  const src = readFileSync("src/app/api/ai/journal-analyze/route.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  assert.ok(/thinkingBudget: 0/.test(src),
+    "sans thinkingConfig explicite, le raisonnement de Gemini 2.5 mange les 500 jetons et coupe le JSON");
+  const i = src.indexOf("if (!analysis)");
+  assert.ok(i > 0 && /status: 502/.test(src.slice(i, i + 300)), "une analyse absente repart en succès");
 });
 
 console.log(`\n${passed} crash-test(s) du kiné passé(s), ${fails.length} échec(s)`);

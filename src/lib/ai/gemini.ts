@@ -67,7 +67,31 @@ export type GeminiResult =
       tronquee?: boolean }
   /** `dailyExhausted` : plus AUCUN modèle n'a de quota jusqu'à minuit au Pacifique.
    *  Permet à l'appelant de dire « revenez demain » plutôt que « réessayez ». */
-  | { ok: false; error: string; status: number; dailyExhausted?: boolean };
+  | { ok: false;
+      /** Message DESTINÉ À ÊTRE AFFICHÉ. Jamais le corps de réponse du fournisseur. */
+      error: string;
+      /** Corps brut renvoyé par Google, tronqué. Pour les journaux du serveur UNIQUEMENT :
+       *  il contient les noms de métriques de quota, le modèle appelé et des liens
+       *  internes. Trois routes (coach, journal-analyze, training-plan) renvoyaient
+       *  `error` tel quel — le coach a servi ce JSON à l'écran, mesuré le 02/09/2026. */
+      detail?: string;
+      status: number; dailyExhausted?: boolean };
+
+/**
+ * Ce qu'on peut montrer à quelqu'un quand le fournisseur refuse.
+ *
+ * ⚠️ ON NE RECOPIE PAS L'ERREUR DE GOOGLE. Elle est en anglais, elle nomme des métriques
+ * internes (« generate_content_free_tier_requests »), elle donne le modèle utilisé et des
+ * liens de facturation. Aucune de ces informations n'aide l'athlète, et toutes décrivent
+ * notre infrastructure.
+ */
+export function messageLisible(status: number, dailyExhausted?: boolean): string {
+  if (dailyExhausted) return "Le quota IA du jour est épuisé — il se réinitialise cette nuit. Réessaie demain 🙏";
+  if (status === 429) return "L'IA est très sollicitée en ce moment — réessaie dans quelques secondes 🙏";
+  if (status === 502) return "L'IA n'a rien renvoyé — reformule ta demande ou réessaie.";
+  if (status >= 500) return "Le service IA est momentanément indisponible — réessaie dans un instant.";
+  return "La demande n'a pas pu être traitée par l'IA.";
+}
 
 type GenConfig = Record<string, unknown>;
 
@@ -235,5 +259,12 @@ export async function generateContent(
   // seulement celui qui vient d'échouer. Tant qu'un modèle garde du quota, l'appelant
   // doit pouvoir réessayer : annoncer « revenez demain » à tort serait une invention.
   const allExhausted = allModels.every((m) => quota.marks.has(m));
-  return { ok: false, error: lastErr, status: lastStatus, ...(allExhausted ? { dailyExhausted: true } : {}) };
+  // `lastErr` a servi en interne (`isDailyQuotaError` lit son texte) ; il s'arrête ici.
+  return {
+    ok: false,
+    error: messageLisible(lastStatus, allExhausted),
+    detail: lastErr,
+    status: lastStatus,
+    ...(allExhausted ? { dailyExhausted: true } : {}),
+  };
 }
