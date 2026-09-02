@@ -2421,8 +2421,13 @@
     "nomExact": "Nike Vaporfly Next% 4",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runrepeat.com"
+    ],
+    "stackTalonMm": {
+      "valeur": 34.1,
+      "vu": "2026-09-02"
+    }
   },
   "nike-air-zoom-alphafly-next-3": {
     "slug": "nike-air-zoom-alphafly-next-3",
@@ -2443,7 +2448,8 @@
     "nomExact": "Nike Air Zoom Alphafly Next% 3",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "prixConseilleEur": {
       "valeur": 310,
@@ -2451,6 +2457,10 @@
     },
     "plaqueCarbone": {
       "valeur": true,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 38.1,
       "vu": "2026-09-02"
     }
   },
@@ -6955,10 +6965,15 @@
     "nomExact": "Nike ZoomX Streakfly 2",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runrepeat.com"
     ],
     "plaqueCarbone": {
       "valeur": true,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 27,
       "vu": "2026-09-02"
     }
   },

@@ -26,7 +26,7 @@ import { prixConseilleDe, estFemme, terrainDeUrl, nomMarque, modeleDeNom, retire
 import { fusionner, contredit } from "../scripts/collecte-specs";
 import { normaliser as normaliserCatalogue, richesse } from "../scripts/normaliser-catalogue";
 import { utilisables } from "../scripts/import-offres";
-import { mesureDeSection, pageCorrespond, dropIncoherent, DROP_MESURE_MAX_MM, DROP_MESURE_MIN_MM } from "../scripts/collecte-runrepeat";
+import { mesureDeSection, pageCorrespond, dropIncoherent, variantesSlug, DROP_MESURE_MAX_MM, DROP_MESURE_MIN_MM } from "../scripts/collecte-runrepeat";
 import { parseFeed, normalizeFeed } from "../src/lib/shop/affiliateFeed";
 
 let passed = 0; const fails: string[] = [];
@@ -1036,6 +1036,16 @@ test("une adresse devinée qui répond 200 n'est pas une preuve d'identité", ()
   const h1 = (t: string) => `<h1 class="x">${t}</h1>`;
   assert.ok(pageCorrespond(h1("Brooks Ghost 17 Review"), "Brooks", "Ghost 17"));
   assert.ok(!pageCorrespond(h1("Brooks Ghost 16 Review"), "Brooks", "Ghost 17"), "une autre version a été acceptée");
+  // ⚠️ UN CHIFFRE SEUL EST UN NUMÉRO DE VERSION, DONC UNE IDENTITÉ. Écarter les mots
+  // d'une lettre — pour ignorer les « X » et les initiales — écartait aussi le « 3 »
+  // d'« Alphafly 3 » : la page de l'Alphafly 2 passait le contrôle, alors que deux
+  // générations n'ont ni la même semelle ni le même drop. Défaut réel : la collecte a
+  // tourné une première fois avec cette faille.
+  assert.ok(!pageCorrespond(h1("Nike Alphafly 2"), "Nike", "Air Zoom Alphafly Next% 3"),
+    "une génération antérieure a été acceptée : le numéro de version n'est pas vérifié");
+  assert.ok(pageCorrespond(h1("Nike Alphafly 3 Review"), "Nike", "Air Zoom Alphafly Next% 3"),
+    "les mots de gamme (« Air Zoom », « Next% ») doivent rester facultatifs");
+  assert.ok(!pageCorrespond(h1("Hoka Mach X 2"), "Hoka", "Mach X 3"));
   assert.ok(!pageCorrespond(h1("Brooks Glycerin 22"), "Brooks", "Ghost 17"));
   assert.ok(!pageCorrespond("<p>pas de titre</p>", "Brooks", "Ghost 17"), "une page sans titre ne prouve rien");
   assert.ok(!pageCorrespond(h1("N'importe quoi"), "", ""), "un nom vide accepterait n'importe quelle page");
@@ -1057,6 +1067,16 @@ test("l'écart entre mesure et annonce est ORIENTÉ, la tolérance aussi", () =>
   assert.ok(dropIncoherent(6, 2.2));
   assert.ok(!dropIncoherent(8, 8));
   assert.ok(DROP_MESURE_MAX_MM > DROP_MESURE_MIN_MM, "la tolérance doit rester asymétrique");
+});
+
+test("les variantes d'adresse restent identifiantes", () => {
+  // La source raccourcit les noms de gamme : « Air Zoom Alphafly Next% 3 » y est
+  // « Alphafly 3 ». On essaie donc une seconde adresse, dépouillée — mais jamais réduite
+  // à la marque seule, qui pointerait vers n'importe lequel de ses modèles.
+  assert.deepEqual(variantesSlug("Nike", "Air Zoom Alphafly Next% 3"), ["nike-air-zoom-alphafly-next-3", "nike-alphafly-3"]);
+  assert.deepEqual(variantesSlug("Hoka", "Clifton 10"), ["hoka-clifton-10"], "aucune variante inutile ne doit être tentée");
+  assert.deepEqual(variantesSlug("Nike", "Air Zoom"), ["nike-air-zoom"],
+    "un nom fait uniquement de mots de gamme ne doit pas produire d'adresse réduite à la marque");
 });
 
 test("seule la hauteur de semelle est reprise de la source de mesure", () => {

@@ -84,6 +84,30 @@ export function mesureDeSection(html: string, id: string): number | null {
 }
 
 /**
+ * Mots que la source peut omettre sans changer la chaussure désignée.
+ *
+ * ⚠️ CE SONT DES MOTS DE GAMME, PAS D'IDENTITÉ. Nike vend l'« Air Zoom Alphafly Next% 3 »,
+ * la source l'appelle « Alphafly 3 » ; la « ZoomX Vaporfly Next% 4 » y est la
+ * « Vaporfly 4 ». Exiger ces mots faisait échouer l'appariement sur des modèles pourtant
+ * présents. À l'inverse, retirer un mot d'identité — « Speedgoat », « Bushido » —
+ * apparierait deux chaussures différentes : la liste reste courte et se justifie mot à mot.
+ */
+const MOTS_DE_GAMME = new Set(["air", "zoom", "zoomx", "next", "one"]);
+
+/** Les adresses à essayer, de la plus fidèle à la plus dépouillée. */
+export function variantesSlug(marque: string, nom: string): string[] {
+  const jetons = normaliser(`${marque} ${nom}`).split(" ").filter(Boolean);
+  const brut = jetons.join("-");
+  const sansGamme = jetons.filter((j) => !MOTS_DE_GAMME.has(j)).join("-");
+  // ⚠️ On n'essaie une variante dépouillée que si elle reste identifiante : réduite à la
+  //    seule marque, elle pointerait vers n'importe quel modèle de celle-ci.
+  const marqueSeule = normaliser(marque).split(" ").join("-");
+  const variantes = [brut];
+  if (sansGamme !== brut && sansGamme.length > marqueSeule.length + 1) variantes.push(sansGamme);
+  return variantes;
+}
+
+/**
  * La page décrit-elle bien NOTRE chaussure ?
  *
  * ⚠️ UNE ADRESSE DEVINÉE QUI RÉPOND 200 N'EST PAS UNE PREUVE. Le site peut rediriger, ou
@@ -93,7 +117,14 @@ export function mesureDeSection(html: string, id: string): number | null {
  */
 export function pageCorrespond(html: string, marque: string, nom: string): boolean {
   const titre = normaliser(html.match(/<h1[^>]*>([\s\S]{0,160}?)<\/h1>/)?.[1]?.replace(/<[^>]+>/g, " ") ?? "");
-  const attendus = normaliser(`${marque} ${nom}`).split(" ").filter((w) => w.length > 1);
+  // Les mots de gamme sont facultatifs ici aussi : sans quoi on rejetterait la page
+  // « Nike Alphafly 3 » pour une chaussure que Nike nomme « Air Zoom Alphafly Next% 3 ».
+  // ⚠️ UN CHIFFRE SEUL EST UN NUMÉRO DE VERSION, DONC UNE IDENTITÉ. Écarter les mots
+  //    d'une seule lettre — pour ignorer les « X » et les initiales — écartait aussi le
+  //    « 3 » d'« Alphafly 3 » : la page de l'Alphafly 2 passait le contrôle. Deux
+  //    générations d'une même chaussure n'ont ni la même semelle ni le même drop.
+  const attendus = normaliser(`${marque} ${nom}`).split(" ")
+    .filter((w) => (w.length > 1 || /^\d$/.test(w)) && !MOTS_DE_GAMME.has(w));
   // ⚠️ PAS DE GARDE « TITRE VIDE » : il serait INATTEIGNABLE. Un titre absent rend une
   //    chaîne vide, et aucun mot non vide n'y est contenu — `every` répond déjà non.
   //    Vérifié par mutation : l'ajouter ne change aucun résultat. Un garde qu'aucune
@@ -123,8 +154,13 @@ async function principal(): Promise<void> {
   let remplis = 0, absents = 0, refuses = 0;
   try {
     for (const m of liste) {
-      const html = await page(`${BASE}/${m.slug}`);
-      if (!html) { absents++; console.log(`  ✗ ${(m.marque + " " + m.nom).padEnd(36)} pas de fiche`); await pause(); continue; }
+      let html: string | null = null;
+      for (const v of variantesSlug(m.marque, m.nom)) {
+        html = await page(`${BASE}/${v}`);
+        await pause();
+        if (html) break;
+      }
+      if (!html) { absents++; console.log(`  ✗ ${(m.marque + " " + m.nom).padEnd(36)} pas de fiche`); continue; }
       if (!pageCorrespond(html, m.marque, m.nom)) {
         refuses++;
         console.log(`  ⚠ ${(m.marque + " " + m.nom).padEnd(36)} la page ne porte pas ce nom`);
