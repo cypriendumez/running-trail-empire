@@ -45,7 +45,7 @@ type Bloc = {
   titrePlein: string; accentPlein: string; chapoPlein: string;
   methodeTitre: string; methode: string[];
   preuveTitre: string; preuveSub: string;
-  labelCourses: string; labelParcours: string; labelPlan: string; labelSynchro: string;
+  labelCourses: string; labelParcours: string; labelPlan: string; labelModeles: string;
   /** Attribution de la réponse de l'éditeur, affichée sous l'avis. */
   reponseDe: string;
   ctaTitre: string; ctaSub: string; ctaBtn: string; ctaNote: string;
@@ -69,7 +69,7 @@ const AV: Record<Lang, Bloc> = {
     labelCourses: "Courses à venir en base",
     labelParcours: "Parcours cartographiés",
     labelPlan: "De plan glissant, recalculé",
-    labelSynchro: "Entre deux replanifications",
+    labelModeles: "Chaussures comparées",
     ctaTitre: "Sois parmi les premiers.",
     ctaSub: "Essaie Pacevo, et si ça t'aide, écris-le. Si ça ne t'aide pas, écris-le aussi.",
     ctaBtn: "Créer un compte gratuit",
@@ -91,7 +91,7 @@ const AV: Record<Lang, Bloc> = {
     reponseDe: "Pacevo replied",
     labelCourses: "Upcoming races in the database",
     labelParcours: "Mapped routes",
-    labelSynchro: "Between two replans",
+    labelModeles: "Shoes compared",
     labelPlan: "Rolling plan, recalculated",
     ctaTitre: "Be among the first.",
     ctaSub: "Try Pacevo, and if it helps, say so. If it doesn't, say that too.",
@@ -115,7 +115,7 @@ const AV: Record<Lang, Bloc> = {
     labelCourses: "Kommende Rennen in der Datenbank",
     labelParcours: "Kartierte Strecken",
     labelPlan: "Rollierender Plan, neu berechnet",
-    labelSynchro: "Zwischen zwei Neuplanungen",
+    labelModeles: "Schuhe im Vergleich",
     ctaTitre: "Sei unter den Ersten.",
     ctaSub: "Probier Pacevo aus. Wenn es hilft, schreib es. Wenn nicht, schreib das auch.",
     ctaBtn: "Kostenloses Konto erstellen",
@@ -138,7 +138,7 @@ const AV: Record<Lang, Bloc> = {
     labelCourses: "Carreras próximas en la base",
     labelParcours: "Rutas cartografiadas",
     labelPlan: "De plan deslizante, recalculado",
-    labelSynchro: "Entre dos replanificaciones",
+    labelModeles: "Zapatillas comparadas",
     ctaTitre: "Sé de los primeros.",
     ctaSub: "Prueba Pacevo. Si te ayuda, dilo. Si no te ayuda, dilo también.",
     ctaBtn: "Crear cuenta gratis",
@@ -161,7 +161,7 @@ const AV: Record<Lang, Bloc> = {
     labelCourses: "Provas futuras na base",
     labelParcours: "Percursos cartografados",
     labelPlan: "De plano deslizante, recalculado",
-    labelSynchro: "Entre duas replanificações",
+    labelModeles: "Ténis comparados",
     ctaTitre: "Sê dos primeiros.",
     ctaSub: "Experimenta a Pacevo. Se ajudar, escreve. Se não ajudar, escreve também.",
     ctaBtn: "Criar conta grátis",
@@ -192,7 +192,7 @@ export default async function AvisPage() {
     { valeur: CHIFFRES.courses, label: A.labelCourses },
     { valeur: CHIFFRES.parcours, label: A.labelParcours },
     { valeur: CHIFFRES.plan, label: A.labelPlan },
-    { valeur: CHIFFRES.synchro, label: A.labelSynchro },
+    { valeur: CHIFFRES.modeles, label: A.labelModeles },
   ];
 
   return (

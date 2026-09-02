@@ -73,7 +73,7 @@ const fr: LandingDict = {
   nav: { programs: "Programmes", features: "Fonctionnalités", pricing: "Tarifs", blog: "Blog", reviews: "Avis", story: "Notre histoire", login: "Connexion", trial: "Essai gratuit" },
   hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "Ta montre mesure déjà tout : VFC, sommeil, charge, allures. Pacevo en fait une séance — durée, intensité, récupération — recalculée à chaque synchronisation.", ctaPrimary: "Commencer gratuitement" },
   sync: { title: "Synchronisation avec", read: "Lecture de tes données :", readValue: "les {n} plateformes.", push: "Envoi de la séance sur ta montre :", pushBridge: "Envoi sur {marque} :", pushBridgeValue: "via l'application iOS {app}.", pushApp: "Envoi vers une application d'entraînement :", note: "Tout passe par intervals.icu, qui gère les connexions officielles de chaque constructeur. Pacevo n'accède jamais directement à tes comptes. * Apple Watch n'a aucune connexion officielle — une application iOS tierce (Intervals Companion) fait les deux sens : elle envoie tes séances vers intervals.icu et convertit le plan pour ta montre." },
-  stats: { races: "Courses à venir", routes: "Parcours cartographiés", plan: "De plan glissant", replan: "Entre deux replanifications" },
+  stats: { races: "Courses à venir", routes: "Parcours cartographiés", plan: "De plan glissant", replan: "Chaussures comparées" },
   programs: {
     eyebrow: "Entraînement", title: "Des programmes pour chaque objectif", subtitle: "Du premier 5 km à l'ultra-trail — chaque plan s'adapte ensuite à tes données réelles.", viewAll: "Voir tout",
     cats: { ALL: "Tout voir", "10KM": "10 km", SEMI: "Semi", MARATHON: "Marathon", TRAIL: "Trail", BEGINNER: "Débutant", SPEED: "Vitesse", ENDURANCE: "Endurance", INJURY: "Blessure", WEIGHT: "Perte de poids" },
@@ -136,7 +136,7 @@ const en: LandingDict = {
   nav: { programs: "Programs", features: "Features", pricing: "Pricing", blog: "Blog", reviews: "Reviews", story: "Our story", login: "Log in", trial: "Free trial" },
   hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "Your watch already measures everything: HRV, sleep, load, paces. Pacevo turns it into a session — duration, intensity, recovery — recalculated on every sync.", ctaPrimary: "Start for free" },
   sync: { title: "Syncs with", read: "Reading your data:", readValue: "all {n} platforms.", push: "Sending the session to your watch:", pushBridge: "Sending to {marque}:", pushBridgeValue: "through the {app} iOS app.", pushApp: "Sending to a training app:", note: "Everything goes through intervals.icu, which handles each manufacturer's official connection. Pacevo never accesses your accounts directly. * Apple Watch has no official connection — a third-party iOS app (Intervals Companion) covers both directions: it sends your workouts to intervals.icu and converts the plan for your watch." },
-  stats: { races: "Upcoming races", routes: "Mapped routes", plan: "Rolling plan", replan: "Between two replans" },
+  stats: { races: "Upcoming races", routes: "Mapped routes", plan: "Rolling plan", replan: "Shoes compared" },
   programs: {
     eyebrow: "Training", title: "A program for every goal", subtitle: "From your first 5K to ultra-trail — each plan then adapts to your real data.", viewAll: "View all",
     cats: { ALL: "View all", "10KM": "10K", SEMI: "Half", MARATHON: "Marathon", TRAIL: "Trail", BEGINNER: "Beginner", SPEED: "Speed", ENDURANCE: "Endurance", INJURY: "Injury", WEIGHT: "Weight loss" },
@@ -199,7 +199,7 @@ const de: LandingDict = {
   nav: { programs: "Programme", features: "Funktionen", pricing: "Preise", blog: "Blog", reviews: "Bewertungen", story: "Unsere Geschichte", login: "Anmelden", trial: "Gratis testen" },
   hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "Deine Uhr misst längst alles: HRV, Schlaf, Belastung, Tempo. Pacevo macht daraus eine Einheit — Dauer, Intensität, Erholung — bei jeder Synchronisation neu berechnet.", ctaPrimary: "Kostenlos starten" },
   sync: { title: "Synchronisiert mit", read: "Deine Daten lesen:", readValue: "alle {n} Plattformen.", push: "Einheit auf deine Uhr senden:", pushBridge: "Senden an {marque}:", pushBridgeValue: "über die iOS-App {app}.", pushApp: "An eine Trainings-App senden:", note: "Alles läuft über intervals.icu, das die offiziellen Verbindungen jedes Herstellers verwaltet. Pacevo greift nie direkt auf deine Konten zu. * Die Apple Watch hat keine offizielle Verbindung — eine iOS-App von Drittanbietern (Intervals Companion) deckt beide Richtungen ab: Sie sendet deine Einheiten an intervals.icu und wandelt den Plan für deine Uhr um." },
-  stats: { races: "Kommende Rennen", routes: "Kartierte Strecken", plan: "Rollierender Plan", replan: "Zwischen zwei Neuplanungen" },
+  stats: { races: "Kommende Rennen", routes: "Kartierte Strecken", plan: "Rollierender Plan", replan: "Schuhe im Vergleich" },
   programs: {
     eyebrow: "Training", title: "Ein Programm für jedes Ziel", subtitle: "Vom ersten 5-km-Lauf bis zum Ultra-Trail — jeder Plan passt sich dann an deine echten Daten an.", viewAll: "Alle ansehen",
     cats: { ALL: "Alle", "10KM": "10 km", SEMI: "Halb", MARATHON: "Marathon", TRAIL: "Trail", BEGINNER: "Einsteiger", SPEED: "Tempo", ENDURANCE: "Ausdauer", INJURY: "Verletzung", WEIGHT: "Abnehmen" },
@@ -262,7 +262,7 @@ const es: LandingDict = {
   nav: { programs: "Programas", features: "Funciones", pricing: "Precios", blog: "Blog", reviews: "Opiniones", story: "Nuestra historia", login: "Iniciar sesión", trial: "Prueba gratis" },
   hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "Tu reloj ya lo mide todo: VFC, sueño, carga, ritmos. Pacevo lo convierte en una sesión — duración, intensidad, recuperación — recalculada en cada sincronización.", ctaPrimary: "Empezar gratis" },
   sync: { title: "Sincroniza con", read: "Lectura de tus datos:", readValue: "las {n} plataformas.", push: "Envío de la sesión a tu reloj:", pushBridge: "Envío al {marque}:", pushBridgeValue: "a través de la app para iOS {app}.", pushApp: "Envío a una app de entrenamiento:", note: "Todo pasa por intervals.icu, que gestiona las conexiones oficiales de cada fabricante. Pacevo nunca accede directamente a tus cuentas. * El Apple Watch no tiene conexión oficial — una app iOS de terceros (Intervals Companion) cubre ambos sentidos: envía tus sesiones a intervals.icu y convierte el plan para tu reloj." },
-  stats: { races: "Carreras próximas", routes: "Rutas cartografiadas", plan: "De plan deslizante", replan: "Entre dos replanificaciones" },
+  stats: { races: "Carreras próximas", routes: "Rutas cartografiadas", plan: "De plan deslizante", replan: "Zapatillas comparadas" },
   programs: {
     eyebrow: "Entrenamiento", title: "Un programa para cada objetivo", subtitle: "Desde tu primer 5K hasta el ultra-trail — cada plan se adapta luego a tus datos reales.", viewAll: "Ver todo",
     cats: { ALL: "Ver todo", "10KM": "10 km", SEMI: "Media", MARATHON: "Maratón", TRAIL: "Trail", BEGINNER: "Principiante", SPEED: "Velocidad", ENDURANCE: "Resistencia", INJURY: "Lesión", WEIGHT: "Pérdida de peso" },
@@ -325,7 +325,7 @@ const pt: LandingDict = {
   nav: { programs: "Programas", features: "Funcionalidades", pricing: "Preços", blog: "Blog", reviews: "Avaliações", story: "A nossa história", login: "Entrar", trial: "Teste grátis" },
   hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "O teu relógio já mede tudo: VFC, sono, carga, ritmos. A Pacevo transforma isso num treino — duração, intensidade, recuperação — recalculado a cada sincronização.", ctaPrimary: "Começar grátis" },
   sync: { title: "Sincroniza com", read: "Leitura dos teus dados:", readValue: "as {n} plataformas.", push: "Envio do treino para o teu relógio:", pushBridge: "Envio para o {marque}:", pushBridgeValue: "através da app iOS {app}.", pushApp: "Envio para uma app de treino:", note: "Tudo passa pelo intervals.icu, que gere as ligações oficiais de cada fabricante. A Pacevo nunca acede diretamente às tuas contas. * O Apple Watch não tem ligação oficial — uma app iOS de terceiros (Intervals Companion) cobre ambos os sentidos: envia os teus treinos para o intervals.icu e converte o plano para o teu relógio." },
-  stats: { races: "Provas futuras", routes: "Percursos cartografados", plan: "De plano deslizante", replan: "Entre duas replanificações" },
+  stats: { races: "Provas futuras", routes: "Percursos cartografados", plan: "De plano deslizante", replan: "Ténis comparados" },
   programs: {
     eyebrow: "Treino", title: "Um programa para cada objetivo", subtitle: "Do teu primeiro 5K ao ultra-trail — cada plano adapta-se depois aos teus dados reais.", viewAll: "Ver tudo",
     cats: { ALL: "Ver tudo", "10KM": "10 km", SEMI: "Meia", MARATHON: "Maratona", TRAIL: "Trail", BEGINNER: "Iniciante", SPEED: "Velocidade", ENDURANCE: "Resistência", INJURY: "Lesão", WEIGHT: "Perda de peso" },

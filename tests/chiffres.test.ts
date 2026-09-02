@@ -107,6 +107,17 @@ test("l'accueil et les pages d'auth lisent la MÊME source", () => {
 });
 
 test("les chiffres publiés sont ceux de la source", () => {
+  // ⚠️ « 300+ MODÈLES » DOIT RESTER VRAI. Le chiffre qu'il a remplacé — « 10 min de
+  // replanification » — annonçait la cadence DEMANDÉE au planificateur GitHub, jamais
+  // celle obtenue : un passage toutes les ~100 minutes, mesuré sur leur API. Celui-ci se
+  // recompte dans un fichier, et le test le recompte.
+  const catalogue = JSON.parse(readFileSync("src/data/gear/chaussures.json", "utf8")) as Record<string, unknown>;
+  const annonce = Number(String(CHIFFRES.modeles).replace(/\D/g, ""));
+  assert.ok(Object.keys(catalogue).length >= annonce,
+    `le site annonce ${CHIFFRES.modeles} modèles, le catalogue en compte ${Object.keys(catalogue).length}`);
+  // Et l'arrondi doit rester PRUDENT : on n'annonce jamais plus qu'on n'a.
+  assert.ok(annonce > 0 && annonce <= Object.keys(catalogue).length);
+
   assert.equal(CHIFFRES_LANDING.length, 4);
   assert.equal(CHIFFRES_AUTH.length, 3);
   for (const v of [...CHIFFRES_LANDING, ...CHIFFRES_AUTH]) {

@@ -11,10 +11,11 @@
  *  · courses  → 14 430 lignes de `races` portent une date à venir (17 027 au total) ;
  *  · parcours → `data/parcours_certifies.json` contient 15 708 entrées ;
  *  · plan     → `buildWeekPlan` pose 7 jours de plan glissant ;
- *  · synchro  → `.github/workflows/sync-coach.yml` DEMANDE deux passages par heure.
- *               ⚠️ « demande » et non « tourne » : mesuré le 02/09/2026 sur l'API GitHub,
- *               le fichier réclamait alors six passages par heure et n'en obtenait qu'un
- *               toutes les ~100 minutes. Un fichier de planification n'est pas une preuve
+ *  · modèles  → `src/data/gear/chaussures.json` compte ~309 chaussures, toutes avec
+ *               leur code-barres. ⚠️ Ce chiffre a REMPLACÉ « 10 min de replanification »,
+ *               qui annonçait la cadence DEMANDÉE au planificateur GitHub et non celle
+ *               obtenue : mesuré le 02/09/2026 sur leur API, un passage toutes les
+ *               ~100 minutes. Un fichier de planification n'est pas une preuve
  *               d'exécution — c'est `total_count` des runs qui l'est.
  *
  * ⚠️ N'ajouter ici QUE ce qui se recompte par une requête ou une lecture de fichier.
@@ -28,8 +29,20 @@ export const CHIFFRES = {
   parcours: "15 700",
   /** Horizon du plan glissant produit par `buildWeekPlan`. */
   plan: "7 j",
-  /** Cadence réelle de la replanification (workflow GitHub Actions). */
-  synchro: "10 min",
+  /**
+   * ⚠️ CE CHIFFRE ÉTAIT « 10 min » ET IL ÉTAIT FAUX DEUX FOIS. Il annonçait la cadence
+   * DEMANDÉE au planificateur GitHub, jamais celle obtenue : mesuré le 02/09/2026, un
+   * passage toutes les ~100 minutes. Et depuis que la demande est passée à deux par
+   * heure, même la valeur affichée ne correspondait plus au fichier.
+   *
+   * Ce qui est vrai et se vérifie, c'est le CATALOGUE du comparateur d'équipement :
+   * `src/data/gear/chaussures.json` contient ~309 modèles, tous avec leur code-barres.
+   * On annonce donc un chiffre recomptable, arrondi vers le bas.
+   *
+   * (La réactivité réelle du coach ne se mesure pas en minutes de cron : elle vient du
+   * webhook de synchronisation instantanée, qui replanifie dès qu'une séance arrive.)
+   */
+  modeles: "300+",
 } as const;
 
 /** Ordre d'affichage du bandeau de la page d'accueil (4 chiffres). */
@@ -37,12 +50,12 @@ export const CHIFFRES_LANDING = [
   CHIFFRES.courses,
   CHIFFRES.parcours,
   CHIFFRES.plan,
-  CHIFFRES.synchro,
+  CHIFFRES.modeles,
 ] as const;
 
 /** Les 3 chiffres du panneau de marque des pages d'auth. */
 export const CHIFFRES_AUTH = [
   CHIFFRES.courses,
   CHIFFRES.parcours,
-  CHIFFRES.synchro,
+  CHIFFRES.modeles,
 ] as const;
