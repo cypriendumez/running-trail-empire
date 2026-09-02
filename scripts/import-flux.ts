@@ -1,7 +1,8 @@
 /**
  * IMPORT D'UN FLUX D'AFFILIATION — la commande à lancer le jour où le programme accepte.
  *
- *   npm run gear:flux -- "<url du flux>" "i-Run"
+ *   npm run gear:flux -- "<url du flux>" "i-Run" --essai   (analyse, n'écrit rien)
+ *   npm run gear:flux -- "<url du flux>" "i-Run"            (importe)
  *
  * ⚠️ C'EST CETTE COMMANDE QUI ALLUME LES PHOTOS. Le contrat d'éditeur affilié accorde le
  * droit d'utiliser les visuels du flux ; `product_offers.image_url` est la seule source
@@ -21,6 +22,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { parseFeed, normalizeFeed } from "../src/lib/shop/affiliateFeed";
+import catalogue from "../src/data/gear/chaussures.json";
 
 for (const l of fs.readFileSync(".env.local", "utf8").split("\n")) {
   const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m) process.env[m[1]] = m[2].replace(/^"|"$/g, "");
@@ -58,10 +60,53 @@ export function lignesUtilisables(
   return [...parEan.values()];
 }
 
+/** Les codes-barres que la boutique sait afficher : la fiche retrouve ses prix par `ean`. */
+export function eansDuCatalogue(): Set<string> {
+  return new Set(Object.values(catalogue as Record<string, { ean?: string }>)
+    .map((m) => m.ean).filter((e): e is string => Boolean(e)));
+}
+
+/**
+ * Sépare les drapeaux des deux arguments attendus.
+ *
+ * ⚠️ SANS CELA, `--essai` PLACÉ EN PREMIER DEVIENT L'ADRESSE DU FLUX : le script part
+ * télécharger « --essai », échoue, et rien n'indique que c'est la place du drapeau qui
+ * était en cause. Pire s'il est placé au milieu : l'URL serait juste, le nom du marchand
+ * deviendrait « --essai », et les offres s'écriraient sous un marchand inexistant.
+ */
+export function lireArguments(args: string[]): { url?: string; marchand?: string; essai: boolean } {
+  const [url, marchand] = args.filter((a) => !a.startsWith("--"));
+  return { url, marchand, essai: args.includes("--essai") };
+}
+
+export type RapportFlux = { lignes: number; avecVisuel: number; rattachees: number; modeles: number };
+
+/**
+ * Ce qu'un flux donnera VRAIMENT une fois en base.
+ *
+ * ⚠️ UN FLUX PARFAIT PEUT NE RIEN AFFICHER. La boutique rattache une offre à un modèle
+ * PAR SON CODE-BARRES : un flux de 40 000 références de textile et de vélo s'importe sans
+ * la moindre erreur, remplit la table, et ne change pas un pixel de la page. Sans ce
+ * décompte, l'échec ressemble trait pour trait à une réussite — on aurait cherché la
+ * panne dans l'affichage pendant que le problème était que rien ne correspondait.
+ */
+export function rapportFlux(lignes: LigneFlux[], eans: Set<string>): RapportFlux {
+  const rattachees = lignes.filter((l) => eans.has(l.ean));
+  return {
+    lignes: lignes.length,
+    avecVisuel: lignes.filter((l) => l.image_url).length,
+    rattachees: rattachees.length,
+    modeles: new Set(rattachees.map((l) => l.ean)).size,
+  };
+}
+
 async function principal(): Promise<void> {
-  const [url, marchand] = process.argv.slice(2);
+  // ⚠️ LES DRAPEAUX SONT RETIRÉS AVANT DE LIRE L'URL. Sans cela, `--essai` placé en
+  // premier deviendrait l'adresse du flux et le script partirait télécharger « --essai ».
+  const { url, marchand, essai } = lireArguments(process.argv.slice(2));
   if (!url || !marchand) {
-    console.log('usage : npm run gear:flux -- "<url du flux>" "<nom du marchand>"');
+    console.log('usage : npm run gear:flux -- "<url du flux>" "<nom du marchand>" [--essai]');
+    console.log("  --essai : analyse le flux et n'écrit RIEN en base.");
     process.exitCode = 1; return;
   }
   console.log(`téléchargement du flux ${marchand}…`);
@@ -71,8 +116,20 @@ async function principal(): Promise<void> {
 
   const lignes = lignesUtilisables(normalizeFeed(parseFeed(await r.text()), marchand), marchand, new Date().toISOString());
   if (!lignes.length) { console.log("aucune offre exploitable — vérifie le format et les colonnes du flux"); process.exitCode = 1; return; }
-  const avecPhoto = lignes.filter((l) => l.image_url).length;
-  console.log(`${lignes.length} offre(s) exploitable(s) · ${avecPhoto} avec un visuel`);
+  const rap = rapportFlux(lignes, eansDuCatalogue());
+  console.log(`${rap.lignes} offre(s) exploitable(s) · ${rap.avecVisuel} avec un visuel`);
+  console.log(`${rap.rattachees} rattachée(s) au catalogue · ${rap.modeles} modèle(s) concerné(s)`);
+  if (!rap.rattachees) {
+    // Écrire quand même remplirait la table sans rien changer à la page, et la prochaine
+    // personne chercherait la panne dans l'affichage.
+    console.log("→ AUCUNE offre ne correspond à un modèle du catalogue : la boutique ne changerait pas.");
+    console.log("  Ce flux ne contient sans doute pas de chaussures, ou pas leurs codes-barres.");
+    process.exitCode = 1; return;
+  }
+  if (essai) {
+    console.log("→ essai : RIEN n'a été écrit en base. Relance sans --essai pour importer.");
+    return;
+  }
 
   // Par paquets : un flux d'affiliation compte souvent plusieurs milliers de lignes.
   for (let i = 0; i < lignes.length; i += 500) {
@@ -81,7 +138,7 @@ async function principal(): Promise<void> {
   }
   const { count } = await sb.from("product_offers").select("*", { count: "exact", head: true });
   console.log(`import terminé · ${count} ligne(s) dans product_offers`);
-  console.log(avecPhoto ? "→ les photos s'afficheront dès le prochain chargement de la boutique."
+  console.log(rap.avecVisuel ? "→ les photos s'afficheront dès le prochain chargement de la boutique."
                         : "→ ce flux ne fournit pas de visuels : le dessin aux cotes reste affiché.");
 }
 

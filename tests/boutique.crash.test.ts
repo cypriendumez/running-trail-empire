@@ -28,7 +28,7 @@ import { prixConseilleDe, estFemme, terrainDeUrl, nomMarque, modeleDeNom, retire
 import { fusionner, contredit } from "../scripts/collecte-specs";
 import { normaliser as normaliserCatalogue, richesse } from "../scripts/normaliser-catalogue";
 import { utilisables } from "../scripts/import-offres";
-import { lignesUtilisables } from "../scripts/import-flux";
+import { lignesUtilisables, rapportFlux, eansDuCatalogue, lireArguments } from "../scripts/import-flux";
 import { mesureDeSection, pageCorrespond, dropIncoherent, variantesSlug, DROP_MESURE_MAX_MM, DROP_MESURE_MIN_MM } from "../scripts/collecte-runrepeat";
 import { parseFeed, normalizeFeed } from "../src/lib/shop/affiliateFeed";
 
@@ -1211,6 +1211,99 @@ test("l'import d'un flux ne retient que ce qui pourra s'afficher", () => {
   assert.ok(brut.every((o) => o.price > 0 && /^https?:\/\//.test(o.url)),
     "une ligne sans prix ou sans lien est arrivée jusqu'à l'import");
   assert.equal(l[0].external_id, l[0].ean, "la clé d'unicité doit être le code-barres");
+});
+
+test("un flux qui ne correspond à rien est reconnu comme tel", () => {
+  // ⚠️ UN FLUX PARFAITEMENT VALIDE PEUT NE RIEN AFFICHER. La boutique rattache une offre
+  // à un modèle PAR SON CODE-BARRES. Un flux de 40 000 références de textile et de vélo
+  // s'importe sans une seule erreur, remplit la table… et ne change pas un pixel de la
+  // page. Sans ce décompte, l'échec ressemble trait pour trait à une réussite : on
+  // chercherait la panne dans l'affichage alors que rien ne correspondait.
+  const eans = eansDuCatalogue();
+  assert.ok(eans.size >= 100, `le catalogue n'expose que ${eans.size} codes-barres`);
+  const eanConnu = [...eans][0]!;
+
+  const ligne = (ean: string, prix: number) => ({
+    external_id: ean, retailer: "M", product_name: "x", brand: null, category: null,
+    ean, price: prix, currency: "EUR", url: "https://m.fr/x", image_url: "https://m.fr/x.jpg",
+    in_stock: true, updated_at: "2026-09-02T00:00:00Z",
+  });
+
+  const rien = rapportFlux([ligne("3700000000001", 39.9), ligne("3700000000002", 24.9)], eans);
+  assert.equal(rien.lignes, 2, "les lignes restent comptées même sans correspondance");
+  assert.equal(rien.rattachees, 0, "un flux sans chaussure du catalogue est annoncé comme rattaché");
+
+  const bon = rapportFlux([ligne(eanConnu, 129), ligne("3700000000001", 39.9)], eans);
+  assert.equal(bon.rattachees, 1, "l'offre au code-barres connu n'est pas reconnue");
+  assert.equal(bon.modeles, 1);
+  assert.equal(bon.avecVisuel, 2, "les visuels du flux ne sont pas comptés");
+
+  // Et l'import REFUSE d'écrire un flux qui ne changerait rien : remplir la table sans
+  // effet visible enverrait la prochaine personne chercher un bug d'affichage.
+  const src = readFileSync("scripts/import-flux.ts", "utf8");
+  const i = src.indexOf("if (!rap.rattachees)");
+  assert.ok(i > 0, "l'import n'examine plus le nombre d'offres rattachées");
+  assert.ok(/process\.exitCode = 1; return;/.test(src.slice(i, i + 700)),
+    "un flux sans aucune correspondance s'écrirait quand même en base");
+});
+
+test("un drapeau ne peut pas être pris pour l'adresse du flux", () => {
+  // ⚠️ `--essai` PLACÉ AU MILIEU EST LE CAS DANGEREUX : l'URL resterait juste, mais le nom
+  // du marchand deviendrait « --essai » et les offres s'écriraient sous un marchand qui
+  // n'existe pas — sans la moindre erreur affichée.
+  const attendu = { url: "https://f.fr/flux.csv", marchand: "i-Run" };
+  for (const args of [
+    ["https://f.fr/flux.csv", "i-Run"],
+    ["--essai", "https://f.fr/flux.csv", "i-Run"],
+    ["https://f.fr/flux.csv", "--essai", "i-Run"],
+    ["https://f.fr/flux.csv", "i-Run", "--essai"],
+  ]) {
+    const a = lireArguments(args);
+    assert.equal(a.url, attendu.url, `URL mal lue avec ${args.join(" ")}`);
+    assert.equal(a.marchand, attendu.marchand, `marchand mal lu avec ${args.join(" ")}`);
+    assert.equal(a.essai, args.includes("--essai"), `mode essai mal lu avec ${args.join(" ")}`);
+  }
+  // Et l'essai doit vraiment empêcher l'écriture, pas seulement l'annoncer.
+  const src = readFileSync("scripts/import-flux.ts", "utf8");
+  const iEssai = src.indexOf("if (essai)");
+  const iEcriture = src.indexOf(".upsert(");
+  assert.ok(iEssai > 0 && iEssai < iEcriture, "le mode essai ne coupe pas AVANT l'écriture en base");
+  assert.ok(/return;/.test(src.slice(iEssai, iEcriture)), "le mode essai n'interrompt pas l'import");
+});
+
+test("les deux formats de flux réels arrivent jusqu'à l'affichage", () => {
+  // Répétition générale : le jour où un programme d'affiliation accepte, c'est l'un de ces
+  // deux formats qui arrivera. Les colonnes sont celles des plateformes, pas des inventions.
+  const eans = eansDuCatalogue();
+  const [e1, e2] = [...eans];
+
+  const awin = [
+    "aw_product_id,product_name,brand_name,merchant_category,search_price,currency,aw_deep_link,merchant_image_url,ean,in_stock",
+    `1,"Modele A",Hoka,Chaussures,"149.90",EUR,https://www.awin1.com/cread.php?p=1,https://img.m.fr/${e1}.jpg,${e1},1`,
+    `2,"Modele B",Nike,Chaussures,"179.90",EUR,https://www.awin1.com/cread.php?p=2,https://img.m.fr/${e2}.jpg,${e2},1`,
+    `9,"Tee-shirt",Odlo,Textile,"39.90",EUR,https://www.awin1.com/cread.php?p=9,https://img.m.fr/t.jpg,3700000000001,1`,
+  ].join("\n");
+  const kwanko = `<?xml version="1.0" encoding="UTF-8"?><products>` +
+    `<product><id>K1</id><name>Modele A</name><prix>139,90 €</prix><devise>EUR</devise>` +
+    `<lien>https://action.metaffiliation.com/trk.php?p=1</lien><image>https://static.m.fr/${e1}.jpg</image>` +
+    `<ean>${e1}</ean><disponibilite>en stock</disponibilite></product></products>`;
+
+  for (const [nom, brut, rattacheesAttendues] of [["Awin CSV", awin, 2], ["Kwanko XML", kwanko, 1]] as const) {
+    const l = lignesUtilisables(normalizeFeed(parseFeed(brut), "M"), "M", "2026-09-02T00:00:00Z");
+    const r = rapportFlux(l, eans);
+    assert.equal(r.rattachees, rattacheesAttendues, `${nom} : ${r.rattachees} offre(s) rattachée(s)`);
+    assert.ok(r.avecVisuel >= rattacheesAttendues, `${nom} : les visuels du flux sont perdus`);
+    // ⚠️ PAS D'ASSERTION SUR L'UNICITÉ DES CLÉS ICI. Elle avait été écrite, puis retirée :
+    // aucune mutation ne la faisait rougir SEULE — `lignesUtilisables` indexe par
+    // code-barres et pose `external_id = ean`, donc la clé est unique par construction et
+    // toute atteinte tombe d'abord sur le test de dédoublonnage. Un garde que rien ne peut
+    // faire tomber laisse croire qu'un cas est couvert alors qu'il ne l'est pas.
+    // Le vrai risque était ailleurs — la contrainte d'unicité côté base, sans laquelle
+    // l'upsert échoue en 42P10 — et il a été vérifié sur la base réelle le 02/09/2026 :
+    // conflit résolu (une ligne, pas deux), témoin supprimé, 268 lignes avant et après.
+    // Le visuel, lui, doit franchir la seule porte qui autorise une image.
+    for (const o of l) assert.ok(photoUtilisable(o.image_url), `${nom} : un visuel du flux serait refusé à l'affichage`);
+  }
 });
 
 test("le catalogue existe et n'est pas vide", () => {
