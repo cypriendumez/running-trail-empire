@@ -20,6 +20,7 @@ import { partTrail, sortieLongueKm, semainesAvant, construireProfil } from "../s
 import { meilleure, remisePourcent, estFraiche, ageEnJours, FRAICHEUR_JOURS, type Offre } from "../src/lib/shop/offres";
 import { indexLeger, trouver, cotesPourGarage } from "../src/lib/shop/indexLeger";
 import { SHOP, texteShop, texteFoulee } from "../src/components/shop/shopI18n";
+import { tonDeMarque } from "../src/components/shop/ChaussureDessin";
 import { choisirFiche, caracteristiques, nombreDe, normaliser } from "../scripts/collecte-irun";
 import { specsDe, desaccord, choisirProduit, nomDeUrl, TOLERANCE } from "../scripts/collecte-rw";
 import { prixConseilleDe, estFemme, terrainDeUrl, nomMarque, modeleDeNom, retirerPrefixe, vautLeCoup, familleDe, plaqueCarboneDe } from "../scripts/decouverte-irun";
@@ -97,10 +98,39 @@ test("un code-barres a la forme d'un code-barres", () => {
   for (const m of CATALOGUE) if (m.ean) assert.match(m.ean, /^\d{8,14}$/, `${m.marque} ${m.nom} : EAN « ${m.ean} »`);
 });
 
+test("le dessin ne montre jamais une épaisseur qu'on ignore", () => {
+  // ⚠️ C'EST LA RÈGLE QUI REND LE DESSIN ACCEPTABLE. Il remplace une photo qu'on n'a pas
+  // le droit d'afficher ; il ne doit donc rien affirmer de plus que les cotes relevées.
+  // Sans hauteur de semelle, la zone de mousse est HACHURÉE et légendée — la silhouette
+  // reste lisible, aucune épaisseur n'est suggérée.
+  const src = codeOf("src/components/shop/ChaussureDessin.tsx");
+  assert.ok(/const connu = stackTalonMm != null/.test(src), "le dessin ne distingue plus le connu de l'inconnu");
+  assert.ok(/url\(#inconnu\)/.test(src), "la mousse d'épaisseur inconnue n'est plus hachurée");
+  assert.ok(/const k = 46 \/ 50/.test(src),
+    "l'échelle doit rester FIXE : c'est ce qui rend deux modèles comparables entre eux");
+  // Un `aria-label` écrit dans le composant serait en français pour tout le monde — et
+  // c'est précisément aux lecteurs d'écran qu'il s'adresse.
+  assert.ok(/aria-label=\{description\}/.test(src), "la description du dessin n'est pas traduite");
+  for (const lang of ["fr", "en", "de", "es", "pt"] as const) {
+    assert.ok(SHOP[lang]["shop.dessin_alt"]?.includes("{talon}"), `${lang} : description du dessin incomplète`);
+    assert.ok(SHOP[lang]["shop.dessin_aide"], `${lang} : explication du dessin absente`);
+  }
+});
+
+test("la teinte d'une marque ne change pas d'une visite à l'autre", () => {
+  // Une couleur tirée au hasard à chaque rendu ferait clignoter la grille et empêcherait
+  // de reconnaître une marque d'un coup d'œil.
+  const a = tonDeMarque("Salomon"), b = tonDeMarque("Salomon");
+  assert.deepEqual(a, b);
+  assert.notDeepEqual(tonDeMarque("Salomon"), tonDeMarque("Hoka"), "deux marques partagent la même teinte");
+  assert.match(a.clair, /^hsl\(/);
+});
+
 test("aucune image de produit n'est référencée", () => {
   // Les visuels produit appartiennent aux marques et aux marchands. Le jour où l'un
   // d'eux réapparaît dans un composant, ce test doit rougir.
   for (const f of ["src/components/shop/GearHub.tsx", "src/components/shop/SemelleProfil.tsx",
+    "src/components/shop/ChaussureDessin.tsx", "src/components/shop/FicheModele.tsx",
     "src/app/dashboard/shop/page.tsx", "src/app/dashboard/shop/[slug]/page.tsx"]) {
     const src = codeOf(f);
     assert.ok(!/<img\b/.test(src) && !/next\/image/.test(src), `${f} affiche une image`);

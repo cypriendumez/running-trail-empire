@@ -12,7 +12,7 @@
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { SemelleProfil } from "@/components/shop/SemelleProfil";
+import { ChaussureDessin } from "@/components/shop/ChaussureDessin";
 import { sourcesCitables, type Modele } from "@/lib/shop/modele";
 import { usageDe } from "@/lib/shop/usage";
 import type { Avis } from "@/lib/shop/pourToi";
@@ -73,13 +73,17 @@ export function FicheModele({ m, avis, bouts, manquantes, proches, offres, offre
 
       <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
         <div className="min-w-0 space-y-5">
-          {m.stackTalonMm != null && (
-            <Card className="p-5">
-              <h2 className="mb-1 text-[15px] font-semibold text-zinc-900">{tx("shop.profil_titre")}</h2>
-              <p className="mb-3 text-[12.5px] text-zinc-500">{tx("shop.profil_aide")}</p>
-              <div className="h-[90px]"><SemelleProfil stackTalonMm={m.stackTalonMm.valeur} dropMm={m.dropMm?.valeur} hauteur={88} absent={tx("shop.profil_absent")} className="h-full w-full" /></div>
-            </Card>
-          )}
+          <Card className="p-5">
+            <div className="mx-auto max-w-[420px]">
+              <ChaussureDessin marque={m.marque} stackTalonMm={m.stackTalonMm?.valeur}
+                dropMm={m.dropMm?.valeur} terrain={m.terrain} plaqueCarbone={m.plaqueCarbone?.valeur}
+                absent={tx("shop.profil_absent")} className="w-full"
+                      description={m.stackTalonMm
+                        ? tx("shop.dessin_alt", { marque: m.marque, talon: Math.round(m.stackTalonMm.valeur), avant: Math.round(m.stackTalonMm.valeur - (m.dropMm?.valeur ?? 0)) })
+                        : tx("shop.profil_absent")} />
+            </div>
+            <p className="mt-2 text-[12px] leading-snug text-zinc-400">{tx("shop.dessin_aide")}</p>
+          </Card>
 
           <Card className="p-5">
             <h2 className="mb-3 text-[15px] font-semibold text-zinc-900">{tx("shop.ce_que_cest")}</h2>

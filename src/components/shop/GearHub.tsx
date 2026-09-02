@@ -13,6 +13,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { SemelleProfil } from "./SemelleProfil";
+import { ChaussureDessin } from "./ChaussureDessin";
 import { filtrer, trier, marques, type Filtres, type Tri } from "@/lib/shop/catalogue";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { texteShop } from "./shopI18n";
@@ -296,12 +297,19 @@ export function GearHub({ catalogue, profil, offres = {} }: {
                       54 px à un cadre vide sur quatre cartes sur cinq noyait les fiches
                       renseignées, celles-là mêmes que le dessin sert à comparer.
                       L'absence reste dite, sur une ligne, dans les caractéristiques. */}
-                  {m.stackTalonMm ? (
-                    <div className="my-3 h-[54px]">
-                      <SemelleProfil stackTalonMm={m.stackTalonMm.valeur} dropMm={m.dropMm?.valeur}
-                        absent={tx("shop.profil_absent")} className="h-full w-full" />
-                    </div>
-                  ) : <div className="my-2" />}
+                  {/* ⚠️ TOUJOURS UN DESSIN, MÊME SANS LA HAUTEUR. Réserver la place à un
+                      cadre vide sur les fiches incomplètes les faisait passer pour des
+                      erreurs ; le dessin, lui, montre la silhouette et HACHURE la mousse
+                      quand son épaisseur n'est pas connue. L'absence se voit, elle ne se
+                      comble pas. */}
+                  <div className="my-3">
+                    <ChaussureDessin marque={m.marque} stackTalonMm={m.stackTalonMm?.valeur}
+                      dropMm={m.dropMm?.valeur} terrain={m.terrain} plaqueCarbone={m.plaqueCarbone?.valeur}
+                      absent={tx("shop.profil_absent")} className="w-full"
+                      description={m.stackTalonMm
+                        ? tx("shop.dessin_alt", { marque: m.marque, talon: Math.round(m.stackTalonMm.valeur), avant: Math.round(m.stackTalonMm.valeur - (m.dropMm?.valeur ?? 0)) })
+                        : tx("shop.profil_absent")} />
+                  </div>
 
                   <div className="grid grid-cols-2 gap-2 border-t border-zinc-100 pt-3">
                     <Spec label={tx("shop.spec.poids")} valeur={m.poidsG ? `${m.poidsG.valeur} g` : null} vide={tx("shop.non_communique")} />
@@ -368,7 +376,7 @@ function Comparaison({ modeles, profil, onVider, tx }: { modeles: Modele[]; prof
               <th key={m.slug} className="pb-2 align-bottom">
                 <div className="text-[11px] uppercase tracking-wider text-zinc-400">{m.marque}</div>
                 <div className="text-[14px] font-semibold text-zinc-900">{m.nom}</div>
-                <div className="mt-1 h-[42px]"><SemelleProfil stackTalonMm={m.stackTalonMm?.valeur} dropMm={m.dropMm?.valeur} hauteur={42} absent={tx("shop.profil_absent")} className="h-full w-full" /></div>
+                <div className="mt-1 h-[42px]"><SemelleProfil stackTalonMm={m.stackTalonMm?.valeur} dropMm={m.dropMm?.valeur} hauteur={42} absent={tx("shop.profil_absent")} className="w-full" /></div>
               </th>
             ))}
           </tr>
