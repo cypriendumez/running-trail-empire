@@ -24,6 +24,7 @@ import { choisirFiche, caracteristiques, nombreDe, normaliser } from "../scripts
 import { specsDe, desaccord, choisirProduit, nomDeUrl, TOLERANCE } from "../scripts/collecte-rw";
 import { prixConseilleDe, estFemme, terrainDeUrl, nomMarque, modeleDeNom, retirerPrefixe, vautLeCoup, familleDe } from "../scripts/decouverte-irun";
 import { fusionner, contredit } from "../scripts/collecte-specs";
+import { normaliser as normaliserCatalogue, richesse } from "../scripts/normaliser-catalogue";
 import { parseFeed, normalizeFeed } from "../src/lib/shop/affiliateFeed";
 
 let passed = 0; const fails: string[] = [];
@@ -755,6 +756,21 @@ test("deux collectes ne peuvent pas écrire le catalogue en même temps", () => 
   const v = codeOf("src/lib/shop/verrou.ts");
   assert.ok(/process\.on\("exit"/.test(v) && /SIGINT/.test(v), "le verrou ne se rend pas en sortie");
   assert.ok(/process\.kill\(pid, 0\)/.test(v), "un verrou dont le propriétaire est mort doit pouvoir être repris");
+});
+
+test("la remise à plat garde la fiche la plus renseignée, pas la plus longue", () => {
+  // ⚠️ « LE NOM LE PLUS LONG » AVAIT PARU MALIN et gardait « One One Mach X 3 » — qui est
+  // justement le résidu à supprimer. Le bon critère est ce que la fiche CONTIENT.
+  const pauvre = modele({ slug: "a", marque: "Hoka", nom: "Mach X 3", nomExact: "Hoka One One Mach X 3" });
+  const riche = modele({ slug: "b", marque: "Hoka", nom: "One One Mach X 3", nomExact: "Hoka One One Mach X 3",
+    poidsG: mes(230), dropMm: mes(5), ean: "1", prixConseilleEur: mes(190) });
+  assert.ok(richesse(riche) > richesse(pauvre));
+  const { catalogue, renommes } = normaliserCatalogue([pauvre, riche]);
+  // Les deux se ramènent au même nom depuis `nomExact`, donc au même identifiant.
+  assert.equal(Object.keys(catalogue).length, 1, "les deux entrées n'ont pas fusionné");
+  assert.equal(Object.values(catalogue)[0].nom, "Mach X 3", "le résidu de la forme longue a été conservé");
+  assert.equal(Object.values(catalogue)[0].ean, "1", "la fiche la plus renseignée n'a pas été gardée");
+  assert.ok(renommes >= 1);
 });
 
 test("une marque n'a qu'un seul libellé", () => {
