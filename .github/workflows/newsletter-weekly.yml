@@ -92,14 +92,25 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           set -euo pipefail
-          reponse=$(curl -sS --max-time 120 -w '\n%{http_code}' \
-            -H "Authorization: Bearer ${CRON_SECRET}" \
-            "${PACEVO_URL}/api/cron/plan-semaine")
-          corps=$(printf '%s' "$reponse" | sed '$d')
-          code=$(printf '%s' "$reponse" | tail -n1)
-          echo "HTTP ${code}"
-          echo "${corps}"
+          # ⚠️ TROIS TENTATIVES, PARCE QUE CE COURRIEL N'A QU'UNE CHANCE PAR SEMAINE.
+          #    Échec constaté le 31/08/2026 sur cette étape. Rejouée le 02/09 en essai à
+          #    blanc, la même route répond 200 en 2,1 s : la panne était passagère
+          #    (démarrage à froid, 5xx de plateforme). Sans reprise, un hoquet de quelques
+          #    secondes prive tous les athlètes du plan de la semaine — et la prochaine
+          #    occasion est sept jours plus tard.
+          code=""
+          for essai in 1 2 3; do
+            reponse=$(curl -sS --max-time 120 -w '\n%{http_code}' \
+              -H "Authorization: Bearer ${CRON_SECRET}" \
+              "${PACEVO_URL}/api/cron/plan-semaine" || true)
+            corps=$(printf '%s' "$reponse" | sed '$d')
+            code=$(printf '%s' "$reponse" | tail -n1)
+            echo "tentative ${essai} → HTTP ${code}"
+            echo "${corps}"
+            [ "${code}" = "200" ] && break
+            [ "${essai}" -lt 3 ] && sleep 30
+          done
           if [ "${code}" != "200" ]; then
-            echo "::error::L'envoi du plan de la semaine a échoué (HTTP ${code})."
+            echo "::error::L'envoi du plan de la semaine a échoué trois fois (dernier code ${code})."
             exit 1
           fi

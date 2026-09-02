@@ -26,8 +26,15 @@ on:
     # DEUX passages par jour : la fonction s'arrête à 235 s pour enregistrer son
     # avancement, ce qui plafonne un passage à ~50 courses. Deux créneaux amènent le
     # rythme à ~100 courses par nuit sans jamais dépasser la durée maximale.
-    - cron: "25 1 * * *"
-    - cron: "25 13 * * *"
+    # ⚠️ HEURES CREUSES ET MINUTES IMPAIRES, PAS PAR SUPERSTITION. Constaté le
+    #    02/09/2026 sur l'API GitHub : ce dépôt voit ses planifications fortement
+    #    retardées — `sync-coach` demande toutes les 10 minutes et n'en obtient qu'une
+    #    toutes les ~100 ; `races-liens`, planifié à 19 h 40, a tourné à 21 h 58. Ce
+    #    workflow, lui, n'avait JAMAIS tiré depuis sa création. GitHub déprioritise les
+    #    créneaux ronds et les dépôts qui saturent la file. On s'écarte donc des heures
+    #    rondes et des minutes multiples de dix, qui sont les plus disputées.
+    - cron: "47 3 * * *"
+    - cron: "47 15 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -57,5 +64,13 @@ jobs:
           echo "$corps"
           if [ "$code" != "200" ]; then
             echo "::error::La correction a répondu $code."
+            exit 1
+          fi
+          # ⚠️ UN 200 NE VEUT PAS DIRE QUE TOUT EST PASSÉ. La route rend `ok:false` quand
+          #    la base a REFUSÉ une insertion — c'est ainsi qu'un type hors énumération a
+          #    pu empêcher pendant deux jours l'ajout de tout semi et de tout marathon,
+          #    sans qu'aucun passage n'apparaisse en échec.
+          if printf '%s' "$corps" | grep -q '"ok":false'; then
+            echo "::error::Des lignes ont été refusées par la base — voir le champ erreurs."
             exit 1
           fi

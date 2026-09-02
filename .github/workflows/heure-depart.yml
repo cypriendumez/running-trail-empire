@@ -20,7 +20,10 @@ name: Heure de départ des courses
 
 on:
   schedule:
-    - cron: "50 5 * * *"
+    # Minute impaire, hors heure ronde : voir la note de races-types.yml — les
+    # planifications de ce dépôt sont fortement retardées, et ce workflow n'avait
+    # jamais tiré depuis sa création.
+    - cron: "53 4 * * *"
   workflow_dispatch:
 
 concurrency:
