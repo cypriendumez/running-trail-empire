@@ -2291,8 +2291,13 @@
     "nomExact": "Altra Experience Flow ST",
     "foulee": "Modérée",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 32,
+      "vu": "2026-09-02"
+    }
   },
   "altra-experience-flow-3": {
     "slug": "altra-experience-flow-3",
@@ -2311,8 +2316,13 @@
     "nomExact": "Altra Experience Flow 3",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 32,
+      "vu": "2026-09-02"
+    }
   },
   "altra-escalante-racer-2": {
     "slug": "altra-escalante-racer-2",
@@ -2331,10 +2341,15 @@
     "nomExact": "Altra Escalante Racer 2",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runningwarehouse.eu"
     ],
     "prixConseilleEur": {
       "valeur": 145,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 24,
       "vu": "2026-09-02"
     }
   },
@@ -2355,8 +2370,13 @@
     "nomExact": "Altra Vanish Pulse",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 25,
+      "vu": "2026-09-02"
+    }
   },
   "altra-fwd-via-2": {
     "slug": "altra-fwd-via-2",
@@ -2533,7 +2553,8 @@
     "terrain": "route",
     "poidsG": {
       "valeur": 246,
-      "vu": "2026-09-02"
+      "vu": "2026-09-02",
+      "autre": 198
     },
     "dropMm": {
       "valeur": 7,
@@ -2543,10 +2564,15 @@
     "nomExact": "Hoka One One Cielo X1",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runningwarehouse.eu"
     ],
     "prixConseilleEur": {
       "valeur": 275,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 48,
       "vu": "2026-09-02"
     }
   },
@@ -2611,10 +2637,15 @@
     "nomExact": "Hoka One One Arahi 8",
     "foulee": "Modérée",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runningwarehouse.eu"
     ],
     "prixConseilleEur": {
       "valeur": 160,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 41,
       "vu": "2026-09-02"
     }
   },
@@ -2635,8 +2666,13 @@
     "nomExact": "Hoka One One Mach X 3",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 46,
+      "vu": "2026-09-02"
+    }
   },
   "inov-8-zero": {
     "slug": "inov-8-zero",
@@ -2799,10 +2835,15 @@
     "nomExact": "La Sportiva Prodigio Max",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runningwarehouse.eu"
     ],
     "prixConseilleEur": {
       "valeur": 180,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 36,
       "vu": "2026-09-02"
     }
   },
@@ -2813,7 +2854,8 @@
     "terrain": "trail",
     "poidsG": {
       "valeur": 288,
-      "vu": "2026-09-02"
+      "vu": "2026-09-02",
+      "autre": 255
     },
     "dropMm": {
       "valeur": 6,
@@ -2823,10 +2865,15 @@
     "nomExact": "La Sportiva Prodigio 2",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runningwarehouse.eu"
     ],
     "prixConseilleEur": {
       "valeur": 160,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 33,
       "vu": "2026-09-02"
     }
   },
@@ -3169,7 +3216,8 @@
     "terrain": "route",
     "poidsG": {
       "valeur": 224,
-      "vu": "2026-09-02"
+      "vu": "2026-09-02",
+      "autre": 198
     },
     "dropMm": {
       "valeur": 5,
@@ -3179,8 +3227,13 @@
     "nomExact": "Mizuno Hyperwarp Pro",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 46,
+      "vu": "2026-09-02"
+    }
   },
   "mizuno-hyperwarp-pure": {
     "slug": "mizuno-hyperwarp-pure",
@@ -3219,10 +3272,15 @@
     "nomExact": "Mizuno Wave Rebellion Flash 3",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runningwarehouse.eu"
     ],
     "prixConseilleEur": {
       "valeur": 200,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 51,
       "vu": "2026-09-02"
     }
   },
@@ -3243,8 +3301,13 @@
     "nomExact": "Mizuno Neo Zen 2",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 48,
+      "vu": "2026-09-02"
+    }
   },
   "mizuno-hyperwarp-elite": {
     "slug": "mizuno-hyperwarp-elite",
@@ -3263,10 +3326,15 @@
     "nomExact": "Mizuno Hyperwarp Elite",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runningwarehouse.eu"
     ],
     "prixConseilleEur": {
       "valeur": 270,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 39,
       "vu": "2026-09-02"
     }
   },
@@ -3787,10 +3855,15 @@
     "nomExact": "Saucony Kinvara 16",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runningwarehouse.eu"
     ],
     "prixConseilleEur": {
       "valeur": 140,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 29,
       "vu": "2026-09-02"
     }
   },
@@ -3811,8 +3884,13 @@
     "nomExact": "Saucony Endorphin Azura",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 41,
+      "vu": "2026-09-02"
+    }
   },
   "saucony-hurricane-25": {
     "slug": "saucony-hurricane-25",
@@ -3831,10 +3909,15 @@
     "nomExact": "Saucony Hurricane 25",
     "foulee": "Modérée",
     "sources": [
-      "i-run.fr"
+      "i-run.fr",
+      "runningwarehouse.eu"
     ],
     "prixConseilleEur": {
       "valeur": 180,
+      "vu": "2026-09-02"
+    },
+    "stackTalonMm": {
+      "valeur": 41,
       "vu": "2026-09-02"
     }
   },
@@ -3855,8 +3938,13 @@
     "nomExact": "Saucony Triumph 24",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 42,
+      "vu": "2026-09-02"
+    }
   },
   "salomon-aero-blaze-4": {
     "slug": "salomon-aero-blaze-4",
@@ -4495,8 +4583,13 @@
     "nomExact": "On-Running Cloudmonster Hyper",
     "foulee": "Neutre",
     "sources": [
-      "i-run.fr"
-    ]
+      "i-run.fr",
+      "runningwarehouse.eu"
+    ],
+    "stackTalonMm": {
+      "valeur": 46,
+      "vu": "2026-09-02"
+    }
   },
   "on-cloudboom-strike-2": {
     "slug": "on-cloudboom-strike-2",

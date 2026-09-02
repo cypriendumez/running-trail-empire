@@ -19,7 +19,6 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { MODELES_A_COLLECTER } from "./modeles-a-collecter";
 import { dansLesBornes, coherenceStackDrop, type Modele } from "../src/lib/shop/modele";
 import { normaliser } from "./collecte-irun";
 
@@ -134,8 +133,13 @@ export function desaccord(ancien: Modele | undefined, rw: SpecsRw): string | nul
 async function principal(): Promise<void> {
   const filtre = process.argv[2]?.toLowerCase();
   const deja: Record<string, Modele> = fs.existsSync(SORTIE) ? JSON.parse(fs.readFileSync(SORTIE, "utf8")) : {};
-  const liste = MODELES_A_COLLECTER.filter((m) =>
-    filtre ? `${m.marque} ${m.nom}`.toLowerCase().includes(filtre) : deja[m.slug] && !deja[m.slug].stackTalonMm);
+  // ⚠️ ON PARCOURT LE CATALOGUE, PAS UNE LISTE DE DÉPART. Ce script itérait sur les 107
+  //    noms écrits à la main au tout début ; depuis que les modèles sont DÉCOUVERTS chez
+  //    le marchand, le catalogue en compte près du double, et les nouveaux ne pouvaient
+  //    jamais recevoir leur hauteur de semelle. Le script tournait, annonçait « 0 absent »
+  //    et laissait 150 fiches sans la cote qui fait tout l'intérêt du schéma de profil.
+  const liste = Object.values(deja).filter((m) =>
+    filtre ? `${m.marque} ${m.nom}`.toLowerCase().includes(filtre) : !m.stackTalonMm);
   console.log(`${liste.length} modèle(s) sans hauteur de semelle\n`);
 
   const index = await texte(`${BASE}/sitemapindex.xml`);
