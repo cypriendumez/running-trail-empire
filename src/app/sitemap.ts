@@ -90,7 +90,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // moteurs pénalisent des deux côtés.
     regions = [...new Set(lignes.map((c) => regionCanonique(c.region)).filter(Boolean))]
       .map((r) => ({
-        url: `${BASE}/courses?region=${encodeURIComponent(r)}`,
+        // ⚠️ ADRESSE EN CHEMIN, PLUS EN PARAMÈTRE. `?region=` obligeait Next à rendre la
+        // page à chaque visite (2,45 s de TTFB mesurés) ; l'ancienne forme redirige
+        // désormais vers celle-ci, qui est engendrée une fois pour toutes.
+        url: `${BASE}/courses/region/${r}`,
         lastModified: now,
         changeFrequency: "weekly" as const,
         priority: 0.7,

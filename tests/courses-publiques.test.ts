@@ -134,9 +134,11 @@ test("le sitemap et les pages appliquent le MÊME filtre", () => {
   assert.ok(/estPubliable\(c, jourFrance\(\)\)/.test(page), "la page de détail ne filtre pas comme le sitemap");
   assert.ok(/notFound\(\)/.test(page), "une course non publiable rendrait quand même une page");
 
-  const liste = nu("src/app/courses/page.tsx");
-  assert.ok(/DATE_INCONNUE/.test(liste) && /gte\("date", auj\)/.test(liste),
-    "la liste renverrait vers des pages absentes");
+  // Le filtre a quitté la page pour le module de catalogue, où il est mis en cache.
+  const cat = nu("src/lib/races/catalogue.ts");
+  assert.ok(/DATE_INCONNUE/.test(cat), "le catalogue publierait des courses non datées");
+  assert.ok(/gte\("date", jourFrance\(\)\)/.test(cat), "le catalogue renverrait vers des courses déjà courues");
+  assert.ok(/registration_url", "is", null/.test(cat), "le catalogue renverrait vers des courses sans inscription");
 });
 
 test("la page de course se déclare honnêtement", () => {
@@ -297,20 +299,65 @@ test("les pages publiques emploient bien ces libellés", () => {
   const fiche = nu("src/app/courses/[slug]/page.tsx");
   assert.ok(/nomAffichable\(c\.name\)/.test(fiche), "le titre de la fiche n'est pas mis en forme");
   assert.ok(/nomRegion\(c\.region\)/.test(fiche), "le fil d'Ariane affiche encore l'identifiant technique");
-  const liste = nu("src/app/courses/page.tsx");
-  assert.ok(/nomAffichable\(c\.name\)/.test(liste), "la liste affiche les noms bruts");
-  assert.ok(/regionCanonique\(/.test(liste), "la liste ne regroupe pas les écritures d'une région");
-  assert.ok(/\.in\("region", ecritures\)/.test(liste), "le filtre ne cherche qu'une seule écriture");
+  const rendu = nu("src/app/courses/Liste.tsx");
+  assert.ok(/nomAffichable\(c\.name\)/.test(rendu), "la liste affiche les noms bruts");
+  const cat = nu("src/lib/races/catalogue.ts");
+  assert.ok(/regionCanonique\)/.test(cat), "le catalogue ne regroupe pas les écritures d'une région");
+  assert.ok(/\.in\("region", ECRITURES_REGION\[canonique\]/.test(cat), "le filtre ne cherche qu'une seule écriture");
   // ⚠️ LA NAVIGATION PAR RÉGION NE S'ÉCHANTILLONNE PAS. Un `limit(1000)` sans ordre
   // rendait 1 000 lignes arbitraires sur 10 700 : La Réunion, une seule course, en
-  // tombait et disparaissait — et la liste changeait d'un déploiement à l'autre. Ces
-  // pages de région sont le maillage interne : une région absente n'est jamais visitée.
-  assert.ok(!/select\("region"\)[\s\S]{0,200}\.limit\(/.test(liste),
+  // tombait et disparaissait — et la liste changeait d'un déploiement à l'autre.
+  assert.ok(!/select\("region"\)[\s\S]{0,200}\.limit\(/.test(cat),
     "la liste des régions est de nouveau un échantillon de 1 000 lignes");
-  assert.ok(/select\("region"\)[\s\S]{0,300}\.range\(/.test(liste),
+  assert.ok(/select\("region"\)[\s\S]{0,300}\.range\(/.test(cat),
     "la liste des régions ne parcourt pas tout le catalogue");
   const sm = nu("src/app/sitemap.ts");
   assert.ok(/regionCanonique\(/.test(sm), "le sitemap déclare deux adresses pour une même région");
+});
+
+test("les pages de région sont engendrées une fois, pas à chaque visite", () => {
+  // ⚠️ MESURÉ EN PRODUCTION : `/courses` répondait en 2,45 s (TTFB) contre 0,41 s pour
+  // une fiche. La page lisait `searchParams`, ce qui la rend DYNAMIQUE dans Next —
+  // `revalidate` ne s'y applique pas — et elle repayait à chaque visite les onze
+  // allers-retours servant à construire la liste des régions. Sur les pages qui
+  // reçoivent le trafic de recherche, c'est un temps que Google mesure.
+  const nu = (f: string) => readFileSync(f, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").filter((l) => !/^\s*import\b/.test(l))
+    .map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+
+  const region = nu("src/app/courses/region/[slug]/page.tsx");
+  // ⚠️ CE TEST EXIGEAIT `generateStaticParams`, ET C'ÉTAIT UNE ERREUR : le build a montré
+  // que ces pages restent DYNAMIQUES, parce que `getPublicLang()` lit les cookies. Le
+  // pré-rendu n'avait donc jamais lieu, et le test certifiait une optimisation
+  // inexistante. Ce qui enlève réellement les 2,45 s, c'est le cache des lectures.
+  assert.ok(!/generateStaticParams/.test(region),
+    "generateStaticParams est revenu alors que la page lit les cookies : il n'a aucun effet");
+  assert.ok(!/searchParams/.test(region), "la page de région lit searchParams : elle repaierait la base par visite");
+  assert.ok(/revalidate = \d+/.test(region), "la page de région n'a plus de durée de fraîcheur");
+
+  // Les lectures doivent passer par le cache, pas être refaites dans la page.
+  // ⚠️ CHAQUE LECTEUR EXPORTÉ, PAS « AU MOINS UN ». Le premier jet exigeait la présence
+  // du motif : muter un seul des deux lecteurs le laissait vert, puisque l'autre le
+  // portait encore. Un motif présent N fois ne rougit que si on exige les N.
+  const cat = nu("src/lib/races/catalogue.ts");
+  const lecteurs = [...cat.matchAll(/export const (\w+) = ([\w.]+)\(/g)];
+  assert.ok(lecteurs.length >= 2, `le catalogue n'expose que ${lecteurs.length} lecteur(s)`);
+  for (const [, nom, enveloppe] of lecteurs) {
+    assert.equal(enveloppe, "unstable_cache",
+      `« ${nom} » n'est plus mis en cache : la page repaierait la base à chaque visite`);
+  }
+
+  // ⚠️ ET L'ANCIENNE ADRESSE DOIT REDIRIGER. `?region=` a été déclarée au sitemap et
+  // soumise aux moteurs : la laisser sans destination transformerait des adresses déjà
+  // connues en pages orphelines.
+  const index = nu("src/app/courses/page.tsx");
+  assert.ok(/redirect\(`\/courses\/region\/\$\{regionCanonique\(brut\)\}`\)/.test(index),
+    "l'ancienne adresse ?region= ne redirige pas vers la nouvelle");
+  // Et le sitemap ne doit plus déclarer que la nouvelle forme.
+  const sm = nu("src/app/sitemap.ts");
+  assert.ok(!/courses\?region=/.test(sm), "le sitemap déclare encore des adresses qui redirigent");
+  assert.ok(/\/courses\/region\/\$\{r\}/.test(sm), "le sitemap ne déclare plus les pages de région");
 });
 
 console.log(`\n${passed} test(s) des courses publiques passé(s), ${fails.length} échec(s)`);
