@@ -30,8 +30,14 @@ if (fs.existsSync(".env.local")) {
     const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m) process.env[m[1]] ??= m[2].replace(/^"|"$/g, "");
   }
 }
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  console.log("Identifiants Supabase absents (NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY).");
+// ⚠️ ON NOMME CE QUI MANQUE. « Identifiants absents » ne disait pas LEQUEL : sur un
+// exécuteur GitHub, où un secret mal orthographié rend une chaîne vide sans erreur,
+// c'est la seule information utile. On n'affiche jamais la valeur.
+const manquantes = ["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]
+  .filter((v) => !String(process.env[v] ?? "").trim());
+if (manquantes.length) {
+  console.log(`Variable(s) absente(s) ou vide(s) : ${manquantes.join(", ")}.`);
+  console.log("Sur GitHub, vérifie le NOM du secret caractère par caractère : un nom erroné rend une chaîne vide, sans erreur.");
   process.exit(1);
 }
 

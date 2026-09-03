@@ -48,6 +48,31 @@ jobs:
       - name: Installer les dépendances
         run: npm ci --no-audit --no-fund
 
+      # ⚠️ ON NOMME LE SECRET MANQUANT. Le script s'arrêtait sur « identifiants Supabase
+      # absents » sans dire LEQUEL : un échec de 2 secondes, illisible depuis la page du
+      # run, et impossible à distinguer d'une faute de frappe dans le nom du secret —
+      # `${{ secrets.X }}` rend une chaîne VIDE quand le secret n'existe pas, sans erreur.
+      # On n'affiche jamais la valeur, seulement sa longueur.
+      - name: Vérifier les secrets
+        env:
+          URL_SB: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          CLE_SB: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          manque=0
+          if [ -z "${URL_SB:-}" ]; then
+            echo "::error::Le secret NEXT_PUBLIC_SUPABASE_URL est vide ou absent. Vérifie son nom, caractère par caractère, dans Settings → Secrets and variables → Actions."
+            manque=1
+          else
+            echo "NEXT_PUBLIC_SUPABASE_URL : présent (${#URL_SB} caractères)"
+          fi
+          if [ -z "${CLE_SB:-}" ]; then
+            echo "::error::Le secret SUPABASE_SERVICE_ROLE_KEY est vide ou absent. Vérifie son nom, caractère par caractère."
+            manque=1
+          else
+            echo "SUPABASE_SERVICE_ROLE_KEY : présent (${#CLE_SB} caractères)"
+          fi
+          exit $manque
+
       - name: Exporter et vérifier
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
