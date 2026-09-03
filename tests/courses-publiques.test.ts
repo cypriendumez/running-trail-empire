@@ -1,0 +1,172 @@
+/**
+ * LES COURSES EN PAGES PUBLIQUES — garde-fous d'un chantier né d'une MESURE.
+ *
+ * Constat du 03/09/2026 : le sitemap déclarait 7 adresses. Les 17 113 courses vivaient
+ * sous `/dashboard/races`, derrière l'authentification ET derrière notre propre
+ * `Disallow: /dashboard/`. Le principal actif du site était invisible sur Google.
+ */
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import {
+  estPubliable, motsUrl, slugCourse, idDepuisSlug, titrePage, descriptionPage,
+  dateEnClair, DATE_INCONNUE,
+} from "../src/lib/races/publique";
+import { C } from "../src/app/courses/coursesI18n";
+
+let passed = 0; const fails: string[] = [];
+function test(nom: string, fn: () => void) {
+  try { fn(); passed++; console.log(`  OK ${nom}`); }
+  catch (e) { fails.push(`${nom} — ${(e as Error).message}`); console.log(`  ✗ ${nom}`); }
+}
+
+const AUJ = "2026-09-03";
+const base = {
+  id: "a1b2c3d4-1111-2222-3333-444455556666",
+  name: "Trail des Crêtes", city: "Épinal", distance_km: 21.4,
+  date: "2026-10-12", registration_url: "https://exemple.fr/inscription",
+};
+
+test("une course sans vraie date n'est PAS publiée", () => {
+  // ⚠️ 6 411 courses portent « 2099-01-01 », qui ne veut pas dire « en 2099 » mais
+  // « date encore inconnue ». Les publier comme des événements datés mentirait au
+  // lecteur ET au moteur, qui traite une date d'événement comme une donnée vérifiable.
+  assert.equal(estPubliable({ ...base, date: DATE_INCONNUE }, AUJ), false, "la date « à venir » est publiée comme une vraie date");
+  assert.equal(estPubliable({ ...base, date: "2099-06-01" }, AUJ), false);
+  assert.equal(estPubliable({ ...base, date: "2026-09-02" }, AUJ), false, "une course déjà courue reste en ligne");
+  assert.equal(estPubliable({ ...base, date: AUJ }, AUJ), true, "la course du jour est exclue à tort");
+  assert.equal(estPubliable(base, AUJ), true);
+});
+
+test("on ne publie pas une page qui ne répond à aucune question", () => {
+  // Quoi, où, quand, comment s'inscrire. Sans l'un des quatre, la page est creuse —
+  // et un moteur classe le remplissage comme tel, pour tout le domaine.
+  assert.equal(estPubliable({ ...base, name: "" }, AUJ), false, "sans nom");
+  assert.equal(estPubliable({ ...base, name: "AB" }, AUJ), false, "un nom de deux lettres n'est pas un nom");
+  assert.equal(estPubliable({ ...base, city: null }, AUJ), false, "sans ville");
+  assert.equal(estPubliable({ ...base, registration_url: null }, AUJ), false, "sans lien d'inscription");
+  assert.equal(estPubliable({ ...base, registration_url: "   " }, AUJ), false, "un lien vide n'est pas un lien");
+  assert.equal(estPubliable({}, AUJ), false);
+});
+
+test("l'adresse est lisible mais c'est l'identifiant qui désigne la course", () => {
+  // ⚠️ DEUX COURSES PEUVENT PARTAGER NOM ET VILLE (deux distances d'un même événement),
+  // et un nom peut être corrigé après coup. Une adresse bâtie sur le seul nom donnerait
+  // des collisions aujourd'hui et des liens morts demain.
+  const s = slugCourse(base);
+  assert.ok(s.startsWith("trail-des-cretes-epinal-21km"), `adresse illisible : ${s}`);
+  assert.ok(s.endsWith("a1b2c3d4"), "l'identifiant ne termine pas l'adresse");
+  assert.equal(idDepuisSlug(s), "a1b2c3d4");
+
+  const jumelle = slugCourse({ ...base, id: "99998888-0000-0000-0000-000000000000", distance_km: 10 });
+  assert.notEqual(s, jumelle, "deux courses de même nom et même ville partagent une adresse");
+
+  // Un nom corrigé ne casse pas le lien déjà indexé : l'identifiant reste le même.
+  assert.equal(idDepuisSlug(slugCourse({ ...base, name: "Trail des Crêtes vosgiennes" })), "a1b2c3d4");
+});
+
+test("une adresse sans identifiant n'ouvre aucune page", () => {
+  for (const mauvais of ["", "trail-des-cretes", "../../etc/passwd", "zzzzzzzz-", "a1b2c3", "GGGGGGGG"]) {
+    assert.equal(idDepuisSlug(mauvais), null, `« ${mauvais} » est accepté comme adresse de course`);
+  }
+  // Huit caractères hexadécimaux, et rien d'autre.
+  assert.equal(idDepuisSlug("nom-ville-A1B2C3D4"), "a1b2c3d4", "la casse doit être tolérée");
+});
+
+test("les accents et les apostrophes ne cassent pas les adresses", () => {
+  assert.equal(motsUrl("Trail de l'Aiguille — Été 2026"), "trail-de-l-aiguille-ete-2026");
+  assert.equal(motsUrl("Saint-Étienne-de-Maurs"), "saint-etienne-de-maurs");
+  assert.equal(motsUrl("   "), "");
+  assert.equal(motsUrl("///"), "");
+  // Une adresse ne doit jamais finir par un tiret, même quand le nom est tronqué.
+  assert.ok(!motsUrl("a".repeat(80) + " suite").endsWith("-"));
+});
+
+test("rien n'est inventé pour remplir un titre ou une description", () => {
+  // ⚠️ UNE DISTANCE ABSENTE NE DEVIENT PAS « 10 km » PARCE QUE ÇA SONNERAIT MIEUX.
+  const sansDistance = titrePage({ ...base, distance_km: null });
+  assert.ok(!/\bkm\b/.test(sansDistance), `une distance a été inventée : ${sansDistance}`);
+  assert.ok(sansDistance.includes("Trail des Crêtes") && sansDistance.includes("Épinal"));
+
+  const t = titrePage(base);
+  assert.ok(t.includes("21 km") && t.includes("2026"), `titre incomplet : ${t}`);
+  // L'année « 2099 » est un repère interne, elle n'a rien à faire dans un titre.
+  assert.ok(!titrePage({ ...base, date: DATE_INCONNUE }).includes("2099"));
+
+  const d = descriptionPage({ ...base, elevation_gain_m: 850, department: "Vosges" });
+  assert.ok(d.includes("12 octobre 2026") && d.includes("Épinal") && d.includes("850 m D+"), d);
+  const sansDplus = descriptionPage({ ...base, elevation_gain_m: null });
+  assert.ok(!sansDplus.includes("D+"), "un dénivelé absent est affiché");
+  // ⚠️ ET LA PHRASE DE FIN NE DOIT PAS LE PROMETTRE NON PLUS. Une formule figée
+  // annonçait « dénivelé » sur des milliers de courses qui n'en ont pas : la promesse
+  // est rompue dès le résultat de recherche, avant même le clic.
+  assert.ok(!/dénivelé/.test(sansDplus), `la description promet un dénivelé absent : ${sansDplus}`);
+  assert.ok(/dénivelé/.test(descriptionPage({ ...base, elevation_gain_m: 850 })), "un dénivelé présent n'est pas annoncé");
+  assert.ok(!/distance/.test(descriptionPage({ ...base, distance_km: null, elevation_gain_m: null })),
+    "la description promet une distance absente");
+  assert.ok(!/undefined|null|NaN/.test(d), `la description laisse fuiter une valeur technique : ${d}`);
+});
+
+test("une date se lit en français sans dépendre du fuseau du serveur", () => {
+  assert.equal(dateEnClair("2026-10-12"), "12 octobre 2026");
+  assert.equal(dateEnClair("2026-01-01"), "1 janvier 2026");
+  assert.equal(dateEnClair("2026-08-31"), "31 août 2026");
+  for (const mauvais of ["", "pas une date", "2026-13-01", "2026-1-1"]) {
+    assert.equal(dateEnClair(mauvais), "", `« ${mauvais} » produit une date`);
+  }
+});
+
+test("le sitemap et les pages appliquent le MÊME filtre", () => {
+  // ⚠️ DÉCLARER UNE ADRESSE QUI RÉPOND 404 FAIT PERDRE LA CONFIANCE DU MOTEUR pour tout
+  // le domaine. Le sitemap ne doit donc jamais être plus large que ce que les pages
+  // acceptent d'afficher.
+  const nu = (f: string) => readFileSync(f, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+
+  const sm = nu("src/app/sitemap.ts");
+  assert.ok(/DATE_INCONNUE/.test(sm), "le sitemap ne connaît pas la date « à venir » : il publierait des courses non datées");
+  assert.ok(/gte\("date", auj\)/.test(sm), "le sitemap déclare des courses déjà courues");
+  assert.ok(/registration_url", "is", null/.test(sm), "le sitemap déclare des courses sans inscription");
+  assert.ok(/\/courses\//.test(sm), "les courses ne sont pas déclarées au sitemap");
+
+  const page = nu("src/app/courses/[slug]/page.tsx");
+  assert.ok(/estPubliable\(c, jourFrance\(\)\)/.test(page), "la page de détail ne filtre pas comme le sitemap");
+  assert.ok(/notFound\(\)/.test(page), "une course non publiable rendrait quand même une page");
+
+  const liste = nu("src/app/courses/page.tsx");
+  assert.ok(/DATE_INCONNUE/.test(liste) && /gte\("date", auj\)/.test(liste),
+    "la liste renverrait vers des pages absentes");
+});
+
+test("la page de course se déclare honnêtement", () => {
+  const page = readFileSync("src/app/courses/[slug]/page.tsx", "utf8");
+  // Le lien sort du site : il ne doit pas transmettre notre réputation ni laisser
+  // croire que nous sommes l'organisateur.
+  assert.ok(/rel="noopener noreferrer nofollow"/.test(page), "le lien sortant n'est pas marqué");
+  // ⚠️ L'AVERTISSEMENT VIT DANS LE DICTIONNAIRE depuis que ces pages sont traduites :
+  // on vise donc l'APPEL qui l'affiche, plus la présence du texte dans les 5 langues.
+  // Chercher la phrase française dans la page validerait l'ancienne version.
+  assert.ok(/t\("cta\.avertissement"\)/.test(page), "la page n'affiche plus l'avertissement de source");
+  for (const lg of ["fr", "en", "de", "es", "pt"] as const) {
+    const txt = C[lg]["cta.avertissement"] ?? "";
+    assert.ok(txt.length > 60, `l'avertissement manque ou est trop court en ${lg}`);
+  }
+  // Données structurées : uniquement des champs qu'on possède.
+  assert.ok(/"@type": "SportsEvent"/.test(page), "aucune donnée structurée : le moteur n'affichera ni date ni lieu");
+  assert.ok(/c\.latitude != null && c\.longitude != null/.test(page),
+    "les coordonnées sont déclarées même quand elles manquent");
+  // Le robots.txt ne doit pas interdire ce qu'on vient d'ouvrir.
+  // robots.txt est GÉNÉRÉ (`src/app/robots.ts`), il n'existe pas en fichier statique.
+  const robots = readFileSync("src/app/robots.ts", "utf8");
+  assert.ok(!/"\/courses/.test(robots), "robots.txt interdit les pages qu'on vient de publier");
+  // ⚠️ ET LE DOMAINE DE REPLI DOIT ÊTRE CELUI QU'ON SERT. Il pointait vers
+  // « running-trail-empire.vercel.app », qui répond 404 : sans NEXT_PUBLIC_APP_URL, on
+  // annonçait aux moteurs un domaine inexistant.
+  for (const f of ["src/app/robots.ts", "src/app/sitemap.ts"]) {
+    const src = readFileSync(f, "utf8");
+    assert.ok(/running-trail-empire-woad\.vercel\.app/.test(src), `${f} a un domaine de repli qui n'est pas servi`);
+  }
+});
+
+console.log(`\n${passed} test(s) des courses publiques passé(s), ${fails.length} échec(s)`);
+if (fails.length) { for (const f of fails) console.log(`  KO ${f}`); process.exit(1); }

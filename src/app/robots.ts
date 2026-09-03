@@ -5,7 +5,11 @@ import type { MetadataRoute } from "next";
 const RAW = process.env.NEXT_PUBLIC_APP_URL;
 const BASE = RAW && RAW.startsWith("http") && !RAW.includes("localhost")
   ? RAW
-  : "https://running-trail-empire.vercel.app";
+  // ⚠️ CE REPLI DOIT ÊTRE LE DOMAINE RÉELLEMENT SERVI. Il pointait vers
+  // « running-trail-empire.vercel.app », qui répond 404 (vérifié le 03/09/2026) : sans
+  // NEXT_PUBLIC_APP_URL, robots.txt et sitemap.xml annonçaient donc aux moteurs un
+  // domaine inexistant, et tout le référencement partait dans le vide.
+  : "https://running-trail-empire-woad.vercel.app";
 
 // /robots.txt — autorise l'indexation des pages publiques, bloque l'espace privé.
 export default function robots(): MetadataRoute.Robots {
