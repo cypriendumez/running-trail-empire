@@ -63,3 +63,26 @@ export function nomDestination(url: unknown): string {
 export function estCalendrierTiers(url: unknown): boolean {
   return Boolean(CONNUES[domaineDe(url)]);
 }
+
+/**
+ * L'organisateur RÉEL, ou rien.
+ *
+ * ⚠️ MESURÉ : 13 399 courses portent « finishers.com » dans leur champ « organisation ».
+ * C'est la SOURCE de la donnée, pas celui qui organise l'épreuve. On l'affichait sous
+ * « Organisation » et on le déclarait à Google comme `organizer` : une information
+ * fausse sur 13 399 pages, et pénible pour l'agrégateur lui-même, qu'on créditait d'un
+ * rôle qu'il ne tient pas.
+ *
+ * La règle : si la valeur ressemble au domaine du lien, ou à un domaine tout court,
+ * ce n'est pas un nom d'organisateur.
+ */
+export function organisateurReel(valeur: unknown, lienInscription?: unknown): string {
+  const v = String(valeur ?? "").trim();
+  if (!v) return "";
+  const nu = v.toLowerCase().replace(/^www\./, "");
+  // Un nom d'organisateur ne se termine pas par une extension de domaine.
+  if (/\.[a-z]{2,6}$/.test(nu) && !nu.includes(" ")) return "";
+  if (nu === domaineDe(lienInscription)) return "";
+  if (Object.values(CONNUES).some((n) => n.toLowerCase() === nu)) return "";
+  return v;
+}

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPublicLang } from "@/lib/i18n/serverLang";
 import { nomAffichable, nomRegion, regionCanonique } from "@/lib/races/libelles";
-import { nomDestination, estCalendrierTiers } from "@/lib/races/destination";
+import { nomDestination, estCalendrierTiers, organisateurReel } from "@/lib/races/destination";
 import { texteCourses } from "../coursesI18n";
 import { jourFrance } from "@/lib/races/jourFrance";
 import {
@@ -73,6 +73,14 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
   const km = Number(c.distance_km);
   const dplus = Number(c.elevation_gain_m);
   const lieu = [c.city, c.department].filter(Boolean).join(", ");
+  // Le champ « organisation » ne vaut que s'il ne désigne pas la source du lien.
+  const organisateur = organisateurReel(c.organization, c.registration_url);
+  // ⚠️ `terrain` EST UN TABLEAU. `{c.terrain && …}` rendait donc une ligne « Terrain »
+  // VIDE sur les ~15 000 courses où il vaut `[]` — un tableau vide est truthy. Et un
+  // tableau plein s'affichait « single_track,forest », en anglais et sans espace.
+  const terrains = (Array.isArray(c.terrain) ? c.terrain : [])
+    .map((v) => t(`terrain.${String(v)}`))
+    .filter(Boolean);
 
   // Données structurées : c'est ce qui permet à un moteur d'afficher la date et le lieu
   // directement dans ses résultats. On ne déclare QUE des champs qu'on possède.
@@ -89,13 +97,19 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
     location: {
       "@type": "Place",
       name: c.city,
-      address: { "@type": "PostalAddress", addressLocality: c.city, addressRegion: c.region ?? undefined, addressCountry: "FR" },
+      // ⚠️ LE NOM, PAS L'IDENTIFIANT. Ce champ partait en « provence-alpes-cote-d-azur »
+      // vers Google, sur 17 153 pages — j'avais corrigé le fil d'Ariane et manqué celui-ci.
+      address: { "@type": "PostalAddress", addressLocality: c.city, addressRegion: c.region ? nomRegion(c.region) : undefined, addressCountry: "FR" },
       ...(c.latitude != null && c.longitude != null
         ? { geo: { "@type": "GeoCoordinates", latitude: c.latitude, longitude: c.longitude } }
         : {}),
     },
     ...(c.registration_url ? { url: c.registration_url } : {}),
-    ...(c.organization ? { organizer: { "@type": "Organization", name: c.organization } } : {}),
+    // ⚠️ ON NE DÉCLARE PAS L'AGRÉGATEUR COMME ORGANISATEUR. Mesuré : 13 399 courses ont
+    // « finishers.com » dans ce champ — c'est la SOURCE de la donnée, pas celui qui
+    // organise l'épreuve. On l'annonçait pourtant à Google en `organizer`, et on
+    // l'affichait sous « Organisation » : une information fausse sur 13 399 pages.
+    ...(organisateur ? { organizer: { "@type": "Organization", name: organisateur } } : {}),
   };
 
   return (
@@ -118,8 +132,8 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
       <dl className="mt-8 rounded-2xl border border-zinc-200 bg-white p-5">
         {Number.isFinite(km) && km > 0 && <Ligne k={t("f.distance")} v={`${Math.round(km)} km`} />}
         {Number.isFinite(dplus) && dplus > 0 && <Ligne k={t("f.denivele")} v={`${Math.round(dplus)} m`} />}
-        {c.terrain && <Ligne k={t("f.terrain")} v={String(c.terrain)} />}
-        {c.organization && <Ligne k={t("f.orga")} v={String(c.organization)} />}
+        {terrains.length > 0 && <Ligne k={t("f.terrain")} v={terrains.join(", ")} />}
+        {organisateur && <Ligne k={t("f.orga")} v={organisateur} />}
         {c.is_itra_certified && <Ligne k={t("f.itra")} v={c.itra_points ? t("f.points", { n: c.itra_points }) : t("f.oui")} />}
       </dl>
 

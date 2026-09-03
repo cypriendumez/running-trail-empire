@@ -12,9 +12,9 @@ import {
   titrePage, descriptionPage,
   dateEnClair, DATE_INCONNUE,
 } from "../src/lib/races/publique";
-import { C } from "../src/app/courses/coursesI18n";
+import { C, texteCourses } from "../src/app/courses/coursesI18n";
 import { nomRegion, regionCanonique, regionAvecPreposition, nomAffichable, ECRITURES_REGION } from "../src/lib/races/libelles";
-import { nomDestination, domaineDe, estCalendrierTiers } from "../src/lib/races/destination";
+import { nomDestination, domaineDe, estCalendrierTiers, organisateurReel } from "../src/lib/races/destination";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -457,6 +457,51 @@ test("la page nomme la vraie destination du lien d'inscription", () => {
   assert.ok(/estCalendrierTiers\(c\.registration_url\) \? "cta\.tiers" : "cta\.direct"/.test(src),
     "la page sert la même phrase quelle que soit la destination");
   assert.ok(/nomDestination\(c\.registration_url\)/.test(src), "la destination n'est pas nommée");
+});
+
+test("l'agrégateur n'est pas déclaré comme organisateur de la course", () => {
+  // ⚠️ MESURÉ : 13 399 courses portent « finishers.com » dans leur champ
+  // « organisation ». C'est la SOURCE de la donnée, pas celui qui organise l'épreuve.
+  // On l'affichait sous « Organisation » ET on le déclarait à Google en `organizer` :
+  // une information fausse sur 13 399 pages.
+  assert.equal(organisateurReel("finishers.com", "https://www.finishers.com/c"), "");
+  assert.equal(organisateurReel("jogging-plus.com", "https://x.fr"), "", "un domaine n'est pas un organisateur");
+  assert.equal(organisateurReel("Finishers", "https://x.fr"), "", "le nom du calendrier non plus");
+  // Un vrai organisateur passe.
+  assert.equal(organisateurReel("Dijon Events", "https://www.finishers.com/c"), "Dijon Events");
+  assert.equal(organisateurReel("Maxi Race", "https://maxirace.fr/c"), "Maxi Race");
+  for (const rien of ["", "   ", null, undefined]) assert.equal(organisateurReel(rien, "https://x.fr"), "");
+
+  const page = readFileSync("src/app/courses/[slug]/page.tsx", "utf8");
+  assert.ok(/organisateurReel\(c\.organization, c\.registration_url\)/.test(page),
+    "la page affiche le champ brut au lieu de l'organisateur réel");
+  assert.ok(!/name: c\.organization/.test(page), "l'agrégateur repart en `organizer` vers Google");
+});
+
+test("le terrain est un TABLEAU, et il se lit en français", () => {
+  // ⚠️ `{c.terrain && …}` RENDAIT UNE LIGNE VIDE sur ~15 000 pages : `terrain` vaut `[]`,
+  // et un tableau vide est truthy. Et un tableau plein s'affichait « single_track,forest ».
+  const page = readFileSync("src/app/courses/[slug]/page.tsx", "utf8");
+  assert.ok(/Array\.isArray\(c\.terrain\)/.test(page), "le terrain n'est plus traité comme un tableau");
+  assert.ok(/terrains\.length > 0 &&/.test(page), "une ligne « Terrain » vide s'affiche de nouveau");
+  assert.ok(!/String\(c\.terrain\)/.test(page), "le tableau brut est réaffiché");
+  // Les valeurs relevées dans la base doivent toutes avoir une traduction.
+  for (const v of ["forest", "asphalt", "coastal", "single_track", "gravel", "alpine", "technical"]) {
+    for (const lg of ["fr", "en", "de", "es", "pt"] as const) {
+      assert.ok((C[lg][`terrain.${v}`] ?? "").length > 1, `terrain « ${v} » non traduit en ${lg}`);
+    }
+  }
+  // ⚠️ ET UNE VALEUR INCONNUE NE DOIT PAS DISPARAÎTRE : `texteCourses` rend la clé,
+  // donc on voit « terrain.xyz » plutôt que rien — visible, donc corrigeable.
+  assert.equal(texteCourses("fr", "terrain.valeur_inedite"), "terrain.valeur_inedite");
+});
+
+test("la région part en clair dans les données structurées", () => {
+  // ⚠️ J'AVAIS CORRIGÉ LE FIL D'ARIANE ET MANQUÉ CELUI-CI : `addressRegion` partait en
+  // « provence-alpes-cote-d-azur » vers Google, sur 17 153 pages.
+  const page = readFileSync("src/app/courses/[slug]/page.tsx", "utf8");
+  assert.ok(/addressRegion: c\.region \? nomRegion\(c\.region\) : undefined/.test(page),
+    "l'identifiant technique de la région repart vers les moteurs");
 });
 
 console.log(`\n${passed} test(s) des courses publiques passé(s), ${fails.length} échec(s)`);
