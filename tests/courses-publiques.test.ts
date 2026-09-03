@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  estPubliable, motsUrl, slugCourse, idDepuisSlug, titrePage, descriptionPage,
+  estPubliable, motsUrl, slugCourse, idDepuisSlug, bornesId, titrePage, descriptionPage,
   dateEnClair, DATE_INCONNUE,
 } from "../src/lib/races/publique";
 import { C } from "../src/app/courses/coursesI18n";
@@ -166,6 +166,45 @@ test("la page de course se déclare honnêtement", () => {
     const src = readFileSync(f, "utf8");
     assert.ok(/running-trail-empire-woad\.vercel\.app/.test(src), `${f} a un domaine de repli qui n'est pas servi`);
   }
+});
+
+test("une fiche se retrouve par un INTERVALLE d'identifiants, pas par `like`", () => {
+  // ⚠️ DÉFAUT CONSTATÉ EN PRODUCTION LE 03/09/2026 : `ilike` sur une colonne `uuid`
+  // lève « operator does not exist: uuid ~~* unknown ». L'erreur était avalée et TOUTES
+  // les fiches répondaient 404 — alors que le sitemap les déclarait. C'est exactement
+  // ce qui fait perdre la confiance d'un moteur pour tout le domaine.
+  const b = bornesId("45fb0540");
+  assert.ok(b, "un préfixe valide ne produit pas de bornes");
+  assert.equal(b!.bas, "45fb0540-0000-0000-0000-000000000000");
+  assert.equal(b!.haut, "45fb0540-ffff-ffff-ffff-ffffffffffff");
+  // Un identifiant réel doit tomber DANS l'intervalle, bornes comprises.
+  const reel = "45fb0540-a488-431f-a24c-59dc5a452f75";
+  assert.ok(reel >= b!.bas && reel <= b!.haut, "l'identifiant réel sort de l'intervalle");
+  // Un préfixe voisin ne doit PAS l'attraper.
+  const voisin = bornesId("45fb0541")!;
+  assert.ok(!(reel >= voisin.bas && reel <= voisin.haut), "deux préfixes voisins se recouvrent");
+  for (const mauvais of ["", "45fb054", "45fb05400", "zzzzzzzz", "45fb0540'", null, undefined]) {
+    assert.equal(bornesId(mauvais as string), null, `« ${String(mauvais)} » produit des bornes`);
+  }
+  assert.deepEqual(bornesId("45FB0540"), bornesId("45fb0540"), "la casse change les bornes");
+
+  const page = readFileSync("src/app/courses/[slug]/page.tsx", "utf8");
+  assert.ok(!/\.ilike\("id"/.test(page), "la recherche par `like` sur un uuid est revenue : toutes les fiches feraient 404");
+  assert.ok(/gte\("id", bornes\.bas\)[\s\S]{0,60}lte\("id", bornes\.haut\)/.test(page),
+    "la fiche ne se cherche plus par intervalle d'identifiants");
+});
+
+test("le sitemap dépasse le plafond de 1 000 lignes de la base", () => {
+  // ⚠️ CONSTATÉ EN PRODUCTION : le premier sitemap déployé annonçait 1 022 adresses au
+  // lieu de 10 700. PostgREST plafonne une réponse à 1 000 lignes QUEL QUE SOIT le
+  // `limit` demandé, et sans message d'erreur — 90 % du catalogue restait invisible.
+  const sm = readFileSync("src/app/sitemap.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  assert.ok(/\.range\(/.test(sm), "le sitemap ne pagine pas : il s'arrêtera à 1 000 courses");
+  // `range` sans `order` explicite fait glisser la pagination d'une page à l'autre.
+  assert.ok(/\.order\([\s\S]{0,80}\.order\(/.test(sm), "la pagination n'est pas ordonnée de façon stable");
+  assert.ok(/lot\.length < PAS/.test(sm), "la boucle ne s'arrête jamais sur un lot incomplet");
 });
 
 console.log(`\n${passed} test(s) des courses publiques passé(s), ${fails.length} échec(s)`);

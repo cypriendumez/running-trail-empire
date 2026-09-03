@@ -55,13 +55,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const sb = createAdminClient();
     const auj = jourFrance();
-    const { data } = await sb.from("races")
-      .select("id,name,city,distance_km,region,date")
-      .gte("date", auj).lt("date", DATE_INCONNUE)
-      .not("registration_url", "is", null)
-      .order("date", { ascending: true })
-      .limit(MAX_SITEMAP);
-    const lignes = (data ?? []) as Pick<CoursePublique, "id" | "name" | "city" | "distance_km" | "region" | "date">[];
+    // ⚠️ POSTGREST PLAFONNE UNE RÉPONSE À 1 000 LIGNES, quel que soit le `limit`
+    // demandé. Le premier sitemap déployé annonçait donc 1 022 adresses au lieu de
+    // 10 700 : 90 % du catalogue restait invisible, sans le moindre message d'erreur.
+    // On pagine. `range` exige un `order` explicite, sinon la pagination glisse.
+    type Ligne = Pick<CoursePublique, "id" | "name" | "city" | "distance_km" | "region" | "date">;
+    const lignes: Ligne[] = [];
+    const PAS = 1000;
+    for (let debut = 0; debut < MAX_SITEMAP; debut += PAS) {
+      const { data, error } = await sb.from("races")
+        .select("id,name,city,distance_km,region,date")
+        .gte("date", auj).lt("date", DATE_INCONNUE)
+        .not("registration_url", "is", null)
+        .order("date", { ascending: true }).order("id", { ascending: true })
+        .range(debut, debut + PAS - 1);
+      if (error) break;
+      const lot = (data ?? []) as Ligne[];
+      lignes.push(...lot);
+      if (lot.length < PAS) break;
+    }
     courses = lignes
       // Une ligne sans nom ni ville produirait une adresse réduite à un identifiant :
       // inutile pour un lecteur comme pour un moteur.

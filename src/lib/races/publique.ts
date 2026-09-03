@@ -92,6 +92,21 @@ export function idDepuisSlug(slug: string): string | null {
   return /^[0-9a-f]{8}$/i.test(dernier) ? dernier.toLowerCase() : null;
 }
 
+/**
+ * Les bornes d'identifiants correspondant à un préfixe court.
+ *
+ * ⚠️ ON NE PEUT PAS FAIRE DE `like` SUR UN `uuid`. PostgreSQL répond « operator does
+ * not exist: uuid ~~* unknown », l'erreur était avalée en silence et TOUTES les fiches
+ * répondaient 404 — alors qu'elles étaient déclarées au sitemap. Un identifiant se
+ * compare octet par octet : un préfixe définit donc un INTERVALLE, que la base sait
+ * parcourir avec son index.
+ */
+export function bornesId(court: string): { bas: string; haut: string } | null {
+  if (!/^[0-9a-f]{8}$/i.test(String(court ?? ""))) return null;
+  const c = String(court).toLowerCase();
+  return { bas: `${c}-0000-0000-0000-000000000000`, haut: `${c}-ffff-ffff-ffff-ffffffffffff` };
+}
+
 const MOIS = ["janvier", "février", "mars", "avril", "mai", "juin",
   "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
 

@@ -6,7 +6,7 @@ import { getPublicLang } from "@/lib/i18n/serverLang";
 import { texteCourses } from "../coursesI18n";
 import { jourFrance } from "@/lib/races/jourFrance";
 import {
-  estPubliable, idDepuisSlug, slugCourse, titrePage, descriptionPage, dateEnClair,
+  estPubliable, idDepuisSlug, bornesId, slugCourse, titrePage, descriptionPage, dateEnClair,
   type CoursePublique,
 } from "@/lib/races/publique";
 
@@ -20,10 +20,11 @@ const CHAMPS = "id,name,city,department,region,date,distance_km,elevation_gain_m
  * laisse le libellé évoluer sans casser les liens déjà indexés.
  */
 async function lire(slug: string): Promise<CoursePublique | null> {
-  const court = idDepuisSlug(slug);
-  if (!court) return null;
+  const bornes = bornesId(idDepuisSlug(slug) ?? "");
+  if (!bornes) return null;
   const sb = createAdminClient();
-  const { data, error } = await sb.from("races").select(CHAMPS).ilike("id", `${court}%`).limit(2);
+  const { data, error } = await sb.from("races").select(CHAMPS)
+    .gte("id", bornes.bas).lte("id", bornes.haut).limit(2);
   // Deux résultats voudraient dire que huit caractères ne suffisent plus à distinguer :
   // on préfère une page absente à une page qui parlerait d'une autre course.
   if (error || !data || data.length !== 1) return null;
