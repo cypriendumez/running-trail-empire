@@ -70,6 +70,23 @@ jobs:
             manque=1
           else
             echo "SUPABASE_SERVICE_ROLE_KEY : présent (${#CLE_SB} caractères)"
+            # ⚠️ UNE CLÉ PRÉSENTE N'EST PAS UNE CLÉ VALABLE. Vu le 03/09/2026 : les deux
+            # secrets étaient bien nommés et non vides, et l'export échouait quand même
+            # sur « Invalid API key ». Un contrôle de FORME distingue les deux confusions
+            # les plus fréquentes sans jamais afficher la valeur : la clé publique
+            # (`anon`) a le même format JWT mais un autre rôle, et le nouveau système de
+            # clés Supabase commence par « sb_ » au lieu de « eyJ ».
+            case "$CLE_SB" in
+              eyJ*) echo "format : JWT (attendu)" ;;
+              sb_*) echo "::error::La clé commence par « sb_ » : c'est une clé du NOUVEAU système Supabase, pas la clé de service historique attendue par le code (format JWT, commence par « eyJ »). Prends « service_role » dans Settings → API Keys → Legacy." ; manque=1 ;;
+              *)    echo "::error::La clé ne commence pas par « eyJ » : ce n'est pas une clé de service au format attendu. Vérifie que tu as copié « service_role » et non « anon », et sans guillemets." ; manque=1 ;;
+            esac
+            # La longueur attendue est de 219 caractères pour ce projet ; un écart
+            # signale un copier-coller tronqué ou entouré de guillemets.
+            if [ "${#CLE_SB}" -lt 100 ]; then
+              echo "::error::La clé ne fait que ${#CLE_SB} caractères — elle est tronquée. Une clé de service en fait plus de 200."
+              manque=1
+            fi
           fi
           exit $manque
 
