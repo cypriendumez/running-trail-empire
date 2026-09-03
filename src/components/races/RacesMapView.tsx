@@ -7,6 +7,7 @@ import type { Race } from "@/types";
 import { correctedRaceType } from "@/lib/raceType";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { RX, fillR, dateRangeKey } from "./racesI18n";
+import { formatDateCivile } from "@/lib/time/fuseau";
 
 const TYPE_COLORS: Record<string, string> = {
   road_5k: "#6366f1", road_10k: "#3b82f6", semi: "#0ea5e9",
@@ -330,7 +331,7 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
                 {[
                   { icon: <Zap className="w-3.5 h-3.5 text-emerald-500" />, label: d["l.distance"], value: `${selected.distance_km} km` },
                   { icon: <Mountain className="w-3.5 h-3.5 text-amber-500" />, label: "D+", value: (selected.elevation_gain_m ?? 0) > 0 ? `+${Number(selected.elevation_gain_m).toLocaleString(lang)} m` : "—" },
-                  { icon: <Calendar className="w-3.5 h-3.5 text-blue-500" />, label: d["l.date"], value: selected.date?.startsWith("2099") ? d["dateTBD"] : new Date(selected.date + "T00:00:00").toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long" }) },
+                  { icon: <Calendar className="w-3.5 h-3.5 text-blue-500" />, label: d["l.date"], value: selected.date?.startsWith("2099") ? d["dateTBD"] : formatDateCivile(selected.date, lang, { weekday: "long", day: "numeric", month: "long" }) },
                   { icon: <MapPin className="w-3.5 h-3.5 text-red-400" />, label: d["l.place"], value: selected.city ? `${selected.city}${selected.department ? ` (${selected.department})` : ""}` : (selected.department || "—") },
                 ].map(m => (
                   <div key={m.label} className="bg-white p-3">

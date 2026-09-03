@@ -11,6 +11,7 @@ import { RX } from "@/components/races/racesI18n";
 import { timeAgo } from "@/lib/utils/time";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { createClient } from "@/lib/supabase/client";
+import { formatDateCivile } from "@/lib/time/fuseau";
 
 type Notif = { id: string; type: string; title: string; body: string | null; read: boolean; created_at: string };
 type RaceHit = { name: string; city: string; distanceKm: number | null; date: string };
@@ -168,7 +169,7 @@ export function TopBar({ profile, avatarColor }: { profile: Record<string, unkno
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-semibold text-zinc-800">{r.name}</span>
                           <span className="block truncate text-[11px] text-zinc-400">
-                            {[r.city, r.distanceKm != null ? `${r.distanceKm} km` : "", r.date && !r.date.startsWith("2099") ? new Date(r.date + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "short", year: "numeric" }) : (RX[lang] ?? RX.fr).dateTBD].filter(Boolean).join(" · ")}
+                            {[r.city, r.distanceKm != null ? `${r.distanceKm} km` : "", r.date && !r.date.startsWith("2099") ? formatDateCivile(r.date, lang, { day: "numeric", month: "short", year: "numeric" }) : (RX[lang] ?? RX.fr).dateTBD].filter(Boolean).join(" · ")}
                           </span>
                         </span>
                       </button>

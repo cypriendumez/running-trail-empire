@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Target, Loader2, Check, Pencil, Search, MapPin } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import type { AvertissementAge as Avertissement } from "@/lib/coach/ageDistance";
+import { formatDateCivile } from "@/lib/time/fuseau";
 
 export type Objective = {
   race: string; distanceKm: number; raceDate: string; heureDepart?: string | null;
@@ -203,7 +204,7 @@ export function ObjectiveCard({ objective, currentVma }: { objective: Objective 
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-semibold text-zinc-800">{s.name}</span>
                       <span className="flex items-center gap-1 truncate text-[11px] text-zinc-400">
-                        {s.city && <><MapPin className="h-2.5 w-2.5" />{s.city} · </>}{new Date(s.date + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "short", year: "numeric" })}
+                        {s.city && <><MapPin className="h-2.5 w-2.5" />{s.city} · </>}{formatDateCivile(s.date, lang, { day: "numeric", month: "short", year: "numeric" })}
                       </span>
                     </span>
                     {(() => { const dk = inferDistance(s.name, s.distanceKm); return dk != null ? <span className="flex-shrink-0 rounded-md bg-zinc-100 px-1.5 py-0.5 text-[11px] font-semibold text-zinc-600">{dk} km</span> : null; })()}

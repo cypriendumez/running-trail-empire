@@ -158,7 +158,9 @@ test("valeurs hostiles : TSS négatif, énorme, NaN, date absurde", () => {
 
 test("l'historique tracé fait toujours 42 points, quelle que soit la mise en route", () => {
   for (const n of [0, 1, 100, 400]) {
-    const l = computeLoad(Array.from({ length: n }, (_, i) => ({ date: jour(i), tss: 50 })));
+    // Daté comme les neuf autres appels : cette assertion-ci résiste au passage de
+    // minuit, mais un appel non daté au milieu d'appels datés finit par être recopié.
+    const l = computeLoad(Array.from({ length: n }, (_, i) => ({ date: jour(i), tss: 50 })), AUJOURD_HUI);
     assert.equal(l.history.length, 42, `${n} séances → ${l.history.length} points tracés`);
   }
 });
@@ -167,7 +169,12 @@ test("une charge constante fait converger CTL et ATL vers cette charge", () => {
   // Vérité mathématique du modèle : à charge quotidienne constante, les deux moyennes
   // convergent vers elle et la fraîcheur tend vers zéro. Si ce n'est pas le cas, le
   // modèle n'est plus un Banister.
-  const l = computeLoad(Array.from({ length: 365 }, (_, i) => ({ date: jour(i), tss: 60 })));
+  // ⚠️ LA DATE DE RÉFÉRENCE EST TRANSMISE. Sans elle, `computeLoad` prend le jour RÉEL
+  // du moteur alors que les données s'arrêtent au 2 septembre 2026 : le test passait
+  // le 2 et devenait ROUGE le 3, avec « CTL converge vers 58,6 » — un jour de
+  // décroissance en trop. Un test qui dépend du jour où on le lance ne prouve rien, et
+  // il finit par être supprimé plutôt que lu.
+  const l = computeLoad(Array.from({ length: 365 }, (_, i) => ({ date: jour(i), tss: 60 })), AUJOURD_HUI);
   assert.ok(Math.abs(l.ctl - 60) < 1, `CTL converge vers ${l.ctl.toFixed(1)} au lieu de 60`);
   assert.ok(Math.abs(l.atl - 60) < 1, `ATL converge vers ${l.atl.toFixed(1)} au lieu de 60`);
   assert.ok(Math.abs(l.tsb) < 1, `TSB vaut ${l.tsb.toFixed(1)} sur une charge parfaitement régulière`);

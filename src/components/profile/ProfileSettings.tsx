@@ -23,6 +23,7 @@ import {
   Shield, ChevronRight, Heart, Wind, Clock, BarChart2,
   CheckCircle, X, Save, AlertCircle, Star, Camera, Loader2, Download,
 } from "lucide-react";
+import { formatDateCivile } from "@/lib/time/fuseau";
 
 // ── i18n local (5 langues) — la page Profil naît traduite. ──────────────────────
 type Tr = (k: string, p?: Record<string, string | number>) => string;
@@ -689,7 +690,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
 
   // ── Graphiques façon Garmin : tendance VO2max + prédicteur de course (allures) ──
   const vo2Hist = Array.isArray(g?.vo2maxHistory) ? g!.vo2maxHistory! : [];
-  const fmtD = (s: string) => new Date(s + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "short" });
+  const fmtD = (s: string) => formatDateCivile(s, lang, { day: "numeric", month: "short" });
   const secToPace = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, "0")}`;
   const vo2ChartData = vo2Hist.map(p => ({ d: fmtD(p.date), v: p.v }));
   const latestVo2pt = vo2Hist.length ? vo2Hist[vo2Hist.length - 1].v : (garminVo2 ?? 0);

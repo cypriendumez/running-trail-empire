@@ -24,6 +24,7 @@ import {
 import { toast } from "sonner";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { WEIGHT_EXPLAIN, rationaleKey } from "@/components/health/weightModeI18n";
+import { formatDateCivile } from "@/lib/time/fuseau";
 
 type Tr = (k: string, p?: Record<string, string | number>) => string;
 function fill(s: string, p?: Record<string, string | number>) {
@@ -417,7 +418,7 @@ export function WeightMode() {
                 <ul className="divide-y divide-zinc-100">
                   {state.logs.slice(0, 12).map((l) => (
                     <li key={l.date} className="group flex items-center justify-between py-2 text-sm">
-                      <span className="text-zinc-500">{new Date(l.date + "T00:00:00").toLocaleDateString(lang, { weekday: "short", day: "numeric", month: "short" })}</span>
+                      <span className="text-zinc-500">{formatDateCivile(l.date, lang, { weekday: "short", day: "numeric", month: "short" })}</span>
                       <span className="flex items-center gap-3">
                         <span className="font-semibold tabular-nums text-zinc-900">{dec(Number(l.weight_kg), 2)} kg</span>
                         <button title={tr("delete")} aria-label={tr("delete")} disabled={busy}

@@ -7,6 +7,8 @@ import { AutoSync } from "@/components/AutoSync";
 import { MessageNotifier } from "@/components/messages/MessageNotifier";
 import { SupportBubble } from "@/components/support/SupportBubble";
 import { LanguageProvider } from "@/lib/i18n/LanguageProvider";
+import { FuseauProvider } from "@/lib/time/FuseauProvider";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { AttributionGarmin } from "@/components/legal/AttributionGarmin";
@@ -16,6 +18,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  // ⚠️ LE FUSEAU EST LU ICI, CÔTÉ SERVEUR, ET DESCENDU DANS L'ARBRE. C'est la seule
+  // façon que le serveur et le navigateur écrivent le MÊME texte : le serveur tourne à
+  // iad1 (États-Unis), donc tout ce qu'il date sans fuseau explicite est décalé. Mesuré :
+  // 23 erreurs React #418, dont 96 % entre minuit et 6 h à Paris — la fenêtre où les
+  // deux machines ne sont pas le même jour.
+  const fuseau = decodeURIComponent((await cookies()).get("pacevo_tz")?.value ?? "");
 
   const [{ data: profile }, { count: unreadMessages }, { data: settingsRow }] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
@@ -29,6 +38,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <LanguageProvider initialLang={String(profile?.preferred_language ?? "fr")} userId={user.id}>
+      <FuseauProvider fuseau={fuseau}>
       <div className="flex h-screen bg-[#FAFAFA] overflow-hidden">
         <AutoSync />
         <MessageNotifier />
@@ -51,6 +61,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             support naît devant l'écran qui pose problème, pas dans un menu séparé. */}
         <SupportBubble />
       </div>
+      </FuseauProvider>
     </LanguageProvider>
   );
 }

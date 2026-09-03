@@ -14,6 +14,7 @@ import { afficherHeure } from "@/lib/races/heure";
 import { extractBody, premierePhrase } from "@/lib/calendar/texte";
 import { libelleType } from "@/lib/ai/planI18n";
 import { AvisCoach } from "@/components/training/AvisCoach";
+import { formatDateCivile } from "@/lib/time/fuseau";
 
 /** Le même jour dans une autre langue — affichage seulement (cf. lib/ai/planI18n.ts). */
 export type PlannedText = { title?: string; subtitle?: string; why?: string; tags?: string[] };
@@ -189,7 +190,7 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
   const upcomingCount = sessions.filter((s) => s.date >= todayKey).length;
   const nextRace = races.filter((r) => r.date >= todayKey).sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;
   const nextRaceLabel = nextRace
-    ? `${nextRace.name} · ${new Date(nextRace.date + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "short" })}`
+    ? `${nextRace.name} · ${formatDateCivile(nextRace.date, lang, { day: "numeric", month: "short" })}`
     : t("cal.stat.noRace");
   const heroChips: { Icon: typeof Flag; text: string }[] = [
     { Icon: CalendarClock, text: `${weekCount} ${t("cal.stat.weekSessions")}` },
@@ -324,7 +325,7 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
                   {libelleType(coach.type, lang)}
                 </span>
                 <span className="text-[12px] font-semibold uppercase tracking-wide text-white/70 first-letter:uppercase">
-                  {sel && new Date(sel + "T00:00:00").toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long" })}
+                  {sel && formatDateCivile(sel, lang, { weekday: "long", day: "numeric", month: "long" })}
                 </span>
                 {/* Jour prévisionnel : on le dit franchement plutôt que de laisser croire
                     à un plan figé — c'est justement parce qu'il bouge qu'il est personnalisé. */}
@@ -541,7 +542,7 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
       {sel && (
         <div className="mt-5 overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
           <div className="flex items-center justify-between gap-2 bg-zinc-900 px-5 py-3 text-white">
-            <div className="text-sm font-bold first-letter:uppercase">{new Date(sel + "T00:00:00").toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long" })}</div>
+            <div className="text-sm font-bold first-letter:uppercase">{formatDateCivile(sel, lang, { weekday: "long", day: "numeric", month: "long" })}</div>
             <button onClick={() => setSel(null)} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15 transition hover:bg-white/25"><X className="h-4 w-4" /></button>
           </div>
 
@@ -717,7 +718,7 @@ function CoachWhy({ state, lang, t, sessions }: { state: CoachState | null; lang
         <p className={`mt-2 text-sm ${tone.head}`}>
           <span className="font-semibold">{t("cal.why.objective")} :</span>{" "}
           {race}
-          {raceDate && ` · ${new Date(raceDate + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "long", year: "numeric" })}`}
+          {raceDate && ` · ${formatDateCivile(raceDate, lang, { day: "numeric", month: "long", year: "numeric" })}`}
           {/* L'heure de départ, quand l'athlète l'a saisie. Elle ne vient pas du
               catalogue — les agrégateurs ne la publient pas — donc elle n'apparaît que
               s'il la connaît vraiment. Voir `lib/races/heure`. */}
@@ -734,7 +735,7 @@ function CoachWhy({ state, lang, t, sessions }: { state: CoachState | null; lang
         <div className={`mt-2 rounded-xl bg-white/60 px-3 py-2 text-sm ${tone.body}`}>
           <p>
             <span className="font-semibold">{t("cal.why.lastSession")}</span>
-            {lastSession.date && ` · ${new Date(lastSession.date + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "long" })}`}
+            {lastSession.date && ` · ${formatDateCivile(lastSession.date, lang, { day: "numeric", month: "long" })}`}
             {" : "}{lastSession.label}
           </p>
           {(lastSession.shows ?? []).length > 0 && (

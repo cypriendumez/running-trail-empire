@@ -32,6 +32,7 @@ import { StreakCard } from "@/components/dashboard/StreakCard";
 import { TrialBanner } from "@/components/dashboard/TrialBanner";
 import type { EtatAcces } from "@/lib/billing/access";
 import type { StreakResult } from "@/lib/streak/compute";
+import { formatDateCivile } from "@/lib/time/fuseau";
 
 // Fonction de traduction (avec interpolation {clé}) passée aux helpers.
 type TFn = (k: string, params?: Record<string, string | number>) => string;
@@ -533,7 +534,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
                 <div className="text-[2.25rem] font-black leading-none tabular-nums text-[#11201d]">J‑{objDaysTo}</div>
                 <div className="mt-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8aa6a6]">{hl.goal}</div>
                 <div className="truncate text-sm font-bold text-[#11201d]">{objective.race}</div>
-                <div className="text-xs text-[#5f7d79]">{new Date(objective.raceDate + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "long", year: "numeric" })}</div>
+                <div className="text-xs text-[#5f7d79]">{formatDateCivile(objective.raceDate, lang, { day: "numeric", month: "long", year: "numeric" })}</div>
                 <Link href="/dashboard/calendrier" className="mt-2.5 inline-flex items-center gap-1.5 rounded-xl bg-[#11201d] px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#0b1714]">
                   {hl.plan} <ChevronRight className="h-3.5 w-3.5" />
                 </Link>
