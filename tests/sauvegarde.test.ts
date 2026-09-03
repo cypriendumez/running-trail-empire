@@ -118,6 +118,15 @@ test("le workflow ne publie que le dossier d'archive, et échoue s'il est vide",
   // ⚠️ ET LA RÉTENTION EST FINIE : 90 jours sur l'offre gratuite. C'est écrit pour que
   // personne ne croie l'archive éternelle.
   assert.ok(/retention-days: 90/.test(wf), "la durée de conservation n'est plus déclarée");
+  // ⚠️ LE DOSSIER COMMENCE PAR UN POINT. `upload-artifact` traite les fichiers cachés
+  // comme exclus depuis la v4.4 : sans cette option, l'archive n'est jamais publiée,
+  // et l'erreur (« No files were found ») accuse l'export alors qu'il a réussi.
+  // Constaté en production le 03/09/2026.
+  const chemin = /path: (\S+)/.exec(wf)?.[1] ?? "";
+  if (chemin.startsWith(".")) {
+    assert.ok(/include-hidden-files: true/.test(wf),
+      `le dossier « ${chemin} » est caché et ne sera pas publié sans include-hidden-files`);
+  }
 });
 
 console.log(`\n${passed} test(s) de sauvegarde passé(s), ${fails.length} échec(s)`);

@@ -126,3 +126,9 @@ jobs:
           path: .sauvegardes/
           retention-days: 90
           if-no-files-found: error
+          # ⚠️ SANS CETTE LIGNE, L'ARCHIVE N'EST PAS PUBLIÉE. Le dossier commence par un
+          # point : `upload-artifact` le traite comme CACHÉ et l'ignore par défaut depuis
+          # la v4.4. Constaté le 03/09/2026 : l'export avait parfaitement réussi
+          # (17 131 courses, archive déclarée VALIDE) et l'étape suivante répondait « No
+          # files were found ». Un échec qui accuse l'export alors qu'il a fonctionné.
+          include-hidden-files: true
