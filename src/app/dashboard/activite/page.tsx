@@ -8,6 +8,7 @@ import { StravaBlocks, type Chiffre } from "@/components/activity/StravaBlocks";
 import { MetricChart } from "@/components/activity/MetricChart";
 import { SessionSegments, type EffortVue } from "@/components/activity/SessionSegments";
 import { leaderboard, type StoredEffort } from "@/lib/segments/match";
+import { lireEfforts } from "@/lib/segments/efforts";
 
 export const dynamic = "force-dynamic";
 
@@ -121,17 +122,13 @@ export default async function ActivitePage({ searchParams }: { searchParams: Pro
             .select("id, segment_id, elapsed_seconds").eq("workout_id", String(wk.id));
           const segIds = [...new Set((mes ?? []).map((e) => String((e as { segment_id: string }).segment_id)))];
           if (segIds.length) {
-            const [{ data: segs }, { data: tous }] = await Promise.all([
+            // ⚠️ MÊME PLAFOND DE 1 000 LIGNES QUE SUR LA PAGE DES SEGMENTS. Le
+            // classement affiché sous une séance était amputé de la même façon, en
+            // silence : PostgREST s'arrête à 1 000 sans erreur.
+            const [{ data: segs }, parSeg] = await Promise.all([
               sb.from("segments").select("id, name, distance_m").in("id", segIds),
-              sb.from("segment_efforts").select("segment_id, user_id, elapsed_seconds, started_at").in("segment_id", segIds),
+              lireEfforts(sb, segIds),
             ]);
-            const parSeg = new Map<string, StoredEffort[]>();
-            for (const e of (tous ?? []) as Record<string, unknown>[]) {
-              const k = String(e.segment_id);
-              parSeg.set(k, [...(parSeg.get(k) ?? []), {
-                user_id: String(e.user_id), elapsed_seconds: Number(e.elapsed_seconds), started_at: String(e.started_at),
-              }]);
-            }
             effortsVus = (mes ?? []).map((e) => {
               const ef = e as unknown as { id: string; segment_id: string; elapsed_seconds: number };
               const seg = (segs ?? []).find((x) => String((x as { id: string }).id) === ef.segment_id) as

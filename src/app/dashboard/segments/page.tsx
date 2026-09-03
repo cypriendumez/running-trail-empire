@@ -2,7 +2,8 @@ export const dynamic = "force-dynamic";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PerfTabs } from "@/components/segments/PerfTabs";
-import { leaderboard, maitreDuSegment, type StoredEffort } from "@/lib/segments/match";
+import { leaderboard, maitreDuSegment } from "@/lib/segments/match";
+import { lireEfforts } from "@/lib/segments/efforts";
 import { SegmentList, type SegmentVue } from "@/components/segments/SegmentList";
 import { getAccountLang } from "@/lib/i18n/serverLang";
 import { T, fill } from "@/lib/i18n/translations";
@@ -37,17 +38,10 @@ export default async function SegmentsPage() {
   }
 
   const ids = (segments ?? []).map((s) => String((s as { id: string }).id));
-  const { data: efforts } = ids.length
-    ? await sb.from("segment_efforts").select("segment_id, user_id, elapsed_seconds, started_at").in("segment_id", ids)
-    : { data: [] };
-
-  const parSegment = new Map<string, StoredEffort[]>();
-  for (const e of (efforts ?? []) as Record<string, unknown>[]) {
-    const k = String(e.segment_id);
-    const arr = parSegment.get(k) ?? [];
-    arr.push({ user_id: String(e.user_id), elapsed_seconds: Number(e.elapsed_seconds), started_at: String(e.started_at) });
-    parSegment.set(k, arr);
-  }
+  // ⚠️ LECTURE PAGINÉE. Sans elle, PostgREST s'arrête à 1 000 efforts sans erreur :
+  // mesuré le 03/09/2026, la base en comptait 1 063 et 63 passages disparaissaient des
+  // classements, du record et du « Maître du segment ».
+  const parSegment = await lireEfforts(sb, ids);
 
   const vues: SegmentVue[] = (segments ?? []).map((s) => {
     const seg = s as unknown as { id: string; name: string; distance_m: number; elevation_gain_m: number; avg_grade_pct: number | null; polyline: string | null };
