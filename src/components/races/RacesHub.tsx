@@ -15,6 +15,8 @@ import { RX, fillR } from "./racesI18n";
 import { PpsStatusCard } from "@/components/pps/PpsStatusCard";
 import { PPS_T } from "@/lib/pps/ppsI18n";
 import { ppsVerdict, type PpsStatus } from "@/lib/pps/status";
+import { jourCivil } from "@/lib/time/fuseau";
+import { useFuseau } from "@/lib/time/FuseauProvider";
 
 // La carte (mapbox-gl + leaflet) est LOURDE : on la charge à la demande (quand l'utilisateur
 // ouvre la carte), pas au chargement de la page → liste des courses bien plus rapide.
@@ -66,6 +68,7 @@ export type PlannedRace = { id: string; name: string; location: string; distance
 const normName = (s: string) => (s || "").toLowerCase().trim().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 export function RacesHub({ races: initialRaces, totalCount, units = "metric", planned: plannedProp = [], initialSearch = "", pps = null, liensMorts = [], favorisInitiaux = [] }: { favorisInitiaux?: string[]; liensMorts?: string[]; races: Race[]; totalCount?: number; units?: UnitSystem; planned?: PlannedRace[]; initialSearch?: string; pps?: PpsStatus | null }) {
+  const fuseau = useFuseau();
   const { lang } = useT();
   const d = RX[lang] ?? RX.fr;
   const tr = (k: string, p?: Record<string, string | number>) => fillR(d[k] ?? k, p);
@@ -221,7 +224,9 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
   // bien » à chaque visite est le meilleur moyen de rendre l'alerte invisible le jour
   // où elle compte. On le confronte à la PROCHAINE course planifiée, pas à aujourd'hui.
   const prochaineCourse = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    // ⚠️ Entre minuit et 2 h à Paris, le jour UTC est celui de la veille : les
+    // courses du jour même restaient affichées comme à venir.
+    const today = jourCivil(new Date(), fuseau);
     return plannedProp.map((p) => p.date).filter((x) => x && x >= today).sort()[0] ?? null;
   }, [plannedProp]);
   const ppsAlerte = useMemo(() => {

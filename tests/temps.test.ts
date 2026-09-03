@@ -195,5 +195,28 @@ test("un seul calcul du « jour dans un fuseau » existe dans le dépôt", () =>
   assert.ok(!/getFullYear\(\)/.test(streak), "jourLocal est revenu aux accesseurs du moteur");
 });
 
+test("les écrans qui décident d'un jour ne le calculent plus en UTC", () => {
+  // ⚠️ `toISOString()` BASCULE À MINUIT UTC : entre minuit et 2 h à Paris (1 h en
+  // hiver), « aujourd'hui » désignait la veille. Deux heures par nuit pendant
+  // lesquelles un défi créé était daté d'hier et affiché comme passé, un pass de
+  // prévention expirant le jour même était déclaré encore valable, et les courses du
+  // jour restaient annoncées comme à venir.
+  const ECRANS = [
+    "src/components/ghost-runner/GhostRunner.tsx",
+    "src/components/pps/PpsVerifier.tsx",
+    "src/components/races/RacesHub.tsx",
+    "src/components/clubs/ClubsHub.tsx",
+  ];
+  for (const f of ECRANS) {
+    const src = readFileSync(f, "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+    assert.ok(!/new Date\(\)\.toISOString\(\)\.slice\(0, 10\)/.test(src),
+      `${f} calcule encore « aujourd'hui » en UTC`);
+    assert.ok(/jourCivil\(new Date\(\), fuseau\)/.test(src), `${f} ne date plus sur le fuseau de l'athlète`);
+    assert.ok(/useFuseau\(\)/.test(src), `${f} n'a plus accès au fuseau`);
+  }
+});
+
 console.log(`\n${passed} test(s) du temps passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log(`  KO ${f}`); process.exit(1); }

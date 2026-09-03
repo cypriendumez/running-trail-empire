@@ -13,6 +13,8 @@ import type { UserProfile, PerformanceBaseline } from "@/types";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { GX, GUIDE, GUIDE_TIP, SPEECH_LANG, fillG } from "./ghostI18n";
 import { estAppleWatch } from "@/lib/watch/intervals";
+import { jourCivil } from "@/lib/time/fuseau";
+import { useFuseau } from "@/lib/time/FuseauProvider";
 
 /**
  * ⚠️ `title`, `detail` et `tags` sont en FRANÇAIS, et doivent le rester :
@@ -111,6 +113,7 @@ export function nomLecture(l: { appareil: string | null; source: string | null }
 }
 
 export function GhostRunner({ baseline, effectiveVma, coachSessions = [] }: GhostRunnerProps) {
+  const fuseau = useFuseau();
   // Une seule VMA dans toute l'application : test enregistré, sinon VMA effective,
   // et seulement en tout dernier recours une valeur par défaut.
   const vmaEff = baseline?.vma_kmh ?? effectiveVma ?? 16;
@@ -517,7 +520,9 @@ export function GhostRunner({ baseline, effectiveVma, coachSessions = [] }: Ghos
     if (sendingWatch) return;
     setSendingWatch(true);
     try {
-      const today = new Date().toISOString().slice(0, 10); // défi perso = pour aujourd'hui (ex. course cet après-midi)
+      // ⚠️ LE JOUR DE L'ATHLÈTE, PAS LE JOUR UTC : un défi créé à 00 h 30 était daté
+      // de la veille, donc affiché comme déjà passé.
+      const today = jourCivil(new Date(), fuseau); // défi perso = pour aujourd'hui
       const payload = targetMode === "hr"
         ? { targetType: "hr", durationMin, hrZone, date: today, name: tg("name.hr", { z: zn(hrZone), m: durationMin }) }
         : { targetType: "pace", distanceKm: distance, targetSeconds: targetTime, elevationM: elevation, date: today, name: tg("name.pace", { d: distance, t: formatTime(targetTime) }) };
@@ -641,7 +646,7 @@ export function GhostRunner({ baseline, effectiveVma, coachSessions = [] }: Ghos
                 <div className="grid gap-2 sm:grid-cols-2">
                   {coachSessions.map((s, i) => {
                     const dt = new Date(s.date + "T00:00:00");
-                    const isToday = s.date === new Date().toISOString().slice(0, 10);
+                    const isToday = s.date === jourCivil(new Date(), fuseau);
                     return (
                       <button key={i} onClick={() => applyCoachSession(s)}
                         className="group flex items-start gap-3 rounded-2xl border border-zinc-200 bg-white p-3.5 text-left transition-all hover:border-emerald-400 hover:shadow-sm">

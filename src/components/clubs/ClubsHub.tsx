@@ -11,6 +11,8 @@ import { useRouter } from "next/navigation";
 import { Users, Target, Plus, Check, MapPin, Loader2 } from "lucide-react";
 import { metricLabel, metricUnit, type Metric } from "@/lib/challenges/progress";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { jourCivil } from "@/lib/time/fuseau";
+import { useFuseau } from "@/lib/time/FuseauProvider";
 
 export type ClubVue = {
   id: string; name: string; description: string | null; city: string | null;
@@ -268,9 +270,11 @@ function FormClub({ onDone }: { onDone: () => void }) {
 }
 
 function FormDefi({ clubs, onDone }: { clubs: ClubVue[]; onDone: () => void }) {
+  const fuseau = useFuseau();
   const { t, lang } = useT();
   const router = useRouter();
-  const aujourdhui = new Date().toISOString().slice(0, 10);
+  // ⚠️ Jour de l'athlète, pas jour UTC — voir lib/time/fuseau.
+  const aujourdhui = jourCivil(new Date(), fuseau);
   const dansUnMois = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
   const [name, setName] = useState(""); const [metric, setMetric] = useState<Metric>("distance");
   const [target, setTarget] = useState("100");

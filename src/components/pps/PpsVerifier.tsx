@@ -19,6 +19,8 @@ import { CalendarCheck, Check, X, Loader2, Info } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { PPS_T } from "@/lib/pps/ppsI18n";
 import { couvertureCourses, ppsExpiration, type PpsStatus } from "@/lib/pps/status";
+import { jourCivil } from "@/lib/time/fuseau";
+import { useFuseau } from "@/lib/time/FuseauProvider";
 
 const jourLisible = (iso: string, lang: string) =>
   new Date(`${iso}T12:00:00`).toLocaleDateString(lang, { day: "numeric", month: "long", year: "numeric" });
@@ -29,6 +31,7 @@ const formeValide = (n: string) => /^[A-Z0-9-]{6,24}$/.test(n.trim().toUpperCase
 export function PpsVerifier({
   initial, courses,
 }: { initial: PpsStatus | null; courses: { date: string; nom: string }[] }) {
+  const fuseau = useFuseau();
   const { lang } = useT();
   const t = PPS_T[lang] ?? PPS_T.fr;
 
@@ -45,7 +48,10 @@ export function PpsVerifier({
   );
 
   const numeroDouteux = numero.trim().length > 0 && !formeValide(numero);
-  const aujourdhui = new Date().toISOString().slice(0, 10);
+  // ⚠️ CE JOUR DÉCIDE D'UN VERDICT. Entre minuit et 2 h à Paris, le jour UTC est
+  // celui de la veille : un pass expirant aujourd'hui aurait été déclaré encore
+  // valable, ou l'inverse. On date sur le fuseau de l'athlète.
+  const aujourdhui = jourCivil(new Date(), fuseau);
 
   const enregistrer = async () => {
     setEtat("envoi");
