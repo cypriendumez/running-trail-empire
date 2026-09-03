@@ -38,6 +38,7 @@ export const TACHES: Tache[] = [
   { fichier: "races-types", cadence: "2×/jour", parJour: 2, role: "Corrige le type des courses (trail, marathon…)" },
   { fichier: "heure-depart", cadence: "1×/jour", parJour: 1, role: "Renseigne l'heure de départ des courses" },
   { fichier: "races-maintenance", cadence: "1×/jour", parJour: 1, role: "Entretien du catalogue de courses" },
+  { fichier: "sauvegarde", cadence: "1×/semaine (dimanche)", parJour: 1 / 7, role: "Exporte le catalogue de courses, irremplaçable" },
   { fichier: "newsletter-weekly", cadence: "1×/semaine (lundi)", parJour: 1 / 7, role: "Résumé d'actualité et plan de la semaine" },
 ];
 

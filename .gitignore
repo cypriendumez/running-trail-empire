@@ -69,3 +69,6 @@ public/brands/polar.svg
 
 # fichiers de travail jetables (audits ponctuels en base)
 /.scratch/
+
+# Archives de sauvegarde : volumineuses, et publiées comme artefact, pas dans le dépôt.
+.sauvegardes/

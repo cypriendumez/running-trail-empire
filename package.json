@@ -10,7 +10,7 @@
     "lint": "next lint",
     "db:push": "supabase db push",
     "db:types": "supabase gen types typescript --linked > src/types/supabase.ts",
-    "test": "npx --yes tsx tests/coach.test.ts && npx --yes tsx tests/scenarios.test.ts && npx --yes tsx tests/crash.test.ts && npx --yes tsx tests/dashboard.crash.test.ts && npx --yes tsx tests/calendrier.crash.test.ts && npx --yes tsx tests/courses.crash.test.ts && npx tsx tests/boutique.crash.test.ts && npx --yes tsx tests/montres.crash.test.ts && npx --yes tsx tests/synchro.crash.test.ts && npx --yes tsx tests/auth.crash.test.ts && npx --yes tsx tests/automatisation.test.ts && npx --yes tsx tests/courses-publiques.test.ts && npx --yes tsx tests/temps.test.ts && npx --yes tsx tests/kine.crash.test.ts && npx --yes tsx tests/support.crash.test.ts && npx --yes tsx tests/support.questions.crash.test.ts && npx --yes tsx tests/i18n.test.ts && npx --yes tsx tests/photos.test.ts && npx --yes tsx tests/compta.test.ts && npx --yes tsx tests/chiffres.test.ts",
+    "test": "npx --yes tsx tests/coach.test.ts && npx --yes tsx tests/scenarios.test.ts && npx --yes tsx tests/crash.test.ts && npx --yes tsx tests/dashboard.crash.test.ts && npx --yes tsx tests/calendrier.crash.test.ts && npx --yes tsx tests/courses.crash.test.ts && npx tsx tests/boutique.crash.test.ts && npx --yes tsx tests/montres.crash.test.ts && npx --yes tsx tests/synchro.crash.test.ts && npx --yes tsx tests/auth.crash.test.ts && npx --yes tsx tests/sauvegarde.test.ts && npx --yes tsx tests/automatisation.test.ts && npx --yes tsx tests/courses-publiques.test.ts && npx --yes tsx tests/temps.test.ts && npx --yes tsx tests/kine.crash.test.ts && npx --yes tsx tests/support.crash.test.ts && npx --yes tsx tests/support.questions.crash.test.ts && npx --yes tsx tests/i18n.test.ts && npx --yes tsx tests/photos.test.ts && npx --yes tsx tests/compta.test.ts && npx --yes tsx tests/chiffres.test.ts",
     "verify": "npx tsc --noEmit && npm test",
     "gear:decouvrir": "npx tsx scripts/decouverte-irun.ts",
     "gear:prix": "npx tsx scripts/decouverte-irun.ts --prix && npx tsx scripts/import-offres.ts",
@@ -20,7 +20,9 @@
     "gear:specs": "npx tsx scripts/collecte-specs.ts",
     "stripe:setup": "node scripts/stripe-setup.mjs",
     "sync:maplibre": "cp node_modules/maplibre-gl/dist/maplibre-gl-csp-worker.js public/maplibre-gl-csp-worker.js",
-    "seo:soumettre": "npx --yes tsx scripts/indexnow.ts"
+    "seo:soumettre": "npx --yes tsx scripts/indexnow.ts",
+    "sauvegarde": "npx --yes tsx scripts/sauvegarde.ts",
+    "restaurer": "npx --yes tsx scripts/restaurer.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

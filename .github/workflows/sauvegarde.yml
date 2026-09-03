@@ -1,0 +1,59 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  SAUVEGARDE DES DONNÉES IRREMPLAÇABLES — tous les dimanches.
+#
+#  ⚠️ POURQUOI. Aucune sauvegarde n'existait au 03/09/2026. Les 17 131 courses ont été
+#  bâties par des mois de collecte auprès de sources qui ne sont plus accessibles à cette
+#  échelle : jogging-plus refuse les automates (403 mesuré), la FFA l'interdit par
+#  robots.txt. Perdue, cette table NE SE RECONSTRUIT PAS.
+#
+#  ⚠️ SEULES LES TABLES PUBLIQUES SORTENT. Le dépôt est public : voir la liste
+#  d'autorisation dans `src/lib/sauvegarde/tables.ts`. Aucune donnée personnelle — ni
+#  profil, ni entraînement, ni journal, ni message — n'entre dans cette archive, et un
+#  test rougit si quelqu'un l'ajoutait.
+#
+#  ⚠️ L'ARCHIVE EST UN ARTEFACT, PAS UN COMMIT. Douze mégaoctets par semaine dans
+#  l'historique git alourdiraient un dépôt dont les envois sont déjà fragiles (ils
+#  exigent `--no-thin`). Un artefact est conservé 90 JOURS — c'est la limite de l'offre
+#  gratuite, et c'est à savoir : au-delà, il faut télécharger et garder ailleurs.
+#
+#  SECRETS REQUIS : NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+# ─────────────────────────────────────────────────────────────────────────────
+name: Sauvegarde des données
+
+on:
+  schedule:
+    - cron: "20 3 * * 0"
+  workflow_dispatch:
+
+concurrency:
+  group: sauvegarde
+  cancel-in-progress: false
+
+jobs:
+  sauvegarder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Exporter et vérifier
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          npx --yes tsx scripts/sauvegarde.ts
+          # ⚠️ ON RELIT CE QU'ON VIENT D'ÉCRIRE. Un export interrompu produit un JSON
+          # valide mais amputé : seule la relecture du manifeste le révèle.
+          npx --yes tsx scripts/sauvegarde.ts --verifie
+
+      - name: Publier l'archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: sauvegarde-pacevo
+          path: .sauvegardes/
+          retention-days: 90
+          if-no-files-found: error
