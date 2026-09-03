@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
+import { permanentRedirect } from "next/navigation";
 import { getPublicLang } from "@/lib/i18n/serverLang";
 import { regionsAvecCourses, prochainesCourses } from "@/lib/races/catalogue";
 import { regionCanonique } from "@/lib/races/libelles";
@@ -23,9 +23,12 @@ export default async function CoursesPage({ searchParams }: { searchParams: Prom
   // ⚠️ L'ANCIENNE FORME `?region=` EST REDIRIGÉE, PAS SUPPRIMÉE. Ces adresses ont été
   // déclarées au sitemap et soumises aux moteurs le 03/09/2026 : les laisser répondre
   // sans destination aurait transformé des adresses déjà connues en pages orphelines.
-  // Une redirection permanente transmet ce qu'elles avaient acquis à la nouvelle.
+  //
+  // ⚠️ PERMANENTE (308), PAS TEMPORAIRE (307). `redirect()` répond 307, ce qui dit à un
+  // moteur « l'ancienne adresse reste la bonne, repasse plus tard » : il la garde
+  // indexée et ne transmet rien à la nouvelle. Vérifié en production avant correction.
   const brut = (await searchParams).region?.trim();
-  if (brut) redirect(`/courses/region/${regionCanonique(brut)}`);
+  if (brut) permanentRedirect(`/courses/region/${regionCanonique(brut)}`);
 
   const [lang, regions, courses] = await Promise.all([
     getPublicLang(), regionsAvecCourses(), prochainesCourses("", PAR_PAGE),

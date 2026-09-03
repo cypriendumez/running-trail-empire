@@ -352,8 +352,8 @@ test("les pages de région sont engendrées une fois, pas à chaque visite", () 
   // soumise aux moteurs : la laisser sans destination transformerait des adresses déjà
   // connues en pages orphelines.
   const index = nu("src/app/courses/page.tsx");
-  assert.ok(/redirect\(`\/courses\/region\/\$\{regionCanonique\(brut\)\}`\)/.test(index),
-    "l'ancienne adresse ?region= ne redirige pas vers la nouvelle");
+  assert.ok(/permanentRedirect\(`\/courses\/region\/\$\{regionCanonique\(brut\)\}`\)/.test(index),
+    "l'ancienne adresse ?region= ne redirige pas DÉFINITIVEMENT : en 307, un moteur garde l'ancienne indexée et ne transmet rien à la nouvelle");
   // Et le sitemap ne doit plus déclarer que la nouvelle forme.
   const sm = nu("src/app/sitemap.ts");
   assert.ok(!/courses\?region=/.test(sm), "le sitemap déclare encore des adresses qui redirigent");
