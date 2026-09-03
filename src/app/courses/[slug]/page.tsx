@@ -4,6 +4,7 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPublicLang } from "@/lib/i18n/serverLang";
 import { nomAffichable, nomRegion, regionCanonique } from "@/lib/races/libelles";
+import { nomDestination, estCalendrierTiers } from "@/lib/races/destination";
 import { texteCourses } from "../coursesI18n";
 import { jourFrance } from "@/lib/races/jourFrance";
 import {
@@ -136,12 +137,21 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
       {c.registration_url && (
         <a href={c.registration_url} target="_blank" rel="noopener noreferrer nofollow"
           className="mt-8 inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 font-semibold text-white transition-colors hover:bg-emerald-700">
-          {t("cta.inscription")}
+          {t("cta.inscription", { site: nomDestination(c.registration_url) })}
         </a>
       )}
-      {/* ⚠️ ON NE SE FAIT PAS PASSER POUR L'ORGANISATEUR. Le lien sort du site, il est
-          marqué comme tel, et la page dit d'où vient l'information. */}
-      <p className="mt-3 text-xs text-zinc-400">
+      {/* ⚠️ ON NE SE FAIT PAS PASSER POUR L'ORGANISATEUR — ET ON NE LE FAIT PAS CROIRE
+          NON PLUS. Mesuré le 03/09/2026 : 78 % des liens mènent à finishers.com et 21 %
+          à jogging-plus.com, deux CALENDRIERS de courses. La page annonçait pourtant
+          « le site officiel de l'organisateur » : faux sur la quasi-totalité des
+          17 153 fiches. On nomme la destination avant le clic. */}
+      {c.registration_url && (
+        <p className="mt-3 text-xs text-zinc-500">
+          {t(estCalendrierTiers(c.registration_url) ? "cta.tiers" : "cta.direct",
+            { site: nomDestination(c.registration_url) })}
+        </p>
+      )}
+      <p className="mt-1 text-xs text-zinc-400">
         {t("cta.avertissement")}
       </p>
 

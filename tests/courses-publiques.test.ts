@@ -14,6 +14,7 @@ import {
 } from "../src/lib/races/publique";
 import { C } from "../src/app/courses/coursesI18n";
 import { nomRegion, regionCanonique, regionAvecPreposition, nomAffichable, ECRITURES_REGION } from "../src/lib/races/libelles";
+import { nomDestination, domaineDe, estCalendrierTiers } from "../src/lib/races/destination";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -147,9 +148,6 @@ test("la page de course se déclare honnêtement", () => {
   // Le lien sort du site : il ne doit pas transmettre notre réputation ni laisser
   // croire que nous sommes l'organisateur.
   assert.ok(/rel="noopener noreferrer nofollow"/.test(page), "le lien sortant n'est pas marqué");
-  // ⚠️ L'AVERTISSEMENT VIT DANS LE DICTIONNAIRE depuis que ces pages sont traduites :
-  // on vise donc l'APPEL qui l'affiche, plus la présence du texte dans les 5 langues.
-  // Chercher la phrase française dans la page validerait l'ancienne version.
   assert.ok(/t\("cta\.avertissement"\)/.test(page), "la page n'affiche plus l'avertissement de source");
   for (const lg of ["fr", "en", "de", "es", "pt"] as const) {
     const txt = C[lg]["cta.avertissement"] ?? "";
@@ -425,6 +423,40 @@ test("le sitemap déclare ces pages, avec une priorité moindre", () => {
   };
   assert.ok(prioDe(iSansDate) < prioDe(iDatees),
     `les pages sans date (${prioDe(iSansDate)}) sont annoncées comme équivalentes aux datées (${prioDe(iDatees)})`);
+});
+
+test("la page nomme la vraie destination du lien d'inscription", () => {
+  // ⚠️ MESURÉ SUR LES 17 131 LIENS : 13 450 (78 %) mènent à finishers.com, 3 664 (21 %)
+  // à jogging-plus.com. Ce sont des CALENDRIERS de courses, pas les sites des
+  // organisateurs. Les pages annonçaient pourtant « S'inscrire sur le site de
+  // l'organisateur » — faux sur la quasi-totalité des 17 153 fiches.
+  assert.equal(nomDestination("https://www.finishers.com/course/x"), "Finishers");
+  assert.equal(nomDestination("https://jogging-plus.com/y"), "Jogging International");
+  assert.equal(nomDestination("https://fr.milesrepublic.com/z"), "Miles Republic", "un sous-domaine change la destination");
+  assert.equal(estCalendrierTiers("https://www.finishers.com/c"), true);
+  // ⚠️ UN DOMAINE INCONNU EST RENDU TEL QUEL, jamais requalifié en « organisateur ».
+  assert.equal(nomDestination("https://www.marathon-metz.fr/b"), "marathon-metz.fr");
+  assert.equal(estCalendrierTiers("https://www.marathon-metz.fr/b"), false);
+  for (const mauvais of ["pas une url", "", null, undefined, "javascript:alert(1)"]) {
+    assert.equal(nomDestination(mauvais), "", `« ${String(mauvais)} » produit une destination`);
+    assert.equal(domaineDe(mauvais), "");
+  }
+
+  // Aucune des cinq langues ne doit plus promettre « le site de l'organisateur » dans
+  // le bouton : c'est la phrase qui mentait.
+  for (const lg of ["fr", "en", "de", "es", "pt"] as const) {
+    const bouton = C[lg]["cta.inscription"] ?? "";
+    assert.ok(/\{site\}/.test(bouton), `le bouton ne nomme pas la destination en ${lg} : ${bouton}`);
+    assert.ok(!/organisateur|organiser|organizador|Veranstalters/i.test(bouton),
+      `le bouton promet encore le site de l'organisateur en ${lg} : ${bouton}`);
+    assert.ok((C[lg]["cta.tiers"] ?? "").includes("{site}"), `la mention du calendrier tiers manque en ${lg}`);
+  }
+
+  // Et la page doit VRAIMENT choisir la phrase selon la destination.
+  const src = readFileSync("src/app/courses/[slug]/page.tsx", "utf8");
+  assert.ok(/estCalendrierTiers\(c\.registration_url\) \? "cta\.tiers" : "cta\.direct"/.test(src),
+    "la page sert la même phrase quelle que soit la destination");
+  assert.ok(/nomDestination\(c\.registration_url\)/.test(src), "la destination n'est pas nommée");
 });
 
 console.log(`\n${passed} test(s) des courses publiques passé(s), ${fails.length} échec(s)`);
