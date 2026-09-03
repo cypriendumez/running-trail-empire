@@ -57,11 +57,26 @@ export default async function CoursesPage({ searchParams }: { searchParams: Prom
 
   // Les régions servent de maillage interne : sans liens, une page profonde n'est
   // jamais atteinte par un moteur, même déclarée au sitemap.
-  const { data: regionsBrutes } = await sb.from("races").select("region")
-    .gte("date", auj).lt("date", DATE_INCONNUE).not("region", "is", null).limit(1000);
+  // ⚠️ ON PARCOURT TOUT, ON N'ÉCHANTILLONNE PAS. Un `limit(1000)` sans ordre rendait
+  // 1 000 lignes arbitraires sur 10 700 : La Réunion, qui compte UNE course, en tombait
+  // et disparaissait de la navigation — et la liste changeait d'un déploiement à
+  // l'autre. C'est le même plafond PostgREST que sur le sitemap, réintroduit ici.
+  // La page est revalidée toutes les heures : ces quelques requêtes d'une colonne ne
+  // sont payées qu'une fois par heure.
+  const brutes: string[] = [];
+  for (let debut = 0; debut < 50000; debut += 1000) {
+    const { data, error } = await sb.from("races").select("region")
+      .gte("date", auj).lt("date", DATE_INCONNUE).not("region", "is", null)
+      .order("id", { ascending: true })
+      .range(debut, debut + 999);
+    if (error) break;
+    const lot = data ?? [];
+    brutes.push(...lot.map((r) => String(r.region ?? "")));
+    if (lot.length < 1000) break;
+  }
   // Regroupées par identifiant canonique : sinon la même région apparaît deux fois,
   // dont une pastille quasi vide.
-  const regions = [...new Set((regionsBrutes ?? []).map((r) => regionCanonique(r.region)).filter(Boolean))]
+  const regions = [...new Set(brutes.map((r) => regionCanonique(r)).filter(Boolean))]
     .map((slug) => ({ slug, nom: nomRegion(slug) }))
     .sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
 

@@ -279,6 +279,14 @@ test("les pages publiques emploient bien ces libellés", () => {
   assert.ok(/nomAffichable\(c\.name\)/.test(liste), "la liste affiche les noms bruts");
   assert.ok(/regionCanonique\(/.test(liste), "la liste ne regroupe pas les écritures d'une région");
   assert.ok(/\.in\("region", ecritures\)/.test(liste), "le filtre ne cherche qu'une seule écriture");
+  // ⚠️ LA NAVIGATION PAR RÉGION NE S'ÉCHANTILLONNE PAS. Un `limit(1000)` sans ordre
+  // rendait 1 000 lignes arbitraires sur 10 700 : La Réunion, une seule course, en
+  // tombait et disparaissait — et la liste changeait d'un déploiement à l'autre. Ces
+  // pages de région sont le maillage interne : une région absente n'est jamais visitée.
+  assert.ok(!/select\("region"\)[\s\S]{0,200}\.limit\(/.test(liste),
+    "la liste des régions est de nouveau un échantillon de 1 000 lignes");
+  assert.ok(/select\("region"\)[\s\S]{0,300}\.range\(/.test(liste),
+    "la liste des régions ne parcourt pas tout le catalogue");
   const sm = nu("src/app/sitemap.ts");
   assert.ok(/regionCanonique\(/.test(sm), "le sitemap déclare deux adresses pour une même région");
 });
