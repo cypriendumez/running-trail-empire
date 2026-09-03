@@ -1,3 +1,11 @@
+"use client";
+// ⚠️ DIRECTIVE INDISPENSABLE : ce composant appelle `useT()`, un crochet React qui
+// n'existe que côté client. Sans elle, Next tente de le rendre sur le serveur et lève
+// « Attempted to call useT() from the server » — les segments d'une séance disparaît derrière une page
+// d'erreur. Constaté en production le 03/09/2026 sur /dashboard/segments, reproduit
+// en local. Le composant n'a par ailleurs ni état ni gestionnaire : la directive est
+// le seul changement nécessaire.
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  Segments franchis pendant CETTE sortie — l'équivalent du bloc « Meilleurs
 //  efforts / Segments » de Strava.
