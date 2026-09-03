@@ -77,5 +77,24 @@ test("les lectures massives du catalogue de courses paginent", () => {
   }
 });
 
+test("le comparateur n'affiche pas les 309 modèles d'un coup", () => {
+  // ⚠️ MESURÉ LE 03/09/2026 : la page servait 1 675 Ko de HTML — 687 SVG et 2 451
+  // tracés, un dessin de semelle par modèle — à un téléphone, pour des cartes que
+  // personne ne déroule jusqu'au bout. Après pagination : 390 Ko, soit 77 % de moins.
+  const src = codeNu(readFileSync("src/components/shop/GearHub.tsx", "utf8"));
+  assert.ok(/const PAR_PAGE = \d+;/.test(src), "la taille de page a disparu");
+  assert.ok(/const visibles = liste\.slice\(0, combien\);/.test(src), "la liste n'est plus tronquée");
+  assert.ok(/\{visibles\.map\(\(m\) => \{/.test(src), "les cartes sont rendues depuis la liste entière");
+  // ⚠️ ET CHANGER DE FILTRE DOIT REVENIR AU DÉBUT. Sans cela, quelqu'un qui a déroulé
+  // jusqu'à 200 modèles puis filtre sur une marque verrait toute cette marque d'un
+  // coup : le gain disparaîtrait dès le premier filtre posé.
+  assert.ok(/setCombien\(PAR_PAGE\)/.test(src), "le compteur ne se remet pas à zéro au changement de filtre");
+  // Le bouton doit dire COMBIEN il reste : muet, il laisse croire qu'on a tout vu.
+  assert.ok(/shop\.voir_plus/.test(src), "le bouton « voir plus » a disparu");
+  const i18n = readFileSync("src/components/shop/shopI18n.ts", "utf8");
+  assert.equal((i18n.match(/"shop\.voir_plus"/g) ?? []).length, 5, "le libellé manque dans une des cinq langues");
+  assert.ok(/"shop\.voir_plus": "[^"]*\{n\}/.test(i18n), "le bouton n'annonce pas le nombre restant");
+});
+
 console.log(`\n${passed} test(s) de pagination passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log(`  KO ${f}`); process.exit(1); }

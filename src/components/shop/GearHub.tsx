@@ -27,6 +27,15 @@ import type { Modele, Usage, Terrain } from "@/lib/shop/modele";
 const USAGES: Usage[] = ["quotidien", "polyvalent", "tempo", "competition", "trail_court", "trail_long", "amorti_max"];
 const TERRAINS: Terrain[] = ["route", "trail"];
 
+/**
+ * Modèles affichés avant d'en demander plus.
+ *
+ * ⚠️ 24 ET PAS 309. Chaque carte porte un dessin de semelle en SVG : la page servait
+ * 1 675 Ko de HTML — 687 SVG et 2 451 tracés — à un téléphone, pour des cartes que
+ * personne ne déroule jusqu'au bout. Mesuré le 03/09/2026.
+ */
+const PAR_PAGE = 24;
+
 function Chip({ actif, onClick, children }: { actif: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button type="button" onClick={onClick}
@@ -61,6 +70,13 @@ export function GearHub({ catalogue, profil, offres = {} }: {
   const [f, setF] = useState<Filtres>({});
   const [tri, setTri] = useState<Tri>("pertinence");
   const [compare, setCompare] = useState<string[]>([]);
+  /**
+   * ⚠️ ON N'AFFICHE PAS LES 309 MODÈLES D'UN COUP. Mesuré le 03/09/2026 : la page
+   * servait 1 675 Ko de HTML, dont l'essentiel en 687 SVG et 2 451 tracés — un dessin
+   * de semelle par modèle. Sur un téléphone, c'est plusieurs secondes de téléchargement
+   * puis de mise en page, pour des cartes que personne ne fera défiler jusqu'au bout.
+   */
+  const [combien, setCombien] = useState(PAR_PAGE);
 
   const pertinence = useMemo(() => classer(catalogue, profil), [catalogue, profil]);
   // La meilleure offre de chaque modèle, calculée une fois : elle sert au tri, aux
@@ -74,6 +90,13 @@ export function GearHub({ catalogue, profil, offres = {} }: {
     return m;
   }, [catalogue, offres]);
   const liste = useMemo(() => trier(filtrer(catalogue, f), tri, pertinence, parModele), [catalogue, f, tri, pertinence, parModele]);
+  // ⚠️ CHANGER DE FILTRE REVIENT AU DÉBUT. Sans cette remise à zéro, quelqu'un qui a
+  // déroulé jusqu'à 200 modèles puis filtre sur une marque verrait la liste entière de
+  // cette marque d'un coup — le gain disparaîtrait dès le premier filtre posé.
+  const cleFiltres = `${JSON.stringify(f)}|${tri}`;
+  const [dernierFiltre, setDernierFiltre] = useState(cleFiltres);
+  if (cleFiltres !== dernierFiltre) { setDernierFiltre(cleFiltres); setCombien(PAR_PAGE); }
+  const visibles = liste.slice(0, combien);
   // Les plus fortes remises du moment, tous filtres confondus : c'est une vitrine, pas
   // un résultat de recherche.
   const promos = useMemo(() => [...parModele.entries()]
@@ -261,7 +284,7 @@ export function GearHub({ catalogue, profil, offres = {} }: {
           </Card>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {liste.map((m) => {
+            {visibles.map((m) => {
               const avis = evaluer(m, profil);
               const choisi = compare.includes(m.slug);
               return (
@@ -355,6 +378,17 @@ export function GearHub({ catalogue, profil, offres = {} }: {
                 </Card>
               );
             })}
+          </div>
+        )}
+
+        {visibles.length < liste.length && (
+          <div className="mt-4 text-center">
+            {/* ⚠️ LE NOMBRE RESTANT EST AFFICHÉ. Un bouton « voir plus » muet laisse
+                croire qu'on a tout vu, ce qui est pire que la liste complète. */}
+            <button type="button" onClick={() => setCombien((n) => n + PAR_PAGE)}
+              className="rounded-xl border border-zinc-200 bg-white px-5 py-2.5 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50">
+              {tx("shop.voir_plus", { n: liste.length - visibles.length })}
+            </button>
           </div>
         )}
 
