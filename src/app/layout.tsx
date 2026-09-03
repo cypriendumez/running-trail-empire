@@ -21,6 +21,17 @@ export const metadata: Metadata = {
   // dire ce que l'app FAIT concrètement pour le coureur, ni d'où vient le nom.
   description:
     "Pace Your Evolution. Ta montre mesure déjà tout : VFC, sommeil, charge, allures. Pacevo en fait une séance recalculée à chaque synchronisation.",
+  /**
+   * ⚠️ LE JETON DE VÉRIFICATION SE POSE SUR L'HÉBERGEMENT, PAS DANS LE CODE. La Search
+   * Console de Google exige de prouver qu'on possède le domaine ; la méthode la plus
+   * simple est une balise dans l'en-tête. En la lisant dans l'environnement, Cyprien —
+   * ou un acheteur — colle son propre jeton depuis le tableau de bord Vercel, sans
+   * modification du code ni redéploiement. Même raisonnement qu'`ADMIN_EMAILS` et
+   * `EDITEUR_STATUT`. Absente, la balise n'est simplement pas émise.
+   */
+  verification: process.env.GOOGLE_SITE_VERIFICATION
+    ? { google: process.env.GOOGLE_SITE_VERIFICATION }
+    : undefined,
   keywords: [
     "running", "trail", "course à pied", "entraînement", "plan d'entraînement",
     "VMA", "biomécanique", "GPX", "Garmin", "Coros", "UTMB",
