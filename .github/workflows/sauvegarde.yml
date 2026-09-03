@@ -78,11 +78,29 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          set -euo pipefail
-          npx --yes tsx scripts/sauvegarde.ts
+          set -uo pipefail
+          # ⚠️ L'ERREUR DOIT SORTIR DU JOURNAL. Les journaux d'exécution sont réservés aux
+          # administrateurs du dépôt : un échec y reste illisible pour quiconque aide à
+          # distance, et la page du run n'affiche que « exit code 1 ». On capture donc la
+          # sortie et on la republie en ANNOTATION, qui est lisible par l'API publique.
+          if ! npx --yes tsx scripts/sauvegarde.ts 2>&1 | tee /tmp/sortie.txt; then
+            echo "::error::Export échoué — $(tail -c 800 /tmp/sortie.txt | tr '\n' ' ')"
+            exit 1
+          fi
+          if grep -q "^ÉCHEC\|absente(s)\|REFUSÉ" /tmp/sortie.txt; then
+            echo "::error::Export échoué — $(tail -c 800 /tmp/sortie.txt | tr '\n' ' ')"
+            exit 1
+          fi
           # ⚠️ ON RELIT CE QU'ON VIENT D'ÉCRIRE. Un export interrompu produit un JSON
           # valide mais amputé : seule la relecture du manifeste le révèle.
-          npx --yes tsx scripts/sauvegarde.ts --verifie
+          if ! npx --yes tsx scripts/sauvegarde.ts --verifie 2>&1 | tee /tmp/verif.txt; then
+            echo "::error::Vérification échouée — $(tail -c 800 /tmp/verif.txt | tr '\n' ' ')"
+            exit 1
+          fi
+          if grep -q "INEXPLOITABLE" /tmp/verif.txt; then
+            echo "::error::Archive inexploitable — $(tail -c 800 /tmp/verif.txt | tr '\n' ' ')"
+            exit 1
+          fi
 
       - name: Publier l'archive
         uses: actions/upload-artifact@v4
