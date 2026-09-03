@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
 import { Metadata } from "next";
+import { Automatisation } from "@/components/admin/Automatisation";
 
 export const metadata: Metadata = { title: "Admin — Pacevo" };
 
@@ -29,5 +30,12 @@ export default async function AdminPage() {
     workout_count: (workoutCounts as Record<string, number>)?.[p.id] ?? 0,
   }));
 
-  return <AdminDashboard users={users} />;
+  return (
+    <div className="space-y-5">
+      {/* L'état de l'automatisation en tête : c'est la première question qu'on se pose
+          en ouvrant cet écran, et la seule à laquelle rien ne répondait. */}
+      <Automatisation />
+      <AdminDashboard users={users} />
+    </div>
+  );
 }
