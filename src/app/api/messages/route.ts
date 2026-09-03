@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { emailEditeur } from "@/lib/admin/acces";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { peutEcrire, type Lien } from "@/lib/social/amis";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 type Attachment = { url: string; name: string; type: string };
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const admin = createAdminClient();
-  const b = await req.json() as { action?: string; id?: string; subject?: string; body?: string; attachments?: unknown };
+  const b = await req.json() as { action?: string; id?: string; subject?: string; body?: string; attachments?: unknown; to?: string };
 
   if (b.action === "restore" && b.id) {
     const { data: row } = await admin.from("notifications").select("data").eq("id", b.id).eq("user_id", user.id).single();
@@ -27,6 +28,44 @@ export async function POST(req: Request) {
 
   const atts = cleanAtt(b.attachments);
   if (!b.body?.trim() && atts.length === 0) return NextResponse.json({ error: "Message vide" }, { status: 400 });
+
+  // ── MESSAGE À UN AUTRE ATHLÈTE ─────────────────────────────────────────────
+  //
+  // ⚠️ LE DROIT D'ÉCRIRE SE VÉRIFIE ICI, PAS DANS LA LISTE DE CONTACTS. Masquer un
+  // destinataire à l'écran n'empêche personne d'appeler cette route à la main avec
+  // l'identifiant de son choix — et un athlète n'a pas à recevoir un message de
+  // quelqu'un qu'il n'a pas choisi.
+  const destinataire = String(b.to ?? "").trim();
+  if (destinataire) {
+    const { data: liens } = await admin.from("follows")
+      .select("follower_id,following_id")
+      .or(`follower_id.eq.${user.id},following_id.eq.${user.id}`);
+    if (!peutEcrire(user.id, destinataire, (liens ?? []) as Lien[])) {
+      // On ne dit pas si la personne existe : répondre « athlète inconnu » d'un côté et
+      // « pas ami » de l'autre laisserait deviner qui est inscrit.
+      return NextResponse.json({ error: "Vous ne pouvez pas écrire à cet athlète." }, { status: 403 });
+    }
+    const { data: moi } = await admin.from("profiles").select("full_name").eq("id", user.id).single();
+    const expediteur = String(moi?.full_name ?? "").trim() || "Un athlète";
+    const contenu = {
+      from: "athlete", from_id: user.id, from_name: expediteur, to_id: destinataire,
+      subject: String(b.subject ?? "").slice(0, 120), body: String(b.body ?? "").slice(0, 2000),
+      attachments: atts, ts: new Date().toISOString(),
+    };
+    // Deux lignes : celle du destinataire alimente sa boîte de réception, celle de
+    // l'expéditeur son dossier « Envoyés ». Une seule ligne obligerait chaque lecture à
+    // interroger les deux sens, et le dossier « Envoyés » resterait vide.
+    const { error: eEnvoi } = await admin.from("notifications").insert([
+      { user_id: destinataire, type: "athlete_message",
+        title: `${expediteur} — ${(b.subject?.trim() || "Message").slice(0, 60)}`,
+        body: (b.body || `📎 ${atts.length} pièce(s) jointe(s)`).slice(0, 200), data: contenu },
+      { user_id: user.id, type: "athlete_message_sent",
+        title: (b.subject?.trim() || "Message").slice(0, 80),
+        body: (b.body || `📎 ${atts.length} pièce(s) jointe(s)`).slice(0, 200), data: contenu },
+    ]);
+    if (eEnvoi) return NextResponse.json({ error: eEnvoi.message }, { status: 500 });
+    return NextResponse.json({ ok: true, a: destinataire });
+  }
 
   const { data: ins, error } = await admin.from("notifications").insert({
     user_id: user.id, type: "client_message",

@@ -29,7 +29,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const [{ data: profile }, { count: unreadMessages }, { data: settingsRow }] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase.from("notifications").select("id", { count: "exact", head: true })
-      .eq("user_id", user.id).eq("type", "coach_message").eq("read", false),
+      // La pastille compte AUSSI les messages d'athlètes : un message qu'on ne voit pas
+      // arriver est un message auquel on ne répond pas.
+      .eq("user_id", user.id).in("type", ["coach_message", "athlete_message"]).eq("read", false),
     supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "user_settings").maybeSingle(),
   ]);
   const avatarColor = String(((settingsRow?.data ?? {}) as Record<string, unknown>).avatarColor ?? "emerald");

@@ -25,6 +25,7 @@ const DRAFT_KEY = "rte:draft:client";
 const M: Record<string, Record<string, string>> = {
   fr: {
     "f.received": "Boîte de réception", "f.sent": "Envoyés", "f.drafts": "Brouillons", "f.all": "Tous les messages", "f.trash": "Corbeille",
+    "amis": "Tes amis", "amisVides": "Aucun ami pour l'instant. Suis un athlète depuis le Club — vous pourrez échanger dès qu'il te suivra en retour.", "aCoach": "Au coach", "aAmi": "À {nom}",
     "new": "Nouveau message", "coachYou": "Ton coach", "sla": "Réponse sous 24-48 h",
     "searchPh": "Rechercher dans les messages…",
     "cnt.draft": "brouillon", "cnt.drafts": "brouillons", "cnt.msg": "message", "cnt.msgs": "messages",
@@ -47,6 +48,7 @@ const M: Record<string, Record<string, string>> = {
   },
   en: {
     "f.received": "Inbox", "f.sent": "Sent", "f.drafts": "Drafts", "f.all": "All messages", "f.trash": "Trash",
+    "amis": "Your friends", "amisVides": "No friends yet. Follow an athlete from the Club — you can talk as soon as they follow you back.", "aCoach": "To coach", "aAmi": "To {nom}",
     "new": "New message", "coachYou": "Your coach", "sla": "Replies within 24-48 h",
     "searchPh": "Search messages…",
     "cnt.draft": "draft", "cnt.drafts": "drafts", "cnt.msg": "message", "cnt.msgs": "messages",
@@ -69,6 +71,7 @@ const M: Record<string, Record<string, string>> = {
   },
   de: {
     "f.received": "Posteingang", "f.sent": "Gesendet", "f.drafts": "Entwürfe", "f.all": "Alle Nachrichten", "f.trash": "Papierkorb",
+    "amis": "Deine Freunde", "amisVides": "Noch keine Freunde. Folge einem Athleten im Club — ihr könnt schreiben, sobald er zurückfolgt.", "aCoach": "An den Coach", "aAmi": "An {nom}",
     "new": "Neue Nachricht", "coachYou": "Dein Coach", "sla": "Antwort innerhalb von 24-48 h",
     "searchPh": "Nachrichten durchsuchen…",
     "cnt.draft": "Entwurf", "cnt.drafts": "Entwürfe", "cnt.msg": "Nachricht", "cnt.msgs": "Nachrichten",
@@ -91,6 +94,7 @@ const M: Record<string, Record<string, string>> = {
   },
   es: {
     "f.received": "Bandeja de entrada", "f.sent": "Enviados", "f.drafts": "Borradores", "f.all": "Todos los mensajes", "f.trash": "Papelera",
+    "amis": "Tus amigos", "amisVides": "Aún no tienes amigos. Sigue a un atleta desde el Club — podréis hablar en cuanto te siga de vuelta.", "aCoach": "Al coach", "aAmi": "A {nom}",
     "new": "Nuevo mensaje", "coachYou": "Tu coach", "sla": "Respuesta en 24-48 h",
     "searchPh": "Buscar en los mensajes…",
     "cnt.draft": "borrador", "cnt.drafts": "borradores", "cnt.msg": "mensaje", "cnt.msgs": "mensajes",
@@ -113,6 +117,7 @@ const M: Record<string, Record<string, string>> = {
   },
   pt: {
     "f.received": "Caixa de entrada", "f.sent": "Enviadas", "f.drafts": "Rascunhos", "f.all": "Todas as mensagens", "f.trash": "Lixo",
+    "amis": "Os teus amigos", "amisVides": "Ainda sem amigos. Segue um atleta no Clube — podem falar assim que ele te seguir de volta.", "aCoach": "Ao coach", "aAmi": "Para {nom}",
     "new": "Nova mensagem", "coachYou": "O teu coach", "sla": "Resposta em 24-48 h",
     "searchPh": "Pesquisar nas mensagens…",
     "cnt.draft": "rascunho", "cnt.drafts": "rascunhos", "cnt.msg": "mensagem", "cnt.msgs": "mensagens",
@@ -255,11 +260,25 @@ export function MessageThread({ initial }: { initial: Msg[] }) {
     finally { setUploading(false); if (fileRef.current) fileRef.current.value = ""; }
   };
 
+  // ⚠️ LA LISTE VIENT DU SERVEUR, ET LE DROIT D'ÉCRIRE Y EST REVÉRIFIÉ. Ce qu'on
+  // affiche ici n'est qu'un confort : la route refuse un destinataire non réciproque,
+  // qu'il soit dans cette liste ou non.
+  const [amis, setAmis] = useState<{ id: string; nom: string }[]>([]);
+  const [aQui, setAQui] = useState<string>("");
+  useEffect(() => {
+    let vivant = true;
+    fetch("/api/social/amis")
+      .then((r) => (r.ok ? r.json() : { amis: [] }))
+      .then((j) => { if (vivant) setAmis(Array.isArray(j.amis) ? j.amis : []); })
+      .catch(() => { /* la messagerie du coach doit marcher même si cette liste échoue */ });
+    return () => { vivant = false; };
+  }, []);
+
   const doSend = async () => {
     if ((!body.trim() && pending.length === 0) || sending) return;
     setSending(true);
     try {
-      const r = await fetch("/api/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ subject, body, attachments: pending }) });
+      const r = await fetch("/api/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ subject, body, attachments: pending, to: aQui || undefined }) });
       const j = await r.json();
       if (j.ok) {
         const id = j.id || `tmp-${Date.now()}`;
@@ -314,7 +333,9 @@ export function MessageThread({ initial }: { initial: Msg[] }) {
           })}
         </nav>
         <div className="border-t border-zinc-100 p-3">
-          <div className="flex items-center gap-2.5 rounded-2xl bg-white p-2.5 ring-1 ring-zinc-100">
+          <button type="button" onClick={() => { setAQui(""); setMode("compose"); }}
+            className={`flex w-full items-center gap-2.5 rounded-2xl p-2.5 text-left ring-1 transition-colors ${
+              aQui === "" ? "bg-emerald-50 ring-emerald-200" : "bg-white ring-zinc-100 hover:bg-zinc-50"}`}>
             <div className="relative">
               <Avatar coach />
               <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-500" />
@@ -323,7 +344,29 @@ export function MessageThread({ initial }: { initial: Msg[] }) {
               <div className="truncate text-[13px] font-semibold text-zinc-800">{d["coachYou"]}</div>
               <div className="truncate text-[11px] text-zinc-400">{d["sla"]}</div>
             </div>
-          </div>
+          </button>
+
+          {/* ── LES AMIS ────────────────────────────────────────────────────────
+              Le suivi est à SENS UNIQUE dans ce produit : n'apparaissent ici que les
+              athlètes qu'on suit ET qui nous suivent. Sans cette réciprocité, il
+              suffirait de suivre quelqu'un pour lui écrire. */}
+          <div className="mt-3 text-[10px] font-bold uppercase tracking-wide text-zinc-400">{d["amis"]}</div>
+          {amis.length === 0 ? (
+            <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-400">{d["amisVides"]}</p>
+          ) : (
+            <div className="mt-1.5 space-y-1">
+              {amis.map((a) => (
+                <button key={a.id} type="button" onClick={() => { setAQui(a.id); setMode("compose"); }}
+                  className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors ${
+                    aQui === a.id ? "bg-emerald-50 ring-1 ring-emerald-200" : "hover:bg-zinc-50"}`}>
+                  <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-zinc-900 text-[11px] font-bold text-white">
+                    {a.nom.charAt(0).toUpperCase()}
+                  </span>
+                  <span className="truncate text-[13px] font-medium text-zinc-800">{a.nom}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </aside>
 
@@ -413,7 +456,15 @@ export function MessageThread({ initial }: { initial: Msg[] }) {
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-5">
               <div className="flex items-center gap-2 text-sm">
                 <span className="w-12 flex-shrink-0 text-zinc-400">{d["to"]}</span>
-                <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 py-1 pl-1 pr-3 ring-1 ring-emerald-100"><Avatar coach /><span className="text-[13px] font-semibold text-emerald-800">{d["coachYou"]}</span></span>
+                {/* ⚠️ LE DESTINATAIRE EST AFFICHÉ. Sans cela, on choisit un ami dans la
+                    colonne de gauche puis on écrit en croyant s'adresser au coach —
+                    et le message part chez quelqu'un d'autre. */}
+                <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 py-1 pl-1 pr-3 ring-1 ring-emerald-100">
+                  <Avatar coach />
+                  <span className="text-[13px] font-semibold text-emerald-800">
+                    {aQui ? (amis.find((a) => a.id === aQui)?.nom ?? d["coachYou"]) : d["coachYou"]}
+                  </span>
+                </span>
               </div>
               <div className="flex items-center gap-2 border-b border-zinc-100 pb-2">
                 <span className="w-12 flex-shrink-0 text-sm text-zinc-400">{d["subject"]}</span>

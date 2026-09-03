@@ -25,20 +25,27 @@ export default async function MessagesPage() {
   const [{ data }, { data: profileRow }] = await Promise.all([
     sb.from("notifications")
       .select("id, type, data, created_at")
-      .eq("user_id", user.id).in("type", ["client_message", "coach_message"])
+      // ⚠️ LES QUATRE TYPES. Les messages entre athlètes s'écrivent en deux lignes —
+      // `athlete_message` chez le destinataire, `athlete_message_sent` chez l'expéditeur —
+      // sans quoi le dossier « Envoyés » resterait vide de son côté.
+      .eq("user_id", user.id).in("type", ["client_message", "coach_message", "athlete_message", "athlete_message_sent"])
       .order("created_at", { ascending: true }).limit(200),
     sb.from("profiles").select("preferred_language").eq("id", user.id).single(),
   ]);
   const l = L[normLang(profileRow?.preferred_language ?? "fr")] ?? L.fr;
 
   const initial: Msg[] = (data ?? []).map((r) => {
-    const d = (r.data ?? {}) as { subject?: string; body?: string; ts?: string; attachments?: { url: string; name: string; type: string }[]; deleted?: boolean };
-    return { id: String(r.id), from: r.type === "coach_message" ? "coach" : "client", subject: d.subject || "", body: d.body || "", ts: d.ts || (r.created_at as string), attachments: Array.isArray(d.attachments) ? d.attachments : [], deleted: !!d.deleted };
+    const d = (r.data ?? {}) as { subject?: string; body?: string; ts?: string; attachments?: { url: string; name: string; type: string }[]; deleted?: boolean; from_name?: string; from_id?: string; to_id?: string };
+    // Un message reçu d'un athlète est « à moi » comme un message du coach ; un message
+    // que J'AI envoyé est à ranger dans « Envoyés », d'où la distinction par type.
+    const from = r.type === "coach_message" || r.type === "athlete_message" ? "coach" : "client";
+    const auteur = r.type === "athlete_message" ? String(d.from_name ?? "").trim() : "";
+    return { id: String(r.id), from, subject: auteur ? `${auteur} — ${d.subject || ""}` : (d.subject || ""), body: d.body || "", ts: d.ts || (r.created_at as string), attachments: Array.isArray(d.attachments) ? d.attachments : [], deleted: !!d.deleted };
   });
 
   // Dès l'ouverture, les réponses du coach sont considérées lues → la pastille de la sidebar disparaît.
   await createAdminClient().from("notifications").update({ read: true })
-    .eq("user_id", user.id).eq("type", "coach_message").eq("read", false);
+    .eq("user_id", user.id).in("type", ["coach_message", "athlete_message"]).eq("read", false);
 
   return (
     <div className="flex h-full flex-col">
