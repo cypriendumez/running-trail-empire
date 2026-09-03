@@ -11,10 +11,10 @@ export type LangCourses = "fr" | "en" | "de" | "es" | "pt";
 export const C: Record<LangCourses, Record<string, string>> = {
   fr: {
     "index.titre": "Calendrier des courses et trails en France",
-    "index.titreRegion": "Courses et trails en {region}",
+    "index.titreRegion": "Courses et trails {region}",
     "index.sous": "Dates, distances, dénivelé et lien d'inscription officiel. Les prochaines épreuves d'abord.",
     "index.meta": "Le calendrier des courses à pied, trails et ultras en France : dates, distances, dénivelé et lien d'inscription officiel.",
-    "index.metaRegion": "Toutes les courses à pied et trails à venir en {region} : dates, distances, dénivelé et inscription.",
+    "index.metaRegion": "Toutes les courses à pied et trails à venir {region} : dates, distances, dénivelé et inscription.",
     "index.toutes": "Toutes", "index.vide": "Aucune course à venir n'est enregistrée pour cette région.",
     "index.limite": "Les {n} prochaines épreuves.", "fil.courses": "Courses",
     "f.distance": "Distance", "f.denivele": "Dénivelé positif", "f.terrain": "Terrain",

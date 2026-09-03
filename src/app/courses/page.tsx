@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPublicLang } from "@/lib/i18n/serverLang";
-import { nomAffichable, nomRegion, regionCanonique, ECRITURES_REGION } from "@/lib/races/libelles";
+import { nomAffichable, nomRegion, regionCanonique, regionAvecPreposition, ECRITURES_REGION } from "@/lib/races/libelles";
 import { texteCourses } from "./coursesI18n";
 import { jourFrance } from "@/lib/races/jourFrance";
 import { DATE_INCONNUE, slugCourse, dateEnClair, type CoursePublique } from "@/lib/races/publique";
@@ -14,8 +14,12 @@ const CHAMPS = "id,name,city,department,region,date,distance_km,elevation_gain_m
 
 export async function generateMetadata({ searchParams }: { searchParams: Promise<{ region?: string }> }): Promise<Metadata> {
   const brut = (await searchParams).region?.trim();
-  const region = brut ? nomRegion(brut) : "";
   const lang = await getPublicLang();
+  // ⚠️ EN FRANÇAIS, LA PRÉPOSITION FAIT PARTIE DU NOM DE LA RÉGION (« dans le Grand
+  // Est »). Les autres langues portent la leur dans le modèle (« in {region} »), donc
+  // elles reçoivent le nom nu. Le paramètre reste le même partout : c'est sa VALEUR qui
+  // s'adapte, ce qui laisse les cinq phrases structurellement identiques.
+  const region = brut ? (lang === "fr" ? regionAvecPreposition(brut) : nomRegion(brut)) : "";
   const titre = region
     ? texteCourses(lang, "index.titreRegion", { region })
     : texteCourses(lang, "index.titre");
@@ -34,8 +38,8 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
 export default async function CoursesPage({ searchParams }: { searchParams: Promise<{ region?: string }> }) {
   const brut = (await searchParams).region?.trim();
   const canonique = brut ? regionCanonique(brut) : "";
-  const region = brut ? nomRegion(brut) : "";
   const lang = await getPublicLang();
+  const region = brut ? (lang === "fr" ? regionAvecPreposition(brut) : nomRegion(brut)) : "";
   const t = (k: string, p?: Record<string, string | number>) => texteCourses(lang, k, p);
   const sb = createAdminClient();
   const auj = jourFrance();

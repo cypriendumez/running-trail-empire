@@ -68,6 +68,29 @@ export function nomRegion(slug: unknown): string {
 }
 
 /**
+ * La région précédée de sa préposition, en français : « en Bretagne », « dans le Grand
+ * Est », « à La Réunion ».
+ *
+ * ⚠️ LA PRÉPOSITION N'EST PAS INTERCHANGEABLE. Un modèle figé « en {région} » écrivait
+ * « en Grand Est », « en Hauts-de-France » et « en La Réunion » dans le titre de page —
+ * ce que voit un lecteur français dans sa liste de résultats, et ce qui distingue à
+ * l'œil nu un site rédigé d'un site généré.
+ * Les autres langues n'en ont pas besoin : leur modèle porte déjà « in {region} ».
+ */
+const PREPOSITION: Record<string, string> = {
+  "grand-est": "dans le", "centre-val-de-loire": "dans le",
+  "hauts-de-france": "dans les", "pays-de-la-loire": "dans les",
+  "la-reunion": "à", "guadeloupe": "en", "guyane": "en", "martinique": "en", "mayotte": "à",
+};
+
+export function regionAvecPreposition(slug: unknown): string {
+  const nom = nomRegion(slug);
+  if (!nom) return "";
+  // « en » par défaut : c'est le cas de la majorité des régions métropolitaines.
+  return `${PREPOSITION[regionCanonique(slug)] ?? "en"} ${nom}`;
+}
+
+/**
  * Les écritures acceptées pour un identifiant canonique, l'identifiant lui-même compris.
  * Sert à FILTRER : chercher une seule écriture laisserait des courses inatteignables.
  */

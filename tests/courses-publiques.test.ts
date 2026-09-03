@@ -12,7 +12,7 @@ import {
   dateEnClair, DATE_INCONNUE,
 } from "../src/lib/races/publique";
 import { C } from "../src/app/courses/coursesI18n";
-import { nomRegion, regionCanonique, nomAffichable, ECRITURES_REGION } from "../src/lib/races/libelles";
+import { nomRegion, regionCanonique, regionAvecPreposition, nomAffichable, ECRITURES_REGION } from "../src/lib/races/libelles";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -264,6 +264,28 @@ test("un nom de course est écrit comme un titre français, sans abîmer les sig
   }
   assert.equal(nomAffichable(null), "");
   assert.equal(nomAffichable("   "), "");
+});
+
+test("chaque région porte SA préposition, pas un « en » universel", () => {
+  // ⚠️ UN MODÈLE FIGÉ « en {région} » écrivait « en Grand Est », « en Hauts-de-France »
+  // et « en La Réunion » dans le TITRE DE PAGE — la ligne qu'un lecteur français voit
+  // dans sa liste de résultats, et ce qui distingue à l'œil nu un site rédigé d'un site
+  // généré à la chaîne.
+  assert.equal(regionAvecPreposition("bretagne"), "en Bretagne");
+  assert.equal(regionAvecPreposition("grand-est"), "dans le Grand Est");
+  assert.equal(regionAvecPreposition("hauts-de-france"), "dans les Hauts-de-France");
+  assert.equal(regionAvecPreposition("pays-de-la-loire"), "dans les Pays de la Loire");
+  assert.equal(regionAvecPreposition("centre-val-de-loire"), "dans le Centre-Val de Loire");
+  assert.equal(regionAvecPreposition("la-reunion"), "à La Réunion");
+  // La forme fautive ne doit apparaître nulle part.
+  for (const r of ["grand-est", "hauts-de-france", "la-reunion", "centre-val-de-loire", "pays-de-la-loire"]) {
+    assert.ok(!regionAvecPreposition(r).startsWith("en "), `« en ${nomRegion(r)} » ne se dit pas`);
+  }
+  assert.equal(regionAvecPreposition(null), "", "une région absente produit une préposition orpheline");
+  // Le modèle français ne doit plus porter le « en » : il arrive avec la région.
+  assert.ok(!/en \{region\}/.test(C.fr["index.titreRegion"] ?? ""),
+    "le modèle français a repris un « en » figé : la préposition serait écrite deux fois");
+  assert.ok(/\{region\}/.test(C.en["index.titreRegion"] ?? ""), "le modèle anglais a perdu son paramètre");
 });
 
 test("les pages publiques emploient bien ces libellés", () => {
