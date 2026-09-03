@@ -7,11 +7,19 @@ import { nomAffichable, nomRegion, regionCanonique } from "@/lib/races/libelles"
 import { texteCourses } from "../coursesI18n";
 import { jourFrance } from "@/lib/races/jourFrance";
 import {
-  estPubliable, idDepuisSlug, bornesId, slugCourse, titrePage, descriptionPage, dateEnClair,
+  estPubliable, estPubliableSansDate, aUneDate, idDepuisSlug, bornesId, slugCourse,
+  titrePage, descriptionPage, dateEnClair,
   type CoursePublique,
 } from "@/lib/races/publique";
 
 export const revalidate = 3600;
+
+/**
+ * Une course a une page si elle est datée ET à venir, OU si elle n'a pas encore de date
+ * annoncée. Les 6 401 courses du second cas ne produisaient aucune page alors qu'elles
+ * portent la réponse à « où et comment courir le Trail des Galopins ? ».
+ */
+const publiable = (c: CoursePublique) => estPubliable(c, jourFrance()) || estPubliableSansDate(c);
 
 const CHAMPS = "id,name,city,department,region,date,distance_km,elevation_gain_m,type,terrain,registration_url,latitude,longitude,organization,description,is_itra_certified,itra_points";
 
@@ -34,7 +42,7 @@ async function lire(slug: string): Promise<CoursePublique | null> {
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const c = await lire((await params).slug);
-  if (!c || !estPubliable(c, jourFrance())) return { title: texteCourses(await getPublicLang(), "introuvable") };
+  if (!c || !publiable(c)) return { title: texteCourses(await getPublicLang(), "introuvable") };
   const titre = titrePage(c);
   const description = descriptionPage(c);
   return {
@@ -59,7 +67,7 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
   // ⚠️ LE MÊME FILTRE QUE LE SITEMAP. Une course sans date réelle ou déjà courue n'a pas
   // de page : la publier laisserait en ligne une information périmée que Google
   // continuerait de servir pendant des semaines.
-  if (!c || !estPubliable(c, jourFrance())) notFound();
+  if (!c || !publiable(c)) notFound();
 
   const km = Number(c.distance_km);
   const dplus = Number(c.elevation_gain_m);
@@ -67,7 +75,10 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
 
   // Données structurées : c'est ce qui permet à un moteur d'afficher la date et le lieu
   // directement dans ses résultats. On ne déclare QUE des champs qu'on possède.
-  const jsonLd: Record<string, unknown> = {
+  // ⚠️ AUCUNE DONNÉE STRUCTURÉE D'ÉVÉNEMENT SANS DATE. `SportsEvent` exige `startDate` :
+  // en déclarer un sans date produirait une donnée invalide, et en inventer une serait
+  // pire — un moteur affiche cette date dans ses résultats comme un fait vérifié.
+  const jsonLd: Record<string, unknown> | null = !aUneDate(c) ? null : {
     "@context": "https://schema.org",
     "@type": "SportsEvent",
     name: nomAffichable(c.name),
@@ -88,7 +99,7 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
 
   return (
     <main className="mx-auto max-w-3xl px-5 py-10 sm:py-14">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      {jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />}
 
       <nav className="mb-6 text-sm text-zinc-500">
         <Link href="/courses" className="hover:text-zinc-900">{t("fil.courses")}</Link>
@@ -97,7 +108,10 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
 
       <h1 className="text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl">{nomAffichable(c.name)}</h1>
       <p className="mt-2 text-lg text-zinc-600">
-        {dateEnClair(String(c.date))}{lieu && ` · ${lieu}`}
+        {/* ⚠️ JAMAIS DE DATE INVENTÉE. « 2099-01-01 » est le repère interne de
+            « prochaine édition non annoncée » : l'écrire tel quel donnerait
+            « 1 janvier 2099 », et le taire laisserait croire à un oubli. */}
+        {aUneDate(c) ? dateEnClair(String(c.date)) : t("sansDate.liste")}{lieu && ` · ${lieu}`}
       </p>
 
       <dl className="mt-8 rounded-2xl border border-zinc-200 bg-white p-5">
@@ -107,6 +121,13 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
         {c.organization && <Ligne k={t("f.orga")} v={String(c.organization)} />}
         {c.is_itra_certified && <Ligne k={t("f.itra")} v={c.itra_points ? t("f.points", { n: c.itra_points }) : t("f.oui")} />}
       </dl>
+
+      {!aUneDate(c) && (
+        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+          <h2 className="text-sm font-bold text-amber-900">{t("sansDate.titre")}</h2>
+          <p className="mt-1 text-sm text-amber-900/80">{t("sansDate.texte")}</p>
+        </div>
+      )}
 
       {c.description && (
         <p className="mt-6 whitespace-pre-wrap leading-relaxed text-zinc-700">{c.description}</p>

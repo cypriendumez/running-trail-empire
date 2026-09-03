@@ -1,13 +1,15 @@
 import Link from "next/link";
-import { slugCourse, dateEnClair, type CoursePublique } from "@/lib/races/publique";
+import { slugCourse, dateEnClair, aUneDate, type CoursePublique } from "@/lib/races/publique";
 import { nomAffichable } from "@/lib/races/libelles";
 import { texteCourses } from "./coursesI18n";
 
 /** Rendu partagé par la page « toutes régions » et par chaque page de région. */
 export function Liste({
-  courses, regions, canonique, titre, lang, limite,
+  courses, sansDate = [], regions, canonique, titre, lang, limite,
 }: {
   courses: CoursePublique[];
+  /** Les épreuves dont la date n'est pas annoncée, listées à part. */
+  sansDate?: CoursePublique[];
   regions: { slug: string; nom: string }[];
   canonique: string;
   titre: string;
@@ -35,7 +37,7 @@ export function Liste({
         </nav>
       )}
 
-      {courses.length === 0 ? (
+      {courses.length === 0 && sansDate.length === 0 ? (
         // On dit qu'il n'y a rien : une page vide sans un mot laisse croire à une panne.
         <p className="mt-10 text-zinc-500">{t("index.vide")}</p>
       ) : (
@@ -64,6 +66,31 @@ export function Liste({
             );
           })}
         </ul>
+      )}
+
+      {sansDate.length > 0 && (
+        <section className="mt-10">
+          <h2 className="text-lg font-bold text-zinc-900">{t("index.sansDate")}</h2>
+          <ul className="mt-3 divide-y divide-zinc-100 rounded-2xl border border-zinc-200 bg-white">
+            {sansDate.map((c) => {
+              const km = Number(c.distance_km);
+              return (
+                <li key={c.id}>
+                  <Link href={`/courses/${slugCourse(c)}`}
+                    className="flex flex-col gap-0.5 px-5 py-3.5 hover:bg-zinc-50 sm:flex-row sm:items-baseline sm:gap-4">
+                    <span className="text-sm text-amber-700 sm:w-32 sm:flex-shrink-0">{t("sansDate.liste")}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-semibold text-zinc-900 sm:truncate">{nomAffichable(c.name)}</span>
+                      <span className="block text-sm text-zinc-500 sm:truncate">
+                        {[c.city, Number.isFinite(km) && km > 0 ? `${Math.round(km)} km` : ""].filter(Boolean).join(" · ")}
+                      </span>
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
       )}
 
       <p className="mt-6 text-sm text-zinc-400">

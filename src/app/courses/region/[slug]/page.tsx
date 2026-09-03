@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getPublicLang } from "@/lib/i18n/serverLang";
-import { regionsAvecCourses, prochainesCourses } from "@/lib/races/catalogue";
+import { regionsAvecCourses, prochainesCourses, sansDateAnnoncee } from "@/lib/races/catalogue";
 import { nomRegion, regionCanonique, regionAvecPreposition } from "@/lib/races/libelles";
 import { texteCourses } from "../../coursesI18n";
 import { Liste } from "../../Liste";
@@ -9,6 +9,8 @@ import { Liste } from "../../Liste";
 export const revalidate = 3600;
 
 const PAR_PAGE = 60;
+/** Volontairement plus court : ces épreuves informent, elles ne guident pas un choix de date. */
+const SANS_DATE_PAR_PAGE = 30;
 
 /**
  * ⚠️ PAS DE `generateStaticParams` ICI, ET C'EST DÉLIBÉRÉ. Je l'avais ajouté en croyant
@@ -39,15 +41,19 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function RegionPage({ params }: { params: Promise<{ slug: string }> }) {
   const demande = (await params).slug;
   const slug = regionCanonique(demande);
-  const [lang, regions, courses] = await Promise.all([
+  const [lang, regions, courses, sansDate] = await Promise.all([
     getPublicLang(), regionsAvecCourses(), prochainesCourses(slug, PAR_PAGE),
+    sansDateAnnoncee(slug, SANS_DATE_PAR_PAGE),
   ]);
   // Une région sans aucune course n'a pas de page : mieux vaut une 404 franche qu'une
   // page vide que les moteurs garderaient en réserve.
-  if (!regions.some((r) => r.slug === slug)) notFound();
+  // ⚠️ UNE RÉGION QUI N'A QUE DES ÉPREUVES NON DATÉES GARDE SA PAGE. Ne regarder que
+  // la liste des régions « avec courses à venir » l'aurait fait disparaître alors
+  // qu'elle a du contenu — et son lien, déclaré au sitemap, aurait répondu 404.
+  if (!regions.some((r) => r.slug === slug) && sansDate.length === 0) notFound();
   const region = lang === "fr" ? regionAvecPreposition(slug) : nomRegion(slug);
   return (
-    <Liste courses={courses} regions={regions} canonique={slug} lang={lang}
+    <Liste courses={courses} sansDate={sansDate} regions={regions} canonique={slug} lang={lang}
       titre={texteCourses(lang, "index.titreRegion", { region })} limite={PAR_PAGE} />
   );
 }

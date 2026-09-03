@@ -8,7 +8,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  estPubliable, motsUrl, slugCourse, idDepuisSlug, bornesId, titrePage, descriptionPage,
+  estPubliable, estPubliableSansDate, aUneDate, motsUrl, slugCourse, idDepuisSlug, bornesId,
+  titrePage, descriptionPage,
   dateEnClair, DATE_INCONNUE,
 } from "../src/lib/races/publique";
 import { C } from "../src/app/courses/coursesI18n";
@@ -358,6 +359,72 @@ test("les pages de région sont engendrées une fois, pas à chaque visite", () 
   const sm = nu("src/app/sitemap.ts");
   assert.ok(!/courses\?region=/.test(sm), "le sitemap déclare encore des adresses qui redirigent");
   assert.ok(/\/courses\/region\/\$\{r\}/.test(sm), "le sitemap ne déclare plus les pages de région");
+});
+
+// ── LES ÉPREUVES SANS DATE ANNONCÉE ────────────────────────────────────────────
+test("une course sans date annoncée obtient une page, mais jamais une fausse date", () => {
+  // ⚠️ 6 401 COURSES (37 % DU CATALOGUE) NE PRODUISAIENT AUCUNE PAGE. Leur date porte
+  // « 2099-01-01 », qui signifie « prochaine édition non annoncée ». Elles ont pourtant
+  // un nom, une ville, une distance et le lien officiel — la réponse à « où et comment
+  // courir le Trail des Galopins ? », que des coureurs cherchent toute l'année.
+  const sd = { ...base, date: DATE_INCONNUE };
+  assert.equal(estPubliableSansDate(sd), true, "une course non datée reste sans page");
+  assert.equal(aUneDate(sd), false);
+  assert.equal(estPubliable(sd, AUJ), false, "elle ne doit PAS passer par le chemin des courses datées");
+
+  // Les deux prédicats ne doivent jamais se recouvrir : une course a UN statut.
+  assert.equal(estPubliableSansDate(base), false, "une course datée passe aussi par le chemin « sans date »");
+  assert.equal(aUneDate(base), true);
+
+  // Mêmes exigences de fond : sans quoi, où, ni comment s'inscrire, pas de page.
+  for (const manque of [{ name: "" }, { name: "AB" }, { city: null }, { registration_url: "  " }]) {
+    assert.equal(estPubliableSansDate({ ...sd, ...manque }), false, `publiée malgré ${JSON.stringify(manque)}`);
+  }
+
+  // ⚠️ ET AUCUNE DATE N'APPARAÎT NULLE PART. « 2099 » ne doit jamais devenir
+  // « 1 janvier 2099 », ni dans le titre, ni dans la description.
+  const t = titrePage(sd), d = descriptionPage(sd);
+  assert.ok(!/2099/.test(t + d), `le repère interne fuit à l'écran : ${t} / ${d}`);
+  assert.ok(!/janvier 2099|le 1 /.test(d), `une fausse date est écrite : ${d}`);
+  assert.ok(!/^.*\bdate\b/i.test(d.split(".").slice(1).join(".")) || !/Date,/.test(d),
+    `la description promet une date absente : ${d}`);
+});
+
+test("aucune donnée structurée d'événement sans date", () => {
+  // ⚠️ `SportsEvent` EXIGE `startDate`. En déclarer un sans date produit une donnée
+  // invalide ; en inventer une serait pire, car un moteur affiche cette date dans ses
+  // résultats comme un fait vérifié.
+  const page = readFileSync("src/app/courses/[slug]/page.tsx", "utf8");
+  assert.ok(/!aUneDate\(c\) \? null :/.test(page),
+    "les données structurées d'événement sont émises même sans date");
+  assert.ok(/\{jsonLd && <script/.test(page), "le bloc est rendu même quand il vaut null");
+  // Et la page doit DIRE que la date manque, au lieu de laisser un blanc.
+  assert.ok(/sansDate\.titre/.test(page) && /sansDate\.texte/.test(page),
+    "la page ne dit pas que la date n'est pas annoncée");
+  for (const lg of ["fr", "en", "de", "es", "pt"] as const) {
+    assert.ok((C[lg]["sansDate.texte"] ?? "").length > 40, `l'explication manque en ${lg}`);
+  }
+});
+
+test("le sitemap déclare ces pages, avec une priorité moindre", () => {
+  const sm = readFileSync("src/app/sitemap.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  assert.ok(/parcourir\(false\)/.test(sm), "les épreuves sans date ne sont pas déclarées au sitemap");
+  assert.ok(/gte\("date", DATE_INCONNUE\)/.test(sm), "le sitemap ne sait pas les sélectionner");
+  // ⚠️ VISER LE BLOC, PAS LE FICHIER. Le premier jet cherchait « 0.4 » n'importe où :
+  // la page de contact en porte déjà un, donc remonter la priorité des épreuves sans
+  // date laissait le test vert. Trouvé par mutation.
+  const iDatees = sm.indexOf("lignes.filter(exploitable)");
+  const iSansDate = sm.indexOf("sansDate.filter(exploitable)");
+  assert.ok(iDatees > 0 && iSansDate > iDatees, "les deux blocs d'adresses ne sont plus identifiables");
+  const prioDe = (i: number) => {
+    const m = /priority: (0\.\d+)/.exec(sm.slice(i, i + 400));
+    assert.ok(m, "aucune priorité déclarée dans ce bloc");
+    return Number(m![1]);
+  };
+  assert.ok(prioDe(iSansDate) < prioDe(iDatees),
+    `les pages sans date (${prioDe(iSansDate)}) sont annoncées comme équivalentes aux datées (${prioDe(iDatees)})`);
 });
 
 console.log(`\n${passed} test(s) des courses publiques passé(s), ${fails.length} échec(s)`);

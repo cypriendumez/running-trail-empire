@@ -52,6 +52,29 @@ export const regionsAvecCourses = unstable_cache(
   { revalidate: DUREE, tags: ["catalogue"] },
 );
 
+/**
+ * Les épreuves SANS date annoncée, par région.
+ *
+ * ⚠️ ELLES N'APPARAISSENT PAS DANS LA LISTE PRINCIPALE, qui est classée par date : sans
+ * date, elles s'y placeraient arbitrairement. Elles ont leur propre section, clairement
+ * annoncée. Sans ce maillage, leurs 6 401 fiches ne seraient atteignables que par le
+ * sitemap — et une page qu'aucun lien ne désigne est rarement visitée.
+ */
+export const sansDateAnnoncee = unstable_cache(
+  async (canonique: string, combien: number): Promise<CoursePublique[]> => {
+    const sb = createAdminClient();
+    let q = sb.from("races").select(CHAMPS)
+      .gte("date", DATE_INCONNUE)
+      .not("registration_url", "is", null)
+      .order("name", { ascending: true }).limit(combien);
+    if (canonique) q = q.in("region", ECRITURES_REGION[canonique] ?? [canonique]);
+    const { data } = await q;
+    return (data ?? []) as CoursePublique[];
+  },
+  ["sans-date-annoncee"],
+  { revalidate: DUREE, tags: ["catalogue"] },
+);
+
 /** Les prochaines épreuves, toutes régions ou pour une seule. */
 export const prochainesCourses = unstable_cache(
   async (canonique: string, combien: number): Promise<CoursePublique[]> => {

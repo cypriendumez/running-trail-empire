@@ -59,6 +59,36 @@ export function estPubliable(c: Partial<CoursePublique>, aujourdhui: string): bo
   return Boolean(String(c.registration_url ?? "").trim());
 }
 
+/**
+ * Cette course mérite-t-elle une page SANS date annoncée ?
+ *
+ * ⚠️ 6 401 COURSES (37 % DU CATALOGUE) NE PRODUISAIENT AUCUNE PAGE. Leur date porte le
+ * repère « 2099-01-01 », qui signifie « prochaine édition non encore annoncée ». Elles
+ * ont pourtant un nom, une ville, une distance et le lien officiel d'inscription —
+ * c'est-à-dire la réponse à « où et comment courir le Trail des Galopins ? », que des
+ * coureurs cherchent toute l'année. 3 231 portent même une description rédigée.
+ *
+ * ⚠️ ET LA DATE PASSÉE EST PERDUE. Le basculement vers 2099 l'a ÉCRASÉE sans rien
+ * conserver (aucune colonne `edition`, vérifié) : on ne peut donc pas écrire « l'édition
+ * précédente avait lieu le… ». La page dira qu'on ne sait pas, et rien de plus.
+ */
+export function estPubliableSansDate(c: Partial<CoursePublique>): boolean {
+  const nom = String(c.name ?? "").trim();
+  const ville = String(c.city ?? "").trim();
+  const date = String(c.date ?? "").slice(0, 10);
+  if (nom.length < 3 || !ville) return false;
+  // Ce prédicat ne couvre QUE les courses non datées : une course datée passe par
+  // `estPubliable`, qui vérifie en plus qu'elle n'est pas déjà courue.
+  if (date && date < DATE_INCONNUE) return false;
+  return Boolean(String(c.registration_url ?? "").trim());
+}
+
+/** Cette course a-t-elle une date annoncée ? Décide de tout le reste de la page. */
+export function aUneDate(c: Partial<CoursePublique>): boolean {
+  const date = String(c.date ?? "").slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) && date < DATE_INCONNUE;
+}
+
 /** Réduit un libellé à des mots utilisables dans une adresse. */
 export function motsUrl(s: string): string {
   return String(s ?? "")
@@ -139,7 +169,10 @@ export function titrePage(c: Partial<CoursePublique>): string {
 /** La description affichée aux moteurs : ce qu'on sait, et rien d'autre. */
 export function descriptionPage(c: Partial<CoursePublique>): string {
   const faits: string[] = [];
-  const d = dateEnClair(String(c.date ?? ""));
+  // ⚠️ AUCUNE DATE INVENTÉE POUR UNE COURSE QUI N'EN A PAS. « 2099 » n'est pas une
+  // date : `dateEnClair` la refuse déjà, mais l'écrire explicitement évite qu'un
+  // futur repli la fasse réapparaître sous la forme « le 1 janvier 2099 ».
+  const d = aUneDate(c) ? dateEnClair(String(c.date ?? "")) : "";
   if (d) faits.push(`le ${d}`);
   if (c.city) faits.push(`à ${String(c.city).trim()}`);
   if (c.department) faits.push(`(${String(c.department).trim()})`);
@@ -152,10 +185,14 @@ export function descriptionPage(c: Partial<CoursePublique>): string {
   // (« date, distance, dénivelé et inscription ») promettait un dénivelé sur des
   // milliers de courses qui n'en ont pas — une promesse non tenue dès le résultat de
   // recherche, avant même que le lecteur ait cliqué.
-  const contenu = ["Date", Number.isFinite(km) && km > 0 ? "distance" : "",
+  const contenu = [aUneDate(c) ? "date" : "", Number.isFinite(km) && km > 0 ? "distance" : "",
     Number.isFinite(d_) && d_ > 0 ? "dénivelé" : "", "lien d'inscription officiel"].filter(Boolean);
-  const fin = contenu.length > 1
-    ? `${contenu.slice(0, -1).join(", ")} et ${contenu[contenu.length - 1]}.`
-    : `${contenu[0]}.`;
+  // La première lettre passe en capitale quelle que soit l'entrée retenue : sans date,
+  // la phrase commence par « Distance », pas par « distance ».
+  const premier = String(contenu[0] ?? "");
+  const liste = [premier.charAt(0).toUpperCase() + premier.slice(1), ...contenu.slice(1)];
+  const fin = liste.length > 1
+    ? `${liste.slice(0, -1).join(", ")} et ${liste[liste.length - 1]}.`
+    : `${liste[0]}.`;
   return `${tete} ${faits.join(" ")}. ${fin}`.replace(/\s+/g, " ").trim();
 }

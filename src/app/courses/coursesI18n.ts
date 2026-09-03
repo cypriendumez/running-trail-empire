@@ -23,7 +23,8 @@ export const C: Record<LangCourses, Record<string, string>> = {
     "cta.avertissement": "Lien vers le site officiel de l'organisateur. Les informations sont données à titre indicatif : seul l'organisateur fait foi pour les dates, tarifs et conditions.",
     "prep.titre": "Se préparer pour cette course",
     "prep.texte": "Pacevo construit un plan d'entraînement qui vise cette date, l'ajuste à ta forme réelle et l'envoie sur ta montre.",
-    "prep.bouton": "Créer mon plan", "introuvable": "Course introuvable",
+    "prep.bouton": "Créer mon plan", "sansDate.titre": "Date non encore annoncée", "sansDate.texte": "L'organisateur n'a pas publié la date de la prochaine édition. Le lien ci-dessous mène à son site officiel, où elle paraîtra.", "sansDate.liste": "Date non annoncée", "index.sansDate": "Épreuves dont la date n'est pas encore annoncée",
+ "introuvable": "Course introuvable",
   },
   en: {
     "index.titre": "Running races and trails calendar in France",
@@ -39,7 +40,8 @@ export const C: Record<LangCourses, Record<string, string>> = {
     "cta.avertissement": "Link to the organiser's official website. Information is indicative only: the organiser alone is authoritative on dates, prices and conditions.",
     "prep.titre": "Train for this race",
     "prep.texte": "Pacevo builds a training plan aimed at this date, adjusts it to your actual fitness and sends it to your watch.",
-    "prep.bouton": "Build my plan", "introuvable": "Race not found",
+    "prep.bouton": "Build my plan", "sansDate.titre": "Date not announced yet", "sansDate.texte": "The organiser has not published the date of the next edition. The link below leads to their official site, where it will appear.", "sansDate.liste": "Date not announced", "index.sansDate": "Events whose date is not announced yet",
+ "introuvable": "Race not found",
   },
   de: {
     "index.titre": "Lauf- und Trailkalender in Frankreich",
@@ -55,7 +57,8 @@ export const C: Record<LangCourses, Record<string, string>> = {
     "cta.avertissement": "Link zur offiziellen Website des Veranstalters. Die Angaben sind unverbindlich: Für Termine, Preise und Bedingungen gilt allein der Veranstalter.",
     "prep.titre": "Für diesen Lauf trainieren",
     "prep.texte": "Pacevo erstellt einen Trainingsplan für dieses Datum, passt ihn an deine tatsächliche Form an und schickt ihn auf deine Uhr.",
-    "prep.bouton": "Plan erstellen", "introuvable": "Lauf nicht gefunden",
+    "prep.bouton": "Plan erstellen", "sansDate.titre": "Termin noch nicht bekannt", "sansDate.texte": "Der Veranstalter hat den Termin der nächsten Ausgabe noch nicht veröffentlicht. Der Link unten führt auf seine offizielle Seite, wo er erscheinen wird.", "sansDate.liste": "Termin offen", "index.sansDate": "Veranstaltungen ohne bekannten Termin",
+ "introuvable": "Lauf nicht gefunden",
   },
   es: {
     "index.titre": "Calendario de carreras y trails en Francia",
@@ -71,7 +74,8 @@ export const C: Record<LangCourses, Record<string, string>> = {
     "cta.avertissement": "Enlace a la web oficial del organizador. La información es orientativa: solo el organizador da fe de fechas, precios y condiciones.",
     "prep.titre": "Preparar esta carrera",
     "prep.texte": "Pacevo construye un plan de entrenamiento que apunta a esta fecha, lo ajusta a tu forma real y lo envía a tu reloj.",
-    "prep.bouton": "Crear mi plan", "introuvable": "Carrera no encontrada",
+    "prep.bouton": "Crear mi plan", "sansDate.titre": "Fecha aún no anunciada", "sansDate.texte": "El organizador no ha publicado la fecha de la próxima edición. El enlace de abajo lleva a su web oficial, donde aparecerá.", "sansDate.liste": "Fecha no anunciada", "index.sansDate": "Pruebas cuya fecha aún no se ha anunciado",
+ "introuvable": "Carrera no encontrada",
   },
   pt: {
     "index.titre": "Calendário de corridas e trails em França",
@@ -87,7 +91,8 @@ export const C: Record<LangCourses, Record<string, string>> = {
     "cta.avertissement": "Link para o site oficial do organizador. As informações são indicativas: só o organizador faz fé quanto a datas, preços e condições.",
     "prep.titre": "Preparar esta corrida",
     "prep.texte": "A Pacevo constrói um plano de treino que aponta para esta data, ajusta-o à tua forma real e envia-o para o teu relógio.",
-    "prep.bouton": "Criar o meu plano", "introuvable": "Corrida não encontrada",
+    "prep.bouton": "Criar o meu plano", "sansDate.titre": "Data ainda não anunciada", "sansDate.texte": "O organizador não publicou a data da próxima edição. O link abaixo leva ao seu site oficial, onde ela aparecerá.", "sansDate.liste": "Data não anunciada", "index.sansDate": "Provas cuja data ainda não foi anunciada",
+ "introuvable": "Corrida não encontrada",
   },
 };
 

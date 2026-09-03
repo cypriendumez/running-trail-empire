@@ -61,30 +61,48 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // 10 700 : 90 % du catalogue restait invisible, sans le moindre message d'erreur.
     // On pagine. `range` exige un `order` explicite, sinon la pagination glisse.
     type Ligne = Pick<CoursePublique, "id" | "name" | "city" | "distance_km" | "region" | "date">;
-    const lignes: Ligne[] = [];
     const PAS = 1000;
-    for (let debut = 0; debut < MAX_SITEMAP; debut += PAS) {
-      const { data, error } = await sb.from("races")
-        .select("id,name,city,distance_km,region,date")
-        .gte("date", auj).lt("date", DATE_INCONNUE)
-        .not("registration_url", "is", null)
-        .order("date", { ascending: true }).order("id", { ascending: true })
-        .range(debut, debut + PAS - 1);
-      if (error) break;
-      const lot = (data ?? []) as Ligne[];
-      lignes.push(...lot);
-      if (lot.length < PAS) break;
-    }
-    courses = lignes
-      // Une ligne sans nom ni ville produirait une adresse réduite à un identifiant :
-      // inutile pour un lecteur comme pour un moteur.
-      .filter((c) => String(c.name ?? "").trim().length >= 3 && String(c.city ?? "").trim())
-      .map((c) => ({
+    const parcourir = async (datee: boolean): Promise<Ligne[]> => {
+      const out: Ligne[] = [];
+      for (let debut = 0; debut < MAX_SITEMAP; debut += PAS) {
+        let q = sb.from("races").select("id,name,city,distance_km,region,date")
+          .not("registration_url", "is", null)
+          .order("date", { ascending: true }).order("id", { ascending: true })
+          .range(debut, debut + PAS - 1);
+        q = datee ? q.gte("date", auj).lt("date", DATE_INCONNUE) : q.gte("date", DATE_INCONNUE);
+        const { data, error } = await q;
+        if (error) break;
+        const lot = (data ?? []) as Ligne[];
+        out.push(...lot);
+        if (lot.length < PAS) break;
+      }
+      return out;
+    };
+    const lignes = await parcourir(true);
+    // ⚠️ LES ÉPREUVES SANS DATE ANNONCÉE ONT AUSSI UNE PAGE, avec une priorité MOINDRE.
+    // Elles répondent à « où et comment courir le Trail des Galopins ? » — une question
+    // posée toute l'année — mais elles renseignent moins qu'une épreuve datée, et le
+    // dire au moteur vaut mieux que de les présenter comme équivalentes.
+    const sansDate = await parcourir(false);
+    // Une ligne sans nom ni ville produirait une adresse réduite à un identifiant :
+    // inutile pour un lecteur comme pour un moteur.
+    const exploitable = (c: Ligne) => String(c.name ?? "").trim().length >= 3 && String(c.city ?? "").trim();
+    courses = [
+      ...lignes.filter(exploitable).map((c) => ({
         url: `${BASE}/courses/${slugCourse(c)}`,
         lastModified: now,
         changeFrequency: "monthly" as const,
         priority: 0.6,
-      }));
+      })),
+      ...sansDate.filter(exploitable).map((c) => ({
+        url: `${BASE}/courses/${slugCourse(c)}`,
+        lastModified: now,
+        // Hebdomadaire : c'est précisément la page qui change le jour où l'organisateur
+        // annonce sa date.
+        changeFrequency: "weekly" as const,
+        priority: 0.4,
+      })),
+    ];
     // ⚠️ IDENTIFIANT CANONIQUE. Déclarer les deux écritures de la même région
     // publierait deux adresses au contenu identique — du contenu dupliqué, que les
     // moteurs pénalisent des deux côtés.
