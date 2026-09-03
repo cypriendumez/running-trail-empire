@@ -1,3 +1,5 @@
+import { nomAffichable } from "./libelles";
+
 /**
  * LES COURSES EN PAGES PUBLIQUES — le principal actif du site, jusqu'ici invisible.
  *
@@ -125,7 +127,7 @@ export function dateEnClair(iso: string): string {
  * pas « 10 km » parce que ça sonnerait mieux ; le titre raccourcit, simplement.
  */
 export function titrePage(c: Partial<CoursePublique>): string {
-  const bouts = [String(c.name ?? "").trim()];
+  const bouts = [nomAffichable(c.name)];
   const km = Number(c.distance_km);
   if (Number.isFinite(km) && km > 0) bouts.push(`${Math.round(km)} km`);
   if (c.city) bouts.push(String(c.city).trim());
@@ -145,7 +147,7 @@ export function descriptionPage(c: Partial<CoursePublique>): string {
   if (Number.isFinite(km) && km > 0) faits.push(`— ${Math.round(km)} km`);
   const d_ = Number(c.elevation_gain_m);
   if (Number.isFinite(d_) && d_ > 0) faits.push(`${Math.round(d_)} m D+`);
-  const tete = String(c.name ?? "").trim();
+  const tete = nomAffichable(c.name);
   // ⚠️ LA PHRASE DE FIN N'ANNONCE QUE CE QUE LA FICHE CONTIENT. Une formule figée
   // (« date, distance, dénivelé et inscription ») promettait un dénivelé sur des
   // milliers de courses qui n'en ont pas — une promesse non tenue dès le résultat de

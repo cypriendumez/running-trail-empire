@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPublicLang } from "@/lib/i18n/serverLang";
+import { nomAffichable, nomRegion, regionCanonique } from "@/lib/races/libelles";
 import { texteCourses } from "../coursesI18n";
 import { jourFrance } from "@/lib/races/jourFrance";
 import {
@@ -69,7 +70,7 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
   const jsonLd: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "SportsEvent",
-    name: c.name,
+    name: nomAffichable(c.name),
     startDate: c.date,
     eventStatus: "https://schema.org/EventScheduled",
     eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
@@ -91,10 +92,10 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
 
       <nav className="mb-6 text-sm text-zinc-500">
         <Link href="/courses" className="hover:text-zinc-900">{t("fil.courses")}</Link>
-        {c.region && <> · <Link href={`/courses?region=${encodeURIComponent(c.region)}`} className="hover:text-zinc-900">{c.region}</Link></>}
+        {c.region && <> · <Link href={`/courses?region=${encodeURIComponent(regionCanonique(c.region))}`} className="hover:text-zinc-900">{nomRegion(c.region)}</Link></>}
       </nav>
 
-      <h1 className="text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl">{c.name}</h1>
+      <h1 className="text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl">{nomAffichable(c.name)}</h1>
       <p className="mt-2 text-lg text-zinc-600">
         {dateEnClair(String(c.date))}{lieu && ` · ${lieu}`}
       </p>

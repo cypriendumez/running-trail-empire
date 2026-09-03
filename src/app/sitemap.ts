@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { jourFrance } from "@/lib/races/jourFrance";
 import { DATE_INCONNUE, slugCourse, type CoursePublique } from "@/lib/races/publique";
+import { regionCanonique } from "@/lib/races/libelles";
 
 /**
  * ⚠️ CONSTAT DU 03/09/2026 : ce fichier déclarait SEPT adresses. Les 17 113 courses
@@ -84,7 +85,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         changeFrequency: "monthly" as const,
         priority: 0.6,
       }));
-    regions = [...new Set(lignes.map((c) => String(c.region ?? "")).filter(Boolean))]
+    // ⚠️ IDENTIFIANT CANONIQUE. Déclarer les deux écritures de la même région
+    // publierait deux adresses au contenu identique — du contenu dupliqué, que les
+    // moteurs pénalisent des deux côtés.
+    regions = [...new Set(lignes.map((c) => regionCanonique(c.region)).filter(Boolean))]
       .map((r) => ({
         url: `${BASE}/courses?region=${encodeURIComponent(r)}`,
         lastModified: now,

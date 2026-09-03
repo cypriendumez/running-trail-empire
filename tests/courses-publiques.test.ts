@@ -12,6 +12,7 @@ import {
   dateEnClair, DATE_INCONNUE,
 } from "../src/lib/races/publique";
 import { C } from "../src/app/courses/coursesI18n";
+import { nomRegion, regionCanonique, nomAffichable, ECRITURES_REGION } from "../src/lib/races/libelles";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -205,6 +206,81 @@ test("le sitemap dépasse le plafond de 1 000 lignes de la base", () => {
   // `range` sans `order` explicite fait glisser la pagination d'une page à l'autre.
   assert.ok(/\.order\([\s\S]{0,80}\.order\(/.test(sm), "la pagination n'est pas ordonnée de façon stable");
   assert.ok(/lot\.length < PAS/.test(sm), "la boucle ne s'arrête jamais sur un lot incomplet");
+});
+
+// ── LIBELLÉS : ce que lisent Google et les coureurs ─────────────────────────────
+test("une région s'écrit en français, pas en identifiant technique", () => {
+  // ⚠️ MESURÉ : les 10 700 pages affichaient « Courses et trails en
+  // auvergne-rhone-alpes » en titre, en description et dans le fil d'Ariane de chaque
+  // fiche. Personne ne cherche ça, et c'est la seule ligne qu'un humain lit dans une
+  // liste de résultats.
+  assert.equal(nomRegion("auvergne-rhone-alpes"), "Auvergne-Rhône-Alpes");
+  assert.equal(nomRegion("ile-de-france"), "Île-de-France");
+  assert.equal(nomRegion("provence-alpes-cote-d-azur"), "Provence-Alpes-Côte d'Azur");
+  assert.equal(nomRegion("la-reunion"), "La Réunion");
+  // Une région inconnue est RENDUE, pas effacée : mieux vaut la voir que faire
+  // disparaître des courses parce qu'un libellé manquait à la table.
+  assert.equal(nomRegion("region-inventee"), "region-inventee");
+  assert.equal(nomRegion(null), "");
+});
+
+test("les deux écritures de PACA désignent la même région", () => {
+  // ⚠️ MESURÉ : « provence-alpes-cote-azur » (33 courses) et
+  // « provence-alpes-cote-d-azur » (1 088) produisaient DEUX filtres, dont un quasi
+  // vide — et 33 courses étaient pratiquement introuvables.
+  assert.equal(regionCanonique("provence-alpes-cote-azur"), "provence-alpes-cote-d-azur");
+  assert.equal(regionCanonique("provence-alpes-cote-d-azur"), "provence-alpes-cote-d-azur");
+  assert.equal(nomRegion("provence-alpes-cote-azur"), nomRegion("provence-alpes-cote-d-azur"));
+  // Et le filtre doit chercher les DEUX écritures, sinon les 33 restent perdues.
+  const e = ECRITURES_REGION["provence-alpes-cote-d-azur"] ?? [];
+  assert.ok(e.includes("provence-alpes-cote-azur") && e.includes("provence-alpes-cote-d-azur"),
+    `le filtre ne couvre pas les deux écritures : ${JSON.stringify(e)}`);
+});
+
+test("un nom de course est écrit comme un titre français, sans abîmer les sigles", () => {
+  // 295 noms portaient une majuscule sur un mot-outil — recapitalisation mot à mot
+  // d'une source anglophone, pas du français.
+  assert.equal(nomAffichable("Ultra Tour Du Mont Ventoux"), "Ultra Tour du Mont Ventoux");
+  assert.equal(nomAffichable("Triathlon Saint-Gilles Croix De Vie"), "Triathlon Saint-Gilles Croix de Vie");
+  // 89 noms criaient en capitales : illisible en titre de page.
+  assert.equal(nomAffichable("LE BERGANTY CHALLENGE"), "Le Berganty Challenge");
+  assert.equal(nomAffichable("LA RÉMI CAVAGNA"), "La Rémi Cavagna");
+  // ⚠️ ET SURTOUT : 155 SIGLES ATTESTÉS DANS LE CATALOGUE. Une mise en forme mot à mot
+  // écrirait « Vtt », « Edf », « Ag2R ».
+  // ⚠️ LE SIGLE N'EST EN DANGER QUE DANS UN NOM QUI CRIE : ailleurs, la fonction ne
+  // touche à rien de toute façon. Le premier jet testait « Trail VTT 2026 » — casse
+  // mixte, donc rien n'était transformé et la garde n'était jamais atteinte. Aucune
+  // mutation ne le faisait rougir. Trouvé en supprimant la garde.
+  for (const sigle of ["VTT", "EDF", "AG2R", "UCI", "EDHEC", "TERREX"]) {
+    const crie = `TRAIL ${sigle} DE MONTAGNE`;
+    const sortie = nomAffichable(crie);
+    assert.ok(sortie.includes(sigle), `le sigle ${sigle} a été abîmé : ${sortie}`);
+    assert.ok(sortie.startsWith("Trail "), `le nom qui crie n'a pas été apaisé : ${sortie}`);
+    assert.ok(sortie.includes(" de "), `le mot-outil garde sa majuscule : ${sortie}`);
+  }
+  // Un nom déjà bien écrit n'est jamais touché : quelqu'un l'a écrit exprès.
+  for (const n of ["Trail de l'Aiguille", "10 km de Vouneuil", "SaintéLyon", "EcoTrail Paris"]) {
+    assert.equal(nomAffichable(n), n, `« ${n} » a été modifié alors qu'il était correct`);
+  }
+  assert.equal(nomAffichable(null), "");
+  assert.equal(nomAffichable("   "), "");
+});
+
+test("les pages publiques emploient bien ces libellés", () => {
+  // Viser les SITES qui produisent l'effet, pas les imports.
+  const nu = (f: string) => readFileSync(f, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").filter((l) => !/^\s*import\b/.test(l))
+    .map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  const fiche = nu("src/app/courses/[slug]/page.tsx");
+  assert.ok(/nomAffichable\(c\.name\)/.test(fiche), "le titre de la fiche n'est pas mis en forme");
+  assert.ok(/nomRegion\(c\.region\)/.test(fiche), "le fil d'Ariane affiche encore l'identifiant technique");
+  const liste = nu("src/app/courses/page.tsx");
+  assert.ok(/nomAffichable\(c\.name\)/.test(liste), "la liste affiche les noms bruts");
+  assert.ok(/regionCanonique\(/.test(liste), "la liste ne regroupe pas les écritures d'une région");
+  assert.ok(/\.in\("region", ecritures\)/.test(liste), "le filtre ne cherche qu'une seule écriture");
+  const sm = nu("src/app/sitemap.ts");
+  assert.ok(/regionCanonique\(/.test(sm), "le sitemap déclare deux adresses pour une même région");
 });
 
 console.log(`\n${passed} test(s) des courses publiques passé(s), ${fails.length} échec(s)`);
