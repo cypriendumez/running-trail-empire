@@ -8,7 +8,7 @@ import { SurvolChoix } from "@/components/segments/SurvolChoix";
 import { getAccountLang } from "@/lib/i18n/serverLang";
 import { T, fill } from "@/lib/i18n/translations";
 
-export const metadata = { title: "Survol 3D | Pacevo" };
+export const metadata = { title: "Survol 3D" };
 
 /**
  * SURVOL 3D — rejouer une sortie vue du ciel.

@@ -8,7 +8,7 @@ import { SegmentList, type SegmentVue } from "@/components/segments/SegmentList"
 import { getAccountLang } from "@/lib/i18n/serverLang";
 import { T, fill } from "@/lib/i18n/translations";
 
-export const metadata = { title: "Segments | Pacevo" };
+export const metadata = { title: "Segments" };
 
 /**
  * Les segments ne sont pas dessinés à la main : ils sont DÉTECTÉS dans l'historique,

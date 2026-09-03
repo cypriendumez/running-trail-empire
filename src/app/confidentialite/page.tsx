@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { LegalContent } from "@/components/legal/LegalContent";
 
 export const metadata: Metadata = {
-  title: "Politique de confidentialité | Pacevo",
+  title: "Politique de confidentialité",
   description: "Comment Pacevo collecte, utilise et protège tes données personnelles (RGPD).",
 };
 

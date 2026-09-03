@@ -7,7 +7,7 @@ import { LeaguesHub } from "@/components/gamification/LeaguesHub";
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 import { computeStreak, jourLocal, decaleJour, type StreakWorkout, type StreakPrescription } from "@/lib/streak/compute";
 
-export const metadata = { title: "Ligues & Gamification | Pacevo" };
+export const metadata = { title: "Ligues & Gamification" };
 
 export default async function LeaguesPage() {
   const supabase = await createClient();

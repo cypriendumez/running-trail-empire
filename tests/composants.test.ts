@@ -61,5 +61,27 @@ test("les deux composants corrigés portent bien la directive", () => {
   }
 });
 
+test("aucun titre de page ne répète « Pacevo »", () => {
+  // ⚠️ LE GABARIT RACINE AJOUTE DÉJÀ « | Pacevo ». Une page qui le porte aussi affiche
+  // « Segments | Pacevo | Pacevo » — constaté dans l'onglet du navigateur le
+  // 03/09/2026 sur 16 pages, dont six PUBLIQUES : c'est ce que Google montre dans ses
+  // résultats, et la seule ligne qu'un humain y lit.
+  const gabarit = readFileSync("src/app/layout.tsx", "utf8");
+  assert.ok(/template: "%s \| Pacevo"/.test(gabarit), "le gabarit de titre a changé : ce test ne garde plus rien");
+
+  const coupables: string[] = [];
+  for (const f of fichiers("src/app")) {
+    // Le layout racine porte légitimement le nom complet dans ses titres de partage,
+    // qui ne passent pas par le gabarit.
+    if (f === "src/app/layout.tsx") continue;
+    const src = readFileSync(f, "utf8");
+    for (const m of src.matchAll(/title: "([^"]*)"/g)) {
+      if (/pacevo/i.test(m[1])) coupables.push(`${f} → « ${m[1]} | Pacevo »`);
+    }
+  }
+  assert.deepEqual(coupables, [],
+    `ces titres seront doublés par le gabarit :\n    ${coupables.join("\n    ")}`);
+});
+
 console.log(`\n${passed} test(s) de composants passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log(`  KO ${f}`); process.exit(1); }

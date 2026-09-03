@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { LegalContent } from "@/components/legal/LegalContent";
 
 export const metadata: Metadata = {
-  title: "Mentions légales | Pacevo",
+  title: "Mentions légales",
   description: "Mentions légales de Pacevo (éditeur, hébergeur, contact).",
 };
 

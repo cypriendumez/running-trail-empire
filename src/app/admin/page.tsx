@@ -4,7 +4,7 @@ import { AdminDashboard } from "@/components/admin/AdminDashboard";
 import { Metadata } from "next";
 import { Automatisation } from "@/components/admin/Automatisation";
 
-export const metadata: Metadata = { title: "Admin — Pacevo" };
+export const metadata: Metadata = { title: "Admin" };
 
 export default async function AdminPage() {
   const supabase = createAdminClient();

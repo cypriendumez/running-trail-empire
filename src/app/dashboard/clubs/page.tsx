@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { challengeProgress, challengeLeaderboard, daysLeft, notStarted, type Challenge, type ChallengeWorkout } from "@/lib/challenges/progress";
 import { ClubsHub, type ClubVue, type DefiVue } from "@/components/clubs/ClubsHub";
 
-export const metadata = { title: "Clubs & Défis | Pacevo" };
+export const metadata = { title: "Clubs & Défis" };
 
 /**
  * Clubs et défis.

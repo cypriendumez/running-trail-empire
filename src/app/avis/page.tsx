@@ -170,7 +170,7 @@ const AV: Record<Lang, Bloc> = {
 };
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Avis — Pacevo" };
+export const metadata = { title: "Avis" };
 
 export default async function AvisPage() {
   const lang = await getPublicLang();

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CommunityTabs } from "@/components/social/CommunityTabs";
 
-export const metadata = { title: "Le Club | Pacevo" };
+export const metadata = { title: "Le Club" };
 
 /**
  * L'agrégateur d'actualités qui occupait cet onglet N'EST PAS remplacé : il devient

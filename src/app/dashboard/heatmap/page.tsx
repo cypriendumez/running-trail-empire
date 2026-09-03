@@ -8,7 +8,7 @@ import { HeatmapLazy } from "@/components/segments/HeatmapLazy";
 import { getAccountLang } from "@/lib/i18n/serverLang";
 import { T, fill } from "@/lib/i18n/translations";
 
-export const metadata = { title: "Carte de chaleur | Pacevo" };
+export const metadata = { title: "Carte de chaleur" };
 
 /**
  * Carte de chaleur personnelle : où l'athlète court VRAIMENT.

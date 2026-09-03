@@ -1,6 +1,6 @@
 import { LiveViewer } from "@/components/parcours/LiveViewer";
 
-export const metadata = { title: "Suivi en direct · Pacevo" };
+export const metadata = { title: "Suivi en direct" };
 
 // Page publique (hors auth) : n'importe qui avec le lien suit le coureur en direct.
 export default async function SuivrePage({ params }: { params: Promise<{ id: string }> }) {

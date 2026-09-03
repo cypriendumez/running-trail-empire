@@ -6,7 +6,7 @@ import type { Lang } from "@/lib/i18n/translations";
 import { EDITEUR, PAYS_EDITEUR } from "@/lib/brand/editeur";
 
 export const metadata: Metadata = {
-  title: "Contact | Pacevo",
+  title: "Contact",
   description: "Une question, un bug, une suggestion ? Contacte l'équipe de Pacevo.",
 };
 

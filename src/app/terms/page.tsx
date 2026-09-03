@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { LegalContent } from "@/components/legal/LegalContent";
 
 export const metadata: Metadata = {
-  title: "Conditions générales (CGU / CGV) | Pacevo",
+  title: "Conditions générales (CGU / CGV)",
   description: "Conditions générales d'utilisation et de vente de Pacevo.",
 };
 

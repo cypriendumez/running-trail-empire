@@ -7,7 +7,7 @@ import { TrophyWall } from "@/components/trophies/TrophyWall";
 import { getAccountLang } from "@/lib/i18n/serverLang";
 import { T, fill } from "@/lib/i18n/translations";
 
-export const metadata = { title: "Vitrine | Pacevo" };
+export const metadata = { title: "Vitrine" };
 
 /**
  * Les trophées sont calculés À LA LECTURE, sur les séances réelles — aucune table,

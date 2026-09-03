@@ -7,7 +7,7 @@ import { TYPE_ETAT_ABO, litEtatAbo } from "@/lib/billing/etatAbonnement";
 import { bestVmaFromWorkouts, effectiveVma } from "@/lib/running/fitness";
 import { isRun } from "@/lib/intervals/sport";
 
-export const metadata = { title: "Mon Profil | Pacevo" };
+export const metadata = { title: "Mon Profil" };
 
 export default async function ProfilePage() {
   const supabase = await createClient();

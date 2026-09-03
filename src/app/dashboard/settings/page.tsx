@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { SettingsView } from "@/components/settings/SettingsView";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 
-export const metadata = { title: "Paramètres | Pacevo" };
+export const metadata = { title: "Paramètres" };
 
 export default async function SettingsPage() {
   const sb = await createClient();
