@@ -38,6 +38,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: "npm"
+
+      # ⚠️ SANS CETTE ÉTAPE, LE SCRIPT NE DÉMARRE PAS. Les autres workflows de ce dépôt
+      # n'appellent qu'une route HTTP avec `curl` : aucun n'avait besoin des dépendances.
+      # Celui-ci exécute du TypeScript qui importe `@supabase/supabase-js`, et l'exécuteur
+      # part d'un dépôt fraîchement cloné, donc SANS `node_modules`. Premier lancement
+      # réel : « Cannot find module '@supabase/supabase-js' ». Reproduit en local.
+      - name: Installer les dépendances
+        run: npm ci --no-audit --no-fund
 
       - name: Exporter et vérifier
         env:

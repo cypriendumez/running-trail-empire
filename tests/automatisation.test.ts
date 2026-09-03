@@ -139,5 +139,24 @@ test("une exécution illisible ne fait pas tomber le calcul", () => {
   assert.ok(Number.isFinite(c.ilYaHeures ?? NaN));
 });
 
+test("un workflow qui exécute du code installe ses dépendances", () => {
+  // ⚠️ DÉFAUT RÉEL, AU PREMIER LANCEMENT DE LA SAUVEGARDE : « Cannot find module
+  // '@supabase/supabase-js' ». L'exécuteur part d'un dépôt fraîchement cloné, donc sans
+  // `node_modules`. Les autres workflows n'appellent qu'une route avec `curl` et n'en
+  // avaient jamais eu besoin — l'oubli était donc invisible jusqu'au premier essai.
+  for (const f of readdirSync(".github/workflows").filter((x) => x.endsWith(".yml"))) {
+    const src = readFileSync(`.github/workflows/${f}`, "utf8")
+      .split("\n").filter((l) => !/^\s*#/.test(l)).join("\n");
+    const executeDuCode = /\b(tsx|ts-node)\s+scripts?\/|node\s+scripts?\//.test(src);
+    if (!executeDuCode) continue;
+    assert.ok(/npm (ci|install)/.test(src),
+      `${f} exécute un script du dépôt sans installer les dépendances : il tombera sur « Cannot find module »`);
+    // L'installation doit précéder l'exécution, sinon elle ne sert à rien.
+    const iInstall = src.search(/npm (ci|install)/);
+    const iScript = src.search(/\b(tsx|ts-node)\s+scripts?\/|node\s+scripts?\//);
+    assert.ok(iInstall < iScript, `${f} installe les dépendances APRÈS avoir lancé le script`);
+  }
+});
+
 console.log(`\n${passed} test(s) de supervision passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log(`  KO ${f}`); process.exit(1); }
