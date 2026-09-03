@@ -12,6 +12,8 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 import { AUTH } from "@/components/auth/authI18n";
 import { JOURS_ESSAI } from "@/lib/billing/access";
 
+export const metadata = { title: "Créer un compte" };
+
 export default function SignupPage() {
   const { lang } = useT();
   const L = (AUTH[lang] ?? AUTH.fr).signup;

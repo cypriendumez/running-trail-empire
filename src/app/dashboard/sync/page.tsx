@@ -13,6 +13,8 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 import { SY, SY_NODES, fillY } from "./syncI18n";
 import { cleanActivityName } from "@/lib/utils/activityName";
 
+export const metadata = { title: "Sync Montre" };
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface SyncStats {
   workouts: number;

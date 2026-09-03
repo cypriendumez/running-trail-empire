@@ -12,6 +12,8 @@ import { lireEfforts } from "@/lib/segments/efforts";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "Séance" };
+
 const hhmm = (s: number) => {
   const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60);
   return h > 0 ? `${h}h ${String(m).padStart(2, "0")}` : `${m} min`;

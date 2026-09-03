@@ -83,5 +83,21 @@ test("aucun titre de page ne répète « Pacevo »", () => {
     `ces titres seront doublés par le gabarit :\n    ${coupables.join("\n    ")}`);
 });
 
+test("chaque page porte un titre", () => {
+  // ⚠️ SANS TITRE, L'ONGLET ET GOOGLE AFFICHENT « Pacevo » TOUT COURT. Dix pages
+  // étaient dans ce cas le 03/09/2026, dont /blog — pourtant déclarée au sitemap :
+  // le titre est la seule ligne qu'un humain lit dans une liste de résultats.
+  const sansTitre: string[] = [];
+  for (const f of fichiers("src/app")) {
+    if (!f.endsWith("page.tsx")) continue;
+    // La page d'accueil hérite légitimement du titre par défaut du gabarit racine.
+    if (f === "src/app/page.tsx") continue;
+    const src = readFileSync(f, "utf8");
+    if (!/export (const|async function) (metadata|generateMetadata)/.test(src)) sansTitre.push(f);
+  }
+  assert.deepEqual(sansTitre, [],
+    `ces pages s'afficheront « Pacevo » sans plus de précision :\n    ${sansTitre.join("\n    ")}`);
+});
+
 console.log(`\n${passed} test(s) de composants passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log(`  KO ${f}`); process.exit(1); }

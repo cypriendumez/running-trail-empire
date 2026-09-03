@@ -13,6 +13,8 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 import { AUTH } from "@/components/auth/authI18n";
 import { fournisseursActifs } from "@/lib/auth/fournisseurs";
 
+export const metadata = { title: "Connexion" };
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
