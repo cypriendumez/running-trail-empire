@@ -27,8 +27,6 @@ import { btnClass } from "@/components/ui/Button";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { LANDING } from "@/components/landing/landingI18n";
 
-export const metadata = { title: "Tarifs", description: "Les formules Pacevo : essai gratuit, Starter et Premium. Prix tout compris, sans engagement." };
-
 
 export default function PricingPage() {
   const { lang } = useT();

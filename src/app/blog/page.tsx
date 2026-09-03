@@ -13,8 +13,6 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 import { BLOG, BLOG_CATS } from "./blogI18n";
 import { SLUG_PAR_CLE } from "./articles";
 
-export const metadata = { title: "Conseils course à pied et trail", description: "Entraînement, allures, blessures, matériel : les articles de Pacevo pour progresser sans se blesser." };
-
 // Données visuelles (non traduisibles). Titres/extraits/catégories viennent de BLOG[lang].
 //
 // ── AUDIT DES VISUELS, 20/08/2026 ────────────────────────────────────────────

@@ -12,7 +12,7 @@
  * volontairement muet.
  */
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
 let passed = 0; const fails: string[] = [];
@@ -93,10 +93,31 @@ test("chaque page porte un titre", () => {
     // La page d'accueil hérite légitimement du titre par défaut du gabarit racine.
     if (f === "src/app/page.tsx") continue;
     const src = readFileSync(f, "utf8");
-    if (!/export (const|async function) (metadata|generateMetadata)/.test(src)) sansTitre.push(f);
+    if (/export (const|async function) (metadata|generateMetadata)/.test(src)) continue;
+    // ⚠️ UNE PAGE « use client » NE PEUT PAS EXPORTER `metadata` — Next l'interdit, et
+    // l'erreur n'apparaît QU'AU BUILD (`tsc` et les tests passent). Son titre vit alors
+    // dans un `layout.tsx` voisin, ce qui est la bonne réponse et non un contournement.
+    const layout = f.replace(/page\.tsx$/, "layout.tsx");
+    if (existsSync(layout) && /export const metadata/.test(readFileSync(layout, "utf8"))) continue;
+    sansTitre.push(f);
   }
   assert.deepEqual(sansTitre, [],
     `ces pages s'afficheront « Pacevo » sans plus de précision :\n    ${sansTitre.join("\n    ")}`);
+});
+
+test("aucune page « use client » n'exporte metadata", () => {
+  // ⚠️ DÉFAUT COMMIS LE 03/09/2026 : huit pages client se sont vu ajouter un
+  // `export const metadata`. `tsc` passe, la suite de tests passe, et le BUILD tombe —
+  // « You are attempting to export metadata from a component marked with use client ».
+  // C'est précisément ce qui distingue `npm run verify` de `npm run build`.
+  const coupables: string[] = [];
+  for (const f of fichiers("src/app")) {
+    const src = readFileSync(f, "utf8");
+    if (!/^\s*["']use client["']/.test(src.split("\n").slice(0, 3).join("\n"))) continue;
+    if (/export const metadata|export async function generateMetadata/.test(src)) coupables.push(f);
+  }
+  assert.deepEqual(coupables, [],
+    `ces fichiers « use client » exportent metadata — le build échouera :\n    ${coupables.join("\n    ")}`);
 });
 
 console.log(`\n${passed} test(s) de composants passé(s), ${fails.length} échec(s)`);

@@ -12,8 +12,6 @@ import { Wordmark } from "@/components/brand/Wordmark";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { AUTH } from "@/components/auth/authI18n";
 
-export const metadata = { title: "Nouveau mot de passe" };
-
 export default function ResetPasswordPage() {
   const router = useRouter();
   const { lang } = useT();

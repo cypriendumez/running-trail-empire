@@ -14,8 +14,6 @@ import { OB } from "./onboardingI18n";
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthLabel } from "@/data/healthCatalog";
 import { TERRAINS, terrainLabel } from "@/data/terrainCatalog";
 
-export const metadata = { title: "Premiers pas" };
-
 type Step = "watch" | "profile" | "physio" | "goals" | "done";
 
 // Le profil et la santé d'abord (questions faciles sur soi : l'athlète s'investit

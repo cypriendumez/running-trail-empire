@@ -11,8 +11,6 @@ import { Wordmark } from "@/components/brand/Wordmark";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { AUTH } from "@/components/auth/authI18n";
 
-export const metadata = { title: "Mot de passe oublié" };
-
 export default function ForgotPasswordPage() {
   const { t, lang } = useT();
   const L = (AUTH[lang] ?? AUTH.fr).forgot;
