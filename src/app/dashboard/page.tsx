@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
+import { fuseauOuDefaut } from "@/lib/time/fuseau";
 import { createClient } from "@/lib/supabase/server";
 import { BentoDashboard } from "@/components/dashboard/BentoDashboard";
 import { stripProfileSecrets } from "@/lib/profile/safe";
@@ -22,7 +24,11 @@ export default async function DashboardPage() {
   // jour écoulé + 7 à venir, donc 40 lignes ne couvrent qu'un mois — la série se
   // serait tue au-delà, sans que rien ne l'indique. On charge donc explicitement la
   // fenêtre d'observation, en ne demandant que les colonnes réellement lues.
-  const streakToday = jourLocal();
+  // ⚠️ LE FUSEAU DE L'ATHLÈTE, PAS CELUI DU SERVEUR. Cette page est rendue à iad1
+  // (États-Unis) : sans ce paramètre, `jourLocal` répondait la VEILLE entre minuit et
+  // 6 h heure de Paris, et la flamme de série se calculait sur le mauvais jour.
+  const fuseauAthlete = fuseauOuDefaut(decodeURIComponent((await cookies()).get("pacevo_tz")?.value ?? ""));
+  const streakToday = jourLocal(new Date(), fuseauAthlete);
   const streakFrom = decaleJour(streakToday, -119);
 
   const [profileRes, hrvRes, workoutsRes, planRes, leagueRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, newMembersRes, prRes, chargeRes, streakWkRes, streakPlanRes] = await Promise.all([

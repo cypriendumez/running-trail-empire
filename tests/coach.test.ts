@@ -4678,13 +4678,26 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     assert.equal(acwrAu(decaleJour(AUJ, -18), tss), 0, "3 journées actives ne font pas une base chronique");
   });
 
-  test("la série ne se calcule jamais en UTC — le repère est la date LOCALE", () => {
-    // `iso()` (autoPlan) écrit les prescriptions en heure LOCALE ; `toISOString()` est en
-    // UTC. Mélanger les deux décale la journée d'un cran passé minuit à l'est de
-    // Greenwich : la série casse chez les uns et pas chez les autres, sans rien signaler.
+  test("la série se calcule dans le jour de l'ATHLÈTE, ni en UTC ni dans celui du moteur", () => {
+    // `iso()` (autoPlan) écrit les prescriptions dans le jour de l'athlète ;
+    // `toISOString()` est en UTC. Mélanger les deux décale la journée d'un cran passé
+    // minuit à l'est de Greenwich : la série casse chez les uns et pas chez les autres.
+    //
+    // ⚠️ CE TEST EXIGEAIT `getFullYear()`, ET C'ÉTAIT DEVENU UNE ERREUR. Les accesseurs
+    // locaux rendent le jour du MOTEUR : sur un rendu serveur, celui de iad1
+    // (États-Unis), donc la VEILLE entre minuit et 6 h heure de Paris. Le test
+    // interdisait donc la seule implémentation juste. Il vise désormais l'intention —
+    // un fuseau nommé — et non un moyen technique devenu faux.
     const src = codeOf("src/lib/streak/compute.ts");
     assert.ok(!/toISOString\(\)/.test(src), "aucune date ne doit passer par toISOString() dans ce module");
-    assert.ok(/getFullYear\(\)/.test(src), "la date locale doit être construite par les accesseurs locaux");
+    assert.ok(!/getFullYear\(\)/.test(src),
+      "les accesseurs locaux rendent le jour du moteur — sur le serveur, celui de Washington");
+    assert.ok(/jourCivil\(/.test(src), "le jour doit venir du module de fuseaux, seul endroit qui nomme un fuseau");
+    // Et ce jour doit VRAIMENT dépendre du fuseau, pas seulement en avoir l'air.
+    const nuit = new Date("2026-09-03T22:30:00Z"); // 00 h 30 à Paris le 4
+    assert.equal(jourLocal(nuit, "Europe/Paris"), "2026-09-04", "le coureur parisien est déjà le 4");
+    assert.equal(jourLocal(nuit, "America/New_York"), "2026-09-03", "le serveur, lui, est encore le 3");
+    assert.equal(jourLocal(nuit), "2026-09-04", "par défaut, c'est le jour du coureur français qui fait foi");
     // Et le décalage de jours doit rester juste au changement d'heure (ancrage à midi UTC).
     assert.equal(decaleJour("2026-03-29", 1), "2026-03-30", "passage à l'heure d'été");
     assert.equal(decaleJour("2026-10-25", 1), "2026-10-26", "retour à l'heure d'hiver");

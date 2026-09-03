@@ -11,8 +11,10 @@ import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import {
   FUSEAU_DEFAUT, fuseauValide, fuseauOuDefaut, jourCivil, aujourdhui,
-  formatDateCivile, formatInstant, decalerJour, ecartJours,
+  formatDateCivile, formatInstant,
 } from "../src/lib/time/fuseau";
+// ⚠️ IMPORTÉS DE LEUR SEUL FOYER, PAS RÉÉCRITS. Voir le commentaire de `lib/time/fuseau`.
+import { decaleJour, ecartJours } from "../src/lib/streak/compute";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -83,7 +85,12 @@ test("un fuseau venu d'un cookie ne fait pas tomber la page", () => {
 test("une date invalide rend une chaîne vide, jamais « Invalid Date »", () => {
   for (const mauvais of ["", "pas une date", "2026-13-45", "0000", null, undefined]) {
     assert.equal(formatDateCivile(mauvais as string, "fr"), "", `« ${String(mauvais)} » produit du texte`);
-    assert.equal(decalerJour(mauvais as string, 1), "");
+    // ⚠️ CONTRAT DIFFÉRENT, VOLONTAIREMENT : `decaleJour` rend l'entrée telle quelle
+    // quand elle est illisible, là où `formatDateCivile` rend une chaîne vide. Le
+    // premier sert à naviguer dans un calendrier (mieux vaut ne pas bouger que
+    // renvoyer du vide), le second à écrire du texte à l'écran (mieux vaut ne rien
+    // écrire qu'écrire « Invalid Date »).
+    assert.equal(decaleJour(String(mauvais), 1), String(mauvais));
   }
   assert.equal(jourCivil("pas une date", "Europe/Paris"), "");
   assert.equal(formatInstant("pas une date", "fr", "Europe/Paris", { hour: "2-digit" }), "");
@@ -91,11 +98,11 @@ test("une date invalide rend une chaîne vide, jamais « Invalid Date »", () =>
 
 test("les décalages de jours ignorent l'heure d'été", () => {
   // Le passage à l'heure d'hiver 2026 en Europe : nuit du 24 au 25 octobre.
-  assert.equal(decalerJour("2026-10-24", 1), "2026-10-25", "la nuit du changement d'heure décale d'un jour");
+  assert.equal(decaleJour("2026-10-24", 1), "2026-10-25", "la nuit du changement d'heure décale d'un jour");
   assert.equal(ecartJours("2026-10-24", "2026-10-25"), 1);
   assert.equal(ecartJours("2026-03-28", "2026-03-29"), 1, "le passage à l'heure d'été aussi");
-  assert.equal(decalerJour("2026-12-31", 1), "2027-01-01", "changement d'année");
-  assert.equal(decalerJour("2028-02-28", 1), "2028-02-29", "année bissextile");
+  assert.equal(decaleJour("2026-12-31", 1), "2027-01-01", "changement d'année");
+  assert.equal(decaleJour("2028-02-28", 1), "2028-02-29", "année bissextile");
   assert.equal(ecartJours("2026-09-03", "2026-09-03"), 0);
   assert.equal(ecartJours("2026-09-04", "2026-09-03"), -1);
 });
@@ -139,6 +146,53 @@ test("le fuseau du rendu vient du cookie, jamais du navigateur", () => {
   const layout = readFileSync("src/app/dashboard/layout.tsx", "utf8");
   assert.ok(/cookies\(\)\)\.get\("pacevo_tz"\)/.test(layout), "le layout ne lit pas le cookie de fuseau");
   assert.ok(/<FuseauProvider fuseau=\{fuseau\}>/.test(layout), "le fuseau lu n'est pas descendu dans l'arbre");
+});
+
+// ── VOLET 2 : la LOGIQUE, pas seulement l'affichage ─────────────────────────────
+/** Le source, débarrassé des imports ET des commentaires — voir le test du provider. */
+function codeNu(f: string): string {
+  return readFileSync(f, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n")
+    .filter((l) => !/^\s*import\b/.test(l))
+    .map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1"))
+    .join("\n");
+}
+
+test("les pages rendues par le serveur datent sur le fuseau de l'athlète", () => {
+  // ⚠️ CES PAGES SONT RENDUES À iad1. Un `jourLocal()` sans fuseau y répond la VEILLE
+  // entre minuit et 6 h heure de Paris : la flamme de série et le classement des ligues
+  // se calculaient alors sur le mauvais jour.
+  for (const f of ["src/app/dashboard/page.tsx", "src/app/dashboard/leagues/page.tsx"]) {
+    const src = codeNu(f);
+    assert.ok(/pacevo_tz/.test(src), `${f} ne lit pas le fuseau de l'athlète`);
+    assert.ok(/fuseauOuDefaut\(/.test(src), `${f} ne valide pas le fuseau reçu du cookie`);
+    // Viser l'APPEL : un `jourLocal()` nu subsistant redonnerait le jour du serveur.
+    for (const m of src.matchAll(/jourLocal\(([^)]*)\)/g)) {
+      assert.ok(String(m[1]).trim().length > 0, `${f} appelle encore jourLocal() sans fuseau`);
+    }
+  }
+});
+
+test("le calendrier ne lit pas le fuseau du navigateur pendant le rendu", () => {
+  const src = codeNu("src/components/training/CalendarView.tsx");
+  assert.ok(/useFuseau\(\)/.test(src), "le calendrier n'utilise pas le fuseau partagé");
+  assert.ok(!/resolvedOptions/.test(src), "le calendrier lit le fuseau du navigateur : le serveur ne peut pas le connaître");
+  for (const m of src.matchAll(/jourLocal\(([^)]*)\)/g)) {
+    assert.ok(String(m[1]).trim().length > 0, "le calendrier appelle encore jourLocal() sans fuseau");
+  }
+});
+
+test("un seul calcul du « jour dans un fuseau » existe dans le dépôt", () => {
+  // ⚠️ TROIS COPIES COEXISTAIENT : `jourLocal` (accesseurs locaux), `jourFrance` (son
+  // propre Intl) et `jourCivil`. Trois vérités, c'est une seule corrigée le jour où
+  // l'une se trompe. Les deux premières délèguent maintenant.
+  const france = codeNu("src/lib/races/jourFrance.ts");
+  assert.ok(/jourCivil\(/.test(france), "jourFrance a de nouveau son propre calcul");
+  assert.ok(!/Intl\.DateTimeFormat/.test(france), "une seconde implémentation du jour est réapparue dans jourFrance");
+  const streak = codeNu("src/lib/streak/compute.ts");
+  assert.ok(/jourCivil\(/.test(streak), "jourLocal ne délègue plus au module de fuseaux");
+  assert.ok(!/getFullYear\(\)/.test(streak), "jourLocal est revenu aux accesseurs du moteur");
 });
 
 console.log(`\n${passed} test(s) du temps passé(s), ${fails.length} échec(s)`);

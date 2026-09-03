@@ -1,4 +1,6 @@
 export const dynamic = "force-dynamic";
+import { cookies } from "next/headers";
+import { fuseauOuDefaut } from "@/lib/time/fuseau";
 import { isRun } from "@/lib/intervals/sport";
 import { createClient } from "@/lib/supabase/server";
 import { LeaguesHub } from "@/components/gamification/LeaguesHub";
@@ -9,6 +11,14 @@ export const metadata = { title: "Ligues & Gamification | Pacevo" };
 
 export default async function LeaguesPage() {
   const supabase = await createClient();
+  // ⚠️ UNE SEULE LECTURE DU JOUR POUR TOUTE LA PAGE, et dans le fuseau de l'athlète.
+  // Rendue aux États-Unis, cette page datait la veille entre minuit et 6 h heure de
+  // Paris. Et deux lectures séparées pourraient tomber de part et d'autre de minuit :
+  // la fenêtre des 120 jours et le classement du jour ne diraient alors pas pareil.
+  const aujourdhuiAthlete = jourLocal(
+    new Date(),
+    fuseauOuDefaut(decodeURIComponent((await cookies()).get("pacevo_tz")?.value ?? "")),
+  );
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
@@ -60,7 +70,7 @@ export default async function LeaguesPage() {
     // chaque créneau, donc la décision la plus récente.
     supabase.from("notifications").select("created_at, data")
       .eq("user_id", user.id).eq("type", "coach_session")
-      .gte("data->>date", decaleJour(jourLocal(), -119))
+      .gte("data->>date", decaleJour(aujourdhuiAthlete, -119))
       .order("created_at", { ascending: false }).limit(600),
     supabase.from("notifications").select("data")
       .eq("user_id", user.id).eq("type", "session_feedback")
@@ -158,7 +168,7 @@ export default async function LeaguesPage() {
       (r) => slotKey(r.data as { date?: unknown; moment?: unknown }),
     ).map((r) => r.data),
     feedbacks: ((streakFeedback ?? []) as { data: { date?: unknown; pain?: unknown } }[]).map((r) => r.data),
-    today: jourLocal(),
+    today: aujourdhuiAthlete,
   });
   const longestStreak = serie.best;
 

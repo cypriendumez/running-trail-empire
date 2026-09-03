@@ -15,6 +15,7 @@ import { extractBody, premierePhrase } from "@/lib/calendar/texte";
 import { libelleType } from "@/lib/ai/planI18n";
 import { AvisCoach } from "@/components/training/AvisCoach";
 import { formatDateCivile } from "@/lib/time/fuseau";
+import { useFuseau } from "@/lib/time/FuseauProvider";
 
 /** Le même jour dans une autre langue — affichage seulement (cf. lib/ai/planI18n.ts). */
 export type PlannedText = { title?: string; subtitle?: string; why?: string; tags?: string[] };
@@ -637,6 +638,7 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
  * un décor qu'on ne lit plus.
  */
 function CoachWhy({ state, lang, t, sessions }: { state: CoachState | null; lang: string; t: (k: string, p?: Record<string, string | number>) => string; sessions: Planned[] }) {
+  const fuseau = useFuseau();
   if (!state) return null;
   const noQuality = (state.qBudget ?? 1) === 0;
   // Qualité maintenue mais RACCOURCIE : cas intermédiaire qui n'existait pas. L'athlète
@@ -652,7 +654,10 @@ function CoachWhy({ state, lang, t, sessions }: { state: CoachState | null; lang
   //    résumée au coach commençait par une séance déjà passée. Le reste du calendrier
   //    raisonne déjà en jours locaux (`fmtKey`) : deux définitions du jour sur le même
   //    écran, c'est exactement ce qu'on vient de retirer du tableau de bord.
-  const aujourdhui = jourLocal();
+  // ⚠️ LE FUSEAU VIENT DU CONTEXTE, PAS DU NAVIGATEUR. Ce composant est rendu une
+  // première fois PAR LE SERVEUR : s'il lisait le fuseau du navigateur, les deux rendus
+  // désigneraient un jour différent et React remplacerait la page (erreur #418).
+  const aujourdhui = jourLocal(new Date(), fuseau);
   const semaine = sessions
     .filter((d) => d.date >= aujourdhui)
     .slice(0, 7)

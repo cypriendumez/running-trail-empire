@@ -1,3 +1,5 @@
+import { jourCivil } from "@/lib/time/fuseau";
+
 /**
  * LE JOUR COURANT EN FRANCE — la seule référence juste pour un catalogue français.
  *
@@ -13,9 +15,14 @@
  */
 const FUSEAU = "Europe/Paris";
 
+/**
+ * ⚠️ DÉLÈGUE À `jourCivil` — ce module ne recalcule plus rien. Il gardait sa propre
+ * copie du calcul « quel jour est-il dans ce fuseau », identique à celle de
+ * `lib/time/fuseau`. Deux copies, c'est une seule des deux corrigée le jour où l'une se
+ * trompe. Ce qui reste ici, et qui n'appartient qu'à ce module, c'est le CHOIX du
+ * fuseau : les courses ont lieu en France, quel que soit l'endroit d'où la page est
+ * rendue et où que soit l'athlète qui les consulte.
+ */
 export function jourFrance(d: Date = new Date()): string {
-  // `en-CA` produit directement « AAAA-MM-JJ », ce qui évite de recoller des morceaux à la main.
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: FUSEAU, year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(d);
+  return jourCivil(d, FUSEAU);
 }

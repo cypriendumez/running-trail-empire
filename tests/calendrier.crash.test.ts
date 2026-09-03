@@ -243,7 +243,17 @@ test("le résumé de la semaine part du jour LOCAL, pas du jour UTC", () => {
     .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
   assert.ok(!/const aujourdhui = new Date\(\)\.toISOString\(\)/.test(src),
     "le calendrier redéfinit « aujourd'hui » en UTC alors que le reste de l'écran est en local");
-  assert.ok(/const aujourdhui = jourLocal\(\)/.test(src), "jourLocal n'est plus utilisé");
+  // ⚠️ CE TEST EXIGEAIT `jourLocal()` SANS ARGUMENT, ET C'EST DEVENU UNE ERREUR : sans
+  // fuseau, cette fonction rend le jour du MOTEUR — sur un rendu serveur, celui de
+  // iad1 (États-Unis), donc la veille entre minuit et 6 h heure de Paris. Il vise
+  // maintenant l'intention (un jour daté sur le fuseau de l'athlète), pas la forme.
+  const appels = [...src.matchAll(/jourLocal\(([^)]*)\)/g)];
+  assert.ok(appels.length > 0, "jourLocal n'est plus utilisé");
+  for (const a of appels) {
+    assert.ok(String(a[1]).trim().length > 0,
+      "le calendrier appelle jourLocal() sans fuseau : il daterait sur le serveur, pas sur l'athlète");
+  }
+  assert.ok(/useFuseau\(\)/.test(src), "le fuseau ne vient plus du contexte partagé");
 });
 
 test("une semaine de calendrier fait toujours 7 jours, changement d'heure compris", () => {

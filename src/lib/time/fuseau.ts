@@ -102,25 +102,11 @@ export function formatInstant(
   return new Intl.DateTimeFormat(lang || "fr", { ...options, timeZone: fuseauOuDefaut(tz) }).format(d);
 }
 
-/** Décale une date civile de `n` jours, sans jamais passer par un fuseau. */
-export function decalerJour(iso: string, n: number): string {
-  const jour = String(iso ?? "").slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(jour)) return "";
-  const d = new Date(`${jour}T12:00:00Z`);
-  // ⚠️ LA FORME NE FAIT PAS LA DATE. « 2026-13-45 » satisfait l'expression régulière et
-  // produit une date invalide : `toISOString()` LÈVE alors une exception, au milieu d'un
-  // rendu. Trouvé par le test, pas deviné.
-  if (Number.isNaN(d.getTime())) return "";
-  d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
-}
-
-/** Nombre de jours entre deux dates civiles (b − a). Insensible au fuseau et à l'heure d'été. */
-export function ecartJours(a: string, b: string): number {
-  const x = new Date(`${String(a).slice(0, 10)}T12:00:00Z`).getTime();
-  const y = new Date(`${String(b).slice(0, 10)}T12:00:00Z`).getTime();
-  if (Number.isNaN(x) || Number.isNaN(y)) return 0;
-  // Ancrées à midi, les deux bornes gardent 12 h de marge : un changement d'heure d'été
-  // (±1 h) ne peut pas faire basculer l'arrondi d'un jour entier.
-  return Math.round((y - x) / 86400000);
-}
+/**
+ * ⚠️ PAS DE `decalerJour` NI D'`ecartJours` ICI. Ils existent depuis longtemps dans
+ * `lib/streak/compute`, avec la même idée (ancrage à MIDI UTC) et un contrat déjà
+ * éprouvé — notamment qu'une entrée invalide y rend la date d'origine, et non une
+ * chaîne vide. En écrire une seconde version le jour où on crée ce module aurait
+ * donné deux vérités à corriger séparément, et une seule des deux réparée le jour où
+ * l'une se trompe. On importe les leurs.
+ */

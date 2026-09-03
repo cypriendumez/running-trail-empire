@@ -29,6 +29,8 @@
 
 // Le barème de charge est IMPORTÉ, jamais recopié : la série doit lire exactement
 // la même charge que le tableau de bord et que le coach.
+import { jourCivil, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
+
 import { estimateTSS } from "@/lib/running/fitness";
 
 /** Séance réellement enregistrée (montre → intervals.icu → `workouts`). */
@@ -159,14 +161,22 @@ export const MIN_JOURS_CHARGE = 8;
 // ── Dates : une seule conversion, à la frontière ─────────────────────────────
 
 /**
- * Date locale au format `AAAA-MM-JJ` — MÊME convention que `iso()` dans autoPlan,
- * qui est ce qui produit les dates des prescriptions. Utiliser
- * `toISOString().slice(0, 10)` (UTC) ici décalerait la journée d'un cran pour tout
- * athlète situé à l'est de Greenwich à partir de minuit local : la série aurait
- * cassé à minuit chez les uns et pas chez les autres, sans que rien ne le signale.
+ * Date du jour de l'ATHLÈTE au format `AAAA-MM-JJ` — MÊME convention que `iso()` dans
+ * autoPlan, qui produit les dates des prescriptions.
+ *
+ * ⚠️ CE N'EST PLUS « LE JOUR DU MOTEUR ». La version précédente lisait `getFullYear()`,
+ * `getMonth()`, `getDate()` — donc le fuseau de la machine qui exécute le code. Sur un
+ * rendu SERVEUR, cette machine est à iad1 (États-Unis) : de minuit à 6 h du matin heure
+ * de Paris, elle répondait la VEILLE. La série, le volume et la forme demandaient tous
+ * « quel jour est-on ? » et recevaient le jour de Washington.
+ *
+ * Le fuseau par défaut est `Europe/Paris` et non celui du moteur, pour deux raisons :
+ * il est juste pour la quasi-totalité des athlètes, et surtout il est IDENTIQUE côté
+ * serveur et côté navigateur — sans quoi les deux rendus divergent et React remplace la
+ * page (erreur #418, 23 occurrences mesurées). Là où le fuseau réel de l'athlète est
+ * disponible (cookie `pacevo_tz`), on le passe explicitement.
  */
-export const jourLocal = (d: Date = new Date()): string =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+export const jourLocal = (d: Date = new Date(), tz: string = FUSEAU_DEFAUT): string => jourCivil(d, tz);
 
 /**
  * Décalage en jours d'une date `AAAA-MM-JJ`, ancré à MIDI UTC.
@@ -177,6 +187,11 @@ export const jourLocal = (d: Date = new Date()): string =>
  * horaire de la planète ne fait changer la date de jour.
  */
 export function decaleJour(iso: string, n: number): string {
+  // ⚠️ LA FORME EST VÉRIFIÉE AVANT L'ANALYSE. `Date.parse("0000T12:00:00Z")` réussit et
+  // produisait « 0-01-02 » : une date absurde là où la documentation ci-dessus promet de
+  // rendre l'entrée telle quelle quand elle est illisible. Le contrat était donc violé
+  // en silence. Trouvé en écrivant les tests du module `lib/time`.
+  if (!/^\d{4}-\d{2}-\d{2}/.test(String(iso ?? ""))) return iso;
   const t = Date.parse(`${iso}T12:00:00Z`);
   if (!Number.isFinite(t)) return iso;
   const d = new Date(t + n * 86400000);
