@@ -1,4 +1,5 @@
 import type { Lang } from "@/lib/i18n/translations";
+import { statutEditeur } from "@/lib/brand/statutEditeur";
 import { EDITEUR, PAYS_EDITEUR, HEBERGEUR_APP, HEBERGEUR_BDD, PAYS_APP } from "@/lib/brand/editeur";
 
 // Textes juridiques (mentions légales, CGU/CGV, confidentialité) en 5 langues.
@@ -14,7 +15,7 @@ const fr: LegalDict = {
   mentions: {
     heading: "Mentions légales",
     sections: [
-      { title: "1. Éditeur du site", paras: ["Le site et l'application Pacevo sont édités par :"], list: [`${EDITEUR.nom}`, `Statut juridique : ${EDITEUR.statut}`, `Adresse : ${EDITEUR.adresse}, ${PAYS_EDITEUR.fr}`, `E-mail : ${EDITEUR.email}`] },
+      { title: "1. Éditeur du site", paras: ["Le site et l'application Pacevo sont édités par :"], list: [`${EDITEUR.nom}`, `Statut juridique : ${statutEditeur()}`, `Adresse : ${EDITEUR.adresse}, ${PAYS_EDITEUR.fr}`, `E-mail : ${EDITEUR.email}`] },
       { title: "2. Directeur de la publication", paras: [`${EDITEUR.nom}.`] },
       { title: "3. Hébergement", paras: ["L'application est hébergée par :"], list: [`Application : ${HEBERGEUR_APP.nom}, ${HEBERGEUR_APP.adresse}, ${PAYS_APP.fr} — ${HEBERGEUR_APP.site} (les fonctions serveur s'exécutent dans la région ${HEBERGEUR_APP.region}, aux ${PAYS_APP.fr})`, `Base de données : ${HEBERGEUR_BDD.nom} — hébergée dans l'Union européenne (${HEBERGEUR_BDD.ville.fr}, ${HEBERGEUR_BDD.region}).`] },
       { title: "4. Propriété intellectuelle", paras: ["Le nom, le logo, les textes, l'interface et le code de Pacevo sont protégés. Toute reproduction non autorisée est interdite. Les marques, noms et photos de produits tiers appartiennent à leurs propriétaires respectifs ; ils sont, le cas échéant, utilisés dans le cadre de programmes d'affiliation officiels."] },
@@ -64,7 +65,7 @@ const en: LegalDict = {
   mentions: {
     heading: "Legal notice",
     sections: [
-      { title: "1. Site publisher", paras: ["The Pacevo website and app are published by:"], list: [`${EDITEUR.nom}`, `Legal status: ${EDITEUR.statut}`, `Address: ${EDITEUR.adresse}, ${PAYS_EDITEUR.en}`, `Email: ${EDITEUR.email}`] },
+      { title: "1. Site publisher", paras: ["The Pacevo website and app are published by:"], list: [`${EDITEUR.nom}`, `Legal status: ${statutEditeur()}`, `Address: ${EDITEUR.adresse}, ${PAYS_EDITEUR.en}`, `Email: ${EDITEUR.email}`] },
       { title: "2. Publication director", paras: [`${EDITEUR.nom}.`] },
       { title: "3. Hosting", paras: ["The application is hosted by:"], list: [`Application: ${HEBERGEUR_APP.nom}, ${HEBERGEUR_APP.adresse}, ${PAYS_APP.en} — ${HEBERGEUR_APP.site} (server functions run in region ${HEBERGEUR_APP.region}, in the ${PAYS_APP.en})`, `Database: ${HEBERGEUR_BDD.nom} — hosted in the European Union (${HEBERGEUR_BDD.ville.en}, ${HEBERGEUR_BDD.region}).`] },
       { title: "4. Intellectual property", paras: ["The name, logo, texts, interface and code of Pacevo are protected. Any unauthorised reproduction is prohibited. Third-party brands, names and product photos belong to their respective owners; where applicable, they are used under official affiliate programs."] },
@@ -114,7 +115,7 @@ const de: LegalDict = {
   mentions: {
     heading: "Impressum",
     sections: [
-      { title: "1. Herausgeber", paras: ["Die Website und App Pacevo werden herausgegeben von:"], list: [`${EDITEUR.nom}`, `Rechtsform: ${EDITEUR.statut}`, `Adresse: ${EDITEUR.adresse}, ${PAYS_EDITEUR.de}`, `E-Mail: ${EDITEUR.email}`] },
+      { title: "1. Herausgeber", paras: ["Die Website und App Pacevo werden herausgegeben von:"], list: [`${EDITEUR.nom}`, `Rechtsform: ${statutEditeur()}`, `Adresse: ${EDITEUR.adresse}, ${PAYS_EDITEUR.de}`, `E-Mail: ${EDITEUR.email}`] },
       { title: "2. Verantwortlich für den Inhalt", paras: [`${EDITEUR.nom}.`] },
       { title: "3. Hosting", paras: ["Die Anwendung wird gehostet von:"], list: [`Anwendung: ${HEBERGEUR_APP.nom}, ${HEBERGEUR_APP.adresse}, ${PAYS_APP.de} — ${HEBERGEUR_APP.site} (Serverfunktionen laufen in der Region ${HEBERGEUR_APP.region}, in den ${PAYS_APP.de})`, `Datenbank: ${HEBERGEUR_BDD.nom} — gehostet in der Europäischen Union (${HEBERGEUR_BDD.ville.de}, ${HEBERGEUR_BDD.region}).`] },
       { title: "4. Geistiges Eigentum", paras: ["Name, Logo, Texte, Oberfläche und Code von Pacevo sind geschützt. Jede unbefugte Vervielfältigung ist untersagt. Marken, Namen und Produktfotos Dritter gehören ihren jeweiligen Eigentümern; sie werden ggf. im Rahmen offizieller Partnerprogramme verwendet."] },
@@ -164,7 +165,7 @@ const es: LegalDict = {
   mentions: {
     heading: "Aviso legal",
     sections: [
-      { title: "1. Editor del sitio", paras: ["El sitio y la aplicación Pacevo están editados por:"], list: [`${EDITEUR.nom}`, `Estatus jurídico: ${EDITEUR.statut}`, `Dirección: ${EDITEUR.adresse}, ${PAYS_EDITEUR.es}`, `Correo: ${EDITEUR.email}`] },
+      { title: "1. Editor del sitio", paras: ["El sitio y la aplicación Pacevo están editados por:"], list: [`${EDITEUR.nom}`, `Estatus jurídico: ${statutEditeur()}`, `Dirección: ${EDITEUR.adresse}, ${PAYS_EDITEUR.es}`, `Correo: ${EDITEUR.email}`] },
       { title: "2. Director de la publicación", paras: [`${EDITEUR.nom}.`] },
       { title: "3. Alojamiento", paras: ["La aplicación está alojada por:"], list: [`Aplicación: ${HEBERGEUR_APP.nom}, ${HEBERGEUR_APP.adresse}, ${PAYS_APP.es} — ${HEBERGEUR_APP.site} (las funciones de servidor se ejecutan en la región ${HEBERGEUR_APP.region}, en ${PAYS_APP.es})`, `Base de datos: ${HEBERGEUR_BDD.nom} — alojada en la Unión Europea (${HEBERGEUR_BDD.ville.es}, ${HEBERGEUR_BDD.region}).`] },
       { title: "4. Propiedad intelectual", paras: ["El nombre, el logotipo, los textos, la interfaz y el código de Pacevo están protegidos. Queda prohibida toda reproducción no autorizada. Las marcas, nombres y fotos de productos de terceros pertenecen a sus respectivos propietarios; en su caso, se usan en el marco de programas de afiliación oficiales."] },
@@ -214,7 +215,7 @@ const pt: LegalDict = {
   mentions: {
     heading: "Aviso legal",
     sections: [
-      { title: "1. Editor do site", paras: ["O site e a aplicação Pacevo são editados por:"], list: [`${EDITEUR.nom}`, `Estatuto jurídico: ${EDITEUR.statut}`, `Morada: ${EDITEUR.adresse}, ${PAYS_EDITEUR.pt}`, `E-mail: ${EDITEUR.email}`] },
+      { title: "1. Editor do site", paras: ["O site e a aplicação Pacevo são editados por:"], list: [`${EDITEUR.nom}`, `Estatuto jurídico: ${statutEditeur()}`, `Morada: ${EDITEUR.adresse}, ${PAYS_EDITEUR.pt}`, `E-mail: ${EDITEUR.email}`] },
       { title: "2. Diretor de publicação", paras: [`${EDITEUR.nom}.`] },
       { title: "3. Alojamento", paras: ["A aplicação é alojada por:"], list: [`Aplicação: ${HEBERGEUR_APP.nom}, ${HEBERGEUR_APP.adresse}, ${PAYS_APP.pt} — ${HEBERGEUR_APP.site} (as funções de servidor são executadas na região ${HEBERGEUR_APP.region}, nos ${PAYS_APP.pt})`, `Base de dados: ${HEBERGEUR_BDD.nom} — alojada na União Europeia (${HEBERGEUR_BDD.ville.pt}, ${HEBERGEUR_BDD.region}).`] },
       { title: "4. Propriedade intelectual", paras: ["O nome, o logótipo, os textos, a interface e o código da Pacevo estão protegidos. É proibida qualquer reprodução não autorizada. As marcas, nomes e fotos de produtos de terceiros pertencem aos respetivos proprietários; quando aplicável, são usados no âmbito de programas de afiliação oficiais."] },

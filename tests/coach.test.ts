@@ -4291,7 +4291,7 @@ test("l'e-mail porte le logo, une ligne d'aperçu et une mise en page qui tient 
 
     // 5. RIEN DE CASSÉ. Une clé absente donnerait « undefined » en pleine page.
     assert.ok(!m.html.includes("undefined"), `${lang} : « undefined » dans le corps`);
-    // Et surtout PAS le gabarit juridique non rempli : `EDITEUR.statut` porte encore
+    // Et surtout PAS le gabarit juridique non rempli : `statutEditeur()` rend encore
     // « [À COMPLÉTER] », qui n'a rien à faire dans la boîte d'un client.
     assert.ok(!m.html.includes("COMPLÉTER"), `${lang} : gabarit juridique non résolu dans l'e-mail`);
   }

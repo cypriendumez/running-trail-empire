@@ -13,22 +13,6 @@ import type { Lang } from "@/lib/i18n/translations";
  * Ici : les FAITS. Les phrases qui les entourent restent dans `legalI18n.ts`, à leur
  * place, traduites. Un test interdit à toute page légale de réécrire un de ces faits.
  */
-/** Le repère affiché tant que l'identité légale n'est pas déclarée. */
-export const STATUT_A_COMPLETER = "[À COMPLÉTER / TO BE COMPLETED — statut juridique et n° SIREN/SIRET]";
-
-/**
- * Le statut juridique publié, lu sur l'hébergement.
- *
- * ⚠️ ON NE PUBLIE QU'UNE VALEUR PLAUSIBLE. Une variable posée à « oui », « ok » ou à
- * trois caractères remplirait la page d'un statut qui n'en est pas un, et la mention
- * légale paraîtrait complète tout en étant fausse — pire que le repère visible qu'elle
- * remplace. En dessous de dix caractères, on garde le repère.
- */
-export function statutEditeur(env: Record<string, string | undefined> = process.env): string {
-  const v = (env.EDITEUR_STATUT ?? "").trim();
-  return v.length >= 10 ? v : STATUT_A_COMPLETER;
-}
-
 export const EDITEUR = {
   nom: "Cyprien Dumez",
   /**
@@ -43,10 +27,24 @@ export const EDITEUR = {
    * identité légale sans disposer du dépôt ni savoir redéployer. Une identité qui exige
    * un développeur pour changer est une identité qui restera fausse.
    *
-   * Ces textes sont rendus côté SERVEUR uniquement (vérifié : aucun composant `use
-   * client` ne les importe), donc la variable y est réellement lisible.
+   * ⚠️ LE STATUT N'EST PLUS UNE PROPRIÉTÉ DE CET OBJET, ET C'EST VOULU. Il l'a été,
+   * sous un commentaire qui affirmait « vérifié : aucun composant `use client` ne les
+   * importe ». C'ÉTAIT FAUX : `ProfileSettings.tsx` porte « use client » et importe
+   * cette fiche pour y lire l'adresse de contact. Un composant client embarque tout son
+   * arbre d'imports — l'appel `statutEditeur()`, placé ici au chargement du module, se
+   * retrouvait donc DANS LE NAVIGATEUR (constaté dans .next/static/chunks/, pas déduit).
+   *
+   * Or le navigateur ne reçoit que les variables `NEXT_PUBLIC_*`. Le jour où l'éditeur
+   * pose `EDITEUR_STATUT` sur l'hébergement, la page légale aurait affiché le vrai
+   * statut au premier rendu (serveur) puis l'aurait remplacé par « [À COMPLÉTER] » à
+   * l'hydratation — avec une erreur React #418 au passage, et une mention légale fausse
+   * sur un site en vente. Le défaut dormait : tant que la variable est vide, serveur et
+   * navigateur produisent le même repère, donc rien ne se voyait.
+   *
+   * Le statut se lit désormais LÀ OÙ IL S'AFFICHE, par `statutEditeur()`, dans du code
+   * serveur. Et ce n'est plus un commentaire qui le garantit : `tests/bundle.test.ts`
+   * refuse qu'un composant client atteigne une variable d'environnement non publique.
    */
-  statut: statutEditeur(),
   /** Sans le pays : il est TRADUIT (France / Frankreich / Francia / França) — voir PAYS_EDITEUR. */
   adresse: "28 avenue Pasteur, 59130 Lambersart",
   email: "cypriendumez@outlook.fr",

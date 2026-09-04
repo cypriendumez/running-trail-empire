@@ -32,7 +32,8 @@ import { PRIX_AFFICHES } from "../src/lib/billing/prix";
 import { ATTRIBUTION_GARMIN, PAGES_ATTRIBUTION } from "../src/components/legal/attributionI18n";
 import { liensStore } from "../src/lib/brand/stores";
 import { estAdmin, adminsAutorises, emailEditeur, ADMIN_PAR_DEFAUT } from "../src/lib/admin/acces";
-import { EDITEUR, STATUT_A_COMPLETER, statutEditeur, HEBERGEUR_APP, PAYS_APP, SOUS_TRAITANTS } from "../src/lib/brand/editeur";
+import { EDITEUR, HEBERGEUR_APP, PAYS_APP, SOUS_TRAITANTS } from "../src/lib/brand/editeur";
+import { STATUT_A_COMPLETER, statutEditeur } from "../src/lib/brand/statutEditeur";
 import { fournisseursActifs } from "../src/lib/auth/fournisseurs";
 import { nomAffiche, refusDe, avisDe, litAvis, TEXTE_MIN } from "../src/lib/avis/store";
 
@@ -228,7 +229,7 @@ test("les mentions légales disent la même chose dans les 5 langues", () => {
       );
       // Le repère vient d'UNE fiche : il doit être identique partout. Deux formulations
       // différentes voudraient dire que quelqu'un l'a recopié.
-      assert.equal(premier, EDITEUR.statut, `le repère à compléter diverge en ${lg}`);
+      assert.equal(premier, statutEditeur(), `le repère à compléter diverge en ${lg}`);
       assert.equal(premier, STATUT_A_COMPLETER, "le repère ne vient plus de la fiche unique");
     } else {
       // Renseigné : le statut déclaré doit RÉELLEMENT apparaître dans chaque langue.
