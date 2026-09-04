@@ -120,7 +120,7 @@ export default function BlogPage() {
 
       {/* HERO */}
       <Container className="pt-16 pb-10 text-center sm:pt-20">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#059669]">{B.heroEyebrow}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#047857]">{B.heroEyebrow}</p>
         <h1 className="mx-auto mt-3 max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
           {B.heroTitleA}<span className="text-[#059669]">{B.heroAccent}</span>.
         </h1>

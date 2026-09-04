@@ -464,7 +464,7 @@ export default function LandingPage() {
           logo, c'est promettre une intégration, et promettre l'envoi d'une séance à une
           plateforme qui ne peut pas la recevoir est le pire des deux mensonges. */}
       <Container className="pt-14 sm:pt-16">
-        <p className="text-center text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-400">
+        <p className="text-center text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
           {L.sync.title}
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5 sm:gap-3">
@@ -482,7 +482,7 @@ export default function LandingPage() {
                 // égalise la surface perçue, quelle que soit la marque affichée.
                 ? <img src={`/brands/${m.logo}`} alt={m.nom} className="h-6 w-auto max-w-[112px] object-contain" loading="lazy" />
                 : m.nom}
-              {m.passerelle && <span className="ml-1 -translate-y-1 text-[11px] font-semibold text-zinc-400">*</span>}
+              {m.passerelle && <span className="ml-1 -translate-y-1 text-[11px] font-semibold text-zinc-500">*</span>}
             </span>
           ))}
         </div>
@@ -527,7 +527,7 @@ export default function LandingPage() {
             {SYNC.filter((m) => m.appli).map((m) => m.nom).join(", ")}
           </p>
         </div>
-        <p className="mx-auto mt-4 max-w-2xl text-center text-xs leading-relaxed text-zinc-400">
+        <p className="mx-auto mt-4 max-w-2xl text-center text-xs leading-relaxed text-zinc-500">
           {L.sync.note}
         </p>
       </Container>
@@ -565,7 +565,7 @@ export default function LandingPage() {
                 key={code}
                 onClick={() => setActiveCategory(code)}
                 className={`rounded-full px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
-                  activeCategory === code ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
+                  activeCategory === code ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
                 }`}
               >
                 {L.programs.cats[code]}
@@ -631,7 +631,7 @@ export default function LandingPage() {
                   className={`rounded-2xl border p-7 ${sombre ? "surface-brand border-transparent" : "border-zinc-200 bg-white"}`}>
                   <Icon className={sombre ? "h-5 w-5 text-[#34d399]" : "h-5 w-5 text-[#059669]"} strokeWidth={1.6} />
                   <div className="mt-7 text-[1.75rem] font-bold leading-none tracking-tight">{p.metric}</div>
-                  <div className={`mt-2 text-[10px] font-semibold uppercase tracking-[0.16em] ${sombre ? "text-white/45" : "text-zinc-400"}`}>
+                  <div className={`mt-2 text-[10px] font-semibold uppercase tracking-[0.16em] ${sombre ? "text-white/45" : "text-zinc-500"}`}>
                     {p.metricLabel}
                   </div>
                   <h3 className="mt-6 text-[17px] font-semibold tracking-tight">{p.title}</h3>
@@ -690,7 +690,7 @@ export default function LandingPage() {
                   className={`rounded-full px-5 py-2 text-sm font-semibold transition-colors ${
                     periode === p ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-900"}`}>
                   {p === "mois" ? L.pricing.mois : L.pricing.an}
-                  {p === "an" && <span className={`ml-2 text-[11px] font-bold ${periode === "an" ? "text-[#34d399]" : "text-[#059669]"}`}>{L.pricing.economie}</span>}
+                  {p === "an" && <span className={`ml-2 text-[11px] font-bold ${periode === "an" ? "text-[#34d399]" : "text-[#047857]"}`}>{L.pricing.economie}</span>}
                 </button>
               ))}
             </div>
@@ -714,12 +714,12 @@ export default function LandingPage() {
                       {plan.badge}
                     </span>
                   )}
-                  <div className={`text-sm font-semibold ${vedette ? "text-white/50" : "text-zinc-400"}`}>{plan.name}</div>
+                  <div className={`text-sm font-semibold ${vedette ? "text-white/50" : "text-zinc-500"}`}>{plan.name}</div>
                   <div className="mt-2 flex items-baseline gap-1">
                     <span className="text-5xl font-bold tracking-tight">{plan.cle === "gratuit" ? euros(0, lang) : euros(grand, lang)}</span>
-                    <span className={`text-sm ${vedette ? "text-white/40" : "text-zinc-400"}`}>{plan.cle === "gratuit" ? "" : L.pricing.parMois}</span>
+                    <span className={`text-sm ${vedette ? "text-white/40" : "text-zinc-500"}`}>{plan.cle === "gratuit" ? "" : L.pricing.parMois}</span>
                   </div>
-                  <div className={`mt-1 h-5 text-xs ${vedette ? "text-white/40" : "text-zinc-400"}`}>
+                  <div className={`mt-1 h-5 text-xs ${vedette ? "text-white/40" : "text-zinc-500"}`}>
                     {plan.cle === "gratuit" ? L.pricing.gratuitNote : periode === "an" ? `${euros(centimes, lang)} / ${L.pricing.an.toLowerCase()}` : ""}
                   </div>
                   <p className={`mt-4 text-sm ${vedette ? "text-white/70" : "text-zinc-500"}`}>{plan.pitch}</p>
