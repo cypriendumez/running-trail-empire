@@ -30,6 +30,21 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-XSS-Protection", value: "1; mode=block" },
+          /**
+           * ⚠️ CE QUI PART VERS LES SITES TIERS. Chaque fiche de course mène au site de
+           * l'organisateur : sans cet en-tête, l'adresse complète de la page de départ
+           * y était transmise. Les navigateurs récents appliquent déjà cette valeur par
+           * défaut — l'écrire la rend indépendante de leur version, et vaut pour les
+           * anciens qui envoyaient l'URL entière.
+           */
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          /**
+           * ⚠️ `geolocation=(self)` ET PAS `()`. L'application s'en sert vraiment — c'est
+           * le tri « près de moi » des parcours. La couper ici casserait la
+           * fonctionnalité en silence : le navigateur refuserait sans message d'erreur
+           * exploitable. Ce qu'on ferme, c'est ce que le produit n'utilise PAS.
+           */
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), payment=(), usb=(), geolocation=(self)" },
         ],
       },
     ];
