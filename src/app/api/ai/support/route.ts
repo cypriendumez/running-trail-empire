@@ -8,6 +8,7 @@ import { T, normLang } from "@/lib/i18n/translations";
 import { fallbackAnswer, reponseImmediate, FALLBACK_MISS, FALLBACK_PREFIX } from "@/lib/support/fallback";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normaliserQuestion, empreinteKb, utilisable, type EntreeMemoire } from "@/lib/support/memoire";
+import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  ASSISTANT DE SUPPORT — répond aux questions sur l'app, dans la langue de l'athlète.
@@ -65,7 +66,7 @@ export async function POST(req: Request) {
   // ── État du compte ──
   // `intervals_api_key` n'est lu QUE pour en déduire un booléen ; la clé elle-même ne
   // quitte pas cette fonction et n'entre jamais dans le prompt envoyé à Gemini.
-  const today = new Date().toISOString().slice(0, 10);
+  const today = aujourdhui(FUSEAU_DEFAUT);
   const since30 = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
   const [profRes, woRes, lastWoRes, csRes, stateRes, objRes, wlRes] = await Promise.all([
     sb.from("profiles").select("age, height_cm, weight_kg, onboarding_completed, health_declared, intervals_athlete_id, intervals_api_key, weight_mode_enabled").eq("id", user.id).maybeSingle(),

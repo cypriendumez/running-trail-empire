@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { jourCivil, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 import {
   Wallet, TrendingUp, TrendingDown, Plus, Download, X, Settings2,
   Search, Ban, AlertCircle, Check, Repeat, Loader2, FileText, PenLine, ArrowRight, Paperclip, Sparkles, CalendarClock,
@@ -31,7 +32,12 @@ import {
 
 const MOIS_FR = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
 const moisLisible = (m: string) => `${MOIS_FR[Number(m.slice(5, 7)) - 1] ?? m} ${m.slice(2, 4)}`;
-const aujourdhui = () => new Date().toISOString().slice(0, 10);
+// ⚠️ UNE ÉCRITURE COMPTABLE SE DATE À PARIS, PAS EN UTC. `toISOString()` reculait la
+// date d'un jour entre minuit et 2 h : une pièce saisie le 5 à 00 h 30 serait tombée
+// dans l'exercice du 4 — et, un 1er janvier, dans l'exercice précédent.
+// L'espace d'administration n'est pas sous `FuseauProvider` : on vise donc
+// explicitement le fuseau de l'éditeur, qui est aussi celui de sa comptabilité.
+const aujourdhui = () => jourCivil(new Date(), FUSEAU_DEFAUT);
 
 type Brouillon = {
   date: string; libelle: string; sens: Sens; categorie: string; montant: string;

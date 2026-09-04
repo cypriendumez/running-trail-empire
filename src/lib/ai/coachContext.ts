@@ -19,6 +19,7 @@ import type { Lang } from "@/lib/i18n/translations";
 import { MOTIF_T } from "@/lib/coach/reasonsI18n";
 import { traduireDouleur } from "@/lib/coach/painZonesI18n";
 import { QUALITE_T } from "@/lib/ai/qualityI18n";
+import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
 type SB = Awaited<ReturnType<typeof createClient>>;
 
@@ -764,7 +765,7 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const easyDiscipline = easyRuns.length && easyCeiling != null
     ? `${tooFastEasy}/${easyRuns.length} footings au-dessus du plafond facile (~${easyCeiling} bpm)${tooFastEasy / easyRuns.length >= 0.34 ? " ⚠️ tendance à courir TROP VITE en facile → fais-le RALENTIR (frein n°1 à la progression)" : tooFastEasy === 0 ? " ✅ excellente discipline" : " ✅ discipline correcte"}`
     : "n/c (FC ou séances manquantes)";
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = aujourdhui(FUSEAU_DEFAUT);
   // Jours où il a COURU. Compter toutes les activités faisait passer une journée de
   // randonnée pour une séance de course honorée : l'adhérence était surestimée et les
   // jours réellement ratés — ceux que la boucle doit justement détecter — invisibles.

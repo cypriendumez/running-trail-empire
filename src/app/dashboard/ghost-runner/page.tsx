@@ -4,6 +4,7 @@ import { GhostRunner } from "@/components/ghost-runner/GhostRunner";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import { oneSessionPerSlot } from "@/lib/coach/sessions";
 import { getEffectiveVma } from "@/lib/ai/coachContext";
+import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
 export const metadata = { title: "Ghost Runner" };
 
@@ -11,7 +12,7 @@ export default async function GhostRunnerPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = aujourdhui(FUSEAU_DEFAUT);
   const [profileRes, baselineRes, coachRes, effectiveVma] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single(),
     supabase

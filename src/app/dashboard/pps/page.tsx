@@ -17,6 +17,7 @@ import { PPS_T } from "@/lib/pps/ppsI18n";
 import { PPS_URL, PPS_PRIX_EUR, PPS_VALIDITE_MOIS, type PpsStatus } from "@/lib/pps/status";
 import { normLang } from "@/lib/i18n/translations";
 import { ShieldCheck, ExternalLink, Award, Baby, ArrowRight } from "lucide-react";
+import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pass Prévention Santé" };
@@ -26,7 +27,7 @@ export default async function PpsPage() {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect("/login");
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = aujourdhui(FUSEAU_DEFAUT);
   const [{ data: ppsRow }, { data: profileRow }, { data: objRow }, { data: plannedRows }] = await Promise.all([
     sb.from("notifications").select("data").eq("user_id", user.id).eq("type", "pps_status").maybeSingle(),
     sb.from("profiles").select("preferred_language").eq("id", user.id).single(),

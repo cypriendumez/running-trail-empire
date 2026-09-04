@@ -8,6 +8,8 @@ import { correctedRaceType } from "@/lib/raceType";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { RX, fillR, dateRangeKey } from "./racesI18n";
 import { formatDateCivile } from "@/lib/time/fuseau";
+import { useFuseau } from "@/lib/time/FuseauProvider";
+import { aujourdhui } from "@/lib/time/fuseau";
 
 const TYPE_COLORS: Record<string, string> = {
   road_5k: "#6366f1", road_10k: "#3b82f6", semi: "#0ea5e9",
@@ -61,7 +63,13 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
   const [geocoding, setGeocoding] = useState(false);
   const [geocodeResult, setGeocodeResult] = useState<string | null>(null);
 
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  // ⚠️ `toISOString()` JETTE LE FUSEAU QUE LE NAVIGATEUR CONNAÎT. Entre minuit et 2 h à
+  // Paris, le jour UTC est encore celui de la veille : les courses datées d'aujourd'hui
+  // basculaient dans le passé et disparaissaient de la carte. Le fuseau vient du
+  // fournisseur (cookie), jamais de `resolvedOptions()` pendant le rendu — ce serait
+  // rétablir l'écart d'hydratation que ce fournisseur existe pour supprimer.
+  const fuseau = useFuseau();
+  const today = useMemo(() => aujourdhui(fuseau), [fuseau]);
   const maxDate = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + dateRangeDays);

@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
 // POST /api/workouts/log — enregistre une course faite au TÉLÉPHONE (GPS, sans montre),
 // façon Strava : distance, durée, allure, D+, FC + tracé GPS → apparaît dans l'historique.
@@ -15,7 +16,7 @@ export async function POST(req: Request) {
   if (!(distance_km > 0.1) || !(duration_seconds > 30)) {
     return NextResponse.json({ error: "Course trop courte pour être enregistrée." }, { status: 400 });
   }
-  const date = typeof b.date === "string" && /^\d{4}-\d{2}-\d{2}/.test(b.date) ? b.date.slice(0, 10) : new Date().toISOString().slice(0, 10);
+  const date = typeof b.date === "string" && /^\d{4}-\d{2}-\d{2}/.test(b.date) ? b.date.slice(0, 10) : aujourdhui(FUSEAU_DEFAUT);
 
   // Tracé GPS (sous-échantillonné) stocké dans `notes` (champ libre, non affiché) → carte plus tard.
   let notes: string | null = null;

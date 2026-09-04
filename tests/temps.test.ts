@@ -7,7 +7,8 @@
  * pas le même jour du calendrier.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import {
   FUSEAU_DEFAUT, fuseauValide, fuseauOuDefaut, jourCivil, aujourdhui,
@@ -216,6 +217,60 @@ test("les écrans qui décident d'un jour ne le calculent plus en UTC", () => {
     assert.ok(/jourCivil\(new Date\(\), fuseau\)/.test(src), `${f} ne date plus sur le fuseau de l'athlète`);
     assert.ok(/useFuseau\(\)/.test(src), `${f} n'a plus accès au fuseau`);
   }
+});
+
+test("une saisie datée d'aujourd'hui n'est pas refusée comme « dans le futur »", () => {
+  // ⚠️ LE DÉFAUT, SUR UN INSTANT PRÉCIS. Le 5 septembre 2026 à 00 h 30 à Paris, il est
+  // encore le 4 en UTC. L'athlète choisit « aujourd'hui » dans son calendrier — donc le
+  // 5 — et les contrôles `saisie > jourUTC` de /api/pps et /api/weight le REJETAIENT
+  // comme une date future. Deux heures par nuit en été, une en hiver.
+  const instant = new Date("2026-09-04T22:30:00Z");
+  const jourUTC = instant.toISOString().slice(0, 10);
+  const jourParis = aujourdhui(FUSEAU_DEFAUT, instant);
+  assert.equal(jourUTC, "2026-09-04");
+  assert.equal(jourParis, "2026-09-05", "le jour de l'athlète n'est plus calculé sur son fuseau");
+
+  const saisie = jourParis;                       // « aujourd'hui », vu par l'athlète
+  assert.ok(saisie > jourUTC, "l'instant choisi ne reproduit plus l'écart : le test ne prouve rien");
+  assert.ok(!(saisie > jourParis), "une saisie du jour serait encore refusée comme future");
+
+  // Et l'écart n'existe QUE la nuit : en pleine journée les deux coïncident, sinon le
+  // correctif déplacerait le problème au lieu de le supprimer.
+  const midi = new Date("2026-09-04T12:00:00Z");
+  assert.equal(aujourdhui(FUSEAU_DEFAUT, midi), midi.toISOString().slice(0, 10),
+    "le jour de l'athlète diverge de l'UTC en pleine journée");
+});
+
+test("plus aucun écran ni route de l'athlète ne date en UTC", () => {
+  // La liste des exceptions est CLOSE et justifiée. Tout nouveau fichier qui daterait en
+  // UTC rougit ici — c'est ce qui empêche la famille de repousser.
+  const TOLERES: Record<string, string> = {
+    "src/lib/time/fuseau.ts": "le motif est cité dans sa propre documentation",
+    "src/app/api/newsletter/weekly/route.ts": "lettre hebdomadaire : un décalage de deux heures ne change aucune semaine",
+    "src/app/api/races/seed-full/route.ts": "collecte du catalogue, aucune décision pour un athlète",
+    "src/app/api/races/sync/route.ts": "collecte du catalogue, aucune décision pour un athlète",
+    "src/app/api/cron/races-maintenance/route.ts": "entretien nocturne du catalogue",
+    "src/lib/intervals/performance.ts": "bornes d'une requête intervals.icu, pas un jour affiché",
+  };
+  const fichiers: string[] = [];
+  (function marche(d: string) {
+    for (const e of readdirSync(d)) {
+      const p = join(d, e);
+      if (statSync(p).isDirectory()) marche(p);
+      else if (/\.(ts|tsx)$/.test(p)) fichiers.push(p);
+    }
+  })("src");
+  const coupables = fichiers.filter((f) => {
+    if (f in TOLERES) return false;
+    const src = readFileSync(f, "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+    return /new Date\(\)\.toISOString\(\)\.slice\(0,\s*10\)/.test(src);
+  });
+  assert.deepEqual(coupables, [],
+    `ces fichiers datent encore en UTC :\n    ${coupables.join("\n    ")}`);
+  // ⚠️ Un balayage qui ne parcourt rien passe toujours.
+  assert.ok(fichiers.length > 300, `seulement ${fichiers.length} fichiers parcourus`);
 });
 
 console.log(`\n${passed} test(s) du temps passé(s), ${fails.length} échec(s)`);

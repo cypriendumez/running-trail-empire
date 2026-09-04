@@ -6,6 +6,7 @@ import {
   type WeightLog, type EnergyWorkout,
 } from "@/lib/weight/energy";
 import { weightTrainingRules } from "@/lib/weight/coaching";
+import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  MODE PERTE DE POIDS — lecture du plan et enregistrement des pesées.
@@ -172,7 +173,7 @@ export async function POST(req: Request) {
   if (!Number.isFinite(w) || w <= 30 || w >= 300) {
     return NextResponse.json({ error: "Poids invalide (30-300 kg)" }, { status: 400 });
   }
-  const today = new Date().toISOString().slice(0, 10);
+  const today = aujourdhui(FUSEAU_DEFAUT);
   const date = typeof b.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(b.date) ? b.date : today;
   // Une pesée dans le futur fausserait la régression : on refuse plutôt que de la ranger
   // silencieusement à aujourd'hui.

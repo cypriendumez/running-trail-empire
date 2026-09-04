@@ -6,6 +6,7 @@ import { generateContent, budget } from "@/lib/ai/gemini";
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 import { sniffImage } from "@/lib/upload/sniff";
 import { suiviParZone, resumeDouleurs, type Signalement } from "@/lib/health/douleurs";
+import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
 type Msg = { role: "user" | "model"; text: string };
 
@@ -109,7 +110,7 @@ export async function POST(req: Request) {
   const pains = [...new Set(feedback.flatMap((f) => f.data?.pain ?? []).filter(Boolean))];
 
   // ── MÉMOIRE DU KINÉ : l'évolution zone par zone sur 60 jours ────────────────────
-  const aujourdhui = new Date().toISOString().slice(0, 10);
+  const jourDeLAthlete = aujourdhui(FUSEAU_DEFAUT);
   const signalements: Signalement[] = ((painRes.data ?? []) as { data: { zone?: string; slot?: string; level?: number; date?: string } | null; created_at: string }[])
     .map((r) => ({
       zone: String(r.data?.zone ?? ""),
@@ -118,7 +119,7 @@ export async function POST(req: Request) {
       // La date porte l'information clinique ; `created_at` ne sert que de repli.
       date: String(r.data?.date ?? r.created_at ?? "").slice(0, 10),
     }));
-  const suivi = suiviParZone(signalements, aujourdhui);
+  const suivi = suiviParZone(signalements, jourDeLAthlete);
   const resumeSuivi = resumeDouleurs(suivi);
 
   // ── GARAGE : modèle et kilométrage, sans verdict inventé ────────────────────────
@@ -135,7 +136,7 @@ export async function POST(req: Request) {
         + (c.drop_mm != null ? ` · drop ${c.drop_mm} mm` : "") + (c.terrain ? ` · ${c.terrain}` : "");
     });
   // Course à venir : un objectif proche change la stratégie (gestion vs guérison complète).
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = aujourdhui(FUSEAU_DEFAUT);
   const nextRace = ((raceRes.data ?? []) as { data: { date?: string; name?: string; distanceKm?: number | null } }[])
     .map((r) => r.data).filter((d) => (d?.date ?? "") >= todayStr)
     .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0] ?? null;
@@ -241,7 +242,7 @@ Si la photo est floue, trop sombre, trop éloignée ou ne montre pas la zone dé
   // CHAQUE message, ce qui créerait sinon une entrée par phrase échangée.
   if (zone && typeof painLevel === "number" && painLevel >= 4) {
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = aujourdhui(FUSEAU_DEFAUT);
       const { data: existing } = await supabase.from("notifications")
         .select("id, data").eq("user_id", user.id).eq("type", "pain_report")
         .gte("created_at", `${today}T00:00:00Z`).limit(20);

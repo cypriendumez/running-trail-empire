@@ -26,6 +26,7 @@ import type { Lang } from "@/lib/i18n/translations";
 // le gabarit « [À COMPLÉTER] », qui n'a rien à faire dans la boîte d'un client.
 import { coquille, carte, titreBloc, pastille, bouton, esc, VERT } from "@/lib/notify/gabarit";
 import { EDITEUR } from "@/lib/brand/editeur";
+import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
 /** Deux séances dans la même matinée ne valent pas deux e-mails. */
 export const EMAIL_MIN_INTERVAL_MS = 3 * 60 * 60 * 1000;
@@ -160,7 +161,7 @@ export function buildPlanReadyEmail(i: PlanReadyInput): { subject: string; text:
   const t = T[i.lang] ?? T.fr;
   const loc = LOCALE[i.lang] ?? "fr-FR";
   const days = i.days.slice(0, 3);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = aujourdhui(FUSEAU_DEFAUT);
   const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
   const dayLabel = (d: string) =>
     d === today ? t.today

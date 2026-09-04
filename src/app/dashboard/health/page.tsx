@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { createClient } from "@/lib/supabase/server";
 import { HealthCenter } from "@/components/health/HealthCenter";
 import { suiviParZone, type Signalement } from "@/lib/health/douleurs";
+import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
 export const metadata = { title: "Santé & Guardian" };
 
@@ -28,7 +29,7 @@ export default async function HealthPage() {
         level: Number(r.data?.level),
         date: String(r.data?.date ?? r.created_at ?? "").slice(0, 10),
       }));
-    suivi = suiviParZone(rows, new Date().toISOString().slice(0, 10));
+    suivi = suiviParZone(rows, aujourdhui(FUSEAU_DEFAUT));
   }
   return <HealthCenter suivi={suivi} />;
 }

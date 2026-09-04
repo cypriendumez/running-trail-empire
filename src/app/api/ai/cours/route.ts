@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { exigeAcces } from "@/lib/billing/guard";
 import { generateContent, budget } from "@/lib/ai/gemini";
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
+import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
 type Msg = { role: "user" | "model"; text: string };
 
@@ -57,7 +58,7 @@ export async function POST(req: Request) {
   const sleep = sleepRes.data;
   const lastSessions = workouts.slice(0, 3).map((w) =>
     `${new Date(w.date).toLocaleDateString("fr", { day: "numeric", month: "short" })} : ${w.title || w.type || "séance"}${num(w.distance_km) ? ` ${num(w.distance_km).toFixed(1)} km` : ""}${num(w.avg_hr) ? ` · ${num(w.avg_hr)} bpm` : ""}`).join(" | ");
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = aujourdhui(FUSEAU_DEFAUT);
   const nextRace = ((raceRes.data ?? []) as { data: { date?: string; name?: string; distanceKm?: number | null } }[])
     .map((r) => r.data).filter((d) => (d?.date ?? "") >= todayStr)
     .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0] ?? null;

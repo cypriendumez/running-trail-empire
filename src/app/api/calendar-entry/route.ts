@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEffectiveVma } from "@/lib/ai/coachContext";
 import { setRaceObjective, predictTargetSeconds } from "@/lib/coach/objective";
+import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
 // POST /api/calendar-entry — le client ajoute une note ou une course planifiée à un jour.
 //   {date, kind:"note", text}  OU  {date, kind:"race", name, location?, distanceKm?}
@@ -45,7 +46,7 @@ export async function POST(req: Request) {
   // impossible de prédire un temps cible cohérent. Best-effort (n'empêche jamais l'ajout).
   if (b.kind === "race") {
     const distanceKm = b.distanceKm != null && b.distanceKm !== "" ? Number(b.distanceKm) : null;
-    const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(date) && !date.startsWith("2099") && date >= new Date().toISOString().slice(0, 10);
+    const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(date) && !date.startsWith("2099") && date >= aujourdhui(FUSEAU_DEFAUT);
     if (distanceKm != null && isFinite(distanceKm) && distanceKm > 0 && dateOk) {
       try {
         const vma = (await getEffectiveVma(sb, user.id)) ?? 14; // repli prudent si VMA inconnue

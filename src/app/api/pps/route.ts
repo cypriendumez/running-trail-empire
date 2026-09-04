@@ -13,6 +13,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import type { PpsStatus } from "@/lib/pps/status";
+import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
 export const dynamic = "force-dynamic";
 const TYPE = "pps_status";
@@ -57,7 +58,7 @@ export async function POST(req: Request) {
   }
   // Une date de DÉLIVRANCE dans le futur décalerait l'expiration d'autant et rendrait le
   // verdict optimiste. L'expiration, elle, est par nature à venir : on ne la borne pas.
-  if (obtainedAt && obtainedAt > new Date().toISOString().slice(0, 10)) {
+  if (obtainedAt && obtainedAt > aujourdhui(FUSEAU_DEFAUT)) {
     return NextResponse.json({ error: "date dans le futur" }, { status: 400 });
   }
 

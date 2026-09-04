@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { autoCoachForUser } from "@/lib/ai/autoCoach";
+import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  OBJECTIF DE COURSE — source unique `race_objective` (lue par tous les générateurs
@@ -72,7 +73,7 @@ export async function setRaceObjective(admin: SupabaseClient, userId: string, in
   if (eEcriture) throw new Error(`objectif non enregistré : ${eEcriture.message}`);
 
   try {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = aujourdhui(FUSEAU_DEFAUT);
     const { data: autoSessions } = await admin.from("notifications")
       .select("id, data").eq("user_id", userId).eq("type", "coach_session");
     const staleIds = (autoSessions ?? [])

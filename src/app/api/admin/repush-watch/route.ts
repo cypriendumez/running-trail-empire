@@ -7,6 +7,7 @@ import { getEffectiveVma } from "@/lib/ai/coachContext";
 import { oneSessionPerSlot } from "@/lib/coach/sessions";
 import { estAdmin } from "@/lib/admin/acces";
 import { identifiantsDe } from "@/lib/intervals/identifiants";
+import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
 
 // POST /api/admin/repush-watch {user_id}
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
   if (!user_id) return NextResponse.json({ error: "user_id requis" }, { status: 400 });
 
   const admin = createAdminClient();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = aujourdhui(FUSEAU_DEFAUT);
 
   // Identifiants montre + durées d'échauffement / retour au calme du client.
   const { data: prof } = await admin.from("profiles").select("*").eq("id", user_id).single();
