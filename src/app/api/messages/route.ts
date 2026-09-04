@@ -22,7 +22,16 @@ export async function POST(req: Request) {
 
   if (b.action === "restore" && b.id) {
     const { data: row } = await admin.from("notifications").select("data").eq("id", b.id).eq("user_id", user.id).single();
-    if (row) await admin.from("notifications").update({ data: { ...(row.data as object), deleted: false } }).eq("id", b.id).eq("user_id", user.id);
+    // ⚠️ « ok: true » ÉTAIT RENVOYÉ MÊME QUAND RIEN N'AVAIT ÉTÉ RESTAURÉ. Le filtre sur
+    // `user_id` protège bien — un message d'autrui n'est jamais touché, vérifié — mais
+    // la réponse affirmait le contraire de ce qui s'était passé. Un athlète dont la
+    // restauration échoue (identifiant périmé, message déjà supprimé) lisait « c'est
+    // fait » et cherchait ensuite son message dans une corbeille où il était resté.
+    if (!row) return NextResponse.json({ error: "Message introuvable" }, { status: 404 });
+    const { error: eMaj } = await admin.from("notifications")
+      .update({ data: { ...(row.data as object), deleted: false } })
+      .eq("id", b.id).eq("user_id", user.id);
+    if (eMaj) return NextResponse.json({ error: "Restauration impossible" }, { status: 500 });
     return NextResponse.json({ ok: true });
   }
 

@@ -76,7 +76,15 @@ test("un refus ne révèle pas qui est inscrit", () => {
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
   assert.ok(/Vous ne pouvez pas écrire à cet athlète\./.test(src), "le message de refus a changé");
-  assert.ok(!/athlète inconnu|introuvable/i.test(src), "un refus distingue le cas « compte inexistant »");
+  // ⚠️ ON VISE LE BLOC D'ENVOI, PAS LE FICHIER. Cette assertion interdisait le mot
+  // « introuvable » PARTOUT : elle a rougi le jour où la RESTAURATION a commencé à
+  // répondre « Message introuvable » — un cas sans rapport, qui ne révèle rien sur
+  // l'existence d'un compte, seulement sur la possession d'un message par l'appelant.
+  const iEnvoi = src.indexOf("const destinataire =");
+  assert.ok(iEnvoi > 0, "le bloc d'envoi entre athlètes a disparu");
+  const blocEnvoi = src.slice(iEnvoi, iEnvoi + 1400);
+  assert.ok(!/athlète inconnu|introuvable/i.test(blocEnvoi),
+    "le refus d'écriture distingue le cas « compte inexistant » : on saurait qui est inscrit");
 });
 
 test("la liste de contacts ne transporte aucun secret de profil", () => {
@@ -115,6 +123,26 @@ test("l'écran dit à QUI on écrit, et ne cache pas l'absence d'amis", () => {
   const i = src.indexOf("/api/social/amis");
   assert.ok(/\.catch\(/.test(src.slice(i, i + 400)),
     "un échec de la liste d'amis ferait tomber la messagerie entière");
+});
+
+test("une restauration qui n'a rien restauré ne répond pas « c'est fait »", () => {
+  // ⚠️ CONSTATÉ EN TESTANT L'ACCÈS CROISÉ le 03/09/2026 : un compte demandant la
+  // restauration du message d'un AUTRE recevait « ok: true ». Le filtre sur `user_id`
+  // protégeait bien — rien n'était touché, vérifié — mais la réponse affirmait le
+  // contraire de ce qui s'était passé. Un athlète dont la restauration échoue lisait
+  // « c'est fait » puis cherchait son message dans une corbeille où il était resté.
+  const src = readFileSync("src/app/api/messages/route.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  const i = src.indexOf('action === "restore"');
+  assert.ok(i > 0, "la branche de restauration a disparu");
+  const bloc = src.slice(i, i + 900);
+  assert.ok(/if \(!row\) return NextResponse\.json\([\s\S]{0,80}status: 404/.test(bloc),
+    "une restauration sans ligne correspondante répond de nouveau « ok »");
+  // L'échec de l'écriture elle-même doit aussi se voir.
+  assert.ok(/if \(eMaj\)/.test(bloc), "une écriture ratée passerait pour une réussite");
+  // Et le filtre par propriétaire reste la protection : il ne doit pas disparaître.
+  assert.ok(/\.eq\("user_id", user\.id\)/.test(bloc), "le message d'un autre athlète devient restaurable");
 });
 
 console.log(`\n${passed} test(s) de messagerie passé(s), ${fails.length} échec(s)`);
