@@ -138,5 +138,40 @@ test("un corps vide n'efface pas le pass santé", () => {
   assert.ok(i < src.indexOf(".insert("), "le pass est créé avant d'être validé");
 });
 
+test("le journal d'erreurs public ne peut pas remplir la base", () => {
+  // ⚠️ MESURÉ LE 03/09/2026 : une seule requête ANONYME a stocké 500 Ko dans
+  // `error_logs`. La route est publique — elle doit l'être, une erreur survient souvent
+  // avant la connexion — mais elle ÉCRIT, et rien ne la bornait : `cut()` coupait les
+  // chaînes, jamais l'objet `meta`. Le palier gratuit de Supabase plafonne à 500 Mo :
+  // mille requêtes suffisaient à remplir la base, sans qu'aucune alerte ne le signale.
+  const src = readFileSync("src/app/api/log-error/route.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+
+  // Le corps est refusé AVANT d'être analysé : `req.json()` sur un corps énorme le
+  // chargerait en mémoire avant toute borne.
+  // ⚠️ VISER L'USAGE, PAS LA DÉCLARATION. Premier jet : le test cherchait la constante
+  // `CORPS_MAX`, qui reste déclarée même quand plus rien ne l'utilise — supprimer la
+  // garde laissait le test vert. Trouvé par mutation.
+  const gardeTaille = /annonce > CORPS_MAX\) return/.test(src);
+  assert.ok(gardeTaille, "la taille annoncée n'est plus refusée avant lecture");
+  const iGarde = src.indexOf("annonce > CORPS_MAX");
+  const iLecture = src.indexOf("await req.text()");
+  assert.ok(iGarde > 0 && iGarde < iLecture, "le corps est lu avant d'être borné");
+  assert.ok(/brut\.length > CORPS_MAX\) return/.test(src),
+    "un corps sans en-tête de taille échappe à la borne");
+
+  // `meta` est borné, et TRONQUÉ plutôt que jeté : on garde de quoi diagnostiquer.
+  assert.ok(/META_MAX/.test(src), "meta n'est plus borné");
+  assert.ok(/tronque: true/.test(src), "un meta trop gros est jeté au lieu d'être tronqué");
+
+  // Et un afflux cesse d'écrire. Le compteur est GLOBAL et non par adresse IP :
+  // compter par IP obligerait à stocker une donnée personnelle.
+  assert.ok(/\(count \?\? 0\) >= PAR_MINUTE_MAX\) return/.test(src),
+    "le coupe-circuit est déclaré mais plus appliqué : un afflux écrirait sans limite");
+  assert.ok(!/x-forwarded-for|req\.ip|realIp/i.test(src),
+    "la route s'est mise à lire l'adresse IP — c'est une donnée personnelle");
+});
+
 console.log(`\n${passed} test(s) de composants passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log(`  KO ${f}`); process.exit(1); }
