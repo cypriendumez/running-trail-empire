@@ -107,13 +107,19 @@ export async function syncIntervalsForUser(
     if (!day.id) continue;
     if (day.hrv !== undefined) {
       const state = day.hrv < 50 ? "recovery" : day.hrv > 80 ? "competition" : "optimal";
-      await admin.from("hrv_data").upsert(
+      // ⚠️ MÊME RÈGLE QUE POUR LES SÉANCES, dix lignes plus haut : ne jamais avaler une
+      // erreur d'écriture. Elle ne s'appliquait pourtant qu'aux séances. Un refus sur la
+      // VFC ou le sommeil laissait le coach raisonner sur une fenêtre de bien-être vide
+      // — et « pas de VFC » se lit comme « aucune mesure », jamais comme « écriture
+      // refusée ». L'athlète voit un graphique troué sans explication possible.
+      const { error: eHrv } = await admin.from("hrv_data").upsert(
         { user_id: profile.id, date: day.id, hrv_ms: day.hrv, rmssd: day.hrv, sdnn: day.hrvSDNN ?? null, physiological_state: state },
         { onConflict: "user_id,date" }
       );
+      if (eHrv) failures.push(`VFC du ${day.id} : ${eHrv.code ?? "?"} ${eHrv.message}`);
     }
     if (day.sleepSecs !== undefined) {
-      await admin.from("sleep_data").upsert(
+      const { error: eSommeil } = await admin.from("sleep_data").upsert(
         {
           user_id: profile.id, date: day.id,
           total_sleep_min: Math.round(day.sleepSecs / 60),
@@ -131,6 +137,7 @@ export async function syncIntervalsForUser(
         },
         { onConflict: "user_id,date" }
       );
+      if (eSommeil) failures.push(`sommeil du ${day.id} : ${eSommeil.code ?? "?"} ${eSommeil.message}`);
     }
   }
 

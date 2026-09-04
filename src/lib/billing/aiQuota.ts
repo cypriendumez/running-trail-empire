@@ -74,7 +74,15 @@ export const PLAFOND_JOUR: Record<Acces, number> = {
  * un `utilises > plafond` laissait passer parce que le compteur, déjà bloqué à 25,
  * n'était plus incrémenté. On rend donc la décision explicite.
  */
-export type EtatQuota = { utilises: number; plafond: number; restants: number; accorde: boolean };
+export type EtatQuota = {
+  utilises: number; plafond: number; restants: number; accorde: boolean;
+  /**
+   * Le compteur n'a pas pu être LU ou ÉCRIT. Ce n'est pas « plafond atteint » : on
+   * refuse parce qu'on ne sait pas, et il faut pouvoir le DIRE — les deux situations
+   * ne se résolvent pas du même geste (attendre demain / réessayer dans un instant).
+   */
+  indisponible?: true;
+};
 
 /** Lit le compteur du jour sans l'incrémenter — pour l'affichage. */
 export async function quotaDuJour(
@@ -84,8 +92,20 @@ export async function quotaDuJour(
   aujourdhui: string = jourLocal(),
 ): Promise<EtatQuota> {
   const plafond = PLAFOND_JOUR[etat];
-  const { data } = await supabase.from("notifications")
+  const { data, error } = await supabase.from("notifications")
     .select("data").eq("user_id", userId).eq("type", TYPE_QUOTA).maybeSingle();
+  /**
+   * ⚠️ CETTE ERREUR N'ÉTAIT PAS LUE, ET LE PLAFOND CÉDAIT DANS LE MAUVAIS SENS.
+   *
+   * Sans compteur, `utilises` retombait à 0 et `accorde` passait à `true` : une base
+   * momentanément illisible OUVRAIT le plafond en grand au lieu de le fermer. Sur une
+   * clé Gemini payante, il n'y a aucune borne côté Google — c'est la facture qui monte,
+   * en silence, exactement ce que ce module existe pour empêcher.
+   *
+   * Un garde-fou de dépense se ferme quand il ne sait pas. Un refus d'une minute se
+   * rattrape ; une boucle facturée, non.
+   */
+  if (error) return { utilises: 0, plafond, restants: 0, accorde: false, indisponible: true };
   const d = (data as { data?: { jour?: string; n?: number } } | null)?.data;
   // Un compteur d'hier ne compte pas : le jour a changé, la remise à zéro est implicite.
   const utilises = d?.jour === aujourdhui ? Number(d?.n ?? 0) : 0;
@@ -119,14 +139,22 @@ export async function consommerAppelIA(
   // On suit le motif déjà utilisé pour `auto_coach_state` : on cherche, puis on met à
   // jour ou on insère.
   const ligne = { jour: aujourdhui, n };
-  const { data: existante } = await supabase.from("notifications")
+  const { data: existante, error: eLecture } = await supabase.from("notifications")
     .select("id").eq("user_id", userId).eq("type", TYPE_QUOTA).maybeSingle();
-  if ((existante as { id?: string } | null)?.id) {
-    await supabase.from("notifications").update({ data: ligne }).eq("id", (existante as { id: string }).id);
-  } else {
-    await supabase.from("notifications")
-      .insert({ user_id: userId, type: TYPE_QUOTA, title: "quota ia", body: "", read: true, data: ligne });
-  }
+  if (eLecture) return { utilises: avant.utilises, plafond: avant.plafond, restants: 0, accorde: false, indisponible: true };
+  const { error: eEcriture } = (existante as { id?: string } | null)?.id
+    ? await supabase.from("notifications").update({ data: ligne }).eq("id", (existante as { id: string }).id)
+    : await supabase.from("notifications")
+        .insert({ user_id: userId, type: TYPE_QUOTA, title: "quota ia", body: "", read: true, data: ligne });
+  /**
+   * ⚠️ UN APPEL NON COMPTÉ EST UN APPEL GRATUIT — POUR TOUJOURS.
+   *
+   * L'échec de cette écriture n'était pas lu : la fonction rendait `accorde: true` avec
+   * un compteur qui n'avait jamais été enregistré. L'appel suivant relisait l'ancienne
+   * valeur, et ainsi de suite : le plafond ne montait JAMAIS. Le seul verrou qui borne
+   * la facture Gemini devenait décoratif, sans la moindre erreur nulle part.
+   */
+  if (eEcriture) return { utilises: avant.utilises, plafond: avant.plafond, restants: 0, accorde: false, indisponible: true };
   // Cet appel-ci est accordé : c'est lui qu'on vient de compter.
   return { utilises: n, plafond: avant.plafond, restants: Math.max(0, avant.plafond - n), accorde: true };
 }

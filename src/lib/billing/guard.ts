@@ -46,6 +46,18 @@ export async function exigeAcces(
   if (quoi === "ia" && peut(acces.etat, quoi)) {
     const q = await consommerAppelIA(supabase, userId, acces.etat);
     if (!q.accorde) {
+      // ⚠️ NE PAS CONFONDRE « PLAFOND ATTEINT » ET « COMPTEUR ILLISIBLE ». Le premier se
+      // résout demain, le second dans une minute : annoncer l'un pour l'autre envoie
+      // l'athlète attendre vingt-quatre heures pour une panne de quelques secondes.
+      if (q.indisponible) {
+        return {
+          acces,
+          reponse: NextResponse.json(
+            { error: "quota_indisponible", etat: acces.etat },
+            { status: 503 },
+          ),
+        };
+      }
       return {
         acces,
         reponse: NextResponse.json(

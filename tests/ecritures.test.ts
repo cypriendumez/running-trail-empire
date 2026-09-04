@@ -19,11 +19,28 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { quotaDuJour, consommerAppelIA } from "../src/lib/billing/aiQuota";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
   try { fn(); passed++; console.log(`  OK ${nom}`); }
   catch (e) { fails.push(`${nom} — ${(e as Error).message}`); console.log(`  ✗ ${nom}`); }
+}
+
+/**
+ * ⚠️ UN TEST ASYNCHRONE A BESOIN D'UN HARNAIS ASYNCHRONE.
+ *
+ * Rendre une promesse à `test()` ci-dessus ne prouve RIEN : le harnais ne l'attend pas,
+ * une assertion qui échoue part en rejet non traité, et le test est compté RÉUSSI. Les
+ * deux tests de quota ci-dessous ont d'abord été écrits ainsi — ils sont restés VERTS
+ * face au code fautif remis en place. Seules les mutations l'ont montré.
+ */
+const enAttente: Promise<void>[] = [];
+function testAsync(nom: string, fn: () => Promise<void>) {
+  enAttente.push(fn().then(
+    () => { passed++; console.log(`  OK ${nom}`); },
+    (e: Error) => { fails.push(`${nom} — ${e.message}`); console.log(`  ✗ ${nom}`); },
+  ));
 }
 
 /** Sans commentaires : une explication qui décrit le défaut n'est pas le correctif. */
@@ -128,5 +145,84 @@ test("l'inscription ne génère pas un plan sur des données qu'elle n'a pas pu 
     "un échec partiel laisse l'inscription se poursuivre comme si tout allait bien");
 });
 
-console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
-if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }
+/**
+ * Une base d'essai réduite au nécessaire : elle sait refuser une LECTURE ou une
+ * ÉCRITURE, séparément. La distinction n'est pas cosmétique — une première version
+ * refusait « à partir du deuxième appel », ce qui faisait échouer la relecture avant
+ * d'atteindre l'écriture : le test passait par un autre chemin et restait vert quand on
+ * retirait le contrôle qu'il prétendait garder.
+ */
+function baseFactice(opts: { erreurLecture?: boolean; erreurEcriture?: boolean; n?: number; jour?: string }) {
+  const err = (m: string) => ({ message: m, code: "XX000" });
+  const ok = () => ({ data: { data: { jour: opts.jour, n: opts.n ?? 0 }, id: "x" }, error: null });
+  const chaine = (ecrit: boolean): Record<string, unknown> => {
+    const o: Record<string, unknown> = {};
+    o.select = () => chaine(ecrit);
+    o.eq = () => chaine(ecrit);
+    for (const m of ["update", "insert", "upsert"]) o[m] = () => chaine(true);
+    const resoudre = () => {
+      if (ecrit) return opts.erreurEcriture ? { data: null, error: err("écriture refusée") } : ok();
+      return opts.erreurLecture ? { data: null, error: err("lecture refusée") } : ok();
+    };
+    o.maybeSingle = resoudre;
+    // Une écriture s'attend directement, sans `maybeSingle` : le maillon doit donc
+    // être « thenable » lui-même.
+    o.then = (r: (v: unknown) => unknown) => Promise.resolve(resoudre()).then(r);
+    return o;
+  };
+  return { from: () => chaine(false) } as never;
+}
+
+testAsync("le plafond de dépense IA se FERME quand il ne sait pas", async () => {
+  // ⚠️ IL CÉDAIT DANS LE MAUVAIS SENS. L'erreur de lecture n'étant pas lue, `utilises`
+  // retombait à 0 et l'appel était accordé : une base illisible OUVRAIT le plafond.
+  // Sur une clé Gemini payante, Google ne borne rien — c'est la facture qui monte.
+  const r = await quotaDuJour(baseFactice({ erreurLecture: true }), "u1", "premium", "2026-09-04");
+  assert.equal(r.accorde, false, "une base illisible accorde encore l'appel : le plafond est ouvert");
+  assert.equal(r.indisponible, true, "le refus ne se distingue plus d'un plafond réellement atteint");
+});
+
+testAsync("un appel qui n'a pas pu être COMPTÉ n'est pas accordé", async () => {
+  // Sinon le compteur n'avance jamais : l'appel suivant relit l'ancienne valeur, et le
+  // seul verrou qui borne la facture devient décoratif. Ici les LECTURES réussissent —
+  // c'est bien l'écriture, et elle seule, qui échoue.
+  const r = await consommerAppelIA(baseFactice({ erreurEcriture: true, jour: "2026-09-04", n: 1 }), "u1", "premium", "2026-09-04");
+  assert.equal(r.accorde, false, "un appel non compté est accordé : le plafond ne montera jamais");
+  assert.equal(r.indisponible, true, "l'échec d'écriture se fait passer pour un plafond atteint");
+});
+
+testAsync("un compteur lisible et inscriptible accorde bien l'appel", async () => {
+  // ⚠️ LE CONTRE-EXEMPLE, sans quoi les deux tests ci-dessus seraient satisfaits par un
+  // quota qui refuse TOUT. Ils vérifieraient alors une panne, pas un garde-fou.
+  const r = await consommerAppelIA(baseFactice({ jour: "2026-09-04", n: 1 }), "u1", "premium", "2026-09-04");
+  assert.equal(r.accorde, true, "un quota sain refuse l'appel : le module est cassé, pas prudent");
+  assert.equal(r.utilises, 2, "le compteur n'a pas avancé");
+  assert.equal(r.indisponible, undefined, "un quota sain se déclare indisponible");
+});
+
+test("« compteur illisible » et « plafond atteint » ne se disent pas pareil", () => {
+  // Le premier se résout dans une minute, le second demain : les confondre envoie
+  // l'athlète attendre vingt-quatre heures pour une panne de quelques secondes.
+  const src = codeNu("src/lib/billing/guard.ts");
+  assert.ok(/q\.indisponible/.test(src), "le garde ne distingue plus les deux refus");
+  assert.ok(/quota_indisponible[\s\S]{0,160}status:\s*503/.test(src),
+    "le refus pour cause d'indisponibilité ne répond pas 503");
+  assert.ok(/quota_ia_atteint[\s\S]{0,160}status:\s*429/.test(src),
+    "le vrai plafond ne répond plus 429");
+});
+
+test("la synchronisation signale une VFC ou un sommeil non enregistrés", () => {
+  // Le fichier portait déjà la règle « ne JAMAIS avaler une erreur d'écriture » — mais
+  // elle ne s'appliquait qu'aux séances. Un refus sur le bien-être laissait le coach
+  // raisonner sur une fenêtre vide, et « pas de VFC » se lit comme « aucune mesure ».
+  const src = codeNu("src/lib/intervals/syncUser.ts");
+  assert.ok(/const\s*\{\s*error:\s*eHrv\s*\}/.test(src) && /failures\.push\(`VFC/.test(src),
+    "l'écriture de la VFC ne signale plus son échec");
+  assert.ok(/const\s*\{\s*error:\s*eSommeil\s*\}/.test(src) && /failures\.push\(`sommeil/.test(src),
+    "l'écriture du sommeil ne signale plus son échec");
+});
+
+Promise.all(enAttente).then(() => {
+  console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
+  if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }
+});
