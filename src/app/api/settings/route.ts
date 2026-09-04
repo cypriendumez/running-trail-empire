@@ -23,13 +23,34 @@ export async function POST(req: Request) {
   if (Object.keys(patch).length === 0) return NextResponse.json({ error: "Rien à enregistrer" }, { status: 400 });
 
   const admin = createAdminClient();
-  const { data: existing } = await admin.from("notifications")
+
+  /**
+   * ⚠️ LA LECTURE D'ABORD, ET SON ÉCHEC EST FATAL.
+   *
+   * Son erreur n'était pas lue. Une lecture en échec rend `existing` indéfini, ce que
+   * la suite interprétait comme « cet athlète n'a encore aucun réglage » : on partait
+   * d'un objet VIDE et on insérait une seconde ligne. Autrement dit, une coupure d'une
+   * seconde effaçait tous les réglages déjà enregistrés et n'en gardait que celui qu'on
+   * venait d'envoyer — en répondant `ok: true`. On refuse plutôt que d'écraser.
+   */
+  const { data: existing, error: eLecture } = await admin.from("notifications")
     .select("id, data").eq("user_id", user.id).eq("type", "user_settings").maybeSingle();
-  const merged = { ...((existing?.data as object) ?? {}), ...patch };
-  if (existing?.id) {
-    await admin.from("notifications").update({ data: merged }).eq("id", existing.id);
-  } else {
-    await admin.from("notifications").insert({ user_id: user.id, type: "user_settings", title: "Préférences", body: "", read: true, data: merged });
+  if (eLecture) {
+    console.error("[réglages] lecture impossible, écriture refusée :", eLecture.message);
+    return NextResponse.json({ error: "Réglages illisibles pour le moment" }, { status: 500 });
   }
+
+  const merged = { ...((existing?.data as object) ?? {}), ...patch };
+  // ⚠️ ET L'ÉCRITURE ENSUITE. Elle non plus n'était pas contrôlée : la route renvoyait
+  // `ok: true` avec les réglages fusionnés, l'écran les affichait, et ils revenaient à
+  // leur ancienne valeur au premier rechargement.
+  const { error: eEcriture } = existing?.id
+    ? await admin.from("notifications").update({ data: merged }).eq("id", existing.id)
+    : await admin.from("notifications").insert({ user_id: user.id, type: "user_settings", title: "Préférences", body: "", read: true, data: merged });
+  if (eEcriture) {
+    console.error("[réglages] écriture refusée :", eEcriture.message);
+    return NextResponse.json({ error: "Réglages non enregistrés" }, { status: 500 });
+  }
+
   return NextResponse.json({ ok: true, settings: merged });
 }

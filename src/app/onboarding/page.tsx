@@ -210,31 +210,56 @@ export default function OnboardingPage() {
       health_declared: healthAnswered,
     }).eq("id", user.id);
 
-    // Disponibilités — écriture ISOLÉE : ces colonnes arrivent avec la migration 011.
-    // Les laisser dans le bloc ci-dessus ferait échouer TOUTE la sauvegarde (ancienneté,
-    // dénivelé, santé) tant que la migration n'est pas passée.
-    await supabase.from("profiles").update({
+    /**
+     * ⚠️ CES ÉCRITURES ÉTAIENT MUETTES, SOUS UNE RAISON QUI N'EXISTE PLUS.
+     *
+     * Elles sont ISOLÉES pour de bonnes raisons — une colonne manquante ne doit pas
+     * emporter la sauvegarde de l'ancienneté, du dénivelé et de la santé. Mais les
+     * commentaires les justifiaient par « ces colonnes arrivent avec la migration 011 »
+     * et « avec la migration 009 » : les quatre ont été VÉRIFIÉES en base le
+     * 04/09/2026, elles existent. Isolées, oui ; muettes, non.
+     *
+     * Ce que coûtait le silence, ici précisément : le plan d'entraînement est généré
+     * JUSTE APRÈS, à partir de ces disponibilités. Un athlète qui déclare courir trois
+     * jours par semaine et dont l'écriture échoue reçoit un plan bâti sur autre chose,
+     * dès sa première minute dans l'application — et rien, nulle part, ne le dit.
+     */
+    const echecs: string[] = [];
+    const noter = (e: { message: string } | null, quoi: string) => { if (e) echecs.push(`${quoi}: ${e.message}`); };
+
+    const { error: eDispo } = await supabase.from("profiles").update({
       days_per_week: profile.days_per_week,
       available_days: profile.available_days,
     }).eq("id", user.id);
+    noter(eDispo, "disponibilités");
 
-    // Terrains multiples — écriture ISOLÉE : la colonne `main_terrains` arrive avec la
-    // migration 009. Si elle manque encore, seule cette ligne échoue, pas tout le profil.
-    // Repli sur l'ancienne colonne mono-choix pour ne rien perdre entre-temps.
-    await supabase.from("profiles").update({ main_terrains: profile.main_terrains }).eq("id", user.id);
-    await supabase.from("profiles").update({ main_terrain: profile.main_terrains[0] ?? null }).eq("id", user.id);
+    // Terrains multiples — écriture ISOLÉE, avec repli sur l'ancienne colonne mono-choix.
+    const { error: eTer } = await supabase.from("profiles")
+      .update({ main_terrains: profile.main_terrains }).eq("id", user.id);
+    noter(eTer, "terrains");
+    const { error: eTer1 } = await supabase.from("profiles")
+      .update({ main_terrain: profile.main_terrains[0] ?? null }).eq("id", user.id);
+    noter(eTer1, "terrain principal");
 
     if (!profileError && vma.vma_kmh) {
-      await supabase.from("performance_baselines").insert({
+      // Une VMA que l'athlète a SAISIE : la perdre en silence, c'est calibrer toutes ses
+      // allures sur une estimation alors qu'il avait donné une mesure.
+      const { error: eVma } = await supabase.from("performance_baselines").insert({
         user_id: user.id,
         vma_kmh: parseFloat(vma.vma_kmh),
         max_hr: parseInt(vma.max_hr) || 190,
         resting_hr: parseInt(vma.resting_hr) || 50,
         tested_at: new Date().toISOString().split("T")[0],
       });
+      noter(eVma, "VMA déclarée");
     }
 
-    if (profileError) { toast.error(tr("tSaveError")); setLoading(false); return; }
+    if (profileError || echecs.length) {
+      if (echecs.length) console.error("[inscription] champs non enregistrés :", echecs);
+      toast.error(tr("tSaveError"));
+      setLoading(false);
+      return;
+    }
 
     // ── PLAN GÉNÉRÉ TOUT DE SUITE, sans attendre le cron de 3 h 30 ──────────────
     //

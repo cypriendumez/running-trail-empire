@@ -88,5 +88,45 @@ test("aucune écriture du profil n'échoue en silence", () => {
     "les échecs collectés ne sont plus regardés au moment d'afficher le résultat");
 });
 
+test("une pesée enregistrée ne laisse pas le profil sur l'ancien poids", () => {
+  // Le commentaire du code dit lui-même ce que coûte ce poids : il alimente le calcul
+  // de charge, les zones et la dépense des séances. Son échec était pourtant muet.
+  const src = codeNu("src/app/api/weight/route.ts");
+  assert.ok(/const\s*\{\s*error:\s*eProfil\s*\}\s*=\s*await\s+sb\.from\("profiles"\)\.update\(\{\s*weight_kg/.test(src),
+    "la mise à jour du poids du profil ne lit plus son erreur");
+  assert.ok(/profilAJour/.test(src),
+    "la réponse ne distingue plus « pesée enregistrée » de « profil à jour »");
+});
+
+test("les réglages ne s'écrasent pas eux-mêmes quand la lecture échoue", () => {
+  // ⚠️ LE PIÈGE N'EST PAS L'ÉCRITURE, C'EST LA LECTURE. Son échec rendait `existing`
+  // indéfini, ce que la suite lisait comme « aucun réglage existant » : on repartait
+  // d'un objet vide et on insérait. Une coupure d'une seconde effaçait tout le reste,
+  // en répondant `ok: true`.
+  const src = codeNu("src/app/api/settings/route.ts");
+  assert.ok(/const\s*\{\s*data:\s*existing,\s*error:\s*eLecture\s*\}/.test(src),
+    "la lecture des réglages ne rend plus son erreur");
+  const iLecture = src.search(/if\s*\(\s*eLecture\s*\)/);
+  const iMerge = src.indexOf("const merged");
+  assert.ok(iLecture > 0 && iMerge > iLecture,
+    "la fusion se fait AVANT le contrôle de lecture : les réglages existants seraient écrasés");
+  assert.ok(/if\s*\(\s*eEcriture\s*\)[\s\S]{0,240}status:\s*500/.test(src),
+    "un échec d'écriture des réglages répond encore ok: true");
+});
+
+test("l'inscription ne génère pas un plan sur des données qu'elle n'a pas pu écrire", () => {
+  // Le plan est bâti JUSTE APRÈS, à partir des disponibilités déclarées. Les écrire en
+  // silence, c'est calibrer la première semaine d'un athlète sur autre chose que ce
+  // qu'il vient de dire.
+  const src = codeNu("src/app/onboarding/page.tsx");
+  const i = src.indexOf("const echecs");
+  assert.ok(i > 0, "l'inscription ne collecte plus les échecs d'écriture");
+  const bloc = src.slice(i, i + 2600);
+  assert.equal([...bloc.matchAll(/noter\(/g)].length, 4,
+    "les quatre écritures isolées de l'inscription ne sont plus toutes contrôlées");
+  assert.ok(/if\s*\(\s*profileError\s*\|\|\s*echecs\.length\s*\)/.test(src),
+    "un échec partiel laisse l'inscription se poursuivre comme si tout allait bien");
+});
+
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }

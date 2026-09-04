@@ -187,9 +187,20 @@ export async function POST(req: Request) {
   // Le profil suit la dernière pesée du jour : c'est lui que lisent le calcul de charge,
   // les zones de puissance et la dépense des séances. Le laisser figé à la valeur de
   // l'inscription faussait toutes les calories des séances suivantes.
-  if (date === today) await sb.from("profiles").update({ weight_kg: weightKg }).eq("id", user.id);
+  // ⚠️ CET ÉCHEC ÉTAIT MUET, ALORS QUE LE COMMENTAIRE CI-DESSUS DIT CE QU'IL COÛTE :
+  // la pesée serait enregistrée, le profil garderait l'ancien poids, et toutes les
+  // dépenses de séance suivantes seraient fausses — sans que rien ne l'indique. On le
+  // DIT, et on distingue les deux : la pesée du jour, elle, est bel et bien enregistrée.
+  let profilAJour = true;
+  if (date === today) {
+    const { error: eProfil } = await sb.from("profiles").update({ weight_kg: weightKg }).eq("id", user.id);
+    if (eProfil) {
+      profilAJour = false;
+      console.error("[poids] pesée enregistrée mais profil non mis à jour :", eProfil.message);
+    }
+  }
 
-  return NextResponse.json({ ok: true, date, weightKg });
+  return NextResponse.json({ ok: true, date, weightKg, profilAJour });
 }
 
 export async function DELETE(req: Request) {
