@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState , useId} from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -13,6 +13,20 @@ import { AUTH } from "@/components/auth/authI18n";
 import { JOURS_ESSAI } from "@/lib/billing/access";
 
 export default function SignupPage() {
+  /**
+   * ⚠️ CHAQUE CHAMP EST RELIÉ À SON LIBELLÉ, ET CE N'EST PAS COSMÉTIQUE.
+   *
+   * Constaté sur la production le 04/09/2026 : les libellés visibles (« Prénom & Nom »,
+   * « Email », « Mot de passe ») n'étaient reliés à AUCUN champ. Le nom accessible
+   * retombait donc sur le `placeholder` : un lecteur d'écran annonçait « Marie Dupont »
+   * au lieu de « Prénom & Nom ». Quelqu'un qui n'y voit pas ne pouvait pas savoir quoi
+   * taper — sur le formulaire d'inscription, la toute première interaction avec le
+   * produit. Et pour tout le monde, cliquer le libellé ne plaçait pas le curseur.
+   *
+   * `useId()` plutôt qu'un identifiant écrit à la main : deux formulaires rendus sur la
+   * même page ne peuvent pas entrer en collision.
+   */
+  const cid = useId();
   const { lang } = useT();
   const L = (AUTH[lang] ?? AUTH.fr).signup;
   const [step, setStep] = useState<"account" | "verify">("account");
@@ -112,16 +126,16 @@ export default function SignupPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-sm font-medium text-zinc-700 block mb-1.5">{L.name}</label>
-            <input type="text" value={form.fullName} onChange={(e) => update("fullName", e.target.value)} placeholder={L.namePh} required className={inputCls} />
+            <label htmlFor={`${cid}-nom`} className="text-sm font-medium text-zinc-700 block mb-1.5">{L.name}</label>
+            <input id={`${cid}-nom`} type="text" value={form.fullName} onChange={(e) => update("fullName", e.target.value)} placeholder={L.namePh} required className={inputCls} />
           </div>
           <div>
-            <label className="text-sm font-medium text-zinc-700 block mb-1.5">{L.email}</label>
-            <input type="email" value={form.email} onChange={(e) => update("email", e.target.value)} placeholder="marie@exemple.com" required className={inputCls} />
+            <label htmlFor={`${cid}-email`} className="text-sm font-medium text-zinc-700 block mb-1.5">{L.email}</label>
+            <input id={`${cid}-email`} type="email" value={form.email} onChange={(e) => update("email", e.target.value)} placeholder="marie@exemple.com" required className={inputCls} />
           </div>
           <div>
-            <label className="text-sm font-medium text-zinc-700 block mb-1.5">{L.password}</label>
-            <input type="password" value={form.password} onChange={(e) => update("password", e.target.value)} placeholder={L.passwordPh} required className={inputCls} />
+            <label htmlFor={`${cid}-mdp`} className="text-sm font-medium text-zinc-700 block mb-1.5">{L.password}</label>
+            <input id={`${cid}-mdp`} type="password" value={form.password} onChange={(e) => update("password", e.target.value)} placeholder={L.passwordPh} required className={inputCls} />
             {form.password && (
               <div className="mt-2 flex gap-1">
                 {[1, 2, 3, 4].map((i) => (
@@ -138,8 +152,8 @@ export default function SignupPage() {
             )}
           </div>
           <div>
-            <label className="text-sm font-medium text-zinc-700 block mb-1.5">{L.confirm}</label>
-            <input type="password" value={form.confirmPassword} onChange={(e) => update("confirmPassword", e.target.value)} placeholder={L.confirmPh} required className={inputCls} />
+            <label htmlFor={`${cid}-confirm`} className="text-sm font-medium text-zinc-700 block mb-1.5">{L.confirm}</label>
+            <input id={`${cid}-confirm`} type="password" value={form.confirmPassword} onChange={(e) => update("confirmPassword", e.target.value)} placeholder={L.confirmPh} required className={inputCls} />
           </div>
 
           <label className="flex items-start gap-2.5 text-xs text-zinc-500">

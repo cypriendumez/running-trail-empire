@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState , useId} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -14,6 +14,20 @@ import { AUTH } from "@/components/auth/authI18n";
 import { fournisseursActifs } from "@/lib/auth/fournisseurs";
 
 export default function LoginPage() {
+  /**
+   * ⚠️ CHAQUE CHAMP EST RELIÉ À SON LIBELLÉ, ET CE N'EST PAS COSMÉTIQUE.
+   *
+   * Constaté sur la production le 04/09/2026 : les libellés visibles (« Prénom & Nom »,
+   * « Email », « Mot de passe ») n'étaient reliés à AUCUN champ. Le nom accessible
+   * retombait donc sur le `placeholder` : un lecteur d'écran annonçait « Marie Dupont »
+   * au lieu de « Prénom & Nom ». Quelqu'un qui n'y voit pas ne pouvait pas savoir quoi
+   * taper — sur le formulaire d'inscription, la toute première interaction avec le
+   * produit. Et pour tout le monde, cliquer le libellé ne plaçait pas le curseur.
+   *
+   * `useId()` plutôt qu'un identifiant écrit à la main : deux formulaires rendus sur la
+   * même page ne peuvent pas entrer en collision.
+   */
+  const cid = useId();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -130,8 +144,8 @@ export default function LoginPage() {
         {/* Email form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-sm font-medium text-zinc-700 block mb-1.5">{L.email}</label>
-            <input
+            <label htmlFor={`${cid}-email`} className="text-sm font-medium text-zinc-700 block mb-1.5">{L.email}</label>
+            <input id={`${cid}-email`}
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -144,13 +158,13 @@ export default function LoginPage() {
           </div>
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-sm font-medium text-zinc-700">{L.password}</label>
+              <label htmlFor={`${cid}-mdp`} className="text-sm font-medium text-zinc-700">{L.password}</label>
               <Link href="/forgot-password" className="text-xs text-emerald-600 hover:text-emerald-700">
                 {L.forgot}
               </Link>
             </div>
             <div className="relative">
-              <input
+              <input id={`${cid}-mdp`}
                 type={showPwd ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

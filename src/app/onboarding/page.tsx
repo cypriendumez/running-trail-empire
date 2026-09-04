@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef , useId} from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -22,6 +22,9 @@ type Step = "watch" | "profile" | "physio" | "goals" | "done";
 const STEPS: Step[] = ["profile", "physio", "goals", "watch", "done"];
 
 export default function OnboardingPage() {
+  // ⚠️ Les libellés visibles n'étaient reliés à aucun champ : un lecteur d'écran
+  // annonçait le `placeholder` à leur place. `useId()` évite toute collision.
+  const cid = useId();
   const router = useRouter();
   const { lang } = useT();
   const tr = (k: string, v?: Record<string, string | number>) => {
@@ -331,20 +334,20 @@ export default function OnboardingPage() {
 
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="text-xs font-medium text-zinc-500 block mb-1">{tr("age")}</label>
-                    <input type="number" value={profile.age} onChange={e => setProfile(p => ({...p, age: e.target.value}))}
+                    <label htmlFor={`${cid}-age`} className="text-xs font-medium text-zinc-500 block mb-1">{tr("age")}</label>
+                    <input id={`${cid}-age`} type="number" value={profile.age} onChange={e => setProfile(p => ({...p, age: e.target.value}))}
                       placeholder="30" min="10" max="99"
                       className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-zinc-500 block mb-1">{tr("height")}</label>
-                    <input type="number" value={profile.height_cm} onChange={e => setProfile(p => ({...p, height_cm: e.target.value}))}
+                    <label htmlFor={`${cid}-taille`} className="text-xs font-medium text-zinc-500 block mb-1">{tr("height")}</label>
+                    <input id={`${cid}-taille`} type="number" value={profile.height_cm} onChange={e => setProfile(p => ({...p, height_cm: e.target.value}))}
                       placeholder="175" min="140" max="220"
                       className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-zinc-500 block mb-1">{tr("weight")}</label>
-                    <input type="number" value={profile.weight_kg} onChange={e => setProfile(p => ({...p, weight_kg: e.target.value}))}
+                    <label htmlFor={`${cid}-poids`} className="text-xs font-medium text-zinc-500 block mb-1">{tr("weight")}</label>
+                    <input id={`${cid}-poids`} type="number" value={profile.weight_kg} onChange={e => setProfile(p => ({...p, weight_kg: e.target.value}))}
                       placeholder="70" min="40" max="150"
                       className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                   </div>
@@ -596,22 +599,22 @@ export default function OnboardingPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-zinc-500 block mb-1">{tr("vmaLabel")}</label>
-                  <input type="number" value={vma.vma_kmh} onChange={e => setVma(p => ({...p, vma_kmh: e.target.value}))}
+                  <label htmlFor={`${cid}-vma`} className="text-xs font-medium text-zinc-500 block mb-1">{tr("vmaLabel")}</label>
+                  <input id={`${cid}-vma`} type="number" value={vma.vma_kmh} onChange={e => setVma(p => ({...p, vma_kmh: e.target.value}))}
                     placeholder="ex: 16.5" min="8" max="30" step="0.5"
                     className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                   <p className="text-[11px] text-zinc-400 mt-1">{tr("vmaHint")}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-medium text-zinc-500 block mb-1">{tr("maxHr")}</label>
-                    <input type="number" value={vma.max_hr} onChange={e => setVma(p => ({...p, max_hr: e.target.value}))}
+                    <label htmlFor={`${cid}-fcmax`} className="text-xs font-medium text-zinc-500 block mb-1">{tr("maxHr")}</label>
+                    <input id={`${cid}-fcmax`} type="number" value={vma.max_hr} onChange={e => setVma(p => ({...p, max_hr: e.target.value}))}
                       placeholder="190" min="140" max="220"
                       className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-zinc-500 block mb-1">{tr("restHr")}</label>
-                    <input type="number" value={vma.resting_hr} onChange={e => setVma(p => ({...p, resting_hr: e.target.value}))}
+                    <label htmlFor={`${cid}-fcrepos`} className="text-xs font-medium text-zinc-500 block mb-1">{tr("restHr")}</label>
+                    <input id={`${cid}-fcrepos`} type="number" value={vma.resting_hr} onChange={e => setVma(p => ({...p, resting_hr: e.target.value}))}
                       placeholder="55" min="30" max="100"
                       className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                   </div>
