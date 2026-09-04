@@ -78,8 +78,20 @@ export async function setRaceObjective(admin: SupabaseClient, userId: string, in
     const staleIds = (autoSessions ?? [])
       .filter((r) => { const dd = (r.data ?? {}) as { from?: string; date?: string }; return dd.from === "coach-auto" && String(dd.date ?? "") >= today; })
       .map((r) => r.id);
-    if (staleIds.length) await admin.from("notifications").delete().in("id", staleIds);
-    await admin.from("notifications").delete().eq("user_id", userId).eq("type", "auto_coach_state");
+    // ⚠️ VOLONTAIREMENT « AU MIEUX », MAIS PLUS MUET. L'intention du `catch` ci-dessous
+    // est juste : l'objectif est déjà enregistré, une replanification ratée ne doit pas
+    // l'effacer. Sauf qu'un client Supabase RETOURNE ses erreurs au lieu de les lever —
+    // le `catch` ne voyait donc rien. Or si `auto_coach_state` n'est pas purgé, le coach
+    // reste bloqué et le calendrier ne bouge pas : l'athlète fixe un marathon et ne voit
+    // rien changer. C'est exactement la plainte « le coach ignore ma course », et sans
+    // trace elle est indiagnosticable. On continue, mais on écrit.
+    if (staleIds.length) {
+      const { error } = await admin.from("notifications").delete().in("id", staleIds);
+      if (error) console.error("[objectif] séances auto non purgées :", error.message);
+    }
+    const { error: eEtat } = await admin.from("notifications")
+      .delete().eq("user_id", userId).eq("type", "auto_coach_state");
+    if (eEtat) console.error("[objectif] coach auto non débloqué, le plan ne sera pas régénéré :", eEtat.message);
     const { data: creds } = await admin.from("profiles").select("intervals_athlete_id, intervals_api_key").eq("id", userId).single();
     if (creds?.intervals_athlete_id && creds?.intervals_api_key) {
       await autoCoachForUser(admin, { userId, athleteId: String(creds.intervals_athlete_id), apiKey: String(creds.intervals_api_key) });

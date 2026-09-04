@@ -38,13 +38,16 @@ export async function POST(req: Request) {
 
   // Push in-app notification if publishing
   if (publish && data) {
-    await supabase.from("notifications").insert({
+    // Sans cette notification, le conseil est enregistré mais l'athlète n'apprend
+    // jamais qu'il existe. L'écran d'administration annonçait « publié » quand même.
+    const { error: eNotif } = await supabase.from("notifications").insert({
       user_id,
       type: "coach_advice",
       title: "Nouveau conseil de votre coach",
       body: coach_advice.slice(0, 120) + (coach_advice.length > 120 ? "…" : ""),
       data: { advice_id: data.id, week_start },
     });
+    if (eNotif) return NextResponse.json({ ok: true, data, avertissement: "Conseil enregistré, mais l'athlète n'a pas été prévenu." });
   }
 
   return NextResponse.json({ advice: data, published: publish ?? false });

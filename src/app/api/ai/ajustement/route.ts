@@ -110,8 +110,12 @@ export async function POST(req: Request) {
 
   // ── 4. Mémoriser pour ce plan ──────────────────────────────────────────────
   const donnees = { empreinte, ajustement: v.ajustement, at: new Date().toISOString() };
-  if (memo?.id) await admin.from("notifications").update({ data: donnees }).eq("id", memo.id);
-  else await admin.from("notifications").insert({ user_id: user.id, type: TYPE_CACHE, title: "ajustement", body: "", data: donnees });
+  // Un cache qui ne s'écrit pas se paie en appels Gemini : la même question repartira
+  // au modèle au prochain affichage.
+  const { error: eMemo } = memo?.id
+    ? await admin.from("notifications").update({ data: donnees }).eq("id", memo.id)
+    : await admin.from("notifications").insert({ user_id: user.id, type: TYPE_CACHE, title: "ajustement", body: "", data: donnees });
+  if (eMemo) console.error("[ajustement] mémorisation impossible, il sera recalculé :", eMemo.message);
 
   return NextResponse.json({ ok: true, ajustement: v.ajustement, memorise: false });
 }

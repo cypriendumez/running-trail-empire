@@ -50,7 +50,12 @@ export async function POST(req: Request) {
 
   // Le créateur devient propriétaire. Sans cette ligne il ne serait pas membre de son
   // propre club, et ne pourrait donc ni le modifier ni le voir s'il est privé.
-  await sb.from("club_members").insert({ club_id: club.id, user_id: user.id, role: "owner" });
+  // ⚠️ LE COMMENTAIRE CI-DESSUS DIT CE QUE COÛTE CET ÉCHEC, il n'était juste pas lu :
+  // sans cette ligne, le créateur n'est pas membre de son propre club et ne peut ni le
+  // modifier ni même le VOIR s'il l'a créé privé. Un club fantôme, sans gestionnaire.
+  const { error: eProprio } = await sb.from("club_members")
+    .insert({ club_id: club.id, user_id: user.id, role: "owner" });
+  if (eProprio) return NextResponse.json({ error: "Club créé sans propriétaire, réessaie" }, { status: 500 });
   return NextResponse.json({ id: club.id });
 }
 
@@ -72,7 +77,12 @@ export async function PUT(req: Request) {
     if ((exist as { role: string }).role === "owner") {
       return NextResponse.json({ error: "Le propriétaire ne peut pas quitter son club" }, { status: 400 });
     }
-    await sb.from("club_members").delete().eq("club_id", clubId).eq("user_id", user.id);
+    // Rejoindre vérifiait son erreur, quitter non : le bouton basculait sur un départ
+    // qui n'avait pas eu lieu, et l'athlète restait membre — visible dans un club privé
+    // qu'il croyait avoir quitté.
+    const { error } = await sb.from("club_members")
+      .delete().eq("club_id", clubId).eq("user_id", user.id);
+    if (error) return NextResponse.json({ error: "Impossible de quitter ce club" }, { status: 500 });
     return NextResponse.json({ joined: false });
   }
   const { error } = await sb.from("club_members").insert({ club_id: clubId, user_id: user.id, role: "member" });

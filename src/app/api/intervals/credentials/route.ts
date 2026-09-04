@@ -90,10 +90,19 @@ export async function DELETE() {
     await unregisterWebhook(profile.intervals_athlete_id, profile.intervals_api_key).catch(() => {});
   }
 
-  await supabase
+  /**
+   * ⚠️ ENREGISTRER VÉRIFIAIT SON ERREUR (plus haut, 500 si elle échoue) ; EFFACER NON.
+   *
+   * Ce n'est pas une symétrie de style. L'athlète clique « déconnecter ma montre »,
+   * lit une confirmation — et sa CLÉ D'API intervals.icu reste en base. Il a demandé
+   * le retrait d'un identifiant et on lui a répondu que c'était fait. Une suppression
+   * de données personnelles ne peut pas se déclarer réussie sans l'être.
+   */
+  const { error } = await supabase
     .from("profiles")
     .update({ intervals_athlete_id: null, intervals_api_key: null })
     .eq("id", user.id);
+  if (error) return NextResponse.json({ error: "Déconnexion impossible, tes identifiants sont toujours enregistrés" }, { status: 500 });
 
   return NextResponse.json({ ok: true });
 }

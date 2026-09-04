@@ -137,13 +137,17 @@ Réponds UNIQUEMENT par un objet JSON valide (aucun texte autour) :
     const payload = { day, fp, session, at: new Date().toISOString() };
     const admin = createAdminClient();
     const existingId = cached?.id;
-    if (existingId) {
-      await admin.from("notifications").update({ data: payload }).eq("id", existingId);
-    } else {
-      await admin.from("notifications").insert({
-        user_id: user.id, type: SESSION_CACHE_TYPE, title: "Séance IA du jour", body: "", read: true, data: payload,
-      });
-    }
+    // ⚠️ CETTE LIGNE EST UN CACHE, ET UN CACHE QUI NE S'ÉCRIT PAS COÛTE CHER ICI. Son
+    // échec n'était pas lu : la séance est rendue à l'athlète, rien n'est mémorisé, et
+    // le prochain affichage du tableau de bord repart interroger Gemini. Le quota
+    // gratuit ne tolère que vingt requêtes par jour — quelques rafraîchissements de
+    // page suffisent à l'épuiser, pour toute l'application.
+    const { error: eCache } = existingId
+      ? await admin.from("notifications").update({ data: payload }).eq("id", existingId)
+      : await admin.from("notifications").insert({
+          user_id: user.id, type: SESSION_CACHE_TYPE, title: "Séance IA du jour", body: "", read: true, data: payload,
+        });
+    if (eCache) console.error("[séance IA] cache non écrit, la séance sera regénérée :", eCache.message);
 
     return NextResponse.json({ session });
   } catch (e) {

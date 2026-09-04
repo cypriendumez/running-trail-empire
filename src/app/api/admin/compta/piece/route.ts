@@ -90,8 +90,12 @@ export async function GET(req: Request) {
 
   // Journal d'accès. Il ne doit JAMAIS empêcher la lecture : une facture illisible parce
   // que la trace a échoué serait une panne provoquée par la sécurité elle-même.
+  // Le `catch` ne rattrapait rien — les erreurs Supabase sont RETOURNÉES, pas levées :
+  // le journal d'accès pouvait donc rester incomplet en silence, alors que le
+  // commentaire ci-dessus promet que « chaque consultation est tracée ». La lecture de
+  // la pièce reste prioritaire, on ne fait que constater.
   try {
-    await admin.from("notifications").insert({
+    const { error: eTrace } = await admin.from("notifications").insert({
       user_id: id, type: "compta_acces", title: "Consultation d'une pièce", read: true,
       data: {
         chemin, par: qui.email, le: new Date().toISOString(),
@@ -99,6 +103,7 @@ export async function GET(req: Request) {
         appareil: (req.headers.get("user-agent") ?? "").slice(0, 200),
       },
     });
+    if (eTrace) console.error("[compta] consultation non tracée :", eTrace.message);
   } catch (e) { console.error("[compta] trace d'accès non enregistrée :", (e as Error).message); }
 
   return new NextResponse(await data.arrayBuffer(), {

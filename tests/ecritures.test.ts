@@ -18,7 +18,8 @@
  *    dix-neuf colonnes ont été vérifiées présentes en base.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { quotaDuJour, consommerAppelIA } from "../src/lib/billing/aiQuota";
 
 let passed = 0; const fails: string[] = [];
@@ -242,6 +243,91 @@ test("un objectif de course non écrit ne se déclare pas enregistré", () => {
   const route = codeNu("src/app/api/objective/route.ts");
   assert.ok(/catch[\s\S]{0,200}status:\s*500/.test(route),
     "la route ne rattrape plus l'échec d'enregistrement de l'objectif");
+});
+
+/**
+ * ── LE GARDE-FOU GÉNÉRAL ────────────────────────────────────────────────────────
+ *
+ * Les tests ci-dessus nomment les défauts constatés. Celui-ci empêche la FAMILLE de
+ * revenir : il refait le balayage à chaque exécution, sur tout `src/`, et refuse une
+ * écriture dont l'échec ne serait lu nulle part. Vingt-huit chemins ont été corrigés
+ * le 04/09/2026 ; sans ce test, le vingt-neuvième s'écrira demain.
+ */
+function balayerEcritures(): { muettes: string[]; examinees: number; fichiers: number } {
+  const fichiers: string[] = [];
+  (function marche(d: string) {
+    for (const e of readdirSync(d)) {
+      const p = join(d, e);
+      if (statSync(p).isDirectory()) marche(p);
+      else if (/\.(ts|tsx)$/.test(p)) fichiers.push(p);
+    }
+  })("src");
+
+  const muettes: string[] = [];
+  let examinees = 0;
+  for (const f of fichiers) {
+    const src = readFileSync(f, "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+
+    for (const m of src.matchAll(/\bawait\s+(?:admin|sb|supabase|client)\s*\n?\s*\.from\("([a-z_]+)"\)([\s\S]{0,400}?);/g)) {
+      const corps = m[2];
+      if (!/\.(insert|upsert|update|delete)\(/.test(corps)) continue;
+      examinees++;
+
+      const avant = src.slice(Math.max(0, m.index! - 170), m.index!);
+      const apres = src.slice(m.index! + m[0].length, m.index! + m[0].length + 400);
+
+      // a) `const { error } = await …` — y compris la forme ternaire sur trois lignes.
+      if (/const\s*\{[^{}]*\berror\b[^{}]*\}\s*=/.test(avant)) continue;
+      // b) `.then(…)` / `.catch(…)` accrochés à l'appel.
+      if (/\.then\(|\.catch\(/.test(corps)) continue;
+      // c) `(await …).error` — l'erreur est extraite juste après la parenthèse, que ce
+      //    soit à la fin de l'instruction ou dans une branche de ternaire.
+      if (/^\s*\)?\s*\.error\b/.test(apres) || /\)\s*\.error\b/.test(m[0])) continue;
+      // d) `const x = await …` puis `x.error` lu plus loin.
+      const nomme = avant.match(/const\s+([A-Za-z_$][\w$]*)\s*=\s*$/);
+      if (nomme && new RegExp(`\\b${nomme[1]}\\.error\\b`).test(apres)) continue;
+
+      const op = (corps.match(/\.(insert|upsert|update|delete)\(/) ?? [])[1] ?? "?";
+      muettes.push(`${f}:${src.slice(0, m.index!).split("\n").length} ${op} ${m[1]}`);
+    }
+  }
+  return { muettes, examinees, fichiers: fichiers.length };
+}
+
+/**
+ * Les SEULES écritures autorisées à ne rien dire, avec la raison qui le justifie.
+ * Une entrée ici est une décision, pas un oubli — et elle doit rester rare.
+ */
+const TOLEREES: Record<string, string> = {};
+
+test("aucune écriture en base n'échoue en silence", () => {
+  // ⚠️ POURQUOI CE TEST EXISTE. Un client Supabase RETOURNE ses erreurs, il ne les lève
+  // pas : un `try/catch` autour d'une écriture ne rattrape rien, et le code continue
+  // comme si tout s'était bien passé. C'est ce qui a produit, dans la même journée :
+  // un webhook Stripe répondant 200 sur un accès jamais accordé, un plafond de dépense
+  // IA qui ne montait jamais, un journal qui effaçait le texte de l'athlète sous un
+  // « Sauvegardé ✓ », des réglages écrasés par une lecture ratée, un objectif de course
+  // qui se dédoublait, et des retraits (ne plus suivre, quitter un club, déconnecter sa
+  // montre) qui se déclaraient faits sans l'être.
+  const muettes = balayerEcritures().muettes.filter((m) => !(m.split(" ")[0] in TOLEREES));
+  assert.deepEqual(muettes, [],
+    `ces écritures ne disent pas quand elles échouent :\n    ${muettes.join("\n    ")}`);
+});
+
+test("le balayage regarde vraiment le code", () => {
+  // ⚠️ UN BALAYAGE QUI NE TROUVE RIEN PASSE TOUJOURS. Si la détection cassait — chemin
+  // changé, motif devenu faux — le test ci-dessus deviendrait vert par VACUITÉ, et la
+  // famille entière rentrerait par la porte qu'on croit gardée.
+  //
+  // ⚠️ ET CE TEST INTERROGE LA MÊME FONCTION, volontairement. Une première version
+  // recomptait les écritures avec un motif JUMEAU : casser celui du balayage laissait
+  // alors les deux tests au vert. Un garde-fou ne se vérifie pas avec une copie de
+  // lui-même.
+  const r = balayerEcritures();
+  assert.ok(r.fichiers > 300, `seulement ${r.fichiers} fichiers parcourus`);
+  assert.ok(r.examinees > 80, `seulement ${r.examinees} écritures examinées : le motif ne trouve plus le code`);
 });
 
 Promise.all(enAttente).then(() => {

@@ -113,9 +113,16 @@ export function TopBar({ profile, avatarColor }: { profile: Record<string, unkno
 
   async function markAllRead() {
     if (!userIdRef.current || unread === 0) return;
+    // L'écran est mis à jour d'abord, pour que le clic réponde tout de suite — mais si
+    // l'écriture est refusée, on REMET la pastille. Sans cela elle disparaissait, puis
+    // revenait au rechargement suivant : l'athlète croit avoir tout lu et rate un
+    // message.
+    const avant = notifs;
     setNotifs((prev) => prev.map((n) => ({ ...n, read: true })));
     const supabase = createClient();
-    await supabase.from("notifications").update({ read: true }).eq("user_id", userIdRef.current).eq("read", false);
+    const { error } = await supabase.from("notifications")
+      .update({ read: true }).eq("user_id", userIdRef.current).eq("read", false);
+    if (error) setNotifs(avant);
   }
 
   async function signOut() {

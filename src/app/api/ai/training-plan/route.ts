@@ -85,8 +85,16 @@ Réponds UNIQUEMENT par du JSON valide (sans markdown), structure EXACTE :
   if (!weeks.length) return NextResponse.json({ error: "Plan IA illisible, réessaie." }, { status: 502 });
 
   const admin = createAdminClient();
-  // Un seul plan actif par client → on désactive les précédents.
-  await admin.from("training_plans").update({ is_active: false }).eq("user_id", user.id).eq("is_active", true);
+  // ⚠️ « UN SEUL PLAN ACTIF PAR CLIENT » — c'est ce que dit la ligne, et rien ne le
+  // garantissait : l'échec de cette désactivation n'était pas lu, et le nouveau plan
+  // était inséré quand même. L'athlète se retrouvait avec DEUX plans actifs, et tout ce
+  // qui lit « le » plan en choisit alors un au hasard. On refuse plutôt que de créer
+  // une ambiguïté qu'aucun écran ne sait résoudre.
+  const { error: eDesactivation } = await admin.from("training_plans")
+    .update({ is_active: false }).eq("user_id", user.id).eq("is_active", true);
+  if (eDesactivation) {
+    return NextResponse.json({ error: "Plan non remplacé, réessaie dans un instant." }, { status: 500 });
+  }
   const { data: plan, error } = await admin.from("training_plans").insert({
     user_id: user.id,
     race_id: raceId,
@@ -143,8 +151,24 @@ Réponds UNIQUEMENT par du JSON valide (sans markdown), structure EXACTE :
     });
   }
   // Remplace l'ancien plan IA (sans toucher aux séances du coach humain).
-  await admin.from("notifications").delete().eq("user_id", user.id).eq("type", "coach_session").contains("data", { source: "ai_plan" });
-  if (coachRows.length) await admin.from("notifications").insert(coachRows);
+  // Si la purge échoue, les nouvelles séances S'AJOUTENT aux anciennes : deux
+  // prescriptions contradictoires le même jour, et c'est la montre qui les reçoit.
+  const { error: ePurge } = await admin.from("notifications").delete()
+    .eq("user_id", user.id).eq("type", "coach_session").contains("data", { source: "ai_plan" });
+  if (ePurge) {
+    return NextResponse.json({ error: "Ancien plan non retiré, réessaie dans un instant." }, { status: 500 });
+  }
+  let seances = 0;
+  if (coachRows.length) {
+    const { error } = await admin.from("notifications").insert(coachRows);
+    // Le plan est enregistré ; ses séances, non. Le dire plutôt que d'annoncer un
+    // calendrier qui restera vide.
+    if (error) {
+      return NextResponse.json({ ok: false, plan, weeks: weeks.length, sessions: 0,
+        error: "Plan enregistré, mais les séances n'ont pas pu être posées au calendrier." }, { status: 500 });
+    }
+    seances = coachRows.length;
+  }
 
-  return NextResponse.json({ ok: true, plan, weeks: weeks.length, sessions: coachRows.length, summary: planJson.summary ?? null });
+  return NextResponse.json({ ok: true, plan, weeks: weeks.length, sessions: seances, summary: planJson.summary ?? null });
 }

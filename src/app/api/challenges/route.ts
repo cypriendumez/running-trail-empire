@@ -34,7 +34,11 @@ export async function POST(req: Request) {
   }).select("id").single();
   if (error || !data) return NextResponse.json({ error: "Création impossible" }, { status: 500 });
 
-  await sb.from("challenge_participants").insert({ challenge_id: data.id, user_id: user.id });
+  // Même défaut que sur la création d'un club : sans cette ligne, le créateur n'est pas
+  // participant de son propre défi et n'apparaît pas dans son classement.
+  const { error: eCreateur } = await sb.from("challenge_participants")
+    .insert({ challenge_id: data.id, user_id: user.id });
+  if (eCreateur) return NextResponse.json({ error: "Défi créé sans son créateur, réessaie" }, { status: 500 });
   return NextResponse.json({ id: data.id });
 }
 
@@ -50,7 +54,11 @@ export async function PUT(req: Request) {
   const { data: exist } = await sb.from("challenge_participants")
     .select("user_id").eq("challenge_id", challengeId).eq("user_id", user.id).maybeSingle();
   if (exist) {
-    await sb.from("challenge_participants").delete().eq("challenge_id", challengeId).eq("user_id", user.id);
+    // Participer vérifiait son erreur, se retirer non : le bouton basculait sur un
+    // retrait qui n'avait pas eu lieu.
+    const { error } = await sb.from("challenge_participants")
+      .delete().eq("challenge_id", challengeId).eq("user_id", user.id);
+    if (error) return NextResponse.json({ error: "Impossible de se retirer de ce défi" }, { status: 500 });
     return NextResponse.json({ joined: false });
   }
   const { error } = await sb.from("challenge_participants").insert({ challenge_id: challengeId, user_id: user.id });

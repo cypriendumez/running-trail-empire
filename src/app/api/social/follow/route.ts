@@ -84,7 +84,18 @@ export async function POST(req: Request) {
     .select("follower_id").eq("follower_id", user.id).eq("following_id", athleteId).maybeSingle();
 
   if (existing) {
-    await sb.from("follows").delete().eq("follower_id", user.id).eq("following_id", athleteId);
+    /**
+     * ⚠️ L'ASYMÉTRIE ÉTAIT LE DÉFAUT : suivre vérifiait son erreur, ne plus suivre non.
+     *
+     * Ce n'est pas cosmétique. Le suivi MUTUEL est ce qui ouvre la messagerie entre
+     * athlètes (`peutEcrire`). Un retrait qui échoue en silence répond « following:
+     * false », le bouton bascule, et le lien reste : l'autre athlète peut toujours
+     * écrire à quelqu'un qui croit l'avoir coupé. Une décision de confidentialité ne
+     * peut pas s'annoncer réussie sans l'être.
+     */
+    const { error } = await sb.from("follows").delete()
+      .eq("follower_id", user.id).eq("following_id", athleteId);
+    if (error) return NextResponse.json({ error: "Impossible de ne plus suivre cet athlète" }, { status: 500 });
     return NextResponse.json({ following: false });
   }
   const { error } = await sb.from("follows")

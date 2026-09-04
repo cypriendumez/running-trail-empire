@@ -116,6 +116,13 @@ export async function DELETE(req: Request) {
   if (!id) return NextResponse.json({ error: "id requis" }, { status: 400 });
   const admin = createAdminClient();
   const { data: row } = await admin.from("notifications").select("data").eq("id", id).eq("user_id", user.id).in("type", ["client_message", "coach_message"]).single();
-  if (row) await admin.from("notifications").update({ data: { ...(row.data as object), deleted: true } }).eq("id", id).eq("user_id", user.id);
+  // ⚠️ LE PENDANT DU DÉFAUT DÉJÀ CORRIGÉ SUR LA RESTAURATION. Là, une restauration qui
+  // n'avait rien restauré répondait « c'est fait » ; ici, une suppression qui n'a rien
+  // supprimé faisait de même — le message disparaissait de l'écran et revenait au
+  // rechargement. Et l'athlète le supprimait peut-être pour de bonnes raisons.
+  if (!row) return NextResponse.json({ error: "Message introuvable" }, { status: 404 });
+  const { error } = await admin.from("notifications")
+    .update({ data: { ...(row.data as object), deleted: true } }).eq("id", id).eq("user_id", user.id);
+  if (error) return NextResponse.json({ error: "Suppression impossible" }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

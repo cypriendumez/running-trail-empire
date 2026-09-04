@@ -595,15 +595,23 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
   }
 
   async function deleteGoal(id: string) {
+    // ⚠️ MÊME ASYMÉTRIE QUE PARTOUT AILLEURS : `addGoal` vérifiait son erreur, pas la
+    // suppression. L'objectif disparaissait de l'écran sous un « supprimé ✓ », et
+    // réapparaissait au rechargement. On ne retire de la liste que ce qui est parti.
     const supabase = createClient();
-    await supabase.from("user_goals").delete().eq("id", id);
+    const { error } = await supabase.from("user_goals").delete().eq("id", id);
+    if (error) { toast.error(tr("t.saveErr")); return; }
     setGoals(g => g.filter(x => x.id !== id));
     toast.success(tr("t.goalDel"));
   }
 
   async function toggleGoalAchieved(goal: Goal) {
+    // Cocher un objectif atteint est un petit moment : le voir se décocher tout seul au
+    // rechargement, sans qu'aucun message n'ait prévenu, l'est beaucoup moins.
     const supabase = createClient();
-    await supabase.from("user_goals").update({ achieved: !goal.achieved }).eq("id", goal.id);
+    const { error } = await supabase.from("user_goals")
+      .update({ achieved: !goal.achieved }).eq("id", goal.id);
+    if (error) { toast.error(tr("t.saveErr")); return; }
     setGoals(g => g.map(x => x.id === goal.id ? { ...x, achieved: !x.achieved } : x));
   }
 
@@ -661,7 +669,10 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
 
   async function deleteShoe(id: string) {
     const supabase = createClient();
-    await supabase.from("shoes").update({ is_active: false }).eq("id", id);
+    // L'ajout et le kilométrage vérifiaient leur erreur, pas la mise au rebut : la paire
+    // disparaissait de la liste et revenait au rechargement.
+    const { error } = await supabase.from("shoes").update({ is_active: false }).eq("id", id);
+    if (error) { toast.error(tr("t.saveErr")); return; }
     setShoeList(s => s.filter(x => x.id !== id));
     toast.success(tr("t.shoeDel"));
   }

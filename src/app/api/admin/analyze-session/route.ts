@@ -274,12 +274,14 @@ Le plan "week" couvre 7 jours (la séance d'AUJOURD'HUI = nextSession est le 1er
     // FILET DE SÉCURITÉ : garantit le nombre de séances de qualité du squelette (anti « trop d'EF »).
     week = enforceQuality(week, ctx?.weekPlan);
 
-    try {
-      await admin.from("notifications").insert({
-        user_id, type: "session_ai_analysis", title: `Analyse séance ${day}`,
-        body: analysis.slice(0, 300), data: { date: day, summary, analysis, nextSession, week },
-      });
-    } catch { /* table optionnelle */ }
+    // « Table optionnelle » : l'intention est bonne, mais le `catch` ne voyait rien —
+    // les erreurs Supabase sont retournées, pas levées. L'analyse est rendue quoi
+    // qu'il arrive ; on écrit simplement ce qui n'a pas été conservé.
+    const { error: eAnalyse } = await admin.from("notifications").insert({
+      user_id, type: "session_ai_analysis", title: `Analyse séance ${day}`,
+      body: analysis.slice(0, 300), data: { date: day, summary, analysis, nextSession, week },
+    });
+    if (eAnalyse) console.error("[analyse séance] non conservée :", eAnalyse.message);
 
     return NextResponse.json({ analysis, nextSession, week, macroPlan: ctx?.macroPlan ?? [], objective: objective ? { ...objective, daysToRace: objDays } : null, rest: { daysSinceLast, restDays7 }, readiness: ctx?.readiness ?? null });
   } catch (e) {

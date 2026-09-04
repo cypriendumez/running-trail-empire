@@ -82,7 +82,12 @@ export async function POST(req: Request) {
   const { data: existing } = await sb.from("post_kudos")
     .select("post_id").eq("post_id", postId).eq("user_id", user.id).maybeSingle();
   if (existing) {
-    await sb.from("post_kudos").delete().eq("post_id", postId).eq("user_id", user.id);
+    // Même asymétrie que pour le suivi : l'ajout vérifiait, le retrait non. Le bouton
+    // basculait sur un retrait qui n'avait pas eu lieu, et l'encouragement revenait au
+    // rechargement — le genre de « bug fantôme » qu'on ne sait pas reproduire.
+    const { error } = await sb.from("post_kudos").delete()
+      .eq("post_id", postId).eq("user_id", user.id);
+    if (error) return NextResponse.json({ error: "Impossible de retirer l'encouragement" }, { status: 500 });
     return NextResponse.json({ kudoed: false });
   }
   const { error } = await sb.from("post_kudos").insert({ post_id: postId, user_id: user.id });

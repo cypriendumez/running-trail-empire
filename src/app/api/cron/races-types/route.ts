@@ -200,8 +200,22 @@ export async function GET(req: Request) {
     body: `${nouvelEtat.vues} course(s) examinée(s) · ${nouvelEtat.corrigees} type(s) corrigé(s) · ${nouvelEtat.ajoutees} distance(s) ajoutée(s)`,
     data: nouvelEtat as unknown as Record<string, unknown>,
   };
-  if (ligne?.id) await sb.from("notifications").update(charge).eq("id", ligne.id);
-  else await sb.from("notifications").insert(charge);
+  /**
+   * ⚠️ LE CURSEUR EST TOUT CE QUI FAIT AVANCER CE CRON.
+   *
+   * Son écriture n'était pas contrôlée. En échec, le curseur reste où il était et le
+   * passage suivant retraite EXACTEMENT la même tranche — indéfiniment, en consommant
+   * le quota Gemini à chaque fois, sans jamais parcourir le catalogue. Le cron
+   * répondrait « ok » à chaque exécution tout en tournant sur place : la panne la plus
+   * difficile à voir, parce que tous les voyants sont au vert.
+   */
+  const { error: eCurseur } = ligne?.id
+    ? await sb.from("notifications").update(charge).eq("id", ligne.id)
+    : await sb.from("notifications").insert(charge);
+  if (eCurseur) {
+    console.error("[races-types] curseur non enregistré, la prochaine exécution repartira du même point :", eCurseur.message);
+    return NextResponse.json({ ok: false, erreur: "curseur non enregistré", total: ids.length }, { status: 500 });
+  }
 
   return NextResponse.json({
     ok: refusees === 0, total: ids.length, demandees: tranche.length, traitees, examinees: vues,

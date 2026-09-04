@@ -137,12 +137,16 @@ export async function POST(req: Request) {
       q: message, cle, a: reponse, lang, kb,
       generique: !compteAvecConstats, source, at: new Date().toISOString(),
     };
-    await admin.from("notifications").insert({
+    // Silencieux POUR L'ATHLÈTE, comme dit ci-dessus — mais le commentaire promet aussi
+    // que « la question est TOUJOURS conservée ». Sans lire cette erreur, elle ne
+    // l'était pas, et Cyprien aurait perdu ce que ses clients demandent sans le savoir.
+    const { error: eMemoire } = await admin.from("notifications").insert({
       user_id: user.id, type: "support_qa",
       title: message.slice(0, 120),
       body: reponse.slice(0, 2000),
       data: entree as unknown as Record<string, unknown>,
     });
+    if (eMemoire) console.error("[support] question non mémorisée :", eMemoire.message);
   };
 
   // Le libellé cité doit être CELUI QUE L'UTILISATEUR VOIT dans sa barre latérale, pas le

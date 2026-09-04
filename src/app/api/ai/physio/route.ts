@@ -253,12 +253,18 @@ Si la photo est floue, trop sombre, trop éloignée ou ne montre pas la zone dé
         return (d?.slot || d?.zone) === cle;
       });
       if (!already) {
-        await supabase.from("notifications").insert({
+        // ⚠️ L'INTENTION DU `catch` EST JUSTE — le kiné doit répondre même si
+        // l'enregistrement échoue — MAIS IL NE VOYAIT RIEN : un client Supabase
+        // RETOURNE ses erreurs, il ne les lève pas. Une déclaration de douleur perdue,
+        // c'est une donnée de santé que l'athlète a saisie et que le kiné ne retrouvera
+        // jamais à la séance suivante, alors que c'est toute l'utilité de sa mémoire.
+        const { error } = await supabase.from("notifications").insert({
           user_id: user.id, type: "pain_report",
           title: `Douleur signalée : ${zone}`,
           body: `Intensité ${painLevel}/10 — déclarée depuis l'espace Santé.`,
           data: { zone, slot: zoneKey ?? null, level: painLevel, date: today },
         });
+        if (error) console.error("[kiné] douleur déclarée non enregistrée :", error.message);
       }
     } catch { /* best-effort : le kiné répond même si l'enregistrement échoue */ }
   }

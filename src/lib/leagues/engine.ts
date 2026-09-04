@@ -50,16 +50,29 @@ export async function runLeagueUpdate(admin: SupabaseClient): Promise<{ ok: bool
     acc.days.add(String(w.date).slice(0, 10)); acc.longestKm = Math.max(acc.longestKm, km);
   }
 
-  // 3) Une ligue par palier présent cette semaine (créée si absente).
+  /**
+   * 3) Une ligue par palier présent cette semaine (créée si absente).
+   *
+   * ⚠️ AUCUNE DE CES ÉCRITURES N'ÉTAIT CONTRÔLÉE, ET LA FONCTION RENDAIT `ok: true`.
+   * Le pire n'est pas la ligue manquante : quand la création échoue, `leagueIdByTier`
+   * reste vide pour ce palier et TOUS ses athlètes sont écartés plus bas par un
+   * `if (!lid) continue` — ils disparaissent du classement sans un mot, et le nombre
+   * de membres annoncé en fin de fonction ne les compte déjà plus. Un classement
+   * amputé ressemble à un classement.
+   */
   const tiers = [...new Set(users.map((u) => u.league || "bronze"))];
   const leagueIdByTier: Record<string, string> = {};
+  const echecs: string[] = [];
   for (const tier of tiers) {
-    const { data: existing } = await admin.from("leagues").select("id").eq("tier", tier).eq("week_start", weekStart).limit(1).maybeSingle();
+    const { data: existing, error: eLecture } = await admin.from("leagues")
+      .select("id").eq("tier", tier).eq("week_start", weekStart).limit(1).maybeSingle();
+    if (eLecture) { echecs.push(`palier ${tier} (lecture) : ${eLecture.message}`); continue; }
     if (existing?.id) { leagueIdByTier[tier] = existing.id as string; continue; }
-    const { data: created } = await admin.from("leagues").insert({
+    const { data: created, error: eCreation } = await admin.from("leagues").insert({
       tier, name: TIER_NAMES[tier] ?? "Ligue", week_start: weekStart, week_end: weekEnd, rewards: ["Badge exclusif", "Montée de palier"],
     }).select("id").single();
-    if (created?.id) leagueIdByTier[tier] = created.id as string;
+    if (eCreation || !created?.id) { echecs.push(`palier ${tier} (création) : ${eCreation?.message ?? "aucune ligne rendue"}`); continue; }
+    leagueIdByTier[tier] = created.id as string;
   }
 
   // 4) Upsert des membres avec leur score.
@@ -69,15 +82,26 @@ export async function runLeagueUpdate(admin: SupabaseClient): Promise<{ ok: bool
     const acc = perUser[u.id];
     rows.push({ league_id: lid, user_id: u.id, score: weeklyScore({ km: acc.km, elevM: acc.elevM, sessions: acc.days.size, longestKm: acc.longestKm }) });
   }
-  if (rows.length) await admin.from("league_members").upsert(rows, { onConflict: "league_id,user_id" });
+  if (rows.length) {
+    const { error } = await admin.from("league_members").upsert(rows, { onConflict: "league_id,user_id" });
+    if (error) echecs.push(`scores des membres : ${error.message}`);
+  }
 
   // 5) Rangs par ligue (score décroissant).
   for (const lid of Object.values(leagueIdByTier)) {
     const inLeague = rows.filter((r) => r.league_id === lid).sort((a, b) => b.score - a.score);
     for (let i = 0; i < inLeague.length; i++) {
-      await admin.from("league_members").update({ rank: i + 1 }).eq("league_id", lid).eq("user_id", inLeague[i].user_id);
+      // Un rang non écrit laisse celui de la semaine PRÉCÉDENTE : l'athlète lit un
+      // classement plausible et faux, ce qui est pire qu'un classement absent.
+      const { error } = await admin.from("league_members")
+        .update({ rank: i + 1 }).eq("league_id", lid).eq("user_id", inLeague[i].user_id);
+      if (error) echecs.push(`rang de ${inLeague[i].user_id} : ${error.message}`);
     }
   }
 
+  if (echecs.length) {
+    console.error("[ligues] écritures en échec :", echecs);
+    return { ok: false, week: weekStart, tiers: Object.keys(leagueIdByTier).length, members: rows.length, error: echecs.join(" ; ") };
+  }
   return { ok: true, week: weekStart, tiers: tiers.length, members: rows.length };
 }

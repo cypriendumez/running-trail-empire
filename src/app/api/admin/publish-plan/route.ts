@@ -41,9 +41,14 @@ export async function POST(req: Request) {
   }
 
   // Remplace le plan à venir : on efface les séances coach datées d'aujourd'hui ou plus tard, puis on réinsère.
-  try {
-    await admin.from("notifications").delete().eq("user_id", user_id).eq("type", "coach_session").gte("data->>date", today);
-  } catch { /* filtre jsonb optionnel — le calendrier dédoublonne par date au pire */ }
+  // ⚠️ ON GARDE LE « AU MIEUX », mais plus le silence. Le `catch` ne voyait rien : un
+  // client Supabase RETOURNE ses erreurs. Contrairement au coach automatique — qui
+  // repasse toutes les dix minutes, et où l'on peut donc abandonner sans rien perdre —
+  // c'est ici un geste MANUEL : refuser bloquerait la publication. On publie donc, et
+  // on écrit ce qui n'a pas pu être purgé.
+  const { error: ePurge } = await admin.from("notifications").delete()
+    .eq("user_id", user_id).eq("type", "coach_session").gte("data->>date", today);
+  if (ePurge) console.error("[publish-plan] plan à venir non purgé, doublons possibles sur la montre :", ePurge.message);
 
   const rows = sessions
     .filter((s) => s.date)

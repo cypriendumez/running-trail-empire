@@ -87,7 +87,17 @@ export async function GET(req: Request) {
         trouvees++;
       }
     }
-    await sb.from("notifications").update({ data: majBase as unknown as Record<string, unknown> }).eq("id", l.id);
+    // ⚠️ C'EST CE MARQUEUR QUI ÉVITE DE RECHERCHER DEUX FOIS LA MÊME HEURE.
+    // Son écriture n'était pas contrôlée : en échec, `heureCherchéeLe` n'est pas posé et
+    // le passage suivant refait exactement le même travail — deux appels Gemini par
+    // objectif, tous les jours, pour un résultat déjà obtenu. Le cron paraîtrait
+    // fonctionner tout en n'avançant jamais.
+    const { error: eMarqueur } = await sb.from("notifications")
+      .update({ data: majBase as unknown as Record<string, unknown> }).eq("id", l.id);
+    if (eMarqueur) {
+      console.error("[heure-depart] marqueur non écrit, la recherche sera refaite :", eMarqueur.message);
+      details.push({ race: o.race, verdict: "marqueur non enregistré" });
+    }
   }
 
   return NextResponse.json({ ok: true, objectifs: (lignes ?? []).length, cherchees, trouvees, details });

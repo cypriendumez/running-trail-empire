@@ -46,16 +46,24 @@ export async function importMissingTracks(
       if (pts.length < 2) {
         // Séance sans trace (tapis, home-trainer) : on l'enregistre COMME TELLE, pour
         // ne plus jamais la redemander à chaque synchronisation.
-        await sb.from("activity_tracks").insert({
+      // ⚠️ `catch` NE RATTRAPE PAS UNE ERREUR SUPABASE : le client la RETOURNE, il ne
+      // la lève pas. Ces deux insertions partaient donc sans contrôle, et la séance
+      // était comptée comme traitée alors que rien n'était écrit. Conséquence directe :
+      // `traitees` ne grandissait jamais, le client rappelait, et le MÊME lot repartait
+      // chercher les mêmes traces chez intervals.icu — dont ce fichier documente
+      // lui-même la limite de débit mesurée (~200 requêtes, puis 101 échecs d'affilée).
+      // Une boucle silencieuse qui épuise le quota de l'athlète.
+        const { error } = await sb.from("activity_tracks").insert({
           workout_id: w.id, user_id: opts.userId, points: [], point_count: 0, has_gps: false,
         });
+        if (error) { failed++; continue; }
         withoutGps++;
         continue;
       }
 
       const light = simplify(pts, 10);
       const box = bboxOf(light);
-      await sb.from("activity_tracks").insert({
+      const { error } = await sb.from("activity_tracks").insert({
         workout_id: w.id, user_id: opts.userId,
         // Positions : 0 lat, 1 lon, 2 temps, 3 altitude, 4 FC, 5 cadence, 6 puissance.
         points: light.map((p) => [
@@ -67,6 +75,7 @@ export async function importMissingTracks(
         min_lat: box?.minLat, max_lat: box?.maxLat, min_lon: box?.minLon, max_lon: box?.maxLon,
         has_gps: true,
       });
+      if (error) { failed++; continue; }
       imported++;
     } catch { failed++; }
   }

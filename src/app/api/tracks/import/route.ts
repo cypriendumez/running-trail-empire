@@ -59,16 +59,24 @@ export async function POST() {
       if (points.length < 2) {
         // Séance sans trace (tapis, home-trainer) : on l'ENREGISTRE comme telle,
         // pour ne plus jamais la redemander.
-        await admin.from("activity_tracks").insert({
+      // ⚠️ `catch` NE RATTRAPE PAS UNE ERREUR SUPABASE : le client la RETOURNE, il ne
+      // la lève pas. Ces deux insertions partaient donc sans contrôle, et la séance
+      // était comptée comme traitée alors que rien n'était écrit. Conséquence directe :
+      // `traitees` ne grandissait jamais, le client rappelait, et le MÊME lot repartait
+      // chercher les mêmes traces chez intervals.icu — dont ce fichier documente
+      // lui-même la limite de débit mesurée (~200 requêtes, puis 101 échecs d'affilée).
+      // Une boucle silencieuse qui épuise le quota de l'athlète.
+        const { error } = await admin.from("activity_tracks").insert({
           workout_id: w.id, user_id: user.id, points: [], point_count: 0, has_gps: false,
         });
+        if (error) { echecs++; continue; }
         sansGps++;
         continue;
       }
 
       const light = simplify(points, 10);
       const box = bboxOf(light);
-      await admin.from("activity_tracks").insert({
+      const { error } = await admin.from("activity_tracks").insert({
         workout_id: w.id, user_id: user.id,
         points: light.map((p) => [Number(p.lat.toFixed(6)), Number(p.lon.toFixed(6)), Math.round(p.t)]),
         polyline: encodePolyline(light),
@@ -76,6 +84,7 @@ export async function POST() {
         min_lat: box?.minLat, max_lat: box?.maxLat, min_lon: box?.minLon, max_lon: box?.maxLon,
         has_gps: true,
       });
+      if (error) { echecs++; continue; }
       importees++;
     } catch { echecs++; }
   }

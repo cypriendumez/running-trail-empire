@@ -38,8 +38,12 @@ export async function POST(req: Request) {
     // aurait accumulé des doublons avant ce garde-fou laisserait sinon un favori
     // fantôme, impossible à enlever depuis l'interface.
     if (deja?.id) {
-      await admin.from("notifications").delete()
+      // L'ajout vérifiait son erreur et répondait 500 ; le retrait rendait « favori:
+      // false » quoi qu'il arrive. La course restait en favori et réapparaissait au
+      // rechargement, sans que l'athlète puisse comprendre pourquoi.
+      const { error } = await admin.from("notifications").delete()
         .eq("user_id", user.id).eq("type", TYPE_FAVORI).eq("data->>raceId", raceId);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     }
     return NextResponse.json({ ok: true, favori: false });
   }

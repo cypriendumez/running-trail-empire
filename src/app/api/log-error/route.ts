@@ -57,7 +57,11 @@ export async function POST(req: Request) {
       meta = s.length <= META_MAX ? body.meta : { tronque: true, extrait: s.slice(0, META_MAX) };
     }
 
-    await admin.from("error_logs").insert({
+    // ⚠️ « Le refus est silencieux POUR LUI, jamais pour nous » — c'est ce que promet le
+    // commentaire du bas, et ce n'était pas tenu : l'échec de cette insertion n'était
+    // lu par personne. On aurait donc perdu TOUT le journal d'erreurs sans le moindre
+    // signe, précisément l'outil qui sert à voir ce qui casse en production.
+    const { error } = await admin.from("error_logs").insert({
       user_id: user?.id ?? null,
       source: cut(body.source, 24) ?? "client",
       message: cut(body.message, 2000) ?? "(no message)",
@@ -66,6 +70,7 @@ export async function POST(req: Request) {
       user_agent: cut(req.headers.get("user-agent"), 500),
       meta,
     });
+    if (error) console.error("[log-error] journal d'erreurs non écrit :", error.message);
   } catch { /* le logger d'erreurs ne doit JAMAIS lever d'erreur lui-même */ }
   // Toujours « ok » : l'appelant est une page en train de tomber, on ne lui ajoute pas
   // une seconde erreur à gérer. Le refus est silencieux POUR LUI, jamais pour nous.

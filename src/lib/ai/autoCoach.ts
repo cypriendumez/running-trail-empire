@@ -86,8 +86,16 @@ export async function autoCoachForUser(
 
   // 2) Remplace le plan à venir. On n'efface QUE le futur : l'historique des séances
   //    déjà passées reste intact pour le suivi d'adhérence.
-  await admin.from("notifications").delete()
+  // ⚠️ SI CETTE PURGE ÉCHOUE EN SILENCE, LE NOUVEAU PLAN S'AJOUTE À L'ANCIEN. Les
+  // écrans dédoublonnent par date (`oneSessionPerDate`) et masqueraient donc le
+  // problème, mais la montre, elle, reçoit ce qui est en base : l'athlète se
+  // retrouverait avec deux séances contradictoires pour le même jour.
+  const { error: ePurge } = await admin.from("notifications").delete()
     .eq("user_id", userId).eq("type", "coach_session").gte("data->>date", from);
+  if (ePurge) {
+    console.error("[coach-auto] plan à venir non purgé, republication abandonnée :", ePurge.message);
+    return { processed: false, days: 0, pushed: 0, emailed: false, emailSkipped: "purge impossible" };
+  }
 
   const rows = week.filter((d: PlanDay) => d.date >= from).map((d: PlanDay) => ({
     user_id: userId,
@@ -265,8 +273,20 @@ export async function autoCoachForUser(
     // compteur à zéro et autoriserait un e-mail toutes les dix minutes.
     lastPlanEmailAt: emailed ? new Date().toISOString() : lastEmailAt,
   };
-  if (prevState?.id) await admin.from("notifications").update({ data: stateData }).eq("id", prevState.id);
-  else await admin.from("notifications").insert({ user_id: userId, type: "auto_coach_state", title: "auto-coach", body: "", data: stateData });
+  /**
+   * ⚠️ CET ÉCHEC-LÀ ENVOIE DES E-MAILS EN BOUCLE.
+   *
+   * Le commentaire ci-dessus dit ce que porte `lastPlanEmailAt` : c'est lui qui espace
+   * les envois. L'écriture n'était pas contrôlée — si elle échoue, la date n'avance
+   * pas, et la synchronisation suivante (toutes les dix minutes) croit qu'aucun e-mail
+   * n'est parti. Elle en renvoie un. Puis un autre. L'athlète reçoit son « plan à jour »
+   * six fois par heure, et se désabonne — ou signale l'expéditeur, ce qui abîme la
+   * réputation du domaine pour tous les autres.
+   */
+  const { error: eEtat } = prevState?.id
+    ? await admin.from("notifications").update({ data: stateData }).eq("id", prevState.id)
+    : await admin.from("notifications").insert({ user_id: userId, type: "auto_coach_state", title: "auto-coach", body: "", data: stateData });
+  if (eEtat) console.error("[coach-auto] état non enregistré (risque d'e-mails répétés) :", eEtat.message);
 
   return { processed: true, days: rows.length, pushed, emailed, emailSkipped };
 }
