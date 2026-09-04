@@ -27,18 +27,40 @@ export default async function HeatmapPage() {
 
   const traces: TrackPoint[][] = [];
   let indisponible = false;
-  for (let page = 0; page < 10; page++) {
-    const { data, error } = await sb.from("activity_tracks")
-      .select("points").eq("user_id", user.id).eq("has_gps", true)
-      .order("workout_id").range(page * 40, page * 40 + 39);
-    if (error) { indisponible = true; break; }
-    if (!data?.length) break;
-    for (const row of data) {
-      const pts = ((row as { points?: number[][] }).points ?? [])
-        .map(([lat, lon, t]) => ({ lat, lon, t }));
-      if (pts.length >= 5) traces.push(pts);
+
+  // ⚠️ MESURÉ LE 04/09/2026 : cette page mettait 12,3 s et pesait 594 Ko. Le temps ne
+  // partait PAS dans le calcul (agrégation de 261 586 points : 52 ms) mais dans le
+  // TRANSFERT de 10,3 Mo de traces, demandées page après page, chacune attendant la
+  // précédente. En parallèle, le même transfert tombe de 3 293 ms à 1 549 ms — et
+  // l'écart se creuse en production, où chaque aller-retour coûte plus cher.
+  //
+  // ⚠️ ON COMPTE SUR `workout_id`, PAS SUR `id` : la table N'A PAS de colonne `id`, et
+  // PostgREST répond alors `count: null` avec un message d'erreur VIDE. Un compte nul
+  // demanderait zéro page et afficherait « aucune donnée » à un athlète qui a 330
+  // traces — une panne déguisée en carte vide.
+  const { count, error: eNb } = await sb.from("activity_tracks")
+    .select("workout_id", { count: "exact", head: true })
+    .eq("user_id", user.id).eq("has_gps", true);
+  if (eNb || count == null) {
+    indisponible = true;
+  } else {
+    const PAGE = 40;
+    const pages = Math.min(10, Math.ceil(count / PAGE));
+    const lots = await Promise.all(
+      Array.from({ length: pages }, (_, p) => sb.from("activity_tracks")
+        .select("points").eq("user_id", user.id).eq("has_gps", true)
+        .order("workout_id").range(p * PAGE, p * PAGE + PAGE - 1)),
+    );
+    for (const lot of lots) {
+      // Une page en échec ne doit pas passer pour une page vide : la carte serait
+      // amputée sans que personne ne le sache.
+      if (lot.error) { indisponible = true; break; }
+      for (const row of lot.data ?? []) {
+        const pts = ((row as { points?: number[][] }).points ?? [])
+          .map(([lat, lon, t]) => ({ lat, lon, t }));
+        if (pts.length >= 5) traces.push(pts);
+      }
     }
-    if (data.length < 40) break;
   }
 
   const cells = indisponible ? [] : topCells(heatCells(traces));

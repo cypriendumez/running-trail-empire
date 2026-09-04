@@ -96,5 +96,34 @@ test("le comparateur n'affiche pas les 309 modèles d'un coup", () => {
   assert.ok(/"shop\.voir_plus": "[^"]*\{n\}/.test(i18n), "le bouton n'annonce pas le nombre restant");
 });
 
+test("la carte de chaleur demande ses pages ENSEMBLE, pas l'une après l'autre", () => {
+  // ⚠️ MESURÉ EN PRODUCTION LE 04/09/2026 : 12,3 s pour afficher la page. Le calcul
+  // n'y était pour rien — l'agrégation de 261 586 points prend 52 ms. C'étaient neuf
+  // allers-retours enchaînés, chacun attendant le précédent pour ramener 1,2 Mo de
+  // traces. Mis en parallèle : 3 293 ms → 1 549 ms sur le même jeu de données.
+  const src = codeNu(readFileSync("src/app/dashboard/heatmap/page.tsx", "utf8"));
+  assert.ok(/Promise\.all\(/.test(src),
+    "la carte de chaleur ne demande plus ses pages en parallèle : le chargement retombera à une dizaine de secondes");
+  assert.ok(!/for\s*\(\s*let\s+page\b/.test(src),
+    "la boucle séquentielle de pagination est revenue");
+});
+
+test("le nombre de traces se compte sur une colonne QUI EXISTE", () => {
+  // ⚠️ `activity_tracks` N'A PAS de colonne `id` (colonnes réelles : workout_id,
+  // user_id, points, polyline, point_count, min_lat…). Un `select("id", { count })`
+  // rend `count: null` avec un message d'erreur VIDE — le piège maison. Comme le
+  // nombre de pages à demander se déduit de ce compte, zéro page serait demandée et
+  // l'athlète verrait « aucune donnée » alors qu'il a 330 traces : une panne déguisée
+  // en carte vide, sans la moindre erreur nulle part.
+  const src = codeNu(readFileSync("src/app/dashboard/heatmap/page.tsx", "utf8"));
+  assert.ok(/select\("workout_id",\s*\{\s*count:/.test(src),
+    "le comptage des traces ne porte plus sur workout_id");
+  assert.ok(!/select\("id",\s*\{\s*count:/.test(src),
+    "le comptage porte sur « id », colonne qui n'existe pas dans activity_tracks");
+  // Et un comptage impossible doit se DIRE, pas se traduire par une carte vide.
+  assert.ok(/count\s*==\s*null/.test(src),
+    "un comptage nul n'est plus distingué d'un athlète qui n'a aucune trace");
+});
+
 console.log(`\n${passed} test(s) de pagination passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log(`  KO ${f}`); process.exit(1); }
