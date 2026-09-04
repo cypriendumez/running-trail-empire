@@ -34,7 +34,21 @@ export async function exigeAcces(
   userId: string,
   quoi: Capacite,
 ): Promise<Refus | null> {
-  const { data } = await supabase.from("profiles").select(COLONNES_ACCES).eq("id", userId).maybeSingle();
+  /**
+   * ⚠️ ON NE CHANGE PAS LA POLITIQUE, ON LA REND VISIBLE.
+   *
+   * `accesDe(null)` accorde délibérément l'ESSAI (voir `access.ts` : « le pire défaut
+   * possible ici n'est pas de laisser passer un fraudeur, c'est de verrouiller un
+   * client légitime »). Ce choix est bon pour une colonne vide ou mal formée.
+   *
+   * Mais l'erreur de cette lecture n'était pas lue, et une lecture EN PANNE prenait le
+   * même chemin qu'une colonne vide : si la base hoquette, TOUT LE MONDE reçoit un
+   * essai — y compris les comptes dont l'essai est fini — et personne ne l'apprend
+   * jamais. Le plafond d'appels IA, lui, se ferme dans ce cas (voir `aiQuota`), donc
+   * la facture reste bornée ; c'est la cécité qu'on corrige ici.
+   */
+  const { data, error: eProfil } = await supabase.from("profiles").select(COLONNES_ACCES).eq("id", userId).maybeSingle();
+  if (eProfil) console.error("[accès] profil illisible, repli sur l'essai :", eProfil.message);
   const acces = accesDe(data as { created_at?: string | null; subscription_tier?: string | null } | null);
 
   // ── PLAFOND JOURNALIER ──────────────────────────────────────────────────────

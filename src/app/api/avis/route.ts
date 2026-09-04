@@ -45,9 +45,14 @@ export async function POST(req: Request) {
   const { data: profil } = await admin.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
   const avis = avisDe(note as number, texte as string, profil?.full_name as string | null);
 
-  const { data: existant } = await admin
+  // ⚠️ L'ÉCRITURE ÉTAIT BIEN CONTRÔLÉE ; CETTE LECTURE, NON. En échec, elle passe pour
+  // « pas encore d'avis » et on insère une seconde ligne — après quoi l'athlète ne peut
+  // plus ni relire ni modifier le sien : les deux lectures de cette route (l. 29 et
+  // l. 50) utilisent `maybeSingle()`, qui échoue dès qu'il y a deux lignes.
+  const { data: existant, error: eLecture } = await admin
     .from("notifications").select("id")
     .eq("user_id", user.id).eq("type", TYPE_AVIS).maybeSingle();
+  if (eLecture) return NextResponse.json({ ok: false, error: "Avis illisible pour le moment" }, { status: 500 });
 
   const erreur = existant?.id
     ? (await admin.from("notifications").update({ data: avis }).eq("id", existant.id)).error

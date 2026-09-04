@@ -160,7 +160,13 @@ export async function PATCH(req: Request) {
       seuilCA: typeof r.seuilCA === "number" && r.seuilCA > 0 ? r.seuilCA : undefined,
       soldeInitialCents: Number.isInteger(r.soldeInitialCents) ? r.soldeInitialCents : undefined,
     };
-    const { data: exist } = await sb.from("notifications").select("id").eq("user_id", editeur.id).eq("type", TYPE_REGLAGES).maybeSingle();
+    // ⚠️ Même piège qu'ailleurs : une lecture en échec passe pour « aucun réglage »,
+    // on insère une seconde ligne, et la lecture des réglages (l. 83, `maybeSingle`)
+    // échoue ensuite définitivement — la comptabilité perd ses taux et son solde
+    // initial d'un coup.
+    const { data: exist, error: eLecture } = await sb.from("notifications")
+      .select("id").eq("user_id", editeur.id).eq("type", TYPE_REGLAGES).maybeSingle();
+    if (eLecture) return NextResponse.json({ ok: false, erreurs: [eLecture.message] }, { status: 500 });
     const { error } = exist
       ? await sb.from("notifications").update({ data: propre }).eq("id", exist.id)
       : await sb.from("notifications").insert({ user_id: editeur.id, type: TYPE_REGLAGES, title: "Réglages comptables", read: true, data: propre });

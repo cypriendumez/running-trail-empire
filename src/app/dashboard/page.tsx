@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { fuseauOuDefaut } from "@/lib/time/fuseau";
 import { createClient } from "@/lib/supabase/server";
+import { lecturesEnEchec } from "@/lib/dashboard/lectures";
 import { BentoDashboard } from "@/components/dashboard/BentoDashboard";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import type { Objective } from "@/components/dashboard/ObjectiveCard";
@@ -134,9 +135,36 @@ export default async function DashboardPage() {
     ? { date: lastWk.date.slice(0, 10), title: lastWk.title || lastWk.type || "Séance" }
     : null;
 
+  /**
+   * ⚠️ UNE LECTURE EN PANNE NE DOIT PAS SE LIRE COMME « TU N'AS RIEN COURU ».
+   *
+   * Aucune des quinze lectures de cette page ne regardait son erreur. Si `workouts`
+   * ne répond pas, `?? []` prend le relais et l'athlète voit zéro kilomètre, zéro
+   * séance, aucune VMA — l'écran d'un compte vide, alors que ses données sont
+   * intactes. C'est le pire message possible : il donne à croire qu'on les a perdues.
+   *
+   * ⚠️ ET `PGRST116` N'EST PAS UNE PANNE. Mesuré : `.single()` sur zéro ligne REND une
+   * erreur portant ce code — c'est le cas normal d'un athlète qui n'a pas encore de
+   * plan, de ligue ou de nuit enregistrée. Le confondre avec une panne afficherait un
+   * avertissement permanent à tout nouvel inscrit, et on n'y croirait plus le jour où
+   * il compte.
+   */
+  // Des identifiants STABLES, pas des libellés : cette page est rendue côté serveur et
+  // n'a pas de dictionnaire. C'est le composant client, qui connaît la langue, qui les
+  // traduit. La distinction panne / absence vit dans `lib/dashboard/lectures`, où elle
+  // est éprouvable — c'est là que le projet range ses calculs affichés.
+  const donneesIncompletes = lecturesEnEchec([
+    ["profil", profileRes], ["seances", workoutsRes],
+    ["charge", chargeRes], ["records", prRes],
+  ]);
+  if (donneesIncompletes.length) {
+    console.error("[tableau de bord] lectures en échec :", donneesIncompletes.join(", "));
+  }
+
   return (
     <>
     <BentoDashboard
+      donneesIncompletes={donneesIncompletes}
       profile={stripProfileSecrets(profileRes.data)}
       hrv={hrvRes.data ?? []}
       workouts={workoutsRes.data ?? []}

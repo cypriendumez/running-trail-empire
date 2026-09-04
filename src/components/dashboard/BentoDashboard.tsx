@@ -27,6 +27,7 @@ import { dansFenetre, ageJours } from "@/lib/dashboard/fenetre";
 import { computeForme } from "@/lib/dashboard/forme";
 import { computeDistancePRs } from "@/lib/dashboard/records";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { fill } from "@/lib/i18n/translations";
 import { ProfileCompletionBanner } from "@/components/dashboard/ProfileCompletionBanner";
 import { StreakCard } from "@/components/dashboard/StreakCard";
 import { TrialBanner } from "@/components/dashboard/TrialBanner";
@@ -64,6 +65,12 @@ interface Props {
   streak?: StreakResult | null;
   /** État d'abonnement, déduit du profil (lib/billing/access). */
   acces?: EtatAcces | null;
+  /**
+   * Les lectures qui ont RÉELLEMENT échoué (identifiants stables, traduits ici).
+   * Vide dans le cas normal — y compris pour un compte sans historique : une absence
+   * de données n'est pas une panne.
+   */
+  donneesIncompletes?: string[];
 }
 
 // Libellés courts des KPI de l'en-tête (multilingues).
@@ -144,7 +151,7 @@ const HR_ZONE_DEFS = [
 
 // La forme du jour est calculée à partir de données réelles : voir computeReadiness().
 
-export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkouts, chargeHistory, sleep, coachSession, pendingFeedback, objective, currentVma, loadRisk, newMembersWeek, streak, acces }: Props) {
+export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkouts, chargeHistory, sleep, coachSession, pendingFeedback, objective, currentVma, loadRisk, newMembersWeek, streak, acces, donneesIncompletes }: Props) {
   const { t, lang } = useT();
   const state = hrv[0]?.physiological_state ?? "optimal";
 
@@ -454,13 +461,35 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
     { label: kpi.vol, value: weeklyKm.toFixed(0), unit: "km" },
   ];
 
-  const noData = workouts.length === 0 && hrv.length === 0;
+  /**
+   * ⚠️ « TU N'AS RIEN » ET « ÇA N'A PAS CHARGÉ » NE SE DISENT PAS EN MÊME TEMPS.
+   *
+   * `noData` se déduisait de listes vides — or une lecture EN PANNE produit exactement
+   * les mêmes listes vides. L'athlète voyait alors « connecte ta montre » alors que ses
+   * séances existent et qu'il l'a déjà connectée. Quand une lecture a réellement
+   * échoué, c'est ce message-là qu'on affiche, et pas l'autre.
+   */
+  const enPanne = (donneesIncompletes ?? []).length > 0;
+  const noData = !enPanne && workouts.length === 0 && hrv.length === 0;
 
   return (
     <div className="min-h-full bg-gradient-to-b from-zinc-50 to-white">
       {/* Profil incomplet : les comptes antérieurs au questionnaire complet ne repassent
           jamais par l'inscription — on leur dit ce qui manque et ce que ça leur coûte. */}
       <ProfileCompletionBanner profile={profile as unknown as Record<string, unknown> | null} />
+
+      {/* ⚠️ Une lecture a échoué : on le DIT, plutôt que d'afficher des zéros qui
+          donneraient à croire que les données ont disparu. */}
+      {enPanne && (
+        <div className="mb-5 flex items-start gap-3 px-4 py-3 rounded-2xl bg-rose-50 border border-rose-200 text-sm">
+          <AlertTriangle className="h-5 w-5 flex-shrink-0 text-rose-500" />
+          <p className="text-rose-800">
+            {fill(t("dash.incomplet"), {
+              quoi: (donneesIncompletes ?? []).map((k) => t(`dash.inc.${k}`)).join(", "),
+            })}
+          </p>
+        </div>
+      )}
 
       {/* No data banner */}
       {noData && (

@@ -68,7 +68,18 @@ export async function POST(req: Request) {
     licensed: body.licensed === true,
   };
 
-  const { data: existing } = await sb.from("notifications").select("id").eq("user_id", user.id).eq("type", TYPE).maybeSingle();
+  /**
+   * ⚠️ CETTE LECTURE DÉCIDE ENTRE « METTRE À JOUR » ET « INSÉRER », et son erreur
+   * n'était pas lue. En échec, `existing` reste indéfini — lu comme « pas encore de
+   * PPS » — et on INSÈRE une seconde ligne. Or le PPS est relu par `maybeSingle()` à
+   * TROIS endroits (cette route, /dashboard/pps et /dashboard/races), et `maybeSingle`
+   * ÉCHOUE dès qu'il y a deux lignes : le pass ne serait pas seulement faux, il
+   * deviendrait illisible partout — y compris sur la page qui doit dire s'il sera
+   * valide LE JOUR de la course. Sans autre issue qu'une intervention en base.
+   */
+  const { data: existing, error: eLecture } = await sb.from("notifications")
+    .select("id").eq("user_id", user.id).eq("type", TYPE).maybeSingle();
+  if (eLecture) return NextResponse.json({ error: "Pass santé illisible pour le moment" }, { status: 500 });
   const row = { user_id: user.id, type: TYPE, title: "PPS", body: "", data: status, read: true };
   const { error } = existing?.id
     ? await sb.from("notifications").update({ data: status }).eq("id", existing.id)
