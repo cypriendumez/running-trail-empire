@@ -2503,7 +2503,15 @@ test("le préchauffage du survol ne se voit JAMAIS", () => {
   assert.ok(/\{prechauffe && \(/.test(code), "un voile doit couvrir le préchauffage");
   const voile = code.slice(code.indexOf("{prechauffe && ("), code.indexOf("{prechauffe && (") + 500);
   assert.ok(/bg-zinc-900\/9\d/.test(voile), "le voile doit être opaque, pas translucide");
-  assert.ok(/Préparation du survol/.test(voile), "un état de préparation doit être ANNONCÉ");
+  // ⚠️ ON VISE LA CLÉ, PLUS LA PHRASE. Le texte a été traduit en cinq langues le
+  // 04/09/2026 : ancrer sur « Préparation du survol » faisait rougir ce test au moment
+  // même où l'on corrigeait le défaut qu'il ne surveillait pas (un athlète allemand
+  // lisait du français). On vérifie donc qu'un message EST annoncé, et qu'il vient du
+  // dictionnaire — ce qui garde l'intention sans figer la langue.
+  assert.ok(/\{t\("survol\.prep"\)\}/.test(voile), "un état de préparation doit être ANNONCÉ");
+  const i18n = readFileSync("src/lib/i18n/translations.ts", "utf8");
+  assert.equal([...i18n.matchAll(/"survol\.prep"\s*:/g)].length, 5,
+    "le message de préparation n'existe pas dans les cinq langues");
 });
 
 test("le survol est piloté par une HORLOGE, pas par un enchaînement d'événements", () => {
