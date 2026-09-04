@@ -21,7 +21,7 @@ const J: Record<string, Record<string, string>> = {
     "title": "Smart Journal", "subtitle": "Analyse NLP de votre état mental · Détection de fatigue psychologique",
     "write": "Écrire", "history": "Historique",
     "placeholder": "Comment s'est passée votre séance ? Comment vous sentez-vous mentalement et physiquement ? Parlez librement…",
-    "stop": "Arrêter", "voice": "Vocal", "chars": "{n} caractères", "analyzeFailed": "L'analyse n'a pas abouti — réessaie dans un instant.",
+    "stop": "Arrêter", "voice": "Vocal", "chars": "{n} caractères", "analyzeFailed": "L'analyse n'a pas abouti — réessaie dans un instant.", "saveFailed": "Ton entrée n'a pas pu être enregistrée — elle est toujours là, réessaie.",
  "analyzing": "Analyse en cours…", "analyze": "Analyser",
     "nlp": "Analyse NLP", "sent.positive": "Positif", "sent.neutral": "Neutre", "sent.negative": "Négatif",
     "score.fatigue": "Fatigue mentale", "score.motivation": "Motivation", "score.stress": "Stress",
@@ -33,7 +33,7 @@ const J: Record<string, Record<string, string>> = {
     "title": "Smart Journal", "subtitle": "NLP analysis of your mental state · Psychological fatigue detection",
     "write": "Write", "history": "History",
     "placeholder": "How did your session go? How do you feel mentally and physically? Speak freely…",
-    "stop": "Stop", "voice": "Voice", "chars": "{n} characters", "analyzeFailed": "The analysis did not complete — try again in a moment.",
+    "stop": "Stop", "voice": "Voice", "chars": "{n} characters", "analyzeFailed": "The analysis did not complete — try again in a moment.", "saveFailed": "Your entry could not be saved — it is still here, try again.",
  "analyzing": "Analyzing…", "analyze": "Analyze",
     "nlp": "NLP analysis", "sent.positive": "Positive", "sent.neutral": "Neutral", "sent.negative": "Negative",
     "score.fatigue": "Mental fatigue", "score.motivation": "Motivation", "score.stress": "Stress",
@@ -45,7 +45,7 @@ const J: Record<string, Record<string, string>> = {
     "title": "Smart Journal", "subtitle": "NLP-Analyse deines mentalen Zustands · Erkennung psychischer Ermüdung",
     "write": "Schreiben", "history": "Verlauf",
     "placeholder": "Wie war dein Training? Wie fühlst du dich mental und körperlich? Sprich frei…",
-    "stop": "Stopp", "voice": "Sprache", "chars": "{n} Zeichen", "analyzeFailed": "Die Analyse ist nicht durchgelaufen — versuch es gleich nochmal.",
+    "stop": "Stopp", "voice": "Sprache", "chars": "{n} Zeichen", "analyzeFailed": "Die Analyse ist nicht durchgelaufen — versuch es gleich nochmal.", "saveFailed": "Dein Eintrag konnte nicht gespeichert werden — er ist noch da, versuch es nochmal.",
  "analyzing": "Analyse läuft…", "analyze": "Analysieren",
     "nlp": "NLP-Analyse", "sent.positive": "Positiv", "sent.neutral": "Neutral", "sent.negative": "Negativ",
     "score.fatigue": "Mentale Ermüdung", "score.motivation": "Motivation", "score.stress": "Stress",
@@ -57,7 +57,7 @@ const J: Record<string, Record<string, string>> = {
     "title": "Smart Journal", "subtitle": "Análisis NLP de tu estado mental · Detección de fatiga psicológica",
     "write": "Escribir", "history": "Historial",
     "placeholder": "¿Cómo fue tu sesión? ¿Cómo te sientes mental y físicamente? Habla con libertad…",
-    "stop": "Detener", "voice": "Voz", "chars": "{n} caracteres", "analyzeFailed": "El análisis no se completó — inténtalo de nuevo en un momento.",
+    "stop": "Detener", "voice": "Voz", "chars": "{n} caracteres", "analyzeFailed": "El análisis no se completó — inténtalo de nuevo en un momento.", "saveFailed": "Tu entrada no se pudo guardar — sigue aquí, inténtalo de nuevo.",
  "analyzing": "Analizando…", "analyze": "Analizar",
     "nlp": "Análisis NLP", "sent.positive": "Positivo", "sent.neutral": "Neutral", "sent.negative": "Negativo",
     "score.fatigue": "Fatiga mental", "score.motivation": "Motivación", "score.stress": "Estrés",
@@ -69,7 +69,7 @@ const J: Record<string, Record<string, string>> = {
     "title": "Smart Journal", "subtitle": "Análise NLP do teu estado mental · Deteção de fadiga psicológica",
     "write": "Escrever", "history": "Histórico",
     "placeholder": "Como correu o teu treino? Como te sentes mental e fisicamente? Fala à vontade…",
-    "stop": "Parar", "voice": "Voz", "chars": "{n} caracteres", "analyzeFailed": "A análise não foi concluída — tenta novamente daqui a pouco.",
+    "stop": "Parar", "voice": "Voz", "chars": "{n} caracteres", "analyzeFailed": "A análise não foi concluída — tenta novamente daqui a pouco.", "saveFailed": "A tua entrada não pôde ser guardada — continua aqui, tenta novamente.",
  "analyzing": "A analisar…", "analyze": "Analisar",
     "nlp": "Análise NLP", "sent.positive": "Positivo", "sent.neutral": "Neutro", "sent.negative": "Negativo",
     "score.fatigue": "Fadiga mental", "score.motivation": "Motivação", "score.stress": "Stress",
@@ -167,7 +167,12 @@ export function SmartJournal() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    await supabase.from("journal_entries").insert({
+    // ⚠️ ON NE VIDE LE CHAMP QUE SI L'ÉCRITURE A RÉUSSI. L'échec de cet `insert` n'était
+    // pas lu : le composant affichait « Sauvegardé ✓ » et effaçait le texte quoi qu'il
+    // arrive. Une coupure réseau, un refus de la base, et l'athlète perdait ce qu'il
+    // venait d'écrire — en lisant une confirmation. Perdre des données est grave ;
+    // affirmer qu'on les a gardées l'est davantage, parce que personne ne les réécrit.
+    const { error } = await supabase.from("journal_entries").insert({
       user_id: user.id,
       raw_text: text,
       mental_fatigue: analysis.mental_fatigue ?? 5,
@@ -177,6 +182,7 @@ export function SmartJournal() {
       keywords: analysis.keywords ?? [],
       ai_insights: analysis.ai_insights ?? "",
     });
+    if (error) { toast.error(tr("saveFailed")); return; }
 
     setSaved(true);
     setText("");

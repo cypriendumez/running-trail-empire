@@ -478,9 +478,28 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
       preferred_language: form.preferred_language,
       guardian_mode_enabled: form.guardian_mode_enabled,
     }).eq("id", userId);
-    // Colonnes optionnelles (bio + préférences de notif) — best-effort : prises en compte
-    // une fois ajoutées en base (voir SQL). Une erreur ici n'empêche pas la sauvegarde du reste.
-    await supabase.from("profiles").update({
+    /**
+     * ⚠️ CES ÉCRITURES ÉTAIENT MUETTES, ET LA RAISON N'EXISTE PLUS.
+     *
+     * Elles portaient « best-effort : prises en compte une fois ajoutées en base » —
+     * les colonnes étaient alors absentes, et un échec attendu ne devait pas emporter
+     * le reste. Les DIX-NEUF colonnes concernées ont été VÉRIFIÉES en base le
+     * 04/09/2026 : elles existent toutes. La migration est passée, la justification est
+     * caduque, et le silence qu'elle couvrait ne couvre plus qu'un défaut.
+     *
+     * Ce que perdait un échec, sans que rien ne le dise : la bio, les DÉCLARATIONS DE
+     * SANTÉ, les disponibilités d'entraînement et les PRÉFÉRENCES DE NOTIFICATION.
+     * Cette dernière est la plus fâcheuse : un athlète qui coupe ses e-mails, lit
+     * « Enregistré » et continue d'en recevoir n'a aucune raison de réessayer — il se
+     * désabonne, ou il signale l'expéditeur.
+     *
+     * On garde les écritures SÉPARÉES — c'est ce qui empêche une colonne fautive
+     * d'emporter tout le profil — mais chaque échec est désormais compté et dit.
+     */
+    const echecs: string[] = [];
+    const noter = (e: { message: string } | null, quoi: string) => { if (e) echecs.push(`${quoi}: ${e.message}`); };
+
+    const { error: eOpt } = await supabase.from("profiles").update({
       bio: form.bio,
       warmup_min: form.warmup_min,
       cooldown_min: form.cooldown_min,
@@ -496,26 +515,41 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
       notif_league: form.notif_league,
       notif_coach: form.notif_coach,
     }).eq("id", userId);
+    noter(eOpt, "bio, santé et notifications");
     // Confidentialité — écriture ISOLÉE : `is_private` vient de la migration 021, qui
     // peut être en retard sur le code déployé. PostgREST rejette TOUT l'update pour une
     // seule colonne inconnue (42703) : groupée, elle emporterait la sauvegarde entière
     // du profil, et en silence. Même piège que les terrains et les disponibilités.
-    await supabase.from("profiles").update({ is_private: form.is_private }).eq("id", userId);
+    // ⚠️ LA PLUS SENSIBLE DES SEPT. Un athlète qui passe son profil en privé, lit
+    // « Enregistré » et reste visible de tous n'a aucune raison de revenir vérifier.
+    const { error: ePriv } = await supabase.from("profiles")
+      .update({ is_private: form.is_private }).eq("id", userId);
+    noter(ePriv, "confidentialité du profil");
     // Écriture ISOLÉE aussi : `double_sessions` vient de la migration 026.
-    await supabase.from("profiles").update({ double_sessions: form.double_sessions }).eq("id", userId);
+    const { error: eDouble } = await supabase.from("profiles")
+      .update({ double_sessions: form.double_sessions }).eq("id", userId);
+    noter(eDouble, "double_sessions");
+
     // Disponibilités — écriture ISOLÉE (colonnes de la migration 011, cf. terrains).
-    await supabase.from("profiles").update({
+    const { error: eDispo } = await supabase.from("profiles").update({
       days_per_week: form.days_per_week,
       available_days: form.available_days,
     }).eq("id", userId);
+    noter(eDispo, "disponibilités");
 
-    // Terrains multiples — écriture ISOLÉE : si `main_terrains` n'existe pas encore en base,
-    // seule cette ligne échoue au lieu d'emporter toute la sauvegarde du profil.
-    await supabase.from("profiles").update({ main_terrains: form.main_terrains }).eq("id", userId);
-    await supabase.from("profiles").update({ main_terrain: form.main_terrains[0] ?? null }).eq("id", userId);
+    // Terrains multiples — écriture ISOLÉE : une colonne fautive n'emporte pas le reste.
+    const { error: eTer } = await supabase.from("profiles")
+      .update({ main_terrains: form.main_terrains }).eq("id", userId);
+    noter(eTer, "terrains");
+    const { error: eTer1 } = await supabase.from("profiles")
+      .update({ main_terrain: form.main_terrains[0] ?? null }).eq("id", userId);
+    noter(eTer1, "terrain principal");
+
     setSaving(false);
-    if (error) toast.error(tr("t.saveErr"));
-    else toast.success(tr("t.saveOk"));
+    if (error || echecs.length) {
+      if (echecs.length) console.error("[profil] champs non enregistrés :", echecs);
+      toast.error(tr("t.saveErr"));
+    } else toast.success(tr("t.saveOk"));
   }
 
   async function uploadAvatar(file: File) {

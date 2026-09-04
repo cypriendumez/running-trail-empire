@@ -35,7 +35,30 @@ export async function POST(req: Request) {
         metadata: { supabase_user_id: user.id },
       });
       customerId = customer.id;
-      await supabase.from("profiles").update({ stripe_customer_id: customerId }).eq("id", user.id);
+      const { error } = await supabase.from("profiles")
+        .update({ stripe_customer_id: customerId }).eq("id", user.id);
+      if (error) {
+        /**
+         * ⚠️ ON REFUSE DE FAIRE PAYER PLUTÔT QUE DE PAYER POUR RIEN.
+         *
+         * Cette écriture était lancée sans jamais lire son échec. Le premier paiement
+         * s'en serait sorti — la session de paiement pose `supabase_user_id` dans les
+         * métadonnées de l'abonnement, et le webhook les lit en premier. Mais TOUT CE
+         * QUI SUIT dépend de ce lien : un changement de formule depuis le portail
+         * client, une reprise après échec de carte, une modification faite dans le
+         * tableau de bord Stripe n'emportent AUCUNE métadonnée. Le webhook retombe
+         * alors sur `stripe_customer_id` — absent — et journalise « abonnement sans
+         * athlète identifiable » : l'athlète paie une formule qui ne s'applique plus.
+         *
+         * Échouer AVANT le paiement coûte un client Stripe orphelin, sans le moindre
+         * débit. Échouer après coûte un client qui paie sans rien recevoir.
+         */
+        console.error("[stripe] lien client non enregistré, paiement refusé :", error.message);
+        return NextResponse.json(
+          { error: "Impossible de préparer le paiement pour le moment. Réessaie dans un instant." },
+          { status: 500 },
+        );
+      }
     }
 
     const joursEssai = joursEssaiStripe(profile);

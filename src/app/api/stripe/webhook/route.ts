@@ -28,6 +28,26 @@ export async function POST(req: Request) {
 
   const admin = createAdminClient();
 
+  /**
+   * LES ÉCRITURES QUI DONNENT OU RETIRENT L'ACCÈS, ET LEURS ÉCHECS.
+   *
+   * ⚠️ CETTE ROUTE RÉPONDAIT 200 QUOI QU'IL ARRIVE. Un `update` de `profiles` refusé —
+   * base indisponible, contrainte, coupure réseau — passait inaperçu : aucune erreur
+   * n'était lue, Stripe recevait un accusé de réception, marquait l'événement livré et
+   * NE LE RÉÉMETTAIT JAMAIS. Le client était débité et restait en `free`, définitivement,
+   * sans trace nulle part. Le pire défaut possible sur un produit qu'on vend.
+   *
+   * On collecte donc les échecs et on répond 500 : Stripe réessaie alors pendant
+   * plusieurs jours, en espaçant. C'est sans danger, VÉRIFIÉ et non supposé :
+   *  · les écritures d'abonnement sont idempotentes (on repose les mêmes valeurs) ;
+   *  · la comptabilité refuse les doublons sur `data->>stripeId` (`enregistrer.ts`) ;
+   *  · l'e-mail à l'éditeur n'part que si une écriture a RÉELLEMENT été créée.
+   *
+   * La comptabilité, elle, ne fait toujours pas échouer le webhook : l'accès de
+   * l'athlète et la tenue du journal restent deux sujets distincts.
+   */
+  const echecs: string[] = [];
+
   // ── COMPTABILITÉ ───────────────────────────────────────────────────────────
   // ⚠️ AVANT le `switch`, et hors de lui. Le `switch` ne traite que le cycle de vie de
   // l'abonnement ; l'ARGENT arrive par d'autres événements (`invoice.paid`,
@@ -66,10 +86,15 @@ export async function POST(req: Request) {
    * intégralement à la notification suivante.
    */
   const memoriserEtat = async (userId: string, etat: EtatAbonnement): Promise<void> => {
-    const { data: existant } = await admin.from("notifications").select("id")
+    const { data: existant, error: eLecture } = await admin.from("notifications").select("id")
       .eq("user_id", userId).eq("type", TYPE_ETAT_ABO).maybeSingle();
-    if (existant?.id) await admin.from("notifications").update({ data: etat }).eq("id", existant.id);
-    else await admin.from("notifications").insert({ user_id: userId, type: TYPE_ETAT_ABO, title: "abonnement", body: "", data: etat });
+    if (eLecture) { echecs.push(`état d'abonnement (lecture) : ${eLecture.message}`); return; }
+    const { error } = existant?.id
+      ? await admin.from("notifications").update({ data: etat }).eq("id", existant.id)
+      : await admin.from("notifications").insert({ user_id: userId, type: TYPE_ETAT_ABO, title: "abonnement", body: "", data: etat });
+    // Sans cet état, l'écran ne peut dire ni « résiliation en cours » ni « carte
+    // refusée » : l'athlète perdrait son accès sans avoir jamais su pourquoi.
+    if (error) echecs.push(`état d'abonnement : ${error.message}`);
   };
 
   /** La fin de période, en AAAA-MM-JJ. Stripe la donne en secondes UNIX. */
@@ -88,12 +113,14 @@ export async function POST(req: Request) {
       // quelqu'un qui avait payé Essentiel : l'écart de 5 € entre les deux formules ne
       // voulait plus rien dire, et le verrou d'accès n'avait rien à verrouiller.
       const priceId = sub.items?.data?.[0]?.price?.id ?? null;
-      await admin.from("profiles").update({
+      const { error: eAcces } = await admin.from("profiles").update({
         // `trialing` donne droit à la formule : ne retenir que `active` coupait l'accès
         // pendant la période d'essai, au moment où l'athlète découvre justement le produit.
         subscription_tier: ["active", "trialing"].includes(sub.status) ? accesDuPrice(priceId) : "free",
         stripe_subscription_id: sub.id,
       }).eq("id", userId);
+      // L'écriture qui DONNE l'accès payé : son échec doit faire réessayer Stripe.
+      if (eAcces) echecs.push(`accès de ${userId} : ${eAcces.message}`);
       // ⚠️ `cancel_at_period_end` est le SEUL moyen de savoir qu'une résiliation est en
       // cours : le statut reste `active` jusqu'au dernier jour. Sans ce drapeau, l'écran
       // afficherait « prochain prélèvement le 24/09 » à quelqu'un qui vient de résilier.
@@ -111,10 +138,12 @@ export async function POST(req: Request) {
       const sub = event.data.object as Stripe.Subscription;
       const userId = await findUser(sub);
       if (!userId) { console.error("[stripe] résiliation sans athlète identifiable", sub.id); break; }
-      await admin.from("profiles").update({
+      const { error: eFin } = await admin.from("profiles").update({
         subscription_tier: "free",
         stripe_subscription_id: null,
       }).eq("id", userId);
+      // Son échec laisse un accès payant à quelqu'un qui ne paie plus.
+      if (eFin) echecs.push(`fin d'accès de ${userId} : ${eFin.message}`);
       await memoriserEtat(userId, { statut: "canceled", periodeFin: null, annuleALaFin: false, echecPaiement: false });
       break;
     }
@@ -150,6 +179,12 @@ export async function POST(req: Request) {
     }
   }
 
+  if (echecs.length) {
+    // Le détail va au journal du serveur, pas à Stripe : la réponse d'un webhook n'est
+    // pas un endroit où raconter l'état de sa base.
+    console.error("[stripe] écritures d'accès en échec, on demande une réémission :", echecs);
+    return NextResponse.json({ error: "écriture impossible" }, { status: 500 });
+  }
   return NextResponse.json({ received: true });
 }
 
