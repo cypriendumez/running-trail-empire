@@ -1686,11 +1686,17 @@ function computeRecords(workouts: Workout[]): { longest: number; maxElev: number
 // Résumé de la semaine en cours (7 derniers jours).
 function computeWeekSummary(workouts: Workout[]): { sessions: number; km: number; elev: number; sec: number } {
   const wk = workouts.filter(w => isRun(w.sport) && dansFenetre(w.date, 7));
+  // ⚠️ `?? 0` NE RATTRAPE PAS `NaN`. Il ne voit que `null` et `undefined` : une seule
+  // valeur non numérique dans la colonne, et la somme entière devient NaN — le total
+  // hebdomadaire s'affiche alors « NaN km » et la durée « NaN:NaN », sur la première
+  // carte que voit l'athlète. La base est saine aujourd'hui (vérifié), mais le coût
+  // d'une garde est nul et celui de l'affichage ne l'est pas.
+  const nombre = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
   return {
     sessions: wk.length,
-    km: wk.reduce((s, w) => s + (w.distance_km ?? 0), 0),
-    elev: wk.reduce((s, w) => s + (w.elevation_gain_m ?? 0), 0),
-    sec: wk.reduce((s, w) => s + (w.duration_seconds ?? 0), 0),
+    km: wk.reduce((s, w) => s + nombre(w.distance_km), 0),
+    elev: wk.reduce((s, w) => s + nombre(w.elevation_gain_m), 0),
+    sec: wk.reduce((s, w) => s + nombre(w.duration_seconds), 0),
   };
 }
 

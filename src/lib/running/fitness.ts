@@ -72,7 +72,7 @@ export function pctVmaForDistance(km: number, longRunKm?: number | null): number
 
 // VMA depuis un test de 6 min (demi-Cooper) : distance(m) parcourue / 100.
 export const vmaFrom6min = (meters: number): number | null =>
-  meters > 0 ? Math.round((meters / 100) * 10) / 10 : null;
+  Number.isFinite(meters) && meters > 0 ? Math.round((meters / 100) * 10) / 10 : null;
 
 /**
  * PART DE LA PÉNALITÉ DE CHALEUR RETENUE POUR RELIRE UNE PERFORMANCE.
@@ -173,7 +173,10 @@ export function easyPaceFromHeartRate(
 // VO2max (ml/kg/min) à partir de plusieurs sources, comme Garmin combine les données.
 //  • VMA × 3.5 (Léger)  • 15.3 × FCmax/FCrepos (Uth-Sørensen)
 // VMA (km/h) déduite d'une VO2max (formule de Léger : VO2max ≈ 3,5 × VMA).
-export const vmaFromVo2max = (vo2max: number): number => Math.round((vo2max / 3.5) * 10) / 10;
+// Une VO2max absente ou aberrante ne donne PAS de VMA : 0 est lu comme « pas de
+// valeur » par les appelants, là où NaN se propageait jusqu'à l'écran.
+export const vmaFromVo2max = (vo2max: number): number =>
+  Number.isFinite(vo2max) && vo2max > 0 ? Math.round((vo2max / 3.5) * 10) / 10 : 0;
 
 export function vo2maxEstimate(opts: { vma?: number | null; maxHr?: number | null; restHr?: number | null; garmin?: number | null }): { value: number; sources: string[] } | null {
   // Mesure Garmin (montre) = source de vérité → on la prend telle quelle, sans moyenner avec l'estimation.
@@ -190,15 +193,32 @@ export const vo2maxLabel = (v: number): string =>
 
 // Temps prédit (secondes) sur une distance, depuis la VMA.
 export function predictRaceSec(vma: number, distanceKm: number, longRunKm?: number | null): number {
+  // Sans VMA exploitable il n'y a pas de prédiction : 0 se lit comme « pas de valeur »
+  // par les appelants, là où `Infinity` se lisait « InfinityhNaN » à l'écran.
+  if (!Number.isFinite(vma) || vma <= 0 || !Number.isFinite(distanceKm) || distanceKm <= 0) return 0;
   const speed = vma * pctVmaForDistance(distanceKm, longRunKm); // km/h
   return (distanceKm / speed) * 3600;
 }
 
+/**
+ * ⚠️ LE DERNIER REMPART AVANT L'ÉCRAN. Ces deux formateurs rendaient « NaN:NaN » et
+ * « NaN'NaN/km » — et `racePredictions(null)` allait jusqu'à « InfinityhNaN ». Les
+ * quatre appelants actuels gardent tous leur entrée (`vma > 0`), donc rien de tel n'est
+ * affiché aujourd'hui : c'est une fragilité, pas un défaut vivant. Mais le jour où un
+ * cinquième appelant oublie la garde, mieux vaut un tiret honnête qu'un charabia qui
+ * ressemble à une panne du produit.
+ *
+ * ⚠️ ET `?? 0` NE RATTRAPE PAS `NaN` : seul `Number.isFinite` le voit.
+ */
+export const NON_CHIFFRE = "—";
+
 export const fmtTime = (sec: number): string => {
+  if (!Number.isFinite(sec)) return NON_CHIFFRE;
   const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = Math.round(sec % 60);
   return h ? `${h}h${String(m).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
 };
 export const fmtPaceSec = (secPerKm: number): string =>
+  !Number.isFinite(secPerKm) ? NON_CHIFFRE :
   `${Math.floor(secPerKm / 60)}'${String(Math.round(secPerKm % 60)).padStart(2, "0")}`;
 
 // Prédictions complètes par distance depuis la VMA.
