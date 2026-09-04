@@ -24,7 +24,8 @@
     "sauvegarde": "npx --yes tsx scripts/sauvegarde.ts",
     "restaurer": "npx --yes tsx scripts/restaurer.ts",
     "prebuild": "npx --yes tsx scripts/version.ts",
-    "enligne": "npx --yes tsx scripts/enligne.ts"
+    "enligne": "npx --yes tsx scripts/enligne.ts",
+    "deploie": "find .next -name '* [0-9].*' -delete; npm run verify && npm run build && npx --yes vercel@54.14.0 deploy --prod --yes"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
