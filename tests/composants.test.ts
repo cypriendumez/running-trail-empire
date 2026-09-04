@@ -120,5 +120,23 @@ test("aucune page « use client » n'exporte metadata", () => {
     `ces fichiers « use client » exportent metadata — le build échouera :\n    ${coupables.join("\n    ")}`);
 });
 
+test("un corps vide n'efface pas le pass santé", () => {
+  // ⚠️ CONSTATÉ EN SONDANT LES POINTS D'ENTRÉE le 03/09/2026 : `POST /api/pps {}`
+  // répondait 200 et remettait le pass à zéro. Le formulaire qui VIDE le pass envoie
+  // bien les champs, à `null` — c'est une intention. Une requête sans aucun champ
+  // reconnu n'exprime rien, et l'écraser revenait à effacer le pass d'un athlète sur
+  // une requête malformée, sans trace.
+  const src = readFileSync("src/app/api/pps/route.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  assert.ok(/CHAMPS\.some\(\(c\) => c in \(body as Record<string, unknown>\)\)/.test(src),
+    "un corps sans aucun champ reconnu est de nouveau accepté");
+  const i = src.indexOf("CHAMPS.some(");
+  assert.ok(/status: 400/.test(src.slice(i, i + 400)), "un corps vide n'est pas refusé");
+  // La vérification doit précéder l'écriture, sinon elle ne protège rien.
+  assert.ok(i < src.indexOf(".update("), "le pass est écrit avant d'être validé");
+  assert.ok(i < src.indexOf(".insert("), "le pass est créé avant d'être validé");
+});
+
 console.log(`\n${passed} test(s) de composants passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log(`  KO ${f}`); process.exit(1); }

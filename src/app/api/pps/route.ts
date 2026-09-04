@@ -31,6 +31,21 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: "non authentifié" }, { status: 401 });
 
   const body = (await req.json().catch(() => ({}))) as Partial<PpsStatus>;
+
+  // ⚠️ UN CORPS VIDE N'EST PAS UN EFFACEMENT. Le formulaire qui vide le pass envoie
+  // bien les champs, à `null` — c'est une intention. Une requête sans AUCUN champ
+  // reconnu, elle, n'exprime rien : la traiter comme un effacement revenait à écraser
+  // le pass d'un athlète sur une requête malformée, sans qu'il l'ait demandé et sans
+  // aucune trace. Constaté en sondant les points d'entrée le 03/09/2026 : `POST {}`
+  // répondait 200 et remettait tout à zéro.
+  const CHAMPS = ["expiresAt", "obtainedAt", "number", "licensed"] as const;
+  if (!CHAMPS.some((c) => c in (body as Record<string, unknown>))) {
+    return NextResponse.json(
+      { error: "Aucun champ fourni. Pour effacer le pass, envoie les champs à null." },
+      { status: 400 },
+    );
+  }
+
   // Une date malformée est REFUSÉE, pas rattrapée : un « 2026-13-45 » silencieusement
   // corrigé produirait une échéance fausse, et c'est exactement ce qu'on cherche à
   // éviter — l'athlète croirait son pass valide le jour de sa course.
