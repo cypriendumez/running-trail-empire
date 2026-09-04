@@ -222,6 +222,28 @@ test("la synchronisation signale une VFC ou un sommeil non enregistrés", () => 
     "l'écriture du sommeil ne signale plus son échec");
 });
 
+test("un objectif de course non écrit ne se déclare pas enregistré", () => {
+  // ⚠️ LE PIRE N'EST PAS LA PERTE, C'EST LE DOUBLON. L'erreur de lecture n'étant pas
+  // lue, `existing` restait indéfini — lu comme « pas encore d'objectif » — et on
+  // insérait une SECONDE ligne `race_objective`. Tout le reste de l'application lit cet
+  // objectif par `maybeSingle()`, qui échoue dès qu'il y a deux lignes : l'objectif
+  // devenait définitivement illisible, sans autre issue qu'une intervention en base.
+  const src = codeNu("src/lib/coach/objective.ts");
+  assert.ok(/const\s*\{\s*data:\s*existing,\s*error:\s*eLecture\s*\}/.test(src),
+    "la lecture de l'objectif ne rend plus son erreur");
+  const iLecture = src.search(/if\s*\(\s*eLecture\s*\)\s*throw/);
+  const iInsert = src.indexOf('type: "race_objective"');
+  assert.ok(iLecture > 0 && iInsert > iLecture,
+    "l'insertion peut encore se produire sans que la lecture ait été validée : doublon garanti");
+  assert.ok(/if\s*\(\s*eEcriture\s*\)\s*throw/.test(src),
+    "l'écriture de l'objectif ne signale plus son échec");
+
+  // Et la route doit TRADUIRE cette levée, pas la laisser filer en 500 opaque.
+  const route = codeNu("src/app/api/objective/route.ts");
+  assert.ok(/catch[\s\S]{0,200}status:\s*500/.test(route),
+    "la route ne rattrape plus l'échec d'enregistrement de l'objectif");
+});
+
 Promise.all(enAttente).then(() => {
   console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
   if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }

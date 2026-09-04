@@ -43,7 +43,16 @@ export async function POST(req: Request) {
 
   const admin = createAdminClient();
   // Écriture de l'objectif + re-synchronisation des séances (centralisé).
-  const data = await setRaceObjective(admin, user.id, { race, distanceKm, raceDate, targetSeconds, heureDepart });
+  // ⚠️ `setRaceObjective` LÈVE désormais quand l'objectif n'a pas pu être écrit. Sans ce
+  // contrôle, la route répondait l'objectif comme s'il était enregistré, l'écran
+  // l'affichait, et il avait disparu au rechargement suivant.
+  let data;
+  try {
+    data = await setRaceObjective(admin, user.id, { race, distanceKm, raceDate, targetSeconds, heureDepart });
+  } catch (e) {
+    console.error("[objectif]", (e as Error).message);
+    return NextResponse.json({ error: "Objectif non enregistré. Réessaie dans un instant." }, { status: 500 });
+  }
 
   // Alerte e-mail au coach (best-effort) — même pattern que /api/feedback.
   const RESEND_API_KEY = process.env.RESEND_API_KEY;

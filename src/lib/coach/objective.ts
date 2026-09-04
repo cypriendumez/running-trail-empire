@@ -47,11 +47,29 @@ export async function setRaceObjective(admin: SupabaseClient, userId: string, in
     ts: new Date().toISOString(),
   };
 
-  const { data: existing } = await admin.from("notifications")
+  /**
+   * ⚠️ L'ÉCHEC DE CETTE LECTURE EST PIRE QUE LA PERTE DE L'OBJECTIF.
+   *
+   * Son erreur n'était pas lue. En échec, `existing` reste indéfini — ce que la suite
+   * interprétait comme « cet athlète n'a pas encore d'objectif » — et on INSÉRAIT une
+   * seconde ligne `race_objective`. Or tout le reste de l'application lit cet objectif
+   * par `maybeSingle()`, qui ÉCHOUE dès qu'il y a deux lignes : l'objectif ne devenait
+   * pas seulement faux, il devenait définitivement illisible, et le seul moyen d'en
+   * sortir aurait été une intervention en base.
+   */
+  const { data: existing, error: eLecture } = await admin.from("notifications")
     .select("id").eq("user_id", userId).eq("type", "race_objective").maybeSingle();
+  if (eLecture) throw new Error(`objectif illisible : ${eLecture.message}`);
+
   const row = { title: "Objectif de course", body: `${data.race} · ${data.targetTime}`, read: true, data };
-  if (existing?.id) await admin.from("notifications").update(row).eq("id", existing.id);
-  else await admin.from("notifications").insert({ user_id: userId, type: "race_objective", ...row });
+  // Et l'écriture elle-même : sans ce contrôle, la fonction rendait l'objectif à
+  // l'appelant, qui l'affichait comme enregistré, alors que rien n'avait été écrit.
+  // C'est exactement la plainte « le coach ignore ma course » — sauf qu'ici elle
+  // aurait été fondée.
+  const { error: eEcriture } = existing?.id
+    ? await admin.from("notifications").update(row).eq("id", existing.id)
+    : await admin.from("notifications").insert({ user_id: userId, type: "race_objective", ...row });
+  if (eEcriture) throw new Error(`objectif non enregistré : ${eEcriture.message}`);
 
   try {
     const today = new Date().toISOString().slice(0, 10);
