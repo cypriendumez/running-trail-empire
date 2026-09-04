@@ -10,10 +10,12 @@
 #  Le décalage d'une heure entre saisons est assumé : sur un e-mail hebdomadaire il ne
 #  change rien, et une bascule automatique demanderait deux planifications concurrentes.
 #
-#  UNE LIMITE DE GITHUB, à connaître : une planification peut être retardée de plusieurs
-#  minutes aux heures de pointe, et le lundi matin en est une. La garantie est « lundi
-#  matin », pas « 8 h 30 pile ». Et un dépôt sans activité pendant 60 jours voit ses
-#  planifications désactivées.
+#  UNE LIMITE DE GITHUB, MESURÉE et pas seulement redoutée : le lundi 31/08/2026, la
+#  planification de 6 h 30 UTC a réellement tiré à 14 h 18 UTC — SEPT HEURES ET DEMIE
+#  de retard (le 24/08 : 7 h 38, une heure). La garantie n'est donc pas « lundi matin »
+#  mais « lundi, un jour ». Conséquence directe traitée plus bas : passé 23 h 59 UTC la
+#  route refuse de s'exécuter, et elle refuse en répondant 200.
+#  Et un dépôt sans activité pendant 60 jours voit ses planifications désactivées.
 #
 #  CE QUE FAIT LA ROUTE APPELÉE :
 #   • elle n'envoie qu'aux abonnés `unsubscribed = false`, jamais aux simples comptes ;
@@ -113,4 +115,18 @@ jobs:
           if [ "${code}" != "200" ]; then
             echo "::error::L'envoi du plan de la semaine a échoué trois fois (dernier code ${code})."
             exit 1
+          fi
+          # ⚠️ UN 200 NE PROUVE PAS QU'ON A ENVOYÉ QUELQUE CHOSE.
+          #    La route refuse de tourner si, à l'instant où elle est appelée, l'UTC
+          #    n'est plus lundi — et elle refuse poliment, par `{"skipped":"..."} ` en
+          #    HTTP 200. Or GitHub a déjà décalé cette planification de sept heures et
+          #    demie (31/08/2026). Un décalage de plus de 17 h 30 la ferait basculer au
+          #    mardi : zéro courriel parti, workflow AU VERT, et personne pour s'en
+          #    apercevoir avant que les athlètes ne se plaignent. On le rend bruyant.
+          if printf '%s' "${corps}" | grep -q '"skipped"'; then
+            if [ "${{ github.event_name }}" = "schedule" ]; then
+              echo "::error::Le plan de la semaine n'a été envoyé à PERSONNE : la route a refusé (${corps})."
+              exit 1
+            fi
+            echo "::warning::Route ignorée (normal hors lundi lors d'un lancement manuel) : ${corps}"
           fi
