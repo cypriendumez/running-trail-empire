@@ -39,7 +39,7 @@ export function SegmentList({ segments }: { segments: SegmentVue[] }) {
   if (!segments.length) {
     return (
       <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-12 text-center">
-        <p className="font-semibold text-zinc-900">Aucun segment pour l&apos;instant</p>
+        <p className="font-semibold text-zinc-900">{t("seg.vide")}</p>
         <p className="mx-auto mt-1 max-w-md text-sm text-zinc-500">
           Les segments se détectent automatiquement dans tes traces : il faut avoir
           parcouru une même portion plusieurs fois pour qu&apos;elle en devienne un.

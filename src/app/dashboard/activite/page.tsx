@@ -9,6 +9,8 @@ import { MetricChart } from "@/components/activity/MetricChart";
 import { SessionSegments, type EffortVue } from "@/components/activity/SessionSegments";
 import { leaderboard, type StoredEffort } from "@/lib/segments/match";
 import { lireEfforts } from "@/lib/segments/efforts";
+import { getPublicLang } from "@/lib/i18n/serverLang";
+import { T } from "@/lib/i18n/translations";
 
 export const dynamic = "force-dynamic";
 
@@ -36,10 +38,15 @@ export default async function ActivitePage({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   const date = (sp.date ?? "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    // ⚠️ CE REFUS ARRIVE AVANT L'AUTHENTIFICATION, donc `getAccountLang` (qui lit le
+    // profil) n'est pas disponible : on prend la langue du cookie, comme les pages
+    // publiques. Sans cela, un athlète allemand tombait sur deux phrases en français
+    // — et sur le seul écran qui lui dit que sa séance n'existe pas.
+    const dPublic = T[await getPublicLang()];
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 text-center">
-        <p className="text-zinc-500">Séance introuvable.</p>
-        <Link href="/dashboard" className="rounded-xl bg-emerald-600 px-4 py-2 font-semibold text-white hover:bg-emerald-700">Retour au tableau de bord</Link>
+        <p className="text-zinc-500">{dPublic["act.introuvable"]}</p>
+        <Link href="/dashboard" className="rounded-xl bg-emerald-600 px-4 py-2 font-semibold text-white hover:bg-emerald-700">{dPublic["act.retour"]}</Link>
       </div>
     );
   }

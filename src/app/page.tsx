@@ -234,7 +234,7 @@ const SYNC: { nom: string; logo?: string; passerelle?: boolean; passerelleApp?: 
   { nom: "Zwift", appli: true, pousse: true },
 ];
 export default function LandingPage() {
-  const { lang } = useT();
+  const { lang, t } = useT();
   const L = LANDING[lang] ?? LANDING.fr;
   const [activeCategory, setActiveCategory] = useState("ALL");
   const [periode, setPeriode] = useState<"mois" | "an">("mois");
@@ -373,7 +373,7 @@ export default function LandingPage() {
           src="https://images.unsplash.com/photo-1502904550040-7534597429ae?w=1920&q=85&fit=crop&crop=center"
           srcSet="https://images.unsplash.com/photo-1502904550040-7534597429ae?w=750&q=80&fit=crop&crop=center 750w, https://images.unsplash.com/photo-1502904550040-7534597429ae?w=1280&q=82&fit=crop&crop=center 1280w, https://images.unsplash.com/photo-1502904550040-7534597429ae?w=1920&q=85&fit=crop&crop=center 1920w"
           sizes="100vw"
-          alt="Piste d'athlétisme vue du dessus"
+          alt={t("alt.piste")}
           fetchPriority="high"
           decoding="async"
           className="absolute inset-0 h-full w-full object-cover"

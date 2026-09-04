@@ -17,6 +17,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { Play, Pause, RotateCcw, Loader2 } from "lucide-react";
 import { decodePolyline } from "@/lib/segments/geo";
 import { poseAt, capLisse } from "@/lib/segments/flyover";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
 const MAPTILER = process.env.NEXT_PUBLIC_MAPTILER_KEY || "";
 
@@ -78,6 +79,7 @@ export function Flyover({ polyline, altitudes, paces, stats }: {
   paces?: (number | null)[] | null;
   stats: FlyoverStats;
 }) {
+  const { t } = useT();
   const conteneur = useRef<HTMLDivElement | null>(null);
   const carte = useRef<MapLibreMap | null>(null);
   const anim = useRef<number | null>(null);
@@ -420,8 +422,8 @@ export function Flyover({ polyline, altitudes, paces, stats }: {
       {prechauffe && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-zinc-900/95">
           <Loader2 className="h-6 w-6 animate-spin text-emerald-400" />
-          <p className="text-sm font-semibold text-white">Préparation du survol…</p>
-          <p className="text-xs text-white/60">Chargement du relief et des images satellite</p>
+          <p className="text-sm font-semibold text-white">{t("survol.prep")}</p>
+          <p className="text-xs text-white/60">{t("survol.chargement")}</p>
         </div>
       )}
 
