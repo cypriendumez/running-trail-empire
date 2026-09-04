@@ -37,8 +37,8 @@ export function SiteFooter({ newsletter = true }: { newsletter?: boolean }) {
             <Logo size={28} />
             <Wordmark className="text-lg" />
           </Link>
-          <p className="text-sm text-zinc-400">{f.rights}</p>
-          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-zinc-400">
+          <p className="text-sm text-zinc-500">{f.rights}</p>
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-zinc-500">
             <Link href="/mentions-legales" className="hover:text-zinc-700 transition-colors">{f.legal}</Link>
             <Link href="/confidentialite" className="hover:text-zinc-700 transition-colors">{f.privacy}</Link>
             <Link href="/terms" className="hover:text-zinc-700 transition-colors">{f.cgu}</Link>

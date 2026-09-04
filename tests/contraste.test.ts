@@ -92,5 +92,22 @@ test("le surtitre partagé garde la couleur lisible", () => {
     "le surtitre de Container est repassé à une couleur sous le seuil");
 });
 
+test("le pied de page et l'avertissement médical restent lisibles", () => {
+  // ⚠️ CES DEUX-LÀ PORTENT DU CONTENU À PORTÉE LÉGALE : « Mentions légales »,
+  // « Confidentialité », « CGU », et l'avertissement de santé. Ils étaient à 2,56:1 sur
+  // fond blanc — et ils vivent dans des composants distincts de la page d'accueil, donc
+  // la correction de celle-ci ne les avait pas atteints. Mesuré APRÈS coup en
+  // production : c'est ce second relevé qui les a fait apparaître.
+  for (const f of ["src/components/layout/SiteFooter.tsx", "src/components/layout/MedicalDisclaimer.tsx"]) {
+    const src = readFileSync(f, "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+    const fondClair = /bg-white/.test(src);
+    const grisFaible = [...src.matchAll(/(?<!hover:)text-zinc-400/g)].length;
+    assert.ok(!(fondClair && grisFaible > 0),
+      `${f} : ${grisFaible} usage(s) de zinc-400 sur fond blanc, soit 2,56:1`);
+  }
+});
+
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }

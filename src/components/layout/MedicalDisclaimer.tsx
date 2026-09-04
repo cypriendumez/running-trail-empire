@@ -17,7 +17,7 @@ export function MedicalDisclaimer({ lang }: { lang?: string }) {
        texte de céder. `pe-20` seulement à partir de `sm` — sur mobile la ligne se replie
        sur plusieurs lignes et la dernière ne finit pas dans le coin. */
     <footer className="shrink-0 border-t border-zinc-100 bg-white px-6 py-2.5 sm:pe-20">
-      <p className="text-center text-[11px] leading-relaxed text-zinc-400">
+      <p className="text-center text-[11px] leading-relaxed text-zinc-500">
         ⚕️ {d["med.intro"]}
         <b className="font-semibold text-zinc-500"> {d["med.strong"]}</b>. {d["med.after"]} ·{" "}
         <a href="/mentions-legales" className="hover:text-zinc-600 underline-offset-2 hover:underline">{d["med.legal"]}</a> ·{" "}
