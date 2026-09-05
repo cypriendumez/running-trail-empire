@@ -270,7 +270,11 @@ export default function LandingPage() {
           essayé pour séparer le texte des silhouettes : il réglait la collision, mais posait
           un bandeau brun en travers du haut de l'image — le remède se voyait plus que le
           mal. Le décalage de « Connexion » ci-dessous suffit. */}
-      <nav className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${solidNav ? "bg-white/90 backdrop-blur-xl border-b border-zinc-200/70" : "bg-transparent"}`}>
+      {/* ⚠️ `transition-all` sur une barre FIXE animée AU DÉFILEMENT anime aussi la
+          position et la taille : le navigateur recalcule à chaque image, pendant que
+          l'utilisateur fait défiler. Seules la couleur de fond et la bordure changent
+          ici — on ne déclare qu'elles, et le défilement redevient franc. */}
+      <nav className={`fixed inset-x-0 top-0 z-50 transition-[background-color,border-color,backdrop-filter] duration-300 ${solidNav ? "bg-white/90 backdrop-blur-xl border-b border-zinc-200/70" : "bg-transparent"}`}>
         {/* DEUX RÉGLAGES INDÉPENDANTS, à ne pas confondre — je les avais liés à tort.
 
             1. `max-w-none` + padding court : la barre ne suit PLUS la largeur de contenu

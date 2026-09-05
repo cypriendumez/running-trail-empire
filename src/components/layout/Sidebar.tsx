@@ -164,7 +164,12 @@ export function Sidebar({ profile, unreadMessages = 0, estEditeur }: { profile: 
     </button>
 
     <aside className={cn(
-      "h-screen flex flex-col border-r border-zinc-100 bg-white transition-all duration-300",
+      // ⚠️ `transition-all` ANIMAIT TOUT, sur un élément pleine hauteur : chaque image
+      // recalculait la mise en page de la barre entière. On ne déclare que les deux
+      // propriétés qui changent réellement — la translation du tiroir sur mobile, la
+      // largeur du repli sur bureau. La translation est composée par le GPU, la
+      // différence se sent à l'ouverture.
+      "h-screen flex flex-col border-r border-zinc-100 bg-white transition-[transform,width] duration-300 ease-out",
       // Mobile : tiroir hors-champ, il ne prend AUCUNE largeur au contenu.
       "fixed inset-y-0 left-0 z-50 w-[264px] -translate-x-full",
       ouvertMobile && "translate-x-0 shadow-2xl",

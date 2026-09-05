@@ -297,6 +297,35 @@ export function TrailBuilder() {
   const [routeName, setRouteName] = useState("");
   const [saving, setSaving] = useState(false);
   const [savedRoutes, setSavedRoutes] = useState<SavedRoute[]>([]);
+
+  /**
+   * PREMIÈRE VUE : LA ZONE DE L'ATHLÈTE, PAS LA FRANCE ENTIÈRE.
+   *
+   * La carte s'ouvrait sur `[46.85, 2.35]` au zoom 6 — le pays vu de haut. Personne ne
+   * trace un parcours à cette échelle : il fallait chercher sa ville et zoomer une
+   * dizaine de fois avant de pouvoir cliquer le premier point.
+   *
+   * On se recentre sur le DERNIER parcours enregistré, qui est déjà chargé pour la
+   * liste : aucune requête de plus, et aucune demande de géolocalisation — un athlète
+   * qui ouvre l'outil ne devrait pas avoir à accorder une permission pour voir sa
+   * région.
+   *
+   * ⚠️ TROIS GARDES. On ne le fait qu'UNE fois (`vueAutoFaite`), jamais si un tracé est
+   * déjà commencé, et jamais si les coordonnées sont hors bornes — `coordinates` est
+   * stocké en [lng, lat] et une inversion ouvrirait la carte au milieu de l'océan.
+   */
+  const vueAutoFaite = useRef(false);
+  useEffect(() => {
+    if (vueAutoFaite.current) return;
+    const map = mapRef.current as L.Map | null;
+    if (!map || waypoints.length > 0 || savedRoutes.length === 0) return;
+    const premier = savedRoutes[0]?.coordinates?.[0];
+    if (!premier) return;
+    const [lng, lat] = premier;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return;
+    vueAutoFaite.current = true;
+    map.setView([lat, lng], 12, { animate: false });
+  }, [savedRoutes, waypoints.length]);
   const [loadingRoutes, setLoadingRoutes] = useState(false);
 
   // ── Navigation GPS en direct (point bleu qui se déplace) ──────────────────────
@@ -1281,8 +1310,17 @@ export function TrailBuilder() {
           </div>
         )}
 
-        {/* Left vertical edit controls (Annuler · Retour · Effacer) */}
-        <div className="absolute top-1/2 -translate-y-1/2 left-3 z-[1000]">
+        {/* Contrôles d'édition (Annuler · Retour · Effacer)
+
+            ⚠️ ILS N'APPARAISSENT QUE QUAND ILS SERVENT. À l'arrivée sur la page il n'y
+            a aucun tracé : les trois boutons étaient affichés, grisés, au milieu de la
+            carte — un bloc blanc qui occupe le regard sans rien permettre. Ils entrent
+            en fondu dès le premier point posé, et ressortent quand on efface. Les
+            garder MONTÉS (plutôt que de les retirer du DOM) évite un saut de mise en
+            page et laisse la transition se jouer. */}
+        <div className={`absolute top-1/2 -translate-y-1/2 left-3 z-[1000] transition-opacity duration-200 ${
+          hasRoute || redoStack.length > 0 ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}>
           <div className="bg-white/95 backdrop-blur rounded-2xl shadow-lg border border-zinc-100 p-1.5 flex flex-col gap-1">
             <EditBtn onClick={handleUndo} disabled={!hasRoute} icon={<Undo2 className="w-5 h-5" />} label={d["undo"]} />
             <EditBtn onClick={handleRedo} disabled={redoStack.length === 0} icon={<Redo2 className="w-5 h-5" />} label={d["redo"]} />
