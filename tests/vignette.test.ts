@@ -11,7 +11,7 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
-import { cheminTrace, POINTS_MIN } from "../src/lib/activities/vignette";
+import { planCarte, mondePx, urlTuile, tailleTuileDe, attributionCarte, ZOOM_MAX } from "../src/lib/activities/tuiles";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -29,77 +29,6 @@ function points(d: string): { x: number; y: number }[] {
 }
 const segment = (n: number, f: (i: number) => { lat: number; lon: number }) => Array.from({ length: n }, (_, i) => f(i));
 
-console.log("\nGÉOMÉTRIE — le tracé doit ressembler au parcours");
-
-test("une trace trop courte ne donne pas de vignette", () => {
-  // Nombres ÉCRITS EN DUR : les déduire de POINTS_MIN rendrait ce test incapable de
-  // voir un changement de seuil — il suivrait le code au lieu de le juger.
-  assert.equal(POINTS_MIN, 8, "seuil de points : décision d'affichage, à changer sciemment");
-  assert.equal(cheminTrace(segment(7, (i) => ({ lat: 49 + i * 0.001, lon: 1 }))), null, "7 points ne font pas une forme");
-  assert.ok(cheminTrace(segment(8, (i) => ({ lat: 49 + i * 0.001, lon: 1 }))), "8 points doivent suffire");
-  assert.equal(cheminTrace([]), null);
-});
-
-test("la longitude est corrigée par le cosinus de la latitude", () => {
-  // Carré de 0,01° de côté à 60° de latitude : 0,01° de longitude n'y vaut que la
-  // MOITIÉ de 0,01° de latitude. Le dessin doit donc être deux fois plus haut que large.
-  const carre = segment(40, (i) => ({ lat: 60 + (i % 20) * 0.0005, lon: 1 + Math.floor(i / 20) * 0.01 }));
-  const p = points(cheminTrace(carre, 200, 200, 0)!.d);
-  const largeur = Math.max(...p.map((q) => q.x)) - Math.min(...p.map((q) => q.x));
-  const hauteur = Math.max(...p.map((q) => q.y)) - Math.min(...p.map((q) => q.y));
-  const rapport = hauteur / largeur;
-  assert.ok(Math.abs(rapport - 2) < 0.1, `sans la correction, le rapport serait 1 ; obtenu ${rapport.toFixed(2)}`);
-});
-
-test("le nord est en HAUT", () => {
-  // L'axe des y d'un SVG descend : oublier l'inversion retourne la carte.
-  const versLeNord = segment(20, (i) => ({ lat: 49 + i * 0.001, lon: 1 }));
-  const p = points(cheminTrace(versLeNord)!.d);
-  assert.ok(p[0].y > p[p.length - 1].y, "le point le plus au nord doit avoir le plus petit y");
-});
-
-test("le tracé tient dans la boîte, marges comprises", () => {
-  const boucle = segment(60, (i) => ({ lat: 49 + Math.sin(i / 9) * 0.01, lon: 1 + Math.cos(i / 9) * 0.01 }));
-  const v = cheminTrace(boucle, 168, 96, 6)!;
-  for (const q of points(v.d)) {
-    assert.ok(q.x >= 6 - 0.05 && q.x <= 168 - 6 + 0.05, `x hors marge : ${q.x}`);
-    assert.ok(q.y >= 6 - 0.05 && q.y <= 96 - 6 + 0.05, `y hors marge : ${q.y}`);
-  }
-});
-
-test("une trace immobile ne produit pas un faux dessin", () => {
-  // GPS bloqué, séance sur tapis : il n'y a pas de forme à inventer.
-  assert.equal(cheminTrace(segment(30, () => ({ lat: 49.1, lon: 1.1 }))), null);
-});
-
-test("un aller-retour parfaitement droit reste dessinable", () => {
-  const droit = segment(20, (i) => ({ lat: 49, lon: 1 + i * 0.001 }));
-  const v = cheminTrace(droit);
-  assert.ok(v, "une ligne est une forme valable, contrairement à un point");
-  assert.ok(v!.d.startsWith("M"), "un chemin SVG commence par un déplacement");
-});
-
-test("les coordonnées absurdes sont écartées, pas dessinées", () => {
-  const sale = [
-    ...segment(20, (i) => ({ lat: 49 + i * 0.001, lon: 1 })),
-    { lat: Number.NaN, lon: 1 }, { lat: 999, lon: 1 }, { lat: 49, lon: 500 },
-  ];
-  const v = cheminTrace(sale)!;
-  assert.ok(v, "les points valables suffisaient à dessiner");
-  assert.ok(!/NaN|Infinity/.test(v.d), "une coordonnée illisible a fini dans le SVG");
-  assert.equal(points(v.d).length, 20, "un point hors du globe a été dessiné");
-});
-
-test("une boîte plus petite que ses marges ne rend rien", () => {
-  const nordSud = segment(20, (i) => ({ lat: 49 + i * 0.001, lon: 1 }));
-  const estOuest = segment(20, (i) => ({ lat: 49, lon: 1 + i * 0.001 }));
-  assert.equal(cheminTrace(nordSud, 10, 10, 6), null);
-  // Cas qui distingue VRAIMENT le garde-fou : une seule dimension est écrasée. Sans
-  // lui, ce tracé se dessinait sur une bande de hauteur nulle — un trait plat au
-  // milieu d'un cadre vide, présenté comme le parcours de la sortie.
-  assert.equal(cheminTrace(estOuest, 40, 20, 10), null, "hauteur utile nulle : rien à dessiner");
-  assert.equal(cheminTrace(nordSud, 20, 40, 10), null, "largeur utile nulle : rien à dessiner");
-});
 
 console.log("\nLE FIL — une requête, et aucun zéro inventé");
 
@@ -152,6 +81,113 @@ test("tous les fichiers de test sont dans la chaîne npm test", () => {
   const chaine = JSON.parse(readFileSync("package.json", "utf8")).scripts.test as string;
   const oublies = readdirSync("tests").filter((f) => f.endsWith(".test.ts")).filter((f) => !chaine.includes(`tests/${f}`));
   assert.deepEqual(oublies, [], `test(s) jamais exécuté(s) : ${oublies.join(", ")}`);
+});
+
+console.log("\nLA VRAIE CARTE — des tuiles derrière le tracé, pas un fond gris");
+
+const boucle = (n: number, r: number, lat = 49.44, lon = 1.10) =>
+  segment(n, (i) => ({ lat: lat + Math.sin(i / (n / 6)) * r, lon: lon + Math.cos(i / (n / 6)) * r * 1.5 }));
+
+test("la projection de Mercator est celle qu'on croit", () => {
+  // Repère vérifiable à la main : la longitude 0 tombe au MILIEU du monde, et
+  // l'équateur aussi. Une erreur ici décale toutes les tuiles sans rien casser.
+  const t = 512, monde = t * Math.pow(2, 3);
+  const zero = mondePx(0, 0, 3, t);
+  assert.ok(Math.abs(zero.x - monde / 2) < 0.001, `longitude 0 mal placée : ${zero.x}`);
+  assert.ok(Math.abs(zero.y - monde / 2) < 0.001, `équateur mal placé : ${zero.y}`);
+  assert.ok(mondePx(0, 180, 3, t).x > monde - 0.001, "la longitude 180 est le bord du monde");
+  // Le nord est en haut : plus la latitude monte, plus y descend.
+  assert.ok(mondePx(60, 0, 3, t).y < mondePx(0, 0, 3, t).y);
+  // Au pôle, Mercator diverge. ⚠️ `Number.isFinite` ne suffit PAS à le voir : en JS
+  // `Math.tan(Math.PI/2)` vaut 1,6e16, pas l'infini — la valeur reste finie tout en
+  // étant absurde (y très négatif, donc hors du monde). On exige donc le bornage.
+  assert.equal(mondePx(90, 0, 3, t).y, mondePx(85.05112878, 0, 3, t).y,
+    "la latitude n'est pas ramenée à la limite de Mercator");
+  assert.ok(mondePx(90, 0, 3, t).y >= 0, "le pôle sort du monde par le haut");
+  assert.ok(mondePx(-90, 0, 3, t).y <= monde, "le pôle sud sort du monde par le bas");
+});
+
+test("la taille des tuiles suit le FOURNISSEUR, pas une hypothèse", () => {
+  // Mesuré le 05/09/2026 : MapTiler sert du 512, OpenStreetMap du 256. Confondre les
+  // deux décale la mosaïque d'un demi-écran.
+  assert.equal(tailleTuileDe("une-cle"), 512);
+  assert.equal(tailleTuileDe(""), 256);
+  assert.match(urlTuile({ z: 12, x: 2050, y: 1400, gauche: 0, haut: 0 }, "abc"), /api\.maptiler\.com\/maps\/[a-z0-9-]+\/12\/2050\/1400\.png\?key=abc/);
+  assert.match(urlTuile({ z: 12, x: 2050, y: 1400, gauche: 0, haut: 0 }, ""), /tile\.openstreetmap\.org\/12\/2050\/1400\.png/);
+});
+
+test("l'attribution suit le fournisseur réellement utilisé", () => {
+  assert.equal(attributionCarte("cle"), "© MapTiler © OpenStreetMap");
+  assert.equal(attributionCarte(""), "© OpenStreetMap");
+});
+
+test("le zoom est le plus SERRÉ où le parcours tient encore", () => {
+  const petit = planCarte(boucle(60, 0.002), { largeur: 176, hauteur: 96 })!;
+  const grand = planCarte(boucle(60, 0.05), { largeur: 176, hauteur: 96 })!;
+  assert.ok(petit.zoom > grand.zoom, "une petite boucle doit être vue de plus près qu'une grande");
+  assert.ok(petit.zoom <= ZOOM_MAX, "au-delà on voit les pavés, plus le parcours");
+});
+
+test("le parcours tient DANS la vignette, marges comprises", () => {
+  for (const rayon of [0.001, 0.01, 0.08]) {
+    const p = planCarte(boucle(80, rayon), { largeur: 176, hauteur: 96, marge: 8 })!;
+    const xs = [...p.chemin.matchAll(/[ML](-?[\d.]+) (-?[\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])]);
+    for (const [x, y] of xs) {
+      assert.ok(x >= -0.6 && x <= 176.6, `rayon ${rayon} : x hors cadre (${x})`);
+      assert.ok(y >= -0.6 && y <= 96.6, `rayon ${rayon} : y hors cadre (${y})`);
+    }
+  }
+});
+
+test("les tuiles couvrent toute la vignette, sans trou", () => {
+  const p = planCarte(boucle(80, 0.01), { largeur: 176, hauteur: 96, tailleTuile: 512 })!;
+  assert.ok(p.tuiles.length >= 1 && p.tuiles.length <= 6, `${p.tuiles.length} tuiles : trop, ou pas assez`);
+  const gauche = Math.min(...p.tuiles.map((t) => t.gauche));
+  const droite = Math.max(...p.tuiles.map((t) => t.gauche + p.tailleTuile));
+  const haut = Math.min(...p.tuiles.map((t) => t.haut));
+  const bas = Math.max(...p.tuiles.map((t) => t.haut + p.tailleTuile));
+  assert.ok(gauche <= 0 && droite >= 176, `bande verticale non couverte : ${gauche}…${droite}`);
+  assert.ok(haut <= 0 && bas >= 96, `bande horizontale non couverte : ${haut}…${bas}`);
+});
+
+test("aucune tuile n'est demandée hors du monde", () => {
+  // Un y négatif ou trop grand donne un 404 que le navigateur affiche en image cassée.
+  // ⚠️ Il faut que la vignette DÉBORDE vraiment du monde pour éprouver le garde-fou.
+  // À un zoom élevé, la latitude 84,9° est encore à des milliers de pixels du bord :
+  // le cas ne se présentait jamais. Au zoom 0, le monde entier fait une tuile, donc
+  // une vignette de 96 px de haut mord forcément au-delà du pôle.
+  for (const [lat, zoomMax] of [[84.9, 0], [-84.9, 0], [84.9, 2], [0, 15]] as [number, number][]) {
+    const p = planCarte(boucle(40, 0.01, lat, 179.9), { largeur: 176, hauteur: 96, zoomMax });
+    if (!p) continue;
+    const dernier = Math.pow(2, p.zoom) - 1;
+    for (const t of p.tuiles) {
+      assert.ok(t.y >= 0 && t.y <= dernier, `tuile y=${t.y} hors du monde à la latitude ${lat}`);
+      assert.ok(t.x >= 0 && t.x <= dernier, `tuile x=${t.x} hors du monde (l'enroulement en longitude a sauté)`);
+    }
+  }
+});
+
+test("une trace inexploitable ne fabrique pas de carte", () => {
+  assert.equal(planCarte(segment(7, (i) => ({ lat: 49 + i * 0.001, lon: 1 })), { largeur: 176, hauteur: 96 }), null);
+  assert.equal(planCarte(segment(30, () => ({ lat: 49.1, lon: 1.1 })), { largeur: 176, hauteur: 96 }), null);
+  assert.equal(planCarte(boucle(40, 0.01), { largeur: 10, hauteur: 10, marge: 8 }), null);
+});
+
+test("la carte remplace le tracé nu dans le fil", () => {
+  const src = codeOf("src/app/dashboard/activites/page.tsx");
+  assert.match(src, /planCarte\(allege, \{/, "la vignette ne compose plus de carte");
+  assert.match(src, /tailleTuileDe\(CLE_CARTE\)/, "la taille des tuiles n'est plus déduite du fournisseur");
+  assert.match(src, /attributionCarte\(CLE_CARTE\)/, "les tuiles seraient affichées sans être créditées");
+  const carte = codeOf("src/components/activity/FeedCard.tsx");
+  assert.match(carte, /loading="lazy"/, "quinze cartes chargeraient leurs tuiles avant tout défilement");
+  // On vise la PROPRIÉTÉ, pas le nombre de balises : rendre le liseré transparent
+  // laissait deux <path> en place et ce test au vert (trouvé par mutation).
+  const blanc = carte.match(/stroke="#ffffff"[^/]*?strokeWidth=\{([\d.]+)\}/);
+  const couleur = carte.match(/stroke="#059669"[^/]*?strokeWidth=\{([\d.]+)\}/);
+  assert.ok(blanc, "le liseré blanc a disparu : le tracé s'effacera sur les zones claires de la carte");
+  assert.ok(couleur, "le tracé coloré a disparu");
+  assert.ok(Number(blanc![1]) > Number(couleur![1]),
+    `le liseré (${blanc![1]}) doit être PLUS LARGE que le tracé (${couleur![1]}), sinon il ne le borde pas`);
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

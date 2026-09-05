@@ -5,7 +5,7 @@ import { AlertTriangle } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { PerfTabs } from "@/components/segments/PerfTabs";
 import { FeedCard, type LigneFil } from "@/components/activity/FeedCard";
-import { cheminTrace } from "@/lib/activities/vignette";
+import { planCarte, urlTuile, tailleTuileDe, attributionCarte } from "@/lib/activities/tuiles";
 import { cleanActivityName } from "@/lib/utils/activityName";
 import { estUnePanne } from "@/lib/dashboard/lectures";
 import { formatDateCivile } from "@/lib/time/fuseau";
@@ -17,6 +17,21 @@ export const metadata = { title: "Activités" };
 
 /** Une page de fil. Chaque trace pesant ~40 Ko côté serveur, on n'en charge pas 50. */
 const PAR_PAGE = 15;
+
+// Carte pleine largeur, comme sur Strava. Elle est RENDUE à 720 px et centrée : le
+// parcours, lui, est calé dans une bande de 380 px au milieu, si bien qu'un téléphone
+// rogne du décor et jamais le tracé.
+const LARGEUR = 720, HAUTEUR = 184;
+// 320 et pas 380 : sur un écran de 375 px, la carte ne dispose que de 343 px une
+// fois les marges de la carte retirées — un parcours calé sur 380 px sortait du
+// cadre par la droite. Constaté à l'écran, pas déduit.
+const BANDE_SURE = 320;
+// ⚠️ Clé PUBLIQUE par conception (les tuiles sont demandées par le navigateur), et
+// c'est la SEULE variable de carte lisible ici : sans elle on retombe sur les tuiles
+// OpenStreetMap, qui font 256 px et non 512 — d'où `tailleTuileDe`, sans quoi toute
+// la mosaïque serait décalée.
+const CLE_CARTE = process.env.NEXT_PUBLIC_MAPTILER_KEY ?? "";
+const TAILLE_TUILE = tailleTuileDe(CLE_CARTE);
 
 const duree = (s: number) => {
   const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60);
@@ -84,9 +99,11 @@ export default async function ActivitesPage({ searchParams }: { searchParams: Pr
     const km = nombre(s.distance_km), sec = nombre(s.duration_seconds);
     const dplus = nombre(s.elevation_gain_m);
     const pts = traces.get(String(s.id)) ?? [];
-    // 1 point sur 4 : à 168 px de large, la précision au mètre ne se voit pas et
+    // Un point sur N : à 176 px de large, la précision au mètre ne se voit pas, et
     // chaque point retiré est autant de HTML en moins sur une page qui en compte 15.
-    const allege = pts.length > 400 ? pts.filter((_, i) => i % Math.ceil(pts.length / 400) === 0) : pts;
+    const allege = pts.length > 500 ? pts.filter((_, i) => i % Math.ceil(pts.length / 500) === 0) : pts;
+    const plan = planCarte(allege, { largeur: LARGEUR, hauteur: HAUTEUR, tailleTuile: TAILLE_TUILE,
+      margeX: (LARGEUR - BANDE_SURE) / 2, margeY: 14 });
     const chiffres = [
       { label: d["feed.distance"], valeur: km != null ? `${fmtNombre(km, lang, 1)} km` : SANS_VALEUR },
       { label: d["feed.pace"], valeur: km != null && sec != null ? allure(sec, km, lang) : SANS_VALEUR },
@@ -99,7 +116,7 @@ export default async function ActivitesPage({ searchParams }: { searchParams: Pr
       href: `/dashboard/activite?date=${String(s.date).slice(0, 10)}&dist=${s.distance_km ?? ""}&title=${encodeURIComponent(s.title ?? "")}`,
       titre: cleanActivityName(s.title) || s.type || s.sport || d["feed.title"],
       dateLisible: formatDateCivile(s.date, lang, { weekday: "long", day: "numeric", month: "long" }),
-      trace: cheminTrace(allege),
+      carte: plan ? { plan, urls: plan.tuiles.map((t) => urlTuile(t, CLE_CARTE)) } : null,
       chiffres,
     };
   });
@@ -124,6 +141,11 @@ export default async function ActivitesPage({ searchParams }: { searchParams: Pr
           <div className="space-y-3">
             {lignes.map((l) => <FeedCard key={l.href + l.dateLisible} ligne={l} sansTrace={d["feed.noTrace"]} />)}
           </div>
+          {/* MENTION OBLIGATOIRE. Les vignettes ne sont pas des cartes Leaflet : elles
+              n'ont pas le bandeau d'attribution intégré, et l'oublier reviendrait à
+              afficher des tuiles OpenStreetMap sans les créditer. Une seule mention
+              pour toute la page, comme le veut l'usage pour un lot de vignettes. */}
+          <p className="mt-4 text-right text-[11px] text-zinc-500">{attributionCarte(CLE_CARTE)}</p>
           {reste && (
             <div className="mt-6 text-center">
               <Link href={`/dashboard/activites?p=${page + 1}`}
