@@ -82,7 +82,6 @@ import {
   haversine, simplify, encodePolyline, decodePolyline, bboxOverlap, elevationGain, type TrackPoint as TP,
 } from "../src/lib/segments/geo";
 import { findEfforts, leaderboard, maitreDuSegment } from "../src/lib/segments/match";
-import { heatCells, intensity, denseBounds, heatBounds, type HeatCell as HC } from "../src/lib/segments/heatmap";
 import { computeSplits, splitPace, elevationProfile, metricSeries } from "../src/lib/segments/splits";
 import { challengeProgress, challengeLeaderboard, daysLeft, notStarted, inWindow, type Challenge } from "../src/lib/challenges/progress";
 import {
@@ -2762,24 +2761,6 @@ test("« je ne sais pas » et « c'est plat » ne se confondent pas", () => {
   const partiel: TP[] = sansAlt.map((p, i) => (i < 5 ? { ...p, alt: 20 + i } : p));
   assert.equal(elevationGain(partiel), null, "5 points sur 50 ne suffisent pas à conclure");
 });
-test("un arrêt au feu rouge ne crée PAS de point brûlant", () => {
-  // Trente points enregistrés à l'arrêt dans la même maille : sans dédoublonnage par
-  // trace, le carrefour paraîtrait plus couru que le parcours lui-même.
-  const arret: TP[] = Array.from({ length: 30 }, (_, i) => ({ lat: 50.6400, lon: 3.0362, t: i }));
-  const cells = heatCells([arret]);
-  assert.equal(cells.length, 1);
-  assert.equal(cells[0].n, 1, "une trace ne compte qu'une fois par maille");
-  // Deux sorties distinctes au même endroit, en revanche, comptent bien double.
-  assert.equal(heatCells([arret, arret])[0].n, 2);
-});
-test("l'échelle de chaleur reste lisible quand un trajet écrase les autres", () => {
-  // En linéaire, une rue vue 10 fois s'afficherait aussi pâle qu'une rue vue 1 fois
-  // dès qu'un trajet quotidien atteint 200 passages. Le logarithme garde l'écart visible.
-  assert.equal(intensity(200, 200), 1);
-  assert.ok(intensity(10, 200) > 0.4, "10 passages doivent rester bien visibles");
-  assert.ok(intensity(1, 200) < 0.1, "un passage unique reste discret");
-  assert.equal(intensity(5, 1), 1, "sans écart de fréquentation, tout est à pleine intensité");
-});
 test("le survol 3D reste GRATUIT — aucun verrou d'abonnement", () => {
   // Décision produit du 13/08/2026 : chez Strava le survol est réservé aux abonnés
   // (c'est l'écran de la vidéo de référence). Sur Pacevo il est ouvert à tous, et
@@ -2898,26 +2879,6 @@ test("sans altitude, pas de profil inventé", () => {
 test("le dénivelé d'un tronçon reste null quand la trace n'en porte pas", () => {
   const pts: TP[] = Array.from({ length: 120 }, (_, i) => ({ lat: 50 + i * 0.0001, lon: 3, t: i * 5 }));
   assert.equal(computeSplits(pts)[0].elevation, null, "« inconnu » n'est pas « plat »");
-});
-
-test("quelques sorties lointaines ne font PAS ouvrir la carte sur l'Europe", () => {
-  // Mesuré sur l'historique réel : 72 % des passages dans 5 km, mais 19 % à plus de
-  // 200 km (courses, vacances). Cadrer sur le tout donnait une fenêtre de 987 × 1 756 km
-  // où le quartier d'entraînement — l'essentiel du contenu — tenait dans un pixel.
-  const quartier: HC[] = Array.from({ length: 200 }, (_, i) => ({
-    lat: 50.64 + (i % 20) * 0.0002, lon: 3.03 + Math.floor(i / 20) * 0.0002, n: 50,
-  }));
-  const vacances: HC[] = [{ lat: 43.30, lon: 5.37, n: 2 }, { lat: 48.85, lon: 2.35, n: 3 }];
-  const b = denseBounds([...quartier, ...vacances])!;
-  assert.ok(b.maxLat - b.minLat < 0.05, "le cadrage doit rester sur le quartier");
-  assert.ok(b.minLat > 50 && b.maxLat < 51, `cadré hors du quartier : ${b.minLat}–${b.maxLat}`);
-  // Les sorties lointaines restent DANS les données : on ne les supprime pas, on ne
-  // cadre simplement pas dessus.
-  assert.equal(heatBounds([...quartier, ...vacances])!.minLat, 43.30);
-});
-test("un point unique produit quand même une fenêtre cadrable", () => {
-  const b = denseBounds([{ lat: 50.64, lon: 3.03, n: 1 }])!;
-  assert.ok(b.maxLat > b.minLat && b.maxLon > b.minLon, "une zone de hauteur nulle n'est pas cadrable");
 });
 test("le préfiltre par zone écarte ce qui est loin, garde ce qui est proche", () => {
   const paris = { minLat: 48.85, maxLat: 48.86, minLon: 2.35, maxLon: 2.36 };

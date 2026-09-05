@@ -109,8 +109,7 @@ export default async function SurvolPage({ searchParams }: { searchParams: Promi
       <header className="mb-5">
         <h1 className="text-3xl font-black tracking-tight text-zinc-900">{d["fly.title"]}</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          {d["fly.sub"]}{" "}
-          <span className="font-semibold text-emerald-700">{d["fly.free"]}</span>
+          {d["fly.sub"]}
         </p>
       </header>
 

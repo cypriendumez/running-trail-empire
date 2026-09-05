@@ -1,0 +1,139 @@
+export const dynamic = "force-dynamic";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { AlertTriangle } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { PerfTabs } from "@/components/segments/PerfTabs";
+import { FeedCard, type LigneFil } from "@/components/activity/FeedCard";
+import { cheminTrace } from "@/lib/activities/vignette";
+import { cleanActivityName } from "@/lib/utils/activityName";
+import { estUnePanne } from "@/lib/dashboard/lectures";
+import { formatDateCivile } from "@/lib/time/fuseau";
+import { getAccountLang } from "@/lib/i18n/serverLang";
+import { T, fill } from "@/lib/i18n/translations";
+import { fmtNombre, SANS_VALEUR } from "@/lib/i18n/nombres";
+
+export const metadata = { title: "Activités" };
+
+/** Une page de fil. Chaque trace pesant ~40 Ko côté serveur, on n'en charge pas 50. */
+const PAR_PAGE = 15;
+
+const duree = (s: number) => {
+  const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60);
+  return h > 0 ? `${h} h ${String(m).padStart(2, "0")}` : `${m} min`;
+};
+const allure = (sec: number, km: number, lang: string) => {
+  const p = sec / km, m = Math.floor(p / 60), s = Math.round(p % 60);
+  const [mm, ss] = s === 60 ? [m + 1, 0] : [m, s];
+  return `${mm}:${String(ss).padStart(2, "0")}${lang === "fr" ? " /km" : "/km"}`;
+};
+const nombre = (v: unknown): number | null =>
+  typeof v === "number" && Number.isFinite(v) && v > 0 ? v : null;
+
+type Brut = {
+  id: string | number; date: string; title: string | null; type: string | null; sport: string | null;
+  distance_km: number | null; duration_seconds: number | null; elevation_gain_m: number | null;
+};
+
+export default async function ActivitesPage({ searchParams }: { searchParams: Promise<{ p?: string }> }) {
+  const sb = await createClient();
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) redirect("/login");
+  const lang = await getAccountLang(sb, user.id);
+  const d = T[lang];
+
+  const page = Math.max(0, Math.min(200, Number((await searchParams).p ?? 0) || 0));
+  const lecture = await sb.from("workouts")
+    .select("id, date, title, type, sport, distance_km, duration_seconds, elevation_gain_m")
+    .eq("user_id", user.id)
+    .order("date", { ascending: false })
+    .range(0, (page + 1) * PAR_PAGE);   // une ligne de plus : elle dit s'il en reste
+
+  // Une lecture EN PANNE ne doit jamais se lire « tu n'as aucune sortie » : le premier
+  // message ferait chercher un bug d'import là où c'est le serveur qui n'a pas répondu.
+  if (estUnePanne(lecture)) {
+    return (
+      <div className="mx-auto w-full max-w-3xl px-4 py-8">
+        <PerfTabs />
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-5">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" />
+          <p className="text-sm text-amber-900">{d["feed.panne"]}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const toutes = (lecture.data ?? []) as Brut[];
+  const reste = toutes.length > (page + 1) * PAR_PAGE;
+  const seances = toutes.slice(0, (page + 1) * PAR_PAGE);
+
+  // Les traces en UNE requête. Sans le `.in(...)`, c'était un aller-retour par carte —
+  // le défaut exact qui avait mis la carte de chaleur à 12 s.
+  const traces = new Map<string, { lat: number; lon: number }[]>();
+  if (seances.length) {
+    const { data: tr } = await sb.from("activity_tracks")
+      .select("workout_id, points")
+      .in("workout_id", seances.map((s) => String(s.id)));
+    for (const t of (tr ?? []) as { workout_id: string; points: number[][] | null }[]) {
+      const pts = (t.points ?? []).map(([lat, lon]) => ({ lat, lon }));
+      if (pts.length) traces.set(String(t.workout_id), pts);
+    }
+  }
+
+  const lignes: LigneFil[] = seances.map((s) => {
+    const km = nombre(s.distance_km), sec = nombre(s.duration_seconds);
+    const dplus = nombre(s.elevation_gain_m);
+    const pts = traces.get(String(s.id)) ?? [];
+    // 1 point sur 4 : à 168 px de large, la précision au mètre ne se voit pas et
+    // chaque point retiré est autant de HTML en moins sur une page qui en compte 15.
+    const allege = pts.length > 400 ? pts.filter((_, i) => i % Math.ceil(pts.length / 400) === 0) : pts;
+    const chiffres = [
+      { label: d["feed.distance"], valeur: km != null ? `${fmtNombre(km, lang, 1)} km` : SANS_VALEUR },
+      { label: d["feed.pace"], valeur: km != null && sec != null ? allure(sec, km, lang) : SANS_VALEUR },
+      { label: d["feed.time"], valeur: sec != null ? duree(sec) : SANS_VALEUR },
+    ];
+    // Le dénivelé n'a sa colonne que s'il a été mesuré. La FC reste sur la page de
+    // détail : quatre chiffres se lisent d'un coup d'œil, cinq deviennent un tableau.
+    if (dplus != null) chiffres.push({ label: d["feed.elev"], valeur: `${Math.round(dplus)} m` });
+    return {
+      href: `/dashboard/activite?date=${String(s.date).slice(0, 10)}&dist=${s.distance_km ?? ""}&title=${encodeURIComponent(s.title ?? "")}`,
+      titre: cleanActivityName(s.title) || s.type || s.sport || d["feed.title"],
+      dateLisible: formatDateCivile(s.date, lang, { weekday: "long", day: "numeric", month: "long" }),
+      trace: cheminTrace(allege),
+      chiffres,
+    };
+  });
+
+  return (
+    <div className="mx-auto w-full max-w-3xl px-4 py-8">
+      <PerfTabs />
+      <header className="mb-6">
+        <h1 className="text-3xl font-black tracking-tight text-zinc-900">{d["feed.title"]}</h1>
+        <p className="mt-1 text-sm text-zinc-500">
+          {lignes.length ? fill(d["feed.sub"], { n: lignes.length }) : d["feed.emptySub"]}
+        </p>
+      </header>
+
+      {lignes.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-12 text-center">
+          <p className="font-semibold text-zinc-900">{d["feed.empty"]}</p>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-zinc-500">{d["feed.emptySub"]}</p>
+        </div>
+      ) : (
+        <>
+          <div className="space-y-3">
+            {lignes.map((l) => <FeedCard key={l.href + l.dateLisible} ligne={l} sansTrace={d["feed.noTrace"]} />)}
+          </div>
+          {reste && (
+            <div className="mt-6 text-center">
+              <Link href={`/dashboard/activites?p=${page + 1}`}
+                className="inline-block rounded-xl border border-zinc-300 bg-white px-5 py-2.5 text-sm font-semibold text-zinc-700 transition hover:border-zinc-400 hover:bg-zinc-50">
+                {d["feed.more"]}
+              </Link>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
