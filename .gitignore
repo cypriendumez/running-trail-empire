@@ -72,3 +72,22 @@ public/brands/polar.svg
 
 # Archives de sauvegarde : volumineuses, et publiées comme artefact, pas dans le dépôt.
 .sauvegardes/
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  DOUBLONS iCLOUD — motif GÉNÉRIQUE, pas un fichier à la fois.
+#
+#  iCloud recopie un fichier ou un dossier en lui ajoutant « 2 » avant l'extension
+#  (« page 2.tsx », « .next 2/ »). Deux dégâts déjà constatés sur ce dépôt :
+#   · 2 106 fichiers de build commités par erreur, parce que `/.next/` ne couvrait
+#     pas `/.next 2/` ;
+#   · le 05/09/2026, six copies de `.git/index` et deux refs dupliquées À L'INTÉRIEUR
+#     de `.git` — `git gc` échouait donc en boucle sur « bad object refs/heads/main 2 »,
+#     ce qui laissait le dépôt sans packfile propre et expliquait les `git push` qui
+#     se coupaient. Nettoyé et repacké : 1 packfile, 0 objet en vrac.
+#
+#  ⚠️ Ce motif ne protège QUE la copie de travail. Les doublons créés dans `.git`
+#  lui échappent par construction : s'ils reviennent, les supprimer à la main puis
+#  relancer `git gc --prune=now`.
+# ─────────────────────────────────────────────────────────────────────────────
+* [0-9]
+* [0-9].*
