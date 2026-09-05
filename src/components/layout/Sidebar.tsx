@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Menu, X,
   LayoutDashboard, MapPin, Mountain, Heart, ShoppingBag,
   User, Trophy, Settings, LogOut, ChevronLeft,
   Ghost, Watch, GraduationCap, CalendarDays, MessagesSquare, Newspaper, Crown, Medal, Users, Target, ShieldCheck,
@@ -10,7 +11,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { Logo } from "@/components/brand/Logo";
 import { Wordmark } from "@/components/brand/Wordmark";
@@ -79,6 +80,25 @@ export function Sidebar({ profile, unreadMessages = 0, estEditeur }: { profile: 
   const router = useRouter();
   const { t, lang } = useT();
   const [collapsed, setCollapsed] = useState(false);
+  /**
+   * ⚠️ SUR MOBILE, CETTE BARRE MANGEAIT 62 % DE L'ÉCRAN.
+   *
+   * Mesuré en production sur un écran de 375 px : l'`aside` restait à 232 px dans le
+   * flux, il ne restait donc que 143 px à TOUTES les pages de l'espace connecté — 95 px
+   * une fois les marges retirées. La carte du Trail Builder tombait à 93 px de large et
+   * sa barre d'attribution, qui ne peut pas descendre sous 95 px, débordait en
+   * s'enroulant sur trois lignes. C'est ce débordement qu'on voyait ; la cause était la
+   * largeur volée à toute l'application.
+   *
+   * `collapsed` n'y changeait rien : il ne se déclenche qu'au clic, ne se souvient de
+   * rien d'un chargement à l'autre, et même replié il prend encore 76 px sur 375.
+   *
+   * Sur mobile, la barre devient donc un TIROIR hors-champ. À partir de `md`, tout le
+   * comportement d'origine est conservé, à la classe près.
+   */
+  const [ouvertMobile, setOuvertMobile] = useState(false);
+  // Naviguer ferme le tiroir : sans cela il reste ouvert par-dessus la page demandée.
+  useEffect(() => { setOuvertMobile(false); }, [pathname]);
   const tier = String(profile?.subscription_tier ?? "free");
   // ⚠️ L'espace coach existait sans qu'aucun lien n'y mène : six pages protégées,
   // absentes de cette barre, atteignables seulement en tapant l'adresse. Masquer ce lien
@@ -121,9 +141,36 @@ export function Sidebar({ profile, unreadMessages = 0, estEditeur }: { profile: 
   };
 
   return (
+    <>
+    {/* Voile : un appui à côté referme le tiroir. */}
+    {ouvertMobile && (
+      <div
+        onClick={() => setOuvertMobile(false)}
+        className="fixed inset-0 z-40 bg-zinc-900/40 md:hidden"
+        aria-hidden="true"
+      />
+    )}
+
+    {/* Bouton d'ouverture, en MIROIR de la bulle d'aide déjà posée en bas à droite :
+        il ne recouvre ni la barre supérieure ni le contenu, et reste sous le pouce. */}
+    <button
+      type="button"
+      onClick={() => setOuvertMobile((v) => !v)}
+      aria-label={t("nav.menu")}
+      aria-expanded={ouvertMobile}
+      className="fixed bottom-5 left-5 z-50 flex h-14 w-14 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-700 shadow-lg md:hidden"
+    >
+      {ouvertMobile ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+    </button>
+
     <aside className={cn(
       "h-screen flex flex-col border-r border-zinc-100 bg-white transition-all duration-300",
-      collapsed ? "w-[76px]" : "w-[232px]",
+      // Mobile : tiroir hors-champ, il ne prend AUCUNE largeur au contenu.
+      "fixed inset-y-0 left-0 z-50 w-[264px] -translate-x-full",
+      ouvertMobile && "translate-x-0 shadow-2xl",
+      // À partir de md : exactement le comportement d'avant.
+      "md:static md:z-auto md:translate-x-0 md:shadow-none",
+      collapsed ? "md:w-[76px]" : "md:w-[232px]",
     )}>
       {/* Logo → retour au tableau de bord */}
       <Link
@@ -190,5 +237,6 @@ export function Sidebar({ profile, unreadMessages = 0, estEditeur }: { profile: 
         </button>
       </div>
     </aside>
+    </>
   );
 }
