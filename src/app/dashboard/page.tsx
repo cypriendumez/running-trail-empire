@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { fuseauOuDefaut } from "@/lib/time/fuseau";
 import { createClient } from "@/lib/supabase/server";
 import { lecturesEnEchec } from "@/lib/dashboard/lectures";
+import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 import { BentoDashboard } from "@/components/dashboard/BentoDashboard";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import type { Objective } from "@/components/dashboard/ObjectiveCard";
@@ -32,6 +33,9 @@ export default async function DashboardPage() {
   const streakToday = jourLocal(new Date(), fuseauAthlete);
   const streakFrom = decaleJour(streakToday, -119);
 
+  // Le jour de l'athlète, calculé AVANT les requêtes : il en filtre une.
+  const today = aujourdhui(FUSEAU_DEFAUT);
+
   const [profileRes, hrvRes, workoutsRes, planRes, leagueRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, newMembersRes, prRes, chargeRes, streakWkRes, streakPlanRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single(),
     supabase.from("hrv_data").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(14),
@@ -39,7 +43,12 @@ export default async function DashboardPage() {
     supabase.from("training_plans").select("*").eq("user_id", user!.id).eq("is_active", true).single(),
     supabase.from("league_members").select("*, leagues(*)").eq("user_id", user!.id).order("score", { ascending: false }).limit(1).single(),
     supabase.from("sleep_data").select("total_sleep_min,sleep_score,body_battery_end,deep_sleep_min,rem_sleep_min,date").eq("user_id", user!.id).order("date", { ascending: false }).limit(1).single(),
-    supabase.from("notifications").select("title,body,data,created_at").eq("user_id", user!.id).eq("type", "coach_session").order("created_at", { ascending: false }).limit(40),
+    // ⚠️ ON NE RAMÈNE QUE LES SÉANCES À VENIR. Cette lecture rapportait les 40
+    // dernières séances — 110 Ko mesurés, la plus grosse de la page — pour n'en garder
+    // ENSUITE qu'une seule : la prochaine. Le filtre est le même, il se fait juste du
+    // bon côté. La série, elle, a sa propre requête (`streakPlanRes`) et n'est pas
+    // touchée : c'est elle qui a besoin du passé.
+    supabase.from("notifications").select("title,body,data,created_at").eq("user_id", user!.id).eq("type", "coach_session").gte("data->>date", today).order("created_at", { ascending: false }).limit(40),
     supabase.from("notifications").select("data").eq("user_id", user!.id).eq("type", "session_feedback").order("created_at", { ascending: false }).limit(60),
     supabase.from("notifications").select("data").eq("user_id", user!.id).eq("type", "race_objective").maybeSingle(),
     supabase.from("performance_baselines").select("vma_kmh,max_hr").eq("user_id", user!.id).order("tested_at", { ascending: false }).limit(1).single(),
@@ -115,7 +124,6 @@ export default async function DashboardPage() {
   const risk = loadRisk(wks);
 
   // Prochaine séance prescrite par le coach (aujourd'hui ou à venir) → prioritaire sur l'IA/l'algo.
-  const today = new Date().toISOString().split("T")[0];
   type CoachText = { title?: string; subtitle?: string; tags?: string[]; why?: string };
   type CoachRow = { title: string; body: string; data: { date?: string; subtitle?: string; tags?: string[]; why?: string; i18n?: Record<string, CoachText> } };
   const cn = oneSessionPerSlot((coachRes.data ?? []) as CoachRow[], (r) => slotKey(r.data))

@@ -6,6 +6,7 @@ import { pushIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace, 
 import { getEffectiveVma } from "@/lib/ai/coachContext";
 import { estAdmin } from "@/lib/admin/acces";
 import { identifiantsDe } from "@/lib/intervals/identifiants";
+import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
 
 type SessionIn = { date: string; type?: string; title?: string; detail?: string; why?: string; feel?: string; tags?: string[] };
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
   if (!user_id || !Array.isArray(sessions) || sessions.length === 0) return NextResponse.json({ error: "user_id et sessions requis" }, { status: 400 });
 
   const admin = createAdminClient();
-  const today = new Date().toISOString().split("T")[0];
+  const today = aujourdhui(FUSEAU_DEFAUT);
 
   // Garde-fou anti-réécriture : si un plan a déjà été publié aujourd'hui (auto ou manuel),
   // la publication automatique ne fait rien. Le bouton du coach, lui, force toujours.

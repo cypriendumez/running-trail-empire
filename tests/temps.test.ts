@@ -251,6 +251,11 @@ test("plus aucun écran ni route de l'athlète ne date en UTC", () => {
     "src/app/api/races/sync/route.ts": "collecte du catalogue, aucune décision pour un athlète",
     "src/app/api/cron/races-maintenance/route.ts": "entretien nocturne du catalogue",
     "src/lib/intervals/performance.ts": "bornes d'une requête intervals.icu, pas un jour affiché",
+    "src/lib/intervals/syncUser.ts": "borne « newest » d'une requête intervals.icu",
+    "src/app/api/intervals/sync/route.ts": "borne « newest » d'une requête intervals.icu",
+    "src/app/api/intervals/debug/route.ts": "borne d'une requête de diagnostic",
+    "src/app/api/intervals/credentials/route.ts": "borne d'une requête de validation de clé",
+    "src/app/api/admin/generate-plan/route.ts": "borne « newest » d'une requête intervals.icu",
   };
   const fichiers: string[] = [];
   (function marche(d: string) {
@@ -265,7 +270,14 @@ test("plus aucun écran ni route de l'athlète ne date en UTC", () => {
     const src = readFileSync(f, "utf8")
       .replace(/\/\*[\s\S]*?\*\//g, "")
       .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
-    return /new Date\(\)\.toISOString\(\)\.slice\(0,\s*10\)/.test(src);
+    /**
+     * ⚠️ DEUX FORMES, PAS UNE. Mon premier balayage ne cherchait que `.slice(0, 10)` et
+     * a laissé passer DIX occurrences écrites `.split("T")[0]` — dont celle du tableau
+     * de bord, qui choisit la prochaine séance du coach. Entre minuit et 2 h à Paris,
+     * elle désignait la séance de la veille. Un balayage qui ne connaît qu'une écriture
+     * du même défaut donne une fausse assurance : il rend « zéro » et on le croit.
+     */
+    return /new Date\(\)\.toISOString\(\)\.(slice\(0,\s*10\)|split\("T"\)\[0\])/.test(src);
   });
   assert.deepEqual(coupables, [],
     `ces fichiers datent encore en UTC :\n    ${coupables.join("\n    ")}`);

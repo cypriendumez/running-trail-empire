@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { aujourdhui, jourCivil, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
 export const runtime = "nodejs";
 
@@ -78,7 +79,7 @@ export async function POST(req: Request) {
   }
 
   // Date from first timestamp
-  const dateStr = points[0].time ? points[0].time.split("T")[0] : new Date().toISOString().split("T")[0];
+  const dateStr = points[0].time ? jourCivil(points[0].time, FUSEAU_DEFAUT) : aujourdhui(FUSEAU_DEFAUT);
 
   const { data, error } = await supabase.from("workouts").insert({
     user_id: user.id,

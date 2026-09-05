@@ -6,6 +6,7 @@ import { pushIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace, 
 import { getEffectiveVma } from "@/lib/ai/coachContext";
 import { estAdmin } from "@/lib/admin/acces";
 import { identifiantsDe } from "@/lib/intervals/identifiants";
+import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
 
 // POST /api/admin/assign-session — le coach pousse la « séance du jour » à un client.
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
   };
   if (!user_id || !title?.trim()) return NextResponse.json({ error: "user_id et title requis" }, { status: 400 });
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = aujourdhui(FUSEAU_DEFAUT);
   const admin = createAdminClient();
   const { error } = await admin.from("notifications").insert({
     user_id,

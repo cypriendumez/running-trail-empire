@@ -13,6 +13,7 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 import { OB } from "./onboardingI18n";
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthLabel } from "@/data/healthCatalog";
 import { TERRAINS, terrainLabel } from "@/data/terrainCatalog";
+import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
 type Step = "watch" | "profile" | "physio" | "goals" | "done";
 
@@ -252,7 +253,7 @@ export default function OnboardingPage() {
         vma_kmh: parseFloat(vma.vma_kmh),
         max_hr: parseInt(vma.max_hr) || 190,
         resting_hr: parseInt(vma.resting_hr) || 50,
-        tested_at: new Date().toISOString().split("T")[0],
+        tested_at: aujourdhui(FUSEAU_DEFAUT),
       });
       noter(eVma, "VMA déclarée");
     }
