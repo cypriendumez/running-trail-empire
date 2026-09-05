@@ -20,6 +20,10 @@ export type TextesMotifs = {
   vfcEtNuit: string;
   vfcBasse: string;
   sommeilDegrade: (score: string) => string;
+  /** Dette CUMULÉE : la nuit dernière peut être correcte et l'athlète en manque quand même. */
+  detteSommeil: (manque: string, nuits: string) => string;
+  /** Chute d'UN matin sous sa propre base — invisible pour une moyenne de 7 jours. */
+  vfcChute: (chute: string, valeur: string, base: string) => string;
   chargeAigue: (acr: string) => string;
   monotonie: (m: string) => string;
   rpeDerniere: (rpe: string) => string;
@@ -39,6 +43,8 @@ export const MOTIF_T: Record<Lang, TextesMotifs> = {
     vfcEtNuit: "VFC en baisse ET nuit dégradée (double signal)",
     vfcBasse: "VFC sous sa base",
     sommeilDegrade: (s) => `sommeil dégradé (${s}/100)`,
+    detteSommeil: (m, n) => `dette de sommeil : ${m} de retard sur ${n} nuits`,
+    vfcChute: (c, v, b) => `VFC en chute nette ce matin (${c} sous ta base : ${v} contre ${b} ms)`,
     chargeAigue: (a) => `charge aiguë élevée (${a})`,
     monotonie: (m) => `monotonie ${m} (charge trop uniforme)`,
     rpeDerniere: (r) => `dernière séance vécue très dure (RPE ${r}/10)`,
@@ -55,6 +61,8 @@ export const MOTIF_T: Record<Lang, TextesMotifs> = {
     vfcEtNuit: "HRV falling AND a poor night (double signal)",
     vfcBasse: "HRV below its baseline",
     sommeilDegrade: (s) => `degraded sleep (${s}/100)`,
+    detteSommeil: (m, n) => `sleep debt: ${m} short over ${n} nights`,
+    vfcChute: (c, v, b) => `sharp HRV drop this morning (${c} below your baseline: ${v} vs ${b} ms)`,
     chargeAigue: (a) => `high acute load (${a})`,
     monotonie: (m) => `monotony ${m} (load too uniform)`,
     rpeDerniere: (r) => `last session felt very hard (RPE ${r}/10)`,
@@ -71,6 +79,8 @@ export const MOTIF_T: Record<Lang, TextesMotifs> = {
     vfcEtNuit: "HRV fallend UND schlechte Nacht (Doppelsignal)",
     vfcBasse: "HRV unter ihrem Ausgangswert",
     sommeilDegrade: (s) => `verschlechterter Schlaf (${s}/100)`,
+    detteSommeil: (m, n) => `Schlafdefizit: ${m} Rückstand über ${n} Nächte`,
+    vfcChute: (c, v, b) => `deutlicher HRV-Einbruch heute Morgen (${c} unter deinem Ausgangswert: ${v} statt ${b} ms)`,
     chargeAigue: (a) => `hohe akute Belastung (${a})`,
     monotonie: (m) => `Monotonie ${m} (Belastung zu gleichförmig)`,
     rpeDerniere: (r) => `letzte Einheit sehr hart empfunden (RPE ${r}/10)`,
@@ -87,6 +97,8 @@ export const MOTIF_T: Record<Lang, TextesMotifs> = {
     vfcEtNuit: "VFC a la baja Y noche degradada (doble señal)",
     vfcBasse: "VFC por debajo de su base",
     sommeilDegrade: (s) => `sueño degradado (${s}/100)`,
+    detteSommeil: (m, n) => `deuda de sueño: ${m} de retraso en ${n} noches`,
+    vfcChute: (c, v, b) => `caída marcada de la VFC esta mañana (${c} por debajo de tu base: ${v} frente a ${b} ms)`,
     chargeAigue: (a) => `carga aguda elevada (${a})`,
     monotonie: (m) => `monotonía ${m} (carga demasiado uniforme)`,
     rpeDerniere: (r) => `última sesión vivida como muy dura (RPE ${r}/10)`,
@@ -103,6 +115,8 @@ export const MOTIF_T: Record<Lang, TextesMotifs> = {
     vfcEtNuit: "VFC em queda E noite degradada (sinal duplo)",
     vfcBasse: "VFC abaixo da sua base",
     sommeilDegrade: (s) => `sono degradado (${s}/100)`,
+    detteSommeil: (m, n) => `dívida de sono: ${m} de atraso em ${n} noites`,
+    vfcChute: (c, v, b) => `queda acentuada da VFC esta manhã (${c} abaixo da sua base: ${v} contra ${b} ms)`,
     chargeAigue: (a) => `carga aguda elevada (${a})`,
     monotonie: (m) => `monotonia ${m} (carga demasiado uniforme)`,
     rpeDerniere: (r) => `última sessão sentida como muito dura (RPE ${r}/10)`,

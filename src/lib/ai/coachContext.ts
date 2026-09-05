@@ -17,7 +17,16 @@ import { warmCoolMin } from "@/lib/watch/intervals";
 import { tr, nLoc, nRaw, type I18nText } from "@/lib/i18n/multi";
 import type { Lang } from "@/lib/i18n/translations";
 import { MOTIF_T } from "@/lib/coach/reasonsI18n";
+import { detteSommeil, chuteVfc } from "@/lib/coach/recuperation";
 import { traduireDouleur } from "@/lib/coach/painZonesI18n";
+
+/** « 4 h 24 » — une dette se lit en heures, pas en 264 minutes. */
+const dureeLoc = (min: number, l: Lang) => {
+  const h = Math.floor(min / 60), m = Math.round(min % 60);
+  if (l === "en") return h ? `${h}h${String(m).padStart(2, "0")}` : `${m}min`;
+  if (l === "de") return h ? `${h} Std. ${m} Min.` : `${m} Min.`;
+  return h ? `${h} h ${String(m).padStart(2, "0")}` : `${m} min`;
+};
 import { QUALITE_T } from "@/lib/ai/qualityI18n";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
@@ -270,8 +279,8 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, shoeRes, objRes, csRes, wlRes, histRes] = await Promise.all([
     sb.from("profiles").select("*").eq("id", userId).single(),
     sb.from("performance_baselines").select("*").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).single(),
-    sb.from("hrv_data").select("hrv_ms,physiological_state,date").eq("user_id", userId).order("date", { ascending: false }).limit(14),
-    sb.from("sleep_data").select("sleep_score,total_sleep_min,deep_sleep_min,rem_sleep_min,body_battery_end,respiration_rate,date").eq("user_id", userId).order("date", { ascending: false }).limit(7),
+    sb.from("hrv_data").select("hrv_ms,physiological_state,date").eq("user_id", userId).order("date", { ascending: false }).limit(30),
+    sb.from("sleep_data").select("sleep_score,total_sleep_min,deep_sleep_min,rem_sleep_min,body_battery_end,respiration_rate,date").eq("user_id", userId).order("date", { ascending: false }).limit(30),
     fetchWorkouts(sb, userId),
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "session_feedback").order("created_at", { ascending: false }).limit(5),
     // Douleurs déclarées depuis l'espace Santé (schéma corporel) — elles n'atteignaient
@@ -379,12 +388,24 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const zoneTotal = zoneTotals.easy + zoneTotals.hard;
   const hardTimePct = zoneTotal > 600 ? Math.round((zoneTotals.hard / zoneTotal) * 100) : null;
 
-  const hrvVals = hrv.map(h => h.hrv_ms).filter((v): v is number => v != null);
+  // Les fenêtres qui suivent sont exprimées en JOURS CIVILS, plus en nombre de lignes.
+  // Mesuré le 05/09/2026 sur un compte réel : « les 14 dernières lignes » de VFC couvraient
+  // 19 jours et « les 7 dernières nuits » en couvraient 12, parce que la montre n'est pas
+  // portée tous les jours. La base annoncée au coach n'était donc pas celle qu'il lisait.
+  const dansLesJours = (d: string | null | undefined, jours: number) => {
+    const t = d ? Date.parse(String(d).slice(0, 10) + "T12:00:00Z") : NaN;
+    return Number.isFinite(t) && now - t <= jours * 86400000;
+  };
+  const hrvVals = hrv.filter(h => dansLesJours(h.date, 14)).map(h => h.hrv_ms).filter((v): v is number => v != null);
   const hrvLatest = hrvVals[0] ?? null;
   const hrvBase = hrvVals.length >= 3 ? Math.round(hrvVals.reduce((a, c) => a + c, 0) / hrvVals.length) : null;
   const hrvTrend = hrvLatest != null && hrvBase != null ? (hrvLatest >= hrvBase ? "au-dessus de sa base → frais" : "sous sa base → fatigue possible") : "n/c";
   const state = hrv[0]?.physiological_state ?? "optimal";
-  const sleepAvg = sleep.length ? Math.round(sleep.reduce((s, d) => s + (d.sleep_score ?? 0), 0) / sleep.length) : null;
+  // Un score ABSENT n'est pas un score de 0 : `?? 0` transformait une nuit non notée par
+  // la montre en nuit catastrophique. (Aucune sur ce compte, mais toutes les montres ne
+  // renseignent pas ce champ.)
+  const scoresSommeil = sleep.filter(d => dansLesJours(d.date, 7)).map(d => d.sleep_score).filter((v): v is number => v != null);
+  const sleepAvg = scoresSommeil.length ? Math.round(scoresSommeil.reduce((a, b) => a + b, 0) / scoresSommeil.length) : null;
   // Sommeil de cette nuit pris en compte SEULEMENT s'il est récent (montre portée).
   const freshSleep = sleep[0]?.date && now - new Date(sleep[0].date + "T00:00:00").getTime() <= 2 * 86400000 ? sleep[0] : null;
   const lastSleepMin = freshSleep?.total_sleep_min ?? null;
@@ -870,6 +891,12 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // On ne compte que la nuit dernière si la montre a été portée (sinon la donnée est absente,
   // pas mauvaise) — un score bas OU moins de 6 h coûtent une séance dure.
   const badNight = !!freshSleep && ((freshSleep.sleep_score != null && freshSleep.sleep_score < 60) || (lastSleepMin != null && lastSleepMin < 360));
+  // DETTE : la règle ci-dessus ne regarde qu'UNE nuit. 3 h 23 puis 5 h 13 puis 6 h 51 se
+  // termine sur une nuit « correcte » — rien ne s'allumait alors qu'il manque 4,4 h.
+  const dette = detteSommeil(sleep, todayStr);
+  // CHUTE AIGUË : la tendance 7 j vs 7 j ne bouge presque pas pour une seule mauvaise
+  // matinée. Le 17/06, VFC à 76 pour une base à 103, et la tendance était EN HAUSSE.
+  const vfcAigue = chuteVfc(hrv, todayStr);
   const noHistory = runs.length === 0;
   const fade = qe?.fadeSec ?? null;
   const faded = fade != null && fade >= 10;
@@ -936,6 +963,13 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   if (hrvWeekTrend?.startsWith("↓") && badNight) redFlags.push(tr((l) => MOTIF_T[l].vfcEtNuit));
   if (hrvWeekTrend?.startsWith("↓")) orangeFlags.push(tr((l) => MOTIF_T[l].vfcBasse));
   if (badNight) orangeFlags.push(tr((l) => MOTIF_T[l].sommeilDegrade(String(freshSleep?.sleep_score ?? "?"))));
+  if (dette) orangeFlags.push(tr((l) => MOTIF_T[l].detteSommeil(dureeLoc(dette.manqueMin, l), nRaw(dette.nuits, l))));
+  // Seule, la chute aiguë vaut un avertissement ; confirmée par le sommeil, c'est le
+  // double signal qui coûte la séance dure.
+  if (vfcAigue) {
+    const motif = tr((l) => MOTIF_T[l].vfcChute(`-${nRaw(vfcAigue.chutePct, l)} %`, nRaw(vfcAigue.valeur, l), nRaw(vfcAigue.base, l)));
+    if (badNight || dette) redFlags.push(motif); else orangeFlags.push(motif);
+  }
   if (load.acr > 1.5 && load.acr <= 1.8) orangeFlags.push(tr((l) => MOTIF_T[l].chargeAigue(nLoc(load.acr, l, 1))));
   if (monotony > 2) orangeFlags.push(tr((l) => MOTIF_T[l].monotonie(nRaw(monotony, l))));
   if (lastRpe != null && lastRpe >= 8) orangeFlags.push(tr((l) => MOTIF_T[l].rpeDerniere(nRaw(lastRpe, l))));
