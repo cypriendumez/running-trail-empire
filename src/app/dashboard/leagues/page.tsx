@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { LeaguesHub } from "@/components/gamification/LeaguesHub";
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 import { computeStreak, jourLocal, decaleJour, type StreakWorkout, type StreakPrescription } from "@/lib/streak/compute";
+import { lecturesEnEchec } from "@/lib/dashboard/lectures";
 
 export const metadata = { title: "Ligues & Gamification" };
 
@@ -26,9 +27,9 @@ export default async function LeaguesPage() {
   const yearStart = `${now.getFullYear()}-01-01`;
 
   const [
-    { data: profile },
+    profileRes,
     { data: myMembership },
-    { data: workouts },
+    workoutsRes,
     { data: userBadges },
     { data: challenges },
     { data: streakPlan },
@@ -76,6 +77,20 @@ export default async function LeaguesPage() {
       .eq("user_id", user.id).eq("type", "session_feedback")
       .order("created_at", { ascending: false }).limit(200),
   ]);
+
+  /**
+   * ⚠️ DES ZÉROS NE SONT PAS UN CLASSEMENT.
+   *
+   * Cette page bâtit les statistiques de l'athlète — kilomètres, séances, dénivelé,
+   * records — à partir de `workouts`. Sans contrôle, un échec de lecture rendait `[]`
+   * et l'écran affichait « 0 km · 0 séance » à quelqu'un qui court depuis des mois.
+   * Sur une page de progression, c'est le message le plus décourageant possible, et il
+   * est faux.
+   */
+  const profile = profileRes.data;
+  const workouts = workoutsRes.data;
+  const statsEnPanne = lecturesEnEchec([["profil", profileRes], ["seances", workoutsRes]]).length > 0;
+  if (statsEnPanne) console.error("[ligues] statistiques illisibles");
 
   // If in a league, fetch all members of that league
   let leagueMembers: Record<string, unknown>[] = [];
@@ -351,6 +366,7 @@ export default async function LeaguesPage() {
 
   return (
     <LeaguesHub
+      enPanne={statsEnPanne}
       userId={user.id}
       profile={profile as Record<string, unknown>}
       myMembership={myMembership as Record<string, unknown> | null}

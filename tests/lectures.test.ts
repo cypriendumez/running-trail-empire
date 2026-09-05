@@ -121,5 +121,34 @@ test("un catalogue de courses vide par accident le DIT", () => {
   assert.equal([...i18n.matchAll(/"races\.enPanne"\s*:/g)].length, 5, "le message manque à une langue");
 });
 
+test("santé et ligues distinguent aussi la panne du vide", () => {
+  /**
+   * Les deux derniers écrans de la famille.
+   *  · SANTÉ — ces lignes sont les douleurs que l'athlète a DÉCLARÉES lui-même, et la
+   *    mémoire dans laquelle puise le kiné IA. Un historique vierge par accident
+   *    donne à croire que l'application a oublié ce qu'on lui a dit.
+   *  · LIGUES — la page bâtit kilomètres, séances, dénivelé et records à partir des
+   *    séances. Sans contrôle, elle affichait « 0 km · 0 séance » à quelqu'un qui court
+   *    depuis des mois : sur une page de progression, le message le plus décourageant
+   *    possible, et il est faux.
+   */
+  const sante = codeNu("src/app/dashboard/health/page.tsx");
+  assert.ok(/estUnePanne\(\{ error \}\)/.test(sante), "la page Santé ne juge plus sa lecture");
+  assert.ok(/enPanne=\{enPanne\}/.test(sante), "l'information n'atteint plus l'écran Santé");
+  const centre = codeNu("src/components/health/HealthCenter.tsx");
+  assert.ok(/\{enPanne && \(/.test(centre), "le bandeau de Santé n'est plus rendu");
+  assert.equal([...readFileSync("src/components/health/HealthCenter.tsx", "utf8")
+    .matchAll(/"h\.enPanne":/g)].length, 5, "le message de Santé manque à une langue");
+
+  const ligues = codeNu("src/app/dashboard/leagues/page.tsx");
+  assert.ok(/lecturesEnEchec\(\[\["profil", profileRes\], \["seances", workoutsRes\]\]\)/.test(ligues),
+    "la page Ligues ne surveille plus ses deux lectures de statistiques");
+  assert.ok(/enPanne=\{statsEnPanne\}/.test(ligues), "l'information n'atteint plus l'écran Ligues");
+  const hub = codeNu("src/components/gamification/LeaguesHub.tsx");
+  assert.ok(/\{enPanne && \(/.test(hub), "le bandeau des Ligues n'est plus rendu");
+  assert.equal([...readFileSync("src/components/gamification/leaguesI18n.ts", "utf8")
+    .matchAll(/"enPanne":/g)].length, 5, "le message des Ligues manque à une langue");
+});
+
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }

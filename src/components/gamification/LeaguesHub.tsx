@@ -7,8 +7,7 @@ import { toast } from "sonner";
 import {
   Trophy, Zap, Users, Star, TrendingUp, TrendingDown, Minus,
   Lock, CheckCircle, Flame, Medal, Plus, ChevronRight,
-  MapPin, Calendar, BarChart2, Target, Crown, Mountain, CalendarClock,
-} from "lucide-react";
+  MapPin, Calendar, BarChart2, Target, Crown, Mountain, CalendarClock, AlertTriangle } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { LX, UNIT_T, CH_T } from "./leaguesI18n";
 import { BADGE_T } from "./leaguesBadgesI18n";
@@ -84,8 +83,10 @@ function Avatar({ name, url, size = 8 }: { name: string; url?: string; size?: nu
 // ── Main Component ─────────────────────────────────────────────────────────────
 export function LeaguesHub({
   userId, profile, myMembership, leagueMembers, computedBadges,
-  myChallenges, availableChallenges, autoChallenges, stats, records,
+  myChallenges, availableChallenges, autoChallenges, stats, records, enPanne = false,
 }: {
+  /** La lecture des séances a ÉCHOUÉ : les statistiques sont à zéro par accident. */
+  enPanne?: boolean;
   userId: string;
   profile: Record<string, unknown>;
   myMembership: Record<string, unknown> | null;
@@ -148,6 +149,14 @@ export function LeaguesHub({
 
   return (
     <div className="space-y-4 pb-10">
+      {/* ⚠️ « 0 km · 0 séance » à quelqu'un qui court depuis des mois est le message le
+          plus décourageant possible — et il serait faux. */}
+      {enPanne && (
+        <div className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm">
+          <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-rose-500" />
+          <p className="text-rose-800">{d["enPanne"]}</p>
+        </div>
+      )}
 
       {/* ── Stats banner ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

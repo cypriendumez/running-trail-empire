@@ -20,7 +20,7 @@ function fill(s: string, p?: Record<string, string | number>) {
 }
 const H: Record<string, Record<string, string>> = {
   fr: {
-    "h.title": "Santé & Performance", "h.subtitle": "Votre kiné IA, votre journal, votre sécurité et votre nutrition — au même endroit.",
+    "h.enPanne": "Tes douleurs déclarées n'ont pas pu être chargées. Cet historique paraît vide, mais rien n'est perdu — réessaie dans un instant.", "h.title": "Santé & Performance", "h.subtitle": "Votre kiné IA, votre journal, votre sécurité et votre nutrition — au même endroit.",
     "tab.kine": "Kiné IA", "tab.journal": "Journal", "tab.guardian": "Guardian", "tab.nutrition": "Nutrition", "tab.poids": "Poids",
     "k.where": "Où as-tu mal ?", "view.face": "Face", "view.dos": "Dos",
     "k.hint": "Touche une zone sur le corps ou dans la liste, ajuste la douleur, puis demande au kiné.",
@@ -58,7 +58,7 @@ const H: Record<string, Record<string, string>> = {
     "ex.def.1n": "Mobilité articulaire douce", "ex.def.1d": "Amplitudes progressives, sans douleur", "ex.def.2n": "Protocole PEACE & LOVE", "ex.def.2d": "Protège, élève, charge progressive, vascularise",
   },
   en: {
-    "h.title": "Health & Performance", "h.subtitle": "Your AI physio, your journal, your safety and your nutrition — all in one place.",
+    "h.enPanne": "Your reported pains could not be loaded. This history looks empty, but nothing is lost — try again in a moment.", "h.title": "Health & Performance", "h.subtitle": "Your AI physio, your journal, your safety and your nutrition — all in one place.",
     "tab.kine": "AI Physio", "tab.journal": "Journal", "tab.guardian": "Guardian", "tab.nutrition": "Nutrition", "tab.poids": "Weight",
     "k.where": "Where does it hurt?", "view.face": "Front", "view.dos": "Back",
     "k.hint": "Tap a zone on the body or in the list, adjust the pain, then ask the physio.",
@@ -96,7 +96,7 @@ const H: Record<string, Record<string, string>> = {
     "ex.def.1n": "Gentle joint mobility", "ex.def.1d": "Progressive range of motion, pain-free", "ex.def.2n": "PEACE & LOVE protocol", "ex.def.2d": "Protect, elevate, progressive load, perfuse",
   },
   de: {
-    "h.title": "Gesundheit & Leistung", "h.subtitle": "Dein KI-Physio, dein Tagebuch, deine Sicherheit und deine Ernährung — alles an einem Ort.",
+    "h.enPanne": "Deine gemeldeten Schmerzen konnten nicht geladen werden. Der Verlauf wirkt leer, es ist aber nichts verloren — versuch es gleich nochmal.", "h.title": "Gesundheit & Leistung", "h.subtitle": "Dein KI-Physio, dein Tagebuch, deine Sicherheit und deine Ernährung — alles an einem Ort.",
     "tab.kine": "KI-Physio", "tab.journal": "Tagebuch", "tab.guardian": "Guardian", "tab.nutrition": "Ernährung", "tab.poids": "Gewicht",
     "k.where": "Wo tut es weh?", "view.face": "Vorne", "view.dos": "Hinten",
     "k.hint": "Tippe eine Zone am Körper oder in der Liste an, stelle die Schmerzen ein und frage den Physio.",
@@ -134,7 +134,7 @@ const H: Record<string, Record<string, string>> = {
     "ex.def.1n": "Sanfte Gelenkmobilität", "ex.def.1d": "Progressive Bewegungsamplitude, schmerzfrei", "ex.def.2n": "PEACE & LOVE Protokoll", "ex.def.2d": "Schützen, hochlagern, progressiv belasten, durchbluten",
   },
   es: {
-    "h.title": "Salud y Rendimiento", "h.subtitle": "Tu fisio IA, tu diario, tu seguridad y tu nutrición — todo en un solo lugar.",
+    "h.enPanne": "Tus dolores declarados no se han podido cargar. Este historial parece vacío, pero no se ha perdido nada — inténtalo de nuevo en un momento.", "h.title": "Salud y Rendimiento", "h.subtitle": "Tu fisio IA, tu diario, tu seguridad y tu nutrición — todo en un solo lugar.",
     "tab.kine": "Fisio IA", "tab.journal": "Diario", "tab.guardian": "Guardian", "tab.nutrition": "Nutrición", "tab.poids": "Peso",
     "k.where": "¿Dónde te duele?", "view.face": "Frente", "view.dos": "Espalda",
     "k.hint": "Toca una zona del cuerpo o de la lista, ajusta el dolor y pregunta al fisio.",
@@ -172,7 +172,7 @@ const H: Record<string, Record<string, string>> = {
     "ex.def.1n": "Movilidad articular suave", "ex.def.1d": "Amplitudes progresivas, sin dolor", "ex.def.2n": "Protocolo PEACE & LOVE", "ex.def.2d": "Protege, eleva, carga progresiva, vasculariza",
   },
   pt: {
-    "h.title": "Saúde e Desempenho", "h.subtitle": "O teu fisio IA, o teu diário, a tua segurança e a tua nutrição — tudo no mesmo sítio.",
+    "h.enPanne": "As tuas dores declaradas não puderam ser carregadas. Este histórico parece vazio, mas nada se perdeu — tenta novamente daqui a pouco.", "h.title": "Saúde e Desempenho", "h.subtitle": "O teu fisio IA, o teu diário, a tua segurança e a tua nutrição — tudo no mesmo sítio.",
     "tab.kine": "Fisio IA", "tab.journal": "Diário", "tab.guardian": "Guardian", "tab.nutrition": "Nutrição", "tab.poids": "Peso",
     "k.where": "Onde te dói?", "view.face": "Frente", "view.dos": "Costas",
     "k.hint": "Toca numa zona do corpo ou na lista, ajusta a dor e pergunta ao fisio.",
@@ -309,7 +309,7 @@ function AnimatedNumber({ value, className }: { value: number; className?: strin
   return <span className={className}>{display.toLocaleString()}</span>;
 }
 
-export function HealthCenter({ suivi = [] }: { suivi?: SuiviZone[] }) {
+export function HealthCenter({ suivi = [], enPanne = false }: { suivi?: SuiviZone[]; /** La lecture des douleurs a ÉCHOUÉ : l'historique est vide par accident. */ enPanne?: boolean }) {
   const { lang } = useT();
   const tr: Tr = (k, p) => fill(H[lang]?.[k] ?? H.fr[k] ?? k, p);
   const [tab, setTab] = useState<Tab>("kine");
@@ -424,6 +424,13 @@ export function HealthCenter({ suivi = [] }: { suivi?: SuiviZone[] }) {
 
   return (
     <div className="space-y-5">
+      {/* ⚠️ Un historique vide par accident se lit comme « l'app a oublié mes douleurs ». */}
+      {enPanne && (
+        <div className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm">
+          <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-rose-500" />
+          <p className="text-rose-800">{tr("h.enPanne")}</p>
+        </div>
+      )}
       {/* En-tête — hero */}
       <div className="flex items-center gap-3.5">
         <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-[0_10px_26px_-10px_rgba(16,185,129,0.65)]">
