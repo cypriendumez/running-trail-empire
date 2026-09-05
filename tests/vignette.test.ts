@@ -179,7 +179,17 @@ test("la carte remplace le tracé nu dans le fil", () => {
   assert.match(src, /tailleTuileDe\(CLE_CARTE\)/, "la taille des tuiles n'est plus déduite du fournisseur");
   assert.match(src, /attributionCarte\(CLE_CARTE\)/, "les tuiles seraient affichées sans être créditées");
   const carte = codeOf("src/components/activity/FeedCard.tsx");
-  assert.match(carte, /loading="lazy"/, "quinze cartes chargeraient leurs tuiles avant tout défilement");
+  // La garantie a CHANGÉ avec le passage au SVG : `loading="lazy"` n'existe pas sur
+  // `<image>`, donc ce n'est plus le différé qui borne la facture mais la pagination.
+  // Ce qui doit être garanti désormais, c'est que la carte SE METTE À L'ÉCHELLE —
+  // sans `viewBox`, on revient à une largeur figée et à un tracé minuscule sur grand
+  // écran, exactement le défaut signalé.
+  assert.match(carte, /<svg viewBox=\{`0 0 \$\{plan\.largeur\} \$\{plan\.hauteur\}`\}/,
+    "la carte n'a plus de viewBox : elle cessera de s'adapter à la largeur du cadre");
+  assert.match(carte, /className="block h-auto w-full/, "la carte ne remplit plus la largeur du cadre");
+  const parPage = Number(codeOf("src/app/dashboard/activites/page.tsx").match(/const PAR_PAGE = (\d+);/)?.[1]);
+  assert.ok(parPage >= 1 && parPage <= 15,
+    `PAR_PAGE = ${parPage} : les tuiles n'étant plus différées, c'est la pagination qui borne le poids de la page`);
   // On vise la PROPRIÉTÉ, pas le nombre de balises : rendre le liseré transparent
   // laissait deux <path> en place et ce test au vert (trouvé par mutation).
   const blanc = carte.match(/stroke="#ffffff"[^/]*?strokeWidth=\{([\d.]+)\}/);
@@ -188,6 +198,23 @@ test("la carte remplace le tracé nu dans le fil", () => {
   assert.ok(couleur, "le tracé coloré a disparu");
   assert.ok(Number(blanc![1]) > Number(couleur![1]),
     `le liseré (${blanc![1]}) doit être PLUS LARGE que le tracé (${couleur![1]}), sinon il ne le borde pas`);
+});
+
+test("le parcours REMPLIT le cadre, il ne flotte pas au milieu", () => {
+  // Le défaut signalé le 06/09/2026 : « l'encadré est trop petit ». La cause n'était pas
+  // la taille du cadre mais la marge — le tracé était confiné dans une bande centrale
+  // (pour qu'un téléphone ne le coupe pas) et n'occupait plus que 45 % de la largeur.
+  const src = codeOf("src/app/dashboard/activites/page.tsx");
+  assert.match(src, /margeX: MARGE_X, margeY: MARGE_Y/,
+    "le cadrage n'utilise plus les marges nommées : une valeur en dur peut reconfiner le tracé");
+  const n = (cle: string) => Number(src.match(new RegExp(`${cle} = (\\d+)`))?.[1]);
+  const [L, H, mx, my] = [n("LARGEUR"), n("HAUTEUR"), n("MARGE_X"), n("MARGE_Y")];
+  for (const [nom, v] of [["LARGEUR", L], ["HAUTEUR", H], ["MARGE_X", mx], ["MARGE_Y", my]] as const)
+    assert.ok(Number.isFinite(v) && v > 0, `${nom} illisible dans la page`);
+  assert.ok((L - 2 * mx) / L >= 0.85,
+    `le tracé n'occupe que ${Math.round((L - 2 * mx) / L * 100)} % de la largeur du cadre`);
+  assert.ok((H - 2 * my) / H >= 0.75,
+    `le tracé n'occupe que ${Math.round((H - 2 * my) / H * 100)} % de la hauteur du cadre`);
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

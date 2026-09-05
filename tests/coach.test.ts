@@ -88,6 +88,7 @@ import {
   computeStreak, decaleJour, ecartJours, acwrAu, jourLocal,
   type StreakWorkout as SW,
 } from "../src/lib/streak/compute";
+import { aujourdhui, FUSEAU_DEFAUT } from "../src/lib/time/fuseau";
 
 let passed = 0;
 const fails: string[] = [];
@@ -4010,7 +4011,11 @@ test("le cap prend le PLUS COURT chemin angulaire", () => {
 });
 
 console.log("\nE-MAIL « TON PLAN EST À JOUR » — un envoi ne se rattrape pas");
-const iso0 = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+// ⚠️ DATE CIVILE DE PARIS, pas UTC. Avec `Date.now()`, ce décor décrivait le 5 septembre
+// alors que l'e-mail, lui, raisonnait sur le 6 : entre minuit et 2 h à Paris ces tests
+// devenaient rouges chaque nuit. Un test qui crie au loup deux heures par jour finit
+// par être ignoré. (C'est ce faux rouge qui a fait découvrir le vrai défaut du module.)
+const iso0 = (n: number) => decaleJour(aujourdhui(FUSEAU_DEFAUT), n);
 const mailIn = (o: Partial<Parameters<typeof buildPlanReadyEmail>[0]> = {}) => buildPlanReadyEmail({
   lang: "fr", firstName: "Cyprien",
   lastSession: { date: iso0(0), label: "Seuil/Tempo · 15 km · 64 min · 4'19/km", shows: ["allure tenue du début à la fin"], effect: "Fraîcheur orange → 1 séance de qualité." },
@@ -4029,6 +4034,36 @@ test("le sujet annonce la prochaine séance, pas celle d'aujourd'hui", () => {
   const m = mailIn();
   assert.ok(/Demain/.test(m.subject), `sujet sans repère de temps : ${m.subject}`);
   assert.ok(/Footing en endurance/.test(m.subject), `sujet sans la prochaine séance : ${m.subject}`);
+});
+test("une séance PASSÉE n'est jamais annoncée comme la prochaine", () => {
+  // Il suffit d'un plan calculé hier et d'un envoi ce matin : l'ancienne règle écartait
+  // « aujourd'hui » mais pas la veille, et annonçait donc une séance déjà courue.
+  const m = mailIn({ days: [
+    { date: iso0(-1), type: "Endurance", title: "Footing d'hier", detail: "" },
+    { date: iso0(0), type: "Seuil", title: "Séance du jour", detail: "" },
+    { date: iso0(2), type: "VMA", title: "Séance VMA", detail: "" },
+  ] });
+  assert.ok(!/hier/i.test(m.subject), `séance passée annoncée : ${m.subject}`);
+  assert.ok(/VMA/.test(m.subject), `la prochaine séance à venir n'est pas annoncée : ${m.subject}`);
+});
+test("« Demain » se déduit d'aujourd'hui, pas de l'horloge UTC", () => {
+  // ⚠️ `today` venait du fuseau de Paris et `tomorrow` d'un `toISOString()` : entre
+  // minuit et 2 h à Paris les deux valaient le même jour et « Demain » disparaissait.
+  // Le serveur étant aux États-Unis, l'écart est la règle, pas l'exception.
+  const m = mailIn({ days: [
+    { date: iso0(0), type: "Seuil", title: "Séance du jour", detail: "" },
+    { date: iso0(1), type: "Endurance", title: "Footing en endurance", detail: "" },
+  ] });
+  assert.ok(/Demain/.test(m.subject), `le lendemain n'est pas nommé « Demain » : ${m.subject}`);
+  assert.ok(!/Aujourd/.test(m.subject), `la séance du jour est annoncée comme prochaine : ${m.subject}`);
+  // Le comportement ci-dessus ne diverge que pendant les deux heures où Paris et UTC
+  // ne sont pas le même jour : hors de cette fenêtre, le bug était INVISIBLE. On fige
+  // donc aussi la façon de calculer, pour que le garde-fou tienne à toute heure.
+  const src = codeOf("src/lib/notify/planReady.ts");
+  assert.match(src, /const tomorrow = decaleJour\(today, 1\);/,
+    "« demain » ne se déduit plus d'aujourd'hui : le décalage de fuseau reviendra");
+  assert.doesNotMatch(src, /Date\.now\(\) \+ 86400000/,
+    "une date d'affichage est de nouveau calculée sur l'horloge UTC");
 });
 test("le repos n'est jamais annoncé comme la prochaine séance", () => {
   const m = mailIn({ days: [

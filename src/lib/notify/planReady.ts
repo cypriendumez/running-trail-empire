@@ -27,6 +27,7 @@ import type { Lang } from "@/lib/i18n/translations";
 import { coquille, carte, titreBloc, pastille, bouton, esc, VERT } from "@/lib/notify/gabarit";
 import { EDITEUR } from "@/lib/brand/editeur";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
+import { decaleJour } from "@/lib/streak/compute";
 
 /** Deux séances dans la même matinée ne valent pas deux e-mails. */
 export const EMAIL_MIN_INTERVAL_MS = 3 * 60 * 60 * 1000;
@@ -162,7 +163,12 @@ export function buildPlanReadyEmail(i: PlanReadyInput): { subject: string; text:
   const loc = LOCALE[i.lang] ?? "fr-FR";
   const days = i.days.slice(0, 3);
   const today = aujourdhui(FUSEAU_DEFAUT);
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  // ⚠️ « Demain » se déduit d'AUJOURD'HUI, pas de l'horloge. `Date.now() + 86400000`
+  // rendait une date UTC alors que `today` est une date de Paris : entre minuit et 2 h
+  // à Paris (22 h–24 h UTC) les deux valaient le MÊME jour, si bien que « Demain »
+  // n'apparaissait jamais et que la séance du lendemain était annoncée par sa date
+  // complète. Le serveur étant aux États-Unis, l'écart est la règle, pas l'exception.
+  const tomorrow = decaleJour(today, 1);
   const dayLabel = (d: string) =>
     d === today ? t.today
     : d === tomorrow ? t.tomorrow
@@ -170,7 +176,11 @@ export function buildPlanReadyEmail(i: PlanReadyInput): { subject: string; text:
 
   // Le sujet annonce la PROCHAINE séance qui n'est ni du repos ni aujourd'hui : c'est
   // la seule information que l'athlète lit vraiment dans sa liste d'e-mails.
-  const next = days.find((d) => d.date !== today && !/repos|rest/i.test(d.type)) ?? days[0] ?? null;
+  // Une séance PASSÉE n'est pas « la prochaine ». `d.date !== today` laissait passer la
+  // veille : il suffit d'un plan calculé hier et d'un envoi ce matin pour annoncer une
+  // séance déjà faite — une information morte dans une boîte de réception.
+  const next = days.find((d) => d.date > today && !/repos|rest/i.test(d.type))
+    ?? days.find((d) => d.date > today) ?? null;
   // Le TYPE reste français (c'est lui qu'on filtre) ; le TITRE, lui, est ce que l'athlète lit.
   const titre = (d: PlanDayLite) => d.i18n?.[i.lang]?.title ?? d.title;
   const subject = next ? t.subject(`${dayLabel(next.date)} · ${titre(next)}`) : t.subjectNoNext;

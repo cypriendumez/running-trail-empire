@@ -7,6 +7,8 @@ import { PerfTabs } from "@/components/segments/PerfTabs";
 import { FeedCard, type LigneFil } from "@/components/activity/FeedCard";
 import { planCarte, urlTuile, tailleTuileDe, attributionCarte } from "@/lib/activities/tuiles";
 import { cleanActivityName } from "@/lib/utils/activityName";
+import { asSport } from "@/lib/intervals/sport";
+import { SPORT_LABEL_T } from "@/lib/intervals/sportI18n";
 import { estUnePanne } from "@/lib/dashboard/lectures";
 import { formatDateCivile } from "@/lib/time/fuseau";
 import { getAccountLang } from "@/lib/i18n/serverLang";
@@ -18,14 +20,12 @@ export const metadata = { title: "Activités" };
 /** Une page de fil. Chaque trace pesant ~40 Ko côté serveur, on n'en charge pas 50. */
 const PAR_PAGE = 15;
 
-// Carte pleine largeur, comme sur Strava. Elle est RENDUE à 720 px et centrée : le
-// parcours, lui, est calé dans une bande de 380 px au milieu, si bien qu'un téléphone
-// rogne du décor et jamais le tracé.
-const LARGEUR = 720, HAUTEUR = 184;
-// 320 et pas 380 : sur un écran de 375 px, la carte ne dispose que de 343 px une
-// fois les marges de la carte retirées — un parcours calé sur 380 px sortait du
-// cadre par la droite. Constaté à l'écran, pas déduit.
-const BANDE_SURE = 320;
+// Carte pleine largeur. Ces dimensions sont un REPÈRE INTERNE, pas des pixels d'écran :
+// le SVG les met à l'échelle du cadre réel. Le parcours peut donc occuper presque tout
+// l'espace — plus besoin de le confiner dans une bande centrale pour protéger le mobile.
+// Rapport 38/15, repris tel quel dans la classe `aspect-[38/15]` du cadre.
+const LARGEUR = 760, HAUTEUR = 300;
+const MARGE_X = 46, MARGE_Y = 30;
 // ⚠️ Clé PUBLIQUE par conception (les tuiles sont demandées par le navigateur), et
 // c'est la SEULE variable de carte lisible ici : sans elle on retombe sur les tuiles
 // OpenStreetMap, qui font 256 px et non 512 — d'où `tailleTuileDe`, sans quoi toute
@@ -103,7 +103,7 @@ export default async function ActivitesPage({ searchParams }: { searchParams: Pr
     // chaque point retiré est autant de HTML en moins sur une page qui en compte 15.
     const allege = pts.length > 500 ? pts.filter((_, i) => i % Math.ceil(pts.length / 500) === 0) : pts;
     const plan = planCarte(allege, { largeur: LARGEUR, hauteur: HAUTEUR, tailleTuile: TAILLE_TUILE,
-      margeX: (LARGEUR - BANDE_SURE) / 2, margeY: 14 });
+      margeX: MARGE_X, margeY: MARGE_Y });
     const chiffres = [
       { label: d["feed.distance"], valeur: km != null ? `${fmtNombre(km, lang, 1)} km` : SANS_VALEUR },
       { label: d["feed.pace"], valeur: km != null && sec != null ? allure(sec, km, lang) : SANS_VALEUR },
@@ -114,6 +114,8 @@ export default async function ActivitesPage({ searchParams }: { searchParams: Pr
     if (dplus != null) chiffres.push({ label: d["feed.elev"], valeur: `${Math.round(dplus)} m` });
     return {
       href: `/dashboard/activite?date=${String(s.date).slice(0, 10)}&dist=${s.distance_km ?? ""}&title=${encodeURIComponent(s.title ?? "")}`,
+      sport: asSport(s.sport ?? s.type),
+      sportLisible: SPORT_LABEL_T[lang][asSport(s.sport ?? s.type)],
       titre: cleanActivityName(s.title) || s.type || s.sport || d["feed.title"],
       dateLisible: formatDateCivile(s.date, lang, { weekday: "long", day: "numeric", month: "long" }),
       carte: plan ? { plan, urls: plan.tuiles.map((t) => urlTuile(t, CLE_CARTE)) } : null,
