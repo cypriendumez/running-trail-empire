@@ -14,6 +14,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import type { AthleteContext } from "@/lib/ai/coachContext";
 import { heatAdvice, windAdvice } from "@/lib/weather/openMeteo";
+import { choisirJourQualite } from "@/lib/coach/meteoPlacement";
 import { scinderFacile, seanceMatinFacile } from "@/lib/coach/doubleSessions";
 import { PLAN_T } from "@/lib/ai/planI18n";
 import { nRaw, type I18nText } from "@/lib/i18n/multi";
@@ -157,16 +158,24 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
    * en alarme d'allure — l'athlète recevait donc une cible impossible, contredite deux
    * lignes plus bas par une note lui disant de lever le pied. On corrige le nombre.
    */
+  // Chaleur ET vent : les deux ralentissent, et ils se cumulent.
+  // La chaleur s'apprivoise (10-14 j d'exposition) ; le vent, non.
+  // Un seul endroit calcule ce surcoût : il sert à RALENTIR l'allure du jour ET à
+  // CHOISIR le jour de la séance de qualité, qui ne peuvent donc pas se contredire.
+  const penaliteMeteo = (i: number): number => {
+    const f = ctx.forecast.find((x) => x.date === iso(dates[i]));
+    if (!f) return 0;
+    return Math.round(heatAdvice(f.tempMax, f.humidity).penaltySecPerKm * ctx.heatAcclim.factor)
+      + windAdvice(f.windMaxKmh).penaltySecPerKm;
+  };
+
   const paceFor = (i: number): string | null => {
     const base = ctx.easyPace;
     if (!base) return null;
     const m = base.match(/(\d+)['’:](\d{2})/);
     const f = ctx.forecast.find((x) => x.date === iso(dates[i]));
     if (!m || !f) return base;
-    // Chaleur ET vent : les deux ralentissent, et ils se cumulent.
-    // La chaleur s'apprivoise (10-14 j d'exposition) ; le vent, non.
-    const penalty = Math.round(heatAdvice(f.tempMax, f.humidity).penaltySecPerKm * ctx.heatAcclim.factor)
-      + windAdvice(f.windMaxKmh).penaltySecPerKm;
+    const penalty = penaliteMeteo(i);
     if (!penalty) return base;
     const sec = Number(m[1]) * 60 + Number(m[2]) + penalty;
     return `${Math.floor(sec / 60)}'${String(sec % 60).padStart(2, "0")}`;
@@ -454,9 +463,14 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // à quinze jours de l'objectif, soit exactement ce que l'affûtage doit empêcher.
   const maxByTaper = ctx.cycle.taper ? (longIdx >= 0 ? 1 : 2) : 99;
   const quality = wp.quality.slice(0, Math.min(wp.quality.length, maxByVolume, maxByFrequency, maxByTaper));
-  for (const q of quality) {
-    let idx = -1;
-    for (let i = dayZeroDropped ? 1 : 0; i <= 6; i++) if (canRun(i) && okSpacing(i) && !coolerExists(i)) { idx = i; break; }
+  for (let qi = 0; qi < quality.length; qi++) {
+    const q = quality[qi];
+    // Tous les jours possibles, plus seulement le premier : c'est ce qui permet à la
+    // météo de départager. Sans cette liste, une séance de VMA pouvait tomber sur le
+    // jour à 25 s/km de pénalité alors qu'un jour à 0 attendait 48 h plus tard.
+    const eligibles: number[] = [];
+    for (let i = dayZeroDropped ? 1 : 0; i <= 6; i++) if (canRun(i) && okSpacing(i) && !coolerExists(i)) eligibles.push(i);
+    let idx = choisirJourQualite(eligibles, penaliteMeteo, quality.length - 1 - qi);
     // Le repli ignorait `dayZeroDropped` : il replaçait la qualité sur le jour même,
     // que l'étape 7 convertissait ensuite en récupération. La séance disparaissait donc
     // de la semaine — le défaut que le premier correctif était censé supprimer, intact
