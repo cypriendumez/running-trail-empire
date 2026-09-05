@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CalendarView, type Planned, type PlannedText, type CalNote, type CalRace, type CoachState } from "@/components/training/CalendarView";
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
+import { estUnePanne } from "@/lib/dashboard/lectures";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Calendrier" };
@@ -11,7 +12,7 @@ export default async function CalendrierPage() {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data }, { data: settingsRow }, { data: profileRow }, { data: objRow }, { data: stateRow }] = await Promise.all([
+  const [seancesRes, { data: settingsRow }, { data: profileRow }, { data: objRow }, { data: stateRow }] = await Promise.all([
     sb.from("notifications").select("id, type, title, data, created_at")
       .eq("user_id", user.id).in("type", ["coach_session", "client_note", "planned_race"])
       .order("created_at", { ascending: false }).limit(200),
@@ -26,6 +27,22 @@ export default async function CalendrierPage() {
     // moment de la génération, donc toujours cohérent avec les séances affichées).
     sb.from("notifications").select("data").eq("user_id", user.id).eq("type", "auto_coach_state").maybeSingle(),
   ]);
+
+  /**
+   * ⚠️ UN CALENDRIER VIDE N'EST PAS UN CALENDRIER EN PANNE.
+   *
+   * Cette lecture ramène TOUT le contenu de l'écran — séances du coach, notes, courses
+   * planifiées. Son erreur n'était pas lue : en cas d'échec, `data` vaut `null`, le
+   * `?? []` prend le relais, et l'athlète voit un calendrier VIDE. Or c'est le mois de
+   * son plan d'entraînement : lui montrer un mois blanc revient à lui dire que son
+   * plan a disparu.
+   *
+   * `PGRST116` n'est pas concerné ici (pas de `.single()`), mais on passe par le même
+   * juge que le tableau de bord pour qu'il n'existe qu'une définition de « panne ».
+   */
+  const data = seancesRes.data;
+  const lectureEnPanne = estUnePanne(seancesRes);
+  if (lectureEnPanne) console.error("[calendrier] séances illisibles :", seancesRes.error?.message);
   const us = (settingsRow?.data ?? {}) as Record<string, unknown>;
   const weekStart: "mon" | "sun" = String(us.weekStart ?? "mon") === "sun" ? "sun" : "mon";
   const units: "metric" | "imperial" = String(us.unitSystem ?? "metric") === "imperial" ? "imperial" : "metric";
@@ -73,7 +90,7 @@ export default async function CalendrierPage() {
   // Le hero (présentation + détail réactif de la séance sélectionnée) vit désormais dans CalendarView.
   return (
     <>
-      <CalendarView sessions={sessions} notes={notes} races={races} coachState={coachState} weekStart={weekStart} units={units} warmupMin={warmupMin} cooldownMin={cooldownMin} />
+      <CalendarView enPanne={lectureEnPanne} sessions={sessions} notes={notes} races={races} coachState={coachState} weekStart={weekStart} units={units} warmupMin={warmupMin} cooldownMin={cooldownMin} />
     </>
   );
 }

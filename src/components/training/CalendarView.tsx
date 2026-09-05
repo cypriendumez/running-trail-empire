@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
   Target, X, Plus, StickyNote, Flag, Loader2, Trash2,
   ChevronLeft, ChevronRight, LayoutGrid, List, CalendarRange,
-  CalendarDays, CalendarClock, ListChecks, ArrowLeft, Sparkles, ChevronDown } from "lucide-react";
+  CalendarDays, CalendarClock, ListChecks, ArrowLeft, Sparkles, ChevronDown, AlertTriangle } from "lucide-react";
 import { RenfoGuide } from "@/components/training/RenfoGuide";
 import { fmtDistance, type UnitSystem } from "@/lib/units";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -104,7 +104,7 @@ function sessionDetail(type: string, detail: string): SessionDetail | null {
   return { mode: "wrapped", body: extractBody(raw) };
 }
 
-export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], races: racesProp = [], coachState = null, weekStart = "mon", units = "metric", warmupMin = 15, cooldownMin = 10 }: { sessions: Planned[]; notes?: CalNote[]; races?: CalRace[]; coachState?: CoachState | null; weekStart?: "mon" | "sun"; units?: UnitSystem; warmupMin?: number; cooldownMin?: number }) {
+export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], races: racesProp = [], coachState = null, weekStart = "mon", units = "metric", warmupMin = 15, cooldownMin = 10, enPanne = false }: { sessions: Planned[]; notes?: CalNote[]; races?: CalRace[]; coachState?: CoachState | null; weekStart?: "mon" | "sun"; units?: UnitSystem; warmupMin?: number; cooldownMin?: number; /** La lecture des séances a ÉCHOUÉ : le mois est vide par accident, pas parce qu'il n'y a rien. */ enPanne?: boolean }) {
   const { t, lang } = useT();
   // LA SÉANCE EST AFFICHÉE DANS LA LANGUE DE L'ATHLÈTE, résolue ICI et pas au serveur :
   // le sélecteur de langue est instantané et ne recharge pas la page. `type` n'est jamais
@@ -308,6 +308,14 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-zinc-50 to-white">
+      {/* ⚠️ UN MOIS VIDE PAR ACCIDENT RESSEMBLE À UN MOIS SANS PLAN. Si la lecture des
+          séances a échoué, on le DIT — sinon l'athlète croit que son plan a disparu. */}
+      {enPanne && (
+        <div className="mx-4 mt-4 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm">
+          <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-rose-500" />
+          <p className="text-rose-800">{t("cal.enPanne")}</p>
+        </div>
+      )}
       {/* ── Hero : par défaut = présentation du plan ; quand une séance est sélectionnée = son détail ── */}
       <div ref={heroRef} className="relative overflow-hidden text-white" style={{ background: "linear-gradient(135deg,#064e3b 0%,#047857 45%,#0d9488 100%)" }}>
         <div className="pointer-events-none absolute -top-24 -right-16 h-72 w-72 rounded-full bg-emerald-300/20 blur-3xl" />

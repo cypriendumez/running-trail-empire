@@ -89,5 +89,25 @@ test("le message existe dans les cinq langues", () => {
   assert.ok(modele && modele[1].includes("{quoi}"), "le message n'indique plus ce qui manque");
 });
 
+test("un calendrier vide par accident le DIT", () => {
+  // ⚠️ CE MOIS-LÀ EST LE PLAN D'ENTRAÎNEMENT. Sa lecture ramène tout le contenu de
+  // l'écran — séances, notes, courses planifiées — et son erreur n'était pas lue : en
+  // cas d'échec, `?? []` prenait le relais et l'athlète voyait un mois BLANC. Lui
+  // montrer un plan vide revient à lui dire que son plan a disparu.
+  const page = codeNu("src/app/dashboard/calendrier/page.tsx");
+  assert.ok(/estUnePanne\(seancesRes\)/.test(page),
+    "la page du calendrier ne juge plus si la lecture a échoué");
+  assert.ok(/enPanne=\{lectureEnPanne\}/.test(page), "l'information n'est plus transmise à l'écran");
+  assert.ok(!/PGRST116/.test(page),
+    "le code d'erreur est recopié dans la page : il n'existe qu'une définition de « panne »");
+
+  const vue = codeNu("src/components/training/CalendarView.tsx");
+  assert.ok(/\{enPanne && \(/.test(vue), "le bandeau de panne du calendrier n'est plus rendu");
+  assert.ok(/t\("cal\.enPanne"\)/.test(vue), "le message n'est plus traduit");
+  const i18n = readFileSync("src/lib/i18n/translations.ts", "utf8");
+  assert.equal([...i18n.matchAll(/"cal\.enPanne"\s*:/g)].length, 5,
+    "le message du calendrier manque à une langue");
+});
+
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }
