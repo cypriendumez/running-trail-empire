@@ -14,6 +14,6 @@ const TrailBuilder = dynamic(() => import("./TrailBuilder").then((m) => m.TrailB
   ),
 });
 
-export function TrailBuilderLazy() {
-  return <TrailBuilder />;
+export function TrailBuilderLazy({ centre }: { centre?: { lat: number; lon: number } | null }) {
+  return <TrailBuilder centre={centre} />;
 }

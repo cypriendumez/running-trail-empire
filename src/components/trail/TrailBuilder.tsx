@@ -235,7 +235,7 @@ function speedRange(activity: ActivityKey): { min: number; max: number; step: nu
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 // ─── Component ───────────────────────────────────────────────────────────────
-export function TrailBuilder() {
+export function TrailBuilder({ centre }: { centre?: { lat: number; lon: number } | null } = {}) {
   const { lang } = useT();
   const d = TB[lang] ?? TB.fr;
   const tb = (k: string, p?: Record<string, string | number>) => fillT(d[k] ?? k, p);
@@ -316,7 +316,7 @@ export function TrailBuilder() {
    */
   const vueAutoFaite = useRef(false);
   useEffect(() => {
-    if (vueAutoFaite.current) return;
+    if (vueAutoFaite.current || centre) return;   // la page a déjà donné un centre
     const map = mapRef.current as L.Map | null;
     if (!map || waypoints.length > 0 || savedRoutes.length === 0) return;
     const premier = savedRoutes[0]?.coordinates?.[0];
@@ -358,8 +358,9 @@ export function TrailBuilder() {
 
       const cfg = LAYERS[layer];
       const map = L.map(mapContainer.current!, {
-        center: [46.85, 2.35],
-        zoom: 6,
+        // Les bornes de la dernière trace GPS si on les a (voir la page), la France sinon.
+        center: centre ? [centre.lat, centre.lon] : [46.85, 2.35],
+        zoom: centre ? 12 : 6,
         minZoom: 5,
         zoomControl: false,
         maxBounds: L.latLngBounds(FRANCE_BOUNDS[0], FRANCE_BOUNDS[1]),

@@ -31,7 +31,10 @@ test("la carte s'ouvre sur la zone de l'athlète, avec ses trois gardes", () => 
   assert.ok(/map\.setView\(\[lat, lng\]/.test(bloc),
     "Leaflet reçoit les coordonnées dans le mauvais ordre : la carte s'ouvrira dans l'océan");
   // Les trois gardes.
-  assert.ok(/if \(vueAutoFaite\.current\) return;/.test(bloc), "le recentrage peut se rejouer et contrarier l'athlète");
+  // Le garde s'est ÉTENDU : il coupe court aussi quand la page a déjà fourni un centre
+  // (traces GPS). Le repli sur les parcours enregistrés ne sert plus que sans traces.
+  assert.ok(/if \(vueAutoFaite\.current \|\| centre\) return;/.test(bloc),
+    "le recentrage de repli peut se rejouer, ou écraser le centre venu des traces GPS");
   assert.ok(/waypoints\.length > 0/.test(bloc), "le recentrage écraserait un tracé déjà commencé");
   assert.ok(/Math\.abs\(lat\) > 90 \|\| Math\.abs\(lng\) > 180/.test(bloc),
     "des coordonnées hors bornes ne sont plus écartées");
@@ -58,6 +61,27 @@ test("la barre latérale n'anime que ce qui change", () => {
   const src = codeNu("src/components/layout/Sidebar.tsx");
   assert.ok(/transition-\[transform,width\]/.test(src), "la barre latérale est revenue à transition-all");
   assert.ok(!/h-screen[^"]*transition-all/.test(src), "transition-all subsiste sur la barre pleine hauteur");
+});
+
+test("le centre de la carte vient des traces GPS, pas des parcours enregistrés", () => {
+  /**
+   * ⚠️ MA PREMIÈRE VERSION ÉTAIT INERTE. Elle se recentrait sur le dernier parcours
+   * ENREGISTRÉ — or `user_routes` est vide en base, y compris pour un compte actif
+   * depuis des mois : le recentrage n'aurait jamais eu lieu. Vérifié, pas supposé.
+   * Les traces GPS, elles, sont 330, et leurs bornes sont déjà stockées.
+   */
+  const page = codeNu("src/app/dashboard/trail/page.tsx");
+  assert.ok(/from\("activity_tracks"\)/.test(page),
+    "la page ne lit plus les traces GPS : la carte rouvrira sur la France entière");
+  assert.ok(/min_lat, max_lat, min_lon, max_lon/.test(page), "les bornes ne sont plus lues");
+  assert.ok(/Math\.abs\(lat\) <= 90 && Math\.abs\(lon\) <= 180/.test(page),
+    "un centre hors bornes n'est plus écarté : la carte pourrait s'ouvrir dans l'océan");
+  assert.ok(/centre=\{centre\}/.test(page), "le centre n'est plus transmis au composant");
+
+  const tb = codeNu("src/components/trail/TrailBuilder.tsx");
+  assert.ok(/center: centre \? \[centre\.lat, centre\.lon\] : \[46\.85, 2\.35\]/.test(tb),
+    "la carte n'utilise plus le centre reçu, ou l'ordre lat/lon a changé");
+  assert.ok(/zoom: centre \? 12 : 6/.test(tb), "le zoom ne s'adapte plus à la présence d'un centre");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

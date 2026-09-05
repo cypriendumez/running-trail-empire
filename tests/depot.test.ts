@@ -51,15 +51,31 @@ test("le motif ne masque AUCUN fichier légitime", () => {
     `ces fichiers du code source portent un suffixe de doublon iCloud :\n    ${coupables.join("\n    ")}`);
 });
 
-test("aucun doublon iCloud ne traîne dans .git", () => {
-  // Ceux-là échappent à `.gitignore` par construction : seule une vérification les voit.
-  const suspects: string[] = [];
-  for (const rep of [".git", ".git/refs/heads", ".git/refs/remotes/origin"]) {
+test("aucune RÉFÉRENCE dupliquée ne traîne dans .git", () => {
+  /**
+   * ⚠️ ON NE FAIT ÉCHOUER QUE SUR LES RÉFÉRENCES, ET C'EST DÉLIBÉRÉ.
+   *
+   * `git gc` s'est arrêté sur « bad object refs/heads/main 2 » : ce sont les REFS qui
+   * cassent le dépôt. Les copies de `.git/index` sont, elles, inertes — git n'ouvre que
+   * `.git/index`. Or iCloud en recrée six toutes les vingt minutes : les compter comme
+   * des échecs rendrait cette suite ROUGE en permanence, et on apprendrait à ignorer
+   * son alerte. Un garde-fou qui crie au loup ne garde plus rien.
+   *
+   * Les copies d'index sont donc SIGNALÉES, pas sanctionnées.
+   */
+  const refs: string[] = [];
+  for (const rep of [".git/refs/heads", ".git/refs/remotes/origin"]) {
     if (!existsSync(rep)) continue;
-    for (const e of readdirSync(rep)) if (DOUBLON.test(e)) suspects.push(`${rep}/${e}`);
+    for (const e of readdirSync(rep)) if (DOUBLON.test(e)) refs.push(`${rep}/${e}`);
   }
-  assert.deepEqual(suspects, [],
-    `iCloud a recopié des fichiers dans .git — « git gc » échouera :\n    ${suspects.join("\n    ")}\n    Les supprimer, puis « git gc --prune=now ».`);
+  const index = existsSync(".git")
+    ? readdirSync(".git").filter((e) => /^index [0-9]+$/.test(e))
+    : [];
+  if (index.length) {
+    console.log(`     ⓘ ${index.length} copie(s) inerte(s) de .git/index laissées par iCloud — sans effet, mais signe que .git est synchronisé.`);
+  }
+  assert.deepEqual(refs, [],
+    `iCloud a recopié des RÉFÉRENCES dans .git — « git gc » va échouer :\n    ${refs.join("\n    ")}\n    Les supprimer, puis « git gc --prune=now ».`);
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
