@@ -821,7 +821,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
             <span className={`text-xs px-2.5 py-1 rounded-lg font-semibold capitalize ${leagueStyle}`}>
               {league.charAt(0).toUpperCase()}{league.slice(1)}
             </span>
-            <span className="text-xs text-zinc-400 flex items-center gap-1">
+            <span className="text-xs text-zinc-500 flex items-center gap-1">
               <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
               {tr("hero.score", { n: Math.round(Number(profile?.discipline_score ?? 0)) })}
             </span>
@@ -850,7 +850,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
         <div className="rounded-2xl border border-zinc-200 bg-white p-4">
           <div className="flex items-baseline justify-between mb-3">
             <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{tr("split.title")}</span>
-            <span className="text-[11px] text-zinc-400">{tr("split.year")}</span>
+            <span className="text-[11px] text-zinc-500">{tr("split.year")}</span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {([
@@ -865,12 +865,12 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                   <span className="text-[11px] font-medium text-zinc-600">{tr(key)}</span>
                 </div>
                 <div className="text-lg font-black text-zinc-900 tabular-nums">
-                  {Math.round(value)}<span className="text-xs font-semibold text-zinc-400 ml-0.5">km</span>
+                  {Math.round(value)}<span className="text-xs font-semibold text-zinc-500 ml-0.5">km</span>
                 </div>
               </div>
             ))}
           </div>
-          <p className="mt-3 text-[11px] leading-relaxed text-zinc-400">{tr("split.note")}</p>
+          <p className="mt-3 text-[11px] leading-relaxed text-zinc-500">{tr("split.note")}</p>
         </div>
       )}
 
@@ -908,7 +908,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                   </div>
                   <div className="flex-1">
                     <div className="text-sm font-medium text-zinc-700 mb-1">{tr("photo.title")}</div>
-                    <div className="text-xs text-zinc-400 mb-2">{tr("photo.hint")}</div>
+                    <div className="text-xs text-zinc-500 mb-2">{tr("photo.hint")}</div>
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
@@ -948,7 +948,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                     placeholder={tr("f.bioPh")}
                     rows={3} maxLength={200}
                     className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none" />
-                  <div className="text-right text-xs text-zinc-400 mt-1">{form.bio.length}/200</div>
+                  <div className="text-right text-xs text-zinc-500 mt-1">{form.bio.length}/200</div>
                 </div>
                 <div className="col-span-2 grid grid-cols-2 gap-3">
                   <div>
@@ -973,7 +973,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       ))}
                     </div>
                   </div>
-                  <p className="col-span-2 text-[11px] text-zinc-400">{tr("f.wcHint")}</p>
+                  <p className="col-span-2 text-[11px] text-zinc-500">{tr("f.wcHint")}</p>
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs font-medium text-zinc-500 block mb-1.5">{tr("f.longMode")}</label>
@@ -985,7 +985,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       </button>
                     ))}
                   </div>
-                  <p className="text-[11px] text-zinc-400 mt-1.5">{tr("f.longHint")}</p>
+                  <p className="text-[11px] text-zinc-500 mt-1.5">{tr("f.longHint")}</p>
                 </div>
 
                 {/* Ancienneté — plafonne la charge que le coach IA se permet de prescrire. */}
@@ -999,7 +999,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       </button>
                     ))}
                   </div>
-                  <p className="text-[11px] text-zinc-400 mt-1.5">{tr("f.expHint")}</p>
+                  <p className="text-[11px] text-zinc-500 mt-1.5">{tr("f.expHint")}</p>
                 </div>
 
                 {/* Disponibilités — le plan n'a de valeur que s'il est tenable. */}
@@ -1013,7 +1013,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       </button>
                     ))}
                   </div>
-                  <p className="text-[11px] text-zinc-400 mt-1.5">{tr("f.dpwHint")}</p>
+                  <p className="text-[11px] text-zinc-500 mt-1.5">{tr("f.dpwHint")}</p>
                 </div>
 
                 {/* DEUX SÉANCES PAR JOUR — placé ici, à côté du nombre de séances par
@@ -1034,14 +1034,14 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                     } catch { setDoubleEtat({ error: "x" }); }
                     finally { setDoubleCheck(false); }
                   }} label={tr("double.title")} />
-                  <p className="text-[11px] text-zinc-400 mt-1.5">{tr("double.hint")}</p>
+                  <p className="text-[11px] text-zinc-500 mt-1.5">{tr("double.hint")}</p>
 
                   {/* LE VERDICT, EN CLAIR. C'est tout l'objet de cette fonctionnalité :
                       une case cochée qui ne produit rien doit dire pourquoi, au moment
                       où on la coche — et pas laisser l'athlète le découvrir en ne
                       voyant jamais son plan changer. */}
                   {doubleCheck && (
-                    <p className="mt-2 flex items-center gap-1.5 text-[11px] text-zinc-400">
+                    <p className="mt-2 flex items-center gap-1.5 text-[11px] text-zinc-500">
                       <Loader2 className="h-3 w-3 animate-spin" /> {tr("double.checking")}
                     </p>
                   )}
@@ -1082,12 +1082,12 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       );
                     })}
                   </div>
-                  <p className="text-[11px] text-zinc-400 mt-1.5">{tr("f.daysHint")}</p>
+                  <p className="text-[11px] text-zinc-500 mt-1.5">{tr("f.daysHint")}</p>
                 </div>
 
                 {/* Terrains — CHOIX MULTIPLE : décide si les séances se pilotent à l'allure ou à la FC. */}
                 <div className="col-span-2">
-                  <label className="text-xs font-medium text-zinc-500 block mb-1.5">{tr("f.terr")} <span className="font-normal text-zinc-400">· {tr("f.terrMulti")}</span></label>
+                  <label className="text-xs font-medium text-zinc-500 block mb-1.5">{tr("f.terr")} <span className="font-normal text-zinc-500">· {tr("f.terrMulti")}</span></label>
                   <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
                     {TERRAINS.map(t => {
                       const on = form.main_terrains.includes(t.slug);
@@ -1100,7 +1100,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       );
                     })}
                   </div>
-                  <p className="text-[11px] text-zinc-400 mt-1.5">{tr("f.terrHint")}</p>
+                  <p className="text-[11px] text-zinc-500 mt-1.5">{tr("f.terrHint")}</p>
                 </div>
 
                 {/* Dénivelé — dose les côtes et le D+ hebdomadaire. */}
@@ -1114,7 +1114,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       </button>
                     ))}
                   </div>
-                  <p className="text-[11px] text-zinc-400 mt-1.5">{tr("f.elevHint")}</p>
+                  <p className="text-[11px] text-zinc-500 mt-1.5">{tr("f.elevHint")}</p>
                 </div>
 
                 {/* Santé — contraint la prescription du coach IA. « Rien » est une réponse valable. */}
@@ -1153,7 +1153,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       placeholder={tr("h.notesPh")} rows={2} maxLength={500}
                       className="w-full px-3 py-2 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none" />
                   </div>
-                  <p className="text-[11px] text-zinc-400 leading-relaxed">⚕️ {tr("h.disc")}</p>
+                  <p className="text-[11px] text-zinc-500 leading-relaxed">⚕️ {tr("h.disc")}</p>
                 </div>
               </div>
               <button onClick={save} disabled={saving} className="btn-brand">
@@ -1265,7 +1265,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                   {tr("gdpr.privacy")}
                 </a>
               </div>
-              <p className="text-xs text-zinc-400">{tr("gdpr.delPre")}<b>{EDITEUR.email}</b>{tr("gdpr.delPost")}</p>
+              <p className="text-xs text-zinc-500">{tr("gdpr.delPre")}<b>{EDITEUR.email}</b>{tr("gdpr.delPost")}</p>
             </div>
           </motion.div>
         )}
@@ -1276,7 +1276,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-semibold text-zinc-900">{tr("goals.title")}</h3>
-                <p className="text-xs text-zinc-400 mt-0.5">{tr("goals.summary", { a: goals.filter(g => !g.achieved).length, b: goals.filter(g => g.achieved).length })}</p>
+                <p className="text-xs text-zinc-500 mt-0.5">{tr("goals.summary", { a: goals.filter(g => !g.achieved).length, b: goals.filter(g => g.achieved).length })}</p>
               </div>
               <button onClick={() => setAddingGoal(true)}
                 className="flex items-center gap-1.5 bg-zinc-900 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-zinc-700 transition-all">
@@ -1370,7 +1370,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                               <span className="font-semibold text-zinc-900 text-sm">{goal.label}</span>
                               {goal.achieved && <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">{tr("goals.achieved")}</span>}
                             </div>
-                            <div className="text-xs text-zinc-400 mt-0.5">
+                            <div className="text-xs text-zinc-500 mt-0.5">
                               {goal.current_value} / {goal.target_value} {gt?.unit}
                               {daysLeft !== null && (
                                 <span className={`ml-2 font-medium ${daysLeft < 30 ? "text-orange-500" : "text-zinc-400"}`}>
@@ -1395,7 +1395,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                             initial={{ width: 0 }} animate={{ width: `${Math.min(pct * 100, 100)}%` }}
                             transition={{ duration: 0.8, ease: "easeOut" }} />
                         </div>
-                        <div className="text-right text-xs text-zinc-400 mt-1">{Math.round(pct * 100)}%</div>
+                        <div className="text-right text-xs text-zinc-500 mt-1">{Math.round(pct * 100)}%</div>
                       </div>
                     </motion.div>
                   );
@@ -1409,15 +1409,15 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
                   <div className="text-2xl font-black">{Math.round(stats.kmMonth)}</div>
-                  <div className="text-xs text-zinc-400 mt-1">{tr("goals.ctxMonth")}</div>
+                  <div className="text-xs text-zinc-500 mt-1">{tr("goals.ctxMonth")}</div>
                 </div>
                 <div>
                   <div className="text-2xl font-black">{Math.round(stats.kmYear)}</div>
-                  <div className="text-xs text-zinc-400 mt-1">{tr("goals.ctxYear")}</div>
+                  <div className="text-xs text-zinc-500 mt-1">{tr("goals.ctxYear")}</div>
                 </div>
                 <div>
                   <div className="text-2xl font-black">{stats.streak}</div>
-                  <div className="text-xs text-zinc-400 mt-1">{tr("goals.ctxStreak")}</div>
+                  <div className="text-xs text-zinc-500 mt-1">{tr("goals.ctxStreak")}</div>
                 </div>
               </div>
             </div>
@@ -1442,7 +1442,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                     ].map(m => (
                       <div key={m.label} className={`${m.bg} rounded-2xl p-4`}>
                         <div className="flex items-center gap-1.5 text-xs text-zinc-500 mb-1">{m.icon}{m.label}</div>
-                        <div className="text-xl font-black text-zinc-900">{String(m.value)}<span className="text-xs font-medium text-zinc-400 ml-1">{m.unit}</span></div>
+                        <div className="text-xl font-black text-zinc-900">{String(m.value)}<span className="text-xs font-medium text-zinc-500 ml-1">{m.unit}</span></div>
                       </div>
                     ))}
                   </div>
@@ -1475,7 +1475,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       </div>
                       {vo2ChartData.length > 1 && (
                         <div className="mt-4">
-                          <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400 mb-1">{tr("perf.vo2trend")}</div>
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 mb-1">{tr("perf.vo2trend")}</div>
                           <ResponsiveContainer width="100%" height={130}>
                             <LineChart data={vo2ChartData} margin={{ top: 6, right: 10, bottom: 0, left: -22 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -1515,7 +1515,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                     </div>
                   ))}
                 </div>
-                <p className="text-[11px] text-zinc-400">{tr("perf.loadHint")}</p>
+                <p className="text-[11px] text-zinc-500">{tr("perf.loadHint")}</p>
               </div>
             )}
 
@@ -1523,21 +1523,21 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
             {predictions.length > 0 && (
               <div className="bento-card space-y-3">
                 <h3 className="font-semibold text-zinc-900 flex items-center gap-2"><Trophy className="w-4 h-4 text-amber-500" /> {tr("perf.predTitle")}</h3>
-                <p className="text-xs text-zinc-400 -mt-1">{tr(vmaSource === "test" ? "perf.predDescTest" : vmaSource === "vo2max" ? "perf.predDescGarmin" : vmaSource === "courbe" ? "perf.predDescCurve" : "perf.predDescSess")}</p>
+                <p className="text-xs text-zinc-500 -mt-1">{tr(vmaSource === "test" ? "perf.predDescTest" : vmaSource === "vo2max" ? "perf.predDescGarmin" : vmaSource === "courbe" ? "perf.predDescCurve" : "perf.predDescSess")}</p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {predictions.map((p, i) => (
                     <div key={p.label} className="rounded-2xl bg-zinc-50 p-4 text-center">
-                      <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-zinc-400">
+                      <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-zinc-500">
                         <span className="h-2 w-2 rounded-full" style={{ background: PRED_LINES[i]?.color ?? "#71717a" }} />{p.label}
                       </div>
                       <div className="text-xl font-black text-zinc-900 mt-1">{p.time}</div>
-                      <div className="text-[11px] text-zinc-400 mt-0.5">{p.pace}</div>
+                      <div className="text-[11px] text-zinc-500 mt-0.5">{p.pace}</div>
                     </div>
                   ))}
                 </div>
                 {paceChartData.length > 1 && (
                   <div className="pt-2">
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400 mb-1">{tr("perf.predGraph")}</div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 mb-1">{tr("perf.predGraph")}</div>
                     <ResponsiveContainer width="100%" height={200}>
                       <LineChart data={paceChartData} margin={{ top: 6, right: 12, bottom: 0, left: -8 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -1566,7 +1566,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
               <div className="bento-card space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold text-zinc-900 flex items-center gap-2"><Heart className="w-4 h-4 text-red-500" /> {tr("perf.zonesTitle")}</h3>
-                  <span className="text-xs text-zinc-400">{tr("perf.maxHrLabel", { n: maxHr })}</span>
+                  <span className="text-xs text-zinc-500">{tr("perf.maxHrLabel", { n: maxHr })}</span>
                 </div>
                 <div className="space-y-3">
                   {zones.map(zone => (
@@ -1586,7 +1586,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                             initial={{ width: 0 }} animate={{ width: `${((zone.max - zone.min) / maxHr) * 100 + zone.min / maxHr * 80}%` }}
                             transition={{ duration: 0.8, ease: "easeOut", delay: zones.indexOf(zone) * 0.1 }} />
                         </div>
-                        <div className="text-xs text-zinc-400 mt-0.5">{zone.desc}</div>
+                        <div className="text-xs text-zinc-500 mt-0.5">{zone.desc}</div>
                       </div>
                     </div>
                   ))}
@@ -1612,7 +1612,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                     return (
                       <div key={label} className="bg-zinc-50 rounded-2xl p-3">
                         <div className="text-xs text-zinc-500 mb-1">{label}</div>
-                        <div className={`text-lg font-black ${color}`}>{mins}:{String(secs).padStart(2,"0")}<span className="text-xs font-normal text-zinc-400 ml-1">min/km</span></div>
+                        <div className={`text-lg font-black ${color}`}>{mins}:{String(secs).padStart(2,"0")}<span className="text-xs font-normal text-zinc-500 ml-1">min/km</span></div>
                       </div>
                     );
                   })}
@@ -1628,7 +1628,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-semibold text-zinc-900">{tr("shoes.title")}</h3>
-                <p className="text-xs text-zinc-400 mt-0.5">{tr(shoeList.length > 1 ? "shoes.countP" : "shoes.count", { n: shoeList.length })}</p>
+                <p className="text-xs text-zinc-500 mt-0.5">{tr(shoeList.length > 1 ? "shoes.countP" : "shoes.count", { n: shoeList.length })}</p>
               </div>
               <button onClick={() => setAddingShoe(true)}
                 className="flex items-center gap-1.5 bg-zinc-900 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-zinc-700 transition-all">
@@ -1699,7 +1699,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                         className="w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-sm transition-colors focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100" />
                     </div>
                   </div>
-                  <p className="mt-2 text-[11px] text-zinc-400">💡 {tr("shoes.suggestHint")}</p>
+                  <p className="mt-2 text-[11px] text-zinc-500">💡 {tr("shoes.suggestHint")}</p>
                   {(() => {
                     // Ce qui sera enregistré à partir de la fiche, annoncé AVANT l'ajout :
                     // une donnée reprise ailleurs doit se voir, pas apparaître en douce.
@@ -1751,7 +1751,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       <div className="flex items-start justify-between mb-3">
                         <div>
                           <div className="font-semibold text-zinc-900">{shoe.brand} {shoe.model}</div>
-                          <div className="mt-1 flex items-center gap-1.5 text-xs text-zinc-400">
+                          <div className="mt-1 flex items-center gap-1.5 text-xs text-zinc-500">
                             <input type="number" min={0} inputMode="numeric" defaultValue={suivi ? String(km) : ""}
                               placeholder={tr("shoes.kmPh")} aria-label={tr("shoes.kmSet")}
                               onBlur={e => { const v = Number(e.target.value); if (Number.isFinite(v) && v !== km) void majKm(String(shoe.id), v); }}
@@ -1773,7 +1773,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                           initial={{ width: 0 }} animate={{ width: `${Math.min(pct, 100)}%` }}
                           transition={{ duration: 0.8, ease: "easeOut" }} />
                       </div>
-                      <div className="flex items-center justify-between mt-1.5 text-xs text-zinc-400">
+                      <div className="flex items-center justify-between mt-1.5 text-xs text-zinc-500">
                         <span>0 km</span>
                         <span className="font-semibold text-zinc-600">{Math.round(pct)}%</span>
                         <span>{Number(shoe.max_km)} km</span>
@@ -1853,7 +1853,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                   </div>
                 ))}
               </div>
-              <div className="flex justify-end gap-8 mt-2 text-xs font-semibold text-zinc-400">
+              <div className="flex justify-end gap-8 mt-2 text-xs font-semibold text-zinc-500">
                 <span>{tr("sub.free")}</span><span className="text-emerald-600">{tr("sub.pro")}</span>
               </div>
             </div>
@@ -1883,8 +1883,8 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                 {portail === "erreur" && (
                   <p className="mt-3 text-sm font-medium text-red-600">{tr("sub.manageErr")}</p>
                 )}
-                <p className="mt-4 text-xs leading-relaxed text-zinc-400">{tr("sub.cancelNote")}</p>
-                <p className="mt-1 text-xs leading-relaxed text-zinc-400">{tr("sub.secure")}</p>
+                <p className="mt-4 text-xs leading-relaxed text-zinc-500">{tr("sub.cancelNote")}</p>
+                <p className="mt-1 text-xs leading-relaxed text-zinc-500">{tr("sub.secure")}</p>
               </div>
             )}
 
