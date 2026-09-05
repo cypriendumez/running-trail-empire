@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { TB, fillT } from "./trailI18n";
+import { fmtNombre, fmtKm } from "@/lib/i18n/nombres";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface LatLng { lat: number; lng: number }
@@ -1099,7 +1100,7 @@ export function TrailBuilder() {
                           <div className="w-1.5 self-stretch rounded-full flex-shrink-0" style={{ backgroundColor: difficultyColor(r.difficulty) }} />
                           <button type="button" className="flex-1 min-w-0 text-left" onClick={() => { handleLoadRoute(r); setShowRoutesPanel(false); }}>
                             <div className="text-sm font-medium text-zinc-900 truncate">{r.name}</div>
-                            <div className="text-xs text-zinc-400">{r.distance_km.toFixed(1)} km · +{r.elevation_gain_m}m</div>
+                            <div className="text-xs text-zinc-400">{fmtKm(r.distance_km, lang, 1)} · +{r.elevation_gain_m}m</div>
                           </button>
                           {/* Le cœur reste TOUJOURS visible quand il est plein : le
                               masquer hors survol cacherait précisément l'information
@@ -1185,13 +1186,13 @@ export function TrailBuilder() {
                       <div className="text-3xl font-bold text-zinc-900 tabular-nums">
                         {speedCfg.mode === "pace"
                           ? <>{formatPace(paceMinPerKm)}<span className="text-base font-semibold text-zinc-400"> /km</span></>
-                          : <>{speedKmh.toFixed(1).replace(".", ",")}<span className="text-base font-semibold text-zinc-400"> km/h</span></>}
+                          : <>{fmtNombre(speedKmh, lang, 1)}<span className="text-base font-semibold text-zinc-400"> km/h</span></>}
                       </div>
                       <div className="text-[11px] text-zinc-400">
                         {manualSpeed === null
                           ? d["autoEstimate"]
                           : speedCfg.mode === "pace"
-                            ? tb("soitKmh", { v: speedKmh.toFixed(1).replace(".", ",") })
+                            ? tb("soitKmh", { v: fmtNombre(speedKmh, lang, 1) })
                             : tb("soitPace", { p: formatPace(paceMinPerKm) })}
                       </div>
                     </div>
@@ -1214,7 +1215,7 @@ export function TrailBuilder() {
               </AnimatePresence>
 
               <div className="bg-white/95 backdrop-blur rounded-full shadow-xl border border-zinc-100 px-2 py-2 flex items-center">
-                <PillStat value={`${distance < 1 ? Math.round(distance * 1000) + " m" : distance.toFixed(2) + " km"}`} label={d["st.distance"]} />
+                <PillStat value={fmtKm(distance, lang, 2)} label={d["st.distance"]} />
                 <PillDivider />
                 <PillStat value={formatDuration(durationMin)} label={d["st.time"]} icon={act.emoji} />
                 <PillDivider />
@@ -1227,7 +1228,7 @@ export function TrailBuilder() {
                 >
                   <PillStat value={`${formatPace(paceMinPerKm)}/km`} label={d["st.pace"]} manual={manualSpeed !== null} />
                   <PillDivider />
-                  <PillStat value={`${speedKmh.toFixed(2).replace(".", ",")} km/h`} label={d["st.speed"]} manual={manualSpeed !== null} />
+                  <PillStat value={`${fmtNombre(speedKmh, lang, 2)} km/h`} label={d["st.speed"]} manual={manualSpeed !== null} />
                   <SlidersHorizontal className={`w-3.5 h-3.5 mr-1.5 ${manualSpeed !== null ? "text-emerald-600" : "text-zinc-300"}`} />
                 </button>
               </div>
@@ -1257,7 +1258,7 @@ export function TrailBuilder() {
                 </span>
                 {navRemainingKm != null && (
                   <span className="text-sm text-zinc-700">
-                    <span className="font-bold">{navRemainingKm < 1 ? `${Math.round(navRemainingKm * 1000)} m` : `${navRemainingKm.toFixed(1)} km`}</span> {d["remaining"]}
+                    <span className="font-bold">{fmtKm(navRemainingKm, lang, 1)}</span> {d["remaining"]}
                   </span>
                 )}
                 {navAccuracy != null && <span className="text-[11px] text-zinc-400">±{Math.round(navAccuracy)} m</span>}

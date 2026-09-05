@@ -165,6 +165,39 @@
   }
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   CARTES LEAFLET — la mention d'attribution ne doit pas être rognée.
+
+   ⚠️ MESURÉ, PAS SUPPOSÉ (05/09/2026, écran 1440×900). Leaflet plaque sa barre
+   d'attribution à 1 px du coin inférieur droit de la carte. Nos cadres de carte ont
+   un rayon de 24 px et `overflow: hidden` : l'arrondi passait donc AU TRAVERS du
+   texte, qui apparaissait tranché en deux — « Leaflet | © MapTiler © OpenStreetMap »
+   coupé dans sa hauteur.
+
+   Ce n'est pas cosmétique : cette mention est EXIGÉE par la licence ODbL
+   d'OpenStreetMap et par les conditions de MapTiler. Une attribution illisible est
+   une attribution absente.
+
+   On la décolle du coin de la valeur du rayon et on lui redonne un fond arrondi,
+   pour qu'elle se lise comme une étiquette posée sur la carte plutôt que comme un
+   morceau de texte tombé du cadre. `!important` parce que Leaflet écrit
+   `margin: 0` dans sa propre feuille, chargée après celle-ci.
+   ───────────────────────────────────────────────────────────────────────────── */
+.leaflet-control-attribution {
+  margin: 0 10px 10px 0 !important;
+  padding: 2px 8px !important;
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.9) !important;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
+}
+/* Les autres contrôles (zoom, calques) subissent le même arrondi : on les décolle
+   aussi, sinon leur coin extérieur mord sur la bordure. */
+.leaflet-bottom.leaflet-right .leaflet-control-zoom,
+.leaflet-bottom.leaflet-left .leaflet-control {
+  margin-bottom: 14px !important;
+}
+
 /* Mapbox overrides */
 .mapboxgl-ctrl-logo { display: none !important; }
 .mapboxgl-map { border-radius: 1.5rem; }
