@@ -22,9 +22,9 @@ export function PrixOffre({ offre, conseille, tx, compact = false }: {
   if (!offre) {
     return (
       <div className="flex items-baseline gap-2">
-        <span className="text-[13px] text-zinc-400">{tx("shop.offre.aucune")}</span>
+        <span className="text-[13px] text-zinc-500">{tx("shop.offre.aucune")}</span>
         {conseille != null && (
-          <span className="text-[12px] text-zinc-400">{tx("shop.conseille_court", { prix: conseille })}</span>
+          <span className="text-[12px] text-zinc-500">{tx("shop.conseille_court", { prix: conseille })}</span>
         )}
       </div>
     );
@@ -38,7 +38,7 @@ export function PrixOffre({ offre, conseille, tx, compact = false }: {
         </span>
         {remise != null && (
           <>
-            <span className="text-[13px] text-zinc-400 line-through">{conseille} €</span>
+            <span className="text-[13px] text-zinc-500 line-through">{conseille} €</span>
             <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[12px] font-semibold text-emerald-700">
               −{remise} %
             </span>

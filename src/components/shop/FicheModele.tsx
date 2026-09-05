@@ -34,7 +34,7 @@ function Ligne({ label, valeur, vide }: { label: string; valeur: string | null; 
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-zinc-100 py-2.5 last:border-0">
       <span className="text-[13px] text-zinc-500">{label}</span>
-      <span className={valeur ? "text-[14px] font-semibold text-zinc-900" : "text-[13px] text-zinc-400"}>
+      <span className={valeur ? "text-[14px] font-semibold text-zinc-900" : "text-[13px] text-zinc-500"}>
         {valeur ?? vide}
       </span>
     </div>
@@ -63,7 +63,7 @@ export function FicheModele({ m, avis, bouts, manquantes, proches, offres, offre
       <Link href="/dashboard/shop" className="text-[13px] text-zinc-500 hover:text-zinc-900">← {tx("shop.retour")}</Link>
 
       <header className="mt-3 mb-6">
-        <div className="text-[12px] font-semibold uppercase tracking-wider text-zinc-400">{m.marque}</div>
+        <div className="text-[12px] font-semibold uppercase tracking-wider text-zinc-500">{m.marque}</div>
         <h1 className="text-[28px] font-semibold tracking-tight text-zinc-900 sm:text-[34px]">{m.nom}</h1>
         <div className="mt-2 flex flex-wrap gap-1.5">
           <Badge tone="neutral">{tx(`shop.t.${m.terrain}`)}</Badge>
@@ -94,7 +94,7 @@ export function FicheModele({ m, avis, bouts, manquantes, proches, offres, offre
                         ? tx("shop.dessin_alt", { marque: m.marque, talon: Math.round(m.stackTalonMm.valeur), avant: Math.round(m.stackTalonMm.valeur - (m.dropMm?.valeur ?? 0)) })
                         : tx("shop.profil_absent")} />
             </div>
-            <p className="mt-2 text-[12px] leading-snug text-zinc-400">{tx("shop.dessin_aide")}</p>
+            <p className="mt-2 text-[12px] leading-snug text-zinc-500">{tx("shop.dessin_aide")}</p>
           </Card>
 
           <Card className="p-5">
@@ -141,7 +141,7 @@ export function FicheModele({ m, avis, bouts, manquantes, proches, offres, offre
                 {proches.map((p) => (
                   <Link key={p.slug} href={`/dashboard/shop/${p.slug}`}
                     className="rounded-xl p-3 ring-1 ring-inset ring-zinc-200 transition hover:ring-zinc-400">
-                    <div className="text-[11px] uppercase tracking-wider text-zinc-400">{p.marque}</div>
+                    <div className="text-[11px] uppercase tracking-wider text-zinc-500">{p.marque}</div>
                     <div className="text-[14px] font-semibold text-zinc-900">{p.nom}</div>
                     <div className="mt-1 text-[12px] text-zinc-500">
                       {p.poidsG ? `${p.poidsG.valeur} g` : "—"} · {p.dropMm != null ? `${p.dropMm.valeur} mm` : "—"}
@@ -195,7 +195,7 @@ export function FicheModele({ m, avis, bouts, manquantes, proches, offres, offre
                 <p className="text-[13px] leading-snug text-zinc-500">
                   {tx("shop.offres_aucune")}
                 </p>
-                <p className="mt-2 text-[12px] leading-snug text-zinc-400">
+                <p className="mt-2 text-[12px] leading-snug text-zinc-500">
                   {tx("shop.offres_aucune_aide")}
                 </p>
               </>
@@ -205,7 +205,7 @@ export function FicheModele({ m, avis, bouts, manquantes, proches, offres, offre
                   <li key={i} className="flex items-center justify-between gap-3 rounded-xl p-2.5 ring-1 ring-inset ring-zinc-200">
                     <div className="min-w-0">
                       <div className="truncate text-[13px] font-semibold text-zinc-900">{o.retailer}</div>
-                      <div className="text-[11px] text-zinc-400">{tx(o.in_stock === false ? "shop.indisponible" : "shop.en_stock")}</div>
+                      <div className="text-[11px] text-zinc-500">{tx(o.in_stock === false ? "shop.indisponible" : "shop.en_stock")}</div>
                     </div>
                     <div className="text-right">
                       <div className={`text-[15px] font-semibold ${best === o ? "text-emerald-700" : "text-zinc-900"}`}>

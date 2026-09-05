@@ -50,9 +50,9 @@ function Chip({ actif, onClick, children }: { actif: boolean; onClick: () => voi
 function Spec({ label, valeur, vide }: { label: string; valeur: string | null; vide: string }) {
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wider text-zinc-400">{label}</div>
+      <div className="text-[10px] uppercase tracking-wider text-zinc-500">{label}</div>
       {/* Une case vide serait lue comme « zéro » : on écrit ce qu'on ne sait pas. */}
-      <div className={valeur ? "text-[15px] font-semibold text-zinc-900" : "text-[13px] text-zinc-400"}>
+      <div className={valeur ? "text-[15px] font-semibold text-zinc-900" : "text-[13px] text-zinc-500"}>
         {valeur ?? vide}
       </div>
     </div>
@@ -128,7 +128,7 @@ export function GearHub({ catalogue, profil, offres = {} }: {
           className="w-full rounded-xl bg-white px-3.5 py-2.5 text-[14px] ring-1 ring-inset ring-zinc-200 placeholder:text-zinc-400 focus:outline-none focus:ring-zinc-400"
         />
         <div>
-          <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">{tx("shop.terrain")}</div>
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">{tx("shop.terrain")}</div>
           <div className="flex flex-wrap gap-1.5">
             {TERRAINS.map((t) => (
               <Chip key={t} actif={!!f.terrains?.includes(t)} onClick={() => bascule("terrains", t)}>{tx(`shop.t.${t}`)}</Chip>
@@ -136,7 +136,7 @@ export function GearHub({ catalogue, profil, offres = {} }: {
           </div>
         </div>
         <div>
-          <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">{tx("shop.usage")}</div>
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">{tx("shop.usage")}</div>
           <div className="flex flex-wrap gap-1.5">
             {USAGES.map((u) => (
               <Chip key={u} actif={!!f.usages?.includes(u)} onClick={() => bascule("usages", u)}>{tx(`shop.u.${u}`)}</Chip>
@@ -144,7 +144,7 @@ export function GearHub({ catalogue, profil, offres = {} }: {
           </div>
         </div>
         <div>
-          <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">{tx("shop.marque")}</div>
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">{tx("shop.marque")}</div>
           <div className="flex flex-wrap gap-1.5">
             {toutesMarques.map((m) => (
               <Chip key={m} actif={!!f.marques?.includes(m)} onClick={() => bascule("marques", m)}>{m}</Chip>
@@ -156,7 +156,7 @@ export function GearHub({ catalogue, profil, offres = {} }: {
             ([label, clef, min, max, pas, unite]) => (
               <div key={clef}>
                 <div className="mb-1 flex items-baseline justify-between">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">{tx(label)}</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">{tx(label)}</span>
                   <span className="text-[12px] text-zinc-600">{f[clef] != null ? `${f[clef]} ${unite}` : tx("shop.indifferent")}</span>
                 </div>
                 <input type="range" min={min} max={max} step={pas} value={(f[clef] as number | undefined) ?? max}
@@ -166,13 +166,13 @@ export function GearHub({ catalogue, profil, offres = {} }: {
             ))}
         </div>
         <div>
-          <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">{tx("shop.plaque")}</div>
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">{tx("shop.plaque")}</div>
           <div className="flex flex-wrap gap-1.5">
             <Chip actif={f.plaqueCarbone === true} onClick={() => setF({ ...f, plaqueCarbone: f.plaqueCarbone === true ? null : true })}>{tx("shop.avec")}</Chip>
             <Chip actif={f.plaqueCarbone === false} onClick={() => setF({ ...f, plaqueCarbone: f.plaqueCarbone === false ? null : false })}>{tx("shop.sans")}</Chip>
           </div>
           {f.plaqueCarbone != null && (
-            <p className="mt-1.5 text-[11px] leading-snug text-zinc-400">
+            <p className="mt-1.5 text-[11px] leading-snug text-zinc-500">
               {tx("shop.plaque_avert")}
             </p>
           )}
@@ -244,11 +244,11 @@ export function GearHub({ catalogue, profil, offres = {} }: {
               {promos.map((p) => (
                 <Link key={p.modele.slug} href={`/dashboard/shop/${p.modele.slug}`}
                   className="rounded-xl p-3 ring-1 ring-inset ring-zinc-200 transition hover:ring-zinc-400">
-                  <div className="text-[11px] uppercase tracking-wider text-zinc-400">{p.modele.marque}</div>
+                  <div className="text-[11px] uppercase tracking-wider text-zinc-500">{p.modele.marque}</div>
                   <div className="truncate text-[14px] font-semibold text-zinc-900">{p.modele.nom}</div>
                   <div className="mt-1.5 flex items-baseline gap-1.5">
                     <span className="text-[16px] font-semibold text-zinc-900">{p.prix.toFixed(0)} €</span>
-                    <span className="text-[12px] text-zinc-400 line-through">{p.modele.prixConseilleEur?.valeur} €</span>
+                    <span className="text-[12px] text-zinc-500 line-through">{p.modele.prixConseilleEur?.valeur} €</span>
                     <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11.5px] font-semibold text-emerald-700">−{p.remise} %</span>
                   </div>
                 </Link>
@@ -291,7 +291,7 @@ export function GearHub({ catalogue, profil, offres = {} }: {
                 <Card key={m.slug} hover className="flex flex-col p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">{m.marque}</div>
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">{m.marque}</div>
                       <Link href={`/dashboard/shop/${m.slug}`} className="block truncate text-[16px] font-semibold text-zinc-900 hover:underline">
                         {m.nom}
                       </Link>
@@ -424,7 +424,7 @@ function Comparaison({ modeles, profil, onVider, tx }: { modeles: Modele[]; prof
             <th className="w-40 pb-2 font-normal text-zinc-400"> </th>
             {modeles.map((m) => (
               <th key={m.slug} className="pb-2 align-bottom">
-                <div className="text-[11px] uppercase tracking-wider text-zinc-400">{m.marque}</div>
+                <div className="text-[11px] uppercase tracking-wider text-zinc-500">{m.marque}</div>
                 <div className="text-[14px] font-semibold text-zinc-900">{m.nom}</div>
                 <div className="mt-1 h-[42px]"><SemelleProfil stackTalonMm={m.stackTalonMm?.valeur} dropMm={m.dropMm?.valeur} hauteur={42} absent={tx("shop.profil_absent")} className="w-full" /></div>
               </th>

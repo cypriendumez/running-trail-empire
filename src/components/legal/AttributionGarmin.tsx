@@ -31,7 +31,7 @@ import { ATTRIBUTION_GARMIN } from "./attributionI18n";
 export function AttributionGarmin({ className = "" }: { className?: string }) {
   const { lang } = useT();
   return (
-    <p className={`text-center text-[11px] leading-relaxed text-zinc-400 ${className}`}>
+    <p className={`text-center text-[11px] leading-relaxed text-zinc-500 ${className}`}>
       {ATTRIBUTION_GARMIN[lang] ?? ATTRIBUTION_GARMIN.fr}
     </p>
   );

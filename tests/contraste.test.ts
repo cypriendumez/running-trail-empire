@@ -129,5 +129,32 @@ test("les écrans CONNECTÉS aussi", () => {
   assert.ok(contraste("#71717a", "#fafafa") >= 4.5, "zinc-500 sur zinc-50 ne passe plus");
 });
 
+test("le petit texte des écrans denses reste lisible", () => {
+  /**
+   * ⚠️ LE COMPARATEUR EN COMPTAIT 136 À LUI SEUL — marques, prix, « Poids », « Drop »,
+   * « Terrain ». Or sur un comparateur, ces libellés SONT le contenu : c'est ce qu'on
+   * vient y lire. Ils étaient tous en zinc-400, soit 2,56:1.
+   *
+   * La règle vise la COMBINAISON relevée par la mesure — une petite taille explicite
+   * ET le gris faible — et pas `text-zinc-400` en général : la même classe est
+   * parfaitement lisible sur les fonds sombres de ces mêmes fichiers, et 18 d'entre eux
+   * y figurent. Un remplacement en masse aurait dégradé ce qui allait bien.
+   */
+  const fichiers = ["FicheModele", "PrixOffre", "GearHub", "ShoppingHub"]
+    .map((n) => `src/components/shop/${n}.tsx`);
+  const coupables: string[] = [];
+  for (const f of fichiers) {
+    let src: string;
+    try { src = readFileSync(f, "utf8"); } catch { continue; }
+    src = src.replace(/\/\*[\s\S]*?\*\//g, "");
+    for (const m of src.matchAll(/class(?:Name)?=["'`][^"'`]*["'`]/g)) {
+      const c = m[0];
+      if (/text-\[1[0-3]px\]/.test(c) && /(?<!hover:)text-zinc-400\b/.test(c)) coupables.push(`${f} → ${c.slice(0, 70)}`);
+    }
+  }
+  assert.deepEqual(coupables, [],
+    `petit texte sous le seuil (2,56:1) :\n    ${coupables.join("\n    ")}`);
+});
+
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }

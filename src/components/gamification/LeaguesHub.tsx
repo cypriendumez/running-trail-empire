@@ -210,13 +210,13 @@ export function LeaguesHub({
                 {leagues ? (
                   <>
                     <div className="text-sm text-zinc-600 font-medium mt-0.5">{String(leagues.name ?? "")}</div>
-                    <div className="text-xs text-zinc-400 mt-0.5">
+                    <div className="text-xs text-zinc-500 mt-0.5">
                       {new Date(String(leagues.week_start)).toLocaleDateString(lang, { day: "numeric", month: "short" })} →{" "}
                       {new Date(String(leagues.week_end)).toLocaleDateString(lang, { day: "numeric", month: "short" })}
                     </div>
                   </>
                 ) : (
-                  <div className="text-xs text-zinc-400 mt-1">{d["noLeague"]}</div>
+                  <div className="text-xs text-zinc-500 mt-1">{d["noLeague"]}</div>
                 )}
               </div>
 
@@ -245,14 +245,14 @@ export function LeaguesHub({
             <div className="col-span-12 md:col-span-8 bento-card">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-zinc-900">{d["lb.title"]}</h3>
-                <span className="text-xs text-zinc-400">{members.length} {members.length > 1 ? d["participants"] : d["participant"]}</span>
+                <span className="text-xs text-zinc-500">{members.length} {members.length > 1 ? d["participants"] : d["participant"]}</span>
               </div>
 
               {members.length === 0 ? (
-                <div className="text-center py-16 text-zinc-400">
+                <div className="text-center py-16 text-zinc-500">
                   <Trophy className="w-10 h-10 mx-auto mb-3 text-zinc-200" />
                   <p className="text-sm">{d["lb.empty1"]}</p>
-                  <p className="text-xs mt-1 text-zinc-300">{d["lb.empty2"]}</p>
+                  <p className="text-xs mt-1 text-zinc-500">{d["lb.empty2"]}</p>
                 </div>
               ) : (
                 <div className="space-y-1.5">
@@ -299,7 +299,7 @@ export function LeaguesHub({
                     );
                   })}
                   {members.length > 10 && (
-                    <div className="text-center text-xs text-zinc-400 py-2">
+                    <div className="text-center text-xs text-zinc-500 py-2">
                       {fillT(d["andOthers"], { n: members.length - 10 })}
                     </div>
                   )}
@@ -322,7 +322,7 @@ export function LeaguesHub({
                   );
                 })}
               </div>
-              <p className="mt-3 text-xs text-zinc-400">{d["ladderHint1"]}<b className="text-zinc-600">{d["ladderTop"]}</b>{d["ladderHint2"]}</p>
+              <p className="mt-3 text-xs text-zinc-500">{d["ladderHint1"]}<b className="text-zinc-600">{d["ladderTop"]}</b>{d["ladderHint2"]}</p>
             </div>
 
             {/* Records personnels */}
@@ -359,7 +359,7 @@ export function LeaguesHub({
                   <div key={x.t} className="rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
                     <div className="text-xl mb-1">{x.icon}</div>
                     <div className="font-semibold">{x.t}</div>
-                    <div className="text-xs text-zinc-400 mt-0.5">{x.d}</div>
+                    <div className="text-xs text-zinc-500 mt-0.5">{x.d}</div>
                   </div>
                 ))}
               </div>
@@ -376,7 +376,7 @@ export function LeaguesHub({
             <div className="bento-card bg-gradient-to-br from-zinc-900 to-zinc-800 text-white flex items-center gap-6">
               <div className="text-center shrink-0">
                 <div className="text-4xl font-black">{unlocked.length}</div>
-                <div className="text-xs text-zinc-400 mt-0.5">/ {computedBadges.length}</div>
+                <div className="text-xs text-zinc-500 mt-0.5">/ {computedBadges.length}</div>
               </div>
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-2">
@@ -521,7 +521,7 @@ export function LeaguesHub({
                           <div className="font-semibold text-zinc-900 flex items-center gap-2">
                             <Users className="w-4 h-4 text-emerald-500" /> {ch.name}
                           </div>
-                          {ch.description && <div className="text-xs text-zinc-400 mt-0.5">{ch.description}</div>}
+                          {ch.description && <div className="text-xs text-zinc-500 mt-0.5">{ch.description}</div>}
                         </div>
                         {daysLeft !== null && (
                           <span className={`text-xs px-2 py-1 rounded-xl font-semibold shrink-0 ${
@@ -574,7 +574,7 @@ export function LeaguesHub({
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex-1">
                           <div className="font-semibold text-zinc-900 text-sm">{ch.name}</div>
-                          {ch.description && <div className="text-xs text-zinc-400 mt-0.5">{ch.description}</div>}
+                          {ch.description && <div className="text-xs text-zinc-500 mt-0.5">{ch.description}</div>}
                           <div className="flex items-center gap-3 mt-1.5 text-xs text-zinc-400">
                             <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{ch.total_km} km</span>
                             {daysLeft !== null && (
