@@ -12,6 +12,7 @@ import { timeAgo } from "@/lib/utils/time";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { createClient } from "@/lib/supabase/client";
 import { formatDateCivile } from "@/lib/time/fuseau";
+import { fmtKm } from "@/lib/i18n/nombres";
 
 type Notif = { id: string; type: string; title: string; body: string | null; read: boolean; created_at: string };
 type RaceHit = { name: string; city: string; distanceKm: number | null; date: string };
@@ -175,7 +176,7 @@ export function TopBar({ profile, avatarColor }: { profile: Record<string, unkno
                         <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-amber-50"><Flag className="h-4 w-4 text-amber-600" /></span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-semibold text-zinc-800">{r.name}</span>
-                          <span className="block truncate text-[11px] text-zinc-400">
+                          <span className="block truncate text-[11px] text-zinc-500">
                             {[r.city, r.distanceKm != null ? `${r.distanceKm} km` : "", r.date && !r.date.startsWith("2099") ? formatDateCivile(r.date, lang, { day: "numeric", month: "short", year: "numeric" }) : (RX[lang] ?? RX.fr).dateTBD].filter(Boolean).join(" · ")}
                           </span>
                         </span>
@@ -192,7 +193,7 @@ export function TopBar({ profile, avatarColor }: { profile: Record<string, unkno
                         <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-50"><RouteIcon className="h-4 w-4 text-emerald-600" /></span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-semibold text-zinc-800">{p.nom}</span>
-                          <span className="block truncate text-[11px] text-zinc-400">{[p.distance_km ? `${p.distance_km.toFixed(1)} km` : "", p.localisation?.departement].filter(Boolean).join(" · ")}</span>
+                          <span className="block truncate text-[11px] text-zinc-500">{[p.distance_km ? fmtKm(p.distance_km, lang, 1) : "", p.localisation?.departement].filter(Boolean).join(" · ")}</span>
                         </span>
                       </button>
                     ))}
@@ -246,7 +247,7 @@ export function TopBar({ profile, avatarColor }: { profile: Record<string, unkno
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-medium text-zinc-900 truncate">{n.title}</div>
                           {n.body && <div className="text-xs text-zinc-500 line-clamp-2">{n.body}</div>}
-                          <div className="text-[11px] text-zinc-400 mt-0.5">{timeAgo(n.created_at, lang)}</div>
+                          <div className="text-[11px] text-zinc-500 mt-0.5">{timeAgo(n.created_at, lang)}</div>
                         </div>
                       </li>
                     ))}
@@ -272,7 +273,7 @@ export function TopBar({ profile, avatarColor }: { profile: Record<string, unkno
             {name && (
               <span className="hidden flex-col items-start pr-1 leading-tight sm:flex">
                 <span className="text-sm font-semibold text-zinc-800">{name.split(" ")[0]}</span>
-                <span className="text-[11px] text-zinc-400">{levelLabel}</span>
+                <span className="text-[11px] text-zinc-500">{levelLabel}</span>
               </span>
             )}
           </button>

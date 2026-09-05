@@ -109,5 +109,25 @@ test("le pied de page et l'avertissement médical restent lisibles", () => {
   }
 });
 
+test("les écrans CONNECTÉS aussi", () => {
+  // ⚠️ MESURÉS SEULEMENT APRÈS COUP. La première passe n'avait porté que sur les pages
+  // publiques : les écrans où l'athlète passe son temps n'avaient jamais été relevés.
+  // Deux défauts y dormaient, dont un à 1,48:1 — les intitulés de section de la barre
+  // latérale (« ENTRAÎNEMENT », « SUIVI »), en zinc-300 sur blanc, à la limite de
+  // l'invisible. Ils servent pourtant à se repérer dans la navigation.
+  for (const [f, interdit] of [
+    ["src/components/layout/Sidebar.tsx", "text-zinc-300"],
+    ["src/components/layout/TopBar.tsx", "text-[11px] text-zinc-400"],
+  ] as [string, string][]) {
+    const src = readFileSync(f, "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+    assert.ok(!src.includes(interdit), `${f} : « ${interdit} » est revenu, sous le seuil de lisibilité`);
+  }
+  // Et les couleurs retenues doivent bien passer, sinon on a déplacé le problème.
+  assert.ok(contraste("#71717a", BLANC) >= 4.5, "zinc-500 sur blanc ne passe plus");
+  assert.ok(contraste("#71717a", "#fafafa") >= 4.5, "zinc-500 sur zinc-50 ne passe plus");
+});
+
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }

@@ -192,7 +192,7 @@ export function Sidebar({ profile, unreadMessages = 0, estEditeur }: { profile: 
         {groups.map((g, gi) => (
           <div key={gi} className={gi > 0 ? "mt-5" : ""}>
             {g.titleKey && !collapsed && (
-              <div className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-300">{t(g.titleKey)}</div>
+              <div className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500">{t(g.titleKey)}</div>
             )}
             {g.titleKey && collapsed && gi > 0 && <div className="mx-3 mb-2 border-t border-zinc-100" />}
             <div className="space-y-0.5">
