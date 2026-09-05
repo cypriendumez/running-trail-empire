@@ -109,5 +109,17 @@ test("un calendrier vide par accident le DIT", () => {
     "le message du calendrier manque à une langue");
 });
 
+test("un catalogue de courses vide par accident le DIT", () => {
+  // ⚠️ 17 000 COURSES QUI DISPARAISSENT NE SONT PAS « AUCUNE COURSE À VENIR ». Le
+  // message serait faux et décourageant — c'est la page qui donne envie de s'inscrire.
+  const page = codeNu("src/app/dashboard/races/page.tsx");
+  assert.ok(/estUnePanne\(coursesRes\)/.test(page), "la page des courses ne juge plus sa lecture");
+  assert.ok(/enPanne=\{cataloguEnPanne\}/.test(page), "l'information n'atteint plus l'écran");
+  const hub = codeNu("src/components/races/RacesHub.tsx");
+  assert.ok(/\{enPanne && \(/.test(hub), "le bandeau du catalogue n'est plus rendu");
+  const i18n = readFileSync("src/lib/i18n/translations.ts", "utf8");
+  assert.equal([...i18n.matchAll(/"races\.enPanne"\s*:/g)].length, 5, "le message manque à une langue");
+});
+
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }

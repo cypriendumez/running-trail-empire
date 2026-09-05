@@ -6,6 +6,7 @@ import { normLang } from "@/lib/i18n/translations";
 import { urlsSignalees, ETAT_VIDE, type EtatLiens } from "@/lib/races/liens";
 import type { PpsStatus } from "@/lib/pps/status";
 import { jourFrance } from "@/lib/races/jourFrance";
+import { estUnePanne } from "@/lib/dashboard/lectures";
 
 export const metadata = { title: "Courses France" };
 
@@ -44,10 +45,21 @@ export default async function RacesPage({ searchParams }: { searchParams: Promis
     .eq("type", "races_liens").order("created_at", { ascending: false }).limit(1).maybeSingle();
   const liensMorts = urlsSignalees({ ...ETAT_VIDE, ...((etatLiens?.data ?? {}) as Partial<EtatLiens>) });
 
-  const [{ data: initialRaces }, { count: totalCount }] = await Promise.all([
+  const [coursesRes, { count: totalCount }] = await Promise.all([
     admin.from("races").select(RACE_COLS).gte("date", today).order("date", { ascending: true }).limit(90),
     admin.from("races").select("id", { count: "estimated", head: true }).gte("date", today),
   ]);
+
+  /**
+   * ⚠️ UN CATALOGUE VIDE, C'EST 17 000 COURSES QUI DISPARAISSENT.
+   *
+   * Cette lecture n'était pas contrôlée : en cas d'échec, `?? []` prenait le relais et
+   * l'écran annonçait qu'il n'y a aucune course à venir en France. Le message est faux
+   * ET décourageant — c'est la page qui donne envie de s'inscrire quelque part.
+   */
+  const initialRaces = coursesRes.data;
+  const cataloguEnPanne = estUnePanne(coursesRes);
+  if (cataloguEnPanne) console.error("[courses] catalogue illisible :", coursesRes.error?.message);
 
   // Courses planifiées par l'athlète (depuis le calendrier) — affichées en haut.
   const sb = await createClient();
@@ -87,7 +99,7 @@ export default async function RacesPage({ searchParams }: { searchParams: Promis
           calendrier l'affiche déjà avec le plan qui l'entoure. La répéter en tête du
           catalogue poussait la recherche de courses, seule raison de venir sur cette
           page, sous la ligne de flottaison. */}
-      <RacesHub favorisInitiaux={favoris} liensMorts={liensMorts} races={(initialRaces ?? []) as never[]} totalCount={totalCount ?? 0} units={units} planned={planned} initialSearch={q ?? ""} pps={pps} />
+      <RacesHub enPanne={cataloguEnPanne} favorisInitiaux={favoris} liensMorts={liensMorts} races={(initialRaces ?? []) as never[]} totalCount={totalCount ?? 0} units={units} planned={planned} initialSearch={q ?? ""} pps={pps} />
     </>
   );
 }

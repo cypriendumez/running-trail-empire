@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { Search, MapPin, Mountain, Clock, Calendar, ExternalLink, Zap, ChevronLeft, ChevronRight, Globe, Loader2, Map, Flag, ArrowDownUp, Footprints, X, Heart } from "lucide-react";
+import { Search, MapPin, Mountain, Clock, Calendar, ExternalLink, Zap, ChevronLeft, ChevronRight, Globe, Loader2, Map, Flag, ArrowDownUp, Footprints, X, Heart , AlertTriangle } from "lucide-react";
 import type { Race } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -67,9 +67,9 @@ export type PlannedRace = { id: string; name: string; location: string; distance
 
 const normName = (s: string) => (s || "").toLowerCase().trim().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
-export function RacesHub({ races: initialRaces, totalCount, units = "metric", planned: plannedProp = [], initialSearch = "", pps = null, liensMorts = [], favorisInitiaux = [] }: { favorisInitiaux?: string[]; liensMorts?: string[]; races: Race[]; totalCount?: number; units?: UnitSystem; planned?: PlannedRace[]; initialSearch?: string; pps?: PpsStatus | null }) {
+export function RacesHub({ races: initialRaces, totalCount, units = "metric", planned: plannedProp = [], initialSearch = "", pps = null, liensMorts = [], favorisInitiaux = [], enPanne = false }: { favorisInitiaux?: string[]; liensMorts?: string[]; races: Race[]; totalCount?: number; units?: UnitSystem; planned?: PlannedRace[]; initialSearch?: string; pps?: PpsStatus | null; /** La lecture du catalogue a ÉCHOUÉ : la liste est vide par accident. */ enPanne?: boolean }) {
   const fuseau = useFuseau();
-  const { lang } = useT();
+  const { lang, t } = useT();
   const d = RX[lang] ?? RX.fr;
   const tr = (k: string, p?: Record<string, string | number>) => fillR(d[k] ?? k, p);
   const fdate = (s: string, style: "short" | "long" = "short") => formatDate(s, lang, d["dateTBD"], style);
@@ -236,6 +236,13 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
 
   return (
     <div className="flex flex-col gap-4 h-full">
+      {/* ⚠️ 17 000 COURSES QUI DISPARAISSENT NE SONT PAS « AUCUNE COURSE ». */}
+      {enPanne && (
+        <div className="mx-4 mt-4 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm">
+          <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-rose-500" />
+          <p className="text-rose-800">{t("races.enPanne")}</p>
+        </div>
+      )}
       {ppsAlerte && (
         <div className="px-0">
           <PpsStatusCard status={pps} raceDate={prochaineCourse} compact />
