@@ -106,9 +106,18 @@ test("le tunnel d'acquisition relie chaque champ à son libellé", () => {
 /**
  * ⚠️ CE PLAFOND NE PEUT QUE BAISSER.
  *
- * 130 champs orphelins après correction du tunnel d'acquisition (le premier chiffre
- * annoncé, 137, venait d'un détecteur qui coupait les balises à la flèche d'une
- * fonction — voir `balises()`). Le
+ * 87 champs, contre 130 après le tunnel d'acquisition — et le vrai chiffre est encore
+ * plus bas. Un relevé PAR FORME, mené le 05/09/2026, a montré que « 130 » mélangeait
+ * trois choses très différentes :
+ *   · 27 champs ENVELOPPÉS dans leur `<label>` — déjà conformes, jamais une dette ;
+ *   · 27 paires libellé/champ simplement non reliées — corrigées par `htmlFor`/`id` ;
+ *   · le reste, dont 49 champs nommés par leur seul `placeholder` (annoncé par les
+ *     lecteurs d'écran : imparfait, pas bloquant), 5 champs `type="file"` MASQUÉS et
+ *     déclenchés par un bouton qui porte un `title` — donc nommés — et 3 listes
+ *     déroulantes dans /admin.
+ *
+ * Ce plafond compte donc large : il inclut des faux positifs que ce test, qui lit le
+ * source ligne à ligne, ne sait pas distinguer. Il ne peut que baisser. Le
  * reste est une dette réelle, pas un choix : l'écrire ici la rend visible et empêche
  * qu'elle grandisse. Quand tu en corriges, baisse ce nombre — le test t'y oblige en
  * n'acceptant jamais plus que lui.
@@ -117,7 +126,7 @@ test("le tunnel d'acquisition relie chaque champ à son libellé", () => {
  * vingt écrans un par un : c'est un chantier, pas une retouche, et le faire à l'aveugle
  * sur 130 sites casserait des mises en page que rien ici ne sait contrôler.
  */
-const PLAFOND_ORPHELINS = 130;
+const PLAFOND_ORPHELINS = 87;
 
 test("la dette d'accessibilité ne grandit pas", () => {
   const fichiers = tousLesTsx();

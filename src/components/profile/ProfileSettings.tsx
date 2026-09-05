@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect , useId } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -354,6 +354,13 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
    */
   catalogue?: ModeleLeger[];
 }) {
+  /**
+   * ⚠️ CHAQUE LIBELLÉ EST RELIÉ À SON CHAMP. Sans `htmlFor`/`id`, un lecteur d'écran
+   * annonce le `placeholder` — ou rien — à la place du libellé affiché, et cliquer le
+   * texte ne place pas le curseur. `useId()` plutôt qu'un identifiant écrit à la main :
+   * ce composant se rend dans plusieurs onglets, deux instances entreraient en collision.
+   */
+  const cid = useId();
   const { lang, setLang } = useT();
   /**
    * OUVERTURE DU PORTAIL DE FACTURATION STRIPE.
@@ -921,21 +928,21 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                   </div>
                 </div>
               <div className="col-span-2">
-                  <label className="text-xs font-medium text-zinc-500 block mb-1">{tr("f.name")}</label>
-                  <input value={form.full_name} onChange={e => setForm(f => ({...f, full_name: e.target.value}))}
+                  <label htmlFor={`${cid}-c0`} className="text-xs font-medium text-zinc-500 block mb-1">{tr("f.name")}</label>
+                  <input id={`${cid}-c0`} value={form.full_name} onChange={e => setForm(f => ({...f, full_name: e.target.value}))}
                     className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                 </div>
                 {[{k:"age",l:tr("f.age")},{k:"height_cm",l:tr("f.height")},{k:"weight_kg",l:tr("f.weight")}].map(({k,l}) => (
                   <div key={k}>
-                    <label className="text-xs font-medium text-zinc-500 block mb-1">{l}</label>
-                    <input type="number" value={(form as unknown as Record<string,string>)[k]}
+                    <label htmlFor={`${cid}-k`} className="text-xs font-medium text-zinc-500 block mb-1">{l}</label>
+                    <input id={`${cid}-k`} type="number" value={(form as unknown as Record<string,string>)[k]}
                       onChange={e => setForm(f => ({...f, [k]: e.target.value}))}
                       className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                   </div>
                 ))}
                 <div>
-                  <label className="text-xs font-medium text-zinc-500 block mb-1">{tr("f.lang")}</label>
-                  <select value={lang} onChange={e => { const l = e.target.value as Lang; setLang(l); setForm(f => ({ ...f, preferred_language: l })); }}
+                  <label htmlFor={`${cid}-c2`} className="text-xs font-medium text-zinc-500 block mb-1">{tr("f.lang")}</label>
+                  <select id={`${cid}-c2`} value={lang} onChange={e => { const l = e.target.value as Lang; setLang(l); setForm(f => ({ ...f, preferred_language: l })); }}
                     className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white">
                     {languageOptions.map(o => (
                       <option key={o.value} value={o.value}>{o.flag} {o.label}</option>
@@ -943,8 +950,8 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                   </select>
                 </div>
                 <div className="col-span-2">
-                  <label className="text-xs font-medium text-zinc-500 block mb-1">{tr("f.bio")}</label>
-                  <textarea value={form.bio} onChange={e => setForm(f => ({...f, bio: e.target.value}))}
+                  <label htmlFor={`${cid}-c3`} className="text-xs font-medium text-zinc-500 block mb-1">{tr("f.bio")}</label>
+                  <textarea id={`${cid}-c3`} value={form.bio} onChange={e => setForm(f => ({...f, bio: e.target.value}))}
                     placeholder={tr("f.bioPh")}
                     rows={3} maxLength={200}
                     className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none" />
@@ -1148,8 +1155,8 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                     {form.health_declared && form.health_conditions.length === 0 && form.injury_zones.length === 0 ? "✓ " : ""}{tr("h.none")}
                   </button>
                   <div>
-                    <label className="text-xs font-medium text-zinc-500 block mb-1.5">{tr("h.notes")}</label>
-                    <textarea value={form.health_notes} onChange={e => setForm(f => ({ ...f, health_notes: e.target.value }))}
+                    <label htmlFor={`${cid}-c4`} className="text-xs font-medium text-zinc-500 block mb-1.5">{tr("h.notes")}</label>
+                    <textarea id={`${cid}-c4`} value={form.health_notes} onChange={e => setForm(f => ({ ...f, health_notes: e.target.value }))}
                       placeholder={tr("h.notesPh")} rows={2} maxLength={500}
                       className="w-full px-3 py-2 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none" />
                   </div>
@@ -1308,23 +1315,23 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       </div>
                     </div>
                     <div className="col-span-2">
-                      <label className="text-xs font-medium text-zinc-500 block mb-1">{tr("goals.name")}</label>
-                      <input value={newGoal.label} onChange={e => setNewGoal(g => ({...g, label: e.target.value}))}
+                      <label htmlFor={`${cid}-c5`} className="text-xs font-medium text-zinc-500 block mb-1">{tr("goals.name")}</label>
+                      <input id={`${cid}-c5`} value={newGoal.label} onChange={e => setNewGoal(g => ({...g, label: e.target.value}))}
                         placeholder={newGoal.type === "race" ? tr("goals.namePhRace") : tr("goals.namePhOther")}
                         className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white" />
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-zinc-500 block mb-1">
+                      <label htmlFor={`${cid}-c6`} className="text-xs font-medium text-zinc-500 block mb-1">
                         {tr("goals.targetVal", { unit: GOAL_TYPES.find(g => g.value === newGoal.type)?.unit ?? "" })}
                       </label>
-                      <input type="number" value={newGoal.target_value} onChange={e => setNewGoal(g => ({...g, target_value: e.target.value}))}
+                      <input id={`${cid}-c6`} type="number" value={newGoal.target_value} onChange={e => setNewGoal(g => ({...g, target_value: e.target.value}))}
                         placeholder={tr("goals.targetValPh")}
                         className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white" />
                     </div>
                     {newGoal.type === "race" && (
                       <div>
-                        <label className="text-xs font-medium text-zinc-500 block mb-1">{tr("goals.targetDate")}</label>
-                        <input type="date" value={newGoal.target_date} onChange={e => setNewGoal(g => ({...g, target_date: e.target.value}))}
+                        <label htmlFor={`${cid}-c7`} className="text-xs font-medium text-zinc-500 block mb-1">{tr("goals.targetDate")}</label>
+                        <input id={`${cid}-c7`} type="date" value={newGoal.target_date} onChange={e => setNewGoal(g => ({...g, target_date: e.target.value}))}
                           className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white" />
                       </div>
                     )}
@@ -1647,8 +1654,8 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                   </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="relative">
-                      <label className="mb-1 block text-xs font-semibold text-zinc-500">{tr("shoes.brand")}</label>
-                      <input value={newShoe.brand} onChange={e => setNewShoe(s => ({...s, brand: e.target.value, model: "" }))}
+                      <label htmlFor={`${cid}-c8`} className="mb-1 block text-xs font-semibold text-zinc-500">{tr("shoes.brand")}</label>
+                      <input id={`${cid}-c8`} value={newShoe.brand} onChange={e => setNewShoe(s => ({...s, brand: e.target.value, model: "" }))}
                         onFocus={() => setBrandFocus(true)} onBlur={() => setTimeout(() => setBrandFocus(false), 150)}
                         placeholder={tr("shoes.brandPh")} autoComplete="off"
                         className="w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-sm transition-colors focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100" />
@@ -1665,8 +1672,8 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       )}
                     </div>
                     <div className="relative">
-                      <label className="mb-1 block text-xs font-semibold text-zinc-500">{tr("shoes.model")}</label>
-                      <input value={newShoe.model} onChange={e => setNewShoe(s => ({...s, model: e.target.value}))}
+                      <label htmlFor={`${cid}-c9`} className="mb-1 block text-xs font-semibold text-zinc-500">{tr("shoes.model")}</label>
+                      <input id={`${cid}-c9`} value={newShoe.model} onChange={e => setNewShoe(s => ({...s, model: e.target.value}))}
                         onFocus={() => setModelFocus(true)} onBlur={() => setTimeout(() => setModelFocus(false), 150)}
                         placeholder={tr("shoes.modelPh")} autoComplete="off"
                         className="w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-sm transition-colors focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100" />
@@ -1689,13 +1696,13 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       )}
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-semibold text-zinc-500">{tr("shoes.life")}</label>
-                      <input type="number" value={newShoe.max_km} onChange={e => setNewShoe(s => ({...s, max_km: e.target.value}))}
+                      <label htmlFor={`${cid}-c10`} className="mb-1 block text-xs font-semibold text-zinc-500">{tr("shoes.life")}</label>
+                      <input id={`${cid}-c10`} type="number" value={newShoe.max_km} onChange={e => setNewShoe(s => ({...s, max_km: e.target.value}))}
                         className="w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-sm transition-colors focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100" />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-semibold text-zinc-500">{tr("shoes.buyDate")}</label>
-                      <input type="date" value={newShoe.purchase_date} onChange={e => setNewShoe(s => ({...s, purchase_date: e.target.value}))}
+                      <label htmlFor={`${cid}-c11`} className="mb-1 block text-xs font-semibold text-zinc-500">{tr("shoes.buyDate")}</label>
+                      <input id={`${cid}-c11`} type="date" value={newShoe.purchase_date} onChange={e => setNewShoe(s => ({...s, purchase_date: e.target.value}))}
                         className="w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-sm transition-colors focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100" />
                     </div>
                   </div>

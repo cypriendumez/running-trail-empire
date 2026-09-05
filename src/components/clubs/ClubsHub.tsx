@@ -247,7 +247,7 @@ function FormClub({ onDone }: { onDone: () => void }) {
 
   return (
     <div className="mb-5 space-y-3 rounded-2xl border border-zinc-200 bg-white p-4">
-      <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("clubs.f.name")} autoFocus
+      <input aria-label={t("clubs.a.nom")} value={name} onChange={(e) => setName(e.target.value)} placeholder={t("clubs.f.name")} autoFocus
         className="w-full rounded-xl border border-zinc-200 p-3 text-sm outline-none focus:border-emerald-400" />
       <input value={city} onChange={(e) => setCity(e.target.value)} placeholder={t("clubs.f.city")}
         className="w-full rounded-xl border border-zinc-200 p-3 text-sm outline-none focus:border-emerald-400" />
@@ -298,24 +298,24 @@ function FormDefi({ clubs, onDone }: { clubs: ClubVue[]; onDone: () => void }) {
       <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("clubs.f.defiName")} autoFocus
         className="w-full rounded-xl border border-zinc-200 p-3 text-sm outline-none focus:border-emerald-400" />
       <div className="grid gap-3 sm:grid-cols-2">
-        <select value={metric} onChange={(e) => setMetric(e.target.value as Metric)}
+        <select aria-label={t("clubs.a.metrique")} value={metric} onChange={(e) => setMetric(e.target.value as Metric)}
           className="rounded-xl border border-zinc-200 p-3 text-sm outline-none">
           {(["distance", "elevation", "sessions", "longest_run"] as Metric[]).map((m) => (
             <option key={m} value={m}>{metricLabel(m, lang)}</option>
           ))}
         </select>
         <div className="flex items-center gap-2">
-          <input value={target} onChange={(e) => setTarget(e.target.value)} type="number" min="1"
+          <input aria-label={t("clubs.a.objectif")} value={target} onChange={(e) => setTarget(e.target.value)} type="number" min="1"
             className="w-full rounded-xl border border-zinc-200 p-3 text-sm outline-none focus:border-emerald-400" />
           <span className="shrink-0 text-xs text-zinc-500">{metricUnit(metric, lang)}</span>
         </div>
-        <input type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)}
+        <input aria-label={t("clubs.a.debut")} type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)}
           className="rounded-xl border border-zinc-200 p-3 text-sm outline-none" />
-        <input type="date" value={endsOn} onChange={(e) => setEndsOn(e.target.value)}
+        <input aria-label={t("clubs.a.fin")} type="date" value={endsOn} onChange={(e) => setEndsOn(e.target.value)}
           className="rounded-xl border border-zinc-200 p-3 text-sm outline-none" />
       </div>
       {clubs.some((c) => c.joined) && (
-        <select value={clubId} onChange={(e) => setClubId(e.target.value)}
+        <select aria-label={t("clubs.a.club")} value={clubId} onChange={(e) => setClubId(e.target.value)}
           className="w-full rounded-xl border border-zinc-200 p-3 text-sm outline-none">
           <option value="">{t("clubs.openAll")}</option>
           {clubs.filter((c) => c.joined).map((c) => <option key={c.id} value={c.id}>{t("clubs.reserved", { name: c.name })}</option>)}

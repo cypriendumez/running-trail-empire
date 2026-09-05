@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState , useId } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -13,6 +13,9 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 import { AUTH } from "@/components/auth/authI18n";
 
 export default function ResetPasswordPage() {
+  // Chaque libellé est relié à son champ : sans cela, un lecteur d'écran annonce
+  // le placeholder — ou rien — à la place du texte affiché.
+  const cid = useId();
   const router = useRouter();
   const { lang } = useT();
   const L = (AUTH[lang] ?? AUTH.fr).reset;
@@ -84,8 +87,8 @@ export default function ResetPasswordPage() {
               </div>
             </div>
             <div>
-              <label className="text-sm font-medium text-zinc-700 block mb-1.5">{L.confirmPw}</label>
-              <input
+              <label htmlFor={`${cid}-c0`} className="text-sm font-medium text-zinc-700 block mb-1.5">{L.confirmPw}</label>
+              <input id={`${cid}-c0`}
                 type={showPwd ? "text" : "password"}
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}

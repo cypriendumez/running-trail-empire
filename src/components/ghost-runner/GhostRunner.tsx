@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback , useId } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Play, Pause, StopCircle, Volume2, VolumeX,
@@ -113,6 +113,9 @@ export function nomLecture(l: { appareil: string | null; source: string | null }
 }
 
 export function GhostRunner({ baseline, effectiveVma, coachSessions = [] }: GhostRunnerProps) {
+  // Les curseurs sont reliés à leur intitulé : sans cela un lecteur d'écran annonce
+  // « curseur, 12 » sans dire de QUOI, et le libellé n'est pas cliquable.
+  const cid = useId();
   const fuseau = useFuseau();
   // Une seule VMA dans toute l'application : test enregistré, sinon VMA effective,
   // et seulement en tout dernier recours une valeur par défaut.
@@ -726,7 +729,7 @@ export function GhostRunner({ baseline, effectiveVma, coachSessions = [] }: Ghos
                   </div>
                 </div>
                 <div className="mb-3 text-4xl font-black tabular-nums text-zinc-900">{distance}<span className="ml-1 text-base font-semibold text-zinc-400">km</span></div>
-                <input type="range" min={1} max={50} step={0.5} value={Math.min(distance, 50)} onChange={(e) => setDistanceKeepPace(parseFloat(e.target.value))} className="w-full accent-emerald-600" />
+                <input aria-label={d["lb.dist"]} type="range" min={1} max={50} step={0.5} value={Math.min(distance, 50)} onChange={(e) => setDistanceKeepPace(parseFloat(e.target.value))} className="w-full accent-emerald-600" />
                 <div className="mt-3 flex flex-wrap gap-1">
                   {[5, 10, 21.1, 42.2].map((dd) => (
                     <button key={dd} onClick={() => setDistanceKeepPace(dd)} className={`rounded-lg px-2 py-0.5 text-xs font-semibold transition-colors ${distance === dd ? "bg-emerald-600 text-white" : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"}`}>{dd === 21.1 ? d["pr.semi"] : dd === 42.2 ? "Marathon" : dd + "K"}</button>
@@ -745,7 +748,7 @@ export function GhostRunner({ baseline, effectiveVma, coachSessions = [] }: Ghos
                     </div>
                   </div>
                   <div className="mb-3 text-4xl font-black tabular-nums text-zinc-900">{formatPace(targetPace)}<span className="ml-1 text-base font-semibold text-zinc-400">/km</span></div>
-                  <input type="range" min={150} max={540} step={5} value={Math.round(Math.min(9, Math.max(2.5, targetPace)) * 60)} onChange={(e) => setPaceMinKm(parseInt(e.target.value) / 60)} className="w-full accent-emerald-600" />
+                  <input aria-label={d["lb.pace"]} type="range" min={150} max={540} step={5} value={Math.round(Math.min(9, Math.max(2.5, targetPace)) * 60)} onChange={(e) => setPaceMinKm(parseInt(e.target.value) / 60)} className="w-full accent-emerald-600" />
                   <div className="mt-1 flex justify-between text-[10px] font-medium text-zinc-400"><span>{d["fast"]}</span><span>{d["slow"]}</span></div>
                 </div>
               </div>
@@ -767,11 +770,11 @@ export function GhostRunner({ baseline, effectiveVma, coachSessions = [] }: Ghos
             {/* Dénivelé — profil de parcours (reflète le D+ choisi) + réglage du total */}
             <div className="mb-6 rounded-3xl border border-zinc-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_40px_-26px_rgba(16,24,40,0.2)]">
               <div className="mb-3 flex items-center justify-between">
-                <label className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400"><TrendingUp className="h-3.5 w-3.5 text-orange-500" /> {d["lb.elev"]}</label>
+                <label htmlFor={`${cid}-r0`} className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400"><TrendingUp className="h-3.5 w-3.5 text-orange-500" /> {d["lb.elev"]}</label>
                 <span className="text-lg font-black tabular-nums text-zinc-900">{elevation}<span className="ml-0.5 text-xs font-semibold text-zinc-400">m D+</span></span>
               </div>
               <ElevationProfile elevation={elevation} distance={distance} />
-              <input type="range" min={0} max={3000} step={50} value={Math.min(elevation, 3000)} onChange={(e) => setElevation(parseInt(e.target.value))} className="mt-3 w-full accent-orange-500" />
+              <input id={`${cid}-r0`} type="range" min={0} max={3000} step={50} value={Math.min(elevation, 3000)} onChange={(e) => setElevation(parseInt(e.target.value))} className="mt-3 w-full accent-orange-500" />
             </div>
 
             {/* Pace zones reference */}
@@ -811,7 +814,7 @@ export function GhostRunner({ baseline, effectiveVma, coachSessions = [] }: Ghos
                   </div>
                 </div>
                 <div className="mb-3 text-4xl font-black tabular-nums text-zinc-900">{durationMin}<span className="ml-1 text-base font-semibold text-zinc-400">min</span></div>
-                <input type="range" min={10} max={180} step={5} value={Math.min(durationMin, 180)} onChange={(e) => setDurationMin(parseInt(e.target.value))} className="w-full accent-emerald-600" />
+                <input aria-label={d["lb.dur"]} type="range" min={10} max={180} step={5} value={Math.min(durationMin, 180)} onChange={(e) => setDurationMin(parseInt(e.target.value))} className="w-full accent-emerald-600" />
                 <div className="mt-3 flex flex-wrap gap-1">
                   {[30, 45, 60, 90].map((d) => (
                     <button key={d} onClick={() => setDurationMin(d)} className={`rounded-lg px-2 py-0.5 text-xs font-semibold transition-colors ${durationMin === d ? "bg-emerald-600 text-white" : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"}`}>{d} min</button>

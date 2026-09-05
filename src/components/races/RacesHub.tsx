@@ -300,6 +300,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
         {/* Filters */}
         <div className="flex flex-wrap gap-2">
           <select
+            aria-label={d["a.region"]}
             value={region}
             onChange={e => handleFilterChange(() => setRegion(e.target.value))}
             className="text-sm px-3 py-1.5 rounded-lg border border-zinc-200 bg-white text-zinc-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -308,6 +309,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
           </select>
 
           <select
+            aria-label={d["a.type"]}
             value={raceType}
             onChange={e => handleFilterChange(() => setRaceType(e.target.value))}
             className="text-sm px-3 py-1.5 rounded-lg border border-zinc-200 bg-white text-zinc-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -317,6 +319,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
           </select>
 
           <input
+            aria-label={d["a.dateDebut"]}
             type="date"
             value={dateFrom}
             onChange={e => handleFilterChange(() => setDateFrom(e.target.value))}
@@ -326,6 +329,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
           <div className="flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white pl-2.5">
             <ArrowDownUp className="h-3.5 w-3.5 text-zinc-400" />
             <select
+              aria-label={d["a.tri"]}
               value={sort}
               onChange={e => handleFilterChange(() => setSort(e.target.value as "date" | "distance" | "elevation"))}
               className="cursor-pointer bg-transparent py-1.5 pr-2 text-sm text-zinc-700 focus:outline-none"

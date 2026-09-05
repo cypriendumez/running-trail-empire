@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState , useId } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -12,6 +12,9 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 import { AUTH } from "@/components/auth/authI18n";
 
 export default function ForgotPasswordPage() {
+  // Chaque libellé est relié à son champ : sans cela, un lecteur d'écran annonce
+  // le placeholder — ou rien — à la place du texte affiché.
+  const cid = useId();
   const { t, lang } = useT();
   const L = (AUTH[lang] ?? AUTH.fr).forgot;
   const [email, setEmail] = useState("");
@@ -52,8 +55,8 @@ export default function ForgotPasswordPage() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-zinc-700 block mb-1.5">{L.email}</label>
-              <input
+              <label htmlFor={`${cid}-c0`} className="text-sm font-medium text-zinc-700 block mb-1.5">{L.email}</label>
+              <input id={`${cid}-c0`}
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}

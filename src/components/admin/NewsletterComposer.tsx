@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState , useId } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { ArrowLeft, Mail, Send, Loader2, Users } from "lucide-react";
 
 export function NewsletterComposer({ subscriberCount }: { subscriberCount: number }) {
+  // Chaque libellé est relié à son champ : sans cela, un lecteur d'écran annonce
+  // le placeholder — ou rien — à la place du texte affiché.
+  const cid = useId();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
@@ -44,14 +47,14 @@ export function NewsletterComposer({ subscriberCount }: { subscriberCount: numbe
 
       <div className="mt-6 space-y-4 rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
         <div>
-          <label className="mb-1 block text-xs font-semibold text-zinc-500">Titre</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120}
+          <label htmlFor={`${cid}-c0`} className="mb-1 block text-xs font-semibold text-zinc-500">Titre</label>
+          <input id={`${cid}-c0`} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120}
             placeholder="Ex. Comment bien gérer ton premier marathon"
             className="w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-sm outline-none transition-colors focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-semibold text-zinc-500">Contenu</label>
-          <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={12}
+          <label htmlFor={`${cid}-c1`} className="mb-1 block text-xs font-semibold text-zinc-500">Contenu</label>
+          <textarea id={`${cid}-c1`} value={body} onChange={(e) => setBody(e.target.value)} rows={12}
             placeholder="Écris ton article ici… (texte simple, les sauts de ligne sont conservés)"
             className="w-full resize-y rounded-xl border border-zinc-200 px-3.5 py-2.5 text-sm leading-relaxed outline-none transition-colors focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
         </div>

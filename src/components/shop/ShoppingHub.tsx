@@ -660,7 +660,7 @@ const SX: Record<string, Record<string, string>> = {
     "cat.clothing": "Vêtements", "cat.accessories": "Accessoires", "cat.nutrition": "Nutrition",
     "searchPh": "Rechercher un produit…", "reset": "Réinitialiser", "shop": "Boutique", "searchOf": "Recherche de «{q}»",
     "demo.title": "Catalogue de démonstration.", "demo.body": "Les produits, les prix et les disponibilités affichés ici sont SIMULÉS et ne correspondent à aucune offre réelle. Les noms d\u2019enseignes servent uniquement d\u2019exemple : vérifie toujours le prix sur le site du marchand avant tout achat.",
-    "filters": "Filtres", "f.cat": "Catégorie", "f.brand": "Marque", "f.price": "Prix", "f.score": "Score IA min", "f.avail": "Disponibilité",
+    "a.prixMin": "Prix minimum", "a.prixMax": "Prix maximum", "a.noteMin": "Note minimale", "filters": "Filtres", "f.cat": "Catégorie", "f.brand": "Marque", "f.price": "Prix", "f.score": "Score IA min", "f.avail": "Disponibilité",
     "all": "Tout", "inStockOnly": "En stock uniquement", "inStock": "En stock",
     "product": "produit", "products": "produits",
     "sortBy": "Classer par :", "sort.score": "Pertinence (Score IA)", "sort.priceAsc": "Prix croissant", "sort.priceDesc": "Prix décroissant", "sort.weight": "Poids",
@@ -675,7 +675,7 @@ const SX: Record<string, Record<string, string>> = {
     "cat.clothing": "Clothing", "cat.accessories": "Accessories", "cat.nutrition": "Nutrition",
     "searchPh": "Search for a product…", "reset": "Reset", "shop": "Store", "searchOf": "Search for “{q}”",
     "demo.title": "Demo catalogue.", "demo.body": "The products, prices and availability shown here are SIMULATED and match no real offer. Retailer names are examples only \u2014 always check the actual price on the merchant\u2019s site before buying.",
-    "filters": "Filters", "f.cat": "Category", "f.brand": "Brand", "f.price": "Price", "f.score": "Min AI score", "f.avail": "Availability",
+    "a.prixMin": "Minimum price", "a.prixMax": "Maximum price", "a.noteMin": "Minimum rating", "filters": "Filters", "f.cat": "Category", "f.brand": "Brand", "f.price": "Price", "f.score": "Min AI score", "f.avail": "Availability",
     "all": "All", "inStockOnly": "In stock only", "inStock": "In stock",
     "product": "product", "products": "products",
     "sortBy": "Sort by:", "sort.score": "Relevance (AI score)", "sort.priceAsc": "Price: low to high", "sort.priceDesc": "Price: high to low", "sort.weight": "Weight",
@@ -690,7 +690,7 @@ const SX: Record<string, Record<string, string>> = {
     "cat.clothing": "Bekleidung", "cat.accessories": "Zubehör", "cat.nutrition": "Ernährung",
     "searchPh": "Produkt suchen…", "reset": "Zurücksetzen", "shop": "Shop", "searchOf": "Suche nach „{q}“",
     "demo.title": "Demo-Katalog.", "demo.body": "Produkte, Preise und Verfügbarkeit sind SIMULIERT und entsprechen keinem realen Angebot. Händlernamen dienen nur als Beispiel \u2014 prüfe den Preis stets auf der Website des Händlers.",
-    "filters": "Filter", "f.cat": "Kategorie", "f.brand": "Marke", "f.price": "Preis", "f.score": "Min. KI-Score", "f.avail": "Verfügbarkeit",
+    "a.prixMin": "Mindestpreis", "a.prixMax": "Höchstpreis", "a.noteMin": "Mindestbewertung", "filters": "Filter", "f.cat": "Kategorie", "f.brand": "Marke", "f.price": "Preis", "f.score": "Min. KI-Score", "f.avail": "Verfügbarkeit",
     "all": "Alle", "inStockOnly": "Nur auf Lager", "inStock": "Auf Lager",
     "product": "Produkt", "products": "Produkte",
     "sortBy": "Sortieren nach:", "sort.score": "Relevanz (KI-Score)", "sort.priceAsc": "Preis aufsteigend", "sort.priceDesc": "Preis absteigend", "sort.weight": "Gewicht",
@@ -705,7 +705,7 @@ const SX: Record<string, Record<string, string>> = {
     "cat.clothing": "Ropa", "cat.accessories": "Accesorios", "cat.nutrition": "Nutrición",
     "searchPh": "Buscar un producto…", "reset": "Restablecer", "shop": "Tienda", "searchOf": "Búsqueda de «{q}»",
     "demo.title": "Catálogo de demostración.", "demo.body": "Los productos, precios y disponibilidad mostrados aquí son SIMULADOS y no corresponden a ninguna oferta real. Los nombres de tiendas son solo un ejemplo: comprueba siempre el precio en la web del comercio antes de comprar.",
-    "filters": "Filtros", "f.cat": "Categoría", "f.brand": "Marca", "f.price": "Precio", "f.score": "Score IA mín.", "f.avail": "Disponibilidad",
+    "a.prixMin": "Precio mínimo", "a.prixMax": "Precio máximo", "a.noteMin": "Nota mínima", "filters": "Filtros", "f.cat": "Categoría", "f.brand": "Marca", "f.price": "Precio", "f.score": "Score IA mín.", "f.avail": "Disponibilidad",
     "all": "Todo", "inStockOnly": "Solo en stock", "inStock": "En stock",
     "product": "producto", "products": "productos",
     "sortBy": "Ordenar por:", "sort.score": "Relevancia (Score IA)", "sort.priceAsc": "Precio ascendente", "sort.priceDesc": "Precio descendente", "sort.weight": "Peso",
@@ -720,7 +720,7 @@ const SX: Record<string, Record<string, string>> = {
     "cat.clothing": "Vestuário", "cat.accessories": "Acessórios", "cat.nutrition": "Nutrição",
     "searchPh": "Pesquisar um produto…", "reset": "Repor", "shop": "Loja", "searchOf": "Pesquisa de «{q}»",
     "demo.title": "Catálogo de demonstração.", "demo.body": "Os produtos, preços e disponibilidade aqui apresentados são SIMULADOS e não correspondem a nenhuma oferta real. Os nomes das lojas são apenas exemplos: confirma sempre o preço no site do comerciante antes de comprar.",
-    "filters": "Filtros", "f.cat": "Categoria", "f.brand": "Marca", "f.price": "Preço", "f.score": "Score IA mín.", "f.avail": "Disponibilidade",
+    "a.prixMin": "Preço mínimo", "a.prixMax": "Preço máximo", "a.noteMin": "Nota mínima", "filters": "Filtros", "f.cat": "Categoria", "f.brand": "Marca", "f.price": "Preço", "f.score": "Score IA mín.", "f.avail": "Disponibilidade",
     "all": "Tudo", "inStockOnly": "Só em stock", "inStock": "Em stock",
     "product": "produto", "products": "produtos",
     "sortBy": "Ordenar por:", "sort.score": "Relevância (Score IA)", "sort.priceAsc": "Preço crescente", "sort.priceDesc": "Preço decrescente", "sort.weight": "Peso",
@@ -1115,10 +1115,10 @@ export function ShoppingHub() {
                 <div className="flex justify-between text-sm font-semibold text-zinc-800">
                   <span>{priceRange[0]}€</span><span>{priceRange[1]}€</span>
                 </div>
-                <input type="range" min={0} max={1000} step={10} value={priceRange[0]}
+                <input aria-label={d["a.prixMin"]} type="range" min={0} max={1000} step={10} value={priceRange[0]}
                   onChange={e => setPriceRange([Math.min(+e.target.value, priceRange[1] - 10), priceRange[1]])}
                   className="w-full accent-zinc-900 h-1" />
-                <input type="range" min={0} max={1000} step={10} value={priceRange[1]}
+                <input aria-label={d["a.prixMax"]} type="range" min={0} max={1000} step={10} value={priceRange[1]}
                   onChange={e => setPriceRange([priceRange[0], Math.max(+e.target.value, priceRange[0] + 10)])}
                   className="w-full accent-zinc-900 h-1" />
                 <div className="flex gap-1.5 flex-wrap">
@@ -1139,7 +1139,7 @@ export function ShoppingHub() {
                   <span className="text-xl font-black text-zinc-900">{minScore || d["all"]}</span>
                   {minScore > 0 && <span className="text-xs text-zinc-400">/100</span>}
                 </div>
-                <input type="range" min={0} max={95} step={5} value={minScore}
+                <input aria-label={d["a.noteMin"]} type="range" min={0} max={95} step={5} value={minScore}
                   onChange={e => setMinScore(+e.target.value)}
                   className="w-full accent-zinc-900 h-1" />
                 <div className="flex gap-1">
@@ -1178,7 +1178,7 @@ export function ShoppingHub() {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-zinc-400 hidden sm:inline">{d["sortBy"]}</span>
-              <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)}
+              <select aria-label={d["sortBy"]} value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)}
                 className="text-sm px-3 py-2 rounded-xl border border-zinc-200 bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900 cursor-pointer font-medium">
                 <option value="score">{d["sort.score"]}</option>
                 <option value="price_asc">{d["sort.priceAsc"]}</option>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState , useId } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Users, Zap, MessageSquare, Send, CheckCircle, AlertCircle,
@@ -36,6 +36,9 @@ interface GeminiAnalysis {
 }
 
 export function AdminWorkflow() {
+  // Chaque libellé est relié à son champ : sans cela, un lecteur d'écran annonce
+  // le placeholder — ou rien — à la place du texte affiché.
+  const cid = useId();
   const [adminSecret, setAdminSecret] = useState("");
   const [authenticated, setAuthenticated] = useState(false);
   const [athletes, setAthletes] = useState<Athlete[]>([]);
@@ -246,8 +249,8 @@ export function AdminWorkflow() {
           {selectedAthlete && (
             <div className="mt-4 pt-4 border-t border-zinc-800 space-y-3">
               <div>
-                <label className="text-xs text-zinc-500 mb-1 block">Semaine (lundi)</label>
-                <input
+                <label htmlFor={`${cid}-c0`} className="text-xs text-zinc-500 mb-1 block">Semaine (lundi)</label>
+                <input id={`${cid}-c0`}
                   type="date"
                   value={weekStart}
                   onChange={(e) => setWeekStart(e.target.value)}

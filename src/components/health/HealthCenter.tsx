@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback , useId } from "react";
 import { motion, AnimatePresence, useMotionValue, animate as fmAnimate } from "framer-motion";
 import {
   Shield, Heart, Utensils, Stethoscope, AlertTriangle,
@@ -310,6 +310,9 @@ function AnimatedNumber({ value, className }: { value: number; className?: strin
 }
 
 export function HealthCenter({ suivi = [], enPanne = false }: { suivi?: SuiviZone[]; /** La lecture des douleurs a ÉCHOUÉ : l'historique est vide par accident. */ enPanne?: boolean }) {
+  // Chaque libellé est relié à son champ : sans cela, un lecteur d'écran annonce
+  // le placeholder — ou rien — à la place du texte affiché.
+  const cid = useId();
   const { lang } = useT();
   const tr: Tr = (k, p) => fill(H[lang]?.[k] ?? H.fr[k] ?? k, p);
   const [tab, setTab] = useState<Tab>("kine");
@@ -545,10 +548,10 @@ export function HealthCenter({ suivi = [], enPanne = false }: { suivi?: SuiviZon
 
                 {selectedZone ? (
                   <div className="mt-3 pt-3 border-t border-zinc-100">
-                    <label className="text-xs font-medium text-zinc-500 block mb-1.5">{tr("k.pain")} — <span className="font-semibold text-zinc-800">{tr(selectedZone.labelKey)}</span> : <span className="font-bold" style={{ color: teinteDouleur(painLevel) }}>{painLevel}/10</span></label>
+                    <label htmlFor={`${cid}-r0`} className="text-xs font-medium text-zinc-500 block mb-1.5">{tr("k.pain")} — <span className="font-semibold text-zinc-800">{tr(selectedZone.labelKey)}</span> : <span className="font-bold" style={{ color: teinteDouleur(painLevel) }}>{painLevel}/10</span></label>
                     {/* Le curseur porte la MÊME couleur que la zone sur la silhouette : deux
                         barèmes différents pour une seule douleur se contrediraient à l'écran. */}
-                    <input type="range" min={1} max={10} value={painLevel} onChange={(e) => setPainLevel(+e.target.value)}
+                    <input id={`${cid}-r0`} type="range" min={1} max={10} value={painLevel} onChange={(e) => setPainLevel(+e.target.value)}
                       className="w-full" style={{ accentColor: teinteDouleur(painLevel) }} />
                     <div className="flex justify-between text-[10px] text-zinc-400 mt-0.5"><span>{tr("k.painLight")}</span><span>{tr("k.painHard")}</span></div>
                     <button onClick={askAboutZone} className="btn-brand w-full justify-center mt-3 text-sm">
@@ -792,13 +795,13 @@ export function HealthCenter({ suivi = [], enPanne = false }: { suivi?: SuiviZon
               </div>
               <div className="space-y-3">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-500">{tr("gd.name")}</label>
-                  <input value={emergencyName} onChange={(e) => setEmergencyName(e.target.value)} placeholder={tr("gd.namePh")}
+                  <label htmlFor={`${cid}-c0`} className="mb-1 block text-xs font-medium text-zinc-500">{tr("gd.name")}</label>
+                  <input id={`${cid}-c0`} value={emergencyName} onChange={(e) => setEmergencyName(e.target.value)} placeholder={tr("gd.namePh")}
                     className="w-full rounded-xl border border-zinc-200 bg-zinc-50/60 px-4 py-3 text-sm transition-colors focus:border-emerald-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30" />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-500">{tr("gd.phone")}</label>
-                  <input value={emergencyPhone} onChange={(e) => setEmergencyPhone(e.target.value)} placeholder="+33 6 12 34 56 78" type="tel"
+                  <label htmlFor={`${cid}-c1`} className="mb-1 block text-xs font-medium text-zinc-500">{tr("gd.phone")}</label>
+                  <input id={`${cid}-c1`} value={emergencyPhone} onChange={(e) => setEmergencyPhone(e.target.value)} placeholder="+33 6 12 34 56 78" type="tel"
                     className="w-full rounded-xl border border-zinc-200 bg-zinc-50/60 px-4 py-3 text-sm transition-colors focus:border-emerald-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30" />
                 </div>
                 <button onClick={() => toast.success(tr("gd.savedContact"))} className="btn-brand w-full justify-center">
@@ -830,17 +833,17 @@ export function HealthCenter({ suivi = [], enPanne = false }: { suivi?: SuiviZon
                 <div className="space-y-5">
                   <div>
                     <div className="mb-2 flex items-baseline justify-between">
-                      <label className="text-xs font-medium uppercase tracking-wide text-zinc-400">{tr("n.duration")}</label>
+                      <label htmlFor={`${cid}-r1`} className="text-xs font-medium uppercase tracking-wide text-zinc-400">{tr("n.duration")}</label>
                       <span className="text-lg font-bold tabular-nums text-zinc-900">{raceHours}<span className="ml-0.5 text-sm font-semibold text-zinc-400">h</span></span>
                     </div>
-                    <input type="range" min={1} max={24} step={0.5} value={raceHours} onChange={(e) => setRaceHours(parseFloat(e.target.value))} className="w-full accent-emerald-500" />
+                    <input id={`${cid}-r1`} type="range" min={1} max={24} step={0.5} value={raceHours} onChange={(e) => setRaceHours(parseFloat(e.target.value))} className="w-full accent-emerald-500" />
                   </div>
                   <div>
                     <div className="mb-2 flex items-baseline justify-between">
-                      <label className="text-xs font-medium uppercase tracking-wide text-zinc-400">{tr("n.temp")}</label>
+                      <label htmlFor={`${cid}-r2`} className="text-xs font-medium uppercase tracking-wide text-zinc-400">{tr("n.temp")}</label>
                       <span className="text-lg font-bold tabular-nums text-zinc-900">{raceTemp}<span className="ml-0.5 text-sm font-semibold text-zinc-400">°C</span></span>
                     </div>
-                    <input type="range" min={0} max={40} step={1} value={raceTemp} onChange={(e) => setRaceTemp(parseInt(e.target.value))} className="w-full accent-orange-500" />
+                    <input id={`${cid}-r2`} type="range" min={0} max={40} step={1} value={raceTemp} onChange={(e) => setRaceTemp(parseInt(e.target.value))} className="w-full accent-orange-500" />
                   </div>
 
                   <div className="rounded-2xl border border-zinc-100 bg-zinc-50/70 p-4">

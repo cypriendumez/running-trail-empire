@@ -529,8 +529,8 @@ export default function OnboardingPage() {
                     {healthNone ? "✓ " : ""}{tr("healthNone")}
                   </button>
                   <div>
-                    <label className="text-xs font-medium text-zinc-500 block mb-1.5">{tr("notesTitle")}</label>
-                    <textarea value={profile.health_notes} onChange={e => setProfile(p => ({ ...p, health_notes: e.target.value }))}
+                    <label htmlFor={`${cid}-c0`} className="text-xs font-medium text-zinc-500 block mb-1.5">{tr("notesTitle")}</label>
+                    <textarea id={`${cid}-c0`} value={profile.health_notes} onChange={e => setProfile(p => ({ ...p, health_notes: e.target.value }))}
                       placeholder={tr("notesPh")} rows={2} maxLength={500}
                       className="w-full px-3 py-2 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none" />
                   </div>
@@ -660,8 +660,8 @@ export default function OnboardingPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-zinc-500 block mb-1">{tr("volumeLabel")}</label>
-                  <input type="range" min="5" max="200" step="5" value={goals.target_weekly_km}
+                  <label htmlFor={`${cid}-c1`} className="text-xs font-medium text-zinc-500 block mb-1">{tr("volumeLabel")}</label>
+                  <input id={`${cid}-c1`} type="range" min="5" max="200" step="5" value={goals.target_weekly_km}
                     onChange={e => setGoals(g => ({...g, target_weekly_km: e.target.value}))}
                     className="w-full accent-emerald-500" />
                   <div className="flex justify-between text-xs text-zinc-400 mt-1">

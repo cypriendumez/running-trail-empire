@@ -159,7 +159,7 @@ export function GearHub({ catalogue, profil, offres = {} }: {
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">{tx(label)}</span>
                   <span className="text-[12px] text-zinc-600">{f[clef] != null ? `${f[clef]} ${unite}` : tx("shop.indifferent")}</span>
                 </div>
-                <input type="range" min={min} max={max} step={pas} value={(f[clef] as number | undefined) ?? max}
+                <input aria-label={tx(label)} type="range" min={min} max={max} step={pas} value={(f[clef] as number | undefined) ?? max}
                   onChange={(e) => setF({ ...f, [clef]: Number(e.target.value) === max ? null : Number(e.target.value) })}
                   className="w-full accent-emerald-600" />
               </div>
