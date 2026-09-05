@@ -18,6 +18,7 @@ import { tr, nLoc, nRaw, type I18nText } from "@/lib/i18n/multi";
 import type { Lang } from "@/lib/i18n/translations";
 import { MOTIF_T } from "@/lib/coach/reasonsI18n";
 import { detteSommeil, chuteVfc } from "@/lib/coach/recuperation";
+import { plusLongueLacune } from "@/lib/coach/lacune";
 import { traduireDouleur } from "@/lib/coach/painZonesI18n";
 
 /** « 4 h 24 » — une dette se lit en heures, pas en 264 minutes. */
@@ -276,7 +277,7 @@ async function fetchWorkouts(sb: SB, userId: string) {
 }
 
 export async function buildAthleteContext(sb: SB, userId: string): Promise<AthleteContext> {
-  const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, shoeRes, objRes, csRes, wlRes, histRes] = await Promise.all([
+  const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, shoeRes, objRes, csRes, wlRes, histRes, sleepDatesRes, hrvDatesRes] = await Promise.all([
     sb.from("profiles").select("*").eq("id", userId).single(),
     sb.from("performance_baselines").select("*").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).single(),
     sb.from("hrv_data").select("hrv_ms,physiological_state,date").eq("user_id", userId).order("date", { ascending: false }).limit(30),
@@ -303,6 +304,12 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
     sb.from("workouts").select("date, sport, distance_km").eq("user_id", userId)
       .gte("date", new Date(Date.now() - 190 * 86400000).toISOString().slice(0, 10))
       .order("date", { ascending: false }).limit(400),
+    sb.from("sleep_data").select("date").eq("user_id", userId)
+      .gte("date", new Date(Date.now() - 190 * 86400000).toISOString().slice(0, 10))
+      .order("date", { ascending: false }).limit(200),
+    sb.from("hrv_data").select("date").eq("user_id", userId)
+      .gte("date", new Date(Date.now() - 190 * 86400000).toISOString().slice(0, 10))
+      .order("date", { ascending: false }).limit(200),
   ]);
 
   const p = profileRes.data as Record<string, unknown> | null;
@@ -315,6 +322,8 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const coachSessions = ((csRes.data ?? []) as { data: { date?: string; sessionType?: string } }[]).map(r => r.data).filter((d): d is { date?: string; sessionType?: string } => !!d?.date);
 
   const now = Date.now();
+  /** Borne basse de l'historique long — la MÊME que celle des requêtes ci-dessus. */
+  const iso190 = () => new Date(now - 190 * 86400000).toISOString().slice(0, 10);
   // Semaine ISO : ancre STABLE d'un jour à l'autre. Sert à faire varier le stimulus des
   // séances de qualité d'une semaine sur l'autre ET à placer la semaine allégée (1 sur 4).
   const isoWeek = (() => {
@@ -893,6 +902,15 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const badNight = !!freshSleep && ((freshSleep.sleep_score != null && freshSleep.sleep_score < 60) || (lastSleepMin != null && lastSleepMin < 360));
   // DETTE : la règle ci-dessus ne regarde qu'UNE nuit. 3 h 23 puis 5 h 13 puis 6 h 51 se
   // termine sur une nuit « correcte » — rien ne s'allumait alors qu'il manque 4,4 h.
+  // Un vide de plusieurs semaines dans TOUTES les sources à la fois ne dit pas ce qui
+  // s'est passé : coupure, blessure ou montre non portée produisent le même silence, et
+  // appellent des plans opposés. On le signale au lieu de le combler par une hypothèse.
+  const datesConnues = [
+    ...histRuns.map((r) => String(r.date)),
+    ...((sleepDatesRes.data ?? []) as { date: string }[]).map((r) => String(r.date)),
+    ...((hrvDatesRes.data ?? []) as { date: string }[]).map((r) => String(r.date)),
+  ];
+  const lacune = plusLongueLacune(datesConnues, iso190(), todayStr);
   const dette = detteSommeil(sleep, todayStr);
   // CHUTE AIGUË : la tendance 7 j vs 7 j ne bouge presque pas pour une seule mauvaise
   // matinée. Le 17/06, VFC à 76 pour une base à 103, et la tendance était EN HAUSSE.
@@ -1603,7 +1621,7 @@ FORME & RÉCUPÉRATION (aujourd'hui)
 
 CHARGE D'ENTRAÎNEMENT
 ${demonstratedKm ? `- 📈 CAPACITÉ DÉJÀ DÉMONTRÉE : ${demonstratedKm} km/semaine tenus sur ses meilleures semaines des 6 derniers mois. Son système musculo-tendineux CONNAÎT ce volume — il y reviendra bien plus vite qu'il n'y est monté la première fois. Ne le traite pas comme un débutant sous prétexte que ses dernières semaines sont basses ; mais ne t'en sers pas non plus pour justifier une charge élevée AUJOURD'HUI : c'est la fraîcheur du moment qui en décide.\n` : ""}- Volume : ${Math.round(weekKm)} km COURUS cette semaine${cross.label ? ` (+ ${fmtMinutes(cross.minutes)} d'AUTRES SPORTS, ${cross.tss} TSS = ${cross.sharePct} % de sa charge : ${cross.label}${cross.impactMinutes > 0 ? ` — dont ${fmtMinutes(cross.impactMinutes)} avec impact sur les jambes, qui s'ajoutent à l'usure de la course` : " — sans impact sur les jambes : ça fatigue le cardio, pas les tendons"}. Ça compte dans la charge, mais ce N'EST PAS du volume de course : ne dimensionne AUCUNE séance dessus)` : ""} · ~${Math.round(avg4wkKm)} km/sem (moy. 4 sem.)
-- 🎯 VOLUME CIBLE de la semaine à venir : ~${targetKm} km, dont une sortie longue de ~${longRunKm} km. Dimensionne les séances sur CES chiffres, pas sur des durées passe-partout.
+${lacune ? `- ⚠️ TROU DE DONNÉES : ${lacune.jours} jours SANS AUCUNE trace (ni séance, ni nuit, ni VFC) du ${lacune.debut} au ${lacune.fin}. Une coupure, une blessure et une montre non portée produisent exactement ce silence — et appellent des plans OPPOSÉS. Les moyennes qui traversent cette période sont donc peu fiables : DIS-LUI que tu l'as remarqué et DEMANDE-LUI ce qui s'est passé, ne suppose pas.\n` : ""}- 🎯 VOLUME CIBLE de la semaine à venir : ~${targetKm} km, dont une sortie longue de ~${longRunKm} km. Dimensionne les séances sur CES chiffres, pas sur des durées passe-partout.
 - 🔄 PHASE DU CYCLE : ${cycleLabel}.
 - 📆 DISPONIBILITÉS : ${availDaysPerWeek} séance(s) de course par semaine${availDays.length < 7 ? `, uniquement les ${availDays.map(d => ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d]).join(", ")}` : ""}${declaredDpw ? " (déclaré par l'athlète)" : " (déduit de son niveau et de sa pratique actuelle — demande-lui de le préciser)"}. NE DÉPASSE PAS ce nombre : un plan qu'il ne peut pas suivre ne vaut rien.
 - ⏱️ Dernière séance DURE réellement effectuée : ${lastHardDaysAgo == null ? "aucune trace récente" : lastHardDaysAgo === 0 ? "AUJOURD'HUI ⚠️ → pas de deuxième séance dure aujourd'hui ni demain" : `il y a ${lastHardDaysAgo} j`}${lastHardDaysAgo != null && lastHardDaysAgo * 24 < hardGapH ? ` ⚠️ moins de ${hardGapH} h se sont écoulées : la prochaine qualité doit attendre.` : ""}${skippedWeekdays.length ? `\n- 🚫 JOURS SYSTÉMATIQUEMENT RATÉS : ${skippedWeekdays.map(d => ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d]).join(", ")} — prescrits plusieurs fois, jamais courus. Ne t'obstine pas : place-y du repos ou rien, et redistribue ailleurs.` : ""}
