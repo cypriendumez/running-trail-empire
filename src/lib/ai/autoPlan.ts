@@ -17,6 +17,7 @@ import { heatAdvice, windAdvice } from "@/lib/weather/openMeteo";
 import { choisirJourQualite } from "@/lib/coach/meteoPlacement";
 import { repartirFootings, varianteFooting } from "@/lib/coach/footings";
 import { manqueDeVolume } from "@/lib/coach/ecartVolume";
+import { axesRenforcement } from "@/lib/coach/renforcement";
 import { scinderFacile, seanceMatinFacile } from "@/lib/coach/doubleSessions";
 import { PLAN_T } from "@/lib/ai/planI18n";
 import { nRaw, type I18nText } from "@/lib/i18n/multi";
@@ -585,10 +586,21 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
     detail: (l) => {
       const phase = ctx.cycle.taper ? "affûtage" : ctx.macroPlan[0]?.phase ?? "Développement";
       const sets = blockWeekRenfo === 3 ? 2 : 3 + Math.min(1, blockWeekRenfo);
+      // ── AXE PERSONNEL, choisi sur une MESURE ────────────────────────────────
+      // La séance ignorait tout de la foulée de l'athlète : deux coureurs aux
+      // fragilités opposées recevaient le même gainage. On ajoute UN axe (deux au
+      // plus), et seulement quand la mesure existe — une valeur absente n'est pas
+      // une valeur normale. Rien pendant l'affûtage : on n'y ajoute pas de travail.
+      const axes = ctx.cycle.taper ? [] : axesRenforcement({
+        ratioVertical: ctx.forme?.ratioVertical ?? null,
+        cadence: ctx.forme?.cadence ?? null,
+        zones: ctx.zonesFragiles ?? [],
+      });
+      const enPlus = axes.map((a) => PLAN_T[l].renfoAxe[a] ?? "").join("");
       if (phase === "affûtage" || ctx.cycle.taper) return PLAN_T[l].renfoAffutage;
-      if (phase === "Base") return PLAN_T[l].renfoBase(sets);
-      if (phase === "Spécifique") return PLAN_T[l].renfoSpecifique(sets);
-      return PLAN_T[l].renfoDeveloppement(sets, sets > 3);
+      if (phase === "Base") return PLAN_T[l].renfoBase(sets) + enPlus;
+      if (phase === "Spécifique") return PLAN_T[l].renfoSpecifique(sets) + enPlus;
+      return PLAN_T[l].renfoDeveloppement(sets, sets > 3) + enPlus;
     },
     why: (l) => PLAN_T[l].renfoWhy,
     tags: tags("Renfo", "Prévention"),

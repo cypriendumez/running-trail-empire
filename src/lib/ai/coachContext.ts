@@ -245,6 +245,10 @@ export type AthleteContext = {
   skippedWeekdays: number[];
   /** Aucune séance de course connue : on ne prescrit rien qui suppose un passé. */
   noHistory: boolean;
+  /** Médianes de foulée sur les séances récentes — chacune `null` si jamais mesurée. */
+  forme: { ratioVertical: number | null; cadence: number | null } | null;
+  /** Zones déclarées fragiles par l'athlète (profil santé). */
+  zonesFragiles: string[];
   /** Disponibilités déclarées : nb de séances de course/semaine et jours praticables (0 = dim). */
   availability: { daysPerWeek: number; days: number[] };
   /** Prévisions RÉELLES à 7 jours (Open-Meteo) — vide si la position est inconnue. */
@@ -1834,6 +1838,18 @@ ${catalog}`;
     cycle: { deload, taper, label: cycleLabel },
     skippedWeekdays,
     noHistory,
+    // Médianes, pas moyennes : une seule séance en côtes ne doit pas décider d'un axe
+    // de renforcement pour tout un bloc.
+    forme: (() => {
+      const med = (vals: (number | null)[]) => {
+        const v = vals.filter((x): x is number => x != null && Number.isFinite(x) && x > 0).sort((a, b) => a - b);
+        return v.length >= 5 ? v[Math.floor(v.length / 2)] : null;
+      };
+      const r = med(recent14.map((w) => num((w as { vertical_ratio_pct?: number | null }).vertical_ratio_pct)));
+      const c = med(recent14.map((w) => num((w as { avg_cadence_spm?: number | null }).avg_cadence_spm)));
+      return r == null && c == null ? null : { ratioVertical: r, cadence: c };
+    })(),
+    zonesFragiles: Array.isArray(p?.injury_zones) ? (p.injury_zones as string[]).filter((z) => typeof z === "string") : [],
     availability: { daysPerWeek: availDaysPerWeek, days: availDays },
     forecast,
     altitude: { elevationM, lossPct: altLoss },

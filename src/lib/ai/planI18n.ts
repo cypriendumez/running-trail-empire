@@ -123,6 +123,8 @@ export type TextesPlan = {
   renfoSpecifique: (series: number) => string;
   renfoDeveloppement: (series: number, enPlus: boolean) => string;
   renfoWhy: string;
+  /** Axe personnalisé, choisi sur une MESURE de l'athlète. */
+  renfoAxe: Record<string, string>;
 
   // ── Verdict de fraîcheur du jour ────────────────────────────────────────────
   recupTitre: string;
@@ -233,6 +235,13 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     renfoSpecifique: (s) => `30 à 35 min, FORCE UTILE À LA COURSE : squats bulgares ${s}×8 par jambe, fentes sautées ${s}×8, montées de mollets sur une jambe ${s}×12, nordic curls ${s}×6, gainage dynamique ${s}×40 s, bondissements ${s}×10. Explosif et court : on transfère la force vers la foulée, on ne cherche plus le volume.`,
     renfoDeveloppement: (s, plus) => `30 à 40 min, DÉVELOPPEMENT : gainage (planche, latéral) ${s}×45 s, squats ${s}×12, fentes ${s}×10 par jambe, montées de mollets ${s}×15, ischios nordic curls ${s}×6, proprioception sur une jambe ${s}×30 s. ${plus ? "Série supplémentaire par rapport à la semaine dernière — la surcharge vaut aussi pour le renfo." : "Charge maintenue cette semaine (assimilation)."}`,
     renfoWhy: "La prévention de blessure n°1, et un gain direct d'économie de foulée. Elle se périodise comme la course : fondations, puis force utile, puis simple entretien à l'approche du jour J.",
+    renfoAxe: {
+      genou_hanche: " 🎯 EN PLUS, pour ton genou / ta hanche : abducteurs de hanche (élévations latérales couchées) 3×15 par côté, pont fessier une jambe 3×12, fentes latérales 3×10. C'est la faiblesse du moyen fessier qui laisse le genou partir en dedans.",
+      mollet_achille: " 🎯 EN PLUS, pour ton mollet / ton tendon d'Achille : montées de mollets EXCENTRIQUES (3 s à la descente) 3×15 jambe tendue puis 3×15 genou fléchi, et tibial antérieur 3×20. L'excentrique est le seul protocole qui ait fait ses preuves sur le tendon.",
+      chaine_posterieure: " 🎯 EN PLUS, pour ta chaîne postérieure : nordic curls 3×6 (descente lente, remontée aidée), soulevé de terre une jambe 3×10 par côté, extensions lombaires au sol 3×15.",
+      raideur: " 🎯 EN PLUS, ton ratio vertical est élevé — tu montes plus que tu n'avances : corde à sauter 3×45 s, pogos (petits rebonds cheville) 3×20, bondissements sur place 3×10. On cherche un contact au sol COURT, pas de la force.",
+      cadence: " 🎯 EN PLUS, ta cadence est basse — la foulée est trop longue et le genou encaisse : 4×1 min à +5 % de cadence sur un footing (métronome ou musique), et gainage dynamique en appui 3×30 s.",
+    },
 
     recupTitre: "Récupération",
     recupDetail: (e, k) => `Échauffement ${e} min très doux FC Z1 → Corps : 25 min en Z1 très facile, piloté à la FRÉQUENCE CARDIAQUE (aucune allure à tenir) → Retour au calme ${k} min FC Z1. Ou repos complet si tu le sens mieux.`,
@@ -331,6 +340,13 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     renfoSpecifique: (s) => `30 to 35 min, STRENGTH THAT TRANSFERS TO RUNNING: Bulgarian split squats ${s}×8 per leg, jump lunges ${s}×8, single-leg calf raises ${s}×12, nordic curls ${s}×6, dynamic core ${s}×40 s, bounds ${s}×10. Explosive and short: we transfer strength into the stride, we no longer chase volume.`,
     renfoDeveloppement: (s, plus) => `30 to 40 min, DEVELOPMENT: core (plank, side) ${s}×45 s, squats ${s}×12, lunges ${s}×10 per leg, calf raises ${s}×15, nordic hamstring curls ${s}×6, single-leg proprioception ${s}×30 s. ${plus ? "One set more than last week — progressive overload applies to strength work too." : "Load held this week (assimilation)."}`,
     renfoWhy: "The number 1 injury prevention, and a direct gain in running economy. It is periodised like the running: foundations, then transferable strength, then simple maintenance as race day approaches.",
+    renfoAxe: {
+      genou_hanche: " 🎯 ALSO, for your knee / hip: side-lying hip abductions 3×15 per side, single-leg glute bridges 3×12, lateral lunges 3×10. A weak gluteus medius is what lets the knee collapse inward.",
+      mollet_achille: " 🎯 ALSO, for your calf / Achilles: ECCENTRIC calf raises (3 s lowering) 3×15 straight-legged then 3×15 bent-knee, plus tibialis anterior 3×20. Eccentric loading is the only protocol proven on tendons.",
+      chaine_posterieure: " 🎯 ALSO, for your posterior chain: nordic curls 3×6 (slow down, assisted up), single-leg deadlifts 3×10 per side, floor back extensions 3×15.",
+      raideur: " 🎯 ALSO, your vertical ratio is high — you bounce more than you move forward: skipping rope 3×45 s, pogos 3×20, standing bounds 3×10. Aim for SHORT ground contact, not strength.",
+      cadence: " 🎯 ALSO, your cadence is low — your stride is too long and the knee absorbs it: 4×1 min at +5 % cadence during an easy run (metronome or music), plus dynamic plank work 3×30 s.",
+    },
 
     recupTitre: "Recovery",
     recupDetail: (e, k) => `Warm-up ${e} min very gentle HR Z1 → Main set: 25 min at Z1 very easy, driven by HEART RATE (no pace to hold) → Cool-down ${k} min HR Z1. Or complete rest if that feels better.`,
@@ -429,6 +445,13 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     renfoSpecifique: (s) => `30 bis 35 min, LAUFSPEZIFISCHE KRAFT: bulgarische Kniebeugen ${s}×8 pro Bein, Sprungausfallschritte ${s}×8, einbeiniges Wadenheben ${s}×12, Nordic Curls ${s}×6, dynamischer Rumpf ${s}×40 s, Sprünge ${s}×10. Explosiv und kurz: Wir übertragen die Kraft in den Laufschritt, Umfang ist nicht mehr das Ziel.`,
     renfoDeveloppement: (s, plus) => `30 bis 40 min, ENTWICKLUNG: Rumpf (Unterarmstütz, seitlich) ${s}×45 s, Kniebeugen ${s}×12, Ausfallschritte ${s}×10 pro Bein, Wadenheben ${s}×15, Nordic Curls ${s}×6, Propriozeption auf einem Bein ${s}×30 s. ${plus ? "Ein Satz mehr als letzte Woche — progressive Überlastung gilt auch für die Kräftigung." : "Belastung diese Woche gehalten (Verarbeitung)."}`,
     renfoWhy: "Die Verletzungsprävention Nummer 1 und ein direkter Gewinn an Laufökonomie. Sie wird periodisiert wie das Laufen: Fundament, dann laufspezifische Kraft, dann nur noch Erhaltung, wenn der Tag X näher rückt.",
+    renfoAxe: {
+      genou_hanche: " 🎯 ZUSÄTZLICH, für Knie/Hüfte: Hüftabduktion in Seitlage 3×15 je Seite, einbeinige Glute Bridge 3×12, seitliche Ausfallschritte 3×10. Ein schwacher Gluteus medius lässt das Knie nach innen fallen.",
+      mollet_achille: " 🎯 ZUSÄTZLICH, für Wade/Achillessehne: EXZENTRISCHE Wadenheber (3 s Absenken) 3×15 gestreckt und 3×15 gebeugt, dazu Tibialis anterior 3×20. Exzentrik ist das einzige an der Sehne belegte Protokoll.",
+      chaine_posterieure: " 🎯 ZUSÄTZLICH, für die hintere Kette: Nordic Curls 3×6, einbeiniges Kreuzheben 3×10 je Seite, Rückenstrecken am Boden 3×15.",
+      raideur: " 🎯 ZUSÄTZLICH: dein Vertikalverhältnis ist hoch — du springst mehr, als du vorankommst: Seilspringen 3×45 s, Pogos 3×20, Standsprünge 3×10. Ziel ist KURZER Bodenkontakt, keine Kraft.",
+      cadence: " 🎯 ZUSÄTZLICH: deine Schrittfrequenz ist niedrig — der Schritt ist zu lang und das Knie fängt es ab: 4×1 min mit +5 % Frequenz im Dauerlauf (Metronom), dazu dynamische Planks 3×30 s.",
+    },
 
     recupTitre: "Erholung",
     recupDetail: (e, k) => `Aufwärmen ${e} min sehr sanft HF Z1 → Hauptteil: 25 min in Z1 sehr locker, über die HERZFREQUENZ gesteuert (kein Tempo zu halten) → Auslaufen ${k} min HF Z1. Oder vollständige Ruhe, wenn sich das besser anfühlt.`,
@@ -527,6 +550,13 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     renfoSpecifique: (s) => `30 a 35 min, FUERZA ÚTIL PARA CORRER: sentadillas búlgaras ${s}×8 por pierna, zancadas saltadas ${s}×8, elevaciones de gemelos a una pierna ${s}×12, nordic curls ${s}×6, core dinámico ${s}×40 s, saltos ${s}×10. Explosivo y corto: transferimos la fuerza a la zancada, ya no buscamos volumen.`,
     renfoDeveloppement: (s, plus) => `30 a 40 min, DESARROLLO: core (plancha, lateral) ${s}×45 s, sentadillas ${s}×12, zancadas ${s}×10 por pierna, elevaciones de gemelos ${s}×15, nordic curls de isquios ${s}×6, propiocepción a una pierna ${s}×30 s. ${plus ? "Una serie más que la semana pasada — la sobrecarga progresiva vale también para la fuerza." : "Carga mantenida esta semana (asimilación)."}`,
     renfoWhy: "La prevención de lesiones n.º 1, y una ganancia directa de economía de zancada. Se periodiza como la carrera: cimientos, luego fuerza útil, y solo mantenimiento al acercarse el día D.",
+    renfoAxe: {
+      genou_hanche: " 🎯 ADEMÁS, para tu rodilla / cadera: abducciones de cadera tumbado 3×15 por lado, puente de glúteo a una pierna 3×12, zancadas laterales 3×10. La debilidad del glúteo medio deja que la rodilla se vaya hacia dentro.",
+      mollet_achille: " 🎯 ADEMÁS, para tu gemelo / tendón de Aquiles: elevaciones de talón EXCÉNTRICAS (3 s de bajada) 3×15 con pierna recta y 3×15 con rodilla flexionada, más tibial anterior 3×20. Lo excéntrico es el único protocolo probado en el tendón.",
+      chaine_posterieure: " 🎯 ADEMÁS, para tu cadena posterior: nordic curls 3×6, peso muerto a una pierna 3×10 por lado, extensiones lumbares en el suelo 3×15.",
+      raideur: " 🎯 ADEMÁS, tu ratio vertical es alto — subes más de lo que avanzas: comba 3×45 s, pogos 3×20, saltos en el sitio 3×10. Se busca un contacto CORTO con el suelo, no fuerza.",
+      cadence: " 🎯 ADEMÁS, tu cadencia es baja — la zancada es demasiado larga y la rodilla lo absorbe: 4×1 min a +5 % de cadencia en un rodaje (metrónomo), más plancha dinámica 3×30 s.",
+    },
 
     recupTitre: "Recuperación",
     recupDetail: (e, k) => `Calentamiento ${e} min muy suave FC Z1 → Parte principal: 25 min en Z1 muy fácil, pilotado por FRECUENCIA CARDÍACA (sin ritmo que mantener) → Vuelta a la calma ${k} min FC Z1. O descanso completo si lo sientes mejor.`,
@@ -625,6 +655,13 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     renfoSpecifique: (s) => `30 a 35 min, FORÇA ÚTIL À CORRIDA: agachamentos búlgaros ${s}×8 por perna, afundos saltados ${s}×8, elevações de gémeos a uma perna ${s}×12, nordic curls ${s}×6, core dinâmico ${s}×40 s, saltos ${s}×10. Explosivo e curto: transferimos a força para a passada, já não procuramos volume.`,
     renfoDeveloppement: (s, plus) => `30 a 40 min, DESENVOLVIMENTO: core (prancha, lateral) ${s}×45 s, agachamentos ${s}×12, afundos ${s}×10 por perna, elevações de gémeos ${s}×15, nordic curls de isquiotibiais ${s}×6, propriocepção a uma perna ${s}×30 s. ${plus ? "Uma série a mais do que na semana passada — a sobrecarga progressiva vale também para o reforço." : "Carga mantida esta semana (assimilação)."}`,
     renfoWhy: "A prevenção de lesões n.º 1, e um ganho direto de economia de passada. Periodiza-se como a corrida: fundações, depois força útil, e simples manutenção à medida que o dia D se aproxima.",
+    renfoAxe: {
+      genou_hanche: " 🎯 ALÉM DISSO, para o teu joelho / anca: abduções de anca deitado 3×15 por lado, ponte de glúteo a uma perna 3×12, afundos laterais 3×10. A fraqueza do glúteo médio deixa o joelho cair para dentro.",
+      mollet_achille: " 🎯 ALÉM DISSO, para o teu gémeo / tendão de Aquiles: elevações de gémeos EXCÊNTRICAS (3 s a descer) 3×15 de perna esticada e 3×15 com joelho fletido, mais tibial anterior 3×20. O excêntrico é o único protocolo comprovado no tendão.",
+      chaine_posterieure: " 🎯 ALÉM DISSO, para a tua cadeia posterior: nordic curls 3×6, peso morto a uma perna 3×10 por lado, extensões lombares no chão 3×15.",
+      raideur: " 🎯 ALÉM DISSO, o teu rácio vertical é alto — sobes mais do que avanças: corda 3×45 s, pogos 3×20, saltos no lugar 3×10. Procura um contacto CURTO com o solo, não força.",
+      cadence: " 🎯 ALÉM DISSO, a tua cadência é baixa — a passada é longa demais e o joelho absorve: 4×1 min a +5 % de cadência num treino leve (metrónomo), mais prancha dinâmica 3×30 s.",
+    },
 
     recupTitre: "Recuperação",
     recupDetail: (e, k) => `Aquecimento ${e} min muito suave FC Z1 → Parte principal: 25 min em Z1 muito fácil, guiado pela FREQUÊNCIA CARDÍACA (sem ritmo a cumprir) → Retorno à calma ${k} min FC Z1. Ou descanso completo se te souber melhor.`,
