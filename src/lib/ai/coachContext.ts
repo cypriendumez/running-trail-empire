@@ -154,6 +154,18 @@ function estimateVmaFromRuns(workouts: Wk[], fcMaxEst: number | null, now: numbe
 
 // Reclasse une séance selon l'allure/FC RÉELLES (les imports intervals.icu arrivent souvent
 // TOUS en « easy ») → l'IA lit une histoire d'entraînement juste, pas une suite de faux footings.
+/**
+ * FC moyenne, en part de la FC max, à partir de laquelle une séance est DURE.
+ *
+ * ⚠️ C'était 0,90 côté `isHardWk` alors que `classifyRun` place la barre du seuil à
+ * 0,85 : deux définitions du même mot, dans le même fichier. Sur un athlète réel
+ * (FC max 212), 0,90 exige une FC MOYENNE de 191 sur toute la séance — un effort de
+ * course, jamais tenu à l'entraînement. Résultat : le coach croyait sa dernière séance
+ * dure vieille de 65 jours alors qu'elle datait de 13, et il espaçait donc les qualités
+ * à partir d'un passé imaginaire. Une seule constante désormais, pour les deux.
+ */
+export const PART_FC_DURE = 0.85;
+
 export function classifyRun(w: { distance_km?: number | null; duration_seconds?: number | null; avg_hr?: number | null; type?: string | null }, fcMax: number | null): string {
   const km = w.distance_km ?? 0, sec = w.duration_seconds ?? 0;
   if (km <= 0 || sec <= 0) return String(w.type ?? "séance");
@@ -161,7 +173,7 @@ export function classifyRun(w: { distance_km?: number | null; duration_seconds?:
   const pct = (w.avg_hr && fcMax) ? w.avg_hr / fcMax : null;
   if (pct != null) {
     if (pct >= 0.90) return "Intense (VMA/course)";
-    if (pct >= 0.85) return "Seuil/Tempo";
+    if (pct >= PART_FC_DURE) return "Seuil/Tempo";
     if (pct >= 0.80) return "Allure soutenue";
     if (pct >= 0.70) return "Endurance";
     return "Footing facile";
@@ -383,7 +395,9 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const obsMaxHr0 = Math.max(0, ...workouts.map(w => num(w.max_hr) ?? 0));
   const fcMaxEst = num(b?.max_hr) ?? (obsMaxHr0 > 150 ? obsMaxHr0 : null) ?? (num(p?.age) != null ? 220 - (num(p?.age) as number) : 190);
   // Une séance est « dure » si son TYPE le dit OU si la FC révèle un effort élevé (≥ 90 % FCmax).
-  const isHardWk = (w: Wk) => isHardType(w.type) || (fcMaxEst != null && w.avg_hr != null && w.avg_hr >= fcMaxEst * 0.90);
+  // ⚠️ `isHardType` ne suffit PAS : mesuré sur 60 séances de ce compte, intervals.icu
+  // n'émet que deux étiquettes, « easy » et « trail ». La FC est donc le seul juge réel.
+  const isHardWk = (w: Wk) => isHardType(w.type) || (fcMaxEst != null && w.avg_hr != null && w.avg_hr >= fcMaxEst * PART_FC_DURE);
   const hardShare = recent14.length ? Math.round(recent14.filter(isHardWk).length / recent14.length * 100) : null;
   // ── LE VRAI 80/20 : en TEMPS passé par zone, pas en nombre de séances ──
   // Compter les séances est trompeur : deux fractionnés courts dans une semaine de

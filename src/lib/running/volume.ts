@@ -45,21 +45,42 @@ export function robustWeeklyKm(
   //    référence découpée autrement — deux règles pour un seul écart affiché.
   const aujourdhui = jourLocal(new Date(now));
   const buckets = new Array(weeks).fill(0);
+  // Kilomètres par JOUR : c'est cette granularité qui rend la fenêtre glissante possible.
+  const parJour = new Array(weeks * 7).fill(0);
   for (const r of runs) {
     const jour = String(r.date ?? "").slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(jour)) continue;
     const ageDays = ecartJours(jour, aujourdhui);
     if (!Number.isFinite(ageDays) || ageDays < 0 || ageDays >= weeks * 7) continue;
-    buckets[Math.floor(ageDays / 7)] += Math.max(0, r.distance_km ?? 0);
+    const km = Math.max(0, r.distance_km ?? 0);
+    buckets[Math.floor(ageDays / 7)] += km;
+    parJour[ageDays] += km;
   }
   // Une semaine « courue » demande un minimum réel : 2 km, c'est un test de chaussures,
   // pas une semaine d'entraînement, et l'inclure tirerait la médiane vers le bas.
-  const run = buckets.filter((k) => k >= 2).sort((a, b) => a - b);
+  // Les semaines COURUES et les semaines de coupure gardent leur définition d'origine
+  // (tranches calendaires) : ce sont elles qui disent « il a coupé trois semaines ».
+  const run = buckets.filter((k) => k >= 2);
   const off = buckets.length - run.length;
   if (run.length < 3) return null;
 
-  const mid = Math.floor(run.length / 2);
-  const km = run.length % 2 ? run[mid] : (run[mid - 1] + run[mid]) / 2;
+  // ⚠️ LE VOLUME SE MESURE SUR DES FENÊTRES GLISSANTES DE 7 JOURS, pas sur des tranches
+  // figées. Avec des tranches, avancer l'ancre d'un seul jour redécoupe TOUTES les
+  // semaines : une grosse sortie change de case et la médiane bascule. Mesuré sur un
+  // compte réel — elle sautait de 25,8 km d'un jour à l'autre et oscillait entre 34 et
+  // 71 km sur trois semaines, donc la taille des footings prescrits avec elle. En
+  // glissant : 10,6 km de saut maximal, et une courbe qui suit la progression.
+  const sommes: number[] = [];
+  for (let d = 0; d + 7 <= parJour.length; d++) {
+    let somme = 0;
+    for (let k = 0; k < 7; k++) somme += parJour[d + k];
+    if (somme >= 2) sommes.push(somme);
+  }
+  // Une poignée de fenêtres ne fait pas une médiane : deux semaines de matière minimum.
+  if (sommes.length < 14) return null;
+  sommes.sort((a, b) => a - b);
+  const mid = Math.floor(sommes.length / 2);
+  const km = sommes.length % 2 ? sommes[mid] : (sommes[mid - 1] + sommes[mid]) / 2;
   return { km: Math.round(km * 10) / 10, weeksRun: run.length, weeksOff: off };
 }
 

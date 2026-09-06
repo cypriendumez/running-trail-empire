@@ -17,6 +17,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { referencesFc, plageFc, plageLisible, cibleEndurance, LARGEUR_MAX, FOOTINGS_MIN, ECART_MIN, PLANCHER_RESERVE } from "../src/lib/coach/fcCible";
 import { repartirFootings, varianteFooting, AMPLITUDE } from "../src/lib/coach/footings";
+import { robustWeeklyKm, type RunLike } from "../src/lib/running/volume";
+import { PART_FC_DURE } from "../src/lib/ai/coachContext";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -278,6 +280,93 @@ test("seule l'ENDURANCE s'ajuste — pas le seuil ni la VMA", () => {
   // rendrait le tri inutile, il faut RECLASSER.
   assert.match(page, /classifyRun\(w, fcMaxObservee\)/, "les séances ne sont plus reclassées avant le tri");
   assert.match(page, /fcFootings=\{fcFootings\}/, "les footings réels ne sont plus transmis");
+});
+
+console.log("\nLE VOLUME DE RÉFÉRENCE — « robuste » doit vouloir dire STABLE");
+
+/** Trace synthétique : `km` kilomètres tous les deux jours, sur `jours` jours. */
+function courses(jours: number, km: number, depuis = Date.now()): RunLike[] {
+  const out: RunLike[] = [];
+  for (let d = 0; d < jours; d += 2)
+    out.push({ date: new Date(depuis - d * 86400000).toISOString().slice(0, 10), distance_km: km } as RunLike);
+  return out;
+}
+
+test("une charge régulière donne un volume régulier", () => {
+  const r = robustWeeklyKm(courses(70, 10), Date.now(), 8);
+  assert.ok(r, "pas de volume calculé");
+  // 10 km tous les deux jours = 35 km par semaine.
+  assert.ok(Math.abs(r!.km - 35) <= 5, `${r!.km} km au lieu de ~35`);
+});
+
+test("le volume ne SAUTE pas d'un jour à l'autre", () => {
+  // ⚠️ C'est le défaut mesuré : en tranches figées, avancer l'ancre d'un jour redécoupe
+  // toutes les semaines d'un coup. Sur un compte réel, la médiane sautait de 25,8 km en
+  // 24 h — donc la taille des footings prescrits avec elle.
+  const runs = courses(80, 12);
+  // Une grosse sortie isolée, exactement le genre de séance qui changeait de tranche.
+  runs.push({ date: new Date(Date.now() - 9 * 86400000).toISOString().slice(0, 10), distance_km: 30 } as RunLike);
+  const serie: number[] = [];
+  for (let d = 14; d >= 0; d--) serie.push(robustWeeklyKm(runs, Date.now() - d * 86400000, 8)?.km ?? 0);
+  const sauts = serie.slice(1).map((v, i) => Math.abs(v - serie[i]));
+  assert.ok(Math.max(...sauts) <= 12,
+    `saut de ${Math.max(...sauts).toFixed(1)} km d'un jour à l'autre : le volume n'est pas stable`);
+});
+
+test("il faut de la matière pour prétendre à une médiane", () => {
+  assert.equal(robustWeeklyKm(courses(10, 10), Date.now(), 8), null, "10 jours ne font pas une référence");
+  assert.equal(robustWeeklyKm([], Date.now(), 8), null);
+});
+
+test("les semaines de coupure restent comptées à part", () => {
+  // ⚠️ Décor AVEC coupure : avec 8 semaines pleines, `weeksOff` vaut 0 et l'assertion
+  // « la somme fait 8 » passait quoi qu'il arrive (trouvé par mutation).
+  const avecCoupure = courses(70, 10).filter((r) => {
+    const age = Math.round((Date.now() - Date.parse(String(r.date) + "T12:00:00Z")) / 86400000);
+    return age < 14 || age >= 35;   // trois semaines sans rien au milieu
+  });
+  const r = robustWeeklyKm(avecCoupure, Date.now(), 8)!;
+  assert.ok(r.weeksOff >= 2, `${r.weeksOff} semaine(s) de coupure comptée(s) : la coupure n'est plus vue`);
+  assert.equal(r.weeksRun + r.weeksOff, 8, "le compte des semaines ne tombe plus juste");
+});
+
+test("une semaine aberrante ne déplace pas la référence", () => {
+  // MÉDIANE et non moyenne : une semaine à 120 km ne doit pas relever la référence
+  // de tout un athlète qui tourne à 35.
+  const normal = courses(70, 10);
+  const avecPic = [...normal];
+  for (let d = 21; d < 28; d++)
+    avecPic.push({ date: new Date(Date.now() - d * 86400000).toISOString().slice(0, 10), distance_km: 18 } as RunLike);
+  const sans = robustWeeklyKm(normal, Date.now(), 8)!.km;
+  const avec = robustWeeklyKm(avecPic, Date.now(), 8)!.km;
+  assert.ok(avec - sans <= 8, `la semaine à haut volume a relevé la référence de ${(avec - sans).toFixed(1)} km : ce n'est pas une médiane`);
+});
+
+test("les fenêtres SANS course ne comptent pas dans la médiane", () => {
+  // Une coupure de trois semaines produit des dizaines de fenêtres à zéro. Les inclure
+  // ferait s'effondrer la référence d'un athlète qui court pourtant 35 km par semaine.
+  // ⚠️ La coupure doit couvrir PLUS DE LA MOITIÉ des fenêtres, sinon la médiane reste
+  // dans la partie non nulle et le filtre n'est pas éprouvé (trouvé par mutation).
+  const avecCoupure = courses(70, 10).filter((r) => {
+    const age = Math.round((Date.now() - Date.parse(String(r.date) + "T12:00:00Z")) / 86400000);
+    return age < 10 || age >= 46;
+  });
+  const km = robustWeeklyKm(avecCoupure, Date.now(), 8)!.km;
+  assert.ok(km >= 25, `référence tombée à ${km} km : les fenêtres vides sont comptées`);
+});
+
+console.log("\nUNE SÉANCE DURE — une seule définition, pas deux");
+
+test("le seuil de séance dure est celui du classificateur", () => {
+  // ⚠️ `isHardWk` exigeait 0,90 de FC max alors que `classifyRun` place le seuil à 0,85 :
+  // deux définitions du même mot dans le même fichier. Sur un athlète à 212 de FC max,
+  // 0,90 réclame une MOYENNE de 191 bpm sur toute la séance — un effort de course. Le
+  // coach croyait sa dernière séance dure vieille de 65 jours ; elle datait de 13.
+  assert.equal(PART_FC_DURE, 0.85, "seuil de séance dure : décision d'entraîneur");
+  const src = codeOf("src/lib/ai/coachContext.ts");
+  assert.match(src, /avg_hr >= fcMaxEst \* PART_FC_DURE/, "le détecteur de séance dure a repris sa propre valeur");
+  assert.match(src, /if \(pct >= PART_FC_DURE\) return "Seuil\/Tempo";/, "le classificateur a repris la sienne");
+  assert.doesNotMatch(src, /avg_hr >= fcMaxEst \* 0\.9/, "le 0,90 est revenu");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
