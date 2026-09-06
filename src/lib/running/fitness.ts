@@ -234,10 +234,19 @@ export type RaceProjection = {
   nowSec: number; projectedSec: number; gapSec: number | null;
   verdict: "acquis" | "atteignable" | "ambitieux" | "irrealiste";
 };
-export function raceProjection(currentVma: number, distanceKm: number, targetSec: number | null, weeksToRace: number | null): RaceProjection {
+export function raceProjection(
+  currentVma: number, distanceKm: number, targetSec: number | null, weeksToRace: number | null,
+  /** Amélioration attendue d'ici la course, en fraction (0,05 = 5 %). Quand elle est
+   *  fournie, elle vient de la pente RÉELLE de l'athlète (`lib/running/progression`)
+   *  et remplace l'hypothèse générique — laquelle promettait le même progrès à tout le
+   *  monde, qu'il monte ou qu'il stagne. */
+  ameliorationMesuree?: number | null,
+): RaceProjection {
   const nowSec = predictRaceSec(currentVma, distanceKm);
   // Amélioration réaliste sur le bloc : ~0,4 %/sem de gain d'allure, plafonné à 8 %.
-  const improv = weeksToRace != null ? Math.min(0.08, Math.max(0, weeksToRace) * 0.004) : 0;
+  const improv = typeof ameliorationMesuree === "number" && Number.isFinite(ameliorationMesuree)
+    ? Math.min(0.08, Math.max(0, ameliorationMesuree))
+    : weeksToRace != null ? Math.min(0.08, Math.max(0, weeksToRace) * 0.004) : 0;
   const projectedSec = Math.round(nowSec * (1 - improv));
   let verdict: RaceProjection["verdict"] = "atteignable";
   let gapSec: number | null = null;

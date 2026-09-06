@@ -2,6 +2,7 @@ import type { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthCoachLines } from "@/data/healthCatalog";
+import { efficaciteParBloc, tendanceEfficacite, ameliorationAttendue } from "@/lib/running/progression";
 import { robustWeeklyKm, demonstratedWeeklyKm, longRunForWeek, longRunPeakKm, longRunShare, longRunGap, type RaceGoal } from "@/lib/running/volume";
 import { buildWeightPlan, weightModeEligibility, type WeightPlan } from "@/lib/weight/energy";
 import { weightCoachBlock, weightTrainingRules, type WeightTrainingRules } from "@/lib/weight/coaching";
@@ -291,7 +292,7 @@ async function fetchWorkouts(sb: SB, userId: string) {
 }
 
 export async function buildAthleteContext(sb: SB, userId: string): Promise<AthleteContext> {
-  const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, shoeRes, objRes, csRes, wlRes, histRes, sleepDatesRes, hrvDatesRes] = await Promise.all([
+  const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, shoeRes, objRes, csRes, wlRes, histRes, sleepDatesRes, hrvDatesRes, formeRes] = await Promise.all([
     sb.from("profiles").select("*").eq("id", userId).single(),
     sb.from("performance_baselines").select("*").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).single(),
     sb.from("hrv_data").select("hrv_ms,physiological_state,date").eq("user_id", userId).order("date", { ascending: false }).limit(30),
@@ -324,6 +325,14 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
     sb.from("hrv_data").select("date").eq("user_id", userId)
       .gte("date", new Date(Date.now() - 190 * 86400000).toISOString().slice(0, 10))
       .order("date", { ascending: false }).limit(200),
+    // Fenêtre LONGUE et colonnes minimales, pour mesurer la PENTE de forme : la requête
+    // principale ne lit que 60 séances, soit deux mois — trop court pour distinguer une
+    // tendance du bruit (constaté : « pente non mesurable » sur un athlète qui en avait
+    // pourtant une, nette, sur 32 semaines).
+    sb.from("workouts").select("date, sport, distance_km, duration_seconds, avg_hr")
+      .eq("user_id", userId).not("avg_hr", "is", null)
+      .gte("date", new Date(Date.now() - 280 * 86400000).toISOString().slice(0, 10))
+      .order("date", { ascending: false }).limit(500),
   ]);
 
   const p = profileRes.data as Record<string, unknown> | null;
@@ -1437,6 +1446,16 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
    * partaient QUE dans le contexte du modèle de langage. L'athlète ne les découvrait
    * qu'en ouvrant une conversation avec le coach. Sur son calendrier, rien.
    */
+  // ── LA PENTE DE L'ATHLÈTE ──────────────────────────────────────────────────
+  // Le coach savait où il en est ; il ne savait pas s'il MONTE. Le verdict sur
+  // l'objectif reposait sur +0,4 %/semaine supposés, identiques pour tout le monde.
+  // On mesure ici l'efficacité aérobie (vitesse par battement, sorties faciles) par
+  // blocs de 4 semaines, et on ne conclut que si la tendance ressort du bruit.
+  const coursesForme = ((formeRes.data ?? []) as { date: string; sport?: string | null; distance_km: number | null; duration_seconds: number | null; avg_hr: number | null }[])
+    .filter((w) => isRun(w.sport));
+  const tendanceForme = tendanceEfficacite(efficaciteParBloc(coursesForme, fcMaxEst, now));
+  const ameliorationPrevue = ameliorationAttendue(weeksToRace, tendanceForme);
+
   const objectiveWarnings: string[] = (() => {
     const out: string[] = [];
     if (!objective) return out;
@@ -1576,7 +1595,14 @@ ${p?.gender === "female" ? `- SEXE : femme → besoins en FER et disponibilité 
 
 ⚡ VERDICT DE FRAÎCHEUR DU JOUR (calculé à partir de la VFC, du sommeil, de la charge et du ressenti — CETTE CONCLUSION S'IMPOSE À TOI, ne la ré-arbitre pas)
 ${readinessBlock}
-${objectiveWarnings.length ? `
+${tendanceForme ? `
+PENTE RÉELLE DE L'ATHLÈTE (mesurée, pas supposée)
+- Son efficacité aérobie — vitesse par battement de cœur sur ses sorties FACILES — évolue de ${tendanceForme.pctParSemaine > 0 ? "+" : ""}${nRaw(tendanceForme.pctParSemaine, "fr")} % par semaine sur ${tendanceForme.semaines} semaines (${tendanceForme.blocs} blocs de 4 semaines, rapport signal/bruit ${nRaw(tendanceForme.signalSurBruit, "fr")}).
+- D'ici sa course, l'amélioration à attendre est donc d'environ ${nRaw(Math.round(ameliorationPrevue * 1000) / 10, "fr")} %, et NON les 8 % que promettrait une hypothèse générique. Fonde ton discours là-dessus.
+- ⚠️ CE MARQUEUR BAISSE AVEC LA CHALEUR à forme égale : une pente mesurée sur un été est pessimiste. Ne conclus pas à une perte de forme sur ce seul chiffre, et ne le lui annonce pas comme un verdict.
+` : `
+PENTE RÉELLE DE L'ATHLÈTE : PAS ENCORE MESURABLE (trop peu de sorties faciles avec cardio, ou tendance noyée dans le bruit). Ne prétends donc pas savoir s'il progresse ou s'il stagne.
+`}${objectiveWarnings.length ? `
 RÉALISME DE L'OBJECTIF (dis-le-lui FRANCHEMENT — ne fais pas comme si le plan préparait la course)
 ${objectiveWarnings.map((w) => `- ${w}`).join("\n")}
 ` : ""}
