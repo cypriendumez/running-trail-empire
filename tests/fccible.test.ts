@@ -15,7 +15,7 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { referencesFc, plageFc, plageLisible, LARGEUR_MAX } from "../src/lib/coach/fcCible";
+import { referencesFc, plageFc, plageLisible, cibleEndurance, LARGEUR_MAX, FOOTINGS_MIN, ECART_MIN, PLANCHER_RESERVE } from "../src/lib/coach/fcCible";
 import { repartirFootings, varianteFooting, AMPLITUDE } from "../src/lib/coach/footings";
 
 let passed = 0; const fails: string[] = [];
@@ -205,6 +205,79 @@ test("les deux variantes sont traduites dans les 5 langues", () => {
   const i18n = readFileSync("src/lib/ai/planI18n.ts", "utf8");
   for (const cle of ["enduranceTitreLignes", "lignesDroites", "enduranceTitreProg", "footingProgressif"])
     assert.equal(i18n.split(`${cle}:`).length - 1, 6, `${cle} : 5 langues + le type attendus`);
+});
+
+console.log("\nL'ENDURANCE SUIT L'ATHLÈTE — mais dans UN SEUL SENS");
+
+const FACILE = [143, 148, 152, 145, 150, 147, 153, 144, 149, 151];
+const DUR = [172, 175, 170, 178, 174, 171, 176, 173, 177, 169];
+
+test("on suit celui qui court PLUS FACILE que la théorie", () => {
+  // Cas réel : théorique 156-166, footings réellement tenus à 143-152. Lui imposer
+  // 10 battements de plus transformerait ses jours faciles en jours moyens — la faute
+  // la plus répandue en course à pied.
+  const p = cibleEndurance(referencesFc(REEL), FACILE)!;
+  assert.ok(p.hi < 156, `cible haute à ${p.hi} : on n'a pas suivi l'athlète`);
+  assert.ok(p.lo >= 138, `cible basse à ${p.lo} : on est descendu trop bas`);
+  assert.ok(p.hi - p.lo <= 10, "la cible ajustée doit rester étroite");
+});
+
+test("on ne suit PAS celui qui court plus dur — c'est tout l'intérêt", () => {
+  // Sinon on validerait le débutant qui fait tous ses footings en zone 3.
+  const theorique = plageFc("endurance", referencesFc(REEL))!;
+  assert.deepEqual(cibleEndurance(referencesFc(REEL), DUR), theorique,
+    "la pratique ne doit jamais RELEVER la cible : la théorie reste le plafond");
+});
+
+test("une habitude ne s'établit pas sur trois séances", () => {
+  const theorique = plageFc("endurance", referencesFc(REEL))!;
+  assert.deepEqual(cibleEndurance(referencesFc(REEL), FACILE.slice(0, FOOTINGS_MIN - 1)), theorique);
+  assert.deepEqual(cibleEndurance(referencesFc(REEL), []), theorique);
+  assert.equal(FOOTINGS_MIN, 8, "seuil de données : décision d'entraîneur");
+});
+
+test("un écart minuscule ne déplace rien", () => {
+  const centre = (plageFc("endurance", referencesFc(REEL))!.lo + plageFc("endurance", referencesFc(REEL))!.hi) / 2;
+  const presque = Array.from({ length: 10 }, () => Math.round(centre - ECART_MIN + 1));
+  assert.deepEqual(cibleEndurance(referencesFc(REEL), presque), plageFc("endurance", referencesFc(REEL))!,
+    "on ne bouge pas la cible d'un athlète pour deux battements");
+});
+
+test("c'est la MÉDIANE : une séance en côtes ne déplace pas la cible", () => {
+  // ⚠️ Les valeurs extrêmes sont placées AU MILIEU du tableau : avec `FACILE` telle
+  // quelle, la médiane par position et la vraie médiane tombaient sur le même chiffre
+  // par coïncidence, et retirer le tri ne faisait rougir personne (trouvé par mutation).
+  const avec = [143, 144, 145, 146, 147, 205, 208, 148, 149, 150, 151, 152];
+  const sans = cibleEndurance(referencesFc(REEL), FACILE)!;
+  const ecart = Math.abs(cibleEndurance(referencesFc(REEL), avec)!.lo - sans.lo);
+  assert.ok(ecart <= 3, `deux valeurs extrêmes ont déplacé la cible de ${ecart} bpm : ce n'est pas une médiane`);
+});
+
+test("un plancher empêche de suivre l'athlète jusqu'à l'absurde", () => {
+  // Marche rapide comptée à tort, capteur en vrac : la cible ne doit pas s'effondrer.
+  const tresBas = Array.from({ length: 12 }, () => 95);
+  const p = cibleEndurance(referencesFc(REEL), tresBas)!;
+  const plancher = 63 + (212 - 63) * PLANCHER_RESERVE;
+  assert.ok(p.lo >= plancher - 6, `cible à ${p.lo}, sous le plancher de ${Math.round(plancher)}`);
+});
+
+test("les valeurs impossibles sont écartées avant tout calcul", () => {
+  const theorique = plageFc("endurance", referencesFc(REEL))!;
+  assert.deepEqual(cibleEndurance(referencesFc(REEL), [40, 41, 42, 43, 44, 45, 46, 47, 48, 49]), theorique,
+    "des FC sous 60 bpm ne sont pas des footings");
+  assert.deepEqual(cibleEndurance(referencesFc(REEL), [Number.NaN, 250, 0, -1]), theorique);
+  assert.equal(cibleEndurance(referencesFc({}), FACILE), null, "sans référence, aucune cible");
+});
+
+test("seule l'ENDURANCE s'ajuste — pas le seuil ni la VMA", () => {
+  const src = codeOf("src/components/ghost-runner/GhostRunner.tsx");
+  assert.match(src, /intensite === "endurance" \? cibleEndurance\(refsFc, fcFootings\) : plageFc\(intensite, refsFc\)/,
+    "l'ajustement déborde sur des zones définies par une MESURE, pas par une habitude");
+  const page = codeOf("src/app/dashboard/ghost-runner/page.tsx");
+  // Les imports intervals.icu étiquettent presque tout en « easy » : croire l'étiquette
+  // rendrait le tri inutile, il faut RECLASSER.
+  assert.match(page, /classifyRun\(w, fcMaxObservee\)/, "les séances ne sont plus reclassées avant le tri");
+  assert.match(page, /fcFootings=\{fcFootings\}/, "les footings réels ne sont plus transmis");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

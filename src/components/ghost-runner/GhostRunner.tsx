@@ -11,7 +11,7 @@ import {
 import { toast } from "sonner";
 import type { UserProfile, PerformanceBaseline } from "@/types";
 import { useT } from "@/lib/i18n/LanguageProvider";
-import { referencesFc, plageFc } from "@/lib/coach/fcCible";
+import { referencesFc, plageFc, cibleEndurance } from "@/lib/coach/fcCible";
 import { GX, GUIDE, GUIDE_TIP, SPEECH_LANG, fillG } from "./ghostI18n";
 import { estAppleWatch } from "@/lib/watch/intervals";
 import { jourCivil } from "@/lib/time/fuseau";
@@ -33,6 +33,8 @@ interface GhostRunnerProps {
   /** FC max réellement ENREGISTRÉE sur ses séances. Une mesure passe avant toute
    *  formule — et avant la baseline, qui n'existe que si l'athlète a fait un test. */
   fcMaxObservee?: number | null;
+  /** FC moyennes de ses footings réels : la cible d'endurance s'y ajuste vers le bas. */
+  fcFootings?: number[];
   baseline: PerformanceBaseline | null;
   /** VMA effective, calculée comme celle du coach (courbe d'allure → efforts réels).
    *  Prime sur la baseline, qui n'est renseignée que si l'athlète a fait un test. */
@@ -116,7 +118,7 @@ export function nomLecture(l: { appareil: string | null; source: string | null }
   return l?.appareil?.trim() || l?.source?.trim() || "intervals.icu";
 }
 
-export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = null, coachSessions = [] }: GhostRunnerProps) {
+export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = null, fcFootings = [], coachSessions = [] }: GhostRunnerProps) {
   // Les curseurs sont reliés à leur intitulé : sans cela un lecteur d'écran annonce
   // « curseur, 12 » sans dire de QUOI, et le libellé n'est pas cliquable.
   const cid = useId();
@@ -425,7 +427,9 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
     // Une zone de 10 points de % FC max fait ~21 bpm de large : « reste entre 114 et
     // 133 » ne cible rien. On donne une fenêtre de 10 bpm, ancrée sur ses mesures.
     const intensite = (["recup", "endurance", "tempo", "seuil", "vma"] as const)[Math.min(4, Math.max(0, hrZone - 1))];
-    const cible = plageFc(intensite, refsFc);
+    // L'endurance suit ce que l'athlète fait VRAIMENT quand il court plus facile que
+    // la théorie — jamais l'inverse, sinon on validerait des footings trop rapides.
+    const cible = intensite === "endurance" ? cibleEndurance(refsFc, fcFootings) : plageFc(intensite, refsFc);
     const z = HR_ZONES[hrZone - 1];
     hrLoRef.current = cible ? cible.lo : Math.round(maxHr * z.lo);
     hrHiRef.current = cible ? cible.hi : Math.round(maxHr * z.hi);

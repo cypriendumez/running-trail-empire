@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 import { createClient } from "@/lib/supabase/server";
+import { classifyRun } from "@/lib/ai/coachContext";
 import { GhostRunner } from "@/components/ghost-runner/GhostRunner";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import { oneSessionPerSlot } from "@/lib/coach/sessions";
@@ -55,10 +56,23 @@ export default async function GhostRunnerPage() {
     .order("max_hr", { ascending: false }).limit(1);
   const fcMaxObservee = (fcRows?.[0] as { max_hr?: number } | undefined)?.max_hr ?? null;
 
+  // FC de ses FOOTINGS réels : la cible d'endurance suit l'athlète quand il court plus
+  // facile que la théorie (et seulement dans ce sens — voir `cibleEndurance`).
+  // ⚠️ On reclasse les séances au lieu de croire leur étiquette : les imports
+  // intervals.icu marquent presque tout en « easy », ce qui rendrait le tri inutile.
+  const { data: recentes } = await supabase.from("workouts")
+    .select("distance_km, duration_seconds, avg_hr, type")
+    .eq("user_id", user!.id).not("avg_hr", "is", null)
+    .order("date", { ascending: false }).limit(60);
+  const fcFootings = ((recentes ?? []) as { distance_km: number | null; duration_seconds: number | null; avg_hr: number | null; type: string | null }[])
+    .filter((w) => /Footing|Endurance/.test(classifyRun(w, fcMaxObservee)))
+    .map((w) => w.avg_hr)
+    .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+
   return (
     <div className="max-w-4xl mx-auto">
       <GhostRunner profile={stripProfileSecrets(profileRes.data)} baseline={baselineRes.data} effectiveVma={effectiveVma}
-        fcMaxObservee={fcMaxObservee} coachSessions={coachSessions} />
+        fcMaxObservee={fcMaxObservee} fcFootings={fcFootings} coachSessions={coachSessions} />
     </div>
   );
 }

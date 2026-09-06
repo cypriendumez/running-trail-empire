@@ -120,3 +120,56 @@ function borner(p: PlageFc, refs: ReferencesFc): PlageFc {
 export function plageLisible(p: PlageFc | null): string | null {
   return p ? `${p.lo}-${p.hi} bpm` : null;
 }
+
+/** Sous ce nombre de footings mesurés, l'habitude n'est pas établie. */
+export const FOOTINGS_MIN = 8;
+/** En deçà, l'écart n'est pas significatif : on ne bouge pas la cible pour 2 battements. */
+export const ECART_MIN = 4;
+/** Garde-fou bas : on ne descend jamais une cible d'endurance sous ce % de réserve. */
+export const PLANCHER_RESERVE = 0.45;
+
+/**
+ * AJUSTE LA CIBLE D'ENDURANCE À CE QUE L'ATHLÈTE FAIT VRAIMENT — dans un seul sens.
+ *
+ * Le modèle de Karvonen place l'endurance à 66 % de réserve. Sur un athlète réel
+ * (06/09/2026) cela donnait 156-166 bpm alors que ses footings tournent à 143-152 : il
+ * court ses footings PLUS FACILE que la théorie, et il a raison — c'est le principe
+ * 80/20, et lui imposer 10 battements de plus transformerait ses jours faciles en jours
+ * moyens, la faute la plus répandue en course à pied.
+ *
+ * ⚠️ L'AJUSTEMENT EST ASYMÉTRIQUE, ET C'EST TOUT L'INTÉRÊT. On suit l'athlète quand il
+ * court PLUS FACILE que la théorie ; on ne le suit PAS quand il court plus dur. Sinon
+ * on validerait précisément l'erreur qu'on veut corriger chez le débutant qui fait tous
+ * ses footings en zone 3. La théorie sert alors de plafond, la pratique de plancher.
+ *
+ * Rien ne bouge pour le seuil ni la VMA : ces zones-là sont définies par une mesure
+ * (le seuil), pas par une habitude.
+ *
+ * @param observees FC moyennes de ses footings récents, en battements.
+ */
+export function cibleEndurance(refs: ReferencesFc, observees: readonly number[], largeur = 10): PlageFc | null {
+  const theorique = plageFc("endurance", refs, largeur);
+  if (!theorique) return null;
+  const mesures = (observees ?? []).filter((v): v is number => typeof v === "number" && Number.isFinite(v) && v > 60 && v < 230);
+  if (mesures.length < FOOTINGS_MIN) return theorique;
+
+  // MÉDIANE, pas moyenne : une seule séance en côtes ou un capteur qui décroche ne doit
+  // pas déplacer la cible de tout un athlète.
+  const triees = [...mesures].sort((a, b) => a - b);
+  const mediane = triees.length % 2
+    ? triees[(triees.length - 1) / 2]
+    : (triees[triees.length / 2 - 1] + triees[triees.length / 2]) / 2;
+
+  const centreTheorique = (theorique.lo + theorique.hi) / 2;
+  if (mediane >= centreTheorique - ECART_MIN) return theorique;   // il ne court pas plus facile : on ne bouge pas
+
+  // Plancher : même en suivant l'athlète, une cible d'endurance ne descend pas au point
+  // de ne plus rien entraîner (marche rapide, capteur en vrac, séances de récupération
+  // comptées à tort comme des footings).
+  const plancher = refs.max != null && refs.repos != null
+    ? refs.repos + (refs.max - refs.repos) * PLANCHER_RESERVE
+    : centreTheorique - 25;
+  const centre = Math.max(plancher, mediane);
+  const demi = Math.max(2, Math.min(LARGEUR_MAX, Math.round(largeur)) / 2);
+  return borner({ lo: Math.round(centre - demi), hi: Math.round(centre + demi) }, refs);
+}
