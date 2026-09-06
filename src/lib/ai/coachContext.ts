@@ -229,6 +229,8 @@ export type AthleteContext = {
   cycle: { deload: boolean; taper: boolean; label: string };
   /** Jours de la semaine (0 = dimanche) systématiquement prescrits ET jamais réalisés. */
   skippedWeekdays: number[];
+  /** Aucune séance de course connue : on ne prescrit rien qui suppose un passé. */
+  noHistory: boolean;
   /** Disponibilités déclarées : nb de séances de course/semaine et jours praticables (0 = dim). */
   availability: { daysPerWeek: number; days: number[] };
   /** Prévisions RÉELLES à 7 jours (Open-Meteo) — vide si la position est inconnue. */
@@ -1746,6 +1748,7 @@ ${catalog}`;
     volume: { weekKm: Math.round(weekKm), avg4wkKm: Math.round(avg4wkKm), targetKm, longRunKm, longRunPlanned, longRunEased },
     cycle: { deload, taper, label: cycleLabel },
     skippedWeekdays,
+    noHistory,
     availability: { daysPerWeek: availDaysPerWeek, days: availDays },
     forecast,
     altitude: { elevationM, lossPct: altLoss },

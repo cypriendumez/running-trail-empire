@@ -101,6 +101,13 @@ export type TextesPlan = {
 
   // ── Endurance ───────────────────────────────────────────────────────────────
   enduranceTitre: string;
+  /** Titre du footing qui porte les lignes droites — il ne doit pas ressembler aux autres. */
+  enduranceTitreLignes: string;
+  /** Footing dont le dernier tiers est un peu plus rapide. */
+  enduranceTitreProg: string;
+  footingProgressif: string;
+  /** Phrase ajoutée à ce footing-là. */
+  lignesDroites: string;
   enduranceDetail: (echauff: number, corps: string, allure: string, calme: number, gap: string, scinder: boolean, cycle: string) => string;
   enduranceWhyTropIntense: (pct: string) => string;
   enduranceWhy: (cible: string) => string;
@@ -206,6 +213,10 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     qualiteWhy: "La séance de qualité de ton bloc, calée sur ta VMA et ton objectif. C'est elle qui te fait progresser.",
 
     enduranceTitre: "Footing en endurance",
+  enduranceTitreLignes: "Footing + lignes droites",
+  enduranceTitreProg: "Footing progressif",
+  footingProgressif: " Cours le dernier tiers un peu plus vite que le début — sans jamais forcer, juste en laissant l’allure venir. Apprendre à finir fort se travaille.",
+  lignesDroites: " Termine par 5 lignes droites de 100 m en accélération progressive, récupération complète en marchant : ça entretient la vitesse sans fatiguer.",
     enduranceDetail: (e, c, a, k, g, s, cy) => `Échauffement ${e} min progressif FC Z1→Z2 → Corps : ${c} en Z2${a}, tu dois pouvoir tenir une conversation → Retour au calme ${k} min FC Z1.${g}${s ? " 💡 À ton volume, scinde en DEUX sorties dans la journée (matin + soir) plutôt qu'un seul footing interminable." : ""}${cy}`,
     enduranceWhyTropIntense: (p) => `⚠️ Tu passes ${p} % de ton temps de course en zone 3 et plus, alors que la cible est 20 %. Tes footings sont courus trop vite — c'est le frein n°1 à la progression. Ralentis jusqu'à pouvoir tenir une conversation complète : c'est censé paraître TROP facile.`,
     enduranceWhy: (c) => `Le socle aérobie. Avec les autres séances, tu es sur ~${c} km cette semaine — c'est le volume facile qui construit la forme de fond, pas les séances dures.`,
@@ -298,6 +309,10 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     qualiteWhy: "The quality session of your block, set on your MAS and your goal. This is the one that makes you progress.",
 
     enduranceTitre: "Easy run",
+  enduranceTitreLignes: "Easy run + strides",
+  enduranceTitreProg: "Progression run",
+  footingProgressif: " Run the last third slightly faster than the start — never forcing, just letting the pace come. Finishing strong is a skill you train.",
+  lignesDroites: " Finish with 5 × 100 m strides, building the pace, walking back to full recovery: it keeps your speed without adding fatigue.",
     enduranceDetail: (e, c, a, k, g, s, cy) => `Warm-up ${e} min building HR Z1→Z2 → Main set: ${c} at Z2${a}, you must be able to hold a conversation → Cool-down ${k} min HR Z1.${g}${s ? " 💡 At your volume, split it into TWO runs in the day (morning + evening) rather than one endless jog." : ""}${cy}`,
     enduranceWhyTropIntense: (p) => `⚠️ You spend ${p} % of your running time in zone 3 and above, when the target is 20 %. Your easy runs are run too fast — that is the number 1 brake on progress. Slow down until you can hold a full conversation: it is supposed to feel TOO easy.`,
     enduranceWhy: (c) => `The aerobic base. With the other sessions you are on ~${c} km this week — it is the easy volume that builds deep fitness, not the hard sessions.`,
@@ -390,6 +405,10 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     qualiteWhy: "Die Qualitätseinheit deines Blocks, abgestimmt auf deine maximale aerobe Geschwindigkeit und dein Ziel. Sie ist es, die dich weiterbringt.",
 
     enduranceTitre: "Lockerer Dauerlauf",
+  enduranceTitreLignes: "Dauerlauf + Steigerungen",
+  enduranceTitreProg: "Progressiver Dauerlauf",
+  footingProgressif: " Laufe das letzte Drittel etwas schneller als den Anfang — ohne zu drücken, das Tempo einfach kommen lassen. Stark zu Ende laufen will geübt sein.",
+  lignesDroites: " Zum Abschluss 5 × 100 m Steigerungen mit vollständiger Gehpause: das erhält die Schnelligkeit, ohne zu ermüden.",
     enduranceDetail: (e, c, a, k, g, s, cy) => `Aufwärmen ${e} min ansteigend HF Z1→Z2 → Hauptteil: ${c} in Z2${a}, du musst dich unterhalten können → Auslaufen ${k} min HF Z1.${g}${s ? " 💡 Bei deinem Umfang teile ihn auf ZWEI Läufe am Tag auf (morgens + abends) statt eines endlosen Dauerlaufs." : ""}${cy}`,
     enduranceWhyTropIntense: (p) => `⚠️ Du verbringst ${p} % deiner Laufzeit in Zone 3 und höher, Ziel sind 20 %. Deine lockeren Läufe sind zu schnell — das ist die Bremse Nummer 1 für den Fortschritt. Werde so langsam, dass du dich vollständig unterhalten kannst: Es soll sich ZU leicht anfühlen.`,
     enduranceWhy: (c) => `Die aerobe Basis. Mit den übrigen Einheiten liegst du diese Woche bei ~${c} km — es ist der lockere Umfang, der die Grundform baut, nicht die harten Einheiten.`,
@@ -482,6 +501,10 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     qualiteWhy: "La sesión de calidad de tu bloque, ajustada a tu VAM y a tu objetivo. Es la que te hace progresar.",
 
     enduranceTitre: "Rodaje en resistencia",
+    enduranceTitreLignes: "Rodaje + progresivos",
+    enduranceTitreProg: "Rodaje progresivo",
+    footingProgressif: " Corre el último tercio algo más rápido que el inicio — sin forzar, dejando que el ritmo venga. Terminar fuerte se entrena.",
+    lignesDroites: " Termina con 5 rectas de 100 m en progresión, recuperando andando por completo: mantiene la velocidad sin cansarte.",
     enduranceDetail: (e, c, a, k, g, s, cy) => `Calentamiento ${e} min progresivo FC Z1→Z2 → Parte principal: ${c} en Z2${a}, tienes que poder mantener una conversación → Vuelta a la calma ${k} min FC Z1.${g}${s ? " 💡 Con tu volumen, divídelo en DOS salidas en el día (mañana + tarde) en vez de un rodaje interminable." : ""}${cy}`,
     enduranceWhyTropIntense: (p) => `⚠️ Pasas el ${p} % de tu tiempo de carrera en zona 3 o más, cuando el objetivo es el 20 %. Tus rodajes van demasiado rápidos — es el freno n.º 1 al progreso. Baja hasta poder mantener una conversación completa: tiene que parecer DEMASIADO fácil.`,
     enduranceWhy: (c) => `La base aeróbica. Con las demás sesiones estás en ~${c} km esta semana — es el volumen fácil el que construye la forma de fondo, no las sesiones duras.`,
@@ -574,6 +597,10 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     qualiteWhy: "A sessão de qualidade do teu bloco, ajustada à tua VAM e ao teu objetivo. É ela que te faz progredir.",
 
     enduranceTitre: "Corrida em resistência",
+    enduranceTitreLignes: "Corrida + acelerações",
+    enduranceTitreProg: "Corrida progressiva",
+    footingProgressif: " Corre o último terço um pouco mais rápido do que o início — sem forçar, deixando o ritmo vir. Acabar forte treina-se.",
+    lignesDroites: " Termina com 5 acelerações de 100 m, recuperando a andar por completo: mantém a velocidade sem cansar.",
     enduranceDetail: (e, c, a, k, g, s, cy) => `Aquecimento ${e} min progressivo FC Z1→Z2 → Parte principal: ${c} em Z2${a}, tens de conseguir manter uma conversa → Retorno à calma ${k} min FC Z1.${g}${s ? " 💡 Com o teu volume, divide em DUAS saídas no dia (manhã + tarde) em vez de uma corrida interminável." : ""}${cy}`,
     enduranceWhyTropIntense: (p) => `⚠️ Passas ${p} % do teu tempo de corrida em zona 3 ou acima, quando o alvo são 20 %. As tuas corridas fáceis vão depressa demais — é o travão n.º 1 ao progresso. Abranda até conseguires manter uma conversa completa: é suposto parecer DEMASIADO fácil.`,
     enduranceWhy: (c) => `A base aeróbia. Com as outras sessões estás em ~${c} km esta semana — é o volume fácil que constrói a forma de fundo, não as sessões duras.`,

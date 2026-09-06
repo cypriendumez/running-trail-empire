@@ -15,6 +15,7 @@
 import type { AthleteContext } from "@/lib/ai/coachContext";
 import { heatAdvice, windAdvice } from "@/lib/weather/openMeteo";
 import { choisirJourQualite } from "@/lib/coach/meteoPlacement";
+import { repartirFootings, varianteFooting } from "@/lib/coach/footings";
 import { scinderFacile, seanceMatinFacile } from "@/lib/coach/doubleSessions";
 import { PLAN_T } from "@/lib/ai/planI18n";
 import { nRaw, type I18nText } from "@/lib/i18n/multi";
@@ -540,15 +541,27 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // qu'un dépassement de la cible hebdomadaire.
   const easyKm = Math.min(easyCap, Math.max(rawEasy >= 3 ? 4 : 3, Math.round(rawEasy)));
   const doubles = rawEasy > easyCap && raceIdx < 0;
-  for (const i of easySlots) put(i, {
-    type: "Endurance", title: (l) => PLAN_T[l].enduranceTitre,
-    detail: (l) => PLAN_T[l].enduranceDetail(warm, kmAndTime(easyKm, paceFor(i), l),
-      paceFor(i) ? ` (~${paceFor(i)}/km)` : "", cool, gapNote(l), doubles, cycleNote(l)),
+  // ⚠️ TOUS les créneaux recevaient EXACTEMENT la même séance : même titre, même
+  // distance, même texte. Trois footings de suite étaient donc trois fois le même
+  // footing — l'athlète l'a signalé, et il avait raison. On fait varier la distance
+  // autour de la moyenne SANS toucher au volume de la semaine, et un footing porte
+  // des lignes droites (coût en fatigue quasi nul, entretien de la vitesse), ce qui
+  // compte double une semaine sans aucune séance de qualité.
+  const distances = repartirFootings(easySlots.length, easyKm, rawEasy >= 3 ? 4 : 3, easyCap);
+  const gardes = { taper: ctx.cycle.taper, semaineCourse: raceIdx >= 0, sansHistorique: ctx.noHistory };
+  easySlots.forEach((i, rang) => put(i, {
+    type: "Endurance",
+    title: (l) => { const v = varianteFooting(rang, easySlots.length, gardes);
+      return v === "lignes" ? PLAN_T[l].enduranceTitreLignes : v === "progressif" ? PLAN_T[l].enduranceTitreProg : PLAN_T[l].enduranceTitre; },
+    detail: (l) => PLAN_T[l].enduranceDetail(warm, kmAndTime(distances[rang] ?? easyKm, paceFor(i), l),
+      paceFor(i) ? ` (~${paceFor(i)}/km)` : "", cool, gapNote(l), doubles, cycleNote(l))
+      + (() => { const v = varianteFooting(rang, easySlots.length, gardes);
+        return v === "lignes" ? PLAN_T[l].lignesDroites : v === "progressif" ? PLAN_T[l].footingProgressif : ""; })(),
     why: (l) => (ctx.tooMuchIntensity
       ? PLAN_T[l].enduranceWhyTropIntense(nRaw(ctx.tooMuchIntensity, l))
       : PLAN_T[l].enduranceWhy(nRaw(targetKm, l))),
-    tags: (l) => [PLAN_T[l].tags["Endurance"], PLAN_T[l].tags["Z2"], PLAN_T[l].tagKm(nRaw(easyKm, l))],
-  });
+    tags: (l) => [PLAN_T[l].tags["Endurance"], PLAN_T[l].tags["Z2"], PLAN_T[l].tagKm(nRaw(distances[rang] ?? easyKm, l))],
+  }));
 
   // ── 6. Renforcement : sur un jour SANS course, jamais la veille d'un jour dur.
   // Il ne consomme pas de budget de course : 30 min à la maison restent possibles

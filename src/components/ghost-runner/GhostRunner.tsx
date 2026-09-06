@@ -11,6 +11,7 @@ import {
 import { toast } from "sonner";
 import type { UserProfile, PerformanceBaseline } from "@/types";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { referencesFc, plageFc } from "@/lib/coach/fcCible";
 import { GX, GUIDE, GUIDE_TIP, SPEECH_LANG, fillG } from "./ghostI18n";
 import { estAppleWatch } from "@/lib/watch/intervals";
 import { jourCivil } from "@/lib/time/fuseau";
@@ -29,6 +30,9 @@ export interface CoachSess {
 
 interface GhostRunnerProps {
   profile: UserProfile | null;
+  /** FC max réellement ENREGISTRÉE sur ses séances. Une mesure passe avant toute
+   *  formule — et avant la baseline, qui n'existe que si l'athlète a fait un test. */
+  fcMaxObservee?: number | null;
   baseline: PerformanceBaseline | null;
   /** VMA effective, calculée comme celle du coach (courbe d'allure → efforts réels).
    *  Prime sur la baseline, qui n'est renseignée que si l'athlète a fait un test. */
@@ -112,7 +116,7 @@ export function nomLecture(l: { appareil: string | null; source: string | null }
   return l?.appareil?.trim() || l?.source?.trim() || "intervals.icu";
 }
 
-export function GhostRunner({ baseline, effectiveVma, coachSessions = [] }: GhostRunnerProps) {
+export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = null, coachSessions = [] }: GhostRunnerProps) {
   // Les curseurs sont reliés à leur intitulé : sans cela un lecteur d'écran annonce
   // « curseur, 12 » sans dire de QUOI, et le libellé n'est pas cliquable.
   const cid = useId();
@@ -418,9 +422,13 @@ export function GhostRunner({ baseline, effectiveVma, coachSessions = [] }: Ghos
     elapsedRef.current = 0; kmRef.current = 0; pausedRef.current = false; lastPosRef.current = null;
     trackRef.current = []; hrSumRef.current = 0; hrNRef.current = 0; hrOutRef.current = 0; lastHrCueRef.current = 0;
     setElapsed(0); setCurrentKm(0); setCurrentPace(0); setPredictedFinish(0); setPaused(false);
+    // Une zone de 10 points de % FC max fait ~21 bpm de large : « reste entre 114 et
+    // 133 » ne cible rien. On donne une fenêtre de 10 bpm, ancrée sur ses mesures.
+    const intensite = (["recup", "endurance", "tempo", "seuil", "vma"] as const)[Math.min(4, Math.max(0, hrZone - 1))];
+    const cible = plageFc(intensite, refsFc);
     const z = HR_ZONES[hrZone - 1];
-    hrLoRef.current = Math.round(maxHr * z.lo);
-    hrHiRef.current = Math.round(maxHr * z.hi);
+    hrLoRef.current = cible ? cible.lo : Math.round(maxHr * z.lo);
+    hrHiRef.current = cible ? cible.hi : Math.round(maxHr * z.hi);
     setPhase("running");
     wantLockRef.current = true; requestWakeLock();
     speak(tg("sp.hrStart", { m: durationMin, z: zn(hrZone), lo: hrLoRef.current, hi: hrHiRef.current }));
@@ -579,7 +587,20 @@ export function GhostRunner({ baseline, effectiveVma, coachSessions = [] }: Ghos
   const onPace = currentPace > 0 && Math.abs(paceDeltaSec) <= 3;
 
   const vma = vmaEff;
-  const maxHr = baseline?.max_hr ?? 190;
+  // ⚠️ C'ÉTAIT `baseline?.max_hr ?? 190`. La table `performance_baselines` n'est
+  // renseignée que si l'athlète a passé un test : chez la plupart, elle est VIDE, et
+  // toutes les zones se calculaient donc sur un 190 générique. Sur un compte réel
+  // (FC max mesurée 212, repos 63, seuil 192), les cibles étaient décalées de ~20 bpm
+  // vers le bas — l'athlète courait trop facile en croyant suivre la consigne.
+  const gm = (profile as unknown as { garmin_metrics?: { lthr?: number; restingHR?: number } } | null)?.garmin_metrics;
+  const refsFc = referencesFc({
+    maxDeclaree: baseline?.max_hr,
+    maxObservee: fcMaxObservee,
+    repos: (profile as unknown as { resting_hr?: number } | null)?.resting_hr ?? gm?.restingHR,
+    seuil: gm?.lthr,
+    age: (profile as unknown as { age?: number } | null)?.age,
+  });
+  const maxHr = refsFc.max ?? 190;
   // Zones d'allure = bandes de %VMA → fourchette d'allure (rapide → lent) + icône/teinte.
   const zoneBands = [
     { label: d["hz.1"], lo: 0.50, hi: 0.60, tint: "#0ea5e9", Icon: Heart },

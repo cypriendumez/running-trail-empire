@@ -47,9 +47,18 @@ export default async function GhostRunnerPage() {
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(0, 6);
 
+  // FC max réellement ENREGISTRÉE : une mesure vaut mieux que la baseline (vide chez
+  // qui n'a pas passé de test) et mieux qu'une formule sur l'âge. Le seuil de 150
+  // écarte les séances où le capteur a décroché plutôt que battu un record.
+  const { data: fcRows } = await supabase.from("workouts")
+    .select("max_hr").eq("user_id", user!.id).gt("max_hr", 150)
+    .order("max_hr", { ascending: false }).limit(1);
+  const fcMaxObservee = (fcRows?.[0] as { max_hr?: number } | undefined)?.max_hr ?? null;
+
   return (
     <div className="max-w-4xl mx-auto">
-      <GhostRunner profile={stripProfileSecrets(profileRes.data)} baseline={baselineRes.data} effectiveVma={effectiveVma} coachSessions={coachSessions} />
+      <GhostRunner profile={stripProfileSecrets(profileRes.data)} baseline={baselineRes.data} effectiveVma={effectiveVma}
+        fcMaxObservee={fcMaxObservee} coachSessions={coachSessions} />
     </div>
   );
 }
