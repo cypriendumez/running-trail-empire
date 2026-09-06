@@ -724,13 +724,16 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
    * demande ensuite pourquoi il ne progresse pas.
    */
   function annoncerEcart(jours: PlanDay[]): PlanDay[] {
-    const prescrits = jours
-      .filter((d) => !/Repos|Renfo/i.test(d.type))
-      .reduce((somme, d) => {
-        const m = String(d.detail ?? "").match(/~([\d,.]+)\s*km/);
-        return somme + (m ? Number(m[1].replace(",", ".")) : 0);
-      }, 0);
-    const ecart = manqueDeVolume(prescrits, targetKm);
+    // ⚠️ NE PAS LIRE LES KILOMÈTRES DANS LA PROSE. Premier jet : une regex sur le texte
+    // des séances. En semaine de course, elles sont décrites en MINUTES (« 30 min de
+    // footing ») — la somme tombait à zéro et le constat annonçait « 0 km sur 60 visés ».
+    // Le crash-test du projet l'a attrapé. On additionne ce qu'on a RÉELLEMENT posé.
+    const prescrits = (longIdx >= 0 ? longRunKm : 0)
+      + qualityKept.length * QUALITY_KM
+      + distances.reduce((a, b) => a + b, 0);
+    // Semaine de course : le volume n'est plus le sujet, l'affûtage le réduit exprès.
+    // Et une somme nulle veut dire « je ne sais pas mesurer », pas « il n'a rien couru ».
+    const ecart = raceIdx >= 0 || !(prescrits > 0) ? null : manqueDeVolume(prescrits, targetKm);
     if (!ecart) return jours;
     const i = jours.findIndex((d) => !/Repos|Renfo/i.test(d.type));
     if (i < 0) return jours;

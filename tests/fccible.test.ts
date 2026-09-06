@@ -450,6 +450,20 @@ test("aucun constat sur une cible minuscule", () => {
   assert.equal(manqueDeVolume(-5, 68), null);
 });
 
+test("les kilomètres prescrits ne se LISENT PAS dans la prose", () => {
+  // ⚠️ RÉGRESSION RÉELLE, attrapée par les crash-tests du projet. Premier jet : une
+  // regex `~(\d+) km` sur le texte des séances. En semaine de course elles sont
+  // décrites en MINUTES (« 30 min de footing ») — la somme tombait à zéro et le constat
+  // annonçait « 0 km sur 60 visés » à un athlète qui allait courir une compétition.
+  const src = codeOf("src/lib/ai/autoPlan.ts");
+  assert.doesNotMatch(src, /const prescrits = jours[\s\S]{0,200}match\(\/~/,
+    "les kilomètres sont de nouveau extraits du texte des séances");
+  assert.match(src, /const prescrits = \(longIdx >= 0 \? longRunKm : 0\)/,
+    "le total ne s'appuie plus sur les distances réellement posées");
+  assert.match(src, /raceIdx >= 0 \|\| !\(prescrits > 0\) \? null/,
+    "une semaine de course, ou un total nul, doivent faire TAIRE le constat");
+});
+
 test("le constat nomme la BONNE cause", () => {
   // ⚠️ Premier jet : il accusait le nombre de jours disponibles. Or sur un athlète à
   // 7 jours dispo, le manque venait de la sortie longue RÉDUITE pour fatigue, qui
