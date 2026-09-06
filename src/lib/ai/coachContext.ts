@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthCoachLines } from "@/data/healthCatalog";
 import { efficaciteParBloc, tendanceEfficacite, ameliorationAttendue } from "@/lib/running/progression";
+import { relireExecution, corrigerAllure } from "@/lib/coach/relecture";
 import { robustWeeklyKm, demonstratedWeeklyKm, longRunForWeek, longRunPeakKm, longRunShare, longRunGap, type RaceGoal } from "@/lib/running/volume";
 import { buildWeightPlan, weightModeEligibility, type WeightPlan } from "@/lib/weight/energy";
 import { weightCoachBlock, weightTrainingRules, type WeightTrainingRules } from "@/lib/weight/coaching";
@@ -329,7 +330,7 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
     // principale ne lit que 60 séances, soit deux mois — trop court pour distinguer une
     // tendance du bruit (constaté : « pente non mesurable » sur un athlète qui en avait
     // pourtant une, nette, sur 32 semaines).
-    sb.from("workouts").select("date, sport, distance_km, duration_seconds, avg_hr")
+    sb.from("workouts").select("date, sport, distance_km, duration_seconds, avg_hr, gap_min_km")
       .eq("user_id", userId).not("avg_hr", "is", null)
       .gte("date", new Date(Date.now() - 280 * 86400000).toISOString().slice(0, 10))
       .order("date", { ascending: false }).limit(500),
@@ -1451,10 +1452,38 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // l'objectif reposait sur +0,4 %/semaine supposés, identiques pour tout le monde.
   // On mesure ici l'efficacité aérobie (vitesse par battement, sorties faciles) par
   // blocs de 4 semaines, et on ne conclut que si la tendance ressort du bruit.
-  const coursesForme = ((formeRes.data ?? []) as { date: string; sport?: string | null; distance_km: number | null; duration_seconds: number | null; avg_hr: number | null }[])
+  const coursesForme = ((formeRes.data ?? []) as { date: string; sport?: string | null; distance_km: number | null; duration_seconds: number | null; avg_hr: number | null; gap_min_km?: number | null }[])
     .filter((w) => isRun(w.sport));
   const tendanceForme = tendanceEfficacite(efficaciteParBloc(coursesForme, fcMaxEst, now));
   const ameliorationPrevue = ameliorationAttendue(weeksToRace, tendanceForme);
+
+  // ── LE COACH SE RELIT ───────────────────────────────────────────────────────
+  // Il vérifiait SI l'athlète avait couru le jour prévu, jamais CE QU'IL AVAIT FAIT.
+  // On compare ici l'allure facile PRESCRITE à celle réellement tenue sur 90 jours,
+  // en GAP quand la montre le donne — sans quoi une semaine en côtes passerait pour
+  // une baisse de forme.
+  const cibleFacileSec = (() => {
+    const m = String(easyPaceLisible ?? "").match(/(\d+)['’:](\d{2})/);
+    return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+  })();
+  const relecture = cibleFacileSec == null ? null : relireExecution(
+    coursesForme
+      .filter((w) => {
+        const km = num(w.distance_km), sec = num(w.duration_seconds), fc = num(w.avg_hr);
+        const age = now - new Date(String(w.date).slice(0, 10) + "T12:00:00Z").getTime();
+        return km != null && km >= 4 && sec != null && sec > 0 && age <= 90 * 86400000
+          && (fcMaxEst == null || (fc != null && fc / fcMaxEst < 0.80));
+      })
+      .map((w) => ({
+        allureSecKm: num(w.gap_min_km) != null ? num(w.gap_min_km)! * 60 : num(w.duration_seconds)! / num(w.distance_km)!,
+        cibleSecKm: cibleFacileSec,
+      })),
+  );
+  // La correction ne s'applique QUE si la relecture a conclu. Sinon l'allure d'origine
+  // reste : une cible ajustée sur du bruit serait pire que pas d'ajustement du tout.
+  const easyPaceCorrige = relecture?.correctionSec
+    ? corrigerAllure(easyPaceLisible, relecture.correctionSec) ?? easyPaceLisible
+    : easyPaceLisible;
 
   const objectiveWarnings: string[] = (() => {
     const out: string[] = [];
@@ -1595,7 +1624,18 @@ ${p?.gender === "female" ? `- SEXE : femme → besoins en FER et disponibilité 
 
 ⚡ VERDICT DE FRAÎCHEUR DU JOUR (calculé à partir de la VFC, du sommeil, de la charge et du ressenti — CETTE CONCLUSION S'IMPOSE À TOI, ne la ré-arbitre pas)
 ${readinessBlock}
-${tendanceForme ? `
+${relecture ? `
+RELECTURE DE L'EXÉCUTION (ce qu'il FAIT, comparé à ce qu'on lui a demandé)
+- Sur ${relecture.seances} footings des 90 derniers jours, il tient ${relecture.ecartMedianSec === 0 ? "exactement" : relecture.ecartMedianSec > 0 ? `${nRaw(Math.abs(relecture.ecartMedianSec), "fr")} s/km PLUS LENTEMENT` : `${nRaw(Math.abs(relecture.ecartMedianSec), "fr")} s/km PLUS VITE`} que l'allure prescrite (${nRaw(Math.abs(relecture.ecartPct), "fr")} %), avec une dispersion de ${nRaw(relecture.dispersionSec, "fr")} s/km.
+${relecture.correctionSec !== 0
+  ? `- L'allure facile a été CORRIGÉE de ${nRaw(relecture.correctionSec, "fr")} s/km en conséquence : ${easyPaceLisible}/km devient ${easyPaceCorrige}/km. Prescris sur cette base.`
+  : relecture.motifInaction === "execution_irreguliere"
+    ? "- AUCUNE correction : la dispersion dépasse l'écart lui-même. Il est IRRÉGULIER, la cible n'est pas fausse — c'est la régularité qu'il faut lui demander, pas une allure différente."
+    : relecture.motifInaction === "ecart_negligeable"
+      ? "- AUCUNE correction : il tient ses allures. Dis-le-lui, c'est une information utile et rarement donnée."
+      : "- AUCUNE correction : trop peu de séances comparables pour conclure."}
+- ⚠️ Aucun ressenti post-séance n'est disponible : un écart ne dit pas SI la cible était trop rapide ou si la séance a été mal exécutée. Ne tranche pas à sa place, demande-lui.
+` : ""}${tendanceForme ? `
 PENTE RÉELLE DE L'ATHLÈTE (mesurée, pas supposée)
 - Son efficacité aérobie — vitesse par battement de cœur sur ses sorties FACILES — évolue de ${tendanceForme.pctParSemaine > 0 ? "+" : ""}${nRaw(tendanceForme.pctParSemaine, "fr")} % par semaine sur ${tendanceForme.semaines} semaines (${tendanceForme.blocs} blocs de 4 semaines, rapport signal/bruit ${nRaw(tendanceForme.signalSurBruit, "fr")}).
 - D'ici sa course, l'amélioration à attendre est donc d'environ ${nRaw(Math.round(ameliorationPrevue * 1000) / 10, "fr")} %, et NON les 8 % que promettrait une hypothèse générique. Fonde ton discours là-dessus.
@@ -1763,7 +1803,9 @@ ${catalog}`;
 
   return {
     text, objective, daysToRace, weeksToRace, athleteName: String(p?.full_name ?? "Athlète"), vma,
-    weekPlan: { qBudget, quality: chosen, easyPace: easyPaceLisible, eased: easeReasons.length > 0, floored: qb.floored },
+    // ⚠️ Allure CORRIGÉE par la relecture : c'est elle qui doit partir dans le plan,
+    // sinon la boucle mesure sans jamais rien changer.
+    weekPlan: { qBudget, quality: chosen, easyPace: easyPaceCorrige, eased: easeReasons.length > 0, floored: qb.floored },
     // Doubles séances : on tranche ICI, avec le volume REPRÉSENTATIF (médiane des
     // semaines courues) et non le pic — une semaine à 90 km ne fait pas un athlète
     // qui double, et doubler sur un pic isolé est la meilleure façon de le payer.
@@ -1786,7 +1828,7 @@ ${catalog}`;
       advice: readinessRule,
     },
     hardGapHours: hardGapH,
-    easyPace: easyPaceLisible,
+    easyPace: easyPaceCorrige,
     lastHardDaysAgo,
     volume: { weekKm: Math.round(weekKm), avg4wkKm: Math.round(avg4wkKm), targetKm, longRunKm, longRunPlanned, longRunEased },
     cycle: { deload, taper, label: cycleLabel },
