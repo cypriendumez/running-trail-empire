@@ -105,6 +105,10 @@ export type TextesPlan = {
   enduranceTitreLignes: string;
   /** Footing dont le dernier tiers est un peu plus rapide. */
   enduranceTitreProg: string;
+  /** Constat quand le plan ne peut pas atteindre la cible de volume. */
+  manqueVolume: (prescrit: string, cible: string, jours: string) => string;
+  /** Même constat, mais quand la semaine est allégée VOLONTAIREMENT. */
+  manqueVolumeAllege: (prescrit: string, cible: string) => string;
   footingProgressif: string;
   /** Phrase ajoutée à ce footing-là. */
   lignesDroites: string;
@@ -215,6 +219,8 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     enduranceTitre: "Footing en endurance",
   enduranceTitreLignes: "Footing + lignes droites",
   enduranceTitreProg: "Footing progressif",
+  manqueVolume: (p, c, j) => ` ⚠️ Cette semaine ne totalise que ${p} km sur les ${c} visés : avec ${j} jour(s) de course disponibles, le reste ne rentre pas sans allonger dangereusement les sorties. Ajoute un jour, ou revois la cible à la baisse — mais ne crois pas faire ${c} km.`,
+  manqueVolumeAllege: (p, c) => ` ⚠️ Cette semaine ne totalise que ${p} km sur les ${c} habituels, et c\u2019est VOULU : la fatigue du moment a fait réduire la sortie longue, et les footings suivent (ils ne dépassent jamais 85 % d\u2019une sortie longue). Ce n\u2019est pas un retard à rattraper — reprendre le volume dès que la fraîcheur revient serait la vraie erreur.`,
   footingProgressif: " Cours le dernier tiers un peu plus vite que le début — sans jamais forcer, juste en laissant l’allure venir. Apprendre à finir fort se travaille.",
   lignesDroites: " Termine par 5 lignes droites de 100 m en accélération progressive, récupération complète en marchant : ça entretient la vitesse sans fatiguer.",
     enduranceDetail: (e, c, a, k, g, s, cy) => `Échauffement ${e} min progressif FC Z1→Z2 → Corps : ${c} en Z2${a}, tu dois pouvoir tenir une conversation → Retour au calme ${k} min FC Z1.${g}${s ? " 💡 À ton volume, scinde en DEUX sorties dans la journée (matin + soir) plutôt qu'un seul footing interminable." : ""}${cy}`,
@@ -311,6 +317,8 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     enduranceTitre: "Easy run",
   enduranceTitreLignes: "Easy run + strides",
   enduranceTitreProg: "Progression run",
+  manqueVolume: (p, c, j) => ` ⚠️ This week only adds up to ${p} km out of the ${c} planned: with ${j} available running day(s), the rest does not fit without making the sessions dangerously long. Add a day, or lower the target — but do not believe you are running ${c} km.`,
+  manqueVolumeAllege: (p, c) => ` ⚠️ This week only adds up to ${p} km instead of your usual ${c}, and that is INTENTIONAL: current fatigue shortened the long run, and the easy runs follow (they never exceed 85 % of a long run). This is not a backlog to catch up — going straight back to full volume would be the real mistake.`,
   footingProgressif: " Run the last third slightly faster than the start — never forcing, just letting the pace come. Finishing strong is a skill you train.",
   lignesDroites: " Finish with 5 × 100 m strides, building the pace, walking back to full recovery: it keeps your speed without adding fatigue.",
     enduranceDetail: (e, c, a, k, g, s, cy) => `Warm-up ${e} min building HR Z1→Z2 → Main set: ${c} at Z2${a}, you must be able to hold a conversation → Cool-down ${k} min HR Z1.${g}${s ? " 💡 At your volume, split it into TWO runs in the day (morning + evening) rather than one endless jog." : ""}${cy}`,
@@ -407,6 +415,8 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     enduranceTitre: "Lockerer Dauerlauf",
   enduranceTitreLignes: "Dauerlauf + Steigerungen",
   enduranceTitreProg: "Progressiver Dauerlauf",
+  manqueVolume: (p, c, j) => ` ⚠️ Diese Woche ergibt nur ${p} km statt der geplanten ${c}: mit ${j} verfügbaren Lauftagen passt der Rest nicht, ohne die Einheiten gefährlich zu verlängern. Füge einen Tag hinzu oder senke das Ziel — aber glaube nicht, ${c} km zu laufen.`,
+  manqueVolumeAllege: (p, c) => ` ⚠️ Diese Woche ergibt nur ${p} km statt der üblichen ${c} — und das ist SO GEWOLLT: die aktuelle Müdigkeit hat den langen Lauf verkürzt, und die Dauerläufe folgen (sie überschreiten nie 85 % eines langen Laufs). Das ist kein Rückstand zum Aufholen.`,
   footingProgressif: " Laufe das letzte Drittel etwas schneller als den Anfang — ohne zu drücken, das Tempo einfach kommen lassen. Stark zu Ende laufen will geübt sein.",
   lignesDroites: " Zum Abschluss 5 × 100 m Steigerungen mit vollständiger Gehpause: das erhält die Schnelligkeit, ohne zu ermüden.",
     enduranceDetail: (e, c, a, k, g, s, cy) => `Aufwärmen ${e} min ansteigend HF Z1→Z2 → Hauptteil: ${c} in Z2${a}, du musst dich unterhalten können → Auslaufen ${k} min HF Z1.${g}${s ? " 💡 Bei deinem Umfang teile ihn auf ZWEI Läufe am Tag auf (morgens + abends) statt eines endlosen Dauerlaufs." : ""}${cy}`,
@@ -503,6 +513,8 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     enduranceTitre: "Rodaje en resistencia",
     enduranceTitreLignes: "Rodaje + progresivos",
     enduranceTitreProg: "Rodaje progresivo",
+    manqueVolume: (p, c, j) => ` ⚠️ Esta semana solo suma ${p} km de los ${c} previstos: con ${j} día(s) disponibles para correr, el resto no cabe sin alargar peligrosamente las salidas. Añade un día o baja el objetivo, pero no creas que haces ${c} km.`,
+    manqueVolumeAllege: (p, c) => ` ⚠️ Esta semana solo suma ${p} km en vez de los ${c} habituales, y es INTENCIONADO: la fatiga actual ha acortado la salida larga, y los rodajes la siguen (nunca superan el 85 % de una salida larga). No es un retraso que recuperar.`,
     footingProgressif: " Corre el último tercio algo más rápido que el inicio — sin forzar, dejando que el ritmo venga. Terminar fuerte se entrena.",
     lignesDroites: " Termina con 5 rectas de 100 m en progresión, recuperando andando por completo: mantiene la velocidad sin cansarte.",
     enduranceDetail: (e, c, a, k, g, s, cy) => `Calentamiento ${e} min progresivo FC Z1→Z2 → Parte principal: ${c} en Z2${a}, tienes que poder mantener una conversación → Vuelta a la calma ${k} min FC Z1.${g}${s ? " 💡 Con tu volumen, divídelo en DOS salidas en el día (mañana + tarde) en vez de un rodaje interminable." : ""}${cy}`,
@@ -599,6 +611,8 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     enduranceTitre: "Corrida em resistência",
     enduranceTitreLignes: "Corrida + acelerações",
     enduranceTitreProg: "Corrida progressiva",
+    manqueVolume: (p, c, j) => ` ⚠️ Esta semana só soma ${p} km dos ${c} previstos: com ${j} dia(s) disponíveis para correr, o resto não cabe sem alongar perigosamente os treinos. Acrescenta um dia ou baixa o objetivo, mas não penses que fazes ${c} km.`,
+    manqueVolumeAllege: (p, c) => ` ⚠️ Esta semana só soma ${p} km em vez dos ${c} habituais, e é INTENCIONAL: o cansaço atual encurtou o treino longo, e as corridas leves acompanham (nunca passam de 85 % de um treino longo). Não é um atraso a recuperar.`,
     footingProgressif: " Corre o último terço um pouco mais rápido do que o início — sem forçar, deixando o ritmo vir. Acabar forte treina-se.",
     lignesDroites: " Termina com 5 acelerações de 100 m, recuperando a andar por completo: mantém a velocidade sem cansar.",
     enduranceDetail: (e, c, a, k, g, s, cy) => `Aquecimento ${e} min progressivo FC Z1→Z2 → Parte principal: ${c} em Z2${a}, tens de conseguir manter uma conversa → Retorno à calma ${k} min FC Z1.${g}${s ? " 💡 Com o teu volume, divide em DUAS saídas no dia (manhã + tarde) em vez de uma corrida interminável." : ""}${cy}`,

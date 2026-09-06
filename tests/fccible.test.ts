@@ -20,6 +20,7 @@ import { repartirFootings, varianteFooting, AMPLITUDE } from "../src/lib/coach/f
 import { robustWeeklyKm, type RunLike } from "../src/lib/running/volume";
 import { PART_FC_DURE } from "../src/lib/ai/coachContext";
 import { computeQualityBudget, SEANCES_AVANT_QUALITE, SEANCES_QUALITE_LIBRE } from "../src/lib/coach/qualityBudget";
+import { manqueDeVolume, PART_ACCEPTABLE, CIBLE_MIN_KM } from "../src/lib/coach/ecartVolume";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -413,6 +414,57 @@ test("le nombre observé vient bien du contexte", () => {
   const src = codeOf("src/lib/ai/coachContext.ts");
   assert.match(src, /seancesRecentes: runs\.filter/, "le budget ne reçoit plus le nombre de séances vues");
   assert.match(src, /28 \* 86400000/, "la fenêtre d'observation a changé sans être annoncée");
+});
+
+console.log("\nUN PLAN QUI N'ATTEINT PAS SA CIBLE DOIT LE DIRE");
+
+test("un écart net est signalé", () => {
+  // Constaté : 2 jours disponibles et 68 km visés → 16,5 km prescrits, sans un mot.
+  const e = manqueDeVolume(16.5, 68)!;
+  assert.ok(e, "un plan à un quart de la cible passait en silence");
+  assert.equal(e.manqueKm, 51.5);
+  assert.ok(e.part < 0.3);
+});
+
+test("un plan qui tient sa cible ne dit rien", () => {
+  // Frais et tous les jours disponibles, le plan atteint 67 des 68 km : pas d'alerte.
+  assert.equal(manqueDeVolume(67, 68), null);
+  assert.equal(manqueDeVolume(68 * PART_ACCEPTABLE, 68), null, "au seuil exact, on se tait");
+  assert.ok(manqueDeVolume(68 * PART_ACCEPTABLE - 1, 68), "juste sous le seuil, on parle");
+});
+
+test("un plan qui DÉPASSE n'est pas une alerte", () => {
+  // Le rôle de ce constat est de dire ce qui manque, pas de brider un athlète qui en
+  // fait un peu plus — les plafonds de charge s'en occupent ailleurs.
+  assert.equal(manqueDeVolume(80, 68), null);
+});
+
+test("aucun constat sur une cible minuscule", () => {
+  // Reprise, première semaine : un écart relatif n'y veut rien dire.
+  // Nombres ÉCRITS EN DUR : les déduire de la constante rendrait ce test incapable de
+  // voir un changement de seuil — il suivrait le code au lieu de le juger.
+  assert.equal(CIBLE_MIN_KM, 15, "cible minimale : décision d'entraîneur, à changer sciemment");
+  assert.equal(manqueDeVolume(2, 10), null, "une cible de 10 km ne se juge pas en écart relatif");
+  assert.ok(manqueDeVolume(2, 20), "à 20 km de cible, un plan à 2 km doit alerter");
+  assert.equal(manqueDeVolume(Number.NaN, 68), null);
+  assert.equal(manqueDeVolume(-5, 68), null);
+});
+
+test("le constat nomme la BONNE cause", () => {
+  // ⚠️ Premier jet : il accusait le nombre de jours disponibles. Or sur un athlète à
+  // 7 jours dispo, le manque venait de la sortie longue RÉDUITE pour fatigue, qui
+  // rabote aussi les footings (plafonnés à 85 % d'elle). Accuser le mauvais coupable
+  // aurait poussé l'athlète à ajouter un jour au lieu de récupérer.
+  const src = codeOf("src/lib/ai/autoPlan.ts");
+  assert.match(src, /const allegee = ctx\.volume\.longRunEased \|\| ctx\.weekPlan\.eased \|\| ctx\.cycle\.taper \|\| ctx\.readiness\.level !== "vert"/,
+    "les deux causes ne sont plus distinguées");
+  assert.match(src, /manqueVolumeAllege\(/, "le message « semaine allégée » a disparu");
+  assert.match(src, /annoncerEcart\(sortir\(week\)\)/, "le constat n'est plus appliqué à la sortie principale");
+  assert.match(src, /annoncerEcart\(sortir\(\[\.\.\.week, \.\.\.doubles\]\)\)/,
+    "le constat saute quand le plan porte des doubles séances");
+  const i18n = readFileSync("src/lib/ai/planI18n.ts", "utf8");
+  for (const cle of ["manqueVolume", "manqueVolumeAllege"])
+    assert.equal(i18n.split(`${cle}:`).length - 1, 6, `${cle} : 5 langues + le type attendus`);
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

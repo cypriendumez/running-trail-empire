@@ -16,6 +16,7 @@ import type { AthleteContext } from "@/lib/ai/coachContext";
 import { heatAdvice, windAdvice } from "@/lib/weather/openMeteo";
 import { choisirJourQualite } from "@/lib/coach/meteoPlacement";
 import { repartirFootings, varianteFooting } from "@/lib/coach/footings";
+import { manqueDeVolume } from "@/lib/coach/ecartVolume";
 import { scinderFacile, seanceMatinFacile } from "@/lib/coach/doubleSessions";
 import { PLAN_T } from "@/lib/ai/planI18n";
 import { nRaw, type I18nText } from "@/lib/i18n/multi";
@@ -690,11 +691,11 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
     // Le matin AVANT le soir : les écrans trient par date, et deux séances de même
     // date doivent s'afficher dans l'ordre où elles se courent.
     if (doubles.length) {
-      return sortir([...week, ...doubles]);
+      return annoncerEcart(sortir([...week, ...doubles]));
     }
   }
 
-  return sortir(week);
+  return annoncerEcart(sortir(week));
 
   /**
    * ── LE RENFORCEMENT DE SECOURS ─────────────────────────────────────────────
@@ -715,6 +716,43 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
    * force non assimilée), pas sur la sortie longue, pas un jour de repos complet — ce
    * repos-là est prescrit, pas une case vide.
    */
+  /**
+   * Le plan ne peut pas toujours atteindre la cible : avec deux jours disponibles et
+   * 68 km visés, les plafonds de sécurité (un footing ne dépasse pas 85 % de la sortie
+   * longue) plafonnent la semaine à 16 km. Ce n'est pas un défaut de calcul — c'est
+   * physique. Le défaut serait de le TAIRE : l'athlète lit un plan complet et se
+   * demande ensuite pourquoi il ne progresse pas.
+   */
+  function annoncerEcart(jours: PlanDay[]): PlanDay[] {
+    const prescrits = jours
+      .filter((d) => !/Repos|Renfo/i.test(d.type))
+      .reduce((somme, d) => {
+        const m = String(d.detail ?? "").match(/~([\d,.]+)\s*km/);
+        return somme + (m ? Number(m[1].replace(",", ".")) : 0);
+      }, 0);
+    const ecart = manqueDeVolume(prescrits, targetKm);
+    if (!ecart) return jours;
+    const i = jours.findIndex((d) => !/Repos|Renfo/i.test(d.type));
+    if (i < 0) return jours;
+    const jour = jours[i];
+    // ⚠️ NE PAS ACCUSER LE MAUVAIS COUPABLE. Le premier jet blâmait le nombre de jours
+    // disponibles ; or sur un athlète à 7 jours disponibles, le manque venait de la
+    // sortie longue RÉDUITE pour cause de fatigue, qui rabote aussi les footings
+    // (plafonnés à 85 % d'elle). Deux causes, deux messages — et dans le second cas
+    // l'écart n'est pas un problème à corriger, c'est la décision d'entraînement.
+    const allegee = ctx.volume.longRunEased || ctx.weekPlan.eased || ctx.cycle.taper || ctx.readiness.level !== "vert";
+    const note = (l: Lang) => (allegee
+      ? PLAN_T[l].manqueVolumeAllege(nRaw(ecart.prescritKm, l), nRaw(ecart.cibleKm, l))
+      : PLAN_T[l].manqueVolume(nRaw(ecart.prescritKm, l), nRaw(ecart.cibleKm, l), nRaw(ctx.availability.days.length, l)));
+    const i18n = { ...(jour.i18n ?? {}) } as Partial<Record<Lang, PlanDayText>>;
+    for (const l of AUTRES_LANGUES) {
+      const t = i18n[l];
+      if (t) i18n[l] = { ...t, why: `${t.why ?? ""}${note(l)}` };
+    }
+    jours[i] = { ...jour, why: `${jour.why ?? ""}${note("fr")}`, i18n };
+    return jours;
+  }
+
   function sortir(jours: PlanDay[]): PlanDay[] {
     if (jours.some((d) => d.type === "Renfo")) return jours;
 
