@@ -239,8 +239,14 @@ test("les tuiles sont CRÉDITÉES", () => {
   // moindre crédit, alors que la licence l'exige — et le commentaire voisin affirmait
   // le contraire.
   const src = codeOf("src/components/segments/SegmentMap.tsx");
-  assert.doesNotMatch(src, /attributionControl=\{false\}/, "les tuiles sont de nouveau affichées sans crédit");
   assert.match(src, /attribution=\{TUILES\.attribution\}/, "la mention n'est plus transmise à la couche de tuiles");
+  // Le contrôle par défaut est désactivé, mais REMPLACÉ par un contrôle explicite —
+  // placé à gauche, parce qu'à droite il recouvrait le bouton de survol (z-index 800).
+  assert.match(src, /<AttributionControl position="bottomleft"/,
+    "plus aucun contrôle d'attribution : les tuiles seraient affichées sans crédit");
+  const blocs = codeOf("src/components/activity/StravaBlocks.tsx");
+  assert.match(blocs, /z-\[1000\]/,
+    "le bouton repasse sous les contrôles Leaflet (z-index 800) : il redeviendrait invisible");
 });
 
 test("la carte montre le sens de parcours et se laisse manipuler", () => {

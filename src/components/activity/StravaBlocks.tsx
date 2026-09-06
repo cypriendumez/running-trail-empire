@@ -51,14 +51,17 @@ export function StravaBlocks({ polyline, chiffres, splits, profil, efforts = [],
     <div className="space-y-6">
       {polyline && (
         <section className="relative overflow-hidden rounded-2xl border border-zinc-200 bg-white">
-          <SegmentMapLazy polyline={polyline} height={300} />
+          {/* Plus haute que large aurait été impossible ; mais à 300 px, une boucle
+              compacte n'occupait qu'un quart de la largeur — Leaflet cadre sur la
+              hauteur. 420 px laissent le parcours remplir l'écran, comme chez Strava. */}
+          <SegmentMapLazy polyline={polyline} height={420} />
           {/* Le bouton de lecture de Strava lance leur rejeu. Ici il ouvre le survol 3D
               DE CETTE sortie — le lien accepte déjà `?w=<id>`. Placé en bas à droite,
               au-dessus de la carte mais SOUS l'attribution, qui reste obligatoire. */}
           {survolHref && (
             <Link href={survolHref} title={t("eff.survolAide")}
-              className="group absolute bottom-4 right-4 z-[500] flex h-14 w-14 items-center justify-center rounded-full bg-white text-emerald-700 shadow-lg ring-1 ring-black/5 transition hover:bg-emerald-600 hover:text-white">
-              <Play className="ml-0.5 h-6 w-6 fill-current" aria-hidden="true" />
+              className="group absolute bottom-4 right-4 z-[1000] flex h-16 w-16 items-center justify-center rounded-full bg-white text-emerald-700 shadow-lg ring-1 ring-black/5 transition hover:bg-emerald-600 hover:text-white">
+              <Play className="ml-1 h-7 w-7 fill-current" aria-hidden="true" />
               <span className="sr-only">{t("eff.survol")}</span>
             </Link>
           )}

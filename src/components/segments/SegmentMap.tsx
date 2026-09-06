@@ -7,7 +7,7 @@
 //  Leaflet + tuiles MapTiler est la pile déjà en service dans Trail Builder — donc
 //  éprouvée, et sans dépendance supplémentaire.
 // ─────────────────────────────────────────────────────────────────────────────
-import { MapContainer, TileLayer, Polyline, CircleMarker, Marker } from "react-leaflet";
+import { MapContainer, TileLayer, Polyline, CircleMarker, Marker, AttributionControl } from "react-leaflet";
 import L from "leaflet";
 import { flechesLeLongDe } from "@/lib/activities/fleches";
 import { decodePolyline } from "@/lib/segments/geo";
@@ -39,9 +39,14 @@ export function SegmentMap({ polyline, height = 180 }: { polyline: string; heigh
           ne pas confisquer le défilement de la page ; le glisser et le zoom, eux, sont
           rendus à l'athlète : une carte qu'on ne peut pas bouger n'est pas une carte. */}
       <MapContainer bounds={bounds} boundsOptions={{ padding: [18, 18] }}
-        scrollWheelZoom={false} dragging zoomControl
+        scrollWheelZoom={false} dragging zoomControl attributionControl={false}
         style={{ height: "100%", width: "100%" }}>
         <TileLayer url={TUILES.url} attribution={TUILES.attribution} />
+        {/* ⚠️ La mention passe À GAUCHE. Par défaut Leaflet la pose en bas à DROITE avec
+            un z-index de 800 — soit exactement sous le bouton « survol 3D », qu'elle
+            recouvrait. Régression introduite en rétablissant l'attribution : le crédit
+            est obligatoire, mais il n'a pas à manger le seul bouton de la carte. */}
+        <AttributionControl position="bottomleft" prefix={false} />
         {/* Double tracé : un liseré blanc dessous pour que la ligne reste lisible
             au-dessus d'une forêt sombre comme d'une zone urbaine claire. */}
         <Polyline positions={ligne} pathOptions={{ color: "#ffffff", weight: 6, opacity: 0.9 }} />
@@ -54,10 +59,10 @@ export function SegmentMap({ polyline, height = 180 }: { polyline: string; heigh
           <Marker key={`f${i}`} position={[f.lat, f.lon]} interactive={false} keyboard={false}
             icon={L.divIcon({
               className: "",
-              iconSize: [16, 16],
-              iconAnchor: [8, 8],
-              html: `<svg viewBox="0 0 16 16" width="16" height="16" style="transform:rotate(${f.cap}deg)">`
-                + `<path d="M8 2.5 L12.5 11 L8 8.6 L3.5 11 Z" fill="#059669" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/></svg>`,
+              iconSize: [22, 22],
+              iconAnchor: [11, 11],
+              html: `<svg viewBox="0 0 16 16" width="22" height="22" style="transform:rotate(${f.cap}deg)">`
+                + `<path d="M8 2.5 L12.5 11 L8 8.6 L3.5 11 Z" fill="#059669" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>`,
             })} />
         ))}
         <CircleMarker center={ligne[0]} radius={5} pathOptions={{ color: "#fff", weight: 2, fillColor: "#059669", fillOpacity: 1 }} />
