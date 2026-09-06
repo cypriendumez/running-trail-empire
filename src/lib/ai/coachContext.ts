@@ -4,6 +4,7 @@ import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrar
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthCoachLines } from "@/data/healthCatalog";
 import { efficaciteParBloc, tendanceEfficacite, ameliorationAttendue } from "@/lib/running/progression";
 import { relireExecution, corrigerAllure } from "@/lib/coach/relecture";
+import { exigenceTerrain, denivelePartSemaine } from "@/lib/coach/terrain";
 import { robustWeeklyKm, demonstratedWeeklyKm, longRunForWeek, longRunPeakKm, longRunShare, longRunGap, type RaceGoal } from "@/lib/running/volume";
 import { buildWeightPlan, weightModeEligibility, type WeightPlan } from "@/lib/weight/energy";
 import { weightCoachBlock, weightTrainingRules, type WeightTrainingRules } from "@/lib/weight/coaching";
@@ -334,7 +335,7 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
     // principale ne lit que 60 séances, soit deux mois — trop court pour distinguer une
     // tendance du bruit (constaté : « pente non mesurable » sur un athlète qui en avait
     // pourtant une, nette, sur 32 semaines).
-    sb.from("workouts").select("date, sport, distance_km, duration_seconds, avg_hr, gap_min_km")
+    sb.from("workouts").select("date, sport, distance_km, duration_seconds, avg_hr, gap_min_km, elevation_gain_m")
       .eq("user_id", userId).not("avg_hr", "is", null)
       .gte("date", new Date(Date.now() - 280 * 86400000).toISOString().slice(0, 10))
       .order("date", { ascending: false }).limit(500),
@@ -1456,10 +1457,35 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // l'objectif reposait sur +0,4 %/semaine supposés, identiques pour tout le monde.
   // On mesure ici l'efficacité aérobie (vitesse par battement, sorties faciles) par
   // blocs de 4 semaines, et on ne conclut que si la tendance ressort du bruit.
-  const coursesForme = ((formeRes.data ?? []) as { date: string; sport?: string | null; distance_km: number | null; duration_seconds: number | null; avg_hr: number | null; gap_min_km?: number | null }[])
+  const coursesForme = ((formeRes.data ?? []) as { date: string; sport?: string | null; distance_km: number | null; duration_seconds: number | null; avg_hr: number | null; gap_min_km?: number | null; elevation_gain_m?: number | null }[])
     .filter((w) => isRun(w.sport));
   const tendanceForme = tendanceEfficacite(efficaciteParBloc(coursesForme, fcMaxEst, now));
   const ameliorationPrevue = ameliorationAttendue(weeksToRace, tendanceForme);
+
+  // ── LE TERRAIN DE LA COURSE ─────────────────────────────────────────────────
+  // L'objectif ne transportait que le NOM de la course : un coureur préparant un trail
+  // à 1 200 m de D+ recevait le même plan qu'un 10 km sur route. On retrouve la course
+  // au catalogue par son nom ET sa date — un nom seul est ambigu, il existe plusieurs
+  // « Course de Bondues ». ⚠️ Un dénivelé ABSENT (null) n'est pas un dénivelé NUL : on
+  // ne prescrit alors rien, et on le dit.
+  // ⚠️ NOM + DATE NE SUFFISENT PAS. Une même épreuve publie plusieurs formats le même
+  // jour : « Foulées de Bondues » existe en 1,5 km, 5 km et 10 km à la même date. Sans
+  // le filtre de DISTANCE, la recherche rendait 3 lignes, était jugée ambiguë, et le
+  // dénivelé passait pour inconnu alors qu'il était là.
+  const courseCible = objective?.race && objective?.raceDate && num(objective.distanceKm) != null
+    ? (await sb.from("races").select("elevation_gain_m, terrain, difficulty, distance_km")
+        .ilike("name", objective.race).eq("date", objective.raceDate)
+        .gte("distance_km", objective.distanceKm - 0.5).lte("distance_km", objective.distanceKm + 0.5)
+        .limit(2)).data
+    : null;
+  const dplusCourse = Array.isArray(courseCible) && courseCible.length === 1
+    ? num((courseCible[0] as { elevation_gain_m?: number | null }).elevation_gain_m)
+    : null;
+  const dplusConnu = Array.isArray(courseCible) && courseCible.length === 1
+    && (courseCible[0] as { elevation_gain_m?: number | null }).elevation_gain_m != null;
+  const terrain = objective
+    ? exigenceTerrain(dplusCourse, objective.distanceKm, denivelePartSemaine(coursesForme, now))
+    : null;
 
   // ── LE COACH SE RELIT ───────────────────────────────────────────────────────
   // Il vérifiait SI l'athlète avait couru le jour prévu, jamais CE QU'IL AVAIT FAIT.
@@ -1628,7 +1654,16 @@ ${p?.gender === "female" ? `- SEXE : femme → besoins en FER et disponibilité 
 
 ⚡ VERDICT DE FRAÎCHEUR DU JOUR (calculé à partir de la VFC, du sommeil, de la charge et du ressenti — CETTE CONCLUSION S'IMPOSE À TOI, ne la ré-arbitre pas)
 ${readinessBlock}
-${relecture ? `
+${objective ? (terrain ? `
+TERRAIN DE LA COURSE (dénivelé du catalogue, pas une estimation)
+- ${objective.race} : ${nRaw(terrain.dplusCourse, "fr")} m de D+ sur ${nRaw(objective.distanceKm, "fr")} km, soit ${nRaw(terrain.mParKm, "fr")} m par kilomètre — profil ${terrain.profil}.
+- Objectif d'entraînement : environ ${nRaw(terrain.cibleHebdoM, "fr")} m de D+ par semaine avant la course. Le corps doit voir PLUS de dénivelé à l'entraînement que le jour J ; une semaine à l'exact D+ de la course ne prépare pas à l'encaisser d'un seul tenant.
+- ${terrain.actuelHebdoM == null ? "Son D+ hebdomadaire actuel n'est pas mesurable (trop peu de sorties avec altitude)." : terrain.manqueHebdoM > 0 ? `Il en fait ${nRaw(terrain.actuelHebdoM, "fr")} m par semaine : il lui en MANQUE ${nRaw(terrain.manqueHebdoM, "fr")}. Construis cette montée progressivement, jamais d'un coup.` : `Il en fait déjà ${nRaw(terrain.actuelHebdoM, "fr")} m par semaine : le terrain est couvert, n'en rajoute pas.`}
+` : dplusConnu ? `
+TERRAIN DE LA COURSE : ${objective.race} est annoncée à ${nRaw(dplusCourse ?? 0, "fr")} m de D+ — plate ou presque. Aucun travail de côte spécifique n'est justifié ; ne fais pas comme si c'était un trail.
+` : `
+TERRAIN DE LA COURSE : le dénivelé de ${objective.race} n'est PAS renseigné au catalogue. Ne suppose ni plat ni montagne — demande-lui, ou invite-le à regarder le profil sur le site de l'organisateur.
+`) : ""}${relecture ? `
 RELECTURE DE L'EXÉCUTION (ce qu'il FAIT, comparé à ce qu'on lui a demandé)
 - Sur ${relecture.seances} footings des 90 derniers jours, il tient ${relecture.ecartMedianSec === 0 ? "exactement" : relecture.ecartMedianSec > 0 ? `${nRaw(Math.abs(relecture.ecartMedianSec), "fr")} s/km PLUS LENTEMENT` : `${nRaw(Math.abs(relecture.ecartMedianSec), "fr")} s/km PLUS VITE`} que l'allure prescrite (${nRaw(Math.abs(relecture.ecartPct), "fr")} %), avec une dispersion de ${nRaw(relecture.dispersionSec, "fr")} s/km.
 ${relecture.correctionSec !== 0
