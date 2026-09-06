@@ -16,6 +16,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { meilleursEfforts, chrono, allure, DISTANCES } from "../src/lib/activities/efforts";
 import type { TrackPoint } from "../src/lib/segments/geo";
+import { cap, flechesLeLongDe, BASE_CAP_M } from "../src/lib/activities/fleches";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -168,6 +169,93 @@ test("les libellés de forme sont traduits, pas écrits en dur", () => {
   const i18n = readFileSync("src/lib/i18n/translations.ts", "utf8");
   for (const c of ["frm.gap", "frm.foulee", "frm.ratio", "frm.tss"])
     assert.equal(i18n.split(`"${c}"`).length - 1, 5, `${c} absente des 5 langues`);
+});
+
+console.log("\nLA CARTE — dans quel sens la sortie a-t-elle été courue ?");
+
+test("le cap est juste, et corrigé de la latitude", () => {
+  assert.equal(Math.round(cap({ lat: 0, lon: 0 }, { lat: 1, lon: 0 })), 0, "plein nord");
+  assert.equal(Math.round(cap({ lat: 0, lon: 0 }, { lat: 0, lon: 1 })), 90, "plein est");
+  assert.equal(Math.round(cap({ lat: 0, lon: 0 }, { lat: -1, lon: 0 })), 180, "plein sud");
+  assert.equal(Math.round(cap({ lat: 0, lon: 0 }, { lat: 0, lon: -1 })), 270, "plein ouest");
+  // ⚠️ À 60° de latitude, un degré de longitude ne vaut que la moitié d'un degré de
+  // latitude : sans la correction, ce déplacement paraîtrait à 45° au lieu de ~27°.
+  const nordEst = cap({ lat: 60, lon: 0 }, { lat: 60.01, lon: 0.01 });
+  assert.ok(Math.abs(nordEst - 26.6) < 2, `cap ${nordEst.toFixed(1)}° : la latitude n'est pas prise en compte`);
+  assert.equal(cap({ lat: 1, lon: 1 }, { lat: 1, lon: 1 }), 0, "deux points identiques ne pointent nulle part");
+});
+
+test("les chevrons suivent la DISTANCE, pas le nombre de points", () => {
+  // Un athlète arrêté à un feu accumule des points au même endroit : des chevrons
+  // « tous les N points » s'y entasseraient tous.
+  const trace = [
+    ...Array.from({ length: 200 }, () => ({ lat: 49, lon: 1 })),          // 200 points à l'arrêt
+    ...Array.from({ length: 60 }, (_, i) => ({ lat: 49, lon: 1 + i * 0.001 })), // puis 4 km plein est
+  ];
+  const f = flechesLeLongDe(trace, 4);
+  assert.equal(f.length, 4);
+  // ⚠️ Compter les positions distinctes ne suffit PAS : espacés « tous les N points »,
+  // les chevrons tombent quand même sur 4 longitudes différentes — mais toutes groupées
+  // au tout début du trajet. Ce qu'il faut vérifier, c'est qu'ils COUVRENT le parcours.
+  const lons = f.map((x) => x.lon);
+  const etendue = Math.max(...lons) - Math.min(...lons);
+  const parcours = 59 * 0.001;
+  assert.ok(etendue > parcours * 0.5,
+    `chevrons répartis sur ${(etendue / parcours * 100).toFixed(0)} % du parcours : ils suivent les POINTS, pas la distance`);
+  for (const x of f) assert.ok(Math.abs(x.cap - 90) < 5, `cap ${x.cap} : la direction réelle est plein est`);
+});
+
+test("aucun chevron sur un parcours qui ne va nulle part", () => {
+  assert.deepEqual(flechesLeLongDe(Array.from({ length: 50 }, () => ({ lat: 49, lon: 1 })), 6), []);
+  assert.deepEqual(flechesLeLongDe([], 6), []);
+  assert.deepEqual(flechesLeLongDe([{ lat: 49, lon: 1 }, { lat: 49.1, lon: 1 }], 6), [], "deux points ne font pas un itinéraire");
+});
+
+test("les coordonnées absurdes sont écartées", () => {
+  // Les points absurdes sont placés AU MILIEU : en fin de trace, aucun chevron ne
+  // tomberait dessus et le filtre ne serait jamais éprouvé.
+  const sale = [
+    ...Array.from({ length: 20 }, (_, i) => ({ lat: 49, lon: 1 + i * 0.001 })),
+    { lat: Number.NaN, lon: 1.02 }, { lat: 999, lon: 1.02 }, { lat: 49, lon: 500 },
+    ...Array.from({ length: 20 }, (_, i) => ({ lat: 49, lon: 1.02 + i * 0.001 })),
+  ];
+  for (const f of flechesLeLongDe(sale, 4)) {
+    assert.ok(Number.isFinite(f.cap) && Number.isFinite(f.lat), "un point illisible a contaminé un chevron");
+    assert.ok(Math.abs(f.lat) <= 90);
+  }
+});
+
+test("le cap se mesure sur une base assez longue pour ignorer le bruit GPS", () => {
+  assert.equal(BASE_CAP_M, 25, "base de calcul du cap : décision technique, à changer sciemment");
+  const src = codeOf("src/lib/activities/fleches.ts");
+  assert.match(src, /cumul\[j\] - cumul\[i\] < BASE_CAP_M/,
+    "le cap se calcule de nouveau sur deux points consécutifs : ce serait le bruit du GPS qui déciderait");
+});
+
+console.log("\nLA CARTE — ce qu'elle doit montrer, et ce qu'elle doit créditer");
+
+test("les tuiles sont CRÉDITÉES", () => {
+  // `attributionControl={false}` affichait des tuiles MapTiler/OpenStreetMap sans le
+  // moindre crédit, alors que la licence l'exige — et le commentaire voisin affirmait
+  // le contraire.
+  const src = codeOf("src/components/segments/SegmentMap.tsx");
+  assert.doesNotMatch(src, /attributionControl=\{false\}/, "les tuiles sont de nouveau affichées sans crédit");
+  assert.match(src, /attribution=\{TUILES\.attribution\}/, "la mention n'est plus transmise à la couche de tuiles");
+});
+
+test("la carte montre le sens de parcours et se laisse manipuler", () => {
+  const src = codeOf("src/components/segments/SegmentMap.tsx");
+  assert.match(src, /flechesLeLongDe\(pts, 6\)/, "les chevrons de direction ont disparu");
+  assert.doesNotMatch(src, /dragging=\{false\}/, "la carte est de nouveau figée");
+});
+
+test("le survol 3D s'atteint par la FLÈCHE, plus par un onglet", () => {
+  const src = codeOf("src/components/segments/PerfTabs.tsx");
+  assert.doesNotMatch(src, /dashboard\/survol/, "l'onglet Survol 3D est revenu : la flèche le rend inutile");
+  // …mais il doit rester ATTEIGNABLE, sinon on a supprimé la fonction, pas l'onglet.
+  assert.match(codeOf("src/components/activity/StravaBlocks.tsx"), /survolHref/, "plus aucun chemin vers le survol");
+  assert.doesNotMatch(readFileSync("src/data/helpKb.ts", "utf8"), /Barre latérale gauche › Survol 3D/,
+    "l'aide envoie encore vers un onglet supprimé");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

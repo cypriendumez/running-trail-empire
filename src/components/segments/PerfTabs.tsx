@@ -2,20 +2,23 @@
 // ─────────────────────────────────────────────────────────────────────────────
 //  Sous-onglets « Performances ».
 //
-//  Activités, Vitrine, Segments et Survol 3D occupaient autant d'entrées de la
-//  barre latérale pour un même sujet : ce que l'athlète a parcouru. On reprend le
+//  Activités, Vitrine et Segments occupaient autant d'entrées de la
+//  barre latérale pour un même sujet : ce que l'athlète a parcouru.
+//
+//  Le survol 3D n'a PLUS d'onglet : on y accède par la flèche posée sur la carte d'une
+//  séance, comme chez Strava. Un onglet obligeait à rechoisir la sortie qu'on venait
+//  justement d'ouvrir ; la flèche, elle, survole CELLE qu'on regarde. On reprend le
 //  motif déjà en place sur l'onglet Santé — une seule entrée de menu, une rangée
 //  d'onglets en haut de page — plutôt que d'allonger encore le menu.
 // ─────────────────────────────────────────────────────────────────────────────
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Trophy, Route, Orbit } from "lucide-react";
+import { Activity, Trophy, Route } from "lucide-react";
 
 const ONGLETS = [
   { href: "/dashboard/activites", label: "Activités", icon: Activity },
   { href: "/dashboard/trophees", label: "Vitrine", icon: Trophy },
   { href: "/dashboard/segments", label: "Segments", icon: Route },
-  { href: "/dashboard/survol", label: "Survol 3D", icon: Orbit },
 ];
 
 export function PerfTabs() {
