@@ -69,7 +69,20 @@ export default async function SurvolPage({ searchParams }: { searchParams: Promi
   }
 
   // Sortie choisie, ou la plus récente par défaut.
-  const choisie = sorties.find((s) => s.id === w) ?? sorties[0];
+  //
+  // ⚠️ La liste ci-dessus est PLAFONNÉE à 300 traces, triées par nombre de points : une
+  // sortie plus ancienne ou plus courte peut en être absente. Se contenter du `find`
+  // faisait alors retomber sur `sorties[0]` — donc ouvrir SILENCIEUSEMENT une autre
+  // activité que celle demandée. Depuis que la carte d'une séance porte un bouton
+  // « rejouer en 3D », ce cas n'est plus théorique : on va chercher la sortie demandée.
+  let choisie = sorties.find((s) => s.id === w);
+  if (!choisie && w) {
+    const { data: exacte } = await sb.from("workouts")
+      .select("id, title, type, date, distance_km, duration_seconds, elevation_gain_m")
+      .eq("id", w).eq("user_id", user.id).maybeSingle();
+    if (exacte) choisie = exacte as unknown as (typeof sorties)[number];
+  }
+  if (!choisie) choisie = sorties[0];
   const { data: trace } = await sb.from("activity_tracks")
     .select("points").eq("workout_id", choisie.id).maybeSingle();
 

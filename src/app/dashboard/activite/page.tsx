@@ -4,7 +4,8 @@ import { cleanActivityName } from "@/lib/utils/activityName";
 import { createClient } from "@/lib/supabase/server";
 import { computeSplits, elevationProfile, metricSeries } from "@/lib/segments/splits";
 import { encodePolyline, simplify, type TrackPoint } from "@/lib/segments/geo";
-import { StravaBlocks, type Chiffre } from "@/components/activity/StravaBlocks";
+import { StravaBlocks, type Chiffre, type EffortVu } from "@/components/activity/StravaBlocks";
+import { meilleursEfforts, chrono as fmtChrono, allure as fmtAllure } from "@/lib/activities/efforts";
 import { MetricChart } from "@/components/activity/MetricChart";
 import { SessionSegments, type EffortVue } from "@/components/activity/SessionSegments";
 import { leaderboard, type StoredEffort } from "@/lib/segments/match";
@@ -64,6 +65,9 @@ export default async function ActivitePage({ searchParams }: { searchParams: Pro
   const chiffres: Chiffre[] = [];
   let courbes: { titre: string; unite: string; couleur: string; points: { d: number; v: number }[]; resume: { label: string; value: string }[] }[] = [];
   let effortsVus: EffortVue[] = [];
+  let efforts: EffortVu[] = [];
+  let forme: Chiffre[] = [];
+  let survolHref: string | null = null;
   let editionDispo = false;
   let sortie: { id: string; titrePerso: string; description: string; titreMontre: string } | null = null;
   let langue = await getPublicLang();
@@ -79,6 +83,9 @@ export default async function ActivitePage({ searchParams }: { searchParams: Pro
       // l'encart de renommage.
       editionDispo = await colonnesEditionPresentes(sb);
       const champs = "id, title, distance_km, duration_seconds, elevation_gain_m, avg_hr, avg_cadence_spm, avg_power_watts"
+        // Les métriques de foulée et de charge doivent être DEMANDÉES : sans elles dans
+        // le select, le bloc « forme » serait resté vide sans la moindre erreur.
+        + ", max_hr, gap_min_km, tss, intensity_pct, stride_length_m, vertical_ratio_pct, vertical_oscillation_cm"
         + (editionDispo ? `, ${COLONNES_EDITION.titre}, ${COLONNES_EDITION.description}` : "");
       const { data: w } = await sb.from("workouts")
         .select(champs)
@@ -105,6 +112,21 @@ export default async function ActivitePage({ searchParams }: { searchParams: Pro
         if (Number(wk.avg_cadence_spm ?? 0) > 0) chiffres.push({ label: "Cadence moy.", value: `${Math.round(Number(wk.avg_cadence_spm))} ppm` });
         if (Number(wk.avg_power_watts ?? 0) > 0) chiffres.push({ label: "Puissance moy.", value: `${Math.round(Number(wk.avg_power_watts))} W` });
 
+        // ⚠️ Chaque case n'apparaît QUE si la mesure existe. `training_effect` et
+        // `ground_contact_ms` sont NULS sur 60 séances sur 60 (vérifié) : les afficher
+        // reviendrait à inventer une donnée que la montre n'envoie pas.
+        const nb = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : null);
+        const gap = nb(wk.gap_min_km), tss = nb(wk.tss), inten = nb(wk.intensity_pct);
+        const foulee = nb(wk.stride_length_m), ratio = nb(wk.vertical_ratio_pct), osc = nb(wk.vertical_oscillation_cm);
+        const fcMax = nb(wk.max_hr);
+        if (gap != null) forme.push({ label: T[langue]["frm.gap"], value: `${Math.floor(gap)}:${String(Math.round((gap % 1) * 60)).padStart(2, "0")} /km` });
+        if (foulee != null) forme.push({ label: T[langue]["frm.foulee"], value: `${foulee.toFixed(2).replace(".", ",")} m` });
+        if (ratio != null) forme.push({ label: T[langue]["frm.ratio"], value: `${ratio.toFixed(1).replace(".", ",")} %` });
+        if (osc != null) forme.push({ label: T[langue]["frm.osc"], value: `${osc.toFixed(1).replace(".", ",")} cm` });
+        if (fcMax != null) forme.push({ label: T[langue]["frm.fcmax"], value: `${Math.round(fcMax)} bpm` });
+        if (tss != null) forme.push({ label: T[langue]["frm.tss"], value: String(Math.round(tss)) });
+        if (inten != null) forme.push({ label: T[langue]["frm.intensite"], value: `${Math.round(inten)} %` });
+
         const { data: tr } = await sb.from("activity_tracks")
           .select("points").eq("workout_id", String(wk.id)).maybeSingle();
         const bruts = ((tr as { points?: number[][] } | null)?.points ?? []);
@@ -119,6 +141,12 @@ export default async function ActivitePage({ searchParams }: { searchParams: Pro
           // Tracé allégé pour la carte : la précision au mètre n'apporte rien à
           // cette échelle et alourdirait la page pour rien.
           polyline = encodePolyline(simplify(pts, 25));
+          // Le survol 3D accepte déjà `?w=<id>` : la flèche sur la carte y mène.
+          if (typeof wk.id === "string") survolHref = `/dashboard/survol?w=${encodeURIComponent(wk.id)}`;
+          efforts = meilleursEfforts(pts).map((e) => ({
+            cle: e.cle, label: T[langue][`eff.${e.cle}` as keyof (typeof T)["fr"]] ?? e.cle,
+            chrono: fmtChrono(e.secondes), allure: fmtAllure(e.allureSecKm),
+          }));
 
           // ── Courbes FC / cadence / puissance ────────────────────────────────
           // Les flux sont stockés aux positions 4, 5 et 6 des points. Chaque courbe
@@ -193,9 +221,10 @@ export default async function ActivitePage({ searchParams }: { searchParams: Pro
             placeholderNom: T[langue]["edit.phNom"], placeholderDescr: T[langue]["edit.phDescr"], echec: T[langue]["edit.echec"],
           }} />
       )}
-      {(polyline || splits.length > 0 || chiffres.length > 0 || courbes.length > 0 || effortsVus.length > 0) && (
+      {(polyline || splits.length > 0 || chiffres.length > 0 || courbes.length > 0 || effortsVus.length > 0 || efforts.length > 0 || forme.length > 0) && (
         <div className="mx-auto w-full max-w-4xl space-y-6 px-4 pb-10">
-          <StravaBlocks polyline={polyline} chiffres={chiffres} splits={splits} profil={profil} />
+          <StravaBlocks polyline={polyline} chiffres={chiffres} splits={splits} profil={profil}
+            efforts={efforts} forme={forme} survolHref={survolHref} />
           <SessionSegments efforts={effortsVus} />
           {courbes.map((c) => <MetricChart key={c.titre} {...c} />)}
         </div>

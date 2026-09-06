@@ -10,22 +10,36 @@
 //  12,01 km finit sur 10 mètres ; présenter cela comme un kilomètre plein affiche un
 //  chrono aberrant en bas de tableau. Strava masque ce détail, on préfère le dire.
 // ─────────────────────────────────────────────────────────────────────────────
+import Link from "next/link";
+import { Play } from "lucide-react";
 import { splitPace, type Split } from "@/lib/segments/splits";
 import { SegmentMapLazy } from "@/components/segments/SegmentMapLazy";
 import { useT } from "@/lib/i18n/LanguageProvider";
 
 export type Chiffre = { label: string; value: string };
+/** Un meilleur effort, déjà mis en forme côté serveur (chrono + allure). */
+export type EffortVu = { cle: string; label: string; chrono: string; allure: string };
 
 const paceLabel = (secParKm: number) => {
   const m = Math.floor(secParKm / 60), s = Math.round(secParKm % 60);
   return s === 60 ? `${m + 1}:00` : `${m}:${String(s).padStart(2, "0")}`;
 };
 
-export function StravaBlocks({ polyline, chiffres, splits, profil }: {
+/** Cases vides à ajouter pour finir la rangée. Sans elles, le fond gris des séparateurs
+ *  apparaît en bloc à la fin d'une grille de 7 cases sur 4 colonnes — un trou qui fait
+ *  « écran inachevé » alors qu'il ne manque aucune donnée. */
+const combler = (n: number, colonnes = 4) => Array.from({ length: (colonnes - (n % colonnes)) % colonnes });
+
+export function StravaBlocks({ polyline, chiffres, splits, profil, efforts = [], forme = [], survolHref = null }: {
   polyline: string | null;
   chiffres: Chiffre[];
   splits: Split[];
   profil: { d: number; alt: number }[] | null;
+  efforts?: EffortVu[];
+  /** Métriques de foulée et de charge — chacune n'apparaît que si elle est MESURÉE. */
+  forme?: Chiffre[];
+  /** Lien vers le survol 3D DE CETTE sortie. Absent quand la trace ne le permet pas. */
+  survolHref?: string | null;
 }) {
   const { t } = useT();
   // Barres proportionnelles à l'allure : la plus rapide occupe toute la largeur.
@@ -36,8 +50,18 @@ export function StravaBlocks({ polyline, chiffres, splits, profil }: {
   return (
     <div className="space-y-6">
       {polyline && (
-        <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
-          <SegmentMapLazy polyline={polyline} height={260} />
+        <section className="relative overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+          <SegmentMapLazy polyline={polyline} height={300} />
+          {/* Le bouton de lecture de Strava lance leur rejeu. Ici il ouvre le survol 3D
+              DE CETTE sortie — le lien accepte déjà `?w=<id>`. Placé en bas à droite,
+              au-dessus de la carte mais SOUS l'attribution, qui reste obligatoire. */}
+          {survolHref && (
+            <Link href={survolHref} title={t("eff.survolAide")}
+              className="group absolute bottom-4 right-4 z-[500] flex h-14 w-14 items-center justify-center rounded-full bg-white text-emerald-700 shadow-lg ring-1 ring-black/5 transition hover:bg-emerald-600 hover:text-white">
+              <Play className="ml-0.5 h-6 w-6 fill-current" aria-hidden="true" />
+              <span className="sr-only">{t("eff.survol")}</span>
+            </Link>
+          )}
         </section>
       )}
 
@@ -45,10 +69,48 @@ export function StravaBlocks({ polyline, chiffres, splits, profil }: {
         <section className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-200 sm:grid-cols-4">
           {chiffres.map((c) => (
             <div key={c.label} className="bg-white p-4">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">{c.label}</div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">{c.label}</div>
               <div className="mt-1 text-2xl font-black tracking-tight text-zinc-900">{c.value}</div>
             </div>
           ))}
+          {combler(chiffres.length).map((_, i) => <div key={`vide-${i}`} className="hidden bg-white sm:block" />)}
+        </section>
+      )}
+
+      {efforts.length > 0 && (
+        <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+          <div className="border-b border-zinc-100 px-4 py-3">
+            <h2 className="text-sm font-bold text-zinc-900">{t("eff.titre")}</h2>
+            {/* La nuance compte : ce n'est PAS le premier kilomètre, c'est le plus rapide. */}
+            <p className="mt-0.5 text-xs text-zinc-500">{t("eff.sous")}</p>
+          </div>
+          <ul className="divide-y divide-zinc-100">
+            {efforts.map((e) => (
+              <li key={e.cle} className="flex items-baseline gap-3 px-4 py-2.5">
+                <span className="w-28 shrink-0 text-sm font-semibold text-zinc-700">{e.label}</span>
+                <span className="text-lg font-black tabular-nums tracking-tight text-zinc-900">{e.chrono}</span>
+                <span className="ml-auto text-sm font-medium tabular-nums text-zinc-500">{e.allure}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {forme.length > 0 && (
+        <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+          <div className="border-b border-zinc-100 px-4 py-3">
+            <h2 className="text-sm font-bold text-zinc-900">{t("act.forme")}</h2>
+            <p className="mt-0.5 text-xs text-zinc-500">{t("act.formeSous")}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-px bg-zinc-100 sm:grid-cols-4">
+            {forme.map((c) => (
+              <div key={c.label} className="bg-white px-4 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">{c.label}</div>
+                <div className="mt-0.5 text-xl font-black tracking-tight text-zinc-900">{c.value}</div>
+              </div>
+            ))}
+            {combler(forme.length).map((_, i) => <div key={`vide-${i}`} className="hidden bg-white sm:block" />)}
+          </div>
         </section>
       )}
 
