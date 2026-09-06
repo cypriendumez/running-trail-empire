@@ -9,7 +9,10 @@ import { MetricChart } from "@/components/activity/MetricChart";
 import { SessionSegments, type EffortVue } from "@/components/activity/SessionSegments";
 import { leaderboard, type StoredEffort } from "@/lib/segments/match";
 import { lireEfforts } from "@/lib/segments/efforts";
-import { getPublicLang } from "@/lib/i18n/serverLang";
+import { getPublicLang, getAccountLang } from "@/lib/i18n/serverLang";
+import { EditerSortie } from "@/components/activity/EditerSortie";
+import { colonnesEditionPresentes, COLONNES_EDITION } from "@/lib/activities/colonnes";
+import { nomAffiche } from "@/lib/activities/renommage";
 import { T } from "@/lib/i18n/translations";
 
 export const dynamic = "force-dynamic";
@@ -61,17 +64,36 @@ export default async function ActivitePage({ searchParams }: { searchParams: Pro
   const chiffres: Chiffre[] = [];
   let courbes: { titre: string; unite: string; couleur: string; points: { d: number; v: number }[]; resume: { label: string; value: string }[] }[] = [];
   let effortsVus: EffortVue[] = [];
+  let editionDispo = false;
+  let sortie: { id: string; titrePerso: string; description: string; titreMontre: string } | null = null;
+  let langue = await getPublicLang();
 
   try {
     const sb = await createClient();
     const { data: { user } } = await sb.auth.getUser();
     if (user) {
+      langue = await getAccountLang(sb, user.id);
+      // Les colonnes d'édition peuvent ne pas exister (migration non passée) : on
+      // demande alors uniquement les champs sûrs. Un `select` sur une colonne absente
+      // ÉCHOUE — il ferait disparaître tout le détail de la séance, pas seulement
+      // l'encart de renommage.
+      editionDispo = await colonnesEditionPresentes(sb);
+      const champs = "id, title, distance_km, duration_seconds, elevation_gain_m, avg_hr, avg_cadence_spm, avg_power_watts"
+        + (editionDispo ? `, ${COLONNES_EDITION.titre}, ${COLONNES_EDITION.description}` : "");
       const { data: w } = await sb.from("workouts")
-        .select("id, distance_km, duration_seconds, elevation_gain_m, avg_hr, avg_cadence_spm, avg_power_watts")
+        .select(champs)
         .eq("user_id", user.id).eq("date", date).order("distance_km", { ascending: false }).limit(1).maybeSingle();
 
       if (w) {
-        const wk = w as Record<string, number | string | null>;
+        const wk = w as unknown as Record<string, number | string | null>;
+        if (editionDispo && typeof wk.id === "string") {
+          sortie = {
+            id: wk.id,
+            titrePerso: String(wk[COLONNES_EDITION.titre] ?? ""),
+            description: String(wk[COLONNES_EDITION.description] ?? ""),
+            titreMontre: String(wk.title ?? ""),
+          };
+        }
         const km = Number(wk.distance_km ?? 0), sec = Number(wk.duration_seconds ?? 0);
         // On n'ajoute une case QUE si la mesure existe : une grille de tirets
         // ferait passer une séance mal enregistrée pour une séance sans effort.
@@ -159,7 +181,18 @@ export default async function ActivitePage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="space-y-6">
-      <SessionDetail clientMode user="" date={date} dist={sp.dist} title={cleanActivityName(sp.title) || undefined} />
+      <SessionDetail clientMode user="" date={date} dist={sp.dist}
+        title={sortie ? nomAffiche(sortie.titrePerso, cleanActivityName(sortie.titreMontre) || sp.title, "") || undefined
+                      : cleanActivityName(sp.title) || undefined} />
+      {sortie && (
+        <EditerSortie id={sortie.id} titreAffiche={cleanActivityName(sortie.titreMontre)}
+          titrePerso={sortie.titrePerso} description={sortie.description}
+          textes={{
+            modifier: T[langue]["edit.modifier"], nom: T[langue]["edit.nom"], descr: T[langue]["edit.descr"],
+            enregistrer: T[langue]["edit.enregistrer"], annuler: T[langue]["edit.annuler"], aide: T[langue]["edit.aide"],
+            placeholderNom: T[langue]["edit.phNom"], placeholderDescr: T[langue]["edit.phDescr"], echec: T[langue]["edit.echec"],
+          }} />
+      )}
       {(polyline || splits.length > 0 || chiffres.length > 0 || courbes.length > 0 || effortsVus.length > 0) && (
         <div className="mx-auto w-full max-w-4xl space-y-6 px-4 pb-10">
           <StravaBlocks polyline={polyline} chiffres={chiffres} splits={splits} profil={profil} />

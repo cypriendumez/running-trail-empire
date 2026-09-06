@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { cleanBody, isPublishable, MAX_BODY, type Visibility } from "@/lib/social/feed";
-import { premierGrosMot } from "@/lib/social/moderation";
+import { verdictGrossierete } from "@/lib/social/moderation";
 
 const VISIBILITIES: Visibility[] = ["public", "followers", "private"];
 const MAX_PHOTOS = 4;
@@ -48,10 +48,14 @@ export async function POST(req: Request) {
   // Grossièretés : même règle qu'en commentaire. Filtrer les commentaires en laissant
   // passer les publications aurait été une demi-mesure — c'est la publication qui est
   // la plus vue.
-  const fautif = body ? premierGrosMot(body) : null;
-  if (fautif) {
+  // ⚠️ La porte est `verdictGrossierete`, pas `premierGrosMot` seul : celui-ci ne
+  // rattrape PAS les lettres espacées (« m e r d e »), qui passaient donc en entier.
+  const v = body ? verdictGrossierete(body) : { propre: true as const };
+  if (!v.propre) {
     return NextResponse.json(
-      { error: `Publication refusée : « ${fautif} » n'a pas sa place ici.`, motif: "grossierete" },
+      { error: v.mot
+          ? `Publication refusée : « ${v.mot} » n'a pas sa place ici.`
+          : "Publication refusée : elle contient une grossièreté.", motif: "grossierete" },
       { status: 422 },
     );
   }

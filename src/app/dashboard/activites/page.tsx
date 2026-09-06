@@ -7,6 +7,8 @@ import { PerfTabs } from "@/components/segments/PerfTabs";
 import { FeedCard, type LigneFil } from "@/components/activity/FeedCard";
 import { planCarte, urlTuile, tailleTuileDe, attributionCarte } from "@/lib/activities/tuiles";
 import { cleanActivityName } from "@/lib/utils/activityName";
+import { colonnesEditionPresentes, COLONNES_EDITION } from "@/lib/activities/colonnes";
+import { nomAffiche } from "@/lib/activities/renommage";
 import { asSport } from "@/lib/intervals/sport";
 import { SPORT_LABEL_T } from "@/lib/intervals/sportI18n";
 import { estUnePanne } from "@/lib/dashboard/lectures";
@@ -48,6 +50,8 @@ const nombre = (v: unknown): number | null =>
 type Brut = {
   id: string | number; date: string; title: string | null; type: string | null; sport: string | null;
   distance_km: number | null; duration_seconds: number | null; elevation_gain_m: number | null;
+  /** Nom choisi par l'athlète. Absent tant que la colonne n'existe pas. */
+  title_custom?: string | null;
 };
 
 export default async function ActivitesPage({ searchParams }: { searchParams: Promise<{ p?: string }> }) {
@@ -58,8 +62,16 @@ export default async function ActivitesPage({ searchParams }: { searchParams: Pr
   const d = T[lang];
 
   const page = Math.max(0, Math.min(200, Number((await searchParams).p ?? 0) || 0));
+  // Le TOTAL est compté à part. La page annonçait « 15 sorties enregistrées » à un
+  // athlète qui en a 332 : la phrase décrivait la page, pas l'historique, et laissait
+  // croire que la synchro avait perdu des séances.
+  const { count: total } = await sb.from("workouts")
+    .select("id", { count: "exact", head: true }).eq("user_id", user.id);
+  const edition = await colonnesEditionPresentes(sb);
+  const champs = "id, date, title, type, sport, distance_km, duration_seconds, elevation_gain_m"
+    + (edition ? `, ${COLONNES_EDITION.titre}` : "");
   const lecture = await sb.from("workouts")
-    .select("id, date, title, type, sport, distance_km, duration_seconds, elevation_gain_m")
+    .select(champs)
     .eq("user_id", user.id)
     .order("date", { ascending: false })
     .range(0, (page + 1) * PAR_PAGE);   // une ligne de plus : elle dit s'il en reste
@@ -78,7 +90,7 @@ export default async function ActivitesPage({ searchParams }: { searchParams: Pr
     );
   }
 
-  const toutes = (lecture.data ?? []) as Brut[];
+  const toutes = (lecture.data ?? []) as unknown as Brut[];
   const reste = toutes.length > (page + 1) * PAR_PAGE;
   const seances = toutes.slice(0, (page + 1) * PAR_PAGE);
 
@@ -116,7 +128,8 @@ export default async function ActivitesPage({ searchParams }: { searchParams: Pr
       href: `/dashboard/activite?date=${String(s.date).slice(0, 10)}&dist=${s.distance_km ?? ""}&title=${encodeURIComponent(s.title ?? "")}`,
       sport: asSport(s.sport ?? s.type),
       sportLisible: SPORT_LABEL_T[lang][asSport(s.sport ?? s.type)],
-      titre: cleanActivityName(s.title) || s.type || s.sport || d["feed.title"],
+      // Le nom choisi par l'athlète l'emporte sur celui de la montre.
+      titre: nomAffiche(s.title_custom, cleanActivityName(s.title), s.type || s.sport || d["feed.title"]),
       dateLisible: formatDateCivile(s.date, lang, { weekday: "long", day: "numeric", month: "long" }),
       carte: plan ? { plan, urls: plan.tuiles.map((t) => urlTuile(t, CLE_CARTE)) } : null,
       chiffres,
@@ -129,7 +142,11 @@ export default async function ActivitesPage({ searchParams }: { searchParams: Pr
       <header className="mb-6">
         <h1 className="text-3xl font-black tracking-tight text-zinc-900">{d["feed.title"]}</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          {lignes.length ? fill(d["feed.sub"], { n: lignes.length }) : d["feed.emptySub"]}
+          {lignes.length
+            ? (total != null && total > lignes.length
+                ? fill(d["feed.subTotal"], { n: lignes.length, t: total })
+                : fill(d["feed.sub"], { n: lignes.length }))
+            : d["feed.emptySub"]}
         </p>
       </header>
 
@@ -152,7 +169,11 @@ export default async function ActivitesPage({ searchParams }: { searchParams: Pr
             <div className="mt-6 text-center">
               <Link href={`/dashboard/activites?p=${page + 1}`}
                 className="inline-block rounded-xl border border-zinc-300 bg-white px-5 py-2.5 text-sm font-semibold text-zinc-700 transition hover:border-zinc-400 hover:bg-zinc-50">
-                {d["feed.more"]}
+                {/* Combien il en reste : sans ce nombre, l'athlète ne sait pas s'il
+                    lui faut un clic ou vingt, et croit que l'historique s'arrête là. */}
+                {total != null && total > lignes.length
+                  ? fill(d["feed.moreN"], { n: total - lignes.length })
+                  : d["feed.more"]}
               </Link>
             </div>
           )}

@@ -141,10 +141,22 @@ export function contientGrosMot(texte: string): boolean {
     if (m.includes(JOKER) && estMasque(m)) return true;
   }
   // « m e r d e » : des lettres seules à la suite forment un mot déguisé.
-  const recolle = mots.filter((m) => m.length === 1).join("");
-  if (recolle.length >= 3) {
-    const n = normaliserMot(recolle);
-    if (n && INTERDITS_NORMALISES.has(n)) return true;
+  //
+  // ⚠️ On teste chaque SUITE CONTIGUË de lettres isolées, pas leur concaténation
+  // globale. Mesuré le 06/09/2026 : « m.e.r.d.e » était bien attrapé, mais
+  // « c'etait m.e.r.d.e » ne l'était plus — le « c » de l'apostrophe se collait devant
+  // et donnait « cmerde ». Autrement dit, il suffisait d'écrire un mot avec une
+  // apostrophe avant pour désarmer le filtre. Découper en suites corrige les deux
+  // sens : ça rattrape ce cas, et ça évite d'assembler des lettres isolées éparpillées
+  // dans un long texte en un mot que personne n'a écrit.
+  let suite = "";
+  for (const m of [...mots, ""]) {
+    if (m.length === 1) { suite += m; continue; }
+    if (suite.length >= 3) {
+      const n = normaliserMot(suite);
+      if (n && INTERDITS_NORMALISES.has(n)) return true;
+    }
+    suite = "";
   }
   return false;
 }
@@ -163,3 +175,18 @@ export function premierGrosMot(texte: string): string | null {
 /** Nombre de formes surveillées — sert au test qui vérifie que la liste n'a pas été
  *  vidée par accident lors d'une édition. */
 export const NB_FORMES_SURVEILLEES = INTERDITS_NORMALISES.size;
+
+/**
+ * LA porte de modération. À utiliser partout, plutôt que d'appeler les deux fonctions
+ * à la main — c'est en les appelant à la main qu'on en oublie une.
+ *
+ * ⚠️ `premierGrosMot` sait NOMMER le mot fautif (un refus sans motif passe pour un bug),
+ * mais il ne rattrape PAS les lettres espacées ou pointées (« m e r d e », « m.e.r.d.e »),
+ * que seul `contientGrosMot` recolle. Mesuré le 06/09/2026 : les routes des publications
+ * ET des commentaires ne se servaient que de la première, et laissaient donc passer le
+ * contournement le plus évident, sans que rien ne le signale.
+ */
+export function verdictGrossierete(texte: string): { propre: true } | { propre: false; mot: string | null } {
+  if (!contientGrosMot(texte)) return { propre: true };
+  return { propre: false, mot: premierGrosMot(texte) };
+}

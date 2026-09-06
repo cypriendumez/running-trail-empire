@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { cleanBody, canComment, MAX_COMMENT } from "@/lib/social/feed";
-import { premierGrosMot } from "@/lib/social/moderation";
+import { verdictGrossierete } from "@/lib/social/moderation";
 
 /**
  * Encouragements et commentaires.
@@ -34,10 +34,15 @@ export async function POST(req: Request) {
     // ── GROSSIÈRETÉS ───────────────────────────────────────────────────────────
     // Refusé AVANT toute écriture, et avec le mot en cause : un refus sans motif se
     // lit comme une panne, et l'auteur réessaie à l'identique.
-    const fautif = premierGrosMot(body);
-    if (fautif) {
+    // ⚠️ `premierGrosMot` NOMME le mot mais ne rattrape pas les lettres espacées
+    // (« m e r d e ») : seul `contientGrosMot` les recolle. La porte doit donc être
+    // `verdictGrossierete`, qui combine les deux — mesuré, le contournement passait.
+    const v = verdictGrossierete(body);
+    if (!v.propre) {
       return NextResponse.json(
-        { error: `Commentaire refusé : « ${fautif} » n'a pas sa place ici.`, motif: "grossierete" },
+        { error: v.mot
+            ? `Commentaire refusé : « ${v.mot} » n'a pas sa place ici.`
+            : "Commentaire refusé : il contient une grossièreté.", motif: "grossierete" },
         { status: 422 },
       );
     }
