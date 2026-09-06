@@ -43,6 +43,8 @@ export type QualityBudgetInput = {
   phase: string;
   /** Aucune séance de course enregistrée → semaine d'observation. */
   noHistory: boolean;
+  /** Séances de course observées sur les 28 derniers jours. `null` si on ne sait pas. */
+  seancesRecentes?: number | null;
   /** Douleurs déclarées en cours. */
   pains: string[];
   /** VFC sous sa ligne de base. */
@@ -116,6 +118,11 @@ export type QualityBudget = {
  *  chaque semaine sans allure spécifique se paie le jour J. */
 const OBJECTIVE_FLOOR_DAYS = 112;
 
+/** En dessous, on n'a pas vu l'athlète courir assez pour lui demander de l'intensité. */
+export const SEANCES_AVANT_QUALITE = 4;
+/** En dessous, une seule séance de qualité : la régularité n'est pas encore établie. */
+export const SEANCES_QUALITE_LIBRE = 8;
+
 export function computeQualityBudget(i: QualityBudgetInput): QualityBudget {
   let qBudget = i.level === "debutant" ? 1 : i.level === "intermediaire" ? 2 : 3;
   if (i.goal === "marathon" || i.goal === "ultra") qBudget -= 1; // le volume prime → un cran de moins
@@ -136,6 +143,23 @@ export function computeQualityBudget(i: QualityBudgetInput): QualityBudget {
   if (i.noHistory) {
     qBudget = 0;
     easeReasons.push("aucun historique d'entraînement : semaine d'observation avant toute intensité");
+  }
+  // ── HISTORIQUE MINCE : ON MONTE PROGRESSIVEMENT ────────────────────────────
+  // `noHistory` ne couvre que le compte VIDE. Constaté sur un profil réel avec TROIS
+  // séances enregistrées : le coach prescrivait déjà une séance de VMA, parce que le
+  // budget découle du niveau DÉCLARÉ. Un entraîneur ne fait jamais ça — il prescrit
+  // sur ce qu'il a vu, pas sur ce qu'on lui a dit. Le déclaratif reste un plafond,
+  // l'observation devient le plancher.
+  const vues = typeof i.seancesRecentes === "number" && Number.isFinite(i.seancesRecentes)
+    ? i.seancesRecentes : null;
+  if (!i.noHistory && vues != null && vues < SEANCES_QUALITE_LIBRE) {
+    const plafond = vues < SEANCES_AVANT_QUALITE ? 0 : 1;
+    if (qBudget > plafond) {
+      qBudget = plafond;
+      easeReasons.push(plafond === 0
+        ? `seulement ${vues} séance(s) observée(s) en 4 semaines : on regarde avant d'ajouter de l'intensité`
+        : `${vues} séances observées en 4 semaines : une seule séance de qualité tant que la régularité n'est pas établie`);
+    }
   }
   if (i.pains.length) { qBudget -= 1; easeReasons.push("douleur signalée"); }
   if (i.hrvDown) { qBudget -= 1; easeReasons.push("VFC en baisse"); }

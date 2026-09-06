@@ -19,6 +19,7 @@ import { referencesFc, plageFc, plageLisible, cibleEndurance, LARGEUR_MAX, FOOTI
 import { repartirFootings, varianteFooting, AMPLITUDE } from "../src/lib/coach/footings";
 import { robustWeeklyKm, type RunLike } from "../src/lib/running/volume";
 import { PART_FC_DURE } from "../src/lib/ai/coachContext";
+import { computeQualityBudget, SEANCES_AVANT_QUALITE, SEANCES_QUALITE_LIBRE } from "../src/lib/coach/qualityBudget";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -367,6 +368,51 @@ test("le seuil de séance dure est celui du classificateur", () => {
   assert.match(src, /avg_hr >= fcMaxEst \* PART_FC_DURE/, "le détecteur de séance dure a repris sa propre valeur");
   assert.match(src, /if \(pct >= PART_FC_DURE\) return "Seuil\/Tempo";/, "le classificateur a repris la sienne");
   assert.doesNotMatch(src, /avg_hr >= fcMaxEst \* 0\.9/, "le 0,90 est revenu");
+});
+
+console.log("\nLE BUDGET DE QUALITÉ — on prescrit sur ce qu'on a VU");
+
+/** Entrée minimale d'un athlète en pleine forme, sans aucun motif d'allègement. */
+const SAIN = {
+  level: "intermediaire" as const, goal: "10k" as const, phase: "BASE", noHistory: false,
+  pains: [] as string[], hrvDown: false, hrvUp: false, badNight: false, monotony: 1.2,
+  acr: 1.0, tsb: 0, daysToRace: 258, rpeHigh: false,
+};
+
+test("trois séances observées ne justifient AUCUNE intensité", () => {
+  // Constaté sur un profil réel : 3 séances en base, et le coach prescrivait déjà une
+  // séance de VMA — parce que le budget découlait du niveau DÉCLARÉ.
+  const b = computeQualityBudget({ ...SAIN, seancesRecentes: 3 } as never);
+  assert.equal(b.qBudget, 0, "de l'intensité prescrite à un athlète qu'on a vu courir trois fois");
+  assert.ok(b.easeReasons.some((r) => /observée/.test(r)), "le refus doit être EXPLIQUÉ");
+});
+
+test("une régularité naissante donne UNE séance, pas trois", () => {
+  const b = computeQualityBudget({ ...SAIN, seancesRecentes: 5 } as never);
+  assert.equal(b.qBudget, 1, `${b.qBudget} séances de qualité sur 5 sorties observées`);
+});
+
+test("un historique fourni rend le budget normal", () => {
+  const b = computeQualityBudget({ ...SAIN, seancesRecentes: 20 } as never);
+  assert.ok(b.qBudget >= 2, `budget ${b.qBudget} : l'athlète régulier est bridé sans raison`);
+  // …et ne pas SAVOIR ne doit pas brider non plus : l'absence d'information n'est pas
+  // une information. Les autres garde-fous (fraîcheur, douleurs) restent en place.
+  const inconnu = computeQualityBudget({ ...SAIN, seancesRecentes: null } as never);
+  assert.ok(inconnu.qBudget >= 2, "une donnée manquante ne doit pas être lue comme « peu de séances »");
+});
+
+test("les seuils sont ceux annoncés", () => {
+  assert.equal(SEANCES_AVANT_QUALITE, 4, "décision d'entraîneur, à changer sciemment");
+  assert.equal(SEANCES_QUALITE_LIBRE, 8, "décision d'entraîneur, à changer sciemment");
+  // Le déclaratif reste un PLAFOND : un débutant qui court beaucoup ne passe pas à 3.
+  const debutant = computeQualityBudget({ ...SAIN, level: "debutant", seancesRecentes: 30 } as never);
+  assert.ok(debutant.qBudget <= 1, "le niveau déclaré ne plafonne plus le budget");
+});
+
+test("le nombre observé vient bien du contexte", () => {
+  const src = codeOf("src/lib/ai/coachContext.ts");
+  assert.match(src, /seancesRecentes: runs\.filter/, "le budget ne reçoit plus le nombre de séances vues");
+  assert.match(src, /28 \* 86400000/, "la fenêtre d'observation a changé sans être annoncée");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

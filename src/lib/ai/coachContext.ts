@@ -941,6 +941,9 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // s'appliquait jamais en cas de fatigue. Voir l'en-tête du module.
   const qb = computeQualityBudget({
     level: libLevel, goal: libGoal, phase, noHistory, pains,
+    // Ce qu'on a VU, pas ce qui a été déclaré : le budget de qualité ne peut pas
+    // dépasser ce que l'historique observé justifie.
+    seancesRecentes: runs.filter(w => now - new Date(String(w.date) + "T12:00:00Z").getTime() <= 28 * 86400000).length,
     hrvDown: !!hrvWeekTrend?.startsWith("↓"),
     hrvUp: !!hrvWeekTrend?.startsWith("↑"),
     badNight,
