@@ -19,7 +19,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   requete, interrogeable, lire, prioriser, versGeoJson, altitudeDe,
-  MIROIRS, MIROIRS_ECARTES, ETENDUE_MAX, ZOOM_MIN, ETIQUETTES_MAX,
+  MIROIRS, MIROIRS_ECARTES, ETENDUE_MAX, ZOOM_MIN, ETIQUETTES_MAX, cleDeTri,
 } from "../src/lib/trail/toponymes";
 
 let passed = 0; const fails: string[] = [];
@@ -49,7 +49,14 @@ test("on n'interroge pas une zone trop large", () => {
 
 test("la requête demande bien tout ce qu'on affiche", () => {
   const q = requete(CHAMONIX);
-  for (const attendu of ["natural=peak", "tourism=alpine_hut", "tourism=viewpoint", "natural=saddle"]) {
+  // ⚠️ CHAQUE FILTRE A ÉTÉ AJOUTÉ APRÈS MESURE, pas par précaution. Comptés sur le cirque
+  // de Gavarnie, objets NOMMÉS : 243 avec la liste d'origine, 268 avec celle-ci —
+  // `amenity=shelter` rapporte 24 cabanes de montagne réelles, `mountain_pass=yes` un col
+  // qu'aucun `saddle` ne portait.
+  for (const attendu of [
+    "natural=peak", "natural=volcano", "tourism=alpine_hut", "tourism=wilderness_hut",
+    "amenity=shelter", "tourism=viewpoint", "natural=saddle", "mountain_pass=yes",
+  ]) {
     assert.ok(q.includes(attendu), `« ${attendu} » absent de la requête`);
   }
   assert.ok(q.includes("45.88,6.8,45.96,6.94"), `cadrage absent : ${q.slice(0, 80)}`);
@@ -129,14 +136,16 @@ test("les doublons sont écartés", () => {
 console.log("\nCE QU'ON AFFICHE EN PREMIER");
 
 test("les sommets hauts passent devant, et on plafonne", () => {
-  // Au-delà, les étiquettes se chevauchent et la carte devient illisible — l'inverse de
-  // ce qu'on cherche.
-  assert.equal(ETIQUETTES_MAX, 60);
+  // ⚠️ LE PLAFOND ÉTAIT À 60 ET IL COUPAIT LA MONTAGNE. Mesuré sur Gavarnie : 268 objets
+  // NOMMÉS dans un seul cadrage — 188 sommets, 48 cols, 24 cabanes, 6 refuges. En n'en
+  // gardant que 60, on jetait plus de 200 noms réels. MapLibre écarte lui-même les
+  // étiquettes qui se chevauchent : couper en amont ne rendait rien plus lisible.
+  assert.ok(ETIQUETTES_MAX >= 300, `${ETIQUETTES_MAX} étiquettes : un massif dense en compte 268`);
   const beaucoup = Array.from({ length: 200 }, (_, i) => ({
     id: i, lat: 45, lon: 6, nom: `P${i}`, altitude: i, genre: "sommet" as const,
   }));
   const p = prioriser(beaucoup);
-  assert.equal(p.length, 60);
+  assert.equal(p.length, Math.min(200, ETIQUETTES_MAX));
   assert.equal(p[0].altitude, 199, "le plus haut n'est plus en tête");
 
   // ⚠️ LES ALTITUDES SONT INVERSÉES EXPRÈS. Une première version donnait 2000 au sommet et
@@ -149,6 +158,57 @@ test("les sommets hauts passent devant, et on plafonne", () => {
     { id: 3, lat: 45, lon: 6, nom: "refuge", altitude: 5000, genre: "refuge" as const },
   ]);
   assert.deepEqual(melange.map((x) => x.genre), ["sommet", "refuge", "lac"], "l'ordre d'importance a changé");
+});
+
+test("un objet portant plusieurs étiquettes OSM n'apparaît qu'une fois", () => {
+  // Un col est souvent marqué `natural=saddle` ET `mountain_pass=yes` : sans ordre
+  // explicite dans la reconnaissance, il ressortirait deux fois, ou changerait de genre
+  // d'une requête à l'autre.
+  const r = lire({ elements: [
+    { id: 1, lat: 45, lon: 6, tags: { natural: "saddle", mountain_pass: "yes", name: "Col du Midi", ele: "3532" } },
+    { id: 2, lat: 45, lon: 6, tags: { tourism: "alpine_hut", amenity: "shelter", name: "Refuge X" } },
+  ] });
+  assert.equal(r.length, 2);
+  assert.equal(r[0].genre, "col", "un col est devenu autre chose");
+  assert.equal(r[1].genre, "refuge", "un refuge a été rétrogradé en simple abri");
+
+  // ⚠️ LES CAS ISOLÉS, ET C'EST CE QUI MANQUAIT. Les deux objets ci-dessus portent CHACUN
+  // deux étiquettes : `natural=saddle` suffisait à reconnaître le col, et `alpine_hut` à
+  // reconnaître le refuge. Retirer la reconnaissance de `mountain_pass` ou de `shelter` ne
+  // changeait donc RIEN, et les mutations restaient vertes. Il faut des objets qui ne
+  // portent QUE l'étiquette qu'on veut éprouver.
+  const seuls = lire({ elements: [
+    { id: 3, lat: 45, lon: 6, tags: { mountain_pass: "yes", name: "Port de Vénasque", ele: "2444" } },
+    { id: 4, lat: 45, lon: 6, tags: { amenity: "shelter", name: "Cabane de Camplong" } },
+    { id: 5, lat: 45, lon: 6, tags: { natural: "volcano", name: "Puy de Dôme", ele: "1465" } },
+  ] });
+  assert.equal(seuls.length, 3, "un objet à étiquette unique a été perdu");
+  assert.equal(seuls.find((x) => x.nom === "Port de Vénasque")?.genre, "col",
+    "un col marqué seulement `mountain_pass` n'est plus reconnu");
+  assert.equal(seuls.find((x) => x.nom === "Cabane de Camplong")?.genre, "abri",
+    "une cabane de montagne n'est plus reconnue : 24 d'entre elles disparaissent sur Gavarnie");
+  assert.equal(seuls.find((x) => x.nom === "Puy de Dôme")?.genre, "sommet",
+    "un volcan n'est plus un sommet : la chaîne des Puys disparaît");
+});
+
+test("la clé de tri décide qui survit à un chevauchement", () => {
+  // ⚠️ SANS ELLE, MapLibre tranche dans l'ordre des données, c'est-à-dire au hasard : un
+  // point de vue anonyme pouvait masquer le Vignemale. Plus BAS = plus prioritaire.
+  const sommetHaut = cleDeTri({ id: 1, lat: 0, lon: 0, nom: "A", altitude: 3400, genre: "sommet" });
+  const sommetBas = cleDeTri({ id: 2, lat: 0, lon: 0, nom: "B", altitude: 1200, genre: "sommet" });
+  const vue = cleDeTri({ id: 3, lat: 0, lon: 0, nom: "C", altitude: 3900, genre: "vue" });
+  assert.ok(sommetHaut < sommetBas, "un sommet bas passe devant un sommet haut");
+  assert.ok(sommetBas < vue, "un point de vue passe devant un sommet, même très haut");
+  const g = versGeoJson([{ id: 1, lat: 45, lon: 6, nom: "A", altitude: 3400, genre: "sommet" }]);
+  assert.equal(g.features[0].properties.tri, sommetHaut, "la clé n'est plus transmise à la carte");
+  assert.equal(g.features[0].properties.altitude, 3400, "l'altitude ne sert plus à dimensionner l'étiquette");
+});
+
+test("la carte hiérarchise vraiment les étiquettes", () => {
+  const vue = readFileSync("src/components/trail/Relief3D.tsx", "utf8");
+  assert.match(vue, /"symbol-sort-key": \["get", "tri"\]/,
+    "les chevauchements se résolvent de nouveau au hasard");
+  assert.match(vue, /"text-size": \[\s*"case"/, "toutes les étiquettes ont repris la même taille");
 });
 
 test("l'étiquette porte l'altitude quand elle existe", () => {

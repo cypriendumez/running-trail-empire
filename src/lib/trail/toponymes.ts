@@ -25,7 +25,7 @@ export type Toponyme = {
   nom: string;
   /** Altitude en mètres, quand OSM la porte. `null` sinon — jamais devinée. */
   altitude: number | null;
-  genre: "sommet" | "refuge" | "vue" | "col" | "lac";
+  genre: "sommet" | "refuge" | "abri" | "vue" | "col" | "lac";
 };
 
 /**
@@ -60,13 +60,33 @@ export const MIROIRS = [
  */
 export const MIROIRS_ECARTES = ["https://overpass.osm.ch/api/interpreter"] as const;
 
-/** Ce qu'on demande à OSM. Chaque genre correspond à une icône et à une priorité. */
+/**
+ * Ce qu'on demande à OSM.
+ *
+ * ⚠️ CETTE LISTE A ÉTÉ ÉTENDUE APRÈS MESURE, et chaque ajout a rapporté. Comptés sur le
+ * cirque de Gavarnie le 07/09/2026, objets NOMMÉS uniquement :
+ *   avec la liste d'origine ......... 243
+ *   avec `amenity=shelter` .......... +24 cabanes de montagne réelles
+ *                                     (Cabane de Camplong, Cabane d'Estarous…)
+ *   avec `mountain_pass=yes` ........ +1 col qu'aucun `saddle` ne portait
+ *   total ........................... 268
+ *
+ * ⚠️ `amenity=shelter` ATTRAPE AUSSI LES ABRIBUS — en théorie. Vérifié en centre-ville
+ * de Toulouse : 2 objets, ZÉRO nommé. La règle « sans nom, pas d'étiquette » les écarte
+ * donc d'elle-même, et aucun filtre supplémentaire n'est nécessaire.
+ *
+ * `natural=volcano` ne rapporte rien dans les Pyrénées ni les Alpes, mais couvre la
+ * chaîne des Puys — c'est une ligne, et l'oublier priverait toute une région.
+ */
 const DEMANDES: { genre: Toponyme["genre"]; filtre: string }[] = [
   { genre: "sommet", filtre: "node[natural=peak]" },
+  { genre: "sommet", filtre: "node[natural=volcano]" },
   { genre: "refuge", filtre: "node[tourism=alpine_hut]" },
   { genre: "refuge", filtre: "node[tourism=wilderness_hut]" },
+  { genre: "abri", filtre: "node[amenity=shelter]" },
   { genre: "vue", filtre: "node[tourism=viewpoint]" },
   { genre: "col", filtre: "node[natural=saddle]" },
+  { genre: "col", filtre: "node[mountain_pass=yes]" },
   { genre: "lac", filtre: "node[natural=water][name]" },
 ];
 
@@ -88,10 +108,14 @@ type Brut = { id?: number; lat?: number; lon?: number; tags?: Record<string, str
 
 /** Le genre d'un objet OSM, ou `null` si ce n'est pas quelque chose qu'on affiche. */
 function genreDe(tags: Record<string, string>): Toponyme["genre"] | null {
-  if (tags.natural === "peak") return "sommet";
+  // ⚠️ L'ORDRE COMPTE : un objet peut porter plusieurs étiquettes OSM. Un col marqué à la
+  // fois `natural=saddle` et `mountain_pass=yes` ne doit apparaître qu'une fois, et un
+  // refuge gardé comme refuge plutôt que rétrogradé en abri.
+  if (tags.natural === "peak" || tags.natural === "volcano") return "sommet";
+  if (tags.natural === "saddle" || tags.mountain_pass === "yes") return "col";
   if (tags.tourism === "alpine_hut" || tags.tourism === "wilderness_hut") return "refuge";
+  if (tags.amenity === "shelter") return "abri";
   if (tags.tourism === "viewpoint") return "vue";
-  if (tags.natural === "saddle") return "col";
   if (tags.natural === "water") return "lac";
   return null;
 }
@@ -131,22 +155,44 @@ export function lire(reponse: unknown): Toponyme[] {
 }
 
 /**
- * Les plus utiles d'abord, puis on coupe.
+ * Plafond d'étiquettes envoyées à la carte.
  *
- * ⚠️ CE PLAFOND N'EST PAS COSMÉTIQUE : au-delà, les étiquettes se chevauchent et la
- * carte devient illisible — exactement l'inverse de ce qu'on cherche. Les sommets HAUTS
- * passent devant : c'est le repère qu'on cherche depuis un versant.
+ * ⚠️ IL ÉTAIT À 60, ET IL COUPAIT LA MONTAGNE EN DEUX. Mesuré le 07/09/2026 sur le cirque
+ * de Gavarnie : 243 objets NOMMÉS dans le cadrage — 188 sommets, 47 cols, 6 refuges. En
+ * n'en gardant que 60, on jetait 183 noms réels, dont des cols entiers.
+ *
+ * J'avais justifié ce plafond par la lisibilité. C'était une erreur de raisonnement :
+ * MapLibre écarte LUI-MÊME les étiquettes qui se chevauchent (`text-allow-overlap: false`)
+ * et le fait à chaque niveau de zoom. Couper la liste en amont ne rendait donc rien plus
+ * lisible — cela retirait seulement des noms qui seraient apparus en zoomant.
+ *
+ * Ce qui reste vrai : il faut un plafond, pour ne pas envoyer dix mille points au
+ * navigateur. 400 couvre largement le massif le plus dense mesuré.
  */
-export const ETIQUETTES_MAX = 60;
+export const ETIQUETTES_MAX = 400;
+
+/** Ordre d'importance : c'est lui qui décide qui reste visible quand deux noms se gênent. */
+const RANG: Record<Toponyme["genre"], number> = { sommet: 0, refuge: 1, col: 2, abri: 3, vue: 4, lac: 5 };
 
 export function prioriser(liste: Toponyme[]): Toponyme[] {
-  const rang: Record<Toponyme["genre"], number> = { sommet: 0, refuge: 1, col: 2, vue: 3, lac: 4 };
   return [...liste]
     .sort((a, b) => {
-      if (rang[a.genre] !== rang[b.genre]) return rang[a.genre] - rang[b.genre];
+      if (RANG[a.genre] !== RANG[b.genre]) return RANG[a.genre] - RANG[b.genre];
       return (b.altitude ?? 0) - (a.altitude ?? 0);
     })
     .slice(0, ETIQUETTES_MAX);
+}
+
+/**
+ * Clé de tri passée à MapLibre.
+ *
+ * ⚠️ SANS ELLE, LA COLLISION SE RÉSOUT DANS L'ORDRE DES DONNÉES, c'est-à-dire au hasard :
+ * un point de vue anonyme pouvait masquer le Vignemale. Plus la clé est BASSE, plus
+ * l'étiquette est prioritaire — c'est la convention de MapLibre.
+ */
+export function cleDeTri(t: Toponyme): number {
+  // Un sommet de 3 000 m passe devant un sommet de 2 000 ; un sommet passe devant un col.
+  return RANG[t.genre] * 10000 + (9000 - (t.altitude ?? 0));
 }
 
 /** Objet GeoJSON prêt pour MapLibre. */
@@ -160,6 +206,9 @@ export function versGeoJson(liste: Toponyme[]) {
         genre: t.genre,
         // Le libellé porte l'altitude quand elle existe, et RIEN quand elle manque.
         etiquette: t.altitude != null ? `${t.nom}\n${t.altitude} m` : t.nom,
+        // Reprise par `symbol-sort-key` : décide qui survit à un chevauchement.
+        tri: cleDeTri(t),
+        altitude: t.altitude ?? 0,
       },
       geometry: { type: "Point" as const, coordinates: [t.lon, t.lat] },
     })),

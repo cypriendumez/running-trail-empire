@@ -319,9 +319,14 @@ export function Relief3D({ trace, centre, textes }: {
             map.addLayer({
               id: "topo-point", type: "circle", source: "topo",
               paint: {
-                "circle-radius": 3.5,
-                "circle-color": ["match", ["get", "genre"], "sommet", "#ffffff", "refuge", "#f59e0b", "vue", "#38bdf8", "col", "#e2e8f0", "#7dd3fc"],
+                "circle-color": ["match", ["get", "genre"],
+                  "sommet", "#ffffff", "refuge", "#f59e0b", "abri", "#fbbf24",
+                  "col", "#e2e8f0", "vue", "#38bdf8", "#7dd3fc"],
                 "circle-stroke-width": 1.5, "circle-stroke-color": "#0f172a",
+                // La pastille d'un sommet haut est un peu plus grosse : elle se repère
+                // avant même qu'on lise le nom.
+                "circle-radius": ["case", ["==", ["get", "genre"], "sommet"],
+                  ["interpolate", ["linear"], ["get", "altitude"], 0, 3, 3500, 5], 3.5],
               },
             });
             map.addLayer({
@@ -329,11 +334,24 @@ export function Relief3D({ trace, centre, textes }: {
               layout: {
                 "text-field": ["get", "etiquette"],
                 "text-font": ["Open Sans Semibold"],
-                "text-size": ["match", ["get", "genre"], "sommet", 12, 11],
+                // ⚠️ LA TAILLE SUIT L'ALTITUDE, pas seulement le genre. Sur un massif
+                // dense — 188 sommets nommés mesurés sur Gavarnie — un 3 000 m et une
+                // bosse de 1 200 m écrits pareil se valent à l'œil, et le regard ne
+                // trouve plus le repère qu'il cherche.
+                "text-size": [
+                  "case",
+                  ["==", ["get", "genre"], "sommet"],
+                  ["interpolate", ["linear"], ["get", "altitude"], 0, 10.5, 2000, 12, 3500, 14],
+                  11,
+                ],
                 "text-offset": [0, -1.1], "text-anchor": "bottom",
                 // Les étiquettes qui se chevauchent sont pires que pas d'étiquettes :
                 // MapLibre en écarte plutôt que de les empiler.
                 "text-allow-overlap": false, "text-padding": 3,
+                // ⚠️ QUI SURVIT À UN CHEVAUCHEMENT. Sans cette clé, MapLibre tranche dans
+                // l'ordre des données — c'est-à-dire au hasard : un point de vue anonyme
+                // pouvait masquer le Vignemale. Plus bas = plus prioritaire.
+                "symbol-sort-key": ["get", "tri"],
               },
               paint: { "text-color": "#ffffff", "text-halo-color": "#0f172a", "text-halo-width": 1.6 },
             });
