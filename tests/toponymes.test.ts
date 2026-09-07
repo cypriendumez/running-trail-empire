@@ -173,6 +173,14 @@ test("le cache existe et il est borné", () => {
   const src = codeOf(ROUTE);
   assert.match(src, /cache\.set\(k, \{ a: Date\.now\(\), liste \}\)/, "plus de mise en cache : on martèlerait un service gratuit");
   assert.match(src, /cache\.size >= CACHE_MAX/, "le cache n'est plus borné : fuite mémoire sur le serveur");
+  // ⚠️ ET UN CACHE RÉSEAU EN PLUS. Mesuré sur le site déployé : la `Map` en mémoire ne
+  // survit pas au sans-serveur — premier appel 5,4 s, second 10,0 s, aucun gain. Sans
+  // en-tête de cache, chaque athlète qui ouvre la même vallée retape Overpass.
+  assert.match(src, /"Cache-Control": `public, s-maxage=\$\{secondes\}/,
+    "l'en-tête de cache a disparu : le cache mémoire seul ne sert à rien en production");
+  assert.match(src, /stale-while-revalidate/, "on ferait attendre quelqu'un pendant le rafraîchissement");
+  // Un échec ne se fige pas pour la journée : Overpass revient en quelques minutes.
+  assert.match(src, /raison: "indisponible" \}, 120\)/, "une panne d'Overpass serait mise en cache six heures");
 });
 
 console.log(`\n${passed} test(s) de toponymes passé(s), ${fails.length} échec(s)`);

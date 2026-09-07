@@ -28,6 +28,26 @@ const CACHE_MAX = 120;
 
 const cache = new Map<string, { a: number; liste: Toponyme[] }>();
 
+/**
+ * ⚠️ LE CACHE EN MÉMOIRE NE SUFFIT PAS EN PRODUCTION, ET C'EST MESURÉ. Vercel exécute
+ * cette route sans état : deux appels identiques tombent sur deux instances différentes,
+ * et la `Map` ci-dessus est vide dans la seconde. Vérifié sur le site déployé — premier
+ * appel 5,4 s, second appel 10,0 s, soit AUCUN gain.
+ *
+ * On ajoute donc un en-tête de cache lu par le réseau de diffusion : la réponse est
+ * servie depuis la périphérie, sans réveiller la fonction ni retoucher Overpass. La
+ * `Map` reste utile en local et pour deux requêtes simultanées sur la même instance.
+ */
+function avecCache(charge: object, secondes: number) {
+  return NextResponse.json(charge, {
+    headers: {
+      // `stale-while-revalidate` : on sert l'ancienne réponse pendant qu'on rafraîchit,
+      // plutôt que de faire attendre quelqu'un devant une carte.
+      "Cache-Control": `public, s-maxage=${secondes}, stale-while-revalidate=${secondes * 4}`,
+    },
+  });
+}
+
 /** Arrondi du cadrage : deux vues presque identiques doivent partager une entrée. */
 function cle(b: { sud: number; ouest: number; nord: number; est: number }): string {
   const r = (n: number) => Math.round(n * 50) / 50;   // pas de 0,02° ≈ 2 km
@@ -44,11 +64,11 @@ export async function GET(req: Request) {
   }
   // Le même contrôle que côté client : une zone trop large ramènerait des milliers
   // d'objets illisibles et pèserait sur un service gratuit.
-  if (!interrogeable(bbox, zoom)) return NextResponse.json({ toponymes: [], raison: "trop_large" });
+  if (!interrogeable(bbox, zoom)) return avecCache({ toponymes: [], raison: "trop_large" }, 3600);
 
   const k = cle(bbox);
   const vu = cache.get(k);
-  if (vu && Date.now() - vu.a < CACHE_MS) return NextResponse.json({ toponymes: vu.liste, cache: true });
+  if (vu && Date.now() - vu.a < CACHE_MS) return avecCache({ toponymes: vu.liste, cache: true }, CACHE_MS / 1000);
 
   /**
    * ⚠️ EN PARALLÈLE, PAS L'UN APRÈS L'AUTRE. Mesuré en dix minutes le 07/09/2026 : un
@@ -86,7 +106,7 @@ export async function GET(req: Request) {
     // existe, et sans cela on rejouerait la requête à chaque déplacement pour rien.
     if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value as string);
     cache.set(k, { a: Date.now(), liste });
-    return NextResponse.json({ toponymes: liste });
+    return avecCache({ toponymes: liste }, CACHE_MS / 1000);
   } catch {
     // Tous les miroirs ont échoué ou n'ont rien trouvé. On mémorise brièvement pour ne
     // pas marteler un service gratuit déjà en peine.
@@ -95,5 +115,8 @@ export async function GET(req: Request) {
   }
   // ⚠️ AUCUNE ERREUR HTTP ICI. Ne pas avoir les noms n'est pas une panne de l'application :
   // la carte reste entièrement utilisable. On le DIT, et l'écran l'affiche.
-  return NextResponse.json({ toponymes: [], raison: "indisponible" });
+  // ⚠️ UN ÉCHEC SE MET EN CACHE BRIÈVEMENT, PAS SIX HEURES. Overpass retombe en marche
+  // en quelques minutes : figer son absence pour la journée priverait l'athlète des noms
+  // longtemps après le retour du service.
+  return avecCache({ toponymes: [], raison: "indisponible" }, 120);
 }
