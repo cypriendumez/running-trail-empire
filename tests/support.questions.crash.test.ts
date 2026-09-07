@@ -120,6 +120,20 @@ test("une question de COURSE À PIED n'est jamais capturée par la base de l'app
   }
 });
 
+test("la navigation reste servie instantanément", () => {
+  // ⚠️ CONTRE-POIDS AU TEST PRÉCÉDENT. Écarter les questions de course à pied est facile :
+  // il suffit de tout envoyer au modèle. Mais la base répond en 0 ms et sans facture, et
+  // une porte trop large la vide de son intérêt sans qu'aucun test ne rougisse.
+  // Défaut réel : la racine « trail » attrapait « comment marche le trail builder », qui
+  // est un nom de fonctionnalité.
+  assert.ok(reponseImmediate("comment marche le trail builder", "fr"),
+    "un nom de FONCTIONNALITÉ a été pris pour un sujet d'entraînement");
+  const servies = QUESTIONS_APP.filter((q) => reponseImmediate(q, "fr")).length;
+  // Plancher, jamais une égalité : élargir la base doit pouvoir faire MONTER ce nombre
+  // sans rendre le test rouge.
+  assert.ok(servies >= 15, `${servies}/${QUESTIONS_APP.length} questions d'app servies : la base ne sert plus à rien`);
+});
+
 test("une question de SANTÉ n'est jamais servie par une fiche générique", () => {
   for (const q of QUESTIONS_SENSIBLES) {
     assert.equal(reponseImmediate(q, "fr"), null,

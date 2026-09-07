@@ -146,11 +146,35 @@ const MOTS_CONSEIL = [
   "mejor", "debo", "cuantos", "cuantas", "melhor", "devo", "quantos", "quantas",
 ];
 
+/** Sujets de COURSE À PIED. Une question qui en parle n'est jamais une question de
+ *  navigation, quelle que soit sa tournure — et c'est ce que la porte précédente ratait :
+ *  elle ne filtrait que la FORME (« quel », « combien », « pourquoi »). « À quoi sert une
+ *  sortie longue » ne contient aucun de ces mots, et recevait donc un chemin de clics vers
+ *  le calendrier au lieu d'une explication.
+ *
+ *  ⚠️ AUCUNE RACINE GÉNÉRIQUE ICI. « course » attraperait « où je vois mes courses à
+ *  venir », qui est bien de la navigation et que la base traite en 0 ms. On ne liste que
+ *  des termes qui ne peuvent désigner qu'un fait d'entraînement. */
+const RACINES_COURSE = [
+  "vma", "seuil", "fractionn", "footing", "sortie longue", "allure", "echauff",
+  "recuper", "etirer", "etirement", "hydrat", "glucide", "gel ", "gels",
+  // ⚠️ « trail » a été RETIRÉ après mesure : il attrapait « comment marche le trail
+  // builder », qui est le nom d'une fonctionnalité et relève bien de la navigation. Les
+  // vraies questions de trail du corpus passent par « chaussure » et « difference ».
+  "marathon", "semi", "ultra", "denivele", "cote en course", "foulee",
+  "cadence", "frequence cardiaque", "cardiaque", "cardiac drift", "derive cardiaque",
+  "80/20", "vo2", "lactate", "chaussure", "dossard", "km par semaine", "tempo",
+  "threshold", "interval", "long run", "pace", "warm up", "taper", "heart rate",
+];
+
 export function reponseImmediate(question: string, lang = "fr"): string | null {
   const n = norm(question);
   // Une demande de conseil ne doit JAMAIS recevoir une fiche de navigation : elle part
   // au modèle, qui sait, lui, répondre sur la course à pied.
   if (RACINES_CONSEIL.some((m) => n.includes(m))) return null;
+  // Le SUJET, pas seulement la tournure : parler de course à pied, c'est déjà sortir de
+  // la navigation.
+  if (RACINES_COURSE.some((m) => n.includes(m))) return null;
   const jetons = new Set(n.split(" "));
   if (MOTS_CONSEIL.some((m) => jetons.has(m))) return null;
   const t = chercherSansIA(question, lang);
