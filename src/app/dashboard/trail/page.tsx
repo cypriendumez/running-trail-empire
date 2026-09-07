@@ -1,9 +1,16 @@
 export const dynamic = "force-dynamic";
-import { TrailBuilderLazy } from "@/components/trail/TrailBuilderLazy";
+import { TrailModes } from "@/components/trail/TrailModes";
+import { texteRelief } from "@/components/trail/relief3dI18n";
 import { ParcoursBrowser } from "@/components/parcours/ParcoursBrowser";
 import { createClient } from "@/lib/supabase/server";
 import { COLONNES_ACCES, profilPeut } from "@/lib/billing/access";
 import { PorteFermee } from "@/components/billing/PorteFermee";
+import { getAccountLang } from "@/lib/i18n/serverLang";
+
+/** Le seul libellé qui n'appartient pas à la vue relief : le mode « construire ». */
+const MODE_CONSTRUIRE: Record<string, string> = {
+  fr: "Construire", en: "Build", de: "Erstellen", es: "Crear", pt: "Criar",
+};
 
 export const metadata = { title: "Trail Builder" };
 
@@ -18,6 +25,9 @@ export default async function TrailPage({ searchParams }: { searchParams: Promis
   const { data: profil } = user
     ? await sb.from("profiles").select(COLONNES_ACCES).eq("id", user.id).maybeSingle()
     : { data: null };
+  // La langue du compte : la vue relief nomme des institutions (IGN, swisstopo, USGS) qui
+  // ne se traduisent pas, mais tout ce qui les décrit, si.
+  const langue = user ? await getAccountLang(sb, user.id) : "fr";
 
   /**
    * OÙ OUVRIR LA CARTE.
@@ -70,7 +80,7 @@ export default async function TrailPage({ searchParams }: { searchParams: Promis
 
   return (
     <div className="space-y-6">
-      <TrailBuilderLazy centre={centre} />
+      <TrailModes centre={centre} textes={{ ...texteRelief(langue), "mode.construire": MODE_CONSTRUIRE[langue] ?? MODE_CONSTRUIRE.fr }} />
       <ParcoursBrowser initialSearch={q ?? ""} />
     </div>
   );
