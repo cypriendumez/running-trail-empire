@@ -175,5 +175,22 @@ test("le contexte mesure la pente sur une fenêtre ASSEZ LONGUE", () => {
   assert.match(src, /PAS ENCORE MESURABLE/, "le cas « on ne sait pas » n'est plus dit");
 });
 
+test("l'efficacité aérobie n'est pas mesurée sur des séances dures", () => {
+  // ⚠️ L'ÉTIQUETTE MENT, ET LE FICHIER LE SAIT. `isHardType` ne reconnaît que des mots
+  // qu'intervals.icu n'écrit pas : mesuré sur le compte réel, 305 séances sur 334 sont
+  // dites « easy », y compris à 180 bpm de moyenne. `easyEF` filtrait sur cette seule
+  // étiquette alors que `isHardWk`, vingt lignes plus haut, croise déjà la FC.
+  const src = codeOf("src/lib/ai/coachContext.ts");
+  // ⚠️ On prend la LIGNE entière : `[^;]*` s'arrêtait au premier point-virgule, qui se
+  // trouve À L'INTÉRIEUR du filtre (`const age = …;`) — la fenêtre examinée n'atteignait
+  // jamais le test d'intensité, et le test échouait sur du code pourtant correct.
+  const m = src.split("\n").find((l) => l.includes("const easyRuns = runs.filter"));
+  assert.ok(m, "le filtre des footings a disparu");
+  assert.ok(/!isHardWk\(w\)/.test(m),
+    "l'efficacité aérobie retient les séances sur la seule étiquette : une séance dure entrera dans une mesure censée être à faible intensité");
+  assert.ok(!/!isHardType\(w\.type\)/.test(m),
+    "le filtre par étiquette seule est revenu");
+});
+
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }

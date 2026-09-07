@@ -661,7 +661,15 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
     // Variable locale volontairement nommée `easyRuns` : un `runs` ici masquerait la
     // référence globale et laisserait croire que le sport est déjà filtré. Il ne l'était
     // pas — les randonnées entraient dans l'efficacité aérobie, dont elles ne disent rien.
-    const easyRuns = runs.filter(w => { const age = now - new Date(w.date).getTime(); return age > from * 86400000 && age <= to * 86400000 && !isHardType(w.type) && !!w.avg_hr && !!w.distance_km && !!w.duration_seconds; });
+    // ⚠️ LA FC, PAS SEULEMENT L'ÉTIQUETTE — et c'est ce que ce filtre ne faisait pas.
+    // Le fichier documente pourtant vingt lignes plus haut (`isHardWk`) qu'intervals.icu
+    // n'émet que deux étiquettes : mesuré sur ce compte, 305 séances sur 334 sont dites
+    // « easy », séances à 180+ de moyenne comprises. L'efficacité aérobie — censée se
+    // mesurer À FAIBLE INTENSITÉ — intégrait donc des séances dures : 3 sur 59 dans la
+    // fenêtre courante, +0,39 % sur le chiffre, et 0,6 point sur une comparaison de
+    // fenêtres jugée à ±2 %. Le verdict ne basculait pas ce jour-là ; rien ne garantit
+    // qu'il ne bascule pas un autre jour, sur un athlète qui enchaîne les séances dures.
+    const easyRuns = runs.filter(w => { const age = now - new Date(w.date).getTime(); return age > from * 86400000 && age <= to * 86400000 && !isHardWk(w) && !!w.avg_hr && !!w.distance_km && !!w.duration_seconds; });
     if (!easyRuns.length) return null;
     // Vitesse AJUSTÉE AU DÉNIVELÉ quand elle est disponible : comparer l'allure brute
     // d'une semaine en montagne à celle d'une semaine sur route ferait passer un athlète
