@@ -134,6 +134,11 @@ export async function POST(req: Request) {
     "RÈGLES ABSOLUES :",
     "- N'écris AUCUN chiffre qui ne figure pas ci-dessous. Aucune estimation, aucun ordre de grandeur.",
     "- Ce qui est listé comme inconnu doit être DIT inconnu, jamais comblé.",
+    ...(faits.exploitable ? [] : [
+      "- ⚠️ CETTE SÉANCE N'EST PAS INTERPRÉTABLE (voir ce qu'on ne sait pas). Dis-le en une",
+      "  ou deux phrases, explique ce qui manque, et N'EN TIRE AUCUNE CONCLUSION sur sa forme.",
+      "  Ne commente ni la chaleur, ni la gestion de l'effort, ni quoi que ce soit d'autre.",
+    ]),
     "- Juge l'intensité sur la fréquence cardiaque fournie, jamais sur le titre de la séance.",
     "- Pas de diagnostic médical, pas de « tu es apte ».",
     `- ${longue ? "Six à huit phrases" : "Trois à quatre phrases"}, ${LANGUE[lang]}.`,

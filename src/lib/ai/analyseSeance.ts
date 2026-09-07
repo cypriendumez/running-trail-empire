@@ -26,6 +26,15 @@ export const PART_FC_FACILE = 0.75;
 export const ECART_DISTANCE = 0.15;
 /** En dessous, un classement ne veut rien dire. */
 export const COMPARABLES_MIN = 4;
+/**
+ * FC moyenne en dessous de laquelle une séance de course n'est PAS crédible.
+ *
+ * ⚠️ VU SUR UN APPEL RÉEL. Une séance du compte porte 64 bpm de moyenne, 65 de maximum et
+ * aucune distance : la montre a enregistré une période de repos. Le coach en a tiré
+ * « une bonne gestion de l'effort malgré la chaleur » — il n'a inventé aucun chiffre, il
+ * a inventé du SENS, ce qui est pire parce que ça ne se repère pas.
+ */
+export const FC_PLANCHER = 90;
 
 export type SeanceBrute = {
   id?: string; date: string; title?: string | null; sport?: string | null;
@@ -41,6 +50,8 @@ export type Reperes = { fcMax?: number | null; vma?: number | null; allureFacile
 export type Prescrit = { type?: string | null; titre?: string | null; detail?: string | null } | null;
 
 export type FaitsSeance = {
+  /** Faux quand la séance n'a rien d'interprétable : le modèle doit alors se taire. */
+  exploitable: boolean;
   date: string;
   sport: string;
   distanceKm: number | null;
@@ -114,6 +125,15 @@ export function faitsDeSeance(
     : partFcMax >= PART_FC_DURE * 100 ? "dure"
     : partFcMax >= PART_FC_FACILE * 100 ? "moderee" : "facile";
 
+  // ── LA SÉANCE EST-ELLE SEULEMENT EXPLOITABLE ? ──────────────────────────────
+  // Sans distance NI durée, il n'y a pas de séance : l'analyser reviendrait à commenter
+  // une ligne vide, ce que le modèle fait très volontiers si on ne l'en empêche pas.
+  const vide = distanceKm == null && dureeSec == null;
+  if (vide) manques.push("séance quasiment vide : ni distance ni durée enregistrées — il n'y a rien à interpréter, et il faut le dire");
+  if (fcMoy != null && fcMoy < FC_PLANCHER) {
+    manques.push(`fréquence cardiaque moyenne de ${Math.round(fcMoy)} : incompatible avec une course, la montre a probablement enregistré du repos — ne rien conclure de cette séance`);
+  }
+
   const zonesMin = zonesEnMinutes(s.hr_zone_seconds);
   if (zonesMin == null) manques.push("temps passé en zones non mesuré");
 
@@ -137,6 +157,7 @@ export function faitsDeSeance(
   })();
 
   return {
+    exploitable: !vide && !(fcMoy != null && fcMoy < FC_PLANCHER),
     date: String(s.date ?? "").slice(0, 10),
     sport: String(s.sport ?? "run"),
     distanceKm: distanceKm == null ? null : Math.round(distanceKm * 100) / 100,

@@ -17,7 +17,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   faitsDeSeance, zonesEnMinutes, allureTexte, dateLisible,
-  PART_FC_DURE, PART_FC_FACILE, ECART_DISTANCE, COMPARABLES_MIN,
+  PART_FC_DURE, PART_FC_FACILE, ECART_DISTANCE, COMPARABLES_MIN, FC_PLANCHER,
   type SeanceBrute,
 } from "../src/lib/ai/analyseSeance";
 
@@ -60,6 +60,29 @@ test("une séance sans cardio le dit au lieu de se taire", () => {
   const f = faitsDeSeance({ ...SEANCE, avg_hr: null }, { fcMax: 212 });
   assert.equal(f.intensite, null);
   assert.ok(f.manques.some((m) => /fréquence cardiaque/.test(m)));
+});
+
+console.log("\nUNE SÉANCE INEXPLOITABLE NE S'INTERPRÈTE PAS");
+
+test("une séance sans distance ni durée n'a rien à dire", () => {
+  // ⚠️ CAS RÉEL, vu sur un appel en production : une séance du compte porte 64 bpm de
+  // moyenne, 65 de max et aucune distance — la montre a enregistré du repos. Le coach en
+  // a tiré « une bonne gestion de l'effort malgré la chaleur ». Il n'a inventé aucun
+  // chiffre : il a inventé du SENS, ce qui est pire parce que ça ne se repère pas.
+  const f = faitsDeSeance({ date: "2026-04-25", sport: "run", distance_km: null, duration_seconds: null, avg_hr: 64, max_hr: 65, weather_temp_c: 29 }, { fcMax: 212 });
+  assert.equal(f.exploitable, false, "une ligne vide a été jugée analysable");
+  assert.ok(f.manques.some((m) => /ni distance ni durée/.test(m)));
+});
+
+test("une FC moyenne de coureur au repos est signalée", () => {
+  assert.equal(FC_PLANCHER, 90, "plancher : décision d'entraîneur, à changer sciemment");
+  assert.equal(faitsDeSeance({ date: "2026-04-25", sport: "run", distance_km: 8, duration_seconds: 2400, avg_hr: 64 }, { fcMax: 212 }).exploitable, false);
+  assert.equal(faitsDeSeance({ date: "2026-04-25", sport: "run", distance_km: 8, duration_seconds: 2400, avg_hr: 140 }, { fcMax: 212 }).exploitable, true,
+    "une séance normale a été jugée inexploitable");
+});
+
+test("une séance normale reste exploitable", () => {
+  assert.equal(faitsDeSeance(SEANCE, { fcMax: 212 }).exploitable, true);
 });
 
 console.log("\nLES ZONES — mesurées ou absentes, jamais devinées");
@@ -159,6 +182,9 @@ test("le modèle a interdiction d'inventer un chiffre", () => {
   assert.match(src, /jamais sur le titre de la séance/, "le modèle peut de nouveau juger l'intensité sur l'étiquette");
   assert.match(src, /f\.manques/, "la liste des inconnues n'est plus transmise");
   assert.match(src, /pas de salutation/, "le modèle recommence à saluer : chaque mot est facturé");
+  assert.match(src, /faits\.exploitable \? \[\] :/,
+    "le modèle n'est plus bridé sur une séance vide : il en tirera des conclusions inventées");
+  assert.match(src, /N'EN TIRE AUCUNE CONCLUSION/, "l'interdiction de conclure sur une séance vide a sauté");
 });
 
 test("l'analyse est écrite dans la langue du compte", () => {
