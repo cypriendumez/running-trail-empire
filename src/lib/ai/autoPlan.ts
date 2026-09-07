@@ -129,8 +129,9 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   const blockWeekRenfo = (() => { const d = new Date(start); const on = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const day = on.getUTCDay() || 7; on.setUTCDate(on.getUTCDate() + 4 - day); const ys = new Date(Date.UTC(on.getUTCFullYear(), 0, 1)); return Math.ceil(((on.getTime() - ys.getTime()) / 86400000 + 1) / 7) % 4; })();
   // Avant une séance de qualité, l'échauffement est allongé (mise en action progressive).
   const warmQ = Math.min(30, warm + 5);
-  const pace = ctx.easyPace;
-  const easy = pace ? ` (~${pace}/km)` : "";
+  // `pace` / `easy` retirés : déclarés ici, jamais lus. Trouvé par mutation — forcer
+  // « (~null/km) » dans `easy` ne changeait STRICTEMENT RIEN au plan produit, ce qui est
+  // la définition d'une variable morte. Les allures affichées viennent de `paceFor()`.
   const wp = ctx.weekPlan;
   const { targetKm, longRunKm } = ctx.volume;
   // En terrain vallonné, une allure au km brute est intenable en montée et trop facile
@@ -465,7 +466,14 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // semaine d'affûtage cumulait sortie longue + 3 qualités — quatre séances exigeantes
   // à quinze jours de l'objectif, soit exactement ce que l'affûtage doit empêcher.
   const maxByTaper = ctx.cycle.taper ? (longIdx >= 0 ? 1 : 2) : 99;
-  const quality = wp.quality.slice(0, Math.min(wp.quality.length, maxByVolume, maxByFrequency, maxByTaper));
+  // ⚠️ `wp.qBudget` EST DANS LE MIN, et il n'y était pas. Le budget de qualité — le seul
+  // frein contre l'intensité quand la fatigue est avérée — n'était appliqué qu'en AMONT
+  // (`coachContext` fait déjà `menu.slice(0, qBudget)`). Le plan recevait donc le chiffre
+  // sans jamais le lire : à ce jour le comportement est identique, mais le jour où un
+  // appelant fournirait une liste non taillée, une semaine au feu rouge repartait avec
+  // deux séances dures sans qu'une seule ligne ne s'y oppose. Vérifié en lui tendant des
+  // candidats avec un budget à zéro : VMA le lundi, seuil le mercredi.
+  const quality = wp.quality.slice(0, Math.min(wp.quality.length, wp.qBudget, maxByVolume, maxByFrequency, maxByTaper));
   for (let qi = 0; qi < quality.length; qi++) {
     const q = quality[qi];
     // Tous les jours possibles, plus seulement le premier : c'est ce qui permet à la
