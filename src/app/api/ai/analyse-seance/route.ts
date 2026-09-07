@@ -40,7 +40,23 @@ const COMPARABLES_MAX = 120;
 
 const COLS = "id,date,title,sport,distance_km,duration_seconds,avg_pace_min_km,gap_min_km,avg_hr,max_hr,elevation_gain_m,hr_zone_seconds,avg_cadence_spm,weather_temp_c";
 
-function lignesDeFaits(f: FaitsSeance, lang: Lang): string {
+/**
+ * Les faits transmis au modèle.
+ *
+ * ⚠️ C'EST ICI QUE SE JOUE L'ÉCART STARTER / PREMIUM, et il ne peut pas être une simple
+ * longueur de texte. Une analyse « plus longue » sur les mêmes données, c'est du
+ * remplissage : le client à 14,99 € paierait des phrases, pas du service.
+ *
+ * Starter reçoit la lecture ESSENTIELLE — ce qui s'est passé, à quelle intensité réelle,
+ * et ce qui était prescrit. Premium reçoit en plus le CONTEXTE COMPARATIF : le rang parmi
+ * les séances semblables, le détail zone par zone, la cadence, la température. Ce sont
+ * des dimensions d'analyse en plus, pas des mots en plus.
+ *
+ * Et c'est le bon sens économique : les jetons d'ENTRÉE coûtent huit fois moins que ceux
+ * de sortie. Donner plus de contexte à Premium coûte presque rien ; le laisser écrire
+ * beaucoup plus, si.
+ */
+function lignesDeFaits(f: FaitsSeance, lang: Lang, complet: boolean): string {
   const l: string[] = [];
   // ⚠️ Une date en toutes lettres, pas « 2026-08-24 » : le modèle RECOPIE ce qu'on lui
   // donne, et il servait la date brute à l'athlète — un entraîneur ne parle pas ainsi.
@@ -50,11 +66,14 @@ function lignesDeFaits(f: FaitsSeance, lang: Lang): string {
   if (a) l.push(`Allure ${a}/km${ac && ac !== a ? ` (corrigée du dénivelé : ${ac}/km)` : ""}`);
   if (f.fcMoy != null) l.push(`FC moyenne ${f.fcMoy}${f.fcMax != null ? `, max ${f.fcMax}` : ""}${f.partFcMax != null ? ` — ${f.partFcMax} % de sa FC max` : ""}`);
   if (f.intensite) l.push(`Intensité RÉELLE, jugée à la fréquence cardiaque : ${f.intensite === "dure" ? "séance dure" : f.intensite === "moderee" ? "modérée" : "footing facile"}`);
-  if (f.zonesMin) l.push(`Temps en zones (minutes, mesuré par la montre) : ${f.zonesMin.map((m, i) => `Z${i + 1} ${m}`).join(" · ")}`);
   if (f.dplus != null) l.push(`Dénivelé positif ${f.dplus} m`);
-  if (f.cadence != null) l.push(`Cadence ${f.cadence} pas/min`);
-  if (f.tempC != null) l.push(`Température ${f.tempC} °C`);
-  if (f.rang) l.push(`Parmi ses séances de distance comparable : ${f.rang.place}ᵉ sur ${f.rang.total}`);
+  // ── Réservé à la formule haute : les dimensions d'analyse supplémentaires. ──
+  if (complet) {
+    if (f.zonesMin) l.push(`Temps en zones (minutes, mesuré par la montre) : ${f.zonesMin.map((m, i) => `Z${i + 1} ${m}`).join(" · ")}`);
+    if (f.cadence != null) l.push(`Cadence ${f.cadence} pas/min`);
+    if (f.tempC != null) l.push(`Température ${f.tempC} °C`);
+    if (f.rang) l.push(`Parmi ses séances de distance comparable : ${f.rang.place}ᵉ sur ${f.rang.total}`);
+  }
   if (f.prescrit) l.push(`Ce qui était PRESCRIT ce jour-là : ${f.prescrit.type}${f.prescrit.titre ? ` — ${f.prescrit.titre}` : ""}`);
   if (f.manques.length) l.push(`CE QU'ON NE SAIT PAS (à dire, jamais à combler) : ${f.manques.join(" ; ")}`);
   return l.join("\n");
@@ -144,10 +163,12 @@ export async function POST(req: Request) {
     `- ${longue ? "Six à huit phrases" : "Trois à quatre phrases"}, ${LANGUE[lang]}.`,
     "- Commence directement par le fond : pas de salutation, pas de « je viens de relire ». Chaque mot est facturé.",
     "",
-    "STRUCTURE : ce qui s'est passé · ce que ça dit de sa forme · une seule chose à retenir pour la suite.",
+    longue
+      ? "STRUCTURE : ce qui s'est passé · la répartition de l'effort et ce qu'elle révèle · comment cette séance se situe par rapport à ses semblables · ce que ça dit de sa forme · une chose à retenir."
+      : "STRUCTURE : ce qui s'est passé · ce que ça dit de sa forme · une seule chose à retenir pour la suite.",
     "",
     "LES FAITS :",
-    lignesDeFaits(faits, lang),
+    lignesDeFaits(faits, lang, longue),
   ].join("\n");
 
   const r = await generateContent(

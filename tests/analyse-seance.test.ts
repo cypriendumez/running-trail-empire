@@ -195,7 +195,7 @@ test("l'analyse est écrite dans la langue du compte", () => {
   assert.match(src, /\$\{LANGUE\[lang\]\}/, "l'invite ne demande plus la langue de l'athlète");
   // ⚠️ LES FAITS AUSSI. La date y est écrite en toutes lettres : figée en français, elle
   // repartait en français dans une analyse allemande. Mutation qui restait verte sans ça.
-  assert.match(src, /lignesDeFaits\(faits, lang\)/, "les faits sont rendus dans une langue figée");
+  assert.match(src, /lignesDeFaits\(faits, lang[,)]/, "les faits sont rendus dans une langue figée");
   assert.ok(!/en français, en tutoyant\.`/.test(src), "le français est redevenu codé en dur");
   for (const lg of ["fr", "en", "de", "es", "pt"]) {
     assert.ok(new RegExp(`\\b${lg}:`).test(src), `langue « ${lg} » absente de la table`);
@@ -215,6 +215,37 @@ test("l'affichage suit le verrou, il ne le remplace pas", () => {
   assert.match(src, /r\.status === 402/,
     "le refus d'abonnement n'est plus distingué d'une panne : un verrou commercial passerait pour un bug");
   assert.match(src, /tronquee/, "une réponse coupée serait affichée comme complète");
+});
+
+test("Premium reçoit des DIMENSIONS en plus, pas des mots en plus", () => {
+  // ⚠️ UNE ANALYSE « PLUS LONGUE » SUR LES MÊMES DONNÉES EST DU REMPLISSAGE : le client
+  // à 14,99 € paierait des phrases, pas du service. L'écart doit porter sur ce que le
+  // modèle a le droit de REGARDER — rang parmi les séances semblables, zones, cadence,
+  // température — pas sur le nombre de phrases qu'il écrit.
+  const src = codeOf("src/app/api/ai/analyse-seance/route.ts");
+  assert.match(src, /function lignesDeFaits\(f: FaitsSeance, lang: Lang, complet: boolean\)/,
+    "les faits ne dépendent plus de la formule : les deux clients voient la même chose");
+  assert.match(src, /if \(complet\) \{/, "le bloc réservé à la formule haute a disparu");
+  // Les quatre dimensions doivent être DANS ce bloc, pas avant lui.
+  const bloc = src.slice(src.indexOf("if (complet) {"), src.indexOf("if (complet) {") + 700);
+  // ⚠️ ON VISE LA CONDITION, PAS LE MOTIF. Chercher « f.rang » quelque part restait vert
+  // quand la ligne devenait `if (false) l.push(\`… ${f.rang.place} …\`)` : le champ
+  // apparaissait encore dans le gabarit de texte. C'est le TEST qui décide de l'affichage.
+  for (const [motif, quoi] of [
+    [/if \(f\.rang\) l\.push/, "le rang"], [/if \(f\.zonesMin\) l\.push/, "les zones"],
+    [/if \(f\.cadence != null\) l\.push/, "la cadence"], [/if \(f\.tempC != null\) l\.push/, "la température"],
+  ] as const) {
+    assert.match(bloc, motif, `${quoi} n'est plus réservé à la formule haute`);
+  }
+  assert.match(src, /lignesDeFaits\(faits, lang, longue\)/, "la formule ne commande plus le contenu des faits");
+});
+
+test("l'écart de formule repose sur une capacité, pas sur un nom écrit en dur", () => {
+  // Un `tier === "premium"` en dur diverge le jour où une formule est renommée, et il
+  // laisserait l'essai — qui montre le niveau Premium — sur la version basse.
+  const src = codeOf("src/app/api/ai/analyse-seance/route.ts");
+  assert.match(src, /profilPeut\([^)]*"analyse_longue"\)/, "la capacité n'est plus interrogée");
+  assert.ok(!/"premium"/.test(src), "le nom d'une formule est codé en dur dans la route");
 });
 
 console.log(`\n${passed} test(s) d'analyse passé(s), ${fails.length} échec(s)`);
