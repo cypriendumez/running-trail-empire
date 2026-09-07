@@ -72,6 +72,47 @@ export const TYPE_QUOTA = "ai_quota";
  * plafond ne borne que la queue de distribution — c'est-à-dire la boucle, le script
  * et l'abus, qui sont exactement ce qui rend une clé payante dangereuse sans lui.
  */
+/**
+ * PLAFOND SÉPARÉ POUR LA BULLE D'AIDE.
+ *
+ * ⚠️ ELLE N'AVAIT AUCUN PLAFOND, ET AUCUN VERROU. `/api/ai/support` n'exigeait que
+ * d'être connecté : un compte à 0 € obtenait donc une réponse écrite par le modèle, et
+ * RIEN ne bornait le nombre d'appels — alors que c'est exactement ce que ce module
+ * existe pour empêcher. Mesuré : jusqu'à 1 200 jetons de sortie, ≈ 0,28 centime l'appel.
+ *
+ * DEUX DÉCISIONS, ET ELLES NE VONT PAS DE SOI :
+ *
+ * 1. LE GRATUIT EN GARDE. Le fermer entièrement serait cohérent avec `PLAFOND_JOUR`,
+ *    mais l'assistant explique le produit à quelqu'un qui hésite à le payer : c'est du
+ *    service client, et c'est ce qui convertit. Cinq questions par jour laissent de quoi
+ *    comprendre l'application, et bornent la boucle.
+ *
+ * 2. C'EST UN COMPTEUR À PART, pas une ponction sur `PLAFOND_JOUR`. Un client à 9,99 €
+ *    qui demande où changer sa langue ne doit pas y perdre un appel au coach : il aurait
+ *    payé une question d'interface au prix d'une séance analysée. Les deux compteurs
+ *    vivent dans la MÊME ligne (`n` et `nSupport`), donc aucune migration.
+ *
+ * Rappel : une réponse trouvée dans la base de connaissances (32 % des questions) ne
+ * passe par aucun modèle et ne doit RIEN consommer. Seul l'appel au modèle est compté.
+ */
+export const PLAFOND_SUPPORT_JOUR: Record<Acces, number> = {
+  gratuit: 5,
+  essai: 20,
+  // Volontairement PLUS HAUT que le plafond coach de Starter (10) : une question sur
+  // l'application ne coûte pas le même contexte qu'un appel au coach, et bloquer le
+  // support d'un client qui paie est le pire endroit où économiser.
+  starter: 20,
+  premium: 30,
+};
+
+/** Quel compteur du jour : le coach et l'analyse, ou la bulle d'aide. */
+export type Compteur = "ia" | "support";
+const CHAMP: Record<Compteur, "n" | "nSupport"> = { ia: "n", support: "nSupport" };
+const PLAFONDS: Record<Compteur, Record<Acces, number>> = {
+  ia: null as unknown as Record<Acces, number>,      // rempli juste après (PLAFOND_JOUR)
+  support: null as unknown as Record<Acces, number>,
+};
+
 export const PLAFOND_JOUR: Record<Acces, number> = {
   // Le palier gratuit permanent n'a AUCUN crédit, et c'est tout le modèle : il reçoit
   // gratuitement tout ce qui ne coûte rien (le plan, la synchro, les courses) et rien
@@ -83,6 +124,9 @@ export const PLAFOND_JOUR: Record<Acces, number> = {
   starter: 10,
   premium: 30,
 };
+
+PLAFONDS.ia = PLAFOND_JOUR;
+PLAFONDS.support = PLAFOND_SUPPORT_JOUR;
 
 /**
  * `accorde` dit si CET appel a le droit de partir. Le déduire d'un `utilises >= plafond`
@@ -107,8 +151,9 @@ export async function quotaDuJour(
   userId: string,
   etat: Acces,
   aujourdhui: string = jourLocal(),
+  compteur: Compteur = "ia",
 ): Promise<EtatQuota> {
-  const plafond = PLAFOND_JOUR[etat];
+  const plafond = PLAFONDS[compteur][etat];
   const { data, error } = await supabase.from("notifications")
     .select("data").eq("user_id", userId).eq("type", TYPE_QUOTA).maybeSingle();
   /**
@@ -123,9 +168,10 @@ export async function quotaDuJour(
    * rattrape ; une boucle facturée, non.
    */
   if (error) return { utilises: 0, plafond, restants: 0, accorde: false, indisponible: true };
-  const d = (data as { data?: { jour?: string; n?: number } } | null)?.data;
+  const d = (data as { data?: { jour?: string; n?: number; nSupport?: number } } | null)?.data;
   // Un compteur d'hier ne compte pas : le jour a changé, la remise à zéro est implicite.
-  const utilises = d?.jour === aujourdhui ? Number(d?.n ?? 0) : 0;
+  // ⚠️ LES DEUX COMPTEURS PARTAGENT LE MÊME JOUR : ils se remettent à zéro ensemble.
+  const utilises = d?.jour === aujourdhui ? Number(d?.[CHAMP[compteur]] ?? 0) : 0;
   return { utilises, plafond, restants: Math.max(0, plafond - utilises), accorde: utilises < plafond };
 }
 
@@ -144,8 +190,9 @@ export async function consommerAppelIA(
   userId: string,
   etat: Acces,
   aujourdhui: string = jourLocal(),
+  compteur: Compteur = "ia",
 ): Promise<EtatQuota> {
-  const avant = await quotaDuJour(supabase, userId, etat, aujourdhui);
+  const avant = await quotaDuJour(supabase, userId, etat, aujourdhui, compteur);
   if (!avant.accorde) return avant;   // plafond déjà atteint : on n'incrémente plus
 
   const n = avant.utilises + 1;
@@ -155,9 +202,19 @@ export async function consommerAppelIA(
   // L'upsert aurait donc échoué en production, ou pire, inséré un doublon par appel.
   // On suit le motif déjà utilisé pour `auto_coach_state` : on cherche, puis on met à
   // jour ou on insère.
-  const ligne = { jour: aujourdhui, n };
+  // ⚠️ ON RELIT L'AUTRE COMPTEUR POUR LE PRÉSERVER. Écrire `{ jour, n }` en dur
+  // effacerait `nSupport` à chaque appel au coach — et réciproquement : la bulle d'aide
+  // remettrait le compteur du coach à zéro, ce qui ouvrirait le plafond en grand.
   const { data: existante, error: eLecture } = await supabase.from("notifications")
-    .select("id").eq("user_id", userId).eq("type", TYPE_QUOTA).maybeSingle();
+    .select("id,data").eq("user_id", userId).eq("type", TYPE_QUOTA).maybeSingle();
+  const precedent = (existante as { data?: { jour?: string; n?: number; nSupport?: number } } | null)?.data;
+  const memeJour = precedent?.jour === aujourdhui;
+  const autre: Compteur = compteur === "ia" ? "support" : "ia";
+  const ligne = {
+    jour: aujourdhui,
+    [CHAMP[compteur]]: n,
+    [CHAMP[autre]]: memeJour ? Number(precedent?.[CHAMP[autre]] ?? 0) : 0,
+  };
   if (eLecture) return { utilises: avant.utilises, plafond: avant.plafond, restants: 0, accorde: false, indisponible: true };
   const { error: eEcriture } = (existante as { id?: string } | null)?.id
     ? await supabase.from("notifications").update({ data: ligne }).eq("id", (existante as { id: string }).id)

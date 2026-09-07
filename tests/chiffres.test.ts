@@ -123,6 +123,7 @@ test("les chiffres publiés sont ceux de la source", () => {
   assert.equal(CHIFFRES_AUTH.length, 3);
   for (const v of [...CHIFFRES_LANDING, ...CHIFFRES_AUTH]) {
     assert.ok(Object.values(CHIFFRES).includes(v as never), `« ${v} » ne vient pas de CHIFFRES`);
+    void 0;
   }
 });
 
@@ -1355,6 +1356,25 @@ test("aucun composant client ne décide de l'accès administrateur", () => {
   };
   parcourir(join(ROOT, "src"));
   assert.deepEqual(fautifs, [], `composant(s) client important la source de vérité : ${fautifs.join(", ")}`);
+});
+
+test("le nombre de courses annoncé sur la landing suit la source unique", () => {
+  // ⚠️ LA SOURCE UNIQUE ÉTAIT CONTOURNÉE. `landingI18n` écrivait « 14 000 courses » en
+  // DUR dans les cinq langues, sans passer par CHIFFRES : le jour où le chiffre a dérivé,
+  // rien ne l'a signalé. Recompté le 07/09/2026, le catalogue n'a que 10 539 courses
+  // DATÉES — les 6 690 autres sont garées au 1er janvier 2099, convention interne pour
+  // « date pas encore publiée ». Or la landing promet des dates juste à côté du nombre.
+  const src = readFileSync("src/components/landing/landingI18n.ts", "utf8");
+  const attendu = String(CHIFFRES.courses).replace(/\D/g, "");            // « 10000 »
+  const trouves = new Set<string>();
+  for (const m of src.matchAll(/(\d[\d  \u202f,.]{2,})\s*(courses|races|Rennen|carreras|corridas|kommende)/gi)) {
+    trouves.add(m[1].replace(/\D/g, ""));
+  }
+  assert.ok(trouves.size > 0, "plus aucun nombre de courses sur la landing : la lecture est cassée");
+  for (const t of trouves) {
+    assert.equal(t, attendu,
+      `la landing annonce ${t} courses, la source unique dit ${attendu} — un chiffre de vente qui a dérivé`);
+  }
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

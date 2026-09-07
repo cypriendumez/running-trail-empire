@@ -4833,8 +4833,17 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     assert.ok(!/depasse/.test(src), "le drapeau ambigu « depasse » est revenu");
     // Un changement de jour remet le compteur à zéro : sans ça, le plafond serait une
     // coupure définitive déguisée.
-    assert.ok(/d\?\.jour === aujourdhui \? Number\(d\?\.n \?\? 0\) : 0/.test(src),
+    // ⚠️ FORMULATION MISE À JOUR LE 07/09/2026, INTENTION INCHANGÉE. Le module compte
+    // désormais DEUX quotas dans la même ligne (`n` pour le coach, `nSupport` pour la
+    // bulle d'aide), donc le champ lu est choisi par `CHAMP[compteur]`. Ce qui doit
+    // rester vrai, et que ce test protège, c'est que la comparaison de JOUR commande la
+    // remise à zéro — sans elle le plafond serait une coupure définitive déguisée.
+    assert.ok(/d\?\.jour === aujourdhui \? Number\(d\?\.\[CHAMP\[compteur\]\] \?\? 0\) : 0/.test(src),
       "le compteur ne se réinitialise plus au changement de jour");
+    // Et les deux compteurs doivent partager ce même jour, sinon l'un se remettrait à
+    // zéro sans l'autre et le plafond deviendrait incohérent selon la porte empruntée.
+    assert.ok(/const CHAMP: Record<Compteur, "n" \| "nSupport">/.test(src),
+      "les deux compteurs ne sont plus distingués");
   });
 
   test("le plan reste DÉTERMINISTE, même s'il est devenu payant", () => {

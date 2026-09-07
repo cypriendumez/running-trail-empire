@@ -23,8 +23,19 @@
  * place que le jour où quelque chose les mesure vraiment.
  */
 export const CHIFFRES = {
-  /** Courses à venir dans la base (arrondi PRUDENT vers le bas : 14 430 mesurées). */
-  courses: "14 000+",
+  /**
+   * Courses à venir AVEC UNE DATE, arrondi prudent vers le bas.
+   *
+   * ⚠️ CE CHIFFRE ANNONÇAIT 14 000 ET IL SURESTIMAIT. Recompté le 07/09/2026 : le
+   * catalogue contient 17 229 courses, mais 6 690 sont garées au 1er janvier 2099 —
+   * c'est la convention interne pour « date pas encore publiée », pas une date. Il reste
+   * 10 539 courses réellement datées.
+   *
+   * La distinction n'est pas cosmétique : la landing promet « Dates, distances et lien
+   * d'inscription » juste à côté de ce nombre. Annoncer 14 000 dates quand 10 539
+   * existent, c'est promettre ce qu'on n'a pas.
+   */
+  courses: "10 000+",
   /** Parcours certifiés par le crawl (15 708 mesurés, arrondi vers le bas). */
   parcours: "15 700",
   /** Horizon du plan glissant produit par `buildWeekPlan`. */

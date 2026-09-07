@@ -6,6 +6,8 @@ import { HELP_PAGES, HELP_FACTS, HELP_PROBLEMS, HEALTH_TABS } from "@/data/helpK
 import { diagnoseAccount, findingsBlock, type AccountState } from "@/lib/support/diagnose";
 import { T, normLang } from "@/lib/i18n/translations";
 import { fallbackAnswer, reponseImmediate, FALLBACK_MISS, FALLBACK_PREFIX } from "@/lib/support/fallback";
+import { accesDe, COLONNES_ACCES } from "@/lib/billing/access";
+import { consommerAppelIA } from "@/lib/billing/aiQuota";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normaliserQuestion, empreinteKb, utilisable, type EntreeMemoire } from "@/lib/support/memoire";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
@@ -35,6 +37,25 @@ const LANGS: Record<string, string> = {
   es: "espagnol (Español)", pt: "portugais (Português)",
 };
 
+/** Bandeau quand le nombre de questions détaillées du jour est atteint. La réponse qui
+ *  suit vient de la base de connaissances : elle est vraie, simplement moins adaptée. */
+const PLAFOND_ATTEINT: Record<string, string> = {
+  fr: "⏳ Tu as posé toutes tes questions détaillées pour aujourd'hui. Voici la réponse de la base d'aide — le compteur repart demain :\n\n",
+  en: "⏳ You've used all your detailed questions for today. Here's the answer from the help base — the counter resets tomorrow:\n\n",
+  de: "⏳ Du hast heute alle ausführlichen Fragen genutzt. Hier die Antwort aus der Hilfe-Datenbank — der Zähler startet morgen neu:\n\n",
+  es: "⏳ Has usado todas tus preguntas detalladas de hoy. Aquí tienes la respuesta de la base de ayuda — el contador se reinicia mañana:\n\n",
+  pt: "⏳ Usaste todas as tuas perguntas detalhadas de hoje. Aqui está a resposta da base de ajuda — o contador reinicia amanhã:\n\n",
+};
+
+/** Plafond atteint ET rien dans la base : on le dit franchement plutôt que de laisser croire à une panne. */
+const PLAFOND_SEUL: Record<string, string> = {
+  fr: "Tu as posé toutes tes questions détaillées pour aujourd'hui, et je n'ai pas de réponse toute prête à celle-ci. Le compteur repart demain — ou écris au coach depuis la Messagerie.",
+  en: "You've used all your detailed questions for today, and I have no ready-made answer to this one. The counter resets tomorrow — or write to your coach from Messages.",
+  de: "Du hast heute alle ausführlichen Fragen genutzt, und ich habe keine vorgefertigte Antwort darauf. Der Zähler startet morgen neu — oder schreib deinem Coach über Nachrichten.",
+  es: "Has usado todas tus preguntas detalladas de hoy y no tengo una respuesta preparada para esta. El contador se reinicia mañana — o escribe a tu entrenador desde Mensajería.",
+  pt: "Usaste todas as tuas perguntas detalhadas de hoje e não tenho uma resposta pronta para esta. O contador reinicia amanhã — ou escreve ao teu treinador a partir das Mensagens.",
+};
+
 export async function POST(req: Request) {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
@@ -62,6 +83,37 @@ export async function POST(req: Request) {
   //  appel, et aucune question de dépannage ni hors-sujet n'est capturée.
   const immediate = reponseImmediate(message, lang);
   if (immediate) return NextResponse.json({ reply: immediate, source: "base" });
+
+  // ── PLAFOND DE LA BULLE D'AIDE ───────────────────────────────────────────────
+  //  ⚠️ IL N'Y EN AVAIT AUCUN. Cette route n'exigeait que d'être connecté : ni capacité,
+  //  ni plafond. Un compte à 0 € obtenait donc une réponse écrite par le modèle, et RIEN
+  //  ne bornait le nombre d'appels — la seule porte de l'application par laquelle un
+  //  compte gratuit pouvait consommer sans limite. Mesuré : jusqu'à 1 200 jetons de
+  //  sortie, ≈ 0,28 centime l'appel.
+  //
+  //  ⚠️ LE COMPTAGE ARRIVE ICI, APRÈS `reponseImmediate` ET AVANT LE MODÈLE. Le placer
+  //  plus haut ferait payer un crédit pour une réponse tirée de la base de connaissances,
+  //  qui ne coûte pas un jeton (32 % des questions). Le placer plus bas ne bornerait
+  //  rien : c'est l'appel qui coûte, pas la réponse.
+  //
+  //  Compteur SÉPARÉ de `PLAFOND_JOUR` : un client à 9,99 € qui demande où changer sa
+  //  langue ne doit pas y perdre un appel au coach.
+  const { data: profilAcces } = await sb.from("profiles").select(COLONNES_ACCES).eq("id", user.id).maybeSingle();
+  const etatAcces = accesDe(profilAcces as { created_at?: string | null; subscription_tier?: string | null } | null);
+  const quota = await consommerAppelIA(sb, user.id, etatAcces.etat, undefined, "support");
+  if (!quota.accorde) {
+    // On ne laisse pas l'athlète sans rien : la base de connaissances répond encore, et
+    // gratuitement. Ce qui change, c'est qu'on DIT pourquoi la réponse est plus sèche —
+    // « plafond atteint » et « service en panne » ne se résolvent pas du même geste.
+    const secours = fallbackAnswer(message, lang);
+    const entete = quota.indisponible
+      ? (FALLBACK_PREFIX[lang] ?? FALLBACK_PREFIX.fr)
+      : (PLAFOND_ATTEINT[lang] ?? PLAFOND_ATTEINT.fr);
+    return NextResponse.json({
+      reply: secours ? entete + secours : (PLAFOND_SEUL[lang] ?? PLAFOND_SEUL.fr),
+      degraded: true, plafond: !quota.indisponible,
+    });
+  }
 
   // ── État du compte ──
   // `intervals_api_key` n'est lu QUE pour en déduire un booléen ; la clé elle-même ne
