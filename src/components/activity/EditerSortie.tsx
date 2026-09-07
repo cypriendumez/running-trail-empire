@@ -14,7 +14,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, Check, X, Loader2 } from "lucide-react";
-import { TITRE_MAX, DESCRIPTION_MAX } from "@/lib/activities/renommage";
+// ⚠️ `bornes` et NON `renommage` : ce dernier importe la liste de grossièretés, qui
+// partirait alors en clair dans le JavaScript public (régression déjà vécue).
+import { TITRE_MAX, DESCRIPTION_MAX } from "@/lib/activities/bornes";
 
 type Props = {
   id: string;

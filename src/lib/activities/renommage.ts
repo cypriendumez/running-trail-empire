@@ -11,9 +11,10 @@
 //  expliquer pousse l'athlète à réessayer au hasard.
 // ─────────────────────────────────────────────────────────────────────────────
 import { verdictGrossierete } from "@/lib/social/moderation";
-
-export const TITRE_MAX = 80;
-export const DESCRIPTION_MAX = 1000;
+// Les bornes vivent à part : un composant CLIENT en a besoin, et les importer d'ici
+// ferait repartir les 106 racines de `moderation` dans le bundle public.
+export { TITRE_MAX, DESCRIPTION_MAX } from "@/lib/activities/bornes";
+import { TITRE_MAX, DESCRIPTION_MAX } from "@/lib/activities/bornes";
 /** Au-delà, ce n'est plus de l'emphase, c'est du bruit (« aaaaaaaaaa »). */
 export const REPETITIONS_MAX = 4;
 
