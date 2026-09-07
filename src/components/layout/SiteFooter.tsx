@@ -39,6 +39,12 @@ export function SiteFooter({ newsletter = true }: { newsletter?: boolean }) {
           </Link>
           <p className="text-sm text-zinc-500">{f.rights}</p>
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-zinc-500">
+            {/* ⚠️ DEUX LIENS VERS LES PAGES PUBLIQUES, ET C'EST LEUR SEULE PORTE D'ENTRÉE
+                interne. Le sitemap les déclare, mais un moteur suit d'abord les liens :
+                sans eux, 10 539 fiches de courses et 309 fiches de chaussures n'étaient
+                atteignables que par le sitemap. */}
+            <Link href="/courses" className="hover:text-zinc-700 transition-colors">Courses</Link>
+            <Link href="/chaussures" className="hover:text-zinc-700 transition-colors">Comparateur</Link>
             <Link href="/mentions-legales" className="hover:text-zinc-700 transition-colors">{f.legal}</Link>
             <Link href="/confidentialite" className="hover:text-zinc-700 transition-colors">{f.privacy}</Link>
             <Link href="/terms" className="hover:text-zinc-700 transition-colors">{f.cgu}</Link>

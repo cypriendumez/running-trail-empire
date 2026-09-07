@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { jourFrance } from "@/lib/races/jourFrance";
 import { DATE_INCONNUE, slugCourse, type CoursePublique } from "@/lib/races/publique";
+import { CATALOGUE } from "@/lib/shop/catalogue";
 import { regionCanonique } from "@/lib/races/libelles";
 
 /**
@@ -122,10 +123,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // abandonner l'exploration du site entier.
   }
 
+  // ── LE COMPARATEUR D'ÉQUIPEMENT ────────────────────────────────────────────
+  // Il vivait derrière la connexion : aucune de ses fiches n'était atteignable depuis un
+  // moteur de recherche, alors qu'elles répondent à « drop de la Clifton 10 » et qu'elles
+  // ne coûtent rien à servir. Le catalogue est un FICHIER : cette liste ne peut pas
+  // échouer, contrairement aux courses qui dépendent de la base.
+  const chaussures = CATALOGUE.map((m) => ({
+    url: `${BASE}/chaussures/${m.slug}`,
+    lastModified: now,
+    changeFrequency: "monthly" as const,
+    priority: 0.6,
+  }));
+
   return [
     ...fixes,
     { url: `${BASE}/courses`, lastModified: now, changeFrequency: "daily" as const, priority: 0.9 },
+    { url: `${BASE}/chaussures`, lastModified: now, changeFrequency: "weekly" as const, priority: 0.8 },
     ...regions,
     ...courses,
+    ...chaussures,
   ];
 }
