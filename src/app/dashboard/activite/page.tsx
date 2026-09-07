@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { computeSplits, elevationProfile, metricSeries } from "@/lib/segments/splits";
 import { encodePolyline, simplify, type TrackPoint } from "@/lib/segments/geo";
 import { StravaBlocks, type Chiffre, type EffortVu } from "@/components/activity/StravaBlocks";
+import { AnalyseCoach } from "@/components/activity/AnalyseCoach";
 import { meilleursEfforts, chrono as fmtChrono, allure as fmtAllure } from "@/lib/activities/efforts";
 import { MetricChart } from "@/components/activity/MetricChart";
 import { SessionSegments, type EffortVue } from "@/components/activity/SessionSegments";
@@ -70,6 +71,10 @@ export default async function ActivitePage({ searchParams }: { searchParams: Pro
   let survolHref: string | null = null;
   let editionDispo = false;
   let sortie: { id: string; titrePerso: string; description: string; titreMontre: string } | null = null;
+  // ⚠️ SÉPARÉ DE `sortie` À DESSEIN. `sortie` n'existe que si les colonnes d'édition sont
+  // présentes en base ; l'analyse, elle, n'en dépend pas. Les lier aurait fait disparaître
+  // le bloc d'analyse partout où la migration d'édition n'est pas passée — sans erreur.
+  let idSeance: string | null = null;
   let langue = await getPublicLang();
 
   try {
@@ -93,6 +98,7 @@ export default async function ActivitePage({ searchParams }: { searchParams: Pro
 
       if (w) {
         const wk = w as unknown as Record<string, number | string | null>;
+        if (typeof wk.id === "string") idSeance = wk.id;
         if (editionDispo && typeof wk.id === "string") {
           sortie = {
             id: wk.id,
@@ -226,6 +232,13 @@ export default async function ActivitePage({ searchParams }: { searchParams: Pro
           <StravaBlocks polyline={polyline} chiffres={chiffres} splits={splits} profil={profil}
             efforts={efforts} forme={forme} survolHref={survolHref} />
           <SessionSegments efforts={effortsVus} />
+          {idSeance && (
+            <AnalyseCoach workoutId={idSeance} textes={{
+              titre: T[langue]["an.titre"], demander: T[langue]["an.demander"], encours: T[langue]["an.encours"],
+              verrou: T[langue]["an.verrou"], offre: T[langue]["an.offre"], echec: T[langue]["an.echec"],
+              memorise: T[langue]["an.memorise"], tronquee: T[langue]["an.tronquee"],
+            }} />
+          )}
           {courbes.map((c) => <MetricChart key={c.titre} {...c} />)}
         </div>
       )}
