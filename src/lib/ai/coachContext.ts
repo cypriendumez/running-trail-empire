@@ -5,12 +5,13 @@ import { HEALTH_CONDITIONS, INJURY_ZONES, healthCoachLines } from "@/data/health
 import { efficaciteParBloc, tendanceEfficacite, ameliorationAttendue } from "@/lib/running/progression";
 import { relireExecution, corrigerAllure } from "@/lib/coach/relecture";
 import { exigenceTerrain, denivelePartSemaine } from "@/lib/coach/terrain";
+import { planNutritionCourse } from "@/lib/coach/nutritionCourse";
 import { robustWeeklyKm, demonstratedWeeklyKm, longRunForWeek, longRunPeakKm, longRunShare, longRunGap, type RaceGoal } from "@/lib/running/volume";
 import { buildWeightPlan, weightModeEligibility, type WeightPlan } from "@/lib/weight/energy";
 import { weightCoachBlock, weightTrainingRules, type WeightTrainingRules } from "@/lib/weight/coaching";
 import { terrainCoachBlock } from "@/data/terrainCatalog";
 import { forecastWithElevation, altitudeLossPct, heatAdvice, windAdvice, archiveDailyMax, heatAcclimation, type DayWeather } from "@/lib/weather/openMeteo";
-import { bestVmaFromWorkouts, vmaFromPaceCurve, effectiveVma, easyPaceFromHeartRate } from "@/lib/running/fitness";
+import { bestVmaFromWorkouts, vmaFromPaceCurve, effectiveVma, easyPaceFromHeartRate, predictRaceSec } from "@/lib/running/fitness";
 import { isRun } from "@/lib/intervals/sport";
 import { summarizeCross, fmtMinutes, type CrossSummary } from "@/lib/coach/crossTraining";
 import { computeQualityBudget } from "@/lib/coach/qualityBudget";
@@ -1487,6 +1488,23 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
     ? exigenceTerrain(dplusCourse, objective.distanceKm, denivelePartSemaine(coursesForme, now))
     : null;
 
+  // ── NUTRITION DU JOUR DE COURSE ─────────────────────────────────────────────
+  // La sortie longue avait son plan ; la course n'avait rien, alors que c'est le seul
+  // jour où une erreur d'alimentation coûte des mois de préparation.
+  // ⚠️ La température du jour J n'est connue QUE si la course tombe dans la fenêtre de
+  // prévision : `historical_weather` est vide sur les 17 211 courses du catalogue.
+  const meteoCourse = objective?.raceDate
+    ? (weather.days ?? []).find((d) => d.date === objective.raceDate)?.tempMax ?? null
+    : null;
+  const nutriCourse = objective && vma
+    ? planNutritionCourse({
+        dureeSec: predictRaceSec(vma, objective.distanceKm),
+        distanceKm: objective.distanceKm,
+        poidsKg: num(p?.weight_kg),
+        tempC: meteoCourse,
+      })
+    : null;
+
   // ── LE COACH SE RELIT ───────────────────────────────────────────────────────
   // Il vérifiait SI l'athlète avait couru le jour prévu, jamais CE QU'IL AVAIT FAIT.
   // On compare ici l'allure facile PRESCRITE à celle réellement tenue sur 90 jours,
@@ -1654,7 +1672,13 @@ ${p?.gender === "female" ? `- SEXE : femme → besoins en FER et disponibilité 
 
 ⚡ VERDICT DE FRAÎCHEUR DU JOUR (calculé à partir de la VFC, du sommeil, de la charge et du ressenti — CETTE CONCLUSION S'IMPOSE À TOI, ne la ré-arbitre pas)
 ${readinessBlock}
-${objective ? (terrain ? `
+${nutriCourse ? `
+NUTRITION DU JOUR DE COURSE (${nRaw(Math.round(nutriCourse.dureeMin), "fr")} min prévues)
+- Glucides : ${nRaw(nutriCourse.glucidesParH, "fr")} g par heure à partir de la ${nRaw(nutriCourse.premierApportMin, "fr")}ᵉ minute — rien avant, les réserves y suffisent. Soit environ ${nRaw(nutriCourse.glucidesTotalG, "fr")} g au total, l'équivalent de ${nRaw(nutriCourse.gels, "fr")} gel(s) de 25 g.${nutriCourse.dureeMin >= 150 ? " Au-delà de 2 h 30, il faut des glucides MULTI-TRANSPORTABLES (glucose + fructose) : au-delà de 60 g/h, l'intestin ne suit pas avec du glucose seul." : ""}
+- Boisson : ${nRaw(nutriCourse.mlParH, "fr")} ml par heure, avec ${nRaw(nutriCourse.sodiumMgParL, "fr")} mg de sodium par litre.${nutriCourse.tempConnue ? ` Température prévue le jour J : ${nRaw(Math.round(nutriCourse.tempC ?? 0), "fr")} °C.` : " ⚠️ LA TEMPÉRATURE DU JOUR J EST INCONNUE (elle n'est prévisible qu'à une semaine) : ce chiffre suppose une journée tempérée. DIS-LE-LUI, et rappelle-lui de le réviser à la hausse s'il fait chaud — un plan d'hydratation faux par 30 °C est dangereux, pas seulement inexact."}
+${nutriCourse.avantCourseG != null ? `- Avant la course : environ ${nRaw(nutriCourse.avantCourseG, "fr")} g de glucides à charger la veille et au petit-déjeuner (3 h avant le départ).` : "- Poids non renseigné : impossible de chiffrer la charge glucidique d'avant course."}
+- ⚠️ RIEN DE TOUT CELA NE S'ESSAIE LE JOUR J. Chaque produit doit avoir été testé en sortie longue, à l'allure de course.
+` : ""}${objective ? (terrain ? `
 TERRAIN DE LA COURSE (dénivelé du catalogue, pas une estimation)
 - ${objective.race} : ${nRaw(terrain.dplusCourse, "fr")} m de D+ sur ${nRaw(objective.distanceKm, "fr")} km, soit ${nRaw(terrain.mParKm, "fr")} m par kilomètre — profil ${terrain.profil}.
 - Objectif d'entraînement : environ ${nRaw(terrain.cibleHebdoM, "fr")} m de D+ par semaine avant la course. Le corps doit voir PLUS de dénivelé à l'entraînement que le jour J ; une semaine à l'exact D+ de la course ne prépare pas à l'encaisser d'un seul tenant.
