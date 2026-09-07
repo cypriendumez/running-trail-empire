@@ -100,7 +100,43 @@ export const CALQUES: Source[] = [
     attribution: "© IGN — inclinaison des pentes",
     couverture: "fr", taille: 256, zoomMax: 17,
   },
+  {
+    // Les courbes de niveau : ce que lit un randonneur pour juger une montée avant de la
+    // faire. Whympr ne les propose pas dans les captures ; l'IGN les publie librement.
+    id: "courbes-fr", cle: "calque.courbesFr",
+    url: "https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ELEVATION.CONTOUR.LINE&STYLE=normal&FORMAT=image/png&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}",
+    attribution: "© IGN — courbes de niveau",
+    couverture: "fr", taille: 256, zoomMax: 18,
+  },
+  {
+    // ⚠️ LE STYLE S'APPELLE `estompage_grayscale`, PAS `normal`. Avec `normal`, la
+    // Géoplateforme répond 400 — vérifié. Un style faux ne lève aucune erreur côté carte :
+    // il laisse un calque vide qu'on croit allumé.
+    id: "ombrage-fr", cle: "calque.ombrageFr",
+    url: "https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ELEVATION.ELEVATIONGRIDCOVERAGE.SHADOW&STYLE=estompage_grayscale&FORMAT=image/png&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}",
+    attribution: "© IGN — estompage du relief",
+    couverture: "fr", taille: 256, zoomMax: 18,
+  },
 ];
+
+/**
+ * CE QUE JE N'AI PAS PU SOURCER, ET QUI EXISTE POURTANT AILLEURS.
+ *
+ * ⚠️ TROIS COUCHES DE WHYMPR MANQUENT ICI, ET CE N'EST PAS UN OUBLI :
+ *
+ * • ORIENTATION DES PENTES et ZONES DE PLAT — le catalogue WMTS de la Géoplateforme a
+ *   été interrogé en entier le 07/09/2026 (2,9 Mo de capacités) : il contient
+ *   `SLOPES.MOUNTAIN`, `CONTOUR.LINE`, `SHADOW`… et AUCUNE couche d'orientation ni de
+ *   zones plates. Elles n'existent pas côté français ; Whympr les calcule ou les achète
+ *   ailleurs.
+ * • BULLETIN D'AVALANCHES — l'API publique de Météo-France répond 401 : elle exige un
+ *   jeton que ce projet n'a pas. Un bulletin d'avalanches approximatif serait pire que
+ *   pas de bulletin du tout : on ne l'invente pas.
+ *
+ * Cette liste est écrite ici pour qu'on sache POURQUOI elles manquent, et pour qu'on
+ * n'aille pas les rechercher une seconde fois.
+ */
+export const NON_SOURCEES = ["orientation des pentes", "zones de plat", "bulletin d'avalanches"] as const;
 
 /** ── TRACES ────────────────────────────────────────────────────────────────── */
 export const TRACES: Source[] = [

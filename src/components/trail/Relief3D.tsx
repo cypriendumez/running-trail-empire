@@ -6,6 +6,7 @@ import {
   FONDS, CALQUES, TRACES, RELIEF, PALIERS_PENTE,
   avecCle, disponibles, attributionDe, type Source,
 } from "@/lib/trail/couches";
+import { interrogeable, prioriser, versGeoJson, type Toponyme } from "@/lib/trail/toponymes";
 
 /**
  * LA VUE RELIEF — la montagne en trois dimensions, avec ses fonds et ses calques.
@@ -111,6 +112,10 @@ export function Relief3D({ trace, centre, textes }: {
   const [relief, setRelief] = useState(true);
   const [panneau, setPanneau] = useState<null | "cartes" | "calques" | "traces">(null);
   const [couches, setCouches] = useState<EtatCouches>({ fond: "satellite", calques: [], traces: [] });
+  /** Étiquettes de sommets et refuges : allumées à la demande, chargées à la volée. */
+  const [noms, setNoms] = useState(false);
+  const [etatNoms, setEtatNoms] = useState<"repos" | "encours" | "large" | "vide" | "ok">("repos");
+  const toponymes = useRef<Toponyme[]>([]);
 
   const fondsDispo = useMemo(() => disponibles(FONDS, CLE), []);
   const t = (k: string) => textes[k] ?? k;
@@ -127,8 +132,11 @@ export function Relief3D({ trace, centre, textes }: {
       ...couches.traces.map((id) => TRACES.find((c) => c.id === id)),
     ];
     const base = attributionDe(actifs);
-    return relief ? `${base} · ${RELIEF.attribution}` : base;
-  }, [couches, relief]);
+    const avecRelief = relief ? `${base} · ${RELIEF.attribution}` : base;
+    // Les noms viennent d'OpenStreetMap sous ODbL : l'attribution est obligatoire dès
+    // qu'ils sont affichés.
+    return noms ? `${avecRelief} · © OpenStreetMap contributors (ODbL)` : avecRelief;
+  }, [couches, relief, noms]);
 
   // ── Création de la carte, une seule fois ────────────────────────────────────
   useEffect(() => {
@@ -269,6 +277,80 @@ export function Relief3D({ trace, centre, textes }: {
     } catch { /* un style refusé laisse le précédent en place, ce qui est le bon repli */ }
   }, [couches, coords, relief]);
 
+  // ── LES NOMS DE LA MONTAGNE ─────────────────────────────────────────────────
+  useEffect(() => {
+    const map = carte.current;
+    if (!map) return;
+
+    const effacer = () => {
+      for (const l of ["topo-texte", "topo-point"]) if (map.getLayer(l)) map.removeLayer(l);
+      if (map.getSource("topo")) map.removeSource("topo");
+    };
+
+    if (!noms) { try { effacer(); } catch { /* style pas encore prêt */ } setEtatNoms("repos"); return; }
+
+    let annule = false;
+    const charger = async () => {
+      const b = map.getBounds();
+      const bbox = { sud: b.getSouth(), ouest: b.getWest(), nord: b.getNorth(), est: b.getEast() };
+      if (!interrogeable(bbox, map.getZoom())) { setEtatNoms("large"); try { effacer(); } catch { /* idem */ } return; }
+      setEtatNoms("encours");
+      // ⚠️ ON PASSE PAR NOTRE SERVEUR, JAMAIS PAR OVERPASS EN DIRECT. Mesuré : la même
+      // requête répond en une seconde depuis le serveur et EXPIRE APRÈS 45 SECONDES
+      // depuis la page. Un écran figé trois quarts de minute pour des étiquettes n'est
+      // pas acceptable ; la route, elle, borne le délai et met en cache.
+      {
+        try {
+          const q = new URLSearchParams({
+            sud: String(bbox.sud), ouest: String(bbox.ouest), nord: String(bbox.nord), est: String(bbox.est),
+            zoom: String(map.getZoom()),
+          });
+          // Ceinture supplémentaire côté navigateur : même si le serveur tardait, on ne
+          // laisse pas l'interface suspendue.
+          const r = await fetch(`/api/trail/toponymes?${q}`, { signal: AbortSignal.timeout(12000) });
+          if (!r.ok) { setEtatNoms("vide"); return; }
+          const liste = prioriser(((await r.json())?.toponymes ?? []) as Toponyme[]);
+          if (annule) return;
+          toponymes.current = liste;
+          if (!liste.length) { setEtatNoms("vide"); try { effacer(); } catch { /* idem */ } return; }
+          try {
+            effacer();
+            map.addSource("topo", { type: "geojson", data: versGeoJson(liste) });
+            map.addLayer({
+              id: "topo-point", type: "circle", source: "topo",
+              paint: {
+                "circle-radius": 3.5,
+                "circle-color": ["match", ["get", "genre"], "sommet", "#ffffff", "refuge", "#f59e0b", "vue", "#38bdf8", "col", "#e2e8f0", "#7dd3fc"],
+                "circle-stroke-width": 1.5, "circle-stroke-color": "#0f172a",
+              },
+            });
+            map.addLayer({
+              id: "topo-texte", type: "symbol", source: "topo",
+              layout: {
+                "text-field": ["get", "etiquette"],
+                "text-font": ["Open Sans Semibold"],
+                "text-size": ["match", ["get", "genre"], "sommet", 12, 11],
+                "text-offset": [0, -1.1], "text-anchor": "bottom",
+                // Les étiquettes qui se chevauchent sont pires que pas d'étiquettes :
+                // MapLibre en écarte plutôt que de les empiler.
+                "text-allow-overlap": false, "text-padding": 3,
+              },
+              paint: { "text-color": "#ffffff", "text-halo-color": "#0f172a", "text-halo-width": 1.6 },
+            });
+            setEtatNoms("ok");
+          } catch { /* le style n'est pas prêt : le prochain déplacement réessaiera */ }
+          return;
+        } catch { /* route injoignable ou délai dépassé : la carte reste utilisable */ }
+      }
+      setEtatNoms("vide");
+    };
+
+    charger();
+    // Recharger au déplacement : les noms suivent ce qu'on regarde.
+    map.on("moveend", charger);
+    return () => { annule = true; map.off("moveend", charger); };
+  }, [noms, pret]);
+
   // ── Bascule 2D / 3D ─────────────────────────────────────────────────────────
   useEffect(() => {
     const map = carte.current;
@@ -394,6 +476,19 @@ export function Relief3D({ trace, centre, textes }: {
 
             {panneau === "calques" && (
               <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                {/* Les NOMS d'abord : c'est ce qui transforme une image en carte. */}
+                <li className="flex items-center justify-between gap-3 py-2.5">
+                  <div>
+                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t("calque.toponymes")}</p>
+                    <p className="text-[11px] text-zinc-500">
+                      {etatNoms === "encours" ? t("topo.chargement")
+                        : etatNoms === "large" ? t("topo.tropLarge")
+                        : etatNoms === "vide" ? t("topo.aucun")
+                        : t("topo.source")}
+                    </p>
+                  </div>
+                  <Bascule actif={noms} onChange={() => setNoms((v) => !v)} label={t("calque.toponymes")} />
+                </li>
                 {CALQUES.map((c) => (
                   <li key={c.id} className="flex items-center justify-between gap-3 py-2.5">
                     <div>
@@ -403,6 +498,15 @@ export function Relief3D({ trace, centre, textes }: {
                     <Bascule actif={couches.calques.includes(c.id)} onChange={() => bascule("calques", c.id)} label={t(c.cle)} />
                   </li>
                 ))}
+                {/* ⚠️ ON DIT CE QU'ON N'A PAS. Trois calques de Whympr manquent, et ce
+                    n'est pas un oubli : le catalogue IGN a été interrogé en entier, il ne
+                    contient ni orientation des pentes ni zones de plat, et l'API Météo-
+                    France du bulletin d'avalanches répond 401. Le taire laisserait croire
+                    à un produit incomplet par négligence. */}
+                <li className="pt-3">
+                  <p className="text-xs font-semibold text-zinc-500">{t("manque.titre")}</p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">{t("manque.texte")}</p>
+                </li>
               </ul>
             )}
 

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
 import { TrailBuilderLazy } from "./TrailBuilderLazy";
@@ -27,6 +27,16 @@ export function TrailModes({ centre, textes }: {
   textes: Record<string, string>;
 }) {
   const [mode, setMode] = useState<"construire" | "relief">("construire");
+  /**
+   * ⚠️ LA TRACE VIT ICI, PAS DANS LE CONSTRUCTEUR. Les deux modes sont montés
+   * séparément — garder deux moteurs cartographiques vivants en même temps serait
+   * ruineux — donc la trace disparaîtrait au changement d'onglet si le constructeur la
+   * gardait pour lui. Elle remonte, et la vue relief la reçoit telle quelle.
+   */
+  const [trace, setTrace] = useState<{ lat: number; lon: number }[]>([]);
+  // `useCallback` : sans lui, une nouvelle fonction à chaque rendu relancerait l'effet de
+  // remontée du constructeur en boucle.
+  const recevoir = useCallback((points: { lat: number; lon: number }[]) => setTrace(points), []);
   const t = (k: string) => textes[k] ?? k;
 
   return (
@@ -41,13 +51,17 @@ export function TrailModes({ centre, textes }: {
           ))}
         </div>
         {mode === "relief" && (
-          <p className="hidden max-w-sm text-right text-xs text-zinc-500 sm:block">{t("relief.sous")}</p>
+          <p className="hidden max-w-sm text-right text-xs text-zinc-500 sm:block">
+            {trace.length > 1 ? t("relief.avecTrace") : t("relief.sous")}
+          </p>
         )}
       </div>
 
       {/* Les deux modes sont MONTÉS séparément : garder le constructeur vivant sous la vue
           relief ferait tourner deux moteurs cartographiques en même temps. */}
-      {mode === "construire" ? <TrailBuilderLazy centre={centre} /> : <Relief3D centre={centre} textes={textes} />}
+      {mode === "construire"
+        ? <TrailBuilderLazy centre={centre} onTrace={recevoir} />
+        : <Relief3D centre={centre} trace={trace} textes={textes} />}
     </div>
   );
 }

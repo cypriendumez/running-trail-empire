@@ -1,0 +1,99 @@
+import { NextResponse } from "next/server";
+import { requete, interrogeable, lire, prioriser, MIROIRS, type Toponyme } from "@/lib/trail/toponymes";
+
+/**
+ * LES NOMS DE LA MONTAGNE, SERVIS PAR LE SERVEUR.
+ *
+ * ⚠️ CETTE ROUTE EXISTE PARCE QU'APPELER OVERPASS DEPUIS LE NAVIGATEUR NE MARCHE PAS.
+ * Mesuré le 07/09/2026 : la même requête répond en une seconde depuis le serveur et
+ * EXPIRE APRÈS 45 SECONDES depuis la page — un écran figé trois quarts de minute pour des
+ * étiquettes. Overpass est un service public gratuit, parfois saturé (504 vu sur le
+ * miroir principal le même jour) : il n'a rien à faire dans le chemin direct d'un
+ * utilisateur.
+ *
+ * Ce que la route ajoute, et que le navigateur ne pouvait pas faire :
+ * • un DÉLAI COURT — au-delà, on rend une liste vide plutôt que de faire attendre ;
+ * • plusieurs MIROIRS, essayés l'un après l'autre ;
+ * • un CACHE en mémoire : deux athlètes qui regardent le même massif ne déclenchent
+ *   qu'une seule requête chez un service qu'on ne paie pas.
+ */
+export const dynamic = "force-dynamic";
+
+/** Au-delà, on rend ce qu'on a — c'est-à-dire rien — plutôt que de faire attendre. */
+const DELAI_MS = 9000;
+/** Une zone de montagne ne change pas dans la journée. */
+const CACHE_MS = 6 * 3600 * 1000;
+/** Bornes du cache : au-delà on oublie les plus anciennes entrées. */
+const CACHE_MAX = 120;
+
+const cache = new Map<string, { a: number; liste: Toponyme[] }>();
+
+/** Arrondi du cadrage : deux vues presque identiques doivent partager une entrée. */
+function cle(b: { sud: number; ouest: number; nord: number; est: number }): string {
+  const r = (n: number) => Math.round(n * 50) / 50;   // pas de 0,02° ≈ 2 km
+  return `${r(b.sud)},${r(b.ouest)},${r(b.nord)},${r(b.est)}`;
+}
+
+export async function GET(req: Request) {
+  const p = new URL(req.url).searchParams;
+  const n = (k: string) => Number(p.get(k));
+  const bbox = { sud: n("sud"), ouest: n("ouest"), nord: n("nord"), est: n("est") };
+  const zoom = n("zoom");
+  if (!Object.values(bbox).every(Number.isFinite) || !Number.isFinite(zoom)) {
+    return NextResponse.json({ error: "cadrage invalide" }, { status: 400 });
+  }
+  // Le même contrôle que côté client : une zone trop large ramènerait des milliers
+  // d'objets illisibles et pèserait sur un service gratuit.
+  if (!interrogeable(bbox, zoom)) return NextResponse.json({ toponymes: [], raison: "trop_large" });
+
+  const k = cle(bbox);
+  const vu = cache.get(k);
+  if (vu && Date.now() - vu.a < CACHE_MS) return NextResponse.json({ toponymes: vu.liste, cache: true });
+
+  /**
+   * ⚠️ EN PARALLÈLE, PAS L'UN APRÈS L'AUTRE. Mesuré en dix minutes le 07/09/2026 : un
+   * miroir servait 118 objets puis a cessé de répondre pendant qu'un autre rendait
+   * 35 sommets en 1,6 s. En série, le miroir mort coûtait NEUF SECONDES d'attente avant
+   * même d'essayer celui qui marchait. On les lance ensemble et on garde la première
+   * vraie réponse.
+   *
+   * ⚠️ ET ON EXIGE UNE RÉPONSE NON VIDE. Un miroir à couverture partielle (osm.ch) rend
+   * 200 avec deux sommets là où un autre en trouve trente-cinq : gagner la course avec
+   * une réponse presque vide donnerait une carte presque muette.
+   */
+  const essai = (miroir: string) => fetch(miroir, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      // ⚠️ OVERPASS EXIGE UN AGENT IDENTIFIABLE, ET IL LE DIT EN CLAIR. Sans cet en-tête,
+      // le serveur répond « 429 — Please include a meaningful User-Agent string with your
+      // requests to avoid rate-limiting ». Mesuré : refus en 217 ms, aucun objet. C'est la
+      // règle d'un service public gratuit, et la respecter coûte une ligne.
+      "User-Agent": "Pacevo/1.0 (application d'entrainement course a pied; https://running-trail-empire-woad.vercel.app)",
+    },
+    body: new URLSearchParams({ data: requete(bbox) }),
+    signal: AbortSignal.timeout(DELAI_MS),
+  }).then(async (r) => {
+    if (!r.ok) throw new Error(String(r.status));
+    const liste = prioriser(lire(await r.json()));
+    if (!liste.length) throw new Error("vide");
+    return liste;
+  });
+
+  try {
+    const liste = await Promise.any(MIROIRS.map(essai));
+    // ⚠️ ON MET EN CACHE MÊME UNE LISTE VIDE (plus bas) : un massif sans sommet nommé
+    // existe, et sans cela on rejouerait la requête à chaque déplacement pour rien.
+    if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value as string);
+    cache.set(k, { a: Date.now(), liste });
+    return NextResponse.json({ toponymes: liste });
+  } catch {
+    // Tous les miroirs ont échoué ou n'ont rien trouvé. On mémorise brièvement pour ne
+    // pas marteler un service gratuit déjà en peine.
+    if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value as string);
+    cache.set(k, { a: Date.now() - CACHE_MS + 120_000, liste: [] });   // revalable dans 2 min
+  }
+  // ⚠️ AUCUNE ERREUR HTTP ICI. Ne pas avoir les noms n'est pas une panne de l'application :
+  // la carte reste entièrement utilisable. On le DIT, et l'écran l'affiche.
+  return NextResponse.json({ toponymes: [], raison: "indisponible" });
+}

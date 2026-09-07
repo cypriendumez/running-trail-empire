@@ -235,7 +235,11 @@ function speedRange(activity: ActivityKey): { min: number; max: number; step: nu
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 // ─── Component ───────────────────────────────────────────────────────────────
-export function TrailBuilder({ centre }: { centre?: { lat: number; lon: number } | null } = {}) {
+export function TrailBuilder({ centre, onTrace }: {
+  centre?: { lat: number; lon: number } | null;
+  /** Remonte la trace construite, pour que la vue relief l'affiche telle quelle. */
+  onTrace?: (points: { lat: number; lon: number }[]) => void;
+} = {}) {
   const { lang } = useT();
   const d = TB[lang] ?? TB.fr;
   const tb = (k: string, p?: Record<string, string | number>) => fillT(d[k] ?? k, p);
@@ -265,6 +269,10 @@ export function TrailBuilder({ centre }: { centre?: { lat: number; lon: number }
   const [segments, setSegments] = useState<LatLng[][]>([]); // [ [p0], legPts, legPts… ]
   const [redoStack, setRedoStack] = useState<{ wp: LatLng; seg: LatLng[] }[]>([]); // for "Retour" (redo)
   const allPoints = useMemo(() => segments.flat(), [segments]);
+  // ⚠️ REMONTÉE DANS UN EFFET, PAS PENDANT LE RENDU. Appeler `onTrace` directement dans
+  // le corps du composant déclencherait un `setState` du parent au milieu du rendu de
+  // l'enfant — React le refuse, et la carte cesserait de se mettre à jour.
+  useEffect(() => { onTrace?.(allPoints.map((p) => ({ lat: p.lat, lon: p.lng }))); }, [allPoints, onTrace]);
   const [elevations, setElevations] = useState<number[]>([]);
   const [distance, setDistance] = useState(0);
   const [routeLoading, setRouteLoading] = useState(false);
