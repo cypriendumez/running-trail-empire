@@ -69,7 +69,7 @@ export function AnalyseCoach({ workoutId, textes }: {
       {etat === "verrou" && (
         <div className="space-y-2">
           <p className="text-sm text-zinc-600 dark:text-zinc-400">{textes.verrou}</p>
-          <a href="/tarifs" className="inline-block rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
+          <a href="/pricing" className="inline-block rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
             {textes.offre}
           </a>
         </div>

@@ -1324,7 +1324,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
               <p className="mt-0.5 text-xs leading-relaxed text-zinc-500">{readiness.tagline}</p>
             </div>
           </div>
-          <Link href="/dashboard/sante" className="mt-4 flex items-center justify-between rounded-xl border border-zinc-100 px-3 py-2 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50">
+          <Link href="/dashboard/health" className="mt-4 flex items-center justify-between rounded-xl border border-zinc-100 px-3 py-2 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50">
             {rl.recommend} <ChevronRight className="h-3.5 w-3.5 text-zinc-400" />
           </Link>
         </div>

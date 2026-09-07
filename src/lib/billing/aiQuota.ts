@@ -9,9 +9,22 @@
 //  sans plafond par athlète est un chèque en blanc, qu'une boucle, un script ou un
 //  simple usage intensif suffit à vider.
 //
-//  CHIFFRES MESURÉS SUR LE COMPTE DE PRODUCTION (pas estimés) : le contexte envoyé
-//  au modèle pèse 18 336 caractères, soit ≈ 4 584 jetons d'entrée. Avec ~700 jetons
-//  de sortie, un appel coûte ≈ 0,29 centime d'euro. Ce qui donne, par athlète :
+//  CHIFFRES MESURÉS SUR LE COMPTE DE PRODUCTION (pas estimés).
+//
+//  ⚠️ REMESURÉ LE 07/09/2026, ET LE CHIFFRE AVAIT DÉRIVÉ. Le contexte pesait 18 336
+//  caractères ; il en pèse 20 124 (≈ 5 031 jetons), soit +9,8 %, parce que quatre blocs
+//  ont été ajoutés à l'invite du coach — terrain de la course, relecture de l'exécution,
+//  pente de progression, nutrition du jour de course. Un commentaire qui annonce un
+//  chiffre « mesuré » vieillit mal : celui-ci sous-estimait le coût réel.
+//  Un appel coach coûte donc ≈ 0,30 centime d'euro (au lieu de 0,29), sortie comprise.
+//
+//  L'analyse de séance (`/api/ai/analyse-seance`), elle, a été mesurée à 0,128 centime :
+//  412 jetons d'entrée, 211 de réponse, 298 de raisonnement. Deux fois moins chère que
+//  l'appel coach, et mémorisée à vie par séance — une séance passée n'est jamais
+//  repayée. La SORTIE représente 91 % de son coût, ce qui est la raison pour laquelle
+//  l'écart Premium porte sur le contexte donné et non sur la longueur du texte produit.
+//
+//  Ce qui donne, par athlète, au tarif le plus cher (l'appel coach) :
 //
 //      5 appels/jour  → 0,43 €/mois   (3 % du prix de Complet)
 //     25 appels/jour  → 2,16 €/mois   (14 %)
@@ -38,13 +51,17 @@ export const TYPE_QUOTA = "ai_quota";
  * l'écart de prix se justifie par un usage, pas par une case cochée. Une formule
  * privée d'IA se vend mal parce que l'acheteur ne sait pas ce qu'il rate.
  *
- * CHIFFRÉ POUR RESTER RENTABLE, en partant du coût mesuré (0,29 centime l'appel) et
- * du revenu NET (après TVA 20 % et commission Stripe) :
+ * CHIFFRÉ POUR RESTER RENTABLE, en partant du coût mesuré (0,30 centime l'appel,
+ * remesuré le 07/09/2026) et du revenu NET (après TVA 20 % et commission Stripe) :
  *
- *   Starter  9,99 €/mois (99,90 €/an) → 10 appels/j = 0,87 €/mois au pire
+ *   Starter  9,99 €/mois (99,90 €/an) → 10 appels/j = 0,90 €/mois au pire
  *              = 11 % du net mensuel, 13 % du net ANNUEL — marge brute 87 %
- *   Premium 14,99 €/mois (149,90 €/an) → 30 appels/j = 2,61 €/mois au pire
+ *   Premium 14,99 €/mois (149,90 €/an) → 30 appels/j = 2,70 €/mois au pire
  *              = 22 % du net mensuel, 26 % du net ANNUEL — marge brute 74 %
+ *
+ * ⚠️ Les MONTANTS ont bougé (0,87 → 0,90 et 2,61 → 2,70) avec l'invite plus riche, mais
+ * les POURCENTAGES sont inchangés au point de pourcentage près : la marge tient. C'est
+ * elle qu'il faut surveiller, pas les euros — un plafond se juge en part du revenu.
  *
  * ⚠️ C'est le tarif ANNUEL qui contraint, pas le mensuel : deux mois offerts diminuent
  * le revenu sans diminuer le plafond. Une remise de −33 % (80 €/an, comme envisagé un
