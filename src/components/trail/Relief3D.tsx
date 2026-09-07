@@ -326,7 +326,7 @@ export function Relief3D({ trace, centre, textes }: {
                 // La pastille d'un sommet haut est un peu plus grosse : elle se repère
                 // avant même qu'on lise le nom.
                 "circle-radius": ["case", ["==", ["get", "genre"], "sommet"],
-                  ["interpolate", ["linear"], ["get", "altitude"], 0, 3, 3500, 5], 3.5],
+                  ["interpolate", ["linear"], ["get", "altitude"], 500, 3, 1500, 4, 3500, 5], 3.5],
               },
             });
             map.addLayer({
@@ -338,10 +338,17 @@ export function Relief3D({ trace, centre, textes }: {
                 // dense — 188 sommets nommés mesurés sur Gavarnie — un 3 000 m et une
                 // bosse de 1 200 m écrits pareil se valent à l'œil, et le regard ne
                 // trouve plus le repère qu'il cherche.
+                //
+                // ⚠️ L'ÉCHELLE PART DE 500 M, PAS DE ZÉRO, et c'est une correction issue
+                // d'une mesure sur toute la France. Calée de 0 à 3 500 m, elle écrasait
+                // les moyennes montagnes : dans les Vosges (plus haut sommet 1 424 m), le
+                // Jura (1 721 m) ou la chaîne des Puys (1 464 m), TOUTES les étiquettes
+                // tombaient autour de 11 px et aucune hiérarchie ne se lisait. Le relief
+                // bas mérite la sienne : entre 500 et 1 500 m, l'écart est déjà net.
                 "text-size": [
                   "case",
                   ["==", ["get", "genre"], "sommet"],
-                  ["interpolate", ["linear"], ["get", "altitude"], 0, 10.5, 2000, 12, 3500, 14],
+                  ["interpolate", ["linear"], ["get", "altitude"], 500, 10.5, 1500, 12, 3500, 14],
                   11,
                 ],
                 "text-offset": [0, -1.1], "text-anchor": "bottom",

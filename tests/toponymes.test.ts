@@ -209,6 +209,11 @@ test("la carte hiérarchise vraiment les étiquettes", () => {
   assert.match(vue, /"symbol-sort-key": \["get", "tri"\]/,
     "les chevauchements se résolvent de nouveau au hasard");
   assert.match(vue, /"text-size": \[\s*"case"/, "toutes les étiquettes ont repris la même taille");
+  // ⚠️ L'ÉCHELLE PART DE 500 M. Mesuré sur toute la France : calée depuis zéro, elle
+  // écrasait les moyennes montagnes — Vosges 1 424 m, Jura 1 721 m, Puys 1 464 m — où
+  // toutes les étiquettes tombaient autour de 11 px, sans aucune hiérarchie.
+  assert.match(vue, /\["get", "altitude"\], 500, 10\.5, 1500, 12, 3500, 14\]/,
+    "l'échelle de taille est repartie de zéro : le relief bas redevient uniforme");
 });
 
 test("l'étiquette porte l'altitude quand elle existe", () => {
