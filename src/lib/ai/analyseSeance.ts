@@ -158,3 +158,20 @@ export function allureTexte(minParKm: number | null): string | null {
   const s = Math.round((minParKm - m) * 60);
   return s === 60 ? `${m + 1}'00` : `${m}'${String(s).padStart(2, "0")}`;
 }
+
+/**
+ * Date en toutes lettres. Le modèle RECOPIE ce qu'on lui donne : lui tendre
+ * « 2026-08-24 » lui faisait servir cette chaîne telle quelle à l'athlète.
+ *
+ * ⚠️ CE QUI PROTÈGE LA DATE, C'EST `timeZone: "UTC"` — pas l'heure de midi. J'avais
+ * d'abord écrit l'inverse ; la mutation l'a démenti : passer le parse à minuit ne change
+ * RIEN tant que le formatage est forcé en UTC. Sans ce `timeZone`, en revanche, le
+ * serveur (iad1, aux États-Unis) reculerait la date d'un jour. Le parse à midi reste une
+ * ceinture de sécurité si quelqu'un retire un jour le `timeZone`.
+ */
+export function dateLisible(iso: string, lang = "fr"): string {
+  const d = new Date(String(iso).slice(0, 10) + "T12:00:00Z");
+  if (!Number.isFinite(d.getTime())) return String(iso);
+  const etiquette: Record<string, string> = { fr: "fr-FR", en: "en-GB", de: "de-DE", es: "es-ES", pt: "pt-PT" };
+  return d.toLocaleDateString(etiquette[lang] ?? "fr-FR", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+}

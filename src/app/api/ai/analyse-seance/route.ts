@@ -5,7 +5,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { exigeAcces } from "@/lib/billing/guard";
 import { COLONNES_ACCES, profilPeut } from "@/lib/billing/access";
 import { generateContent, budget } from "@/lib/ai/gemini";
-import { faitsDeSeance, allureTexte, type SeanceBrute, type FaitsSeance } from "@/lib/ai/analyseSeance";
+import { faitsDeSeance, allureTexte, dateLisible, type SeanceBrute, type FaitsSeance } from "@/lib/ai/analyseSeance";
+import { getAccountLang } from "@/lib/i18n/serverLang";
+import type { Lang } from "@/lib/i18n/translations";
 
 /**
  * L'ANALYSE D'UNE SÉANCE — passée ou tout juste arrivée.
@@ -38,9 +40,11 @@ const COMPARABLES_MAX = 120;
 
 const COLS = "id,date,title,sport,distance_km,duration_seconds,avg_pace_min_km,gap_min_km,avg_hr,max_hr,elevation_gain_m,hr_zone_seconds,avg_cadence_spm,weather_temp_c";
 
-function lignesDeFaits(f: FaitsSeance): string {
+function lignesDeFaits(f: FaitsSeance, lang: Lang): string {
   const l: string[] = [];
-  l.push(`Date : ${f.date} — ${f.sport}`);
+  // ⚠️ Une date en toutes lettres, pas « 2026-08-24 » : le modèle RECOPIE ce qu'on lui
+  // donne, et il servait la date brute à l'athlète — un entraîneur ne parle pas ainsi.
+  l.push(`Date : ${dateLisible(f.date, lang)} — ${f.sport}`);
   if (f.distanceKm != null && f.dureeMin != null) l.push(`Distance ${f.distanceKm} km en ${f.dureeMin} min`);
   const a = allureTexte(f.allure), ac = allureTexte(f.allureCorrigee);
   if (a) l.push(`Allure ${a}/km${ac && ac !== a ? ` (corrigée du dénivelé : ${ac}/km)` : ""}`);
@@ -116,6 +120,14 @@ export async function POST(req: Request) {
 
   // ── 5. Le modèle. Il rédige, il ne calcule pas.
   const longue = profilPeut(accesRes.data as Parameters<typeof profilPeut>[0], "analyse_longue");
+  // ⚠️ LA LANGUE DU COMPTE, PAS LE FRANÇAIS EN DUR. L'invite imposait « en français » :
+  // un client allemand voyait le bouton traduit et recevait une analyse française.
+  const lang = await getAccountLang(supabase, user.id);
+  const LANGUE: Record<Lang, string> = {
+    fr: "en français, en tutoyant", en: "in English, addressing the athlete as “you”",
+    de: "auf Deutsch, mit Du-Anrede", es: "en español, tuteando",
+    pt: "em português, tratando o atleta por tu",
+  };
   const invite = [
     "Tu es l'entraîneur de cet athlète et tu relis UNE de ses séances.",
     "",
@@ -124,12 +136,13 @@ export async function POST(req: Request) {
     "- Ce qui est listé comme inconnu doit être DIT inconnu, jamais comblé.",
     "- Juge l'intensité sur la fréquence cardiaque fournie, jamais sur le titre de la séance.",
     "- Pas de diagnostic médical, pas de « tu es apte ».",
-    `- ${longue ? "Six à huit phrases" : "Trois à quatre phrases"}, en français, en tutoyant.`,
+    `- ${longue ? "Six à huit phrases" : "Trois à quatre phrases"}, ${LANGUE[lang]}.`,
+    "- Commence directement par le fond : pas de salutation, pas de « je viens de relire ». Chaque mot est facturé.",
     "",
     "STRUCTURE : ce qui s'est passé · ce que ça dit de sa forme · une seule chose à retenir pour la suite.",
     "",
     "LES FAITS :",
-    lignesDeFaits(faits),
+    lignesDeFaits(faits, lang),
   ].join("\n");
 
   const r = await generateContent(
@@ -152,7 +165,7 @@ export async function POST(req: Request) {
     user_id: user.id, type: TYPE_ANALYSE,
     title: `Analyse — ${String(s.date).slice(0, 10)}`,
     body: texte,
-    data: { workout_id: workoutId, date: String(s.date).slice(0, 10), longue },
+    data: { workout_id: workoutId, date: String(s.date).slice(0, 10), longue, lang },
   });
   if (eIns) console.error("[analyse-seance] analyse non mémorisée, elle sera repayée :", eIns.message);
 

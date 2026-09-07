@@ -16,7 +16,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  faitsDeSeance, zonesEnMinutes, allureTexte,
+  faitsDeSeance, zonesEnMinutes, allureTexte, dateLisible,
   PART_FC_DURE, PART_FC_FACILE, ECART_DISTANCE, COMPARABLES_MIN,
   type SeanceBrute,
 } from "../src/lib/ai/analyseSeance";
@@ -110,6 +110,20 @@ test("une allure s'écrit en minutes et secondes", () => {
   assert.equal(allureTexte(0), null);
 });
 
+test("une date est écrite en toutes lettres, dans la langue du compte", () => {
+  // Le modèle RECOPIE ce qu'on lui tend : avec « 2026-08-24 » dans les faits, il servait
+  // cette chaîne telle quelle à l'athlète. Vérifié sur un appel réel avant correction.
+  assert.equal(dateLisible("2026-08-24", "fr"), "24 août 2026");
+  assert.match(dateLisible("2026-08-24", "de"), /August/);
+  // ⚠️ CE QUI PROTÈGE VRAIMENT LA DATE : le formatage forcé en UTC. Mon premier
+  // commentaire créditait le parse à midi ; la mutation l'a démenti — passer le parse à
+  // minuit ne change rien. Le test vise donc ce qui produit l'effet.
+  assert.match(dateLisible("2026-01-01", "fr"), /1 janvier 2026/, "la date a reculé d'un jour");
+  assert.match(codeOf("src/lib/ai/analyseSeance.ts"), /timeZone: "UTC"/,
+    "sans fuseau forcé, le serveur (aux États-Unis) reculerait la date d'un jour");
+  assert.equal(dateLisible("n'importe quoi"), "n'importe quoi", "une date illisible ne devient pas une fausse date");
+});
+
 console.log("\nLA ROUTE — verrou, mémoire, et interdiction d'inventer");
 
 test("le verrou est SERVEUR et porte sur la capacité IA", () => {
@@ -144,6 +158,22 @@ test("le modèle a interdiction d'inventer un chiffre", () => {
   assert.match(src, /doit être DIT inconnu, jamais comblé/, "le modèle n'est plus tenu d'avouer ce qu'il ignore");
   assert.match(src, /jamais sur le titre de la séance/, "le modèle peut de nouveau juger l'intensité sur l'étiquette");
   assert.match(src, /f\.manques/, "la liste des inconnues n'est plus transmise");
+  assert.match(src, /pas de salutation/, "le modèle recommence à saluer : chaque mot est facturé");
+});
+
+test("l'analyse est écrite dans la langue du compte", () => {
+  // L'invite imposait « en français » : un client allemand voyait le bouton traduit et
+  // recevait une analyse en français.
+  const src = codeOf("src/app/api/ai/analyse-seance/route.ts");
+  assert.match(src, /getAccountLang\(supabase, user\.id\)/, "la langue du compte n'est plus lue");
+  assert.match(src, /\$\{LANGUE\[lang\]\}/, "l'invite ne demande plus la langue de l'athlète");
+  // ⚠️ LES FAITS AUSSI. La date y est écrite en toutes lettres : figée en français, elle
+  // repartait en français dans une analyse allemande. Mutation qui restait verte sans ça.
+  assert.match(src, /lignesDeFaits\(faits, lang\)/, "les faits sont rendus dans une langue figée");
+  assert.ok(!/en français, en tutoyant\.`/.test(src), "le français est redevenu codé en dur");
+  for (const lg of ["fr", "en", "de", "es", "pt"]) {
+    assert.ok(new RegExp(`\\b${lg}:`).test(src), `langue « ${lg} » absente de la table`);
+  }
 });
 
 test("le budget de raisonnement est séparé de la réponse", () => {
