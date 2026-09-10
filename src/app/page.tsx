@@ -294,7 +294,7 @@ export default function LandingPage() {
             <Wordmark tone={solidNav ? "dark" : "light"} className={`text-xl ${navOmbre}`} />
           </Link>
           {/*
-            LES LIENS SONT CENTRÉS ENTRE LE LOGO ET LA TOUR, PAS SUR LA FENÊTRE.
+            LE BLOC DE LIENS EST ALIGNÉ SUR UNE FRONTIÈRE FIXE, JUSTE AVANT LA TOUR.
 
             ⚠️ LE CENTRAGE SUR LA FENÊTRE EST GÉOMÉTRIQUEMENT IMPOSSIBLE ICI, ET C'EST UN
             CALCUL, PAS UN AVIS. Le bord gauche de la tour est à ~60 % dans le pire cas. Un
@@ -306,28 +306,28 @@ export default function LandingPage() {
               4 liens (français)   26,4 %   →  36,8 % à 63,2 %   sur la tour
               3 liens              20,0 %   →  40,0 % à 60,0 %   à la limite
 
-            Il faudrait descendre à TROIS liens pour centrer sur la fenêtre. Ce n'est pas un
-            arbitrage de mise en page, c'est la largeur du texte contre la position de la
-            tour.
+            Il faudrait descendre à TROIS liens.
 
-            Ce qui EST possible : centrer dans l'espace disponible, c'est-à-dire entre le
-            logo et la tour. `justify-center` centre dans la colonne du milieu (du logo
-            jusqu'aux boutons de droite) ; la réserve `pr-[…vw]` retient la bande de la
-            tour, ce qui décale ce centre vers la gauche. Le bloc remonte ainsi vers le
-            milieu sans jamais atteindre la tour.
+            ⚠️ ET LE CENTRAGE PAR `justify-center` FAIT DÉPENDRE LA POSITION DE LA LANGUE.
+            Un bloc centré s'étend des DEUX côtés : « Unsere Geschichte » finit 4 points
+            plus à droite que « Notre histoire ». Régler la marge pour le français la
+            rendait fausse en allemand, et l'inverse.
 
-            ⚠️ LA RÉSERVE EST PLUS FORTE SOUS 1 536 px, ET C'EST MESURÉ. Le pire cas n'est
-            pas la fenêtre la plus étroite mais la plus HAUTE : à 1 280 × 1 200, le rognage
-            tire la tour jusqu'à 60,0 % et la marge tombait à 1,0 point en allemand. D'où
-            `pr-[12vw]` et `gap-5` en dessous de `2xl`, `pr-[8vw]` et `gap-7` au-dessus, où
-            la place ne manque plus.
+            ⚠️ UNE RÉSERVE CALCULÉE DEPUIS LE GROUPE DE DROITE DÉRIVE AUSSI, pour la même
+            raison : ce groupe mesure 278 px en anglais et 354 px en espagnol. Toute mesure
+            prise « depuis la droite » hérite donc de cet écart de 76 px.
 
-            ⚠️ LA RÉSERVE EST EN `vw`, PAS EN PIXELS, PARCE QUE LA TOUR EST À UN POURCENTAGE.
-            Une valeur en pixels serait juste à une seule largeur d'écran et fausse partout
-            ailleurs — c'est exactement le défaut du vieux `mr-6` sur « Connexion », posé
-            pour écarter un bras de coureur et qui ne valait que sur une fenêtre large.
+            D'où le choix : le bloc est sorti du flux (`absolute`) et son bord DROIT est
+            posé sur une frontière en `vw`. Cette frontière ne dépend ni de la langue, ni de
+            la largeur de l'écran, ni des autres éléments de la barre. Le bloc grandit vers
+            la gauche selon les libellés — du côté où il y a de la place.
+
+            ⚠️ DEUX FRONTIÈRES, PARCE QUE LA TOUR BOUGE AVEC LA FORME DE LA FENÊTRE. Sur une
+            fenêtre large (rapport ≥ 16/10) la tour reste à 62 % : le bloc peut aller
+            jusqu'à 59,5 %. Sur une fenêtre haute, le rognage la tire jusqu'à 60,0 % : le
+            bloc s'arrête alors à 58 %. Dans les deux cas il reste ~2 points de marge.
           */}
-          <div className={`hidden xl:flex items-center justify-center gap-5 pr-[12vw] text-sm font-medium 2xl:gap-7 2xl:pr-[8vw] ${solidNav ? "text-zinc-500" : "text-white/80"}`}>
+          <div className={`absolute top-0 right-[42vw] hidden h-16 items-center gap-6 text-sm font-medium xl:flex [@media(min-aspect-ratio:16/10)]:right-[40.5vw] ${solidNav ? "text-zinc-500" : "text-white/80"}`}>
             <a href="#programmes" className={navLink}>{L.nav.programs}</a>
             <a href="#features" className={navLink}>{L.nav.features}</a>
             <a href="#tarifs" className={navLink}>{L.nav.pricing}</a>

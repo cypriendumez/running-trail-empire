@@ -80,48 +80,69 @@ test("l'ancrage ne s'applique PAS sous lg (sinon la tour arrive au milieu du té
 });
 
 /**
- * ⚠️ CENTRÉS DANS L'ESPACE DISPONIBLE, PAS SUR LA FENÊTRE — et la distinction est
- * arithmétique. Le bord gauche de la tour est à ~60 % dans le pire cas. Un bloc centré sur
- * 50 % étant symétrique, il devrait faire moins de 20 % de large pour finir avant : les six
- * liens en font 42 % en allemand, quatre liens en feraient encore 26 %. Il faudrait
- * descendre à TROIS liens. Le centrage sur la fenêtre est donc exclu, pas arbitré.
- *
- * La réserve `pr-[…vw]` retient la bande de la tour et décale le centrage vers la gauche.
+ * Le bloc de liens est repéré par sa classe, pas par un ordre de mots : les utilitaires
+ * Tailwind se réordonnent au moindre remaniement.
  */
-test("les liens sont centrés dans l'espace libre, avec une réserve pour la tour", () => {
-  const bloc = SRC.match(/hidden xl:flex[^`"]*/);
-  assert.ok(bloc, "le bloc de liens en `hidden xl:flex` est introuvable");
-  assert.match(bloc![0], /justify-center/, "les liens ne sont plus centrés");
-  // ⚠️ ON EXIGE LA RÉSERVE DE BASE, SANS PRÉFIXE DE TAILLE. Mon premier jet acceptait
-  // n'importe quel `pr-[…vw]` : retirer la réserve de base le laissait VERT, parce que le
-  // `2xl:pr-[8vw]` suffisait à satisfaire le motif. Or c'est justement la réserve de base
-  // qui protège la plage 1 280–1 535 px, la plus serrée de toutes.
-  assert.match(bloc![0], /(?:^|\s)pr-\[\d+vw\]/,
-    "la réserve de base (sans préfixe) a disparu : entre 1 280 et 1 535 px, les liens recouvrent la tour");
+const CLASSE_LIENS = (() => {
+  for (const m of SRC.matchAll(/className=\{`([^`]*)`\}/g)) {
+    if (m[1].includes("xl:flex") && m[1].includes("right-[")) return m[1];
+  }
+  return null;
+})();
+
+/**
+ * ⚠️ LE BLOC EST ALIGNÉ SUR UNE FRONTIÈRE FIXE, PAS CENTRÉ — et c'est ce qui le rend
+ * indépendant de la langue. Un bloc centré s'étend des DEUX côtés : « Unsere Geschichte »
+ * finit 4 points plus à droite que « Notre histoire », si bien qu'un réglage juste en
+ * français devenait faux en allemand. Sorti du flux et posé par son bord DROIT sur une
+ * frontière en `vw`, il grandit uniquement vers la gauche — du côté où il y a la place.
+ *
+ * Vérifié dans un navigateur : le bord droit tombe à 59,5 % en français, en allemand ET en
+ * portugais, à 1 280, 1 512 et 1 920 px de large.
+ */
+test("le bloc de liens est posé sur une frontière fixe, hors du flux", () => {
+  assert.ok(CLASSE_LIENS, "le bloc de liens (xl:flex + right-[…]) est introuvable");
+  assert.match(CLASSE_LIENS!, /\babsolute\b/,
+    "le bloc est revenu dans le flux : sa position dépendrait à nouveau de la longueur des libellés");
   assert.ok(!/grid-cols-\[1fr_auto_1fr\]/.test(SRC),
     "la grille qui centre les liens SUR LA FENÊTRE est revenue : c'est elle qui posait « Notre histoire » sur la tour");
 });
 
 /**
- * ⚠️ LA RÉSERVE DOIT ÊTRE EN `vw`, JAMAIS EN PIXELS. La tour est à un POURCENTAGE de la
- * largeur : une réserve en pixels serait juste à une seule taille d'écran et fausse
- * partout ailleurs. C'est très exactement le défaut du vieux `mr-6` posé sur « Connexion »
- * pour écarter le bras d'un coureur, dont le commentaire admettait déjà qu'il ne valait
- * « que pour une fenêtre large ».
+ * ⚠️ LA FRONTIÈRE SE MET EN `vw`, JAMAIS EN PIXELS. La tour est à un POURCENTAGE de la
+ * largeur : une frontière en pixels serait juste à une seule taille d'écran et fausse
+ * partout ailleurs. C'est exactement le défaut du vieux `mr-6` posé sur « Connexion » pour
+ * écarter le bras d'un coureur, dont le commentaire admettait déjà qu'il ne valait « que
+ * pour une fenêtre large ».
  */
-test("la réserve est exprimée en vw, pas en pixels", () => {
-  const bloc = SRC.match(/hidden xl:flex[^`"]*/)![0];
-  const reserves = [...bloc.matchAll(/(?:^|[\s:])pr-\[([^\]]+)\]/g)].map((m) => m[1]);
-  assert.ok(reserves.length > 0, "aucune réserve pr-[…] trouvée sur le bloc de liens");
-  for (const r of reserves) {
-    assert.match(r, /vw$/, `réserve « ${r} » : une valeur en pixels ne suit pas la largeur de l'écran`);
+test("la frontière est exprimée en vw, pas en pixels", () => {
+  const bornes = [...CLASSE_LIENS!.matchAll(/right-\[([^\]]+)\]/g)].map((m) => m[1]);
+  assert.ok(bornes.length >= 1, "aucune frontière right-[…] sur le bloc de liens");
+  for (const b of bornes) {
+    assert.match(b, /vw$/, `frontière « ${b} » : une valeur en pixels ne suit pas la largeur de l'écran`);
   }
 });
 
+/**
+ * ⚠️ DEUX FRONTIÈRES, PARCE QUE LA TOUR BOUGE AVEC LA FORME DE LA FENÊTRE. Sur une fenêtre
+ * large la tour reste à 62 % ; sur une fenêtre HAUTE, le rognage la tire jusqu'à 60,0 %.
+ * La frontière de base doit donc être la PRUDENTE, et celle sous condition de format la
+ * généreuse — l'inverse laisserait les liens sur la tour précisément là où elle avance.
+ */
+test("une frontière de base sans condition, et une plus généreuse sur fenêtre large", () => {
+  const base = CLASSE_LIENS!.match(/(?:^|\s)right-\[([\d.]+)vw\]/);
+  const large = CLASSE_LIENS!.match(/min-aspect-ratio[^\]]*\]:right-\[([\d.]+)vw\]/);
+  assert.ok(base, "aucune frontière de base (sans préfixe) : sur une fenêtre haute, rien ne retient les liens");
+  assert.ok(large, "la frontière conditionnée au format de fenêtre a disparu");
+  assert.ok(Number(base![1]) > Number(large![1]),
+    `la base (${base![1]}vw) doit être plus PRUDENTE que la version fenêtre large (${large![1]}vw) : ici c'est l'inverse`);
+});
+
 test("la barre complète n'apparaît qu'à partir de xl (1 280 px)", () => {
-  assert.ok(!/hidden md:flex items-center/.test(SRC),
+  assert.ok(!/\bmd:flex\b/.test(CLASSE_LIENS ?? ""),
     "les liens réapparaissent dès md : entre 1 024 et 1 279 px ils débordent sur la tour");
-  assert.match(SRC, /hidden xl:flex items-center/, "le seuil xl des liens a disparu");
+  assert.match(CLASSE_LIENS!, /\bxl:flex\b/, "le seuil xl des liens a disparu");
+  assert.match(CLASSE_LIENS!, /\bhidden\b/, "les liens ne sont plus masqués sous le seuil");
   assert.match(SRC, /xl:hidden inline-flex h-9 w-9/, "le bouton du menu déroulant n'est plus en xl:hidden");
 });
 
