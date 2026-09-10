@@ -87,6 +87,11 @@ test("la requête s'annonce — Overpass l'exige", () => {
   assert.match(src, /"User-Agent": "Pacevo\//, "l'agent identifiable a disparu : Overpass refusera tout");
   assert.match(src, /https:\/\/running-trail-empire/, "l'agent ne dit plus d'où viennent les requêtes");
   assert.match(src, /AbortSignal\.timeout\(DELAI_MS\)/, "plus de délai : une requête pourrait pendre indéfiniment");
+  // ⚠️ ASSEZ LONG POUR LES MASSIFS RICHES. À 9 s, le cadrage alpin dense (1 742 objets,
+  // ~700 Ko) rendait TOUJOURS zéro depuis la production alors qu'il aboutit en 4,3 s
+  // depuis un poste : le trajet ajoute la latence qui fait dépasser. Couper là, c'est
+  // couper là où les noms servent le plus.
+  assert.match(src, /const DELAI_MS = 15000;/, "le délai est retombé sous le coût des massifs denses");
 });
 
 test("le navigateur n'appelle jamais Overpass en direct", () => {

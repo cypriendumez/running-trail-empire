@@ -20,7 +20,18 @@ import { requete, interrogeable, lire, prioriser, MIROIRS, type Toponyme } from 
 export const dynamic = "force-dynamic";
 
 /** Au-delà, on rend ce qu'on a — c'est-à-dire rien — plutôt que de faire attendre. */
-const DELAI_MS = 9000;
+/**
+ * ⚠️ 15 SECONDES, ET C'EST UNE MESURE. À 9 s, les massifs les plus fournis rendaient
+ * TOUJOURS zéro toponyme depuis la production, alors que la même requête aboutit en 4,3 s
+ * depuis un poste : le cadrage alpin dense pèse 1 742 objets, soit ~700 Ko à transférer,
+ * et le trajet Vercel → Overpass ajoute assez de latence pour dépasser la limite. Un
+ * massif riche est précisément celui où les noms servent le plus — le couper là est
+ * l'inverse du but.
+ *
+ * Le prix : sur un vrai échec, l'athlète attend jusqu'à 15 s au lieu de 9. Il ne le paie
+ * qu'UNE fois par zone, la réponse étant ensuite mise en cache six heures.
+ */
+const DELAI_MS = 15000;
 /** Une zone de montagne ne change pas dans la journée. */
 const CACHE_MS = 6 * 3600 * 1000;
 /** Bornes du cache : au-delà on oublie les plus anciennes entrées. */
