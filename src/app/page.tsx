@@ -288,12 +288,24 @@ export default function LandingPage() {
                les faisait dépendre de la longueur des libellés : « Fonctionnalités » (FR)
                contre « Features » (EN) déplaçait tout le bloc à chaque langue. Le centre
                géométrique, lui, ne bouge pas. */}
-        <Container className="grid h-16 max-w-none grid-cols-[auto_1fr_auto] items-center gap-4 px-4 sm:px-6 md:grid-cols-[1fr_auto_1fr] lg:px-8">
+        <Container className="grid h-16 max-w-none grid-cols-[auto_1fr_auto] items-center gap-4 px-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex shrink-0 items-center gap-2.5 justify-self-start" onClick={() => setMenuOpen(false)}>
             <Logo size={30} />
             <Wordmark tone={solidNav ? "dark" : "light"} className={`text-xl ${navOmbre}`} />
           </Link>
-          <div className={`hidden md:flex items-center justify-center gap-7 text-sm font-medium ${solidNav ? "text-zinc-500" : "text-white/80"}`}>
+          {/*
+            ⚠️ LES LIENS SONT À GAUCHE, CONTRE LE LOGO, ET PLUS CENTRÉS SUR LA FENÊTRE.
+            Centrés, ils s'étalaient de 30 % à 70 % de la largeur : « Notre histoire »
+            tombait pile sur la tour Eiffel, mesuré à 63,4 % → 70,1 %. Ancrés à gauche, ils
+            s'arrêtent avant 55 % dans les cinq langues, et le tiers central de l'image
+            reste dégagé.
+
+            ⚠️ ET ON NE PERD RIEN DE CE QUE LE CENTRAGE APPORTAIT. Il avait été choisi pour
+            qu'un libellé plus long — « Fonctionnalités » contre « Features » — ne déplace
+            pas le bloc d'une langue à l'autre. Ancré à gauche, le bloc COMMENCE toujours au
+            même endroit : seule sa fin varie. C'est plus stable, pas moins.
+          */}
+          <div className={`hidden xl:flex items-center justify-start gap-6 pl-2 text-sm font-medium lg:pl-4 2xl:gap-7 ${solidNav ? "text-zinc-500" : "text-white/80"}`}>
             <a href="#programmes" className={navLink}>{L.nav.programs}</a>
             <a href="#features" className={navLink}>{L.nav.features}</a>
             <a href="#tarifs" className={navLink}>{L.nav.pricing}</a>
@@ -314,7 +326,7 @@ export default function LandingPage() {
                 l'ombre. ⚠️ Ce réglage vaut pour une fenêtre large : la photo est en
                 `object-cover`, donc la silhouette se déplace avec la taille de l'écran. Ce
                 n'est pas une garantie à toutes les largeurs, c'est un cadrage. */}
-            <Link href="/login" className={`hidden sm:inline-flex rounded-lg px-2.5 py-2 text-sm font-medium transition-colors sm:mr-4 lg:mr-6 ${solidNav ? "text-zinc-600 hover:text-zinc-900" : `text-white hover:text-white ${navOmbre}`}`}>
+            <Link href="/login" className={`hidden xl:inline-flex rounded-lg px-2.5 py-2 text-sm font-medium transition-colors xl:mr-4 2xl:mr-6 ${solidNav ? "text-zinc-600 hover:text-zinc-900" : `text-white hover:text-white ${navOmbre}`}`}>
               {L.nav.login}
             </Link>
             {/* Sur la photo, ce bouton était un rectangle BLANC PLEIN posé en haut à
@@ -336,13 +348,17 @@ export default function LandingPage() {
             >
               {L.nav.trial} <ArrowRight className="h-3.5 w-3.5" />
             </Link>
-            <span aria-hidden className={`hidden sm:block h-4 w-px ${solidNav ? "bg-zinc-200" : "bg-white/25"}`} />
+            {/* Le trait sépare les actions de compte du sélecteur de langue. Sous 1 280 px,
+                « Connexion » est passé dans le menu déroulant : il ne sépare donc plus rien,
+                et les ~24 px qu'il coûte (trait + deux espacements) poussaient le groupe de
+                droite SUR la tour Eiffel — 0,6 point de marge à 1 024 × 1 000. */}
+            <span aria-hidden className={`hidden xl:block h-4 w-px ${solidNav ? "bg-zinc-200" : "bg-white/25"}`} />
             <LanguageSwitcher light={!solidNav} />
             <button
               type="button"
               onClick={() => setMenuOpen((v) => !v)}
               aria-label="Menu"
-              className={`md:hidden inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${solidNav ? "text-zinc-700 hover:bg-zinc-100" : "text-white hover:bg-white/10"}`}
+              className={`xl:hidden inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${solidNav ? "text-zinc-700 hover:bg-zinc-100" : "text-white hover:bg-white/10"}`}
             >
               {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -351,7 +367,7 @@ export default function LandingPage() {
 
         {/* Menu mobile */}
         {menuOpen && (
-          <div className="md:hidden border-t border-zinc-200 bg-white">
+          <div className="xl:hidden border-t border-zinc-200 bg-white">
             <Container className="flex flex-col py-2 text-sm font-medium text-zinc-700">
               {[
                 { href: "#programmes", label: L.nav.programs },
@@ -379,7 +395,7 @@ export default function LandingPage() {
             zones, donc des perspectives incompatibles qu'aucune rotation ne pouvait
             corriger. La photo régénérée en 2 752 px ramène cet écart à 0,65° — la
             perspective est enfin COHÉRENTE, et une rotation globale devient valable.
-            −0,40° est l'angle qui minimise le résidu : 0,70° → 0,35°, pour 0,39 % de
+            −0,40° est l'angle qui minimise le résidu : 0,70° → 0,35°, pour 2,25 % de
             recadrage seulement.
 
             ⚠️ ON RÉDUIT PUIS ON RENFORCE, dans cet ordre. La source fait 2 741 px et les
@@ -420,9 +436,37 @@ export default function LandingPage() {
             srcSet="/hero-paris-750.jpg 750w, /hero-paris.jpg 1400w, /hero-paris-1920.jpg 1920w"
             sizes="100vw"
             alt={t("alt.piste")}
+            /*
+              ⚠️ `object-[65%_50%]` ANCRE LA TOUR EIFFEL, ET C'EST DU CALCUL, PAS DU GOÛT.
+              `object-cover` rogne l'image sur les côtés quand la fenêtre est plus « haute »
+              que la photo, en gardant le CENTRE. Conséquence : un point de l'image se
+              DÉPLACE à l'écran selon le format de la fenêtre. Mesuré sur la tour, qui
+              occupe 62,0 % à 67,9 % de la largeur de l'image dans la bande de la nav :
+
+                fenêtre      la tour se retrouve à     sous « Connexion » ?
+                1920×1080    62,1 % → 68,1 %           non
+                1280×800     63,4 % → 70,1 %           non
+                1280×900     65,1 % → 72,6 %           OUI
+                1100×900     67,6 % → 76,3 %           OUI
+
+              Sous un rapport de 1,49, la tour passait donc sous les boutons de droite — et
+              aucun agencement de la barre n'y pouvait rien, puisque la cible bougeait.
+
+              Fixer l'ancrage à la fraction où vit la tour (65 %) la rend IMMOBILE à
+              l'écran : un point à la fraction X reste à X quel que soit le rognage. Le
+              cadrage change de 1,6 % de largeur sur une fenêtre courante — invisible.
+
+              ⚠️ SEULEMENT À PARTIR DE `lg` (1 024 px), ET C'EST DÉLIBÉRÉ. Sous cette
+              largeur, le rognage devient si fort qu'il ne reste qu'un tiers de la photo :
+              ancrée à 65 %, la tour viendrait se planter au MILIEU de l'écran du téléphone,
+              juste derrière le bouton d'essai. Au centrage par défaut elle glisse au
+              contraire vers le bord droit, presque hors cadre — ce que les captures
+              mobiles montrent, et qui fonctionne. On ne corrige donc que là où le défaut
+              existe.
+            */
             fetchPriority="high"
             decoding="async"
-            className="absolute inset-0 h-full w-full object-cover"
+            className="absolute inset-0 h-full w-full object-cover lg:object-[65%_50%]"
           />
         </picture>
         {/* ⚠️ ALLÉGÉS DE NOUVEAU LE 10/09/2026, sur un constat de Cyprien : la nouvelle photo
