@@ -373,30 +373,31 @@ export default function LandingPage() {
 
       {/* ── HERO ── plein cadre, photo de piste immersive */}
       <section className="relative flex min-h-screen items-end overflow-hidden">
-        {/* ⚠️ DEUX TAILLES SEULEMENT. Le fichier source fait 1 399 × 768 : en générer un de
-            1 920 px l'AGRANDIRAIT, c'est-à-dire fabriquerait une netteté qui n'existe pas.
-            C'est le plafond de qualité de cette image, et il ne se contourne pas — il se
-            lève en régénérant la photo plus grande.
+        {/* ⚠️ LA PHOTO A ÉTÉ REDRESSÉE DE −0,40°, ET C'EST MESURÉ, PAS ESTIMÉ.
+            Sur la version précédente, l'immeuble central penchait de 1,00° pendant que la
+            clôture du stade penchait de +1,55° dans l'AUTRE sens : 2,55° d'écart entre
+            zones, donc des perspectives incompatibles qu'aucune rotation ne pouvait
+            corriger. La photo régénérée en 2 752 px ramène cet écart à 0,65° — la
+            perspective est enfin COHÉRENTE, et une rotation globale devient valable.
+            −0,40° est l'angle qui minimise le résidu : 0,70° → 0,35°, pour 0,39 % de
+            recadrage seulement.
 
-            ⚠️ TROIS FORMATS, DU MEILLEUR AU PLUS COMPATIBLE. Mesuré sur cette photo :
-              AVIF q78 .... 226 Ko · PSNR 40,6 dB
-              WebP q86 .... 280 Ko
-              JPEG q86 .... 307 Ko  (repli, servi à presque personne)
-            L'AVIF pèse donc MOINS que le JPEG d'origine (230 Ko) tout en portant une image
-            renforcée. Le navigateur choisit seul la première ligne qu'il sait lire.
+            ⚠️ ON RÉDUIT PUIS ON RENFORCE, dans cet ordre. La source fait 2 741 px et les
+            tailles servies 750 à 1 920 : la réduction adoucit, donc le masque flou
+            s'applique à la taille de SORTIE. L'inverse — renforcer la grande puis réduire —
+            gaspille le renforcement et crée de l'aliasing. (C'était le bon ordre sur
+            l'ancienne image, dont la source était déjà à la taille finale ; il ne l'est
+            plus ici.)
 
-            ⚠️ ET LA PHOTO EST RENFORCÉE (masque flou r=1,0 · 60 % · seuil 3). Réglage
-            choisi par mesure, pas à l'œil : la netteté passe de 1 197 à 2 571 (×2,15) pour
-            0,39 % de pixels débordants — au-delà (force 80, puis 110) le débordement monte
-            à 1,7 % puis 4,9 % et les halos deviennent visibles sur les arêtes du ciel.
-            Le renforcement est appliqué AVANT la réduction : l'inverse accentuerait les
-            halos au lieu de les atténuer. */}
+            ⚠️ ET LE 1 920 px EXISTE ENFIN. Il était impossible avec l'ancien fichier de
+            1 399 px — le produire aurait été un agrandissement, donc une netteté inventée.
+            Avec 2 741 px de source, c'est une vraie réduction. */}
         <picture>
-          <source type="image/avif" srcSet="/hero-paris-750.avif 750w, /hero-paris.avif 1399w" sizes="100vw" />
-          <source type="image/webp" srcSet="/hero-paris-750.webp 750w, /hero-paris.webp 1399w" sizes="100vw" />
+          <source type="image/avif" srcSet="/hero-paris-750.avif 750w, /hero-paris.avif 1400w, /hero-paris-1920.avif 1920w" sizes="100vw" />
+          <source type="image/webp" srcSet="/hero-paris-750.webp 750w, /hero-paris.webp 1400w, /hero-paris-1920.webp 1920w" sizes="100vw" />
           <img
             src="/hero-paris.jpg"
-            srcSet="/hero-paris-750.jpg 750w, /hero-paris.jpg 1399w"
+            srcSet="/hero-paris-750.jpg 750w, /hero-paris.jpg 1400w, /hero-paris-1920.jpg 1920w"
             sizes="100vw"
             alt={t("alt.piste")}
             fetchPriority="high"
