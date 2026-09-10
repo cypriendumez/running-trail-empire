@@ -85,16 +85,31 @@ export const MIROIRS_ECARTES = ["https://overpass.osm.ch/api/interpreter"] as co
  * chaîne des Puys — c'est une ligne, et l'oublier priverait toute une région.
  */
 const DEMANDES: { genre: Toponyme["genre"]; filtre: string }[] = [
-  { genre: "sommet", filtre: "node[natural=peak]" },
-  { genre: "sommet", filtre: "node[natural=volcano]" },
-  { genre: "refuge", filtre: "node[tourism=alpine_hut]" },
-  { genre: "refuge", filtre: "node[tourism=wilderness_hut]" },
-  { genre: "abri", filtre: "node[amenity=shelter]" },
-  { genre: "vue", filtre: "node[tourism=viewpoint]" },
-  { genre: "col", filtre: "node[natural=saddle]" },
-  { genre: "col", filtre: "node[mountain_pass=yes]" },
-  { genre: "lac", filtre: "node[natural=water][name]" },
+  { genre: "sommet", filtre: "node[natural=peak][name]" },
+  { genre: "sommet", filtre: "node[natural=volcano][name]" },
+  { genre: "refuge", filtre: "node[tourism=alpine_hut][name]" },
+  { genre: "refuge", filtre: "node[tourism=wilderness_hut][name]" },
+  { genre: "abri", filtre: "node[amenity=shelter][name]" },
+  { genre: "vue", filtre: "node[tourism=viewpoint][name]" },
+  { genre: "col", filtre: "node[natural=saddle][name]" },
+  { genre: "col", filtre: "node[mountain_pass=yes][name]" },
 ];
+
+/**
+ * ⚠️ `[name]` SUR CHAQUE FILTRE, ET CE N'EST PAS COSMÉTIQUE : C'EST UN FACTEUR QUATRE.
+ *
+ * Mesuré le 10/09/2026 sur le cadrage alpin le plus dense autorisé :
+ *   sans `[name]`, avec l'eau ..... 16,55 s · 1 566 objets · 1 243 nommés
+ *   avec `[name]`, sans l'eau .....  4,21 s · 1 243 objets · 1 243 nommés
+ * Exactement le même nombre de noms, quatre fois plus vite, et 21 % de données en moins
+ * sur le réseau. On écartait déjà les objets sans nom À L'ARRIVÉE : les demander était du
+ * gaspillage pur, payé en secondes d'attente par l'athlète.
+ *
+ * ⚠️ ET `natural=water` A ÉTÉ RETIRÉ. C'était le filtre le plus cher de tous — 504 au bout
+ * de 10,8 SECONDES quand on l'interroge seul, alors que sommets, cols et refuges réunis
+ * coûtent 3,4 s. Un lac nommé est de toute façon déjà dessiné par le fond de carte, qu'il
+ * soit satellite ou topographique : on payait très cher pour redire ce qui était là.
+ */
 
 export function requete(bbox: { sud: number; ouest: number; nord: number; est: number }): string {
   const b = `(${bbox.sud},${bbox.ouest},${bbox.nord},${bbox.est})`;
@@ -122,6 +137,9 @@ function genreDe(tags: Record<string, string>): Toponyme["genre"] | null {
   if (tags.tourism === "alpine_hut" || tags.tourism === "wilderness_hut") return "refuge";
   if (tags.amenity === "shelter") return "abri";
   if (tags.tourism === "viewpoint") return "vue";
+  // `lac` n'est plus DEMANDÉ (filtre trop coûteux, voir DEMANDES), mais la reconnaissance
+  // reste : si un objet d'eau arrive par un autre chemin, il garde son genre plutôt que
+  // d'être jeté sans raison.
   if (tags.natural === "water") return "lac";
   return null;
 }

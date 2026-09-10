@@ -57,8 +57,21 @@ test("la requête demande bien tout ce qu'on affiche", () => {
     "natural=peak", "natural=volcano", "tourism=alpine_hut", "tourism=wilderness_hut",
     "amenity=shelter", "tourism=viewpoint", "natural=saddle", "mountain_pass=yes",
   ]) {
-    assert.ok(q.includes(attendu), `« ${attendu} » absent de la requête`);
+    assert.ok(q.includes(`${attendu}][name]`), `« ${attendu} » absent, ou sans son filtre [name]`);
   }
+  // ⚠️ `[name]` SUR CHAQUE FILTRE = FACTEUR QUATRE. Mesuré sur le cadrage alpin le plus
+  // dense : 16,55 s sans, 4,21 s avec — pour EXACTEMENT le même nombre de noms (1 243).
+  // On écarte déjà les objets sans nom à l'arrivée : les demander était du gaspillage pur,
+  // payé en secondes d'attente.
+  // Chaque `node[...]` de la requête doit porter `[name]` avant sa parenthèse de cadrage.
+  const filtres = q.split("node").slice(1).map((f) => f.slice(0, f.indexOf("(")));
+  assert.ok(filtres.length >= 8, `${filtres.length} filtres lus : la découpe est cassée`);
+  for (const fl of filtres) {
+    assert.ok(fl.includes("[name]"), `filtre sans [name] : node${fl}`);
+  }
+  // ⚠️ ET L'EAU EST PARTIE : filtre le plus cher de tous (504 en 10,8 s à lui seul), alors
+  // qu'un lac nommé est déjà dessiné par le fond de carte.
+  assert.ok(!q.includes("natural=water"), "le filtre d'eau est revenu : il coûte plus que tout le reste");
   assert.ok(q.includes("45.88,6.8,45.96,6.94"), `cadrage absent : ${q.slice(0, 80)}`);
   assert.ok(q.startsWith("[out:json]"), "la réponse ne serait pas du JSON");
 });
