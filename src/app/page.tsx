@@ -294,18 +294,40 @@ export default function LandingPage() {
             <Wordmark tone={solidNav ? "dark" : "light"} className={`text-xl ${navOmbre}`} />
           </Link>
           {/*
-            ⚠️ LES LIENS SONT À GAUCHE, CONTRE LE LOGO, ET PLUS CENTRÉS SUR LA FENÊTRE.
-            Centrés, ils s'étalaient de 30 % à 70 % de la largeur : « Notre histoire »
-            tombait pile sur la tour Eiffel, mesuré à 63,4 % → 70,1 %. Ancrés à gauche, ils
-            s'arrêtent avant 55 % dans les cinq langues, et le tiers central de l'image
-            reste dégagé.
+            LES LIENS SONT CENTRÉS ENTRE LE LOGO ET LA TOUR, PAS SUR LA FENÊTRE.
 
-            ⚠️ ET ON NE PERD RIEN DE CE QUE LE CENTRAGE APPORTAIT. Il avait été choisi pour
-            qu'un libellé plus long — « Fonctionnalités » contre « Features » — ne déplace
-            pas le bloc d'une langue à l'autre. Ancré à gauche, le bloc COMMENCE toujours au
-            même endroit : seule sa fin varie. C'est plus stable, pas moins.
+            ⚠️ LE CENTRAGE SUR LA FENÊTRE EST GÉOMÉTRIQUEMENT IMPOSSIBLE ICI, ET C'EST UN
+            CALCUL, PAS UN AVIS. Le bord gauche de la tour est à ~60 % dans le pire cas. Un
+            bloc centré sur 50 % est symétrique : pour finir avant 60 %, il doit faire moins
+            de 20 % de large.
+
+              6 liens (allemand)   42,5 %   →  28,8 % à 71,2 %   sur la tour
+              6 liens (français)   40,0 %   →  30,0 % à 70,0 %   sur la tour
+              4 liens (français)   26,4 %   →  36,8 % à 63,2 %   sur la tour
+              3 liens              20,0 %   →  40,0 % à 60,0 %   à la limite
+
+            Il faudrait descendre à TROIS liens pour centrer sur la fenêtre. Ce n'est pas un
+            arbitrage de mise en page, c'est la largeur du texte contre la position de la
+            tour.
+
+            Ce qui EST possible : centrer dans l'espace disponible, c'est-à-dire entre le
+            logo et la tour. `justify-center` centre dans la colonne du milieu (du logo
+            jusqu'aux boutons de droite) ; la réserve `pr-[…vw]` retient la bande de la
+            tour, ce qui décale ce centre vers la gauche. Le bloc remonte ainsi vers le
+            milieu sans jamais atteindre la tour.
+
+            ⚠️ LA RÉSERVE EST PLUS FORTE SOUS 1 536 px, ET C'EST MESURÉ. Le pire cas n'est
+            pas la fenêtre la plus étroite mais la plus HAUTE : à 1 280 × 1 200, le rognage
+            tire la tour jusqu'à 60,0 % et la marge tombait à 1,0 point en allemand. D'où
+            `pr-[12vw]` et `gap-5` en dessous de `2xl`, `pr-[8vw]` et `gap-7` au-dessus, où
+            la place ne manque plus.
+
+            ⚠️ LA RÉSERVE EST EN `vw`, PAS EN PIXELS, PARCE QUE LA TOUR EST À UN POURCENTAGE.
+            Une valeur en pixels serait juste à une seule largeur d'écran et fausse partout
+            ailleurs — c'est exactement le défaut du vieux `mr-6` sur « Connexion », posé
+            pour écarter un bras de coureur et qui ne valait que sur une fenêtre large.
           */}
-          <div className={`hidden xl:flex items-center justify-start gap-6 pl-2 text-sm font-medium lg:pl-4 2xl:gap-7 ${solidNav ? "text-zinc-500" : "text-white/80"}`}>
+          <div className={`hidden xl:flex items-center justify-center gap-5 pr-[12vw] text-sm font-medium 2xl:gap-7 2xl:pr-[8vw] ${solidNav ? "text-zinc-500" : "text-white/80"}`}>
             <a href="#programmes" className={navLink}>{L.nav.programs}</a>
             <a href="#features" className={navLink}>{L.nav.features}</a>
             <a href="#tarifs" className={navLink}>{L.nav.pricing}</a>

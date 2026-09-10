@@ -79,12 +79,43 @@ test("l'ancrage ne s'applique PAS sous lg (sinon la tour arrive au milieu du té
     "l'ancrage est appliqué sans condition de taille : sur téléphone la tour passerait au centre");
 });
 
-test("les liens sont ancrés à gauche, pas centrés sur la fenêtre", () => {
+/**
+ * ⚠️ CENTRÉS DANS L'ESPACE DISPONIBLE, PAS SUR LA FENÊTRE — et la distinction est
+ * arithmétique. Le bord gauche de la tour est à ~60 % dans le pire cas. Un bloc centré sur
+ * 50 % étant symétrique, il devrait faire moins de 20 % de large pour finir avant : les six
+ * liens en font 42 % en allemand, quatre liens en feraient encore 26 %. Il faudrait
+ * descendre à TROIS liens. Le centrage sur la fenêtre est donc exclu, pas arbitré.
+ *
+ * La réserve `pr-[…vw]` retient la bande de la tour et décale le centrage vers la gauche.
+ */
+test("les liens sont centrés dans l'espace libre, avec une réserve pour la tour", () => {
   const bloc = SRC.match(/hidden xl:flex[^`"]*/);
   assert.ok(bloc, "le bloc de liens en `hidden xl:flex` est introuvable");
-  assert.match(bloc![0], /justify-start/, "les liens ne sont plus ancrés à gauche");
+  assert.match(bloc![0], /justify-center/, "les liens ne sont plus centrés");
+  // ⚠️ ON EXIGE LA RÉSERVE DE BASE, SANS PRÉFIXE DE TAILLE. Mon premier jet acceptait
+  // n'importe quel `pr-[…vw]` : retirer la réserve de base le laissait VERT, parce que le
+  // `2xl:pr-[8vw]` suffisait à satisfaire le motif. Or c'est justement la réserve de base
+  // qui protège la plage 1 280–1 535 px, la plus serrée de toutes.
+  assert.match(bloc![0], /(?:^|\s)pr-\[\d+vw\]/,
+    "la réserve de base (sans préfixe) a disparu : entre 1 280 et 1 535 px, les liens recouvrent la tour");
   assert.ok(!/grid-cols-\[1fr_auto_1fr\]/.test(SRC),
-    "la grille qui CENTRE les liens sur la fenêtre est revenue : c'est elle qui posait « Notre histoire » sur la tour");
+    "la grille qui centre les liens SUR LA FENÊTRE est revenue : c'est elle qui posait « Notre histoire » sur la tour");
+});
+
+/**
+ * ⚠️ LA RÉSERVE DOIT ÊTRE EN `vw`, JAMAIS EN PIXELS. La tour est à un POURCENTAGE de la
+ * largeur : une réserve en pixels serait juste à une seule taille d'écran et fausse
+ * partout ailleurs. C'est très exactement le défaut du vieux `mr-6` posé sur « Connexion »
+ * pour écarter le bras d'un coureur, dont le commentaire admettait déjà qu'il ne valait
+ * « que pour une fenêtre large ».
+ */
+test("la réserve est exprimée en vw, pas en pixels", () => {
+  const bloc = SRC.match(/hidden xl:flex[^`"]*/)![0];
+  const reserves = [...bloc.matchAll(/(?:^|[\s:])pr-\[([^\]]+)\]/g)].map((m) => m[1]);
+  assert.ok(reserves.length > 0, "aucune réserve pr-[…] trouvée sur le bloc de liens");
+  for (const r of reserves) {
+    assert.match(r, /vw$/, `réserve « ${r} » : une valeur en pixels ne suit pas la largeur de l'écran`);
+  }
 });
 
 test("la barre complète n'apparaît qu'à partir de xl (1 280 px)", () => {
