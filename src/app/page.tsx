@@ -392,9 +392,29 @@ export default function LandingPage() {
             ⚠️ ET LE 1 920 px EXISTE ENFIN. Il était impossible avec l'ancien fichier de
             1 399 px — le produire aurait été un agrandissement, donc une netteté inventée.
             Avec 2 741 px de source, c'est une vraie réduction. */}
+        {/*
+          ⚠️ LE 2 560 EXISTE PARCE QU'UN ÉCRAN RETINA DEMANDE DEUX FOIS PLUS DE PIXELS QUE
+          SA LARGEUR CSS, ET C'EST MESURÉ SUR LE SITE EN LIGNE : sur une fenêtre de 1 280 px
+          avec `devicePixelRatio: 2`, la dalle affiche 2 560 pixels physiques. On n'en
+          servait que 1 920, que le navigateur ÉTIRAIT — il ne restituait alors que 82,2 %
+          du détail fin du fichier maître (mesuré par l'énergie des hautes fréquences sur la
+          zone la plus structurée de l'image). Le 2 560 en rend 100,3 %, POUR MOINS D'OCTETS :
+          200 Ko contre 316. Plus net et plus léger à la fois, parce qu'un encodeur travaille
+          mieux sur des pixels réels que sur un agrandissement.
+
+          ⚠️ ET IL EST MOINS RENFORCÉ QUE LES AUTRES, VOLONTAIREMENT. Le masque flou compense
+          l'adoucissement de la RÉDUCTION : de 2 741 à 750 px elle est brutale, de 2 741 à
+          2 560 elle est presque nulle. Appliquer ici les 40 % utilisés pour les petites
+          tailles poussait le détail à 130 % du maître — ce n'est pas de la netteté, c'est un
+          liseré ajouté autour de chaque arête. 10 % ramène à 100,3 %.
+
+          Le JPEG s'arrête à 1 920 : c'est le repli des navigateurs qui ne lisent ni AVIF ni
+          WebP, et un 2 560 y pèserait 748 Ko. Leur servir trois quarts de mégaoctet pour
+          gagner de la finesse serait un mauvais échange.
+        */}
         <picture>
-          <source type="image/avif" srcSet="/hero-paris-750.avif 750w, /hero-paris.avif 1400w, /hero-paris-1920.avif 1920w" sizes="100vw" />
-          <source type="image/webp" srcSet="/hero-paris-750.webp 750w, /hero-paris.webp 1400w, /hero-paris-1920.webp 1920w" sizes="100vw" />
+          <source type="image/avif" srcSet="/hero-paris-750.avif 750w, /hero-paris.avif 1400w, /hero-paris-1920.avif 1920w, /hero-paris-2560.avif 2560w" sizes="100vw" />
+          <source type="image/webp" srcSet="/hero-paris-750.webp 750w, /hero-paris.webp 1400w, /hero-paris-1920.webp 1920w, /hero-paris-2560.webp 2560w" sizes="100vw" />
           <img
             src="/hero-paris.jpg"
             srcSet="/hero-paris-750.jpg 750w, /hero-paris.jpg 1400w, /hero-paris-1920.jpg 1920w"
