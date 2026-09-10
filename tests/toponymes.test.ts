@@ -140,13 +140,17 @@ test("les sommets hauts passent devant, et on plafonne", () => {
   // NOMMÉS dans un seul cadrage — 188 sommets, 48 cols, 24 cabanes, 6 refuges. En n'en
   // gardant que 60, on jetait plus de 200 noms réels. MapLibre écarte lui-même les
   // étiquettes qui se chevauchent : couper en amont ne rendait rien plus lisible.
-  assert.ok(ETIQUETTES_MAX >= 300, `${ETIQUETTES_MAX} étiquettes : un massif dense en compte 268`);
-  const beaucoup = Array.from({ length: 200 }, (_, i) => ({
+  // ⚠️ RECOMPTÉ AU CADRAGE MAXIMAL (0,6°) SUR LES ALPES : 1 487 objets NOMMÉS. À 400, on
+  // en jetait près de 1 100 — et comme le tri met les sommets les plus HAUTS en tête, les
+  // jetés étaient les SOMMETS BAS. C'est l'inverse de ce qu'on veut pour la moyenne
+  // montagne.
+  assert.ok(ETIQUETTES_MAX >= 1400, `${ETIQUETTES_MAX} étiquettes : le cadrage maximal en compte 1 487`);
+  const beaucoup = Array.from({ length: 2000 }, (_, i) => ({
     id: i, lat: 45, lon: 6, nom: `P${i}`, altitude: i, genre: "sommet" as const,
   }));
   const p = prioriser(beaucoup);
-  assert.equal(p.length, Math.min(200, ETIQUETTES_MAX));
-  assert.equal(p[0].altitude, 199, "le plus haut n'est plus en tête");
+  assert.equal(p.length, ETIQUETTES_MAX, "le plafond ne s'applique plus");
+  assert.equal(p[0].altitude, 1999, "le plus haut n'est plus en tête");
 
   // ⚠️ LES ALTITUDES SONT INVERSÉES EXPRÈS. Une première version donnait 2000 au sommet et
   // 1500 au refuge : trier par la seule altitude produisait alors le MÊME ordre que trier

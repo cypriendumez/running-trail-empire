@@ -33,6 +33,12 @@ export type Toponyme = {
  * milliers d'objets illisibles à l'écran et pèserait sur un service public gratuit.
  */
 export const ETENDUE_MAX = 0.6;
+/**
+ * ⚠️ 0,6° A ÉTÉ ÉPROUVÉ, PAS SUPPOSÉ. Tenté à 1,0° pour laisser dézoomer sur les massifs
+ * bas : la Bretagne a demandé 18,1 SECONDES à Overpass — le double du délai que le
+ * serveur s'accorde, donc une carte sans noms à tous les coups. La limite reste où elle
+ * est, et ce n'est pas de la prudence : c'est une mesure.
+ */
 /** En deçà de ce zoom, la carte est trop large pour que des noms aient un sens. */
 export const ZOOM_MIN = 10;
 
@@ -166,10 +172,16 @@ export function lire(reponse: unknown): Toponyme[] {
  * et le fait à chaque niveau de zoom. Couper la liste en amont ne rendait donc rien plus
  * lisible — cela retirait seulement des noms qui seraient apparus en zoomant.
  *
- * Ce qui reste vrai : il faut un plafond, pour ne pas envoyer dix mille points au
- * navigateur. 400 couvre largement le massif le plus dense mesuré.
+ * ⚠️ ET 400 COUPAIT ENCORE, DANS LE MAUVAIS SENS. Recompté le 10/09/2026 au cadrage
+ * MAXIMAL autorisé (0,6°) sur les Alpes : 1 892 objets, dont 1 487 NOMMÉS. À 400, on en
+ * jetait près de 1 100 — et comme le tri place les sommets les plus HAUTS en tête, ceux
+ * qu'on jetait étaient précisément les SOMMETS BAS. Un coureur de moyenne montagne ne
+ * voyait donc jamais les siens dès qu'un massif dense entrait dans le cadre.
+ *
+ * 1 500 couvre le cas le plus dense mesuré. Le poids reste modeste : ~200 Ko bruts, soit
+ * une cinquantaine compressés — moins qu'une seule tuile satellite.
  */
-export const ETIQUETTES_MAX = 400;
+export const ETIQUETTES_MAX = 1500;
 
 /** Ordre d'importance : c'est lui qui décide qui reste visible quand deux noms se gênent. */
 const RANG: Record<Toponyme["genre"], number> = { sommet: 0, refuge: 1, col: 2, abri: 3, vue: 4, lac: 5 };
