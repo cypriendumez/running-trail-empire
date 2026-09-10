@@ -373,21 +373,37 @@ export default function LandingPage() {
 
       {/* ── HERO ── plein cadre, photo de piste immersive */}
       <section className="relative flex min-h-screen items-end overflow-hidden">
-        {/* ⚠️ DEUX TAILLES SEULEMENT, ET C'EST DÉLIBÉRÉ. Le fichier source fait 1 399 × 768 :
-            en générer un de 1 920 px l'AGRANDIRAIT, c'est-à-dire fabriquerait une netteté
-            qui n'existe pas. Et une variante intermédiaire à 1 280 px pesait 328 Ko, soit
-            PLUS que l'original en 1 399 px (232 Ko) — la ré-encoder ne faisait qu'ajouter
-            du poids et une seconde perte. On sert donc la photo d'origine telle quelle,
-            octet pour octet, et une seule réduction pour les téléphones. */}
-        <img
-          src="/hero-paris.jpg"
-          srcSet="/hero-paris-750.jpg 750w, /hero-paris.jpg 1399w"
-          sizes="100vw"
-          alt={t("alt.piste")}
-          fetchPriority="high"
-          decoding="async"
-          className="absolute inset-0 h-full w-full object-cover"
-        />
+        {/* ⚠️ DEUX TAILLES SEULEMENT. Le fichier source fait 1 399 × 768 : en générer un de
+            1 920 px l'AGRANDIRAIT, c'est-à-dire fabriquerait une netteté qui n'existe pas.
+            C'est le plafond de qualité de cette image, et il ne se contourne pas — il se
+            lève en régénérant la photo plus grande.
+
+            ⚠️ TROIS FORMATS, DU MEILLEUR AU PLUS COMPATIBLE. Mesuré sur cette photo :
+              AVIF q78 .... 226 Ko · PSNR 40,6 dB
+              WebP q86 .... 280 Ko
+              JPEG q86 .... 307 Ko  (repli, servi à presque personne)
+            L'AVIF pèse donc MOINS que le JPEG d'origine (230 Ko) tout en portant une image
+            renforcée. Le navigateur choisit seul la première ligne qu'il sait lire.
+
+            ⚠️ ET LA PHOTO EST RENFORCÉE (masque flou r=1,0 · 60 % · seuil 3). Réglage
+            choisi par mesure, pas à l'œil : la netteté passe de 1 197 à 2 571 (×2,15) pour
+            0,39 % de pixels débordants — au-delà (force 80, puis 110) le débordement monte
+            à 1,7 % puis 4,9 % et les halos deviennent visibles sur les arêtes du ciel.
+            Le renforcement est appliqué AVANT la réduction : l'inverse accentuerait les
+            halos au lieu de les atténuer. */}
+        <picture>
+          <source type="image/avif" srcSet="/hero-paris-750.avif 750w, /hero-paris.avif 1399w" sizes="100vw" />
+          <source type="image/webp" srcSet="/hero-paris-750.webp 750w, /hero-paris.webp 1399w" sizes="100vw" />
+          <img
+            src="/hero-paris.jpg"
+            srcSet="/hero-paris-750.jpg 750w, /hero-paris.jpg 1399w"
+            sizes="100vw"
+            alt={t("alt.piste")}
+            fetchPriority="high"
+            decoding="async"
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        </picture>
         {/* ⚠️ ALLÉGÉS DE NOUVEAU LE 10/09/2026, sur un constat de Cyprien : la nouvelle photo
             de Paris rendait trop sombre. Les voiles étaient calés sur l'ANCIENNE image — une
             piste vue du dessus, mate et sans ciel. La nouvelle a un ciel clair et une pelouse
