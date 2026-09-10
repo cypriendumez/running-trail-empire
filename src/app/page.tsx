@@ -434,7 +434,31 @@ export default function LandingPage() {
             lisibilité : elle est REPORTÉE sur les ombres portées du titre et du paragraphe,
             renforcées d'autant juste en dessous. Une ombre suit la LETTRE ; un voile éteint
             toute la photo pour protéger trois lignes de texte. */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/12 to-transparent" />
+        {/*
+          ⚠️ LES OPACITÉS DE TAILWIND NE VONT QUE DE 5 EN 5, ET S'EN ÉCARTER NE PRODUIT
+          RIEN — SANS ERREUR NI AVERTISSEMENT. Vérifié le 10/09/2026 sur le site en ligne :
+          deux de ces trois voiles rendaient `background-image: none`.
+
+            demandé          généré ?   effet réel
+            from-black/44    NON        le voile du haut n'existait pas du tout
+            via-black/14     NON
+            from-black/52    NON        le voile mobile n'existait pas du tout
+            to-black/28      NON
+            via-black/12     NON        le voile du bas perdait son point milieu
+
+          L'échelle `opacity` de Tailwind 3.4 vaut exactement 0, 5, 10 … 100. Une valeur
+          hors échelle exige les crochets (`from-black/[0.44]`) ; écrite en clair, la classe
+          n'est jamais engendrée et le dégradé disparaît. Le typage ne voit rien : une
+          classe CSS est une chaîne de caractères.
+
+          Conséquence concrète, celle que Cyprien a vue : en haut de la page, la barre de
+          navigation en blanc reposait directement sur le ciel clair de la photo. Et sur
+          téléphone, le texte du hero se posait sur la photo NUE, sans aucun voile.
+
+          Toutes les valeurs ci-dessous sont désormais sur l'échelle, et `tests/opacites.test.ts`
+          refuse toute classe hors échelle.
+        */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/25 to-transparent" />
         {/* VOILE LATÉRAL — il manquait, et c'est toute l'explication du texte « qui dépasse
             sur les coureurs ». Le hero n'avait qu'un dégradé du BAS et un bandeau du HAUT :
             au milieu de l'image, à hauteur du titre et du paragraphe, la photo était à nu.
@@ -460,10 +484,10 @@ export default function LandingPage() {
             et ce n'est pas une inconséquence : à 375 px le texte occupe TOUTE la largeur,
             il passe donc sur les coureurs et sur la pelouse claire, sans le moindre endroit
             où s'écarter. Le bureau, lui, garde sa colonne de texte à gauche des silhouettes. */}
-        <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-black/52 via-black/40 to-black/28 sm:hidden" />
+        <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-black/50 via-black/40 to-black/30 sm:hidden" />
         {/* Bandeau du haut : il donne au texte de la barre un fond assez sombre pour tenir,
             sans couvrir plus que la barre elle-même. */}
-        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/44 via-black/14 to-transparent" />
+        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/35 via-black/10 to-transparent" />
 
         <Container className="relative z-10 pb-20 pt-28 sm:pb-24">
           {/* Le titre est désormais une LIGNE DE MARQUE identique dans les cinq langues, ce

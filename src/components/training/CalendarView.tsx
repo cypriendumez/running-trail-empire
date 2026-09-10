@@ -378,7 +378,7 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
               ) : null}
               {coach.tags.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  {coach.tags.map((tg) => <span key={tg} className="rounded-full bg-white/12 px-2.5 py-0.5 text-xs font-semibold text-white/90 ring-1 ring-white/15 backdrop-blur-md">{tg}</span>)}
+                  {coach.tags.map((tg) => <span key={tg} className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-semibold text-white/90 ring-1 ring-white/15 backdrop-blur-md">{tg}</span>)}
                 </div>
               )}
               {coach.why && <div className="mt-3 max-w-2xl rounded-xl bg-white/10 p-3 text-sm leading-relaxed text-white/90 ring-1 ring-white/15 backdrop-blur-md"><b>{t("cal.panel.why")}&nbsp;:</b> {coach.why}</div>}
