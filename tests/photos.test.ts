@@ -60,9 +60,14 @@ const BANNIES: Record<string, string> = {
 
 // ── 2. Les auditées, par surface PUBLIQUE ────────────────────────────────────
 // Regardées une par une le 20/08/2026, au recadrage exact servi par la page.
+/**
+ * ⚠️ `photo-1502904550040-7534597429ae` (piste d'athlétisme vue du dessus) A ÉTÉ RETIRÉE
+ * le 08/09/2026 : le fond du Hero n'est plus une image Unsplash distante mais un fichier
+ * local (`public/hero-paris.jpg`). Elle n'est donc plus « auditée mais inutilisée » — elle
+ * n'est plus utilisée du tout. Ne pas la remettre en croyant à un oubli.
+ */
 const AUDITEES: Record<string, string> = {
   // Landing — les 9 cartes de PROGRAMS + le hero.
-  "photo-1502904550040-7534597429ae": "hero : piste vue de haut, aucun visage lisible",
   "photo-1560052767-406e947cc273":    "10 km : coureur de dos, petit dans le cadre, t-shirt uni",
   "photo-1590333748338-d629e4564ad9": "semi : peloton de dos, aucun dossard visible",
   "photo-1682367905664-e36b30f15b19": "marathon : foule vue de haut, visages et dossards illisibles",

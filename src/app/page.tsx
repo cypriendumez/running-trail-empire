@@ -373,9 +373,15 @@ export default function LandingPage() {
 
       {/* ── HERO ── plein cadre, photo de piste immersive */}
       <section className="relative flex min-h-screen items-end overflow-hidden">
+        {/* ⚠️ DEUX TAILLES SEULEMENT, ET C'EST DÉLIBÉRÉ. Le fichier source fait 1 399 × 768 :
+            en générer un de 1 920 px l'AGRANDIRAIT, c'est-à-dire fabriquerait une netteté
+            qui n'existe pas. Et une variante intermédiaire à 1 280 px pesait 328 Ko, soit
+            PLUS que l'original en 1 399 px (232 Ko) — la ré-encoder ne faisait qu'ajouter
+            du poids et une seconde perte. On sert donc la photo d'origine telle quelle,
+            octet pour octet, et une seule réduction pour les téléphones. */}
         <img
-          src="https://images.unsplash.com/photo-1502904550040-7534597429ae?w=1920&q=85&fit=crop&crop=center"
-          srcSet="https://images.unsplash.com/photo-1502904550040-7534597429ae?w=750&q=80&fit=crop&crop=center 750w, https://images.unsplash.com/photo-1502904550040-7534597429ae?w=1280&q=82&fit=crop&crop=center 1280w, https://images.unsplash.com/photo-1502904550040-7534597429ae?w=1920&q=85&fit=crop&crop=center 1920w"
+          src="/hero-paris.jpg"
+          srcSet="/hero-paris-750.jpg 750w, /hero-paris.jpg 1399w"
           sizes="100vw"
           alt={t("alt.piste")}
           fetchPriority="high"
