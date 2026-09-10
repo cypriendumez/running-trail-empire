@@ -388,12 +388,16 @@ export default function LandingPage() {
           decoding="async"
           className="absolute inset-0 h-full w-full object-cover"
         />
-        {/* Les trois voiles avaient été ALLÉGÉS d'un tiers (ils rendaient 0,85 + 0,60 + 0,68
-            empilés, et la piste virait au brun-noir). Ils sont ici remontés de 8 points —
-            un cran, pas un retour en arrière : la photo reste lisible comme photo, mais le
-            texte blanc regagne la marge de contraste que l'éclaircissement lui avait prise
-            sur les zones de piste les plus claires. */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/24 to-transparent" />
+        {/* ⚠️ ALLÉGÉS DE NOUVEAU LE 10/09/2026, sur un constat de Cyprien : la nouvelle photo
+            de Paris rendait trop sombre. Les voiles étaient calés sur l'ANCIENNE image — une
+            piste vue du dessus, mate et sans ciel. La nouvelle a un ciel clair et une pelouse
+            vive : le même voile qui asseyait le texte sur l'ancienne éteint celle-ci.
+
+            0,70 → 0,45 en bas, 0,24 → 0,12 au milieu. Ce n'est pas un renoncement à la
+            lisibilité : elle est REPORTÉE sur les ombres portées du titre et du paragraphe,
+            renforcées d'autant juste en dessous. Une ombre suit la LETTRE ; un voile éteint
+            toute la photo pour protéger trois lignes de texte. */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/12 to-transparent" />
         {/* VOILE LATÉRAL — il manquait, et c'est toute l'explication du texte « qui dépasse
             sur les coureurs ». Le hero n'avait qu'un dégradé du BAS et un bandeau du HAUT :
             au milieu de l'image, à hauteur du titre et du paragraphe, la photo était à nu.
@@ -413,10 +417,16 @@ export default function LandingPage() {
             photo, et c'est suffisant. La piste a la même lumière d'un bord à l'autre.
             ⚠️ Il reste SOUS `sm` : à 375 px le texte occupe toute la largeur et passe sur
             les silhouettes ; sans fond, une ligne sur deux devient illisible. */}
-        <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-black/70 via-black/55 to-black/40 sm:hidden" />
+        {/* ⚠️ ALLÉGÉ AUSSI, MAIS MOINS QUE LE BUREAU — 0,70/0,55/0,40 → 0,52/0,40/0,28.
+            Vu à l'écran : en n'éclaircissant que le bureau, le mobile restait franchement
+            plus sombre et le site avait deux ambiances. Il garde néanmoins plus de voile,
+            et ce n'est pas une inconséquence : à 375 px le texte occupe TOUTE la largeur,
+            il passe donc sur les coureurs et sur la pelouse claire, sans le moindre endroit
+            où s'écarter. Le bureau, lui, garde sa colonne de texte à gauche des silhouettes. */}
+        <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-black/52 via-black/40 to-black/28 sm:hidden" />
         {/* Bandeau du haut : il donne au texte de la barre un fond assez sombre pour tenir,
             sans couvrir plus que la barre elle-même. */}
-        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/58 via-black/22 to-transparent" />
+        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/44 via-black/14 to-transparent" />
 
         <Container className="relative z-10 pb-20 pt-28 sm:pb-24">
           {/* Le titre est désormais une LIGNE DE MARQUE identique dans les cinq langues, ce
@@ -431,7 +441,7 @@ export default function LandingPage() {
                 l'image (demandé) et garder du contraste sont contradictoires tant qu'on
                 traite le fond. L'ombre agit là où il faut — sous les lettres — et laisse la
                 piste lumineuse partout ailleurs. */}
-            <h1 className="text-[2.9rem] font-bold leading-[1.03] tracking-tight text-white [text-shadow:0_2px_20px_rgba(0,0,0,0.65)] sm:text-6xl md:text-7xl lg:text-[5.25rem]">
+            <h1 className="text-[2.9rem] font-bold leading-[1.03] tracking-tight text-white [text-shadow:0_2px_22px_rgba(0,0,0,0.72)] sm:text-6xl md:text-7xl lg:text-[5.25rem]">
               {L.hero.titleA}<br />{L.hero.titleB}
               {/* Le mot accentué porte la seconde moitié du nom (« Evo ») : on lui donne
                   le vert du wordmark et une ombre portée, sans quoi l'émeraude sur une
@@ -439,13 +449,13 @@ export default function LandingPage() {
                   derrière. */}
               {/* Plus de point final : « Pace Your Evolution » est une ligne de marque,
                   pas une phrase. Un point la referme comme une affirmation banale. */}
-              <span className="text-[#34d399] [text-shadow:0_2px_24px_rgba(0,0,0,0.45)]">{L.hero.accent}</span>
+              <span className="text-[#34d399] [text-shadow:0_2px_26px_rgba(0,0,0,0.55)]">{L.hero.accent}</span>
             </h1>
             {/* Largeur MESURÉE, pas choisie : à `lg:max-w-xl` la plus longue ligne finissait à
                 750 px alors que la première silhouette commence vers 738. `max-w-lg` la
                 ramène à 688 px — le texte s'arrête avant les coureurs, sans dépendre du
                 voile pour rester lisible. */}
-            <p className="mt-6 max-w-lg text-[17px] leading-relaxed text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.8)]">
+            <p className="mt-6 max-w-lg text-[17px] leading-relaxed text-white [text-shadow:0_1px_14px_rgba(0,0,0,0.88)]">
               {L.hero.subtitle}
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
