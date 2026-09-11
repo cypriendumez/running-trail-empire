@@ -10,6 +10,10 @@ import { libellesSections, type Lang, estLang } from "./email";
  * envoyait un message français à un abonné allemand. Le tout premier message qu'une
  * personne reçoit de Pacevo est celui qui décide si elle fait confiance à la suite.
  *
+ * ⚠️ « — on ne recopie aucun article » a été RETIRÉ (24/08 dans la lettre, 11/09 ici, à la
+ * demande de Cyprien) : c'est une règle interne dont l'abonné n'a que faire. La règle,
+ * elle, tient toujours — les titres restent des liens vers l'éditeur.
+ *
  * ⚠️ La promesse « rien d'autre » est tenue par le code, pas par la formule : cette
  * adresse ne sert qu'à la lettre du lundi (voir `api/newsletter/weekly`), et le lien de
  * désinscription est donné AVANT le premier envoi — on peut partir sans avoir rien reçu.
@@ -30,7 +34,7 @@ const T: Record<string, Bloc> = {
     p1: "Merci. Voilà ce qui t'attend, et rien de plus.",
     sommaire: "Chaque lundi matin, cinq rubriques :",
     quand: "Plus les courses qui approchent, tirées du calendrier de Pacevo.",
-    p2: "C'est notre seul envoi récurrent. Cette adresse ne sert à rien d'autre, et chaque titre renvoie chez son éditeur — on ne recopie aucun article.",
+    p2: "C'est notre seul envoi récurrent. Cette adresse ne sert à rien d'autre, et chaque titre renvoie chez son éditeur.",
     voirLeSite: "Découvrir Pacevo",
     desinscrire: "Se désinscrire",
     pourquoi: "Tu reçois ce message parce que tu viens de t'inscrire à la lettre Pacevo.",
@@ -41,7 +45,7 @@ const T: Record<string, Bloc> = {
     p1: "Thank you. Here is what's coming, and nothing more.",
     sommaire: "Every Monday morning, five sections:",
     quand: "Plus the races coming up, taken from the Pacevo calendar.",
-    p2: "It's our only recurring email. This address is used for nothing else, and every headline links to its publisher — we don't reproduce any article.",
+    p2: "It's our only recurring email. This address is used for nothing else, and every headline links to its publisher.",
     voirLeSite: "Explore Pacevo",
     desinscrire: "Unsubscribe",
     pourquoi: "You're getting this because you just subscribed to the Pacevo digest.",
@@ -52,7 +56,7 @@ const T: Record<string, Bloc> = {
     p1: "Danke. Das erwartet dich — und nichts weiter.",
     sommaire: "Jeden Montagmorgen, fünf Rubriken:",
     quand: "Dazu die anstehenden Rennen aus dem Pacevo-Kalender.",
-    p2: "Das ist unsere einzige wiederkehrende E-Mail. Diese Adresse wird für nichts anderes verwendet, und jede Überschrift führt zum Verlag — wir geben keinen Artikel wieder.",
+    p2: "Das ist unsere einzige wiederkehrende E-Mail. Diese Adresse wird für nichts anderes verwendet, und jede Überschrift führt zum Verlag.",
     voirLeSite: "Pacevo entdecken",
     desinscrire: "Abmelden",
     pourquoi: "Du erhältst diese Nachricht, weil du dich gerade für den Pacevo-Rückblick angemeldet hast.",
@@ -63,7 +67,7 @@ const T: Record<string, Bloc> = {
     p1: "Gracias. Esto es lo que te espera, y nada más.",
     sommaire: "Cada lunes por la mañana, cinco secciones:",
     quand: "Además de las carreras que se acercan, del calendario de Pacevo.",
-    p2: "Es nuestro único envío recurrente. Esta dirección no se usa para nada más, y cada titular lleva a su medio — no reproducimos ningún artículo.",
+    p2: "Es nuestro único envío recurrente. Esta dirección no se usa para nada más, y cada titular lleva a su medio.",
     voirLeSite: "Descubrir Pacevo",
     desinscrire: "Darse de baja",
     pourquoi: "Recibes este mensaje porque acabas de suscribirte al resumen de Pacevo.",
@@ -74,7 +78,7 @@ const T: Record<string, Bloc> = {
     p1: "Obrigado. É isto que te espera, e nada mais.",
     sommaire: "Todas as segundas de manhã, cinco rubricas:",
     quand: "Mais as provas que se aproximam, do calendário da Pacevo.",
-    p2: "É o nosso único envio recorrente. Este endereço não serve para mais nada, e cada título remete para o seu editor — não reproduzimos nenhum artigo.",
+    p2: "É o nosso único envio recorrente. Este endereço não serve para mais nada, e cada título remete para o seu editor.",
     voirLeSite: "Descobrir a Pacevo",
     desinscrire: "Cancelar a subscrição",
     pourquoi: "Recebes esta mensagem porque acabaste de te inscrever no resumo da Pacevo.",

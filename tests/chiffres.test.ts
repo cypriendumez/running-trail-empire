@@ -572,6 +572,18 @@ test("la newsletter n'explique plus sa politique éditoriale à ses abonnés", (
     assert.ok(!/recopie|reproduc|reproduz|wieder/i.test(c), `la phrase éditoriale est revenue : « ${c} »`);
     assert.ok(c.trim().length > 8, `chapô vide ou tronqué : « ${c} »`);
   }
+  // ⚠️ La même phrase avait SURVÉCU dans l'accusé d'inscription (« — on ne recopie aucun
+  // article » au bout de son deuxième paragraphe, dans les cinq langues) : retirée d'un
+  // message le 24/08, elle est restée dans l'autre jusqu'au 11/09. Le test garde les deux.
+  const accuse = readFileSync(join(ROOT, "src/lib/newsletter/confirmation.ts"), "utf8");
+  const p2 = [...accuse.matchAll(/p2:\s*"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1]);
+  assert.equal(p2.length, 5, `${p2.length} paragraphe(s) p2 trouvé(s) dans l'accusé, 5 langues attendues`);
+  for (const c of p2) {
+    // « wieder » seul attraperait « wiederkehrende » (récurrent), qui est légitime :
+    // on vise la tournure « wir geben keinen Artikel wieder ».
+    assert.ok(!/recopie|reproduc|reproduz|Artikel wieder|wiedergeb/i.test(c), `la phrase éditoriale est revenue dans l'accusé : « ${c} »`);
+    assert.ok(/éditeur|publisher|Verlag|medio|editor/.test(c), `l'accusé ne dit plus que les titres mènent chez l'éditeur : « ${c} »`);
+  }
 });
 test("les graphiques du tableau de bord occupent la hauteur que la grille leur donne", () => {
   // ⚠️ MESURÉ DANS LE NAVIGATEUR, PAS SUPPOSÉ, le 31/08/2026 sur les vraies données de
