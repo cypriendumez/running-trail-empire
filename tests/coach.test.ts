@@ -39,6 +39,7 @@ import { PRIX_AFFICHES, REMISE_ANNUELLE_PCT, MOIS_FACTURES_PAR_AN, MOIS_OFFERTS,
 import { jetonDesinscription, jetonValide } from "../src/lib/newsletter/token";
 import { emailConfirmation } from "../src/lib/newsletter/confirmation";
 import { emailNouvelInscrit } from "../src/lib/notify/nouvelInscrit";
+import { FOND_EMAIL } from "../src/lib/notify/gabarit";
 import { construireEmail as courrierHebdo, libellesSections, LANGS as LANGS_MAIL2, type Section as SectionMail2 } from "../src/lib/newsletter/email";
 import { chiffresVerifies, rendreTous, extraireResumes, RESUMES_MAX } from "../src/lib/newsletter/resume";
 import { FILTRES, QUERIES, RUBRIQUES_LETTRE, estCat } from "../src/lib/news/rubriques";
@@ -5156,7 +5157,7 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
       );
       for (const [quoi, e] of [["accusé", c], ["hebdo", h]] as [string, { html: string; objet: string }][]) {
         assert.ok(e.html.includes("/icon.png"), `${quoi} sans logo en ${lg}`);
-        assert.ok(e.html.includes("#f4f4f5"), `${quoi} sans coquille en ${lg}`);
+        assert.ok(e.html.includes(FOND_EMAIL), `${quoi} sans coquille en ${lg}`);
         assert.ok(!e.html.includes("undefined"), `${quoi} : une clé manque en ${lg}`);
         assert.ok(e.html.includes(`href="${lienEch}"`), `${quoi} sans lien de désinscription cliquable en ${lg}`);
         // ⚠️ Le point qui a motivé ce test : une URL de 70 caractères affichée en toutes
@@ -5185,6 +5186,64 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     }
   });
 
+  test("la newsletter et le coach partagent UNE coquille : aperçu, langue, titre", () => {
+    // ⚠️ IL Y AVAIT DEUX HABILLAGES, un par famille d'e-mails, et ils avaient divergé :
+    // l'accusé d'inscription n'avait ni ligne d'aperçu (la liste des messages affichait
+    // « PACEVO Tu es bien inscrit… »), ni `<html lang>`, ni mention de l'éditeur, et son
+    // mot-marque était noir quand celui du coach est vert. Un abonné qui recevait les
+    // deux recevait deux marques. Ce test vérifie que l'accusé sort de la MÊME coquille
+    // que « ton plan est à jour » — pas d'une copie qui lui ressemble.
+    const base = "https://exemple.fr";
+    const lien = `${base}/api/newsletter/unsubscribe?e=x%40y.fr&t=abc`;
+    const plan = mailIn({ appUrl: base });
+    for (const lg of LANGS_MAIL2) {
+      const c = emailConfirmation(lg, base, lien);
+      assert.ok(c.html.startsWith("<!doctype html>"), `${lg} : l'accusé n'est pas un document complet`);
+      assert.ok(c.html.includes(`<html lang="${lg}">`), `${lg} : l'accusé ne déclare pas sa langue`);
+      assert.ok(c.html.includes(`<title>${c.objet}</title>`) || c.html.includes(`<title>${c.objet.replace(/'/g, "&#39;")}</title>`),
+        `${lg} : le titre du document n'est pas l'objet`);
+      // La ligne d'aperçu précède la carte : c'est ce que la messagerie montre en liste.
+      const apercu = c.html.indexOf("mso-hide:all"), carte = c.html.indexOf("border-radius:18px");
+      assert.ok(apercu > 0 && carte > apercu, `${lg} : pas de ligne d'aperçu avant la carte`);
+      // Le mot-marque est celui du coach — vert — et le logo le même fichier, même taille.
+      assert.ok(c.html.includes(`color:#059669">PACEVO`), `${lg} : le mot-marque n'est pas celui du coach`);
+      assert.ok(c.html.includes(`${base}/icon.png" width="34" height="34" alt="Pacevo"`), `${lg} : logo différent de celui du coach`);
+      // Le bouton est celui du coach : une cellule verte, pas un lien noir stylé.
+      assert.ok(!c.html.includes("#18181b;color:#ffffff"), `${lg} : bouton noir de l'ancien habillage`);
+      assert.ok(c.html.includes(`background:#059669;border-radius:11px`), `${lg} : bouton différent de celui du coach`);
+      // Le pied reste celui de la newsletter : désinscription signée, jamais /dashboard/profile.
+      assert.ok(!c.html.includes("/dashboard/profile"), `${lg} : le pied renvoie au profil au lieu de la désinscription`);
+    }
+    // Preuve que les deux familles ont le même fond, le même en-tête : même fragment.
+    const entete = (h: string) => h.slice(h.indexOf("<body"), h.indexOf("border-radius:18px"));
+    assert.equal(entete(emailConfirmation("fr", base, lien).html).replace(/mso-hide:all">[^<]*/, ""),
+      entete(plan.html).replace(/mso-hide:all">[^<]*/, ""), "l'en-tête de l'accusé diffère de celui du coach");
+  });
+
+  test("un refus de Resend sur l'accusé d'inscription est écrit dans le journal, jamais avalé", () => {
+    // ⚠️ LE 10/09/2026, UN ABONNÉ N'A RIEN REÇU ET PERSONNE NE L'A SU. La route envoyait
+    // l'accusé dans un `try {} catch {}` vide, SANS lire le statut de la réponse : Resend
+    // répondait 403 (« onboarding@resend.dev » ne livre qu'au propriétaire du compte) et
+    // l'inscription répondait « ok » comme si de rien n'était. Le journal d'erreurs
+    // existait ; rien n'y était écrit.
+    const src = codeOf("src/app/api/newsletter/subscribe/route.ts");
+    const appel = src.indexOf("api.resend.com");
+    assert.ok(appel > 0, "la route n'envoie plus l'accusé");
+    const apres = src.slice(appel);
+    // Le statut est LU…
+    assert.match(apres, /if \(!r\.ok\)/, "le statut de la réponse Resend n'est pas lu");
+    // …le corps de Resend (la raison) est conservé…
+    assert.match(apres, /r\.text\(\)/, "la raison donnée par Resend n'est pas relue");
+    // …et l'échec finit dans error_logs, avec la source « newsletter » pour être filtrable.
+    assert.match(apres, /from\("error_logs"\)\.insert\(/, "l'échec n'est pas journalisé");
+    assert.match(apres, /source: "newsletter"/, "le journal ne porte pas la source « newsletter »");
+    // Le `catch` d'envoi n'est plus vide : il nomme l'échec.
+    assert.ok(!/catch\s*\{\s*\}/.test(apres) && !/catch\s*\{\s*\/\*/.test(apres), "un catch vide avale encore l'échec d'envoi");
+    // Et l'absence de variables (clé, expéditeur, adresse) est journalisée aussi : c'est
+    // tout aussi silencieux qu'un refus, pour la même personne.
+    assert.match(apres, /variables manquantes/, "l'absence de RESEND_FROM / clé n'est pas journalisée");
+  });
+
   test("l'alerte d'inscription part une fois, à la confirmation, avec ce qu'il faut dedans", () => {
     // Une alerte partait déjà quand un athlète notait son ressenti, mais RIEN à la
     // création d'un compte : il fallait penser à ouvrir /admin pour s'en apercevoir.
@@ -5194,7 +5253,7 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
 
     for (const [quoi, e] of [["premier", a], ["suivant", b]] as [string, typeof a][]) {
       assert.ok(e.html.includes("/icon.png"), `${quoi} : pas de logo`);
-      assert.ok(e.html.includes("#f4f4f5"), `${quoi} : pas de coquille`);
+      assert.ok(e.html.includes(FOND_EMAIL), `${quoi} : pas de coquille`);
       assert.ok(!e.html.includes("undefined"), `${quoi} : une valeur manque`);
       // ⚠️ L'e-mail ET le nom doivent y être : une alerte qui dit « quelqu'un s'est
       // inscrit » sans dire QUI oblige à ouvrir l'admin, donc ne sert à rien.

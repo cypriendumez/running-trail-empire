@@ -228,7 +228,12 @@ export function construireEmail(
       <p style="margin:0 0 8px">${ech(t.revuePresse(CONTACT))}</p>
       <p style="margin:0">${ech(t.pourquoi)}<br>${ligneDesinscription(t.desinscrire, lienDesinscription)}</p>`;
 
-  const html = coquilleEmail({ base, surtitre: ech(t.surtitre(semaine)), corps, pied });
+  // Langue, objet et ligne d'aperçu partent avec l'habillage : sans eux, la lettre
+  // allemande portait `lang="fr"` et la liste des messages affichait le début du corps.
+  const html = coquilleEmail({
+    base, surtitre: ech(t.surtitre(semaine)), corps, pied,
+    lang, sujet: t.objet(semaine), apercu: t.chapo,
+  });
 
   const texteSections = pleines
     .map((sec) => `\n\n## ${t.sections[sec.cle].toUpperCase()}\n\n${sec.articles.map((a) => `• ${a.title}\n  ${a.source} — ${a.link}${a.resume ? `\n  ${a.resume}` : ""}`).join("\n\n")}`)

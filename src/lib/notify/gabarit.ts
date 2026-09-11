@@ -23,6 +23,9 @@ import { EDITEUR } from "@/lib/brand/editeur";
 
 /** Émeraude de la marque, la même que sur le site. */
 export const VERT = "#059669";
+/** Le gris du fond, DERRIÈRE la carte blanche. Exporté pour que les tests reconnaissent la
+ *  coquille sans recopier une couleur qui pourrait changer ici sans qu'ils le sachent. */
+export const FOND_EMAIL = "#eef2f6";
 
 /**
  * Échappement HTML. Les titres de séance viennent d'intervals.icu — donc du nom que
@@ -71,9 +74,22 @@ export function coquille(o: {
   apercu: string;
   contenu: string;
   appUrl: string;
-  piedTexte: string;
-  piedLien: string;
+  /** Pied « standard » : une phrase + un lien vers les réglages de notifications. */
+  piedTexte?: string;
+  piedLien?: string;
+  /**
+   * Pied SUR MESURE, déjà en HTML échappé, à la place des deux champs précédents.
+   *
+   * ⚠️ C'est ce qui manquait pour que la newsletter partage cette coquille : son pied
+   * porte un lien de DÉSINSCRIPTION signé, pas un lien vers le profil. Faute de ce
+   * champ, `lib/newsletter/gabarit` avait réécrit tout l'habillage à côté — sans ligne
+   * d'aperçu, sans tableaux pour Outlook, avec un mot-marque noir au lieu du vert : un
+   * abonné recevait deux marques différentes selon le message.
+   */
+  pied?: string;
 }): string {
+  const pied = o.pied ?? `${esc(o.piedTexte ?? "")}
+      <a href="${esc(o.appUrl)}/dashboard/profile" style="color:#64748b;text-decoration:underline">${esc(o.piedLien ?? "")}</a>`;
   return `<!doctype html>
 <html lang="${o.lang}">
 <head>
@@ -83,9 +99,9 @@ export function coquille(o: {
 <meta name="supported-color-schemes" content="light">
 <title>${esc(o.sujet)}</title>
 </head>
-<body style="margin:0;padding:0;background:#eef2f6;font-family:${POLICE};color:#0f172a">
+<body style="margin:0;padding:0;background:${FOND_EMAIL};font-family:${POLICE};color:#0f172a">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all">${esc(o.apercu)}${"&#8199;&#65279;&nbsp;".repeat(60)}</div>
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#eef2f6">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${FOND_EMAIL}">
 <tr><td align="center" style="padding:32px 16px">
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:100%;max-width:600px">
 
@@ -104,8 +120,7 @@ export function coquille(o: {
     </td></tr>
 
     <tr><td style="padding:18px 8px 0;font-size:12px;line-height:1.6;color:#94a3b8">
-      ${esc(o.piedTexte)}
-      <a href="${esc(o.appUrl)}/dashboard/profile" style="color:#64748b;text-decoration:underline">${esc(o.piedLien)}</a>
+      ${pied}
       <div style="margin-top:8px">Pacevo &middot; ${esc(EDITEUR.nom)} &middot; <a href="${esc(o.appUrl)}/mentions-legales" style="color:#94a3b8;text-decoration:underline">${esc(o.appUrl.replace(/^https?:\/\//, ""))}</a></div>
     </td></tr>
 

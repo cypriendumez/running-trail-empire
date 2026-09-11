@@ -1,4 +1,5 @@
 import { coquilleEmail, ligneDesinscription, ech } from "./gabarit";
+import { bouton } from "@/lib/notify/gabarit";
 import { libellesSections, type Lang, estLang } from "./email";
 
 /**
@@ -105,16 +106,16 @@ export function emailConfirmation(lang: string, base: string, lien: string): { o
 
       <p style="margin:22px 0 0;font-size:14px;line-height:1.7;color:#71717a">${ech(t.p2)}</p>
 
-      <div style="margin-top:26px">
-        <a href="${ech(base)}" style="display:inline-block;background:#18181b;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:12px 22px;border-radius:999px">${ech(t.voirLeSite)}</a>
-      </div>`;
+      ${bouton(base, t.voirLeSite)}`;
 
   const pied = `<p style="margin:0">${ech(t.pourquoi)}<br>${ligneDesinscription(t.desinscrire, lien)}</p>`;
   return {
     objet: t.objet,
     // ⚠️ Pas de sur-titre « PACEVO » : l'en-tête au-dessus de la carte porte déjà le logo
     // ET le mot. Le répéter à 3 cm d'intervalle donnait l'air d'un gabarit mal fini.
-    html: coquilleEmail({ base, corps, pied }),
+    // Langue, objet et aperçu vont à la coquille : c'est elle qui écrit `<html lang>`,
+    // le `<title>` et la ligne lue dans la liste des messages avant ouverture.
+    html: coquilleEmail({ base, corps, pied, lang: lg, sujet: t.objet, apercu: t.p1 }),
     // La version texte PORTE l'adresse complète : sans HTML, il n'y a pas de lien à
     // cliquer, seulement du texte à recopier.
     texte: [t.titre, "", t.p1, "", t.sommaire, ...rubriques.map((r) => `  - ${r}`), t.quand, "", t.p2, "", t.pourquoi, `${t.desinscrire} : ${lien}`].join("\n"),

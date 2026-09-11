@@ -28,8 +28,8 @@ export async function POST(req: Request) {
   // donc sans cette lecture on ne saurait pas distinguer une inscription d'un re-clic —
   // et on renverrait un « bienvenue » à quelqu'un d'abonné depuis six mois.
   let nouvelle = true;
+  const admin = createAdminClient();
   try {
-    const admin = createAdminClient();
     const { data: existant } = await admin
       .from("newsletter_subscribers")
       .select("email, unsubscribed")
@@ -66,6 +66,13 @@ export async function POST(req: Request) {
   //
   // BEST EFFORT à dessein : si Resend tombe, l'inscription reste valide. Faire échouer
   // l'inscription parce que l'e-mail de courtoisie n'est pas parti serait absurde.
+  //
+  // ⚠️ MAIS UN REFUS N'EST PLUS AVALÉ. Le 10/09/2026, un abonné s'est inscrit et n'a
+  // jamais reçu l'accusé : Resend avait répondu 403 — l'expéditeur `onboarding@resend.dev`
+  // est un domaine de TEST qui ne livre qu'à l'adresse du propriétaire du compte — et
+  // cette route ne lisait même pas le statut de la réponse. Personne ne pouvait le voir.
+  // Désormais le statut est lu, et tout échec (refus ou réseau) est écrit dans
+  // `error_logs`, le journal que /admin affiche déjà.
   if (nouvelle) {
     const CLE = process.env.RESEND_API_KEY;
     const FROM = process.env.RESEND_FROM;
@@ -76,8 +83,9 @@ export async function POST(req: Request) {
       // au-dessus vient d'écrire la langue choisie en base. Le tout premier message
       // qu'une personne reçoit décide si elle fait confiance à la suite.
       const { objet, html, texte } = emailConfirmation(langue, BASE, lien);
+      let echec: string | null = null;
       try {
-        await fetch("https://api.resend.com/emails", {
+        const r = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: { Authorization: `Bearer ${CLE}`, "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -88,7 +96,32 @@ export async function POST(req: Request) {
           }),
           signal: AbortSignal.timeout(8000),
         });
-      } catch { /* l'inscription vaut, l'e-mail est un bonus */ }
+        if (!r.ok) {
+          // Le corps de Resend dit POURQUOI (« domain is not verified », « only send to
+          // your own address »…) : c'est lui qu'on veut relire dans le journal, sans la clé.
+          const corps = await r.text().catch(() => "");
+          echec = `Resend HTTP ${r.status} — ${corps.slice(0, 300)}`;
+        }
+      } catch (e) {
+        echec = `envoi impossible (réseau ou délai) — ${e instanceof Error ? e.message : String(e)}`;
+      }
+      if (echec) {
+        await admin.from("error_logs").insert({
+          user_id: userId,
+          source: "newsletter",
+          message: `Accusé d'inscription non envoyé à ${clean} : ${echec}`,
+          url: "/api/newsletter/subscribe",
+          meta: { email: clean, lang: langue, from: FROM },
+        }).then(({ error }) => { if (error) console.error("[newsletter] journal non écrit :", error.message); });
+      }
+    } else {
+      // Sans expéditeur ou sans clé, l'accusé ne part pas non plus — et c'est tout aussi
+      // invisible qu'un refus. Même journal, même endroit.
+      await admin.from("error_logs").insert({
+        user_id: userId, source: "newsletter",
+        message: `Accusé d'inscription non envoyé à ${clean} : variables manquantes (${[!CLE && "RESEND_API_KEY", !FROM && "RESEND_FROM", !BASE && "NEXT_PUBLIC_APP_URL"].filter(Boolean).join(", ")})`,
+        url: "/api/newsletter/subscribe",
+      }).then(({ error }) => { if (error) console.error("[newsletter] journal non écrit :", error.message); });
     }
   }
 

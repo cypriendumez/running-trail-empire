@@ -1,29 +1,23 @@
 /**
- * LA COQUILLE DES E-MAILS — une seule, pour tous les envois.
+ * L'HABILLAGE DES E-MAILS DE LA NEWSLETTER (accusé, lettre du lundi, alertes).
  *
- * ⚠️ Il y en avait DEUX, écrites séparément : l'accusé d'inscription et la lettre du
- * lundi. Elles avaient déjà divergé — la lettre affichait un lien « Se désinscrire »
- * propre, l'accusé collait l'URL brute en toutes lettres, soixante-dix caractères de
- * jeton compris, ce qui donnait trois lignes vertes illisibles au bas du message. Deux
- * copies d'un habillage divergent toujours ; celle-ci est la seule.
+ * ⚠️ IL ÉTAIT ÉCRIT À CÔTÉ DE CELUI DES E-MAILS DU COACH (`lib/notify/gabarit`), et les
+ * deux avaient divergé : celui-ci n'avait ni ligne d'aperçu (la liste des messages
+ * montrait « PACEVO Tu es bien inscrit… »), ni tableaux (Outlook ignorait la largeur
+ * bornée), ni mention de l'éditeur ; le mot-marque était noir ici et vert là. Un abonné
+ * qui recevait l'accusé d'inscription puis « ton plan est à jour » recevait deux marques.
  *
- * ── CE QUI EST VOULU, ET POURQUOI ────────────────────────────────────────────
- * · Fond gris, carte blanche, coins arrondis : c'est ce qui distingue un message soigné
- *   d'un bloc de texte collé sur du blanc.
- * · Largeur bornée à 600 px — au-delà, les lignes deviennent trop longues à lire, et
- *   c'est la largeur que tous les clients de messagerie savent rendre.
- * · Le logo est une IMAGE HÉBERGÉE, avec un `alt`. La plupart des clients bloquent les
- *   images par défaut : sans `alt`, l'en-tête d'un message sur deux serait vide. Le mot
- *   « PACEVO » est écrit à côté, en texte, et reste donc toujours lisible.
- * · Aucune police externe. Une police web ne se charge pas dans un e-mail ; on s'appuie
- *   sur la pile système, qui rend correctement partout.
+ * Il ne reste donc ici qu'un ADAPTATEUR : même signature qu'avant pour les sept appelants,
+ * mais la coquille est celle de `lib/notify/gabarit`, la seule. Le pied de la newsletter
+ * (désinscription signée, revue de presse) passe par son champ `pied` sur mesure.
  */
+import { coquille, esc, FOND_EMAIL } from "@/lib/notify/gabarit";
+import type { Lang } from "@/lib/i18n/translations";
 
 /** Échappe ce qui part dans du HTML d'e-mail. Un titre d'article contient des `&`. */
-export const ech = (s: string) =>
-  String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+export const ech = (s: string) => esc(String(s ?? ""));
 
-const POLICE = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+export { FOND_EMAIL };
 
 export function coquilleEmail(opts: {
   /** L'adresse du site, pour le logo et les liens. */
@@ -34,29 +28,24 @@ export function coquilleEmail(opts: {
   corps: string;
   /** Le pied de page, déjà en HTML : mentions, raison de l'envoi, désinscription. */
   pied: string;
+  /** Langue du message (attribut `lang` du document). Français à défaut. */
+  lang?: Lang;
+  /** Objet, repris dans le `<title>` du document. */
+  sujet?: string;
+  /** Ligne lue dans la LISTE des messages, invisible une fois ouvert. */
+  apercu?: string;
 }): string {
   const { base, surtitre, corps, pied } = opts;
-  const logo = `${base.replace(/\/$/, "")}/icon.png`;
-  return `<div style="margin:0;padding:24px 12px;background:#f4f4f5;font-family:${POLICE}">
-  <div style="max-width:600px;margin:0 auto">
-
-    <div style="padding:0 4px 18px;text-align:left">
-      <img src="${ech(logo)}" width="40" height="40" alt="Pacevo"
-        style="display:inline-block;vertical-align:middle;border-radius:9px;border:0" />
-      <span style="display:inline-block;vertical-align:middle;margin-left:10px;font-size:15px;font-weight:800;letter-spacing:.16em;color:#18181b">PACEVO</span>
-    </div>
-
-    <div style="background:#ffffff;border-radius:16px;padding:32px 28px;border:1px solid #e4e4e7">
-      ${surtitre ? `<div style="font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#059669">${surtitre}</div>` : ""}
-      ${corps}
-    </div>
-
-    <div style="padding:18px 8px 4px;font-size:12px;line-height:1.65;color:#a1a1aa">
-      ${pied}
-    </div>
-
-  </div>
-</div>`;
+  const contenu = `${surtitre ? `<div style="font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#059669">${surtitre}</div>` : ""}
+      ${corps}`;
+  return coquille({
+    lang: opts.lang ?? "fr",
+    sujet: opts.sujet ?? "Pacevo",
+    apercu: opts.apercu ?? "",
+    contenu,
+    appUrl: base.replace(/\/+$/, ""),
+    pied,
+  });
 }
 
 /**
