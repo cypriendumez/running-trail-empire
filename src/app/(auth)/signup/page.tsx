@@ -35,14 +35,14 @@ export default function SignupPage() {
   // Domaine sans serveur de courrier, renvoyé par la route : le message reste SOUS le
   // champ (un toast disparaît avant qu'on ait relu son adresse), avec la correction en
   // un clic quand la faute de frappe est évidente.
-  const [domaineMort, setDomaineMort] = useState<{ domaine: string; suggestion: string | null } | null>(null);
+  const [domaineMort, setDomaineMort] = useState<{ domaine: string; suggestion: string | null; douteux: boolean } | null>(null);
 
   function update(field: string, value: string) {
     setForm((p) => ({ ...p, [field]: value }));
     if (field === "email") setDomaineMort(null);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent, domaineConfirme = false) {
     e.preventDefault();
     if (form.password !== form.confirmPassword) { toast.error(L.pwMismatch); return; }
     if (form.password.length < 8) { toast.error(L.pwShort); return; }
@@ -58,7 +58,7 @@ export default function SignupPage() {
     // arriver DEUX e-mails de confirmation.
     const rep = await fetch("/api/auth/confirmation", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: form.email, password: form.password, fullName: form.fullName, lang }),
+      body: JSON.stringify({ email: form.email, password: form.password, fullName: form.fullName, lang, domaineConfirme }),
     });
     const j = await rep.json().catch(() => null);
     setLoading(false);
@@ -68,8 +68,11 @@ export default function SignupPage() {
     // formulaire deviendrait un annuaire : il suffirait d'essayer des adresses pour
     // savoir qui a un compte. Même règle que « mot de passe oublié ». Le domaine, lui,
     // ne dit rien sur les comptes : il parle du fournisseur.
-    if (j?.error === "domaine_sans_courrier") {
-      setDomaineMort({ domaine: String(j.domaine ?? ""), suggestion: j.suggestion ? String(j.suggestion) : null });
+    // « douteux » : le domaine est à une ou deux lettres d'un fournisseur courant (et ces
+    // domaines-là EXISTENT, déposés par des squatteurs) — on demande. « sans courrier » :
+    // le domaine n'existe pas du tout — on refuse.
+    if (j?.error === "domaine_sans_courrier" || j?.error === "domaine_douteux") {
+      setDomaineMort({ domaine: String(j.domaine ?? ""), suggestion: j.suggestion ? String(j.suggestion) : null, douteux: j.error === "domaine_douteux" });
       return;
     }
     if (!rep.ok || !j?.ok) { toast.error(L.pwShort); return; }
@@ -150,7 +153,7 @@ export default function SignupPage() {
             <input id={`${cid}-email`} type="email" value={form.email} onChange={(e) => update("email", e.target.value)} placeholder="marie@exemple.com" required aria-invalid={domaineMort ? true : undefined} aria-describedby={domaineMort ? `${cid}-email-erreur` : undefined} className={inputCls} />
             {domaineMort && (
               <p id={`${cid}-email-erreur`} role="alert" className="mt-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                {L.domainDead.replace("{domain}", domaineMort.domaine)}
+                {(domaineMort.douteux ? L.domainDoubt : L.domainDead).replace("{domain}", domaineMort.domaine)}
                 {domaineMort.suggestion && (
                   <>
                     {" "}
@@ -164,6 +167,15 @@ export default function SignupPage() {
                       }}
                     >
                       {L.didYouMean.replace("{suggestion}", domaineMort.suggestion)}
+                    </button>
+                  </>
+                )}
+                {domaineMort.douteux && (
+                  <>
+                    {" · "}
+                    <button type="button" className="underline underline-offset-2 hover:text-amber-950" disabled={loading}
+                      onClick={(e) => { setDomaineMort(null); void handleSubmit(e as unknown as React.FormEvent, true); }}>
+                      {L.keepEmail.replace("{email}", form.email)}
                     </button>
                   </>
                 )}

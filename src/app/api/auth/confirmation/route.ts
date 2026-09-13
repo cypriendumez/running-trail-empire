@@ -23,7 +23,7 @@ import { domaineRecoitDuCourrier, suggestionDomaine } from "@/lib/auth/domaineCo
  * il ne sort d'ici que par l'e-mail.
  */
 export async function POST(req: Request) {
-  const { email, password, fullName, lang } = (await req.json().catch(() => ({}))) as { email?: string; password?: string; fullName?: string; lang?: string };
+  const { email, password, fullName, lang, domaineConfirme } = (await req.json().catch(() => ({}))) as { email?: string; password?: string; fullName?: string; lang?: string; domaineConfirme?: boolean };
   const adresse = String(email ?? "").trim().toLowerCase();
   // Réponse volontairement identique : on ne renseigne pas un annuaire.
   const ok = () => NextResponse.json({ ok: true });
@@ -44,12 +44,20 @@ export async function POST(req: Request) {
   // rien ne renseigne aucun annuaire : ça parle du fournisseur, pas d'un compte Pacevo.
   // Personne ne peut savoir si la BOÎTE existe (les fournisseurs ne répondent pas à cette
   // question) ; c'est la faute de frappe qu'on attrape ici, avant de créer quoi que ce soit.
+  //
+  // ⚠️ ET LE DNS NE SUFFIT PAS : « gmial.com » et « outlok.fr » EXISTENT, déposés par des
+  // squatteurs de fautes de frappe — « outlok.fr » a même un serveur de courrier, pour
+  // récolter ce qui s'y égare (vérifié le 13/09/2026). Une adresse à une ou deux lettres
+  // d'un fournisseur courant est donc signalée D'ABORD, sans réseau, et la personne
+  // tranche : corriger, ou confirmer que c'était voulu (`domaineConfirme`). Le DNS ne
+  // sert qu'ensuite, pour les domaines qui n'existent pas du tout.
   const domaine = adresse.split("@")[1];
+  const suggestion = suggestionDomaine(domaine);
+  if (suggestion && !domaineConfirme) {
+    return NextResponse.json({ ok: false, error: "domaine_douteux", domaine, suggestion }, { status: 400 });
+  }
   if ((await domaineRecoitDuCourrier(domaine)) === "non") {
-    return NextResponse.json(
-      { ok: false, error: "domaine_sans_courrier", domaine, suggestion: suggestionDomaine(domaine) },
-      { status: 400 },
-    );
+    return NextResponse.json({ ok: false, error: "domaine_sans_courrier", domaine, suggestion }, { status: 400 });
   }
 
   const CLE = process.env.RESEND_API_KEY;

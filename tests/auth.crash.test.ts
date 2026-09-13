@@ -148,8 +148,15 @@ console.log(`  ✓ e-mail : ${rendus} rendus (${LANGS.length} langues × ${LIENS
   if (iCtrl < 0) fail("la route d'inscription ne contrôle plus le domaine", "");
   else if (iCreer > 0 && iCtrl > iCreer) fail("la route crée le compte AVANT de contrôler le domaine", "un compte fantôme par faute de frappe");
   if (!/domaine_sans_courrier/.test(route)) fail("la route ne nomme pas l'erreur de domaine", "l'écran ne peut pas la distinguer d'un mot de passe trop court");
+  // ⚠️ « gmial.com » et « outlok.fr » EXISTENT (squatteurs de fautes de frappe, l'un avec
+  // un serveur de courrier) : le DNS les laisse passer. La suggestion doit donc parler
+  // AVANT le DNS, et pouvoir être confirmée si l'adresse était voulue.
+  const iSugg = route.indexOf("suggestionDomaine("), iDns = route.indexOf("domaineRecoitDuCourrier(");
+  if (iSugg < 0 || iSugg > iDns) fail("la suggestion de domaine ne précède pas le DNS", "un domaine squatté passerait sans question");
+  if (!/domaine_douteux/.test(route) || !/domaineConfirme/.test(route)) fail("la route ne sait pas demander confirmation d'un domaine douteux", "");
   const page = readFileSync("src/app/(auth)/signup/page.tsx", "utf8");
   if (!/domaine_sans_courrier/.test(page)) fail("la page d'inscription ignore l'erreur de domaine", "l'athlète verrait « mot de passe trop court »");
+  if (!/domaine_douteux/.test(page) || !/L\.keepEmail/.test(page)) fail("la page ne propose pas de garder l'adresse douteuse", "quelqu'un dont le domaine ressemble à gmail.com ne pourrait plus s'inscrire");
   if (!/L\.didYouMean/.test(page) || !/L\.wrongEmail/.test(page)) fail("la page n'offre ni la correction en un clic ni « mauvaise adresse »", "");
   // Les quatre libellés existent dans les cinq langues, avec leurs jetons.
   for (const lg of ["fr", "en", "de", "es", "pt"] as const) {
@@ -157,6 +164,7 @@ console.log(`  ✓ e-mail : ${rendus} rendus (${LANGS.length} langues × ${LIENS
     if (!s.domainDead?.includes("{domain}")) fail(`${lg} : domainDead sans {domain}`, s.domainDead ?? "(absent)");
     if (!s.didYouMean?.includes("{suggestion}")) fail(`${lg} : didYouMean sans {suggestion}`, s.didYouMean ?? "(absent)");
     if (!s.wrongEmail || !s.notArriving) fail(`${lg} : wrongEmail / notArriving absents`, "");
+    if (!s.domainDoubt?.includes("{domain}") || !s.keepEmail?.includes("{email}")) fail(`${lg} : domainDoubt / keepEmail sans jeton`, "");
   }
   n += 3;
   console.log(`  ✓ domaine de l'adresse : ${n} cas (suggestions, DNS réel, route, écran, 5 langues)`);
