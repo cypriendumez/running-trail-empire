@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { emailInscription } from "@/lib/auth/emailConfirmation";
 import { envoyerEmail } from "@/lib/email/envoyer";
+import { domaineRecoitDuCourrier, suggestionDomaine } from "@/lib/auth/domaineCourrier";
 
 /**
  * L'E-MAIL DE CONFIRMATION, ENVOYÉ PAR NOUS.
@@ -35,6 +36,20 @@ export async function POST(req: Request) {
   const mdp = String(password ?? "");
   if (mdp.length < 8) {
     return NextResponse.json({ ok: false, error: "mot_de_passe_trop_court", min: 8 }, { status: 400 });
+  }
+
+  // ⚠️ LE DOMAINE, LUI AUSSI, DONNE UNE VRAIE ERREUR. Une adresse bien formée mais dont le
+  // domaine n'a pas de serveur de courrier (« gmial.com », « outlok.fr ») recevait « c'est
+  // envoyé » et la personne attendait un e-mail impossible. Dire que le DOMAINE ne reçoit
+  // rien ne renseigne aucun annuaire : ça parle du fournisseur, pas d'un compte Pacevo.
+  // Personne ne peut savoir si la BOÎTE existe (les fournisseurs ne répondent pas à cette
+  // question) ; c'est la faute de frappe qu'on attrape ici, avant de créer quoi que ce soit.
+  const domaine = adresse.split("@")[1];
+  if ((await domaineRecoitDuCourrier(domaine)) === "non") {
+    return NextResponse.json(
+      { ok: false, error: "domaine_sans_courrier", domaine, suggestion: suggestionDomaine(domaine) },
+      { status: 400 },
+    );
   }
 
   const CLE = process.env.RESEND_API_KEY;

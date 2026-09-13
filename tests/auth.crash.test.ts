@@ -22,6 +22,9 @@
 import { fournisseursActifs } from "../src/lib/auth/fournisseurs";
 import { emailInscription } from "../src/lib/auth/emailConfirmation";
 import { ech } from "../src/lib/newsletter/gabarit";
+import { readFileSync } from "node:fs";
+import { suggestionDomaine, distance, domaineRecoitDuCourrier, FOURNISSEURS_COURANTS } from "../src/lib/auth/domaineCourrier";
+import { AUTH } from "../src/components/auth/authI18n";
 
 let ko = 0;
 const fail = (quoi: string, detail: string) => { ko++; console.log(`  ✗ ${quoi}\n      ${detail}`); };
@@ -98,5 +101,66 @@ for (const lg of LANGS) {
 }
 console.log(`  ✓ e-mail : ${rendus} rendus (${LANGS.length} langues × ${LIENS.length} liens), aucune injection`);
 
-console.log(`\n${NON.length + rendus} cas hostiles · ${ko} problème(s)`);
-process.exit(ko ? 1 : 0);
+// ── Le domaine de l'adresse reçoit-il du courrier ? ─────────────────────────
+// ⚠️ L'inscription répondait « c'est envoyé » à N'IMPORTE QUELLE adresse bien formée :
+// « marie@gmial.com » créait un compte et la personne attendait devant « Vérifiez votre
+// email » un message parti vers un domaine qui n'existe pas. Personne ne peut savoir si
+// une BOÎTE existe (les fournisseurs ne répondent pas), mais un DOMAINE sans serveur de
+// courrier, si — et c'est là que tombent les fautes de frappe.
+(async () => {
+  let n = 0;
+  const attendu: [string, string | null][] = [
+    ["gmial.com", "gmail.com"], ["gmal.com", "gmail.com"], ["outlok.fr", "outlook.fr"], ["hotmal.fr", "hotmail.fr"],
+    ["yaho.fr", "yahoo.fr"], ["orang.fr", "orange.fr"], ["icloud.co", "icloud.com"],
+    // Pas de suggestion : le domaine est exact, ou trop loin pour être une faute de frappe.
+    ["gmail.com", null], ["outlook.fr", null], ["pacevo.fr", null], ["exemple.org", null], ["", null],
+    // ⚠️ outlook.fr et outlook.com sont à trois lettres : deux adresses légitimes, on ne
+    // « corrige » pas quelqu'un qui a bien tapé la sienne.
+    ["outlook.com", null],
+    // ⚠️ À trois lettres, une adresse LÉGITIME hors de la liste (« orange.com » est le
+    // domaine de l'entreprise, pas des boîtes « orange.fr ») serait « corrigée » à tort.
+    // C'est ce cas qui garde le seuil à deux : la mutation « dist <= 3 » le rougit.
+    ["orange.com", null], ["gmail.fr", null],
+  ];
+  for (const [d, s] of attendu) {
+    n++;
+    const got = suggestionDomaine(d);
+    if (got !== s) fail(`suggestion pour « ${d} »`, `attendu ${s}, obtenu ${got}`);
+  }
+  if (distance("gmail.com", "gmial.com") !== 2) fail("distance de Levenshtein", `gmail/gmial = ${distance("gmail.com", "gmial.com")}`);
+  if (distance("abc", "abc") !== 0) fail("distance nulle", "");
+  for (const f of FOURNISSEURS_COURANTS) if (suggestionDomaine(f) !== null) fail(`un fournisseur courant se voit suggérer autre chose : ${f}`, "");
+
+  // Le DNS, en vrai : un domaine qui reçoit, un qui n'existe pas, un délai qui ne bloque pas.
+  const oui = await domaineRecoitDuCourrier("gmail.com");
+  if (oui !== "oui") fail("gmail.com devrait recevoir du courrier", `obtenu ${oui}`);
+  const non = await domaineRecoitDuCourrier("ce-domaine-n-existe-vraiment-pas-8f3a2.fr");
+  if (non !== "non") fail("un domaine inexistant devrait rendre « non »", `obtenu ${non}`);
+  const mal = await domaineRecoitDuCourrier("pas un domaine");
+  if (mal !== "non") fail("une chaîne qui n'est pas un domaine devrait rendre « non »", `obtenu ${mal}`);
+  const t0 = Date.now(); const lent = await domaineRecoitDuCourrier("gmail.com", 1); const dt = Date.now() - t0;
+  if (lent === "non" || dt > 500) fail("le délai ne borne pas la requête DNS", `${lent} en ${dt} ms`);
+  n += 4;
+
+  // La route s'en sert AVANT de créer le compte, et l'écran affiche la réponse.
+  const route = readFileSync("src/app/api/auth/confirmation/route.ts", "utf8").replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  const iCtrl = route.indexOf("domaineRecoitDuCourrier("), iCreer = route.indexOf("generateLink(");
+  if (iCtrl < 0) fail("la route d'inscription ne contrôle plus le domaine", "");
+  else if (iCreer > 0 && iCtrl > iCreer) fail("la route crée le compte AVANT de contrôler le domaine", "un compte fantôme par faute de frappe");
+  if (!/domaine_sans_courrier/.test(route)) fail("la route ne nomme pas l'erreur de domaine", "l'écran ne peut pas la distinguer d'un mot de passe trop court");
+  const page = readFileSync("src/app/(auth)/signup/page.tsx", "utf8");
+  if (!/domaine_sans_courrier/.test(page)) fail("la page d'inscription ignore l'erreur de domaine", "l'athlète verrait « mot de passe trop court »");
+  if (!/L\.didYouMean/.test(page) || !/L\.wrongEmail/.test(page)) fail("la page n'offre ni la correction en un clic ni « mauvaise adresse »", "");
+  // Les quatre libellés existent dans les cinq langues, avec leurs jetons.
+  for (const lg of ["fr", "en", "de", "es", "pt"] as const) {
+    const s = AUTH[lg].signup;
+    if (!s.domainDead?.includes("{domain}")) fail(`${lg} : domainDead sans {domain}`, s.domainDead ?? "(absent)");
+    if (!s.didYouMean?.includes("{suggestion}")) fail(`${lg} : didYouMean sans {suggestion}`, s.didYouMean ?? "(absent)");
+    if (!s.wrongEmail || !s.notArriving) fail(`${lg} : wrongEmail / notArriving absents`, "");
+  }
+  n += 3;
+  console.log(`  ✓ domaine de l'adresse : ${n} cas (suggestions, DNS réel, route, écran, 5 langues)`);
+
+  console.log(`\n${NON.length + rendus + n} cas hostiles · ${ko} problème(s)`);
+  process.exit(ko ? 1 : 0);
+})();

@@ -32,9 +32,14 @@ export default function SignupPage() {
   const [step, setStep] = useState<"account" | "verify">("account");
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ fullName: "", email: "", password: "", confirmPassword: "" });
+  // Domaine sans serveur de courrier, renvoyé par la route : le message reste SOUS le
+  // champ (un toast disparaît avant qu'on ait relu son adresse), avec la correction en
+  // un clic quand la faute de frappe est évidente.
+  const [domaineMort, setDomaineMort] = useState<{ domaine: string; suggestion: string | null } | null>(null);
 
   function update(field: string, value: string) {
     setForm((p) => ({ ...p, [field]: value }));
+    if (field === "email") setDomaineMort(null);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -56,13 +61,18 @@ export default function SignupPage() {
       body: JSON.stringify({ email: form.email, password: form.password, fullName: form.fullName, lang }),
     });
     const j = await rep.json().catch(() => null);
-    // ⚠️ Un seul cas donne une vraie erreur : le mot de passe trop court. Tout le reste
-    // — adresse déjà prise, adresse inconnue — répond « c'est envoyé », sinon le
-    // formulaire deviendrait un annuaire : il suffirait d'essayer des adresses pour
-    // savoir qui a un compte. Même règle que « mot de passe oublié ».
-    const error = !rep.ok || !j?.ok ? { message: L.pwShort } : null;
     setLoading(false);
-    if (error) { toast.error(error.message); return; }
+    // ⚠️ Deux cas seulement donnent une vraie erreur : le mot de passe trop court, et un
+    // DOMAINE qui ne reçoit pas de courrier (faute de frappe : « gmial.com »). Tout le
+    // reste — adresse déjà prise, adresse inconnue — répond « c'est envoyé », sinon le
+    // formulaire deviendrait un annuaire : il suffirait d'essayer des adresses pour
+    // savoir qui a un compte. Même règle que « mot de passe oublié ». Le domaine, lui,
+    // ne dit rien sur les comptes : il parle du fournisseur.
+    if (j?.error === "domaine_sans_courrier") {
+      setDomaineMort({ domaine: String(j.domaine ?? ""), suggestion: j.suggestion ? String(j.suggestion) : null });
+      return;
+    }
+    if (!rep.ok || !j?.ok) { toast.error(L.pwShort); return; }
     setStep("verify");
   }
 
@@ -103,6 +113,12 @@ export default function SignupPage() {
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
             {L.resend}
           </button>
+          {/* Une adresse mal tapée mais sur un domaine réel ne se détecte pas avant l'envoi :
+              on ne laisse donc personne bloqué devant « vérifiez votre email ». */}
+          <p className="mt-6 text-xs text-zinc-400">{L.notArriving}</p>
+          <button type="button" onClick={() => setStep("account")} className="mt-2 text-sm font-medium text-emerald-700 hover:text-emerald-900">
+            {L.wrongEmail}
+          </button>
         </div>
       </AuthShell>
     );
@@ -131,7 +147,28 @@ export default function SignupPage() {
           </div>
           <div>
             <label htmlFor={`${cid}-email`} className="text-sm font-medium text-zinc-700 block mb-1.5">{L.email}</label>
-            <input id={`${cid}-email`} type="email" value={form.email} onChange={(e) => update("email", e.target.value)} placeholder="marie@exemple.com" required className={inputCls} />
+            <input id={`${cid}-email`} type="email" value={form.email} onChange={(e) => update("email", e.target.value)} placeholder="marie@exemple.com" required aria-invalid={domaineMort ? true : undefined} aria-describedby={domaineMort ? `${cid}-email-erreur` : undefined} className={inputCls} />
+            {domaineMort && (
+              <p id={`${cid}-email-erreur`} role="alert" className="mt-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                {L.domainDead.replace("{domain}", domaineMort.domaine)}
+                {domaineMort.suggestion && (
+                  <>
+                    {" "}
+                    <button
+                      type="button"
+                      className="font-semibold underline underline-offset-2 hover:text-amber-950"
+                      onClick={() => {
+                        const local = form.email.split("@")[0];
+                        setForm((p) => ({ ...p, email: `${local}@${domaineMort.suggestion}` }));
+                        setDomaineMort(null);
+                      }}
+                    >
+                      {L.didYouMean.replace("{suggestion}", domaineMort.suggestion)}
+                    </button>
+                  </>
+                )}
+              </p>
+            )}
           </div>
           <div>
             <label htmlFor={`${cid}-mdp`} className="text-sm font-medium text-zinc-700 block mb-1.5">{L.password}</label>
