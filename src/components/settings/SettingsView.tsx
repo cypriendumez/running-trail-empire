@@ -14,6 +14,7 @@ import { languageOptions } from "@/i18n/config";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import type { Lang } from "@/lib/i18n/translations";
 import { activerPush } from "@/lib/push/client";
+import { PWA_I18N } from "@/components/pwa/pwaI18n";
 
 type Profile = Record<string, unknown>;
 const s = (v: unknown) => (v == null ? "" : String(v));
@@ -216,19 +217,17 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
   const changeLang = (l: Lang) => { setLang(l); toast.success(t("toast.lang")); };
 
   const askPermission = async () => {
+    // ⚠️ ON PASSE PAR `activerPush`, QUI FAIT TOUT : permission + abonnement serveur. Et surtout,
+    // on TRADUIT SON RÉSULTAT — le 13/09/2026, ce bouton « ne faisait rien » : sur iPhone hors
+    // app installée le push est indisponible, et l'ancienne version affichait quand même
+    // « activées » (mensonge) ou plantait en silence. Chaque cas a désormais un message clair.
     try {
-      const p = await Notification.requestPermission();
-      setPerm(p);
-      if (p === "granted") {
-        // ⚠️ La permission ne suffit pas : sans abonnement push enregistré côté serveur, aucune
-        // notification ne pourra JAMAIS être envoyée. On abonne donc l'appareil dans la foulée.
-        // Best effort : tant que les clés VAPID ne sont pas posées sur l'hébergement, `activerPush`
-        // renvoie « indispo » sans rien casser — la permission locale reste acquise.
-        await activerPush();
-        toast.success(t("set.notif.on"));
-      } else {
-        toast(t("set.notif.hintBlocked"));
-      }
+      const etat = await activerPush();
+      try { setPerm("Notification" in window ? Notification.permission : "unsupported"); } catch { /* ignore */ }
+      if (etat === "active") toast.success(t("set.notif.on"));
+      else if (etat === "bloque") toast(t("set.notif.hintBlocked"));
+      else if (etat === "indispo") toast(PWA_I18N[lang]?.pushInstallFirst ?? PWA_I18N.fr.pushInstallFirst, { duration: 8000 });
+      else toast.error("—");
     } catch { toast.error("—"); }
   };
   const toggleSound = () => { const v = !sound; setSound(v); try { localStorage.setItem("rte:sound", v ? "on" : "off"); } catch { /* ignore */ } toast(v ? "🔊" : "🔇"); };

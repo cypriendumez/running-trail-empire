@@ -24,6 +24,7 @@ export type PwaBloc = {
   pushEnable: string;
   pushEnabled: string;
   pushBlocked: string;
+  pushInstallFirst: string;
 };
 
 export const PWA_I18N: Record<string, PwaBloc> = {
@@ -42,6 +43,7 @@ export const PWA_I18N: Record<string, PwaBloc> = {
     pushEnable: "Activer les notifications",
     pushEnabled: "Notifications activées",
     pushBlocked: "Notifications bloquées — autorise-les dans les réglages de ton navigateur.",
+    pushInstallFirst: "Sur iPhone, ajoute d'abord Pacevo à ton écran d'accueil (Partager → « Sur l'écran d'accueil »), ouvre l'app installée, puis réessaie.",
   },
   en: {
     installTitle: "Install Pacevo",
@@ -58,6 +60,7 @@ export const PWA_I18N: Record<string, PwaBloc> = {
     pushEnable: "Enable notifications",
     pushEnabled: "Notifications on",
     pushBlocked: "Notifications blocked — allow them in your browser settings.",
+    pushInstallFirst: "On iPhone, first add Pacevo to your home screen (Share → “Add to Home Screen”), open the installed app, then try again.",
   },
   de: {
     installTitle: "Pacevo installieren",
@@ -74,6 +77,7 @@ export const PWA_I18N: Record<string, PwaBloc> = {
     pushEnable: "Benachrichtigungen aktivieren",
     pushEnabled: "Benachrichtigungen an",
     pushBlocked: "Benachrichtigungen blockiert — erlaube sie in den Browsereinstellungen.",
+    pushInstallFirst: "Auf dem iPhone füge Pacevo zuerst zum Startbildschirm hinzu (Teilen → „Zum Home-Bildschirm“), öffne die installierte App und versuche es erneut.",
   },
   es: {
     installTitle: "Instala Pacevo",
@@ -90,6 +94,7 @@ export const PWA_I18N: Record<string, PwaBloc> = {
     pushEnable: "Activar notificaciones",
     pushEnabled: "Notificaciones activadas",
     pushBlocked: "Notificaciones bloqueadas — permítelas en los ajustes del navegador.",
+    pushInstallFirst: "En iPhone, añade primero Pacevo a la pantalla de inicio (Compartir → “Añadir a pantalla de inicio”), abre la app instalada y vuelve a intentarlo.",
   },
   pt: {
     installTitle: "Instala o Pacevo",
@@ -106,5 +111,6 @@ export const PWA_I18N: Record<string, PwaBloc> = {
     pushEnable: "Ativar notificações",
     pushEnabled: "Notificações ativadas",
     pushBlocked: "Notificações bloqueadas — permite-as nas definições do navegador.",
+    pushInstallFirst: "No iPhone, adiciona primeiro o Pacevo ao ecrã inicial (Partilhar → “Adicionar ao ecrã principal”), abre a app instalada e tenta de novo.",
   },
 };

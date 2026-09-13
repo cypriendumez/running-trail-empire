@@ -76,7 +76,7 @@ console.log(`  ✓ installation : ${c} contrôles (Android, iOS, déjà install�
 let t = 0;
 const CLES: (keyof typeof PWA_I18N["fr"])[] = [
   "installTitle", "installBody", "installBtn", "later", "iosTitle", "iosBody",
-  "offlineTitle", "offlineBody", "offlineRetry", "pushTitle", "pushBody", "pushEnable", "pushEnabled", "pushBlocked",
+  "offlineTitle", "offlineBody", "offlineRetry", "pushTitle", "pushBody", "pushEnable", "pushEnabled", "pushBlocked", "pushInstallFirst",
 ];
 for (const lg of ["fr", "en", "de", "es", "pt"] as const) {
   const b = PWA_I18N[lg];
