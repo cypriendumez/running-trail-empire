@@ -25,6 +25,7 @@ import { ech } from "../src/lib/newsletter/gabarit";
 import { readFileSync } from "node:fs";
 import { suggestionDomaine, distance, domaineRecoitDuCourrier, FOURNISSEURS_COURANTS } from "../src/lib/auth/domaineCourrier";
 import { AUTH } from "../src/components/auth/authI18n";
+import { messageErreurConnexion } from "../src/lib/auth/messageErreur";
 
 let ko = 0;
 const fail = (quoi: string, detail: string) => { ko++; console.log(`  ✗ ${quoi}\n      ${detail}`); };
@@ -197,6 +198,43 @@ console.log(`  ✓ e-mail : ${rendus} rendus (${LANGS.length} langues × ${LIENS
   m += 7;
   console.log(`  ✓ lien de confirmation : ${m} cas (hashed_token, forme du lien, /auth/confirm, renvoi)`);
 
-  console.log(`\n${NON.length + rendus + n + m} cas hostiles · ${ko} problème(s)`);
+  // ── L'ÉCHEC DE CONNEXION DOIT PARLER FRANÇAIS, PAS JARGON ANGLAIS ─────────────────────
+  // ⚠️ Le 13/09/2026, un mauvais mot de passe affichait le toast « Invalid login
+  // credentials » (chaîne brute de Supabase) : un coureur francophone ne sait pas si son
+  // mot de passe est faux ou si le site est cassé. Chaque cause réelle rend un libellé
+  // TRADUIT, et rien ne laisse repasser l'anglais brut (repli générique traduit).
+  let c = 0;
+  const Lfr = AUTH.fr.login;
+  const cas: [string, string][] = [
+    ["Invalid login credentials", Lfr.errBadCredentials],
+    ["Email not confirmed", Lfr.errUnconfirmed],
+    ["Request rate limit reached", Lfr.errRate],
+    ["Too many requests", Lfr.errRate],
+    ["Something exploded on our side", Lfr.errGeneric],
+    ["", Lfr.errGeneric],
+  ];
+  for (const [brut, attendu] of cas) {
+    const rendu = messageErreurConnexion(brut, Lfr);
+    if (rendu !== attendu) fail(`« ${brut || "(vide)"} » mal traduit`, `obtenu « ${rendu} », attendu « ${attendu} »`);
+    if (/invalid login|not confirmed|rate limit/i.test(rendu)) fail(`« ${brut} » laisse passer l'anglais brut`, rendu);
+    c++;
+  }
+  // Les trois libellés existent dans les cinq langues, distincts du générique.
+  for (const lg of ["fr", "en", "de", "es", "pt"] as const) {
+    const l = AUTH[lg].login;
+    for (const k of ["errBadCredentials", "errUnconfirmed", "errRate"] as const) {
+      if (!l[k] || l[k].length < 8) fail(`${lg} : ${k} absent`, l[k] ?? "(absent)");
+    }
+    if (l.errBadCredentials === l.errGeneric) fail(`${lg} : errBadCredentials identique au générique`, "un mot de passe faux serait indiscernable d'une panne");
+    c++;
+  }
+  // La page de connexion appelle le traducteur, et n'affiche plus jamais error.message brut.
+  const loginPage = readFileSync("src/app/(auth)/login/page.tsx", "utf8").replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  if ((loginPage.match(/messageErreurConnexion\(/g) ?? []).length < 2) fail("la page de connexion n'appelle pas le traducteur aux deux échecs", "");
+  if (/toast\.error\(error\.message\)/.test(loginPage)) fail("la page de connexion affiche encore error.message brut", "l'anglais de Supabase reviendrait");
+  c += 2;
+  console.log(`  ✓ échec de connexion traduit : ${c} cas (6 causes, 5 langues, page)`);
+
+  console.log(`\n${NON.length + rendus + n + m + c} cas hostiles · ${ko} problème(s)`);
   process.exit(ko ? 1 : 0);
 })();

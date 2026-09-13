@@ -12,6 +12,7 @@ import { Wordmark } from "@/components/brand/Wordmark";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { AUTH } from "@/components/auth/authI18n";
 import { fournisseursActifs } from "@/lib/auth/fournisseurs";
+import { messageErreurConnexion } from "@/lib/auth/messageErreur";
 
 export default function LoginPage() {
   /**
@@ -55,7 +56,10 @@ export default function LoginPage() {
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
-      toast.error(error.message);
+      // ⚠️ PAS `error.message` : Supabase répond en anglais (« Invalid login credentials »).
+      // On traduit la cause réelle dans la langue de la personne, sans révéler si c'est
+      // l'e-mail ou le mot de passe qui cloche (règle anti-annuaire).
+      toast.error(messageErreurConnexion(error.message, L));
       setLoading(false);
       return;
     }
@@ -76,7 +80,7 @@ export default function LoginPage() {
         toast.error(
           error.message?.toLowerCase().includes("not enabled") || error.message?.toLowerCase().includes("provider")
             ? L.errProvider.replace("{provider}", provider === "google" ? "Google" : "Apple")
-            : error.message
+            : messageErreurConnexion(error.message, L)
         );
         setOauthLoading(null);
       }
