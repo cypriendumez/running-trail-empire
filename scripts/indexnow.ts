@@ -15,7 +15,7 @@
  * ce qui exige une connexion personnelle. Ce script ne prétend pas le remplacer.
  */
 const CLE = "65fc58d6c65206ce991ebd921b3daca1";
-const HOTE = "running-trail-empire-woad.vercel.app";
+const HOTE = "pacevo.fr";
 const BASE = `https://${HOTE}`;
 /** Le protocole plafonne à 10 000 adresses par envoi. */
 const LOT = 10000;

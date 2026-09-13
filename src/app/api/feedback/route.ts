@@ -43,7 +43,7 @@ export async function POST(req: Request) {
   // message reste sobre — un bandeau rouge permanent ne veut plus rien dire.
   const RESEND_API_KEY = process.env.RESEND_API_KEY;
   const COACH_EMAIL = emailEditeur();
-  const BASE = process.env.NEXT_PUBLIC_APP_URL || "https://running-trail-empire-woad.vercel.app";
+  const BASE = process.env.NEXT_PUBLIC_APP_URL || "https://pacevo.fr";
   // Sans destinataire exploitable, on n'envoie PAS plutôt que d'écrire au mauvais.
   if (RESEND_API_KEY && COACH_EMAIL) {
     try {

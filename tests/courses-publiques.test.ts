@@ -163,10 +163,15 @@ test("la page de course se déclare honnêtement", () => {
   assert.ok(!/"\/courses/.test(robots), "robots.txt interdit les pages qu'on vient de publier");
   // ⚠️ ET LE DOMAINE DE REPLI DOIT ÊTRE CELUI QU'ON SERT. Il pointait vers
   // « running-trail-empire.vercel.app », qui répond 404 : sans NEXT_PUBLIC_APP_URL, on
-  // annonçait aux moteurs un domaine inexistant.
+  // annonçait aux moteurs un domaine inexistant. Depuis le 13/09/2026 le domaine servi est
+  // pacevo.fr (l'adresse Vercel y redirige en 301) : un repli sur l'ancienne adresse
+  // annoncerait des URL qui redirigent — un moteur déclasse un sitemap de redirections.
   for (const f of ["src/app/robots.ts", "src/app/sitemap.ts"]) {
-    const src = readFileSync(f, "utf8");
-    assert.ok(/running-trail-empire-woad\.vercel\.app/.test(src), `${f} a un domaine de repli qui n'est pas servi`);
+    // ⚠️ On ne coupe pas un « // » précédé de « : » — sinon « https://pacevo.fr » serait
+    // tronqué à « https: » et le test ne verrait jamais le repli qu'il cherche.
+    const src = readFileSync(f, "utf8").replace(/(^|[^:])\/\/.*$/gm, "$1");
+    assert.ok(/"https:\/\/pacevo\.fr"/.test(src), `${f} a un domaine de repli qui n'est pas servi`);
+    assert.ok(!/vercel\.app/.test(src), `${f} replie encore sur l'adresse Vercel, qui redirige`);
   }
 });
 

@@ -11,7 +11,7 @@
  */
 import { execSync } from "node:child_process";
 
-const HOTE = process.env.NEXT_PUBLIC_APP_URL || "https://running-trail-empire-woad.vercel.app";
+const HOTE = process.env.NEXT_PUBLIC_APP_URL || "https://pacevo.fr";
 
 async function main() {
   let deploye: string | null = null;

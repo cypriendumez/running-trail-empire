@@ -100,7 +100,7 @@ export async function GET(req: Request) {
       // le serveur répond « 429 — Please include a meaningful User-Agent string with your
       // requests to avoid rate-limiting ». Mesuré : refus en 217 ms, aucun objet. C'est la
       // règle d'un service public gratuit, et la respecter coûte une ligne.
-      "User-Agent": "Pacevo/1.0 (application d'entrainement course a pied; https://running-trail-empire-woad.vercel.app)",
+      "User-Agent": "Pacevo/1.0 (application d'entrainement course a pied; https://pacevo.fr)",
     },
     body: new URLSearchParams({ data: requete(bbox) }),
     signal: AbortSignal.timeout(DELAI_MS),

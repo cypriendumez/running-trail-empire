@@ -250,7 +250,7 @@ export async function sendPlanSemaineEmail(
     : null;
   const objective = o?.race ? { race: o.race, daysToRace: jRestants } : null;
 
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://running-trail-empire-woad.vercel.app").replace(/\/+$/, "");
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://pacevo.fr").replace(/\/+$/, "");
   const firstName = String(p.full_name ?? "").trim().split(/\s+/)[0] || p.email.split("@")[0];
   const mail = buildPlanSemaineEmail({ lang, firstName, jours, objective, appUrl });
   if (!mail) return { sent: false, skipped: "aucune séance prescrite sur les sept jours" };

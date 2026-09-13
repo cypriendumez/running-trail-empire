@@ -293,7 +293,7 @@ export async function sendPlanReadyEmail(
   const lang = (["fr", "en", "de", "es", "pt"] as const).includes((p.preferred_language ?? "") as Lang)
     ? (p.preferred_language as Lang) : "fr";
   const firstName = String(p.full_name ?? "").trim().split(/\s+/)[0] || p.email.split("@")[0];
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://running-trail-empire-woad.vercel.app").replace(/\/+$/, "");
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://pacevo.fr").replace(/\/+$/, "");
 
   const mail = buildPlanReadyEmail({ lang, firstName, lastSession: opts.lastSession, days: opts.days, objective: opts.objective, appUrl });
 

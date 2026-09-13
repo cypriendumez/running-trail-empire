@@ -26,11 +26,12 @@ const MAX_SITEMAP = 45000;
 const RAW = process.env.NEXT_PUBLIC_APP_URL;
 const BASE = RAW && RAW.startsWith("http") && !RAW.includes("localhost")
   ? RAW
-  // ⚠️ CE REPLI DOIT ÊTRE LE DOMAINE RÉELLEMENT SERVI. Il pointait vers
+  // ⚠️ CE REPLI DOIT ÊTRE LE DOMAINE RÉELLEMENT SERVI — pacevo.fr depuis le 13/09/2026
+  // (l'adresse Vercel y redirige en 301). Il pointait autrefois vers
   // « running-trail-empire.vercel.app », qui répond 404 (vérifié le 03/09/2026) : sans
   // NEXT_PUBLIC_APP_URL, robots.txt et sitemap.xml annonçaient donc aux moteurs un
   // domaine inexistant, et tout le référencement partait dans le vide.
-  : "https://running-trail-empire-woad.vercel.app";
+  : "https://pacevo.fr";
 
 // /sitemap.xml — pages PUBLIQUES indexables (hors espace connecté).
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
