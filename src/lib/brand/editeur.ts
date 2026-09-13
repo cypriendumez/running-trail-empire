@@ -47,7 +47,7 @@ export const EDITEUR = {
    */
   /** Sans le pays : il est TRADUIT (France / Frankreich / Francia / França) — voir PAYS_EDITEUR. */
   adresse: "28 avenue Pasteur, 59130 Lambersart",
-  email: "cypriendumez@outlook.fr",
+  email: "contact@pacevo.fr",
   directeurPublication: "Cyprien Dumez",
 } as const;
 

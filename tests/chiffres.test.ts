@@ -210,7 +210,7 @@ test("les mentions légales disent la même chose dans les 5 langues", () => {
     const tout = JSON.stringify(doc);
     assert.ok(tout.includes("Vercel Inc."), `l'hébergeur n'est pas nommé en ${lg}`);
     assert.ok(tout.includes("Covina, CA 91723"), `l'adresse de l'hébergeur manque en ${lg}`);
-    assert.ok(tout.includes("cypriendumez@outlook.fr"), `aucun contact d'éditeur en ${lg}`);
+    assert.ok(tout.includes("contact@pacevo.fr"), `aucun contact d'éditeur en ${lg}`);
 
     // Un marqueur peut RESTER — le statut juridique, que seul l'éditeur connaît. Le test
     // n'en interdit aucun des deux états, il interdit tout AUTRE trou.

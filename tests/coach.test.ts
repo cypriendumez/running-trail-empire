@@ -5036,7 +5036,7 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
         // ⚠️ L'adresse doit être celle des MENTIONS LÉGALES. Une boîte inventée pour
         // l'occasion affiche une voie de recours qui n'aboutit nulle part — pire que
         // pas de mention du tout. J'avais écrit « contact@pacevo.app », qui n'existe pas.
-        assert.ok(rendu.includes("cypriendumez@outlook.fr"), `adresse hors mentions légales en ${lg}`);
+        assert.ok(rendu.includes("contact@pacevo.fr"), `adresse hors mentions légales en ${lg}`);
         assert.ok(!rendu.includes("pacevo.app"), `domaine non enregistré cité en ${lg}`);
       }
     }
