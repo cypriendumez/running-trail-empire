@@ -71,8 +71,68 @@ const T: Record<string, Bloc> = {
   },
 };
 
-export function emailInscription(lang: string, base: string, lien: string): { objet: string; html: string; texte: string } {
-  const t = T[lang] ?? T.fr;
+/**
+ * L'E-MAIL DE RÉINITIALISATION DU MOT DE PASSE — le nôtre, pas celui de Supabase.
+ *
+ * ⚠️ CE QUI PARTAIT AVANT (constaté le 13/09/2026). `resetPasswordForEmail()` déclenche le
+ * gabarit « Reset Your Password » du tableau de bord Supabase : en ANGLAIS, sans logo, avec
+ * un lien nu « Reset Password ». Il est arrivé DANS LES INDÉSIRABLES d'Outlook — un contenu
+ * anglais générique sur un domaine tout neuf a exactement la signature d'un hameçonnage.
+ * Comme pour l'inscription, on génère le lien nous-mêmes (`generateLink` type `recovery`) et
+ * on envoie NOTRE message : logo, français, expéditeur unique (`RESEND_FROM`), lien
+ * `token_hash` robuste multi-navigateur. Un même expéditeur pour tous nos e-mails aide aussi
+ * la réputation du domaine à se construire — donc à sortir des indésirables.
+ */
+const R: Record<string, Bloc> = {
+  fr: {
+    objet: "Réinitialise ton mot de passe — Pacevo",
+    titre: "Nouveau mot de passe",
+    p1: "Tu as demandé à réinitialiser ton mot de passe Pacevo. Clique ci-dessous pour en choisir un nouveau.",
+    bouton: "Choisir un nouveau mot de passe",
+    p2: "Ce lien expire dans une heure et ne sert qu'une fois.",
+    secours: "Si le bouton ne fonctionne pas, copie cette adresse dans ton navigateur :",
+    pied: "Tu reçois ce message parce qu'une réinitialisation a été demandée pour cette adresse. Si ce n'est pas toi, ignore-le : ton mot de passe actuel reste valable.",
+  },
+  en: {
+    objet: "Reset your password — Pacevo",
+    titre: "New password",
+    p1: "You asked to reset your Pacevo password. Click below to choose a new one.",
+    bouton: "Choose a new password",
+    p2: "This link expires in one hour and works once.",
+    secours: "If the button doesn't work, copy this address into your browser:",
+    pied: "You're getting this because a reset was requested for this address. If it wasn't you, ignore it: your current password still works.",
+  },
+  de: {
+    objet: "Setze dein Passwort zurück — Pacevo",
+    titre: "Neues Passwort",
+    p1: "Du hast angefragt, dein Pacevo-Passwort zurückzusetzen. Klicke unten, um ein neues zu wählen.",
+    bouton: "Neues Passwort wählen",
+    p2: "Dieser Link läuft in einer Stunde ab und funktioniert einmal.",
+    secours: "Wenn der Button nicht funktioniert, kopiere diese Adresse in deinen Browser:",
+    pied: "Du erhältst diese Nachricht, weil für diese Adresse ein Zurücksetzen angefragt wurde. Warst du das nicht, ignoriere sie: Dein aktuelles Passwort bleibt gültig.",
+  },
+  es: {
+    objet: "Restablece tu contraseña — Pacevo",
+    titre: "Nueva contraseña",
+    p1: "Has pedido restablecer tu contraseña de Pacevo. Haz clic abajo para elegir una nueva.",
+    bouton: "Elegir una nueva contraseña",
+    p2: "Este enlace caduca en una hora y sirve una sola vez.",
+    secours: "Si el botón no funciona, copia esta dirección en tu navegador:",
+    pied: "Recibes este mensaje porque se solicitó un restablecimiento para esta dirección. Si no has sido tú, ignóralo: tu contraseña actual sigue siendo válida.",
+  },
+  pt: {
+    objet: "Repõe a tua palavra-passe — Pacevo",
+    titre: "Nova palavra-passe",
+    p1: "Pediste para repor a tua palavra-passe Pacevo. Clica abaixo para escolher uma nova.",
+    bouton: "Escolher uma nova palavra-passe",
+    p2: "Esta ligação expira numa hora e serve uma única vez.",
+    secours: "Se o botão não funcionar, copia este endereço para o teu navegador:",
+    pied: "Recebes esta mensagem porque foi pedida uma reposição para este endereço. Se não foste tu, ignora-a: a tua palavra-passe atual continua válida.",
+  },
+};
+
+/** Rendu commun aux deux e-mails d'authentification : un bouton, un lien de secours. */
+function rendreEmailLien(t: Bloc, base: string, lien: string): { objet: string; html: string; texte: string } {
   const corps = `
       <h1 style="margin:0 0 12px;font-size:24px;line-height:1.25;color:#18181b;font-weight:800">${ech(t.titre)}</h1>
       <p style="margin:0 0 24px;font-size:15px;line-height:1.7;color:#52525b">${ech(t.p1)}</p>
@@ -90,4 +150,12 @@ export function emailInscription(lang: string, base: string, lien: string): { ob
     html: coquilleEmail({ base, corps, pied: `<p style="margin:0">${ech(t.pied)}</p>` }),
     texte: `${t.titre}\n\n${t.p1}\n\n${t.bouton} : ${lien}\n\n${t.p2}\n\n${t.pied}`,
   };
+}
+
+export function emailInscription(lang: string, base: string, lien: string): { objet: string; html: string; texte: string } {
+  return rendreEmailLien(T[lang] ?? T.fr, base, lien);
+}
+
+export function emailReinitialisation(lang: string, base: string, lien: string): { objet: string; html: string; texte: string } {
+  return rendreEmailLien(R[lang] ?? R.fr, base, lien);
 }

@@ -20,7 +20,7 @@
  *   npx tsx tests/auth.crash.test.ts
  */
 import { fournisseursActifs } from "../src/lib/auth/fournisseurs";
-import { emailInscription } from "../src/lib/auth/emailConfirmation";
+import { emailInscription, emailReinitialisation } from "../src/lib/auth/emailConfirmation";
 import { ech } from "../src/lib/newsletter/gabarit";
 import { readFileSync } from "node:fs";
 import { suggestionDomaine, distance, domaineRecoitDuCourrier, FOURNISSEURS_COURANTS } from "../src/lib/auth/domaineCourrier";
@@ -235,6 +235,54 @@ console.log(`  ✓ e-mail : ${rendus} rendus (${LANGS.length} langues × ${LIENS
   c += 2;
   console.log(`  ✓ échec de connexion traduit : ${c} cas (6 causes, 5 langues, page)`);
 
-  console.log(`\n${NON.length + rendus + n + m + c} cas hostiles · ${ko} problème(s)`);
+  // ── LA RÉINITIALISATION DOIT ÊTRE NOTRE E-MAIL FRANÇAIS, PAS CELUI DE SUPABASE ────────
+  // ⚠️ Le 13/09/2026, `resetPasswordForEmail()` envoyait le gabarit anglais sans logo de
+  // Supabase (« Reset Your Password »), tombé dans les indésirables. Comme l'inscription,
+  // le reset passe par NOTRE route (`/api/auth/reset`) : e-mail français avec logo, lien
+  // `token_hash` de type `recovery` vers /reset-password.
+  let z = 0;
+  for (const lg of ["fr", "en", "de", "es", "pt", "xx"] as const) {
+    let e: ReturnType<typeof emailReinitialisation>;
+    try { e = emailReinitialisation(lg, "https://pacevo.fr", 'https://x.fr/c?t=<a"&b'); }
+    catch (err) { fail(`reset : exception sur ${lg}`, String((err as Error).message).slice(0, 90)); continue; }
+    if (/<script/i.test(e.html) || e.html.includes('t=<a"&b')) fail(`reset : lien non échappé (${lg})`, "");
+    if (!e.html.includes("/icon.png")) fail(`reset : logo absent (${lg})`, "");
+    if (!e.objet.trim() || !e.texte.trim()) fail(`reset : objet ou texte vide (${lg})`, "");
+    z++;
+  }
+  // Le message de reset ne doit pas être celui d'inscription (sinon on a copié la mauvaise clé).
+  if (emailReinitialisation("fr", "https://pacevo.fr", "https://x.fr/c").objet === emailInscription("fr", "https://pacevo.fr", "https://x.fr/c").objet) {
+    fail("reset : objet identique à l'inscription", "un coureur qui réinitialise lirait « Confirme ton adresse »");
+  }
+  // Une langue inconnue retombe sur le français.
+  if (emailReinitialisation("xx", "https://pacevo.fr", "https://x.fr/c").objet !== emailReinitialisation("fr", "https://pacevo.fr", "https://x.fr/c").objet) {
+    fail("reset : langue inconnue sans repli français", "");
+  }
+  // La route : lien recovery sur hashed_token, jamais action_link, vers /reset-password.
+  const reset = readFileSync("src/app/api/auth/reset/route.ts", "utf8").replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  if (/action_link/.test(reset)) fail("la route de reset envoie `action_link` (passe par supabase.co/verify)", "");
+  if (!/hashed_token/.test(reset)) fail("la route de reset ne lit pas `hashed_token`", "");
+  if (!/type:\s*"recovery"/.test(reset)) fail("la route de reset ne génère pas un lien `recovery`", "");
+  if (!/envoyerEmail\("reinitialisation"/.test(reset)) fail("la route de reset ne passe pas par la porte unique d'envoi", "");
+  const lienReset = reset.match(/`\$\{BASE\}\/auth\/confirm\?([^`]*)`/);
+  if (!lienReset) fail("le lien de reset ne vise pas `${BASE}/auth/confirm?…`", "");
+  else for (const attendu of ["token_hash=", "type=recovery", "next=/reset-password"]) {
+    if (!lienReset[1].includes(attendu)) fail(`le lien de reset n'a pas \`${attendu}\``, lienReset[1]);
+  }
+  // Anti-annuaire : la route ne renvoie jamais autre chose que { ok: true }.
+  if (/ok:\s*false/.test(reset)) fail("la route de reset révèle un cas d'échec", "le formulaire deviendrait un annuaire");
+  // /auth/confirm : une récupération ne doit PAS passer par /onboarding (nested sous signup/email).
+  // (`confirm` est déjà lu plus haut, dans le bloc « lien de confirmation ».)
+  const iGarde = confirm.indexOf('type === "signup"'), iOnb = confirm.indexOf("/onboarding");
+  if (iGarde < 0) fail("/auth/confirm ne distingue plus le type d'OTP", "");
+  if (iOnb >= 0 && iOnb < iGarde) fail("/auth/confirm envoie une récupération vers /onboarding", "un reset n'atteindrait jamais /reset-password");
+  // La page mot-de-passe-oublié appelle notre route, plus le gabarit Supabase.
+  const forgot = readFileSync("src/app/(auth)/forgot-password/page.tsx", "utf8").replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  if (/resetPasswordForEmail\(/.test(forgot)) fail("« mot de passe oublié » passe encore par le gabarit Supabase", "e-mail anglais sans logo, en indésirable");
+  if (!/fetch\("\/api\/auth\/reset"/.test(forgot)) fail("« mot de passe oublié » n'appelle pas /api/auth/reset", "");
+  z += 8;
+  console.log(`  ✓ réinitialisation : ${z} cas (e-mail 6 langues, route recovery, /auth/confirm, page)`);
+
+  console.log(`\n${NON.length + rendus + n + m + c + z} cas hostiles · ${ko} problème(s)`);
   process.exit(ko ? 1 : 0);
 })();

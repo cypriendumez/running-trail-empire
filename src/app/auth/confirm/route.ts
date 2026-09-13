@@ -24,29 +24,34 @@ export async function GET(request: Request) {
     const supabase = await createClient();
     const { error } = await supabase.auth.verifyOtp({ type, token_hash });
     if (!error) {
-      // Nouveaux comptes → onboarding tant qu'il n'est pas terminé
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("onboarding_completed")
-          .eq("id", user.id)
-          .single();
-        // ── PRÉVENIR L'ÉDITEUR ────────────────────────────────────────────
-        // ⚠️ ICI, ET PAS À LA SOUMISSION DU FORMULAIRE. À la saisie, une faute de
-        // frappe, une adresse jetable ou un robot déclencheraient l'alerte. À la
-        // confirmation, l'adresse est PROUVÉE : quelqu'un a reçu le message et a
-        // cliqué. Et le lien étant à usage unique, `verifyOtp` échoue au second clic —
-        // on ne peut donc pas prévenir deux fois pour le même compte.
-        //
-        // Best effort : un e-mail qui ne part pas ne doit pas empêcher quelqu'un
-        // d'entrer dans l'application qu'il vient de confirmer.
-        if (type === "signup" || type === "email") {
+      // ⚠️ SEULE UNE CONFIRMATION D'INSCRIPTION PASSE PAR L'ONBOARDING ET L'ALERTE.
+      // Une RÉCUPÉRATION de mot de passe (`type=recovery`) doit filer droit sur
+      // `next` (= /reset-password) : y intercaler /onboarding empêcherait quelqu'un
+      // dont l'onboarding n'est pas fini de changer son mot de passe, et l'alerte
+      // « nouvel inscrit » sonnerait pour un compte qui existe déjà.
+      if (type === "signup" || type === "email") {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          // ── PRÉVENIR L'ÉDITEUR ────────────────────────────────────────────
+          // ⚠️ ICI, ET PAS À LA SOUMISSION DU FORMULAIRE. À la saisie, une faute de
+          // frappe, une adresse jetable ou un robot déclencheraient l'alerte. À la
+          // confirmation, l'adresse est PROUVÉE : quelqu'un a reçu le message et a
+          // cliqué. Et le lien étant à usage unique, `verifyOtp` échoue au second clic —
+          // on ne peut donc pas prévenir deux fois pour le même compte.
+          //
+          // Best effort : un e-mail qui ne part pas ne doit pas empêcher quelqu'un
+          // d'entrer dans l'application qu'il vient de confirmer.
           void alerterInscription(supabase, user.id, origin);
-        }
 
-        if (!profile?.onboarding_completed) {
-          return NextResponse.redirect(`${origin}/onboarding`);
+          // Nouveaux comptes → onboarding tant qu'il n'est pas terminé
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("onboarding_completed")
+            .eq("id", user.id)
+            .single();
+          if (!profile?.onboarding_completed) {
+            return NextResponse.redirect(`${origin}/onboarding`);
+          }
         }
       }
       return NextResponse.redirect(`${origin}${next}`);

@@ -2,8 +2,6 @@
 
 import { useState , useId } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
-import { toast } from "sonner";
 import { Loader2, ArrowLeft, MailCheck } from "lucide-react";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Logo } from "@/components/brand/Logo";
@@ -24,13 +22,16 @@ export default function ForgotPasswordPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    const supabase = createClient();
-    // Le lien de l'email passe par /auth/callback (échange du code → session) puis /reset-password.
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
-    });
+    // ⚠️ PAR NOTRE ROUTE, PAS `supabase.auth.resetPasswordForEmail()`. Ce dernier envoie le
+    // gabarit anglais sans logo du tableau de bord Supabase — tombé dans les indésirables le
+    // 13/09/2026. Notre route génère un lien `recovery` et expédie NOTRE e-mail (logo,
+    // français, expéditeur unique). Elle répond toujours « ok » : on ne dit pas si l'adresse
+    // a un compte (anti-annuaire), donc l'écran de confirmation s'affiche dans tous les cas.
+    await fetch("/api/auth/reset", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email.trim(), lang }),
+    }).catch(() => null);
     setLoading(false);
-    if (error) { toast.error(error.message); return; }
     setSent(true);
   }
 
