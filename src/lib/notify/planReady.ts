@@ -29,6 +29,7 @@ import { EDITEUR } from "@/lib/brand/editeur";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 import { decaleJour } from "@/lib/streak/compute";
 import { envoyerEmail } from "@/lib/email/envoyer";
+import { envoyerPush } from "@/lib/push/envoyer";
 
 /** Deux séances dans la même matinée ne valent pas deux e-mails. */
 export const EMAIL_MIN_INTERVAL_MS = 3 * 60 * 60 * 1000;
@@ -312,5 +313,18 @@ export async function sendPlanReadyEmail(
         text: mail.text,
         html: mail.html,
       }, { userId: opts.userId, url: "lib/notify/planReady" });
+
+  // ── NOTIFICATION PUSH, EN PLUS DE L'E-MAIL ────────────────────────────────────────────
+  // Même consentement (`notif_coach` déjà vérifié plus haut), même événement. Best effort et
+  // indépendant : si l'e-mail échoue mais que le push part, l'athlète est quand même prévenu ;
+  // sans clés VAPID posées, `envoyerPush` ne fait rien. On n'attend pas ce résultat pour
+  // conclure — le canal principal reste l'e-mail.
+  void envoyerPush(opts.userId, {
+    title: mail.subject,
+    body: `${firstName}, ta séance du jour t'attend.`,
+    url: `${appUrl}/dashboard`,
+    tag: "plan-pret",
+  }).catch(() => {});
+
   return r.ok ? { sent: true } : { sent: false, skipped: r.erreur };
 }

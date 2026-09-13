@@ -81,3 +81,39 @@ self.addEventListener("fetch", (e) => {
   }
   // Tout le reste : réseau normal.
 });
+
+/*
+ * NOTIFICATIONS PUSH.
+ *
+ * ⚠️ `userVisibleOnly` est imposé par le navigateur : chaque push DOIT afficher une
+ * notification, sinon l'abonnement est révoqué. On affiche donc toujours quelque chose,
+ * même si la charge utile est vide ou illisible.
+ */
+self.addEventListener("push", (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = {}; }
+  const titre = d.title || "Pacevo";
+  e.waitUntil(
+    self.registration.showNotification(titre, {
+      body: d.body || "",
+      icon: "/icons/icon-192x192.png",
+      badge: "/icons/icon-96x96.png",
+      tag: d.tag,
+      data: { url: d.url || "/dashboard" },
+    }),
+  );
+});
+
+// Au clic : on ramène la fenêtre déjà ouverte sur la bonne page, ou on en ouvre une.
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const cible = (e.notification.data && e.notification.data.url) || "/dashboard";
+  e.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((fenetres) => {
+      for (const f of fenetres) {
+        if (f.url.includes(cible) && "focus" in f) return f.focus();
+      }
+      return self.clients.openWindow(cible);
+    }),
+  );
+});

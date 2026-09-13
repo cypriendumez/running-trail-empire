@@ -13,6 +13,7 @@ import { AVATAR_COLORS, colorOf } from "@/lib/avatarColors";
 import { languageOptions } from "@/i18n/config";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import type { Lang } from "@/lib/i18n/translations";
+import { activerPush } from "@/lib/push/client";
 
 type Profile = Record<string, unknown>;
 const s = (v: unknown) => (v == null ? "" : String(v));
@@ -215,8 +216,20 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
   const changeLang = (l: Lang) => { setLang(l); toast.success(t("toast.lang")); };
 
   const askPermission = async () => {
-    try { const p = await Notification.requestPermission(); setPerm(p); if (p === "granted") toast.success(t("set.notif.on")); else toast(t("set.notif.hintBlocked")); }
-    catch { toast.error("—"); }
+    try {
+      const p = await Notification.requestPermission();
+      setPerm(p);
+      if (p === "granted") {
+        // ⚠️ La permission ne suffit pas : sans abonnement push enregistré côté serveur, aucune
+        // notification ne pourra JAMAIS être envoyée. On abonne donc l'appareil dans la foulée.
+        // Best effort : tant que les clés VAPID ne sont pas posées sur l'hébergement, `activerPush`
+        // renvoie « indispo » sans rien casser — la permission locale reste acquise.
+        await activerPush();
+        toast.success(t("set.notif.on"));
+      } else {
+        toast(t("set.notif.hintBlocked"));
+      }
+    } catch { toast.error("—"); }
   };
   const toggleSound = () => { const v = !sound; setSound(v); try { localStorage.setItem("rte:sound", v ? "on" : "off"); } catch { /* ignore */ } toast(v ? "🔊" : "🔇"); };
 

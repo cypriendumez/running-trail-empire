@@ -90,5 +90,38 @@ if (!/window\.location\.reload/.test(offline)) fail("la page hors-ligne n'a pas 
 t += 2;
 console.log(`  ✓ textes : ${t} contrôles (5 langues × ${CLES.length} clés, page hors-ligne)`);
 
-console.log(`\n${n + s + c + t} contrôles PWA · ${ko} problème(s)`);
+// ── 5. Notifications push : jamais casser, jamais envoyer à l'aveugle ─────────
+let p = 0;
+if (!/addEventListener\("push"/.test(sw)) fail("le SW ne gère pas l'événement push");
+if (!/addEventListener\("notificationclick"/.test(sw)) fail("le SW ne gère pas le clic sur la notification");
+if (!/showNotification/.test(sw)) fail("le SW n'affiche aucune notification", "userVisibleOnly serait violé, l'abonnement révoqué");
+p += 3;
+
+const envoi = sansCommentaires(readFileSync("src/lib/push/envoyer.ts", "utf8"));
+if (!/NEXT_PUBLIC_VAPID_PUBLIC_KEY/.test(envoi) || !/VAPID_PRIVATE_KEY/.test(envoi)) fail("l'envoi push ne lit pas les clés VAPID");
+if (!/!configurer\(\)/.test(envoi)) fail("l'envoi push ne vérifie pas la config VAPID avant d'envoyer", "sans clés, il tenterait d'envoyer et planterait la route appelante");
+if (!/404|410/.test(envoi)) fail("l'envoi push ne nettoie pas les abonnements morts (404/410)");
+if (!/push_subscriptions/.test(envoi)) fail("l'envoi push ne lit pas la table des abonnements");
+p += 4;
+
+const clientPush = sansCommentaires(readFileSync("src/lib/push/client.ts", "utf8"));
+if (!/userVisibleOnly:\s*true/.test(clientPush)) fail("le client push n'impose pas userVisibleOnly", "l'abonnement serait révoqué par le navigateur");
+if (!/NEXT_PUBLIC_VAPID_PUBLIC_KEY/.test(clientPush)) fail("le client push n'utilise pas la clé VAPID publique");
+if (!/\/api\/push\/subscribe/.test(clientPush)) fail("le client push n'enregistre pas l'abonnement côté serveur");
+p += 3;
+
+for (const [f, quoi] of [["src/app/api/push/subscribe/route.ts", "subscribe"], ["src/app/api/push/unsubscribe/route.ts", "unsubscribe"]] as const) {
+  const r = sansCommentaires(readFileSync(f, "utf8"));
+  if (!/getUser\(\)/.test(r) || !/status:\s*401/.test(r)) fail(`la route push ${quoi} n'exige pas d'être connecté`, "on inscrirait/supprimerait l'appareil d'un autre");
+  p++;
+}
+const unsub = sansCommentaires(readFileSync("src/app/api/push/unsubscribe/route.ts", "utf8"));
+if (!/eq\("user_id", user\.id\)/.test(unsub)) fail("unsubscribe ne se limite pas à l'utilisateur connecté", "on pourrait supprimer l'abonnement d'un autre");
+p++;
+const pr = sansCommentaires(readFileSync("src/lib/notify/planReady.ts", "utf8"));
+if (!/envoyerPush\(/.test(pr)) fail("aucun événement réel ne déclenche de push (planReady)");
+p++;
+console.log(`  ✓ push : ${p} contrôles (SW, envoi sûr sans clés, auth des routes, déclencheur)`);
+
+console.log(`\n${n + s + c + t + p} contrôles PWA · ${ko} problème(s)`);
 process.exit(ko ? 1 : 0);
