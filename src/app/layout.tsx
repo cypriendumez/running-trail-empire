@@ -6,6 +6,7 @@ import { Providers } from "@/components/layout/Providers";
 import { ErrorReporter } from "@/components/ErrorReporter";
 import { LanguageProvider } from "@/lib/i18n/LanguageProvider";
 import { getPublicLang } from "@/lib/i18n/serverLang";
+import { PwaClient } from "@/components/pwa/PwaClient";
 
 // Polices réellement chargées (avant : variables jamais définies → tout en system-ui).
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
@@ -84,6 +85,7 @@ export default async function RootLayout({
         <ErrorReporter />
         <LanguageProvider initialLang={lang}>
           <Providers>{children}</Providers>
+          <PwaClient />
         </LanguageProvider>
       </body>
     </html>

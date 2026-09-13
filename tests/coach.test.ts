@@ -1452,9 +1452,11 @@ test("AUCUNE page utilisateur n'est absente de la base de connaissances", () => 
   const found = execSync("find src/app -name page.tsx", { encoding: "utf8" })
     .split("\n").filter(Boolean)
     .map((f) => f.replace(/^src\/app\/?/, "").replace(/\/?page\.tsx$/, ""))
-    // Hors périmètre : l'accueil public, l'espace admin (réservé au coach) et les routes
-    // jetables de prévisualisation.
-    .filter((d) => d !== "" && !d.startsWith("admin") && !d.startsWith("preview-"));
+    // Hors périmètre : l'accueil public, l'espace admin (réservé au coach), les routes
+    // jetables de prévisualisation, et /offline — une page technique de SECOURS servie par
+    // le service worker quand le réseau tombe, pas un écran qu'on atteint depuis la nav
+    // (l'assistant n'a rien à en dire).
+    .filter((d) => d !== "" && d !== "offline" && !d.startsWith("admin") && !d.startsWith("preview-"));
   const missing = found.filter((d) => !known.has(d));
   assert.deepEqual(missing, [], `pages absentes de helpKb : ${missing.join(", ")}`);
 });
