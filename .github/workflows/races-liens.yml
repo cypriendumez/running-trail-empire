@@ -14,7 +14,6 @@
 #  rien — c'est pire que pas d'alerte du tout.
 #
 #  SECRETS REQUIS : les mêmes que les autres workflows, rien à créer.
-#   • PACEVO_URL   = https://running-trail-empire-woad.vercel.app
 #   • CRON_SECRET  = la MÊME valeur que la variable CRON_SECRET sur Vercel
 # ──────────────────────────────────────────────────────────────────────────────
 name: Contrôle des liens d'inscription
@@ -39,17 +38,16 @@ jobs:
     steps:
       - name: Contrôler une tranche de liens
         env:
-          PACEVO_URL: ${{ secrets.PACEVO_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           set -euo pipefail
-          if [ -z "${PACEVO_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
-            echo "::error::PACEVO_URL ou CRON_SECRET manquant dans les secrets du dépôt."
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET manquant dans les secrets du dépôt."
             exit 1
           fi
           reponse=$(curl -sS --max-time 600 -w '\n%{http_code}' \
             -H "Authorization: Bearer ${CRON_SECRET}" \
-            "${PACEVO_URL}/api/cron/races-liens")
+            "https://pacevo.fr/api/cron/races-liens")
           corps=$(printf '%s' "$reponse" | sed '$d')
           code=$(printf '%s' "$reponse" | tail -n1)
           echo "$corps"

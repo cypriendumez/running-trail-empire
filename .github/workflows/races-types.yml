@@ -48,17 +48,16 @@ jobs:
     steps:
       - name: Corriger les types depuis le-sportif
         env:
-          PACEVO_URL: ${{ secrets.PACEVO_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           set -euo pipefail
-          if [ -z "${PACEVO_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
-            echo "::error::PACEVO_URL ou CRON_SECRET manquant dans les secrets du dépôt."
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET manquant dans les secrets du dépôt."
             exit 1
           fi
           reponse=$(curl -sS --max-time 600 -w '\n%{http_code}' \
             -H "Authorization: Bearer ${CRON_SECRET}" \
-            "${PACEVO_URL}/api/cron/races-types")
+            "https://pacevo.fr/api/cron/races-types")
           corps=$(printf '%s' "$reponse" | sed '$d')
           code=$(printf '%s' "$reponse" | tail -n1)
           echo "$corps"

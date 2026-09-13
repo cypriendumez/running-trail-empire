@@ -25,7 +25,6 @@
 #
 #  SECRETS REQUIS (Settings → Secrets and variables → Actions) — les MÊMES que le
 #  workflow de synchronisation, rien à créer si celui-ci fonctionne déjà :
-#   • PACEVO_URL   = https://running-trail-empire-woad.vercel.app
 #   • CRON_SECRET  = la MÊME valeur que la variable CRON_SECRET sur Vercel
 # ─────────────────────────────────────────────────────────────────────────────
 name: Résumé hebdomadaire de l'actualité
@@ -48,17 +47,16 @@ jobs:
     steps:
       - name: Envoyer le résumé
         env:
-          PACEVO_URL: ${{ secrets.PACEVO_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           set -euo pipefail
-          if [ -z "${PACEVO_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
-            echo "::error::PACEVO_URL ou CRON_SECRET manquant dans les secrets du dépôt."
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET manquant dans les secrets du dépôt."
             exit 1
           fi
           reponse=$(curl -sS --max-time 120 -w '\n%{http_code}' \
             -H "Authorization: Bearer ${CRON_SECRET}" \
-            "${PACEVO_URL}/api/newsletter/weekly")
+            "https://pacevo.fr/api/newsletter/weekly")
           corps=$(printf '%s' "$reponse" | sed '$d')
           code=$(printf '%s' "$reponse" | tail -n1)
           echo "HTTP ${code}"
@@ -90,7 +88,6 @@ jobs:
       - name: Envoyer le plan de la semaine
         if: always()
         env:
-          PACEVO_URL: ${{ secrets.PACEVO_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           set -euo pipefail
@@ -104,7 +101,7 @@ jobs:
           for essai in 1 2 3; do
             reponse=$(curl -sS --max-time 120 -w '\n%{http_code}' \
               -H "Authorization: Bearer ${CRON_SECRET}" \
-              "${PACEVO_URL}/api/cron/plan-semaine" || true)
+              "https://pacevo.fr/api/cron/plan-semaine" || true)
             corps=$(printf '%s' "$reponse" | sed '$d')
             code=$(printf '%s' "$reponse" | tail -n1)
             echo "tentative ${essai} → HTTP ${code}"
