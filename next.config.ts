@@ -22,6 +22,29 @@ const nextConfig: NextConfig = {
       { hostname: "*.mapbox.com" },
     ],
   },
+  /**
+   * DOMAINE CANONIQUE. Le site a vécu quatre mois sur `running-trail-empire-woad.vercel.app`,
+   * et 17 662 pages y sont indexées. Le jour où `pacevo.fr` répond, tout ce qui arrive sur
+   * l'ancienne adresse — et sur `www.`, et sur `pacevo.app` — doit être renvoyé en 301 vers
+   * le domaine canonique : c'est ce qui transfère le crédit de référencement au lieu de le
+   * diviser entre quatre adresses qui servent la même page.
+   *
+   * ⚠️ PILOTÉ PAR `DOMAINE_CANONIQUE` (ex. « pacevo.fr »), lu au BUILD. Sans elle, aucune
+   * redirection : on ne renvoie jamais vers un domaine qui ne répond pas encore. Les
+   * aperçus Vercel (`*-git-*.vercel.app`) ne sont pas dans la liste et restent servis.
+   */
+  async redirects() {
+    const canon = (process.env.DOMAINE_CANONIQUE ?? "").trim().toLowerCase();
+    if (!canon) return [];
+    const anciens = ["running-trail-empire-woad.vercel.app", `www.${canon}`, "pacevo.app", "www.pacevo.app"]
+      .filter((h) => h !== canon);
+    return anciens.map((host) => ({
+      source: "/:path*",
+      has: [{ type: "host" as const, value: host }],
+      destination: `https://${canon}/:path*`,
+      permanent: true,
+    }));
+  },
   async headers() {
     return [
       {
