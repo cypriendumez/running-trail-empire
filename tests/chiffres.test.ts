@@ -638,7 +638,10 @@ test("le lanceur du Bureau ouvre les adresses que le code utilise vraiment", () 
   for (const u of toutes) {
     assert.match(u, /^https:\/\/\S+$/, `adresse malformée dans le lanceur : « ${u} »`);
     // Toute adresse Pacevo doit viser le domaine que le code sert par défaut.
-    if (/vercel\.app/.test(u)) {
+    // ⚠️ « vercel.app » OU « pacevo.fr » : le 13/09/2026 le domaine servi est devenu
+    // pacevo.fr et l'adresse Vercel redirige. Ne tester que l'une des deux laisserait
+    // passer un lanceur resté sur l'autre.
+    if (/vercel\.app|pacevo\.(fr|app)/.test(u)) {
       assert.ok(u.startsWith(parDefaut!), `« ${u} » ne vise pas ${parDefaut}`);
     }
     // Toute adresse Supabase doit viser le projet de la configuration.

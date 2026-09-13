@@ -98,7 +98,8 @@ test("la requête s'annonce — Overpass l'exige", () => {
   // Sans User-Agent : « 429 — Please include a meaningful User-Agent string ».
   const src = codeOf(ROUTE);
   assert.match(src, /"User-Agent": "Pacevo\//, "l'agent identifiable a disparu : Overpass refusera tout");
-  assert.match(src, /https:\/\/running-trail-empire/, "l'agent ne dit plus d'où viennent les requêtes");
+  // Le domaine a changé le 13/09/2026 : c'est pacevo.fr que l'agent annonce désormais.
+  assert.match(src, /https:\/\/pacevo\.fr/, "l'agent ne dit plus d'où viennent les requêtes");
   assert.match(src, /AbortSignal\.timeout\(DELAI_MS\)/, "plus de délai : une requête pourrait pendre indéfiniment");
   // ⚠️ ASSEZ LONG POUR LES MASSIFS RICHES. À 9 s, le cadrage alpin dense (1 742 objets,
   // ~700 Ko) rendait TOUJOURS zéro depuis la production alors qu'il aboutit en 4,3 s

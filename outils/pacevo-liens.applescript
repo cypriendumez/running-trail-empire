@@ -12,10 +12,10 @@
 
 property destinations : {¬
 	{titre:"Ouvrir TOUT (5 onglets)", url:"*"}, ¬
-	{titre:"Application", url:"https://running-trail-empire-woad.vercel.app"}, ¬
-	{titre:"Espace coach (admin)", url:"https://running-trail-empire-woad.vercel.app/admin"}, ¬
-	{titre:"Comptabilité", url:"https://running-trail-empire-woad.vercel.app/admin?onglet=compta"}, ¬
-	{titre:"Notre histoire", url:"https://running-trail-empire-woad.vercel.app/notre-histoire"}, ¬
+	{titre:"Application", url:"https://pacevo.fr"}, ¬
+	{titre:"Espace coach (admin)", url:"https://pacevo.fr/admin"}, ¬
+	{titre:"Comptabilité", url:"https://pacevo.fr/admin?onglet=compta"}, ¬
+	{titre:"Notre histoire", url:"https://pacevo.fr/notre-histoire"}, ¬
 	{titre:"Vercel — déploiements", url:"https://vercel.com/dashboard"}, ¬
 	{titre:"Supabase — base de données", url:"https://supabase.com/dashboard/project/vglvmhqvntihaeqijdkm"}, ¬
 	{titre:"Supabase — factures stockées", url:"https://supabase.com/dashboard/project/vglvmhqvntihaeqijdkm/storage/buckets/justificatifs"}, ¬
@@ -24,8 +24,8 @@ property destinations : {¬
 	{titre:"Resend — e-mails envoyés", url:"https://resend.com/emails"}}
 
 -- Les cinq adresses ouvertes par « Ouvrir TOUT » : celles du quotidien, pas les onze.
-property lesCinq : {"https://running-trail-empire-woad.vercel.app", ¬
-	"https://running-trail-empire-woad.vercel.app/admin", ¬
+property lesCinq : {"https://pacevo.fr", ¬
+	"https://pacevo.fr/admin", ¬
 	"https://vercel.com/dashboard", ¬
 	"https://supabase.com/dashboard/project/vglvmhqvntihaeqijdkm", ¬
 	"https://github.com/cypriendumez/running-trail-empire"}
