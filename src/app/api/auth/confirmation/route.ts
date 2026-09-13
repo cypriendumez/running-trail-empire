@@ -81,12 +81,20 @@ export async function POST(req: Request) {
         // la place d'une personne, et l'avis publié aurait signé « Un coureur ».
         // C'est la métadonnée que reprend le profil à la création du compte.
         data: { full_name: String(fullName ?? "").trim().slice(0, 80) },
-        redirectTo: `${BASE}/auth/confirm?next=/onboarding`,
       },
     } as Parameters<typeof admin.auth.admin.generateLink>[0]);
 
-    const lien = (data as { properties?: { action_link?: string } } | null)?.properties?.action_link;
-    if (error || !lien) return ok();
+    // ⚠️ PAS `action_link`. Ce lien-là passe par `supabase.co/auth/v1/verify`, qui consomme le
+    // jeton PUIS renvoie chez nous avec la session dans le fragment `#access_token=…` — que le
+    // serveur ne voit jamais. Notre route `/auth/confirm` recevait donc une requête sans
+    // `token_hash` et répondait `/login?error=confirm` : le 13/09/2026, une inscription RÉUSSIE
+    // (compte confirmé, connecté côté Supabase) affichait « lien invalide », et le second clic,
+    // logique après un tel message, tombait sur `otp_expired`. On construit donc le lien sur le
+    // `hashed_token`, que `/auth/confirm` vérifie lui-même (`verifyOtp`) : la session naît dans
+    // nos cookies et la personne arrive sur /onboarding.
+    const jeton = (data as { properties?: { hashed_token?: string } } | null)?.properties?.hashed_token;
+    if (error || !jeton) return ok();
+    const lien = `${BASE}/auth/confirm?token_hash=${encodeURIComponent(jeton)}&type=signup&next=/onboarding`;
 
     const { objet, html, texte } = emailInscription(String(lang ?? "fr"), BASE, lien);
     await envoyerEmail("confirmation", { from: FROM, to: [adresse], subject: objet, text: texte, html },

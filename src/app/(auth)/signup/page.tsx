@@ -2,7 +2,6 @@
 
 import { useState , useId} from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { Loader2, Check } from "lucide-react";
 import { AuthShell } from "@/components/auth/AuthShell";
@@ -79,16 +78,24 @@ export default function SignupPage() {
     setStep("verify");
   }
 
+  /**
+   * ⚠️ PAR NOTRE ROUTE, PAS `supabase.auth.resend()`. Ce dernier expédie le gabarit
+   * « Confirm signup » du tableau de bord Supabase — un texte qu'aucun test ne voit et
+   * dont le lien, par défaut, passe par `supabase.co/auth/v1/verify` : le jeton y est
+   * consommé, la session repart dans un `#fragment` que notre serveur ne lit pas, et
+   * `/auth/confirm` répondait « lien invalide » à une confirmation réussie. Le renvoi
+   * doit produire EXACTEMENT le même message que l'inscription : même logo, même langue,
+   * même lien `token_hash`. Le mot de passe est encore dans le formulaire ; la route
+   * regénère un jeton pour un compte non confirmé (vérifié sur Supabase le 13/09/2026).
+   */
   async function resendConfirmation() {
     setLoading(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.resend({
-      type: "signup",
-      email: form.email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/confirm?next=/onboarding` },
-    });
+    const rep = await fetch("/api/auth/confirmation", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: form.email, password: form.password, fullName: form.fullName, lang, domaineConfirme: true }),
+    }).catch(() => null);
     setLoading(false);
-    if (error) { toast.error(error.message); return; }
+    if (!rep?.ok) { toast.error(L.pwShort); return; }
     toast.success(L.resent);
   }
 

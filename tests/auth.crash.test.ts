@@ -169,6 +169,34 @@ console.log(`  ✓ e-mail : ${rendus} rendus (${LANGS.length} langues × ${LIENS
   n += 3;
   console.log(`  ✓ domaine de l'adresse : ${n} cas (suggestions, DNS réel, route, écran, 5 langues)`);
 
-  console.log(`\n${NON.length + rendus + n} cas hostiles · ${ko} problème(s)`);
+  // ── LE LIEN DE L'E-MAIL DOIT VISER NOTRE ROUTE, AVEC LE JETON ────────────────────────
+  // ⚠️ Le 13/09/2026, une inscription RÉUSSIE affichait « lien invalide ». La route
+  // envoyait `action_link`, qui passe par `supabase.co/auth/v1/verify` : Supabase consomme
+  // le jeton, confirme, connecte… puis renvoie sur `/auth/confirm` avec la session dans un
+  // `#fragment` que le serveur ne voit pas. Sans `token_hash`, `/auth/confirm` répond
+  // `/login?error=confirm` ; le second clic, logique après ce message, tombe sur
+  // `otp_expired`. Le lien doit se construire sur `hashed_token`, et le bouton « Renvoyer »
+  // doit produire le même lien (pas le gabarit Supabase, invisible aux tests).
+  let m = 0;
+  if (/action_link/.test(route)) fail("la route envoie encore `action_link` (passe par supabase.co/verify)", "confirmation réussie → « lien invalide »");
+  if (!/hashed_token/.test(route)) fail("la route ne lit pas `hashed_token`", "sans lui, pas de lien vérifiable par /auth/confirm");
+  const lien = route.match(/`\$\{BASE\}\/auth\/confirm\?([^`]*)`/);
+  if (!lien) fail("le lien de confirmation ne vise pas `${BASE}/auth/confirm?…`", "");
+  else {
+    for (const attendu of ["token_hash=", "type=signup", "next=/onboarding"]) {
+      if (!lien[1].includes(attendu)) fail(`le lien de confirmation n'a pas \`${attendu}\``, lien[1]);
+    }
+  }
+  // `/auth/confirm` accepte bien `type=signup` (il déclenche aussi l'alerte « nouvel inscrit »).
+  const confirm = readFileSync("src/app/auth/confirm/route.ts", "utf8").replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  if (!/verifyOtp\(\{ type, token_hash \}\)/.test(confirm)) fail("/auth/confirm ne vérifie plus le token_hash", "");
+  if (!/type === "signup"/.test(confirm)) fail("/auth/confirm n'alerte plus l'éditeur pour `type=signup`", "");
+  const pageSansComm = page.replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  if (/supabase\.auth\.resend\(/.test(pageSansComm)) fail("« Renvoyer » passe par le gabarit Supabase", "un lien différent de celui de l'inscription, jamais testé");
+  if ((pageSansComm.match(/fetch\("\/api\/auth\/confirmation"/g) ?? []).length < 2) fail("« Renvoyer » ne repasse pas par /api/auth/confirmation", "");
+  m += 7;
+  console.log(`  ✓ lien de confirmation : ${m} cas (hashed_token, forme du lien, /auth/confirm, renvoi)`);
+
+  console.log(`\n${NON.length + rendus + n + m} cas hostiles · ${ko} problème(s)`);
   process.exit(ko ? 1 : 0);
 })();
