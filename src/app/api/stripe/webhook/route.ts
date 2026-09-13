@@ -8,6 +8,7 @@ import { enregistrerEcritures } from "@/lib/compta/enregistrer";
 import { emailEncaissement, emailAlerteCompta } from "@/lib/compta/alerte";
 import { emailEditeur } from "@/lib/admin/acces";
 import { TYPE_ETAT_ABO, type EtatAbonnement } from "@/lib/billing/etatAbonnement";
+import { envoyerEmail } from "@/lib/email/envoyer";
 
 
 export async function POST(req: Request) {
@@ -231,12 +232,8 @@ async function comptabiliser(event: Stripe.Event, req: Request): Promise<void> {
     const from = process.env.RESEND_FROM;
     const envoyer = async (m: { objet: string; html: string; texte: string }) => {
       if (!cle || !from || !dest) return;
-      await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${cle}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from, to: [dest], subject: m.objet, html: m.html, text: m.texte }),
-        signal: AbortSignal.timeout(8000),
-      });
+      await envoyerEmail("compta", { from, to: [dest], subject: m.objet, html: m.html, text: m.texte },
+        { delaiMs: 8000, url: "/api/stripe/webhook" });
     };
 
     if (conv.alerte) { await envoyer(emailAlerteCompta({ raison: conv.alerte, base })); return; }

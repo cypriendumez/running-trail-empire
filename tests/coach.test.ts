@@ -4196,8 +4196,10 @@ test("un athlète qui répond à un e-mail de Pacevo atteint quelqu'un", () => {
   ];
   for (const f of ENVOIS) {
     const src = codeOf(f);
-    // On ne vise que les fichiers qui envoient VRAIMENT : un `from:` sans `reply_to`.
-    assert.match(src, /from: (?:FROM|process\.env\.RESEND_FROM)/, `${f} n'envoie plus d'e-mail`);
+    // On ne vise que les fichiers qui envoient VRAIMENT : un envoi sans `reply_to`.
+    // (Depuis la porte unique, l'expéditeur vient de `RESEND_FROM` dans `lib/email/envoyer`
+    // et n'apparaît plus ici ; c'est l'appel qui atteste l'envoi.)
+    assert.match(src, /envoyerEmail\("/, `${f} n'envoie plus d'e-mail`);
     assert.match(src, /reply_to: EDITEUR\.email/,
       `${f} envoie sans adresse de réponse : répondre à ce message n'atteint personne`);
   }
@@ -4334,7 +4336,7 @@ test("le silence est proscrit côté envoi, comme ailleurs", () => {
     assert.ok(src.includes(motif), `motif de non-envoi manquant : ${motif}`);
   }
   // Le consentement est vérifié AVANT toute construction d'e-mail.
-  assert.ok(src.indexOf("notif_coach") < src.indexOf("api.resend.com"), "le consentement doit précéder l'envoi");
+  assert.ok(src.indexOf("notif_coach") < src.indexOf("envoyerEmail("), "le consentement doit précéder l'envoi");
 });
 test("l'IA propose, mais ne peut pas rouvrir l'intensité que le plan a fermée", () => {
   // ⚠️ C'EST LE TEST QUI REND CET AJOUT ACCEPTABLE. Le plan de 7 jours est déterministe
@@ -5220,28 +5222,56 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
       entete(plan.html).replace(/mso-hide:all">[^<]*/, ""), "l'en-tête de l'accusé diffère de celui du coach");
   });
 
-  test("un refus de Resend sur l'accusé d'inscription est écrit dans le journal, jamais avalé", () => {
+  test("un refus de Resend est écrit dans le journal, jamais avalé — par la porte unique", () => {
     // ⚠️ LE 10/09/2026, UN ABONNÉ N'A RIEN REÇU ET PERSONNE NE L'A SU. La route envoyait
     // l'accusé dans un `try {} catch {}` vide, SANS lire le statut de la réponse : Resend
     // répondait 403 (« onboarding@resend.dev » ne livre qu'au propriétaire du compte) et
-    // l'inscription répondait « ok » comme si de rien n'était. Le journal d'erreurs
-    // existait ; rien n'y était écrit.
-    const src = codeOf("src/app/api/newsletter/subscribe/route.ts");
-    const appel = src.indexOf("api.resend.com");
-    assert.ok(appel > 0, "la route n'envoie plus l'accusé");
-    const apres = src.slice(appel);
-    // Le statut est LU…
+    // l'inscription répondait « ok » comme si de rien n'était. Onze routes faisaient pareil.
+    // Il n'y a plus qu'UNE porte de sortie, `lib/email/envoyer`, et c'est elle qu'on vérifie.
+    const porte = codeOf("src/lib/email/envoyer.ts");
+    const appel = porte.indexOf("api.resend.com");
+    assert.ok(appel > 0, "la porte unique n'appelle plus Resend");
+    const apres = porte.slice(appel);
     assert.match(apres, /if \(!r\.ok\)/, "le statut de la réponse Resend n'est pas lu");
-    // …le corps de Resend (la raison) est conservé…
     assert.match(apres, /r\.text\(\)/, "la raison donnée par Resend n'est pas relue");
-    // …et l'échec finit dans error_logs, avec la source « newsletter » pour être filtrable.
-    assert.match(apres, /from\("error_logs"\)\.insert\(/, "l'échec n'est pas journalisé");
-    assert.match(apres, /source: "newsletter"/, "le journal ne porte pas la source « newsletter »");
-    // Le `catch` d'envoi n'est plus vide : il nomme l'échec.
-    assert.ok(!/catch\s*\{\s*\}/.test(apres) && !/catch\s*\{\s*\/\*/.test(apres), "un catch vide avale encore l'échec d'envoi");
-    // Et l'absence de variables (clé, expéditeur, adresse) est journalisée aussi : c'est
-    // tout aussi silencieux qu'un refus, pour la même personne.
-    assert.match(apres, /variables manquantes/, "l'absence de RESEND_FROM / clé n'est pas journalisée");
+    assert.match(porte, /from\("error_logs"\)\.insert\(/, "l'échec n'est pas journalisé");
+    assert.match(porte, /variables manquantes/, "l'absence de clé n'est pas journalisée");
+    assert.ok(!/catch\s*\{\s*\}/.test(porte) && !/catch\s*\{\s*\/\*/.test(porte), "un catch vide avale encore un échec");
+    // L'appelant reçoit un résultat explicite, pas un `void` qu'il ne peut pas lire.
+    assert.match(porte, /ok: false, erreur/, "la porte ne rend pas d'échec explicite");
+
+    // ⚠️ ET AUCUNE ROUTE NE LA CONTOURNE. C'est le test qui empêche le défaut de revenir
+    // par une douzième route écrite à la va-vite : tout `api.resend.com` hors de la porte
+    // (et hors de la liste des sous-traitants, qui ne fait que le nommer) est refusé.
+    const hors: string[] = [];
+    const parcourir = (d: string) => {
+      for (const e of readdirSync(d, { withFileTypes: true })) {
+        const f = join(d, e.name);
+        if (e.isDirectory()) parcourir(f);
+        else if (/\.tsx?$/.test(e.name) && /api\.resend\.com\/emails/.test(codeOf(f))
+          && !f.endsWith("src/lib/email/envoyer.ts")) hors.push(f);
+      }
+    };
+    parcourir("src");
+    assert.deepEqual(hors, [], `appel direct à Resend hors de la porte unique : ${hors.join(", ")}`);
+
+    // Chaque envoi nomme sa source : c'est la clé de tri du journal dans /admin.
+    for (const [f, source] of [
+      ["src/app/api/newsletter/subscribe/route.ts", "newsletter"],
+      ["src/app/api/newsletter/weekly/route.ts", "newsletter"],
+      ["src/app/api/feedback/route.ts", "ressenti"],
+      ["src/app/api/objective/route.ts", "objectif"],
+      ["src/app/api/messages/route.ts", "messages"],
+      ["src/app/api/auth/confirmation/route.ts", "confirmation"],
+      ["src/app/auth/confirm/route.ts", "inscription"],
+      ["src/app/api/admin/broadcast/route.ts", "broadcast"],
+      ["src/app/api/admin/send-email/route.ts", "admin-email"],
+      ["src/app/api/stripe/webhook/route.ts", "compta"],
+      ["src/lib/notify/planReady.ts", "plan-pret"],
+      ["src/lib/notify/planSemaine.ts", "plan-semaine"],
+    ] as [string, string][]) {
+      assert.ok(codeOf(f).includes(`envoyerEmail("${source}"`), `${f} n'envoie pas par la porte unique avec la source « ${source} »`);
+    }
   });
 
   test("l'alerte d'inscription part une fois, à la confirmation, avec ce qu'il faut dedans", () => {

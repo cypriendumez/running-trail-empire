@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { emailEditeur } from "@/lib/admin/acces";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { emailNouvelInscrit } from "@/lib/notify/nouvelInscrit";
+import { envoyerEmail } from "@/lib/email/envoyer";
 
 /**
  * Confirmation d'email (et autres OTP par lien) — flux `token_hash` recommandé
@@ -87,11 +88,7 @@ async function alerterInscription(
       nom, email, base: origin, premier: (count ?? 0) <= 1,
     });
 
-    await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${CLE}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: FROM, to: [DEST], subject: objet, text: texte, html }),
-      signal: AbortSignal.timeout(8000),
-    });
-  } catch { /* l'inscription vaut, l'alerte est un bonus */ }
+    await envoyerEmail("inscription", { from: FROM, to: [DEST], subject: objet, text: texte, html },
+      { delaiMs: 8000, url: "/auth/confirm", meta: { inscrit: email } });
+  } catch { /* l'inscription vaut, l'alerte est un bonus ; l'échec d'envoi est déjà journalisé */ }
 }

@@ -28,6 +28,7 @@ import { coquille, carte, titreBloc, pastille, bouton, esc, VERT } from "@/lib/n
 import { EDITEUR } from "@/lib/brand/editeur";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 import { decaleJour } from "@/lib/streak/compute";
+import { envoyerEmail } from "@/lib/email/envoyer";
 
 /** Deux séances dans la même matinée ne valent pas deux e-mails. */
 export const EMAIL_MIN_INTERVAL_MS = 3 * 60 * 60 * 1000;
@@ -297,32 +298,19 @@ export async function sendPlanReadyEmail(
 
   const mail = buildPlanReadyEmail({ lang, firstName, lastSession: opts.lastSession, days: opts.days, objective: opts.objective, appUrl });
 
-  try {
-    const r = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: process.env.RESEND_FROM || "Pacevo <onboarding@resend.dev>",
-        // ⚠️ ADRESSE DE RÉPONSE — l'expéditeur n'est PAS une boîte qui reçoit.
-        // `RESEND_FROM` pointe aujourd'hui sur un domaine de test partagé ; répondre à ce
-        // message n'atteindrait personne. Sans `reply_to`, l'athlète qui clique sur
-        // « Répondre » écrit dans le vide et croit avoir été ignoré.
-        // Bénéfice secondaire, réel mais secondaire : un échange effectif est un signal
-        // positif pour le classement du courrier (Prioritaire plutôt qu'Autre).
-        // L'adresse vient de `EDITEUR`, jamais recopiée — un test l'interdit.
+  // La porte unique lit la réponse et journalise tout refus dans `error_logs` ; ici on ne
+  // fait que traduire son résultat dans le vocabulaire du coach (`sent` / `skipped`).
+  const r = await envoyerEmail("plan-pret", {
+        // ⚠️ ADRESSE DE RÉPONSE — l'expéditeur n'est PAS une boîte qui reçoit : sans
+        // `reply_to`, l'athlète qui clique sur « Répondre » écrit dans le vide et croit
+        // avoir été ignoré. Un échange effectif est aussi un signal positif pour le
+        // classement du courrier. L'adresse vient de `EDITEUR`, jamais recopiée — un test
+        // l'interdit.
         reply_to: EDITEUR.email,
         to: [p.email],
         subject: mail.subject,
         text: mail.text,
         html: mail.html,
-      }),
-      signal: AbortSignal.timeout(10000),
-    });
-    // Le corps de la réponse peut contenir un message d'erreur du fournisseur : on le
-    // résume sans jamais y remettre la clé.
-    if (!r.ok) return { sent: false, skipped: `Resend HTTP ${r.status}` };
-    return { sent: true };
-  } catch {
-    return { sent: false, skipped: "envoi impossible (réseau ou délai dépassé)" };
-  }
+      }, { userId: opts.userId, url: "lib/notify/planReady" });
+  return r.ok ? { sent: true } : { sent: false, skipped: r.erreur };
 }

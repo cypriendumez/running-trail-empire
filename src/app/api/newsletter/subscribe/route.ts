@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { lienDesinscription } from "@/lib/newsletter/token";
 import { emailConfirmation } from "@/lib/newsletter/confirmation";
+import { envoyerEmail } from "@/lib/email/envoyer";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -83,37 +84,14 @@ export async function POST(req: Request) {
       // au-dessus vient d'écrire la langue choisie en base. Le tout premier message
       // qu'une personne reçoit décide si elle fait confiance à la suite.
       const { objet, html, texte } = emailConfirmation(langue, BASE, lien);
-      let echec: string | null = null;
-      try {
-        const r = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${CLE}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            from: FROM, to: [clean],
-            subject: objet,
-            text: texte, html,
-            headers: { "List-Unsubscribe": `<${lien}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
-          }),
-          signal: AbortSignal.timeout(8000),
-        });
-        if (!r.ok) {
-          // Le corps de Resend dit POURQUOI (« domain is not verified », « only send to
-          // your own address »…) : c'est lui qu'on veut relire dans le journal, sans la clé.
-          const corps = await r.text().catch(() => "");
-          echec = `Resend HTTP ${r.status} — ${corps.slice(0, 300)}`;
-        }
-      } catch (e) {
-        echec = `envoi impossible (réseau ou délai) — ${e instanceof Error ? e.message : String(e)}`;
-      }
-      if (echec) {
-        await admin.from("error_logs").insert({
-          user_id: userId,
-          source: "newsletter",
-          message: `Accusé d'inscription non envoyé à ${clean} : ${echec}`,
-          url: "/api/newsletter/subscribe",
-          meta: { email: clean, lang: langue, from: FROM },
-        }).then(({ error }) => { if (error) console.error("[newsletter] journal non écrit :", error.message); });
-      }
+      // La porte unique (`lib/email/envoyer`) lit le statut, garde la raison donnée par
+      // Resend et écrit tout échec dans `error_logs` avec la source « newsletter ».
+      await envoyerEmail("newsletter", {
+        from: FROM, to: [clean],
+        subject: objet,
+        text: texte, html,
+        headers: { "List-Unsubscribe": `<${lien}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
+      }, { delaiMs: 8000, userId, url: "/api/newsletter/subscribe", meta: { email: clean, lang: langue } });
     } else {
       // Sans expéditeur ou sans clé, l'accusé ne part pas non plus — et c'est tout aussi
       // invisible qu'un refus. Même journal, même endroit.

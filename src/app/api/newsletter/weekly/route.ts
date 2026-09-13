@@ -7,6 +7,7 @@ import { resumerArticles, traduireTextes, RESUMES_MAX, type ArticleResume } from
 import { construireEmail, estLang, type Lang, type Section, type Course } from "@/lib/newsletter/email";
 import { RUBRIQUES_LETTRE } from "@/lib/news/rubriques";
 import { EDITEUR } from "@/lib/brand/editeur";
+import { envoyerEmail } from "@/lib/email/envoyer";
 
 /**
  * LE RÉSUMÉ DU LUNDI MATIN.
@@ -235,11 +236,8 @@ export async function GET(req: Request) {
     const articles = parLangue.get(lang) ?? base;
     const lien = lienDesinscription(email, BASE);
     const { objet, html, texte } = construireEmail(lang, rubriquesDe(articles), courses, lien, BASE);
-    try {
-      const r = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${CLE}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
+    {
+      const r = await envoyerEmail("newsletter", {
           from: FROM, to: [email], subject: objet, text: texte, html,
           // ⚠️ ADRESSE DE RÉPONSE — l'expéditeur n'est PAS une boîte qui reçoit.
           // `RESEND_FROM` pointe aujourd'hui sur un domaine de test partagé ; répondre à ce
@@ -250,11 +248,10 @@ export async function GET(req: Request) {
           // L'adresse vient de `EDITEUR`, jamais recopiée — un test l'interdit.
           reply_to: EDITEUR.email,
           headers: { "List-Unsubscribe": `<${lien}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
-        }),
-        signal: AbortSignal.timeout(10000),
-      });
+        }, { url: "/api/newsletter/weekly", meta: { email, lang } });
+      // Un destinataire raté n'annule pas les autres ; il est journalisé par la porte unique.
       if (r.ok) { envoye++; parLangueEnvoye[lang] = (parLangueEnvoye[lang] ?? 0) + 1; }
-    } catch { /* un destinataire raté n'annule pas les autres */ }
+    }
   }
 
   return NextResponse.json({

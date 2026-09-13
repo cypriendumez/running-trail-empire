@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { estAdmin } from "@/lib/admin/acces";
+import { envoyerEmail } from "@/lib/email/envoyer";
 
 
 // POST /api/admin/broadcast { title, body }
@@ -60,14 +61,10 @@ export async function POST(req: Request) {
     const batches: string[][] = [];
     for (let i = 0; i < recipients.length; i += 45) batches.push(recipients.slice(i, i + 45));
     for (const batch of batches) {
-      try {
-        const r = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ from: FROM, to: [FROM.replace(/.*<(.+)>.*/, "$1")], bcc: batch, subject: t, text: b, html }),
-        });
-        if (r.ok) emailed += batch.length;
-      } catch { /* best effort : un lot raté n'annule pas le reste */ }
+      // Un lot raté n'annule pas les autres ; il est journalisé par la porte unique.
+      const r = await envoyerEmail("broadcast", { from: FROM, to: [FROM.replace(/.*<(.+)>.*/, "$1")], bcc: batch, subject: t, text: b, html },
+        { url: "/api/admin/broadcast", meta: { destinataires: batch.length } });
+      if (r.ok) emailed += batch.length;
     }
   }
 

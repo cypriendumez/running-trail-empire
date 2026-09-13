@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { emailEditeur } from "@/lib/admin/acces";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { setRaceObjective } from "@/lib/coach/objective";
+import { envoyerEmail } from "@/lib/email/envoyer";
 
 // POST /api/objective {race, distanceKm, targetTime, raceDate}
 // → enregistre l'objectif de course du client (notifications type "race_objective"),
@@ -64,19 +65,13 @@ export async function POST(req: Request) {
       const name = (prof?.full_name as string) || (prof?.email as string) || "Un client";
       const dateFr = new Date(raceDate + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
       const jStr = (() => { const j = Math.ceil((new Date(raceDate + "T00:00:00").getTime() - Date.now()) / 86400000); return j >= 0 ? `J-${j}` : "passée"; })();
-      await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          from: process.env.RESEND_FROM || "Pacevo <onboarding@resend.dev>",
+      await envoyerEmail("objectif", {
           to: [COACH_EMAIL],
           reply_to: (prof?.email as string) || undefined,
           subject: `🎯 Objectif de ${name} : ${race} (${data.targetTime})`,
           text: `${name} vient de définir son objectif de course :\n\n• Course : ${race}\n• Distance : ${distanceKm} km\n• Date : ${dateFr} (${jStr})\n• Temps visé : ${data.targetTime}\n• Allure cible : ${data.targetPace}\n\n→ L'IA coach adapte déjà ses séances (forme, sommeil, historique, niveau) vers cet objectif.`,
-        }),
-        signal: AbortSignal.timeout(10000),
-      });
-    } catch { /* e-mail best-effort : l'objectif est déjà enregistré */ }
+        }, { userId: user.id, url: "/api/objective" });
+    } catch { /* e-mail best-effort : l'objectif est déjà enregistré ; l'échec d'envoi est journalisé */ }
   }
 
   // ── AVERTISSEMENT D'ÂGE, AU MOMENT OÙ IL COMPTE ─────────────────────────────

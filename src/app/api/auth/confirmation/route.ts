@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { emailInscription } from "@/lib/auth/emailConfirmation";
+import { envoyerEmail } from "@/lib/email/envoyer";
 
 /**
  * L'E-MAIL DE CONFIRMATION, ENVOYÉ PAR NOUS.
@@ -65,13 +66,9 @@ export async function POST(req: Request) {
     if (error || !lien) return ok();
 
     const { objet, html, texte } = emailInscription(String(lang ?? "fr"), BASE, lien);
-    await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${CLE}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: FROM, to: [adresse], subject: objet, text: texte, html }),
-      signal: AbortSignal.timeout(10000),
-    });
-  } catch { /* jamais d'échec visible : voir l'en-tête */ }
+    await envoyerEmail("confirmation", { from: FROM, to: [adresse], subject: objet, text: texte, html },
+      { url: "/api/auth/confirmation", meta: { lang } });
+  } catch { /* jamais d'échec visible pour l'appelant : voir l'en-tête ; l'échec est journalisé */ }
 
   return ok();
 }

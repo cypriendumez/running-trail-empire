@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { emailEditeur } from "@/lib/admin/acces";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { coquilleEmail, ech } from "@/lib/newsletter/gabarit";
+import { envoyerEmail } from "@/lib/email/envoyer";
 
 // POST /api/feedback {date, title, rpe (0-10), pain: string[], note}
 // → enregistre le ressenti post-séance (lu par le coach, informe la perso IA).
@@ -88,11 +89,7 @@ export async function POST(req: Request) {
 
       const pied = `<p style="margin:0">Tu reçois ce message parce que ${ech(name)} vient d'enregistrer un ressenti dans Pacevo.<br>Réponds à cet e-mail pour lui écrire directement.</p>`;
 
-      await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          from: process.env.RESEND_FROM || "Pacevo <onboarding@resend.dev>",
+      await envoyerEmail("ressenti", {
           to: [COACH_EMAIL],
           reply_to: (prof?.email as string) || undefined,
           // ⚠️ L'objet porte le verdict EN PREMIER : c'est la seule partie visible dans
@@ -100,10 +97,8 @@ export async function POST(req: Request) {
           subject: `${alerte ? "⚠️" : "🏃"} ${name} · RPE ${r}/10${douleurs.length ? " · douleur" : ""}${title ? ` — ${title}` : ""}`,
           text: `${name} vient de noter sa séance${title ? ` « ${title}` + " »" : ""} :\n\n• Ressenti d'effort : ${r}/10\n• Douleurs : ${painTxt}\n${note ? `• Note : « ${note} »\n` : ""}\n→ ${BASE}/admin`,
           html: coquilleEmail({ base: BASE, corps, pied }),
-        }),
-        signal: AbortSignal.timeout(10000),
-      });
-    } catch { /* e-mail best-effort, le ressenti est déjà enregistré */ }
+        }, { userId: user.id, url: "/api/feedback" });
+    } catch { /* e-mail best-effort, le ressenti est déjà enregistré ; l'échec d'envoi est journalisé */ }
   }
 
   return NextResponse.json({ ok: true });

@@ -21,6 +21,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Lang } from "@/lib/i18n/translations";
 import { coquille, carte, titreBloc, pastille, bouton, esc } from "@/lib/notify/gabarit";
 import { EDITEUR } from "@/lib/brand/editeur";
+import { envoyerEmail } from "@/lib/email/envoyer";
 
 /**
  * Une journée du plan. `titre` est déjà dans la langue de l'athlète.
@@ -259,27 +260,15 @@ export async function sendPlanSemaineEmail(
     return { sent: false, skipped: "essai à blanc", apercu: { to: p.email, subject: mail.subject, jours: jours.filter((j) => j.titre).length } };
   }
 
-  try {
-    const r = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: process.env.RESEND_FROM || "Pacevo <onboarding@resend.dev>",
-        // ⚠️ ADRESSE DE RÉPONSE — l'expéditeur n'est PAS une boîte qui reçoit.
-        // `RESEND_FROM` pointe aujourd'hui sur un domaine de test partagé ; répondre à ce
-        // message n'atteindrait personne. Sans `reply_to`, l'athlète qui clique sur
-        // « Répondre » écrit dans le vide et croit avoir été ignoré.
-        // Bénéfice secondaire, réel mais secondaire : un échange effectif est un signal
-        // positif pour le classement du courrier (Prioritaire plutôt qu'Autre).
-        // L'adresse vient de `EDITEUR`, jamais recopiée — un test l'interdit.
+  // La porte unique lit la réponse et journalise tout refus dans `error_logs`.
+  const r = await envoyerEmail("plan-semaine", {
+        // ⚠️ ADRESSE DE RÉPONSE — l'expéditeur n'est PAS une boîte qui reçoit : sans
+        // `reply_to`, l'athlète qui clique sur « Répondre » écrit dans le vide et croit
+        // avoir été ignoré. Un échange effectif est aussi un signal positif pour le
+        // classement du courrier. L'adresse vient de `EDITEUR`, jamais recopiée — un test
+        // l'interdit.
         reply_to: EDITEUR.email,
         to: [p.email], subject: mail.subject, text: mail.text, html: mail.html,
-      }),
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!r.ok) return { sent: false, skipped: `Resend HTTP ${r.status}` };
-    return { sent: true };
-  } catch {
-    return { sent: false, skipped: "envoi impossible (réseau ou délai dépassé)" };
-  }
+      }, { userId: opts.userId, url: "lib/notify/planSemaine" });
+  return r.ok ? { sent: true } : { sent: false, skipped: r.erreur };
 }

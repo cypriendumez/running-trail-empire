@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { estAdmin } from "@/lib/admin/acces";
+import { envoyerEmail } from "@/lib/email/envoyer";
 
 
 export async function POST(req: NextRequest) {
@@ -19,18 +20,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "to, subject et body sont requis" }, { status: 400 });
   }
 
-  // Use Resend if configured, otherwise fallback to Supabase auth email (magic link)
+  // ⚠️ L'expéditeur était « noreply@running-trail-empire.com », un domaine qui n'a jamais
+  // existé : Resend refusait chaque envoi et la route répondait quand même « ok ». Il vient
+  // maintenant de RESEND_FROM, par la porte unique qui journalise les refus.
   const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
   if (RESEND_API_KEY) {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: "Pacevo <noreply@running-trail-empire.com>",
+    const res = await envoyerEmail("admin-email", {
         to: [to],
         subject,
         text: emailBody,
@@ -45,15 +41,13 @@ export async function POST(req: NextRequest) {
             <p style="color:#52525b;font-size:12px">Pacevo · Ne pas répondre à cet email</p>
           </div>
         </div>`,
-      }),
-    });
+      }, { url: "/api/admin/send-email", meta: { to } });
 
     if (!res.ok) {
-      const err = await res.text();
-      return NextResponse.json({ error: `Resend error: ${err}` }, { status: 500 });
+      return NextResponse.json({ error: `Resend error: ${res.erreur}` }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, provider: "resend" });
+    return NextResponse.json({ ok: true, provider: "resend", id: res.id });
   }
 
   // No email provider configured
