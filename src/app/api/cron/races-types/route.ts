@@ -6,6 +6,7 @@ import { idEditeur } from "@/lib/compta/enregistrer";
 import { typeDepuisUrl, choisirFiche, typeCorrige, typePour, distancesDeFiche, distancesManquantes } from "@/lib/races/leSportif";
 import { trancheAVerifier } from "@/lib/races/liens";
 import { jourFrance } from "@/lib/races/jourFrance";
+import { estErreurTransitoire } from "@/lib/cron/transitoire";
 
 export const TYPE_ETAT = "races_types";
 const BASE = "https://www.le-sportif.com";
@@ -84,7 +85,7 @@ export async function GET(req: Request) {
   let corrigees = 0, vues = 0, appariees = 0, ajoutees = 0;
   const details: { course: string; de: string; vers: string }[] = [];
   const ajouts: { course: string; km: number }[] = [];
-  let refusees = 0;
+  let refusees = 0, transitoires = 0;
   const erreurs: string[] = [];
 
   // Le formulaire ASP.NET exige un VIEWSTATE frais : on le reprend à chaque passage.
@@ -168,18 +169,34 @@ export async function GET(req: Request) {
                 // enregistrés en « road_5k ».
                 const t = typePour(vu, d);
                 if (!t) continue;
-                const { error: e } = await sb.from("races").insert({
+                const ligneRace = {
                   name: c.name, city: c.city, department: c.department, region: c.region,
                   date: c.date, distance_km: d, type: t, difficulty: c.difficulty,
                   registration_url: c.registration_url,
                   latitude: c.latitude, longitude: c.longitude,
-                });
+                };
+                const ins = await sb.from("races").insert(ligneRace);
+                let e = ins.error;
+                // ⚠️ UN « GATEWAY TIMEOUT » DE SUPABASE EST PASSAGER, PAS UN REFUS : on
+                // réessaie une fois avant de conclure. Sans ça, un simple hoquet d'infra
+                // sur UNE ligne perdait la distance jusqu'au prochain cycle (~24 jours).
+                if (e && estErreurTransitoire(e.message)) {
+                  await new Promise((r) => setTimeout(r, 500));
+                  const reessai = await sb.from("races").insert(ligneRace);
+                  e = reessai.error;
+                }
                 // ⚠️ UNE INSERTION REFUSÉE DOIT SE VOIR. Ce `if (!e)` seul a masqué
                 // pendant deux jours que `typePour` rendait des types absents de l'enum
                 // `race_type` : chaque semi et chaque marathon trouvés à la source
                 // étaient refusés par la base, le compteur restait à zéro sur ces
                 // lignes-là, et le rapport de fin annonçait un passage réussi.
+                //
+                // ⚠️ MAIS SEUL UN VRAI REFUS FAIT ROUGIR LA TÂCHE. Un incident passager
+                // (timeout, 5xx) qui persiste après le réessai est NOTÉ, jamais compté
+                // comme refus : sinon un hoquet d'infra ferait passer tout le cron « en
+                // échec » alors que presque tout est écrit — une fausse alerte.
                 if (!e) { ajoutees++; if (ajouts.length < 20) ajouts.push({ course: String(c.name), km: d }); }
+                else if (estErreurTransitoire(e.message)) { transitoires++; if (erreurs.length < 5) erreurs.push(`${c.name} ${d} km (${t}) : ${e.message} [passager, réessai au prochain cycle]`); }
                 else { refusees++; if (erreurs.length < 5) erreurs.push(`${c.name} ${d} km (${t}) : ${e.message}`); }
               }
             }
@@ -219,7 +236,7 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     ok: refusees === 0, total: ids.length, demandees: tranche.length, traitees, examinees: vues,
-    appariees, corrigees, ajoutees, refusees, curseur: parcourus.suivant, secondes: Math.round((Date.now() - debut) / 1000),
+    appariees, corrigees, ajoutees, refusees, transitoires, curseur: parcourus.suivant, secondes: Math.round((Date.now() - debut) / 1000),
     details, ajouts, erreurs,
   });
 }

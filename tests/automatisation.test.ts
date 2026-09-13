@@ -9,6 +9,7 @@
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { TACHES, constater, pire, type Execution } from "../src/lib/cron/supervision";
+import { estErreurTransitoire } from "../src/lib/cron/transitoire";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -156,6 +157,35 @@ test("un workflow qui exécute du code installe ses dépendances", () => {
     const iScript = src.search(/\b(tsx|ts-node)\s+scripts?\/|node\s+scripts?\//);
     assert.ok(iInstall < iScript, `${f} installe les dépendances APRÈS avoir lancé le script`);
   }
+});
+
+test("un incident d'infra passager n'est pas confondu avec un refus de la base", () => {
+  // Ces messages-là DISPARAISSENT au prochain essai : ils ne doivent pas faire rougir un cron.
+  for (const m of ["Gateway Timeout", "fetch failed", "upstream request timeout",
+    "503 Service Unavailable", "504", "Bad Gateway", "Too Many Requests", "ETIMEDOUT", "network error"]) {
+    assert.ok(estErreurTransitoire(m), `« ${m} » devrait être vu comme passager`);
+  }
+  // Ceux-là PERSISTENT tant que le code n'est pas corrigé : ce sont de vrais refus, à signaler.
+  for (const m of ['invalid input value for enum race_type: "road_5k"',
+    "duplicate key value violates unique constraint", "null value in column violates not-null", ""]) {
+    assert.ok(!estErreurTransitoire(m), `« ${m} » ne doit PAS être classé passager (vrai refus masqué)`);
+  }
+});
+
+test("races-types ne rougit que sur un VRAI refus, jamais sur un hoquet d'infra", () => {
+  // ⚠️ Observé le 14/09/2026 : un « Gateway Timeout » sur UNE course parmi ~50 rendait
+  // `ok:false` et faisait passer tout le cron « en échec » alors que presque tout était
+  // écrit — la fausse alerte que le projet refuse. La route doit distinguer les deux.
+  const src = readFileSync("src/app/api/cron/races-types/route.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  assert.ok(/estErreurTransitoire\(/.test(src), "la route ne distingue pas les erreurs passagères des vrais refus");
+  // Un incident passager incrémente `transitoires`, pas `refusees` (qui seul pilote `ok`).
+  assert.ok(/estErreurTransitoire\(e\.message\)\)\s*\{\s*transitoires\+\+/.test(src),
+    "un incident passager doit compter dans `transitoires`, pas dans `refusees`");
+  assert.ok(/ok:\s*refusees === 0/.test(src), "`ok` doit dépendre des refus réels (refusees), pas des incidents passagers");
+  // Et on réessaie une fois avant d'abandonner une ligne sur un incident passager.
+  assert.ok(/setTimeout\([^)]*\)[\s\S]{0,80}?insert\(ligneRace\)/.test(src),
+    "la route ne réessaie pas l'insertion après un incident passager");
 });
 
 console.log(`\n${passed} test(s) de supervision passé(s), ${fails.length} échec(s)`);
