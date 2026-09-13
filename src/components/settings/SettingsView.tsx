@@ -165,9 +165,19 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
   // ── Notifications ──
   const [perm, setPerm] = useState<NotificationPermission | "unsupported">("default");
   const [sound, setSound] = useState(true);
+  // iPhone hors app installée : le push n'existe QUE dans la PWA (Apple). On le détecte pour
+  // afficher « installe d'abord l'app » au lieu du trompeur « clique pour autoriser ».
+  const [iosAInstaller, setIosAInstaller] = useState(false);
   useEffect(() => {
     try { setPerm("Notification" in window ? Notification.permission : "unsupported"); } catch { setPerm("unsupported"); }
     try { setSound(localStorage.getItem("rte:sound") !== "off"); } catch { /* ignore */ }
+    try {
+      const ua = navigator.userAgent || "";
+      const ios = /iphone|ipad|ipod/i.test(ua) || (/Macintosh/.test(ua) && "ontouchend" in document);
+      const standalone = window.matchMedia?.("(display-mode: standalone)").matches
+        || (navigator as unknown as { standalone?: boolean }).standalone === true;
+      setIosAInstaller(ios && !standalone);
+    } catch { /* ignore */ }
   }, []);
 
   // ── Suppression ──
@@ -350,8 +360,8 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
                   <div className="flex items-center gap-3">
                     <span className={`flex h-10 w-10 items-center justify-center rounded-full ${perm === "granted" ? "bg-emerald-100 text-emerald-600" : "bg-zinc-200 text-zinc-500"}`}><BellRing className="h-5 w-5" /></span>
                     <div>
-                      <div className="text-sm font-semibold text-zinc-800">{perm === "granted" ? t("set.notif.on") : perm === "denied" ? t("set.notif.blocked") : perm === "unsupported" ? t("set.notif.unsupported") : t("set.notif.off")}</div>
-                      <div className="text-xs text-zinc-400">{perm === "denied" ? t("set.notif.hintBlocked") : perm === "granted" ? t("set.notif.hintOn") : t("set.notif.hintEnable")}</div>
+                      <div className="text-sm font-semibold text-zinc-800">{perm === "granted" ? t("set.notif.on") : perm === "denied" ? t("set.notif.blocked") : perm === "unsupported" ? (iosAInstaller ? t("set.notif.off") : t("set.notif.unsupported")) : t("set.notif.off")}</div>
+                      <div className="text-xs text-zinc-400">{perm === "denied" ? t("set.notif.hintBlocked") : perm === "granted" ? t("set.notif.hintOn") : (perm === "unsupported" && iosAInstaller) ? (PWA_I18N[lang]?.pushInstallFirst ?? PWA_I18N.fr.pushInstallFirst) : t("set.notif.hintEnable")}</div>
                     </div>
                   </div>
                   {perm !== "granted" && perm !== "unsupported" && perm !== "denied" && <button onClick={askPermission} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">{t("set.notif.enable")}</button>}
