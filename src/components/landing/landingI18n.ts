@@ -76,9 +76,9 @@ const fr: LandingDict = {
   stats: { races: "Courses à venir", routes: "Parcours cartographiés", plan: "De plan glissant", replan: "Chaussures comparées" },
   programs: {
     eyebrow: "Entraînement", title: "Des programmes pour chaque objectif", subtitle: "Du premier 5 km à l'ultra-trail — chaque plan s'adapte ensuite à tes données réelles.", viewAll: "Voir tout",
-    cats: { ALL: "Tout voir", "10KM": "10 km", SEMI: "Semi", MARATHON: "Marathon", TRAIL: "Trail", BEGINNER: "Débutant", SPEED: "Vitesse", ENDURANCE: "Endurance", INJURY: "Blessure", WEIGHT: "Perte de poids" },
+    cats: { ALL: "Tout voir", "10KM": "5 km", SEMI: "Semi", MARATHON: "Marathon", TRAIL: "Trail", BEGINNER: "Débutant", SPEED: "Vitesse", ENDURANCE: "Endurance", INJURY: "Blessure", WEIGHT: "Perte de poids" },
     items: {
-      km10: { title: "10 KILOMÈTRES", subtitle: "De 6 semaines à 4 mois" },
+      km10: { title: "5 KILOMÈTRES", subtitle: "De 6 semaines à 4 mois" },
       semi: { title: "SEMI-MARATHON", subtitle: "De 8 semaines à 12 mois" },
       marathon: { title: "MARATHON", subtitle: "De 8 semaines à 12 mois" },
       trail: { title: "TRAIL RUNNING", subtitle: "De 6 semaines à 12 mois" },
@@ -139,9 +139,9 @@ const en: LandingDict = {
   stats: { races: "Upcoming races", routes: "Mapped routes", plan: "Rolling plan", replan: "Shoes compared" },
   programs: {
     eyebrow: "Training", title: "A program for every goal", subtitle: "From your first 5K to ultra-trail — each plan then adapts to your real data.", viewAll: "View all",
-    cats: { ALL: "View all", "10KM": "10K", SEMI: "Half", MARATHON: "Marathon", TRAIL: "Trail", BEGINNER: "Beginner", SPEED: "Speed", ENDURANCE: "Endurance", INJURY: "Injury", WEIGHT: "Weight loss" },
+    cats: { ALL: "View all", "10KM": "5K", SEMI: "Half", MARATHON: "Marathon", TRAIL: "Trail", BEGINNER: "Beginner", SPEED: "Speed", ENDURANCE: "Endurance", INJURY: "Injury", WEIGHT: "Weight loss" },
     items: {
-      km10: { title: "10 KILOMETRES", subtitle: "From 6 weeks to 4 months" },
+      km10: { title: "5 KILOMETRES", subtitle: "From 6 weeks to 4 months" },
       semi: { title: "HALF MARATHON", subtitle: "From 8 weeks to 12 months" },
       marathon: { title: "MARATHON", subtitle: "From 8 weeks to 12 months" },
       trail: { title: "TRAIL RUNNING", subtitle: "From 6 weeks to 12 months" },
@@ -202,9 +202,9 @@ const de: LandingDict = {
   stats: { races: "Kommende Rennen", routes: "Kartierte Strecken", plan: "Rollierender Plan", replan: "Schuhe im Vergleich" },
   programs: {
     eyebrow: "Training", title: "Ein Programm für jedes Ziel", subtitle: "Vom ersten 5-km-Lauf bis zum Ultra-Trail — jeder Plan passt sich dann an deine echten Daten an.", viewAll: "Alle ansehen",
-    cats: { ALL: "Alle", "10KM": "10 km", SEMI: "Halb", MARATHON: "Marathon", TRAIL: "Trail", BEGINNER: "Einsteiger", SPEED: "Tempo", ENDURANCE: "Ausdauer", INJURY: "Verletzung", WEIGHT: "Abnehmen" },
+    cats: { ALL: "Alle", "10KM": "5 km", SEMI: "Halb", MARATHON: "Marathon", TRAIL: "Trail", BEGINNER: "Einsteiger", SPEED: "Tempo", ENDURANCE: "Ausdauer", INJURY: "Verletzung", WEIGHT: "Abnehmen" },
     items: {
-      km10: { title: "10 KILOMETER", subtitle: "Von 6 Wochen bis 4 Monate" },
+      km10: { title: "5 KILOMETER", subtitle: "Von 6 Wochen bis 4 Monate" },
       semi: { title: "HALBMARATHON", subtitle: "Von 8 Wochen bis 12 Monate" },
       marathon: { title: "MARATHON", subtitle: "Von 8 Wochen bis 12 Monate" },
       trail: { title: "TRAIL RUNNING", subtitle: "Von 6 Wochen bis 12 Monate" },
@@ -265,9 +265,9 @@ const es: LandingDict = {
   stats: { races: "Carreras próximas", routes: "Rutas cartografiadas", plan: "De plan deslizante", replan: "Zapatillas comparadas" },
   programs: {
     eyebrow: "Entrenamiento", title: "Un programa para cada objetivo", subtitle: "Desde tu primer 5K hasta el ultra-trail — cada plan se adapta luego a tus datos reales.", viewAll: "Ver todo",
-    cats: { ALL: "Ver todo", "10KM": "10 km", SEMI: "Media", MARATHON: "Maratón", TRAIL: "Trail", BEGINNER: "Principiante", SPEED: "Velocidad", ENDURANCE: "Resistencia", INJURY: "Lesión", WEIGHT: "Pérdida de peso" },
+    cats: { ALL: "Ver todo", "10KM": "5 km", SEMI: "Media", MARATHON: "Maratón", TRAIL: "Trail", BEGINNER: "Principiante", SPEED: "Velocidad", ENDURANCE: "Resistencia", INJURY: "Lesión", WEIGHT: "Pérdida de peso" },
     items: {
-      km10: { title: "10 KILÓMETROS", subtitle: "De 6 semanas a 4 meses" },
+      km10: { title: "5 KILÓMETROS", subtitle: "De 6 semanas a 4 meses" },
       semi: { title: "MEDIA MARATÓN", subtitle: "De 8 semanas a 12 meses" },
       marathon: { title: "MARATÓN", subtitle: "De 8 semanas a 12 meses" },
       trail: { title: "TRAIL RUNNING", subtitle: "De 6 semanas a 12 meses" },
@@ -328,9 +328,9 @@ const pt: LandingDict = {
   stats: { races: "Provas futuras", routes: "Percursos cartografados", plan: "De plano deslizante", replan: "Ténis comparados" },
   programs: {
     eyebrow: "Treino", title: "Um programa para cada objetivo", subtitle: "Do teu primeiro 5K ao ultra-trail — cada plano adapta-se depois aos teus dados reais.", viewAll: "Ver tudo",
-    cats: { ALL: "Ver tudo", "10KM": "10 km", SEMI: "Meia", MARATHON: "Maratona", TRAIL: "Trail", BEGINNER: "Iniciante", SPEED: "Velocidade", ENDURANCE: "Resistência", INJURY: "Lesão", WEIGHT: "Perda de peso" },
+    cats: { ALL: "Ver tudo", "10KM": "5 km", SEMI: "Meia", MARATHON: "Maratona", TRAIL: "Trail", BEGINNER: "Iniciante", SPEED: "Velocidade", ENDURANCE: "Resistência", INJURY: "Lesão", WEIGHT: "Perda de peso" },
     items: {
-      km10: { title: "10 QUILÓMETROS", subtitle: "De 6 semanas a 4 meses" },
+      km10: { title: "5 QUILÓMETROS", subtitle: "De 6 semanas a 4 meses" },
       semi: { title: "MEIA MARATONA", subtitle: "De 8 semanas a 12 meses" },
       marathon: { title: "MARATONA", subtitle: "De 8 semanas a 12 meses" },
       trail: { title: "TRAIL RUNNING", subtitle: "De 6 semanas a 12 meses" },
