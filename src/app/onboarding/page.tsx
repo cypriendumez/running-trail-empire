@@ -259,7 +259,17 @@ export default function OnboardingPage() {
     }
 
     if (profileError || echecs.length) {
-      if (echecs.length) console.error("[inscription] champs non enregistrés :", echecs);
+      if (profileError) echecs.unshift(`profil: ${profileError.message}`);
+      console.error("[inscription] champs non enregistrés :", echecs);
+      // ⚠️ LA CONSOLE DU NAVIGATEUR N'EST LUE PAR PERSONNE. Le premier vrai inscrit a vu ce
+      // toast le 14/09/2026 (politique RLS absente sur performance_baselines) : l'échec n'a
+      // existé que sur son écran. Il est désormais journalisé, visible dans l'espace coach.
+      try {
+        fetch("/api/log-error", {
+          method: "POST", headers: { "Content-Type": "application/json" }, keepalive: true,
+          body: JSON.stringify({ source: "onboarding", message: echecs.join(" · "), url: location.href, meta: { echecs } }),
+        }).catch(() => {});
+      } catch { /* le journal ne doit pas ajouter une erreur à l'erreur */ }
       toast.error(tr("tSaveError"));
       setLoading(false);
       return;

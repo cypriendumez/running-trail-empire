@@ -72,11 +72,23 @@ export async function GET(req: Request) {
   const { count: restantes } = await sb.from("races").select("id", { count: "exact", head: true })
     .lt("date", aujourdhui);
 
+  // ── MÉNAGE DE LA MESURE D'AUDIENCE ─────────────────────────────────────────
+  // Les visites de plus de 13 mois sont retirées : assez pour comparer un mois à celui
+  // de l'année précédente, en deçà des 25 mois que la CNIL tolère pour la mesure
+  // d'audience. Ce cron est le seul passage quotidien d'entretien ; l'échec est DIT,
+  // jamais tu — mais il ne fait pas rougir le cron des courses, qui a fait son travail.
+  const limiteVisites = new Date(Date.now() - 13 * 30.5 * 864e5).toISOString().slice(0, 10);
+  const { error: eVisites, count: visitesPurgees } = await sb.from("visites")
+    .delete({ count: "exact" }).lt("jour", limiteVisites);
+  if (eVisites) console.error("[maintenance] purge des visites impossible :", eVisites.message);
+
   return NextResponse.json({
     ok: true,
     bascules,
     restantes: restantes ?? null,
     tours,
+    visitesPurgees: eVisites ? null : (visitesPurgees ?? 0),
+    purgeVisites: eVisites ? eVisites.message : "ok",
     message: bascules
       ? `${bascules} course(s) passée(s) rebasculée(s) en « Date à venir » — elles redeviennent visibles au catalogue. Restantes : ${restantes ?? "?"}.`
       : "Aucune course passée : le catalogue est à jour.",

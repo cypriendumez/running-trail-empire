@@ -4,6 +4,7 @@ import { Inter, Anton } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/layout/Providers";
 import { ErrorReporter } from "@/components/ErrorReporter";
+import { Visite } from "@/components/Visite";
 import { LanguageProvider } from "@/lib/i18n/LanguageProvider";
 import { getPublicLang } from "@/lib/i18n/serverLang";
 import { PwaClient } from "@/components/pwa/PwaClient";
@@ -83,6 +84,7 @@ export default async function RootLayout({
     <html lang={lang} className={`${inter.variable} ${anton.variable}`} suppressHydrationWarning>
       <body className="font-sans">
         <ErrorReporter />
+        <Visite />
         <LanguageProvider initialLang={lang}>
           <Providers>{children}</Providers>
           <PwaClient />

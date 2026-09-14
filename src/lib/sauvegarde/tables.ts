@@ -39,6 +39,9 @@ export const INTERDITES = [
   "profiles", "workouts", "journal_entries", "messages", "notifications",
   "gps_traces", "sleep_data", "hrv_data", "shoes", "error_logs",
   "performance_baselines", "auto_coach_state", "discipline_scores", "segments",
+  // Mesure d'audience : des empreintes hachées, pas des personnes — mais un dépôt public
+  // n'a rien à faire des allées et venues de qui que ce soit.
+  "visites",
 ];
 
 export function estSauvegardable(nom: unknown): boolean {
