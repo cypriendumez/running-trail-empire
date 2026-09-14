@@ -24,7 +24,7 @@ export function WaitlistSection() {
     s.replace(/\{places\}/g, String(OFFRE_FONDATEUR.places)).replace(/\{remise\}/g, String(OFFRE_FONDATEUR.remisePct));
 
   return (
-    <section className="relative overflow-hidden bg-zinc-950 py-20 text-white sm:py-24">
+    <section id="liste-attente" className="relative overflow-hidden bg-zinc-950 py-20 text-white sm:py-24 scroll-mt-16">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_60%_at_50%_0%,rgba(16,185,129,0.18),transparent)]" />
       <div className="relative mx-auto max-w-2xl px-6 text-center">
         <p className="text-xs font-semibold uppercase tracking-widest text-emerald-400">{L.eyebrow}</p>

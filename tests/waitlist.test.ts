@@ -49,7 +49,10 @@ if (!/OFFRE_FONDATEUR\.places/.test(sec) || !/OFFRE_FONDATEUR\.remisePct/.test(s
 if (!/injecte\(L\.offer\)/.test(sec)) fail("l'offre affichée n'est pas passée par l'injection des chiffres", "le visiteur verrait « {places} »/« {remise} » en clair");
 if (!/replace\([^)]*\{places\\?\}?/.test(sec) && !sec.includes("{places}")) fail("l'injection ne remplace pas le gabarit {places}");
 if (!/NewsletterSignup/.test(sec)) fail("la section ne réutilise pas la capture d'e-mails existante", "elle réinventerait le stockage/l'accusé");
-c += 4;
+// ⚠️ L'ancre est le point d'arrivée du lien de bio (pacevo.fr/#liste-attente) : sans elle,
+// le clic tombe en haut de page et l'inscrit doit chercher le formulaire.
+if (!/id="liste-attente"/.test(sec)) fail("la section n'a pas d'ancre #liste-attente", "le lien de bio ne pointerait pas sur le formulaire");
+c += 5;
 
 // ── 4. Réellement montée sur la landing ──────────────────────────────────────
 const landing = sansComm(readFileSync("src/app/page.tsx", "utf8"));
