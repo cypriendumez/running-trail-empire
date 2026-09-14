@@ -90,7 +90,14 @@ export async function GET(req: Request) {
 
   // Le formulaire ASP.NET exige un VIEWSTATE frais : on le reprend à chaque passage.
   const page = await fetch(RECHERCHE, { headers: entetes(), signal: AbortSignal.timeout(20000) }).catch(() => null);
-  if (!page?.ok) return NextResponse.json({ error: "Recherche source injoignable", status: page?.status ?? 0 }, { status: 502 });
+  // ⚠️ SOURCE TIERCE INJOIGNABLE ≠ ÉCHEC DE PACEVO. le-sportif.com (site ASP.NET externe) tombe
+  // ou bloque parfois les IP de datacenter (Vercel) : constaté le 14/09/2026, status 0. Renvoyer
+  // 502 faisait passer le cron races-types en ROUGE en permanence pour quelque chose qu'on ne
+  // contrôle pas — une fausse alerte, exactement ce que races-liens évite avec « INCONNU ». On
+  // renvoie donc un 200 « ignoré » (traçable dans le corps, imprimé dans le log GitHub) : rien
+  // n'est corrigé ce passage, on retentera au suivant. Un VRAI échec — la base qui refuse une
+  // écriture — reste un `ok:false` plus bas, lui, et doit rester rouge.
+  if (!page?.ok) return NextResponse.json({ ok: true, ignore: "source injoignable", status: page?.status ?? 0 });
   const html = await page.text();
   const champ = (n: string) => {
     const m = html.match(new RegExp(`name="${n}"[^>]*value="([^"]*)"`));

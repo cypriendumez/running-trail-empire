@@ -186,6 +186,11 @@ test("races-types ne rougit que sur un VRAI refus, jamais sur un hoquet d'infra"
   // Et on réessaie une fois avant d'abandonner une ligne sur un incident passager.
   assert.ok(/setTimeout\([^)]*\)[\s\S]{0,80}?insert\(ligneRace\)/.test(src),
     "la route ne réessaie pas l'insertion après un incident passager");
+  // ⚠️ SOURCE TIERCE INJOIGNABLE = infra, pas un échec Pacevo (le-sportif.com bloque parfois les
+  // IP Vercel, status 0 le 14/09/2026). Elle doit renvoyer 200 « ignoré », JAMAIS 502 — sinon le
+  // cron reste rouge en permanence pour quelque chose hors de notre contrôle.
+  assert.ok(/if \(!page\?\.ok\) return NextResponse\.json\(\{ ok: true, ignore: "source injoignable"/.test(src),
+    "source injoignable doit renvoyer ok:true (ignoré), pas 502 → sinon fausse alerte permanente");
 });
 
 console.log(`\n${passed} test(s) de supervision passé(s), ${fails.length} échec(s)`);
