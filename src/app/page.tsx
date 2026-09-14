@@ -44,6 +44,9 @@ const PROGRAMS: { key: string; category: string; photo: string }[] = [
   // l'image, en t-shirt blanc uni : aucune marque, aucun visage, et la route qui file
   // vers l'horizon dit la distance mieux qu'un gros plan de chaussure.
   { key: "km10", category: "10KM", photo: "photo-1560052767-406e947cc273" },
+  // 10 km (ex-« endurance de base ») : chemin forestier qui file vers le fond — il dit la
+  // DURÉE, à allure facile, mieux qu'un gros plan. Les troncs verticaux tiennent le 3/4.
+  { key: "endurance", category: "ENDURANCE", photo: "photo-1646867802148-b3ccd7ebf76d" },
   // Semi : la précédente n'était pas qu'un problème de marque. On y lisait le DOSSARD
   // 21221 et le logo TCS du marathon de New York — or les résultats de course sont
   // publics, donc ce numéro remonte à un NOM. C'est une donnée personnelle, pas un
@@ -67,12 +70,6 @@ const PROGRAMS: { key: string; category: string; photo: string }[] = [
   // illustration mais comme une caution commerciale. Remplacée par un coureur à
   // contre-jour sur piste : le visage est une ombre, les chaussures n'ont aucun logo.
   { key: "speed", category: "SPEED", photo: "photo-1744060204728-f68e434a3edf" },
-  // Endurance : reprise DEUX fois. D'abord un coureur plié en deux, mains sur les
-  // genoux — de l'épuisement, soit l'inverse du message d'une base aérobie. Puis un
-  // coureur en contre-jour, dont le cadrage large ne disait rien de la notion. Un chemin
-  // forestier qui file vers le fond dit ce que le texte annonce : de la DURÉE, à allure
-  // facile. Les troncs verticaux tiennent en plus le format 3/4 de la carte.
-  { key: "endurance", category: "ENDURANCE", photo: "photo-1646867802148-b3ccd7ebf76d" },
   // Blessure : c'était un portrait de médecin en blouse, souriant face objectif. Au
   // milieu de sept photographies de course, une photo de banque d'images posée cassait
   // la grille entière. Remplacée par des mains qui relacent une chaussure — « je repars ».

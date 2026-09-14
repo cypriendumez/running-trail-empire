@@ -66,8 +66,8 @@ export type LandingDict = {
   cta: { title: string; subtitle: string; primary: string; secondary: string; note: string };
 };
 
-export const PROGRAM_KEYS = ["km10", "semi", "marathon", "trail", "beginner", "speed", "endurance", "injury", "weightloss"] as const;
-export const CATEGORY_CODES = ["ALL", "10KM", "SEMI", "MARATHON", "TRAIL", "BEGINNER", "SPEED", "ENDURANCE", "INJURY", "WEIGHT"] as const;
+export const PROGRAM_KEYS = ["km10", "endurance", "semi", "marathon", "trail", "beginner", "speed", "injury", "weightloss"] as const;
+export const CATEGORY_CODES = ["ALL", "10KM", "ENDURANCE", "SEMI", "MARATHON", "TRAIL", "BEGINNER", "SPEED", "INJURY", "WEIGHT"] as const;
 
 const fr: LandingDict = {
   nav: { programs: "Programmes", features: "Fonctionnalités", pricing: "Tarifs", blog: "Blog", reviews: "Avis", story: "Notre histoire", login: "Connexion", trial: "Essai gratuit" },
