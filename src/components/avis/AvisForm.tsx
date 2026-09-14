@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Star, Loader2, Check } from "lucide-react";
+import { Star, Loader2, Check, MessageSquareHeart } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 // ⚠️ `lib/avis/bornes`, PAS `lib/avis/store` : le store importe le filtre de
 // grossièretés, et l'importer ici enverrait ses 106 racines dans le bundle public.
@@ -27,11 +27,22 @@ const T: Record<string, Record<string, string>> = {
   pt: { titre: "Escreve a tua avaliação", sousTitre: "Será publicada tal como escreves, com o teu nome e a inicial do apelido.", note: "A tua nota", texte: "A tua avaliação", place: "O que te ajudou, o que faltou…", envoyer: "Publicar a minha avaliação", envoi: "A enviar…", merci: "Obrigado. A tua avaliação ficou guardada — aparecerá após uma verificação contra insultos e spam. A tua nota não conta nessa verificação.", modifier: "Editar a minha avaliação", connecte: "Precisas de conta para avaliar — é isso que garante que todas vêm de pessoas reais.", seConnecter: "Entrar", creer: "Criar conta grátis", court: "Faltam {n} caracteres", erreur: "Ocorreu um erro.", reseau: "Sem ligação. Tenta de novo." },
 };
 
+// Libellé de la note (survolée ou choisie) — rend le choix vivant, pas un simple compteur d'étoiles.
+const NOTES: Record<string, string[]> = {
+  fr: ["Décevant", "Moyen", "Bien", "Très bien", "Excellent"],
+  en: ["Poor", "Fair", "Good", "Very good", "Excellent"],
+  de: ["Schwach", "Mittel", "Gut", "Sehr gut", "Ausgezeichnet"],
+  es: ["Flojo", "Regular", "Bien", "Muy bien", "Excelente"],
+  pt: ["Fraco", "Razoável", "Bom", "Muito bom", "Excelente"],
+};
+
 export function AvisForm() {
   const { lang } = useT();
   const t = T[lang] ?? T.fr;
+  const notes = NOTES[lang] ?? NOTES.fr;
   const [etat, setEtat] = useState<"charge" | "anonyme" | "pret" | "envoi" | "merci">("charge");
   const [note, setNote] = useState(5);
+  const [survol, setSurvol] = useState<number | null>(null);
   const [texte, setTexte] = useState("");
   const [erreur, setErreur] = useState<string | null>(null);
 
@@ -85,45 +96,59 @@ export function AvisForm() {
     );
   }
 
+  const affichee = survol ?? note;
   return (
-    <div className="mx-auto max-w-2xl rounded-3xl bg-white p-8 ring-1 ring-inset ring-zinc-200">
-      <h3 className="text-base font-bold text-zinc-900">{t.titre}</h3>
-      <p className="mt-1 text-sm text-zinc-500">{t.sousTitre}</p>
-
-      <div className="mt-6">
-        <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{t.note}</span>
-        <div className="mt-2 flex gap-1">
-          {[1, 2, 3, 4, 5].map((n) => (
-            <button key={n} type="button" onClick={() => setNote(n)} aria-label={`${n}/5`}
-              className="p-1 transition-transform hover:scale-110">
-              <Star className={`h-6 w-6 ${n <= note ? "fill-amber-400 text-amber-400" : "text-zinc-300"}`} />
-            </button>
-          ))}
+    <div className="mx-auto max-w-2xl overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-inset ring-zinc-200">
+      {/* En-tête sur un léger fond émeraude : chaleureux, et raccord avec la marque. */}
+      <div className="flex items-center gap-3 border-b border-zinc-100 bg-gradient-to-br from-emerald-50 to-white px-8 py-6">
+        <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-emerald-600/10 text-emerald-700">
+          <MessageSquareHeart className="h-5 w-5" />
+        </span>
+        <div>
+          <h3 className="text-lg font-bold text-zinc-900">{t.titre}</h3>
+          <p className="mt-0.5 text-sm text-zinc-500">{t.sousTitre}</p>
         </div>
       </div>
 
-      <div className="mt-6">
-        <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{t.texte}</span>
-        <textarea
-          value={texte} onChange={(e) => setTexte(e.target.value.slice(0, TEXTE_MAX))}
-          placeholder={t.place} rows={5}
-          className="mt-2 w-full resize-none rounded-2xl border-0 bg-zinc-50 p-4 text-sm leading-relaxed text-zinc-800 ring-1 ring-inset ring-zinc-200 outline-none placeholder:text-zinc-400 focus:ring-2 focus:ring-emerald-500"
-        />
-        <div className="mt-1.5 flex items-center justify-between text-xs text-zinc-400">
-          <span>{manque > 0 ? t.court.replace("{n}", String(manque)) : ""}</span>
-          <span>{texte.trim().length}/{TEXTE_MAX}</span>
+      <div className="p-8">
+        <div>
+          <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{t.note}</span>
+          <div className="mt-2 flex items-center gap-3">
+            <div className="flex gap-1" onMouseLeave={() => setSurvol(null)}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button key={n} type="button" onClick={() => setNote(n)} onMouseEnter={() => setSurvol(n)} aria-label={`${n}/5`}
+                  className="p-0.5 transition-transform hover:scale-110">
+                  <Star className={`h-8 w-8 transition-colors ${n <= affichee ? "fill-amber-400 text-amber-400" : "text-zinc-200"}`} />
+                </button>
+              ))}
+            </div>
+            <span className="text-sm font-semibold text-zinc-700">{notes[affichee - 1]}</span>
+          </div>
         </div>
+
+        <div className="mt-7">
+          <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{t.texte}</span>
+          <textarea
+            value={texte} onChange={(e) => setTexte(e.target.value.slice(0, TEXTE_MAX))}
+            placeholder={t.place} rows={5}
+            className="mt-2 w-full resize-none rounded-2xl border-0 bg-zinc-50 p-4 text-sm leading-relaxed text-zinc-800 ring-1 ring-inset ring-zinc-200 outline-none placeholder:text-zinc-400 focus:bg-white focus:ring-2 focus:ring-emerald-500"
+          />
+          <div className="mt-1.5 flex items-center justify-between text-xs text-zinc-400">
+            <span>{manque > 0 ? t.court.replace("{n}", String(manque)) : ""}</span>
+            <span>{texte.trim().length}/{TEXTE_MAX}</span>
+          </div>
+        </div>
+
+        {erreur && <p className="mt-3 text-sm font-medium text-red-600">{erreur}</p>}
+
+        <button
+          onClick={envoyer} disabled={etat === "envoi" || manque > 0}
+          className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+        >
+          {etat === "envoi" && <Loader2 className="h-4 w-4 animate-spin" />}
+          {etat === "envoi" ? t.envoi : t.envoyer}
+        </button>
       </div>
-
-      {erreur && <p className="mt-3 text-sm font-medium text-red-600">{erreur}</p>}
-
-      <button
-        onClick={envoyer} disabled={etat === "envoi" || manque > 0}
-        className="mt-5 inline-flex items-center gap-2 rounded-full bg-zinc-900 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-zinc-800 disabled:opacity-40"
-      >
-        {etat === "envoi" && <Loader2 className="h-4 w-4 animate-spin" />}
-        {etat === "envoi" ? t.envoi : t.envoyer}
-      </button>
     </div>
   );
 }
