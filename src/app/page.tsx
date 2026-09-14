@@ -22,6 +22,7 @@ import { CHIFFRES_LANDING } from "@/lib/brand/stats";
 // recopiés ici, dans /pricing, et une TROISIÈME fois (faux) dans les réglages.
 import { PRIX_AFFICHES as PRIX, euros } from "@/lib/billing/prix";
 import { StoreBadges } from "@/components/layout/StoreBadges";
+import { WaitlistSection } from "@/components/WaitlistSection";
 
 // Données visuelles (non traduisibles). Les libellés viennent de LANDING[lang].
 // ── PHOTOS DES PROGRAMMES ────────────────────────────────────────────────────
@@ -600,6 +601,11 @@ export default function LandingPage() {
           </div>
         </Container>
       </section>
+
+      {/* ── LISTE D'ATTENTE (avant-lancement) ── juste après le hero, pour capter le visiteur
+          tant qu'il est intéressé. Ne collecte que des e-mails (aucun paiement, aucune société
+          requise) : bâtir l'audience à contacter le jour du lancement. */}
+      <WaitlistSection />
 
       {/* ── SYNCHRONISATION ── une bande dédiée plutôt qu'une ligne de texte pâle noyée
           sous le CTA, où elle passait pour une mention légale.
