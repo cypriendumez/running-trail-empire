@@ -617,6 +617,10 @@ export default function LandingPage() {
             <StoreBadges className="mt-6" ton="clair" />
           </div>
         </Container>
+        {/* Fondu du bas de la photo vers le vert de la liste d'attente : la piste se
+            coupait net contre l'émeraude et formait une « bande » dure. z entre la photo
+            (z-0) et le contenu (z-10) → le texte et les badges restent lisibles par-dessus. */}
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-32 bg-gradient-to-b from-transparent to-emerald-600" />
       </section>
 
       {/* ── LISTE D'ATTENTE (avant-lancement) ── juste après le hero, pour capter le visiteur

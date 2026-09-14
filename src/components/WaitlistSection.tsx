@@ -30,6 +30,9 @@ export function WaitlistSection() {
       {/* Deux lueurs douces + un voile de grain : de la profondeur, pour ne pas faire aplat. */}
       <div className="pointer-events-none absolute -left-24 top-0 h-72 w-72 rounded-full bg-emerald-400/25 blur-3xl" />
       <div className="pointer-events-none absolute -right-16 bottom-0 h-72 w-72 rounded-full bg-teal-300/20 blur-3xl" />
+      {/* Fondu du bas vers le blanc : la section suivante (partenaires montres) est blanche.
+          Sans ça, le vert se coupait net contre le blanc — une « bande » dure en bas. */}
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-24 bg-gradient-to-b from-transparent to-white" />
 
       <div className="relative mx-auto max-w-xl px-6 text-center">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100">{L.eyebrow}</p>
