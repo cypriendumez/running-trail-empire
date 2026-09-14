@@ -95,19 +95,43 @@ export function emailEditeur(): string {
  * Une porte verrouillée à côté d'une fenêtre ouverte ne protège rien.
  */
 export async function gardeAdmin(): Promise<{ id: string; email: string } | null> {
+  const v = await verdictAdmin();
+  return v.ok ? { id: v.id, email: v.email } : null;
+}
+
+export type VerdictAdmin =
+  | { ok: true; id: string; email: string }
+  | { ok: false; motif: "refus" | "indisponible"; detail?: string };
+
+/**
+ * LE MÊME CONTRÔLE, MAIS QUI DISTINGUE « NON » DE « JE N'AI PAS PU VÉRIFIER ».
+ *
+ * ⚠️ Le 14/09/2026, pendant un incident Supabase (« Failed to get project config » sur
+ * l'API d'authentification), l'espace coach a affiché « Forbidden » à son propriétaire :
+ * la session n'était pas refusée, elle était INVÉRIFIABLE. Un 403 pousse à chercher un
+ * problème de droits qui n'existe pas ; un 503 dit d'attendre et de réessayer.
+ * Une session ABSENTE (aucun cookie) reste un refus : ce n'est pas une panne.
+ */
+export async function verdictAdmin(): Promise<VerdictAdmin> {
   const { createClient } = await import("@/lib/supabase/server");
   const { cookies } = await import("next/headers");
   const { COOKIE_APPAREIL, appareilExige, verifierAppareil } = await import("@/lib/admin/appareil");
   const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
-  if (!estAdmin(user?.email)) return null;
+  const { data: { user }, error } = await sb.auth.getUser();
+  if (!user && error) {
+    const status = (error as { status?: number }).status;
+    // Session manquante ou jeton invalide : 400/401/403. Le reste — pas de statut (réseau),
+    // 5xx — est une panne du service d'authentification, pas un verdict.
+    if (!status || status >= 500) return { ok: false, motif: "indisponible", detail: error.message };
+  }
+  if (!estAdmin(user?.email)) return { ok: false, motif: "refus" };
   if (appareilExige()) {
     const v = verifierAppareil({
       secret: String(process.env.ADMIN_DEVICE_SECRET),
       userId: user!.id,
       jeton: (await cookies()).get(COOKIE_APPAREIL)?.value,
     });
-    if (!v.ok) return null;
+    if (!v.ok) return { ok: false, motif: "refus" };
   }
-  return { id: user!.id, email: String(user!.email) };
+  return { ok: true, id: user!.id, email: String(user!.email) };
 }

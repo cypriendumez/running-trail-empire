@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { gardeAdmin } from "@/lib/admin/acces";
+import { verdictAdmin } from "@/lib/admin/acces";
 import { regrouperErreurs, type LigneErreur } from "@/lib/admin/bugs";
 
 /**
@@ -16,7 +16,13 @@ const LIGNES_MAX = 5000;
 const JOURS = [7, 30, 90] as const;
 
 export async function GET(req: Request) {
-  if (!(await gardeAdmin())) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const acces = await verdictAdmin();
+  if (!acces.ok) {
+    // « Je n'ai pas pu vérifier » n'est pas « non » : 503 et un message qui dit d'attendre.
+    return acces.motif === "indisponible"
+      ? NextResponse.json({ error: "Session invérifiable : le service d'authentification n'a pas répondu. Réessaie dans un instant." }, { status: 503 })
+      : NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const u = new URL(req.url);
   const jours = (JOURS as readonly number[]).includes(Number(u.searchParams.get("jours"))) ? Number(u.searchParams.get("jours")) : 30;

@@ -480,7 +480,9 @@ test("toute route d'administration est protégée", () => {
     // facteur. L'omettre de cette liste faisait passer une route mieux gardée pour une
     // route sans garde — quatrième fois qu'un test de ce projet fige une FORME au lieu
     // d'une intention.
-    if (!/ADMIN_SECRET|x-admin-secret|ADMIN_EMAIL|is_admin|isAdmin|estAdmin|gardeAdmin/.test(src)) unguarded.push(entry.name);
+    // `verdictAdmin` (14/09/2026) est `gardeAdmin` qui distingue « refus » de « service
+    // d'authentification indisponible » — même exigence, réponse 503 au lieu de 403.
+    if (!/ADMIN_SECRET|x-admin-secret|ADMIN_EMAIL|is_admin|isAdmin|estAdmin|gardeAdmin|verdictAdmin/.test(src)) unguarded.push(entry.name);
     // ⚠️ ET L'ADRESSE NE DOIT PLUS ÊTRE RECOPIÉE. Treize routes en portaient leur propre
     // exemplaire. Le jour où l'éditeur change — une vente, par exemple — il faut les
     // retrouver toutes : en manquer une laisse soit une porte ouverte à l'ancien

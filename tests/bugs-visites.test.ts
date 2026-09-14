@@ -263,7 +263,9 @@ test("l'espace coach a ses deux onglets et la politique de confidentialité dit 
   }
   // Les routes d'administration refont le contrôle d'accès : le layout ne protège pas les API.
   for (const r of ["src/app/api/admin/bugs/route.ts", "src/app/api/admin/visites/route.ts"]) {
-    assert.ok(/if \(!\(await gardeAdmin\(\)\)\) return NextResponse\.json\(\{ error: "Forbidden" \}, \{ status: 403 \}\)/.test(codeNu(r)), `${r} n'exige plus gardeAdmin`);
+    const src = codeNu(r);
+    assert.ok(/const acces = await verdictAdmin\(\);\s*if \(!acces\.ok\)/.test(src), `${r} n'exige plus verdictAdmin`);
+    assert.ok(/status: 403/.test(src) && /acces\.motif === "indisponible"[\s\S]{0,200}status: 503/.test(src), `${r} ne distingue plus « refus » (403) de « invérifiable » (503)`);
   }
 });
 
