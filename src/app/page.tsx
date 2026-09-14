@@ -566,7 +566,7 @@ export default function LandingPage() {
             sans couvrir plus que la barre elle-même. */}
         <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/35 via-black/10 to-transparent" />
 
-        <Container className="relative z-10 pb-20 pt-28 sm:pb-24">
+        <Container className="relative z-10 pb-[40vh] pt-28 sm:pb-24">
           {/* Le titre est désormais une LIGNE DE MARQUE identique dans les cinq langues, ce
               qui supprime la contrainte qui gouvernait cette mise en page : il fallait
               auparavant dimensionner sur le pire cas (l'allemand réclamait 872 px là où le
