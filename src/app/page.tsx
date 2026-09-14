@@ -489,7 +489,17 @@ export default function LandingPage() {
             */
             fetchPriority="high"
             decoding="async"
-            className="absolute inset-0 h-full w-full object-cover lg:object-[65%_50%]"
+            /*
+              ⚠️ MOBILE ANCRÉ À 70 %, ET C'EST UN CHOIX DE COMPOSITION DE CYPRIEN (14/09/2026).
+              Au centrage par défaut, la bande verticale visible sur un téléphone tombait sur
+              des immeubles anonymes : la TOUR EIFFEL et les DEUX COUREURS — tout l'intérêt de
+              la photo — étaient rognés hors cadre. Vérifié en rendant l'image réelle en
+              390×812 : à 70 %, la tour est cadrée en haut et les deux coureurs ENTIERS en bas
+              (à 78 % le coureur de gauche est coupé, à 60 % la tour l'est). L'ancien commentaire
+              redoutait la tour « au milieu, derrière le bouton Essai » : le bandeau sombre du
+              haut la couvre déjà, et la composition iconique vaut ce léger recouvrement.
+            */
+            className="absolute inset-0 h-full w-full object-cover object-[70%_50%] lg:object-[65%_50%]"
           />
         </picture>
         {/* ⚠️ ALLÉGÉS DE NOUVEAU LE 10/09/2026, sur un constat de Cyprien : la nouvelle photo
@@ -551,7 +561,7 @@ export default function LandingPage() {
             et ce n'est pas une inconséquence : à 375 px le texte occupe TOUTE la largeur,
             il passe donc sur les coureurs et sur la pelouse claire, sans le moindre endroit
             où s'écarter. Le bureau, lui, garde sa colonne de texte à gauche des silhouettes. */}
-        <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-black/50 via-black/40 to-black/30 sm:hidden" />
+        <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-black/40 via-black/30 to-black/20 sm:hidden" />
         {/* Bandeau du haut : il donne au texte de la barre un fond assez sombre pour tenir,
             sans couvrir plus que la barre elle-même. */}
         <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/35 via-black/10 to-transparent" />
