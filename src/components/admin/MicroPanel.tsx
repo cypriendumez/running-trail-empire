@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Landmark, Copy, Check, Loader2, Plus, CalendarClock, Info, TriangleAlert } from "lucide-react";
+import { Landmark, Copy, Check, Loader2, Plus, CalendarClock, Info, TriangleAlert, ExternalLink, Zap } from "lucide-react";
 import { CATEGORIES, euros, enCentimes, horsResultat, type Ecriture, type Reglages } from "@/lib/compta/model";
 import { declarationsMicro, bilanAnnuel } from "@/lib/compta/micro";
 
@@ -86,6 +86,11 @@ export function MicroPanel() {
 
   const tauxManque = reglages.tauxCotisations === undefined;
   const partPlafond = bilan.partPlafondPct;
+  // Ce qu'on déclare MAINTENANT = la période close la plus récente (la liste est déjà
+  // triée du plus récent au plus ancien). La période « en cours » ne se déclare pas encore.
+  const aDeclarer = periodes.find((p) => p.close);
+  const anneeVide = bilan.caCents === 0;
+  const URSSAF = "https://www.autoentrepreneur.urssaf.fr/";
 
   return (
     <div className="mx-auto w-full max-w-5xl p-8">
@@ -141,8 +146,43 @@ export function MicroPanel() {
             </div>
           </div>
 
-          {/* Périodes à déclarer */}
-          <div className="mb-3 flex items-center gap-2 text-sm font-bold text-zinc-900"><CalendarClock className="h-4 w-4 text-zinc-400" /> À déclarer ({periodicite})</div>
+          {/* Accueil quand rien n'est encore encaissé : on explique le remplissage auto. */}
+          {anneeVide && (
+            <div className="mb-6 rounded-2xl border border-sky-100 bg-sky-50/50 p-5">
+              <h3 className="flex items-center gap-2 text-sm font-bold text-zinc-900"><Zap className="h-4 w-4 text-sky-600" /> Rien à déclarer pour l&apos;instant</h3>
+              <p className="mt-1.5 text-xs leading-relaxed text-zinc-600">
+                Dès que les paiements Stripe seront activés, <b>chaque abonnement payé s&apos;inscrira ici automatiquement</b> (via la comptabilité) et ton CA à déclarer se mettra à jour tout seul. En attendant, tu peux saisir une recette à la main ci-dessous (coaching, vente ponctuelle…).
+              </p>
+            </div>
+          )}
+
+          {/* LA carte qui compte : le trimestre clos à déclarer maintenant. */}
+          {aDeclarer && !anneeVide && (
+            <div className="mb-6 rounded-2xl border-2 border-emerald-300 bg-emerald-50/40 p-6 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-emerald-700"><CalendarClock className="h-3.5 w-3.5" /> À déclarer maintenant</div>
+                  <div className="mt-1 text-lg font-bold capitalize text-zinc-900">{aDeclarer.libelle}</div>
+                  <div className="text-[11px] text-zinc-500">échéance URSSAF indicative ≈ {dateFr(aDeclarer.echeanceIndicative)}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-3xl font-bold tabular-nums text-emerald-700">{euros(aDeclarer.caCents)}</div>
+                  <div className="text-[11px] text-zinc-500">à recopier · {aDeclarer.cotisationsCents === null ? "cotisations : saisis ton taux" : `cotisations ≈ ${euros(aDeclarer.cotisationsCents)}`}</div>
+                </div>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button onClick={() => copier(`tete-${aDeclarer.cle}`, aDeclarer.caCents)} className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-zinc-800">
+                  {copie === `tete-${aDeclarer.cle}` ? <><Check className="h-4 w-4 text-emerald-400" /> {Math.round(aDeclarer.caCents / 100)} € copié</> : <><Copy className="h-4 w-4" /> Copier le montant</>}
+                </button>
+                <a href={URSSAF} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50">
+                  Déclarer sur l&apos;URSSAF <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* Historique des périodes */}
+          <div className="mb-3 flex items-center gap-2 text-sm font-bold text-zinc-900"><CalendarClock className="h-4 w-4 text-zinc-400" /> Toutes les périodes ({periodicite})</div>
           {periodes.length === 0 ? (
             <p className="mb-6 rounded-2xl border border-zinc-100 bg-white p-5 text-sm text-zinc-400 shadow-sm">Aucune période commencée pour {annee}.</p>
           ) : (
