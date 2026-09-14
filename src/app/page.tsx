@@ -499,7 +499,7 @@ export default function LandingPage() {
               redoutait la tour « au milieu, derrière le bouton Essai » : le bandeau sombre du
               haut la couvre déjà, et la composition iconique vaut ce léger recouvrement.
             */
-            className="absolute inset-0 h-full w-full object-cover object-[70%_50%] lg:object-[65%_50%]"
+            className="absolute inset-0 h-full w-full object-cover object-[64%_50%] lg:object-[65%_50%]"
           />
         </picture>
         {/* ⚠️ ALLÉGÉS DE NOUVEAU LE 10/09/2026, sur un constat de Cyprien : la nouvelle photo
@@ -593,7 +593,14 @@ export default function LandingPage() {
                 750 px alors que la première silhouette commence vers 738. `max-w-lg` la
                 ramène à 688 px — le texte s'arrête avant les coureurs, sans dépendre du
                 voile pour rester lisible. */}
-            <p className="mt-6 max-w-lg text-[17px] leading-relaxed text-white [text-shadow:0_1px_14px_rgba(0,0,0,0.88)]">
+            {/* ⚠️ DEUX SOUS-TITRES, ET C'EST VOULU (retour de Cyprien, 14/09/2026). Sur mobile,
+                le paragraphe complet couvrait les coureurs et « faisait chargé » : on n'affiche
+                qu'UNE phrase courte, qui laisse le sujet respirer. Le paragraphe complet reste
+                sur desktop, où la colonne de texte tient à gauche des silhouettes. */}
+            <p className="mt-5 max-w-lg text-[16px] leading-relaxed text-white [text-shadow:0_1px_14px_rgba(0,0,0,0.88)] sm:hidden">
+              {L.hero.subtitleShort}
+            </p>
+            <p className="mt-6 hidden max-w-lg text-[17px] leading-relaxed text-white [text-shadow:0_1px_14px_rgba(0,0,0,0.88)] sm:block">
               {L.hero.subtitle}
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">

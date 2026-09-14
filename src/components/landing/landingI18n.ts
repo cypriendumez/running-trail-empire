@@ -16,7 +16,7 @@ export type LandingDict = {
   // mise en page qui imposait 64 px disparaît.
   // ⚠️ Le nom se découpe PAC·EVO (« Pace » + « Evo(lution) », qui partagent le E) — pas
   // « Pace + VO₂max », contresens d'une version antérieure de ce fichier.
-  hero: { titleA: string; titleB: string; accent: string; subtitle: string; ctaPrimary: string };
+  hero: { titleA: string; titleB: string; accent: string; subtitle: string; subtitleShort: string; ctaPrimary: string };
   // `sync` a quitté le hero, où ce n'était qu'un mot pâle (« Synchro ») suivi de cinq
   // marques sous le bouton. Devenue une bande à part entière, la synchronisation mérite
   // un titre ET une note : six logos sans explication posent plus de questions qu'ils
@@ -71,7 +71,7 @@ export const CATEGORY_CODES = ["ALL", "10KM", "SEMI", "MARATHON", "TRAIL", "BEGI
 
 const fr: LandingDict = {
   nav: { programs: "Programmes", features: "Fonctionnalités", pricing: "Tarifs", blog: "Blog", reviews: "Avis", story: "Notre histoire", login: "Connexion", trial: "Essai gratuit" },
-  hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "Ta montre mesure déjà tout : VFC, sommeil, charge, allures. Pacevo en fait une séance — durée, intensité, récupération — recalculée à chaque synchronisation.", ctaPrimary: "Commencer gratuitement" },
+  hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "Ta montre mesure déjà tout : VFC, sommeil, charge, allures. Pacevo en fait une séance — durée, intensité, récupération — recalculée à chaque synchronisation.", subtitleShort: "Ta séance du jour, recalculée à chaque synchro.", ctaPrimary: "Commencer gratuitement" },
   sync: { title: "Synchronisation avec", read: "Lecture de tes données :", readValue: "les {n} plateformes.", push: "Envoi de la séance sur ta montre :", pushBridge: "Envoi sur {marque} :", pushBridgeValue: "via l'application iOS {app}.", pushApp: "Envoi vers une application d'entraînement :", note: "Tout passe par intervals.icu, qui gère les connexions officielles de chaque constructeur. Pacevo n'accède jamais directement à tes comptes. * Apple Watch n'a aucune connexion officielle — une application iOS tierce (Intervals Companion) fait les deux sens : elle envoie tes séances vers intervals.icu et convertit le plan pour ta montre." },
   stats: { races: "Courses à venir", routes: "Parcours cartographiés", plan: "De plan glissant", replan: "Chaussures comparées" },
   programs: {
@@ -134,7 +134,7 @@ const fr: LandingDict = {
 
 const en: LandingDict = {
   nav: { programs: "Programs", features: "Features", pricing: "Pricing", blog: "Blog", reviews: "Reviews", story: "Our story", login: "Log in", trial: "Free trial" },
-  hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "Your watch already measures everything: HRV, sleep, load, paces. Pacevo turns it into a session — duration, intensity, recovery — recalculated on every sync.", ctaPrimary: "Start for free" },
+  hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "Your watch already measures everything: HRV, sleep, load, paces. Pacevo turns it into a session — duration, intensity, recovery — recalculated on every sync.", subtitleShort: "Your session of the day, recalculated on every sync.", ctaPrimary: "Start for free" },
   sync: { title: "Syncs with", read: "Reading your data:", readValue: "all {n} platforms.", push: "Sending the session to your watch:", pushBridge: "Sending to {marque}:", pushBridgeValue: "through the {app} iOS app.", pushApp: "Sending to a training app:", note: "Everything goes through intervals.icu, which handles each manufacturer's official connection. Pacevo never accesses your accounts directly. * Apple Watch has no official connection — a third-party iOS app (Intervals Companion) covers both directions: it sends your workouts to intervals.icu and converts the plan for your watch." },
   stats: { races: "Upcoming races", routes: "Mapped routes", plan: "Rolling plan", replan: "Shoes compared" },
   programs: {
@@ -197,7 +197,7 @@ const en: LandingDict = {
 
 const de: LandingDict = {
   nav: { programs: "Programme", features: "Funktionen", pricing: "Preise", blog: "Blog", reviews: "Bewertungen", story: "Unsere Geschichte", login: "Anmelden", trial: "Gratis testen" },
-  hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "Deine Uhr misst längst alles: HRV, Schlaf, Belastung, Tempo. Pacevo macht daraus eine Einheit — Dauer, Intensität, Erholung — bei jeder Synchronisation neu berechnet.", ctaPrimary: "Kostenlos starten" },
+  hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "Deine Uhr misst längst alles: HRV, Schlaf, Belastung, Tempo. Pacevo macht daraus eine Einheit — Dauer, Intensität, Erholung — bei jeder Synchronisation neu berechnet.", subtitleShort: "Deine Einheit des Tages, bei jeder Synchronisation neu berechnet.", ctaPrimary: "Kostenlos starten" },
   sync: { title: "Synchronisiert mit", read: "Deine Daten lesen:", readValue: "alle {n} Plattformen.", push: "Einheit auf deine Uhr senden:", pushBridge: "Senden an {marque}:", pushBridgeValue: "über die iOS-App {app}.", pushApp: "An eine Trainings-App senden:", note: "Alles läuft über intervals.icu, das die offiziellen Verbindungen jedes Herstellers verwaltet. Pacevo greift nie direkt auf deine Konten zu. * Die Apple Watch hat keine offizielle Verbindung — eine iOS-App von Drittanbietern (Intervals Companion) deckt beide Richtungen ab: Sie sendet deine Einheiten an intervals.icu und wandelt den Plan für deine Uhr um." },
   stats: { races: "Kommende Rennen", routes: "Kartierte Strecken", plan: "Rollierender Plan", replan: "Schuhe im Vergleich" },
   programs: {
@@ -260,7 +260,7 @@ const de: LandingDict = {
 
 const es: LandingDict = {
   nav: { programs: "Programas", features: "Funciones", pricing: "Precios", blog: "Blog", reviews: "Opiniones", story: "Nuestra historia", login: "Iniciar sesión", trial: "Prueba gratis" },
-  hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "Tu reloj ya lo mide todo: VFC, sueño, carga, ritmos. Pacevo lo convierte en una sesión — duración, intensidad, recuperación — recalculada en cada sincronización.", ctaPrimary: "Empezar gratis" },
+  hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "Tu reloj ya lo mide todo: VFC, sueño, carga, ritmos. Pacevo lo convierte en una sesión — duración, intensidad, recuperación — recalculada en cada sincronización.", subtitleShort: "Tu sesión del día, recalculada en cada sincronización.", ctaPrimary: "Empezar gratis" },
   sync: { title: "Sincroniza con", read: "Lectura de tus datos:", readValue: "las {n} plataformas.", push: "Envío de la sesión a tu reloj:", pushBridge: "Envío al {marque}:", pushBridgeValue: "a través de la app para iOS {app}.", pushApp: "Envío a una app de entrenamiento:", note: "Todo pasa por intervals.icu, que gestiona las conexiones oficiales de cada fabricante. Pacevo nunca accede directamente a tus cuentas. * El Apple Watch no tiene conexión oficial — una app iOS de terceros (Intervals Companion) cubre ambos sentidos: envía tus sesiones a intervals.icu y convierte el plan para tu reloj." },
   stats: { races: "Carreras próximas", routes: "Rutas cartografiadas", plan: "De plan deslizante", replan: "Zapatillas comparadas" },
   programs: {
@@ -323,7 +323,7 @@ const es: LandingDict = {
 
 const pt: LandingDict = {
   nav: { programs: "Programas", features: "Funcionalidades", pricing: "Preços", blog: "Blog", reviews: "Avaliações", story: "A nossa história", login: "Entrar", trial: "Teste grátis" },
-  hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "O teu relógio já mede tudo: VFC, sono, carga, ritmos. A Pacevo transforma isso num treino — duração, intensidade, recuperação — recalculado a cada sincronização.", ctaPrimary: "Começar grátis" },
+  hero: { titleA: "Pace Your", titleB: "", accent: "Evolution", subtitle: "O teu relógio já mede tudo: VFC, sono, carga, ritmos. A Pacevo transforma isso num treino — duração, intensidade, recuperação — recalculado a cada sincronização.", subtitleShort: "O teu treino do dia, recalculado a cada sincronização.", ctaPrimary: "Começar grátis" },
   sync: { title: "Sincroniza com", read: "Leitura dos teus dados:", readValue: "as {n} plataformas.", push: "Envio do treino para o teu relógio:", pushBridge: "Envio para o {marque}:", pushBridgeValue: "através da app iOS {app}.", pushApp: "Envio para uma app de treino:", note: "Tudo passa pelo intervals.icu, que gere as ligações oficiais de cada fabricante. A Pacevo nunca acede diretamente às tuas contas. * O Apple Watch não tem ligação oficial — uma app iOS de terceiros (Intervals Companion) cobre ambos os sentidos: envia os teus treinos para o intervals.icu e converte o plano para o teu relógio." },
   stats: { races: "Provas futuras", routes: "Percursos cartografados", plan: "De plano deslizante", replan: "Ténis comparados" },
   programs: {
