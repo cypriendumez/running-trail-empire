@@ -419,7 +419,7 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
                   <Field label={t("set.lang.label")}>
                     <select value={lang} onChange={(e) => changeLang(e.target.value as Lang)} className={inputCls}>
                       {languageOptions.map((o) => (
-                        <option key={o.value} value={o.value}>{o.flag} {o.label}</option>
+                        <option key={o.value} value={o.value}>{o.value.toUpperCase()} · {o.label}</option>
                       ))}
                     </select>
                   </Field>

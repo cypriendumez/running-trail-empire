@@ -40,7 +40,9 @@ export function LanguageSwitcher({ light = false, className = "" }: { light?: bo
               onClick={() => { setLang(l.code); setOpen(false); router.refresh(); }}
               className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-zinc-700 transition-colors hover:bg-zinc-50"
             >
-              <span>{l.flag}</span>
+              {/* Badge de code langue plutôt qu'un drapeau emoji : rendu identique sur tous
+                  les OS (Windows n'affiche pas les drapeaux), et une langue n'est pas un pays. */}
+              <span className="inline-flex h-5 w-7 flex-shrink-0 items-center justify-center rounded-md bg-zinc-100 text-[10px] font-bold tracking-wide text-zinc-500">{l.code.toUpperCase()}</span>
               <span className="flex-1">{l.label}</span>
               {l.code === lang && <Check className="h-4 w-4 text-[#059669]" />}
             </button>
