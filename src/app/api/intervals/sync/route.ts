@@ -42,7 +42,13 @@ export async function GET(req: Request) {
   const API_KEY = ids?.apiKey;
 
   if (!ATHLETE_ID || !API_KEY) {
-    return NextResponse.json({ error: "Intervals.icu non configuré — ajoutez vos identifiants dans l'onglet Configuration" }, { status: 503 });
+    // ⚠️ PAS DE MONTRE N'EST PAS UNE PANNE. Cette route renvoyait 503 — « service
+    // indisponible » — pour un athlète qui n'a simplement jamais branché sa montre,
+    // c'est-à-dire la majorité au lancement. `AutoSync` l'appelant à chaque affichage du
+    // tableau de bord, ce faux 503 remontait dans le journal des bugs comme un défaut de
+    // production. Un état de compte normal se répond 200 avec un drapeau, pas par un
+    // code d'erreur serveur. Les appelants lisent `configured`/`synced`.
+    return NextResponse.json({ ok: false, configured: false, reason: "non_configuré", synced: { workouts: 0, hrv: 0, sleep: 0 } });
   }
 
   // ── Fetch ICU data + existing DB workouts in parallel ──────

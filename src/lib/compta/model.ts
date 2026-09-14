@@ -142,6 +142,15 @@ export type Reglages = {
   seuilCA?: number;
   /** Solde du compte au démarrage du suivi, en centimes (peut être négatif). */
   soldeInitialCents?: number;
+  /**
+   * Rythme de déclaration URSSAF en micro-entreprise, CHOISI À L'INSCRIPTION.
+   * Ne change rien au calcul du CA, seulement le découpage des périodes à déclarer.
+   */
+  periodiciteUrssaf?: "mensuel" | "trimestriel";
+  /** Identité déclarative, SAISIE PAR L'ÉDITEUR (affichée, jamais devinée). Vide au départ. */
+  siret?: string;
+  /** Régime déclaré, en clair : « micro-entreprise (BNC) », etc. Purement informatif. */
+  regime?: string;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

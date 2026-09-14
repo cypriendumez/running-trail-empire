@@ -36,15 +36,38 @@ export type GroupeErreur = {
   exemple: { stack: string | null; meta: unknown; user_agent: string | null; url: string | null };
 };
 
+const ROBOT_UA = /bot|crawl|spider|slurp|headless|curl\/|wget\/|python-requests|go-http-client|java\/|okhttp|axios|node-fetch|monitor|uptime/i;
+
 /**
- * Ce qui vient d'un poste de développement n'est pas un bug rencontré par un utilisateur.
- * ⚠️ Filtré à l'AFFICHAGE, jamais à l'écriture : le journal reste complet.
+ * CE QUI N'EST NI UN BUG NI ACTIONNABLE — masqué par défaut, jamais effacé (filtre à
+ * l'AFFICHAGE, le journal reste complet). Quatre familles, toutes constatées le
+ * 14/09/2026 en confrontant l'onglet aux vraies lignes :
+ *
+ *  1. DÉVELOPPEMENT : localhost, pages `/preview-*`, le mot « preview ».
+ *  2. DÉPLOIEMENTS *.vercel.app : l'ancien domaine et les prévisualisations. La
+ *     production est pacevo.fr ; une erreur datée d'avant la bascule n'a plus de site
+ *     où être reproduite.
+ *  3. SCANS : un `curl` a posté « x » à `/api/log-error` (url « u », agent curl). Ce
+ *     n'est pas un athlète, c'est du bruit d'attaque.
+ *  4. « Script error. » OPAQUE : le navigateur masque les erreurs venues d'un script
+ *     tiers (extension, injection) derrière ce message unique, sans fichier ni ligne
+ *     (`file:""`). Rien dans notre code ne peut la reproduire ni la corriger.
  */
-export function estBruitDeDev(l: Pick<LigneErreur, "url" | "message" | "source">): boolean {
+export function estBruitDeDev(l: Pick<LigneErreur, "url" | "message" | "user_agent" | "meta">): boolean {
   const url = String(l.url ?? "");
+  const message = String(l.message ?? "").trim();
+  // 1. Développement local et bancs d'essai.
   if (/^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?/i.test(url)) return true;
   if (/^https?:\/\/[^/]+\/preview-/i.test(url)) return true;
-  if (String(l.message ?? "").trim().toLowerCase() === "preview") return true;
+  if (message.toLowerCase() === "preview") return true;
+  // 2. Anciens déploiements et prévisualisations Vercel (la prod est pacevo.fr).
+  try { if (/\.vercel\.app$/i.test(new URL(url).hostname)) return true; } catch { /* url non standard : voir plus bas */ }
+  // 3. Scans : agent robot/curl, ou une url qui n'est même pas une adresse http.
+  if (ROBOT_UA.test(String(l.user_agent ?? ""))) return true;
+  if (url && !/^https?:\/\//i.test(url)) return true;
+  // 4. « Script error. » cross-origin, sans fichier : non diagnosticable.
+  const fichier = (l.meta as { file?: unknown } | null)?.file;
+  if (message.toLowerCase() === "script error." && !fichier) return true;
   return false;
 }
 

@@ -1,15 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Users, Activity, Crown, Search, Mail, BarChart3, TrendingUp, Watch, Send, CheckCircle2, AlertCircle, ChevronRight, Zap, UserCheck, RefreshCw, Calendar, Hash, Wallet, Bug, Eye,
+import { Users, Activity, Crown, Search, Mail, BarChart3, TrendingUp, Watch, Send, CheckCircle2, AlertCircle, ChevronRight, Zap, UserCheck, RefreshCw, Calendar, Hash, Wallet, Bug, Eye, Landmark,
 } from "lucide-react";
+
 import { Logo } from "@/components/brand/Logo";
 import { ConversationClient } from "@/components/admin/ConversationClient";
 import { ComptaClient } from "@/components/admin/ComptaClient";
 import { BugsPanel } from "@/components/admin/BugsPanel";
 import { VisitesPanel } from "@/components/admin/VisitesPanel";
+import { MicroPanel } from "@/components/admin/MicroPanel";
 
-type Onglet = "users" | "stats" | "bugs" | "visites" | "compta";
+type Onglet = "users" | "stats" | "bugs" | "visites" | "compta" | "micro";
 
 interface User {
   id: string;
@@ -207,6 +209,7 @@ export function AdminDashboard({ users }: { users: User[] }) {
             { key: "bugs", label: "Bugs", icon: Bug },
             { key: "visites", label: "Visites", icon: Eye },
             { key: "compta", label: "Comptabilité", icon: Wallet },
+            { key: "micro", label: "Micro-entreprise", icon: Landmark },
           ].map(({ key, label, icon: Icon }) => (
             <button key={key} onClick={() => setTab(key as Onglet)}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -226,6 +229,7 @@ export function AdminDashboard({ users }: { users: User[] }) {
           comptable au montage. Le rendre en permanence ferait une requête sur le chiffre
           d'affaires à chaque ouverture de l'espace coach, pour un écran non regardé. */}
       {tab === "compta" && <ComptaClient />}
+      {tab === "micro" && <MicroPanel />}
 
       {/* Même règle : chaque panneau interroge son journal au montage, donc il n'est rendu
           que sous l'onglet actif. */}

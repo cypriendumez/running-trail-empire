@@ -78,7 +78,7 @@ export function BugsPanel() {
             ))}
           </div>
           <label htmlFor="bugs-bruit" className="flex cursor-pointer items-center gap-1.5 text-xs text-zinc-500">
-            <input id="bugs-bruit" type="checkbox" checked={bruit} onChange={(e) => setBruit(e.target.checked)} className="accent-zinc-700" /> bruit de dev
+            <input id="bugs-bruit" type="checkbox" checked={bruit} onChange={(e) => setBruit(e.target.checked)} className="accent-zinc-700" /> tout afficher
           </label>
           <button onClick={charger} className="rounded-lg border border-zinc-200 bg-white p-2 text-zinc-500 hover:bg-zinc-50" title="Recharger">
             <RefreshCw className={`h-4 w-4 ${chargement ? "animate-spin" : ""}`} />
@@ -118,7 +118,7 @@ export function BugsPanel() {
           <div className="flex items-center gap-2 px-6 py-10 text-sm text-zinc-400"><Loader2 className="h-4 w-4 animate-spin" /> Lecture du journal…</div>
         ) : groupes.length === 0 ? (
           <div className="px-6 py-10 text-center text-sm text-zinc-400">
-            {erreur ? "—" : `Aucune erreur enregistrée sur ${jours} jours${bruit ? "" : " (bruit de développement masqué)"}.`}
+            {erreur ? "—" : `Aucun bug sur ${jours} jours${bruit ? "" : " (bruit technique masqué : dev, scans, erreurs de scripts tiers)"}.`}
           </div>
         ) : (
           <ul className="divide-y divide-zinc-50">

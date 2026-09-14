@@ -66,6 +66,16 @@ interface Props {
   /** État d'abonnement, déduit du profil (lib/billing/access). */
   acces?: EtatAcces | null;
   /**
+   * ⚠️ LE JOUR CIVIL DE L'ATHLÈTE, calculé UNE FOIS côté serveur (dans son fuseau).
+   * Le bandeau affichait `new Date().toLocaleDateString(lang)` : `new Date()` est évalué
+   * au rendu — un instant côté serveur (iad1, USA), un autre à l'hydratation (France) —
+   * et sans `timeZone` le serveur formatait en heure américaine. Entre minuit et 6 h à
+   * Paris, il rendait encore la veille : le texte différait de celui du navigateur, d'où
+   * l'erreur React #418 (96 % des occurrences sur cette plage). On reçoit donc un jour
+   * FIXE et on le met en forme avec `formatDateCivile`, déterministe des deux côtés.
+   */
+  jourAujourdhui?: string;
+  /**
    * Les lectures qui ont RÉELLEMENT échoué (identifiants stables, traduits ici).
    * Vide dans le cas normal — y compris pour un compte sans historique : une absence
    * de données n'est pas une panne.
@@ -151,7 +161,7 @@ const HR_ZONE_DEFS = [
 
 // La forme du jour est calculée à partir de données réelles : voir computeReadiness().
 
-export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkouts, chargeHistory, sleep, coachSession, pendingFeedback, objective, currentVma, loadRisk, newMembersWeek, streak, acces, donneesIncompletes }: Props) {
+export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkouts, chargeHistory, sleep, coachSession, pendingFeedback, objective, currentVma, loadRisk, newMembersWeek, streak, acces, donneesIncompletes, jourAujourdhui }: Props) {
   const { t, lang } = useT();
   const state = hrv[0]?.physiological_state ?? "optimal";
 
@@ -519,7 +529,9 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
         <div className="relative z-10 flex flex-wrap items-center justify-between gap-x-10 gap-y-7 px-6 py-7 sm:px-9 sm:py-8 xl:pr-[34%]">
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#6e8a86] first-letter:uppercase">
-              {new Date().toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long" })}
+              {jourAujourdhui
+                ? formatDateCivile(jourAujourdhui, lang, { weekday: "long", day: "numeric", month: "long" })
+                : new Date().toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long" })}
             </p>
             <h1 className="mt-2 text-[2rem] font-bold tracking-tight text-[#11201d] sm:text-[2.5rem]">
               {t("dash.greeting")}, {profile?.full_name?.split(" ")[0] ?? t("dash.champion")}

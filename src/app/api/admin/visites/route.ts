@@ -32,13 +32,16 @@ export async function GET(req: Request) {
   const jours = (JOURS as readonly number[]).includes(Number(u.searchParams.get("jours"))) ? Number(u.searchParams.get("jours")) : 30;
   const au = aujourdhui(FUSEAU_DEFAUT);
   const du = new Date(new Date(`${au}T12:00:00Z`).getTime() - (jours - 1) * 864e5).toISOString().slice(0, 10);
+  // On lit AUSSI la période précédente de même longueur : la tendance (+/- %) se calcule
+  // dans `agregerVisites`, qui reçoit les deux tranches et n'en expose qu'une.
+  const duLecture = new Date(new Date(`${du}T12:00:00Z`).getTime() - jours * 864e5).toISOString().slice(0, 10);
 
   const admin = createAdminClient();
   const lignes: LigneVisite[] = [];
   for (let debut = 0; debut < LIGNES_MAX; debut += PAS) {
     const { data, error } = await admin.from("visites")
-      .select("jour, chemin, espace, visiteur, compte, connecte, appareil, langue, pays, referent")
-      .gte("jour", du)
+      .select("jour, chemin, espace, visiteur, compte, connecte, appareil, langue, pays, referent, created_at")
+      .gte("jour", duLecture)
       .order("id", { ascending: true })
       .range(debut, debut + PAS - 1);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -48,7 +51,7 @@ export async function GET(req: Request) {
   }
 
   return NextResponse.json({
-    ...agregerVisites(lignes, { du, au }),
+    ...agregerVisites(lignes, { du, au, tz: FUSEAU_DEFAUT }),
     lues: lignes.length,
     tronque: lignes.length >= LIGNES_MAX,
   });

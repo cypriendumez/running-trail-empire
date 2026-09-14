@@ -159,6 +159,10 @@ export async function PATCH(req: Request) {
       tauxApresAcre: typeof r.tauxApresAcre === "number" && r.tauxApresAcre >= 0 && r.tauxApresAcre <= 100 ? r.tauxApresAcre : undefined,
       seuilCA: typeof r.seuilCA === "number" && r.seuilCA > 0 ? r.seuilCA : undefined,
       soldeInitialCents: Number.isInteger(r.soldeInitialCents) ? r.soldeInitialCents : undefined,
+      // Micro-entreprise : rythme de déclaration + identité déclarative (saisie, jamais devinée).
+      periodiciteUrssaf: r.periodiciteUrssaf === "mensuel" || r.periodiciteUrssaf === "trimestriel" ? r.periodiciteUrssaf : undefined,
+      siret: typeof r.siret === "string" && r.siret.trim() ? r.siret.trim().replace(/\s+/g, "").slice(0, 20) : undefined,
+      regime: typeof r.regime === "string" && r.regime.trim() ? r.regime.trim().slice(0, 80) : undefined,
     };
     // ⚠️ Même piège qu'ailleurs : une lecture en échec passe pour « aucun réglage »,
     // on insère une seconde ligne, et la lecture des réglages (l. 83, `maybeSingle`)

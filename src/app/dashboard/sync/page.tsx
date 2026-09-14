@@ -211,6 +211,9 @@ export default function SyncPage() {
         const res = await fetch(`/api/intervals/sync?oldest=${oldest}&newest=${newest}`);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? d["err.sync"]);
+        // « Pas de montre » se répond maintenant 200 avec un drapeau (ce n'est pas une
+        // panne) : on affiche quand même le message, l'utilisateur a cliqué exprès.
+        if (data.configured === false) throw new Error(d["err.notConfigured"] ?? d["err.sync"]);
         totals.workouts += data.synced?.workouts ?? 0;
         totals.hrv += data.synced?.hrv ?? 0;
         totals.sleep += data.synced?.sleep ?? 0;

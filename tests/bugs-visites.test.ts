@@ -95,17 +95,36 @@ test("les occurrences d'un même défaut sont regroupées malgré les identifian
   assert.ok(!g[0].message.includes("a3793412"), "l'identifiant n'a pas été normalisé");
 });
 
-test("le bruit de développement est masqué par défaut, jamais perdu", () => {
-  const lignes = [
-    ligne({ url: "http://localhost:3000/preview-dash-tmp", message: "computeHrZones is not defined" }),
-    ligne({ url: "https://pacevo.fr/preview-cal-tmp", message: "ChevronDown is not defined" }),
-    ligne({ message: "preview" }),
-    ligne({ message: "vrai bug" }),
+test("le bruit technique est masqué par défaut, jamais perdu — et un vrai bug reste", () => {
+  const bruit = [
+    ligne({ url: "http://localhost:3000/preview-dash-tmp", message: "computeHrZones is not defined" }), // dev
+    ligne({ url: "https://pacevo.fr/preview-cal-tmp", message: "ChevronDown is not defined" }),          // banc d'essai
+    ligne({ message: "preview" }),                                                                        // marqueur preview
+    ligne({ url: "https://running-trail-empire-woad.vercel.app/dashboard/segments", message: "erreur ancienne" }), // ancien domaine
+    ligne({ url: "u", message: "x", user_agent: "curl/8.6.0" }),                                          // scan
+    ligne({ url: "https://pacevo.fr/dashboard/profile", message: "Script error.", meta: { file: "", line: 0 } }), // opaque
   ];
-  assert.equal(regrouperErreurs(lignes).length, 1, "seul le vrai bug doit rester");
-  assert.equal(regrouperErreurs(lignes, { masquerBruit: false }).length, 4, "avec le bruit, tout doit être là");
-  assert.equal(estBruitDeDev({ url: "https://pacevo.fr/dashboard", message: "Script error.", source: "client" }), false);
+  const vrai = ligne({ url: "https://pacevo.fr/dashboard", message: "vrai bug", user_agent: "Mozilla/5.0 (iPhone)" });
+  const tout = [...bruit, vrai];
+  assert.equal(regrouperErreurs(tout).length, 1, "seul le vrai bug doit rester");
+  assert.equal(regrouperErreurs(tout)[0].message, "vrai bug");
+  assert.equal(regrouperErreurs(tout, { masquerBruit: false }).length, tout.length, "avec le bruit, tout doit être là");
+  // Chaque famille de bruit, une par une.
+  for (const l of bruit) assert.equal(estBruitDeDev(l), true, `« ${l.message} » (${l.url}) devrait être du bruit`);
+  // ⚠️ Une VRAIE erreur de prod avec un fichier n'est PAS du bruit — même si c'est « Script error. »
+  //    ailleurs : c'est l'absence de fichier (cross-origin) qui la rend opaque, pas le message.
+  assert.equal(estBruitDeDev({ url: "https://pacevo.fr/dashboard", message: "Script error.", meta: { file: "app.js", line: 12 } }), false, "une Script error AVEC fichier reste actionnable");
+  assert.equal(estBruitDeDev({ url: "https://pacevo.fr/dashboard", message: "TypeError: x is not a function" }), false, "un vrai bug de prod ne doit pas être masqué");
   assert.equal(normaliserMessage("Minified React error #418; visit https://react.dev/errors/418?args[]=text"), "Minified React error #<n>; visit <url>");
+});
+
+test("le faux positif intervals/sync est corrigé : « pas de montre » n'est plus un 503", () => {
+  const src = codeNu("src/app/api/intervals/sync/route.ts");
+  assert.ok(/if \(!ATHLETE_ID \|\| !API_KEY\)/.test(src), "le garde « pas d'identifiants » a disparu");
+  // Le bloc « non configuré » ne doit plus répondre 503 (ni aucun ≥ 500 que le journal remonterait).
+  const bloc = /if \(!ATHLETE_ID \|\| !API_KEY\) \{([\s\S]*?)\n  \}/.exec(src)?.[1] ?? "";
+  assert.ok(/configured: false/.test(bloc), "la réponse ne porte plus le drapeau configured:false");
+  assert.ok(!/status: 5\d\d/.test(bloc), "« pas de montre » répond encore avec un code d'erreur serveur (le journal des bugs le remonterait)");
 });
 
 // ── 3. L'empreinte : jamais l'adresse, jamais deux jours de suite ────────────────
@@ -198,6 +217,28 @@ test("les jours sans visite existent (à zéro), les comptes actifs sont distinc
   assert.equal(joursEntre("2026-12-30", "2027-01-02").length, 4, "le passage d'année est mal compté");
 });
 
+test("l'affluence horaire est calculée dans le fuseau de l'éditeur, pas celui du serveur", () => {
+  const v = (p: Partial<LigneVisite>): LigneVisite => ({ jour: "2026-09-14", chemin: "/", espace: "site", visiteur: "a", ...p });
+  // 23:30 UTC le 14 = 01:30 le 15 à Paris (été, +2). Le fuseau doit ranger la vue à 1 h, pas 23 h.
+  const a = agregerVisites([
+    v({ created_at: "2026-09-14T23:30:00Z", visiteur: "n1" }),
+    v({ created_at: "2026-09-14T23:45:00Z", visiteur: "n2" }),
+    v({ created_at: "2026-09-14T08:00:00Z", visiteur: "m1" }), // 10 h à Paris
+  ], { du: "2026-09-14", au: "2026-09-15", tz: "Europe/Paris" });
+  assert.equal(a.heures.length, 24);
+  assert.equal(a.heures[1].vues, 2, "les deux vues de 23:30/23:45 UTC tombent à 1 h de Paris");
+  assert.equal(a.heures[10].vues, 1, "la vue de 08:00 UTC tombe à 10 h de Paris");
+  assert.equal(a.heures[23].vues, 0, "aucune vue à 23 h de Paris — sinon le fuseau du serveur a fui");
+});
+
+test("la tendance compare à la période précédente de même longueur", () => {
+  const v = (jour: string): LigneVisite => ({ jour, chemin: "/", espace: "site", visiteur: `x${jour}` });
+  // Période courante 10-11 (2 vues), précédente 08-09 (1 vue).
+  const a = agregerVisites([v("2026-09-08"), v("2026-09-10"), v("2026-09-11")], { du: "2026-09-10", au: "2026-09-11" });
+  assert.equal(a.total.vues, 2, "période courante");
+  assert.equal(a.precedent.vues, 1, "période précédente (08-09) — une seule vue le 08");
+});
+
 // ── 5. Les appels réseau qui répondent mal ───────────────────────────────────────
 test("seuls les appels qui révèlent un bug sont journalisés — jamais les balises elles-mêmes", () => {
   const H = "abc.supabase.co";
@@ -257,6 +298,9 @@ test("l'espace coach a ses deux onglets et la politique de confidentialité dit 
   const admin = readFileSync("src/components/admin/AdminDashboard.tsx", "utf8");
   assert.ok(/key: "bugs"/.test(admin) && /<BugsPanel \/>/.test(admin), "onglet Bugs absent");
   assert.ok(/key: "visites"/.test(admin) && /<VisitesPanel \/>/.test(admin), "onglet Visites absent");
+  assert.ok(/key: "micro"/.test(admin) && /<MicroPanel \/>/.test(admin), "onglet Micro-entreprise absent");
+  // L'onglet Micro-entreprise vient APRÈS Comptabilité.
+  assert.ok(admin.indexOf('key: "compta"') < admin.indexOf('key: "micro"'), "Micro-entreprise doit suivre Comptabilité");
   const legal = readFileSync("src/app/legalI18n.ts", "utf8");
   for (const mot of ["Mesure d'audience", "Audience measurement", "Reichweitenmessung", "Medición de audiencia", "Medição de audiência"]) {
     assert.ok(legal.includes(mot), `la politique de confidentialité ne mentionne plus la mesure d'audience (« ${mot} »)`);

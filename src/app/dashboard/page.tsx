@@ -189,6 +189,7 @@ export default async function DashboardPage() {
       newMembersWeek={newMembersWeek}
       streak={streak}
       acces={acces}
+      jourAujourdhui={streakToday}
     />
     </>
   );
