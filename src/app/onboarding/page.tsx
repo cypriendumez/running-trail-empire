@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { vmaFrom6min } from "@/lib/running/fitness";
-import { ArrowRight, ArrowLeft, User, Activity, Target, CheckCircle2, Watch, Eye, EyeOff, ExternalLink, RefreshCw, AlertCircle, Wifi } from "lucide-react";
+import { ArrowRight, ArrowLeft, User, Activity, Target, CheckCircle2, Watch, Eye, EyeOff, ExternalLink, RefreshCw, AlertCircle, Wifi, Globe, Mountain, Key } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -312,7 +312,7 @@ export default function OnboardingPage() {
             {STEPS.slice(0, -1).map((s, i) => (
               <div key={s} className="flex items-center gap-2 flex-1">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-all ${
-                  i < stepIdx ? "bg-emerald-500 text-white" : i === stepIdx ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-400"
+                  i < stepIdx ? "bg-emerald-500 text-white" : i === stepIdx ? "bg-emerald-600 text-white" : "bg-zinc-100 text-zinc-400"
                 }`}>
                   {i < stepIdx ? <CheckCircle2 className="w-4 h-4" /> : i + 1}
                 </div>
@@ -370,7 +370,7 @@ export default function OnboardingPage() {
                     {(["male","female","other"] as const).map(g => (
                       <button key={g} type="button" onClick={() => setProfile(p => ({...p, gender: g}))}
                         className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-all ${
-                          profile.gender === g ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"
+                          profile.gender === g ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"
                         }`}>
                         {g === "male" ? tr("male") : g === "female" ? tr("female") : tr("other")}
                       </button>
@@ -384,7 +384,7 @@ export default function OnboardingPage() {
                     {[{v:"morning",l:tr("morning")},{v:"neutral",l:tr("neutral")},{v:"evening",l:tr("evening")}].map(c => (
                       <button key={c.v} onClick={() => setProfile(p => ({...p, chronotype: c.v as typeof p.chronotype}))}
                         className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-all ${
-                          profile.chronotype === c.v ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200"
+                          profile.chronotype === c.v ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-zinc-600 border-zinc-200"
                         }`}>
                         {c.l}
                       </button>
@@ -398,7 +398,7 @@ export default function OnboardingPage() {
                     <div className="grid grid-cols-3 gap-1.5">
                       {[5,10,15,20,25,30].map(m => (
                         <button key={m} type="button" onClick={() => setProfile(p => ({...p, warmup_min: m}))}
-                          className={`py-2 rounded-xl text-sm font-medium border transition-all ${profile.warmup_min === m ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                          className={`py-2 rounded-xl text-sm font-medium border transition-all ${profile.warmup_min === m ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
                           {m} min
                         </button>
                       ))}
@@ -409,7 +409,7 @@ export default function OnboardingPage() {
                     <div className="grid grid-cols-3 gap-1.5">
                       {[5,10,15,20,25,30].map(m => (
                         <button key={m} type="button" onClick={() => setProfile(p => ({...p, cooldown_min: m}))}
-                          className={`py-2 rounded-xl text-sm font-medium border transition-all ${profile.cooldown_min === m ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                          className={`py-2 rounded-xl text-sm font-medium border transition-all ${profile.cooldown_min === m ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
                           {m} min
                         </button>
                       ))}
@@ -423,7 +423,7 @@ export default function OnboardingPage() {
                   <div className="flex gap-2">
                     {([["run", tr("longRun")], ["bike", tr("longBike")]] as const).map(([v, l]) => (
                       <button key={v} type="button" onClick={() => setProfile(p => ({ ...p, long_run_mode: v as "run" | "bike" }))}
-                        className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition-all ${profile.long_run_mode === v ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition-all ${profile.long_run_mode === v ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
                         {l}
                       </button>
                     ))}
@@ -437,7 +437,7 @@ export default function OnboardingPage() {
                   <div className="grid grid-cols-3 gap-1.5">
                     {([[0, tr("exp0")], [1, tr("exp1")], [2, tr("exp2")], [4, tr("exp4")], [8, tr("exp8")], [12, tr("exp12")]] as const).map(([v, l]) => (
                       <button key={v} type="button" onClick={() => setProfile(p => ({ ...p, running_years: v }))}
-                        className={`py-2 rounded-xl text-sm font-medium border transition-all ${profile.running_years === v ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                        className={`py-2 rounded-xl text-sm font-medium border transition-all ${profile.running_years === v ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
                         {l}
                       </button>
                     ))}
@@ -451,7 +451,7 @@ export default function OnboardingPage() {
                   <div className="grid grid-cols-6 gap-1.5">
                     {[2, 3, 4, 5, 6, 7].map(n => (
                       <button key={n} type="button" onClick={() => setProfile(p => ({ ...p, days_per_week: n }))}
-                        className={`py-2 rounded-xl text-sm font-medium border transition-all ${profile.days_per_week === n ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                        className={`py-2 rounded-xl text-sm font-medium border transition-all ${profile.days_per_week === n ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
                         {n}×
                       </button>
                     ))}
@@ -468,7 +468,7 @@ export default function OnboardingPage() {
                       return (
                         <button key={d} type="button"
                           onClick={() => setProfile(p => ({ ...p, available_days: on ? p.available_days.filter(x => x !== d) : [...p.available_days, d] }))}
-                          className={`py-2 rounded-xl text-sm font-medium border transition-all ${on ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-400 border-zinc-200 hover:bg-zinc-50"}`}>
+                          className={`py-2 rounded-xl text-sm font-medium border transition-all ${on ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-zinc-400 border-zinc-200 hover:bg-zinc-50"}`}>
                           {tr("dayShort").split(",")[d]}
                         </button>
                       );
@@ -486,7 +486,7 @@ export default function OnboardingPage() {
                       return (
                         <button key={t.slug} type="button"
                           onClick={() => setProfile(p => ({ ...p, main_terrains: on ? p.main_terrains.filter(s => s !== t.slug) : [...p.main_terrains, t.slug] }))}
-                          className={`py-2 px-1.5 rounded-xl text-xs font-medium border transition-all ${on ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                          className={`py-2 px-1.5 rounded-xl text-xs font-medium border transition-all ${on ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
                           {terrainLabel(t, lang)}
                         </button>
                       );
@@ -501,7 +501,7 @@ export default function OnboardingPage() {
                   <div className="grid grid-cols-4 gap-1.5">
                     {([["evite", tr("elevEvite")], ["modere", tr("elevModere")], ["aime", tr("elevAime")], ["specialiste", tr("elevSpec")]] as const).map(([v, l]) => (
                       <button key={v} type="button" onClick={() => setProfile(p => ({ ...p, elevation_pref: v }))}
-                        className={`py-2 rounded-xl text-xs font-medium border transition-all ${profile.elevation_pref === v ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                        className={`py-2 rounded-xl text-xs font-medium border transition-all ${profile.elevation_pref === v ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
                         {l}
                       </button>
                     ))}
@@ -523,7 +523,7 @@ export default function OnboardingPage() {
                           const on = profile[key].includes(item.slug);
                           return (
                             <button key={item.slug} type="button" onClick={() => toggleHealth(key, item.slug)}
-                              className={`px-2.5 py-1.5 rounded-xl text-xs font-medium border transition-all ${on ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                              className={`px-2.5 py-1.5 rounded-xl text-xs font-medium border transition-all ${on ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
                               {healthLabel(item, lang)}
                             </button>
                           );
@@ -544,7 +544,7 @@ export default function OnboardingPage() {
                       placeholder={tr("notesPh")} rows={2} maxLength={500}
                       className="w-full px-3 py-2 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none" />
                   </div>
-                  <p className="text-[11px] text-zinc-400 leading-relaxed">⚕️ {tr("healthDisc")}</p>
+                  <p className="text-[11px] text-zinc-400 leading-relaxed">{tr("healthDisc")}</p>
                 </div>
 
                 {profile.gender === "female" && (
@@ -716,7 +716,7 @@ export default function OnboardingPage() {
                   {[tr("wsAccount"), tr("wsWatch"), tr("wsKey"), tr("wsConn")].map((label, i) => (
                     <div key={i} className="flex-1 flex flex-col items-center gap-1">
                       <div className={`h-1.5 w-full rounded-full transition-all ${
-                        i < watchSubStep ? "bg-emerald-400" : i === watchSubStep ? "bg-zinc-900" : "bg-zinc-100"
+                        i < watchSubStep ? "bg-emerald-400" : i === watchSubStep ? "bg-emerald-600" : "bg-zinc-100"
                       }`} />
                       <span className={`text-[10px] font-medium ${i === watchSubStep ? "text-zinc-900" : i < watchSubStep ? "text-emerald-600" : "text-zinc-300"}`}>
                         {i < watchSubStep ? "✓" : label}
@@ -731,7 +731,7 @@ export default function OnboardingPage() {
                     {/* STEP 0 — Compte Intervals.icu */}
                     {watchSubStep === 0 && (
                       <div className="space-y-4 py-2 text-center">
-                        <div className="text-5xl">🌐</div>
+                        <Globe className="mx-auto h-12 w-12 text-emerald-600" />
                         <div>
                           <p className="font-semibold text-zinc-900 text-base">{tr("w0Title")}</p>
                           <p className="text-xs text-zinc-500 mt-1.5 leading-relaxed">{tr("w0Desc")}</p>
@@ -744,12 +744,12 @@ export default function OnboardingPage() {
                           </div>
                           <ArrowRight className="w-4 h-4 text-zinc-300" />
                           <div className="flex flex-col items-center gap-1">
-                            <div className="w-12 h-12 bg-blue-50 border-2 border-blue-200 rounded-2xl flex items-center justify-center text-2xl">🌐</div>
+                            <div className="w-12 h-12 bg-blue-50 border-2 border-blue-200 rounded-2xl flex items-center justify-center"><Globe className="h-6 w-6 text-blue-500" /></div>
                             <span className="text-[10px] text-blue-500 font-semibold">{tr("w0Intervals")}</span>
                           </div>
                           <ArrowRight className="w-4 h-4 text-zinc-300" />
                           <div className="flex flex-col items-center gap-1">
-                            <div className="w-12 h-12 bg-emerald-50 border-2 border-emerald-200 rounded-2xl flex items-center justify-center text-2xl">🏔</div>
+                            <div className="w-12 h-12 bg-emerald-50 border-2 border-emerald-200 rounded-2xl flex items-center justify-center"><Mountain className="h-6 w-6 text-emerald-600" /></div>
                             <span className="text-[10px] text-emerald-600 font-semibold">{tr("w0App")}</span>
                           </div>
                         </div>
@@ -803,7 +803,7 @@ export default function OnboardingPage() {
                     {watchSubStep === 2 && (
                       <div className="space-y-4 py-2">
                         <div className="text-center">
-                          <div className="text-5xl">🔑</div>
+                          <Key className="mx-auto h-12 w-12 text-emerald-600" />
                           <p className="font-semibold text-zinc-900 text-base mt-2">{tr("w2Title")}</p>
                           <p className="text-xs text-zinc-500 mt-1">{tr("w2Where")}</p>
                         </div>
@@ -842,8 +842,8 @@ export default function OnboardingPage() {
                         </div>
 
                         <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 space-y-1">
-                          <p className="text-[11px] text-amber-700 flex items-start gap-1.5"><span>❌</span> <span>{tr("w2Warn1")}</span></p>
-                          <p className="text-[11px] text-amber-700 flex items-start gap-1.5"><span>👉</span> <span>{tr("w2Warn2")}</span></p>
+                          <p className="text-[11px] text-amber-700 flex items-start gap-1.5"><AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-px" /> <span>{tr("w2Warn1")}</span></p>
+                          <p className="text-[11px] text-amber-700 flex items-start gap-1.5"><ArrowRight className="h-3.5 w-3.5 flex-shrink-0 mt-px" /> <span>{tr("w2Warn2")}</span></p>
                         </div>
 
                         <a href="https://intervals.icu/settings#developer" target="_blank" rel="noopener noreferrer"
@@ -863,7 +863,7 @@ export default function OnboardingPage() {
                         {!watchSaved ? (
                           <form onSubmit={handleSaveWatch} className="space-y-4">
                             <div className="text-center">
-                              <div className="text-4xl mb-2">🎯</div>
+                              <Target className="mx-auto mb-2 h-9 w-9 text-emerald-600" />
                               <p className="font-semibold text-zinc-900">{tr("w3Title")}</p>
                               <p className="text-xs text-zinc-500 mt-0.5">{tr("w3Sub")}</p>
                             </div>
