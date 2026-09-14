@@ -633,7 +633,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
               <Ghost className="h-7 w-7" />
             </span>
             <div>
-              <h2 className="text-2xl font-bold tracking-tight text-white drop-shadow-sm sm:text-[1.75rem]">{d["hero"]}</h2>
+              <h2 className="text-2xl font-bold tracking-tight text-white drop-shadow-sm sm:text-[1.75rem]"><span className="md:hidden">{d["hero"]}</span><span className="hidden md:inline">Ghost Runner</span></h2>
               <p className="mt-0.5 text-sm text-white/85">{d["hd.sub"]}</p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {[

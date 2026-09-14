@@ -7,7 +7,7 @@ import { oneSessionPerSlot } from "@/lib/coach/sessions";
 import { getEffectiveVma } from "@/lib/ai/coachContext";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
-export const metadata = { title: "Enregistrer" };
+export const metadata = { title: "Ghost Runner" };
 
 export default async function GhostRunnerPage() {
   const supabase = await createClient();

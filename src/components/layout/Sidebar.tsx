@@ -6,7 +6,7 @@ import {
   Menu, X,
   LayoutDashboard, MapPin, Mountain, Heart, ShoppingBag,
   User, Trophy, Settings, LogOut, ChevronLeft,
-  CircleDot, Watch, GraduationCap, CalendarDays, MessagesSquare, Newspaper, Crown, Medal, Users, Target, ShieldCheck,
+  Ghost, Watch, GraduationCap, CalendarDays, MessagesSquare, Newspaper, Crown, Medal, Users, Target, ShieldCheck,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -31,7 +31,7 @@ const groups: { titleKey: string | null; items: { href: string; icon: typeof Lay
       // moment de s'inscrire. Le voisinage fait la moitié du travail de découverte.
       { href: "/dashboard/pps", icon: ShieldCheck, tk: "nav.pps" },
       { href: "/dashboard/trail", icon: Mountain, tk: "nav.trail" },
-      { href: "/dashboard/ghost-runner", icon: CircleDot, tk: "nav.ghost" },
+      { href: "/dashboard/ghost-runner", icon: Ghost, tk: "nav.ghost" },
       { href: "/dashboard/cours", icon: GraduationCap, tk: "nav.courses" },
     ],
   },
@@ -60,11 +60,11 @@ const groups: { titleKey: string | null; items: { href: string; icon: typeof Lay
 ];
 
 const PREMIUM_CARD: Record<string, { title: string; sub: string }> = {
-  fr: { title: "Passe au Pro", sub: "Plans IA illimités, Enregistrement GPS, Trail Builder complet." },
-  en: { title: "Go Pro", sub: "Unlimited AI plans, GPS recording, full Trail Builder." },
-  de: { title: "Auf Pro upgraden", sub: "Unbegrenzte KI-Pläne, GPS-Aufzeichnung, voller Trail Builder." },
-  es: { title: "Pasa a Pro", sub: "Planes IA ilimitados, grabación GPS, Trail Builder completo." },
-  pt: { title: "Passa para Pro", sub: "Planos IA ilimitados, gravação GPS, Trail Builder completo." },
+  fr: { title: "Passe au Pro", sub: "Plans IA illimités, Ghost Runner, Trail Builder complet." },
+  en: { title: "Go Pro", sub: "Unlimited AI plans, Ghost Runner, full Trail Builder." },
+  de: { title: "Auf Pro upgraden", sub: "Unbegrenzte KI-Pläne, Ghost Runner, voller Trail Builder." },
+  es: { title: "Pasa a Pro", sub: "Planes IA ilimitados, Ghost Runner, Trail Builder completo." },
+  pt: { title: "Passa para Pro", sub: "Planos IA ilimitados, Ghost Runner, Trail Builder completo." },
 };
 
 /**
@@ -112,14 +112,14 @@ export function Sidebar({ profile, unreadMessages = 0, estEditeur }: { profile: 
     router.push("/login");
   }
 
-  const NavItem = ({ href, icon: Icon, label }: { href: string; icon: typeof LayoutDashboard; label: string }) => {
+  const NavItem = ({ href, icon: Icon, label }: { href: string; icon: typeof LayoutDashboard; label: React.ReactNode }) => {
     const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
     // Pastille de messages non lus — masquée quand on consulte déjà la messagerie.
     const count = href === "/dashboard/messages" && pathname !== "/dashboard/messages" ? unreadMessages : 0;
     return (
       <Link
         href={href}
-        title={collapsed ? label : undefined}
+        title={typeof label === "string" && collapsed ? label : undefined}
         className={cn(
           "group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
           active ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900",
@@ -196,7 +196,7 @@ export function Sidebar({ profile, unreadMessages = 0, estEditeur }: { profile: 
             )}
             {g.titleKey && collapsed && gi > 0 && <div className="mx-3 mb-2 border-t border-zinc-100" />}
             <div className="space-y-0.5">
-              {g.items.map((it) => <NavItem key={it.href} href={it.href} icon={it.icon} label={t(it.tk)} />)}
+              {g.items.map((it) => <NavItem key={it.href} href={it.href} icon={it.icon} label={it.tk === "nav.ghost" ? (<><span className="md:hidden">{t("nav.ghostMobile")}</span><span className="hidden md:inline">{t("nav.ghost")}</span></>) : t(it.tk)} />)}
             </div>
           </div>
         ))}
