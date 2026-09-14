@@ -31,7 +31,12 @@ export async function GET(req: Request) {
   // 1 = lundi. `getUTCDay` et non `getDay` : le serveur tourne aux États-Unis (région
   // iad1), où il est encore dimanche soir quand l'Europe est lundi matin.
   if (now.getUTCDay() !== 1 && !force) {
-    return NextResponse.json({ ok: true, skipped: "ce n'est pas lundi", jour: now.getUTCDay() });
+    // ⚠️ `skippedGlobal`, PAS `skipped` : chaque athlète peut légitimement être « skipped »
+    // (notifications coach désactivées) dans `resultats`. Un `grep "skipped"` du workflow
+    // confondait ces refus normaux avec un refus GLOBAL de la route, et rougissait alors
+    // que le plan était bien parti. Le refus global porte donc une clé qui n'existe nulle
+    // part ailleurs dans la réponse.
+    return NextResponse.json({ ok: true, skippedGlobal: "ce n'est pas lundi", jour: now.getUTCDay() });
   }
 
   const admin = createAdminClient();

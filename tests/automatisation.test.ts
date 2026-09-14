@@ -193,5 +193,32 @@ test("races-types ne rougit que sur un VRAI refus, jamais sur un hoquet d'infra"
     "source injoignable doit renvoyer ok:true (ignoré), pas 502 → sinon fausse alerte permanente");
 });
 
+test("races-types s'arrête AVANT le plafond Hobby (60 s), sinon Vercel la tue sans réponse", () => {
+  // ⚠️ 14/09/2026 : `maxDuration=300` + échéance 235 s sur un plan HOBBY (coupe à 60 s) =
+  // fonction tuée avant de rendre le moindre 200 dès que le-sportif traîne → 504 → cron
+  // rouge en boucle. L'échéance interne doit rester nettement sous 60 s.
+  const src = readFileSync("src/app/api/cron/races-types/route.ts", "utf8");
+  const maxDur = Number(/maxDuration\s*=\s*(\d+)/.exec(src)?.[1] ?? "0");
+  const echeanceMs = Number(/ECHEANCE_MS\s*=\s*([\d_]+)/.exec(src)?.[1]?.replace(/_/g, "") ?? "0");
+  assert.ok(maxDur > 0 && maxDur <= 60, `maxDuration=${maxDur} : le plan Hobby plafonne à 60 s`);
+  assert.ok(echeanceMs > 0 && echeanceMs < 30_000, `ECHEANCE_MS=${echeanceMs} : trop proche du plafond, la route sera tuée avant de répondre`);
+  assert.ok(echeanceMs < maxDur * 1000, "l'échéance interne doit finir avant que Vercel ne coupe la fonction");
+  // Les fetch vers la source tierce ne doivent pas manger tout le budget : timeouts courts.
+  const timeouts = [...src.matchAll(/AbortSignal\.timeout\((\d+)\)/g)].map((m) => Number(m[1]));
+  assert.ok(timeouts.length > 0 && timeouts.every((t) => t <= 10_000), `un fetch le-sportif a un timeout trop long : ${timeouts.join(", ")} ms`);
+});
+
+test("le plan de la semaine : un skip PAR ATHLÈTE ne fait pas rougir le cron", () => {
+  // ⚠️ 14/09/2026 : le workflow grepait \"skipped\" sur toute la réponse pour détecter un
+  // refus GLOBAL (« pas lundi »). Or chaque athlète aux notifs coach coupées est
+  // légitimement \"skipped\" dans `resultats` → le cron rougissait alors que le plan était
+  // parti. Le refus global porte une clé UNIQUE, et le workflow teste CETTE clé.
+  const route = readFileSync("src/app/api/cron/plan-semaine/route.ts", "utf8");
+  assert.ok(/skippedGlobal/.test(route), "le refus global n'utilise plus une clé distincte des skips par athlète");
+  const wf = readFileSync(".github/workflows/newsletter-weekly.yml", "utf8");
+  assert.ok(wf.includes(`grep -q '"skippedGlobal"'`), "le workflow ne teste plus skippedGlobal (il retomberait sur le faux positif)");
+  assert.ok(!wf.includes(`grep -q '"skipped"'`), "le workflow grepe encore le \"skipped\" générique — faux positif garanti");
+});
+
 console.log(`\n${passed} test(s) de supervision passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log(`  KO ${f}`); process.exit(1); }

@@ -1,5 +1,5 @@
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+export const maxDuration = 60;
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { idEditeur } from "@/lib/compta/enregistrer";
@@ -18,7 +18,13 @@ const RECHERCHE = `${BASE}/Calendar/CalendarSearch.aspx`;
 // signale. On demande donc 100, mais on s'arrête à l'échéance en sauvant l'avancement
 // réel. Deux passages par jour amènent le rythme à ~100 courses par nuit.
 const LOT = 100;
-const ECHEANCE_MS = 235_000;
+// ⚠️ VERCEL HOBBY TUE UNE FONCTION À 60 s, quoi qu'annonce `maxDuration`. Viser 235 s
+// (ancienne valeur) garantissait d'être coupé AVANT de rendre la moindre réponse dès que
+// le-sportif traînait : la fonction mourait sans répondre → 504 → cron rouge en boucle.
+// On s'arrête donc bien avant le plafond, en sauvant l'avancement : la route rend
+// TOUJOURS un 200 dans les temps, et reprend au prochain passage là où elle s'était
+// arrêtée. Une source tierce lente ne doit jamais faire rougir notre cron.
+const ECHEANCE_MS = 25_000;
 const PAUSE_MS = 1500;
 
 /**
@@ -89,7 +95,7 @@ export async function GET(req: Request) {
   const erreurs: string[] = [];
 
   // Le formulaire ASP.NET exige un VIEWSTATE frais : on le reprend à chaque passage.
-  const page = await fetch(RECHERCHE, { headers: entetes(), signal: AbortSignal.timeout(20000) }).catch(() => null);
+  const page = await fetch(RECHERCHE, { headers: entetes(), signal: AbortSignal.timeout(8000) }).catch(() => null);
   // ⚠️ SOURCE TIERCE INJOIGNABLE ≠ ÉCHEC DE PACEVO. le-sportif.com (site ASP.NET externe) tombe
   // ou bloque parfois les IP de datacenter (Vercel) : constaté le 14/09/2026, status 0. Renvoyer
   // 502 faisait passer le cron races-types en ROUGE en permanence pour quelque chose qu'on ne
@@ -124,7 +130,7 @@ export async function GET(req: Request) {
         "ctl00$ContentPlaceHolder_Content$DropDownList_Country_Calendar": "FR",
       });
       const rep = await fetch(RECHERCHE, {
-        method: "POST", body: corps, signal: AbortSignal.timeout(25000),
+        method: "POST", body: corps, signal: AbortSignal.timeout(8000),
         headers: { ...entetes(), "Content-Type": "application/x-www-form-urlencoded", Referer: RECHERCHE },
       });
       if (rep.ok) {
@@ -160,7 +166,7 @@ export async function GET(req: Request) {
           //    un catalogue de course à pied : c'est une donnée fausse ET absurde.
           //    `typeDepuisUrl` rend « inconnu » sur ces fiches-là ; on s'arrête ici.
           const fichePage = vu === "inconnu" ? null
-            : await fetch(BASE + fiche, { headers: entetes(), signal: AbortSignal.timeout(20000) }).catch(() => null);
+            : await fetch(BASE + fiche, { headers: entetes(), signal: AbortSignal.timeout(8000) }).catch(() => null);
           if (fichePage?.ok) {
             const dSource = distancesDeFiche(await fichePage.text());
             if (dSource.length) {

@@ -120,7 +120,7 @@ jobs:
           #    demie (31/08/2026). Un décalage de plus de 17 h 30 la ferait basculer au
           #    mardi : zéro courriel parti, workflow AU VERT, et personne pour s'en
           #    apercevoir avant que les athlètes ne se plaignent. On le rend bruyant.
-          if printf '%s' "${corps}" | grep -q '"skipped"'; then
+          if printf '%s' "${corps}" | grep -q '"skippedGlobal"'; then
             if [ "${{ github.event_name }}" = "schedule" ]; then
               echo "::error::Le plan de la semaine n'a été envoyé à PERSONNE : la route a refusé (${corps})."
               exit 1
