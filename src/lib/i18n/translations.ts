@@ -14,7 +14,7 @@ type Dict = Record<string, string>;
 export const T: Record<Lang, Dict> = {
   fr: {
     "nav.dashboard": "Tableau de bord", "nav.calendar": "Calendrier", "nav.pps": "PPS course", "nav.races": "Courses",
-    "nav.trail": "Trail Builder", "nav.ghost": "Ghost Runner", "nav.courses": "Cours",
+    "nav.trail": "Trail Builder", "nav.ghost": "Enregistrer", "nav.courses": "Cours",
     "nav.health": "Santé", "nav.messaging": "Messagerie", "nav.sync": "Sync Montre",
     "nav.flyover": "Survol 3D", "nav.segments": "Segments", "nav.performances": "Mes activités", "nav.trophies": "Vitrine", "nav.leagues": "Ligues", "nav.shop": "Comparateur", "nav.clubs": "Clubs & Défis", "nav.community": "Le Club", "nav.profile": "Profil",
     "nav.settings": "Paramètres", "nav.logout": "Déconnexion", "nav.collapse": "Réduire", "nav.menu": "Menu",
@@ -309,7 +309,7 @@ export const T: Record<Lang, Dict> = {
   },
   en: {
     "nav.dashboard": "Dashboard", "nav.calendar": "Calendar", "nav.pps": "Race health pass", "nav.races": "Races",
-    "nav.trail": "Trail Builder", "nav.ghost": "Ghost Runner", "nav.courses": "Lessons",
+    "nav.trail": "Trail Builder", "nav.ghost": "Record", "nav.courses": "Lessons",
     "nav.health": "Health", "nav.messaging": "Messages", "nav.sync": "Watch Sync",
     "nav.flyover": "3D Flyover", "nav.segments": "Segments", "nav.performances": "My activities", "nav.trophies": "Trophies", "nav.leagues": "Leagues", "nav.shop": "Compare", "nav.clubs": "Clubs & Challenges", "nav.community": "The Club", "nav.profile": "Profile",
     "nav.settings": "Settings", "nav.logout": "Log out", "nav.collapse": "Collapse", "nav.menu": "Menu",
@@ -596,7 +596,7 @@ export const T: Record<Lang, Dict> = {
   },
   de: {
     "nav.dashboard": "Übersicht", "nav.calendar": "Kalender", "nav.pps": "Gesundheitspass", "nav.races": "Rennen",
-    "nav.trail": "Trail Builder", "nav.ghost": "Ghost Runner", "nav.courses": "Kurse",
+    "nav.trail": "Trail Builder", "nav.ghost": "Aufzeichnen", "nav.courses": "Kurse",
     "nav.health": "Gesundheit", "nav.messaging": "Nachrichten", "nav.sync": "Uhr-Sync",
     "nav.flyover": "3D-Überflug", "nav.segments": "Segmente", "nav.performances": "Meine Aktivitäten", "nav.trophies": "Trophäen", "nav.leagues": "Ligen", "nav.shop": "Vergleich", "nav.clubs": "Clubs & Challenges", "nav.community": "Der Club", "nav.profile": "Profil",
     "nav.settings": "Einstellungen", "nav.logout": "Abmelden", "nav.collapse": "Einklappen", "nav.menu": "Menü",
@@ -883,7 +883,7 @@ export const T: Record<Lang, Dict> = {
   },
   es: {
     "nav.dashboard": "Panel", "nav.calendar": "Calendario", "nav.pps": "Pase de salud", "nav.races": "Carreras",
-    "nav.trail": "Trail Builder", "nav.ghost": "Ghost Runner", "nav.courses": "Cursos",
+    "nav.trail": "Trail Builder", "nav.ghost": "Grabar", "nav.courses": "Cursos",
     "nav.health": "Salud", "nav.messaging": "Mensajes", "nav.sync": "Sincronizar reloj",
     "nav.flyover": "Vuelo 3D", "nav.segments": "Segmentos", "nav.performances": "Mis actividades", "nav.trophies": "Vitrina", "nav.leagues": "Ligas", "nav.shop": "Comparador", "nav.clubs": "Clubes y retos", "nav.community": "El Club", "nav.profile": "Perfil",
     "nav.settings": "Ajustes", "nav.logout": "Cerrar sesión", "nav.collapse": "Contraer", "nav.menu": "Menú",
@@ -1170,7 +1170,7 @@ export const T: Record<Lang, Dict> = {
   },
   pt: {
     "nav.dashboard": "Painel", "nav.calendar": "Calendário", "nav.pps": "Passe de saúde", "nav.races": "Provas",
-    "nav.trail": "Trail Builder", "nav.ghost": "Ghost Runner", "nav.courses": "Aulas",
+    "nav.trail": "Trail Builder", "nav.ghost": "Gravar", "nav.courses": "Aulas",
     "nav.health": "Saúde", "nav.messaging": "Mensagens", "nav.sync": "Sincronizar relógio",
     "nav.flyover": "Sobrevoo 3D", "nav.segments": "Segmentos", "nav.performances": "As minhas atividades", "nav.trophies": "Vitrine", "nav.leagues": "Ligas", "nav.shop": "Comparador", "nav.clubs": "Clubes e desafios", "nav.community": "O Clube", "nav.profile": "Perfil",
     "nav.settings": "Definições", "nav.logout": "Sair", "nav.collapse": "Recolher", "nav.menu": "Menu",

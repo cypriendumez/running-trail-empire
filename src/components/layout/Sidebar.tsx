@@ -6,7 +6,7 @@ import {
   Menu, X,
   LayoutDashboard, MapPin, Mountain, Heart, ShoppingBag,
   User, Trophy, Settings, LogOut, ChevronLeft,
-  Ghost, Watch, GraduationCap, CalendarDays, MessagesSquare, Newspaper, Crown, Medal, Users, Target, ShieldCheck,
+  CircleDot, Watch, GraduationCap, CalendarDays, MessagesSquare, Newspaper, Crown, Medal, Users, Target, ShieldCheck,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -31,7 +31,7 @@ const groups: { titleKey: string | null; items: { href: string; icon: typeof Lay
       // moment de s'inscrire. Le voisinage fait la moitié du travail de découverte.
       { href: "/dashboard/pps", icon: ShieldCheck, tk: "nav.pps" },
       { href: "/dashboard/trail", icon: Mountain, tk: "nav.trail" },
-      { href: "/dashboard/ghost-runner", icon: Ghost, tk: "nav.ghost" },
+      { href: "/dashboard/ghost-runner", icon: CircleDot, tk: "nav.ghost" },
       { href: "/dashboard/cours", icon: GraduationCap, tk: "nav.courses" },
     ],
   },
@@ -60,11 +60,11 @@ const groups: { titleKey: string | null; items: { href: string; icon: typeof Lay
 ];
 
 const PREMIUM_CARD: Record<string, { title: string; sub: string }> = {
-  fr: { title: "Passe au Pro", sub: "Plans IA illimités, Ghost Runner, Trail Builder complet." },
-  en: { title: "Go Pro", sub: "Unlimited AI plans, Ghost Runner, full Trail Builder." },
-  de: { title: "Auf Pro upgraden", sub: "Unbegrenzte KI-Pläne, Ghost Runner, voller Trail Builder." },
-  es: { title: "Pasa a Pro", sub: "Planes IA ilimitados, Ghost Runner, Trail Builder completo." },
-  pt: { title: "Passa para Pro", sub: "Planos IA ilimitados, Ghost Runner, Trail Builder completo." },
+  fr: { title: "Passe au Pro", sub: "Plans IA illimités, Enregistrement GPS, Trail Builder complet." },
+  en: { title: "Go Pro", sub: "Unlimited AI plans, GPS recording, full Trail Builder." },
+  de: { title: "Auf Pro upgraden", sub: "Unbegrenzte KI-Pläne, GPS-Aufzeichnung, voller Trail Builder." },
+  es: { title: "Pasa a Pro", sub: "Planes IA ilimitados, grabación GPS, Trail Builder completo." },
+  pt: { title: "Passa para Pro", sub: "Planos IA ilimitados, gravação GPS, Trail Builder completo." },
 };
 
 /**

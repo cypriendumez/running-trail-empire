@@ -11,7 +11,7 @@ export const GX: Record<string, Record<string, string>> = {
   fr: {
     "hd.sub": "Ton lièvre personnel — il te tient l'allure et te parle pendant que tu cours.",
     "ch.gps": "GPS en direct", "ch.voice": "Guidage vocal", "ch.watch": "Compatible montre",
-    "co.title": "Tes séances du coach", "co.sub": "Pas de montre ? Lance la séance prescrite ici — allure ciblée + voix en direct.",
+    "hero": "Enregistrer", "co.title": "Tes séances du coach", "co.sub": "Pas de montre ? Lance la séance prescrite ici — allure ciblée + voix en direct.",
     "co.today": "AUJOURD'HUI", "co.fallback": "Séance prescrite par ton coach", "co.load": "Charger →",
     "md.pace": "Allure", "md.hr": "Fréquence cardiaque",
     "pr.semi": "Semi", "feas.ok": "À ta portée", "feas.amb": "Ambitieux", "feas.hard": "Très ambitieux", "feas.title": "{l} pour une VMA de {v} km/h",
@@ -69,7 +69,7 @@ export const GX: Record<string, Record<string, string>> = {
   en: {
     "hd.sub": "Your personal pacer — it holds your pace and talks to you while you run.",
     "ch.gps": "Live GPS", "ch.voice": "Voice guidance", "ch.watch": "Watch compatible",
-    "co.title": "Your coach sessions", "co.sub": "No watch? Run your prescribed session here — target pace + live voice.",
+    "hero": "Record", "co.title": "Your coach sessions", "co.sub": "No watch? Run your prescribed session here — target pace + live voice.",
     "co.today": "TODAY", "co.fallback": "Session prescribed by your coach", "co.load": "Load →",
     "md.pace": "Pace", "md.hr": "Heart rate",
     "pr.semi": "Half", "feas.ok": "Within reach", "feas.amb": "Ambitious", "feas.hard": "Very ambitious", "feas.title": "{l} for a VMA of {v} km/h",
@@ -122,7 +122,7 @@ export const GX: Record<string, Record<string, string>> = {
   de: {
     "hd.sub": "Dein persönlicher Tempomacher — er hält deine Pace und spricht beim Laufen mit dir.",
     "ch.gps": "Live-GPS", "ch.voice": "Sprachansagen", "ch.watch": "Uhr-kompatibel",
-    "co.title": "Deine Coach-Einheiten", "co.sub": "Keine Uhr? Starte die geplante Einheit hier — Zielpace + Live-Ansagen.",
+    "hero": "Aufzeichnen", "co.title": "Deine Coach-Einheiten", "co.sub": "Keine Uhr? Starte die geplante Einheit hier — Zielpace + Live-Ansagen.",
     "co.today": "HEUTE", "co.fallback": "Von deinem Coach geplante Einheit", "co.load": "Laden →",
     "md.pace": "Pace", "md.hr": "Herzfrequenz",
     "pr.semi": "HM", "feas.ok": "Machbar für dich", "feas.amb": "Ambitioniert", "feas.hard": "Sehr ambitioniert", "feas.title": "{l} bei einer VMA von {v} km/h",
@@ -175,7 +175,7 @@ export const GX: Record<string, Record<string, string>> = {
   es: {
     "hd.sub": "Tu liebre personal: te marca el ritmo y te habla mientras corres.",
     "ch.gps": "GPS en directo", "ch.voice": "Guía por voz", "ch.watch": "Compatible con reloj",
-    "co.title": "Tus sesiones del coach", "co.sub": "¿Sin reloj? Lanza aquí la sesión prescrita: ritmo objetivo + voz en directo.",
+    "hero": "Grabar", "co.title": "Tus sesiones del coach", "co.sub": "¿Sin reloj? Lanza aquí la sesión prescrita: ritmo objetivo + voz en directo.",
     "co.today": "HOY", "co.fallback": "Sesión prescrita por tu coach", "co.load": "Cargar →",
     "md.pace": "Ritmo", "md.hr": "Frecuencia cardiaca",
     "pr.semi": "Media", "feas.ok": "A tu alcance", "feas.amb": "Ambicioso", "feas.hard": "Muy ambicioso", "feas.title": "{l} para una VMA de {v} km/h",
@@ -228,7 +228,7 @@ export const GX: Record<string, Record<string, string>> = {
   pt: {
     "hd.sub": "O teu coelho pessoal — segura o teu ritmo e fala contigo enquanto corres.",
     "ch.gps": "GPS em direto", "ch.voice": "Orientação por voz", "ch.watch": "Compatível com relógio",
-    "co.title": "As tuas sessões do coach", "co.sub": "Sem relógio? Faz aqui a sessão prescrita — ritmo alvo + voz em direto.",
+    "hero": "Gravar", "co.title": "As tuas sessões do coach", "co.sub": "Sem relógio? Faz aqui a sessão prescrita — ritmo alvo + voz em direto.",
     "co.today": "HOJE", "co.fallback": "Sessão prescrita pelo teu coach", "co.load": "Carregar →",
     "md.pace": "Ritmo", "md.hr": "Frequência cardíaca",
     "pr.semi": "Meia", "feas.ok": "Ao teu alcance", "feas.amb": "Ambicioso", "feas.hard": "Muito ambicioso", "feas.title": "{l} para uma VMA de {v} km/h",
