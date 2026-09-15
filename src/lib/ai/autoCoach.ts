@@ -13,8 +13,70 @@ import { buildWeekPlan, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
 import { pushIntervalsWorkout, supprimerIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
 import { profilPeut, COLONNES_ACCES, JOURS_APERCU } from "@/lib/billing/access";
 import { identifiantsDePaire } from "@/lib/intervals/identifiants";
+import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
 type Admin = SupabaseClient;
+
+// ── SÉANCE « TEST VMA » ───────────────────────────────────────────────────────
+// Tant qu'aucune VMA n'a été MESURÉE (aucune ligne performance_baselines), le coach ne
+// prescrit RIEN d'autre : une seule séance, le test 6 min, que l'athlète fait quand il
+// veut (montre ou téléphone via « Enregistrer »). La distance des 6 min donne sa VMA
+// (voir vmaFrom6min) et débloque le plan complet. Le FR est canonique (la montre et
+// l'analyse le lisent) ; l'affichage traduit via `i18n`.
+const TEST_VMA = {
+  fr: { title: "Test VMA (6 min)", subtitle: "Échauffe-toi 15 min en footing facile, puis cours 6 min À FOND (l'allure la plus rapide que tu tiens), sur du plat — une piste est idéale. Retour au calme 10 min. Relève la distance des 6 min : elle donne ta VMA et débloque ton plan.", why: "Ta VMA calibre TOUTES tes allures, tes zones et ton coaching. Une seule séance, et tout le reste s'ajuste à toi. Tant qu'elle n'est pas mesurée, aucune autre séance n'est prescrite.", tags: ["Test", "VMA"] },
+  en: { title: "vVO2max test (6 min)", subtitle: "Warm up 15 min easy, then run 6 min ALL OUT (the fastest pace you can hold), on flat ground — a track is ideal. Cool down 10 min. Record the distance of the 6 min: it sets your VMA and unlocks your plan.", why: "Your VMA calibrates ALL your paces, zones and coaching. One session, and everything adjusts to you. Until it's measured, no other session is prescribed.", tags: ["Test", "VMA"] },
+  de: { title: "VMA-Test (6 Min)", subtitle: "15 Min locker einlaufen, dann 6 Min VOLL (schnellstes haltbares Tempo), flach — eine Bahn ist ideal. 10 Min auslaufen. Notiere die Distanz der 6 Min: Sie ergibt deine VMA und schaltet deinen Plan frei.", why: "Deine VMA kalibriert ALLE Paces, Zonen und das Coaching. Eine Einheit, und alles passt sich dir an. Bis sie gemessen ist, wird keine andere Einheit vorgegeben.", tags: ["Test", "VMA"] },
+  es: { title: "Test de VMA (6 min)", subtitle: "Calienta 15 min suave, luego corre 6 min A TOPE (el ritmo más rápido que aguantes), en llano — una pista es ideal. Vuelta a la calma 10 min. Anota la distancia de los 6 min: da tu VMA y desbloquea tu plan.", why: "Tu VMA calibra TODOS tus ritmos, zonas y el coaching. Una sesión, y todo se ajusta a ti. Hasta medirla, no se prescribe ninguna otra sesión.", tags: ["Test", "VMA"] },
+  pt: { title: "Teste de VMA (6 min)", subtitle: "Aquece 15 min leve, depois corre 6 min NO MÁXIMO (o ritmo mais rápido que aguentas), em plano — uma pista é ideal. Volta à calma 10 min. Regista a distância dos 6 min: dá a tua VMA e desbloqueia o teu plano.", why: "A tua VMA calibra TODOS os teus ritmos, zonas e o coaching. Uma sessão, e tudo se ajusta a ti. Até ser medida, nenhuma outra sessão é prescrita.", tags: ["Test", "VMA"] },
+} as const;
+
+/**
+ * Prescrit UNIQUEMENT le test VMA : purge le plan à venir, pose la séance test du jour,
+ * la pousse sur la montre (séance libre, sans allure cible — c'est un effort maximal).
+ */
+async function prescrireTestVma(admin: Admin, opts: { userId: string; athleteId?: string | null; apiKey?: string | null; pushToWatch?: boolean }): Promise<AutoResult> {
+  const { userId } = opts;
+  const today = aujourdhui(FUSEAU_DEFAUT);
+  const T = TEST_VMA.fr;
+
+  // Le test se pose AUJOURD'HUI et remplace tout le plan à venir : tant que la VMA n'est
+  // pas mesurée, il ne doit exister aucune autre séance. Même règle que la purge du plan
+  // normal — si elle échoue en silence, la séance test s'empilerait sur d'anciennes.
+  const { error: ePurge } = await admin.from("notifications").delete()
+    .eq("user_id", userId).eq("type", "coach_session").gte("data->>date", today);
+  if (ePurge) return { processed: false, reason: `purge test vma: ${ePurge.message}` };
+
+  const { error } = await admin.from("notifications").insert({
+    user_id: userId, type: "coach_session", title: T.title.slice(0, 80), body: T.subtitle.slice(0, 200),
+    data: {
+      from: "coach-auto", date: today, sessionType: "Test", subtitle: T.subtitle.slice(0, 500),
+      why: T.why.slice(0, 400), feel: "", tags: [...T.tags], confirmed: true, testVma: true,
+      i18n: Object.fromEntries((["en", "de", "es", "pt"] as const).map((l) => [l, {
+        title: TEST_VMA[l].title.slice(0, 80), subtitle: TEST_VMA[l].subtitle.slice(0, 500),
+        why: TEST_VMA[l].why.slice(0, 400), tags: [...TEST_VMA[l].tags],
+      }])),
+    },
+  });
+  if (error) return { processed: false, reason: error.message };
+
+  let pushed = 0;
+  // Montre : seulement pour un accès complet. Un compte en aperçu gratuit voit le test
+  // dans l'app et le fait au téléphone (« Enregistrer ») — même règle que le plan normal,
+  // qui ne pousse rien sur la montre d'un compte gratuit.
+  const ids = opts.pushToWatch ? identifiantsDePaire(opts.athleteId, opts.apiKey) : null;
+  if (ids?.athleteId && ids.apiKey) {
+    try {
+      const r = await pushIntervalsWorkout({
+        athleteId: ids.athleteId, apiKey: ids.apiKey, userId, name: T.title, date: today,
+        description: "Échauffement 15 min très facile (Z1).\n6 min À FOND — allure la plus rapide tenable, terrain plat.\nRetour au calme 10 min.\nRelève la distance des 6 min dans Pacevo : elle fixe ta VMA.",
+        sport: "Run",
+      });
+      if (r.ok) pushed = 1;
+    } catch { /* best effort : la séance reste dans le calendrier même si la montre est injoignable */ }
+  }
+  return { processed: true, days: 1, pushed, reason: "attente_test_vma", emailed: false, emailSkipped: "test vma requis avant tout plan" };
+}
 export type AutoResult = {
   processed: boolean; days?: number; pushed?: number; reason?: string;
   /** E-mail « ton plan est à jour » : envoyé, ou motif de non-envoi. Jamais silencieux. */
@@ -55,6 +117,26 @@ export async function autoCoachForUser(
   const apercu = !planComplet && profilPeut(acces, "apercu");
   if (!planComplet && !apercu) {
     return { processed: false, reason: "essai_expire" };
+  }
+
+  // ── VERROU « TEST VMA » ─────────────────────────────────────────────────────
+  //  Une VMA calibre TOUTES les allures, zones et décisions du coach. Tant qu'elle n'a
+  //  pas été MESURÉE, prescrire un plan reviendrait à deviner l'intensité de chaque séance
+  //  — l'exact contraire de ce que ce produit promet. La VMA n'est donc plus demandée à
+  //  l'inscription (elle « faisait IA » et bloquait 100 % des inscrits sur un chiffre qu'ils
+  //  n'ont pas) : la PREMIÈRE prescription du coach est le test lui-même, que l'athlète fait
+  //  quand il veut, montre ou téléphone. Rien d'autre n'est proposé avant.
+  //
+  //  Signal de mesure = une ligne `performance_baselines` avec `vma_kmh > 0` — EXACTEMENT
+  //  ce que `effectiveVma` (fitness.ts) lit pour rendre la source « test ». On lit la même
+  //  colonne, de la même façon (le tri par `tested_at`, comme coachContext) : aucune 5ᵉ
+  //  chaîne de VMA, un seul signal partagé. Comme `vma_kmh` est NOT NULL en base, « une
+  //  ligne existe » ⟺ « une VMA est mesurée ».
+  const { data: baseVma } = await admin.from("performance_baselines")
+    .select("vma_kmh").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).maybeSingle();
+  const vmaMesuree = Number((baseVma as { vma_kmh?: number } | null)?.vma_kmh) > 0;
+  if (!vmaMesuree) {
+    return prescrireTestVma(admin, { userId, athleteId: opts.athleteId, apiKey: opts.apiKey, pushToWatch: planComplet });
   }
 
   const ctx = await buildAthleteContext(admin as unknown as Parameters<typeof buildAthleteContext>[0], userId).catch(() => null);

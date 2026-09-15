@@ -586,10 +586,10 @@ export default function OnboardingPage() {
                   <h2 className="font-semibold text-zinc-900">{tr("phTitle")}</h2>
                 </div>
 
-                <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl text-sm text-amber-800 space-y-2">
+                <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-sm text-emerald-900 space-y-2">
                   <div className="font-bold">{tr("testTitle")}</div>
                   <p>{tr("testIntro")}</p>
-                  <ol className="list-decimal list-inside space-y-0.5 text-amber-700">
+                  <ol className="list-decimal list-inside space-y-0.5 text-emerald-800/80">
                     <li>{tr("step1")}</li>
                     <li>{tr("step2")}</li>
                     <li>{tr("step3")}</li>
@@ -646,14 +646,14 @@ export default function OnboardingPage() {
                 )}
 
                 {!(parseFloat(vma.vma_kmh) >= 8 && parseFloat(vma.vma_kmh) <= 30) && (
-                  <p className="text-xs text-amber-600">{tr("required")}</p>
+                  <p className="text-xs text-emerald-700">{tr("required")}</p>
                 )}
                 <div className="flex gap-3">
                   <button onClick={prev} className="btn-secondary flex-1 justify-center">
                     <ArrowLeft className="w-4 h-4" /> {tr("back")}
                   </button>
-                  <button onClick={next} disabled={!(parseFloat(vma.vma_kmh) >= 8 && parseFloat(vma.vma_kmh) <= 30)}
-                    className="btn-brand flex-1 justify-center disabled:opacity-50 disabled:cursor-not-allowed">
+                  {/* La VMA n'est plus bloquante : sans elle, la 1ʳᵉ séance prescrite est le test VMA. */}
+                  <button onClick={next} className="btn-brand flex-1 justify-center">
                     {tr("next")} <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>

@@ -5429,6 +5429,38 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     assert.ok(/reason: "essai_expire"/.test(src), "le refus doit être motivé, pas silencieux");
   });
 
+  test("aucun plan n'est prescrit avant une VMA MESURÉE — seulement le test VMA", () => {
+    // La VMA calibre TOUTES les allures. Tant qu'elle n'est pas mesurée, prescrire un plan
+    // reviendrait à deviner l'intensité de chaque séance. Le coach ne prescrit donc d'abord
+    // QUE le test VMA (prescrireTestVma) ; la ligne performance_baselines qui en résulte
+    // (vma_kmh, même colonne que effectiveVma) débloque le plan complet.
+    const src = codeOf("src/lib/ai/autoCoach.ts");
+    // Le signal de mesure est lu — et c'est bien performance_baselines, pas une 5ᵉ chaîne.
+    assert.ok(/\.from\("performance_baselines"\)/.test(src), "le verrou ne lit pas la VMA mesurée dans performance_baselines");
+    // …et AVANT de construire le plan, sinon on paie buildWeekPlan pour un compte qui n'a
+    // pas encore de VMA (et on lui prescrirait des allures devinées).
+    assert.ok(src.indexOf('.from("performance_baselines")') < src.indexOf("buildWeekPlan("),
+      "la lecture de la VMA mesurée est APRÈS la construction du plan");
+    // Quand elle manque, on ne prescrit QUE le test, et on le dit (motif, jamais silencieux).
+    assert.ok(/prescrireTestVma\(/.test(src), "le verrou n'appelle pas prescrireTestVma quand la VMA manque");
+    assert.ok(/reason: "attente_test_vma"/.test(src), "l'attente du test VMA n'est pas motivée");
+    // La séance test pousse une VMA à FOND, sans allure cible imposée : elle ne passe donc
+    // PAS par buildWorkoutDescription (qui cale des paliers d'allure sur la VMA — celle
+    // qu'on cherche justement à mesurer). C'est une séance libre, description en clair.
+    const prescr = src.slice(src.indexOf("function prescrireTestVma"), src.indexOf("export type AutoResult"));
+    assert.ok(!/buildWorkoutDescription\(/.test(prescr), "le test VMA impose des paliers d'allure basés sur la VMA qu'il doit mesurer");
+    assert.ok(/pushIntervalsWorkout\(/.test(prescr), "le test VMA n'est pas poussé sur la montre");
+  });
+
+  test("le test VMA ne se pousse sur la montre qu'avec un accès complet", () => {
+    // Même règle que le plan normal : un compte en aperçu gratuit voit la séance dans l'app
+    // et la fait au téléphone, on ne pousse rien sur sa montre. Le drapeau `pushToWatch` est
+    // câblé sur `planComplet`, pas laissé à vrai par défaut.
+    const src = codeOf("src/lib/ai/autoCoach.ts");
+    assert.ok(/prescrireTestVma\(admin, \{[^}]*pushToWatch: planComplet/.test(src),
+      "le test VMA est poussé sur la montre même en aperçu gratuit (pushToWatch non lié à planComplet)");
+  });
+
   test("le support répond sans jeton — mais JAMAIS sur un dépannage", () => {
     // Économiser des jetons est facile ; économiser sans rien dégrader ne l'est pas.
     // La base sait déjà répondre aux questions de NAVIGATION : le chemin de clics vient

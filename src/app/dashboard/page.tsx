@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { lecturesEnEchec } from "@/lib/dashboard/lectures";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 import { BentoDashboard } from "@/components/dashboard/BentoDashboard";
+import { TestVmaBanner } from "@/components/dashboard/TestVmaBanner";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import type { Objective } from "@/components/dashboard/ObjectiveCard";
 import { bestVmaFromWorkouts, loadRisk, effectiveVma } from "@/lib/running/fitness";
@@ -169,8 +170,14 @@ export default async function DashboardPage() {
     console.error("[tableau de bord] lectures en échec :", donneesIncompletes.join(", "));
   }
 
+  // VMA MESURÉE ? = une ligne performance_baselines avec vma_kmh > 0 (même signal que le
+  // verrou du coach et effectiveVma). Tant qu'elle manque, le coach ne prescrit que le test
+  // VMA : le bandeau donne le moyen de saisir le résultat et de débloquer le plan complet.
+  const vmaMesuree = (Number((baseRes.data as { vma_kmh?: number } | null)?.vma_kmh) || 0) > 0;
+
   return (
     <>
+    <TestVmaBanner measured={vmaMesuree} />
     <BentoDashboard
       donneesIncompletes={donneesIncompletes}
       profile={stripProfileSecrets(profileRes.data)}
