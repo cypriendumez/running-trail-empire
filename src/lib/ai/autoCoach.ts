@@ -14,6 +14,7 @@ import { pushIntervalsWorkout, supprimerIntervalsWorkout, buildWorkoutDescriptio
 import { profilPeut, COLONNES_ACCES, JOURS_APERCU } from "@/lib/billing/access";
 import { identifiantsDePaire } from "@/lib/intervals/identifiants";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
+import { estAdmin } from "@/lib/admin/acces";
 
 type Admin = SupabaseClient;
 
@@ -106,7 +107,7 @@ export async function autoCoachForUser(
   //  Un compte en consultation garde tout ce qu'il a déjà : historique, courses,
   //  trophées, série, et le plan qui était en place. Il ne reçoit simplement plus de
   //  NOUVELLE prescription. On ne détruit rien, on cesse de produire.
-  const { data: profilAcces } = await admin.from("profiles").select(COLONNES_ACCES).eq("id", userId).maybeSingle();
+  const { data: profilAcces } = await admin.from("profiles").select(`${COLONNES_ACCES}, email`).eq("id", userId).maybeSingle();
   const acces = profilAcces as Parameters<typeof profilPeut>[0];
   const planComplet = profilPeut(acces, "plan");
   // ⚠️ LE GRATUIT NE RECEVAIT RIEN — impasse commerciale : un compte qui ne voit jamais
@@ -135,7 +136,11 @@ export async function autoCoachForUser(
   const { data: baseVma } = await admin.from("performance_baselines")
     .select("vma_kmh").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).maybeSingle();
   const vmaMesuree = Number((baseVma as { vma_kmh?: number } | null)?.vma_kmh) > 0;
-  if (!vmaMesuree) {
+  // Le FONDATEUR (compte admin) n'est pas soumis au test : sa VMA a toujours été estimée
+  // depuis sa courbe d'allure/VO2max, il pilote l'app et n'a pas à passer par le test 6 min.
+  // `estAdmin` lit ADMIN_EMAILS côté serveur (repli : le propriétaire historique).
+  const estFondateur = estAdmin((profilAcces as { email?: string } | null)?.email);
+  if (!vmaMesuree && !estFondateur) {
     return prescrireTestVma(admin, { userId, athleteId: opts.athleteId, apiKey: opts.apiKey, pushToWatch: planComplet });
   }
 

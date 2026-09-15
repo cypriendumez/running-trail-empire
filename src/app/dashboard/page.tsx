@@ -12,6 +12,7 @@ import { bestVmaFromWorkouts, loadRisk, effectiveVma } from "@/lib/running/fitne
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 import { computeStreak, jourLocal, decaleJour, type StreakWorkout, type StreakPrescription } from "@/lib/streak/compute";
 import { accesDe } from "@/lib/billing/access";
+import { estAdmin } from "@/lib/admin/acces";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard" };
@@ -173,11 +174,13 @@ export default async function DashboardPage() {
   // VMA MESURÉE ? = une ligne performance_baselines avec vma_kmh > 0 (même signal que le
   // verrou du coach et effectiveVma). Tant qu'elle manque, le coach ne prescrit que le test
   // VMA : le bandeau donne le moyen de saisir le résultat et de débloquer le plan complet.
+  // Le FONDATEUR (admin) en est exempté — même règle que le verrou du coach (autoCoach.ts).
+  const estFondateur = estAdmin((profileRes.data as { email?: string } | null)?.email);
   const vmaMesuree = (Number((baseRes.data as { vma_kmh?: number } | null)?.vma_kmh) || 0) > 0;
 
   return (
     <>
-    <TestVmaBanner measured={vmaMesuree} />
+    <TestVmaBanner measured={vmaMesuree || estFondateur} />
     <BentoDashboard
       donneesIncompletes={donneesIncompletes}
       profile={stripProfileSecrets(profileRes.data)}

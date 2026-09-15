@@ -5452,6 +5452,16 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     assert.ok(/pushIntervalsWorkout\(/.test(prescr), "le test VMA n'est pas poussé sur la montre");
   });
 
+  test("le fondateur (admin) est exempté du test VMA", () => {
+    // Le chef de l'app pilote le produit et a une VMA déjà estimée depuis sa courbe : lui
+    // imposer le test 6 min serait absurde. L'exemption passe par `estAdmin` (ADMIN_EMAILS,
+    // serveur), et le verrou ne se déclenche que si la VMA manque ET que ce n'est pas lui.
+    const src = codeOf("src/lib/ai/autoCoach.ts");
+    assert.ok(/estAdmin\(/.test(src), "le verrou VMA n'exempte pas le compte admin (estAdmin absent)");
+    assert.ok(/if \(!vmaMesuree && !estFondateur\)/.test(src),
+      "la condition du verrou n'exclut pas le fondateur (le test serait imposé à l'admin)");
+  });
+
   test("le test VMA ne se pousse sur la montre qu'avec un accès complet", () => {
     // Même règle que le plan normal : un compte en aperçu gratuit voit la séance dans l'app
     // et la fait au téléphone, on ne pousse rien sur sa montre. Le drapeau `pushToWatch` est
