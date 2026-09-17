@@ -13,7 +13,7 @@ type Dict = Record<string, string>;
 
 export const T: Record<Lang, Dict> = {
   fr: {
-    "nav.dashboard": "Tableau de bord", "nav.calendar": "Calendrier", "nav.pps": "PPS course", "nav.races": "Courses",
+    "nav.plans": "Plans d'entraînement", "nav.dashboard": "Tableau de bord", "nav.calendar": "Calendrier", "nav.pps": "PPS course", "nav.races": "Courses",
     "nav.trail": "Trail Builder", "nav.ghost": "Ghost Runner", "nav.ghostMobile": "Enregistrer", "nav.courses": "Cours",
     "nav.health": "Santé", "nav.messaging": "Messagerie", "nav.sync": "Sync Montre",
     "nav.flyover": "Survol 3D", "nav.segments": "Segments", "nav.performances": "Mes activités", "nav.trophies": "Vitrine", "nav.leagues": "Ligues", "nav.shop": "Comparateur", "nav.clubs": "Clubs & Défis", "nav.community": "Le Club", "nav.profile": "Profil",
@@ -308,7 +308,7 @@ export const T: Record<Lang, Dict> = {
     "renfo.gym.b4.e3.name": "Équilibre Bosu", "renfo.gym.b4.e3.dose": "3 × 30 s", "renfo.gym.b4.e3.cue": "Debout sur un Bosu, stabilise. Proprioception avancée.",
   },
   en: {
-    "nav.dashboard": "Dashboard", "nav.calendar": "Calendar", "nav.pps": "Race health pass", "nav.races": "Races",
+    "nav.plans": "Training plans", "nav.dashboard": "Dashboard", "nav.calendar": "Calendar", "nav.pps": "Race health pass", "nav.races": "Races",
     "nav.trail": "Trail Builder", "nav.ghost": "Ghost Runner", "nav.ghostMobile": "Record", "nav.courses": "Lessons",
     "nav.health": "Health", "nav.messaging": "Messages", "nav.sync": "Watch Sync",
     "nav.flyover": "3D Flyover", "nav.segments": "Segments", "nav.performances": "My activities", "nav.trophies": "Trophies", "nav.leagues": "Leagues", "nav.shop": "Compare", "nav.clubs": "Clubs & Challenges", "nav.community": "The Club", "nav.profile": "Profile",
@@ -595,7 +595,7 @@ export const T: Record<Lang, Dict> = {
     "renfo.gym.b4.e3.name": "Bosu balance", "renfo.gym.b4.e3.dose": "3 × 30 s", "renfo.gym.b4.e3.cue": "Standing on a Bosu, stabilise. Advanced proprioception.",
   },
   de: {
-    "nav.dashboard": "Übersicht", "nav.calendar": "Kalender", "nav.pps": "Gesundheitspass", "nav.races": "Rennen",
+    "nav.plans": "Trainingspläne", "nav.dashboard": "Übersicht", "nav.calendar": "Kalender", "nav.pps": "Gesundheitspass", "nav.races": "Rennen",
     "nav.trail": "Trail Builder", "nav.ghost": "Ghost Runner", "nav.ghostMobile": "Aufzeichnen", "nav.courses": "Kurse",
     "nav.health": "Gesundheit", "nav.messaging": "Nachrichten", "nav.sync": "Uhr-Sync",
     "nav.flyover": "3D-Überflug", "nav.segments": "Segmente", "nav.performances": "Meine Aktivitäten", "nav.trophies": "Trophäen", "nav.leagues": "Ligen", "nav.shop": "Vergleich", "nav.clubs": "Clubs & Challenges", "nav.community": "Der Club", "nav.profile": "Profil",
@@ -882,7 +882,7 @@ export const T: Record<Lang, Dict> = {
     "renfo.gym.b4.e3.name": "Bosu-Gleichgewicht", "renfo.gym.b4.e3.dose": "3 × 30 s", "renfo.gym.b4.e3.cue": "Auf einem Bosu stehen, stabilisieren. Fortgeschrittene Propriozeption.",
   },
   es: {
-    "nav.dashboard": "Panel", "nav.calendar": "Calendario", "nav.pps": "Pase de salud", "nav.races": "Carreras",
+    "nav.plans": "Planes de entrenamiento", "nav.dashboard": "Panel", "nav.calendar": "Calendario", "nav.pps": "Pase de salud", "nav.races": "Carreras",
     "nav.trail": "Trail Builder", "nav.ghost": "Ghost Runner", "nav.ghostMobile": "Grabar", "nav.courses": "Cursos",
     "nav.health": "Salud", "nav.messaging": "Mensajes", "nav.sync": "Sincronizar reloj",
     "nav.flyover": "Vuelo 3D", "nav.segments": "Segmentos", "nav.performances": "Mis actividades", "nav.trophies": "Vitrina", "nav.leagues": "Ligas", "nav.shop": "Comparador", "nav.clubs": "Clubes y retos", "nav.community": "El Club", "nav.profile": "Perfil",
@@ -1169,7 +1169,7 @@ export const T: Record<Lang, Dict> = {
     "renfo.gym.b4.e3.name": "Equilibrio en Bosu", "renfo.gym.b4.e3.dose": "3 × 30 s", "renfo.gym.b4.e3.cue": "De pie sobre un Bosu, estabiliza. Propiocepción avanzada.",
   },
   pt: {
-    "nav.dashboard": "Painel", "nav.calendar": "Calendário", "nav.pps": "Passe de saúde", "nav.races": "Provas",
+    "nav.plans": "Planos de treino", "nav.dashboard": "Painel", "nav.calendar": "Calendário", "nav.pps": "Passe de saúde", "nav.races": "Provas",
     "nav.trail": "Trail Builder", "nav.ghost": "Ghost Runner", "nav.ghostMobile": "Gravar", "nav.courses": "Aulas",
     "nav.health": "Saúde", "nav.messaging": "Mensagens", "nav.sync": "Sincronizar relógio",
     "nav.flyover": "Sobrevoo 3D", "nav.segments": "Segmentos", "nav.performances": "As minhas atividades", "nav.trophies": "Vitrine", "nav.leagues": "Ligas", "nav.shop": "Comparador", "nav.clubs": "Clubes e desafios", "nav.community": "O Clube", "nav.profile": "Perfil",

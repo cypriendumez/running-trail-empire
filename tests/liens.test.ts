@@ -105,10 +105,14 @@ test("le pied de page garde les DEUX seules portes d'entrée internes", () => {
   // déclare bien les 10 539 fiches de courses et les 309 fiches de chaussures, mais un
   // moteur suit d'abord les liens : les retirer du pied de page rendrait ces pages
   // orphelines — sans qu'aucune 404 ni aucun test ne le signale, puisque rien ne casse.
+  // On cherche le CHEMIN, pas une forme d'écriture : les liens peuvent être posés en JSX
+  // (`href="/courses"`) ou décrits dans un tableau de colonnes (`{ href: "/courses" }`).
+  // Épingler la syntaxe ferait rougir ce test à la première refonte du pied de page, ce
+  // qui est exactement la façon dont un garde-fou finit par être désactivé.
   const footer = readFileSync("src/components/layout/SiteFooter.tsx", "utf8");
-  for (const href of ['href="/courses"', 'href="/chaussures"']) {
-    assert.ok(footer.includes(href),
-      `le pied de page ne pointe plus vers ${href} : les pages publiques redeviennent orphelines pour Google`);
+  for (const chemin of ["/courses", "/chaussures"]) {
+    assert.ok(new RegExp(`["']${chemin}["']`).test(footer),
+      `le pied de page ne pointe plus vers ${chemin} : les pages publiques redeviennent orphelines pour Google`);
   }
 });
 

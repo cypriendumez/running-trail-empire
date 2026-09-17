@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Menu, X,
+  Menu, X, ClipboardList,
   LayoutDashboard, MapPin, Mountain, Heart, ShoppingBag,
   User, Trophy, Settings, LogOut, ChevronLeft,
   Ghost, Watch, GraduationCap, CalendarDays, MessagesSquare, Newspaper, Crown, Medal, Users, Target, ShieldCheck,
@@ -26,6 +26,9 @@ const groups: { titleKey: string | null; items: { href: string; icon: typeof Lay
     titleKey: "group.training",
     items: [
       { href: "/dashboard/calendrier", icon: CalendarDays, tk: "nav.calendar" },
+      // Juste sous le calendrier : le plan glissant répond à « et demain ? », le
+      // catalogue à « et les trois prochains mois ? ». Les deux se consultent ensemble.
+      { href: "/dashboard/plans", icon: ClipboardList, tk: "nav.plans" },
       { href: "/dashboard/races", icon: MapPin, tk: "nav.races" },
       // Juste SOUS « Courses » : le PPS ne se cherche pas pour lui-même, on y pense au
       // moment de s'inscrire. Le voisinage fait la moitié du travail de découverte.
