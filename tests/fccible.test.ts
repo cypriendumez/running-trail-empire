@@ -473,8 +473,13 @@ test("le constat nomme la BONNE cause", () => {
   assert.match(src, /const allegee = ctx\.volume\.longRunEased \|\| ctx\.weekPlan\.eased \|\| ctx\.cycle\.taper \|\| ctx\.readiness\.level !== "vert"/,
     "les deux causes ne sont plus distinguées");
   assert.match(src, /manqueVolumeAllege\(/, "le message « semaine allégée » a disparu");
-  assert.match(src, /annoncerEcart\(sortir\(week\)\)/, "le constat n'est plus appliqué à la sortie principale");
-  assert.match(src, /annoncerEcart\(sortir\(\[\.\.\.week, \.\.\.doubles\]\)\)/,
+  // La composition a grandi : `menagerArticulations` s'intercale pour convertir une part
+  // des footings en marche/course et en volume sans impact (mode perte de poids). On
+  // épingle la chaîne COMPLÈTE — si quelqu'un retire l'un des trois maillons, ce test le
+  // dit, au lieu de laisser passer une sortie non annotée ou non ménagée.
+  assert.match(src, /annoncerEcart\(menagerArticulations\(sortir\(week\)\)\)/,
+    "le constat n'est plus appliqué à la sortie principale");
+  assert.match(src, /annoncerEcart\(menagerArticulations\(sortir\(\[\.\.\.week, \.\.\.doubles\]\)\)\)/,
     "le constat saute quand le plan porte des doubles séances");
   const i18n = readFileSync("src/lib/ai/planI18n.ts", "utf8");
   for (const cle of ["manqueVolume", "manqueVolumeAllege"])

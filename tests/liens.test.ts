@@ -100,5 +100,40 @@ test("la page des formules est la MÊME partout", () => {
     `plusieurs adresses pour la même page : ${distincts.join(" · ")}`);
 });
 
+test("le pied de page garde les DEUX seules portes d'entrée internes", () => {
+  // ⚠️ Tout le maillage interne des pages publiques tient à ces deux ancres. Le sitemap
+  // déclare bien les 10 539 fiches de courses et les 309 fiches de chaussures, mais un
+  // moteur suit d'abord les liens : les retirer du pied de page rendrait ces pages
+  // orphelines — sans qu'aucune 404 ni aucun test ne le signale, puisque rien ne casse.
+  const footer = readFileSync("src/components/layout/SiteFooter.tsx", "utf8");
+  for (const href of ['href="/courses"', 'href="/chaussures"']) {
+    assert.ok(footer.includes(href),
+      `le pied de page ne pointe plus vers ${href} : les pages publiques redeviennent orphelines pour Google`);
+  }
+});
+
+test("les réseaux sociaux : une seule source, et jamais de lien externe nu", () => {
+  // Une adresse recopiée finit par diverger, et un lien externe sans `noopener` laisse la
+  // page ouverte manipuler la nôtre via window.opener.
+  const social = readFileSync("src/components/brand/SocialLinks.tsx", "utf8");
+  assert.ok(/from "@\/lib\/brand\/reseaux"/.test(social),
+    "les liens sociaux ne viennent plus de la source unique lib/brand/reseaux");
+  assert.ok(/rel="noopener noreferrer"/.test(social) && /target="_blank"/.test(social),
+    "un lien social s'ouvre sans noopener/noreferrer");
+  // ⚠️ SANS RETIRER LES COMMENTAIRES, CE TEST NE PEUT PLUS ROUGIR : le fichier EXPLIQUE
+  // pourquoi le jeton est proscrit, donc il contient le motif recherché et l'assertion
+  // serait fausse en permanence. On retire les commentaires — et on ne coupe surtout pas
+  // sur `//` précédé de `:`, sinon les URL elles-mêmes seraient tronquées.
+  const src = readFileSync("src/lib/brand/reseaux.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  for (const attendu of ["tiktok.com/@pacevo.fr", "instagram.com/pacevo.fr", "linkedin.com/company/pacevo"]) {
+    assert.ok(src.includes(attendu), `compte absent de la source unique : ${attendu}`);
+  }
+  // Le jeton de partage `stkn` d'Instagram ne doit JAMAIS être publié : il vient d'un QR
+  // code propre à un appareil, il expire, et c'est une trace de session exposée.
+  assert.ok(!/stkn=/.test(src), "un jeton de partage Instagram est publié dans le pied de page");
+});
+
 console.log(`\n${passed} test(s) de liens passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }

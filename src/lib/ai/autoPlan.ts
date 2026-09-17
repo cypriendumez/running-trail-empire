@@ -711,11 +711,79 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
     // Le matin AVANT le soir : les écrans trient par date, et deux séances de même
     // date doivent s'afficher dans l'ordre où elles se courent.
     if (doubles.length) {
-      return annoncerEcart(sortir([...week, ...doubles]));
+      return annoncerEcart(menagerArticulations(sortir([...week, ...doubles])));
     }
   }
 
-  return annoncerEcart(sortir(week));
+  return annoncerEcart(menagerArticulations(sortir(week)));
+
+  /**
+   * ── MÉNAGER LES ARTICULATIONS (mode perte de poids) ────────────────────────
+   *
+   * ⚠️ DEUX RÈGLES ÉTAIENT CALCULÉES ET N'ÉTAIENT CONSOMMÉES PAR PERSONNE.
+   * `weightTrainingRules` (lib/weight/coaching) produit cinq consignes. Deux d'entre
+   * elles pilotaient déjà le plan — `maxQualityPerWeek` plafonne le budget qualité,
+   * `maxWeeklyProgressPct` plafonne la montée de volume. Les deux autres,
+   * `walkRunAdvised` et `lowImpactSharePct`, n'étaient AFFICHÉES que dans l'onglet
+   * Poids : l'écran annonçait « 60 % du volume sans impact, alternance marche/course »
+   * pendant que la montre recevait de la course continue.
+   *
+   * Pour quelqu'un en obésité qui débute, ce n'est pas un détail d'affichage : c'est
+   * exactement le scénario de la périostite et de la fasciite plantaire à la 3ᵉ semaine.
+   *
+   * On ne touche QUE les séances faciles. Une qualité ou une sortie longue ne se
+   * convertit pas ici — le budget qualité les a déjà plafonnées en amont, et les
+   * transformer ferait disparaître la structure de la semaine.
+   */
+  function menagerArticulations(jours: PlanDay[]): PlanDay[] {
+    const regles = ctx.weightLoss?.rules;
+    if (!regles) return jours;
+    const { walkRunAdvised, lowImpactSharePct } = regles;
+    if (!walkRunAdvised && !(lowImpactSharePct > 0)) return jours;
+
+    const FACILES = new Set(["Endurance", "Récup"]);
+    const faciles = jours.map((d, i) => ({ d, i })).filter(({ d }) => FACILES.has(d.type));
+    if (!faciles.length) return jours;
+
+    // Durée de la séance remplacée : on la relit dans la prose française, seule version
+    // canonique (même procédé que le doublage plus haut). Sans distance ni allure
+    // connues, on retombe sur une durée neutre plutôt que d'inventer un chiffre.
+    const dureeDe = (d: PlanDay): string => {
+      const km = Number(String(d.detail).match(/(\d+(?:[.,]\d+)?)\s*km/)?.[1]?.replace(",", "."));
+      return (Number.isFinite(km) && km > 0 ? durationFor(km, ctx.easyPace) : null) ?? "40 min";
+    };
+
+    const out = [...jours];
+
+    // 1) LA PART SANS IMPACT, prise sur les DERNIERS footings faciles de la semaine —
+    //    choix déterministe : un plan qui change à chaque rafraîchissement n'est plus un plan.
+    const nSansImpact = Math.min(faciles.length, Math.round((faciles.length * lowImpactSharePct) / 100));
+    const versVelo = new Set(faciles.slice(faciles.length - nSansImpact).map(({ i }) => i));
+    for (const i of versVelo) {
+      const duree = dureeDe(out[i]);
+      out[i] = reecrire({ ...out[i], type: "Vélo" }, (l) => ({
+        title: PLAN_T[l].sansImpactTitre,
+        detail: PLAN_T[l].sansImpactDetail(duree),
+        why: PLAN_T[l].sansImpactWhy,
+        tags: [PLAN_T[l].tags["Vélo"], PLAN_T[l].tags["Z2"]],
+      }));
+    }
+
+    // 2) MARCHE/COURSE sur les séances à pied qui restent.
+    if (walkRunAdvised) {
+      for (const { i } of faciles) {
+        if (versVelo.has(i)) continue;
+        const duree = dureeDe(out[i]);
+        out[i] = reecrire(out[i], (l) => ({
+          title: PLAN_T[l].marcheCourseTitre,
+          detail: PLAN_T[l].marcheCourseDetail(duree),
+          why: PLAN_T[l].marcheCourseWhy,
+          tags: [PLAN_T[l].tags["Endurance"], PLAN_T[l].tags["Z1"]],
+        }));
+      }
+    }
+    return out;
+  }
 
   /**
    * ── LE RENFORCEMENT DE SECOURS ─────────────────────────────────────────────

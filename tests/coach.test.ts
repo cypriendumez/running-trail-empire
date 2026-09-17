@@ -5452,6 +5452,65 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     assert.ok(/pushIntervalsWorkout\(/.test(prescr), "le test VMA n'est pas poussé sur la montre");
   });
 
+  test("perte de poids : marche/course et volume sans impact arrivent VRAIMENT dans le plan", () => {
+    // ⚠️ Ces deux règles étaient CALCULÉES et affichées dans l'onglet Poids, mais aucun
+    // consommateur ne les lisait : l'écran annonçait « 60 % sans impact, marche/course »
+    // pendant que la montre recevait de la course continue. Pour un débutant en obésité,
+    // c'est le scénario de la périostite à la 3ᵉ semaine.
+    const regles = { maxWeeklyProgressPct: 5, walkRunAdvised: true, lowImpactSharePct: 60, strengthPerWeek: 2, maxQualityPerWeek: 0, rationale: "" };
+    const p = buildWeekPlan(ctx({ weightLoss: { plan: { band: "obesite_2" }, rules: regles } } as never), new Date());
+
+    assert.ok(p.some((d) => d.type === "Vélo"),
+      "aucune séance sans impact alors que 60 % du volume doit sortir de la course");
+    const aPied = p.filter((d) => d.type === "Endurance" || d.type === "Récup");
+    assert.ok(aPied.length > 0, "aucune séance à pied dans le plan : le scénario ne prouve rien");
+    // On vise le TITRE canonique, pas le mot « marche » : « Repos complet. Marche,
+    // étirements… » et la récupération en marchant des lignes droites le contiennent déjà,
+    // donc une assertion sur le texte serait vraie sans que rien n'ait été converti.
+    for (const d of aPied) {
+      assert.match(d.title, /^Marche\/course$/,
+        `séance à pied en course continue malgré l'alternance marche/course demandée : « ${d.title} »`);
+    }
+    // Et les 4 autres langues suivent : sans cela, un athlète non francophone verrait la
+    // consigne d'origine — la divergence silencieuse que `reecrire` existe pour éviter.
+    for (const d of aPied) {
+      for (const l of ["en", "de", "es", "pt"] as const) {
+        assert.ok(d.i18n?.[l] && d.i18n[l]!.detail !== d.detail,
+          `${l} : la séance marche/course n'est pas traduite`);
+      }
+    }
+  });
+
+  test("la marche/course reste POUSSABLE sur la montre, et sans fausses répétitions", () => {
+    // ⚠️ Un type que `stepsForType` ne connaît pas rend null, et autoCoach SUPPRIME alors
+    // la séance de la montre. Une reformulation « inoffensive » du texte peut donc effacer
+    // la séance du poignet sans lever la moindre erreur.
+    const regles = { maxWeeklyProgressPct: 5, walkRunAdvised: true, lowImpactSharePct: 0, strengthPerWeek: 2, maxQualityPerWeek: 0, rationale: "" };
+    const p = buildWeekPlan(ctx({ weightLoss: { plan: { band: "obesite_1" }, rules: regles } } as never), new Date());
+    const marche = p.filter((d) => /^Marche\/course$/.test(d.title));
+    assert.ok(marche.length > 0, "aucune séance marche/course produite : le scénario ne teste rien");
+    for (const d of marche) {
+      const b = buildWorkoutDescription(d.title, d.detail, `${d.type} ${d.tags.join(" ")}`, null, 17.6, 15, 10);
+      assert.ok(b, `séance marche/course non poussable → elle serait EFFACÉE de la montre : « ${d.title} »`);
+      // Le texte ne doit pas contenir de motif « N × valeur », que `parseReps` lirait comme
+      // des répétitions et transformerait en fractionné avec allures cibles.
+      assert.equal(parseReps(d.detail, null), null,
+        `la marche/course est lue comme un fractionné par la montre : « ${d.detail} »`);
+    }
+  });
+
+  test("sans mode perte de poids, aucune marche/course n'est imposée", () => {
+    // Le contre-poids : un garde-fou qui ne s'éteint jamais ne prouve rien. Ici il doit
+    // rester STRICTEMENT inactif pour un athlète qui n'est pas en perte de poids.
+    const p = buildWeekPlan(ctx(), new Date());
+    const aPied = p.filter((d) => d.type === "Endurance" || d.type === "Récup");
+    assert.ok(aPied.length > 0, "aucune séance facile : le contre-poids ne prouve rien");
+    assert.ok(aPied.every((d) => !/^Marche\/course$/.test(d.title)),
+      "une marche/course est imposée à un athlète qui n'est pas en perte de poids");
+    assert.ok(!p.some((d) => d.type === "Vélo" && /sans impact/i.test(d.title)),
+      "du volume sans impact est imposé à un athlète qui n'est pas en perte de poids");
+  });
+
   test("la FC max se lit sur TOUT l'historique, jamais sur la fenêtre de 60 séances", () => {
     // `fetchWorkouts` est plafonné à 60 séances (~2 mois). La vraie FC max d'un athlète qui
     // court depuis des années tombe presque toujours hors de cette fenêtre : le coach calait

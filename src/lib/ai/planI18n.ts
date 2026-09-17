@@ -78,6 +78,18 @@ export type TextesPlan = {
   veloLongTitre: string;
   veloLongDetail: (echauff: number, duree: string, notes: string) => string;
   veloLongWhy: string;
+
+  // ── Ménager les articulations (mode perte de poids) ─────────────────────────
+  // Ces textes ne portent AUCUNE allure cible : ce sont des séances pilotées à la
+  // sensation et à la FC. Ils évitent aussi le motif « N × valeur » — `parseReps`
+  // (lib/watch/intervals) le lirait comme des répétitions et poserait des allures
+  // sur ce qui doit rester une marche.
+  marcheCourseTitre: string;
+  marcheCourseDetail: (duree: string) => string;
+  marcheCourseWhy: string;
+  sansImpactTitre: string;
+  sansImpactDetail: (duree: string) => string;
+  sansImpactWhy: string;
   longSpecTitre: string;
   longSpecDetail: (echauff: number, corps: string, allureFacile: string, specKm: string, allure: string, calme: number, notes: string) => string;
   longSpecWhy: string;
@@ -199,6 +211,12 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     veloLongTitre: "Sortie longue à vélo",
     veloLongDetail: (e, d, n) => `Échauffement ${e} min très facile → ${d} à 2h en FC Z2, allure conversationnelle, cadence souple → 10 min de retour au calme. Pas d'allure cible : c'est du volume aérobie sans impact.${n}`,
     veloLongWhy: "Le volume aérobie de la semaine, sans les contraintes d'impact de la course.",
+    marcheCourseTitre: "Marche/course",
+    marcheCourseDetail: (d) => `Environ ${d} en alternant course très facile et marche : cours deux minutes en restant capable de parler, puis marche une minute, et recommence jusqu'au bout. La marche fait PARTIE de la séance, ce n'est pas un échec.`,
+    marcheCourseWhy: "Ton cœur encaisse déjà la course continue ; tes tendons et tes articulations, pas encore. L'alternance donne le même travail aérobie en divisant les chocs, et c'est ce qui évite la périostite du deuxième mois.",
+    sansImpactTitre: "Volume sans impact (vélo ou elliptique)",
+    sansImpactDetail: (d) => `Environ ${d} à vélo, en elliptique ou en rameur, en FC Z2 — allure conversationnelle, aucune allure cible. Remplace le footing du jour : même temps d'effort, zéro impact au sol.`,
+    sansImpactWhy: "Une part du volume passe hors course pour construire le moteur sans répéter les chocs, le temps que la charge articulaire redevienne soutenable.",
     longSpecTitre: "Sortie longue avec bloc spécifique",
     longSpecDetail: (e, c, a, s, p, k, n) => `Échauffement ${e} min progressif FC Z1→Z2 → Corps : ${c} en Z2${a}, puis ${s} km à ${p}/km SUR JAMBES FATIGUÉES → Retour au calme ${k} min FC Z1.${n}`,
     longSpecWhy: "Le bloc à allure course arrive en FIN de sortie, quand les jambes sont déjà lourdes — c'est exactement l'état dans lequel tu seras au dernier tiers de ta course. Aucune séance ne prépare mieux le jour J.",
@@ -304,6 +322,12 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     veloLongTitre: "Long ride",
     veloLongDetail: (e, d, n) => `Warm-up ${e} min very easy → ${d} to 2h at HR Z2, conversational, smooth cadence → 10 min of cool-down. No target pace: this is aerobic volume without impact.${n}`,
     veloLongWhy: "The aerobic volume of the week, without the impact load of running.",
+    marcheCourseTitre: "Walk/run",
+    marcheCourseDetail: (d) => `About ${d} alternating very easy running and walking: run two minutes while still able to talk, then walk one minute, and repeat to the end. The walking is PART of the session, not a failure.`,
+    marcheCourseWhy: "Your heart already handles continuous running; your tendons and joints do not yet. Alternating gives the same aerobic work while dividing the impact — that is what prevents the second-month shin splints.",
+    sansImpactTitre: "Impact-free volume (bike or elliptical)",
+    sansImpactDetail: (d) => `About ${d} on the bike, elliptical or rower, at HR Z2 — conversational, no target pace. Replaces today's easy run: same time on task, zero ground impact.`,
+    sansImpactWhy: "Part of the volume moves off running to build the engine without repeating the impact, until the joint load becomes sustainable again.",
     longSpecTitre: "Long run with a race-pace block",
     longSpecDetail: (e, c, a, s, p, k, n) => `Warm-up ${e} min building HR Z1→Z2 → Main set: ${c} at Z2${a}, then ${s} km at ${p}/km ON TIRED LEGS → Cool-down ${k} min HR Z1.${n}`,
     longSpecWhy: "The race-pace block comes at the END of the run, when the legs are already heavy — exactly the state you will be in over the last third of your race. No session prepares race day better.",
@@ -409,6 +433,12 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     veloLongTitre: "Lange Radausfahrt",
     veloLongDetail: (e, d, n) => `Aufwärmen ${e} min sehr locker → ${d} bis 2h bei HF Z2, Unterhaltungstempo, runde Trittfrequenz → 10 min Auslaufen. Kein Zieltempo: Das ist aerober Umfang ohne Belastungsspitzen.${n}`,
     veloLongWhy: "Der aerobe Umfang der Woche, ohne die Aufprallbelastung des Laufens.",
+    marcheCourseTitre: "Geh-/Lauf-Wechsel",
+    marcheCourseDetail: (d) => `Etwa ${d} im Wechsel aus sehr lockerem Laufen und Gehen: zwei Minuten laufen, so dass du noch sprechen kannst, dann eine Minute gehen, und so weiter bis zum Schluss. Das Gehen gehört ZUR Einheit, es ist kein Scheitern.`,
+    marcheCourseWhy: "Dein Herz verkraftet Dauerlauf bereits, deine Sehnen und Gelenke noch nicht. Der Wechsel bringt denselben aeroben Reiz bei halber Stoßbelastung — genau das verhindert das Schienbeinkantensyndrom im zweiten Monat.",
+    sansImpactTitre: "Umfang ohne Stoßbelastung (Rad oder Crosstrainer)",
+    sansImpactDetail: (d) => `Etwa ${d} auf dem Rad, Crosstrainer oder Ruderergometer, in HF Z2 — im Gesprächstempo, keine Pace-Vorgabe. Ersetzt den heutigen Dauerlauf: gleiche Belastungszeit, null Aufprall.`,
+    sansImpactWhy: "Ein Teil des Umfangs läuft abseits des Laufens, um den Motor zu bauen, ohne die Stöße zu wiederholen — bis die Gelenkbelastung wieder tragbar ist.",
     longSpecTitre: "Langer Lauf mit Wettkampftempo-Block",
     longSpecDetail: (e, c, a, s, p, k, n) => `Aufwärmen ${e} min ansteigend HF Z1→Z2 → Hauptteil: ${c} in Z2${a}, dann ${s} km zu ${p}/km AUF MÜDEN BEINEN → Auslaufen ${k} min HF Z1.${n}`,
     longSpecWhy: "Der Wettkampftempo-Block kommt am ENDE des Laufs, wenn die Beine schon schwer sind — genau der Zustand, in dem du im letzten Drittel deines Wettkampfs sein wirst. Keine Einheit bereitet besser auf den Tag X vor.",
@@ -514,6 +544,12 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     veloLongTitre: "Salida larga en bici",
     veloLongDetail: (e, d, n) => `Calentamiento ${e} min muy suave → ${d} a 2h en FC Z2, ritmo conversacional, cadencia ágil → 10 min de vuelta a la calma. Sin ritmo objetivo: es volumen aeróbico sin impacto.${n}`,
     veloLongWhy: "El volumen aeróbico de la semana, sin las exigencias de impacto de la carrera.",
+    marcheCourseTitre: "Caminar/correr",
+    marcheCourseDetail: (d) => `Unos ${d} alternando carrera muy suave y caminata: corre dos minutos pudiendo hablar, luego camina un minuto, y repite hasta el final. Caminar FORMA PARTE de la sesión, no es un fracaso.`,
+    marcheCourseWhy: "Tu corazón ya aguanta la carrera continua; tus tendones y articulaciones todavía no. Alternar da el mismo trabajo aeróbico dividiendo los impactos, y es lo que evita la periostitis del segundo mes.",
+    sansImpactTitre: "Volumen sin impacto (bici o elíptica)",
+    sansImpactDetail: (d) => `Unos ${d} en bici, elíptica o remo, en FC Z2 — ritmo conversacional, sin ritmo objetivo. Sustituye el rodaje de hoy: mismo tiempo de esfuerzo, cero impacto contra el suelo.`,
+    sansImpactWhy: "Parte del volumen sale de la carrera para construir el motor sin repetir los impactos, hasta que la carga articular vuelva a ser sostenible.",
     longSpecTitre: "Tirada larga con bloque a ritmo",
     longSpecDetail: (e, c, a, s, p, k, n) => `Calentamiento ${e} min progresivo FC Z1→Z2 → Parte principal: ${c} en Z2${a}, luego ${s} km a ${p}/km CON LAS PIERNAS CANSADAS → Vuelta a la calma ${k} min FC Z1.${n}`,
     longSpecWhy: "El bloque a ritmo de carrera llega al FINAL de la tirada, cuando las piernas ya pesan — exactamente el estado en el que estarás en el último tercio de tu carrera. Ninguna sesión prepara mejor el día D.",
@@ -619,6 +655,12 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     veloLongTitre: "Saída longa de bicicleta",
     veloLongDetail: (e, d, n) => `Aquecimento ${e} min muito fácil → ${d} a 2h em FC Z2, ritmo conversacional, cadência solta → 10 min de retorno à calma. Sem ritmo alvo: é volume aeróbio sem impacto.${n}`,
     veloLongWhy: "O volume aeróbio da semana, sem as exigências de impacto da corrida.",
+    marcheCourseTitre: "Caminhar/correr",
+    marcheCourseDetail: (d) => `Cerca de ${d} alternando corrida muito fácil e caminhada: corre dois minutos conseguindo falar, depois caminha um minuto, e repete até ao fim. A caminhada FAZ PARTE da sessão, não é um fracasso.`,
+    marcheCourseWhy: "O teu coração já aguenta a corrida contínua; os teus tendões e articulações ainda não. Alternar dá o mesmo trabalho aeróbio dividindo os impactos, e é isso que evita a periostite do segundo mês.",
+    sansImpactTitre: "Volume sem impacto (bicicleta ou elíptica)",
+    sansImpactDetail: (d) => `Cerca de ${d} de bicicleta, elíptica ou remo, em FC Z2 — ritmo conversacional, sem ritmo alvo. Substitui o rodagem de hoje: mesmo tempo de esforço, zero impacto no solo.`,
+    sansImpactWhy: "Parte do volume sai da corrida para construir o motor sem repetir os impactos, até a carga articular voltar a ser sustentável.",
     longSpecTitre: "Longo com bloco a ritmo de prova",
     longSpecDetail: (e, c, a, s, p, k, n) => `Aquecimento ${e} min progressivo FC Z1→Z2 → Parte principal: ${c} em Z2${a}, depois ${s} km a ${p}/km COM AS PERNAS CANSADAS → Retorno à calma ${k} min FC Z1.${n}`,
     longSpecWhy: "O bloco a ritmo de prova chega no FIM do longo, quando as pernas já estão pesadas — exatamente o estado em que vais estar no último terço da tua prova. Nenhuma sessão prepara melhor o dia D.",
