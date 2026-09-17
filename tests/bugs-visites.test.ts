@@ -51,8 +51,15 @@ test("toute table écrite depuis le navigateur a une politique RLS dans les migr
     const src = codeNu(f);
     for (const m of src.matchAll(/supabase\.from\("([a-z_]+)"\)\.(insert|update|upsert|delete)\(/g)) ecrites.add(m[1]);
   }
-  assert.ok(ecrites.has("performance_baselines"), "l'inscription n'écrit plus la VMA depuis le navigateur : le test ne surveille plus le bon endroit");
+  // Sentinelle de vivacité : `profiles` est écrit à l'inscription (plusieurs `.update`).
+  // Si le motif ne le trouve plus, c'est lui qui est cassé, pas le code.
+  assert.ok(ecrites.has("profiles"), "l'inscription n'écrit plus le profil depuis le navigateur : le test ne surveille plus le bon endroit");
   assert.ok(ecrites.size >= 5, `seulement ${ecrites.size} table(s) écrite(s) trouvée(s) : le motif ne trouve plus le code`);
+  // ⚠️ ET LA VMA NE DOIT PLUS S'ÉCRIRE DEPUIS LE NAVIGATEUR. Le test 6 min se mesure via
+  // /api/vma (client de service, hors périmètre RLS) ; réintroduire une insertion
+  // `performance_baselines` dans l'inscription ferait revenir le 42501 de 100 % des inscrits.
+  assert.ok(!ecrites.has("performance_baselines"),
+    "l'inscription réécrit la VMA depuis le navigateur : elle doit passer par /api/vma (client de service), pas par le client de session");
   const sansPolitique: string[] = [];
   for (const t of ecrites) {
     const rls = new RegExp(`alter table ${t} enable row level security`).test(sql);

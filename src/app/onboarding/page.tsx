@@ -5,21 +5,24 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import { vmaFrom6min } from "@/lib/running/fitness";
-import { ArrowRight, ArrowLeft, User, Activity, Target, CheckCircle2, Watch, Eye, EyeOff, ExternalLink, RefreshCw, AlertCircle, Wifi, Globe, Mountain, Key } from "lucide-react";
+import { ArrowRight, ArrowLeft, User, Target, HeartPulse, CheckCircle2, Watch, Eye, EyeOff, ExternalLink, RefreshCw, AlertCircle, Wifi, Globe, Mountain, Key } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { OB } from "./onboardingI18n";
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthLabel } from "@/data/healthCatalog";
 import { TERRAINS, terrainLabel } from "@/data/terrainCatalog";
-import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
 type Step = "watch" | "profile" | "physio" | "goals" | "done";
 
 // Le profil et la santé d'abord (questions faciles sur soi : l'athlète s'investit
 // progressivement), la connexion montre EN DERNIER et FACULTATIVE — exiger un compte
 // intervals.icu avant tout usage de l'app est ce qui fait le plus abandonner à l'inscription.
+// ⚠️ L'ÉTAPE « physio » NE DEMANDE PLUS DE VMA. La VMA ne se saisit plus à l'inscription :
+// la toute première séance prescrite par le coach EST le test VMA, et l'athlète en
+// enregistre le résultat depuis son tableau de bord (TestVmaBanner) — voir le verrou dans
+// lib/ai/autoCoach. Il ne reste ici que les FC, FACULTATIVES : à défaut, le coach déduit la
+// FC max du maximum réellement enregistré en séance et la FC de repos de la montre.
 const STEPS: Step[] = ["profile", "physio", "goals", "watch", "done"];
 
 export default function OnboardingPage() {
@@ -90,8 +93,8 @@ export default function OnboardingPage() {
     // il classe « Â » comme non-caractère et « Âge » deviendrait « ge ».
   ].filter((x): x is string => typeof x === "string").map(s => s.replace(/^[^\p{L}\p{N}]+/u, ""));
 
-  const [vma, setVma] = useState({ vma_kmh: "", max_hr: "", resting_hr: "" });
-  const [test6min, setTest6min] = useState("");
+  // FC déclarées — FACULTATIVES. Vides, le coach s'en passe très bien (migration 029).
+  const [fc, setFc] = useState({ max_hr: "", resting_hr: "" });
   const [goals, setGoals] = useState({ target_race: "", target_weekly_km: "50" });
 
   // Watch step state
@@ -197,7 +200,8 @@ export default function OnboardingPage() {
       gender: profile.gender,
       chronotype: profile.chronotype,
       is_female_cycle_sync: profile.is_female_cycle_sync,
-      mode: parseFloat(vma.vma_kmh) >= 17 ? "elite" : "ludique",
+      // Pas de VMA à l'inscription → mode par défaut prudent ; le coach l'affine ensuite.
+      mode: "ludique",
       onboarding_completed: true,
     }).eq("id", user.id);
 
@@ -245,17 +249,30 @@ export default function OnboardingPage() {
       .update({ main_terrain: profile.main_terrains[0] ?? null }).eq("id", user.id);
     noter(eTer1, "terrain principal");
 
-    if (!profileError && vma.vma_kmh) {
-      // Une VMA que l'athlète a SAISIE : la perdre en silence, c'est calibrer toutes ses
-      // allures sur une estimation alors qu'il avait donné une mesure.
-      const { error: eVma } = await supabase.from("performance_baselines").insert({
-        user_id: user.id,
-        vma_kmh: parseFloat(vma.vma_kmh),
-        max_hr: parseInt(vma.max_hr) || 190,
-        resting_hr: parseInt(vma.resting_hr) || 50,
-        tested_at: aujourdhui(FUSEAU_DEFAUT),
-      });
-      noter(eVma, "VMA déclarée");
+    // ⚠️ AUCUNE VMA N'EST PLUS ÉCRITE À L'INSCRIPTION. La VMA se mesure via le test que le
+    // coach prescrit en première séance, et l'athlète en saisit le résultat depuis son
+    // tableau de bord (/api/vma, client de service). L'inscription n'a donc plus rien à
+    // dire sur `performance_baselines` — elle ne l'écrit plus depuis le navigateur.
+
+    /**
+     * FC DÉCLARÉES (facultatives) — ÉCRITURE ISOLÉE ET VOLONTAIREMENT NON BLOQUANTE.
+     *
+     * `performance_baselines` ne peut pas les accueillir seules (ses trois colonnes sont
+     * NOT NULL et il n'y a plus de VMA à l'inscription) : elles vivent donc sur `profiles`,
+     * colonnes ajoutées par la MIGRATION 029.
+     *
+     * ⚠️ TANT QUE LA 029 N'EST PAS PASSÉE, PostgREST répond « column does not exist ». Faire
+     * échouer « Terminer » pour ça reproduirait EXACTEMENT le défaut du 14/09/2026 — 100 %
+     * des inscrits bloqués — et cette fois pour une donnée FACULTATIVE. L'échec est donc
+     * journalisé (jamais muet) mais n'entre pas dans `echecs` : le coach sait déduire les
+     * deux tout seul (max réellement enregistré en séance, montre pour la FC de repos).
+     */
+    if (fc.max_hr || fc.resting_hr) {
+      const { error: eFc } = await supabase.from("profiles").update({
+        max_hr: parseInt(fc.max_hr) || null,
+        resting_hr: parseInt(fc.resting_hr) || null,
+      }).eq("id", user.id);
+      if (eFc) console.error("[inscription] FC déclarées non enregistrées (migration 029 passée ?) :", eFc.message);
     }
 
     if (profileError || echecs.length) {
@@ -581,78 +598,36 @@ export default function OnboardingPage() {
               <div className="bento-card space-y-5">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-9 h-9 bg-zinc-100 rounded-xl flex items-center justify-center">
-                    <Activity className="w-4 h-4 text-zinc-700" />
+                    <HeartPulse className="w-4 h-4 text-zinc-700" />
                   </div>
                   <h2 className="font-semibold text-zinc-900">{tr("phTitle")}</h2>
                 </div>
 
-                <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-sm text-emerald-900 space-y-2">
-                  <div className="font-bold">{tr("testTitle")}</div>
-                  <p>{tr("testIntro")}</p>
-                  <ol className="list-decimal list-inside space-y-0.5 text-emerald-800/80">
-                    <li>{tr("step1")}</li>
-                    <li>{tr("step2")}</li>
-                    <li>{tr("step3")}</li>
-                  </ol>
+                <div className="p-4 bg-zinc-50 border border-zinc-100 rounded-2xl text-sm text-zinc-600 space-y-1">
+                  <div className="font-semibold text-zinc-800">{tr("fcTitle")}</div>
+                  <p className="leading-relaxed">{tr("fcIntro")}</p>
                 </div>
 
-                <div className="rounded-2xl border border-zinc-200 p-4">
-                  <label className="text-xs font-medium text-zinc-500 block mb-1">{tr("distLabel")}</label>
-                  <div className="flex items-center gap-2">
-                    <input type="number" value={test6min}
-                      onChange={e => { setTest6min(e.target.value); const v = vmaFrom6min(parseFloat(e.target.value)); if (v != null) setVma(p => ({ ...p, vma_kmh: String(v) })); }}
-                      placeholder="ex: 1650" min="800" max="3500" step="10"
-                      className="flex-1 px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                    {test6min && vmaFrom6min(parseFloat(test6min)) != null && (
-                      <div className="px-4 py-3 rounded-xl bg-emerald-50 text-emerald-700 font-bold text-sm whitespace-nowrap">{tr("vmaResult", { v: vmaFrom6min(parseFloat(test6min))! })}</div>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor={`${cid}-vma`} className="text-xs font-medium text-zinc-500 block mb-1">{tr("vmaLabel")}</label>
-                  <input id={`${cid}-vma`} type="number" value={vma.vma_kmh} onChange={e => setVma(p => ({...p, vma_kmh: e.target.value}))}
-                    placeholder="ex: 16.5" min="8" max="30" step="0.5"
-                    className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                  <p className="text-[11px] text-zinc-400 mt-1">{tr("vmaHint")}</p>
-                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label htmlFor={`${cid}-fcmax`} className="text-xs font-medium text-zinc-500 block mb-1">{tr("maxHr")}</label>
-                    <input id={`${cid}-fcmax`} type="number" value={vma.max_hr} onChange={e => setVma(p => ({...p, max_hr: e.target.value}))}
+                    <input id={`${cid}-fcmax`} type="number" value={fc.max_hr} onChange={e => setFc(p => ({ ...p, max_hr: e.target.value }))}
                       placeholder="190" min="140" max="220"
                       className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                   </div>
                   <div>
                     <label htmlFor={`${cid}-fcrepos`} className="text-xs font-medium text-zinc-500 block mb-1">{tr("restHr")}</label>
-                    <input id={`${cid}-fcrepos`} type="number" value={vma.resting_hr} onChange={e => setVma(p => ({...p, resting_hr: e.target.value}))}
+                    <input id={`${cid}-fcrepos`} type="number" value={fc.resting_hr} onChange={e => setFc(p => ({ ...p, resting_hr: e.target.value }))}
                       placeholder="55" min="30" max="100"
                       className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                   </div>
                 </div>
 
-                {vma.vma_kmh && (
-                  <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl">
-                    <div className="text-sm font-semibold text-emerald-800 mb-3">{tr("zonesTitle")}</div>
-                    <div className="grid grid-cols-5 gap-1 text-xs">
-                      {computeZones(parseFloat(vma.vma_kmh)).map((z, i) => (
-                        <div key={i} className={`rounded-lg p-2 text-center zone-z${i+1}`}>
-                          <div className="font-semibold">Z{i+1}</div>
-                          <div>{z}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {!(parseFloat(vma.vma_kmh) >= 8 && parseFloat(vma.vma_kmh) <= 30) && (
-                  <p className="text-xs text-emerald-700">{tr("required")}</p>
-                )}
                 <div className="flex gap-3">
                   <button onClick={prev} className="btn-secondary flex-1 justify-center">
                     <ArrowLeft className="w-4 h-4" /> {tr("back")}
                   </button>
-                  {/* La VMA n'est plus bloquante : sans elle, la 1ʳᵉ séance prescrite est le test VMA. */}
+                  {/* Rien n'est obligatoire ici : on ne bloque personne sur une FC qu'il ignore. */}
                   <button onClick={next} className="btn-brand flex-1 justify-center">
                     {tr("next")} <ArrowRight className="w-4 h-4" />
                   </button>
@@ -994,19 +969,4 @@ export default function OnboardingPage() {
       </div>
     </div>
   );
-}
-
-function computeZones(vma: number): string[] {
-  const paces = [
-    vma * 0.60, vma * 0.72,
-    vma * 0.72, vma * 0.82,
-    vma * 0.82, vma * 0.87,
-    vma * 0.87, vma * 0.92,
-    vma * 0.92, vma,
-  ];
-  return [0,1,2,3,4].map(i => {
-    const lo = 60 / paces[i*2];
-    const hi = 60 / paces[i*2+1];
-    return `${lo.toFixed(0)}-${hi.toFixed(0)}'`;
-  });
 }

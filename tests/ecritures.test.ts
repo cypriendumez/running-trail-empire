@@ -140,10 +140,27 @@ test("l'inscription ne génère pas un plan sur des données qu'elle n'a pas pu 
   const i = src.indexOf("const echecs");
   assert.ok(i > 0, "l'inscription ne collecte plus les échecs d'écriture");
   const bloc = src.slice(i, i + 2600);
-  assert.equal([...bloc.matchAll(/noter\(/g)].length, 4,
-    "les quatre écritures isolées de l'inscription ne sont plus toutes contrôlées");
+  // TROIS depuis que la VMA ne s'écrit plus à l'inscription : elle se mesure via le test
+  // prescrit en première séance et s'enregistre côté serveur (/api/vma), plus depuis le
+  // navigateur. Les trois qui restent (disponibilités, terrains, terrain principal) portent
+  // toutes le plan de la première semaine : elles, doivent rester bloquantes.
+  assert.equal([...bloc.matchAll(/noter\(/g)].length, 3,
+    "les trois écritures isolées BLOQUANTES de l'inscription ne sont plus toutes contrôlées");
   assert.ok(/if\s*\(\s*profileError\s*\|\|\s*echecs\.length\s*\)/.test(src),
     "un échec partiel laisse l'inscription se poursuivre comme si tout allait bien");
+  /**
+   * ⚠️ L'EXCEPTION ASSUMÉE : LES FC DÉCLARÉES.
+   *
+   * Elles sont FACULTATIVES et leurs colonnes n'existent qu'à partir de la migration 029 :
+   * bloquer « Terminer » dessus reproduirait le défaut du 14/09/2026 (100 % des inscrits
+   * bloqués), et cette fois pour une donnée dont le coach sait très bien se passer — il
+   * déduit la FC max du maximum réellement enregistré en séance.
+   *
+   * Hors de `echecs`, donc. Mais PAS muette : sans cette trace, une colonne absente ferait
+   * disparaître en silence ce que l'athlète vient de saisir, et personne ne l'apprendrait.
+   */
+  assert.ok(/if \(eFc\) console\.error\(/.test(src),
+    "l'échec d'écriture des FC déclarées est muet : la saisie de l'athlète disparaîtrait sans trace");
 });
 
 /**

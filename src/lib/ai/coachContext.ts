@@ -299,7 +299,7 @@ async function fetchWorkouts(sb: SB, userId: string) {
 }
 
 export async function buildAthleteContext(sb: SB, userId: string): Promise<AthleteContext> {
-  const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, shoeRes, objRes, csRes, wlRes, histRes, sleepDatesRes, hrvDatesRes, formeRes] = await Promise.all([
+  const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, shoeRes, objRes, csRes, wlRes, histRes, sleepDatesRes, hrvDatesRes, formeRes, fcMaxRes] = await Promise.all([
     sb.from("profiles").select("*").eq("id", userId).single(),
     sb.from("performance_baselines").select("*").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).single(),
     sb.from("hrv_data").select("hrv_ms,physiological_state,date").eq("user_id", userId).order("date", { ascending: false }).limit(30),
@@ -340,6 +340,16 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
       .eq("user_id", userId).not("avg_hr", "is", null)
       .gte("date", new Date(Date.now() - 280 * 86400000).toISOString().slice(0, 10))
       .order("date", { ascending: false }).limit(500),
+    // ── FC MAX SUR TOUT L'HISTORIQUE — UNE LIGNE, AUCUNE FENÊTRE ────────────────
+    // `fetchWorkouts` est plafonné à 60 séances, soit environ deux mois. La FC max d'un
+    // athlète qui court depuis des années tombe presque toujours HORS de cette fenêtre :
+    // le coach calait alors ses zones sur le maximum des deux derniers mois, plus bas que
+    // la réalité, et prescrivait des allures et des zones trop basses — sans que rien ne
+    // le dise. Même leçon que les records par distance du tableau de bord : une donnée
+    // « meilleur de tous les temps » se lit avec une requête DÉDIÉE, pas dans une liste
+    // plafonnée. Le tri fait le travail, on ne ramène qu'une ligne.
+    sb.from("workouts").select("max_hr").eq("user_id", userId)
+      .not("max_hr", "is", null).order("max_hr", { ascending: false }).limit(1).maybeSingle(),
   ]);
 
   const p = profileRes.data as Record<string, unknown> | null;
@@ -408,8 +418,19 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const recent14 = workouts.filter(w => isRun(w.sport) && now - new Date(w.date).getTime() <= 14 * 86400000);
   // FC max de repli (baseline → max observé en séance → formule d'âge) — sert à CLASSER l'effort
   // ET à estimer la VMA. Les imports intervals.icu étiquettent souvent TOUT en « easy » : on lit la FC.
-  const obsMaxHr0 = Math.max(0, ...workouts.map(w => num(w.max_hr) ?? 0));
-  const fcMaxEst = num(b?.max_hr) ?? (obsMaxHr0 > 150 ? obsMaxHr0 : null) ?? (num(p?.age) != null ? 220 - (num(p?.age) as number) : 190);
+  // ⚠️ LE MAXIMUM RÉELLEMENT ENREGISTRÉ, SUR TOUT L'HISTORIQUE — pas sur les 60 dernières
+  // séances. `fcMaxRes` porte la ligne la plus haute de toute la table (requête dédiée).
+  const obsMaxHr0 = Math.max(0, ...workouts.map(w => num(w.max_hr) ?? 0),
+    num((fcMaxRes.data as { max_hr?: number } | null)?.max_hr) ?? 0);
+  // FC max DÉCLARÉE : celle du test (baseline) d'abord, sinon celle saisie à l'inscription.
+  const maxHrDeclare = num(b?.max_hr) ?? num(p?.max_hr);
+  // ⚠️ JAMAIS SOUS UNE VALEUR RÉELLEMENT ATTEINTE. Une FC max déclarée à 190 alors que la
+  // montre a enregistré 205 est fausse par construction — on ne peut pas avoir un maximum
+  // inférieur à un battement qu'on a réellement produit. On retient donc la plus haute des
+  // deux, et on ne retombe sur l'âge que si l'athlète n'a NI déclaré NI couru.
+  const fcMaxEst = (maxHrDeclare != null || obsMaxHr0 > 150)
+    ? Math.max(maxHrDeclare ?? 0, obsMaxHr0 > 150 ? obsMaxHr0 : 0)
+    : (num(p?.age) != null ? 220 - (num(p?.age) as number) : 190);
   // Une séance est « dure » si son TYPE le dit OU si la FC révèle un effort élevé (≥ 90 % FCmax).
   // ⚠️ `isHardType` ne suffit PAS : mesuré sur 60 séances de ce compte, intervals.icu
   // n'émet que deux étiquettes, « easy » et « trail ». La FC est donc le seul juge réel.
@@ -471,7 +492,10 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // Notes libres récentes de l'athlète (sensations, douleur précise…) → vues par le coach.
   const fbNotes = feedback.map(f => f.data?.note?.trim()).filter((n): n is string => !!n).slice(0, 3);
 
-  const maxHr = num(b?.max_hr), restHr = num(b?.resting_hr), ltHr = num(b?.lt_hr);
+  // FC déclarées : la baseline (mesurée avec le test) prime, sinon ce que l'athlète a
+  // renseigné à l'inscription (facultatif — migration 029). `null` s'il n'a rien dit :
+  // le coach déduit alors tout seul (max observé en séance, montre pour la FC de repos).
+  const maxHr = maxHrDeclare, restHr = num(b?.resting_hr) ?? num(p?.resting_hr), ltHr = num(b?.lt_hr);
   const vmaStored = num(b?.vma_kmh);
   const garminVo2 = num((p as Record<string, unknown> | null)?.garmin_vo2max);
   // VMA, par fiabilité : test enregistré → efforts réels (reflète l'allure de course) → dérivée de la
@@ -505,10 +529,13 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
    * courir trop vite. `null` si l'historique ne permet pas de conclure : on retombe
    * alors sur le pourcentage de VMA, et le briefing le dit.
    */
+  // ⚠️ LES MÊMES RÉFÉRENCES QUE PARTOUT AILLEURS. Cette chaîne recalculait la FC max dans
+  // son coin (`b.max_hr ?? observé`) : elle ignorait donc la FC déclarée au profil ET la
+  // règle « jamais sous le maximum réellement atteint ». `fcMaxEst` porte déjà les deux.
   const easyPaceMesure = easyPaceFromHeartRate(
     runs,
-    num(b?.max_hr) ?? (obsMaxHr0 > 150 ? obsMaxHr0 : null),
-    num(b?.resting_hr) ?? num((((p as Record<string, unknown> | null)?.garmin_metrics) as Record<string, unknown> | null)?.restingHR),
+    fcMaxEst,
+    restHr ?? num((((p as Record<string, unknown> | null)?.garmin_metrics) as Record<string, unknown> | null)?.restingHR),
     acclimVma,
   );
 
@@ -574,11 +601,14 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // à la zone qu'il définit littéralement : le seuil.
   const gm = (p as Record<string, unknown> | null)?.garmin_metrics as Record<string, unknown> | null | undefined;
   const lthrMeasured = num(gm?.lthr) ?? ltHr;
-  const maxHrEff = maxHr
-    ?? (obsMaxHr0 > 150 ? obsMaxHr0 : null)
+  // ⚠️ MÊME RÈGLE QU'EN HAUT (fcMaxEst) : la plus haute entre ce qui est DÉCLARÉ et ce qui
+  // a été RÉELLEMENT enregistré. Prendre la déclaration seule faisait calculer toutes les
+  // zones sous la réalité pour qui s'est sous-estimé à l'inscription.
+  const maxHrEff = (maxHr != null || obsMaxHr0 > 150)
+    ? Math.max(maxHr ?? 0, obsMaxHr0 > 150 ? obsMaxHr0 : 0)
     // Le seuil vaut ~92 % de la FC max chez un athlète entraîné : bien meilleur repli
     // que l'âge (ici 209 déduit contre 209 réellement observés).
-    ?? (lthrMeasured != null && lthrMeasured > 120 ? Math.round(lthrMeasured / 0.92) : null)
+    : (lthrMeasured != null && lthrMeasured > 120 ? Math.round(lthrMeasured / 0.92) : null)
     ?? (num(p?.age) ? 220 - num(p!.age)! : null);
   const restHrEff = restHr ?? num(gm?.restingHR) ?? null;
   const hrZone = (lo: number, hi: number) => {

@@ -5452,6 +5452,36 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     assert.ok(/pushIntervalsWorkout\(/.test(prescr), "le test VMA n'est pas poussé sur la montre");
   });
 
+  test("la FC max se lit sur TOUT l'historique, jamais sur la fenêtre de 60 séances", () => {
+    // `fetchWorkouts` est plafonné à 60 séances (~2 mois). La vraie FC max d'un athlète qui
+    // court depuis des années tombe presque toujours hors de cette fenêtre : le coach calait
+    // alors ses zones sur le maximum des deux derniers mois — plus bas que la réalité, donc
+    // des allures et des zones trop basses, en silence. Une requête DÉDIÉE, une seule ligne.
+    const src = codeOf("src/lib/ai/coachContext.ts");
+    assert.ok(/\.select\("max_hr"\)[\s\S]{0,200}?\.order\("max_hr", \{ ascending: false \}\)/.test(src),
+      "aucune requête dédiée ne cherche la FC max sur tout l'historique");
+    // …et elle doit RÉELLEMENT alimenter le maximum observé, pas dormir dans une variable.
+    assert.ok(/const obsMaxHr0 = Math\.max\([\s\S]{0,200}?fcMaxRes/.test(src),
+      "la FC max historique n'entre pas dans le maximum observé (requête faite pour rien)");
+  });
+
+  test("une FC max déclarée ne passe jamais sous une FC réellement enregistrée", () => {
+    // Déclarer 190 quand la montre a relevé 205 est faux par construction : on ne peut pas
+    // avoir un maximum inférieur à un battement réellement produit. Les deux chaînes (celle
+    // qui classe l'effort, celle qui calcule les zones) retiennent donc la plus haute.
+    const src = codeOf("src/lib/ai/coachContext.ts");
+    assert.ok(/const fcMaxEst = \(maxHrDeclare != null \|\| obsMaxHr0 > 150\)[\s\S]{0,120}?Math\.max\(maxHrDeclare/.test(src),
+      "fcMaxEst retient la FC déclarée même si une FC plus haute a été enregistrée");
+    assert.ok(/const maxHrEff = \(maxHr != null \|\| obsMaxHr0 > 150\)[\s\S]{0,120}?Math\.max\(maxHr/.test(src),
+      "maxHrEff retient la FC déclarée même si une FC plus haute a été enregistrée");
+    // La FC déclarée au PROFIL (migration 029) doit être lue, sinon le champ de l'inscription
+    // est un champ qui jette ce qu'on lui donne.
+    assert.ok(/maxHrDeclare = num\(b\?\.max_hr\) \?\? num\(p\?\.max_hr\)/.test(src),
+      "la FC max déclarée à l'inscription (profiles.max_hr) n'est pas lue");
+    assert.ok(/restHr = num\(b\?\.resting_hr\) \?\? num\(p\?\.resting_hr\)/.test(src),
+      "la FC de repos déclarée à l'inscription (profiles.resting_hr) n'est pas lue");
+  });
+
   test("le fondateur (admin) est exempté du test VMA", () => {
     // Le chef de l'app pilote le produit et a une VMA déjà estimée depuis sa courbe : lui
     // imposer le test 6 min serait absurde. L'exemption passe par `estAdmin` (ADMIN_EMAILS,
