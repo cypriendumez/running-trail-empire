@@ -114,6 +114,28 @@ test("aucune classe n'utilise une opacité absente de l'échelle Tailwind", () =
  * toujours là ET toujours valides. Un voile supprimé ne casse rien visiblement en test,
  * mais rend le texte blanc illisible sur une photo claire.
  */
+test("le fondu vert du bas du hero rend VRAIMENT quelque chose", () => {
+  // ⚠️ DEUX FOIS LE MÊME PIÈGE, ET C'EST TOUTE LA RAISON D'ÊTRE DE CE FICHIER.
+  // Il est né d'opacités hors échelle Tailwind qui ne produisaient aucun CSS. Le
+  // 17/09/2026, le fondu du bas du hero a été réécrit en `bg-[linear-gradient(...)]` pour
+  // cesser d'écraser la piste d'athlétisme : `getComputedStyle` rendait
+  // `background-image: none`. La classe était bien dans le DOM, le compilateur n'en avait
+  // rien fait, et rien ne le signalait. Or un fondu qui ne rend rien ne se voit pas — il
+  // ramène juste la coupure nette qu'il devait supprimer.
+  // D'où le style INLINE : il ne passe par aucun compilateur, donc il ne peut pas
+  // disparaître en silence.
+  const src = sansCommentaires(readFileSync("src/app/page.tsx", "utf8"));
+  const m = src.match(/backgroundImage:\s*"linear-gradient\(to bottom,[^"]*?(#[0-9a-fA-F]{6}) 100%\)"/);
+  assert.ok(m, "le fondu du bas du hero n'est plus un style inline : une classe arbitraire peut ne produire AUCUN CSS");
+
+  // …et sa dernière étape doit valoir EXACTEMENT la couleur par laquelle commence la
+  // section suivante. Sinon la bande réapparaît, à l'endroit précis qu'on voulait adoucir.
+  assert.equal(m![1].toLowerCase(), "#059669", `le fondu finit sur ${m![1]} au lieu de #059669 (emerald-600)`);
+  const waitlist = readFileSync("src/components/WaitlistSection.tsx", "utf8");
+  assert.match(waitlist, /from-emerald-600/,
+    "WaitlistSection ne commence plus par emerald-600 : le fondu du hero ne la rejoint plus, la bande revient");
+});
+
 test("les trois voiles du hero existent, chacun identifié par son ancrage", () => {
   const src = sansCommentaires(readFileSync("src/app/page.tsx", "utf8"));
   // ⚠️ ON IDENTIFIE CHAQUE VOILE PAR SON ANCRAGE, PAS PAR UN COMPTE. Mon premier jet

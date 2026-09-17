@@ -614,10 +614,34 @@ export default function LandingPage() {
             <StoreBadges className="mt-6" ton="clair" />
           </div>
         </Container>
-        {/* Fondu du bas de la photo vers le vert de la liste d'attente : la piste se
-            coupait net contre l'émeraude et formait une « bande » dure. z entre la photo
-            (z-0) et le contenu (z-10) → le texte et les badges restent lisibles par-dessus. */}
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-32 bg-gradient-to-b from-transparent to-emerald-600" />
+        {/* Fondu du bas de la photo vers le vert de la liste d'attente.
+            ⚠️ IL ÉTAIT LINÉAIRE, ET IL MANGEAIT LA PHOTO. `from-transparent to-emerald-600`
+            sur 128 px : à mi-hauteur le voile était déjà à ~50 % d'opacité, donc la piste
+            d'athlétisme — le sujet même de l'image — disparaissait sous une bande verte,
+            sur téléphone comme sur ordinateur. Le fondu servait à supprimer une coupure
+            nette ; il en créait une autre, juste plus large.
+            La courbe monte donc TARD : quasi nulle sur les deux premiers tiers, elle ne
+            ferme sur l'émeraude que dans les derniers pixels. Le raccord reste invisible
+            parce que la dernière étape vaut EXACTEMENT #059669 — la couleur par laquelle
+            commence `WaitlistSection`. Changer l'une sans l'autre rouvre la bande.
+            ⚠️ ET LE DÉGRADÉ EST EN STYLE INLINE, PAS EN CLASSE TAILWIND. Première tentative
+            écrite en `bg-[linear-gradient(...)]` : `getComputedStyle` rendait
+            `background-image: none`. La classe existait dans le DOM, le compilateur n'en
+            avait produit AUCUN CSS, et rien ne le signalait — même famille de panne que les
+            opacités hors échelle qui ont motivé tests/opacites.test.ts. Un fondu qui ne rend
+            rien ne se voit pas : il ramène juste la coupure nette qu'on cherchait à enlever.
+            Un style inline ne passe par aucun compilateur, donc il ne peut pas disparaître.
+            z entre la photo (z-0) et le contenu (z-10) → texte et badges restent lisibles. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-20 sm:h-32"
+          style={{
+            // Dernière étape = EXACTEMENT #059669, la couleur par laquelle commence
+            // `WaitlistSection`. Les deux doivent bouger ensemble, sinon la bande revient.
+            backgroundImage:
+              "linear-gradient(to bottom, rgba(5,150,105,0) 0%, rgba(5,150,105,0.04) 62%, rgba(5,150,105,0.30) 85%, rgba(5,150,105,0.70) 95%, #059669 100%)",
+          }}
+        />
       </section>
 
       {/* ── LISTE D'ATTENTE (avant-lancement) ── juste après le hero, pour capter le visiteur
