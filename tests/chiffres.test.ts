@@ -36,6 +36,7 @@ import { EDITEUR, HEBERGEUR_APP, PAYS_APP, SOUS_TRAITANTS } from "../src/lib/bra
 import { STATUT_A_COMPLETER, statutEditeur } from "../src/lib/brand/statutEditeur";
 import { fournisseursActifs } from "../src/lib/auth/fournisseurs";
 import { nomAffiche, refusDe, avisDe, litAvis, TEXTE_MIN } from "../src/lib/avis/store";
+import { doitAfficher, refuser, reporter, lireEtat, REPORT_MS } from "../src/lib/avis/invite";
 
 const ROOT = join(import.meta.dirname, "..");
 const SRC = join(ROOT, "src");
@@ -957,6 +958,37 @@ test("l'écran de modération ne trie pas par note, et n'édite pas les avis", (
   assert.match(pub, /\{a\.reponse && \(/, "la page publique n'affiche plus les réponses");
   assert.match(pub, /A\.reponseDe/, "la réponse n'est pas attribuée");
 });
+test("« plus tard » ne se comporte PAS comme « non »", () => {
+  // ⚠️ LE DÉFAUT CORRIGÉ ICI. La première version n'avait qu'un « Plus tard » qui masquait
+  // POUR TOUJOURS : un athlète qui voulait juste finir sa séance perdait définitivement la
+  // seule porte d'entrée vers les avis — et on croyait lui avoir laissé le choix.
+  const t0 = Date.UTC(2026, 8, 17);
+
+  // Sans rien de mémorisé : on propose.
+  assert.equal(doitAfficher({}, t0), true, "rien de mémorisé : l'invitation doit s'afficher");
+
+  // « Non merci » : jamais, et le temps n'y change rien.
+  assert.equal(doitAfficher(refuser(), t0), false, "un refus doit masquer l'invitation");
+  assert.equal(doitAfficher(refuser(), t0 + 10 * REPORT_MS), false,
+    "un refus expire avec le temps : l'athlète serait relancé alors qu'il a dit non");
+
+  // « Plus tard » : masqué un mois, reproposé ensuite.
+  const report = reporter(t0);
+  assert.equal(doitAfficher(report, t0), false, "l'invitation reste après un « plus tard »");
+  assert.equal(doitAfficher(report, t0 + REPORT_MS - 1000), false, "reproposée AVANT le mois écoulé");
+  assert.equal(doitAfficher(report, t0 + REPORT_MS), true, "jamais reproposée : « plus tard » vaut un refus");
+  assert.ok(REPORT_MS >= 28 * 86400000, `report de ${Math.round(REPORT_MS / 86400000)} j : ce n'est plus « un mois »`);
+
+  // ⚠️ UN STOCKAGE ILLISIBLE NE DOIT PAS FAIRE DISPARAÎTRE L'INVITATION. `localStorage`
+  // peut rendre n'importe quoi (autre version, écriture partielle, extension) : on
+  // retombe sur « propose », jamais sur un masquage définitif qu'on ne saurait pas expliquer.
+  for (const brut of [null, "", "pas du json", "[]", '{"refuse":"oui"}', '{"reporteJusqu":"demain"}']) {
+    assert.equal(doitAfficher(lireEtat(brut), t0), true, `état illisible « ${brut} » : doit retomber sur « propose »`);
+  }
+  // …mais un état VALIDE est bien relu.
+  assert.equal(doitAfficher(lireEtat(JSON.stringify(refuser())), t0), false, "un refus relu depuis le stockage est perdu");
+});
+
 test("l'athlète CONNECTÉ a un chemin pour écrire son avis", () => {
   // ⚠️ PORTE INVERSÉE, CONSTATÉE LE 17/09/2026 — et elle explique à elle seule les zéro
   // avis en base. `/api/avis` refuse toute soumission anonyme : SEULS les comptes peuvent
