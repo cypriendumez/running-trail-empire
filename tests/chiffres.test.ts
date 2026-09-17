@@ -942,11 +942,23 @@ test("un avis ne peut pas être fabriqué depuis le navigateur", () => {
   // et « ne jamais en écrire nous-mêmes ». Ce qui rend la promesse tenable, c'est que
   // RIEN de ce que le client envoie n'atteint la base tel quel.
   //
-  // ⚠️ LE POINT CRITIQUE : `publie` est forcé à faux à la construction. Un client qui
-  // enverrait `{publie: true}` publierait sinon directement sur la page d'accueil du
-  // site, sans relecture.
+  // ⚠️ LE POINT CRITIQUE N'EST PAS LA VALEUR DE `publie`, C'EST QUI LA DÉCIDE.
+  // Elle valait faux (relecture manuelle obligatoire) ; comme personne ne relisait, aucun
+  // avis n'est jamais apparu — une page d'avis qui n'affiche jamais rien ne protège de
+  // rien. Elle vaut vrai depuis le 17/09/2026, parce que les deux filtres qui comptent
+  // tournent AVANT : compte réel exigé par l'API, grossièretés refusées à la soumission.
+  //
+  // Ce que ce test garde, c'est l'invariant qui n'a jamais bougé : la valeur est écrite
+  // par le SERVEUR, et rien de ce que le client envoie ne l'influence. `avisDe` ne reçoit
+  // que la note, le texte et le nom — il n'a même pas de quoi lire un `publie` client.
   const a = avisDe(5, "  Un avis assez long pour franchir la validation du serveur.  ", "Cyprien Dumez");
-  assert.equal(a.publie, false, "un avis ne doit JAMAIS naître publié");
+  assert.equal(a.publie, true, "un avis validé doit être publié : sinon la page reste vide pour toujours");
+  // …et on le vérifie sur le CORPS de `avisDe` seulement : `litAvis`, lui, a parfaitement
+  // le droit de lire `d.publie` — c'est une relecture de la base, pas une soumission.
+  const src = readFileSync("src/lib/avis/store.ts", "utf8");
+  const corps = src.slice(src.indexOf("export function avisDe"), src.indexOf("export function litAvis"));
+  assert.ok(/publie:\s*true,/.test(corps),
+    "`publie` n'est plus écrit en dur dans avisDe : la valeur pourrait venir d'ailleurs que du serveur");
   assert.equal(a.auteur, "Cyprien D.", "le nom complet ne doit pas être publié");
   assert.equal(a.texte, "Un avis assez long pour franchir la validation du serveur.", "le texte doit être détouré");
 

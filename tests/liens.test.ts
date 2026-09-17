@@ -139,5 +139,39 @@ test("les réseaux sociaux : une seule source, et jamais de lien externe nu", ()
   assert.ok(!/stkn=/.test(src), "un jeton de partage Instagram est publié dans le pied de page");
 });
 
+test("« Notre histoire » ne peut plus se périmer toute seule", () => {
+  // ⚠️ DÉFAUT RÉEL, RELEVÉ LE 17/09/2026. La page se terminait sur « Le marathon de Lille
+  // approche » et la frise disait « Lille sera mon premier marathon ». Le lendemain de la
+  // course, les deux devenaient faux — et la première est la dernière phrase que lit un
+  // visiteur avant le bouton d'inscription. Rien ne l'aurait signalé : pas d'erreur, pas
+  // de lien mort, juste un texte devenu mensonger.
+  const i18n = readFileSync("src/app/notre-histoire/histoireI18n.ts", "utf8");
+  const page = readFileSync("src/app/notre-histoire/page.tsx", "utf8");
+
+  // Les DEUX variantes existent, dans les cinq langues (5 × 2 + 2 lignes de type).
+  for (const cle of ["fermetureAvant", "fermetureApres"]) {
+    assert.equal(i18n.split(`${cle}:`).length - 1, 6, `${cle} : 5 langues + le type attendus`);
+  }
+  // …et la page CHOISIT réellement entre les deux, en comparant à la date de la course.
+  assert.match(page, /DATE_PREMIER_MARATHON \? H\.fermetureApres : H\.fermetureAvant/,
+    "la page n'arbitre plus entre les deux fermetures : elle est repartie pour se périmer");
+  assert.match(i18n, /export const DATE_PREMIER_MARATHON = "\d{4}-\d{2}-\d{2}"/,
+    "la date de la course n'est plus une date civile pilotable");
+
+  // Aucune affirmation au futur ne doit subsister dans le RÉCIT (hors fermetureAvant, qui
+  // est justement la variante réservée à l'avant-course).
+  // ⚠️ On retire les COMMENTAIRES d'abord : le fichier explique le défaut en citant les
+  // anciennes phrases (« Lille sera… »), donc sans ce nettoyage l'assertion serait fausse
+  // en permanence — un garde-fou rouge pour la mauvaise raison ne vaut pas mieux qu'un
+  // garde-fou vert pour la mauvaise raison. Même piège que le jeton Instagram plus haut.
+  const recit = i18n
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n")
+    .replace(/fermetureAvant:.*\n/g, "");
+  for (const motif of [/Lille sera/, /Lille will be/, /Lille wird/, /Lille será/]) {
+    assert.ok(!motif.test(recit), `affirmation au futur encore figée dans le récit : ${motif}`);
+  }
+});
+
 console.log(`\n${passed} test(s) de liens passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }

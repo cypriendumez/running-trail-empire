@@ -7,7 +7,8 @@ import { Container, Section } from "@/components/ui/Container";
 import { btnClass } from "@/components/ui/Button";
 import { getPublicLang } from "@/lib/i18n/serverLang";
 import Image from "next/image";
-import { HISTOIRE } from "./histoireI18n";
+import { HISTOIRE, DATE_PREMIER_MARATHON } from "./histoireI18n";
+import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 // ⚠️ IMPORT STATIQUE, pas une chaîne de chemin. Trois raisons :
 //  · Next connaît alors les dimensions et réserve la place — le texte ne saute plus ;
 //  · il peut servir de l'AVIF et du WebP redimensionnés à la volée ;
@@ -119,7 +120,13 @@ export default async function NotreHistoirePage() {
         <Container>
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-400">{H.fermetureTitre}</h2>
-            <p className="mt-4 text-balance text-lg leading-relaxed text-zinc-700">{H.fermeture}</p>
+            {/* ⚠️ LA PAGE SE RÉÉCRIT SEULE LE LENDEMAIN DE LA COURSE. « Le marathon approche »
+                  était vrai à l'écriture et faux pour toujours ensuite — juste au-dessus du
+                  bouton. On compare des dates civiles (AAAA-MM-JJ), donc une comparaison de
+                  chaînes suffit et reste juste quel que soit le fuseau du serveur. */}
+              <p className="mt-4 text-balance text-lg leading-relaxed text-zinc-700">
+                {aujourdhui(FUSEAU_DEFAUT) > DATE_PREMIER_MARATHON ? H.fermetureApres : H.fermetureAvant}
+              </p>
             <Link href="/signup" className={btnClass("primary", "md", "mt-8 inline-flex items-center gap-2")}>
               {H.cta} <ArrowRight className="h-4 w-4" />
             </Link>

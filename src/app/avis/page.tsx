@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, ShieldCheck } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { Container, Section } from "@/components/ui/Container";
@@ -211,24 +211,13 @@ export default async function AvisPage() {
         </Container>
       </Section>
 
-      {/* L'ENGAGEMENT. C'est ce qui remplace la preuve sociale : à défaut de pouvoir
-          montrer des avis, on montre la règle qu'on s'impose pour le jour où il y en aura. */}
+      {/* ⚠️ LE FORMULAIRE EST ICI, ET PAS EN BAS DE PAGE. Cet emplacement portait un
+          encadré « ce qu'on s'engage à faire quand ils arriveront » — une promesse pour
+          plus tard, là où le visiteur pouvait AGIR tout de suite. Tant qu'il n'y a pas
+          d'avis à lire, la seule chose utile à mettre en haut, c'est de quoi en écrire un. */}
       <Section>
         <Container>
-          <div className="mx-auto max-w-2xl rounded-3xl bg-zinc-50 p-8 ring-1 ring-inset ring-zinc-200">
-            <div className="flex items-center gap-2.5">
-              <ShieldCheck className="h-5 w-5 flex-shrink-0 text-emerald-600" />
-              <h2 className="text-base font-bold text-zinc-900">{A.methodeTitre}</h2>
-            </div>
-            <ul className="mt-5 space-y-3">
-              {A.methode.map((m) => (
-                <li key={m} className="flex gap-3 text-sm leading-relaxed text-zinc-600">
-                  <span aria-hidden className="mt-2 h-1 w-1 flex-shrink-0 rounded-full bg-emerald-600" />
-                  {m}
-                </li>
-              ))}
-            </ul>
-          </div>
+          <AvisForm />
         </Container>
       </Section>
 
@@ -272,12 +261,6 @@ export default async function AvisPage() {
           </Container>
         </Section>
       )}
-
-      <Section>
-        <Container>
-          <AvisForm />
-        </Container>
-      </Section>
 
       <Section>
         <Container>

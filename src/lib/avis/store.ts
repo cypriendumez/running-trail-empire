@@ -16,7 +16,17 @@
  * c'est cette chaîne-là qui s'affiche : recalculer plus tard depuis le profil ferait
  * changer un avis déjà publié si la personne renomme son compte.
  *
- * ⚠️ `publie` est faux au départ. La modération sert à écarter l'insulte et le spam,
+ * ⚠️ `publie` est VRAI dès la soumission, et c'est un renversement assumé (17/09/2026).
+ * Il était faux, donc chaque avis attendait une relecture manuelle — et comme personne
+ * ne relisait, AUCUN avis n'est jamais apparu. Une page d'avis qui n'affiche jamais rien
+ * ne protège de rien : elle donne juste l'impression que personne n'utilise le produit.
+ *
+ * Ce que la relecture apportait est déjà fait AVANT l'écriture : il faut un compte réel
+ * (l'API refuse toute soumission anonyme) et les grossièretés sont refusées à la
+ * soumission (voir plus bas). L'avis publié a donc déjà passé les deux filtres.
+ *
+ * ⚠️ LA MODÉRATION NE DISPARAÎT PAS, ELLE CHANGE DE SENS : elle sert désormais à
+ * DÉPUBLIER après coup et à répondre, plus à autoriser en amont. Et elle ne sert
  * JAMAIS à trier par note — filtrer les avis négatifs est précisément ce que la
  * directive (UE) 2019/2161 interdit, au même titre que les inventer.
  *
@@ -113,9 +123,11 @@ export function avisDe(note: number, texte: string, fullName: string | null | un
     texte: String(texte).trim().slice(0, TEXTE_MAX),
     auteur: nomAffiche(fullName),
     at: new Date().toISOString(),
-    // ⚠️ TOUJOURS faux ici. Un client qui enverrait `publie: true` ne doit rien pouvoir
-    // publier : la valeur ne vient jamais de la requête.
-    publie: false,
+    // ⚠️ DÉCIDÉ PAR LE SERVEUR, JAMAIS PAR LA REQUÊTE. C'est ça, l'invariant à tenir —
+    // pas la valeur elle-même. Un client qui enverrait `publie` n'a aucun effet : la
+    // valeur est écrite ici, à partir de rien d'autre que le passage des deux filtres
+    // (compte réel + grossièretés), tous deux appliqués avant d'arriver jusqu'ici.
+    publie: true,
   };
 }
 
