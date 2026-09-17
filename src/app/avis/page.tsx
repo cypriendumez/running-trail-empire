@@ -176,8 +176,10 @@ export default async function AvisPage() {
   const lang = await getPublicLang();
   const A = AV[lang] ?? AV.fr;
 
-  // ⚠️ SEULS LES AVIS PUBLIÉS. `publie` est faux à la soumission et ne passe à vrai que
-  // par la modération, qui n'écarte que l'insulte et le spam — jamais une mauvaise note.
+  // ⚠️ SEULS LES AVIS PUBLIÉS. Depuis le 17/09/2026, `publie` est VRAI dès la soumission :
+  // les deux filtres qui comptent tournent avant (compte réel exigé par l'API,
+  // grossièretés refusées à l'écriture). La modération sert donc à DÉPUBLIER après coup
+  // et à répondre — jamais à écarter une mauvaise note (directive UE 2019/2161).
   let publies: { note: number; texte: string; auteur: string; at: string; reponse?: string; reponseAt?: string }[] = [];
   try {
     const { data } = await createAdminClient()

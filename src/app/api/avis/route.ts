@@ -16,8 +16,10 @@ import { TYPE_AVIS, refusDe, avisDe, litAvis } from "@/lib/avis/store";
  *
  * ⚠️ RIEN de ce que le client envoie n'atteint la base tel quel. La note est bornée, le
  * texte est validé et tronqué, l'auteur est calculé DEPUIS LE PROFIL côté serveur, et
- * `publie` est forcé à faux. Un client qui enverrait `{publie: true, auteur: "Kilian
- * Jornet"}` obtiendrait exactement le même résultat qu'un client honnête.
+ * `publie` est écrit EN DUR par le serveur — à vrai depuis le 17/09/2026, parce que les
+ * deux filtres qui comptent (compte réel, grossièretés) tournent avant d'arriver ici.
+ * Un client qui enverrait `{publie: false, auteur: "Kilian Jornet"}` obtiendrait
+ * exactement le même résultat qu'un client honnête : la requête ne décide de rien.
  */
 export async function GET() {
   const sb = await createClient();
