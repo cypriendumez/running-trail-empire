@@ -19,8 +19,15 @@
  * le vérifie sur le bundle réellement produit, pas sur les imports.
  */
 
-/** En dessous, ce n'est pas un avis mais un clic. */
-export const TEXTE_MIN = 40;
+/**
+ * Plancher de longueur — abaissé de 40 à 10 le 17/09/2026, sur décision de Cyprien.
+ *
+ * 40 caractères, c'était deux lignes : « très bien, je recommande » (25) était refusé.
+ * Or un avis court et sincère vaut mieux qu'un avis absent, et le compteur du formulaire
+ * transformait le plancher en mur — on voyait le bouton rester gris sans comprendre.
+ * 10 caractères écartent encore le clic vide (« ok », « top ») sans rien exiger de plus.
+ */
+export const TEXTE_MIN = 10;
 /** Au-dessus, la carte devient illisible et le champ un vecteur d'abus. */
 export const TEXTE_MAX = 600;
 

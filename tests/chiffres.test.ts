@@ -692,13 +692,33 @@ test("aucun avis de consommateur n'est fabriqué", () => {
   assert.ok(!/\bstars\s*:/.test(avis), "des témoignages notés sont revenus dans le source de /avis");
   assert.ok(!/\bname\s*:\s*"[^"]+"\s*,\s*(stars|rating)/.test(avis), "un avis nominatif est écrit en dur");
 
-  // Et les agrégats qui les accompagnaient : une note moyenne suppose des notes.
-  for (const [motif, quoi] of [
-    [/note moyenne|average rating|nota media|nota média|Bewertung\b/i, "une note moyenne"],
-    [/\bavis publiés|published reviews|opiniones publicadas/i, "un compteur d'avis publiés"],
-    [/\d\s*%\s*(de\s*)?5\s*étoiles|5\s*stars/i, "un pourcentage de 5 étoiles"],
-  ] as [RegExp, string][]) {
-    assert.ok(!motif.test(avis), `${quoi} est affiché alors qu'aucun avis n'existe en base`);
+  /**
+   * ⚠️ CE QUI EST INTERDIT A CHANGÉ DE NATURE, PAS DE SÉVÉRITÉ (17/09/2026).
+   *
+   * Une note moyenne existe désormais sur la page. Ce n'est pas un retour en arrière :
+   * elle est CALCULÉE sur les lignes réellement lues en base et ne s'affiche que s'il y
+   * en a — exactement ce que le commentaire ci-dessus autorisait (« le jour où il y en
+   * aura, ils viendront de la base, pas d'un tableau écrit à la main »).
+   *
+   * Le premier jet de ce test interdisait des MOTS (« note moyenne », « Bewertung »).
+   * C'était trop grossier dans un sens et trop faible dans l'autre : le libellé allemand
+   * « aus 3 Bewertungen » le faisait rougir alors que rien n'était inventé, tandis qu'un
+   * « 4,9 » écrit en dur sous une autre formulation passait. Ce qui est trompeur au sens
+   * de la directive (UE) 2019/2161, c'est le CHIFFRE FABRIQUÉ — pas le mot qui l'annonce.
+   */
+  const chiffresEnDur: string[] = [];
+  for (const m of avis.matchAll(/([0-9]+[.,][0-9])\s*(\/\s*5|★|étoiles|stars)/gi)) chiffresEnDur.push(m[0]);
+  for (const m of avis.matchAll(/\b(\d{1,3})\s*%\s*(de\s*)?(5\s*étoiles|satisfaction|5\s*stars)/gi)) chiffresEnDur.push(m[0]);
+  assert.deepEqual(chiffresEnDur, [],
+    `note(s) ou pourcentage(s) écrits en dur dans /avis : ${chiffresEnDur.join(" · ")}`);
+
+  // Le taux de satisfaction, lui, ne revient PAS : rien dans l'application ne le calcule.
+  assert.ok(!/satisfaction/i.test(avis), "un taux de satisfaction est affiché alors que rien ne le calcule");
+
+  // Et si une moyenne est affichée, elle DOIT venir des lignes lues en base.
+  if (/moyenne/.test(avis)) {
+    assert.match(avis, /publies\.reduce\(/,
+      "une moyenne est affichée sans être calculée sur les avis lus en base");
   }
 });
 
@@ -937,6 +957,28 @@ test("l'écran de modération ne trie pas par note, et n'édite pas les avis", (
   assert.match(pub, /\{a\.reponse && \(/, "la page publique n'affiche plus les réponses");
   assert.match(pub, /A\.reponseDe/, "la réponse n'est pas attribuée");
 });
+test("un nouvel avis PRÉVIENT l'éditeur, et la moyenne ne sort jamais sans son compte", () => {
+  // ⚠️ RIEN NE SIGNALAIT UN NOUVEL AVIS. C'était tolérable tant que la publication
+  // attendait une relecture (l'avis restait invisible). Depuis qu'il paraît IMMÉDIATEMENT,
+  // le silence laisse un avis à dépublier en ligne pendant des semaines.
+  const route = sansCommentaires(readFileSync("src/app/api/avis/route.ts", "utf8"));
+  assert.match(route, /envoyerEmail\("avis"/, "aucune alerte n'est envoyée à l'arrivée d'un avis");
+  // …et vers l'adresse de l'ÉDITEUR, jamais une adresse en dur (cf. lib/admin/acces).
+  assert.match(route, /emailEditeur\(\)/, "le destinataire de l'alerte n'est plus lu dans emailEditeur");
+  assert.ok(!/to:\s*\[["'][^"']*@/.test(route), "une adresse de destinataire est écrite en dur dans la route");
+
+  // ⚠️ LA MOYENNE NE DOIT JAMAIS S'AFFICHER SEULE. « 5,0/5 » sur un unique avis se lit
+  // comme un argument commercial ; « 5,0/5 sur 1 avis » se lit comme un fait. Le compte
+  // est ce qui rend le chiffre honnête, pas une mention secondaire.
+  const page = sansCommentaires(readFileSync("src/app/avis/page.tsx", "utf8"));
+  assert.match(page, /const moyenne = publies\.length/, "la moyenne n'est plus calculée sur les avis publiés");
+  const bloc = page.slice(page.indexOf("{moyenne != null &&"), page.indexOf("{moyenne != null &&") + 900);
+  assert.ok(/surUnAvis|surNAvis\.replace/.test(bloc),
+    "la moyenne est affichée sans le nombre d'avis qui la fonde");
+  // Le libellé du compte existe dans les cinq langues (5 + la ligne de type).
+  assert.ok(page.split("surNAvis").length - 1 >= 6, "surNAvis n'est pas défini dans les 5 langues");
+});
+
 test("un avis ne peut pas être fabriqué depuis le navigateur", () => {
   // La page promet « n'afficher que des avis de personnes ayant réellement un compte »
   // et « ne jamais en écrire nous-mêmes ». Ce qui rend la promesse tenable, c'est que
@@ -967,7 +1009,10 @@ test("un avis ne peut pas être fabriqué depuis le navigateur", () => {
   assert.equal(nomAffiche("Kilian"), "Kilian");
 
   // Bornes du texte : trop court ce n'est pas un avis, trop long c'est un vecteur d'abus.
-  assert.ok(refusDe(5, "trop court"), "un texte trop court doit être refusé");
+  // ⚠️ L'ÉCHANTILLON DOIT RESTER SOUS LE PLANCHER. « trop court » fait exactement
+  // 10 caractères : au plancher de 10, il PASSE — le test réussissait alors pour la
+  // mauvaise raison le jour où la borne a bougé. On le calcule depuis TEXTE_MIN.
+  assert.ok(refusDe(5, "x".repeat(TEXTE_MIN - 1)), "un texte trop court doit être refusé");
   assert.ok(refusDe(5, "x".repeat(5000)), "un texte démesuré doit être refusé");
   assert.equal(refusDe(5, "x".repeat(TEXTE_MIN)), null);
   // La note est bornée AUSSI À LA LECTURE : une ligne écrite avant une correction, ou à

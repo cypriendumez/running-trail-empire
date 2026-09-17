@@ -8,6 +8,7 @@ import { getPublicLang } from "@/lib/i18n/serverLang";
 import { CHIFFRES } from "@/lib/brand/stats";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { TYPE_AVIS, litAvis } from "@/lib/avis/store";
+import { nRaw } from "@/lib/i18n/multi";
 import { AvisForm } from "@/components/avis/AvisForm";
 import type { Lang } from "@/lib/i18n/translations";
 
@@ -46,6 +47,17 @@ type Bloc = {
   methodeTitre: string; methode: string[];
   preuveTitre: string; preuveSub: string;
   labelCourses: string; labelParcours: string; labelPlan: string; labelModeles: string;
+  /**
+   * « sur 1 avis » / « sur 12 avis » — le COMPTE accompagne toujours la moyenne.
+   *
+   * ⚠️ DEUX CHAÎNES SIMPLES AVEC UN PLACEHOLDER, PAS UNE FONCTION À GABARIT. Un
+   * `(n) => \`de ${n} avaliações\`` concatène en plein mot : ça casse dans toute langue
+   * dont le pluriel change la racine, et le détecteur de texte en dur signale à juste
+   * titre le fragment accentué qui en sort. La convention du projet est le placeholder
+   * substitué au rendu (cf. `vmaResult: "VMA {v} km/h"`).
+   */
+  surUnAvis: string;
+  surNAvis: string;
   /** Attribution de la réponse de l'éditeur, affichée sous l'avis. */
   reponseDe: string;
   ctaTitre: string; ctaSub: string; ctaBtn: string; ctaNote: string;
@@ -53,6 +65,7 @@ type Bloc = {
 
 const AV: Record<Lang, Bloc> = {
   fr: {
+    surUnAvis: "sur 1 avis", surNAvis: "sur {n} avis",
     titre: "Aucun avis. ", accent: "Pas encore.",
     titrePlein: "Ce qu'ils en ", accentPlein: "disent.", chapoPlein: "Écrits par des coureurs qui ont un compte Pacevo, publiés tels quels.",
     chapo: "Pacevo vient d'ouvrir. Le jour où des coureurs écriront, ce sont leurs mots qui seront ici — pas les nôtres.",
@@ -76,6 +89,7 @@ const AV: Record<Lang, Bloc> = {
     ctaNote: "Gratuit · Sans carte bancaire · Annulable à tout moment",
   },
   en: {
+    surUnAvis: "from 1 review", surNAvis: "from {n} reviews",
     titre: "No reviews. ", accent: "Not yet.",
     titrePlein: "What they ", accentPlein: "say.", chapoPlein: "Written by runners with a Pacevo account, published as written.",
     chapo: "Pacevo has just opened. The day runners write something, their words will be here — not ours.",
@@ -99,6 +113,7 @@ const AV: Record<Lang, Bloc> = {
     ctaNote: "Free · No credit card · Cancel anytime",
   },
   de: {
+    surUnAvis: "aus 1 Bewertung", surNAvis: "aus {n} Bewertungen",
     titre: "Keine Bewertungen. ", accent: "Noch nicht.",
     titrePlein: "Was sie ", accentPlein: "sagen.", chapoPlein: "Von Läufern mit einem Pacevo-Konto geschrieben, unverändert veröffentlicht.",
     chapo: "Pacevo ist gerade gestartet. Sobald Läufer etwas schreiben, stehen ihre Worte hier — nicht unsere.",
@@ -122,6 +137,7 @@ const AV: Record<Lang, Bloc> = {
     ctaNote: "Gratis · Keine Kreditkarte · Jederzeit kündbar",
   },
   es: {
+    surUnAvis: "de 1 opinión", surNAvis: "de {n} opiniones",
     titre: "Sin opiniones. ", accent: "Todavía.",
     titrePlein: "Lo que ", accentPlein: "dicen.", chapoPlein: "Escritas por corredores con cuenta Pacevo, publicadas tal cual.",
     chapo: "Pacevo acaba de abrir. El día en que los corredores escriban, estarán sus palabras aquí — no las nuestras.",
@@ -145,6 +161,7 @@ const AV: Record<Lang, Bloc> = {
     ctaNote: "Gratis · Sin tarjeta · Cancela cuando quieras",
   },
   pt: {
+    surUnAvis: "de 1 avaliação", surNAvis: "de {n} avaliações",
     titre: "Sem avaliações. ", accent: "Ainda.",
     titrePlein: "O que eles ", accentPlein: "dizem.", chapoPlein: "Escritas por corredores com conta Pacevo, publicadas tal como escritas.",
     chapo: "A Pacevo acabou de abrir. No dia em que os corredores escreverem, estarão aqui as palavras deles — não as nossas.",
@@ -189,6 +206,21 @@ export default async function AvisPage() {
       .map((r) => litAvis(r.data))
       .filter((a): a is NonNullable<typeof a> => Boolean(a?.publie));
   } catch { publies = []; }
+  /**
+   * NOTE MOYENNE — calculée sur les avis RÉELLEMENT publiés, jamais ailleurs.
+   *
+   * ⚠️ ELLE NE S'AFFICHE QUE ACCOMPAGNÉE DU COMPTE. « 5,0/5 » seul, sur un unique avis,
+   * se lit comme un argument commercial ; « 5,0/5 sur 1 avis » se lit comme un fait. Le
+   * compte n'est pas une mention secondaire : c'est ce qui rend la moyenne honnête, et
+   * les deux ne doivent jamais être séparés.
+   *
+   * Arrondie au dixième et rendue avec le séparateur décimal de la langue (`nRaw`) :
+   * « 4.7/5 » sur une page en français signalerait un chiffre recopié d'ailleurs.
+   */
+  const moyenne = publies.length
+    ? Math.round((publies.reduce((acc, a) => acc + a.note, 0) / publies.length) * 10) / 10
+    : null;
+
   // Les quatre chiffres viennent de la SOURCE UNIQUE, jamais recopiés ici.
   const preuves = [
     { valeur: CHIFFRES.courses, label: A.labelCourses },
@@ -210,6 +242,17 @@ export default async function AvisPage() {
           <p className="mx-auto mt-6 max-w-xl text-center text-lg leading-relaxed text-zinc-500">
             {publies.length ? A.chapoPlein : A.chapo}
           </p>
+          {moyenne != null && (
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+              <div className="flex gap-0.5 text-2xl" aria-hidden>
+                {Array.from({ length: 5 }, (_, i) => (
+                  <span key={i} className={i < Math.round(moyenne) ? "text-amber-400" : "text-zinc-200"}>★</span>
+                ))}
+              </div>
+              <span className="text-2xl font-bold text-zinc-900">{nRaw(moyenne, lang)}</span>
+              <span className="text-sm text-zinc-500">/ 5 · {publies.length === 1 ? A.surUnAvis : A.surNAvis.replace("{n}", String(publies.length))}</span>
+            </div>
+          )}
         </Container>
       </Section>
 
