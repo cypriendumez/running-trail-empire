@@ -1,6 +1,9 @@
 "use client";
 import { useState } from "react";
-import { ArrowLeft, ChevronRight, Gauge, Footprints, Bike, TrendingUp, Info } from "lucide-react";
+import {
+  ArrowLeft, ChevronRight, Gauge, Footprints, Bike, TrendingUp, Info,
+  Timer, Route, Medal, Mountain, Zap, HeartPulse, Scale,
+} from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { PROGRAMMES, genererPlan, volumeTotal, type CleProgramme, type Niveau } from "@/lib/plans/catalogue";
 import { PLANS_I18N } from "./plansI18n";
@@ -14,7 +17,22 @@ const TEINTE: Record<string, string> = {
   "Affûtage": "bg-violet-50 text-violet-700 ring-violet-200",
 };
 
-const ORDRE: CleProgramme[] = ["km5", "km10", "semi", "marathon", "trail", "debutant", "vitesse", "blessure", "poids"];
+/**
+ * ⚠️ LES NEUF PLANS NE SONT PAS DE MÊME NATURE, et les aligner dans une grille uniforme
+ * le cachait. Cinq visent une COURSE avec une date (le plan finit par un affûtage), quatre
+ * n'en ont pas (aucun affûtage, cf. `phaseDe` dans le catalogue). Les séparer n'est donc
+ * pas une coquetterie : c'est la seule différence qui change la structure du plan.
+ */
+const GROUPES: { cle: "course" | "sansCourse"; plans: CleProgramme[] }[] = [
+  { cle: "course", plans: ["km5", "km10", "semi", "marathon", "trail"] },
+  { cle: "sansCourse", plans: ["debutant", "vitesse", "blessure", "poids"] },
+];
+
+/** Une icône par programme : la carte se reconnaît avant d'être lue. */
+const ICONE: Record<CleProgramme, typeof Gauge> = {
+  km5: Timer, km10: Gauge, semi: Route, marathon: Medal, trail: Mountain,
+  debutant: Footprints, vitesse: Zap, blessure: HeartPulse, poids: Scale,
+};
 
 export function PlansView({ niveau, volumeKm }: { niveau: Niveau; volumeKm: number }) {
   const { lang } = useT();
@@ -24,52 +42,90 @@ export function PlansView({ niveau, volumeKm }: { niveau: Niveau; volumeKm: numb
 
   if (!choisi) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-8">
         <header>
           <h1 className="text-2xl font-bold text-zinc-900 sm:text-3xl">{t.titre}</h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-500">{t.sousTitre}</p>
         </header>
 
-        {/* Les deux chiffres qui personnalisent TOUS les plans : on les montre d'emblée,
-            pour que l'athlète sache sur quoi ils sont bâtis. */}
-        <div className="flex flex-wrap gap-3">
-          <span className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm ring-1 ring-inset ring-zinc-200">
-            <Gauge className="h-4 w-4 text-emerald-600" />
-            <span className="text-zinc-500">{t.niveau}</span>
-            <span className="font-semibold text-zinc-900">{t.niveaux[niveau]}</span>
-          </span>
-          <span className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm ring-1 ring-inset ring-zinc-200">
-            <TrendingUp className="h-4 w-4 text-emerald-600" />
-            <span className="text-zinc-500">{t.volumeActuel}</span>
-            <span className="font-semibold text-zinc-900">{volumeKm} {t.parSemaine}</span>
-          </span>
+        {/* Les DEUX chiffres qui personnalisent chaque plan, mis en évidence : sans eux,
+            l'athlète ne peut pas savoir sur quoi les volumes affichés sont bâtis. */}
+        <div className="grid gap-3 sm:grid-cols-2 lg:max-w-xl">
+          <div className="flex items-center gap-3 rounded-2xl bg-white px-5 py-4 ring-1 ring-inset ring-zinc-200">
+            <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-600/10 text-emerald-700">
+              <Gauge className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{t.niveau}</div>
+              <div className="text-lg font-bold leading-tight text-zinc-900">{t.niveaux[niveau]}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 rounded-2xl bg-white px-5 py-4 ring-1 ring-inset ring-zinc-200">
+            <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-600/10 text-emerald-700">
+              <TrendingUp className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{t.volumeActuel}</div>
+              <div className="text-lg font-bold leading-tight text-zinc-900">
+                {volumeKm} <span className="text-sm font-medium text-zinc-400">{t.parSemaine}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {ORDRE.map((cle) => {
-            const prog = PROGRAMMES[cle];
-            return (
-              <button
-                key={cle}
-                onClick={() => { setChoisi(cle); setSemaines(prog.semaines[0]); }}
-                className="group flex flex-col items-start rounded-3xl bg-white p-6 text-left shadow-sm ring-1 ring-inset ring-zinc-200 transition-all hover:shadow-md hover:ring-emerald-300"
-              >
-                <div className="flex w-full items-start justify-between gap-3">
-                  <h2 className="text-base font-bold text-zinc-900">{t.noms[cle]}</h2>
-                  <span className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-400 transition-colors group-hover:bg-emerald-600 group-hover:text-white">
-                    <ChevronRight className="h-4 w-4" />
-                  </span>
-                </div>
-                <p className="mt-2 text-sm leading-relaxed text-zinc-500">{t.pitchs[cle]}</p>
-                <div className="mt-4 flex flex-wrap gap-1.5">
-                  <Chip>{prog.semaines[0]} {t.semaines}</Chip>
-                  {prog.marcheCourse && <Chip icone={<Footprints className="h-3 w-3" />}>{t.marcheCourse}</Chip>}
-                  {prog.sansImpactPct > 0 && <Chip icone={<Bike className="h-3 w-3" />}>{prog.sansImpactPct} %</Chip>}
-                </div>
-              </button>
-            );
-          })}
-        </div>
+        {GROUPES.map((groupe) => (
+          <section key={groupe.cle} className="space-y-4">
+            <h2 className="flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+              {groupe.cle === "course" ? t.groupeCourse : t.groupeSansCourse}
+              <span aria-hidden className="h-px flex-1 bg-zinc-200" />
+            </h2>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {groupe.plans.map((cle) => {
+                const prog = PROGRAMMES[cle];
+                const Icone = ICONE[cle];
+                return (
+                  <button
+                    key={cle}
+                    onClick={() => { setChoisi(cle); setSemaines(prog.semaines[0]); }}
+                    className="group relative flex flex-col items-start overflow-hidden rounded-3xl bg-white p-6 text-left ring-1 ring-inset ring-zinc-200 transition-all hover:-translate-y-0.5 hover:shadow-lg hover:ring-emerald-400"
+                  >
+                    {/* ⚠️ PAS DE LISERÉ AU SURVOL ICI. Première version : un
+                        `scale-x-0 group-hover:scale-x-100`. Vérifié dans le navigateur —
+                        AUCUNE règle `.scale-x-0` n'existait dans la feuille de style
+                        produite, et `getComputedStyle` rendait `transform: none` : le
+                        liseré s'affichait donc en permanence sur les neuf cartes, ce qui
+                        les faisait toutes paraître sélectionnées. Troisième panne de cette
+                        famille dans la même journée (opacités hors échelle, dégradé
+                        arbitraire) — une classe présente dans le DOM ne prouve rien.
+                        Le survol est déjà signalé quatre fois : élévation, ombre, anneau
+                        émeraude et icône qui se remplit. Un cinquième signal décoratif ne
+                        valait pas de reprendre ce risque. */}
+                    <div className="flex w-full items-start justify-between gap-3">
+                      <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-emerald-600/10 text-emerald-700 transition-colors group-hover:bg-emerald-600 group-hover:text-white">
+                        <Icone className="h-5 w-5" />
+                      </span>
+                      {/* La distance, pour les plans qui visent une course : c'est
+                          l'information qu'on cherche en premier, pas la durée du plan. */}
+                      {prog.distanceKm != null && groupe.cle === "course" && (
+                        <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] font-bold tabular-nums text-zinc-600">
+                          {prog.distanceKm} km
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="mt-4 text-base font-bold text-zinc-900">{t.noms[cle]}</h3>
+                    <p className="mt-1.5 flex-1 text-sm leading-relaxed text-zinc-500">{t.pitchs[cle]}</p>
+                    <div className="mt-4 flex w-full flex-wrap items-center gap-1.5">
+                      <Chip>{prog.semaines[0]} {t.semaines}</Chip>
+                      {prog.marcheCourse && <Chip icone={<Footprints className="h-3 w-3" />}>{t.marcheCourse}</Chip>}
+                      {prog.sansImpactPct > 0 && <Chip icone={<Bike className="h-3 w-3" />}>{prog.sansImpactPct} %</Chip>}
+                      <ChevronRight className="ml-auto h-4 w-4 text-zinc-300 transition-all group-hover:translate-x-0.5 group-hover:text-emerald-600" />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ))}
       </div>
     );
   }

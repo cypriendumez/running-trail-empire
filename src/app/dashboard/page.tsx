@@ -6,6 +6,8 @@ import { lecturesEnEchec } from "@/lib/dashboard/lectures";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 import { BentoDashboard } from "@/components/dashboard/BentoDashboard";
 import { TestVmaBanner } from "@/components/dashboard/TestVmaBanner";
+import { InviteAvis } from "@/components/dashboard/InviteAvis";
+import { TYPE_AVIS } from "@/lib/avis/store";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import type { Objective } from "@/components/dashboard/ObjectiveCard";
 import { bestVmaFromWorkouts, loadRisk, effectiveVma } from "@/lib/running/fitness";
@@ -178,9 +180,30 @@ export default async function DashboardPage() {
   const estFondateur = estAdmin((profileRes.data as { email?: string } | null)?.email);
   const vmaMesuree = (Number((baseRes.data as { vma_kmh?: number } | null)?.vma_kmh) || 0) > 0;
 
+  /**
+   * INVITER À DONNER SON AVIS — et seulement quand c'est mérité.
+   *
+   * ⚠️ PORTE INVERSÉE : `/api/avis` n'accepte que les comptes, et `/avis` n'était lié que
+   * depuis les pages PUBLIQUES. Les seules personnes autorisées à écrire ne voyaient
+   * jamais le lien — ce qui explique à lui seul les zéro avis en base.
+   *
+   * Deux conditions, lues ici plutôt que devinées côté client :
+   *  · l'athlète n'a pas DÉJÀ écrit un avis (un compte = un avis) ;
+   *  · il a réellement utilisé le produit. Réclamer un avis à un inscrit du jour ne
+   *    produit rien d'utile, et la directive (UE) 2019/2161 n'admet que des avis
+   *    d'utilisateurs réels — un avis sollicité trop tôt n'en est pas un.
+   */
+  const SEANCES_AVANT_INVITE = 5;
+  const [avisRes, nbSeancesRes] = await Promise.all([
+    supabase.from("notifications").select("id").eq("user_id", user!.id).eq("type", TYPE_AVIS).limit(1),
+    supabase.from("workouts").select("id", { count: "exact", head: true }).eq("user_id", user!.id),
+  ]);
+  const inviterAvis = (avisRes.data?.length ?? 0) === 0 && (nbSeancesRes.count ?? 0) >= SEANCES_AVANT_INVITE;
+
   return (
     <>
     <TestVmaBanner measured={vmaMesuree || estFondateur} />
+    <InviteAvis afficher={inviterAvis} />
     <BentoDashboard
       donneesIncompletes={donneesIncompletes}
       profile={stripProfileSecrets(profileRes.data)}

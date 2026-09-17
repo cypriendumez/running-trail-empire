@@ -957,6 +957,27 @@ test("l'écran de modération ne trie pas par note, et n'édite pas les avis", (
   assert.match(pub, /\{a\.reponse && \(/, "la page publique n'affiche plus les réponses");
   assert.match(pub, /A\.reponseDe/, "la réponse n'est pas attribuée");
 });
+test("l'athlète CONNECTÉ a un chemin pour écrire son avis", () => {
+  // ⚠️ PORTE INVERSÉE, CONSTATÉE LE 17/09/2026 — et elle explique à elle seule les zéro
+  // avis en base. `/api/avis` refuse toute soumission anonyme : SEULS les comptes peuvent
+  // écrire. Or `/avis` n'était lié que depuis la landing et le pied de page PUBLIC, jamais
+  // depuis l'espace connecté. Les seules personnes autorisées à écrire étaient donc
+  // exactement celles qui ne voyaient jamais le lien. Même motif que la boutique dont la
+  // porte s'ouvrait du mauvais côté : la fonctionnalité existait, personne ne pouvait
+  // l'atteindre, et aucun test ne rougissait puisque rien n'était cassé.
+  const invite = readFileSync(join(ROOT, "src/components/dashboard/InviteAvis.tsx"), "utf8");
+  assert.match(invite, /href="\/avis"/, "l'invitation ne mène plus à la page des avis");
+  const dash = sansCommentaires(readFileSync(join(ROOT, "src/app/dashboard/page.tsx"), "utf8"));
+  assert.match(dash, /<InviteAvis afficher=\{inviterAvis\}/, "le tableau de bord n'affiche plus l'invitation");
+
+  // ⚠️ MAIS PAS À N'IMPORTE QUI, NI N'IMPORTE QUAND. Un avis réclamé à un inscrit du jour
+  // ne vaut rien, et la directive (UE) 2019/2161 n'admet que des avis d'utilisateurs
+  // RÉELS du produit. Les deux conditions sont calculées côté serveur.
+  assert.match(dash, /SEANCES_AVANT_INVITE/, "l'invitation n'est plus conditionnée à un usage réel du produit");
+  assert.match(dash, /avisRes\.data\?\.length \?\? 0\) === 0/,
+    "l'invitation ne vérifie plus que l'athlète n'a pas déjà écrit un avis");
+});
+
 test("un nouvel avis PRÉVIENT l'éditeur, et la moyenne ne sort jamais sans son compte", () => {
   // ⚠️ RIEN NE SIGNALAIT UN NOUVEL AVIS. C'était tolérable tant que la publication
   // attendait une relecture (l'avis restait invisible). Depuis qu'il paraît IMMÉDIATEMENT,

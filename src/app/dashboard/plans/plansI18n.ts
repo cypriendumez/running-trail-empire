@@ -13,6 +13,7 @@ export type PlansDict = {
   niveau: string; niveaux: Record<"debutant" | "intermediaire" | "confirme" | "elite", string>;
   volumeActuel: string; parSemaine: string; duree: string; semaines: string;
   choisir: string; retour: string;
+  groupeCourse: string; groupeSansCourse: string;
   colSemaine: string; colPhase: string; colVolume: string; colLongue: string; colQualite: string; colSansImpact: string;
   phases: Record<"Reprise" | "Base" | "Développement" | "Spécifique" | "Affûtage", string>;
   decharge: string; marcheCourse: string; sansImpact: string; aucuneQualite: string;
@@ -33,6 +34,7 @@ export const PLANS_I18N: Record<Lang, PlansDict> = {
     niveau: "Ton niveau", niveaux: { debutant: "Débutant", intermediaire: "Intermédiaire", confirme: "Confirmé", elite: "Élite" },
     volumeActuel: "Ton volume actuel", parSemaine: "km/sem", duree: "Durée", semaines: "semaines",
     choisir: "Voir le plan", retour: "Tous les plans",
+    groupeCourse: "Préparer une course", groupeSansCourse: "Sans course à préparer",
     colSemaine: "Sem.", colPhase: "Phase", colVolume: "Volume", colLongue: "Sortie longue", colQualite: "Qualité", colSansImpact: "Sans impact",
     phases: { "Reprise": "Reprise", "Base": "Base", "Développement": "Développement", "Spécifique": "Spécifique", "Affûtage": "Affûtage" },
     decharge: "décharge", marcheCourse: "Marche/course", sansImpact: "Volume sans impact", aucuneQualite: "—",
@@ -56,6 +58,7 @@ export const PLANS_I18N: Record<Lang, PlansDict> = {
     niveau: "Your level", niveaux: { debutant: "Beginner", intermediaire: "Intermediate", confirme: "Advanced", elite: "Elite" },
     volumeActuel: "Your current volume", parSemaine: "km/wk", duree: "Length", semaines: "weeks",
     choisir: "View plan", retour: "All plans",
+    groupeCourse: "Training for a race", groupeSansCourse: "No race to prepare",
     colSemaine: "Wk", colPhase: "Phase", colVolume: "Volume", colLongue: "Long run", colQualite: "Quality", colSansImpact: "Impact-free",
     phases: { "Reprise": "Return", "Base": "Base", "Développement": "Build", "Spécifique": "Specific", "Affûtage": "Taper" },
     decharge: "deload", marcheCourse: "Walk/run", sansImpact: "Impact-free volume", aucuneQualite: "—",
@@ -79,6 +82,7 @@ export const PLANS_I18N: Record<Lang, PlansDict> = {
     niveau: "Dein Niveau", niveaux: { debutant: "Anfänger", intermediaire: "Fortgeschritten", confirme: "Erfahren", elite: "Elite" },
     volumeActuel: "Dein aktueller Umfang", parSemaine: "km/Wo", duree: "Dauer", semaines: "Wochen",
     choisir: "Plan ansehen", retour: "Alle Pläne",
+    groupeCourse: "Auf einen Wettkampf hin", groupeSansCourse: "Ohne Wettkampf",
     colSemaine: "Wo", colPhase: "Phase", colVolume: "Umfang", colLongue: "Langer Lauf", colQualite: "Qualität", colSansImpact: "Ohne Stoß",
     phases: { "Reprise": "Wiedereinstieg", "Base": "Grundlage", "Développement": "Aufbau", "Spécifique": "Spezifisch", "Affûtage": "Tapering" },
     decharge: "Entlastung", marcheCourse: "Geh/Lauf", sansImpact: "Umfang ohne Stoßbelastung", aucuneQualite: "—",
@@ -102,6 +106,7 @@ export const PLANS_I18N: Record<Lang, PlansDict> = {
     niveau: "Tu nivel", niveaux: { debutant: "Principiante", intermediaire: "Intermedio", confirme: "Avanzado", elite: "Élite" },
     volumeActuel: "Tu volumen actual", parSemaine: "km/sem", duree: "Duración", semaines: "semanas",
     choisir: "Ver el plan", retour: "Todos los planes",
+    groupeCourse: "Preparar una carrera", groupeSansCourse: "Sin carrera que preparar",
     colSemaine: "Sem.", colPhase: "Fase", colVolume: "Volumen", colLongue: "Tirada larga", colQualite: "Calidad", colSansImpact: "Sin impacto",
     phases: { "Reprise": "Retorno", "Base": "Base", "Développement": "Desarrollo", "Spécifique": "Específico", "Affûtage": "Afinamiento" },
     decharge: "descarga", marcheCourse: "Caminar/correr", sansImpact: "Volumen sin impacto", aucuneQualite: "—",
@@ -125,6 +130,7 @@ export const PLANS_I18N: Record<Lang, PlansDict> = {
     niveau: "O teu nível", niveaux: { debutant: "Iniciante", intermediaire: "Intermédio", confirme: "Avançado", elite: "Elite" },
     volumeActuel: "O teu volume atual", parSemaine: "km/sem", duree: "Duração", semaines: "semanas",
     choisir: "Ver o plano", retour: "Todos os planos",
+    groupeCourse: "Preparar uma prova", groupeSansCourse: "Sem prova para preparar",
     colSemaine: "Sem.", colPhase: "Fase", colVolume: "Volume", colLongue: "Longão", colQualite: "Qualidade", colSansImpact: "Sem impacto",
     phases: { "Reprise": "Retorno", "Base": "Base", "Développement": "Desenvolvimento", "Spécifique": "Específico", "Affûtage": "Afinamento" },
     decharge: "descarga", marcheCourse: "Caminhar/correr", sansImpact: "Volume sem impacto", aucuneQualite: "—",
