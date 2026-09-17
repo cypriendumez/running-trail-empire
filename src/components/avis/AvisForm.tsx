@@ -36,6 +36,11 @@ const NOTES: Record<string, string[]> = {
   pt: ["Fraco", "Razoável", "Bom", "Muito bom", "Excelente"],
 };
 
+/** Une seule enveloppe pour les trois états : la carte ne doit pas changer de forme
+ *  entre « connecte-toi », « écris » et « merci ». */
+const CARTE =
+  "mx-auto max-w-xl rounded-3xl bg-white p-7 shadow-[0_1px_2px_rgba(0,0,0,.04),0_8px_24px_-12px_rgba(0,0,0,.10)] ring-1 ring-inset ring-zinc-200/80 sm:p-8";
+
 export function AvisForm() {
   const { lang } = useT();
   const t = T[lang] ?? T.fr;
@@ -76,11 +81,11 @@ export function AvisForm() {
 
   if (etat === "anonyme") {
     return (
-      <div className="mx-auto max-w-2xl rounded-3xl bg-white p-8 text-center ring-1 ring-inset ring-zinc-200">
-        <p className="text-sm leading-relaxed text-zinc-600">{t.connecte}</p>
-        <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-          <Link href="/login" className="rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-zinc-800">{t.seConnecter}</Link>
-          <Link href="/signup" className="rounded-full px-5 py-2.5 text-sm font-semibold text-zinc-600 ring-1 ring-inset ring-zinc-200 transition-colors hover:bg-zinc-50">{t.creer}</Link>
+      <div className={`${CARTE} text-center`}>
+        <p className="text-[15px] leading-relaxed text-zinc-600">{t.connecte}</p>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <Link href="/login" className="rounded-xl bg-zinc-900 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-zinc-800">{t.seConnecter}</Link>
+          <Link href="/signup" className="rounded-xl px-5 py-2.5 text-sm font-semibold text-zinc-700 ring-1 ring-inset ring-zinc-200 transition-colors hover:bg-zinc-50">{t.creer}</Link>
         </div>
       </div>
     );
@@ -88,80 +93,85 @@ export function AvisForm() {
 
   if (etat === "merci") {
     return (
-      <div className="mx-auto max-w-2xl rounded-3xl bg-emerald-50 p-8 text-center ring-1 ring-inset ring-emerald-200">
-        <Check className="mx-auto h-6 w-6 text-emerald-600" />
-        <p className="mt-3 text-sm leading-relaxed text-emerald-900">{t.merci}</p>
-        <button onClick={() => setEtat("pret")} className="mt-5 text-sm font-semibold text-emerald-700 underline underline-offset-4">{t.modifier}</button>
+      <div className={`${CARTE} text-center`}>
+        <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-emerald-600/10">
+          <Check className="h-5 w-5 text-emerald-700" />
+        </span>
+        <p className="mt-4 text-[15px] leading-relaxed text-zinc-700">{t.merci}</p>
+        <button onClick={() => setEtat("pret")} className="mt-5 text-sm font-semibold text-emerald-700 underline decoration-emerald-300 underline-offset-4 hover:decoration-emerald-600">{t.modifier}</button>
       </div>
     );
   }
 
   const affichee = survol ?? note;
   return (
-    <div className="mx-auto max-w-xl rounded-3xl bg-white p-6 ring-1 ring-inset ring-zinc-200 sm:p-8">
-      {/* ⚠️ PLUS D'EN-TÊTE EN DÉGRADÉ ÉMERAUDE. Une bande colorée avec sa pastille d'icône
-          par-dessus un corps blanc, c'est le gabarit qu'on voit sur tous les formulaires
-          générés : ça décore au lieu de hiérarchiser. Un titre, une ligne d'explication,
-          puis les champs — le regard va droit à ce qu'il doit remplir. */}
-      <h3 className="text-lg font-bold tracking-tight text-zinc-900">{t.titre}</h3>
-      <p className="mt-1 text-sm leading-relaxed text-zinc-500">{t.sousTitre}</p>
+    <div className={CARTE}>
+      <h3 className="text-xl font-bold tracking-tight text-zinc-900">{t.titre}</h3>
+      <p className="mt-1.5 text-sm leading-relaxed text-zinc-500">{t.sousTitre}</p>
 
-      {/* ── LA NOTE ──────────────────────────────────────────────────────────────
-          ⚠️ LES ÉTOILES ÉTAIENT CINQ GROSSES FORMES AMBRE POSÉES DANS LE VIDE, à 32 px,
-          sans rien qui les désigne comme un champ à remplir. C'est ce qui faisait
-          « débutant » : un contrôle doit se voir comme un contrôle.
-          Elles vivent donc dans un cadre, à 24 px, et le libellé occupe une largeur
-          MINIMALE FIXE — sinon passer de « Bien » à « Très bien » décalait la ligne à
-          chaque survol, ce qui donnait cette impression de flottement. */}
-      <div className="mt-6">
-        <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400">{t.note}</label>
-        <div className="mt-2 inline-flex items-center gap-3 rounded-2xl bg-zinc-50 px-3 py-2 ring-1 ring-inset ring-zinc-200">
-          <div className="flex items-center gap-0.5" onMouseLeave={() => setSurvol(null)}>
+      {/* ── LA NOTE ───────────────────────────────────────────────────────────────
+          ⚠️ DEUX ERREURS CORRIGÉES ICI, DANS CET ORDRE.
+          1. Les étoiles flottaient à 32 px dans le vide, sans rien les désigner comme un
+             champ : illisible comme contrôle.
+          2. Je les avais alors enfermées dans une pastille GRISE — qui les faisait
+             paraître désactivées, donc pire. Un champ se signale par son LIBELLÉ et son
+             affordance au survol, pas par un aplat gris.
+          Libellés en `text-sm font-medium text-zinc-700` et non en 11 px gris clair :
+          c'est ce micro-texte pâle en majuscules qui donnait l'air « gabarit ». */}
+      <fieldset className="mt-7">
+        <legend className="text-sm font-medium text-zinc-700">{t.note}</legend>
+        <div className="mt-2.5 flex items-center gap-4">
+          <div className="flex items-center gap-1" onMouseLeave={() => setSurvol(null)}>
             {[1, 2, 3, 4, 5].map((n) => (
               <button
                 key={n} type="button" onClick={() => setNote(n)} onMouseEnter={() => setSurvol(n)}
                 aria-label={`${n}/5`} aria-pressed={note === n}
-                className="rounded-lg p-1 outline-none transition-transform focus-visible:ring-2 focus-visible:ring-emerald-500 active:scale-95"
+                className="rounded-lg p-0.5 outline-none transition-transform duration-150 hover:scale-110 focus-visible:ring-2 focus-visible:ring-emerald-500 active:scale-95"
               >
                 <Star
-                  className={`h-6 w-6 transition-colors duration-150 ${
-                    n <= affichee ? "fill-amber-400 text-amber-400" : "fill-zinc-200 text-zinc-200"
+                  className={`h-8 w-8 transition-colors duration-150 ${
+                    n <= affichee ? "fill-amber-400 text-amber-400" : "fill-zinc-100 text-zinc-300"
                   }`}
                 />
               </button>
             ))}
           </div>
-          <span className="min-w-[5.5rem] text-sm font-semibold text-zinc-700">{notes[affichee - 1]}</span>
+          {/* Largeur minimale fixe : sans elle, « Bien » → « Très bien » décale la ligne
+              à chaque survol, et la notation semble bouger sous le curseur. */}
+          <span className="min-w-[6rem] text-sm font-semibold text-zinc-700">{notes[affichee - 1]}</span>
         </div>
-      </div>
+      </fieldset>
 
-      {/* ── LE TEXTE ─────────────────────────────────────────────────────────────── */}
-      <div className="mt-6">
-        <label htmlFor="avis-texte" className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400">{t.texte}</label>
+      {/* ── LE TEXTE ──────────────────────────────────────────────────────────────
+          Fond BLANC bordé, pas un aplat gris : un champ vide en gris se lit comme
+          désactivé, et c'était le plus grand bloc de la carte. */}
+      <div className="mt-7">
+        <label htmlFor="avis-texte" className="block text-sm font-medium text-zinc-700">{t.texte}</label>
         <textarea
           id="avis-texte"
           value={texte} onChange={(e) => setTexte(e.target.value.slice(0, TEXTE_MAX))}
           placeholder={t.place} rows={4}
-          className="mt-2 w-full resize-none rounded-2xl border-0 bg-zinc-50 p-4 text-sm leading-relaxed text-zinc-800 ring-1 ring-inset ring-zinc-200 outline-none placeholder:text-zinc-400 focus:bg-white focus:ring-2 focus:ring-emerald-500"
+          className="mt-2.5 w-full resize-none rounded-2xl bg-white p-4 text-[15px] leading-relaxed text-zinc-900 ring-1 ring-inset ring-zinc-300 outline-none transition placeholder:text-zinc-400 hover:ring-zinc-400 focus:ring-2 focus:ring-emerald-500"
         />
+        <div className="mt-2 flex items-center justify-between text-xs text-zinc-400">
+          <span>{manque > 0 ? t.court.replace("{n}", String(manque)) : ""}</span>
+          <span className="tabular-nums">{texte.trim().length}/{TEXTE_MAX}</span>
+        </div>
       </div>
 
       {erreur && <p className="mt-3 text-sm font-medium text-red-600">{erreur}</p>}
 
-      {/* Le bouton et les compteurs sur UNE ligne : le compteur de caractères manquants
-          explique pourquoi le bouton est encore gris, il doit donc être à côté de lui et
-          pas trois lignes plus haut. */}
-      <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <button
-          onClick={envoyer} disabled={etat === "envoi" || manque > 0}
-          className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-400"
-        >
-          {etat === "envoi" && <Loader2 className="h-4 w-4 animate-spin" />}
-          {etat === "envoi" ? t.envoi : t.envoyer}
-        </button>
-        {manque > 0 && <span className="text-xs text-zinc-400">{t.court.replace("{n}", String(manque))}</span>}
-        <span className="ml-auto text-xs tabular-nums text-zinc-300">{texte.trim().length}/{TEXTE_MAX}</span>
-      </div>
+      {/* ⚠️ LE BOUTON DÉSACTIVÉ RESTE ÉMERAUDE, JUSTE ATTÉNUÉ. En gris `zinc-200` il
+          devenait le point focal de la carte ET semblait cassé : le visiteur lisait « ça
+          ne marche pas » là où il faut lire « pas encore ». La couleur de marque conservée
+          dit la bonne chose, et le compteur au-dessus explique ce qui manque. */}
+      <button
+        onClick={envoyer} disabled={etat === "envoi" || manque > 0}
+        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+      >
+        {etat === "envoi" && <Loader2 className="h-4 w-4 animate-spin" />}
+        {etat === "envoi" ? t.envoi : t.envoyer}
+      </button>
     </div>
   );
 }

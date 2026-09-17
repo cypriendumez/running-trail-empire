@@ -237,13 +237,16 @@ export default async function AvisPage() {
           empilées, or `Section` vaut `py-20 sm:py-28` : jusqu'à 224 px de vide entre le
           titre et le champ à remplir, sur une page qui n'a par ailleurs rien à montrer
           tant qu'aucun avis n'existe. L'espace était là par construction, pas par choix. */}
-      <Section className="pt-14 pb-0 sm:pt-20">
+      <Section className="pt-12 pb-0 sm:pt-16">
         <Container>
-          <h1 className="mx-auto max-w-2xl text-balance text-center text-4xl font-bold leading-[1.08] tracking-tight text-zinc-900 sm:text-5xl">
+          {/* ⚠️ TITRE RESSERRÉ. À text-5xl il écrasait tout : sur une page qui n'a
+              qu'un formulaire à montrer, un titre deux fois plus gros que le reste fait
+              paraître le contenu accessoire. */}
+          <h1 className="mx-auto max-w-2xl text-balance text-center text-3xl font-bold leading-[1.1] tracking-tight text-zinc-900 sm:text-4xl">
             {publies.length ? A.titrePlein : A.titre}
             <span className="text-emerald-600">{publies.length ? A.accentPlein : A.accent}</span>
           </h1>
-          <p className="mx-auto mt-5 max-w-lg text-center leading-relaxed text-zinc-500">
+          <p className="mx-auto mt-4 max-w-md text-center text-[15px] leading-relaxed text-zinc-500">
             {publies.length ? A.chapoPlein : A.chapo}
           </p>
 
@@ -263,7 +266,7 @@ export default async function AvisPage() {
 
           {/* Le formulaire suit immédiatement : tant qu'il n'y a pas d'avis à lire, écrire
               le premier est la seule action que la page a à proposer. */}
-          <div className="mt-10">
+          <div className="mt-9">
             <AvisForm />
           </div>
         </Container>
