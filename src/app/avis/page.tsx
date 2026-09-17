@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Star } from "lucide-react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { Container, Section } from "@/components/ui/Container";
@@ -233,36 +233,39 @@ export default async function AvisPage() {
     <div className="min-h-screen bg-white">
       <SiteHeader />
 
-      <Section className="pt-16">
+      {/* ⚠️ HERO ET FORMULAIRE DANS UNE SEULE SECTION. Ils étaient dans deux `Section`
+          empilées, or `Section` vaut `py-20 sm:py-28` : jusqu'à 224 px de vide entre le
+          titre et le champ à remplir, sur une page qui n'a par ailleurs rien à montrer
+          tant qu'aucun avis n'existe. L'espace était là par construction, pas par choix. */}
+      <Section className="pt-14 pb-0 sm:pt-20">
         <Container>
-          <h1 className="mx-auto max-w-3xl text-center text-5xl font-bold leading-[1.05] tracking-tight text-zinc-900 sm:text-6xl">
+          <h1 className="mx-auto max-w-2xl text-balance text-center text-4xl font-bold leading-[1.08] tracking-tight text-zinc-900 sm:text-5xl">
             {publies.length ? A.titrePlein : A.titre}
             <span className="text-emerald-600">{publies.length ? A.accentPlein : A.accent}</span>
           </h1>
-          <p className="mx-auto mt-6 max-w-xl text-center text-lg leading-relaxed text-zinc-500">
+          <p className="mx-auto mt-5 max-w-lg text-center leading-relaxed text-zinc-500">
             {publies.length ? A.chapoPlein : A.chapo}
           </p>
+
           {moyenne != null && (
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
-              <div className="flex gap-0.5 text-2xl" aria-hidden>
+            <div className="mx-auto mt-7 flex w-fit items-center gap-3 rounded-2xl bg-zinc-50 px-5 py-3 ring-1 ring-inset ring-zinc-200">
+              <div className="flex gap-0.5" aria-hidden>
                 {Array.from({ length: 5 }, (_, i) => (
-                  <span key={i} className={i < Math.round(moyenne) ? "text-amber-400" : "text-zinc-200"}>★</span>
+                  <Star key={i} className={`h-5 w-5 ${i < Math.round(moyenne) ? "fill-amber-400 text-amber-400" : "fill-zinc-200 text-zinc-200"}`} />
                 ))}
               </div>
-              <span className="text-2xl font-bold text-zinc-900">{nRaw(moyenne, lang)}</span>
-              <span className="text-sm text-zinc-500">/ 5 · {publies.length === 1 ? A.surUnAvis : A.surNAvis.replace("{n}", String(publies.length))}</span>
+              <span className="text-xl font-bold tabular-nums text-zinc-900">{nRaw(moyenne, lang)}</span>
+              <span className="text-sm text-zinc-500">
+                / 5 · {publies.length === 1 ? A.surUnAvis : A.surNAvis.replace("{n}", String(publies.length))}
+              </span>
             </div>
           )}
-        </Container>
-      </Section>
 
-      {/* ⚠️ LE FORMULAIRE EST ICI, ET PAS EN BAS DE PAGE. Cet emplacement portait un
-          encadré « ce qu'on s'engage à faire quand ils arriveront » — une promesse pour
-          plus tard, là où le visiteur pouvait AGIR tout de suite. Tant qu'il n'y a pas
-          d'avis à lire, la seule chose utile à mettre en haut, c'est de quoi en écrire un. */}
-      <Section>
-        <Container>
-          <AvisForm />
+          {/* Le formulaire suit immédiatement : tant qu'il n'y a pas d'avis à lire, écrire
+              le premier est la seule action que la page a à proposer. */}
+          <div className="mt-10">
+            <AvisForm />
+          </div>
         </Container>
       </Section>
 
@@ -307,7 +310,7 @@ export default async function AvisPage() {
         </Section>
       )}
 
-      <Section>
+      <Section className="py-16 sm:py-20">
         <Container>
           <h2 className="text-center text-3xl font-bold tracking-tight text-zinc-900">{A.preuveTitre}</h2>
           <p className="mx-auto mt-3 max-w-xl text-center text-sm leading-relaxed text-zinc-500">{A.preuveSub}</p>

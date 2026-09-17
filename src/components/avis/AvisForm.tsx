@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Star, Loader2, Check, MessageSquareHeart } from "lucide-react";
+import { Star, Loader2, Check } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 // ⚠️ `lib/avis/bornes`, PAS `lib/avis/store` : le store importe le filtre de
 // grossièretés, et l'importer ici enverrait ses 106 racines dans le bundle public.
@@ -98,56 +98,69 @@ export function AvisForm() {
 
   const affichee = survol ?? note;
   return (
-    <div className="mx-auto max-w-2xl overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-inset ring-zinc-200">
-      {/* En-tête sur un léger fond émeraude : chaleureux, et raccord avec la marque. */}
-      <div className="flex items-center gap-3 border-b border-zinc-100 bg-gradient-to-br from-emerald-50 to-white px-8 py-6">
-        <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-emerald-600/10 text-emerald-700">
-          <MessageSquareHeart className="h-5 w-5" />
-        </span>
-        <div>
-          <h3 className="text-lg font-bold text-zinc-900">{t.titre}</h3>
-          <p className="mt-0.5 text-sm text-zinc-500">{t.sousTitre}</p>
+    <div className="mx-auto max-w-xl rounded-3xl bg-white p-6 ring-1 ring-inset ring-zinc-200 sm:p-8">
+      {/* ⚠️ PLUS D'EN-TÊTE EN DÉGRADÉ ÉMERAUDE. Une bande colorée avec sa pastille d'icône
+          par-dessus un corps blanc, c'est le gabarit qu'on voit sur tous les formulaires
+          générés : ça décore au lieu de hiérarchiser. Un titre, une ligne d'explication,
+          puis les champs — le regard va droit à ce qu'il doit remplir. */}
+      <h3 className="text-lg font-bold tracking-tight text-zinc-900">{t.titre}</h3>
+      <p className="mt-1 text-sm leading-relaxed text-zinc-500">{t.sousTitre}</p>
+
+      {/* ── LA NOTE ──────────────────────────────────────────────────────────────
+          ⚠️ LES ÉTOILES ÉTAIENT CINQ GROSSES FORMES AMBRE POSÉES DANS LE VIDE, à 32 px,
+          sans rien qui les désigne comme un champ à remplir. C'est ce qui faisait
+          « débutant » : un contrôle doit se voir comme un contrôle.
+          Elles vivent donc dans un cadre, à 24 px, et le libellé occupe une largeur
+          MINIMALE FIXE — sinon passer de « Bien » à « Très bien » décalait la ligne à
+          chaque survol, ce qui donnait cette impression de flottement. */}
+      <div className="mt-6">
+        <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400">{t.note}</label>
+        <div className="mt-2 inline-flex items-center gap-3 rounded-2xl bg-zinc-50 px-3 py-2 ring-1 ring-inset ring-zinc-200">
+          <div className="flex items-center gap-0.5" onMouseLeave={() => setSurvol(null)}>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button
+                key={n} type="button" onClick={() => setNote(n)} onMouseEnter={() => setSurvol(n)}
+                aria-label={`${n}/5`} aria-pressed={note === n}
+                className="rounded-lg p-1 outline-none transition-transform focus-visible:ring-2 focus-visible:ring-emerald-500 active:scale-95"
+              >
+                <Star
+                  className={`h-6 w-6 transition-colors duration-150 ${
+                    n <= affichee ? "fill-amber-400 text-amber-400" : "fill-zinc-200 text-zinc-200"
+                  }`}
+                />
+              </button>
+            ))}
+          </div>
+          <span className="min-w-[5.5rem] text-sm font-semibold text-zinc-700">{notes[affichee - 1]}</span>
         </div>
       </div>
 
-      <div className="p-8">
-        <div>
-          <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{t.note}</span>
-          <div className="mt-2 flex items-center gap-3">
-            <div className="flex gap-1" onMouseLeave={() => setSurvol(null)}>
-              {[1, 2, 3, 4, 5].map((n) => (
-                <button key={n} type="button" onClick={() => setNote(n)} onMouseEnter={() => setSurvol(n)} aria-label={`${n}/5`}
-                  className="p-0.5 transition-transform hover:scale-110">
-                  <Star className={`h-8 w-8 transition-colors ${n <= affichee ? "fill-amber-400 text-amber-400" : "text-zinc-200"}`} />
-                </button>
-              ))}
-            </div>
-            <span className="text-sm font-semibold text-zinc-700">{notes[affichee - 1]}</span>
-          </div>
-        </div>
+      {/* ── LE TEXTE ─────────────────────────────────────────────────────────────── */}
+      <div className="mt-6">
+        <label htmlFor="avis-texte" className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400">{t.texte}</label>
+        <textarea
+          id="avis-texte"
+          value={texte} onChange={(e) => setTexte(e.target.value.slice(0, TEXTE_MAX))}
+          placeholder={t.place} rows={4}
+          className="mt-2 w-full resize-none rounded-2xl border-0 bg-zinc-50 p-4 text-sm leading-relaxed text-zinc-800 ring-1 ring-inset ring-zinc-200 outline-none placeholder:text-zinc-400 focus:bg-white focus:ring-2 focus:ring-emerald-500"
+        />
+      </div>
 
-        <div className="mt-7">
-          <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{t.texte}</span>
-          <textarea
-            value={texte} onChange={(e) => setTexte(e.target.value.slice(0, TEXTE_MAX))}
-            placeholder={t.place} rows={5}
-            className="mt-2 w-full resize-none rounded-2xl border-0 bg-zinc-50 p-4 text-sm leading-relaxed text-zinc-800 ring-1 ring-inset ring-zinc-200 outline-none placeholder:text-zinc-400 focus:bg-white focus:ring-2 focus:ring-emerald-500"
-          />
-          <div className="mt-1.5 flex items-center justify-between text-xs text-zinc-400">
-            <span>{manque > 0 ? t.court.replace("{n}", String(manque)) : ""}</span>
-            <span>{texte.trim().length}/{TEXTE_MAX}</span>
-          </div>
-        </div>
+      {erreur && <p className="mt-3 text-sm font-medium text-red-600">{erreur}</p>}
 
-        {erreur && <p className="mt-3 text-sm font-medium text-red-600">{erreur}</p>}
-
+      {/* Le bouton et les compteurs sur UNE ligne : le compteur de caractères manquants
+          explique pourquoi le bouton est encore gris, il doit donc être à côté de lui et
+          pas trois lignes plus haut. */}
+      <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
         <button
           onClick={envoyer} disabled={etat === "envoi" || manque > 0}
-          className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+          className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-400"
         >
           {etat === "envoi" && <Loader2 className="h-4 w-4 animate-spin" />}
           {etat === "envoi" ? t.envoi : t.envoyer}
         </button>
+        {manque > 0 && <span className="text-xs text-zinc-400">{t.court.replace("{n}", String(manque))}</span>}
+        <span className="ml-auto text-xs tabular-nums text-zinc-300">{texte.trim().length}/{TEXTE_MAX}</span>
       </div>
     </div>
   );
