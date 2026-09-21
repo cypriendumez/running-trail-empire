@@ -12,7 +12,9 @@ const MODE_CONSTRUIRE: Record<string, string> = {
   fr: "Construire", en: "Build", de: "Erstellen", es: "Crear", pt: "Criar",
 };
 
-export const metadata = { title: "Trail Builder" };
+// « Carte » dans la navigation depuis le 21/09/2026 (Cyprien) — le nom d'outil « Trail Builder »
+// reste sur la vitrine, où il désigne la fonctionnalité ; ici c'est l'onglet de l'app.
+export const metadata = { title: "Carte" };
 
 export default async function TrailPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const { q } = await searchParams;

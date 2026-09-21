@@ -157,6 +157,20 @@ test("sur téléphone, le calendrier s'ouvre en vue Agenda (verticale), décidé
   assert.match(vue, /useState<"month" \| "agenda">\(vueParDefaut\)/, "la vue initiale ignore la valeur transmise par le serveur");
 });
 
+test("sur téléphone, la carte (Trail Builder) garde ses commandes sur une ligne et ses boutons dans l'écran", () => {
+  // Cyprien, 21/09/2026 : « ne rend pas sur téléphone ». Mesuré à 375 px : barre de
+  // commandes empilée sur 190 px, indice superposé, troisième bouton hors écran.
+  const src = codeNu("src/components/trail/TrailBuilder.tsx");
+  assert.match(src, /flex flex-col-reverse items-stretch gap-2 pointer-events-none sm:flex-row/, "la barre du haut n'est plus en colonne sur téléphone : elle s'empile sur la carte");
+  assert.match(src, /flex-nowrap overflow-x-auto \[scrollbar-width:none\][^"]*sm:flex-wrap/, "les commandes ne défilent plus sur une ligne sous sm");
+  assert.match(src, /w-full max-w-full sm:w-72 sm:max-w-\[44%\]/, "le panneau de droite garde 44 % de large sur téléphone : le troisième bouton sort de l'écran");
+  assert.equal([...src.matchAll(/top-32 sm:top-20/g)].length, 2, "les indices se superposent aux commandes sur téléphone");
+  // Et la navigation l'appelle « Carte », comme l'onglet du téléphone.
+  const i18n = readFileSync("src/lib/i18n/translations.ts", "utf8");
+  assert.equal([...i18n.matchAll(/"nav\.trail": "Trail Builder"/g)].length, 0, "l'onglet s'appelle encore « Trail Builder » dans une langue");
+  assert.equal([...i18n.matchAll(/"nav\.trail": "(Carte|Map|Karte|Mapa)"/g)].length, 5, "« Carte » manque à une langue");
+});
+
 test("les libellés de la barre existent dans les cinq langues", () => {
   const src = readFileSync(BARRE, "utf8");
   for (const cle of ["accueil", "carte", "enregistrer", "calendrier", "plus", "tout", "fermer"]) {

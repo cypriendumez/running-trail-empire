@@ -932,7 +932,7 @@ export function TrailBuilder({ centre, onTrace }: {
 
   const hasRoute = allPoints.length > 0;
   return (
-    <div className="flex flex-col gap-3 h-[80vh] min-h-[460px]">
+    <div className="flex flex-col gap-3 h-[68vh] min-h-[460px] sm:h-[80vh]">
       {/* ── MAP ───────────────────────────────────────────────────────────── */}
       <div className="flex-1 relative rounded-3xl overflow-hidden border border-zinc-200 shadow-sm min-h-0">
         <div
@@ -950,9 +950,15 @@ export function TrailBuilder({ centre, onTrace }: {
         )}
 
         {/* ── TOP TOOLBAR (map-planner style) ──────────────────────────── */}
-        <div className="absolute top-3 left-3 right-3 z-[1000] flex items-start justify-between gap-3 pointer-events-none">
+        {/* ⚠️ SUR TÉLÉPHONE, LA BARRE D'OUTILS NE S'EMPILE PLUS SUR LA CARTE (Cyprien,
+            21/09/2026 : « ne rend pas sur téléphone »). En retour à la ligne, les cinq
+            commandes formaient une colonne de 190 px qui recouvrait le tiers de la carte,
+            l'indice « Cliquez sur la carte » s'y superposait et le troisième bouton de
+            droite sortait de l'écran. Sous sm : les boutons de droite sur une première
+            ligne, puis la barre sur UNE ligne qui défile ; à partir de sm, comme avant. */}
+        <div className="absolute top-3 left-3 right-3 z-[1000] flex flex-col-reverse items-stretch gap-2 pointer-events-none sm:flex-row sm:items-start sm:justify-between sm:gap-3">
           {/* Main controls */}
-          <div className="pointer-events-auto bg-white/95 backdrop-blur rounded-2xl shadow-lg border border-zinc-100 px-3 py-2 flex items-center gap-2.5 flex-wrap max-w-[calc(100%-1rem)]">
+          <div className="pointer-events-auto bg-white/95 backdrop-blur rounded-2xl shadow-lg border border-zinc-100 px-3 py-2 flex items-center gap-2.5 flex-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-w-full sm:flex-wrap sm:overflow-visible sm:max-w-[calc(100%-1rem)]">
             <Toggle id="tg-follow" checked={followPaths} onChange={setFollowPaths} label={d["tg.follow"]} />
             <span className="w-px h-6 bg-zinc-200" />
             <Toggle id="tg-trails" checked={showTrails} onChange={setShowTrails} label={d["tg.trails"]} />
@@ -1021,7 +1027,7 @@ export function TrailBuilder({ centre, onTrace }: {
           </div>
 
           {/* Tools (la recherche de ville a été retirée — la recherche globale du haut s'en charge) */}
-          <div className="pointer-events-auto flex flex-col items-end gap-2 w-72 max-w-[44%]">
+          <div className="pointer-events-auto flex flex-col items-end gap-2 w-full max-w-full sm:w-72 sm:max-w-[44%]">
             {/* Tool chips */}
             <div className="flex gap-2">
               <ToolChip active={showLayers} onClick={() => { setShowLayers(s => !s); setShowFamous(false); setShowRoutesPanel(false); }} label={d["tool.layers"]}>
@@ -1169,7 +1175,7 @@ export function TrailBuilder({ centre, onTrace }: {
 
         {/* Route loading indicator */}
         {routeLoading && (
-          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[999]">
+          <div className="absolute top-32 sm:top-20 left-1/2 -translate-x-1/2 z-[999]">
             <div className="bg-white/95 backdrop-blur rounded-full shadow-lg border border-zinc-100 px-4 py-1.5 flex items-center gap-2 text-sm text-zinc-700">
               <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
               {d["computing"]}
@@ -1179,8 +1185,8 @@ export function TrailBuilder({ centre, onTrace }: {
 
         {/* Empty-state hint */}
         {!hasRoute && mounted && !routeLoading && (
-          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[999] pointer-events-none">
-            <div className="bg-zinc-900/80 backdrop-blur text-white rounded-full px-4 py-1.5 text-sm font-medium shadow-lg">
+          <div className="absolute top-32 sm:top-20 left-1/2 -translate-x-1/2 z-[999] pointer-events-none w-max max-w-[calc(100%-2rem)]">
+            <div className="bg-zinc-900/80 backdrop-blur text-white rounded-full px-4 py-1.5 text-sm font-medium shadow-lg text-center">
               {d["emptyHint"]}
             </div>
           </div>
@@ -1381,7 +1387,7 @@ function PillDivider() {
 // iOS-style toggle switch (toolbar)
 function Toggle({ id, checked, onChange, label }: { id: string; checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-shrink-0 items-center gap-2 whitespace-nowrap">
       <button
         id={id}
         type="button"
