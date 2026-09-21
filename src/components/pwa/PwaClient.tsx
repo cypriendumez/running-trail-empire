@@ -43,10 +43,21 @@ export function PwaClient() {
 
   // Enregistrement du service worker (hors-ligne + base des notifications). Best effort :
   // un échec ne doit rien casser du site.
+  //
+  // ⚠️ JAMAIS EN DÉVELOPPEMENT. Le worker sert `/_next/static/` CACHE D'ABORD, ce qui est
+  // juste en production (URL hachées, immuables) et FAUX avec `next dev`, où la feuille
+  // de style garde la même URL d'une modification à l'autre. Résultat, constaté cinq
+  // fois en deux jours : des classes présentes dans le DOM sans aucune règle CSS — une
+  // panne indiscernable d'une classe Tailwind hors échelle, sauf qu'ici la classe est
+  // bonne. Deux heures perdues à chercher un bogue Tailwind qui était un cache.
+  // Et s'il en reste un d'une session précédente, on le désinscrit.
   useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    if (!("serviceWorker" in navigator)) return;
+    if (process.env.NODE_ENV !== "production") {
+      navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister())).catch(() => {});
+      return;
     }
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
   }, []);
 
   useEffect(() => {

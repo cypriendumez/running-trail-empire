@@ -57,9 +57,10 @@ test("les nombres affichés passent par le formateur de la langue", () => {
 
 test("la barre latérale n'anime que ce qui change", () => {
   // `transition-all` sur un élément pleine hauteur recalcule la mise en page à chaque
-  // image. Seules la translation (tiroir mobile) et la largeur (repli bureau) bougent.
+  // image. Seule la largeur (repli bureau) bouge encore : depuis le 21/09/2026 la
+  // colonne n'existe plus sur mobile (barre d'onglets), il n'y a plus de translation.
   const src = codeNu("src/components/layout/Sidebar.tsx");
-  assert.ok(/transition-\[transform,width\]/.test(src), "la barre latérale est revenue à transition-all");
+  assert.ok(/transition-\[width\]/.test(src), "la barre latérale est revenue à transition-all");
   assert.ok(!/h-screen[^"]*transition-all/.test(src), "transition-all subsiste sur la barre pleine hauteur");
 });
 

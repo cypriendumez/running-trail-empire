@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
+import { MobileTabBar } from "@/components/layout/MobileTabBar";
 import { MedicalDisclaimer } from "@/components/layout/MedicalDisclaimer";
 import { AutoSync } from "@/components/AutoSync";
 import { MessageNotifier } from "@/components/messages/MessageNotifier";
@@ -58,6 +59,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
               layout, non : toute page présente et à venir la porte. */}
           <AttributionGarmin className="pb-3" />
           <MedicalDisclaimer lang={String(profile?.preferred_language ?? "fr")} />
+          {/* Téléphone seulement : la barre d'onglets (Accueil · Carte · Enregistrer ·
+              Calendrier · Plus) et la cale qui lui réserve sa place sous le pied de page. */}
+          <MobileTabBar unreadMessages={unreadMessages ?? 0} estEditeur={estAdmin(user.email)} />
         </div>
         {/* Bulle d'aide : hors du flux, disponible sur TOUTES les pages — une question de
             support naît devant l'écran qui pose problème, pas dans un menu séparé. */}

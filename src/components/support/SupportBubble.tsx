@@ -92,8 +92,10 @@ export function SupportBubble() {
 
   return (
     <>
+      {/* Sur téléphone la bulle remonte de la hauteur de la barre d'onglets (4 rem) pour
+          ne pas se poser sur l'onglet « Plus » ; à partir de md elle retrouve son coin. */}
       <button onClick={() => setOpen((v) => !v)} aria-label={open ? t("close") : t("open")}
-        className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 text-white shadow-[0_10px_30px_-8px_rgba(0,0,0,0.45)] transition-transform hover:scale-105 active:scale-95">
+        className="fixed bottom-20 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 md:bottom-5 text-white shadow-[0_10px_30px_-8px_rgba(0,0,0,0.45)] transition-transform hover:scale-105 active:scale-95">
         {open ? <X className="h-5 w-5" /> : <LifeBuoy className="h-6 w-6" />}
       </button>
 
@@ -102,7 +104,7 @@ export function SupportBubble() {
           <motion.div
             initial={{ opacity: 0, y: 16, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.97 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            className="fixed bottom-24 right-5 z-50 flex w-[min(420px,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-[0_24px_60px_-15px_rgba(16,24,40,0.35)]"
+            className="fixed bottom-40 right-5 z-50 flex w-[min(420px,calc(100vw-2.5rem))] md:bottom-24 flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-[0_24px_60px_-15px_rgba(16,24,40,0.35)]"
             style={{ maxHeight: "min(600px, calc(100vh - 8rem))" }}>
 
             {/* En-tête volontairement SOBRE. Une version précédente empilait un dégradé
