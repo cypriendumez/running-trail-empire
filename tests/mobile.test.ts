@@ -135,6 +135,17 @@ test("sur mobile, l'avertissement médical part dans « Plus » — mais la lign
   assert.ok(!/\bhidden\b/.test(balise), "l'attribution Garmin porte un `hidden`");
 });
 
+test("sur téléphone, la séance du jour vient en deuxième, juste sous « Bonjour »", () => {
+  // Cyprien, 21/09/2026 : « c'est ce qui est très important sur mon application ».
+  // Trois variantes rendent la séance (bannière sans coach, carte compacte, carte
+  // complète) : chacune porte `order-first` sous lg, et la colonne est une pile flex.
+  const src = codeNu("src/components/dashboard/BentoDashboard.tsx");
+  assert.ok(/<div className="flex min-w-0 flex-col lg:block">/.test(src),
+    "la colonne principale n'est plus une pile flex sur mobile : `order-first` n'aurait aucun effet");
+  const variantes = [...src.matchAll(/order-first[^"]*lg:order-none/g)].length;
+  assert.equal(variantes, 3, `${variantes} variante(s) de la séance passent en tête, 3 attendues`);
+});
+
 test("les libellés de la barre existent dans les cinq langues", () => {
   const src = readFileSync(BARRE, "utf8");
   for (const cle of ["accueil", "carte", "enregistrer", "calendrier", "plus", "tout", "fermer"]) {

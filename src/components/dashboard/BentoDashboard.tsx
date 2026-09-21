@@ -603,7 +603,12 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
 
       {/* ── Contenu principal + rail de droite (3 colonnes avec la sidebar) ── */}
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-6">
-      <div className="min-w-0">
+      {/* ⚠️ SUR TÉLÉPHONE, LA SÉANCE VIENT EN DEUXIÈME, juste sous « Bonjour » (Cyprien,
+          21/09/2026 : « c'est ce qui est très important sur mon application »). La colonne
+          devient une pile flex sous `lg` pour que `order-first` sur les trois variantes de
+          la séance (bannière sans coach, carte compacte, carte complète) les fasse passer
+          devant série, objectif et bandeaux — sans toucher à l'ordre du bureau. */}
+      <div className="flex min-w-0 flex-col lg:block">
 
       {/* Ressenti post-séance — demandé après la dernière séance */}
       {pendingFeedback && <SessionFeedback date={pendingFeedback.date} title={pendingFeedback.title} />}
@@ -632,7 +637,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
 
       {/* Prochaine séance — bannière compacte (uniquement si pas de bandeau coach) */}
       {!coachKey && (
-        <div className="mb-5 flex items-center gap-4 rounded-2xl border border-zinc-200/70 bg-white px-5 py-3.5 shadow-sm">
+        <div className="order-first mb-5 flex items-center gap-4 rounded-2xl border border-zinc-200/70 bg-white px-5 py-3.5 shadow-sm lg:order-none">
           <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#ecfdf5]" style={{ color: displaySession.accent }}>
             <Calendar className="h-5 w-5" />
           </span>
@@ -654,7 +659,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
         <motion.div
           initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-          className="relative mb-5 flex items-center gap-4 overflow-hidden rounded-3xl px-5 py-4 text-white shadow-xl shadow-emerald-900/30 ring-1 ring-white/10 sm:px-6"
+          className="order-first relative mb-5 flex items-center gap-4 overflow-hidden rounded-3xl px-5 py-4 text-white shadow-xl shadow-emerald-900/30 ring-1 ring-white/10 sm:px-6 lg:order-none"
           style={{ background: "linear-gradient(120deg,#064e3b 0%,#047857 48%,#0d9488 100%)" }}
         >
           <div className="pointer-events-none absolute -top-16 -right-10 h-44 w-44 rounded-full bg-emerald-300/20 blur-3xl" />
@@ -675,7 +680,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
         <motion.div
           initial={{ opacity: 0, y: 18, scale: 0.99 }} animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          className="relative mb-5 overflow-hidden rounded-3xl p-5 sm:p-6 text-white shadow-2xl shadow-emerald-900/40 ring-1 ring-white/10"
+          className="order-first relative mb-5 overflow-hidden rounded-3xl p-5 sm:p-6 text-white shadow-2xl shadow-emerald-900/40 ring-1 ring-white/10 lg:order-none"
           style={{ background: "linear-gradient(135deg,#064e3b 0%,#047857 44%,#0d9488 100%)" }}
         >
           {/* Halos lumineux — profondeur premium */}
