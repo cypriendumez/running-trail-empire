@@ -1,0 +1,19 @@
+-- ─────────────────────────────────────────────────────────────────────────────
+--  030 — LA SOURCE « phone_gps » MANQUAIT À L'ÉNUMÉRATION wearable_source
+--
+--  Trouvé le 22/09/2026 en exerçant l'app connectée : chaque course enregistrée par le
+--  téléphone (écran « Enregistrer », Ghost Runner) finissait en 500 —
+--    invalid input value for enum wearable_source: "phone_gps"
+--  parce que la 001 n'énumère que manual, garmin, coros, strava, apple_health, polar.
+--  Le code écrit « phone_gps » depuis la première version ; AUCUNE course GPS du
+--  téléphone n'a donc jamais été enregistrée, et la file d'attente hors-ligne
+--  réessayait la même erreur trois fois avant d'abandonner en silence.
+--
+--  Pas de DROP, pas de retour arrière nécessaire : ajouter une valeur à une énumération
+--  est sans risque pour les lignes existantes. `if not exists` rend la migration
+--  rejouable.
+--
+--  En attendant qu'elle passe, /api/workouts/log retombe sur « manual » en marquant la
+--  trace « [GPS] » dans les notes, et journalise ce repli dans error_logs (panneau Bugs).
+-- ─────────────────────────────────────────────────────────────────────────────
+alter type wearable_source add value if not exists 'phone_gps';

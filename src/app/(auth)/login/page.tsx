@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Logo } from "@/components/brand/Logo";
+import { cheminSur } from "@/lib/social/amisLiens";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { AUTH } from "@/components/auth/authI18n";
@@ -63,7 +64,9 @@ export default function LoginPage() {
       setLoading(false);
       return;
     }
-    router.push("/dashboard");
+    // `?next=` : un chemin SUR le site (jamais une adresse externe) où revenir — la page
+    // d'invitation /amis/<id> s'en sert pour que le suivi se fasse juste après.
+    router.push(cheminSur(new URLSearchParams(window.location.search).get("next")));
     router.refresh();
   }
 

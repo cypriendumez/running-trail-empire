@@ -1,6 +1,12 @@
 "use client";
 // ─────────────────────────────────────────────────────────────────────────────
-//  LE CLUB — fil social de Pacevo.
+//  AJOUTER DES AMIS + LE FIL — le social de Pacevo.
+//
+//  Depuis le 22/09/2026 la page S'OUVRE SUR L'ANNUAIRE (`AjouterAmis` : suggestions,
+//  contacts, QR code) et le fil des publications est à un bouton, en haut à droite.
+//  Cyprien : « change le nom club, mets plutôt ajouter des amis ». L'en-tête est
+//  compact : sur téléphone, titre + tabs + sous-titre + bouton + bascule mangeaient
+//  la moitié de l'écran avant la première ligne utile.
 //
 //  Parti pris esthétique : on n'imite pas la carte-liste dense d'un fil classique.
 //  Chaque séance publiée est une CARTE-PERFORMANCE — les chiffres d'abord, gros et
@@ -12,7 +18,8 @@
 //  mentirait sur la sortie de quelqu'un.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from "react";
-import { Heart, MessageCircle, Search, UserPlus, UserCheck, Trash2, Send, Users, Sparkles, ImagePlus, X, Loader2 } from "lucide-react";
+import { Heart, MessageCircle, UserPlus, Trash2, Send, Users, Sparkles, ImagePlus, X, Loader2, Rss } from "lucide-react";
+import { AjouterAmis } from "./AjouterAmis";
 import { timeAgo, statLine, likesLabel } from "@/lib/social/feed";
 import { useT } from "@/lib/i18n/LanguageProvider";
 
@@ -26,7 +33,6 @@ type Post = {
   kudos_count: number; comments_count: number; kudoed: boolean; mine: boolean;
   author?: Author | null; workout?: Workout | null;
 };
-type Athlete = { id: string; full_name?: string | null; avatar_url?: string | null; league?: string | null; discipline_score?: number | null; following: boolean };
 type Comment = { id: string; body: string; created_at: string; author?: Author | null };
 
 const initials = (name?: string | null) =>
@@ -45,13 +51,34 @@ function Avatar({ author, size = 40 }: { author?: Author | null; size?: number }
   );
 }
 
-export function SocialHub({ recentWorkouts, clubs = [] }: {
+/**
+ * État honnête : on DIT que la fonctionnalité attend son activation, au lieu
+ * d'afficher un fil vide qui laisserait croire que personne ne publie.
+ */
+export function SocleEnAttente() {
+  return (
+    <div className="mx-auto w-full max-w-2xl px-4 py-16 text-center">
+      <p className="text-lg font-bold text-zinc-900">Le Club arrive</p>
+      <p className="mx-auto mt-2 max-w-md text-sm text-zinc-500">
+        Le fil social attend l&apos;activation de sa base de données. En attendant,
+        l&apos;onglet Actualité fonctionne normalement.
+      </p>
+    </div>
+  );
+}
+
+export function SocialHub({ recentWorkouts, clubs = [], moi, suivre = null }: {
   recentWorkouts: Workout[];
   /** Clubs dont l'athlète est membre — seuls ceux-là peuvent filtrer son fil. */
   clubs?: { id: string; name: string }[];
+  /** Moi : l'identifiant encodé dans mon QR code, et le prénom affiché dessous. */
+  moi: { id: string; nom: string | null };
+  /** L'athlète d'un lien scanné (`?suivre=`), proposé en tête de l'annuaire. */
+  suivre?: string | null;
 }) {
   const { t, lang } = useT();
-  const [tab, setTab] = useState<"feed" | "athletes">("feed");
+  // ⚠️ ON OUVRE SUR L'ANNUAIRE, pas sur le fil : c'est le nom de la page.
+  const [tab, setTab] = useState<"feed" | "athletes">("athletes");
   const [posts, setPosts] = useState<Post[]>([]);
   const [followingCount, setFollowingCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -70,33 +97,21 @@ export function SocialHub({ recentWorkouts, clubs = [] }: {
 
   useEffect(() => { void loadFeed(); }, [loadFeed]);
 
+  const auFil = tab === "feed";
   return (
     <div className="mx-auto w-full max-w-2xl px-4 pb-16">
-      {/* Le bouton « Ajouter des amis » est PERMANENT et dans l'en-tête. Il n'était
-          auparavant accessible que par l'onglet « Athlètes », ou par le message du fil
-          vide : deux chemins qu'il fallait deviner. Une action aussi centrale ne doit
-          pas dépendre d'un onglet qu'on pense à ouvrir. */}
-      <header className="flex flex-wrap items-center justify-between gap-3 pt-6 pb-4">
-        <div>
-          <h1 className="text-3xl font-black tracking-tight text-zinc-900">{t("club.title")}</h1>
-          <p className="mt-1 text-sm text-zinc-500">{t("club.sub")}</p>
+      {/* Un seul rang : le titre de la vue, et le bouton qui mène à l'autre. */}
+      <header className="flex items-center justify-between gap-3 pt-4 pb-3 sm:pt-6">
+        <div className="min-w-0">
+          <h1 className="truncate text-xl font-black tracking-tight text-zinc-900 sm:text-2xl">{auFil ? t("club.tab.feed") : t("nav.community")}</h1>
+          {auFil && <p className="mt-0.5 hidden text-sm text-zinc-500 sm:block">{t("club.sub")}</p>}
         </div>
-        <button onClick={() => setTab("athletes")}
-          className="flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700">
-          <UserPlus className="h-4 w-4" />
-          {t("club.addFriends")}
+        <button type="button" onClick={() => setTab(auFil ? "athletes" : "feed")}
+          className={`flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-sm font-semibold transition ${
+            auFil ? "bg-emerald-600 text-white hover:bg-emerald-700" : "border border-zinc-200 text-zinc-800 hover:border-zinc-300"}`}>
+          {auFil ? <><UserPlus className="h-4 w-4" />{t("club.addFriends")}</> : <><Rss className="h-4 w-4" />{t("club.tab.feed")}</>}
         </button>
       </header>
-
-      <div className="mb-5 flex gap-1 rounded-xl bg-zinc-100 p-1">
-        {([["feed", t("club.tab.feed")], ["athletes", followingCount > 0 ? t("club.tab.athletes", { n: followingCount }) : t("club.tab.findShort")]] as const).map(([k, label]) => (
-          <button key={k} onClick={() => setTab(k)}
-            className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition ${
-              tab === k ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}>
-            {label}
-          </button>
-        ))}
-      </div>
 
       {tab === "feed" && clubs.length > 0 && (
         <div className="mb-4 flex flex-wrap gap-2">
@@ -127,7 +142,7 @@ export function SocialHub({ recentWorkouts, clubs = [] }: {
           )}
         </>
       ) : (
-        <AthleteFinder onFollowChange={loadFeed} />
+        <AjouterAmis moi={moi} suivre={suivre} onFollowChange={loadFeed} />
       )}
     </div>
   );
@@ -455,82 +470,6 @@ function Comments({ postId }: { postId: string }) {
           <Send className="h-4 w-4" />
         </button>
       </div>
-    </div>
-  );
-}
-
-function AthleteFinder({ onFollowChange }: { onFollowChange: () => void }) {
-  const { t } = useT();
-  const [q, setQ] = useState("");
-  const [athletes, setAthletes] = useState<Athlete[] | null>(null);
-
-  const load = useCallback(async (query: string) => {
-    const r = await fetch(`/api/social/follow?q=${encodeURIComponent(query)}`);
-    const j = await r.json();
-    setAthletes(j.athletes ?? []);
-  }, []);
-
-  // Recherche différée : sans ce délai, chaque frappe déclenchait une requête.
-  useEffect(() => {
-    const id = setTimeout(() => void load(q), q ? 300 : 0);
-    return () => clearTimeout(id);
-  }, [q, load]);
-
-  async function toggle(a: Athlete) {
-    setAthletes((prev) => prev?.map((x) => x.id === a.id ? { ...x, following: !x.following } : x) ?? null);
-    const r = await fetch("/api/social/follow", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ athleteId: a.id }),
-    });
-    if (!r.ok) {
-      setAthletes((prev) => prev?.map((x) => x.id === a.id ? { ...x, following: a.following } : x) ?? null);
-      return;
-    }
-    onFollowChange();
-  }
-
-  return (
-    <div>
-      <div className="relative mb-4">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("club.searchPh")}
-          className="w-full rounded-full border border-zinc-200 py-3 pl-10 pr-4 text-sm outline-none focus:border-emerald-400" />
-      </div>
-
-      {athletes === null ? (
-        <div className="space-y-2">{[0, 1, 2].map((i) => <div key={i} className="h-16 animate-pulse rounded-xl bg-zinc-100" />)}</div>
-      ) : athletes.length === 0 ? (
-        <p className="py-10 text-center text-sm text-zinc-400">
-          {q ? t("club.noMatch", { q }) : t("club.noSuggestion")}
-        </p>
-      ) : (
-        <div className="space-y-2">
-          {!q && <p className="px-1 pb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">{t("club.suggestions")}</p>}
-          {athletes.map((a) => (
-            <div key={a.id} className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3">
-              <Avatar author={a} />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-zinc-900">{a.full_name || t("club.athlete")}</div>
-                {/* On n'affiche la ligue et le score QUE s'ils existent : un « Ligue —,
-                    score 0 » ferait passer un compte neuf pour un compte à l'abandon. */}
-                {(a.league || (a.discipline_score ?? 0) > 0) && (
-                  <div className="text-xs text-zinc-400">
-                    {[a.league, (a.discipline_score ?? 0) > 0 ? t("club.discipline", { n: a.discipline_score ?? 0 }) : null]
-                      .filter(Boolean).join(" · ")}
-                  </div>
-                )}
-              </div>
-              <button onClick={() => toggle(a)}
-                className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition ${
-                  a.following
-                    ? "border border-zinc-200 text-zinc-600 hover:border-red-200 hover:text-red-600"
-                    : "bg-emerald-600 text-white hover:bg-emerald-700"}`}>
-                {a.following ? <><UserCheck className="h-3.5 w-3.5" /> {t("club.following")}</> : <><UserPlus className="h-3.5 w-3.5" /> {t("club.follow")}</>}
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

@@ -1,26 +1,28 @@
 export const dynamic = "force-dynamic";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { CommunityTabs } from "@/components/social/CommunityTabs";
+import { SocialHub, SocleEnAttente } from "@/components/social/SocialHub";
 
-export const metadata = { title: "Le Club" };
+export const metadata = { title: "Ajouter des amis" };
 
 /**
- * L'agrégateur d'actualités qui occupait cet onglet N'EST PAS remplacé : il devient
- * le second onglet. Le supprimer pour installer le fil social aurait détruit une
- * fonctionnalité qui marche, au nom d'une autre.
+ * « AJOUTER DES AMIS » — l'annuaire social, façon Strava (22/09/2026).
+ *
+ * L'agrégateur d'actualités qui partageait cet onglet a désormais sa page
+ * (/dashboard/actualite) ; le fil des publications reste ici, à un bouton.
  *
  * Les séances proposées à la publication sont chargées ICI, côté serveur : le
  * compositeur n'a donc aucune requête à faire à l'ouverture, et surtout on écarte
  * en amont celles qui sont DÉJÀ publiées — proposer de republier une séance
  * n'aboutirait qu'à l'erreur 409 de la contrainte d'unicité.
  */
-export default async function CommunautePage() {
+export default async function CommunautePage({ searchParams }: { searchParams: Promise<{ suivre?: string }> }) {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect("/login");
+  const { suivre } = await searchParams;
 
-  const [{ data: workouts }, published, mesClubs] = await Promise.all([
+  const [{ data: workouts }, published, mesClubs, { data: moi }] = await Promise.all([
     sb.from("workouts")
       .select("id, title, type, sport, date, distance_km, duration_seconds, elevation_gain_m")
       .eq("user_id", user.id).order("date", { ascending: false }).limit(12),
@@ -28,6 +30,8 @@ export default async function CommunautePage() {
     // Seuls les clubs dont l'athlète est MEMBRE peuvent filtrer son fil : proposer
     // un club qu'il n'a pas rejoint donnerait un filtre systématiquement vide.
     sb.from("club_members").select("club_id, clubs!inner(id, name)").eq("user_id", user.id),
+    // Le prénom sous le QR code : l'ami qui scanne doit voir QUI l'invite.
+    sb.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
   ]);
 
   // Les tables sociales arrivent par une migration MANUELLE (019). Tant qu'elle n'est
@@ -48,5 +52,13 @@ export default async function CommunautePage() {
     return liste.map((c) => ({ id: String((c as { id: string }).id), name: String((c as { name: string }).name) }));
   });
 
-  return <CommunityTabs recentWorkouts={recent as never} socialReady={socialReady} clubs={clubs} />;
+  if (!socialReady) return <SocleEnAttente />;
+  return (
+    <SocialHub
+      recentWorkouts={recent as never}
+      clubs={clubs}
+      moi={{ id: user.id, nom: (moi as { full_name?: string | null } | null)?.full_name ?? null }}
+      suivre={typeof suivre === "string" ? suivre : null}
+    />
+  );
 }

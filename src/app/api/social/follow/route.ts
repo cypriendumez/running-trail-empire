@@ -1,7 +1,10 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { suggestable } from "@/lib/social/feed";
+import { athletesMasques, estMasque } from "@/lib/social/visibilite";
+import { estUuid } from "@/lib/social/amisLiens";
 
 /**
  * Colonnes publiques d'un athlète — ÉNUMÉRÉES, jamais `select("*")` suivi d'un
@@ -26,37 +29,39 @@ const ATHLETE_COLS = "id, full_name, avatar_url, league, discipline_score";
  */
 const TABLE_ATHLETES = "athletes_publics";
 
-/** Athlètes ayant explicitement refusé d'apparaître dans la Communauté. */
-async function hiddenAthletes(sb: Awaited<ReturnType<typeof createClient>>): Promise<Set<string>> {
-  const { data } = await sb.from("notifications").select("user_id, data").eq("type", "user_settings");
-  const hidden = new Set<string>();
-  for (const row of data ?? []) {
-    const settings = (row as { data?: Record<string, unknown> }).data ?? {};
-    // Le réglage existe déjà dans l'écran Paramètres ; l'ignorer ici aurait rendu
-    // une case à cocher mensongère — l'athlète l'aurait décochée sans effet.
-    if (settings.communityVisible === false) hidden.add(String((row as { user_id: string }).user_id));
-  }
-  return hidden;
-}
-
-/** GET ?q=… → recherche d'athlètes ; sans `q`, suggestions à suivre. */
+/**
+ * GET ?q=… → recherche d'athlètes ; sans `q`, suggestions à suivre ;
+ * GET ?id=… → UN athlète (le lien d'un QR code scanné), avec l'état du bouton.
+ */
 export async function GET(req: Request) {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-  const q = new URL(req.url).searchParams.get("q")?.trim() ?? "";
+  const params = new URL(req.url).searchParams;
+  const q = params.get("q")?.trim().slice(0, 80) ?? "";
+  const id = params.get("id");
+  // ⚠️ `id` est une colonne uuid : un `.eq` sur « n'importe quoi » LÈVE côté PostgREST
+  // (400) au lieu de répondre « rien ». On filtre la forme avant de demander.
+  if (id !== null && !estUuid(id)) return NextResponse.json({ error: "Identifiant invalide" }, { status: 400 });
 
   let query = sb.from(TABLE_ATHLETES).select(ATHLETE_COLS).eq("onboarding_completed", true).limit(30);
-  if (q) query = query.ilike("full_name", `%${q}%`);
-  const [{ data: rows }, { data: following }, hidden] = await Promise.all([
+  if (id) query = query.eq("id", id);
+  else if (q) query = query.ilike("full_name", `%${q}%`);
+  const [{ data: rows }, { data: following }, masques] = await Promise.all([
     query,
     sb.from("follows").select("following_id").eq("follower_id", user.id).eq("status", "accepted"),
-    hiddenAthletes(sb),
+    athletesMasques(createAdminClient()),
   ]);
 
   const followingIds = new Set((following ?? []).map((f) => String((f as { following_id: string }).following_id)));
-  const visible = ((rows ?? []) as { id: string }[]).filter((a) => !hidden.has(a.id));
+  const visible = ((rows ?? []) as { id: string }[]).filter((a) => !estMasque(masques, a.id) && a.id !== user.id);
+
+  if (id) {
+    const a = visible[0];
+    if (!a) return NextResponse.json({ error: "Athlète introuvable" }, { status: 404 });
+    return NextResponse.json({ athlete: { ...a, following: followingIds.has(a.id) }, followingCount: followingIds.size });
+  }
 
   return NextResponse.json({
     // En recherche on montre TOUT le monde (avec l'état du bouton), alors qu'en

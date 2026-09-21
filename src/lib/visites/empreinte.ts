@@ -69,6 +69,7 @@ const GABARITS: [RegExp, string][] = [
   [/^\/blog\/[^/]+$/, "/blog/[slug]"],
   [/^\/dashboard\/shop\/[^/]+$/, "/dashboard/shop/[slug]"],
   [/^\/suivre\/[^/]+$/, "/suivre/[id]"],
+  [/^\/amis\/[^/]+$/, "/amis/[id]"],
 ];
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 

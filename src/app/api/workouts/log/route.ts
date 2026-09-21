@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
 // POST /api/workouts/log — enregistre une course faite au TÉLÉPHONE (GPS, sans montre),
@@ -43,7 +44,30 @@ export async function POST(req: Request) {
     notes,
   };
 
-  const { data, error } = await sb.from("workouts").insert(row).select("id").single();
+  const tentative = await sb.from("workouts").insert(row).select("id").single();
+  let { data, error } = tentative;
+  /**
+   * ⚠️ FILET TANT QUE LA MIGRATION 030 N'EST PAS PASSÉE. L'énumération `wearable_source`
+   * de la 001 ne connaît pas « phone_gps » : jusqu'au 22/09/2026, CHAQUE course du
+   * téléphone finissait ici en 500, et la file hors-ligne réessayait trois fois la même
+   * erreur avant d'abandonner. Plutôt que de perdre la sortie, on l'enregistre en
+   * « manual » (les notes gardent « [GPS] » + la trace) et on JOURNALISE le repli :
+   * une course sauvée sous une mauvaise étiquette doit se voir dans le panneau Bugs,
+   * pas rester un secret.
+   */
+  if (tentative.error && /wearable_source/.test(tentative.error.message)) {
+    const repli = await sb.from("workouts").insert({ ...row, source: "manual" }).select("id").single();
+    data = repli.data; error = repli.error;
+    if (!error) {
+      try {
+        await createAdminClient().from("error_logs").insert({
+          user_id: user.id, source: "workouts/log", url: "/api/workouts/log",
+          message: "Repli source=manual : l'énumération wearable_source n'a pas « phone_gps » (migration 030 à passer)",
+          meta: { workout_id: data?.id ?? null },
+        });
+      } catch { /* le journal ne doit pas faire échouer l'enregistrement */ }
+    }
+  }
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, id: data.id });
+  return NextResponse.json({ ok: true, id: data?.id });
 }

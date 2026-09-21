@@ -19,7 +19,10 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/dashboard/", "/admin/", "/api/", "/onboarding"],
+        // /amis/<id> et /suivre/<id> : des pages publiques PAR LIEN (QR code, suivi en
+        // direct), pas des pages à indexer — un moteur n'a rien à faire d'un prénom
+        // derrière un identifiant.
+        disallow: ["/dashboard/", "/admin/", "/api/", "/onboarding", "/amis/", "/suivre/"],
       },
     ],
     sitemap: `${BASE}/sitemap.xml`,

@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, CalendarDays, ClipboardList, MapPin, ShieldCheck, Mountain, Ghost,
-  GraduationCap, Heart, MessagesSquare, Watch, Users, Target, Trophy, Medal, ShoppingBag,
+  GraduationCap, Heart, MessagesSquare, Watch, UserPlus, Newspaper, Trophy, Medal, ShoppingBag,
 } from "lucide-react";
 
 /**
@@ -55,11 +55,16 @@ export const NAV_GROUPES: Groupe[] = [
     ],
   },
   {
+    // ⚠️ « CLUBS & DÉFIS » RETIRÉ DU MENU LE 22/09/2026 (Cyprien : « enlève club et les
+    // défis pour l'instant ») — la page /dashboard/clubs existe toujours, elle n'est
+    // plus proposée. L'onglet « Le Club » devient « Ajouter des amis » (suggestions,
+    // contacts, QR code, façon Strava) et l'agrégateur d'actualités, qui y vivait en
+    // second onglet, a sa propre page.
     titleKey: "group.club",
     items: [
-      { href: "/dashboard/communaute", icon: Users, tk: "nav.community" },
-      { href: "/dashboard/clubs", icon: Target, tk: "nav.clubs" },
+      { href: "/dashboard/communaute", icon: UserPlus, tk: "nav.community" },
       { href: "/dashboard/leagues", icon: Medal, tk: "nav.leagues" },
+      { href: "/dashboard/actualite", icon: Newspaper, tk: "nav.news" },
     ],
   },
   {
