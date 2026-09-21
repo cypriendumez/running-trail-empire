@@ -12,7 +12,6 @@ santé du coureur, nutrition, matériel, ce que fait Pacevo).
 
 Catégories possibles pour la carte : `AI`, `TRAINING`, `NUTRITION`, `HEALTH`, `RACES`, `GEAR`.
 
-- [ ] Courir par forte chaleur : ce que dit la littérature (acclimatation, hydratation, allure) — `HEALTH`
 - [ ] Le sommeil, la séance que personne ne planifie : dette de sommeil et performance — `HEALTH`
 - [ ] Marche-course : pourquoi alterner n'est pas « tricher » (reprise, débutants, ultra) — `TRAINING`
 - [ ] Cadence et foulée : ce que les 180 pas/min ont de vrai et de faux — `TRAINING`
@@ -24,3 +23,13 @@ Catégories possibles pour la carte : `AI`, `TRAINING`, `NUTRITION`, `HEALTH`, `
 - [ ] Reprendre après une blessure : les principes de progression qui tiennent la route — `HEALTH`
 - [ ] Le seuil lactique expliqué sans jargon : pourquoi le coach le vise autant — `AI`
 - [ ] Récupération active ou repos complet : ce que montrent les études contrôlées — `TRAINING`
+- [ ] Courir par forte chaleur : ce que dit la littérature (acclimatation, hydratation, allure) — `HEALTH`
+      <!-- Reporté le 21/09/2026, passage de la routine : rien n'a été écrit. L'environnement
+           d'exécution refuse au CONNECT (403, politique réseau de l'organisation) les trois hôtes
+           dont l'article dépend — eutils.ncbi.nlm.nih.gov et pubmed.ncbi.nlm.nih.gov (donc AUCUNE
+           source vérifiable par esummary) et images.unsplash.com (donc AUCUNE photo regardable
+           avant de l'inscrire dans AUDITEES). Écrire quand même aurait voulu dire citer de
+           mémoire et auditer une image sans la voir : les deux règles que ce blog s'est données.
+           Le sujet est remis en fin de liste, non coché, pour que le passage suivant prenne le
+           sujet d'après sans le perdre. À rouvrir quand l'environnement autorise ces hôtes. -->
+
