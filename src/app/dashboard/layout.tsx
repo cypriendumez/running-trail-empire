@@ -3,6 +3,7 @@ import { stripProfileSecrets } from "@/lib/profile/safe";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { MobileTabBar } from "@/components/layout/MobileTabBar";
+import { FileAttenteCourses } from "@/components/courses/FileAttenteCourses";
 import { MedicalDisclaimer } from "@/components/layout/MedicalDisclaimer";
 import { AutoSync } from "@/components/AutoSync";
 import { MessageNotifier } from "@/components/messages/MessageNotifier";
@@ -47,6 +48,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <div className="flex h-screen bg-[#FAFAFA] overflow-hidden">
         <AutoSync />
         <MessageNotifier />
+        {/* Les courses enregistrées sans réseau repartent dès que le réseau revient. */}
+        <FileAttenteCourses />
         <Sidebar profile={stripProfileSecrets(profile)} unreadMessages={unreadMessages ?? 0} estEditeur={estAdmin(user.email)} />
         <div className="flex-1 flex flex-col min-w-0">
           <TopBar profile={stripProfileSecrets(profile)} avatarColor={avatarColor} notifsMasquees={notifsMasquees} />

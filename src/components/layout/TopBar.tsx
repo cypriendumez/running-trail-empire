@@ -11,6 +11,7 @@ import { RX } from "@/components/races/racesI18n";
 import { timeAgo } from "@/lib/utils/time";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { createClient } from "@/lib/supabase/client";
+import { deconnexion } from "@/lib/auth/deconnexion";
 import { formatDateCivile } from "@/lib/time/fuseau";
 import { fmtKm } from "@/lib/i18n/nombres";
 import { construirePanneau, sansMasquees, ajouterMasquee, TYPES_NOTIFIES, type LigneNotification } from "@/lib/notifications/panneau";
@@ -153,8 +154,7 @@ export function TopBar({ profile, avatarColor, notifsMasquees: masqueesInitiales
   }
 
   async function signOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await deconnexion();
     router.push("/login");
     router.refresh();
   }

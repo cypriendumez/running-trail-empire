@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutDashboard, User, Settings, LogOut, ChevronLeft, Crown, ShieldCheck } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { deconnexion } from "@/lib/auth/deconnexion";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
 import { useState } from "react";
@@ -48,8 +48,7 @@ export function Sidebar({ profile, unreadMessages = 0, estEditeur }: { profile: 
   const pc = PREMIUM_CARD[lang] ?? PREMIUM_CARD.fr;
 
   async function signOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await deconnexion();
     router.push("/login");
   }
 

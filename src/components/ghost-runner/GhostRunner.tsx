@@ -16,6 +16,7 @@ import { GX, GUIDE, GUIDE_TIP, SPEECH_LANG, fillG } from "./ghostI18n";
 import { estAppleWatch } from "@/lib/watch/intervals";
 import { jourCivil } from "@/lib/time/fuseau";
 import { useFuseau } from "@/lib/time/FuseauProvider";
+import { sauverEnCours, lireEnCours, effacerEnCours, mettreEnAttente, vautEnregistrement, INTERVALLE_SAUVEGARDE_MS, type CourseEnCours } from "@/lib/courses/horsLigne";
 
 /**
  * ⚠️ `title`, `detail` et `tags` sont en FRANÇAIS, et doivent le rester :
@@ -131,6 +132,11 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
   const tg = (k: string, p?: Record<string, string | number>) => fillG(d[k] ?? k, p);
   const zn = (z: number) => d[`hz.${z}`];
   const [phase, setPhase] = useState<"setup" | "running" | "finished">("setup");
+  /** Une course commencée puis perdue (appli tuée, batterie) : retrouvée sur le téléphone à
+   *  l'ouverture, proposée à l'enregistrement — jamais jetée en silence. */
+  const [courseRetrouvee, setCourseRetrouvee] = useState<CourseEnCours | null>(null);
+  const derniereSauvegardeRef = useRef(0);
+  const demarreeARef = useRef(0);
   const [distance, setDistance] = useState(10);
   const [targetTime, setTargetTime] = useState(3600); // seconds
   const [elevation, setElevation] = useState(0);
@@ -287,23 +293,39 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
   }
 
   // Enregistre la course dans l'historique (façon Strava : distance/temps/allure/D+ + tracé GPS).
-  async function saveRun(finalSec: number) {
-    if (kmRef.current < 0.1 || finalSec < 30) return;
+  /** Envoie une course terminée ; sans réseau, la met en file d'attente sur le téléphone. */
+  async function envoyerCourse(corps: { title: string; distanceKm: number; durationSeconds: number; elevationGain?: number; track?: [number, number][]; type: string }) {
+    const st = typeof localStorage !== "undefined" ? localStorage : null;
+    // ⚠️ HORS LIGNE, ON N'ESSAIE MÊME PAS : la course va directement dans la file, et
+    // `FileAttenteCourses` (layout) l'enverra dès que le réseau revient.
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      mettreEnAttente(st, corps); effacerEnCours(st);
+      toast.info(d["t.queued"], { duration: 8000 });
+      return;
+    }
     try {
-      const r = await fetch("/api/workouts/log", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: tg("runTitle", { km: Math.round(kmRef.current * 10) / 10 }),
-          distanceKm: kmRef.current, durationSeconds: finalSec,
-          elevationGain: elevation > 0 ? elevation : undefined,
-          track: trackRef.current.length > 1 ? trackRef.current : undefined,
-          type: "easy",
-        }),
-      });
-      const j = await r.json();
-      if (j.ok) toast.success(d["t.saved"], { duration: 5000 });
-      else toast.error(j.error || d["t.saveErr"]);
-    } catch { toast.error(d["t.saveErr"]); }
+      const r = await fetch("/api/workouts/log", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corps) });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.ok) { effacerEnCours(st); toast.success(d["t.saved"], { duration: 5000 }); return; }
+      // Refusée par le serveur (course invalide) : on le dit, on ne met pas en file — une
+      // course refusée trois fois de suite y resterait pour rien.
+      if (r.status >= 400 && r.status < 500) { toast.error(j.error || d["t.saveErr"]); return; }
+      mettreEnAttente(st, corps); effacerEnCours(st); toast.info(d["t.queued"], { duration: 8000 });
+    } catch {
+      // Le réseau a lâché en cours de route : même file, même promesse.
+      mettreEnAttente(st, corps); effacerEnCours(st); toast.info(d["t.queued"], { duration: 8000 });
+    }
+  }
+
+  async function saveRun(finalSec: number) {
+    if (kmRef.current < 0.1 || finalSec < 30) { effacerEnCours(typeof localStorage !== "undefined" ? localStorage : null); return; }
+    await envoyerCourse({
+      title: tg("runTitle", { km: Math.round(kmRef.current * 10) / 10 }),
+      distanceKm: kmRef.current, durationSeconds: finalSec,
+      elevationGain: elevation > 0 ? elevation : undefined,
+      track: trackRef.current.length > 1 ? trackRef.current : undefined,
+      type: "easy",
+    });
   }
 
   function finishSession() {
@@ -357,6 +379,15 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
         const pace = mps > 0.5 ? 1000 / mps / 60 : currentPace;
         trackRef.current.push([latitude, longitude]); // trace le parcours réel (carte + historique)
         processProgress(kmRef.current + d / 1000, pace);
+        // ⚠️ ÉCRITE SUR LE TÉLÉPHONE PENDANT L'EFFORT (au plus toutes les 5 s) : sans
+        // réseau, ou si le système tue l'appli, la course n'est plus perdue.
+        if (t - derniereSauvegardeRef.current >= INTERVALLE_SAUVEGARDE_MS) {
+          derniereSauvegardeRef.current = t;
+          sauverEnCours(typeof localStorage !== "undefined" ? localStorage : null, {
+            demarreeA: demarreeARef.current, elapsedSec: elapsedRef.current, km: kmRef.current,
+            elevation, track: trackRef.current, misAJourA: t,
+          });
+        }
       }
     }
     lastPosRef.current = { lat: latitude, lng: longitude, t };
@@ -481,6 +512,8 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
     setCheckpoints(cps);
     elapsedRef.current = 0; kmRef.current = 0; pausedRef.current = false; lastPosRef.current = null;
     trackRef.current = [];
+    demarreeARef.current = Date.now(); derniereSauvegardeRef.current = 0;
+    effacerEnCours(typeof localStorage !== "undefined" ? localStorage : null);
     setElapsed(0); setCurrentKm(0); setCurrentPace(0); setPredictedFinish(0); setPaused(false);
     setPhase("running");
     wantLockRef.current = true; requestWakeLock(); // garde l'écran allumé pendant la course
@@ -579,6 +612,12 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
 
   // État de la connexion montre (intervals.icu → Garmin/Coros/Wahoo) pour le voyant vert.
   useEffect(() => {
+    const c = lireEnCours(typeof localStorage !== "undefined" ? localStorage : null);
+    if (c && vautEnregistrement(c)) setCourseRetrouvee(c);
+    else if (c) effacerEnCours(localStorage);
+  }, []);
+
+  useEffect(() => {
     fetch("/api/watch/status").then((r) => r.json()).then(setWatchStatus).catch(() => setWatchStatus({ connected: false, pushReady: false, device: null }));
   }, []);
 
@@ -663,6 +702,31 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
       <AnimatePresence mode="wait">
         {phase === "setup" && (
           <motion.div key="setup" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            {/* Une course commencée puis perdue (appli tuée, batterie, réseau) a été retrouvée
+                sur le téléphone : on la propose, on ne la jette pas en silence. */}
+            {courseRetrouvee && (
+              <div className="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <p className="min-w-0 flex-1 text-sm font-medium text-amber-900">
+                  {tg("t.recovered", { km: Math.round(courseRetrouvee.km * 10) / 10, t: formatTime(courseRetrouvee.elapsedSec) })}
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      const c = courseRetrouvee; setCourseRetrouvee(null);
+                      await envoyerCourse({
+                        title: tg("runTitle", { km: Math.round(c.km * 10) / 10 }), distanceKm: c.km, durationSeconds: c.elapsedSec,
+                        elevationGain: c.elevation > 0 ? c.elevation : undefined, track: c.track.length > 1 ? c.track : undefined, type: "easy",
+                      });
+                    }}
+                    className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white"
+                  >{d["t.recoverSave"]}</button>
+                  <button
+                    onClick={() => { effacerEnCours(localStorage); setCourseRetrouvee(null); }}
+                    className="rounded-xl px-3 py-1.5 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-200"
+                  >{d["t.recoverDrop"]}</button>
+                </div>
+              </div>
+            )}
             {/* Séances du coach — faisables ici sans montre (allure/FC ciblée + voix) */}
             {coachSessions.length > 0 && (
               <div className="mb-5 rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-5">

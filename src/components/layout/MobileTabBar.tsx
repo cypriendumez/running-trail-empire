@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Home, Map, CalendarDays, LayoutGrid, X, User, Settings, LogOut, ShieldCheck, LifeBuoy, CircleDot } from "lucide-react";
 import { MedicalDisclaimer } from "@/components/layout/MedicalDisclaimer";
 import { EVENEMENT_AIDE } from "@/components/support/evenement";
-import { createClient } from "@/lib/supabase/client";
+import { deconnexion } from "@/lib/auth/deconnexion";
 import { cn } from "@/lib/utils/cn";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { NAV_GROUPES, ONGLETS_MOBILE, resteMobile, estActive } from "./navigation";
@@ -57,7 +57,7 @@ export function MobileTabBar({ unreadMessages = 0, estEditeur }: { unreadMessage
   }, [ouvert]);
 
   async function signOut() {
-    await createClient().auth.signOut();
+    await deconnexion();
     router.push("/login");
   }
 
@@ -102,10 +102,14 @@ export function MobileTabBar({ unreadMessages = 0, estEditeur }: { unreadMessage
         aria-modal="true"
         aria-label={d.tout}
         hidden={!ouvert}
-        className="fixed inset-x-0 z-[60] overflow-y-auto rounded-t-3xl bg-white shadow-[0_-12px_40px_-12px_rgba(0,0,0,0.25)] md:hidden"
-        style={{ bottom: `calc(${HAUTEUR} + env(safe-area-inset-bottom))`, maxHeight: "70vh" }}
+        // ⚠️ UNE PAGE ENTIÈRE, PAS UNE FEUILLE À 70 % (Cyprien, 21/09/2026, capture) : la
+        // feuille laissait la page du dessous dépasser en haut, et son entête « Tout
+        // Pacevo » flottait au milieu de l'écran. Elle couvre maintenant tout, du haut de
+        // l'écran jusqu'à la barre d'onglets.
+        className="fixed inset-x-0 top-0 z-[60] overflow-y-auto bg-white md:hidden"
+        style={{ bottom: `calc(${HAUTEUR} + env(safe-area-inset-bottom))` }}
       >
-        <div className="sticky top-0 flex items-center justify-between border-b border-zinc-100 bg-white px-5 py-3">
+        <div className="sticky top-0 flex items-center justify-between border-b border-zinc-100 bg-white px-5 py-3" style={{ paddingTop: "calc(0.75rem + env(safe-area-inset-top))" }}>
           <span className="text-sm font-bold text-zinc-900">{d.tout}</span>
           <button type="button" onClick={() => setOuvert(false)} aria-label={d.fermer} className="rounded-full p-1.5 text-zinc-500 active:bg-zinc-100">
             <X className="h-5 w-5" />

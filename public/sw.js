@@ -53,9 +53,19 @@ self.addEventListener("fetch", (e) => {
   if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/auth/")) return;
 
   // Navigations : réseau d'abord, /offline en dernier recours.
+  // ⚠️ SAUF « ENREGISTRER » (/dashboard/ghost-runner) : sa dernière version est GARDÉE,
+  // pour pouvoir démarrer une course sans réseau (Cyprien, 21/09/2026 : « comme sur
+  // Strava »). Le GPS n'a pas besoin du réseau ; c'est la page qui en avait besoin.
+  // La page contient les séances de l'athlète : elle ne sert QUE hors ligne, sur ce
+  // téléphone, et le cache est vidé à la déconnexion (lib/auth/deconnexion).
   if (req.mode === "navigate") {
+    const garder = url.pathname === "/dashboard/ghost-runner";
     e.respondWith(
-      fetch(req).catch(async () =>
+      fetch(req).then((res) => {
+        if (garder && res.ok) { const clone = res.clone(); caches.open(CACHE).then((c) => c.put(req, clone)); }
+        return res;
+      }).catch(async () =>
+        (garder && (await caches.match(req))) ||
         (await caches.match(PAGE_HORS_LIGNE)) ||
         new Response("Hors-ligne", { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8" } }),
       ),

@@ -41,7 +41,16 @@ if (!/method\s*!==\s*"GET"/.test(sw)) fail("le SW n'exclut pas les écritures (m
 if (!/origin\s*!==\s*self\.location\.origin/.test(sw)) fail("le SW ne se limite pas à son propre domaine");
 // Navigations : réseau d'abord + repli hors-ligne.
 if (!/mode\s*===\s*"navigate"/.test(sw)) fail("le SW ne traite pas les navigations à part");
-if (!/fetch\(req\)\.catch/.test(sw)) fail("le SW ne fait pas réseau-d'abord sur les navigations", "risque de page périmée");
+// ⚠️ RÉSEAU D'ABORD = `fetch(req)` PRÉCÈDE toute lecture du cache dans la branche des
+// navigations. Depuis le 21/09/2026, la page « Enregistrer » est gardée en cache APRÈS un
+// succès (`.then`) pour s'ouvrir sans réseau : la forme est `fetch(req).then(…).catch(…)`.
+{
+  const nav = sw.slice(sw.indexOf('mode === "navigate"'));
+  const iFetch = nav.indexOf("fetch(req)");
+  const iCache = nav.indexOf("caches.match(req)");
+  if (iFetch < 0 || !/fetch\(req\)[\s\S]{0,600}?\.catch\(/.test(nav)) fail("le SW ne fait pas réseau-d'abord sur les navigations", "risque de page périmée");
+  if (iCache >= 0 && iCache < iFetch) fail("le SW lit le cache AVANT le réseau sur une navigation", "page périmée servie alors que le réseau est là");
+}
 if (!/\/offline/.test(sw)) fail("le SW n'a pas de page hors-ligne de secours");
 // Cache versionné + nettoyage à l'activation.
 if (!/caches\.delete/.test(sw)) fail("le SW ne supprime pas les anciens caches", "un mauvais cache resterait coincé");

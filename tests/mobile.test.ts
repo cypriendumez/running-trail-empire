@@ -80,6 +80,13 @@ test("« Plus » mène à TOUT ce que la colonne du bureau connaît — calculé
   assert.ok(/resteMobile\(\)/.test(src), "la barre ne calcule plus « Plus » depuis la liste partagée");
 });
 
+test("« Plus » est une page entière, du haut de l'écran à la barre d'onglets", () => {
+  // Capture de Cyprien, 21/09/2026 : la feuille à 70 % laissait la page du dessous dépasser.
+  const src = codeNu(BARRE);
+  assert.match(src, /className="fixed inset-x-0 top-0 z-\[60\] overflow-y-auto bg-white md:hidden"/, "« Plus » n'est plus une page entière");
+  assert.ok(!/maxHeight: "70vh"/.test(src), "la feuille est revenue à 70 % de l'écran");
+});
+
 test("naviguer referme la feuille « Plus »", () => {
   // Sans cela, toucher une tuile laisse la feuille ouverte PAR-DESSUS la page demandée :
   // l'athlète croit que rien ne s'est passé et appuie à nouveau.
