@@ -39,9 +39,17 @@ export const NAV_GROUPES: Groupe[] = [
     ],
   },
   {
+    // ⚠️ RANGÉ LE 21/09/2026 (Cyprien : « range mieux les différentes catégories ») :
+    // « Mes activités » est du SUIVI (ce que l'athlète a couru), pas du club ; et le
+    // comparateur d'équipement n'a rien de social — il a son propre groupe.
     titleKey: "group.tracking",
     items: [
       { href: "/dashboard/health", icon: Heart, tk: "nav.health" },
+      // Vitrine, Segments, Carte de chaleur et Survol 3D partagent UNE entrée : ce
+      // sont quatre lectures du même sujet — ce que l'athlète a parcouru. Ils se
+      // choisissent par la rangée d'onglets en haut de page (comme l'onglet Santé),
+      // au lieu d'occuper quatre lignes de menu.
+      { href: "/dashboard/trophees", icon: Trophy, tk: "nav.performances" },
       { href: "/dashboard/messages", icon: MessagesSquare, tk: "nav.messaging" },
       { href: "/dashboard/sync", icon: Watch, tk: "nav.sync" },
     ],
@@ -51,14 +59,12 @@ export const NAV_GROUPES: Groupe[] = [
     items: [
       { href: "/dashboard/communaute", icon: Users, tk: "nav.community" },
       { href: "/dashboard/clubs", icon: Target, tk: "nav.clubs" },
-      // Vitrine, Segments, Carte de chaleur et Survol 3D partagent UNE entrée : ce
-      // sont quatre lectures du même sujet — ce que l'athlète a parcouru. Ils se
-      // choisissent par la rangée d'onglets en haut de page (comme l'onglet Santé),
-      // au lieu d'occuper quatre lignes de menu.
-      { href: "/dashboard/trophees", icon: Trophy, tk: "nav.performances" },
       { href: "/dashboard/leagues", icon: Medal, tk: "nav.leagues" },
-      { href: "/dashboard/shop", icon: ShoppingBag, tk: "nav.shop" },
     ],
+  },
+  {
+    titleKey: "group.gear",
+    items: [{ href: "/dashboard/shop", icon: ShoppingBag, tk: "nav.shop" }],
   },
 ];
 

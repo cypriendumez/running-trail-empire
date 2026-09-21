@@ -87,6 +87,27 @@ test("« Plus » est une page entière, du haut de l'écran à la barre d'onglet
   assert.ok(!/maxHeight: "70vh"/.test(src), "la feuille est revenue à 70 % de l'écran");
 });
 
+test("« Plus » range ses rubriques en LISTES, sans trou — et le comparateur n'est plus « Club »", () => {
+  // Capture de Cyprien, 21/09/2026 (« range mieux les différentes catégories ») : en tuiles
+  // de trois, un groupe de quatre pages laissait deux trous, un groupe de cinq, un trou.
+  const src = codeNu(BARRE);
+  assert.ok(!/grid-cols-3/.test(src), "les tuiles de trois colonnes sont revenues : un groupe de quatre pages laisse deux trous");
+  assert.ok(/divide-y divide-zinc-100/.test(src), "les rubriques ne sont plus des listes séparées par un filet");
+  assert.ok(/<ChevronRight /.test(src), "les lignes n'annoncent plus qu'elles mènent quelque part (chevron)");
+  // Chaque rubrique porte un titre, et le compte est une rubrique comme les autres.
+  assert.ok(/aria-label=\{t\("group\.account"\)\}/.test(src), "le bloc « Compte » n'est plus une rubrique nommée");
+  // Le comparateur d'équipement n'a rien de social ; « Mes activités » est du suivi.
+  const groupe = (href: string) => NAV_GROUPES.find((g) => g.items.some((it) => it.href === href))?.titleKey;
+  assert.equal(groupe("/dashboard/shop"), "group.gear", "le comparateur d'équipement est rangé ailleurs que dans « Équipement »");
+  assert.equal(groupe("/dashboard/trophees"), "group.tracking", "« Mes activités » n'est pas rangé dans « Suivi »");
+  assert.equal(groupe("/dashboard/messages"), "group.tracking", "la messagerie n'est pas rangée dans « Suivi »");
+  // Les deux libellés de rubrique existent dans les cinq dictionnaires.
+  const dico = readFileSync("src/lib/i18n/translations.ts", "utf8");
+  for (const cle of ["group.gear", "group.account"]) {
+    assert.equal([...dico.matchAll(new RegExp(`"${cle.replace(".", "\\.")}": "`, "g"))].length, 5, `« ${cle} » manque à une langue`);
+  }
+});
+
 test("naviguer referme la feuille « Plus »", () => {
   // Sans cela, toucher une tuile laisse la feuille ouverte PAR-DESSUS la page demandée :
   // l'athlète croit que rien ne s'est passé et appuie à nouveau.
@@ -209,6 +230,38 @@ test("plus d'emoji « personnage » pour les sports : des icônes en trait", () 
   const tb = codeNu("src/components/trail/TrailBuilder.tsx");
   assert.match(tb, /<IconeSport sport=\{activity\}/, "le sélecteur d'activité de la carte est revenu aux emoji");
   assert.ok(!/\{act\.emoji\}|\{cfg\.emoji\}/.test(tb), "un emoji d'activité est encore rendu dans la carte");
+});
+
+test("sur téléphone, « Enregistrer » ouvre sur la carte, les réglages en dessous — le bureau garde son entête", () => {
+  // Cyprien, 21/09/2026 : « fais comme Strava avec la carte et laisse la personne aller
+  // en bas avec tous les réglages qu'il y a déjà ».
+  const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
+  const carte = gr.indexOf('<div className="relative -mx-6 -mt-6 md:hidden">');
+  assert.ok(carte > 0, "le bloc carte du téléphone a disparu de l'écran « Enregistrer »");
+  assert.ok(/<CarteDirect position=\{positionCarte\} track=\{traceCarte\}/.test(gr.slice(carte, carte + 600)), "la carte ne suit plus la position ni la trace");
+  // Elle est pleine largeur : les marges négatives annulent EXACTEMENT le `p-6` du <main>.
+  assert.match(codeNu("src/app/dashboard/layout.tsx"), /<main className="flex-1 overflow-auto p-6">/, "le <main> n'a plus p-6 : les marges -mx-6/-mt-6 de la carte ne s'annulent plus");
+  // L'entête vert reste sur bureau, où la carte n'est pas montée.
+  const hero = gr.indexOf('className="relative hidden overflow-hidden rounded-3xl');
+  assert.ok(hero > carte, "l'entête vert du bureau a disparu ou passe avant la carte");
+  assert.ok(/ md:block"/.test(gr.slice(hero, hero + 220)), "l'entête vert ne revient plus sur bureau");
+  // La carte est chargée SANS rendu serveur : Leaflet touche `window` à l'import.
+  assert.match(gr, /const CarteDirect = dynamic\(\(\) => import\("\.\/CarteDirect"\)[^;]*\{ ssr: false \}\)/, "CarteDirect n'est plus importée hors rendu serveur (Leaflet plante au SSR)");
+  // Les réglages existants sont toujours là, SOUS la carte : le choix allure / fréquence
+  // cardiaque et l'envoi vers la montre viennent après le bloc carte dans le rendu.
+  const rendu = gr.slice(carte);
+  assert.ok(/onClick=\{\(\) => setTargetMode\(m\)\}/.test(rendu), "le choix allure / FC n'est plus sous la carte");
+  assert.ok(/onClick=\{sendToWatch\}|sendToWatch\(\)/.test(rendu), "l'envoi vers la montre n'est plus sous la carte");
+  assert.ok(rendu.indexOf("setAudioEnabled(!audioEnabled)") > 0, "le bouton audio a disparu du bloc carte");
+});
+
+test("sur téléphone, les plans d'entraînement se lisent en petites cartes et en liste empilée", () => {
+  const src = codeNu("src/app/dashboard/plans/PlansView.tsx");
+  assert.match(src, /grid-cols-2 gap-2\.5 sm:gap-4 lg:grid-cols-3/, "les cartes de plans ne sont plus sur deux colonnes sur téléphone");
+  assert.match(src, /rounded-2xl [^"]*p-3\.5 [^"]*sm:rounded-3xl sm:p-6/, "les cartes de plans ont repris leur grand rembourrage sur téléphone");
+  // Le tableau des semaines (7 colonnes) ne tient pas en 375 px : une liste empilée le remplace.
+  assert.match(src, /space-y-1\.5 sm:hidden/, "la liste empilée des semaines a disparu sur téléphone");
+  assert.match(src, /hidden [^"]*sm:block/, "le tableau des semaines s'affiche aussi sur téléphone (7 colonnes en 375 px)");
 });
 
 test("les libellés de la barre existent dans les cinq langues", () => {

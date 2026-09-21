@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Home, Map, CalendarDays, LayoutGrid, X, User, Settings, LogOut, ShieldCheck, LifeBuoy, CircleDot } from "lucide-react";
+import { Home, Map, CalendarDays, LayoutGrid, X, User, Settings, LogOut, ShieldCheck, LifeBuoy, CircleDot, ChevronRight } from "lucide-react";
 import { MedicalDisclaimer } from "@/components/layout/MedicalDisclaimer";
 import { EVENEMENT_AIDE } from "@/components/support/evenement";
 import { deconnexion } from "@/lib/auth/deconnexion";
@@ -38,6 +38,9 @@ const T: Record<string, { accueil: string; carte: string; enregistrer: string; c
 
 /** Hauteur de la barre (sans la zone de sécurité) — partagée avec la cale qui la réserve. */
 const HAUTEUR = "4rem";
+
+/** Une ligne de la page « Plus » : icône, libellé, chevron — 44 px, la hauteur qu'un pouce touche sans viser. */
+const LIGNE = "flex min-h-[44px] items-center gap-3 px-4 py-2.5 text-[14px] font-medium";
 
 export function MobileTabBar({ unreadMessages = 0, estEditeur }: { unreadMessages?: number; estEditeur: boolean }) {
   const pathname = usePathname();
@@ -96,7 +99,7 @@ export function MobileTabBar({ unreadMessages = 0, estEditeur }: { unreadMessage
           ouverte (vu en local). La barre reste au-dessus du voile, comme dans Strava. */}
       {ouvert && <div onClick={() => setOuvert(false)} className="fixed inset-0 z-[55] bg-zinc-900/40 md:hidden" aria-hidden="true" />}
 
-      {/* La feuille « Plus » : tout le reste, en tuiles, au-dessus de la barre. */}
+      {/* La page « Plus » : tout le reste, en listes par rubrique, au-dessus de la barre. */}
       <div
         role="dialog"
         aria-modal="true"
@@ -116,68 +119,65 @@ export function MobileTabBar({ unreadMessages = 0, estEditeur }: { unreadMessage
           </button>
         </div>
 
+        {/* ⚠️ DES LISTES, PAS DES TUILES (Cyprien, 21/09/2026, capture « range mieux les
+            différentes catégories ») : en tuiles de trois, un groupe de quatre pages laissait
+            deux trous et un groupe de cinq, un trou — l'œil lisait un damier, pas des
+            rubriques. Une liste se lit de haut en bas, un groupe = un bloc, sans trou quel
+            que soit le nombre de pages. Même patron pour le compte, en dernier bloc. */}
         <div className="px-4 py-4">
           {NAV_GROUPES.map((g) => {
             const items = g.items.filter((it) => reste.includes(it));
             if (items.length === 0) return null;
             return (
-              <div key={g.titleKey ?? "racine"} className="mb-5">
-                {g.titleKey && <div className="mb-2 px-1 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500">{t(g.titleKey)}</div>}
-                <div className="grid grid-cols-3 gap-2">
+              <section key={g.titleKey ?? "racine"} className="mb-4" aria-label={g.titleKey ? t(g.titleKey) : undefined}>
+                {g.titleKey && <h2 className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500">{t(g.titleKey)}</h2>}
+                <div className="overflow-hidden rounded-2xl border border-zinc-100 bg-zinc-50 divide-y divide-zinc-100">
                   {items.map((it) => {
                     const actif = estActive(pathname, it.href);
                     const badge = it.href === "/dashboard/messages" ? unreadMessages : 0;
                     return (
-                      <Link
-                        key={it.href}
-                        href={it.href}
-                        aria-current={actif ? "page" : undefined}
-                        className={cn(
-                          "relative flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3 text-center text-[11px] font-medium leading-tight",
-                          actif ? "bg-zinc-900 text-white" : "bg-zinc-50 text-zinc-700 active:bg-zinc-100",
-                        )}
-                      >
-                        <it.icon className="h-5 w-5" />
-                        {titre(it.tk)}
+                      <Link key={it.href} href={it.href} aria-current={actif ? "page" : undefined} className={cn(LIGNE, actif ? "bg-zinc-900 text-white" : "text-zinc-800 active:bg-zinc-100")}>
+                        <it.icon className={cn("h-5 w-5 shrink-0", actif ? "text-white" : "text-zinc-500")} />
+                        <span className="flex-1 truncate">{titre(it.tk)}</span>
                         {badge > 0 && (
-                          <span className="absolute right-2 top-2 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-emerald-500 px-1 text-[9px] font-bold text-white">{badge > 9 ? "9+" : badge}</span>
+                          <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[10px] font-bold text-white">{badge > 9 ? "9+" : badge}</span>
                         )}
+                        <ChevronRight className={cn("h-4 w-4 shrink-0", actif ? "text-white/70" : "text-zinc-400")} />
                       </Link>
                     );
                   })}
                 </div>
-              </div>
+              </section>
             );
           })}
 
-          {/* Le compte : mêmes entrées que le pied de la barre latérale. */}
-          <div className="grid grid-cols-3 gap-2 border-t border-zinc-100 pt-4">
-            {estEditeur && (
-              <Link href="/admin" className="flex flex-col items-center gap-1.5 rounded-2xl bg-emerald-50 px-2 py-3 text-center text-[11px] font-semibold leading-tight text-emerald-700">
-                <ShieldCheck className="h-5 w-5" />Espace coach
+          {/* Le compte : mêmes entrées que le pied de la barre latérale, en dernier bloc. */}
+          <section className="mb-4" aria-label={t("group.account")}>
+            <h2 className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500">{t("group.account")}</h2>
+            <div className="overflow-hidden rounded-2xl border border-zinc-100 bg-zinc-50 divide-y divide-zinc-100">
+              {estEditeur && (
+                <Link href="/admin" className={cn(LIGNE, "bg-emerald-50 font-semibold text-emerald-700 active:bg-emerald-100")}>
+                  <ShieldCheck className="h-5 w-5 shrink-0" /><span className="flex-1">Espace coach</span><ChevronRight className="h-4 w-4 shrink-0 text-emerald-400" />
+                </Link>
+              )}
+              <Link href="/dashboard/profile" className={cn(LIGNE, "text-zinc-800 active:bg-zinc-100")}>
+                <User className="h-5 w-5 shrink-0 text-zinc-500" /><span className="flex-1">{t("nav.profile")}</span><ChevronRight className="h-4 w-4 shrink-0 text-zinc-400" />
               </Link>
-            )}
-            <Link href="/dashboard/profile" className="flex flex-col items-center gap-1.5 rounded-2xl bg-zinc-50 px-2 py-3 text-center text-[11px] font-medium leading-tight text-zinc-700 active:bg-zinc-100">
-              <User className="h-5 w-5" />{t("nav.profile")}
-            </Link>
-            <Link href="/dashboard/settings" className="flex flex-col items-center gap-1.5 rounded-2xl bg-zinc-50 px-2 py-3 text-center text-[11px] font-medium leading-tight text-zinc-700 active:bg-zinc-100">
-              <Settings className="h-5 w-5" />{t("nav.settings")}
-            </Link>
-            {/* ⚠️ L'ASSISTANT VIT ICI SUR TÉLÉPHONE, pas en bulle flottante : elle se posait
-                sur le contenu et sur l'onglet « Plus » (demande de Cyprien, 21/09/2026).
-                La tuile referme la feuille et réveille le panneau par un événement DOM :
-                les deux composants ne partagent aucun état, et n'ont pas à le faire. */}
-            <button
-              type="button"
-              onClick={() => { setOuvert(false); window.dispatchEvent(new CustomEvent(EVENEMENT_AIDE)); }}
-              className="flex flex-col items-center gap-1.5 rounded-2xl bg-zinc-50 px-2 py-3 text-center text-[11px] font-medium leading-tight text-zinc-700 active:bg-zinc-100"
-            >
-              <LifeBuoy className="h-5 w-5" />{d.aide}
-            </button>
-            <button type="button" onClick={signOut} className="flex flex-col items-center gap-1.5 rounded-2xl bg-zinc-50 px-2 py-3 text-center text-[11px] font-medium leading-tight text-zinc-700 active:bg-red-50 active:text-red-600">
-              <LogOut className="h-5 w-5" />{t("nav.logout")}
-            </button>
-          </div>
+              <Link href="/dashboard/settings" className={cn(LIGNE, "text-zinc-800 active:bg-zinc-100")}>
+                <Settings className="h-5 w-5 shrink-0 text-zinc-500" /><span className="flex-1">{t("nav.settings")}</span><ChevronRight className="h-4 w-4 shrink-0 text-zinc-400" />
+              </Link>
+              {/* ⚠️ L'ASSISTANT VIT ICI SUR TÉLÉPHONE, pas en bulle flottante : elle se posait
+                  sur le contenu et sur l'onglet « Plus » (demande de Cyprien, 21/09/2026).
+                  La ligne referme la page et réveille le panneau par un événement DOM :
+                  les deux composants ne partagent aucun état, et n'ont pas à le faire. */}
+              <button type="button" onClick={() => { setOuvert(false); window.dispatchEvent(new CustomEvent(EVENEMENT_AIDE)); }} className={cn(LIGNE, "w-full text-left text-zinc-800 active:bg-zinc-100")}>
+                <LifeBuoy className="h-5 w-5 shrink-0 text-zinc-500" /><span className="flex-1">{d.aide}</span><ChevronRight className="h-4 w-4 shrink-0 text-zinc-400" />
+              </button>
+              <button type="button" onClick={signOut} className={cn(LIGNE, "w-full text-left text-zinc-800 active:bg-red-50 active:text-red-600")}>
+                <LogOut className="h-5 w-5 shrink-0 text-zinc-500" /><span className="flex-1">{t("nav.logout")}</span>
+              </button>
+            </div>
+          </section>
         </div>
 
         {/* L'avertissement médical et les liens légaux : retirés du bas de chaque écran

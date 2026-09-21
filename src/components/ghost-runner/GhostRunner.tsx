@@ -16,6 +16,8 @@ import { GX, GUIDE, GUIDE_TIP, SPEECH_LANG, fillG } from "./ghostI18n";
 import { estAppleWatch } from "@/lib/watch/intervals";
 import { jourCivil } from "@/lib/time/fuseau";
 import { useFuseau } from "@/lib/time/FuseauProvider";
+import dynamic from "next/dynamic";
+const CarteDirect = dynamic(() => import("./CarteDirect").then((m) => m.CarteDirect), { ssr: false });
 import { sauverEnCours, lireEnCours, effacerEnCours, mettreEnAttente, vautEnregistrement, INTERVALLE_SAUVEGARDE_MS, type CourseEnCours } from "@/lib/courses/horsLigne";
 
 /**
@@ -135,6 +137,9 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
   /** Une course commencée puis perdue (appli tuée, batterie) : retrouvée sur le téléphone à
    *  l'ouverture, proposée à l'enregistrement — jamais jetée en silence. */
   const [courseRetrouvee, setCourseRetrouvee] = useState<CourseEnCours | null>(null);
+  /** Ce que la carte affiche : la position (point bleu) et le tracé de la course en cours. */
+  const [positionCarte, setPositionCarte] = useState<[number, number] | null>(null);
+  const [traceCarte, setTraceCarte] = useState<[number, number][]>([]);
   const derniereSauvegardeRef = useRef(0);
   const demarreeARef = useRef(0);
   const [distance, setDistance] = useState(10);
@@ -378,6 +383,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
         const mps = speed != null && speed > 0.5 ? speed : d / dt;
         const pace = mps > 0.5 ? 1000 / mps / 60 : currentPace;
         trackRef.current.push([latitude, longitude]); // trace le parcours réel (carte + historique)
+        setTraceCarte([...trackRef.current]);
         processProgress(kmRef.current + d / 1000, pace);
         // ⚠️ ÉCRITE SUR LE TÉLÉPHONE PENDANT L'EFFORT (au plus toutes les 5 s) : sans
         // réseau, ou si le système tue l'appli, la course n'est plus perdue.
@@ -391,6 +397,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
       }
     }
     lastPosRef.current = { lat: latitude, lng: longitude, t };
+    setPositionCarte([latitude, longitude]);
   }
 
   // Toujours la dernière version de speak (les listeners Bluetooth vivent longtemps).
@@ -512,7 +519,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
     setCheckpoints(cps);
     elapsedRef.current = 0; kmRef.current = 0; pausedRef.current = false; lastPosRef.current = null;
     trackRef.current = [];
-    demarreeARef.current = Date.now(); derniereSauvegardeRef.current = 0;
+    demarreeARef.current = Date.now(); derniereSauvegardeRef.current = 0; setTraceCarte([]);
     effacerEnCours(typeof localStorage !== "undefined" ? localStorage : null);
     setElapsed(0); setCurrentKm(0); setCurrentPace(0); setPredictedFinish(0); setPaused(false);
     setPhase("running");
@@ -612,6 +619,16 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
 
   // État de la connexion montre (intervals.icu → Garmin/Coros/Wahoo) pour le voyant vert.
   useEffect(() => {
+    // La carte s'ouvre sur la position de l'athlète, avant même de démarrer (comme Strava).
+    // Une seule lecture, tolérante : refus ou absence de GPS = carte de la France.
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setPositionCarte([pos.coords.latitude, pos.coords.longitude]),
+      () => {}, { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+    );
+  }, []);
+
+  useEffect(() => {
     const c = lireEnCours(typeof localStorage !== "undefined" ? localStorage : null);
     if (c && vautEnregistrement(c)) setCourseRetrouvee(c);
     else if (c) effacerEnCours(localStorage);
@@ -655,9 +672,23 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
 
   return (
     <div className="space-y-6">
-      {/* Header — hero émeraude immersif (photo montagne + dégradé) */}
+      {/* ⚠️ SUR TÉLÉPHONE, LA CARTE D'ABORD — comme Strava (Cyprien, 21/09/2026) : la
+          position en direct, puis le tracé pendant la course ; les réglages existants
+          suivent en dessous. Le bouton audio passe sur la carte. */}
+      <div className="relative -mx-6 -mt-6 md:hidden">
+        <CarteDirect position={positionCarte} track={traceCarte} className="h-[46vh] min-h-[280px] w-full" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#FAFAFA] to-transparent" />
+        <button
+          onClick={() => setAudioEnabled(!audioEnabled)}
+          className={`absolute right-4 top-4 z-[500] flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold shadow-md backdrop-blur ${audioEnabled ? "bg-zinc-900/85 text-white" : "bg-white/90 text-zinc-500 ring-1 ring-zinc-200"}`}
+        >
+          {audioEnabled ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />} Audio {audioEnabled ? "ON" : "OFF"}
+        </button>
+      </div>
+
+      {/* Header — hero émeraude immersif (photo montagne + dégradé) — bureau seulement */}
       <div
-        className="relative overflow-hidden rounded-3xl border border-emerald-900/20 px-6 py-6 shadow-[0_18px_50px_-24px_rgba(6,78,59,0.6)] sm:px-8"
+        className="relative hidden overflow-hidden rounded-3xl border border-emerald-900/20 px-6 py-6 shadow-[0_18px_50px_-24px_rgba(6,78,59,0.6)] sm:px-8 md:block"
         style={{ background: "linear-gradient(120deg,#064e3b 0%,#047857 52%,#0d9488 100%)" }}
       >
         {/* photo montagne fondue à droite */}

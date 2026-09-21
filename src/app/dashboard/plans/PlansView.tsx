@@ -50,23 +50,23 @@ export function PlansView({ niveau, volumeKm }: { niveau: Niveau; volumeKm: numb
 
         {/* Les DEUX chiffres qui personnalisent chaque plan, mis en évidence : sans eux,
             l'athlète ne peut pas savoir sur quoi les volumes affichés sont bâtis. */}
-        <div className="grid gap-3 sm:grid-cols-2 lg:max-w-xl">
-          <div className="flex items-center gap-3 rounded-2xl bg-white px-5 py-4 ring-1 ring-inset ring-zinc-200">
-            <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-600/10 text-emerald-700">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:max-w-xl">
+          <div className="flex items-center gap-2.5 rounded-2xl bg-white px-3 py-3 ring-1 ring-inset ring-zinc-200 sm:gap-3 sm:px-5 sm:py-4">
+            <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-600/10 text-emerald-700 sm:h-10 sm:w-10">
               <Gauge className="h-5 w-5" />
             </span>
             <div className="min-w-0">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{t.niveau}</div>
-              <div className="text-lg font-bold leading-tight text-zinc-900">{t.niveaux[niveau]}</div>
+              <div className="text-base font-bold leading-tight text-zinc-900 sm:text-lg">{t.niveaux[niveau]}</div>
             </div>
           </div>
-          <div className="flex items-center gap-3 rounded-2xl bg-white px-5 py-4 ring-1 ring-inset ring-zinc-200">
-            <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-600/10 text-emerald-700">
+          <div className="flex items-center gap-2.5 rounded-2xl bg-white px-3 py-3 ring-1 ring-inset ring-zinc-200 sm:gap-3 sm:px-5 sm:py-4">
+            <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-600/10 text-emerald-700 sm:h-10 sm:w-10">
               <TrendingUp className="h-5 w-5" />
             </span>
             <div className="min-w-0">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{t.volumeActuel}</div>
-              <div className="text-lg font-bold leading-tight text-zinc-900">
+              <div className="text-base font-bold leading-tight text-zinc-900 sm:text-lg">
                 {volumeKm} <span className="text-sm font-medium text-zinc-400">{t.parSemaine}</span>
               </div>
             </div>
@@ -79,7 +79,7 @@ export function PlansView({ niveau, volumeKm }: { niveau: Niveau; volumeKm: numb
               {groupe.cle === "course" ? t.groupeCourse : t.groupeSansCourse}
               <span aria-hidden className="h-px flex-1 bg-zinc-200" />
             </h2>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-3">
               {groupe.plans.map((cle) => {
                 const prog = PROGRAMMES[cle];
                 const Icone = ICONE[cle];
@@ -87,7 +87,7 @@ export function PlansView({ niveau, volumeKm }: { niveau: Niveau; volumeKm: numb
                   <button
                     key={cle}
                     onClick={() => { setChoisi(cle); setSemaines(prog.semaines[0]); }}
-                    className="group relative flex flex-col items-start overflow-hidden rounded-3xl bg-white p-6 text-left ring-1 ring-inset ring-zinc-200 transition-all hover:-translate-y-0.5 hover:shadow-lg hover:ring-emerald-400"
+                    className="group relative flex flex-col items-start overflow-hidden rounded-2xl bg-white p-3.5 text-left ring-1 ring-inset ring-zinc-200 transition-all hover:-translate-y-0.5 hover:shadow-lg hover:ring-emerald-400 sm:rounded-3xl sm:p-6"
                   >
                     {/* ⚠️ PAS DE LISERÉ AU SURVOL ICI. Première version : un
                         `scale-x-0 group-hover:scale-x-100`. Vérifié dans le navigateur —
@@ -101,7 +101,7 @@ export function PlansView({ niveau, volumeKm }: { niveau: Niveau; volumeKm: numb
                         émeraude et icône qui se remplit. Un cinquième signal décoratif ne
                         valait pas de reprendre ce risque. */}
                     <div className="flex w-full items-start justify-between gap-3">
-                      <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-emerald-600/10 text-emerald-700 transition-colors group-hover:bg-emerald-600 group-hover:text-white">
+                      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-600/10 text-emerald-700 transition-colors group-hover:bg-emerald-600 group-hover:text-white sm:h-11 sm:w-11 sm:rounded-2xl">
                         <Icone className="h-5 w-5" />
                       </span>
                       {/* La distance, pour les plans qui visent une course : c'est
@@ -112,9 +112,9 @@ export function PlansView({ niveau, volumeKm }: { niveau: Niveau; volumeKm: numb
                         </span>
                       )}
                     </div>
-                    <h3 className="mt-4 text-base font-bold text-zinc-900">{t.noms[cle]}</h3>
-                    <p className="mt-1.5 flex-1 text-sm leading-relaxed text-zinc-500">{t.pitchs[cle]}</p>
-                    <div className="mt-4 flex w-full flex-wrap items-center gap-1.5">
+                    <h3 className="mt-2.5 text-sm font-bold leading-snug text-zinc-900 sm:mt-4 sm:text-base">{t.noms[cle]}</h3>
+                    <p className="mt-1 line-clamp-2 flex-1 text-xs leading-relaxed text-zinc-500 sm:mt-1.5 sm:line-clamp-none sm:text-sm">{t.pitchs[cle]}</p>
+                    <div className="mt-2.5 flex w-full flex-wrap items-center gap-1.5 sm:mt-4">
                       <Chip>{prog.semaines[0]} {t.semaines}</Chip>
                       {prog.marcheCourse && <Chip icone={<Footprints className="h-3 w-3" />}>{t.marcheCourse}</Chip>}
                       {prog.sansImpactPct > 0 && <Chip icone={<Bike className="h-3 w-3" />}>{prog.sansImpactPct} %</Chip>}
@@ -160,7 +160,26 @@ export function PlansView({ niveau, volumeKm }: { niveau: Niveau; volumeKm: numb
         <Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />{t.avertissement}
       </p>
 
-      <div className="overflow-x-auto rounded-3xl bg-white shadow-sm ring-1 ring-inset ring-zinc-200">
+      {/* ⚠️ SUR TÉLÉPHONE, UNE LISTE, PAS UN TABLEAU DE 640 PX (Cyprien, 21/09/2026) : une
+          ligne par semaine — phase, volume, sortie longue (ou km sans impact), qualités. */}
+      <div className="space-y-1.5 sm:hidden">
+        {plan.map((w) => (
+          <div key={w.semaine} className="flex items-center gap-3 rounded-2xl bg-white px-3.5 py-2.5 ring-1 ring-inset ring-zinc-200">
+            <span className="w-7 flex-shrink-0 text-sm font-bold tabular-nums text-zinc-900">S{w.semaine}</span>
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${TEINTE[w.phase]}`}>{t.phases[w.phase]}{w.decharge ? " ↓" : ""}</span>
+            <span className="ml-auto text-sm font-semibold tabular-nums text-zinc-900">{w.volumeKm} km</span>
+            <span className="text-xs tabular-nums text-zinc-500">
+              {prog.marcheCourse ? `${w.sansImpactKm} km` : w.sortieLongueKm != null ? `SL ${w.sortieLongueKm}` : "—"}
+            </span>
+            <span className="w-7 text-right text-xs tabular-nums text-zinc-500">{w.qualites > 0 ? `${w.qualites}×` : "—"}</span>
+          </div>
+        ))}
+        <div className="flex items-center justify-between rounded-2xl bg-zinc-50 px-3.5 py-2.5 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+          <span>{t.total}</span><span className="text-sm normal-case tracking-normal text-zinc-900">{volumeTotal(plan)} km</span>
+        </div>
+      </div>
+
+      <div className="hidden overflow-x-auto rounded-3xl bg-white shadow-sm ring-1 ring-inset ring-zinc-200 sm:block">
         <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="border-b border-zinc-100 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">
