@@ -4226,7 +4226,7 @@ test("chaque étape du lundi se suffit à elle-même", () => {
   // lundi matin où Cyprien a cru que sa newsletter n'était pas partie.
   //
   // L'invariant qui l'aurait attrapé : un script qui LIT `$reponse` doit l'AVOIR DÉFINIE.
-  const wf = readFileSync("/Users/cypriendumez/Desktop/running-trail-empire/.github/workflows/newsletter-weekly.yml", "utf8");
+  const wf = readFileSync(".github/workflows/newsletter-weekly.yml", "utf8");
   const blocs = wf.split(/^ {6}- name: /m).slice(1);
   assert.equal(blocs.length, 2, `${blocs.length} étape(s) dans le workflow du lundi, 2 attendues`);
   for (const b of blocs) {
@@ -4249,7 +4249,7 @@ test("le récapitulatif du lundi refuse de partir un autre jour", () => {
   assert.ok(!/\.getDay\(\)/.test(src), "`getDay()` dépend du fuseau du serveur, qui est américain");
   assert.match(src, /CRON_SECRET/, "la route n'est pas protégée par le secret de cron");
   // Et le déclencheur du lundi doit vraiment l'appeler, sinon la route est du code mort.
-  const wf = readFileSync("/Users/cypriendumez/Desktop/running-trail-empire/.github/workflows/newsletter-weekly.yml", "utf8");
+  const wf = readFileSync(".github/workflows/newsletter-weekly.yml", "utf8");
   assert.match(wf, /api\/cron\/plan-semaine/, "aucun déclencheur n'appelle la route");
   // ⚠️ ON ISOLE L'ÉTAPE, ON NE CHERCHE PAS LE MOTIF DANS TOUT LE FICHIER. `if: always()`
   // y figure DEUX fois — l'autre appartient à une étape sans rapport. Un `match` global

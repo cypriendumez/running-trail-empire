@@ -622,9 +622,16 @@ test("le lanceur du Bureau ouvre les adresses que le code utilise vraiment", () 
   assert.ok(parDefaut, "impossible de lire l'adresse par défaut du projet");
 
   // 2. Le projet Supabase doit être celui de la configuration, pas un ancien.
-  const ref = readFileSync(join(ROOT, ".env.local"), "utf8")
-    .match(/NEXT_PUBLIC_SUPABASE_URL=https:\/\/([a-z0-9]+)\.supabase\.co/)?.[1];
-  assert.ok(ref, "impossible de lire la référence du projet Supabase");
+  // ⚠️ `.env.local` n'existe que sur le poste de Cyprien : un clone neuf (la routine
+  // cloud du blog, le 21/09/2026) n'a ni le fichier ni le lanceur AppleScript qui va
+  // avec. Sans le fichier, cette vérification-là n'a pas de référence — on la saute en
+  // le disant, et les autres assertions du test tournent quand même.
+  const envLocal = join(ROOT, ".env.local");
+  const ref = existsSync(envLocal)
+    ? readFileSync(envLocal, "utf8").match(/NEXT_PUBLIC_SUPABASE_URL=https:\/\/([a-z0-9]+)\.supabase\.co/)?.[1]
+    : null;
+  if (!existsSync(envLocal)) console.log("     (pas de .env.local : référence Supabase du lanceur non vérifiée)");
+  else assert.ok(ref, "impossible de lire la référence du projet Supabase");
 
   // 3. Toutes les adresses sont en HTTPS et sans espace : une URL malformée dans un
   //    AppleScript échoue silencieusement, la fenêtre se ferme sans rien ouvrir.
@@ -646,8 +653,8 @@ test("le lanceur du Bureau ouvre les adresses que le code utilise vraiment", () 
       assert.ok(u.startsWith(parDefaut!), `« ${u} » ne vise pas ${parDefaut}`);
     }
     // Toute adresse Supabase doit viser le projet de la configuration.
-    if (/supabase\.com/.test(u)) {
-      assert.ok(u.includes(ref!), `« ${u} » ouvre un autre projet que ${ref}`);
+    if (ref && /supabase\.com/.test(u)) {
+      assert.ok(u.includes(ref), `« ${u} » ouvre un autre projet que ${ref}`);
     }
   }
 });

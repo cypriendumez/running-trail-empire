@@ -20,14 +20,21 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { parseFeed, normalizeFeed } from "../src/lib/shop/affiliateFeed";
 import catalogue from "../src/data/gear/chaussures.json";
 
-for (const l of fs.readFileSync(".env.local", "utf8").split("\n")) {
-  const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m) process.env[m[1]] = m[2].replace(/^"|"$/g, "");
+// ⚠️ `.env.local` n'existe que sur le poste de Cyprien, et `tests/boutique.crash.test.ts`
+// importe ce module pour ses fonctions pures : lire le fichier et ouvrir le client
+// Supabase À L'IMPORT faisait planter toute la suite dans un clone neuf (routine cloud,
+// 21/09/2026). Le client ne s'ouvre qu'au premier usage, quand on importe vraiment.
+if (fs.existsSync(".env.local")) {
+  for (const l of fs.readFileSync(".env.local", "utf8").split("\n")) {
+    const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m) process.env[m[1]] = m[2].replace(/^"|"$/g, "");
+  }
 }
-const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+let _sb: SupabaseClient | null = null;
+const sb = () => (_sb ??= createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!));
 
 export type LigneFlux = {
   external_id: string; retailer: string; product_name: string; brand: string | null;
@@ -133,10 +140,10 @@ async function principal(): Promise<void> {
 
   // Par paquets : un flux d'affiliation compte souvent plusieurs milliers de lignes.
   for (let i = 0; i < lignes.length; i += 500) {
-    const { error } = await sb.from("product_offers").upsert(lignes.slice(i, i + 500), { onConflict: "retailer,external_id" });
+    const { error } = await sb().from("product_offers").upsert(lignes.slice(i, i + 500), { onConflict: "retailer,external_id" });
     if (error) { console.log("ÉCHEC :", error.message); process.exitCode = 1; return; }
   }
-  const { count } = await sb.from("product_offers").select("*", { count: "exact", head: true });
+  const { count } = await sb().from("product_offers").select("*", { count: "exact", head: true });
   console.log(`import terminé · ${count} ligne(s) dans product_offers`);
   console.log(rap.avecVisuel ? "→ les photos s'afficheront dès le prochain chargement de la boutique."
                         : "→ ce flux ne fournit pas de visuels : le dessin aux cotes reste affiché.");

@@ -19,8 +19,14 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-for (const l of fs.readFileSync(".env.local", "utf8").split("\n")) {
-  const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m) process.env[m[1]] = m[2].replace(/^"|"$/g, "");
+// ⚠️ `.env.local` n'existe que sur le poste de Cyprien. `tests/boutique.crash.test.ts`
+// importe ce module pour `fusionner`/`contredit` : lire le fichier à l'import faisait
+// planter TOUTE la suite dans un clone neuf (routine cloud, 21/09/2026). Les clés ne
+// servent qu'à la collecte elle-même, qui les vérifie au moment de s'en servir.
+if (fs.existsSync(".env.local")) {
+  for (const l of fs.readFileSync(".env.local", "utf8").split("\n")) {
+    const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m) process.env[m[1]] = m[2].replace(/^"|"$/g, "");
+  }
 }
 import { generateContent } from "../src/lib/ai/gemini";
 import { dansLesBornes, coherenceStackDrop, sourceValide, type Modele } from "../src/lib/shop/modele";

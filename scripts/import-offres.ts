@@ -20,12 +20,19 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-for (const l of fs.readFileSync(".env.local", "utf8").split("\n")) {
-  const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m) process.env[m[1]] = m[2].replace(/^"|"$/g, "");
+// ⚠️ `.env.local` n'existe que sur le poste de Cyprien, et `tests/boutique.crash.test.ts`
+// importe ce module pour ses fonctions pures : lire le fichier et ouvrir le client
+// Supabase À L'IMPORT faisait planter toute la suite dans un clone neuf (routine cloud,
+// 21/09/2026). Le client ne s'ouvre qu'au premier usage, quand on importe vraiment.
+if (fs.existsSync(".env.local")) {
+  for (const l of fs.readFileSync(".env.local", "utf8").split("\n")) {
+    const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m) process.env[m[1]] = m[2].replace(/^"|"$/g, "");
+  }
 }
-const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+let _sb: SupabaseClient | null = null;
+const sb = () => (_sb ??= createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!));
 
 export type OffreRelevee = { slug: string; ean?: string; prix: number; dispo: boolean; url: string };
 
@@ -67,7 +74,7 @@ async function principal(): Promise<void> {
   }));
 
   // Une offre = un produit chez un marchand : ré-importer met à jour, n'empile pas.
-  const { error } = await sb.from("product_offers").upsert(rows, { onConflict: "retailer,external_id" });
+  const { error } = await sb().from("product_offers").upsert(rows, { onConflict: "retailer,external_id" });
   if (error) { console.log("ÉCHEC :", error.message); process.exitCode = 1; return; }
   // ⚠️ LES OFFRES ORPHELINES NE DISPARAISSENT PAS TOUTES SEULES. Quand un modèle est
   //    renommé ou fusionné par la remise à plat du catalogue, son code-barres peut ne
@@ -76,11 +83,11 @@ async function principal(): Promise<void> {
   //    On ne supprime QUE ce qu'aucune fiche ne peut plus afficher.
   const catalogue = JSON.parse(fs.readFileSync(path.join(process.cwd(), "src/data/gear/chaussures.json"), "utf8")) as Record<string, { ean?: string }>;
   const connus = new Set(Object.values(catalogue).map((m) => m.ean).filter(Boolean));
-  const { data: toutes } = await sb.from("product_offers").select("id,ean");
+  const { data: toutes } = await sb().from("product_offers").select("id,ean");
   const orphelines = (toutes ?? []).filter((o: { ean: string | null }) => !o.ean || !connus.has(o.ean));
-  for (const o of orphelines as { id: string }[]) await sb.from("product_offers").delete().eq("id", o.id);
+  for (const o of orphelines as { id: string }[]) await sb().from("product_offers").delete().eq("id", o.id);
 
-  const { count } = await sb.from("product_offers").select("*", { count: "exact", head: true });
+  const { count } = await sb().from("product_offers").select("*", { count: "exact", head: true });
   console.log(`${rows.length} offre(s) écrite(s) · ${orphelines.length} orpheline(s) retirée(s) · ${count} ligne(s) dans product_offers`);
 }
 

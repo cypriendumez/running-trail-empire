@@ -26,6 +26,7 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
+import { RESERVE_PHOTOS } from "../src/app/blog/reservePhotos";
 import { join, relative } from "node:path";
 
 const ROOT = join(import.meta.dirname, "..");
@@ -89,6 +90,14 @@ const AUDITEES: Record<string, string> = {
   "photo-1543352632-5a4b24e4d2a6": "REDs : trois contenants repas vus de haut — ni visage ni marque",
   "photo-1603077492579-39ff927823db": "renforcement : haltères sur un râtelier — ni visage ni marque lisible",
   "photo-1774460261319-cdd3b2363143": "cycle : vagues pastel abstraites — ni personne ni marque",
+  // Réserve du blog (`src/app/blog/reservePhotos.ts`) — regardées le 21/09/2026, format servi.
+  "photo-1690644932424-63fdff67172d": "réserve blog : route désertique droite sous un ciel bleu, ligne jaune — ni personne ni marque",
+  "photo-1544034287-c9c09e0341a1": "réserve blog : piste de sable dans un désert, rocher au loin, soleil haut — ni personne ni marque",
+  "photo-1592859600972-1b0834d83747": "réserve blog : sentier dans une pinède claire, sous-bois vert — ni personne ni marque",
+  "photo-1700745286959-8658de43a15c": "réserve blog : sentier de montagne en forêt de mélèzes — ni personne ni marque",
+  "photo-1519681393784-d120267933ba": "réserve blog : voie lactée au-dessus de sommets enneigés, nuit — ni personne ni marque",
+  "photo-1761660227670-28922e2a69dc": "réserve blog : crête au lever du soleil au-dessus d'une mer de nuages — ni personne ni marque",
+  "photo-1762858741992-a254724623bd": "réserve blog : chaînes de montagnes dans la brume, soleil voilé — ni personne ni marque",
 };
 
 // ── 3. Les Pexels validées du fil Communauté ─────────────────────────────────
@@ -242,6 +251,19 @@ test("la page boutique ne rend pas le catalogue simulé", () => {
 test("une photo ne peut pas être à la fois bannie et auditée", () => {
   const deux = Object.keys(AUDITEES).filter((id) => BANNIES[id]);
   assert.equal(deux.length, 0, `contradiction : ${deux.join(", ")}`);
+});
+
+
+// ── 4. La réserve du blog est entièrement auditée ─────────────────────────────
+test("chaque photo de la réserve du blog a été regardée (présente dans AUDITEES)", () => {
+  // La routine bimensuelle pioche dans cette réserve quand elle ne peut pas télécharger
+  // d'image (réseau cloud fermé). Une entrée qui n'est pas dans AUDITEES serait une
+  // photo jamais vue qui atterrit sur une page publique sans que ce test ne le voie.
+  assert.ok(RESERVE_PHOTOS.length >= 5, `réserve trop maigre : ${RESERVE_PHOTOS.length} photo(s)`);
+  const nonVues = RESERVE_PHOTOS.filter((p) => !AUDITEES[p.id]).map((p) => p.id);
+  assert.equal(nonVues.length, 0, `photo(s) de la réserve jamais auditée(s) : ${nonVues.join(", ")}`);
+  const doublons = RESERVE_PHOTOS.map((p) => p.id).filter((id, i, a) => a.indexOf(id) !== i);
+  assert.equal(doublons.length, 0, `doublon(s) dans la réserve : ${doublons.join(", ")}`);
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
