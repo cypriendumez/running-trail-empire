@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CalendarView, type Planned, type PlannedText, type CalNote, type CalRace, type CoachState } from "@/components/training/CalendarView";
@@ -44,6 +45,9 @@ export default async function CalendrierPage() {
   const lectureEnPanne = estUnePanne(seancesRes);
   if (lectureEnPanne) console.error("[calendrier] séances illisibles :", seancesRes.error?.message);
   const us = (settingsRow?.data ?? {}) as Record<string, unknown>;
+  // Téléphone → vue Agenda d'abord. L'agent utilisateur suffit pour un DÉFAUT d'onglet :
+  // se tromper coûte un clic, pas une fonctionnalité.
+  const surTelephone = /Mobi|Android|iPhone|iPad/i.test((await headers()).get("user-agent") ?? "");
   const weekStart: "mon" | "sun" = String(us.weekStart ?? "mon") === "sun" ? "sun" : "mon";
   const units: "metric" | "imperial" = String(us.unitSystem ?? "metric") === "imperial" ? "imperial" : "metric";
   // Durées d'échauffement / retour au calme choisies par l'athlète (repli 15 / 10 min).
@@ -90,7 +94,7 @@ export default async function CalendrierPage() {
   // Le hero (présentation + détail réactif de la séance sélectionnée) vit désormais dans CalendarView.
   return (
     <>
-      <CalendarView enPanne={lectureEnPanne} sessions={sessions} notes={notes} races={races} coachState={coachState} weekStart={weekStart} units={units} warmupMin={warmupMin} cooldownMin={cooldownMin} realismeMasque={typeof us.realismeMasque === "string" ? us.realismeMasque : null} />
+      <CalendarView enPanne={lectureEnPanne} sessions={sessions} notes={notes} races={races} coachState={coachState} weekStart={weekStart} units={units} warmupMin={warmupMin} cooldownMin={cooldownMin} realismeMasque={typeof us.realismeMasque === "string" ? us.realismeMasque : null} vueParDefaut={surTelephone ? "agenda" : "month"} />
     </>
   );
 }

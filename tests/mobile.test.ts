@@ -146,6 +146,17 @@ test("sur téléphone, la séance du jour vient en deuxième, juste sous « Bonj
   assert.equal(variantes, 3, `${variantes} variante(s) de la séance passent en tête, 3 attendues`);
 });
 
+test("sur téléphone, le calendrier s'ouvre en vue Agenda (verticale), décidé côté serveur", () => {
+  // La grille Mois fait 700 px : sur 375 px elle se lit en défilant LATÉRALEMENT
+  // (Cyprien, 21/09/2026 : « c'est mieux quand je défile »). L'Agenda défile verticalement.
+  const page = codeNu("src/app/dashboard/calendrier/page.tsx");
+  assert.match(page, /\/Mobi\|Android\|iPhone\|iPad\/i\.test\(\(await headers\(\)\)\.get\("user-agent"\)/,
+    "le téléphone n'est plus détecté côté serveur : le premier rendu serait la grille, puis un clignotement");
+  assert.match(page, /vueParDefaut=\{surTelephone \? "agenda" : "month"\}/, "la page n'ouvre plus l'Agenda sur téléphone");
+  const vue = codeNu("src/components/training/CalendarView.tsx");
+  assert.match(vue, /useState<"month" \| "agenda">\(vueParDefaut\)/, "la vue initiale ignore la valeur transmise par le serveur");
+});
+
 test("les libellés de la barre existent dans les cinq langues", () => {
   const src = readFileSync(BARRE, "utf8");
   for (const cle of ["accueil", "carte", "enregistrer", "calendrier", "plus", "tout", "fermer"]) {

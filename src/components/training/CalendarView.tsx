@@ -105,7 +105,7 @@ function sessionDetail(type: string, detail: string): SessionDetail | null {
   return { mode: "wrapped", body: extractBody(raw) };
 }
 
-export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], races: racesProp = [], coachState = null, weekStart = "mon", units = "metric", warmupMin = 15, cooldownMin = 10, enPanne = false, realismeMasque = null }: { sessions: Planned[]; notes?: CalNote[]; races?: CalRace[]; coachState?: CoachState | null; weekStart?: "mon" | "sun"; units?: UnitSystem; warmupMin?: number; cooldownMin?: number; /** La lecture des séances a ÉCHOUÉ : le mois est vide par accident, pas parce qu'il n'y a rien. */ enPanne?: boolean; /** Clé de l'avertissement de réalisme que l'athlète a choisi de ne plus voir (réglages). */ realismeMasque?: string | null }) {
+export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], races: racesProp = [], coachState = null, weekStart = "mon", units = "metric", warmupMin = 15, cooldownMin = 10, enPanne = false, realismeMasque = null, vueParDefaut = "month" }: { sessions: Planned[]; notes?: CalNote[]; races?: CalRace[]; coachState?: CoachState | null; weekStart?: "mon" | "sun"; units?: UnitSystem; warmupMin?: number; cooldownMin?: number; /** La lecture des séances a ÉCHOUÉ : le mois est vide par accident, pas parce qu'il n'y a rien. */ enPanne?: boolean; /** Clé de l'avertissement de réalisme que l'athlète a choisi de ne plus voir (réglages). */ realismeMasque?: string | null; /** Vue ouverte à l'arrivée : « agenda » sur téléphone (décidé côté serveur, donc sans clignotement). */ vueParDefaut?: "month" | "agenda" }) {
   const { t, lang } = useT();
   // LA SÉANCE EST AFFICHÉE DANS LA LANGUE DE L'ATHLÈTE, résolue ICI et pas au serveur :
   // le sélecteur de langue est instantané et ne recharge pas la page. `type` n'est jamais
@@ -129,7 +129,12 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
    *  d'une journée qui n'a qu'une séance. */
   const [momentIdx, setMomentIdx] = useState(0);
   const [suggest, setSuggest] = useState<{ name: string; city: string; distanceKm: number | null; date: string; type: string }[]>([]);
-  const [view, setView] = useState<"month" | "agenda">("month");
+  // ⚠️ SUR TÉLÉPHONE, L'AGENDA D'ABORD (Cyprien, 21/09/2026 : « je dois aller sur le côté
+  // alors que c'est mieux quand je défile »). La grille Mois fait 700 px de large : sur
+  // 375 px elle se lit en défilant LATÉRALEMENT, la liste Agenda se lit en défilant
+  // verticalement. Le choix vient du serveur (agent utilisateur) pour que le premier
+  // rendu soit déjà le bon ; l'onglet Mois reste à un geste.
+  const [view, setView] = useState<"month" | "agenda">(vueParDefaut);
   const [offset, setOffset] = useState(0); // décalage en blocs de 4 semaines
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heroRef = useRef<HTMLDivElement | null>(null);
