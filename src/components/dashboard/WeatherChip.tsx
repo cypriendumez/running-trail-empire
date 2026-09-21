@@ -7,7 +7,7 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 // Chips météo + lieu + qualité de l'air — géolocalisation navigateur (avec consentement)
 // + Open-Meteo (météo & air, sans clé) + BigDataCloud (reverse-geocode, sans clé).
 // Si refusé/échec → rien ne s'affiche.
-const chip = "inline-flex items-center gap-1.5 rounded-full border border-zinc-200/70 bg-white/70 px-3 py-1 text-xs font-medium text-zinc-600";
+const chip = "inline-flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-zinc-200/70 bg-white/70 px-3 py-1 text-xs font-medium text-zinc-600";
 
 const AQ: Record<string, { good: string; fair: string; poor: string }> = {
   fr: { good: "Bonne qualité de l'air", fair: "Air moyen", poor: "Air pollué" },

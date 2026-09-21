@@ -515,9 +515,14 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
         </div>
       )}
 
-      {/* Header élite — carte premium (3 zones : salutation · objectif · photo) */}
+      {/* Header élite — carte premium (3 zones : salutation · objectif · photo)
+          ⚠️ COMPACTE SUR TÉLÉPHONE (Cyprien, 21/09/2026) : empilée, elle prenait plus de la
+          moitié de l'écran — titre à 2 rem, cinq pastilles sur quatre lignes, anneau de
+          92 px, J-34 en 2,25 rem. Sous `sm`, tout est resserré : pastilles sur UNE ligne
+          qui défile, anneau à 64 px, pastille de série retirée (la carte Série est juste
+          dessous). À partir de `sm`, rien ne change. */}
       <div
-        className="relative mb-6 overflow-hidden rounded-3xl border border-[#e3eef0] shadow-[0_12px_44px_-26px_rgba(16,24,40,0.22)]"
+        className="relative mb-4 overflow-hidden rounded-3xl border border-[#e3eef0] shadow-[0_12px_44px_-26px_rgba(16,24,40,0.22)] sm:mb-6"
         style={{ background: "linear-gradient(120deg,#ecfdf5 0%,#eef6ff 58%,#ffffff 100%)" }}
       >
         {/* Photo de coureur — panneau net à droite, fondu doux vers le dégradé */}
@@ -526,30 +531,30 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
           <div className="absolute inset-0" style={{ background: "linear-gradient(to right, #eef6ff 0%, rgba(238,246,255,0.45) 26%, rgba(238,246,255,0) 64%)" }} />
         </div>
         <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[#0ea5e9]/10 blur-3xl" />
-        <div className="relative z-10 flex flex-wrap items-center justify-between gap-x-10 gap-y-7 px-6 py-7 sm:px-9 sm:py-8 xl:pr-[34%]">
+        <div className="relative z-10 flex flex-wrap items-center justify-between gap-x-10 gap-y-4 px-5 py-5 sm:gap-y-7 sm:px-9 sm:py-8 xl:pr-[34%]">
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#6e8a86] first-letter:uppercase">
               {jourAujourdhui
                 ? formatDateCivile(jourAujourdhui, lang, { weekday: "long", day: "numeric", month: "long" })
                 : new Date().toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long" })}
             </p>
-            <h1 className="mt-2 text-[2rem] font-bold tracking-tight text-[#11201d] sm:text-[2.5rem]">
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#11201d] sm:mt-2 sm:text-[2.5rem]">
               {t("dash.greeting")}, {profile?.full_name?.split(" ")[0] ?? t("dash.champion")}
             </h1>
-            <p className="mt-2 flex items-center gap-2 text-sm text-[#5f7d79]">
+            <p className="mt-1.5 flex items-center gap-2 text-[13px] text-[#5f7d79] sm:mt-2 sm:text-sm">
               <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ background: readiness.accent }} />
               {readiness.tagline}
             </p>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200/70 bg-white/70 px-3 py-1 text-xs font-medium text-zinc-600">
+            <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mt-4 sm:flex-wrap sm:overflow-visible">
+              <span className="inline-flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-zinc-200/70 bg-white/70 px-3 py-1 text-xs font-medium text-zinc-600">
                 <Gauge className="h-3.5 w-3.5 text-[#059669]" /> {levelLabel}
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200/70 bg-white/70 px-3 py-1 text-xs font-medium text-zinc-600">
+              <span className="inline-flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-zinc-200/70 bg-white/70 px-3 py-1 text-xs font-medium text-zinc-600">
                 <Activity className="h-3.5 w-3.5 text-[#059669]" /> {weeklyKm.toFixed(0)} km · 7 j
               </span>
               {/* Série du jour — visible dès le premier coup d'œil, sans quitter l'en-tête. */}
               {streak && streak.current > 0 && (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200/80 bg-amber-50/80 px-3 py-1 text-xs font-semibold text-amber-700">
+                <span className="hidden flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-amber-200/80 bg-amber-50/80 px-3 py-1 text-xs font-semibold text-amber-700 sm:inline-flex">
                   <Flame className="h-3.5 w-3.5 text-amber-500" />
                   {streak.current} {streak.current === 1 ? t("streak.unit1") : t("streak.unit")}
                 </span>
@@ -558,8 +563,8 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
             </div>
           </div>
           {objective && objDaysTo != null && objDaysTo >= 0 ? (
-            <div className="flex items-center gap-5">
-              <div className="relative h-[92px] w-[92px] flex-shrink-0">
+            <div className="flex items-center gap-4 sm:gap-5">
+              <div className="relative h-16 w-16 flex-shrink-0 sm:h-[92px] sm:w-[92px]">
                 <svg className="h-full w-full -rotate-90" viewBox="0 0 92 92">
                   <circle cx="46" cy="46" r="40" fill="none" stroke="#e3eef0" strokeWidth="7" />
                   <circle cx="46" cy="46" r="40" fill="none" stroke="#059669" strokeWidth="7" strokeLinecap="round"
@@ -567,16 +572,16 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
                     className="transition-all duration-1000" />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
-                  <span className="text-base font-bold tabular-nums text-[#11201d]">{objProgress ?? "—"}<span className="text-[10px] text-[#8aa6a6]">%</span></span>
-                  <span className="mt-1 text-[8px] font-semibold uppercase tracking-[0.12em] text-[#8aa6a6]">{hl.prep}</span>
+                  <span className="text-sm font-bold tabular-nums text-[#11201d] sm:text-base">{objProgress ?? "—"}<span className="text-[10px] text-[#8aa6a6]">%</span></span>
+                  <span className="mt-0.5 hidden text-[8px] font-semibold uppercase tracking-[0.12em] text-[#8aa6a6] sm:mt-1 sm:block">{hl.prep}</span>
                 </div>
               </div>
               <div className="min-w-0">
-                <div className="text-[2.25rem] font-black leading-none tabular-nums text-[#11201d]">J‑{objDaysTo}</div>
-                <div className="mt-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8aa6a6]">{hl.goal}</div>
+                <div className="text-[1.6rem] font-black leading-none tabular-nums text-[#11201d] sm:text-[2.25rem]">J‑{objDaysTo}</div>
+                <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8aa6a6] sm:mt-1.5">{hl.goal}</div>
                 <div className="truncate text-sm font-bold text-[#11201d]">{objective.race}</div>
                 <div className="text-xs text-[#5f7d79]">{formatDateCivile(objective.raceDate, lang, { day: "numeric", month: "long", year: "numeric" })}</div>
-                <Link href="/dashboard/calendrier" className="mt-2.5 inline-flex items-center gap-1.5 rounded-xl bg-[#11201d] px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#0b1714]">
+                <Link href="/dashboard/calendrier" className="mt-2 inline-flex items-center gap-1.5 rounded-xl bg-[#11201d] px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#0b1714] sm:mt-2.5 sm:px-3.5 sm:py-2">
                   {hl.plan} <ChevronRight className="h-3.5 w-3.5" />
                 </Link>
               </div>
