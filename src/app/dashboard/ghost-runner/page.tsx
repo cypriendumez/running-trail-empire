@@ -7,7 +7,10 @@ import { oneSessionPerSlot } from "@/lib/coach/sessions";
 import { getEffectiveVma } from "@/lib/ai/coachContext";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
-export const metadata = { title: "Ghost Runner" };
+// « Enregistrer » dans la navigation depuis le 21/09/2026 (Cyprien), comme l'onglet du
+// téléphone : c'est l'écran qui enregistre une course. Le nom « Ghost Runner » reste sur
+// la vitrine, où il désigne la fonctionnalité (coach vocal).
+export const metadata = { title: "Enregistrer" };
 
 export default async function GhostRunnerPage() {
   const supabase = await createClient();

@@ -169,6 +169,9 @@ test("sur téléphone, la carte (Trail Builder) garde ses commandes sur une lign
   const i18n = readFileSync("src/lib/i18n/translations.ts", "utf8");
   assert.equal([...i18n.matchAll(/"nav\.trail": "Trail Builder"/g)].length, 0, "l'onglet s'appelle encore « Trail Builder » dans une langue");
   assert.equal([...i18n.matchAll(/"nav\.trail": "(Carte|Map|Karte|Mapa)"/g)].length, 5, "« Carte » manque à une langue");
+  // Idem pour le Ghost Runner : « Enregistrer » dans le menu, comme l'onglet central.
+  assert.equal([...i18n.matchAll(/"nav\.ghost": "Ghost Runner"/g)].length, 0, "l'onglet s'appelle encore « Ghost Runner » dans une langue");
+  assert.equal([...i18n.matchAll(/"nav\.ghost": "(Enregistrer|Record|Aufzeichnen|Grabar|Gravar)"/g)].length, 5, "« Enregistrer » manque à une langue");
 });
 
 test("les libellés de la barre existent dans les cinq langues", () => {
