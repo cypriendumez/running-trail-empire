@@ -36,8 +36,8 @@ const jourLisible = (iso: string, lang: string) =>
   new Date(`${iso}T12:00:00`).toLocaleDateString(lang, { day: "numeric", month: "long", year: "numeric" });
 
 export function PpsStatusCard({
-  status, raceDate = null, compact = false, showCta = true,
-}: { status: PpsStatus | null; raceDate?: string | null; compact?: boolean; showCta?: boolean }) {
+  status, raceDate = null, compact = false, showCta = true, onMasquer,
+}: { status: PpsStatus | null; raceDate?: string | null; compact?: boolean; showCta?: boolean; /** Présent → bouton « Compris, masquer » à côté de l'appel à agir (bandeau de la page Courses). */ onMasquer?: () => void }) {
   const { t, lang } = usePpsTextes();
   const v = useMemo(() => ppsVerdict(status, raceDate), [status, raceDate]);
   const ton = TON[v.kind];
@@ -67,10 +67,18 @@ export function PpsStatusCard({
             <p className="mt-1 text-[11.5px] leading-relaxed text-zinc-500">{t.avertissement}</p>
           )}
           {showCta && doitAgir && (
-            <a href={PPS_URL} target="_blank" rel="noopener noreferrer"
-               className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-zinc-900 px-3.5 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-zinc-800">
-              {t.cta} <ExternalLink className="h-3.5 w-3.5" />
-            </a>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <a href={PPS_URL} target="_blank" rel="noopener noreferrer"
+                 className="inline-flex items-center gap-1.5 rounded-xl bg-zinc-900 px-3.5 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-zinc-800">
+                {t.cta} <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+              {onMasquer && (
+                <button type="button" onClick={onMasquer}
+                        className={`inline-flex items-center rounded-xl bg-white/70 px-3 py-2 text-[12px] font-semibold ring-1 ring-inset ${ton.ring} ${ton.fg} transition-colors hover:bg-white`}>
+                  {t.masquer}
+                </button>
+              )}
+            </div>
           )}
         </div>
         {/* Le tarif et la durée sont annoncés par le bandeau de la page PPS : les répéter

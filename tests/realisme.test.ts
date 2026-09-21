@@ -109,5 +109,29 @@ test("les trois libellés existent dans les cinq langues", () => {
   }
 });
 
+// ── Même mécanique pour le bandeau PPS de la page Courses (Cyprien, 21/09/2026) ────────
+import { cleBandeauPps } from "../src/lib/pps/status";
+
+test("la clé du bandeau PPS dépend du verdict ET de sa date", () => {
+  assert.equal(cleBandeauPps({ kind: "inconnu" }), "pps|inconnu|");
+  assert.notEqual(cleBandeauPps({ kind: "inconnu" }), cleBandeauPps({ kind: "expire", expiresAt: "2026-10-01" }));
+  assert.notEqual(cleBandeauPps({ kind: "expire", expiresAt: "2026-10-01" }), cleBandeauPps({ kind: "expire", expiresAt: "2027-10-01" }),
+    "un pass qui expire à une autre date resterait masqué sans avoir été lu");
+  assert.ok(cleBandeauPps({ kind: "expireAvantCourse", expiresAt: "2026-10-01", raceDate: "2026-10-25" }).length <= 80);
+});
+
+test("le bandeau PPS ne s'affiche que s'il faut agir, s'écarte d'un clic, et l'erreur est lue", () => {
+  const hub = codeNu("src/components/races/RacesHub.tsx");
+  assert.match(hub, /return agir && \(ppsMasqueLocal \?\? ppsMasque\) !== ppsCle;/, "le bandeau ignore la clé mémorisée, ou s'affiche sans qu'il faille agir");
+  assert.match(hub, /body: JSON\.stringify\(\{ ppsBandeauMasque: ppsCle \}\)/, "le choix n'est plus enregistré côté serveur");
+  assert.match(hub, /if \(!r\.ok\) \{ setPpsMasqueLocal\(null\)/, "un échec d'enregistrement laisserait le bandeau masqué");
+  assert.match(hub, /<PpsStatusCard status=\{pps\} raceDate=\{prochaineCourse\} compact onMasquer=\{masquerPps\} \/>/, "la carte du bandeau n'a plus le bouton");
+  assert.match(codeNu("src/components/pps/PpsStatusCard.tsx"), /\{onMasquer && \(/, "PpsStatusCard n'affiche plus le bouton quand on le lui demande");
+  assert.match(codeNu("src/app/api/settings/route.ts"), /patch\.ppsBandeauMasque = body\.ppsBandeauMasque\.slice\(0, 80\)/, "/api/settings n'accepte plus (ou ne borne plus) ppsBandeauMasque");
+  assert.match(codeNu("src/app/dashboard/races/page.tsx"), /ppsMasque=\{ppsMasque\}/, "la page Courses ne transmet plus le réglage");
+  const i18n = readFileSync("src/lib/pps/ppsI18n.ts", "utf8");
+  for (const k of ["masquer", "masquerEchec"]) assert.equal([...i18n.matchAll(new RegExp(`^\\s+${k}: "`, "gm"))].length, 5, `« ${k} » manque à une langue`);
+});
+
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }

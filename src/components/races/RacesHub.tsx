@@ -14,7 +14,7 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 import { RX, fillR } from "./racesI18n";
 import { PpsStatusCard } from "@/components/pps/PpsStatusCard";
 import { PPS_T } from "@/lib/pps/ppsI18n";
-import { ppsVerdict, type PpsStatus } from "@/lib/pps/status";
+import { ppsVerdict, type PpsStatus, cleBandeauPps } from "@/lib/pps/status";
 import { jourCivil } from "@/lib/time/fuseau";
 import { useFuseau } from "@/lib/time/FuseauProvider";
 
@@ -67,7 +67,7 @@ export type PlannedRace = { id: string; name: string; location: string; distance
 
 const normName = (s: string) => (s || "").toLowerCase().trim().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
-export function RacesHub({ races: initialRaces, totalCount, units = "metric", planned: plannedProp = [], initialSearch = "", pps = null, liensMorts = [], favorisInitiaux = [], enPanne = false }: { favorisInitiaux?: string[]; liensMorts?: string[]; races: Race[]; totalCount?: number; units?: UnitSystem; planned?: PlannedRace[]; initialSearch?: string; pps?: PpsStatus | null; /** La lecture du catalogue a ÉCHOUÉ : la liste est vide par accident. */ enPanne?: boolean }) {
+export function RacesHub({ races: initialRaces, totalCount, units = "metric", planned: plannedProp = [], initialSearch = "", pps = null, liensMorts = [], favorisInitiaux = [], enPanne = false, ppsMasque = null }: { favorisInitiaux?: string[]; /** Clé du bandeau PPS que l'athlète a écarté (réglages). */ ppsMasque?: string | null; liensMorts?: string[]; races: Race[]; totalCount?: number; units?: UnitSystem; planned?: PlannedRace[]; initialSearch?: string; pps?: PpsStatus | null; /** La lecture du catalogue a ÉCHOUÉ : la liste est vide par accident. */ enPanne?: boolean }) {
   const fuseau = useFuseau();
   const { lang, t } = useT();
   const d = RX[lang] ?? RX.fr;
@@ -229,10 +229,24 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
     const today = jourCivil(new Date(), fuseau);
     return plannedProp.map((p) => p.date).filter((x) => x && x >= today).sort()[0] ?? null;
   }, [plannedProp]);
+  // ⚠️ LE BANDEAU PPS PEUT ÊTRE ÉCARTÉ (Cyprien, 21/09/2026), sous une clé qui dépend du
+  // verdict et de sa date : un pass qui expire le fait revenir. Et il disparaît de
+  // lui-même dès que le PPS est renseigné et valable — il n'existe que pour agir.
+  const [ppsMasqueLocal, setPpsMasqueLocal] = useState<string | null>(null);
+  const ppsCle = useMemo(() => cleBandeauPps(ppsVerdict(pps, prochaineCourse)), [pps, prochaineCourse]);
   const ppsAlerte = useMemo(() => {
     const v = ppsVerdict(pps, prochaineCourse);
-    return v.kind === "inconnu" || v.kind === "expire" || v.kind === "expireAvantCourse";
-  }, [pps, prochaineCourse]);
+    const agir = v.kind === "inconnu" || v.kind === "expire" || v.kind === "expireAvantCourse";
+    return agir && (ppsMasqueLocal ?? ppsMasque) !== ppsCle;
+  }, [pps, prochaineCourse, ppsMasqueLocal, ppsMasque, ppsCle]);
+  const masquerPps = async () => {
+    setPpsMasqueLocal(ppsCle);
+    // L'erreur est lue : un choix « enregistré » qui ne l'est pas ferait revenir le bandeau.
+    try {
+      const r = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ppsBandeauMasque: ppsCle }) });
+      if (!r.ok) { setPpsMasqueLocal(null); toast.error(PPS_T[lang]?.masquerEchec ?? PPS_T.fr.masquerEchec); }
+    } catch { setPpsMasqueLocal(null); toast.error(PPS_T[lang]?.masquerEchec ?? PPS_T.fr.masquerEchec); }
+  };
 
   return (
     <div className="flex flex-col gap-4 h-full">
@@ -245,7 +259,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
       )}
       {ppsAlerte && (
         <div className="px-0">
-          <PpsStatusCard status={pps} raceDate={prochaineCourse} compact />
+          <PpsStatusCard status={pps} raceDate={prochaineCourse} compact onMasquer={masquerPps} />
         </div>
       )}
       {/* Map overlay — partage l'état « planifiée » avec la liste */}

@@ -164,3 +164,12 @@ export function couvertureCourses(
     courses: aVenir.map((c) => ({ ...c, couverte: fin != null && c.date <= fin })),
   };
 }
+
+/**
+ * La clé sous laquelle l'athlète peut ÉCARTER le bandeau de la page Courses (Cyprien,
+ * 21/09/2026 : « permets-lui avec un bouton de pouvoir l'enlever »). Elle dépend du
+ * verdict et de sa date : un PPS qui expire, ou qui expirera avant la course, fait
+ * revenir le bandeau — on ne cache jamais une échéance qui n'a pas été lue.
+ */
+export const cleBandeauPps = (v: PpsVerdict): string =>
+  `pps|${v.kind}|${"expiresAt" in v ? v.expiresAt : ""}`;

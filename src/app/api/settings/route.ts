@@ -18,6 +18,8 @@ export async function POST(req: Request) {
   // L'avertissement de réalisme que l'athlète a choisi de ne plus voir : la CLÉ de cet
   // avertissement-là (objectif + contenu), pas un booléen — cf. lib/coach/realismeCle.
   if (typeof body.realismeMasque === "string") patch.realismeMasque = body.realismeMasque.slice(0, 160);
+  // Même mécanique pour le bandeau PPS de la page Courses (clé = verdict + date, cf. lib/pps/status).
+  if (typeof body.ppsBandeauMasque === "string") patch.ppsBandeauMasque = body.ppsBandeauMasque.slice(0, 80);
   // Préférences booléennes (notifications + confidentialité). Stockées centralement,
   // lues par les générateurs de notifications / les pages Ligues & Communauté.
   for (const k of ["weeklyDigest", "recoveryAlerts", "coachTips", "sessionReminders", "leaguePublic", "communityVisible"]) {

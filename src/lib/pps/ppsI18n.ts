@@ -44,6 +44,9 @@ export type TextesPps = {
   // ── Verdicts ───────────────────────────────────────────────────────────────
   vInconnu: string;
   vInconnuAide: string;
+  /** « Compris, masquer » sur le bandeau de la page Courses, et l'échec d'enregistrement. */
+  masquer: string;
+  masquerEchec: string;
   vValide: (expire: string, jours: number) => string;
   vExpire: (expire: string) => string;
   vExpireAvantCourse: (expire: string, course: string) => string;
@@ -107,6 +110,8 @@ export const PPS_T: Record<Lang, TextesPps> = {
 
     vInconnu: "PPS non renseigné",
     vInconnuAide: "Tu en auras besoin pour t'inscrire à une course en France.",
+    masquer: "Compris, masquer",
+    masquerEchec: "Impossible d'enregistrer ce choix. Réessaie.",
     vValide: (e, j) => `Valable jusqu'au ${e} — encore ${j} jour${j > 1 ? "s" : ""}`,
     vExpire: (e) => `Expiré depuis le ${e}`,
     vExpireAvantCourse: (e, c) => `⚠️ Il expire le ${e}, avant ta course du ${c} : refais-le, sinon tu ne pourras pas t'inscrire ou retirer ton dossard.`,
@@ -162,6 +167,8 @@ export const PPS_T: Record<Lang, TextesPps> = {
 
     vInconnu: "PPS not recorded",
     vInconnuAide: "You will need one to enter a race in France.",
+    masquer: "Got it, hide",
+    masquerEchec: "Could not save this choice. Try again.",
     vValide: (e, j) => `Valid until ${e} — ${j} day${j > 1 ? "s" : ""} left`,
     vExpire: (e) => `Expired on ${e}`,
     vExpireAvantCourse: (e, c) => `⚠️ It expires on ${e}, before your race on ${c}: renew it, otherwise you will not be able to enter or collect your bib.`,
@@ -217,6 +224,8 @@ export const PPS_T: Record<Lang, TextesPps> = {
 
     vInconnu: "PPS nicht hinterlegt",
     vInconnuAide: "Du brauchst ihn für die Anmeldung zu einem Wettkampf in Frankreich.",
+    masquer: "Verstanden, ausblenden",
+    masquerEchec: "Auswahl konnte nicht gespeichert werden. Versuch es erneut.",
     vValide: (e, j) => `Gültig bis ${e} — noch ${j} Tag${j > 1 ? "e" : ""}`,
     vExpire: (e) => `Abgelaufen am ${e}`,
     vExpireAvantCourse: (e, c) => `⚠️ Er läuft am ${e} ab, also vor deinem Wettkampf am ${c}: erneuere ihn, sonst kannst du dich nicht anmelden und deine Startnummer nicht abholen.`,
@@ -272,6 +281,8 @@ export const PPS_T: Record<Lang, TextesPps> = {
 
     vInconnu: "PPS no registrado",
     vInconnuAide: "Lo necesitarás para inscribirte en una carrera en Francia.",
+    masquer: "Entendido, ocultar",
+    masquerEchec: "No se pudo guardar esta elección. Inténtalo de nuevo.",
     vValide: (e, j) => `Válido hasta el ${e} — quedan ${j} día${j > 1 ? "s" : ""}`,
     vExpire: (e) => `Caducado el ${e}`,
     vExpireAvantCourse: (e, c) => `⚠️ Caduca el ${e}, antes de tu carrera del ${c}: renuévalo o no podrás inscribirte ni recoger el dorsal.`,
@@ -327,6 +338,8 @@ export const PPS_T: Record<Lang, TextesPps> = {
 
     vInconnu: "PPS não registado",
     vInconnuAide: "Vais precisar dele para te inscreveres numa corrida em França.",
+    masquer: "Entendido, ocultar",
+    masquerEchec: "Não foi possível guardar esta escolha. Tenta de novo.",
     vValide: (e, j) => `Válido até ${e} — faltam ${j} dia${j > 1 ? "s" : ""}`,
     vExpire: (e) => `Expirou a ${e}`,
     vExpireAvantCourse: (e, c) => `⚠️ Expira a ${e}, antes da tua corrida de ${c}: renova-o, senão não poderás inscrever-te nem levantar o dorsal.`,

@@ -69,6 +69,7 @@ export default async function RacesPage({ searchParams }: { searchParams: Promis
   let lang = "fr";
   // État du PPS : c'est sur CETTE page qu'on s'inscrit, donc là qu'il doit se rappeler.
   let pps: PpsStatus | null = null;
+  let ppsMasque: string | null = null;
   let favoris: string[] = [];
   if (user) {
     const [{ data }, { data: settingsRow }, { data: profileRow }, { data: ppsRow }, { data: favLignes }] = await Promise.all([
@@ -82,6 +83,8 @@ export default async function RacesPage({ searchParams }: { searchParams: Promis
       sb.from("notifications").select("data").eq("user_id", user.id).eq("type", "race_favori").limit(2000),
     ]);
     pps = (ppsRow?.data ?? null) as PpsStatus | null;
+    const reglages = (settingsRow?.data ?? {}) as Record<string, unknown>;
+    ppsMasque = typeof reglages.ppsBandeauMasque === "string" ? reglages.ppsBandeauMasque : null;
     favoris = (favLignes ?? [])
       .map((r) => String((r.data as { raceId?: string } | null)?.raceId ?? ""))
       .filter(Boolean);
@@ -99,7 +102,7 @@ export default async function RacesPage({ searchParams }: { searchParams: Promis
           calendrier l'affiche déjà avec le plan qui l'entoure. La répéter en tête du
           catalogue poussait la recherche de courses, seule raison de venir sur cette
           page, sous la ligne de flottaison. */}
-      <RacesHub enPanne={cataloguEnPanne} favorisInitiaux={favoris} liensMorts={liensMorts} races={(initialRaces ?? []) as never[]} totalCount={totalCount ?? 0} units={units} planned={planned} initialSearch={q ?? ""} pps={pps} />
+      <RacesHub enPanne={cataloguEnPanne} favorisInitiaux={favoris} liensMorts={liensMorts} races={(initialRaces ?? []) as never[]} totalCount={totalCount ?? 0} units={units} planned={planned} initialSearch={q ?? ""} pps={pps} ppsMasque={ppsMasque} />
     </>
   );
 }

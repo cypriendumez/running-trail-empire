@@ -238,14 +238,17 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
         </div>
 
         {/* ── Date range filter ─────────────────────────────────── */}
-        <div className="flex items-center gap-1 ml-1">
+        {/* ⚠️ SUR TÉLÉPHONE, UNE LIGNE QUI DÉFILE (Cyprien, 21/09/2026). En retour à la
+            ligne, « Cette semaine » se cassait en deux et l'entête mangeait un quart de
+            l'écran ; la géolocalisation, elle, remonte sur la première ligne (order). */}
+        <div className="order-2 flex w-full items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:order-none sm:ml-1 sm:w-auto sm:overflow-visible">
           <Calendar className="w-3.5 h-3.5 text-zinc-400 flex-shrink-0" />
-          <div className="flex gap-1">
+          <div className="flex flex-nowrap gap-1 sm:flex-wrap">
             {DATE_RANGES.map(r => (
               <button
                 key={r.days}
                 onClick={() => setDateRangeDays(r.days)}
-                className={`px-2 py-0.5 rounded-full text-xs font-semibold transition-all ${
+                className={`flex-shrink-0 whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-semibold transition-all ${
                   dateRangeDays === r.days
                     ? "bg-zinc-900 text-white"
                     : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
@@ -257,13 +260,13 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
           </div>
         </div>
 
-        <div className="w-px h-4 bg-zinc-200 flex-shrink-0" />
+        <div className="hidden w-px h-4 bg-zinc-200 flex-shrink-0 sm:block" />
 
         {/* ── Type filter pills ─────────────────────────────────── */}
-        <div className="flex items-center gap-1 flex-wrap">
+        <div className="order-3 flex w-full flex-nowrap items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:order-none sm:w-auto sm:flex-wrap sm:overflow-visible">
           <button
             onClick={() => setFilterType("all")}
-            className={`px-2 py-0.5 rounded-full text-xs font-semibold transition-all ${
+            className={`flex-shrink-0 whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-semibold transition-all ${
               filterType === "all" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
             }`}
           >
@@ -275,7 +278,7 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
               <button
                 key={type}
                 onClick={() => setFilterType(filterType === type ? "all" : type)}
-                className="px-2 py-0.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1"
+                className="flex flex-shrink-0 items-center gap-1 whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-semibold transition-all"
                 style={{
                   background: filterType === type ? (TYPE_COLORS[type] || "#22c55e") : "#f3f4f6",
                   color: filterType === type ? "white" : "#374151",
@@ -438,7 +441,7 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
       </div>
 
       {/* ── Legend ───────────────────────────────────────────────────────── */}
-      <div className="absolute bottom-6 left-4 bg-white/95 backdrop-blur rounded-2xl shadow-lg border border-zinc-200/80 p-3 z-[1000]">
+      <div className="absolute bottom-6 left-4 hidden bg-white/95 backdrop-blur rounded-2xl shadow-lg border border-zinc-200/80 p-3 z-[1000] sm:block">
         <div className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">{d["legendTitle"]}</div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
           {Object.entries(TYPE_COLORS).map(([type, color]) => (
