@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Home, Map, CalendarDays, LayoutGrid, X, User, Settings, LogOut, ShieldCheck, LifeBuoy } from "lucide-react";
+import { Home, Map, CalendarDays, LayoutGrid, X, User, Settings, LogOut, ShieldCheck, LifeBuoy, CircleDot } from "lucide-react";
 import { MedicalDisclaimer } from "@/components/layout/MedicalDisclaimer";
 import { EVENEMENT_AIDE } from "@/components/support/evenement";
 import { createClient } from "@/lib/supabase/client";
@@ -191,22 +191,12 @@ export function MobileTabBar({ unreadMessages = 0, estEditeur }: { unreadMessage
           <Onglet href={accueil} icone={Home} label={d.accueil} />
           <Onglet href={carte} icone={Map} label={d.carte} />
 
-          {/* ⚠️ LE BOUTON CENTRAL, SURÉLEVÉ : la seule action de la barre qui DÉMARRE
-              quelque chose plutôt que d'y aller. Le rond noir et le point blanc, c'est
-              le symbole « enregistrer » que toutes les applis de sport ont fixé. */}
-          <Link
-            href={enregistrer}
-            aria-current={estActive(pathname, enregistrer) ? "page" : undefined}
-            className="flex flex-col items-center justify-end gap-1 pb-1.5 text-[10px] font-semibold text-zinc-700"
-          >
-            <span className={cn(
-              "-mt-6 flex h-14 w-14 items-center justify-center rounded-full shadow-lg ring-4 ring-white transition-transform active:scale-95",
-              estActive(pathname, enregistrer) ? "bg-emerald-600" : "bg-zinc-900",
-            )}>
-              <span className="h-5 w-5 rounded-full border-[3px] border-white" />
-            </span>
-            {d.enregistrer}
-          </Link>
+          {/* ⚠️ « ENREGISTRER » A LA MÊME TAILLE QUE LES AUTRES. La première version le
+              surélevait dans un rond noir de 56 px, façon Strava : sur l'iPhone de Cyprien
+              (21/09/2026) il mordait sur la ligne Garmin au-dessus et son libellé passait
+              sous la barre d'accueil du téléphone. Un onglet parmi cinq, avec le glyphe
+              « enregistrer » (cercle et point) pour rester reconnaissable. */}
+          <Onglet href={enregistrer} icone={CircleDot} label={d.enregistrer} />
 
           <Onglet href={calendrier} icone={CalendarDays} label={d.calendrier} />
 
