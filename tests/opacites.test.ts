@@ -154,6 +154,70 @@ test("les trois voiles du hero existent, chacun identifié par son ancrage", () 
   }
 });
 
+
+/**
+ * ⚠️ QUATRIÈME PANNE SILENCIEUSE DE LA FAMILLE, TROUVÉE LE 21/09/2026 EN MESURANT.
+ * `Section` vaut `py-20 sm:py-28`. Écrire `<Section className="pb-0">` retire bien le
+ * padding du bas… sur TÉLÉPHONE seulement : `sm:py-28` vit dans une media query, donc
+ * APRÈS `pb-0` dans la feuille de style, et l'emporte dès 640 px. Mesuré à 1024 px sur
+ * /avis : padding-bottom = 112 px, soit les 224 px de vide « déjà corrigés » qui avaient
+ * survécu sur ordinateur. Ni l'ordre des classes dans l'attribut ni `twMerge` (qui ne
+ * voit pas de conflit entre deux variantes) n'y changent rien.
+ *
+ * La règle : sur une `Section`, tout padding vertical écrit en base (`pt-*`, `pb-*`,
+ * `py-*`) doit être RÉÉCRIT dans la variante `sm:` — sinon il n'existe que sur téléphone.
+ */
+const SECTION_CLASSE = /<Section\s+className="([^"]*)"/g;
+type Manque = { fichier: string; ligne: number; classe: string };
+
+/**
+ * La valeur que `Section` impose dès 640 px — LUE dans le composant, pas recopiée. Un
+ * `pt-28` en base rend exactement ce que `sm:py-28` rendra ensuite : aucune différence
+ * visible, donc pas une panne. Le test ne signale que ce qui CHANGE au passage du seuil.
+ */
+const SM_SECTION = /sm:py-(\d+)/.exec(readFileSync("src/components/ui/Container.tsx", "utf8"))?.[1];
+
+function paddingsOrphelins(): Manque[] {
+  const out: Manque[] = [];
+  for (const f of fichiers("src/app")) {
+    const lignes = sansCommentaires(readFileSync(f, "utf8")).split("\n");
+    lignes.forEach((l, i) => {
+      for (const m of l.matchAll(SECTION_CLASSE)) {
+        const classes = m[1].split(/\s+/).filter(Boolean);
+        const sm = new Set(classes.filter((c) => c.startsWith("sm:")).map((c) => c.slice(3).replace(/-.*$/, "")));
+        for (const c of classes) {
+          const [, cote, valeur] = /^(pt|pb|py)-(.+)$/.exec(c) ?? [];
+          if (!cote) continue;
+          if (valeur === SM_SECTION) continue;   // même valeur des deux côtés du seuil
+          const couvert = sm.has(cote) || sm.has("py") || (cote === "py" && sm.has("pt") && sm.has("pb"));
+          if (!couvert) out.push({ fichier: f, ligne: i + 1, classe: c });
+        }
+      }
+    });
+  }
+  return out;
+}
+
+test("le balayage reconnaît réellement des <Section className> avec un padding vertical", () => {
+  assert.ok(SM_SECTION, "la valeur sm: de Section n'a pas été trouvée dans Container.tsx");
+  let vus = 0;
+  for (const f of fichiers("src/app")) {
+    for (const m of sansCommentaires(readFileSync(f, "utf8")).matchAll(SECTION_CLASSE)) {
+      if (/(^|\s)(pt|pb|py)-/.test(m[1])) vus++;
+    }
+  }
+  assert.ok(vus >= 2, `${vus} Section(s) avec padding en base — le motif ne voit plus rien`);
+});
+
+test("un padding vertical posé sur une Section est aussi posé dans la variante sm:", () => {
+  const manques = paddingsOrphelins();
+  assert.equal(
+    manques.length, 0,
+    "padding qui n'existe que sur téléphone (sm:py-28 l'emporte dès 640 px) :\n" +
+      manques.map((m) => `  ${m.fichier}:${m.ligne}  ${m.classe}`).join("\n"),
+  );
+});
+
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
 for (const f of fails) console.log(`  ✗ ${f}`);
 if (fails.length) process.exit(1);

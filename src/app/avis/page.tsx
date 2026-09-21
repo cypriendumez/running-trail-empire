@@ -1,15 +1,14 @@
 import Link from "next/link";
-import { ArrowRight, Star } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { Container, Section } from "@/components/ui/Container";
 import { btnClass } from "@/components/ui/Button";
 import { getPublicLang } from "@/lib/i18n/serverLang";
-import { CHIFFRES } from "@/lib/brand/stats";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { TYPE_AVIS, litAvis } from "@/lib/avis/store";
-import { nRaw } from "@/lib/i18n/multi";
 import { AvisForm } from "@/components/avis/AvisForm";
+import { AvisListe } from "@/components/avis/AvisListe";
 import type { Lang } from "@/lib/i18n/translations";
 
 /**
@@ -44,141 +43,50 @@ type Bloc = {
   titre: string; accent: string; chapo: string;
   // Quand des avis existent, la page ne peut plus s'intituler « Aucun avis ».
   titrePlein: string; accentPlein: string; chapoPlein: string;
-  methodeTitre: string; methode: string[];
-  preuveTitre: string; preuveSub: string;
-  labelCourses: string; labelParcours: string; labelPlan: string; labelModeles: string;
-  /**
-   * « sur 1 avis » / « sur 12 avis » — le COMPTE accompagne toujours la moyenne.
-   *
-   * ⚠️ DEUX CHAÎNES SIMPLES AVEC UN PLACEHOLDER, PAS UNE FONCTION À GABARIT. Un
-   * `(n) => \`de ${n} avaliações\`` concatène en plein mot : ça casse dans toute langue
-   * dont le pluriel change la racine, et le détecteur de texte en dur signale à juste
-   * titre le fragment accentué qui en sort. La convention du projet est le placeholder
-   * substitué au rendu (cf. `vmaResult: "VMA {v} km/h"`).
-   */
-  surUnAvis: string;
-  surNAvis: string;
-  /** Attribution de la réponse de l'éditeur, affichée sous l'avis. */
-  reponseDe: string;
   ctaTitre: string; ctaSub: string; ctaBtn: string; ctaNote: string;
 };
 
 const AV: Record<Lang, Bloc> = {
   fr: {
-    surUnAvis: "sur 1 avis", surNAvis: "sur {n} avis",
     titre: "Aucun avis. ", accent: "Pas encore.",
     titrePlein: "Ce qu'ils en ", accentPlein: "disent.", chapoPlein: "Écrits par des coureurs qui ont un compte Pacevo, publiés tels quels.",
     chapo: "Pacevo vient d'ouvrir. Le jour où des coureurs écriront, ce sont leurs mots qui seront ici — pas les nôtres.",
-    methodeTitre: "Ce qu'on s'engage à faire quand ils arriveront",
-    methode: [
-      "Publier les avis tels qu'ils sont écrits, sans les retoucher.",
-      "Ne pas cacher les avis négatifs : un produit sans reproche n'existe pas.",
-      "N'afficher que des avis de personnes ayant réellement un compte.",
-      "Ne jamais écrire d'avis nous-mêmes, ni en commander.",
-    ],
-    preuveTitre: "En attendant, voici ce qui se vérifie",
-    preuveSub: "Chacun de ces chiffres se recompte dans l'application. Aucun ne vient d'une enquête qu'on n'a pas faite.",
-    reponseDe: "Réponse de Pacevo",
-    labelCourses: "Courses à venir en base",
-    labelParcours: "Parcours cartographiés",
-    labelPlan: "De plan glissant, recalculé",
-    labelModeles: "Chaussures comparées",
     ctaTitre: "Sois parmi les premiers.",
     ctaSub: "Essaie Pacevo, et si ça t'aide, écris-le. Si ça ne t'aide pas, écris-le aussi.",
     ctaBtn: "Créer un compte gratuit",
     ctaNote: "Gratuit · Sans carte bancaire · Annulable à tout moment",
   },
   en: {
-    surUnAvis: "from 1 review", surNAvis: "from {n} reviews",
     titre: "No reviews. ", accent: "Not yet.",
     titrePlein: "What they ", accentPlein: "say.", chapoPlein: "Written by runners with a Pacevo account, published as written.",
     chapo: "Pacevo has just opened. The day runners write something, their words will be here — not ours.",
-    methodeTitre: "What we commit to when they arrive",
-    methode: [
-      "Publish reviews exactly as they are written, unedited.",
-      "Never hide the negative ones: no product is beyond reproach.",
-      "Only show reviews from people who really have an account.",
-      "Never write reviews ourselves, nor commission any.",
-    ],
-    preuveTitre: "In the meantime, here is what can be checked",
-    preuveSub: "Every figure below can be recounted inside the app. None comes from a survey we never ran.",
-    reponseDe: "Pacevo replied",
-    labelCourses: "Upcoming races in the database",
-    labelParcours: "Mapped routes",
-    labelModeles: "Shoes compared",
-    labelPlan: "Rolling plan, recalculated",
     ctaTitre: "Be among the first.",
     ctaSub: "Try Pacevo, and if it helps, say so. If it doesn't, say that too.",
     ctaBtn: "Create a free account",
     ctaNote: "Free · No credit card · Cancel anytime",
   },
   de: {
-    surUnAvis: "aus 1 Bewertung", surNAvis: "aus {n} Bewertungen",
     titre: "Keine Bewertungen. ", accent: "Noch nicht.",
     titrePlein: "Was sie ", accentPlein: "sagen.", chapoPlein: "Von Läufern mit einem Pacevo-Konto geschrieben, unverändert veröffentlicht.",
     chapo: "Pacevo ist gerade gestartet. Sobald Läufer etwas schreiben, stehen ihre Worte hier — nicht unsere.",
-    methodeTitre: "Was wir versprechen, sobald sie kommen",
-    methode: [
-      "Bewertungen genau so veröffentlichen, wie sie geschrieben wurden.",
-      "Negative Bewertungen nicht verstecken: Kein Produkt ist tadellos.",
-      "Nur Bewertungen von Personen zeigen, die wirklich ein Konto haben.",
-      "Niemals selbst Bewertungen schreiben oder in Auftrag geben.",
-    ],
-    preuveTitre: "Bis dahin: das hier lässt sich nachprüfen",
-    preuveSub: "Jede Zahl unten lässt sich in der App nachzählen. Keine stammt aus einer Umfrage, die es nie gab.",
-    reponseDe: "Antwort von Pacevo",
-    labelCourses: "Kommende Rennen in der Datenbank",
-    labelParcours: "Kartierte Strecken",
-    labelPlan: "Rollierender Plan, neu berechnet",
-    labelModeles: "Schuhe im Vergleich",
     ctaTitre: "Sei unter den Ersten.",
     ctaSub: "Probier Pacevo aus. Wenn es hilft, schreib es. Wenn nicht, schreib das auch.",
     ctaBtn: "Kostenloses Konto erstellen",
     ctaNote: "Gratis · Keine Kreditkarte · Jederzeit kündbar",
   },
   es: {
-    surUnAvis: "de 1 opinión", surNAvis: "de {n} opiniones",
     titre: "Sin opiniones. ", accent: "Todavía.",
     titrePlein: "Lo que ", accentPlein: "dicen.", chapoPlein: "Escritas por corredores con cuenta Pacevo, publicadas tal cual.",
     chapo: "Pacevo acaba de abrir. El día en que los corredores escriban, estarán sus palabras aquí — no las nuestras.",
-    methodeTitre: "A qué nos comprometemos cuando lleguen",
-    methode: [
-      "Publicar las opiniones tal y como se escriben, sin retocarlas.",
-      "No esconder las negativas: ningún producto es irreprochable.",
-      "Mostrar solo opiniones de personas que tienen cuenta de verdad.",
-      "No escribir nunca opiniones nosotros mismos, ni encargarlas.",
-    ],
-    preuveTitre: "Mientras tanto, esto sí se puede comprobar",
-    preuveSub: "Cada cifra se puede volver a contar dentro de la app. Ninguna viene de una encuesta que no hicimos.",
-    reponseDe: "Respuesta de Pacevo",
-    labelCourses: "Carreras próximas en la base",
-    labelParcours: "Rutas cartografiadas",
-    labelPlan: "De plan deslizante, recalculado",
-    labelModeles: "Zapatillas comparadas",
     ctaTitre: "Sé de los primeros.",
     ctaSub: "Prueba Pacevo. Si te ayuda, dilo. Si no te ayuda, dilo también.",
     ctaBtn: "Crear cuenta gratis",
     ctaNote: "Gratis · Sin tarjeta · Cancela cuando quieras",
   },
   pt: {
-    surUnAvis: "de 1 avaliação", surNAvis: "de {n} avaliações",
     titre: "Sem avaliações. ", accent: "Ainda.",
     titrePlein: "O que eles ", accentPlein: "dizem.", chapoPlein: "Escritas por corredores com conta Pacevo, publicadas tal como escritas.",
     chapo: "A Pacevo acabou de abrir. No dia em que os corredores escreverem, estarão aqui as palavras deles — não as nossas.",
-    methodeTitre: "O que prometemos quando chegarem",
-    methode: [
-      "Publicar as avaliações tal como são escritas, sem retoques.",
-      "Não esconder as negativas: nenhum produto é irrepreensível.",
-      "Mostrar apenas avaliações de quem tem mesmo uma conta.",
-      "Nunca escrever avaliações nós próprios, nem encomendá-las.",
-    ],
-    preuveTitre: "Entretanto, isto verifica-se",
-    preuveSub: "Cada número abaixo pode ser recontado dentro da app. Nenhum vem de um inquérito que nunca fizemos.",
-    reponseDe: "Resposta da Pacevo",
-    labelCourses: "Provas futuras na base",
-    labelParcours: "Percursos cartografados",
-    labelPlan: "De plano deslizante, recalculado",
-    labelModeles: "Ténis comparados",
     ctaTitre: "Sê dos primeiros.",
     ctaSub: "Experimenta a Pacevo. Se ajudar, escreve. Se não ajudar, escreve também.",
     ctaBtn: "Criar conta grátis",
@@ -206,28 +114,6 @@ export default async function AvisPage() {
       .map((r) => litAvis(r.data))
       .filter((a): a is NonNullable<typeof a> => Boolean(a?.publie));
   } catch { publies = []; }
-  /**
-   * NOTE MOYENNE — calculée sur les avis RÉELLEMENT publiés, jamais ailleurs.
-   *
-   * ⚠️ ELLE NE S'AFFICHE QUE ACCOMPAGNÉE DU COMPTE. « 5,0/5 » seul, sur un unique avis,
-   * se lit comme un argument commercial ; « 5,0/5 sur 1 avis » se lit comme un fait. Le
-   * compte n'est pas une mention secondaire : c'est ce qui rend la moyenne honnête, et
-   * les deux ne doivent jamais être séparés.
-   *
-   * Arrondie au dixième et rendue avec le séparateur décimal de la langue (`nRaw`) :
-   * « 4.7/5 » sur une page en français signalerait un chiffre recopié d'ailleurs.
-   */
-  const moyenne = publies.length
-    ? Math.round((publies.reduce((acc, a) => acc + a.note, 0) / publies.length) * 10) / 10
-    : null;
-
-  // Les quatre chiffres viennent de la SOURCE UNIQUE, jamais recopiés ici.
-  const preuves = [
-    { valeur: CHIFFRES.courses, label: A.labelCourses },
-    { valeur: CHIFFRES.parcours, label: A.labelParcours },
-    { valeur: CHIFFRES.plan, label: A.labelPlan },
-    { valeur: CHIFFRES.modeles, label: A.labelModeles },
-  ];
 
   return (
     <div className="min-h-screen bg-white">
@@ -236,8 +122,14 @@ export default async function AvisPage() {
       {/* ⚠️ HERO ET FORMULAIRE DANS UNE SEULE SECTION. Ils étaient dans deux `Section`
           empilées, or `Section` vaut `py-20 sm:py-28` : jusqu'à 224 px de vide entre le
           titre et le champ à remplir, sur une page qui n'a par ailleurs rien à montrer
-          tant qu'aucun avis n'existe. L'espace était là par construction, pas par choix. */}
-      <Section className="pt-12 pb-0 sm:pt-16">
+          tant qu'aucun avis n'existe. L'espace était là par construction, pas par choix.
+          ⚠️ ET `pb-0` NE SUFFIT PAS : mesuré à 1024 px, padding-bottom = 112 px. Le
+          `sm:py-28` de `Section` vit dans la media query, donc APRÈS `pb-0` dans la
+          feuille de style, et l'emporte dès 640 px — l'ordre des classes dans l'attribut
+          n'y change rien, et `twMerge` ne voit pas de conflit entre deux variantes. Il
+          faut annuler dans la même variante : `sm:pb-0`. Le vide de 224 px avait donc
+          survécu sur ordinateur à sa première « correction ». */}
+      <Section className="pt-12 pb-0 sm:pt-16 sm:pb-0">
         <Container>
           {/* ⚠️ TITRE RESSERRÉ. À text-5xl il écrasait tout : sur une page qui n'a
               qu'un formulaire à montrer, un titre deux fois plus gros que le reste fait
@@ -250,20 +142,6 @@ export default async function AvisPage() {
             {publies.length ? A.chapoPlein : A.chapo}
           </p>
 
-          {moyenne != null && (
-            <div className="mx-auto mt-7 flex w-fit items-center gap-3 rounded-2xl bg-zinc-50 px-5 py-3 ring-1 ring-inset ring-zinc-200">
-              <div className="flex gap-0.5" aria-hidden>
-                {Array.from({ length: 5 }, (_, i) => (
-                  <Star key={i} className={`h-5 w-5 ${i < Math.round(moyenne) ? "fill-amber-400 text-amber-400" : "fill-zinc-200 text-zinc-200"}`} />
-                ))}
-              </div>
-              <span className="text-xl font-bold tabular-nums text-zinc-900">{nRaw(moyenne, lang)}</span>
-              <span className="text-sm text-zinc-500">
-                / 5 · {publies.length === 1 ? A.surUnAvis : A.surNAvis.replace("{n}", String(publies.length))}
-              </span>
-            </div>
-          )}
-
           {/* Le formulaire suit immédiatement : tant qu'il n'y a pas d'avis à lire, écrire
               le premier est la seule action que la page a à proposer. */}
           <div className="mt-9">
@@ -273,61 +151,25 @@ export default async function AvisPage() {
       </Section>
 
       {publies.length > 0 && (
-        <Section>
+        <Section className="pt-16 pb-0 sm:pt-20 sm:pb-0">
           <Container>
-            <div className="mx-auto grid max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {publies.map((a) => (
-                <div key={`${a.auteur}-${a.at}`} className="rounded-2xl bg-white p-5 ring-1 ring-inset ring-zinc-200">
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">
-                      {a.auteur.charAt(0)}
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-zinc-900">{a.auteur}</div>
-                      <div className="text-xs text-zinc-400">{a.at.slice(0, 10)}</div>
-                    </div>
-                  </div>
-                  <div className="mt-3 flex gap-0.5" aria-label={`${a.note}/5`}>
-                    {Array.from({ length: 5 }, (_, i) => (
-                      <span key={i} className={i < a.note ? "text-amber-400" : "text-zinc-200"}>★</span>
-                    ))}
-                  </div>
-                  <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-zinc-600">{a.texte}</p>
-                  {/* ⚠️ LA RÉPONSE S'AFFICHE SOUS L'AVIS, JAMAIS À SA PLACE. C'est ce que
-                      font App Store, Google Play et Google, et c'est ce qui permet de
-                      tenir la promesse « publiés tels qu'ils sont écrits » : le texte de
-                      l'athlète reste intact et vérifiable, la réponse est attribuée. */}
-                  {a.reponse && (
-                    <div className="mt-4 rounded-xl border-l-2 border-emerald-500 bg-zinc-50 py-3 pl-4 pr-3">
-                      <div className="text-xs font-semibold text-emerald-700">
-                        {A.reponseDe}
-                        {a.reponseAt ? <span className="ml-2 font-normal text-zinc-400">{a.reponseAt.slice(0, 10)}</span> : null}
-                      </div>
-                      <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-zinc-600">{a.reponse}</p>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+            <AvisListe avis={publies} />
           </Container>
         </Section>
       )}
 
-      <Section className="py-16 sm:py-20">
-        <Container>
-          <h2 className="text-center text-3xl font-bold tracking-tight text-zinc-900">{A.preuveTitre}</h2>
-          <p className="mx-auto mt-3 max-w-xl text-center text-sm leading-relaxed text-zinc-500">{A.preuveSub}</p>
-          <div className="mx-auto mt-10 grid max-w-4xl grid-cols-2 gap-px overflow-hidden rounded-2xl bg-zinc-200 ring-1 ring-zinc-200 sm:grid-cols-4">
-            {preuves.map((p) => (
-              <div key={p.label} className="bg-white px-5 py-8 text-center">
-                <div className="text-4xl font-bold tracking-tight text-zinc-900">{p.valeur}</div>
-                <div className="mt-2 text-xs leading-snug text-zinc-500">{p.label}</div>
-              </div>
-            ))}
-          </div>
-        </Container>
-      </Section>
-
+      {/* ⚠️ LE BLOC DE CHIFFRES A ÉTÉ RETIRÉ LE 17/09/2026, sur décision de Cyprien, et il
+          vaut la peine de dire pourquoi pour ne pas le remettre par réflexe. Il affichait
+          « 10 000+ courses · 15 700 parcours · 7 j · 300+ chaussures » sous un titre
+          « En attendant, voici ce qui se vérifie ».
+          Trois raisons de sa disparition :
+           · il répondait à une question que personne ne pose ICI — un visiteur venu lire
+             ce que des coureurs pensent du coaching trouvait la TAILLE DU CATALOGUE ;
+           · son titre disait le manque à voix haute, alors que le h1 le dit déjà
+             (« Aucun avis. Pas encore. ») : la deuxième fois sonnait comme une excuse ;
+           · ces quatre chiffres sont déjà sur la page d'accueil.
+          Les chiffres eux-mêmes restent justes et vérifiables (lib/brand/stats) : ce n'est
+          pas leur exactitude qui posait problème, c'est leur présence à cet endroit. */}
       <Section>
         <Container>
           <div className="relative overflow-hidden rounded-3xl bg-zinc-950 px-8 py-20 text-center">

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Star, Loader2, Check } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 // ⚠️ `lib/avis/bornes`, PAS `lib/avis/store` : le store importe le filtre de
@@ -15,16 +16,18 @@ import { TEXTE_MIN, TEXTE_MAX } from "@/lib/avis/bornes";
  * soumission non authentifiée, et l'auteur affiché est calculé depuis le profil, jamais
  * envoyé par le navigateur.
  *
- * ⚠️ On n'appelle PAS l'API au montage pour savoir si la personne est connectée — un 401
- * sur chaque visite anonyme de la page d'avis, c'est du bruit pour rien. Le composant
- * demande une fois, et bascule sur l'invitation à se connecter si la réponse est 401.
+ * UN SEUL appel à l'API au montage : il dit si la personne est connectée ET, si oui,
+ * ramène son avis existant à modifier. Un visiteur anonyme reçoit un 401 — c'est la
+ * réponse attendue, pas une erreur : le composant bascule alors sur l'invitation à se
+ * connecter. (Une vérification côté serveur éviterait ce 401 en console, mais elle
+ * ferait dépendre une page publique de la session : à ne faire que si ça gêne vraiment.)
  */
 const T: Record<string, Record<string, string>> = {
-  fr: { titre: "Écris ton avis", sousTitre: "Il sera publié tel quel, sous ton prénom et l'initiale de ton nom.", note: "Ta note", texte: "Ton avis", place: "Ce qui t'a servi, ce qui t'a manqué…", envoyer: "Publier mon avis", envoi: "Envoi…", merci: "Merci. Ton avis est enregistré — il apparaîtra ici après une relecture contre les insultes et le spam. Ta note n'entre pas en compte dans cette relecture.", modifier: "Modifier mon avis", connecte: "Il faut un compte pour écrire un avis — c'est la garantie qu'ils viennent tous de vraies personnes.", seConnecter: "Se connecter", creer: "Créer un compte gratuit", court: "Encore {n} caractères", erreur: "Une erreur est survenue.", reseau: "Connexion impossible. Réessaie." },
-  en: { titre: "Write your review", sousTitre: "It will be published as written, under your first name and last initial.", note: "Your rating", texte: "Your review", place: "What helped, what was missing…", envoyer: "Publish my review", envoi: "Sending…", merci: "Thank you. Your review is saved — it will appear here after a check against abuse and spam. Your rating plays no part in that check.", modifier: "Edit my review", connecte: "You need an account to write a review — that is what guarantees they all come from real people.", seConnecter: "Sign in", creer: "Create a free account", court: "{n} more characters", erreur: "Something went wrong.", reseau: "Connection failed. Try again." },
-  de: { titre: "Schreib deine Bewertung", sousTitre: "Sie wird unverändert veröffentlicht, mit Vorname und Initiale.", note: "Deine Bewertung", texte: "Dein Text", place: "Was geholfen hat, was gefehlt hat…", envoyer: "Bewertung veröffentlichen", envoi: "Senden…", merci: "Danke. Deine Bewertung ist gespeichert — sie erscheint nach einer Prüfung auf Beleidigungen und Spam. Deine Note spielt dabei keine Rolle.", modifier: "Bewertung bearbeiten", connecte: "Für eine Bewertung brauchst du ein Konto — so ist sichergestellt, dass alle von echten Menschen stammen.", seConnecter: "Anmelden", creer: "Kostenloses Konto erstellen", court: "Noch {n} Zeichen", erreur: "Ein Fehler ist aufgetreten.", reseau: "Keine Verbindung. Versuch es erneut." },
-  es: { titre: "Escribe tu opinión", sousTitre: "Se publicará tal cual, con tu nombre y la inicial del apellido.", note: "Tu nota", texte: "Tu opinión", place: "Lo que te sirvió, lo que faltó…", envoyer: "Publicar mi opinión", envoi: "Enviando…", merci: "Gracias. Tu opinión está guardada — aparecerá tras una revisión contra insultos y spam. Tu nota no cuenta en esa revisión.", modifier: "Editar mi opinión", connecte: "Necesitas una cuenta para opinar — así se garantiza que todas vienen de personas reales.", seConnecter: "Iniciar sesión", creer: "Crear cuenta gratis", court: "Faltan {n} caracteres", erreur: "Se ha producido un error.", reseau: "Sin conexión. Inténtalo de nuevo." },
-  pt: { titre: "Escreve a tua avaliação", sousTitre: "Será publicada tal como escreves, com o teu nome e a inicial do apelido.", note: "A tua nota", texte: "A tua avaliação", place: "O que te ajudou, o que faltou…", envoyer: "Publicar a minha avaliação", envoi: "A enviar…", merci: "Obrigado. A tua avaliação ficou guardada — aparecerá após uma verificação contra insultos e spam. A tua nota não conta nessa verificação.", modifier: "Editar a minha avaliação", connecte: "Precisas de conta para avaliar — é isso que garante que todas vêm de pessoas reais.", seConnecter: "Entrar", creer: "Criar conta grátis", court: "Faltam {n} caracteres", erreur: "Ocorreu um erro.", reseau: "Sem ligação. Tenta de novo." },
+  fr: { titre: "Écris ton avis", sousTitre: "Il sera publié tel quel, sous ton prénom et l'initiale de ton nom.", note: "Ta note", texte: "Ton avis", place: "Ce qui t'a servi, ce qui t'a manqué…", envoyer: "Publier mon avis", envoi: "Envoi…", merci: "Merci. Ton avis est en ligne, tel que tu l'as écrit.", modifier: "Modifier mon avis", connecte: "Il faut un compte pour écrire un avis — c'est la garantie qu'ils viennent tous de vraies personnes.", seConnecter: "Se connecter", creer: "Créer un compte gratuit", court: "Encore {n} caractères", erreur: "Une erreur est survenue.", reseau: "Connexion impossible. Réessaie." },
+  en: { titre: "Write your review", sousTitre: "It will be published as written, under your first name and last initial.", note: "Your rating", texte: "Your review", place: "What helped, what was missing…", envoyer: "Publish my review", envoi: "Sending…", merci: "Thank you. Your review is live, exactly as you wrote it.", modifier: "Edit my review", connecte: "You need an account to write a review — that is what guarantees they all come from real people.", seConnecter: "Sign in", creer: "Create a free account", court: "{n} more characters", erreur: "Something went wrong.", reseau: "Connection failed. Try again." },
+  de: { titre: "Schreib deine Bewertung", sousTitre: "Sie wird unverändert veröffentlicht, mit Vorname und Initiale.", note: "Deine Bewertung", texte: "Dein Text", place: "Was geholfen hat, was gefehlt hat…", envoyer: "Bewertung veröffentlichen", envoi: "Senden…", merci: "Danke. Deine Bewertung ist online, genau so, wie du sie geschrieben hast.", modifier: "Bewertung bearbeiten", connecte: "Für eine Bewertung brauchst du ein Konto — so ist sichergestellt, dass alle von echten Menschen stammen.", seConnecter: "Anmelden", creer: "Kostenloses Konto erstellen", court: "Noch {n} Zeichen", erreur: "Ein Fehler ist aufgetreten.", reseau: "Keine Verbindung. Versuch es erneut." },
+  es: { titre: "Escribe tu opinión", sousTitre: "Se publicará tal cual, con tu nombre y la inicial del apellido.", note: "Tu nota", texte: "Tu opinión", place: "Lo que te sirvió, lo que faltó…", envoyer: "Publicar mi opinión", envoi: "Enviando…", merci: "Gracias. Tu opinión ya está publicada, tal y como la escribiste.", modifier: "Editar mi opinión", connecte: "Necesitas una cuenta para opinar — así se garantiza que todas vienen de personas reales.", seConnecter: "Iniciar sesión", creer: "Crear cuenta gratis", court: "Faltan {n} caracteres", erreur: "Se ha producido un error.", reseau: "Sin conexión. Inténtalo de nuevo." },
+  pt: { titre: "Escreve a tua avaliação", sousTitre: "Será publicada tal como escreves, com o teu nome e a inicial do apelido.", note: "A tua nota", texte: "A tua avaliação", place: "O que te ajudou, o que faltou…", envoyer: "Publicar a minha avaliação", envoi: "A enviar…", merci: "Obrigado. A tua avaliação está online, tal como a escreveste.", modifier: "Editar a minha avaliação", connecte: "Precisas de conta para avaliar — é isso que garante que todas vêm de pessoas reais.", seConnecter: "Entrar", creer: "Criar conta grátis", court: "Faltam {n} caracteres", erreur: "Ocorreu um erro.", reseau: "Sem ligação. Tenta de novo." },
 };
 
 // Libellé de la note (survolée ou choisie) — rend le choix vivant, pas un simple compteur d'étoiles.
@@ -43,6 +46,7 @@ const CARTE =
 
 export function AvisForm() {
   const { lang } = useT();
+  const router = useRouter();
   const t = T[lang] ?? T.fr;
   const notes = NOTES[lang] ?? NOTES.fr;
   const [etat, setEtat] = useState<"charge" | "anonyme" | "pret" | "envoi" | "merci">("charge");
@@ -74,6 +78,12 @@ export function AvisForm() {
       const j = await r.json();
       if (!r.ok || !j.ok) { setErreur(j?.error ?? t.erreur); setEtat("pret"); return; }
       setEtat("merci");
+      // ⚠️ L'avis est publié dès l'écriture (le filtre de grossièretés a tourné AVANT
+      // l'insertion, cf. /api/avis). La liste est rendue côté serveur : sans ce
+      // rafraîchissement, « ton avis est en ligne » serait vrai en base et faux à
+      // l'écran jusqu'au prochain rechargement. `refresh()` relit les composants
+      // serveur sans toucher à l'état de ce formulaire.
+      router.refresh();
     } catch { setErreur(t.reseau); setEtat("pret"); }
   }
 

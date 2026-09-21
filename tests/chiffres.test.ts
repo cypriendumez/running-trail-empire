@@ -951,12 +951,17 @@ test("l'écran de modération ne trie pas par note, et n'édite pas les avis", (
   // jamais répondre.
   assert.match(ui, /Supprimer la réponse/, "aucun moyen de retirer une réponse écrite trop vite");
   // Et la page publique doit vraiment l'afficher, sinon répondre ne sert à rien.
-  const pub = sansCommentaires(readFileSync(join(ROOT, "src/app/avis/page.tsx"), "utf8"));
+  // La liste publique (et donc l'affichage des réponses) vit dans `AvisListe` depuis le
+  // 17/09/2026 ; la page ne fait plus que lire les lignes et les lui passer.
+  const pub = sansCommentaires(readFileSync(join(ROOT, "src/components/avis/AvisListe.tsx"), "utf8"));
   // ⚠️ ON VISE LA CONDITION, PAS LA MENTION. `a.reponse` apparaît deux fois — dans le
   // test d'affichage ET dans le texte rendu. Remplacer la condition par `false` laissait
   // donc le test vert alors que plus aucune réponse ne s'affichait. Huitième fois.
   assert.match(pub, /\{a\.reponse && \(/, "la page publique n'affiche plus les réponses");
-  assert.match(pub, /A\.reponseDe/, "la réponse n'est pas attribuée");
+  // On vise la CLÉ, pas le nom de la variable de dictionnaire : `A.` dans la page,
+  // `t.` dans le composant — épingler le préfixe ferait rougir ce test au moindre
+  // déplacement du rendu, alors que l'invariant (la réponse est attribuée) tient.
+  assert.match(pub, /\breponseDe\b/, "la réponse n'est pas attribuée");
 });
 test("« plus tard » ne se comporte PAS comme « non »", () => {
   // ⚠️ LE DÉFAUT CORRIGÉ ICI. La première version n'avait qu'un « Plus tard » qui masquait
@@ -1023,13 +1028,31 @@ test("un nouvel avis PRÉVIENT l'éditeur, et la moyenne ne sort jamais sans son
   // ⚠️ LA MOYENNE NE DOIT JAMAIS S'AFFICHER SEULE. « 5,0/5 » sur un unique avis se lit
   // comme un argument commercial ; « 5,0/5 sur 1 avis » se lit comme un fait. Le compte
   // est ce qui rend le chiffre honnête, pas une mention secondaire.
-  const page = sansCommentaires(readFileSync("src/app/avis/page.tsx", "utf8"));
-  assert.match(page, /const moyenne = publies\.length/, "la moyenne n'est plus calculée sur les avis publiés");
-  const bloc = page.slice(page.indexOf("{moyenne != null &&"), page.indexOf("{moyenne != null &&") + 900);
-  assert.ok(/surUnAvis|surNAvis\.replace/.test(bloc),
+  // ⚠️ LA MOYENNE A DÉMÉNAGÉ dans `AvisListe` le 17/09/2026, à côté de l'histogramme qui
+  // la décompose — c'est là qu'elle a un sens. Le test suit le code : ce qu'il garde n'a
+  // pas changé, c'est l'endroit qui a bougé.
+  const liste = sansCommentaires(readFileSync(join(ROOT, "src/components/avis/AvisListe.tsx"), "utf8"));
+  assert.match(liste, /avis\.reduce\(\(s, a\) => s \+ a\.note, 0\) \/ avis\.length/,
+    "la moyenne n'est plus calculée sur les avis reçus en props");
+  // ⚠️ UNE DÉCIMALE, TOUJOURS : sept avis à 28 points font « 4 » avec nRaw, « 4,0 » avec
+  // nLoc(…, 1). Vu en local le 21/09/2026 — « 4 sur 5 » se lit comme une note entière,
+  // pas comme une moyenne.
+  const ANCRE = "{nLoc(moyenne, lang, 1)}";
+  const debut = liste.indexOf(ANCRE);
+  assert.ok(debut >= 0, "la moyenne n'est plus affichée avec une décimale imposée (nLoc(…, 1))");
+  // Le compte accompagne la moyenne dans le MÊME bloc de synthèse.
+  const synthese = liste.slice(debut, debut + 700);
+  assert.ok(/compte\(avis\.length\)/.test(synthese),
     "la moyenne est affichée sans le nombre d'avis qui la fonde");
-  // Le libellé du compte existe dans les cinq langues (5 + la ligne de type).
-  assert.ok(page.split("surNAvis").length - 1 >= 6, "surNAvis n'est pas défini dans les 5 langues");
+  // ⚠️ LES DATES SONT LOCALISÉES ET À FUSEAU FIXE. « 2026-09-18 » brut est illisible pour
+  // un lecteur ; et sans `timeZone`, un avis écrit à 23 h à Paris change de jour entre le
+  // rendu serveur (iad1) et l'hydratation (France) → React #418.
+  assert.ok(!/\.slice\(0, 10\)/.test(liste), "une date d'avis est encore affichée en ISO brut");
+  assert.match(liste, /timeZone: FUSEAU_DEFAUT/, "la date d'avis n'impose pas de fuseau : jour différent serveur/client");
+  // ⚠️ ET LE FILTRE NE PART JAMAIS D'UNE NOTE : filtrer les avis négatifs par défaut
+  // tombe sous la même interdiction que les inventer (directive UE 2019/2161).
+  assert.match(liste, /useState<number \| null>\(null\)/, "le filtre de note ne part plus de « tout »");
+  assert.match(liste, /useState<Tri>\("recent"\)/, "le tri par défaut n'est plus le plus récent mais un classement par note");
 });
 
 test("un avis ne peut pas être fabriqué depuis le navigateur", () => {
