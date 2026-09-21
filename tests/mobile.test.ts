@@ -99,10 +99,40 @@ test("la barre réserve sa place : le pied de page ne finit pas derrière elle",
   assert.ok(/style=\{\{ height: HAUTEUR \}\}/.test(src), "la barre n'a plus la hauteur que la cale réserve");
 });
 
-test("la bulle d'aide remonte au-dessus de la barre sur mobile, et retrouve son coin sur bureau", () => {
-  const src = codeNu("src/components/support/SupportBubble.tsx");
-  assert.ok(/fixed bottom-20 right-5 [^"]*md:bottom-5/.test(src),
-    "la bulle d'aide se pose sur l'onglet « Plus » (ou ne retrouve pas bottom-5 sur bureau)");
+test("sur mobile, l'assistant vit dans « Plus », pas en bulle flottante — et il s'ouvre vraiment", () => {
+  // Cyprien, 21/09/2026 : la bulle recouvrait le contenu et l'onglet « Plus ».
+  const bulle = codeNu("src/components/support/SupportBubble.tsx");
+  assert.ok(/fixed bottom-5 right-5 z-50 hidden [^"]*md:flex/.test(bulle),
+    "la bulle flottante s'affiche encore sur téléphone (ou a disparu du bureau)");
+  // Le panneau, lui, doit se poser AU-DESSUS de la barre d'onglets (4 rem), pas dessous.
+  assert.ok(/fixed bottom-20 right-5 z-50 flex w-\[min\(420px/.test(bulle),
+    "le panneau d'aide ne se place plus au-dessus de la barre d'onglets sur mobile");
+  // La tuile émet l'événement, le panneau l'écoute : vérifier LES DEUX bouts, sinon une
+  // tuile muette (ou un panneau sourd) passerait inaperçu.
+  const barre = codeNu(BARRE);
+  assert.ok(/window\.dispatchEvent\(new CustomEvent\(EVENEMENT_AIDE\)\)/.test(barre), "la tuile « Assistant » n'émet plus l'événement d'ouverture");
+  assert.ok(/window\.addEventListener\(EVENEMENT_AIDE, ouvrir\)/.test(bulle), "le panneau d'aide n'écoute plus l'événement de la tuile");
+  // Et la tuile referme la feuille, sinon le panneau s'ouvre DERRIÈRE elle (z-[60] > z-50).
+  const i = barre.indexOf("new CustomEvent(EVENEMENT_AIDE)");
+  assert.ok(/setOuvert\(false\)/.test(barre.slice(Math.max(0, i - 80), i)), "la tuile « Assistant » n'referme pas la feuille avant d'ouvrir le panneau");
+});
+
+test("sur mobile, l'avertissement médical part dans « Plus » — mais la ligne Garmin reste", () => {
+  // Le bas de l'écran perdait ~120 px sur téléphone (Cyprien, 21/09/2026). L'avertissement
+  // et les liens légaux restent à un geste, sur chaque page, dans la feuille « Plus ».
+  const layout = codeNu(LAYOUT);
+  const cache = layout.indexOf('<div className="hidden shrink-0 md:block">');
+  assert.ok(cache > 0, "l'avertissement médical n'est plus masqué sous md dans le layout");
+  assert.ok(/<MedicalDisclaimer/.test(layout.slice(cache, layout.indexOf("</div>", cache))),
+    "ce qui est masqué sous md n'est pas l'avertissement médical");
+  assert.ok(/<MedicalDisclaimer lang=\{lang\} \/>/.test(codeNu(BARRE)), "la feuille « Plus » n'affiche plus l'avertissement médical : il n'est plus nulle part sur téléphone");
+  // ⚠️ LA LIGNE GARMIN N'EST PAS UN TEXTE DE CONFORT : c'est l'article 1.1 des conditions
+  // de l'API intervals.icu, dont dépend tout le produit. Elle reste sur téléphone —
+  // donc HORS du bloc masqué, et sans `hidden` à elle.
+  const garmin = layout.indexOf("<AttributionGarmin");
+  assert.ok(garmin > 0 && garmin < cache, "l'attribution Garmin est masquée sur téléphone : manquement aux conditions de l'API");
+  const balise = layout.slice(garmin, layout.indexOf("/>", garmin));
+  assert.ok(!/\bhidden\b/.test(balise), "l'attribution Garmin porte un `hidden`");
 });
 
 test("les libellés de la barre existent dans les cinq langues", () => {

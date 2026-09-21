@@ -57,8 +57,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
               autres vues lisaient les mêmes tables sans rien afficher (heatmap, survol,
               trophées, clubs, ligues, profil…). Une liste tenue à la main s'oublie ; le
               layout, non : toute page présente et à venir la porte. */}
-          <AttributionGarmin className="pb-3" />
-          <MedicalDisclaimer lang={String(profile?.preferred_language ?? "fr")} />
+          {/* ⚠️ LA LIGNE GARMIN RESTE SUR TÉLÉPHONE, même si Cyprien a demandé (21/09/2026)
+              d'alléger le bas de l'écran : c'est la contrepartie contractuelle de l'API
+              dont dépend tout le produit, pas un texte de confort. Elle est ramenée à une
+              seule ligne serrée (~22 px). L'avertissement médical, lui, part dans la
+              feuille « Plus » sous md : il reste à un geste sur chaque page. */}
+          <AttributionGarmin className="px-2 py-1 text-[10px] leading-tight tracking-tight md:px-6 md:pb-3 md:text-[11px] md:leading-relaxed md:tracking-normal" />
+          <div className="hidden shrink-0 md:block">
+            <MedicalDisclaimer lang={String(profile?.preferred_language ?? "fr")} />
+          </div>
           {/* Téléphone seulement : la barre d'onglets (Accueil · Carte · Enregistrer ·
               Calendrier · Plus) et la cale qui lui réserve sa place sous le pied de page. */}
           <MobileTabBar unreadMessages={unreadMessages ?? 0} estEditeur={estAdmin(user.email)} />

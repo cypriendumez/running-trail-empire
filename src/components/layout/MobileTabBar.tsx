@@ -2,7 +2,9 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Home, Map, CalendarDays, LayoutGrid, X, User, Settings, LogOut, ShieldCheck } from "lucide-react";
+import { Home, Map, CalendarDays, LayoutGrid, X, User, Settings, LogOut, ShieldCheck, LifeBuoy } from "lucide-react";
+import { MedicalDisclaimer } from "@/components/layout/MedicalDisclaimer";
+import { EVENEMENT_AIDE } from "@/components/support/evenement";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils/cn";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -26,12 +28,12 @@ import { NAV_GROUPES, ONGLETS_MOBILE, resteMobile, estActive } from "./navigatio
  *
  * Elle est `md:hidden` : à partir de `md`, la barre latérale reprend le service.
  */
-const T: Record<string, { accueil: string; carte: string; enregistrer: string; calendrier: string; plus: string; tout: string; fermer: string }> = {
-  fr: { accueil: "Accueil", carte: "Carte", enregistrer: "Enregistrer", calendrier: "Calendrier", plus: "Plus", tout: "Tout Pacevo", fermer: "Fermer" },
-  en: { accueil: "Home", carte: "Map", enregistrer: "Record", calendrier: "Calendar", plus: "More", tout: "All of Pacevo", fermer: "Close" },
-  de: { accueil: "Start", carte: "Karte", enregistrer: "Aufzeichnen", calendrier: "Kalender", plus: "Mehr", tout: "Ganz Pacevo", fermer: "Schließen" },
-  es: { accueil: "Inicio", carte: "Mapa", enregistrer: "Grabar", calendrier: "Calendario", plus: "Más", tout: "Todo Pacevo", fermer: "Cerrar" },
-  pt: { accueil: "Início", carte: "Mapa", enregistrer: "Gravar", calendrier: "Calendário", plus: "Mais", tout: "Toda a Pacevo", fermer: "Fechar" },
+const T: Record<string, { accueil: string; carte: string; enregistrer: string; calendrier: string; plus: string; tout: string; fermer: string; aide: string }> = {
+  fr: { accueil: "Accueil", carte: "Carte", enregistrer: "Enregistrer", calendrier: "Calendrier", plus: "Plus", tout: "Tout Pacevo", fermer: "Fermer", aide: "Assistant" },
+  en: { accueil: "Home", carte: "Map", enregistrer: "Record", calendrier: "Calendar", plus: "More", tout: "All of Pacevo", fermer: "Close", aide: "Assistant" },
+  de: { accueil: "Start", carte: "Karte", enregistrer: "Aufzeichnen", calendrier: "Kalender", plus: "Mehr", tout: "Ganz Pacevo", fermer: "Schließen", aide: "Assistent" },
+  es: { accueil: "Inicio", carte: "Mapa", enregistrer: "Grabar", calendrier: "Calendario", plus: "Más", tout: "Todo Pacevo", fermer: "Cerrar", aide: "Asistente" },
+  pt: { accueil: "Início", carte: "Mapa", enregistrer: "Gravar", calendrier: "Calendário", plus: "Mais", tout: "Toda a Pacevo", fermer: "Fechar", aide: "Assistente" },
 };
 
 /** Hauteur de la barre (sans la zone de sécurité) — partagée avec la cale qui la réserve. */
@@ -157,11 +159,26 @@ export function MobileTabBar({ unreadMessages = 0, estEditeur }: { unreadMessage
             <Link href="/dashboard/settings" className="flex flex-col items-center gap-1.5 rounded-2xl bg-zinc-50 px-2 py-3 text-center text-[11px] font-medium leading-tight text-zinc-700 active:bg-zinc-100">
               <Settings className="h-5 w-5" />{t("nav.settings")}
             </Link>
+            {/* ⚠️ L'ASSISTANT VIT ICI SUR TÉLÉPHONE, pas en bulle flottante : elle se posait
+                sur le contenu et sur l'onglet « Plus » (demande de Cyprien, 21/09/2026).
+                La tuile referme la feuille et réveille le panneau par un événement DOM :
+                les deux composants ne partagent aucun état, et n'ont pas à le faire. */}
+            <button
+              type="button"
+              onClick={() => { setOuvert(false); window.dispatchEvent(new CustomEvent(EVENEMENT_AIDE)); }}
+              className="flex flex-col items-center gap-1.5 rounded-2xl bg-zinc-50 px-2 py-3 text-center text-[11px] font-medium leading-tight text-zinc-700 active:bg-zinc-100"
+            >
+              <LifeBuoy className="h-5 w-5" />{d.aide}
+            </button>
             <button type="button" onClick={signOut} className="flex flex-col items-center gap-1.5 rounded-2xl bg-zinc-50 px-2 py-3 text-center text-[11px] font-medium leading-tight text-zinc-700 active:bg-red-50 active:text-red-600">
               <LogOut className="h-5 w-5" />{t("nav.logout")}
             </button>
           </div>
         </div>
+
+        {/* L'avertissement médical et les liens légaux : retirés du bas de chaque écran
+            sur téléphone (ils prenaient ~120 px), ils restent à un geste, sur chaque page. */}
+        <MedicalDisclaimer lang={lang} />
       </div>
 
       {/* La barre elle-même. */}
