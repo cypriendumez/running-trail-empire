@@ -54,5 +54,21 @@ test("le fond de carte est MapTiler avec la clé du projet, à la bonne taille, 
   assert.match(src, /tile\.openstreetmap\.org\/\{z\}\/\{x\}\/\{y\}\.png/, "sans clé MapTiler, la carte n'aurait aucun fond");
 });
 
+test("la liste des courses est dense et sur deux colonnes en large — sauf quand un détail est ouvert", () => {
+  // Cyprien, 21/09/2026 : « trouve un moyen de voir plus de courses ». Mesuré à 1440 px :
+  // 4 courses visibles avant, 10 après.
+  const hub = codeNu("src/components/races/RacesHub.tsx");
+  assert.match(hub, /\$\{selected \? "grid-cols-1" : "grid-cols-1 xl:grid-cols-2"\}/,
+    "la liste n'est plus sur deux colonnes en large (ou le reste quand le panneau de détail est ouvert)");
+  assert.match(hub, /bento-card cursor-pointer !p-4 !rounded-2xl/, "les cartes ont repris leurs marges de 24 px : quatre courses par écran");
+  // ⚠️ `col-span-2` sur la pagination CRÉAIT une deuxième colonne implicite même en
+  // `grid-cols-1` (vu en local : carte sélectionnée écrasée à 193 px). `col-span-full`
+  // s'adapte au nombre de colonnes déclarées.
+  assert.ok(!/xl:col-span-2/.test(hub), "col-span-2 est revenu : il fabrique une colonne fantôme quand le panneau est ouvert");
+  assert.equal([...hub.matchAll(/col-span-full/g)].length, 2, "la pagination et l'état vide ne couvrent plus toutes les colonnes");
+  // Et sur téléphone, le compteur + le bouton Carte passent sous la recherche au lieu de sortir de l'écran.
+  assert.match(hub, /<div className="flex flex-wrap items-center gap-3 mb-3">/, "l'entête de recherche ne se replie plus sur téléphone : le bouton Carte sort de l'écran");
+});
+
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }

@@ -272,8 +272,11 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
 
       {/* ── Header bar ─────────────────────────────────────────────────── */}
       <div className="bento-card p-4">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="flex-1 flex items-center gap-2 px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl">
+        {/* Sur téléphone, le compteur et le bouton Carte passent sous le champ de recherche
+            (ils sortaient de l'écran à droite, vu le 21/09/2026). Le champ garde toute la
+            largeur ; à partir de sm, une seule ligne comme avant. */}
+        <div className="flex flex-wrap items-center gap-3 mb-3">
+          <div className="flex w-full flex-1 items-center gap-2 px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl sm:w-auto">
             <Search className="w-4 h-4 text-zinc-400 flex-shrink-0" />
             <input
               value={search}
@@ -282,7 +285,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
               className="bg-transparent text-sm text-zinc-700 placeholder:text-zinc-400 outline-none flex-1"
             />
           </div>
-          <span className="flex-shrink-0 text-right">
+          <span className="ml-auto flex-shrink-0 text-right">
             <span className="flex items-center justify-end gap-1.5 text-sm font-semibold text-zinc-600">
               {loadingAll && <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />}
               {/* ⚠️ LE GRAND NOMBRE COMPTE LES COURSES, PAS LES CARTES. Une « course »
@@ -384,10 +387,15 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
       {/* ── Main content ─────────────────────────────────────────────────── */}
       <div className="flex gap-6 flex-1 min-h-0">
 
-        {/* Race list */}
-        <div className="flex-1 flex flex-col gap-3 min-w-0 overflow-auto">
+        {/* Race list
+            ⚠️ PLUS DE COURSES PAR ÉCRAN (Cyprien, 21/09/2026 : « essaie de trouver un moyen de
+            voir plus de courses »). Avant : une colonne de cartes à 24 px de marge, 12 px
+            d'écart — quatre courses visibles, et la moitié droite de chaque carte vide. Ici :
+            cartes resserrées (16 px), écart 8 px, et DEUX colonnes dès 1280 px tant qu'aucun
+            détail n'est ouvert (le panneau de droite reprend alors la place). */}
+        <div className={`flex-1 grid content-start gap-2 min-w-0 overflow-auto ${selected ? "grid-cols-1" : "grid-cols-1 xl:grid-cols-2"}`}>
           {paginated.length === 0 ? (
-            <div className="bento-card text-center py-16">
+            <div className="bento-card text-center py-16 col-span-full">
               <Globe className="w-10 h-10 text-zinc-300 mx-auto mb-3" />
               <p className="text-zinc-500 font-medium">{d["empty.title"]}</p>
               <p className="text-zinc-400 text-sm mt-1">{d["empty.sub"]}</p>
@@ -402,7 +410,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: Math.min(i * 0.015, 0.3) }}
                 onClick={() => openRace(race)}
-                className={`bento-card cursor-pointer transition-all hover:shadow-md ${selected?.id === race.id ? "ring-2 ring-emerald-500 bg-emerald-50/30" : ""}`}
+                className={`bento-card cursor-pointer !p-4 !rounded-2xl transition-all hover:shadow-md ${selected?.id === race.id ? "ring-2 ring-emerald-500 bg-emerald-50/30" : ""}`}
               >
                 <div className="flex items-start gap-3.5">
                   <div
@@ -521,7 +529,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center justify-between pt-2 col-span-full">
               <button
                 onClick={() => setPage(p => Math.max(0, p - 1))}
                 disabled={page === 0}
