@@ -59,6 +59,10 @@ export function ObjectiveCard({ objective, currentVma }: { objective: Objective 
   /** Avertissements liés à l'âge, renvoyés par l'API au moment de l'enregistrement.
    *  Affichés SOUS l'objectif, et refermables : c'est une information, pas une punition. */
   const [avertissements, setAvertissements] = useState<Avertissement[]>([]);
+  /** Verdict de réalisme au moment de l'enregistrement : `true` = rien à signaler (on le
+   *  DIT, en vert), `false` = les avertissements sont dans la liste ci-dessus, `null` =
+   *  le serveur n'a pas pu se prononcer (on ne dit rien plutôt que « tout va bien »). */
+  const [verdictOk, setVerdictOk] = useState<boolean | null>(null);
 
   // Autocomplétion des courses (catalogue) → sélection auto-remplit distance + date.
   const [sug, setSug] = useState<RaceSug[]>([]);
@@ -110,9 +114,15 @@ export function ObjectiveCard({ objective, currentVma }: { objective: Objective 
         // pendant qu'il peut encore choisir une autre course.
         // Plusieurs autorités peuvent parler en même temps : à 16 ans, un marathon
         // se heurte à la règle fédérale ET à l'avis médical. On les affiche toutes.
-        if (Array.isArray(j.avertissementsAge) && j.avertissementsAge.length) {
-          setAvertissements(j.avertissementsAge as Avertissement[]);
-        }
+        // ── RÉALISME, AU MÊME INSTANT (Cyprien, 21/09/2026) ───────────────────
+        // Chrono hors de portée, sortie longue impossible d'ici la course : dits ICI,
+        // pas trois jours plus tard dans le calendrier. Fusionnés avec l'âge dans la
+        // même liste refermable ; et quand il n'y a rien à signaler, on le dit aussi.
+        const age = Array.isArray(j.avertissementsAge) ? (j.avertissementsAge as Avertissement[]) : [];
+        const realisme = (Array.isArray(j.avertissementsRealisme) ? (j.avertissementsRealisme as string[]) : [])
+          .map((texte): Avertissement => ({ niveau: "progression", categorie: "", texte, sources: [] }));
+        setAvertissements([...age, ...realisme]);
+        setVerdictOk(typeof j.verdictOk === "boolean" ? j.verdictOk : null);
         setEditing(false);
         router.refresh();
       }
@@ -149,6 +159,15 @@ export function ObjectiveCard({ objective, currentVma }: { objective: Objective 
         {/* Avertissement d'âge. Ambre pour un conseil de progression, rouge quand la
             distance n'est pas autorisée par le règlement fédéral — la nuance compte :
             l'un se discute, l'autre empêche de s'inscrire. */}
+        {verdictOk === true && avertissements.length === 0 && (
+          <div className="mt-2.5 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs leading-relaxed text-emerald-900">
+            <Check className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-emerald-600" />
+            <p className="flex-1">{t("obj.verdictOk")}</p>
+            <button onClick={() => setVerdictOk(null)} className="text-[11px] font-semibold underline underline-offset-2 opacity-70 hover:opacity-100">
+              {t("obj.warnClose")}
+            </button>
+          </div>
+        )}
         {avertissements.map((a, i) => (
           <div key={i} className={`mt-2.5 rounded-xl border px-3 py-2 text-xs leading-relaxed ${
             a.niveau === "reglement" ? "border-red-200 bg-red-50 text-red-900"

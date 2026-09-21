@@ -98,5 +98,27 @@ export async function POST(req: Request) {
     } catch { return []; }
   })();
 
-  return NextResponse.json({ ok: true, objective: data, avertissementsAge: alerteAge ?? [] });
+  // ── VERDICT DE RÉALISME, AU MÊME INSTANT ────────────────────────────────────
+  // Cyprien, 21/09/2026 : « quand la personne met pour la première fois son objectif,
+  // annonce-lui si ça va ou pas ». Le chrono hors de portée et la sortie longue
+  // impossible d'ici la course n'étaient dits que dans le calendrier, plus tard. On
+  // rebâtit le contexte coach (il relit l'objectif qu'on vient d'écrire) et on renvoie
+  // ses avertissements SANS ceux de l'âge, déjà renvoyés structurés ci-dessus.
+  // Best-effort : si le contexte échoue, l'objectif est enregistré quand même et la
+  // carte ne dit simplement rien du réalisme (verdict null, pas « tout va bien »).
+  const realisme = await (async (): Promise<{ avertissements: string[]; ok: boolean } | null> => {
+    try {
+      const { buildAthleteContext } = await import("@/lib/ai/coachContext");
+      const ctx = await buildAthleteContext(admin, user.id);
+      const textesAge = new Set((alerteAge ?? []).map((a) => a.texte));
+      const autres = ctx.objectiveWarnings.filter((w) => ![...textesAge].some((tA) => w.startsWith(tA)));
+      return { avertissements: autres, ok: ctx.objectiveWarnings.length === 0 };
+    } catch { return null; }
+  })();
+
+  return NextResponse.json({
+    ok: true, objective: data, avertissementsAge: alerteAge ?? [],
+    avertissementsRealisme: realisme?.avertissements ?? [],
+    verdictOk: realisme ? realisme.ok : null,
+  });
 }

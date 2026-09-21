@@ -90,7 +90,7 @@ export default async function CalendrierPage() {
   // Le hero (présentation + détail réactif de la séance sélectionnée) vit désormais dans CalendarView.
   return (
     <>
-      <CalendarView enPanne={lectureEnPanne} sessions={sessions} notes={notes} races={races} coachState={coachState} weekStart={weekStart} units={units} warmupMin={warmupMin} cooldownMin={cooldownMin} />
+      <CalendarView enPanne={lectureEnPanne} sessions={sessions} notes={notes} races={races} coachState={coachState} weekStart={weekStart} units={units} warmupMin={warmupMin} cooldownMin={cooldownMin} realismeMasque={typeof us.realismeMasque === "string" ? us.realismeMasque : null} />
     </>
   );
 }

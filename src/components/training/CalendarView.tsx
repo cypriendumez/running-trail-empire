@@ -10,6 +10,7 @@ import { RenfoGuide } from "@/components/training/RenfoGuide";
 import { fmtDistance, type UnitSystem } from "@/lib/units";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { jourLocal } from "@/lib/streak/compute";
+import { cleRealisme, realismeMasque as estMasque } from "@/lib/coach/realismeCle";
 import { afficherHeure } from "@/lib/races/heure";
 import { extractBody, premierePhrase } from "@/lib/calendar/texte";
 import { libelleType } from "@/lib/ai/planI18n";
@@ -104,7 +105,7 @@ function sessionDetail(type: string, detail: string): SessionDetail | null {
   return { mode: "wrapped", body: extractBody(raw) };
 }
 
-export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], races: racesProp = [], coachState = null, weekStart = "mon", units = "metric", warmupMin = 15, cooldownMin = 10, enPanne = false }: { sessions: Planned[]; notes?: CalNote[]; races?: CalRace[]; coachState?: CoachState | null; weekStart?: "mon" | "sun"; units?: UnitSystem; warmupMin?: number; cooldownMin?: number; /** La lecture des séances a ÉCHOUÉ : le mois est vide par accident, pas parce qu'il n'y a rien. */ enPanne?: boolean }) {
+export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], races: racesProp = [], coachState = null, weekStart = "mon", units = "metric", warmupMin = 15, cooldownMin = 10, enPanne = false, realismeMasque = null }: { sessions: Planned[]; notes?: CalNote[]; races?: CalRace[]; coachState?: CoachState | null; weekStart?: "mon" | "sun"; units?: UnitSystem; warmupMin?: number; cooldownMin?: number; /** La lecture des séances a ÉCHOUÉ : le mois est vide par accident, pas parce qu'il n'y a rien. */ enPanne?: boolean; /** Clé de l'avertissement de réalisme que l'athlète a choisi de ne plus voir (réglages). */ realismeMasque?: string | null }) {
   const { t, lang } = useT();
   // LA SÉANCE EST AFFICHÉE DANS LA LANGUE DE L'ATHLÈTE, résolue ICI et pas au serveur :
   // le sélecteur de langue est instantané et ne recharge pas la page. `type` n'est jamais
@@ -408,7 +409,7 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
 
       <div className="mx-auto max-w-6xl px-5 py-6">
       {/* Pourquoi le plan ressemble à ça — voir le commentaire du type CoachState. */}
-      <CoachWhy state={coachState} lang={lang} t={t} sessions={sessionsProp} />
+      <CoachWhy state={coachState} lang={lang} t={t} sessions={sessionsProp} realismeMasque={realismeMasque} />
 
       {/* Barre de contrôle : navigation période + bascule de vue */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -645,8 +646,12 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
  * On n'affiche rien s'il n'y a rien de notable à dire : un bandeau permanent redevient
  * un décor qu'on ne lit plus.
  */
-function CoachWhy({ state, lang, t, sessions }: { state: CoachState | null; lang: string; t: (k: string, p?: Record<string, string | number>) => string; sessions: Planned[] }) {
+function CoachWhy({ state, lang, t, sessions, realismeMasque = null }: { state: CoachState | null; lang: string; t: (k: string, p?: Record<string, string | number>) => string; sessions: Planned[]; realismeMasque?: string | null }) {
   const fuseau = useFuseau();
+  // La clé mémorisée côté serveur, puis celle qu'on vient d'enregistrer d'un clic : le
+  // bloc disparaît tout de suite, sans attendre un rechargement. (Déclaré AVANT le
+  // premier `return` : un hook ne se place jamais après une sortie anticipée.)
+  const [masqueLocal, setMasqueLocal] = useState<string | null>(null);
   if (!state) return null;
   const noQuality = (state.qBudget ?? 1) === 0;
   // Qualité maintenue mais RACCOURCIE : cas intermédiaire qui n'existait pas. L'athlète
@@ -655,6 +660,17 @@ function CoachWhy({ state, lang, t, sessions }: { state: CoachState | null; lang
   const reasons = (state.reasons ?? []).filter(Boolean);
   const hasObjective = Boolean(state.objective?.race);
   const warnings = (state.warnings ?? []).filter(Boolean);
+  const cle = cleRealisme(state.objective, warnings);
+  const realismeCache = estMasque(masqueLocal ?? realismeMasque, cle);
+  const masquerRealisme = async () => {
+    setMasqueLocal(cle);
+    // ⚠️ L'ERREUR EST LUE : un réglage « enregistré » qui ne l'est pas ferait revenir le
+    // bloc à la prochaine visite, et l'athlète croirait au bogue.
+    try {
+      const r = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ realismeMasque: cle }) });
+      if (!r.ok) { setMasqueLocal(null); toast.error(t("cal.why.realismHideFail")); }
+    } catch { setMasqueLocal(null); toast.error(t("cal.why.realismHideFail")); }
+  };
   // Les 7 jours à venir, tels qu'on les enverra au coach. On borne à 7 : au-delà, c'est
   // du prévisionnel que le plan réajustera de toute façon.
   // ⚠️ JOUR LOCAL, PAS JOUR UTC. `toISOString()` bascule à minuit UTC : entre minuit et
@@ -789,8 +805,12 @@ function CoachWhy({ state, lang, t, sessions }: { state: CoachState | null; lang
           qu'on l'a lu. On ne le SUPPRIME pas pour autant : c'est de la mise en garde,
           et la masquer serait pire que la répéter. La première phrase — celle qui porte
           l'avertissement — reste toujours visible ; le raisonnement se déplie au clic. */}
-      {warnings.length > 0 && (
-        <details className="group mt-3 rounded-xl border border-red-200 bg-red-50/80 px-3.5 py-3">
+      {/* ⚠️ ET IL PEUT ÊTRE ÉCARTÉ (Cyprien, 21/09/2026) — mais sous une clé qui dépend
+          de l'objectif et du contenu : un nouvel objectif ou un avertissement nouveau
+          le fait revenir. On ne cache jamais une mise en garde qui n'a pas été lue. */}
+      {warnings.length > 0 && !realismeCache && (
+        <div className="mt-3 rounded-xl border border-red-200 bg-red-50/80 px-3.5 py-3">
+        <details className="group">
           <summary className="cursor-pointer list-none">
             <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-red-700">
               <Flag className="h-3.5 w-3.5" /> {t("cal.why.realism")}
@@ -806,6 +826,15 @@ function CoachWhy({ state, lang, t, sessions }: { state: CoachState | null; lang
             {warnings.map((w, i) => <li key={i}>{w}</li>)}
           </ul>
         </details>
+        {/* HORS du <details> : le bouton se voit replié comme déplié. */}
+        <button
+          type="button"
+          onClick={masquerRealisme}
+          className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-100"
+        >
+          {t("cal.why.realismHide")}
+        </button>
+        </div>
       )}
 
       <AvisCoach week={semaine} qBudget={state.qBudget ?? 0} raisons={reasons} />

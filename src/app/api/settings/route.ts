@@ -15,6 +15,9 @@ export async function POST(req: Request) {
   if (typeof body.avatarColor === "string") patch.avatarColor = body.avatarColor.slice(0, 20);
   if (body.unitSystem === "metric" || body.unitSystem === "imperial") patch.unitSystem = body.unitSystem;
   if (body.weekStart === "mon" || body.weekStart === "sun") patch.weekStart = body.weekStart;
+  // L'avertissement de réalisme que l'athlète a choisi de ne plus voir : la CLÉ de cet
+  // avertissement-là (objectif + contenu), pas un booléen — cf. lib/coach/realismeCle.
+  if (typeof body.realismeMasque === "string") patch.realismeMasque = body.realismeMasque.slice(0, 160);
   // Préférences booléennes (notifications + confidentialité). Stockées centralement,
   // lues par les générateurs de notifications / les pages Ligues & Communauté.
   for (const k of ["weeklyDigest", "recoveryAlerts", "coachTips", "sessionReminders", "leaguePublic", "communityVisible"]) {
