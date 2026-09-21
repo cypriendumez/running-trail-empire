@@ -82,20 +82,22 @@ export default async function CoursPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      {/* Hero */}
+      {/* Hero — resserré le 21/09/2026 (Cyprien : « trop grand, il prend trop de place ») :
+          padding 40→20 px, titre 4xl→3xl, sous-titre plus petit et limité à 2 lignes sur
+          téléphone. */}
       <div className="relative overflow-hidden" style={{ background: "linear-gradient(135deg,#064e3b 0%,#047857 45%,#0d9488 100%)" }}>
         <div className="pointer-events-none absolute -top-24 -right-16 h-72 w-72 rounded-full bg-emerald-300/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-28 -left-10 h-80 w-80 rounded-full bg-teal-300/10 blur-3xl" />
-        <div className="relative z-10 mx-auto max-w-6xl px-5 py-10 sm:py-12 text-white">
+        <div className="relative z-10 mx-auto max-w-6xl px-5 py-5 sm:py-7 text-white">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/20 backdrop-blur-md">
             <GraduationCap className="h-3.5 w-3.5 text-amber-300" />
             <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-50">{ui.heroEyebrow}</span>
           </span>
-          <h1 className="mt-4 text-3xl sm:text-4xl font-bold tracking-tight drop-shadow-sm">{ui.heroTitle}</h1>
-          <p className="mt-2.5 max-w-2xl text-[15px] sm:text-lg leading-relaxed text-white/85">{ui.heroSub}</p>
-          <div className="mt-4 flex flex-wrap gap-2">
+          <h1 className="mt-2.5 text-2xl sm:text-3xl font-bold tracking-tight drop-shadow-sm">{ui.heroTitle}</h1>
+          <p className="mt-1.5 max-w-2xl text-[13.5px] sm:text-[15px] leading-relaxed text-white/85 line-clamp-2 sm:line-clamp-none">{ui.heroSub}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
             {[fill(ui.chipChapters, { n: chapters.length }), fill(ui.chipNotions, { n: totalNotions }), ui.chipCoach].map((c) => (
-              <span key={c} className="inline-flex items-center rounded-full bg-white/10 px-3 py-1.5 text-[13px] font-semibold text-white/90 ring-1 ring-white/15 backdrop-blur-md">
+              <span key={c} className="inline-flex items-center rounded-full bg-white/10 px-2.5 py-1 text-[12px] font-semibold text-white/90 ring-1 ring-white/15 backdrop-blur-md">
                 {c}
               </span>
             ))}
