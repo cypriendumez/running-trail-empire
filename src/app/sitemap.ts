@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { jourFrance } from "@/lib/races/jourFrance";
 import { DATE_INCONNUE, slugCourse, type CoursePublique } from "@/lib/races/publique";
+import { ARTICLES } from "@/app/blog/articles";
 import { CATALOGUE } from "@/lib/shop/catalogue";
 import { regionCanonique } from "@/lib/races/libelles";
 
@@ -39,6 +40,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const entries: { path: string; freq: MetadataRoute.Sitemap[number]["changeFrequency"]; priority: number }[] = [
     { path: "", freq: "weekly", priority: 1.0 },
     { path: "/blog", freq: "weekly", priority: 0.8 },
+    // ⚠️ LES ARTICLES EUX-MÊMES, PAS SEULEMENT L'INDEX. Onze articles sourcés étaient en
+    // ligne depuis le 21/08/2026 sans qu'aucune de leurs URL ne soit déclarée : les moteurs
+    // ne les découvraient qu'en suivant les cartes. La liste vient de `ARTICLES`, donc un
+    // article ajouté (à la main ou par la routine bimensuelle) est déclaré sans y penser.
+    ...ARTICLES.map((a) => ({ path: `/blog/${a.slug}`, freq: "monthly" as const, priority: 0.6 })),
     { path: "/avis", freq: "weekly", priority: 0.7 },
     { path: "/contact", freq: "yearly", priority: 0.4 },
     { path: "/mentions-legales", freq: "yearly", priority: 0.3 },
