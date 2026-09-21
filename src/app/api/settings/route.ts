@@ -20,6 +20,11 @@ export async function POST(req: Request) {
   if (typeof body.realismeMasque === "string") patch.realismeMasque = body.realismeMasque.slice(0, 160);
   // Même mécanique pour le bandeau PPS de la page Courses (clé = verdict + date, cf. lib/pps/status).
   if (typeof body.ppsBandeauMasque === "string") patch.ppsBandeauMasque = body.ppsBandeauMasque.slice(0, 80);
+  // Les notifications écartées d'une croix : des CLÉS (id de ligne ou `plan:<jour>`),
+  // bornées en nombre et en longueur — cf. lib/notifications/panneau.
+  if (Array.isArray(body.notifsMasquees)) {
+    patch.notifsMasquees = body.notifsMasquees.filter((x): x is string => typeof x === "string").map((x) => x.slice(0, 80)).slice(-50);
+  }
   // Préférences booléennes (notifications + confidentialité). Stockées centralement,
   // lues par les générateurs de notifications / les pages Ligues & Communauté.
   for (const k of ["weeklyDigest", "recoveryAlerts", "coachTips", "sessionReminders", "leaguePublic", "communityVisible"]) {

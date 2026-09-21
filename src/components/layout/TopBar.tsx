@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, Search, User, Settings, LogOut, CheckCheck, Flag, Route as RouteIcon, Loader2 } from "lucide-react";
+import { Bell, Search, User, Settings, LogOut, CheckCheck, Flag, Route as RouteIcon, Loader2, X, MessageSquare, CalendarCheck, Activity } from "lucide-react";
 import { colorOf } from "@/lib/avatarColors";
 // « Date à venir » existe déjà, traduit, dans le dictionnaire de l'onglet Courses : le
 // redéclarer ici créerait deux libellés pour une même notion, qui divergeraient un jour.
@@ -13,8 +13,9 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 import { createClient } from "@/lib/supabase/client";
 import { formatDateCivile } from "@/lib/time/fuseau";
 import { fmtKm } from "@/lib/i18n/nombres";
+import { construirePanneau, sansMasquees, ajouterMasquee, TYPES_NOTIFIES, type LigneNotification } from "@/lib/notifications/panneau";
 
-type Notif = { id: string; type: string; title: string; body: string | null; read: boolean; created_at: string };
+type Notif = LigneNotification;
 type RaceHit = { name: string; city: string; distanceKm: number | null; date: string };
 type ParcoursHit = { id: number; nom: string; distance_km: number; localisation: { departement: string } };
 
@@ -26,7 +27,7 @@ const LEVELS: Record<string, { elite: string; inter: string }> = {
   pt: { elite: "Nível Elite", inter: "Nível intermédio" },
 };
 
-export function TopBar({ profile, avatarColor }: { profile: Record<string, unknown> | null; avatarColor?: string }) {
+export function TopBar({ profile, avatarColor, notifsMasquees: masqueesInitiales = [] }: { profile: Record<string, unknown> | null; avatarColor?: string; /** Clés des notifications écartées d'une croix (réglages, lues côté serveur). */ notifsMasquees?: string[] }) {
   const { t, lang } = useT();
   const lv = LEVELS[lang] ?? LEVELS.fr;
   const levelLabel = String(profile?.mode ?? "") === "elite" ? lv.elite : lv.inter;
@@ -41,6 +42,7 @@ export function TopBar({ profile, avatarColor }: { profile: Record<string, unkno
   const [openMenu, setOpenMenu] = useState(false);
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [loadingNotif, setLoadingNotif] = useState(true);
+  const [masquees, setMasquees] = useState<string[]>(masqueesInitiales);
   const userIdRef = useRef<string | null>(null);
 
   // ── Recherche globale : courses + parcours, résultats live ──────────────────
@@ -103,14 +105,38 @@ export function TopBar({ profile, avatarColor }: { profile: Record<string, unkno
         .from("notifications")
         .select("id, type, title, body, read, created_at")
         .eq("user_id", user.id)
+        // ⚠️ LISTE BLANCHE : la table est un fourre-tout (séances, ressenti, état du
+        // coach, quotas…). Seules les NOUVELLES pour la personne passent, cf.
+        // lib/notifications/panneau. 60 lignes, parce que les séances se regroupent.
+        .in("type", [...TYPES_NOTIFIES])
         .order("created_at", { ascending: false })
-        .limit(20);
+        .limit(60);
       setNotifs((data ?? []) as Notif[]);
       setLoadingNotif(false);
     })();
   }, []);
 
-  const unread = notifs.filter((n) => !n.read).length;
+  const entrees = sansMasquees(
+    construirePanneau(notifs, {
+      planMaj: t("topbar.planMaj"),
+      seances: (n) => (n === 1 ? t("topbar.seance1") : t("topbar.seanceN")).replace("{n}", String(n)),
+    }),
+    masquees,
+  );
+  const unread = entrees.filter((e) => !e.lue).length;
+
+  /** La croix d'une entrée : mémorisée dans les réglages (elle ne revient pas au
+   *  rechargement), l'erreur est lue — un choix « enregistré » qui ne l'est pas ferait
+   *  réapparaître la notification, et l'athlète croirait au bogue. */
+  async function ecarter(cle: string) {
+    const avant = masquees;
+    const apres = ajouterMasquee(masquees, cle);
+    setMasquees(apres);
+    try {
+      const r = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notifsMasquees: apres }) });
+      if (!r.ok) setMasquees(avant);
+    } catch { setMasquees(avant); }
+  }
 
   async function markAllRead() {
     if (!userIdRef.current || unread === 0) return;
@@ -133,9 +159,7 @@ export function TopBar({ profile, avatarColor }: { profile: Record<string, unkno
     router.refresh();
   }
 
-  const iconFor = (type: string) =>
-    /coach|session|s[ée]ance/i.test(type) ? "🏃" : /race|objectif/i.test(type) ? "🎯"
-    : /feedback|ressenti/i.test(type) ? "💬" : /badge|league|ligue|d[ée]fi/i.test(type) ? "🏆" : "🔔";
+  const IconeDe = { message: MessageSquare, plan: CalendarCheck, analyse: Activity } as const;
 
   // L'horodatage des notifications était calculé ICI, en français en dur — une TROISIÈME
   // copie de `timeAgo`, alors que `lib/utils/time` en tient déjà une version traduite.
@@ -226,31 +250,47 @@ export function TopBar({ profile, avatarColor }: { profile: Record<string, unkno
           {openNotif && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setOpenNotif(false)} />
-              <div className="absolute right-0 mt-2 w-80 max-h-[26rem] overflow-y-auto rounded-2xl border border-zinc-200 bg-white shadow-xl z-50">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-100 sticky top-0 bg-white">
+              {/* ⚠️ SUR TÉLÉPHONE, LE PANNEAU PREND TOUTE LA LARGEUR sous la barre (une
+                  feuille), au lieu d'un menu de 320 px accroché à la cloche qui sortait
+                  de l'écran ; à partir de sm, le menu d'avant. Cyprien, 21/09/2026. */}
+              <div className="fixed inset-x-3 top-[4.5rem] z-50 max-h-[70vh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white shadow-xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80 sm:max-h-[26rem]">
+                <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-zinc-100 sticky top-0 bg-white">
                   <span className="font-semibold text-sm text-zinc-900">{t("topbar.notifs")}</span>
-                  {unread > 0 && (
-                    <button onClick={markAllRead} className="text-xs text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
-                      <CheckCheck className="w-3.5 h-3.5" /> {t("topbar.markAll")}
+                  <span className="flex items-center gap-2">
+                    {unread > 0 && (
+                      <button onClick={markAllRead} className="text-xs text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
+                        <CheckCheck className="w-3.5 h-3.5" /> {t("topbar.markAll")}
+                      </button>
+                    )}
+                    {/* La croix qui manquait : fermer sans avoir à viser le voile. */}
+                    <button onClick={() => setOpenNotif(false)} aria-label={t("topbar.close")} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700">
+                      <X className="w-4 h-4" />
                     </button>
-                  )}
+                  </span>
                 </div>
                 {loadingNotif ? (
                   <div className="p-6 text-center text-sm text-zinc-400">{t("topbar.loading")}</div>
-                ) : notifs.length === 0 ? (
+                ) : entrees.length === 0 ? (
                   <div className="p-8 text-center text-sm text-zinc-400"><Bell className="w-8 h-8 mx-auto mb-2 text-zinc-200" />{t("topbar.noNotif")}</div>
                 ) : (
                   <ul className="divide-y divide-zinc-50">
-                    {notifs.map((n) => (
-                      <li key={n.id} className={`flex gap-3 px-4 py-3 ${n.read ? "" : "bg-emerald-50/40"}`}>
-                        <span className="text-lg shrink-0">{iconFor(n.type)}</span>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium text-zinc-900 truncate">{n.title}</div>
-                          {n.body && <div className="text-xs text-zinc-500 line-clamp-2">{n.body}</div>}
-                          <div className="text-[11px] text-zinc-500 mt-0.5">{timeAgo(n.created_at, lang)}</div>
-                        </div>
-                      </li>
-                    ))}
+                    {entrees.map((e) => {
+                      const Icone = IconeDe[e.type];
+                      return (
+                        <li key={e.cle} className={`flex gap-3 px-4 py-3 ${e.lue ? "" : "bg-emerald-50/40"}`}>
+                          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-600"><Icone className="h-3.5 w-3.5" /></span>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-medium text-zinc-900 truncate">{e.titre}</div>
+                            {e.corps && <div className="text-xs text-zinc-500 line-clamp-2">{e.corps}</div>}
+                            <div className="text-[11px] text-zinc-500 mt-0.5">{timeAgo(e.at, lang)}</div>
+                          </div>
+                          {/* Une croix par entrée : elle disparaît, et ne revient pas. */}
+                          <button onClick={() => ecarter(e.cle)} aria-label={t("topbar.dismiss")} className="-mr-1 h-6 w-6 shrink-0 self-start rounded-md text-zinc-300 hover:bg-zinc-100 hover:text-zinc-600">
+                            <X className="mx-auto h-3.5 w-3.5" />
+                          </button>
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </div>

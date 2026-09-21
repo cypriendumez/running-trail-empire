@@ -36,6 +36,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
     supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "user_settings").maybeSingle(),
   ]);
   const avatarColor = String(((settingsRow?.data ?? {}) as Record<string, unknown>).avatarColor ?? "emerald");
+  const brutMasquees = ((settingsRow?.data ?? {}) as Record<string, unknown>).notifsMasquees;
+  const notifsMasquees = Array.isArray(brutMasquees) ? brutMasquees.filter((x): x is string => typeof x === "string") : [];
 
   if (profile && !profile.onboarding_completed) redirect("/onboarding");
 
@@ -47,7 +49,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <MessageNotifier />
         <Sidebar profile={stripProfileSecrets(profile)} unreadMessages={unreadMessages ?? 0} estEditeur={estAdmin(user.email)} />
         <div className="flex-1 flex flex-col min-w-0">
-          <TopBar profile={stripProfileSecrets(profile)} avatarColor={avatarColor} />
+          <TopBar profile={stripProfileSecrets(profile)} avatarColor={avatarColor} notifsMasquees={notifsMasquees} />
           <main className="flex-1 overflow-auto p-6">
             {children}
           </main>
