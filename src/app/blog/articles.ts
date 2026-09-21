@@ -788,6 +788,114 @@ export const ARTICLES: Article[] = [
     ],
   },
 
+  // ══════════════════════════════════════════════════════════════════════════
+  {
+    slug: "courir-par-forte-chaleur-acclimatation-hydratation-allure",
+    cle: "p12",
+    maj: "21 septembre 2026",
+    chapo:
+      "La chaleur est le seul facteur d'environnement qui dégrade la performance et met la vie en jeu le même jour. Voici ce que la littérature mesure vraiment sur l'acclimatation, la boisson et l'allure — et les endroits où elle ne tranche pas.",
+    avertissement:
+      "Le coup de chaleur d'effort est une urgence médicale, pas un coup de fatigue. Cet article n'est ni un outil de diagnostic ni un substitut à un avis médical. Si tu prends un traitement, si tu relèves d'une maladie récente ou si tu as déjà fait un malaise à la chaleur, parles-en à un médecin avant de t'entraîner par forte température.",
+    blocs: [
+      {
+        h: "Ce que la chaleur coûte, chiffres en main",
+        p: [
+          "Le marathon féminin des championnats du monde de Doha 2019 est le cas d'école : des athlètes de très haut niveau, des conditions extrêmes, et une analyse publiée. L'étude de Beal et ses collègues (2022) décrit une course à 32 °C et 74 % d'humidité relative, et un taux d'abandon de 41 %.",
+          "L'allure moyenne y tombe à 14,82 km/h, contre 15,74 km/h au marathon de Londres 2017 pris comme témoin tempéré (19 °C, 59 % d'humidité). Même niveau, même distance, près d'un kilomètre-heure en moins : par forte chaleur, l'allure que tu tiens n'est plus celle que ton entraînement annonce, et ce n'est pas une question de volonté.",
+        ],
+      },
+      {
+        h: "S'acclimater : ce qui déplace vraiment la ligne",
+        p: [
+          "S'acclimater, c'est s'entraîner délibérément dans la chaleur pour que le corps s'y adapte. C'est la seule stratégie dont l'effet sur la performance soit mesuré de façon répétée, et la méta-analyse de Benjamin et ses collègues (2019), qui rassemble 35 études, en donne les magnitudes.",
+          "Le gain est le plus net sur le temps limite — tenir un effort jusqu'à épuisement — avec une taille d'effet de 0,86 (IC 95 % : 0,71 à 1,01). Sur un contre-la-montre, donc sur ce qui ressemble à une course, il descend à 0,49 (0,26 à 0,71) ; sur la VO2max, à 0,30 (0,07 à 0,53).",
+          "L'acclimatation améliore donc franchement ta tolérance, et plus modestement ton chrono. Confondre les deux mène à surestimer ce qu'on gagnera le jour J.",
+        ],
+      },
+      {
+        h: "La dose, et ce qu'elle change dans le corps",
+        p: [
+          "La revue systématique de Kelly et ses collègues (2023), qui a le mérite rare de porter sur des femmes, chiffre la dose : les adaptations s'observent le plus régulièrement pour 451 à 900 minutes cumulées et/ou 8 à 14 jours, en séances consécutives plutôt qu'espacées.",
+          "Ce qui bouge : la température centrale à l'effort baisse (taille d'effet -0,81), la fréquence cardiaque aussi (-0,60), la température de peau (-0,64), et la sudation augmente (+0,53). Les performances testées dans la chaleur s'améliorent avec une taille d'effet de 1,00 (0,56 à 1,45).",
+          "En clair : deux semaines de sorties dans la chaleur, tous les jours ou presque, avant une échéance chaude. Pas trois sorties étalées sur un mois — la régularité fait partie de la dose.",
+        ],
+      },
+      {
+        h: "Boire : ni au hasard, ni plus que nécessaire",
+        p: [
+          "La prise de position de l'American College of Sports Medicine rédigée par Sawka et ses collègues (2007) pose l'objectif : éviter une déshydratation excessive, qu'elle définit au-delà de 2 % du poids corporel perdu, et éviter les variations excessives d'électrolytes.",
+          "Elle insiste sur un point qu'on oublie : la sudation et sa teneur en sel varient énormément d'une personne à l'autre, donc un plan de boisson se personnalise. Sa méthode est artisanale et fiable — se peser avant et après une sortie pour estimer son propre débit de sudation.",
+          "Arriver au départ correctement hydraté se joue la veille et dans les heures qui précèdent, pas sur le dernier bidon. Et boire au-delà de la soif n'est pas une sécurité de plus : le même texte met en garde contre les variations excessives d'électrolytes.",
+        ],
+      },
+      {
+        h: "Ce que les études ne montrent pas",
+        p: [
+          "Le seuil de 2 % est plus discuté qu'il n'y paraît. La méta-analyse de Deshayes et ses collègues (2022), qui rassemble 16 études et 147 personnes, mesure l'effet de la déshydratation sur la perception de l'effort : environ 0,21 point d'échelle de Borg par pour-cent de poids perdu (IC 95 % : 0,12 à 0,31), et un écart maximal de 0,81 point (0,36 à 1,27).",
+          "Ses auteurs en concluent que l'effet n'est probablement pas significatif en pratique avant 3 % de perte de masse — et que ni l'humidité, ni la température ambiante, ni la capacité aérobie ne modifient cette relation. La littérature ne parle donc pas d'une seule voix sur le point où la déshydratation commence à coûter.",
+          "Deux autres angles morts. La réponse à l'acclimatation est très variable : la méta-régression de Benjamin montre que la méthode d'induction, le niveau de forme initial et l'indice de chaleur en modifient significativement l'ampleur. Et l'essentiel de cette littérature a été bâti sur des hommes : c'est la raison d'être du travail de Kelly, qui relève que le volume plasmatique n'y évolue pas significativement chez les femmes.",
+        ],
+      },
+      {
+        h: "L'allure : partir moins vite n'est pas une concession",
+        p: [
+          "À Doha, l'étude de Beal relève que les athlètes classées de la 1re à la 10e place sont parties à 93,7 % de l'allure de leur record personnel, quand les groupes plus lents partaient à 96,6 %. Les meilleures ont été les plus prudentes, et elles ont fini devant.",
+          "La même étude apporte une nuance qu'il faut citer honnêtement : jusqu'au 10e kilomètre, celles qui ont terminé et celles qui ont abandonné couraient à la même allure. L'allure de départ n'explique pas à elle seule les abandons.",
+          "Pour toi : décide l'allure avant de partir, en l'abaissant, et juge la sortie à l'effort ressenti plutôt qu'au chrono.",
+        ],
+      },
+      {
+        h: "Le risque qu'aucune performance ne justifie",
+        p: [
+          "La prise de position de l'ACSM rédigée par Armstrong et ses collègues (2007) définit le coup de chaleur d'effort par une température rectale supérieure à 40 °C accompagnée de signes de défaillance d'organe, le plus souvent une atteinte du système nerveux central : confusion, propos incohérents, comportement inhabituel.",
+          "Deux choses de ce texte méritent d'être connues de tout coureur. Il peut frapper des athlètes apparemment sains, y compris par temps relativement frais. Et c'est la reconnaissance précoce associée à un refroidissement rapide qui réduit la gravité et la mortalité.",
+          "Il liste aussi les profils plus exposés : non acclimaté, déshydraté, sous certains traitements, ou sortant d'une maladie récente. Cocher l'une de ces cases un jour de canicule, c'est n'avoir rien à prouver ce jour-là.",
+        ],
+      },
+      {
+        h: "Ce que Pacevo fait de la chaleur",
+        p: [
+          "L'application lit la météo prévue et convertit la température, aggravée au-delà de 70 % d'humidité, en une pénalité d'allure en secondes par kilomètre appliquée à l'allure cible de la séance.",
+          "Elle compte les jours d'entraînement réellement passés dans la chaleur — pas les jours de canicule au calendrier — et réduit cette pénalité à partir de quatre, huit puis douze jours : appliquer le même handicap au premier et au quinzième jour ferait courir trop lentement quelqu'un qui s'est déjà adapté.",
+          "Enfin, plutôt que de seulement ralentir une séance de qualité, le plan peut la déplacer jusqu'à deux jours si un autre jour éligible coûte nettement moins cher. Un fractionné dont l'allure cible est détruite par la chaleur n'est plus le même entraînement.",
+        ],
+      },
+    ],
+    sources: [
+      {
+        label:
+          "Beal H et al. Marathon Performance and Pacing in the Doha 2019 Women's IAAF World Championships: Extreme Heat, Suboptimal Pacing, and High Failure Rates. Int J Sports Physiol Perform, 2022",
+        url: "https://pubmed.ncbi.nlm.nih.gov/35580843/",
+      },
+      {
+        label:
+          "Benjamin CL et al. Performance Changes Following Heat Acclimation and the Factors That Influence These Changes: Meta-Analysis and Meta-Regression. Front Physiol, 2019",
+        url: "https://pubmed.ncbi.nlm.nih.gov/31827444/",
+      },
+      {
+        label:
+          "Kelly MK et al. Heat Adaptation for Females: A Systematic Review and Meta-Analysis of Physiological Adaptations and Exercise Performance in the Heat. Sports Med, 2023",
+        url: "https://pubmed.ncbi.nlm.nih.gov/37222863/",
+      },
+      {
+        label:
+          "Sawka MN et al. American College of Sports Medicine position stand. Exercise and fluid replacement. Med Sci Sports Exerc, 2007",
+        url: "https://pubmed.ncbi.nlm.nih.gov/17277604/",
+      },
+      {
+        label:
+          "Deshayes TA et al. Impact of dehydration on perceived exertion during endurance exercise: A systematic review with meta-analysis. J Exerc Sci Fit, 2022",
+        url: "https://pubmed.ncbi.nlm.nih.gov/35601980/",
+      },
+      {
+        label:
+          "Armstrong LE et al. American College of Sports Medicine position stand. Exertional heat illness during training and competition. Med Sci Sports Exerc, 2007",
+        url: "https://pubmed.ncbi.nlm.nih.gov/17473783/",
+      },
+    ],
+  },
+
 ];
 
 /** Clé d'article → slug, pour que l'index sache quelles cartes sont cliquables. */

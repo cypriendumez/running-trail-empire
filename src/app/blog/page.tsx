@@ -80,6 +80,12 @@ const POSTS = [
   { id: 9, key: "p9", cat: "HEALTH", img: "https://images.unsplash.com/photo-1543352632-5a4b24e4d2a6?w=600&h=450&fit=crop&q=80", featured: false },
   { id: 10, key: "p10", cat: "TRAINING", img: "https://images.unsplash.com/photo-1603077492579-39ff927823db?w=600&h=450&fit=crop&q=80", featured: false },
   { id: 11, key: "p11", cat: "HEALTH", img: "https://images.unsplash.com/photo-1774460261319-cdd3b2363143?w=600&h=450&fit=crop&q=80", featured: false },
+  // Ajouté le 21/09/2026 par la routine bimensuelle. Photo prise dans la RÉSERVE
+  // (`src/app/blog/reservePhotos.ts`, première entrée libre, thèmes « chaleur/route ») :
+  // le CDN d'images d'Unsplash répondait, mais son API de recherche non — impossible donc
+  // de découvrir puis d'auditer un identifiant inédit. Celui-ci a malgré tout été
+  // retéléchargé au format servi et regardé avant d'être écrit ici.
+  { id: 12, key: "p12", cat: "HEALTH", img: "https://images.unsplash.com/photo-1690644932424-63fdff67172d?w=600&h=450&fit=crop&q=80", featured: false },
 ];
 
 /**

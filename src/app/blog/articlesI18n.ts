@@ -571,6 +571,77 @@ export const ARTICLES_I18N: Partial<Record<Lang, Record<string, TraductionArticl
         },
       ],
     },
+    "courir-par-forte-chaleur-acclimatation-hydratation-allure": {
+      chapo:
+        "Heat is the only environmental factor that degrades performance and puts life at risk on the same day. Here is what the literature actually measures about acclimation, drinking and pacing — and the places where it does not settle the matter.",
+      avertissement:
+        "Exertional heat stroke is a medical emergency, not a bad patch. This article is neither a diagnostic tool nor a substitute for medical advice. If you are on medication, recovering from a recent illness, or have already collapsed in the heat, talk to a doctor before training in high temperatures.",
+      blocs: [
+        {
+          h: "What heat actually costs, in figures",
+          p: [
+            "The women's marathon at the 2019 Doha World Championships is the textbook case: elite athletes, extreme conditions, and a published analysis. The study by Beal and colleagues (2022) describes a race at 32 °C and 74% relative humidity, with a 41% failure rate.",
+            "Average pace there drops to 14.82 km/h, against 15.74 km/h at the 2017 London Marathon used as a temperate control (19 °C, 59% humidity). Same level, same distance, almost one kilometre per hour less: in serious heat, the pace you hold is no longer the one your training predicts, and it is not a matter of willpower.",
+          ],
+        },
+        {
+          h: "Acclimation: what really moves the line",
+          p: [
+            "Acclimating means deliberately training in the heat so the body adapts to it. It is the only strategy whose effect on performance has been measured repeatedly, and the meta-analysis by Benjamin and colleagues (2019), pooling 35 studies, gives the magnitudes.",
+            "The gain is clearest on time to exhaustion — holding an effort until you can no longer — with an effect size of 0.86 (95% CI: 0.71 to 1.01). On a time trial, that is, on something resembling a race, it falls to 0.49 (0.26 to 0.71); on VO2max, to 0.30 (0.07 to 0.53).",
+            "So acclimation clearly improves your tolerance, and more modestly your finish time. Confusing the two leads to overestimating what you will gain on race day.",
+          ],
+        },
+        {
+          h: "The dose, and what it changes in the body",
+          p: [
+            "The systematic review by Kelly and colleagues (2023), which has the rare merit of covering women, quantifies the dose: adaptations are most consistently observed for 451 to 900 cumulative minutes and/or 8 to 14 days, in consecutive rather than spread-out sessions.",
+            "What moves: exercise core temperature falls (effect size -0.81), heart rate too (-0.60), skin temperature (-0.64), and sweat rate rises (+0.53). Performance tested in the heat improves with an effect size of 1.00 (0.56 to 1.45).",
+            "Plainly: two weeks of runs in the heat, daily or nearly so, before a hot target race. Not three runs spread over a month — regularity is part of the dose.",
+          ],
+        },
+        {
+          h: "Drinking: neither at random nor more than needed",
+          p: [
+            "The American College of Sports Medicine position stand written by Sawka and colleagues (2007) sets the objective: avoid excessive dehydration, which it defines as beyond 2% of body weight lost, and avoid excessive changes in electrolyte balance.",
+            "It insists on a point people forget: sweat rate and its salt content vary enormously between individuals, so a drinking plan has to be personalised. Its method is homemade and reliable — weigh yourself before and after a run to estimate your own sweat rate.",
+            "Arriving at the start properly hydrated is settled the day before and in the preceding hours, not by the last bottle. And drinking beyond thirst is not extra safety: the same text warns against excessive changes in electrolyte balance.",
+          ],
+        },
+        {
+          h: "What the studies do not show",
+          p: [
+            "The 2% threshold is more debated than it looks. The meta-analysis by Deshayes and colleagues (2022), pooling 16 studies and 147 people, measures the effect of dehydration on perceived exertion: around 0.21 points on the Borg scale per percent of body weight lost (95% CI: 0.12 to 0.31), and a maximum difference of 0.81 points (0.36 to 1.27).",
+            "Its authors conclude that the effect is unlikely to be practically meaningful before 3% of body mass lost — and that neither humidity, nor ambient temperature, nor aerobic capacity alters the relationship. So the literature does not speak with one voice on where dehydration starts to cost.",
+            "Two further blind spots. The response to acclimation is highly variable: Benjamin's meta-regression shows that induction method, baseline fitness and heat index significantly modify its size. And most of this literature was built on men: that is the reason Kelly's work exists, and it reports that plasma volume does not change significantly in women there.",
+          ],
+        },
+        {
+          h: "Pacing: starting slower is not a concession",
+          p: [
+            "In Doha, Beal's study reports that athletes finishing in positions 1 to 10 started at 93.7% of their personal-best pace, while slower groups started at 96.6%. The best were the most cautious, and they finished ahead.",
+            "The same study brings a nuance that must be quoted honestly: up to the 10-kilometre mark, those who finished and those who dropped out were running at the same pace. Starting pace alone does not explain the failures.",
+            "For you: decide your pace before you leave, revised downwards, and judge the run by perceived effort rather than by the watch.",
+          ],
+        },
+        {
+          h: "The risk no performance justifies",
+          p: [
+            "The ACSM position stand written by Armstrong and colleagues (2007) defines exertional heat stroke as a rectal temperature above 40 °C accompanied by signs of organ system failure, most frequently central nervous system dysfunction: confusion, incoherent speech, unusual behaviour.",
+            "Two things from that text deserve to be known by every runner. It can strike seemingly healthy athletes, including in relatively cool weather. And it is early recognition combined with rapid cooling that reduces severity and mortality.",
+            "It also lists the profiles more exposed: not acclimatised, dehydrated, on certain medications, or recovering from a recent illness. Ticking one of those boxes on a scorching day means having nothing to prove that day.",
+          ],
+        },
+        {
+          h: "What Pacevo does with heat",
+          p: [
+            "The app reads the forecast and converts temperature, made worse beyond 70% humidity, into a pace penalty in seconds per kilometre applied to the session's target pace.",
+            "It counts the training days actually spent in the heat — not the heatwave days on the calendar — and reduces that penalty from four, then eight, then twelve days: applying the same handicap on the first and the fifteenth day would make someone already adapted run too slowly.",
+            "Finally, rather than merely slowing a quality session down, the plan can move it by up to two days if another eligible day costs noticeably less. An interval session whose target pace is destroyed by the heat is no longer the same training.",
+          ],
+        },
+      ],
+    },
   },
   de: {
     "deficit-energetique-relatif-reds-coureur": {

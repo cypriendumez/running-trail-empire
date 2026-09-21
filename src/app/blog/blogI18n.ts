@@ -1,7 +1,7 @@
 import type { Lang } from "@/lib/i18n/translations";
 
 export const BLOG_CATS = ["ALL", "AI", "TRAINING", "NUTRITION", "HEALTH", "RACES", "GEAR"] as const;
-export const POST_KEYS = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10", "p11"] as const;
+export const POST_KEYS = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10", "p11", "p12"] as const;
 
 export type BlogDict = {
   heroEyebrow: string; heroTitleA: string; heroAccent: string; heroSubtitle: string;
@@ -28,6 +28,7 @@ const fr: BlogDict = {
     p9: { title: "Manger trop peu : le déficit énergétique relatif chez le coureur", excerpt: "Ce que le consensus du CIO appelle les REDs : quand l'apport ne couvre plus l'entraînement, ce que ça abîme, et les signes qui doivent alerter." },
     p10: { title: "Le renforcement, la séance qui fait courir plus vite sans courir", excerpt: "Un des liens les mieux établis de la littérature — et la séance que presque tout le monde saute. Ce qu'elle change, et à quoi elle ressemble." },
     p11: { title: "Cycle menstruel et entraînement : ce que dit vraiment la méta-analyse", excerpt: "Un effet réel mais faible et très variable d'une femme à l'autre. Pourquoi une périodisation rigide passe à côté, et ce qui marche mieux." },
+    p12: { title: "Courir par forte chaleur : acclimatation, hydratation, allure", excerpt: "La dose d'acclimatation qui tient debout dans la littérature, le seuil de déshydratation plus discuté qu'on ne croit, et pourquoi les meilleures sont parties le plus lentement à Doha." },
   },
 };
 
@@ -48,6 +49,7 @@ const en: BlogDict = {
     p9: { title: "Eating too little: relative energy deficiency in runners", excerpt: "What the IOC consensus calls REDs: when intake no longer covers training, what it damages, and the signs that should alert you." },
     p10: { title: "Strength work: the session that makes you run faster without running", excerpt: "One of the best-established links in the literature — and the session almost everyone skips. What it changes, and what it looks like." },
     p11: { title: "Menstrual cycle and training: what the meta-analysis actually says", excerpt: "A real effect, but small and highly variable between women. Why rigid periodisation misses the point, and what works better." },
+    p12: { title: "Running in serious heat: acclimation, hydration, pacing", excerpt: "The acclimation dose that holds up in the literature, a dehydration threshold more disputed than you'd think, and why the best runners started slowest in Doha." },
   },
 };
 
@@ -68,6 +70,7 @@ const de: BlogDict = {
     p9: { title: "Zu wenig essen: relatives Energiedefizit bei Läufern", excerpt: "Was der IOC-Konsens REDs nennt: wenn die Zufuhr das Training nicht mehr deckt, was das schädigt und welche Zeichen alarmieren sollten." },
     p10: { title: "Krafttraining: die Einheit, die schneller macht, ohne zu laufen", excerpt: "Einer der am besten belegten Zusammenhänge der Literatur — und die Einheit, die fast alle auslassen. Was sie verändert und wie sie aussieht." },
     p11: { title: "Menstruationszyklus und Training: was die Meta-Analyse wirklich sagt", excerpt: "Ein realer, aber kleiner und von Frau zu Frau stark schwankender Effekt. Warum starre Periodisierung daran vorbeigeht und was besser wirkt." },
+    p12: { title: "Laufen bei großer Hitze: Akklimatisation, Trinken, Tempo", excerpt: "Die Akklimatisationsdosis, die der Literatur standhält, eine umstrittenere Dehydrationsschwelle als gedacht — und warum in Doha die Besten am langsamsten starteten." },
   },
 };
 
@@ -88,6 +91,7 @@ const es: BlogDict = {
     p9: { title: "Comer demasiado poco: el déficit energético relativo en el corredor", excerpt: "Lo que el consenso del COI llama REDs: cuando el aporte deja de cubrir el entrenamiento, qué daña y qué señales deben alertarte." },
     p10: { title: "La fuerza: la sesión que te hace correr más rápido sin correr", excerpt: "Uno de los vínculos mejor establecidos de la literatura — y la sesión que casi todo el mundo se salta. Qué cambia y cómo es." },
     p11: { title: "Ciclo menstrual y entrenamiento: lo que dice de verdad el metaanálisis", excerpt: "Un efecto real pero pequeño y muy variable entre mujeres. Por qué una periodización rígida se equivoca, y qué funciona mejor." },
+    p12: { title: "Correr con mucho calor: aclimatación, hidratación, ritmo", excerpt: "La dosis de aclimatación que aguanta en la literatura, un umbral de deshidratación más discutido de lo que parece, y por qué en Doha las mejores salieron más lentas." },
   },
 };
 
@@ -108,6 +112,7 @@ const pt: BlogDict = {
     p9: { title: "Comer demasiado pouco: o défice energético relativo no corredor", excerpt: "O que o consenso do COI chama REDs: quando o aporte deixa de cobrir o treino, o que danifica e que sinais devem alertar-te." },
     p10: { title: "A força: a sessão que te faz correr mais depressa sem correr", excerpt: "Uma das ligações mais bem estabelecidas da literatura — e a sessão que quase toda a gente salta. O que muda e como é." },
     p11: { title: "Ciclo menstrual e treino: o que diz mesmo a meta-análise", excerpt: "Um efeito real mas pequeno e muito variável entre mulheres. Porque uma periodização rígida falha, e o que funciona melhor." },
+    p12: { title: "Correr com muito calor: aclimatação, hidratação, ritmo", excerpt: "A dose de aclimatação que se aguenta na literatura, um limiar de desidratação mais discutido do que parece, e porque em Doha as melhores partiram mais devagar." },
   },
 };
 
