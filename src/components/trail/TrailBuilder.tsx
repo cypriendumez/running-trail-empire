@@ -7,6 +7,7 @@ import {
   ChevronDown, X, MapPin, Mountain, Search, Layers, Bookmark, Heart,
   SlidersHorizontal, Gauge, Navigation, Share2
 } from "lucide-react";
+import { IconeSport } from "@/components/parcours/IconeSport";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -934,7 +935,11 @@ export function TrailBuilder({ centre, onTrace }: {
   return (
     <div className="flex flex-col gap-3 h-[68vh] min-h-[460px] sm:h-[80vh]">
       {/* ── MAP ───────────────────────────────────────────────────────────── */}
-      <div className="flex-1 relative rounded-3xl overflow-hidden border border-zinc-200 shadow-sm min-h-0">
+      {/* ⚠️ `isolate` : la carte est son PROPRE contexte d'empilement. Ses commandes
+          (barre d'outils z-1000, Leaflet z-1000) passaient PAR-DESSUS le menu Profil et le
+          panneau de notifications de l'entête (z-30/50) — vu sur téléphone le 21/09/2026.
+          Isolées, elles ne se comparent plus qu'entre elles, à l'intérieur de la carte. */}
+      <div className="flex-1 relative isolate rounded-3xl overflow-hidden border border-zinc-200 shadow-sm min-h-0">
         <div
           ref={mapContainer}
           className="w-full h-full"
@@ -976,7 +981,7 @@ export function TrailBuilder({ centre, onTrace }: {
                 aria-label={tb("activityType", { label: tb(`act.${activity}`) })}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-50 hover:bg-zinc-100 text-sm font-medium text-zinc-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
               >
-                <span className="text-base leading-none">{act.emoji}</span>
+                <IconeSport sport={activity} className="h-4 w-4" />
                 {tb(`act.${activity}`)}
                 <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform ${activityMenuOpen ? "rotate-180" : ""}`} />
               </button>
@@ -1002,7 +1007,7 @@ export function TrailBuilder({ centre, onTrace }: {
                             activity === key ? "bg-emerald-50 text-emerald-700 font-semibold" : "text-zinc-700 hover:bg-zinc-100"
                           }`}
                         >
-                          <span className="text-lg leading-none">{cfg.emoji}</span>
+                          <IconeSport sport={key} className="h-4 w-4" />
                           {tb(`act.${key}`)}
                         </button>
                       </li>
@@ -1261,7 +1266,7 @@ export function TrailBuilder({ centre, onTrace }: {
               <div className="bg-white/95 backdrop-blur rounded-full shadow-xl border border-zinc-100 px-2 py-2 flex items-center">
                 <PillStat value={fmtKm(distance, lang, 2)} label={d["st.distance"]} />
                 <PillDivider />
-                <PillStat value={formatDuration(durationMin)} label={d["st.time"]} icon={act.emoji} />
+                <PillStat value={formatDuration(durationMin)} label={d["st.time"]} icon={<IconeSport sport={activity} className="h-3 w-3 text-zinc-400" />} />
                 <PillDivider />
                 <button
                   type="button"
@@ -1371,11 +1376,11 @@ export function TrailBuilder({ centre, onTrace }: {
 }
 
 // ─── Small UI atoms ───────────────────────────────────────────────────────────
-function PillStat({ value, label, icon, manual }: { value: string; label: string; icon?: string; manual?: boolean }) {
+function PillStat({ value, label, icon, manual }: { value: string; label: string; icon?: React.ReactNode; manual?: boolean }) {
   return (
     <div className="px-3 text-center min-w-[58px]">
       <div className={`flex items-center justify-center gap-1 font-bold text-sm leading-tight whitespace-nowrap ${manual ? "text-emerald-600" : "text-zinc-900"}`}>
-        {value}{icon && <span className="text-xs">{icon}</span>}
+        {value}{icon && <span className="inline-flex">{icon}</span>}
       </div>
       <div className="text-[10px] text-zinc-400">{label}</div>
     </div>

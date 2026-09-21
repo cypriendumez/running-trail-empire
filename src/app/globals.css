@@ -218,3 +218,13 @@
   to   { transform: translateY(0); opacity: 1; }
 }
 .count-up { animation: countUp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+/* ⚠️ TOUTE CARTE EST SON PROPRE CONTEXTE D'EMPILEMENT. Leaflet et MapLibre placent leurs
+   commandes à z-index 1000 en position absolue : sans isolation, elles passent par-dessus
+   les menus de l'entête (Profil, notifications), qui vivent à z-30/50 — vu sur téléphone le
+   21/09/2026, le menu Profil coupé par les boutons de la carte. `isolation: isolate` borne
+   ce 1000 à l'intérieur de la carte, sans toucher à ce que Leaflet fait chez lui. */
+.leaflet-container,
+.maplibregl-map {
+  isolation: isolate;
+}

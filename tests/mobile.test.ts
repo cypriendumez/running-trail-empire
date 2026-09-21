@@ -184,6 +184,26 @@ test("sur téléphone, les mesures d'une activité récente passent sous le titr
     "les mesures ne passent plus sur leur propre ligne sous le titre");
 });
 
+test("les menus de l'entête passent au-dessus des cartes : chaque carte est isolée", () => {
+  // Capture de Cyprien, 21/09/2026 : le menu Profil coupé par les boutons de la carte.
+  // Leaflet et MapLibre placent leurs commandes à z-1000 ; l'entête vit à z-30/50.
+  const css = readFileSync("src/app/globals.css", "utf8");
+  assert.match(css, /\.leaflet-container,\s*\.maplibregl-map\s*\{\s*isolation: isolate;/, "les cartes ne sont plus isolées : leurs commandes repassent par-dessus les menus");
+  const tb = codeNu("src/components/trail/TrailBuilder.tsx");
+  assert.match(tb, /className="flex-1 relative isolate rounded-3xl overflow-hidden/, "l'enveloppe de la carte du Trail Builder n'est plus isolée : sa barre d'outils (z-1000) repasse par-dessus l'entête");
+});
+
+test("plus d'emoji « personnage » pour les sports : des icônes en trait", () => {
+  // Cyprien, 21/09/2026 : « enlève les petits personnages, ça fait trop IA ».
+  const pb = codeNu("src/components/parcours/ParcoursBrowser.tsx");
+  assert.ok(!/[\u{1F3C3}\u{1F97E}\u{1F6B6}\u{1F6B4}\u{1F6B5}\u{1F30D}]/u.test(pb), "un emoji de sport subsiste dans les filtres de parcours");
+  assert.match(pb, /<IconeSport sport=\{t\.key\}/, "les onglets de sport n'utilisent plus l'icône partagée");
+  assert.match(pb, /<IconeSport sport=\{p\.sport\}/, "la pastille de sport d'un parcours n'utilise plus l'icône partagée");
+  const tb = codeNu("src/components/trail/TrailBuilder.tsx");
+  assert.match(tb, /<IconeSport sport=\{activity\}/, "le sélecteur d'activité de la carte est revenu aux emoji");
+  assert.ok(!/\{act\.emoji\}|\{cfg\.emoji\}/.test(tb), "un emoji d'activité est encore rendu dans la carte");
+});
+
 test("les libellés de la barre existent dans les cinq langues", () => {
   const src = readFileSync(BARRE, "utf8");
   for (const cle of ["accueil", "carte", "enregistrer", "calendrier", "plus", "tout", "fermer"]) {

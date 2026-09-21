@@ -15,12 +15,10 @@ import { tileUrl, thumbZoomFor } from "@/data/famousRoutes";
 import { generateTrace } from "@/lib/parcoursTrace";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { PX, fillP } from "./parcoursI18n";
+import { IconeSport } from "./IconeSport";
 
-// Onglets sport : clé canonique + emoji (libellé traduit au rendu).
-const SPORT_TABS: { key: string; emoji: string }[] = [
-  { key: "all", emoji: "🌍" },
-  ...SPORTS.map((s) => ({ key: s, emoji: SPORT_META[s].emoji })),
-];
+// Onglets sport : clé canonique (libellé traduit et icône au rendu).
+const SPORT_TABS: { key: string }[] = [{ key: "all" }, ...SPORTS.map((s) => ({ key: s }))];
 
 const SORT_KEYS: SortKey[] = ["recommande", "proche", "distance-asc", "distance-desc", "denivele-desc", "denivele-asc", "alpha"];
 
@@ -225,7 +223,7 @@ export function ParcoursBrowser({ initialSearch = "" }: { initialSearch?: string
                 active ? "bg-zinc-900 text-white shadow-sm" : "bg-zinc-50 text-zinc-600 border border-zinc-200 hover:bg-zinc-100"
               }`}
             >
-              <span className="text-base leading-none">{t.emoji}</span>
+              <IconeSport sport={t.key} className="h-4 w-4" />
               {t.key === "all" ? L["allTab"] : pr(`sport.${t.key}`)}
             </button>
           );
@@ -464,7 +462,7 @@ function ParcoursCard({ p, near, loading, disabled, onLoad }: { p: ParcoursHdf; 
         />
         <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/40 to-transparent" />
         {/* (pastille centrale supprimée : elle masquait le cœur de la mini-carte) */}
-        <span className={`absolute top-3 left-3 px-2.5 py-1 rounded-full text-[11px] font-bold ${meta.chip}`}>{meta.emoji} {pr(`sport.${p.sport}`)}</span>
+        <span className={`absolute top-3 left-3 px-2.5 py-1 rounded-full text-[11px] font-bold ${meta.chip}`}><IconeSport sport={p.sport} className="mr-1 inline h-3 w-3 align-[-1px]" />{pr(`sport.${p.sport}`)}</span>
         <span className="absolute top-3 right-3 px-2.5 py-1 rounded-full text-[11px] font-bold text-white shadow" style={{ backgroundColor: diff.color }}>{pr(`diff.${p.difficulte}`)}</span>
         {kmAway != null && (
           <span className="absolute bottom-2.5 left-3 flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-600/90 backdrop-blur text-[10px] font-bold text-white shadow">
