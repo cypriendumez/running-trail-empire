@@ -12,7 +12,7 @@ santé du coureur, nutrition, matériel, ce que fait Pacevo).
 
 Catégories possibles pour la carte : `AI`, `TRAINING`, `NUTRITION`, `HEALTH`, `RACES`, `GEAR`.
 
-- [ ] Courir par forte chaleur : ce que dit la littérature (acclimatation, hydratation, allure) — `HEALTH`
+- [x] Courir par forte chaleur : ce que dit la littérature (acclimatation, hydratation, allure) — `HEALTH` (`courir-par-forte-chaleur-acclimatation-hydratation-allure`)
 - [ ] Le sommeil, la séance que personne ne planifie : dette de sommeil et performance — `HEALTH`
 - [ ] Marche-course : pourquoi alterner n'est pas « tricher » (reprise, débutants, ultra) — `TRAINING`
 - [ ] Cadence et foulée : ce que les 180 pas/min ont de vrai et de faux — `TRAINING`
