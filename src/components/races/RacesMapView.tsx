@@ -29,6 +29,9 @@ const DATE_RANGES = [
 ];
 
 // ─── Component ───────────────────────────────────────────────────────────────
+// Clé MapTiler publique du projet (même variable que SegmentMap et le Trail Builder).
+const MAPTILER = process.env.NEXT_PUBLIC_MAPTILER_KEY || "";
+
 export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrain, onCancel, busy = false }: {
   races: Race[];
   onClose: () => void;
@@ -45,6 +48,12 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
   const rendererRef = useRef<unknown>(null);
   const markersRef = useRef<unknown[]>([]);
   const [races, setRaces] = useState<Race[]>(initialRaces);
+  // ⚠️ LA LISTE SUIT LES PROPS. La page ne charge que ~90 courses côté serveur, le
+  // catalogue complet (~17 500) arrive 4 s plus tard depuis /api/races/list. Copier la
+  // liste UNE FOIS à l'ouverture figeait la carte à 90 pins pour qui l'ouvrait dans ces
+  // 4 secondes — vu par Cyprien le 21/09/2026 : « 90 pins · 90 courses ». L'état local
+  // reste (le géocodage le met à jour), mais il se réaligne à chaque nouvelle liste.
+  useEffect(() => { setRaces(initialRaces); }, [initialRaces]);
   const [selected, setSelected] = useState<Race | null>(null);
   // Champs lourds chargés à la demande quand une course est sélectionnée (hors payload de liste).
   const [details, setDetails] = useState<Record<string, Partial<Race>>>({});
@@ -121,13 +130,22 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
       });
       mapInstanceRef.current = map;
 
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-        subdomains: "abcd",
-        maxZoom: 19,
-      }).addTo(map);
+      // ⚠️ PLUS DE CARTO. Ses tuiles Voyager, servies sans clé depuis le début, sont
+      // désormais filigranées « API KEY REQUIRED » sur toute la carte (vu en production le
+      // 21/09/2026). Même convention que SegmentMap : MapTiler avec la clé du projet, et
+      // OpenStreetMap en repli si elle manque — jamais une carte illisible.
+      // Les tuiles MapTiler font 512 px : `tileSize: 512, zoomOffset: -1`, sinon les
+      // libellés sont deux fois trop gros (cf. lib/activities/tuiles).
+      if (MAPTILER) {
+        L.tileLayer(`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${MAPTILER}`, {
+          tileSize: 512, zoomOffset: -1, maxZoom: 19,
+        }).addTo(map);
+      } else {
+        L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
+      }
 
       L.control.zoom({ position: "bottomright" }).addTo(map);
-      L.control.attribution({ position: "bottomright", prefix: "© OpenStreetMap" }).addTo(map);
+      L.control.attribution({ position: "bottomright", prefix: MAPTILER ? "© MapTiler © OpenStreetMap" : "© OpenStreetMap" }).addTo(map);
 
       // Rendu canvas → des milliers de points s'affichent sans ralentir.
       rendererRef.current = L.canvas({ padding: 0.5 });
