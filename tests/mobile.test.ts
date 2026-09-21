@@ -153,7 +153,11 @@ test("sur mobile, l'avertissement médical part dans « Plus » — mais la lign
   assert.ok(cache > 0, "l'avertissement médical n'est plus masqué sous md dans le layout");
   assert.ok(/<MedicalDisclaimer/.test(layout.slice(cache, layout.indexOf("</div>", cache))),
     "ce qui est masqué sous md n'est pas l'avertissement médical");
-  assert.ok(/<MedicalDisclaimer lang=\{lang\} \/>/.test(codeNu(BARRE)), "la feuille « Plus » n'affiche plus l'avertissement médical : il n'est plus nulle part sur téléphone");
+  // Depuis le 22/09/2026, l'avertissement est rendu par le layout SERVEUR et passé en
+  // nœud (`avertissement=`) : importé depuis la barre, il aurait embarqué le
+  // dictionnaire entier dans le JavaScript de chaque page (voir tests/fluidite.test.ts).
+  assert.ok(/\{avertissement\}/.test(codeNu(BARRE)), "la feuille « Plus » n'affiche plus l'avertissement médical : il n'est plus nulle part sur téléphone");
+  assert.ok(/avertissement=\{<MedicalDisclaimer lang=\{langue\} \/>\}/.test(layout), "le layout ne passe plus l'avertissement médical à la barre");
   // ⚠️ LA LIGNE GARMIN N'EST PAS UN TEXTE DE CONFORT : c'est l'article 1.1 des conditions
   // de l'API intervals.icu, dont dépend tout le produit. Elle reste sur téléphone —
   // donc HORS du bloc masqué, et sans `hidden` à elle.

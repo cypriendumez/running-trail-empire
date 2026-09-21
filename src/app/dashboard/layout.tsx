@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 import { stripProfileSecrets } from "@/lib/profile/safe";
+import { T, normLang } from "@/lib/i18n/translations";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { MobileTabBar } from "@/components/layout/MobileTabBar";
@@ -41,9 +42,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const notifsMasquees = Array.isArray(brutMasquees) ? brutMasquees.filter((x): x is string => typeof x === "string") : [];
 
   if (profile && !profile.onboarding_completed) redirect("/onboarding");
+  const langue = normLang(String(profile?.preferred_language ?? "fr"));
 
   return (
-    <LanguageProvider initialLang={String(profile?.preferred_language ?? "fr")} userId={user.id}>
+    <LanguageProvider initialLang={langue} dict={T[langue]} userId={user.id}>
       <FuseauProvider fuseau={fuseau}>
       <div className="flex h-screen bg-[#FAFAFA] overflow-hidden">
         <AutoSync />
@@ -69,11 +71,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
               feuille « Plus » sous md : il reste à un geste sur chaque page. */}
           <AttributionGarmin className="px-2 py-1 text-[10px] leading-tight tracking-tight md:px-6 md:pb-3 md:text-[11px] md:leading-relaxed md:tracking-normal" />
           <div className="hidden shrink-0 md:block">
-            <MedicalDisclaimer lang={String(profile?.preferred_language ?? "fr")} />
+            <MedicalDisclaimer lang={langue} />
           </div>
           {/* Téléphone seulement : la barre d'onglets (Accueil · Carte · Enregistrer ·
               Calendrier · Plus) et la cale qui lui réserve sa place sous le pied de page. */}
-          <MobileTabBar unreadMessages={unreadMessages ?? 0} estEditeur={estAdmin(user.email)} />
+          {/* L'avertissement médical est rendu ICI, côté serveur, et passé en nœud : importé
+              depuis la barre (composant client), il aurait embarqué le dictionnaire entier
+              (183 kB) dans le JavaScript de chaque page. */}
+          <MobileTabBar unreadMessages={unreadMessages ?? 0} estEditeur={estAdmin(user.email)} avertissement={<MedicalDisclaimer lang={langue} />} />
         </div>
         {/* Bulle d'aide : hors du flux, disponible sur TOUTES les pages — une question de
             support naît devant l'écran qui pose problème, pas dans un menu séparé. */}

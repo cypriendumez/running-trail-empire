@@ -8,10 +8,9 @@ import {
   Gauge, Mountain, Timer, Flame, Rocket, Award, TrendingUp, AlertTriangle, Shield, Users,
   type LucideIcon,
 } from "lucide-react";
-import {
-  BarChart, Bar, Cell, AreaChart, Area,
-  ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid
-} from "recharts";
+// ⚠️ PLUS DE recharts ICI (22/09/2026) : ≈ 500 kB de JS pour deux petits dessins, sur
+// la page que le téléphone ouvre en premier. Voir MiniGraphes.tsx.
+import { MiniAire, MiniBarres } from "./MiniGraphes";
 import Link from "next/link";
 import type { UserProfile, HRVData, Workout } from "@/types";
 import { robustWeeklyKm } from "@/lib/running/volume";
@@ -27,7 +26,7 @@ import { dansFenetre, ageJours } from "@/lib/dashboard/fenetre";
 import { computeForme } from "@/lib/dashboard/forme";
 import { computeDistancePRs } from "@/lib/dashboard/records";
 import { useT } from "@/lib/i18n/LanguageProvider";
-import { fill } from "@/lib/i18n/translations";
+import { fill } from "@/lib/i18n/base";
 import { ProfileCompletionBanner } from "@/components/dashboard/ProfileCompletionBanner";
 import { StreakCard } from "@/components/dashboard/StreakCard";
 import { TrialBanner } from "@/components/dashboard/TrialBanner";
@@ -875,22 +874,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
               voisines vides) ; `flex-1` absorbe le reste de la hauteur imposée. */}
           {hrvChartData.length > 0 ? (
             <div className="min-h-[80px] flex-1">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={hrvChartData}>
-                <defs>
-                  <linearGradient id="hrv-grad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={readiness.accent} stopOpacity={0.2} />
-                    <stop offset="100%" stopColor={readiness.accent} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <Area type="monotone" dataKey="hrv" stroke={readiness.accent} strokeWidth={2}
-                  fill="url(#hrv-grad)" dot={false} />
-                <Tooltip
-                  contentStyle={{ borderRadius: "12px", border: "1px solid #E4E4E7", fontSize: "12px" }}
-                  formatter={(v: number) => [`${v.toFixed(0)} ms`, "HRV"]}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+              <MiniAire points={hrvChartData.map((h) => ({ date: h.date, valeur: Number(h.hrv) }))} couleur={readiness.accent} unite="ms" libelle="HRV" />
             </div>
           ) : (
             <div className="h-20 flex items-center justify-center text-sm text-zinc-400">
@@ -1193,19 +1177,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
           {/* Même raison que la carte VFC : la rangée impose sa hauteur, le graphique
               était figé à 140 px et laissait 36 px de blanc mesuré sous lui. */}
           <div className="min-h-[140px] flex-1">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={weeklyData} barCategoryGap="24%">
-              <CartesianGrid strokeDasharray="3 3" stroke="#F4F4F5" vertical={false} />
-              <XAxis dataKey="day" tick={{ fontSize: 11, fill: "#A1A1AA" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: "#A1A1AA" }} axisLine={false} tickLine={false} width={28} />
-              <Tooltip cursor={{ fill: "rgba(16,185,129,0.06)" }}
-                contentStyle={{ borderRadius: "12px", border: "1px solid #E4E4E7", fontSize: "12px" }}
-                formatter={(v: number) => [`${v.toFixed(1)} km`, t("dash.chart.distance")]} />
-              <Bar dataKey="km" radius={[6, 6, 0, 0]} maxBarSize={36}>
-                {weeklyData.map((d, i) => (<Cell key={i} fill={d.km > 0 ? "#10b981" : "#E4E4E7"} />))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+            <MiniBarres barres={weeklyData.map((d) => ({ jour: d.day, valeur: d.km }))} libelle={t("dash.chart.distance")} unite="km" />
           </div>
         </motion.div>
 

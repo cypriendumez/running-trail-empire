@@ -3,7 +3,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Home, Map, CalendarDays, LayoutGrid, X, User, Settings, LogOut, ShieldCheck, LifeBuoy, CircleDot, ChevronRight } from "lucide-react";
-import { MedicalDisclaimer } from "@/components/layout/MedicalDisclaimer";
 import { EVENEMENT_AIDE } from "@/components/support/evenement";
 import { deconnexion } from "@/lib/auth/deconnexion";
 import { cn } from "@/lib/utils/cn";
@@ -42,7 +41,11 @@ const HAUTEUR = "4rem";
 /** Une ligne de la page « Plus » : icône, libellé, chevron — 44 px, la hauteur qu'un pouce touche sans viser. */
 const LIGNE = "flex min-h-[44px] items-center gap-3 px-4 py-2.5 text-[14px] font-medium";
 
-export function MobileTabBar({ unreadMessages = 0, estEditeur }: { unreadMessages?: number; estEditeur: boolean }) {
+export function MobileTabBar({ unreadMessages = 0, estEditeur, avertissement }: {
+  unreadMessages?: number; estEditeur: boolean;
+  /** L'avertissement médical, rendu par le layout SERVEUR (voir là-bas pourquoi). */
+  avertissement?: React.ReactNode;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const { t, lang } = useT();
@@ -76,6 +79,12 @@ export function MobileTabBar({ unreadMessages = 0, estEditeur }: { unreadMessage
     return (
       <Link
         href={href}
+        // ⚠️ PRÉCHARGÉ EN ENTIER : sans `prefetch`, une page dynamique n'est préchargée que
+        // jusqu'à son squelette (loading.tsx), et le premier appui sur un onglet attend le
+        // serveur. La barre est toujours à l'écran, donc les quatre pages se préchargent
+        // une fois par session (puis à l'expiration de `staleTimes`) — quatre rendus pour
+        // des appuis instantanés.
+        prefetch={true}
         aria-current={actif ? "page" : undefined}
         className={cn(
           "flex flex-col items-center justify-center gap-1 text-[10px] font-semibold transition-colors",
@@ -182,13 +191,13 @@ export function MobileTabBar({ unreadMessages = 0, estEditeur }: { unreadMessage
 
         {/* L'avertissement médical et les liens légaux : retirés du bas de chaque écran
             sur téléphone (ils prenaient ~120 px), ils restent à un geste, sur chaque page. */}
-        <MedicalDisclaimer lang={lang} />
+        {avertissement}
       </div>
 
       {/* La barre elle-même. */}
       <nav
         aria-label={d.tout}
-        className="fixed inset-x-0 bottom-0 z-[60] border-t border-zinc-200 bg-white/95 backdrop-blur md:hidden"
+        className="fixed inset-x-0 bottom-0 z-[60] border-t border-zinc-200 bg-white md:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <div className="grid grid-cols-5" style={{ height: HAUTEUR }}>

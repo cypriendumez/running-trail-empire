@@ -595,16 +595,22 @@ test("les graphiques du tableau de bord occupent la hauteur que la grille leur d
   // contenu de sa carte : le vide et l'illisibilité avaient la même cause.
   //
   // Total du blanc mesuré sur la grille : 193 px avant, 48 après.
+  //
+  // Depuis le 22/09/2026 les deux graphiques sont en SVG nu (MiniGraphes.tsx, plus de
+  // recharts) : ils remplissent leur conteneur (`h-full w-full`) — le plancher et la
+  // hauteur libre restent portés par le conteneur, comme avant.
   const ui = sansCommentaires(readFileSync(join(ROOT, "src/components/dashboard/BentoDashboard.tsx"), "utf8"));
-  const figes = [...ui.matchAll(/<ResponsiveContainer[^>]*height=\{(\d+)\}/g)].map((m) => m[1]);
+  const figes = [...ui.matchAll(/<(?:ResponsiveContainer|MiniAire|MiniBarres)[^>]*height=\{(\d+)\}/g)].map((m) => m[1]);
   assert.deepEqual(figes, [],
     `${figes.length} graphique(s) à hauteur figée (${figes.join(", ")}px) : ils laisseront du blanc dès que la rangée sera plus haute`);
   // Chaque conteneur en hauteur libre doit avoir un plancher, sinon il s'écrase à zéro
   // quand la rangée est courte — sur téléphone, où chaque carte est seule sur sa ligne.
-  const libres = (ui.match(/<ResponsiveContainer[^>]*height="100%"/g) ?? []).length;
+  const libres = (ui.match(/<(?:MiniAire|MiniBarres) /g) ?? []).length;
   const planchers = (ui.match(/min-h-\[\d+px\][^"]*flex-1|flex-1[^"]*min-h-\[\d+px\]/g) ?? []).length;
   assert.ok(libres >= 2, `seulement ${libres} graphique(s) en hauteur libre`);
   assert.ok(planchers >= libres, `${libres} graphiques libres pour ${planchers} plancher(s) : un graphique peut s'écraser à zéro`);
+  const mini = sansCommentaires(readFileSync(join(ROOT, "src/components/dashboard/MiniGraphes.tsx"), "utf8"));
+  assert.ok(/className="h-full w-full"/.test(mini) && /className="flex h-full w-full flex-col"/.test(mini), "un mini-graphique ne remplit plus son conteneur");
 });
 test("le lanceur du Bureau ouvre les adresses que le code utilise vraiment", () => {
   // ⚠️ UN RACCOURCI QUI OUVRE UN SITE MORT EST PIRE QUE PAS DE RACCOURCI. Les adresses

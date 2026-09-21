@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 import type { Metadata, Viewport } from "next";
+import { T, normLang } from "@/lib/i18n/translations";
 import { Inter, Anton } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/layout/Providers";
@@ -85,7 +86,7 @@ export default async function RootLayout({
       <body className="font-sans">
         <ErrorReporter />
         <Visite />
-        <LanguageProvider initialLang={lang}>
+        <LanguageProvider initialLang={lang} dict={T[normLang(lang)]}>
           <Providers>{children}</Providers>
           <PwaClient />
         </LanguageProvider>

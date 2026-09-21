@@ -4,6 +4,7 @@ export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { gunzipSync } from "zlib";
 import { filterAndSort, computeFacets, type ParcoursHdf, type SortKey, type Facets, type SportHdf, type DiffHdf, type TypeHdf } from "@/data/parcoursHdf";
 
 // VRAIS parcours France (OpenStreetMap / ODbL). Lu une fois puis gardé en mémoire.
@@ -13,6 +14,12 @@ let FACETS: Facets | null = null;
 // Priorité aux parcours CERTIFIÉS par le crawl (~15 000 vérifiés : vraie distance/D+/difficulté/nom) ;
 // repli sur la liste brute si le fichier certifié est absent.
 const CANDIDATES: { file: string; certified: boolean }[] = [
+  // ⚠️ EN PRODUCTION, SEUL LE .gz EXISTE (22/09/2026) : 1,1 Mo au lieu des 36 Mo du
+  // dossier `data/` que le traceur embarquait dans la fonction serveur — 7,4 s de
+  // démarrage à froid mesurées. Il est produit par `scripts/parcours-compacter.ts` et
+  // ne contient que les champs lus par `mapCertified`. Les JSON complets restent pour
+  // le développement et les outils, exclus du traçage (next.config.ts).
+  { file: "parcours_certifies.min.json.gz", certified: true },
   { file: "parcours_certifies.json", certified: true },
   { file: "dataset_france.json", certified: false },
   { file: "dataset.json", certified: false },
@@ -43,7 +50,8 @@ function mapCertified(p: RawCertified): ParcoursHdf {
     altitude_max_m: p.altitude_max_m ?? 0,
     lat: p.lat, lng: p.lng,
     localisation: { region: p.region ?? "", departement: Array.isArray(p.departements) ? (p.departements[0] ?? "") : (p.departements ?? "") },
-    description: [p.depart, p.arrivee].filter(Boolean).join(" → "),
+    // « None » : le None de Python, sérialisé tel quel par le crawl — pas une arrivée.
+    description: [p.depart, p.arrivee].filter((v) => v && v !== "None").join(" → "),
   };
 }
 
@@ -53,7 +61,7 @@ function load(): ParcoursHdf[] {
     const file = path.join(process.cwd(), "data", c.file);
     try {
       if (fs.existsSync(file)) {
-        const raw = JSON.parse(fs.readFileSync(file, "utf-8"));
+        const raw = JSON.parse(file.endsWith(".gz") ? gunzipSync(fs.readFileSync(file)).toString("utf-8") : fs.readFileSync(file, "utf-8"));
         CACHE = c.certified ? (raw as RawCertified[]).map(mapCertified) : (raw as ParcoursHdf[]);
         FACETS = computeFacets(CACHE);
         return CACHE;

@@ -10,11 +10,10 @@ import { colorOf } from "@/lib/avatarColors";
 import { RX } from "@/components/races/racesI18n";
 import { timeAgo } from "@/lib/utils/time";
 import { useT } from "@/lib/i18n/LanguageProvider";
-import { createClient } from "@/lib/supabase/client";
 import { deconnexion } from "@/lib/auth/deconnexion";
 import { formatDateCivile } from "@/lib/time/fuseau";
 import { fmtKm } from "@/lib/i18n/nombres";
-import { construirePanneau, sansMasquees, ajouterMasquee, TYPES_NOTIFIES, type LigneNotification } from "@/lib/notifications/panneau";
+import { construirePanneau, sansMasquees, ajouterMasquee, type LigneNotification } from "@/lib/notifications/panneau";
 
 type Notif = LigneNotification;
 type RaceHit = { name: string; city: string; distanceKm: number | null; date: string };
@@ -44,7 +43,7 @@ export function TopBar({ profile, avatarColor, notifsMasquees: masqueesInitiales
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [loadingNotif, setLoadingNotif] = useState(true);
   const [masquees, setMasquees] = useState<string[]>(masqueesInitiales);
-  const userIdRef = useRef<string | null>(null);
+  const chargees = useRef(false);
 
   // ── Recherche globale : courses + parcours, résultats live ──────────────────
   const [q, setQ] = useState("");
@@ -96,25 +95,19 @@ export function TopBar({ profile, avatarColor, notifsMasquees: masqueesInitiales
     router.push(`/dashboard/trail?q=${encodeURIComponent(nom ?? q.trim())}`);
   };
 
+  // Par une route, pas par supabase-js : voir /api/notifications (≈ 220 kB de JS
+  // économisés sur chaque page du tableau de bord). La liste blanche vit côté serveur.
   useEffect(() => {
-    const supabase = createClient();
+    let vivant = true;
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setLoadingNotif(false); return; }
-      userIdRef.current = user.id;
-      const { data } = await supabase
-        .from("notifications")
-        .select("id, type, title, body, read, created_at")
-        .eq("user_id", user.id)
-        // ⚠️ LISTE BLANCHE : la table est un fourre-tout (séances, ressenti, état du
-        // coach, quotas…). Seules les NOUVELLES pour la personne passent, cf.
-        // lib/notifications/panneau. 60 lignes, parce que les séances se regroupent.
-        .in("type", [...TYPES_NOTIFIES])
-        .order("created_at", { ascending: false })
-        .limit(60);
-      setNotifs((data ?? []) as Notif[]);
-      setLoadingNotif(false);
+      try {
+        const r = await fetch("/api/notifications");
+        const j = await r.json().catch(() => ({}));
+        if (vivant && r.ok) { setNotifs((j.notifications ?? []) as Notif[]); chargees.current = true; }
+      } catch { /* l'entête reste sans notifications ; la pastille ne ment pas, elle est vide */ }
+      if (vivant) setLoadingNotif(false);
     })();
+    return () => { vivant = false; };
   }, []);
 
   const entrees = sansMasquees(
@@ -140,17 +133,17 @@ export function TopBar({ profile, avatarColor, notifsMasquees: masqueesInitiales
   }
 
   async function markAllRead() {
-    if (!userIdRef.current || unread === 0) return;
+    if (!chargees.current || unread === 0) return;
     // L'écran est mis à jour d'abord, pour que le clic réponde tout de suite — mais si
     // l'écriture est refusée, on REMET la pastille. Sans cela elle disparaissait, puis
     // revenait au rechargement suivant : l'athlète croit avoir tout lu et rate un
     // message.
     const avant = notifs;
     setNotifs((prev) => prev.map((n) => ({ ...n, read: true })));
-    const supabase = createClient();
-    const { error } = await supabase.from("notifications")
-      .update({ read: true }).eq("user_id", userIdRef.current).eq("read", false);
-    if (error) setNotifs(avant);
+    try {
+      const r = await fetch("/api/notifications", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ toutLu: true }) });
+      if (!r.ok) setNotifs(avant);
+    } catch { setNotifs(avant); }
   }
 
   async function signOut() {
@@ -167,7 +160,7 @@ export function TopBar({ profile, avatarColor, notifsMasquees: masqueesInitiales
   // trois occasions d'en oublier une le jour où on ajoute une langue.
 
   return (
-    <header className="h-16 border-b border-zinc-100 bg-white/80 backdrop-blur-sm flex items-center px-6 gap-4 sticky top-0 z-30">
+    <header className="h-16 border-b border-zinc-100 bg-white md:bg-white/80 md:backdrop-blur-sm flex items-center px-6 gap-4 sticky top-0 z-30">
       {/* Recherche globale — courses + parcours, résultats en direct */}
       <div ref={searchRef} className="relative flex-1 max-w-md">
         <div className="flex items-center gap-2 px-3.5 py-2.5 bg-zinc-50 rounded-2xl border border-zinc-200 focus-within:ring-2 focus-within:ring-emerald-500/40 focus-within:border-emerald-400 transition-all">

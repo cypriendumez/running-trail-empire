@@ -1,15 +1,11 @@
 // Internationalisation — traductions de l'interface (FR / EN / DE / ES / PT).
-export type Lang = "fr" | "en" | "de" | "es" | "pt";
-
-export const LANGS: { code: Lang; label: string; flag: string }[] = [
-  { code: "fr", label: "Français", flag: "🇫🇷" },
-  { code: "en", label: "English", flag: "🇬🇧" },
-  { code: "de", label: "Deutsch", flag: "🇩🇪" },
-  { code: "es", label: "Español", flag: "🇪🇸" },
-  { code: "pt", label: "Português", flag: "🇵🇹" },
-];
-
-type Dict = Record<string, string>;
+//
+// ⚠️ CE MODULE EST LOURD (cinq langues). Côté navigateur, n'importer que `./base`
+// (types, LANGS, fill, normLang) : la langue courante arrive en prop du serveur, et ce
+// fichier n'est chargé dans le navigateur qu'au changement de langue (import paresseux).
+import type { Lang, Dict } from "./base";
+export { LANGS, fill, normLang } from "./base";
+export type { Lang, Dict } from "./base";
 
 export const T: Record<Lang, Dict> = {
   fr: {
@@ -1456,19 +1452,3 @@ export const T: Record<Lang, Dict> = {
     "renfo.gym.b4.e3.name": "Equilíbrio em Bosu", "renfo.gym.b4.e3.dose": "3 × 30 s", "renfo.gym.b4.e3.cue": "De pé sobre um Bosu, estabiliza. Propriocepção avançada.",
   },
 };
-
-/**
- * Interpolation `{clé}` pour les composants SERVEUR, qui n'ont pas accès au `t()` du
- * LanguageProvider. La même substitution était déjà réécrite dans `fillR` (courses),
- * `fillP` (parcours) et le provider lui-même ; les pages serveur allaient en ajouter une
- * quatrième. Une seule fonction, testée par le contrôle « mêmes paramètres dans toutes
- * les langues » de tests/i18n.test.ts.
- */
-export function fill(s: string, params?: Record<string, string | number>): string {
-  if (!params) return s;
-  return s.replace(/\{(\w+)\}/g, (m, k) => (k in params ? String(params[k]) : m));
-}
-
-export function normLang(l: string | null | undefined): Lang {
-  return (["fr", "en", "de", "es", "pt"].includes(l ?? "") ? l : "fr") as Lang;
-}

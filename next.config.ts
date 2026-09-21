@@ -8,6 +8,31 @@ const nextConfig: NextConfig = {
   // (recharts, framer-motion, lucide importent énormément par défaut). Transitions plus fluides.
   experimental: {
     optimizePackageImports: ["lucide-react", "framer-motion", "recharts", "date-fns"],
+    /**
+     * FLUIDITÉ DES ALLERS-RETOURS ENTRE ONGLETS (22/09/2026). Toutes les pages du tableau
+     * de bord sont dynamiques ; par défaut (`dynamic: 0`) le routeur les redemande au
+     * serveur À CHAQUE retour — Accueil → Calendrier → Accueil = trois rendus serveur,
+     * trois attentes de 0,5 à 1 s, trois squelettes. Trente secondes de garde en mémoire
+     * rendent le retour instantané ; une action qui change les données appelle
+     * `router.refresh()` et repart de zéro. Les pages publiques (statiques) gardent
+     * trois minutes.
+     */
+    staleTimes: { dynamic: 30, static: 180 },
+  },
+  /**
+   * CE QUE LA FONCTION SERVEUR EMBARQUE (22/09/2026). Le traceur suivait
+   * `path.join(process.cwd(), "data", …)` et incluait le dossier `data/` ENTIER — 36 Mo
+   * de JSON de crawl — dans l'unique fonction qui sert toutes les pages ; chaque
+   * démarrage à froid la téléchargeait (7,4 s mesurées sur la première visite). Seul
+   * le catalogue compacté (1,1 Mo, `scripts/parcours-compacter.ts`) est nécessaire.
+   */
+  outputFileTracingExcludes: {
+    // Nommés un par un, sans motif d'étoile après une barre : les tests qui relisent ce
+    // fichier retirent les commentaires, et ce motif dans une chaîne en ouvrirait un faux.
+    "*": ["./data/dataset.json", "./data/dataset_france.json", "./data/parcours_certifies.json", "./data/finishers-dates.jsonl", "./data/jp-dates.jsonl", "./data/finishers-catalog.progress", "./data/CRAWL_DONE", "./data/data_scan.json", "./data/water_routes.json"],
+  },
+  outputFileTracingIncludes: {
+    "/api/parcours": ["./data/parcours_certifies.min.json.gz"],
   },
   images: {
     // ⚠️ NEXT 16 N'ACCEPTE QUE LES QUALITÉS DÉCLARÉES ICI. Sans cette liste, un

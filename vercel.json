@@ -8,5 +8,8 @@
       "path": "/api/cron/auto-coach",
       "schedule": "30 3 * * *"
     }
+  ],
+  "regions": [
+    "fra1"
   ]
 }

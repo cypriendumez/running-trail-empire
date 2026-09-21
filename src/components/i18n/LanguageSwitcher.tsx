@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Globe, Check } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
-import { LANGS } from "@/lib/i18n/translations";
+import { LANGS } from "@/lib/i18n/base";
 import { LangFlag } from "@/components/i18n/LangFlag";
 
 // Sélecteur de langue pour les pages publiques (et partout). Persisté via cookie par setLang.

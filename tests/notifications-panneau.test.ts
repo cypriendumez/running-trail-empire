@@ -82,7 +82,10 @@ test("une croix écarte l'entrée, et la liste des écartées reste bornée", ()
 
 test("la barre lit la liste blanche en base, mémorise les croix côté serveur et lit l'erreur", () => {
   const src = codeNu("src/components/layout/TopBar.tsx");
-  assert.match(src, /\.in\("type", \[\.\.\.TYPES_NOTIFIES\]\)/, "la requête ne filtre plus sur la liste blanche : la table entière revient dans le panneau");
+  // Depuis le 22/09/2026 la requête vit dans /api/notifications (l'entête n'embarque
+  // plus le client Supabase, ≈ 220 kB) ; la liste blanche s'applique LÀ.
+  assert.match(src, /fetch\("\/api\/notifications"\)/, "l'entête ne lit plus /api/notifications");
+  assert.match(codeNu("src/app/api/notifications/route.ts"), /\.in\("type", \[\.\.\.TYPES_NOTIFIES\]\)/, "la requête ne filtre plus sur la liste blanche : la table entière revient dans le panneau");
   assert.match(src, /sansMasquees\(\s*construirePanneau\(notifs/, "le panneau n'est plus construit par le module pur");
   assert.match(src, /body: JSON\.stringify\(\{ notifsMasquees: apres \}\)/, "la croix n'est plus mémorisée dans les réglages");
   assert.match(src, /if \(!r\.ok\) setMasquees\(avant\)/, "un échec d'enregistrement laisserait l'entrée masquée jusqu'au prochain rechargement");
