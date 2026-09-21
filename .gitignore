@@ -54,6 +54,8 @@ Capture*.png
 # Dossier data/ : on ne versionne QUE les JSON lus par l'app (/api/parcours).
 # Le reste (artefacts de crawl, caches, jsonl) est régénérable / hors-app.
 /data/*
+# Le catalogue compacté (.gz, 1 Mo) que la production lit en premier — scripts/parcours-compacter.ts.
+!/data/parcours_certifies.min.json.gz
 !/data/parcours_certifies.json
 !/data/dataset_france.json
 !/data/dataset.json
