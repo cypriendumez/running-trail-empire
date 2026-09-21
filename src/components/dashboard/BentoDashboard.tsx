@@ -1269,7 +1269,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
                 <Link
                   key={w.id}
                   href={`/dashboard/activite?date=${String(w.date).slice(0, 10)}&dist=${w.distance_km ?? ""}&title=${encodeURIComponent(w.title ?? "")}`}
-                  className="group flex items-center gap-4 p-3 rounded-2xl hover:bg-zinc-50 transition-colors cursor-pointer"
+                  className="group flex flex-wrap items-center gap-x-4 gap-y-1 p-3 rounded-2xl hover:bg-zinc-50 transition-colors cursor-pointer sm:flex-nowrap"
                 >
                   <div className="w-9 h-9 bg-zinc-100 rounded-xl flex items-center justify-center flex-shrink-0">
                     <Activity className="w-4 h-4 text-zinc-600" />
@@ -1288,9 +1288,15 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
                       durée) et on masque le dénivelé sous 640 px — c'est la seule des
                       quatre dont l'absence ne change pas la lecture d'une sortie, et elle
                       reste disponible au clic sur la séance. */}
-                  <div className="flex gap-3 text-sm text-zinc-600 flex-shrink-0 sm:gap-4">
+                  {/* ⚠️ SUR TÉLÉPHONE, LES MESURES PASSENT SOUS LE TITRE (Cyprien, 21/09/2026,
+                      capture) : à 375 px elles prenaient ~250 px et ne laissaient que 40 px
+                      au titre et à la date — la date se pliait sur trois lignes SOUS les
+                      chiffres, et le titre de la séance disparaissait. `order-last` +
+                      `w-full` les font passer sur une deuxième ligne, alignée sur le titre ;
+                      à partir de sm, une seule ligne comme avant. */}
+                  <div className="order-last flex w-full gap-3 pl-[52px] text-sm text-zinc-600 sm:order-none sm:w-auto sm:flex-shrink-0 sm:gap-4 sm:pl-0">
                     {w.distance_km && <span>{w.distance_km.toFixed(1)} km</span>}
-                    {w.elevation_gain_m ? <span className="hidden sm:inline">+{w.elevation_gain_m}m</span> : null}
+                    {w.elevation_gain_m ? <span>+{w.elevation_gain_m}m</span> : null}
                     {w.avg_hr && <span>{w.avg_hr} bpm</span>}
                     <span className="text-zinc-400">
                       {Math.floor(w.duration_seconds / 3600)}h{String(Math.floor((w.duration_seconds % 3600) / 60)).padStart(2, "0")}

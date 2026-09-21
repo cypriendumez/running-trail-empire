@@ -174,6 +174,16 @@ test("sur téléphone, la carte (Trail Builder) garde ses commandes sur une lign
   assert.equal([...i18n.matchAll(/"nav\.ghost": "(Enregistrer|Record|Aufzeichnen|Grabar|Gravar)"/g)].length, 5, "« Enregistrer » manque à une langue");
 });
 
+test("sur téléphone, les mesures d'une activité récente passent sous le titre", () => {
+  // Capture de Cyprien, 21/09/2026 : la date pliée sur trois lignes SOUS les chiffres, le
+  // titre invisible. Les mesures prennent leur propre ligne (`order-last w-full`) sous sm.
+  const src = codeNu("src/components/dashboard/BentoDashboard.tsx");
+  assert.match(src, /className="group flex flex-wrap items-center gap-x-4 gap-y-1 p-3 rounded-2xl[^"]*sm:flex-nowrap"/,
+    "la ligne d'activité ne se replie plus sur téléphone : les mesures écrasent le titre");
+  assert.match(src, /className="order-last flex w-full gap-3 pl-\[52px\] text-sm text-zinc-600 sm:order-none sm:w-auto sm:flex-shrink-0/,
+    "les mesures ne passent plus sur leur propre ligne sous le titre");
+});
+
 test("les libellés de la barre existent dans les cinq langues", () => {
   const src = readFileSync(BARRE, "utf8");
   for (const cle of ["accueil", "carte", "enregistrer", "calendrier", "plus", "tout", "fermer"]) {
