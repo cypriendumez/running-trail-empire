@@ -25,6 +25,10 @@ export async function POST(req: Request) {
   if (Array.isArray(body.notifsMasquees)) {
     patch.notifsMasquees = body.notifsMasquees.filter((x): x is string => typeof x === "string").map((x) => x.slice(0, 80)).slice(-50);
   }
+  // Le contact d'urgence (onglet Santé › Sécurité) : jusqu'au 22/09/2026 le bouton
+  // « Enregistrer » affichait un succès… sans rien écrire nulle part.
+  if (typeof body.contactUrgenceNom === "string") patch.contactUrgenceNom = body.contactUrgenceNom.slice(0, 80);
+  if (typeof body.contactUrgenceTel === "string") patch.contactUrgenceTel = body.contactUrgenceTel.replace(/[^0-9+ .()-]/g, "").slice(0, 30);
   // Préférences booléennes (notifications + confidentialité). Stockées centralement,
   // lues par les générateurs de notifications / les pages Ligues & Communauté.
   for (const k of ["weeklyDigest", "recoveryAlerts", "coachTips", "sessionReminders", "leaguePublic", "communityVisible"]) {

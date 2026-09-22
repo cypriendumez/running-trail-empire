@@ -155,6 +155,21 @@ const MOTS_CONSEIL = [
  *  ⚠️ AUCUNE RACINE GÉNÉRIQUE ICI. « course » attraperait « où je vois mes courses à
  *  venir », qui est bien de la navigation et que la base traite en 0 ms. On ne liste que
  *  des termes qui ne peuvent désigner qu'un fait d'entraînement. */
+/**
+ * ⚠️ UNE DOULEUR N'EST JAMAIS UNE QUESTION DE NAVIGATION. Constaté le 22/09/2026 :
+ * après avoir enrichi la fiche « Santé » de la base de connaissances (elle décrit
+ * maintenant le kiné IA, les douleurs, le bilan…), « j'ai mal au genou depuis 3 jours »
+ * a commencé à recevoir cette fiche — une carte « voici où cliquer » en réponse à
+ * quelqu'un qui a mal. Ces racines ferment la porte quelle que soit la richesse de la
+ * fiche : ces questions vont au modèle, qui écoute, ou au kiné IA.
+ */
+const RACINES_SANTE = [
+  "mal au", "mal a la", "mal aux", "douleur", "blesse", "blessure", "genou", "tendon", "cheville",
+  "mollet", "ischio", "periostite", "fracture", "entorse", "boite", "inflamm",
+  "pain", "hurts", "injur", "knee", "ankle", "calf", "tendon", "shin",
+  "schmerz", "verletz", "knie", "dolor", "lesion", "rodilla", "dor", "lesao", "joelho",
+];
+
 const RACINES_COURSE = [
   "vma", "seuil", "fractionn", "footing", "sortie longue", "allure", "echauff",
   "recuper", "etirer", "etirement", "hydrat", "glucide", "gel ", "gels",
@@ -175,6 +190,8 @@ export function reponseImmediate(question: string, lang = "fr"): string | null {
   // Le SUJET, pas seulement la tournure : parler de course à pied, c'est déjà sortir de
   // la navigation.
   if (RACINES_COURSE.some((m) => n.includes(m))) return null;
+  // La santé avant tout : voir RACINES_SANTE.
+  if (RACINES_SANTE.some((m) => n.includes(m))) return null;
   const jetons = new Set(n.split(" "));
   if (MOTS_CONSEIL.some((m) => jetons.has(m))) return null;
   const t = chercherSansIA(question, lang);

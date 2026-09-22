@@ -5,13 +5,16 @@ import { motion, AnimatePresence, useMotionValue, animate as fmAnimate } from "f
 import {
   Shield, Heart, Utensils, Stethoscope, AlertTriangle,
   Phone, CheckCircle2, Zap, Droplets, BookOpen, Send, Loader2, Sparkles, Scale, Camera, X, Activity,
+  MapPin, ListChecks, ClipboardList, CalendarPlus, RotateCcw, ChevronDown,
 } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { SmartJournal } from "@/components/journal/SmartJournal";
 import { WeightMode } from "@/components/health/WeightMode";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { RichText } from "@/components/ui/RichText";
 import type { SuiviZone, Tendance } from "@/lib/health/douleurs";
+import type { Bilan } from "@/lib/health/bilan";
 
 // ── i18n local (5 langues) — la page Santé naît traduite. ───────────────────────
 type Tr = (k: string, p?: Record<string, string | number>) => string;
@@ -21,7 +24,7 @@ function fill(s: string, p?: Record<string, string | number>) {
 const H: Record<string, Record<string, string>> = {
   fr: {
     "h.enPanne": "Tes douleurs déclarées n'ont pas pu être chargées. Cet historique paraît vide, mais rien n'est perdu — réessaie dans un instant.", "h.title": "Santé & Performance", "h.subtitle": "Votre kiné IA, votre journal, votre sécurité et votre nutrition — au même endroit.",
-    "tab.kine": "Kiné IA", "tab.journal": "Journal", "tab.guardian": "Guardian", "tab.nutrition": "Nutrition", "tab.poids": "Poids",
+    "tab.kine": "Kiné IA", "tab.journal": "Journal", "tab.guardian": "Sécurité", "tab.nutrition": "Nutrition", "tab.poids": "Poids",
     "k.where": "Où as-tu mal ?", "view.face": "Face", "view.dos": "Dos",
     "k.hint": "Touche une zone sur le corps ou dans la liste, ajuste la douleur, puis demande au kiné.",
     "k.pain": "Douleur", "k.painLight": "Gêne légère", "k.painHard": "Très douloureux",
@@ -34,13 +37,17 @@ const H: Record<string, Record<string, string>> = {
     "chat.disclaimer": "⚕️ Conseils informatifs — ne remplacent pas un avis médical. Douleur forte / persistante → consultez.",
     "chat.errNoReply": "Je n'ai pas pu répondre, réessayez.", "chat.errConn": "Connexion impossible au kiné IA. Réessayez.",
     "k.askPrompt": "J'ai une douleur au niveau : {zone} (intensité {n}/10). Qu'est-ce que ça peut être, et que dois-je faire concrètement ?",
-    "gd.title": "Guardian Mode", "gd.sub": "Sécurité active en course", "gd.on": "Guardian activé !", "gd.off": "Guardian désactivé",
-    "gd.active": "Guardian actif — surveillance en temps réel", "gd.activeDesc": "Détection de chute · Arrêt cardiaque · Alerte GPS automatique",
-    "gd.f1": "Détection de chute", "gd.f1d": "Accéléromètre + gyroscope", "gd.f2": "Arrêt cardiaque", "gd.f2d": "Via montre connectée (HRV)",
-    "gd.f3": "Position GPS live", "gd.f3d": "Partagée avec les contacts d'urgence", "gd.f4": "Alerte automatique", "gd.f4d": "SMS + appel si pas de réponse en 2 min",
-    "gd.emergency": "Contact d'urgence", "gd.name": "Prénom Nom", "gd.namePh": "Jean Dupont", "gd.phone": "Téléphone",
-    "gd.saveContact": "Enregistrer le contact", "gd.savedContact": "Contact sauvegardé !",
-    "gd.testTitle": "Test de l'alerte", "gd.testBtn": "Envoyer un message test", "gd.testToast": "Test envoyé à votre contact d'urgence",
+    "sec.title": "Sécurité en course", "sec.sub": "Ce que Pacevo fait vraiment pour ta sécurité — et ce qui reste entre tes mains.",
+    "sec.live": "Partage ta position en direct", "sec.liveDesc": "Depuis la Carte, un lien de suivi envoie ta position en temps réel à un proche — sans compte ni installation de son côté.", "sec.liveBtn": "Ouvrir la Carte",
+    "sec.contact": "Contact d'urgence", "sec.contactDesc": "Enregistré dans tes réglages et affiché ici. Pacevo n'appelle et n'écrit à personne : en cas de problème, c'est toi — ou un témoin — qui appelle.",
+    "gd.name": "Prénom Nom", "gd.namePh": "Jean Dupont", "gd.phone": "Téléphone", "gd.saveContact": "Enregistrer le contact", "gd.savedContact": "Contact enregistré.", "sec.saveFail": "Contact non enregistré — réessaie.", "sec.call": "Appeler",
+    "sec.honest": "Pacevo ne détecte pas les chutes et n'alerte personne automatiquement : aucune application ne le fait sans le matériel dédié. La détection d'incident de ta montre (Garmin, Apple, Coros…) reste la référence — active-la là-bas.",
+    "sec.kit": "Avant une sortie en montagne", "sec.k1": "Dis à quelqu'un où tu vas et quand tu rentres.", "sec.k2": "Téléphone chargé, sifflet, couverture de survie, veste imperméable.", "sec.k3": "Eau et sel sur les longues sorties par chaleur ; boire à la soif.", "sec.k4": "Numéros d'urgence : 112 (Europe), 15 SAMU, 18 pompiers.", "sec.k5": "Lampe et vêtement réfléchissant dès la pénombre.",
+    "chat.new": "Nouvelle consultation", "chat.newConfirm": "Effacer la conversation ? Tes douleurs déclarées restent dans ton suivi.", "chat.resumed": "Consultation précédente reprise — le kiné se souvient de vos échanges.", "chat.newFail": "Effacement impossible, réessaie.",
+    "k.mapOpen": "Où as-tu mal ? Montrer le schéma", "k.mapClose": "Masquer le schéma", "k.zoneChip": "{zone} · {n}/10",
+    "bilan.title": "Bilan de la consultation", "bilan.hyp": "Hypothèses", "bilan.urgent": "Drapeau rouge : consulte rapidement un médecin. Le kiné IA ne remplace pas un avis médical.", "bilan.exos": "Exercices", "bilan.charge": "Charge", "bilan.reprise": "Reprise",
+    "bilan.plan": "Programmer 2 semaines dans mon calendrier", "bilan.planned": "{n} séances ajoutées au calendrier (un jour sur deux).", "bilan.planFail": "Le calendrier n'a pas pu être écrit.", "bilan.voirCal": "Voir le calendrier",
+    "bilan.proba.haute": "probable", "bilan.proba.moyenne": "possible", "bilan.proba.faible": "peu probable",
     "n.title": "Nutrition Lab — Stratégie de course", "n.duration": "Durée de l'épreuve (heures)", "n.temp": "Température prévue (°C)",
     "n.carbs": "g glucides/h", "n.water": "ml eau/h", "n.sodium": "mg sodium/h", "n.caffeine": "mg caféine total", "n.plan": "Plan de ravitaillement", "n.total": "Total course",
     "n.food1": "Gel énergétique + eau", "n.food2": "Barre + compote + eau", "n.food3": "Gel + eau + électrolytes",
@@ -59,7 +66,7 @@ const H: Record<string, Record<string, string>> = {
   },
   en: {
     "h.enPanne": "Your reported pains could not be loaded. This history looks empty, but nothing is lost — try again in a moment.", "h.title": "Health & Performance", "h.subtitle": "Your AI physio, your journal, your safety and your nutrition — all in one place.",
-    "tab.kine": "AI Physio", "tab.journal": "Journal", "tab.guardian": "Guardian", "tab.nutrition": "Nutrition", "tab.poids": "Weight",
+    "tab.kine": "AI Physio", "tab.journal": "Journal", "tab.guardian": "Safety", "tab.nutrition": "Nutrition", "tab.poids": "Weight",
     "k.where": "Where does it hurt?", "view.face": "Front", "view.dos": "Back",
     "k.hint": "Tap a zone on the body or in the list, adjust the pain, then ask the physio.",
     "k.pain": "Pain", "k.painLight": "Mild discomfort", "k.painHard": "Very painful",
@@ -72,13 +79,17 @@ const H: Record<string, Record<string, string>> = {
     "chat.disclaimer": "⚕️ Informational advice — not a substitute for medical care. Severe / persistent pain → see a doctor.",
     "chat.errNoReply": "I couldn't reply, please try again.", "chat.errConn": "Couldn't connect to the AI physio. Try again.",
     "k.askPrompt": "I have pain in: {zone} (intensity {n}/10). What could it be, and what should I concretely do?",
-    "gd.title": "Guardian Mode", "gd.sub": "Active safety during your run", "gd.on": "Guardian enabled!", "gd.off": "Guardian disabled",
-    "gd.active": "Guardian active — real-time monitoring", "gd.activeDesc": "Fall detection · Cardiac arrest · Automatic GPS alert",
-    "gd.f1": "Fall detection", "gd.f1d": "Accelerometer + gyroscope", "gd.f2": "Cardiac arrest", "gd.f2d": "Via connected watch (HRV)",
-    "gd.f3": "Live GPS position", "gd.f3d": "Shared with emergency contacts", "gd.f4": "Automatic alert", "gd.f4d": "SMS + call if no reply within 2 min",
-    "gd.emergency": "Emergency contact", "gd.name": "First & last name", "gd.namePh": "John Smith", "gd.phone": "Phone",
-    "gd.saveContact": "Save contact", "gd.savedContact": "Contact saved!",
-    "gd.testTitle": "Alert test", "gd.testBtn": "Send a test message", "gd.testToast": "Test sent to your emergency contact",
+    "sec.title": "Safety on the run", "sec.sub": "What Pacevo really does for your safety — and what stays in your hands.",
+    "sec.live": "Share your live position", "sec.liveDesc": "From the Map, a tracking link sends your real-time position to someone close — no account or install on their side.", "sec.liveBtn": "Open the Map",
+    "sec.contact": "Emergency contact", "sec.contactDesc": "Saved in your settings and shown here. Pacevo calls or messages nobody: if something happens, you — or a witness — make the call.",
+    "gd.name": "First & last name", "gd.namePh": "John Smith", "gd.phone": "Phone", "gd.saveContact": "Save contact", "gd.savedContact": "Contact saved.", "sec.saveFail": "Contact not saved — try again.", "sec.call": "Call",
+    "sec.honest": "Pacevo doesn't detect falls and alerts nobody automatically: no app does without dedicated hardware. Your watch's incident detection (Garmin, Apple, Coros…) remains the reference — enable it there.",
+    "sec.kit": "Before a mountain outing", "sec.k1": "Tell someone where you go and when you'll be back.", "sec.k2": "Charged phone, whistle, survival blanket, waterproof jacket.", "sec.k3": "Water and salt on long hot runs; drink to thirst.", "sec.k4": "Emergency numbers: 112 (Europe).", "sec.k5": "Light and reflective clothing from dusk.",
+    "chat.new": "New consultation", "chat.newConfirm": "Clear the conversation? Your reported pains stay in your history.", "chat.resumed": "Previous consultation resumed — the physio remembers your exchanges.", "chat.newFail": "Couldn't clear, try again.",
+    "k.mapOpen": "Where does it hurt? Show the body map", "k.mapClose": "Hide the body map", "k.zoneChip": "{zone} · {n}/10",
+    "bilan.title": "Consultation summary", "bilan.hyp": "Hypotheses", "bilan.urgent": "Red flag: see a doctor promptly. The AI physio is no substitute for medical advice.", "bilan.exos": "Exercises", "bilan.charge": "Load", "bilan.reprise": "Return",
+    "bilan.plan": "Schedule 2 weeks in my calendar", "bilan.planned": "{n} sessions added to the calendar (every other day).", "bilan.planFail": "The calendar couldn't be written.", "bilan.voirCal": "See the calendar",
+    "bilan.proba.haute": "likely", "bilan.proba.moyenne": "possible", "bilan.proba.faible": "unlikely",
     "n.title": "Nutrition Lab — Race strategy", "n.duration": "Race duration (hours)", "n.temp": "Expected temperature (°C)",
     "n.carbs": "g carbs/h", "n.water": "ml water/h", "n.sodium": "mg sodium/h", "n.caffeine": "mg caffeine total", "n.plan": "Fueling plan", "n.total": "Race total",
     "n.food1": "Energy gel + water", "n.food2": "Bar + fruit purée + water", "n.food3": "Gel + water + electrolytes",
@@ -97,7 +108,7 @@ const H: Record<string, Record<string, string>> = {
   },
   de: {
     "h.enPanne": "Deine gemeldeten Schmerzen konnten nicht geladen werden. Der Verlauf wirkt leer, es ist aber nichts verloren — versuch es gleich nochmal.", "h.title": "Gesundheit & Leistung", "h.subtitle": "Dein KI-Physio, dein Tagebuch, deine Sicherheit und deine Ernährung — alles an einem Ort.",
-    "tab.kine": "KI-Physio", "tab.journal": "Tagebuch", "tab.guardian": "Guardian", "tab.nutrition": "Ernährung", "tab.poids": "Gewicht",
+    "tab.kine": "KI-Physio", "tab.journal": "Tagebuch", "tab.guardian": "Sicherheit", "tab.nutrition": "Ernährung", "tab.poids": "Gewicht",
     "k.where": "Wo tut es weh?", "view.face": "Vorne", "view.dos": "Hinten",
     "k.hint": "Tippe eine Zone am Körper oder in der Liste an, stelle die Schmerzen ein und frage den Physio.",
     "k.pain": "Schmerz", "k.painLight": "Leichtes Unbehagen", "k.painHard": "Sehr schmerzhaft",
@@ -110,13 +121,17 @@ const H: Record<string, Record<string, string>> = {
     "chat.disclaimer": "⚕️ Informative Hinweise — kein Ersatz für ärztlichen Rat. Starke / anhaltende Schmerzen → zum Arzt.",
     "chat.errNoReply": "Ich konnte nicht antworten, bitte erneut versuchen.", "chat.errConn": "Keine Verbindung zum KI-Physio. Versuche es erneut.",
     "k.askPrompt": "Ich habe Schmerzen im Bereich: {zone} (Intensität {n}/10). Was könnte es sein, und was soll ich konkret tun?",
-    "gd.title": "Guardian-Modus", "gd.sub": "Aktive Sicherheit beim Laufen", "gd.on": "Guardian aktiviert!", "gd.off": "Guardian deaktiviert",
-    "gd.active": "Guardian aktiv — Echtzeit-Überwachung", "gd.activeDesc": "Sturzerkennung · Herzstillstand · Automatischer GPS-Alarm",
-    "gd.f1": "Sturzerkennung", "gd.f1d": "Beschleunigungssensor + Gyroskop", "gd.f2": "Herzstillstand", "gd.f2d": "Über verbundene Uhr (HRV)",
-    "gd.f3": "Live-GPS-Position", "gd.f3d": "Mit Notfallkontakten geteilt", "gd.f4": "Automatischer Alarm", "gd.f4d": "SMS + Anruf, wenn keine Antwort in 2 Min.",
-    "gd.emergency": "Notfallkontakt", "gd.name": "Vor- & Nachname", "gd.namePh": "Max Mustermann", "gd.phone": "Telefon",
-    "gd.saveContact": "Kontakt speichern", "gd.savedContact": "Kontakt gespeichert!",
-    "gd.testTitle": "Alarm-Test", "gd.testBtn": "Testnachricht senden", "gd.testToast": "Test an deinen Notfallkontakt gesendet",
+    "sec.title": "Sicherheit beim Laufen", "sec.sub": "Was Pacevo wirklich für deine Sicherheit tut — und was in deiner Hand bleibt.",
+    "sec.live": "Teile deine Live-Position", "sec.liveDesc": "Von der Karte aus sendet ein Tracking-Link deine Echtzeit-Position an eine nahestehende Person — ohne Konto oder Installation auf ihrer Seite.", "sec.liveBtn": "Karte öffnen",
+    "sec.contact": "Notfallkontakt", "sec.contactDesc": "In deinen Einstellungen gespeichert und hier angezeigt. Pacevo ruft niemanden an und schreibt niemandem: Passiert etwas, rufst du — oder ein Zeuge — an.",
+    "gd.name": "Vor- & Nachname", "gd.namePh": "Max Mustermann", "gd.phone": "Telefon", "gd.saveContact": "Kontakt speichern", "gd.savedContact": "Kontakt gespeichert.", "sec.saveFail": "Kontakt nicht gespeichert — bitte erneut versuchen.", "sec.call": "Anrufen",
+    "sec.honest": "Pacevo erkennt keine Stürze und alarmiert niemanden automatisch: Das tut keine App ohne spezielle Hardware. Die Unfallerkennung deiner Uhr (Garmin, Apple, Coros…) bleibt die Referenz — aktiviere sie dort.",
+    "sec.kit": "Vor einer Bergtour", "sec.k1": "Sag jemandem, wohin du gehst und wann du zurück bist.", "sec.k2": "Geladenes Handy, Pfeife, Rettungsdecke, wasserdichte Jacke.", "sec.k3": "Wasser und Salz auf langen Läufen bei Hitze; nach Durst trinken.", "sec.k4": "Notrufnummern: 112 (Europa).", "sec.k5": "Lampe und reflektierende Kleidung ab der Dämmerung.",
+    "chat.new": "Neue Konsultation", "chat.newConfirm": "Gespräch löschen? Deine gemeldeten Schmerzen bleiben in deinem Verlauf.", "chat.resumed": "Vorherige Konsultation fortgesetzt — der Physio erinnert sich an eure Gespräche.", "chat.newFail": "Löschen nicht möglich, bitte erneut versuchen.",
+    "k.mapOpen": "Wo tut es weh? Körperschema zeigen", "k.mapClose": "Körperschema ausblenden", "k.zoneChip": "{zone} · {n}/10",
+    "bilan.title": "Bilanz der Konsultation", "bilan.hyp": "Hypothesen", "bilan.urgent": "Rote Flagge: Geh zeitnah zum Arzt. Der KI-Physio ersetzt keinen ärztlichen Rat.", "bilan.exos": "Übungen", "bilan.charge": "Belastung", "bilan.reprise": "Wiedereinstieg",
+    "bilan.plan": "2 Wochen in meinen Kalender eintragen", "bilan.planned": "{n} Einheiten in den Kalender eingetragen (jeden zweiten Tag).", "bilan.planFail": "Der Kalender konnte nicht geschrieben werden.", "bilan.voirCal": "Kalender ansehen",
+    "bilan.proba.haute": "wahrscheinlich", "bilan.proba.moyenne": "möglich", "bilan.proba.faible": "unwahrscheinlich",
     "n.title": "Nutrition Lab — Renn-Strategie", "n.duration": "Renndauer (Stunden)", "n.temp": "Erwartete Temperatur (°C)",
     "n.carbs": "g KH/h", "n.water": "ml Wasser/h", "n.sodium": "mg Natrium/h", "n.caffeine": "mg Koffein gesamt", "n.plan": "Verpflegungsplan", "n.total": "Renn-Gesamt",
     "n.food1": "Energie-Gel + Wasser", "n.food2": "Riegel + Fruchtmus + Wasser", "n.food3": "Gel + Wasser + Elektrolyte",
@@ -135,7 +150,7 @@ const H: Record<string, Record<string, string>> = {
   },
   es: {
     "h.enPanne": "Tus dolores declarados no se han podido cargar. Este historial parece vacío, pero no se ha perdido nada — inténtalo de nuevo en un momento.", "h.title": "Salud y Rendimiento", "h.subtitle": "Tu fisio IA, tu diario, tu seguridad y tu nutrición — todo en un solo lugar.",
-    "tab.kine": "Fisio IA", "tab.journal": "Diario", "tab.guardian": "Guardian", "tab.nutrition": "Nutrición", "tab.poids": "Peso",
+    "tab.kine": "Fisio IA", "tab.journal": "Diario", "tab.guardian": "Seguridad", "tab.nutrition": "Nutrición", "tab.poids": "Peso",
     "k.where": "¿Dónde te duele?", "view.face": "Frente", "view.dos": "Espalda",
     "k.hint": "Toca una zona del cuerpo o de la lista, ajusta el dolor y pregunta al fisio.",
     "k.pain": "Dolor", "k.painLight": "Molestia leve", "k.painHard": "Muy doloroso",
@@ -148,13 +163,17 @@ const H: Record<string, Record<string, string>> = {
     "chat.disclaimer": "⚕️ Consejos informativos — no sustituyen un consejo médico. Dolor fuerte / persistente → consulta.",
     "chat.errNoReply": "No he podido responder, inténtalo de nuevo.", "chat.errConn": "No se pudo conectar con el fisio IA. Inténtalo de nuevo.",
     "k.askPrompt": "Tengo dolor en: {zone} (intensidad {n}/10). ¿Qué puede ser y qué debo hacer concretamente?",
-    "gd.title": "Modo Guardian", "gd.sub": "Seguridad activa en carrera", "gd.on": "¡Guardian activado!", "gd.off": "Guardian desactivado",
-    "gd.active": "Guardian activo — monitorización en tiempo real", "gd.activeDesc": "Detección de caídas · Paro cardíaco · Alerta GPS automática",
-    "gd.f1": "Detección de caídas", "gd.f1d": "Acelerómetro + giroscopio", "gd.f2": "Paro cardíaco", "gd.f2d": "Mediante reloj conectado (VFC)",
-    "gd.f3": "Posición GPS en vivo", "gd.f3d": "Compartida con los contactos de emergencia", "gd.f4": "Alerta automática", "gd.f4d": "SMS + llamada si no respondes en 2 min",
-    "gd.emergency": "Contacto de emergencia", "gd.name": "Nombre y apellidos", "gd.namePh": "Juan Pérez", "gd.phone": "Teléfono",
-    "gd.saveContact": "Guardar contacto", "gd.savedContact": "¡Contacto guardado!",
-    "gd.testTitle": "Prueba de alerta", "gd.testBtn": "Enviar un mensaje de prueba", "gd.testToast": "Prueba enviada a tu contacto de emergencia",
+    "sec.title": "Seguridad en carrera", "sec.sub": "Lo que Pacevo hace de verdad por tu seguridad — y lo que queda en tus manos.",
+    "sec.live": "Comparte tu posición en directo", "sec.liveDesc": "Desde el Mapa, un enlace de seguimiento envía tu posición en tiempo real a alguien cercano — sin cuenta ni instalación por su parte.", "sec.liveBtn": "Abrir el Mapa",
+    "sec.contact": "Contacto de emergencia", "sec.contactDesc": "Guardado en tus ajustes y mostrado aquí. Pacevo no llama ni escribe a nadie: si pasa algo, eres tú — o un testigo — quien llama.",
+    "gd.name": "Nombre y apellidos", "gd.namePh": "Juan Pérez", "gd.phone": "Teléfono", "gd.saveContact": "Guardar contacto", "gd.savedContact": "Contacto guardado.", "sec.saveFail": "Contacto no guardado — inténtalo de nuevo.", "sec.call": "Llamar",
+    "sec.honest": "Pacevo no detecta caídas ni avisa a nadie automáticamente: ninguna aplicación lo hace sin el material dedicado. La detección de incidentes de tu reloj (Garmin, Apple, Coros…) sigue siendo la referencia — actívala allí.",
+    "sec.kit": "Antes de una salida de montaña", "sec.k1": "Di a alguien adónde vas y cuándo vuelves.", "sec.k2": "Móvil cargado, silbato, manta térmica, chaqueta impermeable.", "sec.k3": "Agua y sal en las tiradas largas con calor; bebe según la sed.", "sec.k4": "Números de emergencia: 112 (Europa).", "sec.k5": "Luz y ropa reflectante desde el anochecer.",
+    "chat.new": "Nueva consulta", "chat.newConfirm": "¿Borrar la conversación? Tus dolores declarados siguen en tu historial.", "chat.resumed": "Consulta anterior retomada — el fisio recuerda vuestros intercambios.", "chat.newFail": "No se pudo borrar, inténtalo de nuevo.",
+    "k.mapOpen": "¿Dónde te duele? Mostrar el esquema", "k.mapClose": "Ocultar el esquema", "k.zoneChip": "{zone} · {n}/10",
+    "bilan.title": "Balance de la consulta", "bilan.hyp": "Hipótesis", "bilan.urgent": "Bandera roja: consulta pronto a un médico. El fisio IA no sustituye un consejo médico.", "bilan.exos": "Ejercicios", "bilan.charge": "Carga", "bilan.reprise": "Vuelta",
+    "bilan.plan": "Programar 2 semanas en mi calendario", "bilan.planned": "{n} sesiones añadidas al calendario (un día sí, otro no).", "bilan.planFail": "No se pudo escribir en el calendario.", "bilan.voirCal": "Ver el calendario",
+    "bilan.proba.haute": "probable", "bilan.proba.moyenne": "posible", "bilan.proba.faible": "poco probable",
     "n.title": "Nutrition Lab — Estrategia de carrera", "n.duration": "Duración de la prueba (horas)", "n.temp": "Temperatura prevista (°C)",
     "n.carbs": "g carbohidratos/h", "n.water": "ml agua/h", "n.sodium": "mg sodio/h", "n.caffeine": "mg cafeína total", "n.plan": "Plan de avituallamiento", "n.total": "Total carrera",
     "n.food1": "Gel energético + agua", "n.food2": "Barrita + compota + agua", "n.food3": "Gel + agua + electrolitos",
@@ -173,7 +192,7 @@ const H: Record<string, Record<string, string>> = {
   },
   pt: {
     "h.enPanne": "As tuas dores declaradas não puderam ser carregadas. Este histórico parece vazio, mas nada se perdeu — tenta novamente daqui a pouco.", "h.title": "Saúde e Desempenho", "h.subtitle": "O teu fisio IA, o teu diário, a tua segurança e a tua nutrição — tudo no mesmo sítio.",
-    "tab.kine": "Fisio IA", "tab.journal": "Diário", "tab.guardian": "Guardian", "tab.nutrition": "Nutrição", "tab.poids": "Peso",
+    "tab.kine": "Fisio IA", "tab.journal": "Diário", "tab.guardian": "Segurança", "tab.nutrition": "Nutrição", "tab.poids": "Peso",
     "k.where": "Onde te dói?", "view.face": "Frente", "view.dos": "Costas",
     "k.hint": "Toca numa zona do corpo ou na lista, ajusta a dor e pergunta ao fisio.",
     "k.pain": "Dor", "k.painLight": "Desconforto ligeiro", "k.painHard": "Muito doloroso",
@@ -186,13 +205,17 @@ const H: Record<string, Record<string, string>> = {
     "chat.disclaimer": "⚕️ Conselhos informativos — não substituem aconselhamento médico. Dor forte / persistente → consulta.",
     "chat.errNoReply": "Não consegui responder, tenta novamente.", "chat.errConn": "Não foi possível ligar ao fisio IA. Tenta novamente.",
     "k.askPrompt": "Tenho dor em: {zone} (intensidade {n}/10). O que pode ser e o que devo fazer concretamente?",
-    "gd.title": "Modo Guardian", "gd.sub": "Segurança ativa em prova", "gd.on": "Guardian ativado!", "gd.off": "Guardian desativado",
-    "gd.active": "Guardian ativo — monitorização em tempo real", "gd.activeDesc": "Deteção de quedas · Paragem cardíaca · Alerta GPS automático",
-    "gd.f1": "Deteção de quedas", "gd.f1d": "Acelerómetro + giroscópio", "gd.f2": "Paragem cardíaca", "gd.f2d": "Via relógio ligado (VFC)",
-    "gd.f3": "Posição GPS em direto", "gd.f3d": "Partilhada com os contactos de emergência", "gd.f4": "Alerta automático", "gd.f4d": "SMS + chamada se não responderes em 2 min",
-    "gd.emergency": "Contacto de emergência", "gd.name": "Nome completo", "gd.namePh": "João Silva", "gd.phone": "Telefone",
-    "gd.saveContact": "Guardar contacto", "gd.savedContact": "Contacto guardado!",
-    "gd.testTitle": "Teste de alerta", "gd.testBtn": "Enviar uma mensagem de teste", "gd.testToast": "Teste enviado ao teu contacto de emergência",
+    "sec.title": "Segurança em prova", "sec.sub": "O que a Pacevo faz mesmo pela tua segurança — e o que fica nas tuas mãos.",
+    "sec.live": "Partilha a tua posição em direto", "sec.liveDesc": "A partir do Mapa, uma ligação de seguimento envia a tua posição em tempo real a alguém próximo — sem conta nem instalação do lado dele.", "sec.liveBtn": "Abrir o Mapa",
+    "sec.contact": "Contacto de emergência", "sec.contactDesc": "Guardado nas tuas definições e mostrado aqui. A Pacevo não liga nem escreve a ninguém: se algo acontecer, és tu — ou uma testemunha — quem liga.",
+    "gd.name": "Nome completo", "gd.namePh": "João Silva", "gd.phone": "Telefone", "gd.saveContact": "Guardar contacto", "gd.savedContact": "Contacto guardado.", "sec.saveFail": "Contacto não guardado — tenta de novo.", "sec.call": "Ligar",
+    "sec.honest": "A Pacevo não deteta quedas nem alerta ninguém automaticamente: nenhuma aplicação o faz sem o material dedicado. A deteção de incidentes do teu relógio (Garmin, Apple, Coros…) continua a ser a referência — ativa-a lá.",
+    "sec.kit": "Antes de uma saída de montanha", "sec.k1": "Diz a alguém para onde vais e quando voltas.", "sec.k2": "Telemóvel carregado, apito, manta térmica, casaco impermeável.", "sec.k3": "Água e sal nas saídas longas com calor; bebe pela sede.", "sec.k4": "Números de emergência: 112 (Europa).", "sec.k5": "Luz e roupa refletora desde o anoitecer.",
+    "chat.new": "Nova consulta", "chat.newConfirm": "Apagar a conversa? As tuas dores declaradas ficam no teu histórico.", "chat.resumed": "Consulta anterior retomada — o fisio lembra-se das vossas trocas.", "chat.newFail": "Não foi possível apagar, tenta de novo.",
+    "k.mapOpen": "Onde te dói? Mostrar o esquema", "k.mapClose": "Esconder o esquema", "k.zoneChip": "{zone} · {n}/10",
+    "bilan.title": "Balanço da consulta", "bilan.hyp": "Hipóteses", "bilan.urgent": "Bandeira vermelha: consulta rapidamente um médico. O fisio IA não substitui um parecer médico.", "bilan.exos": "Exercícios", "bilan.charge": "Carga", "bilan.reprise": "Retoma",
+    "bilan.plan": "Programar 2 semanas no meu calendário", "bilan.planned": "{n} sessões adicionadas ao calendário (dia sim, dia não).", "bilan.planFail": "Não foi possível escrever no calendário.", "bilan.voirCal": "Ver o calendário",
+    "bilan.proba.haute": "provável", "bilan.proba.moyenne": "possível", "bilan.proba.faible": "pouco provável",
     "n.title": "Nutrition Lab — Estratégia de prova", "n.duration": "Duração da prova (horas)", "n.temp": "Temperatura prevista (°C)",
     "n.carbs": "g hidratos/h", "n.water": "ml água/h", "n.sodium": "mg sódio/h", "n.caffeine": "mg cafeína total", "n.plan": "Plano de abastecimento", "n.total": "Total da corrida",
     "n.food1": "Gel energético + água", "n.food2": "Barra + compota + água", "n.food3": "Gel + água + eletrólitos",
@@ -309,7 +332,15 @@ function AnimatedNumber({ value, className }: { value: number; className?: strin
   return <span className={className}>{display.toLocaleString()}</span>;
 }
 
-export function HealthCenter({ suivi = [], enPanne = false }: { suivi?: SuiviZone[]; /** La lecture des douleurs a ÉCHOUÉ : l'historique est vide par accident. */ enPanne?: boolean }) {
+export function HealthCenter({ suivi = [], enPanne = false, filInitial = [], contactInitial = { nom: "", tel: "" } }: {
+  suivi?: SuiviZone[];
+  /** La lecture des douleurs a ÉCHOUÉ : l'historique est vide par accident. */
+  enPanne?: boolean;
+  /** La consultation précédente, relue côté serveur (type `kine_chat`). */
+  filInitial?: { role: "user" | "model"; text: string }[];
+  /** Le contact d'urgence enregistré dans les réglages. */
+  contactInitial?: { nom: string; tel: string };
+}) {
   // Chaque libellé est relié à son champ : sans cela, un lecteur d'écran annonce
   // le placeholder — ou rien — à la place du texte affiché.
   const cid = useId();
@@ -319,16 +350,24 @@ export function HealthCenter({ suivi = [], enPanne = false }: { suivi?: SuiviZon
   const [view, setView] = useState<"face" | "dos">("face");
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [painLevel, setPainLevel] = useState(5);
-  const [guardianEnabled, setGuardianEnabled] = useState(false);
-  const [emergencyName, setEmergencyName] = useState("");
-  const [emergencyPhone, setEmergencyPhone] = useState("");
+  const [emergencyName, setEmergencyName] = useState(contactInitial.nom);
+  const [emergencyPhone, setEmergencyPhone] = useState(contactInitial.tel);
+  const [contactEnCours, setContactEnCours] = useState(false);
   const [raceHours, setRaceHours] = useState(6);
   const [raceTemp, setRaceTemp] = useState(15);
 
   // ── Chat kiné IA ──────────────────────────────────────────────
-  const [messages, setMessages] = useState<ChatMsg[]>([
-    { role: "model", text: tr("chat.seed") },
-  ]);
+  // ⚠️ LA CONSULTATION REPREND OÙ ELLE S'EST ARRÊTÉE (22/09/2026). Avant, le fil vivait
+  // dans l'état du composant : changer d'onglet suffisait à faire « oublier » au kiné
+  // tout ce qu'on venait de lui décrire. Le serveur rend les 40 derniers messages.
+  const [messages, setMessages] = useState<ChatMsg[]>(
+    filInitial.length > 0 ? filInitial : [{ role: "model", text: tr("chat.seed") }],
+  );
+  /** Le dernier bilan structuré rendu par le kiné (hypothèses, exercices, charge). */
+  const [bilan, setBilan] = useState<Bilan | null>(null);
+  const [planEnCours, setPlanEnCours] = useState(false);
+  /** Sur téléphone, le schéma corporel s'ouvre à la demande : il prenait tout l'écran. */
+  const [schemaOuvert, setSchemaOuvert] = useState(false);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -411,7 +450,7 @@ export function HealthCenter({ suivi = [], enPanne = false }: { suivi?: SuiviZon
         }),
       });
       const json = await res.json();
-      if (json.reply) setMessages((m) => [...m, { role: "model", text: json.reply }]);
+      if (json.reply) { setMessages((m) => [...m, { role: "model", text: json.reply }]); setBilan(json.bilan ?? null); }
       else setMessages((m) => [...m, { role: "model", text: "⚠️ " + (json.error || tr("chat.errNoReply")) }]);
     } catch {
       setMessages((m) => [...m, { role: "model", text: "⚠️ " + tr("chat.errConn") }]);
@@ -419,6 +458,47 @@ export function HealthCenter({ suivi = [], enPanne = false }: { suivi?: SuiviZon
       setSending(false);
     }
   }, [messages, sending, selectedSlot, view, painLevel, lang, photo]);
+
+  /** Le contact d'urgence : ÉCRIT dans les réglages, et l'échec est dit. */
+  async function enregistrerContact() {
+    setContactEnCours(true);
+    try {
+      const r = await fetch("/api/settings", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contactUrgenceNom: emergencyName.trim(), contactUrgenceTel: emergencyPhone.trim() }),
+      });
+      if (r.ok) toast.success(tr("gd.savedContact"));
+      else toast.error(tr("sec.saveFail"));
+    } catch { toast.error(tr("sec.saveFail")); }
+    setContactEnCours(false);
+  }
+
+  /** « Nouvelle consultation » : le fil est effacé côté serveur AVANT l'écran. */
+  async function nouvelleConsultation() {
+    if (!window.confirm(tr("chat.newConfirm"))) return;
+    try {
+      const r = await fetch("/api/health/consultation", { method: "DELETE" });
+      if (!r.ok) { toast.error(tr("chat.newFail")); return; }
+      setMessages([{ role: "model", text: tr("chat.seed") }]);
+      setBilan(null);
+    } catch { toast.error(tr("chat.newFail")); }
+  }
+
+  /** Le protocole du bilan → six notes dans le calendrier (deux semaines). */
+  async function programmerProtocole() {
+    if (!bilan?.exercices.length || planEnCours) return;
+    setPlanEnCours(true);
+    try {
+      const r = await fetch("/api/health/protocole", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ zone: selectedZone ? tr(selectedZone.labelKey) : null, exercices: bilan.exercices }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) toast.success(tr("bilan.planned", { n: j.n ?? 0 }));
+      else toast.error(j.error || tr("bilan.planFail"));
+    } catch { toast.error(tr("bilan.planFail")); }
+    setPlanEnCours(false);
+  }
 
   const askAboutZone = () => {
     if (!selectedZone) return;
@@ -436,17 +516,19 @@ export function HealthCenter({ suivi = [], enPanne = false }: { suivi?: SuiviZon
       )}
       {/* En-tête — hero */}
       <div className="flex items-center gap-3.5">
-        <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-[0_10px_26px_-10px_rgba(16,185,129,0.65)]">
+        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white sm:h-12 sm:w-12 shadow-[0_10px_26px_-10px_rgba(16,185,129,0.65)]">
           <Heart className="h-6 w-6" />
         </span>
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900">{tr("h.title")}</h1>
-          <p className="mt-0.5 text-sm text-zinc-500">{tr("h.subtitle")}</p>
+          <h1 className="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl">{tr("h.title")}</h1>
+          <p className="mt-0.5 line-clamp-2 text-[13px] text-zinc-500 sm:text-sm">{tr("h.subtitle")}</p>
         </div>
       </div>
 
       {/* Onglets — pastille active qui glisse en douceur */}
-      <div className="flex flex-wrap gap-1 rounded-2xl bg-zinc-100/80 p-1 w-fit ring-1 ring-zinc-200/60">
+      {/* Défilement horizontal sur téléphone : cinq onglets à icône ne tiennent pas dans
+          375 px, et `flex-wrap` les cassait sur deux lignes au-dessus du contenu. */}
+      <div className="-mx-1 flex gap-1 overflow-x-auto rounded-2xl bg-zinc-100/80 p-1 ring-1 ring-zinc-200/60 [scrollbar-width:none] sm:mx-0 sm:w-fit sm:overflow-visible">
         {([
           { v: "kine", l: tr("tab.kine"), icon: Stethoscope },
           { v: "journal", l: tr("tab.journal"), icon: BookOpen },
@@ -457,7 +539,7 @@ export function HealthCenter({ suivi = [], enPanne = false }: { suivi?: SuiviZon
           const active = tab === t.v;
           return (
             <button key={t.v} onClick={() => setTab(t.v)}
-              className={`relative flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors sm:px-5 ${active ? "text-zinc-900" : "text-zinc-500 hover:text-zinc-700"}`}>
+              className={`relative flex flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-colors sm:px-5 ${active ? "text-zinc-900" : "text-zinc-500 hover:text-zinc-700"}`}>
               {active && (
                 <motion.span layoutId="health-tab-pill" transition={{ type: "spring", stiffness: 420, damping: 34 }}
                   className="absolute inset-0 rounded-xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.06),0_6px_16px_-8px_rgba(16,24,40,0.18)]" />
@@ -472,13 +554,22 @@ export function HealthCenter({ suivi = [], enPanne = false }: { suivi?: SuiviZon
         {/* ── KINÉ IA ── */}
         {tab === "kine" && (
           <motion.div key="kine" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25, ease: "easeOut" }}
-            className="grid grid-cols-12 gap-4">
+            // ⚠️ SUR TÉLÉPHONE, LA CONSULTATION D'ABORD (22/09/2026). Le schéma corporel
+            // et sa liste de 24 zones occupaient le premier écran entier : le chat — ce
+            // pour quoi on ouvre l'onglet — commençait sous la ligne de flottaison.
+            // `order` remet le chat en tête sous lg ; la grille à 12 colonnes n'existe
+            // qu'à partir de lg (sinon 11 gouttières dans 287 px, cf. la page Cours).
+            className="grid grid-cols-1 gap-4 lg:grid-cols-12">
 
             {/* Schéma corporel + sélection de zone */}
-            <div className="col-span-12 lg:col-span-5 space-y-4">
+            <div className="order-2 space-y-4 lg:order-none lg:col-span-5">
               <div className="bento-card">
                 <div className="flex items-center justify-between mb-1">
-                  <h3 className="font-semibold text-zinc-900 text-sm">{tr("k.where")}</h3>
+                  <button type="button" onClick={() => setSchemaOuvert((v) => !v)} aria-expanded={schemaOuvert}
+                    className="flex items-center gap-1.5 text-sm font-semibold text-zinc-900 lg:pointer-events-none">
+                    {tr("k.where")}
+                    <ChevronDown className={`h-4 w-4 text-zinc-400 transition-transform lg:hidden ${schemaOuvert ? "rotate-180" : ""}`} />
+                  </button>
                   <div className="flex gap-0.5 p-0.5 bg-zinc-100 rounded-lg text-xs font-semibold">
                     {(["face", "dos"] as const).map((v) => (
                       <button key={v} onClick={() => setView(v)}
@@ -490,6 +581,7 @@ export function HealthCenter({ suivi = [], enPanne = false }: { suivi?: SuiviZon
                 </div>
                 <p className="text-xs text-zinc-400 mb-2">{tr("k.hint")}</p>
 
+                <div className={`${schemaOuvert ? "" : "hidden lg:block"}`}>
                 <div className="grid grid-cols-12 gap-3 items-start">
                   {/* Silhouette interactive */}
                   <div className="col-span-5">
@@ -546,6 +638,7 @@ export function HealthCenter({ suivi = [], enPanne = false }: { suivi?: SuiviZon
                   </div>
                 </div>
 
+                </div>
                 {selectedZone ? (
                   <div className="mt-3 pt-3 border-t border-zinc-100">
                     <label htmlFor={`${cid}-r0`} className="text-xs font-medium text-zinc-500 block mb-1.5">{tr("k.pain")} — <span className="font-semibold text-zinc-800">{tr(selectedZone.labelKey)}</span> : <span className="font-bold" style={{ color: teinteDouleur(painLevel) }}>{painLevel}/10</span></label>
@@ -629,14 +722,25 @@ export function HealthCenter({ suivi = [], enPanne = false }: { suivi?: SuiviZon
             </div>
 
             {/* Chat kiné IA */}
-            <div className="col-span-12 lg:col-span-7 bento-card flex flex-col" style={{ minHeight: 520 }}>
+            <div className="order-1 bento-card flex flex-col lg:order-none lg:col-span-7" style={{ minHeight: 520 }}>
               <div className="flex items-center gap-2 pb-3 border-b border-zinc-100">
-                <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center"><Stethoscope className="w-5 h-5 text-emerald-600" /></div>
-                <div>
+                <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0"><Stethoscope className="w-5 h-5 text-emerald-600" /></div>
+                <div className="min-w-0 flex-1">
                   <div className="font-semibold text-zinc-900 text-sm">{tr("chat.title")}</div>
-                  <div className="text-xs text-zinc-400">{tr("chat.sub")}</div>
+                  <div className="truncate text-xs text-zinc-400">{tr("chat.sub")}</div>
                 </div>
+                {/* La consultation est mémorisée : il faut donc pouvoir en ouvrir une neuve. */}
+                {messages.length > 1 && (
+                  <button type="button" onClick={nouvelleConsultation} title={tr("chat.new")} aria-label={tr("chat.new")}
+                    className="flex flex-shrink-0 items-center gap-1.5 rounded-full border border-zinc-200 px-2.5 py-1.5 text-[11px] font-semibold text-zinc-600 transition-colors hover:border-emerald-300 hover:text-emerald-700">
+                    <RotateCcw className="h-3.5 w-3.5" /><span className="hidden sm:inline">{tr("chat.new")}</span>
+                  </button>
+                )}
               </div>
+              {/* Dire que le fil vient d'avant évite de croire à un bug d'affichage. */}
+              {filInitial.length > 0 && messages.length > 1 && (
+                <p className="mt-2 rounded-xl bg-emerald-50 px-3 py-2 text-[11px] leading-relaxed text-emerald-800">{tr("chat.resumed")}</p>
+              )}
 
               <div ref={scrollRef} className="flex-1 overflow-y-auto py-4 space-y-3" style={{ maxHeight: 440 }}>
                 {messages.map((m, i) => (
@@ -711,6 +815,67 @@ export function HealthCenter({ suivi = [], enPanne = false }: { suivi?: SuiviZon
                 </button>
               </form>
               <p className="text-[11px] text-zinc-400 mt-2">{tr("chat.disclaimer")}</p>
+
+              {/* ── LE BILAN DE LA CONSULTATION ──────────────────────────────────
+                  Une consultation se terminait par un mur de texte : hypothèses,
+                  exercices et consignes se perdaient dedans, et rien n'en sortait. Le
+                  modèle rend désormais un bilan structuré (bloc ```bilan, validé champ
+                  par champ côté serveur) — affiché ici, et surtout PROGRAMMABLE : le
+                  protocole part dans le calendrier, six séances sur deux semaines. */}
+              {bilan && (
+                <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4">
+                  <div className="flex items-center gap-2">
+                    <ClipboardList className="h-4 w-4 text-emerald-700" aria-hidden />
+                    <h4 className="text-sm font-bold text-emerald-900">{tr("bilan.title")}</h4>
+                  </div>
+                  {bilan.urgence && (
+                    <p className="mt-2 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[13px] font-semibold leading-relaxed text-rose-800">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden />{tr("bilan.urgent")}
+                    </p>
+                  )}
+                  {bilan.hypotheses.length > 0 && (
+                    <div className="mt-3">
+                      <div className="text-[11px] font-bold uppercase tracking-wide text-emerald-800/70">{tr("bilan.hyp")}</div>
+                      <ul className="mt-1 space-y-1">
+                        {bilan.hypotheses.map((h) => (
+                          <li key={h.nom} className="flex items-center gap-2 text-[13px] text-zinc-800">
+                            <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${h.probabilite === "haute" ? "bg-emerald-600 text-white" : h.probabilite === "moyenne" ? "bg-emerald-100 text-emerald-800" : "bg-zinc-100 text-zinc-600"}`}>
+                              {tr(`bilan.proba.${h.probabilite}`)}
+                            </span>
+                            {h.nom}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {bilan.exercices.length > 0 && (
+                    <div className="mt-3">
+                      <div className="text-[11px] font-bold uppercase tracking-wide text-emerald-800/70">{tr("bilan.exos")}</div>
+                      <ul className="mt-1 space-y-1">
+                        {bilan.exercices.map((e) => (
+                          <li key={e.nom} className="text-[13px] text-zinc-800">
+                            <b className="font-semibold">{e.nom}</b> — {e.dosage}{e.frequence ? ` · ${e.frequence}` : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {(bilan.charge || bilan.reprise) && (
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      {bilan.charge && <p className="rounded-xl bg-white/70 px-3 py-2 text-[13px] leading-relaxed text-zinc-700"><b className="text-emerald-800">{tr("bilan.charge")} : </b>{bilan.charge}</p>}
+                      {bilan.reprise && <p className="rounded-xl bg-white/70 px-3 py-2 text-[13px] leading-relaxed text-zinc-700"><b className="text-emerald-800">{tr("bilan.reprise")} : </b>{bilan.reprise}</p>}
+                    </div>
+                  )}
+                  {bilan.exercices.length > 0 && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <button type="button" onClick={programmerProtocole} disabled={planEnCours} className="btn-brand justify-center text-sm disabled:opacity-60">
+                        {planEnCours ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarPlus className="h-4 w-4" />}{tr("bilan.plan")}
+                      </button>
+                      <Link href="/dashboard/calendrier" className="text-sm font-semibold text-emerald-700 underline-offset-2 hover:underline">{tr("bilan.voirCal")}</Link>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </motion.div>
         )}
@@ -723,98 +888,88 @@ export function HealthCenter({ suivi = [], enPanne = false }: { suivi?: SuiviZon
         )}
 
         {/* ── GUARDIAN ── */}
+        {/* ── SÉCURITÉ ──────────────────────────────────────────────────────────
+            ⚠️ CET ONGLET ANNONÇAIT CE QUI N'EXISTE PAS (22/09/2026) : « détection de
+            chute (accéléromètre + gyroscope) », « arrêt cardiaque via la montre »,
+            « alerte automatique SMS + appel », et un bouton « Enregistrer le contact »
+            qui affichait un succès sans rien écrire. Aucune de ces quatre choses n'était
+            implémentée — sur une fonction de SÉCURITÉ, c'est la promesse la plus
+            dangereuse qu'une application puisse faire : quelqu'un part seul en montagne
+            en croyant être surveillé. Ce qui reste est ce qui marche vraiment : le
+            partage de position en direct (Carte), un contact d'urgence réellement
+            enregistré et appelable, et la check-list avant une sortie. */}
         {tab === "guardian" && (
           <motion.div key="guardian" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25, ease: "easeOut" }}
-            className="grid grid-cols-2 gap-4">
+            className="grid gap-4 lg:grid-cols-2">
 
-            {/* Console de sécurité */}
-            <div className="bento-card col-span-2 md:col-span-1">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <span className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl transition-colors duration-300 ${guardianEnabled ? "bg-emerald-100 text-emerald-600" : "bg-zinc-100 text-zinc-400"}`}>
-                    <Shield className="h-6 w-6" />
-                  </span>
-                  <div>
-                    <h3 className="text-lg font-bold text-zinc-900">{tr("gd.title")}</h3>
-                    <p className="text-sm text-zinc-500">{tr("gd.sub")}</p>
-                  </div>
+            <div className="bento-card lg:col-span-2">
+              <div className="flex items-center gap-3">
+                <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600"><Shield className="h-6 w-6" /></span>
+                <div className="min-w-0">
+                  <h3 className="text-lg font-bold text-zinc-900">{tr("sec.title")}</h3>
+                  <p className="text-sm text-zinc-500">{tr("sec.sub")}</p>
                 </div>
-                <button onClick={() => { setGuardianEnabled(!guardianEnabled); toast.success(guardianEnabled ? tr("gd.off") : tr("gd.on")); }}
-                  role="switch" aria-checked={guardianEnabled} aria-label={tr("gd.title")}
-                  className={`relative h-7 w-14 flex-shrink-0 rounded-full transition-colors duration-300 ${guardianEnabled ? "bg-emerald-500" : "bg-zinc-200"}`}>
-                  <span className={`absolute top-1 left-1 h-5 w-5 rounded-full bg-white shadow transition-transform duration-300 ${guardianEnabled ? "translate-x-7" : "translate-x-0"}`} />
-                </button>
               </div>
-
-              {/* Bannière d'état (apparition animée) */}
-              <AnimatePresence initial={false}>
-                {guardianEnabled && (
-                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.25 }} className="overflow-hidden">
-                    <div className="mt-4 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-emerald-50 p-4">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-emerald-700">
-                        <span className="relative flex h-2.5 w-2.5">
-                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                        </span>
-                        {tr("gd.active")}
-                      </div>
-                      <p className="mt-1 text-xs text-emerald-600">{tr("gd.activeDesc")}</p>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Capteurs */}
-              <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {[
-                  { icon: "🤸", label: tr("gd.f1"), desc: tr("gd.f1d"), tile: "bg-amber-50 ring-amber-100" },
-                  { icon: "❤️", label: tr("gd.f2"), desc: tr("gd.f2d"), tile: "bg-rose-50 ring-rose-100" },
-                  { icon: "📍", label: tr("gd.f3"), desc: tr("gd.f3d"), tile: "bg-blue-50 ring-blue-100" },
-                  { icon: "📞", label: tr("gd.f4"), desc: tr("gd.f4d"), tile: "bg-violet-50 ring-violet-100" },
-                ].map((f) => (
-                  <div key={f.label} className={`flex items-start gap-2.5 rounded-2xl border border-zinc-100 p-3 transition-colors ${guardianEnabled ? "bg-white" : "bg-zinc-50/60"}`}>
-                    <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-base ring-1 ${f.tile}`}>{f.icon}</span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-semibold text-zinc-900">{f.label}</span>
-                        <CheckCircle2 className={`h-3.5 w-3.5 flex-shrink-0 transition-colors ${guardianEnabled ? "text-emerald-500" : "text-zinc-300"}`} />
-                      </div>
-                      <div className="text-xs leading-snug text-zinc-500">{f.desc}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <p className="mt-3 flex items-start gap-2.5 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-[13px] leading-relaxed text-amber-900">
+                <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" aria-hidden />{tr("sec.honest")}
+              </p>
             </div>
 
-            {/* Contact d'urgence */}
-            <div className="bento-card col-span-2 md:col-span-1">
-              <div className="mb-4 flex items-center gap-2">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600"><Phone className="h-[18px] w-[18px]" /></span>
-                <h3 className="font-semibold text-zinc-900">{tr("gd.emergency")}</h3>
+            {/* Ce qui existe : le partage de position en direct, depuis la Carte. */}
+            <div className="bento-card flex flex-col">
+              <div className="flex items-center gap-2">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-100 text-blue-600"><MapPin className="h-[18px] w-[18px]" /></span>
+                <h3 className="font-semibold text-zinc-900">{tr("sec.live")}</h3>
               </div>
-              <div className="space-y-3">
+              <p className="mt-2 flex-1 text-sm leading-relaxed text-zinc-600">{tr("sec.liveDesc")}</p>
+              <Link href="/dashboard/trail" className="btn-brand mt-3 w-full justify-center"><MapPin className="h-4 w-4" />{tr("sec.liveBtn")}</Link>
+            </div>
+
+            {/* Le contact d'urgence — ENREGISTRÉ pour de bon (api/settings), et appelable. */}
+            <div className="bento-card">
+              <div className="flex items-center gap-2">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600"><Phone className="h-[18px] w-[18px]" /></span>
+                <h3 className="font-semibold text-zinc-900">{tr("sec.contact")}</h3>
+              </div>
+              <p className="mt-2 text-[13px] leading-relaxed text-zinc-500">{tr("sec.contactDesc")}</p>
+              <div className="mt-3 space-y-3">
                 <div>
                   <label htmlFor={`${cid}-c0`} className="mb-1 block text-xs font-medium text-zinc-500">{tr("gd.name")}</label>
                   <input id={`${cid}-c0`} value={emergencyName} onChange={(e) => setEmergencyName(e.target.value)} placeholder={tr("gd.namePh")}
-                    className="w-full rounded-xl border border-zinc-200 bg-zinc-50/60 px-4 py-3 text-sm transition-colors focus:border-emerald-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30" />
+                    className="w-full rounded-xl border border-zinc-200 bg-zinc-50/60 px-4 py-3 text-sm transition-colors focus:border-emerald-400 focus:bg-white focus:outline-none" />
                 </div>
                 <div>
                   <label htmlFor={`${cid}-c1`} className="mb-1 block text-xs font-medium text-zinc-500">{tr("gd.phone")}</label>
                   <input id={`${cid}-c1`} value={emergencyPhone} onChange={(e) => setEmergencyPhone(e.target.value)} placeholder="+33 6 12 34 56 78" type="tel"
-                    className="w-full rounded-xl border border-zinc-200 bg-zinc-50/60 px-4 py-3 text-sm transition-colors focus:border-emerald-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30" />
+                    className="w-full rounded-xl border border-zinc-200 bg-zinc-50/60 px-4 py-3 text-sm transition-colors focus:border-emerald-400 focus:bg-white focus:outline-none" />
                 </div>
-                <button onClick={() => toast.success(tr("gd.savedContact"))} className="btn-brand w-full justify-center">
-                  <Phone className="h-4 w-4" /> {tr("gd.saveContact")}
-                </button>
+                <div className="flex gap-2">
+                  <button onClick={enregistrerContact} disabled={contactEnCours} className="btn-brand flex-1 justify-center disabled:opacity-60">
+                    {contactEnCours ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}{tr("gd.saveContact")}
+                  </button>
+                  {emergencyPhone.trim() && (
+                    <a href={`tel:${emergencyPhone.replace(/[^0-9+]/g, "")}`}
+                      className="flex items-center gap-1.5 rounded-xl border border-emerald-200 px-4 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-50">
+                      <Phone className="h-4 w-4" />{tr("sec.call")}
+                    </a>
+                  )}
+                </div>
               </div>
-              <div className="mt-6 rounded-2xl border border-red-100 bg-gradient-to-br from-red-50 to-rose-50 p-4">
-                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-red-700"><AlertTriangle className="h-4 w-4" /> {tr("gd.testTitle")}</div>
-                <button onClick={() => toast(tr("gd.testToast"), { icon: "📱" })}
-                  className="w-full rounded-xl border border-red-200 bg-white py-2.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 active:scale-[0.99]">
-                  {tr("gd.testBtn")}
-                </button>
+            </div>
+
+            {/* La check-list — ce qui sauve vraiment, et qui ne dépend d'aucune technologie. */}
+            <div className="bento-card lg:col-span-2">
+              <div className="flex items-center gap-2">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-100 text-zinc-600"><ListChecks className="h-[18px] w-[18px]" /></span>
+                <h3 className="font-semibold text-zinc-900">{tr("sec.kit")}</h3>
               </div>
+              <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                {(["sec.k1", "sec.k2", "sec.k3", "sec.k4", "sec.k5"] as const).map((k) => (
+                  <li key={k} className="flex items-start gap-2.5 rounded-xl bg-zinc-50 px-3 py-2.5 text-sm leading-relaxed text-zinc-700">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-500" aria-hidden />{tr(k)}
+                  </li>
+                ))}
+              </ul>
             </div>
           </motion.div>
         )}

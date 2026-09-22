@@ -7,6 +7,7 @@ import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 import { sniffImage } from "@/lib/upload/sniff";
 import { suiviParZone, resumeDouleurs, type Signalement } from "@/lib/health/douleurs";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
+import { extraireBilan } from "@/lib/health/bilan";
 
 type Msg = { role: "user" | "model"; text: string };
 
@@ -194,7 +195,13 @@ CE QU'UNE PHOTO NE PERMET PAS, ET QUE TU NE DOIS PAS PRÉTENDRE : palper, tester
 MÉTHODE : décris D'ABORD ce que tu observes réellement, puis ce que tu ne peux PAS conclure de l'image, et seulement ensuite pose tes questions ou propose des hypothèses. Une photo ne remplace jamais l'anamnèse : ce que la personne raconte reste ta source principale.
 ⛔ SI L'IMAGE ÉVOQUE UNE URGENCE, tu arrêtes tout le reste — pas d'exercices, pas de plan de charge, orientation médicale IMMÉDIATE et sans ambiguïté : mollet gonflé d'un seul côté avec rougeur, chaleur ou douleur au mollet (une PHLÉBITE est une urgence vitale, elle ne se rééduque pas), plaie ouverte avec pus, traînée rouge ou fièvre (infection), déformation d'un membre ou angulation anormale (fracture/luxation), gonflement massif immédiat après un traumatisme, orteil ou pied blanc/violacé (atteinte vasculaire).
 Si la photo est floue, trop sombre, trop éloignée ou ne montre pas la zone décrite, DIS-LE et demande une reprise — n'interprète pas une image que tu ne vois pas correctement.
-` : ""}STYLE : experte, humaine, structurée (titres courts / puces), CONCISE (pas de pavé indigeste). N'invente jamais un chiffre médical. Reste dans ton champ (kiné, prépa physique, biomécanique, charge du coureur) — pour le médicamenteux/l'imagerie, renvoie au médecin.`;
+` : ""}BILAN STRUCTURÉ (OBLIGATOIRE, EN TOUT DERNIER) : après ta réponse, termine par un bloc de code étiqueté bilan contenant UN objet JSON et rien d'autre :
+\`\`\`bilan
+{"hypotheses":[{"nom":"…","probabilite":"haute|moyenne|faible"}],"urgence":false,"exercices":[{"nom":"…","dosage":"3 × 15, tempo lent","frequence":"1 jour sur 2"}],"charge":"une phrase : quoi faire des prochaines séances","reprise":"une phrase : le critère objectif de reprise"}
+\`\`\`
+Ta réponse lisible fait AU PLUS ~350 mots : au-delà, tu risques d'être coupée avant d'avoir écrit le bilan, qui est obligatoire.
+Règles du bilan : 1 à 3 hypothèses (la plus probable d'abord), 0 à 4 exercices NOMMÉS et DOSÉS (ceux de ton plan, pas d'autres), "urgence": true UNIQUEMENT si tu as levé un drapeau rouge dans ta réponse. Si tu n'as encore que des questions à poser (anamnèse), mets des tableaux vides et laisse "charge" et "reprise" vides. Ce bloc est lu par l'application, pas par l'athlète : n'y mets aucune phrase d'accueil.
+STYLE : experte, humaine, structurée (titres courts / puces), CONCISE (pas de pavé indigeste). N'invente jamais un chiffre médical. Reste dans ton champ (kiné, prépa physique, biomécanique, charge du coureur) — pour le médicamenteux/l'imagerie, renvoie au médecin.`;
 
   const contents = [
     { role: "user", parts: [{ text: systemPrompt }] },
@@ -213,7 +220,10 @@ Si la photo est floue, trop sombre, trop éloignée ou ne montre pas la zone dé
   // ⚠️ 512 POUR RÉFLÉCHIR, 1600 POUR RÉPONDRE. L'ancien réglage (1600 au total dont
   // 1536 de raisonnement) ne laissait que 62 jetons à la consultation : mesuré en
   // production, la réponse s'arrêtait au milieu d'une question posée à l'athlète.
-  const out = await generateContent(contents, { temperature: 0.45, ...budget(512, 1600) });
+  // ⚠️ 2600 POUR LA RÉPONSE, PAS 1900. Mesuré le 22/09/2026 en consultation réelle : le
+  // texte clinique prenait tout, et le bilan structuré — qui vient en DERNIER — était
+  // coupé en plein JSON. Le bilan pèse 150-250 jetons ; la consultation, jusqu'à ~2 000.
+  const out = await generateContent(contents, { temperature: 0.45, ...budget(512, 2600) });
   if (!out.ok) {
     // Les filtres de sécurité de Gemini refusent régulièrement les images corporelles et
     // renvoient une réponse VIDE. Sans ce cas particulier, l'utilisateur lisait « Le kiné
@@ -273,8 +283,29 @@ Si la photo est floue, trop sombre, trop éloignée ou ne montre pas la zone dé
   // ⚠️ UNE RÉPONSE COUPÉE NE DOIT PAS PASSER POUR UNE CONCLUSION. On garde le texte —
   // il reste utile — mais on dit qu'il manque la suite, plutôt que de laisser une
   // demi-phrase ressembler à un avis terminé sur une douleur.
+  // Le bloc ```bilan est détaché du texte lu par l'athlète et validé champ par champ
+  // (lib/health/bilan) ; sans bloc ou avec un bloc mal formé, la réponse reste entière.
+  const { texte, bilan } = extraireBilan(out.text);
   const reply = out.tronquee
-    ? `${out.text}\n\n_(Réponse interrompue avant la fin — redemande-moi la suite.)_`
-    : out.text;
-  return NextResponse.json({ reply });
+    ? `${texte}\n\n_(Réponse interrompue avant la fin — redemande-moi la suite.)_`
+    : texte;
+
+  // ── MÉMOIRE DE LA CONSULTATION ──────────────────────────────────────────────
+  // Le fil (texte seul — jamais la photo, qui n'est pas conservée) est écrit dans UNE
+  // ligne `kine_chat` par athlète, 40 derniers messages, pour être relu à la prochaine
+  // ouverture de l'onglet. L'échec est journalisé, pas caché : une consultation qui
+  // « disparaît » est exactement ce que cette mémoire doit empêcher.
+  try {
+    const fil = [...(history ?? []).slice(-38).map((m) => ({ role: m.role, text: String(m.text).slice(0, 1500) })),
+      { role: "user" as const, text: (message || "").slice(0, 1500) }, { role: "model" as const, text: reply.slice(0, 4000) }].slice(-40);
+    const { data: existant, error: eLecture } = await supabase.from("notifications").select("id").eq("user_id", user.id).eq("type", "kine_chat").limit(1).maybeSingle();
+    if (eLecture) console.error("[kiné] mémoire illisible :", eLecture.message);
+    const contenu = { user_id: user.id, type: "kine_chat", title: "Consultation kiné IA", body: null, data: { messages: fil, maj: new Date().toISOString() } };
+    const { error } = existant
+      ? await supabase.from("notifications").update({ data: contenu.data }).eq("id", existant.id)
+      : await supabase.from("notifications").insert(contenu);
+    if (error) console.error("[kiné] consultation non mémorisée :", error.message);
+  } catch (e) { console.error("[kiné] consultation non mémorisée :", e instanceof Error ? e.message : String(e)); }
+
+  return NextResponse.json({ reply, bilan });
 }

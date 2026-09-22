@@ -19,7 +19,21 @@ export default async function HealthPage() {
   const { data: { user } } = await supabase.auth.getUser();
   let suivi: ReturnType<typeof suiviParZone> = [];
   let enPanne = false;
+  let fil: { role: "user" | "model"; text: string }[] = [];
+  let contact: { nom: string; tel: string } = { nom: "", tel: "" };
   if (user) {
+    // La consultation en cours (mémoire du kiné, /api/ai/physio) et le contact d'urgence
+    // (réglages) : lus ensemble, en une vague, avec les douleurs.
+    const [filRes, reglagesRes] = await Promise.all([
+      supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "kine_chat").limit(1).maybeSingle(),
+      supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "user_settings").maybeSingle(),
+    ]);
+    const brut = (filRes.data?.data as { messages?: unknown } | null)?.messages;
+    fil = (Array.isArray(brut) ? brut : [])
+      .filter((m): m is { role: "user" | "model"; text: string } => !!m && typeof m === "object" && ((m as { role?: string }).role === "user" || (m as { role?: string }).role === "model") && typeof (m as { text?: unknown }).text === "string")
+      .slice(-40);
+    const r = (reglagesRes.data?.data ?? {}) as Record<string, unknown>;
+    contact = { nom: typeof r.contactUrgenceNom === "string" ? r.contactUrgenceNom : "", tel: typeof r.contactUrgenceTel === "string" ? r.contactUrgenceTel : "" };
     /**
      * ⚠️ « AUCUNE DOULEUR » N'EST PAS « ON N'A PAS PU LIRE ».
      *
@@ -43,5 +57,5 @@ export default async function HealthPage() {
     enPanne = estUnePanne({ error });
     if (enPanne) console.error("[santé] douleurs illisibles :", error?.message);
   }
-  return <HealthCenter suivi={suivi} enPanne={enPanne} />;
+  return <HealthCenter suivi={suivi} enPanne={enPanne} filInitial={fil} contactInitial={contact} />;
 }
