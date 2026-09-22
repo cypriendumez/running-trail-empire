@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback , useId } from "react";
+import { useState, useEffect, useRef, useCallback , useId, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Play, Pause, StopCircle, Volume2, VolumeX,
   TrendingUp, TrendingDown, Minus, Zap, Timer, MapPin, Watch, Loader2,
   Ghost, Heart, ClipboardList, ChevronDown, Satellite, Mic, Bluetooth,
-  Activity, Gauge,
+  Activity, Gauge, Layers, LocateFixed, SlidersHorizontal,
   AlertTriangle, X, ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -22,6 +22,12 @@ const CarteDirect = dynamic(() => import("./CarteDirect").then((m) => m.CarteDir
 import { sauverEnCours, lireEnCours, effacerEnCours, mettreEnAttente, vautEnregistrement, INTERVALLE_SAUVEGARDE_MS, type CourseEnCours } from "@/lib/courses/horsLigne";
 import { avancer, intensite, idPartage, lienSuivi, lienSms, messageAlerte, messageDepart, type EtatVeille } from "@/lib/courses/veille";
 import { createClient } from "@/lib/supabase/client";
+import { fondsCarteDirecte, type IdFond } from "@/lib/courses/fondsCarte";
+
+/** ⚠️ Le satellite n'existe QUE si la clé MapTiler existe : sans elle les tuiles
+ *  répondent 403 et la carte reste grise sans la moindre erreur. On ne propose donc
+ *  pas le bouton plutôt que de le proposer cassé (cf. lib/courses/fondsCarte). */
+const SATELLITE_DISPO = fondsCarteDirecte(process.env.NEXT_PUBLIC_MAPTILER_KEY || undefined).some((f) => f.id === "satellite");
 
 /**
  * ⚠️ `title`, `detail` et `tags` sont en FRANÇAIS, et doivent le rester :
@@ -166,6 +172,19 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
   const reboursRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const motionRef = useRef<((e: DeviceMotionEvent) => void) | null>(null);
   const [traceCarte, setTraceCarte] = useState<[number, number][]>([]);
+
+  // ── LA CARTE, COMME STRAVA (Cyprien, 22/09/2026 : « fais comme sur Strava ») ──
+  // Le fond affiché, le suivi automatique — coupé dès que la main déplace la carte,
+  // sinon la position suivante la ramène et on ne peut rien regarder d'autre — et un
+  // compteur qui sert de signal de recentrage à la carte.
+  const [fondCarte, setFondCarte] = useState<IdFond>("plan");
+  const [suiviCarte, setSuiviCarte] = useState(true);
+  const [recentrages, setRecentrages] = useState(0);
+  /** Le nom de la séance chargée depuis le coach — titre du bloc de chiffres. */
+  const [seanceChargee, setSeanceChargee] = useState<string | null>(null);
+  /** Le bas de l'écran : réglages avant le départ, chiffres géants pendant. */
+  const detailsRef = useRef<HTMLDivElement | null>(null);
+  const versDetails = () => detailsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   const derniereSauvegardeRef = useRef(0);
   const demarreeARef = useRef(0);
   const [distance, setDistance] = useState(10);
@@ -271,6 +290,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
     } else {
       setTargetMode("hr"); setDurationMin(durMin ?? 45); setHrZone(zone ?? 2);
     }
+    setSeanceChargee(s.i18n?.[lang]?.title ?? s.title);
     toast.success(tg("t.loaded", { t: s.title }), { duration: 4000 });
   };
 
@@ -821,6 +841,36 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
     { label: "VMA", lo: 0.92, hi: 1.00, tint: "#ef4444", Icon: Zap },
   ].map((z) => ({ ...z, paceSlow: 60 / (vma * z.lo), paceFast: 60 / (vma * z.hi) }));
 
+  // ── LE BLOC DE CHIFFRES POSÉ SUR LA CARTE (façon Strava) ────────────────────
+  // Avant le départ il montre ce qu'on s'apprête à faire ; pendant la course, ce qu'on
+  // fait. TROIS COLONNES, jamais plus : au-delà, plus rien ne se lit en courant.
+  const dureeTotale = durationMin * 60;
+  const chiffresCarte: { l: string; v: string; u?: string }[] =
+    phase === "setup"
+      ? targetMode === "hr"
+        ? [
+            { l: d["lb.dur"], v: String(durationMin), u: "min" },
+            { l: d["sm.hrZone"], v: zn(hrZone) },
+            { l: d["sm.target"], v: `${Math.round(maxHr * HR_ZONES[hrZone - 1].lo)}–${Math.round(maxHr * HR_ZONES[hrZone - 1].hi)}`, u: "bpm" },
+          ]
+        : [
+            { l: d["lb.time"], v: formatTime(targetTime) },
+            { l: d["lb.dist"], v: String(distance), u: "km" },
+            { l: d["lb.pace"], v: formatPace(targetPace), u: "/km" },
+          ]
+      : sessionKind === "hr"
+        ? [
+            { l: d["lv.time"], v: formatTime(elapsed) },
+            { l: d["lv.left"], v: formatTime(Math.max(0, dureeTotale - elapsed)) },
+            { l: d["map.fc"], v: liveHr != null ? String(liveHr) : "—", u: "bpm" },
+          ]
+        : [
+            { l: d["lv.time"], v: formatTime(elapsed) },
+            { l: d["lb.dist"], v: currentKm.toFixed(2), u: "km" },
+            { l: d["lv.curPace"], v: currentPace > 0 ? formatPace(currentPace) : "—", u: "/km" },
+          ];
+  const titreCarte = seanceChargee ?? (phase === "setup" ? (targetMode === "hr" ? d["md.hr"] : d["md.pace"]) : d["hero"]);
+
   return (
     <div className="space-y-6">
       {/* ⚠️ SUR TÉLÉPHONE, LA CARTE D'ABORD — comme Strava (Cyprien, 21/09/2026) : la
@@ -892,22 +942,111 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
         </div>
       )}
 
-      {/* ⚠️ LA CARTE EST LÀ SUR TOUS LES ÉCRANS (22/09/2026, Cyprien : « pourquoi il n'y a
-          pas la carte comme sur Strava »). Elle était en `md:hidden` : une décision prise
-          quand la demande portait sur le téléphone, et qui laissait le bureau devant une
-          photo de montagne décorative pendant que le vrai tracé restait invisible. Sur
-          bureau elle prend une hauteur fixe et s'arrondit ; sur téléphone elle reste
-          pleine largeur, collée au bord. */}
-      <div className="relative -mx-6 -mt-6 md:mx-0 md:mt-0 md:overflow-hidden md:rounded-3xl md:border md:border-zinc-200">
-        <CarteDirect position={positionCarte} track={traceCarte} className="h-[46vh] min-h-[280px] w-full md:h-[380px]" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#FAFAFA] to-transparent md:hidden" />
-        <button
-          onClick={() => setAudioEnabled(!audioEnabled)}
-          className={`absolute right-4 top-4 z-[500] flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold shadow-md ${audioEnabled ? "bg-zinc-900/85 text-white" : "bg-white/90 text-zinc-500 ring-1 ring-zinc-200"}`}
-        >
-          {audioEnabled ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />} Audio {audioEnabled ? "ON" : "OFF"}
-        </button>
-      </div>
+      {/* ══ L'ÉCRAN S'OUVRE SUR LA CARTE — COMME STRAVA ═══════════════════════════
+          Cyprien, 22/09/2026, capture de l'écran d'enregistrement de Strava à l'appui :
+          « fais comme sur Strava ça rend ». Ce que ça veut dire, concrètement :
+            · la carte PREND L'ÉCRAN tant qu'on n'est pas parti — c'est elle qu'on regarde
+              avant de lancer une séance, pas une photo de montagne ni un réglage ;
+            · les commandes FLOTTENT dessus (voix, fond, recentrage) au lieu de manger de
+              la hauteur ;
+            · un seul bloc blanc en bas tient les trois chiffres qui comptent et LE bouton.
+          Pendant la course, la carte se réduit : les chiffres géants et l'écart d'allure
+          reprennent la main juste dessous — c'est là que se joue la séance.
+          ⚠️ La carte reste pleine largeur sur téléphone (`-mx-6` annule le cadre de la
+          page) ; `-mt-6` annule l'espacement de la pile pour qu'elle colle au bord haut. */}
+      <section className="relative -mx-6 -mt-6 md:mx-0 md:mt-0 md:overflow-hidden md:rounded-3xl md:border md:border-zinc-200">
+        <CarteDirect
+          position={positionCarte}
+          track={traceCarte}
+          fond={fondCarte}
+          suivre={suiviCarte}
+          onDeplacement={() => setSuiviCarte(false)}
+          recentrer={recentrages}
+          etiquette={d["hero"]}
+          className={phase === "setup"
+            ? "h-[calc(100dvh-13.5rem)] min-h-[360px] w-full md:h-[460px]"
+            : "h-[40vh] min-h-[220px] w-full md:h-[380px]"}
+        />
+
+        {/* Le bloc blanc : ce qu'on va faire (ou ce qu'on fait), puis l'action.
+            ⚠️ IL EST HORS DE LA CARTE dans le DOM, posé dessus : à l'intérieur, Leaflet
+            capterait le doigt et un appui sur « Démarrer » déplacerait la carte. */}
+        <div className="absolute inset-x-0 bottom-0 z-[500] px-3 pb-3 md:px-4 md:pb-4">
+          {/* ⚠️ LES COMMANDES SONT DANS LA MÊME PILE QUE LE BLOC BLANC, pas collées en haut
+              de la carte. En colonne à droite, elles passaient DERRIÈRE lui dès que la carte
+              se réduit au départ de la course (325 px de carte pour 148 px de commandes et
+              173 px de bloc) : le bouton de recentrage devenait inatteignable au moment précis
+              où il sert. En ligne au-dessus, la pile garde sa hauteur quelle que soit celle
+              de la carte. */}
+          <div className="mx-auto mb-2.5 flex max-w-lg justify-end gap-2">
+            <BtnCarte actif={audioEnabled} titre={d["ch.voice"]} onClick={() => setAudioEnabled(!audioEnabled)}>
+              {audioEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+            </BtnCarte>
+            {SATELLITE_DISPO && (
+              <BtnCarte
+                actif={fondCarte === "satellite"}
+                titre={fondCarte === "satellite" ? d["map.plan"] : d["map.satellite"]}
+                onClick={() => setFondCarte(fondCarte === "satellite" ? "plan" : "satellite")}
+              >
+                <Layers className="h-5 w-5" />
+              </BtnCarte>
+            )}
+            {/* Allumé = la carte reste collée à la position. Éteint = la main a pris la
+                carte, et c'est ce bouton qui rend le suivi. */}
+            <BtnCarte
+              actif={suiviCarte}
+              titre={d["map.recentrer"]}
+              onClick={() => { setSuiviCarte(true); setRecentrages((n) => n + 1); }}
+            >
+              <LocateFixed className="h-5 w-5" />
+            </BtnCarte>
+          </div>
+          <div className="mx-auto max-w-lg rounded-[26px] border border-black/5 bg-white/95 px-4 py-3 shadow-[0_20px_45px_-20px_rgba(9,9,11,0.55)] backdrop-blur">
+            <p className="truncate text-center text-[13px] font-bold text-zinc-900">{titreCarte}</p>
+            <div className="mt-1.5 grid grid-cols-3">
+              {chiffresCarte.map((c) => (
+                <div key={c.l} className="min-w-0 text-center">
+                  <div className="text-[22px] font-black leading-none tabular-nums text-zinc-900">
+                    {c.v}{c.u && <span className="ml-0.5 text-[11px] font-bold text-zinc-400">{c.u}</span>}
+                  </div>
+                  <div className="mt-1 truncate text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">{c.l}</div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 flex items-start justify-around border-t border-zinc-100 pt-3">
+              {phase === "setup" ? (
+                <>
+                  <ActionCarte label={targetMode === "hr" ? d["md.hr"] : d["md.pace"]} onClick={() => setTargetMode(targetMode === "hr" ? "pace" : "hr")}>
+                    {targetMode === "hr" ? <Heart className="h-5 w-5 text-rose-500" /> : <Zap className="h-5 w-5 text-emerald-600" />}
+                  </ActionCarte>
+                  <GrosBouton label={d["start"]} teinte="emerald" onClick={() => (targetMode === "hr" ? startHrSession() : startSession())}>
+                    <Play className="h-7 w-7 translate-x-0.5" fill="currentColor" />
+                  </GrosBouton>
+                  <ActionCarte label={d["map.reglages"]} onClick={versDetails}>
+                    <SlidersHorizontal className="h-5 w-5 text-zinc-600" />
+                  </ActionCarte>
+                </>
+              ) : phase === "running" ? (
+                <>
+                  <ActionCarte label={paused ? d["ct.resume"] : d["ct.pause"]} onClick={pauseSession}>
+                    {paused ? <Play className="h-5 w-5 text-zinc-700" /> : <Pause className="h-5 w-5 text-zinc-700" />}
+                  </ActionCarte>
+                  <GrosBouton label={d["ct.stop"]} teinte="rouge" onClick={stopSession}>
+                    <StopCircle className="h-7 w-7" />
+                  </GrosBouton>
+                  <ActionCarte label={d["map.details"]} onClick={versDetails}>
+                    <ChevronDown className="h-5 w-5 text-zinc-600" />
+                  </ActionCarte>
+                </>
+              ) : (
+                <button type="button" onClick={stopSession} className="rounded-2xl bg-zinc-900 px-6 py-3 text-sm font-bold text-white">
+                  {d["ct.new"]}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Header — entête émeraude. ⚠️ PLUS DE PHOTO DE MONTAGNE : sur bureau, elle
           occupait 200 px au-dessus de la carte pour ne rien dire de la course en cours.
@@ -949,6 +1088,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
         </div>
       </div>
 
+      <div ref={detailsRef}>
       <AnimatePresence mode="wait">
         {phase === "setup" && (
           <motion.div key="setup" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -1514,7 +1654,47 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
           </motion.div>
         )}
       </AnimatePresence>
+      </div>
     </div>
+  );
+}
+
+/**
+ * Une commande posée sur la carte : ronde, blanche, 44 px — la taille minimale d'une
+ * cible tactile. « Actif » l'inverse en noir plein, pour qu'on sache d'un regard si la
+ * voix parle et si la carte suit encore la position.
+ */
+function BtnCarte({ actif, titre, onClick, children }: { actif?: boolean; titre: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button" onClick={onClick} title={titre} aria-label={titre} aria-pressed={!!actif}
+      className={`flex h-11 w-11 items-center justify-center rounded-full shadow-[0_8px_18px_-8px_rgba(9,9,11,0.6)] ring-1 transition-colors ${actif ? "bg-zinc-900 text-white ring-zinc-900" : "bg-white/95 text-zinc-600 ring-black/5 hover:bg-white"}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Une action secondaire du bloc du bas : icône ronde + son mot, comme sur Strava. */
+function ActionCarte({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} className="flex w-20 flex-col items-center gap-1.5">
+      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 transition-colors hover:bg-zinc-200">{children}</span>
+      <span className="w-full truncate text-center text-[11px] font-semibold text-zinc-600">{label}</span>
+    </button>
+  );
+}
+
+/** LE bouton : celui qu'on cherche du pouce sans regarder, au départ comme à l'arrivée. */
+function GrosBouton({ label, teinte, onClick, children }: { label: string; teinte: "emerald" | "rouge"; onClick: () => void; children: ReactNode }) {
+  const vert = teinte === "emerald";
+  return (
+    <button type="button" onClick={onClick} className="flex w-20 flex-col items-center gap-1.5">
+      <span className={`flex h-[60px] w-[60px] items-center justify-center rounded-full text-white transition-transform active:scale-95 ${vert ? "bg-emerald-600 shadow-[0_12px_26px_-10px_rgba(5,150,105,0.95)]" : "bg-red-600 shadow-[0_12px_26px_-10px_rgba(220,38,38,0.95)]"}`}>
+        {children}
+      </span>
+      <span className={`w-full truncate text-center text-[11px] font-bold ${vert ? "text-emerald-700" : "text-red-700"}`}>{label}</span>
+    </button>
   );
 }
 

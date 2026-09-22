@@ -249,10 +249,10 @@ test("« Enregistrer » ouvre sur la carte — sur TOUS les écrans — et les r
   // montée en `md:hidden`, décision prise quand la demande portait sur le téléphone, et
   // le bureau restait devant une photo de montagne décorative. Elle est partout.
   const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
-  const carte = gr.indexOf('<div className="relative -mx-6 -mt-6 md:mx-0 md:mt-0');
+  const carte = gr.indexOf('<section className="relative -mx-6 -mt-6 md:mx-0 md:mt-0');
   assert.ok(carte > 0, "le bloc carte a disparu de l'écran « Enregistrer »");
   assert.ok(!/relative -mx-6 -mt-6 md:hidden/.test(gr), "la carte est redevenue invisible sur bureau");
-  assert.ok(/<CarteDirect position=\{positionCarte\} track=\{traceCarte\}/.test(gr.slice(carte, carte + 600)), "la carte ne suit plus la position ni la trace");
+  assert.ok(/<CarteDirect\s+position=\{positionCarte\}\s+track=\{traceCarte\}/.test(gr.slice(carte, carte + 700)), "la carte ne suit plus la position ni la trace");
   // Elle est pleine largeur : les marges négatives annulent EXACTEMENT le `p-6` du <main>.
   assert.match(codeNu("src/app/dashboard/layout.tsx"), /<main className="flex-1 overflow-auto p-6">/, "le <main> n'a plus p-6 : les marges -mx-6/-mt-6 de la carte ne s'annulent plus");
   // L'entête vert reste sur bureau, SOUS la carte, et sans la photo de montagne qui
