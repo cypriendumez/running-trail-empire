@@ -55,6 +55,8 @@ interface GhostRunnerProps {
   /** Le contact d'urgence enregistré (Santé › Sécurité) : destinataire du lien de suivi
    *  au départ, et du message si un choc reste sans réponse. */
   contact?: { nom: string; tel: string };
+  /** Centre de la dernière trace connue — CADRAGE de la carte, jamais une position. */
+  centreInitial?: [number, number] | null;
 }
 
 interface Checkpoint {
@@ -133,7 +135,7 @@ export function nomLecture(l: { appareil: string | null; source: string | null }
   return l?.appareil?.trim() || l?.source?.trim() || "intervals.icu";
 }
 
-export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = null, fcFootings = [], coachSessions = [], contact = { nom: "", tel: "" } }: GhostRunnerProps) {
+export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = null, fcFootings = [], coachSessions = [], contact = { nom: "", tel: "" }, centreInitial = null }: GhostRunnerProps) {
   // Les curseurs sont reliés à leur intitulé : sans cela un lecteur d'écran annonce
   // « curseur, 12 » sans dire de QUOI, et le libellé n'est pas cliquable.
   const cid = useId();
@@ -180,6 +182,8 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
   const [fondCarte, setFondCarte] = useState<IdFond>("plan");
   const [suiviCarte, setSuiviCarte] = useState(true);
   const [recentrages, setRecentrages] = useState(0);
+  /** Vrai quand le navigateur n'a pas donné la position : on le DIT sur la carte. */
+  const [geoRefusee, setGeoRefusee] = useState(false);
   /** Le nom de la séance chargée depuis le coach — titre du bloc de chiffres. */
   const [seanceChargee, setSeanceChargee] = useState<string | null>(null);
   /** Le bas de l'écran : réglages avant le départ, chiffres géants pendant. */
@@ -791,13 +795,24 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
   // État de la connexion montre (intervals.icu → Garmin/Coros/Wahoo) pour le voyant vert.
   useEffect(() => {
     // La carte s'ouvre sur la position de l'athlète, avant même de démarrer (comme Strava).
-    // Une seule lecture, tolérante : refus ou absence de GPS = carte de la France.
-    if (typeof navigator === "undefined" || !navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => setPositionCarte([pos.coords.latitude, pos.coords.longitude]),
-      () => {}, { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
-    );
+    demanderPosition();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /**
+   * ⚠️ UN REFUS DE LOCALISATION NE DOIT PAS ÊTRE SILENCIEUX. Il l'était : la carte
+   * restait sur son cadrage et l'athlète n'avait aucun moyen de comprendre pourquoi il
+   * ne se voyait pas dessus, ni de revenir en arrière. On le dit, et on propose de
+   * redemander — le navigateur reposera la question tant que le refus n'est pas définitif.
+   */
+  function demanderPosition() {
+    if (typeof navigator === "undefined" || !navigator.geolocation) { setGeoRefusee(true); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { setPositionCarte([pos.coords.latitude, pos.coords.longitude]); setGeoRefusee(false); },
+      () => setGeoRefusee(true),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+    );
+  }
 
   useEffect(() => {
     const c = lireEnCours(typeof localStorage !== "undefined" ? localStorage : null);
@@ -871,6 +886,35 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
           ];
   const titreCarte = seanceChargee ?? (phase === "setup" ? (targetMode === "hr" ? d["md.hr"] : d["md.pace"]) : d["hero"]);
 
+  // ⚠️ DÉFINIES UNE FOIS, RENDUES À DEUX ENDROITS. Leur place change avec l'écran (en
+  // ligne au-dessus du bloc sur téléphone, en colonne sur la carte sur ordinateur) mais
+  // leur comportement, non : dupliquer le JSX, c'est dupliquer l'état qu'il commande.
+  const commandesCarte = (
+    <>
+      <BtnCarte actif={audioEnabled} titre={d["ch.voice"]} onClick={() => setAudioEnabled(!audioEnabled)}>
+        {audioEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+      </BtnCarte>
+      {SATELLITE_DISPO && (
+        <BtnCarte
+          actif={fondCarte === "satellite"}
+          titre={fondCarte === "satellite" ? d["map.plan"] : d["map.satellite"]}
+          onClick={() => setFondCarte(fondCarte === "satellite" ? "plan" : "satellite")}
+        >
+          <Layers className="h-5 w-5" />
+        </BtnCarte>
+      )}
+      {/* Allumé = la carte reste collée à la position. Éteint = la main a pris la carte,
+          et c'est ce bouton qui rend le suivi. */}
+      <BtnCarte
+        actif={suiviCarte}
+        titre={d["map.recentrer"]}
+        onClick={() => { setSuiviCarte(true); setRecentrages((n) => n + 1); }}
+      >
+        <LocateFixed className="h-5 w-5" />
+      </BtnCarte>
+    </>
+  );
+
   return (
     <div className="space-y-6">
       {/* ⚠️ SUR TÉLÉPHONE, LA CARTE D'ABORD — comme Strava (Cyprien, 21/09/2026) : la
@@ -943,65 +987,64 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
       )}
 
       {/* ══ L'ÉCRAN S'OUVRE SUR LA CARTE — COMME STRAVA ═══════════════════════════
-          Cyprien, 22/09/2026, capture de l'écran d'enregistrement de Strava à l'appui :
-          « fais comme sur Strava ça rend ». Ce que ça veut dire, concrètement :
-            · la carte PREND L'ÉCRAN tant qu'on n'est pas parti — c'est elle qu'on regarde
-              avant de lancer une séance, pas une photo de montagne ni un réglage ;
-            · les commandes FLOTTENT dessus (voix, fond, recentrage) au lieu de manger de
-              la hauteur ;
-            · un seul bloc blanc en bas tient les trois chiffres qui comptent et LE bouton.
-          Pendant la course, la carte se réduit : les chiffres géants et l'écart d'allure
-          reprennent la main juste dessous — c'est là que se joue la séance.
-          ⚠️ La carte reste pleine largeur sur téléphone (`-mx-6` annule le cadre de la
-          page) ; `-mt-6` annule l'espacement de la pile pour qu'elle colle au bord haut. */}
+          Cyprien, 22/09/2026 puis 23/09 : « fais comme sur Strava ça rend », et devant son
+          ordinateur, capture à l'appui : « ça rend pas ». Les deux sont vrais, parce que
+          Strava n'a pas d'écran d'enregistrement sur ordinateur — il fallait l'adapter,
+          pas l'étirer.
+
+            · TÉLÉPHONE : la carte prend l'écran, les commandes et le bloc blanc flottent
+              en bas, pleine largeur. C'est la composition de Strava.
+            · ORDINATEUR : la carte est plus courte, le bloc blanc s'ancre EN BAS À GAUCHE
+              à largeur fixe, et les commandes remontent en colonne en haut à droite. Un
+              bloc de 512 px centré au milieu de 1 200 px de carte flottait dans le vide.
+
+          ⚠️ ET SURTOUT, LE CONTENU DE LA CARTE. Elle s'ouvrait sur la France entière au
+          zoom 5 tant que la localisation n'était pas accordée : un rectangle bleu qui ne
+          dit rien de personne. `centreInitial` la cadre sur la dernière trace connue de
+          l'athlète, et un refus de localisation se DIT au lieu de laisser deviner. */}
       <section className="relative -mx-6 -mt-6 md:mx-0 md:mt-0 md:overflow-hidden md:rounded-3xl md:border md:border-zinc-200">
         <CarteDirect
           position={positionCarte}
           track={traceCarte}
+          centre={centreInitial}
           fond={fondCarte}
           suivre={suiviCarte}
           onDeplacement={() => setSuiviCarte(false)}
           recentrer={recentrages}
           etiquette={d["hero"]}
           className={phase === "setup"
-            ? "h-[calc(100dvh-13.5rem)] min-h-[360px] w-full md:h-[460px]"
+            ? "h-[calc(100dvh-13.5rem)] min-h-[360px] w-full md:h-[440px]"
             : "h-[40vh] min-h-[220px] w-full md:h-[380px]"}
         />
+
+        {/* Sur ordinateur, les commandes reprennent leur place naturelle : en colonne, en
+            haut à droite de la carte. Le bloc blanc n'est plus dessous, il est à gauche. */}
+        <div className="absolute right-3 top-3 z-[500] hidden flex-col gap-2 md:flex">{commandesCarte}</div>
 
         {/* Le bloc blanc : ce qu'on va faire (ou ce qu'on fait), puis l'action.
             ⚠️ IL EST HORS DE LA CARTE dans le DOM, posé dessus : à l'intérieur, Leaflet
             capterait le doigt et un appui sur « Démarrer » déplacerait la carte. */}
         <div className="absolute inset-x-0 bottom-0 z-[500] px-3 pb-3 md:px-4 md:pb-4">
-          {/* ⚠️ LES COMMANDES SONT DANS LA MÊME PILE QUE LE BLOC BLANC, pas collées en haut
-              de la carte. En colonne à droite, elles passaient DERRIÈRE lui dès que la carte
-              se réduit au départ de la course (325 px de carte pour 148 px de commandes et
-              173 px de bloc) : le bouton de recentrage devenait inatteignable au moment précis
-              où il sert. En ligne au-dessus, la pile garde sa hauteur quelle que soit celle
-              de la carte. */}
-          <div className="mx-auto mb-2.5 flex max-w-lg justify-end gap-2">
-            <BtnCarte actif={audioEnabled} titre={d["ch.voice"]} onClick={() => setAudioEnabled(!audioEnabled)}>
-              {audioEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
-            </BtnCarte>
-            {SATELLITE_DISPO && (
-              <BtnCarte
-                actif={fondCarte === "satellite"}
-                titre={fondCarte === "satellite" ? d["map.plan"] : d["map.satellite"]}
-                onClick={() => setFondCarte(fondCarte === "satellite" ? "plan" : "satellite")}
-              >
-                <Layers className="h-5 w-5" />
-              </BtnCarte>
-            )}
-            {/* Allumé = la carte reste collée à la position. Éteint = la main a pris la
-                carte, et c'est ce bouton qui rend le suivi. */}
-            <BtnCarte
-              actif={suiviCarte}
-              titre={d["map.recentrer"]}
-              onClick={() => { setSuiviCarte(true); setRecentrages((n) => n + 1); }}
-            >
-              <LocateFixed className="h-5 w-5" />
-            </BtnCarte>
-          </div>
-          <div className="mx-auto max-w-lg rounded-[26px] border border-black/5 bg-white/95 px-4 py-3 shadow-[0_20px_45px_-20px_rgba(9,9,11,0.55)] backdrop-blur">
+          {/* Sur téléphone, les commandes sont DANS cette pile, pas collées en haut de la
+              carte : en colonne à droite, elles passaient derrière le bloc blanc dès que la
+              carte se réduit au départ de la course (325 px de carte pour 148 px de
+              commandes et 173 px de bloc), et le bouton de recentrage devenait
+              inatteignable au moment précis où il sert. */}
+          <div className="mx-auto mb-2.5 flex max-w-lg justify-end gap-2 md:hidden">{commandesCarte}</div>
+
+          {/* ⚠️ UN REFUS DE LOCALISATION SE DIT. Sans cette ligne, la carte reste sur son
+              cadrage et l'athlète ne comprend ni pourquoi il ne se voit pas dessus, ni
+              comment revenir en arrière. */}
+          {geoRefusee && (
+            <div className="mx-auto mb-2.5 flex max-w-lg items-center justify-center gap-2 rounded-full bg-zinc-900/85 px-3 py-1.5 text-[12px] font-semibold text-white backdrop-blur md:mx-0 md:max-w-sm">
+              <MapPin className="h-3.5 w-3.5 flex-shrink-0" aria-hidden />
+              <span className="truncate">{d["map.geoOff"]}</span>
+              <button type="button" onClick={demanderPosition} className="ml-1 flex-shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-zinc-900">
+                {d["map.geoBtn"]}
+              </button>
+            </div>
+          )}
+          <div className="mx-auto max-w-lg rounded-[26px] md:mx-0 md:max-w-sm border border-black/5 bg-white/95 px-4 py-3 shadow-[0_20px_45px_-20px_rgba(9,9,11,0.55)] backdrop-blur">
             <p className="truncate text-center text-[13px] font-bold text-zinc-900">{titreCarte}</p>
             <div className="mt-1.5 grid grid-cols-3">
               {chiffresCarte.map((c) => (
@@ -1048,45 +1091,11 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
         </div>
       </section>
 
-      {/* Header — entête émeraude. ⚠️ PLUS DE PHOTO DE MONTAGNE : sur bureau, elle
-          occupait 200 px au-dessus de la carte pour ne rien dire de la course en cours.
-          La carte est passée au-dessus ; l'entête garde l'identité de l'écran, en plus
-          court, et le bouton audio vit sur la carte. */}
-      <div
-        className="relative hidden overflow-hidden rounded-3xl border border-emerald-900/20 px-6 py-4 shadow-[0_18px_50px_-24px_rgba(6,78,59,0.6)] sm:px-8 md:block"
-        style={{ background: "linear-gradient(120deg,#064e3b 0%,#047857 52%,#0d9488 100%)" }}
-      >
-        {/* photo montagne fondue à droite — retirée le 22/09/2026 : voir au-dessus */}
-        <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[58%]">
-          <img src="https://images.unsplash.com/photo-1454496522488-7a8e488e8606?w=1100&q=70&fit=crop&crop=entropy" alt="" className="h-full w-full object-cover opacity-40" />
-          <div className="absolute inset-0" style={{ background: "linear-gradient(to right,#064e3b 0%,rgba(6,78,59,0.55) 38%,rgba(6,78,59,0) 100%)" }} />
-        </div>
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-        <div className="relative z-10 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <span className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-white/10 text-white ring-1 ring-white/25 backdrop-blur-md">
-              <Ghost className="h-7 w-7" />
-            </span>
-            <div>
-              <h2 className="text-2xl font-bold tracking-tight text-white drop-shadow-sm sm:text-[1.75rem]"><span className="md:hidden">{d["hero"]}</span><span className="hidden md:inline">Ghost Runner</span></h2>
-              <p className="mt-0.5 text-sm text-white/85">{d["hd.sub"]}</p>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {[
-                  { icon: Satellite, l: d["ch.gps"] },
-                  { icon: Mic, l: d["ch.voice"] },
-                  { icon: Watch, l: d["ch.watch"] },
-                ].map((b) => (
-                  <span key={b.l} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/90 ring-1 ring-white/15 backdrop-blur-md">
-                    <b.icon className="h-3.5 w-3.5 text-emerald-200" /> {b.l}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-          {/* Le bouton audio a rejoint la carte (un seul par écran) : deux interrupteurs
-              pour le même réglage, c'est un doute à chaque clic. */}
-        </div>
-      </div>
+      {/* ⚠️ L'ENTÊTE VERT « GHOST RUNNER » A ÉTÉ RETIRÉ (23/09/2026). Il était passé SOUS
+          la carte quand celle-ci a pris la tête de l'écran, et n'y disait plus rien que la
+          carte ne dise déjà : un titre, un sous-titre et trois pastilles décoratives, 200 px
+          de haut, entre l'action et les réglages. Le nom « Ghost Runner » reste sur la
+          vitrine, où il désigne la fonctionnalité. */}
 
       <div ref={detailsRef}>
       <AnimatePresence mode="wait">

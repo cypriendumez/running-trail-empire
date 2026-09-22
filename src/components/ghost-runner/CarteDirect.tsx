@@ -27,10 +27,20 @@ import { fondsCarteDirecte, type IdFond } from "@/lib/courses/fondsCarte";
 const FONDS = fondsCarteDirecte(process.env.NEXT_PUBLIC_MAPTILER_KEY || undefined);
 
 export function CarteDirect({
-  position, track, fond = "plan", suivre = true, onDeplacement, recentrer = 0, etiquette, className = "",
+  position, track, centre, fond = "plan", suivre = true, onDeplacement, recentrer = 0, etiquette, className = "",
 }: {
   position: [number, number] | null;
   track: [number, number][];
+  /**
+   * Où ouvrir la carte tant que le GPS n'a rien donné — le centre de la dernière trace
+   * connue de l'athlète.
+   *
+   * ⚠️ CE N'EST PAS SA POSITION, et le point bleu ne s'y affiche JAMAIS : c'est un
+   * cadrage, pas une mesure. Sans lui, la carte s'ouvrait sur la France entière au zoom
+   * 5 — un rectangle bleu qui ne dit rien de personne (Cyprien, 23/09/2026 : « ça rend
+   * pas »).
+   */
+  centre?: [number, number] | null;
   fond?: IdFond;
   /** Tant que c'est vrai, la carte reste collée à la position. */
   suivre?: boolean;
@@ -60,7 +70,12 @@ export function CarteDirect({
     (async () => {
       const Lf = (await import("leaflet")).default;
       if (annule || !conteneur.current) return;
-      const m = Lf.map(conteneur.current, { center: position ?? [46.6, 2.3], zoom: position ? 15 : 5, zoomControl: false, attributionControl: false });
+      const depart = position ?? centre ?? null;
+      const m = Lf.map(conteneur.current, {
+        center: depart ?? [46.6, 2.3],
+        zoom: position ? 15 : depart ? 13 : 5,
+        zoomControl: false, attributionControl: false,
+      });
       // L'attribution suit la couche : Leaflet la met à jour tout seul au changement de
       // fond, à condition qu'elle soit portée par la couche et non par un préfixe figé.
       // ⚠️ EN HAUT À GAUCHE, PAS EN BAS À DROITE : le bloc blanc des chiffres occupe tout

@@ -255,12 +255,12 @@ test("« Enregistrer » ouvre sur la carte — sur TOUS les écrans — et les r
   assert.ok(/<CarteDirect\s+position=\{positionCarte\}\s+track=\{traceCarte\}/.test(gr.slice(carte, carte + 700)), "la carte ne suit plus la position ni la trace");
   // Elle est pleine largeur : les marges négatives annulent EXACTEMENT le `p-6` du <main>.
   assert.match(codeNu("src/app/dashboard/layout.tsx"), /<main className="flex-1 overflow-auto p-6">/, "le <main> n'a plus p-6 : les marges -mx-6/-mt-6 de la carte ne s'annulent plus");
-  // L'entête vert reste sur bureau, SOUS la carte, et sans la photo de montagne qui
-  // doublait la hauteur pour ne rien dire de la course en cours.
-  const hero = gr.indexOf('className="relative hidden overflow-hidden rounded-3xl');
-  assert.ok(hero > carte, "l'entête vert du bureau a disparu ou passe avant la carte");
-  assert.ok(/ md:block"/.test(gr.slice(hero, hero + 220)), "l'entête vert ne revient plus sur bureau");
+  // ⚠️ L'ENTÊTE VERT A ÉTÉ RETIRÉ (23/09/2026). Passé SOUS la carte quand celle-ci a pris
+  // la tête de l'écran, il ne disait plus rien qu'elle ne dise déjà : un titre, un
+  // sous-titre et trois pastilles décoratives, 200 px entre l'action et les réglages.
+  assert.ok(!/className="relative hidden overflow-hidden rounded-3xl/.test(gr), "l'entête vert décoratif est revenu entre la carte et les réglages");
   assert.ok(!/inset-y-0 right-0 w-\[58%\]/.test(gr), "la photo de montagne est revenue au-dessus de la carte");
+  assert.ok(!/\{d\["hd\.sub"\]\}/.test(gr), "le sous-titre de l'entête vert est revenu");
   // Un seul interrupteur audio par écran : deux, c'est un doute à chaque clic.
   assert.equal([...gr.matchAll(/setAudioEnabled\(!audioEnabled\)/g)].length, 1, "il y a de nouveau deux boutons audio (entête + carte)");
   // La carte est chargée SANS rendu serveur : Leaflet touche `window` à l'import.
@@ -270,7 +270,10 @@ test("« Enregistrer » ouvre sur la carte — sur TOUS les écrans — et les r
   const rendu = gr.slice(carte);
   assert.ok(/onClick=\{\(\) => setTargetMode\(m\)\}/.test(rendu), "le choix allure / FC n'est plus sous la carte");
   assert.ok(/onClick=\{sendToWatch\}|sendToWatch\(\)/.test(rendu), "l'envoi vers la montre n'est plus sous la carte");
-  assert.ok(rendu.indexOf("setAudioEnabled(!audioEnabled)") > 0, "le bouton audio a disparu du bloc carte");
+  // Les commandes de la carte sont DÉFINIES UNE FOIS (`commandesCarte`) et posées à deux
+  // endroits selon l'écran : dupliquer le JSX dupliquerait l'état qu'il commande.
+  assert.equal([...gr.matchAll(/\{commandesCarte\}/g)].length, 2, "les commandes de la carte ne sont plus posées aux deux emplacements (téléphone et bureau)");
+  assert.match(gr, /const commandesCarte = \(/, "les commandes de la carte ne sont plus définies une seule fois");
 });
 
 test("sur téléphone, les plans d'entraînement se lisent en petites cartes et en liste empilée", () => {

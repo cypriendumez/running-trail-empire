@@ -158,6 +158,48 @@ test("React ne réécrit jamais la classe du conteneur de Leaflet", () => {
   assert.ok(!/ref=\{conteneur\}[^>]*className=\{/.test(carte), "le conteneur de Leaflet reçoit de nouveau une classe variable : React effacera les classes de Leaflet et la carte deviendra blanche");
 });
 
+test("la carte s'ouvre chez l'athlète, pas sur l'Europe entière", () => {
+  // Cyprien, 23/09/2026, capture de son ordinateur : « ça rend pas ». Le pire n'était pas
+  // la mise en page — la carte s'ouvrait sur la FRANCE ENTIÈRE au zoom 5, un rectangle
+  // bleu, et y restait tant que la localisation n'était pas accordée.
+  const page = codeNu("src/app/dashboard/ghost-runner/page.tsx");
+  assert.match(page, /from\("activity_tracks"\)[\s\S]{0,200}min_lat,max_lat,min_lon,max_lon/, "l'emprise de la dernière trace n'est plus lue : la carte repart sur l'Europe");
+  assert.match(page, /\.eq\("has_gps", true\)/, "des traces SANS GPS sont prises pour un cadrage");
+  // ⚠️ LES QUATRE BORNES, toutes finies. Une seule manquante donne un NaN, et Leaflet
+  // s'ouvre sur une carte vide sans lever la moindre erreur.
+  assert.match(page, /bornes\.every\(\(v\) => typeof v === "number" && Number\.isFinite\(v\)\)/, "un centre peut désormais être calculé sur une borne manquante (NaN silencieux)");
+  assert.match(page, /centreInitial=\{centreInitial\}/, "le cadrage n'est plus transmis à l'écran");
+
+  const carte = codeNu("src/components/ghost-runner/CarteDirect.tsx");
+  assert.match(carte, /const depart = position \?\? centre \?\? null;/, "la position réelle ne prime plus sur le cadrage");
+  assert.match(carte, /zoom: position \? 15 : depart \? 13 : 5/, "le cadrage ne change plus le zoom : on reverrait l'Europe");
+  // ⚠️ LE CADRAGE N'EST PAS UNE POSITION : le point bleu ne doit JAMAIS s'y afficher.
+  const dessinPoint = carte.slice(carte.indexOf("circleMarker") - 400, carte.indexOf("circleMarker") + 200);
+  assert.ok(!/centre/.test(dessinPoint), "le point bleu est dessiné à partir du cadrage : l'athlète se verrait là où il n'est pas");
+});
+
+test("un refus de localisation se dit, et se rattrape", () => {
+  const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
+  assert.match(gr, /\(\) => setGeoRefusee\(true\),/, "un refus de localisation est de nouveau avalé en silence");
+  assert.match(gr, /setPositionCarte\(\[pos\.coords\.latitude, pos\.coords\.longitude\]\); setGeoRefusee\(false\);/, "une position obtenue n'efface plus l'avertissement");
+  assert.match(gr, /\{geoRefusee && \(/, "l'écran ne dit plus que la position manque");
+  assert.match(gr, /onClick=\{demanderPosition\}/, "on ne peut plus redemander la position : le refus est sans issue");
+  for (const k of ["map.geoOff", "map.geoBtn"]) {
+    const n = [...readFileSync("src/components/ghost-runner/ghostI18n.tsx", "utf8").matchAll(new RegExp(`"${k.replace(/\./g, "\\.")}":`, "g"))].length;
+    assert.equal(n, 5, `« ${k} » présent ${n} fois, attendu 5`);
+  }
+});
+
+test("sur ordinateur, le bloc s'ancre à gauche et les commandes montent sur la carte", () => {
+  // Un bloc de 512 px centré au milieu de 1 200 px de carte flottait dans le vide.
+  const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
+  assert.match(gr, /rounded-\[26px\][^"]*md:mx-0 md:max-w-sm/, "le bloc blanc est redevenu centré et large sur ordinateur");
+  assert.match(gr, /absolute right-3 top-3 z-\[500\] hidden flex-col gap-2 md:flex">\{commandesCarte\}/, "les commandes ne remontent plus sur la carte sur ordinateur");
+  assert.match(gr, /mx-auto mb-2\.5 flex max-w-lg justify-end gap-2 md:hidden">\{commandesCarte\}/, "les commandes ne sont plus dans la pile du bas sur téléphone");
+  // Une seule définition : deux copies du JSX, ce serait deux fois le même état à tenir.
+  assert.equal([...gr.matchAll(/setAudioEnabled\(!audioEnabled\)/g)].length, 1, "le bouton audio est de nouveau écrit deux fois");
+});
+
 test("les mots des commandes existent dans les cinq langues", () => {
   const src = readFileSync("src/components/ghost-runner/ghostI18n.tsx", "utf8");
   for (const k of ["map.plan", "map.satellite", "map.recentrer", "map.reglages", "map.details", "map.fc"]) {
