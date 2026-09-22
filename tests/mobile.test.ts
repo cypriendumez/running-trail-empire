@@ -249,7 +249,9 @@ test("« Enregistrer » ouvre sur la carte — sur TOUS les écrans — et les r
   // montée en `md:hidden`, décision prise quand la demande portait sur le téléphone, et
   // le bureau restait devant une photo de montagne décorative. Elle est partout.
   const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
-  const carte = gr.indexOf('<section className="relative -mx-6 -mt-6 md:mx-0 md:mt-0');
+  // La branche « pas en plein écran » du className de la section (elle en a deux depuis
+  // que la carte peut passer en grand écran).
+  const carte = gr.indexOf(': "relative -mx-6 -mt-6 md:mx-0 md:mt-0');
   assert.ok(carte > 0, "le bloc carte a disparu de l'écran « Enregistrer »");
   assert.ok(!/relative -mx-6 -mt-6 md:hidden/.test(gr), "la carte est redevenue invisible sur bureau");
   assert.ok(/<CarteDirect\s+position=\{positionCarte\}\s+track=\{traceCarte\}/.test(gr.slice(carte, carte + 700)), "la carte ne suit plus la position ni la trace");

@@ -200,6 +200,49 @@ test("sur ordinateur, le bloc s'ancre à gauche et les commandes montent sur la 
   assert.equal([...gr.matchAll(/setAudioEnabled\(!audioEnabled\)/g)].length, 1, "le bouton audio est de nouveau écrit deux fois");
 });
 
+test("le plein écran ne repose pas sur une API absente d'iPhone", () => {
+  // Cyprien, 23/09/2026 : « un bouton comme sur YouTube qui met la carte en grand ».
+  // ⚠️ `requestFullscreen` N'EXISTE PAS sur Safari iOS pour autre chose qu'une vidéo : un
+  // bouton qui ne reposerait que sur elle ne ferait RIEN sur la moitié des téléphones,
+  // sans erreur. Le mécanisme est une couverture CSS ; l'API n'est qu'un bonus.
+  const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
+  assert.match(gr, /\? "fixed inset-0 z-\[2000\] bg-white"/, "le grand écran ne repose plus sur une couverture CSS");
+  assert.match(gr, /void sectionCarte\.current\?\.requestFullscreen\?\.\(\)\.catch\(\(\) => \{\}\)/, "l'appel au plein écran natif n'est plus facultatif ni protégé");
+  assert.match(gr, /className=\{plein\s*\n?\s*\? "h-full w-full"/, "la carte ne remplit plus la couverture");
+  // ⚠️ LA MARGE HÉRITÉE. La pile parente est en `space-y-6`, dont `> * + *` l'emporte sur
+  // un `mt-0` : la couverture s'arrêtait 24 px avant le bas (mesuré 788 px sur 812).
+  assert.match(gr, /style=\{plein \? \{ margin: 0 \} : undefined\}/, "la marge héritée de la pile n'est plus annulée : la couverture sera trop courte de 24 px");
+  // Deux sorties, et elles doivent rester d'accord.
+  assert.match(gr, /e\.key === "Escape" && plein/, "Échap ne sort plus du grand écran");
+  assert.match(gr, /if \(!document\.fullscreenElement && plein\) setPlein\(false\)/, "quitter le plein écran natif ne referme plus la couverture");
+  for (const k of ["map.plein", "map.reduire"]) {
+    const n = [...readFileSync("src/components/ghost-runner/ghostI18n.tsx", "utf8").matchAll(new RegExp(`"${k.replace(/\./g, "\\.")}":`, "g"))].length;
+    assert.equal(n, 5, `« ${k} » présent ${n} fois, attendu 5`);
+  }
+});
+
+test("« Arrêter » enregistre la course — il ne la jetait pas, il la perdait de vue", () => {
+  // ⚠️ DÉFAUT TROUVÉ LE 23/09/2026 EN LISANT LE CHEMIN D'ARRÊT. `finishSession` (distance
+  // visée atteinte) appelait `saveRun` ; le bouton rouge, lui, coupait le GPS et remettait
+  // l'écran à zéro. Arrêter après 8 km vidait l'écran sans un mot — la copie de secours
+  // restait sur le téléphone, mais ne réapparaissait qu'au PROCHAIN chargement de la page.
+  const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
+  const arret = gr.slice(gr.indexOf("function arreterSession()"), gr.indexOf("function nouvelleSession()"));
+  assert.ok(arret.length > 100, "`arreterSession` a disparu");
+  assert.match(arret, /if \(modeRef\.current === "live"\) saveRun\(fin\);/, "le bouton « Arrêter » n'enregistre plus la course");
+  assert.match(arret, /setPhase\("finished"\)/, "arrêter ne mène plus à l'écran d'arrivée : on ne voit pas ce qu'on vient de courir");
+  // …et repartir de zéro depuis l'écran d'arrivée ne doit PAS réenregistrer.
+  const neuve = gr.slice(gr.indexOf("function nouvelleSession()"), gr.indexOf("function nouvelleSession()") + 900);
+  assert.ok(!/saveRun/.test(neuve), "« Nouvelle session » enregistre une seconde fois la course déjà envoyée");
+  assert.match(neuve, /setPhase\("setup"\)/, "« Nouvelle session » ne ramène plus aux réglages");
+  // Les quatre boutons vont au bon endroit : 2 pendant la course, 2 à l'arrivée.
+  assert.equal([...gr.matchAll(/onClick=\{arreterSession\}|onClick=\{\(\) => arreterSession/g)].length + [...gr.matchAll(/teinte="rouge" onClick=\{arreterSession\}/g)].length, 3, "les boutons d'arrêt ne pointent plus tous sur l'enregistrement");
+  assert.equal([...gr.matchAll(/onClick=\{nouvelleSession\}/g)].length, 2, "les boutons « Nouvelle session » ne pointent plus tous sur la remise à zéro");
+  assert.ok(!/stopSession\(/.test(gr), "l'ancien arrêt sans enregistrement est revenu");
+  const n = [...readFileSync("src/components/ghost-runner/ghostI18n.tsx", "utf8").matchAll(/"sp\.arret":/g)].length;
+  assert.equal(n, 5, `« sp.arret » présent ${n} fois, attendu 5`);
+});
+
 test("les mots des commandes existent dans les cinq langues", () => {
   const src = readFileSync("src/components/ghost-runner/ghostI18n.tsx", "utf8");
   for (const k of ["map.plan", "map.satellite", "map.recentrer", "map.reglages", "map.details", "map.fc"]) {

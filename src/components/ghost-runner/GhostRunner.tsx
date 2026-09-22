@@ -6,7 +6,7 @@ import {
   Play, Pause, StopCircle, Volume2, VolumeX,
   TrendingUp, TrendingDown, Minus, Zap, Timer, MapPin, Watch, Loader2,
   Ghost, Heart, ClipboardList, ChevronDown, Satellite, Mic, Bluetooth,
-  Activity, Gauge, Layers, LocateFixed, SlidersHorizontal,
+  Activity, Gauge, Layers, LocateFixed, SlidersHorizontal, Maximize2, Minimize2,
   AlertTriangle, X, ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -184,6 +184,9 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
   const [recentrages, setRecentrages] = useState(0);
   /** Vrai quand le navigateur n'a pas donné la position : on le DIT sur la carte. */
   const [geoRefusee, setGeoRefusee] = useState(false);
+  /** Carte en grand, comme le bouton plein écran d'une vidéo (Cyprien, 23/09/2026). */
+  const [plein, setPlein] = useState(false);
+  const sectionCarte = useRef<HTMLElement | null>(null);
   /** Le nom de la séance chargée depuis le coach — titre du bloc de chiffres. */
   const [seanceChargee, setSeanceChargee] = useState<string | null>(null);
   /** Le bas de l'écran : réglages avant le départ, chiffres géants pendant. */
@@ -733,7 +736,33 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
     speak(pausedRef.current ? d["sp.pause"] : d["sp.resume"]);
   }
 
-  function stopSession() {
+  /**
+   * LE BOUTON ROUGE « ARRÊTER ».
+   *
+   * ⚠️ IL N'ENREGISTRAIT RIEN. `finishSession` (distance visée atteinte) appelait bien
+   * `saveRun` ; `stopSession`, lui, coupait le GPS et remettait l'écran à zéro. Arrêter
+   * après 8 km vidait donc l'écran sans un mot. La copie de secours restait dans le
+   * téléphone, si bien que la course réapparaissait en « course non terminée retrouvée »
+   * — mais seulement au PROCHAIN chargement de la page.
+   *
+   * Arrêter termine désormais la séance comme l'arrivée : on enregistre ce qui a été
+   * couru. `saveRun` écarte de lui-même les faux départs (moins de 100 m ou de 30 s).
+   */
+  function arreterSession() {
+    desarmerVeille(); arreterPartage();
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (watchIdRef.current != null && typeof navigator !== "undefined") navigator.geolocation.clearWatch(watchIdRef.current);
+    intervalRef.current = null; watchIdRef.current = null;
+    releaseWakeLock();
+    disconnectHrSensor();
+    const fin = elapsedRef.current;
+    speak(tg("sp.arret", { t: formatTime(fin) }));
+    setPhase("finished");
+    if (modeRef.current === "live") saveRun(fin);
+  }
+
+  /** Repartir de zéro depuis l'écran d'arrivée — n'enregistre rien, tout l'est déjà. */
+  function nouvelleSession() {
     desarmerVeille(); arreterPartage();
     if (intervalRef.current) clearInterval(intervalRef.current);
     if (watchIdRef.current != null && typeof navigator !== "undefined") navigator.geolocation.clearWatch(watchIdRef.current);
@@ -805,6 +834,37 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
    * ne se voyait pas dessus, ni de revenir en arrière. On le dit, et on propose de
    * redemander — le navigateur reposera la question tant que le refus n'est pas définitif.
    */
+  /**
+   * LE PLEIN ÉCRAN DE LA CARTE.
+   *
+   * ⚠️ L'API `requestFullscreen` N'EXISTE PAS SUR IPHONE pour autre chose qu'une vidéo :
+   * Safari iOS ne la propose que sur `<video>`. Un bouton qui ne reposerait que sur elle
+   * ne ferait donc RIEN sur la moitié des téléphones, sans erreur — exactement le genre de
+   * promesse creuse qu'on retire de cette application depuis deux jours.
+   *
+   * Le mécanisme est donc une couverture CSS (`fixed inset-0`), qui marche partout et à
+   * l'identique ; l'API n'est appelée qu'EN PLUS, quand elle existe, pour masquer aussi la
+   * barre du navigateur. Si elle échoue ou n'existe pas, la couverture suffit.
+   */
+  function basculerPlein() {
+    const suivant = !plein;
+    setPlein(suivant);
+    if (typeof document === "undefined") return;
+    if (suivant) void sectionCarte.current?.requestFullscreen?.().catch(() => {});
+    else if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => {});
+  }
+
+  // Échap sort du grand écran, et sortir du plein écran natif (Échap du navigateur)
+  // referme la couverture : les deux doivent rester d'accord.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const surTouche = (e: KeyboardEvent) => { if (e.key === "Escape" && plein) { setPlein(false); if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => {}); } };
+    const surPlein = () => { if (!document.fullscreenElement && plein) setPlein(false); };
+    window.addEventListener("keydown", surTouche);
+    document.addEventListener("fullscreenchange", surPlein);
+    return () => { window.removeEventListener("keydown", surTouche); document.removeEventListener("fullscreenchange", surPlein); };
+  }, [plein]);
+
   function demanderPosition() {
     if (typeof navigator === "undefined" || !navigator.geolocation) { setGeoRefusee(true); return; }
     navigator.geolocation.getCurrentPosition(
@@ -912,6 +972,9 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
       >
         <LocateFixed className="h-5 w-5" />
       </BtnCarte>
+      <BtnCarte actif={plein} titre={plein ? d["map.reduire"] : d["map.plein"]} onClick={basculerPlein}>
+        {plein ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
+      </BtnCarte>
     </>
   );
 
@@ -1002,7 +1065,17 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
           zoom 5 tant que la localisation n'était pas accordée : un rectangle bleu qui ne
           dit rien de personne. `centreInitial` la cadre sur la dernière trace connue de
           l'athlète, et un refus de localisation se DIT au lieu de laisser deviner. */}
-      <section className="relative -mx-6 -mt-6 md:mx-0 md:mt-0 md:overflow-hidden md:rounded-3xl md:border md:border-zinc-200">
+      <section
+        ref={sectionCarte}
+        // ⚠️ `margin: 0` EN STYLE, PAS EN CLASSE. La pile parente est en `space-y-6`, dont
+        // la règle `> * + *` l'emporte en spécificité sur un `mt-0` : la couverture
+        // `fixed inset-0` héritait d'une marge haute de 24 px et s'arrêtait 24 px avant le
+        // bas de l'écran. Mesuré : carte de 788 px dans une fenêtre de 812.
+        style={plein ? { margin: 0 } : undefined}
+        className={plein
+          ? "fixed inset-0 z-[2000] bg-white"
+          : "relative -mx-6 -mt-6 md:mx-0 md:mt-0 md:overflow-hidden md:rounded-3xl md:border md:border-zinc-200"}
+      >
         <CarteDirect
           position={positionCarte}
           track={traceCarte}
@@ -1012,9 +1085,11 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
           onDeplacement={() => setSuiviCarte(false)}
           recentrer={recentrages}
           etiquette={d["hero"]}
-          className={phase === "setup"
-            ? "h-[calc(100dvh-13.5rem)] min-h-[360px] w-full md:h-[440px]"
-            : "h-[40vh] min-h-[220px] w-full md:h-[380px]"}
+          className={plein
+            ? "h-full w-full"
+            : phase === "setup"
+              ? "h-[calc(100dvh-13.5rem)] min-h-[360px] w-full md:h-[440px]"
+              : "h-[40vh] min-h-[220px] w-full md:h-[380px]"}
         />
 
         {/* Sur ordinateur, les commandes reprennent leur place naturelle : en colonne, en
@@ -1074,7 +1149,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                   <ActionCarte label={paused ? d["ct.resume"] : d["ct.pause"]} onClick={pauseSession}>
                     {paused ? <Play className="h-5 w-5 text-zinc-700" /> : <Pause className="h-5 w-5 text-zinc-700" />}
                   </ActionCarte>
-                  <GrosBouton label={d["ct.stop"]} teinte="rouge" onClick={stopSession}>
+                  <GrosBouton label={d["ct.stop"]} teinte="rouge" onClick={arreterSession}>
                     <StopCircle className="h-7 w-7" />
                   </GrosBouton>
                   <ActionCarte label={d["map.details"]} onClick={versDetails}>
@@ -1082,7 +1157,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                   </ActionCarte>
                 </>
               ) : (
-                <button type="button" onClick={stopSession} className="rounded-2xl bg-zinc-900 px-6 py-3 text-sm font-bold text-white">
+                <button type="button" onClick={nouvelleSession} className="rounded-2xl bg-zinc-900 px-6 py-3 text-sm font-bold text-white">
                   {d["ct.new"]}
                 </button>
               )}
@@ -1643,7 +1718,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                     {paused ? d["ct.resume"] : d["ct.pause"]}
                   </button>
                   <button
-                    onClick={stopSession}
+                    onClick={arreterSession}
                     className="flex items-center justify-center gap-2 bg-red-100 hover:bg-red-200 text-red-700 font-semibold px-6 py-3 rounded-2xl transition-all"
                   >
                     <StopCircle className="w-5 h-5" />
@@ -1653,7 +1728,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
               )}
               {phase === "finished" && (
                 <button
-                  onClick={stopSession}
+                  onClick={nouvelleSession}
                   className="flex-1 flex items-center justify-center gap-2 bg-white text-zinc-700 font-semibold py-3 rounded-2xl border border-zinc-200 hover:border-zinc-400 transition-all"
                 >
                   {d["ct.new"]}
