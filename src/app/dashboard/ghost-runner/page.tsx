@@ -17,7 +17,7 @@ export default async function GhostRunnerPage() {
   const { data: { user } } = await supabase.auth.getUser();
 
   const todayStr = aujourdhui(FUSEAU_DEFAUT);
-  const [profileRes, baselineRes, coachRes, effectiveVma] = await Promise.all([
+  const [profileRes, baselineRes, coachRes, effectiveVma, contactRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single(),
     supabase
       .from("performance_baselines")
@@ -35,7 +35,15 @@ export default async function GhostRunnerPage() {
     // retombait alors sur 16 km/h CODÉ EN DUR, soit une troisième VMA dans l'application
     // et des allures de défi ~10 % trop lentes.
     getEffectiveVma(supabase, user!.id),
+    // Le contact d'urgence (Santé › Sécurité) : c'est à lui que part le lien de suivi au
+    // départ, et le message si un choc reste sans réponse. Lu ici, dans la même vague.
+    supabase.from("notifications").select("data").eq("user_id", user!.id).eq("type", "user_settings").maybeSingle(),
   ]);
+  const reglages = ((contactRes.data?.data ?? {}) as Record<string, unknown>);
+  const contact = {
+    nom: typeof reglages.contactUrgenceNom === "string" ? reglages.contactUrgenceNom : "",
+    tel: typeof reglages.contactUrgenceTel === "string" ? reglages.contactUrgenceTel : "",
+  };
 
   // Même source de vérité que le Calendrier : UNE séance par date (la plus récente), puis on ne
   // garde que les séances COURABLES (pas repos/renfo) à venir, les 6 prochaines.
@@ -78,7 +86,7 @@ export default async function GhostRunnerPage() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <GhostRunner profile={stripProfileSecrets(profileRes.data)} baseline={baselineRes.data} effectiveVma={effectiveVma}
+      <GhostRunner contact={contact} profile={stripProfileSecrets(profileRes.data)} baseline={baselineRes.data} effectiveVma={effectiveVma}
         fcMaxObservee={fcMaxObservee} fcFootings={fcFootings} coachSessions={coachSessions} />
     </div>
   );

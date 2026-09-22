@@ -7,6 +7,7 @@ import {
   TrendingUp, TrendingDown, Minus, Zap, Timer, MapPin, Watch, Loader2,
   Ghost, Heart, ClipboardList, ChevronDown, Satellite, Mic, Bluetooth,
   Activity, Gauge,
+  AlertTriangle, X, ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { UserProfile, PerformanceBaseline } from "@/types";
@@ -19,6 +20,8 @@ import { useFuseau } from "@/lib/time/FuseauProvider";
 import dynamic from "next/dynamic";
 const CarteDirect = dynamic(() => import("./CarteDirect").then((m) => m.CarteDirect), { ssr: false });
 import { sauverEnCours, lireEnCours, effacerEnCours, mettreEnAttente, vautEnregistrement, INTERVALLE_SAUVEGARDE_MS, type CourseEnCours } from "@/lib/courses/horsLigne";
+import { avancer, intensite, idPartage, lienSuivi, lienSms, messageAlerte, messageDepart, type EtatVeille } from "@/lib/courses/veille";
+import { createClient } from "@/lib/supabase/client";
 
 /**
  * ⚠️ `title`, `detail` et `tags` sont en FRANÇAIS, et doivent le rester :
@@ -43,6 +46,9 @@ interface GhostRunnerProps {
    *  Prime sur la baseline, qui n'est renseignée que si l'athlète a fait un test. */
   effectiveVma?: number | null;
   coachSessions?: CoachSess[];
+  /** Le contact d'urgence enregistré (Santé › Sécurité) : destinataire du lien de suivi
+   *  au départ, et du message si un choc reste sans réponse. */
+  contact?: { nom: string; tel: string };
 }
 
 interface Checkpoint {
@@ -121,7 +127,7 @@ export function nomLecture(l: { appareil: string | null; source: string | null }
   return l?.appareil?.trim() || l?.source?.trim() || "intervals.icu";
 }
 
-export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = null, fcFootings = [], coachSessions = [] }: GhostRunnerProps) {
+export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = null, fcFootings = [], coachSessions = [], contact = { nom: "", tel: "" } }: GhostRunnerProps) {
   // Les curseurs sont reliés à leur intitulé : sans cela un lecteur d'écran annonce
   // « curseur, 12 » sans dire de QUOI, et le libellé n'est pas cliquable.
   const cid = useId();
@@ -139,6 +145,26 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
   const [courseRetrouvee, setCourseRetrouvee] = useState<CourseEnCours | null>(null);
   /** Ce que la carte affiche : la position (point bleu) et le tracé de la course en cours. */
   const [positionCarte, setPositionCarte] = useState<[number, number] | null>(null);
+
+  // ── VEILLE DE SÉCURITÉ (22/09/2026) ────────────────────────────────────────
+  // Deux choses qui EXISTENT vraiment, à la différence des quatre promesses retirées de
+  // l'onglet Sécurité : la position diffusée en direct à un proche dès le départ, et un
+  // choc suivi d'une immobilité qui demande « tu vas bien ? ». Le reste (appel, SMS
+  // automatique, détection hors premier plan) n'est pas à la portée d'une page web, et
+  // l'écran le dit au lieu de le laisser croire.
+  /** L'identifiant du partage en cours (`/suivre/<id>`), ou null si on ne partage pas. */
+  const [partageId, setPartageId] = useState<string | null>(null);
+  const partageCanalRef = useRef<{ send: (m: unknown) => void; unsubscribe: () => void } | null>(null);
+  /** L'état de la veille : calme → choc → alerte. */
+  const veilleRef = useRef<EtatVeille>({ phase: "calme" });
+  const [chocDetecte, setChocDetecte] = useState(false);
+  const [rebours, setRebours] = useState(60);
+  const [veilleActive, setVeilleActive] = useState(false);
+  const [capteursIndispo, setCapteursIndispo] = useState(false);
+  /** Le lien de suivi proposé au départ, tant que l'athlète ne l'a pas envoyé ni fermé. */
+  const [departPret, setDepartPret] = useState<string | null>(null);
+  const reboursRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const motionRef = useRef<((e: DeviceMotionEvent) => void) | null>(null);
   const [traceCarte, setTraceCarte] = useState<[number, number][]>([]);
   const derniereSauvegardeRef = useRef(0);
   const demarreeARef = useRef(0);
@@ -322,6 +348,115 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
     }
   }
 
+  /** Le prénom affiché dans les messages : celui du profil, jamais le nom complet. */
+  const prenom = (profile?.full_name ?? "").trim().split(/\s+/)[0] || null;
+  const contactNom = (contact.nom || "").trim().split(/\s+/)[0] || null;
+
+  /**
+   * Diffuse la position en direct sur le canal `run-<id>` — EXACTEMENT le protocole que
+   * la page publique `/suivre/<id>` écoute déjà (événement `pos`). Rien de nouveau à
+   * apprendre côté spectateur, et aucun compte à créer de son côté.
+   */
+  function demarrerPartage(): string {
+    const id = idPartage();
+    setPartageId(id);
+    try {
+      const canal = createClient().channel(`run-${id}`, { config: { broadcast: { self: false } } });
+      canal.subscribe();
+      partageCanalRef.current = canal as unknown as { send: (m: unknown) => void; unsubscribe: () => void };
+    } catch { /* sans réseau, le lien existe quand même : il s'animera dès le retour */ }
+    return id;
+  }
+
+  function arreterPartage() {
+    try { partageCanalRef.current?.unsubscribe(); } catch { /* déjà fermé */ }
+    partageCanalRef.current = null;
+    setPartageId(null);
+  }
+
+  /** Prépare le SMS au contact d'urgence (départ ou alerte) et l'ouvre d'un geste. */
+  function prevenirContact(corps: string) {
+    if (!contact.tel.trim()) { toast.error(d["veille.sansContact"]); return; }
+    window.location.href = lienSms(contact.tel, corps);
+  }
+
+  /** Le lien de suivi complet, quand un partage est en cours. */
+  const lienPartage = partageId && typeof window !== "undefined" ? lienSuivi(window.location.origin, partageId) : null;
+
+  /**
+   * Démarre l'écoute de l'accéléromètre.
+   *
+   * ⚠️ SUR IPHONE, LA PERMISSION SE DEMANDE DEPUIS UN GESTE DE L'UTILISATEUR :
+   * `DeviceMotionEvent.requestPermission()` n'existe que là, et refuse hors d'un clic.
+   * C'est pourquoi la veille s'arme au démarrage de la séance — un bouton pressé — et
+   * pas au montage de la page.
+   */
+  async function armerVeille() {
+    if (typeof window === "undefined" || typeof DeviceMotionEvent === "undefined") { setCapteursIndispo(true); return; }
+    const DM = DeviceMotionEvent as unknown as { requestPermission?: () => Promise<"granted" | "denied"> };
+    try {
+      if (typeof DM.requestPermission === "function") {
+        const r = await DM.requestPermission();
+        if (r !== "granted") { setCapteursIndispo(true); return; }
+      }
+    } catch { setCapteursIndispo(true); return; }
+    veilleRef.current = { phase: "calme" };
+    const onMotion = (e: DeviceMotionEvent) => {
+      const g = intensite(e.accelerationIncludingGravity);
+      const avant = veilleRef.current.phase;
+      veilleRef.current = avancer(veilleRef.current, { g, t: Date.now() });
+      if (veilleRef.current.phase === "alerte" && avant !== "alerte") declencherAlerte();
+    };
+    motionRef.current = onMotion;
+    window.addEventListener("devicemotion", onMotion);
+    setVeilleActive(true);
+  }
+
+  function desarmerVeille() {
+    if (motionRef.current) window.removeEventListener("devicemotion", motionRef.current);
+    motionRef.current = null;
+    if (reboursRef.current) clearInterval(reboursRef.current);
+    reboursRef.current = null;
+    veilleRef.current = { phase: "calme" };
+    setVeilleActive(false); setChocDetecte(false);
+  }
+
+  /**
+   * Un choc suivi d'une immobilité : on demande, on ne décide pas. Soixante secondes,
+   * une voix et un écran — puis le message au contact, qu'il reste à envoyer d'un geste.
+   * ⚠️ Pacevo n'envoie RIEN tout seul : le dire est la seule façon que personne ne compte
+   * sur une alerte qui ne partirait pas.
+   */
+  function declencherAlerte() {
+    setChocDetecte(true);
+    setRebours(60);
+    speakRef.current(d["veille.choc"]);
+    if (reboursRef.current) clearInterval(reboursRef.current);
+    reboursRef.current = setInterval(() => {
+      setRebours((n) => {
+        if (n <= 1) {
+          if (reboursRef.current) clearInterval(reboursRef.current);
+          reboursRef.current = null;
+          const pos = lastPosRef.current ? { lat: lastPosRef.current.lat, lng: lastPosRef.current.lng } : null;
+          prevenirContact(messageAlerte(prenom, lienPartage, pos, {
+            alerte: tg("veille.alerte", { nom: prenom ?? "" }), position: d["veille.position"],
+            suivi: d["veille.suivi"], secours: d["veille.secours"],
+          }));
+          return 0;
+        }
+        return n - 1;
+      });
+    }, 1000);
+  }
+
+  /** « Je vais bien » : la veille repart à zéro, rien n'est envoyé. */
+  function jeVaisBien() {
+    if (reboursRef.current) clearInterval(reboursRef.current);
+    reboursRef.current = null;
+    veilleRef.current = { phase: "calme" };
+    setChocDetecte(false);
+  }
+
   async function saveRun(finalSec: number) {
     if (kmRef.current < 0.1 || finalSec < 30) { effacerEnCours(typeof localStorage !== "undefined" ? localStorage : null); return; }
     await envoyerCourse({
@@ -334,6 +469,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
   }
 
   function finishSession() {
+    desarmerVeille(); arreterPartage();
     if (intervalRef.current) clearInterval(intervalRef.current);
     if (watchIdRef.current != null && typeof navigator !== "undefined") navigator.geolocation.clearWatch(watchIdRef.current);
     intervalRef.current = null; watchIdRef.current = null;
@@ -398,6 +534,9 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
     }
     lastPosRef.current = { lat: latitude, lng: longitude, t };
     setPositionCarte([latitude, longitude]);
+    // Le proche qui suit reçoit la position en direct — même événement que la page
+    // /suivre/<id> écoute déjà. Sans réseau, l'envoi échoue sans rien casser.
+    try { partageCanalRef.current?.send({ type: "broadcast", event: "pos", payload: { lat: latitude, lng: longitude } }); } catch { /* hors ligne */ }
   }
 
   // Toujours la dernière version de speak (les listeners Bluetooth vivent longtemps).
@@ -502,6 +641,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
   }
 
   function finishHrSession() {
+    desarmerVeille(); arreterPartage();
     if (intervalRef.current) clearInterval(intervalRef.current);
     if (watchIdRef.current != null && typeof navigator !== "undefined") navigator.geolocation.clearWatch(watchIdRef.current);
     intervalRef.current = null; watchIdRef.current = null;
@@ -524,6 +664,16 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
     setElapsed(0); setCurrentKm(0); setCurrentPace(0); setPredictedFinish(0); setPaused(false);
     setPhase("running");
     wantLockRef.current = true; requestWakeLock(); // garde l'écran allumé pendant la course
+    // ⚠️ ARMÉE ICI, DEPUIS LE CLIC : sur iPhone, la permission des capteurs de mouvement
+    // ne peut être demandée que dans un geste de l'utilisateur. Au montage de la page,
+    // l'appel est refusé sans explication.
+    void armerVeille();
+    const idp = demarrerPartage();
+    // ⚠️ PROPOSÉ MÊME SANS CONTACT ENREGISTRÉ : le lien se copie et s'envoie par le moyen
+    // qu'on veut (message, WhatsApp…). Le réserver aux comptes ayant rempli le contact
+    // d'urgence, c'était priver du partage ceux qui en ont le plus besoin — ceux qui
+    // n'ont rien configuré.
+    if (typeof window !== "undefined") setDepartPret(lienSuivi(window.location.origin, idp));
     speak(tg("sp.start", { t: formatTime(targetTime), p: formatPace(targetPace) }));
 
     // GPS réel si disponible (téléphone/montre), sinon mode démo.
@@ -560,6 +710,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
   }
 
   function stopSession() {
+    desarmerVeille(); arreterPartage();
     if (intervalRef.current) clearInterval(intervalRef.current);
     if (watchIdRef.current != null && typeof navigator !== "undefined") navigator.geolocation.clearWatch(watchIdRef.current);
     intervalRef.current = null; watchIdRef.current = null;
@@ -675,6 +826,72 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
       {/* ⚠️ SUR TÉLÉPHONE, LA CARTE D'ABORD — comme Strava (Cyprien, 21/09/2026) : la
           position en direct, puis le tracé pendant la course ; les réglages existants
           suivent en dessous. Le bouton audio passe sur la carte. */}
+      {/* ══ LE CHOC DÉTECTÉ — la seule chose qui passe devant tout le reste ══════════
+          Plein écran, gros boutons, compte à rebours : si quelqu'un est au sol, il ne
+          cherche pas un bouton de 28 px. Et si personne ne répond, Pacevo n'appelle
+          PAS à sa place : il ouvre le message au contact, prêt à partir. */}
+      {chocDetecte && (
+        <div className="fixed inset-0 z-[3000] flex flex-col items-center justify-center gap-6 bg-red-600 px-6 text-center text-white" role="alertdialog" aria-live="assertive">
+          <AlertTriangle className="h-16 w-16" aria-hidden />
+          <p className="text-2xl font-black leading-tight">{d["veille.choc"]}</p>
+          <p className="text-lg font-bold tabular-nums">{tg("veille.rebours", { n: rebours })}</p>
+          <button type="button" onClick={jeVaisBien}
+            className="w-full max-w-xs rounded-2xl bg-white px-6 py-5 text-lg font-bold text-red-700 shadow-lg">
+            {d["veille.jeVaisBien"]}
+          </button>
+          {contact.tel.trim() && (
+            <button type="button"
+              onClick={() => prevenirContact(messageAlerte(prenom, lienPartage, lastPosRef.current ? { lat: lastPosRef.current.lat, lng: lastPosRef.current.lng } : null, {
+                alerte: tg("veille.alerte", { nom: prenom ?? "" }), position: d["veille.position"], suivi: d["veille.suivi"], secours: d["veille.secours"],
+              }))}
+              className="w-full max-w-xs rounded-2xl border-2 border-white/70 px-6 py-4 text-base font-semibold">
+              {tg("veille.prevenir", { nom: contactNom ?? "" })}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Le lien de suivi, proposé au départ — un geste, puis il disparaît. */}
+      {departPret && (
+        <div className="-mx-6 -mt-6 flex items-start gap-3 border-b border-blue-100 bg-blue-50 px-5 py-3 md:mx-0 md:mt-0 md:rounded-2xl md:border">
+          <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-600" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-semibold leading-snug text-blue-900">{d["veille.partage"]}</p>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              <button type="button"
+                onClick={() => { prevenirContact(messageDepart(prenom, departPret, { depart: tg("veille.depart", { nom: prenom ?? "" }), suivi: d["veille.suivi"] })); setDepartPret(null); }}
+                className="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white">
+                {contactNom ? tg("veille.prevenir", { nom: contactNom }) : d["veille.partage"]}
+              </button>
+              <button type="button"
+                onClick={() => { navigator.clipboard?.writeText(departPret).then(() => toast.success(d["veille.partageCopie"]), () => toast.error(d["veille.partageCopie"])); setDepartPret(null); }}
+                className="rounded-full border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700">
+                {d["veille.copier"]}
+              </button>
+            </div>
+          </div>
+          <button type="button" onClick={() => setDepartPret(null)} aria-label={d["t.recoverDrop"]} className="rounded-full p-1 text-blue-400">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {/* L'état de la veille, dit sans emphase — et sa LIMITE, dans le même regard.
+          ⚠️ « Veille active » est une promesse ; la phrase qui la borne ne doit pas être
+          repliée dessous, sinon on retombe sur ce qui a été retiré de l'onglet Sécurité :
+          quelqu'un qui part en montagne en se croyant surveillé. */}
+      {(veilleActive || capteursIndispo) && phase === "running" && (
+        <div className="-mx-6 border-b border-zinc-100 bg-white px-5 py-2 md:mx-0 md:rounded-2xl md:border">
+          <div className="flex items-start gap-1.5 text-[11px] leading-relaxed text-zinc-500">
+            <ShieldCheck className={`mt-0.5 h-3.5 w-3.5 flex-shrink-0 ${veilleActive ? "text-emerald-600" : "text-zinc-300"}`} aria-hidden />
+            <p>
+              <b className="font-semibold text-zinc-700">{veilleActive ? d["veille.active"] : d["veille.titre"]} — </b>
+              {capteursIndispo ? d["veille.indispo"] : d["veille.limite"]}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="relative -mx-6 -mt-6 md:hidden">
         <CarteDirect position={positionCarte} track={traceCarte} className="h-[46vh] min-h-[280px] w-full" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#FAFAFA] to-transparent" />
