@@ -144,6 +144,27 @@ test("allers-retours d'onglets : pages gardées 30 s, barre préchargée, pas de
   assert.ok(!/(^|\s)backdrop-blur/.test(header.replace(/md:backdrop-blur-sm/g, "")), "l'entête a un flou d'arrière-plan sans préfixe md:");
 });
 
+test("aucun flou d'arrière-plan posé sur une carte qui se déplace, et une seule vague de lectures par page", () => {
+  // Un `backdrop-filter` au-dessus d'une carte est recomposé À CHAQUE IMAGE pendant le
+  // déplacement de la carte : à 95 % d'opacité, le flou est invisible mais la facture
+  // GPU est entière — sur téléphone, c'est le saccadement de la carte.
+  for (const f of ["src/components/trail/TrailBuilder.tsx", "src/components/races/RacesMapView.tsx"]) {
+    assert.ok(!/backdrop-blur/.test(codeNu(f)), `${f} : un flou d'arrière-plan est revenu sur la carte`);
+  }
+  const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
+  const carte = gr.slice(gr.indexOf('<div className="relative -mx-6 -mt-6 md:hidden">'), gr.indexOf("</CarteDirect>") > 0 ? gr.indexOf("</CarteDirect>") : gr.indexOf('className="relative hidden overflow-hidden rounded-3xl'));
+  assert.ok(!/backdrop-blur/.test(carte), "le bouton audio posé sur la carte du téléphone a retrouvé son flou");
+  // Les pages qui enchaînaient des vagues de lectures indépendantes n'en font plus qu'une.
+  const races = codeNu("src/app/dashboard/races/page.tsx");
+  assert.match(races, /\[\{ data: etatLiens \}, coursesRes, \{ count: totalCount \}, \{ data: \{ user \} \}\] = await Promise\.all\(\[/, "la page Courses a retrouvé ses vagues successives (liens, puis courses, puis session)");
+  const accueil = codeNu("src/app/dashboard/page.tsx");
+  assert.ok(!/const \[avisRes, nbSeancesRes\] = await Promise\.all/.test(accueil) && /streakPlanRes, avisRes, nbSeancesRes\] = await Promise\.all\(\[/.test(accueil), "l'accueil a retrouvé sa troisième vague (invitation à laisser un avis)");
+  const rec = codeNu("src/app/dashboard/ghost-runner/page.tsx");
+  assert.match(rec, /const \[\{ data: fcRows \}, \{ data: recentes \}\] = await Promise\.all\(\[/, "« Enregistrer » relit ses deux séries de FC en deux attentes");
+  // Le catalogue des courses reste en cache navigateur : sinon ~1 Mo à chaque ouverture.
+  assert.match(codeNu("src/app/api/races/list/route.ts"), /"Cache-Control": "public, max-age=1800, s-maxage=1800, stale-while-revalidate=86400"/, "le catalogue des courses n'est plus gardé par le navigateur");
+});
+
 test("la fonction serveur n'embarque que le catalogue compacté (1 Mo), pas les 36 Mo du crawl", () => {
   const cfg = codeNu("next.config.ts");
   for (const f of ["./data/dataset.json", "./data/dataset_france.json", "./data/parcours_certifies.json"]) {

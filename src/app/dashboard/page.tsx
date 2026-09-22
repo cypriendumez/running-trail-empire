@@ -40,7 +40,7 @@ export default async function DashboardPage() {
   // Le jour de l'athlète, calculé AVANT les requêtes : il en filtre une.
   const today = aujourdhui(FUSEAU_DEFAUT);
 
-  const [profileRes, hrvRes, workoutsRes, planRes, leagueRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, newMembersRes, prRes, chargeRes, streakWkRes, streakPlanRes] = await Promise.all([
+  const [profileRes, hrvRes, workoutsRes, planRes, leagueRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, newMembersRes, prRes, chargeRes, streakWkRes, streakPlanRes, avisRes, nbSeancesRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single(),
     supabase.from("hrv_data").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(14),
     supabase.from("workouts").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(40),
@@ -90,6 +90,11 @@ export default async function DashboardPage() {
     supabase.from("notifications").select("created_at,data")
       .eq("user_id", user!.id).eq("type", "coach_session").gte("data->>date", streakFrom)
       .order("created_at", { ascending: false }).limit(600),
+    // L'invitation à laisser un avis (voir plus bas) : ces deux lectures faisaient une
+    // TROISIÈME vague après celle-ci, alors qu'elles ne dépendent que de l'identifiant.
+    // Une vague de moins = un aller-retour de moins avant le premier octet (22/09/2026).
+    supabase.from("notifications").select("id").eq("user_id", user!.id).eq("type", TYPE_AVIS).limit(1),
+    supabase.from("workouts").select("id", { count: "exact", head: true }).eq("user_id", user!.id),
   ]);
 
   // L'état d'abonnement se déduit du profil déjà chargé : `created_at` donne l'essai,
@@ -194,10 +199,6 @@ export default async function DashboardPage() {
    *    d'utilisateurs réels — un avis sollicité trop tôt n'en est pas un.
    */
   const SEANCES_AVANT_INVITE = 5;
-  const [avisRes, nbSeancesRes] = await Promise.all([
-    supabase.from("notifications").select("id").eq("user_id", user!.id).eq("type", TYPE_AVIS).limit(1),
-    supabase.from("workouts").select("id", { count: "exact", head: true }).eq("user_id", user!.id),
-  ]);
   const inviterAvis = (avisRes.data?.length ?? 0) === 0 && (nbSeancesRes.count ?? 0) >= SEANCES_AVANT_INVITE;
 
   return (

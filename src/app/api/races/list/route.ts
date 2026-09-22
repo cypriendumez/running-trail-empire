@@ -46,7 +46,13 @@ export async function GET() {
         // Caché au bord du CDN Vercel : la 1re requête remplit le cache, les suivantes
         // sont servies instantanément (compressé), sans DB ni sérialisation par requête.
         // s-maxage=30 min, sert l'ancienne version pendant la revalidation jusqu'à 24 h.
-        "Cache-Control": "public, s-maxage=1800, stale-while-revalidate=86400",
+        //
+        // ⚠️ `max-age` AUSSI (22/09/2026) : Vercel retire `s-maxage` de l'en-tête envoyé au
+        // navigateur, qui ne recevait que `public` — donc AUCUNE mise en cache côté
+        // téléphone : chaque ouverture de l'onglet Courses retéléchargeait ~1 Mo compressé
+        // (5,5 Mo de JSON à relire). Trente minutes en cache navigateur, puis revalidation
+        // en arrière-plan : le catalogue s'ouvre sans réseau la fois d'après.
+        "Cache-Control": "public, max-age=1800, s-maxage=1800, stale-while-revalidate=86400",
       },
     },
   );

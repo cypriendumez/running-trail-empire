@@ -441,7 +441,7 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
       </div>
 
       {/* ── Legend ───────────────────────────────────────────────────────── */}
-      <div className="absolute bottom-6 left-4 hidden bg-white/95 backdrop-blur rounded-2xl shadow-lg border border-zinc-200/80 p-3 z-[1000] sm:block">
+      <div className="absolute bottom-6 left-4 hidden bg-white/95 rounded-2xl shadow-lg border border-zinc-200/80 p-3 z-[1000] sm:block">
         <div className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">{d["legendTitle"]}</div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
           {Object.entries(TYPE_COLORS).map(([type, color]) => (

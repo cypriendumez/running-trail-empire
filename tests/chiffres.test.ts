@@ -1388,11 +1388,14 @@ test("tout sous-traitant déclaré est réellement appelé par le code", () => {
 
 test("les cinq langues disent où le code serveur s'exécute vraiment", () => {
   // ⚠️ LA POLITIQUE DISAIT « tes données sont hébergées dans l'Union européenne » et
-  // n'évoquait, hors UE, que Google, Anthropic et Stripe. VÉRIFIÉ EN PRODUCTION :
-  // l'en-tête `x-vercel-id` renvoie `cdg1::iad1::…` — `cdg1` n'est que le point d'entrée
-  // parisien, `iad1` est la région où le CODE S'EXÉCUTE, en Virginie. Autrement dit,
-  // toute donnée qui traverse une route de l'application est traitée aux États-Unis, et
-  // la section « transferts hors UE » ne le disait pas.
+  // n'évoquait, hors UE, que Google, Anthropic et Stripe. VÉRIFIÉ EN PRODUCTION (23/08) :
+  // l'en-tête `x-vercel-id` renvoyait `cdg1::iad1::…` — `iad1`, la Virginie. Depuis le
+  // 22/09/2026, `vercel.json` fixe la région à `fra1` (Francfort, vérifié : `cdg1::fra1`)
+  // et les textes doivent suivre : la région publiée est CELLE du déploiement, pas une
+  // valeur écrite de mémoire — sinon la politique décrirait un serveur qui n'existe plus.
+  const regions = (JSON.parse(readFileSync(join(ROOT, "vercel.json"), "utf8")) as { regions?: string[] }).regions ?? ["iad1"];
+  assert.equal(HEBERGEUR_APP.region, regions[0], `la région publiée (${HEBERGEUR_APP.region}) n'est pas celle du déploiement (${regions[0]})`);
+  if (regions[0] === "fra1") assert.equal(PAYS_APP.fr, "Allemagne", "fra1 est à Francfort : le pays d'exécution publié doit être l'Allemagne");
   const manques: string[] = [];
   for (const lg of LANGUES) {
     const sec = LEGAL[lg].privacy.sections.find((s) => /^6\./.test(s.title));

@@ -77,19 +77,19 @@ export function MiniBarres({ barres, libelle, unite = "km" }: {
   const max = Math.max(1, ...barres.map((b) => b.valeur));
   return (
     <div className="flex h-full w-full flex-col" role="img" aria-label={libelle}>
-      <div className="flex min-h-0 flex-1 items-end gap-[6%] px-1">
+      <div className="flex min-h-0 flex-1 items-end gap-[4%] px-1">
         {barres.map((b, i) => {
           const h = b.valeur > 0 ? Math.max(6, (b.valeur / max) * 100) : 4;
           return (
             <div key={i} className="flex h-full flex-1 items-end" title={`${b.jour} · ${b.valeur.toFixed(1)} ${unite}`}>
-              <div className="w-full rounded-t-md transition-[height] duration-500" style={{ height: `${h}%`, background: b.valeur > 0 ? "#10b981" : "#E4E4E7" }} />
+              <div className="mx-auto w-full max-w-[36px] rounded-t-md transition-[height] duration-500" style={{ height: `${h}%`, background: b.valeur > 0 ? "#10b981" : "#E4E4E7" }} />
             </div>
           );
         })}
       </div>
-      <div className="mt-1.5 flex gap-[6%] px-1">
+      <div className="mt-1.5 flex gap-[4%] px-1">
         {barres.map((b, i) => (
-          <div key={i} className="flex-1 truncate text-center text-[11px] text-zinc-400">{b.jour}</div>
+          <div key={i} className="flex-1 text-center text-[10px] leading-none text-zinc-400">{b.jour}</div>
         ))}
       </div>
     </div>

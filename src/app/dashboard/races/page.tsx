@@ -41,14 +41,18 @@ export default async function RacesPage({ searchParams }: { searchParams: Promis
   //  disparue sans que rien ne le signale. Un contrôle en tâche de fond en vérifie une
   //  tranche trois fois par jour ; on ne descend ici QUE les URL confirmées (deux 404
   //  d'affilée), c'est-à-dire une poignée — pas l'état complet du balayage.
-  const { data: etatLiens } = await admin.from("notifications").select("data")
-    .eq("type", "races_liens").order("created_at", { ascending: false }).limit(1).maybeSingle();
-  const liensMorts = urlsSignalees({ ...ETAT_VIDE, ...((etatLiens?.data ?? {}) as Partial<EtatLiens>) });
-
-  const [coursesRes, { count: totalCount }] = await Promise.all([
+  // ⚠️ UNE SEULE VAGUE (22/09/2026) : ces lectures étaient enchaînées en trois attentes
+  // successives (état des liens, puis courses + total, puis la session) alors qu'aucune
+  // ne dépend d'une autre. Chaque vague est un aller-retour vers la base avant le
+  // premier octet ; deux de moins, c'est autant de gagné sur chaque ouverture.
+  const sb = await createClient();
+  const [{ data: etatLiens }, coursesRes, { count: totalCount }, { data: { user } }] = await Promise.all([
+    admin.from("notifications").select("data").eq("type", "races_liens").order("created_at", { ascending: false }).limit(1).maybeSingle(),
     admin.from("races").select(RACE_COLS).gte("date", today).order("date", { ascending: true }).limit(90),
     admin.from("races").select("id", { count: "estimated", head: true }).gte("date", today),
+    sb.auth.getUser(),
   ]);
+  const liensMorts = urlsSignalees({ ...ETAT_VIDE, ...((etatLiens?.data ?? {}) as Partial<EtatLiens>) });
 
   /**
    * ⚠️ UN CATALOGUE VIDE, C'EST 17 000 COURSES QUI DISPARAISSENT.
@@ -62,8 +66,6 @@ export default async function RacesPage({ searchParams }: { searchParams: Promis
   if (cataloguEnPanne) console.error("[courses] catalogue illisible :", coursesRes.error?.message);
 
   // Courses planifiées par l'athlète (depuis le calendrier) — affichées en haut.
-  const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
   let planned: { id: string; name: string; location: string; distanceKm: number | null; date: string }[] = [];
   let units: "metric" | "imperial" = "metric";
   let lang = "fr";

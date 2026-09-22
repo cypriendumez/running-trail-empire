@@ -54,19 +54,23 @@ export default async function GhostRunnerPage() {
   // FC max réellement ENREGISTRÉE : une mesure vaut mieux que la baseline (vide chez
   // qui n'a pas passé de test) et mieux qu'une formule sur l'âge. Le seuil de 150
   // écarte les séances où le capteur a décroché plutôt que battu un record.
-  const { data: fcRows } = await supabase.from("workouts")
-    .select("max_hr").eq("user_id", user!.id).gt("max_hr", 150)
-    .order("max_hr", { ascending: false }).limit(1);
+  // Les deux lectures ci-dessous ne dépendent que de l'identifiant : en UNE vague, pas
+  // deux attentes de plus avant le premier octet (22/09/2026).
+  const [{ data: fcRows }, { data: recentes }] = await Promise.all([
+    supabase.from("workouts")
+      .select("max_hr").eq("user_id", user!.id).gt("max_hr", 150)
+      .order("max_hr", { ascending: false }).limit(1),
+    supabase.from("workouts")
+      .select("distance_km, duration_seconds, avg_hr, type")
+      .eq("user_id", user!.id).not("avg_hr", "is", null)
+      .order("date", { ascending: false }).limit(60),
+  ]);
   const fcMaxObservee = (fcRows?.[0] as { max_hr?: number } | undefined)?.max_hr ?? null;
 
   // FC de ses FOOTINGS réels : la cible d'endurance suit l'athlète quand il court plus
   // facile que la théorie (et seulement dans ce sens — voir `cibleEndurance`).
   // ⚠️ On reclasse les séances au lieu de croire leur étiquette : les imports
   // intervals.icu marquent presque tout en « easy », ce qui rendrait le tri inutile.
-  const { data: recentes } = await supabase.from("workouts")
-    .select("distance_km, duration_seconds, avg_hr, type")
-    .eq("user_id", user!.id).not("avg_hr", "is", null)
-    .order("date", { ascending: false }).limit(60);
   const fcFootings = ((recentes ?? []) as { distance_km: number | null; duration_seconds: number | null; avg_hr: number | null; type: string | null }[])
     .filter((w) => /Footing|Endurance/.test(classifyRun(w, fcMaxObservee)))
     .map((w) => w.avg_hr)

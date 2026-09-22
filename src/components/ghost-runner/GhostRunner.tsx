@@ -680,7 +680,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#FAFAFA] to-transparent" />
         <button
           onClick={() => setAudioEnabled(!audioEnabled)}
-          className={`absolute right-4 top-4 z-[500] flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold shadow-md backdrop-blur ${audioEnabled ? "bg-zinc-900/85 text-white" : "bg-white/90 text-zinc-500 ring-1 ring-zinc-200"}`}
+          className={`absolute right-4 top-4 z-[500] flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold shadow-md ${audioEnabled ? "bg-zinc-900/85 text-white" : "bg-white/90 text-zinc-500 ring-1 ring-zinc-200"}`}
         >
           {audioEnabled ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />} Audio {audioEnabled ? "ON" : "OFF"}
         </button>

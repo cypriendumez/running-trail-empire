@@ -65,9 +65,10 @@ export default async function ActivitesPage({ searchParams }: { searchParams: Pr
   // Le TOTAL est compté à part. La page annonçait « 15 sorties enregistrées » à un
   // athlète qui en a 332 : la phrase décrivait la page, pas l'historique, et laissait
   // croire que la synchro avait perdu des séances.
-  const { count: total } = await sb.from("workouts")
-    .select("id", { count: "exact", head: true }).eq("user_id", user.id);
-  const edition = await colonnesEditionPresentes(sb);
+  const [{ count: total }, edition] = await Promise.all([
+    sb.from("workouts").select("id", { count: "exact", head: true }).eq("user_id", user.id),
+    colonnesEditionPresentes(sb),
+  ]);
   const champs = "id, date, title, type, sport, distance_km, duration_seconds, elevation_gain_m"
     + (edition ? `, ${COLONNES_EDITION.titre}` : "");
   const lecture = await sb.from("workouts")

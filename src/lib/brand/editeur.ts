@@ -57,18 +57,23 @@ export const EDITEUR = {
  * Adresse relevée le 23/08/2026 sur les pages légales de Vercel elles-mêmes
  * (vercel.com/legal/privacy-policy et /legal/terms), pas de mémoire.
  *
- * ⚠️ `region` VÉRIFIÉE EN PRODUCTION le 23/08/2026 : l'en-tête `x-vercel-id` renvoie
- * `cdg1::iad1::…` sur chaque appel — `cdg1` n'est que le point d'entrée parisien,
- * `iad1` est la région où le CODE SERVEUR S'EXÉCUTE, en Virginie du Nord. Autrement dit,
- * toute donnée qui traverse une route de l'application est traitée aux États-Unis. La
- * politique de confidentialité le disait pour l'hébergement, mais l'omettait dans la
- * section « transferts hors Union européenne » — c'est corrigé.
+ * ⚠️ `region` VÉRIFIÉE EN PRODUCTION : jusqu'au 22/09/2026 l'en-tête `x-vercel-id`
+ * renvoyait `cdg1::iad1::…` — `cdg1` n'est que le point d'entrée parisien, `iad1` la
+ * région où le CODE SERVEUR S'EXÉCUTAIT, en Virginie du Nord. Depuis le 22/09/2026
+ * (`vercel.json` → `regions: ["fra1"]`, accepté sur le plan Hobby), il renvoie
+ * `cdg1::fra1::…` : les fonctions tournent à FRANCFORT, dans la même ville que la
+ * base — chaque requête vers Supabase ne traverse plus l'Atlantique (≈ 90 ms de
+ * moins par aller-retour, plusieurs par page). Les pages légales en découlent.
+ *
+ * ⚠️ DEUX PAYS DISTINCTS, à ne pas confondre dans les textes : le SIÈGE de Vercel Inc.
+ * (États-Unis, c'est l'adresse ci-dessous) et le LIEU D'EXÉCUTION du code (Allemagne).
  */
 export const HEBERGEUR_APP = {
   nom: "Vercel Inc.",
   adresse: "440 N Barranca Avenue #4133, Covina, CA 91723",
   site: "vercel.com",
-  region: "iad1",
+  region: "fra1",
+  ville: { fr: "Francfort", en: "Frankfurt", de: "Frankfurt", es: "Fráncfort", pt: "Frankfurt" } as Record<Lang, string>,
 } as const;
 
 /**
@@ -96,8 +101,13 @@ export const PAYS_EDITEUR: Record<Lang, string> = {
   fr: "France", en: "France", de: "Frankreich", es: "Francia", pt: "França",
 };
 
-/** Le pays d'exécution de l'application, dans chaque langue publiée. */
+/** Le pays d'EXÉCUTION de l'application (région `fra1`), dans chaque langue publiée. */
 export const PAYS_APP: Record<Lang, string> = {
+  fr: "Allemagne", en: "Germany", de: "Deutschland", es: "Alemania", pt: "Alemanha",
+};
+
+/** Le pays du SIÈGE de l'hébergeur de l'application (l'adresse de `HEBERGEUR_APP`). */
+export const PAYS_SIEGE_APP: Record<Lang, string> = {
   fr: "États-Unis", en: "United States", de: "USA", es: "Estados Unidos", pt: "Estados Unidos",
 };
 

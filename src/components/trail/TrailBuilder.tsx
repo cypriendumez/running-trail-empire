@@ -963,7 +963,7 @@ export function TrailBuilder({ centre, onTrace }: {
             ligne, puis la barre sur UNE ligne qui défile ; à partir de sm, comme avant. */}
         <div className="absolute top-3 left-3 right-3 z-[1000] flex flex-col-reverse items-stretch gap-2 pointer-events-none sm:flex-row sm:items-start sm:justify-between sm:gap-3">
           {/* Main controls */}
-          <div className="pointer-events-auto bg-white/95 backdrop-blur rounded-2xl shadow-lg border border-zinc-100 px-3 py-2 flex items-center gap-2.5 flex-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-w-full sm:flex-wrap sm:overflow-visible sm:max-w-[calc(100%-1rem)]">
+          <div className="pointer-events-auto bg-white/95 rounded-2xl shadow-lg border border-zinc-100 px-3 py-2 flex items-center gap-2.5 flex-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-w-full sm:flex-wrap sm:overflow-visible sm:max-w-[calc(100%-1rem)]">
             <Toggle id="tg-follow" checked={followPaths} onChange={setFollowPaths} label={d["tg.follow"]} />
             <span className="w-px h-6 bg-zinc-200" />
             <Toggle id="tg-trails" checked={showTrails} onChange={setShowTrails} label={d["tg.trails"]} />
@@ -1181,7 +1181,7 @@ export function TrailBuilder({ centre, onTrace }: {
         {/* Route loading indicator */}
         {routeLoading && (
           <div className="absolute top-32 sm:top-20 left-1/2 -translate-x-1/2 z-[999]">
-            <div className="bg-white/95 backdrop-blur rounded-full shadow-lg border border-zinc-100 px-4 py-1.5 flex items-center gap-2 text-sm text-zinc-700">
+            <div className="bg-white/95 rounded-full shadow-lg border border-zinc-100 px-4 py-1.5 flex items-center gap-2 text-sm text-zinc-700">
               <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
               {d["computing"]}
             </div>
@@ -1191,7 +1191,7 @@ export function TrailBuilder({ centre, onTrace }: {
         {/* Empty-state hint */}
         {!hasRoute && mounted && !routeLoading && (
           <div className="absolute top-32 sm:top-20 left-1/2 -translate-x-1/2 z-[999] pointer-events-none w-max max-w-[calc(100%-2rem)]">
-            <div className="bg-zinc-900/80 backdrop-blur text-white rounded-full px-4 py-1.5 text-sm font-medium shadow-lg text-center">
+            <div className="bg-zinc-900/85 text-white rounded-full px-4 py-1.5 text-sm font-medium shadow-lg text-center">
               {d["emptyHint"]}
             </div>
           </div>
@@ -1263,7 +1263,7 @@ export function TrailBuilder({ centre, onTrace }: {
                 )}
               </AnimatePresence>
 
-              <div className="bg-white/95 backdrop-blur rounded-full shadow-xl border border-zinc-100 px-2 py-2 flex items-center">
+              <div className="bg-white/95 rounded-full shadow-xl border border-zinc-100 px-2 py-2 flex items-center">
                 <PillStat value={fmtKm(distance, lang, 2)} label={d["st.distance"]} />
                 <PillDivider />
                 <PillStat value={formatDuration(durationMin)} label={d["st.time"]} icon={<IconeSport sport={activity} className="h-3 w-3 text-zinc-400" />} />
@@ -1297,7 +1297,7 @@ export function TrailBuilder({ centre, onTrace }: {
                 <Navigation className="w-4 h-4" /> {d["followLive"]}
               </button>
             ) : (
-              <div className="flex items-center gap-3 px-4 py-2 bg-white/95 backdrop-blur rounded-full shadow-xl border border-blue-100">
+              <div className="flex items-center gap-3 px-4 py-2 bg-white/95 rounded-full shadow-xl border border-blue-100">
                 <span className="flex items-center gap-1.5 text-sm font-semibold text-blue-700">
                   <span className="relative flex h-2.5 w-2.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
@@ -1341,7 +1341,7 @@ export function TrailBuilder({ centre, onTrace }: {
         <div className={`absolute top-1/2 -translate-y-1/2 left-3 z-[1000] transition-opacity duration-200 ${
           hasRoute || redoStack.length > 0 ? "opacity-100" : "pointer-events-none opacity-0"
         }`}>
-          <div className="bg-white/95 backdrop-blur rounded-2xl shadow-lg border border-zinc-100 p-1.5 flex flex-col gap-1">
+          <div className="bg-white/95 rounded-2xl shadow-lg border border-zinc-100 p-1.5 flex flex-col gap-1">
             <EditBtn onClick={handleUndo} disabled={!hasRoute} icon={<Undo2 className="w-5 h-5" />} label={d["undo"]} />
             <EditBtn onClick={handleRedo} disabled={redoStack.length === 0} icon={<Redo2 className="w-5 h-5" />} label={d["redo"]} />
             <EditBtn onClick={handleClear} disabled={!hasRoute} icon={<Trash2 className="w-5 h-5" />} label={d["clear"]} danger />
@@ -1419,7 +1419,7 @@ function ToolChip({ active, onClick, label, children }: { active: boolean; onCli
       aria-pressed={active}
       title={label}
       className={`w-10 h-10 flex items-center justify-center rounded-xl shadow-lg border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
-        active ? "bg-zinc-900 text-white border-zinc-900" : "bg-white/95 backdrop-blur text-zinc-700 border-zinc-100 hover:bg-zinc-100"
+        active ? "bg-zinc-900 text-white border-zinc-900" : "bg-white/95 text-zinc-700 border-zinc-100 hover:bg-zinc-100"
       }`}
     >
       {children}
