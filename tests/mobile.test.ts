@@ -242,19 +242,27 @@ test("plus d'emoji « personnage » pour les sports : des icônes en trait", () 
   assert.ok(!/\{act\.emoji\}|\{cfg\.emoji\}/.test(tb), "un emoji d'activité est encore rendu dans la carte");
 });
 
-test("sur téléphone, « Enregistrer » ouvre sur la carte, les réglages en dessous — le bureau garde son entête", () => {
+test("« Enregistrer » ouvre sur la carte — sur TOUS les écrans — et les réglages en dessous", () => {
   // Cyprien, 21/09/2026 : « fais comme Strava avec la carte et laisse la personne aller
-  // en bas avec tous les réglages qu'il y a déjà ».
+  // en bas avec tous les réglages qu'il y a déjà ». Puis, le 22/09/2026 devant son
+  // ordinateur : « pourquoi il n'y a pas la carte comme sur Strava » — la carte avait été
+  // montée en `md:hidden`, décision prise quand la demande portait sur le téléphone, et
+  // le bureau restait devant une photo de montagne décorative. Elle est partout.
   const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
-  const carte = gr.indexOf('<div className="relative -mx-6 -mt-6 md:hidden">');
-  assert.ok(carte > 0, "le bloc carte du téléphone a disparu de l'écran « Enregistrer »");
+  const carte = gr.indexOf('<div className="relative -mx-6 -mt-6 md:mx-0 md:mt-0');
+  assert.ok(carte > 0, "le bloc carte a disparu de l'écran « Enregistrer »");
+  assert.ok(!/relative -mx-6 -mt-6 md:hidden/.test(gr), "la carte est redevenue invisible sur bureau");
   assert.ok(/<CarteDirect position=\{positionCarte\} track=\{traceCarte\}/.test(gr.slice(carte, carte + 600)), "la carte ne suit plus la position ni la trace");
   // Elle est pleine largeur : les marges négatives annulent EXACTEMENT le `p-6` du <main>.
   assert.match(codeNu("src/app/dashboard/layout.tsx"), /<main className="flex-1 overflow-auto p-6">/, "le <main> n'a plus p-6 : les marges -mx-6/-mt-6 de la carte ne s'annulent plus");
-  // L'entête vert reste sur bureau, où la carte n'est pas montée.
+  // L'entête vert reste sur bureau, SOUS la carte, et sans la photo de montagne qui
+  // doublait la hauteur pour ne rien dire de la course en cours.
   const hero = gr.indexOf('className="relative hidden overflow-hidden rounded-3xl');
   assert.ok(hero > carte, "l'entête vert du bureau a disparu ou passe avant la carte");
   assert.ok(/ md:block"/.test(gr.slice(hero, hero + 220)), "l'entête vert ne revient plus sur bureau");
+  assert.ok(!/inset-y-0 right-0 w-\[58%\]/.test(gr), "la photo de montagne est revenue au-dessus de la carte");
+  // Un seul interrupteur audio par écran : deux, c'est un doute à chaque clic.
+  assert.equal([...gr.matchAll(/setAudioEnabled\(!audioEnabled\)/g)].length, 1, "il y a de nouveau deux boutons audio (entête + carte)");
   // La carte est chargée SANS rendu serveur : Leaflet touche `window` à l'import.
   assert.match(gr, /const CarteDirect = dynamic\(\(\) => import\("\.\/CarteDirect"\)[^;]*\{ ssr: false \}\)/, "CarteDirect n'est plus importée hors rendu serveur (Leaflet plante au SSR)");
   // Les réglages existants sont toujours là, SOUS la carte : le choix allure / fréquence

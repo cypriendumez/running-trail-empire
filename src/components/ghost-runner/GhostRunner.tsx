@@ -892,9 +892,15 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
         </div>
       )}
 
-      <div className="relative -mx-6 -mt-6 md:hidden">
-        <CarteDirect position={positionCarte} track={traceCarte} className="h-[46vh] min-h-[280px] w-full" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#FAFAFA] to-transparent" />
+      {/* ⚠️ LA CARTE EST LÀ SUR TOUS LES ÉCRANS (22/09/2026, Cyprien : « pourquoi il n'y a
+          pas la carte comme sur Strava »). Elle était en `md:hidden` : une décision prise
+          quand la demande portait sur le téléphone, et qui laissait le bureau devant une
+          photo de montagne décorative pendant que le vrai tracé restait invisible. Sur
+          bureau elle prend une hauteur fixe et s'arrondit ; sur téléphone elle reste
+          pleine largeur, collée au bord. */}
+      <div className="relative -mx-6 -mt-6 md:mx-0 md:mt-0 md:overflow-hidden md:rounded-3xl md:border md:border-zinc-200">
+        <CarteDirect position={positionCarte} track={traceCarte} className="h-[46vh] min-h-[280px] w-full md:h-[380px]" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#FAFAFA] to-transparent md:hidden" />
         <button
           onClick={() => setAudioEnabled(!audioEnabled)}
           className={`absolute right-4 top-4 z-[500] flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold shadow-md ${audioEnabled ? "bg-zinc-900/85 text-white" : "bg-white/90 text-zinc-500 ring-1 ring-zinc-200"}`}
@@ -903,13 +909,16 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
         </button>
       </div>
 
-      {/* Header — hero émeraude immersif (photo montagne + dégradé) — bureau seulement */}
+      {/* Header — entête émeraude. ⚠️ PLUS DE PHOTO DE MONTAGNE : sur bureau, elle
+          occupait 200 px au-dessus de la carte pour ne rien dire de la course en cours.
+          La carte est passée au-dessus ; l'entête garde l'identité de l'écran, en plus
+          court, et le bouton audio vit sur la carte. */}
       <div
-        className="relative hidden overflow-hidden rounded-3xl border border-emerald-900/20 px-6 py-6 shadow-[0_18px_50px_-24px_rgba(6,78,59,0.6)] sm:px-8 md:block"
+        className="relative hidden overflow-hidden rounded-3xl border border-emerald-900/20 px-6 py-4 shadow-[0_18px_50px_-24px_rgba(6,78,59,0.6)] sm:px-8 md:block"
         style={{ background: "linear-gradient(120deg,#064e3b 0%,#047857 52%,#0d9488 100%)" }}
       >
-        {/* photo montagne fondue à droite */}
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-[58%]">
+        {/* photo montagne fondue à droite — retirée le 22/09/2026 : voir au-dessus */}
+        <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[58%]">
           <img src="https://images.unsplash.com/photo-1454496522488-7a8e488e8606?w=1100&q=70&fit=crop&crop=entropy" alt="" className="h-full w-full object-cover opacity-40" />
           <div className="absolute inset-0" style={{ background: "linear-gradient(to right,#064e3b 0%,rgba(6,78,59,0.55) 38%,rgba(6,78,59,0) 100%)" }} />
         </div>
@@ -935,15 +944,8 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
               </div>
             </div>
           </div>
-          <button
-            onClick={() => setAudioEnabled(!audioEnabled)}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold shadow-sm backdrop-blur-md transition-all ${
-              audioEnabled ? "bg-white/15 text-white ring-1 ring-white/30 hover:bg-white/25" : "bg-white/5 text-white/60 ring-1 ring-white/15 hover:bg-white/15"
-            }`}
-          >
-            {audioEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-            Audio {audioEnabled ? "ON" : "OFF"}
-          </button>
+          {/* Le bouton audio a rejoint la carte (un seul par écran) : deux interrupteurs
+              pour le même réglage, c'est un doute à chaque clic. */}
         </div>
       </div>
 
