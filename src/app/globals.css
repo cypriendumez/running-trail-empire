@@ -228,3 +228,15 @@
 .maplibregl-map {
   isolation: isolate;
 }
+
+/* ══ LA CARTE SUR TÉLÉPHONE (22/09/2026) ═══════════════════════════════════════
+   La barre du pouce du constructeur de parcours occupe le bas de la carte. Deux
+   conséquences à régler ICI, parce que Leaflet place ses propres éléments :
+   · l'attribution (OpenStreetMap / MapTiler) est OBLIGATOIRE : elle remonte
+     au-dessus de la barre au lieu de passer dessous ;
+   · les boutons +/− ne servent à rien au doigt (on pince) et tombaient juste
+     au-dessus de la barre : ils disparaissent sous 640 px. */
+@media (max-width: 639px) {
+  .leaflet-bottom { bottom: 64px; }
+  .leaflet-control-zoom { display: none; }
+}

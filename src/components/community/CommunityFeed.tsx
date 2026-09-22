@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { FILTRES } from "@/lib/news/rubriques";
@@ -153,15 +154,21 @@ export function CommunityFeed() {
     </div>
   );
 
-  const Cover = ({ c, big = false, seed = 0 }: { c: Cat; big?: boolean; seed?: number }) => {
+  const Cover = ({ c, big = false, seed = 0, priorite = false }: { c: Cat; big?: boolean; seed?: number; priorite?: boolean }) => {
     const Icon = THEME[c].icon;
     const pool = PHOTOS[c] ?? PHOTOS.running;
     const photo = pool[((seed % pool.length) + pool.length) % pool.length];
     return (
       <div className={`relative overflow-hidden bg-gradient-to-br ${THEME[c].grad} ${big ? "h-48 sm:h-auto sm:w-[40%]" : "h-28"}`}>
-        {/* Photo représentative libre de droits (Unsplash, usage commercial OK) par catégorie */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={photo} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        {/* Photo représentative libre de droits (Unsplash/Pexels, usage commercial OK).
+            ⚠️ PAR L'OPTIMISEUR, PAS EN DIRECT (22/09/2026). Chaque carte téléchargeait un
+            JPEG de ~90 ko chez Pexels : 48 allers-retours vers un CDN tiers, 766 ms
+            mesurées pour la première image. `next/image` les sert en AVIF/WebP, à la
+            taille réellement affichée, depuis notre domaine et en cache. Les deux
+            premières cartes sont prioritaires : ce sont elles que l'œil attend. */}
+        <Image src={photo} alt="" fill sizes={big ? "(max-width: 640px) 100vw, 40vw" : "(max-width: 640px) 100vw, 33vw"}
+          priority={priorite} loading={priorite ? undefined : "lazy"} quality={55}
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
         {/* Voile dégradé teinté : lisibilité du badge + identité couleur de la catégorie */}
         <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${THEME[c].grad} opacity-50 mix-blend-multiply`} />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-black/10" />
@@ -253,7 +260,7 @@ export function CommunityFeed() {
                   <motion.a key={i} href={it.link} target="_blank" rel="noopener noreferrer"
                     initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.04, 0.4), duration: 0.3 }} whileHover={{ y: -4 }}
                     className="group flex flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white transition-[border-color,box-shadow] hover:border-emerald-300 hover:shadow-[0_18px_44px_-22px_rgba(16,185,129,0.45)] sm:col-span-2 sm:flex-row">
-                    <Cover c={c} big seed={i} />
+                    <Cover c={c} big seed={i} priorite />
                     <div className="flex flex-1 flex-col p-5 sm:p-6">
                       <h2 className="text-lg font-bold leading-snug text-zinc-900 line-clamp-3 group-hover:text-emerald-700 sm:text-xl">{it.title}</h2>
                       <Footer it={it} />
@@ -265,7 +272,7 @@ export function CommunityFeed() {
                 <motion.a key={i} href={it.link} target="_blank" rel="noopener noreferrer"
                   initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.04, 0.4), duration: 0.3 }} whileHover={{ y: -4 }}
                   className="group flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white transition-[border-color,box-shadow] hover:border-emerald-300 hover:shadow-[0_16px_40px_-22px_rgba(16,185,129,0.4)]">
-                  <Cover c={c} seed={i} />
+                  <Cover c={c} seed={i} priorite={i <= 2} />
                   <div className="flex flex-1 flex-col p-4">
                     <h3 className="text-[15px] font-semibold leading-snug text-zinc-900 line-clamp-3 group-hover:text-emerald-700">{it.title}</h3>
                     <Footer it={it} />

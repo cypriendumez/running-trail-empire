@@ -8,6 +8,8 @@ export function fillT(s: string, p?: Record<string, string | number>): string {
 
 export const TB: Record<string, Record<string, string>> = {
   fr: {
+    "reglages": "Réglages de la carte", "fermer": "Fermer", "activite": "Activité",
+    "altIndispo": "Altitude indisponible pour l'instant — le dénivelé n'est pas affiché plutôt que d'être inventé. Réessaie dans un instant.",
     "layer.outdoor": "🌲 Plein air", "layer.paths": "🥾 Chemins", "layer.topo": "🗺️ Topo", "layer.street": "🏙️ Plan", "layer.satellite": "🛰️ Satellite",
     "act.course": "Course", "act.marche": "Marche", "act.trail": "Trail", "act.velo": "Vélo",
     "desc.vallonné": "vallonné", "desc.plat": "plat", "desc.variable": "variable",
@@ -41,6 +43,8 @@ export const TB: Record<string, Record<string, string>> = {
     "t.shareCopied": "Lien de suivi copié ! Envoie-le à qui tu veux 📍", "t.shareLink": "Lien de suivi : {link}",
   },
   en: {
+    "reglages": "Map settings", "fermer": "Close", "activite": "Activity",
+    "altIndispo": "Elevation unavailable right now — the climb is left blank rather than invented. Try again in a moment.",
     "layer.outdoor": "🌲 Outdoor", "layer.paths": "🥾 Paths", "layer.topo": "🗺️ Topo", "layer.street": "🏙️ Street", "layer.satellite": "🛰️ Satellite",
     "act.course": "Run", "act.marche": "Walk", "act.trail": "Trail", "act.velo": "Bike",
     "desc.vallonné": "rolling", "desc.plat": "flat", "desc.variable": "variable",
@@ -74,6 +78,8 @@ export const TB: Record<string, Record<string, string>> = {
     "t.shareCopied": "Tracking link copied! Send it to whoever you like 📍", "t.shareLink": "Tracking link: {link}",
   },
   de: {
+    "reglages": "Karteneinstellungen", "fermer": "Schließen", "activite": "Aktivität",
+    "altIndispo": "Höhendaten gerade nicht verfügbar — der Anstieg bleibt leer, statt erfunden zu werden. Versuche es gleich erneut.",
     "layer.outdoor": "🌲 Outdoor", "layer.paths": "Wege", "layer.topo": "🗺️ Topo", "layer.street": "🏙️ Karte", "layer.satellite": "🛰️ Satellit",
     "act.course": "Laufen", "act.marche": "Gehen", "act.trail": "Trail", "act.velo": "Rad",
     "desc.vallonné": "hügelig", "desc.plat": "flach", "desc.variable": "variabel",
@@ -107,6 +113,8 @@ export const TB: Record<string, Record<string, string>> = {
     "t.shareCopied": "Tracking-Link kopiert! Schick ihn, wem du willst 📍", "t.shareLink": "Tracking-Link: {link}",
   },
   es: {
+    "reglages": "Ajustes del mapa", "fermer": "Cerrar", "activite": "Actividad",
+    "altIndispo": "Altitud no disponible ahora mismo — el desnivel se deja en blanco en vez de inventarlo. Inténtalo en un momento.",
     "layer.outdoor": "🌲 Aire libre", "layer.paths": "🥾 Senderos", "layer.topo": "🗺️ Topo", "layer.street": "🏙️ Plano", "layer.satellite": "🛰️ Satélite",
     "act.course": "Correr", "act.marche": "Caminar", "act.trail": "Trail", "act.velo": "Bici",
     "desc.vallonné": "ondulado", "desc.plat": "llano", "desc.variable": "variable",
@@ -140,6 +148,8 @@ export const TB: Record<string, Record<string, string>> = {
     "t.shareCopied": "¡Enlace de seguimiento copiado! Envíalo a quien quieras 📍", "t.shareLink": "Enlace de seguimiento: {link}",
   },
   pt: {
+    "reglages": "Definições do mapa", "fermer": "Fechar", "activite": "Atividade",
+    "altIndispo": "Altitude indisponível de momento — o desnível fica em branco em vez de ser inventado. Tenta daqui a pouco.",
     "layer.outdoor": "🌲 Ar livre", "layer.paths": "🥾 Trilhos", "layer.topo": "🗺️ Topo", "layer.street": "🏙️ Mapa", "layer.satellite": "🛰️ Satélite",
     "act.course": "Corrida", "act.marche": "Caminhada", "act.trail": "Trail", "act.velo": "Bicicleta",
     "desc.vallonné": "ondulado", "desc.plat": "plano", "desc.variable": "variável",

@@ -40,10 +40,16 @@ const nextConfig: NextConfig = {
     // code affiche une intention que le serveur ignore, et rien ne le signale. Constaté
     // sur la page « Notre histoire » — les URL servies portaient toutes `q=75` alors que
     // le composant demandait 82. Ajouter une valeur ici est le seul moyen de l'autoriser.
-    qualities: [75, 82],
+    // 55 : les visuels de l'Actualité sont décoratifs et passent sous un voile coloré à
+    // 50 % d'opacité — la différence ne se voit pas, le poids si (−35 % mesuré).
+    qualities: [55, 75, 82],
     remotePatterns: [
       { hostname: "*.supabase.co" },
       { hostname: "images.unsplash.com" },
+      // Les visuels de thème de l'Actualité (22/09/2026) : servis en direct par Pexels,
+      // c'était 48 JPEG de ~90 ko et un aller-retour vers un CDN tiers par carte.
+      // Via l'optimiseur, ils deviennent de l'AVIF servi depuis notre propre domaine.
+      { hostname: "images.pexels.com" },
       { hostname: "*.mapbox.com" },
     ],
   },

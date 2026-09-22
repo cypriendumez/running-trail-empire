@@ -47,7 +47,9 @@ export async function POST(req: NextRequest) {
       name,
       coordinates,         // [[lng,lat], ...]
       distance_km: Math.round(distance_km * 100) / 100,
-      elevation_gain_m: Math.round(elevation_gain_m),
+      // ⚠️ `Math.round(null)` vaut 0 : un parcours dont l'altitude n'a pas pu être lue
+      // serait enregistré « plat » et relu comme tel. On garde le trou.
+      elevation_gain_m: typeof elevation_gain_m === "number" && Number.isFinite(elevation_gain_m) ? Math.round(elevation_gain_m) : null,
       duration_min: Math.round(duration_min),
       difficulty: difficulty || "green",
       created_at: new Date().toISOString(),

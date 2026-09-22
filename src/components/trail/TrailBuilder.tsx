@@ -8,6 +8,7 @@ import {
   SlidersHorizontal, Gauge, Navigation, Share2
 } from "lucide-react";
 import { IconeSport } from "@/components/parcours/IconeSport";
+import { chargerProfil, profilOsrm, type Profil } from "@/lib/trail/altitude";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -164,9 +165,11 @@ ${trk}
 }
 
 // ─── OSRM routing (follows real paths) ───────────────────────────────────────
-async function fetchRoute(a: LatLng, b: LatLng): Promise<LatLng[] | null> {
+async function fetchRoute(a: LatLng, b: LatLng, activite: string): Promise<LatLng[] | null> {
   try {
-    const url = `https://router.project-osrm.org/route/v1/foot/${a.lng},${a.lat};${b.lng},${b.lat}?geometries=geojson&overview=full`;
+    // ⚠️ LE PROFIL SUIT L'ACTIVITÉ (22/09/2026). `foot` était écrit en dur : un parcours
+    // à vélo était calculé sur les sentiers piétons — distance, temps et itinéraire faux.
+    const url = `https://router.project-osrm.org/route/v1/${profilOsrm(activite)}/${a.lng},${a.lat};${b.lng},${b.lat}?geometries=geojson&overview=full`;
     const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
     if (!res.ok) return null;
     const data = await res.json();
@@ -181,41 +184,12 @@ async function fetchRoute(a: LatLng, b: LatLng): Promise<LatLng[] | null> {
 // ─── City search / geocoding (restricted to France) ──────────────────────────
 // (Recherche de ville supprimée — la recherche globale de la barre du haut s'en charge.)
 
-// ─── Elevation from open-meteo ────────────────────────────────────────────────
-async function fetchElevations(pts: LatLng[]): Promise<number[]> {
-  if (!pts.length) return [];
-  // Sample at most 100 points evenly
-  const step = Math.max(1, Math.floor(pts.length / 100));
-  const sampled = pts.filter((_, i) => i % step === 0);
-  try {
-    const lats = sampled.map(p => p.lat.toFixed(5)).join(",");
-    const lngs = sampled.map(p => p.lng.toFixed(5)).join(",");
-    const res = await fetch(
-      `https://api.open-meteo.com/v1/elevation?latitude=${lats}&longitude=${lngs}`,
-      { signal: AbortSignal.timeout(8000) }
-    );
-    if (!res.ok) return new Array(pts.length).fill(0);
-    const data = await res.json();
-    const elevs: number[] = data.elevation ?? [];
-    // Expand back to full length
-    return pts.map((_, i) => elevs[Math.floor(i / step)] ?? 0);
-  } catch {
-    return new Array(pts.length).fill(0);
-  }
-}
-
-function elevStats(elevs: number[]) {
-  let gain = 0, loss = 0;
-  for (let i = 1; i < elevs.length; i++) {
-    const d = elevs[i] - elevs[i - 1];
-    if (d > 0) gain += d; else loss += -d;
-  }
-  return {
-    gain, loss,
-    min: elevs.length ? Math.min(...elevs) : 0,
-    max: elevs.length ? Math.max(...elevs) : 0,
-  };
-}
+// ─── Altitude : voir `lib/trail/altitude` ────────────────────────────────────
+// ⚠️ LE CALCUL A DÉMÉNAGÉ, ET CE N'EST PAS UN RANGEMENT. Il vivait ici en trois défauts
+// silencieux : un D+ qui additionnait le bruit du modèle d'altitude, 100 mesures quelle
+// que soit la longueur (une tous les 400 m sur 40 km), et un échec de lecture rendu en
+// ZÉROS — « D+ 0 m », difficulté facile, durée sans pénalité, pour un parcours de
+// montagne. Le module est éprouvé par `tests/trace.test.ts`.
 
 function formatPace(minPerKm: number): string {
   if (!isFinite(minPerKm) || minPerKm <= 0) return "—";
@@ -274,7 +248,12 @@ export function TrailBuilder({ centre, onTrace }: {
   // le corps du composant déclencherait un `setState` du parent au milieu du rendu de
   // l'enfant — React le refuse, et la carte cesserait de se mettre à jour.
   useEffect(() => { onTrace?.(allPoints.map((p) => ({ lat: p.lat, lon: p.lng }))); }, [allPoints, onTrace]);
-  const [elevations, setElevations] = useState<number[]>([]);
+  const [profil, setProfil] = useState<Profil | null>(null);
+  /** Vrai quand la lecture d'altitude a ÉCHOUÉ : l'écran le dit au lieu d'afficher 0 m. */
+  const [altitudeIndispo, setAltitudeIndispo] = useState(false);
+  /** La feuille de réglages du téléphone (suivre les chemins, sentiers, activité, fonds). */
+  const [reglagesOuverts, setReglagesOuverts] = useState(false);
+  const elevations = profil?.altitudes ?? [];
   const [distance, setDistance] = useState(0);
   const [routeLoading, setRouteLoading] = useState(false);
   const [activity, setActivity] = useState<ActivityKey>("course");
@@ -284,8 +263,8 @@ export function TrailBuilder({ centre, onTrace }: {
   const speedEditorRef = useRef<HTMLDivElement>(null);
 
   // Derived metrics (declared early so map effects can use them)
-  const { gain: elevGain, loss: elevLoss, min: elevMin, max: elevMax } =
-    useMemo(() => elevStats(elevations), [elevations]);
+  const elevGain = profil?.gain ?? 0, elevLoss = profil?.perte ?? 0;
+  const elevMin = profil?.min ?? 0, elevMax = profil?.max ?? 0;
   const act = ACTIVITIES[activity];
   // Automatic terrain-based estimate (flat speed + climb penalty)
   const autoDurationMin = distance > 0
@@ -529,14 +508,14 @@ export function TrailBuilder({ centre, onTrace }: {
 
     if (followPaths) {
       setRouteLoading(true);
-      const routed = await fetchRoute(prev, latlng);
+      const routed = await fetchRoute(prev, latlng, activity);
       setRouteLoading(false);
       const leg = routed ?? [prev, latlng];
       setSegments(s => [...s, leg.slice(1)]);
     } else {
       setSegments(s => [...s, [latlng]]);
     }
-  }, [waypoints, followPaths]);
+  }, [waypoints, followPaths, activity]);
 
   // Attach click handler — drawing is always on (click adds a point, drag pans)
   useEffect(() => {
@@ -555,10 +534,18 @@ export function TrailBuilder({ centre, onTrace }: {
     setDistance(d);
 
     if (allPoints.length >= 2) {
-      fetchElevations(allPoints).then(elevs => setElevations(elevs));
-    } else {
-      setElevations([]);
+      // Annulable : chaque clic ajoute un point, et sans cela les réponses d'une
+      // ancienne requête écrasaient celles de la nouvelle (profil d'un tracé précédent).
+      const ctrl = new AbortController();
+      chargerProfil(allPoints, { signal: ctrl.signal }).then((p) => {
+        if (ctrl.signal.aborted) return;
+        setProfil(p);
+        setAltitudeIndispo(p === null);
+      });
+      return () => ctrl.abort();
     }
+    setProfil(null);
+    setAltitudeIndispo(false);
   }, [allPoints]);
 
   // ── Undo last waypoint (precise — drops exactly the last leg) ───────────────
@@ -586,7 +573,7 @@ export function TrailBuilder({ centre, onTrace }: {
     setWaypoints([]);
     setSegments([]);
     setRedoStack([]);
-    setElevations([]);
+    setProfil(null);
     setDistance(0);
     setSpeedEditorOpen(false);
   }, []);
@@ -631,7 +618,10 @@ export function TrailBuilder({ centre, onTrace }: {
           name: routeName,
           coordinates: allPoints.map(p => [p.lng, p.lat]),
           distance_km: distance,
-          elevation_gain_m: elevGain,
+          // ⚠️ `null` QUAND L'ALTITUDE N'A PAS PU ÊTRE LUE, jamais 0 : un parcours
+          // enregistré avec « D+ 0 m » se relit comme un parcours plat, des mois plus
+          // tard, sans que rien ne rappelle que la mesure avait échoué ce jour-là.
+          elevation_gain_m: altitudeIndispo ? null : elevGain,
           duration_min: durationMin,
           difficulty,
         }),
@@ -653,7 +643,7 @@ export function TrailBuilder({ centre, onTrace }: {
           name: routeName,
           coordinates: allPoints.map(p => [p.lng, p.lat]),
           distance_km: Math.round(distance * 100) / 100,
-          elevation_gain_m: Math.round(elevGain),
+          elevation_gain_m: altitudeIndispo ? null : Math.round(elevGain),
           duration_min: Math.round(durationMin),
           difficulty,
           created_at: new Date().toISOString(),
@@ -932,14 +922,31 @@ export function TrailBuilder({ centre, onTrace }: {
   }, [userPos, sharing, navRemainingKm]);
 
   const hasRoute = allPoints.length > 0;
+  /** Une ligne de la feuille de réglages : libellé à gauche, interrupteur à droite. */
+  const LigneReglage = ({ label, children }: { label: string; children: ReactNode }) => (
+    <div className="flex min-h-[44px] items-center justify-between rounded-xl px-1">
+      <span className="text-sm font-medium text-zinc-800">{label}</span>{children}
+    </div>
+  );
+
+  // ⚠️ PLEIN ÉCRAN SUR TÉLÉPHONE (22/09/2026, Cyprien : « trouve des techniques pour que
+  // la carte soit très facile à utiliser sur téléphone malgré sa taille »). La carte
+  // vivait dans une boîte de 68 % de la hauteur, avec les marges de la page de chaque
+  // côté : il restait 325 × 420 px pour tracer, et toutes les commandes flottaient
+  // PAR-DESSUS. Désormais elle prend la largeur entière (les marges négatives annulent
+  // le `p-6` du <main>) et toute la hauteur libre entre l'entête et la barre d'onglets ;
+  // les réglages passent dans une feuille, et les actions dans une barre à portée du pouce.
+  // ⚠️ 16rem retirés, MESURÉ : entête 64 + bascule Construire/Vue relief 56 + ligne
+  // Garmin 34 + barre d'onglets 64 + marges. À 11,5rem, le bas de la carte — donc la
+  // barre du pouce — passait SOUS la barre d'onglets (29 px de chevauchement mesurés).
   return (
-    <div className="flex flex-col gap-3 h-[68vh] min-h-[460px] sm:h-[80vh]">
+    <div className="-mx-6 flex h-[calc(100dvh-16rem)] min-h-[380px] flex-col gap-3 sm:mx-0 sm:h-[80vh]">
       {/* ── MAP ───────────────────────────────────────────────────────────── */}
       {/* ⚠️ `isolate` : la carte est son PROPRE contexte d'empilement. Ses commandes
           (barre d'outils z-1000, Leaflet z-1000) passaient PAR-DESSUS le menu Profil et le
           panneau de notifications de l'entête (z-30/50) — vu sur téléphone le 21/09/2026.
           Isolées, elles ne se comparent plus qu'entre elles, à l'intérieur de la carte. */}
-      <div className="flex-1 relative isolate rounded-3xl overflow-hidden border border-zinc-200 shadow-sm min-h-0">
+      <div className="flex-1 relative isolate overflow-hidden border-y border-zinc-200 shadow-sm min-h-0 sm:rounded-3xl sm:border">
         <div
           ref={mapContainer}
           className="w-full h-full"
@@ -961,7 +968,9 @@ export function TrailBuilder({ centre, onTrace }: {
             l'indice « Cliquez sur la carte » s'y superposait et le troisième bouton de
             droite sortait de l'écran. Sous sm : les boutons de droite sur une première
             ligne, puis la barre sur UNE ligne qui défile ; à partir de sm, comme avant. */}
-        <div className="absolute top-3 left-3 right-3 z-[1000] flex flex-col-reverse items-stretch gap-2 pointer-events-none sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+        {/* Sur téléphone, ces commandes passent dans la feuille « Réglages » (bouton en
+            bas) : en bandeau, elles mangeaient le tiers haut de la carte. */}
+        <div className="pointer-events-none absolute left-3 right-3 top-3 z-[1000] hidden items-start justify-between gap-3 sm:flex">
           {/* Main controls */}
           <div className="pointer-events-auto bg-white/95 rounded-2xl shadow-lg border border-zinc-100 px-3 py-2 flex items-center gap-2.5 flex-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-w-full sm:flex-wrap sm:overflow-visible sm:max-w-[calc(100%-1rem)]">
             <Toggle id="tg-follow" checked={followPaths} onChange={setFollowPaths} label={d["tg.follow"]} />
@@ -1190,7 +1199,7 @@ export function TrailBuilder({ centre, onTrace }: {
 
         {/* Empty-state hint */}
         {!hasRoute && mounted && !routeLoading && (
-          <div className="absolute top-32 sm:top-20 left-1/2 -translate-x-1/2 z-[999] pointer-events-none w-max max-w-[calc(100%-2rem)]">
+          <div className="pointer-events-none absolute bottom-24 left-1/2 z-[999] w-max max-w-[calc(100%-2rem)] -translate-x-1/2 sm:bottom-auto sm:top-20">
             <div className="bg-zinc-900/85 text-white rounded-full px-4 py-1.5 text-sm font-medium shadow-lg text-center">
               {d["emptyHint"]}
             </div>
@@ -1205,7 +1214,7 @@ export function TrailBuilder({ centre, onTrace }: {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 12 }}
-              className="absolute bottom-5 left-1/2 -translate-x-1/2 z-[1000]"
+              className="absolute bottom-5 left-1/2 z-[1000] hidden -translate-x-1/2 sm:block"
             >
               {/* Target-speed editor popover */}
               <AnimatePresence>
@@ -1338,7 +1347,7 @@ export function TrailBuilder({ centre, onTrace }: {
             en fondu dès le premier point posé, et ressortent quand on efface. Les
             garder MONTÉS (plutôt que de les retirer du DOM) évite un saut de mise en
             page et laisse la transition se jouer. */}
-        <div className={`absolute top-1/2 -translate-y-1/2 left-3 z-[1000] transition-opacity duration-200 ${
+        <div className={`absolute top-1/2 -translate-y-1/2 left-3 z-[1000] hidden transition-opacity duration-200 sm:block ${
           hasRoute || redoStack.length > 0 ? "opacity-100" : "pointer-events-none opacity-0"
         }`}>
           <div className="bg-white/95 rounded-2xl shadow-lg border border-zinc-100 p-1.5 flex flex-col gap-1">
@@ -1347,6 +1356,88 @@ export function TrailBuilder({ centre, onTrace }: {
             <EditBtn onClick={handleClear} disabled={!hasRoute} icon={<Trash2 className="w-5 h-5" />} label={d["clear"]} danger />
           </div>
         </div>
+
+        {/* ══ TÉLÉPHONE : LA BARRE DU POUCE ════════════════════════════════════
+            Tout ce dont on a besoin en traçant, à portée du pouce et en une ligne :
+            les chiffres du tracé, annuler, effacer, et les réglages. Avant, il fallait
+            viser des boutons de 28 px posés au milieu de la carte, et les chiffres
+            vivaient dans une pastille qu'un doigt masquait. */}
+        <div className="absolute inset-x-0 bottom-0 z-[1000] sm:hidden">
+          {/* ⚠️ `bg-white`, PAS `bg-white/97` : 97 n'est pas sur l'échelle d'opacité de
+              Tailwind, la classe ne produit AUCUN CSS et la barre s'affichait
+              transparente PAR-DESSUS la carte (vu à l'écran). Le piège est connu du
+              projet — il se reproduit dès qu'on écrit une valeur « au jugé ». */}
+          <div className="border-t border-zinc-200 bg-white px-3 pb-2 pt-2 shadow-[0_-6px_20px_-12px_rgba(0,0,0,0.25)]">
+            <div className="flex items-center gap-2">
+              <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
+                <div className="min-w-0">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">{d["st.distance"]}</div>
+                  <div className="text-[15px] font-bold tabular-nums text-zinc-900">{fmtKm(distance, lang, 2)}</div>
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">D+</div>
+                  {/* ⚠️ « — » ET PAS « 0 m » quand l'altitude n'a pas pu être lue : un
+                      parcours de montagne annoncé plat ferait partir quelqu'un sans
+                      s'attendre à 800 m de dénivelé. */}
+                  <div className={`text-[15px] font-bold tabular-nums ${altitudeIndispo ? "text-amber-600" : "text-zinc-900"}`}>
+                    {altitudeIndispo ? "—" : `${elevGain} m`}
+                  </div>
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">{d["st.time"]}</div>
+                  <div className="text-[15px] font-bold tabular-nums text-zinc-900">{formatDuration(durationMin)}</div>
+                </div>
+              </div>
+              <button type="button" onClick={handleUndo} disabled={!hasRoute} aria-label={d["undo"]}
+                className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl border border-zinc-200 text-zinc-700 disabled:opacity-30">
+                <Undo2 className="h-5 w-5" />
+              </button>
+              <button type="button" onClick={handleClear} disabled={!hasRoute} aria-label={d["clear"]}
+                className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl border border-zinc-200 text-red-600 disabled:opacity-30">
+                <Trash2 className="h-5 w-5" />
+              </button>
+              <button type="button" onClick={() => setReglagesOuverts(true)} aria-label={d["reglages"]}
+                className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-zinc-900 text-white">
+                <SlidersHorizontal className="h-5 w-5" />
+              </button>
+            </div>
+            {altitudeIndispo && (
+              <p className="mt-1.5 text-[11px] leading-snug text-amber-700">{d["altIndispo"]}</p>
+            )}
+          </div>
+        </div>
+
+        {/* La feuille de réglages du téléphone : les mêmes interrupteurs que la barre du
+            bureau, mais hors de la carte, avec des cibles qu'un pouce atteint. */}
+        {reglagesOuverts && (
+          <div className="absolute inset-0 z-[1002] sm:hidden" role="dialog" aria-modal="true" aria-label={d["reglages"]}>
+            <div className="absolute inset-0 bg-zinc-900/40" onClick={() => setReglagesOuverts(false)} />
+            <div className="absolute inset-x-0 bottom-0 max-h-[80%] overflow-y-auto rounded-t-3xl bg-white p-4 pb-6">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-sm font-bold text-zinc-900">{d["reglages"]}</span>
+                <button type="button" onClick={() => setReglagesOuverts(false)} aria-label={d["fermer"]}
+                  className="rounded-full p-1.5 text-zinc-500 active:bg-zinc-100"><X className="h-5 w-5" /></button>
+              </div>
+              <div className="space-y-1">
+                <LigneReglage label={d["tg.follow"]}><Toggle id="tg-follow-m" checked={followPaths} onChange={setFollowPaths} label="" /></LigneReglage>
+                <LigneReglage label={d["tg.trails"]}><Toggle id="tg-trails-m" checked={showTrails} onChange={setShowTrails} label="" /></LigneReglage>
+                <LigneReglage label={d["tg.elev"]}><Toggle id="tg-elev-m" checked={showElevation} onChange={setShowElevation} label="" /></LigneReglage>
+              </div>
+              <div className="mt-4">
+                <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-zinc-400">{d["activite"]}</div>
+                <div className="grid grid-cols-4 gap-2">
+                  {(Object.keys(ACTIVITIES) as ActivityKey[]).map((k) => (
+                    <button key={k} type="button" onClick={() => setActivity(k)}
+                      className={`flex flex-col items-center gap-1 rounded-2xl px-2 py-2.5 text-[11px] font-semibold ${activity === k ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-700"}`}>
+                      <IconeSport sport={k} className="h-4 w-4" />
+                      {d[`act.${k}`]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── ELEVATION PROFILE (full-width, below the map) ─────────────────── */}

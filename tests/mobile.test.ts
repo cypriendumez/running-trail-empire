@@ -189,14 +189,20 @@ test("sur téléphone, le calendrier s'ouvre en vue Agenda (verticale), décidé
   assert.match(vue, /useState<"month" \| "agenda">\(vueParDefaut\)/, "la vue initiale ignore la valeur transmise par le serveur");
 });
 
-test("sur téléphone, la carte (Trail Builder) garde ses commandes sur une ligne et ses boutons dans l'écran", () => {
+test("sur téléphone, la carte (Trail Builder) sort ses commandes de la carte", () => {
   // Cyprien, 21/09/2026 : « ne rend pas sur téléphone ». Mesuré à 375 px : barre de
-  // commandes empilée sur 190 px, indice superposé, troisième bouton hors écran.
+  // commandes empilée sur 190 px, indice superposé, troisième bouton hors écran. Le
+  // 22/09/2026, la réponse est allée plus loin que l'empilement : sur téléphone, les
+  // commandes QUITTENT la carte (barre du pouce + feuille de réglages) — voir
+  // tests/trace.test.ts, qui tient cette mise en page.
   const src = codeNu("src/components/trail/TrailBuilder.tsx");
-  assert.match(src, /flex flex-col-reverse items-stretch gap-2 pointer-events-none sm:flex-row/, "la barre du haut n'est plus en colonne sur téléphone : elle s'empile sur la carte");
+  assert.match(src, /hidden items-start justify-between gap-3 sm:flex/, "la barre du haut s'affiche de nouveau sur la carte du téléphone");
   assert.match(src, /flex-nowrap overflow-x-auto \[scrollbar-width:none\][^"]*sm:flex-wrap/, "les commandes ne défilent plus sur une ligne sous sm");
   assert.match(src, /w-full max-w-full sm:w-72 sm:max-w-\[44%\]/, "le panneau de droite garde 44 % de large sur téléphone : le troisième bouton sort de l'écran");
-  assert.equal([...src.matchAll(/top-32 sm:top-20/g)].length, 2, "les indices se superposent aux commandes sur téléphone");
+  // L'indice de départ est passé AU-DESSUS de la barre du pouce (22/09/2026) ; le
+  // bandeau « calcul en cours », lui, reste en haut, là où la barre n'est plus.
+  assert.match(src, /bottom-24 left-1\/2 z-\[999\][^"]*sm:bottom-auto sm:top-20/, "l'indice de départ est revenu au milieu de la carte sur téléphone");
+  assert.equal([...src.matchAll(/top-32 sm:top-20/g)].length, 1, "le bandeau de calcul a changé de place sans raison");
   // Et la navigation l'appelle « Carte », comme l'onglet du téléphone.
   const i18n = readFileSync("src/lib/i18n/translations.ts", "utf8");
   assert.equal([...i18n.matchAll(/"nav\.trail": "Trail Builder"/g)].length, 0, "l'onglet s'appelle encore « Trail Builder » dans une langue");
@@ -222,7 +228,7 @@ test("les menus de l'entête passent au-dessus des cartes : chaque carte est iso
   const css = readFileSync("src/app/globals.css", "utf8");
   assert.match(css, /\.leaflet-container,\s*\.maplibregl-map\s*\{\s*isolation: isolate;/, "les cartes ne sont plus isolées : leurs commandes repassent par-dessus les menus");
   const tb = codeNu("src/components/trail/TrailBuilder.tsx");
-  assert.match(tb, /className="flex-1 relative isolate rounded-3xl overflow-hidden/, "l'enveloppe de la carte du Trail Builder n'est plus isolée : sa barre d'outils (z-1000) repasse par-dessus l'entête");
+  assert.match(tb, /className="flex-1 relative isolate overflow-hidden/, "l'enveloppe de la carte du Trail Builder n'est plus isolée : sa barre d'outils (z-1000) repasse par-dessus l'entête");
 });
 
 test("plus d'emoji « personnage » pour les sports : des icônes en trait", () => {

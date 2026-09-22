@@ -17,5 +17,15 @@ export default async function ActualitePage() {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect("/login");
-  return <CommunityFeed />;
+  return (
+    <>
+      {/* La poignée de main TLS avec les domaines d'images est payée AVANT la première
+          image (mesuré : 766 ms pour la première photo, dont l'essentiel en connexion).
+          Les favicons des éditeurs viennent de DuckDuckGo, une par carte. */}
+      <link rel="preconnect" href="https://images.pexels.com" crossOrigin="" />
+      <link rel="preconnect" href="https://images.unsplash.com" crossOrigin="" />
+      <link rel="preconnect" href="https://icons.duckduckgo.com" crossOrigin="" />
+      <CommunityFeed />
+    </>
+  );
 }

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
 import { TrailBuilderLazy } from "./TrailBuilderLazy";
@@ -37,10 +37,29 @@ export function TrailModes({ centre, textes }: {
   // `useCallback` : sans lui, une nouvelle fonction à chaque rendu relancerait l'effet de
   // remontée du constructeur en boucle.
   const recevoir = useCallback((points: { lat: number; lon: number }[]) => setTrace(points), []);
+
+  /**
+   * ⚠️ MAPLIBRE EST PRÉCHARGÉ PENDANT QU'ON CONSTRUIT (22/09/2026). Le module et son
+   * moteur de terrain pèsent ~1 Mo : chargés AU CLIC sur « Vue relief », ils faisaient
+   * attendre deux à trois secondes devant un rond qui tourne, alors que les tuiles, une
+   * fois le code là, arrivent en 0,7 s (mesuré). On le télécharge en tâche de fond dès
+   * que le navigateur est inactif — donc sans retarder le constructeur, qui est ce que
+   * l'athlète regarde. `requestIdleCallback` n'existe pas sur Safari : repli sur un
+   * délai. Le module reste hors du paquet initial : c'est un préchargement, pas un
+   * import statique.
+   */
+  useEffect(() => {
+    if (mode !== "construire") return;
+    const precharger = () => { void import("./Relief3D"); };
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
+    if (w.requestIdleCallback) { const id = w.requestIdleCallback(precharger, { timeout: 4000 }); return () => (window as Window & { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback?.(id); }
+    const t = setTimeout(precharger, 2500);
+    return () => clearTimeout(t);
+  }, [mode]);
   const t = (k: string) => textes[k] ?? k;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div className="flex rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800">
           {(["construire", "relief"] as const).map((m) => (
