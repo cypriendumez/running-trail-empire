@@ -195,6 +195,135 @@ export const QUIZ_ES: QuizQuestion[] = [
   { q: "El tapering antes de una carrera objetivo consiste en…", options: ["Reducir el volumen MANTENIENDO algo de intensidad", "Pararlo todo durante 3 semanas", "Doblar el entrenamiento la última semana"], answer: 0, explain: "Se evacúa la fatiga (ATL) conservando la forma (CTL) → TSB positivo el día D.", chapitre: "12 · Construir tu progresión", anchor: "plan" },
 ];
 
+// ═══ LO QUE CONVIERTE UN GLOSARIO EN UN CURSO (22/09/2026) — espejo de fr.ts ═══════
+export const EXTRAS_ES: Record<string, { objectif: string; erreurs: string[]; action: { text: string; href: string; label: string } }> = {
+  physio: {
+    objectif: "Leer tus tres cifras de base (VAM, umbral, FC máx) y saber de dónde salen: medidas, no adivinadas.",
+    erreurs: ["Calibrar todos los ritmos sobre una VAM estimada «a ojo» o sobre la fórmula 220 − edad.", "Confundir VO2max (un techo) con VAM (una velocidad de trabajo).", "Creer que un VO2max alto basta: a igual VO2max, la economía de carrera marca la diferencia."],
+    action: { text: "Haz el test de 6 minutos que te prescribe el coach: todo el plan se calibra sobre él.", href: "/dashboard/calendrier", label: "Ver mi próxima sesión" },
+  },
+  zones: {
+    objectif: "Situar cada sesión en su zona y comprobar que tu semana está realmente polarizada (mucho fácil, poco duro).",
+    erreurs: ["Correr todos los rodajes «un poco demasiado rápido»: la zona gris (Z3) cansa sin hacer progresar.", "Usar zonas calculadas sobre una FC máx falsa.", "Hacer intensidad todos los días pensando que progresarás más rápido."],
+    action: { text: "Mira el tiempo por zona de tu última semana en la pestaña Salud: si Z3 supera a Z2, frena tus rodajes.", href: "/dashboard/health", label: "Mis zonas de la semana" },
+  },
+  seances: {
+    objectif: "Reconocer el tipo de cada sesión del plan y lo que desarrolla — y por tanto lo que NO hay que hacer en ella.",
+    erreurs: ["Convertir la tirada larga en una contrarreloj.", "Saltarse la recuperación entre dos sesiones duras.", "Repetir las mismas sesiones cada semana: el cuerpo se acostumbra, el progreso se para."],
+    action: { text: "Abre la sesión del día y lee su «por qué»: el coach explica lo que busca antes de que la corras.", href: "/dashboard/calendrier", label: "La sesión de hoy" },
+  },
+  charge: {
+    objectif: "Leer CTL, ATL y TSB en tu panel y deducir si toca apretar, mantener o levantar el pie.",
+    erreurs: ["Subir el volumen un 30 % de golpe tras una buena semana.", "Leer un TSB muy negativo como «soy malo» cuando dice «estoy en plena carga».", "Ignorar una fatiga que sube porque el plan dice correr."],
+    action: { text: "Compara tu carga aguda (7 d) y crónica (42 d) en la pantalla de inicio: una ratio por encima de 1,3 es luz ámbar.", href: "/dashboard", label: "Mi carga actual" },
+  },
+  techni: {
+    objectif: "Conocer tu cadencia y saber lo que un pequeño ajuste (+5 %) cambia en el impacto — sin reinventar tu zancada.",
+    erreurs: ["Cambiar el apoyo del pie de un día para otro porque un vídeo lo aconseja.", "Alargar la zancada para ir más rápido (es al revés: frenas).", "Descuidar la fuerza y esperar de la técnica lo que los músculos no pueden dar."],
+    action: { text: "Graba un rodaje con el móvil o el reloj y mira tu cadencia media: apunta a +5 % como máximo, por escalones.", href: "/dashboard/ghost-runner", label: "Grabar un rodaje" },
+  },
+  recup: {
+    objectif: "Usar tu VFC y tu sueño como panel de recuperación, y decidir una sesión a partir de ellos.",
+    erreurs: ["Compensar una mala noche con una sesión más dura «para despertarse».", "Mirar la VFC de un solo día en vez de la tendencia de 7 días.", "Tomar la recuperación por pereza."],
+    action: { text: "Mira tu VFC de los últimos 7 días en Salud: una caída clara = rodaje, no la sesión de calidad.", href: "/dashboard/health", label: "Mi recuperación" },
+  },
+  nutrition: {
+    objectif: "Saber qué comer antes, durante y después, y probar tu estrategia de avituallamiento ANTES del día de la carrera.",
+    erreurs: ["Descubrir los geles el día de la carrera.", "Beber litros de agua sola en un esfuerzo largo sin sal.", "Correr la sesión de calidad en ayunas «para quemar grasa»."],
+    action: { text: "El plan de nutrición de tu carrera objetivo se calcula sobre tu duración prevista: ábrelo y pruébalo en tu próxima tirada larga.", href: "/dashboard/races", label: "Mi nutrición de carrera" },
+  },
+  trail: {
+    objectif: "Razonar en desnivel y esfuerzo más que en ritmo, y preparar una salida de montaña como una salida de montaña.",
+    erreurs: ["Comparar tu ritmo de trail con tu ritmo de asfalto.", "Bajar a tope sin cuádriceps entrenados: los últimos 20 km te lo recuerdan.", "Salir sin el material obligatorio porque «hace bueno»."],
+    action: { text: "Traza tu próximo recorrido en el Mapa y lee su perfil: desnivel, pendientes, tiempo estimado — luego compara con la salida real.", href: "/dashboard/trail", label: "Trazar un recorrido" },
+  },
+  jourj: {
+    objectif: "Llegar a la salida con un plan de ritmo, un plan de avituallamiento y un plan B — y correr la segunda mitad más rápido que la primera.",
+    erreurs: ["Salir 20 s/km demasiado rápido porque todo el mundo sale rápido.", "Cambiar de desayuno, de zapatillas o de gel esa misma mañana.", "Pensar en la meta en el kilómetro 5."],
+    action: { text: "Comprueba que tu PPS será válido EL DÍA de tu carrera objetivo: sin él, no hay dorsal.", href: "/dashboard/pps", label: "Mi PPS" },
+  },
+  materiel: {
+    objectif: "Elegir una zapatilla por comodidad y uso, rotar dos pares y saber cuándo un par está acabado.",
+    erreurs: ["Comprar la zapatilla de un élite o de un anuncio en vez de la que te va bien.", "Cambiar de drop bruscamente.", "Correr 1 000 km con un par muerto porque «parece que está bien»."],
+    action: { text: "El comparador clasifica los modelos por uso y comodidad; tu garaje sigue el kilometraje de cada par.", href: "/dashboard/shop", label: "Comparar zapatillas" },
+  },
+  blessures: {
+    objectif: "Distinguir un dolor normal de una señal de alerta, y saber qué hacer en las 48 h siguientes.",
+    erreurs: ["Seguir con un dolor preciso que aumenta al correr.", "Volver tras una lesión al volumen de antes.", "Buscar la causa en la zapatilla cuando lo que cambió es la carga."],
+    action: { text: "¿Una molestia? Descríbesela al Fisio IA (zona, momento, intensidad sobre 10): orienta, adapta tu carga — y te dice cuándo consultar.", href: "/dashboard/health", label: "Hablar con el Fisio IA" },
+  },
+  plan: {
+    objectif: "Entender por qué tu plan tiene esta forma (bloques, descargas, afinamiento) y qué lo hace cambiar.",
+    erreurs: ["Recuperar una semana perdida doblando la siguiente.", "Quitar el afinamiento «para no perder la forma».", "Cambiar de objetivo cada quince días."],
+    action: { text: "El catálogo muestra la progresión semana a semana (volumen, descarga, tirada larga) según tu nivel.", href: "/dashboard/plans", label: "Ver los planes" },
+  },
+  coach: {
+    objectif: "Saber qué mira el coach Pacevo cada mañana para decidir tu sesión — y por qué cambia de opinión.",
+    erreurs: ["Creer que el plan está escrito de una vez para siempre.", "Ignorar el «Por qué este plan» del calendario cuando una sesión sorprende.", "Registrar «bien» tras una noche en blanco: el coach decide con lo que le das."],
+    action: { text: "Abre el calendario y lee el recuadro «Por qué este plan»: cada decisión de la semana está explicada ahí.", href: "/dashboard/calendrier", label: "Por qué este plan" },
+  },
+  femmes: {
+    objectif: "Adaptar el entrenamiento a tu ciclo sin dogmas, reconocer los signos de un déficit energético o de falta de hierro, y saber cuándo consultar.",
+    erreurs: ["Considerar la ausencia de regla como «normal en deportistas».", "Suplementarse con hierro sin análisis de sangre.", "Comer menos cuando sube el volumen."],
+    action: { text: "Anota tus sensaciones y tu energía tras cada sesión: a lo largo de varios ciclos, el diario muestra lo que de verdad va ligado al ciclo — y lo que no.", href: "/dashboard/health", label: "Mi diario" },
+  },
+  milieu: {
+    objectif: "Ajustar ritmo, hidratación y equipo al calor, al frío y a la altitud — y reconocer el peligro de beber demasiado.",
+    erreurs: ["Apuntar al mismo ritmo a 30 °C que a 12 °C.", "Beber en cada avituallamiento «por seguridad» en una carrera lenta.", "Descubrir la altitud el día de la carrera."],
+    action: { text: "Mira el tiempo previsto de tu carrera objetivo: el plan de nutrición y los ritmos se ajustan al calor previsto.", href: "/dashboard/races", label: "Mi carrera y su tiempo" },
+  },
+};
+
+export const CHAPTERS_ES_SUPP: ChapterContent[] = [
+  {
+    id: "coach", title: "13 · Entender a tu coach Pacevo",
+    intro: "El plan no está escrito de una vez para siempre: se recalcula con lo que tu cuerpo y tu reloj le enseñan. Esto es lo que mira.",
+    concepts: [
+      { term: "De dónde sale tu VAM en Pacevo", short: "un test, no una estimación", def: "Mientras no haya un test registrado, el coach prescribe SOLO el test de 6 minutos. Después, la VAM de referencia es la más fiable entre tu test y lo que muestran tus carreras recientes — y la pantalla siempre te dice cuál usa.", why: "Una VAM equivocada en 1 km/h desplaza todos tus ritmos 15-20 s/km: cada sesión se vuelve demasiado dura o demasiado fácil.", repere: "Test 6 min: distancia (m) ÷ 100 = VAM (km/h)" },
+      { term: "Tu forma del día (readiness)", short: "VFC + sueño + FC reposo", def: "Cada mañana, el coach lee tu VFC al despertar, tu noche y tu FC de reposo, y los compara con TU base de las semanas anteriores. Una caída clara de VFC o una deuda de sueño desplaza la sesión de calidad; una buena base la mantiene.", why: "Guiar el entrenamiento por la VFC da, a igual volumen, más progreso que un plan fijo — es lo que muestran los estudios que compararon ambos.", repere: "¿Sin reloj? La sensación que registras tras cada sesión sirve de señal." },
+      { term: "El volumen que te da", short: "la mediana, no la media", def: "El volumen semanal de partida es la MEDIANA de tus semanas realmente corridas (un parón de 15 días no hunde la cifra), luego sube como máximo un 10 % por semana, con una descarga cada cuatro semanas.", why: "Una progresión de más de ~30 % de una semana a otra se asocia con muchas más lesiones por sobrecarga." },
+      { term: "El presupuesto de calidad", short: "cuántas sesiones duras", def: "El número de sesiones duras de la semana (VAM, umbral, cuestas) depende de tu fatiga real — carga aguda frente a crónica — no del calendario. Fatiga alta = 0 o 1 sesión dura, y el coach lo dice.", why: "«El coach ignora mi maratón» es casi siempre un presupuesto de calidad a cero sobre una fatiga real: el plan es correcto, espera a que te recuperes." },
+      { term: "Por qué cambia el plan", short: "tres disparadores", def: "El plan se recalcula cuando llega una sesión de tu reloj, cuando registras una sensación y cuando cambia tu objetivo. Cada cambio se explica en el recuadro «Por qué este plan» del calendario.", why: "Un plan que no se mueve cuando estás enfermo, lesionado o en forma no es un coach, es un calendario." },
+      { term: "Lo que el coach no hace", def: "No diagnostica, no sustituye ni al médico ni al fisio, y no te inscribe en una carrera: el PPS (pase de prevención de salud) sigue siendo tu responsabilidad. El Fisio IA orienta y adapta la carga; te dice cuándo consultar.", why: "Una herramienta que pretendiera «autorizarte» a correr mentiría. Te da referencias, la decisión sigue siendo tuya — y de un profesional cuando hace falta." },
+    ],
+  },
+  {
+    id: "femmes", title: "14 · Mujeres y running",
+    intro: "El ciclo, el hierro, la energía disponible: lo que la mayoría de los planes ignora, y que lo cambia todo para una corredora.",
+    concepts: [
+      { term: "El ciclo menstrual y el entrenamiento", short: "referencias, no reglas", def: "De media, el efecto de las fases del ciclo sobre el rendimiento es pequeño y muy variable de una mujer a otra: una ligera bajada posible al principio del ciclo (fase folicular temprana), nada sistemático en el resto. Lo que cuenta es TU patrón.", why: "El metaanálisis de 78 estudios (McNulty 2020) concluye un efecto «trivial» de media: adaptar según la sensación individual vale más que un calendario de entrenamiento atado al ciclo.", repere: "Llevar un diario ciclo × energía × sueño durante 3 ciclos revela tu patrón personal." },
+      { term: "El hierro", short: "la carencia silenciosa de la corredora", def: "Pérdidas menstruales, hemólisis en cada impacto, sudor: la corredora está especialmente expuesta a la carencia de hierro. Señales: fatiga inusual, falta de aire, rendimiento que baja, FC que sube a igual ritmo.", why: "Un análisis de sangre (ferritina, hemoglobina) lo resuelve en una extracción. Nunca suplementarse a ciegas: el exceso de hierro es tóxico.", repere: "Ferritina < 30 µg/L en una deportista: háblalo con tu médico." },
+      { term: "RED-S: cuando falta energía", short: "comer suficiente para lo que gastas", def: "Déficit energético relativo en el deporte: la ingesta no cubre el entrenamiento + las necesidades del cuerpo. Regla alterada o ausente, huesos frágiles (fracturas por estrés), inmunidad y ánimo a la baja, rendimiento en retroceso — los hombres también están afectados.", why: "La ausencia de regla NUNCA es «normal en deportistas»: es la primera señal que cita el COI en su consenso. Se trata comiendo más, no solo entrenando menos." },
+      { term: "Embarazo y posparto", def: "Correr embarazada es posible cuando el embarazo es normal, de acuerdo con el médico o la matrona, a intensidad moderada y escuchando al cuerpo. Tras el parto: rehabilitación del suelo pélvico primero, vuelta progresiva andar → correr, sin fecha «estándar».", why: "Una vuelta demasiado temprana expone el suelo pélvico; una vuelta acompañada lo protege. El coach Pacevo no conoce tu embarazo: díselo en tu perfil y adapta con tu profesional." },
+      { term: "Sujetador deportivo y comodidad", def: "Un sujetador deportivo bien ajustado limita el movimiento del pecho y las molestias en las tiradas largas; se cambia cuando el elástico cede (a menudo 6 a 12 meses de uso regular).", why: "La molestia mamaria es una causa citada de abandono de la carrera entre las mujeres — y se resuelve con una buena prueba de talla." },
+    ],
+  },
+  {
+    id: "milieu", title: "15 · Calor, frío y altitud",
+    intro: "El mismo corredor no corre igual a 30 °C, a −5 °C o a 2 000 m. Qué ajustar, y qué es peligroso.",
+    concepts: [
+      { term: "Aclimatarse al calor", short: "10 a 14 días", def: "Exposiciones progresivas de 60 a 90 min al día durante 10 a 14 días: el cuerpo suda antes, aumenta su volumen de plasma, baja su FC a igual esfuerzo.", why: "Las recomendaciones de consenso son claras: la aclimatación es la medida más eficaz para rendir y estar a salvo con mucho calor.", repere: "A igual calor, el ritmo baja y la FC sube: guíate por el pulso o la sensación, no por el ritmo." },
+      { term: "Correr con mucho calor", def: "Temprano por la mañana o tarde, a la sombra, ropa clara y ligera, mojarse la nuca y los antebrazos, beber según la sed y salar las tiradas largas.", why: "El golpe de calor empieza con escalofríos, confusión o el cese del sudor: se para, se enfría, se llama. Nada de heroísmos." },
+      { term: "Hiponatremia: beber DEMASIADO es peligroso", short: "el agua sola diluye el sodio", def: "En un maratón lento o un ultra, beber más allá de la sed diluye el sodio de la sangre: dolor de cabeza, náuseas, confusión, aumento de peso durante la carrera — un caso puede ser grave.", why: "El consenso internacional recomienda beber según la sed: es la señal más fiable, incluso con mucho calor.", repere: "Pesar más en meta que en la salida = has bebido demasiado." },
+      { term: "El frío", def: "Tres capas (transpirable, aislante, cortavientos), guantes y gorro, calentamiento más largo, atención al hielo. También se deshidrata uno en invierno: el aire seco y el frío enmascaran la sed.", why: "El frío no enferma, el aire seco irrita los bronquios: una bufanda fina delante de la boca ayuda a los sensibles." },
+      { term: "La altitud", short: "menos oxígeno, mismas exigencias", def: "Por encima de ~1 500-2 000 m, el oxígeno disponible baja: a igual FC, el ritmo es más lento y la recuperación más larga. Para una carrera en altitud, prevé un 10 a 20 % más de tiempo, y llega o muy pronto (≥ 2 semanas) o justo la víspera.", why: "«Vivir alto, entrenar bajo» es la única estrategia de altitud que ha mostrado una ganancia en carrera: la altitud ayuda a adaptarse y recuperar, no a hacer sesiones de calidad." },
+      { term: "Contaminación y polen", def: "Picos de contaminación o de polen: correr temprano, lejos de las vías principales, reducir la intensidad. Asmático: el inhalador va en el bolsillo, la toma antes del esfuerzo se valida con el médico.", why: "Una sesión de calidad en pleno pico de contaminación daña más de lo que construye: ese día, el rodaje basta." },
+    ],
+  },
+];
+
+export const QUIZ_ES_SUPP: QuizQuestion[] = [
+  { q: "Mientras no haya un test de VAM registrado, el coach Pacevo…", options: ["Estima tu VAM por tu edad y prescribe todo el plan", "Solo prescribe el test de 6 minutos", "No te da ninguna sesión"], answer: 1, explain: "Todo el plan se calibra sobre la VAM: el coach empieza por medirla.", chapitre: "13 · Entender a tu coach Pacevo", anchor: "coach" },
+  { q: "El volumen semanal de partida del plan Pacevo es…", options: ["La mediana de tus semanas corridas", "La media de las últimas 4 semanas", "El volumen de un plan de maratón estándar"], answer: 0, explain: "La mediana: un parón de 15 días no hunde la cifra, a diferencia de la media.", chapitre: "13 · Entender a tu coach Pacevo", anchor: "coach" },
+  { q: "Tu plan cambia cuando…", options: ["Cambia el mes", "Llega una sesión de tu reloj, registras una sensación o cambia el objetivo", "Nunca: está escrito para 12 semanas"], answer: 1, explain: "Tres disparadores, y cada cambio se explica en «Por qué este plan».", chapitre: "13 · Entender a tu coach Pacevo", anchor: "coach" },
+  { q: "La ausencia de regla en una corredora…", options: ["Es normal con mucho entrenamiento", "Es la primera señal de un déficit energético (RED-S)", "No tiene ninguna relación con correr"], answer: 1, explain: "El consenso del COI la cita primero: se trata comiendo más, no solo entrenando menos.", chapitre: "14 · Mujeres y running", anchor: "femmes" },
+  { q: "Fatiga inusual, rendimiento que baja, FC que sube a igual ritmo: antes de suplementarse con hierro…", options: ["Se doblan las raciones de carne roja", "Se hace un análisis de sangre (ferritina)", "Se sube el volumen para relanzarse"], answer: 1, explain: "El exceso de hierro es tóxico: un análisis lo resuelve, nunca suplementarse a ciegas.", chapitre: "14 · Mujeres y running", anchor: "femmes" },
+  { q: "Según el metaanálisis de McNulty (2020), el efecto del ciclo sobre el rendimiento es…", options: ["Fuerte e idéntico en todas las mujeres", "Pequeño de media y muy variable de una mujer a otra", "Nulo, nunca hay que tenerlo en cuenta"], answer: 1, explain: "Efecto «trivial» de media: lo que cuenta es TU patrón — de ahí el diario durante varios ciclos.", chapitre: "14 · Mujeres y running", anchor: "femmes" },
+  { q: "Aclimatarse al calor lleva aproximadamente…", options: ["2 días", "10 a 14 días de exposiciones progresivas", "Imposible, uno está hecho o no para el calor"], answer: 1, explain: "El cuerpo suda antes, aumenta su plasma y baja su FC: la medida más eficaz del consenso.", chapitre: "15 · Calor, frío y altitud", anchor: "milieu" },
+  { q: "En un maratón lento con mucho calor, beber mucho más que la sed…", options: ["Es la mejor protección", "Puede provocar una hiponatremia (sodio diluido), a veces grave", "No tiene ningún efecto"], answer: 1, explain: "Beber según la sed es la señal recomendada por el consenso internacional; pesar más en meta = has bebido demasiado.", chapitre: "15 · Calor, frío y altitud", anchor: "milieu" },
+  { q: "La única estrategia de altitud que ha mostrado una ganancia en carrera es…", options: ["Entrenar duro en altitud", "Vivir alto, entrenar bajo", "Llegar 3 días antes"], answer: 1, explain: "La altitud ayuda a adaptarse y recuperar; las sesiones de calidad se hacen donde no falta el oxígeno.", chapitre: "15 · Calor, frío y altitud", anchor: "milieu" },
+];
+
 export const UI_ES: CoursUI = {
   heroEyebrow: "El curso del corredor",
   heroTitle: "Entenderlo todo sobre el running",
@@ -206,6 +335,8 @@ export const UI_ES: CoursUI = {
   askCoach: "Profundizar con el coach",
   askCoachQuestion: "Explícame lo esencial del capítulo «{chapter}» y aplícalo a mi perfil y a mi entrenamiento actual.",
   whyLabel: "¿Por qué?", repereLabel: "Referencias:", persoLabel: "Para ti:",
+  objectifLabel: "Al final de este capítulo sabrás", erreursLabel: "Los errores clásicos", actionLabel: "Para hacer esta semana", sourcesLabel: "Fuentes (PubMed)",
+  progression: { lu: "Leído ✓", marquer: "Marcar como leído", marque: "Capítulo leído", compteur: "{n}/{total} capítulos leídos" },
   perso: {
     vma: "VAM {vma} km/h → tu ritmo de VAM ≈ {pace}/km",
     seuil: "tu umbral ≈ {lo}–{hi}/km (82-88 % VAM)",

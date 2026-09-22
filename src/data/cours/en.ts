@@ -195,6 +195,135 @@ export const QUIZ_EN: QuizQuestion[] = [
   { q: "Tapering before a goal race means…", options: ["Reducing volume while KEEPING a touch of intensity", "Stopping everything for 3 weeks", "Doubling your training in the final week"], answer: 0, explain: "You shed the fatigue (ATL) while keeping the fitness (CTL) → positive TSB on race day.", chapitre: "12 · Building your progression", anchor: "plan" },
 ];
 
+// ═══ WHAT TURNS A GLOSSARY INTO A COURSE (22/09/2026) — mirrors fr.ts ═══════════════
+export const EXTRAS_EN: Record<string, { objectif: string; erreurs: string[]; action: { text: string; href: string; label: string } }> = {
+  physio: {
+    objectif: "Read your three base numbers (MAS, threshold, max HR) and know where they come from — measured, not guessed.",
+    erreurs: ["Calibrating every pace on a MAS estimated 'by feel' or on the 220 − age formula.", "Confusing VO2max (a ceiling) with MAS (a working speed).", "Believing a big VO2max is enough: running economy makes the difference at equal VO2max."],
+    action: { text: "Do the 6-minute test the coach prescribes: the whole plan is calibrated on it.", href: "/dashboard/calendrier", label: "See my next session" },
+  },
+  zones: {
+    objectif: "Place each session in its zone, and check that your week is truly polarized (lots of easy, a little hard).",
+    erreurs: ["Running every easy run 'a bit too fast': the grey zone (Z3) tires you without making you progress.", "Using zones computed from a wrong max HR.", "Doing intensity every day thinking you'll progress faster."],
+    action: { text: "Look at last week's time in zones in the Health tab: if Z3 exceeds Z2, slow your easy runs down.", href: "/dashboard/health", label: "My zones this week" },
+  },
+  seances: {
+    objectif: "Recognise each session type in the plan and what it develops — hence what NOT to do in it.",
+    erreurs: ["Turning the long run into a time trial.", "Skipping recovery between two hard sessions.", "Repeating the same sessions every week: the body adapts, progress stops."],
+    action: { text: "Open today's session and read its 'why': the coach explains what it targets before you run it.", href: "/dashboard/calendrier", label: "Today's session" },
+  },
+  charge: {
+    objectif: "Read CTL, ATL and TSB on your dashboard, and tell whether to push, hold or ease off.",
+    erreurs: ["Raising volume by 30 % at once after a good week.", "Reading a very negative TSB as 'I'm bad' when it says 'I'm in a heavy block'.", "Ignoring rising fatigue because the plan says run."],
+    action: { text: "Compare your acute (7 d) and chronic (42 d) load on the home screen: a ratio above 1.3 is an amber light.", href: "/dashboard", label: "My current load" },
+  },
+  techni: {
+    objectif: "Know your cadence and what a small adjustment (+5 %) changes about impact — without reinventing your stride.",
+    erreurs: ["Changing your foot strike overnight because a video said so.", "Lengthening the stride to go faster (it's the opposite: you brake).", "Neglecting strength work and expecting technique to give what muscles can't."],
+    action: { text: "Record an easy run with your phone or watch and check your average cadence: aim for +5 % at most, in steps.", href: "/dashboard/ghost-runner", label: "Record a run" },
+  },
+  recup: {
+    objectif: "Use your HRV and sleep as a recovery dashboard, and decide a session from them.",
+    erreurs: ["Compensating a bad night with a harder session 'to wake up'.", "Looking at one day of HRV instead of the 7-day trend.", "Mistaking recovery for laziness."],
+    action: { text: "Check your last 7 days of HRV in Health: a sharp drop = an easy run, not the quality session.", href: "/dashboard/health", label: "My recovery" },
+  },
+  nutrition: {
+    objectif: "Know what to eat before, during and after, and test your fuelling strategy BEFORE race day.",
+    erreurs: ["Discovering gels on race day.", "Drinking litres of plain water on a long effort with no salt.", "Running the quality session fasted 'to burn fat'."],
+    action: { text: "The nutrition plan of your goal race is computed on your predicted duration: open it and test it on your next long run.", href: "/dashboard/races", label: "My race nutrition" },
+  },
+  trail: {
+    objectif: "Think in elevation and effort rather than pace, and prepare a mountain outing like a mountain outing.",
+    erreurs: ["Comparing your trail pace to your road pace.", "Bombing the downhills without trained quads: the last 20 km remind you.", "Leaving without the mandatory kit because 'the weather is nice'."],
+    action: { text: "Draw your next route on the Map and read its profile: elevation, gradients, estimated time — then compare with the real run.", href: "/dashboard/trail", label: "Draw a route" },
+  },
+  jourj: {
+    objectif: "Arrive at the start with a pacing plan, a fuelling plan and a plan B — and run the second half faster than the first.",
+    erreurs: ["Starting 20 s/km too fast because everyone does.", "Changing breakfast, shoes or gels that very morning.", "Thinking about the finish at kilometre 5."],
+    action: { text: "Check your PPS will be valid ON the day of your goal race: without it, no bib.", href: "/dashboard/pps", label: "My PPS" },
+  },
+  materiel: {
+    objectif: "Choose a shoe for comfort and use, rotate two pairs, and know when a pair is done.",
+    erreurs: ["Buying an elite's or an ad's shoe rather than the one that fits you.", "Switching drop abruptly.", "Running 1,000 km on a dead pair because it 'looks fine'."],
+    action: { text: "The comparator ranks models by use and comfort; your garage tracks each pair's mileage.", href: "/dashboard/shop", label: "Compare shoes" },
+  },
+  blessures: {
+    objectif: "Tell a normal ache from a warning sign, and know what to do in the following 48 h.",
+    erreurs: ["Carrying on with a precise pain that grows while running.", "Coming back after an injury at the previous volume.", "Blaming the shoe when it's the load that moved."],
+    action: { text: "A niggle? Describe it to the AI Physio (area, when, intensity out of 10): it guides you, adapts your load — and tells you when to see someone.", href: "/dashboard/health", label: "Talk to the AI Physio" },
+  },
+  plan: {
+    objectif: "Understand why your plan has this shape (blocks, deloads, taper) and what makes it change.",
+    erreurs: ["Making up a missed week by doubling the next one.", "Removing the taper 'so as not to lose fitness'.", "Changing goal every fortnight."],
+    action: { text: "The catalogue shows the week-by-week progression (volume, deload, long run) for your level.", href: "/dashboard/plans", label: "See the plans" },
+  },
+  coach: {
+    objectif: "Know what the Pacevo coach looks at each morning to decide your session — and why it changes its mind.",
+    erreurs: ["Believing the plan is written once and for all.", "Ignoring the calendar's 'Why this plan' when a session surprises you.", "Logging 'fine' after a sleepless night: the coach decides with what you give it."],
+    action: { text: "Open the calendar and read the 'Why this plan' box: every decision of the week is explained there.", href: "/dashboard/calendrier", label: "Why this plan" },
+  },
+  femmes: {
+    objectif: "Adapt training to your cycle without dogma, recognise the signs of energy deficiency or low iron, and know when to consult.",
+    erreurs: ["Treating missing periods as 'normal for athletes'.", "Taking iron supplements without a blood test.", "Eating less when volume goes up."],
+    action: { text: "Log how you feel and your energy after each session: over several cycles, the journal shows what is truly cycle-related — and what isn't.", href: "/dashboard/health", label: "My journal" },
+  },
+  milieu: {
+    objectif: "Adjust pace, hydration and kit to heat, cold and altitude — and recognise the danger of drinking too much.",
+    erreurs: ["Targeting the same pace at 30 °C as at 12 °C.", "Drinking at every aid station 'to be safe' on a slow race.", "Discovering altitude on race day."],
+    action: { text: "Look at the expected weather of your goal race: the nutrition plan and paces are adjusted to the forecast heat.", href: "/dashboard/races", label: "My race and its weather" },
+  },
+};
+
+export const CHAPTERS_EN_SUPP: ChapterContent[] = [
+  {
+    id: "coach", title: "13 · Understanding your Pacevo coach",
+    intro: "The plan is not written once and for all: it recomputes with what your body and your watch teach it. Here is what it looks at.",
+    concepts: [
+      { term: "Where your MAS comes from in Pacevo", short: "a test, not an estimate", def: "Until a test is recorded, the coach prescribes ONLY the 6-minute test. Then the reference MAS is the most reliable of your test and what your recent runs show — and the screen always tells you which one it uses.", why: "A MAS off by 1 km/h shifts every pace by 15-20 s/km: every session becomes too hard or too easy.", repere: "6-min test: distance (m) ÷ 100 = MAS (km/h)" },
+      { term: "Your readiness of the day", short: "HRV + sleep + resting HR", def: "Each morning the coach reads your waking HRV, your night and your resting HR, and compares them to YOUR baseline of the previous weeks. A sharp HRV drop or a sleep debt shifts the quality session; a good baseline keeps it.", why: "Guiding training by HRV gives, at equal volume, more progress than a fixed plan — that is what the studies comparing both show.", repere: "No watch? The feeling you log after each session serves as the signal." },
+      { term: "The volume it gives you", short: "the median, not the mean", def: "The starting weekly volume is the MEDIAN of the weeks you actually ran (a 15-day break doesn't crush the number), then it rises by at most 10 % a week, with a deload every four weeks.", why: "A progression above ~30 % from one week to the next is associated with markedly more overload injuries." },
+      { term: "The quality budget", short: "how many hard sessions", def: "The number of hard sessions in the week (MAS, threshold, hills) depends on your real fatigue — acute against chronic load — not on the calendar. High fatigue = 0 or 1 hard session, and the coach says so.", why: "'The coach ignores my marathon' is almost always a quality budget at zero on real fatigue: the plan is right, it is waiting for you to recover." },
+      { term: "Why the plan changes", short: "three triggers", def: "The plan is recomputed when a session arrives from your watch, when you log how you felt, and when your goal changes. Every change is explained in the calendar's 'Why this plan' box.", why: "A plan that doesn't move when you're ill, injured or in great shape isn't a coach, it's a calendar." },
+      { term: "What the coach doesn't do", def: "It doesn't diagnose, doesn't replace a doctor or a physio, and doesn't enter you in a race: the PPS (health prevention pass) stays your responsibility. The AI Physio guides and adapts the load; it tells you when to consult.", why: "A tool claiming to 'clear' you to run would be lying. It gives you reference points; the decision stays yours — and a professional's when needed." },
+    ],
+  },
+  {
+    id: "femmes", title: "14 · Women & running",
+    intro: "The cycle, iron, available energy: what most plans ignore, and what changes everything for a female runner.",
+    concepts: [
+      { term: "The menstrual cycle and training", short: "reference points, not rules", def: "On average, the effect of cycle phases on performance is small and highly variable from one woman to another: a slight possible dip early in the cycle (early follicular phase), nothing systematic elsewhere. What matters is YOUR pattern.", why: "The meta-analysis of 78 studies (McNulty 2020) concludes to a 'trivial' effect on average: adapting to individual feel beats a training calendar locked to the cycle.", repere: "Keeping a cycle × energy × sleep journal over 3 cycles reveals your personal pattern." },
+      { term: "Iron", short: "the female runner's silent deficiency", def: "Menstrual losses, foot-strike haemolysis, sweat: the female runner is particularly exposed to iron deficiency. Signs: unusual fatigue, shortness of breath, falling performance, HR rising at equal pace.", why: "A blood test (ferritin, haemoglobin) settles it in one draw. Never supplement blindly: excess iron is toxic.", repere: "Ferritin < 30 µg/L in an athlete: talk to your doctor." },
+      { term: "RED-S: when energy is missing", short: "eating enough for what you spend", def: "Relative energy deficiency in sport: food intake doesn't cover training + the body's needs. Disrupted or absent periods, weakened bones (stress fractures), lower immunity and mood, falling performance — men are affected too.", why: "Missing periods are NEVER 'normal for athletes': it's the first signal the IOC cites in its consensus. It is treated by eating more, not only by training less." },
+      { term: "Pregnancy and post-partum", def: "Running while pregnant is possible when the pregnancy is normal, in agreement with the doctor or midwife, at moderate intensity and listening to the body. After delivery: pelvic-floor rehabilitation first, gradual walk → run return, with no 'standard' date.", why: "Returning too early exposes the pelvic floor; a supported return protects it. The Pacevo coach doesn't know about your pregnancy: tell it in your profile and adapt with your carer." },
+      { term: "Sports bra & comfort", def: "A well-fitted sports bra limits breast movement and discomfort on long runs; replace it when the elastic gives (often 6 to 12 months of regular use).", why: "Breast discomfort is a cited reason women give up running — and it's solved with a proper fitting." },
+    ],
+  },
+  {
+    id: "milieu", title: "15 · Heat, cold & altitude",
+    intro: "The same runner doesn't run the same at 30 °C, at −5 °C or at 2,000 m. What to adjust, and what is dangerous.",
+    concepts: [
+      { term: "Acclimatising to heat", short: "10 to 14 days", def: "Progressive exposures of 60 to 90 min a day for 10 to 14 days: the body sweats earlier, raises its plasma volume, lowers its HR at equal effort.", why: "Consensus recommendations are clear: acclimatisation is the most effective measure to perform and stay safe in strong heat.", repere: "At equal heat, pace drops and HR rises: drive by heart rate or feel, not by pace." },
+      { term: "Running in strong heat", def: "Early morning or late evening, in the shade, light airy kit, wet your neck and forearms, drink to thirst and salt the long runs.", why: "Heat stroke starts with chills, confusion or sweating that stops: you stop, cool down, call. No heroics." },
+      { term: "Hyponatraemia: drinking TOO MUCH is dangerous", short: "plain water dilutes sodium", def: "On a slow marathon or an ultra, drinking beyond thirst dilutes blood sodium: headache, nausea, confusion, weight gain during the race — a case can be serious.", why: "The international consensus recommends drinking to thirst: it's the most reliable signal, even in strong heat.", repere: "Weighing more at the finish than at the start = drank too much." },
+      { term: "Cold", def: "Three layers (breathable, insulating, windproof), gloves and hat, a longer warm-up, watch for ice. You dehydrate in winter too: dry air and cold mask thirst.", why: "Cold doesn't make you ill, dry air irritates the airways: a thin scarf over the mouth helps sensitive runners." },
+      { term: "Altitude", short: "less oxygen, same demands", def: "Above ~1,500-2,000 m, available oxygen drops: at equal HR the pace is slower, recovery longer. For a race at altitude, allow 10 to 20 % more time, and arrive either very early (≥ 2 weeks) or just the day before.", why: "'Live high, train low' is the only altitude strategy that has shown a racing gain: altitude helps you adapt and recover, not do quality sessions." },
+      { term: "Pollution & pollen", def: "Pollution or pollen peaks: run early, away from main roads, reduce intensity. Asthmatic: the inhaler goes in the pocket, pre-effort use is agreed with the doctor.", why: "A quality session during a pollution peak damages more than it builds: that day, the easy run is enough." },
+    ],
+  },
+];
+
+export const QUIZ_EN_SUPP: QuizQuestion[] = [
+  { q: "Until a MAS test is recorded, the Pacevo coach…", options: ["Estimates your MAS from your age and prescribes the whole plan", "Prescribes only the 6-minute test", "Gives you no session"], answer: 1, explain: "The whole plan is calibrated on MAS: the coach starts by measuring it.", chapitre: "13 · Understanding your Pacevo coach", anchor: "coach" },
+  { q: "The starting weekly volume of the Pacevo plan is…", options: ["The median of the weeks you ran", "The average of the last 4 weeks", "The volume of a standard marathon plan"], answer: 0, explain: "The median: a 15-day break doesn't crush the number, unlike the mean.", chapitre: "13 · Understanding your Pacevo coach", anchor: "coach" },
+  { q: "Your plan changes when…", options: ["The month changes", "A session arrives from your watch, you log how you felt, or the goal changes", "Never: it's written for 12 weeks"], answer: 1, explain: "Three triggers, and every change is explained in 'Why this plan'.", chapitre: "13 · Understanding your Pacevo coach", anchor: "coach" },
+  { q: "Missing periods in a female runner…", options: ["Are normal with lots of training", "Are the first signal of an energy deficiency (RED-S)", "Have nothing to do with running"], answer: 1, explain: "The IOC consensus cites it first: it's treated by eating more, not only by training less.", chapitre: "14 · Women & running", anchor: "femmes" },
+  { q: "Unusual fatigue, falling performance, HR rising at equal pace: before taking iron…", options: ["Double the red meat", "Get a blood test (ferritin)", "Raise the volume to get going again"], answer: 1, explain: "Excess iron is toxic: a blood test settles it, never supplement blindly.", chapitre: "14 · Women & running", anchor: "femmes" },
+  { q: "According to the McNulty meta-analysis (2020), the cycle's effect on performance is…", options: ["Strong and identical in all women", "Small on average and highly variable between women", "Nil, never take it into account"], answer: 1, explain: "'Trivial' effect on average: YOUR pattern is what counts — hence the journal over several cycles.", chapitre: "14 · Women & running", anchor: "femmes" },
+  { q: "Acclimatising to heat takes about…", options: ["2 days", "10 to 14 days of progressive exposure", "Impossible, you're made for heat or not"], answer: 1, explain: "The body sweats earlier, raises its plasma and lowers its HR: the consensus' most effective measure.", chapitre: "15 · Heat, cold & altitude", anchor: "milieu" },
+  { q: "On a slow marathon in strong heat, drinking well beyond thirst…", options: ["Is the best protection", "Can cause hyponatraemia (diluted sodium), sometimes serious", "Has no effect"], answer: 1, explain: "Drinking to thirst is the signal recommended by the international consensus; weighing more at the finish = drank too much.", chapitre: "15 · Heat, cold & altitude", anchor: "milieu" },
+  { q: "The only altitude strategy that has shown a racing gain is…", options: ["Training hard at altitude", "Living high, training low", "Arriving 3 days before"], answer: 1, explain: "Altitude helps you adapt and recover; quality sessions happen where oxygen isn't lacking.", chapitre: "15 · Heat, cold & altitude", anchor: "milieu" },
+];
+
 export const UI_EN: CoursUI = {
   heroEyebrow: "The runner's course",
   heroTitle: "Understand everything about running",
@@ -206,6 +335,8 @@ export const UI_EN: CoursUI = {
   askCoach: "Go deeper with the coach",
   askCoachQuestion: "Explain the essentials of the chapter \"{chapter}\" and apply it to my profile and my current training.",
   whyLabel: "Why?", repereLabel: "Benchmarks:", persoLabel: "For you:",
+  objectifLabel: "By the end of this chapter, you will know how to", erreursLabel: "Classic mistakes", actionLabel: "To do this week", sourcesLabel: "Sources (PubMed)",
+  progression: { lu: "Read ✓", marquer: "Mark as read", marque: "Chapter read", compteur: "{n}/{total} chapters read" },
   perso: {
     vma: "MAS {vma} km/h → your MAS pace ≈ {pace}/km",
     seuil: "your threshold ≈ {lo}–{hi}/km (82-88% MAS)",

@@ -9,11 +9,25 @@ export type Concept = {
   repere?: string;
 };
 
+/** Une référence PubMed — vérifiée par l'API NCBI (voir sources.ts et tests/cours.test.ts). */
+export type Source = { label: string; pmid: string; titre: string };
+
 export type ChapterContent = {
   id: string;           // identifiant stable inter-langues (ancre + jointure avec la structure)
   title: string;        // inclut le numéro : « 1 · … »
   intro: string;
   concepts: Concept[];
+  /**
+   * Ce qui fait d'un glossaire un COURS (22/09/2026) :
+   *  · `objectif` — ce que le lecteur saura FAIRE à la fin du chapitre ;
+   *  · `erreurs`  — les 2-3 erreurs classiques que les notions permettent d'éviter ;
+   *  · `action`   — une chose à faire cette semaine, DANS l'app (le lien mène à l'outil).
+   * Les sources, communes aux langues, sont jointes par `id` (sources.ts).
+   */
+  objectif?: string;
+  erreurs?: string[];
+  action?: { text: string; href: string; label: string };
+  sources?: Source[];
 };
 
 export type QuizQuestion = {
@@ -33,6 +47,8 @@ export type CoursUI = {
   searchPlaceholder: string; searchEmpty: string;
   askCoach: string; askCoachQuestion: string; // {chapter} interpolé
   whyLabel: string; repereLabel: string; persoLabel: string;
+  objectifLabel: string; erreursLabel: string; actionLabel: string; sourcesLabel: string;
+  progression: { lu: string; marquer: string; marque: string; compteur: string }; // {n} {total}
   perso: {                 // gabarits des repères personnalisés ({...} interpolés côté page)
     vma: string;           // {vma} {pace}
     seuil: string;         // {lo} {hi}

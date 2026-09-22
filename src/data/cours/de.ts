@@ -195,6 +195,135 @@ export const QUIZ_DE: QuizQuestion[] = [
   { q: "Das Tapering vor einem Zielwettkampf bedeutet…", options: ["Den Umfang reduzieren und dabei etwas Intensität BEHALTEN", "3 Wochen lang alles stoppen", "Das Training in der letzten Woche verdoppeln"], answer: 0, explain: "Die Ermüdung wird abgebaut (ATL), die Form bleibt (CTL) → positiver TSB am Wettkampftag.", chapitre: "12 · Den Fortschritt aufbauen", anchor: "plan" },
 ];
 
+// ═══ WAS AUS EINEM GLOSSAR EINEN KURS MACHT (22/09/2026) — Spiegel von fr.ts ═══════
+export const EXTRAS_DE: Record<string, { objectif: string; erreurs: string[]; action: { text: string; href: string; label: string } }> = {
+  physio: {
+    objectif: "Deine drei Basiswerte (MAS, Schwelle, HFmax) lesen und wissen, woher sie kommen — gemessen, nicht geraten.",
+    erreurs: ["Alle Tempi auf eine „nach Gefühl“ geschätzte MAS oder auf die Formel 220 − Alter kalibrieren.", "VO2max (eine Obergrenze) mit MAS (einer Arbeitsgeschwindigkeit) verwechseln.", "Glauben, eine hohe VO2max reiche: Bei gleicher VO2max entscheidet die Laufökonomie."],
+    action: { text: "Mach den 6-Minuten-Test, den der Coach dir verschreibt: Der ganze Plan wird darauf kalibriert.", href: "/dashboard/calendrier", label: "Meine nächste Einheit" },
+  },
+  zones: {
+    objectif: "Jede Einheit ihrer Zone zuordnen und prüfen, ob deine Woche wirklich polarisiert ist (viel locker, wenig hart).",
+    erreurs: ["Jeden Dauerlauf „etwas zu schnell“ laufen: Die Grauzone (Z3) ermüdet, ohne voranzubringen.", "Zonen aus einer falschen HFmax berechnen.", "Jeden Tag Intensität, in der Hoffnung, schneller voranzukommen."],
+    action: { text: "Sieh dir im Reiter Gesundheit die Zeit pro Zone der letzten Woche an: Liegt Z3 über Z2, laufe deine Dauerläufe langsamer.", href: "/dashboard/health", label: "Meine Zonen der Woche" },
+  },
+  seances: {
+    objectif: "Jeden Einheitstyp im Plan erkennen und wissen, was er entwickelt — also, was man darin NICHT tun sollte.",
+    erreurs: ["Den langen Lauf in ein Zeitfahren verwandeln.", "Die Erholung zwischen zwei harten Einheiten auslassen.", "Jede Woche dieselben Einheiten: Der Körper gewöhnt sich, der Fortschritt stoppt."],
+    action: { text: "Öffne die heutige Einheit und lies ihr „Warum“: Der Coach erklärt, was sie bezweckt, bevor du sie läufst.", href: "/dashboard/calendrier", label: "Die heutige Einheit" },
+  },
+  charge: {
+    objectif: "CTL, ATL und TSB auf deinem Dashboard lesen und ableiten, ob du pushen, halten oder zurückstecken solltest.",
+    erreurs: ["Das Volumen nach einer guten Woche auf einen Schlag um 30 % erhöhen.", "Einen stark negativen TSB als „ich bin schlecht“ lesen, obwohl er „ich bin mitten im Belastungsblock“ bedeutet.", "Steigende Müdigkeit ignorieren, weil der Plan Laufen vorsieht."],
+    action: { text: "Vergleiche auf der Startseite akute (7 T) und chronische (42 T) Belastung: Ein Verhältnis über 1,3 ist gelb.", href: "/dashboard", label: "Meine aktuelle Belastung" },
+  },
+  techni: {
+    objectif: "Deine Kadenz kennen und wissen, was eine kleine Anpassung (+5 %) am Aufprall ändert — ohne deinen Schritt neu zu erfinden.",
+    erreurs: ["Den Fußaufsatz von heute auf morgen ändern, weil ein Video es rät.", "Den Schritt verlängern, um schneller zu werden (das Gegenteil: man bremst).", "Kräftigung vernachlässigen und von der Technik erwarten, was die Muskeln nicht leisten können."],
+    action: { text: "Zeichne einen Dauerlauf mit Handy oder Uhr auf und prüfe deine mittlere Kadenz: höchstens +5 %, in Stufen.", href: "/dashboard/ghost-runner", label: "Einen Lauf aufzeichnen" },
+  },
+  recup: {
+    objectif: "HRV und Schlaf als Erholungs-Dashboard nutzen und eine Einheit daraus ableiten.",
+    erreurs: ["Eine schlechte Nacht mit einer härteren Einheit „zum Wachwerden“ ausgleichen.", "Einen einzelnen HRV-Tag statt des 7-Tage-Trends betrachten.", "Erholung für Faulheit halten."],
+    action: { text: "Sieh dir deine HRV der letzten 7 Tage in Gesundheit an: Ein deutlicher Einbruch = Dauerlauf, nicht die Qualitätseinheit.", href: "/dashboard/health", label: "Meine Erholung" },
+  },
+  nutrition: {
+    objectif: "Wissen, was du vor, während und nach dem Laufen isst, und deine Verpflegungsstrategie VOR dem Wettkampftag testen.",
+    erreurs: ["Gels am Wettkampftag entdecken.", "Literweise reines Wasser bei einer langen Belastung ohne Salz trinken.", "Die Qualitätseinheit nüchtern laufen, „um Fett zu verbrennen“."],
+    action: { text: "Der Ernährungsplan deines Zielwettkampfs wird auf deine prognostizierte Dauer berechnet: Öffne ihn und teste ihn beim nächsten langen Lauf.", href: "/dashboard/races", label: "Meine Wettkampfernährung" },
+  },
+  trail: {
+    objectif: "In Höhenmetern und Anstrengung denken statt in Tempo, und eine Bergtour wie eine Bergtour vorbereiten.",
+    erreurs: ["Dein Trail-Tempo mit deinem Straßentempo vergleichen.", "Bergab volle Kanne ohne trainierte Oberschenkel: Die letzten 20 km erinnern dich daran.", "Ohne Pflichtausrüstung losziehen, weil „das Wetter schön ist“."],
+    action: { text: "Zeichne deine nächste Strecke auf der Karte und lies ihr Profil: Höhenmeter, Steigungen, geschätzte Zeit — dann vergleiche mit dem echten Lauf.", href: "/dashboard/trail", label: "Eine Strecke zeichnen" },
+  },
+  jourj: {
+    objectif: "Mit einem Tempoplan, einem Verpflegungsplan und einem Plan B am Start stehen — und die zweite Hälfte schneller laufen als die erste.",
+    erreurs: ["20 s/km zu schnell starten, weil alle schnell starten.", "Am selben Morgen Frühstück, Schuhe oder Gel wechseln.", "Bei Kilometer 5 ans Ziel denken."],
+    action: { text: "Prüfe, ob dein PPS AM Tag deines Zielwettkampfs gültig ist: Ohne ihn keine Startnummer.", href: "/dashboard/pps", label: "Mein PPS" },
+  },
+  materiel: {
+    objectif: "Einen Schuh nach Komfort und Einsatz wählen, zwei Paare rotieren und wissen, wann ein Paar durch ist.",
+    erreurs: ["Den Schuh eines Profis oder einer Werbung kaufen statt den, der dir passt.", "Die Sprengung abrupt wechseln.", "1 000 km auf einem toten Paar laufen, weil es „gut aussieht“."],
+    action: { text: "Der Vergleich ordnet Modelle nach Einsatz und Komfort; deine Garage verfolgt die Kilometer jedes Paars.", href: "/dashboard/shop", label: "Schuhe vergleichen" },
+  },
+  blessures: {
+    objectif: "Einen normalen Schmerz von einem Warnsignal unterscheiden und wissen, was in den folgenden 48 h zu tun ist.",
+    erreurs: ["Mit einem genau lokalisierten Schmerz weiterlaufen, der beim Laufen zunimmt.", "Nach einer Verletzung mit dem alten Volumen zurückkommen.", "Die Ursache im Schuh suchen, obwohl sich die Belastung geändert hat."],
+    action: { text: "Ein Zwicken? Beschreibe es dem KI-Physio (Zone, wann, Intensität von 10): Er orientiert, passt deine Belastung an — und sagt dir, wann du jemanden aufsuchen solltest.", href: "/dashboard/health", label: "Mit dem KI-Physio sprechen" },
+  },
+  plan: {
+    objectif: "Verstehen, warum dein Plan diese Form hat (Blöcke, Entlastung, Tapering) und was ihn verändert.",
+    erreurs: ["Eine verpasste Woche durch Verdoppeln der nächsten aufholen.", "Das Tapering streichen, „um die Form nicht zu verlieren“.", "Alle zwei Wochen das Ziel wechseln."],
+    action: { text: "Der Katalog zeigt die Progression Woche für Woche (Volumen, Entlastung, langer Lauf) für dein Niveau.", href: "/dashboard/plans", label: "Die Pläne ansehen" },
+  },
+  coach: {
+    objectif: "Wissen, was der Pacevo-Coach jeden Morgen anschaut, um deine Einheit zu entscheiden — und warum er seine Meinung ändert.",
+    erreurs: ["Glauben, der Plan sei ein für alle Mal geschrieben.", "Das „Warum dieser Plan“ im Kalender ignorieren, wenn eine Einheit überrascht.", "Nach einer schlaflosen Nacht „geht so“ eintragen: Der Coach entscheidet mit dem, was du ihm gibst."],
+    action: { text: "Öffne den Kalender und lies den Kasten „Warum dieser Plan“: Jede Entscheidung der Woche ist dort erklärt.", href: "/dashboard/calendrier", label: "Warum dieser Plan" },
+  },
+  femmes: {
+    objectif: "Das Training ohne Dogma an deinen Zyklus anpassen, die Zeichen eines Energiedefizits oder Eisenmangels erkennen und wissen, wann du zum Arzt gehst.",
+    erreurs: ["Ausbleibende Regel als „bei Sportlerinnen normal“ ansehen.", "Eisen ohne Blutbild supplementieren.", "Weniger essen, wenn das Volumen steigt."],
+    action: { text: "Notiere nach jeder Einheit Befinden und Energie: Über mehrere Zyklen zeigt das Tagebuch, was wirklich mit dem Zyklus zusammenhängt — und was nicht.", href: "/dashboard/health", label: "Mein Tagebuch" },
+  },
+  milieu: {
+    objectif: "Tempo, Flüssigkeit und Ausrüstung an Hitze, Kälte und Höhe anpassen — und die Gefahr des Zuviel-Trinkens erkennen.",
+    erreurs: ["Bei 30 °C dasselbe Tempo anpeilen wie bei 12 °C.", "Bei einem langsamen Wettkampf an jeder Verpflegungsstelle „zur Sicherheit“ trinken.", "Die Höhe am Wettkampftag entdecken."],
+    action: { text: "Sieh dir das erwartete Wetter deines Zielwettkampfs an: Ernährungsplan und Tempi sind an die prognostizierte Hitze angepasst.", href: "/dashboard/races", label: "Mein Wettkampf und sein Wetter" },
+  },
+};
+
+export const CHAPTERS_DE_SUPP: ChapterContent[] = [
+  {
+    id: "coach", title: "13 · Deinen Pacevo-Coach verstehen",
+    intro: "Der Plan ist nicht ein für alle Mal geschrieben: Er wird mit dem neu berechnet, was dein Körper und deine Uhr ihm beibringen. Das schaut er an.",
+    concepts: [
+      { term: "Woher deine MAS in Pacevo kommt", short: "ein Test, keine Schätzung", def: "Solange kein Test gespeichert ist, verschreibt der Coach NUR den 6-Minuten-Test. Danach ist die Referenz-MAS die zuverlässigste aus deinem Test und dem, was deine letzten Läufe zeigen — und der Bildschirm sagt dir immer, welche er verwendet.", why: "Eine um 1 km/h falsche MAS verschiebt jedes Tempo um 15-20 s/km: Jede Einheit wird zu hart oder zu leicht.", repere: "6-Min-Test: Distanz (m) ÷ 100 = MAS (km/h)" },
+      { term: "Deine Tagesform (Readiness)", short: "HRV + Schlaf + Ruhepuls", def: "Jeden Morgen liest der Coach deine HRV beim Aufwachen, deine Nacht und deinen Ruhepuls und vergleicht sie mit DEINER Basis der Vorwochen. Ein deutlicher HRV-Einbruch oder ein Schlafdefizit verschiebt die Qualitätseinheit; eine gute Basis behält sie.", why: "HRV-gesteuertes Training bringt bei gleichem Volumen mehr Fortschritt als ein starrer Plan — das zeigen die Studien, die beides verglichen haben.", repere: "Keine Uhr? Das nach jeder Einheit eingetragene Befinden dient als Signal." },
+      { term: "Das Volumen, das er dir gibt", short: "der Median, nicht der Mittelwert", def: "Das wöchentliche Startvolumen ist der MEDIAN deiner tatsächlich gelaufenen Wochen (eine 15-tägige Pause drückt die Zahl nicht), dann steigt es um höchstens 10 % pro Woche, mit einer Entlastung alle vier Wochen.", why: "Eine Steigerung von mehr als ~30 % von einer Woche zur nächsten geht mit deutlich mehr Überlastungsverletzungen einher." },
+      { term: "Das Qualitätsbudget", short: "wie viele harte Einheiten", def: "Die Zahl der harten Einheiten der Woche (MAS, Schwelle, Berge) hängt von deiner realen Müdigkeit ab — akute gegen chronische Belastung — nicht vom Kalender. Hohe Müdigkeit = 0 oder 1 harte Einheit, und der Coach sagt es.", why: "„Der Coach ignoriert meinen Marathon“ ist fast immer ein Qualitätsbudget von null bei realer Müdigkeit: Der Plan stimmt, er wartet, bis du dich erholt hast." },
+      { term: "Warum der Plan sich ändert", short: "drei Auslöser", def: "Der Plan wird neu berechnet, wenn eine Einheit von deiner Uhr kommt, wenn du ein Befinden einträgst und wenn sich dein Ziel ändert. Jede Änderung wird im Kasten „Warum dieser Plan“ des Kalenders erklärt.", why: "Ein Plan, der sich nicht bewegt, wenn du krank, verletzt oder in Topform bist, ist kein Coach, sondern ein Kalender." },
+      { term: "Was der Coach nicht tut", def: "Er stellt keine Diagnose, ersetzt weder Arzt noch Physio und meldet dich nicht zu einem Wettkampf an: Der PPS (Gesundheitspass) bleibt deine Verantwortung. Der KI-Physio orientiert und passt die Belastung an; er sagt dir, wann du zum Arzt gehst.", why: "Ein Werkzeug, das behauptet, dich zum Laufen „freizugeben“, würde lügen. Es gibt dir Anhaltspunkte, die Entscheidung bleibt deine — und die eines Profis, wenn nötig." },
+    ],
+  },
+  {
+    id: "femmes", title: "14 · Frauen & Laufen",
+    intro: "Zyklus, Eisen, verfügbare Energie: was die meisten Pläne ignorieren und was für eine Läuferin alles ändert.",
+    concepts: [
+      { term: "Der Menstruationszyklus und das Training", short: "Anhaltspunkte, keine Regeln", def: "Im Durchschnitt ist der Effekt der Zyklusphasen auf die Leistung gering und von Frau zu Frau sehr unterschiedlich: ein leichter möglicher Einbruch früh im Zyklus (frühe Follikelphase), sonst nichts Systematisches. Was zählt, ist DEIN Muster.", why: "Die Meta-Analyse von 78 Studien (McNulty 2020) kommt auf einen im Mittel „trivialen“ Effekt: Sich am individuellen Befinden zu orientieren ist besser als ein am Zyklus festgemachter Trainingskalender.", repere: "Ein Tagebuch Zyklus × Energie × Schlaf über 3 Zyklen zeigt dein persönliches Muster." },
+      { term: "Eisen", short: "der stille Mangel der Läuferin", def: "Menstruationsverluste, Hämolyse bei jedem Aufprall, Schweiß: Die Läuferin ist besonders für Eisenmangel anfällig. Zeichen: ungewohnte Müdigkeit, Kurzatmigkeit, sinkende Leistung, steigende HF bei gleichem Tempo.", why: "Ein Blutbild (Ferritin, Hämoglobin) klärt es mit einer Abnahme. Nie blind supplementieren: Zu viel Eisen ist giftig.", repere: "Ferritin < 30 µg/L bei einer Sportlerin: Sprich mit deiner Ärztin." },
+      { term: "RED-S: wenn Energie fehlt", short: "genug essen für das, was man verbraucht", def: "Relatives Energiedefizit im Sport: Die Nahrungszufuhr deckt Training + Körperbedarf nicht. Gestörte oder ausbleibende Regel, geschwächte Knochen (Ermüdungsbrüche), schwächere Immunität und Stimmung, sinkende Leistung — Männer sind ebenfalls betroffen.", why: "Eine ausbleibende Regel ist NIE „bei Sportlerinnen normal“: Es ist das erste Signal, das das IOC in seinem Konsens nennt. Behandelt wird sie durch mehr Essen, nicht nur durch weniger Training." },
+      { term: "Schwangerschaft und Wochenbett", def: "Laufen in der Schwangerschaft ist möglich, wenn die Schwangerschaft normal verläuft, in Absprache mit Ärztin oder Hebamme, bei moderater Intensität und mit Blick auf den Körper. Nach der Geburt: zuerst Beckenboden-Rehabilitation, schrittweise Rückkehr Gehen → Laufen, ohne „Standard“-Datum.", why: "Eine zu frühe Rückkehr belastet den Beckenboden; eine begleitete schützt ihn. Der Pacevo-Coach kennt deine Schwangerschaft nicht: Trag sie in dein Profil ein und passe mit deiner Betreuung an." },
+      { term: "Sport-BH & Komfort", def: "Ein gut sitzender Sport-BH begrenzt die Bewegung der Brust und Beschwerden auf langen Läufen; ersetze ihn, wenn das Gummi nachlässt (oft nach 6 bis 12 Monaten regelmäßiger Nutzung).", why: "Brustbeschwerden sind ein genannter Grund, warum Frauen mit dem Laufen aufhören — und sie lassen sich mit einer guten Anprobe lösen." },
+    ],
+  },
+  {
+    id: "milieu", title: "15 · Hitze, Kälte & Höhe",
+    intro: "Derselbe Läufer läuft bei 30 °C, bei −5 °C oder auf 2 000 m nicht gleich. Was anzupassen ist und was gefährlich ist.",
+    concepts: [
+      { term: "Sich an Hitze gewöhnen", short: "10 bis 14 Tage", def: "Progressive Expositionen von 60 bis 90 min pro Tag über 10 bis 14 Tage: Der Körper schwitzt früher, erhöht sein Plasmavolumen, senkt seine HF bei gleicher Anstrengung.", why: "Die Konsensempfehlungen sind klar: Akklimatisierung ist die wirksamste Maßnahme, um bei starker Hitze zu leisten und sicher zu bleiben.", repere: "Bei gleicher Hitze sinkt das Tempo und die HF steigt: Steuere nach Puls oder Gefühl, nicht nach Tempo." },
+      { term: "Laufen bei starker Hitze", def: "Früh morgens oder spät abends, im Schatten, helle luftige Kleidung, Nacken und Unterarme befeuchten, nach Durst trinken und die langen Läufe salzen.", why: "Ein Hitzschlag beginnt mit Schüttelfrost, Verwirrung oder ausbleibendem Schwitzen: anhalten, abkühlen, anrufen. Kein Heldentum." },
+      { term: "Hyponatriämie: ZU VIEL trinken ist gefährlich", short: "reines Wasser verdünnt das Natrium", def: "Bei einem langsamen Marathon oder einem Ultra verdünnt Trinken über den Durst hinaus das Blutnatrium: Kopfschmerz, Übelkeit, Verwirrung, Gewichtszunahme während des Rennens — ein Fall kann ernst sein.", why: "Der internationale Konsens empfiehlt, nach Durst zu trinken: das zuverlässigste Signal, auch bei starker Hitze.", repere: "Im Ziel schwerer als am Start = zu viel getrunken." },
+      { term: "Kälte", def: "Drei Schichten (atmungsaktiv, isolierend, winddicht), Handschuhe und Mütze, längeres Aufwärmen, Vorsicht bei Glatteis. Auch im Winter dehydriert man: Trockene Luft und Kälte überdecken den Durst.", why: "Kälte macht nicht krank, trockene Luft reizt die Bronchien: Ein dünner Schal vor dem Mund hilft Empfindlichen." },
+      { term: "Höhe", short: "weniger Sauerstoff, gleiche Anforderungen", def: "Über ~1 500-2 000 m sinkt der verfügbare Sauerstoff: Bei gleicher HF ist das Tempo langsamer, die Erholung länger. Für einen Wettkampf in der Höhe 10 bis 20 % mehr Zeit einplanen und entweder sehr früh (≥ 2 Wochen) oder erst am Vortag anreisen.", why: "„Hoch wohnen, tief trainieren“ ist die einzige Höhenstrategie, die einen Wettkampfgewinn gezeigt hat: Die Höhe hilft beim Anpassen und Erholen, nicht bei Qualitätseinheiten." },
+      { term: "Luftverschmutzung & Pollen", def: "Bei Schadstoff- oder Pollenspitzen: früh laufen, fern von Hauptstraßen, Intensität reduzieren. Asthmatiker: Der Inhalator kommt in die Tasche, die Anwendung vor der Belastung wird mit dem Arzt abgesprochen.", why: "Eine Qualitätseinheit während einer Schadstoffspitze schadet mehr, als sie aufbaut: An diesem Tag reicht der Dauerlauf." },
+    ],
+  },
+];
+
+export const QUIZ_DE_SUPP: QuizQuestion[] = [
+  { q: "Solange kein MAS-Test gespeichert ist, …", options: ["schätzt der Pacevo-Coach deine MAS aus deinem Alter und verschreibt den ganzen Plan", "verschreibt der Pacevo-Coach nur den 6-Minuten-Test", "gibt dir der Pacevo-Coach keine Einheit"], answer: 1, explain: "Der ganze Plan wird auf die MAS kalibriert: Der Coach misst sie zuerst.", chapitre: "13 · Deinen Pacevo-Coach verstehen", anchor: "coach" },
+  { q: "Das wöchentliche Startvolumen des Pacevo-Plans ist …", options: ["der Median deiner gelaufenen Wochen", "der Mittelwert der letzten 4 Wochen", "das Volumen eines Standard-Marathonplans"], answer: 0, explain: "Der Median: Eine 15-tägige Pause drückt die Zahl nicht, anders als der Mittelwert.", chapitre: "13 · Deinen Pacevo-Coach verstehen", anchor: "coach" },
+  { q: "Dein Plan ändert sich, wenn …", options: ["der Monat wechselt", "eine Einheit von deiner Uhr kommt, ein Befinden eingetragen wird oder sich das Ziel ändert", "nie: Er ist für 12 Wochen geschrieben"], answer: 1, explain: "Drei Auslöser, und jede Änderung wird in „Warum dieser Plan“ erklärt.", chapitre: "13 · Deinen Pacevo-Coach verstehen", anchor: "coach" },
+  { q: "Eine ausbleibende Regel bei einer Läuferin …", options: ["ist bei viel Training normal", "ist das erste Signal eines Energiedefizits (RED-S)", "hat nichts mit dem Laufen zu tun"], answer: 1, explain: "Der IOC-Konsens nennt sie zuerst: Behandelt wird sie durch mehr Essen, nicht nur durch weniger Training.", chapitre: "14 · Frauen & Laufen", anchor: "femmes" },
+  { q: "Ungewohnte Müdigkeit, sinkende Leistung, steigende HF bei gleichem Tempo: Bevor man Eisen nimmt, …", options: ["verdoppelt man die Portionen rotes Fleisch", "macht man ein Blutbild (Ferritin)", "erhöht man das Volumen, um wieder in Schwung zu kommen"], answer: 1, explain: "Zu viel Eisen ist giftig: Ein Blutbild klärt es, nie blind supplementieren.", chapitre: "14 · Frauen & Laufen", anchor: "femmes" },
+  { q: "Laut der Meta-Analyse von McNulty (2020) ist der Effekt des Zyklus auf die Leistung …", options: ["stark und bei allen Frauen gleich", "im Mittel gering und von Frau zu Frau sehr unterschiedlich", "null, man sollte ihn nie berücksichtigen"], answer: 1, explain: "Im Mittel „trivialer“ Effekt: DEIN Muster zählt — daher das Tagebuch über mehrere Zyklen.", chapitre: "14 · Frauen & Laufen", anchor: "femmes" },
+  { q: "Die Hitzeakklimatisierung dauert etwa …", options: ["2 Tage", "10 bis 14 Tage progressiver Exposition", "unmöglich, man ist für Hitze gemacht oder nicht"], answer: 1, explain: "Der Körper schwitzt früher, erhöht sein Plasma und senkt seine HF: die wirksamste Maßnahme des Konsenses.", chapitre: "15 · Hitze, Kälte & Höhe", anchor: "milieu" },
+  { q: "Bei einem langsamen Marathon in starker Hitze weit über den Durst hinaus zu trinken …", options: ["ist der beste Schutz", "kann eine Hyponatriämie (verdünntes Natrium) auslösen, manchmal ernst", "hat keine Wirkung"], answer: 1, explain: "Nach Durst trinken ist das vom internationalen Konsens empfohlene Signal; im Ziel schwerer = zu viel getrunken.", chapitre: "15 · Hitze, Kälte & Höhe", anchor: "milieu" },
+  { q: "Die einzige Höhenstrategie, die einen Wettkampfgewinn gezeigt hat, ist …", options: ["hart in der Höhe trainieren", "hoch wohnen, tief trainieren", "3 Tage vorher anreisen"], answer: 1, explain: "Die Höhe hilft beim Anpassen und Erholen; Qualitätseinheiten finden dort statt, wo der Sauerstoff nicht fehlt.", chapitre: "15 · Hitze, Kälte & Höhe", anchor: "milieu" },
+];
+
 export const UI_DE: CoursUI = {
   heroEyebrow: "Der Läufer-Kurs",
   heroTitle: "Das Laufen komplett verstehen",
@@ -206,6 +335,8 @@ export const UI_DE: CoursUI = {
   askCoach: "Mit dem Coach vertiefen",
   askCoachQuestion: "Erkläre mir das Wesentliche des Kapitels „{chapter}“ und wende es auf mein Profil und mein aktuelles Training an.",
   whyLabel: "Warum?", repereLabel: "Richtwerte:", persoLabel: "Für dich:",
+  objectifLabel: "Am Ende dieses Kapitels weißt du", erreursLabel: "Die klassischen Fehler", actionLabel: "Diese Woche zu tun", sourcesLabel: "Quellen (PubMed)",
+  progression: { lu: "Gelesen ✓", marquer: "Als gelesen markieren", marque: "Kapitel gelesen", compteur: "{n}/{total} Kapitel gelesen" },
   perso: {
     vma: "MAS {vma} km/h → dein MAS-Tempo ≈ {pace}/km",
     seuil: "deine Schwelle ≈ {lo}–{hi}/km (82-88 % MAS)",

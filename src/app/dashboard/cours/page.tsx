@@ -1,6 +1,8 @@
 import {
   Activity, Gauge, Footprints, TrendingUp, HeartPulse, Mountain, Target, GraduationCap, Utensils, Shirt, Flag, Shield,
+  BrainCircuit, HeartHandshake, ThermometerSun, AlertTriangle, ArrowRight, BookOpenCheck, ExternalLink,
 } from "lucide-react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { normLang } from "@/lib/i18n/translations";
 import { getCoursContent } from "@/data/cours";
@@ -11,6 +13,7 @@ import { CoursSearch } from "@/components/cours/CoursSearch";
 import { CoursQuiz } from "@/components/cours/CoursQuiz";
 import { CoursFlashcards } from "@/components/cours/CoursFlashcards";
 import { AskCoachButton } from "@/components/cours/AskCoachButton";
+import { CoursBarreProgression, CoursMarquerLu, CoursSommaireMobile } from "@/components/cours/CoursProgression";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Cours du coureur" };
@@ -29,6 +32,9 @@ const META: Record<string, { icon: typeof Activity; from: string; to: string; ac
   materiel:  { icon: Shirt,      from: "#0891b2", to: "#2563eb", accent: "text-cyan-700" },
   blessures: { icon: Shield,     from: "#dc2626", to: "#ea580c", accent: "text-red-700" },
   plan:      { icon: Target,     from: "#059669", to: "#16a34a", accent: "text-emerald-700" },
+  coach:     { icon: BrainCircuit, from: "#0f766e", to: "#0891b2", accent: "text-teal-700" },
+  femmes:    { icon: HeartHandshake, from: "#be185d", to: "#e11d48", accent: "text-pink-700" },
+  milieu:    { icon: ThermometerSun, from: "#b45309", to: "#0369a1", accent: "text-amber-700" },
 };
 
 const slugify = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -102,19 +108,28 @@ export default async function CoursPage() {
               </span>
             ))}
           </div>
+          {/* La progression du lecteur — locale à l'appareil, remplie après montage. */}
+          <CoursBarreProgression ids={chapters.map((c) => c.id)} gabarit={ui.progression.compteur} />
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl px-5 py-8">
-        <div className="grid grid-cols-12 gap-8">
+      <div className="mx-auto max-w-6xl px-0 py-6 sm:px-5 sm:py-8">
+        {/* ⚠️ `grid-cols-12 gap-8` SUR TÉLÉPHONE = 11 GOUTTIÈRES DE 32 px = 352 px DE VIDE dans
+            une colonne de 287 : la colonne de contenu débordait de 65 px à droite (mesuré le
+            22/09/2026). Une seule colonne sous lg ; la grille à douze colonnes n'a de sens
+            qu'avec le sommaire latéral. */}
+        <div className="grid grid-cols-1 gap-0 lg:grid-cols-12 lg:gap-8">
           {/* Sommaire — scroll-spy (la section lue se surligne) */}
           <aside className="hidden lg:block lg:col-span-3">
             <CoursSommaire label={ui.sommaire} items={chapters.map((ch) => ({ id: ch.id, title: ch.title, color: META[ch.id]?.from ?? "#059669" }))} />
           </aside>
 
           {/* Contenu */}
-          <div className="col-span-12 lg:col-span-9 space-y-12">
+                    <div className="min-w-0 space-y-12 lg:col-span-9">
             <div className="space-y-4">
+              {/* Sur téléphone, le sommaire n'existait pas (aside `hidden lg:block`) : une
+                  rangée de puces qui défile, la section lue en vert. */}
+              <CoursSommaireMobile items={chapters.map((ch) => ({ id: ch.id, title: ch.title, color: META[ch.id]?.from ?? "#059669" }))} />
               {/* Recherche instantanée dans les notions du cours */}
               <CoursSearch
                 placeholder={ui.searchPlaceholder}
@@ -140,7 +155,14 @@ export default async function CoursPage() {
                     </div>
                     <AskCoachButton label={ui.askCoach} question={fill(ui.askCoachQuestion, { chapter: ch.title.replace(/^\d+ · /, "") })} />
                   </div>
-                  <p className="mb-4 text-sm text-zinc-500 leading-relaxed">{ch.intro}</p>
+                  <p className="mb-3 text-sm text-zinc-500 leading-relaxed">{ch.intro}</p>
+                  {/* Ce qui fait d'un glossaire un cours : l'objectif annoncé AVANT les notions. */}
+                  {ch.objectif && (
+                    <div className="mb-4 flex items-start gap-2.5 rounded-2xl border px-4 py-3 text-sm leading-relaxed" style={{ borderColor: `${m.from}33`, background: `${m.from}0d` }}>
+                      <BookOpenCheck className="mt-0.5 h-4 w-4 flex-shrink-0" style={{ color: m.from }} aria-hidden />
+                      <p className="text-zinc-800"><b className={m.accent}>{ui.objectifLabel}</b> {ch.objectif}</p>
+                    </div>
+                  )}
                   <div className="grid gap-3 sm:grid-cols-2">
                     {ch.concepts.map((c, i) => (
                       <div key={c.term} id={slugify(`${ch.id}-${c.term}`)} className="scroll-mt-24 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition-all hover:shadow-md">
@@ -160,6 +182,46 @@ export default async function CoursPage() {
                         )}
                       </div>
                     ))}
+                  </div>
+
+                  {/* Erreurs classiques + action de la semaine (dans l'app) + sources vérifiées. */}
+                  {(ch.erreurs?.length || ch.action) && (
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      {ch.erreurs && ch.erreurs.length > 0 && (
+                        <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+                          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-amber-800"><AlertTriangle className="h-4 w-4" aria-hidden />{ui.erreursLabel}</div>
+                          <ul className="mt-2 space-y-1.5 text-sm leading-relaxed text-amber-950">
+                            {ch.erreurs.map((e) => <li key={e} className="flex gap-2"><span className="mt-[9px] h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-500" />{e}</li>)}
+                          </ul>
+                        </div>
+                      )}
+                      {ch.action && (
+                        <Link href={ch.action.href} className="group flex flex-col justify-between rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 transition hover:border-emerald-400 hover:shadow-md">
+                          <div>
+                            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-emerald-800"><Target className="h-4 w-4" aria-hidden />{ui.actionLabel}</div>
+                            <p className="mt-2 text-sm leading-relaxed text-emerald-950">{ch.action.text}</p>
+                          </div>
+                          <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-700 group-hover:gap-2.5 transition-all">{ch.action.label}<ArrowRight className="h-4 w-4" /></span>
+                        </Link>
+                      )}
+                    </div>
+                  )}
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                    {ch.sources && ch.sources.length > 0 ? (
+                      <details className="min-w-0 text-xs text-zinc-500">
+                        <summary className="cursor-pointer select-none font-semibold text-zinc-600 hover:text-zinc-900">{ui.sourcesLabel} · {ch.sources.length}</summary>
+                        <ul className="mt-2 space-y-1">
+                          {ch.sources.map((src) => (
+                            <li key={src.pmid}>
+                              <a href={`https://pubmed.ncbi.nlm.nih.gov/${src.pmid}/`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline-offset-2 hover:text-emerald-700 hover:underline">
+                                {src.label} — <i>{src.titre}</i><ExternalLink className="h-3 w-3 flex-shrink-0" aria-hidden />
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    ) : <span />}
+                    <CoursMarquerLu id={ch.id} libelles={ui.progression} />
                   </div>
                 </section>
               );
