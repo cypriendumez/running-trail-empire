@@ -145,6 +145,46 @@ test("sur téléphone : la consultation d'abord, le schéma corporel repliable, 
   assert.match(src, /overflow-x-auto rounded-2xl bg-zinc-100\/80/, "les cinq onglets ne défilent plus (ils se cassaient sur deux lignes)");
 });
 
+test("plus aucun « Guardian » à l'écran — ni onglet, ni titre, ni réponse du support", () => {
+  // Le ménage du 22/09 avait laissé trois survivances, trouvées le 23/09 en ouvrant la
+  // vraie page : le TITRE D'ONGLET du navigateur disait encore « Santé & Guardian »,
+  // l'assistant de support promettait toujours « détection de chute, alerte GPS
+  // automatique », et le Profil portait un interrupteur « Mode Guardian ».
+  const vus: string[] = [];
+  for (const f of ["src/app/dashboard/health/page.tsx", "src/data/helpKb.ts",
+                   "src/components/profile/ProfileSettings.tsx", "src/components/health/HealthCenter.tsx"]) {
+    if (/Guardian/.test(codeNu(f))) vus.push(f);
+  }
+  assert.deepEqual(vus, [], `« Guardian » revient à l'écran dans : ${vus.join(", ")}`);
+  // Et le support ne promet plus ce qui n'existe pas ; il dit la limite.
+  const kb = readFileSync("src/data/helpKb.ts", "utf8");
+  assert.ok(!/détection de chute|alerte GPS automatique/.test(kb), "l'assistant de support promet de nouveau une détection de chute et une alerte GPS automatique");
+  const secu = kb.split("\n").find((l) => l.includes("SÉCURITÉ EN COURSE"));
+  assert.ok(secu, "l'entrée « sécurité en course » a disparu de la base de connaissances");
+  assert.match(secu!, /ÉCRAN ALLUMÉ/, "le support ne dit plus que la veille s'arrête écran verrouillé");
+  assert.match(secu!, /n'appelle et n'écrit à personne/, "le support laisse croire que Pacevo alerte tout seul");
+});
+
+test("le Profil n'a plus d'interrupteur qui ne commande rien", () => {
+  // ⚠️ `guardian_mode_enabled` était ÉCRIT en base et relu seulement pour se dessiner :
+  // aucun autre fichier ne le lisait. Il annonçait « bloque automatiquement les séances à
+  // haute intensité » et, allumé, « votre santé est protégée ». L'allègement existe —
+  // `lib/coach/qualityBudget` — mais il n'est PAS optionnel, donc l'interrupteur laissait
+  // aussi croire qu'éteint, on n'était pas protégé.
+  const prof = codeNu("src/components/profile/ProfileSettings.tsx");
+  assert.ok(!/guardian_mode_enabled/.test(prof), "le réglage fantôme est revenu dans le formulaire du Profil");
+  assert.ok(!/guard\.active/.test(prof), "« votre santé est protégée » est revenu");
+  // Ce qui le remplace doit RENVOYER vers la preuve, pas se contenter d'affirmer.
+  assert.match(prof, /href="\/dashboard\/calendrier"[^>]*>\s*\n?\s*\{tr\("guard\.voir"\)\}/, "l'encart ne renvoie plus au calendrier, où les allègements sont motivés");
+  // …et la protection annoncée doit exister pour de vrai, à ces conditions-là.
+  const qb = codeNu("src/lib/coach/qualityBudget.ts");
+  assert.match(qb, /if \(i\.hrvDown\) \{ qBudget -= 1;/, "la VFC en baisse ne retire plus d'intensité : l'encart du Profil ment");
+  assert.match(qb, /if \(i\.pains\.length\) \{ qBudget -= 1;/, "une douleur signalée ne retire plus d'intensité : l'encart du Profil ment");
+  assert.match(qb, /if \(i\.rpeHigh\) \{ qBudget -= 1;/, "un ressenti élevé ne retire plus d'intensité : l'encart du Profil ment");
+  const n = [...readFileSync("src/components/profile/ProfileSettings.tsx", "utf8").matchAll(/"guard\.voir":/g)].length;
+  assert.equal(n, 5, `« guard.voir » présent ${n} fois, attendu 5`);
+});
+
 test("les libellés Santé ajoutés existent dans les cinq langues", () => {
   const src = readFileSync(CENTRE, "utf8");
   const cles = ["sec.title", "sec.sub", "sec.live", "sec.liveDesc", "sec.liveBtn", "sec.contact", "sec.contactDesc", "sec.honest", "sec.kit", "sec.k1", "sec.k5", "sec.call", "sec.saveFail",

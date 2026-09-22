@@ -48,7 +48,7 @@ const P: Record<string, Record<string, string>> = {
     "f.terrMulti": "plusieurs choix possibles",
     "notif.title": "Notifications", "notif.workout": "Rappels de séance", "notif.goal": "Objectifs atteints", "notif.league": "Classement ligue", "notif.coach": "Conseils du coach IA", "notif.save": "Sauvegarder les préférences", "notif.news": "Résumé du lundi matin", "notif.newsHint": "L'actualité running et trail de la semaine, une fois par semaine. Rien d'autre.", "notif.newsOff": "Tu ne reçois plus le résumé hebdomadaire.",
     "double.title": "Deux séances par jour", "double.checking": "Vérification de ton volume et de ta forme…", "double.checkFail": "Impossible de vérifier maintenant — le réglage est bien enregistré, le coach appliquera ses propres critères.", "double.ok": "✅ C'est bon : le coach pourra scinder une sortie facile en deux dès que ce sera utile.", "double.blocked": "⚠️ Enregistré, mais le coach ne doublera pas encore :", "double.kept": "Ton réglage est conservé : dès que ce point sera levé, le plan se scindera tout seul.", "double.noThreshold": "Le double SEUIL (méthode norvégienne) reste hors de portée pour l'instant :", "double.hint": "Le coach pourra scinder une sortie facile en deux (matin + soir) quand ton volume le justifie. Même volume, mieux absorbé — il te dira ce qui manque tant qu'il ne le fait pas.", "privacy.private": "Compte privé", "privacy.privateHint": "Seuls tes amis (vous vous suivez tous les deux) peuvent commenter tes publications.", "privacy.publicHint": "N'importe qui peut commenter les publications que tu rends visibles.",
-    "guard.title": "Mode Guardian", "guard.desc": "Bloque automatiquement les séances à haute intensité en cas de surentraînement détecté par l'IA (HRV, fatigue mentale).", "guard.active": "Actif — votre santé est protégée",
+    "guard.title": "Le coach allège quand tu es fatigué", "guard.desc": "Ce n'est pas une option à activer. Dès que ta VFC baisse, que tu signales une douleur, que ton ressenti monte ou que ta charge grimpe trop vite, le coach retire de l'intensité de la semaine — pour tout le monde, à chaque replanification.", "guard.voir": "Voir pourquoi dans le calendrier →",
     "gdpr.title": "Données & confidentialité", "gdpr.desc": "Conformément au RGPD, tu peux récupérer toutes tes données à tout moment.", "gdpr.export": "Exporter mes données (JSON)", "gdpr.exporting": "Export…", "gdpr.privacy": "Politique de confidentialité", "gdpr.delPre": "Pour supprimer ton compte et toutes tes données, écris à ", "gdpr.delPost": " — suppression sous 30 jours.",
     "goals.title": "Mes objectifs", "goals.summary": "{a} en cours · {b} atteints", "goals.new": "Nouvel objectif", "goals.type": "Type", "goals.name": "Nom", "goals.namePhRace": "Marathon de Paris 2027", "goals.namePhOther": "Objectif hebdo", "goals.targetVal": "Valeur cible ({unit})", "goals.targetValPh": "42.2", "goals.targetDate": "Date cible", "goals.create": "Créer l'objectif", "goals.emptyTitle": "Aucun objectif défini", "goals.emptyDesc": "Fixez-vous une course cible, un volume hebdo…", "goals.achieved": "Atteint ✓", "goals.past": "Passé", "goals.context": "Contexte actuel", "goals.ctxMonth": "km ce mois", "goals.ctxYear": "km cette année", "goals.ctxStreak": "jours de suite",
     "gt.race": "Course cible", "gt.weekly": "Km hebdo", "gt.monthly": "Km mensuel", "gt.pace": "Allure cible", "gt.weight": "Poids cible",
@@ -83,7 +83,7 @@ const P: Record<string, Record<string, string>> = {
     "f.terrMulti": "select all that apply",
     "notif.title": "Notifications", "notif.workout": "Workout reminders", "notif.goal": "Goals achieved", "notif.league": "League ranking", "notif.coach": "AI coach tips", "notif.save": "Save preferences", "notif.news": "Monday morning digest", "notif.newsHint": "The week in running and trail, once a week. Nothing else.", "notif.newsOff": "You no longer receive the weekly digest.",
     "double.title": "Two sessions a day", "double.checking": "Checking your volume and form…", "double.checkFail": "Cannot check right now — the setting is saved, and the coach will apply its own criteria.", "double.ok": "✅ All set: the coach may split an easy run in two as soon as it helps.", "double.blocked": "⚠️ Saved, but the coach will not double yet:", "double.kept": "Your setting is kept: as soon as this is cleared, the plan will split on its own.", "double.noThreshold": "Double THRESHOLD (Norwegian method) is out of reach for now:", "double.hint": "The coach may split an easy run in two (morning + evening) when your volume justifies it. Same volume, better absorbed — it will tell you what is missing until then.", "privacy.private": "Private account", "privacy.privateHint": "Only your friends (you follow each other) can comment on your posts.", "privacy.publicHint": "Anyone can comment on the posts you make visible.",
-    "guard.title": "Guardian Mode", "guard.desc": "Automatically blocks high-intensity sessions when the AI detects overtraining (HRV, mental fatigue).", "guard.active": "Active — your health is protected",
+    "guard.title": "Your coach eases off when you're tired", "guard.desc": "This is not a setting to switch on. As soon as your HRV drops, you report a pain, your perceived effort climbs or your load rises too fast, the coach takes intensity out of the week — for everyone, at every replanning.", "guard.voir": "See why in your calendar →",
     "gdpr.title": "Data & privacy", "gdpr.desc": "Under GDPR, you can retrieve all your data at any time.", "gdpr.export": "Export my data (JSON)", "gdpr.exporting": "Exporting…", "gdpr.privacy": "Privacy policy", "gdpr.delPre": "To delete your account and all your data, email ", "gdpr.delPost": " — deletion within 30 days.",
     "goals.title": "My goals", "goals.summary": "{a} ongoing · {b} achieved", "goals.new": "New goal", "goals.type": "Type", "goals.name": "Name", "goals.namePhRace": "Paris Marathon 2027", "goals.namePhOther": "Weekly goal", "goals.targetVal": "Target value ({unit})", "goals.targetValPh": "42.2", "goals.targetDate": "Target date", "goals.create": "Create goal", "goals.emptyTitle": "No goal set", "goals.emptyDesc": "Set yourself a target race, a weekly volume…", "goals.achieved": "Achieved ✓", "goals.past": "Past", "goals.context": "Current context", "goals.ctxMonth": "km this month", "goals.ctxYear": "km this year", "goals.ctxStreak": "days in a row",
     "gt.race": "Target race", "gt.weekly": "Weekly km", "gt.monthly": "Monthly km", "gt.pace": "Target pace", "gt.weight": "Target weight",
@@ -118,7 +118,7 @@ const P: Record<string, Record<string, string>> = {
     "f.terrMulti": "Mehrfachauswahl möglich",
     "notif.title": "Benachrichtigungen", "notif.workout": "Trainings-Erinnerungen", "notif.goal": "Erreichte Ziele", "notif.league": "Liga-Ranking", "notif.coach": "Tipps des KI-Coachs", "notif.save": "Einstellungen speichern", "notif.news": "Montagmorgen-Überblick", "notif.newsHint": "Die Laufwoche, einmal pro Woche. Sonst nichts.", "notif.newsOff": "Du erhältst den wöchentlichen Überblick nicht mehr.",
     "double.title": "Zwei Einheiten pro Tag", "double.checking": "Umfang und Form werden geprüft…", "double.checkFail": "Prüfung derzeit nicht möglich — die Einstellung ist gespeichert, der Coach wendet seine eigenen Kriterien an.", "double.ok": "✅ Passt: Der Coach kann einen lockeren Lauf teilen, sobald es sinnvoll ist.", "double.blocked": "⚠️ Gespeichert, aber der Coach verdoppelt noch nicht:", "double.kept": "Deine Einstellung bleibt erhalten: Sobald das erfüllt ist, teilt sich der Plan von selbst.", "double.noThreshold": "Doppelte SCHWELLE (norwegische Methode) ist vorerst außer Reichweite:", "double.hint": "Der Coach kann einen lockeren Lauf teilen (morgens + abends), wenn dein Umfang es rechtfertigt. Gleicher Umfang, besser verkraftet — bis dahin sagt er dir, was fehlt.", "privacy.private": "Privates Konto", "privacy.privateHint": "Nur deine Freunde (ihr folgt euch gegenseitig) können deine Beiträge kommentieren.", "privacy.publicHint": "Jede Person kann die Beiträge kommentieren, die du sichtbar machst.",
-    "guard.title": "Guardian-Modus", "guard.desc": "Blockiert automatisch intensive Einheiten, wenn die KI Übertraining erkennt (HRV, mentale Ermüdung).", "guard.active": "Aktiv — deine Gesundheit ist geschützt",
+    "guard.title": "Dein Coach nimmt Tempo raus, wenn du müde bist", "guard.desc": "Das ist keine Option zum Einschalten. Sobald deine HRV sinkt, du Schmerzen meldest, dein Empfinden steigt oder deine Belastung zu schnell wächst, nimmt der Coach Intensität aus der Woche — bei allen, bei jeder Neuplanung.", "guard.voir": "Im Kalender nachlesen, warum →",
     "gdpr.title": "Daten & Datenschutz", "gdpr.desc": "Gemäß DSGVO kannst du jederzeit alle deine Daten abrufen.", "gdpr.export": "Meine Daten exportieren (JSON)", "gdpr.exporting": "Export…", "gdpr.privacy": "Datenschutzerklärung", "gdpr.delPre": "Um dein Konto und alle Daten zu löschen, schreibe an ", "gdpr.delPost": " — Löschung innerhalb von 30 Tagen.",
     "goals.title": "Meine Ziele", "goals.summary": "{a} laufend · {b} erreicht", "goals.new": "Neues Ziel", "goals.type": "Typ", "goals.name": "Name", "goals.namePhRace": "Marathon Paris 2027", "goals.namePhOther": "Wochenziel", "goals.targetVal": "Zielwert ({unit})", "goals.targetValPh": "42.2", "goals.targetDate": "Zieldatum", "goals.create": "Ziel erstellen", "goals.emptyTitle": "Kein Ziel festgelegt", "goals.emptyDesc": "Setze dir ein Zielrennen, ein Wochenvolumen…", "goals.achieved": "Erreicht ✓", "goals.past": "Vorbei", "goals.context": "Aktueller Kontext", "goals.ctxMonth": "km diesen Monat", "goals.ctxYear": "km dieses Jahr", "goals.ctxStreak": "Tage in Folge",
     "gt.race": "Zielrennen", "gt.weekly": "Wochen-km", "gt.monthly": "Monats-km", "gt.pace": "Zieltempo", "gt.weight": "Zielgewicht",
@@ -153,7 +153,7 @@ const P: Record<string, Record<string, string>> = {
     "f.terrMulti": "varias opciones posibles",
     "notif.title": "Notificaciones", "notif.workout": "Recordatorios de sesión", "notif.goal": "Objetivos logrados", "notif.league": "Clasificación de liga", "notif.coach": "Consejos del entrenador IA", "notif.save": "Guardar preferencias", "notif.news": "Resumen del lunes por la mañana", "notif.newsHint": "La semana del running y el trail, una vez por semana. Nada más.", "notif.newsOff": "Ya no recibes el resumen semanal.",
     "double.title": "Dos sesiones al día", "double.checking": "Comprobando tu volumen y tu forma…", "double.checkFail": "No se puede comprobar ahora — el ajuste está guardado y el entrenador aplicará sus criterios.", "double.ok": "✅ Listo: el entrenador podrá dividir una tirada suave en cuanto sea útil.", "double.blocked": "⚠️ Guardado, pero el entrenador aún no doblará:", "double.kept": "Tu ajuste se conserva: en cuanto se resuelva, el plan se dividirá solo.", "double.noThreshold": "El doble UMBRAL (método noruego) queda fuera de alcance por ahora:", "double.hint": "El entrenador podrá dividir una tirada suave en dos (mañana + tarde) cuando tu volumen lo justifique. Mismo volumen, mejor asimilado — hasta entonces te dirá qué falta.", "privacy.private": "Cuenta privada", "privacy.privateHint": "Solo tus amigos (os seguís mutuamente) pueden comentar tus publicaciones.", "privacy.publicHint": "Cualquiera puede comentar las publicaciones que hagas visibles.",
-    "guard.title": "Modo Guardian", "guard.desc": "Bloquea automáticamente las sesiones de alta intensidad cuando la IA detecta sobreentrenamiento (VFC, fatiga mental).", "guard.active": "Activo — tu salud está protegida",
+    "guard.title": "Tu entrenador afloja cuando estás cansado", "guard.desc": "No es una opción que haya que activar. En cuanto tu VFC baja, señalas un dolor, tu sensación sube o tu carga crece demasiado rápido, el entrenador quita intensidad de la semana: para todos, en cada replanificación.", "guard.voir": "Ver por qué en el calendario →",
     "gdpr.title": "Datos y privacidad", "gdpr.desc": "Conforme al RGPD, puedes recuperar todos tus datos en cualquier momento.", "gdpr.export": "Exportar mis datos (JSON)", "gdpr.exporting": "Exportando…", "gdpr.privacy": "Política de privacidad", "gdpr.delPre": "Para eliminar tu cuenta y todos tus datos, escribe a ", "gdpr.delPost": " — eliminación en 30 días.",
     "goals.title": "Mis objetivos", "goals.summary": "{a} en curso · {b} logrados", "goals.new": "Nuevo objetivo", "goals.type": "Tipo", "goals.name": "Nombre", "goals.namePhRace": "Maratón de París 2027", "goals.namePhOther": "Objetivo semanal", "goals.targetVal": "Valor objetivo ({unit})", "goals.targetValPh": "42.2", "goals.targetDate": "Fecha objetivo", "goals.create": "Crear objetivo", "goals.emptyTitle": "Ningún objetivo definido", "goals.emptyDesc": "Fíjate una carrera objetivo, un volumen semanal…", "goals.achieved": "Logrado ✓", "goals.past": "Pasado", "goals.context": "Contexto actual", "goals.ctxMonth": "km este mes", "goals.ctxYear": "km este año", "goals.ctxStreak": "días seguidos",
     "gt.race": "Carrera objetivo", "gt.weekly": "Km semanal", "gt.monthly": "Km mensual", "gt.pace": "Ritmo objetivo", "gt.weight": "Peso objetivo",
@@ -188,7 +188,7 @@ const P: Record<string, Record<string, string>> = {
     "f.terrMulti": "várias opções possíveis",
     "notif.title": "Notificações", "notif.workout": "Lembretes de sessão", "notif.goal": "Objetivos alcançados", "notif.league": "Classificação da liga", "notif.coach": "Conselhos do treinador IA", "notif.save": "Guardar preferências", "notif.news": "Resumo de segunda de manhã", "notif.newsHint": "A semana da corrida e do trail, uma vez por semana. Nada mais.", "notif.newsOff": "Já não recebes o resumo semanal.",
     "double.title": "Duas sessões por dia", "double.checking": "A verificar o teu volume e a tua forma…", "double.checkFail": "Não é possível verificar agora — a definição está guardada e o treinador aplicará os seus critérios.", "double.ok": "✅ Tudo certo: o treinador poderá dividir um treino leve assim que for útil.", "double.blocked": "⚠️ Guardado, mas o treinador ainda não vai duplicar:", "double.kept": "A tua definição fica guardada: assim que isto for resolvido, o plano divide-se sozinho.", "double.noThreshold": "O duplo LIMIAR (método norueguês) está fora de alcance por agora:", "double.hint": "O treinador pode dividir um treino leve em dois (manhã + tarde) quando o teu volume o justificar. Mesmo volume, melhor absorvido — até lá dir-te-á o que falta.", "privacy.private": "Conta privada", "privacy.privateHint": "Só os teus amigos (seguem-se mutuamente) podem comentar as tuas publicações.", "privacy.publicHint": "Qualquer pessoa pode comentar as publicações que tornares visíveis.",
-    "guard.title": "Modo Guardian", "guard.desc": "Bloqueia automaticamente as sessões de alta intensidade quando a IA deteta excesso de treino (VFC, fadiga mental).", "guard.active": "Ativo — a tua saúde está protegida",
+    "guard.title": "O teu treinador alivia quando estás cansado", "guard.desc": "Não é uma opção para ativar. Assim que a tua VFC desce, assinalas uma dor, a tua perceção sobe ou a tua carga cresce depressa demais, o treinador retira intensidade da semana — para toda a gente, em cada replaneamento.", "guard.voir": "Ver porquê no calendário →",
     "gdpr.title": "Dados e privacidade", "gdpr.desc": "Em conformidade com o RGPD, podes recuperar todos os teus dados a qualquer momento.", "gdpr.export": "Exportar os meus dados (JSON)", "gdpr.exporting": "A exportar…", "gdpr.privacy": "Política de privacidade", "gdpr.delPre": "Para eliminar a tua conta e todos os dados, escreve para ", "gdpr.delPost": " — eliminação em 30 dias.",
     "goals.title": "Os meus objetivos", "goals.summary": "{a} em curso · {b} alcançados", "goals.new": "Novo objetivo", "goals.type": "Tipo", "goals.name": "Nome", "goals.namePhRace": "Maratona de Paris 2027", "goals.namePhOther": "Objetivo semanal", "goals.targetVal": "Valor-alvo ({unit})", "goals.targetValPh": "42.2", "goals.targetDate": "Data-alvo", "goals.create": "Criar objetivo", "goals.emptyTitle": "Nenhum objetivo definido", "goals.emptyDesc": "Define uma prova-alvo, um volume semanal…", "goals.achieved": "Alcançado ✓", "goals.past": "Passado", "goals.context": "Contexto atual", "goals.ctxMonth": "km este mês", "goals.ctxYear": "km este ano", "goals.ctxStreak": "dias seguidos",
     "gt.race": "Prova-alvo", "gt.weekly": "Km semanal", "gt.monthly": "Km mensal", "gt.pace": "Ritmo-alvo", "gt.weight": "Peso-alvo",
@@ -453,7 +453,6 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
     days_per_week: profile?.days_per_week == null ? null : Number(profile.days_per_week),
     available_days: (Array.isArray(profile?.available_days) && profile.available_days.length
       ? profile.available_days.map(Number) : [0, 1, 2, 3, 4, 5, 6]) as number[],
-    guardian_mode_enabled: Boolean(profile?.guardian_mode_enabled),
     notif_workout: Boolean(profile?.notif_workout ?? true),
     notif_goal: Boolean(profile?.notif_goal ?? true),
     notif_league: Boolean(profile?.notif_league ?? true),
@@ -483,7 +482,6 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
       height_cm: parseInt(form.height_cm) || null,
       weight_kg: parseFloat(form.weight_kg) || null,
       preferred_language: form.preferred_language,
-      guardian_mode_enabled: form.guardian_mode_enabled,
     }).eq("id", userId);
     /**
      * ⚠️ CES ÉCRITURES ÉTAIENT MUETTES, ET LA RAISON N'EXISTE PLUS.
@@ -1224,38 +1222,35 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
               </div>
             </div>
 
-            {/* Guardian mode */}
-            <div className={`bento-card border-2 transition-colors ${form.guardian_mode_enabled ? "border-violet-300 bg-violet-50" : "border-zinc-200"}`}>
+            {/* ══ CE QUE LE COACH FAIT DÉJÀ, DIT AU LIEU D'ÊTRE PROMIS ══════════════
+                ⚠️ IL Y AVAIT ICI UN INTERRUPTEUR « MODE GUARDIAN » QUI NE COMMANDAIT RIEN.
+                `guardian_mode_enabled` était écrit en base et relu UNIQUEMENT pour se
+                dessiner lui-même : aucun autre fichier ne le consultait. Il annonçait
+                « bloque automatiquement les séances à haute intensité en cas de
+                surentraînement » et, allumé, « votre santé est protégée ».
+
+                Deux mensonges pour le prix d'un, parce que l'allègement EXISTE et n'est
+                PAS optionnel : `lib/coach/qualityBudget` retire de l'intensité dès que la
+                VFC baisse, qu'une douleur est signalée, que le ressenti monte ou que la
+                charge grimpe trop vite — pour tout le monde, sans réglage. L'interrupteur
+                laissait donc croire, éteint, qu'on n'était pas protégé.
+
+                Même ménage que l'onglet Sécurité (22/09/2026) : on énonce ce qui se passe,
+                et on envoie là où l'athlète peut le VOIR — le calendrier motive chaque
+                allègement. */}
+            <div className="bento-card">
               <div className="flex items-start gap-4">
-                <div className={`p-3 rounded-2xl ${form.guardian_mode_enabled ? "bg-violet-100" : "bg-zinc-100"}`}>
-                  <Shield className={`w-6 h-6 ${form.guardian_mode_enabled ? "text-violet-600" : "text-zinc-400"}`} />
+                <div className="rounded-2xl bg-emerald-50 p-3">
+                  <Shield className="h-6 w-6 text-emerald-600" />
                 </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-zinc-900">{tr("guard.title")}</h3>
-                    <button
-                      onClick={() => { setForm(f => ({...f, guardian_mode_enabled: !f.guardian_mode_enabled})); }}
-                      className={`relative w-11 h-6 rounded-full transition-colors ${form.guardian_mode_enabled ? "bg-violet-500" : "bg-zinc-300"}`}>
-                      <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.guardian_mode_enabled ? "translate-x-5" : ""}`} />
-                    </button>
-                  </div>
-                  <p className="text-sm text-zinc-500 mt-1">
-                    {tr("guard.desc")}
-                  </p>
-                  {form.guardian_mode_enabled && (
-                    <div className="mt-3 flex items-center gap-2 text-xs text-violet-700 font-medium">
-                      <CheckCircle className="w-3.5 h-3.5" /> {tr("guard.active")}
-                    </div>
-                  )}
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-semibold text-zinc-900">{tr("guard.title")}</h3>
+                  <p className="mt-1 text-sm text-zinc-500">{tr("guard.desc")}</p>
+                  <a href="/dashboard/calendrier" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 hover:text-emerald-800">
+                    {tr("guard.voir")}
+                  </a>
                 </div>
               </div>
-              {form.guardian_mode_enabled && (
-                <div className="mt-3 pt-3 border-t border-violet-200">
-                  <button onClick={save} disabled={saving} className="text-sm text-violet-600 font-semibold hover:underline">
-                    {tr("common.save")}
-                  </button>
-                </div>
-              )}
             </div>
 
             {/* Données & confidentialité (RGPD) */}

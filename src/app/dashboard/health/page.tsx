@@ -5,7 +5,7 @@ import { suiviParZone, type Signalement } from "@/lib/health/douleurs";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 import { estUnePanne } from "@/lib/dashboard/lectures";
 
-export const metadata = { title: "Santé & Guardian" };
+export const metadata = { title: "Santé" };
 
 /**
  * Le suivi des douleurs est lu ICI, côté serveur.
