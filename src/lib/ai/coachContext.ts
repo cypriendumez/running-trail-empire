@@ -34,6 +34,7 @@ const dureeLoc = (min: number, l: Lang) => {
 };
 import { QUALITE_T } from "@/lib/ai/qualityI18n";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
+import { libellesActifs, type Douleur } from "@/lib/health/douleurs";
 
 type SB = Awaited<ReturnType<typeof createClient>>;
 
@@ -308,7 +309,7 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "session_feedback").order("created_at", { ascending: false }).limit(5),
     // Douleurs déclarées depuis l'espace Santé (schéma corporel) — elles n'atteignaient
     // pas le coach, qui ne regardait que le formulaire post-séance.
-    sb.from("notifications").select("data").eq("user_id", userId).eq("type", "pain_report").order("created_at", { ascending: false }).limit(10),
+    sb.from("notifications").select("id, data").eq("user_id", userId).eq("type", "pain_report").order("created_at", { ascending: false }).limit(10),
     // Usure des chaussures : un des rares facteurs de blessure à la fois mesurable
     // et actionnable. Silencieux tant qu'aucune paire n'est enregistrée.
     sb.from("shoes").select("brand, model, current_km, km_at_purchase, max_km, purchase_date, terrain").eq("user_id", userId).eq("is_active", true),
@@ -475,9 +476,16 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // Douleurs = formulaire post-séance ET espace Santé. Une déclaration se périme au
   // bout de 14 jours : une gêne signalée il y a un mois ne doit pas brider l'athlète
   // indéfiniment s'il ne l'a pas re-signalée.
-  const declaredPains = ((painRes.data ?? []) as { data: { zone?: string; level?: number; date?: string } }[])
-    .filter(n => n.data?.zone && n.data?.date && now - new Date(`${n.data.date}T12:00:00`).getTime() <= 14 * 86400000)
-    .map(n => `${n.data.zone}${n.data.level ? ` (${n.data.level}/10)` : ""}`);
+  // ⚠️ UNE DOULEUR DÉCLARÉE PASSÉE NE DOIT PLUS BRIDER LE PLAN. Jusqu'au 23/09/2026 elle
+  // ne s'éteignait QUE par péremption : une déclaration faite pour essayer l'application
+  // retirait de l'intensité pendant deux semaines. L'athlète peut désormais dire « c'est
+  // passé », « ça va mieux » ou « ça empire » ; seul « c'est passé » l'efface, et la
+  // tendance part au coach avec la douleur.
+  const declaredPains = libellesActifs(
+    ((painRes.data ?? []) as { id?: string; data: Douleur | null }[]).map((n) => ({ ...(n.data ?? {}), id: n.id })),
+    aujourdhui(FUSEAU_DEFAUT),
+    { mieux: "en amélioration selon l'athlète", pire: "en aggravation selon l'athlète" },
+  );
   const pains = [...new Set([
     ...feedback.flatMap(f => f.data?.pain ?? []).filter((p) => p && p !== "Aucune douleur"),
     ...declaredPains,

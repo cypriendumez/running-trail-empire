@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 import { createClient } from "@/lib/supabase/server";
 import { HealthCenter } from "@/components/health/HealthCenter";
-import { suiviParZone, type Signalement } from "@/lib/health/douleurs";
+import { suiviParZone, actives, etatDe, type Signalement, type Douleur } from "@/lib/health/douleurs";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 import { estUnePanne } from "@/lib/dashboard/lectures";
 
@@ -18,6 +18,7 @@ export default async function HealthPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   let suivi: ReturnType<typeof suiviParZone> = [];
+  const etats: { cle: string; id: string; etat: string }[] = [];
   let enPanne = false;
   let fil: { role: "user" | "model"; text: string }[] = [];
   let contact: { nom: string; tel: string } = { nom: "", tel: "" };
@@ -43,19 +44,32 @@ export default async function HealthPage() {
      * C'est aussi la mémoire dans laquelle puise le kiné IA.
      */
     const { data, error } = await supabase.from("notifications")
-      .select("data,created_at").eq("user_id", user.id).eq("type", "pain_report")
+      .select("id,data,created_at").eq("user_id", user.id).eq("type", "pain_report")
       .gte("created_at", new Date(Date.now() - 60 * 86400000).toISOString())
       .order("created_at", { ascending: false }).limit(120);
-    const rows: Signalement[] = ((data ?? []) as { data: { zone?: string; slot?: string; level?: number; date?: string } | null; created_at: string }[])
-      .map((r) => ({
-        zone: String(r.data?.zone ?? ""),
-        cle: r.data?.slot ? String(r.data.slot) : null,
-        level: Number(r.data?.level),
-        date: String(r.data?.date ?? r.created_at ?? "").slice(0, 10),
-      }));
+    const brutes = ((data ?? []) as { id: string; data: Douleur | null; created_at: string }[])
+      .map((r) => ({ ...(r.data ?? {}), id: r.id, date: String(r.data?.date ?? r.created_at ?? "").slice(0, 10) }));
+    // ⚠️ CE QUE L'ATHLÈTE A DÉCLARÉ PASSÉ NE REMONTE PLUS DANS LE SUIVI — sinon l'écran
+    // continue d'afficher une douleur qu'il vient lui-même d'éteindre.
+    const retenues = actives(brutes, aujourdhui(FUSEAU_DEFAUT), 60);
+    const rows: Signalement[] = retenues.map((r) => ({
+      zone: String(r.zone ?? ""),
+      cle: r.slot ? String(r.slot) : null,
+      level: Number(r.level),
+      date: String(r.date ?? "").slice(0, 10),
+    }));
     suivi = suiviParZone(rows, aujourdhui(FUSEAU_DEFAUT));
+    // La déclaration la PLUS RÉCENTE de chaque zone : c'est elle qu'on met à jour quand
+    // l'athlète dit « ça va mieux » ou « c'est passé ».
+    const vues = new Set<string>();
+    for (const r of retenues) {
+      const cle = String(r.slot || r.zone || "");
+      if (!cle || vues.has(cle) || !r.id) continue;
+      vues.add(cle);
+      etats.push({ cle, id: String(r.id), etat: etatDe(r) });
+    }
     enPanne = estUnePanne({ error });
     if (enPanne) console.error("[santé] douleurs illisibles :", error?.message);
   }
-  return <HealthCenter suivi={suivi} enPanne={enPanne} filInitial={fil} contactInitial={contact} />;
+  return <HealthCenter suivi={suivi} etats={etats} enPanne={enPanne} filInitial={fil} contactInitial={contact} />;
 }

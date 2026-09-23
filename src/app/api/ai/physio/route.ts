@@ -7,6 +7,8 @@ import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 import { sniffImage } from "@/lib/upload/sniff";
 import { suiviParZone, resumeDouleurs, type Signalement } from "@/lib/health/douleurs";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
+import { prochaineCourse } from "@/lib/coach/prochaineCourse";
+import { actives, libellesActifs, type Douleur } from "@/lib/health/douleurs";
 import { extraireBilan } from "@/lib/health/bilan";
 
 type Msg = { role: "user" | "model"; text: string };
@@ -66,13 +68,19 @@ export async function POST(req: Request) {
     imagePart = { inline_data: { mime_type: mime, data: b64 } };
   }
 
-  const [profileRes, workoutsRes, sleepRes, hrvRes, fbRes, raceRes, coachSessRes, painRes, shoesRes] = await Promise.all([
+  const [profileRes, workoutsRes, sleepRes, hrvRes, fbRes, raceRes, objRes, coachSessRes, painRes, shoesRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase.from("workouts").select("title,date,distance_km,elevation_gain_m,duration_seconds,avg_hr,max_hr,avg_cadence_spm,ground_contact_ms,vertical_oscillation_cm,stride_length_m,type").eq("user_id", user.id).order("date", { ascending: false }).limit(40),
     supabase.from("sleep_data").select("*").eq("user_id", user.id).order("date", { ascending: false }).limit(1).single(),
     supabase.from("hrv_data").select("hrv_ms,date").eq("user_id", user.id).order("date", { ascending: false }).limit(14),
     supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "session_feedback").order("created_at", { ascending: false }).limit(6),
     supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "planned_race").order("created_at", { ascending: false }).limit(20),
+    // ⚠️ L'OBJECTIF DÉCLARÉ, QUE CETTE ROUTE NE LISAIT PAS. Mesuré le 23/09/2026 : le
+    // calendrier contenait « Foulées de Bondues, 23/05/2027 » et l'objectif disait
+    // « Marathon de Lille, 25/10/2026 » — absent du calendrier. Le kiné conseillait donc
+    // sur une échéance huit mois trop loin. Les deux sources se rejoignent maintenant
+    // dans `prochaineCourse`, et nulle part ailleurs.
+    supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "race_objective").maybeSingle(),
     supabase.from("notifications").select("title,body,data").eq("user_id", user.id).eq("type", "coach_session").order("created_at", { ascending: false }).limit(30),
     // ⚠️ L'HISTORIQUE DE DOULEUR, QUE CETTE ROUTE N'AVAIT JAMAIS RELU. Elle écrivait des
     // `pain_report` que seul le COACH relisait ; le kiné, lui, ne consultait que ceux du
@@ -108,18 +116,30 @@ export async function POST(req: Request) {
   const hrvVals = hrv.map((h) => h.hrv_ms).filter((v): v is number => v != null);
   const hrvLatest = hrvVals[0] ?? null;
   const hrvBase = hrvVals.length >= 3 ? Math.round(hrvVals.reduce((a, b) => a + b, 0) / hrvVals.length) : null;
+  // ⚠️ UNE DOULEUR DÉCLARÉE PASSÉE NE DOIT PLUS REVENIR DANS LA CONSULTATION. Le kiné
+  // la ressortait à chaque fois, puisque rien ne permettait de la retirer.
   const pains = [...new Set(feedback.flatMap((f) => f.data?.pain ?? []).filter(Boolean))];
 
   // ── MÉMOIRE DU KINÉ : l'évolution zone par zone sur 60 jours ────────────────────
   const jourDeLAthlete = aujourdhui(FUSEAU_DEFAUT);
-  const signalements: Signalement[] = ((painRes.data ?? []) as { data: { zone?: string; slot?: string; level?: number; date?: string } | null; created_at: string }[])
+  // ⚠️ ON ÉCARTE D'ABORD CE QUE L'ATHLÈTE A DÉCLARÉ PASSÉ. Sans ce filtre, la mémoire du
+  // kiné ressort une douleur résolue à chaque consultation — le reproche exact de Cyprien
+  // le 23/09/2026, après en avoir déclaré une POUR TESTER.
+  // La date porte l'information clinique ; `created_at` ne sert que de repli.
+  const brutes: Douleur[] = ((painRes.data ?? []) as { data: Douleur | null; created_at: string }[])
+    .map((r) => ({ ...(r.data ?? {}), date: String(r.data?.date ?? r.created_at ?? "").slice(0, 10) }));
+  const signalements: Signalement[] = actives(brutes, jourDeLAthlete, 60)
     .map((r) => ({
-      zone: String(r.data?.zone ?? ""),
-      cle: r.data?.slot ? String(r.data.slot) : null,
-      level: Number(r.data?.level),
-      // La date porte l'information clinique ; `created_at` ne sert que de repli.
-      date: String(r.data?.date ?? r.created_at ?? "").slice(0, 10),
+      zone: String(r.zone ?? ""),
+      cle: r.slot ? String(r.slot) : null,
+      level: Number(r.level),
+      date: String(r.date ?? "").slice(0, 10),
     }));
+  // Les libellés lus par le modèle : zone, niveau, ET tendance déclarée par l'athlète.
+  const douleursDites = [...new Set([
+    ...libellesActifs(brutes, jourDeLAthlete, { mieux: "en amélioration selon l'athlète", pire: "en aggravation selon l'athlète" }),
+    ...pains,
+  ])];
   const suivi = suiviParZone(signalements, jourDeLAthlete);
   const resumeSuivi = resumeDouleurs(suivi);
 
@@ -138,9 +158,12 @@ export async function POST(req: Request) {
     });
   // Course à venir : un objectif proche change la stratégie (gestion vs guérison complète).
   const todayStr = aujourdhui(FUSEAU_DEFAUT);
-  const nextRace = ((raceRes.data ?? []) as { data: { date?: string; name?: string; distanceKm?: number | null } }[])
-    .map((r) => r.data).filter((d) => (d?.date ?? "") >= todayStr)
-    .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0] ?? null;
+  const suivante = prochaineCourse(
+    (objRes.data?.data ?? null) as { race?: unknown; raceDate?: unknown; distanceKm?: unknown } | null,
+    ((raceRes.data ?? []) as { data: { date?: string; name?: string; distanceKm?: number | null } }[]).map((r) => r.data),
+    todayStr,
+  );
+  const nextRace = suivante ? { name: suivante.nom, date: suivante.date, distanceKm: suivante.distanceKm } : null;
   // Séances prescrites par le coach humain (à venir) → l'ajustement de charge cite les VRAIES séances.
   type CoachRow = { title: string; body: string | null; data: { date?: string; subtitle?: string } };
   const upcomingSess = oneSessionPerSlot((coachSessRes.data ?? []) as CoachRow[], (r) => slotKey(r.data))
@@ -156,7 +179,7 @@ DOSSIER DE L'ATHLÈTE (exploite-le finement — c'est ce qui te rend supérieure
 - Charge : ${weekKm.toFixed(0)} km cette semaine vs ${avg4wk.toFixed(0)} km/sem (moy. 4 sem.) → rampe ${rampPct > 0 ? "+" : ""}${rampPct}% ${rampPct > 30 ? "⚠️ PROGRESSION TROP RAPIDE = risque majeur de blessure de surcharge" : rampPct > 10 ? "(au-dessus des +10%/sem recommandés)" : "(progressive, ok)"} · ${elevWeek} m D+ /7j
 - Biomécanique récente : cadence ${cadence ?? "?"} spm ${cadence && cadence < 165 ? "(basse → suroscillation/impact, lien possible avec les douleurs)" : ""} · contact sol ${gct ?? "?"} ms · oscillation verticale ${vosc ?? "?"} cm
 - Récupération : ${sleep ? `sommeil ${Math.round(num(sleep.total_sleep_min) / 60)}h (score ${sleep.sleep_score ?? "?"}/100), énergie ${sleep.body_battery_end ?? "?"}/100` : "n/c"}${hrvLatest != null ? ` · VFC ${hrvLatest} ms (base ${hrvBase ?? "?"} → ${hrvBase && hrvLatest < hrvBase * 0.92 ? "BASSE = fatigue/stress, cicatrisation ralentie" : "ok"})` : ""}
-${pains.length ? `- Douleurs déjà signalées récemment : ${pains.join(", ")}` : ""}
+${douleursDites.length ? `- Douleurs en cours, telles que l'athlète les décrit : ${douleursDites.join(", ")}` : ""}
 - SUIVI DES DOULEURS DÉCLARÉES (60 derniers jours) : ${resumeSuivi || "aucun antécédent enregistré — ne suppose donc AUCUN historique, et ne dis pas que c'est nouveau : tu n'en sais rien."}${resumeSuivi ? `
   → OUVRE la consultation par ce suivi quand il concerne la zone dont on te parle : « ton genou droit était à 7/10 il y a 5 jours, tu es à 4 aujourd'hui » est exactement ce qu'un kiné dit en revoyant quelqu'un. Une zone marquée EN AGGRAVATION prime sur tout le reste. Une évolution notée « une seule déclaration » n'est PAS une tendance : ne la commente pas comme telle.` : ""}
 - CHAUSSURES (garage) : ${chaussures.length ? chaussures.join(" | ") : "aucune paire enregistrée — DEMANDE le modèle et le kilométrage approximatif, c'est une cause fréquente et facile à corriger."}${chaussures.length ? `

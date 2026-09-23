@@ -106,3 +106,99 @@ export function resumeDouleurs(suivi: SuiviZone[]): string {
     return `${s.zone} : ${evolution} (${s.signalements} déclaration${s.signalements > 1 ? "s" : ""}, ${anciennete}, dernière ${recence})`;
   }).join("\n");
 }
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * L'ÉTAT D'UNE DOULEUR — déclaré par l'athlète, et comment on en sort.
+ *
+ * ⚠️ UNE DOULEUR DÉCLARÉE NE POUVAIT PAS ÊTRE RETIRÉE. Elle s'écrivait depuis le kiné IA
+ * (schéma corporel, niveau ≥ 4) et ne s'éteignait QUE par péremption. Entre-temps elle
+ * retirait de l'intensité à chaque replanification (`qualityBudget` : `if (i.pains.length)
+ * qBudget -= 1`) et le kiné la ressortait à chaque consultation.
+ *
+ * Cyprien, 23/09/2026 : « hier j'ai dit que j'avais mal au bras, ce qui est faux, c'était
+ * pour tester — trouve un moyen pour que le client puisse dire que tout va mieux, ou que
+ * ça s'empire ». Une déclaration de santé qu'on ne peut pas corriger est pire qu'une
+ * absence de déclaration : elle est fausse ET elle agit.
+ *
+ * ⚠️ CECI N'EST PAS `tendance` CI-DESSUS. `tendance` est MESURÉE en comparant des niveaux
+ * successifs (7/10 → 4/10) ; l'état est DÉCLARÉ par l'athlète. Les deux disent des choses
+ * différentes et doivent coexister : on peut aller mieux sans avoir redéclaré un niveau.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+export type EtatDouleur = "actif" | "mieux" | "pire" | "resolu";
+
+export const ETATS: readonly EtatDouleur[] = ["actif", "mieux", "pire", "resolu"] as const;
+
+/** Une ligne `pain_report` telle qu'elle est stockée. */
+export type Douleur = {
+  id?: string;
+  zone?: string | null;
+  slot?: string | null;
+  level?: number | null;
+  date?: string | null;
+  etat?: string | null;
+  /** Jour de la dernière mise à jour d'état, déclarée par l'athlète. */
+  majA?: string | null;
+};
+
+/** L'état d'une ligne, quoi qu'elle contienne. Tout ce qui n'est pas connu vaut `actif`. */
+export function etatDe(d: Douleur | null | undefined): EtatDouleur {
+  const e = String(d?.etat ?? "").trim().toLowerCase();
+  return (ETATS as readonly string[]).includes(e) ? (e as EtatDouleur) : "actif";
+}
+
+/**
+ * Une douleur pèse sur l'entraînement tant qu'elle n'est pas déclarée passée.
+ *
+ * ⚠️ « MIEUX » N'EST PAS « RÉSOLU ». Une gêne qui s'améliore reste une gêne : la retirer
+ * du budget de qualité rendrait la séance dure le jour même où l'athlète dit « ça va un
+ * peu mieux ». C'est exactement comme ça qu'on rechute.
+ */
+export function pese(d: Douleur | null | undefined): boolean {
+  return etatDe(d) !== "resolu";
+}
+
+/**
+ * ⚠️ LA PÉREMPTION RESTE, EN PLUS DE L'ÉTAT. Elle protège contre l'oubli — une gêne
+ * signalée il y a un mois et jamais redéclarée ne doit pas brider indéfiniment. L'état,
+ * lui, protège contre l'erreur. Aucun des deux ne couvre le cas de l'autre.
+ */
+export const PEREMPTION_JOURS = 14;
+
+/** Les douleurs encore valables : ni périmées, ni déclarées passées. */
+export function actives(liste: Douleur[], aujourdhui: string, peremptionJours = PEREMPTION_JOURS): Douleur[] {
+  const t0 = Date.parse(`${aujourdhui}T12:00:00`);
+  return liste.filter((d) => {
+    if (!d?.zone || !d?.date) return false;
+    if (!pese(d)) return false;
+    const t = Date.parse(`${String(d.date).slice(0, 10)}T12:00:00`);
+    if (!Number.isFinite(t) || !Number.isFinite(t0)) return false;
+    return t0 - t <= peremptionJours * 86400000;
+  });
+}
+
+/**
+ * Le libellé lu par le coach et par le kiné : la zone, le niveau, et la tendance DÉCLARÉE.
+ *
+ * ⚠️ ELLE FAIT PARTIE DU FAIT. « Mollet gauche (6/10) » et « Mollet gauche (6/10), en
+ * aggravation » n'appellent pas la même séance ; taire l'évolution, c'est demander au
+ * coach de décider sur une photo au lieu d'un film.
+ */
+export function libelleEtat(d: Douleur, mots: { mieux: string; pire: string }): string {
+  const base = `${d.zone ?? ""}${d.level ? ` (${d.level}/10)` : ""}`;
+  const e = etatDe(d);
+  if (e === "mieux") return `${base}, ${mots.mieux}`;
+  if (e === "pire") return `${base}, ${mots.pire}`;
+  return base;
+}
+
+/** Les libellés des douleurs actives, prêts pour le contexte du coach. */
+export function libellesActifs(liste: Douleur[], aujourdhui: string, mots: { mieux: string; pire: string }): string[] {
+  return [...new Set(actives(liste, aujourdhui).map((d) => libelleEtat(d, mots)))];
+}
+
+/** Un état reçu d'un client : accepté seulement s'il est connu. */
+export function etatValide(brut: unknown): EtatDouleur | null {
+  const e = String(brut ?? "").trim().toLowerCase();
+  return (ETATS as readonly string[]).includes(e) ? (e as EtatDouleur) : null;
+}

@@ -5,6 +5,7 @@ import { exigeAcces } from "@/lib/billing/guard";
 import { generateContent, budget } from "@/lib/ai/gemini";
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
+import { prochaineCourse } from "@/lib/coach/prochaineCourse";
 
 type Msg = { role: "user" | "model"; text: string };
 
@@ -59,9 +60,16 @@ export async function POST(req: Request) {
   const lastSessions = workouts.slice(0, 3).map((w) =>
     `${new Date(w.date).toLocaleDateString("fr", { day: "numeric", month: "short" })} : ${w.title || w.type || "séance"}${num(w.distance_km) ? ` ${num(w.distance_km).toFixed(1)} km` : ""}${num(w.avg_hr) ? ` · ${num(w.avg_hr)} bpm` : ""}`).join(" | ");
   const todayStr = aujourdhui(FUSEAU_DEFAUT);
-  const nextRace = ((raceRes.data ?? []) as { data: { date?: string; name?: string; distanceKm?: number | null } }[])
-    .map((r) => r.data).filter((d) => (d?.date ?? "") >= todayStr)
-    .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0] ?? null;
+  // ⚠️ L'OBJECTIF DÉCLARÉ EN FAIT PARTIE. Cette route lisait `planned_race` seul : le
+  // marathon préparé n'y figurant pas, le cours parlait d'une course située huit mois
+  // trop loin (mesuré le 23/09/2026). Les deux sources se rejoignent dans une seule
+  // fonction, partagée avec le kiné.
+  const suivante = prochaineCourse(
+    (objRes.data?.data ?? null) as { race?: unknown; raceDate?: unknown; distanceKm?: unknown } | null,
+    ((raceRes.data ?? []) as { data: { date?: string; name?: string; distanceKm?: number | null } }[]).map((r) => r.data),
+    todayStr,
+  );
+  const nextRace = suivante ? { name: suivante.nom, date: suivante.date, distanceKm: suivante.distanceKm } : null;
   // Objectif chiffré saisi par l'athlète (course + chrono visé) — l'or du coach.
   const obj = (objRes.data?.data ?? null) as { race?: string; distanceKm?: number; raceDate?: string; targetTime?: string; targetPace?: string } | null;
 

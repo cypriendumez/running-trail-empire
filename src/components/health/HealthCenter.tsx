@@ -43,6 +43,7 @@ const H: Record<string, Record<string, string>> = {
     "gd.name": "Prénom Nom", "gd.namePh": "Jean Dupont", "gd.phone": "Téléphone", "gd.saveContact": "Enregistrer le contact", "gd.savedContact": "Contact enregistré.", "sec.saveFail": "Contact non enregistré — réessaie.", "sec.call": "Appeler",
     "sec.honest": "Pacevo ne détecte pas les chutes et n'alerte personne automatiquement : aucune application ne le fait sans le matériel dédié. La détection d'incident de ta montre (Garmin, Apple, Coros…) reste la référence — active-la là-bas.",
     "sec.kit": "Avant une sortie en montagne", "sec.k1": "Dis à quelqu'un où tu vas et quand tu rentres.", "sec.k2": "Téléphone chargé, sifflet, couverture de survie, veste imperméable.", "sec.k3": "Eau et sel sur les longues sorties par chaleur ; boire à la soif.", "sec.k4": "Numéros d'urgence : 112 (Europe), 15 SAMU, 18 pompiers.", "sec.k5": "Lampe et vêtement réfléchissant dès la pénombre.",
+    "k.etatQ": "{z} — où en es-tu ?", "k.mieux": "Ça va mieux", "k.pire": "Ça empire", "k.passe": "C'est passé", "k.etatOk": "C'est noté — ton coach en tient compte.", "k.etatPasse": "Noté : cette douleur ne bride plus ton plan.", "k.etatErr": "Mise à jour impossible. Réessaie.",
     "chat.new": "Nouvelle consultation", "chat.newConfirm": "Effacer la conversation ? Tes douleurs déclarées restent dans ton suivi.", "chat.resumed": "Consultation précédente reprise — le kiné se souvient de vos échanges.", "chat.newFail": "Effacement impossible, réessaie.",
     "k.mapOpen": "Où as-tu mal ? Montrer le schéma", "k.mapClose": "Masquer le schéma", "k.zoneChip": "{zone} · {n}/10",
     "bilan.title": "Bilan de la consultation", "bilan.hyp": "Hypothèses", "bilan.urgent": "Drapeau rouge : consulte rapidement un médecin. Le kiné IA ne remplace pas un avis médical.", "bilan.exos": "Exercices", "bilan.charge": "Charge", "bilan.reprise": "Reprise",
@@ -85,6 +86,7 @@ const H: Record<string, Record<string, string>> = {
     "gd.name": "First & last name", "gd.namePh": "John Smith", "gd.phone": "Phone", "gd.saveContact": "Save contact", "gd.savedContact": "Contact saved.", "sec.saveFail": "Contact not saved — try again.", "sec.call": "Call",
     "sec.honest": "Pacevo doesn't detect falls and alerts nobody automatically: no app does without dedicated hardware. Your watch's incident detection (Garmin, Apple, Coros…) remains the reference — enable it there.",
     "sec.kit": "Before a mountain outing", "sec.k1": "Tell someone where you go and when you'll be back.", "sec.k2": "Charged phone, whistle, survival blanket, waterproof jacket.", "sec.k3": "Water and salt on long hot runs; drink to thirst.", "sec.k4": "Emergency numbers: 112 (Europe).", "sec.k5": "Light and reflective clothing from dusk.",
+    "k.etatQ": "{z} — how is it now?", "k.mieux": "Getting better", "k.pire": "Getting worse", "k.passe": "It's gone", "k.etatOk": "Noted — your coach takes it into account.", "k.etatPasse": "Noted: this pain no longer holds your plan back.", "k.etatErr": "Couldn't update. Try again.",
     "chat.new": "New consultation", "chat.newConfirm": "Clear the conversation? Your reported pains stay in your history.", "chat.resumed": "Previous consultation resumed — the physio remembers your exchanges.", "chat.newFail": "Couldn't clear, try again.",
     "k.mapOpen": "Where does it hurt? Show the body map", "k.mapClose": "Hide the body map", "k.zoneChip": "{zone} · {n}/10",
     "bilan.title": "Consultation summary", "bilan.hyp": "Hypotheses", "bilan.urgent": "Red flag: see a doctor promptly. The AI physio is no substitute for medical advice.", "bilan.exos": "Exercises", "bilan.charge": "Load", "bilan.reprise": "Return",
@@ -127,6 +129,7 @@ const H: Record<string, Record<string, string>> = {
     "gd.name": "Vor- & Nachname", "gd.namePh": "Max Mustermann", "gd.phone": "Telefon", "gd.saveContact": "Kontakt speichern", "gd.savedContact": "Kontakt gespeichert.", "sec.saveFail": "Kontakt nicht gespeichert — bitte erneut versuchen.", "sec.call": "Anrufen",
     "sec.honest": "Pacevo erkennt keine Stürze und alarmiert niemanden automatisch: Das tut keine App ohne spezielle Hardware. Die Unfallerkennung deiner Uhr (Garmin, Apple, Coros…) bleibt die Referenz — aktiviere sie dort.",
     "sec.kit": "Vor einer Bergtour", "sec.k1": "Sag jemandem, wohin du gehst und wann du zurück bist.", "sec.k2": "Geladenes Handy, Pfeife, Rettungsdecke, wasserdichte Jacke.", "sec.k3": "Wasser und Salz auf langen Läufen bei Hitze; nach Durst trinken.", "sec.k4": "Notrufnummern: 112 (Europa).", "sec.k5": "Lampe und reflektierende Kleidung ab der Dämmerung.",
+    "k.etatQ": "{z} — wie ist es jetzt?", "k.mieux": "Wird besser", "k.pire": "Wird schlimmer", "k.passe": "Ist weg", "k.etatOk": "Notiert — dein Coach berücksichtigt es.", "k.etatPasse": "Notiert: dieser Schmerz bremst deinen Plan nicht mehr.", "k.etatErr": "Aktualisierung nicht möglich. Versuch es nochmal.",
     "chat.new": "Neue Konsultation", "chat.newConfirm": "Gespräch löschen? Deine gemeldeten Schmerzen bleiben in deinem Verlauf.", "chat.resumed": "Vorherige Konsultation fortgesetzt — der Physio erinnert sich an eure Gespräche.", "chat.newFail": "Löschen nicht möglich, bitte erneut versuchen.",
     "k.mapOpen": "Wo tut es weh? Körperschema zeigen", "k.mapClose": "Körperschema ausblenden", "k.zoneChip": "{zone} · {n}/10",
     "bilan.title": "Bilanz der Konsultation", "bilan.hyp": "Hypothesen", "bilan.urgent": "Rote Flagge: Geh zeitnah zum Arzt. Der KI-Physio ersetzt keinen ärztlichen Rat.", "bilan.exos": "Übungen", "bilan.charge": "Belastung", "bilan.reprise": "Wiedereinstieg",
@@ -169,6 +172,7 @@ const H: Record<string, Record<string, string>> = {
     "gd.name": "Nombre y apellidos", "gd.namePh": "Juan Pérez", "gd.phone": "Teléfono", "gd.saveContact": "Guardar contacto", "gd.savedContact": "Contacto guardado.", "sec.saveFail": "Contacto no guardado — inténtalo de nuevo.", "sec.call": "Llamar",
     "sec.honest": "Pacevo no detecta caídas ni avisa a nadie automáticamente: ninguna aplicación lo hace sin el material dedicado. La detección de incidentes de tu reloj (Garmin, Apple, Coros…) sigue siendo la referencia — actívala allí.",
     "sec.kit": "Antes de una salida de montaña", "sec.k1": "Di a alguien adónde vas y cuándo vuelves.", "sec.k2": "Móvil cargado, silbato, manta térmica, chaqueta impermeable.", "sec.k3": "Agua y sal en las tiradas largas con calor; bebe según la sed.", "sec.k4": "Números de emergencia: 112 (Europa).", "sec.k5": "Luz y ropa reflectante desde el anochecer.",
+    "k.etatQ": "{z}: ¿cómo va?", "k.mieux": "Va mejor", "k.pire": "Va peor", "k.passe": "Ya pasó", "k.etatOk": "Anotado: tu entrenador lo tiene en cuenta.", "k.etatPasse": "Anotado: este dolor ya no frena tu plan.", "k.etatErr": "No se pudo actualizar. Reinténtalo.",
     "chat.new": "Nueva consulta", "chat.newConfirm": "¿Borrar la conversación? Tus dolores declarados siguen en tu historial.", "chat.resumed": "Consulta anterior retomada — el fisio recuerda vuestros intercambios.", "chat.newFail": "No se pudo borrar, inténtalo de nuevo.",
     "k.mapOpen": "¿Dónde te duele? Mostrar el esquema", "k.mapClose": "Ocultar el esquema", "k.zoneChip": "{zone} · {n}/10",
     "bilan.title": "Balance de la consulta", "bilan.hyp": "Hipótesis", "bilan.urgent": "Bandera roja: consulta pronto a un médico. El fisio IA no sustituye un consejo médico.", "bilan.exos": "Ejercicios", "bilan.charge": "Carga", "bilan.reprise": "Vuelta",
@@ -211,6 +215,7 @@ const H: Record<string, Record<string, string>> = {
     "gd.name": "Nome completo", "gd.namePh": "João Silva", "gd.phone": "Telefone", "gd.saveContact": "Guardar contacto", "gd.savedContact": "Contacto guardado.", "sec.saveFail": "Contacto não guardado — tenta de novo.", "sec.call": "Ligar",
     "sec.honest": "A Pacevo não deteta quedas nem alerta ninguém automaticamente: nenhuma aplicação o faz sem o material dedicado. A deteção de incidentes do teu relógio (Garmin, Apple, Coros…) continua a ser a referência — ativa-a lá.",
     "sec.kit": "Antes de uma saída de montanha", "sec.k1": "Diz a alguém para onde vais e quando voltas.", "sec.k2": "Telemóvel carregado, apito, manta térmica, casaco impermeável.", "sec.k3": "Água e sal nas saídas longas com calor; bebe pela sede.", "sec.k4": "Números de emergência: 112 (Europa).", "sec.k5": "Luz e roupa refletora desde o anoitecer.",
+    "k.etatQ": "{z} — como está agora?", "k.mieux": "Está melhor", "k.pire": "Está pior", "k.passe": "Já passou", "k.etatOk": "Registado — o teu treinador tem isso em conta.", "k.etatPasse": "Registado: esta dor já não trava o teu plano.", "k.etatErr": "Não foi possível atualizar. Tenta de novo.",
     "chat.new": "Nova consulta", "chat.newConfirm": "Apagar a conversa? As tuas dores declaradas ficam no teu histórico.", "chat.resumed": "Consulta anterior retomada — o fisio lembra-se das vossas trocas.", "chat.newFail": "Não foi possível apagar, tenta de novo.",
     "k.mapOpen": "Onde te dói? Mostrar o esquema", "k.mapClose": "Esconder o esquema", "k.zoneChip": "{zone} · {n}/10",
     "bilan.title": "Balanço da consulta", "bilan.hyp": "Hipóteses", "bilan.urgent": "Bandeira vermelha: consulta rapidamente um médico. O fisio IA não substitui um parecer médico.", "bilan.exos": "Exercícios", "bilan.charge": "Carga", "bilan.reprise": "Retoma",
@@ -332,8 +337,10 @@ function AnimatedNumber({ value, className }: { value: number; className?: strin
   return <span className={className}>{display.toLocaleString()}</span>;
 }
 
-export function HealthCenter({ suivi = [], enPanne = false, filInitial = [], contactInitial = { nom: "", tel: "" } }: {
+export function HealthCenter({ suivi = [], etats = [], enPanne = false, filInitial = [], contactInitial = { nom: "", tel: "" } }: {
   suivi?: SuiviZone[];
+  /** Pour chaque zone, la déclaration la plus récente et son état déclaré. */
+  etats?: { cle: string; id: string; etat: string }[];
   /** La lecture des douleurs a ÉCHOUÉ : l'historique est vide par accident. */
   enPanne?: boolean;
   /** La consultation précédente, relue côté serveur (type `kine_chat`). */
@@ -348,6 +355,34 @@ export function HealthCenter({ suivi = [], enPanne = false, filInitial = [], con
   const tr: Tr = (k, p) => fill(H[lang]?.[k] ?? H.fr[k] ?? k, p);
   const [tab, setTab] = useState<Tab>("kine");
   const [view, setView] = useState<"face" | "dos">("face");
+  /** États mis à jour depuis cet écran, avant le prochain chargement de la page. */
+  const [majEtats, setMajEtats] = useState<Record<string, string>>({});
+  const [enCours, setEnCours] = useState<string | null>(null);
+
+  /**
+   * « Ça va mieux », « ça empire », « c'est passé ».
+   *
+   * ⚠️ ON N'AFFICHE LE CHANGEMENT QU'UNE FOIS ÉCRIT. Une mise à jour optimiste
+   * afficherait « c'est passé » alors que le serveur a refusé — et l'athlète croirait
+   * que son plan va se rouvrir alors qu'il restera allégé.
+   */
+  async function majEtatDouleur(id: string, etat: string) {
+    setEnCours(id);
+    try {
+      const r = await fetch("/api/health/douleur", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, etat }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j?.ok) { toast.error(tr("k.etatErr")); return; }
+      setMajEtats((m) => ({ ...m, [id]: etat }));
+      toast.success(tr(etat === "resolu" ? "k.etatPasse" : "k.etatOk"));
+    } catch {
+      toast.error(tr("k.etatErr"));
+    } finally {
+      setEnCours(null);
+    }
+  }
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [painLevel, setPainLevel] = useState(5);
   const [emergencyName, setEmergencyName] = useState(contactInitial.nom);
@@ -691,6 +726,36 @@ export function HealthCenter({ suivi = [], enPanne = false, filInitial = [], con
                           <span className={`rounded-lg px-1.5 py-0.5 text-[10px] font-semibold ring-1 ${ton[z.tendance]}`}>
                             {tr("trend." + z.tendance)}
                           </span>
+                        </div>
+                      );
+                    })}
+                    {/* ══ CE QUE L'ATHLÈTE PEUT EN DIRE ═══════════════════════════════
+                        ⚠️ Une douleur déclarée ne pouvait pas être retirée : elle ne
+                        s'éteignait QUE par péremption, au bout de 14 jours, en retirant de
+                        l'intensité à chaque replanification. Cyprien en avait déclaré une
+                        POUR TESTER (23/09/2026) et son plan a été allégé pour rien.
+                        « Ça va mieux » NE L'EFFACE PAS : une gêne qui s'améliore reste une
+                        gêne, et la faire disparaître du budget de qualité rendrait la
+                        séance dure le jour même. Seul « c'est passé » l'éteint. */}
+                    {suivi.slice(0, 5).map((z) => {
+                      const e = etats.find((x) => x.cle === z.cle);
+                      if (!e) return null;
+                      const courant = majEtats[e.id] ?? e.etat;
+                      if (courant === "resolu") return null;
+                      return (
+                        <div key={`etat-${e.id}`} className="-mt-0.5 flex flex-wrap items-center gap-1.5 px-2.5 pb-1">
+                          <span className="text-[11px] text-zinc-400">{tr("k.etatQ", { z: z.zone })}</span>
+                          {([["mieux", "k.mieux"], ["pire", "k.pire"], ["resolu", "k.passe"]] as const).map(([val, cle]) => (
+                            <button key={val} type="button" disabled={enCours === e.id}
+                              onClick={() => majEtatDouleur(e.id, val)}
+                              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 transition-colors disabled:opacity-50 ${
+                                courant === val ? "bg-zinc-900 text-white ring-zinc-900"
+                                : val === "resolu" ? "bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100"
+                                : val === "pire" ? "bg-red-50 text-red-700 ring-red-200 hover:bg-red-100"
+                                : "bg-white text-zinc-600 ring-zinc-200 hover:bg-zinc-50"}`}>
+                              {tr(cle)}
+                            </button>
+                          ))}
                         </div>
                       );
                     })}
