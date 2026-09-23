@@ -283,6 +283,34 @@ console.log(`  ✓ e-mail : ${rendus} rendus (${LANGS.length} langues × ${LIENS
   z += 8;
   console.log(`  ✓ réinitialisation : ${z} cas (e-mail 6 langues, route recovery, /auth/confirm, page)`);
 
-  console.log(`\n${NON.length + rendus + n + m + c + z} cas hostiles · ${ko} problème(s)`);
+  // ── L'ALERTE « NOUVEL INSCRIT » NE DOIT SONNER QU'UNE FOIS, ET POUR UN VRAI NOUVEAU ──
+  // ⚠️ Le commentaire d'origine affirmait qu'on ne pouvait pas prévenir deux fois « le
+  // lien étant à usage unique ». C'est faux : chaque lien REGÉNÉRÉ est un nouveau jeton.
+  // Cyprien a reçu plusieurs « nouvel inscrit : Cyprien Dumez » pour son propre compte,
+  // créé des mois plus tôt (23/09/2026) — une connexion par lien suffisait.
+  let a = 0;
+  const conf = readFileSync("src/app/auth/confirm/route.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  if (!/const creeA = Date\.parse\(String\(profil\?\.created_at \?\? ""\)\)/.test(conf))
+    fail("l'âge du compte n'est plus lu", "une connexion des mois plus tard repasserait pour une inscription");
+  if (!/Date\.now\(\) - creeA > FENETRE_INSCRIPTION_MS\) return;/.test(conf))
+    fail("la fenêtre d'inscription ne borne plus l'alerte", "tout lien de connexion réveillerait l'alerte");
+  if (!/\.eq\("type", "alerte_inscription"\)/.test(conf))
+    fail("la trace d'alerte n'est plus relue", "un renvoi de confirmation referait sonner l'alerte");
+  if (!/if \(dejaDit\) return;/.test(conf))
+    fail("la trace est lue mais pas utilisée", "calculer un garde-fou sans s'en servir ne change rien");
+  // ⚠️ La trace s'écrit AVANT l'envoi : après, un envoi lent puis rejoué laisserait
+  // passer un doublon.
+  const iTrace = conf.indexOf('type: "alerte_inscription", title:');
+  const iEnvoi = conf.indexOf('await envoyerEmail("inscription"');
+  if (iTrace < 0) fail("la trace d'alerte n'est plus écrite", "l'alerte pourrait sonner à chaque confirmation");
+  else if (iEnvoi > 0 && iTrace > iEnvoi) fail("la trace s'écrit APRÈS l'envoi", "un envoi rejoué passerait deux fois");
+  // Et le lien d'inscription de l'application reste un vrai lien d'inscription.
+  if (!/type=signup&next=\/onboarding/.test(readFileSync("src/app/api/auth/confirmation/route.ts", "utf8")))
+    fail("le lien de confirmation ne porte plus type=signup", "");
+  a += 6;
+  console.log(`  ✓ alerte nouvel inscrit : ${a} cas (âge du compte, trace unique, ordre d'écriture)`);
+
+  console.log(`\n${NON.length + rendus + n + m + c + z + a} cas hostiles · ${ko} problème(s)`);
   process.exit(ko ? 1 : 0);
 })();
