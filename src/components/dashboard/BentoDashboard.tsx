@@ -530,7 +530,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
           <div className="absolute inset-0" style={{ background: "linear-gradient(to right, #eef6ff 0%, rgba(238,246,255,0.45) 26%, rgba(238,246,255,0) 64%)" }} />
         </div>
         <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[#0ea5e9]/10 blur-3xl" />
-        <div className="relative z-10 flex flex-wrap items-center justify-between gap-x-10 gap-y-4 px-5 py-5 sm:gap-y-7 sm:px-9 sm:py-8 xl:pr-[34%]">
+        <div className="relative z-10 flex flex-wrap items-center justify-between gap-x-10 gap-y-3 px-5 py-4 sm:gap-y-7 sm:px-9 sm:py-8 xl:pr-[34%]">
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#6e8a86] first-letter:uppercase">
               {jourAujourdhui
@@ -562,8 +562,13 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
             </div>
           </div>
           {objective && objDaysTo != null && objDaysTo >= 0 ? (
-            <div className="flex items-center gap-4 sm:gap-5">
-              <div className="relative h-16 w-16 flex-shrink-0 sm:h-[92px] sm:w-[92px]">
+            /* ⚠️ SUR TÉLÉPHONE, UNE SEULE LIGNE CLIQUABLE. Empilé, ce bloc faisait 124 px
+               (anneau, J‑32, libellé, nom de course, date, bouton) et poussait la séance du
+               jour hors de l'écran. Il devient une rangée : anneau 56 px, deux lignes de
+               texte, un chevron — et la rangée ENTIÈRE mène au plan, ce que seul le bouton
+               faisait avant. À partir de `sm`, rien ne change. */
+            <Link href="/dashboard/calendrier" className="group/obj -mx-1 flex w-full items-center gap-3 rounded-2xl px-1 py-1 transition-colors active:bg-white/40 sm:mx-0 sm:w-auto sm:gap-5 sm:px-0 sm:py-0">
+              <div className="relative h-14 w-14 flex-shrink-0 sm:h-[92px] sm:w-[92px]">
                 <svg className="h-full w-full -rotate-90" viewBox="0 0 92 92">
                   <circle cx="46" cy="46" r="40" fill="none" stroke="#e3eef0" strokeWidth="7" />
                   <circle cx="46" cy="46" r="40" fill="none" stroke="#059669" strokeWidth="7" strokeLinecap="round"
@@ -575,16 +580,23 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
                   <span className="mt-0.5 hidden text-[8px] font-semibold uppercase tracking-[0.12em] text-[#8aa6a6] sm:mt-1 sm:block">{hl.prep}</span>
                 </div>
               </div>
-              <div className="min-w-0">
-                <div className="text-[1.6rem] font-black leading-none tabular-nums text-[#11201d] sm:text-[2.25rem]">J‑{objDaysTo}</div>
-                <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8aa6a6] sm:mt-1.5">{hl.goal}</div>
-                <div className="truncate text-sm font-bold text-[#11201d]">{objective.race}</div>
+              <div className="min-w-0 flex-1">
+                {/* Le libellé « Objectif » ne tient pas sur téléphone : le J‑32 et le nom de
+                    la course le disent déjà. */}
+                <div className="hidden text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8aa6a6] sm:mt-1.5 sm:block">{hl.goal}</div>
+                <div className="flex items-baseline gap-2 sm:block">
+                  <span className="text-[1.5rem] font-black leading-none tabular-nums text-[#11201d] sm:text-[2.25rem]">J‑{objDaysTo}</span>
+                  <span className="min-w-0 truncate text-sm font-bold text-[#11201d] sm:mt-1 sm:block">{objective.race}</span>
+                </div>
                 <div className="text-xs text-[#5f7d79]">{formatDateCivile(objective.raceDate, lang, { day: "numeric", month: "long", year: "numeric" })}</div>
-                <Link href="/dashboard/calendrier" className="mt-2 inline-flex items-center gap-1.5 rounded-xl bg-[#11201d] px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#0b1714] sm:mt-2.5 sm:px-3.5 sm:py-2">
+                {/* Un habillage, plus un lien : la rangée entière mène déjà au plan, et un
+                    lien dans un lien est du HTML invalide. */}
+                <span className="mt-2.5 hidden items-center gap-1.5 rounded-xl bg-[#11201d] px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors group-hover/obj:bg-[#0b1714] sm:inline-flex sm:px-3.5 sm:py-2">
                   {hl.plan} <ChevronRight className="h-3.5 w-3.5" />
-                </Link>
+                </span>
               </div>
-            </div>
+              <ChevronRight className="h-5 w-5 flex-shrink-0 text-[#8aa6a6] sm:hidden" aria-hidden />
+            </Link>
           ) : (
             <div className="flex flex-wrap gap-x-7 gap-y-4 sm:gap-x-9">
               {heroStats.map((s) => (
@@ -692,7 +704,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
             <div className="mb-3 flex items-center justify-between gap-3">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/20 backdrop-blur-md">
                 <Trophy className="h-3.5 w-3.5 text-amber-300" />
-                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-50">{t("dash.coach.badge")}</span>
+                <span className="whitespace-nowrap text-[11px] font-bold uppercase tracking-[0.16em] text-amber-50">{t("dash.coach.badge")}</span>
               </span>
               <Link href="/dashboard/calendrier" title={t("dash.viewCalendar")}
                 className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/15 backdrop-blur-md transition-colors hover:bg-white/25">
@@ -711,13 +723,24 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
               </div>
             )}
 
+            {/* ⚠️ L'EXPLICATION SE REPLIE. Déployée, elle ajoutait ~110 px à une carte qui
+                en faisait déjà 478 sur un écran de 390 px : la séance du jour — la seule
+                chose sur laquelle on agit en ouvrant l'application — était coupée en deux.
+                La PRESCRIPTION reste entière et visible ; c'est le POURQUOI qui se déplie,
+                nommé par son intitulé pour qu'on sache ce qu'on ouvre.
+                `<details>` plutôt qu'un état React : pas de JavaScript, pas de différence
+                entre le rendu serveur et le navigateur. */}
             {coachKey.why && (
-              <div className="mt-4 flex items-start gap-3 border-t border-white/15 pt-3.5">
-                <span className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/15">
-                  <Target className="h-3.5 w-3.5 text-emerald-100" />
-                </span>
-                <p className="text-[13px] leading-relaxed text-white/80">{coachKey.why}</p>
-              </div>
+              <details className="group mt-4 border-t border-white/15 pt-3.5">
+                <summary className="flex cursor-pointer list-none items-center gap-2.5 text-[13px] font-semibold text-white/85 [&::-webkit-details-marker]:hidden">
+                  <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/15">
+                    <Target className="h-3.5 w-3.5 text-emerald-100" />
+                  </span>
+                  {t("dash.coach.pourquoi")}
+                  <ChevronRight className="h-4 w-4 text-white/60 transition-transform group-open:rotate-90" aria-hidden />
+                </summary>
+                <p className="mt-2.5 pl-[2.1rem] text-[13px] leading-relaxed text-white/80">{coachKey.why}</p>
+              </details>
             )}
           </div>
         </motion.div>

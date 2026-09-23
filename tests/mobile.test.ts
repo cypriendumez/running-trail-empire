@@ -242,6 +242,53 @@ test("plus d'emoji « personnage » pour les sports : des icônes en trait", () 
   assert.ok(!/\{act\.emoji\}|\{cfg\.emoji\}/.test(tb), "un emoji d'activité est encore rendu dans la carte");
 });
 
+test("l'accueil s'ouvre sur la séance du jour, pas sur une demande d'avis", () => {
+  // Cyprien, 23/09/2026, capture iPhone : « quand j'ouvre l'application on voit toute la
+  // page verte, et le dessus réduit ». MESURÉ AVANT en 390×844 : zone visible jusqu'à
+  // 758 px, carte verte de 478 px commençant à 528 — moins de la moitié à l'écran.
+  // Trois gains : la demande d'avis descend (−92), l'entête se compacte (−64),
+  // l'explication de la séance se replie (−110). APRÈS : verte 372→653, entière.
+  const page = codeNu("src/app/dashboard/page.tsx");
+  const iBento = page.indexOf("<BentoDashboard");
+  const iAvis = page.indexOf("<InviteAvis");
+  assert.ok(iBento > 0 && iAvis > 0, "la demande d'avis ou le tableau de bord a disparu de l'accueil");
+  assert.ok(iAvis > iBento, "la demande d'avis est repassée AVANT le contenu : elle repousse la séance du jour hors de l'écran");
+
+  const b = codeNu("src/components/dashboard/BentoDashboard.tsx");
+  // L'explication de la séance se replie — la PRESCRIPTION, elle, reste entière.
+  assert.match(b, /<details className="group mt-4 border-t border-white\/15 pt-3\.5">/, "l'explication de la séance ne se replie plus : la carte repasse à 478 px");
+  assert.match(b, /\{t\("dash\.coach\.pourquoi"\)\}/, "le repli n'est plus nommé : on ne sait pas ce qu'on ouvre");
+  // ⚠️ VISER LA BONNE CARTE : `coachKey.subtitle` existe dans DEUX variantes (compacte et
+  // complète). Une assertion sur le fichier entier se satisfait de l'autre — mutation
+  // passée au vert le 23/09/2026.
+  const iVerte = b.indexOf('order-first relative mb-5 overflow-hidden rounded-3xl p-5');
+  assert.ok(iVerte > 0, "la carte complète de la séance du jour a disparu");
+  const carte = b.slice(iVerte, b.indexOf("</motion.div>", iVerte));
+  assert.match(carte, /\{coachKey\.subtitle\}/, "la prescription a disparu de la carte — c'est elle qu'on vient lire");
+  assert.match(carte, /<details className="group mt-4/, "le repli n'est plus dans la carte complète");
+  // Le badge ne se coupe pas en deux sur un écran étroit.
+  assert.match(b, /whitespace-nowrap text-\[11px\] font-bold uppercase[^"]*">\{t\("dash\.coach\.badge"\)\}/, "le badge de la séance se coupe de nouveau sur deux lignes");
+  const n = [...readFileSync("src/lib/i18n/translations.ts", "utf8").matchAll(/"dash\.coach\.pourquoi":/g)].length;
+  assert.equal(n, 5, `« dash.coach.pourquoi » présent ${n} fois, attendu 5`);
+});
+
+test("l'objectif de l'entête tient sur une rangée — et reste UN seul lien", () => {
+  const b = codeNu("src/components/dashboard/BentoDashboard.tsx");
+  const i = b.indexOf('<Link href="/dashboard/calendrier" className="group/obj');
+  assert.ok(i > 0, "la rangée objectif n'est plus cliquable en entier sur téléphone");
+  const bloc = b.slice(i, i + 3600); // l'anneau SVG occupe à lui seul ~1,5 ko
+  // ⚠️ UN LIEN DANS UN LIEN EST DU HTML INVALIDE, et la première version mettait
+  // `pointer-events-none` sur la rangée — ce qui éteignait AUSSI le bouton à l'intérieur,
+  // donc « Voir mon plan » devenait mort sur ordinateur. Le bouton n'est plus qu'un
+  // habillage.
+  assert.ok(!/<Link/.test(bloc.slice(60)), "un lien est de nouveau imbriqué dans la rangée objectif : HTML invalide");
+  assert.ok(!/pointer-events-none/.test(bloc), "`pointer-events-none` est revenu sur la rangée : il éteint aussi ce qu'elle contient");
+  assert.match(bloc, /<span className="mt-2\.5 hidden items-center[^"]*sm:inline-flex/, "le bouton « Voir mon plan » n'est plus un habillage réservé au bureau");
+  // Sur téléphone : pas de libellé « Objectif », un chevron à la place du bouton.
+  assert.match(bloc, /className="hidden text-\[10px\] font-semibold uppercase[^"]*sm:block">\{hl\.goal\}/, "le libellé « Objectif » est revenu sur téléphone, où le J‑32 le dit déjà");
+  assert.match(bloc, /<ChevronRight className="h-5 w-5 flex-shrink-0 text-\[#8aa6a6\] sm:hidden"/, "le chevron qui signale que la rangée est cliquable a disparu");
+});
+
 test("« Enregistrer » ouvre sur la carte — sur TOUS les écrans — et les réglages en dessous", () => {
   // Cyprien, 21/09/2026 : « fais comme Strava avec la carte et laisse la personne aller
   // en bas avec tous les réglages qu'il y a déjà ». Puis, le 22/09/2026 devant son

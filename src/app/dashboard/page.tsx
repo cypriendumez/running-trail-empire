@@ -203,8 +203,12 @@ export default async function DashboardPage() {
 
   return (
     <>
+    {/* ⚠️ LA DEMANDE D'AVIS NE PASSE PLUS AVANT LA SÉANCE DU JOUR. Posée en tête, elle
+        occupait 92 px au-dessus de « Bonjour » et repoussait d'autant la carte verte —
+        la seule chose sur laquelle on agit en ouvrant l'application (Cyprien, 23/09/2026 :
+        « quand j'ouvre l'application on voit toute la page verte »). On demande un avis
+        APRÈS avoir rendu service, pas avant. */}
     <TestVmaBanner measured={vmaMesuree || estFondateur} />
-    <InviteAvis afficher={inviterAvis} />
     <BentoDashboard
       donneesIncompletes={donneesIncompletes}
       profile={stripProfileSecrets(profileRes.data)}
@@ -225,6 +229,7 @@ export default async function DashboardPage() {
       acces={acces}
       jourAujourdhui={streakToday}
     />
+    <InviteAvis afficher={inviterAvis} />
     </>
   );
 }
