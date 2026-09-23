@@ -188,8 +188,11 @@ test("le Ghost Runner n'utilise plus une FC max générique", () => {
   assert.match(src, /referencesFc\(\{/, "les références mesurées ne sont plus lues");
   assert.match(src, /plageFc\(intensite, refsFc\)/, "la cible n'est plus calculée");
   // …et elle doit PILOTER les bornes : calculer la cible sans s'en servir ne change rien.
-  assert.match(src, /hrLoRef\.current = cible \? cible\.lo/, "la borne basse ignore la cible resserrée");
-  assert.match(src, /hrHiRef\.current = cible \? cible\.hi/, "la borne haute ignore la cible resserrée");
+  // ⚠️ DEPUIS LA COURSE LIBRE (23/09/2026), la fourchette choisie par l'athlète passe
+  // DEVANT la cible calculée — mais seulement en libre. Hors libre, c'est toujours la
+  // cible resserrée qui pilote : l'assertion tient les deux branches d'un coup.
+  assert.match(src, /hrLoRef\.current = libre \? Math\.min\(fcLo, fcHi\) : cible \? cible\.lo/, "la borne basse ignore la cible resserrée (ou la fourchette libre)");
+  assert.match(src, /hrHiRef\.current = libre \? Math\.max\(fcLo, fcHi\) : cible \? cible\.hi/, "la borne haute ignore la cible resserrée (ou la fourchette libre)");
   const page = codeOf("src/app/dashboard/ghost-runner/page.tsx");
   assert.match(page, /gt\("max_hr", 150\)/, "la FC max observée n'est plus transmise, ou n'écarte plus les capteurs qui décrochent");
 });

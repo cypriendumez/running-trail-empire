@@ -76,6 +76,18 @@ const PRESETS = [
   { name: "Trail", goal: "25 km", distance: 25, targetTime: 10800 },
 ];
 
+/**
+ * Bornes des réglages LIBRES.
+ * ⚠️ L'allure d'objectif est bornée à 10:00/km, ce qui exclut la marche rapide et le
+ * trail en montée — deux allures parfaitement réelles. En libre on va jusqu'à 15:00.
+ * La fourchette cardiaque, elle, doit pouvoir descendre au repos et monter au-delà de
+ * la FC max théorique : c'est une mesure de l'athlète, pas une théorie.
+ */
+const PACE_LIBRE_MIN = 2.5;   // 2:30 /km
+const PACE_LIBRE_MAX = 15;    // 15:00 /km
+const FC_MIN = 80;
+const FC_MAX = 220;
+
 // Zones de fréquence cardiaque (% de la FC max) — noms traduits au rendu (clés hz.*).
 const HR_ZONES = [
   { z: 1, lo: 0.50, hi: 0.60 },
@@ -198,6 +210,26 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
   const [targetTime, setTargetTime] = useState(3600); // seconds
   const [elevation, setElevation] = useState(0);
   const [targetMode, setTargetMode] = useState<"pace" | "hr">("pace");
+  /**
+   * ── COURSE LIBRE (Cyprien, 23/09/2026) ────────────────────────────────────
+   * « Il faut aussi permettre au client de courir à l'allure qu'il veut ou la fréquence
+   * cardiaque qu'il veut. » Jusqu'ici l'écran imposait un OBJECTIF : en allure, il fallait
+   * une distance ET un temps (l'allure n'existait que comme leur quotient) ; en cardio,
+   * il fallait choisir parmi cinq zones. Impossible de dire « je pars à 5:30 » sans
+   * s'engager sur une distance, ni « je reste entre 145 et 155 ».
+   *
+   * En mode libre : aucune distance, aucune durée, aucune fin automatique. Le coach tient
+   * la cible à la voix, et on arrête quand on veut — ce qui n'était jouable que depuis que
+   * le bouton « Arrêter » enregistre vraiment la course.
+   */
+  const [libre, setLibre] = useState(false);
+  const [paceLibre, setPaceLibre] = useState(6);      // min/km
+  const [fcLo, setFcLo] = useState(130);
+  const [fcHi, setFcHi] = useState(145);
+  /** Figé au départ : changer d'avis en courant ne doit pas changer la séance en cours. */
+  const libreRef = useRef(false);
+  /** Dernier kilomètre annoncé à la voix en mode libre (il n'y a pas de points de passage). */
+  const dernierKmDitRef = useRef(0);
   const [durationMin, setDurationMin] = useState(45);
   const [hrZone, setHrZone] = useState(2);
   const [audioEnabled, setAudioEnabled] = useState(true);
@@ -247,7 +279,11 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
   const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null); // écran allumé
   const wantLockRef = useRef(false);
 
-  const targetPace = distance > 0 ? targetTime / 60 / distance : 6; // min/km
+  // ⚠️ EN LIBRE, L'ALLURE EST LA DONNÉE, PAS LE QUOTIENT. Ailleurs elle se déduit de la
+  // distance et du temps visés ; en libre il n'y a ni l'une ni l'autre.
+  const targetPace = libre && targetMode === "pace"
+    ? paceLibre
+    : distance > 0 ? targetTime / 60 / distance : 6; // min/km
 
   // ── Contrôles « faciles » : on garde distance / allure / temps cohérents ──
   const setPaceMinKm = (p: number) => {
@@ -303,6 +339,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
 
   // Generate checkpoints every 1 km
   const buildCheckpoints = useCallback((): Checkpoint[] => {
+    if (libre) return []; // aucune distance visée : rien à jalonner
     return Array.from({ length: Math.floor(distance) }, (_, i) => {
       const km = i + 1;
       // Apply terrain factor for elevation
@@ -314,7 +351,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
         targetTime: km * pace * 60,
       };
     });
-  }, [distance, targetPace, elevation]);
+  }, [distance, targetPace, elevation, libre]);
 
   function speak(text: string) {
     if (!audioEnabled || typeof window === "undefined") return;
@@ -513,7 +550,16 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
     setCurrentKm(km);
     if (paceMinKm > 0 && isFinite(paceMinKm)) setCurrentPace(paceMinKm);
     const el = elapsedRef.current;
-    if (km > 0) setPredictedFinish((el / km) * distance);
+    if (!libreRef.current && km > 0) setPredictedFinish((el / km) * distance);
+    // ⚠️ EN LIBRE, PERSONNE NE JALONNE LA COURSE : sans points de passage, la voix se
+    // tairait tout le long. On annonce donc chaque kilomètre entier avec l'allure tenue.
+    if (libreRef.current) {
+      const entier = Math.floor(km);
+      if (entier > dernierKmDitRef.current) {
+        dernierKmDitRef.current = entier;
+        if (audioEnabled) speak(tg("sp.kmLibre", { km: entier, p: formatPace(paceMinKm) }));
+      }
+    }
     let changed = false;
     cpsRef.current.forEach((cp) => {
       if (km >= cp.km && !cp.actualTime) {
@@ -527,7 +573,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
     });
     if (changed) setCheckpoints([...cpsRef.current]);
     // En mode FC, la distance est un bonus (GPS) : la fin est pilotée par la DURÉE.
-    if (sessionKindRef.current === "pace" && km >= distance) finishSession();
+    if (sessionKindRef.current === "pace" && !libreRef.current && km >= distance) finishSession();
   }
 
   // Position GPS réelle (téléphone/montre) → distance + vitesse réelles.
@@ -624,6 +670,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
   // ── Séance FC guidée EN DIRECT (durée + zone cible) — annonces vocales, capteur optionnel ──
   function startHrSession() {
     sessionKindRef.current = "hr"; setSessionKind("hr");
+    libreRef.current = libre; dernierKmDitRef.current = 0;
     cpsRef.current = []; setCheckpoints([]);
     elapsedRef.current = 0; kmRef.current = 0; pausedRef.current = false; lastPosRef.current = null;
     trackRef.current = []; hrSumRef.current = 0; hrNRef.current = 0; hrOutRef.current = 0; lastHrCueRef.current = 0;
@@ -635,11 +682,14 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
     // la théorie — jamais l'inverse, sinon on validerait des footings trop rapides.
     const cible = intensite === "endurance" ? cibleEndurance(refsFc, fcFootings) : plageFc(intensite, refsFc);
     const z = HR_ZONES[hrZone - 1];
-    hrLoRef.current = cible ? cible.lo : Math.round(maxHr * z.lo);
-    hrHiRef.current = cible ? cible.hi : Math.round(maxHr * z.hi);
+    // ⚠️ EN LIBRE, C'EST L'ATHLÈTE QUI DONNE LA FOURCHETTE : ni zone, ni théorie.
+    hrLoRef.current = libre ? Math.min(fcLo, fcHi) : cible ? cible.lo : Math.round(maxHr * z.lo);
+    hrHiRef.current = libre ? Math.max(fcLo, fcHi) : cible ? cible.hi : Math.round(maxHr * z.hi);
     setPhase("running");
     wantLockRef.current = true; requestWakeLock();
-    speak(tg("sp.hrStart", { m: durationMin, z: zn(hrZone), lo: hrLoRef.current, hi: hrHiRef.current }));
+    speak(libre
+      ? tg("sp.hrStartLibre", { lo: hrLoRef.current, hi: hrHiRef.current })
+      : tg("sp.hrStart", { m: durationMin, z: zn(hrZone), lo: hrLoRef.current, hi: hrHiRef.current }));
 
     // GPS en bonus (distance réelle + tracé) — la fin de séance reste pilotée par la durée.
     if (typeof navigator !== "undefined" && navigator.geolocation) {
@@ -663,7 +713,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
       else if (el === Math.round(total / 2)) speakRef.current(tg("sp.half", { hr: liveHrRef.current ? tg("sp.halfHr", { hr: liveHrRef.current }) : "" }));
       else if (el === Math.round((3 * total) / 4)) speakRef.current(d["sp.q3"]);
       else if (total - el === 60) speakRef.current(d["sp.lastMin"]);
-      if (el >= total) finishHrSession();
+      if (!libreRef.current && el >= total) finishHrSession(); // en libre, aucune fin automatique
     }, 1000);
   }
 
@@ -674,13 +724,16 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
     intervalRef.current = null; watchIdRef.current = null;
     releaseWakeLock();
     const avg = hrNRef.current > 0 ? Math.round(hrSumRef.current / hrNRef.current) : null;
-    speak(tg("sp.hrFinish", { m: durationMin, z: zn(hrZone), avg: avg ? tg("sp.hrFinishAvg", { a: avg }) : "" }));
+    speak(libreRef.current
+      ? tg("sp.arret", { t: formatTime(elapsedRef.current) })
+      : tg("sp.hrFinish", { m: durationMin, z: zn(hrZone), avg: avg ? tg("sp.hrFinishAvg", { a: avg }) : "" }));
     setPhase("finished");
     if (modeRef.current === "live") saveRun(elapsedRef.current); // vraie sortie GPS → historique
   }
 
   function startSession() {
     sessionKindRef.current = "pace"; setSessionKind("pace");
+    libreRef.current = libre; dernierKmDitRef.current = 0;
     const cps = buildCheckpoints();
     cpsRef.current = cps;
     setCheckpoints(cps);
@@ -701,7 +754,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
     // d'urgence, c'était priver du partage ceux qui en ont le plus besoin — ceux qui
     // n'ont rien configuré.
     if (typeof window !== "undefined") setDepartPret(lienSuivi(window.location.origin, idp));
-    speak(tg("sp.start", { t: formatTime(targetTime), p: formatPace(targetPace) }));
+    speak(libre ? tg("sp.startLibre", { p: formatPace(paceLibre) }) : tg("sp.start", { t: formatTime(targetTime), p: formatPace(targetPace) }));
 
     // GPS réel si disponible (téléphone/montre), sinon mode démo.
     if (typeof navigator !== "undefined" && navigator.geolocation) {
@@ -916,12 +969,29 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
     { label: "VMA", lo: 0.92, hi: 1.00, tint: "#ef4444", Icon: Zap },
   ].map((z) => ({ ...z, paceSlow: 60 / (vma * z.lo), paceFast: 60 / (vma * z.hi) }));
 
+  /** La zone où tombe une allure, d'après SA VMA. Un fait, pas un conseil. */
+  const zoneDeLAllure = (p: number) => {
+    const b = zoneBands.find((z) => p <= z.paceSlow && p >= z.paceFast);
+    if (b) return b.label;
+    return p > zoneBands[0].paceSlow ? zoneBands[0].label : zoneBands[zoneBands.length - 1].label;
+  };
+
   // ── LE BLOC DE CHIFFRES POSÉ SUR LA CARTE (façon Strava) ────────────────────
   // Avant le départ il montre ce qu'on s'apprête à faire ; pendant la course, ce qu'on
   // fait. TROIS COLONNES, jamais plus : au-delà, plus rien ne se lit en courant.
   const dureeTotale = durationMin * 60;
   const chiffresCarte: { l: string; v: string; u?: string }[] =
-    phase === "setup"
+    phase === "setup" && libre
+      ? targetMode === "hr"
+        ? [
+            { l: d["sm.target"], v: `${Math.min(fcLo, fcHi)}–${Math.max(fcLo, fcHi)}`, u: "bpm" },
+            { l: d["lb.dur"], v: d["libre.valeur"] },
+          ]
+        : [
+            { l: d["lb.pace"], v: formatPace(paceLibre), u: "/km" },
+            { l: d["lb.dist"], v: d["libre.valeur"] },
+          ]
+      : phase === "setup"
       ? targetMode === "hr"
         ? [
             { l: d["lb.dur"], v: String(durationMin), u: "min" },
@@ -944,7 +1014,10 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
             { l: d["lb.dist"], v: currentKm.toFixed(2), u: "km" },
             { l: d["lv.curPace"], v: currentPace > 0 ? formatPace(currentPace) : "—", u: "/km" },
           ];
-  const titreCarte = seanceChargee ?? (phase === "setup" ? (targetMode === "hr" ? d["md.hr"] : d["md.pace"]) : d["hero"]);
+  const titreCarte = seanceChargee
+    ?? (phase === "setup"
+      ? `${targetMode === "hr" ? d["md.hr"] : d["md.pace"]}${libre ? ` · ${d["md.libre"]}` : ""}`
+      : d["hero"]);
 
   // ⚠️ DÉFINIES UNE FOIS, RENDUES À DEUX ENDROITS. Leur place change avec l'écran (en
   // ligne au-dessus du bloc sur téléphone, en colonne sur la carte sur ordinateur) mais
@@ -1121,7 +1194,9 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
           )}
           <div className="mx-auto max-w-lg rounded-[26px] md:mx-0 md:max-w-sm border border-black/5 bg-white/95 px-4 py-3 shadow-[0_20px_45px_-20px_rgba(9,9,11,0.55)] backdrop-blur">
             <p className="truncate text-center text-[13px] font-bold text-zinc-900">{titreCarte}</p>
-            <div className="mt-1.5 grid grid-cols-3">
+            {/* 2 colonnes en libre (rien d'imposé), 3 sinon. Classe dynamique impossible
+                avec Tailwind : la grille se donne en style. */}
+            <div className="mt-1.5 grid" style={{ gridTemplateColumns: `repeat(${chiffresCarte.length}, minmax(0, 1fr))` }}>
               {chiffresCarte.map((c) => (
                 <div key={c.l} className="min-w-0 text-center">
                   <div className="text-[22px] font-black leading-none tabular-nums text-zinc-900">
@@ -1245,7 +1320,53 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
               ))}
             </div>
 
-            {targetMode === "pace" ? (
+            {/* ══ OBJECTIF OU LIBRE ═════════════════════════════════════════════════
+                L'écran n'offrait que des objectifs : une distance ET un temps en allure,
+                une des cinq zones en cardio. On ne pouvait pas simplement partir courir à
+                l'allure de son choix, ni tenir une fourchette de battements à soi. */}
+            <div className="mb-4 flex flex-wrap items-center gap-3">
+              <div className="flex gap-1 rounded-2xl bg-zinc-100 p-1">
+                {([[false, d["md.objectif"]], [true, d["md.libre"]]] as const).map(([v, l]) => (
+                  <button key={String(v)} onClick={() => setLibre(v)}
+                    className={`rounded-xl px-4 py-2 text-sm font-semibold transition-all ${libre === v ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+              {libre && (
+                <p className="min-w-0 flex-1 text-[12px] leading-snug text-zinc-500">
+                  {targetMode === "pace" ? d["libre.explPace"] : d["libre.explHr"]}
+                </p>
+              )}
+            </div>
+
+            {targetMode === "pace" && libre ? (
+            /* ── ALLURE LIBRE : une seule chose à régler, l'allure ── */
+            <div className="mb-6 rounded-3xl border border-emerald-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_40px_-26px_rgba(16,24,40,0.2)]">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-600"><Zap className="h-3.5 w-3.5" /> {d["lb.paceLibre"]}</label>
+                <div className="flex gap-1">
+                  <button onClick={() => setPaceLibre((v) => Math.min(PACE_LIBRE_MAX, Math.round((v + 1 / 12) * 120) / 120))} aria-label="−" className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 font-bold text-zinc-600 transition-colors hover:bg-emerald-600 hover:text-white">−</button>
+                  <button onClick={() => setPaceLibre((v) => Math.max(PACE_LIBRE_MIN, Math.round((v - 1 / 12) * 120) / 120))} aria-label="+" className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 font-bold text-zinc-600 transition-colors hover:bg-emerald-600 hover:text-white">+</button>
+                </div>
+              </div>
+              <div className="mb-3 mt-1 text-5xl font-black tabular-nums text-zinc-900">{formatPace(paceLibre)}<span className="ml-1 text-base font-semibold text-zinc-400">/km</span></div>
+              {/* ⚠️ JUSQU'À 15:00/km : le curseur d'objectif s'arrête à 10:00, ce qui exclut
+                  la marche rapide et le trail en montée — deux allures parfaitement réelles. */}
+              <input aria-label={d["lb.paceLibre"]} type="range" min={PACE_LIBRE_MIN} max={PACE_LIBRE_MAX} step={1 / 60}
+                value={paceLibre} onChange={(e) => setPaceLibre(parseFloat(e.target.value))} className="w-full accent-emerald-600" />
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {[4, 4.5, 5, 5.5, 6, 6.5, 7, 8].map((v) => (
+                  <button key={v} onClick={() => setPaceLibre(v)}
+                    className={`rounded-lg px-2 py-0.5 text-xs font-semibold transition-colors ${Math.abs(paceLibre - v) < 0.005 ? "bg-emerald-600 text-white" : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"}`}>
+                    {formatPace(v)}
+                  </button>
+                ))}
+              </div>
+              {/* La zone correspondante est un FAIT calculé sur sa VMA, pas un conseil. */}
+              <p className="mt-3 text-[11px] text-zinc-400">{tg("libre.zone", { z: zoneDeLAllure(paceLibre) })} · {tg("libre.vma", { v: vma })}</p>
+            </div>
+            ) : targetMode === "pace" ? (
             <>
             {/* Presets — objectifs classiques, avec allure requise et faisabilité vs ta VMA */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
@@ -1364,6 +1485,50 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
               <p className="mt-3 text-[11px] text-zinc-400">{d["ref.hint"]}</p>
             </div>
             </>
+            ) : libre ? (
+            /* ── FRÉQUENCE CARDIAQUE LIBRE : la fourchette qu'on veut, en battements ── */
+            <div className="mb-6 rounded-3xl border border-rose-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_40px_-26px_rgba(16,24,40,0.2)]">
+              <label className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-rose-600"><Heart className="h-3.5 w-3.5" /> {d["lb.fcLibre"]}</label>
+              <div className="mb-3 mt-1 text-5xl font-black tabular-nums text-zinc-900">{Math.min(fcLo, fcHi)}<span className="mx-1 text-2xl text-zinc-300">–</span>{Math.max(fcLo, fcHi)}<span className="ml-1 text-base font-semibold text-zinc-400">bpm</span></div>
+              <div className="grid grid-cols-2 gap-4">
+                {([["lo", fcLo, setFcLo], ["hi", fcHi, setFcHi]] as const).map(([cle, val, set]) => (
+                  <div key={cle}>
+                    <div className="mb-1 flex items-center justify-between">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{cle === "lo" ? d["libre.bas"] : d["libre.haut"]}</span>
+                      <div className="flex gap-1">
+                        <button onClick={() => set((v) => Math.max(FC_MIN, v - 1))} aria-label={`− ${cle}`} className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-xs font-bold text-zinc-600 hover:bg-rose-500 hover:text-white">−</button>
+                        <button onClick={() => set((v) => Math.min(FC_MAX, v + 1))} aria-label={`+ ${cle}`} className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-xs font-bold text-zinc-600 hover:bg-rose-500 hover:text-white">+</button>
+                      </div>
+                    </div>
+                    <input aria-label={cle === "lo" ? d["libre.bas"] : d["libre.haut"]} type="range" min={FC_MIN} max={FC_MAX} step={1}
+                      value={val} onChange={(e) => set(parseInt(e.target.value, 10))} className="w-full accent-rose-500" />
+                  </div>
+                ))}
+              </div>
+              {/* Les zones restent là comme RACCOURCIS : on ne les impose plus, on les propose. */}
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {HR_ZONES.map((z) => (
+                  <button key={z.z} onClick={() => { setFcLo(Math.round(maxHr * z.lo)); setFcHi(Math.round(maxHr * z.hi)); }}
+                    className="rounded-lg bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-500 transition-colors hover:bg-zinc-200">
+                    {zn(z.z)}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] text-zinc-400">{tg("hr.max", { n: Math.round(maxHr) })}</p>
+                {hrSensor === "on" ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700">
+                    <Bluetooth className="h-3 w-3" /> {d["hr.on"]}{liveHr != null ? ` · ${liveHr} bpm` : ""}
+                  </span>
+                ) : (
+                  <button onClick={connectHrSensor} disabled={hrSensor === "connecting"}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white transition-colors hover:bg-emerald-500 disabled:opacity-50">
+                    {hrSensor === "connecting" ? <Loader2 className="h-3 w-3 animate-spin" /> : <Bluetooth className="h-3 w-3" />}
+                    {d["hr.connect"]}
+                  </button>
+                )}
+              </div>
+            </div>
             ) : (
             /* ── Mode FRÉQUENCE CARDIAQUE : durée + zone cardiaque ── */
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
@@ -1421,7 +1586,14 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
             <div className="relative overflow-hidden rounded-3xl p-5 text-white shadow-xl shadow-emerald-900/30 ring-1 ring-white/10 flex flex-wrap items-center justify-between gap-4 mb-6" style={{ background: "linear-gradient(120deg,#064e3b 0%,#047857 48%,#0d9488 100%)" }}>
               <div className="pointer-events-none absolute -top-16 -right-10 h-44 w-44 rounded-full bg-emerald-300/20 blur-3xl" />
               <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
-              {targetMode === "pace" ? (
+              {libre ? (
+                <div className="flex items-center gap-6 sm:gap-8">
+                  {targetMode === "pace"
+                    ? <div><div className="text-emerald-100/80 text-sm mb-1">{d["lb.pace"]}</div><div className="text-2xl font-bold">{formatPace(paceLibre)} /km</div></div>
+                    : <div><div className="text-emerald-100/80 text-sm mb-1">{d["sm.target"]}</div><div className="text-2xl font-bold tabular-nums">{Math.min(fcLo, fcHi)}–{Math.max(fcLo, fcHi)} bpm</div></div>}
+                  <div><div className="text-emerald-100/80 text-sm mb-1">{targetMode === "pace" ? d["lb.dist"] : d["lb.dur"]}</div><div className="text-2xl font-bold">{d["libre.valeur"]}</div></div>
+                </div>
+              ) : targetMode === "pace" ? (
                 <div className="flex items-center gap-6 sm:gap-8">
                   <div><div className="text-emerald-100/80 text-sm mb-1">{d["lb.pace"]}</div><div className="text-2xl font-bold">{formatPace(targetPace)} /km</div></div>
                   <div><div className="text-emerald-100/80 text-sm mb-1">{d["lb.dist"]}</div><div className="text-2xl font-bold">{distance} km</div></div>
@@ -1435,6 +1607,12 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                 </div>
               )}
               <div className="flex items-center gap-3">
+                {/* ⚠️ RIEN À ENVOYER À LA MONTRE EN LIBRE : une séance planifiée chez
+                    intervals.icu a besoin d'une distance ou d'une durée. Plutôt que de
+                    fabriquer un objectif que l'athlète n'a pas donné, on le dit. */}
+                {libre ? (
+                  <p className="max-w-[16rem] text-[11px] leading-snug text-emerald-100/80">{d["libre.montre"]}</p>
+                ) : (
                 <button
                   onClick={sendToWatch}
                   disabled={sendingWatch}
@@ -1448,6 +1626,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                       className={`h-2 w-2 rounded-full ${watchStatus.pushReady ? "bg-emerald-400" : watchStatus.lecture ? "bg-sky-400" : watchStatus.connected ? "bg-amber-400" : "bg-zinc-400"}`} />
                   )}
                 </button>
+                )}
                 <button
                   onClick={() => (targetMode === "hr" ? startHrSession() : startSession())}
                   className="bg-white hover:bg-emerald-50 text-emerald-700 font-bold px-8 py-4 rounded-2xl flex items-center gap-3 text-lg shadow-md transition-all"
@@ -1628,8 +1807,8 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                   )}
                 </div>
 
-                {/* Avance / retard cumulé */}
-                {phase === "running" && Math.abs(timeDelta) > 3 && (
+                {/* Avance / retard cumulé — sur QUOI, en libre ? Rien n'est visé. */}
+                {phase === "running" && !libreRef.current && Math.abs(timeDelta) > 3 && (
                   <div className="mt-4 text-center text-base font-bold" style={{ color: isAhead ? "#047857" : "#c2410c" }}>
                     {isAhead ? tg("lv.aheadGoal", { t: formatTime(Math.abs(timeDelta)) }) : tg("lv.behindGoal", { t: formatTime(Math.abs(timeDelta)) })}
                   </div>
@@ -1645,6 +1824,16 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                     <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{d["lb.dist"]}</div>
                     <div className="mt-0.5 text-2xl sm:text-3xl font-extrabold tabular-nums text-zinc-900">{currentKm.toFixed(2)}<span className="text-sm text-zinc-300"> km</span></div>
                   </div>
+                  {/* ⚠️ PAS DE « FIN PRÉVUE » SANS DISTANCE VISÉE : ce serait un chiffre
+                      inventé. On montre à la place l'allure moyenne, qui, elle, se mesure. */}
+                  {libreRef.current ? (
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{d["lv.avgPace"]}</div>
+                    <div className="mt-0.5 text-2xl sm:text-3xl font-extrabold tabular-nums text-zinc-900">
+                      {currentKm > 0.05 ? formatPace(elapsed / 60 / currentKm) : "—"}<span className="ml-0.5 text-sm font-bold text-zinc-300">/km</span>
+                    </div>
+                  </div>
+                  ) : (
                   <div>
                     <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{d["lv.eta"]}</div>
                     <div className="mt-0.5 text-2xl sm:text-3xl font-extrabold tabular-nums flex items-center justify-center gap-1" style={{ color: isAhead ? "#047857" : isBehind ? "#c2410c" : "#0369a1" }}>
@@ -1652,9 +1841,11 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                       {isAhead ? <TrendingDown className="w-4 h-4" /> : isBehind ? <TrendingUp className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
                     </div>
                   </div>
+                  )}
                 </div>
 
-                {/* Progress bar fine & élégante */}
+                {/* Progress bar fine & élégante — masquée en libre : aucune fin à viser. */}
+                {!libreRef.current && (<>
                 <div className="relative mt-8 h-2 rounded-full bg-zinc-100 overflow-hidden">
                   <motion.div className="absolute left-0 top-0 h-full rounded-full" style={{ background: accent }} animate={{ width: `${progressPct}%` }} transition={{ duration: 0.5 }} />
                   <div className="absolute top-1/2 h-3.5 w-1 -translate-y-1/2 rounded-full" style={{ left: `calc(${Math.min(100, (elapsed / targetTime) * 100)}% - 2px)`, background: accent, boxShadow: `0 0 8px ${accent}66` }} />
@@ -1664,13 +1855,14 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                   <span>{(distance / 2).toFixed(1)} km</span>
                   <span>{distance} km</span>
                 </div>
+                </>)}
               </div>
             </div>
               );
             })()}
 
             {/* Checkpoints — mode allure uniquement (la séance FC est pilotée par la durée) */}
-            {sessionKind === "pace" && (
+            {sessionKind === "pace" && checkpoints.length > 0 && (
             <div className="bg-white rounded-2xl border border-zinc-200 p-5 mb-5">
               <h3 className="text-sm font-semibold text-zinc-700 mb-3 flex items-center gap-2">
                 <MapPin className="w-4 h-4" /> {d["cp.title"]}
