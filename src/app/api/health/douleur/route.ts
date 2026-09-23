@@ -1,6 +1,8 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { autoCoachForUser } from "@/lib/ai/autoCoach";
 import { etatValide } from "@/lib/health/douleurs";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
@@ -55,5 +57,25 @@ export async function POST(req: Request) {
     console.error("[santé] état de douleur non enregistré :", error.message);
     return NextResponse.json({ ok: false, error: "ecriture" }, { status: 500 });
   }
+  // ══ LE COACH DOIT LE PRENDRE EN COMPTE TOUT DE SUITE ═══════════════════════════
+  // ⚠️ LE MOTIF DE LA SÉANCE EST UN TEXTE FIGÉ, pas un calcul : il est écrit dans
+  // `coach_session.data.why` au moment où le plan est produit. Sans replanification, un
+  // athlète qui déclare « c'est passé » verrait son tableau de bord continuer d'afficher
+  // « aujourd'hui ton corps demande de la récupération : douleur en cours » — et il
+  // conclurait, à raison, que son geste n'a servi à rien. Mesuré en production le
+  // 23/09/2026, juste après avoir éteint la douleur.
+  //
+  // Même motif que `/api/vma` : best effort, le cron de nuit rattrape un échec. Le plan
+  // est DÉTERMINISTE (`autoPlan`), donc cette régénération ne consomme aucun appel d'IA.
+  const admin = createAdminClient();
+  const { data: creds } = await admin.from("profiles")
+    .select("intervals_athlete_id, intervals_api_key").eq("id", user.id).maybeSingle();
+  await autoCoachForUser(admin, {
+    userId: user.id,
+    athleteId: (creds?.intervals_athlete_id as string | null) ?? null,
+    apiKey: (creds?.intervals_api_key as string | null) ?? null,
+    notify: false, // l'athlète vient d'agir : il n'a pas besoin qu'on l'en prévienne par e-mail
+  }).catch((e) => console.error("[santé] replanification après changement de douleur :", e));
+
   return NextResponse.json({ ok: true, etat: valide });
 }

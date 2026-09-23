@@ -154,5 +154,45 @@ test("le coach et le kiné ignorent une douleur résolue", () => {
   assert.match(kine, /actives\(|libellesActifs\(/, "le kiné ressort encore une douleur que l'athlète a déclarée passée");
 });
 
+test("changer l'état d'une douleur replanifie tout de suite", () => {
+  // ⚠️ LE MOTIF DE LA SÉANCE EST UN TEXTE FIGÉ (`coach_session.data.why`), pas un calcul.
+  // Mesuré en production le 23/09/2026 : après avoir éteint la douleur, le tableau de bord
+  // affichait TOUJOURS « douleur en cours » comme motif du jour. Sans replanification,
+  // l'athlète conclut que son geste n'a servi à rien.
+  const r = codeNu("src/app/api/health/douleur/route.ts");
+  assert.match(r, /await autoCoachForUser\(admin, \{/, "changer l'état d'une douleur ne replanifie plus : le motif figé de la séance resterait celui d'hier");
+  assert.match(r, /notify: false/, "une replanification déclenchée par l'athlète lui envoie un e-mail : il vient d'agir, il le sait");
+  // Elle vient APRÈS l'écriture : replanifier sur une donnée pas encore écrite ne
+  // changerait rien, et masquerait l'échec de l'écriture.
+  const iEcrit = r.indexOf(".update({ data: fusion })");
+  // ⚠️ L'APPEL, PAS L'IMPORT : `import { autoCoachForUser }` est en tête de fichier et
+  // passerait donc toujours « avant » l'écriture.
+  const iPlan = r.indexOf("await autoCoachForUser(admin");
+  assert.ok(iEcrit > 0 && iPlan > iEcrit, "la replanification passe avant l'écriture de l'état");
+  // ⚠️ ON N'ÉCRIT QUE SUR SES PROPRES LIGNES : sans `user_id`, un identifiant suffirait
+  // à modifier le dossier de santé d'un autre.
+  assert.match(r, /\.update\(\{ data: fusion \}\)\.eq\("id", ligne\)\.eq\("user_id", user\.id\)/, "la mise à jour ne filtre plus sur le propriétaire de la ligne");
+  assert.match(r, /if \(!valide\)|!ligne \|\| !valide/, "un état quelconque est accepté par la route");
+});
+
+test("la table des abonnements push existe, avec le contrat que le code attend", () => {
+  // ⚠️ Le code du push est livré depuis le 13/09/2026 ; la table, non. Un athlète qui
+  // activait les notifications écrivait dans une table inexistante.
+  // ⚠️ SANS LES COMMENTAIRES : le fichier DOCUMENTE le contrat en tête, donc chercher
+  // « p256dh » dans le texte entier se satisfait de la documentation et laisse passer
+  // une colonne réellement absente (mutation restée verte le 23/09/2026).
+  const sql = readFileSync("supabase/migrations/031_push_subscriptions.sql", "utf8")
+    .split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
+  for (const col of ["user_id", "endpoint", "p256dh", "auth", "user_agent"]) {
+    assert.match(sql, new RegExp(`^\\s*${col}\\s+(uuid|text)`, "m"), `la colonne ${col} manque : le code l'écrit pourtant`);
+  }
+  // `onConflict: "endpoint"` EXIGE une contrainte d'unicité, sinon l'upsert échoue.
+  assert.match(sql, /endpoint\s+text not null unique/, "sans contrainte unique sur endpoint, l'upsert du code échoue");
+  assert.match(sql, /references auth\.users\(id\) on delete cascade/, "un compte supprimé laisserait ses abonnements derrière lui");
+  assert.match(sql, /enable row level security/, "une table de données personnelles reste ouverte par défaut");
+  const abo = codeNu("src/app/api/push/subscribe/route.ts");
+  assert.match(abo, /onConflict: "endpoint"/, "le code n'utilise plus endpoint comme clé de conflit : la contrainte unique ne correspond plus");
+});
+
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
 if (fails.length) process.exit(1);

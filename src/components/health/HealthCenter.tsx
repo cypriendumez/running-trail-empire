@@ -43,7 +43,7 @@ const H: Record<string, Record<string, string>> = {
     "gd.name": "Prénom Nom", "gd.namePh": "Jean Dupont", "gd.phone": "Téléphone", "gd.saveContact": "Enregistrer le contact", "gd.savedContact": "Contact enregistré.", "sec.saveFail": "Contact non enregistré — réessaie.", "sec.call": "Appeler",
     "sec.honest": "Pacevo ne détecte pas les chutes et n'alerte personne automatiquement : aucune application ne le fait sans le matériel dédié. La détection d'incident de ta montre (Garmin, Apple, Coros…) reste la référence — active-la là-bas.",
     "sec.kit": "Avant une sortie en montagne", "sec.k1": "Dis à quelqu'un où tu vas et quand tu rentres.", "sec.k2": "Téléphone chargé, sifflet, couverture de survie, veste imperméable.", "sec.k3": "Eau et sel sur les longues sorties par chaleur ; boire à la soif.", "sec.k4": "Numéros d'urgence : 112 (Europe), 15 SAMU, 18 pompiers.", "sec.k5": "Lampe et vêtement réfléchissant dès la pénombre.",
-    "k.etatQ": "{z} — où en es-tu ?", "k.mieux": "Ça va mieux", "k.pire": "Ça empire", "k.passe": "C'est passé", "k.etatOk": "C'est noté — ton coach en tient compte.", "k.etatPasse": "Noté : cette douleur ne bride plus ton plan.", "k.etatErr": "Mise à jour impossible. Réessaie.",
+    "k.annuler": "Annuler", "k.etatQ": "{z} — où en es-tu ?", "k.mieux": "Ça va mieux", "k.pire": "Ça empire", "k.passe": "C'est passé", "k.etatOk": "C'est noté — ton coach en tient compte.", "k.etatPasse": "Noté : cette douleur ne bride plus ton plan.", "k.etatErr": "Mise à jour impossible. Réessaie.",
     "chat.new": "Nouvelle consultation", "chat.newConfirm": "Effacer la conversation ? Tes douleurs déclarées restent dans ton suivi.", "chat.resumed": "Consultation précédente reprise — le kiné se souvient de vos échanges.", "chat.newFail": "Effacement impossible, réessaie.",
     "k.mapOpen": "Où as-tu mal ? Montrer le schéma", "k.mapClose": "Masquer le schéma", "k.zoneChip": "{zone} · {n}/10",
     "bilan.title": "Bilan de la consultation", "bilan.hyp": "Hypothèses", "bilan.urgent": "Drapeau rouge : consulte rapidement un médecin. Le kiné IA ne remplace pas un avis médical.", "bilan.exos": "Exercices", "bilan.charge": "Charge", "bilan.reprise": "Reprise",
@@ -86,7 +86,7 @@ const H: Record<string, Record<string, string>> = {
     "gd.name": "First & last name", "gd.namePh": "John Smith", "gd.phone": "Phone", "gd.saveContact": "Save contact", "gd.savedContact": "Contact saved.", "sec.saveFail": "Contact not saved — try again.", "sec.call": "Call",
     "sec.honest": "Pacevo doesn't detect falls and alerts nobody automatically: no app does without dedicated hardware. Your watch's incident detection (Garmin, Apple, Coros…) remains the reference — enable it there.",
     "sec.kit": "Before a mountain outing", "sec.k1": "Tell someone where you go and when you'll be back.", "sec.k2": "Charged phone, whistle, survival blanket, waterproof jacket.", "sec.k3": "Water and salt on long hot runs; drink to thirst.", "sec.k4": "Emergency numbers: 112 (Europe).", "sec.k5": "Light and reflective clothing from dusk.",
-    "k.etatQ": "{z} — how is it now?", "k.mieux": "Getting better", "k.pire": "Getting worse", "k.passe": "It's gone", "k.etatOk": "Noted — your coach takes it into account.", "k.etatPasse": "Noted: this pain no longer holds your plan back.", "k.etatErr": "Couldn't update. Try again.",
+    "k.annuler": "Undo", "k.etatQ": "{z} — how is it now?", "k.mieux": "Getting better", "k.pire": "Getting worse", "k.passe": "It's gone", "k.etatOk": "Noted — your coach takes it into account.", "k.etatPasse": "Noted: this pain no longer holds your plan back.", "k.etatErr": "Couldn't update. Try again.",
     "chat.new": "New consultation", "chat.newConfirm": "Clear the conversation? Your reported pains stay in your history.", "chat.resumed": "Previous consultation resumed — the physio remembers your exchanges.", "chat.newFail": "Couldn't clear, try again.",
     "k.mapOpen": "Where does it hurt? Show the body map", "k.mapClose": "Hide the body map", "k.zoneChip": "{zone} · {n}/10",
     "bilan.title": "Consultation summary", "bilan.hyp": "Hypotheses", "bilan.urgent": "Red flag: see a doctor promptly. The AI physio is no substitute for medical advice.", "bilan.exos": "Exercises", "bilan.charge": "Load", "bilan.reprise": "Return",
@@ -129,7 +129,7 @@ const H: Record<string, Record<string, string>> = {
     "gd.name": "Vor- & Nachname", "gd.namePh": "Max Mustermann", "gd.phone": "Telefon", "gd.saveContact": "Kontakt speichern", "gd.savedContact": "Kontakt gespeichert.", "sec.saveFail": "Kontakt nicht gespeichert — bitte erneut versuchen.", "sec.call": "Anrufen",
     "sec.honest": "Pacevo erkennt keine Stürze und alarmiert niemanden automatisch: Das tut keine App ohne spezielle Hardware. Die Unfallerkennung deiner Uhr (Garmin, Apple, Coros…) bleibt die Referenz — aktiviere sie dort.",
     "sec.kit": "Vor einer Bergtour", "sec.k1": "Sag jemandem, wohin du gehst und wann du zurück bist.", "sec.k2": "Geladenes Handy, Pfeife, Rettungsdecke, wasserdichte Jacke.", "sec.k3": "Wasser und Salz auf langen Läufen bei Hitze; nach Durst trinken.", "sec.k4": "Notrufnummern: 112 (Europa).", "sec.k5": "Lampe und reflektierende Kleidung ab der Dämmerung.",
-    "k.etatQ": "{z} — wie ist es jetzt?", "k.mieux": "Wird besser", "k.pire": "Wird schlimmer", "k.passe": "Ist weg", "k.etatOk": "Notiert — dein Coach berücksichtigt es.", "k.etatPasse": "Notiert: dieser Schmerz bremst deinen Plan nicht mehr.", "k.etatErr": "Aktualisierung nicht möglich. Versuch es nochmal.",
+    "k.annuler": "Rückgängig", "k.etatQ": "{z} — wie ist es jetzt?", "k.mieux": "Wird besser", "k.pire": "Wird schlimmer", "k.passe": "Ist weg", "k.etatOk": "Notiert — dein Coach berücksichtigt es.", "k.etatPasse": "Notiert: dieser Schmerz bremst deinen Plan nicht mehr.", "k.etatErr": "Aktualisierung nicht möglich. Versuch es nochmal.",
     "chat.new": "Neue Konsultation", "chat.newConfirm": "Gespräch löschen? Deine gemeldeten Schmerzen bleiben in deinem Verlauf.", "chat.resumed": "Vorherige Konsultation fortgesetzt — der Physio erinnert sich an eure Gespräche.", "chat.newFail": "Löschen nicht möglich, bitte erneut versuchen.",
     "k.mapOpen": "Wo tut es weh? Körperschema zeigen", "k.mapClose": "Körperschema ausblenden", "k.zoneChip": "{zone} · {n}/10",
     "bilan.title": "Bilanz der Konsultation", "bilan.hyp": "Hypothesen", "bilan.urgent": "Rote Flagge: Geh zeitnah zum Arzt. Der KI-Physio ersetzt keinen ärztlichen Rat.", "bilan.exos": "Übungen", "bilan.charge": "Belastung", "bilan.reprise": "Wiedereinstieg",
@@ -172,7 +172,7 @@ const H: Record<string, Record<string, string>> = {
     "gd.name": "Nombre y apellidos", "gd.namePh": "Juan Pérez", "gd.phone": "Teléfono", "gd.saveContact": "Guardar contacto", "gd.savedContact": "Contacto guardado.", "sec.saveFail": "Contacto no guardado — inténtalo de nuevo.", "sec.call": "Llamar",
     "sec.honest": "Pacevo no detecta caídas ni avisa a nadie automáticamente: ninguna aplicación lo hace sin el material dedicado. La detección de incidentes de tu reloj (Garmin, Apple, Coros…) sigue siendo la referencia — actívala allí.",
     "sec.kit": "Antes de una salida de montaña", "sec.k1": "Di a alguien adónde vas y cuándo vuelves.", "sec.k2": "Móvil cargado, silbato, manta térmica, chaqueta impermeable.", "sec.k3": "Agua y sal en las tiradas largas con calor; bebe según la sed.", "sec.k4": "Números de emergencia: 112 (Europa).", "sec.k5": "Luz y ropa reflectante desde el anochecer.",
-    "k.etatQ": "{z}: ¿cómo va?", "k.mieux": "Va mejor", "k.pire": "Va peor", "k.passe": "Ya pasó", "k.etatOk": "Anotado: tu entrenador lo tiene en cuenta.", "k.etatPasse": "Anotado: este dolor ya no frena tu plan.", "k.etatErr": "No se pudo actualizar. Reinténtalo.",
+    "k.annuler": "Deshacer", "k.etatQ": "{z}: ¿cómo va?", "k.mieux": "Va mejor", "k.pire": "Va peor", "k.passe": "Ya pasó", "k.etatOk": "Anotado: tu entrenador lo tiene en cuenta.", "k.etatPasse": "Anotado: este dolor ya no frena tu plan.", "k.etatErr": "No se pudo actualizar. Reinténtalo.",
     "chat.new": "Nueva consulta", "chat.newConfirm": "¿Borrar la conversación? Tus dolores declarados siguen en tu historial.", "chat.resumed": "Consulta anterior retomada — el fisio recuerda vuestros intercambios.", "chat.newFail": "No se pudo borrar, inténtalo de nuevo.",
     "k.mapOpen": "¿Dónde te duele? Mostrar el esquema", "k.mapClose": "Ocultar el esquema", "k.zoneChip": "{zone} · {n}/10",
     "bilan.title": "Balance de la consulta", "bilan.hyp": "Hipótesis", "bilan.urgent": "Bandera roja: consulta pronto a un médico. El fisio IA no sustituye un consejo médico.", "bilan.exos": "Ejercicios", "bilan.charge": "Carga", "bilan.reprise": "Vuelta",
@@ -215,7 +215,7 @@ const H: Record<string, Record<string, string>> = {
     "gd.name": "Nome completo", "gd.namePh": "João Silva", "gd.phone": "Telefone", "gd.saveContact": "Guardar contacto", "gd.savedContact": "Contacto guardado.", "sec.saveFail": "Contacto não guardado — tenta de novo.", "sec.call": "Ligar",
     "sec.honest": "A Pacevo não deteta quedas nem alerta ninguém automaticamente: nenhuma aplicação o faz sem o material dedicado. A deteção de incidentes do teu relógio (Garmin, Apple, Coros…) continua a ser a referência — ativa-a lá.",
     "sec.kit": "Antes de uma saída de montanha", "sec.k1": "Diz a alguém para onde vais e quando voltas.", "sec.k2": "Telemóvel carregado, apito, manta térmica, casaco impermeável.", "sec.k3": "Água e sal nas saídas longas com calor; bebe pela sede.", "sec.k4": "Números de emergência: 112 (Europa).", "sec.k5": "Luz e roupa refletora desde o anoitecer.",
-    "k.etatQ": "{z} — como está agora?", "k.mieux": "Está melhor", "k.pire": "Está pior", "k.passe": "Já passou", "k.etatOk": "Registado — o teu treinador tem isso em conta.", "k.etatPasse": "Registado: esta dor já não trava o teu plano.", "k.etatErr": "Não foi possível atualizar. Tenta de novo.",
+    "k.annuler": "Anular", "k.etatQ": "{z} — como está agora?", "k.mieux": "Está melhor", "k.pire": "Está pior", "k.passe": "Já passou", "k.etatOk": "Registado — o teu treinador tem isso em conta.", "k.etatPasse": "Registado: esta dor já não trava o teu plano.", "k.etatErr": "Não foi possível atualizar. Tenta de novo.",
     "chat.new": "Nova consulta", "chat.newConfirm": "Apagar a conversa? As tuas dores declaradas ficam no teu histórico.", "chat.resumed": "Consulta anterior retomada — o fisio lembra-se das vossas trocas.", "chat.newFail": "Não foi possível apagar, tenta de novo.",
     "k.mapOpen": "Onde te dói? Mostrar o esquema", "k.mapClose": "Esconder o esquema", "k.zoneChip": "{zone} · {n}/10",
     "bilan.title": "Balanço da consulta", "bilan.hyp": "Hipóteses", "bilan.urgent": "Bandeira vermelha: consulta rapidamente um médico. O fisio IA não substitui um parecer médico.", "bilan.exos": "Exercícios", "bilan.charge": "Carga", "bilan.reprise": "Retoma",
@@ -741,7 +741,22 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                       const e = etats.find((x) => x.cle === z.cle);
                       if (!e) return null;
                       const courant = majEtats[e.id] ?? e.etat;
-                      if (courant === "resolu") return null;
+                      // ⚠️ UN CLIC DE TROP DOIT POUVOIR SE REPRENDRE. La ligne disparaît au
+                      // prochain chargement (elle n'est plus active), mais tant qu'on est sur
+                      // l'écran on garde « c'est passé » affiché avec son annulation : sans
+                      // cela, un appui par erreur efface la douleur sans retour possible, et
+                      // il faut repasser par le kiné pour la redéclarer.
+                      if (courant === "resolu") {
+                        return (
+                          <div key={`etat-${e.id}`} className="-mt-0.5 flex flex-wrap items-center gap-1.5 px-2.5 pb-1">
+                            <span className="text-[11px] font-medium text-emerald-700">{tr("k.etatPasse")}</span>
+                            <button type="button" disabled={enCours === e.id} onClick={() => majEtatDouleur(e.id, "actif")}
+                              className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-zinc-600 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50 disabled:opacity-50">
+                              {tr("k.annuler")}
+                            </button>
+                          </div>
+                        );
+                      }
                       return (
                         <div key={`etat-${e.id}`} className="-mt-0.5 flex flex-wrap items-center gap-1.5 px-2.5 pb-1">
                           <span className="text-[11px] text-zinc-400">{tr("k.etatQ", { z: z.zone })}</span>
