@@ -40,7 +40,7 @@ export default async function DashboardPage() {
   // Le jour de l'athlète, calculé AVANT les requêtes : il en filtre une.
   const today = aujourdhui(FUSEAU_DEFAUT);
 
-  const [profileRes, hrvRes, workoutsRes, planRes, leagueRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, newMembersRes, prRes, chargeRes, streakWkRes, streakPlanRes, avisRes, nbSeancesRes] = await Promise.all([
+  const [profileRes, hrvRes, workoutsRes, planRes, leagueRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, newMembersRes, prRes, chargeRes, streakWkRes, streakPlanRes, avisRes, nbSeancesRes, premiereRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single(),
     supabase.from("hrv_data").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(14),
     supabase.from("workouts").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(40),
@@ -95,6 +95,12 @@ export default async function DashboardPage() {
     // Une vague de moins = un aller-retour de moins avant le premier octet (22/09/2026).
     supabase.from("notifications").select("id").eq("user_id", user!.id).eq("type", TYPE_AVIS).limit(1),
     supabase.from("workouts").select("id", { count: "exact", head: true }).eq("user_id", user!.id),
+    // ⚠️ LA PROFONDEUR RÉELLE DE L'HISTORIQUE. « Record personnel » sous-entend « de
+    // toujours » : sans cette date, la carte affirme un record sur une base dont
+    // personne ne connaît le début. Celle de Cyprien commence le 03/07/2025, et son
+    // semi de 2024 n'y est pas — d'où « 1h19 » là où il sait avoir fait 1h15.
+    supabase.from("workouts").select("date")
+      .eq("user_id", user!.id).order("date", { ascending: true }).limit(1).maybeSingle(),
   ]);
 
   // L'état d'abonnement se déduit du profil déjà chargé : `created_at` donne l'essai,
@@ -217,6 +223,7 @@ export default async function DashboardPage() {
       plan={planRes.data}
       league={leagueRes.data}
       prWorkouts={prRes.data ?? []}
+      premiereSeance={(premiereRes.data as { date?: string } | null)?.date ?? null}
       chargeHistory={chargeRes.data ?? []}
       sleep={sleepRes.data ?? null}
       coachSession={coachSession}

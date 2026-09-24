@@ -1184,7 +1184,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
               cadrage et l'athlète ne comprend ni pourquoi il ne se voit pas dessus, ni
               comment revenir en arrière. */}
           {geoRefusee && (
-            <div className="mx-auto mb-2.5 flex max-w-lg items-center justify-center gap-2 rounded-full bg-zinc-900/85 px-3 py-1.5 text-[12px] font-semibold text-white backdrop-blur md:mx-0 md:max-w-sm">
+            <div className="mx-auto mb-2.5 flex max-w-lg items-center justify-center gap-2 rounded-full bg-zinc-900 px-3 py-1.5 text-[12px] font-semibold text-white md:mx-0 md:max-w-sm">
               <MapPin className="h-3.5 w-3.5 flex-shrink-0" aria-hidden />
               <span className="truncate">{d["map.geoOff"]}</span>
               <button type="button" onClick={demanderPosition} className="ml-1 flex-shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-zinc-900">
@@ -1192,7 +1192,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
               </button>
             </div>
           )}
-          <div className="mx-auto max-w-lg rounded-[26px] md:mx-0 md:max-w-sm border border-black/5 bg-white/95 px-4 py-3 shadow-[0_20px_45px_-20px_rgba(9,9,11,0.55)] backdrop-blur">
+          <div className="mx-auto max-w-lg rounded-[26px] md:mx-0 md:max-w-sm border border-black/5 bg-white px-4 py-3 shadow-[0_20px_45px_-20px_rgba(9,9,11,0.55)]">
             <p className="truncate text-center text-[13px] font-bold text-zinc-900">{titreCarte}</p>
             {/* 2 colonnes en libre (rien d'imposé), 3 sinon. Classe dynamique impossible
                 avec Tailwind : la grille se donne en style. */}

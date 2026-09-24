@@ -152,13 +152,32 @@ test("aucun flou d'arrière-plan posé sur une carte qui se déplace, et une seu
     assert.ok(!/backdrop-blur/.test(codeNu(f)), `${f} : un flou d'arrière-plan est revenu sur la carte`);
   }
   const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
-  const carte = gr.slice(gr.indexOf('<div className="relative -mx-6 -mt-6 md:hidden">'), gr.indexOf("</CarteDirect>") > 0 ? gr.indexOf("</CarteDirect>") : gr.indexOf('className="relative hidden overflow-hidden rounded-3xl'));
-  assert.ok(!/backdrop-blur/.test(carte), "le bouton audio posé sur la carte du téléphone a retrouvé son flou");
+  // ⚠️ CETTE TRANCHE ÉTAIT DEVENUE VIDE SANS QUE PERSONNE LE VOIE. Elle cherchait
+  // `<div className="relative -mx-6 -mt-6 md:hidden">`, balise disparue quand la carte est
+  // devenue une `<section>` (22-23/09/2026) : `indexOf` rendait -1, la tranche ne
+  // contenait rien, et le test restait vert pendant qu'un bloc blanc `bg-white/95
+  // backdrop-blur` et une pastille floutée s'installaient PAR-DESSUS la carte. On ancre
+  // désormais sur la section entière, et on EXIGE de la trouver.
+  const iSection = gr.indexOf(': "relative -mx-6 -mt-6 md:mx-0 md:mt-0');
+  const iFin = gr.indexOf("</section>", iSection);
+  assert.ok(iSection > 0 && iFin > iSection, "la section de la carte est introuvable : ce garde ne vérifierait plus rien");
+  const carte = gr.slice(iSection, iFin);
+  assert.ok(!/backdrop-blur/.test(carte), "un flou d'arrière-plan est revenu PAR-DESSUS la carte d'Enregistrer (bloc, pastille ou commandes)");
+  // Et les commandes, définies HORS de la section, ne doivent pas en porter non plus.
+  const cmd = gr.slice(gr.indexOf("const commandesCarte = ("), gr.indexOf("return (", gr.indexOf("const commandesCarte = (")));
+  assert.ok(cmd.length > 50 && !/backdrop-blur/.test(cmd), "les commandes posées sur la carte ont retrouvé un flou");
+  // Les boutons eux-mêmes sont définis au niveau du module (`BtnCarte`, `ActionCarte`,
+  // `GrosBouton`) : leurs classes ne sont ni dans la section ni dans `commandesCarte`.
+  for (const comp of ["function BtnCarte(", "function ActionCarte(", "function GrosBouton("]) {
+    const i = gr.indexOf(comp);
+    assert.ok(i > 0, `${comp} introuvable : ce garde ne le vérifierait plus`);
+    assert.ok(!/backdrop-blur/.test(gr.slice(i, gr.indexOf("\n}\n", i))), `${comp.slice(9, -1)} a retrouvé un flou — il est posé sur la carte`);
+  }
   // Les pages qui enchaînaient des vagues de lectures indépendantes n'en font plus qu'une.
   const races = codeNu("src/app/dashboard/races/page.tsx");
   assert.match(races, /\[\{ data: etatLiens \}, coursesRes, \{ count: totalCount \}, \{ data: \{ user \} \}\] = await Promise\.all\(\[/, "la page Courses a retrouvé ses vagues successives (liens, puis courses, puis session)");
   const accueil = codeNu("src/app/dashboard/page.tsx");
-  assert.ok(!/const \[avisRes, nbSeancesRes\] = await Promise\.all/.test(accueil) && /streakPlanRes, avisRes, nbSeancesRes\] = await Promise\.all\(\[/.test(accueil), "l'accueil a retrouvé sa troisième vague (invitation à laisser un avis)");
+  assert.ok(!/const \[avisRes, nbSeancesRes\] = await Promise\.all/.test(accueil) && /streakPlanRes, avisRes, nbSeancesRes(, \w+)*\] = await Promise\.all\(\[/.test(accueil), "l'accueil a retrouvé sa troisième vague (invitation à laisser un avis)");
   const rec = codeNu("src/app/dashboard/ghost-runner/page.tsx");
   assert.match(rec, /const \[\{ data: fcRows \}, \{ data: recentes \}\] = await Promise\.all\(\[/, "« Enregistrer » relit ses deux séries de FC en deux attentes");
   // Le catalogue des courses reste en cache navigateur : sinon ~1 Mo à chaque ouverture.

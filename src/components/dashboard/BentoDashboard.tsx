@@ -47,6 +47,8 @@ interface Props {
    *  requête dédiée. La liste `workouts` est plafonnée à 40 lignes : s'en servir revenait
    *  à annoncer « record personnel » sur le meilleur temps des deux derniers mois. */
   prWorkouts: { date: string; distance_km: number | null; duration_seconds: number | null }[];
+  /** Date de la PLUS ANCIENNE séance connue — la profondeur réelle de l'historique. */
+  premiereSeance?: string | null;
   /** Un an de charge (date + TSS), chargé à part. Le modèle CTL/ATL a une constante de
    *  42 jours : nourri de 40 activités il ne converge pas, et l'amorce reste visible
    *  dans le chiffre affiché. Voir `computeLoad` dans TaperingWidget. */
@@ -160,7 +162,7 @@ const HR_ZONE_DEFS = [
 
 // La forme du jour est calculée à partir de données réelles : voir computeReadiness().
 
-export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkouts, chargeHistory, sleep, coachSession, pendingFeedback, objective, currentVma, loadRisk, newMembersWeek, streak, acces, donneesIncompletes, jourAujourdhui }: Props) {
+export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkouts, premiereSeance = null, chargeHistory, sleep, coachSession, pendingFeedback, objective, currentVma, loadRisk, newMembersWeek, streak, acces, donneesIncompletes, jourAujourdhui }: Props) {
   const { t, lang } = useT();
   const state = hrv[0]?.physiological_state ?? "optimal";
 
@@ -1470,6 +1472,17 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
                 </div>
               ))}
             </div>
+            {/* ⚠️ « RECORD PERSONNEL » SOUS-ENTEND « DE TOUJOURS ». Cyprien, 23/09/2026 :
+                « mon record au semi est de 1h15 » — l'app affichait 1h19. Elle ne se
+                trompait pas de calcul : la séance la plus ancienne de sa base date du
+                03/07/2025, et son semi de 2024 n'y est pas. Un record calculé sur un
+                historique partiel n'est pas faux, il est INCOMPLET — et le dire est la
+                seule façon de ne pas contredire l'athlète sur sa propre histoire. */}
+            {premiereSeance && (
+              <p className="mt-3 border-t border-zinc-100 pt-2.5 text-[11px] leading-snug text-zinc-400">
+                {t("dash.rec.depuis", { d: new Date(premiereSeance).toLocaleDateString(lang, { month: "long", year: "numeric" }) })}
+              </p>
+            )}
           </div>
         )}
       </aside>

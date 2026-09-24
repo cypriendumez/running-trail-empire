@@ -12,6 +12,7 @@
  * qui prétend mesurer ce qu'il n'a pas mesuré.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { computeHrZones } from "../src/lib/dashboard/zones";
 import { computeLoad, estimateTSS } from "../src/lib/dashboard/charge";
 import { computeDistancePRs } from "../src/lib/dashboard/records";
@@ -290,6 +291,29 @@ test("une date illisible ne casse pas l'affichage du record", () => {
   const r = computeDistancePRs([{ date: "pas-une-date", distance_km: 10, duration_seconds: 2038 }], "fr");
   assert.equal(r.length, 1);
   assert.ok(typeof r[0].date === "string", "la date du record n'est pas une chaîne");
+});
+
+test("« record personnel » dit sur quelle profondeur d'historique il est calculé", () => {
+  // Cyprien, 23/09/2026 : « mon record au semi est de 1h15 » — l'app affichait 1h19.
+  // ⚠️ LE CALCUL N'ÉTAIT PAS FAUX, LA BASE ÉTAIT INCOMPLÈTE : sa séance la plus ancienne
+  // date du 03/07/2025 et son semi de 2024 n'y est pas. « Record personnel » sous-entend
+  // « de toujours » : sans la profondeur, la carte contredit l'athlète sur sa propre
+  // histoire, et c'est elle qui a l'air d'avoir raison.
+  const nu = (f: string) => readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  const b = nu("src/components/dashboard/BentoDashboard.tsx");
+  if (!/\{premiereSeance && \(/.test(b)) fails.push("la carte des records n'annonce plus depuis quand elle calcule");
+  else if (!/t\("dash\.rec\.depuis", \{ d: new Date\(premiereSeance\)/.test(b)) fails.push("la profondeur affichée n'est plus celle de la première séance");
+  else passed++;
+  // Et elle doit être RENSEIGNÉE : une propriété jamais transmise laisse la ligne muette.
+  const page = nu("src/app/dashboard/page.tsx");
+  if (!/premiereSeance=\{\(premiereRes\.data as/.test(page)) fails.push("la première séance n'est plus transmise au tableau de bord");
+  else if (!/order\("date", \{ ascending: true \}\)\.limit\(1\)/.test(page)) fails.push("la première séance n'est plus lue dans l'ordre croissant : ce serait la plus RÉCENTE");
+  else passed++;
+  // Les cinq langues portent la phrase — dans le dictionnaire principal, pas en dur.
+  const n = [...readFileSync("src/lib/i18n/translations.ts", "utf8").matchAll(/"dash\.rec\.depuis":/g)].length;
+  if (n !== 5) fails.push(`« depuis » présent ${n} fois, attendu 5`);
+  else passed++;
 });
 
 console.log(`\n${passed} crash-test(s) passé(s), ${fails.length} échec(s)`);
