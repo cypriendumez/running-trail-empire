@@ -182,11 +182,27 @@ export function longRunForWeek(args: {
   weekIndex: number; weeksToPeak: number;
   current: number; peak: number | null;
   weeklyKm: number; share: number; taper: boolean;
+  /** Semaines PLEINES avant la semaine de course (0 = semaine de course). */
+  semainesAvantCourse?: number | null;
+  /** La plus longue sortie du bloc, avant l'affûtage — ce dont l'affûtage part. */
+  reference?: number | null;
 }): number {
-  const { weekIndex, weeksToPeak, current, peak, weeklyKm, share, taper } = args;
+  const { weekIndex, weeksToPeak, current, peak, weeklyKm, share, taper, semainesAvantCourse, reference } = args;
 
-  // Affûtage : on coupe pour de bon, la sortie longue n'apporte plus rien.
-  if (taper) return Math.max(1, Math.round(Math.min(weeklyKm * 0.20, peak ?? Infinity)));
+  if (taper) {
+    // ⚠️ L'AFFÛTAGE COUPAIT LA SORTIE LONGUE À 20 % DU VOLUME DÈS J−20. Cas réel (Cyprien,
+    // marathon de Lille, 28/09/2026) : 10 km à J−20 et 8 km à J−13 pour un bloc culminant à
+    // 26 km — bien en dessous de tous les plans de référence (Higdon ≈ 60 % puis 40 % de la
+    // plus longue, Pfitzinger ≈ 85 % puis 65 %). On garde la sortie longue en DÉCRUE, depuis
+    // la plus longue du bloc : 75 % à J−20, 55 % à J−13 — sans jamais dépasser la moitié du
+    // volume de la semaine, ni le pic visé. La semaine de course, elle, n'en a pas (autoPlan).
+    const part = semainesAvantCourse == null ? null : semainesAvantCourse >= 2 ? 0.75 : semainesAvantCourse === 1 ? 0.55 : null;
+    if (part != null && reference != null && reference > 0) {
+      return Math.max(1, Math.round(Math.min(reference * part, weeklyKm * 0.5, peak ?? Infinity)));
+    }
+    // Semaine de course, ou appel sans référence : on coupe pour de bon.
+    return Math.max(1, Math.round(Math.min(weeklyKm * 0.20, peak ?? Infinity)));
+  }
 
   // Sans objectif de course, rien ne dit quelle distance viser : on s'en tient à la part
   // du volume, comme avant. On n'invente pas un pic qui n'a pas de raison d'être.

@@ -60,6 +60,8 @@ interface Props {
   pendingFeedback?: { date: string; title: string } | null;
   objective?: Objective | null;
   currentVma?: number | null;
+  /** D'où vient la VMA affichée, et de quand — pour qu'on voie qu'elle suit la forme. */
+  sourceVma?: SourceVma | null;
   loadRisk?: { acwr: number; monotony: number; deload: boolean; level: string; reason: string };
   newMembersWeek?: number;
   /** Série calculée à la lecture (lib/streak) — jamais stockée, donc réparable. */
@@ -162,7 +164,14 @@ const HR_ZONE_DEFS = [
 
 // La forme du jour est calculée à partir de données réelles : voir computeReadiness().
 
-export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkouts, premiereSeance = null, chargeHistory, sleep, coachSession, pendingFeedback, objective, currentVma, loadRisk, newMembersWeek, streak, acces, donneesIncompletes, jourAujourdhui }: Props) {
+/** La source de la VMA du tableau de bord (voir `effectiveVma`). Dates au format AAAA-MM-JJ. */
+export type SourceVma =
+  | { type: "seances"; date: string | null; km: number | null }
+  | { type: "test"; date: string | null }
+  | { type: "courbe" }
+  | { type: "vo2max" };
+
+export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkouts, premiereSeance = null, chargeHistory, sleep, coachSession, pendingFeedback, objective, currentVma, sourceVma = null, loadRisk, newMembersWeek, streak, acces, donneesIncompletes, jourAujourdhui }: Props) {
   const { t, lang } = useT();
   const state = hrv[0]?.physiological_state ?? "optimal";
 
@@ -953,6 +962,20 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
                 <span className="text-sm text-zinc-400">km/h</span>
               </div>
               <div className="text-[11px] text-zinc-400">{t("dash.vma.sub")}</div>
+              {sourceVma && (
+                <div className="mt-0.5 text-[11px] leading-snug text-zinc-400">
+                  {sourceVma.type === "seances" && sourceVma.date
+                    ? t("dash.vma.src.seances", {
+                        d: formatDateCivile(sourceVma.date, lang, { day: "numeric", month: "long" }),
+                        km: (Math.round((sourceVma.km ?? 0) * 10) / 10).toLocaleString(lang),
+                      })
+                    : sourceVma.type === "test" && sourceVma.date
+                      ? t("dash.vma.src.test", { d: formatDateCivile(sourceVma.date, lang, { day: "numeric", month: "long", year: "numeric" }) })
+                      : sourceVma.type === "courbe" ? t("dash.vma.src.courbe")
+                      : sourceVma.type === "vo2max" ? t("dash.vma.src.vo2max") : null}
+                  {" · "}{t("dash.vma.maj")}
+                </div>
+              )}
               <div className="mt-4 grid grid-cols-2 gap-2.5">
                 {predictions.map((p) => (
                   <div key={p.label} className="rounded-xl bg-gradient-to-b from-zinc-50 to-white px-3 py-2.5 ring-1 ring-inset ring-zinc-100 transition-shadow hover:shadow-sm">

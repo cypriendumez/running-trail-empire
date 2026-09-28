@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { positionArrondie, type Point } from "@/lib/races/proximite";
 import { createClient } from "@/lib/supabase/server";
 import { RacesHub } from "@/components/races/RacesHub";
 import { normLang } from "@/lib/i18n/translations";
@@ -73,11 +74,15 @@ export default async function RacesPage({ searchParams }: { searchParams: Promis
   let pps: PpsStatus | null = null;
   let ppsMasque: string | null = null;
   let favoris: string[] = [];
+  let positionEntrainement: Point | null = null;
   if (user) {
     const [{ data }, { data: settingsRow }, { data: profileRow }, { data: ppsRow }, { data: favLignes }] = await Promise.all([
       sb.from("notifications").select("id, title, data").eq("user_id", user.id).eq("type", "planned_race").order("created_at", { ascending: false }).limit(50),
       sb.from("notifications").select("data").eq("user_id", user.id).eq("type", "user_settings").maybeSingle(),
-      sb.from("profiles").select("preferred_language").eq("id", user.id).single(),
+      // `last_lat/last_lon` : départ de la dernière sortie GPS — repli du filtre « Autour de
+      // moi » quand le navigateur refuse la position. Arrondi au km AVANT de quitter le
+      // serveur : la page n'a pas à transporter l'adresse exacte de l'athlète.
+      sb.from("profiles").select("preferred_language, last_lat, last_lon").eq("id", user.id).single(),
       sb.from("notifications").select("data").eq("user_id", user.id).eq("type", "pps_status").maybeSingle(),
       // Favoris : chargés AVEC le reste, pour que le cœur soit déjà rempli au premier
       // rendu. Un cœur qui se remplit une seconde après l'affichage donne l'impression
@@ -92,6 +97,8 @@ export default async function RacesPage({ searchParams }: { searchParams: Promis
       .filter(Boolean);
     units = String(((settingsRow?.data ?? {}) as Record<string, unknown>).unitSystem ?? "metric") === "imperial" ? "imperial" : "metric";
     lang = normLang(profileRow?.preferred_language ?? "fr");
+    positionEntrainement = positionArrondie(
+      (profileRow as { last_lat?: unknown } | null)?.last_lat, (profileRow as { last_lon?: unknown } | null)?.last_lon);
     planned = (data ?? []).map((r) => {
       const d = (r.data ?? {}) as { date?: string; name?: string; location?: string; distanceKm?: number | null };
       return { id: String(r.id), name: d.name || (r.title as string) || (NOM_PAR_DEFAUT[lang] ?? NOM_PAR_DEFAUT.fr), location: d.location || "", distanceKm: d.distanceKm ?? null, date: String(d.date ?? "").slice(0, 10) };
@@ -104,7 +111,7 @@ export default async function RacesPage({ searchParams }: { searchParams: Promis
           calendrier l'affiche déjà avec le plan qui l'entoure. La répéter en tête du
           catalogue poussait la recherche de courses, seule raison de venir sur cette
           page, sous la ligne de flottaison. */}
-      <RacesHub enPanne={cataloguEnPanne} favorisInitiaux={favoris} liensMorts={liensMorts} races={(initialRaces ?? []) as never[]} totalCount={totalCount ?? 0} units={units} planned={planned} initialSearch={q ?? ""} pps={pps} ppsMasque={ppsMasque} />
+      <RacesHub positionEntrainement={positionEntrainement} enPanne={cataloguEnPanne} favorisInitiaux={favoris} liensMorts={liensMorts} races={(initialRaces ?? []) as never[]} totalCount={totalCount ?? 0} units={units} planned={planned} initialSearch={q ?? ""} pps={pps} ppsMasque={ppsMasque} />
     </>
   );
 }

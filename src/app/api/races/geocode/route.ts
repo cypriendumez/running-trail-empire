@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { denyIfAnonymous } from "@/lib/api/adminGuard";
+import { denyIfNotAdmin } from "@/lib/api/adminGuard";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -28,10 +28,15 @@ async function nominatim(city: string, dept: string): Promise<{ lat: number; lon
   return null;
 }
 
+// ⚠️ RÉSERVÉ À L'ADMINISTRATION DEPUIS LE 28/09/2026. La carte des courses l'exposait à
+// tout compte connecté derrière un bouton « Géolocaliser » — que les athlètes prenaient,
+// à raison, pour « me localiser » : un clic lançait jusqu'à 300 requêtes Nominatim (5 min)
+// et des écritures dans le catalogue. Le bouton est remplacé par « Autour de moi » ; cette
+// maintenance se déclenche avec le secret d'administration ou le compte admin.
 export async function POST(req: Request) {
-  // Consomme un service de géocodage externe : réservé aux comptes connectés.
-  const denied = await denyIfAnonymous();
-  if (denied) return NextResponse.json({ error: denied }, { status: 401 });
+  // Service de géocodage externe + écritures dans le catalogue : administration seulement.
+  const denied = await denyIfNotAdmin(req);
+  if (denied) return NextResponse.json({ error: denied }, { status: 403 });
   // Fetch races without GPS
   const { data: races, error } = await createAdminClient()
     .from("races")
@@ -76,8 +81,8 @@ export async function POST(req: Request) {
 }
 
 export async function GET(req: Request) {
-  // Consomme un service de géocodage externe : réservé aux comptes connectés.
-  const denied = await denyIfAnonymous();
-  if (denied) return NextResponse.json({ error: denied }, { status: 401 });
+  // Service de géocodage externe + écritures dans le catalogue : administration seulement.
+  const denied = await denyIfNotAdmin(req);
+  if (denied) return NextResponse.json({ error: denied }, { status: 403 });
   return POST(req);
 }

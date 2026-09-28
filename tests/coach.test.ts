@@ -884,7 +884,7 @@ test("les services externes gratuits ne sont pas ouverts aux anonymes", () => {
   // route ouverte, c'est l'adresse IP de l'application bannie pour TOUS les utilisateurs.
   for (const f of ["src/app/api/parcours/geometry/route.ts", "src/app/api/races/geocode/route.ts"]) {
     if (!existsSync(f)) continue;
-    assert.ok(/denyIfAnonymous|auth\.getUser/.test(readFileSync(f, "utf8")), `${f} est ouvert aux requêtes anonymes`);
+    assert.ok(/denyIfAnonymous|denyIfNotAdmin|auth\.getUser/.test(readFileSync(f, "utf8")), `${f} est ouvert aux requêtes anonymes`);
   }
 });
 

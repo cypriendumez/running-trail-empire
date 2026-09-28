@@ -2,11 +2,13 @@
 
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, MapPin, Calendar, Zap, Mountain, ExternalLink, ChevronRight, RefreshCw, Loader2, Flag } from "lucide-react";
+import { X, MapPin, Calendar, Zap, Mountain, ExternalLink, ChevronRight, Loader2, Flag } from "lucide-react";
 import type { Race } from "@/types";
 import { correctedRaceType } from "@/lib/raceType";
 import { useT } from "@/lib/i18n/LanguageProvider";
-import { RX, fillR, dateRangeKey } from "./racesI18n";
+import { RX, dateRangeKey } from "./racesI18n";
+import { AutourDeMoi } from "./AutourDeMoi";
+import { dansLeRayon, type Point, type Proximite } from "@/lib/races/proximite";
 import { formatDateCivile } from "@/lib/time/fuseau";
 import { useFuseau } from "@/lib/time/FuseauProvider";
 import { aujourdhui } from "@/lib/time/fuseau";
@@ -32,8 +34,12 @@ const DATE_RANGES = [
 // Clé MapTiler publique du projet (même variable que SegmentMap et le Trail Builder).
 const MAPTILER = process.env.NEXT_PUBLIC_MAPTILER_KEY || "";
 
-export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrain, onCancel, busy = false }: {
+export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrain, onCancel, busy = false, proximite = null, onProximite, positionEntrainement = null }: {
   races: Race[];
+  /** « Autour de moi » — l'état vit dans la liste (RacesHub) : la carte et la liste filtrent pareil. */
+  proximite?: Proximite | null;
+  onProximite?: (p: Proximite | null) => void;
+  positionEntrainement?: Point | null;
   onClose: () => void;
   // État « course planifiée » partagé avec la liste (RacesHub) → bouton vert ↔ rouge cohérent.
   findPlanned?: (r: Race) => { id: string } | undefined;
@@ -52,7 +58,7 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
   // catalogue complet (~17 500) arrive 4 s plus tard depuis /api/races/list. Copier la
   // liste UNE FOIS à l'ouverture figeait la carte à 90 pins pour qui l'ouvrait dans ces
   // 4 secondes — vu par Cyprien le 21/09/2026 : « 90 pins · 90 courses ». L'état local
-  // reste (le géocodage le met à jour), mais il se réaligne à chaque nouvelle liste.
+  // reste, et se réaligne à chaque nouvelle liste.
   useEffect(() => { setRaces(initialRaces); }, [initialRaces]);
   const [selected, setSelected] = useState<Race | null>(null);
   // Champs lourds chargés à la demande quand une course est sélectionnée (hors payload de liste).
@@ -69,8 +75,6 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
   const [dateRangeDays, setDateRangeDays] = useState<number>(ALL_DAYS); // tous les points dès l'arrivée
   const [mounted, setMounted] = useState(false);
   const [mapReady, setMapReady] = useState(false);
-  const [geocoding, setGeocoding] = useState(false);
-  const [geocodeResult, setGeocodeResult] = useState<string | null>(null);
 
   // ⚠️ `toISOString()` JETTE LE FUSEAU QUE LE NAVIGATEUR CONNAÎT. Entre minuit et 2 h à
   // Paris, le jour UTC est encore celui de la veille : les courses datées d'aujourd'hui
@@ -98,13 +102,15 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
 
   const filtered = useMemo(() => withCoords.filter(r => {
     const matchType = filterType === "all" || correctedRaceType(r.distance_km, r.type) === filterType;
-    return matchType && matchesDateRange(r.date);
-  }), [withCoords, filterType, matchesDateRange]);
+    return matchType && matchesDateRange(r.date) && dansLeRayon(r, proximite);
+  }), [withCoords, filterType, matchesDateRange, proximite]);
 
+  // Les pastilles de type comptent ce qui est RÉELLEMENT dans le rayon : « Trail S 9079 »
+  // au-dessus d'une carte qui en montre 40 autour de Lille serait un compteur faux.
   const typeCounts = useMemo(() => withCoords.reduce<Record<string, number>>((acc, r) => {
-    if (matchesDateRange(r.date)) { const t = correctedRaceType(r.distance_km, r.type); acc[t] = (acc[t] || 0) + 1; }
+    if (matchesDateRange(r.date) && dansLeRayon(r, proximite)) { const t = correctedRaceType(r.distance_km, r.type); acc[t] = (acc[t] || 0) + 1; }
     return acc;
-  }, {}), [withCoords, matchesDateRange]);
+  }, {}), [withCoords, matchesDateRange, proximite]);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -189,27 +195,35 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
     return () => { cancelled = true; };
   }, [filtered, mapReady]);
 
-  // L'action « M'entraîner / Annuler » vient du parent (RacesHub) → un seul état partagé.
+  // ── « AUTOUR DE MOI » SUR LA CARTE : le cercle, le point de départ, et le cadrage ──
+  // Sans cadrage, activer le filtre depuis une vue de toute la France laissait une
+  // poignée de points minuscules au milieu de l'écran : on zoome sur le cercle.
+  const cercleRef = useRef<unknown[]>([]);
+  useEffect(() => {
+    if (!mapInstanceRef.current || !mapReady) return;
+    let cancelled = false;
+    (async () => {
+      const leaflet = await import("leaflet");
+      if (cancelled) return;
+      const L = (leaflet.default ?? leaflet) as typeof import("leaflet");
+      const map = mapInstanceRef.current as ReturnType<typeof L.map>;
+      cercleRef.current.forEach((c) => (c as ReturnType<typeof L.circle>).remove());
+      cercleRef.current = [];
+      if (!proximite) return;
+      const centre: [number, number] = [proximite.centre.lat, proximite.centre.lon];
+      const cercle = L.circle(centre, {
+        radius: proximite.rayonKm * 1000, color: "#059669", weight: 1.5, fillColor: "#10b981", fillOpacity: 0.06, interactive: false,
+      }).addTo(map);
+      const point = L.circleMarker(centre, {
+        radius: 7, fillColor: "#2563eb", color: "#ffffff", weight: 2.5, fillOpacity: 1, interactive: false,
+      }).addTo(map);
+      cercleRef.current = [cercle, point];
+      map.fitBounds(cercle.getBounds(), { padding: [24, 24] });
+    })();
+    return () => { cancelled = true; };
+  }, [proximite, mapReady]);
 
-  const triggerGeocode = async () => {
-    setGeocoding(true);
-    setGeocodeResult(null);
-    try {
-      const res = await fetch("/api/races/geocode", { method: "POST" });
-      const data = await res.json();
-      setGeocodeResult(fillR(d["geo.ok"], { n: data.geocoded }));
-      // Reload races to immediately show new GPS pins on map
-      const fresh = await fetch("/api/races/list");
-      if (fresh.ok) {
-        const { races: newRaces } = await fresh.json();
-        setRaces(newRaces);
-      }
-    } catch {
-      setGeocodeResult(d["geo.err"]);
-    } finally {
-      setGeocoding(false);
-    }
-  };
+  // L'action « M'entraîner / Annuler » vient du parent (RacesHub) → un seul état partagé.
 
   return (
     <motion.div
@@ -293,20 +307,15 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
             ))}
         </div>
 
-        {/* Geocode button */}
-        <div className="ml-auto flex items-center gap-2 flex-shrink-0">
-          {geocodeResult && (
-            <span className="text-xs text-zinc-600 bg-zinc-100 px-2 py-1 rounded-lg">{geocodeResult}</span>
-          )}
-          <button
-            onClick={triggerGeocode}
-            disabled={geocoding}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-zinc-100 text-zinc-600 hover:bg-zinc-200 disabled:opacity-50 transition-all"
-          >
-            <RefreshCw className={`w-3 h-3 ${geocoding ? "animate-spin" : ""}`} />
-            {geocoding ? d["geocoding"] : d["geolocate"]}
-          </button>
-        </div>
+        {/* « Autour de moi » — À LA PLACE du bouton « Géolocaliser », qui ne localisait
+            PAS l'athlète : il lançait le géocodage de tout le catalogue (tâche de
+            maintenance, 5 min, écritures en base) depuis n'importe quel compte. Retiré le
+            28/09/2026 ; la route est désormais réservée à l'administration. */}
+        {onProximite && (
+          <div className="ml-auto flex-shrink-0">
+            <AutourDeMoi valeur={proximite} onChange={onProximite} positionEntrainement={positionEntrainement} d={d} compact />
+          </div>
+        )}
       </div>
 
       {/* ── Map + side panel ─────────────────────────────────────────────── */}

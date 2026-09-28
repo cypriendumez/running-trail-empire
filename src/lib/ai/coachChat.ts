@@ -141,7 +141,7 @@ export function feuilleDeRoute(
     const debut = plusJours(aujourdhui, 7 * i);
     let fin = plusJours(debut, 6);
     if (jourJ && fin > jourJ) fin = jourJ;
-    return `- Semaine ${s.week} (du ${court(debut)} au ${court(fin)}) · ${s.phase} · ~${s.volumeKm} km · qualité : ${s.quality.join(" + ") || "aucune"} · sortie longue ~${s.longRunKm} km${s.focus ? ` · ${s.focus}` : ""}`;
+    return `- Semaine ${s.week} (du ${court(debut)} au ${court(fin)}) · ${s.phase} · ~${s.volumeKm} km · qualité : ${s.quality.join(" + ") || "aucune"} · ${s.longRunKm > 0 ? `sortie longue ~${s.longRunKm} km` : "pas de sortie longue (la course est l'effort long)"}${s.focus ? ` · ${s.focus}` : ""}`;
   });
   if (jourJ) lignes.push(`- JOUR J : ${course?.nom || "la course"}, ${court(jourJ)} ${jourJ.slice(0, 4)}. Le volume de la semaine de course s'entend HORS course.`);
   return lignes.join("\n");

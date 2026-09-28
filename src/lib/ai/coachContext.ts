@@ -1459,6 +1459,7 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
     const lrPeak = longRunPeakKm(libGoal as RaceGoal, objective?.distanceKm ?? null);
     const lrShare = longRunShare(libGoal as RaceGoal, objective?.distanceKm ?? null);
     const out: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[] = [];
+    let longueDuBloc = 0;   // plus longue sortie planifiée avant l'affûtage
     for (let i = 0; i < W; i++) {
       // Semaines PLEINES avant la semaine de course : même sens que `weeksToRace`, donc
       // mêmes seuils de phase qu'avant (0 = semaine de course, 1 = J−13 → J−7…).
@@ -1487,11 +1488,17 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
       // du volume. Le plafond de Daniels (25 %) empêche la sortie longue d'écraser la
       // semaine ; il ne dit pas ce qu'il faut courir pour préparer un marathon. Employé
       // seul, il produisait un pic de 12 km de sortie longue pour une course de 42,2 km.
-      const longRunKm = longRunForWeek({
+      // Semaine de course : AUCUNE sortie longue — la course est l'effort long (autoPlan n'en
+      // pose pas). La feuille de route annonçait « ~6 km », que le coach IA répétait.
+      const longRunKm = wkUntil <= 0 ? 0 : longRunForWeek({
         weekIndex: i, weeksToPeak: Math.max(1, W - 3),
         current: lrCurrent, peak: lrPeak,
         weeklyKm: volumeKm, share: lrShare, taper: ph === "Affûtage",
+        // L'affûtage part de la plus longue sortie du bloc (ou, s'il commence tout de suite,
+        // de ce que l'athlète court déjà) : il descend EN PENTE, il ne tombe pas à 20 %.
+        semainesAvantCourse: wkUntil, reference: Math.max(lrCurrent, longueDuBloc),
       });
+      if (ph !== "Affûtage") longueDuBloc = Math.max(longueDuBloc, longRunKm);
       // Semaine en cours : l'état de forme du jour compte. Semaines suivantes : on planifie
       // sur le budget structurel, sinon un ratio aigu:chronique élevé aujourd'hui viderait
       // toute la feuille de route de sa qualité jusqu'au jour J.

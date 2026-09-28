@@ -30,10 +30,13 @@ export async function denyIfNotAdmin(req: Request): Promise<string | null> {
 /**
  * Garde plus souple : un compte CONNECTÉ suffit.
  *
- * Le géocodage est déclenché par la carte des courses pour compléter les 2 % de fiches
- * sans coordonnées — c'est une réparation utile, qu'on ne veut pas réserver à
- * l'administrateur. Mais elle consomme un service externe : la laisser ouverte aux
- * requêtes ANONYMES revenait à offrir notre quota au premier venu.
+ * Sert aux routes qu'un athlète déclenche lui-même et qui consomment un service externe
+ * (tracés Overpass du Trail Builder) : les laisser ouvertes aux requêtes ANONYMES
+ * revenait à offrir notre quota au premier venu.
+ *
+ * ⚠️ Le géocodage du catalogue l'utilisait aussi, via un bouton « Géolocaliser » de la
+ * carte des courses que les athlètes prenaient pour « me localiser ». Il est passé sous
+ * `denyIfNotAdmin` le 28/09/2026 : c'est une maintenance, pas une fonction d'athlète.
  */
 export async function denyIfAnonymous(): Promise<string | null> {
   try {

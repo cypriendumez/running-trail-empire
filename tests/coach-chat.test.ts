@@ -17,6 +17,7 @@ import {
 } from "../src/lib/ai/coachChat";
 import { niveauDe } from "../src/lib/ai/coachChatServeur";
 import { lireUsage } from "../src/lib/ai/gemini";
+import { longRunForWeek } from "../src/lib/running/volume";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -35,9 +36,9 @@ const base = {
 // La feuille de route réelle de Cyprien le 28/09/2026 (Lille le 25/10), après correction.
 const MACRO = [
   { week: 1, phase: "Spécifique", volumeKm: 70, quality: ["Allure mara"], longRunKm: 26, focus: "" },
-  { week: 2, phase: "Affûtage", volumeKm: 50, quality: ["Allure mara", "Seuil"], longRunKm: 10, focus: "" },
-  { week: 3, phase: "Affûtage", volumeKm: 39, quality: ["Allure mara"], longRunKm: 8, focus: "" },
-  { week: 4, phase: "Affûtage", volumeKm: 28, quality: ["Allure mara"], longRunKm: 6, focus: "" },
+  { week: 2, phase: "Affûtage", volumeKm: 50, quality: ["Allure mara", "Seuil"], longRunKm: 20, focus: "" },
+  { week: 3, phase: "Affûtage", volumeKm: 39, quality: ["Allure mara"], longRunKm: 14, focus: "" },
+  { week: 4, phase: "Affûtage", volumeKm: 28, quality: ["Allure mara"], longRunKm: 0, focus: "" },
 ];
 
 console.log("\n=== MÉMOIRE DE LA CONVERSATION ===\n");
@@ -109,6 +110,7 @@ test("la feuille de route porte des dates EXACTES, et la semaine de course s'arr
   assert.match(f, /Semaine 4 \(du lundi 19\/10 au dimanche 25\/10\) · Affûtage · ~28 km/);
   assert.match(f, /JOUR J : Marathon International de Lille, dimanche 25\/10 2026/);
   assert.match(f, /HORS course/, "le volume de la semaine de course exclut la course : il faut le dire");
+  assert.match(f, /Semaine 4 [^\n]*pas de sortie longue/, "la semaine de course n'a pas de sortie longue : le coach annonçait « ~6 km »");
   // Une course un mercredi : la dernière semaine est coupée au jour J, pas prolongée après.
   const mer = feuilleDeRoute(MACRO.slice(0, 1), "2026-09-28", { nom: "X", date: "2026-09-30" });
   assert.match(mer, /au mercredi 30\/09/);
@@ -236,6 +238,25 @@ test("la feuille de route compte la semaine de course, et l'affûtage descend ju
   const j13 = f(/else if \(wkUntil === 1\) factor = ([\d.]+);/);
   const j20 = f(/else if \(wkUntil === 2\) factor = ([\d.]+);/);
   assert.ok(course < j13 && j13 < j20, `affûtage non décroissant : ${j20} → ${j13} → ${course}`);
+});
+
+test("l'affûtage garde une sortie longue en DÉCRUE depuis la plus longue du bloc (Lille : 26 → 20 → 14)", () => {
+  const j20 = longRunForWeek({ weekIndex: 1, weeksToPeak: 1, current: 23, peak: 32, weeklyKm: 50, share: 0.35, taper: true, semainesAvantCourse: 2, reference: 26 });
+  const j13 = longRunForWeek({ weekIndex: 2, weeksToPeak: 1, current: 23, peak: 32, weeklyKm: 39, share: 0.35, taper: true, semainesAvantCourse: 1, reference: 26 });
+  assert.equal(j20, 20, "75 % de 26 km à J−20 (il était de 10 km)");
+  assert.equal(j13, 14, "55 % de 26 km à J−13 (il était de 8 km)");
+  assert.ok(26 > j20 && j20 > j13, "la sortie longue doit décroître, pas s'effondrer ni remonter");
+  // Le garde-fou de volume tient toujours : jamais plus de la moitié de la semaine.
+  assert.equal(longRunForWeek({ weekIndex: 1, weeksToPeak: 1, current: 30, peak: 32, weeklyKm: 25, share: 0.35, taper: true, semainesAvantCourse: 2, reference: 30 }), 13);
+  // Sans ces informations, la règle d'avant (20 % du volume) — pour tout autre appelant.
+  assert.equal(longRunForWeek({ weekIndex: 1, weeksToPeak: 1, current: 30, peak: 32, weeklyKm: 50, share: 0.35, taper: true }), 10);
+});
+
+test("la feuille de route transmet la référence d'affûtage et ne pose rien en semaine de course", () => {
+  const src = codeNu("src/lib/ai/coachContext.ts");
+  assert.match(src, /const longRunKm = wkUntil <= 0 \? 0 : longRunForWeek\(/);
+  assert.match(src, /semainesAvantCourse: wkUntil, reference: Math\.max\(lrCurrent, longueDuBloc\)/);
+  assert.match(src, /if \(ph !== "Affûtage"\) longueDuBloc = Math\.max\(longueDuBloc, longRunKm\);/);
 });
 
 console.log("\n=== MESURE DES JETONS ===\n");

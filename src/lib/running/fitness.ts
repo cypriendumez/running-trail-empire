@@ -381,7 +381,22 @@ export function effectiveVma(i: {
   return { vma: gagnant.v, source: gagnant.s };
 }
 
+/** La séance qui donne la VMA « séances » : sa valeur, et de QUAND et de QUOI elle date. */
+export type MeilleurEffort = { vma: number; date: string | null; distanceKm: number };
+
 export function bestVmaFromWorkouts(
+  ...args: Parameters<typeof meilleurEffort>
+): number | null {
+  return meilleurEffort(...args)?.vma ?? null;
+}
+
+/**
+ * ⚠️ LA MÊME RECHERCHE, MAIS QUI DIT D'OÙ VIENT LE CHIFFRE. « 19,8 km/h — VMA estimée »
+ * ne permettait pas de savoir si la carte suivait la forme ou datait de six mois
+ * (Cyprien, 28/09/2026 : « est-ce que ça se met régulièrement à jour ? »). Elle suit :
+ * c'était son semi de Lambersart du 24/08, relu à 23,9 °C. Il faut pouvoir le LIRE.
+ */
+export function meilleurEffort(
   workouts: { date?: string; distance_km?: number | null; duration_seconds?: number | null; type?: string | null; avg_hr?: number | null;
     /** Température du jour de la séance. Sans elle, aucune correction n'est appliquée. */
     weather_temp_c?: number | null }[],
@@ -396,8 +411,8 @@ export function bestVmaFromWorkouts(
   windowDays = 120,
   /** Acclimatation à la chaleur (≤ 1) : un athlète acclimaté souffre moins, on corrige moins. */
   heatFactor = 1,
-): number | null {
-  let best: number | null = null;
+): MeilleurEffort | null {
+  let best: MeilleurEffort | null = null;
   const now = Date.now();
   for (const w of workouts) {
     if (w.date && (now - new Date(w.date).getTime()) > windowDays * 86400000) continue;
@@ -409,7 +424,7 @@ export function bestVmaFromWorkouts(
     // chrono qu'à 13 °C, et le lire brut faisait s'effondrer la VMA chaque été.
     const sec = dureeEnConditionsNeutres(w.duration_seconds, w.distance_km, w.weather_temp_c, heatFactor);
     const v = vmaFromEffort(w.distance_km, sec);
-    if (v != null && (best == null || v > best)) best = v;
+    if (v != null && (best == null || v > best.vma)) best = { vma: v, date: w.date ? String(w.date).slice(0, 10) : null, distanceKm: w.distance_km };
   }
   return best;
 }

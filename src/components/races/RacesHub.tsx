@@ -12,6 +12,8 @@ import { fmtDistance, type UnitSystem } from "@/lib/units";
 import { correctedRaceType } from "@/lib/raceType";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { RX, fillR } from "./racesI18n";
+import { AutourDeMoi } from "./AutourDeMoi";
+import { dansLeRayon, distanceDeCourse, kmArrondis, type Point, type Proximite } from "@/lib/races/proximite";
 import { PpsStatusCard } from "@/components/pps/PpsStatusCard";
 import { PPS_T } from "@/lib/pps/ppsI18n";
 import { ppsVerdict, type PpsStatus, cleBandeauPps } from "@/lib/pps/status";
@@ -67,7 +69,7 @@ export type PlannedRace = { id: string; name: string; location: string; distance
 
 const normName = (s: string) => (s || "").toLowerCase().trim().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
-export function RacesHub({ races: initialRaces, totalCount, units = "metric", planned: plannedProp = [], initialSearch = "", pps = null, liensMorts = [], favorisInitiaux = [], enPanne = false, ppsMasque = null }: { favorisInitiaux?: string[]; /** Clé du bandeau PPS que l'athlète a écarté (réglages). */ ppsMasque?: string | null; liensMorts?: string[]; races: Race[]; totalCount?: number; units?: UnitSystem; planned?: PlannedRace[]; initialSearch?: string; pps?: PpsStatus | null; /** La lecture du catalogue a ÉCHOUÉ : la liste est vide par accident. */ enPanne?: boolean }) {
+export function RacesHub({ races: initialRaces, totalCount, units = "metric", planned: plannedProp = [], initialSearch = "", pps = null, liensMorts = [], favorisInitiaux = [], enPanne = false, ppsMasque = null, positionEntrainement = null }: { /** Départ de la dernière sortie GPS, arrondi au km — repli du filtre « Autour de moi ». */ positionEntrainement?: Point | null; favorisInitiaux?: string[]; /** Clé du bandeau PPS que l'athlète a écarté (réglages). */ ppsMasque?: string | null; liensMorts?: string[]; races: Race[]; totalCount?: number; units?: UnitSystem; planned?: PlannedRace[]; initialSearch?: string; pps?: PpsStatus | null; /** La lecture du catalogue a ÉCHOUÉ : la liste est vide par accident. */ enPanne?: boolean }) {
   const fuseau = useFuseau();
   const { lang, t } = useT();
   const d = RX[lang] ?? RX.fr;
@@ -107,7 +109,21 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
       .catch(() => {});
   }, [details]);
   const [page, setPage] = useState(0);
-  const [sort, setSort] = useState<"date" | "distance" | "elevation">("date");
+  const [sort, setSort] = useState<"date" | "distance" | "elevation" | "proche">("date");
+  // « Autour de moi » : partagé avec la carte, pour que la liste et les pins disent la même chose.
+  const [proximite, setProximite] = useState<Proximite | null>(null);
+  /**
+   * ⚠️ LE TRI RESTE CHRONOLOGIQUE À L'ACTIVATION. Trier d'office par distance mettait en tête
+   * les courses « date à venir » de sa propre ville (vérifié à l'écran le 28/09/2026 : quatre
+   * courses de Lille sans date avant le premier départ réel). Le rayon fait déjà le « près de
+   * chez moi » ; ce qu'on cherche ensuite, c'est la prochaine. « Les plus proches » reste au
+   * choix — et disparaît avec le filtre, donc le tri revient alors à la date.
+   */
+  const changerProximite = useCallback((p: Proximite | null) => {
+    if (!p) setSort((t) => (t === "proche" ? "date" : t));
+    setProximite(p);
+    setPage(0);
+  }, []);
   const [planning, setPlanning] = useState(false);
 
   const [showMap, setShowMap] = useState(false);
@@ -153,16 +169,25 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
       const matchType = raceType === "all" || correctedRaceType(r.distance_km, r.type) === raceType;
       const matchDate = !dateFrom || r.date.startsWith("2099") || new Date(r.date) >= new Date(dateFrom);
       const matchFavori = !filtreFavoris || favoris.has(r.id);
-      return matchSearch && matchRegion && matchType && matchDate && matchFavori;
+      return matchSearch && matchRegion && matchType && matchDate && matchFavori && dansLeRayon(r, proximite);
     });
     return [...list].sort((a, b) => {
+      if (sort === "proche" && proximite) {
+        // À distance égale (au km affiché près), la plus proche DANS LE TEMPS d'abord.
+        const da = distanceDeCourse(a, proximite.centre), db = distanceDeCourse(b, proximite.centre);
+        const ecart = (da == null ? Infinity : kmArrondis(da)) - (db == null ? Infinity : kmArrondis(db));
+        if (ecart !== 0 && Number.isFinite(ecart)) return ecart;
+        const ad = a.date?.startsWith("2099") ? "9999-99-99" : a.date;
+        const bd = b.date?.startsWith("2099") ? "9999-99-99" : b.date;
+        return ad.localeCompare(bd);
+      }
       if (sort === "distance") return (b.distance_km || 0) - (a.distance_km || 0);
       if (sort === "elevation") return (b.elevation_gain_m || 0) - (a.elevation_gain_m || 0);
       const ad = a.date?.startsWith("2099") ? "9999-99-99" : a.date;
       const bd = b.date?.startsWith("2099") ? "9999-99-99" : b.date;
       return ad.localeCompare(bd);
     });
-  }, [races, search, region, raceType, dateFrom, sort, filtreFavoris, favoris]);
+  }, [races, search, region, raceType, dateFrom, sort, filtreFavoris, favoris, proximite]);
 
   // Courses déjà planifiées par l'athlète — partagé liste + carte (bouton vert ↔ rouge).
   const [plannedList, setPlannedList] = useState<PlannedRace[]>(plannedProp);
@@ -266,7 +291,8 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
       <AnimatePresence>
         {showMap && (
           <RacesMapView races={races} onClose={() => setShowMap(false)}
-            findPlanned={findPlanned} onTrain={trainForRace} onCancel={cancelTraining} busy={planning} />
+            findPlanned={findPlanned} onTrain={trainForRace} onCancel={cancelTraining} busy={planning}
+            proximite={proximite} onProximite={changerProximite} positionEntrainement={positionEntrainement} />
         )}
       </AnimatePresence>
 
@@ -297,7 +323,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                   regroupement ne change que la mise en page des cartes.
                   La sous-ligne dit combien d'événements cela représente, ce qui explique
                   l'écart avec le nombre de cartes affichées. */}
-              {(loadingAll && !search && region === "Toutes" && raceType === "all" && !dateFrom ? (totalCount ?? filtered.length) : filtered.length).toLocaleString(lang)} {filtered.length > 1 || loadingAll ? d["courses"] : d["course"]}
+              {(loadingAll && !search && region === "Toutes" && raceType === "all" && !dateFrom && !proximite ? (totalCount ?? filtered.length) : filtered.length).toLocaleString(lang)} {filtered.length > 1 || loadingAll ? d["courses"] : d["course"]}
             </span>
             {!loadingAll && (
               <span className="block text-[11px] text-zinc-400">
@@ -315,7 +341,11 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
         </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-start gap-2">
+          {/* EN TÊTE : c'est la question d'un coureur (« qu'y a-t-il près de chez moi ? »),
+              à laquelle une région ne répond pas — Lille est à 20 km de la Belgique et à
+              250 km de l'autre bout des Hauts-de-France. */}
+          <AutourDeMoi valeur={proximite} onChange={changerProximite} positionEntrainement={positionEntrainement} d={d} />
           <select
             aria-label={d["a.region"]}
             value={region}
@@ -348,12 +378,13 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
             <select
               aria-label={d["a.tri"]}
               value={sort}
-              onChange={e => handleFilterChange(() => setSort(e.target.value as "date" | "distance" | "elevation"))}
+              onChange={e => handleFilterChange(() => setSort(e.target.value as "date" | "distance" | "elevation" | "proche"))}
               className="cursor-pointer bg-transparent py-1.5 pr-2 text-sm text-zinc-700 focus:outline-none"
             >
               <option value="date">{d["sort.date"]}</option>
               <option value="distance">{d["sort.distance"]}</option>
               <option value="elevation">{d["sort.elevation"]}</option>
+              {proximite && <option value="proche">{d["sort.near"]}</option>}
             </select>
           </div>
           {/* Filtre « mes favoris » : c'est ce qui rend le cœur utile. Sans lui, on
@@ -372,9 +403,9 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
             )}
           </button>
 
-          {(search || region !== "Toutes" || raceType !== "all" || dateFrom) && (
+          {(search || region !== "Toutes" || raceType !== "all" || dateFrom || proximite) && (
             <button
-              onClick={() => handleFilterChange(() => { setSearch(""); setRegion("Toutes"); setRaceType("all"); setDateFrom(""); })}
+              onClick={() => handleFilterChange(() => { setSearch(""); setRegion("Toutes"); setRaceType("all"); setDateFrom(""); changerProximite(null); })}
               className="text-sm px-3 py-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors"
             >
               {d["reset"]}
@@ -398,7 +429,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
             <div className="bento-card text-center py-16 col-span-full">
               <Globe className="w-10 h-10 text-zinc-300 mx-auto mb-3" />
               <p className="text-zinc-500 font-medium">{d["empty.title"]}</p>
-              <p className="text-zinc-400 text-sm mt-1">{d["empty.sub"]}</p>
+              <p className="text-zinc-400 text-sm mt-1">{proximite ? tr("near.empty", { n: proximite.rayonKm }) : d["empty.sub"]}</p>
             </div>
           ) : (
             paginated.map((evt, i) => {
@@ -460,6 +491,14 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                           {race.city ? `${race.city}${race.department ? ` (${race.department})` : ""}` : race.department}
                         </span>
                       )}
+                      {proximite && (() => {
+                        const km = distanceDeCourse(race, proximite.centre);
+                        return km == null ? null : (
+                          <span className="rounded bg-emerald-50 px-1.5 py-0.5 font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                            {tr("near.at", { n: kmArrondis(km) })}
+                          </span>
+                        );
+                      })()}
                       {/* Tous les formats de l'événement, du plus court au plus long.
                           Chacun est cliquable : c'est la distance qui intéresse, pas
                           l'événement en bloc. */}

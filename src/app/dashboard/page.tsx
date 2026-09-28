@@ -10,7 +10,8 @@ import { InviteAvis } from "@/components/dashboard/InviteAvis";
 import { TYPE_AVIS } from "@/lib/avis/store";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import type { Objective } from "@/components/dashboard/ObjectiveCard";
-import { bestVmaFromWorkouts, loadRisk, effectiveVma } from "@/lib/running/fitness";
+import { meilleurEffort, loadRisk, effectiveVma } from "@/lib/running/fitness";
+import type { SourceVma } from "@/components/dashboard/BentoDashboard";
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 import { computeStreak, jourLocal, decaleJour, type StreakWorkout, type StreakPrescription } from "@/lib/streak/compute";
 import { accesDe } from "@/lib/billing/access";
@@ -55,7 +56,7 @@ export default async function DashboardPage() {
     supabase.from("notifications").select("title,body,data,created_at").eq("user_id", user!.id).eq("type", "coach_session").gte("data->>date", today).order("created_at", { ascending: false }).limit(40),
     supabase.from("notifications").select("data").eq("user_id", user!.id).eq("type", "session_feedback").order("created_at", { ascending: false }).limit(60),
     supabase.from("notifications").select("data").eq("user_id", user!.id).eq("type", "race_objective").maybeSingle(),
-    supabase.from("performance_baselines").select("vma_kmh,max_hr").eq("user_id", user!.id).order("tested_at", { ascending: false }).limit(1).single(),
+    supabase.from("performance_baselines").select("vma_kmh,max_hr,tested_at").eq("user_id", user!.id).order("tested_at", { ascending: false }).limit(1).single(),
     supabase.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", new Date(Date.now() - 7 * 86400000).toISOString()),
     // ── RECORDS PAR DISTANCE — requête DÉDIÉE, sur TOUT l'historique ──────────────
     // La liste principale est plafonnée à 40 activités, soit ici deux mois seulement.
@@ -130,12 +131,22 @@ export default async function DashboardPage() {
   // MÊME calcul que le coach — la même fonction, pas une chaîne parallèle. Celle-ci
   // ignorait purement et simplement la courbe d'allure : le tableau de bord annonçait
   // 18,7 km/h pendant que le plan était calé sur 17,3, pour le même athlète.
-  const currentVma = effectiveVma({
+  const effort = meilleurEffort(wks, obsMaxHr > 120 ? obsMaxHr : null);
+  const vmaCalculee = effectiveVma({
     vmaStored: Number((baseRes.data as { vma_kmh?: number } | null)?.vma_kmh) || null,
     paceCurveBest: ((profileRes.data as { pace_curve?: { best?: { m: number; sec: number }[] } | null } | null)?.pace_curve)?.best,
     garminVo2: garminVo2 || null,
-    fromRuns: bestVmaFromWorkouts(wks, obsMaxHr > 120 ? obsMaxHr : null),
-  }).vma ?? 0;
+    fromRuns: effort?.vma ?? null,
+  });
+  const currentVma = vmaCalculee.vma ?? 0;
+  // D'OÙ VIENT LE CHIFFRE — sans quoi « 19,8 km/h » ne disait pas s'il suivait la forme
+  // ou datait de six mois. Il la suit (recalculé à chaque affichage) ; on le montre.
+  const sourceVma: SourceVma | null = vmaCalculee.source === "séances" && effort
+    ? { type: "seances", date: effort.date, km: effort.distanceKm }
+    : vmaCalculee.source === "test"
+      ? { type: "test", date: String((baseRes.data as { tested_at?: string } | null)?.tested_at ?? "").slice(0, 10) || null }
+      : vmaCalculee.source === "courbe" ? { type: "courbe" }
+      : vmaCalculee.source === "vo2max" ? { type: "vo2max" } : null;
   const risk = loadRisk(wks);
 
   // Prochaine séance prescrite par le coach (aujourd'hui ou à venir) → prioritaire sur l'IA/l'algo.
@@ -230,6 +241,7 @@ export default async function DashboardPage() {
       pendingFeedback={pendingFeedback}
       objective={objective}
       currentVma={currentVma}
+      sourceVma={sourceVma}
       loadRisk={risk}
       newMembersWeek={newMembersWeek}
       streak={streak}
