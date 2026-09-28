@@ -742,6 +742,13 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
                   <ChevronRight className="h-4 w-4 text-white/60 transition-transform group-open:rotate-90" aria-hidden />
                 </summary>
                 <p className="mt-2.5 pl-[2.1rem] text-[13px] leading-relaxed text-white/80">{coachKey.why}</p>
+                {/* DANS le repli, pas à côté : la carte verte doit tenir entière dans l'écran du
+                    téléphone. Celui qui lit le « pourquoi » est celui qui a une question. La
+                    question est PRÉ-REMPLIE, jamais envoyée : un lien ne dépense pas un crédit. */}
+                <Link href={`/dashboard/coach?q=${encodeURIComponent(t("dash.coach.questionSeance"))}`}
+                  className="mt-2.5 ml-[2.1rem] inline-flex items-center gap-1 text-[13px] font-semibold text-emerald-100 underline-offset-2 hover:underline">
+                  {t("dash.coach.demander")} <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+                </Link>
               </details>
             )}
           </div>

@@ -64,7 +64,10 @@ export type GeminiResult =
        *  (`finishReason: "MAX_TOKENS"`). Sans ce drapeau, une réponse coupée revenait en
        *  `ok: true` et l'athlète lisait une demi-phrase comme si c'était la conclusion —
        *  mesuré en production sur le kiné le 02/09/2026. L'appelant doit le dire. */
-      tronquee?: boolean }
+      tronquee?: boolean;
+      /** Jetons RÉELLEMENT facturés, tels que Google les compte. Le raisonnement se paie au
+       *  prix de la sortie : c'est la somme `sortie + raisonnement` qui fait la facture. */
+      usage?: Usage }
   /** `dailyExhausted` : plus AUCUN modèle n'a de quota jusqu'à minuit au Pacifique.
    *  Permet à l'appelant de dire « revenez demain » plutôt que « réessayez ». */
   | { ok: false;
@@ -106,6 +109,24 @@ type GenConfig = Record<string, unknown>;
  * Écrire les deux nombres séparément rendait l'erreur invisible : « 1600 » avait l'air
  * généreux. Cette fonction force à nommer ce qu'on laisse à la RÉPONSE.
  */
+/** Jetons consommés par un appel. */
+export type Usage = {
+  entree: number; sortie: number; raisonnement: number;
+  /** Part de l'entrée servie depuis le cache implicite de Google (facturée ~4× moins cher). */
+  cache: number;
+};
+
+/**
+ * Ce que Google dit avoir consommé. Mesurer vaut mieux que supposer : les coûts inscrits
+ * dans `billing/aiQuota` ont déjà dérivé une fois de 10 % sans que rien ne le signale.
+ */
+export function lireUsage(meta: unknown): Usage | undefined {
+  const m = meta as { promptTokenCount?: unknown; candidatesTokenCount?: unknown; thoughtsTokenCount?: unknown; cachedContentTokenCount?: unknown } | null;
+  if (!m || typeof m !== "object") return undefined;
+  const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : 0);
+  return { entree: n(m.promptTokenCount), sortie: n(m.candidatesTokenCount), raisonnement: n(m.thoughtsTokenCount), cache: n(m.cachedContentTokenCount) };
+}
+
 /**
  * La réponse s'est-elle arrêtée faute de budget ?
  *
@@ -199,7 +220,7 @@ export async function generateContent(
             // `MAX_TOKENS` est la seule façon de savoir que la phrase n'est pas finie :
             // le texte, lui, n'a rien qui le signale.
             const tronquee = estTronquee(data?.candidates?.[0]);
-            return { ok: true, text, model, sources, tronquee };
+            return { ok: true, text, model, sources, tronquee, usage: lireUsage(data?.usageMetadata) };
           }
           // Réponse vide (filtre de sécurité, etc.) → on tente le modèle suivant.
           lastErr = "Réponse vide du modèle.";

@@ -1437,8 +1437,16 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
 
   // ── PLAN MACRO PÉRIODISÉ — bloc complet jusqu'au jour J (base → dév → spécifique → affûtage) ──
   const macroPlan: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[] = (() => {
-    if (!weeksToRace || weeksToRace < 1 || !vma) return [];
-    const W = Math.min(weeksToRace, 26);
+    // ⚠️ LA SEMAINE DE COURSE N'EXISTAIT PAS. `weeksToRace` arrondit vers le bas : à 27 jours
+    // du marathon de Lille (Cyprien, 28/09/2026), il vaut 3, et la feuille de route
+    // s'arrêtait au 18/10 — la course est le 25. Tout était décalé d'une semaine : le
+    // volume de « semaine de course » (−45 %) tombait à J−13, et la vraie semaine de course,
+    // sans feuille de route, retombait sur un repli à −35 % : l'affûtage REMONTAIT juste
+    // avant le départ, avec des footings de 10 km la veille de l'avant-veille.
+    // On compte donc les semaines EN INCLUANT celle de la course (J−6 → J = la dernière).
+    if (daysToRace == null || daysToRace < 0 || !vma) return [];
+    const semainesAvecCourse = Math.floor(daysToRace / 7) + 1;
+    const W = Math.min(semainesAvecCourse, 26);
     const baseKm = targetFrom(20);
     const menuTypes = (libGoal === "5k" || libGoal === "10k") ? ["VMA", "Allure spé", "Seuil"]
       : libGoal === "marathon" ? ["Seuil", "Allure mara", "VMA"]
@@ -1452,11 +1460,17 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
     const lrShare = longRunShare(libGoal as RaceGoal, objective?.distanceKm ?? null);
     const out: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[] = [];
     for (let i = 0; i < W; i++) {
-      const wkUntil = weeksToRace - i;                 // semaines restantes au début de cette semaine
+      // Semaines PLEINES avant la semaine de course : même sens que `weeksToRace`, donc
+      // mêmes seuils de phase qu'avant (0 = semaine de course, 1 = J−13 → J−7…).
+      const wkUntil = semainesAvecCourse - 1 - i;
       const ph = phaseDeSemaine(wkUntil);
       let factor: number;
-      if (wkUntil <= 1) factor = 0.55;                  // semaine de course
-      else if (wkUntil === 2) factor = 0.72;            // affûtage
+      // L'affûtage DESCEND jusqu'au bout. La semaine de course est la plus légère — et son
+      // volume s'entend HORS course : `autoPlan` ne compte pas la course dans la cible
+      // (`usedKm`), il répartit ce chiffre entre les footings de J−6 à J−3.
+      if (wkUntil <= 0) factor = 0.40;                  // semaine de course (J−6 → J)
+      else if (wkUntil === 1) factor = 0.55;            // J−13 → J−7
+      else if (wkUntil === 2) factor = 0.72;            // J−20 → J−14
       else {
         // Plafond de montée en charge : +40 % au-dessus du volume de départ… SAUF si
         // l'athlète a DÉJÀ tenu davantage. Un coureur de 20 ans revenu à 40 km après une
@@ -1721,7 +1735,7 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   })();
 
   const cycleLabel = taper ? "AFFÛTAGE — volume fortement réduit, on garde l'intensité pour arriver frais"
-    : deload ? "SEMAINE ALLÉGÉE (1 sur 4) — volume −20 %, c'est là que le corps assimile"
+    : deload ? "SEMAINE ALLÉGÉE (une semaine sur quatre, en fin de bloc) — volume −20 %, c'est là que le corps assimile"
     : "montée en charge normale";
 
   // ── DISPONIBILITÉS DÉCLARÉES ────────────────────────────────────────────────

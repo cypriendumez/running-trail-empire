@@ -30,6 +30,16 @@
 //     25 appels/jour  → 2,16 €/mois   (14 %)
 //    100 appels/jour  → 8,63 €/mois   (58 % — la marge est morte)
 //
+//  ⚠️ LE COACH EN CONVERSATION (`/api/ai/coach`, 28/09/2026) PÈSE PLUS QUE L'APPEL CI-DESSUS.
+//  Il lit le contexte complet PLUS le plan des 7 jours, ses règles et (Premium) la feuille de
+//  route : mesuré à 10 700 – 10 900 jetons d'entrée et 490 – 750 de sortie (raisonnement
+//  compris), soit ≈ 0,41 – 0,45 c€ SANS cache, et ≈ 0,2 c€ quand Google sert l'entrée depuis
+//  son cache (10 202 jetons sur 10 560 au troisième appel mesuré). Un Premium qui ne ferait
+//  QUE converser, 30 fois par jour, tous les jours, SANS jamais toucher le cache, coûterait
+//  ≈ 4 €/mois — au-dessus du quart du net. Le cache, la mémoire bornée et l'usage réel
+//  (~4 appels/jour) ramènent ce chiffre bien en dessous ; c'est une décision à suivre, pas un
+//  invariant garanti.
+//
 //  D'où le plafond ci-dessous : large pour un usage réel (un athlète en fait trois
 //  ou quatre), mais qui borne le pire cas à une fraction supportable du prix.
 //
