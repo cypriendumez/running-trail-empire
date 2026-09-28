@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { lireFiche } from "../scripts/finishers-collecte";
 import {
-  kmDe, estCourseAPied, dplusDe, dplusPlausible, dateDe, apparier, planEvenement, pasUneCourseAPied, deCetteFiche,
+  kmDe, estCourseAPied, dplusDe, dplusPlausible, dateDe, apparier, planEvenement, pasUneCourseAPied, deCetteFiche, estChrono,
   slugRegion, typeDe, formatsRetenus, cleNomVille,
   DATE_A_VENIR, type Fiche, type LigneCourse,
 } from "../src/lib/races/majFinishers";
@@ -71,6 +71,7 @@ test("le kilomètre vertical se reconnaît à sa PENTE — la source l'étiquett
   assert.equal(kmDe(3800, "trail", 1000), 3.8, "KV du Marathon du Mont-Blanc : 3,8 km pour 1 000 m");
   assert.equal(kmDe(3800, "trail", 60), null, "3,8 km presque plat : une course enfants");
   assert.equal(kmDe(3800, "trail", null), null);
+  assert.equal(kmDe(3500, "trail", 520), 3.5, "« Défi de l'Olympe » : 3,5 km pour 520 m, une vraie course d'adultes");
 });
 
 test("un dénivelé IMPOSSIBLE pour la distance devient inconnu", () => {
@@ -193,6 +194,28 @@ test("sans la colonne « confirmée », une date ANNONCÉE n'est pas écrite com
   assert.equal(planEvenement(TUE, [ligne("a", 30.4, { date: DATE_A_VENIR })], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: true }).majs[0].patch.date, "2026-09-28", "après la migration, écrite AVEC son drapeau");
   const faux = planEvenement({ ...TUE, formats: TUE.formats!.map((f) => ({ ...f, dplus: null })) }, [ligne("v", 30.4, { elevation_gain_m: 16660 })], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: false });
   assert.equal(faux.majs[0].patch.elevation_gain_m, null, "un dénivelé faux en base n'est pas conservé faute de mieux");
+});
+
+const fmt = (id: string, titre: string, discipline: string, distanceM: number, dplus: number | null = null) =>
+  ({ id, titre, discipline, distanceM, dplus, date: "2026-10-18", heure: null, inscription: null, statut: "confirmed" });
+
+test("une course À DURÉE (6 h, 24 h) n'est ni importée à la longueur de sa boucle, ni retirée", () => {
+  for (const t of ["6h - Solo", "24H solo (boucle de 6km)", "Course à pied de 24h", "Backyard Ultra", "12 heures"]) assert.equal(estChrono(t), true, t);
+  for (const t of ["10 km - Chronométré", "Trail 21 km départ 9h30", "Semi-marathon"]) assert.equal(estChrono(t), false, t);
+  const atipik: Fiche = { ...TUE, formats: [fmt("a", "6h - Solo", "trail", 3300, 110), fmt("b", "3h-Duo", "trail", 3300, 110), fmt("c", "Challenge parents/enfants", "trail", 3000)] };
+  assert.equal(pasUneCourseAPied(atipik), false, "l'Atipik Trail est une course de 6 h, pas un triathlon");
+  assert.deepEqual(planEvenement(atipik, [ligne("boucle", 3.3)], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: false }).retraits, []);
+  const mixte: Fiche = { ...TUE, formats: [fmt("x", "Trail 21 km", "trail", 21000, 600), fmt("y", "Solo 6h", "trail", 6000, 150)] };
+  const p = planEvenement(mixte, [ligne("t21", 21), ligne("b6", 6), ligne("vieux", 42)], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: false });
+  assert.deepEqual(p.retraits, ["vieux"], "la boucle de 6 km reste ; le 42 km disparu part");
+  assert.equal(p.ajouts.length, 0, "on n'ajoute pas un « 6 km » qui est un 6 h");
+  assert.deepEqual(formatsRetenus(mixte).map((x) => x.id), ["x"]);
+  assert.deepEqual(p.majs.map((m) => m.id), ["t21"], "la ligne de la boucle ne reçoit pas les données d'un 6 h");
+});
+
+test("à distance égale, la course individuelle passe avant le relais", () => {
+  const f: Fiche = { ...TUE, formats: [fmt("rel", "Semi-marathon relais à 3", "road", 21097), fmt("ind", "Semi-marathon", "road", 21097)] };
+  assert.deepEqual(formatsRetenus(f).map((x) => x.id), ["ind"]);
 });
 
 console.log("\n=== LIENS ===\n");

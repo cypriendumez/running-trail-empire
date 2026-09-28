@@ -60,6 +60,7 @@ async function main() {
   const retraits: string[] = [];
   const exemples: string[] = [];
   const touchees = new Set<string>();
+  const detailRetraits: string[] = [];
 
   for (const f of fiches.values()) {
     if (!f.ok) { st.erreurs++; continue; }
@@ -95,6 +96,10 @@ async function main() {
     for (const id of p.retraits) touchees.add(id);
     ajouts.push(...p.ajouts);
     st.retraits += p.retraits.length; retraits.push(...p.retraits);
+    for (const id of p.retraits) {
+      const l = existantes.find((x) => x.id === id)!;
+      detailRetraits.push(`${p.motifs[id]} | ${l.name} (${l.city}) ${l.distance_km} km ${l.date} | fiche : ${(f.formats ?? []).map((x) => `${x.titre ?? "?"} [${x.discipline} ${x.distanceM != null ? Math.round(x.distanceM / 100) / 10 : "?"}]`).join(" ; ")}`);
+    }
     st.retraitsProteges += existantes.filter((l) => favoris.has(l.id) && !p.majs.some((m) => m.id === l.id)).length;
     if (exemples.length < 6 && (p.retraits.length || p.ajouts.length) && existantes.length) {
       exemples.push(`${f.nom} : ${existantes.map((l) => l.distance_km).join("/")} km en base → ${formatsRetenus(f).map((x) => x.km).join("/")} km (retraits ${p.retraits.length}, ajouts ${p.ajouts.length})`);
@@ -109,7 +114,7 @@ async function main() {
 
   console.log(JSON.stringify({ ...st, colonnesNouvelles, pacaANormaliser: paca.length, dplusFauxBalayes: dplusFaux.length, aujourdhui }, null, 1));
   console.log(exemples.join("\n"));
-  writeFileSync(fichier.replace(/\.jsonl$/, "") + `-plan-${ECRIRE ? "ecrit" : "a-blanc"}.json`, JSON.stringify({ st, majs: majs.length, ajouts: ajouts.length, retraits }, null, 1));
+  writeFileSync(fichier.replace(/\.jsonl$/, "") + `-plan-${ECRIRE ? "ecrit" : "a-blanc"}.json`, JSON.stringify({ st, majs: majs.length, ajouts: ajouts.length, retraits, detailRetraits }, null, 1));
   if (!ECRIRE) { console.log("(à blanc — rien écrit ; relancer avec --ecrire)"); return; }
 
   // ── ÉCRITURE ────────────────────────────────────────────────────────────────

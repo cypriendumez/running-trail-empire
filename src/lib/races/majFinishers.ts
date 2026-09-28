@@ -64,8 +64,8 @@ export const estTrail = (type: string) => /trail|ultra/.test(type);
  */
 export const kmDe = (m: number | null | undefined, discipline?: string | null, dplus?: number | null) => {
   if (typeof m !== "number" || !Number.isFinite(m)) return null;
-  const vertical = /vertical|kv/i.test(String(discipline ?? ""))
-    || (typeof dplus === "number" && dplus >= 300 && m > 0 && dplus / (m / 1000) >= 150);
+  // 300 m de D+ : aucune course enfants n'en a ; « Défi de l'Olympe, 3,5 km, 520 m » en a.
+  const vertical = /vertical|kv/i.test(String(discipline ?? "")) || (typeof dplus === "number" && dplus >= 300);
   const min = vertical ? 1500 : 4000;
   return m >= min ? Math.round(m / 100) / 10 : null;
 };
@@ -103,11 +103,34 @@ export function dplusDe(dplus: number | null | undefined, trail: boolean, km?: n
   return Math.round(dplus);
 }
 
-/** Les formats de course à pied retenus d'une fiche, dédoublonnés par distance. */
+/**
+ * Format À DURÉE (6 h, 24 h, backyard) : la « distance » que donne la source est celle de
+ * la BOUCLE (« Atipik Trail – 6h Solo : 3,3 km »). Ce n'est pas une course de 3,3 km —
+ * ni à importer comme telle, ni à retirer comme périmée.
+ * « 9h30 » (une heure de départ) ne compte pas : le `h` y est suivi de chiffres.
+ */
+export const estChrono = (titre: string | null | undefined) =>
+  /(^|[^\d])\d{1,3}\s*h\b|\bheures?\b|backyard/i.test(String(titre ?? ""));
+
+const estRelais = (titre: string | null | undefined) => /relais|relay|[ée]quipe|\bduo\b|\btrio\b/i.test(String(titre ?? ""));
+
+/** Boucles des formats à durée — les lignes à cette distance ne sont pas des formats périmés. */
+export function bouclesChrono(fiche: Fiche): number[] {
+  return (fiche.formats ?? []).filter((f) => estChrono(f.titre) && estCourseAPied(f.discipline) && typeof f.distanceM === "number")
+    .map((f) => Math.round((f.distanceM as number) / 100) / 10);
+}
+
+/**
+ * Les formats de course à pied retenus d'une fiche, dédoublonnés par distance. À distance
+ * égale, la course INDIVIDUELLE passe avant le relais (« Semi-marathon relais à 3 ») : c'est
+ * elle dont on veut le lien d'inscription.
+ */
 export function formatsRetenus(fiche: Fiche): (FormatFiche & { km: number })[] {
   const vus = new Set<number>();
   const out: (FormatFiche & { km: number })[] = [];
-  for (const f of fiche.formats ?? []) {
+  const ordre = [...(fiche.formats ?? [])].sort((a, b) => Number(estRelais(a.titre)) - Number(estRelais(b.titre)));
+  for (const f of ordre) {
+    if (estChrono(f.titre)) continue;
     const km = kmDe(f.distanceM, f.discipline, f.dplus);
     if (km == null || !estCourseAPied(f.discipline) || km > 400) continue;
     if (vus.has(km)) continue;
@@ -167,7 +190,7 @@ export const deCetteFiche = (l: Pick<LigneCourse, "organization" | "registration
  */
 export function pasUneCourseAPied(fiche: Fiche): boolean {
   const f = fiche.formats ?? [];
-  if (!f.length || formatsRetenus(fiche).length) return false;
+  if (!f.length || formatsRetenus(fiche).length || bouclesChrono(fiche).length) return false;
   return f.every((x) => typeof x.distanceM === "number" && x.distanceM > 0 && !!x.discipline);
 }
 
@@ -258,10 +281,12 @@ export function planEvenement(
     });
   }
 
+  const boucles = bouclesChrono(fiche);
   for (const l of lignesSeules) {
     if (o.favoris.has(l.id)) continue;
-    if (deCetteFiche(l, fiche.slug)) { retirer(l.id, "perime"); continue; }
     const km = Number(l.distance_km);
+    if (boucles.some((b) => Math.abs(b - km) <= tolere(b))) continue;   // la boucle d'un 6 h, pas un format périmé
+    if (deCetteFiche(l, fiche.slug)) { retirer(l.id, "perime"); continue; }
     if (formats.some((f) => Math.abs(f.km - km) <= tolere(f.km))) retirer(l.id, "doublon");
   }
   return plan;
