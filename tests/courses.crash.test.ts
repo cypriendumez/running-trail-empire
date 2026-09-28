@@ -22,7 +22,7 @@ import { grouperEvenements, cleEvenement, normNom } from "../src/lib/races/group
 import { idCourseValide } from "../src/lib/races/favoris";
 import { jourFrance } from "../src/lib/races/jourFrance";
 import { typeDepuisUrl, anneeDepuisUrl, choisirFiche, typeCorrige, motsCles, distancesDeFiche, distancesManquantes, typePour, segmentNom, motProche } from "../src/lib/races/leSportif";
-import { joursAvant, sansAccents, correspond, domaineSource, ficheVerifiable } from "../src/lib/races/temps";
+import { joursAvant, sansAccents, correspond, domaineSource, ficheVerifiable, motifSansAccents } from "../src/lib/races/temps";
 import { normaliserHeure, afficherHeure } from "../src/lib/races/heure";
 import { dateDeLaFiche, doitMettreAJour } from "../src/lib/races/fiche";
 import { analyserReponse, promptRecherche, promptExtraction, libelleFormat, libelleDate, MARQUEUR_INCONNU } from "../src/lib/races/heureWeb";
@@ -250,6 +250,22 @@ test("chercher sans accent trouve les courses accentuées", () => {
   assert.ok(correspond("Trail Impérial de Bizy", "imperial"));
   assert.ok(correspond("Nîmes", "nimes"));
   assert.ok(correspond("Saint-Étienne", "saint-etienne"));
+  // 29/09/2026 : sur téléphone, on tape des espaces, pas des tirets — et « st ».
+  assert.ok(correspond("Saint-Étienne", "saint etienne"));
+  assert.ok(correspond("Aix-en-Provence", "aix en provence"));
+  assert.ok(correspond("Saint-Malo", "st malo"));
+  assert.ok(correspond("Sainte-Maxime", "ste maxime"));
+  assert.ok(correspond("10 Km d'Houppeville", "d houppeville"));
+  assert.equal(correspond("Stade de France", "saint"), false, "« st » n'est développé qu'en mot entier");
+  // La barre de recherche du haut interroge la base : le motif doit tolérer les accents.
+  assert.equal(motifSansAccents("foulées"), "f__l__s");
+  assert.ok(new RegExp("^" + motifSansAccents("chambery").replace(/_/g, ".") + "$", "i").test("Chambéry"));
+  const rechercheApi = readFileSync("src/app/api/races/search/route.ts", "utf8");
+  assert.ok(!/\.lt\("date", "2099-01-01"\)/.test(rechercheApi), "la barre du haut exclut de nouveau les courses « Date à venir »");
+  assert.match(rechercheApi, /query\.or\(`name\.ilike\.\*\$\{m\}\*,city\.ilike\.\*\$\{m\}\*`\)/, "la ville n'est plus cherchée");
+  assert.match(rechercheApi, /\.filter\(\(r\) => words\.every\(\(w\) => correspond\(/, "le tri exact après le filet large a disparu");
+  assert.match(rechercheApi, /distanceVoulue == null \|\| Math\.abs\(Number\(r\.distance_km\) - distanceVoulue\)/, "« 10 km bondues » cherche de nouveau « 10 » et « km » dans le nom");
+  assert.match(rechercheApi, /if \(vus\.has\(k\)\) return false; vus\.add\(k\); return true;/, "une suggestion par format revient (« Nîmes Urban Trail » ×3)");
 });
 
 test("chercher AVEC l'accent fonctionne aussi", () => {

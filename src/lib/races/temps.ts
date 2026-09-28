@@ -35,10 +35,28 @@ export function sansAccents(v: unknown): string {
   return String(v ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 }
 
-/** Le texte contient-il la recherche, accents et casse ignorés ? */
+/**
+ * Forme de comparaison : sans accents, ponctuation → espaces, « st »/« ste » → « saint »/
+ * « sainte ». ⚠️ 29/09/2026 : « saint etienne » ne trouvait pas « Saint-Étienne », ni
+ * « aix en provence » « Aix-en-Provence », ni « st malo » « Saint-Malo » — le tiret et
+ * l'abréviation comptaient comme des lettres. Personne ne tape de tiret sur un téléphone.
+ */
+const formeRecherche = (v: unknown) => sansAccents(v).replace(/[^a-z0-9]+/g, " ")
+  .replace(/\bste\b/g, "sainte").replace(/\bst\b/g, "saint").trim();
+
+/**
+ * Un motif SQL `ilike` qui tolère les accents SANS extension `unaccent` : chaque voyelle
+ * (et « c », pour « ç ») devient un joker d'UN caractère — « foulees » → « f__l__s »
+ * attrape « Foulées ». Le filet est large ; `correspond` fait ensuite le tri exact.
+ */
+export function motifSansAccents(mot: string): string {
+  return formeRecherche(mot).replace(/[^a-z0-9 ]/g, "").replace(/[aeiouyc]/g, "_").replace(/ /g, "*");
+}
+
+/** Le texte contient-il la recherche, accents, casse, tirets et « st » ignorés ? */
 export function correspond(champ: unknown, recherche: string): boolean {
-  const q = sansAccents(recherche);
-  return q === "" || sansAccents(champ).includes(q);
+  const q = formeRecherche(recherche);
+  return q === "" || formeRecherche(champ).includes(q);
 }
 
 /**
