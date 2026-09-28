@@ -15,6 +15,7 @@
 import type { AthleteContext } from "@/lib/ai/coachContext";
 import { heatAdvice, windAdvice } from "@/lib/weather/openMeteo";
 import { choisirJourQualite } from "@/lib/coach/meteoPlacement";
+import { fenetreRespectee } from "@/lib/coach/qualiteRecente";
 import { repartirFootings, varianteFooting } from "@/lib/coach/footings";
 import { manqueDeVolume } from "@/lib/coach/ecartVolume";
 import { axesRenforcement } from "@/lib/coach/renforcement";
@@ -428,6 +429,18 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   //  ici à la qualité. Deux déclarations auraient fini par diverger.)
   const placed: number[] = ctx.lastHardDaysAgo != null ? [-ctx.lastHardDaysAgo] : [];
   if (raceIdx >= 0) placed.push(raceIdx);
+  // ── LE BUDGET S'APPLIQUE À SEPT JOURS GLISSANTS, PASSÉ COMPRIS ──────────────────
+  //  Le plan repart d'aujourd'hui chaque matin. Sans mémoire du passé, « une qualité par
+  //  semaine » voulait dire « une qualité dans les sept jours qui viennent », recalculé
+  //  tous les jours : une séance manquée retombait sur aujourd'hui le lendemain (quatre
+  //  seuils identiques du 21 au 24/09/2026 chez Cyprien), et une séance faite en appelait
+  //  une autre 48 h plus tard. Les jours de qualité passés — courus, ou prescrits et
+  //  manqués — occupent désormais leur place dans la fenêtre (lib/coach/qualiteRecente).
+  //  La course n'y entre pas : son approche est déjà protégée par l'espacement.
+  const indiceDe = (jour: string) =>
+    Math.round((Date.parse(`${jour.slice(0, 10)}T12:00:00Z`) - Date.parse(`${iso(dates[0])}T12:00:00Z`)) / 86400000);
+  const qualitePassee = (ctx.qualiteRecente?.jours ?? []).map(indiceDe).filter((i) => Number.isFinite(i) && i <= 0);
+  const qualitePosee: number[] = [];
   // Un jour à 30 °C n'est pas un jour de qualité s'il existe une alternative plus fraîche
   // dans la fenêtre : on ne sacrifie pas une séance clé à la canicule.
   const tempOf = (i: number) => ctx.forecast.find((x) => x.date === iso(dates[i]))?.tempMax ?? null;
@@ -442,7 +455,8 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   };
   const okSpacing = (i: number) => placed.every((p) => Math.abs(p - i) >= gapDays)
     && (longIdx < 0 || Math.abs(i - longIdx) >= 2)
-    && (raceIdx < 0 || Math.abs(i - raceIdx) >= 3);   // rien de dur dans les 48 h autour de la course
+    && (raceIdx < 0 || Math.abs(i - raceIdx) >= 3)    // rien de dur dans les 48 h autour de la course
+    && fenetreRespectee(i, [...qualitePassee, ...qualitePosee], plafondQualite);
   // Le VOLUME plafonne aussi le nombre de qualités : une séance complète (20 min
   // d'échauffement + corps + 10 min de retour au calme) pèse ~11 km. En dessous de
   // 35 km/semaine, deux séances de ce type ne rentrent pas à côté de la sortie longue.
@@ -473,7 +487,10 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // appelant fournirait une liste non taillée, une semaine au feu rouge repartait avec
   // deux séances dures sans qu'une seule ligne ne s'y oppose. Vérifié en lui tendant des
   // candidats avec un budget à zéro : VMA le lundi, seuil le mercredi.
-  const quality = wp.quality.slice(0, Math.min(wp.quality.length, wp.qBudget, maxByVolume, maxByFrequency, maxByTaper));
+  // Le plafond est celui d'une SEMAINE : il borne aussi toute fenêtre de sept jours qui
+  // chevauche le passé (`okSpacing` → `fenetreRespectee`).
+  const plafondQualite = Math.min(wp.qBudget, maxByVolume, maxByFrequency, maxByTaper);
+  const quality = wp.quality.slice(0, Math.min(wp.quality.length, plafondQualite));
   for (let qi = 0; qi < quality.length; qi++) {
     const q = quality[qi];
     // Tous les jours possibles, plus seulement le premier : c'est ce qui permet à la
@@ -514,6 +531,7 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
       ],
     });
     placed.push(idx);
+    qualitePosee.push(idx);
     spend();
   }
 

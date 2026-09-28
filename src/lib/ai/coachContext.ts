@@ -35,6 +35,8 @@ const dureeLoc = (min: number, l: Lang) => {
 import { QUALITE_T } from "@/lib/ai/qualityI18n";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 import { libellesActifs, type Douleur } from "@/lib/health/douleurs";
+import { qualiteRecente as qualiteDesSeptJours, type QualiteRecente, type Prescription } from "@/lib/coach/qualiteRecente";
+import { phaseDeSemaine, specifiqueEnTete } from "@/lib/coach/phase";
 
 type SB = Awaited<ReturnType<typeof createClient>>;
 
@@ -238,6 +240,10 @@ export type AthleteContext = {
   easyPace: string | null;
   /** Jours écoulés depuis la dernière séance DURE réellement effectuée (0 = aujourd'hui). */
   lastHardDaysAgo: number | null;
+  /** Les jours de qualité des sept derniers jours — courus, ou prescrits et MANQUÉS. Le plan
+   *  les compte dans son budget glissant ; sans eux, une séance non faite revenait chaque
+   *  matin. Optionnel : un contexte sérialisé avant cette version ne l'a pas. */
+  qualiteRecente?: QualiteRecente;
   /** Volumes cibles de la semaine, en km. `longRunPlanned` = ce que la périodisation
    *  prévoyait AVANT réduction pour fatigue ; `longRunEased` dit si la coupe a eu lieu,
    *  pour que la séance puisse l'expliquer au lieu d'afficher un chiffre inexpliqué. */
@@ -360,7 +366,9 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const workouts = (woRes.data ?? []) as Wk[];
   const feedback = (fbRes.data ?? []) as { data: { rpe?: number; pain?: string[]; note?: string } }[];
   const objective = (objRes.data?.data ?? null) as CoachObjective | null;
-  const coachSessions = ((csRes.data ?? []) as { data: { date?: string; sessionType?: string } }[]).map(r => r.data).filter((d): d is { date?: string; sessionType?: string } => !!d?.date);
+  // `tags` est lu en plus de la date et du type : c'est lui qui dit qu'une séance d'un
+  // autre écrivain que le plan automatique était une séance de qualité (`qualiteRecente`).
+  const coachSessions = ((csRes.data ?? []) as { data: Prescription & { date?: string; sessionType?: string } }[]).map(r => r.data).filter((d): d is Prescription & { date?: string; sessionType?: string } => !!d?.date);
 
   const now = Date.now();
   /** Borne basse de l'historique long — la MÊME que celle des requêtes ci-dessus. */
@@ -904,6 +912,11 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const lastHardDaysAgo = lastHardWk
     ? Math.max(0, Math.floor((now - new Date(String(lastHardWk.date) + "T00:00:00").getTime()) / 86400000))
     : null;
+  // ── LA QUALITÉ DES SEPT DERNIERS JOURS, FAITE OU MANQUÉE ──
+  // La dernière séance dure ne suffit pas : une séance PRESCRITE et non faite ne laissait
+  // aucune trace, et le plan la represcrivait chaque matin (voir `lib/coach/qualiteRecente`).
+  const qualiteRecente: QualiteRecente = qualiteDesSeptJours(
+    coachSessions, workouts.filter(w => isHardWk(w)).map(w => String(w.date)), todayStr);
 
   // Taux d'adhérence exploitable par le code, et sa formulation lisible. Ils étaient
   // confondus dans une seule chaîne : impossible d'en tirer une décision.
@@ -1401,6 +1414,12 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
       if (i > 0) menu = [menu[i], ...menu.filter((_, k) => k !== i)];
     }
   }
+  // LA PHASE PASSE APRÈS LE FACTEUR LIMITANT, DONC DEVANT LUI. À un mois de la course,
+  // l'allure objectif prend la tête du menu — la même règle que la feuille de route, qui
+  // annonçait « Allure mara » au-dessus d'une semaine qui posait un seuil (lib/coach/phase).
+  // Une course déjà passée (semaines négatives) ne donne pas de phase.
+  const phaseSemaine = objective?.raceDate && weeksToRace != null && weeksToRace >= 0 ? phaseDeSemaine(weeksToRace) : null;
+  menu = specifiqueEnTete(menu, phaseSemaine);
   const chosen = menu.slice(0, qBudget);
   // Préférence athlète : remplacer la sortie longue course par du VÉLO (cross-training sans impact, comme beaucoup de pros).
   const bikeLong = String((p as Record<string, unknown> | null)?.long_run_mode ?? "run") === "bike";
@@ -1434,7 +1453,7 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
     const out: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[] = [];
     for (let i = 0; i < W; i++) {
       const wkUntil = weeksToRace - i;                 // semaines restantes au début de cette semaine
-      const ph = wkUntil <= 2 ? "Affûtage" : wkUntil <= 6 ? "Spécifique" : wkUntil <= 11 ? "Développement" : "Base";
+      const ph = phaseDeSemaine(wkUntil);
       let factor: number;
       if (wkUntil <= 1) factor = 0.55;                  // semaine de course
       else if (wkUntil === 2) factor = 0.72;            // affûtage
@@ -1818,7 +1837,7 @@ ${demonstratedKm ? `- 📈 CAPACITÉ DÉJÀ DÉMONTRÉE : ${demonstratedKm} km/s
 ${lacune ? `- ⚠️ TROU DE DONNÉES : ${lacune.jours} jours SANS AUCUNE trace (ni séance, ni nuit, ni VFC) du ${lacune.debut} au ${lacune.fin}. Une coupure, une blessure et une montre non portée produisent exactement ce silence — et appellent des plans OPPOSÉS. Les moyennes qui traversent cette période sont donc peu fiables : DIS-LUI que tu l'as remarqué et DEMANDE-LUI ce qui s'est passé, ne suppose pas.\n` : ""}- 🎯 VOLUME CIBLE de la semaine à venir : ~${targetKm} km, dont une sortie longue de ~${longRunKm} km. Dimensionne les séances sur CES chiffres, pas sur des durées passe-partout.
 - 🔄 PHASE DU CYCLE : ${cycleLabel}.
 - 📆 DISPONIBILITÉS : ${availDaysPerWeek} séance(s) de course par semaine${availDays.length < 7 ? `, uniquement les ${availDays.map(d => ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d]).join(", ")}` : ""}${declaredDpw ? " (déclaré par l'athlète)" : " (déduit de son niveau et de sa pratique actuelle — demande-lui de le préciser)"}. NE DÉPASSE PAS ce nombre : un plan qu'il ne peut pas suivre ne vaut rien.
-- ⏱️ Dernière séance DURE réellement effectuée : ${lastHardDaysAgo == null ? "aucune trace récente" : lastHardDaysAgo === 0 ? "AUJOURD'HUI ⚠️ → pas de deuxième séance dure aujourd'hui ni demain" : `il y a ${lastHardDaysAgo} j`}${lastHardDaysAgo != null && lastHardDaysAgo * 24 < hardGapH ? ` ⚠️ moins de ${hardGapH} h se sont écoulées : la prochaine qualité doit attendre.` : ""}${skippedWeekdays.length ? `\n- 🚫 JOURS SYSTÉMATIQUEMENT RATÉS : ${skippedWeekdays.map(d => ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d]).join(", ")} — prescrits plusieurs fois, jamais courus. Ne t'obstine pas : place-y du repos ou rien, et redistribue ailleurs.` : ""}
+- ⏱️ Dernière séance DURE réellement effectuée : ${lastHardDaysAgo == null ? "aucune trace récente" : lastHardDaysAgo === 0 ? "AUJOURD'HUI ⚠️ → pas de deuxième séance dure aujourd'hui ni demain" : `il y a ${lastHardDaysAgo} j`}${lastHardDaysAgo != null && lastHardDaysAgo * 24 < hardGapH ? ` ⚠️ moins de ${hardGapH} h se sont écoulées : la prochaine qualité doit attendre.` : ""}${qualiteRecente.manquees.length ? `\n- ⏭️ QUALITÉ PRESCRITE ET NON FAITE (7 derniers jours) : ${qualiteRecente.manquees.join(", ")} — elle compte dans la semaine et NE SE RATTRAPE PAS : ne la re-propose pas le lendemain.` : ""}${skippedWeekdays.length ? `\n- 🚫 JOURS SYSTÉMATIQUEMENT RATÉS : ${skippedWeekdays.map(d => ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d]).join(", ")} — prescrits plusieurs fois, jamais courus. Ne t'obstine pas : place-y du repos ou rien, et redistribue ailleurs.` : ""}
 - Repos : dernière séance il y a ${daysSinceLast ?? "?"} j · ${restDays7} j sans courir sur les 7 derniers${daysSinceLast != null && daysSinceLast >= 3 ? " ⚠️ reprise après coupure : redémarre en douceur, pas de grosse séance d'emblée" : ""}
 - CTL ${Math.round(load.ctl)} (forme) · ATL ${Math.round(load.atl)} (fatigue) · TSB ${Math.round(load.tsb)} (fraîcheur) · ratio aigu:chronique ${r1(load.acr)}${load.acr > 1.5 ? " ⚠️ élevé (risque)" : ""}
 - Répartition d'intensité 14j : ${hardTimePct != null ? `**${hardTimePct} % du TEMPS passé en Z3+** (mesure réelle par zone FC — c'est CE chiffre qui compte, cible ≤ 20 %)${hardTimePct > 25 ? " ⚠️ trop d'intensité : il court ses footings trop vite ou empile les séances dures" : hardTimePct < 8 ? " ⚠️ presque aucune intensité : il ne progressera pas sans qualité" : " ✅ polarisation correcte"}` : `${hardShare ?? "?"} % de SÉANCES qualité (approximation : le temps par zone n'est pas encore remonté par sa montre)`}
@@ -1939,6 +1958,7 @@ ${catalog}`;
     hardGapHours: hardGapH,
     easyPace: easyPaceCorrige,
     lastHardDaysAgo,
+    qualiteRecente,
     volume: { weekKm: Math.round(weekKm), avg4wkKm: Math.round(avg4wkKm), targetKm, longRunKm, longRunPlanned, longRunEased },
     cycle: { deload, taper, label: cycleLabel },
     skippedWeekdays,

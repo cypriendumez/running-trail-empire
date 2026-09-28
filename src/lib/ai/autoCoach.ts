@@ -10,6 +10,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildAthleteContext } from "@/lib/ai/coachContext";
 import { buildWeekPlan, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
+import { estQualitePrescrite } from "@/lib/coach/qualiteRecente";
 import { pushIntervalsWorkout, supprimerIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
 import { profilPeut, COLONNES_ACCES, JOURS_APERCU } from "@/lib/billing/access";
 import { identifiantsDePaire } from "@/lib/intervals/identifiants";
@@ -348,6 +349,11 @@ export async function autoCoachForUser(
     // publient pas. On la fait suivre jusqu'au calendrier, où elle sert vraiment.
     heureDepart: ctx.objective?.heureDepart ?? null,
     phase: ctx.macroPlan[0]?.phase ?? null,
+    // LA SÉANCE MANQUÉE NE SE RATTRAPE PLUS (lib/coach/qualiteRecente). Sans une ligne pour
+    // le dire, l'athlète la verrait simplement disparaître — et croirait le coach en panne,
+    // exactement comme il le croyait quand elle revenait chaque matin.
+    qualiteManquee: ctx.qualiteRecente?.manquees ?? [],
+    prochaineQualite: week.find((d: PlanDay) => d.date >= from && estQualitePrescrite({ sessionType: d.type, tags: d.tags }))?.date ?? null,
     plannedQuality: ctx.macroPlan[0]?.quality ?? [],
     nextWeekQuality: ctx.macroPlan[1]?.quality ?? [],
     targetKm: ctx.volume.targetKm,

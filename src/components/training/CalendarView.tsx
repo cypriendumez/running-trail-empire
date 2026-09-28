@@ -53,6 +53,11 @@ export type CoachState = {
   /** La séance de qualité a été SAUVÉE par le plancher « préparation en cours » : elle
    *  est raccourcie. Sans ce champ, l'athlète lisait « (allégée) » sans savoir pourquoi. */
   qualityFloored?: boolean;
+  /** Séances de qualité prescrites et NON faites ces sept derniers jours. Le plan ne les
+   *  rattrape pas : on le dit, sinon la séance disparaît sans explication. */
+  qualiteManquee?: string[];
+  /** Date de la prochaine séance de qualité réellement posée dans le plan. */
+  prochaineQualite?: string | null;
   /** Ce qui a été fait hors course cette semaine — souvent l'explication d'un allègement
    *  que le calendrier, qui ne montre que la course, rendait incompréhensible. */
   cross?: { label?: string; minutes?: number; tss?: number; sharePct?: number } | null;
@@ -699,7 +704,7 @@ function CoachWhy({ state, lang, t, sessions, realismeMasque = null }: { state: 
   // c'est-à-dire la majorité — ne verrait jamais que cette fonction existe. C'était le
   // défaut du premier jet : la fonction était livrée et invisible pour presque tout le
   // monde.
-  if (!noQuality && !easedQuality && !hasObjective && !warnings.length && !state.lastSession?.label) {
+  if (!noQuality && !easedQuality && !hasObjective && !warnings.length && !state.lastSession?.label && !(state.qualiteManquee ?? []).length) {
     return semaine.length
       ? <div className="mb-4"><AvisCoach week={semaine} qBudget={state.qBudget ?? 0} raisons={reasons} /></div>
       : null;
@@ -715,6 +720,11 @@ function CoachWhy({ state, lang, t, sessions, realismeMasque = null }: { state: 
   const quality = (state.plannedQuality ?? []).filter(Boolean);
   const nextQuality = (state.nextWeekQuality ?? []).filter(Boolean);
   const lastSession = state.lastSession ?? null;
+  const manquees = (state.qualiteManquee ?? []).filter(Boolean);
+  // La prochaine séance en toutes lettres (« jeudi 1 octobre ») : c'est une consigne. Les
+  // séances manquées en bref : il peut y en avoir trois, et ce n'est qu'un rappel.
+  const jourCourt = (d: string) => formatDateCivile(d, lang, { weekday: "long", day: "numeric", month: "long" });
+  const jourBref = (d: string) => formatDateCivile(d, lang, { day: "numeric", month: "short" });
 
   return (
     <div className={`mb-4 rounded-2xl border ${tone.border} ${tone.bg} px-4 py-3.5`}>
@@ -742,6 +752,14 @@ function CoachWhy({ state, lang, t, sessions, realismeMasque = null }: { state: 
           {(noQuality || easedQuality) && (
             <span className={`mt-1.5 block text-sm leading-relaxed ${tone.body}`}>
               {t(noQuality ? "cal.why.noQuality" : "cal.why.easedQuality")}
+            </span>
+          )}
+          {/* Visible repliée : c'est la réponse à « où est passée ma séance ? ». */}
+          {manquees.length > 0 && (
+            <span className={`mt-1.5 block text-sm leading-relaxed ${tone.body}`}>
+              {state.prochaineQualite
+                ? t("cal.why.manquee", { dates: manquees.map(jourBref).join(", "), prochaine: jourCourt(state.prochaineQualite) })
+                : t("cal.why.manqueeSansSuite", { dates: manquees.map(jourBref).join(", ") })}
             </span>
           )}
         </summary>
