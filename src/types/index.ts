@@ -187,6 +187,13 @@ export interface Race {
   terrain: string[];
   time_limits: TimeLimit[];
   registration_url?: string;
+  /** Migration 032 — lus à la demande (`/api/races/detail`), absents de la liste en masse. */
+  site_officiel?: string | null;
+  inscription_url?: string | null;
+  resultats_url?: string | null;
+  resultats_annee?: number | null;
+  heure_depart?: string | null;
+  date_confirmee?: boolean | null;
   gpx_url?: string;
   altitude_profile_url?: string;
   historical_weather?: WeatherConditions;

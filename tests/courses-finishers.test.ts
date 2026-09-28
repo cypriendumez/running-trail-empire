@@ -1,0 +1,236 @@
+/**
+ * COURSES : fiches finishers.com, liens d'inscription directs, classements (28/09/2026).
+ *
+ * Mesuré ce jour-là : aucune course importée depuis le 10/06 ; 7 002 événements du plan du
+ * site finishers absents ; 7 994 formats « Date à venir » ; 510 trails à « 0 m » de D+ ;
+ * des formats d'anciennes éditions mêlés aux vrais ; 78 % des « S'inscrire » vers une fiche
+ * de calendrier ; aucun lien de classement.
+ *
+ *   npx tsx tests/courses-finishers.test.ts
+ */
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { lireFiche } from "../scripts/finishers-collecte";
+import {
+  kmDe, estCourseAPied, dplusDe, dplusPlausible, dateDe, apparier, planEvenement, pasUneCourseAPied, deCetteFiche,
+  slugRegion, typeDe, formatsRetenus, cleNomVille,
+  DATE_A_VENIR, type Fiche, type LigneCourse,
+} from "../src/lib/races/majFinishers";
+import { lienInscription, lienSiteOfficiel, lienClassement, heureLisible } from "../src/lib/races/liensCourse";
+
+let passed = 0; const fails: string[] = [];
+function test(nom: string, fn: () => void) {
+  try { fn(); passed++; console.log("  OK " + nom); }
+  catch (e) { fails.push(`${nom} — ${(e as Error).message}`); console.log("  ✗ " + nom + "\n      " + (e as Error).message); }
+}
+const codeNu = (p: string) => readFileSync(p, "utf8").replace(/\/\*[\s\S]*?\*\//g, "")
+  .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+const AUJ = "2026-09-28";
+
+console.log("\n=== LECTURE D'UNE FICHE ===\n");
+
+test("la fiche donne pays, lieu, formats, dénivelé, heure, site officiel et classement", () => {
+  const data = { props: { pageProps: {
+    event: {
+      name: "10 km de Chambéry", countryName: { code: "FR" }, cityCoordinates: { lat: 45.58, lng: 5.9 },
+      breadcrumb: [{ type: "country", label: "France" }, { type: "level1AdminArea", label: "Auvergne-Rhône-Alpes" }, { type: "level2AdminArea", label: "Savoie" }, { type: "city", label: "Chambéry" }],
+      links: { website: "/external?url=https%3A%2F%2Fwww.10km-chambery.fr%2F&event=x", registration: "/external?url=https%3A%2F%2Fwww.njuko.net%2F10km&event=x" },
+    },
+    lastEdition: { year: 2026, status: "confirmed", dateRange: { start: "2026-06-14" } },
+    nextEdition: { year: 2027, status: "tba", dateRange: { start: "2027-06-13" } },
+    races: [{ id: "r1", formattedTitle: "10 km", discipline: "road", distance: 10000, distanceUnit: "meters", elevationGain: 25, date: "2027-06-13", time: "09:30:00", registrationUrl: null, status: "tba" }],
+    customSubPages: [{ slug: "resultats-10-km", name: "Les résultats", href: "/course/10-km-de-chambery/p/resultats-10-km",
+      longDescription: '<p>Classement : <a href=\\"https://www.finishers.com/course/x\\">fiche</a> <a href=\\"kavval://events/1\\">x</a> <a href=\\"https://resultats-live.com/events/10km\\">ici</a></p>' }],
+  } } };
+  const html = `<html><script id="__NEXT_DATA__" type="application/json">${JSON.stringify(data)}</script></html>`;
+  const f = lireFiche("10-km-de-chambery", html);
+  assert.equal(f.pays, "FR");
+  assert.deepEqual([f.ville, f.departement, f.region, f.lat, f.lon], ["Chambéry", "Savoie", "Auvergne-Rhône-Alpes", 45.58, 5.9]);
+  assert.deepEqual(f.formats?.map((x) => [x.distanceM, x.dplus, x.heure]), [[10000, 25, "09:30"]]);
+  assert.equal(f.siteOfficiel, "https://www.10km-chambery.fr/", "le lien de redirection doit rendre l'adresse réelle");
+  assert.equal(f.inscription, "https://www.njuko.net/10km");
+  assert.equal(f.resultats?.classement, "https://resultats-live.com/events/10km", "le classement direct, pas un lien interne finishers ni kavval");
+  assert.equal(lireFiche("x", "<html>rien</html>").ok, false);
+});
+
+console.log("\n=== DÉCISIONS ===\n");
+
+test("formats retenus : ni courses enfants, ni marche, ni triathlon — le KV reste", () => {
+  assert.equal(kmDe(1800), null, "« 10 000 Pattes » : 1,8 km = course enfants");
+  assert.equal(kmDe(4000), 4);
+  assert.equal(kmDe(3200, "vertical"), 3.2, "un kilomètre vertical est court par nature");
+  assert.equal(estCourseAPied("road"), true); assert.equal(estCourseAPied("trail"), true);
+  // Valeurs relevées dans les fiches : walking, nordic, bike_and_run, obstacle_race, aquathlon…
+  for (const d of ["walking", "nordic", "bike_and_run", "obstacle_race", "aquathlon", "swimrun", "other"]) assert.equal(estCourseAPied(d), false, d);
+  // …et les composées qu'un préfixe « course » ne doit pas faire passer.
+  for (const d of ["trail_walking", "road_cycling", "cross_triathlon"]) assert.equal(estCourseAPied(d), false, d);
+  assert.equal(estCourseAPied("cross"), true, "le cross-country est de la course à pied");
+});
+
+test("le kilomètre vertical se reconnaît à sa PENTE — la source l'étiquette « trail »", () => {
+  assert.equal(kmDe(3800, "trail", 1000), 3.8, "KV du Marathon du Mont-Blanc : 3,8 km pour 1 000 m");
+  assert.equal(kmDe(3800, "trail", 60), null, "3,8 km presque plat : une course enfants");
+  assert.equal(kmDe(3800, "trail", null), null);
+});
+
+test("un dénivelé IMPOSSIBLE pour la distance devient inconnu", () => {
+  assert.equal(dplusPlausible(16660, 18), false, "« Montée du Ventoux, 18 km, 16 660 m » : un zéro de trop");
+  assert.equal(dplusPlausible(1000, 1.9), true, "le KV de Fully, le plus raide");
+  assert.equal(dplusPlausible(1676, 25.7), true); assert.equal(dplusPlausible(5472, 42), true, "Zegama");
+  assert.equal(dplusDe(16660, true, 18), null);
+});
+
+test("le dénivelé : 0 m sur un trail est une ABSENCE de donnée, pas du plat", () => {
+  assert.equal(dplusDe(0, true), null);
+  assert.equal(dplusDe(0, false), 0, "sur route, zéro peut être vrai");
+  assert.equal(dplusDe(472.4, true), 472);
+  assert.equal(dplusDe(null, true), null);
+});
+
+test("la date : passée ou absente → « Date à venir » ; estimée ≠ confirmée", () => {
+  const fiche: Fiche = { slug: "x", ok: true, prochaine: { annee: 2027, debut: "2027-06-13", statut: "tba" } };
+  assert.deepEqual(dateDe({ id: "a", titre: null, discipline: "road", distanceM: 10000, dplus: null, date: "2027-06-13", heure: null, inscription: null, statut: "tba" }, fiche, AUJ), { date: "2027-06-13", confirmee: false });
+  assert.deepEqual(dateDe({ id: "a", titre: null, discipline: "road", distanceM: 10000, dplus: null, date: "2027-06-13", heure: null, inscription: null, statut: "confirmed" }, fiche, AUJ), { date: "2027-06-13", confirmee: true });
+  assert.equal(dateDe({ id: "a", titre: null, discipline: "road", distanceM: 10000, dplus: null, date: "2026-06-14", heure: null, inscription: null, statut: "confirmed" }, fiche, AUJ).date, DATE_A_VENIR, "une date passée n'est pas une date à venir");
+});
+
+test("appariement un pour un, par identifiant de source d'abord", () => {
+  // La ligne « a » porte l'identifiant du format r2 : la distance seule l'aurait donnée à r1.
+  const lignes = [{ id: "a", distance_km: 10, source_id: "r2" }, { id: "b", distance_km: 10.1, source_id: null }];
+  const r = apparier(lignes, [{ id: "r1", km: 10 }, { id: "r2", km: 10.1 }]);
+  assert.deepEqual(r.paires.map(([l, f]) => [l.id, f.id]).sort(), [["a", "r2"], ["b", "r1"]]);
+  assert.deepEqual(apparier([{ id: "a", distance_km: 10 }], [{ id: "x", km: 21.1 }]).formatsSeuls.map((f) => f.km), [21.1]);
+});
+
+const ligne = (id: string, km: number, extra: Partial<LigneCourse> = {}): LigneCourse => ({
+  id, name: "Odyssée du Tue Vaques", city: "Fermanville", date: "2026-09-28", distance_km: km, elevation_gain_m: 0, type: "trail_s",
+  organization: "finishers.com", registration_url: "https://www.finishers.com/course/odyssee-du-tue-vaques",
+  latitude: 49.68, longitude: -1.44, region: "normandie", department: "Manche", difficulty: "blue", ...extra,
+});
+const TUE: Fiche = {
+  slug: "odyssee-du-tue-vaques", ok: true, pays: "FR", nom: "Odyssée du Tue Vaques", ville: "Fermanville",
+  prochaine: { annee: 2026, debut: "2026-09-28", statut: "tba" },
+  formats: [30400, 16000, 8900].map((m, i) => ({ id: `r${i}`, titre: null, discipline: "trail", distanceM: m, dplus: [472, 255, 103][i], date: "2026-09-28", heure: null, inscription: null, statut: "tba" })),
+};
+
+test("le cas réel : 9 formats en base pour 3 réels — les vrais mis à jour, les périmés retirés", () => {
+  const base = [8, 8.9, 10, 15, 16, 27, 30, 30.4, 50].map((km, i) => ligne(`l${i}`, km));
+  const p = planEvenement(TUE, base, { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: false });
+  assert.equal(p.majs.length, 3);
+  assert.deepEqual(p.majs.map((m) => m.patch.elevation_gain_m).sort(), [103, 255, 472], "le « 0 m » laisse la place au vrai dénivelé");
+  assert.equal(p.retraits.length, 6);
+  assert.equal(p.ajouts.length, 0);
+  for (const m of p.majs) assert.ok(!("name" in m.patch) && !("type" in m.patch) && !("city" in m.patch), "on ne réécrit ni le nom, ni le type, ni la ville");
+});
+
+test("jamais retiré : une ligne d'une autre source, ou mise en favori par un athlète", () => {
+  const base = [ligne("fav", 50), ligne("autre", 27, { organization: "le-sportif.com" }), ligne("vieux", 15)];
+  const p = planEvenement(TUE, base, { aujourdhui: AUJ, favoris: new Set(["fav"]), colonnesNouvelles: false });
+  assert.deepEqual(p.retraits, ["vieux"]);
+});
+
+test("hors de France ou sans format lisible : on ne touche à rien", () => {
+  const be = planEvenement({ ...TUE, pays: "BE" }, [ligne("a", 10)], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: false });
+  assert.deepEqual([be.majs, be.ajouts, be.retraits], [[], [], []]);
+  assert.deepEqual(planEvenement({ ...TUE, formats: [] }, [ligne("a", 10)], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: false }).retraits, []);
+});
+
+test("un nouvel événement : lignes complètes, lien vers la fiche, région au format de la base", () => {
+  const p = planEvenement({ ...TUE, slug: "nouveau", region: "Provence-Alpes-Côte d'Azur", departement: "Var", lat: 43.1, lon: 6 }, [], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: true });
+  assert.equal(p.ajouts.length, 3);
+  const a = p.ajouts[0];
+  assert.equal(a.region, "provence-alpes-cote-d-azur");
+  assert.equal(a.registration_url, "https://www.finishers.com/course/nouveau");
+  assert.equal(a.organization, "finishers.com");
+  assert.equal(a.source_id, "r0", "l'identifiant de format rend les mises à jour suivantes exactes");
+  assert.equal(slugRegion("Provence-Alpes-Côte d'Azur"), "provence-alpes-cote-d-azur");
+  assert.equal(typeDe("trail", 30.4), "trail_m"); assert.equal(typeDe("road", 21.1), "semi"); assert.equal(typeDe("road", 10), "road_10k");
+  assert.equal(cleNomVille("Foulées de Bondues", "Bondues"), cleNomVille("FOULEES DE BONDUES ", "bondues"));
+});
+
+test("les nouvelles colonnes ne sont écrites QU'APRÈS la migration 032", () => {
+  const avant = planEvenement(TUE, [ligne("a", 30.4)], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: false });
+  assert.ok(!("site_officiel" in avant.majs[0].patch) && !("date_confirmee" in avant.majs[0].patch));
+  const apres = planEvenement({ ...TUE, siteOfficiel: "https://x.fr" }, [ligne("a", 30.4)], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: true });
+  assert.equal(apres.majs[0].patch.site_officiel, "https://x.fr");
+  assert.equal(apres.majs[0].patch.date_confirmee, false);
+  assert.equal(formatsRetenus(TUE).length, 3);
+});
+
+test("un doublon venu d'ailleurs part ; une ligne d'ailleurs SANS équivalent reste", () => {
+  const jp = (id: string, km: number) => ligne(id, km, { organization: "", registration_url: "https://www.jogging-plus.com/presentation-courses-trails/tue" });
+  // La copie jogging-plus est listée AVANT : c'est quand même la ligne de la fiche qui garde le format.
+  const p = planEvenement(TUE, [jp("jp16", 16), jp("jp21", 21), ligne("fin16", 16)], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: false });
+  assert.ok(p.majs.some((m) => m.id === "fin16"));
+  assert.deepEqual(p.retraits, ["jp16"]); assert.equal(p.motifs.jp16, "doublon");
+  assert.ok(!p.retraits.includes("jp21"), "un 21 km que la fiche ne connaît pas n'est pas un doublon");
+  assert.equal(planEvenement(TUE, [jp("jp16", 16), ligne("fin16", 16)], { aujourdhui: AUJ, favoris: new Set(["jp16"]), colonnesNouvelles: false }).retraits.length, 0);
+});
+
+test("une ligne d'une AUTRE fiche finishers n'est pas « de cette fiche »", () => {
+  assert.equal(deCetteFiche(ligne("a", 10), "odyssee-du-tue-vaques"), true);
+  assert.equal(deCetteFiche(ligne("a", 10, { registration_url: "https://www.finishers.com/course/odyssee-du-tue-vaques-bis" }), "odyssee-du-tue-vaques"), false);
+  assert.equal(deCetteFiche(ligne("a", 10, { registration_url: "https://www.jogging-plus.com/x" }), "odyssee-du-tue-vaques"), false, "organisation finishers mais lien jogging-plus");
+});
+
+test("un triathlon retire ce qu'on en avait importé ; une fiche MUETTE ne retire rien", () => {
+  const tri: Fiche = { ...TUE, formats: [{ id: "t", titre: null, discipline: "triathlon", distanceM: 103000, dplus: 1200, date: null, heure: null, inscription: null, statut: null }] };
+  assert.equal(pasUneCourseAPied(tri), true);
+  const p = planEvenement(tri, [ligne("tri", 103), ligne("jp", 103, { organization: "" })], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: false });
+  assert.deepEqual(p.retraits, ["tri"]); assert.equal(p.motifs.tri, "pasCourseAPied");
+  const muette: Fiche = { ...TUE, formats: [{ id: "x", titre: null, discipline: "trail", distanceM: null, dplus: null, date: null, heure: null, inscription: null, statut: null }] };
+  assert.equal(pasUneCourseAPied(muette), false);
+  assert.deepEqual(planEvenement(muette, [ligne("a", 20)], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: false }).retraits, []);
+});
+
+test("sans la colonne « confirmée », une date ANNONCÉE n'est pas écrite comme certaine", () => {
+  const annonce = planEvenement(TUE, [ligne("a", 30.4, { date: DATE_A_VENIR })], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: false });
+  assert.equal(annonce.majs[0].patch.date, DATE_A_VENIR);
+  assert.deepEqual(annonce.ajouts.map((x) => x.date), [DATE_A_VENIR, DATE_A_VENIR], "les formats ajoutés non plus");
+  assert.equal(annonce.datesEnAttente, 3, "1 mise à jour + 2 ajouts, comptés pour le rapport");
+  const conf: Fiche = { ...TUE, formats: TUE.formats!.map((f) => ({ ...f, statut: "confirmed" })) };
+  assert.equal(planEvenement(conf, [ligne("a", 30.4, { date: DATE_A_VENIR })], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: false }).majs[0].patch.date, "2026-09-28");
+  assert.equal(planEvenement(TUE, [ligne("a", 30.4, { date: DATE_A_VENIR })], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: true }).majs[0].patch.date, "2026-09-28", "après la migration, écrite AVEC son drapeau");
+  const faux = planEvenement({ ...TUE, formats: TUE.formats!.map((f) => ({ ...f, dplus: null })) }, [ligne("v", 30.4, { elevation_gain_m: 16660 })], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: false });
+  assert.equal(faux.majs[0].patch.elevation_gain_m, null, "un dénivelé faux en base n'est pas conservé faute de mieux");
+});
+
+console.log("\n=== LIENS ===\n");
+
+test("inscription : directe, sinon site officiel, sinon la fiche du calendrier", () => {
+  assert.equal(lienInscription({ inscription_url: "https://njuko.net/x", site_officiel: "https://site.fr", registration_url: "https://www.finishers.com/course/x" })?.sorte, "inscription");
+  assert.equal(lienInscription({ site_officiel: "https://site.fr", registration_url: "https://www.finishers.com/course/x" })?.sorte, "officiel");
+  assert.equal(lienInscription({ registration_url: "https://www.finishers.com/course/x" })?.sorte, "fiche");
+  assert.equal(lienInscription({ inscription_url: "javascript:alert(1)" }), null, "seules les adresses http(s) passent");
+  assert.equal(lienSiteOfficiel({ site_officiel: "https://site.fr", inscription_url: "https://njuko.net/x" }), "https://site.fr");
+  assert.equal(lienSiteOfficiel({ site_officiel: "https://site.fr" }), null, "déjà le lien principal : pas deux fois");
+});
+
+test("classement : direct quand on le connaît, sinon une RECHERCHE nommée comme telle", () => {
+  const d = lienClassement({ resultats_url: "https://resultats-live.com/x", resultats_annee: 2026 }, { name: "10 km de Chambéry" });
+  assert.deepEqual(d, { url: "https://resultats-live.com/x", direct: true, annee: 2026 });
+  const r = lienClassement({}, { name: "Corrida de Langueux", city: "Langueux" });
+  assert.equal(r?.direct, false);
+  assert.ok(r?.url.startsWith("https://www.google.com/search?q=") && r.url.includes(encodeURIComponent("Corrida de Langueux")));
+  assert.equal(heureLisible("09:30"), "9 h 30"); assert.equal(heureLisible("25:00"), null);
+});
+
+console.log("\n=== BRANCHEMENTS ===\n");
+
+test("avant la migration, la fiche et la page publique retombent sur les anciens champs", () => {
+  for (const f of ["src/app/api/races/detail/route.ts", "src/app/courses/[slug]/page.tsx", "src/app/api/races/list/route.ts"]) {
+    assert.match(codeNu(f), /\berror\?\.code === "42703"/, `${f} : sans repli, une colonne absente ferait tout échouer`);
+  }
+  assert.match(codeNu("src/components/races/RacesHub.tsx"), /<LiensCourse detail=\{details\[selected\.id\]\} course=\{selected\} d=\{d\} \/>/);
+  assert.match(codeNu("src/components/races/RacesMapView.tsx"), /<LiensCourse detail=\{details\[selected\.id\]\} course=\{selected\} d=\{d\}/);
+  assert.match(codeNu("src/app/api/races/list/route.ts"), /let cols = RACE_COLS \+ COLS_032;/, "la liste doit demander date_confirmee");
+  assert.match(codeNu("src/components/races/RacesHub.tsx"), /race\.date_confirmee === false && !race\.date\?\.startsWith\("2099"\)/, "la liste signale une date seulement annoncée");
+  const sql = readFileSync("supabase/migrations/032_courses_liens_resultats.sql", "utf8").replace(/--.*$/gm, "");
+  assert.doesNotMatch(sql, /\bdrop\b/i);
+  for (const c of ["site_officiel", "inscription_url", "resultats_url", "resultats_annee", "heure_depart", "date_confirmee", "source_id", "source_maj_at"]) {
+    assert.match(sql, new RegExp(`add column if not exists ${c}\\b`), c);
+  }
+});
+
+console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
+if (fails.length) process.exit(1);

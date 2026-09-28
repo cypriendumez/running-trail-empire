@@ -4,6 +4,7 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPublicLang } from "@/lib/i18n/serverLang";
 import { nomAffichable, nomRegion, regionCanonique } from "@/lib/races/libelles";
+import { lienInscription, lienClassement, heureLisible } from "@/lib/races/liensCourse";
 import { nomDestination, estCalendrierTiers, organisateurReel } from "@/lib/races/destination";
 import { texteCourses } from "../coursesI18n";
 import { jourFrance } from "@/lib/races/jourFrance";
@@ -23,6 +24,10 @@ export const revalidate = 3600;
 const publiable = (c: CoursePublique) => estPubliable(c, jourFrance()) || estPubliableSansDate(c);
 
 const CHAMPS = "id,name,city,department,region,date,distance_km,elevation_gain_m,type,terrain,registration_url,latitude,longitude,organization,description,is_itra_certified,itra_points";
+// Migration 032 (inscription directe, site officiel, classement, heure, date confirmée).
+// ⚠️ Lus seulement s'ils existent : avant la migration, les demander ferait échouer la
+// requête (42703) et la page répondrait 404 — pour 10 000 pages indexées.
+const CHAMPS_032 = ",site_officiel,inscription_url,resultats_url,resultats_annee,heure_depart,date_confirmee";
 
 /**
  * ⚠️ RECHERCHE PAR PRÉFIXE D'IDENTIFIANT, PAS PAR NOM. L'adresse se termine par les
@@ -33,8 +38,11 @@ async function lire(slug: string): Promise<CoursePublique | null> {
   const bornes = bornesId(idDepuisSlug(slug) ?? "");
   if (!bornes) return null;
   const sb = createAdminClient();
-  const { data, error } = await sb.from("races").select(CHAMPS)
+  const complet = await sb.from("races").select(CHAMPS + CHAMPS_032)
     .gte("id", bornes.bas).lte("id", bornes.haut).limit(2);
+  const { data, error } = complet.error?.code === "42703"
+    ? await sb.from("races").select(CHAMPS).gte("id", bornes.bas).lte("id", bornes.haut).limit(2)
+    : complet;
   // Deux résultats voudraient dire que huit caractères ne suffisent plus à distinguer :
   // on préfère une page absente à une page qui parlerait d'une autre course.
   if (error || !data || data.length !== 1) return null;
@@ -73,6 +81,8 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
   const km = Number(c.distance_km);
   const dplus = Number(c.elevation_gain_m);
   const lieu = [c.city, c.department].filter(Boolean).join(", ");
+  const insc = lienInscription(c);
+  const classement = lienClassement(c, c);
   // Le champ « organisation » ne vaut que s'il ne désigne pas la source du lien.
   const organisateur = organisateurReel(c.organization, c.registration_url);
   // ⚠️ `terrain` EST UN TABLEAU. `{c.terrain && …}` rendait donc une ligne « Terrain »
@@ -134,6 +144,7 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
         {Number.isFinite(dplus) && dplus > 0 && <Ligne k={t("f.denivele")} v={`${Math.round(dplus)} m`} />}
         {terrains.length > 0 && <Ligne k={t("f.terrain")} v={terrains.join(", ")} />}
         {organisateur && <Ligne k={t("f.orga")} v={organisateur} />}
+        {heureLisible(c.heure_depart) && <Ligne k={t("f.depart")} v={heureLisible(c.heure_depart) as string} />}
         {c.is_itra_certified && <Ligne k={t("f.itra")} v={c.itra_points ? t("f.points", { n: c.itra_points }) : t("f.oui")} />}
       </dl>
 
@@ -148,10 +159,26 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
         <p className="mt-6 whitespace-pre-wrap leading-relaxed text-zinc-700">{c.description}</p>
       )}
 
-      {c.registration_url && (
-        <a href={c.registration_url} target="_blank" rel="noopener noreferrer nofollow"
+      {c.date_confirmee === false && aUneDate(c) && (
+        <p className="mt-6 rounded-xl bg-amber-50 px-4 py-2.5 text-sm text-amber-800">{t("date.aConfirmer")}</p>
+      )}
+
+      {/* Inscription DIRECTE quand la source la donne, sinon le site officiel, sinon la fiche
+          du calendrier — nommée comme telle (lib/races/liensCourse). */}
+      {insc && (
+        <a href={insc.url} target="_blank" rel="noopener noreferrer nofollow"
           className="mt-8 inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 font-semibold text-white transition-colors hover:bg-emerald-700">
-          {t("cta.inscription", { site: nomDestination(c.registration_url) })}
+          {insc.sorte === "inscription" ? t("cta.inscriptionDirecte")
+            : insc.sorte === "officiel" ? t("cta.siteOfficiel")
+            : t("cta.inscription", { site: nomDestination(insc.url) })}
+        </a>
+      )}
+      {classement && (
+        <a href={classement.url} target="_blank" rel="noopener noreferrer nofollow"
+          className="ml-0 mt-3 inline-flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-5 py-3 font-semibold text-zinc-700 transition-colors hover:border-amber-300 hover:bg-amber-50 sm:ml-3">
+          {classement.direct
+            ? (classement.annee ? t("resultats.direct", { a: classement.annee }) : t("resultats.voir"))
+            : t("resultats.chercher")}
         </a>
       )}
       {/* ⚠️ ON NE SE FAIT PAS PASSER POUR L'ORGANISATEUR — ET ON NE LE FAIT PAS CROIRE
@@ -159,7 +186,7 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
           à jogging-plus.com, deux CALENDRIERS de courses. La page annonçait pourtant
           « le site officiel de l'organisateur » : faux sur la quasi-totalité des
           17 153 fiches. On nomme la destination avant le clic. */}
-      {c.registration_url && (
+      {insc?.sorte === "fiche" && c.registration_url && (
         <p className="mt-3 text-xs text-zinc-500">
           {t(estCalendrierTiers(c.registration_url) ? "cta.tiers" : "cta.direct",
             { site: nomDestination(c.registration_url) })}

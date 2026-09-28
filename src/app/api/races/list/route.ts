@@ -7,6 +7,8 @@ import { jourFrance } from "@/lib/races/jourFrance";
 // /api/races/detail. Service role pour dépasser la limite PostgREST de 1000 lignes.
 const RACE_COLS =
   "id,name,type,region,department,city,date,distance_km,elevation_gain_m,difficulty,latitude,longitude,is_itra_certified,itra_points";
+// Date annoncée ≠ date confirmée (migration 032) : la liste le signale d'un « ≈ ».
+const COLS_032 = ",date_confirmee";
 
 export async function GET() {
   const supabaseAdmin = createAdminClient();
@@ -18,10 +20,13 @@ export async function GET() {
   const allRaces: unknown[] = [];
   const PAGE = 1000;
   let from = 0;
+  // ⚠️ Avant la migration 032, la colonne n'existe pas : PostgREST répond 42703 et le
+  // catalogue entier tomberait. On retombe alors sur les colonnes d'origine.
+  let cols = RACE_COLS + COLS_032;
   while (true) {
     const { data, error } = await supabaseAdmin
       .from("races")
-      .select(RACE_COLS)
+      .select(cols)
       .gte("date", today)
       .order("date", { ascending: true })
       // ⚠️ UN `range()` SANS ORDRE TOTAL SAUTE DES LIGNES. Constaté pour de vrai sur la
@@ -31,6 +36,7 @@ export async function GET() {
       // non plus — il faut un départage stable, d'où l'`id`.
       .order("id")
       .range(from, from + PAGE - 1);
+    if (error?.code === "42703" && cols !== RACE_COLS) { cols = RACE_COLS; continue; }
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     if (!data?.length) break;
     allRaces.push(...data);

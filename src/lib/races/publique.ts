@@ -29,6 +29,13 @@ export type CoursePublique = {
   type: string | null;
   terrain: string | null;
   registration_url: string | null;
+  /** Migration 032 — absents avant elle (lecture avec repli, voir la page de course). */
+  site_officiel?: string | null;
+  inscription_url?: string | null;
+  resultats_url?: string | null;
+  resultats_annee?: number | null;
+  heure_depart?: string | null;
+  date_confirmee?: boolean | null;
   latitude: number | null;
   longitude: number | null;
   organization: string | null;

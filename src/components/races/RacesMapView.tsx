@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, MapPin, Calendar, Zap, Mountain, ExternalLink, ChevronRight, Loader2, Flag } from "lucide-react";
+import { X, MapPin, Calendar, Zap, Mountain, ChevronRight, Loader2, Flag } from "lucide-react";
 import type { Race } from "@/types";
 import { correctedRaceType } from "@/lib/raceType";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { RX, dateRangeKey } from "./racesI18n";
 import { AutourDeMoi } from "./AutourDeMoi";
+import { LiensCourse } from "./LiensCourse";
 import { usePleinEcran } from "@/lib/ui/pleinEcran";
 import { dansLeRayon, type Point, type Proximite } from "@/lib/races/proximite";
 import { formatDateCivile } from "@/lib/time/fuseau";
@@ -418,18 +419,9 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
 
               {/* Footer CTA */}
               <div className="p-4 border-t border-zinc-100 space-y-2">
-                {details[selected.id]?.registration_url && (
-                  <a
-                    href={details[selected.id]?.registration_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90"
-                    style={{ backgroundColor: TYPE_COLORS[correctedRaceType(selected.distance_km, selected.type)] || "#22c55e" }}
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    {d["register"]}
-                  </a>
-                )}
+                {/* Inscription directe, site officiel et classement — le même bloc que la liste. */}
+                <LiensCourse detail={details[selected.id]} course={selected} d={d}
+                  couleur={TYPE_COLORS[correctedRaceType(selected.distance_km, selected.type)] || "#22c55e"} />
                 {findPlanned?.(selected) ? (
                   <button
                     onClick={() => onCancel?.(selected)}
