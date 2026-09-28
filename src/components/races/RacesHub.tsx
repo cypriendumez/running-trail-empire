@@ -342,8 +342,10 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
           </button>
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap items-start gap-2">
+        {/* Filters — UNE LIGNE qui défile au doigt sur téléphone (29/09/2026, « on défile
+            trop ») : empilés, les six filtres prenaient un écran entier avant la première
+            course. Sur grand écran, ils reviennent à la ligne. */}
+        <div className="-mx-4 flex items-start gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden [&>*]:flex-shrink-0">
           {/* EN TÊTE : c'est la question d'un coureur (« qu'y a-t-il près de chez moi ? »),
               à laquelle une région ne répond pas — Lille est à 20 km de la Belgique et à
               250 km de l'autre bout des Hauts-de-France. */}
@@ -352,7 +354,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
             aria-label={d["a.region"]}
             value={region}
             onChange={e => handleFilterChange(() => setRegion(e.target.value))}
-            className="text-sm px-3 py-1.5 rounded-lg border border-zinc-200 bg-white text-zinc-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="max-w-[10.5rem] text-sm px-3 py-1.5 rounded-lg border border-zinc-200 bg-white text-zinc-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500 sm:max-w-none"
           >
             {REGIONS.map(r => <option key={r} value={r}>{r === "Toutes" ? d["allRegions"] : r}</option>)}
           </select>
@@ -361,7 +363,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
             aria-label={d["a.type"]}
             value={raceType}
             onChange={e => handleFilterChange(() => setRaceType(e.target.value))}
-            className="text-sm px-3 py-1.5 rounded-lg border border-zinc-200 bg-white text-zinc-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="max-w-[9.5rem] text-sm px-3 py-1.5 rounded-lg border border-zinc-200 bg-white text-zinc-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500 sm:max-w-none"
           >
             <option value="all">{d["allTypes"]}</option>
             {RACE_TYPE_KEYS.map(v => <option key={v} value={v}>{d[`rt.${v}`]}</option>)}
@@ -510,7 +512,9 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                           l'événement en bloc. */}
                       <span className="flex flex-wrap items-center gap-1">
                         <Zap className="w-3 h-3 text-emerald-500" />
-                        {evt.formats.map((f) => (
+                        {/* Une pastille PAR DISTANCE : deux lignes de 10 km (deux sources, ou
+                            élite et populaire) s'affichaient « 10 km 10 km » — lu comme un bug. */}
+                        {evt.formats.filter((f, i, t) => t.findIndex((x) => fmtDistance(x.distance_km, units) === fmtDistance(f.distance_km, units)) === i).map((f) => (
                           <button key={f.id} type="button"
                             onClick={(e) => { e.stopPropagation(); openRace(f); }}
                             className={`rounded px-1.5 py-0.5 font-semibold transition-colors ${

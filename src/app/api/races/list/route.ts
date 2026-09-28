@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { jourFrance } from "@/lib/races/jourFrance";
+import { compacterCourse } from "@/lib/races/compacter";
 
 // Catalogue PUBLIC des courses à venir — colonnes LÉGÈRES (liste + marqueurs carte).
 // Les champs lourds (description, time_limits, terrain…) sont chargés au clic via
@@ -39,7 +40,7 @@ export async function GET() {
     if (error?.code === "42703" && cols !== RACE_COLS) { cols = RACE_COLS; continue; }
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     if (!data?.length) break;
-    allRaces.push(...data);
+    allRaces.push(...data.map((r) => compacterCourse(r as unknown as Record<string, unknown>)));
     if (data.length < PAGE) break;
     from += PAGE;
     if (allRaces.length >= 25000) break;

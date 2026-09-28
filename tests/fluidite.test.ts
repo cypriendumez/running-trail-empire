@@ -25,6 +25,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { T } from "../src/lib/i18n/translations";
+import { compacterCourse } from "../src/lib/races/compacter";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -211,6 +212,15 @@ test("la fonction serveur n'embarque que le catalogue compacté (1 Mo), pas les 
   assert.ok(slim.every((p) => p.arrivee !== "None"), "« None » (le None de Python) est encore une arrivée");
   // Et la route n'affiche plus « → None ».
   assert.match(route, /v && v !== "None"/, "« Départ → None » est de retour dans les descriptions");
+});
+
+test("la liste des courses omet les champs vides — sans perdre « date estimée »", () => {
+  // 29/09/2026 : 15 500 lignes, ~1,2 Mo de `null`/`false` sur 5,9 Mo à décoder au téléphone.
+  const r = compacterCourse({ id: "a", itra_points: null, is_itra_certified: false, date_confirmee: false, elevation_gain_m: null, latitude: 47.5186934, longitude: -2.3031149, distance_km: 0 });
+  assert.deepEqual(r, { id: "a", date_confirmee: false, latitude: 47.51869, longitude: -2.30311, distance_km: 0 },
+    "false de « date_confirmee » = date ESTIMÉE (le « ≈ ») ; 0 km n'est pas un vide");
+  assert.equal(compacterCourse({ is_itra_certified: true, itra_points: 3 }).itra_points, 3);
+  assert.match(codeNu("src/app/api/races/list/route.ts"), /allRaces\.push\(\.\.\.data\.map\(\(r\) => compacterCourse\(/, "la liste n'est plus allégée");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

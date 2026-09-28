@@ -17,7 +17,7 @@ import {
   DATE_A_VENIR, type Fiche, type LigneCourse,
 } from "../src/lib/races/majFinishers";
 import { lienInscription, lienSiteOfficiel, lienClassement, heureLisible } from "../src/lib/races/liensCourse";
-import { lienResultats, robotsAutorise, anneeDe, motsDistinctifs } from "../src/lib/races/resultatsSite";
+import { lienResultats, robotsAutorise, anneeDe, motsDistinctifs, entites } from "../src/lib/races/resultatsSite";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -302,6 +302,12 @@ test("le lien doit NOMMER la course : un organisateur a plusieurs épreuves, un 
   assert.equal(lienResultats(`<a href="/resultats-2026">Résultats 2026</a>`, "https://www.argentrail.com/", 2026, { noms: ["Argentrail"] })?.annee, 2026);
   // Site de club qui porte le nom de la ville : ce n'est pas le site de la course.
   assert.equal(lienResultats(`<a href="/resultats/">Résultats</a>`, "https://reims-athletisme.fr/", 2026, { noms: ["Run in Reims"] }), null);
+});
+
+test("les entités HTML d'un lien sont décodées — « d&#039;Issy » donnait un 404", () => {
+  assert.equal(entites("Corrida%20d&#039;Issy&amp;x=1"), "Corrida%20d'Issy&x=1");
+  const l = lienResultats(`<a href="https://resultats.chronocompetition.com/Corrida%20d&#039;Issy%202025/">Résultats 2025</a>`, "https://x.fr/", 2026);
+  assert.equal(l?.url, "https://resultats.chronocompetition.com/Corrida%20d'Issy%202025/");
 });
 
 test("un classement de plus de deux ans ne répond plus à « comment s'est passée la course »", () => {

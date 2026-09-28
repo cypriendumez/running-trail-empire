@@ -61,6 +61,14 @@ export function anneeDe(texte: string, anneeCourante: number): number | null {
 
 const decode = (u: string) => { try { return decodeURIComponent(u); } catch { return u; } };
 
+/**
+ * Les entités HTML d'un attribut `href`. ⚠️ `&amp;` ne suffit pas : « Corrida%20d&#039;Issy »
+ * est parti tel quel en base (29/09/2026) et le chronométreur répondait 404 — avec
+ * l'apostrophe, la page existe.
+ */
+export const entites = (h: string) => h
+  .replace(/&#0*39;|&#x0*27;|&apos;/gi, "'").replace(/&quot;|&#0*34;/gi, '"').replace(/&amp;/gi, "&");
+
 export const estChronometreur = (url: string) => {
   const h = (() => { try { return new URL(url).hostname.toLowerCase(); } catch { return ""; } })();
   return CHRONOMETREURS.some((c) => h === c || h.endsWith(`.${c}`));
@@ -85,7 +93,7 @@ export function lienResultats(
   for (let m; (m = re.exec(html));) {
     const texte = sansBalises(m[2]).slice(0, 120);
     let url: string;
-    try { url = new URL(m[1].replace(/&amp;/g, "&"), base).toString(); } catch { continue; }
+    try { url = new URL(entites(m[1]), base).toString(); } catch { continue; }
     if (!/^https?:\/\//i.test(url)) continue;
     const chrono = estChronometreur(url);
     const dit = `${texte} ${decode(url)}`;
