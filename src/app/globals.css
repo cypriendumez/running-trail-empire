@@ -240,3 +240,26 @@
   .leaflet-bottom { bottom: 64px; }
   .leaflet-control-zoom { display: none; }
 }
+
+/* Une vue plein écran (carte des courses…) retire la bulle d'aide : elle masquait le
+   pied de la fiche ouverte à droite. Drapeau posé par `usePleinEcran` (lib/ui/pleinEcran). */
+html[data-plein-ecran] [data-bulle-aide] { display: none !important; }
+
+/* ── ÉCRAN DE LANCEMENT (layout du tableau de bord + EcranLancement) ─────────────────
+   Même fond que le démarrage natif de l'application installée (manifest : #FAFAFA) :
+   l'un s'enchaîne sur l'autre sans flash. */
+#lancement { transition: opacity 450ms ease, visibility 450ms; }
+#lancement[data-sortie] { opacity: 0; visibility: hidden; pointer-events: none; }
+#lancement[data-vu] { display: none; }
+.lancement-logo { animation: lancement-entree 600ms cubic-bezier(.2, .8, .2, 1) both; }
+.lancement-nom { animation: lancement-entree 600ms 120ms cubic-bezier(.2, .8, .2, 1) both; }
+.lancement-barre > span {
+  display: block; height: 100%; width: 40%; border-radius: 9999px; background: #059669;
+  animation: lancement-barre 1100ms ease-in-out infinite;
+}
+@keyframes lancement-entree { from { opacity: 0; transform: translateY(6px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes lancement-barre { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
+@media (prefers-reduced-motion: reduce) {
+  .lancement-logo, .lancement-nom, .lancement-barre > span { animation: none; }
+  #lancement { transition: none; }
+}

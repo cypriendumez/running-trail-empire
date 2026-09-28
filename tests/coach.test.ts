@@ -6387,7 +6387,7 @@ test("les records par distance sont cherchés sur tout l'historique, pas sur 40 
   // La liste principale est plafonnée à 40 lignes, soit deux mois. La carte annonçait
   // donc « record personnel » sur le meilleur temps des deux derniers mois : 25:48 au
   // 5 km alors que le vrai record est 16:07, 41:20 au 10 km contre 33:58 en réalité.
-  assert.match(src, /computeDistancePRs\(prWorkouts, lang\)/,
+  assert.match(src, /computeDistancePRs\(prWorkouts, lang(, recordsDeclares)?\)/,
     "les records repassent par `workouts`, plafonné à 40 lignes : ils redeviennent « les deux derniers mois »");
   // La requête dédiée doit rester bornée à la COURSE : un tour de vélo de 21 km
   // deviendrait sinon un record du semi-marathon.

@@ -126,7 +126,7 @@ test("le tunnel d'acquisition relie chaque champ à son libellé", () => {
  * vingt écrans un par un : c'est un chantier, pas une retouche, et le faire à l'aveugle
  * sur 130 sites casserait des mises en page que rien ici ne sait contrôler.
  */
-const PLAFOND_ORPHELINS = 87;
+const PLAFOND_ORPHELINS = 84;   // 87 → 84 le 28/09/2026 : formulaire de record déclaré relié par id
 
 test("la dette d'accessibilité ne grandit pas", () => {
   const fichiers = tousLesTsx();

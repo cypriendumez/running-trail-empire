@@ -8,6 +8,7 @@ import { correctedRaceType } from "@/lib/raceType";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { RX, dateRangeKey } from "./racesI18n";
 import { AutourDeMoi } from "./AutourDeMoi";
+import { usePleinEcran } from "@/lib/ui/pleinEcran";
 import { dansLeRayon, type Point, type Proximite } from "@/lib/races/proximite";
 import { formatDateCivile } from "@/lib/time/fuseau";
 import { useFuseau } from "@/lib/time/FuseauProvider";
@@ -49,6 +50,8 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
 }) {
   const { lang } = useT();
   const d = RX[lang] ?? RX.fr;
+  // La bulle d'aide se retire tant que la carte est ouverte (voir lib/ui/pleinEcran).
+  usePleinEcran();
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<unknown>(null);
   const rendererRef = useRef<unknown>(null);
@@ -154,7 +157,10 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
       L.control.attribution({ position: "bottomright", prefix: MAPTILER ? "© MapTiler © OpenStreetMap" : "© OpenStreetMap" }).addTo(map);
 
       // Rendu canvas → des milliers de points s'affichent sans ralentir.
-      rendererRef.current = L.canvas({ padding: 0.5 });
+      // `tolerance` : la zone cliquable dépasse le point de 6 px. Un point de 5 px de rayon
+      // se ratait au trackpad ou au doigt — un clic « à côté » ne faisait rien, et semblait
+      // une panne (signalé par Cyprien le 28/09/2026).
+      rendererRef.current = L.canvas({ padding: 0.5, tolerance: 6 });
       setMapReady(true);
     }
 

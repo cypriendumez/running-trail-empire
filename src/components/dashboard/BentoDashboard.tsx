@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   Activity, Heart, Trophy, Target,
@@ -24,7 +25,8 @@ import { isRun } from "@/lib/intervals/sport";
 import { computeHrZones } from "@/lib/dashboard/zones";
 import { dansFenetre, ageJours } from "@/lib/dashboard/fenetre";
 import { computeForme } from "@/lib/dashboard/forme";
-import { computeDistancePRs } from "@/lib/dashboard/records";
+import { computeDistancePRs, type RecordDeclare } from "@/lib/dashboard/records";
+import { AjoutRecord } from "@/components/dashboard/AjoutRecord";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { fill } from "@/lib/i18n/base";
 import { ProfileCompletionBanner } from "@/components/dashboard/ProfileCompletionBanner";
@@ -47,6 +49,8 @@ interface Props {
    *  requête dédiée. La liste `workouts` est plafonnée à 40 lignes : s'en servir revenait
    *  à annoncer « record personnel » sur le meilleur temps des deux derniers mois. */
   prWorkouts: { date: string; distance_km: number | null; duration_seconds: number | null }[];
+  /** Records DÉCLARÉS par l'athlète (courus avant l'historique de sa montre). */
+  recordsDeclares?: RecordDeclare[];
   /** Date de la PLUS ANCIENNE séance connue — la profondeur réelle de l'historique. */
   premiereSeance?: string | null;
   /** Un an de charge (date + TSS), chargé à part. Le modèle CTL/ATL a une constante de
@@ -171,7 +175,7 @@ export type SourceVma =
   | { type: "courbe" }
   | { type: "vo2max" };
 
-export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkouts, premiereSeance = null, chargeHistory, sleep, coachSession, pendingFeedback, objective, currentVma, sourceVma = null, loadRisk, newMembersWeek, streak, acces, donneesIncompletes, jourAujourdhui }: Props) {
+export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkouts, recordsDeclares = [], premiereSeance = null, chargeHistory, sleep, coachSession, pendingFeedback, objective, currentVma, sourceVma = null, loadRisk, newMembersWeek, streak, acces, donneesIncompletes, jourAujourdhui }: Props) {
   const { t, lang } = useT();
   const state = hrv[0]?.physiological_state ?? "optimal";
 
@@ -473,7 +477,16 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
   const nx = NEXT_LABELS[lang] ?? NEXT_LABELS.fr;
   const vit = VITALS[lang] ?? VITALS.fr;
   const restingHr = Number((profile as { resting_hr?: number } | null)?.resting_hr) || Number(workouts[0]?.avg_hr) || 0;
-  const distancePRs = computeDistancePRs(prWorkouts, lang);
+  const distancePRs = computeDistancePRs(prWorkouts, lang, recordsDeclares);
+  const router = useRouter();
+  const [retrait, setRetrait] = useState<string | null>(null);
+  const retirerRecord = async (cle: string) => {
+    setRetrait(cle);
+    try {
+      const r = await fetch(`/api/records?distance=${encodeURIComponent(cle)}`, { method: "DELETE" });
+      if (r.ok) router.refresh();
+    } finally { setRetrait(null); }
+  };
   const heroStats = [
     { label: kpi.form, value: disc.hasData ? String(disc.total) : "—", unit: disc.hasData ? "/100" : "" },
     { label: kpi.hrv, value: hrvLatest != null ? hrvLatest.toFixed(0) : "—", unit: hrvLatest != null ? "ms" : "" },
@@ -1487,7 +1500,8 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
           </div>
         </div>
         {/* Records personnels — meilleurs temps réels par distance */}
-        {distancePRs.length > 0 && (
+        {/* Toujours affichée : même sans record mesuré, on peut y DÉCLARER celui d'avant Pacevo. */}
+        {(
           <div className="bento-card">
             <div className="metric-label">{rl.records}</div>
             <div className="mt-3 space-y-2.5">
@@ -1496,8 +1510,18 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
                   <span className="text-sm text-zinc-500">{pr.label}</span>
                   <span className="flex items-center gap-2">
                     <span className="text-sm font-bold tabular-nums text-zinc-900">{pr.time}</span>
-                    <span className="hidden text-[10px] text-zinc-400 sm:inline">{pr.date}</span>
-                    <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-600">RP</span>
+                    <span className="hidden text-[10px] text-zinc-400 sm:inline" title={pr.course ?? undefined}>{pr.date}</span>
+                    {/* « Déclaré » : saisi par l'athlète, pas mesuré — on ne le fait jamais
+                        passer pour une donnée de montre. */}
+                    {pr.source === "declare" ? (
+                      <button type="button" onClick={() => retirerRecord(pr.cle)} disabled={retrait === pr.cle}
+                        title={t("dash.rec.retirer")}
+                        className="rounded bg-sky-50 px-1.5 py-0.5 text-[9px] font-bold text-sky-700 hover:bg-sky-100 disabled:opacity-50">
+                        {t("dash.rec.declare")}
+                      </button>
+                    ) : (
+                      <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-600">RP</span>
+                    )}
                   </span>
                 </div>
               ))}
@@ -1513,6 +1537,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
                 {t("dash.rec.depuis", { d: new Date(premiereSeance).toLocaleDateString(lang, { month: "long", year: "numeric" }) })}
               </p>
             )}
+            {jourAujourdhui && <AjoutRecord aujourdhui={jourAujourdhui} />}
           </div>
         )}
       </aside>

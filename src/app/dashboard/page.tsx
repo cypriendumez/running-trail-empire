@@ -11,6 +11,7 @@ import { TYPE_AVIS } from "@/lib/avis/store";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import type { Objective } from "@/components/dashboard/ObjectiveCard";
 import { meilleurEffort, loadRisk, effectiveVma } from "@/lib/running/fitness";
+import { validerRecordDeclare, type RecordDeclare } from "@/lib/dashboard/records";
 import type { SourceVma } from "@/components/dashboard/BentoDashboard";
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 import { computeStreak, jourLocal, decaleJour, type StreakWorkout, type StreakPrescription } from "@/lib/streak/compute";
@@ -41,7 +42,7 @@ export default async function DashboardPage() {
   // Le jour de l'athlète, calculé AVANT les requêtes : il en filtre une.
   const today = aujourdhui(FUSEAU_DEFAUT);
 
-  const [profileRes, hrvRes, workoutsRes, planRes, leagueRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, newMembersRes, prRes, chargeRes, streakWkRes, streakPlanRes, avisRes, nbSeancesRes, premiereRes] = await Promise.all([
+  const [profileRes, hrvRes, workoutsRes, planRes, leagueRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, newMembersRes, prRes, chargeRes, streakWkRes, streakPlanRes, avisRes, nbSeancesRes, premiereRes, declaresRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single(),
     supabase.from("hrv_data").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(14),
     supabase.from("workouts").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(40),
@@ -102,7 +103,14 @@ export default async function DashboardPage() {
     // semi de 2024 n'y est pas — d'où « 1h19 » là où il sait avoir fait 1h15.
     supabase.from("workouts").select("date")
       .eq("user_id", user!.id).order("date", { ascending: true }).limit(1).maybeSingle(),
+    // Records DÉCLARÉS par l'athlète — ce qu'il a couru avant l'historique de sa montre
+    // (lib/dashboard/records, `RecordDeclare`). Quatre lignes au plus.
+    supabase.from("notifications").select("data").eq("user_id", user!.id).eq("type", "record_declare").limit(8),
   ]);
+  if (declaresRes.error) console.error("[accueil] records déclarés illisibles :", declaresRes.error.message);
+  const recordsDeclares = ((declaresRes.data ?? []) as { data: unknown }[])
+    .map((r) => validerRecordDeclare(r.data, "9999-12-31"))
+    .filter((r): r is RecordDeclare => r != null);
 
   // L'état d'abonnement se déduit du profil déjà chargé : `created_at` donne l'essai,
   // `subscription_tier` la formule. Aucune requête de plus.
@@ -235,6 +243,7 @@ export default async function DashboardPage() {
       league={leagueRes.data}
       prWorkouts={prRes.data ?? []}
       premiereSeance={(premiereRes.data as { date?: string } | null)?.date ?? null}
+      recordsDeclares={recordsDeclares}
       chargeHistory={chargeRes.data ?? []}
       sleep={sleepRes.data ?? null}
       coachSession={coachSession}
