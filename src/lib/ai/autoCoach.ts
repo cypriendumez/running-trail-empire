@@ -16,6 +16,9 @@ import { profilPeut, COLONNES_ACCES, JOURS_APERCU } from "@/lib/billing/access";
 import { identifiantsDePaire } from "@/lib/intervals/identifiants";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 import { estAdmin } from "@/lib/admin/acces";
+import { normLang } from "@/lib/i18n/base";
+import { relireSemaine } from "@/lib/ai/relectureServeur";
+import { appliquerConseils } from "@/lib/ai/relectureSemaine";
 
 type Admin = SupabaseClient;
 
@@ -108,7 +111,7 @@ export async function autoCoachForUser(
   //  Un compte en consultation garde tout ce qu'il a déjà : historique, courses,
   //  trophées, série, et le plan qui était en place. Il ne reçoit simplement plus de
   //  NOUVELLE prescription. On ne détruit rien, on cesse de produire.
-  const { data: profilAcces } = await admin.from("profiles").select(`${COLONNES_ACCES}, email`).eq("id", userId).maybeSingle();
+  const { data: profilAcces } = await admin.from("profiles").select(`${COLONNES_ACCES}, email, preferred_language`).eq("id", userId).maybeSingle();
   const acces = profilAcces as Parameters<typeof profilPeut>[0];
   const planComplet = profilPeut(acces, "plan");
   // ⚠️ LE GRATUIT NE RECEVAIT RIEN — impasse commerciale : un compte qui ne voit jamais
@@ -172,6 +175,18 @@ export async function autoCoachForUser(
   const dayZeroFrozen = (doneToday?.length ?? 0) > 0;
   const from = dayZeroFrozen ? week[1].date : today;
 
+  // ── LE COACH AVANCÉ (Premium, et l'essai qui le montre) ─────────────────────
+  // Le modèle relit les séances CLÉS et ajoute à leur « pourquoi » un conseil d'exécution
+  // personnalisé — sans jamais toucher à la séance (voir lib/ai/relectureSemaine). Aucun
+  // onglet, aucune question à poser : c'est le même plan, mieux expliqué. Starter garde le
+  // moteur seul. Best effort : une panne ou un délai dépassé donne le plan sans conseil.
+  const coachAvance = !apercu && profilPeut(acces, "plan_ia");
+  const langue = normLang(String((profilAcces as { preferred_language?: string } | null)?.preferred_language ?? "fr"));
+  const relecture = coachAvance
+    ? await relireSemaine(admin as unknown as SupabaseClient, { userId, ctx, week, from, lang: langue })
+    : null;
+  const semaineCoach = relecture?.conseils.length ? appliquerConseils(week, relecture.conseils) : week;
+
   // 2) Remplace le plan à venir. On n'efface QUE le futur : l'historique des séances
   //    déjà passées reste intact pour le suivi d'adhérence.
   // ⚠️ SI CETTE PURGE ÉCHOUE EN SILENCE, LE NOUVEAU PLAN S'AJOUTE À L'ANCIEN. Les
@@ -185,7 +200,7 @@ export async function autoCoachForUser(
     return { processed: false, days: 0, pushed: 0, emailed: false, emailSkipped: "purge impossible" };
   }
 
-  const rows = week.filter((d: PlanDay) => d.date >= from).map((d: PlanDay) => ({
+  const rows = semaineCoach.filter((d: PlanDay) => d.date >= from).map((d: PlanDay) => ({
     user_id: userId,
     type: "coach_session",
     // ⚠️ `title` et `body` restent en FRANÇAIS : ce sont les champs canoniques, ceux
@@ -198,7 +213,9 @@ export async function autoCoachForUser(
       date: d.date,
       sessionType: d.type,
       subtitle: d.detail.slice(0, 500),
-      why: d.why.slice(0, 400),
+      // 640 et non plus 400 : le motif du moteur (≤ 400) PLUS le conseil du coach avancé
+      // (≤ 240), composés par `composerPourquoi` qui garde le total sous cette borne.
+      why: d.why.slice(0, 640),
       feel: "",
       tags: d.tags.slice(0, 4),
       confirmed: d.confirmed,
@@ -208,7 +225,7 @@ export async function autoCoachForUser(
       ...(d.i18n ? { i18n: Object.fromEntries(Object.entries(d.i18n).map(([lang, t]) => [lang, {
         title: t.title.slice(0, 80),
         subtitle: t.detail.slice(0, 500),
-        why: t.why.slice(0, 400),
+        why: t.why.slice(0, 640),
         tags: t.tags.slice(0, 4),
       }])) } : {}),
       // Créneau de la journée. SANS lui, la déduplication des écrans (qui porte sur
@@ -353,6 +370,8 @@ export async function autoCoachForUser(
     // le dire, l'athlète la verrait simplement disparaître — et croirait le coach en panne,
     // exactement comme il le croyait quand elle revenait chaque matin.
     qualiteManquee: ctx.qualiteRecente?.manquees ?? [],
+    // Mémoire du coach avancé : réutilisée tant que les séances relues ne changent pas.
+    ...(relecture ? { relecture } : {}),
     prochaineQualite: week.find((d: PlanDay) => d.date >= from && estQualitePrescrite({ sessionType: d.type, tags: d.tags }))?.date ?? null,
     plannedQuality: ctx.macroPlan[0]?.quality ?? [],
     nextWeekQuality: ctx.macroPlan[1]?.quality ?? [],

@@ -3496,7 +3496,8 @@ test("la séance DÉJÀ COURUE aujourd'hui n'est pas réécrite", () => {
   const src = codeOf("src/lib/ai/autoCoach.ts");
   assert.ok(/const from = dayZeroFrozen \? week\[1\]\.date : today/.test(src), "le gel du jour 0 a disparu");
   assert.ok(/\.gte\("data->>date", from\)/.test(src), "l'effacement ne part pas de la date gelée");
-  assert.ok(/week\.filter\(\(d: PlanDay\) => d\.date >= from\)/.test(src), "l'insertion ne part pas de la date gelée");
+  // `semaineCoach` : la même semaine, enrichie des conseils du coach avancé (Premium).
+  assert.ok(/(week|semaineCoach)\.filter\(\(d: PlanDay\) => d\.date >= from\)/.test(src), "l'insertion ne part pas de la date gelée");
   // On vérifie l'INVARIANT (la poussée part de la date gelée), pas une expression
   // exacte : la ligne s'est enrichie du filtrage par jours confirmés quand les doubles
   // séances sont arrivées, et un test qui épingle une chaîne littérale casse au premier

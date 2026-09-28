@@ -12,12 +12,16 @@ import { Logo } from "@/components/brand/Logo";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { NAV_GROUPES, estActive } from "./navigation";
 
+// ⚠️ CET ENCART PROMETTAIT « Plans IA illimités, Ghost Runner, Trail Builder complet » :
+// aucun plan IA n'existe à la demande, et le Ghost Runner est ouvert au gratuit. Il ne
+// s'affiche qu'aux comptes gratuits : il doit dire ce qu'une formule DÉBLOQUE vraiment
+// (réécrit le 28/09/2026, avec le coach avancé de Premium).
 const PREMIUM_CARD: Record<string, { title: string; sub: string }> = {
-  fr: { title: "Passe au Pro", sub: "Plans IA illimités, Ghost Runner, Trail Builder complet." },
-  en: { title: "Go Pro", sub: "Unlimited AI plans, Ghost Runner, full Trail Builder." },
-  de: { title: "Auf Pro upgraden", sub: "Unbegrenzte KI-Pläne, Ghost Runner, voller Trail Builder." },
-  es: { title: "Pasa a Pro", sub: "Planes IA ilimitados, Ghost Runner, Trail Builder completo." },
-  pt: { title: "Passa para Pro", sub: "Planos IA ilimitados, Ghost Runner, Trail Builder completo." },
+  fr: { title: "Débloque ton coach", sub: "Plan complet de 7 jours, séances sur ta montre — et le coach IA avancé en Premium." },
+  en: { title: "Unlock your coach", sub: "Full 7-day plan, sessions on your watch — and the advanced AI coach with Premium." },
+  de: { title: "Schalte deinen Coach frei", sub: "Vollständiger 7-Tage-Plan, Einheiten auf deiner Uhr — und der erweiterte KI-Coach mit Premium." },
+  es: { title: "Desbloquea tu coach", sub: "Plan completo de 7 días, sesiones en tu reloj — y el coach IA avanzado con Premium." },
+  pt: { title: "Desbloqueia o teu coach", sub: "Plano completo de 7 dias, sessões no teu relógio — e o coach IA avançado com Premium." },
 };
 
 /**

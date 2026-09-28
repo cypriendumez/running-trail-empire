@@ -30,15 +30,13 @@
 //     25 appels/jour  → 2,16 €/mois   (14 %)
 //    100 appels/jour  → 8,63 €/mois   (58 % — la marge est morte)
 //
-//  ⚠️ LE COACH EN CONVERSATION (`/api/ai/coach`, 28/09/2026) PÈSE PLUS QUE L'APPEL CI-DESSUS.
-//  Il lit le contexte complet PLUS le plan des 7 jours, ses règles et (Premium) la feuille de
-//  route : mesuré à 10 700 – 10 900 jetons d'entrée et 490 – 750 de sortie (raisonnement
-//  compris), soit ≈ 0,41 – 0,45 c€ SANS cache, et ≈ 0,2 c€ quand Google sert l'entrée depuis
-//  son cache (10 202 jetons sur 10 560 au troisième appel mesuré). Un Premium qui ne ferait
-//  QUE converser, 30 fois par jour, tous les jours, SANS jamais toucher le cache, coûterait
-//  ≈ 4 €/mois — au-dessus du quart du net. Le cache, la mémoire bornée et l'usage réel
-//  (~4 appels/jour) ramènent ce chiffre bien en dessous ; c'est une décision à suivre, pas un
-//  invariant garanti.
+//  ⚠️ LE COACH IA AVANCÉ (Premium, `lib/ai/relectureServeur`) N'EST PAS DANS CE PLAFOND.
+//  Il ne répond à aucune question : il relit les séances clés quand le plan change.
+//  Mesuré le 28/09/2026 sur le compte de Cyprien : 9 664 jetons d'entrée, 498 de sortie
+//  (raisonnement compris) ≈ 0,38 c€ la relecture. Bornée à APPELS_MAX_JOUR (3) par jour et
+//  par athlète, et réutilisée tant que les séances ne changent pas : ≈ 0,11 €/mois en usage
+//  normal (une relecture par jour), 0,34 € au pire. La décompter des crédits de l'athlète
+//  lui ferait payer une fonction qu'il n'a pas demandée.
 //
 //  D'où le plafond ci-dessous : large pour un usage réel (un athlète en fait trois
 //  ou quatre), mais qui borne le pire cas à une fraction supportable du prix.

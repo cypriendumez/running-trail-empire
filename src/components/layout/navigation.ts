@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, CalendarDays, ClipboardList, MapPin, ShieldCheck, Mountain, Ghost,
-  GraduationCap, Heart, MessagesSquare, Watch, UserPlus, Newspaper, Trophy, Medal, ShoppingBag, BrainCircuit,
+  GraduationCap, Heart, MessagesSquare, Watch, UserPlus, Newspaper, Trophy, Medal, ShoppingBag,
 } from "lucide-react";
 
 /**
@@ -25,9 +25,6 @@ export const NAV_GROUPES: Groupe[] = [
   {
     titleKey: "group.training",
     items: [
-      // EN TÊTE de l'entraînement : c'est ce que les formules payantes achètent (« 10 / 30
-      // échanges avec l'IA par jour »), et il n'avait aucune entrée avant le 28/09/2026.
-      { href: "/dashboard/coach", icon: BrainCircuit, tk: "nav.coach" },
       { href: "/dashboard/calendrier", icon: CalendarDays, tk: "nav.calendar" },
       // Juste sous le calendrier : le plan glissant répond à « et demain ? », le
       // catalogue à « et les trois prochains mois ? ». Les deux se consultent ensemble.
