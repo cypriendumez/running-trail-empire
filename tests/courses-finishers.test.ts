@@ -17,7 +17,7 @@ import {
   DATE_A_VENIR, type Fiche, type LigneCourse,
 } from "../src/lib/races/majFinishers";
 import { lienInscription, lienSiteOfficiel, lienClassement, heureLisible } from "../src/lib/races/liensCourse";
-import { lienResultats, robotsAutorise, anneeDe } from "../src/lib/races/resultatsSite";
+import { lienResultats, robotsAutorise, anneeDe, motsDistinctifs } from "../src/lib/races/resultatsSite";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -267,6 +267,33 @@ test("le chronométreur passe devant, puis l'année la plus récente — jamais 
   assert.equal(lienResultats(html.split("<a href=\"https://www.sport")[0], "https://x.fr/", 2026)?.annee, 2025);
   assert.equal(anneeDe("édition 2031, résultats 2024", 2026), 2024);
   assert.equal(anneeDe("course n°120254", 2026), null, "un numéro n'est pas une année");
+});
+
+test("cas relevés le 28/09 : pagination de blog, résultats DU CLUB, vente de dossards", () => {
+  const x = (html: string) => lienResultats(html, "https://x.fr/", 2026);
+  assert.equal(x(`<a href="https://blog.fr/search?updated-max=2025&max-results=5">Articles plus anciens</a>`), null);
+  assert.equal(x(`<a href="https://blog.fr/p?max-results=5">Suite</a>`), null, "« results » dans la requête ne dit rien");
+  assert.equal(x(`<a href="/les-resultats-du-club">LES RESULTATS DU CLUB</a>`), null);
+  assert.equal(x(`<a href="/resultats5km/menu.php">Résultats tests 5 km ou VMA</a>`), null);
+  assert.equal(x(`<a href="https://duotrail.com/courses/le-dossard-pour-le-duo-trail">Résultats Duo Trail</a>`), null);
+  assert.equal(x(`<a href="https://duotrail.com/resultats/resultats-duo-trail-isola-2000">Résultats Duo Trail</a>`)?.url, "https://duotrail.com/resultats/resultats-duo-trail-isola-2000");
+});
+
+test("le lien doit NOMMER la course : un organisateur a plusieurs épreuves, un club publie les siens", () => {
+  assert.deepEqual(motsDistinctifs("10 km d'Isneauville"), ["isneauville"]);
+  assert.deepEqual(motsDistinctifs("Les Foulées du Populaire"), ["populaire"]);
+  const agence = `<a href="https://lvorganisation.com/bol-dor-velo-2026-cyclo">Classements</a><a href="https://lvorganisation.com/corrida-du-laudon-2025/">Résultats 2025</a>`;
+  assert.equal(lienResultats(agence, "https://lvorganisation.com/", 2026, { noms: ["Corrida du Laudon"] })?.url, "https://lvorganisation.com/corrida-du-laudon-2025/");
+  assert.equal(lienResultats(agence, "https://lvorganisation.com/", 2026, { noms: ["Trail des Monts"] }), null, "aucun lien ne nomme ce trail");
+  // Site dédié à la course : son propre « /resultats » suffit (le nom est dans l'adresse du site).
+  assert.equal(lienResultats(`<a href="/resultats-2026">Résultats 2026</a>`, "https://www.argentrail.com/", 2026, { noms: ["Argentrail"] })?.annee, 2026);
+  // Site de club qui porte le nom de la ville : ce n'est pas le site de la course.
+  assert.equal(lienResultats(`<a href="/resultats/">Résultats</a>`, "https://reims-athletisme.fr/", 2026, { noms: ["Run in Reims"] }), null);
+});
+
+test("un classement de plus de deux ans ne répond plus à « comment s'est passée la course »", () => {
+  assert.equal(lienResultats(`<a href="/edition-2015/resultat-2015/">RESULTAT 2015</a>`, "https://x.fr/", 2026), null);
+  assert.equal(lienResultats(`<a href="/resultats-2024/">Résultats 2024</a>`, "https://x.fr/", 2026)?.annee, 2024);
 });
 
 test("robots.txt : respecté, groupe à notre nom d'abord, motifs à étoile", () => {

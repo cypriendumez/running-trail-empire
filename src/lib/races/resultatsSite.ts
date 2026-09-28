@@ -25,12 +25,30 @@ export const CHRONOMETREURS = [
   "chronorace.be", "racetimer.fr", "active-timing.fr", "3wsport.com", "mychrono.fr", "chronopro.net", "endurance-chrono.com",
 ] as const;
 
-const SENS_ECARTES = /tirage|loterie|concours|photo|vid[ée]o|newsletter|partenaire|sondage|quiz|jeu\b|b[ée]n[ée]vole|recherche/i;
+const SENS_ECARTES = /tirage|loterie|concours|photo|vid[ée]o|newsletter|partenaire|sondage|quiz|jeu\b|b[ée]n[ée]vole|recherche|\bclub\b|licenci|adh[ée]rent|\btests?\b|\bvma\b|plus anciens/i;
 const SENS_RESULTATS = /r[ée]sultat|classement|results?\b|ranking/i;
 // klikego, njuko… chronomètrent ET vendent les dossards : leur lien « S'inscrire » n'est pas un classement.
 const SENS_INSCRIPTION = /inscri|register|registration|dossard|billet|ticket|engagement|r[ée]server/i;
 
 export type LienResultats = { url: string; annee: number | null; texte: string; chronometreur: boolean };
+
+/** Plus vieux que ça, un classement ne répond plus à « comment s'est passée la course ». */
+export const ANCIENNETE_MAX_ANS = 2;
+
+const MOTS_VIDES = new Set(["de", "du", "des", "la", "le", "les", "et", "en", "au", "aux", "sur", "the", "and", "of",
+  "trail", "trails", "course", "courses", "foulee", "foulees", "run", "running", "semi", "marathon", "nocturne", "nature",
+  "ronde", "corrida", "tour", "grand", "petit", "petite", "boucle", "boucles", "edition", "challenge", "cross", "ultra",
+  "raid", "race", "urbain", "urban", "defi", "saint", "sainte", "courir", "rose", "octobre", "solidaire", "resultats"]);
+
+/** Les mots DISTINCTIFS d'un nom de course : « 10 km d'Isneauville » → [« isneauville »]. */
+export function motsDistinctifs(nom: string): string[] {
+  return [...new Set(nom.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().split(/[^a-z0-9]+/)
+    .filter((m) => m.length >= 4 && !/^\d+$/.test(m) && !MOTS_VIDES.has(m)))];
+}
+
+// Un site de CLUB ou d'institution publie les résultats de ses licenciés, pas le classement
+// de la course (« reims-athletisme.fr/resultats », « classement des clubs » FFA).
+const HOTE_GENERIQUE = /athle|athletisme|club|federation|fftri|ligue|comite|mairie|tourisme/i;
 
 const sansBalises = (s: string) => s.replace(/<[^>]*>/g, " ").replace(/&nbsp;|&#160;/g, " ").replace(/&amp;/g, "&")
   .replace(/&eacute;/g, "é").replace(/&#233;/g, "é").replace(/\s+/g, " ").trim();
@@ -52,7 +70,16 @@ export const estChronometreur = (url: string) => {
  * Le meilleur lien de résultats d'une page, ou `null`. Préférence : un chronométreur,
  * puis l'année la plus récente, puis un libellé court (un menu, pas une phrase).
  */
-export function lienResultats(html: string, base: string, anneeCourante: number): LienResultats | null {
+export function lienResultats(
+  html: string, base: string, anneeCourante: number, evenement?: { noms: string[] },
+): LienResultats | null {
+  // ⚠️ UN ORGANISATEUR A PLUSIEURS ÉPREUVES. Lu le 28/09/2026 : le menu « Classements »
+  // d'une agence menait à une cyclo, pas au trail demandé. Le lien doit NOMMER la course
+  // (un mot distinctif dans l'adresse ou le libellé), ou vivre sur un site qui la nomme.
+  const mots = evenement ? evenement.noms.flatMap(motsDistinctifs) : null;
+  const nomme = (x: string) => !mots || mots.some((m) => x.includes(m));
+  const norm = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const hoteBase = (() => { try { return new URL(base).hostname.toLowerCase(); } catch { return ""; } })();
   const cands: (LienResultats & { score: number })[] = [];
   const re = /<a\b[^>]*?href\s*=\s*["']([^"'#][^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
   for (let m; (m = re.exec(html));) {
@@ -62,9 +89,22 @@ export function lienResultats(html: string, base: string, anneeCourante: number)
     if (!/^https?:\/\//i.test(url)) continue;
     const chrono = estChronometreur(url);
     const dit = `${texte} ${decode(url)}`;
-    if (!SENS_RESULTATS.test(dit) && !(chrono && /live/i.test(url))) continue;
+    const chemin = (() => { const u = new URL(url); return decode(u.hostname + u.pathname + u.hash); })();
+    // Le SENS se lit dans le libellé et le chemin, pas dans la requête : « ?max-results=5 »
+    // (la pagination d'un blog) passait pour un lien de résultats.
+    if (!SENS_RESULTATS.test(`${texte} ${chemin}`) && !(chrono && /live/i.test(url))) continue;
     if (SENS_ECARTES.test(texte) || SENS_INSCRIPTION.test(texte)) continue;
+    // « Résultats Duo Trail » menait à « /le-dossard-pour-le-duo-trail… » : une vente de dossards.
+    if (SENS_INSCRIPTION.test(chemin) && !SENS_RESULTATS.test(chemin)) continue;
     const annee = anneeDe(dit, anneeCourante);
+    if (annee != null && annee < anneeCourante - ANCIENNETE_MAX_ANS) continue;
+    if (/frmbase=cclubs|classement des clubs/i.test(dit)) continue;
+    if (mots) {
+      const u = new URL(url);
+      const memeSite = u.hostname.toLowerCase() === hoteBase;
+      const siteNomme = memeSite && !HOTE_GENERIQUE.test(hoteBase) && nomme(norm(hoteBase));
+      if (!siteNomme && !nomme(norm(`${decode(u.pathname + u.search + u.hash)} ${texte}`))) continue;
+    }
     const score = (chrono ? 100 : 0) + (annee ? annee - 2000 : 0) + (texte.length > 0 && texte.length <= 40 ? 5 : 0);
     cands.push({ url, annee, texte, chronometreur: chrono, score });
   }

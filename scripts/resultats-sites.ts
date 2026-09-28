@@ -32,13 +32,17 @@ async function lire(url: string, ms = 12000): Promise<{ code: number; texte: str
 
 async function main() {
   const [fFiches, sortie] = process.argv.slice(2);
-  const sites = new Set<string>();
+  // Site → noms des courses qui y renvoient (un organisateur peut en avoir plusieurs).
+  const noms = new Map<string, string[]>();
   for (const l of readFileSync(fFiches, "utf8").split("\n")) {
     try {
       const f = JSON.parse(l) as Fiche;
-      if (f?.ok && PAYS_FRANCE.has(String(f.pays ?? "")) && f.siteOfficiel && !f.resultats?.classement) sites.add(f.siteOfficiel);
+      if (f?.ok && PAYS_FRANCE.has(String(f.pays ?? "")) && f.siteOfficiel && !f.resultats?.classement) {
+        noms.set(f.siteOfficiel, [...(noms.get(f.siteOfficiel) ?? []), String(f.nom ?? "")]);
+      }
     } catch { /* ligne en cours d'écriture */ }
   }
+  const sites = new Set(noms.keys());
   const faits = new Set<string>();
   if (existsSync(sortie)) for (const l of readFileSync(sortie, "utf8").split("\n")) { try { faits.add((JSON.parse(l) as LigneSite).site); } catch { /* */ } }
   const reste = [...sites].filter((s) => !faits.has(s));
@@ -66,7 +70,7 @@ async function main() {
       const p = await lire(site);
       if (p.texte == null) return ecrire({ ok: false, http: p.code });
       if (!/html/i.test(p.type)) return ecrire({ ok: false, http: p.code, motif: "pas-html" });
-      const lien = lienResultats(p.texte, site, anneeCourante);
+      const lien = lienResultats(p.texte, site, anneeCourante, { noms: noms.get(site) ?? [] });
       if (lien) trouves++;
       ecrire({ ok: true, http: p.code, lien });
     } finally { occupes.delete(u.host); }
