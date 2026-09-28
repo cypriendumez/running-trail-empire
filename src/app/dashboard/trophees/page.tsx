@@ -58,8 +58,8 @@ export default async function TropheesPage() {
   return (
     <div className="mx-auto w-full max-w-5xl sm:px-4 sm:py-8">
       <PerfTabs />
-      <header className="mb-6">
-        <h1 className="text-3xl font-black tracking-tight text-zinc-900">{d["nav.trophies"]}</h1>
+      <header className="mb-4 sm:mb-6">
+        <h1 className="text-2xl font-black tracking-tight text-zinc-900 sm:text-3xl">{d["nav.trophies"]}</h1>
         <p className="mt-1 text-sm text-zinc-500">
           {trophies.length > 0 ? fill(d["tro.sub"], { n: trophies.length }) : d["tro.empty"]}
         </p>
@@ -68,9 +68,9 @@ export default async function TropheesPage() {
       {/* BILAN — quatre chiffres, une seule ligne. La page n'était qu'une suite de
           grandes cartes blanches : il manquait un point d'entrée qui résume. */}
       {seances.length > 0 && (
-        <dl className="mb-8 grid grid-cols-2 divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 bg-white sm:grid-cols-4 sm:divide-x">
+        <dl className="mb-5 grid grid-cols-2 sm:mb-8 divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 bg-white sm:grid-cols-4 sm:divide-x">
           {bilan.map((b) => (
-            <div key={b.label} className="px-4 py-3.5">
+            <div key={b.label} className="px-3.5 py-2.5 sm:px-4 sm:py-3.5">
               <dt className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{b.label}</dt>
               <dd className="mt-0.5 text-xl font-black tracking-tight text-zinc-900">{b.valeur}</dd>
             </div>

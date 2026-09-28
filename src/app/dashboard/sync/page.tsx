@@ -7,7 +7,9 @@ import {
   Zap, Heart, Moon, Battery,
   AlertCircle, ChevronRight, Upload, Info, WifiOff, Clock,
   Key, Eye, EyeOff, Trash2, ExternalLink,
-  ArrowDown, MousePointerClick, Settings2, Link2, Code2, Sparkles
+  ArrowDown, MousePointerClick, Settings2, Link2, Code2, Sparkles,
+  Footprints, Mountain, Bike, Waves, XCircle, ArrowRight, AlertTriangle, HeartPulse, Droplet, BarChart3, Trophy,
+  type LucideIcon,
 } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { SY, SY_NODES, fillY } from "./syncI18n";
@@ -55,14 +57,14 @@ function fmtDuration(sec: number) {
   return h > 0 ? `${h}h${String(m).padStart(2, "0")}` : `${m}min`;
 }
 
-function activityIcon(type?: string) {
-  if (!type) return "🏃";
-  if (type.toLowerCase().includes("trail")) return "🏔";
-  if (type.toLowerCase().includes("run")) return "🏃";
-  if (type.toLowerCase().includes("ride")) return "🚴";
-  if (type.toLowerCase().includes("swim")) return "🏊";
-  if (type.toLowerCase().includes("hike")) return "🥾";
-  return "⚡";
+/** L'icône d'une activité — dessinée, plus d'emoji (29/09/2026 : « ça fait trop IA »). */
+function activityIcon(type?: string): LucideIcon {
+  const t = String(type ?? "").toLowerCase();
+  if (t.includes("trail")) return Mountain;
+  if (t.includes("ride")) return Bike;
+  if (t.includes("swim")) return Waves;
+  if (!t || t.includes("run") || t.includes("hike") || t.includes("walk")) return Footprints;
+  return Activity;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -440,7 +442,7 @@ export default function SyncPage() {
                   {activities.map((act, i) => (
                     <motion.div key={act.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.02, 0.25), duration: 0.2 }}
                       className="flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-zinc-50">
-                      <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-lg">{activityIcon(act.type)}</span>
+                      <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-600">{(() => { const I = activityIcon(act.type); return <I className="h-5 w-5" />; })()}</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-zinc-900 truncate">{cleanActivityName(act.name) || act.type || d["act.fallback"]}</p>
                         <p className="text-xs text-zinc-400">{act.date}</p>
@@ -726,8 +728,8 @@ export default function SyncPage() {
                   </div>
                   {/* Common-mistake warnings */}
                   <div className="mt-2 bg-amber-50 border border-amber-100 rounded-xl p-2.5 space-y-1">
-                    <p className="text-[11px] text-amber-700 flex items-start gap-1.5"><span>❌</span> <span>{nodes.s3warn1}</span></p>
-                    <p className="text-[11px] text-amber-700 flex items-start gap-1.5"><span>👉</span> <span>{nodes.s3warn2}</span></p>
+                    <p className="text-[11px] text-amber-700 flex items-start gap-1.5"><XCircle className="mt-px h-3.5 w-3.5 flex-shrink-0" /> <span>{nodes.s3warn1}</span></p>
+                    <p className="text-[11px] text-amber-700 flex items-start gap-1.5"><ArrowRight className="mt-px h-3.5 w-3.5 flex-shrink-0" /> <span>{nodes.s3warn2}</span></p>
                   </div>
                   <a href="https://intervals.icu/settings#developer" target="_blank" rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:underline mt-2.5">
@@ -767,7 +769,7 @@ export default function SyncPage() {
                           {idValid && <CheckCircle2 className="w-4 h-4 text-emerald-500 absolute right-3 top-1/2 -translate-y-1/2" />}
                           {idHint && <AlertCircle className="w-4 h-4 text-red-400 absolute right-3 top-1/2 -translate-y-1/2" />}
                         </div>
-                        {idHint && <p className="text-[11px] text-red-500 mt-1 flex items-start gap-1"><span>⚠️</span>{idHint}</p>}
+                        {idHint && <p className="text-[11px] text-red-500 mt-1 flex items-start gap-1"><AlertTriangle className="mt-px h-3.5 w-3.5 flex-shrink-0" />{idHint}</p>}
                       </div>
                       <div>
                         <label className="text-xs font-medium text-zinc-600 block mb-1.5">
@@ -793,7 +795,7 @@ export default function SyncPage() {
                             {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </button>
                         </div>
-                        {keyHint && <p className="text-[11px] text-red-500 mt-1 flex items-start gap-1"><span>⚠️</span>{keyHint}</p>}
+                        {keyHint && <p className="text-[11px] text-red-500 mt-1 flex items-start gap-1"><AlertTriangle className="mt-px h-3.5 w-3.5 flex-shrink-0" />{keyHint}</p>}
                       </div>
                     </div>
 
@@ -853,19 +855,19 @@ export default function SyncPage() {
             <div className="bg-white rounded-2xl border border-zinc-200 p-5">
               <h3 className="font-semibold text-zinc-900 text-sm mb-3">{d["sync.title"]}</h3>
               <div className="grid grid-cols-2 gap-2 text-xs">
-                {[
-                  [d["d1t"], d["d1d"]],
-                  [d["d2t"], d["d2d"]],
-                  [d["d3t"], d["d3d"]],
-                  [d["d4t"], d["d4d"]],
-                  [d["d5t"], d["d5d"]],
-                  [d["d6t"], d["d6d"]],
-                  [d["d7t"], d["d7d"]],
-                  [d["d8t"], d["d8d"]],
-                  [d["d9t"], d["d9d"]],
-                ].map(([title, desc]) => (
+                {([
+                  [d["d1t"], d["d1d"], Footprints],
+                  [d["d2t"], d["d2d"], Heart],
+                  [d["d3t"], d["d3d"], Zap],
+                  [d["d4t"], d["d4d"], Activity],
+                  [d["d5t"], d["d5d"], Moon],
+                  [d["d6t"], d["d6d"], HeartPulse],
+                  [d["d7t"], d["d7d"], Droplet],
+                  [d["d8t"], d["d8d"], BarChart3],
+                  [d["d9t"], d["d9d"], Trophy],
+                ] as [string, string, LucideIcon][]).map(([title, desc, I]) => (
                   <div key={String(title)} className="flex items-start gap-2">
-                    <ChevronRight className="w-3.5 h-3.5 text-zinc-300 mt-0.5 flex-shrink-0" />
+                    <I className="w-3.5 h-3.5 text-emerald-600 mt-0.5 flex-shrink-0" />
                     <div>
                       <span className="font-medium text-zinc-700">{title}</span>
                       <span className="text-zinc-400"> — {desc}</span>
