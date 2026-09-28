@@ -22,7 +22,7 @@ import { grouperEvenements, cleEvenement, normNom } from "../src/lib/races/group
 import { idCourseValide } from "../src/lib/races/favoris";
 import { jourFrance } from "../src/lib/races/jourFrance";
 import { typeDepuisUrl, anneeDepuisUrl, choisirFiche, typeCorrige, motsCles, distancesDeFiche, distancesManquantes, typePour, segmentNom, motProche } from "../src/lib/races/leSportif";
-import { joursAvant, sansAccents, correspond, domaineSource, ficheVerifiable, motifSansAccents } from "../src/lib/races/temps";
+import { joursAvant, sansAccents, correspond, domaineSource, ficheVerifiable, motifSansAccents, analyseRecherche, correspondCourse } from "../src/lib/races/temps";
 import { normaliserHeure, afficherHeure } from "../src/lib/races/heure";
 import { dateDeLaFiche, doitMettreAJour } from "../src/lib/races/fiche";
 import { analyserReponse, promptRecherche, promptExtraction, libelleFormat, libelleDate, MARQUEUR_INCONNU } from "../src/lib/races/heureWeb";
@@ -266,6 +266,19 @@ test("chercher sans accent trouve les courses accentuées", () => {
   assert.match(rechercheApi, /\.filter\(\(r\) => words\.every\(\(w\) => correspond\(/, "le tri exact après le filet large a disparu");
   assert.match(rechercheApi, /distanceVoulue == null \|\| Math\.abs\(Number\(r\.distance_km\) - distanceVoulue\)/, "« 10 km bondues » cherche de nouveau « 10 » et « km » dans le nom");
   assert.match(rechercheApi, /if \(vus\.has\(k\)\) return false; vus\.add\(k\); return true;/, "une suggestion par format revient (« Nîmes Urban Trail » ×3)");
+  // La liste : des MOTS dans n'importe quel ordre, « 10 km » comme distance (29/09/2026).
+  const hiv = { name: "Hivernale des Templiers", city: "Roquefort-sur-Soulzon", department: "Aveyron", distance_km: 67 };
+  assert.ok(correspondCourse(hiv, analyseRecherche("hivernale templiers")), "« hivernale templiers » ne trouve pas « Hivernale des Templiers »");
+  assert.ok(correspondCourse(hiv, analyseRecherche("templiers aveyron")), "le nom et le département ensemble");
+  assert.equal(correspondCourse(hiv, analyseRecherche("hivernale bretagne")), false, "chaque mot doit se trouver quelque part");
+  const bondues = { name: "Foulées de Bondues", city: "Bondues", distance_km: 10 };
+  assert.ok(correspondCourse(bondues, analyseRecherche("10 km bondues")));
+  assert.equal(correspondCourse({ ...bondues, distance_km: 21.1 }, analyseRecherche("10 km bondues")), false, "« 10 km » est une distance, pas un mot");
+  assert.deepEqual(analyseRecherche("Semi 21,1 km de Lille"), { mots: ["semi", "lille"], km: 21.1 });
+  const hub = readFileSync("src/components/races/RacesHub.tsx", "utf8");
+  assert.match(hub, /const matchSearch = !q\.trim\(\) \|\| correspondCourse\(r, aq\);/, "la liste ne cherche plus par mots");
+  // La fiche : une page entière au téléphone (elle débordait de 21 px en colonne de 360 px).
+  assert.match(hub, /className="bento-card fixed inset-0 z-\[70\] overflow-auto[^"]*md:static md:z-auto md:w-\[360px\]/, "la fiche de course est redevenue une colonne fixe au téléphone");
 });
 
 test("chercher AVEC l'accent fonctionne aussi", () => {

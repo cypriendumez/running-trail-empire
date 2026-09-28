@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
 import { grouperEvenements } from "@/lib/races/groupes";
-import { joursAvant, correspond, domaineSource, ficheVerifiable } from "@/lib/races/temps";
+import { joursAvant, domaineSource, ficheVerifiable, analyseRecherche, correspondCourse } from "@/lib/races/temps";
 import { fmtDistance, type UnitSystem } from "@/lib/units";
 import { correctedRaceType } from "@/lib/raceType";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -157,16 +157,14 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
 
   const filtered = useMemo(() => {
     const q = search;
+    // Des MOTS dans n'importe quel ordre, « 10 km » comme distance — voir `analyseRecherche`.
+    const aq = analyseRecherche(q);
     const list = races.filter(r => {
       // ⚠️ CATALOGUE FRANÇAIS, RECHERCHE SANS ACCENTS. Comparer des minuscules brutes
       //    rendait 4 425 noms (30 %) et 3 027 villes introuvables sans taper l'accent
       //    au bon endroit : « foulees » ne trouvait pas « Foulées », « nimes » ne
       //    trouvait pas « Nîmes ».
-      const matchSearch = !q ||
-        correspond(r.name, q) ||
-        correspond(r.organization, q) ||
-        correspond(r.city, q) ||
-        correspond(r.department, q);
+      const matchSearch = !q.trim() || correspondCourse(r, aq);
       // Identifiant contre identifiant : le libellé du menu porte des accents que la base
       // n'a pas (« Île-de-France » / « ile-de-france ») — voir `slugDeRegion`.
       const matchRegion = region === "Toutes" || slugDeRegion(r.region) === slugDeRegion(region);
@@ -615,7 +613,10 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
-              className="w-[360px] flex-shrink-0 bento-card overflow-auto"
+              // ⚠️ SUR TÉLÉPHONE, UNE PAGE ENTIÈRE (29/09/2026). En colonne de 360 px à
+              // côté de la liste, la fiche écrasait la liste et débordait de 21 px sur un
+              // écran de 375 (page qui glissait de côté). Au-delà de md, la colonne revient.
+              className="bento-card fixed inset-0 z-[70] overflow-auto !rounded-none pt-[calc(1rem+env(safe-area-inset-top))] md:static md:z-auto md:w-[360px] md:flex-shrink-0 md:!rounded-3xl md:pt-6"
             >
               <button
                 onClick={() => setSelected(null)}

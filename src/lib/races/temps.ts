@@ -59,6 +59,37 @@ export function correspond(champ: unknown, recherche: string): boolean {
   return q === "" || formeRecherche(champ).includes(q);
 }
 
+const MOTS_VIDES_RECHERCHE = new Set(["de", "du", "des", "la", "le", "les", "et", "au", "aux", "sur", "en", "d", "l", "a"]);
+
+/**
+ * Une recherche lue comme un coureur la tape : des MOTS dans n'importe quel ordre, et
+ * « 10 km » comme une distance. ⚠️ 29/09/2026 : la liste cherchait la phrase d'un bloc —
+ * « hivernale templiers » ne trouvait pas « Hivernale des Templiers », « 10 km bondues »
+ * ne trouvait rien (« 10 km » n'est pas dans le nom, c'est un format).
+ */
+export function analyseRecherche(q: string): { mots: string[]; km: number | null } {
+  const brut = sansAccents(q);
+  const kmTape = brut.match(/(\d+(?:[.,]\d+)?)\s*(?:km|k)\b/)?.[1];
+  const km = kmTape ? Number(kmTape.replace(",", ".")) : null;
+  const mots = formeRecherche(brut.replace(/(\d+(?:[.,]\d+)?)\s*(?:km|k)\b/g, " "))
+    .split(" ").filter((m) => m && !MOTS_VIDES_RECHERCHE.has(m));
+  return { mots, km };
+}
+
+/** La course répond-elle à la recherche analysée ? Chaque mot dans l'un des champs, et la distance. */
+export function correspondCourse(
+  r: { name?: unknown; organization?: unknown; city?: unknown; department?: unknown; distance_km?: unknown },
+  a: { mots: string[]; km: number | null },
+): boolean {
+  if (a.km != null) {
+    const d = Number(r.distance_km);
+    if (!Number.isFinite(d) || Math.abs(d - a.km) > Math.max(0.6, a.km * 0.03)) return false;
+  }
+  if (!a.mots.length) return true;
+  const texte = formeRecherche(`${r.name ?? ""} ${r.organization ?? ""} ${r.city ?? ""} ${r.department ?? ""}`);
+  return a.mots.every((m) => texte.includes(m));
+}
+
 /**
  * Domaine d'où provient une fiche de course, prêt à afficher.
  *
