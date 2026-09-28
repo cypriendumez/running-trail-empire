@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { lireFiche } from "../scripts/finishers-collecte";
 import {
-  kmDe, estCourseAPied, dplusDe, dplusPlausible, dateDe, apparier, planEvenement, pasUneCourseAPied, deCetteFiche, estChrono,
+  estFerie, kmDe, estCourseAPied, dplusDe, dplusPlausible, dateDe, apparier, planEvenement, pasUneCourseAPied, deCetteFiche, estChrono,
   slugRegion, typeDe, formatsRetenus, cleNomVille,
   DATE_A_VENIR, type Fiche, type LigneCourse,
 } from "../src/lib/races/majFinishers";
@@ -103,6 +103,19 @@ test("la date : passée ou absente → « Date à venir » ; estimée ≠ confir
   assert.equal(dateDe({ id: "a", titre: null, discipline: "road", distanceM: 10000, dplus: null, date: "2026-06-14", heure: null, inscription: null, statut: "confirmed" }, fiche, AUJ).date, DATE_A_VENIR, "une date passée n'est pas une date à venir");
 });
 
+test("une date ESTIMÉE en semaine est tenue pour inconnue — 0 juste sur 28 un lundi ou un mardi", () => {
+  const f = (date: string, statut: string) => ({ id: "a", titre: null, discipline: "road", distanceM: 10000, dplus: null, date, heure: null, inscription: null, statut });
+  const fiche: Fiche = { slug: "x", ok: true };
+  assert.equal(dateDe(f("2026-10-06", "tba"), fiche, AUJ).date, DATE_A_VENIR, "« Foulées Halluinoises » un mardi : courues le dimanche 11");
+  assert.equal(dateDe(f("2026-10-08", "tba"), fiche, AUJ).date, DATE_A_VENIR, "jeudi estimé");
+  assert.deepEqual(dateDe(f("2026-10-06", "confirmed"), fiche, AUJ), { date: "2026-10-06", confirmee: true }, "confirmée par l'organisateur : on la croit");
+  assert.deepEqual(dateDe(f("2026-10-11", "tba"), fiche, AUJ), { date: "2026-10-11", confirmee: false }, "un dimanche estimé reste, signalé");
+  assert.deepEqual(dateDe(f("2026-10-09", "tba"), fiche, AUJ), { date: "2026-10-09", confirmee: false }, "le vendredi soir aussi");
+  assert.equal(dateDe(f("2026-11-11", "tba"), fiche, AUJ).date, "2026-11-11", "le 11 novembre (mercredi) est férié : on y court");
+  assert.equal(estFerie("2027-05-06"), true, "Ascension 2027"); assert.equal(estFerie("2027-05-17"), true, "lundi de Pentecôte 2027");
+  assert.equal(estFerie("2027-03-29"), true, "lundi de Pâques 2027"); assert.equal(estFerie("2027-05-13"), false);
+});
+
 test("appariement un pour un, par identifiant de source d'abord", () => {
   // La ligne « a » porte l'identifiant du format r2 : la distance seule l'aurait donnée à r1.
   const lignes = [{ id: "a", distance_km: 10, source_id: "r2" }, { id: "b", distance_km: 10.1, source_id: null }];
@@ -118,8 +131,8 @@ const ligne = (id: string, km: number, extra: Partial<LigneCourse> = {}): LigneC
 });
 const TUE: Fiche = {
   slug: "odyssee-du-tue-vaques", ok: true, pays: "FR", nom: "Odyssée du Tue Vaques", ville: "Fermanville",
-  prochaine: { annee: 2026, debut: "2026-09-28", statut: "tba" },
-  formats: [30400, 16000, 8900].map((m, i) => ({ id: `r${i}`, titre: null, discipline: "trail", distanceM: m, dplus: [472, 255, 103][i], date: "2026-09-28", heure: null, inscription: null, statut: "tba" })),
+  prochaine: { annee: 2026, debut: "2026-10-04", statut: "tba" },
+  formats: [30400, 16000, 8900].map((m, i) => ({ id: `r${i}`, titre: null, discipline: "trail", distanceM: m, dplus: [472, 255, 103][i], date: "2026-10-04", heure: null, inscription: null, statut: "tba" })),
 };
 
 test("le cas réel : 9 formats en base pour 3 réels — les vrais mis à jour, les périmés retirés", () => {
@@ -198,8 +211,8 @@ test("sans la colonne « confirmée », une date ANNONCÉE n'est pas écrite com
   assert.deepEqual(annonce.ajouts.map((x) => x.date), [DATE_A_VENIR, DATE_A_VENIR], "les formats ajoutés non plus");
   assert.equal(annonce.datesEnAttente, 3, "1 mise à jour + 2 ajouts, comptés pour le rapport");
   const conf: Fiche = { ...TUE, formats: TUE.formats!.map((f) => ({ ...f, statut: "confirmed" })) };
-  assert.equal(planEvenement(conf, [ligne("a", 30.4, { date: DATE_A_VENIR })], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: false }).majs[0].patch.date, "2026-09-28");
-  assert.equal(planEvenement(TUE, [ligne("a", 30.4, { date: DATE_A_VENIR })], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: true }).majs[0].patch.date, "2026-09-28", "après la migration, écrite AVEC son drapeau");
+  assert.equal(planEvenement(conf, [ligne("a", 30.4, { date: DATE_A_VENIR })], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: false }).majs[0].patch.date, "2026-10-04");
+  assert.equal(planEvenement(TUE, [ligne("a", 30.4, { date: DATE_A_VENIR })], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: true }).majs[0].patch.date, "2026-10-04", "après la migration, écrite AVEC son drapeau");
   const faux = planEvenement({ ...TUE, formats: TUE.formats!.map((f) => ({ ...f, dplus: null })) }, [ligne("v", 30.4, { elevation_gain_m: 16660 })], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: false });
   assert.equal(faux.majs[0].patch.elevation_gain_m, null, "un dénivelé faux en base n'est pas conservé faute de mieux");
 });

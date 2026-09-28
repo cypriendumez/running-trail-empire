@@ -85,15 +85,38 @@ export function dplusPlausible(dplus: number, km: number | null | undefined): bo
   return dplus <= k * (k <= 5 ? 600 : 250);
 }
 
+/** Jours fériés en France (Pâques par l'algorithme de Meeus) : on y court, même en semaine. */
+export function estFerie(iso: string): boolean {
+  const [a, m, j] = iso.split("-").map(Number);
+  if (["01-01", "05-01", "05-08", "07-14", "08-15", "11-01", "11-11", "12-25"].includes(iso.slice(5, 10))) return true;
+  const g = a % 19, c = Math.floor(a / 100), h = (c - Math.floor(c / 4) - Math.floor((8 * c + 13) / 25) + 19 * g + 15) % 30;
+  const i = h - Math.floor(h / 28) * (1 - Math.floor(29 / (h + 1)) * Math.floor((21 - g) / 11));
+  const jr = (a + Math.floor(a / 4) + i + 2 - c + Math.floor(c / 4)) % 7;
+  const l = i - jr, moisP = 3 + Math.floor((l + 40) / 44), jourP = l + 28 - 31 * Math.floor(moisP / 4);
+  const paques = Date.UTC(a, moisP - 1, jourP), ce = Date.UTC(a, m - 1, j);
+  return [1, 39, 50].some((k) => ce === paques + k * 864e5);   // lundi de Pâques, Ascension, lundi de Pentecôte
+}
+
 /**
  * La date d'un format : la sienne, sinon celle de la prochaine édition. Passée ou absente
- * → « Date à venir ». `confirmee` dit si l'organisateur l'a confirmée (sinon estimée).
+ * → « Date à venir ». `confirmee` dit si l'organisateur l'a confirmée.
+ *
+ * ⚠️ « tba » N'EST PAS UNE DATE ANNONCÉE, C'EST UNE ESTIMATION de la source, reportée
+ * d'édition en édition, et qui DÉRIVE : « Foulées Halluinoises » le mardi 06/10/2026, courues
+ * le dimanche 11. Mesuré le 29/09/2026 contre le calendrier kikourou (3 semaines, 12
+ * départements) : 0 estimation juste sur 28 un lundi ou un mardi ; 22 sur 34 un dimanche.
+ * Et sur 387 dates CONFIRMÉES, aucune un mardi. Une date estimée en semaine (lundi → jeudi,
+ * hors férié) est donc tenue pour inconnue ; le vendredi soir et le week-end restent,
+ * signalés « estimée ».
  */
 export function dateDe(f: FormatFiche, fiche: Fiche, aujourdhui: string): { date: string; confirmee: boolean | null } {
   const d = (f.date ?? fiche.prochaine?.debut ?? "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || d < aujourdhui) return { date: DATE_A_VENIR, confirmee: null };
   const statut = f.statut ?? fiche.prochaine?.statut ?? null;
-  return { date: d, confirmee: statut === "confirmed" ? true : statut ? false : null };
+  const confirmee = statut === "confirmed" ? true : statut ? false : null;
+  const jour = new Date(`${d}T12:00:00Z`).getUTCDay();   // 0 = dimanche
+  if (confirmee !== true && jour >= 1 && jour <= 4 && !estFerie(d)) return { date: DATE_A_VENIR, confirmee: null };
+  return { date: d, confirmee };
 }
 
 /**
