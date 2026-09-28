@@ -327,8 +327,13 @@ test("« Enregistrer » ouvre sur la carte — sur TOUS les écrans — et les r
 
 test("sur téléphone, les plans d'entraînement se lisent en petites cartes et en liste empilée", () => {
   const src = codeNu("src/app/dashboard/plans/PlansView.tsx");
-  assert.match(src, /grid-cols-2 gap-2\.5 sm:gap-4 lg:grid-cols-3/, "les cartes de plans ne sont plus sur deux colonnes sur téléphone");
-  assert.match(src, /rounded-2xl [^"]*p-3\.5 [^"]*sm:rounded-3xl sm:p-6/, "les cartes de plans ont repris leur grand rembourrage sur téléphone");
+  // 28/09/2026 : les cartes portent désormais les photos de la page d'accueil. Sur téléphone,
+  // une LISTE à vignettes (photo 112 px à gauche, texte à droite) : 4 plans par écran à
+  // 375 px, autant que les deux colonnes de petites cartes d'avant, et lisibles.
+  assert.match(src, /grid grid-cols-1 gap-2\.5 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3/, "la grille des plans a changé sur téléphone");
+  assert.match(src, /group relative flex overflow-hidden rounded-2xl [^"]*sm:flex-col sm:rounded-3xl/, "la carte n'est plus une ligne compacte sur téléphone");
+  assert.match(src, /relative h-auto w-28 flex-shrink-0 [^"]*sm:aspect-\[4\/3\] sm:w-full/, "la vignette photo n'est plus compacte sur téléphone");
+  assert.match(src, /flex min-w-0 flex-1 flex-col p-3\.5 sm:p-4/, "les cartes de plans ont repris un grand rembourrage sur téléphone");
   // Le tableau des semaines (7 colonnes) ne tient pas en 375 px : une liste empilée le remplace.
   assert.match(src, /space-y-1\.5 sm:hidden/, "la liste empilée des semaines a disparu sur téléphone");
   assert.match(src, /hidden [^"]*sm:block/, "le tableau des semaines s'affiche aussi sur téléphone (7 colonnes en 375 px)");

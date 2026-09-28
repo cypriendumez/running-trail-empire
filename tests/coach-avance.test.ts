@@ -74,6 +74,16 @@ test("un chiffre absent des données est repéré ; un chiffre présent ne l'est
   assert.deepEqual(chiffresInconnus("dérive +4,8 %", SOURCE), [], "la virgule décimale vaut le point");
 });
 
+test("une ALLURE doit venir de la séance elle-même, pas du contexte (le « 4'57 » du 28/09)", () => {
+  const ctx = "allure facile 4'57/km · corrigée de la chaleur : 5'07/km";
+  const seance = "Footing : ~18 km en Z2 (~5'07/km)";
+  assert.deepEqual(chiffresInconnus("Vise 5'07/km en Z2.", ctx, seance), []);
+  assert.deepEqual(chiffresInconnus("Vise 4'57/km en Z2.", ctx, seance), ["4'57"], "4'57 existe dans le contexte, pas dans la séance : il la contredit");
+  const jours = [j("2026-09-28", "Endurance", "Footing en endurance", seance)];
+  const brut = JSON.stringify({ conseils: [{ date: "2026-09-28", conseil: "Avec la chaleur, vise 4'57/km et reste en Z2 tout du long." }] });
+  assert.deepEqual(validerConseils(brut, jours, "fr", ctx), [], "le conseil qui contredit l'allure prescrite doit être rejeté");
+});
+
 test("un conseil qui invente un chiffre est rejeté ENTIER ; les autres passent", () => {
   const jours = joursARelire(SEMAINE, "2026-09-28");
   const brut = "```json\n" + JSON.stringify({ conseils: [

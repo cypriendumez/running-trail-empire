@@ -82,6 +82,7 @@ MISSION : pour chaque séance ci-dessus, écris UN conseil d'exécution personna
 - Il dit COMMENT réussir CETTE séance avec CES données : ce que la dernière séance ou la dernière séance de qualité a montré, la dérive cardiaque, le sommeil et la VFC, la chaleur prévue ce jour-là, une douleur en cours, une séance manquée, l'objectif proche.
 - Tu ne modifies JAMAIS la séance : ni distance, ni allure, ni structure, ni intensité en plus. Tu peux dire de lever le pied, jamais d'en faire plus.
 - Chiffres : UNIQUEMENT ceux qui figurent ci-dessus. Aucun autre.
+- ALLURES : si tu en cites une, c'est EXACTEMENT celle écrite dans CETTE séance (elle est déjà corrigée de la chaleur). Jamais une autre allure du contexte.
 - Le « pourquoi » de chaque séance est DÉJÀ affiché juste au-dessus de ton conseil : ne le répète pas, complète-le.
 - Temps : ${e.aujourdhui ? `aujourd'hui, c'est le ${e.aujourdhui}. N'écris « aujourd'hui » que pour cette date ; pour les autres, « jeudi », « dimanche »… ou rien.` : "n'écris pas « aujourd'hui » : tu ne sais pas quel jour l'athlète lira."}
 - 2 phrases COURTES au maximum, ${LONGUEUR_MAX} caractères AU TOTAL au maximum — la plus importante d'abord, car au-delà la fin est coupée. En ${NOM_LANGUE[e.lang]}, directement à l'athlète, sans salutation.
@@ -98,15 +99,21 @@ const norm = (s: string) => s.toLowerCase().replace(/[’‘]/g, "'").replace(/(
  * Les chiffres du conseil qui n'apparaissent NULLE PART dans les données. Allures
  * (« 3'47 »), et nombres suivis d'une unité (km, m, ms, bpm, %, °C, min, h, s).
  */
-export function chiffresInconnus(conseil: string, source: string): string[] {
+export function chiffresInconnus(conseil: string, source: string, seance?: string): string[] {
   const src = norm(source);
   const c = norm(conseil);
+  // ⚠️ UNE ALLURE EST UNE CONSIGNE : elle doit venir de LA SÉANCE, pas du contexte. Mesuré
+  // le 28/09/2026 : « vise 4'57/km » sur un footing prescrit à 5'07 — 4'57 existait bien
+  // dans les données (l'allure facile AVANT correction de chaleur), donc le contrôle
+  // global le laissait passer, alors qu'il contredisait la séance.
+  const allures = c.match(/\d{1,2}'\d{2}/g) ?? [];
+  const alluresInconnues = seance != null ? allures.filter((a) => !norm(seance).includes(a)) : [];
   const jetons = [
-    ...(c.match(/\d{1,2}'\d{2}/g) ?? []),
+    ...(seance != null ? [] : allures),
     // L'ordre des unités compte : « min » avant « m », « ms » avant « m ».
     ...(c.match(/\d+(?:\.\d+)?(?:km|ms|min|bpm|m|%|°c|°|h|s)(?![a-z])/g) ?? []),
   ];
-  return [...new Set(jetons)].filter((j) => !src.includes(j));
+  return [...new Set([...alluresInconnues, ...jetons.filter((j) => !src.includes(j))])];
 }
 
 /**
@@ -144,7 +151,9 @@ export function validerConseils(brut: string, jours: readonly JourPlan[], lang: 
     if (!dates.has(date) || vus.has(date)) { motifs?.push(`date ${date}`); continue; }
     const texte = raccourcir(brutTexte);
     if (!texte || texte.length < LONGUEUR_MIN) { motifs?.push(`longueur ${brutTexte.length}`); continue; }
-    const inconnus = chiffresInconnus(texte, source);
+    const jour = jours.find((d) => d.date === date);
+    const seance = jour ? `${jour.title} ${jour.detail} ${jour.why}` : "";
+    const inconnus = chiffresInconnus(texte, source, seance);
     if (inconnus.length) { motifs?.push(`chiffres inventés ${inconnus.join(",")}`); continue; }
     vus.add(date);
     out.push({ date, lang, texte });

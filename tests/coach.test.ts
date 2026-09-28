@@ -5805,8 +5805,16 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     assert.ok(cles.length >= 8, `PROGRAM_KEYS illisible (${cles.length})`);
 
     // Chaque programme déclaré possède une entrée dans PROGRAMS, avec une photo.
-    const entrees = [...page.matchAll(/\{ key: "([a-z0-9]+)", category: "([A-Z0-9]+)", photo: "(photo-[\w-]+)" \}/g)]
-      .map((m) => ({ key: m[1], cat: m[2], photo: m[3] }));
+    // Les identifiants vivent dans lib/brand/photosProgrammes (partagés avec la page Plans) :
+    // chaque entrée de PROGRAMS doit y pointer sur SA propre clé, et la clé y exister.
+    const photosSrc = codeOf("src/lib/brand/photosProgrammes.ts");
+    const photoDe = (k: string) => photosSrc.match(new RegExp(`\\b${k}: "(photo-[\\w-]+)"`))?.[1];
+    const entrees = [...page.matchAll(/\{ key: "([a-z0-9]+)", category: "([A-Z0-9]+)", photo: PHOTOS_PROGRAMMES\.([a-z0-9]+) \}/g)]
+      .map((m) => ({ key: m[1], cat: m[2], cleePhoto: m[3], photo: photoDe(m[3]) }));
+    for (const e of entrees) {
+      assert.equal(e.cleePhoto, e.key, `${e.key} pointe sur la photo d'un autre programme (${e.cleePhoto})`);
+      assert.ok(e.photo, `${e.key} : aucune photo dans lib/brand/photosProgrammes`);
+    }
     assert.deepEqual(entrees.map((e) => e.key).sort(), [...cles].sort(),
       "PROGRAM_KEYS et le tableau PROGRAMS de page.tsx ne décrivent pas les mêmes programmes");
     for (const e of entrees) assert.ok(cats.includes(e.cat), `${e.key} : catégorie « ${e.cat} » absente de CATEGORY_CODES`);

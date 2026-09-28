@@ -7,6 +7,21 @@ import {
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { PROGRAMMES, genererPlan, volumeTotal, type CleProgramme, type Niveau } from "@/lib/plans/catalogue";
 import { PLANS_I18N } from "./plansI18n";
+import { PHOTOS_PROGRAMMES, photoUnsplash, type ClePhotoProgramme } from "@/lib/brand/photosProgrammes";
+
+/**
+ * LES PHOTOS DE LA PAGE D'ACCUEIL, REPRISES ICI (Cyprien, 28/09/2026 : « améliore le
+ * design, tu peux remettre ces images »). Mêmes photos auditées — aucun visage
+ * identifiable, aucune marque lisible —, lues dans la MÊME liste que l'accueil.
+ * Les clés de l'accueil sont historiques : « km10 » y est la carte 5 km, « endurance » la 10 km.
+ */
+const PHOTO: Record<CleProgramme, ClePhotoProgramme> = {
+  km5: "km10", km10: "endurance", semi: "semi", marathon: "marathon", trail: "trail",
+  debutant: "beginner", vitesse: "speed", blessure: "injury", poids: "weightloss",
+};
+/** Largeurs servies aux cartes (3 colonnes Retina au plus) et au bandeau du plan choisi. */
+const LARGEURS_CARTE = [400, 600, 800];
+const LARGEURS_BANDEAU = [800, 1200, 1600];
 
 /** Teinte par phase — la lecture doit se faire d'un coup d'œil, sans lire les mots. */
 const TEINTE: Record<string, string> = {
@@ -79,46 +94,59 @@ export function PlansView({ niveau, volumeKm }: { niveau: Niveau; volumeKm: numb
               {groupe.cle === "course" ? t.groupeCourse : t.groupeSansCourse}
               <span aria-hidden className="h-px flex-1 bg-zinc-200" />
             </h2>
-            <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
               {groupe.plans.map((cle) => {
                 const prog = PROGRAMMES[cle];
                 const Icone = ICONE[cle];
+                const photo = PHOTOS_PROGRAMMES[PHOTO[cle]];
+                const distance = prog.distanceKm != null && groupe.cle === "course" ? `${prog.distanceKm} km` : null;
                 return (
                   <button
                     key={cle}
-                    onClick={() => { setChoisi(cle); setSemaines(prog.semaines[0]); }}
-                    className="group relative flex flex-col items-start overflow-hidden rounded-2xl bg-white p-3.5 text-left ring-1 ring-inset ring-zinc-200 transition-all hover:-translate-y-0.5 hover:shadow-lg hover:ring-emerald-400 sm:rounded-3xl sm:p-6"
+                    onClick={() => { setChoisi(cle); setSemaines(prog.semaines[0]); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                    className="group relative flex overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 ring-inset ring-zinc-200 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:ring-zinc-300 sm:flex-col sm:rounded-3xl"
                   >
-                    {/* ⚠️ PAS DE LISERÉ AU SURVOL ICI. Première version : un
-                        `scale-x-0 group-hover:scale-x-100`. Vérifié dans le navigateur —
-                        AUCUNE règle `.scale-x-0` n'existait dans la feuille de style
-                        produite, et `getComputedStyle` rendait `transform: none` : le
-                        liseré s'affichait donc en permanence sur les neuf cartes, ce qui
-                        les faisait toutes paraître sélectionnées. Troisième panne de cette
-                        famille dans la même journée (opacités hors échelle, dégradé
-                        arbitraire) — une classe présente dans le DOM ne prouve rien.
-                        Le survol est déjà signalé quatre fois : élévation, ombre, anneau
-                        émeraude et icône qui se remplit. Un cinquième signal décoratif ne
-                        valait pas de reprendre ce risque. */}
-                    <div className="flex w-full items-start justify-between gap-3">
-                      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-600/10 text-emerald-700 transition-colors group-hover:bg-emerald-600 group-hover:text-white sm:h-11 sm:w-11 sm:rounded-2xl">
-                        <Icone className="h-5 w-5" />
-                      </span>
-                      {/* La distance, pour les plans qui visent une course : c'est
-                          l'information qu'on cherche en premier, pas la durée du plan. */}
-                      {prog.distanceKm != null && groupe.cle === "course" && (
-                        <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] font-bold tabular-nums text-zinc-600">
-                          {prog.distanceKm} km
+                    {/* ── LA PHOTO ── vignette carrée sur téléphone (une liste se parcourt
+                        plus vite que neuf grandes cartes), grande image à partir de 640 px. */}
+                    <div className="relative h-auto w-28 flex-shrink-0 overflow-hidden bg-zinc-900 sm:aspect-[4/3] sm:w-full">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={photoUnsplash(photo, 600, 3 / 4)}
+                        srcSet={LARGEURS_CARTE.map((w) => `${photoUnsplash(photo, w, 3 / 4)} ${w}w`).join(", ")}
+                        sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 112px"
+                        alt="" loading="lazy" decoding="async"
+                        className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05]"
+                      />
+                      <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+                      {distance && (
+                        <span className="absolute right-3 top-3 hidden rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-bold tabular-nums text-zinc-900 shadow-sm sm:inline-block">
+                          {distance}
                         </span>
                       )}
+                      {/* Titre SUR la photo à partir de 640 px, comme les cartes de l'accueil. */}
+                      <div className="absolute inset-x-0 bottom-0 hidden p-4 sm:block">
+                        <div className="flex items-center gap-2 text-white/80">
+                          <Icone className="h-4 w-4" />
+                          <span className="text-[11px] font-semibold uppercase tracking-[0.14em]">{prog.semaines[0]} {t.semaines}</span>
+                        </div>
+                        <h3 className="mt-1 text-xl font-extrabold uppercase leading-tight tracking-tight text-white drop-shadow-sm">{t.noms[cle]}</h3>
+                      </div>
                     </div>
-                    <h3 className="mt-2.5 text-sm font-bold leading-snug text-zinc-900 sm:mt-4 sm:text-base">{t.noms[cle]}</h3>
-                    <p className="mt-1 line-clamp-2 flex-1 text-xs leading-relaxed text-zinc-500 sm:mt-1.5 sm:line-clamp-none sm:text-sm">{t.pitchs[cle]}</p>
-                    <div className="mt-2.5 flex w-full flex-wrap items-center gap-1.5 sm:mt-4">
-                      <Chip>{prog.semaines[0]} {t.semaines}</Chip>
-                      {prog.marcheCourse && <Chip icone={<Footprints className="h-3 w-3" />}>{t.marcheCourse}</Chip>}
-                      {prog.sansImpactPct > 0 && <Chip icone={<Bike className="h-3 w-3" />}>{prog.sansImpactPct} %</Chip>}
-                      <ChevronRight className="ml-auto h-4 w-4 text-zinc-300 transition-all group-hover:translate-x-0.5 group-hover:text-emerald-600" />
+
+                    <div className="flex min-w-0 flex-1 flex-col p-3.5 sm:p-4">
+                      {/* Sur téléphone, le titre et la distance vivent ici (la vignette est trop petite). */}
+                      <div className="flex items-start justify-between gap-2 sm:hidden">
+                        <h3 className="text-sm font-bold leading-snug text-zinc-900">{t.noms[cle]}</h3>
+                        {distance && <span className="flex-shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold tabular-nums text-zinc-600">{distance}</span>}
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-zinc-500 sm:mt-0 sm:text-sm">{t.pitchs[cle]}</p>
+                      <div className="mt-2.5 flex w-full flex-wrap items-center gap-1.5 sm:mt-3.5">
+                        {/* La durée est déjà SUR la photo à partir de 640 px : pas deux fois. */}
+                        <span className="contents sm:hidden"><Chip>{prog.semaines[0]} {t.semaines}</Chip></span>
+                        {prog.marcheCourse && <Chip icone={<Footprints className="h-3 w-3" />}>{t.marcheCourse}</Chip>}
+                        {prog.sansImpactPct > 0 && <Chip icone={<Bike className="h-3 w-3" />}>{prog.sansImpactPct} %</Chip>}
+                        <ChevronRight className="ml-auto h-4 w-4 text-zinc-300 transition-all group-hover:translate-x-0.5 group-hover:text-emerald-600" />
+                      </div>
                     </div>
                   </button>
                 );
@@ -139,9 +167,21 @@ export function PlansView({ niveau, volumeKm }: { niveau: Niveau; volumeKm: numb
         <ArrowLeft className="h-4 w-4" /> {t.retour}
       </button>
 
-      <header>
-        <h1 className="text-2xl font-bold text-zinc-900 sm:text-3xl">{t.noms[choisi]}</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-500">{t.pitchs[choisi]}</p>
+      {/* Bandeau : la même photo que la carte — on sait où l'on est sans relire le titre. */}
+      <header className="relative overflow-hidden rounded-3xl bg-zinc-900 shadow-sm">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={photoUnsplash(PHOTOS_PROGRAMMES[PHOTO[choisi]], 1200, 0.42)}
+          srcSet={LARGEURS_BANDEAU.map((w) => `${photoUnsplash(PHOTOS_PROGRAMMES[PHOTO[choisi]], w, 0.42)} ${w}w`).join(", ")}
+          sizes="(min-width: 1024px) 70vw, 100vw"
+          alt="" decoding="async"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-black/10" />
+        <div className="relative flex min-h-[180px] flex-col justify-end p-5 sm:min-h-[240px] sm:p-7">
+          <h1 className="text-2xl font-extrabold uppercase tracking-tight text-white sm:text-4xl">{t.noms[choisi]}</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/85">{t.pitchs[choisi]}</p>
+        </div>
       </header>
 
       <div className="flex flex-wrap items-center gap-2">

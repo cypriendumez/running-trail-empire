@@ -182,7 +182,9 @@ test("aucune photo bannie ne réapparaît dans le source", () => {
 });
 
 // ── 2. Les surfaces publiques n'affichent que de l'audité ────────────────────
-const PUBLIQUES = ["app/page.tsx", "app/blog/page.tsx"];
+// `lib/brand/photosProgrammes` : les photos des cartes de la page d'accueil y vivent depuis
+// le 28/09/2026 — sans lui ici, ce contrôle serait resté vert sur une page vidée de ses ids.
+const PUBLIQUES = ["app/page.tsx", "app/blog/page.tsx", "lib/brand/photosProgrammes.ts"];
 
 test("toute photo d'une page publique a été auditée", () => {
   const inconnus: string[] = [];
