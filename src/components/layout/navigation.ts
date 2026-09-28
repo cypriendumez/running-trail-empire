@@ -16,7 +16,15 @@ import {
 export type Destination = { href: string; icon: typeof LayoutDashboard; tk: string };
 export type Groupe = { titleKey: string | null; items: Destination[] };
 
-// Navigation groupée par univers — plus lisible et pro.
+// ⚠️ DU PLUS UTILISÉ AU MOINS UTILE (Cyprien, 28/09/2026 : « choisis le bon ordre, du plus
+// utilisé au moins utile, mets-toi à la place de l'utilisateur »). La mesure d'audience ne
+// comptait que 11 pages vues dans l'app ce jour-là : l'ordre suit donc la FRÉQUENCE
+// d'usage d'un coureur coaché, rubrique par rubrique, puis dans chaque rubrique :
+//   - chaque jour : l'accueil, puis la séance du jour (calendrier) ;
+//   - à chaque sortie : enregistrer, puis relire ce qu'on a couru, sa santé, son coach ;
+//   - de temps en temps : préparer (courses, parcours, plans, cours, PPS) ;
+//   - le social ;
+//   - presque jamais : la montre (réglée une fois) et les chaussures (une paire par saison).
 export const NAV_GROUPES: Groupe[] = [
   {
     titleKey: null,
@@ -26,32 +34,33 @@ export const NAV_GROUPES: Groupe[] = [
     titleKey: "group.training",
     items: [
       { href: "/dashboard/calendrier", icon: CalendarDays, tk: "nav.calendar" },
-      // Juste sous le calendrier : le plan glissant répond à « et demain ? », le
-      // catalogue à « et les trois prochains mois ? ». Les deux se consultent ensemble.
-      { href: "/dashboard/plans", icon: ClipboardList, tk: "nav.plans" },
-      { href: "/dashboard/races", icon: MapPin, tk: "nav.races" },
-      // Juste SOUS « Courses » : le PPS ne se cherche pas pour lui-même, on y pense au
-      // moment de s'inscrire. Le voisinage fait la moitié du travail de découverte.
-      { href: "/dashboard/pps", icon: ShieldCheck, tk: "nav.pps" },
-      { href: "/dashboard/trail", icon: Mountain, tk: "nav.trail" },
       { href: "/dashboard/ghost-runner", icon: Ghost, tk: "nav.ghost" },
-      { href: "/dashboard/cours", icon: GraduationCap, tk: "nav.courses" },
     ],
   },
   {
-    // ⚠️ RANGÉ LE 21/09/2026 (Cyprien : « range mieux les différentes catégories ») :
-    // « Mes activités » est du SUIVI (ce que l'athlète a couru), pas du club ; et le
-    // comparateur d'équipement n'a rien de social — il a son propre groupe.
+    // « Mes activités » est du SUIVI (ce que l'athlète a couru) ; la messagerie aussi :
+    // on y écrit d'abord à son coach (imprévus, douleurs, objectifs).
     titleKey: "group.tracking",
     items: [
-      { href: "/dashboard/health", icon: Heart, tk: "nav.health" },
       // Vitrine, Segments, Carte de chaleur et Survol 3D partagent UNE entrée : ce
       // sont quatre lectures du même sujet — ce que l'athlète a parcouru. Ils se
       // choisissent par la rangée d'onglets en haut de page (comme l'onglet Santé),
       // au lieu d'occuper quatre lignes de menu.
       { href: "/dashboard/trophees", icon: Trophy, tk: "nav.performances" },
+      { href: "/dashboard/health", icon: Heart, tk: "nav.health" },
       { href: "/dashboard/messages", icon: MessagesSquare, tk: "nav.messaging" },
-      { href: "/dashboard/sync", icon: Watch, tk: "nav.sync" },
+    ],
+  },
+  {
+    // Ce qu'on consulte pour PRÉPARER, pas chaque jour. Le PPS ferme la marche : on y pense
+    // une fois par an, et la fiche de chaque course l'annonce déjà au moment de s'inscrire.
+    titleKey: "group.prep",
+    items: [
+      { href: "/dashboard/races", icon: MapPin, tk: "nav.races" },
+      { href: "/dashboard/trail", icon: Mountain, tk: "nav.trail" },
+      { href: "/dashboard/plans", icon: ClipboardList, tk: "nav.plans" },
+      { href: "/dashboard/cours", icon: GraduationCap, tk: "nav.courses" },
+      { href: "/dashboard/pps", icon: ShieldCheck, tk: "nav.pps" },
     ],
   },
   {
@@ -68,8 +77,13 @@ export const NAV_GROUPES: Groupe[] = [
     ],
   },
   {
+    // La montre et les chaussures : l'équipement. La synchro se règle une fois, puis
+    // tourne seule — elle n'a rien à faire au milieu du suivi de tous les jours.
     titleKey: "group.gear",
-    items: [{ href: "/dashboard/shop", icon: ShoppingBag, tk: "nav.shop" }],
+    items: [
+      { href: "/dashboard/sync", icon: Watch, tk: "nav.sync" },
+      { href: "/dashboard/shop", icon: ShoppingBag, tk: "nav.shop" },
+    ],
   },
 ];
 

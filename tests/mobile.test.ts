@@ -101,11 +101,25 @@ test("« Plus » range ses rubriques en LISTES, sans trou — et le comparateur 
   assert.equal(groupe("/dashboard/shop"), "group.gear", "le comparateur d'équipement est rangé ailleurs que dans « Équipement »");
   assert.equal(groupe("/dashboard/trophees"), "group.tracking", "« Mes activités » n'est pas rangé dans « Suivi »");
   assert.equal(groupe("/dashboard/messages"), "group.tracking", "la messagerie n'est pas rangée dans « Suivi »");
-  // Les deux libellés de rubrique existent dans les cinq dictionnaires.
+  // Les libellés de rubrique existent dans les cinq dictionnaires.
   const dico = readFileSync("src/lib/i18n/translations.ts", "utf8");
-  for (const cle of ["group.gear", "group.account"]) {
+  for (const cle of ["group.gear", "group.account", "group.prep"]) {
     assert.equal([...dico.matchAll(new RegExp(`"${cle.replace(".", "\\.")}": "`, "g"))].length, 5, `« ${cle} » manque à une langue`);
   }
+});
+
+test("le menu va du PLUS UTILISÉ au MOINS UTILE", () => {
+  // Cyprien, 28/09/2026 : « choisis le bon ordre, du plus utilisé au moins utile, mets-toi à
+  // la place de l'utilisateur ». Chaque jour d'abord, à chaque sortie ensuite, puis ce qu'on
+  // consulte pour préparer, le social, et l'équipement qu'on règle une fois.
+  assert.deepEqual(NAV_GROUPES.map((g) => g.titleKey), [null, "group.training", "group.tracking", "group.prep", "group.club", "group.gear"]);
+  const ordre = NAV_GROUPES.flatMap((g) => g.items.map((d) => d.href));
+  assert.deepEqual(ordre.slice(0, 4), ["/dashboard", "/dashboard/calendrier", "/dashboard/ghost-runner", "/dashboard/trophees"],
+    "l'accueil, la séance du jour, enregistrer, puis relire ce qu'on a couru");
+  assert.equal(ordre.at(-1), "/dashboard/shop", "le comparateur (une paire par saison) ferme la marche");
+  const groupe = (href: string) => NAV_GROUPES.find((g) => g.items.some((it) => it.href === href))?.titleKey;
+  assert.equal(groupe("/dashboard/sync"), "group.gear", "la synchro montre (réglée une fois) est revenue au milieu du suivi quotidien");
+  assert.equal(NAV_GROUPES.find((g) => g.titleKey === "group.prep")?.items.at(-1)?.href, "/dashboard/pps", "le PPS (une fois par an) ne ferme plus la rubrique « Préparation »");
 });
 
 test("naviguer referme la feuille « Plus »", () => {
