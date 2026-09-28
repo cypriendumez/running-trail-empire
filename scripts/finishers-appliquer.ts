@@ -7,7 +7,8 @@
  *
  *   npx tsx scripts/finishers-appliquer.ts <fiches.jsonl> [--ecrire]
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { planEvenement, cleNomVille, PAYS_FRANCE, formatsRetenus, pasUneCourseAPied, dplusPlausible, estTrail, type Fiche, type LigneCourse } from "../src/lib/races/majFinishers";
 
@@ -30,6 +31,19 @@ async function main() {
   // 1. Fiches (la plus récente par slug).
   const fiches = new Map<string, Fiche>();
   for (const l of readFileSync(fichier, "utf8").split("\n")) { try { const f = JSON.parse(l) as Fiche; if (f?.slug) fiches.set(f.slug, f); } catch { /* ligne en cours d'écriture */ } }
+
+  // 1 bis. Liens « Résultats » lus sur les sites officiels (`scripts/resultats-sites.ts`) :
+  // ils passent AVANT la page éditoriale de la source, jamais avant un classement déjà cité.
+  const fSites = join(dirname(fichier), "resultats-sites.jsonl");
+  let liensSites = 0;
+  if (existsSync(fSites)) {
+    const parSite = new Map<string, { url: string; annee: number | null }>();
+    for (const l of readFileSync(fSites, "utf8").split("\n")) { try { const x = JSON.parse(l); if (x?.lien?.url) parSite.set(x.site, x.lien); } catch { /* */ } }
+    for (const f of fiches.values()) {
+      const lien = f.siteOfficiel ? parSite.get(f.siteOfficiel) : undefined;
+      if (lien && !f.resultats?.classement) { f.resultats = { page: f.resultats?.page ?? null, classement: lien.url, annee: lien.annee }; liensSites++; }
+    }
+  }
 
   // 2. Les nouvelles colonnes existent-elles (migration 032) ?
   const sonde = await sb.from("races").select("site_officiel, source_id").limit(1);
@@ -112,7 +126,7 @@ async function main() {
   const dplusFaux = lignes.filter((l) => !touchees.has(l.id) && l.elevation_gain_m != null
     && ((estTrail(l.type) && l.elevation_gain_m === 0) || !dplusPlausible(l.elevation_gain_m, l.distance_km))).map((l) => l.id);
 
-  console.log(JSON.stringify({ ...st, colonnesNouvelles, pacaANormaliser: paca.length, dplusFauxBalayes: dplusFaux.length, aujourdhui }, null, 1));
+  console.log(JSON.stringify({ ...st, liensResultatsSites: liensSites, colonnesNouvelles, pacaANormaliser: paca.length, dplusFauxBalayes: dplusFaux.length, aujourdhui }, null, 1));
   console.log(exemples.join("\n"));
   writeFileSync(fichier.replace(/\.jsonl$/, "") + `-plan-${ECRIRE ? "ecrit" : "a-blanc"}.json`, JSON.stringify({ st, majs: majs.length, ajouts: ajouts.length, retraits, detailRetraits }, null, 1));
   if (!ECRIRE) { console.log("(à blanc — rien écrit ; relancer avec --ecrire)"); return; }

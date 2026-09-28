@@ -30,6 +30,8 @@ export type FicheFinishers = {
   formats?: Format[];
   siteOfficiel?: string | null; inscription?: string | null;
   resultats?: { page: string | null; classement: string | null } | null;
+  /** Résultats hébergés par la source elle-même (`event.results`, bannière) — relevés pour savoir s'ils existent. */
+  resultatsSource?: { banniere: boolean; editions: unknown[] } | null;
   lueLe: string;
 };
 
@@ -95,6 +97,8 @@ export function lireFiche(slug: string, html: string): FicheFinishers {
     formats,
     siteOfficiel: lienReel(ev.links?.website), inscription: lienReel(ev.links?.registration),
     resultats: page || classement ? { page, classement } : null,
+    resultatsSource: pp.showResultsBanner || (Array.isArray(ev.results) && ev.results.length)
+      ? { banniere: !!pp.showResultsBanner, editions: Array.isArray(ev.results) ? ev.results.slice(0, 3) : [] } : null,
     lueLe,
   };
 }
@@ -110,14 +114,20 @@ async function main() {
   for (const slug of reste) {
     let essai = 0;
     for (;;) {
-      let r: Response | null = null;
-      try { r = await fetch(`https://www.finishers.com/course/${encodeURIComponent(slug)}`, { headers: { "User-Agent": UA, "Accept-Language": "fr-FR" }, signal: AbortSignal.timeout(20000) }); } catch { r = null; }
-      if (r && r.ok) {
-        const fiche = lireFiche(slug, await r.text());
+      // ⚠️ LE CORPS AUSSI PEUT EXPIRER. Le délai court jusqu'à la fin de `text()` : lu hors
+      // du `try`, il a levé une exception non rattrapée et arrêté la collecte à 1 561/12 028
+      // (28/09/2026, 21 h 03). Une coupure en pleine lecture est une erreur réseau comme une autre.
+      let code = 0, html: string | null = null;
+      try {
+        const r = await fetch(`https://www.finishers.com/course/${encodeURIComponent(slug)}`, { headers: { "User-Agent": UA, "Accept-Language": "fr-FR" }, signal: AbortSignal.timeout(20000) });
+        code = r.status;
+        if (r.ok) html = await r.text();
+      } catch { code = 0; html = null; }
+      if (html != null) {
+        const fiche = lireFiche(slug, html);
         appendFileSync(sortie, JSON.stringify(fiche) + "\n");
         recul = 60_000; break;
       }
-      const code = r?.status ?? 0;
       if (code === 404 || code === 410) { appendFileSync(sortie, JSON.stringify({ slug, ok: false, http: code, lueLe: new Date().toISOString() }) + "\n"); break; }
       // 403 / 429 / 5xx / réseau : le serveur demande de ralentir — on recule, sans insister.
       essai++;

@@ -15,12 +15,16 @@
  * dénivelé, liens, heure.
  */
 
+import { anneeDe } from "./resultatsSite";
+
 export type FormatFiche = { id: string; titre: string | null; discipline: string | null; distanceM: number | null; dplus: number | null; date: string | null; heure: string | null; inscription: string | null; statut: string | null };
 export type Edition = { annee: number; debut: string | null; statut: string | null };
 export type Fiche = {
   slug: string; ok: boolean; pays?: string | null; nom?: string; ville?: string | null; departement?: string | null; region?: string | null;
   lat?: number | null; lon?: number | null; derniere?: Edition | null; prochaine?: Edition | null; formats?: FormatFiche[];
-  siteOfficiel?: string | null; inscription?: string | null; resultats?: { page: string | null; classement: string | null } | null;
+  siteOfficiel?: string | null; inscription?: string | null;
+  /** `annee` fixée quand on l'a LUE (lien trouvé sur le site officiel) ; sinon déduite du lien. */
+  resultats?: { page: string | null; classement: string | null; annee?: number | null } | null;
 };
 export type LigneCourse = {
   id: string; name: string; city: string | null; date: string; distance_km: number | null; elevation_gain_m: number | null;
@@ -228,11 +232,15 @@ export function planEvenement(
   }
 
   const resultats = fiche.resultats?.classement ?? fiche.resultats?.page ?? null;
+  // L'année du classement : lue dans le lien (« …-marathon-de-paris-2026 »), JAMAIS supposée
+  // être celle de la dernière édition — une page qui s'arrête en 2024 n'est pas « 2026 ».
+  const anneeRes = resultats == null ? null
+    : fiche.resultats?.annee !== undefined ? fiche.resultats.annee ?? null : anneeDe(resultats, Number(o.aujourdhui.slice(0, 4)));
   const extras = (f: FormatFiche) => (o.colonnesNouvelles ? {
     site_officiel: fiche.siteOfficiel ?? null,
     inscription_url: f.inscription ?? fiche.inscription ?? null,
     resultats_url: resultats,
-    resultats_annee: resultats ? fiche.derniere?.annee ?? null : null,
+    resultats_annee: anneeRes,
     heure_depart: f.heure && /^\d{2}:\d{2}$/.test(f.heure) ? f.heure : null,
     source_id: f.id || null,
     source_maj_at: new Date().toISOString(),

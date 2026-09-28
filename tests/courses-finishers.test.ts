@@ -17,6 +17,7 @@ import {
   DATE_A_VENIR, type Fiche, type LigneCourse,
 } from "../src/lib/races/majFinishers";
 import { lienInscription, lienSiteOfficiel, lienClassement, heureLisible } from "../src/lib/races/liensCourse";
+import { lienResultats, robotsAutorise, anneeDe } from "../src/lib/races/resultatsSite";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -51,6 +52,13 @@ test("la fiche donne pays, lieu, formats, dénivelé, heure, site officiel et cl
   assert.equal(f.inscription, "https://www.njuko.net/10km");
   assert.equal(f.resultats?.classement, "https://resultats-live.com/events/10km", "le classement direct, pas un lien interne finishers ni kavval");
   assert.equal(lireFiche("x", "<html>rien</html>").ok, false);
+});
+
+test("la collecte survit à une coupure PENDANT la lecture de la page", () => {
+  // Arrêtée net à 1 561/12 028 le 28/09/2026 : `await r.text()` hors du `try` a laissé
+  // filer l'expiration du délai. Une coupure en pleine lecture doit être une erreur réseau.
+  assert.match(codeNu("scripts/finishers-collecte.ts"), /try \{[^}]*?const r = await fetch\([\s\S]*?html = await r\.text\(\);\s*\} catch/);
+  assert.doesNotMatch(codeNu("scripts/finishers-collecte.ts"), /lireFiche\(slug, await r\.text\(\)\)/);
 });
 
 console.log("\n=== DÉCISIONS ===\n");
@@ -238,6 +246,49 @@ test("classement : direct quand on le connaît, sinon une RECHERCHE nommée comm
   assert.equal(heureLisible("09:30"), "9 h 30"); assert.equal(heureLisible("25:00"), null);
 });
 
+console.log("\n=== RÉSULTATS SUR LE SITE OFFICIEL ===\n");
+
+test("le lien « Résultats » du menu, pas le concours photo ni l'inscription", () => {
+  // Le concours photo et l'inscription viennent AVANT : à égalité, l'ordre les aurait choisis.
+  const menu = `<nav><a href="/concours">Résultats du concours photo</a>
+    <a href="https://www.chrono-start.com/inscriptions-resultats/10-km-x">Inscrivez-vous</a>
+    <a href="/inscriptions">Inscriptions</a><a href="/resultats">Résultats</a></nav>`;
+  assert.deepEqual(lienResultats(menu, "https://www.10km-x.fr/", 2026), { url: "https://www.10km-x.fr/resultats", annee: null, texte: "Résultats", chronometreur: false });
+  assert.equal(lienResultats(`<a href="https://www.njuko.net/event/trail-x">Je m'inscris</a>`, "https://x.fr/", 2026), null, "un chronométreur qui vend les dossards n'est pas un classement");
+  assert.equal(lienResultats(`<a href="/contact">Contact</a>`, "https://x.fr/", 2026), null);
+  assert.equal(lienResultats(`<a href="https://www.sportinnovation.fr/">Notre chronométreur</a>`, "https://x.fr/", 2026), null, "un chronométreur sans « résultats » n'est pas un classement");
+  assert.equal(lienResultats(`<a href="https://livetrail.net/trail-x">Suivi en direct</a>`, "https://x.fr/", 2026)?.chronometreur, true, "le suivi « live » du chronométreur, si");
+});
+
+test("le chronométreur passe devant, puis l'année la plus récente — jamais une année future", () => {
+  const html = `<a href="/resultats-2023">Résultats 2023</a><a href="/resultats-2025">Résultats 2025</a>
+    <a href="https://www.sportinnovation.fr/resultats/trail-x-2024">Classement</a>`;
+  assert.equal(lienResultats(html, "https://x.fr/", 2026)?.url, "https://www.sportinnovation.fr/resultats/trail-x-2024");
+  assert.equal(lienResultats(html.split("<a href=\"https://www.sport")[0], "https://x.fr/", 2026)?.annee, 2025);
+  assert.equal(anneeDe("édition 2031, résultats 2024", 2026), 2024);
+  assert.equal(anneeDe("course n°120254", 2026), null, "un numéro n'est pas une année");
+});
+
+test("robots.txt : respecté, groupe à notre nom d'abord, motifs à étoile", () => {
+  assert.equal(robotsAutorise(null, "/"), true, "pas de robots.txt : permis");
+  assert.equal(robotsAutorise("User-agent: *\nDisallow: /", "/"), false);
+  assert.equal(robotsAutorise("User-agent: *\nDisallow: /admin", "/"), true);
+  assert.equal(robotsAutorise("User-agent: pacevobot\nDisallow: /\n\nUser-agent: *\nAllow: /", "/"), false);
+  assert.equal(robotsAutorise("User-agent: Googlebot\nDisallow: /", "/"), true, "une règle pour un autre robot ne nous vise pas");
+  assert.equal(robotsAutorise("User-agent: *\nDisallow: /*?", "/?page=2"), false);
+  assert.equal(robotsAutorise("User-agent: *\nDisallow: /*?", "/"), true);
+  assert.equal(robotsAutorise("User-agent: *\nDisallow: /*/prive", "/2025/prive"), false, "l'étoile au milieu du motif");
+  assert.equal(robotsAutorise("User-agent: *\nDisallow: /\nAllow: /resultats", "/resultats"), true, "la règle la plus longue l'emporte");
+});
+
+test("l'année du classement est LUE dans le lien, jamais supposée", () => {
+  const avec = (resultats: Fiche["resultats"]) => planEvenement({ ...TUE, derniere: { annee: 2026, debut: "2026-06-14", statut: "confirmed" }, resultats },
+    [ligne("a", 30.4)], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: true }).majs[0].patch;
+  assert.equal(avec({ page: null, classement: "https://results.timeto.com/marathon-de-paris-2026" }).resultats_annee, 2026);
+  assert.equal(avec({ page: null, classement: "https://resultats-live.com/events/10km" }).resultats_annee, null, "pas « Classement 2026 » sur une page sans année");
+  assert.equal(avec({ page: null, classement: "https://x.fr/resultats", annee: 2024 }).resultats_annee, 2024);
+});
+
 console.log("\n=== BRANCHEMENTS ===\n");
 
 test("avant la migration, la fiche et la page publique retombent sur les anciens champs", () => {
@@ -248,6 +299,8 @@ test("avant la migration, la fiche et la page publique retombent sur les anciens
   assert.match(codeNu("src/components/races/RacesMapView.tsx"), /<LiensCourse detail=\{details\[selected\.id\]\} course=\{selected\} d=\{d\}/);
   assert.match(codeNu("src/app/api/races/list/route.ts"), /let cols = RACE_COLS \+ COLS_032;/, "la liste doit demander date_confirmee");
   assert.match(codeNu("src/components/races/RacesHub.tsx"), /race\.date_confirmee === false && !race\.date\?\.startsWith\("2099"\)/, "la liste signale une date seulement annoncée");
+  assert.match(codeNu("scripts/finishers-appliquer.ts"), /if \(lien && !f\.resultats\?\.classement\) \{ f\.resultats = /, "un lien de site ne remplace jamais un classement déjà cité");
+  assert.match(codeNu("scripts/resultats-sites.ts"), /if \(!robotsAutorise\(rb, u\.pathname \+ u\.search\)\) return ecrire/, "robots.txt consulté avant de lire le site");
   const sql = readFileSync("supabase/migrations/032_courses_liens_resultats.sql", "utf8").replace(/--.*$/gm, "");
   assert.doesNotMatch(sql, /\bdrop\b/i);
   for (const c of ["site_officiel", "inscription_url", "resultats_url", "resultats_annee", "heure_depart", "date_confirmee", "source_id", "source_maj_at"]) {
