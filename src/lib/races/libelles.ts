@@ -34,6 +34,12 @@ const REGIONS: Record<string, string> = {
   "la-reunion": "La Réunion",
   "martinique": "Martinique",
   "mayotte": "Mayotte",
+  "nouvelle-caledonie": "Nouvelle-Calédonie",
+  "polynesie-francaise": "Polynésie française",
+  "saint-pierre-et-miquelon": "Saint-Pierre-et-Miquelon",
+  "saint-barthelemy": "Saint-Barthélemy",
+  "saint-martin": "Saint-Martin",
+  "wallis-et-futuna": "Wallis-et-Futuna",
 };
 
 /**
@@ -55,6 +61,21 @@ const ALIAS: Record<string, string> = {
 export function regionCanonique(slug: unknown): string {
   const s = String(slug ?? "").trim().toLowerCase();
   return ALIAS[s] ?? s;
+}
+
+/**
+ * L'identifiant d'une région à partir de N'IMPORTE QUELLE écriture — libellé du menu
+ * (« Île-de-France », « Provence-Alpes-Côte d'Azur ») ou valeur en base.
+ *
+ * ⚠️ CONSTATÉ LE 29/09/2026 : le filtre par région comparait « auvergne-rhone-alpes » à
+ * « Auvergne-Rhône-Alpes » en retirant les tirets mais PAS les accents. Cinq régions
+ * renvoyaient 0 course — Auvergne-Rhône-Alpes (2 882), PACA (1 473), Île-de-France (1 195),
+ * Bourgogne-Franche-Comté (937), La Réunion : ~6 500 courses introuvables par région.
+ */
+export function slugDeRegion(v: unknown): string {
+  const s = String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return regionCanonique(s);
 }
 
 /**
@@ -81,6 +102,7 @@ const PREPOSITION: Record<string, string> = {
   "grand-est": "dans le", "centre-val-de-loire": "dans le",
   "hauts-de-france": "dans les", "pays-de-la-loire": "dans les",
   "la-reunion": "à", "guadeloupe": "en", "guyane": "en", "martinique": "en", "mayotte": "à",
+  "saint-pierre-et-miquelon": "à", "saint-barthelemy": "à", "saint-martin": "à", "wallis-et-futuna": "à",
 };
 
 export function regionAvecPreposition(slug: unknown): string {

@@ -13,6 +13,7 @@ import { correctedRaceType } from "@/lib/raceType";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { RX, fillR } from "./racesI18n";
 import { AutourDeMoi } from "./AutourDeMoi";
+import { slugDeRegion } from "@/lib/races/libelles";
 import { LiensCourse } from "./LiensCourse";
 import { heureLisible } from "@/lib/races/liensCourse";
 import { dansLeRayon, distanceDeCourse, kmArrondis, type Point, type Proximite } from "@/lib/races/proximite";
@@ -39,7 +40,7 @@ const REGIONS = [
   "Centre-Val de Loire", "Corse", "Grand-Est", "Hauts-de-France",
   "Île-de-France", "Normandie", "Nouvelle-Aquitaine", "Occitanie",
   "Pays-de-la-Loire", "Provence-Alpes-Côte d'Azur",
-  "Guadeloupe", "Martinique", "La Réunion",
+  "Guadeloupe", "Martinique", "Guyane", "La Réunion", "Mayotte",
 ];
 
 const RACE_TYPE_KEYS = ["road_5k", "road_10k", "semi", "marathon", "trail_s", "trail_m", "trail_l", "trail_xl", "ultra"] as const;
@@ -166,8 +167,9 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
         correspond(r.organization, q) ||
         correspond(r.city, q) ||
         correspond(r.department, q);
-      const matchRegion = region === "Toutes" ||
-        r.region?.toLowerCase().replace(/-/g, " ").includes(region.toLowerCase().replace(/-/g, " "));
+      // Identifiant contre identifiant : le libellé du menu porte des accents que la base
+      // n'a pas (« Île-de-France » / « ile-de-france ») — voir `slugDeRegion`.
+      const matchRegion = region === "Toutes" || slugDeRegion(r.region) === slugDeRegion(region);
       const matchType = raceType === "all" || correctedRaceType(r.distance_km, r.type) === raceType;
       const matchDate = !dateFrom || r.date.startsWith("2099") || new Date(r.date) >= new Date(dateFrom);
       const matchFavori = !filtreFavoris || favoris.has(r.id);

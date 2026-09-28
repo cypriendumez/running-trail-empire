@@ -18,6 +18,8 @@ import {
 } from "../src/lib/races/majFinishers";
 import { lienInscription, lienSiteOfficiel, lienClassement, heureLisible } from "../src/lib/races/liensCourse";
 import { lienResultats, robotsAutorise, anneeDe, motsDistinctifs, entites } from "../src/lib/races/resultatsSite";
+import { slugDeRegion, nomRegion, regionAvecPreposition } from "../src/lib/races/libelles";
+import { REGION_OUTRE_MER } from "../src/lib/races/majFinishers";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -333,6 +335,32 @@ test("l'année du classement est LUE dans le lien, jamais supposée", () => {
   assert.equal(avec({ page: null, classement: "https://results.timeto.com/marathon-de-paris-2026" }).resultats_annee, 2026);
   assert.equal(avec({ page: null, classement: "https://resultats-live.com/events/10km" }).resultats_annee, null, "pas « Classement 2026 » sur une page sans année");
   assert.equal(avec({ page: null, classement: "https://x.fr/resultats", annee: 2024 }).resultats_annee, 2024);
+});
+
+console.log("\n=== FILTRE PAR RÉGION ===\n");
+
+test("chaque région du menu retrouve ses courses — accents compris", () => {
+  // 29/09/2026 : cinq régions renvoyaient 0 course (≈ 6 500 introuvables) — le libellé
+  // « Île-de-France » était comparé à « ile-de-france » sans retirer les accents.
+  const hub = readFileSync("src/components/races/RacesHub.tsx", "utf8");
+  const menu = [...(hub.match(/const REGIONS = \[([\s\S]*?)\];/)?.[1] ?? "").matchAll(/"([^"]+)"/g)].map((m) => m[1]).filter((r) => r !== "Toutes");
+  assert.ok(menu.length >= 16, `menu des régions illisible (${menu.length})`);
+  for (const libelle of menu) {
+    const slug = slugDeRegion(libelle);
+    assert.notEqual(nomRegion(slug), slug, `« ${libelle} » → « ${slug} » : aucune région connue sous cet identifiant`);
+  }
+  assert.equal(slugDeRegion("Auvergne-Rhône-Alpes"), slugDeRegion("auvergne-rhone-alpes"));
+  assert.equal(slugDeRegion("Provence-Alpes-Côte d'Azur"), "provence-alpes-cote-d-azur");
+  assert.equal(slugDeRegion("reunion"), "la-reunion", "l'alias historique rejoint la bonne région");
+  assert.match(codeNu("src/components/races/RacesHub.tsx"), /const matchRegion = region === "Toutes" \|\| slugDeRegion\(r\.region\) === slugDeRegion\(region\);/);
+});
+
+test("outre-mer : la région vient du CODE PAYS, pas de l'arrondissement de la source", () => {
+  const p = planEvenement({ ...TUE, slug: "grand-raid", pays: "RE", region: "Saint-Benoît" }, [], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: true });
+  assert.equal(p.ajouts[0].region, "la-reunion");
+  for (const slug of Object.values(REGION_OUTRE_MER)) assert.notEqual(nomRegion(slug), slug, `${slug} sans nom lisible`);
+  assert.equal(regionAvecPreposition("saint-martin"), "à Saint-Martin");
+  assert.equal(regionAvecPreposition("nouvelle-caledonie"), "en Nouvelle-Calédonie");
 });
 
 console.log("\n=== BRANCHEMENTS ===\n");

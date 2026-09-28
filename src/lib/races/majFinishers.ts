@@ -41,6 +41,17 @@ export const estCourseAPied = (discipline: string | null | undefined) =>
   /^(road|trail|running|ultra|cross|stairs|mountain|vertical|skyrunning|kv)/i.test(String(discipline ?? ""))
   && !/walk|marche|nordic|bike|cycl|swim|tri|duathlon|obstacle/i.test(String(discipline ?? ""));
 
+/**
+ * Outre-mer : la région vient du CODE PAYS. Le fil d'Ariane de la source y donne
+ * l'arrondissement (« Saint-Benoît », « Saint-Paul » pour La Réunion), voire rien : une
+ * course rangée en « saint-benoit » serait invisible du filtre par région.
+ */
+export const REGION_OUTRE_MER: Record<string, string> = {
+  RE: "la-reunion", GP: "guadeloupe", MQ: "martinique", GF: "guyane", YT: "mayotte",
+  NC: "nouvelle-caledonie", PF: "polynesie-francaise", PM: "saint-pierre-et-miquelon",
+  BL: "saint-barthelemy", MF: "saint-martin", WF: "wallis-et-futuna",
+};
+
 /** « Provence-Alpes-Côte d'Azur » → « provence-alpes-cote-d-azur » (la forme déjà en base). */
 export function slugRegion(label: string | null | undefined): string | null {
   const s = String(label ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
@@ -302,7 +313,8 @@ export function planEvenement(
     const type = typeDe(f.discipline, f.km);
     plan.ajouts.push({
       name: modele?.name ?? fiche.nom, city: modele?.city ?? fiche.ville ?? "",
-      department: modele?.department ?? fiche.departement ?? "", region: modele?.region ?? slugRegion(fiche.region) ?? "",
+      department: modele?.department ?? fiche.departement ?? "",
+      region: modele?.region ?? REGION_OUTRE_MER[String(fiche.pays)] ?? slugRegion(fiche.region) ?? "",
       date, distance_km: f.km, type, elevation_gain_m: dplusDe(f.dplus, estTrail(type), f.km),
       difficulty: estTrail(type) ? "blue" : "green", terrain: [], time_limits: [],
       registration_url: `https://www.finishers.com/course/${fiche.slug}`, organization: "finishers.com",
