@@ -389,7 +389,7 @@ export default function SyncPage() {
                   <p className="text-sm font-semibold text-zinc-800">{d["gpx.title"]}</p>
                   <p className="mt-0.5 text-xs text-zinc-400">{d["gpx.sub"]}</p>
                 </div>
-                <input type="file" accept=".gpx,.fit" className="hidden" onChange={handleFileUpload} />
+                <input type="file" accept=".gpx" className="hidden" onChange={handleFileUpload} />
               </label>
             </div>
 

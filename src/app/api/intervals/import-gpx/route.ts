@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { aujourdhui, jourCivil, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
+import { sportDuGpx, idExterneGpx } from "@/lib/intervals/gpx";
 
 export const runtime = "nodejs";
 
@@ -81,6 +82,17 @@ export async function POST(req: Request) {
   // Date from first timestamp
   const dateStr = points[0].time ? jourCivil(points[0].time, FUSEAU_DEFAUT) : aujourdhui(FUSEAU_DEFAUT);
 
+  // Sans `sport`, une course importée n'entrait pas dans les records (voir lib/intervals/gpx).
+  const sport = sportDuGpx(xml, distanceKm, durationSec);
+  // Le même fichier importé deux fois doublait la séance, donc le volume de la semaine.
+  const externalId = idExterneGpx(points[0]?.time);
+  if (externalId) {
+    const { data: deja, error: eDeja } = await supabase.from("workouts").select("id")
+      .eq("user_id", user.id).eq("external_id", externalId).limit(1).maybeSingle();
+    if (eDeja) console.error("[import GPX] doublon non vérifié :", eDeja.message);
+    if (deja) return NextResponse.json({ error: "Cette activité est déjà importée." }, { status: 409 });
+  }
+
   const { data, error } = await supabase.from("workouts").insert({
     user_id: user.id,
     title: name,
@@ -91,11 +103,13 @@ export async function POST(req: Request) {
     elevation_gain_m: Math.round(elevGain),
     elevation_loss_m: 0,
     source: "manual", // enum: manual|garmin|coros|strava|apple_health|polar
+    ...(sport ? { sport } : {}),
+    ...(externalId ? { external_id: externalId } : {}),
     created_at: new Date().toISOString(),
   })
     .select()
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, name, distanceKm, elevGain, durationSec, workout: data });
+  return NextResponse.json({ ok: true, name, distanceKm, elevGain, durationSec, sport, workout: data });
 }
