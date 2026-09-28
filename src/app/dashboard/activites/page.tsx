@@ -81,7 +81,7 @@ export default async function ActivitesPage({ searchParams }: { searchParams: Pr
   // message ferait chercher un bug d'import là où c'est le serveur qui n'a pas répondu.
   if (estUnePanne(lecture)) {
     return (
-      <div className="mx-auto w-full max-w-3xl px-4 py-8">
+      <div className="mx-auto w-full max-w-3xl sm:px-4 sm:py-8">
         <PerfTabs />
         <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-5">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" />
@@ -138,7 +138,7 @@ export default async function ActivitesPage({ searchParams }: { searchParams: Pr
   });
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-8">
+    <div className="mx-auto w-full max-w-3xl sm:px-4 sm:py-8">
       <PerfTabs />
       <header className="mb-6">
         <h1 className="text-3xl font-black tracking-tight text-zinc-900">{d["feed.title"]}</h1>

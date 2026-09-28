@@ -5,7 +5,7 @@
 //  courir un marathon en France y est soumis exactement comme un Français. Les textes
 //  précisent donc « pour les courses en France » plutôt que de supposer le lecteur.
 //
-//  ⚠️ RÈGLE DE RÉDACTION. On n'écrit NULLE PART que l'athlète est « apte », « en règle »
+//  RÈGLE DE RÉDACTION. On n'écrit NULLE PART que l'athlète est « apte », « en règle »
 //  ou « autorisé à courir ». Nous ne vérifions rien auprès de la fédération — il n'y a
 //  pas d'API pour cela — et nous ne raisonnons que sur une date qu'il a saisie lui-même.
 //  Chaque formulation le rappelle. L'autorité reste l'organisateur et la FFA.
@@ -114,7 +114,7 @@ export const PPS_T: Record<Lang, TextesPps> = {
     masquerEchec: "Impossible d'enregistrer ce choix. Réessaie.",
     vValide: (e, j) => `Valable jusqu'au ${e} — encore ${j} jour${j > 1 ? "s" : ""}`,
     vExpire: (e) => `Expiré depuis le ${e}`,
-    vExpireAvantCourse: (e, c) => `⚠️ Il expire le ${e}, avant ta course du ${c} : refais-le, sinon tu ne pourras pas t'inscrire ou retirer ton dossard.`,
+    vExpireAvantCourse: (e, c) => `Il expire le ${e}, avant ta course du ${c} : refais-le, sinon tu ne pourras pas t'inscrire ou retirer ton dossard.`,
     vLicencie: "Licencié FFA — dispensé de PPS",
     avertissement: "Calculé à partir de la date que tu as saisie. Nous ne vérifions rien auprès de la fédération : seul l'organisateur de la course fait foi.",
     pastilleRequis: "PPS requis",
@@ -171,7 +171,7 @@ export const PPS_T: Record<Lang, TextesPps> = {
     masquerEchec: "Could not save this choice. Try again.",
     vValide: (e, j) => `Valid until ${e} — ${j} day${j > 1 ? "s" : ""} left`,
     vExpire: (e) => `Expired on ${e}`,
-    vExpireAvantCourse: (e, c) => `⚠️ It expires on ${e}, before your race on ${c}: renew it, otherwise you will not be able to enter or collect your bib.`,
+    vExpireAvantCourse: (e, c) => `It expires on ${e}, before your race on ${c}: renew it, otherwise you will not be able to enter or collect your bib.`,
     vLicencie: "FFA licence holder — no PPS needed",
     avertissement: "Worked out from the date you entered. We check nothing with the federation: only the race organiser decides.",
     pastilleRequis: "PPS required",
@@ -228,7 +228,7 @@ export const PPS_T: Record<Lang, TextesPps> = {
     masquerEchec: "Auswahl konnte nicht gespeichert werden. Versuch es erneut.",
     vValide: (e, j) => `Gültig bis ${e} — noch ${j} Tag${j > 1 ? "e" : ""}`,
     vExpire: (e) => `Abgelaufen am ${e}`,
-    vExpireAvantCourse: (e, c) => `⚠️ Er läuft am ${e} ab, also vor deinem Wettkampf am ${c}: erneuere ihn, sonst kannst du dich nicht anmelden und deine Startnummer nicht abholen.`,
+    vExpireAvantCourse: (e, c) => `Er läuft am ${e} ab, also vor deinem Wettkampf am ${c}: erneuere ihn, sonst kannst du dich nicht anmelden und deine Startnummer nicht abholen.`,
     vLicencie: "FFA-Lizenz — kein PPS nötig",
     avertissement: "Berechnet aus dem von dir eingetragenen Datum. Wir prüfen nichts beim Verband: maßgeblich ist allein der Veranstalter.",
     pastilleRequis: "PPS erforderlich",
@@ -285,7 +285,7 @@ export const PPS_T: Record<Lang, TextesPps> = {
     masquerEchec: "No se pudo guardar esta elección. Inténtalo de nuevo.",
     vValide: (e, j) => `Válido hasta el ${e} — quedan ${j} día${j > 1 ? "s" : ""}`,
     vExpire: (e) => `Caducado el ${e}`,
-    vExpireAvantCourse: (e, c) => `⚠️ Caduca el ${e}, antes de tu carrera del ${c}: renuévalo o no podrás inscribirte ni recoger el dorsal.`,
+    vExpireAvantCourse: (e, c) => `Caduca el ${e}, antes de tu carrera del ${c}: renuévalo o no podrás inscribirte ni recoger el dorsal.`,
     vLicencie: "Licencia FFA — exento de PPS",
     avertissement: "Calculado a partir de la fecha que has indicado. No verificamos nada ante la federación: solo el organizador decide.",
     pastilleRequis: "PPS obligatorio",
@@ -342,7 +342,7 @@ export const PPS_T: Record<Lang, TextesPps> = {
     masquerEchec: "Não foi possível guardar esta escolha. Tenta de novo.",
     vValide: (e, j) => `Válido até ${e} — faltam ${j} dia${j > 1 ? "s" : ""}`,
     vExpire: (e) => `Expirou a ${e}`,
-    vExpireAvantCourse: (e, c) => `⚠️ Expira a ${e}, antes da tua corrida de ${c}: renova-o, senão não poderás inscrever-te nem levantar o dorsal.`,
+    vExpireAvantCourse: (e, c) => `Expira a ${e}, antes da tua corrida de ${c}: renova-o, senão não poderás inscrever-te nem levantar o dorsal.`,
     vLicencie: "Licença FFA — dispensado de PPS",
     avertissement: "Calculado a partir da data que indicaste. Não verificamos nada junto da federação: só o organizador decide.",
     pastilleRequis: "PPS obrigatório",

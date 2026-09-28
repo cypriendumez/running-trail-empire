@@ -7,7 +7,8 @@ import { toast } from "sonner";
 import {
   Trophy, Zap, Users, Star, TrendingUp, TrendingDown, Minus,
   Lock, CheckCircle, Flame, Medal, Plus, ChevronRight,
-  MapPin, Calendar, BarChart2, Target, Crown, Mountain, CalendarClock, AlertTriangle } from "lucide-react";
+  MapPin, Calendar, BarChart2, Target, Crown, Mountain, CalendarClock, AlertTriangle, Award, Gift, Footprints } from "lucide-react";
+import { iconeBadge, iconeDefi, ICONE_PALIER } from "./iconesLigues";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { LX, UNIT_T, CH_T } from "./leaguesI18n";
 import { BADGE_T } from "./leaguesBadgesI18n";
@@ -47,12 +48,29 @@ interface AutoChallenge {
 
 // ── Config ─────────────────────────────────────────────────────────────────────
 // Libellés (label/next) traduits au rendu via LX (clés tier.* / rar.*).
-const TIER_CONFIG: Record<string, { gradient: string; emoji: string; textColor: string; next?: string }> = {
-  bronze:   { gradient: "from-orange-400 to-amber-600",   emoji: "🥉", textColor: "text-amber-700",  next: "silver" },
-  silver:   { gradient: "from-slate-300 to-slate-500",    emoji: "🥈", textColor: "text-slate-600",  next: "gold" },
-  gold:     { gradient: "from-yellow-400 to-amber-500",   emoji: "🥇", textColor: "text-yellow-700", next: "platinum" },
-  platinum: { gradient: "from-cyan-400 to-sky-600",       emoji: "🔷", textColor: "text-cyan-700",   next: "diamond" },
-  diamond:  { gradient: "from-violet-400 to-purple-600",  emoji: "💎", textColor: "text-violet-700", next: undefined },
+const TIER_CONFIG: Record<string, { gradient: string; textColor: string; next?: string }> = {
+  bronze:   { gradient: "from-orange-400 to-amber-600",   textColor: "text-amber-700",  next: "silver" },
+  silver:   { gradient: "from-slate-300 to-slate-500",    textColor: "text-slate-600",  next: "gold" },
+  gold:     { gradient: "from-yellow-400 to-amber-500",   textColor: "text-yellow-700", next: "platinum" },
+  platinum: { gradient: "from-cyan-400 to-sky-600",       textColor: "text-cyan-700",   next: "diamond" },
+  diamond:  { gradient: "from-violet-400 to-purple-600",  textColor: "text-violet-700", next: undefined },
+};
+
+/** La médaille d'un palier : un disque à ses couleurs, une icône au trait. */
+function MedaillePalier({ cle, taille }: { cle: string; taille: "s" | "m" }) {
+  const t = TIER_CONFIG[cle] ?? TIER_CONFIG.bronze;
+  const I = ICONE_PALIER[cle] ?? Award;
+  return (
+    <div className={`flex shrink-0 items-center justify-center bg-gradient-to-br ${t.gradient} text-white shadow-sm ring-2 ring-white ${taille === "m" ? "h-14 w-14 rounded-2xl md:h-20 md:w-20 md:rounded-3xl" : "h-10 w-10 rounded-xl"}`}>
+      <I className={taille === "m" ? "h-7 w-7 md:h-10 md:w-10" : "h-5 w-5"} strokeWidth={1.75} />
+    </div>
+  );
+}
+
+const RARETE_POINT: Record<string, string> = { common: "bg-zinc-400", rare: "bg-blue-500", epic: "bg-amber-500", legendary: "bg-violet-500" };
+const RARETE_MEDAILLE: Record<string, string> = {
+  common: "from-zinc-200 to-zinc-300 text-zinc-600", rare: "from-blue-400 to-blue-600 text-white",
+  epic: "from-amber-400 to-orange-500 text-white", legendary: "from-violet-500 to-fuchsia-600 text-white",
 };
 
 const RARITY_CONFIG = {
@@ -182,15 +200,16 @@ export function LeaguesHub({
       {/* ── Tabs ── */}
       <div className="flex w-fit gap-1 rounded-2xl bg-zinc-100/80 p-1 ring-1 ring-zinc-200/60">
         {[
-          { v: "league", l: d["tab.league"] },
-          { v: "badges", l: `${d["tab.badges"]} (${unlocked.length}/${computedBadges.length})` },
-          { v: "challenges", l: d["tab.challenges"] },
+          { v: "league", l: d["tab.league"], I: Trophy },
+          { v: "badges", l: `${d["tab.badges"]} ${unlocked.length}/${computedBadges.length}`, I: Award },
+          { v: "challenges", l: d["tab.challenges"], I: Target },
         ].map(t => {
           const active = tab === t.v;
           return (
             <button key={t.v} onClick={() => setTab(t.v as typeof tab)}
-              className={`relative whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${active ? "text-zinc-900" : "text-zinc-500 hover:text-zinc-700"}`}>
+              className={`relative flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-semibold transition-colors sm:px-4 ${active ? "text-zinc-900" : "text-zinc-500 hover:text-zinc-700"}`}>
               {active && <motion.span layoutId="leagues-tab-pill" transition={{ type: "spring", stiffness: 420, damping: 34 }} className="absolute inset-0 rounded-xl bg-white shadow-sm" />}
+              <t.I className="relative h-4 w-4" strokeWidth={2} />
               <span className="relative">{t.l}</span>
             </button>
           );
@@ -206,16 +225,12 @@ export function LeaguesHub({
 
             {/* My league card */}
             <div className="col-span-12 md:col-span-4 bento-card flex flex-col">
-              {/* Tier badge — halo coloré + léger flottement */}
-              <div className="relative mb-4 self-center">
-                <div className={`absolute inset-0 rounded-3xl bg-gradient-to-br ${tier.gradient} opacity-50 blur-xl`} />
-                <motion.div animate={{ y: [0, -4, 0] }} transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                  className={`relative flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br ${tier.gradient} text-5xl shadow-lg ring-4 ring-white`}>
-                  {tier.emoji}
-                </motion.div>
-              </div>
-              <div className="text-center mb-5">
-                <div className={`text-2xl font-black ${tier.textColor}`}>{d[`tier.${tierKey}`]}</div>
+              {/* Médaille + palier : côte à côte sur téléphone (une ligne au lieu d'un
+                  écran), empilés sur grand écran. Plus de flottement en boucle. */}
+              <div className="mb-3 flex items-center gap-3 md:mb-5 md:flex-col md:gap-3">
+                <MedaillePalier cle={tierKey} taille="m" />
+              <div className="md:text-center">
+                <div className={`text-xl font-black md:text-2xl ${tier.textColor}`}>{d[`tier.${tierKey}`]}</div>
                 {leagues ? (
                   <>
                     <div className="text-sm text-zinc-600 font-medium mt-0.5">{String(leagues.name ?? "")}</div>
@@ -225,18 +240,19 @@ export function LeaguesHub({
                     </div>
                   </>
                 ) : (
-                  <div className="text-xs text-zinc-500 mt-1">{d["noLeague"]}</div>
+                  <div className="text-xs text-zinc-500 mt-0.5">{d["noLeague"]}</div>
                 )}
               </div>
+              </div>
 
-              <div className="space-y-2 text-sm flex-1">
+              <div className="text-sm flex-1">
                 {([
                   { label: d["myRank"], value: myRank > 0 ? fillT(d["rankVal"], { n: myRank, m: members.length }) : "—" },
                   { label: d["weekScore"], value: myScore > 0 ? `${myScore.toFixed(0)} pts` : "—" },
                   { label: d["badgesUnlocked"], value: `${unlocked.length}/${computedBadges.length}` },
                   { label: d["nextTier"], value: tier.next ? fillT(d["tierLeague"], { t: d[`tier.${tier.next}`] }) : d["maxTier"] },
                 ] as { label: string; value: string }[]).map(s => (
-                  <div key={s.label} className="flex justify-between py-2 border-b border-zinc-50 last:border-0">
+                  <div key={s.label} className="flex justify-between py-1.5 border-b border-zinc-50 last:border-0 md:py-2">
                     <span className="text-zinc-500">{s.label}</span>
                     <span className="font-semibold text-zinc-900">{s.value}</span>
                   </div>
@@ -244,8 +260,8 @@ export function LeaguesHub({
               </div>
 
               {Array.isArray(leagues?.rewards) && (leagues.rewards as string[]).length > 0 && (
-                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-100 rounded-2xl text-xs text-yellow-800">
-                  {d["reward"]} {(leagues.rewards as string[]).join(", ")}
+                <div className="mt-3 flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-100 rounded-2xl text-xs text-yellow-800">
+                  <Gift className="h-4 w-4 flex-shrink-0" /> <span>{d["reward"]} {(leagues.rewards as string[]).join(", ")}</span>
                 </div>
               )}
             </div>
@@ -258,8 +274,8 @@ export function LeaguesHub({
               </div>
 
               {members.length === 0 ? (
-                <div className="text-center py-16 text-zinc-500">
-                  <Trophy className="w-10 h-10 mx-auto mb-3 text-zinc-200" />
+                <div className="text-center py-6 text-zinc-500 md:py-14">
+                  <Trophy className="w-8 h-8 mx-auto mb-2 text-zinc-200" />
                   <p className="text-sm">{d["lb.empty1"]}</p>
                   <p className="text-xs mt-1 text-zinc-500">{d["lb.empty2"]}</p>
                 </div>
@@ -284,7 +300,7 @@ export function LeaguesHub({
                           i === 2 ? "bg-orange-100 text-orange-600" :
                           "bg-zinc-100 text-zinc-500"
                         }`}>
-                          {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}
+                          {i + 1}
                         </div>
 
                         <Avatar name={displayName} url={avatarUrl} size={8} />
@@ -318,14 +334,14 @@ export function LeaguesHub({
 
             {/* Échelle des ligues */}
             <div className="col-span-12 bento-card">
-              <h3 className="font-semibold text-zinc-900 mb-4 flex items-center gap-2"><Trophy className="w-4 h-4 text-amber-500" /> {d["ladder"]}</h3>
-              <div className="grid grid-cols-5 gap-2 sm:gap-3">
+              <h3 className="font-semibold text-zinc-900 mb-3 flex items-center gap-2"><Trophy className="w-4 h-4 text-amber-500" /> {d["ladder"]}</h3>
+              <div className="grid grid-cols-5 gap-1.5 sm:gap-3">
                 {Object.entries(TIER_CONFIG).map(([key, t]) => {
                   const isCurrent = key === currentTierKey;
                   return (
-                    <div key={key} className={`relative rounded-2xl border p-3 text-center transition-all ${isCurrent ? "border-transparent ring-2 ring-emerald-400 shadow-md bg-emerald-50/40" : "border-zinc-200 bg-white opacity-70"}`}>
-                      <div className={`mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${t.gradient} text-2xl shadow`}>{t.emoji}</div>
-                      <div className={`text-xs sm:text-sm font-bold ${t.textColor}`}>{d[`tier.${key}`]}</div>
+                    <div key={key} className={`relative flex flex-col items-center rounded-2xl border px-1 py-2.5 text-center transition-all sm:p-3 ${isCurrent ? "border-transparent ring-2 ring-emerald-400 shadow-md bg-emerald-50/40" : "border-zinc-200 bg-white opacity-70"}`}>
+                      <div className="mb-1.5"><MedaillePalier cle={key} taille="s" /></div>
+                      <div className={`text-[11px] sm:text-sm font-bold ${t.textColor}`}>{d[`tier.${key}`]}</div>
                       {isCurrent && <span className="mt-1 inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">{d["youChip"]}</span>}
                     </div>
                   );
@@ -336,8 +352,8 @@ export function LeaguesHub({
 
             {/* Records personnels */}
             <div className="col-span-12 bento-card">
-              <h3 className="font-semibold text-zinc-900 mb-4 flex items-center gap-2"><Medal className="w-4 h-4 text-violet-500" /> {d["rec.title"]} <span className="text-xs font-normal text-zinc-400">{d["rec.year"]}</span></h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              <h3 className="font-semibold text-zinc-900 mb-3 flex items-center gap-2"><Medal className="w-4 h-4 text-violet-500" /> {d["rec.title"]} <span className="text-xs font-normal text-zinc-400">{d["rec.year"]}</span></h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
                 {([
                   { icon: <MapPin className="w-3.5 h-3.5" />, label: d["rec.longest"], value: records.longestRun.toLocaleString(lang), unit: "km", color: "text-emerald-600" },
                   { icon: <Zap className="w-3.5 h-3.5" />, label: d["rec.pace"], value: fmtPace(records.bestPace), unit: "/km", color: "text-blue-600" },
@@ -348,7 +364,7 @@ export function LeaguesHub({
                   { icon: <CalendarClock className="w-3.5 h-3.5" />, label: d["rec.hours"], value: records.totalHours.toLocaleString(lang), unit: "h", color: "text-amber-600" },
                   { icon: <Calendar className="w-3.5 h-3.5" />, label: d["rec.weeks"], value: records.weeksActive, unit: "/52", color: "text-violet-600" },
                 ] as { icon: React.ReactNode; label: string; value: number | string; unit: string; color: string }[]).map((r) => (
-                  <div key={r.label} className="rounded-2xl border border-zinc-100 bg-zinc-50/60 p-3">
+                  <div key={r.label} className="rounded-2xl border border-zinc-100 bg-zinc-50/60 px-3 py-2.5 sm:p-3">
                     <div className={`flex items-center gap-1.5 text-xs font-medium mb-1 ${r.color}`}>{r.icon}{r.label}</div>
                     <div className="text-xl font-black text-zinc-900 tabular-nums">{r.value}<span className="text-xs font-normal text-zinc-400 ml-1">{r.unit}</span></div>
                   </div>
@@ -361,14 +377,16 @@ export function LeaguesHub({
               <h3 className="font-bold mb-3 flex items-center gap-2"><Zap className="w-4 h-4 text-yellow-400" /> {d["climb.title"]}</h3>
               <div className="grid sm:grid-cols-3 gap-3 text-sm">
                 {[
-                  { icon: "🏃", t: d["climb.1t"], d: d["climb.1d"] },
-                  { icon: "⛰️", t: d["climb.2t"], d: d["climb.2d"] },
-                  { icon: "🎯", t: d["climb.3t"], d: d["climb.3d"] },
+                  { I: Footprints, t: d["climb.1t"], d: d["climb.1d"] },
+                  { I: Mountain, t: d["climb.2t"], d: d["climb.2d"] },
+                  { I: Target, t: d["climb.3t"], d: d["climb.3d"] },
                 ].map((x) => (
-                  <div key={x.t} className="rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
-                    <div className="text-xl mb-1">{x.icon}</div>
-                    <div className="font-semibold">{x.t}</div>
-                    <div className="text-xs text-zinc-500 mt-0.5">{x.d}</div>
+                  <div key={x.t} className="flex items-start gap-3 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
+                    <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-400/15 text-emerald-300"><x.I className="h-4 w-4" /></span>
+                    <div>
+                      <div className="font-semibold">{x.t}</div>
+                      <div className="text-xs text-zinc-400 mt-0.5">{x.d}</div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -397,11 +415,13 @@ export function LeaguesHub({
                     initial={{ width: 0 }} animate={{ width: `${(unlocked.length / computedBadges.length) * 100}%` }}
                     transition={{ duration: 1, ease: "easeOut" }} />
                 </div>
-                <div className="flex gap-3 mt-3 text-xs text-zinc-400">
-                  <span>⬜ {d["rar.common"]}: {computedBadges.filter(b => b.rarity === "common" && b.unlocked).length}/{computedBadges.filter(b => b.rarity === "common").length}</span>
-                  <span>🔵 {d["rar.rare"]}: {computedBadges.filter(b => b.rarity === "rare" && b.unlocked).length}/{computedBadges.filter(b => b.rarity === "rare").length}</span>
-                  <span>🟡 {d["rar.epic"]}: {computedBadges.filter(b => b.rarity === "epic" && b.unlocked).length}/{computedBadges.filter(b => b.rarity === "epic").length}</span>
-                  <span>💜 {d["rar.legShort"]}: {computedBadges.filter(b => b.rarity === "legendary" && b.unlocked).length}/{computedBadges.filter(b => b.rarity === "legendary").length}</span>
+                <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 text-xs text-zinc-400">
+                  {(["common", "rare", "epic", "legendary"] as const).map((r) => (
+                    <span key={r} className="flex items-center gap-1.5">
+                      <span className={`h-2 w-2 rounded-full ${RARETE_POINT[r]}`} />
+                      {d[r === "legendary" ? "rar.legShort" : `rar.${r}`]} {computedBadges.filter(b => b.rarity === r && b.unlocked).length}/{computedBadges.filter(b => b.rarity === r).length}
+                    </span>
+                  ))}
                 </div>
               </div>
             </div>
@@ -419,13 +439,14 @@ export function LeaguesHub({
             </div>
 
             {/* Badge grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
               {filteredBadges.map((badge, i) => {
                 const rc = RARITY_CONFIG[badge.rarity];
+                const Icone = iconeBadge(badge.id);
                 return (
                   <motion.div key={badge.id}
-                    initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.03 }}
-                    className={`relative p-4 rounded-3xl border shadow-sm transition-all ${
+                    initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: Math.min(i, 12) * 0.02 }}
+                    className={`relative px-3 py-3.5 rounded-3xl border shadow-sm transition-all sm:p-4 ${
                       badge.unlocked
                         ? `${rc.bg} ${rc.border} ${rc.glow}`
                         : "bg-zinc-50 border-zinc-100 grayscale opacity-50"
@@ -441,7 +462,9 @@ export function LeaguesHub({
                         <Lock className="w-3.5 h-3.5 text-zinc-300" />
                       </span>
                     )}
-                    <div className="text-4xl mb-2 text-center">{badge.icon}</div>
+                    <div className={`mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br shadow-sm ring-4 ring-white ${RARETE_MEDAILLE[badge.rarity]}`}>
+                      <Icone className="h-6 w-6" strokeWidth={1.75} />
+                    </div>
                     <div className="text-xs font-bold text-zinc-900 text-center leading-tight mb-1">{bT(badge)[0]}</div>
                     <div className={`text-xs text-center font-semibold mb-2 ${rc.text}`}>{d[`rar.${badge.rarity}`]}</div>
                     <div className="text-xs text-zinc-400 text-center leading-tight mb-2">{bT(badge)[1]}</div>
@@ -483,7 +506,9 @@ export function LeaguesHub({
                       initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
                       className={`rounded-3xl border p-4 transition-all ${done ? "border-emerald-200 bg-emerald-50/60" : "border-zinc-200 bg-white hover:border-zinc-300"}`}>
                       <div className="flex items-start gap-3">
-                        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-xl ${done ? "bg-emerald-100" : "bg-zinc-100"}`}>{c.icon}</div>
+                        {(() => { const I = iconeDefi(c.id); return (
+                          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${done ? "bg-emerald-100 text-emerald-700" : "bg-zinc-100 text-zinc-600"}`}><I className="h-5 w-5" strokeWidth={1.9} /></div>
+                        ); })()}
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-zinc-900 text-sm truncate">{cT(c)[0]}</span>

@@ -312,12 +312,13 @@ test("« Enregistrer » ouvre sur la carte — sur TOUS les écrans — et les r
   const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
   // La branche « pas en plein écran » du className de la section (elle en a deux depuis
   // que la carte peut passer en grand écran).
-  const carte = gr.indexOf(': "relative -mx-6 -mt-6 md:mx-0 md:mt-0');
+  const carte = gr.indexOf(': "relative -mx-3 -mt-3 md:mx-0 md:mt-0');
   assert.ok(carte > 0, "le bloc carte a disparu de l'écran « Enregistrer »");
-  assert.ok(!/relative -mx-6 -mt-6 md:hidden/.test(gr), "la carte est redevenue invisible sur bureau");
+  assert.ok(!/relative -mx-[36] -mt-[36] md:hidden/.test(gr), "la carte est redevenue invisible sur bureau");
   assert.ok(/<CarteDirect\s+position=\{positionCarte\}\s+track=\{traceCarte\}/.test(gr.slice(carte, carte + 700)), "la carte ne suit plus la position ni la trace");
-  // Elle est pleine largeur : les marges négatives annulent EXACTEMENT le `p-6` du <main>.
-  assert.match(codeNu("src/app/dashboard/layout.tsx"), /<main className="flex-1 overflow-auto p-6">/, "le <main> n'a plus p-6 : les marges -mx-6/-mt-6 de la carte ne s'annulent plus");
+  // Elle est pleine largeur : les marges négatives annulent EXACTEMENT la marge du <main>
+  // sur téléphone (`p-3` depuis le 29/09/2026 — « on défile trop ») ; `md:p-6` au-delà.
+  assert.match(codeNu("src/app/dashboard/layout.tsx"), /<main className="flex-1 overflow-auto p-3 md:p-6">/, "le <main> n'a plus p-3 sur téléphone : les marges -mx-3/-mt-3 de la carte ne s'annulent plus");
   // ⚠️ L'ENTÊTE VERT A ÉTÉ RETIRÉ (23/09/2026). Passé SOUS la carte quand celle-ci a pris
   // la tête de l'écran, il ne disait plus rien qu'elle ne dise déjà : un titre, un
   // sous-titre et trois pastilles décoratives, 200 px entre l'action et les réglages.

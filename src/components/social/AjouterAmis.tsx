@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { Search, UserPlus, UserCheck, Users, BookUser, QrCode, Share2, ScanLine, X, Loader2 } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { estUuid, idDepuisLien, lienAmi } from "@/lib/social/amisLiens";
+import { FeuilleInvitation } from "./FeuilleInvitation";
 
 export type Athlete = { id: string; full_name?: string | null; avatar_url?: string | null; league?: string | null; discipline_score?: number | null; following: boolean };
 
@@ -30,7 +31,7 @@ const T: Record<string, Record<string, string>> = {
     suggestions: "Suggestions", contacts: "Contacts", qr: "QR code", resultats: "Résultats",
     inviteTitre: "Invite des amis qui ne sont pas sur Pacevo", inviter: "Inviter",
     inviteTexte: "Rejoins-moi sur Pacevo, le coach running qui adapte ton plan chaque jour.",
-    lienCopie: "Lien copié", partageEchec: "Partage impossible",
+    inviteSujet: "Rejoins-moi sur Pacevo",
     contactsChoisir: "Choisir dans mes contacts",
     contactsExplique: "Pacevo compare les adresses e-mail des contacts que tu choisis avec les comptes existants. Aucune adresse n'est conservée.",
     contactsIndispo: "Ton navigateur ne donne pas accès aux contacts du téléphone (c'est le cas sur iPhone). Invite tes amis par message : une fois inscrits, tu les retrouves dans Suggestions.",
@@ -46,7 +47,7 @@ const T: Record<string, Record<string, string>> = {
     suggestions: "Suggestions", contacts: "Contacts", qr: "QR code", resultats: "Results",
     inviteTitre: "Invite friends who aren't on Pacevo yet", inviter: "Invite",
     inviteTexte: "Join me on Pacevo, the running coach that adapts your plan every day.",
-    lienCopie: "Link copied", partageEchec: "Sharing failed",
+    inviteSujet: "Join me on Pacevo",
     contactsChoisir: "Pick from my contacts",
     contactsExplique: "Pacevo matches the email addresses of the contacts you pick against existing accounts. No address is stored.",
     contactsIndispo: "Your browser doesn't give access to the phone's contacts (that's the case on iPhone). Invite your friends by message: once signed up, you'll find them under Suggestions.",
@@ -62,7 +63,7 @@ const T: Record<string, Record<string, string>> = {
     suggestions: "Vorschläge", contacts: "Kontakte", qr: "QR-Code", resultats: "Ergebnisse",
     inviteTitre: "Lade Freunde ein, die noch nicht bei Pacevo sind", inviter: "Einladen",
     inviteTexte: "Komm zu mir auf Pacevo, den Lauf-Coach, der deinen Plan jeden Tag anpasst.",
-    lienCopie: "Link kopiert", partageEchec: "Teilen nicht möglich",
+    inviteSujet: "Komm zu mir auf Pacevo",
     contactsChoisir: "Aus meinen Kontakten wählen",
     contactsExplique: "Pacevo gleicht die E-Mail-Adressen der gewählten Kontakte mit bestehenden Konten ab. Keine Adresse wird gespeichert.",
     contactsIndispo: "Dein Browser gibt keinen Zugriff auf die Kontakte des Telefons (so ist es auf dem iPhone). Lade deine Freunde per Nachricht ein: nach der Anmeldung findest du sie unter Vorschläge.",
@@ -78,7 +79,7 @@ const T: Record<string, Record<string, string>> = {
     suggestions: "Sugerencias", contacts: "Contactos", qr: "Código QR", resultats: "Resultados",
     inviteTitre: "Invita a amigos que aún no están en Pacevo", inviter: "Invitar",
     inviteTexte: "Únete a mí en Pacevo, el coach de running que adapta tu plan cada día.",
-    lienCopie: "Enlace copiado", partageEchec: "No se pudo compartir",
+    inviteSujet: "Únete a mí en Pacevo",
     contactsChoisir: "Elegir entre mis contactos",
     contactsExplique: "Pacevo compara las direcciones de correo de los contactos que eliges con las cuentas existentes. No se guarda ninguna dirección.",
     contactsIndispo: "Tu navegador no da acceso a los contactos del teléfono (es el caso en iPhone). Invita a tus amigos por mensaje: una vez registrados, los encontrarás en Sugerencias.",
@@ -94,7 +95,7 @@ const T: Record<string, Record<string, string>> = {
     suggestions: "Sugestões", contacts: "Contactos", qr: "Código QR", resultats: "Resultados",
     inviteTitre: "Convida amigos que ainda não estão na Pacevo", inviter: "Convidar",
     inviteTexte: "Junta-te a mim na Pacevo, o coach de corrida que adapta o teu plano todos os dias.",
-    lienCopie: "Ligação copiada", partageEchec: "Não foi possível partilhar",
+    inviteSujet: "Junta-te a mim na Pacevo",
     contactsChoisir: "Escolher nos meus contactos",
     contactsExplique: "A Pacevo compara os e-mails dos contactos que escolhes com as contas existentes. Nenhum endereço é guardado.",
     contactsIndispo: "O teu navegador não dá acesso aos contactos do telemóvel (é o caso no iPhone). Convida os teus amigos por mensagem: depois de inscritos, encontra-los em Sugestões.",
@@ -147,6 +148,12 @@ export function AjouterAmis({ moi, suivre, onFollowChange }: {
   const [q, setQ] = useState("");
   const [athletes, setAthletes] = useState<Athlete[] | null>(null);
   const [invite, setInvite] = useState<Athlete | null>(null);
+  const [feuille, setFeuille] = useState(false);
+  const [origine, setOrigine] = useState<string | null>(null);
+  useEffect(() => { setOrigine(window.location.origin); }, []);
+  // Le lien PERSONNEL (/amis/<id>) plutôt que l'accueil : l'ami arrive sur l'invitation
+  // de celui qui l'envoie, et peut le suivre d'un geste une fois inscrit.
+  const invitation = { texte: d.inviteTexte, sujet: d.inviteSujet, url: origine ? lienAmi(origine, moi.id) : "" };
 
   const load = useCallback(async (query: string) => {
     try {
@@ -202,18 +209,10 @@ export function AjouterAmis({ moi, suivre, onFollowChange }: {
   const toggleListe = (a: Athlete) => toggle(a, (f) => setAthletes((prev) => prev?.map(f) ?? null));
   const toggleInvite = (a: Athlete) => toggle(a, (f) => setInvite((prev) => (prev ? f(prev) : prev)));
 
-  async function inviter() {
-    const url = typeof window === "undefined" ? "" : window.location.origin;
-    const nav = navigator as Navigator & { share?: (d: { title?: string; text?: string; url?: string }) => Promise<void> };
-    try {
-      if (nav.share) { await nav.share({ title: "Pacevo", text: d.inviteTexte, url }); return; }
-      await navigator.clipboard.writeText(`${d.inviteTexte} ${url}`);
-      toast.success(d.lienCopie);
-    } catch (e) {
-      // L'annulation par l'athlète n'est pas une erreur.
-      if ((e as { name?: string })?.name !== "AbortError") toast.error(d.partageEchec);
-    }
-  }
+  // ⚠️ PLUS DE `navigator.share` NU : sur Mac, choisir une application dans la feuille du
+  // système levait une erreur, affichée « Partage impossible », et Instagram n'y figurait
+  // pas. La feuille à nous propose les applications, puis « Plus » pour celle du système.
+  const inviter = () => { if (origine) setFeuille(true); };
 
   const Ligne = ({ a, onToggle }: { a: Athlete; onToggle: (a: Athlete) => void }) => (
     <div className="flex items-center gap-3 py-2.5">
@@ -308,9 +307,10 @@ export function AjouterAmis({ moi, suivre, onFollowChange }: {
 
           {onglet === "contacts" && <Contacts d={d} dd={dd} Ligne={Ligne} Invitation={Invitation} />}
 
-          {onglet === "qr" && <CodeQr moi={moi} d={d} onScan={(id) => router.push(`/dashboard/communaute?suivre=${id}`)} />}
+          {onglet === "qr" && <CodeQr moi={moi} d={d} onPartager={inviter} onScan={(id) => router.push(`/dashboard/communaute?suivre=${id}`)} />}
         </>
       )}
+      {origine && <FeuilleInvitation ouverte={feuille} onFermer={() => setFeuille(false)} invitation={invitation} />}
     </div>
   );
 }
@@ -378,23 +378,11 @@ function Contacts({ d, dd, Ligne, Invitation }: {
 }
 
 /** L'onglet QR code : mon code (à faire scanner) et, quand le navigateur sait lire, un scanner. */
-function CodeQr({ moi, d, onScan }: { moi: { id: string; nom: string | null }; d: Record<string, string>; onScan: (id: string) => void }) {
+function CodeQr({ moi, d, onScan, onPartager }: { moi: { id: string; nom: string | null }; d: Record<string, string>; onScan: (id: string) => void; onPartager: () => void }) {
   const [origine, setOrigine] = useState<string | null>(null);
   const [scan, setScan] = useState(false);
   useEffect(() => { setOrigine(window.location.origin); }, []);
   const lien = origine ? lienAmi(origine, moi.id) : null;
-
-  async function partager() {
-    if (!lien) return;
-    const nav = navigator as Navigator & { share?: (d: { title?: string; text?: string; url?: string }) => Promise<void> };
-    try {
-      if (nav.share) { await nav.share({ title: "Pacevo", text: d.inviteTexte, url: lien }); return; }
-      await navigator.clipboard.writeText(lien);
-      toast.success(d.lienCopie);
-    } catch (e) {
-      if ((e as { name?: string })?.name !== "AbortError") toast.error(d.partageEchec);
-    }
-  }
 
   return (
     <div className="mt-4">
@@ -404,7 +392,7 @@ function CodeQr({ moi, d, onScan }: { moi: { id: string; nom: string | null }; d
         <p className="mt-1 text-xs leading-relaxed text-zinc-500">{d.qrExplique}</p>
       </div>
       <div className="mx-auto mt-4 flex max-w-xs flex-col gap-2">
-        <button type="button" onClick={partager} className="flex items-center justify-center gap-2 rounded-full bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700">
+        <button type="button" onClick={onPartager} className="flex items-center justify-center gap-2 rounded-full bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700">
           <Share2 className="h-4 w-4" />{d.qrPartager}
         </button>
         {origine !== null && (peutScanner()

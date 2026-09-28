@@ -416,7 +416,7 @@ export function Relief3D({ trace, centre, textes }: {
   // boîte de 72 % de la hauteur, avec les marges de la page — on regardait une montagne
   // par un hublot. Les marges négatives annulent le `p-6` du <main>.
   return (
-    <div className="relative -mx-6 overflow-hidden border-y border-zinc-200 sm:mx-0 sm:rounded-2xl sm:border dark:border-zinc-800"
+    <div className="relative -mx-3 overflow-hidden border-y border-zinc-200 sm:mx-0 sm:rounded-2xl sm:border dark:border-zinc-800"
       style={{ height: "clamp(380px, calc(100dvh - 16rem), 820px)" }}>
       {/* ⚠️ HAUTEUR EXPLICITE, PAS `absolute inset-0`. La feuille de style de MapLibre
           déclare `.maplibregl-map { position: relative }` et, à spécificité égale, elle

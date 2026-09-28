@@ -940,7 +940,7 @@ export function TrailBuilder({ centre, onTrace }: {
   // Garmin 34 + barre d'onglets 64 + marges. À 11,5rem, le bas de la carte — donc la
   // barre du pouce — passait SOUS la barre d'onglets (29 px de chevauchement mesurés).
   return (
-    <div className="-mx-6 flex h-[calc(100dvh-16rem)] min-h-[380px] flex-col gap-3 sm:mx-0 sm:h-[80vh]">
+    <div className="-mx-3 flex h-[calc(100dvh-16rem)] min-h-[380px] flex-col gap-3 sm:mx-0 sm:h-[80vh]">
       {/* ── MAP ───────────────────────────────────────────────────────────── */}
       {/* ⚠️ `isolate` : la carte est son PROPRE contexte d'empilement. Ses commandes
           (barre d'outils z-1000, Leaflet z-1000) passaient PAR-DESSUS le menu Profil et le

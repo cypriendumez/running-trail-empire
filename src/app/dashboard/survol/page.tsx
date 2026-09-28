@@ -117,7 +117,7 @@ export default async function SurvolPage({ searchParams }: { searchParams: Promi
   const pace = paceOf(choisie.duration_seconds, choisie.distance_km);
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-8">
+    <div className="mx-auto w-full max-w-5xl sm:px-4 sm:py-8">
       <PerfTabs />
       <header className="mb-5">
         <h1 className="text-3xl font-black tracking-tight text-zinc-900">{d["fly.title"]}</h1>

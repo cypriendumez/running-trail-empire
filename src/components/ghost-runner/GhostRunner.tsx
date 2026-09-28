@@ -1083,7 +1083,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
 
       {/* Le lien de suivi, proposé au départ — un geste, puis il disparaît. */}
       {departPret && (
-        <div className="-mx-6 -mt-6 flex items-start gap-3 border-b border-blue-100 bg-blue-50 px-5 py-3 md:mx-0 md:mt-0 md:rounded-2xl md:border">
+        <div className="-mx-3 -mt-3 flex items-start gap-3 border-b border-blue-100 bg-blue-50 px-5 py-3 md:mx-0 md:mt-0 md:rounded-2xl md:border">
           <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-600" aria-hidden />
           <div className="min-w-0 flex-1">
             <p className="text-[13px] font-semibold leading-snug text-blue-900">{d["veille.partage"]}</p>
@@ -1111,7 +1111,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
           repliée dessous, sinon on retombe sur ce qui a été retiré de l'onglet Sécurité :
           quelqu'un qui part en montagne en se croyant surveillé. */}
       {(veilleActive || capteursIndispo) && phase === "running" && (
-        <div className="-mx-6 border-b border-zinc-100 bg-white px-5 py-2 md:mx-0 md:rounded-2xl md:border">
+        <div className="-mx-3 border-b border-zinc-100 bg-white px-5 py-2 md:mx-0 md:rounded-2xl md:border">
           <div className="flex items-start gap-1.5 text-[11px] leading-relaxed text-zinc-500">
             <ShieldCheck className={`mt-0.5 h-3.5 w-3.5 flex-shrink-0 ${veilleActive ? "text-emerald-600" : "text-zinc-300"}`} aria-hidden />
             <p>
@@ -1147,7 +1147,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
         style={plein ? { margin: 0 } : undefined}
         className={plein
           ? "fixed inset-0 z-[2000] bg-white"
-          : "relative -mx-6 -mt-6 md:mx-0 md:mt-0 md:overflow-hidden md:rounded-3xl md:border md:border-zinc-200"}
+          : "relative -mx-3 -mt-3 md:mx-0 md:mt-0 md:overflow-hidden md:rounded-3xl md:border md:border-zinc-200"}
       >
         <CarteDirect
           position={positionCarte}

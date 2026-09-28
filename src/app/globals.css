@@ -77,8 +77,11 @@
   .state-competition { background-color: var(--state-competition); }
 
   /* Bento card — finition premium : ombre douce en couches + léger soulèvement au survol */
+  /* ⚠️ 16 px sur téléphone, 24 px au-delà (29/09/2026, Cyprien : « tu perds trop de
+     place, on défile trop, surtout sur téléphone »). 78 cartes : 16 px gagnés en haut
+     et en bas de chacune, c'est un écran entier sur un tableau de bord. */
   .bento-card {
-    @apply bg-white rounded-3xl border border-zinc-200/70 p-6
+    @apply bg-white rounded-3xl border border-zinc-200/70 p-4 md:p-6
            shadow-[0_1px_2px_rgba(0,0,0,0.04),0_10px_30px_-14px_rgba(16,24,40,0.12)]
            transition-all duration-300
            hover:-translate-y-0.5 hover:border-zinc-200
@@ -86,13 +89,13 @@
   }
 
   .bento-card-dark {
-    @apply bg-zinc-900 rounded-3xl border border-zinc-800 p-6
+    @apply bg-zinc-900 rounded-3xl border border-zinc-800 p-4 md:p-6
            transition-all duration-300;
   }
 
   /* Metric display */
   .metric-value {
-    @apply text-4xl font-bold tabular-nums tracking-tight;
+    @apply text-3xl md:text-4xl font-bold tabular-nums tracking-tight;
   }
 
   .metric-label {

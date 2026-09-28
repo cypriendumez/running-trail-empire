@@ -110,7 +110,7 @@ export default async function ClubsPage() {
   });
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-8">
+    <div className="mx-auto w-full max-w-3xl sm:px-4 sm:py-8">
       <ClubsHub clubs={clubs} defis={defis} />
     </div>
   );

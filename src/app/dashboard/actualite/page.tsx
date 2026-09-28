@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CommunityFeed } from "@/components/community/CommunityFeed";
+import { actualitesEnCache, sansTexte } from "@/lib/news/actualites";
 
 export const metadata = { title: "Actualité" };
 
@@ -17,6 +18,13 @@ export default async function ActualitePage() {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect("/login");
+  // Le fil « Tout » est rendu PAR LE SERVEUR : les titres sont là dès l'affichage, sans
+  // attendre que le navigateur les demande. Cache partagé chaud → instantané ; cache froid
+  // → on n'attend pas plus de 2,5 s, le navigateur prendra le relais.
+  const initial = await Promise.race([
+    actualitesEnCache("all").then(sansTexte).catch(() => null),
+    new Promise<null>((r) => setTimeout(() => r(null), 2500)),
+  ]);
   return (
     <>
       {/* La poignée de main TLS avec les domaines d'images est payée AVANT la première
@@ -25,7 +33,7 @@ export default async function ActualitePage() {
       <link rel="preconnect" href="https://images.pexels.com" crossOrigin="" />
       <link rel="preconnect" href="https://images.unsplash.com" crossOrigin="" />
       <link rel="preconnect" href="https://icons.duckduckgo.com" crossOrigin="" />
-      <CommunityFeed />
+      <CommunityFeed initial={initial} />
     </>
   );
 }

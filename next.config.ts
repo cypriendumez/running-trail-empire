@@ -1,9 +1,21 @@
 import type { NextConfig } from "next";
+import { readFileSync } from "node:fs";
 import createNextIntlPlugin from "next-intl/plugin";
+
+/**
+ * LA VERSION QUE CE BUILD EMBARQUE — lue dans le tampon que `prebuild` vient d'écrire.
+ * Le navigateur la compare à `/version.json` en ligne (`MiseAJour`) : un onglet resté
+ * ouvert pendant une mise en ligne se met à jour tout seul, au lieu de montrer l'ancien
+ * menu pendant des heures (constaté le 29/09/2026 sur les captures de Cyprien).
+ */
+const VERSION_BUILD = (() => {
+  try { return String(JSON.parse(readFileSync("public/version.json", "utf8")).commit ?? ""); } catch { return ""; }
+})();
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 const nextConfig: NextConfig = {
+  env: { NEXT_PUBLIC_VERSION: VERSION_BUILD },
   // Tree-shaking ciblé des grosses libs à barrel-file → JS par page nettement plus léger
   // (recharts, framer-motion, lucide importent énormément par défaut). Transitions plus fluides.
   experimental: {

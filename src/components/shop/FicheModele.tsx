@@ -59,7 +59,7 @@ export function FicheModele({ m, avis, bouts, manquantes, proches, offres, offre
   const usage = usageDe(m);
   const photo = photoUtilisable(best?.image_url);
   return (
-    <div className="mx-auto w-full max-w-[1180px] px-4 py-6 sm:px-6">
+    <div className="mx-auto w-full max-w-[1180px] sm:px-6 sm:py-6">
       <Link href="/dashboard/shop" className="text-[13px] text-zinc-500 hover:text-zinc-900">← {tx("shop.retour")}</Link>
 
       <header className="mt-3 mb-6">

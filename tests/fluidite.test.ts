@@ -158,7 +158,7 @@ test("aucun flou d'arrière-plan posé sur une carte qui se déplace, et une seu
   // contenait rien, et le test restait vert pendant qu'un bloc blanc `bg-white/95
   // backdrop-blur` et une pastille floutée s'installaient PAR-DESSUS la carte. On ancre
   // désormais sur la section entière, et on EXIGE de la trouver.
-  const iSection = gr.indexOf(': "relative -mx-6 -mt-6 md:mx-0 md:mt-0');
+  const iSection = gr.indexOf(': "relative -mx-3 -mt-3 md:mx-0 md:mt-0');
   const iFin = gr.indexOf("</section>", iSection);
   assert.ok(iSection > 0 && iFin > iSection, "la section de la carte est introuvable : ce garde ne vérifierait plus rien");
   const carte = gr.slice(iSection, iFin);

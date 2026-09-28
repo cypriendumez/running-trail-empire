@@ -169,7 +169,7 @@ function ligne(n: number, pasM: number) {
     const ui = codeNu("src/components/trail/TrailBuilder.tsx");
     // Plein écran : la boîte de 68 % de hauteur avec les marges de la page a disparu.
     assert.ok(!/h-\[68vh\] min-h-\[460px\]/.test(ui), "la carte est revenue dans sa boîte de 68 % de hauteur");
-    assert.match(ui, /-mx-6 flex h-\[calc\(100dvh-16rem\)\]/, "la carte ne prend plus la largeur et la hauteur de l'écran sur téléphone");
+    assert.match(ui, /-mx-3 flex h-\[calc\(100dvh-16rem\)\]/, "la carte ne prend plus la largeur et la hauteur de l'écran sur téléphone");
     // Les commandes flottantes sont réservées au bureau ; le téléphone a sa barre.
     assert.match(ui, /hidden items-start justify-between gap-3 sm:flex/, "la barre d'outils flotte de nouveau sur la carte du téléphone");
     assert.match(ui, /absolute inset-x-0 bottom-0 z-\[1000\] sm:hidden/, "la barre du pouce a disparu");
@@ -186,7 +186,7 @@ function ligne(n: number, pasM: number) {
     assert.match(css, /\.leaflet-bottom \{ bottom: 64px; \}/, "l'attribution OpenStreetMap repasse sous la barre du pouce");
     assert.match(css, /\.leaflet-control-zoom \{ display: none; \}/, "les boutons +/− de Leaflet reviennent gêner le pouce");
     // La vue relief : même traitement, et MapLibre préchargé pendant qu'on construit.
-    assert.match(codeNu("src/components/trail/Relief3D.tsx"), /-mx-6 overflow-hidden border-y/, "la vue relief est revenue dans son hublot");
+    assert.match(codeNu("src/components/trail/Relief3D.tsx"), /-mx-3 overflow-hidden border-y/, "la vue relief est revenue dans son hublot");
     assert.match(codeNu("src/components/trail/TrailModes.tsx"), /void import\("\.\/Relief3D"\)/, "MapLibre n'est plus préchargé : 1 Mo à télécharger au clic sur « Vue relief »");
   });
 

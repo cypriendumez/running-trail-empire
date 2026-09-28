@@ -62,7 +62,7 @@ export default async function ShopPage() {
   const profil = construireProfil({ seances, paires: pairesRes.data ?? [], objectif: obj, vma });
 
   return (
-    <div className="mx-auto w-full max-w-[1180px] px-4 py-6 sm:px-6">
+    <div className="mx-auto w-full max-w-[1180px] sm:px-6 sm:py-6">
       <header className="mb-6">
         <h1 className="text-[26px] font-semibold tracking-tight text-zinc-900 sm:text-[32px]">{tx("shop.titre")}</h1>
         <p className="mt-1.5 max-w-2xl text-[14px] leading-relaxed text-zinc-500">

@@ -114,175 +114,187 @@ function Favicon({ src, name, className = "h-4 w-4" }: { src?: string; name: str
   );
 }
 
-export function CommunityFeed() {
-  const { t, lang } = useT();
-  const tr = (k: string) => L[lang]?.[k] ?? L.fr[k] ?? k;
-  const [cat, setCat] = useState<Cat>("all");
-  const [items, setItems] = useState<Item[]>([]);
-  const [loading, setLoading] = useState(true);
+const fmtDate = (d: string, lang: string) => {
+  const t = new Date(d).getTime();
+  if (!t) return "";
+  const h = Math.floor((Date.now() - t) / 3600000);
+  if (h < 1) return "•";
+  if (h < 24) return `${h} h`;
+  return new Date(t).toLocaleDateString(LOCALE[lang] ?? "fr-FR", { day: "numeric", month: "short" });
+};
 
-  const load = (c: Cat) => {
-    setLoading(true);
-    fetch(`/api/community/news?cat=${c}`)
-      .then((r) => r.json())
-      .then((j) => setItems(Array.isArray(j.items) ? j.items : []))
-      .catch(() => setItems([]))
-      .finally(() => setLoading(false));
-  };
-  useEffect(() => { load(cat); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [cat]);
-
-  const fmtDate = (d: string) => {
-    const t = new Date(d).getTime();
-    if (!t) return "";
-    const h = Math.floor((Date.now() - t) / 3600000);
-    if (h < 1) return "•";
-    if (h < 24) return `${h} h`;
-    return new Date(t).toLocaleDateString(LOCALE[lang] ?? "fr-FR", { day: "numeric", month: "short" });
-  };
-
-  const itemCat = (it: Item): Cat => (cat !== "all" ? cat : catOf(it.title));
-
-  // Pied de carte (source + date + « Lire ») — réutilisé par la carte vedette et les cartes standard.
-  const Footer = ({ it }: { it: Item }) => (
-    <div className="mt-auto flex items-center gap-2 pt-3 text-xs">
+// ⚠️ `Cover` ET `Footer` VIVENT HORS DU COMPOSANT (29/09/2026). Déclarés dedans, ils
+// étaient de NOUVEAUX composants à chaque rendu : React démontait et remontait les 48
+// images à chaque changement d'état (chargement, rubrique) — d'où le clignotement et des
+// images qui semblaient « mettre du temps ».
+function Footer({ it, lang, lire }: { it: Item; lang: string; lire: string }) {
+  return (
+    <div className="mt-auto flex items-center gap-2 pt-2.5 text-xs">
       <Favicon src={it.favicon} name={it.source} className="h-4 w-4" />
       <span className="truncate font-medium text-zinc-500">{it.source}</span>
-      {it.date && <><span className="text-zinc-300">·</span><span className="shrink-0 text-zinc-400">{fmtDate(it.date)}</span></>}
+      {it.date && <><span className="text-zinc-300">·</span><span className="shrink-0 text-zinc-400">{fmtDate(it.date, lang)}</span></>}
       <span className="ml-auto flex shrink-0 items-center gap-1 font-semibold text-emerald-600 opacity-0 transition-opacity group-hover:opacity-100">
-        {tr("read")} <ExternalLink className="h-3 w-3" />
+        {lire} <ExternalLink className="h-3 w-3" />
       </span>
     </div>
   );
+}
 
-  const Cover = ({ c, big = false, seed = 0, priorite = false }: { c: Cat; big?: boolean; seed?: number; priorite?: boolean }) => {
-    const Icon = THEME[c].icon;
-    const pool = PHOTOS[c] ?? PHOTOS.running;
-    const photo = pool[((seed % pool.length) + pool.length) % pool.length];
-    return (
-      <div className={`relative overflow-hidden bg-gradient-to-br ${THEME[c].grad} ${big ? "h-48 sm:h-auto sm:w-[40%]" : "h-28"}`}>
-        {/* Photo représentative libre de droits (Unsplash/Pexels, usage commercial OK).
-            ⚠️ PAR L'OPTIMISEUR, PAS EN DIRECT (22/09/2026). Chaque carte téléchargeait un
-            JPEG de ~90 ko chez Pexels : 48 allers-retours vers un CDN tiers, 766 ms
-            mesurées pour la première image. `next/image` les sert en AVIF/WebP, à la
-            taille réellement affichée, depuis notre domaine et en cache. Les deux
-            premières cartes sont prioritaires : ce sont elles que l'œil attend. */}
-        <Image src={photo} alt="" fill sizes={big ? "(max-width: 640px) 100vw, 40vw" : "(max-width: 640px) 100vw, 33vw"}
-          priority={priorite} loading={priorite ? undefined : "lazy"} quality={55}
-          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-        {/* Voile dégradé teinté : lisibilité du badge + identité couleur de la catégorie */}
-        <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${THEME[c].grad} opacity-50 mix-blend-multiply`} />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-black/10" />
-        {/* reflet qui balaie au survol */}
-        <div className="pointer-events-none absolute -inset-y-2 -left-1/3 w-1/3 -skew-x-12 bg-white/20 blur-md transition-transform duration-700 group-hover:translate-x-[420%]" />
-        <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white ring-1 ring-white/25 backdrop-blur-sm">
-          <Icon className="h-3 w-3" /> {tr(c)}
-        </span>
-      </div>
-    );
+function Cover({ c, libelle, big = false, seed = 0, priorite = false }: { c: Cat; libelle: string; big?: boolean; seed?: number; priorite?: boolean }) {
+  const Icon = THEME[c].icon;
+  const pool = PHOTOS[c] ?? PHOTOS.running;
+  const photo = pool[((seed % pool.length) + pool.length) % pool.length];
+  return (
+    <div className={`relative overflow-hidden bg-gradient-to-br ${THEME[c].grad} ${big ? "h-40 sm:h-auto sm:w-[40%]" : "h-24 sm:h-28"}`}>
+      {/* Photo représentative libre de droits (Unsplash/Pexels, usage commercial OK).
+          ⚠️ PAR L'OPTIMISEUR, PAS EN DIRECT (22/09/2026) : AVIF/WebP à la taille affichée,
+          depuis notre domaine et en cache. Les premières cartes sont prioritaires. */}
+      <Image src={photo} alt="" fill sizes={big ? "(max-width: 640px) 100vw, 40vw" : "(max-width: 640px) 50vw, 33vw"}
+        priority={priorite} loading={priorite ? undefined : "lazy"} quality={55}
+        className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+      {/* Voile dégradé teinté : lisibilité du badge + identité couleur de la catégorie */}
+      <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${THEME[c].grad} opacity-50 mix-blend-multiply`} />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-black/10" />
+      <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-1 rounded-full bg-black/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white ring-1 ring-white/25 backdrop-blur-sm">
+        <Icon className="h-3 w-3" /> {libelle}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Les rubriques déjà lues, gardées le temps de la visite : revenir sur « Trail » après
+ * « Tout » est instantané. (Le CDN garde aussi chaque rubrique 15 min.)
+ */
+const memoire = new Map<Cat, Item[]>();
+const enVol = new Map<Cat, Promise<Item[]>>();
+function lireRubrique(c: Cat, forcer = false): Promise<Item[]> {
+  if (!forcer && memoire.has(c)) return Promise.resolve(memoire.get(c)!);
+  if (!forcer && enVol.has(c)) return enVol.get(c)!;
+  const p = fetch(`/api/community/news?cat=${c}`)
+    .then((r) => r.json())
+    .then((j) => { const items: Item[] = Array.isArray(j.items) ? j.items : []; if (items.length) memoire.set(c, items); return items; })
+    .catch(() => [] as Item[])
+    .finally(() => enVol.delete(c));
+  enVol.set(c, p);
+  return p;
+}
+
+/** `initial` : le fil « Tout », rendu par le serveur — les titres sont là dès l'affichage. */
+export function CommunityFeed({ initial }: { initial?: Item[] | null }) {
+  const { t, lang } = useT();
+  const tr = (k: string) => L[lang]?.[k] ?? L.fr[k] ?? k;
+  if (initial?.length && !memoire.has("all")) memoire.set("all", initial);
+  const [cat, setCat] = useState<Cat>("all");
+  const [items, setItems] = useState<Item[]>(() => memoire.get("all") ?? []);
+  const [loading, setLoading] = useState(() => !memoire.has("all"));
+
+  const load = (c: Cat, forcer = false) => {
+    const deja = !forcer && memoire.get(c);
+    if (deja) { setItems(deja); setLoading(false); return; }
+    setLoading(true);
+    void lireRubrique(c, forcer).then((x) => { setItems(x); setLoading(false); });
   };
+  useEffect(() => { load(cat); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [cat]);
+
+  const itemCat = (it: Item): Cat => (cat !== "all" ? cat : catOf(it.title));
 
   return (
-    <div className="mx-auto max-w-5xl pb-12">
-      {/* Hero */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
-        className="relative overflow-hidden rounded-3xl p-7 text-white shadow-[0_18px_50px_-24px_rgba(5,80,60,0.7)]" style={{ background: "linear-gradient(135deg,#064e3b 0%,#047857 45%,#0d9488 100%)" }}>
+    <div className="mx-auto max-w-5xl pb-8">
+      {/* En-tête compact : sur téléphone, le fil commence dans le premier écran. */}
+      <div className="relative overflow-hidden rounded-3xl px-5 py-4 text-white sm:p-6" style={{ background: "linear-gradient(135deg,#064e3b 0%,#047857 45%,#0d9488 100%)" }}>
         <div className="pointer-events-none absolute -top-20 -right-12 h-64 w-64 rounded-full bg-emerald-300/25 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-24 -left-10 h-56 w-56 rounded-full bg-teal-300/20 blur-3xl" />
-        <div className="pointer-events-none absolute inset-0 opacity-[0.12]" style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.6) 1px, transparent 1px)", backgroundSize: "18px 18px" }} />
-        <div className="relative z-10">
-          <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/20 backdrop-blur-md">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-300 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-300" />
-            </span>
-            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-50">{tr("title")}</span>
-          </span>
-          <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">{tr("title")}</h1>
-          <p className="mt-1.5 max-w-2xl text-[15px] leading-relaxed text-white/85">{tr("subtitle")}</p>
+        <div className="relative z-10 flex items-center gap-3">
+          <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/20"><Newspaper className="h-5 w-5" /></span>
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold tracking-tight sm:text-2xl">{tr("title")}</h1>
+            <p className="text-[13px] leading-snug text-white/80 sm:text-[15px]">{tr("subtitle")}</p>
+          </div>
         </div>
-      </motion.div>
+      </div>
 
-      {/* Encart newsletter (opt-in in-app) */}
-      <div className="mt-5 overflow-hidden rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50/80 to-white p-5 sm:flex sm:items-center sm:justify-between sm:gap-6">
+      {/* Filtres : une ligne qui défile sur téléphone, au lieu de trois lignes empilées. */}
+      <div className="-mx-4 mt-3 flex items-center gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {CATS.map((c) => {
+          const Icon = THEME[c].icon;
+          const active = cat === c;
+          // Précharger au survol / au toucher : la rubrique est souvent prête avant le clic.
+          const precharger = () => { if (!memoire.has(c)) void lireRubrique(c); };
+          return (
+            <button key={c} onClick={() => setCat(c)} onPointerEnter={precharger} onTouchStart={precharger} onFocus={precharger}
+              className={`relative inline-flex flex-shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${active ? "text-white" : "bg-white text-zinc-600 ring-1 ring-zinc-200 hover:bg-zinc-50"}`}>
+              {active && <motion.span layoutId="community-cat-pill" transition={{ type: "spring", stiffness: 460, damping: 34 }} className="absolute inset-0 rounded-full bg-zinc-900" />}
+              <span className="relative flex items-center gap-1.5"><Icon className="h-3.5 w-3.5" /> {tr(c)}</span>
+            </button>
+          );
+        })}
+        <button onClick={() => load(cat, true)} disabled={loading} title={tr("refresh")} aria-label={tr("refresh")}
+          className="ml-auto flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white text-zinc-500 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50 disabled:opacity-50">
+          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+        </button>
+      </div>
+
+      {/* Liste */}
+      <div className="mt-3">
+        {loading ? (
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className={`overflow-hidden rounded-2xl border border-zinc-200 bg-white ${i === 0 ? "col-span-2" : ""}`}>
+                <div className="h-24 animate-pulse bg-zinc-100" />
+                <div className="space-y-2 p-3">
+                  <div className="h-4 w-5/6 animate-pulse rounded bg-zinc-100" />
+                  <div className="h-4 w-2/3 animate-pulse rounded bg-zinc-100" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : items.length === 0 ? (
+          <div className="py-12 text-center text-sm text-zinc-400"><Newspaper className="mx-auto mb-3 h-10 w-10 text-zinc-200" />{tr("empty")}</div>
+        ) : (
+          /* Deux colonnes dès le téléphone : un titre + une vignette tiennent dans une
+             demi-largeur, et on voit deux fois plus d'articles par écran. */
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            {items.map((it, i) => {
+              const c = itemCat(it);
+              if (i === 0) {
+                return (
+                  <a key={it.link} href={it.link} target="_blank" rel="noopener noreferrer"
+                    className="group col-span-2 flex flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_18px_44px_-22px_rgba(16,185,129,0.45)] sm:flex-row">
+                    <Cover c={c} libelle={tr(c)} big seed={i} priorite />
+                    <div className="flex flex-1 flex-col p-4 sm:p-6">
+                      <h2 className="text-base font-bold leading-snug text-zinc-900 line-clamp-3 group-hover:text-emerald-700 sm:text-xl">{it.title}</h2>
+                      <Footer it={it} lang={lang} lire={tr("read")} />
+                    </div>
+                  </a>
+                );
+              }
+              return (
+                <a key={it.link} href={it.link} target="_blank" rel="noopener noreferrer"
+                  className="group flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_16px_40px_-22px_rgba(16,185,129,0.4)]">
+                  <Cover c={c} libelle={tr(c)} seed={i} priorite={i <= 4} />
+                  <div className="flex flex-1 flex-col p-3 sm:p-4">
+                    <h3 className="text-[13px] font-semibold leading-snug text-zinc-900 line-clamp-4 group-hover:text-emerald-700 sm:text-[15px] sm:line-clamp-3">{it.title}</h3>
+                    <Footer it={it} lang={lang} lire={tr("read")} />
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+        )}
+        <p className="mt-4 text-center text-[11px] text-zinc-400">{tr("via")}</p>
+      </div>
+
+      {/* Lettre d'information : APRÈS le fil. On vient ici pour lire l'actualité ; l'encart
+          d'inscription en tête repoussait le premier article sous la ligne de flottaison. */}
+      <div className="mt-6 overflow-hidden rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50/80 to-white p-4 sm:flex sm:items-center sm:justify-between sm:gap-6 sm:p-5">
         <div className="mb-3 flex items-start gap-3 sm:mb-0">
-          <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-emerald-100"><Mail className="h-5 w-5 text-emerald-600" /></span>
+          <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-2xl bg-emerald-100"><Mail className="h-4 w-4 text-emerald-600" /></span>
           <div>
             <h3 className="font-bold text-zinc-900">{t("news.title")}</h3>
             <p className="text-sm text-zinc-500">{t("news.sub")}</p>
           </div>
         </div>
         <div className="w-full sm:max-w-sm"><NewsletterSignup /></div>
-      </div>
-
-      {/* Filtres */}
-      <div className="mt-5 flex flex-wrap items-center gap-2">
-        {CATS.map((c) => {
-          const Icon = THEME[c].icon;
-          const active = cat === c;
-          return (
-            <button key={c} onClick={() => setCat(c)}
-              className={`relative inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${active ? "text-white" : "bg-white text-zinc-600 ring-1 ring-zinc-200 hover:bg-zinc-50"}`}>
-              {active && <motion.span layoutId="community-cat-pill" transition={{ type: "spring", stiffness: 460, damping: 34 }} className="absolute inset-0 rounded-full bg-zinc-900" />}
-              <span className="relative flex items-center gap-1.5"><Icon className="h-3.5 w-3.5" /> {tr(c)}</span>
-            </button>
-          );
-        })}
-        <button onClick={() => load(cat)} disabled={loading} title={tr("refresh")}
-          className="ml-auto flex h-9 w-9 items-center justify-center rounded-full bg-white text-zinc-500 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50 disabled:opacity-50">
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-        </button>
-      </div>
-
-      {/* Liste */}
-      <div className="mt-5">
-        {loading ? (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
-                <div className="h-24 animate-pulse bg-zinc-100" />
-                <div className="space-y-2 p-4">
-                  <div className="h-4 w-5/6 animate-pulse rounded bg-zinc-100" />
-                  <div className="h-4 w-2/3 animate-pulse rounded bg-zinc-100" />
-                  <div className="mt-3 h-3 w-1/3 animate-pulse rounded bg-zinc-100" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : items.length === 0 ? (
-          <div className="py-20 text-center text-sm text-zinc-400"><Newspaper className="mx-auto mb-3 h-10 w-10 text-zinc-200" />{tr("empty")}</div>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {items.map((it, i) => {
-              const c = itemCat(it);
-              if (i === 0) {
-                // Carte vedette — pleine largeur, cover latérale, titre plus grand.
-                return (
-                  <motion.a key={i} href={it.link} target="_blank" rel="noopener noreferrer"
-                    initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.04, 0.4), duration: 0.3 }} whileHover={{ y: -4 }}
-                    className="group flex flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white transition-[border-color,box-shadow] hover:border-emerald-300 hover:shadow-[0_18px_44px_-22px_rgba(16,185,129,0.45)] sm:col-span-2 sm:flex-row">
-                    <Cover c={c} big seed={i} priorite />
-                    <div className="flex flex-1 flex-col p-5 sm:p-6">
-                      <h2 className="text-lg font-bold leading-snug text-zinc-900 line-clamp-3 group-hover:text-emerald-700 sm:text-xl">{it.title}</h2>
-                      <Footer it={it} />
-                    </div>
-                  </motion.a>
-                );
-              }
-              return (
-                <motion.a key={i} href={it.link} target="_blank" rel="noopener noreferrer"
-                  initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.04, 0.4), duration: 0.3 }} whileHover={{ y: -4 }}
-                  className="group flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white transition-[border-color,box-shadow] hover:border-emerald-300 hover:shadow-[0_16px_40px_-22px_rgba(16,185,129,0.4)]">
-                  <Cover c={c} seed={i} priorite={i <= 2} />
-                  <div className="flex flex-1 flex-col p-4">
-                    <h3 className="text-[15px] font-semibold leading-snug text-zinc-900 line-clamp-3 group-hover:text-emerald-700">{it.title}</h3>
-                    <Footer it={it} />
-                  </div>
-                </motion.a>
-              );
-            })}
-          </div>
-        )}
-        <p className="mt-6 text-center text-[11px] text-zinc-400">{tr("via")}</p>
       </div>
     </div>
   );

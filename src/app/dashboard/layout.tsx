@@ -18,6 +18,7 @@ import { AttributionGarmin } from "@/components/legal/AttributionGarmin";
 import { estAdmin } from "@/lib/admin/acces";
 import { Logo } from "@/components/brand/Logo";
 import { EcranLancement } from "@/components/layout/EcranLancement";
+import { MiseAJour } from "@/components/layout/MiseAJour";
 import { CLE_SESSION_LANCEMENT } from "@/lib/ui/lancement";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -66,13 +67,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <EcranLancement />
       <div className="flex h-screen bg-[#FAFAFA] overflow-hidden">
         <AutoSync />
+        {/* Un onglet resté ouvert pendant une mise en ligne passe à la nouvelle version. */}
+        <MiseAJour />
         <MessageNotifier />
         {/* Les courses enregistrées sans réseau repartent dès que le réseau revient. */}
         <FileAttenteCourses />
         <Sidebar profile={stripProfileSecrets(profile)} unreadMessages={unreadMessages ?? 0} estEditeur={estAdmin(user.email)} />
         <div className="flex-1 flex flex-col min-w-0">
           <TopBar profile={stripProfileSecrets(profile)} avatarColor={avatarColor} notifsMasquees={notifsMasquees} />
-          <main className="flex-1 overflow-auto p-6">
+          <main className="flex-1 overflow-auto p-3 md:p-6">
             {children}
           </main>
           {/* ⚠️ ICI, ET PAS PAGE PAR PAGE. L'article 1.1 des conditions d'API

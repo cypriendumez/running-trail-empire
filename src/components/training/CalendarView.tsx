@@ -328,11 +328,13 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
         </div>
       )}
       {/* ── Hero : par défaut = présentation du plan ; quand une séance est sélectionnée = son détail ── */}
-      <div ref={heroRef} className="relative overflow-hidden text-white" style={{ background: "linear-gradient(135deg,#064e3b 0%,#047857 45%,#0d9488 100%)" }}>
+      <div ref={heroRef} className="relative overflow-hidden rounded-3xl text-white" style={{ background: "linear-gradient(135deg,#064e3b 0%,#047857 45%,#0d9488 100%)" }}>
         <div className="pointer-events-none absolute -top-24 -right-16 h-72 w-72 rounded-full bg-emerald-300/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-28 left-1/3 h-72 w-72 rounded-full bg-teal-300/10 blur-3xl" />
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-        <div className="relative z-10 mx-auto max-w-6xl px-5 py-8">
+        {/* Marges resserrées sur téléphone (29/09/2026, « on défile trop ») : le bandeau
+            prenait près d'un demi-écran avant la première séance. */}
+        <div className="relative z-10 mx-auto max-w-6xl px-4 py-4 sm:px-5 sm:py-8">
           {coach ? (
             /* Détail de la séance du jour sélectionné */
             <>
@@ -402,11 +404,11 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
                 <CalendarDays className="h-3.5 w-3.5 text-amber-300" />
                 <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-50">{t("cal.eyebrow")}</span>
               </span>
-              <h1 className="mt-3 text-2xl font-bold tracking-tight drop-shadow-sm sm:text-3xl">{t("cal.title")}</h1>
-              <p className="mt-1.5 max-w-2xl text-[15px] leading-relaxed text-white/85">{t("cal.subtitle")}</p>
-              <div className="mt-4 flex flex-wrap gap-2">
+              <h1 className="mt-2 text-xl font-bold tracking-tight drop-shadow-sm sm:mt-3 sm:text-3xl">{t("cal.title")}</h1>
+              <p className="mt-1 max-w-2xl text-[13.5px] leading-snug text-white/85 sm:mt-1.5 sm:text-[15px] sm:leading-relaxed">{t("cal.subtitle")}</p>
+              <div className="mt-3 flex flex-wrap gap-1.5 sm:mt-4 sm:gap-2">
                 {heroChips.map((c, i) => (
-                  <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[13px] font-semibold text-white/90 ring-1 ring-white/15 backdrop-blur-md">
+                  <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[12px] font-semibold sm:px-3 sm:py-1.5 sm:text-[13px] text-white/90 ring-1 ring-white/15 backdrop-blur-md">
                     <c.Icon className="h-3.5 w-3.5 text-amber-200" />
                     {c.text}
                   </span>
@@ -417,7 +419,7 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl px-5 py-6">
+      <div className="mx-auto max-w-6xl px-0 py-3 sm:px-5 sm:py-6">
       {/* Pourquoi le plan ressemble à ça — voir le commentaire du type CoachState. */}
       <CoachWhy state={coachState} lang={lang} t={t} sessions={sessionsProp} realismeMasque={realismeMasque} />
 
@@ -451,7 +453,7 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
 
       {view === "month" ? (
         <>
-          <p className="mb-3 text-sm text-zinc-500">{t("cal.hint")} 🏁</p>
+          <p className="mb-3 text-sm text-zinc-500">{t("cal.hint")}</p>
           <div className="-mx-1 overflow-x-auto px-1 pb-1">
             <div className="min-w-[700px] lg:min-w-0">
               <div className="mb-2.5 grid grid-cols-7 gap-2 sm:gap-3">

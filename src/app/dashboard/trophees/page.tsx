@@ -56,7 +56,7 @@ export default async function TropheesPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-8">
+    <div className="mx-auto w-full max-w-5xl sm:px-4 sm:py-8">
       <PerfTabs />
       <header className="mb-6">
         <h1 className="text-3xl font-black tracking-tight text-zinc-900">{d["nav.trophies"]}</h1>
