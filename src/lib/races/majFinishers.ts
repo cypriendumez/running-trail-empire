@@ -17,6 +17,7 @@
 
 import { anneeDe } from "./resultatsSite";
 import { nomCanonique } from "./groupes";
+import { formatPasCourseAPied } from "./nonCourse";
 
 export type FormatFiche = { id: string; titre: string | null; discipline: string | null; distanceM: number | null; dplus: number | null; date: string | null; heure: string | null; inscription: string | null; statut: string | null };
 export type Edition = { annee: number; debut: string | null; statut: string | null };
@@ -37,10 +38,18 @@ export type LigneCourse = {
 export const PAYS_FRANCE = new Set(["FR", "RE", "GP", "MQ", "GF", "YT", "PM", "BL", "MF", "NC", "PF", "WF"]);
 export const DATE_A_VENIR = "2099-01-01";
 
-/** Disciplines de COURSE À PIED — la source recense aussi triathlons, vélo, nage, marche. */
+/**
+ * Disciplines de COURSE À PIED — la source recense aussi triathlons, vélo, nage, marche.
+ *
+ * ⚠️ LISTE EXACTE, PAS UN PRÉFIXE (29/09/2026). « commence par mountain » laissait passer
+ * `mountain_biking` (443 formats : « Roc d'Azur VTT », « Le bélier VTT » au catalogue des
+ * courses), et « commence par cross » `cross_country_skiing` ; l'exclusion cherchait
+ * « bike », que « biking » ne contient pas. Vocabulaire mesuré sur 34 000 formats : seuls
+ * `trail`, `road` et `cross` sont de la course. Une discipline inconnue est écartée.
+ */
+const DISCIPLINES_COURSE = new Set(["road", "trail", "cross", "running", "ultra", "stairs", "mountain_running", "vertical", "vertical_km", "skyrunning", "kv"]);
 export const estCourseAPied = (discipline: string | null | undefined) =>
-  /^(road|trail|running|ultra|cross|stairs|mountain|vertical|skyrunning|kv)/i.test(String(discipline ?? ""))
-  && !/walk|marche|nordic|bike|cycl|swim|tri|duathlon|obstacle/i.test(String(discipline ?? ""));
+  DISCIPLINES_COURSE.has(String(discipline ?? "").trim().toLowerCase());
 
 /**
  * Outre-mer : la région vient du CODE PAYS. Le fil d'Ariane de la source y donne
@@ -187,7 +196,7 @@ export function formatsRetenus(fiche: Fiche): (FormatFiche & { km: number })[] {
   const out: (FormatFiche & { km: number })[] = [];
   const ordre = [...(fiche.formats ?? [])].sort((a, b) => Number(estRelais(a.titre)) - Number(estRelais(b.titre)));
   for (const f of ordre) {
-    if (estChrono(f.titre)) continue;
+    if (estChrono(f.titre) || formatPasCourseAPied(f.titre)) continue;
     const km = kmDe(f.distanceM, f.discipline, f.dplus);
     if (km == null || !estCourseAPied(f.discipline) || km > 400) continue;
     if (vus.has(km)) continue;
@@ -359,6 +368,35 @@ export function planEvenement(
     if (formats.some((f) => Math.abs(f.km - km) <= tolere(f.km))) retirer(l.id, "doublon");
   }
   return plan;
+}
+
+/**
+ * FICHES JUMELLES : le même événement publié sous DEUX adresses par la source
+ * (« trail-de-haute-provence » et « trail-de-haute-provence-thp », « les-sentiers-de-l-ajar »
+ * et « les-sentiers-de-l-ajar-1 »), avec les MÊMES identifiants de formats. Importées
+ * chacune, elles doublaient chaque format au catalogue (29/09/2026 : 27 paires). Des
+ * identifiants de courses identiques sont une preuve, pas une ressemblance.
+ *
+ * Rend jumelle → fiche gardée. On garde celle qui a déjà des lignes au catalogue, puis la
+ * plus courte adresse (sans « -1 »), puis l'ordre alphabétique — toujours la même.
+ */
+export function fichesJumelles(fiches: Iterable<Fiche>, aDesLignes: (slug: string) => boolean): Map<string, string> {
+  const parIds = new Map<string, string[]>();
+  for (const f of fiches) {
+    if (!f.ok) continue;
+    const ids = formatsRetenus(f).map((x) => x.id).filter(Boolean).sort();
+    if (!ids.length) continue;
+    const k = ids.join("|");
+    parIds.set(k, [...(parIds.get(k) ?? []), f.slug]);
+  }
+  const jumelles = new Map<string, string>();
+  for (const slugs of parIds.values()) {
+    if (slugs.length < 2) continue;
+    const [gardee, ...autres] = [...slugs].sort((a, b) =>
+      Number(aDesLignes(b)) - Number(aDesLignes(a)) || a.length - b.length || a.localeCompare(b));
+    for (const s of autres) jumelles.set(s, gardee);
+  }
+  return jumelles;
 }
 
 /** Clé de rapprochement nom + ville, pour ne pas réimporter un événement venu d'une autre source. */

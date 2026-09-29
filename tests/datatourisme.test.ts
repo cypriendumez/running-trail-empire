@@ -105,6 +105,10 @@ test("pas de la course à pied, d'après le NOM — seulement sans ambiguïté",
   for (const n of ["Trail et Rando des Caps", "Course Nature et Marche Nordique de Chevaigné", "Cyclosportive & running Babybel", "Rando Trail de Trept", "Foulées de Bondues", "Trail du Vélodrome"]) {
     assert.equal(pasCourseAPiedParNom(n), false, n);
   }
+  // Mots de marque collés (29/09/2026) : `\b` ne voyait ni « GravelMan » ni « SwimRunMan »…
+  for (const n of ["GravelMan Series Paris Est", "SwimRunMan Grands Lacs de Laffrey", "SwimRun Aquaterra"]) assert.equal(pasCourseAPiedParNom(n), true, n);
+  // … mais Gravelines est une VILLE : « gravel\w* » y retirait une course à obstacles.
+  assert.equal(pasCourseAPiedParNom("Frappadingues Gravelines"), false, "« Gravelines » pris pour du gravel");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

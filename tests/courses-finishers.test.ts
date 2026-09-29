@@ -12,11 +12,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { lireFiche } from "../scripts/finishers-collecte";
 import {
-  estFerie, kmDe, estCourseAPied, dplusDe, dplusPlausible, dateDe, dateConservee, apparier, planEvenement, pasUneCourseAPied, deCetteFiche, estChrono,
+  estFerie, kmDe, estCourseAPied, dplusDe, dplusPlausible, dateDe, dateConservee, fichesJumelles, apparier, planEvenement, pasUneCourseAPied, deCetteFiche, estChrono,
   slugRegion, typeDe, formatsRetenus, cleNomVille,
   DATE_A_VENIR, type Fiche, type LigneCourse,
 } from "../src/lib/races/majFinishers";
 import { lienInscription, lienSiteOfficiel, lienClassement, heureLisible } from "../src/lib/races/liensCourse";
+import { formatPasCourseAPied } from "../src/lib/races/nonCourse";
 import { lienResultats, robotsAutorise, anneeDe, motsDistinctifs, entites } from "../src/lib/races/resultatsSite";
 import { slugDeRegion, nomRegion, regionAvecPreposition } from "../src/lib/races/libelles";
 import { REGION_OUTRE_MER } from "../src/lib/races/majFinishers";
@@ -78,6 +79,53 @@ test("formats retenus : ni courses enfants, ni marche, ni triathlon — le KV re
   // …et les composées qu'un préfixe « course » ne doit pas faire passer.
   for (const d of ["trail_walking", "road_cycling", "cross_triathlon"]) assert.equal(estCourseAPied(d), false, d);
   assert.equal(estCourseAPied("cross"), true, "le cross-country est de la course à pied");
+  // ⚠️ 29/09/2026 : « Roc d'Azur VTT », « Le bélier VTT » étaient au catalogue — un PRÉFIXE
+  // « mountain » laissait passer `mountain_biking` (443 formats), « cross » le ski de fond.
+  for (const d of ["mountain_biking", "cross_country_skiing", "gravel_biking", "cyclo_cross", "fast_hiking", "ski_mountaineering", "", null]) {
+    assert.equal(estCourseAPied(d as string), false, String(d));
+  }
+  assert.equal(estCourseAPied(" Trail "), true, "la casse ou un espace écartent un vrai trail");
+});
+
+test("un format étiqueté « route » ou « trail » dont le TITRE dit autre chose est écarté", () => {
+  for (const t of ["Rando cyclo 56km / 1000m D+", "Vélo de route 93km", "Marche solidaire", "Marche 5 km", "Randonnée 10km",
+    "9km Randonnée", "Rando des Gourmets", "Ski de randonnée - Trace étoilée", "Run & Bike", "Run & Bike Marathon", "Run'Paddle"]) {
+    assert.equal(formatPasCourseAPied(t), true, t);
+  }
+  // Un titre MIXTE garde sa place : la course y existe.
+  for (const t of ["Course ou marche relax", "Course / Marche de 4 km", "Trail ou Rando à 2", "Rando-course",
+    "63 Km discipline au choix (VTT, Gravel, Trail ou Rando)", "Trail 42 km", "Skyrace 30 km", "Trail des Marcheurs", "La Petite", "10 km", null]) {
+    assert.equal(formatPasCourseAPied(t), false, String(t));
+  }
+  const cyclo: Fiche = { slug: "l-alsacienne-cyclo", ok: true, pays: "FR", nom: "L'Alsacienne Cyclo", ville: "Kruth",
+    formats: [{ id: "c1", titre: "Rando cyclo 56km / 1000m D+", discipline: "road", distanceM: 56000, dplus: 1000, date: "2027-06-06", heure: null, inscription: null, statut: "tba" },
+      { id: "c2", titre: "GF 195km", discipline: "cycling", distanceM: 195000, dplus: 4900, date: "2027-06-06", heure: null, inscription: null, statut: "tba" }] };
+  assert.deepEqual(formatsRetenus(cyclo), [], "« Rando cyclo 56 km » étiquetée « road » est importée comme une course");
+  assert.equal(pasUneCourseAPied(cyclo), true, "une cyclosportive garde ses lignes au catalogue des courses");
+});
+
+test("fiches jumelles : même événement sous deux adresses, une seule appliquée", () => {
+  const f = (slug: string, ids: string[]): Fiche => ({ slug, ok: true, pays: "FR", nom: "THP", ville: "Forcalquier",
+    formats: ids.map((id, i) => ({ id, titre: `THP ${i}`, discipline: "trail", distanceM: 10000 * (i + 1), dplus: 300, date: "2027-05-08", heure: null, inscription: null, statut: "tba" })) });
+  const a = f("trail-de-haute-provence", ["x1", "x2"]), b = f("trail-de-haute-provence-thp", ["x2", "x1"]);
+  // Aucune des deux au catalogue : la plus courte adresse est gardée.
+  assert.deepEqual([...fichesJumelles([b, a], () => false)], [["trail-de-haute-provence-thp", "trail-de-haute-provence"]]);
+  // Celle qui a déjà des lignes est gardée, même plus longue — sinon on retirerait l'existant.
+  assert.deepEqual([...fichesJumelles([a, b], (s) => s.endsWith("-thp"))], [["trail-de-haute-provence", "trail-de-haute-provence-thp"]]);
+  // Cas réel où l'ordre alphabétique et la longueur divergent : la plus courte gagne.
+  assert.deepEqual([...fichesJumelles([f("choco-trail-dhardricourt", ["c1"]), f("chocotrail-dhardricourt", ["c1"])], () => false)],
+    [["choco-trail-dhardricourt", "chocotrail-dhardricourt"]]);
+  // Un seul format commun ne suffit pas : ce sont peut-être deux événements d'un même organisateur.
+  assert.equal(fichesJumelles([a, f("autre", ["x1", "x9"])], () => false).size, 0);
+  assert.equal(fichesJumelles([a, { ...b, ok: false }], () => false).size, 0, "une fiche illisible fait une jumelle");
+  const src = codeNu("scripts/finishers-appliquer.ts");
+  assert.ok(/const gardee = jumelles\.get\(f\.slug\);\s*if \(gardee\) \{[\s\S]{0,120}if \(favoris\.has\(l\.id\) \|\| touchees\.has\(l\.id\)\) continue;/.test(src),
+    "les lignes d'une jumelle sont retirées même en favori");
+  assert.ok(/lignesJumelles\+\+;[\s\S]{0,300}\n\s*continue;\n\s*\}/.test(src), "une fiche jumelle est encore planifiée : ses formats seraient réimportés");
+  // Page supprimée à la source (404/410) : seul le NOM sans ambiguïté fait partir la ligne.
+  assert.ok(/if \(f\.http !== 404 && f\.http !== 410\) \{ aRevoir\.push\(f\.slug\); continue; \}/.test(src), "une fiche illisible (réseau) retire des lignes");
+  assert.ok(/if \(favoris\.has\(l\.id\) \|\| touchees\.has\(l\.id\) \|\| !pasCourseAPiedParNom\(l\.name\)\) continue;/.test(src),
+    "une ligne orpheline part sans que son nom le justifie, ou même en favori");
 });
 
 test("le kilomètre vertical se reconnaît à sa PENTE — la source l'étiquette « trail »", () => {

@@ -11,7 +11,8 @@ import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { seuil, depassement, arreterSiDepasse } from "./garde-fous";
-import { planEvenement, cleNomVille, PAYS_FRANCE, formatsRetenus, pasUneCourseAPied, dplusPlausible, estTrail, type Fiche, type LigneCourse } from "../src/lib/races/majFinishers";
+import { pasCourseAPiedParNom } from "../src/lib/races/nonCourse";
+import { planEvenement, cleNomVille, fichesJumelles, PAYS_FRANCE, formatsRetenus, pasUneCourseAPied, dplusPlausible, estTrail, type Fiche, type LigneCourse } from "../src/lib/races/majFinishers";
 
 const ECRIRE = process.argv.includes("--ecrire");
 /**
@@ -117,8 +118,37 @@ async function main() {
   // nouvelles : illisibles cette fois (réseau, 403, 5xx), ou françaises SANS format encore
   // publié — sinon elles restaient « déjà vues » et on n'y revenait jamais.
   const aRevoir: string[] = [];
+  // Même événement, deux adresses chez la source, mêmes formats : une seule est appliquée,
+  // les lignes de l'autre (copies exactes) partent — voir `fichesJumelles`.
+  const jumelles = fichesJumelles(fiches.values(), (s) => (parSlug.get(s) ?? []).length > 0);
+  let lignesJumelles = 0;
   for (const f of fiches.values()) {
-    if (!f.ok) { st.erreurs++; if (f.http !== 404 && f.http !== 410) aRevoir.push(f.slug); continue; }
+    const gardee = jumelles.get(f.slug);
+    if (gardee) {
+      for (const l of parSlug.get(f.slug) ?? []) {
+        if (favoris.has(l.id) || touchees.has(l.id)) continue;
+        retraits.push(l.id); touchees.add(l.id); lignesJumelles++;
+        st.motifs.jumelle = (st.motifs.jumelle ?? 0) + 1;
+        detailRetraits.push(`jumelle | ${l.name} (${l.city}) ${l.distance_km} km ${l.date} | fiche ${f.slug} = ${gardee}`);
+      }
+      continue;
+    }
+    if (!f.ok) {
+      st.erreurs++;
+      if (f.http !== 404 && f.http !== 410) { aRevoir.push(f.slug); continue; }
+      // ⚠️ PAGE SUPPRIMÉE À LA SOURCE : plus aucune fiche ne dit la discipline, et la règle
+      // par le nom ne s'appliquait qu'aux autres sources. « GravelMan Series », « SwimRun
+      // Aquaterra », « Triathlon du Salagou » restaient au catalogue (29/09/2026 : 75 lignes
+      // orphelines). Seul le NOM sans ambiguïté fait partir une ligne — « Marathon
+      // d'Avignon », dont l'adresse a changé, reste.
+      for (const l of parSlug.get(f.slug) ?? []) {
+        if (favoris.has(l.id) || touchees.has(l.id) || !pasCourseAPiedParNom(l.name)) continue;
+        retraits.push(l.id); touchees.add(l.id);
+        st.motifs.orpheline = (st.motifs.orpheline ?? 0) + 1;
+        detailRetraits.push(`orpheline | ${l.name} (${l.city}) ${l.distance_km} km ${l.date} | fiche ${f.slug} : ${f.http}`);
+      }
+      continue;
+    }
     st.lues++;
     if (!PAYS_FRANCE.has(String(f.pays ?? ""))) { st.horsFrance++; continue; }
     const deLaFiche = parSlug.get(f.slug) ?? [];
@@ -168,7 +198,7 @@ async function main() {
   const dplusFaux = lignes.filter((l) => !touchees.has(l.id) && l.elevation_gain_m != null
     && ((estTrail(l.type) && l.elevation_gain_m === 0) || !dplusPlausible(l.elevation_gain_m, l.distance_km))).map((l) => l.id);
 
-  console.log(JSON.stringify({ ...st, liensResultatsSites: liensSites, liensMortsEcartes: morts.size, colonnesNouvelles, pacaANormaliser: paca.length, dplusFauxBalayes: dplusFaux.length, aujourdhui }, null, 1));
+  console.log(JSON.stringify({ ...st, fichesJumelles: jumelles.size, lignesJumelles, liensResultatsSites: liensSites, liensMortsEcartes: morts.size, colonnesNouvelles, pacaANormaliser: paca.length, dplusFauxBalayes: dplusFaux.length, aujourdhui }, null, 1));
   console.log(exemples.join("\n"));
   writeFileSync(fichier.replace(/\.jsonl$/, "") + `-plan-${ECRIRE ? "ecrit" : "a-blanc"}.json`, JSON.stringify({ st, majs: majs.length, ajouts: ajouts.length, retraits, detailRetraits }, null, 1));
   writeFileSync(join(dirname(fichier), "a-revoir.txt"), aRevoir.join("\n") + (aRevoir.length ? "\n" : ""));
