@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { jourFrance } from "@/lib/races/jourFrance";
-import { correspond, motifSansAccents, sansAccents } from "@/lib/races/temps";
+import { correspond, motifRegex, sansAccents } from "@/lib/races/temps";
 
 // Connecteurs ignorés pour que « marathon pari » trouve « Marathon de Paris ».
 const STOP = new Set(["de", "du", "des", "la", "le", "les", "et", "au", "aux", "sur", "en"]);
@@ -31,12 +31,17 @@ export async function GET(req: Request) {
   const today = jourFrance();
   // ⚠️ REFAIT LE 29/09/2026. `ilike` est sensible aux accents (« foulees » ne trouvait
   // pas « Foulées »), seul le NOM était cherché (pas la ville), et les ~5 000 courses en
-  // « Date à venir » étaient exclues. Désormais : un filet large en base (voyelles en
-  // jokers, nom OU ville, courses sans date comprises — triées en dernier), puis le tri
-  // exact en mémoire avec la même règle que la liste des courses (`correspond`).
+  // « Date à venir » étaient exclues. Désormais : un filet en base (accents tolérés, nom
+  // OU ville, courses sans date comprises — triées en dernier), puis le tri exact en
+  // mémoire avec la même règle que la liste des courses (`correspond`).
   let query = sb.from("races").select("name, city, distance_km, date, type").gte("date", today);
-  for (const w of words) { const m = motifSansAccents(w); query = query.or(`name.ilike.*${m}*,city.ilike.*${m}*`); }
-  const { data } = await query.order("date", { ascending: true }).limit(80);
+  // Filet PRÉCIS en base (expression régulière à classes d'accents, voir `motifRegex`),
+  // guillemets obligatoires : `(`, `|` et `[` sont réservés dans un filtre `or` PostgREST.
+  for (const w of words) { const m = motifRegex(w); if (m) query = query.or(`name.imatch."${m}",city.imatch."${m}"`); }
+  const { data, error } = await query.order("date", { ascending: true }).limit(80);
+  // Une lecture refusée (motif mal formé, base indisponible) rendait « aucune course »
+  // sans la moindre trace : on la journalise, la liste vide reste la réponse.
+  if (error) console.error("[races/search]", error.message);
 
   const vus = new Set<string>();
   const races = (data ?? [])

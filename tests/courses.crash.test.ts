@@ -22,7 +22,7 @@ import { grouperEvenements, cleEvenement, normNom } from "../src/lib/races/group
 import { idCourseValide } from "../src/lib/races/favoris";
 import { jourFrance } from "../src/lib/races/jourFrance";
 import { typeDepuisUrl, anneeDepuisUrl, choisirFiche, typeCorrige, motsCles, distancesDeFiche, distancesManquantes, typePour, segmentNom, motProche } from "../src/lib/races/leSportif";
-import { joursAvant, sansAccents, correspond, domaineSource, ficheVerifiable, motifSansAccents, analyseRecherche, correspondCourse } from "../src/lib/races/temps";
+import { joursAvant, sansAccents, correspond, domaineSource, ficheVerifiable, motifRegex, analyseRecherche, correspondCourse } from "../src/lib/races/temps";
 import { normaliserHeure, afficherHeure } from "../src/lib/races/heure";
 import { dateDeLaFiche, doitMettreAJour } from "../src/lib/races/fiche";
 import { analyserReponse, promptRecherche, promptExtraction, libelleFormat, libelleDate, MARQUEUR_INCONNU } from "../src/lib/races/heureWeb";
@@ -269,12 +269,21 @@ test("chercher sans accent trouve les courses accentuées", () => {
   assert.ok(correspond("Sainte-Maxime", "ste maxime"));
   assert.ok(correspond("10 Km d'Houppeville", "d houppeville"));
   assert.equal(correspond("Stade de France", "saint"), false, "« st » n'est développé qu'en mot entier");
-  // La barre de recherche du haut interroge la base : le motif doit tolérer les accents.
-  assert.equal(motifSansAccents("foulées"), "f__l__s");
-  assert.ok(new RegExp("^" + motifSansAccents("chambery").replace(/_/g, ".") + "$", "i").test("Chambéry"));
+  // La barre de recherche du haut interroge la base : le motif doit tolérer les accents…
+  const re = (mot: string) => new RegExp(motifRegex(mot), "i");
+  assert.ok(re("chambery").test("Chambéry") && re("foulees").test("Les FOULÉES") && re("nimes").test("Nîmes"));
+  assert.ok(re("st").test("Saint-Malo") && re("st").test("St-Malo") && re("saint").test("St Lô"));
+  // … sans devenir un joker : « ducs » → « d__s » attrapait « de s… », des milliers de
+  // trails remplissaient les 80 places et le « Trail des Ducs » (Bar-le-Duc) disparaissait.
+  assert.ok(re("ducs").test("Trail des Ducs - Bar-le-Duc"));
+  assert.equal(re("ducs").test("Trail de Saint-Cyr"), false, "le filet en base redevient un joker");
+  assert.equal(re("foulees").test("Fil des lunes"), false);
+  assert.equal(motifRegex("%_*"), "", "des caractères de motif passent tels quels dans le filtre");
   const rechercheApi = readFileSync("src/app/api/races/search/route.ts", "utf8");
   assert.ok(!/\.lt\("date", "2099-01-01"\)/.test(rechercheApi), "la barre du haut exclut de nouveau les courses « Date à venir »");
-  assert.match(rechercheApi, /query\.or\(`name\.ilike\.\*\$\{m\}\*,city\.ilike\.\*\$\{m\}\*`\)/, "la ville n'est plus cherchée");
+  assert.match(rechercheApi, /query\.or\(`name\.imatch\."\$\{m\}",city\.imatch\."\$\{m\}"`\)/, "la ville n'est plus cherchée, ou le motif n'est plus entre guillemets");
+  assert.ok(!/\.ilike[.(]/.test(rechercheApi), "le joker `ilike` est revenu dans la recherche");
+  assert.match(rechercheApi, /if \(error\) console\.error\(/, "une lecture refusée redevient « aucune course », sans trace");
   assert.match(rechercheApi, /\.filter\(\(r\) => words\.every\(\(w\) => correspond\(/, "le tri exact après le filet large a disparu");
   assert.match(rechercheApi, /distanceVoulue == null \|\| Math\.abs\(Number\(r\.distance_km\) - distanceVoulue\)/, "« 10 km bondues » cherche de nouveau « 10 » et « km » dans le nom");
   assert.match(rechercheApi, /if \(vus\.has\(k\)\) return false; vus\.add\(k\); return true;/, "une suggestion par format revient (« Nîmes Urban Trail » ×3)");

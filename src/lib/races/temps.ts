@@ -45,12 +45,24 @@ const formeRecherche = (v: unknown) => sansAccents(v).replace(/[^a-z0-9]+/g, " "
   .replace(/\bste\b/g, "sainte").replace(/\bst\b/g, "saint").trim();
 
 /**
- * Un motif SQL `ilike` qui tolère les accents SANS extension `unaccent` : chaque voyelle
- * (et « c », pour « ç ») devient un joker d'UN caractère — « foulees » → « f__l__s »
- * attrape « Foulées ». Le filet est large ; `correspond` fait ensuite le tri exact.
+ * Une expression régulière POSIX (filtre `imatch` de PostgREST) qui tolère les accents
+ * SANS extension `unaccent` : chaque lettre accentuable devient la classe de ses formes —
+ * « foulees » → « f[oô…]l[eéè…][eéè…]s » attrape « Foulées » ; « st » attrape aussi « saint ».
+ *
+ * ⚠️ REMPLACE UN JOKER TROP LARGE (29/09/2026). L'ancien motif `ilike` changeait chaque
+ * voyelle et le « c » en « _ » (n'importe quel caractère) : « ducs » devenait « d__s »,
+ * qui attrape aussi « de s… ». « trail des ducs » ramenait ainsi des milliers de trails ;
+ * les 80 premiers par date remplissaient la liste et le « Trail des Ducs » de Bar-le-Duc
+ * (avril 2027) n'apparaissait jamais. `correspond` fait toujours le tri exact ensuite.
  */
-export function motifSansAccents(mot: string): string {
-  return formeRecherche(mot).replace(/[^a-z0-9 ]/g, "").replace(/[aeiouyc]/g, "_").replace(/ /g, "*");
+const FORMES: Record<string, string> = {
+  a: "aàâäAÀÂÄ", e: "eéèêëEÉÈÊË", i: "iîïIÎÏ", o: "oôöOÔÖ", u: "uùûüUÙÛÜ", y: "yÿYŸ", c: "cçCÇ",
+};
+export function motifRegex(mot: string): string {
+  return formeRecherche(mot).split(" ").filter(Boolean).map((t) =>
+    t === "saint" ? "(saint|st)" : t === "sainte" ? "(sainte|ste)"
+      : [...t].map((ch) => (FORMES[ch] ? `[${FORMES[ch]}]` : ch)).join(""),
+  ).join(".*");
 }
 
 /** Le texte contient-il la recherche, accents, casse, tirets et « st » ignorés ? */
