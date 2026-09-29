@@ -59,12 +59,33 @@ export function normNom(v: unknown): string {
     .trim();
 }
 
+/**
+ * Le nom tel qu'on le COMPARE entre deux sources : `normNom`, plus la typographie des
+ * distances et des abréviations — « 10 Km de Soustons » = « 10km de Soustons »,
+ * « St-Lô » = « Saint-Lô ». Rien d'autre : ce sont des façons d'écrire, pas des mots.
+ *
+ * ⚠️ MESURÉ LE 29/09/2026 : 275 événements affichés DEUX FOIS (même nom à l'article près,
+ * même ville, même distance), l'un daté par finishers, l'autre repris de jogging-plus en
+ * « Date à venir ». La clé de rapprochement de l'application finishers (`cleNomVille`)
+ * ne retirait pas l'article : « La Gambade Escalaise » n'y retrouvait jamais « Gambade
+ * Escalaise », et le doublon survivait à chaque rafraîchissement.
+ *
+ * Pas dans `normNom` lui-même : l'appariement le-sportif en tire des MOTS, et « 10km »
+ * y deviendrait un mot obligatoire que les adresses n'écrivent pas toujours.
+ */
+export function nomCanonique(v: unknown): string {
+  return normNom(v)
+    .replace(/\b(\d+) ?(?:km|k)\b/g, "$1km")
+    .replace(/\bst\b/g, "saint")
+    .replace(/\bste\b/g, "sainte");
+}
+
 const norm = (v: unknown) => String(v ?? "").trim().toLowerCase();
 const normVille = (v: unknown) =>
   String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
 export function cleEvenement(r: CourseGroupable): string {
-  return `${normNom(r.name)}::${normVille(r.city)}::${norm(r.date)}`;
+  return `${nomCanonique(r.name)}::${normVille(r.city)}::${norm(r.date)}`;
 }
 
 /**

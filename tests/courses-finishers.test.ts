@@ -184,6 +184,14 @@ test("un nouvel événement : lignes complètes, lien vers la fiche, région au 
   assert.equal(slugRegion("Provence-Alpes-Côte d'Azur"), "provence-alpes-cote-d-azur");
   assert.equal(typeDe("trail", 30.4), "trail_m"); assert.equal(typeDe("road", 21.1), "semi"); assert.equal(typeDe("road", 10), "road_10k");
   assert.equal(cleNomVille("Foulées de Bondues", "Bondues"), cleNomVille("FOULEES DE BONDUES ", "bondues"));
+  // ⚠️ 275 événements affichés deux fois le 29/09/2026 : l'article et « 10 Km »/« 10km »
+  // suffisaient à rater le rapprochement, et le doublon survivait à chaque passage.
+  assert.equal(cleNomVille("La Gambade Escalaise", "L'Escale"), cleNomVille("Gambade Escalaise", "L'Escale"));
+  assert.equal(cleNomVille("10 Km de Soustons", "Soustons"), cleNomVille("10km de Soustons", "Soustons"));
+  assert.equal(cleNomVille("Foulées de St-Lô", "Saint-Lô"), cleNomVille("Foulées de Saint Lô", "Saint-Lô"));
+  // … sans jamais rapprocher deux noms réellement différents.
+  assert.notEqual(cleNomVille("Course de Bondues", "Bondues"), cleNomVille("Foulées de Bondues", "Bondues"));
+  assert.notEqual(cleNomVille("Kids Trail d'Antibes", "Antibes"), cleNomVille("Trail d'Antibes", "Antibes"));
 });
 
 test("les nouvelles colonnes ne sont écrites QU'APRÈS la migration 032", () => {
@@ -247,6 +255,10 @@ test("une estimation écartée n'efface pas la date déclarée par l'office de t
   const f = mardi.formats![0];
   assert.equal(dateConservee("2026-10-17", f, mardi, AUJ), true);
   assert.equal(dateConservee("2027-10-16", f, mardi, AUJ), false, "une date d'une AUTRE édition (un an d'écart) est gardée");
+  // « Trail des Ducs » : déclaré le 25/04/2027, estimé au lundi 08/03 — 48 jours, même saison.
+  const ducs = { ...f, date: "2027-03-08" };
+  assert.equal(dateConservee("2027-04-25", ducs, mardi, AUJ), true, "une épreuve qui change de mois perd sa date déclarée");
+  assert.equal(dateConservee("2027-09-01", ducs, mardi, AUJ), false, "une date à 6 mois de l'estimation est gardée");
   assert.equal(dateConservee("2026-09-20", f, mardi, AUJ), false, "une date PASSÉE est gardée comme date à venir");
   assert.equal(dateConservee("2099-01-01", f, mardi, AUJ), false);
   assert.equal(dateConservee(null, f, mardi, AUJ), false);

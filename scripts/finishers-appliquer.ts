@@ -26,7 +26,14 @@ const MAX_DATES_PERDUES = seuil(process.argv, "--max-dates-perdues", 400);
 const MAX_ERREURS_PCT = seuil(process.argv, "--max-erreurs-pct", 20);
 const MAX_SANS_FORMAT_PCT = seuil(process.argv, "--max-sans-format-pct", 25);
 const [fichier] = process.argv.slice(2).filter((a) => !a.startsWith("--"));
-const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+// ⚠️ UNE REQUÊTE SANS DÉLAI PEUT ATTENDRE TOUJOURS. 29/09/2026, 17 h 44 : après 1 016
+// mises à jour sur 11 589, une coupure réseau a figé l'écriture — plus rien pendant dix
+// minutes, aucun message, aucune erreur. 30 s par requête : une requête perdue devient une
+// erreur comptée (et, au-delà du seuil, un échec visible), jamais une attente sans fin.
+const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+  auth: { persistSession: false },
+  global: { fetch: (u, o) => fetch(u, { ...o, signal: o?.signal ?? AbortSignal.timeout(30_000) }) },
+});
 const aujourdhui = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date());
 
 async function toutLire<T>(requete: (de: number, a: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
@@ -187,6 +194,7 @@ async function main() {
   await parLots(majs, 8, async (lot) => {
     const r = await Promise.all(lot.map((m) => sb.from("races").update(m.patch).eq("id", m.id)));
     for (const x of r) { if (x.error) { ko++; if (ko < 5) console.error("maj :", x.error.message); } else ok++; }
+    if ((ok + ko) % 1000 < 8) console.log(`  … ${ok + ko}/${majs.length} (${new Date().toLocaleTimeString("fr-FR")})`);
   });
   console.log(`mises à jour : ${ok} ok, ${ko} en erreur`);
   let ins = 0;

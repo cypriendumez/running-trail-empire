@@ -16,6 +16,7 @@
  */
 
 import { anneeDe } from "./resultatsSite";
+import { nomCanonique } from "./groupes";
 
 export type FormatFiche = { id: string; titre: string | null; discipline: string | null; distanceM: number | null; dplus: number | null; date: string | null; heure: string | null; inscription: string | null; statut: string | null };
 export type Edition = { annee: number; debut: string | null; statut: string | null };
@@ -136,14 +137,16 @@ export function dateDe(f: FormatFiche, fiche: Fiche, aujourdhui: string): { date
  * 17/10 par l'office de tourisme (DATAtourisme), repassait chaque semaine en « Date à
  * venir » parce que finishers l'estime au mardi 27/10 — une estimation que `dateDe`
  * écarte, à raison. Écarter une estimation ne prouve rien contre une date d'une autre
- * source : si la ligne porte une date FUTURE proche de l'estimation (± 45 jours, même
- * édition), elle la garde. Une estimation passée ou absente, ou une date lointaine : rien.
+ * source : si la ligne porte une date FUTURE de la même saison que l'estimation (± 120 j),
+ * elle la garde. Une estimation passée ou absente, ou une date d'une autre édition
+ * (~365 j) : rien. ± 45 j ne suffisait pas : « Trail des Ducs » (Bar-le-Duc), déclaré le
+ * dimanche 25/04/2027, estimé au lundi 08/03 — l'épreuve a changé de mois, pas d'année.
  */
 export function dateConservee(existante: string | null | undefined, f: FormatFiche, fiche: Fiche, aujourdhui: string): boolean {
   const e = String(existante ?? "").slice(0, 10), estimee = (f.date ?? fiche.prochaine?.debut ?? "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(e) || e.startsWith("2099") || e < aujourdhui) return false;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(estimee) || estimee < aujourdhui) return false;
-  return Math.abs(Date.parse(e) - Date.parse(estimee)) <= 45 * 864e5;
+  return Math.abs(Date.parse(e) - Date.parse(estimee)) <= 120 * 864e5;
 }
 
 /**
@@ -361,5 +364,6 @@ export function planEvenement(
 /** Clé de rapprochement nom + ville, pour ne pas réimporter un événement venu d'une autre source. */
 export function cleNomVille(nom: string | null | undefined, ville: string | null | undefined): string {
   const n = (s: string | null | undefined) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-  return `${n(nom)}::${n(ville)}`;
+  // Le NOM par `nomCanonique` (article, « 10 Km »/« 10km », « St ») : voir lib/races/groupes.
+  return `${nomCanonique(nom)}::${n(ville)}`;
 }

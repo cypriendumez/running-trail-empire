@@ -121,6 +121,18 @@ test("accents et ponctuation ne dédoublent pas non plus", () => {
   assert.equal(normNom("La Gambade-Escalaise !"), normNom("Gambade Escalaise"));
 });
 
+test("« 10 Km » et « 10km », « St » et « Saint » ne dédoublent pas la carte", () => {
+  const g = grouperEvenements([
+    c("a", "10 Km de Soustons", "Soustons", "2027-03-07", 10),
+    c("b", "10km de Soustons", "Soustons", "2027-03-07", 5),
+    c("c", "Foulées de St-Lô", "Saint-Lô", "2027-03-07", 10),
+    c("d", "Foulées de Saint Lô", "Saint-Lô", "2027-03-07", 5),
+  ]);
+  assert.equal(g.length, 2, "une façon d'écrire la distance ou « Saint » dédouble la carte");
+  // Et « normNom » n'a PAS changé : l'appariement le-sportif en tire des mots.
+  assert.equal(normNom("10 Km de Soustons"), "10 km de soustons");
+});
+
 test("une ville accentuée ou tiretée ne dédouble pas la course", () => {
   const g = grouperEvenements([
     c("a", "Trail X", "L'Escale", "2026-09-26", 5),

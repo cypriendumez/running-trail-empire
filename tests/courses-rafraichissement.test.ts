@@ -140,6 +140,8 @@ test("finishers-appliquer : garde-fous de forme, fiches à revoir, échec visibl
   assert.ok(/if \(!f\.ok\) \{[^}]*if \(f\.http !== 404 && f\.http !== 410\) aRevoir\.push\(f\.slug\)/.test(src),
     "les fiches illisibles ne sont plus mises à revoir");
   assert.ok(/else \{ st\.sansFormat\+\+; aRevoir\.push\(f\.slug\); \}/.test(src), "les fiches françaises sans format ne sont plus mises à revoir");
+  // Une requête sans délai a figé l'écriture le 29/09 (1 016 màj sur 11 589, puis plus rien).
+  assert.ok(/global: \{ fetch: [^}]*AbortSignal\.timeout\(/.test(src), "les requêtes Supabase n'ont plus de délai maximal : une coupure fige le script");
   // Supabase REND ses erreurs : sans code de sortie, un run qui n'a rien écrit passe au vert.
   assert.ok(/if \(refus > 0 \|\| ko > [^)]*\)\) \{[\s\S]{0,200}?process\.exit\(1\)/.test(src), "un lot refusé ne fait plus rougir l'exécution");
 });
