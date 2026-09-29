@@ -150,6 +150,17 @@ test("le cas réel : 9 formats en base pour 3 réels — les vrais mis à jour, 
   for (const m of p.majs) assert.ok(!("name" in m.patch) && !("type" in m.patch) && !("city" in m.patch), "on ne réécrit ni le nom, ni le type, ni la ville");
 });
 
+test("une fiche finishers remplace les lignes DATAtourisme du même événement", () => {
+  // « Luga'Trail » : 8 et 15 km lus dans le texte de l'office de tourisme ; 11 et 16 km
+  // format par format chez finishers — la carte affichait les quatre.
+  const dt = (id: string, km: number) => ligne(id, km, { organization: "DATAtourisme", registration_url: "https://www.brasseriedelugazaut.com/lugatrail26" });
+  const p = planEvenement(TUE, [dt("d8", 8), dt("d30", 30.4)], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: false });
+  assert.deepEqual(p.retraits.sort(), ["d30", "d8"]);
+  assert.equal(p.majs.length, 0, "une ligne DATAtourisme n'est pas réécrite en ligne finishers (sa source citée deviendrait fausse)");
+  assert.equal(p.ajouts.length, 3, "les formats de la fiche sont ajoutés, sous la source finishers");
+  assert.deepEqual(planEvenement(TUE, [dt("d8", 8)], { aujourdhui: AUJ, favoris: new Set(["d8"]), colonnesNouvelles: false }).retraits, [], "jamais un favori");
+});
+
 test("jamais retiré : une ligne d'une autre source, ou mise en favori par un athlète", () => {
   const base = [ligne("fav", 50), ligne("autre", 27, { organization: "le-sportif.com" }), ligne("vieux", 15)];
   const p = planEvenement(TUE, base, { aujourdhui: AUJ, favoris: new Set(["fav"]), colonnesNouvelles: false });
@@ -399,6 +410,10 @@ test("avant la migration, la fiche et la page publique retombent sur les anciens
   assert.match(codeNu("src/components/races/RacesHub.tsx"), /race\.date_confirmee === false && !race\.date\?\.startsWith\("2099"\)/, "la liste signale une date seulement annoncée");
   assert.match(codeNu("scripts/finishers-appliquer.ts"), /if \(lien && !f\.resultats\?\.classement\) \{ f\.resultats = /, "un lien de site ne remplace jamais un classement déjà cité");
   assert.match(codeNu("scripts/resultats-sites.ts"), /if \(!robotsAutorise\(rb, u\.pathname \+ u\.search\)\) return ecrire/, "robots.txt consulté avant de lire le site");
+  // Un lien prouvé mort par le contrôle n'est jamais réécrit par l'application suivante.
+  const app = codeNu("scripts/finishers-appliquer.ts");
+  assert.match(app, /\/\^liens-controle-\.\*\\\.json\$\//, "l'application ne lit plus les rapports de liens morts");
+  assert.match(app, /if \(f\.resultats\?\.classement && morts\.has\(f\.resultats\.classement\)\)/, "un classement mort serait réécrit");
   const sql = readFileSync("supabase/migrations/032_courses_liens_resultats.sql", "utf8").replace(/--.*$/gm, "");
   assert.doesNotMatch(sql, /\bdrop\b/i);
   for (const c of ["site_officiel", "inscription_url", "resultats_url", "resultats_annee", "heure_depart", "date_confirmee", "source_id", "source_maj_at"]) {

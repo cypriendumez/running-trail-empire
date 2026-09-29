@@ -7,7 +7,7 @@
  *
  *   npx tsx scripts/finishers-appliquer.ts <fiches.jsonl> [--ecrire]
  */
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { planEvenement, cleNomVille, PAYS_FRANCE, formatsRetenus, pasUneCourseAPied, dplusPlausible, estTrail, type Fiche, type LigneCourse } from "../src/lib/races/majFinishers";
@@ -43,6 +43,20 @@ async function main() {
       const lien = f.siteOfficiel ? parSite.get(f.siteOfficiel) : undefined;
       if (lien && !f.resultats?.classement) { f.resultats = { page: f.resultats?.page ?? null, classement: lien.url, annee: lien.annee }; liensSites++; }
     }
+  }
+
+  // 1 ter. Liens PROUVÉS MORTS par `scripts/verifier-liens-courses.ts` (deux 404/410
+  // espacés) : jamais réécrits — sinon chaque application ressuscitait ce que le contrôle
+  // venait de retirer.
+  const morts = new Set<string>();
+  for (const f of readdirSync(dirname(fichier)).filter((x) => /^liens-controle-.*\.json$/.test(x))) {
+    try { for (const m of JSON.parse(readFileSync(join(dirname(fichier), f), "utf8")).mortes ?? []) morts.add(m.u); } catch { /* rapport illisible */ }
+  }
+  for (const f of fiches.values()) {
+    if (f.resultats?.classement && morts.has(f.resultats.classement)) f.resultats = { ...f.resultats, classement: null };
+    if (f.resultats?.page && morts.has(f.resultats.page)) f.resultats = { ...f.resultats, page: null };
+    if (f.inscription && morts.has(f.inscription)) f.inscription = null;
+    for (const x of f.formats ?? []) if (x.inscription && morts.has(x.inscription)) x.inscription = null;
   }
 
   // 2. Les nouvelles colonnes existent-elles (migration 032) ?
@@ -126,7 +140,7 @@ async function main() {
   const dplusFaux = lignes.filter((l) => !touchees.has(l.id) && l.elevation_gain_m != null
     && ((estTrail(l.type) && l.elevation_gain_m === 0) || !dplusPlausible(l.elevation_gain_m, l.distance_km))).map((l) => l.id);
 
-  console.log(JSON.stringify({ ...st, liensResultatsSites: liensSites, colonnesNouvelles, pacaANormaliser: paca.length, dplusFauxBalayes: dplusFaux.length, aujourdhui }, null, 1));
+  console.log(JSON.stringify({ ...st, liensResultatsSites: liensSites, liensMortsEcartes: morts.size, colonnesNouvelles, pacaANormaliser: paca.length, dplusFauxBalayes: dplusFaux.length, aujourdhui }, null, 1));
   console.log(exemples.join("\n"));
   writeFileSync(fichier.replace(/\.jsonl$/, "") + `-plan-${ECRIRE ? "ecrit" : "a-blanc"}.json`, JSON.stringify({ st, majs: majs.length, ajouts: ajouts.length, retraits, detailRetraits }, null, 1));
   if (!ECRIRE) { console.log("(à blanc — rien écrit ; relancer avec --ecrire)"); return; }

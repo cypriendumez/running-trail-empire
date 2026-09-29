@@ -133,7 +133,11 @@ test("le sitemap et les pages appliquent le MÊME filtre", () => {
   assert.ok(/\/courses\//.test(sm), "les courses ne sont pas déclarées au sitemap");
   // 29/09/2026 : le sitemap servait l'état du build six heures après — la régénération,
   // vingt pages lues l'une après l'autre, dépassait le délai de 10 s de la fonction.
-  assert.ok(/export const maxDuration = 60;/.test(sm), "la régénération du sitemap retombe sous le délai par défaut");
+  assert.ok(/export const maxDuration = 60;/.test(sm), "la lecture du sitemap retombe sous le délai par défaut");
+  // …et même lue en parallèle, la régénération ISR ne se déclenchait pas : le sitemap est
+  // rendu à la demande, sur des adresses gardées une heure dans le cache de données.
+  assert.ok(/export const dynamic = "force-dynamic";/.test(sm) && !/export const revalidate/.test(sm), "le sitemap est redevenu figé au build");
+  assert.ok(/const adressesCourses = unstable_cache\([\s\S]*\{ revalidate: 3600 \}\);/.test(sm), "les adresses du sitemap ne sont plus en cache d'une heure");
   assert.ok(/const lots = await Promise\.all\(debuts\.map\(/.test(sm), "les pages du sitemap sont de nouveau lues l'une après l'autre");
 
   const page = nu("src/app/courses/[slug]/page.tsx");
@@ -425,8 +429,10 @@ test("le sitemap déclare ces pages, avec une priorité moindre", () => {
   // ⚠️ VISER LE BLOC, PAS LE FICHIER. Le premier jet cherchait « 0.4 » n'importe où :
   // la page de contact en porte déjà un, donc remonter la priorité des épreuves sans
   // date laissait le test vert. Trouvé par mutation.
-  const iDatees = sm.indexOf("lignes.filter(exploitable)");
-  const iSansDate = sm.indexOf("sansDate.filter(exploitable)");
+  // (Depuis le 29/09/2026, les adresses viennent d'un cache : la priorité est posée là où
+  // elles deviennent des entrées du sitemap.)
+  const iDatees = sm.indexOf("a.datees.map(");
+  const iSansDate = sm.indexOf("a.sansDate.map(");
   assert.ok(iDatees > 0 && iSansDate > iDatees, "les deux blocs d'adresses ne sont plus identifiables");
   const prioDe = (i: number) => {
     const m = /priority: (0\.\d+)/.exec(sm.slice(i, i + 400));

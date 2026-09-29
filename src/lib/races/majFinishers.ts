@@ -287,9 +287,15 @@ export function planEvenement(
     return { date: existante ?? DATE_A_VENIR, confirmee: null };
   };
 
+  // ⚠️ DATATOURISME CÈDE LA PLACE. Ses distances sont LUES DANS LE TEXTE de l'office de
+  // tourisme (« Luga'Trail » : 8 et 15 km) ; la fiche finishers les donne format par
+  // format (11 et 16 km). Quand la fiche couvre l'événement, les lignes DATAtourisme
+  // partent — sinon la carte affichait « 8 · 11 · 15 · 16 km » (vu le 29/09/2026).
+  for (const l of lignes) if (l.organization === "DATAtourisme" && !o.favoris.has(l.id)) retirer(l.id, "doublon");
+  const retenues = lignes.filter((l) => l.organization !== "DATAtourisme" || o.favoris.has(l.id));
   // Les lignes de la fiche d'abord : à distance égale, c'est elle qui garde le format et la
   // copie venue d'ailleurs qui devient le doublon.
-  const ordonnees = [...lignes].sort((a, b) => Number(deCetteFiche(b, fiche.slug)) - Number(deCetteFiche(a, fiche.slug)));
+  const ordonnees = [...retenues].sort((a, b) => Number(deCetteFiche(b, fiche.slug)) - Number(deCetteFiche(a, fiche.slug)));
   const { paires, lignesSeules, formatsSeuls } = apparier(ordonnees, formats);
   for (const [l, fa] of paires) {
     const f = formats.find((x) => x.id === fa.id && x.km === fa.km)!;
