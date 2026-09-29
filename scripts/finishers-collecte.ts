@@ -18,7 +18,9 @@
 import { readFileSync, existsSync, appendFileSync } from "node:fs";
 
 const UA = "Mozilla/5.0 (compatible; PacevoBot/1.0; +https://pacevo.fr/contact)";
-const PAUSE_MS = 1200;
+// 0,7 s + aléa entre deux pages, une seule à la fois : robots.txt de finishers ne fixe
+// aucun délai (vérifié le 28/09/2026) ; ~45 pages/min restent une lecture polie.
+const PAUSE_MS = 700;
 
 type Format = { id: string; titre: string | null; discipline: string | null; distanceM: number | null; dplus: number | null; date: string | null; heure: string | null; inscription: string | null; statut: string | null };
 export type FicheFinishers = {
