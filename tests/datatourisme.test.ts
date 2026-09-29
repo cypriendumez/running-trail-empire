@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { lireCsv, distancesLues, evenementCourse, lignesDT, dateRetrouvee, cleCommune, manifestationsDatees, type ManifestationDatee } from "../src/lib/races/datatourisme";
 import { organisateurReel } from "../src/lib/races/destination";
+import { pasCourseAPiedParNom } from "../src/lib/races/nonCourse";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -94,6 +95,16 @@ test("date retrouvée : une période d'UN seul jour — sur deux jours, le jour 
   assert.equal(m.get(cleCommune("Marseille")), undefined, "le « 24 au 25 » n'est pas une date de course");
   assert.deepEqual(m.get(cleCommune("Cassis"))?.map((x) => x.date), ["2026-10-25"]);
   assert.equal(cleCommune("Marseille 8e Arrondissement"), cleCommune("Marseille"));
+});
+
+test("pas de la course à pied, d'après le NOM — seulement sans ambiguïté", () => {
+  for (const n of ["Triathlon des Roses Paris", "Roc d'Azur VTT", "Randonnée verte", "Marche nordique du Pignada", "Bike and Run de la Batterie de Merville", "Duathlon de Troyes", "Rando des Benauges"]) {
+    assert.equal(pasCourseAPiedParNom(n), true, n);
+  }
+  // La course y existe : on garde.
+  for (const n of ["Trail et Rando des Caps", "Course Nature et Marche Nordique de Chevaigné", "Cyclosportive & running Babybel", "Rando Trail de Trept", "Foulées de Bondues", "Trail du Vélodrome"]) {
+    assert.equal(pasCourseAPiedParNom(n), false, n);
+  }
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
