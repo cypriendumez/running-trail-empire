@@ -12,7 +12,8 @@ import { dirname, join } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { seuil, depassement, arreterSiDepasse } from "./garde-fous";
 import { pasCourseAPiedParNom } from "../src/lib/races/nonCourse";
-import { planEvenement, cleNomVille, fichesJumelles, PAYS_FRANCE, formatsRetenus, pasUneCourseAPied, dplusPlausible, estTrail, type Fiche, type LigneCourse } from "../src/lib/races/majFinishers";
+import { dplusPourFormat, type CoupleDplus } from "../src/lib/races/dplusSite";
+import { planEvenement, cleNomVille, fichesJumelles, kmDe, PAYS_FRANCE, formatsRetenus, pasUneCourseAPied, dplusPlausible, estTrail, type Fiche, type LigneCourse } from "../src/lib/races/majFinishers";
 
 const ECRIRE = process.argv.includes("--ecrire");
 /**
@@ -55,16 +56,33 @@ async function main() {
   // 1 bis. Liens « Résultats » lus sur les sites officiels (`scripts/resultats-sites.ts`) :
   // ils passent AVANT la page éditoriale de la source, jamais avant un classement déjà cité.
   const fSites = join(dirname(fichier), "resultats-sites.jsonl");
-  let liensSites = 0;
+  let liensSites = 0, dplusSites = 0;
   if (existsSync(fSites)) {
     // La DERNIÈRE lecture réussie d'un site fait foi, même si elle n'a plus rien trouvé : un
     // site relu (voir `--relire-apres`) qui a retiré son lien ne le garde pas chez nous. Une
     // relecture ratée (réseau, 403) ne remplace rien.
     const parSite = new Map<string, { url: string; annee: number | null } | null>();
-    for (const l of readFileSync(fSites, "utf8").split("\n")) { try { const x = JSON.parse(l); if (x?.site && x.ok) parSite.set(x.site, x.lien?.url ? x.lien : null); } catch { /* */ } }
+    const dplusParSite = new Map<string, CoupleDplus[]>();
+    for (const l of readFileSync(fSites, "utf8").split("\n")) {
+      try {
+        const x = JSON.parse(l);
+        if (!(x?.site && x.ok)) continue;
+        parSite.set(x.site, x.lien?.url ? x.lien : null);
+        if (Array.isArray(x.dplus)) dplusParSite.set(x.site, x.dplus);
+      } catch { /* */ }
+    }
     for (const f of fiches.values()) {
       const lien = f.siteOfficiel ? parSite.get(f.siteOfficiel) : undefined;
       if (lien && !f.resultats?.classement) { f.resultats = { page: f.resultats?.page ?? null, classement: lien.url, annee: lien.annee }; liensSites++; }
+      // Dénivelé lu sur le site officiel (lib/races/dplusSite) : SEULEMENT pour un format
+      // trail dont la source ne donne rien — jamais à la place d'une valeur de la fiche.
+      const couples = f.siteOfficiel ? dplusParSite.get(f.siteOfficiel) : undefined;
+      if (couples?.length) for (const x of f.formats ?? []) {
+        if (x.discipline !== "trail" || x.dplus != null) continue;
+        const km = kmDe(x.distanceM, x.discipline, null);
+        const d = km == null ? null : dplusPourFormat(couples, km);
+        if (d != null) { x.dplus = d; dplusSites++; }
+      }
     }
   }
 
@@ -198,7 +216,7 @@ async function main() {
   const dplusFaux = lignes.filter((l) => !touchees.has(l.id) && l.elevation_gain_m != null
     && ((estTrail(l.type) && l.elevation_gain_m === 0) || !dplusPlausible(l.elevation_gain_m, l.distance_km))).map((l) => l.id);
 
-  console.log(JSON.stringify({ ...st, fichesJumelles: jumelles.size, lignesJumelles, liensResultatsSites: liensSites, liensMortsEcartes: morts.size, colonnesNouvelles, pacaANormaliser: paca.length, dplusFauxBalayes: dplusFaux.length, aujourdhui }, null, 1));
+  console.log(JSON.stringify({ ...st, fichesJumelles: jumelles.size, lignesJumelles, liensResultatsSites: liensSites, dplusLusSurSites: dplusSites, liensMortsEcartes: morts.size, colonnesNouvelles, pacaANormaliser: paca.length, dplusFauxBalayes: dplusFaux.length, aujourdhui }, null, 1));
   console.log(exemples.join("\n"));
   writeFileSync(fichier.replace(/\.jsonl$/, "") + `-plan-${ECRIRE ? "ecrit" : "a-blanc"}.json`, JSON.stringify({ st, majs: majs.length, ajouts: ajouts.length, retraits, detailRetraits }, null, 1));
   writeFileSync(join(dirname(fichier), "a-revoir.txt"), aRevoir.join("\n") + (aRevoir.length ? "\n" : ""));

@@ -19,13 +19,14 @@
 import { readFileSync, existsSync, appendFileSync } from "node:fs";
 import { lienResultats, robotsAutorise, type LienResultats } from "../src/lib/races/resultatsSite";
 import { PAYS_FRANCE, type Fiche } from "../src/lib/races/majFinishers";
+import { couplesDistanceDplus, type CoupleDplus } from "../src/lib/races/dplusSite";
 import { seuil } from "./garde-fous";
 
 const UA = "Mozilla/5.0 (compatible; PacevoBot/1.0; +https://pacevo.fr/contact)";
 const PARALLELE = 6;
 const anneeCourante = new Date().getFullYear();
 
-export type LigneSite = { site: string; ok: boolean; http?: number; motif?: string; lien?: LienResultats | null; lueLe: string };
+export type LigneSite = { site: string; ok: boolean; http?: number; motif?: string; lien?: LienResultats | null; dplus?: CoupleDplus[]; lueLe: string };
 
 /** Échecs qui disent quelque chose DU SITE (et le rediront) : inutile d'y retourner chaque semaine. */
 const ECHECS_DURABLES = new Set(["robots-interdit", "pas-html", "adresse"]);
@@ -50,19 +51,27 @@ async function main() {
   const [fFiches, sortie] = process.argv.slice(2).filter((a, i, t) => !a.startsWith("--") && !t[i - 1]?.startsWith("--"));
   const joursMax = seuil(process.argv, "--relire-apres", Infinity);
   // Site → noms des courses qui y renvoient (un organisateur peut en avoir plusieurs).
+  // Un site est lu s'il manque le lien « Résultats » OU le dénivelé d'un format trail
+  // (même page d'accueil, même requête — voir lib/races/dplusSite).
   const noms = new Map<string, string[]>();
+  const besoinDplus = new Set<string>();
   for (const l of readFileSync(fFiches, "utf8").split("\n")) {
     try {
       const f = JSON.parse(l) as Fiche;
-      if (f?.ok && PAYS_FRANCE.has(String(f.pays ?? "")) && f.siteOfficiel && !f.resultats?.classement) {
-        noms.set(f.siteOfficiel, [...(noms.get(f.siteOfficiel) ?? []), String(f.nom ?? "")]);
-      }
+      if (!(f?.ok && PAYS_FRANCE.has(String(f.pays ?? "")) && f.siteOfficiel)) continue;
+      const sansDplus = (f.formats ?? []).some((x) => x.discipline === "trail" && x.dplus == null);
+      if (!f.resultats?.classement || sansDplus) noms.set(f.siteOfficiel, [...(noms.get(f.siteOfficiel) ?? []), String(f.nom ?? "")]);
+      if (sansDplus) besoinDplus.add(f.siteOfficiel);
     } catch { /* ligne en cours d'écriture */ }
   }
   const sites = new Set(noms.keys());
   const faits = new Set<string>();
   const maintenant = Date.now();
-  if (existsSync(sortie)) for (const l of readFileSync(sortie, "utf8").split("\n")) { try { const x = JSON.parse(l) as LigneSite; if (dejaLu(x, maintenant, joursMax)) faits.add(x.site); } catch { /* */ } }
+  // Une lecture antérieure au relevé du dénivelé (sans champ `dplus`) ne dispense pas de
+  // relire un site qui en a besoin.
+  if (existsSync(sortie)) for (const l of readFileSync(sortie, "utf8").split("\n")) {
+    try { const x = JSON.parse(l) as LigneSite; if (dejaLu(x, maintenant, joursMax) && (!x.ok || !besoinDplus.has(x.site) || Array.isArray(x.dplus))) faits.add(x.site); } catch { /* */ }
+  }
   const reste = [...sites].filter((s) => !faits.has(s));
   console.log(`[sites] ${sites.size} sites, ${faits.size} déjà lus, ${reste.length} à lire`);
 
@@ -90,7 +99,7 @@ async function main() {
       if (!/html/i.test(p.type)) return ecrire({ ok: false, http: p.code, motif: "pas-html" });
       const lien = lienResultats(p.texte, site, anneeCourante, { noms: noms.get(site) ?? [] });
       if (lien) trouves++;
-      ecrire({ ok: true, http: p.code, lien });
+      ecrire({ ok: true, http: p.code, lien, dplus: couplesDistanceDplus(p.texte) });
     } finally { occupes.delete(u.host); }
   };
   const file = [...reste];

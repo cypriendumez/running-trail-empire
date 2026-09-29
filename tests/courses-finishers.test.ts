@@ -18,6 +18,7 @@ import {
 } from "../src/lib/races/majFinishers";
 import { lienInscription, lienSiteOfficiel, lienClassement, heureLisible } from "../src/lib/races/liensCourse";
 import { formatPasCourseAPied } from "../src/lib/races/nonCourse";
+import { couplesDistanceDplus, dplusPourFormat } from "../src/lib/races/dplusSite";
 import { lienResultats, robotsAutorise, anneeDe, motsDistinctifs, entites } from "../src/lib/races/resultatsSite";
 import { slugDeRegion, nomRegion, regionAvecPreposition } from "../src/lib/races/libelles";
 import { REGION_OUTRE_MER } from "../src/lib/races/majFinishers";
@@ -102,6 +103,37 @@ test("un format étiqueté « route » ou « trail » dont le TITRE dit autre ch
       { id: "c2", titre: "GF 195km", discipline: "cycling", distanceM: 195000, dplus: 4900, date: "2027-06-06", heure: null, inscription: null, statut: "tba" }] };
   assert.deepEqual(formatsRetenus(cyclo), [], "« Rando cyclo 56 km » étiquetée « road » est importée comme une course");
   assert.equal(pasUneCourseAPied(cyclo), true, "une cyclosportive garde ses lignes au catalogue des courses");
+});
+
+test("le dénivelé lu sur le site officiel : juste plutôt que beaucoup", () => {
+  // Formulations relevées le 29/09/2026 sur de vrais sites d'organisateurs.
+  const c = (t: string) => couplesDistanceDplus(t).map((x) => [x.km, x.dplus]);
+  assert.deepEqual(c("13 Km - 780 d+ - 13&euro; - 9h30 24 Km - 1450 d+ - 18"), [[13, 780], [24, 1450]]);
+  assert.deepEqual(c("Distance : 32,72 km Dénivelé positif : 792 m Départ"), [[32.72, 792]]);
+  assert.deepEqual(c("<p>Un trail de 27km et 1100m D+</p>"), [[27, 1100]]);
+  assert.deepEqual(c("Ultra 80 km : 4 200 m D+"), [[80, 4200]], "le séparateur de milliers est perdu");
+  assert.deepEqual(c("Le 42 km : D+ : 2 100 m"), [[42, 2100]]);
+  // La distance d'AVANT, jamais celle d'un autre format : « 7 km avec 100 D+ et 14 km 350 D+ ».
+  assert.deepEqual(c("de 7km avec 100D+ et un parcours de 14 km 350 D+ avec"), [[7, 100], [14, 350]]);
+  assert.deepEqual(c("Semi 21 km puis Trail 15 km 600 D+"), [[15, 600]], "la distance la plus PROCHE n'est plus celle retenue");
+  // Une seconde mention sans distance à elle ne reprend pas celle de la première.
+  assert.deepEqual(c("Le 12 km : 400 D+, dont la montée finale : 150 D+"), [[12, 400]], "« 150 D+ » attribué au 12 km");
+  // Ce qui n'est PAS un dénivelé positif, ou sans distance : rien.
+  for (const t of ["Le 30 km descend : 1200 m de dénivelé négatif", "altitude 1450 m, 20 km", "Dénivelé 600 m sans distance"]) {
+    assert.deepEqual(c(t), [], t);
+  }
+  const p = couplesDistanceDplus("13 Km - 780 d+ - 24 Km - 1450 d+ - 24 km duo 1500 D+");
+  assert.equal(dplusPourFormat(p, 13), 780);
+  assert.equal(dplusPourFormat(p, 12.8), 780, "une distance arrondie par la source ne retrouve plus son format");
+  assert.equal(dplusPourFormat(p, 24), null, "deux valeurs pour 24 km : on en choisit une au hasard");
+  assert.equal(dplusPourFormat(p, 50), null);
+  assert.equal(dplusPourFormat([{ km: 5, dplus: 9000 }], 5), null, "un dénivelé impossible est écrit");
+  // Intégration : jamais à la place d'une valeur de la source, et seulement pour un trail.
+  const app = codeNu("scripts/finishers-appliquer.ts");
+  assert.ok(/if \(x\.discipline !== "trail" \|\| x\.dplus != null\) continue;/.test(app), "le dénivelé du site écrase celui de la fiche");
+  const sites = codeNu("scripts/resultats-sites.ts");
+  assert.ok(/dplus: couplesDistanceDplus\(p\.texte\)/.test(sites), "la lecture des sites ne relève plus le dénivelé");
+  assert.ok(/!besoinDplus\.has\(x\.site\) \|\| Array\.isArray\(x\.dplus\)/.test(sites), "un site lu avant le relevé n'est jamais relu");
 });
 
 test("fiches jumelles : même événement sous deux adresses, une seule appliquée", () => {
