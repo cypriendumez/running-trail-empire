@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { lireCsv, distancesLues, evenementCourse, lignesDT } from "../src/lib/races/datatourisme";
+import { lireCsv, distancesLues, evenementCourse, lignesDT, dateRetrouvee, cleCommune, manifestationsDatees, type ManifestationDatee } from "../src/lib/races/datatourisme";
 import { organisateurReel } from "../src/lib/races/destination";
 
 let passed = 0; const fails: string[] = [];
@@ -66,6 +66,34 @@ test("Licence Ouverte 2.0 : la source est CITÉE, jamais présentée comme organ
   assert.match(codeNu("src/components/races/RacesHub.tsx"), /details\[selected\.id\]\?\.organization === "DATAtourisme"\s*\?\s*"DATAtourisme \(Licence Ouverte 2\.0\)"/);
   const dico = readFileSync("src/app/courses/coursesI18n.ts", "utf8");
   assert.equal([...dico.matchAll(/"source\.datatourisme": "[^"]*Licence Ouverte 2\.0[^"]*"/g)].length, 5);
+});
+
+test("date retrouvée : la même course dans la même commune — jamais par le seul nom de la ville", () => {
+  const m = (commune: string, ...evts: [string, string][]) => new Map<string, ManifestationDatee[]>([[cleCommune(commune), evts.map(([nom, date]) => ({ nom, commune, date }))]]);
+  // Vrais cas du 29/09/2026 (la Rouge Flamande : le 11/10, date confirmée par kikourou).
+  assert.equal(dateRetrouvee({ name: "Les foulées de la Rouge Flamande", city: "Bergues" }, m("Bergues", ["La Rouge Flamande à Bergues", "2026-10-11"])), "2026-10-11");
+  assert.equal(dateRetrouvee({ name: "Trail Victor Hugo", city: "Lescar" }, m("Lescar", ["11 ème trail Victor Hugo", "2026-11-08"])), "2026-11-08");
+  // Faux rapprochements mesurés : le seul mot commun était la COMMUNE.
+  assert.equal(dateRetrouvee({ name: "La Foulée du Madiran", city: "Madiran" }, m("Madiran", ["Portes ouvertes en Madiran & Pacherenc du Vic-Bilh", "2026-11-14"])), null);
+  assert.equal(dateRetrouvee({ name: "Urban Trail de Romans", city: "Romans-sur-Isère" }, m("Romans-sur-Isère", ["Braderie Vintage - Ville de Romans", "2026-10-16"])), null);
+  // Pas un nom de course : une montée aux lanternes n'est pas le trail.
+  assert.equal(dateRetrouvee({ name: "Trail du Haut-Barr", city: "Saverne" }, m("Saverne", ["Montée en lumière vers le Château du Haut-Barr", "2026-10-31"])), null);
+  assert.equal(dateRetrouvee({ name: "Marche nordique du Pignada", city: "Anglet" }, m("Anglet", ["Marche nordique du Pignada", "2026-10-04"])), null);
+  // Deux dates pour la même course : on ne choisit pas au hasard.
+  assert.equal(dateRetrouvee({ name: "Trail des 7 Monts", city: "Septmoncel" }, m("Septmoncel", ["Trail des 7 Monts", "2026-10-10"], ["Trail des 7 Monts", "2027-10-09"])), null);
+  // Une autre commune ne compte pas.
+  assert.equal(dateRetrouvee({ name: "Trail Victor Hugo", city: "Pau" }, m("Lescar", ["11 ème trail Victor Hugo", "2026-11-08"])), null);
+});
+
+test("date retrouvée : une période d'UN seul jour — sur deux jours, le jour de course est incertain", () => {
+  const rows = [
+    ligne({ Nom_du_POI: "47e édition de la course Marseille - Cassis", Code_postal_et_commune: "13008#Marseille 8e Arrondissement", Periodes_regroupees: "2026-10-24<->2026-10-25" }),
+    ligne({ Nom_du_POI: "Course Marseille-Cassis", Code_postal_et_commune: "13260#Cassis", Periodes_regroupees: "2026-10-25<->2026-10-25" }),
+  ];
+  const m = manifestationsDatees(rows, AUJ, "2027-10-31");
+  assert.equal(m.get(cleCommune("Marseille")), undefined, "le « 24 au 25 » n'est pas une date de course");
+  assert.deepEqual(m.get(cleCommune("Cassis"))?.map((x) => x.date), ["2026-10-25"]);
+  assert.equal(cleCommune("Marseille 8e Arrondissement"), cleCommune("Marseille"));
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

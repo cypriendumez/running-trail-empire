@@ -15,6 +15,7 @@
  */
 import { estChrono, typeDe } from "./majFinishers";
 import { departementDuCodePostal, type Departement } from "./departements";
+import { motsDistinctifs } from "./resultatsSite";
 
 /** Lecture CSV (RFC 4180) : guillemets, guillemets doublés, retours à la ligne dans un champ. */
 export function lireCsv(texte: string): string[][] {
@@ -106,3 +107,55 @@ export function lignesDT(e: EvenementDT, maintenant: string): Record<string, unk
     };
   });
 }
+
+/** Une manifestation sportive datée, pour rapprochement : nom, commune, prochaine date. */
+export type ManifestationDatee = { nom: string; commune: string; date: string };
+
+/** Les manifestations SPORTIVES à venir du fichier, par commune (clé de comparaison). */
+export function manifestationsDatees(rows: Record<string, string>[], aujourdhui: string, jusquA: string): Map<string, ManifestationDatee[]> {
+  const out = new Map<string, ManifestationDatee[]>();
+  for (const r of rows) {
+    if (!/SportsEvent/.test(r.Categories_de_POI ?? "")) continue;
+    // ⚠️ UN SEUL JOUR. Sur « 24 au 25 octobre » (Marseille-Cassis vu par la mairie de
+    // Marseille : le village, puis la course le dimanche), le jour de course est incertain.
+    const date = [...String(r.Periodes_regroupees ?? "").matchAll(/(\d{4}-\d{2}-\d{2})<->(\d{4}-\d{2}-\d{2})/g)]
+      .filter((m) => m[1] === m[2]).map((m) => m[1]).filter((d) => d >= aujourdhui && d <= jusquA).sort()[0];
+    const commune = String(r.Code_postal_et_commune ?? "").split("|")[0].split("#")[1] ?? "";
+    if (!date || !commune) continue;
+    const k = cleCommune(commune);
+    (out.get(k) ?? out.set(k, []).get(k)!).push({ nom: String(r.Nom_du_POI ?? ""), commune, date });
+  }
+  return out;
+}
+
+/** « Saint-Maurice-la-Clouère », « Paris 8e arrondissement » → clé de comparaison. */
+export const cleCommune = (v: unknown) => String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+  .replace(/\b(\d+)(e|er|eme)?\b/g, " ").replace(/\barrondissement\b/g, " ").replace(/[^a-z]+/g, " ").trim();
+
+/**
+ * La date DATAtourisme d'une course du catalogue restée « Date à venir », ou `null`.
+ *
+ * ⚠️ LE NOM DE LA VILLE NE COMPTE PAS. Mesuré le 29/09/2026 : « La Foulée du Madiran »
+ * rapprochée de « Portes ouvertes en Madiran », « Urban Trail de Romans » d'une braderie —
+ * le seul mot commun était la commune. On retire les mots de la ville, on exige que la
+ * manifestation porte un NOM DE COURSE (« Montée en lumière vers le château du Haut-Barr »
+ * n'est pas le « Trail du Haut-Barr »), et au moins deux mots communs quand il y en a deux.
+ */
+export function dateRetrouvee(course: { name: string; city: string | null }, parCommune: Map<string, ManifestationDatee[]>): string | null {
+  const motsVille = new Set(motsDistinctifs(String(course.city ?? "")));
+  const mots = motsDistinctifs(course.name).filter((m) => !motsVille.has(m));
+  if (!mots.length) return null;
+  const candidates = (parCommune.get(cleCommune(course.city)) ?? []).filter((e) => {
+    if (PAS_UNE_COURSE.test(forme(e.nom).replace(/\b(trail|course|courses)\b.*$/, ""))) return false;
+    const m = motsDistinctifs(e.nom).filter((x) => !motsVille.has(x));
+    const communs = mots.filter((x) => m.includes(x)).length;
+    if (communs < Math.min(2, mots.length)) return false;
+    // Un nom de course… ou un nom qui n'ajoute RIEN à celui de la course (« La Rouge
+    // Flamande à Bergues ») — pas « Montée en lumière vers le château du Haut-Barr ».
+    return NOM_DE_COURSE.test(forme(e.nom)) || m.every((x) => mots.includes(x));
+  });
+  const dates = [...new Set(candidates.map((c) => c.date))].sort();
+  // Deux dates différentes pour la même course : on ne choisit pas au hasard.
+  return dates.length === 1 ? dates[0] : null;
+}
+const NOM_DE_COURSE = /\b(trail|corrida|foulee|foulees|course|courses|semi|marathon|cross|ekiden|run|running|km|kilometres?)\b/;
