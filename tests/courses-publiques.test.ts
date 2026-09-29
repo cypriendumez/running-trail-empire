@@ -131,6 +131,10 @@ test("le sitemap et les pages appliquent le MÊME filtre", () => {
   assert.ok(/gte\("date", auj\)/.test(sm), "le sitemap déclare des courses déjà courues");
   assert.ok(/registration_url", "is", null/.test(sm), "le sitemap déclare des courses sans inscription");
   assert.ok(/\/courses\//.test(sm), "les courses ne sont pas déclarées au sitemap");
+  // 29/09/2026 : le sitemap servait l'état du build six heures après — la régénération,
+  // vingt pages lues l'une après l'autre, dépassait le délai de 10 s de la fonction.
+  assert.ok(/export const maxDuration = 60;/.test(sm), "la régénération du sitemap retombe sous le délai par défaut");
+  assert.ok(/const lots = await Promise\.all\(debuts\.map\(/.test(sm), "les pages du sitemap sont de nouveau lues l'une après l'autre");
 
   const page = nu("src/app/courses/[slug]/page.tsx");
   assert.ok(/estPubliable\(c, jourFrance\(\)\)/.test(page), "la page de détail ne filtre pas comme le sitemap");
@@ -211,7 +215,10 @@ test("le sitemap dépasse le plafond de 1 000 lignes de la base", () => {
   assert.ok(/\.range\(/.test(sm), "le sitemap ne pagine pas : il s'arrêtera à 1 000 courses");
   // `range` sans `order` explicite fait glisser la pagination d'une page à l'autre.
   assert.ok(/\.order\([\s\S]{0,80}\.order\(/.test(sm), "la pagination n'est pas ordonnée de façon stable");
-  assert.ok(/lot\.length < PAS/.test(sm), "la boucle ne s'arrête jamais sur un lot incomplet");
+  // Depuis le 29/09/2026 (lecture en parallèle), le nombre de pages vient du COMPTE exact,
+  // borné par MAX_SITEMAP : ni page oubliée, ni boucle sans fin.
+  assert.ok(/count: "exact", head: true/.test(sm) && /Math\.ceil\(Math\.min\(count, MAX_SITEMAP\) \/ PAS\)/.test(sm),
+    "le nombre de pages du sitemap ne vient plus du compte exact de la base");
 });
 
 // ── LIBELLÉS : ce que lisent Google et les coureurs ─────────────────────────────

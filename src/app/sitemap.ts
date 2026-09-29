@@ -18,6 +18,12 @@ import { regionCanonique } from "@/lib/races/libelles";
  * fait perdre la confiance du moteur pour tout le domaine.
  */
 export const revalidate = 3600;
+// ⚠️ LA RÉGÉNÉRATION NE DOIT PAS DÉPASSER LE DÉLAI DE LA FONCTION (29/09/2026). Constaté :
+// le sitemap servait encore, six heures plus tard, l'état du build — sans les 700 courses
+// importées depuis. Une vingtaine de pages lues L'UNE APRÈS L'AUTRE (4 à 8 s) contre 10 s
+// par défaut sur Vercel Hobby : la régénération mourait, l'ancienne version restait. Les
+// pages sont maintenant lues en PARALLÈLE, et la fonction a 60 s (plafond Hobby).
+export const maxDuration = 60;
 
 // Le protocole plafonne un fichier à 50 000 adresses ; on reste très en dessous, mais
 // la borne est écrite pour que personne ne la découvre le jour où le catalogue double.
@@ -71,20 +77,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     type Ligne = Pick<CoursePublique, "id" | "name" | "city" | "distance_km" | "region" | "date">;
     const PAS = 1000;
     const parcourir = async (datee: boolean): Promise<Ligne[]> => {
-      const out: Ligne[] = [];
-      for (let debut = 0; debut < MAX_SITEMAP; debut += PAS) {
-        let q = sb.from("races").select("id,name,city,distance_km,region,date")
+      const filtre = <T extends { gte: (c: string, v: string) => T; lt: (c: string, v: string) => T }>(q: T) =>
+        datee ? q.gte("date", auj).lt("date", DATE_INCONNUE) : q.gte("date", DATE_INCONNUE);
+      const { count, error: eCompte } = await filtre(sb.from("races").select("id", { count: "exact", head: true }).not("registration_url", "is", null));
+      if (eCompte || !count) return [];
+      const debuts = Array.from({ length: Math.ceil(Math.min(count, MAX_SITEMAP) / PAS) }, (_, i) => i * PAS);
+      const lots = await Promise.all(debuts.map(async (debut) => {
+        const { data, error } = await filtre(sb.from("races").select("id,name,city,distance_km,region,date")
           .not("registration_url", "is", null)
           .order("date", { ascending: true }).order("id", { ascending: true })
-          .range(debut, debut + PAS - 1);
-        q = datee ? q.gte("date", auj).lt("date", DATE_INCONNUE) : q.gte("date", DATE_INCONNUE);
-        const { data, error } = await q;
-        if (error) break;
-        const lot = (data ?? []) as Ligne[];
-        out.push(...lot);
-        if (lot.length < PAS) break;
-      }
-      return out;
+          .range(debut, debut + PAS - 1));
+        if (error) throw new Error(error.message);   // une page manquante ne passe pas en silence
+        return (data ?? []) as Ligne[];
+      }));
+      return lots.flat();
     };
     const lignes = await parcourir(true);
     // ⚠️ LES ÉPREUVES SANS DATE ANNONCÉE ONT AUSSI UNE PAGE, avec une priorité MOINDRE.
