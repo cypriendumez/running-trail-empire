@@ -16,6 +16,8 @@
 /** Les destinations connues, avec le nom sous lequel elles se présentent. */
 const CONNUES: Record<string, string> = {
   "finishers.com": "Finishers",
+  // Source OUVERTE (Licence Ouverte 2.0), jamais un organisateur — voir lib/races/datatourisme.
+  "datatourisme.fr": "DATAtourisme",
   "jogging-plus.com": "Jogging International",
   "milesrepublic.com": "Miles Republic",
   "utmb.world": "UTMB",

@@ -192,6 +192,10 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
             { site: nomDestination(c.registration_url) })}
         </p>
       )}
+      {/* Licence Ouverte 2.0 : la réutilisation impose de CITER la source. */}
+      {c.organization === "DATAtourisme" && (
+        <p className="mt-1 text-xs text-zinc-400">{t("source.datatourisme")}</p>
+      )}
       <p className="mt-1 text-xs text-zinc-400">
         {t("cta.avertissement")}
       </p>

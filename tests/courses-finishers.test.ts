@@ -20,6 +20,7 @@ import { lienInscription, lienSiteOfficiel, lienClassement, heureLisible } from 
 import { lienResultats, robotsAutorise, anneeDe, motsDistinctifs, entites } from "../src/lib/races/resultatsSite";
 import { slugDeRegion, nomRegion, regionAvecPreposition } from "../src/lib/races/libelles";
 import { REGION_OUTRE_MER } from "../src/lib/races/majFinishers";
+import { DEPARTEMENTS, departementDe, departementDuCodePostal, departementParPosition, departementEtranger } from "../src/lib/races/departements";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -61,6 +62,8 @@ test("la collecte survit à une coupure PENDANT la lecture de la page", () => {
   // filer l'expiration du délai. Une coupure en pleine lecture doit être une erreur réseau.
   assert.match(codeNu("scripts/finishers-collecte.ts"), /try \{[^}]*?const r = await fetch\([\s\S]*?html = await r\.text\(\);\s*\} catch/);
   assert.doesNotMatch(codeNu("scripts/finishers-collecte.ts"), /lireFiche\(slug, await r\.text\(\)\)/);
+  // …et un échec réseau (`http: 0`) est RELU à la reprise, pas tenu pour fait.
+  assert.match(codeNu("scripts/finishers-collecte.ts"), /if \(o\?\.slug && \(o\.ok \|\| o\.http === 404 \|\| o\.http === 410\)\) faits\.add\(o\.slug\);/);
 });
 
 console.log("\n=== DÉCISIONS ===\n");
@@ -361,6 +364,27 @@ test("outre-mer : la région vient du CODE PAYS, pas de l'arrondissement de la s
   for (const slug of Object.values(REGION_OUTRE_MER)) assert.notEqual(nomRegion(slug), slug, `${slug} sans nom lisible`);
   assert.equal(regionAvecPreposition("saint-martin"), "à Saint-Martin");
   assert.equal(regionAvecPreposition("nouvelle-caledonie"), "en Nouvelle-Calédonie");
+});
+
+test("départements : une écriture, la bonne région — et l'étranger reconnu", () => {
+  // 29/09/2026 : 250 écritures pour ~101 départements ; Corse, Martinique et des épreuves
+  // canadiennes rangées en Île-de-France (« Marathon de Toronto » géolocalisé près de Nantes).
+  assert.equal(DEPARTEMENTS.length, 101);
+  for (const d of DEPARTEMENTS) assert.notEqual(nomRegion(d.region), d.region, `${d.nom} : région inconnue « ${d.region} »`);
+  assert.equal(departementDe("59")?.nom, "Nord"); assert.equal(departementDe("59")?.region, "hauts-de-france");
+  assert.deepEqual(DEPARTEMENTS.filter((d) => d.region === "ile-de-france").map((d) => d.code), ["75", "77", "78", "91", "92", "93", "94", "95"]);
+  const parRegion: Record<string, number> = {}; for (const d of DEPARTEMENTS) parRegion[d.region] = (parRegion[d.region] ?? 0) + 1;
+  assert.deepEqual([parRegion["auvergne-rhone-alpes"], parRegion["occitanie"], parRegion["nouvelle-aquitaine"], parRegion["grand-est"], parRegion["hauts-de-france"], parRegion["corse"]], [12, 13, 12, 10, 5, 2]);
+  assert.equal(departementDe("Seine et Marne")?.nom, "Seine-et-Marne");
+  assert.equal(departementDe("Cotes d'Armor")?.nom, "Côtes-d'Armor");
+  assert.equal(departementDe("Réunion")?.region, "la-reunion");
+  assert.equal(departementDe("Corse"), null, "« Corse » est ambigu (2A/2B) : il faut la position");
+  assert.equal(departementDuCodePostal("20090")?.code, "2A"); assert.equal(departementDuCodePostal("20200")?.code, "2B");
+  assert.equal(departementDuCodePostal("97410")?.code, "974"); assert.equal(departementDuCodePostal("75008")?.nom, "Paris");
+  assert.equal(departementParPosition(42.31, 9.15)?.code, "2B", "Corte"); assert.equal(departementParPosition(41.92, 8.74)?.code, "2A", "Ajaccio");
+  assert.equal(departementParPosition(14.8, -61.22)?.code, "972", "Le Prêcheur"); assert.equal(departementParPosition(48.85, 2.35), null);
+  for (const v of ["H2", "EH", "C1", "M6", "V6"]) assert.equal(departementEtranger(v), true, v);
+  for (const v of ["2A", "59", "Nord", ""]) assert.equal(departementEtranger(v), false, v);
 });
 
 console.log("\n=== BRANCHEMENTS ===\n");

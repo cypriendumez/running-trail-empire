@@ -752,7 +752,11 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                       </p>
                     )}
                     {(() => {
-                      const dom = domaineSource(details[selected.id]?.registration_url);
+                      // Licence Ouverte 2.0 : une fiche DATAtourisme CITE sa source — son lien
+                      // mène au site de l'organisateur, qui n'est pas la source des données.
+                      const dom = details[selected.id]?.organization === "DATAtourisme"
+                        ? "DATAtourisme (Licence Ouverte 2.0)"
+                        : domaineSource(details[selected.id]?.registration_url);
                       return dom ? (
                         <p className="w-full text-center text-[11px] leading-relaxed text-zinc-400">
                           {(d["source"] ?? "").replace("{d}", dom)}

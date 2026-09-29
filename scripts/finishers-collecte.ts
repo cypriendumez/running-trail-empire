@@ -107,7 +107,12 @@ async function main() {
   const [fSlugs, sortie] = process.argv.slice(2);
   const slugs = readFileSync(fSlugs, "utf8").split("\n").map((s) => s.trim()).filter(Boolean);
   const faits = new Set<string>();
-  if (existsSync(sortie)) for (const l of readFileSync(sortie, "utf8").split("\n")) { try { const o = JSON.parse(l); if (o?.slug) faits.add(o.slug); } catch { /* ligne tronquée */ } }
+  // ⚠️ UN ÉCHEC RÉSEAU N'EST PAS UNE FICHE LUE. Nuit du 29/09/2026 : cinq heures sans
+  // réseau, chaque course marquée `http: 0` après quatre essais — et tenue pour « faite »
+  // à la reprise. Seules une fiche lue ou une page ABSENTE (404/410) comptent comme faites.
+  if (existsSync(sortie)) for (const l of readFileSync(sortie, "utf8").split("\n")) {
+    try { const o = JSON.parse(l); if (o?.slug && (o.ok || o.http === 404 || o.http === 410)) faits.add(o.slug); } catch { /* ligne tronquée */ }
+  }
   const reste = slugs.filter((s) => !faits.has(s));
   console.log(`[collecte] ${slugs.length} slugs, ${faits.size} déjà lus, ${reste.length} à lire`);
   let recul = 60_000, n = 0;
