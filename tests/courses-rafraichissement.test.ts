@@ -137,7 +137,7 @@ test("finishers-appliquer : garde-fous de forme, fiches à revoir, échec visibl
   const iRevoir = src.indexOf('"a-revoir.txt"'), iBlanc = src.indexOf("if (!ECRIRE)");
   assert.ok(iRevoir > 0 && iRevoir < iBlanc, "a-revoir.txt n'est plus écrit avant le retour « à blanc »");
   // Illisible (réseau, 403, 5xx) : à revoir ; ABSENTE (404/410) : la page n'existe plus.
-  assert.ok(/if \(!f\.ok\) \{[^}]*if \(f\.http !== 404 && f\.http !== 410\) aRevoir\.push\(f\.slug\)/.test(src),
+  assert.ok(/if \(!f\.ok\) \{\s*st\.erreurs\+\+;\s*if \(f\.http !== 404 && f\.http !== 410\) \{ aRevoir\.push\(f\.slug\); continue; \}/.test(src),
     "les fiches illisibles ne sont plus mises à revoir");
   assert.ok(/else \{ st\.sansFormat\+\+; aRevoir\.push\(f\.slug\); \}/.test(src), "les fiches françaises sans format ne sont plus mises à revoir");
   // Une requête sans délai a figé l'écriture le 29/09 (1 016 màj sur 11 589, puis plus rien).
