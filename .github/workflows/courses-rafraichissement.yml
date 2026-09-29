@@ -1,0 +1,152 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  RAFRAÎCHISSEMENT DES COURSES — tous les mardis, sans surveillance.
+#
+#  ⚠️ POURQUOI. Le catalogue n'importait plus RIEN depuis le 10/06/2026 (jogging-plus est
+#  derrière un défi anti-robot), et la remise à niveau du 29/09/2026 (dates, dénivelés,
+#  liens d'inscription, classements) avait été faite À LA MAIN, en une nuit. Sans ce
+#  workflow, elle aurait vieilli dès la semaine suivante : dates annoncées après coup,
+#  nouvelles éditions, classements publiés après la course.
+#
+#  CE QU'IL FAIT, DANS L'ORDRE :
+#   1. relit les fiches finishers des courses françaises DÉJÀ au catalogue, plus celles
+#      apparues au plan du site depuis la semaine passée (~4 900 pages, ~2 h, une à la fois) ;
+#   2. lit le lien « Résultats » sur les sites officiels (robots.txt respecté) ;
+#   3. SAUVEGARDE la table, puis applique — avec des SEUILS : au-delà, rien n'est écrit
+#      (voir scripts/garde-fous.ts) et l'exécution rougit dans /admin → Automatisation ;
+#   4. retire les épreuves qui ne sont pas de la course à pied, contrôle les liens
+#      « Classement » et « S'inscrire » (deux passages, seuls 404/410 comptent) ;
+#   5. DATAtourisme (Licence Ouverte 2.0) : courses locales et dates retrouvées.
+#
+#  ⚠️ L'ÉTAT D'UNE SEMAINE À L'AUTRE EST UN ARTEFACT, PAS UN CACHE. `actions/cache` efface
+#  ce qui n'a pas servi depuis 7 jours — exactement le rythme de ce workflow, qu'un retard
+#  de planification de GitHub ferait basculer. L'état perdu, les courses NOUVELLES ne
+#  seraient plus jamais repérées. Un artefact vit 90 jours.
+#
+#  SECRETS REQUIS : NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (ceux de la sauvegarde).
+# ─────────────────────────────────────────────────────────────────────────────
+name: Rafraîchissement des courses
+
+on:
+  schedule:
+    - cron: "15 0 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+# Deux passages simultanés doubleraient le rythme des requêtes chez finishers.
+concurrency:
+  group: courses-rafraichissement
+  cancel-in-progress: false
+
+defaults:
+  run:
+    # « bash » explicite = `-eo pipefail` : sans lui, `script | tee` masque un échec.
+    shell: bash
+
+jobs:
+  rafraichir:
+    runs-on: ubuntu-latest
+    # Un exécuteur GitHub est tué à 6 h ; la collecte s'arrête proprement à 3 h 30.
+    timeout-minutes: 340
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      ETAT: .cache-courses
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Installer les dépendances
+        run: npm ci --no-audit --no-fund
+
+      # On nomme le secret manquant, sans jamais afficher sa valeur.
+      - name: Vérifier les secrets
+        run: |
+          manque=0
+          if [ -z "${NEXT_PUBLIC_SUPABASE_URL:-}" ]; then echo "::error::Le secret NEXT_PUBLIC_SUPABASE_URL est vide ou absent."; manque=1; fi
+          case "${SUPABASE_SERVICE_ROLE_KEY:-}" in
+            eyJ*) echo "SUPABASE_SERVICE_ROLE_KEY : présent (${#SUPABASE_SERVICE_ROLE_KEY} caractères)" ;;
+            "")   echo "::error::Le secret SUPABASE_SERVICE_ROLE_KEY est vide ou absent."; manque=1 ;;
+            *)    echo "::error::SUPABASE_SERVICE_ROLE_KEY n'est pas au format attendu (JWT « eyJ… », clé service_role historique)."; manque=1 ;;
+          esac
+          exit $manque
+
+      # Le dernier artefact « etat-courses », QUELLE QUE SOIT l'issue de son exécution : une
+      # panne de DATAtourisme en fin de parcours ne doit pas faire oublier la semaine.
+      - name: Reprendre l'état de la semaine précédente
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$ETAT"
+          run_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=etat-courses&per_page=1" \
+            --jq '.artifacts[0] | select(.expired == false) | .workflow_run.id' 2>/dev/null || true)
+          if [ -n "$run_id" ] && gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name etat-courses --dir "$ETAT"; then
+            echo "État repris de l'exécution $run_id :"; ls -la "$ETAT"
+          else
+            echo "::notice::Aucun état précédent — amorce : plan du site du 28/09/2026 (scripts/amorces)."
+          fi
+
+      - name: Choisir les fiches à relire
+        run: npx tsx scripts/finishers-slugs.ts "$ETAT/slugs-semaine.txt" "$ETAT/slugs-vus.txt" "$ETAT/a-revoir.txt"
+
+      # Code 3 = la source refuse (fiches illisibles de suite) : on applique ce qui a été lu.
+      - name: Relire les fiches finishers (une page à la fois, ~2 h)
+        run: |
+          set +e
+          npx tsx scripts/finishers-collecte.ts "$ETAT/slugs-semaine.txt" "$ETAT/fiches-semaine.jsonl" --duree-max 210 --abandon-apres 5
+          code=$?
+          set -e
+          if [ "$code" -eq 3 ]; then echo "::warning::Collecte interrompue : la source refuse. Seules les fiches lues seront appliquées."; exit 0; fi
+          exit "$code"
+
+      - name: Lire les liens « Résultats » des sites officiels
+        run: npx tsx scripts/resultats-sites.ts "$ETAT/fiches-semaine.jsonl" "$ETAT/resultats-sites.jsonl" --relire-apres 56
+
+      - name: Sauvegarder la table avant d'écrire
+        run: npx tsx scripts/sauvegarder-courses.ts .sauvegarde-courses
+
+      - name: Publier la sauvegarde
+        uses: actions/upload-artifact@v4
+        with:
+          name: courses-avant-rafraichissement
+          path: .sauvegarde-courses/
+          retention-days: 30
+          if-no-files-found: error
+          # Dossier « caché » (point initial) : ignoré par défaut depuis upload-artifact v4.4.
+          include-hidden-files: true
+
+      - name: Appliquer les fiches (seuils de sécurité)
+        run: npx tsx scripts/finishers-appliquer.ts "$ETAT/fiches-semaine.jsonl" --ecrire
+
+      - name: Retirer les épreuves qui ne sont pas de la course à pied
+        run: npx tsx scripts/retirer-non-course.ts --ecrire
+
+      - name: Contrôler les liens « Classement » et « S'inscrire »
+        run: npx tsx scripts/verifier-liens-courses.ts "$ETAT/liens-controle-$(date -u +%Y%m%d).json" --ecrire
+
+      - name: Garder l'état pour la semaine prochaine
+        uses: actions/upload-artifact@v4
+        with:
+          name: etat-courses
+          path: |
+            .cache-courses/slugs-vus.txt
+            .cache-courses/a-revoir.txt
+            .cache-courses/resultats-sites.jsonl
+            .cache-courses/liens-controle-*.json
+          retention-days: 90
+          if-no-files-found: error
+          include-hidden-files: true
+
+      - name: DATAtourisme — télécharger le fichier du jour
+        run: npx tsx scripts/datatourisme-telecharger.ts fma.csv
+
+      - name: DATAtourisme — nouvelles courses locales
+        run: npx tsx scripts/datatourisme-importer.ts fma.csv --ecrire
+
+      - name: DATAtourisme — dates des courses « Date à venir »
+        run: npx tsx scripts/datatourisme-dates.ts fma.csv --ecrire

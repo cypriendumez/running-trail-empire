@@ -10,8 +10,10 @@
 import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { lireCsv, manifestationsDatees, dateRetrouvee } from "../src/lib/races/datatourisme";
+import { seuil, arreterSiDepasse } from "./garde-fous";
 
 const ECRIRE = process.argv.includes("--ecrire");
+const MAX_DATES = seuil(process.argv, "--max-dates", 600);
 const [fichier] = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
 const aujourdhui = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date());
@@ -30,6 +32,7 @@ async function main() {
   console.log(JSON.stringify({ dateAVenir: rows.length, datesRetrouvees: majs.length, evenements: new Set(majs.map((x) => `${x.r.name}|${x.r.city}`)).size }));
   for (const x of majs.slice(0, 30)) console.log(`  ${x.date} ${x.r.name} (${x.r.city})`);
   if (!ECRIRE) { console.log("(à blanc — rien écrit)"); return; }
+  arreterSiDepasse([{ quoi: "dates à écrire", n: majs.length, max: MAX_DATES }]);
   let ok = 0, ko = 0;
   const maintenant = new Date().toISOString();
   for (let i = 0; i < majs.length; i += 8) {
@@ -37,5 +40,6 @@ async function main() {
     for (const r of res) { if (r.error) { ko++; if (ko < 4) console.error(r.error.message); } else ok++; }
   }
   console.log(`dates écrites : ${ok}, erreurs : ${ko}`);
+  if (ko > Math.max(5, majs.length * 0.05)) process.exit(1);
 }
 main().catch((e) => { console.error(e); process.exit(1); });

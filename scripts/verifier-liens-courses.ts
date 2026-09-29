@@ -15,10 +15,14 @@
 import { writeFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { verdictDe, type Verdict } from "../src/lib/races/liens";
+import { seuil, arreterSiDepasse } from "./garde-fous";
 
 const UA = "Mozilla/5.0 (compatible; PacevoBot/1.0; +https://pacevo.fr/contact)";
 const ECRIRE = process.argv.includes("--ecrire");
-const [sortie] = process.argv.slice(2).filter((a) => !a.startsWith("--"));
+/** Mesuré le 29/09/2026 : 24 adresses mortes sur ~1 300. Un chronométreur entier en panne
+ *  (404 sur tout son domaine pendant une migration) ne doit pas vider des centaines de liens. */
+const MAX_MORTES = seuil(process.argv, "--max-mortes", 150);
+const [sortie] = process.argv.slice(2).filter((a, i, t) => !a.startsWith("--") && !t[i - 1]?.startsWith("--"));
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
 const CHAMPS = ["resultats_url", "inscription_url"] as const;
 type Champ = (typeof CHAMPS)[number];
@@ -80,15 +84,22 @@ async function main() {
   }
   const codes: Record<string, number> = {};
   for (const c of p1.values()) codes[String(c)] = (codes[String(c)] ?? 0) + 1;
-  const rapport = { le: new Date().toISOString(), adresses: urls.length, bilan, codes, mortes: mortes.map((u) => ({ u, champs: parUrl.get(u) })) };
+  // ⚠️ LE RAPPORT AUSSI EST UNE ÉCRITURE : `finishers-appliquer` ne réécrit jamais une
+  // adresse qu'il déclare morte. Au-delà du seuil, les « mortes » y sont SUSPENDUES (gardées
+  // pour lecture, ignorées de tous) — sinon la semaine suivante les effacerait quand même.
+  const trop = mortes.length > MAX_MORTES;
+  const liste = mortes.map((u) => ({ u, champs: parUrl.get(u) }));
+  const rapport = { le: new Date().toISOString(), adresses: urls.length, bilan, codes, mortes: trop ? [] : liste, ...(trop ? { suspendues: liste } : {}) };
   writeFileSync(sortie, JSON.stringify(rapport, null, 1));
   console.log(JSON.stringify({ bilan, codes }, null, 1));
+  arreterSiDepasse([{ quoi: "adresses mortes", n: mortes.length, max: MAX_MORTES }]);
   if (!ECRIRE) { console.log("(lecture seule — rien retiré)"); return; }
-  let retires = 0;
+  let retires = 0, refus = 0;
   for (const u of mortes) for (const e of parUrl.get(u)!) {
     const { error } = await sb.from("races").update({ [e.champ]: null }).in("id", e.ids).eq(e.champ, u);
-    if (error) console.error(`retrait ${e.champ} :`, error.message); else retires += e.ids.length;
+    if (error) { console.error(`retrait ${e.champ} :`, error.message); refus++; } else retires += e.ids.length;
   }
   console.log(`liens morts retirés : ${retires}`);
+  if (refus) process.exit(1);
 }
 main().catch((e) => { console.error(e); process.exit(1); });

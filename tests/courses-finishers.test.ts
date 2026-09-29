@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { lireFiche } from "../scripts/finishers-collecte";
 import {
-  estFerie, kmDe, estCourseAPied, dplusDe, dplusPlausible, dateDe, apparier, planEvenement, pasUneCourseAPied, deCetteFiche, estChrono,
+  estFerie, kmDe, estCourseAPied, dplusDe, dplusPlausible, dateDe, dateConservee, apparier, planEvenement, pasUneCourseAPied, deCetteFiche, estChrono,
   slugRegion, typeDe, formatsRetenus, cleNomVille,
   DATE_A_VENIR, type Fiche, type LigneCourse,
 } from "../src/lib/races/majFinishers";
@@ -231,6 +231,27 @@ test("sans la colonne « confirmée », une date ANNONCÉE n'est pas écrite com
   assert.equal(planEvenement(TUE, [ligne("a", 30.4, { date: DATE_A_VENIR })], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: true }).majs[0].patch.date, "2026-10-04", "après la migration, écrite AVEC son drapeau");
   const faux = planEvenement({ ...TUE, formats: TUE.formats!.map((f) => ({ ...f, dplus: null })) }, [ligne("v", 30.4, { elevation_gain_m: 16660 })], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: false });
   assert.equal(faux.majs[0].patch.elevation_gain_m, null, "un dénivelé faux en base n'est pas conservé faute de mieux");
+});
+
+test("une estimation écartée n'efface pas la date déclarée par l'office de tourisme", () => {
+  // Cas réel (29/09/2026) : « Boucles des Cordeliers », samedi 17/10 selon DATAtourisme ;
+  // finishers estime le MARDI 27/10 (« tba »), que `dateDe` écarte. La date déclarée reste.
+  const mardi = { ...TUE, prochaine: { annee: 2026, debut: "2026-10-27", statut: "tba" },
+    formats: TUE.formats!.map((f) => ({ ...f, date: "2026-10-27" })) };
+  const opts = { aujourdhui: AUJ, favoris: new Set<string>(), colonnesNouvelles: true };
+  const garde = planEvenement(mardi, [ligne("a", 30.4, { date: "2026-10-17" })], opts).majs[0].patch;
+  assert.equal(garde.date, "2026-10-17", "la date déclarée ailleurs repasse en « Date à venir »");
+  assert.ok(!("date_confirmee" in garde), "le drapeau de la date déclarée est écrasé par celui d'une estimation écartée");
+  // Sans date ailleurs, l'estimation en semaine reste inconnue — la règle ne change pas.
+  assert.equal(planEvenement(mardi, [ligne("a", 30.4, { date: DATE_A_VENIR })], opts).majs[0].patch.date, DATE_A_VENIR);
+  const f = mardi.formats![0];
+  assert.equal(dateConservee("2026-10-17", f, mardi, AUJ), true);
+  assert.equal(dateConservee("2027-10-16", f, mardi, AUJ), false, "une date d'une AUTRE édition (un an d'écart) est gardée");
+  assert.equal(dateConservee("2026-09-20", f, mardi, AUJ), false, "une date PASSÉE est gardée comme date à venir");
+  assert.equal(dateConservee("2099-01-01", f, mardi, AUJ), false);
+  assert.equal(dateConservee(null, f, mardi, AUJ), false);
+  const passee = { ...f, date: "2026-09-22" };   // passée, mais à 25 jours de la date déclarée
+  assert.equal(dateConservee("2026-10-17", passee, { ...mardi, prochaine: null }, AUJ), false, "une estimation PASSÉE justifie une date future");
 });
 
 const fmt = (id: string, titre: string, discipline: string, distanceM: number, dplus: number | null = null) =>

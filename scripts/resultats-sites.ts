@@ -9,17 +9,33 @@
  * Politesse : robots.txt lu et respecté pour chaque hôte ; 6 sites en parallèle, jamais
  * deux requêtes en même temps au même hôte ; délai de 12 s ; on s'identifie.
  *
- *   npx tsx scripts/resultats-sites.ts <fiches.jsonl> <resultats-sites.jsonl>
+ *   npx tsx scripts/resultats-sites.ts <fiches.jsonl> <resultats-sites.jsonl> [--relire-apres <jours>]
+ *
+ * Reprise : un site déjà lu n'est pas relu — sauf s'il a échoué pour une raison PASSAGÈRE
+ * (réseau, 403, 5xx, robots.txt illisible), ou si sa lecture date de plus de
+ * `--relire-apres` jours : le lien « Résultats 2025 » devient « Résultats 2026 » après la
+ * course, et le workflow hebdomadaire doit le voir.
  */
 import { readFileSync, existsSync, appendFileSync } from "node:fs";
 import { lienResultats, robotsAutorise, type LienResultats } from "../src/lib/races/resultatsSite";
 import { PAYS_FRANCE, type Fiche } from "../src/lib/races/majFinishers";
+import { seuil } from "./garde-fous";
 
 const UA = "Mozilla/5.0 (compatible; PacevoBot/1.0; +https://pacevo.fr/contact)";
 const PARALLELE = 6;
 const anneeCourante = new Date().getFullYear();
 
 export type LigneSite = { site: string; ok: boolean; http?: number; motif?: string; lien?: LienResultats | null; lueLe: string };
+
+/** Échecs qui disent quelque chose DU SITE (et le rediront) : inutile d'y retourner chaque semaine. */
+const ECHECS_DURABLES = new Set(["robots-interdit", "pas-html", "adresse"]);
+
+/** Cette ligne dispense-t-elle de relire le site ? */
+export function dejaLu(l: LigneSite, maintenant: number, joursMax = Infinity): boolean {
+  const age = (maintenant - Date.parse(l.lueLe)) / 864e5;
+  if (!(age <= joursMax)) return false;
+  return l.ok || l.http === 404 || l.http === 410 || ECHECS_DURABLES.has(String(l.motif));
+}
 
 async function lire(url: string, ms = 12000): Promise<{ code: number; texte: string | null; type: string }> {
   try {
@@ -31,7 +47,8 @@ async function lire(url: string, ms = 12000): Promise<{ code: number; texte: str
 }
 
 async function main() {
-  const [fFiches, sortie] = process.argv.slice(2);
+  const [fFiches, sortie] = process.argv.slice(2).filter((a, i, t) => !a.startsWith("--") && !t[i - 1]?.startsWith("--"));
+  const joursMax = seuil(process.argv, "--relire-apres", Infinity);
   // Site → noms des courses qui y renvoient (un organisateur peut en avoir plusieurs).
   const noms = new Map<string, string[]>();
   for (const l of readFileSync(fFiches, "utf8").split("\n")) {
@@ -44,7 +61,8 @@ async function main() {
   }
   const sites = new Set(noms.keys());
   const faits = new Set<string>();
-  if (existsSync(sortie)) for (const l of readFileSync(sortie, "utf8").split("\n")) { try { faits.add((JSON.parse(l) as LigneSite).site); } catch { /* */ } }
+  const maintenant = Date.now();
+  if (existsSync(sortie)) for (const l of readFileSync(sortie, "utf8").split("\n")) { try { const x = JSON.parse(l) as LigneSite; if (dejaLu(x, maintenant, joursMax)) faits.add(x.site); } catch { /* */ } }
   const reste = [...sites].filter((s) => !faits.has(s));
   console.log(`[sites] ${sites.size} sites, ${faits.size} déjà lus, ${reste.length} à lire`);
 

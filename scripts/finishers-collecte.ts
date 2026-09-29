@@ -13,9 +13,16 @@
  * Étape 1 = LIRE et mettre en cache (JSONL, une ligne par événement), rien d'autre.
  * L'écriture en base est une étape séparée (`finishers-appliquer.ts`), relisible avant.
  *
- *   npx tsx scripts/finishers-collecte.ts <fichier-slugs> <sortie.jsonl>
+ *   npx tsx scripts/finishers-collecte.ts <fichier-slugs> <sortie.jsonl> [--duree-max <min>] [--abandon-apres <n>]
+ *
+ * Sans surveillance (workflow hebdomadaire), deux arrêts PROPRES : au bout de `--duree-max`
+ * minutes (le travail d'un exécuteur GitHub est tué à six heures, et les étapes suivantes
+ * doivent encore tourner), et après `--abandon-apres` fiches de suite illisibles malgré les
+ * reculs — la source nous refuse, insister ne ferait qu'aggraver. Code 3 dans ce second
+ * cas ; ce qui a été lu reste dans le fichier et peut être appliqué.
  */
 import { readFileSync, existsSync, appendFileSync } from "node:fs";
+import { seuil } from "./garde-fous";
 
 const UA = "Mozilla/5.0 (compatible; PacevoBot/1.0; +https://pacevo.fr/contact)";
 // 0,7 s + aléa entre deux pages, une seule à la fois : robots.txt de finishers ne fixe
@@ -106,7 +113,11 @@ export function lireFiche(slug: string, html: string): FicheFinishers {
 }
 
 async function main() {
-  const [fSlugs, sortie] = process.argv.slice(2);
+  const [fSlugs, sortie] = process.argv.slice(2).filter((a, i, t) => !a.startsWith("--") && !t[i - 1]?.startsWith("--"));
+  const dureeMaxMs = seuil(process.argv, "--duree-max", Infinity) * 60_000;
+  const abandonApres = seuil(process.argv, "--abandon-apres", 5);
+  const debut = Date.now();
+  let echecsDeSuite = 0;
   const slugs = readFileSync(fSlugs, "utf8").split("\n").map((s) => s.trim()).filter(Boolean);
   const faits = new Set<string>();
   // ⚠️ UN ÉCHEC RÉSEAU N'EST PAS UNE FICHE LUE. Nuit du 29/09/2026 : cinq heures sans
@@ -119,6 +130,7 @@ async function main() {
   console.log(`[collecte] ${slugs.length} slugs, ${faits.size} déjà lus, ${reste.length} à lire`);
   let recul = 60_000, n = 0;
   for (const slug of reste) {
+    if (Date.now() - debut > dureeMaxMs) { console.log(`[collecte] durée maximale atteinte après ${n}/${reste.length} — arrêt propre, le reste sera lu au prochain passage`); break; }
     let essai = 0;
     for (;;) {
       // ⚠️ LE CORPS AUSSI PEUT EXPIRER. Le délai court jusqu'à la fin de `text()` : lu hors
@@ -133,12 +145,19 @@ async function main() {
       if (html != null) {
         const fiche = lireFiche(slug, html);
         appendFileSync(sortie, JSON.stringify(fiche) + "\n");
-        recul = 60_000; break;
+        recul = 60_000; echecsDeSuite = 0; break;
       }
-      if (code === 404 || code === 410) { appendFileSync(sortie, JSON.stringify({ slug, ok: false, http: code, lueLe: new Date().toISOString() }) + "\n"); break; }
+      if (code === 404 || code === 410) { appendFileSync(sortie, JSON.stringify({ slug, ok: false, http: code, lueLe: new Date().toISOString() }) + "\n"); echecsDeSuite = 0; break; }
       // 403 / 429 / 5xx / réseau : le serveur demande de ralentir — on recule, sans insister.
       essai++;
-      if (essai > 4) { appendFileSync(sortie, JSON.stringify({ slug, ok: false, http: code, lueLe: new Date().toISOString() }) + "\n"); break; }
+      if (essai > 4) {
+        appendFileSync(sortie, JSON.stringify({ slug, ok: false, http: code, lueLe: new Date().toISOString() }) + "\n");
+        if (++echecsDeSuite >= abandonApres) {
+          console.error(`ARRÊT DE LA COLLECTE : ${echecsDeSuite} fiches de suite illisibles (dernier code ${code}) — la source refuse ou le réseau est coupé.`);
+          process.exit(3);
+        }
+        break;
+      }
       console.log(`[collecte] ${slug} → ${code}, pause ${Math.round(recul / 1000)} s`);
       await dormir(recul); recul = Math.min(recul * 2, 15 * 60_000);
     }

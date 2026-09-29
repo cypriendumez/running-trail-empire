@@ -20,7 +20,7 @@ import { anneeDe } from "./resultatsSite";
 export type FormatFiche = { id: string; titre: string | null; discipline: string | null; distanceM: number | null; dplus: number | null; date: string | null; heure: string | null; inscription: string | null; statut: string | null };
 export type Edition = { annee: number; debut: string | null; statut: string | null };
 export type Fiche = {
-  slug: string; ok: boolean; pays?: string | null; nom?: string; ville?: string | null; departement?: string | null; region?: string | null;
+  slug: string; ok: boolean; /** Code HTTP d'une fiche illisible (0 = réseau). */ http?: number; pays?: string | null; nom?: string; ville?: string | null; departement?: string | null; region?: string | null;
   lat?: number | null; lon?: number | null; derniere?: Edition | null; prochaine?: Edition | null; formats?: FormatFiche[];
   siteOfficiel?: string | null; inscription?: string | null;
   /** `annee` fixée quand on l'a LUE (lien trouvé sur le site officiel) ; sinon déduite du lien. */
@@ -128,6 +128,22 @@ export function dateDe(f: FormatFiche, fiche: Fiche, aujourdhui: string): { date
   const jour = new Date(`${d}T12:00:00Z`).getUTCDay();   // 0 = dimanche
   if (confirmee !== true && jour >= 1 && jour <= 4 && !estFerie(d)) return { date: DATE_A_VENIR, confirmee: null };
   return { date: d, confirmee };
+}
+
+/**
+ * ⚠️ UNE ESTIMATION ÉCARTÉE N'EFFACE PAS UNE DATE DÉCLARÉE AILLEURS. Vu le 29/09/2026 en
+ * rejouant le rafraîchissement : « Boucles des Cordeliers » (Morlaàs), datée du samedi
+ * 17/10 par l'office de tourisme (DATAtourisme), repassait chaque semaine en « Date à
+ * venir » parce que finishers l'estime au mardi 27/10 — une estimation que `dateDe`
+ * écarte, à raison. Écarter une estimation ne prouve rien contre une date d'une autre
+ * source : si la ligne porte une date FUTURE proche de l'estimation (± 45 jours, même
+ * édition), elle la garde. Une estimation passée ou absente, ou une date lointaine : rien.
+ */
+export function dateConservee(existante: string | null | undefined, f: FormatFiche, fiche: Fiche, aujourdhui: string): boolean {
+  const e = String(existante ?? "").slice(0, 10), estimee = (f.date ?? fiche.prochaine?.debut ?? "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(e) || e.startsWith("2099") || e < aujourdhui) return false;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(estimee) || estimee < aujourdhui) return false;
+  return Math.abs(Date.parse(e) - Date.parse(estimee)) <= 45 * 864e5;
 }
 
 /**
@@ -279,9 +295,10 @@ export function planEvenement(
     source_id: f.id || null,
     source_maj_at: new Date().toISOString(),
   } : {});
-  // La date à écrire, ou `undefined` pour laisser celle de la ligne.
-  const dateAEcrire = (f: FormatFiche, existante: string | null) => {
+  // La date à écrire ; `confirmee: undefined` = ne pas toucher à `date_confirmee`.
+  const dateAEcrire = (f: FormatFiche, existante: string | null): { date: string; confirmee: boolean | null | undefined } => {
     const { date, confirmee } = dateDe(f, fiche, o.aujourdhui);
+    if (date === DATE_A_VENIR && existante && dateConservee(existante, f, fiche, o.aujourdhui)) return { date: existante.slice(0, 10), confirmee: undefined };
     if (o.colonnesNouvelles || confirmee === true || date === DATE_A_VENIR) return { date, confirmee };
     plan.datesEnAttente++;
     return { date: existante ?? DATE_A_VENIR, confirmee: null };
@@ -306,7 +323,7 @@ export function planEvenement(
       date, distance_km: f.km,
       elevation_gain_m: dplusDe(f.dplus, trail, f.km) ?? garde,
       ...extras(f),
-      ...(o.colonnesNouvelles ? { date_confirmee: confirmee } : {}),
+      ...(o.colonnesNouvelles && confirmee !== undefined ? { date_confirmee: confirmee } : {}),
     };
     if (l.latitude == null && fiche.lat != null) Object.assign(patch, { latitude: fiche.lat, longitude: fiche.lon });
     plan.majs.push({ id: l.id, patch });

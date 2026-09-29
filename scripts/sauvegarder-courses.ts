@@ -17,6 +17,9 @@ const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPAB
     if (error) throw new Error(error.message);
     rows.push(...(data ?? [])); if (!data || data.length < 1000) break;
   }
+  // Une lecture tronquée donnerait une « sauvegarde » qui ne sauve rien — et l'écriture
+  // qui suit s'en croirait couverte. Le catalogue compte ~15 000 lignes (29/09/2026).
+  if (rows.length < 5000) throw new Error(`lecture anormalement courte (${rows.length} lignes) — sauvegarde refusée`);
   mkdirSync(dossier, { recursive: true });
   const f = `${dossier}/races-sauvegarde-${new Date().toISOString().slice(0, 16).replace(/:/g, "h")}.json`;
   writeFileSync(f, JSON.stringify(rows));

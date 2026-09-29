@@ -6,8 +6,11 @@
  */
 import { createClient } from "@supabase/supabase-js";
 import { pasCourseAPiedParNom } from "../src/lib/races/nonCourse";
+import { seuil, arreterSiDepasse } from "./garde-fous";
 
 const ECRIRE = process.argv.includes("--ecrire");
+/** Le grand ménage a eu lieu le 29/09/2026 ; ensuite, chaque semaine n'apporte que quelques cas. */
+const MAX_RETRAITS = seuil(process.argv, "--max-retraits", 50);
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
 
 (async () => {
@@ -32,10 +35,12 @@ const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPAB
   console.log(JSON.stringify({ lignes: rows.length, pasCourseAPied: cibles.length, protegesFavoris: cibles.length - retraits.length }));
   console.log([...new Set(retraits.map((r) => r.name))].slice(0, 60).join(" | "));
   if (!ECRIRE) { console.log("(à blanc — rien retiré)"); return; }
-  let n = 0;
+  arreterSiDepasse([{ quoi: "épreuves à retirer", n: retraits.length, max: MAX_RETRAITS }]);
+  let n = 0, refus = 0;
   for (let i = 0; i < retraits.length; i += 200) {
     const { error } = await sb.from("races").delete().in("id", retraits.slice(i, i + 200).map((r) => r.id));
-    if (error) console.error("retrait :", error.message); else n += Math.min(200, retraits.length - i);
+    if (error) { console.error("retrait :", error.message); refus++; } else n += Math.min(200, retraits.length - i);
   }
   console.log(`retirées : ${n}`);
+  if (refus) process.exit(1);
 })().catch((e) => { console.error(e); process.exit(1); });

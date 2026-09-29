@@ -40,6 +40,7 @@ export const TACHES: Tache[] = [
   { fichier: "races-maintenance", cadence: "1×/jour", parJour: 1, role: "Entretien du catalogue de courses" },
   { fichier: "sauvegarde", cadence: "1×/semaine (dimanche)", parJour: 1 / 7, role: "Exporte le catalogue de courses, irremplaçable" },
   { fichier: "newsletter-weekly", cadence: "1×/semaine (lundi)", parJour: 1 / 7, role: "Résumé d'actualité et plan de la semaine" },
+  { fichier: "courses-rafraichissement", cadence: "1×/semaine (mardi)", parJour: 1 / 7, role: "Relit les courses : dates, dénivelés, liens d'inscription et classements" },
 ];
 
 export type Execution = { created_at: string; conclusion: string | null; html_url?: string };

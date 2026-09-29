@@ -10,9 +10,21 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createClient } from "@supabase/supabase-js";
+import { seuil, depassement, arreterSiDepasse } from "./garde-fous";
 import { planEvenement, cleNomVille, PAYS_FRANCE, formatsRetenus, pasUneCourseAPied, dplusPlausible, estTrail, type Fiche, type LigneCourse } from "../src/lib/races/majFinishers";
 
 const ECRIRE = process.argv.includes("--ecrire");
+/**
+ * GARDE-FOUS D'UNE APPLICATION SANS SURVEILLANCE (rafraîchissement hebdomadaire). Si la
+ * source change la forme de ses pages, une lecture de travers peut « retirer » des
+ * centaines de courses ou renvoyer des milliers de dates en « Date à venir ». Au-delà de
+ * ces seuils, RIEN n'est écrit : on s'arrête et on le dit (voir `garde-fous.ts`).
+ */
+const MAX_RETRAITS = seuil(process.argv, "--max-retraits", 400);
+const MAX_DATES_PERDUES = seuil(process.argv, "--max-dates-perdues", 400);
+/** Part maximale de fiches illisibles, puis de fiches françaises SANS aucun format retenu (en %). */
+const MAX_ERREURS_PCT = seuil(process.argv, "--max-erreurs-pct", 20);
+const MAX_SANS_FORMAT_PCT = seuil(process.argv, "--max-sans-format-pct", 25);
 const [fichier] = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
 const aujourdhui = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date());
@@ -37,8 +49,11 @@ async function main() {
   const fSites = join(dirname(fichier), "resultats-sites.jsonl");
   let liensSites = 0;
   if (existsSync(fSites)) {
-    const parSite = new Map<string, { url: string; annee: number | null }>();
-    for (const l of readFileSync(fSites, "utf8").split("\n")) { try { const x = JSON.parse(l); if (x?.lien?.url) parSite.set(x.site, x.lien); } catch { /* */ } }
+    // La DERNIÈRE lecture réussie d'un site fait foi, même si elle n'a plus rien trouvé : un
+    // site relu (voir `--relire-apres`) qui a retiré son lien ne le garde pas chez nous. Une
+    // relecture ratée (réseau, 403) ne remplace rien.
+    const parSite = new Map<string, { url: string; annee: number | null } | null>();
+    for (const l of readFileSync(fSites, "utf8").split("\n")) { try { const x = JSON.parse(l); if (x?.site && x.ok) parSite.set(x.site, x.lien?.url ? x.lien : null); } catch { /* */ } }
     for (const f of fiches.values()) {
       const lien = f.siteOfficiel ? parSite.get(f.siteOfficiel) : undefined;
       if (lien && !f.resultats?.classement) { f.resultats = { page: f.resultats?.page ?? null, classement: lien.url, annee: lien.annee }; liensSites++; }
@@ -88,10 +103,15 @@ async function main() {
   const retraits: string[] = [];
   const exemples: string[] = [];
   const touchees = new Set<string>();
+  let datesPerdues = 0;
   const detailRetraits: string[] = [];
 
+  // Fiches à relire la semaine suivante même si le plan du site ne les signale plus comme
+  // nouvelles : illisibles cette fois (réseau, 403, 5xx), ou françaises SANS format encore
+  // publié — sinon elles restaient « déjà vues » et on n'y revenait jamais.
+  const aRevoir: string[] = [];
   for (const f of fiches.values()) {
-    if (!f.ok) { st.erreurs++; continue; }
+    if (!f.ok) { st.erreurs++; if (f.http !== 404 && f.http !== 410) aRevoir.push(f.slug); continue; }
     st.lues++;
     if (!PAYS_FRANCE.has(String(f.pays ?? ""))) { st.horsFrance++; continue; }
     const deLaFiche = parSlug.get(f.slug) ?? [];
@@ -99,7 +119,7 @@ async function main() {
     const dAilleurs = (autresParNomVille.get(cleNomVille(f.nom, f.ville)) ?? []).filter((l) => !touchees.has(l.id));
     const existantes = [...deLaFiche, ...dAilleurs];
     if (!formatsRetenus(f).length) {
-      if (pasUneCourseAPied(f)) st.pasCourseAPied++; else st.sansFormat++;
+      if (pasUneCourseAPied(f)) st.pasCourseAPied++; else { st.sansFormat++; aRevoir.push(f.slug); }
       if (!deLaFiche.length) continue;
     } else if (deLaFiche.length) st.connus++;
     else if (dAilleurs.length) st.viaAutreSource++;
@@ -110,6 +130,7 @@ async function main() {
     for (const m of p.majs) {
       const avant = existantes.find((l) => l.id === m.id)!;
       if (String(avant.date).startsWith("2099") && !String(m.patch.date).startsWith("2099")) st.datesRemplies++;
+      if (!String(avant.date).startsWith("2099") && String(avant.date) >= aujourdhui && String(m.patch.date).startsWith("2099")) datesPerdues++;
       if (avant.elevation_gain_m == null && m.patch.elevation_gain_m != null) st.dplusAjoutes++;
       if (avant.elevation_gain_m === 0 && m.patch.elevation_gain_m == null) st.dplusZeroCorriges++;
     }
@@ -143,10 +164,22 @@ async function main() {
   console.log(JSON.stringify({ ...st, liensResultatsSites: liensSites, liensMortsEcartes: morts.size, colonnesNouvelles, pacaANormaliser: paca.length, dplusFauxBalayes: dplusFaux.length, aujourdhui }, null, 1));
   console.log(exemples.join("\n"));
   writeFileSync(fichier.replace(/\.jsonl$/, "") + `-plan-${ECRIRE ? "ecrit" : "a-blanc"}.json`, JSON.stringify({ st, majs: majs.length, ajouts: ajouts.length, retraits, detailRetraits }, null, 1));
-  if (!ECRIRE) { console.log("(à blanc — rien écrit ; relancer avec --ecrire)"); return; }
+  writeFileSync(join(dirname(fichier), "a-revoir.txt"), aRevoir.join("\n") + (aRevoir.length ? "\n" : ""));
+  // Mesuré sur la collecte complète du 29/09/2026 : 28 fiches illisibles sur 7 997 (0,4 %),
+  // 74 françaises sans format sur ~5 400 (1,4 %). Des parts vingt fois plus fortes disent
+  // que la source a changé de forme, pas que les courses ont disparu.
+  const francaises = st.lues - st.horsFrance;
+  const comptes = [
+    { quoi: "retraits", n: retraits.length, max: MAX_RETRAITS },
+    { quoi: "dates futures renvoyées en « Date à venir »", n: datesPerdues, max: MAX_DATES_PERDUES },
+    { quoi: "% de fiches illisibles", n: st.fiches ? Math.round((st.erreurs / st.fiches) * 100) : 0, max: MAX_ERREURS_PCT },
+    { quoi: "% de fiches françaises sans aucun format", n: francaises ? Math.round((st.sansFormat / francaises) * 100) : 0, max: MAX_SANS_FORMAT_PCT },
+  ];
+  if (!ECRIRE) { console.log(`(à blanc — rien écrit ; relancer avec --ecrire) — dates perdues : ${datesPerdues}, à revoir : ${aRevoir.length}`); console.log(depassement(comptes) ?? "seuils : aucun dépassement"); return; }
+  arreterSiDepasse(comptes);
 
   // ── ÉCRITURE ────────────────────────────────────────────────────────────────
-  let ok = 0, ko = 0;
+  let ok = 0, ko = 0, refus = 0;
   const parLots = async <T>(items: T[], taille: number, faire: (lot: T[]) => Promise<void>) => {
     for (let i = 0; i < items.length; i += taille) await faire(items.slice(i, i + taille));
   };
@@ -159,13 +192,13 @@ async function main() {
   let ins = 0;
   await parLots(ajouts, 400, async (lot) => {
     const { error } = await sb.from("races").insert(lot);
-    if (error) console.error("insertion :", error.message); else ins += lot.length;
+    if (error) { console.error("insertion :", error.message); refus++; } else ins += lot.length;
   });
   console.log(`ajouts : ${ins}/${ajouts.length}`);
   let sup = 0;
   await parLots(retraits, 200, async (lot) => {
     const { error } = await sb.from("races").delete().in("id", lot);
-    if (error) console.error("retrait :", error.message); else sup += lot.length;
+    if (error) { console.error("retrait :", error.message); refus++; } else sup += lot.length;
   });
   console.log(`retraits : ${sup}/${retraits.length}`);
   let bal = 0;
@@ -178,6 +211,10 @@ async function main() {
     const { error } = await sb.from("races").update({ region: "provence-alpes-cote-d-azur" }).eq("region", "provence-alpes-cote-azur");
     console.log(error ? `PACA : ${error.message}` : `PACA normalisée : ${paca.length}`);
   }
+  // ⚠️ SUPABASE REND SES ERREURS, IL NE LES LÈVE PAS : sans ce code de sortie, une
+  // exécution planifiée qui n'a rien écrit passait au vert. Quelques mises à jour ratées
+  // sur ~10 000 (hoquet réseau) ne font pas rougir ; un lot refusé, si.
+  if (refus > 0 || ko > Math.max(20, majs.length * 0.01)) { console.error(`ÉCHEC : ${refus} lot(s) refusé(s), ${ko} mise(s) à jour en erreur`); process.exit(1); }
   console.log("terminé");
 }
 

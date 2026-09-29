@@ -12,8 +12,11 @@ import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { lireCsv, evenementCourse, lignesDT } from "../src/lib/races/datatourisme";
 import { motsDistinctifs } from "../src/lib/races/resultatsSite";
+import { seuil, arreterSiDepasse } from "./garde-fous";
 
 const ECRIRE = process.argv.includes("--ecrire");
+/** Sans surveillance : au-delà, la règle de reconnaissance d'une course a sans doute dérapé. */
+const MAX_AJOUTS = seuil(process.argv, "--max-ajouts", 300);
 const [fichier] = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
 const aujourdhui = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date());
@@ -45,7 +48,10 @@ async function main() {
   console.log(JSON.stringify({ manifestations: lignes.length - 1, coursesStrictes: evts.length, dejaAuCatalogue: evts.length - nouveaux.length, nouveauxEvenements: nouveaux.length, lignes: aInserer.length }, null, 1));
   for (const e of nouveaux) console.log(`  ${e.date} ${e.nom} (${e.commune}, ${e.departement.nom}) ${e.kms.join("/")} km — ${e.site.slice(0, 50)}`);
   if (!ECRIRE) { console.log("(à blanc — rien écrit)"); return; }
+  arreterSiDepasse([{ quoi: "lignes à insérer", n: aInserer.length, max: MAX_AJOUTS }]);
+  if (!aInserer.length) { console.log("rien de nouveau"); return; }
   const { error } = await sb.from("races").insert(aInserer);
-  console.log(error ? `insertion : ${error.message}` : `insérées : ${aInserer.length}`);
+  if (error) { console.error(`insertion : ${error.message}`); process.exit(1); }
+  console.log(`insérées : ${aInserer.length}`);
 }
 main().catch((e) => { console.error(e); process.exit(1); });
