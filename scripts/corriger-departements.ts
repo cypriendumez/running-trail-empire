@@ -12,7 +12,10 @@ import { createClient } from "@supabase/supabase-js";
 import { departementDe, departementParPosition, departementEtranger } from "../src/lib/races/departements";
 
 const ECRIRE = process.argv.includes("--ecrire");
-const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+  auth: { persistSession: false },
+  global: { fetch: (u, o) => fetch(u, { ...o, signal: o?.signal ?? AbortSignal.timeout(30_000) }) },
+});
 type L = { id: string; name: string; city: string | null; department: string | null; region: string | null; latitude: number | null; longitude: number | null };
 
 async function main() {
@@ -45,7 +48,11 @@ async function main() {
   for (const r of rows) {
     const brut = String(r.department ?? "").trim();
     const ambigu = /^(20|corse|97|98)$/i.test(brut) || brut === "";
-    const d = (ambigu ? departementParPosition(r.latitude, r.longitude) : null) ?? departementDe(brut) ?? (brut === "" ? deLaVille(r.city) : null);
+    // Une valeur ILLISIBLE (« Entre-Deux », une commune de La Réunion écrite à la place du
+    // département) se résout aussi par la position : elle ne reconnaît que la Corse et
+    // l'outre-mer, jamais une commune de métropole au hasard.
+    const d = (ambigu ? departementParPosition(r.latitude, r.longitude) : null) ?? departementDe(brut)
+      ?? (brut === "" ? deLaVille(r.city) : null) ?? departementParPosition(r.latitude, r.longitude);
     if (d) {
       if (r.department !== d.nom || r.region !== d.region) majs.set(r.id, { department: d.nom, region: d.region });
     } else if (departementEtranger(brut)) etrangeres.push(r);

@@ -18,6 +18,7 @@
 import { anneeDe } from "./resultatsSite";
 import { nomCanonique } from "./groupes";
 import { formatPasCourseAPied } from "./nonCourse";
+import { DEPARTEMENTS } from "./departements";
 
 export type FormatFiche = { id: string; titre: string | null; discipline: string | null; distanceM: number | null; dplus: number | null; date: string | null; heure: string | null; inscription: string | null; statut: string | null };
 export type Edition = { annee: number; debut: string | null; statut: string | null };
@@ -50,6 +51,12 @@ export const DATE_A_VENIR = "2099-01-01";
 const DISCIPLINES_COURSE = new Set(["road", "trail", "cross", "running", "ultra", "stairs", "mountain_running", "vertical", "vertical_km", "skyrunning", "kv"]);
 export const estCourseAPied = (discipline: string | null | undefined) =>
   DISCIPLINES_COURSE.has(String(discipline ?? "").trim().toLowerCase());
+
+/** Le département d'outre-mer d'un code pays (RE → « La Réunion »), ou `null` (métropole, collectivités). */
+export function departementOutreMer(pays: string | null | undefined): string | null {
+  const region = REGION_OUTRE_MER[String(pays ?? "")];
+  return (region && DEPARTEMENTS.find((d) => d.region === region)?.nom) || null;
+}
 
 /**
  * Outre-mer : la région vient du CODE PAYS. Le fil d'Ariane de la source y donne
@@ -355,7 +362,9 @@ export function planEvenement(
     const type = typeDe(f.discipline, f.km);
     plan.ajouts.push({
       name: modele?.name ?? fiche.nom, city: modele?.city ?? fiche.ville ?? "",
-      department: modele?.department ?? fiche.departement ?? "",
+      // Outre-mer : le fil d'Ariane de la source n'a pas le département (48 courses de La
+      // Réunion, Martinique… sans lui le 30/09) ; il se déduit du code pays, sans ambiguïté.
+      department: modele?.department || departementOutreMer(fiche.pays) || fiche.departement || "",
       region: modele?.region ?? REGION_OUTRE_MER[String(fiche.pays)] ?? slugRegion(fiche.region) ?? "",
       date, distance_km: f.km, type, elevation_gain_m: dplusDe(f.dplus, estTrail(type), f.km),
       difficulty: estTrail(type) ? "blue" : "green", terrain: [], time_limits: [],

@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { lireFiche } from "../scripts/finishers-collecte";
 import {
-  estFerie, kmDe, estCourseAPied, dplusDe, dplusPlausible, dateDe, dateConservee, fichesJumelles, apparier, planEvenement, pasUneCourseAPied, deCetteFiche, estChrono,
+  estFerie, kmDe, estCourseAPied, dplusDe, dplusPlausible, dateDe, dateConservee, fichesJumelles, departementOutreMer, apparier, planEvenement, pasUneCourseAPied, deCetteFiche, estChrono,
   slugRegion, typeDe, formatsRetenus, cleNomVille,
   DATE_A_VENIR, type Fiche, type LigneCourse,
 } from "../src/lib/races/majFinishers";
@@ -20,6 +20,7 @@ import { lienInscription, lienSiteOfficiel, lienClassement, heureLisible } from 
 import { formatPasCourseAPied } from "../src/lib/races/nonCourse";
 import { couplesDistanceDplus, dplusPourFormat } from "../src/lib/races/dplusSite";
 import { doublonsParfaits, type LigneDoublon } from "../src/lib/races/doublons";
+import { memeCommune, villeLisible } from "../scripts/corriger-idf-mal-classees";
 import { lienResultats, robotsAutorise, anneeDe, motsDistinctifs, entites } from "../src/lib/races/resultatsSite";
 import { slugDeRegion, nomRegion, regionAvecPreposition } from "../src/lib/races/libelles";
 import { REGION_OUTRE_MER } from "../src/lib/races/majFinishers";
@@ -153,6 +154,21 @@ test("doublons parfaits : une copie part, jamais un favori ni une ligne finisher
   for (const x of [{ date: "2027-02-07" }, { distance_km: 15 }, { city: "Cusset" }, { name: "Trail des Sources" }]) {
     assert.deepEqual(doublonsParfaits([l("a"), l("b", x)], new Set()), [], JSON.stringify(x));
   }
+});
+
+test("courses rangées en Île-de-France par défaut : la commune, ou l'étranger", () => {
+  // La commune aux coordonnées doit porter le nom de la ville : « Ferney » est Ferney-Voltaire ;
+  // le « Marathon de Dublin », placé au hasard près d'Avignon, n'est pas à Sorgues.
+  assert.equal(memeCommune("Ferney", "Ferney-Voltaire"), true);
+  assert.equal(memeCommune("Saint-Jean-de-Braye", "Saint-Jean-de-Braye"), true);
+  assert.equal(memeCommune("Ferney-Voltaire (01)", "Ferney-Voltaire"), true, "une ville suivie de son code n'est plus reconnue");
+  assert.equal(memeCommune("Dublin", "Sorgues"), false);
+  assert.equal(memeCommune("Lyon", "Lyons-la-Forêt"), false, "un préfixe de MOT n'est pas la même commune");
+  assert.equal(memeCommune("A :", "Ain"), false);
+  // Une ville illisible n'est jamais déclarée étrangère : elle est corrigée ou signalée.
+  assert.equal(villeLisible("A :"), false);
+  assert.equal(villeLisible("Nîmes"), true);
+  assert.equal(villeLisible("Gorëme"), true);
 });
 
 test("fiches jumelles : même événement sous deux adresses, une seule appliquée", () => {
@@ -517,6 +533,12 @@ test("chaque région du menu retrouve ses courses — accents compris", () => {
 test("outre-mer : la région vient du CODE PAYS, pas de l'arrondissement de la source", () => {
   const p = planEvenement({ ...TUE, slug: "grand-raid", pays: "RE", region: "Saint-Benoît" }, [], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: true });
   assert.equal(p.ajouts[0].region, "la-reunion");
+  // 30/09/2026 : 48 courses d'outre-mer importées SANS département (« Saint-Denis » seul :
+  // Seine-Saint-Denis ou La Réunion ?). Il se déduit du code pays ; une collectivité n'en a pas.
+  assert.equal(p.ajouts[0].department, "La Réunion", "une course de La Réunion importée sans son département");
+  assert.equal(departementOutreMer("MQ"), "Martinique");
+  assert.equal(departementOutreMer("YT"), "Mayotte");
+  for (const pays of ["PF", "NC", "FR", "", null]) assert.equal(departementOutreMer(pays as string), null, String(pays));
   for (const slug of Object.values(REGION_OUTRE_MER)) assert.notEqual(nomRegion(slug), slug, `${slug} sans nom lisible`);
   assert.equal(regionAvecPreposition("saint-martin"), "à Saint-Martin");
   assert.equal(regionAvecPreposition("nouvelle-caledonie"), "en Nouvelle-Calédonie");
