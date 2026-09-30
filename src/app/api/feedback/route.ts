@@ -5,18 +5,39 @@ import { emailEditeur } from "@/lib/admin/acces";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { coquilleEmail, ech } from "@/lib/newsletter/gabarit";
 import { envoyerEmail } from "@/lib/email/envoyer";
+import { kmApres } from "@/lib/dashboard/ressenti";
 
-// POST /api/feedback {date, title, rpe (0-10), pain: string[], note}
-// → enregistre le ressenti post-séance (lu par le coach, informe la perso IA).
+// POST /api/feedback {workout_id?, date, title, rpe (0-10), pain: string[], note, chaussure_id?}
+// → enregistre le ressenti post-séance (lu par le coach, informe la perso IA), rattaché à
+//   la SÉANCE (son identifiant) ; ajoute, si une paire est cochée, la distance au Garage.
 export async function POST(req: Request) {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { date, title, rpe, pain, note } = await req.json() as { date?: string; title?: string; rpe?: number; pain?: string[]; note?: string };
+  const { workout_id, date, title, rpe, pain, note, chaussure_id } = await req.json() as {
+    workout_id?: string; date?: string; title?: string; rpe?: number; pain?: string[]; note?: string; chaussure_id?: string | null;
+  };
   if (date == null || rpe == null) return NextResponse.json({ error: "date et rpe requis" }, { status: 400 });
 
   const admin = createAdminClient();
+  // La SÉANCE, relue chez nous et filtrée par propriétaire : sa distance ne vient jamais du
+  // navigateur (on n'ajouterait pas 500 km à une paire sur la foi d'une requête).
+  let seance: { id: string; distance_km: number | null } | null = null;
+  if (typeof workout_id === "string" && workout_id) {
+    const { data: w, error: ew } = await admin.from("workouts").select("id, distance_km").eq("id", workout_id).eq("user_id", user.id).maybeSingle();
+    if (ew) return NextResponse.json({ error: ew.message }, { status: 500 });
+    seance = (w as { id: string; distance_km: number | null } | null) ?? null;
+    // Déjà renseignée (double clic, deux onglets) : on ne l'enregistre pas deux fois — et
+    // surtout on n'ajoute pas deux fois ses kilomètres à la paire.
+    if (seance) {
+      const { data: deja, error: ed } = await admin.from("notifications").select("id").eq("user_id", user.id)
+        .eq("type", "session_feedback").eq("data->>workout_id", seance.id).limit(1);
+      if (ed) return NextResponse.json({ error: ed.message }, { status: 500 });
+      if (deja?.length) return NextResponse.json({ ok: true, deja: true });
+    }
+  }
+
   const { error } = await admin.from("notifications").insert({
     user_id: user.id,
     type: "session_feedback",
@@ -28,10 +49,29 @@ export async function POST(req: Request) {
       rpe: Math.max(0, Math.min(10, Math.round(Number(rpe)))),
       pain: Array.isArray(pain) ? pain.slice(0, 4).map((p) => String(p).slice(0, 24)) : [],
       note: String(note ?? "").slice(0, 500),
+      ...(seance ? { workout_id: seance.id } : {}),
+      ...(seance && typeof chaussure_id === "string" && chaussure_id ? { chaussure_id } : {}),
       ts: new Date().toISOString(),
     },
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // ── CHAUSSURES ─────────────────────────────────────────────────────────────
+  // ⚠️ `shoes.current_km` n'avait AUCUN écrivain : la jauge d'usure ne pouvait rien dire.
+  // La paire cochée reçoit la distance de la séance — la paire DE CET ATHLÈTE, active.
+  // Un échec ici ne perd pas le ressenti (déjà enregistré) : on le dit, sans échouer.
+  let chaussure: { id: string; km: number } | null = null, chaussureErreur = false;
+  const km = Number(seance?.distance_km);
+  if (seance && typeof chaussure_id === "string" && chaussure_id && Number.isFinite(km) && km > 0) {
+    const { data: c, error: ec } = await admin.from("shoes").select("id, current_km").eq("id", chaussure_id).eq("user_id", user.id).eq("is_active", true).maybeSingle();
+    if (ec || !c) chaussureErreur = true;
+    else {
+      const nouveau = kmApres((c as { current_km: number | null }).current_km, km);
+      const { error: eu } = await admin.from("shoes").update({ current_km: nouveau }).eq("id", chaussure_id).eq("user_id", user.id);
+      if (eu) chaussureErreur = true; else chaussure = { id: chaussure_id, km: nouveau };
+    }
+    if (chaussureErreur) console.error("[feedback] kilométrage de la paire non mis à jour", chaussure_id);
+  }
 
   // ── ALERTE AU COACH ────────────────────────────────────────────────────────
   // Elle partait en TEXTE BRUT, sans logo ni mise en forme : une ligne de puces au
@@ -101,5 +141,5 @@ export async function POST(req: Request) {
     } catch { /* e-mail best-effort, le ressenti est déjà enregistré ; l'échec d'envoi est journalisé */ }
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, chaussure, chaussureErreur });
 }

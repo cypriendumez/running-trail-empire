@@ -411,6 +411,12 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
   }, []);
   const tr: Tr = (k, p) => fill(P[lang]?.[k] ?? P.fr[k] ?? k, p);
   const [tab, setTab] = useState("profile");
+  // Lien direct vers le Garage (« Ouvrir le Garage » du questionnaire de ressenti) : lu APRÈS
+  // le montage — le rendu serveur ne connaît pas l'adresse, un état initial différent romprait
+  // l'hydratation.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("onglet") === "garage") setTab("shoes");
+  }, []);
   const [saving, setSaving] = useState(false);
   /** Verdict « peux-tu doubler ? », demandé au serveur QUAND l'athlète coche la case.
    *  Sans lui, il coche, ne voit rien changer dans son plan, et conclut que c'est cassé

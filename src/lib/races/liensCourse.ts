@@ -1,3 +1,4 @@
+import { jourFrance } from "./jourFrance";
 /**
  * QUEL LIEN POUR S'INSCRIRE, ET OÙ TROUVER LE CLASSEMENT — une seule décision, trois écrans
  * (liste des courses, carte, page publique).
@@ -43,12 +44,24 @@ export function lienSiteOfficiel(d: LiensDetail | null | undefined): string | nu
 /**
  * Le classement : direct quand on le connaît, sinon une RECHERCHE nommée comme telle.
  * La recherche ne transporte que le nom et la ville de la course — rien de l'athlète.
+ *
+ * ⚠️ PAS DE « CLASSEMENT 2026 » AVANT LA COURSE 2026 (30/09/2026). « La Ronda des
+ * Coudous », courue le jour même, proposait « Classement 2026 » : la page du chronométreur
+ * existait mais restait vide, en chargement sans fin. Tant que l'édition annoncée n'est pas
+ * passée (jour de la course compris), le lien vers SES résultats n'est pas proposé ; celui
+ * d'une édition PASSÉE (« Classement 2025 ») l'est — il sert à se préparer.
  */
 export function lienClassement(
-  d: LiensDetail | null | undefined, course: { name?: string | null; city?: string | null },
+  d: LiensDetail | null | undefined, course: { name?: string | null; city?: string | null; date?: string | null },
+  aujourdhui: string = jourFrance(),
 ): { url: string; direct: boolean; annee: number | null } | null {
   const direct = http(d?.resultats_url);
-  if (direct) return { url: direct, direct: true, annee: typeof d?.resultats_annee === "number" ? d.resultats_annee : null };
+  const annee = typeof d?.resultats_annee === "number" ? d.resultats_annee : null;
+  const jour = String(course.date ?? "").slice(0, 10);
+  // « Date à venir » (2099) n'est jamais concernée : aucune année de classement n'atteint 2099.
+  const aVenir = /^\d{4}-\d{2}-\d{2}$/.test(jour) && jour >= aujourdhui;
+  if (direct && annee != null && aVenir && annee >= Number(jour.slice(0, 4))) return null;
+  if (direct) return { url: direct, direct: true, annee };
   const nom = String(course.name ?? "").trim();
   if (!nom) return null;
   const q = `classement ${nom}${course.city ? ` ${course.city}` : ""}`;

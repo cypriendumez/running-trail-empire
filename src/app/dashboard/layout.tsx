@@ -77,22 +77,24 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <TopBar profile={stripProfileSecrets(profile)} avatarColor={avatarColor} notifsMasquees={notifsMasquees} />
           <main className="flex-1 overflow-auto p-3 md:p-6">
             {children}
+            {/* ⚠️ EN FIN DE CONTENU, PLUS FIXÉ SOUS L'ÉCRAN (30/09/2026). Cyprien : « ce qu'il y
+                a en bas, on perd trop de place ». Fixé hors de la zone qui défile, ce pied
+                occupait EN PERMANENCE ~100 px sur ordinateur et ~22 px sur téléphone, sur
+                chaque page. Il reste sur toutes les pages — l'attribution Garmin est une
+                obligation (conditions d'API d'intervals.icu, art. 1.1) — mais au bout du
+                contenu, là où l'on arrive en défilant, sans prendre de place au travail. */}
+            <div className="mt-8 border-t border-zinc-100 pt-2">
+              <AttributionGarmin className="px-2 py-1 text-[10px] leading-tight text-zinc-400 md:text-[11px] md:leading-relaxed" />
+              <div className="hidden md:block">
+                <MedicalDisclaimer lang={langue} />
+              </div>
+            </div>
           </main>
-          {/* ⚠️ ICI, ET PAS PAGE PAR PAGE. L'article 1.1 des conditions d'API
-              d'intervals.icu impose d'attribuer à Garmin toute information dérivée de ses
-              données. Elle était posée sur quatre pages choisies à la main — et HUIT
-              autres vues lisaient les mêmes tables sans rien afficher (heatmap, survol,
-              trophées, clubs, ligues, profil…). Une liste tenue à la main s'oublie ; le
-              layout, non : toute page présente et à venir la porte. */}
-          {/* ⚠️ LA LIGNE GARMIN RESTE SUR TÉLÉPHONE, même si Cyprien a demandé (21/09/2026)
-              d'alléger le bas de l'écran : c'est la contrepartie contractuelle de l'API
-              dont dépend tout le produit, pas un texte de confort. Elle est ramenée à une
-              seule ligne serrée (~22 px). L'avertissement médical, lui, part dans la
-              feuille « Plus » sous md : il reste à un geste sur chaque page. */}
-          <AttributionGarmin className="px-2 py-1 text-[10px] leading-tight tracking-tight md:px-6 md:pb-3 md:text-[11px] md:leading-relaxed md:tracking-normal" />
-          <div className="hidden shrink-0 md:block">
-            <MedicalDisclaimer lang={langue} />
-          </div>
+          {/* ⚠️ L'ATTRIBUTION GARMIN VIT DANS CE LAYOUT, PAS PAGE PAR PAGE (voir le pied de
+              <main> ci-dessus) : l'article 1.1 des conditions d'API d'intervals.icu impose
+              d'attribuer à Garmin toute information dérivée de ses données, et huit vues
+              l'avaient oubliée quand elle était posée à la main. Sur téléphone,
+              l'avertissement médical est aussi dans la feuille « Plus ». */}
           {/* Téléphone seulement : la barre d'onglets (Accueil · Carte · Enregistrer ·
               Calendrier · Plus) et la cale qui lui réserve sa place sous le pied de page. */}
           {/* L'avertissement médical est rendu ICI, côté serveur, et passé en nœud : importé

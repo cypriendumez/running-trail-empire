@@ -487,6 +487,18 @@ test("classement : direct quand on le connaît, sinon une RECHERCHE nommée comm
   assert.equal(r?.direct, false);
   assert.ok(r?.url.startsWith("https://www.google.com/search?q=") && r.url.includes(encodeURIComponent("Corrida de Langueux")));
   assert.equal(heureLisible("09:30"), "9 h 30"); assert.equal(heureLisible("25:00"), null);
+  // ⚠️ « La Ronda des Coudous », courue le 30/09/2026 : « Classement 2026 » menait, ce jour-là,
+  // à une page de chronométreur vide, en chargement sans fin. Pas avant le lendemain.
+  const ronda = { resultats_url: "https://inscriptionsenligne.fr.wiclax-results.com/La%20Ronda%20des%20Coudous%202026/", resultats_annee: 2026 };
+  const c = { name: "La Ronda des Coudous", city: "L'Isle-Jourdain", date: "2026-09-30" };
+  assert.equal(lienClassement(ronda, c, "2026-09-29"), null, "le classement d'une édition À VENIR est proposé");
+  assert.equal(lienClassement(ronda, c, "2026-09-30"), null, "le classement est proposé le jour même, avant la course");
+  assert.equal(lienClassement(ronda, c, "2026-10-01")?.annee, 2026, "le lendemain, le classement doit apparaître");
+  // Le classement d'une édition PASSÉE reste proposé avant la course : il sert à se préparer.
+  assert.equal(lienClassement({ ...ronda, resultats_annee: 2025 }, c, "2026-09-29")?.annee, 2025);
+  // Sans année connue (page de résultats générale), ou course sans date : on le propose.
+  assert.equal(lienClassement({ ...ronda, resultats_annee: null }, c, "2026-09-29")?.direct, true);
+  assert.equal(lienClassement(ronda, { ...c, date: "2099-01-01" }, "2026-09-29")?.annee, 2026);
 });
 
 console.log("\n=== RÉSULTATS SUR LE SITE OFFICIEL ===\n");

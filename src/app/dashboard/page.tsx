@@ -14,6 +14,7 @@ import { meilleurEffort, loadRisk, effectiveVma } from "@/lib/running/fitness";
 import { validerRecordDeclare, type RecordDeclare } from "@/lib/dashboard/records";
 import type { SourceVma } from "@/components/dashboard/BentoDashboard";
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
+import { seancesSansRessenti } from "@/lib/dashboard/ressenti";
 import { computeStreak, jourLocal, decaleJour, type StreakWorkout, type StreakPrescription } from "@/lib/streak/compute";
 import { accesDe } from "@/lib/billing/access";
 import { estAdmin } from "@/lib/admin/acces";
@@ -42,7 +43,7 @@ export default async function DashboardPage() {
   // Le jour de l'athlète, calculé AVANT les requêtes : il en filtre une.
   const today = aujourdhui(FUSEAU_DEFAUT);
 
-  const [profileRes, hrvRes, workoutsRes, planRes, leagueRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, newMembersRes, prRes, chargeRes, streakWkRes, streakPlanRes, avisRes, nbSeancesRes, premiereRes, declaresRes] = await Promise.all([
+  const [profileRes, hrvRes, workoutsRes, planRes, leagueRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, newMembersRes, prRes, chargeRes, streakWkRes, streakPlanRes, avisRes, nbSeancesRes, premiereRes, declaresRes, garageRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single(),
     supabase.from("hrv_data").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(14),
     supabase.from("workouts").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(40),
@@ -106,7 +107,10 @@ export default async function DashboardPage() {
     // Records DÉCLARÉS par l'athlète — ce qu'il a couru avant l'historique de sa montre
     // (lib/dashboard/records, `RecordDeclare`). Quatre lignes au plus.
     supabase.from("notifications").select("data").eq("user_id", user!.id).eq("type", "record_declare").limit(8),
+    // Les paires du Garage, pour « quelles chaussures as-tu portées ? » dans le ressenti.
+    supabase.from("shoes").select("id, brand, model, current_km, max_km").eq("user_id", user!.id).eq("is_active", true).limit(12),
   ]);
+  if (garageRes.error) console.error("[accueil] garage illisible :", garageRes.error.message);
   if (declaresRes.error) console.error("[accueil] records déclarés illisibles :", declaresRes.error.message);
   const recordsDeclares = ((declaresRes.data ?? []) as { data: unknown }[])
     .map((r) => validerRecordDeclare(r.data, "9999-12-31"))
@@ -169,13 +173,19 @@ export default async function DashboardPage() {
     ? { title: cn.title, subtitle: cn.data.subtitle || cn.body || "", tags: cn.data.tags ?? [], why: cn.data.why ?? "", i18n: cn.data.i18n }
     : null;
 
-  // Demande de ressenti après la dernière séance (si non donné et séance récente ≤ 4 j).
-  const fbDates = new Set(((feedbackRes.data ?? []) as { data: { date?: string } }[]).map((r) => r.data?.date).filter(Boolean));
-  const lastWk = (workoutsRes.data ?? [])[0] as { date?: string; title?: string; type?: string } | undefined;
+  // Ressenti demandé pour CHAQUE séance récente (≤ 4 j) qui n'en a pas — désignée par son
+  // identifiant, jamais par sa seule date (lib/dashboard/ressenti).
   const fourDaysAgo = new Date(Date.now() - 4 * 86400000).toISOString().split("T")[0];
-  const pendingFeedback = lastWk?.date && lastWk.date.slice(0, 10) >= fourDaysAgo && !fbDates.has(lastWk.date.slice(0, 10))
-    ? { date: lastWk.date.slice(0, 10), title: lastWk.title || lastWk.type || "Séance" }
-    : null;
+  const seancesRessenti = seancesSansRessenti(
+    (workoutsRes.data ?? []) as Record<string, unknown>[],
+    ((feedbackRes.data ?? []) as { data: { date?: string; workout_id?: string } | null }[]).map((r) => r.data),
+    fourDaysAgo,
+  );
+  const ressenti = seancesRessenti.length ? {
+    seances: seancesRessenti,
+    chaussures: ((garageRes.data ?? []) as { id: string; brand: string; model: string; current_km: number | null; max_km: number | null }[])
+      .map((c) => ({ id: c.id, nom: `${c.brand} ${c.model}`.trim(), km: Number(c.current_km) || 0, maxKm: Number(c.max_km) || 0 })),
+  } : null;
 
   /**
    * ⚠️ UNE LECTURE EN PANNE NE DOIT PAS SE LIRE COMME « TU N'AS RIEN COURU ».
@@ -247,7 +257,7 @@ export default async function DashboardPage() {
       chargeHistory={chargeRes.data ?? []}
       sleep={sleepRes.data ?? null}
       coachSession={coachSession}
-      pendingFeedback={pendingFeedback}
+      ressenti={ressenti}
       objective={objective}
       currentVma={currentVma}
       sourceVma={sourceVma}

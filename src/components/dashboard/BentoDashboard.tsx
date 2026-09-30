@@ -18,7 +18,8 @@ import { robustWeeklyKm } from "@/lib/running/volume";
 import { racePredictions, fmtPaceSec, fmtTime } from "@/lib/running/fitness";
 import { TaperingWidget } from "@/components/dashboard/TaperingWidget";
 import { WeatherChip } from "@/components/dashboard/WeatherChip";
-import { SessionFeedback } from "@/components/dashboard/SessionFeedback";
+import { SessionFeedback, type ChaussureGarage } from "@/components/dashboard/SessionFeedback";
+import type { SeanceRessenti } from "@/lib/dashboard/ressenti";
 import { ObjectiveCard, type Objective } from "@/components/dashboard/ObjectiveCard";
 import { cleanActivityName } from "@/lib/utils/activityName";
 import { isRun } from "@/lib/intervals/sport";
@@ -61,7 +62,8 @@ interface Props {
   /** `i18n` = le même jour dans les autres langues (cf. lib/ai/planI18n.ts). Le français
    *  reste au premier niveau : c'est lui qui part sur la montre et sert aux analyses. */
   coachSession?: { title: string; subtitle: string; tags: string[]; why: string; i18n?: Record<string, { title?: string; subtitle?: string; tags?: string[]; why?: string }> } | null;
-  pendingFeedback?: { date: string; title: string } | null;
+  /** Séances récentes sans ressenti, et les paires du Garage (lib/dashboard/ressenti). */
+  ressenti?: { seances: SeanceRessenti[]; chaussures: ChaussureGarage[] } | null;
   objective?: Objective | null;
   currentVma?: number | null;
   /** D'où vient la VMA affichée, et de quand — pour qu'on voie qu'elle suit la forme. */
@@ -175,7 +177,7 @@ export type SourceVma =
   | { type: "courbe" }
   | { type: "vo2max" };
 
-export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkouts, recordsDeclares = [], premiereSeance = null, chargeHistory, sleep, coachSession, pendingFeedback, objective, currentVma, sourceVma = null, loadRisk, newMembersWeek, streak, acces, donneesIncompletes, jourAujourdhui }: Props) {
+export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkouts, recordsDeclares = [], premiereSeance = null, chargeHistory, sleep, coachSession, ressenti, objective, currentVma, sourceVma = null, loadRisk, newMembersWeek, streak, acces, donneesIncompletes, jourAujourdhui }: Props) {
   const { t, lang } = useT();
   const state = hrv[0]?.physiological_state ?? "optimal";
 
@@ -646,7 +648,7 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
       <div className="flex min-w-0 flex-col lg:block">
 
       {/* Ressenti post-séance — demandé après la dernière séance */}
-      {pendingFeedback && <SessionFeedback date={pendingFeedback.date} title={pendingFeedback.title} />}
+      {ressenti && <SessionFeedback seances={ressenti.seances} chaussures={ressenti.chaussures} />}
 
       {/* Anti-blessure proactif — déload auto si la charge devient risquée */}
       {loadRisk?.deload && (

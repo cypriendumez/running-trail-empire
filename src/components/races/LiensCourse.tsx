@@ -10,7 +10,7 @@ import { fillR } from "./racesI18n";
  */
 export function LiensCourse({ detail, course, d, couleur }: {
   detail: LiensDetail | null | undefined;
-  course: { name?: string | null; city?: string | null };
+  course: { name?: string | null; city?: string | null; date?: string | null };
   d: Record<string, string>;
   /** Couleur du bouton principal sur la carte (celle du type de course) ; absente = style de la liste. */
   couleur?: string;

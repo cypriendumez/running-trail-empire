@@ -163,7 +163,7 @@ test("sur mobile, l'avertissement médical part dans « Plus » — mais la lign
   // Le bas de l'écran perdait ~120 px sur téléphone (Cyprien, 21/09/2026). L'avertissement
   // et les liens légaux restent à un geste, sur chaque page, dans la feuille « Plus ».
   const layout = codeNu(LAYOUT);
-  const cache = layout.indexOf('<div className="hidden shrink-0 md:block">');
+  const cache = layout.indexOf('<div className="hidden md:block">');
   assert.ok(cache > 0, "l'avertissement médical n'est plus masqué sous md dans le layout");
   assert.ok(/<MedicalDisclaimer/.test(layout.slice(cache, layout.indexOf("</div>", cache))),
     "ce qui est masqué sous md n'est pas l'avertissement médical");
@@ -179,6 +179,12 @@ test("sur mobile, l'avertissement médical part dans « Plus » — mais la lign
   assert.ok(garmin > 0 && garmin < cache, "l'attribution Garmin est masquée sur téléphone : manquement aux conditions de l'API");
   const balise = layout.slice(garmin, layout.indexOf("/>", garmin));
   assert.ok(!/\bhidden\b/.test(balise), "l'attribution Garmin porte un `hidden`");
+  // ⚠️ Cyprien, 30/09/2026 : « ce qu'il y a en bas, on perd trop de place ». Le pied de page
+  // vit DANS la zone qui défile (fin du contenu), plus fixé sous l'écran où il mangeait
+  // ~100 px en permanence sur ordinateur.
+  const debutMain = layout.indexOf("<main"), finMain = layout.indexOf("</main>");
+  assert.ok(debutMain > 0 && garmin > debutMain && garmin < finMain, "le pied de page est ressorti de la zone qui défile : il reprend de la place sur chaque écran");
+  assert.ok(cache > debutMain && cache < finMain, "l'avertissement médical est de nouveau fixé sous l'écran");
 });
 
 test("sur téléphone, la séance du jour vient en deuxième, juste sous « Bonjour »", () => {
