@@ -105,14 +105,14 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
   }, [dateRangeDays, today, maxDate]);
 
   const filtered = useMemo(() => withCoords.filter(r => {
-    const matchType = filterType === "all" || correctedRaceType(r.distance_km, r.type) === filterType;
+    const matchType = filterType === "all" || correctedRaceType(r.distance_km, r.type, r.name) === filterType;
     return matchType && matchesDateRange(r.date) && dansLeRayon(r, proximite);
   }), [withCoords, filterType, matchesDateRange, proximite]);
 
   // Les pastilles de type comptent ce qui est RÉELLEMENT dans le rayon : « Trail S 9079 »
   // au-dessus d'une carte qui en montre 40 autour de Lille serait un compteur faux.
   const typeCounts = useMemo(() => withCoords.reduce<Record<string, number>>((acc, r) => {
-    if (matchesDateRange(r.date) && dansLeRayon(r, proximite)) { const t = correctedRaceType(r.distance_km, r.type); acc[t] = (acc[t] || 0) + 1; }
+    if (matchesDateRange(r.date) && dansLeRayon(r, proximite)) { const t = correctedRaceType(r.distance_km, r.type, r.name); acc[t] = (acc[t] || 0) + 1; }
     return acc;
   }, {}), [withCoords, matchesDateRange, proximite]);
 
@@ -188,7 +188,7 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
 
       filtered.forEach(race => {
         if (!race.latitude || !race.longitude) return;
-        const color = TYPE_COLORS[correctedRaceType(race.distance_km, race.type)] || "#22c55e";
+        const color = TYPE_COLORS[correctedRaceType(race.distance_km, race.type, race.name)] || "#22c55e";
         const marker = L.circleMarker([race.latitude, race.longitude], {
           renderer, radius: 5, fillColor: color, color: "#ffffff", weight: 1.4, fillOpacity: 0.92,
         });
@@ -344,9 +344,9 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
                 <div className="flex items-start justify-between mb-3">
                   <span
                     className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold text-white"
-                    style={{ backgroundColor: TYPE_COLORS[correctedRaceType(selected.distance_km, selected.type)] || "#22c55e" }}
+                    style={{ backgroundColor: TYPE_COLORS[correctedRaceType(selected.distance_km, selected.type, selected.name)] || "#22c55e" }}
                   >
-                    {d[`rts.${correctedRaceType(selected.distance_km, selected.type)}`] ?? selected.type}
+                    {d[`rts.${correctedRaceType(selected.distance_km, selected.type, selected.name)}`] ?? selected.type}
                     {selected.is_itra_certified && ` • ITRA ${selected.itra_points}pts`}
                   </span>
                   <button
@@ -421,7 +421,7 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
               <div className="p-4 border-t border-zinc-100 space-y-2">
                 {/* Inscription directe, site officiel et classement — le même bloc que la liste. */}
                 <LiensCourse detail={details[selected.id]} course={selected} d={d}
-                  couleur={TYPE_COLORS[correctedRaceType(selected.distance_km, selected.type)] || "#22c55e"} />
+                  couleur={TYPE_COLORS[correctedRaceType(selected.distance_km, selected.type, selected.name)] || "#22c55e"} />
                 {findPlanned?.(selected) ? (
                   <button
                     onClick={() => onCancel?.(selected)}

@@ -14,9 +14,9 @@ const MAX_RETRAITS = seuil(process.argv, "--max-retraits", 50);
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
 
 (async () => {
-  const rows: { id: string; name: string; city: string | null; organization: string | null }[] = [];
+  const rows: { id: string; name: string; city: string | null; organization: string | null; registration_url: string | null }[] = [];
   for (let p = 0; ; p++) {
-    const { data, error } = await sb.from("races").select("id, name, city, organization").order("id").range(p * 1000, p * 1000 + 999);
+    const { data, error } = await sb.from("races").select("id, name, city, organization, registration_url").order("id").range(p * 1000, p * 1000 + 999);
     if (error) throw new Error(error.message); rows.push(...(data ?? [])); if (!data || data.length < 1000) break;
   }
   const favs = new Set<string>();
@@ -30,7 +30,11 @@ const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPAB
   // « Triathlon des Roses Paris, 10 km » y est déclaré « course sur route » : une vraie
   // course, organisée dans le cadre du triathlon. Le nom ne tranche que là où la source
   // ne dit rien (jogging-plus, saisies anciennes).
-  const cibles = rows.filter((r) => r.organization !== "finishers.com" && pasCourseAPiedParNom(r.name));
+  // ⚠️ LE LIEN, PAS LE LIBELLÉ D'ORGANISATION (30/09/2026). « Méribel Cyclo Challenge »
+  // portait « finishers.com » en organisation mais venait de jogging-plus (lien d'inscription
+  // jogging-plus) : aucune fiche ne le rafraîchissait, et cette règle l'épargnait. Seule une
+  // ligne RELIÉE à une fiche finishers a sa discipline dite par la source.
+  const cibles = rows.filter((r) => !/finishers\.com\/course\//.test(String(r.registration_url ?? "")) && pasCourseAPiedParNom(r.name));
   const retraits = cibles.filter((r) => !favs.has(r.id));
   console.log(JSON.stringify({ lignes: rows.length, pasCourseAPied: cibles.length, protegesFavoris: cibles.length - retraits.length }));
   console.log([...new Set(retraits.map((r) => r.name))].slice(0, 60).join(" | "));

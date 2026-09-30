@@ -20,6 +20,7 @@ import { lienInscription, lienSiteOfficiel, lienClassement, heureLisible } from 
 import { formatPasCourseAPied } from "../src/lib/races/nonCourse";
 import { couplesDistanceDplus, dplusPourFormat } from "../src/lib/races/dplusSite";
 import { doublonsParfaits, type LigneDoublon } from "../src/lib/races/doublons";
+import { lienInscriptionSite } from "../src/lib/races/inscriptionSite";
 import { memeCommune, villeLisible } from "../scripts/corriger-idf-mal-classees";
 import { lienResultats, robotsAutorise, anneeDe, motsDistinctifs, entites } from "../src/lib/races/resultatsSite";
 import { slugDeRegion, nomRegion, regionAvecPreposition } from "../src/lib/races/libelles";
@@ -171,6 +172,46 @@ test("courses rangées en Île-de-France par défaut : la commune, ou l'étrange
   assert.equal(villeLisible("Gorëme"), true);
 });
 
+test("le lien « S'inscrire » lu sur le site officiel : juste, ou rien", () => {
+  // Cas relevés sur de vrais sites d'organisateurs le 30/09/2026 (trois échantillons de 60).
+  const L = (a: string, base = "https://www.trail-de-la-biche.fr/", noms = ["Trail de la Biche"]) =>
+    lienInscriptionSite(`<nav>${a}</nav>`, base, 2026, { noms })?.url ?? null;
+  // Justes : plateforme de dossards, adresse qui dit « inscription », bouton vers un autre site.
+  assert.equal(L('<a href="https://in.njuko.com/trail-de-la-biche-2026">Inscriptions</a>'), "https://in.njuko.com/trail-de-la-biche-2026");
+  assert.equal(L('<a href="/inscriptions/">S&#x27;inscrire</a>'), "https://www.trail-de-la-biche.fr/inscriptions/");
+  assert.equal(lienInscriptionSite('<a href="/inscriptions/">S&#x27;inscrire</a>', "https://www.trail-de-la-biche.fr/", 2026)?.texte, "S'inscrire",
+    "l'apostrophe encodée reste dans le libellé");
+  assert.equal(L('<a href="https://chrono.example-timing.fr/biche-2026">Inscriptions ouvertes</a>'), "https://chrono.example-timing.fr/biche-2026");
+  // Une plateforme passe AVANT une page du site, à libellés et années égaux.
+  assert.equal(L('<a href="/inscription">Inscription</a> <a href="https://in.njuko.com/biche">Je m\'inscris</a>'), "https://in.njuko.com/biche");
+  // Faux, et écartés — chaque cas n'est attrapé QUE par la règle qu'il vise (vu sur un vrai site).
+  for (const [a, pourquoi] of [
+    ['<a href="/liste-des-inscrits">Liste des inscrits</a>', "la liste des inscrits"],
+    ['<a href="/liste-des-inscriptions">Liste des inscriptions</a>', "la liste des inscriptions (participants)"],
+    ['<a href="/inscription-newsletter">Inscription à la newsletter</a>', "la newsletter"],
+    ['<a href="/nos-engagements">Nos engagements</a>', "« Nos engagements » (valeurs d'un club)"],
+    ['<a href="/inscriptions-assemblee">Inscriptions</a>', "une assemblée générale"],
+    ['<a href="/2-circuits">Trails et inscriptions</a>', "une page de présentation du même site"],
+    ['<a href="/benevoles/inscription">Inscription bénévoles</a>', "les bénévoles"],
+    ['<a href="/docs/inscription-2026.pdf">Inscription</a>', "un document à imprimer"],
+    ['<a href="https://biche.blogspot.com/2025/01/lien-inscription.html">Inscription Hello-asso 2026</a>', "une édition passée dans l'ADRESSE"],
+    ['<a href="/inscriptions">ADHERENTS</a>', "les adhérents d'un club"],
+    ['<a href="/inscriptions-aux-competitions">Inscriptions aux compétitions</a>', "les compétitions d'un club"],
+    ['<a href="https://www.finishers.com/course/trail-de-la-biche">S\'inscrire</a>', "un calendrier"],
+  ] as const) assert.equal(L(a), null, pourquoi);
+  // Un site de CLUB : son adresse ne nomme pas la course (« DIXkm de Caluire »).
+  assert.equal(L('<a href="https://athle-caluire.net/inscriptions/">Inscriptions</a>', "https://athle-caluire.net/", ["DIXkm de Caluire"]), null,
+    "le nom de la ville dans l'adresse d'un club passe pour le nom de la course");
+  // Un organisateur de plusieurs épreuves : le lien doit nommer LA course.
+  assert.equal(L('<a href="https://in.njuko.com/trail-des-vignes-2026">Inscriptions</a>', "https://www.asso-sport.fr/", ["Trail des Cimes"]), null,
+    "l'inscription d'une AUTRE épreuve du même organisateur");
+  // Intégration : jamais à la place d'un lien de la source.
+  const app = codeNu("scripts/finishers-appliquer.ts");
+  assert.ok(/if \(insc && !f\.inscription && !\(f\.formats \?\? \[\]\)\.some\(\(x\) => x\.inscription\)\)/.test(app), "le lien du site écrase celui de la fiche");
+  // Et les liens prouvés morts sont écartés APRÈS (sinon un lien mort reviendrait chaque semaine).
+  assert.ok(app.indexOf("inscriptionParSite.get(") < app.indexOf("if (f.inscription && morts.has(f.inscription))"), "le filtre des liens morts passe avant le lien du site");
+});
+
 test("fiches jumelles : même événement sous deux adresses, une seule appliquée", () => {
   const f = (slug: string, ids: string[]): Fiche => ({ slug, ok: true, pays: "FR", nom: "THP", ville: "Forcalquier",
     formats: ids.map((id, i) => ({ id, titre: `THP ${i}`, discipline: "trail", distanceM: 10000 * (i + 1), dplus: 300, date: "2027-05-08", heure: null, inscription: null, statut: "tba" })) });
@@ -201,6 +242,12 @@ test("fiches jumelles : même événement sous deux adresses, une seule appliqu�
   assert.ok(/if \(f\.http !== 404 && f\.http !== 410\) \{ aRevoir\.push\(f\.slug\); continue; \}/.test(src), "une fiche illisible (réseau) retire des lignes");
   assert.ok(/if \(favoris\.has\(l\.id\) \|\| touchees\.has\(l\.id\) \|\| !pasCourseAPiedParNom\(l\.name\)\) continue;/.test(src),
     "une ligne orpheline part sans que son nom le justifie, ou même en favori");
+  // Le retrait par le nom n'épargne que les lignes RELIÉES à une fiche : « Méribel Cyclo
+  // Challenge » portait « finishers.com » en organisation mais venait de jogging-plus.
+  // Lu BRUT : le retrait des commentaires couperait l'expression « \/course\// » à son « // ».
+  const nc = readFileSync("scripts/retirer-non-course.ts", "utf8");
+  assert.ok(nc.includes("!/finishers\\.com\\/course\\//.test(String(r.registration_url"), "le retrait par le nom se fie de nouveau au libellé d'organisation");
+  assert.ok(!/r\.organization !== "finishers\.com"/.test(nc), "le libellé d'organisation épargne de nouveau une cyclo reprise de jogging-plus");
 });
 
 test("le kilomètre vertical se reconnaît à sa PENTE — la source l'étiquette « trail »", () => {

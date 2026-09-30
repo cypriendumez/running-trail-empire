@@ -19,6 +19,7 @@
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
 import { grouperEvenements, cleEvenement, normNom } from "../src/lib/races/groupes";
+import { correctedRaceType } from "../src/lib/raceType";
 import { idCourseValide } from "../src/lib/races/favoris";
 import { jourFrance } from "../src/lib/races/jourFrance";
 import { typeDepuisUrl, anneeDepuisUrl, choisirFiche, typeCorrige, motsCles, distancesDeFiche, distancesManquantes, typePour, segmentNom, motProche } from "../src/lib/races/leSportif";
@@ -1189,6 +1190,27 @@ test("la ville est bien transmise à l'appariement", () => {
   // et le test rougissait sur un code JUSTE. Un test faux coûte plus cher qu'un test
   // absent : il fait douter du code correct.
   assert.match(src, /choisirFiche\(liens,[\s\S]{0,240}?city:/, "la route n'envoie pas la ville à `choisirFiche`");
+});
+
+test("une course nommée « Trail » s'affiche et se filtre comme un trail", () => {
+  // 30/09/2026 : 116 courses « Trail … » typées route manquaient au filtre « Trail ».
+  assert.equal(correctedRaceType(15, "road_10k", "Trail des 7 Monts"), "trail_s");
+  assert.equal(correctedRaceType(42, "marathon", "Trail des Rivières et Châteaux"), "trail_m");
+  assert.equal(correctedRaceType(null, "road_10k", "Trail TKAL"), "trail_s", "sans distance, le trail reste un trail");
+  // Le trail URBAIN se court souvent sur le bitume : il garde son type.
+  assert.equal(correctedRaceType(10, "road_10k", "Urban Trail Wallers-Arenberg"), "road_10k");
+  assert.equal(correctedRaceType(12, "road_10k", "Trail Urbain d'Orange"), "road_10k");
+  // Une course de côte sur ROUTE, même raide, reste une course sur route.
+  assert.equal(correctedRaceType(11.5, "road_10k", "Montée du Faron"), "road_10k");
+  // Sans nom (anciens appels), rien ne change.
+  assert.equal(correctedRaceType(15, "road_10k"), "road_10k");
+  assert.equal(correctedRaceType(51, "ultra"), "trail_l");
+  // Et chaque vue passe le nom : un appel qui l'oublie referait disparaître ces trails du filtre.
+  for (const f of ["src/components/races/RacesHub.tsx", "src/components/races/RacesMapView.tsx"]) {
+    const appels = readFileSync(f, "utf8").match(/correctedRaceType\([^)]*\)/g) ?? [];
+    assert.ok(appels.length > 0, `${f} n'appelle plus correctedRaceType`);
+    for (const a of appels) assert.equal(a.split(",").length, 3, `${f} : ${a} n'a pas le nom de la course`);
+  }
 });
 
 console.log(`\n${passed} crash-test(s) du catalogue passé(s), ${fails.length} échec(s)`);

@@ -168,7 +168,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
       // Identifiant contre identifiant : le libellé du menu porte des accents que la base
       // n'a pas (« Île-de-France » / « ile-de-france ») — voir `slugDeRegion`.
       const matchRegion = region === "Toutes" || slugDeRegion(r.region) === slugDeRegion(region);
-      const matchType = raceType === "all" || correctedRaceType(r.distance_km, r.type) === raceType;
+      const matchType = raceType === "all" || correctedRaceType(r.distance_km, r.type, r.name) === raceType;
       const matchDate = !dateFrom || r.date.startsWith("2099") || new Date(r.date) >= new Date(dateFrom);
       const matchFavori = !filtreFavoris || favoris.has(r.id);
       return matchSearch && matchRegion && matchType && matchDate && matchFavori && dansLeRayon(r, proximite);
@@ -452,7 +452,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                     className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl text-white shadow-sm"
                     style={{ background: `linear-gradient(135deg, ${DIFF_COLORS[race.difficulty] || "#22c55e"} 0%, ${DIFF_COLORS[race.difficulty] || "#22c55e"}cc 100%)` }}
                   >
-                    {isTrailType(correctedRaceType(race.distance_km, race.type))
+                    {isTrailType(correctedRaceType(race.distance_km, race.type, race.name))
                       ? <Mountain className="h-5 w-5" />
                       : <Footprints className="h-5 w-5" />}
                   </div>
@@ -550,7 +550,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                           Sur un événement à plusieurs formats, les distances parlent
                           d'elles-mêmes et une famille unique serait de toute façon fausse. */}
                       {(() => {
-                        const lib = d[`rt.${correctedRaceType(race.distance_km, race.type)}`] ?? race.type;
+                        const lib = d[`rt.${correctedRaceType(race.distance_km, race.type, race.name)}`] ?? race.type;
                         if (evt.formats.length > 1) return null;
                         const distances = evt.formats.map((f) => fmtDistance(f.distance_km, units));
                         if (distances.some((x) => x === lib)) return null;
@@ -630,7 +630,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                   className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-bold text-white mb-2"
                   style={{ backgroundColor: DIFF_COLORS[selected.difficulty] || "#22c55e" }}
                 >
-                  {d[`rt.${correctedRaceType(selected.distance_km, selected.type)}`] ?? selected.type}
+                  {d[`rt.${correctedRaceType(selected.distance_km, selected.type, selected.name)}`] ?? selected.type}
                   {selected.is_itra_certified && ` • ITRA ${selected.itra_points}pts`}
                 </div>
                 <h2 className="text-lg font-bold text-zinc-900 leading-snug">{selected.name}</h2>

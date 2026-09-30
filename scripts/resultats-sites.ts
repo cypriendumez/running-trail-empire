@@ -20,13 +20,14 @@ import { readFileSync, existsSync, appendFileSync } from "node:fs";
 import { lienResultats, robotsAutorise, type LienResultats } from "../src/lib/races/resultatsSite";
 import { PAYS_FRANCE, type Fiche } from "../src/lib/races/majFinishers";
 import { couplesDistanceDplus, type CoupleDplus } from "../src/lib/races/dplusSite";
+import { lienInscriptionSite, type LienInscription } from "../src/lib/races/inscriptionSite";
 import { seuil } from "./garde-fous";
 
 const UA = "Mozilla/5.0 (compatible; PacevoBot/1.0; +https://pacevo.fr/contact)";
 const PARALLELE = 6;
 const anneeCourante = new Date().getFullYear();
 
-export type LigneSite = { site: string; ok: boolean; http?: number; motif?: string; lien?: LienResultats | null; dplus?: CoupleDplus[]; lueLe: string };
+export type LigneSite = { site: string; ok: boolean; http?: number; motif?: string; lien?: LienResultats | null; dplus?: CoupleDplus[]; inscription?: LienInscription | null; lueLe: string };
 
 /** Échecs qui disent quelque chose DU SITE (et le rediront) : inutile d'y retourner chaque semaine. */
 const ECHECS_DURABLES = new Set(["robots-interdit", "pas-html", "adresse"]);
@@ -55,13 +56,16 @@ async function main() {
   // (même page d'accueil, même requête — voir lib/races/dplusSite).
   const noms = new Map<string, string[]>();
   const besoinDplus = new Set<string>();
+  const besoinInscription = new Set<string>();
   for (const l of readFileSync(fFiches, "utf8").split("\n")) {
     try {
       const f = JSON.parse(l) as Fiche;
       if (!(f?.ok && PAYS_FRANCE.has(String(f.pays ?? "")) && f.siteOfficiel)) continue;
       const sansDplus = (f.formats ?? []).some((x) => x.discipline === "trail" && x.dplus == null);
-      if (!f.resultats?.classement || sansDplus) noms.set(f.siteOfficiel, [...(noms.get(f.siteOfficiel) ?? []), String(f.nom ?? "")]);
+      const sansInscription = !f.inscription && !(f.formats ?? []).some((x) => x.inscription);
+      if (!f.resultats?.classement || sansDplus || sansInscription) noms.set(f.siteOfficiel, [...(noms.get(f.siteOfficiel) ?? []), String(f.nom ?? "")]);
       if (sansDplus) besoinDplus.add(f.siteOfficiel);
+      if (sansInscription) besoinInscription.add(f.siteOfficiel);
     } catch { /* ligne en cours d'écriture */ }
   }
   const sites = new Set(noms.keys());
@@ -70,7 +74,11 @@ async function main() {
   // Une lecture antérieure au relevé du dénivelé (sans champ `dplus`) ne dispense pas de
   // relire un site qui en a besoin.
   if (existsSync(sortie)) for (const l of readFileSync(sortie, "utf8").split("\n")) {
-    try { const x = JSON.parse(l) as LigneSite; if (dejaLu(x, maintenant, joursMax) && (!x.ok || !besoinDplus.has(x.site) || Array.isArray(x.dplus))) faits.add(x.site); } catch { /* */ }
+    try {
+      const x = JSON.parse(l) as LigneSite;
+      const releves = (!besoinDplus.has(x.site) || Array.isArray(x.dplus)) && (!besoinInscription.has(x.site) || x.inscription !== undefined);
+      if (dejaLu(x, maintenant, joursMax) && (!x.ok || releves)) faits.add(x.site);
+    } catch { /* */ }
   }
   const reste = [...sites].filter((s) => !faits.has(s));
   console.log(`[sites] ${sites.size} sites, ${faits.size} déjà lus, ${reste.length} à lire`);
@@ -99,7 +107,8 @@ async function main() {
       if (!/html/i.test(p.type)) return ecrire({ ok: false, http: p.code, motif: "pas-html" });
       const lien = lienResultats(p.texte, site, anneeCourante, { noms: noms.get(site) ?? [] });
       if (lien) trouves++;
-      ecrire({ ok: true, http: p.code, lien, dplus: couplesDistanceDplus(p.texte) });
+      const inscription = lienInscriptionSite(p.texte, site, anneeCourante, { noms: noms.get(site) ?? [] });
+      ecrire({ ok: true, http: p.code, lien, dplus: couplesDistanceDplus(p.texte), inscription });
     } finally { occupes.delete(u.host); }
   };
   const file = [...reste];
