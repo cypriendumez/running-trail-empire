@@ -21,6 +21,7 @@ import { formatPasCourseAPied } from "../src/lib/races/nonCourse";
 import { couplesDistanceDplus, dplusPourFormat } from "../src/lib/races/dplusSite";
 import { doublonsParfaits, type LigneDoublon } from "../src/lib/races/doublons";
 import { lienInscriptionSite } from "../src/lib/races/inscriptionSite";
+import { adressesEditions, pageTrouvee, editionsAAfficher } from "../src/lib/races/editionsResultats";
 import { memeCommune, villeLisible } from "../scripts/corriger-idf-mal-classees";
 import { lienResultats, robotsAutorise, anneeDe, motsDistinctifs, entites } from "../src/lib/races/resultatsSite";
 import { slugDeRegion, nomRegion, regionAvecPreposition } from "../src/lib/races/libelles";
@@ -216,6 +217,38 @@ test("le lien « S'inscrire » lu sur le site officiel : juste, ou rien", () => 
   assert.ok(/if \(insc && !f\.inscription && !\(f\.formats \?\? \[\]\)\.some\(\(x\) => x\.inscription\)\)/.test(app), "le lien du site écrase celui de la fiche");
   // Et les liens prouvés morts sont écartés APRÈS (sinon un lien mort reviendrait chaque semaine).
   assert.ok(app.indexOf("inscriptionParSite.get(") < app.indexOf("if (f.inscription && morts.has(f.inscription))"), "le filtre des liens morts passe avant le lien du site");
+});
+
+test("classements des éditions passées : devinés, mais VÉRIFIÉS", () => {
+  // Cas réel (30/09/2026) : le chronométreur de « La Ronda des Coudous » range chaque édition
+  // sous une adresse qui porte l'année ; 2025 et 2024 existent, 2023 et 1999 non.
+  const c = adressesEditions("http://inscriptionsenligne.fr.wiclax-results.com/La%20Ronda%20des%20Coudous%202026/", 2026)!;
+  assert.deepEqual(c.candidates.map((x) => x.annee), [2025, 2024, 2023]);
+  assert.equal(c.candidates[0].url, "http://inscriptionsenligne.fr.wiclax-results.com/La%20Ronda%20des%20Coudous%202025/",
+    "l'année qui suit « %20 » n'est pas reconnue (le « 0 » de l'espace encodé)");
+  assert.equal(c.temoin, "http://inscriptionsenligne.fr.wiclax-results.com/La%20Ronda%20des%20Coudous%201999/", "plus de témoin pour démasquer un site qui répond à tout");
+  // L'année deux fois (ou dans la requête), ou absente : on ne devine pas.
+  assert.equal(adressesEditions("https://www.livetrail.net/histo/sainte2025/2025/", 2025), null);
+  assert.equal(adressesEditions("https://x.fr/resultats?annee=2025&ed=2025", 2025), null);
+  assert.equal(adressesEditions("https://x.fr/course-2025/resultats?annee=2025", 2025), null,
+    "l'année est aussi dans la requête : remplacer celle du chemin seule donnerait une adresse incohérente");
+  assert.equal(adressesEditions("https://x.fr/resultats", 2025), null);
+  assert.equal(adressesEditions("https://x.fr/course-12025/", 2025), null, "« 12025 » n'est pas l'année 2025");
+  // Une page n'EXISTE que si la réponse est 2xx ET porte encore l'année demandée.
+  assert.equal(pageTrouvee(200, "http://a/La%20Ronda%202025/", 2025), true);
+  assert.equal(pageTrouvee(200, "http://a/", 2025), false, "une redirection vers l'accueil passe pour l'édition 2025");
+  assert.equal(pageTrouvee(404, "http://a/2025", 2025), false);
+  assert.equal(pageTrouvee(200, "http://a/%E0%A4%A/2025", 2025), true, "une adresse mal encodée fait planter la vérification");
+  // À l'écran : sans le lien principal, une fois par année, la plus récente d'abord, trois au plus.
+  assert.deepEqual(editionsAAfficher([{ annee: 2023, url: "https://a/2023" }, { annee: 2025, url: "https://a/2025" }, { annee: 2025, url: "https://b/2025" },
+    { annee: 2024, url: "https://a/2024" }, { annee: 2022, url: "https://a/2022" }, { annee: 2026, url: "https://p" }, "x", { annee: 2021, url: "javascript:x" }], "https://p").map((e) => e.annee),
+    [2025, 2024, 2023]);
+  assert.deepEqual(editionsAAfficher(null, null), []);
+  assert.deepEqual(editionsAAfficher([{ annee: 2025, url: "javascript:alert(1)" }], null), [], "un lien non http(s) serait affiché");
+  // Et le script n'écrit RIEN sans la colonne (migration 033), et ouvre le témoin AVANT les candidates.
+  const src = codeNu("scripts/resultats-editions.ts");
+  assert.ok(src.indexOf("await ouvrir(c.temoin)") < src.indexOf("await ouvrir(cand.url)") && /if \(!temoinTrouve\) for/.test(src), "un site qui répond à tout n'est plus démasqué");
+  assert.ok(/sonde\.error\?\.code === "42703"\) \{[^}]*process\.exit\(2\)/.test(src), "le script écrit sans vérifier que la colonne existe");
 });
 
 test("fiches jumelles : même événement sous deux adresses, une seule appliquée", () => {

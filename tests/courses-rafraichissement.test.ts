@@ -184,6 +184,11 @@ test("le workflow sauvegarde AVANT d'appliquer, garde son état, respecte le pla
   assert.ok(collecte > 0 && collecte + 90 <= minutes, "la collecte ne laisse plus le temps aux étapes suivantes");
   assert.ok(/shell: bash/.test(yml), "sans « shell: bash », pipefail n'est pas garanti");
   assert.ok(i("scripts/dedoublonner-courses.ts --ecrire") > i("scripts/finishers-appliquer.ts"), "les doublons parfaits ne sont plus retirés chaque semaine");
+  // Éditions passées : vérifiées AVANT la sauvegarde de l'état (le cache voyage), écrites en DERNIER.
+  const verif = yml.indexOf('resultats-editions.ts "$ETAT/editions-resultats.jsonl"\n'), etat = yml.indexOf("name: etat-courses");
+  const ecriture = yml.indexOf('resultats-editions.ts "$ETAT/editions-resultats.jsonl" --ecrire');
+  assert.ok(verif > 0 && verif < etat, "le cache des éditions n'est plus rempli avant la sauvegarde de l'état");
+  assert.ok(ecriture > yml.indexOf("datatourisme-dates.ts"), "l'écriture des éditions n'est plus en dernier : une colonne manquante bloquerait la suite");
   assert.ok(readFileSync(".gitignore", "utf8").includes("/.cache-courses/"), "l'état local n'est pas ignoré par git");
 });
 

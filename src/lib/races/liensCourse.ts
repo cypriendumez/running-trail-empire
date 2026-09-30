@@ -20,6 +20,8 @@ export type LiensDetail = {
   site_officiel?: string | null;
   resultats_url?: string | null;
   resultats_annee?: number | null;
+  /** Migration 033 : classements des éditions passées, vérifiés (lib/races/editionsResultats). */
+  resultats_editions?: unknown;
 };
 
 const http = (u: string | null | undefined) => (typeof u === "string" && /^https?:\/\//i.test(u.trim()) ? u.trim() : null);

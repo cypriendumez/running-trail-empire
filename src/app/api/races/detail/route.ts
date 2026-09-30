@@ -18,7 +18,9 @@ export async function GET(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id manquant" }, { status: 400 });
   const sb = createAdminClient();
-  const complet = await sb.from("races").select(`${CHAMPS}, ${CHAMPS_032}`).eq("id", id).single();
+  // Migration 033 : classements des éditions passées — même repli si la colonne manque.
+  const avec033 = await sb.from("races").select(`${CHAMPS}, ${CHAMPS_032}, resultats_editions`).eq("id", id).single();
+  const complet = avec033.error?.code === "42703" ? await sb.from("races").select(`${CHAMPS}, ${CHAMPS_032}`).eq("id", id).single() : avec033;
   const { data, error } = complet.error?.code === "42703"
     ? await sb.from("races").select(CHAMPS).eq("id", id).single()
     : complet;

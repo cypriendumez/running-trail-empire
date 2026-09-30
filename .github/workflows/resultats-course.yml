@@ -1,0 +1,48 @@
+# ──────────────────────────────────────────────────────────────────────────────
+#  « TES RÉSULTATS SONT EN LIGNE » — tous les matins.
+#
+#  Demandé par Cyprien le 30/09/2026 : quelques jours après la course visée par un
+#  athlète, un e-mail avec le lien DIRECT vers le classement de son édition. La route
+#  (`/api/cron/resultats-course`) n'écrit qu'aux athlètes dont la course date de 2 à 10
+#  jours, qui ont activé les notifications du coach, et une seule fois par course.
+#
+#  POURQUOI CHAQUE JOUR : le classement paraît un, deux ou cinq jours après la course. On
+#  envoie le PREMIER matin où il est connu — pas un jour fixe où il manquerait encore.
+#
+#  SECRETS REQUIS : CRON_SECRET (la même valeur que sur Vercel), rien à créer.
+# ──────────────────────────────────────────────────────────────────────────────
+name: Résultats de la course visée
+
+on:
+  schedule:
+    - cron: "20 7 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: resultats-course
+  cancel-in-progress: false
+
+jobs:
+  envoyer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Envoyer les e-mails de résultats
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET manquant dans les secrets du dépôt."
+            exit 1
+          fi
+          reponse=$(curl -sS --max-time 120 -w '\n%{http_code}' \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "https://pacevo.fr/api/cron/resultats-course")
+          corps=$(printf '%s' "$reponse" | sed '$d')
+          code=$(printf '%s' "$reponse" | tail -n1)
+          echo "$corps"
+          if [ "$code" != "200" ]; then
+            echo "::error::La route a répondu $code."
+            exit 1
+          fi

@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getPublicLang } from "@/lib/i18n/serverLang";
 import { nomAffichable, nomRegion, regionCanonique } from "@/lib/races/libelles";
 import { lienInscription, lienClassement, heureLisible } from "@/lib/races/liensCourse";
+import { editionsAAfficher } from "@/lib/races/editionsResultats";
 import { nomDestination, estCalendrierTiers, organisateurReel } from "@/lib/races/destination";
 import { texteCourses } from "../coursesI18n";
 import { jourFrance } from "@/lib/races/jourFrance";
@@ -38,8 +39,12 @@ async function lire(slug: string): Promise<CoursePublique | null> {
   const bornes = bornesId(idDepuisSlug(slug) ?? "");
   if (!bornes) return null;
   const sb = createAdminClient();
-  const complet = await sb.from("races").select(CHAMPS + CHAMPS_032)
+  // Migration 033 (éditions passées) d'abord, avec le même repli si la colonne manque.
+  const avec033 = await sb.from("races").select(CHAMPS + CHAMPS_032 + ",resultats_editions")
     .gte("id", bornes.bas).lte("id", bornes.haut).limit(2);
+  const complet = avec033.error?.code === "42703"
+    ? await sb.from("races").select(CHAMPS + CHAMPS_032).gte("id", bornes.bas).lte("id", bornes.haut).limit(2)
+    : avec033;
   const { data, error } = complet.error?.code === "42703"
     ? await sb.from("races").select(CHAMPS).gte("id", bornes.bas).lte("id", bornes.haut).limit(2)
     : complet;
@@ -83,6 +88,7 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
   const lieu = [c.city, c.department].filter(Boolean).join(", ");
   const insc = lienInscription(c);
   const classement = lienClassement(c, c);
+  const editions = editionsAAfficher((c as { resultats_editions?: unknown }).resultats_editions, classement?.direct ? classement.url : null);
   // Le champ « organisation » ne vaut que s'il ne désigne pas la source du lien.
   const organisateur = organisateurReel(c.organization, c.registration_url);
   // ⚠️ `terrain` EST UN TABLEAU. `{c.terrain && …}` rendait donc une ligne « Terrain »
@@ -180,6 +186,18 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
             ? (classement.annee ? t("resultats.direct", { a: classement.annee }) : t("resultats.voir"))
             : t("resultats.chercher")}
         </a>
+      )}
+      {/* Classements des éditions PASSÉES, chacune vérifiée (lib/races/editionsResultats). */}
+      {editions.length > 0 && (
+        <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-zinc-500">
+          <span>{t("resultats.editions")}</span>
+          {editions.map((e) => (
+            <a key={e.annee} href={e.url} target="_blank" rel="noopener noreferrer nofollow"
+              className="rounded-full border border-zinc-200 bg-white px-3 py-1 font-semibold tabular-nums text-zinc-700 transition-colors hover:border-amber-300 hover:bg-amber-50">
+              {e.annee}
+            </a>
+          ))}
+        </p>
       )}
       {/* ⚠️ ON NE SE FAIT PAS PASSER POUR L'ORGANISATEUR — ET ON NE LE FAIT PAS CROIRE
           NON PLUS. Mesuré le 03/09/2026 : 78 % des liens mènent à finishers.com et 21 %

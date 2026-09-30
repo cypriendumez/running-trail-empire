@@ -2,6 +2,7 @@
 
 import { ExternalLink, Globe, Search, Trophy } from "lucide-react";
 import { lienInscription, lienSiteOfficiel, lienClassement, type LiensDetail } from "@/lib/races/liensCourse";
+import { editionsAAfficher } from "@/lib/races/editionsResultats";
 import { fillR } from "./racesI18n";
 
 /**
@@ -18,6 +19,7 @@ export function LiensCourse({ detail, course, d, couleur }: {
   const insc = lienInscription(detail);
   const site = lienSiteOfficiel(detail);
   const classement = lienClassement(detail, course);
+  const editions = editionsAAfficher(detail?.resultats_editions, classement?.direct ? classement.url : null);
   const libelle = insc?.sorte === "inscription" ? d["reg.inscription"] : insc?.sorte === "officiel" ? d["reg.officiel"] : d["register"];
   return (
     <div className="w-full space-y-2">
@@ -44,6 +46,18 @@ export function LiensCourse({ detail, course, d, couleur }: {
             ? (classement.annee ? fillR(d["res.direct"], { a: classement.annee }) : d["res.directSansAnnee"])
             : d["res.chercher"]}
         </a>
+      )}
+      {/* Classements des éditions PASSÉES (2025, 2024…), chacune vérifiée avant d'être écrite. */}
+      {editions.length > 0 && (
+        <div className="flex flex-wrap items-center justify-center gap-1.5 text-[12px] text-zinc-500">
+          <Trophy className="h-3.5 w-3.5 text-amber-500" />{d["res.editions"]}
+          {editions.map((e) => (
+            <a key={e.annee} href={e.url} target="_blank" rel="noopener noreferrer nofollow"
+              className="rounded-full border border-zinc-200 bg-white px-2.5 py-0.5 font-semibold tabular-nums text-zinc-700 transition-colors hover:border-amber-300 hover:bg-amber-50 hover:text-amber-800">
+              {e.annee}
+            </a>
+          ))}
+        </div>
       )}
     </div>
   );

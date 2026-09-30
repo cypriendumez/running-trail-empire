@@ -132,6 +132,11 @@ jobs:
       - name: Contrôler les liens « Classement » et « S'inscrire »
         run: npx tsx scripts/verifier-liens-courses.ts "$ETAT/liens-controle-$(date -u +%Y%m%d).json" --ecrire
 
+      # Classements des éditions PASSÉES (2025, 2024…) : chaque adresse devinée est OUVERTE,
+      # un site qui répond à tout est écarté. AVANT la sauvegarde de l'état : le cache voyage.
+      - name: Classements des éditions passées — vérification
+        run: npx tsx scripts/resultats-editions.ts "$ETAT/editions-resultats.jsonl"
+
       - name: Garder l'état pour la semaine prochaine
         uses: actions/upload-artifact@v4
         with:
@@ -141,6 +146,7 @@ jobs:
             .cache-courses/a-revoir.txt
             .cache-courses/resultats-sites.jsonl
             .cache-courses/liens-controle-*.json
+            .cache-courses/editions-resultats.jsonl
           retention-days: 90
           if-no-files-found: error
           include-hidden-files: true
@@ -153,3 +159,8 @@ jobs:
 
       - name: DATAtourisme — dates des courses « Date à venir »
         run: npx tsx scripts/datatourisme-dates.ts fma.csv --ecrire
+
+      # Écriture des éditions vérifiées plus haut (cache relu, aucune requête). EN DERNIER :
+      # sans la colonne (migration 033), elle s'arrête et le dit (code 2) sans rien bloquer.
+      - name: Classements des éditions passées — écriture
+        run: npx tsx scripts/resultats-editions.ts "$ETAT/editions-resultats.jsonl" --ecrire

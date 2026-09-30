@@ -1,0 +1,13 @@
+-- ─────────────────────────────────────────────────────────────────────────────
+--  033 — COURSES : les classements des éditions PASSÉES (2025, 2024, 2023…)
+--
+--  Demandé par Cyprien le 30/09/2026 : « mets les anciens résultats des courses ». La
+--  colonne `resultats_url` (032) ne porte qu'UN lien ; celle-ci garde la liste des
+--  éditions précédentes, chacune VÉRIFIÉE avant d'être écrite (page ouverte, site témoin
+--  « 1999 » pour écarter un site qui répond à tout) — `scripts/resultats-editions.ts`.
+--  Forme : [{ "annee": 2025, "url": "https://…" }, …]. Facultative : une course sans elle
+--  s'affiche comme avant.
+--
+--  ⚠️ PAS DE DROP, pas même « if exists ». Rejouer ce fichier ne fait rien.
+-- ─────────────────────────────────────────────────────────────────────────────
+alter table public.races add column if not exists resultats_editions jsonb;
