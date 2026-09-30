@@ -15,6 +15,7 @@
  * épreuves. Tout ce qui DÉCIDE est ici ; `scripts/resultats-sites.ts` lit les pages.
  */
 import { entites, motsDistinctifs } from "./resultatsSite";
+import { domaineDe } from "./destination";
 
 /** Plateformes qui vendent des dossards : un lien vers elles, libellé « inscription », EST l'inscription. */
 export const PLATEFORMES_INSCRIPTION = [
@@ -33,9 +34,10 @@ const CALENDRIERS = /(^|\.)(finishers\.com|jogging-plus\.com|milesrepublic\.com|
 
 // ⚠️ PAS « engagement » : « Nos engagements » (valeurs d'un club) passait pour une inscription.
 const SENS_INSCRIPTION = /inscri|s'inscrire|je m'inscris|register|registration|billetterie|acheter (?:mon|un|son) dossard/i;
-// Relevés sur 60 vrais sites le 30/09/2026 : « liste des inscrits », « inscriptions assemblée
+// Relevés sur de vrais sites le 30/09/2026 : « liste des inscrits », « 451 personnes
+// inscrites » (la liste des coureurs chez protiming), « inscriptions assemblée
 // générale », une page d'agenda de mairie, « entraînements » d'un club… : pas la course.
-const SENS_ECARTES = /inscrits?\b|liste des|newsletter|lettre d'info|b[ée]n[ée]vole|volontaire|\bclub\b|licence|adh[ée]si|partenaire|exposant|village|mon compte|connexion|se connecter|r[ée]sultat|classement|photo|r[èe]glement|bulletin|tirage|annul|rembours|transf[ée]r|modifi|assembl|\bstages?\b|formation|atelier|entra[iî]nement|[ée]cole|repas|soir[ée]e|pasta|d[iî]ner|agenda|actualit|\bnews\b|\bblog\b|adh[ée]rent|aux comp[ée]titions/i;
+const SENS_ECARTES = /inscrite?s?\b|liste des|newsletter|lettre d'info|b[ée]n[ée]vole|volontaire|\bclub\b|licence|adh[ée]si|partenaire|exposant|village|mon compte|connexion|se connecter|r[ée]sultat|classement|photo|r[èe]glement|bulletin|tirage|annul|rembours|transf[ée]r|modifi|assembl|\bstages?\b|formation|atelier|entra[iî]nement|[ée]cole|repas|soir[ée]e|pasta|d[iî]ner|agenda|actualit|\bactus?\b|\bnews\b|\bblog\b|adh[ée]rent|aux comp[ée]titions/i;
 // L'adresse elle-même dit l'inscription : « /inscriptions », « /register », « …-reservez-votre-dossard ».
 const CHEMIN_INSCRIPTION = /inscri|register|registration|billet|dossard|ticket|s-?inscrire/i;
 const DOCUMENT = /\.(pdf|docx?|xlsx?|odt|jpe?g|png)(\?|$)/i;
@@ -45,7 +47,7 @@ const HOTE_GENERIQUE = /athle|athletisme|club|federation|ligue|comite|mairie|tou
 export type LienInscription = { url: string; texte: string; plateforme: boolean };
 
 const sansBalises = (s: string) => s.replace(/<[^>]*>/g, " ").replace(/&nbsp;|&#160;/g, " ").replace(/&amp;/g, "&")
-  .replace(/&eacute;/g, "é").replace(/&#233;/g, "é").replace(/&agrave;/g, "à").replace(/&#0*39;|&#x0*27;|&rsquo;|&apos;/gi, "'")
+  .replace(/&eacute;/g, "é").replace(/&#233;/g, "é").replace(/&agrave;/g, "à").replace(/&#0*39;|&#x0*27;|&rsquo;|&apos;|&#8217;|&#x2019;/gi, "'")
   .replace(/\s+/g, " ").trim();
 const norm = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 const decode = (u: string) => { try { return decodeURIComponent(u); } catch { return u; } };
@@ -73,6 +75,9 @@ export function lienInscriptionSite(
     try { url = new URL(entites(m[1]), base).toString(); } catch { continue; }
     if (!/^https?:\/\//i.test(url) || DOCUMENT.test(url)) continue;
     const u = new URL(url);
+    // Un billet de blog DATÉ (« /2025/11/17/ouverture-des-inscriptions-2026/ ») annonce les
+    // inscriptions ; il n'inscrit pas.
+    if (/\/20\d{2}\/\d{2}\/(?:\d{2}\/)?/.test(u.pathname)) continue;
     if (CALENDRIERS.test(u.hostname)) continue;
     const chemin = decode(u.hostname + u.pathname);
     // Le SENS se lit dans le libellé, et à défaut dans le chemin (« /inscriptions »).
@@ -88,7 +93,9 @@ export function lienInscriptionSite(
     // La preuve : une plateforme de dossards, une adresse qui dit « inscription », ou un
     // BOUTON court vers un autre site (« Inscriptions ouvertes » → le chronométreur). Un
     // libellé seul, sur le même site, menait à « /2-circuits » ou « /entrainements-1 ».
-    const memeHote = u.hostname.toLowerCase() === hoteBase;
+    // Même SITE, pas même nom d'hôte : « boutique.bagnolesdelorne.com » (la boutique de
+    // l'office de tourisme) n'est pas un autre site que « www.bagnolesdelorne.com ».
+    const memeHote = domaineDe(url) === domaineDe(base);
     const bouton = !memeHote && texte.length > 0 && texte.length <= 30 && SENS_INSCRIPTION.test(texte);
     if (!plateforme && !CHEMIN_INSCRIPTION.test(chemin) && !bouton) continue;
     if (mots) {

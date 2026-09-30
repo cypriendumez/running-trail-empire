@@ -73,12 +73,17 @@ async function main() {
   const maintenant = Date.now();
   // Une lecture antérieure au relevé du dénivelé (sans champ `dplus`) ne dispense pas de
   // relire un site qui en a besoin.
+  // `--relire-inscriptions` : la règle du lien « S'inscrire » a changé — on relit les sites où
+  // un lien avait été retenu (une règle plus stricte ne peut en écarter qu'eux).
+  const relireInscriptions = process.argv.includes("--relire-inscriptions");
+  const derniere = new Map<string, LigneSite>();
   if (existsSync(sortie)) for (const l of readFileSync(sortie, "utf8").split("\n")) {
-    try {
-      const x = JSON.parse(l) as LigneSite;
-      const releves = (!besoinDplus.has(x.site) || Array.isArray(x.dplus)) && (!besoinInscription.has(x.site) || x.inscription !== undefined);
-      if (dejaLu(x, maintenant, joursMax) && (!x.ok || releves)) faits.add(x.site);
-    } catch { /* */ }
+    try { const x = JSON.parse(l) as LigneSite; if (x?.site) derniere.set(x.site, x); } catch { /* */ }
+  }
+  for (const x of derniere.values()) {
+    const releves = (!besoinDplus.has(x.site) || Array.isArray(x.dplus)) && (!besoinInscription.has(x.site) || x.inscription !== undefined);
+    if (relireInscriptions && x.inscription) continue;
+    if (dejaLu(x, maintenant, joursMax) && (!x.ok || releves)) faits.add(x.site);
   }
   const reste = [...sites].filter((s) => !faits.has(s));
   console.log(`[sites] ${sites.size} sites, ${faits.size} déjà lus, ${reste.length} à lire`);

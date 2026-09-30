@@ -181,6 +181,8 @@ test("le lien « S'inscrire » lu sur le site officiel : juste, ou rien", () => 
   assert.equal(L('<a href="/inscriptions/">S&#x27;inscrire</a>'), "https://www.trail-de-la-biche.fr/inscriptions/");
   assert.equal(lienInscriptionSite('<a href="/inscriptions/">S&#x27;inscrire</a>', "https://www.trail-de-la-biche.fr/", 2026)?.texte, "S'inscrire",
     "l'apostrophe encodée reste dans le libellé");
+  assert.equal(lienInscriptionSite('<a href="/sinscrire">S&#8217;inscrire</a>', "https://www.trail-de-la-biche.fr/", 2026)?.texte, "S'inscrire",
+    "l'apostrophe typographique encodée reste dans le libellé");
   assert.equal(L('<a href="https://chrono.example-timing.fr/biche-2026">Inscriptions ouvertes</a>'), "https://chrono.example-timing.fr/biche-2026");
   // Une plateforme passe AVANT une page du site, à libellés et années égaux.
   assert.equal(L('<a href="/inscription">Inscription</a> <a href="https://in.njuko.com/biche">Je m\'inscris</a>'), "https://in.njuko.com/biche");
@@ -188,6 +190,10 @@ test("le lien « S'inscrire » lu sur le site officiel : juste, ou rien", () => 
   for (const [a, pourquoi] of [
     ['<a href="/liste-des-inscrits">Liste des inscrits</a>', "la liste des inscrits"],
     ['<a href="/liste-des-inscriptions">Liste des inscriptions</a>', "la liste des inscriptions (participants)"],
+    ['<a href="https://protiming.fr/events/8270-trail-de-la-biche/runners">451 personnes inscrites</a>', "la liste des coureurs (« inscrites »)"],
+    ['<a href="/2025/11/17/ouverture-des-inscriptions-2026/">Ouverture des inscriptions 2026</a>', "un billet de blog daté"],
+    ['<a href="/actus/inscription-les-rencontres-de-marie-jose">Les rencontres</a>', "un article d'actualité"],
+    ['<a href="https://boutique.trail-de-la-biche.fr/">Billetterie</a>', "la boutique du même site (autre sous-domaine)"],
     ['<a href="/inscription-newsletter">Inscription à la newsletter</a>', "la newsletter"],
     ['<a href="/nos-engagements">Nos engagements</a>', "« Nos engagements » (valeurs d'un club)"],
     ['<a href="/inscriptions-assemblee">Inscriptions</a>', "une assemblée générale"],
@@ -613,6 +619,28 @@ test("départements : une écriture, la bonne région — et l'étranger reconnu
 });
 
 console.log("\n=== BRANCHEMENTS ===\n");
+
+test("« S'inscrire », « Site officiel », « Classement » s'ouvrent dans un NOUVEL onglet", () => {
+  // Demandé par Cyprien le 30/09/2026 : un coureur qui consulte un classement ne doit pas
+  // perdre Pacevo. Chaque balise <a> vers l'extérieur, lue EN ENTIER (les accolades et les
+  // « => » d'un gestionnaire ne coupent pas la balise), porte target="_blank" et noopener.
+  for (const f of ["src/components/races/LiensCourse.tsx", "src/app/courses/[slug]/page.tsx"]) {
+    const src = readFileSync(f, "utf8");
+    let n = 0;
+    for (let i = src.indexOf("<a"); i >= 0; i = src.indexOf("<a", i + 2)) {
+      if (!/<a[\s>]/.test(src.slice(i, i + 3))) continue;
+      let j = i + 2, prof = 0;
+      for (; j < src.length; j++) { const c = src[j]; if (c === "{") prof++; else if (c === "}") prof--; else if (c === ">" && prof === 0) break; }
+      const balise = src.slice(i, j + 1);
+      const href = balise.match(/href=(\{[^}]*\}|"[^"]*")/)?.[1] ?? "";
+      if (/^"\/|^\{`\//.test(href)) continue;   // lien interne à Pacevo
+      n++;
+      assert.ok(/target="_blank"/.test(balise), `${f} : ${href} s'ouvre dans le même onglet`);
+      assert.ok(/rel="[^"]*noopener[^"]*"/.test(balise), `${f} : ${href} sans noopener (la page ouverte pourrait piloter Pacevo)`);
+    }
+    assert.ok(n > 0, `${f} : aucun lien externe trouvé (motif à revoir)`);
+  }
+});
 
 test("avant la migration, la fiche et la page publique retombent sur les anciens champs", () => {
   for (const f of ["src/app/api/races/detail/route.ts", "src/app/courses/[slug]/page.tsx", "src/app/api/races/list/route.ts"]) {
