@@ -130,6 +130,7 @@ async function main() {
   const exemples: string[] = [];
   const touchees = new Set<string>();
   let datesPerdues = 0;
+  const exemplesPerdues: string[] = [];
   const detailRetraits: string[] = [];
 
   // Fiches à relire la semaine suivante même si le plan du site ne les signale plus comme
@@ -185,7 +186,10 @@ async function main() {
     for (const m of p.majs) {
       const avant = existantes.find((l) => l.id === m.id)!;
       if (String(avant.date).startsWith("2099") && !String(m.patch.date).startsWith("2099")) st.datesRemplies++;
-      if (!String(avant.date).startsWith("2099") && String(avant.date) >= aujourdhui && String(m.patch.date).startsWith("2099")) datesPerdues++;
+      if (!String(avant.date).startsWith("2099") && String(avant.date) >= aujourdhui && String(m.patch.date).startsWith("2099")) {
+        datesPerdues++;
+        if (exemplesPerdues.length < 12) exemplesPerdues.push(`${avant.name} (${avant.city}) ${avant.distance_km} km : ${avant.date} → Date à venir | fiche ${f.slug} : ${(f.formats ?? []).map((x) => `${x.distanceM != null ? Math.round(x.distanceM / 100) / 10 : "?"} km ${x.date ?? "?"} ${x.statut ?? ""}`).join(" ; ").slice(0, 160)}`);
+      }
       if (avant.elevation_gain_m == null && m.patch.elevation_gain_m != null) st.dplusAjoutes++;
       if (avant.elevation_gain_m === 0 && m.patch.elevation_gain_m == null) st.dplusZeroCorriges++;
     }
@@ -218,6 +222,8 @@ async function main() {
 
   console.log(JSON.stringify({ ...st, fichesJumelles: jumelles.size, lignesJumelles, liensResultatsSites: liensSites, dplusLusSurSites: dplusSites, liensMortsEcartes: morts.size, colonnesNouvelles, pacaANormaliser: paca.length, dplusFauxBalayes: dplusFaux.length, aujourdhui }, null, 1));
   console.log(exemples.join("\n"));
+  // Une date future renvoyée en « Date à venir » doit pouvoir se relire dans le journal.
+  if (exemplesPerdues.length) console.log(`Dates perdues (exemples) :\n  ${exemplesPerdues.join("\n  ")}`);
   writeFileSync(fichier.replace(/\.jsonl$/, "") + `-plan-${ECRIRE ? "ecrit" : "a-blanc"}.json`, JSON.stringify({ st, majs: majs.length, ajouts: ajouts.length, retraits, detailRetraits }, null, 1));
   writeFileSync(join(dirname(fichier), "a-revoir.txt"), aRevoir.join("\n") + (aRevoir.length ? "\n" : ""));
   // Mesuré sur la collecte complète du 29/09/2026 : 28 fiches illisibles sur 7 997 (0,4 %),

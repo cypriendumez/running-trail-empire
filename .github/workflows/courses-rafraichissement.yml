@@ -13,7 +13,7 @@
 #   2. lit le lien « Résultats » sur les sites officiels (robots.txt respecté) ;
 #   3. SAUVEGARDE la table, puis applique — avec des SEUILS : au-delà, rien n'est écrit
 #      (voir scripts/garde-fous.ts) et l'exécution rougit dans /admin → Automatisation ;
-#   4. retire les épreuves qui ne sont pas de la course à pied, contrôle les liens
+#   4. retire les épreuves qui ne sont pas de la course à pied et les doublons parfaits, contrôle les liens
 #      « Classement » et « S'inscrire » (deux passages, seuls 404/410 comptent) ;
 #   5. DATAtourisme (Licence Ouverte 2.0) : courses locales et dates retrouvées.
 #
@@ -125,6 +125,9 @@ jobs:
 
       - name: Retirer les épreuves qui ne sont pas de la course à pied
         run: npx tsx scripts/retirer-non-course.ts --ecrire
+
+      - name: Retirer les doublons parfaits (même nom, ville, date, distance)
+        run: npx tsx scripts/dedoublonner-courses.ts --ecrire
 
       - name: Contrôler les liens « Classement » et « S'inscrire »
         run: npx tsx scripts/verifier-liens-courses.ts "$ETAT/liens-controle-$(date -u +%Y%m%d).json" --ecrire

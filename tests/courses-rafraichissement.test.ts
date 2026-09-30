@@ -114,6 +114,7 @@ test("chaque script d'écriture vérifie ses seuils AVANT d'écrire", () => {
     ["scripts/datatourisme-dates.ts", /\.from\("races"\)\.update\(/],
     ["scripts/retirer-non-course.ts", /\.from\("races"\)\.delete\(/],
     ["scripts/verifier-liens-courses.ts", /\.from\("races"\)\.update\(/],
+    ["scripts/dedoublonner-courses.ts", /\.from\("races"\)\.delete\(/],
   ];
   for (const [f, ecriture] of cas) {
     const src = code(f);
@@ -131,7 +132,7 @@ test("finishers-appliquer : garde-fous de forme, fiches à revoir, échec visibl
     assert.ok(new RegExp(`quoi: "[^"]*${q}`).test(src), `seuil « ${q} » disparu`);
   }
   // Le compte de dates PERDUES : une vraie date future remplacée par 2099.
-  assert.ok(/String\(avant\.date\) >= aujourdhui && String\(m\.patch\.date\)\.startsWith\("2099"\)\) datesPerdues\+\+/.test(src),
+  assert.ok(/String\(avant\.date\) >= aujourdhui && String\(m\.patch\.date\)\.startsWith\("2099"\)\) \{\s*datesPerdues\+\+/.test(src),
     "les dates futures renvoyées en « Date à venir » ne sont plus comptées");
   // Les fiches à revoir s'écrivent en lecture à blanc AUSSI (avant le retour anticipé).
   const iRevoir = src.indexOf('"a-revoir.txt"'), iBlanc = src.indexOf("if (!ECRIRE)");
@@ -182,6 +183,7 @@ test("le workflow sauvegarde AVANT d'appliquer, garde son état, respecte le pla
   assert.ok(minutes > 0 && minutes < 360, "délai absent ou au-delà du plafond GitHub (360 min)");
   assert.ok(collecte > 0 && collecte + 90 <= minutes, "la collecte ne laisse plus le temps aux étapes suivantes");
   assert.ok(/shell: bash/.test(yml), "sans « shell: bash », pipefail n'est pas garanti");
+  assert.ok(i("scripts/dedoublonner-courses.ts --ecrire") > i("scripts/finishers-appliquer.ts"), "les doublons parfaits ne sont plus retirés chaque semaine");
   assert.ok(readFileSync(".gitignore", "utf8").includes("/.cache-courses/"), "l'état local n'est pas ignoré par git");
 });
 

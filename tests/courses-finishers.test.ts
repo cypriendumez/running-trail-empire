@@ -19,6 +19,7 @@ import {
 import { lienInscription, lienSiteOfficiel, lienClassement, heureLisible } from "../src/lib/races/liensCourse";
 import { formatPasCourseAPied } from "../src/lib/races/nonCourse";
 import { couplesDistanceDplus, dplusPourFormat } from "../src/lib/races/dplusSite";
+import { doublonsParfaits, type LigneDoublon } from "../src/lib/races/doublons";
 import { lienResultats, robotsAutorise, anneeDe, motsDistinctifs, entites } from "../src/lib/races/resultatsSite";
 import { slugDeRegion, nomRegion, regionAvecPreposition } from "../src/lib/races/libelles";
 import { REGION_OUTRE_MER } from "../src/lib/races/majFinishers";
@@ -136,6 +137,24 @@ test("le dénivelé lu sur le site officiel : juste plutôt que beaucoup", () =>
   assert.ok(/!besoinDplus\.has\(x\.site\) \|\| Array\.isArray\(x\.dplus\)/.test(sites), "un site lu avant le relevé n'est jamais relu");
 });
 
+test("doublons parfaits : une copie part, jamais un favori ni une ligne finishers", () => {
+  const l = (id: string, x: Partial<LigneDoublon> = {}): LigneDoublon => ({ id, name: "Trail des Fontaines", city: "Le Montat", date: "2027-02-06", distance_km: 14.5, organization: "", ...x });
+  // Cas réel : deux lignes identiques reprises de jogging-plus → une part (la moins renseignée).
+  assert.deepEqual(doublonsParfaits([l("a"), l("b", { elevation_gain_m: 300 })], new Set()), ["a"]);
+  // L'article et la typographie ne font pas deux courses : « Les Foulées Sarmates » = « Foulées Sarmates ».
+  assert.deepEqual(doublonsParfaits([l("a", { name: "Les Foulées Sarmates" }), l("b", { name: "Foulées Sarmates", site_officiel: "https://x.fr" })], new Set()), ["a"]);
+  // Un favori est gardé, même moins renseigné — et jamais retiré.
+  assert.deepEqual(doublonsParfaits([l("a"), l("b", { elevation_gain_m: 300 })], new Set(["a"])), ["b"]);
+  assert.deepEqual(doublonsParfaits([l("a"), l("b")], new Set(["a", "b"])), [], "un favori est retiré");
+  // Une ligne finishers n'est jamais retirée (l'application hebdomadaire la recréerait).
+  assert.deepEqual(doublonsParfaits([l("a", { organization: "finishers.com" }), l("b", { elevation_gain_m: 300 })], new Set()), ["b"]);
+  assert.deepEqual(doublonsParfaits([l("a", { organization: "finishers.com" }), l("b", { organization: "finishers.com" })], new Set()), []);
+  // Une seule différence — date, distance, ville ou nom — et ce ne sont plus des doublons.
+  for (const x of [{ date: "2027-02-07" }, { distance_km: 15 }, { city: "Cusset" }, { name: "Trail des Sources" }]) {
+    assert.deepEqual(doublonsParfaits([l("a"), l("b", x)], new Set()), [], JSON.stringify(x));
+  }
+});
+
 test("fiches jumelles : même événement sous deux adresses, une seule appliquée", () => {
   const f = (slug: string, ids: string[]): Fiche => ({ slug, ok: true, pays: "FR", nom: "THP", ville: "Forcalquier",
     formats: ids.map((id, i) => ({ id, titre: `THP ${i}`, discipline: "trail", distanceM: 10000 * (i + 1), dplus: 300, date: "2027-05-08", heure: null, inscription: null, statut: "tba" })) });
@@ -147,8 +166,16 @@ test("fiches jumelles : même événement sous deux adresses, une seule appliqu�
   // Cas réel où l'ordre alphabétique et la longueur divergent : la plus courte gagne.
   assert.deepEqual([...fichesJumelles([f("choco-trail-dhardricourt", ["c1"]), f("chocotrail-dhardricourt", ["c1"])], () => false)],
     [["choco-trail-dhardricourt", "chocotrail-dhardricourt"]]);
+  // Seconde preuve : identifiants différents, même nom (article près), même ville, formats IDENTIQUES.
+  const nomme = (slug: string, nom: string, ids: string[], kms: number[]): Fiche => ({ ...f(slug, ids), nom, ville: "Cahors",
+    formats: ids.map((id, i) => ({ id, titre: null, discipline: "trail", distanceM: kms[i] * 1000, dplus: 300, date: "2027-02-21", heure: null, inscription: null, statut: "tba" })) });
+  assert.deepEqual([...fichesJumelles([nomme("les-collines-du-diable", "Les Collines du Diable", ["a1", "a2"], [12, 25]), nomme("collines-du-diable", "Collines du diable", ["b1", "b2"], [12, 25])], () => false)],
+    [["les-collines-du-diable", "collines-du-diable"]]);
+  // Mêmes noms mais formats DIVERGENTS (« JURAPICS » 27 km, « Jurapics » 28 km) : on ne choisit pas.
+  assert.equal(fichesJumelles([nomme("jurapics", "JURAPICS", ["a1", "a2"], [9, 27]), nomme("jurapics-2", "Jurapics", ["b1", "b2"], [9, 28])], () => false).size, 0,
+    "deux fiches divergentes rapprochées : l'une des deux versions disparaît sans preuve");
   // Un seul format commun ne suffit pas : ce sont peut-être deux événements d'un même organisateur.
-  assert.equal(fichesJumelles([a, f("autre", ["x1", "x9"])], () => false).size, 0);
+  assert.equal(fichesJumelles([a, { ...f("autre", ["x1", "x9"]), nom: "Autre trail" }], () => false).size, 0);
   assert.equal(fichesJumelles([a, { ...b, ok: false }], () => false).size, 0, "une fiche illisible fait une jumelle");
   const src = codeNu("scripts/finishers-appliquer.ts");
   assert.ok(/const gardee = jumelles\.get\(f\.slug\);\s*if \(gardee\) \{[\s\S]{0,120}if \(favoris\.has\(l\.id\) \|\| touchees\.has\(l\.id\)\) continue;/.test(src),
@@ -342,8 +369,13 @@ test("une estimation écartée n'efface pas la date déclarée par l'office de t
   assert.equal(dateConservee("2026-09-20", f, mardi, AUJ), false, "une date PASSÉE est gardée comme date à venir");
   assert.equal(dateConservee("2099-01-01", f, mardi, AUJ), false);
   assert.equal(dateConservee(null, f, mardi, AUJ), false);
-  const passee = { ...f, date: "2026-09-22" };   // passée, mais à 25 jours de la date déclarée
-  assert.equal(dateConservee("2026-10-17", passee, { ...mardi, prochaine: null }, AUJ), false, "une estimation PASSÉE justifie une date future");
+  // Une ESTIMATION dépassée ne prouve rien (« Course des Remparts de Provins » : estimée au
+  // mardi 29/09, déclarée le dimanche 4/10 — effacée le 30/09) ; une date CONFIRMÉE dépassée,
+  // si : l'édition a eu lieu (« Transvésubienne », 27/09).
+  const passee = { ...f, date: "2026-09-22" };   // passée, à 25 jours de la date déclarée
+  assert.equal(dateConservee("2026-10-17", passee, { ...mardi, prochaine: null }, AUJ), true, "une estimation dépassée efface une date déclarée");
+  assert.equal(dateConservee("2026-10-17", { ...passee, statut: "confirmed" }, { ...mardi, prochaine: null }, AUJ), false,
+    "une édition CONFIRMÉE et passée garde une date future qui n'est plus la sienne");
 });
 
 const fmt = (id: string, titre: string, discipline: string, distanceM: number, dplus: number | null = null) =>

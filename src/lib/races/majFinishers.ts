@@ -150,11 +150,18 @@ export function dateDe(f: FormatFiche, fiche: Fiche, aujourdhui: string): { date
  * elle la garde. Une estimation passée ou absente, ou une date d'une autre édition
  * (~365 j) : rien. ± 45 j ne suffisait pas : « Trail des Ducs » (Bar-le-Duc), déclaré le
  * dimanche 25/04/2027, estimé au lundi 08/03 — l'épreuve a changé de mois, pas d'année.
+ *
+ * ⚠️ UNE ESTIMATION DÉPASSÉE NE PROUVE RIEN (30/09/2026). Six courses estimées au mardi
+ * 29/09 (« Course des Remparts de Provins », « La Yussoise »…), déclarées le dimanche 4/10,
+ * repassaient en « Date à venir » le lendemain : l'estimation était devenue passée. Seule
+ * une date CONFIRMÉE et passée dit que l'édition a eu lieu (« Transvésubienne », 27/09).
  */
 export function dateConservee(existante: string | null | undefined, f: FormatFiche, fiche: Fiche, aujourdhui: string): boolean {
   const e = String(existante ?? "").slice(0, 10), estimee = (f.date ?? fiche.prochaine?.debut ?? "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(e) || e.startsWith("2099") || e < aujourdhui) return false;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(estimee) || estimee < aujourdhui) return false;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(estimee)) return false;
+  const confirmee = (f.statut ?? fiche.prochaine?.statut ?? null) === "confirmed";
+  if (estimee < aujourdhui && confirmee) return false;
   return Math.abs(Date.parse(e) - Date.parse(estimee)) <= 120 * 864e5;
 }
 
@@ -377,20 +384,29 @@ export function planEvenement(
  * chacune, elles doublaient chaque format au catalogue (29/09/2026 : 27 paires). Des
  * identifiants de courses identiques sont une preuve, pas une ressemblance.
  *
+ * Seconde preuve (30/09/2026) : identifiants différents, mais même nom (`cleNomVille`) et
+ * EXACTEMENT les mêmes formats — mêmes distances, mêmes dates (« Collines du diable » /
+ * « Les Collines du Diable », « 10km de la Bastille » / « Les 10 Km de la Bastille »). Deux
+ * fiches qui divergent (« JURAPICS » 27 km, « Jurapics » 28 km) ne sont PAS rapprochées :
+ * rien ne dit laquelle est juste.
+ *
  * Rend jumelle → fiche gardée. On garde celle qui a déjà des lignes au catalogue, puis la
  * plus courte adresse (sans « -1 »), puis l'ordre alphabétique — toujours la même.
  */
 export function fichesJumelles(fiches: Iterable<Fiche>, aDesLignes: (slug: string) => boolean): Map<string, string> {
-  const parIds = new Map<string, string[]>();
+  const groupes = new Map<string, string[]>();
+  const ajouter = (k: string, slug: string) => groupes.set(k, [...new Set([...(groupes.get(k) ?? []), slug])]);
   for (const f of fiches) {
     if (!f.ok) continue;
-    const ids = formatsRetenus(f).map((x) => x.id).filter(Boolean).sort();
+    const retenus = formatsRetenus(f);
+    const ids = retenus.map((x) => x.id).filter(Boolean).sort();
     if (!ids.length) continue;
-    const k = ids.join("|");
-    parIds.set(k, [...(parIds.get(k) ?? []), f.slug]);
+    ajouter(`ids:${ids.join("|")}`, f.slug);
+    const formats = retenus.map((x) => `${x.km}@${String(x.date ?? f.prochaine?.debut ?? "").slice(0, 10)}`).sort().join(",");
+    if (cleNomVille(f.nom, f.ville) !== "::") ajouter(`nom:${cleNomVille(f.nom, f.ville)}|${formats}`, f.slug);
   }
   const jumelles = new Map<string, string>();
-  for (const slugs of parIds.values()) {
+  for (const slugs of groupes.values()) {
     if (slugs.length < 2) continue;
     const [gardee, ...autres] = [...slugs].sort((a, b) =>
       Number(aDesLignes(b)) - Number(aDesLignes(a)) || a.length - b.length || a.localeCompare(b));
