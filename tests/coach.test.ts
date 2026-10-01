@@ -1439,7 +1439,9 @@ test("les onglets Santé cités correspondent aux VRAIS libellés de l'écran", 
   // nom français : « no separador "Poids" » à un lusophone dont l'onglet affiche « Peso ».
   const hc = readFileSync("src/components/health/HealthCenter.tsx", "utf8");
   for (const [lg, labels] of Object.entries(HEALTH_TABS)) {
-    assert.equal(labels.length, 5, `${lg} : 5 onglets attendus`);
+    // 3 onglets depuis le 30/09/2026 (Journal et Sécurité retirés) — et AUCUN des anciens.
+    assert.equal(labels.length, 3, `${lg} : 3 onglets attendus`);
+    assert.ok(!labels.some((l) => /Journal|Tagebuch|Diario|Diário|Sécurité|Safety|Sicherheit|Seguridad|Segurança/.test(l)), `${lg} : l'assistant cite un onglet retiré`);
     for (const label of labels) {
       assert.ok(hc.includes(`"${label}"`), `onglet « ${label} » (${lg}) absent de HealthCenter.tsx`);
     }

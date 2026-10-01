@@ -17,6 +17,7 @@
  *   npx tsx tests/courses.crash.test.ts
  */
 import assert from "node:assert/strict";
+import { RX } from "../src/components/races/racesI18n";
 import { readFileSync, existsSync } from "node:fs";
 import { grouperEvenements, cleEvenement, normNom } from "../src/lib/races/groupes";
 import { correctedRaceType } from "../src/lib/raceType";
@@ -690,8 +691,16 @@ test("le compteur affiche le nombre de COURSES, pas le nombre de cartes", () => 
     .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
   assert.ok(/\(totalCount \?\? filtered\.length\) : filtered\.length\)\.toLocaleString/.test(src),
     "le grand compteur est repassé sur le nombre de cartes : le catalogue paraîtra deux fois plus pauvre");
-  assert.ok(/\{evenements\.length\.toLocaleString\(lang\)\} \{d\["events"\]\}/.test(src),
+  // 30/09/2026 : la sous-ligne dit la RELATION (« dans 8 003 événements »), et le bas de
+  // page donne les deux nombres ensemble — plus de « 8 000 » d'un côté, « 14 700 » de l'autre.
+  assert.ok(/tr\("f\.dansEvts", \{ e: evenements\.length\.toLocaleString\(lang\) \}\)/.test(src),
     "la sous-ligne n'annonce plus le nombre d'événements : l'écart avec les cartes devient inexplicable");
+  assert.ok(/tr\("pageInfo", \{ p: page \+ 1, t: totalPages, n: evenements\.length\.toLocaleString\(lang\), c: filtered\.length\.toLocaleString\(lang\) \}\)/.test(src),
+    "le bas de page ne donne plus le nombre de courses à côté du nombre d'événements");
+  for (const l of Object.keys(RX)) assert.ok(RX[l]["pageInfo"].includes("{c}") && RX[l]["f.dansEvts"].includes("{e}"), `${l} : libellé de compteur incomplet`);
+  const carte = readFileSync("src/components/races/RacesMapView.tsx", "utf8");
+  assert.ok(/const nbEvenements = useMemo\(\(\) => grouperEvenements\(filtered\)\.length/.test(carte) && !/\{d\["pins"\]\}/.test(carte),
+    "la carte compte encore des « pins » au lieu des événements de la liste");
   const i18n = readFileSync("src/components/races/racesI18n.ts", "utf8");
   assert.equal((i18n.match(/"events": "/g) ?? []).length, 5, "le libellé « événements » manque dans une langue");
 });

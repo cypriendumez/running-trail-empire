@@ -54,7 +54,8 @@ test("toute table écrite depuis le navigateur a une politique RLS dans les migr
   // Sentinelle de vivacité : `profiles` est écrit à l'inscription (plusieurs `.update`).
   // Si le motif ne le trouve plus, c'est lui qui est cassé, pas le code.
   assert.ok(ecrites.has("profiles"), "l'inscription n'écrit plus le profil depuis le navigateur : le test ne surveille plus le bon endroit");
-  assert.ok(ecrites.size >= 5, `seulement ${ecrites.size} table(s) écrite(s) trouvée(s) : le motif ne trouve plus le code`);
+  // 4 depuis le 30/09/2026 : le Smart Journal (seul écrivain de `journal_entries`) a été retiré.
+  assert.ok(ecrites.size >= 4, `seulement ${ecrites.size} table(s) écrite(s) trouvée(s) : le motif ne trouve plus le code`);
   // ⚠️ ET LA VMA NE DOIT PLUS S'ÉCRIRE DEPUIS LE NAVIGATEUR. Le test 6 min se mesure via
   // /api/vma (client de service, hors périmètre RLS) ; réintroduire une insertion
   // `performance_baselines` dans l'inscription ferait revenir le 42501 de 100 % des inscrits.

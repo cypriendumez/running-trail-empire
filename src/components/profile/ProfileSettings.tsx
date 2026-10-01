@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect , useId } from "react";
+import { tousLesModeles, suggererModeles, toutesLesMarques, compact } from "@/lib/gear/modelesChaussures";
+import { useState, useRef, useEffect , useId, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -314,22 +315,8 @@ function Toggle({ enabled, onToggle, label }: { enabled: boolean; onToggle: () =
   );
 }
 
-// Marques + modèles populaires (autocomplétion du garage) — clés en minuscules.
-const SHOE_BRANDS = ["Nike", "Hoka", "Adidas", "Asics", "Saucony", "Brooks", "New Balance", "Salomon", "On", "Puma", "Mizuno", "Altra"];
-const SHOE_MODELS: Record<string, string[]> = {
-  nike: ["Vaporfly 3", "Alphafly 3", "Pegasus 41", "Pegasus Plus", "Vomero 18", "Structure 25", "Invincible 3", "Zoom Fly 6", "Streakfly", "Pegasus Trail 5", "Ultrafly", "Kiger 10"],
-  hoka: ["Mach 6", "Clifton 9", "Bondi 9", "Rocket X 2", "Speedgoat 6", "Mafate 4", "Challenger 7", "Arahi 7", "Skyward X", "Cielo X1", "Torrent 3", "Tecton X 2"],
-  adidas: ["Adizero Adios Pro 4", "Adizero Boston 12", "Adizero SL", "Supernova Rise", "Ultraboost Light", "Takumi Sen 10", "Terrex Agravic Speed", "Terrex Speed Ultra"],
-  asics: ["Metaspeed Sky Paris", "Metaspeed Edge Paris", "Novablast 4", "Gel-Nimbus 26", "Gel-Kayano 31", "Gel-Cumulus 26", "Magic Speed 4", "Superblast 2", "Trabuco Max 3", "Fuji Lite 4"],
-  saucony: ["Endorphin Speed 4", "Endorphin Pro 4", "Endorphin Elite", "Kinvara 15", "Ride 17", "Triumph 22", "Guide 17", "Peregrine 14", "Xodus Ultra 3"],
-  brooks: ["Ghost 16", "Glycerin 21", "Hyperion Max 2", "Hyperion Elite 4", "Launch 10", "Adrenaline GTS 23", "Caldera 7", "Cascadia 18", "Catamount 3"],
-  "new balance": ["FuelCell SC Elite v4", "FuelCell Rebel v4", "SuperComp Trainer v3", "Fresh Foam X 1080v14", "Fresh Foam More v5", "Hierro v8", "SC Trail"],
-  salomon: ["S/Lab Genesis", "Sense Ride 5", "Speedcross 6", "Pulsar Trail Pro 2", "Ultra Glide 2", "S/Lab Pulsar 3", "Thundercross", "Aero Glide 2"],
-  on: ["Cloudmonster 2", "Cloudboom Strike", "Cloudsurfer 2", "Cloudeclipse", "Cloudultra 2", "Cloudvista 2"],
-  puma: ["Deviate Nitro 3", "Deviate Nitro Elite 3", "Velocity Nitro 3", "ForeverRun Nitro 2", "Fast-R Nitro Elite 2"],
-  mizuno: ["Wave Rebellion Pro 2", "Wave Neo Ultra", "Wave Sky 8", "Wave Rider 28", "Wave Inspire 20", "Wave Mujin 10"],
-  altra: ["Escalante 4", "Torin 8", "Lone Peak 8", "Olympus 6", "Mont Blanc Carbon", "Vanish Carbon"],
-};
+// Autocomplétion du garage : toutes les générations de chaque gamme, prolongées par le
+// catalogue du comparateur (lib/gear/modelesChaussures) — plus une liste figée à la main.
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals, stats, fitness, userId, etatAbo, catalogue = [] }: {
@@ -736,13 +723,9 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
   //    du catalogue portent leurs cotes ; les ~100 noms écrits en dur n'en ont aucune,
   //    mais ils couvrent des générations que le catalogue n'a pas encore. Les remplacer
   //    ferait disparaître des modèles que des athlètes ont réellement au pied.
-  const marquesCat = Array.from(new Set(catalogue.map(m => m.marque)));
-  const toutesMarques = Array.from(new Set([...marquesCat, ...SHOE_BRANDS]));
-  const shoeBrandOpts = toutesMarques.filter(b => b.toLowerCase().includes(shoeBrandQ) && b.toLowerCase() !== shoeBrandQ).slice(0, 8);
-  const modelesCat = catalogue.filter(m => !shoeBrandQ || m.marque.toLowerCase() === shoeBrandQ).map(m => m.nom);
-  const shoeModelPool = Array.from(new Set([...modelesCat, ...(SHOE_MODELS[shoeBrandQ] ?? Object.values(SHOE_MODELS).flat())]));
-  const shoeModelQ = newShoe.model.trim().toLowerCase();
-  const shoeModelOpts = shoeModelPool.filter(m => m.toLowerCase().includes(shoeModelQ) && m.toLowerCase() !== shoeModelQ).slice(0, 10);
+  const tousModeles = useMemo(() => tousLesModeles(catalogue), [catalogue]);
+  const shoeBrandOpts = toutesLesMarques(tousModeles).filter(b => compact(b).includes(compact(shoeBrandQ)) && b.toLowerCase() !== shoeBrandQ).slice(0, 8);
+  const shoeModelOpts = suggererModeles(tousModeles, newShoe.brand, newShoe.model, 10);
 
   // ── Graphiques façon Garmin : tendance VO2max + prédicteur de course (allures) ──
   const vo2Hist = Array.isArray(g?.vo2maxHistory) ? g!.vo2maxHistory! : [];
@@ -1681,16 +1664,19 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       {modelFocus && shoeModelOpts.length > 0 && (
                         <div className="absolute z-30 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-zinc-200 bg-white py-1 shadow-xl">
                           {shoeModelOpts.map(m => (
-                            <button key={m} type="button" onMouseDown={e => e.preventDefault()}
+                            <button key={`${m.marque}|${m.nom}`} type="button" onMouseDown={e => e.preventDefault()}
                               onClick={() => {
                                 // La durée de vie annoncée par le fabricant vaut mieux que
                                 // les 800 km par défaut, qui ne viennent d'aucune mesure.
-                                const f = trouver(catalogue, newShoe.brand, m);
-                                setNewShoe(s => ({ ...s, model: m, max_km: f?.dureeVieKm ? String(f.dureeVieKm) : s.max_km }));
+                                // Et la MARQUE suit le modèle choisi : « gel nimbus 27 »
+                                // tapé sans marque range bien la paire chez Asics.
+                                const f = trouver(catalogue, m.marque, m.nom);
+                                setNewShoe(s => ({ ...s, brand: m.marque, model: m.nom, max_km: f?.dureeVieKm ? String(f.dureeVieKm) : s.max_km }));
                                 setModelFocus(false);
                               }}
-                              className="block w-full px-3 py-2 text-left text-sm font-medium text-zinc-700 transition-colors hover:bg-emerald-50">
-                              {m}
+                              className="flex w-full items-baseline gap-2 px-3 py-2 text-left text-sm font-medium text-zinc-700 transition-colors hover:bg-emerald-50">
+                              <span>{m.nom}</span>
+                              {compact(m.marque) !== compact(newShoe.brand) && <span className="text-xs font-normal text-zinc-400">{m.marque}</span>}
                             </button>
                           ))}
                         </div>

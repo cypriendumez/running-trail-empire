@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, useMemo, useCallback } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, MapPin, Calendar, Zap, Mountain, ChevronRight, Loader2, Flag } from "lucide-react";
+import { X, MapPin, Calendar, Zap, Mountain, ChevronRight, ChevronDown, Loader2, Flag, type LucideIcon } from "lucide-react";
 import type { Race } from "@/types";
 import { correctedRaceType } from "@/lib/raceType";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { RX, dateRangeKey } from "./racesI18n";
 import { AutourDeMoi } from "./AutourDeMoi";
+import { grouperEvenements } from "@/lib/races/groupes";
 import { LiensCourse } from "./LiensCourse";
 import { usePleinEcran } from "@/lib/ui/pleinEcran";
 import { dansLeRayon, type Point, type Proximite } from "@/lib/races/proximite";
@@ -115,6 +116,11 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
     if (matchesDateRange(r.date) && dansLeRayon(r, proximite)) { const t = correctedRaceType(r.distance_km, r.type, r.name); acc[t] = (acc[t] || 0) + 1; }
     return acc;
   }, {}), [withCoords, matchesDateRange, proximite]);
+
+  // Le compteur parle comme la liste : des ÉVÉNEMENTS (le 10 km et le semi d'un même
+  // week-end en font un), puis le nombre de courses. « 14 759 pins » d'un côté et
+  // « 8 003 événements » de l'autre, c'était deux chiffres sans lien (Cyprien, 30/09/2026).
+  const nbEvenements = useMemo(() => grouperEvenements(filtered).length, [filtered]);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -239,90 +245,68 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 flex flex-col bg-slate-50"
     >
-      {/* ── Top bar ─────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-4 py-2.5 bg-white border-b border-zinc-200 shadow-sm z-10 flex-wrap">
-        {/* Back */}
+      {/* ── Barre du haut ───────────────────────────────────────────────────
+          ⚠️ REFAITE LE 30/09/2026 (Cyprien : « ça fait pas pro et pas intuitif en
+          filtre », « mets Autour de moi avec les autres filtres »). Deux rangées de 17
+          pastilles grises (« Trail S 9627 », « 2 ans »…) et « Autour de moi » isolé à
+          l'autre bout de l'écran. Désormais trois filtres de MÊME forme, côte à côte —
+          Dates, Type de course, Autour de moi — un « Effacer » quand un filtre est actif,
+          et un compteur qui parle comme la liste (événements, puis courses). */}
+      <div className="z-10 flex flex-wrap items-center gap-2 border-b border-zinc-200 bg-white px-3 py-2 shadow-sm sm:flex-nowrap sm:px-4">
         <button
           onClick={onClose}
-          className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 font-medium transition-colors flex-shrink-0"
+          className="flex h-9 flex-shrink-0 items-center gap-1 rounded-full pl-1.5 pr-3 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900"
         >
-          <ChevronRight className="w-4 h-4 rotate-180" />
+          <ChevronRight className="h-4 w-4 rotate-180" />
           {d["back"]}
         </button>
-        <div className="w-px h-4 bg-zinc-200 flex-shrink-0" />
 
-        {/* Count */}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <MapPin className="w-3.5 h-3.5 text-emerald-600" />
-          <span className="text-sm font-bold text-zinc-800">{filtered.length}</span>
-          <span className="text-xs text-zinc-400">{d["pins"]} · {races.length.toLocaleString(lang)} {d["courses"]}</span>
+        {/* Compteur : à droite sur ordinateur, à côté du retour sur téléphone. */}
+        <div className="ml-auto flex flex-shrink-0 items-baseline gap-1.5 sm:order-last" aria-live="polite">
+          <span className="text-sm font-bold tabular-nums text-zinc-900">{nbEvenements.toLocaleString(lang)}</span>
+          <span className="text-xs text-zinc-500">{nbEvenements > 1 ? d["events"] : d["f.event"]}</span>
+          <span className="hidden text-xs text-zinc-400 md:inline">· {filtered.length.toLocaleString(lang)} {filtered.length > 1 ? d["courses"] : d["course"]}</span>
         </div>
 
-        {/* ── Date range filter ─────────────────────────────────── */}
-        {/* ⚠️ SUR TÉLÉPHONE, UNE LIGNE QUI DÉFILE (Cyprien, 21/09/2026). En retour à la
-            ligne, « Cette semaine » se cassait en deux et l'entête mangeait un quart de
-            l'écran ; la géolocalisation, elle, remonte sur la première ligne (order). */}
-        <div className="order-2 flex w-full items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:order-none sm:ml-1 sm:w-auto sm:overflow-visible">
-          <Calendar className="w-3.5 h-3.5 text-zinc-400 flex-shrink-0" />
-          <div className="flex flex-nowrap gap-1 sm:flex-wrap">
-            {DATE_RANGES.map(r => (
-              <button
-                key={r.days}
-                onClick={() => setDateRangeDays(r.days)}
-                className={`flex-shrink-0 whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-semibold transition-all ${
-                  dateRangeDays === r.days
-                    ? "bg-zinc-900 text-white"
-                    : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
-                }`}
-              >
-                {d[dateRangeKey(r.days)]}
-              </button>
+        {/* ⚠️ SUR TÉLÉPHONE, UNE LIGNE QUI DÉFILE (Cyprien, 21/09/2026) : jamais un
+            libellé cassé en deux, jamais un quart d'écran mangé par les filtres. */}
+        <div className="flex w-full min-w-0 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:w-auto sm:flex-1 sm:overflow-visible">
+          <FiltreMenu icone={Calendar} libelle={d["f.dates"]} actif={dateRangeDays !== ALL_DAYS}
+            texte={dateRangeDays === ALL_DAYS ? d["f.toutesDates"] : d[dateRangeKey(dateRangeDays)]}
+            valeur={String(dateRangeDays)} onChange={(v) => setDateRangeDays(Number(v))}>
+            {DATE_RANGES.map((r) => (
+              <option key={r.days} value={r.days}>{r.days === ALL_DAYS ? d["f.toutesDates"] : d[dateRangeKey(r.days)]}</option>
             ))}
-          </div>
-        </div>
+          </FiltreMenu>
 
-        <div className="hidden w-px h-4 bg-zinc-200 flex-shrink-0 sm:block" />
+          <FiltreMenu icone={Flag} libelle={d["legendTitle"]} actif={filterType !== "all"}
+            pastille={filterType !== "all" ? (TYPE_COLORS[filterType] || "#22c55e") : undefined}
+            texte={filterType === "all" ? d["f.tousTypes"] : (d[`rts.${filterType}`] ?? filterType)}
+            valeur={filterType} onChange={setFilterType}>
+            <option value="all">{d["f.tousTypes"]}</option>
+            {Object.entries(typeCounts)
+              .sort((a, b) => b[1] - a[1])
+              .map(([type, count]) => (
+                <option key={type} value={type}>{d[`rts.${type}`] ?? type} · {count.toLocaleString(lang)}</option>
+              ))}
+          </FiltreMenu>
 
-        {/* ── Type filter pills ─────────────────────────────────── */}
-        <div className="order-3 flex w-full flex-nowrap items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:order-none sm:w-auto sm:flex-wrap sm:overflow-visible">
-          <button
-            onClick={() => setFilterType("all")}
-            className={`flex-shrink-0 whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-semibold transition-all ${
-              filterType === "all" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
-            }`}
-          >
-            {d["allShort"]}
-          </button>
-          {Object.entries(typeCounts)
-            .sort((a, b) => b[1] - a[1])
-            .map(([type, count]) => (
-              <button
-                key={type}
-                onClick={() => setFilterType(filterType === type ? "all" : type)}
-                className="flex flex-shrink-0 items-center gap-1 whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-semibold transition-all"
-                style={{
-                  background: filterType === type ? (TYPE_COLORS[type] || "#22c55e") : "#f3f4f6",
-                  color: filterType === type ? "white" : "#374151",
-                }}
-              >
-                <span
-                  className="w-1.5 h-1.5 rounded-full"
-                  style={{ background: filterType === type ? "white" : (TYPE_COLORS[type] || "#22c55e") }}
-                />
-                {d[`rts.${type}`] ?? type} {count}
-              </button>
-            ))}
-        </div>
-
-        {/* « Autour de moi » — À LA PLACE du bouton « Géolocaliser », qui ne localisait
-            PAS l'athlète : il lançait le géocodage de tout le catalogue (tâche de
-            maintenance, 5 min, écritures en base) depuis n'importe quel compte. Retiré le
-            28/09/2026 ; la route est désormais réservée à l'administration. */}
-        {onProximite && (
-          <div className="ml-auto flex-shrink-0">
+          {/* « Autour de moi » — À LA PLACE du bouton « Géolocaliser », qui ne localisait
+              PAS l'athlète : il lançait le géocodage de tout le catalogue (tâche de
+              maintenance, 5 min, écritures en base) depuis n'importe quel compte. Retiré le
+              28/09/2026 ; la route est désormais réservée à l'administration. */}
+          {onProximite && (
             <AutourDeMoi valeur={proximite} onChange={onProximite} positionEntrainement={positionEntrainement} d={d} compact />
-          </div>
-        )}
+          )}
+
+          {(dateRangeDays !== ALL_DAYS || filterType !== "all" || proximite) && (
+            <button type="button"
+              onClick={() => { setDateRangeDays(ALL_DAYS); setFilterType("all"); onProximite?.(null); }}
+              className="h-9 flex-shrink-0 whitespace-nowrap rounded-full px-3 text-sm font-medium text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900">
+              {d["f.effacer"]}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── Map + side panel ─────────────────────────────────────────────── */}
@@ -460,5 +444,28 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
         </div>
       </div>
     </motion.div>
+  );
+}
+
+/**
+ * Un filtre en forme de pastille, qui ouvre le MENU NATIF du système (liste déroulante sur
+ * ordinateur, roue de sélection sur téléphone) : accessible au clavier et au lecteur
+ * d'écran sans rien réinventer. Le `<select>` transparent couvre toute la pastille.
+ */
+function FiltreMenu({ icone: Icone, libelle, texte, valeur, onChange, actif, pastille, children }: {
+  icone: LucideIcon; libelle: string; texte: string; valeur: string;
+  onChange: (v: string) => void; actif: boolean; pastille?: string; children: ReactNode;
+}) {
+  return (
+    <label className={`relative flex h-9 flex-shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border pl-3 pr-8 text-sm font-medium transition-colors focus-within:ring-2 focus-within:ring-emerald-500/40 ${
+      actif ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50"}`}>
+      {pastille ? <span className="h-2 w-2 rounded-full ring-2 ring-white/70" style={{ background: pastille }} aria-hidden /> : <Icone className="h-4 w-4 opacity-70" aria-hidden />}
+      <span aria-hidden>{texte}</span>
+      <ChevronDown className="pointer-events-none absolute right-2.5 h-4 w-4 opacity-60" aria-hidden />
+      <select aria-label={libelle} value={valeur} onChange={(e) => onChange(e.target.value)}
+        className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0">
+        {children}
+      </select>
+    </label>
   );
 }

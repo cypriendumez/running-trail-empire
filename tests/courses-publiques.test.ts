@@ -409,8 +409,9 @@ test("aucune donnée structurée d'événement sans date", () => {
   // invalide ; en inventer une serait pire, car un moteur affiche cette date dans ses
   // résultats comme un fait vérifié.
   const page = readFileSync("src/app/courses/[slug]/page.tsx", "utf8");
-  assert.ok(/!aUneDate\(c\) \? null :/.test(page),
-    "les données structurées d'événement sont émises même sans date");
+  // Ni avec une date seulement ESTIMÉE (30/09/2026) : « ≈ » n'est pas un fait vérifié.
+  assert.ok(/!aUneDate\(c\) \|\| c\.date_confirmee === false \? null :/.test(page),
+    "les données structurées d'événement sont émises même sans date (ou avec une date estimée)");
   assert.ok(/\{jsonLd && <script/.test(page), "le bloc est rendu même quand il vaut null");
   // Et la page doit DIRE que la date manque, au lieu de laisser un blanc.
   assert.ok(/sansDate\.titre/.test(page) && /sansDate\.texte/.test(page),

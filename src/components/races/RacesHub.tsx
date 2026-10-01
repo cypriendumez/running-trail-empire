@@ -328,8 +328,12 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
               {(loadingAll && !search && region === "Toutes" && raceType === "all" && !dateFrom && !proximite ? (totalCount ?? filtered.length) : filtered.length).toLocaleString(lang)} {filtered.length > 1 || loadingAll ? d["courses"] : d["course"]}
             </span>
             {!loadingAll && (
-              <span className="block text-[11px] text-zinc-400">
-                {evenements.length.toLocaleString(lang)} {d["events"]} · {races.filter(r => r.date?.startsWith("2099")).length.toLocaleString(lang)} {d["toConfirm"]}
+              // ⚠️ « 14 759 courses » en haut, « 8 003 événements » en bas de page : deux
+              // nombres sans lien apparent (Cyprien, 30/09/2026 : « pourquoi il annonce
+              // 8 000 et en haut 14 700 ? »). La sous-ligne dit désormais la RELATION —
+              // « dans 8 003 événements » — et l'infobulle l'explique.
+              <span className="block text-[11px] text-zinc-400" title={d["f.explication"]}>
+                {tr("f.dansEvts", { e: evenements.length.toLocaleString(lang) })} · {races.filter(r => r.date?.startsWith("2099")).length.toLocaleString(lang)} {d["f.sansDate"]}
               </span>
             )}
           </span>
@@ -592,7 +596,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                     17 027 courses : le même mot pour deux nombres, à deux endroits de
                     la même page. Une carte regroupe toutes les distances d'un même
                     week-end — c'est un événement, pas une course. */}
-                {tr("pageInfo", { p: page + 1, t: totalPages, n: evenements.length.toLocaleString(lang) })}
+                {tr("pageInfo", { p: page + 1, t: totalPages, n: evenements.length.toLocaleString(lang), c: filtered.length.toLocaleString(lang) })}
               </span>
               <button
                 onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}

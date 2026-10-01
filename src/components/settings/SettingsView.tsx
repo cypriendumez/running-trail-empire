@@ -1,5 +1,6 @@
 "use client";
 
+import { ContactUrgence } from "./ContactUrgence";
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -126,6 +127,12 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
   const sb = createClient();
   const { t, lang, setLang } = useT();
   const [tab, setTab] = useState<TabKey>("profil");
+  // « Paramètres › Sécurité » s'ouvre directement depuis un lien (`?onglet=securite`) —
+  // l'enregistrement de sortie y renvoie quand aucun contact d'urgence n'est enregistré.
+  useEffect(() => {
+    const o = new URLSearchParams(window.location.search).get("onglet");
+    if (o && TABS.some((x) => x.k === o)) setTab(o as TabKey);
+  }, []);
 
   // ── Préférences serveur (couleur, unités, début de semaine) ──
   const [color, setColor] = useState(s(settings.avatarColor) || "emerald");
@@ -346,6 +353,10 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
                   <button onClick={saveEmail} disabled={savingEmail || !newEmail} className="inline-flex h-[42px] items-center gap-2 rounded-xl border border-zinc-200 px-4 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50">{savingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : t("set.email.send")}</button>
                 </div>
               </Card>
+
+              {/* Le contact d'urgence a quitté Santé › Sécurité (30/09/2026) : il sert à
+                  l'enregistrement de sortie, sa place est avec la sécurité du compte. */}
+              <ContactUrgence initial={{ nom: s(settings.contactUrgenceNom), tel: s(settings.contactUrgenceTel) }} />
 
               <Card title={t("set.session")}>
                 <button onClick={signOut} className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-semibold text-zinc-700 transition-colors hover:bg-red-50 hover:text-red-600"><LogOut className="h-4 w-4" /> {t("set.logout")}</button>

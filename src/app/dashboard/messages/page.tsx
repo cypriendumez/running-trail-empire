@@ -10,11 +10,11 @@ export const metadata = { title: "Messagerie" };
 
 // ── i18n local (5 langues) — en-tête serveur de la page. ───────────────────
 const L: Record<string, { title: string; subtitle: string }> = {
-  fr: { title: "Messagerie", subtitle: "Échange directement avec ton coach — questions, imprévus, douleurs, objectifs." },
-  en: { title: "Messages", subtitle: "Chat directly with your coach — questions, hiccups, aches, goals." },
-  de: { title: "Nachrichten", subtitle: "Tausche dich direkt mit deinem Coach aus — Fragen, Unvorhergesehenes, Schmerzen, Ziele." },
-  es: { title: "Mensajería", subtitle: "Habla directamente con tu coach: preguntas, imprevistos, dolores, objetivos." },
-  pt: { title: "Mensagens", subtitle: "Fala diretamente com o teu coach — perguntas, imprevistos, dores, objetivos." },
+  fr: { title: "Messages", subtitle: "Ton coach et tes amis, en direct." },
+  en: { title: "Messages", subtitle: "Your coach and your friends, in real time." },
+  de: { title: "Nachrichten", subtitle: "Dein Coach und deine Freunde, direkt." },
+  es: { title: "Mensajes", subtitle: "Tu coach y tus amigos, en directo." },
+  pt: { title: "Mensagens", subtitle: "O teu coach e os teus amigos, em direto." },
 };
 
 export default async function MessagesPage() {
@@ -35,12 +35,15 @@ export default async function MessagesPage() {
   const l = L[normLang(profileRow?.preferred_language ?? "fr")] ?? L.fr;
 
   const initial: Msg[] = (data ?? []).map((r) => {
-    const d = (r.data ?? {}) as { subject?: string; body?: string; ts?: string; attachments?: { url: string; name: string; type: string }[]; deleted?: boolean; from_name?: string; from_id?: string; to_id?: string };
+    const d = (r.data ?? {}) as { subject?: string; body?: string; ts?: string; attachments?: { url: string; name: string; type: string }[]; deleted?: boolean; from_name?: string; from_id?: string; to_id?: string; to_name?: string };
     // Un message reçu d'un athlète est « à moi » comme un message du coach ; un message
     // que J'AI envoyé est à ranger dans « Envoyés », d'où la distinction par type.
     const from = r.type === "coach_message" || r.type === "athlete_message" ? "coach" : "client";
-    const auteur = r.type === "athlete_message" ? String(d.from_name ?? "").trim() : "";
-    return { id: String(r.id), from, subject: auteur ? `${auteur} — ${d.subject || ""}` : (d.subject || ""), body: d.body || "", ts: d.ts || (r.created_at as string), attachments: Array.isArray(d.attachments) ? d.attachments : [], deleted: !!d.deleted };
+    // LA CONVERSATION du message (messagerie en fils, 30/09/2026) : le coach, ou l'ami —
+    // l'expéditeur d'un message reçu, le destinataire d'un message envoyé.
+    const avec = r.type === "athlete_message" ? String(d.from_id ?? "") : r.type === "athlete_message_sent" ? String(d.to_id ?? "") : "coach";
+    const avecNom = r.type === "athlete_message" ? String(d.from_name ?? "").trim() : r.type === "athlete_message_sent" ? String(d.to_name ?? "").trim() : "";
+    return { id: String(r.id), from, subject: d.subject || "", body: d.body || "", ts: d.ts || (r.created_at as string), attachments: Array.isArray(d.attachments) ? d.attachments : [], deleted: !!d.deleted, avec: avec || "coach", avecNom: avecNom || undefined };
   });
 
   // Dès l'ouverture, les réponses du coach sont considérées lues → la pastille de la sidebar disparaît.
@@ -49,14 +52,11 @@ export default async function MessagesPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="mb-4 flex items-end justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2.5 text-xl font-bold tracking-tight text-zinc-900">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-[0_8px_20px_-8px_rgba(16,185,129,0.6)]"><MessagesSquare className="h-[18px] w-[18px]" /></span>
-            {l.title}
-          </h1>
-          <p className="mt-1 text-sm text-zinc-500">{l.subtitle}</p>
-        </div>
+      <div className="mb-3">
+        <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight text-zinc-900">
+          <MessagesSquare className="h-5 w-5 text-emerald-600" aria-hidden />{l.title}
+        </h1>
+        <p className="mt-0.5 text-sm text-zinc-500">{l.subtitle}</p>
       </div>
       <div className="min-h-0 flex-1">
         <MessageThread initial={initial} />

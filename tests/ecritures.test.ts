@@ -73,21 +73,19 @@ test("le paiement est refusé si le lien client Stripe ne peut pas être enregis
     "l'échec n'interrompt plus le parcours : l'athlète serait envoyé payer avec un lien absent");
 });
 
-test("le journal n'efface le texte QUE si l'écriture a réussi", () => {
-  // ⚠️ L'ORDRE EST TOUT. `setText("")` avant le contrôle d'erreur détruit ce que
-  // l'athlète vient d'écrire, sous une confirmation. C'est ce que faisait le code.
-  const src = codeNu("src/components/journal/SmartJournal.tsx");
-  const i = src.indexOf('from("journal_entries").insert');
-  assert.ok(i > 0, "l'insertion du journal a disparu");
-  const apres = src.slice(i, i + 900);
-  const posErreur = apres.search(/if\s*\(\s*error\s*\)/);
-  const posEfface = apres.indexOf('setText("")');
-  assert.ok(posErreur > 0, "l'insertion du journal ne lit pas son erreur");
-  assert.ok(posEfface > 0, "le champ n'est plus vidé après un enregistrement réussi");
-  assert.ok(posErreur < posEfface,
-    "le champ est vidé AVANT le contrôle d'erreur : l'entrée de l'athlète serait perdue");
-  assert.ok(/return;/.test(apres.slice(posErreur, posEfface)),
-    "l'échec ne coupe pas la suite : « Sauvegardé ✓ » s'afficherait quand même");
+test("le Smart Journal est retiré (30/09/2026) : plus aucun écran n'écrit dans journal_entries", () => {
+  // Cyprien : « est-ce que c'est vraiment utile ? Si ce n'est pas utile, enlève-le ».
+  // Vérifié : rien ne lisait ces entrées — ni le coach, ni le plan. Le ressenti de fin de
+  // séance (lib/dashboard/ressenti) porte désormais ce que l'athlète dit de sa forme.
+  // La table reste en base (aucune donnée supprimée) ; un écran qui y réécrirait sans
+  // lecteur serait une écriture pour personne.
+  const { readdirSync, statSync } = require("node:fs") as typeof import("node:fs");
+  const fichiers: string[] = [];
+  const parcourir = (d: string) => { for (const f of readdirSync(d)) { const p = `${d}/${f}`; if (statSync(p).isDirectory()) parcourir(p); else if (/\.tsx?$/.test(f)) fichiers.push(p); } };
+  parcourir("src/components"); parcourir("src/app/dashboard");
+  const ecrivains = fichiers.filter((f) => /from\("journal_entries"\)\.insert/.test(codeNu(f)));
+  assert.deepEqual(ecrivains, [], `le journal est revenu : ${ecrivains.join(", ")}`);
+  assert.ok(!/tab\.journal|SmartJournal/.test(codeNu("src/components/health/HealthCenter.tsx")), "l'onglet Journal est revenu dans Santé");
 });
 
 test("aucune écriture du profil n'échoue en silence", () => {

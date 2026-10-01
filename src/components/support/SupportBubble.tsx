@@ -102,10 +102,13 @@ export function SupportBubble() {
       {/* ⚠️ PAS DE BULLE FLOTTANTE SUR TÉLÉPHONE : elle recouvrait le contenu et l'onglet
           « Plus » (Cyprien, 21/09/2026). Sous md, l'assistant s'ouvre depuis la tuile
           « Assistant » de la feuille « Plus », qui émet `EVENEMENT_AIDE` ; le panneau,
-          lui, s'affiche au-dessus de la barre d'onglets. À partir de md, rien ne change. */}
+          lui, s'affiche au-dessus de la barre d'onglets. À partir de md, rien ne change.
+          ⚠️ PETITE ET DISCRÈTE (30/09/2026) : à 56 px elle cachait des chiffres (les
+          « 500 ml » du plan de ravitaillement, le bouton « Suivant » de la liste des
+          courses). 40 px, collée au coin, à moitié effacée tant qu'on ne la survole pas. */}
       <button data-bulle-aide onClick={() => setOpen((v) => !v)} aria-label={open ? t("close") : t("open")}
-        className="fixed bottom-5 right-5 z-50 hidden h-14 w-14 items-center justify-center rounded-full bg-zinc-900 text-white shadow-[0_10px_30px_-8px_rgba(0,0,0,0.45)] transition-transform hover:scale-105 active:scale-95 md:flex">
-        {open ? <X className="h-5 w-5" /> : <LifeBuoy className="h-6 w-6" />}
+        className={`fixed bottom-3 right-3 z-50 hidden h-10 w-10 items-center justify-center rounded-full bg-zinc-900 text-white shadow-[0_6px_16px_-6px_rgba(0,0,0,0.45)] transition-all hover:scale-105 hover:opacity-100 active:scale-95 md:flex ${open ? "opacity-100" : "opacity-70"}`}>
+        {open ? <X className="h-4 w-4" /> : <LifeBuoy className="h-[18px] w-[18px]" />}
       </button>
 
       <AnimatePresence>
@@ -114,7 +117,7 @@ export function SupportBubble() {
             initial={{ opacity: 0, y: 16, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.97 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
             data-bulle-aide
-            className="fixed bottom-20 right-5 z-50 flex w-[min(420px,calc(100vw-2.5rem))] md:bottom-24 flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-[0_24px_60px_-15px_rgba(16,24,40,0.35)]"
+            className="fixed bottom-20 right-5 z-50 flex w-[min(420px,calc(100vw-2.5rem))] md:bottom-16 md:right-3 flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-[0_24px_60px_-15px_rgba(16,24,40,0.35)]"
             style={{ maxHeight: "min(600px, calc(100vh - 8rem))" }}>
 
             {/* En-tête volontairement SOBRE. Une version précédente empilait un dégradé

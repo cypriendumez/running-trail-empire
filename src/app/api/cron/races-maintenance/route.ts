@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { editionSuivanteEstimee } from "@/lib/races/prochaineEdition";
 
 /**
  * BASCULEMENT QUOTIDIEN DES COURSES PASSÉES.
@@ -15,6 +16,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
  *
  * Les courses françaises sont annuelles : une édition passée n'est pas une course
  * disparue. On bascule donc la date sur le marqueur 2099-01-01, affiché « Date à venir ».
+ *
+ * ⚠️ SAUF QUAND L'ÉDITION SUIVANTE SE DEVINE (30/09/2026). Les Foulées Lambersartoises,
+ * courues le dimanche 27/09, sont passées en « Date à venir » le lendemain — Cyprien :
+ * « pourquoi il met Date à venir alors que l'édition était le week-end dernier ? ». Une
+ * course de WEEK-END revient au même rang du même mois (« 4e dimanche de septembre ») :
+ * elle reçoit cette date, marquée ESTIMÉE (`date_confirmee = false`, affichée « ≈ »),
+ * que le relevé hebdomadaire du site officiel confirme ou corrige
+ * (`scripts/dates-sites.ts`). En semaine, l'estimation se trompait toujours : 2099.
  *
  * ⚠️ CETTE ROUTE NE SUPPRIME RIEN. La route d'administration supprime en plus les
  * éditions périmées déjà remplacées par une édition future ; c'est utile mais destructif,
@@ -42,28 +51,41 @@ export async function GET(req: Request) {
   //    Borné à 5 tours — au-delà, c'est un problème qu'une boucle ne réglera pas.
   const PAGE = 1000;
   const LOT = 200;
-  let bascules = 0;
+  const A_VENIR = "2099-01-01";
+  let bascules = 0, estimees = 0;
   let tours = 0;
+  let colonneConfirmee = true;
 
   for (; tours < 5; tours++) {
-    const aBasculer: string[] = [];
+    // Date cible → courses : l'édition suivante estimée, ou le marqueur « à venir ».
+    const parCible = new Map<string, string[]>();
+    let lues = 0;
     for (let from = 0; ; from += PAGE) {
-      const { data, error } = await sb.from("races").select("id")
+      const { data, error } = await sb.from("races").select("id, date")
         .lt("date", aujourdhui).order("id").range(from, from + PAGE - 1);
       if (error) return NextResponse.json({ error: error.message, bascules }, { status: 500 });
       if (!data?.length) break;
-      aBasculer.push(...data.map((r) => r.id as string));
+      for (const r of data) {
+        const cible = (colonneConfirmee && editionSuivanteEstimee(r.date, aujourdhui)) || A_VENIR;
+        parCible.set(cible, [...(parCible.get(cible) ?? []), r.id as string]);
+      }
+      lues += data.length;
       if (data.length < PAGE) break;
     }
-    if (!aBasculer.length) break;
+    if (!lues) break;
 
-    for (let i = 0; i < aBasculer.length; i += LOT) {
-      const lot = aBasculer.slice(i, i + LOT);
-      const { error } = await sb.from("races")
-        .update({ date: "2099-01-01", updated_at: new Date().toISOString() })
-        .in("id", lot);
+    for (const [cible, ids] of parCible) for (let i = 0; i < ids.length; i += LOT) {
+      const lot = ids.slice(i, i + LOT);
+      const patch = cible === A_VENIR
+        ? { date: A_VENIR, updated_at: new Date().toISOString() }
+        : { date: cible, date_confirmee: false, updated_at: new Date().toISOString() };
+      const { error } = await sb.from("races").update(patch).in("id", lot);
+      // Colonne `date_confirmee` absente (migration 032 non passée) : on ne peut pas dire
+      // « estimée » — le marqueur reprend la main, au tour suivant.
+      if (error?.code === "42703") { colonneConfirmee = false; continue; }
       if (error) return NextResponse.json({ error: error.message, bascules }, { status: 500 });
       bascules += lot.length;
+      if (cible !== A_VENIR) estimees += lot.length;
     }
   }
 
@@ -85,12 +107,13 @@ export async function GET(req: Request) {
   return NextResponse.json({
     ok: true,
     bascules,
+    estimees,
     restantes: restantes ?? null,
     tours,
     visitesPurgees: eVisites ? null : (visitesPurgees ?? 0),
     purgeVisites: eVisites ? eVisites.message : "ok",
     message: bascules
-      ? `${bascules} course(s) passée(s) rebasculée(s) en « Date à venir » — elles redeviennent visibles au catalogue. Restantes : ${restantes ?? "?"}.`
+      ? `${bascules} course(s) passée(s) rebasculée(s) — ${estimees} sur l'édition suivante estimée (≈), les autres en « Date à venir ». Restantes : ${restantes ?? "?"}.`
       : "Aucune course passée : le catalogue est à jour.",
   });
 }

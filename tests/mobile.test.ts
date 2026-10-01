@@ -144,8 +144,10 @@ test("la barre réserve sa place : le pied de page ne finit pas derrière elle",
 test("sur mobile, l'assistant vit dans « Plus », pas en bulle flottante — et il s'ouvre vraiment", () => {
   // Cyprien, 21/09/2026 : la bulle recouvrait le contenu et l'onglet « Plus ».
   const bulle = codeNu("src/components/support/SupportBubble.tsx");
-  assert.ok(/fixed bottom-5 right-5 z-50 hidden [^"]*md:flex/.test(bulle),
+  assert.ok(/fixed bottom-3 right-3 z-50 hidden [^"`]*md:flex/.test(bulle),
     "la bulle flottante s'affiche encore sur téléphone (ou a disparu du bureau)");
+  // Cyprien, 30/09/2026 : « le bouton en bas à droite cache des données, mets-le plus petit ».
+  assert.ok(/fixed bottom-3 right-3 z-50 hidden h-10 w-10 /.test(bulle) && !/h-14 w-14/.test(bulle), "la bulle d'aide a regrossi");
   // Le panneau, lui, doit se poser AU-DESSUS de la barre d'onglets (4 rem), pas dessous.
   assert.ok(/fixed bottom-20 right-5 z-50 flex w-\[min\(420px/.test(bulle),
     "le panneau d'aide ne se place plus au-dessus de la barre d'onglets sur mobile");

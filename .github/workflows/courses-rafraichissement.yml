@@ -107,6 +107,11 @@ jobs:
       - name: Lire les liens « Résultats » des sites officiels
         run: npx tsx scripts/resultats-sites.ts "$ETAT/fiches-semaine.jsonl" "$ETAT/resultats-sites.jsonl" --relire-apres 56
 
+      # Les dates : la maintenance quotidienne ESTIME l'édition suivante d'une course passée
+      # (≈) ; ici on la VÉRIFIE sur la page officielle, qui la confirme ou la corrige.
+      - name: Vérifier les dates sur les sites officiels (lecture)
+        run: npx tsx scripts/dates-sites.ts "$ETAT/dates-sites.jsonl"
+
       - name: Sauvegarder la table avant d'écrire
         run: npx tsx scripts/sauvegarder-courses.ts .sauvegarde-courses
 
@@ -132,8 +137,12 @@ jobs:
       - name: Contrôler les liens « Classement » et « S'inscrire »
         run: npx tsx scripts/verifier-liens-courses.ts "$ETAT/liens-controle-$(date -u +%Y%m%d).json" --ecrire
 
-      # Classements des éditions PASSÉES (2025, 2024…) : chaque adresse devinée est OUVERTE,
-      # un site qui répond à tout est écarté. AVANT la sauvegarde de l'état : le cache voyage.
+      # Classements des éditions PASSÉES (2025, 2024…) : adresses devinées chez les
+      # chronométreurs ET liens « Résultats 2024 » des organisateurs — chacune OUVERTE avant
+      # d'être retenue. AVANT la sauvegarde de l'état : les deux caches voyagent.
+      - name: Dates vérifiées sur les sites officiels — écriture (seuil de sécurité)
+        run: npx tsx scripts/dates-sites.ts "$ETAT/dates-sites.jsonl" --ecrire
+
       - name: Classements des éditions passées — vérification
         run: npx tsx scripts/resultats-editions.ts "$ETAT/editions-resultats.jsonl"
 
@@ -147,6 +156,8 @@ jobs:
             .cache-courses/resultats-sites.jsonl
             .cache-courses/liens-controle-*.json
             .cache-courses/editions-resultats.jsonl
+            .cache-courses/editions-sites-verifiees.jsonl
+            .cache-courses/dates-sites.jsonl
           retention-days: 90
           if-no-files-found: error
           include-hidden-files: true

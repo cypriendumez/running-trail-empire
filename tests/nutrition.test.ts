@@ -14,8 +14,13 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { NutritionCourse } from "../src/components/health/NutritionCourse";
+import { coursesPourNutrition } from "../src/lib/health/coursesNutrition";
+import { predictRaceSec } from "../src/lib/running/fitness";
 import {
-  planNutritionCourse, DUREE_MIN_MIN, DUREE_LONGUE_MIN, PREMIER_APPORT_MIN,
+  planNutritionCourse, DUREE_MIN_MIN, DUREE_LONGUE_MIN, PREMIER_APPORT_MIN, derouleCourse, TRANCHES_TEMPERATURE, FLASQUE_ML,
 } from "../src/lib/coach/nutritionCourse";
 
 let passed = 0; const fails: string[] = [];
@@ -122,6 +127,65 @@ test("la durée vient de la PRÉDICTION, pas d'une saisie", () => {
   assert.match(src, /dureeSec: predictRaceSec\(vma, objective\.distanceKm\)/,
     "la durée de course n'est plus prédite depuis la VMA");
   assert.match(src, /tempC: meteoCourse/, "la météo du jour J n'est plus transmise");
+});
+
+// ── L'écran Santé › Nutrition (refait le 30/09/2026) ─────────────────────────
+test("le déroulé : autant de prises que de gels, au bon rythme, et le sac qui va avec", () => {
+  const semi = planNutritionCourse({ dureeSec: 100 * 60 })!;          // < 2 h 30 : 50 g/h
+  const d = derouleCourse(semi);
+  assert.equal(d.prises.length, semi.gels, "la liste des horaires et le décompte des gels se contredisent");
+  assert.equal(d.prises[0], PREMIER_APPORT_MIN, "le premier gel ne tombe plus avant la faim");
+  assert.equal(d.intervalleMin, 30, "un gel de 25 g à 50 g/h, c'est toutes les 30 min");
+  const ultra = derouleCourse(planNutritionCourse({ dureeSec: 6 * 3600, tempC: 27 })!);   // 75 g/h
+  assert.equal(ultra.intervalleMin, 20, "à 75 g/h, un gel toutes les 20 min");
+  assert.equal(ultra.flasques, Math.ceil(ultra.boissonTotaleMl / FLASQUE_ML), "le nombre de flasques ne suit plus la boisson");
+  // 3 h par temps frais : 1 050 ml → TROIS flasques, pas deux (on arrondit vers le haut, sinon on manque).
+  assert.equal(derouleCourse(planNutritionCourse({ dureeSec: 3 * 3600, tempC: 5 })!).flasques, 3, "une flasque manque dans le sac");
+  for (let i = 1; i < ultra.prises.length; i++) assert.equal(ultra.prises[i] - ultra.prises[i - 1], ultra.intervalleMin);
+  const p = planNutritionCourse({ dureeSec: 6 * 3600, tempC: 27 })!;
+  assert.equal(ultra.sodiumMgParH, Math.round((p.sodiumMgParL * p.mlParH) / 1000), "le sodium par heure n'est plus la concentration × la boisson");
+});
+
+test("chaque tranche de météo rend LE MÊME plan sur ses deux bords (une tranche = un palier)", () => {
+  for (const t of TRANCHES_TEMPERATURE) {
+    const bords = [t.min ?? t.max! - 5, t.max ?? t.min! + 5];
+    const ref = planNutritionCourse({ dureeSec: 3 * 3600, tempC: t.tempC })!;
+    for (const b of bords) {
+      const x = planNutritionCourse({ dureeSec: 3 * 3600, tempC: b })!;
+      assert.equal(x.mlParH, ref.mlParH, `${t.cle} : ${b} °C ne boit pas comme ${t.tempC} °C`);
+      assert.equal(x.sodiumMgParL, ref.sodiumMgParL, `${t.cle} : ${b} °C ne sale pas comme ${t.tempC} °C`);
+    }
+  }
+});
+
+test("les courses proposées : la durée PRÉDITE par la VMA, sinon le temps visé, sinon rien d'inventé", () => {
+  const obj = { race: "Marathon de Lille", raceDate: "2026-10-25", distanceKm: 42.195, targetSeconds: 3 * 3600 };
+  const cal = [{ name: "Foulées de Bondues", date: "2026-11-08", distanceKm: 10 }];
+  const avecVma = coursesPourNutrition(obj, cal, "2026-09-30", 18);
+  assert.equal(avecVma[0].origine, "vma");
+  assert.equal(avecVma[0].dureeSec, Math.round(predictRaceSec(18, 42.195)), "la durée n'est plus celle du coach");
+  const sansVma = coursesPourNutrition(obj, cal, "2026-09-30", null);
+  assert.deepEqual([sansVma[0].origine, sansVma[0].dureeSec], ["cible", 3 * 3600], "le temps visé de l'objectif est ignoré");
+  assert.deepEqual([sansVma[1].origine, sansVma[1].dureeSec], [null, null], "une durée est inventée pour une course sans VMA ni temps visé");
+  assert.ok(coursesPourNutrition(obj, Array.from({ length: 9 }, (_, i) => ({ name: `C${i}`, date: `2026-11-${10 + i}`, distanceKm: 10 })), "2026-09-30", 18).length <= 3);
+  assert.deepEqual(coursesPourNutrition(null, [], "2026-09-30", 18), []);
+});
+
+test("L'ÉCRAN : pas de chiffre inventé, pas de décor « IA », le même plan que le coach, 5 langues", () => {
+  const src = readFileSync("src/components/health/NutritionCourse.tsx", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  assert.ok(!/caf[ée]ine|caffeine/i.test(src), "la caféine inventée est revenue");
+  assert.ok(!/bg-gradient|Nutrition Lab|🧂|☕/.test(src), "le décor en dégradé et émojis est revenu");
+  assert.ok(/planNutritionCourse\(\{ dureeSec, distanceKm: course\?\.distanceKm \?\? null, poidsKg, tempC \}\)/.test(src), "l'écran ne lit plus le calcul du coach");
+  const rendu = (courses: Parameters<typeof NutritionCourse>[0]["courses"]) => renderToStaticMarkup(createElement(NutritionCourse, { courses, poidsKg: 68 }));
+  // Un 10 km prédit en 40 min : rien à manger — et l'écran le dit.
+  const court = rendu([{ nom: "10 km de Lille", date: "2026-10-12", distanceKm: 10, dureeSec: 40 * 60, origine: "vma" }]);
+  assert.ok(court.includes("tes réserves suffisent"), "un 10 km reçoit un plan de gels");
+  // Un marathon en 3 h : les gels du plan, ni plus ni moins.
+  const p = planNutritionCourse({ dureeSec: 3 * 3600, distanceKm: 42.195, poidsKg: 68, tempC: null })!;
+  const long = rendu([{ nom: "Marathon de Lille", date: "2026-10-25", distanceKm: 42.195, dureeSec: 3 * 3600, origine: "vma" }]);
+  assert.ok(long.includes(`${p.gels} gels de 25 g`), `le sac n'annonce plus les ${p.gels} gels du plan`);
+  assert.ok(long.includes("Marathon de Lille"));
+  for (const l of ["fr", "en", "de", "es", "pt"]) assert.ok(new RegExp(`\\n  ${l}: \\{`).test(readFileSync("src/components/health/NutritionCourse.tsx", "utf8")), `langue ${l} absente`);
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

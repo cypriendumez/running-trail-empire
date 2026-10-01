@@ -20,6 +20,7 @@ import type { Lang } from "@/lib/i18n/translations";
 import { coquille, carte, bouton, esc } from "@/lib/notify/gabarit";
 import { envoyerEmail } from "@/lib/email/envoyer";
 import { nomCanonique } from "@/lib/races/groupes";
+import { lienClassementPropre } from "@/lib/races/lienPropre";
 
 export const TYPE_ENVOI = "resultats_course_envoye";
 export const JOURS_MIN = 2, JOURS_MAX = 10, JOURS_RECHERCHE = 6;
@@ -59,7 +60,8 @@ export function ligneDeLaCourse(lignes: readonly LigneCourse[], c: { nom: string
  */
 export function lienAEnvoyer(l: LigneCourse | null, c: { nom: string; date: string; ilYa: number }): Lien | null {
   const annee = Number(c.date.slice(0, 4));
-  if (l?.resultats_url && /^https?:\/\//.test(l.resultats_url) && l.resultats_annee === annee) return { url: l.resultats_url, direct: true };
+  const propre = lienClassementPropre(l?.resultats_url);
+  if (propre && l?.resultats_annee === annee) return { url: propre, direct: true };
   if (c.ilYa < JOURS_RECHERCHE) return null;
   const q = `classement ${c.nom}${l?.city ? ` ${l.city}` : ""} ${annee}`;
   return { url: `https://www.google.com/search?q=${encodeURIComponent(q)}`, direct: false };

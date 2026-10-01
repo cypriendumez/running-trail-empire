@@ -1,9 +1,10 @@
 /**
  * LIENS « RÉSULTATS » DES SITES OFFICIELS — étape 1 bis (lecture seule, reprenable).
  *
- * Pour chaque site officiel connu par les fiches finishers (et sans classement déjà cité),
- * lit la PAGE D'ACCUEIL — une seule requête par site — et en retient le lien de résultats
- * (`lib/races/resultatsSite`). Rien n'est écrit en base : `finishers-appliquer.ts` relit
+ * Pour chaque site officiel connu par les fiches finishers, lit la PAGE D'ACCUEIL et en
+ * retient le lien de résultats (`lib/races/resultatsSite`), le dénivelé, le lien
+ * d'inscription et les classements des éditions passées (plus, pour ceux-ci, la page
+ * « Résultats » du même site si l'accueil y renvoie). Rien n'est écrit en base : `finishers-appliquer.ts` relit
  * ce fichier s'il est à côté des fiches (`resultats-sites.jsonl`).
  *
  * Politesse : robots.txt lu et respecté pour chaque hôte ; 6 sites en parallèle, jamais
@@ -17,7 +18,8 @@
  * course, et le workflow hebdomadaire doit le voir.
  */
 import { readFileSync, existsSync, appendFileSync } from "node:fs";
-import { lienResultats, robotsAutorise, type LienResultats } from "../src/lib/races/resultatsSite";
+import { lienResultats, liensResultatsParAnnee, pageArchivesResultats, robotsAutorise, type LienResultats } from "../src/lib/races/resultatsSite";
+import { fusionEditions } from "../src/lib/races/editionsResultats";
 import { PAYS_FRANCE, type Fiche } from "../src/lib/races/majFinishers";
 import { couplesDistanceDplus, type CoupleDplus } from "../src/lib/races/dplusSite";
 import { lienInscriptionSite, type LienInscription } from "../src/lib/races/inscriptionSite";
@@ -27,7 +29,13 @@ const UA = "Mozilla/5.0 (compatible; PacevoBot/1.0; +https://pacevo.fr/contact)"
 const PARALLELE = 6;
 const anneeCourante = new Date().getFullYear();
 
-export type LigneSite = { site: string; ok: boolean; http?: number; motif?: string; lien?: LienResultats | null; dplus?: CoupleDplus[]; inscription?: LienInscription | null; lueLe: string };
+export type LigneSite = {
+  site: string; ok: boolean; http?: number; motif?: string; lien?: LienResultats | null; dplus?: CoupleDplus[];
+  inscription?: LienInscription | null;
+  /** Classements des éditions passées publiés par l'organisateur, un lien par année (non vérifiés ici). */
+  editions?: { annee: number; url: string }[];
+  lueLe: string;
+};
 
 /** Échecs qui disent quelque chose DU SITE (et le rediront) : inutile d'y retourner chaque semaine. */
 const ECHECS_DURABLES = new Set(["robots-interdit", "pas-html", "adresse"]);
@@ -52,8 +60,6 @@ async function main() {
   const [fFiches, sortie] = process.argv.slice(2).filter((a, i, t) => !a.startsWith("--") && !t[i - 1]?.startsWith("--"));
   const joursMax = seuil(process.argv, "--relire-apres", Infinity);
   // Site → noms des courses qui y renvoient (un organisateur peut en avoir plusieurs).
-  // Un site est lu s'il manque le lien « Résultats » OU le dénivelé d'un format trail
-  // (même page d'accueil, même requête — voir lib/races/dplusSite).
   const noms = new Map<string, string[]>();
   const besoinDplus = new Set<string>();
   const besoinInscription = new Set<string>();
@@ -63,7 +69,9 @@ async function main() {
       if (!(f?.ok && PAYS_FRANCE.has(String(f.pays ?? "")) && f.siteOfficiel)) continue;
       const sansDplus = (f.formats ?? []).some((x) => x.discipline === "trail" && x.dplus == null);
       const sansInscription = !f.inscription && !(f.formats ?? []).some((x) => x.inscription);
-      if (!f.resultats?.classement || sansDplus || sansInscription) noms.set(f.siteOfficiel, [...(noms.get(f.siteOfficiel) ?? []), String(f.nom ?? "")]);
+      // TOUS les sites : même une course dont la source cite le classement peut avoir ses
+      // éditions passées (« Résultats 2024 ») rangées chez l'organisateur.
+      noms.set(f.siteOfficiel, [...(noms.get(f.siteOfficiel) ?? []), String(f.nom ?? "")]);
       if (sansDplus) besoinDplus.add(f.siteOfficiel);
       if (sansInscription) besoinInscription.add(f.siteOfficiel);
     } catch { /* ligne en cours d'écriture */ }
@@ -81,7 +89,9 @@ async function main() {
     try { const x = JSON.parse(l) as LigneSite; if (x?.site) derniere.set(x.site, x); } catch { /* */ }
   }
   for (const x of derniere.values()) {
-    const releves = (!besoinDplus.has(x.site) || Array.isArray(x.dplus)) && (!besoinInscription.has(x.site) || x.inscription !== undefined);
+    // Une lecture antérieure au relevé des éditions passées (30/09/2026) est refaite.
+    const releves = (!besoinDplus.has(x.site) || Array.isArray(x.dplus)) && (!besoinInscription.has(x.site) || x.inscription !== undefined)
+      && Array.isArray(x.editions);
     if (relireInscriptions && x.inscription) continue;
     if (dejaLu(x, maintenant, joursMax) && (!x.ok || releves)) faits.add(x.site);
   }
@@ -113,7 +123,19 @@ async function main() {
       const lien = lienResultats(p.texte, site, anneeCourante, { noms: noms.get(site) ?? [] });
       if (lien) trouves++;
       const inscription = lienInscriptionSite(p.texte, site, anneeCourante, { noms: noms.get(site) ?? [] });
-      ecrire({ ok: true, http: p.code, lien, dplus: couplesDistanceDplus(p.texte), inscription });
+      // Éditions passées : sur la page d'accueil, puis sur la page « Résultats » du MÊME site
+      // (pas un chronométreur) — c'est là que les organisateurs rangent leurs archives.
+      let editions = liensResultatsParAnnee(p.texte, site, anneeCourante, { noms: noms.get(site) ?? [] });
+      const archives = pageArchivesResultats(p.texte, site, anneeCourante, { noms: noms.get(site) ?? [] });
+      if (archives) {
+        const pu = new URL(archives);
+        if (robotsAutorise(rb, pu.pathname + pu.search)) {
+          await new Promise((r) => setTimeout(r, 400));
+          const pr = await lire(archives);
+          if (pr.texte != null && /html/i.test(pr.type)) editions = fusionEditions(editions, liensResultatsParAnnee(pr.texte, archives, anneeCourante, { noms: noms.get(site) ?? [] }));
+        }
+      }
+      ecrire({ ok: true, http: p.code, lien, dplus: couplesDistanceDplus(p.texte), inscription, editions });
     } finally { occupes.delete(u.host); }
   };
   const file = [...reste];

@@ -19,7 +19,7 @@ export function LiensCourse({ detail, course, d, couleur }: {
   const insc = lienInscription(detail);
   const site = lienSiteOfficiel(detail);
   const classement = lienClassement(detail, course);
-  const editions = editionsAAfficher(detail?.resultats_editions, classement?.direct ? classement.url : null);
+  const editions = editionsAAfficher(detail?.resultats_editions, classement?.direct ? classement : null, course);
   const libelle = insc?.sorte === "inscription" ? d["reg.inscription"] : insc?.sorte === "officiel" ? d["reg.officiel"] : d["register"];
   return (
     <div className="w-full space-y-2">

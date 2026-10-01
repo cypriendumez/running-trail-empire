@@ -88,7 +88,7 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
   const lieu = [c.city, c.department].filter(Boolean).join(", ");
   const insc = lienInscription(c);
   const classement = lienClassement(c, c);
-  const editions = editionsAAfficher((c as { resultats_editions?: unknown }).resultats_editions, classement?.direct ? classement.url : null);
+  const editions = editionsAAfficher((c as { resultats_editions?: unknown }).resultats_editions, classement?.direct ? classement : null, c);
   // Le champ « organisation » ne vaut que s'il ne désigne pas la source du lien.
   const organisateur = organisateurReel(c.organization, c.registration_url);
   // ⚠️ `terrain` EST UN TABLEAU. `{c.terrain && …}` rendait donc une ligne « Terrain »
@@ -103,7 +103,9 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
   // ⚠️ AUCUNE DONNÉE STRUCTURÉE D'ÉVÉNEMENT SANS DATE. `SportsEvent` exige `startDate` :
   // en déclarer un sans date produirait une donnée invalide, et en inventer une serait
   // pire — un moteur affiche cette date dans ses résultats comme un fait vérifié.
-  const jsonLd: Record<string, unknown> | null = !aUneDate(c) ? null : {
+  // ⚠️ NI UNE DATE ESTIMÉE (30/09/2026) : « ≈ 26 sept. 2027 » est une déduction de
+  // l'édition précédente — Google l'aurait affichée comme la date officielle.
+  const jsonLd: Record<string, unknown> | null = !aUneDate(c) || c.date_confirmee === false ? null : {
     "@context": "https://schema.org",
     "@type": "SportsEvent",
     name: nomAffichable(c.name),

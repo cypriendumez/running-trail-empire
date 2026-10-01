@@ -1,4 +1,5 @@
 import { jourFrance } from "./jourFrance";
+import { lienClassementPropre } from "./lienPropre";
 /**
  * QUEL LIEN POUR S'INSCRIRE, ET OÙ TROUVER LE CLASSEMENT — une seule décision, trois écrans
  * (liste des courses, carte, page publique).
@@ -57,7 +58,7 @@ export function lienClassement(
   d: LiensDetail | null | undefined, course: { name?: string | null; city?: string | null; date?: string | null },
   aujourdhui: string = jourFrance(),
 ): { url: string; direct: boolean; annee: number | null } | null {
-  const direct = http(d?.resultats_url);
+  const direct = lienClassementPropre(d?.resultats_url);
   const annee = typeof d?.resultats_annee === "number" ? d.resultats_annee : null;
   const jour = String(course.date ?? "").slice(0, 10);
   // « Date à venir » (2099) n'est jamais concernée : aucune année de classement n'atteint 2099.

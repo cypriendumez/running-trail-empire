@@ -16,6 +16,10 @@
  * jusqu'à 2024 serait faux : sans année dans le lien ou son texte, l'année reste inconnue.
  */
 
+import { domaineDe } from "./destination";
+import { sansDossierDePublication } from "./editionsResultats";
+import { lienClassementPropre } from "./lienPropre";
+
 /** Plateformes de chronométrage : un lien vers elles EST le classement. */
 export const CHRONOMETREURS = [
   "timeto.com", "sportinnovation.fr", "protiming.fr", "chrono-start.com", "klikego.com", "njuko.net", "ipitos.com",
@@ -61,6 +65,7 @@ export function anneeDe(texte: string, anneeCourante: number): number | null {
 
 const decode = (u: string) => { try { return decodeURIComponent(u); } catch { return u; } };
 
+
 /**
  * Les entités HTML d'un attribut `href`. ⚠️ `&amp;` ne suffit pas : « Corrida%20d&#039;Issy »
  * est parti tel quel en base (29/09/2026) et le chronométreur répondait 404 — avec
@@ -81,6 +86,52 @@ export const estChronometreur = (url: string) => {
 export function lienResultats(
   html: string, base: string, anneeCourante: number, evenement?: { noms: string[] },
 ): LienResultats | null {
+  const cands = candidatsResultats(html, base, anneeCourante, evenement, ANCIENNETE_MAX_ANS);
+  if (!cands.length) return null;
+  cands.sort((a, b) => b.score - a.score);
+  const { score: _s, anneesLues: _a, ...meilleur } = cands[0];
+  return meilleur;
+}
+
+/**
+ * UN LIEN PAR ANNÉE — les classements des éditions passées publiés par l'organisateur
+ * lui-même (« Résultats 2024 », « Classement 2023 ») (30/09/2026). Mêmes filtres de SENS que
+ * `lienResultats` (pas de tirage au sort, pas de club, la course nommée), sans limite d'âge,
+ * et l'année doit être LUE SANS AMBIGUÏTÉ : « Résultats 2019 à 2024 » n'est rangé nulle part.
+ */
+export function liensResultatsParAnnee(
+  html: string, base: string, anneeCourante: number, evenement?: { noms: string[] },
+): { annee: number; url: string }[] {
+  const parAnnee = new Map<number, { url: string; score: number }>();
+  for (const c of candidatsResultats(html, base, anneeCourante, evenement, Infinity)) {
+    if (c.anneesLues.length !== 1) continue;
+    const a = c.anneesLues[0];
+    if (a < 2005 || a > anneeCourante) continue;
+    const deja = parAnnee.get(a);
+    if (!deja || c.score > deja.score) parAnnee.set(a, { url: c.url, score: c.score });
+  }
+  return [...parAnnee].map(([annee, x]) => ({ annee, url: x.url })).sort((a, b) => b.annee - a.annee);
+}
+
+/**
+ * La page « Résultats » du MÊME site, sans année (le menu « Résultats » → « /resultats ») :
+ * c'est là que les organisateurs rangent leurs archives « 2024 », « 2023 »… `null` si
+ * l'accueil ne renvoie qu'à un chronométreur ou à une page datée.
+ */
+export function pageArchivesResultats(
+  html: string, base: string, anneeCourante: number, evenement?: { noms: string[] },
+): string | null {
+  const sans = (u: string) => u.replace(/#.*$/, "").replace(/\/$/, "");
+  const cands = candidatsResultats(html, base, anneeCourante, evenement, Infinity)
+    .filter((c) => !c.chronometreur && c.anneesLues.length === 0 && domaineDe(c.url) === domaineDe(base) && sans(c.url) !== sans(base))
+    .sort((a, b) => b.score - a.score);
+  return cands[0]?.url ?? null;
+}
+
+/** Les liens de résultats d'une page qui passent les filtres de sens, notés. */
+function candidatsResultats(
+  html: string, base: string, anneeCourante: number, evenement: { noms: string[] } | undefined, ageMax: number,
+): (LienResultats & { score: number; anneesLues: number[] })[] {
   // ⚠️ UN ORGANISATEUR A PLUSIEURS ÉPREUVES. Lu le 28/09/2026 : le menu « Classements »
   // d'une agence menait à une cyclo, pas au trail demandé. Le lien doit NOMMER la course
   // (un mot distinctif dans l'adresse ou le libellé), ou vivre sur un site qui la nomme.
@@ -88,24 +139,31 @@ export function lienResultats(
   const nomme = (x: string) => !mots || mots.some((m) => x.includes(m));
   const norm = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const hoteBase = (() => { try { return new URL(base).hostname.toLowerCase(); } catch { return ""; } })();
-  const cands: (LienResultats & { score: number })[] = [];
+  const cands: (LienResultats & { score: number; anneesLues: number[] })[] = [];
   const re = /<a\b[^>]*?href\s*=\s*["']([^"'#][^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
   for (let m; (m = re.exec(html));) {
     const texte = sansBalises(m[2]).slice(0, 120);
     let url: string;
     try { url = new URL(entites(m[1]), base).toString(); } catch { continue; }
-    if (!/^https?:\/\//i.test(url)) continue;
+    // Porte unique : bouton de partage, blog tiers, fiche d'un coureur… (lib/races/lienPropre).
+    const propre = lienClassementPropre(url);
+    if (!propre) continue;
+    url = propre;
     const chrono = estChronometreur(url);
-    const dit = `${texte} ${decode(url)}`;
+    const dit = `${texte} ${decode(sansDossierDePublication(url))}`;
     const chemin = (() => { const u = new URL(url); return decode(u.hostname + u.pathname + u.hash); })();
     // Le SENS se lit dans le libellé et le chemin, pas dans la requête : « ?max-results=5 »
     // (la pagination d'un blog) passait pour un lien de résultats.
     if (!SENS_RESULTATS.test(`${texte} ${chemin}`) && !(chrono && /live/i.test(url))) continue;
+    // Un libellé LONG est l'accroche d'un article, pas un menu « Résultats » : lu le 30/09/2026,
+    // « Des arbitrages à hauteur de 30 M€… qui scelle les résultats de l'exercice » (un conseil
+    // municipal) passait pour le classement. Il faut alors que l'ADRESSE parle de résultats.
+    if (texte.length > 60 && !chrono && !SENS_RESULTATS.test(chemin)) continue;
     if (SENS_ECARTES.test(texte) || SENS_INSCRIPTION.test(texte)) continue;
     // « Résultats Duo Trail » menait à « /le-dossard-pour-le-duo-trail… » : une vente de dossards.
     if (SENS_INSCRIPTION.test(chemin) && !SENS_RESULTATS.test(chemin)) continue;
     const annee = anneeDe(dit, anneeCourante);
-    if (annee != null && annee < anneeCourante - ANCIENNETE_MAX_ANS) continue;
+    if (annee != null && annee < anneeCourante - ageMax) continue;
     if (/frmbase=cclubs|classement des clubs/i.test(dit)) continue;
     if (mots) {
       const u = new URL(url);
@@ -114,12 +172,12 @@ export function lienResultats(
       if (!siteNomme && !nomme(norm(`${decode(u.pathname + u.search + u.hash)} ${texte}`))) continue;
     }
     const score = (chrono ? 100 : 0) + (annee ? annee - 2000 : 0) + (texte.length > 0 && texte.length <= 40 ? 5 : 0);
-    cands.push({ url, annee, texte, chronometreur: chrono, score });
+    // Les années DISTINCTES lues dans le libellé et le chemin (pas la requête ni le domaine).
+    // Ni le domaine (« trail2025.fr ») ni l'ancre : seulement ce que dit la page visée.
+    const anneesLues = [...new Set((`${texte} ${decode(sansDossierDePublication(new URL(url).pathname))}`.match(/(?<!\d)20[0-3]\d(?!\d)/g) ?? []).map(Number))];
+    cands.push({ url, annee, texte, chronometreur: chrono, score, anneesLues });
   }
-  if (!cands.length) return null;
-  cands.sort((a, b) => b.score - a.score);
-  const { score: _s, ...meilleur } = cands[0];
-  return meilleur;
+  return cands;
 }
 
 /**

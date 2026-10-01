@@ -1431,7 +1431,10 @@ test("les alertes suivent l'éditeur, elles ne restent pas chez l'ancien", () =>
     // Et l'envoi doit être CONDITIONNÉ au destinataire : appeler emailEditeur() puis
     // écrire à une chaîne vide ne vaut rien.
     if (!/emailEditeur\(\)/.test(src)) sansGarde.push(`${r} (n'utilise pas la source unique)`);
-    else if (!/&&\s*COACH_EMAIL|\|\|\s*!DEST/.test(src)) sansGarde.push(`${r} (envoie sans destinataire vérifié)`);
+    // ⚠️ `if (COACH_EMAIL)` SEUL EST UNE GARDE VALABLE (30/09/2026) : la messagerie ne
+    // conditionne plus l'envoi à la clé Resend, pour que la porte unique journalise une
+    // clé absente au lieu de la sauter en silence. Le destinataire, lui, reste vérifié.
+    else if (!/&&\s*COACH_EMAIL|\|\|\s*!DEST|if\s*\(\s*COACH_EMAIL\s*\)/.test(src)) sansGarde.push(`${r} (envoie sans destinataire vérifié)`);
   }
   assert.deepEqual(replis, [], `repli en dur vers une adresse : ${replis.join(", ")}`);
   assert.deepEqual(sansGarde, [], `envoi non conditionné : ${sansGarde.join(", ")}`);

@@ -16,6 +16,8 @@
  */
 
 import { anneeDe } from "./resultatsSite";
+import { lienClassementPropre } from "./lienPropre";
+import { sansDossierDePublication } from "./editionsResultats";
 import { nomCanonique } from "./groupes";
 import { formatPasCourseAPied } from "./nonCourse";
 import { DEPARTEMENTS } from "./departements";
@@ -307,11 +309,16 @@ export function planEvenement(
     return plan;
   }
 
-  const resultats = fiche.resultats?.classement ?? fiche.resultats?.page ?? null;
+  // Un lien de classement passe par la porte unique (lib/races/lienPropre) : ni bouton de
+  // partage, ni fiche d'un seul coureur, ni `&amp;` non décodé.
+  const classement = lienClassementPropre(fiche.resultats?.classement);
+  const resultats = classement ?? lienClassementPropre(fiche.resultats?.page);
   // L'année du classement : lue dans le lien (« …-marathon-de-paris-2026 »), JAMAIS supposée
   // être celle de la dernière édition — une page qui s'arrête en 2024 n'est pas « 2026 ».
+  // Celle que donne la fiche vaut pour SON lien : pas pour la page de repli.
   const anneeRes = resultats == null ? null
-    : fiche.resultats?.annee !== undefined ? fiche.resultats.annee ?? null : anneeDe(resultats, Number(o.aujourdhui.slice(0, 4)));
+    : fiche.resultats?.annee !== undefined && (classement != null || fiche.resultats?.classement == null) ? fiche.resultats.annee ?? null
+    : anneeDe(sansDossierDePublication(resultats), Number(o.aujourdhui.slice(0, 4)));
   const extras = (f: FormatFiche) => (o.colonnesNouvelles ? {
     site_officiel: fiche.siteOfficiel ?? null,
     inscription_url: f.inscription ?? fiche.inscription ?? null,
