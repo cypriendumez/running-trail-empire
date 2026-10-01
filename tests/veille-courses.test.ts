@@ -200,6 +200,25 @@ test("relus sur le passage complet : saison de club, billetterie de ville, post 
   assert.equal(lienVeilleAccepte("parcours", `https://traildes2ponts.com/parcours-${an - 1}/`, page), true, "le parcours de l'an dernier est refusé");
   assert.equal(lienVeilleAccepte("parcours", `https://x.fr/parcours-${an - 3}/`, page), false);
   assert.equal(lienVeilleAccepte("parcours", `https://x.fr/parcours-${an - 2}/`, page), true, "un tracé d'il y a deux ans (limite incluse) est refusé");
+  // Relus sur le premier passage après la migration 034 : itinéraires pour VENIR, photos,
+  // règlement seul, « Parcours Prévention Santé » (PPS), idées de balade d'un office de tourisme.
+  for (const u of ["https://maps.google.fr/?saddr=&daddr=47.51,-2.56", "https://www.google.com/maps/dir//43.49,1.31/", "https://www.google.com/maps/search/?api=1&query=x",
+    "https://maps.app.goo.gl/EChfE6cUTxN6e46t5", "https://goo.gl/maps/qU1iUycq1tn", "https://fr.mappy.com/itineraire", "https://photos.app.goo.gl/nDYPwVA3gjvBFBo1A",
+    "https://photos.google.com/share/AF1Qip", "https://pps.athle.fr/?locale=fr", "https://comite.fr/5-_reglement_escargot_2026.pdf",
+    "https://lesfouleesdelembanie.com/acces-et-itineraire/", "https://www.ekidenvdascq.fr/includes/acces.php",
+    `https://traildufourchat.wordpress.com/${an}/06/24/parcours-de-prevention-sante/`, "https://lecannet-tourisme.fr/fr/idees-parcours/"]) {
+    assert.equal(lienVeilleAccepte("parcours", u, page), false, `pas un tracé : ${u}`);
+  }
+  // Une carte « My Maps » dessinée par l'organisateur, un GPX sur Drive, parcours + règlement : des tracés.
+  for (const u of ["https://www.google.com/maps/d/viewer?mid=1Qy_PvFMGa59y", "https://drive.google.com/file/d/1xLfqW/view", "https://xwald-trail.sitew.fr/Parcours_Reglement.C.htm"]) {
+    assert.equal(lienVeilleAccepte("parcours", u, page), true, `tracé refusé à tort : ${u}`);
+  }
+  // Et la lecture d'une page n'en retient aucun non plus.
+  const p = liensParcours(`<a href="https://www.google.com/maps/dir//43.49,1.31/">Itinéraire</a><a href="https://photos.app.goo.gl/x">Parcours en photos</a><a href="/reglement.pdf">Règlement</a><a href="/trace-12km.gpx">Tracé 12 km</a>`, "https://trail-x.fr/");
+  assert.deepEqual(p.map((x) => x.url), ["https://trail-x.fr/trace-12km.gpx"], "un itinéraire, un album ou un règlement est lu comme parcours");
+  // Le libellé ne trahit rien : seule l'ADRESSE dit que ce n'est pas un tracé.
+  const muets = liensParcours(`<a href="https://maps.app.goo.gl/abc">Le parcours</a><a href="/reglement-profil.pdf">Profil</a>`, "https://trail-x.fr/");
+  assert.deepEqual(muets, [], "un lien raccourci Google Maps ou un règlement passe pour le parcours");
   assert.equal(lienVeilleAccepte("resultats", "pas une adresse", page), false);
 });
 

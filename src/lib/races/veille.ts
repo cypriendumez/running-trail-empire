@@ -24,7 +24,7 @@
 import { estCalendrierTiers, domaineDe } from "./destination";
 import { estPlateformeInscription, lienInscriptionSite } from "./inscriptionSite";
 import { estChronometreur, motsDistinctifs, liensResultatsCandidats, choisirParDistance } from "./resultatsSite";
-import { liensParcours, parcoursPour } from "./parcoursSite";
+import { liensParcours, parcoursPour, estItineraireOuPhoto, reglementSeul } from "./parcoursSite";
 import { datesAnnoncees, dateDepuisPage, type DateLue } from "./prochaineEdition";
 import { lienClassementPropre, lienSortantPropre } from "./lienPropre";
 
@@ -119,6 +119,9 @@ export function lienVeilleAccepte(quoi: "resultats" | "inscription" | "parcours"
     // Une billetterie d'office de tourisme, la page d'un club : sans le nom de la course, non.
     return !(estPlateformeInscription(url) && PAGE_LISTE.test(u.pathname));
   }
+  // Un itinéraire pour venir, un album photo, un règlement seul, le « Parcours Prévention
+  // Santé » : pas des tracés (relu sur le premier passage, 01/10/2026).
+  if (estItineraireOuPhoto(url) || reglementSeul(dit) || /parcours[-_ ](?:de[-_ ])?pr[ée]vention|\bpps\b|id[ée]es?[-_ ]parcours|acc[eè]s[-_ ]et[-_ ]itin|\/acces\b|itin[ée]raire/i.test(dit)) return false;
   // Un tracé DATÉ de plus de deux ans (« /2013/12/le-parcours-decouverte.html ») a toutes
   // les chances d'avoir changé depuis : pas de parcours plutôt qu'un parcours périmé.
   const anneeCourante = new Date().getUTCFullYear();

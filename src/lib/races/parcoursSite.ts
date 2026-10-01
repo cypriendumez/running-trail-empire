@@ -16,9 +16,30 @@ import { libelleDuLien, choisirParDistance } from "./resultatsSite";
 /** Services de tracés : un lien vers eux EST le parcours. */
 const SERVICES_TRACES = /(^|\.)(openrunner\.com|tracedetrail\.fr|visugpx\.com|ridewithgps\.com|komoot\.(com|fr|de)|plotaroute\.com|wikiloc\.com|outdooractive\.com|calculitineraires\.fr|alltrails\.com|gpx-studio\.com|utagawavtt\.com|ign\.fr)$/i;
 const FICHIER_TRACE = /\.(gpx|kml|kmz|tcx)(?:[?#].*)?$/i;
-const SENS_PARCOURS = /parcours|trac[ée]s?\b|gpx|itin[ée]raire|profil(?! utilisateur)|course map|route map|carte du parcours/i;
-/** Ce qui parle du mot « parcours » sans être un tracé. */
-const SENS_ECARTES = /parcours (?:sant[ée]|du combattant|scolaire|professionnel|de soins|d'?emploi|client)|inscri|r[ée]sultat|classement|b[ée]n[ée]vole|partenaire|photo|vid[ée]o/i;
+// ⚠️ PAS « ITINÉRAIRE » (01/10/2026) : en français, c'est le plus souvent l'itinéraire POUR
+// VENIR — relu sur le premier passage, « Itinéraire » menait à Google Maps, Mappy, Waze.
+const SENS_PARCOURS = /parcours|trac[ée]s?\b|gpx|profil(?! utilisateur)|course map|route map|carte du parcours/i;
+/** Ce qui parle du mot « parcours » sans être un tracé — dont le « Parcours Prévention Santé » de la FFA (PPS). */
+const SENS_ECARTES = /parcours[-_ ](?:sant[ée]|du[-_ ]combattant|scolaire|professionnel|de[-_ ]soins|d'?emploi|client|(?:de[-_ ])?pr[ée]vention)|\bpps\b|id[ée]es?[-_ ]parcours|inscri|r[ée]sultat|classement|b[ée]n[ée]vole|partenaire|photo|vid[ée]o|acc[eè]s|itin[ée]raire|venir|parking|h[ée]bergement/i;
+
+/**
+ * Un lien d'ITINÉRAIRE ou de PHOTOS, pas un tracé : Google Maps « itinéraire vers… » ou
+ * « recherche », Mappy, Waze, un lien raccourci maps.app.goo.gl, un album Google Photos.
+ * Une carte « My Maps » (`/maps/d/`) dessinée par l'organisateur EST un tracé : gardée.
+ */
+export function estItineraireOuPhoto(url: string): boolean {
+  let u: URL; try { u = new URL(url); } catch { return true; }
+  const h = u.hostname.toLowerCase();
+  if (/(^|\.)(mappy\.com|waze\.com|viamichelin\.[a-z]+)$/.test(h) || /^(photos|maps)\.app\.goo\.gl$/.test(h) || h === "photos.google.com") return true;
+  // Les sites de la FFA (pps.athle.fr, bases.athle.fr) ne publient pas le tracé d'une course.
+  if (/(^|\.)athle\.fr$/.test(h)) return true;
+  if (h === "goo.gl" && /^\/maps/i.test(u.pathname)) return true;
+  if (/(^|\.)google\.[a-z.]+$/.test(h) && (/^\/maps/i.test(u.pathname) || /^maps\./.test(h))) return !/\/maps\/d\//i.test(u.pathname);
+  return false;
+}
+
+/** Un RÈGLEMENT seul n'est pas un tracé ; « parcours et règlement » sur la même page, si. */
+export const reglementSeul = (x: string) => /r[eè]glement/i.test(x) && !/parcours|trac[eé]|gpx/i.test(x);
 
 export type LienParcours = { url: string; texte: string; trace: boolean; score: number };
 
@@ -46,6 +67,7 @@ export function liensParcours(html: string, base: string, evenement?: { mots: st
     const fichier = FICHIER_TRACE.test(u.pathname);
     if (!service && !fichier && !SENS_PARCOURS.test(`${texte} ${chemin}`)) continue;
     if (SENS_ECARTES.test(`${texte} ${decode(u.pathname)}`)) continue;
+    if (estItineraireOuPhoto(url) || reglementSeul(`${texte} ${decode(u.pathname)}`)) continue;
     // Un libellé LONG est une phrase d'article, pas un lien « Parcours ».
     if (texte.length > 70 && !service && !fichier) continue;
     if (evenement?.mots.length) {
