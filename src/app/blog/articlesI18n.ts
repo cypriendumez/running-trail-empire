@@ -642,6 +642,75 @@ export const ARTICLES_I18N: Partial<Record<Lang, Record<string, TraductionArticl
         },
       ],
     },
+    "reprendre-apres-une-blessure-progression": {
+      chapo:
+        "The best-established risk factor in runners is the previous injury: coming back is therefore the moment the next one is decided. Here is what the literature documents about progression — and the numerical rules it does not confirm.",
+      avertissement:
+        "An injury has to be diagnosed, and this article diagnoses nothing. The principles described here come from studies on populations, not from your case: pain that persists, wakes you at night or changes your gait is a matter for a doctor or a physiotherapist, and a suspected bone stress injury is confirmed on imaging before any return to running.",
+      blocs: [
+        {
+          h: "The previous injury predicts the next one",
+          p: [
+            "The systematic review by Saragiotto and colleagues (2014) pooled eleven prospective cohorts, that is 4,671 participants, and reviewed 60 predictive factors. Only one stands out clearly: an injury in the previous twelve months, reported by five of the eight studies that investigated it. Nothing else reaches that consistency, not even sex: most of the included studies find no association there.",
+            "Coming back is therefore not a formality between two training blocks: it is where your next injury is statistically decided.",
+          ],
+        },
+        {
+          h: "The 10% rule was tested. It prevented nothing.",
+          p: [
+            "You have certainly heard it: never increase your weekly volume by more than 10%. Simple, and evaluated.",
+            "The randomised trial by Buist and colleagues (2008) allocated 532 novice runners preparing for a 6.7 km event to either a 13-week graded programme built on that rule or a standard 8-week programme. The incidence of running-related injury: 20.8% in the graded group, 20.3% in the standard group (P = .90).",
+            "The systematic review by Damsted and colleagues (2018) found only four eligible articles, and reports no difference between an average weekly increase of 10% and one of 24% (hazard ratio 0.8; 95% CI: 0.6 to 1.3). Its conclusion: the evidence for a link between a sudden change in load and injury is very limited.",
+          ],
+        },
+        {
+          h: "What does come through: the big jumps",
+          p: [
+            "The prospective study by Nielsen and colleagues (2014) followed 874 novice runners wearing a GPS watch for one year; 202 were injured. Each week was classified by distance progression: less than 10% or a decrease, 10 to 30%, more than 30%. No significant difference between the three groups across all injuries.",
+            "The signal only appears when seven diagnoses described as distance-related are isolated, among them patellofemoral pain, iliotibial band syndrome and medial tibial stress syndrome: hazard ratio 1.59 (95% CI: 0.96 to 2.66; P = .07) beyond 30% over two weeks, compared with less than 10%. The authors themselves call their work exploratory.",
+            "Damsted reports a study in which injured runners had increased their total distance by 86% more (95% CI: 12% to 159%; P = .026) in the week before the injury. It is not the gentle slope that is documented: it is the abrupt jump.",
+          ],
+        },
+        {
+          h: "Before the first run back: five boxes to tick",
+          p: [
+            "The scoping review by George and colleagues (2024) gathered 50 studies on returning to running after a tibial bone stress injury. Thirty-nine are reviews or clinical commentaries: the authors therefore grade their recommendations as level IV evidence.",
+            "Five elements are to be settled before reintroducing running: no more bony tenderness, pain-free walking, radiological healing for high-risk sites, strength, functional and loading tests, and the identification of the factors that contributed to the injury. The fifth is the one people skip: coming back without looking for what gave way is running the same experiment again.",
+          ],
+        },
+        {
+          h: "Then: walk-run, and distance before speed",
+          p: [
+            "The same review describes what follows: an individualised, graduated programme, often starting with walk-run intervals, progressing distance ahead of speed, with symptom provocation as a standing criterion.",
+            "This is the opposite of what most runners do, resuming at their usual pace over a shorter distance. Pace is what costs tissue the most: it is restored last.",
+          ],
+        },
+        {
+          h: "Wait for zero pain? Not always",
+          p: [
+            "The randomised trial by Silbernagel and colleagues (2007) allocated 38 patients with Achilles tendinopathy, all following the same rehabilitation: nineteen kept running and jumping using a pain-monitoring model, nineteen had to stop for six weeks.",
+            "No significant difference in the rate of improvement. The VISA-A-S score went from 57 to 85 at twelve months in those who kept going, and from 57 to 91 in those who rested — both improved markedly.",
+            "Do not transpose that result to everything. A tendon and a bone do not follow the same rule: for a bone stress injury, George's criteria demand the opposite — no more bony tenderness, pain-free walking — before the first step.",
+          ],
+        },
+        {
+          h: "What the studies do not show",
+          p: [
+            "There is no validated numerical rule. The 10% rule failed in a randomised trial; Nielsen's 30% threshold does not reach significance and comes from an exploratory study; Damsted concludes that the evidence is very limited; George, that it is level IV.",
+            "What is documented is not a percentage but a sequence: criteria before running, walk-run intervals, lengthen before you speed up, watch the symptoms. Less satisfying than a number, and it is all the literature allows us to say.",
+          ],
+        },
+        {
+          h: "What Pacevo does with a reported pain",
+          p: [
+            "When you mark an area on the body chart at a level of at least 4 out of 10, the app records it: the current week loses one quality session, and the reason \"pain reported\" appears in your plan.",
+            "\"It's better\" is not \"it's resolved\": until you declare the complaint over, it keeps weighing. But a pain not re-reported for fourteen days stops restricting the plan, so that a forgotten report does not lock you in.",
+            "As long as it is active, it counts as an alarm signal: it cancels the floor that otherwise keeps one quality session during a race build-up. The plan may drop to zero intensity, even a few weeks out from a race.",
+            "The return itself is driven by observation: below four running sessions observed over 28 days, no quality is prescribed; below eight, only one. And because a break collapses chronic load, the acute:chronic ratio climbs for someone perfectly fresh: HRV clearly above baseline, a decent night and no pain are enough for that rise not to be penalised.",
+          ],
+        },
+      ],
+    },
   },
   de: {
     "deficit-energetique-relatif-reds-coureur": {

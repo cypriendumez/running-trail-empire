@@ -86,6 +86,12 @@ const POSTS = [
   // de découvrir puis d'auditer un identifiant inédit. Celui-ci a malgré tout été
   // retéléchargé au format servi et regardé avant d'être écrit ici.
   { id: 12, key: "p12", cat: "HEALTH", img: "https://images.unsplash.com/photo-1690644932424-63fdff67172d?w=600&h=450&fit=crop&q=80", featured: false },
+  // Ajouté le 01/10/2026 par la routine bimensuelle. Photo prise dans la RÉSERVE
+  // (`src/app/blog/reservePhotos.ts`, thèmes « trail/forêt/récupération ») : le CDN
+  // d'images d'Unsplash répond, mais son API de recherche reste injoignable depuis le
+  // conteneur — impossible donc de découvrir puis d'auditer un identifiant inédit.
+  // Celui-ci a été retéléchargé au format servi et regardé avant d'être écrit ici.
+  { id: 13, key: "p13", cat: "HEALTH", img: "https://images.unsplash.com/photo-1592859600972-1b0834d83747?w=600&h=450&fit=crop&q=80", featured: false },
 ];
 
 /**

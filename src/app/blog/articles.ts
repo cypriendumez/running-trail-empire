@@ -896,6 +896,112 @@ export const ARTICLES: Article[] = [
     ],
   },
 
+  // ══════════════════════════════════════════════════════════════════════════
+  {
+    slug: "reprendre-apres-une-blessure-progression",
+    cle: "p13",
+    maj: "1er octobre 2026",
+    chapo:
+      "Le facteur de risque le mieux établi chez le coureur, c'est la blessure précédente : la reprise est donc le moment où se joue la suivante. Voici ce que la littérature documente sur la progression — et les règles chiffrées qu'elle ne confirme pas.",
+    avertissement:
+      "Une blessure se diagnostique, et cet article ne diagnostique rien. Les principes décrits ici viennent d'études menées sur des populations, pas de ton cas : une douleur qui persiste, qui réveille la nuit ou qui modifie ta foulée relève d'un médecin ou d'un kinésithérapeute, et une fracture de fatigue suspectée se confirme à l'imagerie avant toute reprise.",
+    blocs: [
+      {
+        h: "La blessure d'avant prédit la suivante",
+        p: [
+          "La revue systématique de Saragiotto et ses collègues (2014) a rassemblé onze cohortes prospectives, soit 4 671 participants, et passé en revue 60 facteurs prédictifs. Un seul en sort nettement : la blessure survenue dans les douze mois précédents, rapportée par cinq des huit études qui l'ont examinée. Aucun autre n'atteint cette régularité, pas même le sexe : la majorité des études incluses n'y trouve aucune association.",
+          "La reprise n'est donc pas une formalité entre deux blocs : c'est là que se décide, statistiquement, ta blessure d'après.",
+        ],
+      },
+      {
+        h: "La règle des 10 % a été testée. Elle n'a rien prévenu.",
+        p: [
+          "Tu l'as forcément entendue : ne pas augmenter son volume hebdomadaire de plus de 10 %. Simple, et évaluée.",
+          "L'essai randomisé de Buist et ses collègues (2008) a réparti 532 coureurs débutants préparant une course de 6,7 km entre un programme progressif de 13 semaines bâti sur cette règle et un programme standard de 8 semaines. L'incidence des blessures liées à la course : 20,8 % dans le groupe progressif, 20,3 % dans le groupe standard (P = 0,90).",
+          "La revue systématique de Damsted et ses collègues (2018) n'a trouvé que quatre articles éligibles, et ne relève aucune différence entre une hausse hebdomadaire moyenne de 10 % et une de 24 % (rapport de risque 0,8 ; IC 95 % : 0,6 à 1,3). Sa conclusion : les preuves d'un lien entre changement brutal de charge et blessure sont très limitées.",
+        ],
+      },
+      {
+        h: "Ce qui ressort malgré tout : les grands sauts",
+        p: [
+          "L'étude prospective de Nielsen et ses collègues (2014) a suivi un an durant 874 coureurs débutants équipés d'une montre GPS ; 202 se sont blessés. Chaque semaine était classée selon la progression de distance : moins de 10 % ou une baisse, 10 à 30 %, plus de 30 %. Aucune différence significative entre les trois groupes sur l'ensemble des blessures.",
+          "Le signal n'apparaît qu'en isolant sept diagnostics dits liés à la distance, dont le syndrome fémoro-patellaire, la bandelette ilio-tibiale et la périostite tibiale : rapport de risque 1,59 (IC 95 % : 0,96 à 2,66 ; P = 0,07) au-delà de 30 % sur deux semaines, comparé à moins de 10 %. Les auteurs qualifient eux-mêmes leur travail d'exploratoire.",
+          "Damsted rapporte une étude où les blessés avaient augmenté leur distance totale de 86 % de plus (IC 95 % : 12 % à 159 % ; P = 0,026) la semaine précédant la blessure. Ce n'est pas la pente douce qui est documentée : c'est le saut brutal.",
+        ],
+      },
+      {
+        h: "Avant le premier footing : cinq cases à cocher",
+        p: [
+          "La revue de portée de George et ses collègues (2024) a rassemblé 50 études sur la reprise après une fracture de fatigue du tibia. Trente-neuf sont des revues ou des commentaires cliniques : les auteurs classent donc leurs recommandations en niveau de preuve IV.",
+          "Cinq éléments sont à régler avant de réintroduire la course : plus de douleur à la palpation de l'os, une marche indolore, une consolidation visible à l'imagerie pour les localisations à haut risque, des tests de force, de fonction et de mise en charge, et l'identification des facteurs ayant contribué à la blessure. Le cinquième est celui qu'on saute : reprendre sans chercher ce qui a cédé, c'est relancer la même expérience.",
+        ],
+      },
+      {
+        h: "Puis : marche-course, et la distance avant la vitesse",
+        p: [
+          "La même revue décrit la suite : un programme progressif et individualisé, débutant souvent par des intervalles de marche-course, qui fait progresser la distance avant la vitesse, avec la provocation des symptômes comme critère permanent.",
+          "C'est l'inverse de ce que font la plupart des coureurs, qui reprennent à leur allure habituelle sur une distance raccourcie. L'allure est ce qui coûte le plus cher aux tissus : on la rétablit en dernier.",
+        ],
+      },
+      {
+        h: "Attendre zéro douleur ? Pas toujours",
+        p: [
+          "L'essai randomisé de Silbernagel et ses collègues (2007) a réparti 38 patients atteints de tendinopathie d'Achille, tous suivant la même rééducation : dix-neuf ont continué à courir et à sauter en s'appuyant sur un modèle de surveillance de la douleur, dix-neuf ont dû arrêter six semaines.",
+          "Aucune différence significative sur la vitesse d'amélioration. Le score VISA-A-S est passé de 57 à 85 à douze mois chez ceux qui avaient continué, de 57 à 91 chez ceux qui s'étaient reposés — les deux progressent nettement.",
+          "Ne transpose pas ce résultat à tout. Un tendon et un os ne suivent pas la même règle : pour une fracture de fatigue, les critères de George exigent l'inverse — plus de douleur à la palpation, une marche indolore — avant le premier pas.",
+        ],
+      },
+      {
+        h: "Ce que les études ne montrent pas",
+        p: [
+          "Il n'existe pas de règle chiffrée validée. Celle des 10 % a échoué dans un essai randomisé ; le seuil de 30 % chez Nielsen ne franchit pas la significativité et vient d'une étude exploratoire ; Damsted conclut à des preuves très limitées ; George, à un niveau de preuve IV.",
+          "Ce qui est documenté n'est pas un pourcentage mais une séquence : des critères avant de courir, de la marche-course, allonger avant d'accélérer, surveiller les symptômes. Moins satisfaisant qu'un nombre, et c'est tout ce que la littérature permet de dire.",
+        ],
+      },
+      {
+        h: "Ce que Pacevo fait d'une douleur déclarée",
+        p: [
+          "Quand tu pointes une zone sur le schéma corporel avec un niveau d'au moins 4 sur 10, l'application l'enregistre : la semaine en cours perd une séance de qualité, et le motif « douleur signalée » apparaît dans ton plan.",
+          "« Ça va mieux » n'est pas « c'est résolu » : tant que tu n'as pas déclaré la gêne passée, elle continue de peser. Mais une douleur non redéclarée depuis quatorze jours cesse de brider le plan, pour qu'un signalement oublié ne t'enferme pas.",
+          "Tant qu'elle est active, elle vaut signal d'alerte : elle annule le plancher qui maintient sinon une séance de qualité pendant une préparation. Le plan peut descendre à zéro intensité, même à quelques semaines d'une course.",
+          "La reprise, elle, est pilotée par l'observation : sous quatre séances de course observées sur 28 jours, aucune qualité n'est prescrite ; sous huit, une seule. Et parce qu'un arrêt effondre la charge de fond, le ratio aigu:chronique grimpe chez quelqu'un de parfaitement frais : une VFC nettement au-dessus de sa base, une nuit correcte et aucune douleur suffisent à ne pas sanctionner cette remontée.",
+        ],
+      },
+    ],
+    sources: [
+      {
+        label:
+          "Saragiotto BT et al. What are the main risk factors for running-related injuries ? Sports Med, 2014",
+        url: "https://pubmed.ncbi.nlm.nih.gov/24809248/",
+      },
+      {
+        label:
+          "Buist I et al. No effect of a graded training program on the number of running-related injuries in novice runners: a randomized controlled trial. Am J Sports Med, 2008",
+        url: "https://pubmed.ncbi.nlm.nih.gov/17940147/",
+      },
+      {
+        label:
+          "Damsted C et al. Is there evidence for an association between changes in training load and running-related injuries ? A systematic review. Int J Sports Phys Ther, 2018",
+        url: "https://pubmed.ncbi.nlm.nih.gov/30534459/",
+      },
+      {
+        label:
+          "Nielsen RØ et al. Excessive progression in weekly running distance and risk of running-related injuries: an association which varies according to type of injury. J Orthop Sports Phys Ther, 2014",
+        url: "https://pubmed.ncbi.nlm.nih.gov/25155475/",
+      },
+      {
+        label:
+          "George ERM et al. Criteria and Guidelines for Returning to Running Following a Tibial Bone Stress Injury: A Scoping Review. Sports Med, 2024",
+        url: "https://pubmed.ncbi.nlm.nih.gov/39141251/",
+      },
+      {
+        label:
+          "Silbernagel KG et al. Continued sports activity, using a pain-monitoring model, during rehabilitation in patients with Achilles tendinopathy: a randomized controlled study. Am J Sports Med, 2007",
+        url: "https://pubmed.ncbi.nlm.nih.gov/17307888/",
+      },
+    ],
+  },
+
 ];
 
 /** Clé d'article → slug, pour que l'index sache quelles cartes sont cliquables. */
