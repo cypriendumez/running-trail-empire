@@ -37,6 +37,16 @@ export function pseudonymeCompte(p: { sel: string; userId: string }): string | n
 }
 
 /**
+ * LE REFUS D'ÊTRE COMPTÉ (01/10/2026). La politique de confidentialité fonde la mesure
+ * d'audience sur l'intérêt légitime : la personne doit donc pouvoir s'y opposer. Un
+ * navigateur qui envoie « Do Not Track » (`DNT: 1`) ou « Global Privacy Control »
+ * (`Sec-GPC: 1`) a déjà dit non — sa visite n'est pas comptée, connecté ou pas.
+ */
+export function refusMesure(entetes: { get(nom: string): string | null }): boolean {
+  return entetes.get("sec-gpc")?.trim() === "1" || entetes.get("dnt")?.trim() === "1";
+}
+
+/**
  * Les robots ne sont pas des visiteurs. La liste vise les agents qui se DÉCLARENT ; un
  * robot qui se fait passer pour Chrome passera, et c'est une limite assumée : le filtre
  * sert à ne pas compter Google, pas à gagner une course contre les faussaires.

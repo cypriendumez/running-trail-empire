@@ -19,6 +19,7 @@
  *     → écrit les modifications d'un rapport à blanc déjà relu (sans relire les pages),
  *       chaque lien revalidé par les règles du jour ; à blanc sans `--ecrire`.
  */
+import { UA_PACEVOBOT, siteExclu } from "../src/lib/races/robot";
 import { readFileSync } from "node:fs";
 import { writeFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
@@ -28,7 +29,8 @@ import { robotsAutorise } from "../src/lib/races/resultatsSite";
 import { jourFrance } from "../src/lib/races/jourFrance";
 import { seuil } from "./garde-fous";
 
-const UA = "Mozilla/5.0 (compatible; PacevoBot/1.0; +https://pacevo.fr/contact)";
+// L'identité déclarée de PacevoBot, en un seul endroit (lib/races/robot → pacevo.fr/robot).
+const UA = UA_PACEVOBOT;
 const ECRIRE = process.argv.includes("--ecrire");
 const FENETRE = process.argv.includes("--fenetre");
 const [rapport] = process.argv.slice(2).filter((a, i, t) => !a.startsWith("--") && !t[i - 1]?.startsWith("--"));

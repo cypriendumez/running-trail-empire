@@ -5775,18 +5775,16 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     // enseignes, calculées par un simple multiplicateur, qui sont fictives — et c'était
     // exactement celles que la vitrine citait nommément.
     //
-    // La liste interdite est donc DÉRIVÉE DU CODE plutôt que recopiée : le jour où une
-    // enseigne quitte la table simulée, elle devient citable sans qu'on ait à y penser,
-    // et le jour où la table disparaît, ce test le dit.
-    const shop = codeOf("src/app/api/shop/prices/route.ts");
-    const fictives = [...shop.matchAll(/retailer_name: "([^"]+)",\s*multiplier:/g)].map((m) => m[1]);
-    assert.ok(fictives.length >= 4,
-      "la table de prix simulés a disparu : la boutique devient réelle, la vitrine peut "
-      + "à nouveau en parler et ce test doit être rouvert");
-    for (const nom of fictives) {
+    // ⚠️ LA ROUTE DES PRIX SIMULÉS A ÉTÉ SUPPRIMÉE (01/10/2026, « reste dans la légalité ») :
+    // plus appelée par l'application, elle restait PUBLIQUE — des prix calculés par
+    // multiplicateur, attribués à des enseignes nommées (pratique commerciale trompeuse s'ils
+    // s'affichaient), et un appel à l'API interne de Decathlon sous une identité de
+    // navigateur. Elle ne doit pas revenir, et la vitrine ne cite toujours pas ces enseignes.
+    assert.ok(!existsSync("src/app/api/shop/prices/route.ts"), "la route des prix simulés est revenue");
+    for (const nom of ["i-Run", "Alltricks", "Lepape", "Ekosport", "Décathlon"]) {
       for (const l of ALL_LANGS) {
         assert.ok(!JSON.stringify(LANDING_T[l].features).includes(nom),
-          `${l} : la vitrine cite « ${nom} », dont le prix est calculé par multiplicateur`);
+          `${l} : la vitrine cite « ${nom} » comme source de prix`);
       }
     }
   });

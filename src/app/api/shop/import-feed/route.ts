@@ -1,4 +1,5 @@
 export const dynamic = "force-dynamic";
+import { UA_PACEVOBOT } from "@/lib/races/robot";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseFeed, normalizeFeed } from "@/lib/shop/affiliateFeed";
@@ -21,7 +22,7 @@ async function handle(req: Request) {
 
   let text: string;
   try {
-    const r = await fetch(url, { signal: AbortSignal.timeout(45000), headers: { "User-Agent": "RunningTrailEmpire-FeedImporter/1.0" } });
+    const r = await fetch(url, { signal: AbortSignal.timeout(45000), headers: { "User-Agent": UA_PACEVOBOT } });
     if (!r.ok) return NextResponse.json({ error: `Flux inaccessible (HTTP ${r.status}).` }, { status: 502 });
     text = await r.text();
   } catch (e) {

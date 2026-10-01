@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { UA_PACEVOBOT } from "@/lib/races/robot";
 import { requete, interrogeable, lire, prioriser, MIROIRS, type Toponyme } from "@/lib/trail/toponymes";
 
 /**
@@ -100,7 +101,7 @@ export async function GET(req: Request) {
       // le serveur répond « 429 — Please include a meaningful User-Agent string with your
       // requests to avoid rate-limiting ». Mesuré : refus en 217 ms, aucun objet. C'est la
       // règle d'un service public gratuit, et la respecter coûte une ligne.
-      "User-Agent": "Pacevo/1.0 (application d'entrainement course a pied; https://pacevo.fr)",
+      "User-Agent": UA_PACEVOBOT,
     },
     body: new URLSearchParams({ data: requete(bbox) }),
     signal: AbortSignal.timeout(DELAI_MS),

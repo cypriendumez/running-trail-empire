@@ -16,6 +16,7 @@
  *    borne le délai et met en cache.
  */
 import assert from "node:assert/strict";
+import { UA_PACEVOBOT } from "../src/lib/races/robot";
 import { readFileSync } from "node:fs";
 import {
   requete, interrogeable, lire, prioriser, versGeoJson, altitudeDe,
@@ -97,9 +98,11 @@ test("les miroirs sont interrogés EN PARALLÈLE, pas l'un après l'autre", () =
 test("la requête s'annonce — Overpass l'exige", () => {
   // Sans User-Agent : « 429 — Please include a meaningful User-Agent string ».
   const src = codeOf(ROUTE);
-  assert.match(src, /"User-Agent": "Pacevo\//, "l'agent identifiable a disparu : Overpass refusera tout");
-  // Le domaine a changé le 13/09/2026 : c'est pacevo.fr que l'agent annonce désormais.
-  assert.match(src, /https:\/\/pacevo\.fr/, "l'agent ne dit plus d'où viennent les requêtes");
+  // Depuis le 01/10/2026, l'agent est l'identité UNIQUE de PacevoBot (lib/races/robot),
+  // qui renvoie à pacevo.fr/robot — plus une chaîne recopiée route par route.
+  assert.match(src, /"User-Agent": UA_PACEVOBOT/, "l'agent identifiable a disparu : Overpass refusera tout");
+  assert.match(src, /import \{ UA_PACEVOBOT \} from "@\/lib\/races\/robot"/, "l'agent ne vient plus de l'identité unique");
+  assert.match(UA_PACEVOBOT, /PacevoBot\/\d.*https:\/\/pacevo\.fr\//, "l'agent ne dit plus d'où viennent les requêtes");
   assert.match(src, /AbortSignal\.timeout\(DELAI_MS\)/, "plus de délai : une requête pourrait pendre indéfiniment");
   // ⚠️ ASSEZ LONG POUR LES MASSIFS RICHES. À 9 s, le cadrage alpin dense (1 742 objets,
   // ~700 Ko) rendait TOUJOURS zéro depuis la production alors qu'il aboutit en 4,3 s

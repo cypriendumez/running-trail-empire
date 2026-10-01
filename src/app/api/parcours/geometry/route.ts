@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+import { UA_PACEVOBOT } from "@/lib/races/robot";
 import { NextRequest, NextResponse } from "next/server";
 import { denyIfAnonymous } from "@/lib/api/adminGuard";
 
@@ -144,7 +145,7 @@ export async function GET(req: NextRequest) {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
-          "User-Agent": "RunningTrailEmpire/1.0 (parcours; ODbL)",
+          "User-Agent": UA_PACEVOBOT,
         },
         body: "data=" + encodeURIComponent(q),
         signal: AbortSignal.timeout(30000),

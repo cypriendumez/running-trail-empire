@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
+import { UA_PACEVOBOT } from "@/lib/races/robot";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { idEditeur } from "@/lib/compta/enregistrer";
@@ -82,7 +83,7 @@ export async function GET(req: Request) {
         headers: {
           // Un agent réaliste : une requête anonyme est refusée d'office, ce qui
           // produirait des « indéterminé » à la chaîne et ne contrôlerait rien.
-          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
+          "User-Agent": UA_PACEVOBOT,
           "Accept-Language": "fr-FR,fr;q=0.9",
         },
       });

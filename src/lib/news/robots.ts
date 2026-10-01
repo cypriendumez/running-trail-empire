@@ -21,6 +21,7 @@
  * inaccessible n'est pas un refus, et le traiter comme tel couperait la lettre au
  * premier incident réseau.
  */
+import { UA_PACEVOBOT } from "@/lib/races/robot";
 
 type Regles = { interdits: string[]; at: number };
 const cache = new Map<string, Regles>();
@@ -57,7 +58,7 @@ export async function pageAutorisee(url: string): Promise<boolean> {
   if (!regles) {
     try {
       const r = await fetch(`${u.origin}/robots.txt`, {
-        headers: { "User-Agent": "Mozilla/5.0 (compatible; PacevoNewsletter/1.0)" },
+        headers: { "User-Agent": UA_PACEVOBOT },
         signal: AbortSignal.timeout(5000),
       });
       // 404 = pas de règles = tout est permis. Une erreur serveur, pareil : on n'invente

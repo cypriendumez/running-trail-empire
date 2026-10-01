@@ -21,6 +21,7 @@
  *   npx tsx --env-file=.env.local scripts/resultats-editions.ts <cache.jsonl> [--ecrire]
  *   (lit `resultats-sites.jsonl` dans le même dossier que le cache)
  */
+import { UA_PACEVOBOT, siteExclu } from "../src/lib/races/robot";
 import { readFileSync, existsSync, appendFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createClient } from "@supabase/supabase-js";
@@ -28,7 +29,8 @@ import { adressesEditions, pageTrouvee, editionSiteVerifiee, editionsDuSite, fus
 import { nomCanonique } from "../src/lib/races/groupes";
 import { robotsAutorise } from "../src/lib/races/resultatsSite";
 
-const UA = "Mozilla/5.0 (compatible; PacevoBot/1.0; +https://pacevo.fr/contact)";
+// L'identité déclarée de PacevoBot, en un seul endroit (lib/races/robot → pacevo.fr/robot).
+const UA = UA_PACEVOBOT;
 const ECRIRE = process.argv.includes("--ecrire");
 const [cache] = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 /** Profondeur des recherches par l'année (A) ; une ligne de cache plus courte est refaite. */
@@ -110,6 +112,8 @@ async function main() {
   const occupes = new Set<string>();
   const sousVerrou = async <T>(url: string, f: (u: URL, rb: string | null | "inconnu") => Promise<T>) => {
     const u = new URL(url);
+    // Opposition (lib/races/robot) : traité comme un robots.txt illisible — rien n'est lu, rien n'est mémorisé.
+    if (siteExclu(url)) return f(u, "inconnu");
     while (occupes.has(u.host)) await new Promise((r) => setTimeout(r, 200));
     occupes.add(u.host);
     try { return await f(u, await robotsDe(u.origin)); } finally { occupes.delete(u.host); }

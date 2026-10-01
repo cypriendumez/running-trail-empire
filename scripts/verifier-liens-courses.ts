@@ -12,12 +12,14 @@
  *
  *   npx tsx --env-file=.env.local scripts/verifier-liens-courses.ts <rapport.json> [--ecrire]
  */
+import { UA_PACEVOBOT, siteExclu } from "../src/lib/races/robot";
 import { writeFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { verdictDe, type Verdict } from "../src/lib/races/liens";
 import { seuil, arreterSiDepasse } from "./garde-fous";
 
-const UA = "Mozilla/5.0 (compatible; PacevoBot/1.0; +https://pacevo.fr/contact)";
+// L'identité déclarée de PacevoBot, en un seul endroit (lib/races/robot → pacevo.fr/robot).
+const UA = UA_PACEVOBOT;
 const ECRIRE = process.argv.includes("--ecrire");
 /** Mesuré le 29/09/2026 : 24 adresses mortes sur ~1 300. Un chronométreur entier en panne
  *  (404 sur tout son domaine pendant une migration) ne doit pas vider des centaines de liens. */
@@ -28,6 +30,8 @@ const CHAMPS = ["resultats_url", "inscription_url"] as const;
 type Champ = (typeof CHAMPS)[number];
 
 async function code(url: string): Promise<number> {
+  // Opposition (lib/races/robot) : 0, « inconnu » — jamais compté comme un lien mort.
+  if (siteExclu(url)) return 0;
   try {
     const r = await fetch(url, { headers: { "User-Agent": UA, "Accept-Language": "fr-FR" }, redirect: "follow", signal: AbortSignal.timeout(15000) });
     try { await r.body?.cancel(); } catch { /* corps déjà lu */ }

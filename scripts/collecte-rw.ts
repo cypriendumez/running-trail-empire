@@ -17,6 +17,8 @@
  * elle aussi. C'est la leçon du catalogue de courses, où trois épreuves avaient hérité
  * des distances d'une course à 400 km de là.
  */
+import { UA_PACEVOBOT } from "../src/lib/races/robot";
+import { lirePoliment } from "./acces-poli";
 import fs from "node:fs";
 import path from "node:path";
 import { dansLesBornes, coherenceStackDrop, type Modele } from "../src/lib/shop/modele";
@@ -25,7 +27,10 @@ import { prendreVerrou } from "../src/lib/shop/verrou";
 
 const BASE = "https://www.runningwarehouse.eu";
 const SORTIE = path.join(process.cwd(), "src/data/gear/chaussures.json");
-const UA = { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36", "Accept-Language": "en;q=0.9" };
+// ⚠️ PLUS DE DÉGUISEMENT EN NAVIGATEUR (01/10/2026) : ce script se présentait comme Chrome.
+// Il s'identifie désormais (PacevoBot) et passe par l'accès poli : robots.txt relu et
+// respecté automatiquement, liste d'opposition (scripts/acces-poli).
+const UA = { "User-Agent": UA_PACEVOBOT, "Accept-Language": "en;q=0.9" };
 
 /** Tolérances du contrôle croisé, et leur raison. */
 export const TOLERANCE = {
@@ -51,7 +56,7 @@ export class Refus extends Error {}
  * lendemain, elle reprend là où elle s'est arrêtée.
  */
 async function texte(url: string): Promise<string | null> {
-  const r = await fetch(url, { headers: UA, signal: AbortSignal.timeout(25000) }).catch(() => null);
+  const r = await lirePoliment(url, { headers: UA, signal: AbortSignal.timeout(25000) }).catch(() => null);
   if (r && (r.status === 406 || r.status === 429 || r.status === 403)) {
     throw new Refus(`la source refuse de répondre (HTTP ${r.status}) — reprise plus tard`);
   }

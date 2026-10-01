@@ -27,6 +27,7 @@ import { estChronometreur, motsDistinctifs, liensResultatsCandidats, choisirParD
 import { liensParcours, parcoursPour, estItineraireOuPhoto, reglementSeul } from "./parcoursSite";
 import { datesAnnoncees, dateDepuisPage, type DateLue } from "./prochaineEdition";
 import { lienClassementPropre, lienSortantPropre } from "./lienPropre";
+import { siteExclu } from "./robot";
 
 const norm = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 const decode = (u: string) => { try { return decodeURIComponent(u); } catch { return u; } };
@@ -40,7 +41,8 @@ const decode = (u: string) => { try { return decodeURIComponent(u); } catch { re
  */
 export function pageOfficielle(c: { site_officiel?: string | null; registration_url?: string | null }): string | null {
   const http = (u: unknown) => (typeof u === "string" && /^https?:\/\//i.test(u.trim()) ? u.trim() : null);
-  const propre = (u: string | null) => (u && !estCalendrierTiers(u) && !estPlateformeInscription(u) && !estChronometreur(u) ? u : null);
+  // Un site qui a demandé à ne plus être lu (lib/races/robot) n'a plus de page officielle pour nous.
+  const propre = (u: string | null) => (u && !estCalendrierTiers(u) && !estPlateformeInscription(u) && !estChronometreur(u) && !siteExclu(u) ? u : null);
   return propre(http(c.site_officiel)) ?? propre(http(c.registration_url));
 }
 

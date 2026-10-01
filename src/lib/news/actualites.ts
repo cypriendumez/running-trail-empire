@@ -1,4 +1,5 @@
 import { unstable_cache } from "next/cache";
+import { UA_PACEVOBOT } from "@/lib/races/robot";
 import { QUERIES, FILTRES, type Cat } from "@/lib/news/rubriques";
 import { decodeEntites as decode, texteDuFlux } from "@/lib/news/rss";
 
@@ -99,7 +100,7 @@ function parseRss(xml: string, defaultSource?: string, defaultDomain?: string, l
 }
 
 async function fetchFeed(url: string): Promise<string> {
-  const r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 RunningTrailEmpire/1.0" }, signal: AbortSignal.timeout(DELAI_FLUX_MS) });
+  const r = await fetch(url, { headers: { "User-Agent": UA_PACEVOBOT }, signal: AbortSignal.timeout(DELAI_FLUX_MS) });
   if (!r.ok) throw new Error(`${r.status}`);
   return r.text();
 }

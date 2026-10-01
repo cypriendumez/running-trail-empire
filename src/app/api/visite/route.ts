@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { estAdmin } from "@/lib/admin/acces";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 import {
-  appareilDe, empreinteVisiteur, espaceDe, estRobot, langueDe, normaliserChemin, paysDe, pseudonymeCompte, referentDe,
+  appareilDe, empreinteVisiteur, espaceDe, estRobot, refusMesure, langueDe, normaliserChemin, paysDe, pseudonymeCompte, referentDe,
 } from "@/lib/visites/empreinte";
 
 /**
@@ -40,6 +40,7 @@ export async function POST(req: Request) {
 
     const ua = req.headers.get("user-agent");
     if (estRobot(ua)) return rien();
+    if (refusMesure(req.headers)) return rien();
     const hote = req.headers.get("host") ?? "";
     if (/^(localhost|127\.0\.0\.1)/.test(hote)) return rien();
 

@@ -17,6 +17,7 @@
  * `--relire-apres` jours : le lien « Résultats 2025 » devient « Résultats 2026 » après la
  * course, et le workflow hebdomadaire doit le voir.
  */
+import { UA_PACEVOBOT, siteExclu } from "../src/lib/races/robot";
 import { readFileSync, existsSync, appendFileSync } from "node:fs";
 import { lienResultats, liensResultatsParAnnee, pageArchivesResultats, robotsAutorise, type LienResultats } from "../src/lib/races/resultatsSite";
 import { fusionEditions } from "../src/lib/races/editionsResultats";
@@ -25,7 +26,8 @@ import { couplesDistanceDplus, type CoupleDplus } from "../src/lib/races/dplusSi
 import { lienInscriptionSite, type LienInscription } from "../src/lib/races/inscriptionSite";
 import { seuil } from "./garde-fous";
 
-const UA = "Mozilla/5.0 (compatible; PacevoBot/1.0; +https://pacevo.fr/contact)";
+// L'identité déclarée de PacevoBot, en un seul endroit (lib/races/robot → pacevo.fr/robot).
+const UA = UA_PACEVOBOT;
 const PARALLELE = 6;
 const anneeCourante = new Date().getFullYear();
 
@@ -38,7 +40,7 @@ export type LigneSite = {
 };
 
 /** Échecs qui disent quelque chose DU SITE (et le rediront) : inutile d'y retourner chaque semaine. */
-const ECHECS_DURABLES = new Set(["robots-interdit", "pas-html", "adresse"]);
+const ECHECS_DURABLES = new Set(["robots-interdit", "pas-html", "adresse", "opposition"]);
 
 /** Cette ligne dispense-t-elle de relire le site ? */
 export function dejaLu(l: LigneSite, maintenant: number, joursMax = Infinity): boolean {
@@ -110,6 +112,8 @@ async function main() {
     const ecrire = (x: Omit<LigneSite, "site" | "lueLe">) => appendFileSync(sortie, JSON.stringify({ site, ...x, lueLe: new Date().toISOString() }) + "\n");
     let u: URL;
     try { u = new URL(site); } catch { return ecrire({ ok: false, motif: "adresse" }); }
+    // Un site qui a refusé d'être lu (lib/races/robot) ne l'est plus.
+    if (siteExclu(site)) return ecrire({ ok: false, motif: "opposition" });
     while (occupes.has(u.host)) await new Promise((r) => setTimeout(r, 300));
     occupes.add(u.host);
     try {

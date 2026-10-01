@@ -12,13 +12,15 @@
  * Même politesse que les robots : robots.txt respecté, délai court, une panne ne décide rien.
  * Serveur uniquement (client de service).
  */
+import { UA_PACEVOBOT } from "./robot";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { pageOfficielle, lirePage, deciderVeille, type CourseVeillee } from "./veille";
 import { robotsAutorise } from "./resultatsSite";
 import { reponseIncertaine } from "./editionsResultats";
 import { jourFrance } from "./jourFrance";
 
-const UA = "Mozilla/5.0 (compatible; PacevoBot/1.0; +https://pacevo.fr/contact)";
+// L'identité déclarée de PacevoBot, en un seul endroit (lib/races/robot → pacevo.fr/robot).
+const UA = UA_PACEVOBOT;
 const HEURE = 3600_000;
 
 /** Combien de temps une lecture reste fraîche : 6 h autour de la course (J-60 à J+12), 3 jours sinon. */

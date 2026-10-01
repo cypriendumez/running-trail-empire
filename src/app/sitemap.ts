@@ -111,6 +111,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { path: "/mentions-legales", freq: "yearly", priority: 0.3 },
     { path: "/confidentialite", freq: "yearly", priority: 0.3 },
     { path: "/terms", freq: "yearly", priority: 0.3 },
+    { path: "/robot", freq: "yearly", priority: 0.2 },
   ];
   const fixes: MetadataRoute.Sitemap = entries.map(e => ({
     url: `${BASE}${e.path}`,

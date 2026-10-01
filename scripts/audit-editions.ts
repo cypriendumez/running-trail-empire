@@ -17,6 +17,7 @@
  *
  *   npx tsx --env-file=.env.local scripts/audit-editions.ts <rapport.json> [--ecrire]
  */
+import { UA_PACEVOBOT, siteExclu } from "../src/lib/races/robot";
 import { writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
@@ -24,7 +25,8 @@ import { editionSiteVerifiee, reponseIncertaine, sansPagePartagee, type EditionR
 import { robotsAutorise } from "../src/lib/races/resultatsSite";
 import { lienClassementPropre } from "../src/lib/races/lienPropre";
 
-const UA = "Mozilla/5.0 (compatible; PacevoBot/1.0; +https://pacevo.fr/contact)";
+// L'identité déclarée de PacevoBot, en un seul endroit (lib/races/robot → pacevo.fr/robot).
+const UA = UA_PACEVOBOT;
 const ECRIRE = process.argv.includes("--ecrire");
 const [rapport] = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 
@@ -84,7 +86,7 @@ async function main() {
       while (occupes.has(u.host)) await new Promise((r) => setTimeout(r, 200));
       occupes.add(u.host);
       try {
-        const rb = await robotsDe(u.origin);
+        const rb = siteExclu(u.toString()) ? "inconnu" : await robotsDe(u.origin);
         if (rb === "inconnu" || !robotsAutorise(rb, u.pathname + u.search)) {
           controles.set(`${e.annee}|${e.url}`, { ...e, verdict: "INCERTAIN", motif: rb === "inconnu" ? "robots-illisible" : "robots-interdit", code: 0, finale: e.url, empreinte: null, longueur: 0 });
           continue;

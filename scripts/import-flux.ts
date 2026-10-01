@@ -18,6 +18,7 @@
  * paraîtrait nulle part. Et un lot ne peut pas contenir deux fois la même clé
  * (marchand, code-barres) — PostgREST refuse le lot ENTIER, pas la ligne fautive.
  */
+import { UA_PACEVOBOT } from "../src/lib/races/robot";
 import fs from "node:fs";
 import path from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -117,7 +118,7 @@ async function principal(): Promise<void> {
     process.exitCode = 1; return;
   }
   console.log(`téléchargement du flux ${marchand}…`);
-  const r = await fetch(url, { headers: { "User-Agent": "Pacevo/1.0 (+https://pacevo.fr)" }, signal: AbortSignal.timeout(120000) })
+  const r = await fetch(url, { headers: { "User-Agent": UA_PACEVOBOT }, signal: AbortSignal.timeout(120000) })
     .catch((e) => { console.log("flux injoignable :", String(e).slice(0, 90)); return null; });
   if (!r?.ok) { console.log(`flux inaccessible (HTTP ${r?.status ?? "?"})`); process.exitCode = 1; return; }
 
