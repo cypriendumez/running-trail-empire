@@ -12,7 +12,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { libelleDuLien, distancesNommees, choisirParDistance, liensResultatsCandidats } from "../src/lib/races/resultatsSite";
 import { liensParcours, parcoursPour } from "../src/lib/races/parcoursSite";
-import { lirePage, deciderVeille, pageDediee, sansMenus, motsCourse, pageGenerique } from "../src/lib/races/veille";
+import { lirePage, deciderVeille, pageDediee, sansMenus, motsCourse, pageGenerique, lienVeilleAccepte } from "../src/lib/races/veille";
 import { fraicheurVeille, aRelire } from "../src/lib/races/veilleCourse";
 import { lienSortantPropre } from "../src/lib/races/lienPropre";
 import { LiensCourse } from "../src/components/races/LiensCourse";
@@ -172,6 +172,31 @@ test("jamais un lien publicitaire de constructeur de sites, ni une page généri
   assert.ok(!("inscription_url" in deciderVeille({ id: "x", name: "Trail X Saint-Alban", date: "2026-11-20" }, club, AUJ, TOUT)), "l'inscription jeunesse du club devient celle de la course");
 });
 
+test("relus sur le passage complet : saison de club, billetterie de ville, post Instagram, résultats du club", () => {
+  const page = "https://trail-x.fr/";
+  const non: [Parameters<typeof lienVeilleAccepte>[0], string][] = [
+    ["inscription", "https://www.asfondettesathletisme.com/en-savoir-plus/inscriptions-saison-2026-2027-182161"],
+    ["inscription", "https://www.racingclubnantais.fr/index.php/theme-athlecompet/inscription-aux-competitions"],
+    ["inscription", "https://avignon-tourisme.com/billetterie/"],
+    ["resultats", "https://www.instagram.com/p/DcVU9hfipWC/"],
+    ["resultats", "https://www.facebook.com/trailx/posts/123"],
+    ["resultats", "https://www.psn-preaux.fr/resultats-du-club-2026.html"],
+    ["resultats", "https://pyreneeschrono.fr/resultats-epreuves/"],
+  ];
+  for (const [q, u] of non) assert.equal(lienVeilleAccepte(q, u, page), false, `${q} : ${u}`);
+  const oui: [Parameters<typeof lienVeilleAccepte>[0], string][] = [
+    ["inscription", "https://www.weezevent.com/billetterie-trail-x-2026"],
+    ["inscription", "https://protiming.fr/Runnings/register/7702-La-Saunarias/20543-Trail-28km-250mD"],
+    ["inscription", "https://trail-x.fr/inscriptions/"],
+    ["resultats", "https://sportips.fr/chrono/PEYR26/results"],
+    ["resultats", "https://www.athle.fr/bases/liste.aspx?frmbase=resultats&frmmode=1&frmespace=0&frmcompetition=307842"],
+    ["parcours", "https://www.openrunner.com/route-details/1"],
+  ];
+  for (const [q, u] of oui) assert.equal(lienVeilleAccepte(q, u, page), true, `${q} refusé à tort : ${u}`);
+  assert.equal(lienVeilleAccepte("parcours", "https://www.instagram.com/p/x/", page), false);
+  assert.equal(lienVeilleAccepte("resultats", "pas une adresse", page), false);
+});
+
 test("la veille à la consultation : au plus une lecture par fenêtre, plus serrée autour de la course", () => {
   const H = 3600_000, maintenant = Date.parse("2026-10-01T12:00:00Z");
   assert.equal(fraicheurVeille("2026-09-27", AUJ), 6 * H, "une course qui vient d'avoir lieu n'est pas relue souvent");
@@ -206,6 +231,9 @@ test("le lien du parcours s'affiche, s'ouvre dans un NOUVEL ONGLET, et rien d'ho
   const script = codeNu("scripts/veille-courses.ts");
   assert.ok(/if \(patchs\.length > max\) \{[\s\S]{0,120}?process\.exit\(2\)/.test(script), "l'application d'un rapport n'a plus de seuil");
   assert.ok(/if \(iApp >= 0\) return appliquerRapport\(/.test(script), "le mode --appliquer relit les pages au lieu d'écrire le rapport relu");
+  assert.ok(/if \(typeof patch\[champ\] === "string" && !lienVeilleAccepte\(quoi, patch\[champ\] as string, page\)\)/.test(script), "un rapport ancien écrit un lien qu'une règle récente refuse");
+  const app = script.slice(script.indexOf("async function appliquerRapport"), script.indexOf("async function main()"));
+  assert.ok(app.indexOf("if (!ECRIRE)") > 0 && app.indexOf("if (!ECRIRE)") < app.indexOf(".update("), "--appliquer écrit sans --ecrire");
   const sql = readFileSync("supabase/migrations/034_courses_parcours_veille.sql", "utf8").replace(/--.*$/gm, "");
   assert.ok(/add column if not exists parcours_url text/.test(sql) && /add column if not exists veille_at timestamptz/.test(sql) && !/\bdrop\b/i.test(sql));
 });

@@ -87,7 +87,7 @@ export function motsCourse(nom: string, ville?: string | null): string[] {
 }
 
 /** Une inscription qui n'est pas celle d'une course : école, cantine, crèche, adhésion au club… */
-const INSCRIPTION_HORS_COURSE = /scolaire|cantine|p[ée]riscolaire|cr[èe]che|loisirs|garderie|[ée]cole|stage|b[ée]n[ée]vole|newsletter|listes? [ée]lectorales?|enfance|jeunesse|adh[ée]sion|licence|cotisation|plaquette/i;
+const INSCRIPTION_HORS_COURSE = /scolaire|cantine|p[ée]riscolaire|cr[èe]che|loisirs|garderie|[ée]cole|stage|b[ée]n[ée]vole|newsletter|listes? [ée]lectorales?|enfance|jeunesse|adh[ée]sion|licence|cotisation|plaquette|saison|aux[-_ ]comp[ée]titions/i;
 
 /**
  * Les CONSTRUCTEURS DE SITES (01/10/2026) : sur leur domaine nu, « Créer un site »,
@@ -96,7 +96,31 @@ const INSCRIPTION_HORS_COURSE = /scolaire|cantine|p[ée]riscolaire|cr[èe]che|lo
  * vivent sur des SOUS-domaines (club.sportsregions.fr) et restent lus.
  */
 export const HOTE_CONSTRUCTEUR = /^(?:www\.)?(?:wordpress\.com|wix\.com|jimdo\.com|weebly\.com|squarespace\.com|godaddy\.com|e-monsite\.com|site123\.com|webnode\.(?:fr|com)|strikingly\.com|sportsregions\.fr|clubeo\.com)$/i;
-const SEGMENT_GENERIQUE = /^(?:resultats?|r%c3%a9sultats?|results?|classements?|live|calendrier|calendar|evenements?|events?|inscriptions?|competitions?|accueil|home)$/i;
+const SEGMENT_GENERIQUE = /^(?:(?:resultats?|r%c3%a9sultats?|results?|classements?)(?:[-_](?:epreuves?|courses?|evenements?|events?|competitions?|en-ligne|live))?|live|calendrier|calendar|evenements?|events?|inscriptions?|competitions?|accueil|home)$/i;
+/** Un réseau social : un message qui ANNONCE les résultats n'est pas le classement. */
+const RESEAU_SOCIAL = /(^|\.)(instagram\.com|facebook\.com|fb\.com|tiktok\.com|youtube\.com|youtu\.be|x\.com|twitter\.com|threads\.net)$/i;
+/** Les résultats des licenciés d'un CLUB, toutes courses confondues, pas le classement de celle-ci. */
+const RESULTATS_DU_CLUB = /r[ée]sultats?[-_ ](?:du|des)[-_ ](?:club|licenci[ée]s|adh[ée]rents)/i;
+
+/**
+ * Un lien est-il acceptable pour la veille ? Les règles qui ne dépendent que de l'ADRESSE
+ * (et du libellé) : elles s'appliquent aussi à un rapport déjà produit (`--appliquer`).
+ */
+export function lienVeilleAccepte(quoi: "resultats" | "inscription" | "parcours", url: string, pageUrl: string, texte = ""): boolean {
+  let u: URL; try { u = new URL(url); } catch { return false; }
+  if (pageGenerique(url, pageUrl)) return false;
+  const dit = `${texte} ${decode(u.pathname + u.search)}`;
+  if (quoi === "resultats") return !RESEAU_SOCIAL.test(u.hostname) && !RESULTATS_DU_CLUB.test(dit);
+  if (quoi === "inscription") {
+    if (INSCRIPTION_HORS_COURSE.test(dit)) return false;
+    // La billetterie GÉNÉRALE d'une ville ou d'un office de tourisme (« /billetterie/ » nue) ;
+    // une billetterie propre à la course (« /billetterie-trail-x ») reste acceptée.
+    if (/\/billetterie\/?$/i.test(u.pathname) && !u.search) return false;
+    // Une billetterie d'office de tourisme, la page d'un club : sans le nom de la course, non.
+    return !(estPlateformeInscription(url) && PAGE_LISTE.test(u.pathname));
+  }
+  return !RESEAU_SOCIAL.test(u.hostname);
+}
 
 /**
  * Une page GÉNÉRIQUE d'un autre site — la liste « tous nos résultats » d'un chronométreur
@@ -190,7 +214,7 @@ export function deciderVeille(
   const aVenir = /^\d{4}-\d{2}-\d{2}$/.test(jour) && !jour.startsWith("2099") && jour >= aujourdhui;
 
   // ── Classement ──
-  const res = choisirParDistance(p.resultats.filter((x) => nommeLien(x) && !pageGenerique(x.url, p.url)), km);
+  const res = choisirParDistance(p.resultats.filter((x) => nommeLien(x) && lienVeilleAccepte("resultats", x.url, p.url, x.texte)), km);
   const resUrl = res ? lienClassementPropre(res.url) : null;
   // Le classement d'une édition qui n'a pas encore eu lieu n'existe pas (page vide).
   const futur = res?.annee != null && aVenir && res.annee >= Number(jour.slice(0, 4));
@@ -199,17 +223,15 @@ export function deciderVeille(
     if (!c.resultats_url || plusRecent) { patch.resultats_url = resUrl; patch.resultats_annee = res.annee ?? null; }
   }
   // ── Inscription : seulement si on n'en a aucune ──
-  if (!c.inscription_url && p.inscription && nommeLien(p.inscription)
-    && !INSCRIPTION_HORS_COURSE.test(`${p.inscription.texte} ${decode(p.inscription.url)}`)) {
+  if (!c.inscription_url && p.inscription && nommeLien(p.inscription)) {
     const u = lienSortantPropre(p.inscription.url);
-    let chemin = ""; try { chemin = new URL(u ?? "").pathname; } catch { /* */ }
-    // La liste « toutes nos courses » d'une PLATEFORME n'est l'inscription d'aucune ; sur le
-    // site de la course, « /inscriptions » est bien la sienne.
-    if (u && !(estPlateformeInscription(u) && PAGE_LISTE.test(chemin)) && !pageGenerique(u, p.url)) patch.inscription_url = u;
+    // École, adhésion, liste « toutes nos courses » d'une plateforme, page générique : non.
+    // Sur le site de la course, « /inscriptions » est bien la sienne.
+    if (u && lienVeilleAccepte("inscription", u, p.url, p.inscription.texte)) patch.inscription_url = u;
   }
   // ── Parcours : seulement si on n'en a aucun ──
   if (colonnes.parcours && !c.parcours_url) {
-    const tr = parcoursPour(p.parcours.filter((x) => nommeLien(x) && !pageGenerique(x.url, p.url)), km);
+    const tr = parcoursPour(p.parcours.filter((x) => nommeLien(x) && lienVeilleAccepte("parcours", x.url, p.url, x.texte)), km);
     if (tr) patch.parcours_url = tr.url;
   }
   // ── Date : « à venir » ou estimée seulement ──

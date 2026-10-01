@@ -15,13 +15,14 @@
  * `--ecrire` écrit, sous le seuil `--max` (sinon arrêt, code 2).
  *
  *   npx tsx --env-file=.env.local scripts/veille-courses.ts <rapport.json> [--fenetre] [--ecrire] [--max <n>]
- *   npx tsx --env-file=.env.local scripts/veille-courses.ts --appliquer <rapport.json> [--max <n>]
- *     → écrit EXACTEMENT les modifications d'un rapport à blanc déjà relu (sans relire les pages).
+ *   npx tsx --env-file=.env.local scripts/veille-courses.ts --appliquer <rapport.json> [--ecrire] [--max <n>]
+ *     → écrit les modifications d'un rapport à blanc déjà relu (sans relire les pages),
+ *       chaque lien revalidé par les règles du jour ; à blanc sans `--ecrire`.
  */
 import { readFileSync } from "node:fs";
 import { writeFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
-import { pageOfficielle, lirePage, deciderVeille, type CourseVeillee, type PageLue } from "../src/lib/races/veille";
+import { pageOfficielle, lirePage, deciderVeille, lienVeilleAccepte, type CourseVeillee, type PageLue } from "../src/lib/races/veille";
 import { reponseIncertaine } from "../src/lib/races/editionsResultats";
 import { robotsAutorise } from "../src/lib/races/resultatsSite";
 import { jourFrance } from "../src/lib/races/jourFrance";
@@ -45,8 +46,30 @@ async function appliquerRapport(fichier: string, max: number) {
     auth: { persistSession: false },
     global: { fetch: (u, o) => fetch(u, { ...o, signal: o?.signal ?? AbortSignal.timeout(30_000) }) },
   });
+  // ⚠️ CHAQUE LIEN EST REVALIDÉ par les règles d'AUJOURD'HUI (`lienVeilleAccepte`) : un
+  // rapport produit avant une règle ne peut pas écrire ce qu'elle refuse.
+  const pages = new Map<string, string | null>();
+  const ids = patchs.map(([id]) => id);
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await sb.from("races").select("id, site_officiel, registration_url").in("id", ids.slice(i, i + 200));
+    if (error) throw new Error(error.message);
+    for (const r of data ?? []) pages.set(r.id as string, pageOfficielle(r));
+  }
+  let ecartes = 0;
   const lots = new Map<string, { patch: Record<string, unknown>; ids: string[] }>();
-  for (const [id, patch] of patchs) { const k = JSON.stringify(patch); const g = lots.get(k) ?? { patch, ids: [] }; g.ids.push(id); lots.set(k, g); }
+  for (const [id, brut] of patchs) {
+    const page = pages.get(id);
+    if (!page) { ecartes++; continue; }
+    const patch = { ...brut };
+    const refuse = (quoi: "resultats" | "inscription" | "parcours", champ: string) => {
+      if (typeof patch[champ] === "string" && !lienVeilleAccepte(quoi, patch[champ] as string, page)) { delete patch[champ]; if (champ === "resultats_url") delete patch.resultats_annee; ecartes++; }
+    };
+    refuse("resultats", "resultats_url"); refuse("inscription", "inscription_url"); refuse("parcours", "parcours_url");
+    if (!Object.keys(patch).length) continue;
+    const k = JSON.stringify(patch); const g = lots.get(k) ?? { patch, ids: [] }; g.ids.push(id); lots.set(k, g);
+  }
+  console.log(`[veille] rapport : ${patchs.length} courses, ${ecartes} lien(s) écarté(s) par les règles actuelles`);
+  if (!ECRIRE) { console.log("(à blanc — rien écrit ; ajouter --ecrire)"); return; }
   let ok = 0, ko = 0;
   for (const g of lots.values()) for (let i = 0; i < g.ids.length; i += 200) {
     const lot = g.ids.slice(i, i + 200);
