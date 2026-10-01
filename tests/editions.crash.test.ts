@@ -283,7 +283,8 @@ test("la page publique utilise la MÊME règle et ouvre chaque édition dans un 
 test("les mauvais liens relevés dans l'inventaire du 30/09 sont corrigés ou refusés", () => {
   const cas: [string, string | null, string][] = [
     ["https://www.sport-info.com/i_liste_resultats.php?id=318&amp;general=1&amp;epreuve=3689", "https://www.sport-info.com/i_liste_resultats.php?id=318&general=1&epreuve=3689", "« &amp; » non décodé"],
-    ["https://www.athle.fr/bases/liste.aspx?frmbase=resultats&#038;frmmode=1", "https://www.athle.fr/bases/liste.aspx?frmbase=resultats&frmmode=1", "« &#038; » non décodé"],
+    ["https://www.athle.fr/bases/liste.aspx?frmbase=resultats&#038;frmmode=1&#038;frmcompetition=306225", "https://www.athle.fr/bases/liste.aspx?frmbase=resultats&frmmode=1&frmcompetition=306225", "« &#038; » non décodé"],
+    ["https://bases.athle.fr/asp.net/accueil.aspx?frmbase=resultats&frmtype1=Stade", null, "la page d'accueil des résultats FFA passe pour un classement"],
     ["https://x.fr/r?a=1&amp;amp;b=2", "https://x.fr/r?a=1&b=2", "entité encodée deux fois"],
     ["https://www.linkedin.com/shareArticle?mini=true&url=https%3A%2F%2Fx.fr&title=classement", null, "un bouton de partage LinkedIn"],
     ["https://www.facebook.com/sharer/sharer.php?u=https://x.fr/resultats", null, "un bouton de partage Facebook"],

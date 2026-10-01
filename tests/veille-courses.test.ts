@@ -12,7 +12,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { libelleDuLien, distancesNommees, choisirParDistance, liensResultatsCandidats } from "../src/lib/races/resultatsSite";
 import { liensParcours, parcoursPour } from "../src/lib/races/parcoursSite";
-import { lirePage, deciderVeille, pageDediee, sansMenus, motsCourse } from "../src/lib/races/veille";
+import { lirePage, deciderVeille, pageDediee, sansMenus, motsCourse, pageGenerique } from "../src/lib/races/veille";
 import { fraicheurVeille, aRelire } from "../src/lib/races/veilleCourse";
 import { lienSortantPropre } from "../src/lib/races/lienPropre";
 import { LiensCourse } from "../src/components/races/LiensCourse";
@@ -149,6 +149,29 @@ test("une MAIRIE n'est pas dédiée à la course qui porte son nom ; ni école n
   assert.ok(!("inscription_url" in deciderVeille({ id: "g", name: "Cap Sur Grenade", city: "Grenade", date: "2027-03-07" }, liste, AUJ, TOUT)), "la liste de toutes les courses d'une plateforme devient l'inscription");
 });
 
+test("jamais un lien publicitaire de constructeur de sites, ni une page générique d'un autre site", () => {
+  const page = "https://trail-x.fr/";
+  for (const u of ["https://wordpress.com/start/", "https://www.sportsregions.fr/inscription", "https://www.wix.com/", "https://yaka-chrono.com/resultats",
+    "https://fabricessportchrono.fr/calendar/etiquette/resultat/", "https://chrono.fr/"]) assert.equal(pageGenerique(u, page), true, u);
+  // Les sites de clubs hébergés en sous-domaine, la page /resultats du site de la course, un
+  // classement précis chez un chronométreur : gardés.
+  for (const u of ["https://trail-x.fr/resultats", "https://yaka-chrono.com/results/2025/MIB/", "https://www.kms.fr/v5/public/Resultats_Event/5293"]) {
+    assert.equal(pageGenerique(u, page), false, u);
+  }
+  assert.equal(pageGenerique("https://monclub.sportsregions.fr/inscription", "https://monclub.sportsregions.fr/"), false, "la page d'inscription du site d'un club (sous-domaine) est écartée");
+  const html = `<title>Trail X</title><p>Trail X</p><footer></footer><a href="https://wordpress.com/start/">Créer un site — inscription gratuite</a><a href="https://yaka-chrono.com/resultats">Résultats</a>`;
+  const r = deciderVeille({ id: "x", name: "Trail X Saint-Alban", date: "2026-09-20" }, lirePage(html, "https://trailx-saintalban.fr/", AUJ), AUJ, TOUT);
+  assert.ok(!("inscription_url" in r) && !("resultats_url" in r), `lien générique retenu : ${JSON.stringify(r)}`);
+  // La création de compte d'une plateforme de clubs n'est pas l'inscription à la course.
+  const plateforme = lirePage(`<title>Trail X</title><p>Trail X Saint-Alban</p><a href="https://www.sportsregions.fr/inscription">Inscription</a>`, "https://trailx-saintalban.fr/", AUJ);
+  assert.ok(plateforme.inscription, "le lien d'inscription n'est plus lu (le cas ne teste plus rien)");
+  assert.ok(!("inscription_url" in deciderVeille({ id: "x", name: "Trail X Saint-Alban", date: "2026-11-20" }, plateforme, AUJ, TOUT)), "la création de compte de la plateforme devient l'inscription");
+  // L'inscription « enfance et jeunesse » d'un club (lue sur clubleovienne.fr) non plus.
+  const club = lirePage(`<title>Trail X</title><p>Trail X Saint-Alban</p><a href="/plaquette-2025-2026-inscriptions/">Inscriptions enfance et jeunesse</a>`, "https://trailx-saintalban.fr/", AUJ);
+  assert.ok(club.inscription, "le lien d'inscription n'est plus lu (le cas ne teste plus rien)");
+  assert.ok(!("inscription_url" in deciderVeille({ id: "x", name: "Trail X Saint-Alban", date: "2026-11-20" }, club, AUJ, TOUT)), "l'inscription jeunesse du club devient celle de la course");
+});
+
 test("la veille à la consultation : au plus une lecture par fenêtre, plus serrée autour de la course", () => {
   const H = 3600_000, maintenant = Date.parse("2026-10-01T12:00:00Z");
   assert.equal(fraicheurVeille("2026-09-27", AUJ), 6 * H, "une course qui vient d'avoir lieu n'est pas relue souvent");
@@ -179,6 +202,10 @@ test("le lien du parcours s'affiche, s'ouvre dans un NOUVEL ONGLET, et rien d'ho
   const page = codeNu("src/app/courses/[slug]/page.tsx");
   assert.ok(/const parcours = lienSortantPropre\(\(c as \{ parcours_url\?: unknown \}\)\.parcours_url\);/.test(page) && /\{parcours && \(\s*<a href=\{parcours\} target="_blank"/.test(page),
     "la page publique n'affiche plus le parcours, ou hors d'un nouvel onglet");
+  // Écrire un rapport relu : exactement ses modifications, sous le même seuil.
+  const script = codeNu("scripts/veille-courses.ts");
+  assert.ok(/if \(patchs\.length > max\) \{[\s\S]{0,120}?process\.exit\(2\)/.test(script), "l'application d'un rapport n'a plus de seuil");
+  assert.ok(/if \(iApp >= 0\) return appliquerRapport\(/.test(script), "le mode --appliquer relit les pages au lieu d'écrire le rapport relu");
   const sql = readFileSync("supabase/migrations/034_courses_parcours_veille.sql", "utf8").replace(/--.*$/gm, "");
   assert.ok(/add column if not exists parcours_url text/.test(sql) && /add column if not exists veille_at timestamptz/.test(sql) && !/\bdrop\b/i.test(sql));
 });

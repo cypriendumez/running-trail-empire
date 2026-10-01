@@ -15,7 +15,10 @@
  * `--ecrire` écrit, sous le seuil `--max` (sinon arrêt, code 2).
  *
  *   npx tsx --env-file=.env.local scripts/veille-courses.ts <rapport.json> [--fenetre] [--ecrire] [--max <n>]
+ *   npx tsx --env-file=.env.local scripts/veille-courses.ts --appliquer <rapport.json> [--max <n>]
+ *     → écrit EXACTEMENT les modifications d'un rapport à blanc déjà relu (sans relire les pages).
  */
+import { readFileSync } from "node:fs";
 import { writeFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { pageOfficielle, lirePage, deciderVeille, type CourseVeillee, type PageLue } from "../src/lib/races/veille";
@@ -33,7 +36,30 @@ const A_VENIR_PAR_JOUR = 400;
 
 const decaler = (jour: string, n: number) => new Date(Date.parse(`${jour}T12:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
 
+/** Les modifications d'un rapport, réécrites telles quelles : ce qu'on a relu est ce qui part. */
+async function appliquerRapport(fichier: string, max: number) {
+  const r = JSON.parse(readFileSync(fichier, "utf8")) as { patchs?: Record<string, Record<string, unknown>> };
+  const patchs = Object.entries(r.patchs ?? {});
+  if (patchs.length > max) { console.error(`ARRÊT : ${patchs.length} courses à modifier (> ${max}).`); process.exit(2); }
+  const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+    auth: { persistSession: false },
+    global: { fetch: (u, o) => fetch(u, { ...o, signal: o?.signal ?? AbortSignal.timeout(30_000) }) },
+  });
+  const lots = new Map<string, { patch: Record<string, unknown>; ids: string[] }>();
+  for (const [id, patch] of patchs) { const k = JSON.stringify(patch); const g = lots.get(k) ?? { patch, ids: [] }; g.ids.push(id); lots.set(k, g); }
+  let ok = 0, ko = 0;
+  for (const g of lots.values()) for (let i = 0; i < g.ids.length; i += 200) {
+    const lot = g.ids.slice(i, i + 200);
+    const { error } = await sb.from("races").update({ ...g.patch, updated_at: new Date().toISOString() }).in("id", lot);
+    if (error) { ko++; if (ko < 4) console.error(error.message); } else ok += lot.length;
+  }
+  console.log(`courses mises à jour depuis le rapport : ${ok}, lots en erreur : ${ko}`);
+  if (ko) process.exit(1);
+}
+
 async function main() {
+  const iApp = process.argv.indexOf("--appliquer");
+  if (iApp >= 0) return appliquerRapport(process.argv[iApp + 1], seuil(process.argv, "--max", 4000));
   if (!rapport) throw new Error("usage : veille-courses.ts <rapport.json> [--fenetre] [--ecrire] [--max <n>]");
   const max = seuil(process.argv, "--max", FENETRE ? 800 : 4000);
   const aujourdhui = jourFrance();

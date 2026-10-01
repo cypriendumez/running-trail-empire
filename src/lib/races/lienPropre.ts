@@ -55,6 +55,9 @@ export function lienClassementPropre(url: unknown): string | null {
   if (PARTAGE.test(hote) || (/(^|\.)facebook\.com$/.test(hote) && /^\/sharer/i.test(u.pathname))) return null;
   if (EDITORIAUX.test(hote)) return null;
   if (/(^|[/_-])bugs?([/_.-]|$)/i.test(u.pathname)) return null;
+  // La base de résultats de la FFA sans COMPÉTITION désignée : la page d'accueil de toutes
+  // les compétitions (« frmbase=resultats&frmtype1=Stade »), pas le classement d'une course.
+  if (/(^|\.)athle\.fr$/.test(hote) && /frmbase=resultats/i.test(u.search) && !/frmcompetition=\d/i.test(u.search)) return null;
   // livetrail (anciennes éditions) : la fiche d'un coureur → le classement de l'édition.
   if (/(^|\.)livetrail\.net$/.test(hote) && /\/coureur\.php$/i.test(u.pathname)) {
     u.pathname = u.pathname.replace(/coureur\.php$/i, "classement.php");

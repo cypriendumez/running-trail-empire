@@ -139,7 +139,9 @@ test("la maintenance estime au lieu de tout basculer en « Date à venir » ; Go
   assert.ok(/if \(!pageNommeLaCourse\(`\$\{p\.titre\} \$\{p\.texte\}`, p\.url, c\.name\)\) return patch;/.test(lib), "une page qui ne nomme pas la course la modifie quand même");
   const script = codeNu("scripts/veille-courses.ts");
   assert.ok(/if \(reponseIncertaine\(code\)\) \{ incertaines\+\+; continue; \}/.test(script), "une panne déciderait quelque chose");
-  assert.ok(script.indexOf("if (!ECRIRE)") < script.indexOf(".update({ ...g.patch"), "le script écrit à blanc");
+  // Dans la veille elle-même (le mode --appliquer, plus haut, écrit un rapport déjà relu).
+  const veille = script.slice(script.indexOf("async function main()"));
+  assert.ok(veille.indexOf("if (!ECRIRE)") > 0 && veille.indexOf("if (!ECRIRE)") < veille.indexOf(".update({ ...g.patch"), "le script écrit à blanc");
   assert.ok(/if \(patchs\.size > max\) \{[\s\S]{0,200}?process\.exit\(2\)/.test(script), "le seuil de sécurité de la veille a disparu");
 });
 

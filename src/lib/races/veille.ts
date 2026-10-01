@@ -21,7 +21,7 @@
  *   - les dates suivent `lib/races/prochaineEdition` (annoncée = confirmée, édition récente
  *     racontée = suivante estimée).
  */
-import { estCalendrierTiers } from "./destination";
+import { estCalendrierTiers, domaineDe } from "./destination";
 import { estPlateformeInscription, lienInscriptionSite } from "./inscriptionSite";
 import { estChronometreur, motsDistinctifs, liensResultatsCandidats, choisirParDistance } from "./resultatsSite";
 import { liensParcours, parcoursPour } from "./parcoursSite";
@@ -86,8 +86,31 @@ export function motsCourse(nom: string, ville?: string | null): string[] {
   return propres.length ? propres : mots;
 }
 
-/** Une inscription qui n'est pas celle d'une course : école, cantine, crèche, centre de loisirs… */
-const INSCRIPTION_HORS_COURSE = /scolaire|cantine|p[ée]riscolaire|cr[èe]che|loisirs|garderie|[ée]cole|stage|b[ée]n[ée]vole|newsletter|listes? [ée]lectorales?/i;
+/** Une inscription qui n'est pas celle d'une course : école, cantine, crèche, adhésion au club… */
+const INSCRIPTION_HORS_COURSE = /scolaire|cantine|p[ée]riscolaire|cr[èe]che|loisirs|garderie|[ée]cole|stage|b[ée]n[ée]vole|newsletter|listes? [ée]lectorales?|enfance|jeunesse|adh[ée]sion|licence|cotisation|plaquette/i;
+
+/**
+ * Les CONSTRUCTEURS DE SITES (01/10/2026) : sur leur domaine nu, « Créer un site »,
+ * « Inscription » vendent le service — lu en pied de page, `wordpress.com/start` passait pour
+ * l'inscription à une course, `sportsregions.fr/inscription` aussi. Les sites des clubs, eux,
+ * vivent sur des SOUS-domaines (club.sportsregions.fr) et restent lus.
+ */
+export const HOTE_CONSTRUCTEUR = /^(?:www\.)?(?:wordpress\.com|wix\.com|jimdo\.com|weebly\.com|squarespace\.com|godaddy\.com|e-monsite\.com|site123\.com|webnode\.(?:fr|com)|strikingly\.com|sportsregions\.fr|clubeo\.com)$/i;
+const SEGMENT_GENERIQUE = /^(?:resultats?|r%c3%a9sultats?|results?|classements?|live|calendrier|calendar|evenements?|events?|inscriptions?|competitions?|accueil|home)$/i;
+
+/**
+ * Une page GÉNÉRIQUE d'un autre site — la liste « tous nos résultats » d'un chronométreur
+ * (`yaka-chrono.com/resultats`), une page « étiquette » de blog — n'est le classement ni
+ * l'inscription d'aucune course. Sur le site de la course, « /resultats » est bien le sien.
+ */
+export function pageGenerique(url: string, pageUrl: string): boolean {
+  let u: URL; try { u = new URL(url); } catch { return true; }
+  if (HOTE_CONSTRUCTEUR.test(u.hostname)) return true;
+  if (/\/(?:etiquette|tag|tags|categorie|category)\//i.test(u.pathname)) return true;
+  const segs = u.pathname.split("/").filter(Boolean);
+  const externe = domaineDe(url) !== domaineDe(pageUrl);
+  return externe && !u.search && (segs.length === 0 || (segs.length === 1 && SEGMENT_GENERIQUE.test(segs[0])));
+}
 /** Une page de plateforme qui liste TOUTES ses courses n'est l'inscription d'aucune. */
 const PAGE_LISTE = /\/(?:inscriptions?(?:-listing)?|listing|events?|evenements?|calendrier|agenda|courses|competitions?|accueil)\/?$/i;
 
@@ -167,7 +190,7 @@ export function deciderVeille(
   const aVenir = /^\d{4}-\d{2}-\d{2}$/.test(jour) && !jour.startsWith("2099") && jour >= aujourdhui;
 
   // ── Classement ──
-  const res = choisirParDistance(p.resultats.filter(nommeLien), km);
+  const res = choisirParDistance(p.resultats.filter((x) => nommeLien(x) && !pageGenerique(x.url, p.url)), km);
   const resUrl = res ? lienClassementPropre(res.url) : null;
   // Le classement d'une édition qui n'a pas encore eu lieu n'existe pas (page vide).
   const futur = res?.annee != null && aVenir && res.annee >= Number(jour.slice(0, 4));
@@ -182,11 +205,11 @@ export function deciderVeille(
     let chemin = ""; try { chemin = new URL(u ?? "").pathname; } catch { /* */ }
     // La liste « toutes nos courses » d'une PLATEFORME n'est l'inscription d'aucune ; sur le
     // site de la course, « /inscriptions » est bien la sienne.
-    if (u && !(estPlateformeInscription(u) && PAGE_LISTE.test(chemin))) patch.inscription_url = u;
+    if (u && !(estPlateformeInscription(u) && PAGE_LISTE.test(chemin)) && !pageGenerique(u, p.url)) patch.inscription_url = u;
   }
   // ── Parcours : seulement si on n'en a aucun ──
   if (colonnes.parcours && !c.parcours_url) {
-    const tr = parcoursPour(p.parcours.filter(nommeLien), km);
+    const tr = parcoursPour(p.parcours.filter((x) => nommeLien(x) && !pageGenerique(x.url, p.url)), km);
     if (tr) patch.parcours_url = tr.url;
   }
   // ── Date : « à venir » ou estimée seulement ──
