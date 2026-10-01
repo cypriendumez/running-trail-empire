@@ -286,7 +286,8 @@ export function MessageThread({ initial }: { initial: Msg[] }) {
               </Fragment>
             );
           })}
-          {amis.length === 0 && (
+          {/* L'explication seulement s'il n'y a AUCUNE conversation d'ami — pas sous celle de Louis. */}
+          {amis.length === 0 && !conversations.some((c) => c.id !== COACH) && !query.trim() && (
             <p className="mx-3 mt-4 rounded-2xl bg-zinc-50 px-3 py-2.5 text-[12px] leading-relaxed text-zinc-500">{d["amisVides"]}</p>
           )}
         </div>
@@ -328,7 +329,7 @@ export function MessageThread({ initial }: { initial: Msg[] }) {
                 <div className={`group flex items-end gap-2 ${moi ? "justify-end" : "justify-start"}`}>
                   {moi && (
                     <button onClick={() => softDelete(m.id)} aria-label={d["suppr"]} title={d["suppr"]}
-                      className="mb-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-zinc-300 opacity-0 transition-opacity hover:bg-zinc-100 hover:text-red-500 focus:opacity-100 group-hover:opacity-100">
+                      className="mb-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-zinc-300 opacity-60 transition-opacity hover:bg-zinc-100 hover:text-red-500 focus:opacity-100 md:opacity-0 md:group-hover:opacity-100">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   )}
@@ -348,7 +349,7 @@ export function MessageThread({ initial }: { initial: Msg[] }) {
                   </div>
                   {!moi && (
                     <button onClick={() => softDelete(m.id)} aria-label={d["suppr"]} title={d["suppr"]}
-                      className="mb-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-zinc-300 opacity-0 transition-opacity hover:bg-zinc-100 hover:text-red-500 focus:opacity-100 group-hover:opacity-100">
+                      className="mb-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-zinc-300 opacity-60 transition-opacity hover:bg-zinc-100 hover:text-red-500 focus:opacity-100 md:opacity-0 md:group-hover:opacity-100">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   )}

@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { editionSuivanteEstimee, datesAnnoncees, dateDepuisPage } from "../src/lib/races/prochaineEdition";
-import { pageOfficielle, pageNommeLaCourse, datesDeLaCourse } from "../scripts/dates-sites";
+import { pageOfficielle, pageNommeLaCourse, datesDeLaCourse } from "../src/lib/races/veille";
 import { tousLesModeles, suggererModeles, compact } from "../src/lib/gear/modelesChaussures";
 
 let passed = 0; const fails: string[] = [];
@@ -128,12 +128,19 @@ test("la maintenance estime au lieu de tout basculer en « Date à venir » ; Go
   assert.ok(/if \(error\?\.code === "42703"\) \{ colonneConfirmee = false; continue; \}/.test(cron), "sans la colonne, l'estimation passerait pour sûre");
   const page = codeNu("src/app/courses/[slug]/page.tsx");
   assert.ok(/!aUneDate\(c\) \|\| c\.date_confirmee === false \? null :/.test(page), "une date estimée part dans les données structurées de Google");
+  // La vérification des dates vit désormais dans la VEILLE (quotidienne et hebdomadaire).
   const wf = readFileSync(".github/workflows/courses-rafraichissement.yml", "utf8");
-  assert.ok(/scripts\/dates-sites\.ts "\$ETAT\/dates-sites\.jsonl" --ecrire/.test(wf), "la vérification hebdomadaire des dates ne tourne plus");
-  const script = codeNu("scripts/dates-sites.ts");
-  assert.ok(/if \(!pageNommeLaCourse\(x\.texte, url, l\.name\)\) \{ nonNommees\+\+; continue; \}/.test(script), "une page qui ne nomme pas la course la date quand même");
-  assert.ok(/if \(reponseIncertaine\(code\)\) continue;/.test(script), "une panne serait mise en cache");
-  assert.ok(script.indexOf("if (!ECRIRE)") < script.indexOf(".update({ date: g.date"), "le script écrit à blanc");
+  assert.ok(/scripts\/veille-courses\.ts "\$ETAT\/veille-rapport\.json" --ecrire/.test(wf), "la veille hebdomadaire ne tourne plus");
+  assert.ok(wf.indexOf("sauvegarder-courses.ts") < wf.indexOf("scripts/veille-courses.ts"), "la veille hebdomadaire écrit avant la sauvegarde");
+  const quotidienne = readFileSync(".github/workflows/veille-courses.yml", "utf8");
+  assert.ok(/cron: "40 4 \* \* \*"/.test(quotidienne) && /cron: "40 17 \* \* \*"/.test(quotidienne) && /veille-courses\.ts veille-rapport\.json --fenetre --ecrire/.test(quotidienne),
+    "la veille quotidienne (deux passages) ne tourne plus");
+  const lib = codeNu("src/lib/races/veille.ts");
+  assert.ok(/if \(!pageNommeLaCourse\(`\$\{p\.titre\} \$\{p\.texte\}`, p\.url, c\.name\)\) return patch;/.test(lib), "une page qui ne nomme pas la course la modifie quand même");
+  const script = codeNu("scripts/veille-courses.ts");
+  assert.ok(/if \(reponseIncertaine\(code\)\) \{ incertaines\+\+; continue; \}/.test(script), "une panne déciderait quelque chose");
+  assert.ok(script.indexOf("if (!ECRIRE)") < script.indexOf(".update({ ...g.patch"), "le script écrit à blanc");
+  assert.ok(/if \(patchs\.size > max\) \{[\s\S]{0,200}?process\.exit\(2\)/.test(script), "le seuil de sécurité de la veille a disparu");
 });
 
 // ── Le Garage ────────────────────────────────────────────────────────────────

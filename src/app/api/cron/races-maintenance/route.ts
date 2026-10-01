@@ -23,7 +23,7 @@ import { editionSuivanteEstimee } from "@/lib/races/prochaineEdition";
  * course de WEEK-END revient au même rang du même mois (« 4e dimanche de septembre ») :
  * elle reçoit cette date, marquée ESTIMÉE (`date_confirmee = false`, affichée « ≈ »),
  * que le relevé hebdomadaire du site officiel confirme ou corrige
- * (`scripts/dates-sites.ts`). En semaine, l'estimation se trompait toujours : 2099.
+ * (`scripts/veille-courses.ts`, la veille quotidienne et hebdomadaire). En semaine, l'estimation se trompait toujours : 2099.
  *
  * ⚠️ CETTE ROUTE NE SUPPRIME RIEN. La route d'administration supprime en plus les
  * éditions périmées déjà remplacées par une édition future ; c'est utile mais destructif,

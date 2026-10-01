@@ -41,6 +41,7 @@ export const TACHES: Tache[] = [
   { fichier: "sauvegarde", cadence: "1×/semaine (dimanche)", parJour: 1 / 7, role: "Exporte le catalogue de courses, irremplaçable" },
   { fichier: "newsletter-weekly", cadence: "1×/semaine (lundi)", parJour: 1 / 7, role: "Résumé d'actualité et plan de la semaine" },
   { fichier: "resultats-course", cadence: "1×/jour", parJour: 1, role: "E-mail « tes résultats sont en ligne » après la course visée" },
+  { fichier: "veille-courses", cadence: "2×/jour", parJour: 2, role: "Veille des pages officielles : résultats, dates, inscriptions, parcours (J-12 à J+60)" },
   { fichier: "courses-rafraichissement", cadence: "1×/semaine (mardi)", parJour: 1 / 7, role: "Relit les courses : dates, dénivelés, liens d'inscription et classements" },
 ];
 

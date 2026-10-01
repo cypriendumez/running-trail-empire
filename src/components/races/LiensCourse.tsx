@@ -1,8 +1,9 @@
 "use client";
 
-import { ExternalLink, Globe, Search, Trophy } from "lucide-react";
+import { ExternalLink, Globe, Route, Search, Trophy } from "lucide-react";
 import { lienInscription, lienSiteOfficiel, lienClassement, type LiensDetail } from "@/lib/races/liensCourse";
 import { editionsAAfficher } from "@/lib/races/editionsResultats";
+import { lienSortantPropre } from "@/lib/races/lienPropre";
 import { fillR } from "./racesI18n";
 
 /**
@@ -19,6 +20,8 @@ export function LiensCourse({ detail, course, d, couleur }: {
   const insc = lienInscription(detail);
   const site = lienSiteOfficiel(detail);
   const classement = lienClassement(detail, course);
+  // Le tracé publié par l'organisateur (veille des pages officielles, migration 034).
+  const parcours = lienSortantPropre(detail?.parcours_url);
   const editions = editionsAAfficher(detail?.resultats_editions, classement?.direct ? classement : null, course);
   const libelle = insc?.sorte === "inscription" ? d["reg.inscription"] : insc?.sorte === "officiel" ? d["reg.officiel"] : d["register"];
   return (
@@ -36,6 +39,12 @@ export function LiensCourse({ detail, course, d, couleur }: {
         <a href={site} target="_blank" rel="noopener noreferrer nofollow"
           className="flex w-full items-center justify-center gap-1.5 text-[12px] font-semibold text-zinc-500 hover:text-zinc-800">
           <Globe className="h-3.5 w-3.5" />{d["reg.officiel"]}
+        </a>
+      )}
+      {parcours && (
+        <a href={parcours} target="_blank" rel="noopener noreferrer nofollow"
+          className="flex w-full items-center justify-center gap-1.5 text-[12px] font-semibold text-zinc-500 hover:text-zinc-800">
+          <Route className="h-3.5 w-3.5" />{d["parcours"]}
         </a>
       )}
       {classement && (

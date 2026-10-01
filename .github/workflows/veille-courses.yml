@@ -1,0 +1,66 @@
+# ──────────────────────────────────────────────────────────────────────────────
+#  LA VEILLE DES COURSES — deux fois par jour.
+#
+#  Demandé par Cyprien le 01/10/2026 : « des sortes de bots qui mettent instantanément les
+#  liens des parcours, les dates, les résultats sur mon application quand ça sort ».
+#  `scripts/veille-courses.ts --fenetre` relit la page OFFICIELLE des courses de J-12 à
+#  J+60 (et d'un lot de courses « à venir ») : un classement publié, une date annoncée, un
+#  tracé ou une inscription qui ouvre — écrits dans l'heure qui suit le passage.
+#
+#  POURQUOI DEUX PASSAGES : les classements d'une course du dimanche tombent le dimanche
+#  soir ou le lundi matin. 06 h 40 et 19 h 40 (heure de Paris, été) les attrapent tous les
+#  deux. La veille « à la consultation » (`/api/races/detail`) complète entre deux passages.
+#
+#  Seuil : au-delà de 800 courses modifiées d'un coup, le script s'arrête (code 2) et le
+#  rapport est publié pour relecture. robots.txt respecté, une requête à la fois par site.
+#  SECRETS REQUIS : NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (déjà présents).
+# ──────────────────────────────────────────────────────────────────────────────
+name: Veille des courses
+
+on:
+  schedule:
+    - cron: "40 4 * * *"
+    - cron: "40 17 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: veille-courses
+  cancel-in-progress: false
+
+jobs:
+  veiller:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Installer les dépendances
+        run: npm ci --no-audit --no-fund
+
+      # On nomme le secret manquant, sans jamais afficher sa valeur.
+      - name: Vérifier les secrets
+        run: |
+          manque=0
+          for v in NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY; do
+            if [ -z "${!v:-}" ]; then echo "::error::Secret manquant : $v"; manque=1; fi
+          done
+          exit "$manque"
+
+      - name: Relire les pages officielles et écrire (seuil de sécurité)
+        run: npx tsx scripts/veille-courses.ts veille-rapport.json --fenetre --ecrire
+
+      - name: Publier le rapport
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veille-rapport
+          path: veille-rapport.json
+          retention-days: 14
+          if-no-files-found: ignore

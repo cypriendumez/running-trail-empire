@@ -6,6 +6,7 @@ import { getPublicLang } from "@/lib/i18n/serverLang";
 import { nomAffichable, nomRegion, regionCanonique } from "@/lib/races/libelles";
 import { lienInscription, lienClassement, heureLisible } from "@/lib/races/liensCourse";
 import { editionsAAfficher } from "@/lib/races/editionsResultats";
+import { lienSortantPropre } from "@/lib/races/lienPropre";
 import { nomDestination, estCalendrierTiers, organisateurReel } from "@/lib/races/destination";
 import { texteCourses } from "../coursesI18n";
 import { jourFrance } from "@/lib/races/jourFrance";
@@ -39,9 +40,12 @@ async function lire(slug: string): Promise<CoursePublique | null> {
   const bornes = bornesId(idDepuisSlug(slug) ?? "");
   if (!bornes) return null;
   const sb = createAdminClient();
-  // Migration 033 (éditions passées) d'abord, avec le même repli si la colonne manque.
-  const avec033 = await sb.from("races").select(CHAMPS + CHAMPS_032 + ",resultats_editions")
+  // Migrations 034 (parcours) puis 033 (éditions passées), avec le même repli si une colonne manque.
+  const avec034 = await sb.from("races").select(CHAMPS + CHAMPS_032 + ",resultats_editions,parcours_url")
     .gte("id", bornes.bas).lte("id", bornes.haut).limit(2);
+  const avec033 = avec034.error?.code === "42703"
+    ? await sb.from("races").select(CHAMPS + CHAMPS_032 + ",resultats_editions").gte("id", bornes.bas).lte("id", bornes.haut).limit(2)
+    : avec034;
   const complet = avec033.error?.code === "42703"
     ? await sb.from("races").select(CHAMPS + CHAMPS_032).gte("id", bornes.bas).lte("id", bornes.haut).limit(2)
     : avec033;
@@ -89,6 +93,7 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
   const insc = lienInscription(c);
   const classement = lienClassement(c, c);
   const editions = editionsAAfficher((c as { resultats_editions?: unknown }).resultats_editions, classement?.direct ? classement : null, c);
+  const parcours = lienSortantPropre((c as { parcours_url?: unknown }).parcours_url);
   // Le champ « organisation » ne vaut que s'il ne désigne pas la source du lien.
   const organisateur = organisateurReel(c.organization, c.registration_url);
   // ⚠️ `terrain` EST UN TABLEAU. `{c.terrain && …}` rendait donc une ligne « Terrain »
@@ -187,6 +192,13 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
           {classement.direct
             ? (classement.annee ? t("resultats.direct", { a: classement.annee }) : t("resultats.voir"))
             : t("resultats.chercher")}
+        </a>
+      )}
+      {/* Le tracé publié par l'organisateur (veille des pages officielles, migration 034). */}
+      {parcours && (
+        <a href={parcours} target="_blank" rel="noopener noreferrer nofollow"
+          className="ml-0 mt-3 inline-flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-5 py-3 font-semibold text-zinc-700 transition-colors hover:border-emerald-300 hover:bg-emerald-50 sm:ml-3">
+          {t("parcours")}
         </a>
       )}
       {/* Classements des éditions PASSÉES, chacune vérifiée (lib/races/editionsResultats). */}

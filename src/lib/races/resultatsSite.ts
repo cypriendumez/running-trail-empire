@@ -128,6 +128,65 @@ export function pageArchivesResultats(
   return cands[0]?.url ?? null;
 }
 
+/**
+ * Un libellé de lien qui ne dit RIEN (« Télécharger », « PDF », « ici ») : le sens est dans
+ * le texte juste AVANT (30/09/2026). Lu sur lambersart.fr : « Résultats 10km » puis un lien
+ * « Télécharger » vers le PDF — le lien seul ne parlait pas de résultats, il était ignoré.
+ */
+const LIBELLE_VIDE = /^(?:t[ée]l[ée]charger(?: le (?:fichier|pdf|document))?|download|voir|consulter|ouvrir|lire|ici|cliquez ici|clique ici|lien|pdf|fichier|document|>+|»|→|\+)?$/i;
+
+/** Le libellé utile d'un lien : son texte, ou — s'il ne dit rien — les derniers mots qui le précèdent. */
+export function libelleDuLien(html: string, debut: number, texte: string): string {
+  if (!LIBELLE_VIDE.test(texte.trim())) return texte;
+  let bout = html.slice(Math.max(0, debut - 500), debut);
+  // La coupe a pu tomber au milieu d'une balise (« …ument__text"> ») : on la saute.
+  const ferme = bout.indexOf(">"), ouvre = bout.indexOf("<");
+  if (ferme >= 0 && (ouvre < 0 || ferme < ouvre)) bout = bout.slice(ferme + 1);
+  const avant = sansBalises(bout).slice(-70);
+  // On ne garde que la dernière phrase : « … pdf Publié le 27 Sep. 2026 Résultats 5km » → « 2026 Résultats 5km ».
+  const coupe = avant.split(/[.|•·:]\s/).pop() ?? avant;
+  return coupe.trim().slice(-60);
+}
+
+/** Les années écrites JUSTE APRÈS un lien (« … pdf · Publié le 27 Sep. 2026 ») : l'année d'un document sans titre daté. */
+function anneeApres(html: string, fin: number, anneeCourante: number): number | null {
+  return anneeDe(sansBalises(html.slice(fin, fin + 400)).slice(0, 140), anneeCourante);
+}
+
+/**
+ * Les DISTANCES qu'un libellé ou une adresse nomme (« Résultats 10km », « classement-semi »).
+ * Une page qui publie trois classements (10 km, 5 km, 2 km) doit donner à chaque course le sien.
+ */
+export function distancesNommees(x: string): number[] {
+  const t = x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const out: number[] = [];
+  for (const m of t.matchAll(/(?<![\d.,])(\d{1,3}(?:[.,]\d{1,3})?)\s?(?:km|k)(?![a-z])/g)) out.push(Number(m[1].replace(",", ".")));
+  if (/semi|half/.test(t)) out.push(21.1);
+  if (/(?<!semi[\s-]?)marathon/.test(t)) out.push(42.195);
+  return out;
+}
+
+/**
+ * Parmi des liens notés, celui qui convient à une course de `km` : un lien qui nomme SA
+ * distance passe devant ; un lien qui nomme une AUTRE distance est écarté ; sans distance
+ * nommée, le meilleur score. `null` si rien ne convient.
+ */
+export function choisirParDistance<T extends { texte: string; url: string; score: number }>(cands: readonly T[], km: number | null | undefined): T | null {
+  const tries = [...cands].sort((a, b) => b.score - a.score);
+  if (!(typeof km === "number" && km > 0)) return tries[0] ?? null;
+  const proche = (d: number) => Math.abs(d - km) <= Math.max(0.6, km * 0.05);
+  const dists = (c: T) => distancesNommees(`${c.texte} ${decode(c.url)}`);
+  return tries.find((c) => dists(c).some(proche)) ?? tries.find((c) => dists(c).length === 0) ?? null;
+}
+
+/** Tous les liens de résultats d'une page, notés (le meilleur d'abord) — pour choisir par distance. */
+export function liensResultatsCandidats(
+  html: string, base: string, anneeCourante: number, evenement?: { noms: string[] },
+): (LienResultats & { score: number })[] {
+  return candidatsResultats(html, base, anneeCourante, evenement, ANCIENNETE_MAX_ANS)
+    .sort((a, b) => b.score - a.score).map(({ anneesLues: _a, ...c }) => c);
+}
+
 /** Les liens de résultats d'une page qui passent les filtres de sens, notés. */
 function candidatsResultats(
   html: string, base: string, anneeCourante: number, evenement: { noms: string[] } | undefined, ageMax: number,
@@ -142,7 +201,7 @@ function candidatsResultats(
   const cands: (LienResultats & { score: number; anneesLues: number[] })[] = [];
   const re = /<a\b[^>]*?href\s*=\s*["']([^"'#][^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
   for (let m; (m = re.exec(html));) {
-    const texte = sansBalises(m[2]).slice(0, 120);
+    const texte = libelleDuLien(html, m.index, sansBalises(m[2]).slice(0, 120));
     let url: string;
     try { url = new URL(entites(m[1]), base).toString(); } catch { continue; }
     // Porte unique : bouton de partage, blog tiers, fiche d'un coureur… (lib/races/lienPropre).
@@ -162,7 +221,9 @@ function candidatsResultats(
     if (SENS_ECARTES.test(texte) || SENS_INSCRIPTION.test(texte)) continue;
     // « Résultats Duo Trail » menait à « /le-dossard-pour-le-duo-trail… » : une vente de dossards.
     if (SENS_INSCRIPTION.test(chemin) && !SENS_RESULTATS.test(chemin)) continue;
-    const annee = anneeDe(dit, anneeCourante);
+    // Sans année dans le libellé ni l'adresse, celle écrite juste après le lien (« Publié
+    // le 27 Sep. 2026 ») date un document de résultats.
+    const annee = anneeDe(dit, anneeCourante) ?? (SENS_RESULTATS.test(texte) ? anneeApres(html, m.index + m[0].length, anneeCourante) : null);
     if (annee != null && annee < anneeCourante - ageMax) continue;
     if (/frmbase=cclubs|classement des clubs/i.test(dit)) continue;
     if (mots) {

@@ -107,11 +107,6 @@ jobs:
       - name: Lire les liens « Résultats » des sites officiels
         run: npx tsx scripts/resultats-sites.ts "$ETAT/fiches-semaine.jsonl" "$ETAT/resultats-sites.jsonl" --relire-apres 56
 
-      # Les dates : la maintenance quotidienne ESTIME l'édition suivante d'une course passée
-      # (≈) ; ici on la VÉRIFIE sur la page officielle, qui la confirme ou la corrige.
-      - name: Vérifier les dates sur les sites officiels (lecture)
-        run: npx tsx scripts/dates-sites.ts "$ETAT/dates-sites.jsonl"
-
       - name: Sauvegarder la table avant d'écrire
         run: npx tsx scripts/sauvegarder-courses.ts .sauvegarde-courses
 
@@ -140,8 +135,12 @@ jobs:
       # Classements des éditions PASSÉES (2025, 2024…) : adresses devinées chez les
       # chronométreurs ET liens « Résultats 2024 » des organisateurs — chacune OUVERTE avant
       # d'être retenue. AVANT la sauvegarde de l'état : les deux caches voyagent.
-      - name: Dates vérifiées sur les sites officiels — écriture (seuil de sécurité)
-        run: npx tsx scripts/dates-sites.ts "$ETAT/dates-sites.jsonl" --ecrire
+      # LA VEILLE COMPLÈTE (01/10/2026) : la page officielle de CHAQUE course est relue —
+      # classement (le plus récent, par distance), dates (estimées → confirmées), lien
+      # d'inscription et tracé du parcours quand il manque. La veille quotidienne
+      # (`veille-courses.yml`) ne relit que les courses de J-12 à J+60.
+      - name: Veille des pages officielles — résultats, dates, inscriptions, parcours
+        run: npx tsx scripts/veille-courses.ts "$ETAT/veille-rapport.json" --ecrire
 
       - name: Classements des éditions passées — vérification
         run: npx tsx scripts/resultats-editions.ts "$ETAT/editions-resultats.jsonl"
@@ -157,7 +156,7 @@ jobs:
             .cache-courses/liens-controle-*.json
             .cache-courses/editions-resultats.jsonl
             .cache-courses/editions-sites-verifiees.jsonl
-            .cache-courses/dates-sites.jsonl
+            .cache-courses/veille-rapport.json
           retention-days: 90
           if-no-files-found: error
           include-hidden-files: true

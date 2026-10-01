@@ -32,6 +32,20 @@ const EDITORIAUX = /(^|\.)(dicodusport\.fr)$/i;
 const FILTRE_SEXE = /^(sexe|sex|gender|genre)$/i;
 const VALEUR_SEXE = /^(f|m|h|w|x|female|male|femme|femmes|homme|hommes|women|men|woman|man|masculin|feminin|f%C3%A9minin|féminin)$/i;
 
+/**
+ * N'importe quel lien SORTANT (parcours, inscription) : entités décodées, http(s) seulement,
+ * jamais un bouton de partage. Sans les corrections propres aux classements.
+ */
+export function lienSortantPropre(url: unknown): string | null {
+  if (typeof url !== "string") return null;
+  let u: URL;
+  try { u = new URL(decodeEntitesUrl(url.trim())); } catch { return null; }
+  if (!/^https?:$/.test(u.protocol)) return null;
+  const hote = u.hostname.toLowerCase();
+  if (PARTAGE.test(hote) || (/(^|\.)facebook\.com$/.test(hote) && /^\/sharer/i.test(u.pathname))) return null;
+  return u.toString();
+}
+
 export function lienClassementPropre(url: unknown): string | null {
   if (typeof url !== "string") return null;
   let u: URL;
