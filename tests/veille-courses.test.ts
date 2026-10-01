@@ -194,6 +194,12 @@ test("relus sur le passage complet : saison de club, billetterie de ville, post 
   ];
   for (const [q, u] of oui) assert.equal(lienVeilleAccepte(q, u, page), true, `${q} refusé à tort : ${u}`);
   assert.equal(lienVeilleAccepte("parcours", "https://www.instagram.com/p/x/", page), false);
+  // Un tracé daté de plus de deux ans est périmé ; un tracé de l'an dernier, non.
+  const an = new Date().getUTCFullYear();
+  assert.equal(lienVeilleAccepte("parcours", "https://lesbalcons.over-blog.com/2013/12/le-parcours-decouverte.html", page), false, "un parcours de 2013 est proposé");
+  assert.equal(lienVeilleAccepte("parcours", `https://traildes2ponts.com/parcours-${an - 1}/`, page), true, "le parcours de l'an dernier est refusé");
+  assert.equal(lienVeilleAccepte("parcours", `https://x.fr/parcours-${an - 3}/`, page), false);
+  assert.equal(lienVeilleAccepte("parcours", `https://x.fr/parcours-${an - 2}/`, page), true, "un tracé d'il y a deux ans (limite incluse) est refusé");
   assert.equal(lienVeilleAccepte("resultats", "pas une adresse", page), false);
 });
 

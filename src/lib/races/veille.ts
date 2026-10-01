@@ -119,6 +119,11 @@ export function lienVeilleAccepte(quoi: "resultats" | "inscription" | "parcours"
     // Une billetterie d'office de tourisme, la page d'un club : sans le nom de la course, non.
     return !(estPlateformeInscription(url) && PAGE_LISTE.test(u.pathname));
   }
+  // Un tracé DATÉ de plus de deux ans (« /2013/12/le-parcours-decouverte.html ») a toutes
+  // les chances d'avoir changé depuis : pas de parcours plutôt qu'un parcours périmé.
+  const anneeCourante = new Date().getUTCFullYear();
+  const annees = (decode(u.pathname).match(/(?<!\d)20\d{2}(?!\d)/g) ?? []).map(Number);
+  if (annees.length && Math.max(...annees) < anneeCourante - 2) return false;
   return !RESEAU_SOCIAL.test(u.hostname);
 }
 
