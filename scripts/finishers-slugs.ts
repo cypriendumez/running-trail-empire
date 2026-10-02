@@ -45,7 +45,13 @@ export function slugsDuPlan(brut: Buffer): string[] {
 
 async function main() {
   const [sortie, fichierVus, fichierARevoir] = process.argv.slice(2);
-  if (siteExclu("https://www.finishers.com")) throw new Error("finishers.com a demandé à ne plus être lu (lib/races/robot) — collecte arrêtée.");
+  // Sur la liste d'opposition (lib/races/robot) : AUCUNE requête, des fichiers vides et un
+  // code 0 — les étapes suivantes du mardi (veille, liens, DATAtourisme) tournent quand même.
+  if (siteExclu("https://www.finishers.com")) {
+    for (const f of [sortie, fichierARevoir]) if (f) writeFileSync(f, "");
+    console.log("[slugs] finishers.com est sur la liste d'opposition (lib/races/robot) : aucune requête, rien à lire.");
+    return;
+  }
   const r = await fetch("https://api.finishers.com/public/sitemap/events.xml", { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(60000) });
   if (!r.ok) throw new Error(`plan du site : ${r.status}`);
   const plan = slugsDuPlan(Buffer.from(await r.arrayBuffer()));

@@ -6,13 +6,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { peutEcrire, type Lien } from "@/lib/social/amis";
 import { envoyerEmail } from "@/lib/email/envoyer";
 import { esc } from "@/lib/notify/gabarit";
+import { nettoyerPieces } from "@/lib/messages/piecesJointes";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-type Attachment = { url: string; name: string; type: string };
-
-const cleanAtt = (a: unknown): Attachment[] => Array.isArray(a)
-  ? a.slice(0, 5).map((x) => ({ url: String((x as Attachment).url ?? "").slice(0, 600), name: String((x as Attachment).name ?? "fichier").slice(0, 120), type: String((x as Attachment).type ?? "").slice(0, 80) })).filter((x) => x.url)
-  : [];
+// Seules NOS pièces jointes (dépôt privé, /api/messages/piece) sont acceptées : un lien
+// quelconque ne peut plus se faire passer pour un fichier joint.
+const cleanAtt = nettoyerPieces;
 
 /**
  * Le début d'un message, pour l'objet de l'e-mail au coach.
@@ -142,8 +141,10 @@ export async function POST(req: Request) {
     const link = `${APP_URL}/admin/messages?client=${user.id}`;
     // Les pièces jointes sont CLIQUABLES : le coach les ouvre depuis Outlook, sans
     // passer par l'application. Seules les adresses web sont reprises en lien.
-    const liens = atts.filter((a) => /^https?:\/\//i.test(a.url))
-      .map((a) => `<a href="${esc(a.url)}" style="color:#047857">${esc(a.name)}</a>`).join("<br>");
+    // Le lien mène à l'APPLICATION (/api/messages/piece), qui ne sert le fichier qu'au
+    // coach connecté : un e-mail transféré ou lu par un tiers n'ouvre rien.
+    const liens = atts
+      .map((a) => `<a href="${esc(`${APP_URL}${a.url}`)}" style="color:#047857">${esc(a.name)}</a>`).join("<br>");
     const attLine = atts.length ? `<p style="color:#666;font-size:13px">📎 ${atts.length} pièce(s) jointe(s)${liens ? `<br>${liens}` : ""}</p>` : "";
     const repondre = emailAthlete
       ? `<p style="color:#999;font-size:12px;margin-top:18px">Répondre à cet e-mail écrit directement à ${esc(emailAthlete)} — hors de l'application. Le bouton, lui, répond dans la messagerie Pacevo.</p>`

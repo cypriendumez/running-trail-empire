@@ -750,7 +750,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                         jamais. Le dire est le minimum avant une inscription payante —
                         laisser croire que toutes les fiches se valent se paierait en
                         déplacement inutile un dimanche matin. */}
-                    {!ficheVerifiable(details[selected.id]?.registration_url) && (
+                    {!ficheVerifiable(details[selected.id]?.registration_url, details[selected.id]?.site_officiel) && (
                       <p className="w-full rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] leading-relaxed text-amber-800">
                         {d["unverifiable"]}
                       </p>

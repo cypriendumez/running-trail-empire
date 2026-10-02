@@ -120,6 +120,12 @@ async function main() {
   const abandonApres = seuil(process.argv, "--abandon-apres", 5);
   const debut = Date.now();
   let echecsDeSuite = 0;
+  // Sur la liste d'opposition (lib/races/robot) : aucune requête, un fichier vide, code 0.
+  if (siteExclu("https://www.finishers.com")) {
+    appendFileSync(sortie, "");
+    console.log("[collecte] finishers.com est sur la liste d'opposition (lib/races/robot) : aucune fiche lue.");
+    return;
+  }
   const slugs = readFileSync(fSlugs, "utf8").split("\n").map((s) => s.trim()).filter(Boolean);
   const faits = new Set<string>();
   // ⚠️ UN ÉCHEC RÉSEAU N'EST PAS UNE FICHE LUE. Nuit du 29/09/2026 : cinq heures sans

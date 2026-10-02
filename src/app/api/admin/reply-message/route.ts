@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { estAdmin } from "@/lib/admin/acces";
+import { nettoyerPieces } from "@/lib/messages/piecesJointes";
 
 
 // POST /api/admin/reply-message {user_id, body} — le coach répond à un client.
@@ -12,7 +13,8 @@ export async function POST(req: Request) {
   if (!user || !estAdmin(user?.email)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { user_id, body, attachments } = await req.json() as { user_id?: string; body?: string; attachments?: { url: string; name: string; type: string }[] };
-  const atts = Array.isArray(attachments) ? attachments.slice(0, 5).map((a) => ({ url: String(a.url ?? "").slice(0, 600), name: String(a.name ?? "fichier").slice(0, 120), type: String(a.type ?? "").slice(0, 80) })).filter((a) => a.url) : [];
+  // Mêmes règles que la messagerie des athlètes : seules nos pièces jointes privées.
+  const atts = nettoyerPieces(attachments);
   if (!user_id || (!body?.trim() && atts.length === 0)) return NextResponse.json({ error: "user_id et message requis" }, { status: 400 });
 
   const admin = createAdminClient();

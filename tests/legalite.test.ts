@@ -20,12 +20,15 @@ import { lectureAutorisee, lirePoliment } from "../scripts/acces-poli";
 import { TEXTES_ROBOT, ROBOTS_TXT_REFUS } from "../src/app/robot/textes";
 import { LEGAL } from "../src/app/legalI18n";
 import { refusMesure } from "../src/lib/visites/empreinte";
+import { cheminPiece, cheminValide, urlPiece, cheminDeUrl, nettoyerPieces, peutOuvrir } from "../src/lib/messages/piecesJointes";
 
 let ok = 0, ko = 0;
 async function t(nom: string, f: () => void | Promise<void>) {
   try { await f(); ok++; } catch (e) { ko++; console.error(`✗ ${nom}\n  ${(e as Error).message}`); }
 }
 const lire = (f: string) => readFileSync(f, "utf8");
+// Le CODE seul : blocs /* */, lignes // et fins de ligne // (jamais « :// » d'une adresse).
+const code = (f: string) => lire(f).replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 function fichiers(dossier: string): string[] {
   return readdirSync(dossier).flatMap((n) => {
     const p = join(dossier, n);
@@ -172,6 +175,91 @@ const LANGUES = ["fr", "en", "de", "es", "pt"] as const;
     const route = lire("src/app/api/visite/route.ts");
     const refus = route.indexOf("refusMesure(req.headers)");
     assert.ok(refus > 0 && refus < route.indexOf(".insert("), "le refus n'est pas lu avant l'écriture de la visite");
+  });
+
+  // ── 7. LES PIÈCES JOINTES NE SONT PLUS PUBLIQUES (art. 32 RGPD) ─────────────
+  await t("pièces jointes : chemin sans nom ni date, adresse de l'application, refus des liens étrangers", () => {
+    const u = "0b9d2f4e-1c2a-4d5e-8f60-123456789abc", f = "7e1f0a2b-3c4d-4e5f-8a6b-abcdef012345";
+    const c = cheminPiece(u, f, "image/jpeg");
+    assert.equal(c, `${u}/${f}.jpeg`);
+    assert.equal(cheminPiece(u, f, "application/pdf"), `${u}/${f}.pdf`);
+    assert.equal(cheminValide(c), true);
+    for (const mauvais of [`${u}/../${f}.jpeg`, `${u}/${f}.html`, `${u}/photo-cheville.jpeg`, `autre/${f}.png`, `${u}/${f}.jpeg/x`, ""]) assert.equal(cheminValide(mauvais), false, mauvais);
+    const url = urlPiece(c);
+    assert.ok(url.startsWith("/api/messages/piece?c="));
+    assert.equal(cheminDeUrl(url), c);
+    assert.equal(cheminDeUrl(`https://x.supabase.co/storage/v1/object/public/message-attachments/${c}`), null);
+    assert.equal(cheminDeUrl(`${url}&c=${encodeURIComponent(`${u}/x.png`)}`), null);
+    assert.deepEqual(nettoyerPieces([
+      { url, name: "cheville.jpg", type: "image/jpeg" },
+      { url: "https://hameconnage.example/facture.pdf", name: "facture.pdf", type: "application/pdf" },
+      { url: urlPiece(`${u}/../secret.png`), name: "x" },
+    ]), [{ url, name: "cheville.jpg", type: "image/jpeg" }]);
+    assert.equal(nettoyerPieces(Array.from({ length: 9 }, () => ({ url, name: "a" }))).length, 5);
+    assert.deepEqual(nettoyerPieces("pas un tableau"), []);
+  });
+
+  await t("pièces jointes : seuls le déposant, un destinataire et le coach ouvrent le fichier", () => {
+    const u = "0b9d2f4e-1c2a-4d5e-8f60-123456789abc", autre = "99999999-1c2a-4d5e-8f60-123456789abc";
+    const chemin = cheminPiece(u, "7e1f0a2b-3c4d-4e5f-8a6b-abcdef012345", "image/png");
+    assert.equal(peutOuvrir({ chemin, userId: u, estCoach: false, recu: false }), true);
+    assert.equal(peutOuvrir({ chemin, userId: autre, estCoach: false, recu: false }), false);
+    assert.equal(peutOuvrir({ chemin, userId: autre, estCoach: false, recu: true }), true);
+    assert.equal(peutOuvrir({ chemin, userId: autre, estCoach: true, recu: false }), true);
+    assert.equal(peutOuvrir({ chemin: "../x.png", userId: autre, estCoach: true, recu: true }), false);
+    assert.equal(peutOuvrir({ chemin, userId: "", estCoach: false, recu: false }), false);
+    // L'identifiant du lecteur doit OUVRIR le chemin : le retrouver plus loin ne prouve rien.
+    assert.equal(peutOuvrir({ chemin: cheminPiece(u, autre, "image/png"), userId: autre, estCoach: false, recu: false }), false);
+  });
+
+  await t("pièces jointes : le dépôt vise le seau PRIVÉ vérifié, la lecture contrôle la boîte du lecteur", () => {
+    const depot = code("src/app/api/upload/route.ts");
+    assert.doesNotMatch(depot, /getPublicUrl|message-attachments/, "le dépôt publie encore une adresse publique");
+    assert.match(depot, /storage\.from\(SEAU_PJ\)\.upload\(/);
+    assert.ok(depot.indexOf("await seauPrive()") > 0 && depot.indexOf("await seauPrive()") < depot.indexOf(".upload("), "le seau n'est pas vérifié privé avant le dépôt");
+    assert.match(depot, /if \(data\.public\) return/);
+    const lecture = code("src/app/api/messages/piece/route.ts");
+    assert.match(lecture, /\.eq\("user_id", user\.id\)\s*\.contains\("data", \{ attachments: \[\{ url: urlPiece\(chemin\) \}\] \}\)/, "le droit de lecture ne vient plus de la boîte du lecteur");
+    assert.match(lecture, /if \(!peutOuvrir\(/);
+    assert.ok(lecture.indexOf("if (!peutOuvrir(") < lecture.indexOf(".download("), "le fichier est lu avant le contrôle");
+    assert.match(lecture, /"Cache-Control": "private, no-store/);
+    assert.doesNotMatch(lecture, /createSignedUrl|getPublicUrl/, "une adresse de stockage réutilisable sortirait vers le navigateur");
+    assert.match(depot, /return NextResponse\.json\(\{ ok: true, url: urlPiece\(path\),/, "le dépôt ne rend plus l'adresse de l'application");
+    // Le SITE qui filtre, pas l'import : une liste copiée telle quelle passerait sinon.
+    const msg = code("src/app/api/messages/route.ts");
+    assert.match(msg, /const cleanAtt = nettoyerPieces;/);
+    assert.match(msg, /const atts = cleanAtt\(b\.attachments\);/);
+    assert.match(code("src/app/api/admin/reply-message/route.ts"), /const atts = nettoyerPieces\(attachments\);/);
+    assert.match(lire("src/app/api/messages/route.ts"), /href="\$\{esc\(`\$\{APP_URL\}\$\{a\.url\}`\)\}"/, "le lien de l'e-mail au coach n'est plus absolu");
+  });
+
+  // ── 8. FINISHERS ET JOGGING-PLUS : EN PAUSE TANT QU'ILS N'ONT PAS DIT OUI ───────
+  await t("finishers.com et jogging-plus.com sont sur la liste d'opposition (CGU de finishers, défi anti-robot)", () => {
+    for (const d of ["finishers.com", "jogging-plus.com"]) {
+      assert.ok(SITES_EXCLUS.includes(d), `${d} n'est plus sur la liste d'opposition`);
+      assert.equal(siteExclu(`https://www.${d}/course/x`), true);
+    }
+  });
+
+  await t("la collecte du mardi ne fait AUCUNE requête à finishers et ne casse pas le workflow", () => {
+    const slugs = code("scripts/finishers-slugs.ts");
+    const garde = slugs.indexOf('if (siteExclu("https://www.finishers.com")) {');
+    assert.ok(garde > 0 && garde < slugs.indexOf("await fetch("), "le plan du site est demandé avant le contrôle d'opposition");
+    assert.match(slugs.slice(garde, garde + 400), /return;/, "l'opposition doit arrêter proprement (code 0), pas lever une erreur");
+    const collecte = code("scripts/finishers-collecte.ts");
+    const g2 = collecte.indexOf('if (siteExclu("https://www.finishers.com")) {');
+    assert.ok(g2 > 0 && g2 < collecte.indexOf("await fetch("), "une fiche est lue avant le contrôle d'opposition");
+    assert.match(collecte.slice(g2, g2 + 300), /appendFileSync\(sortie, ""\);\s*console\.log\("[^"]*"\);\s*return;/);
+    assert.match(code("scripts/finishers-appliquer.ts"), /if \(!fiches\.size\) \{ console\.log\("[^"]*"\); return; \}/, "zéro fiche ne doit RIEN modifier au catalogue");
+  });
+
+  await t("le contrôle des liens (3×/jour) ne visite plus un site opposé", () => {
+    assert.match(code("src/app/api/cron/races-liens/route.ts"), /if \(u && !vues\.has\(u\) && !siteExclu\(u\)\) \{ vues\.add\(u\); urls\.push\(u\); \}/);
+  });
+
+  await t("plus aucun commentaire n'affirme que finishers « autorise l'exploration » sans réserve", () => {
+    const fautifs = CODE.filter((f) => /autorise (explicitement )?l'exploration(?! \[⚠️| DANS SON robots\.txt \[⚠️)/i.test(lire(f)) && /finishers/i.test(lire(f)));
+    assert.deepEqual(fautifs, []);
   });
 
   // ── 6. PLUS DE PRIX SIMULÉS ATTRIBUÉS À DE VRAIES ENSEIGNES ─────────────────

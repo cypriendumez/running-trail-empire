@@ -52,6 +52,9 @@ async function main() {
   // 1. Fiches (la plus récente par slug).
   const fiches = new Map<string, Fiche>();
   for (const l of readFileSync(fichier, "utf8").split("\n")) { try { const f = JSON.parse(l) as Fiche; if (f?.slug) fiches.set(f.slug, f); } catch { /* ligne en cours d'écriture */ } }
+  // Aucune fiche (source en pause sur la liste d'opposition, ou rien de neuf) : on ne touche
+  // à RIEN. Une absence de fiches ne prouve jamais qu'une course a disparu.
+  if (!fiches.size) { console.log("[appliquer] aucune fiche lue : rien à appliquer."); return; }
 
   // 1 bis. Liens « Résultats » lus sur les sites officiels (`scripts/resultats-sites.ts`) :
   // ils passent AVANT la page éditoriale de la source, jamais avant un classement déjà cité.

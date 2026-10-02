@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
-import { UA_PACEVOBOT } from "@/lib/races/robot";
+import { UA_PACEVOBOT, siteExclu } from "@/lib/races/robot";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { idEditeur } from "@/lib/compta/enregistrer";
@@ -54,7 +54,9 @@ export async function GET(req: Request) {
     if (!data?.length) break;
     for (const r of data) {
       const u = String(r.registration_url ?? "");
-      if (u && !vues.has(u)) { vues.add(u); urls.push(u); }
+      // Un site sur la liste d'opposition (lib/races/robot) n'est plus visité du tout —
+      // finishers.com depuis la lecture de ses CGU (02/10/2026), jogging-plus.com aussi.
+      if (u && !vues.has(u) && !siteExclu(u)) { vues.add(u); urls.push(u); }
     }
     if (data.length < 1000) break;
   }
@@ -75,7 +77,7 @@ export async function GET(req: Request) {
       //    L'ancienne synchronisation explorait jogging-plus, passé derrière un défi
       //    JavaScript anti-robot qu'un serveur ne peut pas résoudre : elle renvoyait
       //    zéro course et le catalogue était figé depuis le 10 juin. finishers.com, lui,
-      //    autorise l'exploration et publie des données structurées. Comme on visite
+      //    autorise l'exploration [⚠️ robots.txt seulement : ses CGU l'interdisent, il est sur la liste d'opposition depuis le 02/10/2026] et publie des données structurées. Comme on visite
       //    déjà ces pages pour contrôler le lien, on y lit la date au passage — une
       //    visite, deux bénéfices, et pas un octet de charge en plus pour la source.
       const rep = await fetch(url, {

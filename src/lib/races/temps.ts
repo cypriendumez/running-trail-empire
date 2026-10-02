@@ -1,4 +1,6 @@
 import { jourLocal, ecartJours } from "@/lib/streak/compute";
+import { siteExclu } from "./robot";
+import { estCalendrierTiers } from "./destination";
 
 /**
  * JOURS AVANT UNE COURSE — en jours de CALENDRIER.
@@ -133,7 +135,7 @@ export function domaineSource(url: unknown): string | null {
  * ⚠️ CE N'EST PAS UN DÉTAIL TECHNIQUE, C'EST UNE DIFFÉRENCE DE FIABILITÉ que l'athlète
  * doit connaître avant de payer une inscription. Mesuré sur le catalogue :
  *
- *   · 78 % des fiches viennent de finishers.com, qui AUTORISE l'exploration et publie
+ *   · 78 % des fiches viennent de finishers.com, dont le robots.txt autorise l'exploration [⚠️ mais PAS ses CGU — voir plus bas, 02/10/2026] et qui publie
  *     des données structurées. Le contrôle nocturne y relit la date à la source et
  *     corrige la nôtre : ces fiches se soignent toutes seules.
  *   · 22 % viennent de jogging-plus.com, passé derrière un défi anti-robot JavaScript.
@@ -145,7 +147,19 @@ export function domaineSource(url: unknown): string | null {
  */
 const DOMAINES_VERIFIABLES = ["finishers.com"];
 
-export function ficheVerifiable(url: unknown): boolean {
+/**
+ * ⚠️ DEPUIS LE 02/10/2026, UNE SOURCE N'EST « RELUE » QUE SI ELLE ACCEPTE DE L'ÊTRE. Les CGU
+ * de finishers interdisent l'extraction automatisée : il est sur la liste d'opposition
+ * (lib/races/robot), plus aucun robot ne relit ses fiches — les déclarer « vérifiables »
+ * aurait été le même mensonge que celui que ce module dénonce. Ce qui reste vérifiable :
+ *   · un calendrier qui l'accepte (finishers, le jour où il donne son accord écrit — il
+ *     suffit alors de le retirer de la liste d'opposition) ;
+ *   · le SITE OFFICIEL de l'organisateur, que la veille relit deux fois par jour autour
+ *     de la course et à chaque consultation (lib/races/veilleCourse).
+ */
+export function ficheVerifiable(url: unknown, siteOfficiel?: unknown): boolean {
   const d = domaineSource(url);
-  return !!d && DOMAINES_VERIFIABLES.some((x) => d === x || d.endsWith(`.${x}`));
+  if (d && DOMAINES_VERIFIABLES.some((x) => d === x || d.endsWith(`.${x}`)) && !siteExclu(url)) return true;
+  return typeof siteOfficiel === "string" && /^https?:\/\//i.test(siteOfficiel.trim())
+    && !estCalendrierTiers(siteOfficiel) && !siteExclu(siteOfficiel);
 }

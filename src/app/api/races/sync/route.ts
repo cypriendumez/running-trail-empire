@@ -711,8 +711,8 @@ export async function POST(req: Request) {
     //    cette route : un travail planifié qui échoue chaque semaine apprend juste à
     //    ignorer le rouge.
     //    Le rafraîchissement passe désormais par `/api/cron/races-liens`, qui lit les
-    //    données structurées des fiches finishers.com — un site qui, lui, autorise
-    //    explicitement l'exploration et publie son sitemap.
+    //    données structurées des fiches finishers.com — dont le robots.txt autorise
+    //    l'exploration ; ⚠️ ses CGU l'INTERDISENT (lues le 02/10/2026) : liste d'opposition.
     return NextResponse.json({
       error: "Aucune course trouvée — les sources explorées par cette route bloquent désormais les requêtes automatiques (défi anti-robot). Le rafraîchissement des dates passe par /api/cron/races-liens.",
       sources: {
