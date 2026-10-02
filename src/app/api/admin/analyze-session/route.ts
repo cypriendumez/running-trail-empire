@@ -101,7 +101,7 @@ export async function POST(req: Request) {
       admin.from("workouts").select("date,title,type,distance_km,duration_seconds,tss,avg_hr,max_hr").eq("user_id", user_id).order("date", { ascending: false }).limit(20),
       admin.from("hrv_data").select("hrv_ms,physiological_state").eq("user_id", user_id).order("date", { ascending: false }).limit(1).single(),
       admin.from("sleep_data").select("sleep_score,total_sleep_min").eq("user_id", user_id).order("date", { ascending: false }).limit(1).single(),
-      admin.from("training_plans").select("goal,race_date").eq("user_id", user_id).eq("is_active", true).single(),
+      admin.from("training_plans").select("goal:name, race_date").eq("user_id", user_id).eq("is_active", true).single(),
       admin.from("notifications").select("data").eq("user_id", user_id).eq("type", "race_objective").maybeSingle(),
     ]);
     const a: Record<string, unknown> = fullRes && fullRes.ok ? await fullRes.json() : act;

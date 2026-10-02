@@ -248,21 +248,35 @@
    pied de la fiche ouverte à droite. Drapeau posé par `usePleinEcran` (lib/ui/pleinEcran). */
 html[data-plein-ecran] [data-bulle-aide] { display: none !important; }
 
-/* ── ÉCRAN DE LANCEMENT (layout du tableau de bord + EcranLancement) ─────────────────
-   Même fond que le démarrage natif de l'application installée (manifest : #FAFAFA) :
-   l'un s'enchaîne sur l'autre sans flash. */
+/* ── ÉCRAN DE LANCEMENT (refait le 02/10/2026) — les verts et le crème du logo ──────
+   Le démarrage natif de l'application installée prend le même vert (manifest :
+   background_color #074A32) : l'un s'enchaîne sur l'autre sans flash blanc. */
 #lancement { transition: opacity 450ms ease, visibility 450ms; }
 #lancement[data-sortie] { opacity: 0; visibility: hidden; pointer-events: none; }
+#lancement[data-sortie] .lancement-contenu { transform: scale(1.04); }
 #lancement[data-vu] { display: none; }
-.lancement-logo { animation: lancement-entree 600ms cubic-bezier(.2, .8, .2, 1) both; }
-.lancement-nom { animation: lancement-entree 600ms 120ms cubic-bezier(.2, .8, .2, 1) both; }
-.lancement-barre > span {
-  display: block; height: 100%; width: 40%; border-radius: 9999px; background: #059669;
-  animation: lancement-barre 1100ms ease-in-out infinite;
+.lancement-fond {
+  background:
+    radial-gradient(60% 45% at 50% 38%, rgba(52, 211, 153, .22) 0%, transparent 70%),
+    radial-gradient(130% 95% at 50% 0%, #12895c 0%, #0b6343 38%, #074a32 64%, #03271b 100%);
+  color: #F3F1E6;
 }
-@keyframes lancement-entree { from { opacity: 0; transform: translateY(6px) scale(.96); } to { opacity: 1; transform: none; } }
-@keyframes lancement-barre { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
+.lancement-relief { position: absolute; inset: 0; width: 100%; height: 100%; color: rgba(243, 241, 230, .06); animation: lancement-relief 14s ease-in-out infinite alternate; }
+.lancement-halo { position: absolute; left: 50%; top: 50%; width: 340px; height: 340px; margin: -230px 0 0 -170px; border-radius: 9999px; background: radial-gradient(circle, rgba(110, 231, 183, .28) 0%, transparent 65%); animation: lancement-halo 2.4s ease-in-out infinite; }
+.lancement-contenu { transition: transform 450ms cubic-bezier(.2, .8, .2, 1); }
+.lancement-tuile { box-shadow: 0 18px 40px -12px rgba(0, 0, 0, .55), 0 0 0 1px rgba(243, 241, 230, .18); }
+.lancement-logo { width: 132px; height: 132px; animation: lancement-entree 700ms cubic-bezier(.2, .8, .2, 1) both; }
+.lancement-anneau { inset: 0; animation: lancement-tour 1.4s linear infinite; }
+.lancement-nom { animation: lancement-entree 700ms 140ms cubic-bezier(.2, .8, .2, 1) both; }
+.lancement-slogan { animation: lancement-entree 700ms 240ms cubic-bezier(.2, .8, .2, 1) both; }
+.lancement-route { animation: lancement-entree 700ms 320ms cubic-bezier(.2, .8, .2, 1) both; }
+.lancement-trace { animation: lancement-trace 1.6s cubic-bezier(.45, 0, .25, 1) infinite; }
+@keyframes lancement-entree { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes lancement-tour { to { transform: rotate(360deg); } }
+@keyframes lancement-trace { from { stroke-dashoffset: 18; } to { stroke-dashoffset: -100; } }
+@keyframes lancement-halo { 0%, 100% { opacity: .65; transform: scale(.94); } 50% { opacity: 1; transform: scale(1.04); } }
+@keyframes lancement-relief { from { transform: scale(1) rotate(0deg); } to { transform: scale(1.08) rotate(4deg); } }
 @media (prefers-reduced-motion: reduce) {
-  .lancement-logo, .lancement-nom, .lancement-barre > span { animation: none; }
-  #lancement { transition: none; }
+  .lancement-logo, .lancement-nom, .lancement-slogan, .lancement-route, .lancement-anneau, .lancement-trace, .lancement-halo, .lancement-relief { animation: none; }
+  #lancement, .lancement-contenu { transition: none; }
 }

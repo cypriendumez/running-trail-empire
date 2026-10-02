@@ -1584,7 +1584,10 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
     : null;
   const nutriCourse = objective && vma
     ? planNutritionCourse({
-        dureeSec: predictRaceSec(vma, objective.distanceKm),
+        // Le même socle réel que le tableau de bord (sortie longue 42 j, volume démontré) :
+        // la durée de course qui dimensionne gels et boisson ne doit pas différer de
+        // celle que l'athlète lit sur sa carte de prédictions.
+        dureeSec: predictRaceSec(vma, objective.distanceKm, { sortieLongueKm: longestRecentKm || null, volumeHebdoKm: demonstratedKm }),
         distanceKm: objective.distanceKm,
         poidsKg: num(p?.weight_kg),
         tempC: meteoCourse,

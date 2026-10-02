@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { Send, Loader2, Sparkles, GraduationCap } from "lucide-react";
 import { toast } from "sonner";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { RichText } from "@/components/ui/RichText";
 
 type Msg = { role: "user" | "model"; text: string };
 
@@ -118,11 +119,16 @@ export function CoursChat() {
 
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-[85%] whitespace-pre-line rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
-              m.role === "user" ? "bg-emerald-600 text-white rounded-br-md" : "bg-zinc-100 text-zinc-800 rounded-bl-md"
-            }`}>
-              {m.text}
-            </div>
+            {/* ⚠️ LA RÉPONSE DU MODÈLE PASSE PAR RichText (02/10/2026). Affichée brute, elle
+                montrait « ### Pourquoi… » et « **Le temps :** » au coureur — la même structure
+                que le kiné et le support savaient déjà mettre en forme. */}
+            {m.role === "user" ? (
+              <div className="max-w-[85%] whitespace-pre-line rounded-2xl rounded-br-md bg-emerald-600 px-3.5 py-2.5 text-sm leading-relaxed text-white">
+                {m.text}
+              </div>
+            ) : (
+              <RichText texte={m.text} className="max-w-[85%] rounded-2xl rounded-bl-md bg-zinc-100 px-3.5 py-2.5 text-sm leading-relaxed text-zinc-800" />
+            )}
           </div>
         ))}
 

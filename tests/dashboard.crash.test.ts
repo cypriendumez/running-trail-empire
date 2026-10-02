@@ -212,7 +212,9 @@ test("avec un objectif, les repères suivent la distance visée", () => {
 
 test("la vitesse se mesure au chrono visé quand il existe", () => {
   const sansCible = computeForme(seances(12, 10), 17, 80, 80, { distanceKm: 10, targetSeconds: null });
-  const ambitieux = computeForme(seances(12, 10), 17, 80, 80, { distanceKm: 10, targetSeconds: 1800 });
+  // 28'20 et non 30'00 : avec le modèle de Daniels (02/10/2026), 30'00 pour 17 km/h donnait
+  // PILE 75 — le même score que sans objectif, par coïncidence arithmétique.
+  const ambitieux = computeForme(seances(12, 10), 17, 80, 80, { distanceKm: 10, targetSeconds: 1700 });
   const modeste = computeForme(seances(12, 10), 17, 80, 80, { distanceKm: 10, targetSeconds: 3600 });
   assert.notEqual(ambitieux.speed, sansCible.speed, "le chrono visé ne change rien à l'axe vitesse");
   assert.ok(modeste.speed >= ambitieux.speed,

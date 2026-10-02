@@ -25,7 +25,7 @@ import { cleanActivityName } from "@/lib/utils/activityName";
 import { isRun } from "@/lib/intervals/sport";
 import { computeHrZones } from "@/lib/dashboard/zones";
 import { dansFenetre, ageJours } from "@/lib/dashboard/fenetre";
-import { computeForme } from "@/lib/dashboard/forme";
+import { computeForme, socleDesSeances } from "@/lib/dashboard/forme";
 import { computeDistancePRs, type RecordDeclare } from "@/lib/dashboard/records";
 import { AjoutRecord } from "@/components/dashboard/AjoutRecord";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -270,7 +270,9 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
   const lastMetrics = w0 ? buildLastMetrics(w0, t) : [];
 
   // ── Données dérivées (toutes calculées depuis le réel — rien d'inventé) ──────────
-  const predictions = currentVma && currentVma > 0 ? racePredictions(currentVma) : null;
+  // ⚠️ LE SOCLE RÉEL (02/10/2026) : sans lui, le marathon était prédit pour un coureur
+  // sans sortie longue ni volume — la prédiction prudente, servie à tout le monde.
+  const predictions = currentVma && currentVma > 0 ? racePredictions(currentVma, socleDesSeances(workouts)) : null;
   const volumeTrend = computeWeeklyTrend(workouts, 6);
   const trendMax = Math.max(1, ...volumeTrend.map((v) => v.km));
   const prevWeeks = volumeTrend.slice(0, -1);

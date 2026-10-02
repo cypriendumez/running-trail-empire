@@ -21,7 +21,7 @@ export async function POST(req: Request) {
     admin.from("hrv_data").select("date,hrv_ms,physiological_state").eq("user_id", user_id).order("date", { ascending: false }).limit(14),
     admin.from("sleep_data").select("date,total_sleep_min,sleep_score,body_battery_end,deep_sleep_min,rem_sleep_min").eq("user_id", user_id).order("date", { ascending: false }).limit(14),
     admin.from("performance_baselines").select("vma_kmh,ftp_watts,max_hr,resting_hr").eq("user_id", user_id).order("tested_at", { ascending: false }).limit(1).single(),
-    admin.from("training_plans").select("race_date,goal").eq("user_id", user_id).eq("is_active", true).single(),
+    admin.from("training_plans").select("race_date, goal:name").eq("user_id", user_id).eq("is_active", true).single(),
   ]);
 
   return NextResponse.json({

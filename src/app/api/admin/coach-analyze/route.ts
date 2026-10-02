@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     admin.from("hrv_data").select("hrv_ms,physiological_state,date").eq("user_id", user_id).order("date", { ascending: false }).limit(1).single(),
     admin.from("sleep_data").select("total_sleep_min,sleep_score,body_battery_end").eq("user_id", user_id).order("date", { ascending: false }).limit(1).single(),
     admin.from("performance_baselines").select("vma_kmh,max_hr,resting_hr").eq("user_id", user_id).order("tested_at", { ascending: false }).limit(1).single(),
-    admin.from("training_plans").select("race_date,goal").eq("user_id", user_id).eq("is_active", true).single(),
+    admin.from("training_plans").select("race_date, goal:name").eq("user_id", user_id).eq("is_active", true).single(),
     admin.from("notifications").select("data,created_at").eq("user_id", user_id).eq("type", "session_ai_analysis").order("created_at", { ascending: false }).limit(3),
   ]);
 

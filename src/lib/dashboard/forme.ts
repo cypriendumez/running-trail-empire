@@ -1,6 +1,6 @@
 import { isRun } from "@/lib/intervals/sport";
 import { longRunPeakKm, demonstratedWeeklyKm, type RaceGoal } from "@/lib/running/volume";
-import { raceProjection } from "@/lib/running/fitness";
+import { raceProjection, type Socle } from "@/lib/running/fitness";
 import { dansFenetre } from "./fenetre";
 
 /**
@@ -61,6 +61,22 @@ export function butDe(distanceKm: number | null): RaceGoal {
   return "5k";
 }
 
+/**
+ * LE SOCLE D'ENDURANCE RÉEL, depuis les séances : la plus longue sortie des 6 dernières
+ * semaines et le volume DÉMONTRÉ (médiane des 4 meilleures semaines). C'est ce que le
+ * modèle de prédiction (lib/running/vdot) lit pour ajuster tout ce qui dépasse le semi —
+ * le même pour la carte « Vitesse & prédictions » et pour le score de forme.
+ */
+export function socleDesSeances(workouts: Seance[]): Socle {
+  const courses = workouts.filter((w) => isRun(w.sport));
+  const recentes = courses.filter((w) => dansFenetre(w.date, 42));
+  const plusLongue = Math.max(0, ...recentes.map((w) => w.distance_km ?? 0));
+  return {
+    sortieLongueKm: plusLongue > 0 ? plusLongue : null,
+    volumeHebdoKm: demonstratedWeeklyKm(courses.map((w) => ({ date: w.date, distance_km: w.distance_km ?? 0 }))),
+  };
+}
+
 export function computeForme(
   workouts: Seance[],
   currentVma: number,
@@ -90,7 +106,8 @@ export function computeForme(
   // coureur de 10 km et juste pour un objectif marathon ambitieux.
   let speed: number;
   if (currentVma > 0 && raceKm && objectif?.targetSeconds && objectif.targetSeconds > 0) {
-    const { nowSec } = raceProjection(currentVma, raceKm, objectif.targetSeconds, null);
+    // Le même socle que la carte de prédictions : les deux chiffres sont lus côte à côte.
+    const { nowSec } = raceProjection(currentVma, raceKm, objectif.targetSeconds, null, null, { sortieLongueKm: longest || null, volumeHebdoKm: cibleVolumeKm });
     speed = nowSec > 0 ? clamp(Math.round((objectif.targetSeconds / nowSec) * 100)) : 0;
   } else {
     speed = currentVma > 0 ? clamp(Math.round(((currentVma - VMA_PLANCHER) / VMA_ETENDUE) * 100)) : 0;

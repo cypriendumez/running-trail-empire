@@ -25,7 +25,7 @@ import { contientGrosMot, premierGrosMot, NB_FORMES_SURVEILLEES } from "../src/l
 import { avertissementAge, avertissementsAge, kmEffort } from "../src/lib/coach/ageDistance";
 import { etatDouble, scinderFacile, seanceDoubleSeuil, AVERTISSEMENT_LACTATE } from "../src/lib/coach/doubleSessions";
 import { oneSessionPerSlot, slotKey } from "../src/lib/coach/sessions";
-import { vmaFromPaceCurve, bestVmaFromWorkouts, effectiveVma, dureeEnConditionsNeutres, PART_PENALITE_CHALEUR, pctVmaForDistance, easyPaceFromHeartRate, MIN_SEANCES_ALLURE_Z2, LONG_RUN_PRET_KM, LONG_RUN_PLANCHER_KM } from "../src/lib/running/fitness";
+import { vmaFromPaceCurve, bestVmaFromWorkouts, effectiveVma, dureeEnConditionsNeutres, PART_PENALITE_CHALEUR, pctVmaForDistance, easyPaceFromHeartRate, MIN_SEANCES_ALLURE_Z2, LONG_RUN_PRET_KM, LONG_RUN_PLANCHER_KM, vmaFromEffort, predictRaceSec } from "../src/lib/running/fitness";
 import { heatAdvice, windAdvice, altitudeLossPct, heatAcclimation } from "../src/lib/weather/openMeteo";
 import { parseReps, parsePaceSec, stepsForType, warmCoolMin, buildWorkoutDescription, montreDe, metriquesMixtesSupportees, DESTINATIONS_MONTRE , lectureDe, estAppleWatch } from "../src/lib/watch/intervals";
 import { buildWeekPlan, CONFIRMED_DAYS } from "../src/lib/ai/autoPlan";
@@ -1991,8 +1991,10 @@ test("le marathon dépend de la plus longue sortie, pas d'une constante", () => 
   const bas = pctVmaForDistance(42.195, LONG_RUN_PLANCHER_KM);
   const pret = pctVmaForDistance(42.195, LONG_RUN_PRET_KM);
   assert.ok(pret > bas, "une préparation aboutie doit valoir mieux qu'un plancher");
-  assert.equal(Math.round(bas * 1000) / 10, 75);
-  assert.equal(Math.round(pret * 1000) / 10, 79);
+  // Modèle Daniels & Gilbert (02/10/2026), coureur de référence à 17 km/h : 75,9 % sans
+  // socle, 80,5 % préparé — la fourchette marathon de la littérature (75-80 %).
+  assert.equal(Math.round(bas * 1000) / 10, 75.9);
+  assert.equal(Math.round(pret * 1000) / 10, 80.5);
   // Au-delà de la référence, on plafonne : 40 km de sortie longue ne rend pas le
   // marathon plus facile que la physiologie ne le permet.
   assert.equal(pctVmaForDistance(42.195, 40), pret);
@@ -2015,11 +2017,17 @@ test("les courtes distances ne dépendent PAS du socle d'endurance", () => {
 });
 
 test("lire une performance ne suppose aucune préparation", () => {
-  // `vmaFromEffort` ne doit pas appliquer le bonus de socle : on lit ce qui a été fait,
-  // on ne récompense pas l'athlète d'avoir un gros volume.
-  const code = codeOf("src/lib/running/fitness.ts");
-  const appel = code.match(/speed \/ pctVmaForDistance\(([^)]*)\)/)?.[1] ?? "";
-  assert.equal(appel.trim(), "distanceKm", `vmaFromEffort passe « ${appel} » à pctVmaForDistance`);
+  // `vmaFromEffort` ne doit pas appliquer le socle : on lit ce qui a été fait, on ne
+  // récompense pas l'athlète d'avoir un gros volume. Preuve par l'aller-retour : un
+  // marathon PRÉPARÉ (socle complet, aucune pénalité) se relit à la VMA d'origine ; le
+  // même marathon couru sans socle, plus lent, se relit plus bas — jamais « corrigé ».
+  const PRET = { sortieLongueKm: 40, volumeHebdoKm: 120 };
+  for (const vma of [14, 17, 20]) {
+    for (const km of [5, 10, 21.0975, 42.195]) {
+      assert.ok(Math.abs(vmaFromEffort(km, predictRaceSec(vma, km, PRET))! - vma) <= 0.1, `${vma} km/h sur ${km} km ne se relit pas à l'identique`);
+    }
+    assert.ok(vmaFromEffort(42.195, predictRaceSec(vma, 42.195))! < vma - 0.3, "un marathon sans socle se relit comme s'il avait été préparé");
+  }
 });
 
 console.log("\nCHALEUR — une performance se lit DANS SES CONDITIONS");
@@ -2120,7 +2128,8 @@ test("la VO2max de la montre est CROISÉE avec la courbe, plus reléguée au der
   // son meilleur 5 000 m est une sortie d'entraînement. Constaté en production :
   // courbe 17,3 km/h contre VO2max 63 → 18,0, et un « meilleur » 10 000 m à 41'08.
   const r = effectiveVma({ paceCurveBest: COURBE, garminVo2: 63, fromRuns: null });
-  assert.equal(vmaFromPaceCurve(COURBE), 17.3, "la courbe donne bien 17,3");
+  // 5 000 m en 18'27 = VDOT 54,7 → 17,8 km/h (modèle de Daniels, 02/10/2026).
+  assert.equal(vmaFromPaceCurve(COURBE), 17.8, "la courbe donne bien 17,8");
   assert.equal(r.vma, 18, "la VO2max (63 → 18,0) doit l'emporter sur la courbe");
   assert.equal(r.source, "vo2max", "et la source doit le DIRE, sinon l'athlète subit le chiffre");
 });
@@ -2129,7 +2138,7 @@ test("quand la courbe est la meilleure, c'est elle qui gagne", () => {
   // Le croisement n'est pas « la VO2max gagne toujours » : les deux sources ne peuvent
   // que sous-estimer, donc on retient la plus favorable, d'où qu'elle vienne.
   const r = effectiveVma({ paceCurveBest: COURBE, garminVo2: 45, fromRuns: null });
-  assert.equal(r.vma, 17.3);
+  assert.equal(r.vma, 17.8);
   assert.equal(r.source, "courbe");
 });
 

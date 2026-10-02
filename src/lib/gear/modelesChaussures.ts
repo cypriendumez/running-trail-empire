@@ -141,6 +141,9 @@ const numero = (nom: string) => Number(nom.match(/(\d+(?:\.\d+)?)\D*$/)?.[1] ?? 
  * La liste complète : les générations de chaque gamme, prolongées par le catalogue (un
  * « Clifton 11 » du comparateur étend la gamme jusqu'à 11), plus les modèles du catalogue.
  */
+/** Combien de générations un catalogue peut ajouter à une gamme écrite (une par an, environ). */
+export const AVANCE_MAX_GENERATIONS = 3;
+
 export function tousLesModeles(catalogue: readonly ModeleChaussure[] = []): ModeleChaussure[] {
   const vus = new Map<string, ModeleChaussure>();
   const ajouter = (marque: string, nom: string) => { const k = `${compact(marque)}|${compact(nom)}`; if (!vus.has(k)) vus.set(k, { marque, nom }); };
@@ -149,7 +152,14 @@ export function tousLesModeles(catalogue: readonly ModeleChaussure[] = []): Mode
     // Le catalogue connaît-il une génération plus récente de cette gamme ?
     const motif = new RegExp(`^${g.modele.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&").replace("\\{n\\}", "(\\d+)")}$`, "i");
     let a = g.a;
-    for (const m of catalogue) if (compact(m.marque) === compact(g.marque)) { const x = m.nom.match(motif); if (x) a = Math.max(a, Number(x[1])); }
+    // ⚠️ UN NOMBRE N'EST PAS TOUJOURS UNE GÉNÉRATION (02/10/2026) : « Olympus 275 » est un
+    // modèle d'Altra, pas la 275ᵉ Olympus — la gamme s'étendait de 7 à 275 et le Garage
+    // proposait 268 chaussures qui n'existent pas. Une gamme gagne une génération par an :
+    // au-delà de quelques numéros d'avance, c'est un autre modèle (ajouté tel quel plus bas).
+    for (const m of catalogue) if (compact(m.marque) === compact(g.marque)) {
+      const x = m.nom.match(motif);
+      if (x && Number(x[1]) <= g.a + AVANCE_MAX_GENERATIONS) a = Math.max(a, Number(x[1]));
+    }
     for (let n = g.de; n <= a; n++) ajouter(g.marque, g.modele.replace("{n}", String(n)));
   }
   for (const m of catalogue) ajouter(m.marque, m.nom);

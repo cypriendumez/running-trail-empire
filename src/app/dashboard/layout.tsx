@@ -16,10 +16,10 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { AttributionGarmin } from "@/components/legal/AttributionGarmin";
 import { estAdmin } from "@/lib/admin/acces";
-import { Logo } from "@/components/brand/Logo";
 import { EcranLancement } from "@/components/layout/EcranLancement";
 import { MiseAJour } from "@/components/layout/MiseAJour";
 import { CLE_SESSION_LANCEMENT } from "@/lib/ui/lancement";
+import { DecorLancement } from "@/components/layout/DecorLancement";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -57,12 +57,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           peinture s'il a déjà été vu dans cette session — sans quoi il flasherait à
           chaque rechargement. `suppressHydrationWarning` : ce script modifie l'élément
           avant l'hydratation, c'est voulu. */}
-      <div id="lancement" aria-hidden="true" suppressHydrationWarning
-        className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#FAFAFA]">
-        <div className="lancement-logo"><Logo size={76} /></div>
-        <div className="lancement-nom mt-4 text-[22px] font-bold tracking-tight text-zinc-900">Pacevo</div>
-        <div className="lancement-barre mt-6 h-[3px] w-28 overflow-hidden rounded-full bg-zinc-200"><span /></div>
-      </div>
+      <DecorLancement langue={langue} />
       <script dangerouslySetInnerHTML={{ __html: `try{if(sessionStorage.getItem(${JSON.stringify(CLE_SESSION_LANCEMENT)}))document.getElementById("lancement").setAttribute("data-vu","")}catch(e){}` }} />
       <EcranLancement />
       <div className="flex h-screen bg-[#FAFAFA] overflow-hidden">

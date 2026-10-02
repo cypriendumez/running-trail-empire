@@ -124,8 +124,10 @@ test("le prompt dit l'essentiel — y compris ce qu'il ignore", () => {
 
 test("la durée vient de la PRÉDICTION, pas d'une saisie", () => {
   const src = codeOf("src/lib/ai/coachContext.ts");
-  assert.match(src, /dureeSec: predictRaceSec\(vma, objective\.distanceKm\)/,
-    "la durée de course n'est plus prédite depuis la VMA");
+  // Avec le SOCLE réel (02/10/2026) : la durée qui dimensionne gels et boisson est celle
+  // que l'athlète lit sur sa carte de prédictions, pas une prédiction « sans préparation ».
+  assert.match(src, /dureeSec: predictRaceSec\(vma, objective\.distanceKm, \{ sortieLongueKm: longestRecentKm \|\| null, volumeHebdoKm: demonstratedKm \}\)/,
+    "la durée de course n'est plus prédite depuis la VMA et le socle réel");
   assert.match(src, /tempC: meteoCourse/, "la météo du jour J n'est plus transmise");
 });
 

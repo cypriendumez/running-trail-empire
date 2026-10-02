@@ -158,6 +158,17 @@ test("le Garage trouve la Gel-Nimbus 27, quelle que soit l'écriture", () => {
   assert.ok(suggererModeles(TOUS, "Asics", "nimbus 20").some((x) => x.nom === "Gel-Nimbus 20"), "les anciennes générations ont disparu");
 });
 
+test("un NOMBRE dans un nom n'est pas une génération : « Olympus 275 » n'invente pas 268 chaussures", () => {
+  // Constaté le 02/10/2026 : le comparateur contient l'Altra « Olympus 275 », et la gamme
+  // « Olympus {n} » s'étendait de 7 à 275 — 302 modèles Altra dans le Garage, dont 268 faux.
+  const tous = tousLesModeles([{ marque: "Altra", nom: "Olympus 275" }, { marque: "Altra", nom: "Olympus 7" }]);
+  const olympus = tous.filter((m) => m.marque === "Altra" && /^Olympus \d+$/.test(m.nom)).map((m) => m.nom);
+  assert.deepEqual(olympus.sort(), ["Olympus 275", "Olympus 5", "Olympus 6", "Olympus 7"], "la gamme s'étend encore au-delà du vraisemblable");
+  // Une vraie nouvelle génération (+1, +2) prolonge toujours la gamme.
+  assert.ok(tousLesModeles([{ marque: "Saucony", nom: "Endorphin Pro 6" }]).some((m) => m.nom === "Endorphin Pro 6"));
+  assert.ok(tousLesModeles([{ marque: "Hoka", nom: "Clifton 12" }]).some((m) => m.nom === "Clifton 11"), "+2 : la génération intermédiaire doit exister aussi");
+});
+
 test("le catalogue PROLONGE une gamme (un nouveau modèle apparaît dès qu'il y entre)", () => {
   assert.equal(suggererModeles(TOUS, "Hoka", "clifton")[0].nom, "Clifton 11", "la génération connue du catalogue n'étend pas la gamme");
   // Ce qui COMMENCE par la saisie passe avant ce qui la contient : « sky » → Skyward X,
