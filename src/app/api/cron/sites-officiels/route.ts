@@ -3,7 +3,7 @@ export const maxDuration = 300;
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { idEditeur } from "@/lib/compta/enregistrer";
-import { traiterLot } from "@/lib/races/sitesOfficiels";
+import { traiterLot, fenetreFinDeQuota } from "@/lib/races/sitesOfficiels";
 import { jourFrance } from "@/lib/races/jourFrance";
 
 /**
@@ -15,9 +15,11 @@ import { jourFrance } from "@/lib/races/jourFrance";
  * n'est pas copiée dans GitHub. Déclenché par .github/workflows/sites-officiels.yml.
  *
  * ⚠️ LOT PETIT : chaque épreuve coûte une recherche web (quota du projet, partagé avec le
- * kiné et le coach) et quelques lectures de pages ; 300 s de fonction au plus.
+ * kiné et le coach) et quelques lectures de pages ; 300 s de fonction au plus. Et SEULEMENT
+ * dans les 35 dernières minutes de la journée de quota (`fenetreFinDeQuota`) : on n'utilise
+ * que ce que les athlètes n'ont pas pris.
  */
-const LOT_DEFAUT = 12;
+const LOT_DEFAUT = 15;
 const LOT_MAX = 20;
 
 export async function GET(req: Request) {
@@ -28,7 +30,14 @@ export async function GET(req: Request) {
   const proprietaire = await idEditeur();
   if (!proprietaire) return NextResponse.json({ error: "Aucun compte d'administration : l'état n'a pas de propriétaire." }, { status: 500 });
 
-  const demande = Number(new URL(req.url).searchParams.get("lot"));
+  // Hors des dernières minutes de la journée de quota, on ne touche à RIEN : le quota du
+  // jour appartient d'abord aux athlètes. `?force=1` pour un lancement manuel assumé.
+  const parametres = new URL(req.url).searchParams;
+  const fenetre = fenetreFinDeQuota(new Date());
+  if (fenetre == null && parametres.get("force") !== "1") {
+    return NextResponse.json({ ok: true, ignore: "hors de la fin de journée de quota (minuit, heure du Pacifique)" });
+  }
+  const demande = Number(parametres.get("lot"));
   const lot = Number.isFinite(demande) && demande > 0 ? Math.min(LOT_MAX, Math.floor(demande)) : LOT_DEFAUT;
   try {
     const b = await traiterLot(createAdminClient(), { proprietaire, aujourdhui: jourFrance(), lot, ecrire: true });

@@ -11,17 +11,22 @@
 #  La recherche tourne sur le serveur (/api/cron/sites-officiels), où est la clé du
 #  modèle : rien à copier dans GitHub. 12 épreuves par passage.
 #
-#  ⚠️ PAS DE PLANNING TANT QUE LE PROJET GEMINI EST EN OFFRE GRATUITE (03/10/2026) : elle
-#  plafonne à 20 requêtes par JOUR et par modèle, partagées avec le kiné et le coach. Une
-#  recherche planifiée priverait les athlètes de leur IA. Le jour où la facturation est
-#  activée, ajouter :   schedule: [{ cron: "10 1,5,9,13,17,21 * * *" }]
-#  (les jumeaux, eux, sont repris chaque mardi sans aucune recherche : courses-rafraichissement).
+#  ⚠️ OFFRE GRATUITE DE GEMINI (03/10/2026) : 20 requêtes par JOUR et par modèle, partagées
+#  avec le kiné et le coach, remises à zéro à minuit heure du Pacifique. La tâche ne tourne
+#  QUE dans les 35 dernières minutes de cette journée (la route le vérifie elle-même) : elle
+#  n'utilise que le reste que les athlètes n'ont pas pris. Deux créneaux, pour l'heure d'été
+#  et l'heure d'hiver de la Californie ; hors fenêtre, la route ne fait rien.
+#  Avec la facturation activée : planifier plus souvent et appeler avec « ?force=1 ».
+#  Le passage SANS IA (jumeaux, DATAtourisme, adresses devinées) : sites-officiels-gratuits.yml.
 #
 #  SECRETS REQUIS : CRON_SECRET (la même valeur que sur Vercel), déjà présent.
 # ──────────────────────────────────────────────────────────────────────────────
 name: Sites officiels des courses
 
 on:
+  schedule:
+    - cron: "35 6 * * *"
+    - cron: "35 7 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -44,7 +49,7 @@ jobs:
           fi
           reponse=$(curl -sS --max-time 320 -w '\n%{http_code}' \
             -H "Authorization: Bearer ${CRON_SECRET}" \
-            "https://pacevo.fr/api/cron/sites-officiels")
+            "https://pacevo.fr/api/cron/sites-officiels?lot=15")
           corps=$(printf '%s' "$reponse" | sed '$d')
           code=$(printf '%s' "$reponse" | tail -n1)
           echo "$corps"

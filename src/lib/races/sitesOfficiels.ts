@@ -12,7 +12,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { generateContent } from "@/lib/ai/gemini";
 import { lirePoliment } from "./lecturePolie";
 import { lirePage, deciderVeille, type CourseVeillee, type PageLue } from "./veille";
-import { promptSiteOfficiel, candidatsSite, verdictSite, siteCandidatAcceptable, type EpreuveARechercher } from "./siteOfficielWeb";
+import { lookup } from "node:dns/promises";
+import { promptSiteOfficiel, candidatsSite, verdictSite, siteCandidatAcceptable, domainesDevines, candidatsOuverts, type EpreuveARechercher, type EvenementOuvert } from "./siteOfficielWeb";
 import { nomCanonique } from "./groupes";
 import { domaineDe } from "./destination";
 
@@ -121,6 +122,20 @@ export function epreuvesAChercher(eps: readonly Epreuve[], essais: Record<string
     .slice(0, Math.max(0, lot));
 }
 
+/**
+ * LA FIN DE LA JOURNÉE DE QUOTA (03/10/2026). L'offre gratuite de Gemini (20 requêtes par
+ * jour et par modèle, partagées avec le kiné et le coach) se remet à zéro à MINUIT HEURE DU
+ * PACIFIQUE. La recherche de sites ne consomme que ce qui reste dans les dernières minutes
+ * avant cette remise à zéro : ce qui n'a pas servi aux athlètes, et qui serait perdu.
+ * Rend le nombre de minutes restantes si l'on est dans la fenêtre, sinon `null`.
+ */
+export function fenetreFinDeQuota(maintenant: Date, marge = 35): number | null {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+    .formatToParts(maintenant).filter((x) => x.type !== "literal").map((x) => [x.type, Number(x.value)]));
+  const restantes = 1440 - (p.hour * 60 + p.minute);
+  return restantes <= marge ? restantes : null;
+}
+
 export type Recherche = {
   url: string | null; force?: string; motif: string; indisponible?: boolean;
   candidats: { url: string; motif: string }[]; page?: PageLue;
@@ -131,18 +146,10 @@ type Dependances = {
   lire?: (url: string, init?: RequestInit) => Promise<Response | null>;
 };
 
-/** Cherche, LIT et juge les candidats ; rend le premier qui passe tous les contrôles. */
-export async function chercherSiteOfficiel(e: EpreuveARechercher, aujourdhui: string, deps: Dependances = {}): Promise<Recherche> {
-  const generer = deps.generer ?? generateContent;
-  const lire = deps.lire ?? lirePoliment;
-  const rech = await generer(
-    [{ role: "user", parts: [{ text: promptSiteOfficiel(e) }] }],
-    { temperature: 0, maxOutputTokens: 1500 },
-    { tools: [{ google_search: {} }] },
-  );
-  if (!rech.ok) return { url: null, motif: "modèle indisponible", indisponible: true, candidats: [] };
+/** LIT et juge des candidats, dans l'ordre ; rend le premier qui passe tous les contrôles. */
+export async function essayerCandidats(e: EpreuveARechercher, urls: readonly string[], aujourdhui: string, lire: NonNullable<Dependances["lire"]>): Promise<Recherche> {
   const candidats: Recherche["candidats"] = [];
-  for (const url of candidatsSite(rech.text, rech.sources ?? [])) {
+  for (const url of urls) {
     let r: Response | null = null;
     try { r = await lire(url, { redirect: "follow", signal: AbortSignal.timeout(10_000), headers: { "Accept-Language": "fr-FR" } }); }
     catch { r = null; }
@@ -163,12 +170,86 @@ export async function chercherSiteOfficiel(e: EpreuveARechercher, aujourdhui: st
   return { url: null, motif: candidats.length ? "aucun candidat ne passe les contrôles" : "aucun site proposé", candidats };
 }
 
+/** Cherche avec le modèle (recherche web), puis LIT et juge ce qu'il propose. */
+export async function chercherSiteOfficiel(e: EpreuveARechercher, aujourdhui: string, deps: Dependances = {}): Promise<Recherche> {
+  const generer = deps.generer ?? generateContent;
+  const lire = deps.lire ?? lirePoliment;
+  const rech = await generer(
+    [{ role: "user", parts: [{ text: promptSiteOfficiel(e) }] }],
+    { temperature: 0, maxOutputTokens: 1500 },
+    { tools: [{ google_search: {} }] },
+  );
+  if (!rech.ok) return { url: null, motif: "modèle indisponible", indisponible: true, candidats: [] };
+  return essayerCandidats(e, candidatsSite(rech.text, rech.sources ?? []), aujourdhui, lire);
+}
+
+/** Le domaine existe-t-il ? (une adresse devinée qui ne résout pas n'est jamais visitée) */
+export async function domaineExiste(url: string): Promise<boolean> {
+  try { await lookup(new URL(url).hostname); return true; } catch { return false; }
+}
+
+/**
+ * SANS AUCUNE IA (03/10/2026) : les candidats de DATAtourisme (même commune, un mot du nom
+ * en commun), puis les adresses devinées depuis le nom — seulement celles dont le domaine
+ * existe. Chaque candidat est lu et jugé comme les autres.
+ */
+export async function chercherSansIA(
+  e: EpreuveARechercher, aujourdhui: string,
+  o: { ouverts?: ReadonlyMap<string, readonly EvenementOuvert[]>; existe?: (url: string) => Promise<boolean>; lire?: Dependances["lire"] } = {},
+): Promise<Recherche> {
+  const existe = o.existe ?? domaineExiste;
+  const devines: string[] = [];
+  for (const u of domainesDevines(e.nom)) if (siteCandidatAcceptable(u) && await existe(u)) devines.push(u);
+  const urls = [...new Set([...(o.ouverts ? candidatsOuverts(e, o.ouverts) : []), ...devines])];
+  return essayerCandidats(e, urls, aujourdhui, o.lire ?? lirePoliment);
+}
+
 /** Ce qu'il faut écrire sur chaque ligne de l'épreuve : le site, et ce que la veille en tire déjà. */
 export function patchsPourEpreuve(ep: Epreuve, url: string, page: PageLue, aujourdhui: string): { id: string; patch: Record<string, unknown> }[] {
   return ep.lignes.map((l) => ({
     id: l.id,
     patch: { site_officiel: url, ...deciderVeille(l, page, aujourdhui, { confirmee: true, parcours: true }), veille_at: new Date().toISOString() },
   }));
+}
+
+/** Les fiches à source fermée sans site officiel, regroupées en épreuves. */
+async function epreuvesFermees(sb: SupabaseClient): Promise<Epreuve[]> {
+  const lignes: LigneCourse[] = [];
+  for (let de = 0; ; de += 1000) {
+    const { data, error } = await sb.from("races")
+      .select("id, name, city, department, date, date_confirmee, distance_km, registration_url, site_officiel, inscription_url, resultats_url, resultats_annee, parcours_url")
+      .like("registration_url", MOTIF_SOURCE_FERMEE).is("site_officiel", null).order("id").range(de, de + 999);
+    if (error) throw new Error(`courses illisibles : ${error.message}`);
+    lignes.push(...((data ?? []) as LigneCourse[]));
+    if (!data || data.length < 1000) break;
+  }
+  return epreuvesDepuisLignes(lignes);
+}
+
+/**
+ * LE PASSAGE GRATUIT : toutes les épreuves fermées sans site, sans modèle ni quota, sans
+ * état (une semaine plus tard, on réessaie : DATAtourisme et le web auront bougé). Les
+ * épreuves passées sont sautées.
+ */
+export async function traiterGratuit(sb: SupabaseClient, o: { aujourdhui: string; ecrire: boolean; max?: number; ouverts?: ReadonlyMap<string, readonly EvenementOuvert[]>; existe?: (url: string) => Promise<boolean>; lire?: Dependances["lire"] }): Promise<BilanLot> {
+  const eps = (await epreuvesFermees(sb)).filter((e) => !(e.date && e.date < o.aujourdhui))
+    .sort((a, b) => (a.date ?? "9999").localeCompare(b.date ?? "9999") || a.cle.localeCompare(b.cle))
+    .slice(0, o.max ?? Infinity);
+  const bilan: BilanLot = { cherchees: 0, trouvees: 0, lignesMisesAJour: 0, erreursEcriture: 0, indisponible: false, details: [] };
+  for (const ep of eps) {
+    const r = await chercherSansIA(ep, o.aujourdhui, o);
+    bilan.cherchees++;
+    const patchs = r.url && r.page ? patchsPourEpreuve(ep, r.url, r.page, o.aujourdhui) : [];
+    if (r.url) bilan.trouvees++;
+    bilan.details.push({ nom: ep.nom, ville: ep.ville, date: ep.date, url: r.url, force: r.force, motif: r.motif, candidats: r.candidats, patchs: patchs.map((p) => p.patch) });
+    if (!o.ecrire) continue;
+    for (const { id, patch } of patchs) {
+      const { error } = await sb.from("races").update(patch).eq("id", id);
+      if (error) { bilan.erreursEcriture++; console.error("[sites officiels] écriture impossible :", id, error.message); }
+      else bilan.lignesMisesAJour++;
+    }
+  }
+  return bilan;
 }
 
 export type BilanLot = {
@@ -182,22 +263,14 @@ export type BilanLot = {
  * indisponible (quota) : chercher sans lui n'a pas de sens, et l'état n'est pas consommé.
  */
 export async function traiterLot(sb: SupabaseClient, o: { proprietaire: string; aujourdhui: string; lot: number; ecrire: boolean; deps?: Dependances }): Promise<BilanLot> {
-  const lignes: LigneCourse[] = [];
-  for (let de = 0; ; de += 1000) {
-    const { data, error } = await sb.from("races")
-      .select("id, name, city, department, date, date_confirmee, distance_km, registration_url, site_officiel, inscription_url, resultats_url, resultats_annee, parcours_url")
-      .like("registration_url", MOTIF_SOURCE_FERMEE).is("site_officiel", null).order("id").range(de, de + 999);
-    if (error) throw new Error(`courses illisibles : ${error.message}`);
-    lignes.push(...((data ?? []) as LigneCourse[]));
-    if (!data || data.length < 1000) break;
-  }
+  const eps = await epreuvesFermees(sb);
   const { data: etatLigne, error: eEtat } = await sb.from("notifications").select("id, data")
     .eq("user_id", o.proprietaire).eq("type", ETAT_SITES_OFFICIELS).maybeSingle();
   if (eEtat) throw new Error(`état illisible : ${eEtat.message}`);
   const essais: Record<string, string> = { ...(((etatLigne?.data ?? {}) as { essais?: Record<string, string> }).essais ?? {}) };
 
   const bilan: BilanLot = { cherchees: 0, trouvees: 0, lignesMisesAJour: 0, erreursEcriture: 0, indisponible: false, details: [] };
-  for (const ep of epreuvesAChercher(epreuvesDepuisLignes(lignes), essais, o.aujourdhui, o.lot)) {
+  for (const ep of epreuvesAChercher(eps, essais, o.aujourdhui, o.lot)) {
     const r = await chercherSiteOfficiel(ep, o.aujourdhui, o.deps);
     if (r.indisponible) { bilan.indisponible = true; break; }
     bilan.cherchees++;

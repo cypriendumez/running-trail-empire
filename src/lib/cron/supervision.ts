@@ -43,6 +43,8 @@ export const TACHES: Tache[] = [
   { fichier: "resultats-course", cadence: "1×/jour", parJour: 1, role: "E-mail « tes résultats sont en ligne » après la course visée" },
   { fichier: "veille-courses", cadence: "2×/jour", parJour: 2, role: "Veille des pages officielles : résultats, dates, inscriptions, parcours (J-12 à J+60)" },
   { fichier: "courses-rafraichissement", cadence: "1×/semaine (mardi)", parJour: 1 / 7, role: "Relit les courses : dates, dénivelés, liens d'inscription et classements" },
+  { fichier: "sites-officiels-gratuits", cadence: "1×/semaine (mercredi)", parJour: 1 / 7, role: "Trouve le site officiel des courses jogging-plus, sans IA" },
+  { fichier: "sites-officiels", cadence: "1×/jour (fin de quota)", parJour: 2, role: "Recherche web des sites officiels, avec le reste du quota IA du jour" },
 ];
 
 export type Execution = { created_at: string; conclusion: string | null; html_url?: string };

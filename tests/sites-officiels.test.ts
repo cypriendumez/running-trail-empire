@@ -9,8 +9,8 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { siteCandidatAcceptable, candidatsSite, promptSiteOfficiel, citeLeLieu, dateConcorde, dedicaceFiable, verdictSite, type EpreuveARechercher } from "../src/lib/races/siteOfficielWeb";
-import { epreuvesDepuisLignes, epreuvesAChercher, chercherSiteOfficiel, patchsPourEpreuve, sitesDesJumeaux, REESSAI_JOURS, type LigneCourse } from "../src/lib/races/sitesOfficiels";
+import { siteCandidatAcceptable, candidatsSite, promptSiteOfficiel, citeLeLieu, dateConcorde, dedicaceFiable, verdictSite, adresseAuNom, titreAuNom, domainesDevines, sansPistage, candidatsOuverts, indexOuvert, type EpreuveARechercher } from "../src/lib/races/siteOfficielWeb";
+import { epreuvesDepuisLignes, epreuvesAChercher, chercherSiteOfficiel, chercherSansIA, patchsPourEpreuve, sitesDesJumeaux, fenetreFinDeQuota, REESSAI_JOURS, type LigneCourse } from "../src/lib/races/sitesOfficiels";
 import { lirePage } from "../src/lib/races/veille";
 import { SITES_EXCLUS } from "../src/lib/races/robot";
 
@@ -107,6 +107,73 @@ const page = (url: string, html: string) => lirePage(`<html><head><title>${html.
     assert.equal(citeLeLieu(p, "Eu", null), false);
     assert.equal(citeLeLieu(p, "Eu", "Seine-Maritime"), false);
     assert.equal(citeLeLieu({ ...p, texte: "Seine-Maritime" }, "Eu", "Seine-Maritime"), true);
+  });
+
+  await test("l'adresse doit porter le NOM : un seul mot de lieu ne suffit pas (vincennes-hippodrome.com)", () => {
+    const semi = ep({ nom: "Semi-marathon du Bois de Vincennes", ville: "Paris", departement: "Paris", date: "2026-10-18" });
+    assert.equal(adresseAuNom(semi, "https://www.vincennes-hippodrome.com/fr/"), false);
+    assert.equal(titreAuNom(semi, { url: "https://www.vincennes-hippodrome.com/fr/", titre: "Hippodrome de Vincennes" }), false);
+    // Même datée au bon jour, la page d'accueil de l'hippodrome n'est pas le site du semi.
+    const hippo = page("https://www.vincennes-hippodrome.com/fr/", "<h1>Hippodrome de Vincennes</h1><p>Paris — le 18 octobre 2026, Semi-marathon du Bois de Vincennes au départ de l'hippodrome.</p>");
+    assert.equal(verdictSite(semi, hippo).ok, false, "la page d'accueil de l'hippodrome passait pour le site du semi");
+    // Une page PRÉCISE qui la cite, mais à une AUTRE date que notre fiche : ni adresse au nom,
+    // ni même date — refusée (sans cette règle, le passage « texte » l'aurait acceptée).
+    const agenda = page("https://www.vincennes-hippodrome.com/fr/agenda-octobre", "<h1>Agenda d'octobre</h1><p>Paris : Semi-marathon du Bois de Vincennes le dimanche 25 octobre 2026.</p>");
+    assert.deepEqual(verdictSite(semi, agenda), { ok: false, motif: "ni adresse au nom de la course, ni la même date sur la page" });
+    assert.equal(adresseAuNom(ep({ nom: "20 km de Paris", ville: "Paris" }), "https://harmonie-mutuelle.20kmparis.com/"), true, "le nom complet, chiffres compris");
+    assert.equal(adresseAuNom(ep({ nom: "Foulées des Raids Dingues", ville: "Auchay-sur-Vendée" }), "https://www.lesraidsdingues85.fr/"), true, "deux mots distinctifs");
+    assert.equal(titreAuNom(ep({ nom: "Top Porquerolles Trail", ville: "Hyères" }), { url: "https://trailporquerolles.com/", titre: "Trail de Porquerolles" }), true);
+  });
+
+  await test("« /fr/ » est une page d'accueil comme « / »", () => {
+    const e = ep({ nom: "Foulées de Vertou", ville: "Vertou", date: "2026-10-04" });
+    const p = page("https://vertou.fr/fr/", "<h1>Ville de Vertou</h1><p>Foulées de Vertou : dimanche 4 octobre 2026.</p>");
+    assert.deepEqual(verdictSite(e, p), { ok: false, motif: "page d'accueil qui cite la course en passant" });
+  });
+
+  console.log("\nSANS IA — adresses devinées et données ouvertes");
+  await test("les adresses devinées : le nom collé ou à tirets, avec ou sans articles, en .fr/.com/.org", () => {
+    const d = domainesDevines("Course du Marais");
+    for (const u of ["https://coursedumarais.fr/", "https://course-du-marais.com/", "https://coursemarais.org/", "https://course-marais.fr/"]) assert.ok(d.includes(u), u);
+    assert.ok(domainesDevines("20 km de Paris").includes("https://20kmparis.com/"));
+    assert.deepEqual(domainesDevines("Eco"), [], "trop court : n'importe quel domaine répondrait");
+    assert.ok(domainesDevines("Beaujol'Trail").includes("https://beaujoltrail.fr/"));
+  });
+
+  await test("les paramètres de pistage ne font pas partie d'une adresse officielle", () => {
+    assert.equal(sansPistage("https://lesaiglesdegouvieux.fr/?fbclid=IwY2&utm_source=fb"), "https://lesaiglesdegouvieux.fr/");
+    assert.equal(sansPistage("https://x.fr/course?annee=2026&utm_campaign=y"), "https://x.fr/course?annee=2026");
+  });
+
+  await test("DATAtourisme propose les sites d'événements de la MÊME commune au nom voisin", () => {
+    const idx = indexOuvert([
+      { nom: "Les Ragondins en folie", commune: "Cantenay-Épinard", site: "https://www.traildesragondins.fr/?fbclid=x" },
+      { nom: "Fête des Ragondins", commune: "Angers", site: "https://angers-fete.fr/" },
+      { nom: "Marché de Noël", commune: "Cantenay-Épinard", site: "https://marche.fr/" },
+      { nom: "Ragondins nocturne", commune: "Cantenay-Épinard", site: "https://www.anjou-tourisme.com/x" },
+    ]);
+    assert.deepEqual(candidatsOuverts(ep({ nom: "Trail des Ragondins", ville: "Cantenay Epinard" }), idx), ["https://www.traildesragondins.fr/"]);
+    assert.deepEqual(candidatsOuverts(ep({ nom: "Trail des Ragondins", ville: "Écouflant" }), idx), []);
+  });
+
+  await test("sans IA, de bout en bout : un domaine qui n'existe pas n'est jamais visité", async () => {
+    const e = ep({ nom: "Course du Marais", ville: "Saint Omer", departement: "Pas-de-Calais", date: "2026-10-04" });
+    const visites: string[] = [];
+    const r = await chercherSansIA(e, AUJ, {
+      existe: async (u) => u === "https://coursedumarais.org/",
+      lire: async (u: string) => { visites.push(u); return new Response("<html><head><title>Course du Marais</title></head><body>Saint-Omer, dimanche 4 octobre 2026.</body></html>", { status: 200, headers: { "content-type": "text/html" } }); },
+    });
+    assert.equal(r.url, "https://coursedumarais.org/");
+    assert.deepEqual(visites, ["https://coursedumarais.org/"], "un domaine inexistant a été visité");
+  });
+
+  console.log("\nQUOTA — la recherche IA ne prend que le reste du jour");
+  await test("la fenêtre : les 35 dernières minutes avant minuit, heure du Pacifique (été comme hiver)", () => {
+    assert.equal(fenetreFinDeQuota(new Date("2026-10-04T06:40:00Z")), 20, "23 h 40 en Californie (heure d'été)");
+    assert.equal(fenetreFinDeQuota(new Date("2026-12-01T07:40:00Z")), 20, "23 h 40 en Californie (heure d'hiver)");
+    assert.equal(fenetreFinDeQuota(new Date("2026-10-04T05:40:00Z")), null, "22 h 40 : le quota est encore aux athlètes");
+    assert.equal(fenetreFinDeQuota(new Date("2026-12-01T06:40:00Z")), null);
+    assert.equal(fenetreFinDeQuota(new Date("2026-10-04T07:10:00Z")), null, "juste après minuit : nouvelle journée, intouchable");
   });
 
   console.log("\nMOTEUR — épreuves, ordre, lecture polie, écritures");
@@ -220,11 +287,22 @@ const page = (url: string, html: string) => lirePage(`<html><head><title>${html.
       "le mode jumeaux exige un compte d'administration que GitHub n'a pas");
   });
 
-  await test("la recherche web n'est PAS planifiée : 20 requêtes/jour/modèle en offre gratuite, partagées avec les athlètes", () => {
+  await test("la recherche IA n'est planifiée QU'EN FIN DE JOURNÉE DE QUOTA, et la route le vérifie elle-même", () => {
     const wf = readFileSync(".github/workflows/sites-officiels.yml", "utf8");
     const actif = wf.split("\n").filter((l) => !l.trim().startsWith("#")).join("\n");
-    assert.doesNotMatch(actif, /schedule:/, "planifier la recherche épuiserait le quota du kiné et du coach — activer d'abord la facturation Gemini, puis revoir ce test");
-    assert.match(actif, /workflow_dispatch:/);
+    const crons = [...actif.matchAll(/cron: "([^"]+)"/g)].map((m) => m[1]);
+    assert.deepEqual(crons, ["35 6 * * *", "35 7 * * *"], "un autre créneau prendrait le quota des athlètes");
+    const route = readFileSync("src/app/api/cron/sites-officiels/route.ts", "utf8");
+    const garde = route.indexOf("if (fenetre == null && parametres.get(\"force\") !== \"1\")");
+    assert.ok(garde > 0 && garde < route.indexOf("traiterLot("), "la route cherche avant de vérifier la fenêtre");
+  });
+
+  await test("le passage sans IA tourne chaque semaine sur GitHub, sans clé du modèle", () => {
+    const wf = readFileSync(".github/workflows/sites-officiels-gratuits.yml", "utf8");
+    assert.match(wf, /scripts\/sites-officiels\.ts rapport-sites\.json --gratuit --fma fma\.csv --ecrire/);
+    assert.doesNotMatch(wf, /GEMINI/);
+    const script = readFileSync("scripts/sites-officiels.ts", "utf8");
+    assert.ok(script.indexOf('if (process.argv.includes("--gratuit")) {') < script.indexOf("await idEditeur()"), "le passage gratuit exige un compte d'administration que GitHub n'a pas");
   });
 
   console.log(`\n${ok} test(s) des sites officiels passé(s), ${ko} échec(s)`);

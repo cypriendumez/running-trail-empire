@@ -18,7 +18,7 @@ import { domaineDe, estCalendrierTiers } from "./destination";
 import { estPlateformeInscription } from "./inscriptionSite";
 import { estChronometreur, motsDistinctifs } from "./resultatsSite";
 import { siteExclu } from "./robot";
-import { pageNommeLaCourse, pageDediee, datesDeLaCourse, type PageLue } from "./veille";
+import { pageNommeLaCourse, datesDeLaCourse, type PageLue } from "./veille";
 
 export type EpreuveARechercher = {
   nom: string;
@@ -42,6 +42,7 @@ const CALENDRIERS_EN_PLUS = new Set([
   // Relevés en essai réel le 03/10/2026 : calendriers et agendas proposés comme « officiels ».
   "runtrail.run", "gotrail.run", "followmysport.com", "werun.world", "esprit-trail.com", "jds.fr", "oleno.fr",
   "infolocale.fr", "unidivers.fr", "provencemed.com", "lesportif.com", "trailrunningfrance.fr", "agenda-trail.fr",
+  "ok-time.fr",
 ]);
 
 /** Offices de tourisme et agendas : ils annoncent tout, n'organisent rien. */
@@ -150,12 +151,103 @@ const mots = (x: string) => norm(x).split(" ").filter((m) => m.length >= 3 && !A
 export function dedicaceFiable(e: EpreuveARechercher, page: Pick<PageLue, "url" | "titre">): boolean {
   const deVille = new Set(mots(e.ville ?? ""));
   if (motsDistinctifs(e.nom).some((m) => !deVille.has(m))) return true;
+  // Le domaine reprend le nom COMPLET, chiffres compris : « 20kmparis.com » pour « 20 km de
+  // Paris » (03/10/2026) — aucun mot distinctif hors la ville, mais aucun doute non plus.
+  let hote = ""; try { hote = new URL(page.url).hostname.replace(/[^a-z0-9]/gi, "").toLowerCase(); } catch { /* */ }
+  const complet = compact(e.nom), sansArticles = compact(e.nom, true);
+  if (hote && ((complet.length >= 6 && hote.includes(complet)) || (sansArticles.length >= 6 && hote.includes(sansArticles)))) return true;
   const autres = mots(e.nom).filter((m) => !deVille.has(m));
   if (!autres.length) return false;
   let ou = page.titre;
   try { const u = new URL(page.url); ou += ` ${u.hostname} ${decodeURIComponent(u.pathname.replace(/%(?![0-9a-f]{2})/gi, ""))}`; } catch { /* */ }
   const corpus = norm(ou);
   return autres.some((m) => corpus.includes(m));
+}
+
+/** « 20 km de Paris » → « 20kmdeparis » (ou « 20kmparis » sans articles). */
+export function compact(nom: string, sansArticles = false): string {
+  const ms = nom.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/['’]/g, "").split(/[^a-z0-9]+/).filter(Boolean);
+  return (sansArticles ? ms.filter((m) => !ARTICLES.has(m)) : ms).join("");
+}
+
+/**
+ * LES ADRESSES QU'UN ORGANISATEUR CHOISIT LE PLUS SOUVENT : le nom de la course, collé ou
+ * avec des tirets, avec ou sans articles, en .fr / .com / .org. Mesuré le 03/10/2026 sur 60
+ * courses : 5 sites justes (coursedumarais.fr, runinclaye.fr, grandraidcamargue.fr…), aucun
+ * faux — les domaines homonymes (bellerose.fr) sont écartés par `verdictSite`.
+ */
+export function domainesDevines(nom: string): string[] {
+  const ms = nom.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/['’]/g, "").split(/[^a-z0-9]+/).filter(Boolean);
+  const sans = ms.filter((m) => !ARTICLES.has(m));
+  const bases = [...new Set([ms.join(""), ms.join("-"), sans.join(""), sans.join("-")])]
+    .filter((b) => b.length >= 6 && b.length <= 50 && !/^-|-$/.test(b));
+  return bases.flatMap((b) => ["fr", "com", "org"].map((t) => `https://${b}.${t}/`));
+}
+
+/** Une adresse sans ses paramètres de pistage (fbclid, utm_…), qui n'ont rien d'officiel. */
+export function sansPistage(url: string): string {
+  try {
+    const u = new URL(url);
+    for (const k of [...u.searchParams.keys()]) if (/^(fbclid|gclid|utm_|mc_|igshid)/i.test(k)) u.searchParams.delete(k);
+    return u.toString();
+  } catch { return url; }
+}
+
+/** Un événement de DATAtourisme réduit à ce qui sert : son nom, sa commune, son site. */
+export type EvenementOuvert = { nom: string; commune: string; site: string };
+
+/**
+ * Les sites que DATAtourisme (Licence Ouverte) donne pour des événements de la MÊME commune
+ * dont le nom partage un mot distinctif avec la course. Ce ne sont que des CANDIDATS : chacun
+ * est ensuite lu et jugé par `verdictSite`, comme ceux de la recherche web.
+ */
+export function candidatsOuverts(e: EpreuveARechercher, parCommune: ReadonlyMap<string, readonly EvenementOuvert[]>): string[] {
+  const evts = parCommune.get(norm(e.ville ?? "")) ?? [];
+  const nos = new Set(motsDistinctifs(e.nom));
+  const out: string[] = [];
+  for (const ev of evts) {
+    if (!motsDistinctifs(ev.nom).some((m) => nos.has(m))) continue;
+    const u = sansPistage(ev.site);
+    if (siteCandidatAcceptable(u) && !out.includes(u)) out.push(u);
+  }
+  return out.slice(0, 3);
+}
+
+/** L'index par commune, construit une fois pour tout le fichier. */
+export function indexOuvert(evts: readonly EvenementOuvert[]): Map<string, EvenementOuvert[]> {
+  const m = new Map<string, EvenementOuvert[]>();
+  for (const ev of evts) { const k = norm(ev.commune); if (k) (m.get(k) ?? m.set(k, []).get(k)!).push(ev); }
+  return m;
+}
+
+/**
+ * L'ADRESSE PORTE-T-ELLE LE NOM DE LA COURSE, sans ambiguïté ? Le nom complet (« coursedumarais »,
+ * « 20kmparis »), ou au moins DEUX de ses mots distinctifs hors la ville (« lesraidsdingues85 »).
+ * Un seul mot ne suffit pas : « vincennes-hippodrome.com » contient « vincennes », et ce n'est
+ * pas le site du semi-marathon du Bois de Vincennes (03/10/2026).
+ */
+export function adresseAuNom(e: EpreuveARechercher, url: string): boolean {
+  let hote = ""; try { hote = new URL(url).hostname.replace(/[^a-z0-9]/gi, "").toLowerCase(); } catch { return false; }
+  const complet = compact(e.nom), sansArticles = compact(e.nom, true);
+  if ((complet.length >= 6 && hote.includes(complet)) || (sansArticles.length >= 6 && hote.includes(sansArticles))) return true;
+  const deVille = new Set(mots(e.ville ?? ""));
+  return motsDistinctifs(e.nom).filter((m) => !deVille.has(m) && hote.includes(m)).length >= 2;
+}
+
+/**
+ * Le TITRE ou le CHEMIN de la page porte-t-il TOUS les mots distinctifs du nom (hors la
+ * ville) ? « Hippodrome de Vincennes » ne porte pas « bois » : ce n'est pas la page du
+ * semi-marathon du Bois de Vincennes, même s'il en annonce la date.
+ */
+export function titreAuNom(e: EpreuveARechercher, page: Pick<PageLue, "url" | "titre">): boolean {
+  const deVille = new Set(mots(e.ville ?? ""));
+  let ms = motsDistinctifs(e.nom).filter((m) => !deVille.has(m));
+  if (!ms.length) ms = mots(e.nom).filter((m) => !deVille.has(m));
+  if (!ms.length) return false;
+  let ou = page.titre;
+  try { const u = new URL(page.url); ou += ` ${decodeURIComponent(u.pathname.replace(/%(?![0-9a-f]{2})/gi, ""))}`; } catch { /* */ }
+  const corpus = norm(ou).replace(/ /g, "");
+  return ms.every((m) => corpus.includes(m));
 }
 
 export type Verdict = { ok: true; force: "site" | "page" | "texte" } | { ok: false; motif: string };
@@ -165,14 +257,18 @@ export function verdictSite(e: EpreuveARechercher, page: Pick<PageLue, "url" | "
   if (!siteCandidatAcceptable(page.url)) return { ok: false, motif: "calendrier, plateforme, média ou site opposé" };
   if (!pageNommeLaCourse(`${page.titre} ${page.texte}`, page.url, e.nom)) return { ok: false, motif: "ne nomme pas la course" };
   if (!citeLeLieu(page, e.ville, e.departement) && !dateConcorde(e, page)) return { ok: false, motif: "ne cite ni la ville ni le département, ni la même date (homonyme possible)" };
-  const dediee = dedicaceFiable(e, page) ? pageDediee(page.url, page.titre, e.nom, e.ville) : null;
-  if (dediee) return { ok: true, force: dediee };
-  // Une page qui n'est pas DÉDIÉE (agenda d'une mairie, page « nos événements » d'un club)
-  // ne vaut que si elle DATE la course à côté de son nom : sinon elle la cite en passant.
-  if (!datesDeLaCourse(page.dates ?? [], page.url, e.nom).length) return { ok: false, motif: "page générale qui ne date pas la course" };
+  // Hors une adresse au nom de la course, il faut que la page DATE la course au même jour que
+  // notre fiche : le nom d'un lieu (« Vincennes », « Malagar ») se retrouve sur bien des sites.
+  if (!adresseAuNom(e, page.url) && !dateConcorde(e, page)) return { ok: false, motif: "ni adresse au nom de la course, ni la même date sur la page" };
+  // « site » : l'adresse porte le nom ; « page » : le titre ou le chemin porte TOUS ses mots.
+  if (adresseAuNom(e, page.url)) return { ok: true, force: "site" };
+  if (dedicaceFiable(e, page) && titreAuNom(e, page)) return { ok: true, force: "page" };
+  // Ici, la page n'est pas DÉDIÉE (agenda d'une mairie, page « nos événements » d'un club) :
+  // elle a passé la règle ci-dessus, donc elle DATE la course au jour de notre fiche.
   // La PAGE D'ACCUEIL d'un site qui ne fait que citer la course (vertou.fr, 03/10/2026) :
   // la mention disparaît avec l'actualité suivante. Seule une page précise vaut.
-  let racine = true; try { racine = new URL(page.url).pathname.replace(/\/+$/, "") === ""; } catch { /* */ }
+  // « /fr/ », « /en » : une page d'accueil aussi.
+  let racine = true; try { racine = /^\/?(?:[a-z]{2}(?:-[a-z]{2})?)?\/?$/i.test(new URL(page.url).pathname); } catch { /* */ }
   if (racine) return { ok: false, motif: "page d'accueil qui cite la course en passant" };
   return { ok: true, force: "texte" };
 }
