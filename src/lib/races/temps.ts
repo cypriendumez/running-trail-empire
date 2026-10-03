@@ -149,7 +149,9 @@ const DOMAINES_VERIFIABLES = ["finishers.com"];
 
 /**
  * ⚠️ DEPUIS LE 02/10/2026, UNE SOURCE N'EST « RELUE » QUE SI ELLE ACCEPTE DE L'ÊTRE. Les CGU
- * de finishers interdisent l'extraction automatisée : il est sur la liste d'opposition
+ * de finishers interdisent l'extraction automatisée : mis sur la liste d'opposition le
+ * 02/10/2026, puis RETIRÉ le 03/10/2026 sur décision de Cyprien jusqu'au lancement —
+ * tant qu'il y est,
  * (lib/races/robot), plus aucun robot ne relit ses fiches — les déclarer « vérifiables »
  * aurait été le même mensonge que celui que ce module dénonce. Ce qui reste vérifiable :
  *   · un calendrier qui l'accepte (finishers, le jour où il donne son accord écrit — il

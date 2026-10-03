@@ -234,14 +234,16 @@ const LANGUES = ["fr", "en", "de", "es", "pt"] as const;
   });
 
   // ── 8. FINISHERS ET JOGGING-PLUS : EN PAUSE TANT QU'ILS N'ONT PAS DIT OUI ───────
-  await t("finishers.com et jogging-plus.com sont sur la liste d'opposition (CGU de finishers, défi anti-robot)", () => {
-    for (const d of ["finishers.com", "jogging-plus.com"]) {
-      assert.ok(SITES_EXCLUS.includes(d), `${d} n'est plus sur la liste d'opposition`);
-      assert.equal(siteExclu(`https://www.${d}/course/x`), true);
-    }
+  await t("jogging-plus.com reste sur la liste d'opposition (défi anti-robot) ; finishers.com en est sorti sur décision écrite", () => {
+    assert.ok(SITES_EXCLUS.includes("jogging-plus.com"), "jogging-plus n'est plus sur la liste d'opposition");
+    assert.equal(siteExclu("https://www.jogging-plus.com/calendrier/x"), true);
+    // 03/10/2026 : Cyprien, informé des CGU, reprend la mise à jour Finishers jusqu'au
+    // lancement. La décision doit rester ÉCRITE à côté de la liste, datée.
+    assert.equal(siteExclu("https://www.finishers.com/course/x"), false);
+    assert.match(lire("src/lib/races/robot.ts"), /RETIRÉ de cette liste le 03\/10\/2026 sur décision de Cyprien/);
   });
 
-  await t("la collecte du mardi ne fait AUCUNE requête à finishers et ne casse pas le workflow", () => {
+  await t("si finishers revient sur la liste, la collecte du mardi s'arrête sans requête ni casse", () => {
     const slugs = code("scripts/finishers-slugs.ts");
     const garde = slugs.indexOf('if (siteExclu("https://www.finishers.com")) {');
     assert.ok(garde > 0 && garde < slugs.indexOf("await fetch("), "le plan du site est demandé avant le contrôle d'opposition");

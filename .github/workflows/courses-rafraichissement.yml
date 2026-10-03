@@ -123,6 +123,11 @@ jobs:
       - name: Appliquer les fiches (seuils de sécurité)
         run: npx tsx scripts/finishers-appliquer.ts "$ETAT/fiches-semaine.jsonl" --ecrire
 
+      # Les fiches reprises de jogging-plus (source fermée) reçoivent le site officiel connu
+      # de leur jumeau finishers (même nom canonique, même ville) : la veille les relit ensuite.
+      - name: Sites officiels des fiches à source fermée (jumeaux)
+        run: npx tsx scripts/sites-officiels.ts --jumeaux-seulement --ecrire
+
       - name: Retirer les épreuves qui ne sont pas de la course à pied
         run: npx tsx scripts/retirer-non-course.ts --ecrire
 

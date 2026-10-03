@@ -1,0 +1,54 @@
+# ──────────────────────────────────────────────────────────────────────────────
+#  SITES OFFICIELS DES COURSES À SOURCE FERMÉE — recherche web, DÉCLENCHEMENT MANUEL.
+#
+#  POURQUOI : ~3 100 courses viennent de jogging-plus.com, qui oppose un défi anti-robot
+#  (on ne le contourne pas) : leurs fiches ne pouvaient plus être revérifiées. La tâche
+#  cherche sur le web le site de l'ORGANISATEUR, le lit poliment (robots.txt, liste
+#  d'opposition), vérifie qu'il nomme la course et la situe, puis l'enregistre : la veille
+#  le relit ensuite (dates, inscription, résultats, parcours). Les courses les plus
+#  proches d'abord. Une épreuve sans résultat n'est re-cherchée qu'après 45 jours.
+#
+#  La recherche tourne sur le serveur (/api/cron/sites-officiels), où est la clé du
+#  modèle : rien à copier dans GitHub. 12 épreuves par passage.
+#
+#  ⚠️ PAS DE PLANNING TANT QUE LE PROJET GEMINI EST EN OFFRE GRATUITE (03/10/2026) : elle
+#  plafonne à 20 requêtes par JOUR et par modèle, partagées avec le kiné et le coach. Une
+#  recherche planifiée priverait les athlètes de leur IA. Le jour où la facturation est
+#  activée, ajouter :   schedule: [{ cron: "10 1,5,9,13,17,21 * * *" }]
+#  (les jumeaux, eux, sont repris chaque mardi sans aucune recherche : courses-rafraichissement).
+#
+#  SECRETS REQUIS : CRON_SECRET (la même valeur que sur Vercel), déjà présent.
+# ──────────────────────────────────────────────────────────────────────────────
+name: Sites officiels des courses
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: sites-officiels
+  cancel-in-progress: false
+
+jobs:
+  chercher:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Chercher un lot de sites officiels
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET manquant dans les secrets du dépôt."
+            exit 1
+          fi
+          reponse=$(curl -sS --max-time 320 -w '\n%{http_code}' \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "https://pacevo.fr/api/cron/sites-officiels")
+          corps=$(printf '%s' "$reponse" | sed '$d')
+          code=$(printf '%s' "$reponse" | tail -n1)
+          echo "$corps"
+          if [ "$code" != "200" ]; then
+            echo "::error::La recherche a répondu $code."
+            exit 1
+          fi
