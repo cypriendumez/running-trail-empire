@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { INDICATEURS } from "@/lib/indicateurs/types";
 
 /**
  * MESURE D'AUDIENCE SANS COOKIE — ce qu'on retient d'une visite, et ce qu'on refuse d'en retenir.
@@ -80,6 +81,9 @@ const GABARITS: [RegExp, string][] = [
   [/^\/dashboard\/shop\/[^/]+$/, "/dashboard/shop/[slug]"],
   [/^\/suivre\/[^/]+$/, "/suivre/[id]"],
   [/^\/amis\/[^/]+$/, "/amis/[id]"],
+  // Neuf fiches seulement : chacune garde sa ligne (savoir QUELLE carte on ouvre est
+  // l'information utile) ; une clé inconnue (404) est repliée sur le gabarit.
+  [new RegExp(`^/dashboard/indicateurs/(?!(?:${INDICATEURS.join("|")})$)[^/]+$`), "/dashboard/indicateurs/[cle]"],
 ];
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 

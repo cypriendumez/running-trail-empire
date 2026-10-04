@@ -255,6 +255,25 @@ export function estimateTSS(w: { duration_seconds?: number | null; type?: string
   if (w.tss != null) return Number(w.tss);
   return Math.round(((w.duration_seconds ?? 0) / 3600) * (TSS_BY_TYPE[String(w.type ?? "")] ?? 60));
 }
+/**
+ * La charge (TSS mesuré, sinon estimé) de chacun des `jours` derniers jours de CALENDRIER —
+ * indice 0 = aujourd'hui. La base de l'ACWR et de la monotonie (`loadRisk`), exposée pour
+ * que la page détaillée trace exactement ce que la carte a additionné.
+ */
+export function chargesQuotidiennes(
+  workouts: { date: string; type?: string | null; duration_seconds?: number | null; tss?: number | null }[],
+  jours = 28, aujourdhui = jourLocal(),
+): number[] {
+  const out = new Array(jours).fill(0);
+  for (const w of workouts) {
+    const j = String(w.date ?? "").slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(j)) continue;
+    const n = ecartJours(j, aujourdhui);
+    if (Number.isFinite(n) && n >= 0 && n < jours) out[n] += estimateTSS(w);
+  }
+  return out;
+}
+
 export type LoadRisk = { acwr: number; monotony: number; deload: boolean; level: "ok" | "vigilance" | "deload"; reason: string };
 export function loadRisk(workouts: { date: string; type?: string | null; duration_seconds?: number | null; tss?: number | null }[]): LoadRisk {
   // ⚠️ JOURS DE CALENDRIER, comme partout ailleurs sur le tableau de bord. Les fenêtres
@@ -264,18 +283,13 @@ export function loadRisk(workouts: { date: string; type?: string | null; duratio
   //    était juste, mais il n'était pas STABLE — et il est lu à côté d'un volume et d'une
   //    charge qui, eux, comptent en cases de calendrier.
   const aujourdhui = jourLocal();
-  const ageDe = (w: { date: string }) => {
-    const j = String(w.date ?? "").slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(j)) return null;
-    const n = ecartJours(j, aujourdhui);
-    return Number.isFinite(n) && n >= 0 ? n : null;
-  };
-  const within = (d: number) => workouts.filter(w => { const a = ageDe(w); return a != null && a < d; });
-  const tss7 = within(7).reduce((s, w) => s + estimateTSS(w), 0);
-  const tss28 = within(28).reduce((s, w) => s + estimateTSS(w), 0);
+  // Une seule lecture jour par jour, partagée avec la page détaillée de l'ACWR
+  // (`chargesQuotidiennes`) : 7 jours et 28 jours sont des sommes de la même série.
+  const q = chargesQuotidiennes(workouts, 28, aujourdhui);
+  const tss7 = q.slice(0, 7).reduce((a, b) => a + b, 0);
+  const tss28 = q.reduce((a, b) => a + b, 0);
   const acwr = tss28 > 0 ? Math.round((tss7 / (tss28 / 4)) * 100) / 100 : 0;
-  const daily = Array.from({ length: 7 }, (_, i) =>
-    workouts.filter(w => ageDe(w) === i).reduce((s, w) => s + estimateTSS(w), 0));
+  const daily = q.slice(0, 7);
   const mean = daily.reduce((a, b) => a + b, 0) / 7;
   const sd = Math.sqrt(daily.reduce((a, b) => a + (b - mean) ** 2, 0) / 7) || 1;
   const monotony = mean > 0 ? Math.round((mean / sd) * 10) / 10 : 0;

@@ -7,7 +7,7 @@ import {
   Activity, Heart, Trophy, Target,
   Calendar, Footprints, Moon, ChevronRight,
   Gauge, Mountain, Timer, Flame, Rocket, Award, TrendingUp, AlertTriangle, Shield, Users,
-  type LucideIcon,
+  ArrowUpRight, type LucideIcon,
 } from "lucide-react";
 // ⚠️ PLUS DE recharts ICI (22/09/2026) : ≈ 500 kB de JS pour deux petits dessins, sur
 // la page que le téléphone ouvre en premier. Voir MiniGraphes.tsx.
@@ -24,6 +24,8 @@ import { ObjectiveCard, type Objective } from "@/components/dashboard/ObjectiveC
 import { cleanActivityName } from "@/lib/utils/activityName";
 import { isRun } from "@/lib/intervals/sport";
 import { computeHrZones } from "@/lib/dashboard/zones";
+import { computeDiscipline, etatDuJour, statsVfc } from "@/lib/dashboard/discipline";
+import { computeWeeklyTrend } from "@/lib/dashboard/semaines";
 import { dansFenetre, ageJours } from "@/lib/dashboard/fenetre";
 import { computeForme, socleDesSeances } from "@/lib/dashboard/forme";
 import { computeDistancePRs, type RecordDeclare } from "@/lib/dashboard/records";
@@ -170,12 +172,10 @@ const HR_ZONE_DEFS = [
 
 // La forme du jour est calculée à partir de données réelles : voir computeReadiness().
 
-/** La source de la VMA du tableau de bord (voir `effectiveVma`). Dates au format AAAA-MM-JJ. */
-export type SourceVma =
-  | { type: "seances"; date: string | null; km: number | null }
-  | { type: "test"; date: string | null }
-  | { type: "courbe" }
-  | { type: "vo2max" };
+/** La source de la VMA affichée — définie avec son calcul (lib/dashboard/vmaAffichee). */
+export type { SourceVma } from "@/lib/dashboard/vmaAffichee";
+import type { SourceVma } from "@/lib/dashboard/vmaAffichee";
+import type { CleIndicateur } from "@/lib/indicateurs/types";
 
 export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkouts, recordsDeclares = [], premiereSeance = null, chargeHistory, sleep, coachSession, ressenti, objective, currentVma, sourceVma = null, loadRisk, newMembersWeek, streak, acces, donneesIncompletes, jourAujourdhui }: Props) {
   const { t, lang } = useT();
@@ -229,14 +229,11 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
   //    On garde la valeur (elle est vraie, elle est juste datée) mais on dit QUAND elle
   //    a été prise dès qu'elle n'est plus d'hier, et elle cesse de décider de la forme
   //    du jour au-delà de ce délai.
-  const hrvLatest = hrv[0]?.hrv_ms ?? null;
-  const hrvJours = hrv[0]?.date
-    ? Math.floor((Date.now() - new Date(String(hrv[0].date).slice(0, 10) + "T00:00:00").getTime()) / 86400000)
-    : null;
+  //    Le calcul vit dans `statsVfc`, que la page détaillée (/dashboard/indicateurs/vfc)
+  //    appelle aussi : la carte et la page ne peuvent pas afficher deux bases différentes.
+  const sv = statsVfc(hrv);
+  const hrvLatest = sv.dernier, hrvJours = sv.jours, hrvBaseline = sv.base, hrvDelta = sv.ecart;
   const hrvFraiche = hrvJours != null && hrvJours <= 2;
-  const hrvSeries = hrv.slice(0, 14).map(h => h.hrv_ms).filter((v): v is number => v != null);
-  const hrvBaseline = hrvSeries.length ? Math.round(hrvSeries.reduce((a, b) => a + b, 0) / hrvSeries.length) : null;
-  const hrvDelta = hrvLatest != null && hrvBaseline != null ? hrvLatest - hrvBaseline : null;
 
   // État du jour = lecture honnête de la forme (VFC vs base + sommeil récent), pas un label figé.
   const readiness = computeReadiness(hrvFraiche ? hrvDelta : null, hrvFraiche ? hrvBaseline : null, freshSleep?.sleep_score ?? null, t);
@@ -782,10 +779,11 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
         {/* Discipline Score — large card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
-          className="col-span-12 md:col-span-4 bento-card"
+          className="group relative col-span-12 md:col-span-4 bento-card"
         >
           <div className="flex items-center justify-between mb-4">
             <div className="metric-label">{fl.title}</div>
+            <VersFiche cle="forme" titre={fl.title} lang={lang} />
             <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-zinc-100 text-zinc-500"><Target className="h-4 w-4" /></span>
           </div>
           {forme.hasData ? (
@@ -890,11 +888,12 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
             `flex-col`, le graphique prend la place que la rangée lui donne. */}
         <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.10 }}
-          className="col-span-12 md:col-span-4 bento-card flex flex-col"
+          className="group relative col-span-12 md:col-span-4 bento-card flex flex-col"
         >
           <div className="flex items-start justify-between mb-3">
             <div>
               <div className="metric-label">{t("dash.hrv.title")}</div>
+            <VersFiche cle="vfc" titre={t("dash.hrv.title")} lang={lang} />
               <div className="mt-1 flex items-baseline gap-2">
                 <span className="text-3xl font-bold tabular-nums text-zinc-900">
                   {hrvLatest != null ? hrvLatest.toFixed(0) : "--"} <span className="text-sm font-normal text-zinc-400">ms</span>
@@ -959,10 +958,11 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
         {/* VMA & prédictions de course — depuis la VMA estimée (modèle % VMA) */}
         <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
-          className="col-span-12 md:col-span-4 bento-card"
+          className="group relative col-span-12 md:col-span-4 bento-card"
         >
           <div className="mb-3 flex items-center justify-between">
             <div className="metric-label">{t("dash.vma.title")}</div>
+            <VersFiche cle="vitesse" titre={t("dash.vma.title")} lang={lang} />
             <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#ecfdf5] text-[#059669]"><Rocket className="h-4 w-4" /></span>
           </div>
           {predictions ? (
@@ -1009,19 +1009,21 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
         {/* Charge & Affûtage — CTL/ATL/TSB réels (modèle Banister) */}
         <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
-          className="col-span-12 md:col-span-6"
+          className="group relative col-span-12 md:col-span-6"
         >
           <TaperingWidget workouts={chargeHistory} raceDate={raceDate} />
+          <VersFiche cle="charge" titre={t("tap.title")} lang={lang} />
         </motion.div>
 
         {/* Charge aiguë / chronique (ACWR) — prévention blessure (modèle Gabbett) */}
         <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.10 }}
-          className="col-span-12 md:col-span-6 bento-card flex flex-col"
+          className="group relative col-span-12 md:col-span-6 bento-card flex flex-col"
         >
           <div className="mb-1 flex items-start justify-between">
             <div>
               <div className="metric-label">{t("dash.acwr.title")}</div>
+            <VersFiche cle="acwr" titre={t("dash.acwr.title")} lang={lang} />
               <div className="mt-0.5 text-[11px] text-zinc-400">{t("dash.acwr.sub")}</div>
             </div>
             <Gauge className="h-5 w-5 text-zinc-300" />
@@ -1069,10 +1071,11 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
         {/* Volume + tendance 6 semaines */}
         <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
-          className="col-span-12 md:col-span-4 bento-card"
+          className="group relative col-span-12 md:col-span-4 bento-card"
         >
           <div className="mb-2 flex items-center justify-between">
             <div className="metric-label">{t("dash.volume.title")}</div>
+            <VersFiche cle="volume" titre={t("dash.volume.title")} lang={lang} />
             <TrendingUp className="h-4 w-4 text-zinc-300" />
           </div>
           <div className="flex items-baseline gap-1.5">
@@ -1102,10 +1105,11 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
         {/* Zones d'entraînement (FC) — temps par zone + verdict de polarisation 80/20 */}
         <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.20 }}
-          className="col-span-12 md:col-span-4 bento-card"
+          className="group relative col-span-12 md:col-span-4 bento-card"
         >
           <div className="mb-1 flex items-center justify-between">
             <div className="metric-label">{zl.title}</div>
+            <VersFiche cle="zones" titre={zl.title} lang={lang} />
             <Flame className="h-4 w-4 text-orange-400" />
           </div>
           <div className="mb-3 text-[11px] text-zinc-400">{zl.sub}</div>
@@ -1370,8 +1374,9 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
             le même 90 que la carte Ligue annonce sous le nom « Score hebdo ». Deux noms
             différents pour un seul chiffre, sur un seul écran, dont un qui n'existe pas.
             La carte porte désormais le nom de ce qu'elle montre. */}
-        <div className="bento-card">
+        <div className="group relative bento-card">
           <div className="metric-label">{t("dash.discipline.title")}</div>
+            <VersFiche cle="discipline" titre={t("dash.discipline.title")} lang={lang} />
           <div className="mt-4 flex items-center gap-4">
             <div className="relative h-20 w-20 flex-shrink-0">
               <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
@@ -1389,15 +1394,16 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
               <p className="mt-0.5 text-xs leading-relaxed text-zinc-500">{readiness.tagline}</p>
             </div>
           </div>
-          <Link href="/dashboard/health" className="mt-4 flex items-center justify-between rounded-xl border border-zinc-100 px-3 py-2 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50">
+          <Link href="/dashboard/health" className="relative z-[3] mt-4 flex items-center justify-between rounded-xl border border-zinc-100 px-3 py-2 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50">
             {rl.recommend} <ChevronRight className="h-3.5 w-3.5 text-zinc-400" />
           </Link>
         </div>
 
         {/* Objectif principal */}
         {objective && objDaysTo != null && objDaysTo >= 0 && (
-          <div className="bento-card">
+          <div className="group relative bento-card">
             <div className="metric-label">{rl.goal}</div>
+            <VersFiche cle="objectif" titre={rl.goal} lang={lang} />
             <div className="mt-2 truncate text-sm font-bold text-zinc-900">{objective.race}</div>
             <div className="text-xs text-zinc-400">{objective.distanceKm} km · {objective.targetTime}</div>
             <div className="mt-3 text-3xl font-black leading-none tabular-nums text-zinc-900">J‑{objDaysTo}</div>
@@ -1411,16 +1417,17 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
                 </div>
               </div>
             )}
-            <Link href="/dashboard/calendrier" className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-[#059669] transition-colors hover:text-[#047857]">
+            <Link href="/dashboard/calendrier" className="relative z-[3] mt-3 inline-flex items-center gap-1 text-xs font-bold text-[#059669] transition-colors hover:text-[#047857]">
               {hl.plan} <ChevronRight className="h-3.5 w-3.5" />
             </Link>
           </div>
         )}
 
         {/* Analyse IA */}
-        <div className="bento-card">
+        <div className="group relative bento-card">
           <div className="flex items-center justify-between">
             <div className="metric-label">{rl.ai}</div>
+            <VersPage href="/dashboard/calendrier" titre={rl.ai} lang={lang} />
             <span className="rounded-md bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-700">Beta</span>
           </div>
           <p className="mt-2.5 text-sm leading-relaxed text-zinc-600">{coachKey?.why || coachKey?.subtitle || readiness.tagline}</p>
@@ -1653,81 +1660,18 @@ function buildLastMetrics(w: Workout, t: TFn): { label: string; value: string | 
 //  (RMSSD vs base) pour la Récupération. total = somme pondérée → l'anneau colle
 //  TOUJOURS aux 3 barres. Toutes les constantes sont regroupées ici pour être
 //  ajustées sans toucher à la logique.
-const DISCIPLINE_CONFIG = {
-  weights: { precision: 0.4, consistency: 0.4, recovery: 0.2 }, // somme = 1
-  windowDays: 14,            // fenêtre d'analyse (lisse le bruit d'une semaine isolée)
-  weeklyTarget: 4,           // séances/semaine visées (Assiduité)
-  easyShareTarget: 0.8,      // 80 % facile / 20 % qualité (modèle polarisé)
-  penaltyTooHard: 220,       // trop d'intensité = pénalité forte (risque surcharge/blessure)
-  penaltyTooEasy: 120,       // trop facile = pénalité plus douce (annulée en semaine de récup)
-  minForPrecision: 3,        // sous ce nombre de séances, la Précision est peu fiable
-  stateBaseline: { optimal: 85, competition: 80, recovery: 55 } as Record<string, number>,
-};
 
 // État du jour — lecture honnête de la forme (VFC vs base 14 j + sommeil RÉCENT).
 function computeReadiness(hrvDelta: number | null, hrvBaseline: number | null, sleepScore: number | null, t: TFn) {
-  const sig: number[] = [];
-  if (hrvDelta != null && hrvBaseline) sig.push(hrvDelta >= 0 ? 1 : hrvDelta / hrvBaseline >= -0.06 ? 0 : -1);
-  if (sleepScore != null) sig.push(sleepScore >= 75 ? 1 : sleepScore >= 55 ? 0 : -1);
-  if (!sig.length) return { accent: "#0d9488", tagline: t("dash.ready.none") };
-  const avg = sig.reduce((a, b) => a + b, 0) / sig.length;
-  if (avg >= 0.5) return { accent: "#059669", tagline: t("dash.ready.top") };
-  if (avg <= -0.5) return { accent: "#0284C7", tagline: t("dash.ready.rest") };
+  const e = etatDuJour(hrvDelta, hrvBaseline, sleepScore);
+  if (e === "aucun") return { accent: "#0d9488", tagline: t("dash.ready.none") };
+  if (e === "top") return { accent: "#059669", tagline: t("dash.ready.top") };
+  if (e === "repos") return { accent: "#0284C7", tagline: t("dash.ready.rest") };
   return { accent: "#0d9488", tagline: t("dash.ready.ok") };
 }
 
-const clamp = (n: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, n));
 
-function computeDiscipline(
-  workouts: Workout[], hrv: HRVData[],
-  sleep: { sleep_score: number } | null, state: string,
-): { total: number; precision: number; consistency: number; recovery: number; hasData: boolean } {
-  const C = DISCIPLINE_CONFIG;
-  const now = Date.now();
-  const recent = workouts.filter(w => now - new Date(w.date).getTime() <= C.windowDays * 86400000);
-  const hasData = workouts.length > 0 || hrv.length > 0;
 
-  // Assiduité — régularité sur la fenêtre vs cible (séances/sem × nb de semaines).
-  const consistency = clamp(Math.round((recent.length / (C.weeklyTarget * (C.windowDays / 7))) * 100));
-
-  // Précision — proximité d'une répartition polarisée ~80 % facile / 20 % qualité.
-  //  Pénalité asymétrique : le « trop dur » coûte plus cher que le « trop facile ».
-  let precision: number;
-  if (recent.length >= C.minForPrecision) {
-    const easyShare = recent.filter(w => !isQualityWorkout(w)).length / recent.length;
-    const dev = easyShare - C.easyShareTarget;                          // <0 trop dur · >0 trop facile
-    const tooEasy = state === "recovery" ? 0 : C.penaltyTooEasy;        // semaine de récup → le facile est normal
-    precision = clamp(Math.round(100 - (dev < 0 ? -dev * C.penaltyTooHard : dev * tooEasy)));
-  } else {
-    precision = recent.length ? consistency : 0;                        // pas assez d'historique
-  }
-
-  // Récupération — données réelles : sommeil + tendance VFC (RMSSD du jour vs base 14 j).
-  const signals: number[] = [];
-  if (sleep?.sleep_score != null) signals.push(sleep.sleep_score);
-  const hrvVals = hrv.slice(0, 14).map(h => h.hrv_ms).filter((v): v is number => v != null);
-  if (hrvVals.length >= 3) {
-    const base = hrvVals.reduce((a, b) => a + b, 0) / hrvVals.length;
-    signals.push(clamp(70 + ((hrvVals[0] - base) / base) * 300));       // à la base ≈ 70, +10 % ≈ 100
-  }
-  const recovery = signals.length
-    ? Math.round(signals.reduce((a, b) => a + b, 0) / signals.length)
-    : (C.stateBaseline[state] ?? 70);
-
-  const total = Math.round(
-    C.weights.precision * precision + C.weights.consistency * consistency + C.weights.recovery * recovery,
-  );
-  return { total, precision, consistency, recovery, hasData };
-}
-
-// ── Qualité (intensité) d'une séance — partagé par le Score Discipline ET la
-//    répartition d'intensité (une seule source de vérité). ─────────────────────────
-function isQualityWorkout(w: Workout): boolean {
-  const type = String(w.type ?? "").toLowerCase();
-  if (/easy|recovery|long|trail|endurance|footing|récup|fond|marche/.test(type)) return false;
-  if (/interval|vma|tempo|seuil|race|hill|fractionn|côte|cote|sprint|vif|fartlek|threshold/.test(type)) return true;
-  return (w.training_effect ?? 0) >= 4; // type ambigu : seul un effort très élevé compte comme qualité
-}
 
 // Tendance du volume : N blocs glissants de 7 jours (du plus ancien au plus récent).
 // ⚠️ CE GRAPHE CONTREDISAIT LE GROS CHIFFRE DE SA PROPRE CARTE.
@@ -1735,21 +1679,6 @@ function isQualityWorkout(w: Workout): boolean {
 //    barres en fenêtres glissantes de 168 heures : la carte annonçait 37,5 km en grand
 //    et sa dernière barre en valait 47,7 — 10,2 km d'écart, côte à côte, pour la même
 //    semaine. Une seule définition du jour, ici comme ailleurs : `lib/dashboard/fenetre`.
-function computeWeeklyTrend(workouts: Workout[], weeks = 6): { km: number; isCurrent: boolean }[] {
-  return Array.from({ length: weeks }, (_, i) => {
-    // i = 0 est la semaine la plus ANCIENNE ; la dernière est celle en cours.
-    const recul = weeks - 1 - i;
-    const km = workouts
-      .filter((w) => {
-        if (!isRun(w.sport)) return false;
-        const age = ageJours(w.date);
-        if (age == null || age < 0) return false;
-        return Math.floor(age / 7) === recul;
-      })
-      .reduce((s, w) => s + (w.distance_km ?? 0), 0);
-    return { km, isCurrent: i === weeks - 1 };
-  });
-}
 
 // Meilleures sorties récentes (sur l'historique chargé — honnête, pas « all-time »).
 function computeRecords(workouts: Workout[]): { longest: number; maxElev: number; longestSec: number; bestPace: number | null } | null {
@@ -1789,6 +1718,31 @@ function computeWeekSummary(workouts: Workout[]): { sessions: number; km: number
 }
 
 // Intitulé de section — repère éditorial entre les rangées du bento.
+/**
+ * CHAQUE CARTE OUVRE SA PAGE DÉTAILLÉE (04/10/2026) — Cyprien : « quand on clique sur ces
+ * modules, une page qui donne les valeurs précises et qui explique pourquoi ».
+ * Un lien couvre toute la carte (le doigt n'a pas à viser un bouton) ; les liens déjà
+ * présents dans une carte passent au-dessus (`z-[3]`). La pastille « Détails » n'apparaît
+ * qu'au survol : sur téléphone, la carte entière se touche.
+ */
+const DETAIL_LIBELLE: Record<string, string> = { fr: "Détails", en: "Details", de: "Details", es: "Detalles", pt: "Detalhes" };
+function VersPage({ href, titre, lang }: { href: string; titre: string; lang: string }) {
+  const l = DETAIL_LIBELLE[lang] ?? DETAIL_LIBELLE.fr;
+  return (
+    <>
+      <Link href={href} aria-label={`${titre} — ${l}`}
+        className="absolute inset-0 z-[1] rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2" />
+      <span aria-hidden
+        className="pointer-events-none absolute bottom-3 right-3 z-[2] inline-flex items-center gap-1 rounded-full bg-zinc-900 px-2.5 py-1 text-[10px] font-semibold text-white opacity-0 shadow-lg transition-opacity duration-200 group-hover:opacity-100">
+        {l} <ArrowUpRight className="h-3 w-3" />
+      </span>
+    </>
+  );
+}
+function VersFiche({ cle, titre, lang }: { cle: CleIndicateur; titre: string; lang: string }) {
+  return <VersPage href={`/dashboard/indicateurs/${cle}`} titre={titre} lang={lang} />;
+}
+
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div className="col-span-12 flex items-center gap-2.5 pt-2 first:pt-0">

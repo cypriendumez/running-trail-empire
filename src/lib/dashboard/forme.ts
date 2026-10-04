@@ -38,6 +38,15 @@ export type Forme = {
   reference: "objectif" | "general";
   cibleLongueKm: number | null;
   cibleVolumeKm: number | null;
+  /**
+   * Les valeurs INTERMÉDIAIRES — lues par la page détaillée (/dashboard/indicateurs/forme)
+   * pour montrer le calcul avec les vrais chiffres de l'athlète, pas une formule abstraite.
+   */
+  details: {
+    plusLongueKm: number; volumeMoyenKm: number; refLongueKm: number; refVolumeKm: number;
+    /** « objectif » : chrono visé ÷ chrono prédit ; « vma » : VMA ramenée sur 8–20 km/h. */
+    modeVitesse: "objectif" | "vma"; chronoPreditSec: number | null;
+  };
 };
 
 type Seance = { date: string; sport?: string | null; distance_km?: number | null };
@@ -105,10 +114,13 @@ export function computeForme(
   // seule échelle qui ait un sens pour lui — une VMA de 17 est excellente pour un
   // coureur de 10 km et juste pour un objectif marathon ambitieux.
   let speed: number;
+  let chronoPreditSec: number | null = null;
+  const modeVitesse: Forme["details"]["modeVitesse"] = currentVma > 0 && raceKm && objectif?.targetSeconds && objectif.targetSeconds > 0 ? "objectif" : "vma";
   if (currentVma > 0 && raceKm && objectif?.targetSeconds && objectif.targetSeconds > 0) {
     // Le même socle que la carte de prédictions : les deux chiffres sont lus côte à côte.
     const { nowSec } = raceProjection(currentVma, raceKm, objectif.targetSeconds, null, null, { sortieLongueKm: longest || null, volumeHebdoKm: cibleVolumeKm });
     speed = nowSec > 0 ? clamp(Math.round((objectif.targetSeconds / nowSec) * 100)) : 0;
+    chronoPreditSec = nowSec > 0 ? nowSec : null;
   } else {
     speed = currentVma > 0 ? clamp(Math.round(((currentVma - VMA_PLANCHER) / VMA_ETENDUE) * 100)) : 0;
   }
@@ -122,5 +134,8 @@ export function computeForme(
   const reg = clamp(regularity);
   const total = clamp(Math.round((endurance + speed + rec + reg) / 4));
   const reference: Forme["reference"] = cibleLongueKm != null ? "objectif" : "general";
-  return { total, endurance, speed, recovery: rec, regularity: reg, hasData, reference, cibleLongueKm, cibleVolumeKm };
+  return {
+    total, endurance, speed, recovery: rec, regularity: reg, hasData, reference, cibleLongueKm, cibleVolumeKm,
+    details: { plusLongueKm: longest, volumeMoyenKm: weeklyKm, refLongueKm: refLongue, refVolumeKm: refVolume, modeVitesse, chronoPreditSec },
+  };
 }

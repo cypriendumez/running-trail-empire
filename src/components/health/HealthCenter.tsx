@@ -301,6 +301,12 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
   const { lang } = useT();
   const tr: Tr = (k, p) => fill(H[lang]?.[k] ?? H.fr[k] ?? k, p);
   const [tab, setTab] = useState<Tab>("kine");
+  // Un lien peut ouvrir un onglet précis (« ?onglet=nutrition », depuis la page détaillée
+  // de l'objectif). Lu après le montage : le rendu serveur reste celui de l'onglet par défaut.
+  useEffect(() => {
+    const o = new URLSearchParams(window.location.search).get("onglet");
+    if (o === "nutrition" || o === "poids" || o === "kine") setTab(o);
+  }, []);
   const [view, setView] = useState<"face" | "dos">("face");
   /** États mis à jour depuis cet écran, avant le prochain chargement de la page. */
   const [majEtats, setMajEtats] = useState<Record<string, string>>({});

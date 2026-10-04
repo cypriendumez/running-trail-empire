@@ -175,6 +175,9 @@ test("les chemins sont repliés sur leur gabarit, et chaque route dynamique en a
   assert.equal(normaliserChemin("/_next/static/x.js"), null);
   assert.equal(normaliserChemin("sans-slash"), null);
   assert.equal(normaliserChemin("/x/a3793412-17b7-4af3-821f-230b36e8c4a4"), "/x/[id]");
+  // Les neuf fiches d'indicateurs gardent chacune leur ligne : savoir QUELLE carte on ouvre.
+  assert.equal(normaliserChemin("/dashboard/indicateurs/acwr"), "/dashboard/indicateurs/acwr");
+  assert.equal(normaliserChemin("/dashboard/indicateurs/zones?x=1"), "/dashboard/indicateurs/zones");
   // Chaque dossier `[param]` de src/app (hors API) doit être couvert : sinon 17 000 courses
   // feraient 17 000 lignes distinctes dans « pages les plus vues ».
   const dynamiques = fichiers("src/app", /^page\.tsx$/)

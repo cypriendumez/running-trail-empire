@@ -10,9 +10,9 @@ import { InviteAvis } from "@/components/dashboard/InviteAvis";
 import { TYPE_AVIS } from "@/lib/avis/store";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import type { Objective } from "@/components/dashboard/ObjectiveCard";
-import { meilleurEffort, loadRisk, effectiveVma } from "@/lib/running/fitness";
+import { loadRisk } from "@/lib/running/fitness";
+import { vmaAffichee } from "@/lib/dashboard/vmaAffichee";
 import { validerRecordDeclare, type RecordDeclare } from "@/lib/dashboard/records";
-import type { SourceVma } from "@/components/dashboard/BentoDashboard";
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 import { seancesSansRessenti } from "@/lib/dashboard/ressenti";
 import { computeStreak, jourLocal, decaleJour, type StreakWorkout, type StreakPrescription } from "@/lib/streak/compute";
@@ -137,28 +137,13 @@ export default async function DashboardPage() {
 
   // VMA actuelle (test sinon estimée) + risque de charge (déload proactif).
   const wks = (workoutsRes.data ?? []) as { date: string; type?: string | null; distance_km?: number | null; duration_seconds?: number | null; avg_hr?: number | null; max_hr?: number | null; tss?: number | null }[];
-  const obsMaxHr = Math.max(0, ...wks.map(w => Number(w.max_hr ?? 0)));
-  const garminVo2 = Number((profileRes.data as { garmin_vo2max?: number | null } | null)?.garmin_vo2max) || 0;
-  // VMA : test → efforts réels (reflète l'allure de course) → dérivée de la VO2max Garmin (repli).
-  // MÊME calcul que le coach — la même fonction, pas une chaîne parallèle. Celle-ci
-  // ignorait purement et simplement la courbe d'allure : le tableau de bord annonçait
-  // 18,7 km/h pendant que le plan était calé sur 17,3, pour le même athlète.
-  const effort = meilleurEffort(wks, obsMaxHr > 120 ? obsMaxHr : null);
-  const vmaCalculee = effectiveVma({
-    vmaStored: Number((baseRes.data as { vma_kmh?: number } | null)?.vma_kmh) || null,
-    paceCurveBest: ((profileRes.data as { pace_curve?: { best?: { m: number; sec: number }[] } | null } | null)?.pace_curve)?.best,
-    garminVo2: garminVo2 || null,
-    fromRuns: effort?.vma ?? null,
+  // VMA et sa source : le module partagé avec la page détaillée (lib/dashboard/vmaAffichee),
+  // lui-même branché sur `effectiveVma` — une seule chaîne de VMA dans toute l'application.
+  const { vma: currentVma, source: sourceVma } = vmaAffichee({
+    seances: wks,
+    baseline: baseRes.data as { vma_kmh?: number | null; tested_at?: string | null } | null,
+    profil: profileRes.data as { garmin_vo2max?: number | null; pace_curve?: { best?: { m: number; sec: number }[] } | null } | null,
   });
-  const currentVma = vmaCalculee.vma ?? 0;
-  // D'OÙ VIENT LE CHIFFRE — sans quoi « 19,8 km/h » ne disait pas s'il suivait la forme
-  // ou datait de six mois. Il la suit (recalculé à chaque affichage) ; on le montre.
-  const sourceVma: SourceVma | null = vmaCalculee.source === "séances" && effort
-    ? { type: "seances", date: effort.date, km: effort.distanceKm }
-    : vmaCalculee.source === "test"
-      ? { type: "test", date: String((baseRes.data as { tested_at?: string } | null)?.tested_at ?? "").slice(0, 10) || null }
-      : vmaCalculee.source === "courbe" ? { type: "courbe" }
-      : vmaCalculee.source === "vo2max" ? { type: "vo2max" } : null;
   const risk = loadRisk(wks);
 
   // Prochaine séance prescrite par le coach (aujourd'hui ou à venir) → prioritaire sur l'IA/l'algo.

@@ -2151,7 +2151,10 @@ test("sans courbe ni VO2max, on retombe sur les séances — jamais sur zéro", 
 test("aucune chaîne parallèle ne recalcule la VMA dans son coin", () => {
   // C'est la cause RACINE des quatre chiffres divergents : chaque écran refaisait la
   // chaîne à la main, et chaque commentaire jurait pourtant qu'elle était identique.
-  for (const f of ["src/app/dashboard/page.tsx", "src/app/dashboard/profile/page.tsx", "src/lib/ai/coachContext.ts"]) {
+  // Le tableau de bord passe par `vmaAffichee` (partagé avec la page détaillée), qui passe
+  // par `effectiveVma` : c'est ce module-là qui est contrôlé, et la page doit l'appeler.
+  assert.match(codeOf("src/app/dashboard/page.tsx"), /vmaAffichee\(\{/, "le tableau de bord ne passe plus par la VMA partagée");
+  for (const f of ["src/lib/dashboard/vmaAffichee.ts", "src/app/dashboard/profile/page.tsx", "src/lib/ai/coachContext.ts"]) {
     const src = codeOf(f);
     assert.ok(/effectiveVma\(/.test(src), `${f} ne passe pas par effectiveVma`);
     // `vmaFromVo2max` ne doit plus être appelée hors de la fonction commune : c'est
@@ -6524,9 +6527,11 @@ test("aucun calcul du tableau de bord ne découpe le temps en millisecondes", ()
   const cibles: [string, string[]][] = [
     ["src/lib/dashboard/zones.ts", ["computeHrZones"]],
     ["src/lib/running/volume.ts", ["robustWeeklyKm", "demonstratedWeeklyKm"]],
-    ["src/components/dashboard/BentoDashboard.tsx", ["computeWeeklyTrend", "computeWeekSummary"]],
+    ["src/components/dashboard/BentoDashboard.tsx", ["computeWeekSummary"]],
+    // Sortie du composant le 04/10/2026, partagée avec la page détaillée « Volume ».
+    ["src/lib/dashboard/semaines.ts", ["computeWeeklyTrend"]],
     ["src/lib/dashboard/forme.ts", ["computeForme"]],
-    ["src/lib/running/fitness.ts", ["loadRisk"]],
+    ["src/lib/running/fitness.ts", ["loadRisk", "chargesQuotidiennes"]],
   ];
   for (const [fichier, fns] of cibles) {
     const src = codeOf(fichier);
