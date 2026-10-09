@@ -18,6 +18,7 @@ import { JOURS_ESSAI } from "@/lib/billing/access";
 import { PRIX_AFFICHES, euros, MOIS_OFFERTS } from "@/lib/billing/prix";
 import { EDITEUR } from "@/lib/brand/editeur";
 import { messageAbo, type EtatAbonnement } from "@/lib/billing/etatAbonnement";
+import { fenetreRetractation } from "@/lib/billing/retractation";
 import {
   User, Activity, Footprints, CreditCard, Target, Bell,
   Flame, TrendingUp, Zap, Trophy, Calendar, Plus, Trash2,
@@ -65,6 +66,7 @@ const P: Record<string, Record<string, string>> = {
     "sub.title": "Abonnement actuel", "sub.plan": "Plan {tier}", "sub.freeDesc": "Accès limité aux fonctionnalités de base", "sub.proDesc": "Accès complet à toutes les fonctionnalités", "sub.active": "✓ Actif", "sub.free": "Gratuit", "sub.pro": "Pro",
     "feat.dash": "Dashboard & statistiques", "feat.journal": "Journal intelligent (NLP)", "feat.plans3": "Plans d'entraînement (3 max)", "feat.plansUnli": "Plans d'entraînement illimités", "feat.coach": "Coach IA personnalisé (Claude)", "feat.ghost": "Ghost Runner IA", "feat.vma": "Analyses VMA & zones cardiaques", "feat.sync": "Sync montres GPS (Garmin, Polar…)", "feat.shop": "Shopping Hub & recommandations", "feat.leagues": "Ligues & classements",
     "sub.renouvelle": "Prochain prélèvement le {d}", "sub.annule": "Résilié — ton accès reste ouvert jusqu'au {d}", "sub.essai": "Essai gratuit jusqu'au {d}, aucun prélèvement d'ici là", "sub.echec": "Ton dernier paiement a échoué. Mets ta carte à jour pour ne pas perdre l'accès.", "sub.manage": "Gérer mon abonnement", "sub.manageDesc": "Changer de formule, passer au tarif annuel, mettre à jour ta carte, récupérer tes factures ou résilier.", "sub.manageCta": "Ouvrir mon espace de facturation", "sub.manageOpening": "Ouverture…", "sub.manageErr": "Impossible d'ouvrir l'espace de facturation. Réessaie dans un instant.", "sub.cancelNote": "Si tu résilies, ton accès reste ouvert jusqu'à la fin de la période déjà payée — aucun prélèvement ensuite.", "sub.secure": "Paiement et facturation gérés par Stripe. Pacevo ne voit jamais ton numéro de carte.", "sub.goPro": "Passer à Starter ou Premium", "sub.unlock": "Débloquez le module IA", "sub.perMonth": "/mois", "sub.yearly": "{an}/an · {mois} mois offerts", "sub.trial": "Commencer l'essai gratuit de {n} jours",
+    "retr.title": "Droit de rétractation", "retr.desc": "Tu as souscrit ton abonnement le {d}. Tu peux y renoncer jusqu'au {fin} inclus, sans te justifier : tu paies seulement la part du service déjà fournie, le reste t'est remboursé.", "retr.cta": "Renoncer au contrat ici", "retr.formTitle": "Confirmer ta rétractation", "retr.nom": "Ton nom et prénom", "retr.contrat": "Contrat concerné : abonnement {f}, souscrit le {d}.", "retr.accuse": "L'accusé de réception sera envoyé à {email}.", "retr.confirm": "Confirmer ma rétractation", "retr.sending": "Envoi…", "retr.ok": "C'est fait : ta rétractation est enregistrée. Un accusé de réception vient de partir à {email}.", "retr.okRembourse": "Remboursement : {m}, sous 14 jours au plus tard, sur ton moyen de paiement.", "retr.okRien": "Rien n'avait été prélevé : il n'y a rien à rembourser.", "retr.okManuel": "La part non utilisée de ton paiement te sera remboursée sous 14 jours au plus tard.", "retr.err": "La demande n'a pas pu être envoyée. Réessaie dans un instant, ou écris-nous à {email}.",
     "t.saveErr": "Erreur lors de la sauvegarde", "t.saveOk": "Profil mis à jour !", "t.uploadErr": "Erreur lors de l'upload", "t.photoOk": "Photo de profil mise à jour !", "t.netErr": "Erreur réseau", "t.goalsSql": "Objectifs pas encore activés — lance le SQL fourni dans Supabase.", "t.createErr": "Erreur lors de la création", "t.goalAdd": "Objectif ajouté !", "t.goalDel": "Objectif supprimé", "t.addErr": "Erreur lors de l'ajout", "t.shoeAdd": "Chaussure ajoutée !", "t.shoeDel": "Chaussure retirée du garage", "t.exportOk": "Tes données ont été exportées (JSON).", "t.exportErr": "Export impossible, réessaie.",
   },
   en: {
@@ -100,6 +102,7 @@ const P: Record<string, Record<string, string>> = {
     "sub.title": "Current subscription", "sub.plan": "{tier} plan", "sub.freeDesc": "Limited access to basic features", "sub.proDesc": "Full access to all features", "sub.active": "✓ Active", "sub.free": "Free", "sub.pro": "Pro",
     "feat.dash": "Dashboard & stats", "feat.journal": "Smart journal (NLP)", "feat.plans3": "Training plans (3 max)", "feat.plansUnli": "Unlimited training plans", "feat.coach": "Personalized AI coach (Claude)", "feat.ghost": "AI Ghost Runner", "feat.vma": "vVO2max & HR-zone analysis", "feat.sync": "GPS watch sync (Garmin, Polar…)", "feat.shop": "Shopping Hub & recommendations", "feat.leagues": "Leagues & rankings",
     "sub.renouvelle": "Next charge on {d}", "sub.annule": "Cancelled — your access stays open until {d}", "sub.essai": "Free trial until {d}, nothing charged before then", "sub.echec": "Your last payment failed. Update your card to keep your access.", "sub.manage": "Manage my subscription", "sub.manageDesc": "Switch plan, move to yearly billing, update your card, download invoices or cancel.", "sub.manageCta": "Open my billing portal", "sub.manageOpening": "Opening…", "sub.manageErr": "Could not open the billing portal. Try again in a moment.", "sub.cancelNote": "If you cancel, your access stays open until the end of the period you already paid for — nothing is charged after that.", "sub.secure": "Payments and billing handled by Stripe. Pacevo never sees your card number.", "sub.goPro": "Upgrade to Starter or Premium", "sub.unlock": "Unlock the AI module", "sub.perMonth": "/mo", "sub.yearly": "{an}/yr · {mois} months free", "sub.trial": "Start the {n}-day free trial",
+    "retr.title": "Right of withdrawal", "retr.desc": "You took out your subscription on {d}. You can withdraw until {fin} inclusive, without giving a reason: you only pay for the part of the service already provided, the rest is refunded.", "retr.cta": "Withdraw from contract here", "retr.formTitle": "Confirm your withdrawal", "retr.nom": "Your full name", "retr.contrat": "Contract concerned: {f} subscription, taken out on {d}.", "retr.accuse": "The acknowledgement will be sent to {email}.", "retr.confirm": "Confirm my withdrawal", "retr.sending": "Sending…", "retr.ok": "Done: your withdrawal is recorded. An acknowledgement has just been sent to {email}.", "retr.okRembourse": "Refund: {m}, within 14 days at the latest, to your payment method.", "retr.okRien": "Nothing had been charged: there is nothing to refund.", "retr.okManuel": "The unused part of your payment will be refunded within 14 days at the latest.", "retr.err": "The request could not be sent. Try again in a moment, or write to us at {email}.",
     "t.saveErr": "Error while saving", "t.saveOk": "Profile updated!", "t.uploadErr": "Upload error", "t.photoOk": "Profile photo updated!", "t.netErr": "Network error", "t.goalsSql": "Goals not enabled yet — run the provided SQL in Supabase.", "t.createErr": "Error while creating", "t.goalAdd": "Goal added!", "t.goalDel": "Goal deleted", "t.addErr": "Error while adding", "t.shoeAdd": "Shoe added!", "t.shoeDel": "Shoe removed from garage", "t.exportOk": "Your data has been exported (JSON).", "t.exportErr": "Export failed, try again.",
   },
   de: {
@@ -135,6 +138,7 @@ const P: Record<string, Record<string, string>> = {
     "sub.title": "Aktuelles Abo", "sub.plan": "{tier}-Plan", "sub.freeDesc": "Eingeschränkter Zugang zu Basisfunktionen", "sub.proDesc": "Voller Zugang zu allen Funktionen", "sub.active": "✓ Aktiv", "sub.free": "Kostenlos", "sub.pro": "Pro",
     "feat.dash": "Dashboard & Statistiken", "feat.journal": "Intelligentes Tagebuch (NLP)", "feat.plans3": "Trainingspläne (max. 3)", "feat.plansUnli": "Unbegrenzte Trainingspläne", "feat.coach": "Personalisierter KI-Coach (Claude)", "feat.ghost": "KI Ghost Runner", "feat.vma": "vVO2max- & HF-Zonen-Analyse", "feat.sync": "GPS-Uhr-Sync (Garmin, Polar…)", "feat.shop": "Shopping-Hub & Empfehlungen", "feat.leagues": "Ligen & Ranglisten",
     "sub.renouvelle": "Nächste Abbuchung am {d}", "sub.annule": "Gekündigt — dein Zugang bleibt bis zum {d}", "sub.essai": "Kostenlos testen bis {d}, vorher wird nichts abgebucht", "sub.echec": "Deine letzte Zahlung ist fehlgeschlagen. Aktualisiere deine Karte, um den Zugang zu behalten.", "sub.manage": "Abo verwalten", "sub.manageDesc": "Tarif wechseln, auf Jahreszahlung umstellen, Karte aktualisieren, Rechnungen laden oder kündigen.", "sub.manageCta": "Rechnungsbereich öffnen", "sub.manageOpening": "Wird geöffnet…", "sub.manageErr": "Der Rechnungsbereich lässt sich nicht öffnen. Versuch es gleich noch einmal.", "sub.cancelNote": "Bei einer Kündigung bleibt dein Zugang bis zum Ende des bereits bezahlten Zeitraums bestehen — danach wird nichts mehr abgebucht.", "sub.secure": "Zahlung und Abrechnung über Stripe. Pacevo sieht deine Kartennummer nie.", "sub.goPro": "Auf Starter oder Premium wechseln", "sub.unlock": "KI-Modul freischalten", "sub.perMonth": "/Monat", "sub.yearly": "{an}/Jahr · {mois} Monate geschenkt", "sub.trial": "{n} Tage kostenlos testen",
+    "retr.title": "Widerrufsrecht", "retr.desc": "Du hast dein Abo am {d} abgeschlossen. Du kannst es bis einschließlich {fin} ohne Angabe von Gründen widerrufen: Du zahlst nur den bereits erbrachten Teil der Leistung, der Rest wird erstattet.", "retr.cta": "Vertrag hier widerrufen", "retr.formTitle": "Widerruf bestätigen", "retr.nom": "Dein vollständiger Name", "retr.contrat": "Betroffener Vertrag: {f}-Abo, abgeschlossen am {d}.", "retr.accuse": "Die Eingangsbestätigung wird an {email} gesendet.", "retr.confirm": "Widerruf bestätigen", "retr.sending": "Wird gesendet…", "retr.ok": "Erledigt: Dein Widerruf ist erfasst. Eine Eingangsbestätigung wurde gerade an {email} gesendet.", "retr.okRembourse": "Erstattung: {m}, spätestens innerhalb von 14 Tagen, auf dein Zahlungsmittel.", "retr.okRien": "Es war nichts abgebucht: Es gibt nichts zu erstatten.", "retr.okManuel": "Der nicht genutzte Teil deiner Zahlung wird spätestens innerhalb von 14 Tagen erstattet.", "retr.err": "Die Anfrage konnte nicht gesendet werden. Versuche es gleich noch einmal oder schreib uns an {email}.",
     "t.saveErr": "Fehler beim Speichern", "t.saveOk": "Profil aktualisiert!", "t.uploadErr": "Upload-Fehler", "t.photoOk": "Profilbild aktualisiert!", "t.netErr": "Netzwerkfehler", "t.goalsSql": "Ziele noch nicht aktiviert — führe das bereitgestellte SQL in Supabase aus.", "t.createErr": "Fehler beim Erstellen", "t.goalAdd": "Ziel hinzugefügt!", "t.goalDel": "Ziel gelöscht", "t.addErr": "Fehler beim Hinzufügen", "t.shoeAdd": "Schuh hinzugefügt!", "t.shoeDel": "Schuh aus der Garage entfernt", "t.exportOk": "Deine Daten wurden exportiert (JSON).", "t.exportErr": "Export fehlgeschlagen, versuche es erneut.",
   },
   es: {
@@ -170,6 +174,7 @@ const P: Record<string, Record<string, string>> = {
     "sub.title": "Suscripción actual", "sub.plan": "Plan {tier}", "sub.freeDesc": "Acceso limitado a las funciones básicas", "sub.proDesc": "Acceso completo a todas las funciones", "sub.active": "✓ Activo", "sub.free": "Gratis", "sub.pro": "Pro",
     "feat.dash": "Panel y estadísticas", "feat.journal": "Diario inteligente (NLP)", "feat.plans3": "Planes de entrenamiento (máx. 3)", "feat.plansUnli": "Planes de entrenamiento ilimitados", "feat.coach": "Entrenador IA personalizado (Claude)", "feat.ghost": "Ghost Runner IA", "feat.vma": "Análisis de VAM y zonas cardíacas", "feat.sync": "Sync relojes GPS (Garmin, Polar…)", "feat.shop": "Shopping Hub y recomendaciones", "feat.leagues": "Ligas y clasificaciones",
     "sub.renouvelle": "Próximo cobro el {d}", "sub.annule": "Cancelada — tu acceso sigue abierto hasta el {d}", "sub.essai": "Prueba gratuita hasta el {d}, sin ningún cobro antes", "sub.echec": "Tu último pago ha fallado. Actualiza tu tarjeta para no perder el acceso.", "sub.manage": "Gestionar mi suscripción", "sub.manageDesc": "Cambiar de plan, pasar a la tarifa anual, actualizar tu tarjeta, descargar facturas o cancelar.", "sub.manageCta": "Abrir mi área de facturación", "sub.manageOpening": "Abriendo…", "sub.manageErr": "No se ha podido abrir el área de facturación. Inténtalo dentro de un momento.", "sub.cancelNote": "Si cancelas, tu acceso sigue abierto hasta el final del periodo ya pagado — después no se cobra nada.", "sub.secure": "Pagos y facturación gestionados por Stripe. Pacevo nunca ve el número de tu tarjeta.", "sub.goPro": "Pasar a Starter o Premium", "sub.unlock": "Desbloquea el módulo IA", "sub.perMonth": "/mes", "sub.yearly": "{an}/año · {mois} meses gratis", "sub.trial": "Empezar la prueba gratuita de {n} días",
+    "retr.title": "Derecho de desistimiento", "retr.desc": "Contrataste tu suscripción el {d}. Puedes desistir hasta el {fin} inclusive, sin justificarlo: solo pagas la parte del servicio ya prestada y se te reembolsa el resto.", "retr.cta": "Desistir del contrato aquí", "retr.formTitle": "Confirmar tu desistimiento", "retr.nom": "Tu nombre y apellidos", "retr.contrat": "Contrato afectado: suscripción {f}, contratada el {d}.", "retr.accuse": "El acuse de recibo se enviará a {email}.", "retr.confirm": "Confirmar mi desistimiento", "retr.sending": "Enviando…", "retr.ok": "Hecho: tu desistimiento está registrado. Acabamos de enviar un acuse de recibo a {email}.", "retr.okRembourse": "Reembolso: {m}, en un plazo máximo de 14 días, en tu medio de pago.", "retr.okRien": "No se había cobrado nada: no hay nada que reembolsar.", "retr.okManuel": "La parte no utilizada de tu pago se te reembolsará en un plazo máximo de 14 días.", "retr.err": "No se pudo enviar la solicitud. Vuelve a intentarlo en un momento o escríbenos a {email}.",
     "t.saveErr": "Error al guardar", "t.saveOk": "¡Perfil actualizado!", "t.uploadErr": "Error al subir", "t.photoOk": "¡Foto de perfil actualizada!", "t.netErr": "Error de red", "t.goalsSql": "Objetivos aún no activados — ejecuta el SQL proporcionado en Supabase.", "t.createErr": "Error al crear", "t.goalAdd": "¡Objetivo añadido!", "t.goalDel": "Objetivo eliminado", "t.addErr": "Error al añadir", "t.shoeAdd": "¡Zapatilla añadida!", "t.shoeDel": "Zapatilla retirada del garaje", "t.exportOk": "Tus datos se han exportado (JSON).", "t.exportErr": "Exportación fallida, inténtalo de nuevo.",
   },
   pt: {
@@ -205,6 +210,7 @@ const P: Record<string, Record<string, string>> = {
     "sub.title": "Subscrição atual", "sub.plan": "Plano {tier}", "sub.freeDesc": "Acesso limitado às funcionalidades básicas", "sub.proDesc": "Acesso completo a todas as funcionalidades", "sub.active": "✓ Ativo", "sub.free": "Gratuito", "sub.pro": "Pro",
     "feat.dash": "Painel e estatísticas", "feat.journal": "Diário inteligente (NLP)", "feat.plans3": "Planos de treino (máx. 3)", "feat.plansUnli": "Planos de treino ilimitados", "feat.coach": "Treinador IA personalizado (Claude)", "feat.ghost": "Ghost Runner IA", "feat.vma": "Análise de VAM e zonas cardíacas", "feat.sync": "Sync relógios GPS (Garmin, Polar…)", "feat.shop": "Shopping Hub e recomendações", "feat.leagues": "Ligas e classificações",
     "sub.renouvelle": "Próxima cobrança a {d}", "sub.annule": "Cancelada — o teu acesso fica aberto até {d}", "sub.essai": "Teste grátis até {d}, sem qualquer cobrança antes", "sub.echec": "O teu último pagamento falhou. Atualiza o cartão para não perderes o acesso.", "sub.manage": "Gerir a minha subscrição", "sub.manageDesc": "Mudar de plano, passar à tarifa anual, atualizar o cartão, obter as faturas ou cancelar.", "sub.manageCta": "Abrir a minha área de faturação", "sub.manageOpening": "A abrir…", "sub.manageErr": "Não foi possível abrir a área de faturação. Tenta daqui a pouco.", "sub.cancelNote": "Se cancelares, o acesso fica aberto até ao fim do período já pago — depois não há qualquer cobrança.", "sub.secure": "Pagamentos e faturação geridos pela Stripe. A Pacevo nunca vê o número do teu cartão.", "sub.goPro": "Passar a Starter ou Premium", "sub.unlock": "Desbloqueia o módulo IA", "sub.perMonth": "/mês", "sub.yearly": "{an}/ano · {mois} meses grátis", "sub.trial": "Começar o teste gratuito de {n} dias",
+    "retr.title": "Direito de retratação", "retr.desc": "Fizeste a tua subscrição a {d}. Podes retratar-te até {fin}, inclusive, sem justificação: pagas apenas a parte do serviço já prestada e o resto é reembolsado.", "retr.cta": "Retratar-me do contrato aqui", "retr.formTitle": "Confirmar a tua retratação", "retr.nom": "O teu nome completo", "retr.contrat": "Contrato em causa: subscrição {f}, feita a {d}.", "retr.accuse": "O aviso de receção será enviado para {email}.", "retr.confirm": "Confirmar a minha retratação", "retr.sending": "A enviar…", "retr.ok": "Feito: a tua retratação está registada. Acabámos de enviar um aviso de receção para {email}.", "retr.okRembourse": "Reembolso: {m}, no prazo máximo de 14 dias, no teu meio de pagamento.", "retr.okRien": "Não tinha sido cobrado nenhum valor: não há nada a reembolsar.", "retr.okManuel": "A parte não utilizada do teu pagamento será reembolsada no prazo máximo de 14 dias.", "retr.err": "Não foi possível enviar o pedido. Tenta novamente daqui a pouco ou escreve-nos para {email}.",
     "t.saveErr": "Erro ao guardar", "t.saveOk": "Perfil atualizado!", "t.uploadErr": "Erro no envio", "t.photoOk": "Foto de perfil atualizada!", "t.netErr": "Erro de rede", "t.goalsSql": "Objetivos ainda não ativados — executa o SQL fornecido no Supabase.", "t.createErr": "Erro ao criar", "t.goalAdd": "Objetivo adicionado!", "t.goalDel": "Objetivo eliminado", "t.addErr": "Erro ao adicionar", "t.shoeAdd": "Ténis adicionado!", "t.shoeDel": "Ténis removido da garagem", "t.exportOk": "Os teus dados foram exportados (JSON).", "t.exportErr": "Exportação falhou, tenta novamente.",
   },
 };
@@ -384,6 +390,43 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
     } catch { setPortail("erreur"); }
   }
 
+  /**
+   * LA FONCTION DE RÉTRACTATION — « Renoncer au contrat ici ».
+   *
+   * ⚠️ OBLIGATOIRE DEPUIS LE 19/06/2026 pour un contrat conclu en ligne : un bouton libellé
+   * ainsi, visible pendant les 14 jours, une étape de confirmation (nom + contrat), puis
+   * un accusé de réception par e-mail (art. L221-21). La date limite vient de
+   * `lib/billing/retractation`, la même fonction que la route : le bouton ne disparaît
+   * jamais avant que la route cesse d'accepter.
+   */
+  // L'horloge n'est lue qu'APRÈS le montage : un calcul fait au rendu serveur puis refait
+  // dans le navigateur peut différer autour de minuit, et React rejetterait l'hydratation.
+  const [horloge, setHorloge] = useState<Date | null>(null);
+  useEffect(() => { setHorloge(new Date()); }, []);
+  const fenetreRetr = horloge
+    ? fenetreRetractation(etatAbo?.statut === "canceled" ? null : etatAbo?.souscritLe ?? null, horloge)
+    : { ouverte: false, dernierJour: null };
+  const [retr, setRetr] = useState<"ferme" | "formulaire" | "envoi" | "fait" | "erreur">("ferme");
+  const [retrNom, setRetrNom] = useState(typeof profile?.full_name === "string" ? profile.full_name : "");
+  const [retrRes, setRetrRes] = useState<{ email: string; rembourseCentimes: number | null; message?: string }>({ email: "", rembourseCentimes: null });
+  async function renoncer() {
+    setRetr("envoi");
+    try {
+      const r = await fetch("/api/stripe/retractation", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nom: retrNom, confirmation: true }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j?.ok) {
+        setRetrRes({ email: String(j.email ?? ""), rembourseCentimes: typeof j.rembourseCentimes === "number" ? j.rembourseCentimes : null });
+        setRetr("fait");
+        return;
+      }
+      setRetrRes({ email: "", rembourseCentimes: null, message: typeof j?.error === "string" ? j.error : undefined });
+      setRetr("erreur");
+    } catch { setRetr("erreur"); }
+  }
+
   // Abonnement au résumé hebdomadaire. Il ne vit PAS dans `form` : les champs de `form`
   // attendent le bouton « Sauvegarder », alors qu'un consentement e-mail doit prendre
   // effet au clic. On le charge donc à part, depuis la table des abonnés.
@@ -401,8 +444,11 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
   // Lien direct vers le Garage (« Ouvrir le Garage » du questionnaire de ressenti) : lu APRÈS
   // le montage — le rendu serveur ne connaît pas l'adresse, un état initial différent romprait
   // l'hydratation.
+  // Même principe pour l'onglet Abonnement : c'est le lien du rappel légal avant
+  // reconduction (`lib/billing/reconduction`) — l'abonné doit atterrir là où il résilie.
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("onglet") === "garage") setTab("shoes");
+    if (new URLSearchParams(window.location.search).get("onglet") === "abonnement") setTab("subscription");
   }, []);
   const [saving, setSaving] = useState(false);
   /** Verdict « peux-tu doubler ? », demandé au serveur QUAND l'athlète coche la case.
@@ -1851,6 +1897,84 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                 <span>{tr("sub.free")}</span><span className="text-emerald-600">{tr("sub.pro")}</span>
               </div>
             </div>
+
+            {/* ── RÉTRACTATION : « Renoncer au contrat ici », visible pendant les 14 jours.
+                Le bloc reste affiché après l'envoi pour dire ce qui a été reçu et ce qui
+                sera remboursé : l'abonné ne doit pas se demander si son clic a compté. */}
+            {(fenetreRetr.ouverte || retr === "fait") && (() => {
+              const loc = lang === "fr" ? "fr-FR" : lang;
+              const longue = (d: Date) => d.toLocaleDateString(loc, { timeZone: "Europe/Paris", day: "numeric", month: "long", year: "numeric" });
+              const souscrit = etatAbo?.souscritLe ? longue(new Date(etatAbo.souscritLe)) : "";
+              const limite = fenetreRetr.dernierJour ? longue(new Date(`${fenetreRetr.dernierJour}T12:00:00Z`)) : "";
+              const tier = String(profile?.subscription_tier ?? "");
+              const formule = tier ? tier.charAt(0).toUpperCase() + tier.slice(1) : "";
+              const adresse = profile?.email;
+              const emailCompte = typeof adresse === "string" ? adresse : "";
+              return (
+                <div className="bento-card">
+                  <h3 className="font-semibold text-zinc-900">{tr("retr.title")}</h3>
+                  {retr === "fait" ? (
+                    <div role="status" className="mt-3 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900 ring-1 ring-inset ring-emerald-200">
+                      <p>{tr("retr.ok", { email: retrRes.email || emailCompte })}</p>
+                      <p className="mt-1">
+                        {retrRes.rembourseCentimes === null
+                          ? tr("retr.okManuel")
+                          : retrRes.rembourseCentimes > 0
+                            ? tr("retr.okRembourse", { m: euros(retrRes.rembourseCentimes, lang) })
+                            : tr("retr.okRien")}
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="mt-1 text-sm text-zinc-500">{tr("retr.desc", { d: souscrit, fin: limite })}</p>
+                      {retr === "ferme" ? (
+                        <button
+                          onClick={() => setRetr("formulaire")}
+                          className="mt-4 inline-flex items-center gap-2 rounded-xl border border-red-200 px-5 py-3 text-sm font-semibold text-red-700 transition-colors hover:bg-red-50"
+                        >
+                          {tr("retr.cta")}
+                        </button>
+                      ) : (
+                        <div className="mt-4 space-y-3 rounded-2xl bg-zinc-50 p-4">
+                          <p className="text-sm font-semibold text-zinc-900">{tr("retr.formTitle")}</p>
+                          <div>
+                            <label htmlFor={`${cid}-retr-nom`} className="block text-xs font-medium text-zinc-600">{tr("retr.nom")}</label>
+                            <input
+                              id={`${cid}-retr-nom`}
+                              value={retrNom}
+                              onChange={(e) => setRetrNom(e.target.value)}
+                              autoComplete="name"
+                              className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900"
+                            />
+                          </div>
+                          <p className="text-sm text-zinc-700">{tr("retr.contrat", { f: formule, d: souscrit })}</p>
+                          {emailCompte && <p className="text-xs text-zinc-500">{tr("retr.accuse", { email: emailCompte })}</p>}
+                          {retr === "erreur" && (
+                            <p className="text-sm font-medium text-red-600">{retrRes.message ?? tr("retr.err", { email: EDITEUR.email })}</p>
+                          )}
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              onClick={renoncer}
+                              disabled={retr === "envoi" || retrNom.trim().length < 2}
+                              className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-red-500 disabled:opacity-40"
+                            >
+                              {retr === "envoi" ? tr("retr.sending") : tr("retr.confirm")}
+                            </button>
+                            <button
+                              onClick={() => setRetr("ferme")}
+                              disabled={retr === "envoi"}
+                              className="rounded-xl px-5 py-3 text-sm font-semibold text-zinc-600 transition-colors hover:bg-zinc-100"
+                            >
+                              {tr("common.cancel")}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* ⚠️ LA CONDITION PORTE SUR `stripe_customer_id`, PAS SUR LA FORMULE.
                 Quelqu'un qui a résilié garde son identifiant client Stripe : il doit

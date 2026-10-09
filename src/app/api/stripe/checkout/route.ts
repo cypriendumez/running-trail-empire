@@ -3,10 +3,19 @@ import { NextResponse } from "next/server";
 import { stripe, priceIdDe, estFormule, estPeriode, stripeConfigured } from "@/lib/stripe/client";
 import { createClient } from "@/lib/supabase/server";
 import { joursEssaiStripe } from "@/lib/billing/access";
+import { mediateurConso } from "@/lib/brand/mediateur";
 
 export async function POST(req: Request) {
   try {
     if (!stripeConfigured) {
+      return NextResponse.json({ error: "Le paiement n'est pas encore ouvert. Reviens très bientôt." }, { status: 503 });
+    }
+    // ⚠️ PAS DE VENTE SANS MÉDIATEUR. Les CGV doivent nommer le médiateur de la
+    // consommation avant le premier abonnement (cf. `lib/brand/mediateur`). Le jour où les
+    // clés Stripe arrivent, il serait facile d'oublier cette convention : on refuse donc
+    // d'ouvrir le paiement, et le journal dit exactement pourquoi.
+    if (!mediateurConso()) {
+      console.error("[stripe] paiement refusé : aucun médiateur de la consommation (MEDIATEUR_NOM / MEDIATEUR_SITE)");
       return NextResponse.json({ error: "Le paiement n'est pas encore ouvert. Reviens très bientôt." }, { status: 503 });
     }
     // Deux formules × deux périodicités. L'ancien contrat n'acceptait que
@@ -104,10 +113,15 @@ export async function POST(req: Request) {
       // rien : en cas de litige, il n'existait aucune trace du consentement.
       //
       // Stripe horodate l'acceptation et la conserve sur la session : c'est la preuve.
+      //
+      // ⚠️ LA DEMANDE D'ACCÈS IMMÉDIAT DOIT ÊTRE EXPRESSE, ET SA CONSÉQUENCE DITE. Un
+      // abonné qui renonce dans les 14 jours ne paie la part déjà fournie QUE s'il a
+      // demandé que le service démarre tout de suite (art. L221-25). Sans cette phrase
+      // cochée, il faudrait tout lui rembourser, accès consommé compris.
       consent_collection: { terms_of_service: "required" },
       custom_text: {
         terms_of_service_acceptance: {
-          message: `J'accepte les [conditions générales](${process.env.NEXT_PUBLIC_APP_URL}/terms) et je demande que l'accès démarre immédiatement.`,
+          message: `J'accepte les [conditions générales](${process.env.NEXT_PUBLIC_APP_URL}/terms) et je demande que l'accès démarre immédiatement. Si je renonce dans les 14 jours, je paierai seulement la part du service déjà fournie.`,
         },
       },
       allow_promotion_codes: true,

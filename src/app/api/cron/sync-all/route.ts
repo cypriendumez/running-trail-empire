@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { syncAndCoachForUser, shardForPass } from "@/lib/intervals/syncAndCoach";
+import { envoyerRappelsReconduction } from "@/lib/billing/reconduction";
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // 60s timeout (Vercel hobby = 10s, pro = 60s)
@@ -74,9 +75,15 @@ export async function GET(req: Request) {
   const total = results.reduce((a, r) => a + (r.workouts ?? 0), 0);
   const coached = results.filter((r) => r.coached).length;
   console.log(`[cron/sync-all] tranche ${shard + 1}/${shards} · ${results.length} athlète(s) · ${total} séance(s) inédite(s) · ${coached} replanification(s)`);
+
+  // Le rappel légal avant reconduction des abonnements ANNUELS (art. L215-1) se greffe ici :
+  // c'est la seule tâche qui tourne chaque jour, et le rappel est idempotent (une échéance
+  // n'est annoncée qu'une fois, cf. `lib/billing/reconduction`). Il ne lève jamais.
+  const reconduction = await envoyerRappelsReconduction(admin);
+
   return NextResponse.json({
     ok: true, shard: shard + 1, shards, eligible: eligible.length,
-    users: results.length, total_activities: total, replanned: coached, results,
+    users: results.length, total_activities: total, replanned: coached, results, reconduction,
   });
 }
 

@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 
 // Page PUBLIQUE (CGU + conditions d'abonnement). ⚠️ Adapte les montants/durées (dans legalI18n.ts) à ton offre réelle.
 export default function TermsPage() {
-  return <LegalContent page="terms" date="10/06/2026" />;
+  return <LegalContent page="terms" date="09/10/2026" />;
 }

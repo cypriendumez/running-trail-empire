@@ -36,6 +36,13 @@ export type EtatAbonnement = {
   annuleALaFin: boolean;
   /** Le dernier prélèvement a échoué. Remis à faux dès qu'un paiement réussit. */
   echecPaiement: boolean;
+  /** Instant de la souscription (ISO). C'est lui qui ouvre le délai de rétractation de
+   *  14 jours : sans lui, l'écran ne saurait pas jusqu'à quand afficher « Renoncer au
+   *  contrat ici ». Absent des états écrits avant le 09/10/2026. */
+  souscritLe?: string | null;
+  /** Périodicité facturée. Un abonnement ANNUEL doit être annoncé avant sa reconduction
+   *  (art. L215-1, `lib/billing/reconduction`) ; un mensuel, non. */
+  intervalle?: "mois" | "an" | null;
 };
 
 /** Lit une ligne `notifications` comme un état d'abonnement, ou `null` si elle n'en est pas un. */
@@ -50,6 +57,10 @@ export function litEtatAbo(data: unknown): EtatAbonnement | null {
     periodeFin: typeof d.periodeFin === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d.periodeFin) ? d.periodeFin : null,
     annuleALaFin: d.annuleALaFin === true,
     echecPaiement: d.echecPaiement === true,
+    // Même prudence : un instant illisible devient `null`, et le bouton de rétractation
+    // ne s'affiche pas plutôt que d'annoncer une date limite inventée.
+    souscritLe: typeof d.souscritLe === "string" && !Number.isNaN(new Date(d.souscritLe).getTime()) ? d.souscritLe : null,
+    intervalle: d.intervalle === "mois" || d.intervalle === "an" ? d.intervalle : null,
   };
 }
 
