@@ -1,6 +1,6 @@
 "use client";
 
-import { useState , useId} from "react";
+import { useEffect, useState , useId} from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Loader2, Check } from "lucide-react";
@@ -9,6 +9,10 @@ import { Logo } from "@/components/brand/Logo";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { AUTH } from "@/components/auth/authI18n";
+import { BoutonsOAuth } from "@/components/auth/BoutonsOAuth";
+import { AideCompte, type Situation } from "@/components/auth/AideCompte";
+import type { Methode, StatutCompte } from "@/lib/auth/statut";
+import { memoriserEmail, reprendreEmail } from "@/lib/auth/emailMemorise";
 import { JOURS_ESSAI } from "@/lib/billing/access";
 
 export default function SignupPage() {
@@ -35,10 +39,50 @@ export default function SignupPage() {
   // champ (un toast disparaît avant qu'on ait relu son adresse), avec la correction en
   // un clic quand la faute de frappe est évidente.
   const [domaineMort, setDomaineMort] = useState<{ domaine: string; suggestion: string | null; douteux: boolean } | null>(null);
+  // L'adresse a DÉJÀ un compte : on le dit sous le champ, avec le bon geste (Google, se
+  // connecter…), au lieu d'un « vérifiez votre email » qui n'arriverait jamais — vécu le
+  // 11/10/2026. Voir `lib/auth/statut`.
+  const [aide, setAide] = useState<Situation | null>(null);
+  // La case d'accord (CGU + données de santé) vaut pour Google AUSSI : ici, « Continuer avec
+  // Google » crée un compte, et le consentement aux données de santé doit être explicite.
+  const [accord, setAccord] = useState(false);
+  const [accordManquant, setAccordManquant] = useState(false);
+  const A = (AUTH[lang] ?? AUTH.fr).aide;
+  const Lc = (AUTH[lang] ?? AUTH.fr).login;
+
+  // L'adresse tapée sur la connexion suit la personne ici.
+  useEffect(() => {
+    const e = reprendreEmail();
+    if (e) setForm((p) => ({ ...p, email: e }));
+  }, []);
 
   function update(field: string, value: string) {
     setForm((p) => ({ ...p, [field]: value }));
-    if (field === "email") setDomaineMort(null);
+    if (field === "email") { setDomaineMort(null); setAide(null); }
+  }
+
+  /**
+   * Dès qu'on quitte le champ e-mail : cette adresse a-t-elle déjà un compte ? Comme les
+   * applications courantes, on le dit AVANT que la personne remplisse ses mots de passe.
+   * Au mieux de nos moyens : si la question échoue, l'envoi du formulaire tranchera.
+   */
+  async function verifierAdresse() {
+    const adresse = form.email.trim();
+    if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(adresse)) return;
+    const r = await fetch("/api/auth/statut", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: adresse }),
+    }).catch(() => null);
+    const s = r?.ok ? ((await r.json().catch(() => null)) as StatutCompte | null) : null;
+    if (s?.compte === "actif") setAide({ cas: "compte_existant", methodes: s.methodes });
+  }
+
+  /** « Continuer avec Google » crée un compte : la case d'accord est exigée d'abord. */
+  function accordDonne(): boolean {
+    if (accord) return true;
+    setAccordManquant(true);
+    document.getElementById(`${cid}-accord`)?.focus();
+    return false;
   }
 
   async function handleSubmit(e: React.FormEvent, domaineConfirme = false) {
@@ -58,15 +102,17 @@ export default function SignupPage() {
     const rep = await fetch("/api/auth/confirmation", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: form.email, password: form.password, fullName: form.fullName, lang, domaineConfirme }),
-    });
-    const j = await rep.json().catch(() => null);
+    }).catch(() => null);
+    const j = rep ? await rep.json().catch(() => null) : null;
     setLoading(false);
-    // ⚠️ Deux cas seulement donnent une vraie erreur : le mot de passe trop court, et un
-    // DOMAINE qui ne reçoit pas de courrier (faute de frappe : « gmial.com »). Tout le
-    // reste — adresse déjà prise, adresse inconnue — répond « c'est envoyé », sinon le
-    // formulaire deviendrait un annuaire : il suffirait d'essayer des adresses pour
-    // savoir qui a un compte. Même règle que « mot de passe oublié ». Le domaine, lui,
-    // ne dit rien sur les comptes : il parle du fournisseur.
+    // ⚠️ CHAQUE REFUS EST DIT, AVEC SA CAUSE (décision du 11/10/2026) : adresse déjà
+    // inscrite, mot de passe trop court, domaine sans courrier, trop d'essais, envoi raté.
+    // Avant, « adresse déjà prise » répondait « c'est envoyé » (anti-annuaire) et la
+    // personne attendait un e-mail qui ne partait jamais.
+    if (j?.error === "compte_existant") {
+      setAide({ cas: "compte_existant", methodes: (Array.isArray(j.methodes) ? j.methodes : []) as Methode[] });
+      return;
+    }
     // « douteux » : le domaine est à une ou deux lettres d'un fournisseur courant (et ces
     // domaines-là EXISTENT, déposés par des squatteurs) — on demande. « sans courrier » :
     // le domaine n'existe pas du tout — on refuse.
@@ -74,7 +120,10 @@ export default function SignupPage() {
       setDomaineMort({ domaine: String(j.domaine ?? ""), suggestion: j.suggestion ? String(j.suggestion) : null, douteux: j.error === "domaine_douteux" });
       return;
     }
-    if (!rep.ok || !j?.ok) { toast.error(L.pwShort); return; }
+    if (!rep?.ok || !j?.ok) {
+      toast.error(j?.error === "mot_de_passe_trop_court" ? L.pwShort : rep?.status === 429 ? Lc.errRate : A.envoiImpossible);
+      return;
+    }
     setStep("verify");
   }
 
@@ -95,7 +144,7 @@ export default function SignupPage() {
       body: JSON.stringify({ email: form.email, password: form.password, fullName: form.fullName, lang, domaineConfirme: true }),
     }).catch(() => null);
     setLoading(false);
-    if (!rep?.ok) { toast.error(L.pwShort); return; }
+    if (!rep?.ok) { toast.error(rep?.status === 429 ? Lc.errRate : A.envoiImpossible); return; }
     toast.success(L.resent);
   }
 
@@ -111,7 +160,7 @@ export default function SignupPage() {
           <p className="text-zinc-500 mb-8">
             {pre}<strong className="text-zinc-900">{form.email}</strong>{post}
           </p>
-          <Link href="/login" className="btn-brand justify-center inline-flex w-full">
+          <Link href="/login" onClick={() => memoriserEmail(form.email)} className="btn-brand justify-center inline-flex w-full">
             {L.goLogin}
           </Link>
           <button
@@ -150,6 +199,12 @@ export default function SignupPage() {
           <p className="text-zinc-500 text-sm mt-1">{L.subtitle.replace("{n}", String(JOURS_ESSAI))}</p>
         </div>
 
+        {/* Les mêmes boutons que sur la connexion : s'inscrire avec Google = un clic. */}
+        <BoutonsOAuth lang={lang} avant={accordDonne} separateur />
+        {accordManquant && !accord && (
+          <p role="alert" className="-mt-3 mb-5 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{A.consentement}</p>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor={`${cid}-nom`} className="text-sm font-medium text-zinc-700 block mb-1.5">{L.name}</label>
@@ -157,7 +212,8 @@ export default function SignupPage() {
           </div>
           <div>
             <label htmlFor={`${cid}-email`} className="text-sm font-medium text-zinc-700 block mb-1.5">{L.email}</label>
-            <input id={`${cid}-email`} type="email" value={form.email} onChange={(e) => update("email", e.target.value)} placeholder="marie@exemple.com" required aria-invalid={domaineMort ? true : undefined} aria-describedby={domaineMort ? `${cid}-email-erreur` : undefined} className={inputCls} />
+            <input id={`${cid}-email`} type="email" value={form.email} onChange={(e) => update("email", e.target.value)} onBlur={verifierAdresse} placeholder="marie@exemple.com" autoComplete="email" required aria-invalid={domaineMort || aide ? true : undefined} aria-describedby={domaineMort ? `${cid}-email-erreur` : aide ? `${cid}-email-compte` : undefined} className={inputCls} />
+            {aide && <AideCompte id={`${cid}-email-compte`} situation={aide} email={form.email} lang={lang} />}
             {domaineMort && (
               <p id={`${cid}-email-erreur`} role="alert" className="mt-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                 {(domaineMort.douteux ? L.domainDoubt : L.domainDead).replace("{domain}", domaineMort.domaine)}
@@ -212,8 +268,10 @@ export default function SignupPage() {
             <input id={`${cid}-confirm`} type="password" value={form.confirmPassword} onChange={(e) => update("confirmPassword", e.target.value)} placeholder={L.confirmPh} required className={inputCls} />
           </div>
 
-          <label className="flex items-start gap-2.5 text-xs text-zinc-500">
-            <input type="checkbox" required className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500" />
+          <label className={`flex items-start gap-2.5 text-xs text-zinc-500 rounded-lg ${accordManquant && !accord ? "ring-2 ring-amber-400 ring-offset-4" : ""}`}>
+            <input id={`${cid}-accord`} type="checkbox" required checked={accord}
+              onChange={(e) => { setAccord(e.target.checked); setAccordManquant(false); }}
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500" />
             <span>
               {L.consentPre}
               <Link href="/terms" className="text-emerald-600 hover:underline">{L.cgu}</Link>
@@ -238,7 +296,7 @@ export default function SignupPage() {
 
         <p className="text-center text-sm text-zinc-500 mt-4">
           {L.haveAccount}{" "}
-          <Link href="/login" className="text-emerald-600 font-medium hover:text-emerald-700">
+          <Link href="/login" onClick={() => memoriserEmail(form.email)} className="text-emerald-600 font-medium hover:text-emerald-700">
             {L.login}
           </Link>
         </p>

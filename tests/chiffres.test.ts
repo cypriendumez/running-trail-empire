@@ -1233,11 +1233,19 @@ test("aucun bouton de connexion ne mène à un fournisseur éteint", () => {
   assert.deepEqual(fournisseursActifs("github"), [], "un fournisseur non géré ne doit rien afficher");
   assert.deepEqual(fournisseursActifs("google,github"), ["google"]);
 
-  // La page doit VRAIMENT s'en servir : exposer la fonction sans la brancher ne vaut rien.
-  const page = sansCommentaires(readFileSync(join(ROOT, "src/app/(auth)/login/page.tsx"), "utf8"));
-  assert.match(page, /fournisseursActifs\(/, "la page de connexion n'utilise pas le filtre");
-  assert.match(page, /oauth\.includes\("google"\)/, "le bouton Google n'est pas conditionné");
-  assert.match(page, /oauth\.includes\("apple"\)/, "le bouton Apple n'est pas conditionné");
+  // Les boutons doivent VRAIMENT s'en servir : exposer la fonction sans la brancher ne vaut
+  // rien. Depuis le 11/10/2026, ils vivent dans UN composant partagé par la connexion ET
+  // l'inscription (`BoutonsOAuth`) : c'est lui qui filtre, et aucune page ne doit appeler
+  // OAuth en direct — elle contournerait le filtre.
+  const boutons = sansCommentaires(readFileSync(join(ROOT, "src/components/auth/BoutonsOAuth.tsx"), "utf8"));
+  assert.match(boutons, /fournisseursActifs\(/, "les boutons OAuth n'utilisent pas le filtre");
+  assert.match(boutons, /actifs\.includes\("google"\)/, "le bouton Google n'est pas conditionné");
+  assert.match(boutons, /actifs\.includes\("apple"\)/, "le bouton Apple n'est pas conditionné");
+  for (const f of ["src/app/(auth)/login/page.tsx", "src/app/(auth)/signup/page.tsx"]) {
+    const page = sansCommentaires(readFileSync(join(ROOT, f), "utf8"));
+    assert.match(page, /<BoutonsOAuth/, `${f} n'affiche pas les boutons partagés`);
+    assert.doesNotMatch(page, /signInWithOAuth\(/, `${f} appelle OAuth en direct, hors du filtre`);
+  }
 });
 
 test("l'espace coach est atteignable, et par les seules adresses autorisées", () => {

@@ -1,13 +1,16 @@
 "use client";
 
-import { useState , useId } from "react";
+import { useEffect, useState , useId } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { Loader2, ArrowLeft, MailCheck } from "lucide-react";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Logo } from "@/components/brand/Logo";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { AUTH } from "@/components/auth/authI18n";
+import { AideCompte, type Situation } from "@/components/auth/AideCompte";
+import { memoriserEmail, reprendreEmail } from "@/lib/auth/emailMemorise";
 
 export default function ForgotPasswordPage() {
   // Chaque libellé est relié à son champ : sans cela, un lecteur d'écran annonce
@@ -18,20 +21,33 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [aide, setAide] = useState<Situation | null>(null);
+  const D = AUTH[lang] ?? AUTH.fr;
+
+  // L'adresse tapée sur la connexion suit la personne ici.
+  useEffect(() => {
+    const e = reprendreEmail();
+    if (e) setEmail(e);
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+    setAide(null);
     // ⚠️ PAR NOTRE ROUTE, PAS `supabase.auth.resetPasswordForEmail()`. Ce dernier envoie le
     // gabarit anglais sans logo du tableau de bord Supabase — tombé dans les indésirables le
     // 13/09/2026. Notre route génère un lien `recovery` et expédie NOTRE e-mail (logo,
-    // français, expéditeur unique). Elle répond toujours « ok » : on ne dit pas si l'adresse
-    // a un compte (anti-annuaire), donc l'écran de confirmation s'affiche dans tous les cas.
-    await fetch("/api/auth/reset", {
+    // français, expéditeur unique).
+    // Depuis le 11/10/2026, une adresse SANS compte est dite à l'écran (avec « Créer un
+    // compte ») : avant, l'écran « envoyé » s'affichait quand même et on attendait en vain.
+    const r = await fetch("/api/auth/reset", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: email.trim(), lang }),
     }).catch(() => null);
+    const j = r ? await r.json().catch(() => null) : null;
     setLoading(false);
+    if (j?.error === "aucun_compte") { setAide({ cas: "aucun_compte" }); return; }
+    if (!r?.ok || !j?.ok) { toast.error(r?.status === 429 ? D.login.errRate : D.aide.envoiImpossible); return; }
     setSent(true);
   }
 
@@ -60,13 +76,15 @@ export default function ForgotPasswordPage() {
               <input id={`${cid}-c0`}
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => { setEmail(e.target.value); setAide(null); }}
                 placeholder={t("auth.emailPh")}
+                autoComplete="email"
                 required
                 className="w-full px-4 py-3 rounded-xl border border-zinc-200 bg-white text-sm
                            focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent
                            placeholder:text-zinc-400 transition-shadow"
               />
+              {aide && <AideCompte situation={aide} email={email} lang={lang} />}
             </div>
             <button type="submit" disabled={loading} className="btn-brand w-full justify-center py-3">
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
@@ -76,7 +94,7 @@ export default function ForgotPasswordPage() {
         )}
 
         <p className="text-center text-sm text-zinc-500 mt-6">
-          <Link href="/login" className="inline-flex items-center gap-1 text-emerald-600 font-medium hover:text-emerald-700">
+          <Link href="/login" onClick={() => memoriserEmail(email)} className="inline-flex items-center gap-1 text-emerald-600 font-medium hover:text-emerald-700">
             <ArrowLeft className="w-3.5 h-3.5" /> {L.back}
           </Link>
         </p>

@@ -12,8 +12,11 @@ import { cheminSur } from "@/lib/social/amisLiens";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { AUTH } from "@/components/auth/authI18n";
-import { fournisseursActifs } from "@/lib/auth/fournisseurs";
+import { BoutonsOAuth } from "@/components/auth/BoutonsOAuth";
+import { AideCompte, type Situation } from "@/components/auth/AideCompte";
 import { messageErreurConnexion } from "@/lib/auth/messageErreur";
+import { sansMotDePasse, type StatutCompte } from "@/lib/auth/statut";
+import { memoriserEmail, reprendreEmail } from "@/lib/auth/emailMemorise";
 
 export default function LoginPage() {
   /**
@@ -35,13 +38,12 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState<null | "google" | "apple">(null);
-  // ⚠️ Ni Google ni Apple n'étaient activés côté Supabase (vérifié le 22/08/2026) : les
-  // deux boutons échouaient à chaque clic. Ils ne s'affichent plus que si on les
-  // DÉCLARE — voir `lib/auth/fournisseurs`.
-  const oauth = fournisseursActifs(process.env.NEXT_PUBLIC_OAUTH);
+  // Pourquoi la connexion a échoué, et quoi faire — affiché jusqu'à la prochaine saisie.
+  const [aide, setAide] = useState<Situation | null>(null);
+  const [renvoi, setRenvoi] = useState({ enCours: false, fait: false });
   const { t, lang } = useT();
   const L = (AUTH[lang] ?? AUTH.fr).login;
+  const A = (AUTH[lang] ?? AUTH.fr).aide;
 
   // Surface une erreur renvoyée par /auth/callback ou /auth/confirm
   useEffect(() => {
@@ -51,16 +53,46 @@ export default function LoginPage() {
     else if (err) toast.error(L.errGeneric);
   }, [L]);
 
+  // L'adresse tapée sur l'inscription ou « mot de passe oublié » suit la personne ici.
+  useEffect(() => {
+    const e = reprendreEmail();
+    if (e) setEmail(e);
+  }, []);
+
+  /**
+   * LA VRAIE RAISON DE L'ÉCHEC. Supabase ne dit que « Invalid login credentials » — que
+   * l'adresse n'ait aucun compte, que le compte s'ouvre avec Google (pas de mot de passe du
+   * tout), ou que le mot de passe soit faux. On demande donc à `/api/auth/statut` ce qu'il
+   * en est (décision du 11/10/2026, voir `lib/auth/statut`). Si la question échoue, on
+   * retombe sur le message traduit d'avant — jamais sur l'anglais brut.
+   */
+  async function diagnostiquer(message: string): Promise<Situation> {
+    const brut = message.toLowerCase();
+    if (brut.includes("not confirmed")) return { cas: "a_confirmer" };
+    if (brut.includes("invalid")) {
+      const r = await fetch("/api/auth/statut", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      }).catch(() => null);
+      if (r?.status === 429) return { cas: "message", texte: L.errRate };
+      const s = r?.ok ? ((await r.json().catch(() => null)) as StatutCompte | null) : null;
+      if (s?.compte === "aucun") return { cas: "aucun_compte" };
+      if (s?.compte === "a_confirmer") return { cas: "a_confirmer" };
+      if (s?.compte === "actif") return sansMotDePasse(s.methodes) ? { cas: "via_oauth", methodes: s.methodes } : { cas: "mauvais_mot_de_passe" };
+    }
+    return { cas: "message", texte: messageErreurConnexion(message, L) };
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+    setAide(null);
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       // ⚠️ PAS `error.message` : Supabase répond en anglais (« Invalid login credentials »).
-      // On traduit la cause réelle dans la langue de la personne, sans révéler si c'est
-      // l'e-mail ou le mot de passe qui cloche (règle anti-annuaire).
-      toast.error(messageErreurConnexion(error.message, L));
+      setRenvoi({ enCours: false, fait: false });
+      setAide(await diagnostiquer(error.message));
       setLoading(false);
       return;
     }
@@ -70,27 +102,22 @@ export default function LoginPage() {
     router.refresh();
   }
 
-  async function handleOAuth(provider: "google" | "apple") {
-    try {
-      setOauthLoading(provider);
-      const supabase = createClient();
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: { redirectTo: `${window.location.origin}/auth/callback` },
-      });
-      // Si pas d'erreur, le navigateur est redirigé automatiquement vers le provider.
-      if (error) {
-        toast.error(
-          error.message?.toLowerCase().includes("not enabled") || error.message?.toLowerCase().includes("provider")
-            ? L.errProvider.replace("{provider}", provider === "google" ? "Google" : "Apple")
-            : messageErreurConnexion(error.message, L)
-        );
-        setOauthLoading(null);
-      }
-    } catch {
-      toast.error(L.errOAuth);
-      setOauthLoading(null);
-    }
+  /** Adresse jamais confirmée : on renvoie le lien, sans recréer quoi que ce soit. */
+  async function renvoyerConfirmation() {
+    setRenvoi({ enCours: true, fait: false });
+    const r = await fetch("/api/auth/confirmation", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, lang, renvoi: true }),
+    }).catch(() => null);
+    const j = r ? await r.json().catch(() => null) : null;
+    if (r?.ok && j?.ok) { setRenvoi({ enCours: false, fait: true }); return; }
+    setRenvoi({ enCours: false, fait: false });
+    toast.error(r?.status === 429 ? L.errRate : A.envoiImpossible);
+  }
+
+  function saisir(maj: () => void) {
+    maj();
+    setAide(null);
   }
 
   return (
@@ -105,48 +132,8 @@ export default function LoginPage() {
           <p className="text-zinc-500 text-sm mt-1">{L.subtitle}</p>
         </div>
 
-        {/* Social Login */}
-        {oauth.length > 0 && (<>
-<div className="space-y-3 mb-6">
-          {oauth.includes("google") && <button
-            onClick={() => handleOAuth("google")}
-            disabled={oauthLoading !== null}
-            className="w-full btn-secondary justify-center gap-3 py-3 disabled:opacity-60"
-          >
-            {oauthLoading === "google" ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-              </svg>
-            )}
-            {L.google}
-          </button>}
-          {oauth.includes("apple") && <button
-            onClick={() => handleOAuth("apple")}
-            disabled={oauthLoading !== null}
-            className="w-full btn-secondary justify-center gap-3 py-3 disabled:opacity-60"
-          >
-            {oauthLoading === "apple" ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/>
-              </svg>
-            )}
-            {L.apple}
-          </button>}
-        </div>
-
-        <div className="flex items-center gap-3 mb-6">
-          <div className="flex-1 h-px bg-zinc-200" />
-          <span className="text-xs text-zinc-400">{L.or}</span>
-          <div className="flex-1 h-px bg-zinc-200" />
-        </div>
-        </>)}
+        {/* Les mêmes boutons que sur l'inscription (composant partagé). */}
+        <BoutonsOAuth lang={lang} separateur />
 
         {/* Email form */}
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -155,8 +142,9 @@ export default function LoginPage() {
             <input id={`${cid}-email`}
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => saisir(() => setEmail(e.target.value))}
               placeholder={t("auth.emailPh")}
+              autoComplete="email"
               required
               className="w-full px-4 py-3 rounded-xl border border-zinc-200 bg-white text-sm
                          focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent
@@ -166,7 +154,7 @@ export default function LoginPage() {
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label htmlFor={`${cid}-mdp`} className="text-sm font-medium text-zinc-700">{L.password}</label>
-              <Link href="/forgot-password" className="text-xs text-emerald-600 hover:text-emerald-700">
+              <Link href="/forgot-password" onClick={() => memoriserEmail(email)} className="text-xs text-emerald-600 hover:text-emerald-700">
                 {L.forgot}
               </Link>
             </div>
@@ -174,8 +162,9 @@ export default function LoginPage() {
               <input id={`${cid}-mdp`}
                 type={showPwd ? "text" : "password"}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => saisir(() => setPassword(e.target.value))}
                 placeholder="••••••••"
+                autoComplete="current-password"
                 required
                 className="w-full px-4 py-3 pr-12 rounded-xl border border-zinc-200 bg-white text-sm
                            focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent
@@ -190,6 +179,10 @@ export default function LoginPage() {
               </button>
             </div>
           </div>
+          {aide && (
+            <AideCompte situation={aide} email={email} lang={lang}
+              onRenvoyer={renvoyerConfirmation} renvoiEnCours={renvoi.enCours} renvoiFait={renvoi.fait} />
+          )}
           <button
             type="submit"
             disabled={loading}
@@ -202,7 +195,7 @@ export default function LoginPage() {
 
         <p className="text-center text-sm text-zinc-500 mt-6">
           {L.noAccount}{" "}
-          <Link href="/signup" className="text-emerald-600 font-medium hover:text-emerald-700">
+          <Link href="/signup" onClick={() => memoriserEmail(email)} className="text-emerald-600 font-medium hover:text-emerald-700">
             {L.signup}
           </Link>
         </p>

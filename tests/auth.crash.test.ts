@@ -20,7 +20,9 @@
  *   npx tsx tests/auth.crash.test.ts
  */
 import { fournisseursActifs } from "../src/lib/auth/fournisseurs";
-import { emailCompteExistant, emailInscription, emailReinitialisation } from "../src/lib/auth/emailConfirmation";
+import { emailInscription, emailReinitialisation } from "../src/lib/auth/emailConfirmation";
+import { statutDepuisUtilisateur, sansMotDePasse, fournisseurDe } from "../src/lib/auth/statut";
+import { autoriser } from "../src/lib/auth/limiteur";
 import { ech } from "../src/lib/newsletter/gabarit";
 import { readFileSync } from "node:fs";
 import { suggestionDomaine, distance, domaineRecoitDuCourrier, FOURNISSEURS_COURANTS } from "../src/lib/auth/domaineCourrier";
@@ -230,7 +232,12 @@ console.log(`  ✓ e-mail : ${rendus} rendus (${LANGS.length} langues × ${LIENS
   }
   // La page de connexion appelle le traducteur, et n'affiche plus jamais error.message brut.
   const loginPage = readFileSync("src/app/(auth)/login/page.tsx", "utf8").replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
-  if ((loginPage.match(/messageErreurConnexion\(/g) ?? []).length < 2) fail("la page de connexion n'appelle pas le traducteur aux deux échecs", "");
+  // Depuis le 11/10/2026, l'échec OAuth vit dans le composant partagé `BoutonsOAuth` (mêmes
+  // boutons sur la connexion et l'inscription) : le traducteur doit y être, ET dans la page.
+  const boutonsOAuth = readFileSync("src/components/auth/BoutonsOAuth.tsx", "utf8").replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  if (!/messageErreurConnexion\(/.test(loginPage)) fail("la page de connexion n'appelle pas le traducteur après un échec", "");
+  if (!/messageErreurConnexion\(/.test(boutonsOAuth)) fail("les boutons Google/Apple n'appellent pas le traducteur", "l'anglais de Supabase reviendrait sur un échec OAuth");
+  if (/toast\.error\(error\.message\)/.test(boutonsOAuth)) fail("les boutons OAuth affichent error.message brut", "");
   if (/toast\.error\(error\.message\)/.test(loginPage)) fail("la page de connexion affiche encore error.message brut", "l'anglais de Supabase reviendrait");
   c += 2;
   console.log(`  ✓ échec de connexion traduit : ${c} cas (6 causes, 5 langues, page)`);
@@ -269,8 +276,12 @@ console.log(`  ✓ e-mail : ${rendus} rendus (${LANGS.length} langues × ${LIENS
   else for (const attendu of ["token_hash=", "type=recovery", "next=/reset-password"]) {
     if (!lienReset[1].includes(attendu)) fail(`le lien de reset n'a pas \`${attendu}\``, lienReset[1]);
   }
-  // Anti-annuaire : la route ne renvoie jamais autre chose que { ok: true }.
-  if (/ok:\s*false/.test(reset)) fail("la route de reset révèle un cas d'échec", "le formulaire deviendrait un annuaire");
+  // ⚠️ RÈGLE CHANGÉE LE 11/10/2026 (décision de Cyprien, voir lib/auth/statut) : une adresse
+  // SANS compte est dite à l'écran, au lieu d'un « envoyé » qui laissait attendre en vain.
+  // En échange, la route est bornée par le limiteur de débit.
+  if (!/error:\s*"aucun_compte"/.test(reset)) fail("la route de reset ne dit pas « aucun compte »", "l'écran afficherait « envoyé » pour une adresse inconnue");
+  if (!/autoriser\(`reset:/.test(reset)) fail("la route de reset n'est pas bornée par le limiteur", "on pourrait tester des milliers d'adresses");
+  if (!/if \(!envoi\.ok\)/.test(reset)) fail("la route de reset répond « envoyé » même quand Resend refuse", "");
   // /auth/confirm : une récupération ne doit PAS passer par /onboarding (nested sous signup/email).
   // (`confirm` est déjà lu plus haut, dans le bloc « lien de confirmation ».)
   const iGarde = confirm.indexOf('type === "signup"'), iOnb = confirm.indexOf("/onboarding");
@@ -311,65 +322,91 @@ console.log(`  ✓ e-mail : ${rendus} rendus (${LANGS.length} langues × ${LIENS
   a += 6;
   console.log(`  ✓ alerte nouvel inscrit : ${a} cas (âge du compte, trace unique, ordre d'écriture)`);
 
-  // ── ADRESSE DÉJÀ INSCRITE : L'ÉCRAN SE TAIT, LA BOÎTE REÇOIT UN MESSAGE ──────────────
+  // ── L'ÉCRAN DIT LA VÉRITÉ SUR LE COMPTE (décision du 11/10/2026) ──────────────────────
   // ⚠️ Le 11/10/2026, Cyprien s'inscrit avec une adresse déjà ouverte par Google : écran
-  // « Vérifiez votre email »… et RIEN n'arrive, jamais. Supabase refusait le doublon
-  // (`email_exists`) et la route répondait `ok` sans rien envoyer. L'écran doit rester
-  // muet (anti-annuaire) ; la boîte du titulaire, non.
+  // « Vérifiez votre email », rien n'arrive ; puis la connexion par mot de passe répond
+  // « e-mail ou mot de passe incorrect » sans dire que ce compte n'a PAS de mot de passe.
+  // Désormais, comme dans les applications courantes : l'inscription dit « cette adresse a
+  // déjà un compte » (+ Google / se connecter), la connexion dit la vraie cause, et les deux
+  // pages offrent les mêmes boutons.
   let ex = 0;
-  for (const lg of ["fr", "en", "de", "es", "pt", "xx"]) {
-    for (const f of [["google"], ["email"], ["email", "google"], ["apple"], []]) {
-      let e: ReturnType<typeof emailCompteExistant>;
-      try { e = emailCompteExistant(lg, "https://pacevo.fr", 'https://x.fr/c?t=<a"&b', f); }
-      catch (err) { fail(`compte existant : exception (${lg}, ${f.join("+") || "aucun"})`, String((err as Error).message).slice(0, 90)); continue; }
-      if (/<script/i.test(e.html) || e.html.includes('t=<a"&b')) fail(`compte existant : lien non échappé (${lg})`, "");
-      if (!e.html.includes("/icon.png")) fail(`compte existant : logo absent (${lg})`, "");
-      if (!e.html.includes('href="https://pacevo.fr/login"')) fail(`compte existant : pas de bouton de connexion (${lg})`, "");
-      if (/\{fournisseur\}|\{bouton\}/.test(e.html + e.texte)) fail(`compte existant : jeton non remplacé (${lg}, ${f.join("+")})`, e.texte.slice(0, 120));
-      if (!e.objet.trim() || !e.texte.trim()) fail(`compte existant : objet ou texte vide (${lg})`, "");
-      ex++;
+  // a) Lecture d'un compte GoTrue → ce que l'écran peut dire.
+  const comptes: [string, Parameters<typeof statutDepuisUtilisateur>[0], string, string][] = [
+    ["aucun compte", null, "aucun", ""],
+    ["Google seul (le cas de Cyprien)", { email_confirmed_at: "2026-08-23", app_metadata: { provider: "google", providers: ["google"] } }, "actif", "google"],
+    ["mot de passe jamais confirmé", { email_confirmed_at: null, app_metadata: { provider: "email", providers: ["email"] } }, "a_confirmer", "mot_de_passe"],
+    ["mot de passe + Google", { email_confirmed_at: "2026-06-01", app_metadata: { providers: ["email", "google"] } }, "actif", "mot_de_passe,google"],
+    ["fournisseur inconnu ignoré", { confirmed_at: "2026-06-01", app_metadata: { providers: ["github", "email", "email"] } }, "actif", "mot_de_passe"],
+    ["providers absent → provider", { email_confirmed_at: "2026-06-01", app_metadata: { provider: "apple" } }, "actif", "apple"],
+  ];
+  for (const [nom, u, compte, methodes] of comptes) {
+    const st = statutDepuisUtilisateur(u);
+    if (st.compte !== compte || st.methodes.join(",") !== methodes) fail(`statut « ${nom} »`, `obtenu ${st.compte} [${st.methodes}] , attendu ${compte} [${methodes}]`);
+    ex++;
+  }
+  if (!sansMotDePasse(["google"]) || sansMotDePasse(["mot_de_passe", "google"]) || sansMotDePasse([])) fail("sansMotDePasse se trompe", "un compte Google se verrait proposer « mot de passe incorrect »");
+  if (fournisseurDe(["apple", "google"]) !== "google" || fournisseurDe(["mot_de_passe"]) !== null) fail("fournisseurDe se trompe", "");
+  // b) Le limiteur borne vraiment, puis oublie.
+  const tLim = 1_000_000;
+  const k = `test:${Math.random()}`;
+  const passes = [0, 1, 2, 3].map((d) => autoriser(k, 3, 60_000, tLim + d));
+  if (passes.join() !== "true,true,true,false") fail("le limiteur ne bloque pas au-delà du maximum", passes.join());
+  if (!autoriser(k, 3, 60_000, tLim + 60_001)) fail("le limiteur ne libère pas après la fenêtre", "");
+  if (!autoriser(`${k}:autre`, 3, 60_000, tLim + 3)) fail("le limiteur mélange deux adresses IP", "");
+  ex += 4;
+  // c) La route d'inscription DIT « compte existant », avec les méthodes, et ne ment plus.
+  if (!/statut\?\.compte === "actif"[\s\S]{0,160}error: "compte_existant", methodes: statut\.methodes/.test(route)) fail("l'inscription ne dit pas « compte existant » avec ses méthodes", "écran « vérifiez votre email », boîte vide");
+  if (!/error\?\.code === "email_exists"[\s\S]{0,120}"compte_existant"/.test(route)) fail("le refus `email_exists` de Supabase n'est pas traduit en « compte existant »", "");
+  if (/return ok\(\)/.test(route)) fail("la route d'inscription a encore une sortie « ok » muette", "");
+  if (!/if \(!envoi\.ok\)/.test(route)) fail("l'inscription répond « vérifiez votre email » même quand Resend refuse", "");
+  if (!/autoriser\(`inscription:/.test(route)) fail("l'inscription n'est pas bornée par le limiteur", "");
+  // Le renvoi depuis la connexion ne touche ni au nom ni au mot de passe d'un compte existant.
+  if (!/envoyerConfirmation\(adresse, null, null,/.test(route)) fail("le renvoi transmet un nom ou un mot de passe", "il écraserait le nom du compte");
+  if (!/statut\.compte !== "a_confirmer"/.test(route)) fail("le renvoi ne se limite pas aux comptes à confirmer", "");
+  // La recherche passe par la route dédiée, bornée elle aussi, et ne rend que l'état.
+  const routeStatut = readFileSync("src/app/api/auth/statut/route.ts", "utf8");
+  if (!/autoriser\(`statut:/.test(routeStatut)) fail("/api/auth/statut n'est pas bornée par le limiteur", "un script listerait les inscrits");
+  const chercheur = readFileSync("src/lib/auth/statutCompte.ts", "utf8");
+  if (!/toLowerCase\(\) === cible/.test(chercheur)) fail("la recherche n'exige pas l'égalité EXACTE de l'adresse", "le filtre LIKE de GoTrue ramène aussi « xcyprien@… »");
+  ex += 9;
+  // d) Les pages : mêmes boutons des deux côtés, l'encadré qui dit quoi faire, pas d'adresse dans l'URL.
+  const lire = (f: string) => readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  const [pLogin, pSignup, pForgot, pAide] = ["src/app/(auth)/login/page.tsx", "src/app/(auth)/signup/page.tsx", "src/app/(auth)/forgot-password/page.tsx", "src/components/auth/AideCompte.tsx"].map(lire);
+  if (!/<BoutonsOAuth/.test(pLogin) || !/<BoutonsOAuth/.test(pSignup)) fail("la connexion et l'inscription n'offrent pas les mêmes boutons", "« fais vraiment les mêmes modes » (Cyprien, 11/10/2026)");
+  if (!/<BoutonsOAuth[^>]*avant=\{accordDonne\}/.test(pSignup)) fail("« Continuer avec Google » sur l'inscription contourne la case d'accord", "consentement aux données de santé non recueilli");
+  if (!/fetch\("\/api\/auth\/statut"/.test(pLogin)) fail("la connexion ne cherche pas la vraie cause de l'échec", "« incorrect » pour un compte qui s'ouvre avec Google");
+  if (!/onBlur=\{verifierAdresse\}/.test(pSignup)) fail("l'inscription n'avertit pas dès la saisie de l'adresse", "");
+  if (!/"compte_existant"/.test(pSignup) || !/<AideCompte/.test(pSignup)) fail("l'inscription n'affiche pas « compte existant »", "");
+  if (!/"aucun_compte"/.test(pForgot) || !/<AideCompte/.test(pForgot)) fail("« mot de passe oublié » n'affiche pas « aucun compte »", "");
+  for (const c of ["compte_existant", "aucun_compte", "via_oauth", "mauvais_mot_de_passe", "a_confirmer"]) {
+    if (!new RegExp(`case "${c}"`).test(pAide)) fail(`l'encadré ne sait pas dire « ${c} »`, "");
+  }
+  for (const [nom, src] of [["connexion", pLogin], ["inscription", pSignup], ["oubli", pForgot], ["encadré", pAide]] as const) {
+    if (/[?&]email=/.test(src)) fail(`${nom} : l'adresse passe dans l'URL`, "historique, journaux, Referer — voir lib/auth/emailMemorise");
+  }
+  ex += 11;
+  // e) Les textes existent dans les 5 langues, avec les mêmes jetons que le français.
+  const jetons = (s: string) => (s.match(/\{\w+\}/g) ?? []).sort().join(",");
+  for (const lg of ["en", "de", "es", "pt"] as const) {
+    for (const [cle, fr] of Object.entries(AUTH.fr.aide)) {
+      const v = (AUTH[lg].aide as Record<string, string>)[cle];
+      if (!v || v.length < 3) fail(`${lg} : aide.${cle} absent`, "");
+      else if (jetons(v) !== jetons(fr)) fail(`${lg} : aide.${cle} n'a pas les jetons du français`, `${jetons(v)} ≠ ${jetons(fr)}`);
     }
   }
-  // Compte Google seul : le message nomme le bouton EXACT de la page de connexion, et
-  // propose de CHOISIR un premier mot de passe (pas « nouveau » : il n'y en a pas).
-  for (const lg of ["fr", "en", "de", "es", "pt"] as const) {
-    const g = emailCompteExistant(lg, "https://pacevo.fr", "https://x.fr/c", ["google"]);
-    if (!g.texte.includes(AUTH[lg].login.google)) fail(`${lg} : compte Google sans le libellé « ${AUTH[lg].login.google} »`, g.texte.slice(0, 160));
+  ex++;
+  // f) Le premier mot de passe d'un compte Google : un e-mail qui ne parle pas de « réinitialiser ».
+  for (const lg of ["fr", "en", "de", "es", "pt", "xx"]) {
+    const e = emailReinitialisation(lg, "https://pacevo.fr", 'https://x.fr/c?t=<a"&b', "google");
+    if (e.html.includes('t=<a"&b') || /<script/i.test(e.html)) fail(`premier mot de passe : lien non échappé (${lg})`, "");
+    if (!e.texte.includes("Google") || /\{fournisseur\}/.test(e.html + e.texte)) fail(`premier mot de passe : fournisseur absent ou jeton brut (${lg})`, e.texte.slice(0, 120));
+    ex++;
   }
-  const gFr = emailCompteExistant("fr", "https://pacevo.fr", "https://x.fr/c", ["google"]);
-  if (!gFr.texte.includes("Choisir un mot de passe") || gFr.texte.includes("Choisir un nouveau")) fail("compte Google : il faut CHOISIR un premier mot de passe", gFr.texte);
-  // Compte à mot de passe : pas un mot sur Google, qui l'enverrait vers le mauvais bouton.
-  const mFr = emailCompteExistant("fr", "https://pacevo.fr", "https://x.fr/c", ["email"]);
-  if (/Google/.test(mFr.texte)) fail("compte à mot de passe : Google mentionné à tort", mFr.texte);
-  if (!mFr.texte.includes("Choisir un nouveau mot de passe")) fail("compte à mot de passe : pas de « nouveau mot de passe »", mFr.texte);
-  if (gFr.objet === emailInscription("fr", "https://pacevo.fr", "https://x.fr/c").objet || gFr.objet === emailReinitialisation("fr", "https://pacevo.fr", "https://x.fr/c").objet) {
-    fail("compte existant : objet identique à l'inscription ou au reset", "le titulaire ne comprendrait pas qu'il a déjà un compte");
+  if (emailReinitialisation("fr", "https://pacevo.fr", "https://x.fr/c", "google").objet === emailReinitialisation("fr", "https://pacevo.fr", "https://x.fr/c").objet) {
+    fail("premier mot de passe : même objet que « réinitialise »", "faux pour qui n'en a jamais eu");
   }
-  if (emailCompteExistant("xx", "https://pacevo.fr", "https://x.fr/c", ["google"]).objet !== gFr.objet) fail("compte existant : langue inconnue sans repli français", "");
-  // La route : `email_exists` est traité AVANT la sortie générique, par la porte unique,
-  // avec un lien `recovery` construit sur `hashed_token` (jamais `action_link`).
-  const iExiste = route.indexOf('error?.code === "email_exists"'), iMuet = route.indexOf("if (error || !jeton)");
-  if (iExiste < 0) fail("la route ne traite pas l'adresse déjà inscrite", "écran « vérifiez votre email », boîte vide");
-  else if (iMuet >= 0 && iExiste > iMuet) fail("`email_exists` est traité APRÈS la sortie générique", "jamais atteint");
-  if (!/emailCompteExistant\(/.test(route) || !/envoyerEmail\("compte-existant"/.test(route)) fail("la route n'envoie pas « compte existant » par la porte unique", "");
-  const liensRoute = [...route.matchAll(/`\$\{BASE\}\/auth\/confirm\?([^`]*)`/g)].map((x) => x[1]);
-  if (!liensRoute.some((l) => l.includes("token_hash=") && l.includes("type=recovery") && l.includes("next=/reset-password"))) {
-    fail("le lien « choisir un mot de passe » ne vise pas /auth/confirm?…type=recovery&next=/reset-password", liensRoute.join(" | "));
-  }
-  // Plus de sortie muette : un échec de generateLink va au journal.
-  if (/if \(error \|\| !jeton\) return ok\(\);/.test(route)) fail("un échec de generateLink repart sans trace", "un écran « envoyé » sans e-mail, invisible dans /admin");
-  // Anti-annuaire : l'écran n'apprend QUE ce qui ne dit rien des comptes.
-  const PERMIS = new Set(["mot_de_passe_trop_court", "domaine_douteux", "domaine_sans_courrier"]);
-  for (const [, code] of route.matchAll(/ok:\s*false,\s*error:\s*"([a-z_]+)"/g)) {
-    if (!PERMIS.has(code)) fail(`la route révèle « ${code} » à l'écran`, "le formulaire deviendrait un annuaire");
-  }
-  if (/NextResponse\.json\([^)]*email_exists/.test(route)) fail("la route renvoie `email_exists` à l'écran", "annuaire ouvert");
-  // L'écran d'attente ne promet plus un « lien de confirmation » : il peut s'agir de l'autre message.
-  for (const lg of ["fr", "en", "de", "es", "pt"] as const) {
-    if (!AUTH[lg].signup.verifyText.includes("{email}")) fail(`${lg} : verifyText sans {email}`, AUTH[lg].signup.verifyText);
-  }
-  ex += 10;
-  console.log(`  ✓ adresse déjà inscrite : ${ex} cas (e-mail 6 langues × 5 comptes, libellés, route, anti-annuaire)`);
+  if (!/sansMotDePasse\(methodes\) \? fournisseurDe\(methodes\)/.test(reset)) fail("la route de reset n'envoie pas la variante « premier mot de passe »", "");
+  console.log(`  ✓ l'écran dit la vérité sur le compte : ${ex} cas (statut, limiteur, routes, pages, 5 langues, e-mail)`);
 
   console.log(`\n${NON.length + rendus + n + m + c + z + a + ex} cas hostiles · ${ko} problème(s)`);
   process.exit(ko ? 1 : 0);

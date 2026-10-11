@@ -5282,7 +5282,6 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
       ["src/app/api/objective/route.ts", "objectif"],
       ["src/app/api/messages/route.ts", "messages"],
       ["src/app/api/auth/confirmation/route.ts", "confirmation"],
-      ["src/app/api/auth/confirmation/route.ts", "compte-existant"],
       ["src/app/auth/confirm/route.ts", "inscription"],
       ["src/app/api/admin/broadcast/route.ts", "broadcast"],
       ["src/app/api/admin/send-email/route.ts", "admin-email"],
