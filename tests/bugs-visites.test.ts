@@ -281,6 +281,23 @@ test("l'inscription journalise ses échecs d'enregistrement, avec la source « o
     "l'échec de sauvegarde n'est plus envoyé au journal (ou plus avec la source onboarding)");
 });
 
+test("l'inscription ENREGISTRE par les deux chemins, et aucune écriture n'est muette (11/10/2026)", () => {
+  // ⚠️ Relevé le 11/10/2026 : après « connecter ma montre », le dernier bouton appelait
+  // `next` — écran « Terminé » sans AUCUNE écriture (profil, santé, jours, onboarding non
+  // terminé) : l'athlète perdait toutes ses réponses et retombait sur le questionnaire.
+  const src = codeNu("src/app/onboarding/page.tsx");
+  const appels = src.match(/onClick=\{handleFinish\}/g) ?? [];
+  assert.ok(appels.length >= 2, `handleFinish n'est appelé que par ${appels.length} bouton(s) : le chemin « montre » ne sauvegarde plus`);
+  assert.ok(!/onClick=\{next\}[^<]*>\s*\{[^}]*w3Configure/.test(src), "le bouton final du chemin montre repasse par `next` (aucune sauvegarde)");
+  // La 2ᵉ écriture (ancienneté, dénivelé, santé) n'est plus muette.
+  assert.ok(/const \{ error: eContexte \} = await supabase\.from\("profiles"\)\.update\(\{\s*warmup_min/.test(src), "l'écriture du contexte et de la santé n'est plus lue");
+  assert.ok(/noter\(eContexte, /.test(src), "l'échec de l'écriture du contexte n'entre pas dans les échecs signalés");
+  // Les FC facultatives : un échec va au journal, pas seulement à la console.
+  assert.ok(/if \(eFc\) \{[\s\S]{0,500}fetch\("\/api\/log-error"/.test(src), "l'échec des FC déclarées ne va plus au journal");
+  // L'étape Montre a un retour vers la question précédente.
+  assert.ok(/watchSubStep === 0 && !watchSaved && \([\s\S]{0,120}onClick=\{prev\}/.test(src), "l'étape Montre n'a plus de bouton Retour");
+});
+
 // ── 6. La mesure d'audience : ce qui entre en base, et ce qui n'y entre jamais ──
 test("/api/visite : l'adresse n'est jamais écrite, l'éditeur n'est pas compté, l'erreur est lue", () => {
   const src = codeNu("src/app/api/visite/route.ts");

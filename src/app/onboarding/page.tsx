@@ -205,7 +205,10 @@ export default function OnboardingPage() {
       onboarding_completed: true,
     }).eq("id", user.id);
 
-    await supabase.from("profiles").update({
+    // ⚠️ CETTE ÉCRITURE ÉTAIT MUETTE (relevé le 11/10/2026) : son résultat n'était pas lu.
+    // Elle porte l'ancienneté, le dénivelé et la santé — trois réponses qui changent la
+    // prescription. Un échec doit se voir, comme pour les disponibilités plus bas.
+    const { error: eContexte } = await supabase.from("profiles").update({
       warmup_min: profile.warmup_min,
       cooldown_min: profile.cooldown_min,
       long_run_mode: profile.long_run_mode,
@@ -234,6 +237,7 @@ export default function OnboardingPage() {
      */
     const echecs: string[] = [];
     const noter = (e: { message: string } | null, quoi: string) => { if (e) echecs.push(`${quoi}: ${e.message}`); };
+    noter(eContexte, "contexte et santé");
 
     const { error: eDispo } = await supabase.from("profiles").update({
       days_per_week: profile.days_per_week,
@@ -272,7 +276,15 @@ export default function OnboardingPage() {
         max_hr: parseInt(fc.max_hr) || null,
         resting_hr: parseInt(fc.resting_hr) || null,
       }).eq("id", user.id);
-      if (eFc) console.error("[inscription] FC déclarées non enregistrées (migration 029 passée ?) :", eFc.message);
+      if (eFc) {
+        console.error("[inscription] FC déclarées non enregistrées :", eFc.message);
+        // Facultatives, donc non bloquantes — mais plus jamais muettes : la console du
+        // navigateur n'est lue par personne, le journal /admin › Bugs l'est.
+        fetch("/api/log-error", {
+          method: "POST", headers: { "Content-Type": "application/json" }, keepalive: true,
+          body: JSON.stringify({ source: "onboarding", message: `fc: ${eFc.message}`, url: location.href }),
+        }).catch(() => {});
+      }
     }
 
     if (profileError || echecs.length) {
@@ -679,6 +691,15 @@ export default function OnboardingPage() {
                   <div className="text-xs text-zinc-400 font-medium">{watchSubStep + 1}/4</div>
                 </div>
 
+                {/* Retour à l'étape précédente : sans lui, l'étape Montre était un cul-de-sac
+                    (signalé par Cyprien le 11/10/2026). */}
+                {watchSubStep === 0 && !watchSaved && (
+                  <button type="button" onClick={prev} disabled={loading}
+                    className="btn-secondary w-full justify-center disabled:opacity-50">
+                    <ArrowLeft className="w-4 h-4" /> {tr("back")}
+                  </button>
+                )}
+
                 {/* Sortie facultative : on termine sans montre et on synchronisera plus tard.
                     C'est l'écran qui coûte le plus d'inscriptions — il ne doit jamais être un mur. */}
                 <button onClick={handleFinish} disabled={loading}
@@ -936,9 +957,13 @@ export default function OnboardingPage() {
                                 </div>
                               </>
                             )}
-                            <button onClick={next}
-                              className="btn-brand w-full justify-center">
-                              {tr("w3Configure")} <ArrowRight className="w-4 h-4" />
+                            {/* ⚠️ `handleFinish`, PAS `next` (relevé le 11/10/2026). `next` menait à
+                                l'écran « Terminé » SANS rien enregistrer : profil, santé, jours,
+                                onboarding non terminé — l'athlète qui branchait sa montre perdait
+                                toutes ses réponses et retombait sur le questionnaire. */}
+                            <button onClick={handleFinish} disabled={loading}
+                              className="btn-brand w-full justify-center disabled:opacity-50">
+                              {loading ? tr("saving") : <>{tr("w3Configure")} <ArrowRight className="w-4 h-4" /></>}
                             </button>
                           </div>
                         )}

@@ -142,8 +142,13 @@ test("l'inscription ne génère pas un plan sur des données qu'elle n'a pas pu 
   // prescrit en première séance et s'enregistre côté serveur (/api/vma), plus depuis le
   // navigateur. Les trois qui restent (disponibilités, terrains, terrain principal) portent
   // toutes le plan de la première semaine : elles, doivent rester bloquantes.
-  assert.equal([...bloc.matchAll(/noter\(/g)].length, 3,
-    "les trois écritures isolées BLOQUANTES de l'inscription ne sont plus toutes contrôlées");
+  // ⚠️ PAR LEUR NOM, plus par leur nombre : le 11/10/2026, l'écriture du contexte et de la
+  // santé (ancienneté, dénivelé, pathologies) est passée de MUETTE à contrôlée — un test qui
+  // exigeait « exactement trois » rougissait sur la correction même qu'il devait protéger.
+  for (const [e, quoi] of [["eContexte", "contexte et santé"], ["eDispo", "disponibilités"], ["eTer", "terrains"], ["eTer1", "terrain principal"]]) {
+    assert.ok(new RegExp(`noter\\(${e}, `).test(src), `l'écriture « ${quoi} » de l'inscription n'est plus contrôlée`);
+  }
+  assert.ok([...bloc.matchAll(/noter\(/g)].length >= 3, "les écritures isolées BLOQUANTES de l'inscription ne sont plus toutes contrôlées");
   assert.ok(/if\s*\(\s*profileError\s*\|\|\s*echecs\.length\s*\)/.test(src),
     "un échec partiel laisse l'inscription se poursuivre comme si tout allait bien");
   /**
@@ -157,7 +162,8 @@ test("l'inscription ne génère pas un plan sur des données qu'elle n'a pas pu 
    * Hors de `echecs`, donc. Mais PAS muette : sans cette trace, une colonne absente ferait
    * disparaître en silence ce que l'athlète vient de saisir, et personne ne l'apprendrait.
    */
-  assert.ok(/if \(eFc\) console\.error\(/.test(src),
+  // Et depuis le 11/10/2026, pas seulement dans la console (que personne ne lit) : au journal.
+  assert.ok(/if \(eFc\) \{[\s\S]{0,120}console\.error\([\s\S]{0,400}fetch\("\/api\/log-error"/.test(src),
     "l'échec d'écriture des FC déclarées est muet : la saisie de l'athlète disparaîtrait sans trace");
 });
 
