@@ -20,11 +20,15 @@ import { EcranLancement } from "@/components/layout/EcranLancement";
 import { MiseAJour } from "@/components/layout/MiseAJour";
 import { CLE_SESSION_LANCEMENT } from "@/lib/ui/lancement";
 import { DecorLancement } from "@/components/layout/DecorLancement";
+import { aConsenti } from "@/lib/auth/consentement";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  // Pas de tableau de bord sans accord ENREGISTRÉ aux données de santé (RGPD art. 9) :
+  // compte ouvert avec Google depuis la connexion, ou créé avant le 11/10/2026.
+  if (!aConsenti(user.app_metadata)) redirect("/consentement");
 
   // ⚠️ LE FUSEAU EST LU ICI, CÔTÉ SERVEUR, ET DESCENDU DANS L'ARBRE. C'est la seule
   // façon que le serveur et le navigateur écrivent le MÊME texte : le serveur tourne à

@@ -77,7 +77,9 @@ export default function LoginPage() {
       if (r?.status === 429) return { cas: "message", texte: L.errRate };
       const s = r?.ok ? ((await r.json().catch(() => null)) as StatutCompte | null) : null;
       if (s?.compte === "aucun") return { cas: "aucun_compte" };
-      if (s?.compte === "a_confirmer") return { cas: "a_confirmer" };
+      // Compte jamais confirmé ET mot de passe refusé : la personne ne connaît pas celui posé
+      // à l'inscription — peut-être pas le sien (pré-inscription). Voir la route d'inscription.
+      if (s?.compte === "a_confirmer") return { cas: "a_confirmer", motDePasseConnu: false };
       if (s?.compte === "actif") return sansMotDePasse(s.methodes) ? { cas: "via_oauth", methodes: s.methodes } : { cas: "mauvais_mot_de_passe" };
     }
     return { cas: "message", texte: messageErreurConnexion(message, L) };
@@ -107,7 +109,7 @@ export default function LoginPage() {
     setRenvoi({ enCours: true, fait: false });
     const r = await fetch("/api/auth/confirmation", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, lang, renvoi: true }),
+      body: JSON.stringify({ email, lang, renvoi: true, motDePasseConnu: !(aide?.cas === "a_confirmer" && aide.motDePasseConnu === false) }),
     }).catch(() => null);
     const j = r ? await r.json().catch(() => null) : null;
     if (r?.ok && j?.ok) { setRenvoi({ enCours: false, fait: true }); return; }

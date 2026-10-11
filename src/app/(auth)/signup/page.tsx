@@ -13,6 +13,7 @@ import { BoutonsOAuth } from "@/components/auth/BoutonsOAuth";
 import { AideCompte, type Situation } from "@/components/auth/AideCompte";
 import type { Methode, StatutCompte } from "@/lib/auth/statut";
 import { memoriserEmail, reprendreEmail } from "@/lib/auth/emailMemorise";
+import { COOKIE_ACCORD } from "@/lib/auth/consentement";
 import { JOURS_ESSAI } from "@/lib/billing/access";
 
 export default function SignupPage() {
@@ -79,7 +80,11 @@ export default function SignupPage() {
 
   /** « Continuer avec Google » crée un compte : la case d'accord est exigée d'abord. */
   function accordDonne(): boolean {
-    if (accord) return true;
+    if (accord) {
+      // La case est cochée : `/auth/callback` l'enregistrera au retour de Google (15 min).
+      document.cookie = `${COOKIE_ACCORD}=1; Max-Age=900; Path=/; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
+      return true;
+    }
     setAccordManquant(true);
     document.getElementById(`${cid}-accord`)?.focus();
     return false;
@@ -101,7 +106,7 @@ export default function SignupPage() {
     // arriver DEUX e-mails de confirmation.
     const rep = await fetch("/api/auth/confirmation", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: form.email, password: form.password, fullName: form.fullName, lang, domaineConfirme }),
+      body: JSON.stringify({ email: form.email, password: form.password, fullName: form.fullName, lang, domaineConfirme, accord }),
     }).catch(() => null);
     const j = rep ? await rep.json().catch(() => null) : null;
     setLoading(false);
@@ -121,7 +126,7 @@ export default function SignupPage() {
       return;
     }
     if (!rep?.ok || !j?.ok) {
-      toast.error(j?.error === "mot_de_passe_trop_court" ? L.pwShort : rep?.status === 429 ? Lc.errRate : A.envoiImpossible);
+      toast.error(j?.error === "mot_de_passe_trop_court" ? L.pwShort : j?.error === "accord_requis" ? A.consentement : rep?.status === 429 ? Lc.errRate : A.envoiImpossible);
       return;
     }
     setStep("verify");
@@ -141,7 +146,10 @@ export default function SignupPage() {
     setLoading(true);
     const rep = await fetch("/api/auth/confirmation", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: form.email, password: form.password, fullName: form.fullName, lang, domaineConfirme: true }),
+      // `renvoi` : un nouveau lien pour le compte qu'on vient de créer, sans repasser par
+      // l'inscription — qui, sur un compte non confirmé, impose de rechoisir le mot de passe
+      // à la confirmation (protection contre la pré-inscription, voir la route).
+      body: JSON.stringify({ email: form.email, lang, renvoi: true, motDePasseConnu: true }),
     }).catch(() => null);
     setLoading(false);
     if (!rep?.ok) { toast.error(rep?.status === 429 ? Lc.errRate : A.envoiImpossible); return; }

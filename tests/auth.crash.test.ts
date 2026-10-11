@@ -23,6 +23,7 @@ import { fournisseursActifs } from "../src/lib/auth/fournisseurs";
 import { emailInscription, emailReinitialisation } from "../src/lib/auth/emailConfirmation";
 import { statutDepuisUtilisateur, sansMotDePasse, fournisseurDe } from "../src/lib/auth/statut";
 import { autoriser } from "../src/lib/auth/limiteur";
+import { aConsenti, champsConsentement, CONSENTEMENT_EFFACE, COOKIE_ACCORD } from "../src/lib/auth/consentement";
 import { ech } from "../src/lib/newsletter/gabarit";
 import { readFileSync } from "node:fs";
 import { suggestionDomaine, distance, domaineRecoitDuCourrier, FOURNISSEURS_COURANTS } from "../src/lib/auth/domaineCourrier";
@@ -408,6 +409,75 @@ console.log(`  ✓ e-mail : ${rendus} rendus (${LANGS.length} langues × ${LIENS
   if (!/sansMotDePasse\(methodes\) \? fournisseurDe\(methodes\)/.test(reset)) fail("la route de reset n'envoie pas la variante « premier mot de passe »", "");
   console.log(`  ✓ l'écran dit la vérité sur le compte : ${ex} cas (statut, limiteur, routes, pages, 5 langues, e-mail)`);
 
-  console.log(`\n${NON.length + rendus + n + m + c + z + a + ex} cas hostiles · ${ko} problème(s)`);
+  // ── PRÉ-INSCRIPTION ET ACCORD AUX DONNÉES DE SANTÉ (11/10/2026) ──────────────────────
+  // ⚠️ 1. GoTrue garde le PREMIER mot de passe d'un compte non confirmé qu'on réinscrit :
+  // quiconque inscrivait l'adresse d'un autre récupérait le compte au clic du titulaire.
+  // ⚠️ 2. « Continuer avec Google » depuis la connexion créait un compte sans jamais montrer
+  // la case des données de santé, et l'accord n'était enregistré nulle part.
+  let pc = 0;
+  const lireC = (f: string) => readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  // a) L'accord : présent seulement s'il est daté ; effacer met chaque champ à null.
+  if (aConsenti(undefined) || aConsenti({}) || aConsenti({ consentement_sante_le: "" }) || aConsenti({ consentement_sante_le: null })) fail("aConsenti accepte un accord absent", "");
+  if (!aConsenti(champsConsentement("ecran"))) fail("aConsenti refuse un accord enregistré", "");
+  const ch = champsConsentement("google", new Date("2026-10-11T12:00:00Z"));
+  if (ch.consentement_sante_via !== "google" || ch.consentement_sante_le !== "2026-10-11T12:00:00.000Z" || !ch.consentement_version) fail("champsConsentement incomplet", JSON.stringify(ch));
+  if (Object.values(CONSENTEMENT_EFFACE).some((v) => v !== null) || Object.keys(CONSENTEMENT_EFFACE).sort().join() !== Object.keys(ch).sort().join()) fail("CONSENTEMENT_EFFACE n'efface pas tous les champs", "");
+  pc += 4;
+  // b) La route d'inscription : accord exigé et enregistré ; réinscription = mot de passe
+  // neutralisé AVANT tout envoi, et aucun lien si la neutralisation échoue.
+  const rC = lireC("src/app/api/auth/confirmation/route.ts");
+  if (!/if \(accord !== true\)[\s\S]{0,120}"accord_requis"/.test(rC)) fail("l'inscription n'exige pas l'accord côté serveur", "un appel direct créerait un compte sans accord");
+  if (!/champsConsentement\("inscription"\)/.test(rC)) fail("l'accord donné à l'inscription n'est pas enregistré", "");
+  if (!/statut\?\.compte === "a_confirmer" \? "conteste"/.test(rC)) fail("une réinscription d'un compte non confirmé n'est pas « contestée »", "pré-inscription ouverte");
+  if (!/motDePasseConnu === false \? "conteste"/.test(rC)) fail("le renvoi sans mot de passe connu ne neutralise rien", "pré-inscription par « renvoyer l'e-mail »");
+  if (!/password: randomBytes\(/.test(rC) || !/mdp_a_choisir: true, \.\.\.CONSENTEMENT_EFFACE/.test(rC)) fail("le mot de passe contesté n'est pas rendu aléatoire, ou la marque/l'accord manquent", "");
+  const iNeutre = rC.indexOf("password: randomBytes("), iEnvoiLien = rC.indexOf('envoyerEmail("confirmation"');
+  if (iNeutre < 0 || iNeutre > iEnvoiLien) fail("la neutralisation vient APRÈS l'envoi du lien", "le lien confirmerait le mot de passe de l'intrus");
+  if (!/if \(e\) \{[\s\S]{0,200}return NextResponse\.json\(\{ ok: false, error: "envoi_impossible" \}/.test(rC)) fail("un échec de neutralisation laisse partir le lien", "");
+  // ⚠️ Changer le mot de passe REMET À ZÉRO tous les jetons (GoTrue `UpdatePassword`) : le
+  // lien doit être regénéré APRÈS la neutralisation, sinon le titulaire reçoit un lien mort
+  // (vu sur un essai réel le 11/10/2026).
+  const iRegen = rC.indexOf("({ data, error } = await generer())");
+  if (iRegen < iNeutre || iRegen > iEnvoiLien) fail("le lien n'est pas regénéré entre la neutralisation et l'envoi", "le titulaire recevrait un lien « invalide ou expiré »");
+  const iLien = rC.indexOf("const lien = `${BASE}/auth/confirm");
+  if (iLien < iRegen) fail("le lien envoyé est construit AVANT la regénération", "");
+  if (!/Date\.parse\(String\(compte\?\.created_at/.test(rC)) fail("un compte préexistant n'est pas détecté quand la recherche est en panne", "");
+  pc += 10;
+  // c) La confirmation fait choisir le mot de passe à celui qui clique.
+  const rConf = lireC("src/app/auth/confirm/route.ts");
+  if (!/user\.app_metadata\?\.mdp_a_choisir/.test(rConf) || !/lienChoixMotDePasse\(/.test(rConf)) fail("/auth/confirm ignore la marque « mot de passe à choisir »", "");
+  if (!/type=recovery&next=\$\{encodeURIComponent\("\/reset-password\?apres=inscription"\)\}/.test(rConf)) fail("le lien de choix ne mène pas à /reset-password?apres=inscription", "");
+  if (!/apres"\) === "inscription"/.test(lireC("src/app/(auth)/reset-password/page.tsx"))) fail("/reset-password n'explique pas pourquoi on choisit un mot de passe", "");
+  pc += 3;
+  // d) L'accord : enregistré au retour de Google si coché à l'inscription, sinon demandé ;
+  // aucune page de l'application sans accord.
+  const rCb = lireC("src/app/auth/callback/route.ts");
+  if (!/!aConsenti\(user\.app_metadata\)/.test(rCb) || !/\/consentement\?next=/.test(rCb)) fail("le retour de Google ne demande pas l'accord", "compte Google ouvert depuis la connexion sans accord");
+  if (!/COOKIE_ACCORD/.test(rCb) || !/champsConsentement\("google"\)/.test(rCb)) fail("l'accord coché avant Google n'est pas enregistré au retour", "");
+  for (const f of ["src/app/dashboard/layout.tsx", "src/app/onboarding/layout.tsx"]) {
+    if (!/if \([^)]*!aConsenti\(user\.app_metadata\)\) redirect\("\/consentement/.test(lireC(f))) fail(`${f} s'ouvre sans accord enregistré`, "");
+  }
+  const rApi = lireC("src/app/api/auth/consentement/route.ts");
+  if (!/if \(!user\) return NextResponse\.json\(\{ ok: false, error: "non_connecte" \}/.test(rApi)) fail("/api/auth/consentement accepte un visiteur anonyme", "");
+  if (!/accord !== true/.test(rApi) || !/updateUserById\(user\.id,/.test(rApi)) fail("/api/auth/consentement écrit sans geste explicite, ou pour un autre compte", "");
+  const pCons = lireC("src/app/(auth)/consentement/page.tsx");
+  if (!/useState\(false\)/.test(pCons) || !/disabled=\{!accord \|\| loading\}/.test(pCons)) fail("la case d'accord est pré-cochée ou le bouton passe sans elle", "un accord explicite est un geste");
+  const pS = lireC("src/app/(auth)/signup/page.tsx");
+  if (!/domaineConfirme, accord \}/.test(pS)) fail("l'inscription n'envoie pas l'accord au serveur", "");
+  if (!/document\.cookie = `\$\{COOKIE_ACCORD\}=1/.test(pS)) fail("« Continuer avec Google » à l'inscription ne transmet pas la case cochée", "l'accord serait redemandé");
+  if (!/renvoi: true, motDePasseConnu: true/.test(pS)) fail("« Renvoyer » de l'inscription repasse par la réinscription", "un simple renvoi imposerait de rechoisir le mot de passe");
+  if (!/motDePasseConnu: false/.test(lireC("src/app/(auth)/login/page.tsx"))) fail("la connexion ne signale pas un mot de passe inconnu au renvoi", "");
+  if (COOKIE_ACCORD !== "pacevo_accord") fail("le nom du cookie d'accord a changé sans la page", "");
+  pc += 11;
+  // e) Les textes, dans les 5 langues.
+  for (const lg of ["fr", "en", "de", "es", "pt"] as const) {
+    const cs = AUTH[lg].consentement;
+    if (!cs?.title || !cs.intro || !cs.submit || !cs.logout || !cs.erreur) fail(`${lg} : textes de /consentement incomplets`, "");
+    if (!AUTH[lg].reset.apresInscription) fail(`${lg} : reset.apresInscription absent`, "");
+  }
+  pc++;
+  console.log(`  ✓ pré-inscription & accord santé : ${pc} cas (neutralisation avant envoi, choix au clic, accord exigé/enregistré/redemandé)`);
+
+  console.log(`\n${NON.length + rendus + n + m + c + z + a + ex + pc} cas hostiles · ${ko} problème(s)`);
   process.exit(ko ? 1 : 0);
 })();

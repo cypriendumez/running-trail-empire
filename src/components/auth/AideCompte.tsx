@@ -27,8 +27,9 @@ export type Situation =
   /** Connexion : mot de passe tenté sur un compte qui s'ouvre avec Google/Apple. */
   | { cas: "via_oauth"; methodes: Methode[] }
   | { cas: "mauvais_mot_de_passe" }
-  /** Compte créé par e-mail, lien de confirmation jamais cliqué. */
-  | { cas: "a_confirmer" }
+  /** Compte créé par e-mail, lien de confirmation jamais cliqué. `motDePasseConnu: false` :
+   *  la connexion a refusé le mot de passe — le renvoi neutralise alors celui de l'inscription. */
+  | { cas: "a_confirmer"; motDePasseConnu?: boolean }
   | { cas: "message"; texte: string };
 
 const NOMS = { google: "Google", apple: "Apple" } as const;

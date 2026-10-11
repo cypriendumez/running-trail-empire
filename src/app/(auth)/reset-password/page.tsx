@@ -24,11 +24,15 @@ export default function ResetPasswordPage() {
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState<boolean | null>(null); // session de récupération présente ?
+  // Arrivée depuis une confirmation d'inscription CONTESTÉE (adresse réinscrite avant d'être
+  // confirmée) : on dit pourquoi on demande un mot de passe. Voir /auth/confirm.
+  const [apresInscription, setApresInscription] = useState(false);
 
   // Après le clic sur le lien de l'email → /auth/callback a posé la session → on doit avoir un user.
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data }) => setReady(!!data.user));
+    setApresInscription(new URLSearchParams(window.location.search).get("apres") === "inscription");
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -56,6 +60,9 @@ export default function ResetPasswordPage() {
           </div>
           <h1 className="text-2xl font-bold text-zinc-900">{L.title}</h1>
           <p className="text-zinc-500 text-sm mt-1">{L.subtitle}</p>
+          {apresInscription && (
+            <p role="status" className="mt-4 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{L.apresInscription}</p>
+          )}
         </div>
 
         {ready === false ? (
