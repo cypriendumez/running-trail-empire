@@ -155,5 +155,23 @@ test("la migration 035 crée la colonne, bornée comme le curseur", () => {
   assert.ok(/target_weekly_km between 5 and 300/.test(sql));
 });
 
+console.log("\nAPPLE WATCH — le chemin existe là où on le cherche");
+
+test("l'étape Montre du questionnaire explique l'Apple Watch, avec le lien de l'app", () => {
+  // Le 11/10/2026, Cyprien a cherché une carte Apple sur intervals.icu : il n'y en a pas.
+  const src = code("src/app/onboarding/page.tsx");
+  assert.ok(/tr\("wApple"\)/.test(src), "l'étape Montre ne dit plus rien de l'Apple Watch");
+  assert.ok(/href="https:\/\/apps\.apple\.com\/app\/id6739638454"/.test(src), "le lien vers Intervals Companion a disparu du questionnaire");
+  const ob = readFileSync("src/app/onboarding/onboardingI18n.ts", "utf8");
+  assert.equal((ob.match(/wApple: /g) ?? []).length, 5, "le texte Apple Watch manque dans une langue");
+  assert.equal((ob.match(/wAppleLien: /g) ?? []).length, 5, "le libellé du lien manque dans une langue");
+});
+
+test("la page Sync Montre donne le même lien direct", () => {
+  const src = code("src/app/dashboard/sync/page.tsx");
+  assert.ok(/href="https:\/\/apps\.apple\.com\/app\/id6739638454"/.test(src), "le lien App Store manque sur la page Sync Montre");
+  assert.equal((readFileSync("src/app/dashboard/sync/syncI18n.tsx", "utf8").match(/"s1\.appleLien": /g) ?? []).length, 5);
+});
+
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }

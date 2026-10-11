@@ -723,6 +723,17 @@ export default function OnboardingPage() {
                         </ul>
                         <p className="mt-2 max-w-prose text-sm leading-relaxed text-zinc-500">{tr("w1Garmin")}</p>
                       </div>
+                      {/* APPLE WATCH : aucune carte Apple chez intervals.icu — Cyprien l'a cherchée en vain le
+                          11/10/2026. L'app iPhone tierce « Intervals Companion » fait le pont dans les deux sens
+                          (séances, VFC, sommeil vers intervals.icu ; plan vers la montre). Pacevo écrit le plan
+                          dans le calendrier intervals.icu même sans marque reliée : l'app l'y trouve. */}
+                      <div className="max-w-prose rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
+                        <p className="text-sm leading-relaxed text-zinc-700">{tr("wApple")}</p>
+                        <a href="https://apps.apple.com/app/id6739638454" target="_blank" rel="noopener noreferrer"
+                          className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-700 underline-offset-2 hover:underline">
+                          {tr("wAppleLien")} <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" />
+                        </a>
+                      </div>
                       <div className="flex flex-wrap gap-2">
                         <a href="https://intervals.icu/settings/connections" target="_blank" rel="noopener noreferrer" className={`btn-brand ${lienExterne}`}>
                           {tr("w1Open")} <ExternalLink aria-hidden="true" className="h-4 w-4" />

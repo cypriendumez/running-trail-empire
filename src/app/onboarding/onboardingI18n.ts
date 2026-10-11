@@ -6,6 +6,7 @@ type Dict = Record<string, string>;
 
 export const OB: Record<Lang, Dict> = {
   fr: {
+    wApple: "Apple Watch ? Il n'y a pas de carte Apple sur intervals.icu. Installe l'app iPhone gratuite « Intervals Companion », connecte-la à ton compte intervals.icu et autorise l'accès à Santé : tes séances, ta VFC et ton sommeil y arriveront, et l'app peut aussi envoyer ton plan sur ta montre.", wAppleLien: "Intervals Companion sur l'App Store",
     w1Perm4: "Envoyer les entraînements planifiés depuis Intervals (tes séances arrivent sur la montre)",
     missingShort: "À renseigner",
     // Refonte du 11/10/2026 (questionnaire en 4 étapes équilibrées).
@@ -78,6 +79,7 @@ export const OB: Record<Lang, Dict> = {
     tConnectFirst: "Connectez d'abord votre montre pour continuer.", tCantVerify: "Impossible de vérifier la connexion à votre montre.", tSaveError: "Erreur lors de la sauvegarde",
   },
   en: {
+    wApple: "Apple Watch? There's no Apple card on intervals.icu. Install the free iPhone app “Intervals Companion”, connect it to your intervals.icu account and allow access to Health: your sessions, HRV and sleep will arrive, and the app can also send your plan to your watch.", wAppleLien: "Intervals Companion on the App Store",
     w1Perm4: "Send planned workouts from Intervals (your sessions reach your watch)",
     missingShort: "Required",
     // Refonte du 11/10/2026 (questionnaire en 4 étapes équilibrées).
@@ -150,6 +152,7 @@ export const OB: Record<Lang, Dict> = {
     tConnectFirst: "Connect your watch first to continue.", tCantVerify: "Couldn't verify your watch connection.", tSaveError: "Error while saving",
   },
   de: {
+    wApple: "Apple Watch? Auf intervals.icu gibt es keine Apple-Karte. Installiere die kostenlose iPhone-App „Intervals Companion“, verbinde sie mit deinem intervals.icu-Konto und erlaube den Zugriff auf Health: Deine Einheiten, deine HRV und dein Schlaf kommen an, und die App kann deinen Plan auch auf die Uhr schicken.", wAppleLien: "Intervals Companion im App Store",
     w1Perm4: "Geplante Trainings von Intervals senden (deine Einheiten kommen auf die Uhr)",
     missingShort: "Pflichtangabe",
     // Refonte du 11/10/2026 (questionnaire en 4 étapes équilibrées).
@@ -222,6 +225,7 @@ export const OB: Record<Lang, Dict> = {
     tConnectFirst: "Verbinde zuerst deine Uhr, um fortzufahren.", tCantVerify: "Verbindung zur Uhr konnte nicht geprüft werden.", tSaveError: "Fehler beim Speichern",
   },
   es: {
+    wApple: "¿Apple Watch? No hay tarjeta de Apple en intervals.icu. Instala la app gratuita para iPhone «Intervals Companion», conéctala a tu cuenta de intervals.icu y permite el acceso a Salud: llegarán tus sesiones, tu VFC y tu sueño, y la app también puede enviar tu plan al reloj.", wAppleLien: "Intervals Companion en la App Store",
     w1Perm4: "Enviar los entrenamientos planificados desde Intervals (tus sesiones llegan al reloj)",
     missingShort: "Por completar",
     // Refonte du 11/10/2026 (questionnaire en 4 étapes équilibrées).
@@ -294,6 +298,7 @@ export const OB: Record<Lang, Dict> = {
     tConnectFirst: "Conecta primero tu reloj para continuar.", tCantVerify: "No se pudo verificar la conexión de tu reloj.", tSaveError: "Error al guardar",
   },
   pt: {
+    wApple: "Apple Watch? Não há cartão da Apple no intervals.icu. Instala a app gratuita para iPhone «Intervals Companion», liga-a à tua conta intervals.icu e autoriza o acesso à Saúde: as tuas sessões, a tua VFC e o teu sono vão chegar, e a app também pode enviar o teu plano para o relógio.", wAppleLien: "Intervals Companion na App Store",
     w1Perm4: "Enviar os treinos planeados a partir do Intervals (as tuas sessões chegam ao relógio)",
     missingShort: "Por preencher",
     // Refonte du 11/10/2026 (questionnaire en 4 étapes équilibrées).

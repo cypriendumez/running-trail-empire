@@ -647,7 +647,11 @@ export default function SyncPage() {
                       l'athlète venu pour ça arrivait sur un guide qui ne nomme que Garmin,
                       COROS, Polar et Suunto — et repartait. */}
                   <p className="mt-2 rounded-lg bg-zinc-50 px-3 py-2 text-xs leading-relaxed text-zinc-500">
-                    {d["s1.apple"]}
+                    {d["s1.apple"]}{" "}
+                    <a href="https://apps.apple.com/app/id6739638454" target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 font-semibold text-emerald-700 underline-offset-2 hover:underline">
+                      {d["s1.appleLien"]} <ExternalLink aria-hidden="true" className="h-3 w-3" />
+                    </a>
                   </p>
                   <a href="https://intervals.icu" target="_blank" rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-zinc-900 hover:bg-zinc-700 px-3 py-2 rounded-lg mt-3 transition-colors">
