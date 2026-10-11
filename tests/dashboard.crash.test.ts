@@ -37,11 +37,14 @@ function test(name: string, fn: () => void) {
 const AUJOURD_HUI = "2026-09-02";
 const jour = (n: number) => decaleJour(AUJOURD_HUI, -n);
 const sain = (v: number) => Number.isFinite(v) && !Number.isNaN(v);
+// ⚠️ La fenêtre des zones se compte depuis CE jour figé, pas depuis la date réelle : le
+// 11/10/2026, `jour(4)` (29/08) est sorti des 42 jours et deux tests ont rougi seuls.
+const zonesAu = (w: Parameters<typeof computeHrZones>[0]) => computeHrZones(w, AUJOURD_HUI);
 
 console.log("\nZONES — le temps en zone ne s'invente pas");
 
 test("aucune entrée : zéro partout, jamais NaN", () => {
-  const z = computeHrZones([]);
+  const z = zonesAu([]);
   assert.equal(z.total, 0);
   assert.equal(z.seances, 0);
   for (const s of z.secs) assert.ok(sain(s) && s === 0, "une zone vaut NaN sur un historique vide");
@@ -50,7 +53,7 @@ test("aucune entrée : zéro partout, jamais NaN", () => {
 test("des séances SANS temps en zone ne produisent aucune zone — elles sont comptées à part", () => {
   // C'est la promesse centrale : quand la montre n'a rien mesuré, on ne déduit rien
   // d'une FC moyenne. On le dit, en comptant les séances écartées.
-  const z = computeHrZones([
+  const z = zonesAu([
     { date: jour(1), sport: "run", hr_zone_seconds: null },
     { date: jour(2), sport: "run" },
     { date: jour(3), sport: "run", hr_zone_seconds: [] },
@@ -62,7 +65,7 @@ test("des séances SANS temps en zone ne produisent aucune zone — elles sont c
 });
 
 test("vélo, rando et marche n'entrent jamais dans les zones de course", () => {
-  const z = computeHrZones([
+  const z = zonesAu([
     { date: jour(1), sport: "bike", hr_zone_seconds: [9000, 0, 0, 0, 0, 0, 0] },
     { date: jour(2), sport: "hike", hr_zone_seconds: [9000, 0, 0, 0, 0, 0, 0] },
     { date: jour(3), sport: "walk", hr_zone_seconds: [9000, 0, 0, 0, 0, 0, 0] },
@@ -73,19 +76,19 @@ test("vélo, rando et marche n'entrent jamais dans les zones de course", () => {
 });
 
 test("une montre qui renvoie 7 tranches ne perd rien : tout au-dessus de la 5e est agrégé", () => {
-  const z = computeHrZones([{ date: jour(1), sport: "run", hr_zone_seconds: [10, 20, 30, 40, 50, 60, 70] }]);
+  const z = zonesAu([{ date: jour(1), sport: "run", hr_zone_seconds: [10, 20, 30, 40, 50, 60, 70] }]);
   assert.equal(z.total, 280, "du temps mesuré a été perdu en route");
   assert.equal(z.secs[4], 50 + 60 + 70, "les zones hautes ne sont pas agrégées dans la dernière bande");
 });
 
 test("une montre qui renvoie moins de tranches ne fait pas planter le calcul", () => {
-  const z = computeHrZones([{ date: jour(1), sport: "run", hr_zone_seconds: [100, 200] }]);
+  const z = zonesAu([{ date: jour(1), sport: "run", hr_zone_seconds: [100, 200] }]);
   assert.equal(z.total, 300);
   for (const s of z.secs) assert.ok(sain(s));
 });
 
 test("valeurs corrompues : null, négatif, texte, Infinity", () => {
-  const z = computeHrZones([
+  const z = zonesAu([
     { date: jour(1), sport: "run", hr_zone_seconds: [100, null as never, "x" as never, Infinity as never, NaN as never] },
   ]);
   for (const s of z.secs) assert.ok(sain(s), `une zone vaut ${s}`);
@@ -93,13 +96,13 @@ test("valeurs corrompues : null, négatif, texte, Infinity", () => {
 });
 
 test("hors fenêtre de 6 semaines : rien n'est compté", () => {
-  const z = computeHrZones([{ date: jour(60), sport: "run", hr_zone_seconds: [3600, 0, 0, 0, 0] }]);
+  const z = zonesAu([{ date: jour(60), sport: "run", hr_zone_seconds: [3600, 0, 0, 0, 0] }]);
   assert.equal(z.total, 0, "une séance vieille de 60 jours entre encore dans la fenêtre");
 });
 
 test("une date illisible ne fait pas exploser le calcul", () => {
   for (const d of ["", "pas-une-date", "0000-00-00", "2026-13-45"]) {
-    const z = computeHrZones([{ date: d, sport: "run", hr_zone_seconds: [600, 0, 0, 0, 0] }]);
+    const z = zonesAu([{ date: d, sport: "run", hr_zone_seconds: [600, 0, 0, 0, 0] }]);
     assert.ok(sain(z.total), `date « ${d} » → total ${z.total}`);
   }
 });

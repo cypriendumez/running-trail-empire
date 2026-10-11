@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { emailInscription } from "@/lib/auth/emailConfirmation";
+import { emailCompteExistant, emailInscription } from "@/lib/auth/emailConfirmation";
 import { envoyerEmail } from "@/lib/email/envoyer";
 import { domaineRecoitDuCourrier, suggestionDomaine } from "@/lib/auth/domaineCourrier";
 
@@ -18,6 +18,10 @@ import { domaineRecoitDuCourrier, suggestionDomaine } from "@/lib/auth/domaineCo
  * cas transformerait le formulaire d'inscription en annuaire : il suffirait d'essayer
  * des adresses pour savoir qui a un compte. C'est la même règle que « mot de passe
  * oublié », et elle vaut ici pour la même raison.
+ *
+ * ⚠️ MAIS LA BOÎTE, ELLE, REÇOIT TOUJOURS QUELQUE CHOSE. Adresse neuve → le lien de
+ * confirmation ; adresse déjà inscrite → « tu as déjà un compte », avec la façon d'y entrer.
+ * Seul le titulaire lit ce message : l'annuaire reste fermé, et personne n'attend en vain.
  *
  * ⚠️ LE LIEN EST À USAGE UNIQUE ET DATÉ. Il n'est ni journalisé, ni renvoyé au client :
  * il ne sort d'ici que par l'e-mail.
@@ -93,13 +97,75 @@ export async function POST(req: Request) {
     // `hashed_token`, que `/auth/confirm` vérifie lui-même (`verifyOtp`) : la session naît dans
     // nos cookies et la personne arrive sur /onboarding.
     const jeton = (data as { properties?: { hashed_token?: string } } | null)?.properties?.hashed_token;
-    if (error || !jeton) return ok();
+
+    // ⚠️ ADRESSE DÉJÀ PRISE : avant le 11/10/2026, ON N'ENVOYAIT RIEN. L'écran affichait
+    // « Vérifiez votre email » et la personne attendait un message qui ne partirait jamais
+    // (vécu par Cyprien avec une adresse déjà ouverte par Google). Supabase refuse le
+    // doublon d'un compte CONFIRMÉ (`email_exists`, sans rien écrire) ; on écrit donc au
+    // titulaire de l'adresse que son compte existe, et comment y entrer. La réponse à
+    // l'écran reste la même (`ok`) : l'annuaire reste fermé, seule la boîte est renseignée.
+    if (error?.code === "email_exists") {
+      await prevenirCompteExistant(admin, adresse, String(lang ?? "fr"), BASE, FROM);
+      return ok();
+    }
+    // Tout autre refus était muet lui aussi : il va au journal (/admin › Bugs).
+    if (error || !jeton) {
+      await journaliser(`Lien d'inscription non généré pour ${adresse} : ${error ? `${error.code ?? error.status ?? "?"} — ${error.message}` : "pas de hashed_token"}`, { lang });
+      return ok();
+    }
     const lien = `${BASE}/auth/confirm?token_hash=${encodeURIComponent(jeton)}&type=signup&next=/onboarding`;
 
     const { objet, html, texte } = emailInscription(String(lang ?? "fr"), BASE, lien);
     await envoyerEmail("confirmation", { from: FROM, to: [adresse], subject: objet, text: texte, html },
       { url: "/api/auth/confirmation", meta: { lang } });
-  } catch { /* jamais d'échec visible pour l'appelant : voir l'en-tête ; l'échec est journalisé */ }
+  } catch (e) {
+    // Jamais d'échec visible pour l'appelant (voir l'en-tête) — mais jamais muet non plus.
+    await journaliser(`Inscription de ${adresse} : exception — ${e instanceof Error ? e.message : String(e)}`, { lang });
+  }
 
   return ok();
+}
+
+/**
+ * Écrit au titulaire d'une adresse déjà inscrite : son compte existe, voici comment y entrer.
+ *
+ * Le lien joint est un lien `recovery` (même forme que « mot de passe oublié ») : il permet
+ * de choisir un mot de passe, y compris le PREMIER d'un compte ouvert avec Google. Il ne
+ * sort d'ici que par l'e-mail, vers la boîte du titulaire — exactement comme celui de
+ * `/api/auth/reset`, que n'importe qui peut déjà déclencher.
+ */
+async function prevenirCompteExistant(
+  admin: ReturnType<typeof createAdminClient>, adresse: string, lang: string, BASE: string, FROM: string,
+): Promise<void> {
+  const { data, error } = await admin.auth.admin.generateLink({
+    type: "recovery",
+    email: adresse,
+  } as Parameters<typeof admin.auth.admin.generateLink>[0]);
+  const jeton = (data as { properties?: { hashed_token?: string } } | null)?.properties?.hashed_token;
+  if (error || !jeton) {
+    await journaliser(`Compte existant ${adresse} : lien de mot de passe non généré — ${error ? `${error.code ?? error.status ?? "?"} — ${error.message}` : "pas de hashed_token"}`, { lang });
+    return;
+  }
+  const compte = data.user;
+  const fournisseurs = Array.isArray(compte?.app_metadata?.providers)
+    ? (compte.app_metadata.providers as unknown[]).map(String)
+    : [String(compte?.app_metadata?.provider ?? "email")];
+  const lien = `${BASE}/auth/confirm?token_hash=${encodeURIComponent(jeton)}&type=recovery&next=/reset-password`;
+
+  const { objet, html, texte } = emailCompteExistant(lang, BASE, lien, fournisseurs);
+  await envoyerEmail("compte-existant", { from: FROM, to: [adresse], subject: objet, text: texte, html },
+    { url: "/api/auth/confirmation", userId: compte?.id ?? null, meta: { lang, fournisseurs } });
+}
+
+/** Un échec AVANT l'envoi (lien non généré, exception) : même journal que les refus de Resend. */
+async function journaliser(message: string, meta: Record<string, unknown>): Promise<void> {
+  try {
+    const { error } = await createAdminClient().from("error_logs").insert({
+      user_id: null, source: "confirmation", message: message.slice(0, 2000),
+      url: "/api/auth/confirmation", meta,
+    });
+    if (error) console.error("[confirmation] journal non écrit :", error.message);
+  } catch (e) {
+    console.error("[confirmation] journal non écrit :", e instanceof Error ? e.message : String(e));
+  }
 }

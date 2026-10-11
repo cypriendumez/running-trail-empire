@@ -37,12 +37,14 @@ export type SeanceZones = {
 //    dans chaque zone par la montre (intervals.icu → `icu_hr_zone_times`). Aucune
 //    estimation : quand la donnée manque, la séance est écartée du calcul et le
 //    nombre de séances retenues est annoncé sous le graphe.
-export function computeHrZones(workouts: SeanceZones[]): { secs: number[]; total: number; seances: number; ecartees: number } {
+// `aujourdhui` : jour de référence de la fenêtre (aujourd'hui par défaut). Les tests le
+// figent — sans lui, leurs dates « il y a 4 jours » sortaient de la fenêtre avec le temps.
+export function computeHrZones(workouts: SeanceZones[], aujourdhui?: string): { secs: number[]; total: number; seances: number; ecartees: number } {
   const secs = [0, 0, 0, 0, 0];
   let seances = 0, ecartees = 0;
   for (const w of workouts) {
     // Six semaines de CALENDRIER, pas 1008 heures glissantes : voir `fenetre.ts`.
-    if (!dansFenetre(w.date, 42)) continue;
+    if (!dansFenetre(w.date, 42, aujourdhui)) continue;
     // Les zones de course ne décrivent que la COURSE. Une randonnée de 3 h à faible
     // FC n'est pas du « footing de récupération » : la compter gonfle la part facile
     // et fausse la règle des 80/20, qui ne porte que sur l'entraînement de course.

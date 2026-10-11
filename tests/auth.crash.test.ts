@@ -20,7 +20,7 @@
  *   npx tsx tests/auth.crash.test.ts
  */
 import { fournisseursActifs } from "../src/lib/auth/fournisseurs";
-import { emailInscription, emailReinitialisation } from "../src/lib/auth/emailConfirmation";
+import { emailCompteExistant, emailInscription, emailReinitialisation } from "../src/lib/auth/emailConfirmation";
 import { ech } from "../src/lib/newsletter/gabarit";
 import { readFileSync } from "node:fs";
 import { suggestionDomaine, distance, domaineRecoitDuCourrier, FOURNISSEURS_COURANTS } from "../src/lib/auth/domaineCourrier";
@@ -311,6 +311,66 @@ console.log(`  ✓ e-mail : ${rendus} rendus (${LANGS.length} langues × ${LIENS
   a += 6;
   console.log(`  ✓ alerte nouvel inscrit : ${a} cas (âge du compte, trace unique, ordre d'écriture)`);
 
-  console.log(`\n${NON.length + rendus + n + m + c + z + a} cas hostiles · ${ko} problème(s)`);
+  // ── ADRESSE DÉJÀ INSCRITE : L'ÉCRAN SE TAIT, LA BOÎTE REÇOIT UN MESSAGE ──────────────
+  // ⚠️ Le 11/10/2026, Cyprien s'inscrit avec une adresse déjà ouverte par Google : écran
+  // « Vérifiez votre email »… et RIEN n'arrive, jamais. Supabase refusait le doublon
+  // (`email_exists`) et la route répondait `ok` sans rien envoyer. L'écran doit rester
+  // muet (anti-annuaire) ; la boîte du titulaire, non.
+  let ex = 0;
+  for (const lg of ["fr", "en", "de", "es", "pt", "xx"]) {
+    for (const f of [["google"], ["email"], ["email", "google"], ["apple"], []]) {
+      let e: ReturnType<typeof emailCompteExistant>;
+      try { e = emailCompteExistant(lg, "https://pacevo.fr", 'https://x.fr/c?t=<a"&b', f); }
+      catch (err) { fail(`compte existant : exception (${lg}, ${f.join("+") || "aucun"})`, String((err as Error).message).slice(0, 90)); continue; }
+      if (/<script/i.test(e.html) || e.html.includes('t=<a"&b')) fail(`compte existant : lien non échappé (${lg})`, "");
+      if (!e.html.includes("/icon.png")) fail(`compte existant : logo absent (${lg})`, "");
+      if (!e.html.includes('href="https://pacevo.fr/login"')) fail(`compte existant : pas de bouton de connexion (${lg})`, "");
+      if (/\{fournisseur\}|\{bouton\}/.test(e.html + e.texte)) fail(`compte existant : jeton non remplacé (${lg}, ${f.join("+")})`, e.texte.slice(0, 120));
+      if (!e.objet.trim() || !e.texte.trim()) fail(`compte existant : objet ou texte vide (${lg})`, "");
+      ex++;
+    }
+  }
+  // Compte Google seul : le message nomme le bouton EXACT de la page de connexion, et
+  // propose de CHOISIR un premier mot de passe (pas « nouveau » : il n'y en a pas).
+  for (const lg of ["fr", "en", "de", "es", "pt"] as const) {
+    const g = emailCompteExistant(lg, "https://pacevo.fr", "https://x.fr/c", ["google"]);
+    if (!g.texte.includes(AUTH[lg].login.google)) fail(`${lg} : compte Google sans le libellé « ${AUTH[lg].login.google} »`, g.texte.slice(0, 160));
+  }
+  const gFr = emailCompteExistant("fr", "https://pacevo.fr", "https://x.fr/c", ["google"]);
+  if (!gFr.texte.includes("Choisir un mot de passe") || gFr.texte.includes("Choisir un nouveau")) fail("compte Google : il faut CHOISIR un premier mot de passe", gFr.texte);
+  // Compte à mot de passe : pas un mot sur Google, qui l'enverrait vers le mauvais bouton.
+  const mFr = emailCompteExistant("fr", "https://pacevo.fr", "https://x.fr/c", ["email"]);
+  if (/Google/.test(mFr.texte)) fail("compte à mot de passe : Google mentionné à tort", mFr.texte);
+  if (!mFr.texte.includes("Choisir un nouveau mot de passe")) fail("compte à mot de passe : pas de « nouveau mot de passe »", mFr.texte);
+  if (gFr.objet === emailInscription("fr", "https://pacevo.fr", "https://x.fr/c").objet || gFr.objet === emailReinitialisation("fr", "https://pacevo.fr", "https://x.fr/c").objet) {
+    fail("compte existant : objet identique à l'inscription ou au reset", "le titulaire ne comprendrait pas qu'il a déjà un compte");
+  }
+  if (emailCompteExistant("xx", "https://pacevo.fr", "https://x.fr/c", ["google"]).objet !== gFr.objet) fail("compte existant : langue inconnue sans repli français", "");
+  // La route : `email_exists` est traité AVANT la sortie générique, par la porte unique,
+  // avec un lien `recovery` construit sur `hashed_token` (jamais `action_link`).
+  const iExiste = route.indexOf('error?.code === "email_exists"'), iMuet = route.indexOf("if (error || !jeton)");
+  if (iExiste < 0) fail("la route ne traite pas l'adresse déjà inscrite", "écran « vérifiez votre email », boîte vide");
+  else if (iMuet >= 0 && iExiste > iMuet) fail("`email_exists` est traité APRÈS la sortie générique", "jamais atteint");
+  if (!/emailCompteExistant\(/.test(route) || !/envoyerEmail\("compte-existant"/.test(route)) fail("la route n'envoie pas « compte existant » par la porte unique", "");
+  const liensRoute = [...route.matchAll(/`\$\{BASE\}\/auth\/confirm\?([^`]*)`/g)].map((x) => x[1]);
+  if (!liensRoute.some((l) => l.includes("token_hash=") && l.includes("type=recovery") && l.includes("next=/reset-password"))) {
+    fail("le lien « choisir un mot de passe » ne vise pas /auth/confirm?…type=recovery&next=/reset-password", liensRoute.join(" | "));
+  }
+  // Plus de sortie muette : un échec de generateLink va au journal.
+  if (/if \(error \|\| !jeton\) return ok\(\);/.test(route)) fail("un échec de generateLink repart sans trace", "un écran « envoyé » sans e-mail, invisible dans /admin");
+  // Anti-annuaire : l'écran n'apprend QUE ce qui ne dit rien des comptes.
+  const PERMIS = new Set(["mot_de_passe_trop_court", "domaine_douteux", "domaine_sans_courrier"]);
+  for (const [, code] of route.matchAll(/ok:\s*false,\s*error:\s*"([a-z_]+)"/g)) {
+    if (!PERMIS.has(code)) fail(`la route révèle « ${code} » à l'écran`, "le formulaire deviendrait un annuaire");
+  }
+  if (/NextResponse\.json\([^)]*email_exists/.test(route)) fail("la route renvoie `email_exists` à l'écran", "annuaire ouvert");
+  // L'écran d'attente ne promet plus un « lien de confirmation » : il peut s'agir de l'autre message.
+  for (const lg of ["fr", "en", "de", "es", "pt"] as const) {
+    if (!AUTH[lg].signup.verifyText.includes("{email}")) fail(`${lg} : verifyText sans {email}`, AUTH[lg].signup.verifyText);
+  }
+  ex += 10;
+  console.log(`  ✓ adresse déjà inscrite : ${ex} cas (e-mail 6 langues × 5 comptes, libellés, route, anti-annuaire)`);
+
+  console.log(`\n${NON.length + rendus + n + m + c + z + a + ex} cas hostiles · ${ko} problème(s)`);
   process.exit(ko ? 1 : 0);
 })();
