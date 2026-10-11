@@ -58,8 +58,12 @@ export function referencesFc(e: {
   const repos = nb(e.repos);
   const declaree = nb(e.maxDeclaree);
   const observee = nb(e.maxObservee);
-  if (declaree != null || (observee != null && observee > 150)) {
-    return { max: declaree ?? observee, repos, seuil, source: "mesures" };
+  // ⚠️ JAMAIS SOUS UNE VALEUR RÉELLEMENT ATTEINTE (même règle que le coach, `fcMaxEst`) :
+  // une FC max déclarée à 180 quand la montre a enregistré 195 est fausse par construction.
+  // Avant le 11/10/2026, la déclarée l'emportait toujours ici (`declaree ?? observee`).
+  const observeeFiable = observee != null && observee > 150 ? observee : null;
+  if (declaree != null || observeeFiable != null) {
+    return { max: Math.max(declaree ?? 0, observeeFiable ?? 0), repos, seuil, source: "mesures" };
   }
   // Le seuil vaut ~92 % de la FC max chez un athlète entraîné : bien meilleur repli
   // que l'âge, et il reste adossé à une mesure.

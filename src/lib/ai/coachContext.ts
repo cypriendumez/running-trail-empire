@@ -1,6 +1,8 @@
 import type { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
+import { menuSelonDenivele, preferenceDenivele } from "@/lib/coach/denivele";
+import { volumeAvecCible, volumeCible } from "@/lib/coach/volumeCible";
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthCoachLines } from "@/data/healthCatalog";
 import { efficaciteParBloc, tendanceEfficacite, ameliorationAttendue } from "@/lib/running/progression";
 import { relireExecution, corrigerAllure } from "@/lib/coach/relecture";
@@ -1398,6 +1400,13 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   else if (libGoal === "marathon") menu = [qSeuil, qMara, qVMA];
   else if (libGoal === "trail" || libGoal === "ultra") menu = [qCote, qSeuil, qVMA];
   else menu = [qVMA, qSeuil, qSpec];
+  // LE DÉNIVELÉ DÉCLARÉ décide de la place des côtes (voir lib/coach/denivele) — AVANT le
+  // facteur limitant et la phase : à l'approche de la course, l'objectif garde le dernier mot.
+  // Jusqu'au 11/10/2026, la réponse n'atteignait que la relecture IA, qui ne change aucune séance.
+  menu = menuSelonDenivele(menu, { vma: qVMA, cote: qCote }, preferenceDenivele(p?.elevation_pref), {
+    objectifDenivele: libGoal === "trail" || libGoal === "ultra",
+    semainePaire: isoWeek % 2 === 0,
+  });
   // LE FACTEUR LIMITANT REMONTE EN TÊTE DE MENU.
   // Sans cela il n'était qu'une phrase de plus dans le briefing : le plan continuait à
   // dérouler l'ordre par défaut de l'objectif. Deux coureurs de même VMA, l'un qui
@@ -1672,8 +1681,12 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // osseuse et tendineuse n'a rien de comparable entre 65 et 110 kg.
   const growthBase = (runYears != null && runYears < 1) || (Array.isArray(p?.injury_zones) && (p.injury_zones as unknown[]).map(String).includes("fracture_fatigue")) ? 1.05 : 1.10;
   const growth = weightLoss ? Math.min(growthBase, 1 + weightLoss.rules.maxWeeklyProgressPct / 100) : growthBase;
-  const targetKm = macroPlan.length ? macroPlan[0].volumeKm
-    : Math.round(baseKm * (taper ? 0.65 : deload ? 0.8 : growth));
+  // VOLUME CIBLE déclaré à l'inscription (migration 035, voir lib/coach/volumeCible) : le
+  // plan cesse de MONTER au-delà, sans jamais couper sous ce qui est déjà couru.
+  const targetKm = volumeAvecCible(macroPlan.length ? macroPlan[0].volumeKm
+    : Math.round(baseKm * (taper ? 0.65 : deload ? 0.8 : growth)),
+    volumeCible((p as Record<string, unknown> | null)?.target_weekly_km),
+    robustWeekly?.km ?? (avg4wkKm > 0 ? avg4wkKm : weekKm));
   const longRunPlanned = macroPlan.length ? macroPlan[0].longRunKm : Math.round(targetKm * (taper ? 0.20 : 0.25));
 
   /**
@@ -1753,7 +1766,7 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // courir 3 fois par semaine recevait un plan inapplicable et décrochait.
   const genderLabel = p?.gender === "female" ? "femme" : p?.gender === "male" ? "homme" : p?.gender ? String(p.gender) : "?";
   const text = `PROFIL
-- ${p?.full_name ?? "Athlète"} · ${p?.age ?? "?"} ans · ${genderLabel} · ${num(p?.weight_kg) ?? "?"} kg · ${num(p?.height_cm) ?? "?"} cm · chronotype ${p?.chronotype ?? "?"} · mode ${p?.mode ?? "?"}
+- ${p?.full_name ?? "Athlète"} · ${p?.age ?? "?"} ans · ${genderLabel} · ${num(p?.weight_kg) ?? "?"} kg · ${num(p?.height_cm) ?? "?"} cm · mode ${p?.mode ?? "?"}
 - NIVEAU estimé : ${level}${vma ? ` (VMA ${vma} km/h${vmaIsEst ? " estimée" : ""})` : ""}
 - ANCIENNETÉ en course à pied : ${expLabel ?? "non renseignée (reste prudent sur la charge tant que tu ne sais pas)"}
 - TERRAINS habituels : ${terr.labels.length ? terr.labels.join(" + ") : "non renseignés"}${elev ? ` · dénivelé : ${elev.label}` : ""} · D+ réalisé cette semaine : ${elevWeek} m
@@ -2005,7 +2018,7 @@ ${catalog}`;
     warmCool: warmCoolMin(num(p?.warmup_min), num(p?.cooldown_min)),
     heatAcclim,
     tooMuchIntensity: hardTimePct != null && hardTimePct > 25 ? hardTimePct : null,
-    hillyTraining: elevWeek >= 400 || terr.paceMeaningless,
+    hillyTraining: elevWeek >= 400 || terr.paceMeaningless || preferenceDenivele(p?.elevation_pref) === "specialiste",
     thresholdPace,
     macroPlan,
     objectiveWarnings,

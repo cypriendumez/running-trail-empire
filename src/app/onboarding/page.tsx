@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef , useId} from "react";
+import { useState, useEffect, useRef, useId, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, ArrowLeft, User, Target, HeartPulse, CheckCircle2, Watch, Eye, EyeOff, ExternalLink, RefreshCw, AlertCircle, Wifi, Globe, Mountain, Key } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, ExternalLink, Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -13,17 +12,135 @@ import { OB } from "./onboardingI18n";
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthLabel } from "@/data/healthCatalog";
 import { TERRAINS, terrainLabel } from "@/data/terrainCatalog";
 
-type Step = "watch" | "profile" | "physio" | "goals" | "done";
+/**
+ * LE QUESTIONNAIRE D'INSCRIPTION — refondu le 11/10/2026.
+ *
+ * Ce qui a changé, et pourquoi (Cyprien : « ça ne rend pas professionnel, ça fait IA ») :
+ *  · QUATRE ÉTAPES ÉQUILIBRÉES au lieu d'une première page de douze questions suivie de deux
+ *    pages presque vides : Profil, Entraînement, Santé, Montre.
+ *  · DE VRAIS BOUTONS RADIO ET CASES À COCHER (clavier, lecteurs d'écran), dessinés en
+ *    contrôles segmentés ou en tuiles neutres. Avant : chaque choix était une pastille verte
+ *    pleine — douze rangées de pastilles identiques, la signature d'une page générée.
+ *  · Une seule feuille blanche à filets fins plutôt qu'une carte par bloc, des aides lisibles
+ *    (plus de gris en 11 px), l'unité DANS le champ, une barre d'actions fixe avec « Retour »
+ *    à chaque étape — l'étape Montre était un cul-de-sac.
+ *  · Plus d'animation de glissement à chaque étape, plus d'emoji ni de fausse fenêtre de
+ *    navigateur dans l'étape Montre : une liste numérotée, parce que c'en est une.
+ *
+ * Décisions du 11/10/2026 : le chronotype est retiré (il ne changeait aucune séance) ; le
+ * volume visé est désormais ENREGISTRÉ (il était jeté) et sert de plafond de progression ;
+ * le dénivelé agit sur le plan (lib/coach/denivele).
+ *
+ * La montre est en DERNIER et FACULTATIVE : exiger un compte intervals.icu avant tout usage
+ * de l'app est ce qui fait le plus abandonner à l'inscription. Aucune VMA n'est demandée : la
+ * toute première séance prescrite EST le test VMA (voir le verrou dans lib/ai/autoCoach).
+ */
+type Step = "profile" | "training" | "health" | "watch" | "done";
+const STEPS: Step[] = ["profile", "training", "health", "watch", "done"];
+const ETAPES = 4;
 
-// Le profil et la santé d'abord (questions faciles sur soi : l'athlète s'investit
-// progressivement), la connexion montre EN DERNIER et FACULTATIVE — exiger un compte
-// intervals.icu avant tout usage de l'app est ce qui fait le plus abandonner à l'inscription.
-// ⚠️ L'ÉTAPE « physio » NE DEMANDE PLUS DE VMA. La VMA ne se saisit plus à l'inscription :
-// la toute première séance prescrite par le coach EST le test VMA, et l'athlète en
-// enregistre le résultat depuis son tableau de bord (TestVmaBanner) — voir le verrou dans
-// lib/ai/autoCoach. Il ne reste ici que les FC, FACULTATIVES : à défaut, le coach déduit la
-// FC max du maximum réellement enregistré en séance et la FC de repos de la montre.
-const STEPS: Step[] = ["profile", "physio", "goals", "watch", "done"];
+// ── Habillage des contrôles ─────────────────────────────────────────────────────
+// Un seul endroit pour l'état « choisi » : contour vert, fond teinté, coche. Jamais la
+// couleur seule (un daltonien doit voir la différence) : la coche ou l'ombre la double.
+const FOCUS = "peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-emerald-600";
+const SEGMENT = `flex h-10 items-center justify-center rounded-lg px-2 text-center text-sm font-medium text-zinc-600 transition-colors hover:text-zinc-900 peer-checked:bg-white peer-checked:text-zinc-900 peer-checked:shadow-[0_1px_2px_rgba(16,24,40,0.10),0_0_0_1px_rgba(16,24,40,0.06)] ${FOCUS}`;
+const TUILE = `flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-center text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-300 peer-checked:border-emerald-600 peer-checked:bg-emerald-50 peer-checked:text-emerald-900 ${FOCUS}`;
+const CHAMP = "h-11 w-full rounded-xl border border-zinc-200 bg-white pl-3 pr-10 text-base tabular-nums text-zinc-900 placeholder:text-zinc-400 transition-colors focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 sm:text-[15px]";
+
+/** Une question de la feuille : intitulé, aide d'une phrase, contrôle. */
+function Question({ id, titre, aide, marque, children }: {
+  id: string; titre: string; aide?: string;
+  /** Petite mention à droite de l'intitulé (« Facultatif », « À renseigner »). */
+  marque?: { texte: string; ton: "neutre" | "alerte" };
+  children: ReactNode;
+}) {
+  return (
+    <section id={id} className="scroll-mt-32 px-5 py-6 sm:px-7">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 id={`${id}-t`} className="text-[15px] font-semibold text-zinc-900">{titre}</h2>
+        {marque && (
+          <span className={`shrink-0 text-xs font-medium ${marque.ton === "alerte" ? "text-amber-700" : "text-zinc-500"}`}>{marque.texte}</span>
+        )}
+      </div>
+      {aide && <p id={`${id}-a`} className="mt-1 max-w-prose text-sm leading-relaxed text-zinc-500">{aide}</p>}
+      <div className="mt-4">{children}</div>
+    </section>
+  );
+}
+
+/** Choix UNIQUE : de vrais boutons radio (flèches du clavier, lecteur d'écran). */
+function Choix<V extends string | number>({ id, options, valeur, onChange, variante, grille, aide }: {
+  id: string; options: readonly { v: V; l: string }[]; valeur: V | null | "";
+  onChange: (v: V) => void; variante: "segment" | "tuiles";
+  /** Classes de grille, écrites en entier (Tailwind ne génère pas les classes composées). */
+  grille: string; aide?: boolean;
+}) {
+  const segment = variante === "segment";
+  return (
+    <div role="radiogroup" aria-labelledby={`${id}-t`} aria-describedby={aide ? `${id}-a` : undefined}
+      className={`grid ${grille} ${segment ? "gap-1 rounded-xl bg-zinc-100 p-1" : "gap-2"}`}>
+      {options.map((o) => {
+        const oid = `${id}-${o.v}`;
+        const coche = valeur === o.v;
+        return (
+          <label key={String(o.v)} htmlFor={oid} className="relative cursor-pointer">
+            <input id={oid} type="radio" name={id} value={String(o.v)} checked={coche}
+              onChange={() => onChange(o.v)} className="peer sr-only" />
+            <span className={segment ? SEGMENT : TUILE}>
+              {!segment && coche && <Check aria-hidden="true" className="h-4 w-4 shrink-0" />}
+              {o.l}
+            </span>
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Choix MULTIPLE : de vraies cases à cocher, la coche double la couleur. */
+function Cases({ id, options, valeurs, onToggle, disposition, aide }: {
+  id: string; options: readonly { v: string; l: string; sr?: string }[]; valeurs: readonly string[];
+  onToggle: (v: string) => void; disposition: string; aide?: boolean;
+}) {
+  return (
+    <div role="group" aria-labelledby={`${id}-t`} aria-describedby={aide ? `${id}-a` : undefined} className={disposition}>
+      {options.map((o) => {
+        const oid = `${id}-${o.v}`;
+        const coche = valeurs.includes(o.v);
+        return (
+          <label key={o.v} htmlFor={oid} className="relative cursor-pointer">
+            <input id={oid} type="checkbox" checked={coche} onChange={() => onToggle(o.v)} className="peer sr-only" />
+            <span className={TUILE}>
+              {coche && <Check aria-hidden="true" className="h-4 w-4 shrink-0" />}
+              <span aria-hidden={o.sr ? true : undefined}>{o.l}</span>
+              {o.sr && <span className="sr-only">{o.sr}</span>}
+            </span>
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Mesure chiffrée, unité DANS le champ (16 px sur mobile : iOS ne zoome pas). */
+function Mesure({ id, label, unite, valeur, onChange, placeholder, min, max }: {
+  id: string; label: string; unite: string; valeur: string; onChange: (v: string) => void;
+  placeholder: string; min: number; max: number;
+}) {
+  return (
+    <div>
+      <label htmlFor={id} className="block text-sm font-medium text-zinc-700">{label}</label>
+      <div className="relative mt-1.5">
+        <input id={id} type="number" inputMode="numeric" value={valeur} onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder} min={min} max={max} className={CHAMP} />
+        <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-zinc-500">{unite}</span>
+      </div>
+    </div>
+  );
+}
+
+/** « Taille (cm) » → « Taille » : l'unité est désormais affichée dans le champ. */
+const sansUnite = (s: string) => s.replace(/\s*\([^)]*\)\s*$/, "");
 
 export default function OnboardingPage() {
   // ⚠️ Les libellés visibles n'étaient reliés à aucun champ : un lecteur d'écran
@@ -39,6 +156,10 @@ export default function OnboardingPage() {
 
   const [step, setStep] = useState<Step>("profile");
   const [loading, setLoading] = useState(false);
+  // L'étape où l'on a tenté de continuer avec des réponses manquantes : on ne signale
+  // un manque qu'APRÈS cette tentative, pas en rouge dès l'arrivée sur la page.
+  const [tente, setTente] = useState<Step | null>(null);
+  const titreRef = useRef<HTMLHeadingElement>(null);
 
   const [profile, setProfile] = useState({
     age: "",
@@ -47,18 +168,16 @@ export default function OnboardingPage() {
     // Pas de valeur par défaut sur le sexe : un défaut « male » silencieux fausserait tout le
     // coaching d'une athlète qui n'aurait pas touché au champ. On l'oblige à choisir.
     gender: "" as "" | "male" | "female" | "other",
-    chronotype: "neutral" as "morning" | "evening" | "neutral",
     is_female_cycle_sync: false,
     warmup_min: 15,
     cooldown_min: 10,
     long_run_mode: "run" as "run" | "bike",
-    // Contexte d'entraînement → individualise la prescription du coach IA.
-    // Idem : aucun défaut, ces trois réponses changent radicalement la prescription.
+    // Contexte d'entraînement : aucun défaut, ces réponses changent radicalement la prescription.
     running_years: null as number | null,
     // Terrains MULTIPLES : beaucoup alternent route en semaine et sentier/sable le week-end.
     main_terrains: [] as string[],
     elevation_pref: "" as "" | "evite" | "modere" | "aime" | "specialiste",
-    // Santé : contraint la prescription du coach IA (la santé prime sur la performance).
+    // Santé : contraint la prescription (la santé prime sur la performance).
     health_conditions: [] as string[],
     injury_zones: [] as string[],
     health_notes: "",
@@ -66,11 +185,14 @@ export default function OnboardingPage() {
     days_per_week: null as number | null,
     available_days: [0, 1, 2, 3, 4, 5, 6] as number[],
   });
+  // Volume visé : `null` tant que le curseur n'a pas été touché — la valeur affichée par
+  // défaut n'est pas une réponse (voir lib/coach/volumeCible).
+  const [volume, setVolume] = useState<number | null>(null);
   // « Rien à signaler » coché explicitement — on distingue « pas de problème de santé »
   // de « l'utilisateur a survolé la question sans répondre ».
   const [healthNone, setHealthNone] = useState(false);
 
-  // Bascule d'une puce santé (sélection multiple). Cocher une pathologie annule « rien à signaler ».
+  // Bascule d'une case santé. Cocher une pathologie annule « rien à signaler ».
   const toggleHealth = (key: "health_conditions" | "injury_zones", slug: string) => {
     setHealthNone(false);
     setProfile(p => ({ ...p, [key]: p[key].includes(slug) ? p[key].filter(s => s !== slug) : [...p[key], slug] }));
@@ -78,26 +200,10 @@ export default function OnboardingPage() {
   // Une réponse santé est donnée soit en cochant au moins une entrée, soit « rien à signaler ».
   const healthAnswered = healthNone || profile.health_conditions.length > 0 || profile.injury_zones.length > 0;
 
-  // Champs manquants de l'étape Profil — listés à l'athlète, en toutes lettres.
-  const profileMissing = [
-    !profile.age && tr("age"),
-    !profile.height_cm && tr("height"),
-    !profile.weight_kg && tr("weight"),
-    !profile.gender && tr("gender"),
-    profile.running_years == null && tr("expTitle"),
-    profile.days_per_week == null && tr("dpwTitle"),
-    profile.main_terrains.length === 0 && tr("terrTitle"),
-    !profile.elevation_pref && tr("elevTitle"),
-    !healthAnswered && tr("healthTitle"),
-    // Retire l'emoji de tête des libellés. `\W` est à proscrire ici : sans le drapeau `u`
-    // il classe « Â » comme non-caractère et « Âge » deviendrait « ge ».
-  ].filter((x): x is string => typeof x === "string").map(s => s.replace(/^[^\p{L}\p{N}]+/u, ""));
-
   // FC déclarées — FACULTATIVES. Vides, le coach s'en passe très bien (migration 029).
   const [fc, setFc] = useState({ max_hr: "", resting_hr: "" });
-  const [goals, setGoals] = useState({ target_race: "", target_weekly_km: "50" });
 
-  // Watch step state
+  // Étape Montre
   const [watchSubStep, setWatchSubStep] = useState(0);
   const [watchAthleteId, setWatchAthleteId] = useState("");
   const [watchApiKey, setWatchApiKey] = useState("");
@@ -139,9 +245,14 @@ export default function OnboardingPage() {
   }, [pollingActive]);
 
   const stepIdx = STEPS.indexOf(step);
-  const stepLabels = [tr("sProfil"), tr("sPhysio"), tr("sObjectifs"), tr("sMontre")];
 
-  // ── Validation intelligente ──
+  // Nouvelle étape : on remonte en haut et le focus va au titre (lecteur d'écran, clavier).
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+    titreRef.current?.focus({ preventScroll: true });
+  }, [step]);
+
+  // ── Validation de l'identifiant intervals.icu ──
   const idTrim = watchAthleteId.trim();
   const keyTrim = watchApiKey.trim();
   const idIsEmail = idTrim.includes("@");
@@ -160,8 +271,46 @@ export default function OnboardingPage() {
     !keyValid ? tr("hKeyFormat") :
     null;
 
+  // ── Ce qui manque, étape par étape (l'identifiant sert à y amener la personne) ──
+  const sansEmoji = (s: string) => s.replace(/^[^\p{L}\p{N}]+/u, "");
+  const manquants = (s: Step): { id: string; label: string }[] => {
+    const m: [boolean, string, string][] =
+      s === "profile" ? [
+        [!profile.age, `${cid}-age`, tr("age")],
+        [!profile.height_cm, `${cid}-taille`, sansUnite(tr("height"))],
+        [!profile.weight_kg, `${cid}-poids`, sansUnite(tr("weight"))],
+        [!profile.gender, `${cid}-genre`, tr("gender")],
+      ] : s === "training" ? [
+        [profile.running_years == null, `${cid}-anciennete`, tr("expTitle")],
+        [profile.days_per_week == null, `${cid}-frequence`, tr("dpwShort")],
+        [profile.main_terrains.length === 0, `${cid}-terrains`, tr("terrTitle")],
+        [!profile.elevation_pref, `${cid}-denivele`, tr("elevTitle")],
+      ] : s === "health" ? [
+        [!healthAnswered, `${cid}-sante`, tr("healthTitle")],
+      ] : [];
+    return m.filter(([manque]) => manque).map(([, id, label]) => ({ id, label: sansEmoji(label) }));
+  };
+  const manqueIci = tente === step ? manquants(step) : [];
+  const manque = (id: string) => manqueIci.some(x => x.id === id);
+  const marqueManque = (id: string) => (manque(id) ? { texte: tr("missingShort"), ton: "alerte" as const } : undefined);
+
   function next() { if (stepIdx < STEPS.length - 1) setStep(STEPS[stepIdx + 1]); }
-  function prev() { if (stepIdx > 0) setStep(STEPS[stepIdx - 1]); }
+  function prev() { if (stepIdx > 0) { setTente(null); setStep(STEPS[stepIdx - 1]); } }
+
+  /** « Continuer » reste cliquable : il dit ce qui manque et y amène, plutôt qu'un bouton mort. */
+  function continuer() {
+    const m = manquants(step);
+    if (m.length) {
+      setTente(step);
+      const cible = document.getElementById(m[0].id);
+      const doux = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      cible?.scrollIntoView({ behavior: doux ? "smooth" : "auto", block: "center" });
+      (cible?.querySelector("input") ?? cible)?.focus?.({ preventScroll: true });
+      return;
+    }
+    setTente(null);
+    next();
+  }
 
   async function handleSaveWatch(e: React.FormEvent) {
     e.preventDefault();
@@ -174,7 +323,7 @@ export default function OnboardingPage() {
         body: JSON.stringify({ athleteId: watchAthleteId, apiKey: watchApiKey }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Erreur de sauvegarde");
+      if (!res.ok) throw new Error(data.error ?? tr("tSaveError"));
       setWatchSaved(true);
       setPollingActive(true);
       setPollingStatus("checking");
@@ -198,7 +347,6 @@ export default function OnboardingPage() {
       height_cm: parseInt(profile.height_cm),
       weight_kg: parseFloat(profile.weight_kg),
       gender: profile.gender,
-      chronotype: profile.chronotype,
       is_female_cycle_sync: profile.is_female_cycle_sync,
       // Pas de VMA à l'inscription → mode par défaut prudent ; le coach l'affine ensuite.
       mode: "ludique",
@@ -259,18 +407,20 @@ export default function OnboardingPage() {
     // dire sur `performance_baselines` — elle ne l'écrit plus depuis le navigateur.
 
     /**
-     * FC DÉCLARÉES (facultatives) — ÉCRITURE ISOLÉE ET VOLONTAIREMENT NON BLOQUANTE.
+     * FC DÉCLARÉES ET VOLUME VISÉ (facultatifs) — ÉCRITURES ISOLÉES, NON BLOQUANTES.
      *
-     * `performance_baselines` ne peut pas les accueillir seules (ses trois colonnes sont
-     * NOT NULL et il n'y a plus de VMA à l'inscription) : elles vivent donc sur `profiles`,
-     * colonnes ajoutées par la MIGRATION 029.
-     *
-     * ⚠️ TANT QUE LA 029 N'EST PAS PASSÉE, PostgREST répond « column does not exist ». Faire
-     * échouer « Terminer » pour ça reproduirait EXACTEMENT le défaut du 14/09/2026 — 100 %
-     * des inscrits bloqués — et cette fois pour une donnée FACULTATIVE. L'échec est donc
-     * journalisé (jamais muet) mais n'entre pas dans `echecs` : le coach sait déduire les
-     * deux tout seul (max réellement enregistré en séance, montre pour la FC de repos).
+     * Les FC vivent sur `profiles` (migration 029), le volume visé aussi (migration 035,
+     * à lancer à la main). ⚠️ Tant qu'une colonne manque, PostgREST répond « column does not
+     * exist ». Faire échouer « Terminer » pour ça reproduirait EXACTEMENT le défaut du
+     * 14/09/2026 — 100 % des inscrits bloqués — et cette fois pour une donnée FACULTATIVE.
+     * L'échec va donc au journal (jamais muet) mais n'entre pas dans `echecs`.
      */
+    const journaliserFacultatif = (quoi: string, message: string) => {
+      fetch("/api/log-error", {
+        method: "POST", headers: { "Content-Type": "application/json" }, keepalive: true,
+        body: JSON.stringify({ source: "onboarding", message: `${quoi}: ${message}`, url: location.href }),
+      }).catch(() => {});
+    };
     if (fc.max_hr || fc.resting_hr) {
       const { error: eFc } = await supabase.from("profiles").update({
         max_hr: parseInt(fc.max_hr) || null,
@@ -285,6 +435,10 @@ export default function OnboardingPage() {
           body: JSON.stringify({ source: "onboarding", message: `fc: ${eFc.message}`, url: location.href }),
         }).catch(() => {});
       }
+    }
+    if (volume != null) {
+      const { error: eVol } = await supabase.from("profiles").update({ target_weekly_km: volume }).eq("id", user.id);
+      if (eVol) journaliserFacultatif("volume visé", eVol.message);
     }
 
     if (profileError || echecs.length) {
@@ -322,676 +476,398 @@ export default function OnboardingPage() {
     setLoading(false);
   }
 
-  return (
-    <div className="min-h-screen bg-[#FAFAFA] flex flex-col items-center justify-center px-6 py-12">
-      <div className="w-full max-w-lg">
-        {/* Header */}
-        <div className="text-center mb-10">
-          <div className="flex items-center justify-center gap-2.5 mb-6">
-            <Logo size={36} />
-            <Wordmark className="text-2xl" />
-          </div>
-          <h1 className="text-3xl font-bold text-zinc-900 mb-2">{tr("welcome")}</h1>
-          <p className="text-zinc-500">{tr("subtitle")}</p>
-        </div>
+  // ── Contenu ─────────────────────────────────────────────────────────────────────
+  const titres: Record<Exclude<Step, "done">, [string, string]> = {
+    profile: [tr("t1"), tr("d1")],
+    training: [tr("t2"), tr("d2")],
+    health: [tr("t3"), tr("d3")],
+    watch: [tr("t4"), tr("d4")],
+  };
+  const minutes = [5, 10, 15, 20, 25, 30].map(m => ({ v: m, l: `${m}` }));
+  // Les jours, du lundi au dimanche ; les valeurs restent au format JS (0 = dimanche).
+  // Le nom complet du jour, dans la langue de la personne, pour les lecteurs d'écran.
+  const jourLong = (d: number) => new Intl.DateTimeFormat(lang, { weekday: "long", timeZone: "UTC" }).format(new Date(Date.UTC(2024, 0, 7 + d)));
+  const etapesMontre = [tr("wStep1"), tr("wStep2"), tr("wStep3"), tr("wStep4")];
+  const lienExterne = "inline-flex items-center gap-1.5";
 
-        {/* Progress */}
+  return (
+    <div className="min-h-screen bg-[#FAFAFA]">
+      {/* En-tête fixe : la marque, l'étape, la progression. */}
+      <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+        <div className="mx-auto flex h-14 max-w-2xl items-center justify-between px-4 sm:px-6">
+          <div className="flex items-center gap-2">
+            <Logo size={26} />
+            <Wordmark className="text-lg" />
+          </div>
+          {step !== "done" && (
+            <span className="text-sm tabular-nums text-zinc-500">{tr("stepOf", { n: stepIdx + 1, t: ETAPES })}</span>
+          )}
+        </div>
         {step !== "done" && (
-          <div className="flex items-center gap-2 mb-8">
-            {STEPS.slice(0, -1).map((s, i) => (
-              <div key={s} className="flex items-center gap-2 flex-1">
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-all ${
-                  i < stepIdx ? "bg-emerald-500 text-white" : i === stepIdx ? "bg-emerald-600 text-white" : "bg-zinc-100 text-zinc-400"
-                }`}>
-                  {i < stepIdx ? <CheckCircle2 className="w-4 h-4" /> : i + 1}
-                </div>
-                <span className={`text-xs font-medium hidden sm:block ${i === stepIdx ? "text-zinc-900" : "text-zinc-400"}`}>
-                  {stepLabels[i]}
-                </span>
-                {i < STEPS.length - 2 && <div className={`flex-1 h-px ${i < stepIdx ? "bg-emerald-300" : "bg-zinc-200"}`} />}
-              </div>
+          <div role="progressbar" aria-valuemin={1} aria-valuemax={ETAPES} aria-valuenow={stepIdx + 1}
+            aria-label={tr("stepOf", { n: stepIdx + 1, t: ETAPES })}
+            className="mx-auto flex max-w-2xl gap-1 px-4 pb-3 sm:px-6">
+            {Array.from({ length: ETAPES }, (_, i) => (
+              <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${i <= stepIdx ? "bg-emerald-600" : "bg-zinc-200"}`} />
             ))}
           </div>
         )}
+      </header>
 
-        {/* Cards */}
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={step}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.25 }}
-          >
-            {step === "profile" && (
-              <div className="bento-card space-y-5">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-9 h-9 bg-zinc-100 rounded-xl flex items-center justify-center">
-                    <User className="w-4 h-4 text-zinc-700" />
-                  </div>
-                  <h2 className="font-semibold text-zinc-900">{tr("pTitle")}</h2>
-                </div>
+      <main className="mx-auto max-w-2xl px-4 pb-44 pt-8 sm:px-6 sm:pt-12">
+        {step !== "done" && (
+          <>
+            <h1 ref={titreRef} tabIndex={-1} className="text-[26px] font-semibold leading-tight tracking-tight text-zinc-900 outline-none sm:text-3xl">
+              {titres[step][0]}
+            </h1>
+            <p className="mt-2 max-w-prose text-[15px] leading-relaxed text-zinc-600">{titres[step][1]}</p>
+          </>
+        )}
 
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label htmlFor={`${cid}-age`} className="text-xs font-medium text-zinc-500 block mb-1">{tr("age")}</label>
-                    <input id={`${cid}-age`} type="number" value={profile.age} onChange={e => setProfile(p => ({...p, age: e.target.value}))}
-                      placeholder="30" min="10" max="99"
-                      className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                  </div>
-                  <div>
-                    <label htmlFor={`${cid}-taille`} className="text-xs font-medium text-zinc-500 block mb-1">{tr("height")}</label>
-                    <input id={`${cid}-taille`} type="number" value={profile.height_cm} onChange={e => setProfile(p => ({...p, height_cm: e.target.value}))}
-                      placeholder="175" min="140" max="220"
-                      className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                  </div>
-                  <div>
-                    <label htmlFor={`${cid}-poids`} className="text-xs font-medium text-zinc-500 block mb-1">{tr("weight")}</label>
-                    <input id={`${cid}-poids`} type="number" value={profile.weight_kg} onChange={e => setProfile(p => ({...p, weight_kg: e.target.value}))}
-                      placeholder="70" min="40" max="150"
-                      className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs font-medium text-zinc-500 block mb-2">{tr("gender")}</label>
-                  <div className="flex gap-2">
-                    {(["male","female","other"] as const).map(g => (
-                      <button key={g} type="button" onClick={() => setProfile(p => ({...p, gender: g}))}
-                        className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-all ${
-                          profile.gender === g ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"
-                        }`}>
-                        {g === "male" ? tr("male") : g === "female" ? tr("female") : tr("other")}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs font-medium text-zinc-500 block mb-2">{tr("chrono")}</label>
-                  <div className="flex gap-2">
-                    {[{v:"morning",l:tr("morning")},{v:"neutral",l:tr("neutral")},{v:"evening",l:tr("evening")}].map(c => (
-                      <button key={c.v} onClick={() => setProfile(p => ({...p, chronotype: c.v as typeof p.chronotype}))}
-                        className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-all ${
-                          profile.chronotype === c.v ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-zinc-600 border-zinc-200"
-                        }`}>
-                        {c.l}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-medium text-zinc-500 block mb-2">{tr("warmup")}</label>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {[5,10,15,20,25,30].map(m => (
-                        <button key={m} type="button" onClick={() => setProfile(p => ({...p, warmup_min: m}))}
-                          className={`py-2 rounded-xl text-sm font-medium border transition-all ${profile.warmup_min === m ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
-                          {m} min
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-zinc-500 block mb-2">{tr("cooldown")}</label>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {[5,10,15,20,25,30].map(m => (
-                        <button key={m} type="button" onClick={() => setProfile(p => ({...p, cooldown_min: m}))}
-                          className={`py-2 rounded-xl text-sm font-medium border transition-all ${profile.cooldown_min === m ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
-                          {m} min
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <p className="text-[11px] text-zinc-400 -mt-2">{tr("wcHint")}</p>
-
-                <div>
-                  <label className="text-xs font-medium text-zinc-500 block mb-2">{tr("longTitle")}</label>
-                  <div className="flex gap-2">
-                    {([["run", tr("longRun")], ["bike", tr("longBike")]] as const).map(([v, l]) => (
-                      <button key={v} type="button" onClick={() => setProfile(p => ({ ...p, long_run_mode: v as "run" | "bike" }))}
-                        className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition-all ${profile.long_run_mode === v ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
-                        {l}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-[11px] text-zinc-400 mt-1.5">{tr("longHint")}</p>
-                </div>
-
-                {/* Ancienneté — plafonne la charge que le coach IA se permet de prescrire. */}
-                <div>
-                  <label className="text-xs font-medium text-zinc-500 block mb-2">{tr("expTitle")}</label>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {([[0, tr("exp0")], [1, tr("exp1")], [2, tr("exp2")], [4, tr("exp4")], [8, tr("exp8")], [12, tr("exp12")]] as const).map(([v, l]) => (
-                      <button key={v} type="button" onClick={() => setProfile(p => ({ ...p, running_years: v }))}
-                        className={`py-2 rounded-xl text-sm font-medium border transition-all ${profile.running_years === v ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
-                        {l}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-[11px] text-zinc-400 mt-1.5">{tr("expHint")}</p>
-                </div>
-
-                {/* Disponibilités — le plan n'a de valeur que s'il est tenable. */}
-                <div>
-                  <label className="text-xs font-medium text-zinc-500 block mb-2">{tr("dpwTitle")}</label>
-                  <div className="grid grid-cols-6 gap-1.5">
-                    {[2, 3, 4, 5, 6, 7].map(n => (
-                      <button key={n} type="button" onClick={() => setProfile(p => ({ ...p, days_per_week: n }))}
-                        className={`py-2 rounded-xl text-sm font-medium border transition-all ${profile.days_per_week === n ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
-                        {n}×
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-[11px] text-zinc-400 mt-1.5">{tr("dpwHint")}</p>
-                </div>
-
-                <div>
-                  <label className="text-xs font-medium text-zinc-500 block mb-2">{tr("daysTitle")}</label>
-                  <div className="grid grid-cols-7 gap-1.5">
-                    {/* Ordre lundi→dimanche à l'affichage ; les valeurs restent au format JS (0 = dimanche). */}
-                    {[1, 2, 3, 4, 5, 6, 0].map(d => {
-                      const on = profile.available_days.includes(d);
-                      return (
-                        <button key={d} type="button"
-                          onClick={() => setProfile(p => ({ ...p, available_days: on ? p.available_days.filter(x => x !== d) : [...p.available_days, d] }))}
-                          className={`py-2 rounded-xl text-sm font-medium border transition-all ${on ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-zinc-400 border-zinc-200 hover:bg-zinc-50"}`}>
-                          {tr("dayShort").split(",")[d]}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="text-[11px] text-zinc-400 mt-1.5">{tr("daysHint")}</p>
-                </div>
-
-                {/* Terrains — CHOIX MULTIPLE : décide si les séances se pilotent à l'allure ou à la FC. */}
-                <div>
-                  <label className="text-xs font-medium text-zinc-500 block mb-2">{tr("terrTitle")} <span className="font-normal text-zinc-400">· {tr("terrMulti")}</span></label>
-                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-                    {TERRAINS.map(t => {
-                      const on = profile.main_terrains.includes(t.slug);
-                      return (
-                        <button key={t.slug} type="button"
-                          onClick={() => setProfile(p => ({ ...p, main_terrains: on ? p.main_terrains.filter(s => s !== t.slug) : [...p.main_terrains, t.slug] }))}
-                          className={`py-2 px-1.5 rounded-xl text-xs font-medium border transition-all ${on ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
-                          {terrainLabel(t, lang)}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="text-[11px] text-zinc-400 mt-1.5">{tr("terrHint")}</p>
-                </div>
-
-                {/* Dénivelé — dose les côtes et le D+ hebdomadaire. */}
-                <div>
-                  <label className="text-xs font-medium text-zinc-500 block mb-2">{tr("elevTitle")}</label>
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {([["evite", tr("elevEvite")], ["modere", tr("elevModere")], ["aime", tr("elevAime")], ["specialiste", tr("elevSpec")]] as const).map(([v, l]) => (
-                      <button key={v} type="button" onClick={() => setProfile(p => ({ ...p, elevation_pref: v }))}
-                        className={`py-2 rounded-xl text-xs font-medium border transition-all ${profile.elevation_pref === v ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
-                        {l}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-[11px] text-zinc-400 mt-1.5">{tr("elevHint")}</p>
-                </div>
-
-                {/* Santé — la seule section où « rien » est une réponse parfaitement valable. */}
-                <div className="rounded-2xl border border-zinc-200 bg-zinc-50/60 p-4 space-y-4">
-                  <div>
-                    <div className="text-sm font-semibold text-zinc-900">{tr("healthTitle")}</div>
-                    <p className="text-[11px] text-zinc-500 mt-0.5 leading-relaxed">{tr("healthSub")}</p>
-                  </div>
-                  {([["health_conditions", "condTitle", HEALTH_CONDITIONS], ["injury_zones", "injTitle", INJURY_ZONES]] as const).map(([key, titleKey, catalog]) => (
-                    <div key={key}>
-                      <label className="text-xs font-medium text-zinc-500 block mb-1.5">{tr(titleKey)}</label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {catalog.map(item => {
-                          const on = profile[key].includes(item.slug);
-                          return (
-                            <button key={item.slug} type="button" onClick={() => toggleHealth(key, item.slug)}
-                              className={`px-2.5 py-1.5 rounded-xl text-xs font-medium border transition-all ${on ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
-                              {healthLabel(item, lang)}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                  {/* Réponse explicite « rien à signaler » — sans quoi on ne saurait pas
-                      distinguer un athlète en pleine forme d'un athlète qui a zappé la question. */}
-                  <button type="button"
-                    onClick={() => { setHealthNone(v => !v); setProfile(p => ({ ...p, health_conditions: [], injury_zones: [] })); }}
-                    className={`w-full px-3 py-2.5 rounded-xl text-sm font-medium border transition-all ${healthNone ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
-                    {healthNone ? "✓ " : ""}{tr("healthNone")}
-                  </button>
-                  <div>
-                    <label htmlFor={`${cid}-c0`} className="text-xs font-medium text-zinc-500 block mb-1.5">{tr("notesTitle")}</label>
-                    <textarea id={`${cid}-c0`} value={profile.health_notes} onChange={e => setProfile(p => ({ ...p, health_notes: e.target.value }))}
-                      placeholder={tr("notesPh")} rows={2} maxLength={500}
-                      className="w-full px-3 py-2 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none" />
-                  </div>
-                  <p className="text-[11px] text-zinc-400 leading-relaxed">{tr("healthDisc")}</p>
-                </div>
-
-                {profile.gender === "female" && (
-                  <div className="flex items-center justify-between p-4 bg-pink-50 rounded-2xl border border-pink-100">
-                    <div>
-                      <div className="text-sm font-medium text-zinc-900">{tr("cycle")}</div>
-                      <div className="text-xs text-zinc-500">{tr("cycleSub")}</div>
-                    </div>
-                    <button
-                      onClick={() => setProfile(p => ({...p, is_female_cycle_sync: !p.is_female_cycle_sync}))}
-                      className={`w-11 h-6 rounded-full transition-colors ${profile.is_female_cycle_sync ? "bg-pink-500" : "bg-zinc-200"}`}
-                    >
-                      <div className={`w-4.5 h-4.5 bg-white rounded-full shadow-sm transition-transform mx-0.5 ${profile.is_female_cycle_sync ? "translate-x-5" : "translate-x-0"}`} />
-                    </button>
-                  </div>
-                )}
-
-                {/* Tout est requis : chacun de ces champs change la prescription du coach.
-                    On dit à l'athlète CE QUI manque plutôt que de lui laisser un bouton mort. */}
-                {profileMissing.length > 0 && (
-                  <p className="flex items-start gap-2 text-[12px] text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
-                    <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                    <span>{tr("missing")} <b>{profileMissing.join(" · ")}</b></span>
-                  </p>
-                )}
-                <button onClick={next} disabled={profileMissing.length > 0}
-                  className="btn-brand w-full justify-center">
-                  {tr("next")} <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
+        {/* ── 1. PROFIL ── */}
+        {step === "profile" && (
+          <div className="mt-8 divide-y divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+            <div className="grid grid-cols-3 gap-3 px-5 py-6 sm:gap-4 sm:px-7">
+              <Mesure id={`${cid}-age`} label={tr("age")} unite={tr("uAns")} valeur={profile.age}
+                onChange={(v) => setProfile(p => ({ ...p, age: v }))} placeholder="30" min={10} max={99} />
+              <Mesure id={`${cid}-taille`} label={sansUnite(tr("height"))} unite={tr("uCm")} valeur={profile.height_cm}
+                onChange={(v) => setProfile(p => ({ ...p, height_cm: v }))} placeholder="175" min={140} max={220} />
+              <Mesure id={`${cid}-poids`} label={sansUnite(tr("weight"))} unite={tr("uKg")} valeur={profile.weight_kg}
+                onChange={(v) => setProfile(p => ({ ...p, weight_kg: v }))} placeholder="70" min={40} max={150} />
+            </div>
+            <Question id={`${cid}-genre`} titre={tr("gender")} marque={marqueManque(`${cid}-genre`)}>
+              <Choix id={`${cid}-genre`} variante="segment" grille="grid-cols-3" valeur={profile.gender}
+                onChange={(v) => setProfile(p => ({ ...p, gender: v }))}
+                options={[{ v: "male" as const, l: tr("male") }, { v: "female" as const, l: tr("female") }, { v: "other" as const, l: tr("other") }]} />
+            </Question>
+            {profile.gender === "female" && (
+              <Question id={`${cid}-cycle`} titre={tr("cycle")} aide={tr("cycleSub")}>
+                <label htmlFor={`${cid}-cycle-c`} className="relative inline-flex cursor-pointer items-center">
+                  <input id={`${cid}-cycle-c`} type="checkbox" role="switch" aria-labelledby={`${cid}-cycle-t`}
+                    checked={profile.is_female_cycle_sync}
+                    onChange={() => setProfile(p => ({ ...p, is_female_cycle_sync: !p.is_female_cycle_sync }))}
+                    className="peer sr-only" />
+                  <span aria-hidden="true" className={`relative h-6 w-11 rounded-full bg-zinc-300 transition-colors peer-checked:bg-emerald-600 after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:after:translate-x-5 ${FOCUS}`} />
+                </label>
+              </Question>
             )}
+          </div>
+        )}
 
-            {step === "physio" && (
-              <div className="bento-card space-y-5">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-9 h-9 bg-zinc-100 rounded-xl flex items-center justify-center">
-                    <HeartPulse className="w-4 h-4 text-zinc-700" />
+        {/* ── 2. ENTRAÎNEMENT ── */}
+        {step === "training" && (
+          <div className="mt-8 divide-y divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+            {/* Ancienneté — plafonne la charge que le coach se permet de prescrire. */}
+            <Question id={`${cid}-anciennete`} titre={tr("expTitle")} aide={tr("expHint2")} marque={marqueManque(`${cid}-anciennete`)}>
+              <Choix id={`${cid}-anciennete`} variante="tuiles" grille="grid-cols-2 sm:grid-cols-3" aide
+                valeur={profile.running_years} onChange={(v) => setProfile(p => ({ ...p, running_years: v }))}
+                options={([[0, "exp0"], [1, "exp1"], [2, "exp2"], [4, "exp4"], [8, "exp8"], [12, "exp12"]] as const).map(([v, k]) => ({ v, l: tr(k) }))} />
+            </Question>
+            {/* Disponibilités — le plan n'a de valeur que s'il est tenable. */}
+            <Question id={`${cid}-frequence`} titre={tr("dpwShort")} aide={tr("dpwHint")} marque={marqueManque(`${cid}-frequence`)}>
+              <Choix id={`${cid}-frequence`} variante="segment" grille="grid-cols-6" aide
+                valeur={profile.days_per_week} onChange={(v) => setProfile(p => ({ ...p, days_per_week: v }))}
+                options={[2, 3, 4, 5, 6, 7].map(n => ({ v: n, l: String(n) }))} />
+            </Question>
+            <Question id={`${cid}-jours`} titre={tr("daysShortTitle")} aide={tr("daysHint")}>
+              <Cases id={`${cid}-jours`} disposition="grid grid-cols-7 gap-1.5 sm:gap-2" aide
+                valeurs={profile.available_days.map(String)}
+                onToggle={(v) => { const d = Number(v); setProfile(p => ({ ...p, available_days: p.available_days.includes(d) ? p.available_days.filter(x => x !== d) : [...p.available_days, d] })); }}
+                options={[1, 2, 3, 4, 5, 6, 0].map(d => ({ v: String(d), l: tr("dayShort").split(",")[d], sr: jourLong(d) }))} />
+            </Question>
+            {/* Terrains — CHOIX MULTIPLE : décide si les séances se pilotent à l'allure ou à la FC. */}
+            <Question id={`${cid}-terrains`} titre={tr("terrTitle")} aide={tr("terrHint2")} marque={marqueManque(`${cid}-terrains`)}>
+              <Cases id={`${cid}-terrains`} disposition="grid grid-cols-2 gap-2 sm:grid-cols-4" aide
+                valeurs={profile.main_terrains}
+                onToggle={(v) => setProfile(p => ({ ...p, main_terrains: p.main_terrains.includes(v) ? p.main_terrains.filter(s => s !== v) : [...p.main_terrains, v] }))}
+                options={TERRAINS.map(t => ({ v: t.slug, l: terrainLabel(t, lang) }))} />
+            </Question>
+            {/* Dénivelé — place des côtes et du D+ dans le plan (lib/coach/denivele). */}
+            <Question id={`${cid}-denivele`} titre={tr("elevTitle")} aide={tr("elevHint2")} marque={marqueManque(`${cid}-denivele`)}>
+              <Choix id={`${cid}-denivele`} variante="tuiles" grille="grid-cols-2 sm:grid-cols-4" aide
+                valeur={profile.elevation_pref} onChange={(v) => setProfile(p => ({ ...p, elevation_pref: v }))}
+                options={([["evite", "elevEvite"], ["modere", "elevModere"], ["aime", "elevAime"], ["specialiste", "elevSpec"]] as const).map(([v, k]) => ({ v, l: tr(k) }))} />
+            </Question>
+            <Question id={`${cid}-longue`} titre={tr("longTitle")} aide={tr("longHint2")}>
+              <Choix id={`${cid}-longue`} variante="segment" grille="grid-cols-2" aide
+                valeur={profile.long_run_mode} onChange={(v) => setProfile(p => ({ ...p, long_run_mode: v }))}
+                options={[{ v: "run" as const, l: tr("longRun") }, { v: "bike" as const, l: tr("longBike") }]} />
+            </Question>
+            <Question id={`${cid}-wc`} titre={tr("wcGroup")} aide={tr("wcHint2")}>
+              <div className="space-y-4">
+                {([["warmup_min", "warmup", "echauffement"], ["cooldown_min", "cooldown", "retour"]] as const).map(([cle, k, suffixe]) => (
+                  <div key={cle}>
+                    <p id={`${cid}-${suffixe}-t`} className="text-sm font-medium text-zinc-700">{tr(k)} <span className="font-normal text-zinc-500">({tr("uMin")})</span></p>
+                    <div className="mt-2">
+                      <Choix id={`${cid}-${suffixe}`} variante="segment" grille="grid-cols-6"
+                        valeur={profile[cle]} onChange={(v) => setProfile(p => ({ ...p, [cle]: v }))} options={minutes} />
+                    </div>
                   </div>
-                  <h2 className="font-semibold text-zinc-900">{tr("phTitle")}</h2>
-                </div>
-
-                <div className="p-4 bg-zinc-50 border border-zinc-100 rounded-2xl text-sm text-zinc-600 space-y-1">
-                  <div className="font-semibold text-zinc-800">{tr("fcTitle")}</div>
-                  <p className="leading-relaxed">{tr("fcIntro")}</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label htmlFor={`${cid}-fcmax`} className="text-xs font-medium text-zinc-500 block mb-1">{tr("maxHr")}</label>
-                    <input id={`${cid}-fcmax`} type="number" value={fc.max_hr} onChange={e => setFc(p => ({ ...p, max_hr: e.target.value }))}
-                      placeholder="190" min="140" max="220"
-                      className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                  </div>
-                  <div>
-                    <label htmlFor={`${cid}-fcrepos`} className="text-xs font-medium text-zinc-500 block mb-1">{tr("restHr")}</label>
-                    <input id={`${cid}-fcrepos`} type="number" value={fc.resting_hr} onChange={e => setFc(p => ({ ...p, resting_hr: e.target.value }))}
-                      placeholder="55" min="30" max="100"
-                      className="w-full px-4 py-3 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <button onClick={prev} className="btn-secondary flex-1 justify-center">
-                    <ArrowLeft className="w-4 h-4" /> {tr("back")}
-                  </button>
-                  {/* Rien n'est obligatoire ici : on ne bloque personne sur une FC qu'il ignore. */}
-                  <button onClick={next} className="btn-brand flex-1 justify-center">
-                    {tr("next")} <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
+                ))}
               </div>
-            )}
-
-            {step === "goals" && (
-              <div className="bento-card space-y-5">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-9 h-9 bg-zinc-100 rounded-xl flex items-center justify-center">
-                    <Target className="w-4 h-4 text-zinc-700" />
-                  </div>
-                  <h2 className="font-semibold text-zinc-900">{tr("gTitle")}</h2>
-                </div>
-
-                <div>
-                  <label htmlFor={`${cid}-c1`} className="text-xs font-medium text-zinc-500 block mb-1">{tr("volumeLabel")}</label>
-                  <input id={`${cid}-c1`} type="range" min="5" max="200" step="5" value={goals.target_weekly_km}
-                    onChange={e => setGoals(g => ({...g, target_weekly_km: e.target.value}))}
-                    className="w-full accent-emerald-500" />
-                  <div className="flex justify-between text-xs text-zinc-400 mt-1">
-                    <span>5 km</span>
-                    <span className="font-semibold text-zinc-900">{tr("perWeek", { v: goals.target_weekly_km })}</span>
-                    <span>200 km</span>
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <button onClick={prev} className="btn-secondary flex-1 justify-center">
-                    <ArrowLeft className="w-4 h-4" /> {tr("back")}
-                  </button>
-                  <button onClick={next} className="btn-brand flex-1 justify-center">
-                    {tr("next")} <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {step === "watch" && (
-              <div className="bento-card space-y-5">
-
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="font-semibold text-zinc-900">{tr("wTitle")}</h2>
-                    <p className="text-xs text-zinc-400 mt-0.5 font-medium">{tr("wOptional")}</p>
-                  </div>
-                  <div className="text-xs text-zinc-400 font-medium">{watchSubStep + 1}/4</div>
-                </div>
-
-                {/* Retour à l'étape précédente : sans lui, l'étape Montre était un cul-de-sac
-                    (signalé par Cyprien le 11/10/2026). */}
-                {watchSubStep === 0 && !watchSaved && (
-                  <button type="button" onClick={prev} disabled={loading}
-                    className="btn-secondary w-full justify-center disabled:opacity-50">
-                    <ArrowLeft className="w-4 h-4" /> {tr("back")}
+            </Question>
+            <Question id={`${cid}-volume`} titre={tr("volTitle")} aide={tr("volHint")} marque={{ texte: tr("facultatif"), ton: "neutre" }}>
+              <input id={`${cid}-vol`} type="range" min={5} max={200} step={5} value={volume ?? 40}
+                aria-labelledby={`${cid}-volume-t`} aria-describedby={`${cid}-volume-a`}
+                aria-valuetext={volume == null ? tr("volUnset") : tr("volValue", { v: volume })}
+                onChange={(e) => setVolume(Number(e.target.value))}
+                className={`w-full accent-emerald-600 ${volume == null ? "opacity-50" : ""}`} />
+              <div className="mt-2 flex items-center justify-between gap-3 text-sm">
+                <span aria-live="polite" className={volume == null ? "text-zinc-500" : "font-semibold tabular-nums text-zinc-900"}>
+                  {volume == null ? tr("volUnset") : tr("volValue", { v: volume })}
+                </span>
+                {volume != null && (
+                  <button type="button" onClick={() => setVolume(null)} className="text-zinc-500 underline-offset-2 hover:text-zinc-900 hover:underline">
+                    {tr("volClear")}
                   </button>
                 )}
+              </div>
+            </Question>
+          </div>
+        )}
 
-                {/* Sortie facultative : on termine sans montre et on synchronisera plus tard.
-                    C'est l'écran qui coûte le plus d'inscriptions — il ne doit jamais être un mur. */}
-                <button onClick={handleFinish} disabled={loading}
-                  className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-50">
-                  {loading ? tr("saving") : tr("wSkip")}
-                </button>
+        {/* ── 3. SANTÉ ── la seule section où « rien » est une réponse parfaitement valable. */}
+        {step === "health" && (
+          <div className="mt-8 divide-y divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+            <div id={`${cid}-sante`} className="scroll-mt-32">
+              {([["health_conditions", "condTitle", HEALTH_CONDITIONS, "pathologies"], ["injury_zones", "injTitle", INJURY_ZONES, "blessures"]] as const).map(([key, titreKey, catalogue, suffixe]) => (
+                <Question key={key} id={`${cid}-${suffixe}`} titre={tr(titreKey)}
+                  marque={manque(`${cid}-sante`) ? { texte: tr("missingShort"), ton: "alerte" } : undefined}>
+                  <Cases id={`${cid}-${suffixe}`} disposition="flex flex-wrap gap-2"
+                    valeurs={profile[key]} onToggle={(v) => toggleHealth(key, v)}
+                    options={catalogue.map(item => ({ v: item.slug, l: healthLabel(item, lang) }))} />
+                </Question>
+              ))}
+              {/* Réponse explicite « rien à signaler » — sans quoi on ne saurait pas distinguer
+                  un athlète en pleine forme d'un athlète qui a sauté la question. */}
+              <div className="px-5 pb-6 sm:px-7">
+                <label htmlFor={`${cid}-rien`} className="relative block cursor-pointer">
+                  <input id={`${cid}-rien`} type="checkbox" checked={healthNone}
+                    onChange={() => { setHealthNone(v => !v); setProfile(p => ({ ...p, health_conditions: [], injury_zones: [] })); }}
+                    className="peer sr-only" />
+                  <span className={`${TUILE} w-full`}>
+                    {healthNone && <Check aria-hidden="true" className="h-4 w-4 shrink-0" />}
+                    {tr("healthNoneLong")}
+                  </span>
+                </label>
+              </div>
+            </div>
+            <div className="px-5 py-6 sm:px-7">
+              <label htmlFor={`${cid}-notes`} className="text-[15px] font-semibold text-zinc-900">{tr("notesTitle")}</label>
+              <textarea id={`${cid}-notes`} value={profile.health_notes}
+                onChange={e => setProfile(p => ({ ...p, health_notes: e.target.value }))}
+                placeholder={tr("notesPh")} rows={3} maxLength={500}
+                className="mt-3 w-full resize-none rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-base text-zinc-900 placeholder:text-zinc-400 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 sm:text-[15px]" />
+            </div>
+            <Question id={`${cid}-fc`} titre={tr("fcGroup")} aide={tr("fcHint2")} marque={{ texte: tr("facultatif"), ton: "neutre" }}>
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                <Mesure id={`${cid}-fcmax`} label={sansUnite(tr("maxHr"))} unite={tr("uBpm")} valeur={fc.max_hr}
+                  onChange={(v) => setFc(p => ({ ...p, max_hr: v }))} placeholder="190" min={140} max={230} />
+                <Mesure id={`${cid}-fcrepos`} label={sansUnite(tr("restHr"))} unite={tr("uBpm")} valeur={fc.resting_hr}
+                  onChange={(v) => setFc(p => ({ ...p, resting_hr: v }))} placeholder="55" min={30} max={100} />
+              </div>
+            </Question>
+            <p className="px-5 py-4 text-sm leading-relaxed text-zinc-500 sm:px-7">{tr("healthDisc")}</p>
+          </div>
+        )}
 
-                {/* Sub-step progress dots */}
-                <div className="flex gap-1.5">
-                  {[tr("wsAccount"), tr("wsWatch"), tr("wsKey"), tr("wsConn")].map((label, i) => (
-                    <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                      <div className={`h-1.5 w-full rounded-full transition-all ${
-                        i < watchSubStep ? "bg-emerald-400" : i === watchSubStep ? "bg-emerald-600" : "bg-zinc-100"
-                      }`} />
-                      <span className={`text-[10px] font-medium ${i === watchSubStep ? "text-zinc-900" : i < watchSubStep ? "text-emerald-600" : "text-zinc-300"}`}>
-                        {i < watchSubStep ? "✓" : label}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                <AnimatePresence mode="wait">
-                  <motion.div key={watchSubStep} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.2 }}>
-
-                    {/* STEP 0 — Compte Intervals.icu */}
-                    {watchSubStep === 0 && (
-                      <div className="space-y-4 py-2 text-center">
-                        <Globe className="mx-auto h-12 w-12 text-emerald-600" />
-                        <div>
-                          <p className="font-semibold text-zinc-900 text-base">{tr("w0Title")}</p>
-                          <p className="text-xs text-zinc-500 mt-1.5 leading-relaxed">{tr("w0Desc")}</p>
-                        </div>
-
-                        <div className="flex items-center justify-center gap-2 py-1">
-                          <div className="flex flex-col items-center gap-1">
-                            <div className="w-12 h-12 bg-zinc-100 rounded-2xl flex items-center justify-center text-2xl">⌚</div>
-                            <span className="text-[10px] text-zinc-400 font-medium">{tr("w0Watch")}</span>
-                          </div>
-                          <ArrowRight className="w-4 h-4 text-zinc-300" />
-                          <div className="flex flex-col items-center gap-1">
-                            <div className="w-12 h-12 bg-blue-50 border-2 border-blue-200 rounded-2xl flex items-center justify-center"><Globe className="h-6 w-6 text-blue-500" /></div>
-                            <span className="text-[10px] text-blue-500 font-semibold">{tr("w0Intervals")}</span>
-                          </div>
-                          <ArrowRight className="w-4 h-4 text-zinc-300" />
-                          <div className="flex flex-col items-center gap-1">
-                            <div className="w-12 h-12 bg-emerald-50 border-2 border-emerald-200 rounded-2xl flex items-center justify-center"><Mountain className="h-6 w-6 text-emerald-600" /></div>
-                            <span className="text-[10px] text-emerald-600 font-semibold">{tr("w0App")}</span>
-                          </div>
-                        </div>
-
-                        <a href="https://intervals.icu/signup" target="_blank" rel="noopener noreferrer"
-                          className="btn-brand justify-center w-full">
-                          {tr("w0Create")} <ExternalLink className="w-4 h-4" />
-                        </a>
-                        <button onClick={() => setWatchSubStep(1)}
-                          className="w-full flex items-center justify-center gap-1.5 text-sm text-zinc-600 font-medium hover:text-zinc-900 bg-zinc-50 hover:bg-zinc-100 rounded-xl py-2.5 transition-colors">
-                          {tr("w0Have")}
-                        </button>
-                        <p className="text-[11px] text-zinc-400 leading-relaxed">{tr("w0Tip")}</p>
-                      </div>
+        {/* ── 4. MONTRE ── une liste numérotée, parce que c'en est une : quatre gestes dans l'ordre. */}
+        {step === "watch" && (
+          <ol className="mt-8 divide-y divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+            {etapesMontre.map((titre, i) => {
+              const fait = i < watchSubStep || (i === 3 && watchSaved);
+              const ouvert = i === watchSubStep;
+              return (
+                <li key={i} className="px-5 py-5 sm:px-7">
+                  <div className="flex items-center gap-3">
+                    <span aria-hidden="true" className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold tabular-nums ${
+                      fait ? "bg-emerald-600 text-white" : ouvert ? "border-2 border-emerald-600 text-emerald-700" : "border border-zinc-300 text-zinc-500"
+                    }`}>
+                      {fait ? <Check className="h-4 w-4" /> : i + 1}
+                    </span>
+                    <h2 className={`flex-1 text-[15px] font-semibold ${ouvert || fait ? "text-zinc-900" : "text-zinc-500"}`}>
+                      {titre}{fait && <span className="sr-only"> — {tr("wDone")}</span>}
+                    </h2>
+                    {fait && !ouvert && !watchSaved && (
+                      <button type="button" onClick={() => setWatchSubStep(i)} className="text-sm text-zinc-500 underline-offset-2 hover:text-zinc-900 hover:underline">
+                        {tr("wRedo")}
+                      </button>
                     )}
+                  </div>
 
-                    {/* STEP 1 — Connecter la montre */}
-                    {watchSubStep === 1 && (
-                      <div className="space-y-4 py-2">
-                        <div className="text-center">
-                          <div className="text-5xl mb-3">⌚</div>
-                          <p className="font-semibold text-zinc-900 text-base">{tr("w1Title")}</p>
-                          <p className="text-xs text-zinc-500 mt-1">{tr("w1Where")}</p>
-                        </div>
-                        <div className="flex justify-center gap-2 flex-wrap">
-                          {["Garmin", "COROS", "Polar", "Suunto", "Wahoo"].map(b => (
-                            <span key={b} className="px-2.5 py-1 bg-zinc-100 rounded-lg text-xs font-medium text-zinc-600">{b}</span>
+                  {ouvert && i === 0 && (
+                    <div className="mt-4 space-y-4 sm:pl-10">
+                      <p className="max-w-prose text-sm leading-relaxed text-zinc-600">{tr("w0Desc")}</p>
+                      <div className="flex flex-wrap gap-2">
+                        <a href="https://intervals.icu/signup" target="_blank" rel="noopener noreferrer" className={`btn-brand ${lienExterne}`}>
+                          {tr("w0Create")} <ExternalLink aria-hidden="true" className="h-4 w-4" />
+                        </a>
+                        <button type="button" onClick={() => setWatchSubStep(1)} className="btn-secondary">{tr("w0Have")}</button>
+                      </div>
+                      <p className="max-w-prose text-sm leading-relaxed text-zinc-500">{tr("w0Tip")}</p>
+                    </div>
+                  )}
+
+                  {ouvert && i === 1 && (
+                    <div className="mt-4 space-y-4 sm:pl-10">
+                      <p className="text-sm text-zinc-600">{tr("w1Where")}</p>
+                      <div>
+                        <p className="text-sm font-medium text-zinc-800">{tr("w1PermsTitle")}</p>
+                        <ul className="mt-2 space-y-1.5">
+                          {/* La 3ᵉ case est celle qui porte le PLAN jusqu'au poignet : sans elle, rien n'arrive sur la montre. */}
+                          {[tr("w1Perm1"), tr("w1Perm2"), tr("w1Perm4"), tr("w1Perm3")].map(p => (
+                            <li key={p} className="flex items-center gap-2 text-sm text-zinc-700">
+                              <Check aria-hidden="true" className="h-4 w-4 shrink-0 text-emerald-600" />{p}
+                            </li>
                           ))}
-                        </div>
-                        <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 space-y-1.5">
-                          <p className="text-xs font-semibold text-amber-700">{tr("w1PermsTitle")}</p>
-                          {[tr("w1Perm1"), tr("w1Perm2"), tr("w1Perm3")].map(p => (
-                            <div key={p} className="flex items-center gap-2 text-xs text-amber-700">
-                              <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />{p}
-                            </div>
-                          ))}
-                          <p className="text-[11px] text-amber-600 mt-1">{tr("w1Garmin")}</p>
-                        </div>
-                        <a href="https://intervals.icu/settings/connections" target="_blank" rel="noopener noreferrer"
-                          className="btn-brand justify-center w-full">
-                          {tr("w1Open")} <ExternalLink className="w-4 h-4" />
+                        </ul>
+                        <p className="mt-2 max-w-prose text-sm leading-relaxed text-zinc-500">{tr("w1Garmin")}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <a href="https://intervals.icu/settings/connections" target="_blank" rel="noopener noreferrer" className={`btn-brand ${lienExterne}`}>
+                          {tr("w1Open")} <ExternalLink aria-hidden="true" className="h-4 w-4" />
                         </a>
-                        <div className="flex gap-3">
-                          <button onClick={() => setWatchSubStep(0)} className="flex-1 text-xs text-zinc-400 hover:text-zinc-600 py-2">← {tr("back")}</button>
-                          <button onClick={() => setWatchSubStep(2)} className="flex-1 btn-brand justify-center text-sm py-2">{tr("w1Done")}</button>
-                        </div>
+                        <button type="button" onClick={() => setWatchSubStep(2)} className="btn-secondary">{tr("w1Done")}</button>
                       </div>
-                    )}
+                    </div>
+                  )}
 
-                    {/* STEP 2 — Clé API */}
-                    {watchSubStep === 2 && (
-                      <div className="space-y-4 py-2">
-                        <div className="text-center">
-                          <Key className="mx-auto h-12 w-12 text-emerald-600" />
-                          <p className="font-semibold text-zinc-900 text-base mt-2">{tr("w2Title")}</p>
-                          <p className="text-xs text-zinc-500 mt-1">{tr("w2Where")}</p>
-                        </div>
-
-                        <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden">
-                          <div className="bg-zinc-50 border-b border-zinc-100 px-3 py-2 flex items-center gap-1.5">
-                            <div className="flex gap-1">
-                              <span className="w-2 h-2 rounded-full bg-red-300" />
-                              <span className="w-2 h-2 rounded-full bg-amber-300" />
-                              <span className="w-2 h-2 rounded-full bg-emerald-300" />
-                            </div>
-                            <span className="text-[10px] text-zinc-400 ml-1">{tr("w2Mock")}</span>
-                          </div>
-                          <div className="p-3 space-y-2.5">
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 bg-blue-50 border-2 border-blue-300 rounded-lg px-3 py-2 animate-pulse">
-                                <p className="text-[10px] text-blue-400 font-medium">Athlete ID</p>
-                                <p className="font-mono text-sm font-bold text-blue-700">i564686</p>
-                              </div>
-                              <div className="flex items-center gap-1 text-blue-500 w-20">
-                                <ArrowLeft className="w-4 h-4 flex-shrink-0" />
-                                <span className="text-[11px] font-semibold leading-tight">{tr("w2Code1")}</span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 bg-emerald-50 border-2 border-emerald-300 rounded-lg px-3 py-2 animate-pulse">
-                                <p className="text-[10px] text-emerald-500 font-medium">API Key</p>
-                                <p className="font-mono text-xs font-bold text-emerald-700 truncate">a1b2c3d4e5f6…</p>
-                              </div>
-                              <div className="flex items-center gap-1 text-emerald-600 w-20">
-                                <ArrowLeft className="w-4 h-4 flex-shrink-0" />
-                                <span className="text-[11px] font-semibold leading-tight">{tr("w2Code2")}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 space-y-1">
-                          <p className="text-[11px] text-amber-700 flex items-start gap-1.5"><AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-px" /> <span>{tr("w2Warn1")}</span></p>
-                          <p className="text-[11px] text-amber-700 flex items-start gap-1.5"><ArrowRight className="h-3.5 w-3.5 flex-shrink-0 mt-px" /> <span>{tr("w2Warn2")}</span></p>
-                        </div>
-
-                        <a href="https://intervals.icu/settings#developer" target="_blank" rel="noopener noreferrer"
-                          className="btn-brand justify-center w-full">
-                          {tr("w2Open")} <ExternalLink className="w-4 h-4" />
+                  {ouvert && i === 2 && (
+                    <div className="mt-4 space-y-4 sm:pl-10">
+                      <p className="text-sm text-zinc-600">{tr("w2Where")}</p>
+                      <ul className="space-y-1.5 text-sm text-zinc-700">
+                        <li>{tr("wIdDesc")}</li>
+                        <li>{tr("wKeyDesc")}</li>
+                      </ul>
+                      <p className="max-w-prose text-sm leading-relaxed text-zinc-500">{tr("w2Warn1")} {tr("w2Warn2")}</p>
+                      <div className="flex flex-wrap gap-2">
+                        <a href="https://intervals.icu/settings#developer" target="_blank" rel="noopener noreferrer" className={`btn-brand ${lienExterne}`}>
+                          {tr("w2Open")} <ExternalLink aria-hidden="true" className="h-4 w-4" />
                         </a>
-                        <div className="flex gap-3">
-                          <button onClick={() => setWatchSubStep(1)} className="flex-1 text-xs text-zinc-400 hover:text-zinc-600 py-2">← {tr("back")}</button>
-                          <button onClick={() => setWatchSubStep(3)} className="flex-1 btn-brand justify-center text-sm py-2">{tr("w2Have")}</button>
+                        <button type="button" onClick={() => setWatchSubStep(3)} className="btn-secondary">{tr("w2Have")}</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {ouvert && i === 3 && !watchSaved && (
+                    <form onSubmit={handleSaveWatch} className="mt-4 space-y-4 sm:pl-10">
+                      <div>
+                        <label htmlFor={`${cid}-athlete`} className="block text-sm font-medium text-zinc-700">
+                          Athlete ID <span className="font-normal text-zinc-500">{tr("w3IdNote")}</span>
+                        </label>
+                        <div className="relative mt-1.5">
+                          <input id={`${cid}-athlete`} type="text" value={watchAthleteId} onChange={e => setWatchAthleteId(e.target.value)}
+                            placeholder="i564686" autoComplete="off" spellCheck={false}
+                            aria-invalid={idHint ? true : undefined} aria-describedby={idHint ? `${cid}-athlete-e` : undefined}
+                            className={`${CHAMP} font-mono ${idHint ? "border-red-300" : idValid ? "border-emerald-500" : ""}`} />
+                          {idValid && <CheckCircle2 aria-hidden="true" className="absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-600" />}
                         </div>
+                        {idHint && <p id={`${cid}-athlete-e`} className="mt-1.5 text-sm text-red-600">{idHint}</p>}
                       </div>
-                    )}
-
-                    {/* STEP 3 — Connexion finale */}
-                    {watchSubStep === 3 && (
-                      <div className="space-y-4 py-1">
-                        {!watchSaved ? (
-                          <form onSubmit={handleSaveWatch} className="space-y-4">
-                            <div className="text-center">
-                              <Target className="mx-auto mb-2 h-9 w-9 text-emerald-600" />
-                              <p className="font-semibold text-zinc-900">{tr("w3Title")}</p>
-                              <p className="text-xs text-zinc-500 mt-0.5">{tr("w3Sub")}</p>
-                            </div>
-                            <div className="space-y-3">
-                              <div>
-                                <label className="text-xs font-medium text-zinc-500 mb-1.5 flex items-center gap-1.5">
-                                  <span className="w-4 h-4 bg-blue-100 text-blue-600 rounded text-[10px] font-bold flex items-center justify-center">1</span>
-                                  Athlete ID <span className="text-zinc-400 font-normal">{tr("w3IdNote")}</span>
-                                </label>
-                                <div className="relative">
-                                  <input type="text" value={watchAthleteId} onChange={e => setWatchAthleteId(e.target.value)}
-                                    placeholder="i564686"
-                                    className={`w-full px-3 py-2.5 pr-9 rounded-xl border text-sm font-mono focus:outline-none focus:ring-2 transition-colors ${
-                                      idHint ? "border-red-300 focus:ring-red-400 bg-red-50/40" :
-                                      idValid ? "border-emerald-300 focus:ring-emerald-400 bg-emerald-50/40" :
-                                      "border-zinc-200 focus:ring-emerald-500"
-                                    }`} />
-                                  {idValid && <CheckCircle2 className="w-4 h-4 text-emerald-500 absolute right-3 top-1/2 -translate-y-1/2" />}
-                                  {idHint && <AlertCircle className="w-4 h-4 text-red-400 absolute right-3 top-1/2 -translate-y-1/2" />}
-                                </div>
-                                {idHint && <p className="text-[11px] text-red-500 mt-1 flex items-start gap-1"><span>⚠️</span>{idHint}</p>}
-                              </div>
-                              <div>
-                                <label className="text-xs font-medium text-zinc-500 mb-1.5 flex items-center gap-1.5">
-                                  <span className="w-4 h-4 bg-emerald-100 text-emerald-600 rounded text-[10px] font-bold flex items-center justify-center">2</span>
-                                  {tr("w3KeyLabel")} <span className="text-zinc-400 font-normal">{tr("w3KeyNote")}</span>
-                                </label>
-                                <div className="relative">
-                                  <input type={showWatchKey ? "text" : "password"} value={watchApiKey} onChange={e => setWatchApiKey(e.target.value)}
-                                    placeholder="a1b2c3d4e5f6…"
-                                    className={`w-full px-3 py-2.5 pr-16 rounded-xl border text-sm font-mono focus:outline-none focus:ring-2 transition-colors ${
-                                      keyHint ? "border-red-300 focus:ring-red-400 bg-red-50/40" :
-                                      keyValid ? "border-emerald-300 focus:ring-emerald-400 bg-emerald-50/40" :
-                                      "border-zinc-200 focus:ring-emerald-500"
-                                    }`} />
-                                  {keyValid && <CheckCircle2 className="w-4 h-4 text-emerald-500 absolute right-9 top-1/2 -translate-y-1/2" />}
-                                  {keyHint && <AlertCircle className="w-4 h-4 text-red-400 absolute right-9 top-1/2 -translate-y-1/2" />}
-                                  <button type="button" onClick={() => setShowWatchKey(v => !v)}
-                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600">
-                                    {showWatchKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                  </button>
-                                </div>
-                                {keyHint && <p className="text-[11px] text-red-500 mt-1 flex items-start gap-1"><span>⚠️</span>{keyHint}</p>}
-                              </div>
-                            </div>
-                            {watchError && (
-                              <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
-                                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />{watchError}
-                              </div>
-                            )}
-                            <button type="submit" disabled={savingWatch || !idValid || !keyValid}
-                              className="btn-brand w-full justify-center disabled:opacity-40">
-                              {savingWatch ? <><RefreshCw className="w-4 h-4 animate-spin mr-2" />{tr("w3Verifying")}</> : tr("w3Connect")}
-                            </button>
-                            <button type="button" onClick={() => setWatchSubStep(2)}
-                              className="w-full text-xs text-zinc-400 hover:text-zinc-600 text-center py-1">← {tr("back")}</button>
-                          </form>
-                        ) : (
-                          <div className="text-center space-y-4 py-4">
-                            {pollingStatus === "checking" && (
-                              <>
-                                <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto">
-                                  <Wifi className="w-7 h-7 text-blue-500 animate-pulse" />
-                                </div>
-                                <div>
-                                  <p className="font-semibold text-zinc-900">{tr("w3CheckTitle")}</p>
-                                  <p className="text-xs text-zinc-500 mt-1">{tr("w3CheckSub")}</p>
-                                </div>
-                                <div className="flex justify-center gap-1.5">
-                                  {[0,1,2].map(i => (
-                                    <div key={i} className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
-                                  ))}
-                                </div>
-                              </>
-                            )}
-                            {pollingStatus === "ok" && (
-                              <>
-                                <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto">
-                                  <CheckCircle2 className="w-7 h-7 text-emerald-600" />
-                                </div>
-                                <div>
-                                  <p className="font-semibold text-zinc-900">{tr("w3OkTitle")}</p>
-                                  <p className="text-xs text-zinc-500 mt-1">{tr("w3OkSub")}</p>
-                                </div>
-                              </>
-                            )}
-                            {pollingStatus === "timeout" && (
-                              <>
-                                <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto">
-                                  <RefreshCw className="w-7 h-7 text-amber-500" />
-                                </div>
-                                <div>
-                                  <p className="font-semibold text-zinc-900">{tr("w3ToTitle")}</p>
-                                  <p className="text-xs text-zinc-500 mt-1">{tr("w3ToSub")}</p>
-                                </div>
-                              </>
-                            )}
-                            {/* ⚠️ `handleFinish`, PAS `next` (relevé le 11/10/2026). `next` menait à
-                                l'écran « Terminé » SANS rien enregistrer : profil, santé, jours,
-                                onboarding non terminé — l'athlète qui branchait sa montre perdait
-                                toutes ses réponses et retombait sur le questionnaire. */}
-                            <button onClick={handleFinish} disabled={loading}
-                              className="btn-brand w-full justify-center disabled:opacity-50">
-                              {loading ? tr("saving") : <>{tr("w3Configure")} <ArrowRight className="w-4 h-4" /></>}
-                            </button>
-                          </div>
-                        )}
+                      <div>
+                        <label htmlFor={`${cid}-cle`} className="block text-sm font-medium text-zinc-700">
+                          {tr("w3KeyLabel")} <span className="font-normal text-zinc-500">{tr("w3KeyNote")}</span>
+                        </label>
+                        <div className="relative mt-1.5">
+                          <input id={`${cid}-cle`} type={showWatchKey ? "text" : "password"} value={watchApiKey} onChange={e => setWatchApiKey(e.target.value)}
+                            placeholder="a1b2c3d4e5f6…" autoComplete="off" spellCheck={false}
+                            aria-invalid={keyHint ? true : undefined} aria-describedby={keyHint ? `${cid}-cle-e` : undefined}
+                            className={`${CHAMP} font-mono ${keyHint ? "border-red-300" : keyValid ? "border-emerald-500" : ""}`} />
+                          <button type="button" onClick={() => setShowWatchKey(v => !v)} aria-label={tr("w3KeyLabel")} aria-pressed={showWatchKey}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-zinc-500 hover:text-zinc-800">
+                            {showWatchKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                        {keyHint && <p id={`${cid}-cle-e`} className="mt-1.5 text-sm text-red-600">{keyHint}</p>}
                       </div>
-                    )}
+                      {watchError && (
+                        <p role="alert" className="flex items-start gap-2 text-sm text-red-700">
+                          <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />{watchError}
+                        </p>
+                      )}
+                      <button type="submit" disabled={savingWatch || !idValid || !keyValid} className="btn-brand disabled:opacity-50">
+                        {savingWatch && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}
+                        {savingWatch ? tr("w3Verifying") : tr("w3Connect")}
+                      </button>
+                    </form>
+                  )}
 
-                  </motion.div>
-                </AnimatePresence>
-              </div>
+                  {ouvert && i === 3 && watchSaved && (
+                    <div className="mt-4 sm:pl-10" aria-live="polite">
+                      {pollingStatus === "checking" && (
+                        <p className="flex items-start gap-2 text-sm text-zinc-700">
+                          <Loader2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-emerald-600" />
+                          <span><span className="font-medium text-zinc-900">{tr("w3CheckTitle")}</span> {tr("w3CheckSub")}</span>
+                        </p>
+                      )}
+                      {pollingStatus === "ok" && (
+                        <p className="flex items-start gap-2 text-sm text-zinc-700">
+                          <CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                          <span><span className="font-medium text-zinc-900">{tr("w3OkTitle")}</span> {tr("w3OkSub")}</span>
+                        </p>
+                      )}
+                      {pollingStatus === "timeout" && (
+                        <p className="flex items-start gap-2 text-sm text-zinc-700">
+                          <CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                          <span><span className="font-medium text-zinc-900">{tr("w3ToTitle")}</span> {tr("w3ToSub")}</span>
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        )}
+
+        {/* ── FIN ── */}
+        {step === "done" && (
+          <div className="mx-auto mt-6 max-w-md text-center sm:mt-16">
+            <CheckCircle2 aria-hidden="true" className="mx-auto h-12 w-12 text-emerald-600" />
+            <h1 className="mt-5 text-[26px] font-semibold tracking-tight text-zinc-900 sm:text-3xl">{tr("doneTitle2")}</h1>
+            <p className="mt-2 text-[15px] text-zinc-600">{tr("doneSub2")}</p>
+            <button type="button" onClick={() => router.push("/dashboard")} className="btn-brand mt-8 w-full justify-center py-3 text-base">
+              {tr("doneCta2")}
+            </button>
+          </div>
+        )}
+      </main>
+
+      {/* Barre d'actions FIXE : « Retour » à chaque étape après la première, l'action principale à droite. */}
+      {step !== "done" && (
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+          <div className="mx-auto max-w-2xl px-4 pt-3 pb-[max(env(safe-area-inset-bottom),12px)] sm:px-6">
+            {manqueIci.length > 0 && (
+              <p role="alert" className="mb-3 flex items-start gap-2 text-sm text-amber-800">
+                <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{tr("missing")} {manqueIci.map(m => m.label).join(", ")}</span>
+              </p>
             )}
-
-            {step === "done" && (
-              <div className="bento-card text-center space-y-6">
-                <div className="w-20 h-20 bg-emerald-100 rounded-3xl flex items-center justify-center mx-auto">
-                  <CheckCircle2 className="w-10 h-10 text-emerald-600" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-zinc-900">{tr("doneTitle")}</h2>
-                  <p className="text-zinc-500 mt-2">{tr("doneSub")}</p>
-                </div>
-                <button onClick={() => router.push("/dashboard")} className="btn-brand justify-center w-full py-3.5 text-base">
-                  {tr("doneCta")} <ArrowRight className="w-5 h-5" />
+            <div className="flex items-center justify-between gap-3">
+              {stepIdx > 0 ? (
+                <button type="button" onClick={prev} disabled={loading} className="btn-secondary disabled:opacity-50">
+                  <ArrowLeft aria-hidden="true" className="h-4 w-4" /> {tr("back")}
                 </button>
-              </div>
-            )}
-          </motion.div>
-        </AnimatePresence>
-      </div>
+              ) : <span />}
+              {step !== "watch" ? (
+                <button type="button" onClick={continuer} className="btn-brand min-w-[9rem] justify-center">{tr("continuer")}</button>
+              ) : watchSaved ? (
+                <button type="button" onClick={handleFinish} disabled={loading} className="btn-brand min-w-[9rem] justify-center disabled:opacity-60">
+                  {loading && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}
+                  {loading ? tr("saving") : tr("wFinish")}
+                </button>
+              ) : (
+                // Sortie facultative : on termine sans montre et on synchronisera plus tard.
+                // C'est l'écran qui coûte le plus d'inscriptions — il ne doit jamais être un mur.
+                <button type="button" onClick={handleFinish} disabled={loading} className="btn-secondary justify-center disabled:opacity-60">
+                  {loading && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}
+                  {loading ? tr("saving") : tr("wSkip2")}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

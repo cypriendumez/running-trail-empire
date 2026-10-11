@@ -294,8 +294,10 @@ test("l'inscription ENREGISTRE par les deux chemins, et aucune écriture n'est m
   assert.ok(/noter\(eContexte, /.test(src), "l'échec de l'écriture du contexte n'entre pas dans les échecs signalés");
   // Les FC facultatives : un échec va au journal, pas seulement à la console.
   assert.ok(/if \(eFc\) \{[\s\S]{0,500}fetch\("\/api\/log-error"/.test(src), "l'échec des FC déclarées ne va plus au journal");
-  // L'étape Montre a un retour vers la question précédente.
-  assert.ok(/watchSubStep === 0 && !watchSaved && \([\s\S]{0,120}onClick=\{prev\}/.test(src), "l'étape Montre n'a plus de bouton Retour");
+  // « Retour » à CHAQUE étape après la première, dont l'étape Montre (refonte du 11/10/2026 :
+  // il vit dans la barre d'actions fixe, commune aux quatre étapes).
+  assert.ok(/\{stepIdx > 0 \? \([\s\S]{0,160}onClick=\{prev\}/.test(src), "la barre d'actions n'a plus de bouton Retour");
+  assert.ok(!/step !== "watch" && stepIdx > 0/.test(src), "le bouton Retour est retiré de l'étape Montre");
 });
 
 // ── 6. La mesure d'audience : ce qui entre en base, et ce qui n'y entre jamais ──

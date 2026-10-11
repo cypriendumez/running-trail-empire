@@ -953,7 +953,8 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
   // vers le bas — l'athlète courait trop facile en croyant suivre la consigne.
   const gm = (profile as unknown as { garmin_metrics?: { lthr?: number; restingHR?: number } } | null)?.garmin_metrics;
   const refsFc = referencesFc({
-    maxDeclaree: baseline?.max_hr,
+    // FC max du test d'abord, sinon celle déclarée à l'inscription (ignorée ici avant le 11/10/2026).
+    maxDeclaree: baseline?.max_hr ?? (profile as unknown as { max_hr?: number } | null)?.max_hr,
     maxObservee: fcMaxObservee,
     repos: (profile as unknown as { resting_hr?: number } | null)?.resting_hr ?? gm?.restingHR,
     seuil: gm?.lthr,
