@@ -25,7 +25,9 @@
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { ligneVfc, ligneSommeil, ETAT_ECRIT, VFC_MAX_MS, type IcuWellness } from "../src/lib/intervals/wellnessRow";
+import {
+  ligneVfc, ligneSommeil, ETAT_ECRIT, VFC_MAX_MS, SPO2_MIN, RESPIRATION_MAX, type IcuWellness,
+} from "../src/lib/intervals/wellnessRow";
 import {
   serieVfc, choisirMetrique, etatRelatif, seriesParAthlete, ZONE_NORMALE_VFC, COLONNES_VFC,
   precisionMetrique, type MetriqueVfc,
@@ -139,13 +141,113 @@ test("la forme RÉELLE de l'API (champs à null) : 16 jours mesurés → 16 lign
 test("sommeil : une nuit sans mesure ne devient plus une nuit de 0 min", () => {
   assert.equal(ligneSommeil("u", { id: "2026-10-11", sleepSecs: null }), null);
   assert.equal(ligneSommeil("u", { id: "2026-10-11", sleepSecs: 20 }), null, "20 s = 0 min : refusé par le check");
-  const n = ligneSommeil("u", { id: "2026-10-11", sleepSecs: 27120, sleepScore: 85.6, deepSleepSecs: null });
+  const n = ligneSommeil("u", { id: "2026-10-11", sleepSecs: 27120, sleepScore: 85.6 });
   assert.ok(n);
   assert.equal(n.total_sleep_min, 452);
   assert.equal(n.sleep_score, 86, "un score décimal ferait échouer le smallint");
   assert.equal(n.deep_sleep_min, null, "une phase absente devient un 0 : nuit catastrophique inventée");
   assert.equal(ligneSommeil("u", { id: "2026-10-11", sleepSecs: 27000, sleepScore: 140 })!.sleep_score, null,
     "un score hors [0, 100] ferait refuser tout le lot (check)");
+  assert.equal(ligneSommeil("u", { id: "2026-10-11", sleepSecs: 27000, sleepScore: 0 })!.sleep_score, null,
+    "un score de 0 n'est pas une nuit notée");
+});
+
+/** Les 47 clés d'un jour wellness telles que l'API les renvoie — relevé du 12/10/2026 sur
+ *  401 jours du compte éditeur, identiques au modèle `Wellness` de /api/v1/docs. Ni phases de
+ *  sommeil, ni Body Battery, ni `avgSpo2` / `avgRespiration`. */
+const CHAMPS_API = ["abdomen", "atl", "atlLoad", "avgSleepingHR", "baevskySI", "bloodGlucose", "bodyFat",
+  "carbohydrates", "comments", "ctl", "ctlLoad", "diastolic", "fatTotal", "fatigue", "floorsClimbed", "hrv",
+  "hrvSDNN", "hydration", "hydrationVolume", "id", "injury", "kcalConsumed", "lactate", "locked",
+  "menstrualPhase", "menstrualPhasePredicted", "mood", "motivation", "protein", "rampRate", "readiness",
+  "respiration", "restingHR", "sleepQuality", "sleepScore", "sleepSecs", "soreness", "spO2", "sportInfo",
+  "steps", "stress", "systolic", "tempRestingHR", "tempWeight", "updated", "vo2max", "weight"];
+/** Un jour à la forme RÉELLE : les 47 clés présentes, à null sauf celles données. */
+const jourApi = (valeurs: Record<string, unknown>) =>
+  ({ ...Object.fromEntries(CHAMPS_API.map((k) => [k, null])), ...valeurs }) as IcuWellness;
+
+test("sommeil : une réponse d'API avec `spO2` et `respiration` remplit enfin leurs colonnes", () => {
+  // SpO2 en % (0-100), respiration en respirations/min — décimales comme les livre une source
+  // qui les mesure. Jusqu'ici lues sous `avgSpo2` / `avgRespiration` : vides pour tous.
+  const n = ligneSommeil("u", jourApi({ id: "2026-10-11", sleepSecs: 27120, sleepScore: 81, sleepQuality: 2,
+    avgSleepingHR: 48.5, spO2: 95.6875, respiration: 14.16 }));
+  assert.ok(n);
+  assert.equal(n.spo2_avg, 95.7, "la SpO2 de l'API n'atteint pas `spo2_avg`");
+  assert.equal(n.respiration_rate, 14.2, "la respiration de l'API n'atteint pas `respiration_rate`");
+  assert.equal(n.sleep_score, 81);
+  for (const k of ["deep_sleep_min", "light_sleep_min", "rem_sleep_min", "body_battery_start", "body_battery_end"] as const) {
+    assert.equal(n[k], null, `${k} rempli alors que l'API n'a pas ce champ`);
+  }
+  // Le compte éditeur (Forerunner 165) : les deux champs PRÉSENTS, à null — la nuit s'écrit sans eux.
+  const sans = ligneSommeil("u", jourApi({ id: "2026-10-11", sleepSecs: 27120, sleepScore: 81 }));
+  assert.ok(sans && sans.spo2_avg === null && sans.respiration_rate === null);
+});
+
+test("sommeil : hors de sa plage, une mesure devient NULL — jamais 0, jamais une fraction prise pour des %", () => {
+  const nuit = (v: Record<string, unknown>) => ligneSommeil("u", jourApi({ id: "2026-10-11", sleepSecs: 27000, ...v }))!;
+  for (const spO2 of [0.97, 0, -95, 69.9, 100.5, 150, 950, Number.NaN, Infinity, "96"]) {
+    assert.equal(nuit({ spO2 }).spo2_avg, null, `SpO2 ${spO2} acceptée`);
+  }
+  for (const [spO2, attendu] of [[SPO2_MIN, SPO2_MIN], [88.04, 88], [100, 100]]) assert.equal(nuit({ spO2 }).spo2_avg, attendu);
+  for (const respiration of [0, 0.04, -14, 60.5, 75, 1200, Number.NaN, "14"]) {
+    assert.equal(nuit({ respiration }).respiration_rate, null, `respiration ${respiration} acceptée`);
+  }
+  for (const [respiration, attendu] of [[6.5, 6.5], [14.16, 14.2], [RESPIRATION_MAX, RESPIRATION_MAX]]) {
+    assert.equal(nuit({ respiration }).respiration_rate, attendu);
+  }
+});
+
+test("sommeil : 5 000 nuits tirées au sort — chaque ligne respecte les contraintes de `sleep_data`", () => {
+  const r = alea(11);
+  // null, absent, 0, négatif, NaN, ou n'importe quoi jusqu'à `echelle` : tout ce qui peut arriver.
+  const tirage = (echelle: number) => {
+    const x = r();
+    return x < 0.2 ? null : x < 0.25 ? undefined : x < 0.3 ? 0 : x < 0.35 ? -r() * echelle : x < 0.4 ? Number.NaN : r() * echelle;
+  };
+  let spo2 = 0, respiration = 0;
+  for (let i = 0; i < 5000; i++) {
+    const n = ligneSommeil("u", jourApi({ id: jour(i % 120), sleepSecs: tirage(40000), sleepScore: tirage(200),
+      spO2: tirage(i % 2 ? 130 : 2000), respiration: tirage(i % 2 ? 80 : 2000) }));
+    if (!n) continue;
+    const ctx = JSON.stringify(n);
+    assert.ok(Number.isInteger(n.total_sleep_min) && n.total_sleep_min > 0, `check (total_sleep_min > 0) : ${ctx}`);
+    assert.ok(n.sleep_score === null || (Number.isInteger(n.sleep_score) && n.sleep_score > 0 && n.sleep_score <= 100),
+      `smallint check 0-100 : ${ctx}`);
+    // numeric(4,1) : au plus 999,9, une décimale — au-delà, le lot ENTIER est refusé.
+    for (const v of [n.spo2_avg, n.respiration_rate]) {
+      assert.ok(v === null || (v > 0 && /^\d{1,3}(\.\d)?$/.test(String(v))), `numeric(4,1) : ${ctx}`);
+    }
+    assert.ok(n.spo2_avg === null || (n.spo2_avg >= SPO2_MIN && n.spo2_avg <= 100), `SpO2 hors de 70-100 % : ${ctx}`);
+    assert.ok(n.respiration_rate === null || n.respiration_rate <= RESPIRATION_MAX, `respiration aberrante : ${ctx}`);
+    assert.ok([n.deep_sleep_min, n.light_sleep_min, n.rem_sleep_min, n.body_battery_start, n.body_battery_end].every((v) => v === null),
+      `phase ou Body Battery inventée : ${ctx}`);
+    if (n.spo2_avg !== null) spo2++;
+    if (n.respiration_rate !== null) respiration++;
+  }
+  // Un tirage qui ne remplit jamais les colonnes ne prouverait rien.
+  assert.ok(spo2 > 200 && respiration > 200, `trop peu de valeurs écrites (SpO2 ${spo2}, respiration ${respiration})`);
+});
+
+test("sommeil : `ligneSommeil` et `ligneVfc` ne lisent QUE des champs que l'API renvoie", () => {
+  const lus = new Set<string>();
+  const espion = new Proxy(jourApi({ id: "2026-10-11", sleepSecs: 27000, sleepScore: 80, hrv: 90, hrvSDNN: 60, spO2: 96, respiration: 14 }), {
+    get: (cible, cle) => { if (typeof cle === "string") lus.add(cle); return Reflect.get(cible, cle); },
+  });
+  assert.ok(ligneSommeil("u", espion));
+  assert.ok(ligneVfc("u", espion));
+  const inventes = [...lus].filter((k) => !CHAMPS_API.includes(k));
+  assert.deepEqual(inventes, [], `champ(s) que l'API n'a jamais renvoyé(s) : ${inventes.join(", ")}`);
+  for (const k of ["sleepSecs", "sleepScore", "spO2", "respiration"]) assert.ok(lus.has(k), `\`${k}\` n'est plus lu`);
+});
+
+test("sommeil : aucun fichier qui appelle l'API wellness n'y lit un champ qu'elle ne renvoie pas", () => {
+  const lecteurs = fichiers("src").filter((f) => /\/wellness\?/.test(code(f)));
+  // Un balayage qui ne trouve rien ne prouve rien : 3 lecteurs au 12/10/2026 (les deux
+  // chemins de synchronisation et la génération de plan de l'espace coach).
+  assert.ok(lecteurs.length >= 3, `seulement ${lecteurs.length} lecteur(s) de l'API wellness : le motif ne voit plus le code`);
+  for (const f of [...lecteurs, "src/lib/intervals/wellnessRow.ts"]) {
+    const m = code(f).match(/\.\s*(avgSpo2|avgRespiration|bbMax|bb|deepSleepSecs|lightSleepSecs|remSleepSecs)\b/);
+    assert.equal(m, null, `${f} lit \`${m?.[1]}\`, absent de l'API intervals.icu`);
+  }
 });
 
 console.log("\nLECTURE — une série, une mesure");

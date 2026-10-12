@@ -28,12 +28,12 @@
 type N = number | null | undefined;
 
 /** Champs d'un jour wellness effectivement lus. `| null` partout : c'est ainsi que
- *  l'API dit « pas de mesure ce jour-là ». */
+ *  l'API dit « pas de mesure ce jour-là ». Noms du modèle `Wellness` de l'API
+ *  (spécification /api/v1/docs), retrouvés tels quels dans une réponse réelle le 12/10/2026. */
 export type IcuWellness = {
   id?: string | null;
   hrv?: N; hrvSDNN?: N;
-  sleepSecs?: N; deepSleepSecs?: N; lightSleepSecs?: N; remSleepSecs?: N;
-  sleepScore?: N; bb?: N; bbMax?: N; avgRespiration?: N; avgSpo2?: N;
+  sleepSecs?: N; sleepScore?: N; spO2?: N; respiration?: N;
 };
 
 /** Au-delà, ce n'est pas une variabilité cardiaque mais une erreur de saisie ou de capteur.
@@ -81,19 +81,40 @@ export function ligneVfc(userId: string, jour: IcuWellness): LigneVfcEcrite | nu
 
 export type LigneSommeilEcrite = {
   user_id: string; date: string; total_sleep_min: number;
-  deep_sleep_min: number | null; light_sleep_min: number | null; rem_sleep_min: number | null;
-  sleep_score: number | null; body_battery_start: number | null; body_battery_end: number | null;
+  deep_sleep_min: null; light_sleep_min: null; rem_sleep_min: null;
+  sleep_score: number | null; body_battery_start: null; body_battery_end: null;
   respiration_rate: number | null; spo2_avg: number | null; source: "intervals_icu";
 };
 
+/** SpO2 en % : intervals.icu la définit sur 0-100 % (forum, sujet 5776 #12). Sous 70 %, la
+ *  valeur sort de la plage où un oxymètre doit garantir sa précision (ISO 80601-2-61 :
+ *  70-100 %) ; une fraction (0,97 pour 97 %) y tombe aussi, au lieu de s'afficher « 1 % ». */
+export const SPO2_MIN = 70;
+/** Respirations par minute PENDANT LE SOMMEIL (forum, sujet 63373 #11). À l'effort maximal,
+ *  un adulte en est à 36 ± 9 (Blackie 1991, 231 adultes) : au-delà de 60 en dormant, c'est une
+ *  erreur de saisie ou de capteur — et 1 000 ferait déborder la colonne numeric(4,1), lot entier. */
+export const RESPIRATION_MAX = 60;
+
 const minutes = (secs: unknown) => { const s = mesure(secs); return s != null ? Math.round(s / 60) : null; };
-/** Entier dans [0, 100] — les colonnes portent ce `check` : hors bornes, tout le lot tombe. */
-const sur100 = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 100 ? Math.round(v) : null);
+/** Entier dans ]0, 100] — la colonne porte ce `check` : hors bornes, tout le lot tombe.
+ *  Un score de 0 n'est pas une nuit notée : NULL, comme une mesure absente. */
+const sur100 = (v: unknown) => { const m = mesure(v), r = m == null ? null : Math.round(m); return r != null && r > 0 && r <= 100 ? r : null; };
+/** Au dixième, comme la colonne numeric(4,1) ; hors [min, max] → NULL, jamais 0. */
+const auDixieme = (v: unknown, min: number, max: number) => {
+  const m = mesure(v), r = m == null ? null : Math.round(m * 10) / 10;
+  return r != null && r > 0 && r >= min && r <= max ? r : null;
+};
 
 /**
  * La ligne `sleep_data` d'une nuit, ou `null` sans durée de sommeil mesurée.
- * Les phases et scores ABSENTS restent NULL : les forcer à 0 fabriquait une nuit
- * catastrophique (« 0 % de sommeil profond ») là où la mesure n'existait simplement pas.
+ * Une mesure ABSENTE reste NULL, jamais 0 : un 0 fabriquait une nuit catastrophique
+ * (« 0 % de sommeil profond ») là où la mesure n'existait simplement pas.
+ *
+ * Les noms lus jusqu'au 12/10/2026 (`avgSpo2`, `avgRespiration`, `bb`, `bbMax`,
+ * `deep/light/remSleepSecs`) n'existent PAS dans l'API : ni dans sa spécification, ni dans
+ * 401 jours de réponse réelle. SpO2 et respiration restaient vides pour TOUT LE MONDE, même
+ * quand la source les fournit (Whoop ; Oura et Polar pour la respiration ; Health Snapshot
+ * Garmin pour la SpO2 ; saisie manuelle). Les vrais noms : `spO2`, `respiration`.
  */
 export function ligneSommeil(userId: string, jour: IcuWellness): LigneSommeilEcrite | null {
   const date = dateDuJour(jour);
@@ -101,14 +122,15 @@ export function ligneSommeil(userId: string, jour: IcuWellness): LigneSommeilEcr
   if (!date || total == null || total <= 0) return null;
   return {
     user_id: userId, date, total_sleep_min: total,
-    deep_sleep_min: minutes(jour.deepSleepSecs),
-    light_sleep_min: minutes(jour.lightSleepSecs),
-    rem_sleep_min: minutes(jour.remSleepSecs),
     sleep_score: sur100(jour.sleepScore),
-    body_battery_start: sur100(jour.bbMax),
-    body_battery_end: sur100(jour.bb),
-    respiration_rate: mesure(jour.avgRespiration),
-    spo2_avg: mesure(jour.avgSpo2),
+    respiration_rate: auDixieme(jour.respiration, 0, RESPIRATION_MAX),
+    spo2_avg: auDixieme(jour.spO2, SPO2_MIN, 100),
+    // Ni phases ni Body Battery dans l'API : NULL EXPLICITE. Omises, les phases prendraient le
+    // `default 0` de la colonne (« 0 % de sommeil profond » inventé) et une ancienne valeur ne
+    // serait jamais effacée. (intervals.icu propose un champ PERSONNALISÉ de Body Battery, que
+    // l'athlète doit ajouter lui-même — forum, sujet 119477 #16 : absent chez Cyprien, non lu.)
+    deep_sleep_min: null, light_sleep_min: null, rem_sleep_min: null,
+    body_battery_start: null, body_battery_end: null,
     source: "intervals_icu",
   };
 }

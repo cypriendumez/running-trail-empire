@@ -96,8 +96,8 @@ export async function POST(req: NextRequest) {
         hrv_sdnn: w.hrvSDNN ?? null,
         sleep_hours: w.sleepSecs ? +(w.sleepSecs / 3600).toFixed(1) : null,
         sleep_score: w.sleepScore ?? null,
-        body_battery: w.bb ?? null,
-        spo2: w.avgSpo2 ?? null,
+        // Noms du modèle `Wellness` de l'API : ni `avgSpo2` ni Body Battery n'y existent (12/10/2026).
+        spo2: w.spO2 ?? null,
         resting_hr: w.restingHR ?? null,
         form: w.form ?? null,
         fatigue: w.atl ?? null,
