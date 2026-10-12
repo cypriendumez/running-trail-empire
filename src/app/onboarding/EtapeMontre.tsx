@@ -262,6 +262,22 @@ export function EtapeMontre({ tr, cid, marque, onMarque, enregistre, onEnregistr
                       </ol>
                       <p className="mt-3 max-w-prose text-sm leading-relaxed text-zinc-500">{tr("mApple4")}</p>
                     </div>
+                    {/* ⚠️ L'ENVOI NE SE FAIT PAS TOUT SEUL (Cyprien, 12/10/2026 : « est-ce que tu lui
+                        expliques bien ça ? »). Apple ne laisse lire Santé que sur un iPhone
+                        déverrouillé (auteur de l'app, forum 124208, 06/07/2026) : la séance part quand
+                        l'app tourne. Le dire une fois, en gris, à la fin, ne suffisait pas ; une
+                        automatisation Raccourcis (déclencheur « Exercice Apple Watch » › « Fin ») ouvre
+                        l'app à la fin de chaque séance. */}
+                    <div className="max-w-prose rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3.5">
+                      <p className="text-sm font-semibold text-emerald-950">{tr("mAppleEnvoiTitre")}</p>
+                      <p className="mt-1 text-sm leading-relaxed text-emerald-950/80">{tr("mAppleEnvoiTxt")}</p>
+                      <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm leading-relaxed text-emerald-950/90 marker:text-emerald-700">
+                        <li>{tr("mAuto1")}</li>
+                        <li>{tr("mAuto2")}</li>
+                        <li>{tr("mAuto3")}</li>
+                        <li>{tr("mAuto4")}</li>
+                      </ol>
+                    </div>
                     <button type="button" onClick={() => setSous(2)} className="btn-secondary">{tr("w1Done")}</button>
                   </div>
                 )}
@@ -333,7 +349,7 @@ export function EtapeMontre({ tr, cid, marque, onMarque, enregistre, onEnregistr
                       </p>
                     )}
                     {m.chemin === "companion" && (
-                      <p className="max-w-prose text-sm leading-relaxed text-zinc-500">{tr("mAppleApres")}</p>
+                      <p className="max-w-prose rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium leading-relaxed text-emerald-950">{tr("mAppleApres")}</p>
                     )}
                   </div>
                 )}

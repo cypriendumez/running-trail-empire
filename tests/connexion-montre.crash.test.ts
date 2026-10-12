@@ -247,7 +247,8 @@ async function main() {
     if (m.chemin === "aucun") return [...communs, tr("mAucuneTxt")];
     if (m.chemin === "companion") {
       return [...communs, tr("mEtape2Apple"), ...["mAppleIntro", "mAppleStore", "mAppleQr", "mAppleQrLabel", "mAppleDans",
-        "mApple1", "mApple2", "mApple3", "mApple4", "mAppleApres", "w1Done"].map((k) => tr(k))];
+        "mApple1", "mApple2", "mApple3", "mApple4", "mAppleEnvoiTitre", "mAppleEnvoiTxt", "mAuto1", "mAuto2", "mAuto3", "mAuto4",
+        "mAppleApres", "w1Done"].map((k) => tr(k))];
     }
     const n = m.nom;
     return [...communs,

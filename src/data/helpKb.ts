@@ -168,6 +168,8 @@ export const HELP_FACTS: string[] = [
 export const HELP_PROBLEMS: { q: string; a: string }[] = [
   { q: "Mes séances n'arrivent pas sur ma montre",
     a: "Trois causes possibles, dans l'ordre : (1) la synchronisation Garmin passe par le Bluetooth du téléphone — ouvre Garmin Connect, montre à proximité ; (2) seuls les 5 premiers jours du plan sont poussés, une séance dans 6 jours n'y est pas encore ; (3) les identifiants intervals.icu sont absents ou périmés — vérifie dans Sync Montre." },
+  { q: "Ma séance Apple Watch n'arrive pas dans l'app",
+    a: "Elle passe par l'app iPhone Intervals.icu Companion, qui ne peut lire Santé que sur un iPhone déverrouillé : ouvre l'app après la séance, c'est à ce moment qu'elle l'envoie. Pour ne plus y penser : app Raccourcis › Automatisation › + › « Exercice Apple Watch » › « Fin » › « Exécuter immédiatement », puis l'action « Ouvrir l'app » › Intervals.icu Companion. Vérifie aussi, dans l'onglet Apple Health de l'app, que l'envoi des séances est activé." },
   { q: "Mes activités n'apparaissent pas dans l'app",
     a: "L'import passe par intervals.icu. Vérifie dans Sync Montre que l'identifiant athlète et la clé API sont renseignés et valides. Si la clé a été régénérée côté intervals.icu, il faut la re-saisir ici." },
   { q: "Le coach ne me donne aucune séance de fractionné",

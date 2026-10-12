@@ -132,6 +132,36 @@ async function main() {
     assert.ok(/s\.split\(`\{\$\{key\}\}`\)\.join\(String\(v\[key\]\)\)/.test(src), "tr() ne remplace plus qu'une occurrence");
   });
 
+  await test("l'envoi Apple Watch est expliqué AVANT et APRÈS la connexion, avec la recette d'automatisation", () => {
+    // Cyprien, 12/10/2026 : « est-ce que tu lui expliques bien ça ? » — la séance ne part que
+    // quand l'app Companion tourne, iPhone déverrouillé. Une phrase grise en fin de parcours
+    // ne suffisait pas.
+    const src = code("src/app/onboarding/EtapeMontre.tsx");
+    const i2b = src.indexOf('m.chemin === "companion" && (');
+    const iBouton = src.indexOf('tr("w1Done")', i2b);
+    const iEncadre = src.indexOf('tr("mAppleEnvoiTitre")', i2b);
+    assert.ok(i2b > 0 && iEncadre > i2b && iEncadre < iBouton, "l'encadré « c'est l'app qui envoie tes séances » n'est plus dans l'étape Apple, avant « C'est fait »");
+    for (const k of ["mAppleEnvoiTxt", "mAuto1", "mAuto2", "mAuto3", "mAuto4"]) assert.ok(src.includes(`tr("${k}")`), `${k} n'est plus affiché`);
+    assert.ok(/m\.chemin === "companion" && \(\s*<p[^>]*>\{tr\("mAppleApres"\)\}/.test(src), "le rappel après la connexion a disparu");
+  });
+
+  await test("le déclencheur porte le nom EXACT qu'Apple lui donne, dans chaque langue", () => {
+    // Relevés sur support.apple.com (guide Raccourcis, déclencheurs) le 12/10/2026.
+    const NOMS: Record<string, string> = {
+      fr: "Exercice Apple Watch", en: "Apple Watch Workout", de: "Apple Watch-Training",
+      es: "Entreno con el Apple Watch", pt: "Treino com o Apple Watch",
+    };
+    const sync = readFileSync("src/app/dashboard/sync/syncI18n.tsx", "utf8");
+    const lignesSync = sync.split("\n").filter((l) => l.includes('"s1.appleEnvoi": '));
+    assert.equal(lignesSync.length, 5, "« s1.appleEnvoi » manque dans une langue de la page Sync Montre");
+    for (const [lang, nom] of Object.entries(NOMS)) {
+      assert.ok(OB[lang as keyof typeof OB].mAuto2.includes(nom), `${lang} : le questionnaire ne nomme pas « ${nom} »`);
+      assert.ok(lignesSync.some((l) => l.includes(nom)), `${lang} : la page Sync Montre ne nomme pas « ${nom} »`);
+    }
+    assert.ok(/\{d\["s1\.appleEnvoi"\]\}/.test(code("src/app/dashboard/sync/page.tsx")), "la page Sync Montre n'affiche plus la recette");
+    assert.ok(readFileSync("src/data/helpKb.ts", "utf8").includes("Ma séance Apple Watch n'arrive pas dans l'app"), "l'assistant ne sait plus répondre");
+  });
+
   console.log("\nLES TEXTES — cinq langues, aucune clé orpheline");
 
   await test("chaque texte de l'étape existe dans les cinq langues, variables comprises", () => {
