@@ -3,7 +3,8 @@
  *
  * Sortie d'EtapeMontre pour être passée au crible (tests/connexion-montre.crash.test.ts) :
  * ce que vaut la clé saisie, quel message montrer quand la route refuse, et quoi dire après
- * la première synchronisation.
+ * la première synchronisation. PARTAGÉE avec la page Sync Montre depuis le 12/10/2026 : les
+ * deux portes d'entrée appliquent exactement les mêmes règles.
  */
 
 export type EtatCle = { valide: boolean; indice: "mdp" | "format" | null };

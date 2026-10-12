@@ -162,6 +162,32 @@ async function main() {
     assert.ok(readFileSync("src/data/helpKb.ts", "utf8").includes("Ma séance Apple Watch n'arrive pas dans l'app"), "l'assistant ne sait plus répondre");
   });
 
+  console.log("\nLA PAGE SYNC MONTRE — alignée sur le questionnaire (12/10/2026)");
+
+  await test("la page Sync Montre n'envoie que la clé, avec les mêmes règles que le questionnaire", () => {
+    const src = code("src/app/dashboard/sync/page.tsx");
+    assert.ok(/body: JSON\.stringify\(\{ apiKey: keyTrim \}\)/.test(src), "la page envoie autre chose que la clé seule");
+    assert.ok(!/credsAthleteId|f\.athleteHint|s3\.code1|keyFieldOk/.test(src), "un reste du formulaire à deux codes subsiste");
+    assert.ok(/const etat = etatCle\(credsApiKey\)/.test(src), "la page ne contrôle plus la clé avec les règles partagées");
+    assert.ok(/cleMessageErreur\(data\?\.code\)/.test(src), "les refus de la route ne sont plus traduits");
+    assert.ok(/disabled=\{savingCreds \|\| !keyValid\}/.test(src), "le bouton s'active sans clé valide (l'ancienne « clé vide = garder » répondait 400)");
+    assert.ok(/<label htmlFor="sync-cle-api"/.test(src) && /id="sync-cle-api"/.test(src), "le champ n'est plus relié à son libellé");
+    assert.ok(/d\["f\.account"\]\.replace\("\{nom\}", credsCompte\)/.test(src), "le nom du compte retrouvé n'est plus affiché");
+  });
+
+  await test("ses textes ne parlent plus de deux codes, dans aucune langue", () => {
+    const dico = readFileSync("src/app/dashboard/sync/syncI18n.tsx", "utf8");
+    for (const k of ["s3.aCopier", "f.account", "err.cle", "err.indispo"]) {
+      assert.equal(dico.split(`"${k}": `).length - 1, 5, `« ${k} » manque dans une langue`);
+    }
+    const lignes = dico.split("\n").filter((l) => /"s3\.title": |"s4\.desc": |s3desc: <>/.test(l));
+    assert.equal(lignes.length, 15, `${lignes.length} lignes relevées au lieu de 15`);
+    for (const l of lignes) {
+      assert.ok(!/Athlete ID|deux (valeurs|infos)|two values|beiden Werte|dos valores|dois valores/.test(l), `reste des deux codes : ${l.trim().slice(0, 90)}`);
+    }
+    assert.ok(!/Coller l'identifiant athlète et la clé API/.test(readFileSync("src/data/helpKb.ts", "utf8")), "l'aide demande encore l'identifiant athlète");
+  });
+
   console.log("\nLES TEXTES — cinq langues, aucune clé orpheline");
 
   await test("chaque texte de l'étape existe dans les cinq langues, variables comprises", () => {

@@ -46,10 +46,10 @@ export const PROBLEM_T: Record<string, Record<string, string>> = {
     pt: "Passa pela app de iPhone Intervals.icu Companion, que só consegue ler a app Saúde com o iPhone desbloqueado: abre a app depois da sessão, é nesse momento que a envia. Para não teres de te lembrar: app Atalhos › Automatização › + › «Treino com o Apple Watch» › «Fim» › «Executar imediatamente», e depois a ação «Abrir app» › Intervals.icu Companion. Verifica também, no separador Apple Health da app, que o envio de treinos está ativado.",
   },
   "Mes activités n'apparaissent pas dans l'app": {
-    en: "Imports go through intervals.icu. In Watch Sync, check that your athlete ID and API key are filled in and still valid. If you regenerated the key on intervals.icu, you must re-enter it here.",
-    de: "Der Import läuft über intervals.icu. Prüfe unter Uhr-Sync, ob Athleten-ID und API-Schlüssel eingetragen und noch gültig sind. Wenn du den Schlüssel neu erzeugt hast, musst du ihn hier erneut eingeben.",
-    es: "La importación pasa por intervals.icu. Comprueba en Sincronizar reloj que tu identificador de atleta y tu clave API estén rellenados y sigan siendo válidos. Si regeneraste la clave, vuelve a introducirla aquí.",
-    pt: "A importação passa pelo intervals.icu. Verifica em Sincronizar relógio que o teu ID de atleta e a chave API estão preenchidos e válidos. Se regeraste a chave, tens de a introduzir novamente aqui.",
+    en: "Imports go through intervals.icu. In Watch Sync, check that your API key is filled in and still valid. If you regenerated the key on intervals.icu, you must re-enter it here.",
+    de: "Der Import läuft über intervals.icu. Prüfe unter Uhr-Sync, ob dein API-Schlüssel eingetragen und noch gültig ist. Wenn du den Schlüssel neu erzeugt hast, musst du ihn hier erneut eingeben.",
+    es: "La importación pasa por intervals.icu. Comprueba en Sincronizar reloj que tu clave API esté rellenada y siga siendo válida. Si regeneraste la clave, vuelve a introducirla aquí.",
+    pt: "A importação passa pelo intervals.icu. Verifica em Sincronizar relógio que a tua chave API está preenchida e válida. Se regeraste a chave, tens de a introduzir novamente aqui.",
   },
   "Le coach ne me donne aucune séance de fractionné": {
     en: "It is almost always intentional. The Calendar shows a « why this plan » banner with the exact reason: fatigue (high acute:chronic ratio, very negative TSB, low HRV, poor sleep), reported pain, or a cap tied to your running history. Intensity comes back on its own once the signal drops.",

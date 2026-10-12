@@ -12,6 +12,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { cleMessageErreur, etatCle } from "@/lib/intervals/connexionMontre";
 import { SY, SY_NODES, fillY } from "./syncI18n";
 import { cleanActivityName } from "@/lib/utils/activityName";
 
@@ -85,9 +86,10 @@ export default function SyncPage() {
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"activities" | "wellness" | "setup">("activities");
 
-  // Credentials form state
-  const [credsAthleteId, setCredsAthleteId] = useState("");
+  // Credentials form state — UNE clé suffit depuis le 12/10/2026 : le compte se lit dessus
+  // (lib/intervals/compteDeLaCle), comme dans le questionnaire d'inscription.
   const [credsApiKey, setCredsApiKey] = useState("");
+  const [credsCompte, setCredsCompte] = useState<string | null>(null);
   const [showApiKey, setShowApiKey] = useState(false);
   const [savingCreds, setSavingCreds] = useState(false);
   const [credsError, setCredsError] = useState<string | null>(null);
@@ -109,29 +111,18 @@ export default function SyncPage() {
       .then(r => r.json())
       .then(d => {
         setExistingCreds({ athleteId: d.athleteId, apiKeyMasked: d.apiKeyMasked });
-        if (d.athleteId) setCredsAthleteId(d.athleteId);
       })
       .catch(() => {});
   }, []);
 
-  // ── Smart validation — catches the most common mistakes ──
-  const idTrim = credsAthleteId.trim();
+  // ── La clé : les MÊMES règles que le questionnaire (lib/intervals/connexionMontre) ──
+  // ⚠️ L'ancien formulaire acceptait une clé VIDE pour « garder l'actuelle » quand des
+  // identifiants existaient — mais la route exige la clé : le bouton promettait une mise à
+  // jour qui répondait 400. Il faut désormais une clé pour mettre à jour.
   const keyTrim = credsApiKey.trim();
-  const idValid = /^i\d{3,}$/i.test(idTrim);
-  const idHint =
-    idTrim === "" ? null :
-    idTrim.includes("@") ? d["hint.idEmail"] :
-    !idTrim.toLowerCase().startsWith("i") ? d["hint.idStart"] :
-    !idValid ? d["hint.idFormat"] :
-    null;
-  const keyValid = /^[a-z0-9]{16,}$/i.test(keyTrim);
-  const keyHint =
-    keyTrim === "" ? null :
-    keyTrim.length < 20 && /[A-Z!?@#$%^&*]/.test(keyTrim) ? d["hint.keyPwd"] :
-    !keyValid ? d["hint.keyLen"] :
-    null;
-  // When updating existing creds, an empty key field is allowed (keep current)
-  const keyFieldOk = keyTrim === "" ? !!existingCreds?.athleteId : keyValid;
+  const etat = etatCle(credsApiKey);
+  const keyValid = etat.valide;
+  const keyHint = etat.indice === "mdp" ? d["hint.keyPwd"] : etat.indice === "format" ? d["hint.keyLen"] : null;
 
   async function handleSaveCredentials(e: React.FormEvent) {
     e.preventDefault();
@@ -142,13 +133,17 @@ export default function SyncPage() {
       const res = await fetch("/api/intervals/credentials", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ athleteId: credsAthleteId, apiKey: credsApiKey }),
+        body: JSON.stringify({ apiKey: keyTrim }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? d["err.save"]);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const k = cleMessageErreur(data?.code);
+        throw new Error(k === "mErrCle" ? d["err.cle"] : k === "mErrIndispo" ? d["err.indispo"] : typeof data?.error === "string" ? data.error : d["err.save"]);
+      }
       setCredsSaved(true);
       setCredsApiKey("");
-      setExistingCreds({ athleteId: credsAthleteId, apiKeyMasked: credsApiKey.slice(0, 4) + "●●●●●●●●●●●●" });
+      setCredsCompte(typeof data.nom === "string" ? data.nom : null);
+      setExistingCreds({ athleteId: typeof data.athleteId === "string" ? data.athleteId : null, apiKeyMasked: keyTrim.slice(0, 4) + "●●●●●●●●●●●●" });
       checkStatus();
     } catch (err) {
       setCredsError(String(err).replace("Error: ", ""));
@@ -160,8 +155,8 @@ export default function SyncPage() {
   async function handleDeleteCredentials() {
     if (!confirm(d["cf.delete"])) return;
     await fetch("/api/intervals/credentials", { method: "DELETE" });
-    setCredsAthleteId("");
     setCredsApiKey("");
+    setCredsCompte(null);
     setExistingCreds(null);
     setCredsSaved(false);
     checkStatus();
@@ -712,17 +707,8 @@ export default function SyncPage() {
                       </div>
                       <span className="text-[10px] text-zinc-400 ml-1 flex items-center gap-1"><Code2 className="w-3 h-3" /> intervals.icu — {d["s3.devAccess"]}</span>
                     </div>
-                    <div className="p-3 space-y-2.5">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-blue-50 border-2 border-blue-300 rounded-lg px-3 py-2 animate-pulse">
-                          <p className="text-[10px] text-blue-400 font-medium">Athlete ID</p>
-                          <p className="font-mono text-sm font-bold text-blue-700">i564686</p>
-                        </div>
-                        <div className="flex items-center gap-1 text-blue-500 w-20">
-                          <ArrowDown className="w-4 h-4 flex-shrink-0 rotate-90" />
-                          <span className="text-[11px] font-semibold leading-tight">{d["s3.code1"]}</span>
-                        </div>
-                      </div>
+                    <div className="p-3">
+                      {/* Une seule valeur à copier : l'Athlete ID se déduit de la clé. */}
                       <div className="flex items-center gap-2">
                         <div className="flex-1 bg-emerald-50 border-2 border-emerald-300 rounded-lg px-3 py-2 animate-pulse">
                           <p className="text-[10px] text-emerald-500 font-medium">API Key</p>
@@ -730,7 +716,7 @@ export default function SyncPage() {
                         </div>
                         <div className="flex items-center gap-1 text-emerald-600 w-20">
                           <ArrowDown className="w-4 h-4 flex-shrink-0 rotate-90" />
-                          <span className="text-[11px] font-semibold leading-tight">{d["s3.code2"]}</span>
+                          <span className="text-[11px] font-semibold leading-tight">{d["s3.aCopier"]}</span>
                         </div>
                       </div>
                     </div>
@@ -757,40 +743,21 @@ export default function SyncPage() {
                   </p>
 
                   <form onSubmit={handleSaveCredentials} className="bg-zinc-50 border border-zinc-200 rounded-xl p-4 space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
+                    <div>
                       <div>
-                        <label className="text-xs font-medium text-zinc-600 block mb-1.5">
-                          1️⃣ Athlete ID <span className="text-zinc-400">{d["f.athleteHint"]}</span>
+                        <label htmlFor="sync-cle-api" className="text-xs font-medium text-zinc-600 block mb-1.5">
+                          {d["f.apiKey"]} <span className="text-zinc-400">{d["f.apiKeyHint"]}</span>
                         </label>
                         <div className="relative">
                           <input
-                            type="text"
-                            value={credsAthleteId}
-                            onChange={e => setCredsAthleteId(e.target.value)}
-                            placeholder="i000000"
-                            required
-                            className={`w-full px-3 py-2.5 pr-9 rounded-xl border text-sm font-mono focus:outline-none focus:ring-2 transition-colors ${
-                              idHint ? "border-red-300 focus:ring-red-400 bg-red-50/40" :
-                              idValid ? "border-emerald-300 focus:ring-emerald-400 bg-emerald-50/40" :
-                              "border-zinc-200 focus:ring-zinc-900 bg-white"
-                            }`}
-                          />
-                          {idValid && <CheckCircle2 className="w-4 h-4 text-emerald-500 absolute right-3 top-1/2 -translate-y-1/2" />}
-                          {idHint && <AlertCircle className="w-4 h-4 text-red-400 absolute right-3 top-1/2 -translate-y-1/2" />}
-                        </div>
-                        {idHint && <p className="text-[11px] text-red-500 mt-1 flex items-start gap-1"><AlertTriangle className="mt-px h-3.5 w-3.5 flex-shrink-0" />{idHint}</p>}
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-zinc-600 block mb-1.5">
-                          2️⃣ {d["f.apiKey"]} <span className="text-zinc-400">{d["f.apiKeyHint"]}</span>
-                        </label>
-                        <div className="relative">
-                          <input
+                            id="sync-cle-api"
+                            autoComplete="off" spellCheck={false} autoCapitalize="none"
+                            aria-invalid={keyHint ? true : undefined}
                             type={showApiKey ? "text" : "password"}
                             value={credsApiKey}
                             onChange={e => setCredsApiKey(e.target.value)}
                             placeholder={existingCreds?.apiKeyMasked ? d["f.keyPlaceholder"] : "a1b2c3d4e5f6…"}
-                            required={!existingCreds?.athleteId}
+                            required
                             className={`w-full px-3 py-2.5 pr-16 rounded-xl border text-sm font-mono focus:outline-none focus:ring-2 transition-colors ${
                               keyHint ? "border-red-300 focus:ring-red-400 bg-red-50/40" :
                               keyValid ? "border-emerald-300 focus:ring-emerald-400 bg-emerald-50/40" :
@@ -815,13 +782,16 @@ export default function SyncPage() {
                       </div>
                     )}
                     {credsSaved && (
-                      <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5">
-                        <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-                        {d["f.saved"]}
+                      <div className="flex items-start gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5">
+                        <CheckCircle2 className="mt-px w-4 h-4 flex-shrink-0" />
+                        <span>
+                          {credsCompte && <span className="block font-semibold">{d["f.account"].replace("{nom}", credsCompte)}</span>}
+                          {d["f.saved"]}
+                        </span>
                       </div>
                     )}
 
-                    <button type="submit" disabled={savingCreds || !idValid || !keyFieldOk}
+                    <button type="submit" disabled={savingCreds || !keyValid}
                       className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-zinc-900 hover:bg-zinc-700 text-white rounded-xl text-sm font-semibold disabled:opacity-40 transition-all">
                       {savingCreds ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                       {savingCreds ? d["f.checking"] : existingCreds?.athleteId ? d["f.update"] : d["f.connect"]}

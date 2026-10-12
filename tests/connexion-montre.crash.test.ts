@@ -24,7 +24,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { compteDeLaCle } from "../src/lib/intervals/compteDeLaCle";
-import { etatCle, cleMessageErreur, verdictSuivi } from "../src/app/onboarding/connexionMontre";
+import { etatCle, cleMessageErreur, verdictSuivi } from "../src/lib/intervals/connexionMontre";
 import { MARQUES, type Marque } from "../src/app/onboarding/marquesMontre";
 import { OB } from "../src/app/onboarding/onboardingI18n";
 import {

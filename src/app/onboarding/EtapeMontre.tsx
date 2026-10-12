@@ -5,7 +5,7 @@ import { AlertCircle, Check, CheckCircle2, ExternalLink, Eye, EyeOff, Loader2 } 
 import { QrSvg } from "@/components/ui/QrSvg";
 import { CHAMP, FOCUS } from "./habillage";
 import { APP_STORE_COMPANION, MARQUES, marqueDe, type MarqueId } from "./marquesMontre";
-import { cleMessageErreur, etatCle, verdictSuivi } from "./connexionMontre";
+import { cleMessageErreur, etatCle, verdictSuivi } from "@/lib/intervals/connexionMontre";
 
 type Tr = (k: string, v?: Record<string, string | number>) => string;
 
