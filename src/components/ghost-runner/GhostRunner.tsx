@@ -14,7 +14,7 @@ import type { UserProfile, PerformanceBaseline } from "@/types";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { referencesFc, plageFc, cibleEndurance } from "@/lib/coach/fcCible";
 import { GX, GUIDE, GUIDE_TIP, SPEECH_LANG, fillG } from "./ghostI18n";
-import { estAppleWatch } from "@/lib/watch/intervals";
+import { messageLecture } from "@/lib/watch/intervals";
 import { jourCivil } from "@/lib/time/fuseau";
 import { useFuseau } from "@/lib/time/FuseauProvider";
 import dynamic from "next/dynamic";
@@ -1623,7 +1623,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                   {sendingWatch ? <Loader2 className="w-5 h-5 animate-spin" /> : <Watch className="w-5 h-5" />}
                   {sendingWatch ? d["watch.sending"] : d["watch.send"]}
                   {!sendingWatch && watchStatus && (
-                    <span title={watchStatus.pushReady ? tg("watch.okTitle", { d: watchStatus.device ?? "" }) : watchStatus.lecture ? tg(estAppleWatch(watchStatus.lecture) ? "acc.apple" : "acc.readonly", { d: nomLecture(watchStatus.lecture) }) : d["watch.setupTitle"]}
+                    <span title={watchStatus.pushReady ? tg("watch.okTitle", { d: watchStatus.device ?? "" }) : watchStatus.lecture ? tg(messageLecture(watchStatus.lecture), { d: nomLecture(watchStatus.lecture) }) : d["watch.setupTitle"]}
                       className={`h-2 w-2 rounded-full ${watchStatus.pushReady ? "bg-emerald-400" : watchStatus.lecture ? "bg-sky-400" : watchStatus.connected ? "bg-amber-400" : "bg-zinc-400"}`} />
                   )}
                 </button>
@@ -1658,8 +1658,9 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                         : watchStatus.lecture
                         // Apple est le seul cas « lecture seule » qui ait une issue :
                         // on indique l'app qui convertit le plan, au lieu de laisser
-                        // croire à une impasse.
-                        ? tg(estAppleWatch(watchStatus.lecture) ? "acc.apple" : "acc.readonly", { d: nomLecture(watchStatus.lecture) })
+                        // croire à une impasse — et si les données arrivent DÉJÀ par
+                        // cette app (« Intervals Companion »), on dit le réglage à activer.
+                        ? tg(messageLecture(watchStatus.lecture), { d: nomLecture(watchStatus.lecture) })
                         : watchStatus.connected
                         ? d["acc.almost"]
                         : d["acc.no"]}

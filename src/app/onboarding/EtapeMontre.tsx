@@ -5,6 +5,7 @@ import { AlertCircle, Check, CheckCircle2, ExternalLink, Eye, EyeOff, Loader2 } 
 import { QrSvg } from "@/components/ui/QrSvg";
 import { CHAMP, FOCUS } from "./habillage";
 import { APP_STORE_COMPANION, MARQUES, marqueDe, type MarqueId } from "./marquesMontre";
+import { cleMessageErreur, etatCle, verdictSuivi } from "./connexionMontre";
 
 type Tr = (k: string, v?: Record<string, string | number>) => string;
 
@@ -39,7 +40,7 @@ export function EtapeMontre({ tr, cid, marque, onMarque, enregistre, onEnregistr
   const [erreur, setErreur] = useState<string | null>(null);
   const [compte, setCompte] = useState<string | null>(null);
   // Revenu sur l'étape après avoir enregistré : la connexion est faite, on ne relance rien.
-  const [suivi, setSuivi] = useState<"checking" | "ok" | "timeout">(enregistre ? "timeout" : "checking");
+  const [suivi, setSuivi] = useState<"checking" | "ok" | "vide" | "timeout">(enregistre ? "timeout" : "checking");
   const [suiviActif, setSuiviActif] = useState(false);
   const minuterie = useRef<ReturnType<typeof setInterval> | null>(null);
   const liste = useRef<HTMLOListElement>(null);
@@ -51,13 +52,14 @@ export function EtapeMontre({ tr, cid, marque, onMarque, enregistre, onEnregistr
     minuterie.current = setInterval(async () => {
       essais++;
       try {
-        const r = await fetch("/api/intervals/status");
-        const d = await r.json();
-        if (d.configured) {
-          const sr = await fetch("/api/intervals/sync?days=7");
-          const sd = await sr.json();
-          if (sd?.fetched?.activities > 0 || sd?.synced?.workouts >= 0) {
-            setSuivi("ok");
+        const statut = await (await fetch("/api/intervals/status")).json();
+        if (statut?.configured === true) {
+          const synchro = await (await fetch("/api/intervals/sync?days=7")).json();
+          // Une synchronisation réussie mais VIDE n'est pas « activités détectées » :
+          // voir `verdictSuivi`. Dans les deux cas on arrête de relancer la synchro.
+          const v = verdictSuivi(statut, synchro);
+          if (v !== "attente") {
+            setSuivi(v);
             clearInterval(minuterie.current!);
             setSuiviActif(false);
             return;
@@ -91,9 +93,9 @@ export function EtapeMontre({ tr, cid, marque, onMarque, enregistre, onEnregistr
 
   // ── La clé : un seul code à coller ──
   const cleNette = cle.trim();
-  const ressembleMdp = cleNette.length > 0 && cleNette.length < 20 && /[A-Z!?@#$%^&*]/.test(cleNette);
-  const cleValide = /^[a-z0-9]{16,}$/i.test(cleNette);
-  const indice = cleNette === "" ? null : ressembleMdp ? tr("hKeyPwd") : !cleValide ? tr("hKeyFormat") : null;
+  const etat = etatCle(cle);
+  const cleValide = etat.valide;
+  const indice = etat.indice === "mdp" ? tr("hKeyPwd") : etat.indice === "format" ? tr("hKeyFormat") : null;
 
   async function connecter(e: React.FormEvent) {
     e.preventDefault();
@@ -107,10 +109,8 @@ export function EtapeMontre({ tr, cid, marque, onMarque, enregistre, onEnregistr
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const parCode: Record<string, string> = {
-          cle_refusee: tr("mErrCle"), indisponible: tr("mErrIndispo"), reponse_invalide: tr("mErrIndispo"),
-        };
-        throw new Error(parCode[data?.code] ?? data?.error ?? tr("tSaveError"));
+        const k = cleMessageErreur(data?.code);
+        throw new Error(k ? tr(k) : typeof data?.error === "string" ? data.error : tr("tSaveError"));
       }
       setCompte(typeof data.nom === "string" ? data.nom : null);
       setSuivi("checking");
@@ -318,6 +318,12 @@ export function EtapeMontre({ tr, cid, marque, onMarque, enregistre, onEnregistr
                       <p className="flex items-start gap-2 text-sm text-zinc-700">
                         <CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
                         <span><span className="font-medium text-zinc-900">{tr("w3OkTitle")}</span> {tr("w3OkSub")}</span>
+                      </p>
+                    )}
+                    {suivi === "vide" && (
+                      <p className="flex items-start gap-2 text-sm text-zinc-700">
+                        <CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                        <span><span className="font-medium text-zinc-900">{tr("mVideTitre")}</span> {tr("mVideSub")}</span>
                       </p>
                     )}
                     {suivi === "timeout" && (

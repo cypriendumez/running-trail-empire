@@ -7,6 +7,7 @@ type Dict = Record<string, string>;
 export const OB: Record<Lang, Dict> = {
   fr: {
     // Étape Montre PAR MARQUE (12/10/2026) : on choisit sa montre, puis seulement ses gestes.
+    mVideTitre: "Aucune séance récente pour l'instant.", mVideSub: "Elles arriveront dans Pacevo à la prochaine synchronisation de ta montre. Tu peux terminer sans attendre.",
     mQ: "Quelle montre portes-tu ?", mQAide: "Tu ne verras que les étapes de ta marque.", mAutre: "Autre marque", mAutreEx: "Wahoo, Amazfit, Huawei…", mAucune: "Je n'ai pas de montre",
     mAucuneTxt: "Aucun souci : ton plan fonctionne sans montre. Tu pourras en relier une plus tard, depuis l'onglet « Sync Montre ».", mEtape2Lien: "Relie ta {m} à intervals.icu",
     mEtape2Apple: "Installe l'app Intervals.icu Companion", mEtape3: "Colle ta clé intervals.icu", m0Desc: "C'est gratuit : intervals.icu fait le lien entre ta montre et Pacevo.",
@@ -93,6 +94,7 @@ export const OB: Record<Lang, Dict> = {
   },
   en: {
     // Étape Montre PAR MARQUE (12/10/2026) : on choisit sa montre, puis seulement ses gestes.
+    mVideTitre: "No recent sessions yet.", mVideSub: "They'll reach Pacevo at your watch's next sync. You can finish without waiting.",
     mQ: "Which watch do you wear?", mQAide: "You'll only see the steps for your brand.", mAutre: "Another brand", mAutreEx: "Wahoo, Amazfit, Huawei…", mAucune: "I don't have a watch",
     mAucuneTxt: "No problem: your plan works without a watch. You can link one later from the “Watch Sync” tab.", mEtape2Lien: "Link your {m} to intervals.icu",
     mEtape2Apple: "Install the Intervals.icu Companion app", mEtape3: "Paste your intervals.icu key", m0Desc: "It's free: intervals.icu is the link between your watch and Pacevo.",
@@ -179,6 +181,7 @@ export const OB: Record<Lang, Dict> = {
   },
   de: {
     // Étape Montre PAR MARQUE (12/10/2026) : on choisit sa montre, puis seulement ses gestes.
+    mVideTitre: "Noch keine aktuellen Einheiten.", mVideSub: "Sie kommen bei der nächsten Synchronisierung deiner Uhr in Pacevo an. Du kannst schon abschließen.",
     mQ: "Welche Uhr trägst du?", mQAide: "Du siehst nur die Schritte für deine Marke.", mAutre: "Andere Marke", mAutreEx: "Wahoo, Amazfit, Huawei…", mAucune: "Ich habe keine Uhr",
     mAucuneTxt: "Kein Problem: Dein Plan funktioniert auch ohne Uhr. Du kannst später eine verbinden, im Tab „Uhr-Sync“.", mEtape2Lien: "Verbinde deine {m} mit intervals.icu",
     mEtape2Apple: "Installiere die App Intervals.icu Companion", mEtape3: "Füge deinen intervals.icu-Schlüssel ein", m0Desc: "Kostenlos: intervals.icu verbindet deine Uhr mit Pacevo.",
@@ -265,6 +268,7 @@ export const OB: Record<Lang, Dict> = {
   },
   es: {
     // Étape Montre PAR MARQUE (12/10/2026) : on choisit sa montre, puis seulement ses gestes.
+    mVideTitre: "Todavía no hay sesiones recientes.", mVideSub: "Llegarán a Pacevo en la próxima sincronización de tu reloj. Puedes terminar sin esperar.",
     mQ: "¿Qué reloj llevas?", mQAide: "Solo verás los pasos de tu marca.", mAutre: "Otra marca", mAutreEx: "Wahoo, Amazfit, Huawei…", mAucune: "No tengo reloj", mAucuneTxt: "Sin problema: tu plan funciona sin reloj. Podrás vincular uno más tarde desde la pestaña «Sincronizar reloj».",
     mEtape2Lien: "Vincula tu {m} a intervals.icu", mEtape2Apple: "Instala la app Intervals.icu Companion", mEtape3: "Pega tu clave de intervals.icu", m0Desc: "Es gratis: intervals.icu hace de puente entre tu reloj y Pacevo.",
     mLienOuvre: "Abre la página Conexiones de intervals.icu y haz clic en «{m}».", mLienOuvreAutre: "Abre la página Conexiones de intervals.icu y haz clic en tu marca. ¿No aparece? intervals.icu aún no puede leerla: elige «No tengo reloj» por ahora.",
@@ -350,6 +354,7 @@ export const OB: Record<Lang, Dict> = {
   },
   pt: {
     // Étape Montre PAR MARQUE (12/10/2026) : on choisit sa montre, puis seulement ses gestes.
+    mVideTitre: "Ainda não há sessões recentes.", mVideSub: "Chegam ao Pacevo na próxima sincronização do teu relógio. Podes terminar sem esperar.",
     mQ: "Que relógio usas?", mQAide: "Só vais ver os passos da tua marca.", mAutre: "Outra marca", mAutreEx: "Wahoo, Amazfit, Huawei…", mAucune: "Não tenho relógio",
     mAucuneTxt: "Não há problema: o teu plano funciona sem relógio. Podes ligar um mais tarde, no separador «Sincronizar relógio».", mEtape2Lien: "Liga o teu {m} ao intervals.icu",
     mEtape2Apple: "Instala a app Intervals.icu Companion", mEtape3: "Cola a tua chave do intervals.icu", m0Desc: "É grátis: o intervals.icu faz a ligação entre o teu relógio e o Pacevo.",

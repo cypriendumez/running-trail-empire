@@ -106,6 +106,26 @@ export function estAppleWatch(l: Lecture | null | undefined): boolean {
 }
 
 /**
+ * LES DONNÉES ARRIVENT-ELLES PAR « INTERVALS COMPANION » ? (12/10/2026)
+ *
+ * ⚠️ `estAppleWatch` ne suffisait pas : une séance envoyée par l'app iPhone Intervals
+ * Companion arrive avec l'appareil « Intervals Companion » (relevé sur le forum
+ * intervals.icu, sujet 124208, message du 03/08/2026), sans le mot « Apple ». Le porteur
+ * d'Apple Watch qui avait TOUT branché lisait alors « cette montre ne peut pas recevoir de
+ * séance planifiée » — faux : l'app envoie le plan à la montre.
+ */
+export function viaCompanion(l: Lecture | null | undefined): boolean {
+  return /companion/i.test(l?.appareil ?? "") || /companion/i.test(l?.source ?? "");
+}
+
+/** Le message à montrer quand on LIT sans pouvoir envoyer (clé du dictionnaire Ghost Runner). */
+export function messageLecture(l: Lecture | null | undefined): "acc.companion" | "acc.apple" | "acc.readonly" {
+  // Companion d'abord : l'app est déjà là, il reste un réglage à activer — pas une app à installer.
+  if (viaCompanion(l)) return "acc.companion";
+  return estAppleWatch(l) ? "acc.apple" : "acc.readonly";
+}
+
+/**
  * La première MONTRE prête à recevoir, ou `null`. Pure — testable sans réseau.
  *
  * ⚠️ Les destinations marquées `montre: false` sont sautées : elles reçoivent la séance
