@@ -159,12 +159,15 @@ console.log("\nAPPLE WATCH — le chemin existe là où on le cherche");
 
 test("l'étape Montre du questionnaire explique l'Apple Watch, avec le lien de l'app", () => {
   // Le 11/10/2026, Cyprien a cherché une carte Apple sur intervals.icu : il n'y en a pas.
-  const src = code("src/app/onboarding/page.tsx");
-  assert.ok(/tr\("wApple"\)/.test(src), "l'étape Montre ne dit plus rien de l'Apple Watch");
-  assert.ok(/href="https:\/\/apps\.apple\.com\/app\/id6739638454"/.test(src), "le lien vers Intervals Companion a disparu du questionnaire");
+  // Depuis le 12/10/2026, l'Apple Watch a SON chemin dans l'étape par marque (EtapeMontre).
+  const src = code("src/app/onboarding/EtapeMontre.tsx");
+  assert.ok(/m\.chemin === "companion"/.test(src) && /tr\("mAppleIntro"\)/.test(src), "l'étape Montre ne dit plus rien de l'Apple Watch");
+  assert.ok(/href=\{APP_STORE_COMPANION\}/.test(src), "le lien vers Intervals Companion a disparu du questionnaire");
+  assert.ok(/APP_STORE_COMPANION = "https:\/\/apps\.apple\.com\/app\/id6739638454"/.test(code("src/app/onboarding/marquesMontre.ts")),
+    "l'adresse App Store d'Intervals Companion a changé");
   const ob = readFileSync("src/app/onboarding/onboardingI18n.ts", "utf8");
-  assert.equal((ob.match(/wApple: /g) ?? []).length, 5, "le texte Apple Watch manque dans une langue");
-  assert.equal((ob.match(/wAppleLien: /g) ?? []).length, 5, "le libellé du lien manque dans une langue");
+  assert.equal((ob.match(/mAppleIntro: /g) ?? []).length, 5, "le texte Apple Watch manque dans une langue");
+  assert.equal((ob.match(/mAppleStore: /g) ?? []).length, 5, "le libellé du lien manque dans une langue");
 });
 
 test("la page Sync Montre donne le même lien direct", () => {

@@ -14,7 +14,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import qrcode from "qrcode-generator";
+import { QrSvg } from "@/components/ui/QrSvg";
 import { toast } from "sonner";
 import { Search, UserPlus, UserCheck, Users, BookUser, QrCode, Share2, ScanLine, X, Loader2 } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -403,25 +403,6 @@ function CodeQr({ moi, d, onScan, onPartager }: { moi: { id: string; nom: string
       </div>
       {scan && origine && <Scanner origine={origine} d={d} onFermer={() => setScan(false)} onTrouve={(id) => { setScan(false); onScan(id); }} />}
     </div>
-  );
-}
-
-/**
- * Le QR code, rendu en <rect> React — pas en HTML injecté. Le contenu est un lien que
- * NOUS composons ; le rendre module par module ferme quand même la porte à toute
- * injection le jour où ce composant recevrait un texte venu d'ailleurs.
- */
-function QrSvg({ texte }: { texte: string }) {
-  const qr = qrcode(0, "M");
-  qr.addData(texte);
-  qr.make();
-  const n = qr.getModuleCount();
-  const cases: string[] = [];
-  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) cases.push(`M${c} ${r}h1v1h-1z`);
-  return (
-    <svg viewBox={`0 0 ${n} ${n}`} className="mx-auto h-48 w-48" shapeRendering="crispEdges" role="img" aria-label={texte}>
-      <path d={cases.join("")} fill="#18181b" />
-    </svg>
   );
 }
 

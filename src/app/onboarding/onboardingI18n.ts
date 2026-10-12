@@ -6,7 +6,20 @@ type Dict = Record<string, string>;
 
 export const OB: Record<Lang, Dict> = {
   fr: {
-    wApple: "Apple Watch ? Il n'y a pas de carte Apple sur intervals.icu. Installe l'app iPhone gratuite « Intervals Companion », connecte-la à ton compte intervals.icu et autorise l'accès à Santé : tes séances, ta VFC et ton sommeil y arriveront, et l'app peut aussi envoyer ton plan sur ta montre.", wAppleLien: "Intervals Companion sur l'App Store",
+    // Étape Montre PAR MARQUE (12/10/2026) : on choisit sa montre, puis seulement ses gestes.
+    mQ: "Quelle montre portes-tu ?", mQAide: "Tu ne verras que les étapes de ta marque.", mAutre: "Autre marque", mAutreEx: "Wahoo, Amazfit, Huawei…", mAucune: "Je n'ai pas de montre",
+    mAucuneTxt: "Aucun souci : ton plan fonctionne sans montre. Tu pourras en relier une plus tard, depuis l'onglet « Sync Montre ».", mEtape2Lien: "Relie ta {m} à intervals.icu",
+    mEtape2Apple: "Installe l'app Intervals.icu Companion", mEtape3: "Colle ta clé intervals.icu", m0Desc: "C'est gratuit : intervals.icu fait le lien entre ta montre et Pacevo.",
+    mLienOuvre: "Ouvre la page Connexions d'intervals.icu et clique sur « {m} ».", mLienOuvreAutre: "Ouvre la page Connexions d'intervals.icu et clique sur ta marque. Elle n'y figure pas ? intervals.icu ne sait pas encore la lire : choisis « Je n'ai pas de montre » pour l'instant.",
+    mCompteMarque: "Une fenêtre {m} s'ouvre : connecte-toi avec ton compte {m}, puis accepte.", mCompteAutre: "Une fenêtre de ta marque s'ouvre : connecte-toi, puis accepte.",
+    mCoche: "De retour sur la carte « {m} », coche :", mCocheAutre: "De retour sur la carte de ta marque, coche :", mPolar: "Polar n'accepte pas l'envoi de séances vers la montre : tes sorties arriveront bien dans Pacevo, et tu suivras tes séances depuis l'app.",
+    mAppleIntro: "L'Apple Watch ne se relie pas directement à intervals.icu. Une app iPhone gratuite fait le lien dans les deux sens : tes séances et ta santé vers Pacevo, ton plan vers ta montre.",
+    mAppleStore: "Installer depuis l'App Store", mAppleQr: "Tu es sur ordinateur ? Scanne ce code avec l'appareil photo de ton iPhone.", mAppleQrLabel: "QR code vers l'app Intervals.icu Companion sur l'App Store",
+    mAppleDans: "Puis, dans l'app :", mApple1: "Connecte-toi avec ton compte intervals.icu et autorise l'accès à Santé.", mApple2: "Onglet « Apple Health » : active l'envoi de tes séances et de tes données santé (sommeil, VFC, FC de repos).",
+    mApple3: "Réglages, rubrique « Workouts » : active l'envoi automatique des séances vers ta montre.", mApple4: "Tu dors avec ta montre ? Active aussi « Sleeping HRV (rMSSD) », dans l'onglet « Experimental » : c'est la VFC de nuit, celle que Pacevo utilise.",
+    mAppleApres: "Les données de ta montre arrivent quand l'app Companion se synchronise : ouvre-la de temps en temps sur ton iPhone.", mCleOu: "Sur intervals.icu, ouvre « Settings » (Paramètres) et descends tout en bas, jusqu'à « Developer Settings » : copie ta clé API.",
+    mCleOuvrir: "Ouvrir les réglages intervals.icu", mCompte: "Compte relié : {nom}", mErrCle: "intervals.icu refuse cette clé. Recopie-la en entier depuis « Developer Settings ».",
+    mErrIndispo: "intervals.icu ne répond pas pour l'instant. Réessaie dans une minute.",
     w1Perm4: "Envoyer les entraînements planifiés depuis Intervals (tes séances arrivent sur la montre)",
     missingShort: "À renseigner",
     // Refonte du 11/10/2026 (questionnaire en 4 étapes équilibrées).
@@ -79,7 +92,20 @@ export const OB: Record<Lang, Dict> = {
     tConnectFirst: "Connectez d'abord votre montre pour continuer.", tCantVerify: "Impossible de vérifier la connexion à votre montre.", tSaveError: "Erreur lors de la sauvegarde",
   },
   en: {
-    wApple: "Apple Watch? There's no Apple card on intervals.icu. Install the free iPhone app “Intervals Companion”, connect it to your intervals.icu account and allow access to Health: your sessions, HRV and sleep will arrive, and the app can also send your plan to your watch.", wAppleLien: "Intervals Companion on the App Store",
+    // Étape Montre PAR MARQUE (12/10/2026) : on choisit sa montre, puis seulement ses gestes.
+    mQ: "Which watch do you wear?", mQAide: "You'll only see the steps for your brand.", mAutre: "Another brand", mAutreEx: "Wahoo, Amazfit, Huawei…", mAucune: "I don't have a watch",
+    mAucuneTxt: "No problem: your plan works without a watch. You can link one later from the “Watch Sync” tab.", mEtape2Lien: "Link your {m} to intervals.icu",
+    mEtape2Apple: "Install the Intervals.icu Companion app", mEtape3: "Paste your intervals.icu key", m0Desc: "It's free: intervals.icu is the link between your watch and Pacevo.",
+    mLienOuvre: "Open the intervals.icu Connections page and click “{m}”.", mLienOuvreAutre: "Open the intervals.icu Connections page and click your brand. Not listed? intervals.icu can't read it yet: choose “I don't have a watch” for now.",
+    mCompteMarque: "A {m} window opens: sign in with your {m} account, then accept.", mCompteAutre: "A window from your brand opens: sign in, then accept.", mCoche: "Back on the “{m}” card, tick:",
+    mCocheAutre: "Back on your brand's card, tick:", mPolar: "Polar doesn't accept workouts sent to the watch: your runs will reach Pacevo, and you'll follow your sessions in the app.",
+    mAppleIntro: "The Apple Watch doesn't link to intervals.icu directly. A free iPhone app makes the link both ways: your sessions and health data to Pacevo, your plan to your watch.",
+    mAppleStore: "Get it on the App Store", mAppleQr: "On a computer? Scan this code with your iPhone camera.", mAppleQrLabel: "QR code to the Intervals.icu Companion app on the App Store",
+    mAppleDans: "Then, in the app:", mApple1: "Sign in with your intervals.icu account and allow access to Health.", mApple2: "“Apple Health” tab: turn on sending your workouts and health data (sleep, HRV, resting HR).",
+    mApple3: "Settings, “Workouts” section: turn on automatic workout sync to your watch.", mApple4: "Do you sleep with your watch? Also turn on “Sleeping HRV (rMSSD)” in the “Experimental” tab: that's the overnight HRV Pacevo uses.",
+    mAppleApres: "Your watch data arrives when the Companion app syncs: open it on your iPhone from time to time.", mCleOu: "On intervals.icu, open “Settings” and scroll to the very bottom, to “Developer Settings”: copy your API key.",
+    mCleOuvrir: "Open intervals.icu settings", mCompte: "Account linked: {nom}", mErrCle: "intervals.icu rejects this key. Copy it again in full from “Developer Settings”.",
+    mErrIndispo: "intervals.icu isn't responding right now. Try again in a minute.",
     w1Perm4: "Send planned workouts from Intervals (your sessions reach your watch)",
     missingShort: "Required",
     // Refonte du 11/10/2026 (questionnaire en 4 étapes équilibrées).
@@ -152,7 +178,20 @@ export const OB: Record<Lang, Dict> = {
     tConnectFirst: "Connect your watch first to continue.", tCantVerify: "Couldn't verify your watch connection.", tSaveError: "Error while saving",
   },
   de: {
-    wApple: "Apple Watch? Auf intervals.icu gibt es keine Apple-Karte. Installiere die kostenlose iPhone-App „Intervals Companion“, verbinde sie mit deinem intervals.icu-Konto und erlaube den Zugriff auf Health: Deine Einheiten, deine HRV und dein Schlaf kommen an, und die App kann deinen Plan auch auf die Uhr schicken.", wAppleLien: "Intervals Companion im App Store",
+    // Étape Montre PAR MARQUE (12/10/2026) : on choisit sa montre, puis seulement ses gestes.
+    mQ: "Welche Uhr trägst du?", mQAide: "Du siehst nur die Schritte für deine Marke.", mAutre: "Andere Marke", mAutreEx: "Wahoo, Amazfit, Huawei…", mAucune: "Ich habe keine Uhr",
+    mAucuneTxt: "Kein Problem: Dein Plan funktioniert auch ohne Uhr. Du kannst später eine verbinden, im Tab „Uhr-Sync“.", mEtape2Lien: "Verbinde deine {m} mit intervals.icu",
+    mEtape2Apple: "Installiere die App Intervals.icu Companion", mEtape3: "Füge deinen intervals.icu-Schlüssel ein", m0Desc: "Kostenlos: intervals.icu verbindet deine Uhr mit Pacevo.",
+    mLienOuvre: "Öffne die Seite „Verbindungen“ von intervals.icu und klicke auf „{m}“.", mLienOuvreAutre: "Öffne die Seite „Verbindungen“ von intervals.icu und klicke auf deine Marke. Nicht dabei? Dann kann intervals.icu sie noch nicht lesen: Wähle vorerst „Ich habe keine Uhr“.",
+    mCompteMarque: "Ein {m}-Fenster öffnet sich: Melde dich mit deinem {m}-Konto an und akzeptiere.", mCompteAutre: "Ein Fenster deiner Marke öffnet sich: Melde dich an und akzeptiere.",
+    mCoche: "Zurück auf der Karte „{m}“ ankreuzen:", mCocheAutre: "Zurück auf der Karte deiner Marke ankreuzen:", mPolar: "Polar nimmt keine Einheiten an, die an die Uhr gesendet werden: Deine Läufe kommen in Pacevo an, und deine Einheiten verfolgst du in der App.",
+    mAppleIntro: "Die Apple Watch verbindet sich nicht direkt mit intervals.icu. Eine kostenlose iPhone-App übernimmt das in beide Richtungen: deine Einheiten und Gesundheitsdaten zu Pacevo, dein Plan auf die Uhr.",
+    mAppleStore: "Im App Store laden", mAppleQr: "Am Computer? Scanne diesen Code mit der Kamera deines iPhones.", mAppleQrLabel: "QR-Code zur App Intervals.icu Companion im App Store",
+    mAppleDans: "Dann in der App:", mApple1: "Melde dich mit deinem intervals.icu-Konto an und erlaube den Zugriff auf Health.", mApple2: "Tab „Apple Health“: Schalte das Senden deiner Trainings und Gesundheitsdaten ein (Schlaf, HRV, Ruhepuls).",
+    mApple3: "Einstellungen, Bereich „Workouts“: Schalte das automatische Senden der Einheiten an die Uhr ein.", mApple4: "Schläfst du mit der Uhr? Schalte auch „Sleeping HRV (rMSSD)“ im Tab „Experimental“ ein: Das ist die nächtliche HRV, die Pacevo nutzt.",
+    mAppleApres: "Die Daten deiner Uhr kommen an, wenn die Companion-App synchronisiert: Öffne sie ab und zu auf deinem iPhone.", mCleOu: "Öffne auf intervals.icu „Settings“ (Einstellungen) und scrolle ganz nach unten bis „Developer Settings“: Kopiere deinen API-Schlüssel.",
+    mCleOuvrir: "intervals.icu-Einstellungen öffnen", mCompte: "Konto verbunden: {nom}", mErrCle: "intervals.icu lehnt diesen Schlüssel ab. Kopiere ihn vollständig neu aus „Developer Settings“.",
+    mErrIndispo: "intervals.icu antwortet gerade nicht. Versuche es in einer Minute erneut.",
     w1Perm4: "Geplante Trainings von Intervals senden (deine Einheiten kommen auf die Uhr)",
     missingShort: "Pflichtangabe",
     // Refonte du 11/10/2026 (questionnaire en 4 étapes équilibrées).
@@ -225,7 +264,19 @@ export const OB: Record<Lang, Dict> = {
     tConnectFirst: "Verbinde zuerst deine Uhr, um fortzufahren.", tCantVerify: "Verbindung zur Uhr konnte nicht geprüft werden.", tSaveError: "Fehler beim Speichern",
   },
   es: {
-    wApple: "¿Apple Watch? No hay tarjeta de Apple en intervals.icu. Instala la app gratuita para iPhone «Intervals Companion», conéctala a tu cuenta de intervals.icu y permite el acceso a Salud: llegarán tus sesiones, tu VFC y tu sueño, y la app también puede enviar tu plan al reloj.", wAppleLien: "Intervals Companion en la App Store",
+    // Étape Montre PAR MARQUE (12/10/2026) : on choisit sa montre, puis seulement ses gestes.
+    mQ: "¿Qué reloj llevas?", mQAide: "Solo verás los pasos de tu marca.", mAutre: "Otra marca", mAutreEx: "Wahoo, Amazfit, Huawei…", mAucune: "No tengo reloj", mAucuneTxt: "Sin problema: tu plan funciona sin reloj. Podrás vincular uno más tarde desde la pestaña «Sincronizar reloj».",
+    mEtape2Lien: "Vincula tu {m} a intervals.icu", mEtape2Apple: "Instala la app Intervals.icu Companion", mEtape3: "Pega tu clave de intervals.icu", m0Desc: "Es gratis: intervals.icu hace de puente entre tu reloj y Pacevo.",
+    mLienOuvre: "Abre la página Conexiones de intervals.icu y haz clic en «{m}».", mLienOuvreAutre: "Abre la página Conexiones de intervals.icu y haz clic en tu marca. ¿No aparece? intervals.icu aún no puede leerla: elige «No tengo reloj» por ahora.",
+    mCompteMarque: "Se abre una ventana de {m}: inicia sesión con tu cuenta {m} y acepta.", mCompteAutre: "Se abre una ventana de tu marca: inicia sesión y acepta.",
+    mCoche: "De vuelta en la tarjeta «{m}», marca:", mCocheAutre: "De vuelta en la tarjeta de tu marca, marca:", mPolar: "Polar no acepta el envío de sesiones al reloj: tus salidas llegarán a Pacevo y seguirás tus sesiones en la app.",
+    mAppleIntro: "El Apple Watch no se vincula directamente con intervals.icu. Una app gratuita para iPhone hace de puente en los dos sentidos: tus sesiones y tu salud hacia Pacevo, tu plan hacia el reloj.",
+    mAppleStore: "Descargar en el App Store", mAppleQr: "¿Estás en un ordenador? Escanea este código con la cámara de tu iPhone.", mAppleQrLabel: "Código QR de la app Intervals.icu Companion en el App Store",
+    mAppleDans: "Después, en la app:", mApple1: "Inicia sesión con tu cuenta de intervals.icu y permite el acceso a Salud.", mApple2: "Pestaña «Apple Health»: activa el envío de tus entrenamientos y tus datos de salud (sueño, VFC, FC en reposo).",
+    mApple3: "Ajustes, sección «Workouts»: activa el envío automático de las sesiones al reloj.", mApple4: "¿Duermes con el reloj? Activa también «Sleeping HRV (rMSSD)» en la pestaña «Experimental»: es la VFC nocturna que usa Pacevo.",
+    mAppleApres: "Los datos de tu reloj llegan cuando la app Companion se sincroniza: ábrela de vez en cuando en tu iPhone.", mCleOu: "En intervals.icu, abre «Settings» (Ajustes) y baja hasta el final, a «Developer Settings»: copia tu clave API.",
+    mCleOuvrir: "Abrir los ajustes de intervals.icu", mCompte: "Cuenta vinculada: {nom}", mErrCle: "intervals.icu rechaza esta clave. Vuelve a copiarla entera desde «Developer Settings».",
+    mErrIndispo: "intervals.icu no responde ahora mismo. Inténtalo de nuevo en un minuto.",
     w1Perm4: "Enviar los entrenamientos planificados desde Intervals (tus sesiones llegan al reloj)",
     missingShort: "Por completar",
     // Refonte du 11/10/2026 (questionnaire en 4 étapes équilibrées).
@@ -298,7 +349,20 @@ export const OB: Record<Lang, Dict> = {
     tConnectFirst: "Conecta primero tu reloj para continuar.", tCantVerify: "No se pudo verificar la conexión de tu reloj.", tSaveError: "Error al guardar",
   },
   pt: {
-    wApple: "Apple Watch? Não há cartão da Apple no intervals.icu. Instala a app gratuita para iPhone «Intervals Companion», liga-a à tua conta intervals.icu e autoriza o acesso à Saúde: as tuas sessões, a tua VFC e o teu sono vão chegar, e a app também pode enviar o teu plano para o relógio.", wAppleLien: "Intervals Companion na App Store",
+    // Étape Montre PAR MARQUE (12/10/2026) : on choisit sa montre, puis seulement ses gestes.
+    mQ: "Que relógio usas?", mQAide: "Só vais ver os passos da tua marca.", mAutre: "Outra marca", mAutreEx: "Wahoo, Amazfit, Huawei…", mAucune: "Não tenho relógio",
+    mAucuneTxt: "Não há problema: o teu plano funciona sem relógio. Podes ligar um mais tarde, no separador «Sincronizar relógio».", mEtape2Lien: "Liga o teu {m} ao intervals.icu",
+    mEtape2Apple: "Instala a app Intervals.icu Companion", mEtape3: "Cola a tua chave do intervals.icu", m0Desc: "É grátis: o intervals.icu faz a ligação entre o teu relógio e o Pacevo.",
+    mLienOuvre: "Abre a página Ligações do intervals.icu e clica em «{m}».", mLienOuvreAutre: "Abre a página Ligações do intervals.icu e clica na tua marca. Não aparece? O intervals.icu ainda não a consegue ler: escolhe «Não tenho relógio» por agora.",
+    mCompteMarque: "Abre-se uma janela {m}: inicia sessão com a tua conta {m} e aceita.", mCompteAutre: "Abre-se uma janela da tua marca: inicia sessão e aceita.",
+    mCoche: "De volta ao cartão «{m}», marca:", mCocheAutre: "De volta ao cartão da tua marca, marca:", mPolar: "A Polar não aceita o envio de sessões para o relógio: as tuas saídas chegam ao Pacevo, e segues as tuas sessões na app.",
+    mAppleIntro: "O Apple Watch não se liga diretamente ao intervals.icu. Uma app gratuita para iPhone faz a ligação nos dois sentidos: as tuas sessões e a tua saúde para o Pacevo, o teu plano para o relógio.",
+    mAppleStore: "Descarregar na App Store", mAppleQr: "Estás num computador? Lê este código com a câmara do teu iPhone.", mAppleQrLabel: "Código QR da app Intervals.icu Companion na App Store",
+    mAppleDans: "Depois, na app:", mApple1: "Inicia sessão com a tua conta do intervals.icu e autoriza o acesso à app Saúde.", mApple2: "Separador «Apple Health»: ativa o envio dos teus treinos e dos teus dados de saúde (sono, VFC, FC em repouso).",
+    mApple3: "Definições, secção «Workouts»: ativa o envio automático das sessões para o relógio.", mApple4: "Dormes com o relógio? Ativa também «Sleeping HRV (rMSSD)» no separador «Experimental»: é a VFC noturna que o Pacevo usa.",
+    mAppleApres: "Os dados do teu relógio chegam quando a app Companion sincroniza: abre-a de vez em quando no teu iPhone.", mCleOu: "No intervals.icu, abre «Settings» (Definições) e desce até ao fim, a «Developer Settings»: copia a tua chave API.",
+    mCleOuvrir: "Abrir as definições do intervals.icu", mCompte: "Conta ligada: {nom}", mErrCle: "O intervals.icu recusa esta chave. Copia-a de novo, inteira, a partir de «Developer Settings».",
+    mErrIndispo: "O intervals.icu não está a responder. Tenta de novo dentro de um minuto.",
     w1Perm4: "Enviar os treinos planeados a partir do Intervals (as tuas sessões chegam ao relógio)",
     missingShort: "Por preencher",
     // Refonte du 11/10/2026 (questionnaire en 4 étapes équilibrées).

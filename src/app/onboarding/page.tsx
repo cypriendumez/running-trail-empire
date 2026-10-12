@@ -4,11 +4,14 @@ import { useState, useEffect, useRef, useId, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Check, CheckCircle2, ExternalLink, Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { OB } from "./onboardingI18n";
+import { FOCUS, SEGMENT, TUILE, CHAMP } from "./habillage";
+import { EtapeMontre } from "./EtapeMontre";
+import type { MarqueId } from "./marquesMontre";
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthLabel } from "@/data/healthCatalog";
 import { TERRAINS, terrainLabel } from "@/data/terrainCatalog";
 
@@ -38,14 +41,6 @@ import { TERRAINS, terrainLabel } from "@/data/terrainCatalog";
 type Step = "profile" | "training" | "health" | "watch" | "done";
 const STEPS: Step[] = ["profile", "training", "health", "watch", "done"];
 const ETAPES = 4;
-
-// ── Habillage des contrôles ─────────────────────────────────────────────────────
-// Un seul endroit pour l'état « choisi » : contour vert, fond teinté, coche. Jamais la
-// couleur seule (un daltonien doit voir la différence) : la coche ou l'ombre la double.
-const FOCUS = "peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-emerald-600";
-const SEGMENT = `flex h-10 items-center justify-center rounded-lg px-2 text-center text-sm font-medium text-zinc-600 transition-colors hover:text-zinc-900 peer-checked:bg-white peer-checked:text-zinc-900 peer-checked:shadow-[0_1px_2px_rgba(16,24,40,0.10),0_0_0_1px_rgba(16,24,40,0.06)] ${FOCUS}`;
-const TUILE = `flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-center text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-300 peer-checked:border-emerald-600 peer-checked:bg-emerald-50 peer-checked:text-emerald-900 ${FOCUS}`;
-const CHAMP = "h-11 w-full rounded-xl border border-zinc-200 bg-white pl-3 pr-10 text-base tabular-nums text-zinc-900 placeholder:text-zinc-400 transition-colors focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 sm:text-[15px]";
 
 /** Une question de la feuille : intitulé, aide d'une phrase, contrôle. */
 function Question({ id, titre, aide, marque, children }: {
@@ -150,7 +145,9 @@ export default function OnboardingPage() {
   const { lang } = useT();
   const tr = (k: string, v?: Record<string, string | number>) => {
     let s = (OB[lang] ?? OB.fr)[k] ?? OB.fr[k] ?? k;
-    if (v) for (const key in v) s = s.replace(`{${key}}`, String(v[key]));
+    // `split/join` et non `replace` : une phrase peut citer deux fois la même variable
+    // (« une fenêtre {m} s'ouvre : connecte-toi avec ton compte {m} »).
+    if (v) for (const key in v) s = s.split(`{${key}}`).join(String(v[key]));
     return s;
   };
 
@@ -203,46 +200,10 @@ export default function OnboardingPage() {
   // FC déclarées — FACULTATIVES. Vides, le coach s'en passe très bien (migration 029).
   const [fc, setFc] = useState({ max_hr: "", resting_hr: "" });
 
-  // Étape Montre
-  const [watchSubStep, setWatchSubStep] = useState(0);
-  const [watchAthleteId, setWatchAthleteId] = useState("");
-  const [watchApiKey, setWatchApiKey] = useState("");
-  const [showWatchKey, setShowWatchKey] = useState(false);
-  const [savingWatch, setSavingWatch] = useState(false);
+  // Étape Montre (le détail vit dans EtapeMontre.tsx) : la page ne garde que ce dont sa
+  // barre d'actions a besoin — la marque choisie et « la clé est enregistrée ».
+  const [marque, setMarque] = useState<MarqueId | null>(null);
   const [watchSaved, setWatchSaved] = useState(false);
-  const [watchError, setWatchError] = useState<string | null>(null);
-  const [pollingActive, setPollingActive] = useState(false);
-  const [pollingStatus, setPollingStatus] = useState<"checking" | "ok" | "timeout">("checking");
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    if (!pollingActive) return;
-    let attempts = 0;
-    const MAX = 12;
-    pollingRef.current = setInterval(async () => {
-      attempts++;
-      try {
-        const r = await fetch("/api/intervals/status");
-        const d = await r.json();
-        if (d.configured) {
-          const sr = await fetch("/api/intervals/sync?days=7");
-          const sd = await sr.json();
-          if (sd?.fetched?.activities > 0 || sd?.synced?.workouts >= 0) {
-            setPollingStatus("ok");
-            clearInterval(pollingRef.current!);
-            setPollingActive(false);
-            return;
-          }
-        }
-      } catch {}
-      if (attempts >= MAX) {
-        setPollingStatus("timeout");
-        clearInterval(pollingRef.current!);
-        setPollingActive(false);
-      }
-    }, 5000);
-    return () => clearInterval(pollingRef.current!);
-  }, [pollingActive]);
 
   const stepIdx = STEPS.indexOf(step);
 
@@ -251,25 +212,6 @@ export default function OnboardingPage() {
     window.scrollTo({ top: 0 });
     titreRef.current?.focus({ preventScroll: true });
   }, [step]);
-
-  // ── Validation de l'identifiant intervals.icu ──
-  const idTrim = watchAthleteId.trim();
-  const keyTrim = watchApiKey.trim();
-  const idIsEmail = idTrim.includes("@");
-  const idValid = /^i\d{3,}$/i.test(idTrim);
-  const idHint =
-    idTrim === "" ? null :
-    idIsEmail ? tr("hIdEmail") :
-    !idTrim.toLowerCase().startsWith("i") ? tr("hIdStart") :
-    !idValid ? tr("hIdFormat") :
-    null;
-  const keyLooksLikePassword = keyTrim.length > 0 && keyTrim.length < 20 && /[A-Z!?@#$%^&*]/.test(keyTrim);
-  const keyValid = /^[a-z0-9]{16,}$/i.test(keyTrim);
-  const keyHint =
-    keyTrim === "" ? null :
-    keyLooksLikePassword ? tr("hKeyPwd") :
-    !keyValid ? tr("hKeyFormat") :
-    null;
 
   // ── Ce qui manque, étape par étape (l'identifiant sert à y amener la personne) ──
   const sansEmoji = (s: string) => s.replace(/^[^\p{L}\p{N}]+/u, "");
@@ -310,28 +252,6 @@ export default function OnboardingPage() {
     }
     setTente(null);
     next();
-  }
-
-  async function handleSaveWatch(e: React.FormEvent) {
-    e.preventDefault();
-    setSavingWatch(true);
-    setWatchError(null);
-    try {
-      const res = await fetch("/api/intervals/credentials", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ athleteId: watchAthleteId, apiKey: watchApiKey }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? tr("tSaveError"));
-      setWatchSaved(true);
-      setPollingActive(true);
-      setPollingStatus("checking");
-    } catch (err) {
-      setWatchError(String(err).replace("Error: ", ""));
-    } finally {
-      setSavingWatch(false);
-    }
   }
 
   async function handleFinish() {
@@ -487,8 +407,6 @@ export default function OnboardingPage() {
   // Les jours, du lundi au dimanche ; les valeurs restent au format JS (0 = dimanche).
   // Le nom complet du jour, dans la langue de la personne, pour les lecteurs d'écran.
   const jourLong = (d: number) => new Intl.DateTimeFormat(lang, { weekday: "long", timeZone: "UTC" }).format(new Date(Date.UTC(2024, 0, 7 + d)));
-  const etapesMontre = [tr("wStep1"), tr("wStep2"), tr("wStep3"), tr("wStep4")];
-  const lienExterne = "inline-flex items-center gap-1.5";
 
   return (
     <div className="min-h-screen bg-[#FAFAFA]">
@@ -671,164 +589,10 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* ── 4. MONTRE ── une liste numérotée, parce que c'en est une : quatre gestes dans l'ordre. */}
+        {/* ── 4. MONTRE ── on choisit sa marque, puis on ne lit que ses gestes (12/10/2026). */}
         {step === "watch" && (
-          <ol className="mt-8 divide-y divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 bg-white">
-            {etapesMontre.map((titre, i) => {
-              const fait = i < watchSubStep || (i === 3 && watchSaved);
-              const ouvert = i === watchSubStep;
-              return (
-                <li key={i} className="px-5 py-5 sm:px-7">
-                  <div className="flex items-center gap-3">
-                    <span aria-hidden="true" className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold tabular-nums ${
-                      fait ? "bg-emerald-600 text-white" : ouvert ? "border-2 border-emerald-600 text-emerald-700" : "border border-zinc-300 text-zinc-500"
-                    }`}>
-                      {fait ? <Check className="h-4 w-4" /> : i + 1}
-                    </span>
-                    <h2 className={`flex-1 text-[15px] font-semibold ${ouvert || fait ? "text-zinc-900" : "text-zinc-500"}`}>
-                      {titre}{fait && <span className="sr-only"> — {tr("wDone")}</span>}
-                    </h2>
-                    {fait && !ouvert && !watchSaved && (
-                      <button type="button" onClick={() => setWatchSubStep(i)} className="text-sm text-zinc-500 underline-offset-2 hover:text-zinc-900 hover:underline">
-                        {tr("wRedo")}
-                      </button>
-                    )}
-                  </div>
-
-                  {ouvert && i === 0 && (
-                    <div className="mt-4 space-y-4 sm:pl-10">
-                      <p className="max-w-prose text-sm leading-relaxed text-zinc-600">{tr("w0Desc")}</p>
-                      <div className="flex flex-wrap gap-2">
-                        <a href="https://intervals.icu/signup" target="_blank" rel="noopener noreferrer" className={`btn-brand ${lienExterne}`}>
-                          {tr("w0Create")} <ExternalLink aria-hidden="true" className="h-4 w-4" />
-                        </a>
-                        <button type="button" onClick={() => setWatchSubStep(1)} className="btn-secondary">{tr("w0Have")}</button>
-                      </div>
-                      <p className="max-w-prose text-sm leading-relaxed text-zinc-500">{tr("w0Tip")}</p>
-                    </div>
-                  )}
-
-                  {ouvert && i === 1 && (
-                    <div className="mt-4 space-y-4 sm:pl-10">
-                      <p className="text-sm text-zinc-600">{tr("w1Where")}</p>
-                      <div>
-                        <p className="text-sm font-medium text-zinc-800">{tr("w1PermsTitle")}</p>
-                        <ul className="mt-2 space-y-1.5">
-                          {/* La 3ᵉ case est celle qui porte le PLAN jusqu'au poignet : sans elle, rien n'arrive sur la montre. */}
-                          {[tr("w1Perm1"), tr("w1Perm2"), tr("w1Perm4"), tr("w1Perm3")].map(p => (
-                            <li key={p} className="flex items-center gap-2 text-sm text-zinc-700">
-                              <Check aria-hidden="true" className="h-4 w-4 shrink-0 text-emerald-600" />{p}
-                            </li>
-                          ))}
-                        </ul>
-                        <p className="mt-2 max-w-prose text-sm leading-relaxed text-zinc-500">{tr("w1Garmin")}</p>
-                      </div>
-                      {/* APPLE WATCH : aucune carte Apple chez intervals.icu — Cyprien l'a cherchée en vain le
-                          11/10/2026. L'app iPhone tierce « Intervals Companion » fait le pont dans les deux sens
-                          (séances, VFC, sommeil vers intervals.icu ; plan vers la montre). Pacevo écrit le plan
-                          dans le calendrier intervals.icu même sans marque reliée : l'app l'y trouve. */}
-                      <div className="max-w-prose rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
-                        <p className="text-sm leading-relaxed text-zinc-700">{tr("wApple")}</p>
-                        <a href="https://apps.apple.com/app/id6739638454" target="_blank" rel="noopener noreferrer"
-                          className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-700 underline-offset-2 hover:underline">
-                          {tr("wAppleLien")} <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" />
-                        </a>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <a href="https://intervals.icu/settings/connections" target="_blank" rel="noopener noreferrer" className={`btn-brand ${lienExterne}`}>
-                          {tr("w1Open")} <ExternalLink aria-hidden="true" className="h-4 w-4" />
-                        </a>
-                        <button type="button" onClick={() => setWatchSubStep(2)} className="btn-secondary">{tr("w1Done")}</button>
-                      </div>
-                    </div>
-                  )}
-
-                  {ouvert && i === 2 && (
-                    <div className="mt-4 space-y-4 sm:pl-10">
-                      <p className="text-sm text-zinc-600">{tr("w2Where")}</p>
-                      <ul className="space-y-1.5 text-sm text-zinc-700">
-                        <li>{tr("wIdDesc")}</li>
-                        <li>{tr("wKeyDesc")}</li>
-                      </ul>
-                      <p className="max-w-prose text-sm leading-relaxed text-zinc-500">{tr("w2Warn1")} {tr("w2Warn2")}</p>
-                      <div className="flex flex-wrap gap-2">
-                        <a href="https://intervals.icu/settings#developer" target="_blank" rel="noopener noreferrer" className={`btn-brand ${lienExterne}`}>
-                          {tr("w2Open")} <ExternalLink aria-hidden="true" className="h-4 w-4" />
-                        </a>
-                        <button type="button" onClick={() => setWatchSubStep(3)} className="btn-secondary">{tr("w2Have")}</button>
-                      </div>
-                    </div>
-                  )}
-
-                  {ouvert && i === 3 && !watchSaved && (
-                    <form onSubmit={handleSaveWatch} className="mt-4 space-y-4 sm:pl-10">
-                      <div>
-                        <label htmlFor={`${cid}-athlete`} className="block text-sm font-medium text-zinc-700">
-                          Athlete ID <span className="font-normal text-zinc-500">{tr("w3IdNote")}</span>
-                        </label>
-                        <div className="relative mt-1.5">
-                          <input id={`${cid}-athlete`} type="text" value={watchAthleteId} onChange={e => setWatchAthleteId(e.target.value)}
-                            placeholder="i564686" autoComplete="off" spellCheck={false}
-                            aria-invalid={idHint ? true : undefined} aria-describedby={idHint ? `${cid}-athlete-e` : undefined}
-                            className={`${CHAMP} font-mono ${idHint ? "border-red-300" : idValid ? "border-emerald-500" : ""}`} />
-                          {idValid && <CheckCircle2 aria-hidden="true" className="absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-600" />}
-                        </div>
-                        {idHint && <p id={`${cid}-athlete-e`} className="mt-1.5 text-sm text-red-600">{idHint}</p>}
-                      </div>
-                      <div>
-                        <label htmlFor={`${cid}-cle`} className="block text-sm font-medium text-zinc-700">
-                          {tr("w3KeyLabel")} <span className="font-normal text-zinc-500">{tr("w3KeyNote")}</span>
-                        </label>
-                        <div className="relative mt-1.5">
-                          <input id={`${cid}-cle`} type={showWatchKey ? "text" : "password"} value={watchApiKey} onChange={e => setWatchApiKey(e.target.value)}
-                            placeholder="a1b2c3d4e5f6…" autoComplete="off" spellCheck={false}
-                            aria-invalid={keyHint ? true : undefined} aria-describedby={keyHint ? `${cid}-cle-e` : undefined}
-                            className={`${CHAMP} font-mono ${keyHint ? "border-red-300" : keyValid ? "border-emerald-500" : ""}`} />
-                          <button type="button" onClick={() => setShowWatchKey(v => !v)} aria-label={tr("w3KeyLabel")} aria-pressed={showWatchKey}
-                            className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-zinc-500 hover:text-zinc-800">
-                            {showWatchKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </button>
-                        </div>
-                        {keyHint && <p id={`${cid}-cle-e`} className="mt-1.5 text-sm text-red-600">{keyHint}</p>}
-                      </div>
-                      {watchError && (
-                        <p role="alert" className="flex items-start gap-2 text-sm text-red-700">
-                          <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />{watchError}
-                        </p>
-                      )}
-                      <button type="submit" disabled={savingWatch || !idValid || !keyValid} className="btn-brand disabled:opacity-50">
-                        {savingWatch && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}
-                        {savingWatch ? tr("w3Verifying") : tr("w3Connect")}
-                      </button>
-                    </form>
-                  )}
-
-                  {ouvert && i === 3 && watchSaved && (
-                    <div className="mt-4 sm:pl-10" aria-live="polite">
-                      {pollingStatus === "checking" && (
-                        <p className="flex items-start gap-2 text-sm text-zinc-700">
-                          <Loader2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-emerald-600" />
-                          <span><span className="font-medium text-zinc-900">{tr("w3CheckTitle")}</span> {tr("w3CheckSub")}</span>
-                        </p>
-                      )}
-                      {pollingStatus === "ok" && (
-                        <p className="flex items-start gap-2 text-sm text-zinc-700">
-                          <CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                          <span><span className="font-medium text-zinc-900">{tr("w3OkTitle")}</span> {tr("w3OkSub")}</span>
-                        </p>
-                      )}
-                      {pollingStatus === "timeout" && (
-                        <p className="flex items-start gap-2 text-sm text-zinc-700">
-                          <CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                          <span><span className="font-medium text-zinc-900">{tr("w3ToTitle")}</span> {tr("w3ToSub")}</span>
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ol>
+          <EtapeMontre tr={tr} cid={cid} marque={marque} onMarque={setMarque}
+            enregistre={watchSaved} onEnregistre={() => setWatchSaved(true)} />
         )}
 
         {/* ── FIN ── */}
@@ -862,7 +626,7 @@ export default function OnboardingPage() {
               ) : <span />}
               {step !== "watch" ? (
                 <button type="button" onClick={continuer} className="btn-brand min-w-[9rem] justify-center">{tr("continuer")}</button>
-              ) : watchSaved ? (
+              ) : watchSaved || marque === "aucune" ? (
                 <button type="button" onClick={handleFinish} disabled={loading} className="btn-brand min-w-[9rem] justify-center disabled:opacity-60">
                   {loading && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}
                   {loading ? tr("saving") : tr("wFinish")}

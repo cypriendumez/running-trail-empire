@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { compteDeLaCle } from "@/lib/intervals/compteDeLaCle";
 
 const INTERVALS_BASE = "https://intervals.icu/api/v1";
 
@@ -37,27 +38,20 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
-  const athleteId = (body.athleteId ?? "").trim();
-  const apiKey = (body.apiKey ?? "").trim();
+  const idSaisi = String(body.athleteId ?? "").trim();
+  const apiKey = String(body.apiKey ?? "").trim();
 
-  if (!athleteId || !apiKey) {
-    return NextResponse.json({ error: "athleteId et apiKey sont requis" }, { status: 400 });
+  if (!apiKey) {
+    return NextResponse.json({ error: "La clé API est requise", code: "cle_requise" }, { status: 400 });
   }
 
-  // 1. Verify the credentials work
-  const verifyRes = await fetch(
-    `${INTERVALS_BASE}/athlete/${athleteId}/activities?oldest=${new Date().toISOString().split("T")[0]}&newest=${new Date().toISOString().split("T")[0]}`,
-    { headers: { Authorization: intervalsAuth(apiKey) } }
-  );
-
-  if (!verifyRes.ok && verifyRes.status < 500) {
-    const msg =
-      verifyRes.status === 401 ? "Clé API invalide — vérifiez votre clé dans Intervals.icu → Paramètres → Accès développeur" :
-      verifyRes.status === 403 ? "Accès refusé (403) — vérifiez que l'Athlete ID correspond à votre compte (ex: i564686)" :
-      verifyRes.status === 404 ? "Athlete ID introuvable — l'identifiant doit commencer par 'i' suivi de chiffres (ex: i564686)" :
-      `Erreur Intervals.icu (HTTP ${verifyRes.status}) — vérifiez vos identifiants`;
-    return NextResponse.json({ error: msg }, { status: 422 });
+  // 1. La clé est vérifiée ET désigne le compte : l'Athlete ID n'est plus à recopier
+  //    (questionnaire du 12/10/2026). Celui de la page Sync Montre reste accepté.
+  const compte = await compteDeLaCle(apiKey, idSaisi || null);
+  if (!compte.ok) {
+    return NextResponse.json({ error: compte.message, code: compte.code }, { status: compte.status });
   }
+  const athleteId = compte.athleteId;
 
   // 2. Save to profile
   const { error } = await supabase
@@ -70,7 +64,7 @@ export async function POST(req: Request) {
   // 3. Auto-register webhook with Intervals.icu (best effort — don't fail if it doesn't work)
   const webhookResult = await registerWebhook(athleteId, apiKey);
 
-  return NextResponse.json({ ok: true, webhook: webhookResult });
+  return NextResponse.json({ ok: true, athleteId, nom: compte.nom, webhook: webhookResult });
 }
 
 // DELETE — remove credentials + unregister webhook

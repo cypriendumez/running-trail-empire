@@ -136,9 +136,14 @@ const ID = "6e390574-3290-4882-8cd5-e3e2f8924ea1";
     assert.match(src, /router\.replace\("\/dashboard\/communaute"\)/, "`?suivre=` reste dans l'adresse : un rechargement reproposerait l'athlète");
     // Le scanner n'accepte que les liens Pacevo de CETTE origine.
     assert.match(src, /idDepuisLien\(c\.rawValue, origine\)/, "le scanner navigue sur n'importe quel QR code");
-    // Le QR code est rendu en <path>, jamais en HTML injecté.
+    // Le QR code est rendu en <path>, jamais en HTML injecté. Depuis le 12/10/2026, il vit
+    // dans un composant PARTAGÉ (le questionnaire s'en sert pour l'Apple Watch) : la règle
+    // le suit là-bas, et l'annuaire doit bien s'en servir plutôt que d'en refaire un.
     assert.ok(!/dangerouslySetInnerHTML/.test(src), "le QR code est injecté en HTML");
-    assert.match(src, /qr\.isDark\(r, c\)/);
+    assert.match(src, /import \{ QrSvg \} from "@\/components\/ui\/QrSvg"/, "l'annuaire ne passe plus par le QR code partagé");
+    const qrSrc = codeNu("src/components/ui/QrSvg.tsx");
+    assert.ok(!/dangerouslySetInnerHTML/.test(qrSrc), "le QR code partagé est injecté en HTML");
+    assert.match(qrSrc, /qr\.isDark\(r, c\)/);
   });
 
   await test("la page s'ouvre sur l'annuaire ; trois onglets ; « Clubs & Défis » retiré du menu ; « Actualité » a sa page", () => {
