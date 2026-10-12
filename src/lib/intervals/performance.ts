@@ -9,9 +9,10 @@
 //    · les intervalles réellement courus, répétition par répétition.
 // ─────────────────────────────────────────────────────────────────────────────
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { enteteIntervals } from "@/lib/intervals/auth";
 
 const BASE = "https://intervals.icu/api/v1";
-const auth = (apiKey: string) => ({ Authorization: "Basic " + Buffer.from(`API_KEY:${apiKey}`).toString("base64") });
+const auth = (apiKey: string) => ({ Authorization: enteteIntervals(apiKey) });
 
 /** Distances de référence sur lesquelles on suit la progression. */
 const TARGETS = [400, 1000, 3000, 5000, 10000];

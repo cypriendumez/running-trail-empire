@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { estAdmin } from "@/lib/admin/acces";
 import { identifiantsDe } from "@/lib/intervals/identifiants";
+import { enteteIntervals } from "@/lib/intervals/auth";
 
 const BASE = "https://intervals.icu/api/v1";
 const STREAM_TYPES = "time,distance,heartrate,watts,cadence,altitude,velocity_smooth";
@@ -33,7 +34,7 @@ export async function POST(req: Request) {
   if (!ATH || !KEY) return NextResponse.json({ error: "Intervals.icu non configuré pour ce client" }, { status: 503 });
 
   const day = date.slice(0, 10);
-  const auth = { Authorization: "Basic " + Buffer.from(`API_KEY:${KEY}`).toString("base64") };
+  const auth = { Authorization: enteteIntervals(KEY) };
 
   try {
     // 1) Liste du jour → on identifie l'activité (désambiguïsée par distance) pour récupérer son id.

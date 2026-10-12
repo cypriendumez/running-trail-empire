@@ -23,8 +23,15 @@ type Tr = (k: string, v?: Record<string, string | number>) => string;
  *  3. sur ordinateur, l'Apple Watch a un QR code : on installe l'app sur l'iPhone d'un scan.
  *
  * Le choix « Je n'ai pas de montre » n'ouvre aucune étape : le plan fonctionne sans.
+ *
+ * ── LA CONNEXION EN UN CLIC (OAuth, application intervals.icu approuvée le 12/10/2026) ──
+ * Quand l'application est configurée (`/api/intervals/status` → `oauth: true`), l'étape 3
+ * n'est plus « colle ta clé » mais « autorise Pacevo ». ⚠️ Le questionnaire garde TOUTES les
+ * réponses en mémoire jusqu'à « Terminer » : partir vers intervals.icu les effacerait. Le
+ * bouton appelle donc `onOAuth`, qui enregistre d'abord tout (comme « Terminer »), puis
+ * seulement quitte la page. La clé reste proposée, repliée, pour qui la préfère.
  */
-export function EtapeMontre({ tr, cid, marque, onMarque, enregistre, onEnregistre }: {
+export function EtapeMontre({ tr, cid, marque, onMarque, enregistre, onEnregistre, onOAuth, oauthEnCours }: {
   tr: Tr;
   cid: string;
   marque: MarqueId | null;
@@ -32,6 +39,10 @@ export function EtapeMontre({ tr, cid, marque, onMarque, enregistre, onEnregistr
   /** La clé est enregistrée (la barre d'actions propose alors « Terminer »). */
   enregistre: boolean;
   onEnregistre: () => void;
+  /** Enregistre le questionnaire, puis part vers l'écran d'autorisation d'intervals.icu. */
+  onOAuth: () => void;
+  /** L'enregistrement qui précède le départ est en cours. */
+  oauthEnCours: boolean;
 }) {
   const [sous, setSous] = useState(0);
   const [cle, setCle] = useState("");
@@ -44,6 +55,18 @@ export function EtapeMontre({ tr, cid, marque, onMarque, enregistre, onEnregistr
   const [suiviActif, setSuiviActif] = useState(false);
   const minuterie = useRef<ReturnType<typeof setInterval> | null>(null);
   const liste = useRef<HTMLOListElement>(null);
+
+  // Le bouton « Autoriser Pacevo » n'existe que si l'application OAuth est configurée sur le
+  // serveur : sinon il mènerait à une erreur. En attendant la réponse, on montre la clé.
+  const [oauth, setOauth] = useState(false);
+  useEffect(() => {
+    let actif = true;
+    fetch("/api/intervals/status")
+      .then((r) => r.json())
+      .then((s) => { if (actif) setOauth(s?.oauth === true); })
+      .catch(() => {});
+    return () => { actif = false; };
+  }, []);
 
   // Après l'enregistrement : on guette les premières activités (12 × 5 s).
   useEffect(() => {
@@ -127,8 +150,43 @@ export function EtapeMontre({ tr, cid, marque, onMarque, enregistre, onEnregistr
   const titres = m && m.chemin !== "aucun" ? [
     tr("wStep1"),
     m.chemin === "companion" ? tr("mEtape2Apple") : m.nom ? tr("mEtape2Lien", { m: m.nom }) : tr("wStep2"),
-    tr("mEtape3"),
+    oauth ? tr("mEtape3OAuth") : tr("mEtape3"),
   ] : [];
+
+  // ── Le formulaire de la clé API : seul, ou replié sous le bouton « Autoriser Pacevo ». ──
+  const formulaireCle = (classe: string) => (
+    <form onSubmit={connecter} className={classe}>
+      <p className="max-w-prose text-sm leading-relaxed text-zinc-600">{tr("mCleOu")}</p>
+      <a href="https://intervals.icu/settings#developer" target="_blank" rel="noopener noreferrer"
+        className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-700 underline-offset-2 hover:underline">
+        {tr("mCleOuvrir")} <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" />
+      </a>
+      <div>
+        <label htmlFor={`${cid}-cle`} className="block text-sm font-medium text-zinc-700">{tr("w3KeyLabel")}</label>
+        <div className="relative mt-1.5">
+          <input id={`${cid}-cle`} type={voirCle ? "text" : "password"} value={cle} onChange={(e) => setCle(e.target.value)}
+            placeholder="a1b2c3d4e5f6…" autoComplete="off" spellCheck={false} autoCapitalize="none"
+            aria-invalid={indice ? true : undefined} aria-describedby={`${cid}-cle-a${indice ? ` ${cid}-cle-e` : ""}`}
+            className={`${CHAMP} font-mono ${indice ? "border-red-300" : cleValide ? "border-emerald-500" : ""}`} />
+          <button type="button" onClick={() => setVoirCle((v) => !v)} aria-label={tr("w3KeyLabel")} aria-pressed={voirCle}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-zinc-500 hover:text-zinc-800">
+            {voirCle ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
+        {indice && <p id={`${cid}-cle-e`} className="mt-1.5 text-sm text-red-600">{indice}</p>}
+        <p id={`${cid}-cle-a`} className="mt-1.5 max-w-prose text-sm leading-relaxed text-zinc-500">{tr("w2Warn1")} {tr("w2Warn2")}</p>
+      </div>
+      {erreur && (
+        <p role="alert" className="flex items-start gap-2 text-sm text-red-700">
+          <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />{erreur}
+        </p>
+      )}
+      <button type="submit" disabled={envoi || !cleValide} className="btn-brand disabled:opacity-50">
+        {envoi && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}
+        {envoi ? tr("w3Verifying") : tr("w3Connect")}
+      </button>
+    </form>
+  );
 
   return (
     <div className="mt-8 space-y-4">
@@ -282,40 +340,23 @@ export function EtapeMontre({ tr, cid, marque, onMarque, enregistre, onEnregistr
                   </div>
                 )}
 
-                {/* 3 — UN seul code : la clé. Le compte se lit dessus. */}
-                {ouvert && i === 2 && !enregistre && (
-                  <form onSubmit={connecter} className="mt-4 space-y-4 sm:pl-10">
-                    <p className="max-w-prose text-sm leading-relaxed text-zinc-600">{tr("mCleOu")}</p>
-                    <a href="https://intervals.icu/settings#developer" target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-700 underline-offset-2 hover:underline">
-                      {tr("mCleOuvrir")} <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" />
-                    </a>
-                    <div>
-                      <label htmlFor={`${cid}-cle`} className="block text-sm font-medium text-zinc-700">{tr("w3KeyLabel")}</label>
-                      <div className="relative mt-1.5">
-                        <input id={`${cid}-cle`} type={voirCle ? "text" : "password"} value={cle} onChange={(e) => setCle(e.target.value)}
-                          placeholder="a1b2c3d4e5f6…" autoComplete="off" spellCheck={false} autoCapitalize="none"
-                          aria-invalid={indice ? true : undefined} aria-describedby={`${cid}-cle-a${indice ? ` ${cid}-cle-e` : ""}`}
-                          className={`${CHAMP} font-mono ${indice ? "border-red-300" : cleValide ? "border-emerald-500" : ""}`} />
-                        <button type="button" onClick={() => setVoirCle((v) => !v)} aria-label={tr("w3KeyLabel")} aria-pressed={voirCle}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-zinc-500 hover:text-zinc-800">
-                          {voirCle ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      </div>
-                      {indice && <p id={`${cid}-cle-e`} className="mt-1.5 text-sm text-red-600">{indice}</p>}
-                      <p id={`${cid}-cle-a`} className="mt-1.5 max-w-prose text-sm leading-relaxed text-zinc-500">{tr("w2Warn1")} {tr("w2Warn2")}</p>
-                    </div>
-                    {erreur && (
-                      <p role="alert" className="flex items-start gap-2 text-sm text-red-700">
-                        <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />{erreur}
-                      </p>
-                    )}
-                    <button type="submit" disabled={envoi || !cleValide} className="btn-brand disabled:opacity-50">
-                      {envoi && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}
-                      {envoi ? tr("w3Verifying") : tr("w3Connect")}
+                {/* 3 — En un clic (OAuth) quand l'application est configurée ; sinon, UN seul
+                    code : la clé, dont le compte se lit. La clé reste proposée, repliée. */}
+                {ouvert && i === 2 && !enregistre && oauth && (
+                  <div className="mt-4 space-y-4 sm:pl-10">
+                    <p className="max-w-prose text-sm leading-relaxed text-zinc-600">{tr("mOAuthIntro")}</p>
+                    <button type="button" onClick={onOAuth} disabled={oauthEnCours} className="btn-brand disabled:opacity-60">
+                      {oauthEnCours && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}
+                      {oauthEnCours ? tr("mOAuthEnCours") : tr("mOAuthBouton")}
                     </button>
-                  </form>
+                    <p className="max-w-prose text-sm leading-relaxed text-zinc-500">{tr("mOAuthNote")}</p>
+                    <details className="max-w-prose">
+                      <summary className="cursor-pointer text-sm font-medium text-zinc-600 underline-offset-2 hover:text-zinc-900 hover:underline">{tr("mOAuthCle")}</summary>
+                      {formulaireCle("mt-4 space-y-4")}
+                    </details>
+                  </div>
                 )}
+                {ouvert && i === 2 && !enregistre && !oauth && formulaireCle("mt-4 space-y-4 sm:pl-10")}
 
                 {ouvert && i === 2 && enregistre && (
                   <div className="mt-4 space-y-2 sm:pl-10" aria-live="polite">

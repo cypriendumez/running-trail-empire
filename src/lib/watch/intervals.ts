@@ -3,6 +3,7 @@
 //  On cible des ZONES de fréquence cardiaque : elles s'exportent nativement vers
 //  Garmin (pas besoin d'allure seuil) → le client reçoit la séance sans rien faire.
 // ─────────────────────────────────────────────────────────────────────────────
+import { enteteIntervals } from "@/lib/intervals/auth";
 
 const BASE = "https://intervals.icu/api/v1";
 
@@ -169,7 +170,7 @@ export async function litMontre(opts: { athleteId: string; apiKey: string }): Pr
 
 function authHeader(apiKey: string) {
   return {
-    Authorization: "Basic " + Buffer.from(`API_KEY:${apiKey}`).toString("base64"),
+    Authorization: enteteIntervals(apiKey),
     "Content-Type": "application/json",
   };
 }
