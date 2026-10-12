@@ -53,7 +53,7 @@ export async function GET(req: Request) {
   const { batch, shard, shards } = shardForPass(eligible, { perPass: PER_PASS, everyMinutes: EVERY_MINUTES });
 
   const days = 1; // 24 h suffisent pour un balayage fréquent ; le filet de nuit ratisse plus large
-  const results: { userId: string; ok: boolean; workouts?: number; coached?: boolean; skipped?: string | null; error?: string }[] = [];
+  const results: { userId: string; ok: boolean; workouts?: number; coached?: boolean; skipped?: string | null; refus?: number; passagers?: number; error?: string }[] = [];
 
   for (const profile of batch) {
     try {
@@ -66,7 +66,9 @@ export async function GET(req: Request) {
         apiKey: profile.intervals_api_key as string,
         days,
       });
-      results.push({ userId: profile.id, ok: !r.error, workouts: r.fresh, coached: r.replanned, skipped: r.skipped, error: r.error });
+      // `refus` : écritures refusées par la base, déjà journalisées dans `error_logs` par la
+      // chaîne. Répétées ici pour qu'on les lise aussi dans le compte rendu de l'exécution.
+      results.push({ userId: profile.id, ok: !r.error, workouts: r.fresh, coached: r.replanned, skipped: r.skipped, refus: r.refus, passagers: r.passagers, error: r.error });
     } catch (err) {
       results.push({ userId: profile.id, ok: false, error: String(err) });
     }
@@ -74,7 +76,8 @@ export async function GET(req: Request) {
 
   const total = results.reduce((a, r) => a + (r.workouts ?? 0), 0);
   const coached = results.filter((r) => r.coached).length;
-  console.log(`[cron/sync-all] tranche ${shard + 1}/${shards} · ${results.length} athlète(s) · ${total} séance(s) inédite(s) · ${coached} replanification(s)`);
+  const refus = results.reduce((a, r) => a + (r.refus ?? 0), 0);
+  console.log(`[cron/sync-all] tranche ${shard + 1}/${shards} · ${results.length} athlète(s) · ${total} séance(s) inédite(s) · ${coached} replanification(s) · ${refus} refus d'écriture`);
 
   // Le rappel légal avant reconduction des abonnements ANNUELS (art. L215-1) se greffe ici :
   // c'est la seule tâche qui tourne chaque jour, et le rappel est idempotent (une échéance
@@ -83,7 +86,7 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     ok: true, shard: shard + 1, shards, eligible: eligible.length,
-    users: results.length, total_activities: total, replanned: coached, results, reconduction,
+    users: results.length, total_activities: total, replanned: coached, refus, results, reconduction,
   });
 }
 
