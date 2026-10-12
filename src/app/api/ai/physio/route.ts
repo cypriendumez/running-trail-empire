@@ -11,6 +11,7 @@ import { prochaineCourse } from "@/lib/coach/prochaineCourse";
 import { courseDatee, dateLongue } from "@/lib/ai/reperesTemps";
 import { actives, libellesActifs, type Douleur } from "@/lib/health/douleurs";
 import { extraireBilan } from "@/lib/health/bilan";
+import { COLONNES_VFC, precisionMetrique, serieVfc } from "@/lib/health/vfc";
 
 type Msg = { role: "user" | "model"; text: string };
 
@@ -73,7 +74,7 @@ export async function POST(req: Request) {
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase.from("workouts").select("title,date,distance_km,elevation_gain_m,duration_seconds,avg_hr,max_hr,avg_cadence_spm,ground_contact_ms,vertical_oscillation_cm,stride_length_m,type").eq("user_id", user.id).order("date", { ascending: false }).limit(40),
     supabase.from("sleep_data").select("*").eq("user_id", user.id).order("date", { ascending: false }).limit(1).single(),
-    supabase.from("hrv_data").select("hrv_ms,date").eq("user_id", user.id).order("date", { ascending: false }).limit(14),
+    supabase.from("hrv_data").select(COLONNES_VFC).eq("user_id", user.id).order("date", { ascending: false }).limit(14),
     supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "session_feedback").order("created_at", { ascending: false }).limit(6),
     supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "planned_race").order("created_at", { ascending: false }).limit(20),
     // ⚠️ L'OBJECTIF DÉCLARÉ, QUE CETTE ROUTE NE LISAIT PAS. Mesuré le 23/09/2026 : le
@@ -99,7 +100,9 @@ export async function POST(req: Request) {
   const profile = profileRes.data;
   const workouts = workoutsRes.data ?? [];
   const sleep = sleepRes.data;
-  const hrv = (hrvRes.data ?? []) as { hrv_ms: number | null; date: string }[];
+  // UNE seule mesure de VFC (rMSSD, ou SDNN d'Apple Watch) : la base et la valeur du jour
+  // ne mélangent jamais les deux (lib/health/vfc).
+  const { metrique: metriqueVfc, lignes: hrv } = serieVfc((hrvRes.data ?? []) as { date: string; rmssd: number | null; sdnn: number | null }[]);
   const feedback = (fbRes.data ?? []) as { data: { pain?: string[]; rpe?: number; note?: string } }[];
   const now = Date.now();
   const num = (v: unknown) => Number(v ?? 0);
@@ -179,7 +182,7 @@ DOSSIER DE L'ATHLÈTE (exploite-le finement — c'est ce qui te rend supérieure
 - ${profile?.age ?? "?"} ans · ${profile?.gender ?? "?"} · ${num(profile?.weight_kg) || "?"} kg · ${num(profile?.height_cm) || "?"} cm
 - Charge : ${weekKm.toFixed(0)} km cette semaine vs ${avg4wk.toFixed(0)} km/sem (moy. 4 sem.) → rampe ${rampPct > 0 ? "+" : ""}${rampPct}% ${rampPct > 30 ? "⚠️ PROGRESSION TROP RAPIDE = risque majeur de blessure de surcharge" : rampPct > 10 ? "(au-dessus des +10%/sem recommandés)" : "(progressive, ok)"} · ${elevWeek} m D+ /7j
 - Biomécanique récente : cadence ${cadence ?? "?"} spm ${cadence && cadence < 165 ? "(basse → suroscillation/impact, lien possible avec les douleurs)" : ""} · contact sol ${gct ?? "?"} ms · oscillation verticale ${vosc ?? "?"} cm
-- Récupération : ${sleep ? `sommeil ${Math.round(num(sleep.total_sleep_min) / 60)}h (score ${sleep.sleep_score ?? "?"}/100), énergie ${sleep.body_battery_end ?? "?"}/100` : "n/c"}${hrvLatest != null ? ` · VFC ${hrvLatest} ms (base ${hrvBase ?? "?"} → ${hrvBase && hrvLatest < hrvBase * 0.92 ? "BASSE = fatigue/stress, cicatrisation ralentie" : "ok"})` : ""}
+- Récupération : ${sleep ? `sommeil ${Math.round(num(sleep.total_sleep_min) / 60)}h (score ${sleep.sleep_score ?? "?"}/100), énergie ${sleep.body_battery_end ?? "?"}/100` : "n/c"}${hrvLatest != null ? ` · VFC (${precisionMetrique(metriqueVfc)}) ${hrvLatest} ms (base ${hrvBase ?? "?"} → ${hrvBase && hrvLatest < hrvBase * 0.92 ? "BASSE = fatigue/stress, cicatrisation ralentie" : "ok"})` : ""}
 ${douleursDites.length ? `- Douleurs en cours, telles que l'athlète les décrit : ${douleursDites.join(", ")}` : ""}
 - SUIVI DES DOULEURS DÉCLARÉES (60 derniers jours) : ${resumeSuivi || "aucun antécédent enregistré — ne suppose donc AUCUN historique, et ne dis pas que c'est nouveau : tu n'en sais rien."}${resumeSuivi ? `
   → OUVRE la consultation par ce suivi quand il concerne la zone dont on te parle : « ton genou droit était à 7/10 il y a 5 jours, tu es à 4 aujourd'hui » est exactement ce qu'un kiné dit en revoyant quelqu'un. Une zone marquée EN AGGRAVATION prime sur tout le reste. Une évolution notée « une seule déclaration » n'est PAS une tendance : ne la commente pas comme telle.` : ""}

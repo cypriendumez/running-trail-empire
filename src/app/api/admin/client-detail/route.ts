@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { estAdmin } from "@/lib/admin/acces";
+import { COLONNES_VFC, serieVfc } from "@/lib/health/vfc";
 
 
 // POST /api/admin/client-detail {user_id} — TOUTES les données récentes d'un client.
@@ -18,16 +19,19 @@ export async function POST(req: Request) {
   const [profile, workouts, hrv, sleep, baseline, plan] = await Promise.all([
     admin.from("profiles").select("full_name,age,weight_kg,height_cm,gender,league,discipline_score,subscription_tier").eq("id", user_id).single(),
     admin.from("workouts").select("title,type,date,distance_km,elevation_gain_m,duration_seconds,avg_hr,max_hr,avg_pace_min_km,avg_cadence_spm,training_effect").eq("user_id", user_id).gte("date", new Date(Date.now() - 60 * 86400000).toISOString().split("T")[0]).order("date", { ascending: false }).limit(120),
-    admin.from("hrv_data").select("date,hrv_ms,physiological_state").eq("user_id", user_id).order("date", { ascending: false }).limit(14),
+    admin.from("hrv_data").select(COLONNES_VFC).eq("user_id", user_id).order("date", { ascending: false }).limit(14),
     admin.from("sleep_data").select("date,total_sleep_min,sleep_score,body_battery_end,deep_sleep_min,rem_sleep_min").eq("user_id", user_id).order("date", { ascending: false }).limit(14),
     admin.from("performance_baselines").select("vma_kmh,ftp_watts,max_hr,resting_hr").eq("user_id", user_id).order("tested_at", { ascending: false }).limit(1).single(),
     admin.from("training_plans").select("race_date, goal:name").eq("user_id", user_id).eq("is_active", true).single(),
   ]);
 
+  // UNE mesure de VFC, état face à SA base (lib/health/vfc).
+  const vfc = serieVfc((hrv.data ?? []) as { date: string; rmssd: number | null; sdnn: number | null }[]);
   return NextResponse.json({
     profile: profile.data ?? null,
     workouts: workouts.data ?? [],
-    hrv: hrv.data ?? [],
+    hrv: vfc.lignes.map((l) => ({ date: l.date, hrv_ms: l.hrv_ms, physiological_state: l.physiological_state })),
+    hrvMetrique: vfc.metrique,
     sleep: sleep.data ?? [],
     baseline: baseline.data ?? null,
     plan: plan.data ?? null,

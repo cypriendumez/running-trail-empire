@@ -44,12 +44,27 @@ interface RecentActivity {
 
 interface WellnessDay {
   date: string;
+  /** Dans LA mesure de l'athlète (rMSSD, ou SDNN d'Apple Watch) — voir lib/health/vfc. */
   hrv?: number;
   sleep_h?: number;
   sleep_score?: number;
   body_battery?: number;
   spo2?: number;
+  /** Position face à SA base (zone normale ± 6 %), calculée par le serveur. */
+  state?: "recovery" | "optimal" | "competition" | null;
 }
+
+/**
+ * Les couleurs de l'état. ⚠️ Elles étaient tirées de seuils ABSOLUS (> 80 ms vert, > 55
+ * bleu, sinon « Récup ») : une SDNN d'Apple Watch était presque toujours « Récup », et un
+ * coureur à 90 ms de base presque toujours « Optimal ». L'état vient désormais du serveur,
+ * relatif à la base de l'athlète.
+ */
+const ETAT_VFC = {
+  competition: { cle: "state.optimal", badge: "text-emerald-600 bg-emerald-50", valeur: "text-emerald-600" },
+  optimal: { cle: "state.correct", badge: "text-blue-600 bg-blue-50", valeur: "text-blue-600" },
+  recovery: { cle: "state.recup", badge: "text-orange-600 bg-orange-50", valeur: "text-orange-500" },
+} as const;
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function fmtDuration(sec: number) {
@@ -82,6 +97,7 @@ export default function SyncPage() {
   const [days, setDays] = useState(30);
   const [activities, setActivities] = useState<RecentActivity[]>([]);
   const [wellness, setWellness] = useState<WellnessDay[]>([]);
+  const [metriqueVfc, setMetriqueVfc] = useState<"rmssd" | "sdnn" | null>(null);
   const [loadingData, setLoadingData] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"activities" | "wellness" | "setup">("activities");
@@ -171,7 +187,7 @@ export default function SyncPage() {
         fetch(`/api/intervals/data?type=wellness&days=${days}`),
       ]);
       if (actRes.ok) { const d = await actRes.json(); setActivities(d.activities ?? []); }
-      if (wellRes.ok) { const d = await wellRes.json(); setWellness(d.wellness ?? []); }
+      if (wellRes.ok) { const d = await wellRes.json(); setWellness(d.wellness ?? []); setMetriqueVfc(d.metriqueVfc ?? null); }
     } finally {
       setLoadingData(false);
     }
@@ -514,6 +530,11 @@ export default function SyncPage() {
               <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
                 <div className="px-5 py-3 border-b border-zinc-100">
                   <h2 className="font-semibold text-zinc-900 text-sm">{ty("well.count", { n: wellness.length })}</h2>
+                  {/* Une série en SDNN (Apple Watch par défaut) : on le dit, et on donne le
+                      réglage qui apporte la VFC de nuit. */}
+                  {metriqueVfc === "sdnn" && (
+                    <p className="mt-1.5 max-w-prose text-xs leading-relaxed text-zinc-500">{d["well.sdnn"]}</p>
+                  )}
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -521,7 +542,7 @@ export default function SyncPage() {
                       <tr className="text-xs text-zinc-400 border-b border-zinc-100">
                         <th className="text-left px-5 py-2.5 font-medium">{d["th.date"]}</th>
                         <th className="text-center px-3 py-2.5 font-medium">
-                          <span className="flex items-center justify-center gap-1"><Heart className="w-3 h-3" />{d["th.hrv"]}</span>
+                          <span className="flex items-center justify-center gap-1"><Heart className="w-3 h-3" />{d["th.hrv"]}{metriqueVfc === "sdnn" && <span className="font-normal">SDNN</span>}</span>
                         </th>
                         <th className="text-center px-3 py-2.5 font-medium">
                           <span className="flex items-center justify-center gap-1"><Moon className="w-3 h-3" />{d["th.sleep"]}</span>
@@ -536,17 +557,15 @@ export default function SyncPage() {
                     </thead>
                     <tbody className="divide-y divide-zinc-50">
                       {wellness.map((w) => {
-                        const state = !w.hrv ? null
-                          : w.hrv > 80 ? { label: d["state.optimal"], color: "text-emerald-600 bg-emerald-50" }
-                          : w.hrv > 55 ? { label: d["state.correct"], color: "text-blue-600 bg-blue-50" }
-                          : { label: d["state.recup"], color: "text-orange-600 bg-orange-50" };
+                        const etat = w.hrv && w.state ? ETAT_VFC[w.state] : null;
+                        const state = etat ? { label: d[etat.cle], color: etat.badge } : null;
                         return (
                           <tr key={w.date} className="hover:bg-zinc-50 transition-colors">
                             <td className="px-5 py-3 text-zinc-700 font-medium">
                               {new Date(w.date + "T12:00:00").toLocaleDateString(lang, { weekday: "short", day: "numeric", month: "short" })}
                             </td>
                             <td className="px-3 py-3 text-center">
-                              {w.hrv ? <span className={`font-bold ${w.hrv > 80 ? "text-emerald-600" : w.hrv > 55 ? "text-blue-600" : "text-orange-500"}`}>{w.hrv} ms</span> : <span className="text-zinc-300">—</span>}
+                              {w.hrv ? <span className={`font-bold ${etat?.valeur ?? "text-zinc-700"}`}>{w.hrv} ms</span> : <span className="text-zinc-300">—</span>}
                             </td>
                             <td className="px-3 py-3 text-center">
                               {w.sleep_h ? <span className="font-semibold text-zinc-800">{w.sleep_h.toFixed(1)}h</span> : <span className="text-zinc-300">—</span>}
@@ -652,6 +671,9 @@ export default function SyncPage() {
                     {/* L'app ne lit Santé que sur un iPhone déverrouillé : la séance part quand elle
                         tourne. La recette d'automatisation est la même que dans le questionnaire. */}
                     <p className="mt-1.5 font-medium text-zinc-700">{d["s1.appleEnvoi"]}</p>
+                    {/* Par défaut, l'app envoie la SDNN (moyenne des relevés de la journée) : l'option
+                        « Sleeping HRV (rMSSD) » donne la VFC de nuit, que Pacevo préfère (lib/health/vfc). */}
+                    <p className="mt-1.5">{d["s1.appleVfc"]}</p>
                   </div>
                   <a href="https://intervals.icu" target="_blank" rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-zinc-900 hover:bg-zinc-700 px-3 py-2 rounded-lg mt-3 transition-colors">

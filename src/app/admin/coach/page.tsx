@@ -2,6 +2,8 @@ export const dynamic = "force-dynamic";
 import { isRun } from "@/lib/intervals/sport";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CoachPanel, type CoachClient } from "@/components/admin/CoachPanel";
+import { seriesParAthlete } from "@/lib/health/vfc";
+import { statsVfc } from "@/lib/dashboard/discipline";
 
 export const metadata = { title: "Coach — mes clients" };
 
@@ -11,7 +13,7 @@ export default async function CoachPage() {
     sb.from("profiles").select("id, full_name, email, league, discipline_score"),
     sb.from("workouts").select("user_id, title, type, sport, date, distance_km, tss").order("date", { ascending: false }).limit(3000),
     sb.from("sleep_data").select("user_id, sleep_score, body_battery_end, date").order("date", { ascending: false }).limit(1500),
-    sb.from("hrv_data").select("user_id, hrv_ms, physiological_state, date").order("date", { ascending: false }).limit(1500),
+    sb.from("hrv_data").select("user_id, date, rmssd, sdnn").order("date", { ascending: false }).limit(1500),
     sb.from("notifications").select("id", { count: "exact", head: true }).eq("type", "client_message").eq("read", false),
     sb.from("notifications").select("user_id, data").eq("type", "race_objective"),
     sb.from("notifications").select("user_id").eq("type", "client_message").eq("read", false),
@@ -30,7 +32,9 @@ export default async function CoachPage() {
     return m;
   };
   const lastSleep = firstByUser(sleepRes.data as Row[] | null);
-  const lastHrv = firstByUser(hrvRes.data as Row[] | null);
+  // UNE mesure par athlète (rMSSD, ou SDNN d'Apple Watch), état face à SA base : jamais
+  // `hrv_ms` brut ni l'état stocké, tranché sur des seuils absolus (lib/health/vfc).
+  const vfcParAthlete = seriesParAthlete((hrvRes.data ?? []) as { user_id: string; date: string; rmssd: number | null; sdnn: number | null }[]);
   const wkByUser: Record<string, { date: string; distance_km: number | null; title: string | null; type: string | null; tss: number | null }[]> = {};
   for (const w of (workoutsRes.data ?? []) as { user_id: string; date: string; distance_km: number | null; title: string | null; type: string | null; tss: number | null }[]) {
     (wkByUser[w.user_id] ??= []).push(w);
@@ -42,7 +46,10 @@ export default async function CoachPage() {
     const ws = wkByUser[p.id] ?? [];
     const last = ws[0];
     const sleepScore = (lastSleep[p.id]?.sleep_score as number) ?? null;
-    const state = (lastHrv[p.id]?.physiological_state as string) ?? null;
+    const vfc = vfcParAthlete.get(p.id);
+    const derniereVfc = vfc?.lignes[0] ?? null;
+    // « VFC basse » sur une mesure d'il y a une semaine ne dit rien d'aujourd'hui.
+    const state = vfc && derniereVfc && statsVfc(vfc.lignes).fraiche ? derniereVfc.physiological_state : null;
 
     // ── Triage : drapeaux « à suivre aujourd'hui » ──
     const flags: { icon: string; label: string; sev: number }[] = [];
@@ -69,7 +76,8 @@ export default async function CoachPage() {
       weekKm: Math.round(ws.filter((w) => isRun((w as { sport?: string | null }).sport) && new Date(w.date).getTime() > weekAgo).reduce((s, w) => s + (w.distance_km ?? 0), 0) * 10) / 10,
       sleepScore,
       load14: Math.round(ws.filter((w) => new Date(w.date).getTime() > now - 14 * 86400000).reduce((s, w) => s + (w.tss ?? 0), 0)) || null,
-      hrv: (lastHrv[p.id]?.hrv_ms as number) ?? null,
+      hrv: derniereVfc?.hrv_ms ?? null,
+      hrvMetrique: vfc?.metrique ?? null,
       state,
       flags,
       priority: flags.reduce((s, f) => s + f.sev, 0),

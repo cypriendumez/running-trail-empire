@@ -9,6 +9,8 @@ export type CoachClient = {
   lastRun: { title: string; date: string; km: number } | null;
   weekKm: number; sleepScore: number | null; load14: number | null;
   hrv: number | null; state: string | null;
+  /** La mesure de `hrv` : la SDNN (Apple Watch par défaut) n'a pas l'échelle d'une rMSSD. */
+  hrvMetrique?: "rmssd" | "sdnn" | null;
   flags: { icon: string; label: string; sev: number }[]; priority: number;
 };
 
@@ -29,6 +31,7 @@ type Detail = {
   profile: { full_name?: string; age?: number; weight_kg?: number; height_cm?: number; gender?: string; subscription_tier?: string } | null;
   workouts: { title?: string; type?: string; date: string; distance_km?: number; elevation_gain_m?: number; duration_seconds?: number; avg_hr?: number; avg_cadence_spm?: number; calories?: number }[];
   hrv: { date: string; hrv_ms: number; physiological_state?: string }[];
+  hrvMetrique?: "rmssd" | "sdnn" | null;
   sleep: { date: string; total_sleep_min?: number; sleep_score?: number; body_battery_end?: number }[];
   baseline: { vma_kmh?: number; ftp_watts?: number; max_hr?: number; resting_hr?: number } | null;
   plan: { race_date?: string; goal?: string } | null;
@@ -151,7 +154,7 @@ export function CoachPanel({ clients, unread = 0 }: { clients: CoachClient[]; un
                   {sel.state && STATE[sel.state] && <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${STATE[sel.state].c}`}>{STATE[sel.state].l}</span>}
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <Stat icon={<HeartPulse className="w-4 h-4 text-red-400" />} label="VFC" value={sel.hrv != null ? `${sel.hrv} ms` : "—"} />
+                  <Stat icon={<HeartPulse className="w-4 h-4 text-red-400" />} label="VFC" value={sel.hrv != null ? `${sel.hrv} ms${sel.hrvMetrique === "sdnn" ? " (SDNN)" : ""}` : "—"} />
                   <Stat icon={<Moon className="w-4 h-4 text-indigo-400" />} label="Sommeil" value={sel.sleepScore != null ? `${sel.sleepScore}/100` : "—"} />
                   <Stat icon={<Activity className="w-4 h-4 text-emerald-500" />} label="Volume 7j" value={`${sel.weekKm} km`} />
                   <Stat icon={<span className="text-sm">📊</span>} label="Charge 14j" value={sel.load14 != null ? `${sel.load14} TSS` : "—"} />
@@ -206,7 +209,7 @@ export function CoachPanel({ clients, unread = 0 }: { clients: CoachClient[]; un
                     <div className="grid grid-cols-2 gap-4 mt-4">
                       <div>
                         <div className="text-[11px] font-bold uppercase tracking-wide text-zinc-400 mb-1">VFC — 7 derniers j</div>
-                        {detail && detail.hrv.length ? <div className="text-sm text-zinc-600">{detail.hrv.slice(0, 7).map((h) => h.hrv_ms).join(" · ")} ms</div> : <p className="text-sm text-zinc-400">non synchronisée</p>}
+                        {detail && detail.hrv.length ? <div className="text-sm text-zinc-600">{detail.hrv.slice(0, 7).map((h) => h.hrv_ms).join(" · ")} ms{detail.hrvMetrique === "sdnn" ? " (SDNN)" : ""}</div> : <p className="text-sm text-zinc-400">non synchronisée</p>}
                       </div>
                       <div>
                         <div className="text-[11px] font-bold uppercase tracking-wide text-zinc-400 mb-1">Sommeil — 7 dernières nuits</div>

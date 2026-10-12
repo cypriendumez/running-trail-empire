@@ -18,6 +18,8 @@ import { seancesSansRessenti } from "@/lib/dashboard/ressenti";
 import { computeStreak, jourLocal, decaleJour, type StreakWorkout, type StreakPrescription } from "@/lib/streak/compute";
 import { accesDe } from "@/lib/billing/access";
 import { estAdmin } from "@/lib/admin/acces";
+import { serieVfc } from "@/lib/health/vfc";
+import type { HRVData } from "@/types";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard" };
@@ -115,6 +117,9 @@ export default async function DashboardPage() {
   const recordsDeclares = ((declaresRes.data ?? []) as { data: unknown }[])
     .map((r) => validerRecordDeclare(r.data, "9999-12-31"))
     .filter((r): r is RecordDeclare => r != null);
+  // VFC : UNE seule mesure par athlète (rMSSD, ou la SDNN d'une Apple Watch en réglages
+  // par défaut) et l'état face à SA base — jamais `hrv_ms` brut (lib/health/vfc).
+  const vfc = serieVfc((hrvRes.data ?? []) as HRVData[]);
 
   // L'état d'abonnement se déduit du profil déjà chargé : `created_at` donne l'essai,
   // `subscription_tier` la formule. Aucune requête de plus.
@@ -232,7 +237,8 @@ export default async function DashboardPage() {
     <BentoDashboard
       donneesIncompletes={donneesIncompletes}
       profile={stripProfileSecrets(profileRes.data)}
-      hrv={hrvRes.data ?? []}
+      hrv={vfc.lignes}
+      metriqueVfc={vfc.metrique}
       workouts={workoutsRes.data ?? []}
       plan={planRes.data}
       league={leagueRes.data}

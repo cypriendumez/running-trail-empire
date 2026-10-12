@@ -58,12 +58,20 @@ export interface BiomechanicsData {
   running_effectiveness?: number;
 }
 
+/**
+ * Une ligne de VFC. ⚠️ `hrv_ms` et `physiological_state` ne se lisent QU'APRÈS `serieVfc`
+ * (lib/health/vfc) : en base, `hrv_ms` vaut `rmssd ?? sdnn` — deux mesures d'échelles
+ * différentes — et l'état stocké est neutre. La série les réécrit dans LA mesure de
+ * l'athlète, face à SA base.
+ */
 export interface HRVData {
   user_id: string;
   date: string;
   hrv_ms: number;
-  rmssd: number;
-  sdnn: number;
+  /** rMSSD — la nuit (Garmin, COROS, Polar…, ou Apple Watch avec « Sleeping HRV »). */
+  rmssd: number | null;
+  /** SDNN — moyenne des relevés de la journée (Apple Watch par défaut). */
+  sdnn: number | null;
   physiological_state: PhysiologicalState;
 }
 

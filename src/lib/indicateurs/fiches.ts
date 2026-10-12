@@ -10,7 +10,8 @@ import type { Lang } from "@/lib/i18n/translations";
 import type { HRVData, Workout } from "@/types";
 import { TEXTES } from "./textes";
 import type { CleIndicateur, Composante, Fiche, Point, Ton } from "./types";
-import { computeDiscipline, statsVfc, isQualityWorkout } from "@/lib/dashboard/discipline";
+import { computeDiscipline, etatPhysiologique, statsVfc, isQualityWorkout } from "@/lib/dashboard/discipline";
+import { NOM_METRIQUE, ZONE_NORMALE_VFC, type MetriqueVfc } from "@/lib/health/vfc";
 import { computeForme, socleDesSeances } from "@/lib/dashboard/forme";
 import { computeLoad, type SeanceCharge } from "@/lib/dashboard/charge";
 import { computeHrZones } from "@/lib/dashboard/zones";
@@ -32,8 +33,11 @@ export type DonneesFiche = {
   seances: Workout[];
   /** ~4 mois de séances, pour les graphiques seulement. */
   historique: Workout[];
-  /** Mesures de VFC, de la plus récente à la plus ancienne. */
+  /** Mesures de VFC, de la plus récente à la plus ancienne — PASSÉES PAR `serieVfc` : une
+   *  seule mesure, `physiological_state` relatif à la base de l'athlète. */
   vfc: Pick<HRVData, "date" | "hrv_ms" | "physiological_state">[];
+  /** La mesure de cette série : rMSSD, ou SDNN (Apple Watch en réglages par défaut). */
+  metriqueVfc?: MetriqueVfc | null;
   /** Nuits, de la plus récente à la plus ancienne. */
   sommeil: { date: string; sleep_score: number | null; total_sleep_min: number | null }[];
   charge: SeanceCharge[];
@@ -68,7 +72,8 @@ function contexte(d: DonneesFiche) {
   // Même règle que la carte : une nuit de plus de deux jours ne décrit plus la forme du jour.
   const sommeilFrais = s0 && s0.date && maintenant - new Date(`${s0.date}T00:00:00`).getTime() <= 2 * 86400000 && s0.sleep_score != null
     ? { sleep_score: Number(s0.sleep_score), total_sleep_min: Number(s0.total_sleep_min) || 0 } : null;
-  const etat = d.vfc[0]?.physiological_state ?? "optimal";
+  // Même règle que la carte (`etatPhysiologique`) : sinon le score discipline différerait.
+  const etat = etatPhysiologique(d.vfc, maintenant);
   const disc = computeDiscipline(d.seances, d.vfc.slice(0, 14) as HRVData[], sommeilFrais, etat);
   const forme = computeForme(d.seances, d.vma.vma, disc.recovery, disc.consistency,
     d.objectif ? { distanceKm: d.objectif.distanceKm ?? null, targetSeconds: d.objectif.targetSeconds ?? null } : null);
@@ -141,8 +146,10 @@ function vfc(d: DonneesFiche): Fiche {
   const base: Fiche = { cle: "vfc", titre: t.titre, mesure: t.mesure, valeur: "—", verdict: "", calcul: [], conseils: [], pourquoi: t.pourquoi,
     sources: ["Plews D. J. et al. — Training adaptation and heart rate variability in elite endurance athletes, Sports Medicine, 2013.", "Kiviniemi A. M. et al. — Endurance training guided individually by daily heart rate variability, Eur J Appl Physiol, 2007."] };
   if (s.dernier == null || s.base == null) return { ...base, vide: T.commun.vide };
-  const ecart = s.ecart ?? 0, pct = (ecart / s.base) * 100, seuil = s.base * 0.94;
-  const etat: "ancienne" | "auDessus" | "normale" | "sous" = !s.fraiche ? "ancienne" : ecart >= 0 ? "auDessus" : pct >= -6 ? "normale" : "sous";
+  // La zone normale (± 6 %) est CELLE de l'état physiologique (lib/health/vfc) : la fiche ne
+  // peut pas dire « dans ta normale » quand l'état dit « récupération ».
+  const ecart = s.ecart ?? 0, pct = (ecart / s.base) * 100, seuil = s.base * (1 - ZONE_NORMALE_VFC);
+  const etat: "ancienne" | "auDessus" | "normale" | "sous" = !s.fraiche ? "ancienne" : ecart >= 0 ? "auDessus" : pct >= -ZONE_NORMALE_VFC * 100 ? "normale" : "sous";
   const statut = { ancienne: { libelle: t.ancienne, ton: "neutre" as Ton }, auDessus: { libelle: t.auDessus, ton: "excellent" as Ton }, normale: { libelle: t.normale, ton: "bon" as Ton }, sous: { libelle: t.sous, ton: "alerte" as Ton } }[etat];
   const v = nb(L, s.dernier), b = nb(L, s.base), e = nb(L, Math.abs(ecart));
   const verdict = etat === "ancienne" ? t.verdictAncienne(v, s.jours ?? 0)
@@ -158,6 +165,9 @@ function vfc(d: DonneesFiche): Fiche {
     { libelle: t.base, valeur: b, unite: "ms", ton: "neutre", detail: t.dBase(s.n) },
     { libelle: t.ecart, valeur: signe(L, ecart), unite: "ms", ton: statut.ton, detail: t.dEcart(signe(L, pct, 1)) },
   ];
+  // LA mesure suivie. Une SDNN d'Apple Watch n'a pas l'échelle d'une rMSSD : sans ce nom,
+  // l'athlète la comparerait aux chiffres qu'il lit ailleurs.
+  if (d.metriqueVfc) composantes.push({ libelle: t.metrique, valeur: NOM_METRIQUE[d.metriqueVfc], ton: "neutre", detail: d.metriqueVfc === "sdnn" ? t.dSdnn : t.dRmssd });
   if (d.fcRepos && d.fcRepos > 0) composantes.push({ libelle: t.fcRepos, valeur: nb(L, d.fcRepos), unite: "bpm", ton: "neutre", detail: t.dFcRepos });
   if (sommeilFrais) {
     const h = `${Math.floor(sommeilFrais.total_sleep_min / 60)} h ${String(sommeilFrais.total_sleep_min % 60).padStart(2, "0")}`;
@@ -170,12 +180,17 @@ function vfc(d: DonneesFiche): Fiche {
     graphe: {
       titre: t.graphe, unite: "ms",
       lignes: [{ libelle: t.ligneMesure, couleur: "#059669", points, aire: true }, { libelle: t.ligneMoyenne, couleur: "#27272a", points: moyenne }],
-      bande: { bas: Math.round(seuil * 10) / 10, haut: Math.round(s.base * 1.06 * 10) / 10, libelle: t.bande },
+      bande: { bas: Math.round(seuil * 10) / 10, haut: Math.round(s.base * (1 + ZONE_NORMALE_VFC) * 10) / 10, libelle: t.bande },
       repere: { valeur: s.base, libelle: t.base },
     },
     calcul: [t.cBase(s.n, b), t.cEcart(v, b, signe(L, ecart), signe(L, pct, 1)), t.cSeuil(nb(L, seuil))],
     reperes: { titre: T.commun.reperes, lignes: reperesActifs(t.reperes(b, nb(L, seuil)), ["excellent", "bon", "alerte"], etat === "auDessus" ? 0 : etat === "normale" ? 1 : etat === "sous" ? 2 : -1) },
-    conseils: [etat === "ancienne" ? t.conseilAncienne : etat === "auDessus" ? t.conseilAuDessus : etat === "normale" ? t.conseilNormale : t.conseilSous, t.conseilGeneral],
+    conseils: [
+      etat === "ancienne" ? t.conseilAncienne : etat === "auDessus" ? t.conseilAuDessus : etat === "normale" ? t.conseilNormale : t.conseilSous,
+      // Apple Watch en réglages par défaut : le réglage qui donne une VFC de nuit.
+      ...(d.metriqueVfc === "sdnn" ? [t.conseilSdnn] : []),
+      t.conseilGeneral,
+    ],
     liens: [{ libelle: T.commun.voirSante, href: "/dashboard/health" }],
   };
 }

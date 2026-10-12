@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { estAdmin } from "@/lib/admin/acces";
+import { COLONNES_VFC, precisionMetrique, serieVfc } from "@/lib/health/vfc";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
@@ -20,14 +21,17 @@ export async function POST(req: Request) {
   const [profileRes, workoutsRes, hrvRes, sleepRes, baselineRes, planRes, memoRes] = await Promise.all([
     admin.from("profiles").select("full_name,age,weight_kg,height_cm").eq("id", user_id).single(),
     admin.from("workouts").select("title,type,date,distance_km,elevation_gain_m,duration_seconds,avg_hr,max_hr,avg_pace_min_km,avg_cadence_spm,tss,stride_length_m").eq("user_id", user_id).order("date", { ascending: false }).limit(25),
-    admin.from("hrv_data").select("hrv_ms,physiological_state,date").eq("user_id", user_id).order("date", { ascending: false }).limit(1).single(),
+    admin.from("hrv_data").select(COLONNES_VFC).eq("user_id", user_id).order("date", { ascending: false }).limit(14),
     admin.from("sleep_data").select("total_sleep_min,sleep_score,body_battery_end").eq("user_id", user_id).order("date", { ascending: false }).limit(1).single(),
     admin.from("performance_baselines").select("vma_kmh,max_hr,resting_hr").eq("user_id", user_id).order("tested_at", { ascending: false }).limit(1).single(),
     admin.from("training_plans").select("race_date, goal:name").eq("user_id", user_id).eq("is_active", true).single(),
     admin.from("notifications").select("data,created_at").eq("user_id", user_id).eq("type", "session_ai_analysis").order("created_at", { ascending: false }).limit(3),
   ]);
 
-  const p = profileRes.data, w = workoutsRes.data ?? [], hrv = hrvRes.data, sleep = sleepRes.data, base = baselineRes.data, plan = planRes.data;
+  // La dernière VFC dans LA mesure de l'athlète, état face à SA base (lib/health/vfc).
+  const serie = serieVfc((hrvRes.data ?? []) as { date: string; rmssd: number | null; sdnn: number | null }[]);
+  const hrv = serie.lignes[0] ?? null;
+  const p = profileRes.data, w = workoutsRes.data ?? [], sleep = sleepRes.data, base = baselineRes.data, plan = planRes.data;
   const recent = w.filter((x) => new Date(x.date).getTime() > Date.now() - 14 * 86400000);
   const weekKm = w.filter((x) => new Date(x.date).getTime() > Date.now() - 7 * 86400000).reduce((s, x) => s + (x.distance_km ?? 0), 0);
   const km14 = recent.reduce((s, x) => s + (x.distance_km ?? 0), 0);
@@ -41,7 +45,7 @@ export async function POST(req: Request) {
   const prompt = `Tu es le coach running/trail expert et PRÉCIS de ${p?.full_name ?? "cet athlète"}. Analyse sa charge des 2 dernières semaines et prescris LA séance optimale pour aujourd'hui.
 
 PROFIL : ${p?.age ?? "?"} ans · ${p?.weight_kg ?? "?"} kg · VMA ${base?.vma_kmh ?? "?"} km/h · FC max ${base?.max_hr ?? "?"} · FC repos ${base?.resting_hr ?? "?"}
-RÉCUPÉRATION : VFC ${hrv?.hrv_ms ?? "non synchronisée"}${hrv?.physiological_state ? ` (${hrv.physiological_state})` : ""} · sommeil ${sleep?.sleep_score ?? "non synchronisé"}
+RÉCUPÉRATION : VFC ${hrv ? `${hrv.hrv_ms} ms, ${precisionMetrique(serie.metrique)}, le ${hrv.date} (${hrv.physiological_state} face à sa base)` : "non synchronisée"} · sommeil ${sleep?.sleep_score ?? "non synchronisé"}
 CHARGE : ${weekKm.toFixed(0)} km / 7 j · ${km14.toFixed(0)} km / 14 j · ${recent.length} séances · charge cumulée ${tss14.toFixed(0)} TSS / 14 j
 COURSE CIBLE : ${daysToRace != null ? `J-${daysToRace}` : "aucune"} ${plan?.goal ? `(objectif : ${plan.goal})` : ""}
 

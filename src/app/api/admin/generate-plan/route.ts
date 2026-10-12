@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { buildAthleteContext } from "@/lib/ai/coachContext";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { estAdmin } from "@/lib/admin/acces";
+import { serieVfc } from "@/lib/health/vfc";
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
 // gemini-2.5-flash = free tier, gemini-2.5-flash = requires billing
@@ -123,7 +124,9 @@ export async function POST(req: NextRequest) {
       elevation_m: w.elevation_gain_m,
       avg_hr: w.avg_hr, tss: w.tss,
     }));
-    fallbackHrv = (hRes.data ?? []).map((h: any) => ({ date: h.date, hrv: h.hrv_ms, state: h.physiological_state }));
+    // UNE mesure de VFC, état face à SA base (lib/health/vfc) — jamais `hrv_ms` brut.
+    const serie = serieVfc((hRes.data ?? []) as { date: string; rmssd: number | null; sdnn: number | null }[]);
+    fallbackHrv = serie.lignes.map((h) => ({ date: h.date, hrv: h.hrv_ms, mesure: serie.metrique, state: h.physiological_state }));
     fallbackSleep = (sRes.data ?? []).map((s: any) => ({ date: s.date, sleep_hours: s.total_sleep_min ? +(s.total_sleep_min / 60).toFixed(1) : null, score: s.sleep_score, body_battery: s.body_battery_end }));
   }
 

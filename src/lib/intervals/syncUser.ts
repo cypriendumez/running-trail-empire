@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildWorkoutRow, makeMatcher } from "./workoutRow";
+import { ligneSommeil, ligneVfc, type IcuWellness } from "./wellnessRow";
 import { roleOf } from "./sport";
 
 const BASE = "https://intervals.icu/api/v1";
@@ -103,41 +104,23 @@ export async function syncIntervalsForUser(
     if (!id) synced++;
   }
 
+  // VFC et sommeil : lignes construites par `lib/intervals/wellnessRow`, PARTAGÉ avec la
+  // route du navigateur. Un jour SANS mesure arrive avec `hrv: null` (pas sans champ) et
+  // ne produit plus de ligne ; un jour avec la SEULE SDNN (Apple Watch) n'est plus jeté.
   for (const day of wellness) {
-    if (!day.id) continue;
-    if (day.hrv !== undefined) {
-      const state = day.hrv < 50 ? "recovery" : day.hrv > 80 ? "competition" : "optimal";
-      // ⚠️ MÊME RÈGLE QUE POUR LES SÉANCES, dix lignes plus haut : ne jamais avaler une
-      // erreur d'écriture. Elle ne s'appliquait pourtant qu'aux séances. Un refus sur la
-      // VFC ou le sommeil laissait le coach raisonner sur une fenêtre de bien-être vide
-      // — et « pas de VFC » se lit comme « aucune mesure », jamais comme « écriture
-      // refusée ». L'athlète voit un graphique troué sans explication possible.
-      const { error: eHrv } = await admin.from("hrv_data").upsert(
-        { user_id: profile.id, date: day.id, hrv_ms: day.hrv, rmssd: day.hrv, sdnn: day.hrvSDNN ?? null, physiological_state: state },
-        { onConflict: "user_id,date" }
-      );
-      if (eHrv) failures.push(`VFC du ${day.id} : ${eHrv.code ?? "?"} ${eHrv.message}`);
+    const vfc = ligneVfc(profile.id, day);
+    if (vfc) {
+      // ⚠️ MÊME RÈGLE QUE POUR LES SÉANCES, plus haut : ne jamais avaler une erreur
+      // d'écriture. Un refus sur la VFC ou le sommeil laissait le coach raisonner sur une
+      // fenêtre de bien-être vide — et « pas de VFC » se lit comme « aucune mesure »,
+      // jamais comme « écriture refusée ».
+      const { error: eHrv } = await admin.from("hrv_data").upsert(vfc, { onConflict: "user_id,date" });
+      if (eHrv) failures.push(`VFC du ${vfc.date} : ${eHrv.code ?? "?"} ${eHrv.message}`);
     }
-    if (day.sleepSecs !== undefined) {
-      const { error: eSommeil } = await admin.from("sleep_data").upsert(
-        {
-          user_id: profile.id, date: day.id,
-          total_sleep_min: Math.round(day.sleepSecs / 60),
-          // Ces champs sont ABSENTS de l'API wellness d'intervals.icu pour la plupart des
-          // comptes. Les forcer à 0 fabriquait de la donnée : le coach lisait « 0 % de
-          // sommeil profond » et y voyait une nuit catastrophique, alors qu'il s'agissait
-          // simplement d'une mesure indisponible. Absent doit rester NULL.
-          deep_sleep_min: day.deepSleepSecs != null ? Math.round(day.deepSleepSecs / 60) : null,
-          light_sleep_min: day.lightSleepSecs != null ? Math.round(day.lightSleepSecs / 60) : null,
-          rem_sleep_min: day.remSleepSecs != null ? Math.round(day.remSleepSecs / 60) : null,
-          sleep_score: day.sleepScore ?? null,
-          body_battery_end: day.bb ?? null,
-          spo2_avg: day.avgSpo2 ?? null,
-          source: "intervals_icu",
-        },
-        { onConflict: "user_id,date" }
-      );
-      if (eSommeil) failures.push(`sommeil du ${day.id} : ${eSommeil.code ?? "?"} ${eSommeil.message}`);
+    const nuit = ligneSommeil(profile.id, day);
+    if (nuit) {
+      const { error: eSommeil } = await admin.from("sleep_data").upsert(nuit, { onConflict: "user_id,date" });
+      if (eSommeil) failures.push(`sommeil du ${nuit.date} : ${eSommeil.code ?? "?"} ${eSommeil.message}`);
     }
   }
 
@@ -225,9 +208,8 @@ interface IntervalsActivity {
   average_temp?: number; gap?: number; icu_hr_zone_times?: number[]; icu_intensity?: number;
   icu_training_load?: number;
 }
-interface IntervalsWellness {
-  id: string; hrv?: number; hrvSDNN?: number; sleepSecs?: number;
-  deepSleepSecs?: number; lightSleepSecs?: number; remSleepSecs?: number;
-  sleepScore?: number; bb?: number; avgSpo2?: number; vo2max?: number;
-  restingHR?: number; ctl?: number; atl?: number; rampRate?: number;
-}
+// `| null` : un jour sans mesure arrive avec le champ À null, pas sans champ.
+type IntervalsWellness = IcuWellness & {
+  id: string; vo2max?: number | null;
+  restingHR?: number | null; ctl?: number | null; atl?: number | null; rampRate?: number | null;
+};

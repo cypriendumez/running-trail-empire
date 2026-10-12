@@ -23,7 +23,8 @@ import { warmCoolMin } from "@/lib/watch/intervals";
 import { tr, nLoc, nRaw, type I18nText } from "@/lib/i18n/multi";
 import type { Lang } from "@/lib/i18n/translations";
 import { MOTIF_T } from "@/lib/coach/reasonsI18n";
-import { detteSommeil, chuteVfc } from "@/lib/coach/recuperation";
+import { detteSommeil, chuteVfc, ecartJours, FRAICHEUR_JOURS } from "@/lib/coach/recuperation";
+import { COLONNES_VFC, etatRelatif, precisionMetrique, serieVfc } from "@/lib/health/vfc";
 import { plusLongueLacune } from "@/lib/coach/lacune";
 import { traduireDouleur } from "@/lib/coach/painZonesI18n";
 
@@ -311,7 +312,7 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, shoeRes, objRes, csRes, wlRes, histRes, sleepDatesRes, hrvDatesRes, formeRes, fcMaxRes] = await Promise.all([
     sb.from("profiles").select("*").eq("id", userId).single(),
     sb.from("performance_baselines").select("*").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).single(),
-    sb.from("hrv_data").select("hrv_ms,physiological_state,date").eq("user_id", userId).order("date", { ascending: false }).limit(30),
+    sb.from("hrv_data").select(COLONNES_VFC).eq("user_id", userId).order("date", { ascending: false }).limit(30),
     sb.from("sleep_data").select("sleep_score,total_sleep_min,deep_sleep_min,rem_sleep_min,body_battery_end,respiration_rate,date").eq("user_id", userId).order("date", { ascending: false }).limit(30),
     fetchWorkouts(sb, userId),
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "session_feedback").order("created_at", { ascending: false }).limit(5),
@@ -363,7 +364,10 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
 
   const p = profileRes.data as Record<string, unknown> | null;
   const b = baseRes.data as Record<string, unknown> | null;
-  const hrv = (hrvRes.data ?? []) as { hrv_ms: number | null; physiological_state: string | null; date: string }[];
+  // UNE SEULE MESURE par athlète — la rMSSD, ou la SDNN d'une Apple Watch en réglages par
+  // défaut. Tout ce qui suit (base, tendance 7 j, chute aiguë, état) se calcule dans
+  // celle-là : mélanger les deux fabriquait de fausses chutes. Voir `lib/health/vfc`.
+  const { metrique: metriqueVfc, lignes: hrv } = serieVfc((hrvRes.data ?? []) as { date: string; rmssd: number | null; sdnn: number | null }[]);
   const sleep = (sleepRes.data ?? []) as { sleep_score: number | null; total_sleep_min: number | null; deep_sleep_min: number | null; rem_sleep_min: number | null; body_battery_end: number | null; respiration_rate: number | null; date: string }[];
   const workouts = (woRes.data ?? []) as Wk[];
   const feedback = (fbRes.data ?? []) as { data: { rpe?: number; pain?: string[]; note?: string } }[];
@@ -472,8 +476,24 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   const hrvVals = hrv.filter(h => dansLesJours(h.date, 14)).map(h => h.hrv_ms).filter((v): v is number => v != null);
   const hrvLatest = hrvVals[0] ?? null;
   const hrvBase = hrvVals.length >= 3 ? Math.round(hrvVals.reduce((a, c) => a + c, 0) / hrvVals.length) : null;
-  const hrvTrend = hrvLatest != null && hrvBase != null ? (hrvLatest >= hrvBase ? "au-dessus de sa base → frais" : "sous sa base → fatigue possible") : "n/c";
-  const state = hrv[0]?.physiological_state ?? "optimal";
+  // La MÊME zone normale (± 6 %) que l'état juste en dessous : « 88 ms pour une base de 92 →
+  // fatigue possible » à côté de « état : optimal » donnait deux lectures contraires au coach.
+  const hrvTrend = hrvLatest != null && hrvBase != null
+    ? { recovery: "sous sa zone normale → fatigue possible", optimal: "dans sa zone normale (± 6 %)", competition: "au-dessus de sa zone normale → frais" }[etatRelatif(hrvLatest, hrvBase)]
+    : "n/c";
+  // L'état : la dernière mesure face à SA base (zone normale ± 6 %), plus un seuil absolu
+  // qui classait 49 matins sur 77 « compétition » chez qui vit à 90 ms. Une mesure de
+  // plus de deux jours ne décrit plus aujourd'hui, et « optimal » par défaut affirmait
+  // un état sans aucune donnée : on dit ce qu'on ne sait pas.
+  // ⚠️ SUR LA BASE DE 14 JOURS ci-dessus, pas sur les 14 dernières MESURES de la série :
+  // mesuré le 12/10/2026 sur le compte de Cyprien, les 14 mesures remontaient au 16/09
+  // (un 38 ms) et donnaient « optimal » à 83 ms, juste au-dessus d'une ligne disant « 83 ms
+  // pour une base de 91 → sous sa zone normale ». Deux lectures contraires, même invite.
+  const ageVfc = hrv[0] ? ecartJours(aujourdhui(FUSEAU_DEFAUT), hrv[0].date) : null;
+  const state = ageVfc == null ? "inconnu (aucune VFC reçue)"
+    : ageVfc > FRAICHEUR_JOURS ? `inconnu (dernière VFC il y a ${ageVfc} j)`
+    : hrvLatest != null && hrvBase != null ? etatRelatif(hrvLatest, hrvBase)
+    : hrv[0].physiological_state;
   // Un score ABSENT n'est pas un score de 0 : `?? 0` transformait une nuit non notée par
   // la montre en nuit catastrophique. (Aucune sur ce compte, mais toutes les montres ne
   // renseignent pas ce champ.)
@@ -1865,8 +1885,8 @@ ${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${lim
 })()}${nutrition ? `- 🍫 NUTRITION DE SA SORTIE LONGUE (${Math.round(nutrition.longRunMin / 60)} h ~${longRunKm} km${nutrition.tempC != null ? `, ${Math.round(nutrition.tempC)} °C prévus` : ""}) : ${nutrition.preRun ? `${nutrition.preRun} g de glucides 2-3 h avant, ` : ""}puis ${nutrition.carbsPerH} g/h À PARTIR DE LA 1re HEURE (soit ~${nutrition.carbsTotal} g sur la sortie, ~${Math.max(1, Math.round(nutrition.carbsTotal / 25))} gels ou équivalent), et ${nutrition.mlPerH} ml/h de boisson à ~${nutrition.sodium} mg/L de sodium. Donne-lui CES chiffres, pas une fourchette — et rappelle-lui de les TESTER à l'entraînement, jamais le jour J.\n` : ""}${shoeLines.length ? `- 👟 USURE DES CHAUSSURES : ${shoeLines.join(" · ")}\n` : ""}${plateau ? `- 🛑 PLATEAU DÉTECTÉ : sa capacité stagne (${vmaSlopePerWeek} km/h/sem sur ${Math.round((curvePts[curvePts.length - 1].t - curvePts[0].t) / 86400000)} j) ALORS QUE sa charge monte. N'AJOUTE PAS de volume ni de séances : c'est le réflexe qui blesse. CHANGE le stimulus — format de séance inédit, côtes, force, technique de foulée — ou impose une vraie semaine de décharge. Explique-lui pourquoi.\n` : vmaSlopePerWeek != null ? `- 📈 TRAJECTOIRE DE CAPACITÉ : ${vmaSlopePerWeek > 0 ? "+" : ""}${vmaSlopePerWeek} km/h de VMA par semaine sur ses efforts mesurés.\n` : ""}${vrLine ? `- 🦵 ÉCONOMIE DE COURSE (ratio vertical, ${vr!.n} séances) : ${vrLine}\n` : ""}${hrrLine ? `- ❤️‍🩹 RÉCUPÉRATION CARDIAQUE : ${hrrLine}\n` : ""}${thresholdPace ? `- 🧊 ALLURE SOUS-SEUIL : ${subPace}/km — c'est ICI que se fait le VOLUME au seuil (méthode norvégienne, Bakken : 0,4 à 0,8 mmol sous le seuil). Une allure qu'il doit pouvoir répéter le lendemain. Les blocs LONGS s'y tiennent ; seules les fractions COURTES touchent le seuil réel. Beaucoup de volume sous-seuil DÉPLACE le seuil ; peu de volume AU seuil ne fait que fatiguer.\n` : ""}${thresholdPace ? `- 🎯 ALLURE SEUIL **MESURÉE** : ${thresholdPace}/km (vitesse critique ${(csMs! * 3.6).toFixed(2)} km/h, ajustée sur ses efforts réels)${pc?.dPrime ? ` · réserve anaérobie D' ${pc.dPrime} m` : ""}. UTILISE CETTE VALEUR pour les séances au seuil plutôt qu'un pourcentage de VMA estimée.\n` : ""}${qeLine ? `- 🔍 EXÉCUTION DE SA DERNIÈRE QUALITÉ : ${qeLine}${faded ? " → il a DÉCROCHÉ : la prochaine série doit être plus courte ou plus lente, pas plus dure. Ne répète pas la même erreur." : fade != null && fade <= -6 ? " → il a ACCÉLÉRÉ en fin de série : il en avait sous le pied, tu peux durcir (allure ou volume, pas les deux)." : ""}\n` : ""}- Repères physio : seuil lactique ~${thresholdPace ?? (vma ? paceAt(86) : "?")}/km · vitesse critique ~${vma ? r1(vma * 0.90) : "?"} km/h (${vma ? paceAt(90) : "?"}/km) · VO2max estimé ~${vo2 ?? "?"} ml/kg/min
 
 FORME & RÉCUPÉRATION (aujourd'hui)
-- État physiologique : ${state}
-- VFC : ${hrvLatest ?? "?"} ms (base 14j ${hrvBase ?? "?"} ms → ${hrvTrend})
+- État physiologique (dernière VFC face à SA base, zone normale ± 6 %) : ${state}
+- VFC (${precisionMetrique(metriqueVfc)}) : ${hrvLatest ?? "?"} ms (base 14j ${hrvBase ?? "?"} ms → ${hrvTrend})
 - Sommeil : ${freshSleep ? `${freshSleep.sleep_score ?? "?"}/100 cette nuit${lastSleepMin ? ` (${Math.floor(lastSleepMin / 60)}h${String(lastSleepMin % 60).padStart(2, "0")})` : ""}` : "montre non portée la nuit dernière (donnée ignorée)"} · moyenne 7j ${sleepAvg ?? "?"}/100
 
 CHARGE D'ENTRAÎNEMENT

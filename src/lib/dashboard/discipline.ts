@@ -7,6 +7,7 @@
  * d'un module « use client » — d'où ce module neutre.
  */
 import type { HRVData, Workout } from "@/types";
+import { ZONE_NORMALE_VFC } from "@/lib/health/vfc";
 
 export const DISCIPLINE_CONFIG = {
   weights: { precision: 0.4, consistency: 0.4, recovery: 0.2 }, // somme = 1
@@ -26,7 +27,7 @@ export type EtatDuJour = "aucun" | "top" | "repos" | "correct";
 
 export function etatDuJour(hrvDelta: number | null, hrvBaseline: number | null, sleepScore: number | null): EtatDuJour {
   const sig: number[] = [];
-  if (hrvDelta != null && hrvBaseline) sig.push(hrvDelta >= 0 ? 1 : hrvDelta / hrvBaseline >= -0.06 ? 0 : -1);
+  if (hrvDelta != null && hrvBaseline) sig.push(hrvDelta >= 0 ? 1 : hrvDelta / hrvBaseline >= -ZONE_NORMALE_VFC ? 0 : -1);
   if (sleepScore != null) sig.push(sleepScore >= 75 ? 1 : sleepScore >= 55 ? 0 : -1);
   if (!sig.length) return "aucun";
   const avg = sig.reduce((a, b) => a + b, 0) / sig.length;
@@ -42,6 +43,17 @@ export function statsVfc(hrv: readonly Pick<HRVData, "date" | "hrv_ms">[], maint
   const serie = hrv.slice(0, 14).map((h) => h.hrv_ms).filter((v): v is number => v != null);
   const base = serie.length ? Math.round(serie.reduce((a, b) => a + b, 0) / serie.length) : null;
   return { dernier, jours, fraiche: jours != null && jours <= 2, base, ecart: dernier != null && base != null ? dernier - base : null, n: serie.length };
+}
+
+/**
+ * L'état physiologique qui décide de la séance-clé et du score discipline. `hrv` est une
+ * série passée par `serieVfc` : l'état y est RELATIF à la base de l'athlète. Il ne compte
+ * que si la mesure est fraîche (2 jours) — la même règle que l'état du jour : une
+ * « récupération » vieille d'une semaine ne doit pas imposer un footing aujourd'hui.
+ * Partagé par la carte et la fiche, qui ne peuvent pas annoncer deux scores différents.
+ */
+export function etatPhysiologique(hrv: readonly Pick<HRVData, "date" | "hrv_ms" | "physiological_state">[], maintenant = Date.now()): string {
+  return (statsVfc(hrv, maintenant).fraiche ? hrv[0]?.physiological_state : null) ?? "optimal";
 }
 
 export function computeDiscipline(
@@ -72,7 +84,8 @@ export function computeDiscipline(
     precision = recent.length ? consistency : 0;                        // pas assez d'historique
   }
 
-  // Récupération — données réelles : sommeil + tendance VFC (RMSSD du jour vs base 14 j).
+  // Récupération — données réelles : sommeil + tendance VFC (mesure du jour vs base 14 j,
+  // dans LA mesure de l'athlète : rMSSD, ou SDNN pour une Apple Watch — voir serieVfc).
   const signals: number[] = [];
   if (sleep?.sleep_score != null) signals.push(sleep.sleep_score);
   const hrvVals = hrv.slice(0, 14).map(h => h.hrv_ms).filter((v): v is number => v != null);

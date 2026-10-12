@@ -7,6 +7,7 @@ import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 import { prochaineCourse } from "@/lib/coach/prochaineCourse";
 import { courseDatee, echeance, enteteTemps } from "@/lib/ai/reperesTemps";
+import { COLONNES_VFC, precisionMetrique, serieVfc } from "@/lib/health/vfc";
 
 type Msg = { role: "user" | "model"; text: string };
 
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
     supabase.from("profiles").select("full_name,age,gender,weight_kg,height_cm").eq("id", user.id).single(),
     supabase.from("performance_baselines").select("vma_kmh,max_hr,resting_hr").eq("user_id", user.id).order("tested_at", { ascending: false }).limit(1).single(),
     supabase.from("workouts").select("title,type,distance_km,elevation_gain_m,avg_hr,avg_cadence_spm,date").eq("user_id", user.id).order("date", { ascending: false }).limit(40),
-    supabase.from("hrv_data").select("hrv_ms,date").eq("user_id", user.id).order("date", { ascending: false }).limit(14),
+    supabase.from("hrv_data").select(COLONNES_VFC).eq("user_id", user.id).order("date", { ascending: false }).limit(14),
     supabase.from("sleep_data").select("total_sleep_min,sleep_score").eq("user_id", user.id).order("date", { ascending: false }).limit(1).single(),
     supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "planned_race").order("created_at", { ascending: false }).limit(20),
     supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "race_objective").maybeSingle(),
@@ -54,7 +55,9 @@ export async function POST(req: Request) {
   const elevWeek = Math.round(workouts.filter((w) => now - new Date(w.date).getTime() <= 7 * 86400000).reduce((s, w) => s + num(w.elevation_gain_m), 0));
   const cadVals = workouts.slice(0, 12).map((w) => num(w.avg_cadence_spm)).filter((x) => x > 0);
   const cadence = cadVals.length ? Math.round(cadVals.reduce((a, b) => a + b, 0) / cadVals.length) : null;
-  const hrvVals = ((hrvRes.data ?? []) as { hrv_ms: number | null }[]).map((h) => h.hrv_ms).filter((v): v is number => v != null);
+  // UNE seule mesure de VFC (rMSSD, ou SDNN d'Apple Watch) — lib/health/vfc.
+  const { metrique: metriqueVfc, lignes: lignesVfc } = serieVfc((hrvRes.data ?? []) as { date: string; rmssd: number | null; sdnn: number | null }[]);
+  const hrvVals = lignesVfc.map((h) => h.hrv_ms);
   const hrvLatest = hrvVals[0] ?? null;
   const hrvBase = hrvVals.length >= 3 ? Math.round(hrvVals.reduce((a, b) => a + b, 0) / hrvVals.length) : null;
   const sleep = sleepRes.data;
@@ -100,7 +103,7 @@ DOSSIER DE L'ATHLÈTE (personnalise chaque réponse avec — sans le réciter) :
 - ${profile?.age ?? "?"} ans${profile?.gender ? ` · ${profile.gender}` : ""}${num(profile?.weight_kg) ? ` · ${num(profile?.weight_kg)} kg` : ""}${num(profile?.height_cm) ? ` · ${num(profile?.height_cm)} cm` : ""}
 - VMA ${baseline?.vma_kmh ?? "non renseignée"}${baseline?.vma_kmh ? " km/h" : ""}${baseline?.max_hr ? ` · FC max ${baseline.max_hr}` : ""}${baseline?.resting_hr ? ` · FC repos ${baseline.resting_hr}` : ""}
 - Charge : ${weekKm.toFixed(0)} km et ${sessions7} séance(s) sur 7 j (moy. 4 sem. : ${avg4wk.toFixed(0)} km/sem → rampe ${rampPct > 0 ? "+" : ""}${rampPct} %${rampPct > 10 ? " ⚠️ au-dessus des +10 %/sem recommandés" : ""}) · ${elevWeek} m D+ /7 j${cadence ? `\n- Cadence moyenne récente : ${cadence} spm` : ""}
-- Récupération : ${sleep ? `sommeil ${Math.round(num(sleep.total_sleep_min) / 60)} h (score ${sleep.sleep_score ?? "?"}/100)` : "n/c"}${hrvLatest != null ? ` · VFC ${hrvLatest} ms${hrvBase ? ` (base ${hrvBase} → ${hrvLatest < hrvBase * 0.92 ? "basse : fatigue probable" : "normale"})` : ""}` : ""}
+- Récupération : ${sleep ? `sommeil ${Math.round(num(sleep.total_sleep_min) / 60)} h (score ${sleep.sleep_score ?? "?"}/100)` : "n/c"}${hrvLatest != null ? ` · VFC (${precisionMetrique(metriqueVfc)}) ${hrvLatest} ms${hrvBase ? ` (base ${hrvBase} → ${hrvLatest < hrvBase * 0.92 ? "basse : fatigue probable" : "normale"})` : ""}` : ""}
 ${lastSessions ? `- Dernières séances : ${lastSessions}` : ""}${nextRace ? `\n- Prochaine course : ${courseDatee(`${nextRace.name}${nextRace.distanceKm ? ` (${nextRace.distanceKm} km)` : ""}`, nextRace.date, todayStr)}` : ""}${obj?.race ? `\n- OBJECTIF déclaré : ${obj.race}${obj.distanceKm ? ` (${obj.distanceKm} km)` : ""}${obj.raceDate ? `, ${echeance(obj.raceDate, todayStr)}` : ""}${obj.targetTime ? ` en ${obj.targetTime}` : ""}${obj.targetPace ? ` (${obj.targetPace})` : ""} — oriente tes conseils vers cet objectif` : ""}
 
 PLAN DU COACH HUMAIN (l'athlète est suivi par un coach réel via l'app — tu es son BRAS DROIT : tes conseils S'ALIGNENT sur son plan, tu expliques et renforces ses choix, tu ne le contredis JAMAIS. Pour modifier le plan → renvoie vers l'onglet Messagerie) :

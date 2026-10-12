@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { COLONNES_VFC, serieVfc } from "@/lib/health/vfc";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
@@ -22,17 +23,21 @@ export async function POST(req: Request) {
     .toISOString()
     .split("T")[0];
 
+  // La VFC est lue trois semaines plus tôt : l'état se juge face aux 14 dernières mesures,
+  // qui n'existeraient pas en début de semaine (lib/health/vfc).
+  const debutBaseVfc = new Date(new Date(week_start).getTime() - 21 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
   const [profileRes, workoutsRes, hrvRes, sleepRes, baselineRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user_id).single(),
     supabase.from("workouts").select("*").eq("user_id", user_id).gte("date", week_start).lte("date", weekEnd),
-    supabase.from("hrv_data").select("*").eq("user_id", user_id).gte("date", week_start).lte("date", weekEnd),
+    supabase.from("hrv_data").select(COLONNES_VFC).eq("user_id", user_id).gte("date", debutBaseVfc).lte("date", weekEnd),
     supabase.from("sleep_data").select("*").eq("user_id", user_id).gte("date", week_start).lte("date", weekEnd),
     supabase.from("performance_baselines").select("*").eq("user_id", user_id).order("tested_at", { ascending: false }).limit(1).single(),
   ]);
 
   const profile = profileRes.data;
   const workouts = workoutsRes.data ?? [];
-  const hrv = hrvRes.data ?? [];
+  const serieHrv = serieVfc((hrvRes.data ?? []) as { date: string; rmssd: number | null; sdnn: number | null }[]);
+  const hrv = serieHrv.lignes.filter((h) => h.date >= week_start);
   const sleep = sleepRes.data ?? [];
   const baseline = baselineRes.data;
 
@@ -61,6 +66,7 @@ export async function POST(req: Request) {
       ground_contact: w.ground_contact_time_ms,
     })),
     hrv: hrv.map((h) => ({ date: h.date, hrv_ms: h.hrv_ms, state: h.physiological_state })),
+    hrv_mesure: serieHrv.metrique,
     sleep: sleep.map((s) => ({
       date: s.date,
       total_min: s.total_sleep_min,

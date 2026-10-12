@@ -24,7 +24,8 @@ import { ObjectiveCard, type Objective } from "@/components/dashboard/ObjectiveC
 import { cleanActivityName } from "@/lib/utils/activityName";
 import { isRun } from "@/lib/intervals/sport";
 import { computeHrZones } from "@/lib/dashboard/zones";
-import { computeDiscipline, etatDuJour, statsVfc } from "@/lib/dashboard/discipline";
+import { computeDiscipline, etatDuJour, etatPhysiologique, statsVfc } from "@/lib/dashboard/discipline";
+import type { MetriqueVfc } from "@/lib/health/vfc";
 import { computeWeeklyTrend } from "@/lib/dashboard/semaines";
 import { dansFenetre, ageJours } from "@/lib/dashboard/fenetre";
 import { computeForme, socleDesSeances } from "@/lib/dashboard/forme";
@@ -44,7 +45,10 @@ type TFn = (k: string, params?: Record<string, string | number>) => string;
 
 interface Props {
   profile: UserProfile | null;
+  /** Série passée par `serieVfc` : une seule mesure, état relatif à la base de l'athlète. */
   hrv: HRVData[];
+  /** La mesure de cette série — la SDNN (Apple Watch par défaut) est signalée sur la carte. */
+  metriqueVfc?: MetriqueVfc | null;
   workouts: Workout[];
   plan: Record<string, unknown> | null;
   league: Record<string, unknown> | null;
@@ -177,9 +181,11 @@ export type { SourceVma } from "@/lib/dashboard/vmaAffichee";
 import type { SourceVma } from "@/lib/dashboard/vmaAffichee";
 import type { CleIndicateur } from "@/lib/indicateurs/types";
 
-export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkouts, recordsDeclares = [], premiereSeance = null, chargeHistory, sleep, coachSession, ressenti, objective, currentVma, sourceVma = null, loadRisk, newMembersWeek, streak, acces, donneesIncompletes, jourAujourdhui }: Props) {
+export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, plan, league, prWorkouts, recordsDeclares = [], premiereSeance = null, chargeHistory, sleep, coachSession, ressenti, objective, currentVma, sourceVma = null, loadRisk, newMembersWeek, streak, acces, donneesIncompletes, jourAujourdhui }: Props) {
   const { t, lang } = useT();
-  const state = hrv[0]?.physiological_state ?? "optimal";
+  // État RELATIF à la base de l'athlète, et seulement si la mesure est fraîche — même
+  // règle que la fiche détaillée (`etatPhysiologique`), qui ne peut pas dire autre chose.
+  const state = etatPhysiologique(hrv);
 
   // Sommeil : on n'exploite/affiche que des données RÉCENTES (montre réellement portée).
   const freshSleep = sleep && sleep.date && Date.now() - new Date(sleep.date + "T00:00:00").getTime() <= 2 * 86400000 ? sleep : null;
@@ -916,6 +922,12 @@ export function BentoDashboard({ profile, hrv, workouts, plan, league, prWorkout
                 <div className="mt-1 text-[11px] font-medium text-amber-600">
                   {t(hrvJours > 1 ? "dash.hrv.stale" : "dash.hrv.stale1", { n: hrvJours })}
                 </div>
+              )}
+              {/* La SDNN d'une Apple Watch n'est pas une rMSSD : pas la même échelle, elle ne
+                  se compare qu'à elle-même. On nomme la mesure, et le réglage qui donne la
+                  VFC de nuit. */}
+              {metriqueVfc === "sdnn" && hrvLatest != null && (
+                <div className="mt-1 max-w-[16rem] text-[11px] leading-snug text-zinc-400">{t("dash.hrv.sdnn")}</div>
               )}
             </div>
             <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-400"><Heart className="h-4 w-4 animate-heartbeat" /></span>

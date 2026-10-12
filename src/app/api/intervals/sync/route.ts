@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { buildWorkoutRow } from "@/lib/intervals/workoutRow";
+import { ligneSommeil, ligneVfc, type IcuWellness } from "@/lib/intervals/wellnessRow";
 import { roleOf } from "@/lib/intervals/sport";
 import { identifiantsDe } from "@/lib/intervals/identifiants";
 
@@ -160,35 +161,19 @@ export async function GET(req: Request) {
   // ── Sync wellness → 2 batch upserts (HRV + sleep) ──────────
   const validWellness = wellness.filter(d => d.id);
 
+  // Lignes construites par `lib/intervals/wellnessRow`, PARTAGÉ avec le webhook et le
+  // cron. ⚠️ Ces écritures partent en LOT : avec l'ancien filtre `!== undefined`, un
+  // seul jour sans montre (`hrv: null`, `sleepSecs: null`) glissait une ligne interdite
+  // dans le lot et faisait refuser TOUTE la période. Un jour sans mesure ne produit plus
+  // de ligne, et un jour avec la seule SDNN (Apple Watch) n'est plus jeté.
   const hrvRows = validWellness
-    .filter(d => d.hrv !== undefined)
-    .map(d => ({
-      user_id: user.id, date: d.id,
-      hrv_ms: d.hrv!, rmssd: d.hrv!,
-      sdnn: d.hrvSDNN ?? null,
-      physiological_state: derivePhysiologicalState(d.hrv!, d.hrvSDNN),
-      notes: "Synced from Intervals.icu",
-    }));
+    .map(d => ligneVfc(user.id, d))
+    .filter((l): l is NonNullable<typeof l> => l != null)
+    .map(l => ({ ...l, notes: "Synced from Intervals.icu" }));
 
   const sleepRows = validWellness
-    .filter(d => d.sleepSecs !== undefined)
-    .map(d => ({
-      user_id: user.id, date: d.id,
-      total_sleep_min: Math.round(d.sleepSecs! / 60),
-      // Ces champs sont ABSENTS de l'API wellness d'intervals.icu pour la plupart des
-      // comptes. Les forcer à 0 fabriquait de la donnée : le coach lisait « 0 % de
-      // sommeil profond » et y voyait une nuit catastrophique, alors qu'il s'agissait
-      // simplement d'une mesure indisponible. Absent doit rester NULL.
-      deep_sleep_min: d.deepSleepSecs != null ? Math.round(d.deepSleepSecs / 60) : null,
-      light_sleep_min: d.lightSleepSecs != null ? Math.round(d.lightSleepSecs / 60) : null,
-      rem_sleep_min: d.remSleepSecs != null ? Math.round(d.remSleepSecs / 60) : null,
-      sleep_score: d.sleepScore ?? null,
-      body_battery_start: d.bbMax ?? null,
-      body_battery_end: d.bb ?? null,
-      respiration_rate: d.avgRespiration ?? null,
-      spo2_avg: d.avgSpo2 ?? null,
-      source: "intervals_icu",
-    }));
+    .map(d => ligneSommeil(user.id, d))
+    .filter((l): l is NonNullable<typeof l> => l != null);
 
   // Métriques RICHES Garmin (montre) → profil. ⚠️ Le wellness le PLUS RÉCENT est souvent incomplet
   // (la FC repos / VFC se mesurent la nuit) → pour CHAQUE champ on prend la dernière valeur NON nulle.
@@ -229,13 +214,22 @@ export async function GET(req: Request) {
   const hasGarminMetrics = [garminMetrics.vo2max, garminMetrics.restingHR, garminMetrics.lthr, garminMetrics.ctl].some(v => v != null);
 
   await Promise.all([
+    // ⚠️ LE RÉSULTAT EST LU. `.then(() => synced.hrv = n)` comptait le lot comme écrit
+    // QUEL QUE SOIT le retour : l'écran annonçait « 3 VFC » pendant que la base refusait
+    // les trois. Un refus part maintenant dans `errors`, et le compteur reste à 0.
     hrvRows.length > 0
       ? supabase.from("hrv_data").upsert(hrvRows, { onConflict: "user_id,date" })
-          .then(() => { synced.hrv = hrvRows.length; })
+          .then(({ error }) => {
+            if (error) syncErrors.push(`VFC : ${error.code ?? "?"} ${error.message}`);
+            else synced.hrv = hrvRows.length;
+          })
       : Promise.resolve(),
     sleepRows.length > 0
       ? supabase.from("sleep_data").upsert(sleepRows, { onConflict: "user_id,date" })
-          .then(() => { synced.sleep = sleepRows.length; })
+          .then(({ error }) => {
+            if (error) syncErrors.push(`Sommeil : ${error.code ?? "?"} ${error.message}`);
+            else synced.sleep = sleepRows.length;
+          })
       : Promise.resolve(),
     // best-effort (colonnes garmin_vo2max + garmin_metrics ajoutées via SQL) — n'empêche pas la sync.
     latestVo2 ? supabase.from("profiles").update({ garmin_vo2max: latestVo2 }).eq("id", user.id) : Promise.resolve(),
@@ -325,11 +319,11 @@ export async function GET(req: Request) {
 
 // ─── Helpers ────────────────────────────────────────────────
 
-function derivePhysiologicalState(hrv: number, sdnn?: number): "recovery" | "optimal" | "competition" {
-  if (hrv < 50 || (sdnn !== undefined && sdnn < 40)) return "recovery";
-  if (hrv > 80) return "competition";
-  return "optimal";
-}
+// L'état physiologique ne se tranche plus ici. `derivePhysiologicalState` le décidait sur
+// des seuils ABSOLUS (< 50 ms ou SDNN < 40 → récupération, > 80 → compétition) — et une
+// SDNN à `null` passait pour « < 40 » : 14 des 16 jours « récupération » de Cyprien
+// dépassaient 50 ms, jusqu'à 106. L'état se calcule à la lecture, face à la base de
+// l'athlète dans SA mesure : voir `lib/health/vfc`.
 
 // Le rôle de la séance vient de `lib/intervals/sport` — table UNIQUE (`roleOf`).
 
@@ -374,22 +368,12 @@ interface IntervalsActivity {
   pace_z5?: number;
 }
 
-interface IntervalsWellness {
+// `| null` : un jour sans mesure arrive avec le champ À null, pas sans champ.
+type IntervalsWellness = IcuWellness & {
   id: string;
-  hrv?: number;
-  hrvSDNN?: number;
-  sleepSecs?: number;
-  deepSleepSecs?: number;
-  lightSleepSecs?: number;
-  remSleepSecs?: number;
-  sleepScore?: number;
-  bb?: number;
-  bbMax?: number;
-  avgRespiration?: number;
-  avgSpo2?: number;
-  vo2max?: number;
-  restingHR?: number;
-  ctl?: number;
-  atl?: number;
-  rampRate?: number;
-}
+  vo2max?: number | null;
+  restingHR?: number | null;
+  ctl?: number | null;
+  atl?: number | null;
+  rampRate?: number | null;
+};

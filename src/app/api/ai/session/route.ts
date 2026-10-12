@@ -5,6 +5,7 @@ import { exigeAcces } from "@/lib/billing/guard";
 import { COLONNES_ACCES, profilPeut } from "@/lib/billing/access";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildAthleteContext, COACH_SYSTEM } from "@/lib/ai/coachContext";
+import { COLONNES_VFC, serieVfc } from "@/lib/health/vfc";
 import { generateContent } from "@/lib/ai/gemini";
 import {
   SESSION_CACHE_TYPE, PROFILE_FINGERPRINT_COLUMNS, fingerprint, isCacheUsable, serverDay,
@@ -42,7 +43,9 @@ export async function POST() {
     // moins. Une simple RETOUCHE d'une séance déjà là (même date, même compte) ne périme
     // rien — c'est assumé : elle ne change pas la charge sur laquelle se cale le conseil.
     supabase.from("workouts").select("date", { count: "exact" }).eq("user_id", user.id).order("date", { ascending: false }).limit(1),
-    supabase.from("hrv_data").select("date,hrv_ms").eq("user_id", user.id).order("date", { ascending: false }).limit(1).maybeSingle(),
+    // 14 lignes et non une : la DERNIÈRE mesure n'a de sens que dans LA mesure de l'athlète
+    // (rMSSD, ou SDNN d'Apple Watch) — celle que lira le coach (lib/health/vfc).
+    supabase.from("hrv_data").select(COLONNES_VFC).eq("user_id", user.id).order("date", { ascending: false }).limit(14),
     supabase.from("sleep_data").select("date,sleep_score").eq("user_id", user.id).order("date", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "race_objective").maybeSingle(),
     supabase.from("performance_baselines").select("tested_at").eq("user_id", user.id).order("tested_at", { ascending: false }).limit(1).maybeSingle(),
@@ -59,12 +62,13 @@ export async function POST() {
   const acces = accesRow.data as Parameters<typeof profilPeut>[0];
   const cached = (cacheRow.data?.[0] ?? null) as { id?: string; data?: unknown } | null;
 
+  const derniereVfc = serieVfc((hrvRow.data ?? []) as { date: string; rmssd: number | null; sdnn: number | null }[]).lignes[0] ?? null;
   const signals: SessionSignals = {
     day,
     lastWorkoutDate: (workoutRow.data?.[0] as { date?: string } | undefined)?.date ?? null,
     workoutCount: workoutRow.count ?? 0,
-    lastHrvDate: (hrvRow.data as { date?: string } | null)?.date ?? null,
-    lastHrvMs: (hrvRow.data as { hrv_ms?: number } | null)?.hrv_ms ?? null,
+    lastHrvDate: derniereVfc?.date ?? null,
+    lastHrvMs: derniereVfc?.hrv_ms ?? null,
     lastSleepDate: (sleepRow.data as { date?: string } | null)?.date ?? null,
     lastSleepScore: (sleepRow.data as { sleep_score?: number } | null)?.sleep_score ?? null,
     objective: (objectiveRow.data as { data?: unknown } | null)?.data ?? null,

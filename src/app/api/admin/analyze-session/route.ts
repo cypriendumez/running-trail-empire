@@ -8,6 +8,7 @@ import { HEALTH_CONDITIONS, INJURY_ZONES, healthCoachLines } from "@/data/health
 import { terrainCoachBlock } from "@/data/terrainCatalog";
 import { estAdmin } from "@/lib/admin/acces";
 import { identifiantsDe } from "@/lib/intervals/identifiants";
+import { COLONNES_VFC, precisionMetrique, serieVfc } from "@/lib/health/vfc";
 
 const BASE = "https://intervals.icu/api/v1";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -99,14 +100,17 @@ export async function POST(req: Request) {
       fetch(`${BASE}/activity/${id}/streams?types=time,heartrate,velocity_smooth,watts`, { headers: auth, signal: AbortSignal.timeout(25000) }).catch(() => null),
       admin.from("performance_baselines").select("vma_kmh,max_hr,resting_hr").eq("user_id", user_id).order("tested_at", { ascending: false }).limit(1).single(),
       admin.from("workouts").select("date,title,type,distance_km,duration_seconds,tss,avg_hr,max_hr").eq("user_id", user_id).order("date", { ascending: false }).limit(20),
-      admin.from("hrv_data").select("hrv_ms,physiological_state").eq("user_id", user_id).order("date", { ascending: false }).limit(1).single(),
+      admin.from("hrv_data").select(COLONNES_VFC).eq("user_id", user_id).order("date", { ascending: false }).limit(14),
       admin.from("sleep_data").select("sleep_score,total_sleep_min").eq("user_id", user_id).order("date", { ascending: false }).limit(1).single(),
       admin.from("training_plans").select("goal:name, race_date").eq("user_id", user_id).eq("is_active", true).single(),
       admin.from("notifications").select("data").eq("user_id", user_id).eq("type", "race_objective").maybeSingle(),
     ]);
     const a: Record<string, unknown> = fullRes && fullRes.ok ? await fullRes.json() : act;
     const baseline = baseRes.data;
-    const hrv = hrvRes.data, sleep = sleepRes.data, plan = planRes.data;
+    // La dernière VFC dans LA mesure de l'athlète, état face à SA base (lib/health/vfc).
+    const serieHrv = serieVfc((hrvRes.data ?? []) as { date: string; rmssd: number | null; sdnn: number | null }[]);
+    const hrv = serieHrv.lignes[0] ?? null;
+    const sleep = sleepRes.data, plan = planRes.data;
     const recent = (recentRes.data ?? []).filter((w) => new Date(w.date).getTime() > Date.now() - 14 * 86400000);
     const weekKm = recent.filter((w) => new Date(w.date).getTime() > Date.now() - 7 * 86400000).reduce((s, w) => s + (w.distance_km ?? 0), 0);
     const tss14 = recent.reduce((s, w) => s + (w.tss ?? 0), 0);
@@ -196,7 +200,7 @@ TOURS (un par un) :
 CONTEXTE ATHLÈTE : VMA ${baseline?.vma_kmh ?? "?"} km/h · FC max ${baseline?.max_hr ?? "?"} · FC repos ${baseline?.resting_hr ?? "?"} · volume 7j ${weekKm.toFixed(0)} km · charge 14j ${tss14.toFixed(0)} TSS
 PROFIL : ${p?.age ?? "?"} ans · ${p?.gender === "female" ? "femme" : p?.gender === "male" ? "homme" : "sexe ?"} · ${profExp} · terrain ${profTerrain}${profElev ? ` · ${profElev}` : ""}${terrBlock.paceMeaningless ? "  ⚠️ il court sur une surface où l'allure /km n'est PAS comparable au bitume (sable : +45 s à 1 min 30/km ; montagne ; neige) : juge l'effort à la FC, pas à l'allure." : ""}
 SANTÉ (à prendre en compte dans la lecture de la séance) : ${profHealth}
-RÉCUPÉRATION (dernier relevé) : VFC ${hrv?.hrv_ms ?? "?"} ms${hrv?.physiological_state ? ` · état ${hrv.physiological_state}` : ""} · sommeil ${sleep?.sleep_score ?? "?"}/100${sleep?.total_sleep_min ? ` (${Math.round(sleep.total_sleep_min / 60)}h)` : ""}
+RÉCUPÉRATION (dernier relevé) : VFC ${hrv?.hrv_ms ?? "?"} ms${hrv ? ` (${precisionMetrique(serieHrv.metrique)}) · état ${hrv.physiological_state} face à sa base` : ""} · sommeil ${sleep?.sleep_score ?? "?"}/100${sleep?.total_sleep_min ? ` (${Math.round(sleep.total_sleep_min / 60)}h)` : ""}
 OBJECTIF DE COURSE : ${objLine}
 REPOS : dernière séance il y a ${daysSinceLast ?? "?"} j · ${restDays7} j sans courir sur 7${daysSinceLast != null && daysSinceLast >= 3 ? " ⚠️ reprise après coupure : redémarre progressivement" : ""}
 HISTORIQUE 14 DERNIERS JOURS :

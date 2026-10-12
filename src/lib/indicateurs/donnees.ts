@@ -12,6 +12,7 @@ import type { HRVData, Workout } from "@/types";
 import type { DonneesFiche } from "./fiches";
 import type { SeanceCharge } from "@/lib/dashboard/charge";
 import { vmaAffichee } from "@/lib/dashboard/vmaAffichee";
+import { COLONNES_VFC, serieVfc } from "@/lib/health/vfc";
 
 const decale = (iso: string, n: number) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const PANNE: Record<Lang, string> = {
@@ -27,7 +28,7 @@ export async function chargerDonnees(sb: SupabaseClient, userId: string, lang: L
     sb.from("profiles").select("resting_hr, garmin_vo2max, pace_curve").eq("id", userId).maybeSingle(),
     sb.from("workouts").select("*").eq("user_id", userId).order("date", { ascending: false }).limit(40),
     sb.from("workouts").select("date, sport, distance_km").eq("user_id", userId).gte("date", decale(aujourdhui, -120)).order("date", { ascending: false }).limit(1000),
-    sb.from("hrv_data").select("date, hrv_ms, physiological_state").eq("user_id", userId).order("date", { ascending: false }).limit(60),
+    sb.from("hrv_data").select(COLONNES_VFC).eq("user_id", userId).order("date", { ascending: false }).limit(60),
     sb.from("sleep_data").select("date, sleep_score, total_sleep_min").eq("user_id", userId).order("date", { ascending: false }).limit(14),
     sb.from("workouts").select("date, tss, type, duration_seconds").eq("user_id", userId).gte("date", decale(aujourdhui, -365)).order("date", { ascending: false }).limit(1000),
     sb.from("performance_baselines").select("vma_kmh, tested_at").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).maybeSingle(),
@@ -39,11 +40,15 @@ export async function chargerDonnees(sb: SupabaseClient, userId: string, lang: L
   const ws = (seances.data ?? []) as Workout[];
   const p = profil.data as { resting_hr?: number | null; garmin_vo2max?: number | null; pace_curve?: { best?: { m: number; sec: number }[] } | null } | null;
   const o = (obj.data?.data ?? null) as DonneesFiche["objectif"];
+  // UNE seule mesure de VFC (rMSSD, ou SDNN d'Apple Watch), état face à SA base :
+  // exactement la série que reçoit la carte du tableau de bord (lib/health/vfc).
+  const serie = serieVfc((vfc.data ?? []) as Pick<HRVData, "date" | "rmssd" | "sdnn">[]);
   return {
     lang, aujourdhui,
     seances: ws,
     historique: (historique.data ?? []) as Workout[],
-    vfc: (vfc.data ?? []) as Pick<HRVData, "date" | "hrv_ms" | "physiological_state">[],
+    vfc: serie.lignes,
+    metriqueVfc: serie.metrique,
     sommeil: (sommeil.data ?? []) as DonneesFiche["sommeil"],
     charge: (charge.data ?? []) as SeanceCharge[],
     vma: vmaAffichee({ seances: ws, baseline: base.data as { vma_kmh?: number | null; tested_at?: string | null } | null, profil: p }),
