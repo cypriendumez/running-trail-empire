@@ -191,13 +191,17 @@ export async function GET(req: Request) {
                 };
                 const ins = await sb.from("races").insert(ligneRace);
                 let e = ins.error;
+                let statut = ins.status;
                 // ⚠️ UN « GATEWAY TIMEOUT » DE SUPABASE EST PASSAGER, PAS UN REFUS : on
                 // réessaie une fois avant de conclure. Sans ça, un simple hoquet d'infra
                 // sur UNE ligne perdait la distance jusqu'au prochain cycle (~24 jours).
-                if (e && estErreurTransitoire(e.message)) {
+                // On classe sur l'erreur (son code) et le statut, jamais sur `e.message`
+                // seul : un refus dont le texte cite « "503" » passerait pour un hoquet.
+                if (e && estErreurTransitoire(e, statut)) {
                   await new Promise((r) => setTimeout(r, 500));
                   const reessai = await sb.from("races").insert(ligneRace);
                   e = reessai.error;
+                  statut = reessai.status;
                 }
                 // ⚠️ UNE INSERTION REFUSÉE DOIT SE VOIR. Ce `if (!e)` seul a masqué
                 // pendant deux jours que `typePour` rendait des types absents de l'enum
@@ -210,7 +214,7 @@ export async function GET(req: Request) {
                 // comme refus : sinon un hoquet d'infra ferait passer tout le cron « en
                 // échec » alors que presque tout est écrit — une fausse alerte.
                 if (!e) { ajoutees++; if (ajouts.length < 20) ajouts.push({ course: String(c.name), km: d }); }
-                else if (estErreurTransitoire(e.message)) { transitoires++; if (erreurs.length < 5) erreurs.push(`${c.name} ${d} km (${t}) : ${e.message} [passager, réessai au prochain cycle]`); }
+                else if (estErreurTransitoire(e, statut)) { transitoires++; if (erreurs.length < 5) erreurs.push(`${c.name} ${d} km (${t}) : HTTP ${statut} ${e.message} [passager, réessai au prochain cycle]`); }
                 else { refusees++; if (erreurs.length < 5) erreurs.push(`${c.name} ${d} km (${t}) : ${e.message}`); }
               }
             }
