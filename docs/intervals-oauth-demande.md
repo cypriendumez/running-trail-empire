@@ -101,6 +101,13 @@ partent pas pour les activités Strava. URL en https, réglable sur la page de g
   existent sur le serveur.
 - **Tests** : `tests/intervals-oauth.test.ts` (20 tests, 10 mutations toutes détectées).
 
+## ✅ Activée et essayée le 15/10/2026 à 21 h 14
+
+Déploiement `9913ad8` avec les deux variables ; adresse de retour ajoutée par Cyprien sur « Manage App ».
+Essai réel : départ 21:13:54, retour 21:14:30 (303), puis synchro 200. En base, le profil de Cyprien
+(`i564686`) porte un jeton `oauth:` ; vérifié en lecture seule avec ce jeton : compte 200, activités 200,
+bien-être 200, calendrier 200. Aucune ligne au journal d'erreurs.
+
 ## État au 15/10/2026
 
 - Le code OAuth est **en production** depuis le 15/10 (déploiement `1dd3aa0`, fait par une autre session depuis
