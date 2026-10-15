@@ -7,6 +7,10 @@ description: Lancer la vérification complète de Pacevo (tsc + toute la suite d
 
 1. **Préparer l'arbre** (worktree de session sous `.claude/worktrees/`) :
    - `node_modules` absent → lien symbolique vers celui du dépôt principal (ignoré par git) ;
+   - ⚠️ **jamais de `npm ci` ni de `npm install` tant que `node_modules` est un LIEN** : npm vide d'abord le
+     dossier, la suppression suit le lien et vide celui du dépôt principal (constaté le 15/10/2026 : le
+     `node_modules` de main est passé à 0 entrée pendant qu'une autre session travaillait). Pour changer les
+     dépendances d'un worktree : `rm node_modules` (SANS barre finale : retire le lien seul), puis `npm ci` ;
    - `next-env.d.ts` absent (fichier généré, ignoré) → le recréer, sinon `tsc` échoue en TS2307 sur les images :
      ```
      /// <reference types="next" />

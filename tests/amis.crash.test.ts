@@ -20,7 +20,8 @@
  *   npx tsx tests/amis.crash.test.ts
  */
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { execSync } from "node:child_process";
 import { estUuid, idDepuisLien, lienAmi, normaliserEmails, cheminSur, CONTACTS_MAX } from "../src/lib/social/amisLiens";
 import { NAV_GROUPES } from "../src/components/layout/navigation";
 
@@ -184,9 +185,25 @@ const ID = "6e390574-3290-4882-8cd5-e3e2f8924ea1";
   });
 
   // ── Crash-tests HTTP réels, si un serveur de développement tourne ────────────
+  // ⚠️ LE SERVEUR DE :3000 N'EST PAS FORCÉMENT LE NÔTRE (15/10/2026). Plusieurs sessions travaillent en
+  // parallèle dans .claude/worktrees/ : un `next dev` lancé depuis une AUTRE arborescence répondait 500
+  // (son environnement), ces tests rougissaient, et `npm run deploie` refusait un code sain — la
+  // production, même code, répondait 200/401. On ne teste donc que le serveur qui tourne depuis CE
+  // dossier ; s'il est impossible de le savoir (pas de lsof), on teste comme avant.
+  const dossierDuServeur = (): string | null => {
+    try {
+      const pid = execSync("lsof -nP -t -iTCP:3000 -sTCP:LISTEN", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim().split("\n")[0];
+      if (!pid) return null;
+      const n = execSync(`lsof -a -p ${pid} -d cwd -Fn`, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\n").find((l) => l.startsWith("n"));
+      return n ? realpathSync(n.slice(1)) : null;
+    } catch { return null; }
+  };
   const vivant = await fetch("http://localhost:3000/robots.txt", { signal: AbortSignal.timeout(1500) }).then((r) => r.ok).catch(() => false);
+  const dossier = vivant ? dossierDuServeur() : null;
   if (!vivant) {
     console.log("  (serveur local absent : crash-tests HTTP ignorés)");
+  } else if (dossier && dossier !== realpathSync(process.cwd())) {
+    console.log(`  (le serveur de :3000 tourne depuis ${dossier}, une autre arborescence : crash-tests HTTP ignorés)`);
   } else {
     await test("HTTP : /amis/<junk> et /amis/<uuid inconnu> répondent 200 « introuvable », jamais 500", async () => {
       for (const id of ["pas-un-uuid", "'; drop table--", "00000000-0000-4000-8000-000000000000"]) {
