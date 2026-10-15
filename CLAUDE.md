@@ -17,8 +17,10 @@ Projet de Cyprien. Répondre en **français**.
 - **Rien n'est poussé ni déployé sans l'accord explicite de Cyprien.** `vercel deploy` téléverse le DISQUE, pas ce
   que git suit : jamais depuis un arbre modifié, jamais depuis le dépôt principal quand une autre session y travaille.
 - **Aucune écriture dans la base de production sans accord explicite.** Un changement de schéma = du SQL donné à
-  Cyprien, qui l'exécute dans l'éditeur Supabase (il n'existe aucune RPC `exec_sql`). En local, le serveur MCP
-  `supabase-lecture` est en lecture seule.
+  Cyprien, qui l'exécute dans l'éditeur Supabase (il n'existe aucune RPC `exec_sql`). Le connecteur Supabase de
+  claude.ai a TOUS les droits (rôle `postgres`) : sur le Mac de Cyprien, le garde-fou
+  `~/.claude/hooks/garde-supabase.mjs` bloque ses outils d'écriture et force chaque `execute_sql` en transaction
+  READ ONLY. Ailleurs (routine cloud), aucun filet : la règle seule protège.
 - **Quand la donnée manque, on le dit, on ne la fabrique pas** : jamais de valeur par défaut affichée comme une mesure.
 - Supabase ne lève pas d'exception, il RETOURNE `{ error }` : toute écriture lit son `error` (un `try/catch` seul ne
   rattrape rien).
