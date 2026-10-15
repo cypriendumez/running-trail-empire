@@ -244,6 +244,47 @@ test("la synchronisation signale une VFC ou un sommeil non enregistrés", () => 
     "l'écriture du sommeil ne signale plus son échec");
 });
 
+test("chaque appelant de la synchronisation lit `failures` et le journalise", () => {
+  // ⚠️ LE MÊME DÉFAUT, UN ÉTAGE PLUS HAUT (12/10/2026). La synchro consignait chaque refus
+  // dans `failures` — et ses deux appelants serveur, le webhook intervals.icu et la chaîne
+  // du cron, ne lisaient que `synced` et `error`. Le refus était écrit pour personne.
+  //
+  // ANCRAGE : chaque APPEL, dans tout `src/`, et la région qui le suit jusqu'à l'appel
+  // suivant. Un troisième appelant qui oublierait `failures` rougit ici sans qu'on ait à
+  // penser à l'ajouter ; deux appels dans un même fichier ne se couvrent pas l'un l'autre.
+  const fichiers: string[] = [];
+  (function marche(d: string) {
+    for (const e of readdirSync(d)) {
+      const p = join(d, e);
+      if (statSync(p).isDirectory()) marche(p);
+      else if (/\.(ts|tsx)$/.test(p)) fichiers.push(p);
+    }
+  })("src");
+
+  const sites: string[] = [];
+  const fautes: string[] = [];
+  for (const f of fichiers) {
+    if (f === join("src", "lib", "intervals", "syncUser.ts")) continue; // la définition
+    const src = codeNu(f);
+    const appels = [...src.matchAll(/syncIntervalsForUser\(/g)].map((m) => m.index!);
+    appels.forEach((i, k) => {
+      sites.push(f);
+      const lus = (/const\s*\{([^{}]*)\}\s*=\s*await\s+$/.exec(src.slice(Math.max(0, i - 200), i))?.[1] ?? "")
+        .split(",").map((s) => s.split(":")[0].trim());
+      if (!lus.includes("failures")) { fautes.push(`${f} : \`failures\` n'est pas lu`); return; }
+      const region = src.slice(i, appels[k + 1] ?? src.length);
+      if (!/journaliserRefus\(\s*admin\s*,\s*\{[^}]*\bfailures\b[^}]*\}\s*\)/.test(region)) {
+        fautes.push(`${f} : \`failures\` est lu mais n'est pas journalisé`);
+      }
+    });
+  }
+  // Un balayage qui ne trouve rien passe toujours : les deux appelants connus doivent y être.
+  for (const attendu of [join("src", "app", "api", "webhooks", "intervals", "route.ts"), join("src", "lib", "intervals", "syncAndCoach.ts")]) {
+    assert.ok(sites.includes(attendu), `${attendu} n'appelle plus la synchro, ou le balayage ne le voit plus`);
+  }
+  assert.deepEqual(fautes, [], `des refus d'écriture de la synchro se perdent :\n    ${fautes.join("\n    ")}`);
+});
+
 test("un objectif de course non écrit ne se déclare pas enregistré", () => {
   // ⚠️ LE PIRE N'EST PAS LA PERTE, C'EST LE DOUBLON. L'erreur de lecture n'étant pas
   // lue, `existing` restait indéfini — lu comme « pas encore d'objectif » — et on

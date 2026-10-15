@@ -126,6 +126,33 @@ test("le bruit technique est masqué par défaut, jamais perdu — et un vrai bu
   assert.equal(normaliserMessage("Minified React error #418; visit https://react.dev/errors/418?args[]=text"), "Minified React error #<n>; visit <url>");
 });
 
+test("une ligne écrite par le SERVEUR n'est pas un scan : le panneau la montre", () => {
+  // ⚠️ CONSTATÉ LE 12/10/2026. « Une url qui n'est pas une adresse http est un scan » rangeait
+  // dans le bruit TOUT ce que le serveur journalise sous le nom de sa route ou de son module :
+  // e-mails refusés (« /api/auth/confirmation », « lib/notify/planReady »), repli
+  // d'enregistrement (« /api/workouts/log »), refus d'écriture de la synchro. Masqué par
+  // défaut — précisément ce que ce panneau existe pour montrer.
+  for (const url of ["/api/webhooks/intervals", "/api/cron/sync-all", "/api/auth/confirmation", "/api/workouts/log", "lib/notify/planReady"]) {
+    assert.equal(estBruitDeDev({ url, message: "Écriture refusée à la synchro (VFC) : 23502 null value", user_agent: null, meta: null }), false,
+      `${url} : une ligne du serveur est masquée comme un scan`);
+  }
+  // CONTRE-POIDS : le scan reste du bruit — avec son agent, et sans agent du tout.
+  assert.equal(estBruitDeDev({ url: "u", message: "x", user_agent: "curl/8.6.0", meta: null }), true, "le scan au curl n'est plus masqué");
+  assert.equal(estBruitDeDev({ url: "u", message: "x", user_agent: null, meta: null }), true, "une url quelconque sans agent n'est plus masquée");
+  assert.equal(estBruitDeDev({ url: "api/x", message: "x", user_agent: null, meta: null }), true, "« api/… » sans barre initiale n'est pas une route");
+
+  // Deux passages, deux jours, deux canaux, UNE cause : un seul défaut, ses deux routes listées.
+  const synchro = (p: Partial<LigneErreur>) => ligne({ source: "synchro", user_id: "u1",
+    message: "Écriture refusée à la synchro (VFC) : 23502 null value in column \"hrv_ms\" of relation \"hrv_data\" violates not-null constraint", ...p });
+  const g = regrouperErreurs([
+    synchro({ url: "/api/cron/sync-all", created_at: "2026-10-11T07:37:00Z", meta: { refus: ["VFC du 2026-10-10 : 23502 …"] } }),
+    synchro({ url: "/api/webhooks/intervals", created_at: "2026-10-12T18:40:00Z", meta: { refus: ["VFC du 2026-10-11 : 23502 …"] } }),
+  ]);
+  assert.equal(g.length, 1, "la même cause, deux jours différents, doit faire UN défaut");
+  assert.equal(g[0].occurrences, 2);
+  assert.deepEqual(g[0].pages.map((p) => p.url).sort(), ["/api/cron/sync-all", "/api/webhooks/intervals"]);
+});
+
 test("le faux positif intervals/sync est corrigé : « pas de montre » n'est plus un 503", () => {
   const src = codeNu("src/app/api/intervals/sync/route.ts");
   assert.ok(/if \(!ATHLETE_ID \|\| !API_KEY\)/.test(src), "le garde « pas d'identifiants » a disparu");

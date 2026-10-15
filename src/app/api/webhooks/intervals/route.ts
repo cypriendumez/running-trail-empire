@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { autoCoachForUser } from "@/lib/ai/autoCoach";
 import { syncIntervalsForUser } from "@/lib/intervals/syncUser";
+import { journaliserRefus } from "@/lib/intervals/refusSynchro";
 
 export const runtime = "nodejs";
 
@@ -54,10 +55,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, skipped: "user not found" });
   }
 
-  const { synced, error: syncErr } = await syncIntervalsForUser(admin, {
+  const { synced, error: syncErr, failures } = await syncIntervalsForUser(admin, {
     userId: profile.id, athleteId, apiKey: profile.intervals_api_key, days: 7,
   });
   if (syncErr) return NextResponse.json({ error: syncErr }, { status: 502 });
+  // Les écritures refusées (séance, VFC, sommeil) vont au journal que /admin affiche. La
+  // synchro les consignait ; ce webhook les jetait, et un refus y restait invisible.
+  const { refus } = await journaliserRefus(admin, { userId: profile.id, canal: "webhook", failures });
 
   // Coach AUTONOME INSTANTANÉ : dès qu'intervals notifie une nouvelle séance, on (re)publie
   // la prochaine séance sur le dashboard + la montre, sans aucun délai ni clic.
@@ -66,8 +70,8 @@ export async function POST(req: Request) {
     const r = await autoCoachForUser(admin, { userId: profile.id, athleteId, apiKey: profile.intervals_api_key }).catch(() => null);
     coached = !!r?.processed;
   }
-  console.log(`[webhook/intervals] athlete=${athleteId} → ${synced} activités synced · coach=${coached}`);
-  return NextResponse.json({ ok: true, synced, coached });
+  console.log(`[webhook/intervals] athlete=${athleteId} → ${synced} activités synced · coach=${coached} · ${refus} refus d'écriture`);
+  return NextResponse.json({ ok: true, synced, coached, refus });
 }
 
 // Intervals.icu also sends GET to verify the webhook endpoint is alive

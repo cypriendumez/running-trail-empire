@@ -36,6 +36,8 @@ import {
   DESTINATIONS_MONTRE, montreDe, lectureDe, estAppleWatch,
   metriquesMixtesSupportees, pushIntervalsWorkout, supprimerIntervalsWorkout, buildWorkoutDescription,
 } from "../src/lib/watch/intervals";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { causeDuRefus, estPassager, journaliserRefus } from "../src/lib/intervals/refusSynchro";
 
 const ROOT = join(__dirname, "..");
 let passed = 0;
@@ -629,6 +631,214 @@ test("une montre inconnue reçoit le format qui marche partout", () => {
   assert.equal(metriquesMixtesSupportees("garmin"), false, "la casse ne doit pas décider à la place de la détection");
   assert.equal(metriquesMixtesSupportees("Garmin"), true);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+console.log("\n📒 REFUS D'ÉCRITURE — du webhook et du cron jusqu'au journal de /admin\n");
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// ⚠️ CONSTATÉ LE 12/10/2026 : `syncIntervalsForUser` rend `failures` — chaque séance, VFC ou
+// nuit que la base a refusée —, mais ses deux appelants serveur ne lisaient que `synced` et
+// `error`. Un refus du chemin webhook/cron n'arrivait nulle part.
+
+/** Fait taire la console le temps d'un appel, et rend ce qui y a été écrit. */
+async function enSilence<T>(fn: () => Promise<T>): Promise<{ r: T; sortie: string[] }> {
+  const sortie: string[] = [];
+  const avant = { log: console.log, warn: console.warn, error: console.error };
+  for (const k of ["log", "warn", "error"] as const) console[k] = (...a: unknown[]) => { sortie.push(`${k}: ${a.map(String).join(" ")}`); };
+  try { return { r: await fn(), sortie }; } finally { Object.assign(console, avant); }
+}
+
+type LigneJournal = { user_id: string; source: string; message: string; url: string; meta: { canal: string; total: number; refus: string[] } };
+/** Un client dont seul `error_logs` répond — ce que `journaliserRefus` touche, et rien d'autre. */
+function journalSimule(reponse: () => Promise<{ error: { message: string } | null }>) {
+  const ecrits: { table: string; lignes: LigneJournal[] }[] = [];
+  const admin = { from: (table: string) => ({ insert: async (lignes: LigneJournal[]) => { ecrits.push({ table, lignes }); return reponse(); } }) };
+  return { admin: admin as unknown as SupabaseClient, ecrits };
+}
+
+test("la cause d'un refus se lit sans la date ni le titre — c'est sur elle qu'on regroupe", () => {
+  // Le titre est GOURMAND : Garmin nomme les sorties d'après la ville, et un titre peut
+  // contenir « : » comme « » : ». Le message de la base, lui, n'en contient jamais.
+  assert.deepEqual(causeDuRefus('2026-10-11 « Sortie « longue » : Rouen » : 22P02 invalid input syntax for type smallint: "176.54"'),
+    { quoi: "séance", code: "22P02", cause: '22P02 invalid input syntax for type smallint: "176.54"' });
+  assert.deepEqual(causeDuRefus('VFC du 2026-10-11 : 23502 null value in column "hrv_ms"'),
+    { quoi: "VFC", code: "23502", cause: '23502 null value in column "hrv_ms"' });
+  assert.deepEqual(causeDuRefus('sommeil du 2026-10-11 : 23514 new row for relation "sleep_data" violates check constraint'),
+    { quoi: "sommeil", code: "23514", cause: '23514 new row for relation "sleep_data" violates check constraint' });
+  // Un format inconnu n'est jamais perdu : il devient sa propre cause.
+  assert.equal(causeDuRefus("quelque chose d'inattendu").cause, "quelque chose d'inattendu");
+  assert.equal(causeDuRefus("quelque chose d'inattendu").quoi, "écriture");
+});
+
+test("une erreur rendue par la BASE n'est jamais « passagère », même si elle contient 502", () => {
+  // ⚠️ LE PIÈGE : `estErreurTransitoire` cherche « 502 » sans bornes de mot. La violation de
+  // NOT NULL — celle des jours sans montre — s'écrit 23502 : sans cette garde, elle aurait
+  // été comptée comme une passerelle en panne, et jamais journalisée.
+  const passager = (ligne: string) => estPassager(causeDuRefus(ligne));
+  assert.equal(passager('VFC du 2026-10-11 : 23502 null value in column "hrv_ms"'), false, "23502 pris pour un 502");
+  assert.equal(passager('2026-10-11 « Trail » : 22P02 invalid input syntax for type smallint: "1502.5"'), false, "une valeur refusée prise pour un 502");
+  assert.equal(passager("2026-10-11 « Trail » : PGRST204 Could not find the 'hrr_bpm' column of 'workouts'"), false, "un code PostgREST pris pour un incident");
+  // Ce qui EST passager : sans code de la base (réseau, passerelle).
+  assert.equal(passager("2026-10-11 « Trail » : ? upstream request timeout"), true, "une passerelle qui expire n'est pas passagère");
+  assert.equal(passager("sommeil du 2026-10-11 :  TypeError: fetch failed"), true, "une coupure réseau n'est pas passagère");
+  assert.equal(estPassager({ code: "EPIPE", cause: "EPIPE TypeError: fetch failed" }), true, "EPIPE (cinq majuscules) pris pour un code SQL");
+});
+
+await atest("une même cause sur plusieurs jours fait UNE ligne de journal ; un incident passager n'en fait aucune", async () => {
+  const { admin, ecrits } = journalSimule(async () => ({ error: null }));
+  const { r: bilan, sortie } = await enSilence(() => journaliserRefus(admin, { userId: "u-42", canal: "cron", failures: [
+    '2026-10-09 « Footing » : 22P02 invalid input syntax for type smallint: "176.54"',
+    '2026-10-10 « Footing » : 22P02 invalid input syntax for type smallint: "176.54"',
+    'VFC du 2026-10-10 : 23502 null value in column "hrv_ms" of relation "hrv_data" violates not-null constraint',
+    "sommeil du 2026-10-10 : ? upstream request timeout",
+  ] }));
+  assert.deepEqual(bilan, { refus: 3, passagers: 1 });
+  assert.equal(ecrits.length, 1, "un passage doit faire UNE écriture au journal, pas une par refus");
+  assert.equal(ecrits[0].table, "error_logs");
+  assert.equal(ecrits[0].lignes.length, 2, "deux causes distinctes attendues : séance 22P02, VFC 23502");
+  const seance = ecrits[0].lignes.find((l) => l.message.includes("22P02"))!;
+  assert.equal(seance.meta.total, 2, "les deux jours de la même cause doivent être comptés ensemble");
+  assert.ok(!/2026-10-/.test(seance.message), "la date est dans le message : chaque jour ferait un défaut distinct dans /admin");
+  assert.ok(ecrits[0].lignes.every((l) => l.source === "synchro" && l.user_id === "u-42" && l.url === "/api/cron/sync-all"));
+  assert.ok(sortie.some((s) => s.startsWith("warn:") && /passager/.test(s)), "l'incident passager n'est noté nulle part");
+});
+
+await atest("aucun refus → RIEN au journal (un journal qui s'écrit à vide est du bruit)", async () => {
+  const { admin, ecrits } = journalSimule(async () => ({ error: null }));
+  assert.deepEqual(await journaliserRefus(admin, { userId: "u-42", canal: "webhook", failures: undefined }), { refus: 0, passagers: 0 });
+  assert.deepEqual(await journaliserRefus(admin, { userId: "u-42", canal: "webhook", failures: [] }), { refus: 0, passagers: 0 });
+  assert.equal(ecrits.length, 0);
+});
+
+await atest("un journal qui ne s'écrit pas ne fait pas tomber la synchro — la console prend le relais", async () => {
+  const ligne = ['VFC du 2026-10-10 : 23502 null value in column "hrv_ms"'];
+  for (const reponse of [async () => { throw new Error("réseau"); }, async () => ({ error: { message: "permission denied for table error_logs" } })]) {
+    const { admin } = journalSimule(reponse);
+    const { r, sortie } = await enSilence(() => journaliserRefus(admin, { userId: "u-42", canal: "cron", failures: ligne }));
+    assert.deepEqual(r, { refus: 1, passagers: 0 }, "le refus doit rester compté même quand le journal est injoignable");
+    assert.ok(sortie.some((s) => s.startsWith("error:") && /journal non écrit/.test(s)), "l'échec du journal n'est écrit nulle part");
+  }
+});
+
+// Le banc : les VRAIES routes et le VRAI client supabase-js, devant une base et un
+// intervals.icu simulés derrière `fetch`. Seul ce qui part au réseau est imité.
+const ENV_BANC: Record<string, string> = {
+  NEXT_PUBLIC_SUPABASE_URL: "http://supabase.test", SUPABASE_SERVICE_ROLE_KEY: "cle-de-test",
+  WEBHOOK_SECRET: "secret-webhook-test", CRON_SECRET: "secret-cron-test",
+};
+const envAvant = Object.fromEntries(Object.keys(ENV_BANC).map((k) => [k, process.env[k]]));
+Object.assign(process.env, ENV_BANC);
+
+const PROFIL = { id: "u-42", intervals_athlete_id: "i1", intervals_api_key: "k" };
+const SORTIE = { id: "i900001", name: "Sortie « longue » : Rouen", type: "Run", start_date_local: "2026-10-11T18:05:00",
+  moving_time: 3600, elapsed_time: 3700, distance: 12000, average_heartrate: 141 };
+const NUIT = { id: "2026-10-11", hrv: 62, sleepSecs: 27000 };
+const REFUS_SEANCE = { status: 400, corps: { code: "22P02", message: 'invalid input syntax for type smallint: "176.54"', details: null, hint: null } };
+const REFUS_VFC = { status: 400, corps: { code: "23502", message: 'null value in column "hrv_ms" of relation "hrv_data" violates not-null constraint', details: null, hint: null } };
+
+type Ecrit = { methode: string; table: string; corps: unknown };
+function banc(o: { activites?: unknown[]; wellness?: unknown[]; refus?: Record<string, { status: number; corps: unknown }>; journalHS?: boolean }): Ecrit[] {
+  const ecrits: Ecrit[] = [];
+  const reponse = (status: number, corps?: unknown) => new Response(
+    corps === undefined ? null : typeof corps === "string" ? corps : JSON.stringify(corps),
+    { status, headers: { "content-type": typeof corps === "string" ? "text/plain" : "application/json" } });
+  (globalThis as unknown as { fetch: unknown }).fetch = async (entree: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(entree instanceof Request ? entree.url : String(entree));
+    const methode = (init?.method ?? "GET").toUpperCase();
+    if (url.hostname === "intervals.icu") {
+      if (url.pathname.endsWith("/activities")) return reponse(200, o.activites ?? []);
+      if (url.pathname.endsWith("/wellness")) return reponse(200, o.wellness ?? []);
+      return reponse(404, {});
+    }
+    if (url.hostname !== "supabase.test") return reponse(404, {});
+    const table = url.pathname.replace("/rest/v1/", "");
+    if (methode === "GET" || methode === "HEAD") {
+      if (table === "profiles" && url.searchParams.get("intervals_athlete_id") === "eq.i1") return reponse(200, PROFIL); // webhook (.single)
+      if (table === "profiles" && url.searchParams.has("intervals_api_key")) return reponse(200, [PROFIL]);         // cron (liste)
+      return reponse(200, []);
+    }
+    ecrits.push({ methode, table, corps: init?.body ? JSON.parse(String(init.body)) : null });
+    if (table === "error_logs" && o.journalHS) return reponse(503, "upstream connect error");
+    const refus = o.refus?.[table];
+    if (refus) return reponse(refus.status, refus.corps);
+    return reponse(methode === "POST" ? 201 : 204);
+  };
+  return ecrits;
+}
+const auJournal = (ecrits: Ecrit[]) => ecrits.filter((e) => e.table === "error_logs").flatMap((e) => e.corps as LigneJournal[]);
+const appelerWebhook = async () => {
+  const { POST } = await import("../src/app/api/webhooks/intervals/route");
+  const res = await POST(new Request("https://pacevo.fr/api/webhooks/intervals?secret=secret-webhook-test",
+    { method: "POST", body: JSON.stringify({ athlete_id: "i1", event: "activity_updated" }) }));
+  return { status: res.status, j: await res.json() as { ok?: boolean; synced?: number; refus?: number } };
+};
+type CompteRendu = { refus?: number; results?: { ok: boolean; refus?: number; passagers?: number }[] };
+const appelerCron = async () => {
+  const { GET } = await import("../src/app/api/cron/sync-all/route");
+  const res = await GET(new Request("https://pacevo.fr/api/cron/sync-all", { headers: { authorization: "Bearer secret-cron-test" } }));
+  return { status: res.status, j: await res.json() as CompteRendu };
+};
+
+await atest("webhook : une séance refusée par la base arrive au journal, avec sa cause et sa route", async () => {
+  const ecrits = banc({ activites: [SORTIE], wellness: [NUIT], refus: { workouts: REFUS_SEANCE } });
+  const { r: { status, j } } = await enSilence(appelerWebhook);
+  assert.equal(status, 200);
+  assert.ok(ecrits.some((e) => e.table === "workouts"), "le décor n'a pas exercé l'écriture de la séance : le test ne prouverait rien");
+  assert.equal(j.refus, 1, "la réponse du webhook ne compte pas le refus");
+  const journal = auJournal(ecrits);
+  assert.equal(journal.length, 1, "le refus de la séance n'est pas arrivé au journal");
+  assert.deepEqual([journal[0].source, journal[0].user_id, journal[0].url], ["synchro", "u-42", "/api/webhooks/intervals"]);
+  assert.match(journal[0].message, /\(séance\) : 22P02 invalid input syntax for type smallint: "176\.54"$/);
+  assert.match(journal[0].meta.refus[0], /^2026-10-11 « Sortie « longue » : Rouen » : 22P02 /, "la séance touchée n'est pas identifiable");
+});
+
+await atest("cron : une VFC refusée (23502) arrive au journal ET au compte rendu de l'exécution", async () => {
+  const ecrits = banc({ wellness: [NUIT], refus: { hrv_data: REFUS_VFC } });
+  const { r: { status, j } } = await enSilence(appelerCron);
+  assert.equal(status, 200);
+  assert.ok(ecrits.some((e) => e.table === "hrv_data"), "le décor n'a pas exercé l'écriture de la VFC : le test ne prouverait rien");
+  assert.equal(j.results?.[0]?.refus, 1, "le compte rendu du cron (lu dans GitHub Actions) ne compte pas le refus");
+  assert.equal(j.refus, 1);
+  const journal = auJournal(ecrits);
+  assert.equal(journal.length, 1, "le refus de la VFC n'est pas arrivé au journal — rangé parmi les passagers ?");
+  assert.equal(journal[0].url, "/api/cron/sync-all");
+  assert.match(journal[0].message, /\(VFC\) : 23502 null value in column "hrv_ms"/);
+});
+
+await atest("webhook et cron : une synchro sans refus n'écrit RIEN au journal", async () => {
+  // CONTRE-POIDS : le garde-fou le plus simple à satisfaire serait de journaliser chaque
+  // passage. Un jour mesuré et accepté ne doit produire aucune ligne.
+  const canaux: [string, () => Promise<number | undefined>][] = [
+    ["webhook", async () => (await appelerWebhook()).j.refus],
+    ["cron", async () => (await appelerCron()).j.results?.[0]?.refus],
+  ];
+  for (const [canal, refusDe] of canaux) {
+    const ecrits = banc({ wellness: [NUIT] });
+    const { r: refus } = await enSilence(refusDe);
+    assert.ok(ecrits.some((e) => e.table === "hrv_data"), `${canal} : le décor n'a rien écrit, le test ne prouverait rien`);
+    assert.equal(auJournal(ecrits).length, 0, `${canal} : une synchro sans refus a écrit au journal`);
+    assert.equal(refus, 0, `${canal} : un refus est annoncé alors qu'il n'y en a aucun`);
+  }
+});
+
+await atest("cron : une passerelle qui expire est comptée comme passagère, pas journalisée", async () => {
+  const ecrits = banc({ activites: [SORTIE], refus: { workouts: { status: 504, corps: "upstream request timeout" } } });
+  const { r: { j } } = await enSilence(appelerCron);
+  assert.ok(ecrits.some((e) => e.table === "workouts"), "le décor n'a pas exercé l'écriture de la séance");
+  assert.deepEqual([j.results?.[0]?.refus, j.results?.[0]?.passagers], [0, 1]);
+  assert.equal(auJournal(ecrits).length, 0, "un incident passager a été journalisé comme un refus");
+});
+
+await atest("cron : un journal injoignable ne fait pas tomber le passage", async () => {
+  banc({ wellness: [NUIT], refus: { hrv_data: REFUS_VFC }, journalHS: true });
+  const { r: { status, j }, sortie } = await enSilence(appelerCron);
+  assert.equal(status, 200);
+  assert.deepEqual([j.results?.[0]?.ok, j.results?.[0]?.refus], [true, 1]);
+  assert.ok(sortie.some((s) => s.startsWith("error:") && /journal non écrit/.test(s)), "l'échec du journal n'est écrit nulle part");
+});
+
+globalThis.fetch = vraiFetch;
+for (const [k, v] of Object.entries(envAvant)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

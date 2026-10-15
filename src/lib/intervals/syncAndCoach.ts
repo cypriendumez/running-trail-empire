@@ -19,6 +19,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { syncIntervalsForUser } from "./syncUser";
+import { journaliserRefus } from "./refusSynchro";
 
 /** Jamais deux republications à moins de 10 min : chacune réécrit le calendrier ET
  *  pousse cinq séances sur la montre. */
@@ -38,6 +39,10 @@ export type SyncReport = {
    *  pendant des mois le fait que ce chemin n'enregistrait rien. */
   skipped: "rien de neuf" | "republié il y a moins de 10 min" | "erreur" | null;
   tracks: { imported: number; withoutGps: number; failed: number; remaining: number };
+  /** Écritures refusées par la base à ce passage — journalisées dans `error_logs` — et
+   *  incidents passagers, que le passage suivant reprend (comptés, pas journalisés). */
+  refus: number;
+  passagers: number;
   error?: string;
 };
 
@@ -95,15 +100,18 @@ export async function syncAndCoachForUser(
   admin: SupabaseClient,
   opts: { userId: string; athleteId: string; apiKey: string; days?: number },
 ): Promise<SyncReport> {
-  const { synced, error } = await syncIntervalsForUser(admin, opts);
+  const { synced, error, failures } = await syncIntervalsForUser(admin, opts);
   if (error) {
-    return { fresh: 0, replanned: false, skipped: "erreur", tracks: { imported: 0, withoutGps: 0, failed: 0, remaining: 0 }, error };
+    return { fresh: 0, replanned: false, skipped: "erreur", tracks: { imported: 0, withoutGps: 0, failed: 0, remaining: 0 }, refus: 0, passagers: 0, error };
   }
+  // Les refus d'écriture partent au journal AVANT la suite : rien de ce qui vient après
+  // (traces, replanification) ne doit pouvoir les emporter.
+  const { refus, passagers } = await journaliserRefus(admin, { userId: opts.userId, canal: "cron", failures });
   const tracks = await importTracksBestEffort(admin, { userId: opts.userId, apiKey: opts.apiKey });
   const { replanned, skipped } = await replanIfFresh(admin, {
     userId: opts.userId, athleteId: opts.athleteId, apiKey: opts.apiKey, fresh: synced,
   });
-  return { fresh: synced, replanned, skipped, tracks };
+  return { fresh: synced, replanned, skipped, tracks, refus, passagers };
 }
 
 /**
