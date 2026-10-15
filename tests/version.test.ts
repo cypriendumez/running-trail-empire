@@ -10,6 +10,7 @@
  * Ces tests protègent le mécanisme qui rend l'écart visible.
  */
 import assert from "node:assert";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -131,6 +132,101 @@ test("git rendu réellement, quand il est là", () => {
   if (v === null) return; // machine sans dépôt : rien à prouver ici
   assert.ok(/^[0-9a-f]{7,40}$/.test(v.commit), `commit illisible : ${v.commit}`);
   assert.ok(!Number.isNaN(Date.parse(v.date)), `date illisible : ${v.date}`);
+});
+
+// ── `npm run enligne` : la production peut être EN AVANCE sur l'arbre local ──────────────
+// ⚠️ 15/10/2026 : pacevo.fr servait 1dd3aa0 pendant que le `main` local restait à b63685c,
+// un de ses ancêtres. Le script annonçait « en retard / 0 commit » et proposait de
+// déployer : l'avoir suivi aurait retiré du site le correctif en ligne.
+//
+// Importé APRÈS avoir neutralisé le réseau : si l'appel de main() n'était plus gardé,
+// l'import interrogerait la vraie production.
+let appelsReseau = 0;
+const fetchReel = globalThis.fetch;
+globalThis.fetch = (async () => { appelsReseau++; throw new Error("réseau interdit dans les tests"); }) as typeof fetch;
+const { comparer, bilan } = require("../scripts/enligne") as typeof import("../scripts/enligne");
+globalThis.fetch = fetchReel;
+
+/** Un dépôt git jetable : A ← B sur main (HEAD = B), et C ← A sur une autre branche. */
+function depotJetable() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "enligne-"));
+  const git = (...a: string[]) => execFileSync("git", [
+    "-c", "user.name=Test", "-c", "user.email=test@exemple.invalid",
+    "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null", ...a,
+  ], { cwd: dir, stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+  git("init", "-q", "-b", "main");
+  git("commit", "-q", "--allow-empty", "-m", "A");
+  const A = git("rev-parse", "HEAD");
+  git("commit", "-q", "--allow-empty", "-m", "B correctif en ligne");
+  const B = git("rev-parse", "HEAD");
+  git("checkout", "-q", "-b", "autre", A);
+  git("commit", "-q", "--allow-empty", "-m", "C ailleurs");
+  const C = git("rev-parse", "HEAD");
+  git("checkout", "-q", "main");
+  return { dir, git, A, B, C };
+}
+
+test("enligne : une production EN AVANCE ne passe jamais pour un retard (cas du 15/10/2026)", () => {
+  const d = depotJetable();
+  d.git("checkout", "-q", d.A); // ici HEAD = A ; la production sert B, son descendant
+  const e = comparer(d.B.slice(0, 7), d.dir);
+  assert.equal(e.etat, "en-avance", `état rendu : ${e.etat}`);
+  if (e.etat === "en-avance") {
+    assert.equal(e.absents.length, 1, "le commit en ligne absent d'ici n'est pas listé");
+    assert.equal(e.aDeployer.length, 0, "un commit à déployer est inventé");
+  }
+  const b = bilan(e, d.B.slice(0, 7), d.A.slice(0, 7), "2026-10-15");
+  assert.equal(b.code, 1, "une production en avance doit faire échouer la garde");
+  assert.ok(!b.lignes.some((l) => /deploy --prod|vercel@/.test(l)),
+    "le script propose de déployer un arbre qui retirerait des commits du site");
+  assert.ok(b.lignes.some((l) => /NE PAS déployer/.test(l)), "l'interdiction de déployer n'est pas dite");
+});
+
+test("enligne : deux histoires divergentes sont dites comme telles", () => {
+  const d = depotJetable(); // HEAD = B ; la production sert C
+  const e = comparer(d.C, d.dir);
+  assert.equal(e.etat, "en-avance", `état rendu : ${e.etat}`);
+  if (e.etat === "en-avance") {
+    assert.equal(e.absents.length, 1);
+    assert.equal(e.aDeployer.length, 1, "le commit d'ici non déployé n'est pas compté");
+  }
+  assert.ok(bilan(e, d.C, d.B, "").lignes.some((l) => /divergé/.test(l)), "la divergence n'est pas dite");
+});
+
+test("enligne : un vrai retard propose toujours de déployer", () => {
+  const d = depotJetable(); // HEAD = B ; la production sert A
+  const e = comparer(d.A, d.dir);
+  assert.equal(e.etat, "en-retard", `état rendu : ${e.etat}`);
+  if (e.etat === "en-retard") assert.equal(e.aDeployer.length, 1);
+  const b = bilan(e, d.A, d.B, "");
+  assert.equal(b.code, 1);
+  assert.ok(b.lignes.some((l) => /vercel@54\.14\.0 deploy --prod/.test(l)), "le retard ne dit plus comment déployer");
+});
+
+test("enligne : identique à HEAD, ou commit servi inconnu", () => {
+  const d = depotJetable();
+  assert.equal(comparer(d.B, d.dir).etat, "identique");
+  assert.equal(comparer(d.B.slice(0, 7), d.dir).etat, "identique", "un commit abrégé égal à HEAD n'est pas reconnu");
+  assert.equal(bilan({ etat: "identique" }, "abc1234", "abc1234", "2026-10-15").code, 0);
+  assert.equal(comparer("deadbee", d.dir).etat, "inconnu");
+  const b = bilan({ etat: "inconnu" }, "deadbee", "abc1234", "");
+  assert.equal(b.code, 1);
+  assert.ok(!b.lignes.some((l) => /deploy --prod/.test(l)), "un commit inconnu invite à déployer");
+});
+
+test("enligne : une valeur venue de version.json n'est jamais exécutée ni prise pour une référence", () => {
+  const d = depotJetable();
+  const temoin = path.join(d.dir, "PIRATE");
+  for (const v of [`abc1234; touch ${temoin}`, `$(touch ${temoin})`, "HEAD", "main", ""]) {
+    assert.equal(comparer(v, d.dir).etat, "inconnu", `« ${v} » a été accepté comme commit`);
+  }
+  assert.ok(!fs.existsSync(temoin), "une valeur de version.json a été exécutée par le shell");
+});
+
+test("enligne : importer le script n'interroge pas la production, et main() passe par la comparaison", () => {
+  assert.equal(appelsReseau, 0, "l'import a lancé main() : l'appel n'est plus gardé");
+  const src = fs.readFileSync("scripts/enligne.ts", "utf8");
+  assert.ok(/bilan\(comparer\(deploye\)/.test(src), "main() ne passe plus par comparer() et bilan()");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
