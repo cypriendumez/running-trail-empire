@@ -80,6 +80,12 @@ export async function POST(req: Request) {
     {
       temperature: 0.3,
       maxOutputTokens: 700,
+      // Sortie structurée (15/10/2026) : la réponse est un objet JSON de trois champs. Le mode
+      // JSON de Gemini garantit sa syntaxe — plus de phrase autour, plus d'objet mal fermé que
+      // l'extraction plus bas devait deviner. Les huit autres routes qui attendent du JSON le
+      // demandaient déjà ; celle-ci était la seule à s'en remettre au hasard. `validerAjustement`
+      // reste la vraie garde : un JSON valide n'est pas une proposition acceptable.
+      responseMimeType: "application/json",
       // ⚠️ RAISONNEMENT DÉSACTIVÉ, et c'est ce qui rend cette route rentable. Gemini 2.5
       // « pense » avant d'écrire, et ces jetons de réflexion sont FACTURÉS comme de la
       // sortie — laquelle coûte huit fois l'entrée. Mesuré le 22/08/2026 sur le vrai
