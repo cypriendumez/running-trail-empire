@@ -101,6 +101,37 @@ partent pas pour les activités Strava. URL en https, réglable sur la page de g
   existent sur le serveur.
 - **Tests** : `tests/intervals-oauth.test.ts` (20 tests, 10 mutations toutes détectées).
 
+## État au 15/10/2026
+
+- Le code OAuth est **en production** depuis le 15/10 (déploiement `1dd3aa0`, fait par une autre session depuis
+  la branche qui avait intégré main) : `/api/intervals/oauth/start` et `/callback` répondent sur pacevo.fr.
+- `INTERVALS_OAUTH_CLIENT_ID` = **1331**, posé dans Vercel (Production) le 15/10 : ce n'est pas un secret.
+- `INTERVALS_OAUTH_CLIENT_SECRET` : à coller par Cyprien (onglet Terminal « Secret OAuth », commande
+  `vercel env add INTERVALS_OAUTH_CLIENT_SECRET production --sensitive --yes`).
+- ⚠️ Une variable Vercel ne s'applique qu'au déploiement SUIVANT : après le secret, relancer une mise en ligne
+  (`vercel redeploy` de la production, ou `npm run deploie`), sinon le bouton reste caché.
+- ⚠️ Le bouton « Exécuter » de l'app ne sait pas répondre aux questions d'une commande : `vercel env add` sans
+  `--value` y reste bloquée sur « Is the value a sensitive secret? ». Pour une valeur publique, passer
+  `--value … --non-interactive` ; pour un secret, la taper dans un onglet Terminal.
+
+## Le mail pour l'annuaire public (à envoyer par Cyprien APRÈS un essai réussi)
+
+À : support@intervals.icu · Objet : Pacevo (OAuth app #1331) — listing in the app directory
+
+> Hi David,
+>
+> Thank you for approving our OAuth application (Pacevo, app #1331). The integration is now live on
+> https://pacevo.fr: athletes authorise Pacevo in one click (ACTIVITY:READ, WELLNESS:READ, CALENDAR:WRITE,
+> SETTINGS:WRITE). We exchange the code server-side, check which scopes were actually granted, and revoke
+> the token with /api/v1/disconnect-app when an athlete disconnects. I have tested the full flow with my
+> own account.
+>
+> Could you list Pacevo in the public app directory? Management page: [lien copié depuis la page « Manage App »]
+> Website: https://pacevo.fr · Privacy policy: https://pacevo.fr/confidentialite
+>
+> Thanks again,
+> Cyprien — Pacevo
+
 ## Ce qui reste à faire
 
 1. **Cyprien** — sur https://intervals.icu/settings/apps › Pacevo › « Manage App » :
