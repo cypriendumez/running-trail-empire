@@ -9,6 +9,7 @@ import { terrainCoachBlock } from "@/data/terrainCatalog";
 import { estAdmin } from "@/lib/admin/acces";
 import { identifiantsDe } from "@/lib/intervals/identifiants";
 import { COLONNES_VFC, precisionMetrique, serieVfc } from "@/lib/health/vfc";
+import { enteteIntervals } from "@/lib/intervals/auth";
 
 const BASE = "https://intervals.icu/api/v1";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -81,7 +82,7 @@ export async function POST(req: Request) {
   if (!GEMINI_API_KEY) return NextResponse.json({ error: "IA non configurée" }, { status: 503 });
 
   const day = date.slice(0, 10);
-  const auth = { Authorization: "Basic " + Buffer.from(`API_KEY:${KEY}`).toString("base64") };
+  const auth = { Authorization: enteteIntervals(KEY) };
 
   try {
     const listRes = await fetch(`${BASE}/athlete/${ATH}/activities?oldest=${day}&newest=${day}`, { headers: auth, signal: AbortSignal.timeout(20000) });

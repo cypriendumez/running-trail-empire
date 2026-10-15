@@ -5,6 +5,7 @@ import { buildAthleteContext } from "@/lib/ai/coachContext";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { estAdmin } from "@/lib/admin/acces";
 import { serieVfc } from "@/lib/health/vfc";
+import { enteteIntervals } from "@/lib/intervals/auth";
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
 // gemini-2.5-flash = free tier, gemini-2.5-flash = requires billing
@@ -13,7 +14,7 @@ const GEMINI_URL = (model: string = "gemini-2.5-flash") =>
 const ICU_BASE = "https://intervals.icu/api/v1";
 
 function icuAuth(apiKey: string) {
-  return "Basic " + Buffer.from(`API_KEY:${apiKey}`).toString("base64");
+  return enteteIntervals(apiKey);
 }
 
 export async function POST(req: NextRequest) {

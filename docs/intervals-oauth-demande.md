@@ -1,5 +1,9 @@
 # Demande d'accès OAuth à intervals.icu (11/10/2026)
 
+> **✅ APPROUVÉE le 12/10/2026** (notification « Le statut de votre application OAuth 1331 Pacevo est
+> APPROUVÉ, recherchez-la dans /settings/apps »). Le code est écrit le même jour (voir la fin du
+> document) ; il reste à poser l'identifiant et le secret dans l'environnement, puis à déployer.
+
 À remplir par Cyprien, connecté à son compte intervals.icu : https://intervals.icu/oauth/apply
 L'application reste « Pending » jusqu'à approbation ; ensuite la page de gestion donne le
 client_id et le client_secret (à mettre dans Vercel, jamais dans le code).
@@ -79,12 +83,39 @@ L'appli OAuth donne accès aux webhooks : `ACTIVITY_UPLOADED`, `WELLNESS_UPDATED
 à l'arrivée d'une séance, au lieu des tâches planifiées étranglées. Les webhooks d'activité ne
 partent pas pour les activités Strava. URL en https, réglable sur la page de gestion.
 
-## Après l'approbation (à faire côté code)
+## Après l'approbation : ce qui est fait (12/10/2026)
 
-1. Variables Vercel : `INTERVALS_OAUTH_CLIENT_ID`, `INTERVALS_OAUTH_CLIENT_SECRET`, saisies par
-   Cyprien lui-même (le secret ne passe jamais par la conversation).
-2. Bouton « Connecter intervals.icu » → `https://intervals.icu/oauth/authorize?client_id=…&redirect_uri=…&scope=…&state=…`.
-3. Route `/api/intervals/oauth/callback` : échange du code en moins de 2 minutes sur
-   `POST https://intervals.icu/api/oauth/token` ; la réponse donne le jeton et l'Athlete ID.
-4. Un en-tête d'authentification commun : le code fait aujourd'hui `Basic API_KEY:<clé>` à 8 endroits ;
-   avec OAuth, `Bearer <jeton>`. Garder la clé API comme repli.
+- **En-tête commun** : `src/lib/intervals/auth.ts` (`enteteIntervals`). Il était recopié à la main dans
+  **16 fichiers** (et pas 8) ; une clé part en `Basic API_KEY:…`, un jeton en `Bearer …`.
+- **Aucune migration** : le jeton est rangé dans `profiles.intervals_api_key`, préfixé `oauth:`. La colonne
+  est déjà retirée de tout profil envoyé au navigateur (`stripProfileSecrets`).
+- **Le protocole** : `src/lib/intervals/oauth.ts`. Routes `/api/intervals/oauth/start` (state dans un
+  cookie httpOnly, `SameSite=Lax`, 10 min) et `/api/intervals/oauth/callback` (state vérifié AVANT
+  l'échange, cookie effacé à chaque sortie, retour vers une page fixe, portées accordées relues).
+- **Déconnexion** : révocation par `DELETE /api/v1/disconnect-app` ; une clé collée à la place d'une
+  autorisation révoque aussi l'ancienne autorisation.
+- **Écrans** : bouton « Autoriser Pacevo » à l'étape Montre du questionnaire (les réponses sont
+  enregistrées AVANT de partir : elles n'existent qu'en mémoire) et sur Sync Montre ; bandeau de
+  retour (ok, portées manquantes, refus, expiré, erreur). La clé reste proposée, repliée. Le bouton
+  n'apparaît que si `/api/intervals/status` répond `oauth: true`, c'est-à-dire si les deux variables
+  existent sur le serveur.
+- **Tests** : `tests/intervals-oauth.test.ts` (20 tests, 10 mutations toutes détectées).
+
+## Ce qui reste à faire
+
+1. **Cyprien** — sur https://intervals.icu/settings/apps › Pacevo › « Manage App » :
+   - relever le **Client ID** et le **Client Secret** ;
+   - vérifier l'adresse de retour : `https://pacevo.fr/api/intervals/oauth/callback` ;
+   - déposer le logo (`public/icon-master-1024.png`).
+2. **Cyprien** — poser les deux variables dans Vercel (Production), lui-même : le secret ne passe
+   jamais par la conversation.
+   - `INTERVALS_OAUTH_CLIENT_ID`
+   - `INTERVALS_OAUTH_CLIENT_SECRET`
+   Et dans `.env.local` pour essayer en local (`http://localhost/*` est toujours autorisé).
+3. **Déployer** (avec l'accord de Cyprien), puis essayer « Autoriser Pacevo » sur Sync Montre avec le
+   compte de Cyprien : bandeau vert, première synchro, séance poussée sur la montre.
+4. **Annuaire public** : une fois testé, écrire à support@intervals.icu avec le lien de la page de
+   gestion pour figurer dans la liste des applications (exigé par la documentation).
+5. **Webhooks de l'application** (plus tard) : une seule adresse pour tous les athlètes, réglée sur la
+   page de gestion ; `/api/webhooks/intervals` lit encore l'ancien format et doit être réécrit avant
+   (voir aussi la branche non fusionnée du 12/10 qui touche cette route).

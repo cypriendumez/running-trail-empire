@@ -254,7 +254,14 @@ export default function OnboardingPage() {
     next();
   }
 
-  async function handleFinish() {
+  /**
+   * @param ensuite `"oauth"` : après l'enregistrement, partir vers l'écran d'autorisation
+   * d'intervals.icu (étape Montre, bouton « Autoriser Pacevo »). Les réponses n'existent
+   * qu'ici, en mémoire : on ne quitte la page qu'une fois TOUT enregistré.
+   * `unknown` parce que les boutons « Terminer » passent la fonction telle quelle à `onClick`
+   * (un test le vérifie) : React y glisse l'événement du clic, qui n'est jamais `"oauth"`.
+   */
+  async function handleFinish(ensuite?: unknown) {
     setLoading(true);
     // La montre n'est plus bloquante : le plan d'entraînement fonctionne sans elle, la
     // synchro peut être branchée plus tard depuis l'onglet Sync Montre.
@@ -392,6 +399,11 @@ export default function OnboardingPage() {
     // ne doit pas retenir l'écran de fin.
     await fetch("/api/coach/generate", { method: "POST" }).catch(() => { /* le cron rattrapera */ });
 
+    if (ensuite === "oauth") {
+      // `loading` reste vrai : le bouton garde son indicateur jusqu'au changement de page.
+      window.location.assign("/api/intervals/oauth/start?retour=inscription");
+      return;
+    }
     setStep("done");
     setLoading(false);
   }
@@ -592,7 +604,8 @@ export default function OnboardingPage() {
         {/* ── 4. MONTRE ── on choisit sa marque, puis on ne lit que ses gestes (12/10/2026). */}
         {step === "watch" && (
           <EtapeMontre tr={tr} cid={cid} marque={marque} onMarque={setMarque}
-            enregistre={watchSaved} onEnregistre={() => setWatchSaved(true)} />
+            enregistre={watchSaved} onEnregistre={() => setWatchSaved(true)}
+            onOAuth={() => handleFinish("oauth")} oauthEnCours={loading} />
         )}
 
         {/* ── FIN ── */}

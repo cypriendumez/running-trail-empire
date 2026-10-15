@@ -7,12 +7,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildWorkoutRow, makeMatcher } from "./workoutRow";
 import { ligneSommeil, ligneVfc, type IcuWellness } from "./wellnessRow";
 import { roleOf } from "./sport";
+import { enteteIntervals } from "@/lib/intervals/auth";
 
 const BASE = "https://intervals.icu/api/v1";
 
 function authHeader(apiKey: string) {
   return {
-    Authorization: "Basic " + Buffer.from(`API_KEY:${apiKey}`).toString("base64"),
+    Authorization: enteteIntervals(apiKey),
     "Content-Type": "application/json",
   };
 }

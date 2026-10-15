@@ -40,6 +40,13 @@ const sain = (v: number) => Number.isFinite(v) && !Number.isNaN(v);
 // ⚠️ La fenêtre des zones se compte depuis CE jour figé, pas depuis la date réelle : le
 // 11/10/2026, `jour(4)` (29/08) est sorti des 42 jours et deux tests ont rougi seuls.
 const zonesAu = (w: Parameters<typeof computeHrZones>[0]) => computeHrZones(w, AUJOURD_HUI);
+// ⚠️ Même règle pour la forme : sa fenêtre de 42 jours se comptait depuis la date RÉELLE. Le
+// 15/10/2026, toutes les séances de `seances()` (11/08 → 02/09) en étaient sorties : endurance
+// à 0 pour le 10 km comme pour le marathon, et « les repères suivent la distance » rougissait.
+const formeAu = (
+  w: Parameters<typeof computeForme>[0], vma: number, rec: number, reg: number,
+  obj: Parameters<typeof computeForme>[4] = null,
+) => computeForme(w, vma, rec, reg, obj, AUJOURD_HUI);
 
 console.log("\nZONES — le temps en zone ne s'invente pas");
 
@@ -196,14 +203,14 @@ console.log("\nSCORE DE FORME — un /100 doit dire contre quoi il mesure");
 const seances = (n: number, km: number) => Array.from({ length: n }, (_, i) => ({ date: jour(i * 2), sport: "run", distance_km: km }));
 
 test("sans objectif, le score annonce des repères GÉNÉRIQUES", () => {
-  const f = computeForme(seances(12, 10), 17, 80, 80, null);
+  const f = formeAu(seances(12, 10), 17, 80, 80, null);
   assert.equal(f.reference, "general", "un repère générique est présenté comme la mesure de l'athlète");
   assert.equal(f.cibleLongueKm, null);
 });
 
 test("avec un objectif, les repères suivent la distance visée", () => {
-  const dix = computeForme(seances(12, 10), 17, 80, 80, { distanceKm: 10, targetSeconds: null });
-  const mara = computeForme(seances(12, 10), 17, 80, 80, { distanceKm: 42.2, targetSeconds: null });
+  const dix = formeAu(seances(12, 10), 17, 80, 80, { distanceKm: 10, targetSeconds: null });
+  const mara = formeAu(seances(12, 10), 17, 80, 80, { distanceKm: 42.2, targetSeconds: null });
   assert.equal(dix.reference, "objectif");
   assert.ok((dix.cibleLongueKm ?? 0) < (mara.cibleLongueKm ?? 0),
     `la cible de sortie longue ne dépend pas de l'objectif : ${dix.cibleLongueKm} vs ${mara.cibleLongueKm}`);
@@ -214,11 +221,11 @@ test("avec un objectif, les repères suivent la distance visée", () => {
 });
 
 test("la vitesse se mesure au chrono visé quand il existe", () => {
-  const sansCible = computeForme(seances(12, 10), 17, 80, 80, { distanceKm: 10, targetSeconds: null });
+  const sansCible = formeAu(seances(12, 10), 17, 80, 80, { distanceKm: 10, targetSeconds: null });
   // 28'20 et non 30'00 : avec le modèle de Daniels (02/10/2026), 30'00 pour 17 km/h donnait
   // PILE 75 — le même score que sans objectif, par coïncidence arithmétique.
-  const ambitieux = computeForme(seances(12, 10), 17, 80, 80, { distanceKm: 10, targetSeconds: 1700 });
-  const modeste = computeForme(seances(12, 10), 17, 80, 80, { distanceKm: 10, targetSeconds: 3600 });
+  const ambitieux = formeAu(seances(12, 10), 17, 80, 80, { distanceKm: 10, targetSeconds: 1700 });
+  const modeste = formeAu(seances(12, 10), 17, 80, 80, { distanceKm: 10, targetSeconds: 3600 });
   assert.notEqual(ambitieux.speed, sansCible.speed, "le chrono visé ne change rien à l'axe vitesse");
   assert.ok(modeste.speed >= ambitieux.speed,
     `un objectif plus modeste doit être plus facilement atteint : ${modeste.speed} vs ${ambitieux.speed}`);
@@ -226,11 +233,11 @@ test("la vitesse se mesure au chrono visé quand il existe", () => {
 
 test("tous les axes restent bornés entre 0 et 100, quoi qu'on envoie", () => {
   const cas = [
-    computeForme([], 0, 0, 0, null),
-    computeForme(seances(200, 60), 30, 100, 100, { distanceKm: 5, targetSeconds: 1 }),
-    computeForme(seances(1, 0), -5, -50, 500, { distanceKm: -10, targetSeconds: -1 }),
-    computeForme([{ date: "pas-une-date", sport: "run", distance_km: NaN }], NaN, NaN, NaN, { distanceKm: NaN, targetSeconds: NaN }),
-    computeForme([{ date: jour(1), sport: "bike", distance_km: 200 }], 17, 80, 80, null),
+    formeAu([], 0, 0, 0, null),
+    formeAu(seances(200, 60), 30, 100, 100, { distanceKm: 5, targetSeconds: 1 }),
+    formeAu(seances(1, 0), -5, -50, 500, { distanceKm: -10, targetSeconds: -1 }),
+    formeAu([{ date: "pas-une-date", sport: "run", distance_km: NaN }], NaN, NaN, NaN, { distanceKm: NaN, targetSeconds: NaN }),
+    formeAu([{ date: jour(1), sport: "bike", distance_km: 200 }], 17, 80, 80, null),
   ];
   for (const f of cas) {
     for (const [k, v] of Object.entries({ total: f.total, endurance: f.endurance, speed: f.speed, recovery: f.recovery, regularity: f.regularity })) {
@@ -240,7 +247,7 @@ test("tous les axes restent bornés entre 0 et 100, quoi qu'on envoie", () => {
 });
 
 test("le vélo n'entre pas dans le score d'un coureur", () => {
-  const velo = computeForme([{ date: jour(1), sport: "bike", distance_km: 120 }], 17, 80, 80, null);
+  const velo = formeAu([{ date: jour(1), sport: "bike", distance_km: 120 }], 17, 80, 80, null);
   assert.equal(velo.endurance, 0, "une sortie vélo de 120 km fait grimper l'endurance de course");
 });
 

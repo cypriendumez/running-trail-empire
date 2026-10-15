@@ -12,6 +12,7 @@
  *
  * Un identifiant FOURNI reste accepté (page Sync Montre) : c'est lui qu'on interroge alors.
  */
+import { enteteIntervals } from "@/lib/intervals/auth";
 const BASE = "https://intervals.icu/api/v1";
 
 export type CodeRefus = "cle_refusee" | "acces_refuse" | "athlete_introuvable" | "indisponible" | "reponse_invalide";
@@ -44,7 +45,7 @@ export async function compteDeLaCle(apiKey: string, athleteId: string | null, f:
   let res: Response;
   try {
     res = await f(`${BASE}/athlete/${encodeURIComponent(cible)}`, {
-      headers: { Authorization: "Basic " + Buffer.from(`API_KEY:${apiKey}`).toString("base64") },
+      headers: { Authorization: enteteIntervals(apiKey) },
       cache: "no-store",
       signal: AbortSignal.timeout(10_000),
     });

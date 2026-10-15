@@ -92,8 +92,14 @@ export function computeForme(
   recovery: number,
   regularity: number,
   objectif: ObjectifForme = null,
+  /**
+   * Jour de référence (AAAA-MM-JJ, jour local) ; par défaut, aujourd'hui. Pour les tests à date
+   * figée : sans lui, les séances d'un test daté du 02/09 sortaient de la fenêtre de 42 jours au
+   * fil du calendrier, et le test rougissait seul le 15/10/2026 sans qu'une ligne ait changé.
+   */
+  aujourdhui?: string,
 ): Forme {
-  const recent = workouts.filter((w) => isRun(w.sport) && dansFenetre(w.date, 42));
+  const recent = workouts.filter((w) => isRun(w.sport) && dansFenetre(w.date, 42, aujourdhui));
   const hasData = workouts.length > 0;
   const longest = Math.max(0, ...recent.map((w) => w.distance_km ?? 0));
   const weeklyKm = recent.reduce((s, w) => s + (w.distance_km ?? 0), 0) / 6;
@@ -104,6 +110,8 @@ export function computeForme(
   // l'athlète a réellement tenu. `null` tant qu'il n'a pas 4 semaines courues.
   const cibleVolumeKm = demonstratedWeeklyKm(
     workouts.filter((w) => isRun(w.sport)).map((w) => ({ date: w.date, distance_km: w.distance_km ?? 0 })),
+    // Midi local : `demonstratedWeeklyKm` relit ce jour-là en jour LOCAL, sans glisser d'un cran.
+    aujourdhui ? Date.parse(`${aujourdhui}T12:00:00`) : undefined,
   );
 
   const refLongue = cibleLongueKm ?? LONGUE_GENERIQUE;

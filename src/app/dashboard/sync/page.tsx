@@ -84,6 +84,14 @@ function activityIcon(type?: string): LucideIcon {
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
+/**
+ * Les retours de `/api/intervals/oauth/callback` et les familles de portées. Rien d'autre ne
+ * s'affiche : l'adresse est modifiable par n'importe qui, elle ne choisit qu'un message connu.
+ */
+const STATUTS_OAUTH = ["ok", "partiel", "refuse", "invalide", "erreur", "indisponible"] as const;
+const FAMILLES_OAUTH = ["activity", "wellness", "calendar", "settings"] as const;
+type RetourOAuth = { statut: (typeof STATUTS_OAUTH)[number]; manque: string[]; inscription: boolean };
+
 export default function SyncPage() {
   const { lang } = useT();
   const d = SY[lang] ?? SY.fr;
@@ -110,12 +118,16 @@ export default function SyncPage() {
   const [savingCreds, setSavingCreds] = useState(false);
   const [credsError, setCredsError] = useState<string | null>(null);
   const [credsSaved, setCredsSaved] = useState(false);
-  const [existingCreds, setExistingCreds] = useState<{ athleteId: string | null; apiKeyMasked: string | null } | null>(null);
+  const [existingCreds, setExistingCreds] = useState<{ athleteId: string | null; apiKeyMasked: string | null; mode?: "oauth" | "cle" | null } | null>(null);
+  // Connexion en un clic (OAuth) : proposée seulement si l'application est configurée.
+  const [oauth, setOauth] = useState(false);
+  const [voirCleManuelle, setVoirCleManuelle] = useState(false);
+  const [retourOAuth, setRetourOAuth] = useState<RetourOAuth | null>(null);
 
   function checkStatus() {
     fetch("/api/intervals/status")
       .then(r => r.json())
-      .then(d => setConfigured(d.configured ?? false))
+      .then(d => { setConfigured(d.configured ?? false); setOauth(d.oauth === true); })
       .catch(() => setConfigured(false));
   }
 
@@ -126,9 +138,21 @@ export default function SyncPage() {
     fetch("/api/intervals/credentials")
       .then(r => r.json())
       .then(d => {
-        setExistingCreds({ athleteId: d.athleteId, apiKeyMasked: d.apiKeyMasked });
+        setExistingCreds({ athleteId: d.athleteId, apiKeyMasked: d.apiKeyMasked, mode: d.mode ?? null });
       })
       .catch(() => {});
+  }, []);
+
+  // Retour de l'écran d'autorisation d'intervals.icu : on lit le statut, puis l'adresse
+  // redevient propre (un rechargement ne réaffiche pas le message).
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const statut = p.get("intervals");
+    if (!statut || !(STATUTS_OAUTH as readonly string[]).includes(statut)) return;
+    const manque = (p.get("manque") ?? "").split(",").filter((m) => (FAMILLES_OAUTH as readonly string[]).includes(m));
+    setRetourOAuth({ statut: statut as RetourOAuth["statut"], manque, inscription: p.get("depuis") === "inscription" });
+    if (statut !== "ok") setActiveTab("setup");
+    window.history.replaceState(null, "", window.location.pathname);
   }, []);
 
   // ── La clé : les MÊMES règles que le questionnaire (lib/intervals/connexionMontre) ──
@@ -159,7 +183,7 @@ export default function SyncPage() {
       setCredsSaved(true);
       setCredsApiKey("");
       setCredsCompte(typeof data.nom === "string" ? data.nom : null);
-      setExistingCreds({ athleteId: typeof data.athleteId === "string" ? data.athleteId : null, apiKeyMasked: keyTrim.slice(0, 4) + "●●●●●●●●●●●●" });
+      setExistingCreds({ athleteId: typeof data.athleteId === "string" ? data.athleteId : null, apiKeyMasked: keyTrim.slice(0, 4) + "●●●●●●●●●●●●", mode: "cle" });
       checkStatus();
     } catch (err) {
       setCredsError(String(err).replace("Error: ", ""));
@@ -370,6 +394,44 @@ export default function SyncPage() {
             </div>
           )}
         </div>
+
+        {/* ── Retour de l'autorisation intervals.icu ── */}
+        {retourOAuth && (
+          <div role="status" className={`flex items-start gap-3 rounded-2xl border px-4 py-3.5 text-sm ${
+            retourOAuth.statut === "ok" ? "border-emerald-200 bg-emerald-50 text-emerald-900" :
+            retourOAuth.statut === "partiel" ? "border-amber-200 bg-amber-50 text-amber-900" :
+            "border-red-200 bg-red-50 text-red-900"
+          }`}>
+            {retourOAuth.statut === "ok"
+              ? <CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
+              : <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 flex-shrink-0" />}
+            <div className="flex-1">
+              <p className="font-semibold">{d[`ret.${retourOAuth.statut}`]}</p>
+              {retourOAuth.statut === "ok" && (
+                <p className="mt-0.5">{retourOAuth.inscription ? d["ret.okBienvenue"] : d["ret.okSub"]}</p>
+              )}
+              {retourOAuth.statut === "partiel" && (
+                <>
+                  <ul className="mt-1.5 list-disc space-y-0.5 pl-5">
+                    {retourOAuth.manque.map((m) => <li key={m}>{d[`sc.${m}`]}</li>)}
+                  </ul>
+                  <p className="mt-1.5">{d["ret.partielFix"]}</p>
+                  <a href="/api/intervals/oauth/start?retour=sync"
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-700">
+                    <Link2 aria-hidden="true" className="h-3.5 w-3.5" /> {d["oa.again"]}
+                  </a>
+                </>
+              )}
+              {retourOAuth.statut !== "ok" && retourOAuth.statut !== "partiel" && (
+                <p className="mt-0.5">{d["ret.retry"]}</p>
+              )}
+            </div>
+            <button type="button" onClick={() => setRetourOAuth(null)} aria-label={d["ret.close"]}
+              className="rounded-lg p-1 opacity-70 transition-opacity hover:opacity-100">
+              <XCircle aria-hidden="true" className="h-4 w-4" />
+            </button>
+          </div>
+        )}
 
         {/* ── Tabs ── */}
         <div className="flex w-fit gap-1 rounded-2xl bg-zinc-100/80 p-1 ring-1 ring-zinc-200/60">
@@ -610,7 +672,9 @@ export default function SyncPage() {
                 <div className="flex-1">
                   <p className="font-semibold text-emerald-800 text-sm">{d["connected.title"]}</p>
                   <p className="text-xs text-emerald-700 mt-0.5">
-                    {d["acc.word"]} <span className="font-mono font-semibold">{existingCreds.athleteId}</span> · {d["key.word"]} <span className="font-mono">{existingCreds.apiKeyMasked}</span>
+                    {d["acc.word"]} <span className="font-mono font-semibold">{existingCreds.athleteId}</span> · {existingCreds.mode === "oauth"
+                      ? d["oa.mode"]
+                      : <>{d["key.word"]} <span className="font-mono">{existingCreds.apiKeyMasked}</span></>}
                   </p>
                   <p className="text-xs text-emerald-600 mt-1">
                     {nodes.connectedHint}
@@ -711,6 +775,25 @@ export default function SyncPage() {
                   </a>
                 </div>
 
+                {/* AUTORISATION EN UN CLIC (OAuth) — remplace les étapes 3 et 4 quand elle est proposée. */}
+                {oauth && (
+                  <div className="relative pl-14 pb-8">
+                    <div className="absolute left-0 top-0 w-9 h-9 bg-emerald-600 text-white rounded-full flex items-center justify-center">
+                      <Link2 aria-hidden="true" className="w-4 h-4" />
+                    </div>
+                    <h3 className="font-semibold text-zinc-900 text-sm">{d["oa.title"]}</h3>
+                    <p className="text-sm text-zinc-500 mt-1">{d["oa.desc"]}</p>
+                    <a href="/api/intervals/oauth/start?retour=sync"
+                      className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 mt-3">
+                      <Link2 aria-hidden="true" className="h-4 w-4" /> {existingCreds?.mode === "oauth" ? d["oa.again"] : d["oa.button"]}
+                    </a>
+                    <button type="button" onClick={() => setVoirCleManuelle((v) => !v)} aria-expanded={voirCleManuelle}
+                      className="mt-3 block text-xs font-medium text-zinc-500 underline-offset-2 hover:text-zinc-800 hover:underline">
+                      {d["oa.cle"]}
+                    </button>
+                  </div>
+                )}
+                <div hidden={oauth && !voirCleManuelle}>
                 {/* STEP 3 */}
                 <div className="relative pl-14 pb-8">
                   <div className="absolute left-0 top-0 w-9 h-9 bg-zinc-900 text-white rounded-full flex items-center justify-center font-bold text-sm">3</div>
@@ -819,6 +902,7 @@ export default function SyncPage() {
                       {savingCreds ? d["f.checking"] : existingCreds?.athleteId ? d["f.update"] : d["f.connect"]}
                     </button>
                   </form>
+                </div>
                 </div>
               </div>
             </div>

@@ -3,12 +3,12 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { compteDeLaCle } from "@/lib/intervals/compteDeLaCle";
+import { enteteIntervals, estJetonOAuth, jetonDe } from "@/lib/intervals/auth";
+import { revoquer } from "@/lib/intervals/oauth";
 
 const INTERVALS_BASE = "https://intervals.icu/api/v1";
 
-function intervalsAuth(apiKey: string) {
-  return "Basic " + Buffer.from(`API_KEY:${apiKey}`).toString("base64");
-}
+const intervalsAuth = enteteIntervals;
 
 // GET — fetch user's saved credentials (masked)
 export async function GET() {
@@ -22,9 +22,13 @@ export async function GET() {
     .eq("id", user.id)
     .single();
 
+  // ⚠️ Un jeton OAuth (« oauth:… ») ne se montre pas, même tronqué : ses quatre premiers
+  // caractères seraient toujours « oaut ». L'écran affiche « autorisation intervals.icu ».
+  const oauth = estJetonOAuth(profile?.intervals_api_key);
   return NextResponse.json({
     athleteId: profile?.intervals_athlete_id ?? null,
-    apiKeyMasked: profile?.intervals_api_key
+    mode: oauth ? "oauth" : profile?.intervals_api_key ? "cle" : null,
+    apiKeyMasked: profile?.intervals_api_key && !oauth
       ? profile.intervals_api_key.slice(0, 4) + "●●●●●●●●●●●●"
       : null,
     hasCredentials: !!(profile?.intervals_athlete_id && profile?.intervals_api_key),
@@ -53,6 +57,10 @@ export async function POST(req: Request) {
   }
   const athleteId = compte.athleteId;
 
+  // Une clé remplace une autorisation OAuth : on rend l'autorisation à intervals.icu
+  // (au mieux), plutôt que de la laisser ouverte sans plus jamais s'en servir.
+  const { data: avant } = await supabase.from("profiles").select("intervals_api_key").eq("id", user.id).single();
+
   // 2. Save to profile
   const { error } = await supabase
     .from("profiles")
@@ -60,6 +68,7 @@ export async function POST(req: Request) {
     .eq("id", user.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (estJetonOAuth(avant?.intervals_api_key)) await revoquer(jetonDe(String(avant!.intervals_api_key)));
 
   // 3. Auto-register webhook with Intervals.icu (best effort — don't fail if it doesn't work)
   const webhookResult = await registerWebhook(athleteId, apiKey);
@@ -80,7 +89,11 @@ export async function DELETE() {
     .eq("id", user.id)
     .single();
 
-  if (profile?.intervals_athlete_id && profile?.intervals_api_key) {
+  // OAuth : on révoque l'autorisation (ce qui coupe aussi les webhooks de l'application).
+  // Clé API : on retire l'éventuel webhook personnel, comme avant.
+  if (estJetonOAuth(profile?.intervals_api_key)) {
+    await revoquer(jetonDe(String(profile!.intervals_api_key)));
+  } else if (profile?.intervals_athlete_id && profile?.intervals_api_key) {
     await unregisterWebhook(profile.intervals_athlete_id, profile.intervals_api_key).catch(() => {});
   }
 

@@ -3,9 +3,10 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { montreDe, lectureDe, type Lecture } from "@/lib/watch/intervals";
 import { identifiantsDe } from "@/lib/intervals/identifiants";
+import { enteteIntervals } from "@/lib/intervals/auth";
 
 const BASE = "https://intervals.icu/api/v1";
-const auth = (k: string) => ({ Authorization: "Basic " + Buffer.from(`API_KEY:${k}`).toString("base64") });
+const auth = (k: string) => ({ Authorization: enteteIntervals(k) });
 
 /**
  * GET /api/watch/status
