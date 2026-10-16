@@ -174,15 +174,14 @@ bien-être 200, calendrier 200. Aucune ligne au journal d'erreurs.
 La connexion OAuth est **terminée** : approuvée le 12/10, en production le 15/10, secret changé et
 vérifié le 16/10, inscrite à l'annuaire le 16/10.
 
-Les **alertes** (code prêt le 16/10) restent à mettre en service, dans cet ordre :
-1. **Le secret des alertes**, le même des deux côtés, sans qu'il passe jamais par une conversation :
-   fabriqué sur le Mac, posé dans Vercel (Production) sous `INTERVALS_WEBHOOK_SECRET` par la CLI qui le
-   lit sur l'entrée standard, puis collé par Cyprien dans le champ « Webhook Secret » de Manage App.
-   (L'ancienne valeur de ce champ a été visible sur une capture du 15/10 : on la remplace.)
-2. **Déployer**, avec l'accord de Cyprien : une variable Vercel ne vaut qu'au déploiement suivant.
-3. **Manage App** : Webhook URL `https://pacevo.fr/api/webhooks/intervals` ; cocher `ACTIVITY_UPLOADED`,
-   `ACTIVITY_ANALYZED`, `ACTIVITY_UPDATED`, `WELLNESS_UPDATED` ; ne PAS cocher `CALENDAR_UPDATED` ;
-   enregistrer.
-4. **Essai** : renommer une séance sur intervals.icu → alerte `ACTIVITY_UPDATED` → journaux Vercel :
-   `[webhook/intervals] 1 athlète(s) · ACTIVITY_UPDATED · … · réponse 200`. Un secret désaccordé se lit
-   dans /admin › Bugs (« Alerte intervals.icu refusée : son secret ne correspond pas… »).
+Les **alertes** sont EN SERVICE depuis le 16/10/2026 (déploiement `4739336`, ~20 h 35) :
+- ⚠️ Le champ « Webhook Secret » de Manage App **ne se modifie pas** : intervals.icu fixe lui-même le code
+  (11 caractères). Notre code fabriqué n'a donc pas pu y être collé ; c'est LE SIEN qui a été copié par Cyprien
+  et posé dans Vercel (`INTERVALS_WEBHOOK_SECRET`, Production, sensible) par un script qui le lit sans l'afficher.
+  Il a été visible sur des captures : risque faible (au pire, une synchronisation de plus, aucune donnée lue).
+- Webhook URL `https://pacevo.fr/api/webhooks/intervals` ; cochés `ACTIVITY_UPLOADED`, `ACTIVITY_ANALYZED`,
+  `ACTIVITY_UPDATED`, `WELLNESS_UPDATED` ; PAS `CALENDAR_UPDATED`.
+- **Essai** : bouton « Envoyer le webhook de test » → `POST /api/webhooks/intervals` à 20:42:02, réponse **200**
+  (secret reconnu : sinon 401 ; format lu : sinon 400), aucune ligne dans `error_logs`.
+- Pour vérifier plus tard : `vercel logs --no-branch --environment production --since 1h --json` (filtrer sur
+  `/api/webhooks/intervals`) ; un secret désaccordé se lit dans /admin › Bugs.
