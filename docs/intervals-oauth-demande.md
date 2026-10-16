@@ -101,6 +101,15 @@ partent pas pour les activités Strava. URL en https, réglable sur la page de g
   existent sur le serveur.
 - **Tests** : `tests/intervals-oauth.test.ts` (20 tests, 10 mutations toutes détectées).
 
+## ✅ Secret changé, vérifié, et mail d'annuaire envoyé (16/10/2026)
+
+- Secret de l'application changé (il avait été visible dans une conversation), VÉRIFIÉ auprès d'intervals.icu
+  avant d'être posé dans Vercel, production remise en ligne ; nouvel essai réussi (bandeau vert, 16/10 matin).
+- Diagnostic utile : `POST /api/oauth/token` répond 404 « Client and/or secret not found » quand le couple
+  identifiant/secret est faux — c'était l'échec du 16/10 à 8 h 58.
+- Mail envoyé par Cyprien à support@intervals.icu le 16/10 pour figurer dans l'annuaire public des applications.
+  Reste : leur réponse ; les webhooks de l'application (plus tard).
+
 ## ✅ Activée et essayée le 15/10/2026 à 21 h 14
 
 Déploiement `9913ad8` avec les deux variables ; adresse de retour ajoutée par Cyprien sur « Manage App ».
