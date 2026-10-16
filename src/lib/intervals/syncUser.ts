@@ -22,14 +22,19 @@ function authHeader(apiKey: string) {
 export async function syncIntervalsForUser(
   admin: SupabaseClient,
   opts: { userId: string; athleteId: string; apiKey: string; days?: number },
-): Promise<{ synced: number; error?: string; failures?: string[] }> {
+): Promise<{ synced: number; error?: string; status?: number; failures?: string[] }> {
   const { userId, athleteId, apiKey } = opts;
   const days = opts.days ?? 7;
   const profile = { id: userId, intervals_api_key: apiKey };
 
   // Sync last 7 days to catch the new activity
   const oldest = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-  const newest = new Date().toISOString().split("T")[0];
+  // ⚠️ `newest` est un jour LOCAL pour intervals.icu, et ce serveur compte en UTC. Une sortie
+  // courue à 0 h 30 à Paris (22 h 30 UTC la veille) porte le jour suivant : elle tombait hors
+  // de la fenêtre jusqu'à 2 h du matin. L'alerte d'intervals.icu arrive, elle, dans la minute :
+  // sans ce jour de marge, elle ne rapportait rien. Aucune activité n'étant datée dans le
+  // futur, demander jusqu'au lendemain UTC ne coûte rien.
+  const newest = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
   const [activitiesRes, wellnessRes] = await Promise.all([
     fetch(`${BASE}/athlete/${athleteId}/activities?oldest=${oldest}&newest=${newest}`, {
@@ -41,7 +46,9 @@ export async function syncIntervalsForUser(
   ]);
 
   if (!activitiesRes.ok) {
-    return { synced: 0, error: `Intervals.icu ${activitiesRes.status}` };
+    // Le statut accompagne l'erreur : c'est lui qui dit si réessayer a un sens (429, 503…)
+    // ou non (401, 403 : autorisation retirée), pas le texte.
+    return { synced: 0, error: `Intervals.icu ${activitiesRes.status}`, status: activitiesRes.status };
   }
 
   const [activities, wellness]: [IntervalsActivity[], IntervalsWellness[]] = await Promise.all([
@@ -95,9 +102,21 @@ export async function syncIntervalsForUser(
     const payload = buildWorkoutRow(act, { userId, type: workoutType, hasNewCols });
 
     const id = match({ id: act.id, date, title });
-    const { error } = id
+    const { error: eEcriture } = id
       ? await admin.from("workouts").update(payload).eq("id", id)
       : await admin.from("workouts").insert(payload);
+    let error = eEcriture;
+    // ⚠️ 23505 : la séance EXISTE déjà — index unique (user_id, external_id). Deux cas réels :
+    // un autre passage vient de l'écrire (l'alerte d'intervals.icu et le sondage du navigateur
+    // se croisent), ou elle a changé de JOUR (heure corrigée autour de minuit) et la lecture,
+    // bornée aux jours de la fenêtre, ne l'a pas vue. On met donc à jour la ligne existante :
+    // ce n'est ni une nouveauté (pas de replanification), ni un refus (rien au journal).
+    if (error?.code === "23505" && !id && payload.external_id) {
+      const { error: eDejaLa } = await admin.from("workouts").update(payload)
+        .eq("user_id", userId).eq("external_id", String(payload.external_id));
+      if (!eDejaLa) continue;
+      error = eDejaLa;
+    }
     // Ne JAMAIS avaler une erreur d'écriture : c'est précisément ce qui a masqué
     // pendant des mois le fait que ce chemin n'enregistrait rien du tout.
     if (error) { failures.push(`${date} « ${title} » : ${error.code ?? "?"} ${error.message}`); continue; }

@@ -3521,8 +3521,9 @@ test("la séance DÉJÀ COURUE aujourd'hui n'est pas réécrite", () => {
 test("la chaîne sync → analyse → replanification → montre n'existe qu'à un endroit", () => {
   // Elle a existé en trois exemplaires divergents. Le cron n'importait aucune trace GPS
   // et ignorait le garde-fou anti-rafale : invisible à raison d'un passage par nuit,
-  // ruineux à raison d'un passage toutes les 10 minutes.
-  for (const f of ["src/app/api/cron/sync-all/route.ts", "src/app/api/intervals/sync/route.ts"]) {
+  // ruineux à raison d'un passage toutes les 10 minutes. Le webhook d'intervals.icu, lui,
+  // appelait le coach SANS le garde-fou des 10 minutes jusqu'au 16/10/2026.
+  for (const f of ["src/app/api/cron/sync-all/route.ts", "src/app/api/intervals/sync/route.ts", "src/app/api/webhooks/intervals/route.ts"]) {
     const src = codeOf(f);
     assert.ok(!/autoCoachForUser/.test(src), `${f} rappelle le coach directement au lieu de passer par replanIfFresh`);
     assert.ok(!/importMissingTracks/.test(src), `${f} garde sa propre importation de traces`);

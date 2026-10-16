@@ -76,12 +76,33 @@ Seule précision (#759) : les fichiers FIT importés par l'athlète lui-même so
 Les autres marques (COROS, Suunto, Polar, Wahoo, Apple via Intervals Companion) ne sont pas
 concernées. Pour Pacevo : si le blocage tombe, les coureurs Garmin ne remonteraient plus.
 
-## Webhooks (plus tard)
+## Les alertes (webhooks de l'application) — code prêt le 16/10/2026
 
-L'appli OAuth donne accès aux webhooks : `ACTIVITY_UPLOADED`, `WELLNESS_UPDATED`,
-`CALENDAR_UPDATED` (pas `CALENDAR_EVENT_*`, dépréciés) pourraient déclencher la replanification
-à l'arrivée d'une séance, au lieu des tâches planifiées étranglées. Les webhooks d'activité ne
-partent pas pour les activités Strava. URL en https, réglable sur la page de gestion.
+- **Format réel** (guide d'intégration, forum.intervals.icu, sujet 80090) :
+  `{ "secret": "…", "events": [{ "athlete_id", "type", "timestamp", "activity": {…} }] }`. Le secret
+  voyage dans le CORPS : c'est le champ « Webhook Secret » de Manage App, comparé à
+  `INTERVALS_WEBHOOK_SECRET`. L'ancienne route l'attendait dans `?secret=` et lisait `athlete_id` à la
+  racine : elle n'aurait jamais accepté une seule alerte réelle.
+- **Une réponse hors 2xx est renvoyée** pendant un temps, à intervalles croissants (David, message 20 du
+  même sujet). La route ne répond donc une erreur (503) que si réessayer peut réussir : intervals.icu
+  débordé (429) ou en panne (5xx), coupure réseau, base injoignable, secret pas encore posé. Un compte
+  inconnu, une autorisation retirée (journalisée dans /admin › Bugs) ou un type non traité sont acquittés.
+- **Ce qui synchronise** : `ACTIVITY_UPLOADED`, `ACTIVITY_ANALYZED` (envoyée 60 s après, analyses
+  regroupées), `ACTIVITY_UPDATED`, `WELLNESS_UPDATED`. **Pas `CALENDAR_UPDATED`** : chaque envoi de séances
+  vers la montre écrit le calendrier, qui émettrait l'alerte — boucle. `ACTIVITY_DELETED` est acquittée
+  sans effacer notre copie (le ressenti, la trace et les segments partiraient avec : à concevoir à part).
+- **Comment** : `src/lib/intervals/webhook.ts` (lecture, secret à temps constant, une synchro par athlète,
+  fenêtre qui couvre la séance annoncée) ; la route synchronise par la chaîne partagée
+  (`synchroniser`), répond, puis importe les traces et replanifie APRÈS la réponse (`after`).
+- **Limites** : aucune alerte pour une séance venue de Strava, ni pour un athlète relié par clé API — le
+  sondage (AutoSync) et le balayage restent.
+- **Tests** : `tests/intervals-webhook.test.ts` (20) et 12 cas sur la vraie route dans
+  `tests/synchro.crash.test.ts` ; 18 mutations, toutes détectées.
+
+## ✅ Annuaire public : fait (16/10/2026)
+
+David a répondu « Done! » le 16/10 au mail de Cyprien : Pacevo figure dans l'annuaire public des
+applications d'intervals.icu. Rien à répondre.
 
 ## Après l'approbation : ce qui est fait (12/10/2026)
 
@@ -107,8 +128,8 @@ partent pas pour les activités Strava. URL en https, réglable sur la page de g
   avant d'être posé dans Vercel, production remise en ligne ; nouvel essai réussi (bandeau vert, 16/10 matin).
 - Diagnostic utile : `POST /api/oauth/token` répond 404 « Client and/or secret not found » quand le couple
   identifiant/secret est faux — c'était l'échec du 16/10 à 8 h 58.
-- Mail envoyé par Cyprien à support@intervals.icu le 16/10 pour figurer dans l'annuaire public des applications.
-  Reste : leur réponse ; les webhooks de l'application (plus tard).
+- Mail envoyé par Cyprien à support@intervals.icu le 16/10 pour figurer dans l'annuaire public des applications
+  (accepté le jour même, voir plus haut).
 
 ## ✅ Activée et essayée le 15/10/2026 à 21 h 14
 
@@ -150,19 +171,18 @@ bien-être 200, calendrier 200. Aucune ligne au journal d'erreurs.
 
 ## Ce qui reste à faire
 
-1. **Cyprien** — sur https://intervals.icu/settings/apps › Pacevo › « Manage App » :
-   - relever le **Client ID** et le **Client Secret** ;
-   - vérifier l'adresse de retour : `https://pacevo.fr/api/intervals/oauth/callback` ;
-   - déposer le logo (`public/icon-master-1024.png`).
-2. **Cyprien** — poser les deux variables dans Vercel (Production), lui-même : le secret ne passe
-   jamais par la conversation.
-   - `INTERVALS_OAUTH_CLIENT_ID`
-   - `INTERVALS_OAUTH_CLIENT_SECRET`
-   Et dans `.env.local` pour essayer en local (`http://localhost/*` est toujours autorisé).
-3. **Déployer** (avec l'accord de Cyprien), puis essayer « Autoriser Pacevo » sur Sync Montre avec le
-   compte de Cyprien : bandeau vert, première synchro, séance poussée sur la montre.
-4. **Annuaire public** : une fois testé, écrire à support@intervals.icu avec le lien de la page de
-   gestion pour figurer dans la liste des applications (exigé par la documentation).
-5. **Webhooks de l'application** (plus tard) : une seule adresse pour tous les athlètes, réglée sur la
-   page de gestion ; `/api/webhooks/intervals` lit encore l'ancien format et doit être réécrit avant
-   (voir aussi la branche non fusionnée du 12/10 qui touche cette route).
+La connexion OAuth est **terminée** : approuvée le 12/10, en production le 15/10, secret changé et
+vérifié le 16/10, inscrite à l'annuaire le 16/10.
+
+Les **alertes** (code prêt le 16/10) restent à mettre en service, dans cet ordre :
+1. **Le secret des alertes**, le même des deux côtés, sans qu'il passe jamais par une conversation :
+   fabriqué sur le Mac, posé dans Vercel (Production) sous `INTERVALS_WEBHOOK_SECRET` par la CLI qui le
+   lit sur l'entrée standard, puis collé par Cyprien dans le champ « Webhook Secret » de Manage App.
+   (L'ancienne valeur de ce champ a été visible sur une capture du 15/10 : on la remplace.)
+2. **Déployer**, avec l'accord de Cyprien : une variable Vercel ne vaut qu'au déploiement suivant.
+3. **Manage App** : Webhook URL `https://pacevo.fr/api/webhooks/intervals` ; cocher `ACTIVITY_UPLOADED`,
+   `ACTIVITY_ANALYZED`, `ACTIVITY_UPDATED`, `WELLNESS_UPDATED` ; ne PAS cocher `CALENDAR_UPDATED` ;
+   enregistrer.
+4. **Essai** : renommer une séance sur intervals.icu → alerte `ACTIVITY_UPDATED` → journaux Vercel :
+   `[webhook/intervals] 1 athlète(s) · ACTIVITY_UPDATED · … · réponse 200`. Un secret désaccordé se lit
+   dans /admin › Bugs (« Alerte intervals.icu refusée : son secret ne correspond pas… »).

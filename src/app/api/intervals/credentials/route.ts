@@ -3,12 +3,8 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { compteDeLaCle } from "@/lib/intervals/compteDeLaCle";
-import { enteteIntervals, estJetonOAuth, jetonDe } from "@/lib/intervals/auth";
+import { estJetonOAuth, jetonDe } from "@/lib/intervals/auth";
 import { revoquer } from "@/lib/intervals/oauth";
-
-const INTERVALS_BASE = "https://intervals.icu/api/v1";
-
-const intervalsAuth = enteteIntervals;
 
 // GET — fetch user's saved credentials (masked)
 export async function GET() {
@@ -35,7 +31,7 @@ export async function GET() {
   });
 }
 
-// POST — save credentials + auto-register Intervals.icu webhook
+// POST — enregistre la clé API ; l'identifiant d'athlète est celui que la clé désigne.
 export async function POST(req: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -70,31 +66,29 @@ export async function POST(req: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (estJetonOAuth(avant?.intervals_api_key)) await revoquer(jetonDe(String(avant!.intervals_api_key)));
 
-  // 3. Auto-register webhook with Intervals.icu (best effort — don't fail if it doesn't work)
-  const webhookResult = await registerWebhook(athleteId, apiKey);
-
-  return NextResponse.json({ ok: true, athleteId, nom: compte.nom, webhook: webhookResult });
+  // Pas d'alerte à enregistrer ici : intervals.icu n'en offre AUCUNE à une clé API (son
+  // `/athlete/{id}/webhooks` répondait 404, vérifié le 06/08/2026). Les alertes sont celles de
+  // l'application OAuth, réglées une fois pour toutes sur sa page Manage App
+  // (`/api/webhooks/intervals`). Un athlète relié par clé reste servi par le sondage.
+  return NextResponse.json({ ok: true, athleteId, nom: compte.nom });
 }
 
-// DELETE — remove credentials + unregister webhook
+// DELETE — remove credentials
 export async function DELETE() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Get credentials before deleting to unregister webhook
+  // Lus avant l'effacement : il faut le jeton pour le rendre à intervals.icu.
   const { data: profile } = await supabase
     .from("profiles")
     .select("intervals_athlete_id, intervals_api_key")
     .eq("id", user.id)
     .single();
 
-  // OAuth : on révoque l'autorisation (ce qui coupe aussi les webhooks de l'application).
-  // Clé API : on retire l'éventuel webhook personnel, comme avant.
+  // OAuth : on révoque l'autorisation, ce qui coupe aussi les alertes de l'application.
   if (estJetonOAuth(profile?.intervals_api_key)) {
     await revoquer(jetonDe(String(profile!.intervals_api_key)));
-  } else if (profile?.intervals_athlete_id && profile?.intervals_api_key) {
-    await unregisterWebhook(profile.intervals_athlete_id, profile.intervals_api_key).catch(() => {});
   }
 
   /**
@@ -112,82 +106,4 @@ export async function DELETE() {
   if (error) return NextResponse.json({ error: "Déconnexion impossible, tes identifiants sont toujours enregistrés" }, { status: 500 });
 
   return NextResponse.json({ ok: true });
-}
-
-// ── Webhook helpers ──────────────────────────────────────────────────────────
-
-// ⚠️ intervals.icu N'EXPOSE PAS d'API d'enregistrement de webhook pour l'authentification
-// par clé API : `GET/POST /athlete/{id}/webhooks` répond 404 (vérifié le 6 août 2026, alors
-// que /activities répond 200 avec les mêmes identifiants). Cette fonction a donc TOUJOURS
-// échoué silencieusement. La fraîcheur des données est assurée autrement : le composant
-// AutoSync appelle /api/intervals/sync au chargement, au retour sur l'onglet et toutes les
-// 2 min, et cette route republie le plan dès qu'une séance INÉDITE est importée.
-// On conserve la tentative (sans coût) au cas où l'API évoluerait, mais sans rien promettre.
-async function registerWebhook(athleteId: string, apiKey: string): Promise<string> {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-  const secret = process.env.WEBHOOK_SECRET;
-
-  if (!appUrl || !secret || appUrl.includes("localhost")) {
-    return "skipped (dev environment)";
-  }
-
-  const webhookUrl = `${appUrl}/api/webhooks/intervals?secret=${secret}`;
-
-  try {
-    // List existing webhooks first
-    const listRes = await fetch(`${INTERVALS_BASE}/athlete/${athleteId}/webhooks`, {
-      headers: { Authorization: intervalsAuth(apiKey) },
-    });
-
-    if (listRes.ok) {
-      const existing: { id: number; url: string }[] = await listRes.json();
-      // Delete old webhook for our domain if any
-      for (const wh of existing) {
-        if (wh.url?.includes(new URL(appUrl).hostname)) {
-          await fetch(`${INTERVALS_BASE}/athlete/${athleteId}/webhooks/${wh.id}`, {
-            method: "DELETE",
-            headers: { Authorization: intervalsAuth(apiKey) },
-          });
-        }
-      }
-    }
-
-    // Register new webhook
-    const createRes = await fetch(`${INTERVALS_BASE}/athlete/${athleteId}/webhooks`, {
-      method: "POST",
-      headers: {
-        Authorization: intervalsAuth(apiKey),
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ url: webhookUrl }),
-    });
-
-    if (createRes.ok) return "registered";
-    const err = await createRes.text();
-    console.warn("[credentials] Webhook registration failed:", createRes.status, err);
-    return `failed (${createRes.status})`;
-  } catch (err) {
-    console.warn("[credentials] Webhook registration error:", err);
-    return "error";
-  }
-}
-
-async function unregisterWebhook(athleteId: string, apiKey: string) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-  if (!appUrl || appUrl.includes("localhost")) return;
-
-  const listRes = await fetch(`${INTERVALS_BASE}/athlete/${athleteId}/webhooks`, {
-    headers: { Authorization: intervalsAuth(apiKey) },
-  });
-  if (!listRes.ok) return;
-
-  const existing: { id: number; url: string }[] = await listRes.json();
-  for (const wh of existing) {
-    if (wh.url?.includes(new URL(appUrl).hostname)) {
-      await fetch(`${INTERVALS_BASE}/athlete/${athleteId}/webhooks/${wh.id}`, {
-        method: "DELETE",
-        headers: { Authorization: intervalsAuth(apiKey) },
-      });
-    }
-  }
 }

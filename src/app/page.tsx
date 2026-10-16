@@ -71,8 +71,9 @@ const FEATURE_ICONS: LucideIcon[] = [Heart, Activity, CloudRain, Map, BookOpen, 
 //   · buildWeekPlan pose 7 jours de plan glissant ;
 //   · .github/workflows/sync-coach.yml demande deux passages par heure — et c'est bien
 //     une DEMANDE : mesuré le 02/09/2026, GitHub n'en exécutait qu'un toutes les ~100
-//     minutes alors que le fichier en réclamait six. La réactivité réelle vient du
-//     webhook de synchronisation instantanée, pas de ce cron.
+//     minutes alors que le fichier en réclamait six. La réactivité réelle vient des
+//     alertes d'intervals.icu (athlètes reliés par OAuth ; la route ne lisait pas leur
+//     format avant le 16/10/2026) et du sondage de l'onglet ouvert, pas de ce cron.
 // Les valeurs vivent dans `lib/brand/stats` — elles étaient recopiées ici ET dans le
 // panneau des pages d'auth, qui affichait encore trois chiffres INVENTÉS longtemps
 // après leur retrait d'ici. Une seule source, importée des deux côtés.

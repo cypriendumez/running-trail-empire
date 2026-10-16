@@ -50,8 +50,9 @@ export const CHIFFRES = {
    * `src/data/gear/chaussures.json` contient ~309 modèles, tous avec leur code-barres.
    * On annonce donc un chiffre recomptable, arrondi vers le bas.
    *
-   * (La réactivité réelle du coach ne se mesure pas en minutes de cron : elle vient du
-   * webhook de synchronisation instantanée, qui replanifie dès qu'une séance arrive.)
+   * (La réactivité réelle du coach ne se mesure pas en minutes de cron : elle vient des
+   * alertes d'intervals.icu — athlètes reliés par OAuth, `/api/webhooks/intervals`, qui
+   * ne lisait pas leur format avant le 16/10/2026 — et du sondage de l'onglet ouvert.)
    */
   modeles: "300+",
 } as const;

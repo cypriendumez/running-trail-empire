@@ -19,7 +19,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { syncIntervalsForUser } from "./syncUser";
-import { journaliserRefus } from "./refusSynchro";
+import { journaliserRefus, type CanalSynchro } from "./refusSynchro";
 
 /** Jamais deux republications à moins de 10 min : chacune réécrit le calendrier ET
  *  pousse cinq séances sur la montre. */
@@ -45,6 +45,42 @@ export type SyncReport = {
   passagers: number;
   error?: string;
 };
+
+export type Synchro = {
+  fresh: number;
+  refus: number;
+  passagers: number;
+  error?: string;
+  /** Statut HTTP d'intervals.icu quand c'est lui qui a refusé ; `null` pour une coupure réseau. */
+  status?: number | null;
+};
+
+/**
+ * PREMIÈRE MOITIÉ de la chaîne : importer, puis journaliser les refus d'écriture sous le nom
+ * de la route appelante (`canal`), celle que /admin › Bugs affiche.
+ *
+ * L'alerte d'intervals.icu (webhook) n'attend QU'ELLE : son issue décide de la réponse
+ * (une alerte non acquittée est renvoyée), et elle doit tenir en quelques secondes. La
+ * seconde moitié part après la réponse.
+ *
+ * Ne lève jamais : une coupure réseau devient une erreur sans statut, que
+ * `estErreurTransitoire` reconnaît comme passagère.
+ */
+export async function synchroniser(
+  admin: SupabaseClient,
+  opts: { userId: string; athleteId: string; apiKey: string; days?: number; canal: CanalSynchro },
+): Promise<Synchro> {
+  try {
+    const { synced, error, status, failures } = await syncIntervalsForUser(admin, opts);
+    if (error) return { fresh: 0, refus: 0, passagers: 0, error, status: status ?? null };
+    // Les refus d'écriture partent au journal AVANT la suite : rien de ce qui vient après
+    // (traces, replanification) ne doit pouvoir les emporter.
+    const { refus, passagers } = await journaliserRefus(admin, { userId: opts.userId, canal: opts.canal, failures });
+    return { fresh: synced, refus, passagers };
+  } catch (e) {
+    return { fresh: 0, refus: 0, passagers: 0, error: e instanceof Error ? e.message : String(e), status: null };
+  }
+}
 
 /** Importe les traces GPS manquantes. Best-effort : jamais bloquant. */
 export async function importTracksBestEffort(
@@ -93,6 +129,22 @@ export async function replanIfFresh(
 }
 
 /**
+ * SECONDE MOITIÉ : traces GPS manquantes, puis replanification si une séance inédite est
+ * arrivée. Ni l'une ni l'autre ne lève (best-effort, garde-fou des 10 minutes).
+ */
+export async function poursuivre(
+  admin: SupabaseClient,
+  opts: { userId: string; athleteId: string; apiKey: string },
+  fresh: number,
+): Promise<Pick<SyncReport, "tracks" | "replanned" | "skipped">> {
+  const tracks = await importTracksBestEffort(admin, { userId: opts.userId, apiKey: opts.apiKey });
+  const { replanned, skipped } = await replanIfFresh(admin, {
+    userId: opts.userId, athleteId: opts.athleteId, apiKey: opts.apiKey, fresh,
+  });
+  return { tracks, replanned, skipped };
+}
+
+/**
  * Chaîne complète, côté SERVEUR (client admin) : c'est celle du balayage périodique,
  * le seul chemin qui fonctionne quand l'athlète n'ouvre pas l'application.
  */
@@ -100,18 +152,12 @@ export async function syncAndCoachForUser(
   admin: SupabaseClient,
   opts: { userId: string; athleteId: string; apiKey: string; days?: number },
 ): Promise<SyncReport> {
-  const { synced, error, failures } = await syncIntervalsForUser(admin, opts);
-  if (error) {
-    return { fresh: 0, replanned: false, skipped: "erreur", tracks: { imported: 0, withoutGps: 0, failed: 0, remaining: 0 }, refus: 0, passagers: 0, error };
+  const s = await synchroniser(admin, { ...opts, canal: "cron" });
+  if (s.error) {
+    return { fresh: 0, replanned: false, skipped: "erreur", tracks: { imported: 0, withoutGps: 0, failed: 0, remaining: 0 }, refus: 0, passagers: 0, error: s.error };
   }
-  // Les refus d'écriture partent au journal AVANT la suite : rien de ce qui vient après
-  // (traces, replanification) ne doit pouvoir les emporter.
-  const { refus, passagers } = await journaliserRefus(admin, { userId: opts.userId, canal: "cron", failures });
-  const tracks = await importTracksBestEffort(admin, { userId: opts.userId, apiKey: opts.apiKey });
-  const { replanned, skipped } = await replanIfFresh(admin, {
-    userId: opts.userId, athleteId: opts.athleteId, apiKey: opts.apiKey, fresh: synced,
-  });
-  return { fresh: synced, replanned, skipped, tracks, refus, passagers };
+  const suite = await poursuivre(admin, opts, s.fresh);
+  return { fresh: s.fresh, ...suite, refus: s.refus, passagers: s.passagers };
 }
 
 /**

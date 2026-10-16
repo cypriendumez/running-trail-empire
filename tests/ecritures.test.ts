@@ -278,10 +278,14 @@ test("chaque appelant de la synchronisation lit `failures` et le journalise", ()
       }
     });
   }
-  // Un balayage qui ne trouve rien passe toujours : les deux appelants connus doivent y être.
-  for (const attendu of [join("src", "app", "api", "webhooks", "intervals", "route.ts"), join("src", "lib", "intervals", "syncAndCoach.ts")]) {
-    assert.ok(sites.includes(attendu), `${attendu} n'appelle plus la synchro, ou le balayage ne le voit plus`);
-  }
+  // Un balayage qui ne trouve rien passe toujours : l'appelant connu doit y être.
+  const chaine = join("src", "lib", "intervals", "syncAndCoach.ts");
+  assert.ok(sites.includes(chaine), `${chaine} n'appelle plus la synchro, ou le balayage ne le voit plus`);
+  // Le webhook l'appelait lui-même ; depuis le 16/10/2026 il passe par la chaîne (`synchroniser`),
+  // qui journalise sous le nom de la route appelante — vérifié sur la vraie route dans
+  // tests/synchro.crash.test.ts (« webhook : une séance refusée par la base arrive au journal »).
+  assert.ok(/synchroniser\(admin,[^)]*canal:\s*"webhook"/.test(codeNu(join("src", "app", "api", "webhooks", "intervals", "route.ts"))),
+    "le webhook ne passe plus par la chaîne qui journalise ses refus");
   assert.deepEqual(fautes, [], `des refus d'écriture de la synchro se perdent :\n    ${fautes.join("\n    ")}`);
 });
 

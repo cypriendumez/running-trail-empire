@@ -724,7 +724,7 @@ await atest("un journal qui ne s'écrit pas ne fait pas tomber la synchro — la
 // intervals.icu simulés derrière `fetch`. Seul ce qui part au réseau est imité.
 const ENV_BANC: Record<string, string> = {
   NEXT_PUBLIC_SUPABASE_URL: "http://supabase.test", SUPABASE_SERVICE_ROLE_KEY: "cle-de-test",
-  WEBHOOK_SECRET: "secret-webhook-test", CRON_SECRET: "secret-cron-test",
+  INTERVALS_WEBHOOK_SECRET: "secret-webhook-test", CRON_SECRET: "secret-cron-test",
 };
 const envAvant = Object.fromEntries(Object.keys(ENV_BANC).map((k) => [k, process.env[k]]));
 Object.assign(process.env, ENV_BANC);
@@ -736,9 +736,15 @@ const NUIT = { id: "2026-10-11", hrv: 62, sleepSecs: 27000 };
 const REFUS_SEANCE = { status: 400, corps: { code: "22P02", message: 'invalid input syntax for type smallint: "176.54"', details: null, hint: null } };
 const REFUS_VFC = { status: 400, corps: { code: "23502", message: 'null value in column "hrv_ms" of relation "hrv_data" violates not-null constraint', details: null, hint: null } };
 
-type Ecrit = { methode: string; table: string; corps: unknown };
-function banc(o: { activites?: unknown[]; wellness?: unknown[]; refus?: Record<string, { status: number; corps: unknown }>; journalHS?: boolean }): Ecrit[] {
-  const ecrits: Ecrit[] = [];
+type Ecrit = { methode: string; table: string; corps: unknown; filtre: string };
+/** Les écritures, plus ce qui a été LU en base et DEMANDÉ à intervals.icu. */
+type Banc = Ecrit[] & { lus: string[]; intervals: string[] };
+/**
+ * `refus` : par table (« workouts ») ou par méthode et table (« POST workouts »).
+ * `intervalsStatut` : ce que rend intervals.icu à la lecture des activités (503, 401…).
+ */
+function banc(o: { activites?: unknown[]; wellness?: unknown[]; refus?: Record<string, { status: number; corps: unknown }>; journalHS?: boolean; intervalsStatut?: number }): Banc {
+  const ecrits: Banc = Object.assign([] as Ecrit[], { lus: [] as string[], intervals: [] as string[] });
   const reponse = (status: number, corps?: unknown) => new Response(
     corps === undefined ? null : typeof corps === "string" ? corps : JSON.stringify(corps),
     { status, headers: { "content-type": typeof corps === "string" ? "text/plain" : "application/json" } });
@@ -746,31 +752,46 @@ function banc(o: { activites?: unknown[]; wellness?: unknown[]; refus?: Record<s
     const url = new URL(entree instanceof Request ? entree.url : String(entree));
     const methode = (init?.method ?? "GET").toUpperCase();
     if (url.hostname === "intervals.icu") {
-      if (url.pathname.endsWith("/activities")) return reponse(200, o.activites ?? []);
+      ecrits.intervals.push(url.pathname + url.search);
+      if (url.pathname.endsWith("/activities")) return o.intervalsStatut ? reponse(o.intervalsStatut, "indisponible") : reponse(200, o.activites ?? []);
       if (url.pathname.endsWith("/wellness")) return reponse(200, o.wellness ?? []);
       return reponse(404, {});
     }
     if (url.hostname !== "supabase.test") return reponse(404, {});
     const table = url.pathname.replace("/rest/v1/", "");
     if (methode === "GET" || methode === "HEAD") {
-      if (table === "profiles" && url.searchParams.get("intervals_athlete_id") === "eq.i1") return reponse(200, PROFIL); // webhook (.single)
+      ecrits.lus.push(`${table}${decodeURIComponent(url.search)}`);
+      // Webhook : UNE lecture pour toute la livraison, `intervals_athlete_id=in.(i1,I1)`.
+      const filtre = url.searchParams.get("intervals_athlete_id") ?? "";
+      if (table === "profiles" && filtre.startsWith("in.(")) {
+        const ids = filtre.slice(4, -1).split(",").map((s) => s.replace(/"/g, ""));
+        return reponse(200, ids.includes(PROFIL.intervals_athlete_id) ? [PROFIL] : []);
+      }
       if (table === "profiles" && url.searchParams.has("intervals_api_key")) return reponse(200, [PROFIL]);         // cron (liste)
       return reponse(200, []);
     }
-    ecrits.push({ methode, table, corps: init?.body ? JSON.parse(String(init.body)) : null });
+    ecrits.push({ methode, table, corps: init?.body ? JSON.parse(String(init.body)) : null, filtre: decodeURIComponent(url.search) });
     if (table === "error_logs" && o.journalHS) return reponse(503, "upstream connect error");
-    const refus = o.refus?.[table];
+    const refus = o.refus?.[`${methode} ${table}`] ?? o.refus?.[table];
     if (refus) return reponse(refus.status, refus.corps);
     return reponse(methode === "POST" ? 201 : 204);
   };
   return ecrits;
 }
 const auJournal = (ecrits: Ecrit[]) => ecrits.filter((e) => e.table === "error_logs").flatMap((e) => e.corps as LigneJournal[]);
-const appelerWebhook = async () => {
+/** Une livraison telle qu'intervals.icu l'envoie (guide d'intégration, forum, sujet 80090). */
+const livraison = (events: unknown[], secret: unknown = "secret-webhook-test") => ({ secret, events });
+const ALERTE_SORTIE = { athlete_id: "i1", type: "ACTIVITY_UPLOADED", timestamp: "2026-10-11T19:10:00.000+00:00",
+  activity: { id: SORTIE.id, start_date_local: SORTIE.start_date_local } };
+type ReponseWebhook = {
+  ok?: boolean; fresh?: number; refus?: number; passagers?: number;
+  bilans?: { athlete: string; issue: string; fresh: number }[]; raisons?: Record<string, string>;
+};
+const appelerWebhook = async (corps: unknown = livraison([ALERTE_SORTIE])) => {
   const { POST } = await import("../src/app/api/webhooks/intervals/route");
-  const res = await POST(new Request("https://pacevo.fr/api/webhooks/intervals?secret=secret-webhook-test",
-    { method: "POST", body: JSON.stringify({ athlete_id: "i1", event: "activity_updated" }) }));
-  return { status: res.status, j: await res.json() as { ok?: boolean; synced?: number; refus?: number } };
+  const res = await POST(new Request("https://pacevo.fr/api/webhooks/intervals",
+    { method: "POST", body: typeof corps === "string" ? corps : JSON.stringify(corps) }));
+  return { status: res.status, j: await res.json() as ReponseWebhook };
 };
 type CompteRendu = { refus?: number; results?: { ok: boolean; refus?: number; passagers?: number }[] };
 const appelerCron = async () => {
@@ -835,6 +856,132 @@ await atest("cron : un journal injoignable ne fait pas tomber le passage", async
   assert.equal(status, 200);
   assert.deepEqual([j.results?.[0]?.ok, j.results?.[0]?.refus], [true, 1]);
   assert.ok(sortie.some((s) => s.startsWith("error:") && /journal non écrit/.test(s)), "l'échec du journal n'est écrit nulle part");
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+console.log("\n📨 ALERTES D'intervals.icu — la vraie route, au format réel (16/10/2026)\n");
+// ─────────────────────────────────────────────────────────────────────────────
+// Jusqu'au 16/10/2026, la route attendait `?secret=` et `athlete_id` à la racine du corps :
+// elle n'aurait accepté aucune alerte réelle. Une alerte non acquittée (hors 2xx) est
+// RENVOYÉE par intervals.icu : chaque statut ci-dessous est une décision, pas un détail.
+
+await atest("alerte : une séance inédite est importée, PUIS la replanification est demandée", async () => {
+  const ecrits = banc({ activites: [SORTIE] });
+  const { r: { status, j } } = await enSilence(() => appelerWebhook());
+  assert.equal(status, 200);
+  assert.ok(ecrits.some((e) => e.methode === "POST" && e.table === "workouts"), "la séance annoncée n'a pas été écrite");
+  assert.equal(j.fresh, 1, "la séance inédite n'est pas comptée");
+  assert.deepEqual(j.bilans?.map((b) => b.issue), ["synchronisé"]);
+  // Le garde-fou des 10 minutes se lit dans `auto_coach_state` : le lire, c'est demander la
+  // replanification (après la réponse en production ; ici, hors requête, tout de suite).
+  assert.ok(ecrits.lus.some((l) => l.startsWith("notifications") && l.includes("auto_coach_state")), "la replanification n'a pas été demandée");
+});
+
+await atest("alerte : un secret faux est refusé (401) sans rien lire ni appeler — et ça se voit dans /admin", async () => {
+  const ecrits = banc({ activites: [SORTIE] });
+  const { r: { status } } = await enSilence(() => appelerWebhook(livraison([ALERTE_SORTIE], "secret-devine")));
+  assert.equal(status, 401);
+  assert.deepEqual(ecrits.intervals, [], "intervals.icu a été appelé pour une alerte non authentifiée");
+  assert.deepEqual(ecrits.lus, [], "la base a été lue pour une alerte non authentifiée");
+  const journal = auJournal(ecrits);
+  assert.equal(ecrits.length, journal.length, "une alerte non authentifiée a écrit ailleurs qu'au journal");
+  assert.equal(journal.length, 1, "un secret désaccordé entre intervals.icu et Vercel doit se voir dans /admin › Bugs");
+  assert.match(journal[0].message, /secret/);
+  assert.equal(journal[0].user_id, null);
+});
+
+await atest("alerte : sans INTERVALS_WEBHOOK_SECRET, refus en 503 — l'alerte reviendra, elle n'est pas perdue", async () => {
+  const ecrits = banc({ activites: [SORTIE] });
+  const avant = process.env.INTERVALS_WEBHOOK_SECRET;
+  delete process.env.INTERVALS_WEBHOOK_SECRET;
+  try {
+    const { r: { status } } = await enSilence(() => appelerWebhook());
+    assert.equal(status, 503);
+    assert.deepEqual([ecrits.length, ecrits.lus.length, ecrits.intervals.length], [0, 0, 0], "une alerte non authentifiable a touché quelque chose");
+  } finally { process.env.INTERVALS_WEBHOOK_SECRET = avant; }
+});
+
+await atest("alerte : intervals.icu indisponible ou débordé → 503 pour qu'il la renvoie, rien au journal", async () => {
+  // 429 est le cas qui prouve qu'on lit le STATUT : « Intervals.icu 429 » ne dit rien de
+  // passager à qui ne lirait que le texte, et l'alerte serait acquittée — donc perdue.
+  for (const statut of [503, 429]) {
+    const ecrits = banc({ activites: [SORTIE], intervalsStatut: statut });
+    const { r: { status, j } } = await enSilence(() => appelerWebhook());
+    assert.equal(status, 503, `intervals.icu ${statut} : un incident passager acquitté, c'est une séance perdue jusqu'au prochain balayage`);
+    assert.deepEqual(j.bilans?.map((b) => b.issue), ["passager"]);
+    assert.equal(auJournal(ecrits).length, 0, `intervals.icu ${statut} : un incident passager a été journalisé`);
+    assert.ok(!ecrits.lus.some((l) => l.includes("auto_coach_state")), "une synchro en échec a quand même demandé une replanification");
+  }
+});
+
+await atest("alerte : autorisation retirée (401) → acquittée, mais journalisée", async () => {
+  const ecrits = banc({ activites: [SORTIE], intervalsStatut: 401 });
+  const { r: { status, j } } = await enSilence(() => appelerWebhook());
+  assert.equal(status, 200, "réessayer ne changera rien : l'alerte reviendrait pour rien");
+  assert.deepEqual(j.bilans?.map((b) => b.issue), ["refusé"]);
+  const journal = auJournal(ecrits);
+  assert.equal(journal.length, 1, "un athlète qu'on ne peut plus synchroniser doit se voir dans /admin");
+  assert.deepEqual([journal[0].user_id, journal[0].url], ["u-42", "/api/webhooks/intervals"]);
+  assert.match(journal[0].message, /Intervals\.icu 401/);
+});
+
+await atest("alerte : le calendrier, écrit par Pacevo lui-même, est acquitté sans rien toucher", async () => {
+  const ecrits = banc({ activites: [SORTIE] });
+  const { r: { status, j } } = await enSilence(() => appelerWebhook(livraison([{ athlete_id: "i1", type: "CALENDAR_UPDATED", events: [], deleted_events: [] }])));
+  assert.equal(status, 200);
+  assert.deepEqual([ecrits.length, ecrits.lus.length, ecrits.intervals.length], [0, 0, 0], "une alerte de calendrier a relancé quelque chose : boucle possible");
+  assert.match(j.raisons?.CALENDAR_UPDATED ?? "", /Pacevo/);
+});
+
+await atest("alerte : un athlète sans compte Pacevo est acquitté, sans appel à intervals.icu", async () => {
+  const ecrits = banc({ activites: [SORTIE] });
+  const { r: { status, j } } = await enSilence(() => appelerWebhook(livraison([{ ...ALERTE_SORTIE, athlete_id: "i999" }])));
+  assert.equal(status, 200);
+  assert.deepEqual(j.bilans?.map((b) => b.issue), ["inconnu"]);
+  assert.deepEqual(ecrits.intervals, []);
+});
+
+await atest("alerte : téléversée PUIS analysée dans la même livraison → une seule synchro", async () => {
+  const ecrits = banc({ activites: [SORTIE] });
+  await enSilence(() => appelerWebhook(livraison([ALERTE_SORTIE, { ...ALERTE_SORTIE, type: "ACTIVITY_ANALYZED" }])));
+  // On compte les lectures du BIEN-ÊTRE : la synchro en fait une, et elle seule. La liste des
+  // activités, elle, est aussi relue par l'analyse d'allure et par le coach.
+  assert.equal(ecrits.intervals.filter((u) => u.includes("/wellness")).length, 1, "deux synchros du même athlète pour une seule livraison");
+});
+
+await atest("alerte : une séance déjà écrite par un passage concurrent (23505) n'est ni un refus ni une nouveauté", async () => {
+  // L'alerte et le sondage du navigateur peuvent se croiser : l'index unique (user_id,
+  // external_id) refuse alors la seconde insertion.
+  const DOUBLON = { status: 409, corps: { code: "23505", message: 'duplicate key value violates unique constraint "workouts_user_external_idx"', details: null, hint: null } };
+  const ecrits = banc({ activites: [SORTIE], refus: { "POST workouts": DOUBLON } });
+  const { r: { status, j } } = await enSilence(() => appelerWebhook());
+  assert.equal(status, 200);
+  assert.equal(auJournal(ecrits).length, 0, "une course entre deux synchros a été journalisée comme un refus");
+  assert.equal(j.fresh, 0, "une séance déjà là a été comptée comme inédite : le plan serait republié deux fois");
+  assert.ok(ecrits.some((e) => e.methode === "PATCH" && e.table === "workouts" && /external_id=eq\.i900001/.test(e.filtre)),
+    "la ligne existante n'a pas été mise à jour par son identifiant d'origine");
+});
+
+await atest("alerte : la séance annoncée est dans la fenêtre demandée, même courue après minuit", async () => {
+  // 0 h 30 à Paris = 22 h 30 UTC la veille : la séance porte le jour SUIVANT celui du serveur.
+  const ecrits = banc({ activites: [SORTIE] });
+  const demain = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+  const ilYa5j = new Date(Date.now() - 5 * 86_400_000).toISOString().slice(0, 10);
+  await enSilence(() => appelerWebhook(livraison([{ ...ALERTE_SORTIE, activity: { id: "i900002", start_date_local: `${ilYa5j}T07:00:00` } }])));
+  const demande = ecrits.intervals.find((u) => u.includes("/activities"));
+  assert.ok(demande, "intervals.icu n'a pas été interrogé");
+  const url = new URL(`https://intervals.icu${demande}`);
+  assert.ok((url.searchParams.get("newest") ?? "") >= demain, `borne newest ${url.searchParams.get("newest")} : une sortie après minuit à Paris serait manquée`);
+  assert.ok((url.searchParams.get("oldest") ?? "9") <= ilYa5j, `borne oldest ${url.searchParams.get("oldest")} : la séance annoncée (${ilYa5j}) est hors fenêtre`);
+});
+
+await atest("alerte : un corps qui n'est pas une livraison est refusé (400) sans rien toucher", async () => {
+  for (const corps of ["pas du json", { athlete_id: "i1", event: "activity_updated" }]) {
+    const ecrits = banc({ activites: [SORTIE] });
+    const { r: { status } } = await enSilence(() => appelerWebhook(corps));
+    assert.equal(status, 400, `${JSON.stringify(corps)} accepté`);
+    assert.deepEqual([ecrits.length, ecrits.lus.length, ecrits.intervals.length], [0, 0, 0]);
+  }
 });
 
 globalThis.fetch = vraiFetch;
