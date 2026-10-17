@@ -36,7 +36,7 @@ const MAPTILER = process.env.NEXT_PUBLIC_MAPTILER_KEY || "";
  * par `npm run sync:maplibre` — À RELANCER après toute mise à jour de maplibre-gl,
  * un worker d'une autre version que la bibliothèque ne fonctionnerait pas.
  */
-if (typeof window !== "undefined") setWorkerUrl("/maplibre-gl-csp-worker.js");
+if (typeof window !== "undefined") setWorkerUrl("/maplibre-gl-worker.mjs");
 
 export type FlyoverStats = { title: string; distanceKm: number | null; paceLabel: string | null };
 

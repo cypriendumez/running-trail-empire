@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, useMemo } from "react";
-import maplibregl, { setWorkerUrl } from "maplibre-gl";
+// maplibre-gl v6 est ESM-only : le default export n'existe plus, on prend le namespace.
+import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import {
   FONDS, CALQUES, TRACES, RELIEF, PALIERS_PENTE,
@@ -21,7 +22,7 @@ import { interrogeable, prioriser, versGeoJson, type Toponyme } from "@/lib/trai
  * mais aucune tuile n'est jamais demandée et `load` ne part pas. Le fichier est copié par
  * `npm run sync:maplibre`, à relancer après toute mise à jour de maplibre-gl.
  */
-if (typeof window !== "undefined") setWorkerUrl("/maplibre-gl-csp-worker.js");
+if (typeof window !== "undefined") maplibregl.setWorkerUrl("/maplibre-gl-worker.mjs");
 
 const CLE = process.env.NEXT_PUBLIC_MAPTILER_KEY;
 
