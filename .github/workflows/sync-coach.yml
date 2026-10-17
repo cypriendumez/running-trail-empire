@@ -67,14 +67,24 @@ jobs:
           # --fail-with-body : un 401 ou un 500 doit FAIRE ÉCHOUER le passage et se voir
           # dans l'onglet Actions. Un balayage qui échoue en silence est pire que pas de
           # balayage du tout : on croit le plan à jour alors qu'il ne l'est pas.
-          curl --fail-with-body --silent --show-error --max-time 120 \
+          # -o reponse.json plutôt que `| tee` : le corps n'est PAS imprimé sur la sortie.
+          # La route renvoie un compte rendu PAR ATHLÈTE (champ `userId`, un UUID), et ces
+          # journaux d'exécution sont PUBLICS (dépôt public). B1 de l'audit : on n'imprime
+          # que des totaux agrégés, jamais la liste des athlètes.
+          http=$(curl --fail-with-body --silent --show-error --max-time 120 \
             -H "Authorization: Bearer ${CRON_SECRET}" \
-            "https://pacevo.fr/api/cron/sync-all" | tee reponse.json
-          echo
-          # La réponse ne doit JAMAIS contenir de clé API : la route renvoie un compte
-          # rendu par athlète, et une régression qui y glisserait `intervals_api_key`
-          # publierait la clé dans des journaux d'exécution publics.
+            -o reponse.json -w '%{http_code}' \
+            "https://pacevo.fr/api/cron/sync-all") || {
+              echo "::error::Le balayage a échoué (HTTP ${http})."
+              cat reponse.json   # en échec la réponse est { error: … }, sans liste d'athlètes
+              exit 1
+            }
+          # La réponse ne doit JAMAIS contenir de clé API : une régression qui y glisserait
+          # `intervals_api_key` la publierait dans ces journaux publics.
           if grep -qiE '"?intervals_api_key"?|API_KEY:' reponse.json; then
             echo "::error::La réponse contient un secret — arrêt immédiat."
             exit 1
           fi
+          # Résumé AGRÉGÉ seulement (aucun userId) :
+          jq -r '"tranche \(.shard)/\(.shards) · \(.users) athlète(s) · \(.total_activities) séance(s) inédite(s) · \(.replanned) replanif · \(.refus) refus"' reponse.json \
+            || echo "(résumé indisponible)"
