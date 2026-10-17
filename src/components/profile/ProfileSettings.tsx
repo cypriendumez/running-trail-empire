@@ -10,7 +10,6 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 import { trouver, cotesPourGarage, type ModeleLeger } from "@/lib/shop/indexLeger";
 import { vo2maxEstimate, vo2maxLabel, racePredictions, predictRaceSec, type VmaSource } from "@/lib/running/fitness";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { stripProfileSecrets } from "@/lib/profile/safe";
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthLabel } from "@/data/healthCatalog";
 import { TERRAINS, terrainLabel } from "@/data/terrainCatalog";
 import type { Lang } from "@/lib/i18n/translations";
@@ -725,14 +724,11 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
   async function exportData() {
     setExporting(true);
     try {
-      const supabase = createClient();
-      const [prof, wk, base, gl] = await Promise.all([
-        supabase.from("profiles").select("*").eq("id", userId).single(),
-        supabase.from("workouts").select("*").eq("user_id", userId),
-        supabase.from("performance_baselines").select("*").eq("user_id", userId),
-        supabase.from("user_goals").select("*").eq("user_id", userId),
-      ]);
-      const payload = { exported_at: new Date().toISOString(), profile: stripProfileSecrets(prof.data ?? null), workouts: wk.data ?? [], baselines: base.data ?? [], goals: gl.data ?? [] };
+      // L'export passe par le serveur : le secret intervals.icu est retiré AVANT la réponse,
+      // il n'entre jamais dans le navigateur (audit M1). Voir /api/account/export.
+      const res = await fetch("/api/account/export", { cache: "no-store" });
+      if (!res.ok) throw new Error(`export ${res.status}`);
+      const payload = await res.json();
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");

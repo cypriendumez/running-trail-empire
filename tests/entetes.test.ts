@@ -4,12 +4,11 @@
  * Relevés en production le 04/09/2026 : HSTS, `nosniff` et `X-Frame-Options: DENY`
  * étaient là ; `Referrer-Policy` et `Permissions-Policy` manquaient.
  *
- * ⚠️ CE QUE `Content-Security-Policy` N'EST PAS ENCORE, ET POURQUOI. Elle manque aussi,
- * et c'est un manque réel — mais une CSP posée à l'aveugle sur une application Next.js
- * casse les scripts en ligne qu'elle génère elle-même. La panne serait INVISIBLE depuis
- * ici : la page se rendrait côté serveur, puis resterait morte chez le visiteur. Elle
- * demande des nonces et une vérification écran par écran ; l'ajouter sans cela ferait
- * plus de mal que son absence.
+ * ⚠️ `Content-Security-Policy` EST DÉSORMAIS SERVIE EN REPORT-ONLY (M4, 16/10/2026). En mode
+ * APPLIQUÉ, une CSP casserait les scripts en ligne que Next génère lui-même — la panne serait
+ * INVISIBLE depuis ici (rendu serveur OK, puis page morte chez le visiteur) et demande des nonces
+ * et une vérification écran par écran. Report-only, elle, n'applique rien : elle SIGNALE les
+ * violations (`report-uri` → `/api/csp-report`), le temps de mesurer avant de durcir.
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -20,8 +19,11 @@ function test(nom: string, fn: () => void) {
   catch (e) { fails.push(`${nom} — ${(e as Error).message}`); console.log(`  ✗ ${nom}`); }
 }
 
+// ⚠️ On retire les commentaires SANS confondre `//` (URL) ni `/*` (URL `https://*.hote`) avec
+// un commentaire : un `/*` précédé de `:` ou `/` appartient à une URL (`://*`, `//*`), pas à un
+// commentaire — sinon le bloc mange jusqu'au `*/` suivant et avale de vraies lignes.
 const conf = readFileSync("next.config.ts", "utf8")
-  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/(^|[^:/])\/\*[\s\S]*?\*\//g, "$1")
   .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
 
 test("les cinq en-têtes de sécurité sont déclarés", () => {
@@ -52,6 +54,16 @@ test("la géolocalisation reste ouverte à l'application elle-même", () => {
   for (const interdit of ["camera", "microphone", "payment"]) {
     assert.ok(new RegExp(`${interdit}=\\(\\)`).test(pp![1]), `${interdit} n'est plus fermé`);
   }
+});
+
+test("une CSP est servie en report-only, et pas (encore) appliquée", () => {
+  assert.match(conf, /Content-Security-Policy-Report-Only/, "la CSP report-only n'est plus servie");
+  // Les directives à forte valeur, insensibles aux nonces, doivent y figurer.
+  for (const d of ["default-src 'self'", "object-src 'none'", "frame-ancestors 'none'", "base-uri 'self'", "report-uri /api/csp-report"]) {
+    assert.ok(conf.includes(d), `la CSP report-only ne contient pas « ${d} »`);
+  }
+  // ⚠️ REPORT-ONLY, PAS APPLIQUÉE : l'appliquer sans nonces rendrait les pages mortes chez le visiteur.
+  assert.ok(!/"Content-Security-Policy"\s*,/.test(conf), "la CSP est passée en mode APPLIQUÉ sans nonces : risque de page morte");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

@@ -5,7 +5,7 @@ import { emailInscription } from "@/lib/auth/emailConfirmation";
 import { envoyerEmail } from "@/lib/email/envoyer";
 import { domaineRecoitDuCourrier, suggestionDomaine } from "@/lib/auth/domaineCourrier";
 import { statutCompte } from "@/lib/auth/statutCompte";
-import { autoriser, ipDe } from "@/lib/auth/limiteur";
+import { autoriserPartage, ipDe } from "@/lib/auth/limiteur";
 import { champsConsentement, CONSENTEMENT_EFFACE } from "@/lib/auth/consentement";
 import { randomBytes } from "node:crypto";
 
@@ -46,7 +46,8 @@ import { randomBytes } from "node:crypto";
  * il ne sort d'ici que par l'e-mail.
  */
 export async function POST(req: Request) {
-  if (!autoriser(`inscription:${ipDe(req)}`, 15, 10 * 60_000)) {
+  const limiteurAdmin = createAdminClient();
+  if (!(await autoriserPartage(limiteurAdmin, `inscription:${ipDe(req)}`, 15, 10 * 60_000))) {
     return NextResponse.json({ ok: false, error: "trop_de_requetes" }, { status: 429 });
   }
   const debut = Date.now();

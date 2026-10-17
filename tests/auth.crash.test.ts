@@ -281,7 +281,7 @@ console.log(`  ✓ e-mail : ${rendus} rendus (${LANGS.length} langues × ${LIENS
   // SANS compte est dite à l'écran, au lieu d'un « envoyé » qui laissait attendre en vain.
   // En échange, la route est bornée par le limiteur de débit.
   if (!/error:\s*"aucun_compte"/.test(reset)) fail("la route de reset ne dit pas « aucun compte »", "l'écran afficherait « envoyé » pour une adresse inconnue");
-  if (!/autoriser\(`reset:/.test(reset)) fail("la route de reset n'est pas bornée par le limiteur", "on pourrait tester des milliers d'adresses");
+  if (!/autoriser\w*\([^`]*`reset:/.test(reset)) fail("la route de reset n'est pas bornée par le limiteur", "on pourrait tester des milliers d'adresses");
   if (!/if \(!envoi\.ok\)/.test(reset)) fail("la route de reset répond « envoyé » même quand Resend refuse", "");
   // /auth/confirm : une récupération ne doit PAS passer par /onboarding (nested sous signup/email).
   // (`confirm` est déjà lu plus haut, dans le bloc « lien de confirmation ».)
@@ -360,13 +360,13 @@ console.log(`  ✓ e-mail : ${rendus} rendus (${LANGS.length} langues × ${LIENS
   if (!/error\?\.code === "email_exists"[\s\S]{0,120}"compte_existant"/.test(route)) fail("le refus `email_exists` de Supabase n'est pas traduit en « compte existant »", "");
   if (/return ok\(\)/.test(route)) fail("la route d'inscription a encore une sortie « ok » muette", "");
   if (!/if \(!envoi\.ok\)/.test(route)) fail("l'inscription répond « vérifiez votre email » même quand Resend refuse", "");
-  if (!/autoriser\(`inscription:/.test(route)) fail("l'inscription n'est pas bornée par le limiteur", "");
+  if (!/autoriser\w*\([^`]*`inscription:/.test(route)) fail("l'inscription n'est pas bornée par le limiteur", "");
   // Le renvoi depuis la connexion ne touche ni au nom ni au mot de passe d'un compte existant.
   if (!/envoyerConfirmation\(adresse, null, null,/.test(route)) fail("le renvoi transmet un nom ou un mot de passe", "il écraserait le nom du compte");
   if (!/statut\.compte !== "a_confirmer"/.test(route)) fail("le renvoi ne se limite pas aux comptes à confirmer", "");
   // La recherche passe par la route dédiée, bornée elle aussi, et ne rend que l'état.
   const routeStatut = readFileSync("src/app/api/auth/statut/route.ts", "utf8");
-  if (!/autoriser\(`statut:/.test(routeStatut)) fail("/api/auth/statut n'est pas bornée par le limiteur", "un script listerait les inscrits");
+  if (!/autoriser\w*\([^`]*`statut:/.test(routeStatut)) fail("/api/auth/statut n'est pas bornée par le limiteur", "un script listerait les inscrits");
   const chercheur = readFileSync("src/lib/auth/statutCompte.ts", "utf8");
   if (!/toLowerCase\(\) === cible/.test(chercheur)) fail("la recherche n'exige pas l'égalité EXACTE de l'adresse", "le filtre LIKE de GoTrue ramène aussi « xcyprien@… »");
   ex += 9;

@@ -1,7 +1,8 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { statutCompte } from "@/lib/auth/statutCompte";
-import { autoriser, ipDe } from "@/lib/auth/limiteur";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { autoriserPartage, ipDe } from "@/lib/auth/limiteur";
 
 /**
  * « CETTE ADRESSE A-T-ELLE UN COMPTE, ET COMMENT S'OUVRE-T-IL ? »
@@ -15,7 +16,8 @@ import { autoriser, ipDe } from "@/lib/auth/limiteur";
  * trop peu pour parcourir une liste d'adresses.
  */
 export async function POST(req: Request) {
-  if (!autoriser(`statut:${ipDe(req)}`, 30, 10 * 60_000)) {
+  const admin = createAdminClient();
+  if (!(await autoriserPartage(admin, `statut:${ipDe(req)}`, 30, 10 * 60_000))) {
     return NextResponse.json({ error: "trop_de_requetes" }, { status: 429 });
   }
   const { email } = (await req.json().catch(() => ({}))) as { email?: string };

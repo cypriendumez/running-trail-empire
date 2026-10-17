@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 /**
  * LIMITEUR DE DÉBIT — le prix de « cette adresse a déjà un compte ».
  *
@@ -33,4 +35,25 @@ export function autoriser(cle: string, max: number, fenetreMs: number, maintenan
 /** L'adresse IP du visiteur (première de `x-forwarded-for`, posée par Vercel). */
 export function ipDe(req: Request): string {
   return (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || req.headers.get("x-real-ip") || "inconnue";
+}
+
+/**
+ * LIMITEUR PARTAGÉ — le MÊME compteur pour toutes les instances (constat d'audit M3).
+ *
+ * `autoriser` ci-dessus compte en mémoire, donc une fois PAR INSTANCE : sur Vercel, la limite
+ * réelle vaut un multiple de la limite voulue. Ici, le compteur est en base : la fonction
+ * atomique `rate_limit_hit` (migration 037) incrémente la fenêtre courante et dit si l'appel passe.
+ *
+ * ⚠️ REPLI SYSTÉMATIQUE SUR LA MÉMOIRE. Si la fonction n'existe pas encore (migration non passée)
+ * ou si la base ne répond pas, on retombe sur `autoriser` : jamais pire qu'avant, jamais un
+ * blocage d'utilisateurs légitimes à cause d'un incident de base.
+ */
+export async function autoriserPartage(
+  admin: SupabaseClient, cle: string, max: number, fenetreMs: number, maintenant = Date.now(),
+): Promise<boolean> {
+  try {
+    const { data, error } = await admin.rpc("rate_limit_hit", { p_cle: cle, p_fenetre_ms: fenetreMs, p_max: max });
+    if (!error && typeof data === "boolean") return data;
+  } catch { /* store partagé indisponible : repli mémoire ci-dessous */ }
+  return autoriser(cle, max, fenetreMs, maintenant);
 }

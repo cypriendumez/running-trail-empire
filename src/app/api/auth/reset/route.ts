@@ -5,7 +5,7 @@ import { emailReinitialisation } from "@/lib/auth/emailConfirmation";
 import { envoyerEmail } from "@/lib/email/envoyer";
 import { statutCompte } from "@/lib/auth/statutCompte";
 import { fournisseurDe, sansMotDePasse, statutDepuisUtilisateur } from "@/lib/auth/statut";
-import { autoriser, ipDe } from "@/lib/auth/limiteur";
+import { autoriserPartage, ipDe } from "@/lib/auth/limiteur";
 
 /**
  * L'E-MAIL DE RÉINITIALISATION, ENVOYÉ PAR NOUS.
@@ -29,7 +29,8 @@ import { autoriser, ipDe } from "@/lib/auth/limiteur";
  * contrairement au flux PKCE qui imposait d'ouvrir le lien dans le navigateur d'origine.
  */
 export async function POST(req: Request) {
-  if (!autoriser(`reset:${ipDe(req)}`, 10, 10 * 60_000)) {
+  const limiteurAdmin = createAdminClient();
+  if (!(await autoriserPartage(limiteurAdmin, `reset:${ipDe(req)}`, 10, 10 * 60_000))) {
     return NextResponse.json({ ok: false, error: "trop_de_requetes" }, { status: 429 });
   }
   const { email, lang } = (await req.json().catch(() => ({}))) as { email?: string; lang?: string };

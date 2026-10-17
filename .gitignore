@@ -95,3 +95,11 @@ public/brands/polar.svg
 * [0-9].*
 # État du rafraîchissement hebdomadaire des courses (workflow) : publié comme artefact.
 /.cache-courses/
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  RAPPORT D'AUDIT DE SÉCURITÉ — jamais sur le dépôt PUBLIC.
+#  Il détaille des failles (corrigées) : le publier reviendrait à en donner la carte.
+#  Il vit dans la branche d'audit locale (non poussée) et dans ~/Desktop/Pacevo/.
+#  Ignoré ici pour qu'un `git add -A` ne le remette pas en ligne par accident.
+# ─────────────────────────────────────────────────────────────────────────────
+/docs/audit-securite-*.md

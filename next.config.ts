@@ -89,6 +89,32 @@ const nextConfig: NextConfig = {
     }));
   },
   async headers() {
+    /**
+     * ⚠️ CSP EN REPORT-ONLY (constat d'audit M4). Elle n'APPLIQUE rien : elle SIGNALE les
+     * violations (`report-uri` → `/api/csp-report`, journalisées dans `error_logs`). Une CSP
+     * APPLIQUÉE casserait les scripts en ligne que Next génère lui-même (il faudrait des nonces,
+     * donc un middleware, et une vérification écran par écran) ; report-only mesure sans rien
+     * casser, avant de durcir. Les directives à forte valeur — `connect-src`, `img-src`,
+     * `object-src 'none'`, `frame-ancestors 'none'` — bornent déjà l'exfiltration par une
+     * éventuelle XSS. Hôtes relevés dans le code client : tuiles (maptiler, OSM, opentopomap,
+     * waymarkedtrails, IGN geopf), images (unsplash, cdnjs pour les marqueurs Leaflet, Supabase),
+     * cartes/altitude/itinéraire (maptiler, open-meteo, OSRM, geopf), Supabase REST + realtime.
+     */
+    const csp = [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+      "form-action 'self'",
+      "script-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline'",
+      "font-src 'self' data:",
+      "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://images.pexels.com https://*.mapbox.com https://api.maptiler.com https://*.tile.openstreetmap.org https://*.tile.opentopomap.org https://tile.waymarkedtrails.org https://data.geopf.fr https://cdnjs.cloudflare.com",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.maptiler.com https://*.mapbox.com https://api.open-meteo.com https://router.project-osrm.org https://data.geopf.fr",
+      "worker-src 'self' blob:",
+      "manifest-src 'self'",
+      "report-uri /api/csp-report",
+    ].join("; ");
     return [
       {
         source: "/(.*)",
@@ -111,6 +137,8 @@ const nextConfig: NextConfig = {
            * exploitable. Ce qu'on ferme, c'est ce que le produit n'utilise PAS.
            */
           { key: "Permissions-Policy", value: "camera=(), microphone=(), payment=(), usb=(), geolocation=(self)" },
+          // Report-only : on observe (voir le commentaire et `csp` ci-dessus) avant d'appliquer.
+          { key: "Content-Security-Policy-Report-Only", value: csp },
         ],
       },
     ];
