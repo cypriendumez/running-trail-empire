@@ -110,7 +110,7 @@ const nextConfig: NextConfig = {
       "style-src 'self' 'unsafe-inline'",
       "font-src 'self' data:",
       "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://images.pexels.com https://*.mapbox.com https://api.maptiler.com https://*.tile.openstreetmap.org https://*.tile.opentopomap.org https://tile.waymarkedtrails.org https://data.geopf.fr https://cdnjs.cloudflare.com",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.maptiler.com https://*.mapbox.com https://api.open-meteo.com https://router.project-osrm.org https://data.geopf.fr",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.maptiler.com https://*.mapbox.com https://*.open-meteo.com https://api.bigdatacloud.net https://router.project-osrm.org https://data.geopf.fr",
       "worker-src 'self' blob:",
       "manifest-src 'self'",
       "report-uri /api/csp-report",
