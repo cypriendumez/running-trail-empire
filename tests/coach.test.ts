@@ -5423,8 +5423,14 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
       assert.equal(p.plans.length, 3, `${l} : ${p.plans.length} formules attendues (gratuit, starter, premium)`);
       assert.deepEqual(p.plans.map((x) => x.cle), ["gratuit", "starter", "premium"], `${l} : clés de formule inattendues`);
       assert.ok(p.gratuitNote.length > 10, `${l} : le palier gratuit n'annonce pas qu'il ne demande pas de carte`);
+      // ⚠️ TROIS LIGNES AU MOINS, et plus quatre. Depuis le 22/10/2026 (Cyprien), l'analyse
+      // développée, le GPX et le kiné sont dans LES DEUX formules payantes : la carte
+      // Premium se résume à « Tout le Starter » plus ce qui la distingue VRAIMENT (le
+      // triple d'IA, le coach avancé). Lui imposer une quatrième ligne, c'était exiger
+      // qu'on lui invente une exclusivité — exactement ce qui avait produit « Posture
+      // Lab » et « Accès API développeur ». Le garde-fou vise une carte VIDE, pas courte.
       for (const plan of p.plans) {
-        assert.ok(plan.name && plan.pitch && plan.cta && plan.features.length >= 4, `${l}/${plan.cle} : formule incomplète`);
+        assert.ok(plan.name && plan.pitch && plan.cta && plan.features.length >= 3, `${l}/${plan.cle} : formule incomplète`);
       }
       // Ce qui se passe APRÈS l'essai doit être écrit, dans chaque langue.
       assert.ok(p.apres.length > 40, `${l} : la dégradation en consultation n'est pas expliquée`);

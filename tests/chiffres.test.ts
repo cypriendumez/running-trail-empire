@@ -27,7 +27,7 @@ import { JOURS_ESSAI } from "../src/lib/billing/access";
 import { ARTICLES } from "../src/app/blog/articles";
 import { ARTICLES_I18N } from "../src/app/blog/articlesI18n";
 import { LEGAL } from "../src/app/legalI18n";
-import { accesDe, peut, JOURS_APERCU } from "../src/lib/billing/access";
+import { accesDe, peut } from "../src/lib/billing/access";
 import { PRIX_AFFICHES } from "../src/lib/billing/prix";
 import { ATTRIBUTION_GARMIN, PAGES_ATTRIBUTION } from "../src/components/legal/attributionI18n";
 import { liensStore } from "../src/lib/brand/stores";
@@ -1116,48 +1116,45 @@ test("ce que la page des tarifs promet, le verrou l'accorde vraiment", () => {
   // qui vend : promettre une fonction dans une formule qui ne l'ouvre pas, ou la
   // fermer dans une formule qui la facture. Ce test relie les deux là où c'est
   // vérifiable — les capacités, pas la prose.
+  //
+  // ⚠️ DÉCOUPAGE DU 22/10/2026 (Cyprien). Le gratuit reçoit ses séances vers son
+  // objectif, sans analyse de ses données ; l'analyse développée, le GPX et le kiné sont
+  // dans LES DEUX formules payantes ; Premium garde le coach avancé et le triple d'IA.
   assert.ok(!peut("gratuit", "ia"), "le gratuit ne doit RIEN consommer en IA");
-  assert.ok(!peut("gratuit", "plan"), "le gratuit ne doit pas avoir le plan complet");
+  assert.ok(!peut("gratuit", "plan"), "le gratuit ne doit pas avoir le plan adaptatif");
   assert.ok(!peut("gratuit", "gpx"), "le gratuit ne doit pas avoir l'export GPX");
-  assert.ok(peut("gratuit", "apercu"), "le gratuit doit voir un aperçu, sinon il ne peut pas juger le produit");
+  assert.ok(peut("gratuit", "plan_objectif"), "le gratuit doit recevoir ses séances vers son objectif");
   assert.ok(peut("gratuit", "lecture"), "l'historique reste ouvert : on ne prend personne en otage");
-
-  assert.ok(peut("starter", "plan") && peut("starter", "ia"), "Starter, c'est le coach complet");
-
-  // ⚠️ TROIS PROMESSES « PREMIUM » N'ÉTAIENT VERROUILLÉES NULLE PART. La page réservait
-  // les plans IA à la demande, le Smart Journal et les analyses détaillées à Premium
-  // dans les cinq langues ; les routes n'exigeaient que `ia`, que Starter possède aussi.
-  // Un client à 14,99 € recevait donc ce qu'un client à 9,99 € avait déjà, et la seule
-  // différence réelle était le volume d'appels. Une formule qui ne verrouille rien n'est
-  // pas une formule — et c'est le genre d'écart qu'un acheteur vérifie ligne à ligne.
-  for (const c of ["plan_ia", "journal", "analyse_longue"] as const) {
-    assert.ok(!peut("starter", c), `« ${c} » est annoncé Premium mais ouvert à Starter`);
-    assert.ok(peut("premium", c), `« ${c} » est annoncé Premium mais fermé à Premium`);
-    assert.ok(peut("essai", c), `l'essai doit montrer « ${c} », sinon il fait choisir par méconnaissance`);
+  for (const c of ["plan_ia", "analyse_longue", "journal"] as const) {
     assert.ok(!peut("gratuit", c), `« ${c} » est ouvert au palier gratuit`);
   }
-  // ⚠️ CE QUI SÉPARE LES DEUX FORMULES PAYANTES. Si Starter gagnait le GPX, Premium ne
-  // se distinguerait plus que par un volume d'IA — trop peu pour justifier 5 € de plus.
-  assert.ok(!peut("starter", "gpx"), "le GPX doit rester à Premium");
-  assert.ok(peut("premium", "gpx") && peut("premium", "plan") && peut("premium", "ia"));
-  // L'essai doit montrer le niveau le PLUS HAUT, sinon il fait choisir par méconnaissance.
-  for (const c of ["apercu", "plan", "ia", "gpx"] as const) {
-    assert.ok(peut("essai", c), `l'essai doit ouvrir « ${c} »`);
-  }
 
-  // L'aperçu doit rester un aperçu : sept jours, et il n'y a plus rien à vendre.
-  assert.ok(JOURS_APERCU >= 1 && JOURS_APERCU <= 3, `aperçu de ${JOURS_APERCU} jours — trop généreux ou vide`);
+  // Ce que les DEUX formules payantes annoncent, et l'essai qui doit le montrer.
+  for (const e of ["starter", "premium", "essai"] as const) {
+    for (const c of ["plan_objectif", "plan", "ia", "gpx", "analyse_longue"] as const) {
+      assert.ok(peut(e, c), `${e} : « ${c} » est annoncé dans les formules payantes mais fermé`);
+    }
+  }
+  // ⚠️ CE QUI SÉPARE ENCORE LES DEUX FORMULES PAYANTES. Si Starter gagnait le coach
+  // avancé, Premium ne se distinguerait plus que par un volume d'IA.
+  assert.ok(!peut("starter", "plan_ia"), "le coach avancé est annoncé Premium mais ouvert à Starter");
+  assert.ok(peut("premium", "plan_ia"), "le coach avancé est annoncé Premium mais fermé à Premium");
+  assert.ok(peut("essai", "plan_ia"), "l'essai doit montrer le coach avancé, sinon il fait choisir par méconnaissance");
 
-  // Et la page ne doit pas annoncer le GPX dans le gratuit, dans AUCUNE langue.
-  const tarifs = readFileSync(join(ROOT, "src/components/landing/landingI18n.ts"), "utf8");
-  for (const m of tarifs.matchAll(/cle: "gratuit"[^}]*?features: \[([^\]]*)\]/g)) {
-    assert.ok(!/GPX|Trail Builder/i.test(m[1]), `le gratuit annonce le GPX : ${m[1].slice(0, 70)}`);
+  // Les cartes, dans les CINQ langues.
+  const tarifs = sansCommentaires(readFileSync(join(ROOT, "src/components/landing/landingI18n.ts"), "utf8"));
+  const cartes = (cle: string) => [...tarifs.matchAll(new RegExp(`cle: "${cle}"[^}]*?features: \\[([^\\]]*)\\]`, "g"))].map((m) => m[1]);
+  assert.equal(cartes("gratuit").length, 5, "les cartes gratuites sont illisibles");
+  for (const f of cartes("gratuit")) {
+    assert.ok(!/GPX|Trail Builder/i.test(f), `le gratuit annonce le GPX : ${f.slice(0, 70)}`);
+    assert.ok(!/Kin[ée]|Physio|Fisio/i.test(f), `le gratuit annonce le kiné IA : ${f.slice(0, 70)}`);
   }
-  let premiumAvecGpx = 0;
-  for (const m of tarifs.matchAll(/cle: "premium"[^}]*?features: \[([^\]]*)\]/g)) {
-    if (/GPX/i.test(m[1])) premiumAvecGpx++;
-  }
-  assert.equal(premiumAvecGpx, 5, `le GPX n'est annoncé dans Premium que pour ${premiumAvecGpx} langue(s) sur 5`);
+  const avec = (cle: string, motif: RegExp) => cartes(cle).filter((f) => motif.test(f)).length;
+  assert.equal(avec("starter", /GPX/), 5, "le GPX n'est pas annoncé dans Starter dans les 5 langues");
+  assert.equal(avec("starter", /Kin[ée]|Physio|Fisio/i), 5, "le kiné IA n'est pas annoncé dans Starter dans les 5 langues");
+  // ⚠️ L'ÉCRAN DU SMART JOURNAL A ÉTÉ RETIRÉ LE 30/09/2026 et la page le vendait encore
+  // dans Premium, et dans la grille de l'accueil, trois semaines plus tard.
+  assert.ok(!/Smart Journal/i.test(tarifs), "la vitrine vend le Smart Journal, dont l'écran n'existe plus");
 });
 
 test("le détail d'une séance nomme l'appareil, jamais le canal de synchro", () => {

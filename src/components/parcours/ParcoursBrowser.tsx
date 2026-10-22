@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, X, MapPin, Mountain, Loader2, ChevronLeft, ChevronRight,
-  SlidersHorizontal, Flame, Download, Route as RouteIcon, LocateFixed, Timer,
+  SlidersHorizontal, Flame, Download, Route as RouteIcon, LocateFixed, Timer, Lock,
 } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 import {
   SPORTS, DIFFICULTES, TYPES, SPORT_META, DIFF_META, SPORT_ACTIVITY, coordFor,
@@ -32,7 +33,12 @@ interface ApiResponse {
 }
 
 // ─── Composant ───────────────────────────────────────────────────────────────────
-export function ParcoursBrowser({ initialSearch = "" }: { initialSearch?: string } = {}) {
+/**
+ * `exportGpx` : droit de télécharger le tracé (formules payantes). FAUX par défaut — un
+ * appelant qui oublie la propriété ferme le bouton, il ne l'offre pas. La recherche, la
+ * carte et le tracé affiché restent ouverts à tous.
+ */
+export function ParcoursBrowser({ initialSearch = "", exportGpx = false }: { initialSearch?: string; exportGpx?: boolean } = {}) {
   const { lang } = useT();
   const L = PX[lang] ?? PX.fr;
   const pr = (k: string, p?: Record<string, string | number>) => fillP(L[k] ?? k, p);
@@ -354,7 +360,7 @@ export function ParcoursBrowser({ initialSearch = "" }: { initialSearch?: string
       ) : (
         <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 transition-opacity ${loading ? "opacity-60" : ""}`}>
           {data?.items.map((p) => (
-            <ParcoursCard key={p.id} p={p} near={sort === "proche" ? near : null} loading={loadingId === p.id} disabled={loadingId !== null && loadingId !== p.id} onLoad={() => loadOnMap(p)} />
+            <ParcoursCard key={p.id} p={p} near={sort === "proche" ? near : null} loading={loadingId === p.id} disabled={loadingId !== null && loadingId !== p.id} onLoad={() => loadOnMap(p)} exportGpx={exportGpx} />
           ))}
         </div>
       )}
@@ -403,7 +409,7 @@ ${seg}
 }
 
 // ─── Carte parcours ──────────────────────────────────────────────────────────────
-function ParcoursCard({ p, near, loading, disabled, onLoad }: { p: ParcoursHdf; near?: { lat: number; lng: number } | null; loading: boolean; disabled: boolean; onLoad: () => void }) {
+function ParcoursCard({ p, near, loading, disabled, onLoad, exportGpx }: { p: ParcoursHdf; near?: { lat: number; lng: number } | null; loading: boolean; disabled: boolean; onLoad: () => void; exportGpx: boolean }) {
   const { lang } = useT();
   const L = PX[lang] ?? PX.fr;
   const pr = (k: string, pp?: Record<string, string | number>) => fillP(L[k] ?? k, pp);
@@ -422,7 +428,7 @@ function ParcoursCard({ p, near, loading, disabled, onLoad }: { p: ParcoursHdf; 
 
   const downloadGpx = useCallback(async (e: { stopPropagation: () => void }) => {
     e.stopPropagation();
-    if (dl) return;
+    if (dl || !exportGpx) return;
     setDl(true);
     const tid = toast.loading(L["t.gpxPrep"]);
     try {
@@ -446,7 +452,7 @@ function ParcoursCard({ p, near, loading, disabled, onLoad }: { p: ParcoursHdf; 
     } finally {
       setDl(false);
     }
-  }, [dl, p, L]);
+  }, [dl, p, L, exportGpx]);
 
   return (
     <div className="relative group">
@@ -506,15 +512,27 @@ function ParcoursCard({ p, near, loading, disabled, onLoad }: { p: ParcoursHdf; 
       </div>
     </button>
 
-      {/* Bouton GPX — télécharge le vrai tracé (montre / téléphone / appli GPS) */}
-      <button
-        type="button" onClick={downloadGpx} disabled={dl}
-        aria-label={pr("gpxAria", { name: p.nom })}
-        title={L["gpxTitle"]}
-        className="absolute bottom-3.5 right-3.5 z-10 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-white bg-zinc-900/90 backdrop-blur hover:bg-emerald-600 shadow-lg opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-      >
-        {dl ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} GPX
-      </button>
+      {/* Bouton GPX — télécharge le vrai tracé (montre / téléphone / appli GPS). Formules
+          payantes : sans le droit, il mène aux formules au lieu de disparaître. */}
+      {exportGpx ? (
+        <button
+          type="button" onClick={downloadGpx} disabled={dl}
+          aria-label={pr("gpxAria", { name: p.nom })}
+          title={L["gpxTitle"]}
+          className="absolute bottom-3.5 right-3.5 z-10 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-white bg-zinc-900/90 backdrop-blur hover:bg-emerald-600 shadow-lg opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+        >
+          {dl ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} GPX
+        </button>
+      ) : (
+        <Link
+          href="/pricing"
+          aria-label={L["gpxVerrou"]}
+          title={L["gpxVerrou"]}
+          className="absolute bottom-3.5 right-3.5 z-10 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-white bg-zinc-900/90 backdrop-blur hover:bg-zinc-700 shadow-lg opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+        >
+          <Lock className="w-3.5 h-3.5" /> GPX
+        </Link>
+      )}
     </div>
   );
 }

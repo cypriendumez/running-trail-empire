@@ -12,7 +12,7 @@ import { buildAthleteContext } from "@/lib/ai/coachContext";
 import { buildWeekPlan, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
 import { estQualitePrescrite } from "@/lib/coach/qualiteRecente";
 import { pushIntervalsWorkout, supprimerIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
-import { profilPeut, COLONNES_ACCES, JOURS_APERCU } from "@/lib/billing/access";
+import { profilPeut, COLONNES_ACCES } from "@/lib/billing/access";
 import { identifiantsDePaire } from "@/lib/intervals/identifiants";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 import { estAdmin } from "@/lib/admin/acces";
@@ -66,9 +66,9 @@ async function prescrireTestVma(admin: Admin, opts: { userId: string; athleteId?
   if (error) return { processed: false, reason: error.message };
 
   let pushed = 0;
-  // Montre : seulement pour un accès complet. Un compte en aperçu gratuit voit le test
-  // dans l'app et le fait au téléphone (« Enregistrer ») — même règle que le plan normal,
-  // qui ne pousse rien sur la montre d'un compte gratuit.
+  // Montre : seulement pour un accès complet. Un compte gratuit voit le test dans l'app et
+  // le fait au téléphone (« Enregistrer ») — même règle que son plan bâti sur l'objectif,
+  // qui ne pousse rien sur la montre.
   const ids = opts.pushToWatch ? identifiantsDePaire(opts.athleteId, opts.apiKey) : null;
   if (ids?.athleteId && ids.apiKey) {
     try {
@@ -114,13 +114,14 @@ export async function autoCoachForUser(
   const { data: profilAcces } = await admin.from("profiles").select(`${COLONNES_ACCES}, email, preferred_language`).eq("id", userId).maybeSingle();
   const acces = profilAcces as Parameters<typeof profilPeut>[0];
   const planComplet = profilPeut(acces, "plan");
-  // ⚠️ LE GRATUIT NE RECEVAIT RIEN — impasse commerciale : un compte qui ne voit jamais
-  // le produit ne peut pas décider de le payer. Il reçoit désormais un APERÇU de deux
-  // jours. Ce n'est PAS un plan générique : il sort des mêmes données que le plan
-  // complet, parce qu'un « plan standard » qui ignore la VFC prescrirait de la VMA à
-  // quelqu'un d'épuisé — l'exact contraire de ce que ce produit défend.
-  const apercu = !planComplet && profilPeut(acces, "apercu");
-  if (!planComplet && !apercu) {
+  // ⚠️ LE PALIER GRATUIT REÇOIT SEPT JOURS, BÂTIS SUR SON OBJECTIF SEUL (Cyprien,
+  // 22/10/2026). Avant, il recevait un aperçu de deux jours tiré de TOUTES ses mesures —
+  // exactement l'inverse de ce qui se vend : le gratuit profitait de l'analyse du sommeil
+  // et de la VFC, et n'avait pas de quoi organiser une semaine. Désormais le contexte ne
+  // lit, pour lui, que l'objectif, le déclaré et le volume couru (`objectifSeul`) ; rien
+  // ne part sur la montre et aucun modèle ne relit le plan.
+  const objectifSeul = !planComplet && profilPeut(acces, "plan_objectif");
+  if (!planComplet && !objectifSeul) {
     return { processed: false, reason: "essai_expire" };
   }
 
@@ -148,14 +149,10 @@ export async function autoCoachForUser(
     return prescrireTestVma(admin, { userId, athleteId: opts.athleteId, apiKey: opts.apiKey, pushToWatch: planComplet });
   }
 
-  const ctx = await buildAthleteContext(admin as unknown as Parameters<typeof buildAthleteContext>[0], userId).catch(() => null);
+  const ctx = await buildAthleteContext(admin as unknown as Parameters<typeof buildAthleteContext>[0], userId, { objectifSeul }).catch(() => null);
   if (!ctx) return { processed: false, reason: "ctx_failed" };
 
-  // ⚠️ Tronqué APRÈS construction, jamais pendant : le squelette de semaine tient compte
-  // de l'enchaînement qualité → récupération. Le raccourcir en amont donnerait deux
-  // séances qui n'ont plus de sens l'une par rapport à l'autre.
-  const semaineComplete = buildWeekPlan(ctx);
-  const week = apercu ? semaineComplete.slice(0, JOURS_APERCU) : semaineComplete;
+  const week = buildWeekPlan(ctx);
   const today = week[0].date;
 
   // ── LA SÉANCE DÉJÀ COURUE NE SE RÉÉCRIT PAS ─────────────────────────────────
@@ -180,7 +177,7 @@ export async function autoCoachForUser(
   // personnalisé — sans jamais toucher à la séance (voir lib/ai/relectureSemaine). Aucun
   // onglet, aucune question à poser : c'est le même plan, mieux expliqué. Starter garde le
   // moteur seul. Best effort : une panne ou un délai dépassé donne le plan sans conseil.
-  const coachAvance = !apercu && profilPeut(acces, "plan_ia");
+  const coachAvance = planComplet && profilPeut(acces, "plan_ia");
   const langue = normLang(String((profilAcces as { preferred_language?: string } | null)?.preferred_language ?? "fr"));
   const relecture = coachAvance
     ? await relireSemaine(admin as unknown as SupabaseClient, { userId, ctx, week, from, lang: langue })
@@ -251,7 +248,7 @@ export async function autoCoachForUser(
   const ids = identifiantsDePaire(opts.athleteId, opts.apiKey);
   const athleteId = ids?.athleteId;
   const apiKey = ids?.apiKey;
-  if (athleteId && apiKey && !apercu) {
+  if (athleteId && apiKey && planComplet) {
     try {
       const { data: objRow } = await admin.from("notifications").select("data").eq("user_id", userId).eq("type", "race_objective").maybeSingle();
       const objectiveRace = ((objRow?.data as { race?: string } | undefined)?.race) || null;
@@ -301,12 +298,13 @@ export async function autoCoachForUser(
     .eq("user_id", userId).eq("type", "auto_coach_state").maybeSingle();
   const lastEmailAt = (prevState?.data as { lastPlanEmailAt?: string } | null)?.lastPlanEmailAt ?? null;
   let emailed = false;
-  // ⚠️ L'e-mail « ton plan est à jour » annonce SEPT jours de prescription. L'envoyer
-  // pour un aperçu de deux jours promettrait un service qui n'est pas celui du palier.
-  let emailSkipped: string | undefined = apercu
-    ? "aperçu gratuit"
+  // ⚠️ L'e-mail « ton plan est à jour » part APRÈS UNE SÉANCE et dit ce qu'elle a montré
+  // et ce qu'elle change : c'est le coach adaptatif. Le plan gratuit ne lit pas les séances,
+  // il n'a donc rien de tel à annoncer.
+  let emailSkipped: string | undefined = objectifSeul
+    ? "plan gratuit (objectif seul)"
     : opts.notify ? undefined : "replanification sans séance nouvelle";
-  if (opts.notify && !apercu) {
+  if (opts.notify && planComplet) {
     const { sendPlanReadyEmail } = await import("@/lib/notify/planReady");
     const r = await sendPlanReadyEmail(admin, {
       userId,

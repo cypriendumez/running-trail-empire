@@ -5,7 +5,7 @@ import { JOURS_ESSAI } from "@/lib/billing/access";
 import { useEffect, useState } from "react";
 import {
   ArrowRight, ChevronRight, Check, Menu, X,
-  Bot, Heart, Map, Trophy, Ghost, Moon, CloudRain, ShoppingBag, BookOpen, Shield, Activity, Zap, Flag, Flame, Scale,
+  Bot, Heart, Trophy, Ghost, ShoppingBag, Zap, Watch, Mountain, MapPin, ClipboardList, GraduationCap, Medal,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
@@ -57,7 +57,13 @@ const LARGEURS_CARTE = [400, 600, 900];
 // menthe arrondie : c'est le motif le plus reconnaissable des pages « générées », et
 // c'est lui qui faisait amateur bien plus que les textes.
 const PILLAR_ICONS: LucideIcon[] = [Bot, Ghost, Zap];
-const FEATURE_ICONS: LucideIcon[] = [Heart, Activity, CloudRain, Map, BookOpen, Flag, Flame, Scale, Trophy];
+// ⚠️ LA GRILLE SUIT LES ONGLETS DE L'APPLICATION (Cyprien, 22/10/2026 : « voici les
+// principaux onglets de mon application, je pense que ça sera plus pertinent »), avec les
+// MÊMES icônes que le menu (`components/layout/navigation.ts`) : ce qu'on voit ici, on le
+// retrouve tel quel une fois connecté. « Météo réelle » et « Trail Builder » en sont sortis
+// à sa demande ; « Smart Journal vocal » aussi, parce que l'écran n'existe plus depuis le
+// 30/09/2026 — on ne vend pas ce qu'on a retiré.
+const FEATURE_ICONS: LucideIcon[] = [Watch, Heart, Mountain, MapPin, ClipboardList, Trophy, GraduationCap, ShoppingBag, Medal];
 
 // ── CHIFFRES DU BANDEAU — chacun est VÉRIFIABLE, aucun n'est décoratif ──────
 //  « 10k+ coureurs actifs », « 4,9 ★ de note moyenne » et « 98 % de satisfaction »

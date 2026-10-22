@@ -22,9 +22,11 @@ const Relief3D = dynamic(() => import("./Relief3D").then((m) => m.Relief3D), {
   ),
 });
 
-export function TrailModes({ centre, textes }: {
+export function TrailModes({ centre, textes, exportGpx }: {
   centre?: { lat: number; lon: number } | null;
   textes: Record<string, string>;
+  /** Droit d'exporter en GPX (formules payantes) — lu côté serveur par la page. */
+  exportGpx: boolean;
 }) {
   const [mode, setMode] = useState<"construire" | "relief">("construire");
   /**
@@ -79,7 +81,7 @@ export function TrailModes({ centre, textes }: {
       {/* Les deux modes sont MONTÉS séparément : garder le constructeur vivant sous la vue
           relief ferait tourner deux moteurs cartographiques en même temps. */}
       {mode === "construire"
-        ? <TrailBuilderLazy centre={centre} onTrace={recevoir} />
+        ? <TrailBuilderLazy centre={centre} onTrace={recevoir} exportGpx={exportGpx} />
         : <Relief3D centre={centre} trace={trace} textes={textes} />}
     </div>
   );

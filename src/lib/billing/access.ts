@@ -34,13 +34,13 @@ export type Acces =
 
 /** Ce qu'on cherche à faire. */
 export type Capacite =
-  | "lecture"  // historique, courses, trophées, séries — toujours ouvert
-  | "apercu"   // les 2 prochains jours du plan, sans replanification ni montre
-  | "plan"     // le plan complet de 7 jours, replanifié à chaque synchronisation
-  | "gpx"      // Trail Builder et export GPX
+  | "lecture"  // historique, courses, trophées, séries, carte et parcours — toujours ouvert
+  | "plan_objectif" // le plan bâti sur l'OBJECTIF seul : aucune mesure lue, rien sur la montre
+  | "plan"     // le plan ADAPTATIF : séances, sommeil, VFC, FC lus ; poussé sur la montre
+  | "gpx"      // exporter une trace en GPX (Carte et parcours) — la carte elle-même est ouverte
   | "ia"       // faire parler un modèle (analyse, kiné, coach, assistant)
-  | "plan_ia"  // demander un plan complet écrit par le modèle
-  | "journal"  // le Smart Journal et son analyse
+  | "plan_ia"  // le coach avancé : le modèle relit les séances clés du plan
+  | "journal"  // l'analyse du Smart Journal — écran retiré le 30/09/2026, route sans appelant
   | "analyse_longue"; // l'analyse de séance en version développée
 
 /**
@@ -126,61 +126,50 @@ export function accesDe(p: ProfilAcces | null | undefined, maintenant: number = 
  *
  * `lecture` est ouvert à TOUS les états, y compris la consultation, et c'est
  * délibéré : à l'expiration on ne coupe pas tout. L'athlète garde son historique,
- * ses courses et ses trophées, il perd seulement la production de nouveaux plans.
- * Servir ces pages ne coûte rien, et une coupure sèche fait désinstaller l'app —
- * alors qu'un compte en consultation revient de lui-même à la préparation suivante.
+ * ses courses et ses trophées, la carte et les parcours. Servir ces pages ne coûte
+ * rien, et une coupure sèche fait désinstaller l'app.
  */
 /**
- * ⚠️ LE PLAN EST PAYANT — DÉCISION COMMERCIALE, PAS TECHNIQUE, ET IL FAUT LE SAVOIR.
+ * ⚠️ CE QUI EST PAYANT, C'EST L'ADAPTATION — DÉCISION COMMERCIALE, PAS TECHNIQUE.
  *
  * `autoPlan` et `autoCoach` sont DÉTERMINISTES : republier sept jours ne consomme aucun
- * jeton et ne coûte donc rien à servir. Le mettre derrière l'abonnement ne protège
- * aucune dépense — c'est un choix d'ACQUISITION assumé par Cyprien : le coach adaptatif
- * est ce que le produit a de meilleur, donc c'est lui qui doit décider quelqu'un à
- * payer, pas seulement l'IA conversationnelle.
- *
- * Ce que ça coûte, en revanche : le palier gratuit devient un CONSULTATEUR. Il garde
- * ses activités (la synchronisation intervals.icu tourne indépendamment du verrou,
- * vérifié dans syncAndCoach), son historique, ses courses et ses trophées — mais plus
- * de prescription. Si les inscriptions se tarissent, c'est la première ligne à
- * réexaminer : remettre `plan` ici ne coûterait toujours rien.
+ * jeton, quel que soit le palier. Le gratuit reçoit donc un plan, bâti sur son objectif.
+ * Ce qui se vend, c'est le coach qui LIT : chaque séance analysée, le sommeil, la VFC,
+ * la fréquence cardiaque, la fraîcheur du jour — et la séance envoyée au poignet.
  *
  * `ia` reste la seule capacité dont la dépense grandit avec le nombre d'athlètes, et
  * son volume (PLAFOND_JOUR) sépare les deux formules payantes.
  */
 const DROITS: Record<Acces, Capacite[]> = {
-  // ⚠️ LE GRATUIT NE RECEVAIT RIEN, et c'était une impasse commerciale : un compte qui
-  // ne voit jamais le produit ne peut pas décider de le payer. Il reçoit maintenant un
-  // APERÇU — les 2 prochains jours seulement, recalculés une fois par jour, sans
-  // poussée sur la montre et sans un mot d'IA. De quoi comprendre ce que fait le coach,
-  // pas de quoi s'en passer.
+  // ⚠️ LE DÉCOUPAGE DU 22/10/2026 (Cyprien) : « dans l'abonnement gratuit, les
+  // utilisateurs n'ont accès qu'au plan d'entraînement gratuit, ou alors ils mettent leur
+  // prochaine course ou un objectif de temps ou de distance, et l'IA donne les séances
+  // selon ces objectifs — mais en aucun cas le coach n'analyse leurs séances, leur
+  // sommeil, leurs caractéristiques physiques et physiologiques ».
   //
-  // ⚠️ L'aperçu est construit à partir DES VRAIES DONNÉES de l'athlète, pas d'un
-  // squelette générique. Servir un plan « standard » qui ignore la VFC et le sommeil
-  // reviendrait à prescrire une séance de VMA à quelqu'un d'épuisé : le produit tout
-  // entier repose sur l'inverse, et ce serait le seul endroit où il mentirait.
-  gratuit: ["lecture", "apercu"],
-  // L'essai montre le niveau Premium, GPX compris : juger le produit sur la formule
-  // basse ferait choisir Starter par méconnaissance, ou renoncer.
-  essai: ["lecture", "apercu", "plan", "ia", "gpx", "plan_ia", "journal", "analyse_longue"],
-  starter: ["lecture", "apercu", "plan", "ia"],
-  // ⚠️ TROIS FONCTIONS ANNONCÉES « PREMIUM » N'ÉTAIENT VERROUILLÉES NULLE PART :
-  // les plans IA à la demande, le Smart Journal et les analyses détaillées. La page les
-  // réservait à Premium dans les cinq langues ; les routes, elles, n'exigeaient que
-  // `ia` — que Starter possède aussi. Un client à 14,99 € recevait donc exactement ce
-  // qu'un client à 9,99 € avait déjà, et la seule différence réelle était le volume
-  // d'appels. Une formule qui ne verrouille rien n'est pas une formule.
-  premium: ["lecture", "apercu", "plan", "ia", "gpx", "plan_ia", "journal", "analyse_longue"],
+  // Le gratuit reçoit donc un VRAI plan de sept jours, mais bâti sur l'objectif et sur ce
+  // que l'athlète DÉCLARE (disponibilités, VMA du test, douleurs signalées), plus les
+  // kilomètres qu'il court — seul garde-fou contre une montée de volume qui blesse. Ce
+  // qu'il ne lit pas : sommeil, VFC, fréquence cardiaque, puissance, foulée, ressenti,
+  // météo, analyse de chaque séance. Voir `buildAthleteContext(…, { objectifSeul })`.
+  // Rien n'est poussé sur la montre et aucun modèle ne parle.
+  //
+  // La carte, tous les parcours, le Ghost Runner vocal et le comparateur sont ouverts à
+  // tous : ils relèvent de `lecture`, qu'aucune route ne refuse.
+  gratuit: ["lecture", "plan_objectif"],
+  // L'essai montre le niveau Premium : juger le produit sur la formule basse ferait
+  // choisir Starter par méconnaissance, ou renoncer.
+  essai: ["lecture", "plan_objectif", "plan", "ia", "gpx", "analyse_longue", "plan_ia", "journal"],
+  // ⚠️ L'ANALYSE DÉVELOPPÉE ET LE GPX DANS LES DEUX FORMULES PAYANTES (Cyprien, 22/10) :
+  // « pour les deux abonnements, il faut que le coach IA soit très puissant en analyse de
+  // séance », et l'export GPX vers la montre « dans les abonnements payants ». Le kiné IA
+  // y est par `ia`. Ce qui sépare encore Premium : trois fois plus d'appels IA par jour
+  // (`PLAFOND_JOUR`) et le coach avancé (`plan_ia`), qui relit les séances clés du plan.
+  starter: ["lecture", "plan_objectif", "plan", "ia", "gpx", "analyse_longue"],
+  premium: ["lecture", "plan_objectif", "plan", "ia", "gpx", "analyse_longue", "plan_ia", "journal"],
 };
 
 /**
- * Combien de jours de plan voit un compte gratuit.
- *
- * ⚠️ DEUX, pas sept. Assez pour voir la logique — une séance de qualité suivie de sa
- * récupération — trop peu pour organiser une semaine, ce qui est précisément le service
- * qu'on vend. Un chiffre plus généreux ne convertirait pas davantage : il retirerait la
- * raison de payer.
- */
 /**
  * COMBIEN DE JOURS D'ESSAI STRIPE ACCORDER À CET ATHLÈTE.
  *
@@ -212,8 +201,6 @@ export function joursEssaiStripe(p: ProfilAcces | null | undefined, maintenant?:
   // manuelle) donnerait sinon un essai plus long que celui qu'on annonce.
   return Math.max(0, Math.min(JOURS_ESSAI, joursRestants));
 }
-
-export const JOURS_APERCU = 2;
 
 export function peut(etat: Acces, quoi: Capacite): boolean {
   return DROITS[etat].includes(quoi);

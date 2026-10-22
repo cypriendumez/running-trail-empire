@@ -131,9 +131,11 @@ test("français → le pourquoi canonique ; autre langue → SA traduction, le f
 
 console.log("\n=== BRANCHEMENT ===\n");
 
-test("Premium et essai seulement ; jamais l'aperçu gratuit ; le plan ne dépend pas du modèle", () => {
+test("Premium et essai seulement ; jamais le plan gratuit ; le plan ne dépend pas du modèle", () => {
   const src = codeNu("src/lib/ai/autoCoach.ts");
-  assert.match(src, /const coachAvance = !apercu && profilPeut\(acces, "plan_ia"\);/);
+  // `planComplet` et pas seulement `plan_ia` : le plan gratuit (objectif seul) ne doit
+  // jamais être relu par un modèle, quel que soit le tableau des droits.
+  assert.match(src, /const coachAvance = planComplet && profilPeut\(acces, "plan_ia"\);/);
   assert.match(src, /const relecture = coachAvance\s*\? await relireSemaine\(/);
   assert.match(src, /const rows = semaineCoach\.filter\(/, "les conseils n'atteindraient pas les séances enregistrées");
   assert.match(src, /\.\.\.\(relecture \? \{ relecture \} : \{\}\)/, "sans mémoire, chaque republication rappellerait le modèle");

@@ -5,8 +5,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Undo2, Redo2, Trash2, Download, Save, Loader2,
   ChevronDown, X, MapPin, Mountain, Search, Layers, Bookmark, Heart,
-  SlidersHorizontal, Gauge, Navigation, Share2
+  SlidersHorizontal, Gauge, Navigation, Share2, Lock
 } from "lucide-react";
+import Link from "next/link";
 import { IconeSport } from "@/components/parcours/IconeSport";
 import { chargerProfil, profilOsrm, type Profil } from "@/lib/trail/altitude";
 import { toast } from "sonner";
@@ -210,10 +211,13 @@ function speedRange(activity: ActivityKey): { min: number; max: number; step: nu
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 // ─── Component ───────────────────────────────────────────────────────────────
-export function TrailBuilder({ centre, onTrace }: {
+export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
   centre?: { lat: number; lon: number } | null;
   /** Remonte la trace construite, pour que la vue relief l'affiche telle quelle. */
   onTrace?: (points: { lat: number; lon: number }[]) => void;
+  /** Droit d'exporter en GPX (formules payantes). FAUX par défaut : un oubli de
+   *  propriété ferme le bouton, il ne l'offre pas. */
+  exportGpx?: boolean;
 } = {}) {
   const { lang } = useT();
   const d = TB[lang] ?? TB.fr;
@@ -592,6 +596,7 @@ export function TrailBuilder({ centre, onTrace }: {
 
   // ── GPX export ────────────────────────────────────────────────────────────
   const handleExportGPX = useCallback(() => {
+    if (!exportGpx) return;
     if (!allPoints.length) { toast.error(d["t.drawFirst"]); return; }
     const name = routeName || d["defaultRouteName"];
     const gpx = buildGPX(name, allPoints, elevations);
@@ -603,7 +608,7 @@ export function TrailBuilder({ centre, onTrace }: {
     a.click();
     URL.revokeObjectURL(url);
     toast.success(d["t.gpxOk"]);
-  }, [allPoints, elevations, routeName, d]);
+  }, [allPoints, elevations, routeName, d, exportGpx]);
 
   // ── Save route ─────────────────────────────────────────────────────────────
   const handleSave = useCallback(async () => {
@@ -1028,16 +1033,30 @@ export function TrailBuilder({ centre, onTrace }: {
 
             <span className="w-px h-6 bg-zinc-200" />
 
-            <button
-              type="button"
-              onClick={handleExportGPX}
-              disabled={!hasRoute}
-              aria-label={d["exportGpx"]}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-            >
-              <Download className="w-4 h-4" />
-              {d["exportGpx"]}
-            </button>
+            {/* Export GPX : formules payantes. Sans le droit, le bouton mène aux formules
+                au lieu de disparaître — l'athlète doit savoir que la fonction existe. */}
+            {exportGpx ? (
+              <button
+                type="button"
+                onClick={handleExportGPX}
+                disabled={!hasRoute}
+                aria-label={d["exportGpx"]}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+              >
+                <Download className="w-4 h-4" />
+                {d["exportGpx"]}
+              </button>
+            ) : (
+              <Link
+                href="/pricing"
+                title={d["gpxVerrou"]}
+                aria-label={d["gpxVerrou"]}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium text-zinc-500 hover:bg-zinc-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+              >
+                <Lock className="w-4 h-4" />
+                {d["exportGpx"]}
+              </Link>
+            )}
           </div>
 
           {/* Tools (la recherche de ville a été retirée — la recherche globale du haut s'en charge) */}
@@ -1137,14 +1156,25 @@ export function TrailBuilder({ centre, onTrace }: {
                       {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                       {d["save"]}
                     </button>
-                    <button
-                      type="button"
-                      onClick={handleExportGPX}
-                      disabled={!hasRoute}
-                      className="flex items-center justify-center gap-1.5 px-3 py-2 border border-zinc-200 hover:bg-zinc-50 rounded-xl text-xs font-medium text-zinc-600 disabled:opacity-40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-                    >
-                      <Download className="w-3.5 h-3.5" /> GPX
-                    </button>
+                    {exportGpx ? (
+                      <button
+                        type="button"
+                        onClick={handleExportGPX}
+                        disabled={!hasRoute}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2 border border-zinc-200 hover:bg-zinc-50 rounded-xl text-xs font-medium text-zinc-600 disabled:opacity-40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                      >
+                        <Download className="w-3.5 h-3.5" /> GPX
+                      </button>
+                    ) : (
+                      <Link
+                        href="/pricing"
+                        title={d["gpxVerrou"]}
+                        aria-label={d["gpxVerrou"]}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2 border border-zinc-200 hover:bg-zinc-50 rounded-xl text-xs font-medium text-zinc-500 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                      >
+                        <Lock className="w-3.5 h-3.5" /> GPX
+                      </Link>
+                    )}
                   </div>
                   <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide mb-1.5">{tb("myRoutes", { n: savedRoutes.length })}</div>
                   {loadingRoutes ? (

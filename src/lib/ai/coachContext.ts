@@ -284,6 +284,9 @@ export type AthleteContext = {
    *  la distance). Destinés à l'ÉCRAN autant qu'à l'IA — ils ne servaient à rien tant
    *  qu'ils ne quittaient pas le prompt. */
   objectiveWarnings: string[];
+  /** Construit pour le palier gratuit (`LectureContexte.objectifSeul`) : l'objectif et le
+   *  déclaré, aucune mesure. Optionnel : un contexte sérialisé avant cette version ne l'a pas. */
+  objectifSeul?: boolean;
   /** Mode perte de poids — `null` s'il n'est pas activé OU si le profil n'y est pas
    *  éligible. Quand il est présent, il PLAFONNE la qualité et la progression du volume
    *  dans le plan déterministe, il ne se contente pas d'informer l'IA. */
@@ -298,8 +301,12 @@ export type AthleteContext = {
  * encore (42703). Nommer `sport` avant l'application de la migration 015 priverait
  * donc le coach de TOUT l'historique, et pas seulement du sport. On retente sans.
  */
-async function fetchWorkouts(sb: SB, userId: string) {
-  const cols = "vertical_ratio_pct,hrr_bpm,date,type,distance_km,duration_seconds,elevation_gain_m,avg_hr,max_hr,training_effect,tss,avg_cadence_spm,avg_power_watts,vertical_oscillation_cm,ground_contact_ms,stride_length_m,cardiac_decoupling,weather_temp_c,gap_min_km,hr_zone_seconds,intensity_pct";
+async function fetchWorkouts(sb: SB, userId: string, objectifSeul = false) {
+  // Palier gratuit : le VOLUME seul (quand, quoi, combien de kilomètres et de minutes).
+  // Aucune fréquence cardiaque, puissance, foulée ni charge mesurée — voir `LectureContexte`.
+  const cols = objectifSeul
+    ? COLONNES_VOLUME
+    : "vertical_ratio_pct,hrr_bpm,date,type,distance_km,duration_seconds,elevation_gain_m,avg_hr,max_hr,training_effect,tss,avg_cadence_spm,avg_power_watts,vertical_oscillation_cm,ground_contact_ms,stride_length_m,cardiac_decoupling,weather_temp_c,gap_min_km,hr_zone_seconds,intensity_pct";
   const q = async (c: string) => {
     const r = await sb.from("workouts").select(c).eq("user_id", userId).order("date", { ascending: false }).limit(60);
     return { data: r.data as unknown as Wk[] | null, error: r.error };
@@ -308,26 +315,75 @@ async function fetchWorkouts(sb: SB, userId: string) {
   return withSport.error ? await q(cols) : withSport;
 }
 
-export async function buildAthleteContext(sb: SB, userId: string): Promise<AthleteContext> {
+/**
+ * CE QUE LE CONTEXTE A LE DROIT DE LIRE.
+ *
+ * `objectifSeul` — LE PALIER GRATUIT (Cyprien, 22/10/2026) : « l'IA donne les séances
+ * selon ses objectifs, mais en aucun cas le coach n'analyse ses séances, son sommeil,
+ * ses caractéristiques physiques, physiologiques ». Le plan se bâtit alors sur :
+ *  · l'OBJECTIF (course, date, chrono, distance) ;
+ *  · ce que l'athlète DÉCLARE : disponibilités, terrains, VMA du test, âge (espacement
+ *    des séances dures), pathologies, zones fragiles et douleurs signalées ;
+ *  · les KILOMÈTRES courus — date, durée, distance, dénivelé, type —, seul garde-fou
+ *    contre une montée de volume qui blesse.
+ * Il NE lit PAS : VFC, sommeil, fréquence cardiaque (repos, max, zones), puissance,
+ * foulée, charge mesurée (TSS), dérive cardiaque, courbe d'allure, VO2max Garmin,
+ * relecture des répétitions, ressenti et notes de séance, chaussures, poids et
+ * morphologie, cycle, position (donc ni météo, ni altitude).
+ *
+ * ⚠️ LES LECTURES INTERDITES NE SONT PAS FAITES, ELLES NE SONT PAS « IGNORÉES ». Rendre
+ * une réponse vide en amont, c'est faire voir au moteur un athlète dont la montre ne
+ * mesure pas ces signaux — un cas qu'il sait déjà traiter honnêtement (« inconnu »,
+ * jamais une valeur par défaut). Filtrer en aval aurait laissé la moindre lecture
+ * oubliée irriguer le plan gratuit.
+ *
+ * ⚠️ LE PROFIL SE LIT EN ENTIER PUIS SE FILTRE PAR LISTE BLANCHE, pas par une liste de
+ * colonnes dans le `select` : PostgREST rejette la requête ENTIÈRE si une seule colonne
+ * manque (schéma appliqué à la main), et le plan perdrait jusqu'aux disponibilités. Et
+ * une liste BLANCHE, pas noire : une colonne de mesure ajoutée demain reste hors du
+ * plan gratuit sans que personne ait à y penser.
+ */
+export type LectureContexte = { objectifSeul?: boolean };
+
+/** Les seules colonnes de séance lues pour le palier gratuit : le volume, rien du corps. */
+const COLONNES_VOLUME = "date,type,distance_km,duration_seconds,elevation_gain_m";
+
+/** Les seules colonnes du profil lues pour le palier gratuit — toutes DÉCLARÉES. */
+export const PROFIL_DECLARE = [
+  "id", "full_name", "preferred_language", "age", "mode",
+  "health_conditions", "health_declared", "health_notes", "injury_zones",
+  "elevation_pref", "main_terrain", "main_terrains", "running_years",
+  "days_per_week", "available_days", "warmup_min", "cooldown_min",
+  "target_weekly_km", "double_sessions", "long_run_mode",
+] as const;
+
+const garder = (o: Record<string, unknown> | null, cles: readonly string[]) =>
+  o ? Object.fromEntries(cles.filter((k) => k in o).map((k) => [k, o[k]])) : null;
+
+export async function buildAthleteContext(sb: SB, userId: string, lecture: LectureContexte = {}): Promise<AthleteContext> {
+  const objectifSeul = !!lecture.objectifSeul;
+  // Une lecture qu'on ne fait pas : la forme exacte d'une réponse vide de PostgREST.
+  const nonLu = () => Promise.resolve({ data: [] as never[], error: null });
+  const nonLuUne = () => Promise.resolve({ data: null, error: null });
   const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, shoeRes, objRes, csRes, wlRes, histRes, sleepDatesRes, hrvDatesRes, formeRes, fcMaxRes] = await Promise.all([
     sb.from("profiles").select("*").eq("id", userId).single(),
     sb.from("performance_baselines").select("*").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).single(),
-    sb.from("hrv_data").select(COLONNES_VFC).eq("user_id", userId).order("date", { ascending: false }).limit(30),
-    sb.from("sleep_data").select("sleep_score,total_sleep_min,deep_sleep_min,rem_sleep_min,body_battery_end,respiration_rate,date").eq("user_id", userId).order("date", { ascending: false }).limit(30),
-    fetchWorkouts(sb, userId),
+    objectifSeul ? nonLu() : sb.from("hrv_data").select(COLONNES_VFC).eq("user_id", userId).order("date", { ascending: false }).limit(30),
+    objectifSeul ? nonLu() : sb.from("sleep_data").select("sleep_score,total_sleep_min,deep_sleep_min,rem_sleep_min,body_battery_end,respiration_rate,date").eq("user_id", userId).order("date", { ascending: false }).limit(30),
+    fetchWorkouts(sb, userId, objectifSeul),
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "session_feedback").order("created_at", { ascending: false }).limit(5),
     // Douleurs déclarées depuis l'espace Santé (schéma corporel) — elles n'atteignaient
     // pas le coach, qui ne regardait que le formulaire post-séance.
     sb.from("notifications").select("id, data").eq("user_id", userId).eq("type", "pain_report").order("created_at", { ascending: false }).limit(10),
     // Usure des chaussures : un des rares facteurs de blessure à la fois mesurable
     // et actionnable. Silencieux tant qu'aucune paire n'est enregistrée.
-    sb.from("shoes").select("brand, model, current_km, km_at_purchase, max_km, purchase_date, terrain").eq("user_id", userId).eq("is_active", true),
+    objectifSeul ? nonLu() : sb.from("shoes").select("brand, model, current_km, km_at_purchase, max_km, purchase_date, terrain").eq("user_id", userId).eq("is_active", true),
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "race_objective").maybeSingle(),
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "coach_session").order("created_at", { ascending: false }).limit(40),
     // Pesées du mode perte de poids. La table n'existe pas tant que la migration 018
     // n'est pas passée : supabase-js renvoie alors `{ error }` sans lever d'exception,
     // donc `Promise.all` tient et le reste du contexte coach est intact.
-    sb.from("weight_logs").select("date, weight_kg").eq("user_id", userId).order("date", { ascending: false }).limit(60),
+    objectifSeul ? nonLu() : sb.from("weight_logs").select("date, weight_kg").eq("user_id", userId).order("date", { ascending: false }).limit(60),
     // HISTORIQUE LONG, volontairement séparé et minimal (3 colonnes, 180 jours).
     // `fetchWorkouts` s'arrête à 60 séances, soit ~10 à 13 semaines : la capacité déjà
     // démontrée par l'athlète quatre à six mois plus tôt lui était donc INVISIBLE. Un
@@ -336,17 +392,17 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
     sb.from("workouts").select("date, sport, distance_km").eq("user_id", userId)
       .gte("date", new Date(Date.now() - 190 * 86400000).toISOString().slice(0, 10))
       .order("date", { ascending: false }).limit(400),
-    sb.from("sleep_data").select("date").eq("user_id", userId)
+    objectifSeul ? nonLu() : sb.from("sleep_data").select("date").eq("user_id", userId)
       .gte("date", new Date(Date.now() - 190 * 86400000).toISOString().slice(0, 10))
       .order("date", { ascending: false }).limit(200),
-    sb.from("hrv_data").select("date").eq("user_id", userId)
+    objectifSeul ? nonLu() : sb.from("hrv_data").select("date").eq("user_id", userId)
       .gte("date", new Date(Date.now() - 190 * 86400000).toISOString().slice(0, 10))
       .order("date", { ascending: false }).limit(200),
     // Fenêtre LONGUE et colonnes minimales, pour mesurer la PENTE de forme : la requête
     // principale ne lit que 60 séances, soit deux mois — trop court pour distinguer une
     // tendance du bruit (constaté : « pente non mesurable » sur un athlète qui en avait
     // pourtant une, nette, sur 32 semaines).
-    sb.from("workouts").select("date, sport, distance_km, duration_seconds, avg_hr, gap_min_km, elevation_gain_m")
+    objectifSeul ? nonLu() : sb.from("workouts").select("date, sport, distance_km, duration_seconds, avg_hr, gap_min_km, elevation_gain_m")
       .eq("user_id", userId).not("avg_hr", "is", null)
       .gte("date", new Date(Date.now() - 280 * 86400000).toISOString().slice(0, 10))
       .order("date", { ascending: false }).limit(500),
@@ -358,19 +414,28 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
     // le dise. Même leçon que les records par distance du tableau de bord : une donnée
     // « meilleur de tous les temps » se lit avec une requête DÉDIÉE, pas dans une liste
     // plafonnée. Le tri fait le travail, on ne ramène qu'une ligne.
-    sb.from("workouts").select("max_hr").eq("user_id", userId)
+    objectifSeul ? nonLuUne() : sb.from("workouts").select("max_hr").eq("user_id", userId)
       .not("max_hr", "is", null).order("max_hr", { ascending: false }).limit(1).maybeSingle(),
   ]);
 
-  const p = profileRes.data as Record<string, unknown> | null;
-  const b = baseRes.data as Record<string, unknown> | null;
+  // Palier gratuit : le profil réduit à ce qui est DÉCLARÉ, et du test de VMA, la VMA seule
+  // (le test enregistre aussi des FC de repos, max et au seuil : des mesures du corps).
+  const p = objectifSeul
+    ? garder(profileRes.data as Record<string, unknown> | null, PROFIL_DECLARE)
+    : profileRes.data as Record<string, unknown> | null;
+  const b = objectifSeul
+    ? garder(baseRes.data as Record<string, unknown> | null, ["vma_kmh", "tested_at"])
+    : baseRes.data as Record<string, unknown> | null;
   // UNE SEULE MESURE par athlète — la rMSSD, ou la SDNN d'une Apple Watch en réglages par
   // défaut. Tout ce qui suit (base, tendance 7 j, chute aiguë, état) se calcule dans
   // celle-là : mélanger les deux fabriquait de fausses chutes. Voir `lib/health/vfc`.
   const { metrique: metriqueVfc, lignes: hrv } = serieVfc((hrvRes.data ?? []) as { date: string; rmssd: number | null; sdnn: number | null }[]);
   const sleep = (sleepRes.data ?? []) as { sleep_score: number | null; total_sleep_min: number | null; deep_sleep_min: number | null; rem_sleep_min: number | null; body_battery_end: number | null; respiration_rate: number | null; date: string }[];
   const workouts = (woRes.data ?? []) as Wk[];
-  const feedback = (fbRes.data ?? []) as { data: { rpe?: number; pain?: string[]; note?: string } }[];
+  // Palier gratuit : du formulaire d'après-séance, la DOULEUR signalée seule — c'est une
+  // déclaration et un garde-fou. Le ressenti (RPE) et les notes sont de l'analyse de séance.
+  const feedback = ((fbRes.data ?? []) as { data: { rpe?: number; pain?: string[]; note?: string } }[])
+    .map((f) => objectifSeul ? { data: { pain: f.data?.pain } } : f);
   const objective = (objRes.data?.data ?? null) as CoachObjective | null;
   // `tags` est lu en plus de la date et du type : c'est lui qui dit qu'une séance d'un
   // autre écrivain que le plan automatique était une séance de qualité (`qualiteRecente`).
@@ -553,7 +618,9 @@ export async function buildAthleteContext(sb: SB, userId: string): Promise<Athle
   // chaînes divergentes coexistaient, et le tableau de bord ignorait la courbe d'allure.
   const { vma, source: vmaSource } = effectiveVma({
     vmaStored, paceCurveBest: paceCurve?.best, garminVo2,
-    fromRuns: bestVmaFromWorkouts(runs, fcMaxEst, 120, acclimVma) ?? estimateVmaFromRuns(runs, fcMaxEst, now),
+    // Palier gratuit : la VMA du TEST, rien d'autre. L'estimer depuis les séances, c'est
+    // précisément l'analyse que ce palier ne fait pas.
+    fromRuns: objectifSeul ? null : bestVmaFromWorkouts(runs, fcMaxEst, 120, acclimVma) ?? estimateVmaFromRuns(runs, fcMaxEst, now),
   });
   const vmaIsEst = vmaSource !== "test" && vma != null;
 
@@ -2043,7 +2110,9 @@ ${catalog}`;
     macroPlan,
     objectiveWarnings,
     weightLoss,
-    lastSession,
+    // Palier gratuit : « ce que ta dernière séance a montré » EST une analyse de séance.
+    lastSession: objectifSeul ? null : lastSession,
+    objectifSeul,
   };
 }
 

@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback , useId } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Heart, Utensils, Stethoscope, AlertTriangle, Phone, Send, Loader2, Sparkles, Scale, Camera, X, Activity, ClipboardList, CalendarPlus, RotateCcw, ChevronDown,
+  Heart, Utensils, Stethoscope, AlertTriangle, Phone, Send, Loader2, Sparkles, Scale, Camera, X, Activity, ClipboardList, CalendarPlus, RotateCcw, ChevronDown, Lock,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -35,6 +35,7 @@ const H: Record<string, Record<string, string>> = {
     "chat.thinking": "Le kiné réfléchit…", "chat.placeholder": "Ex : douleur au genou après mes sorties longues…", "chat.photoAdd": "Ajouter une photo", "chat.photoRemove": "Retirer la photo", "chat.photoReady": "Photo prête. Elle est analysée puis oubliée : rien n'est enregistré. Cadre serré sur la zone, en pleine lumière.", "chat.photoBadType": "Image illisible. Formats acceptés : JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Peux-tu regarder cette photo ?",
     "chat.disclaimer": "⚕️ Conseils informatifs — ne remplacent pas un avis médical. Douleur forte / persistante → consultez.",
     "chat.errNoReply": "Je n'ai pas pu répondre, réessayez.", "chat.errConn": "Connexion impossible au kiné IA. Réessayez.",
+    "chat.verrou": "Le kiné IA fait partie des formules Starter et Premium.", "chat.verrouCta": "Voir les formules", "chat.quota": "Tu as utilisé tes échanges avec l'IA pour aujourd'hui : ils reviennent demain.",
     "k.askPrompt": "J'ai une douleur au niveau : {zone} (intensité {n}/10). Qu'est-ce que ça peut être, et que dois-je faire concrètement ?",
     "k.annuler": "Annuler", "k.etatQ": "{z} — où en es-tu ?", "k.mieux": "Ça va mieux", "k.pire": "Ça empire", "k.passe": "C'est passé", "k.etatOk": "C'est noté — ton coach en tient compte.", "k.etatPasse": "Noté : cette douleur ne bride plus ton plan.", "k.etatErr": "Mise à jour impossible. Réessaie.",
     "chat.new": "Nouvelle consultation", "chat.newConfirm": "Effacer la conversation ? Tes douleurs déclarées restent dans ton suivi.", "chat.resumed": "Consultation précédente reprise — le kiné se souvient de vos échanges.", "chat.newFail": "Effacement impossible, réessaie.",
@@ -69,6 +70,7 @@ const H: Record<string, Record<string, string>> = {
     "chat.thinking": "The physio is thinking…", "chat.placeholder": "E.g. knee pain after my long runs…", "chat.photoAdd": "Add a photo", "chat.photoRemove": "Remove photo", "chat.photoReady": "Photo ready. It is analysed then forgotten: nothing is stored. Frame the area closely, in good light.", "chat.photoBadType": "Unreadable image. Accepted: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Could you look at this photo?",
     "chat.disclaimer": "⚕️ Informational advice — not a substitute for medical care. Severe / persistent pain → see a doctor.",
     "chat.errNoReply": "I couldn't reply, please try again.", "chat.errConn": "Couldn't connect to the AI physio. Try again.",
+    "chat.verrou": "The AI physio is part of the Starter and Premium plans.", "chat.verrouCta": "See the plans", "chat.quota": "You've used today's AI exchanges: they come back tomorrow.",
     "k.askPrompt": "I have pain in: {zone} (intensity {n}/10). What could it be, and what should I concretely do?",
     "k.annuler": "Undo", "k.etatQ": "{z} — how is it now?", "k.mieux": "Getting better", "k.pire": "Getting worse", "k.passe": "It's gone", "k.etatOk": "Noted — your coach takes it into account.", "k.etatPasse": "Noted: this pain no longer holds your plan back.", "k.etatErr": "Couldn't update. Try again.",
     "chat.new": "New consultation", "chat.newConfirm": "Clear the conversation? Your reported pains stay in your history.", "chat.resumed": "Previous consultation resumed — the physio remembers your exchanges.", "chat.newFail": "Couldn't clear, try again.",
@@ -103,6 +105,7 @@ const H: Record<string, Record<string, string>> = {
     "chat.thinking": "Der Physio überlegt…", "chat.placeholder": "Z. B. Knieschmerzen nach langen Läufen…", "chat.photoAdd": "Foto hinzufügen", "chat.photoRemove": "Foto entfernen", "chat.photoReady": "Foto bereit. Es wird analysiert und dann verworfen: nichts wird gespeichert. Bereich nah und gut ausgeleuchtet aufnehmen.", "chat.photoBadType": "Bild nicht lesbar. Erlaubt: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Kannst du dir dieses Foto ansehen?",
     "chat.disclaimer": "⚕️ Informative Hinweise — kein Ersatz für ärztlichen Rat. Starke / anhaltende Schmerzen → zum Arzt.",
     "chat.errNoReply": "Ich konnte nicht antworten, bitte erneut versuchen.", "chat.errConn": "Keine Verbindung zum KI-Physio. Versuche es erneut.",
+    "chat.verrou": "Die KI-Physio ist Teil der Tarife Starter und Premium.", "chat.verrouCta": "Tarife ansehen", "chat.quota": "Deine KI-Dialoge für heute sind aufgebraucht: morgen gibt es neue.",
     "k.askPrompt": "Ich habe Schmerzen im Bereich: {zone} (Intensität {n}/10). Was könnte es sein, und was soll ich konkret tun?",
     "k.annuler": "Rückgängig", "k.etatQ": "{z} — wie ist es jetzt?", "k.mieux": "Wird besser", "k.pire": "Wird schlimmer", "k.passe": "Ist weg", "k.etatOk": "Notiert — dein Coach berücksichtigt es.", "k.etatPasse": "Notiert: dieser Schmerz bremst deinen Plan nicht mehr.", "k.etatErr": "Aktualisierung nicht möglich. Versuch es nochmal.",
     "chat.new": "Neue Konsultation", "chat.newConfirm": "Gespräch löschen? Deine gemeldeten Schmerzen bleiben in deinem Verlauf.", "chat.resumed": "Vorherige Konsultation fortgesetzt — der Physio erinnert sich an eure Gespräche.", "chat.newFail": "Löschen nicht möglich, bitte erneut versuchen.",
@@ -137,6 +140,7 @@ const H: Record<string, Record<string, string>> = {
     "chat.thinking": "El fisio está pensando…", "chat.placeholder": "Ej.: dolor de rodilla tras mis tiradas largas…", "chat.photoAdd": "Añadir una foto", "chat.photoRemove": "Quitar la foto", "chat.photoReady": "Foto lista. Se analiza y se descarta: no se guarda nada. Encuadra la zona de cerca y con buena luz.", "chat.photoBadType": "Imagen ilegible. Formatos: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "¿Puedes mirar esta foto?",
     "chat.disclaimer": "⚕️ Consejos informativos — no sustituyen un consejo médico. Dolor fuerte / persistente → consulta.",
     "chat.errNoReply": "No he podido responder, inténtalo de nuevo.", "chat.errConn": "No se pudo conectar con el fisio IA. Inténtalo de nuevo.",
+    "chat.verrou": "El fisio IA forma parte de los planes Starter y Premium.", "chat.verrouCta": "Ver los planes", "chat.quota": "Has usado tus intercambios con la IA de hoy: vuelven mañana.",
     "k.askPrompt": "Tengo dolor en: {zone} (intensidad {n}/10). ¿Qué puede ser y qué debo hacer concretamente?",
     "k.annuler": "Deshacer", "k.etatQ": "{z}: ¿cómo va?", "k.mieux": "Va mejor", "k.pire": "Va peor", "k.passe": "Ya pasó", "k.etatOk": "Anotado: tu entrenador lo tiene en cuenta.", "k.etatPasse": "Anotado: este dolor ya no frena tu plan.", "k.etatErr": "No se pudo actualizar. Reinténtalo.",
     "chat.new": "Nueva consulta", "chat.newConfirm": "¿Borrar la conversación? Tus dolores declarados siguen en tu historial.", "chat.resumed": "Consulta anterior retomada — el fisio recuerda vuestros intercambios.", "chat.newFail": "No se pudo borrar, inténtalo de nuevo.",
@@ -171,6 +175,7 @@ const H: Record<string, Record<string, string>> = {
     "chat.thinking": "O fisio está a pensar…", "chat.placeholder": "Ex.: dor no joelho após os meus treinos longos…", "chat.photoAdd": "Adicionar uma foto", "chat.photoRemove": "Remover a foto", "chat.photoReady": "Foto pronta. É analisada e depois descartada: nada é guardado. Enquadra a zona de perto e com boa luz.", "chat.photoBadType": "Imagem ilegível. Formatos: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Podes olhar para esta foto?",
     "chat.disclaimer": "⚕️ Conselhos informativos — não substituem aconselhamento médico. Dor forte / persistente → consulta.",
     "chat.errNoReply": "Não consegui responder, tenta novamente.", "chat.errConn": "Não foi possível ligar ao fisio IA. Tenta novamente.",
+    "chat.verrou": "O fisio IA faz parte dos planos Starter e Premium.", "chat.verrouCta": "Ver os planos", "chat.quota": "Usaste as tuas trocas com a IA de hoje: voltam amanhã.",
     "k.askPrompt": "Tenho dor em: {zone} (intensidade {n}/10). O que pode ser e o que devo fazer concretamente?",
     "k.annuler": "Anular", "k.etatQ": "{z} — como está agora?", "k.mieux": "Está melhor", "k.pire": "Está pior", "k.passe": "Já passou", "k.etatOk": "Registado — o teu treinador tem isso em conta.", "k.etatPasse": "Registado: esta dor já não trava o teu plano.", "k.etatErr": "Não foi possível atualizar. Tenta de novo.",
     "chat.new": "Nova consulta", "chat.newConfirm": "Apagar a conversa? As tuas dores declaradas ficam no teu histórico.", "chat.resumed": "Consulta anterior retomada — o fisio lembra-se das vossas trocas.", "chat.newFail": "Não foi possível apagar, tenta de novo.",
@@ -343,6 +348,8 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
   // ⚠️ LA CONSULTATION REPREND OÙ ELLE S'EST ARRÊTÉE (22/09/2026). Avant, le fil vivait
   // dans l'état du composant : changer d'onglet suffisait à faire « oublier » au kiné
   // tout ce qu'on venait de lui décrire. Le serveur rend les 40 derniers messages.
+  // Le serveur a refusé le kiné IA pour cette formule (402) : on montre la sortie.
+  const [verrou, setVerrou] = useState(false);
   const [messages, setMessages] = useState<ChatMsg[]>(
     filInitial.length > 0 ? filInitial : [{ role: "model", text: tr("chat.seed") }],
   );
@@ -430,9 +437,18 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
           photo: sentPhoto ? { data: sentPhoto } : null,
         }),
       });
+      // ⚠️ 402 = LA FORMULE NE COUVRE PAS LE KINÉ IA, ce n'est pas une panne. Le refus
+      // s'affichait tel quel dans la conversation : « ⚠️ essai_expire », un code interne
+      // lu par un compte gratuit. On le dit en clair, avec la sortie (voir `verrou`).
+      if (res.status === 402) { setVerrou(true); return; }
       const json = await res.json();
+      // Les deux codes du plafond quotidien (`lib/billing/guard`) sont des CLÉS, pas des
+      // phrases : on les traduit au lieu de les afficher.
+      const erreur = json.error === "quota_ia_atteint" ? tr("chat.quota")
+        : json.error === "quota_indisponible" ? tr("chat.errNoReply")
+        : json.error || tr("chat.errNoReply");
       if (json.reply) { setMessages((m) => [...m, { role: "model", text: json.reply }]); setBilan(json.bilan ?? null); }
-      else setMessages((m) => [...m, { role: "model", text: "⚠️ " + (json.error || tr("chat.errNoReply")) }]);
+      else setMessages((m) => [...m, { role: "model", text: "⚠️ " + erreur }]);
     } catch {
       setMessages((m) => [...m, { role: "model", text: "⚠️ " + tr("chat.errConn") }]);
     } finally {
@@ -793,6 +809,15 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                     <div className="bg-zinc-100 text-zinc-500 px-3.5 py-2.5 rounded-2xl rounded-bl-md text-sm flex items-center gap-2">
                       <Loader2 className="w-4 h-4 animate-spin" /> {tr("chat.thinking")}
                     </div>
+                  </div>
+                )}
+                {verrou && (
+                  <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-zinc-200 bg-white px-3.5 py-3">
+                    <Lock className="h-4 w-4 flex-shrink-0 text-zinc-500" />
+                    <p className="min-w-0 flex-1 text-sm text-zinc-700">{tr("chat.verrou")}</p>
+                    <Link href="/pricing" className="flex-shrink-0 rounded-xl bg-zinc-900 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-zinc-800">
+                      {tr("chat.verrouCta")}
+                    </Link>
                   </div>
                 )}
               </div>
