@@ -17,6 +17,7 @@ import { readFileSync } from "node:fs";
 import { meilleursEfforts, chrono, allure, DISTANCES } from "../src/lib/activities/efforts";
 import type { TrackPoint } from "../src/lib/segments/geo";
 import { cap, flechesLeLongDe, BASE_CAP_M } from "../src/lib/activities/fleches";
+import { seLitEnVitesse, vitesseKmh } from "../src/lib/activities/vitesse";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -262,6 +263,23 @@ test("le survol 3D s'atteint par la FLÈCHE, plus par un onglet", () => {
   assert.match(codeOf("src/components/activity/StravaBlocks.tsx"), /survolHref/, "plus aucun chemin vers le survol");
   assert.doesNotMatch(readFileSync("src/data/helpKb.ts", "utf8"), /Barre latérale gauche › Survol 3D/,
     "l'aide envoie encore vers un onglet supprimé");
+});
+
+test("le vélo se lit en km/h, la course en allure — dans le fil ET dans la fiche", () => {
+  // Sortie vélo réelle, Lambersart, 23/10/2026 : 8,973 km en 1 679 s. Le fil affichait
+  // « 3:07 /km » ; un cycliste lit 19,2 km/h.
+  assert.equal(vitesseKmh(8.973, 1679)?.toFixed(1), "19.2");
+  assert.equal(seLitEnVitesse("bike"), true, "le vélo ne se lit plus en km/h");
+  for (const s of ["run", "hike", "walk", null]) assert.equal(seLitEnVitesse(s), false, `${s} se lit en km/h`);
+  // Une mesure absente ne devient pas une vitesse.
+  assert.equal(vitesseKmh(null, 1679), null);
+  assert.equal(vitesseKmh(8.973, 0), null);
+  // Le SITE D'APPEL, pas l'import : chaque écran choisit vraiment selon le sport.
+  const fil = codeOf("src/app/dashboard/activites/page.tsx");
+  assert.match(fil, /seLitEnVitesse\(s\.sport \?\? s\.type\)[\s\S]{0,40}\? \{ label: d\["feed\.speed"\]/, "le fil n'affiche plus la vitesse du vélo");
+  const fiche = codeOf("src/app/dashboard/activite/page.tsx");
+  assert.match(fiche, /seLitEnVitesse\(wk\.sport[^)]*\)\) chiffres\.push\(\{ label: "Vitesse moyenne"/, "la fiche n'affiche plus la vitesse du vélo");
+  assert.match(fiche, /"id, title, sport,/, "la fiche ne lit plus le sport : tout se lirait en allure");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

@@ -15,6 +15,7 @@ import { getPublicLang, getAccountLang } from "@/lib/i18n/serverLang";
 import { EditerSortie } from "@/components/activity/EditerSortie";
 import { colonnesEditionPresentes, COLONNES_EDITION } from "@/lib/activities/colonnes";
 import { nomAffiche } from "@/lib/activities/renommage";
+import { seLitEnVitesse, vitesseKmh } from "@/lib/activities/vitesse";
 import { T } from "@/lib/i18n/translations";
 
 export const dynamic = "force-dynamic";
@@ -87,7 +88,7 @@ export default async function ActivitePage({ searchParams }: { searchParams: Pro
       // ÉCHOUE — il ferait disparaître tout le détail de la séance, pas seulement
       // l'encart de renommage.
       editionDispo = await colonnesEditionPresentes(sb);
-      const champs = "id, title, distance_km, duration_seconds, elevation_gain_m, avg_hr, avg_cadence_spm, avg_power_watts"
+      const champs = "id, title, sport, distance_km, duration_seconds, elevation_gain_m, avg_hr, avg_cadence_spm, avg_power_watts"
         // Les métriques de foulée et de charge doivent être DEMANDÉES : sans elles dans
         // le select, le bloc « forme » serait resté vide sans la moindre erreur.
         + ", max_hr, gap_min_km, tss, intensity_pct, stride_length_m, vertical_ratio_pct, vertical_oscillation_cm"
@@ -112,7 +113,10 @@ export default async function ActivitePage({ searchParams }: { searchParams: Pro
         // ferait passer une séance mal enregistrée pour une séance sans effort.
         if (km > 0) chiffres.push({ label: "Distance", value: `${km.toFixed(2).replace(".", ",")} km` });
         if (sec > 0) chiffres.push({ label: "Temps", value: hhmm(sec) });
-        if (km > 0 && sec > 0) chiffres.push({ label: "Allure moyenne", value: pace(sec, km) });
+        // Le vélo se lit en km/h, comme dans le fil (lib/activities/vitesse).
+        const kmh = vitesseKmh(km, sec);
+        if (kmh != null && seLitEnVitesse(wk.sport as string | null)) chiffres.push({ label: "Vitesse moyenne", value: `${kmh.toFixed(1).replace(".", ",")} km/h` });
+        else if (km > 0 && sec > 0) chiffres.push({ label: "Allure moyenne", value: pace(sec, km) });
         if (Number(wk.elevation_gain_m ?? 0) > 0) chiffres.push({ label: "Dénivelé +", value: `${Math.round(Number(wk.elevation_gain_m))} m` });
         if (Number(wk.avg_hr ?? 0) > 0) chiffres.push({ label: "FC moyenne", value: `${Math.round(Number(wk.avg_hr))} bpm` });
         if (Number(wk.avg_cadence_spm ?? 0) > 0) chiffres.push({ label: "Cadence moy.", value: `${Math.round(Number(wk.avg_cadence_spm))} ppm` });

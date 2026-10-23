@@ -13,7 +13,7 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { NAV_GROUPES, ONGLETS_MOBILE, resteMobile } from "../src/components/layout/navigation";
+import { NAV_GROUPES, ONGLETS_MOBILE, resteMobile, estActive } from "../src/components/layout/navigation";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -99,7 +99,7 @@ test("« Plus » range ses rubriques en LISTES, sans trou — et le comparateur 
   // Le comparateur d'équipement n'a rien de social ; « Mes activités » est du suivi.
   const groupe = (href: string) => NAV_GROUPES.find((g) => g.items.some((it) => it.href === href))?.titleKey;
   assert.equal(groupe("/dashboard/shop"), "group.gear", "le comparateur d'équipement est rangé ailleurs que dans « Équipement »");
-  assert.equal(groupe("/dashboard/trophees"), "group.tracking", "« Mes activités » n'est pas rangé dans « Suivi »");
+  assert.equal(groupe("/dashboard/activites"), "group.tracking", "« Mes activités » n'est pas rangé dans « Suivi »");
   assert.equal(groupe("/dashboard/messages"), "group.tracking", "la messagerie n'est pas rangée dans « Suivi »");
   // Les libellés de rubrique existent dans les cinq dictionnaires.
   const dico = readFileSync("src/lib/i18n/translations.ts", "utf8");
@@ -114,7 +114,7 @@ test("le menu va du PLUS UTILISÉ au MOINS UTILE", () => {
   // consulte pour préparer, le social, et l'équipement qu'on règle une fois.
   assert.deepEqual(NAV_GROUPES.map((g) => g.titleKey), [null, "group.training", "group.tracking", "group.prep", "group.club", "group.gear"]);
   const ordre = NAV_GROUPES.flatMap((g) => g.items.map((d) => d.href));
-  assert.deepEqual(ordre.slice(0, 4), ["/dashboard", "/dashboard/calendrier", "/dashboard/ghost-runner", "/dashboard/trophees"],
+  assert.deepEqual(ordre.slice(0, 4), ["/dashboard", "/dashboard/calendrier", "/dashboard/ghost-runner", "/dashboard/activites"],
     "l'accueil, la séance du jour, enregistrer, puis relire ce qu'on a couru");
   assert.equal(ordre.at(-1), "/dashboard/shop", "le comparateur (une paire par saison) ferme la marche");
   const groupe = (href: string) => NAV_GROUPES.find((g) => g.items.some((it) => it.href === href))?.titleKey;
@@ -378,6 +378,25 @@ test("le service worker ne s'installe pas en développement", () => {
   assert.ok(i > 0, "l'enregistrement du service worker a disparu");
   assert.ok(/process\.env\.NODE_ENV !== "production"/.test(src.slice(Math.max(0, i - 400), i)),
     "le service worker s'enregistre aussi en développement : le cache resservira du CSS périmé");
+});
+
+test("« Mes activités » ouvre la LISTE DES SORTIES, et reste allumé sur ses onglets", () => {
+  // Cyprien, 23/10/2026 : « je viens de faire une sortie vélo et je ne la vois pas dans mes
+  // activités ». Elle était synchronisée depuis 11 h 53 — mais l'entrée « Mes activités »
+  // ouvrait la Vitrine (trophées), qui n'affiche aucune sortie.
+  const entree = NAV_GROUPES.flatMap((g) => g.items).find((d) => d.tk === "nav.performances");
+  assert.equal(entree?.href, "/dashboard/activites", "« Mes activités » n'ouvre plus la liste des sorties");
+  // Les onglets frères et la fiche d'une séance gardent l'entrée allumée : sans cela, on
+  // ne sait plus où l'on est dès qu'on change d'onglet.
+  for (const p of ["/dashboard/activites", "/dashboard/trophees", "/dashboard/segments", "/dashboard/activite", "/dashboard/survol"]) {
+    assert.ok(estActive(p, "/dashboard/activites"), `« Mes activités » s'éteint sur ${p}`);
+  }
+  assert.ok(!estActive("/dashboard/health", "/dashboard/activites"), "« Mes activités » s'allume hors de son sujet");
+  // Une seule entrée allumée à la fois, quelle que soit la page.
+  for (const p of ["/dashboard/trophees", "/dashboard/activite", "/dashboard/health", "/dashboard/calendrier"]) {
+    const allumees = NAV_GROUPES.flatMap((g) => g.items).filter((d) => estActive(p, d.href)).map((d) => d.href);
+    assert.equal(allumees.length, 1, `${p} allume ${allumees.length} entrées : ${allumees.join(", ")}`);
+  }
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

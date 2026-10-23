@@ -10,6 +10,7 @@ import { cleanActivityName } from "@/lib/utils/activityName";
 import { colonnesEditionPresentes, COLONNES_EDITION } from "@/lib/activities/colonnes";
 import { nomAffiche } from "@/lib/activities/renommage";
 import { asSport } from "@/lib/intervals/sport";
+import { seLitEnVitesse, vitesseKmh } from "@/lib/activities/vitesse";
 import { SPORT_LABEL_T } from "@/lib/intervals/sportI18n";
 import { estUnePanne } from "@/lib/dashboard/lectures";
 import { formatDateCivile } from "@/lib/time/fuseau";
@@ -117,9 +118,14 @@ export default async function ActivitesPage({ searchParams }: { searchParams: Pr
     const allege = pts.length > 500 ? pts.filter((_, i) => i % Math.ceil(pts.length / 500) === 0) : pts;
     const plan = planCarte(allege, { largeur: LARGEUR, hauteur: HAUTEUR, tailleTuile: TAILLE_TUILE,
       margeX: MARGE_X, margeY: MARGE_Y });
+    // Le vélo se lit en km/h : « 3:07 /km » ne dit rien à un cycliste (lib/activities/vitesse).
+    const kmh = vitesseKmh(km, sec);
+    const moyenne = seLitEnVitesse(s.sport ?? s.type)
+      ? { label: d["feed.speed"], valeur: kmh != null ? `${fmtNombre(kmh, lang, 1)} km/h` : SANS_VALEUR }
+      : { label: d["feed.pace"], valeur: km != null && sec != null ? allure(sec, km, lang) : SANS_VALEUR };
     const chiffres = [
       { label: d["feed.distance"], valeur: km != null ? `${fmtNombre(km, lang, 1)} km` : SANS_VALEUR },
-      { label: d["feed.pace"], valeur: km != null && sec != null ? allure(sec, km, lang) : SANS_VALEUR },
+      moyenne,
       { label: d["feed.time"], valeur: sec != null ? duree(sec) : SANS_VALEUR },
     ];
     // Le dénivelé n'a sa colonne que s'il a été mesuré. La FC reste sur la page de
