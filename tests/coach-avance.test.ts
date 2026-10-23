@@ -144,6 +144,26 @@ test("Premium et essai seulement ; jamais le plan gratuit ; le plan ne dépend p
   assert.match(serveur, /catch \(e\) \{[\s\S]*return null;/, "une panne du modèle ne doit jamais empêcher le plan");
 });
 
+test("« Un avis sur ma semaine » : Premium, la mémoire avant le plafond, un refus qui dit la formule", () => {
+  // L'exclusivité réelle de Premium depuis le 23/10/2026 (`plan_ia`).
+  const route = codeNu("src/app/api/ai/ajustement/route.ts");
+  const formule = route.indexOf('exigeAcces(supabase, user.id, "plan_ia")');
+  const memoire = route.indexOf("cache?.empreinte === empreinte");
+  const plafond = route.indexOf('exigeAcces(supabase, user.id, "ia")');
+  const appel = route.indexOf("generateContent(");
+  assert.ok(formule > 0, "l'avis sur la semaine n'est plus réservé à Premium");
+  assert.ok(formule < memoire, "la réponse mémorisée est servie AVANT de vérifier la formule");
+  // ⚠️ Le plafond se décompte APRÈS la mémoire : une réponse resservie ne coûte rien, elle
+  // retirait pourtant un échange à chaque réouverture du calendrier.
+  assert.ok(memoire < plafond && plafond < appel, "le plafond du jour n'est plus décompté entre la mémoire et l'appel au modèle");
+
+  const bouton = codeNu("src/components/training/AvisCoach.tsx");
+  assert.ok(bouton.indexOf("r.status === 402") > 0 && bouton.indexOf("r.status === 402") < bouton.indexOf("await r.json()"),
+    "un refus de formule s'affiche de nouveau comme une panne (« pas joignable »)");
+  assert.match(bouton, /href="\/pricing"/, "le refus ne mène plus aux formules");
+  assert.equal((readFileSync("src/components/training/AvisCoach.tsx", "utf8").match(/verrou: "/g) ?? []).length, 5, "le message Premium manque à une langue");
+});
+
 test("plus d'onglet ni de conversation « Coach IA »", () => {
   assert.equal(existsSync("src/app/dashboard/coach/page.tsx"), false);
   assert.equal(existsSync("src/app/api/ai/coach/route.ts"), false);

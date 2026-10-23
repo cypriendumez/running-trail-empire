@@ -1155,6 +1155,23 @@ test("ce que la page des tarifs promet, le verrou l'accorde vraiment", () => {
   // ⚠️ L'ÉCRAN DU SMART JOURNAL A ÉTÉ RETIRÉ LE 30/09/2026 et la page le vendait encore
   // dans Premium, et dans la grille de l'accueil, trois semaines plus tard.
   assert.ok(!/Smart Journal/i.test(tarifs), "la vitrine vend le Smart Journal, dont l'écran n'existe plus");
+
+  // L'EXCLUSIVITÉ PREMIUM (23/10/2026) : « Un avis sur ma semaine », verrouillé par
+  // `plan_ia` dans `ai/ajustement`. Annoncée dans Premium, jamais dans Starter qui la refuse.
+  const AVIS = /avis du coach|view on your week|Einschätzung des KI-Coachs|opinión del coach|opinião do coach/i;
+  assert.equal(avec("premium", AVIS), 5, "l'avis sur la semaine n'est pas annoncé dans Premium dans les 5 langues");
+  assert.equal(avec("starter", AVIS), 0, "Starter annonce l'avis sur la semaine, que sa formule refuse");
+  assert.match(sansCommentaires(readFileSync(join(ROOT, "src/app/api/ai/ajustement/route.ts"), "utf8")),
+    /exigeAcces\(supabase, user\.id, "plan_ia"\)/, "l'avis sur la semaine n'est plus réservé à Premium");
+
+  // ⚠️ AUCUN BADGE DE POPULARITÉ. « Le plus demandé » s'affichait sur Premium alors
+  // qu'aucun abonnement n'avait été vendu : un fait inventé, comme les faux avis.
+  const badges = [...tarifs.matchAll(/badge: "([^"]+)"/g)].map((m) => m[1]);
+  assert.equal(badges.length, 5, "les badges sont illisibles");
+  for (const b of badges) {
+    assert.ok(!/demand|popular|beliebt|elegid|escolhid|choisi|favori|vendu|best ?sell/i.test(b),
+      `badge de popularité sans aucune vente pour le prouver : « ${b} »`);
+  }
 });
 
 test("le détail d'une séance nomme l'appareil, jamais le canal de synchro", () => {

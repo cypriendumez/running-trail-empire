@@ -60,6 +60,10 @@ export type LandingDict = {
      *  « Essayer 7 jours » figé mentirait dès le lendemain de l'inscription. */
     ctaEssai: string; ctaAbo: string;
     gratuitNote: string;
+    // ⚠️ `badge` énonce un FAIT VÉRIFIABLE (« Le plus complet » : Premium contient tout le
+    // reste), jamais une popularité. « Le plus demandé » s'est affiché alors qu'aucun
+    // abonnement n'avait été vendu (Stripe pas encore branché) : même faute que les faux
+    // chiffres et les faux avis retirés du site (Cyprien, 23/10/2026).
     plans: { cle: "gratuit" | "starter" | "premium"; name: string; pitch: string; badge?: string; cta: string; features: string[] }[];
     apres: string;
   };
@@ -124,8 +128,8 @@ const fr: LandingDict = {
         features: ["Séances vers ton objectif : course, chrono ou distance", "Plans d'entraînement tout construits", "Carte et accès à tous les parcours", "Ghost Runner : ton allure annoncée à l'oreille", "Comparateur de chaussures", "Sync montre, historique, 10 000 courses à venir", "Série, ligues et trophées"] },
       { cle: "starter", name: "Starter", pitch: "Le coach qui lit tout et adapte ton plan après chaque sortie.", cta: "Essayer 7 jours",
         features: ["Tout le gratuit", "Plan adapté à tes séances, ton sommeil, ta VFC et ta FC", "Analyse IA complète de chaque séance", "Séances poussées sur la montre", "Kiné IA, avec photo", "Export GPX de tes tracés et des parcours", "10 échanges avec l'IA par jour"] },
-      { cle: "premium", name: "Premium", pitch: "Le coach IA au maximum, pour préparer une grande échéance.", badge: "Le plus demandé", cta: "Essayer 7 jours",
-        features: ["Tout le Starter", "30 échanges avec l'IA par jour", "Coach IA avancé : séances clés relues par l'IA"] },
+      { cle: "premium", name: "Premium", pitch: "Le coach IA au maximum, pour préparer une grande échéance.", badge: "Le plus complet", cta: "Essayer 7 jours",
+        features: ["Tout le Starter", "30 échanges avec l'IA par jour", "Coach IA avancé : séances clés relues par l'IA", "L'avis du coach IA sur ta semaine, à la demande"] },
     ],
     apres: "À la fin de l'essai, rien n'est effacé : ton compte passe au palier gratuit. Tes activités continuent d'être synchronisées et ton plan continue, bâti sur ton objectif. Ce qui s'arrête : l'adaptation à tes données, l'analyse de tes séances, l'envoi sur la montre et les échanges avec l'IA.",
   },
@@ -187,8 +191,8 @@ const en: LandingDict = {
         features: ["Sessions toward your goal: race, time or distance", "Ready-made training plans", "Map and access to every route", "Ghost Runner: your pace called out in your ear", "Shoe comparison", "Watch sync, history, 10,000 upcoming races", "Streak, leagues and trophies"] },
       { cle: "starter", name: "Starter", pitch: "The coach that reads everything and adapts your plan after every run.", cta: "Try 7 days",
         features: ["Everything in Free", "Plan adapted to your sessions, sleep, HRV and heart rate", "Full AI analysis of every session", "Sessions pushed to your watch", "AI physio, with photo", "GPX export of your routes and of the trails", "10 AI exchanges per day"] },
-      { cle: "premium", name: "Premium", pitch: "The AI coach at full power, to prepare a big goal.", badge: "Most popular", cta: "Try 7 days",
-        features: ["Everything in Starter", "30 AI exchanges per day", "Advanced AI coach: key sessions reviewed by AI"] },
+      { cle: "premium", name: "Premium", pitch: "The AI coach at full power, to prepare a big goal.", badge: "Most complete", cta: "Try 7 days",
+        features: ["Everything in Starter", "30 AI exchanges per day", "Advanced AI coach: key sessions reviewed by AI", "The AI coach's view on your week, on demand"] },
     ],
     apres: "When the trial ends nothing is deleted: your account moves to the free tier. Your activities keep syncing and your plan carries on, built on your goal. What stops: adapting to your data, analysing your sessions, sending to your watch and the AI exchanges.",
   },
@@ -250,8 +254,8 @@ const de: LandingDict = {
         features: ["Einheiten zu deinem Ziel: Rennen, Zeit oder Distanz", "Fertige Trainingspläne", "Karte und Zugang zu allen Strecken", "Ghost Runner: dein Tempo im Ohr", "Schuhvergleich", "Uhr-Sync, Verlauf, 10 000 kommende Rennen", "Serie, Ligen und Trophäen"] },
       { cle: "starter", name: "Starter", pitch: "Der Coach, der alles liest und deinen Plan nach jedem Lauf anpasst.", cta: "7 Tage testen",
         features: ["Alles aus Gratis", "Plan angepasst an Einheiten, Schlaf, HRV und Puls", "Vollständige KI-Analyse jeder Einheit", "Einheiten direkt auf die Uhr", "KI-Physio, mit Foto", "GPX-Export deiner Runden und der Strecken", "10 KI-Dialoge pro Tag"] },
-      { cle: "premium", name: "Premium", pitch: "Der KI-Coach mit voller Leistung, für ein großes Ziel.", badge: "Am beliebtesten", cta: "7 Tage testen",
-        features: ["Alles aus Starter", "30 KI-Dialoge pro Tag", "Erweiterter KI-Coach: Schlüsseleinheiten von der KI geprüft"] },
+      { cle: "premium", name: "Premium", pitch: "Der KI-Coach mit voller Leistung, für ein großes Ziel.", badge: "Das Komplettpaket", cta: "7 Tage testen",
+        features: ["Alles aus Starter", "30 KI-Dialoge pro Tag", "Erweiterter KI-Coach: Schlüsseleinheiten von der KI geprüft", "Die Einschätzung des KI-Coachs zu deiner Woche, auf Abruf"] },
     ],
     apres: "Am Ende des Tests wird nichts gelöscht: dein Konto wechselt auf die Gratis-Stufe. Deine Aktivitäten werden weiter synchronisiert und dein Plan läuft weiter, gebaut auf dein Ziel. Es enden: die Anpassung an deine Daten, die Analyse deiner Einheiten, das Senden auf die Uhr und die KI-Dialoge.",
   },
@@ -313,8 +317,8 @@ const es: LandingDict = {
         features: ["Sesiones hacia tu objetivo: carrera, tiempo o distancia", "Planes de entrenamiento ya hechos", "Mapa y acceso a todas las rutas", "Ghost Runner: tu ritmo anunciado al oído", "Comparador de zapatillas", "Sync del reloj, historial, 10 000 carreras próximas", "Racha, ligas y trofeos"] },
       { cle: "starter", name: "Starter", pitch: "El entrenador que lo lee todo y adapta tu plan tras cada salida.", cta: "Probar 7 días",
         features: ["Todo lo gratuito", "Plan adaptado a tus sesiones, sueño, VFC y FC", "Análisis IA completo de cada sesión", "Sesiones enviadas al reloj", "Fisio IA, con foto", "Exportación GPX de tus trazados y de las rutas", "10 intercambios con la IA al día"] },
-      { cle: "premium", name: "Premium", pitch: "El coach IA a máxima potencia, para preparar un gran objetivo.", badge: "El más elegido", cta: "Probar 7 días",
-        features: ["Todo lo de Starter", "30 intercambios con la IA al día", "Coach IA avanzado: sesiones clave revisadas por la IA"] },
+      { cle: "premium", name: "Premium", pitch: "El coach IA a máxima potencia, para preparar un gran objetivo.", badge: "El más completo", cta: "Probar 7 días",
+        features: ["Todo lo de Starter", "30 intercambios con la IA al día", "Coach IA avanzado: sesiones clave revisadas por la IA", "La opinión del coach IA sobre tu semana, cuando la pidas"] },
     ],
     apres: "Al terminar la prueba no se borra nada: tu cuenta pasa al nivel gratuito. Tus actividades se siguen sincronizando y tu plan continúa, construido sobre tu objetivo. Lo que se detiene: la adaptación a tus datos, el análisis de tus sesiones, el envío al reloj y los intercambios con la IA.",
   },
@@ -376,8 +380,8 @@ const pt: LandingDict = {
         features: ["Treinos rumo ao teu objetivo: prova, tempo ou distância", "Planos de treino prontos", "Mapa e acesso a todos os percursos", "Ghost Runner: o teu ritmo anunciado ao ouvido", "Comparador de ténis", "Sync do relógio, histórico, 10 000 provas futuras", "Série, ligas e troféus"] },
       { cle: "starter", name: "Starter", pitch: "O treinador que lê tudo e adapta o teu plano após cada saída.", cta: "Testar 7 dias",
         features: ["Tudo o gratuito", "Plano adaptado aos teus treinos, sono, VFC e FC", "Análise IA completa de cada treino", "Treinos enviados para o relógio", "Fisio IA, com foto", "Exportação GPX dos teus traçados e dos percursos", "10 trocas com a IA por dia"] },
-      { cle: "premium", name: "Premium", pitch: "O coach IA no máximo, para preparar um grande objetivo.", badge: "O mais escolhido", cta: "Testar 7 dias",
-        features: ["Tudo o do Starter", "30 trocas com a IA por dia", "Coach IA avançado: sessões-chave revistas pela IA"] },
+      { cle: "premium", name: "Premium", pitch: "O coach IA no máximo, para preparar um grande objetivo.", badge: "O mais completo", cta: "Testar 7 dias",
+        features: ["Tudo o do Starter", "30 trocas com a IA por dia", "Coach IA avançado: sessões-chave revistas pela IA", "A opinião do coach IA sobre a tua semana, quando quiseres"] },
     ],
     apres: "No fim do teste nada é apagado: a tua conta passa ao nível gratuito. As tuas atividades continuam a sincronizar e o teu plano continua, construído sobre o teu objetivo. O que para: a adaptação aos teus dados, a análise dos teus treinos, o envio para o relógio e as trocas com a IA.",
   },

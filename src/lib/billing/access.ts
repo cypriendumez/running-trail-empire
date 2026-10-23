@@ -39,7 +39,7 @@ export type Capacite =
   | "plan"     // le plan ADAPTATIF : séances, sommeil, VFC, FC lus ; poussé sur la montre
   | "gpx"      // exporter une trace en GPX (Carte et parcours) — la carte elle-même est ouverte
   | "ia"       // faire parler un modèle (analyse, kiné, coach, assistant)
-  | "plan_ia"  // le coach avancé : le modèle relit les séances clés du plan
+  | "plan_ia"  // le coach avancé : le modèle relit le PLAN (séances clés, avis sur la semaine)
   | "journal"  // l'analyse du Smart Journal — écran retiré le 30/09/2026, route sans appelant
   | "analyse_longue"; // l'analyse de séance en version développée
 
@@ -164,7 +164,9 @@ const DROITS: Record<Acces, Capacite[]> = {
   // « pour les deux abonnements, il faut que le coach IA soit très puissant en analyse de
   // séance », et l'export GPX vers la montre « dans les abonnements payants ». Le kiné IA
   // y est par `ia`. Ce qui sépare encore Premium : trois fois plus d'appels IA par jour
-  // (`PLAFOND_JOUR`) et le coach avancé (`plan_ia`), qui relit les séances clés du plan.
+  // (`PLAFOND_JOUR`) et le coach avancé (`plan_ia`) — le modèle qui relit le PLAN : les
+  // séances clés chaque jour, et « Un avis sur ma semaine » à la demande (route
+  // `ai/ajustement`, réservée le 23/10/2026 pour que Premium ait une exclusivité RÉELLE).
   starter: ["lecture", "plan_objectif", "plan", "ia", "gpx", "analyse_longue"],
   premium: ["lecture", "plan_objectif", "plan", "ia", "gpx", "analyse_longue", "plan_ia", "journal"],
 };
