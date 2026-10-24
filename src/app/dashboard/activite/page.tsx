@@ -15,7 +15,7 @@ import { getPublicLang, getAccountLang } from "@/lib/i18n/serverLang";
 import { EditerSortie } from "@/components/activity/EditerSortie";
 import { colonnesEditionPresentes, COLONNES_EDITION } from "@/lib/activities/colonnes";
 import { nomAffiche } from "@/lib/activities/renommage";
-import { seLitEnVitesse, vitesseKmh } from "@/lib/activities/vitesse";
+import { seLitEnVitesse, vitesseKmh, kmhDepuisAllure, fmtKmh } from "@/lib/activities/vitesse";
 import { T } from "@/lib/i18n/translations";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +30,8 @@ const pace = (sec: number, km: number) => {
   const p = sec / km, m = Math.floor(p / 60), s = Math.round(p % 60);
   return s === 60 ? `${m + 1}:00 /km` : `${m}:${String(s).padStart(2, "0")} /km`;
 };
+/** Meilleurs efforts à vélo : la distance, pas le nom d'une course à pied. */
+const LIBELLE_VELO: Record<string, string> = { semi: "21,1 km", marathon: "42,2 km" };
 
 /**
  * Détail d'une séance.
@@ -70,6 +72,7 @@ export default async function ActivitePage({ searchParams }: { searchParams: Pro
   let efforts: EffortVu[] = [];
   let forme: Chiffre[] = [];
   let survolHref: string | null = null;
+  let enVitesse = false;
   let editionDispo = false;
   let sortie: { id: string; titrePerso: string; description: string; titreMontre: string } | null = null;
   // ⚠️ SÉPARÉ DE `sortie` À DESSEIN. `sortie` n'existe que si les colonnes d'édition sont
@@ -113,9 +116,11 @@ export default async function ActivitePage({ searchParams }: { searchParams: Pro
         // ferait passer une séance mal enregistrée pour une séance sans effort.
         if (km > 0) chiffres.push({ label: "Distance", value: `${km.toFixed(2).replace(".", ",")} km` });
         if (sec > 0) chiffres.push({ label: "Temps", value: hhmm(sec) });
-        // Le vélo se lit en km/h, comme dans le fil (lib/activities/vitesse).
+        // Le vélo se lit en km/h, comme dans le fil (lib/activities/vitesse) — moyenne,
+        // meilleurs efforts et découpage au kilomètre.
+        enVitesse = seLitEnVitesse(wk.sport as string | null);
         const kmh = vitesseKmh(km, sec);
-        if (kmh != null && seLitEnVitesse(wk.sport as string | null)) chiffres.push({ label: "Vitesse moyenne", value: `${kmh.toFixed(1).replace(".", ",")} km/h` });
+        if (kmh != null && enVitesse) chiffres.push({ label: "Vitesse moyenne", value: fmtKmh(kmh) });
         else if (km > 0 && sec > 0) chiffres.push({ label: "Allure moyenne", value: pace(sec, km) });
         if (Number(wk.elevation_gain_m ?? 0) > 0) chiffres.push({ label: "Dénivelé +", value: `${Math.round(Number(wk.elevation_gain_m))} m` });
         if (Number(wk.avg_hr ?? 0) > 0) chiffres.push({ label: "FC moyenne", value: `${Math.round(Number(wk.avg_hr))} bpm` });
@@ -153,10 +158,15 @@ export default async function ActivitePage({ searchParams }: { searchParams: Pro
           polyline = encodePolyline(simplify(pts, 25));
           // Le survol 3D accepte déjà `?w=<id>` : la flèche sur la carte y mène.
           if (typeof wk.id === "string") survolHref = `/dashboard/survol?w=${encodeURIComponent(wk.id)}`;
-          efforts = meilleursEfforts(pts).map((e) => ({
-            cle: e.cle, label: T[langue][`eff.${e.cle}` as keyof (typeof T)["fr"]] ?? e.cle,
-            chrono: fmtChrono(e.secondes), allure: fmtAllure(e.allureSecKm),
-          }));
+          efforts = meilleursEfforts(pts).map((e) => {
+            const kmhEffort = enVitesse ? kmhDepuisAllure(e.allureSecKm) : null;
+            return {
+              // « Semi-marathon » ne veut rien dire à vélo : on y nomme la distance.
+              cle: e.cle, label: (enVitesse && LIBELLE_VELO[e.cle]) || (T[langue][`eff.${e.cle}` as keyof (typeof T)["fr"]] ?? e.cle),
+              chrono: fmtChrono(e.secondes),
+              allure: kmhEffort != null ? fmtKmh(kmhEffort) : fmtAllure(e.allureSecKm),
+            };
+          });
 
           // ── Courbes FC / cadence / puissance ────────────────────────────────
           // Les flux sont stockés aux positions 4, 5 et 6 des points. Chaque courbe
@@ -234,7 +244,7 @@ export default async function ActivitePage({ searchParams }: { searchParams: Pro
       {(polyline || splits.length > 0 || chiffres.length > 0 || courbes.length > 0 || effortsVus.length > 0 || efforts.length > 0 || forme.length > 0) && (
         <div className="mx-auto w-full max-w-4xl space-y-6 px-4 pb-10">
           <StravaBlocks polyline={polyline} chiffres={chiffres} splits={splits} profil={profil}
-            efforts={efforts} forme={forme} survolHref={survolHref} />
+            efforts={efforts} forme={forme} survolHref={survolHref} enVitesse={enVitesse} />
           <SessionSegments efforts={effortsVus} />
           {idSeance && (
             <AnalyseCoach workoutId={idSeance} textes={{

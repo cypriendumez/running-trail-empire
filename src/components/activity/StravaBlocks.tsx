@@ -15,9 +15,10 @@ import { Play } from "lucide-react";
 import { splitPace, type Split } from "@/lib/segments/splits";
 import { SegmentMapLazy } from "@/components/segments/SegmentMapLazy";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { kmhDepuisAllure, chiffreKmh } from "@/lib/activities/vitesse";
 
 export type Chiffre = { label: string; value: string };
-/** Un meilleur effort, déjà mis en forme côté serveur (chrono + allure). */
+/** Un meilleur effort, déjà mis en forme côté serveur (chrono + allure, ou vitesse à vélo). */
 export type EffortVu = { cle: string; label: string; chrono: string; allure: string };
 
 const paceLabel = (secParKm: number) => {
@@ -30,7 +31,7 @@ const paceLabel = (secParKm: number) => {
  *  « écran inachevé » alors qu'il ne manque aucune donnée. */
 const combler = (n: number, colonnes = 4) => Array.from({ length: (colonnes - (n % colonnes)) % colonnes });
 
-export function StravaBlocks({ polyline, chiffres, splits, profil, efforts = [], forme = [], survolHref = null }: {
+export function StravaBlocks({ polyline, chiffres, splits, profil, efforts = [], forme = [], survolHref = null, enVitesse = false }: {
   polyline: string | null;
   chiffres: Chiffre[];
   splits: Split[];
@@ -40,6 +41,8 @@ export function StravaBlocks({ polyline, chiffres, splits, profil, efforts = [],
   forme?: Chiffre[];
   /** Lien vers le survol 3D DE CETTE sortie. Absent quand la trace ne le permet pas. */
   survolHref?: string | null;
+  /** Vélo : le découpage se lit en km/h, pas en allure (lib/activities/vitesse). */
+  enVitesse?: boolean;
 }) {
   const { t } = useT();
   // Barres proportionnelles à l'allure : la plus rapide occupe toute la largeur.
@@ -123,11 +126,12 @@ export function StravaBlocks({ polyline, chiffres, splits, profil, efforts = [],
         <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
           <h2 className="border-b border-zinc-100 px-4 py-3 text-sm font-bold text-zinc-900">{t("act.splits")}</h2>
           <div className="grid grid-cols-[2.5rem_3.5rem_1fr_3rem] gap-2 border-b border-zinc-100 px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
-            <span>Km</span><span>Allure</span><span /><span className="text-right">{t("act.elev")}</span>
+            <span>Km</span><span>{enVitesse ? "km/h" : t("feed.pace")}</span><span /><span className="text-right">{t("act.elev")}</span>
           </div>
           <div className="divide-y divide-zinc-50">
             {splits.map((s) => {
               const pace = splitPace(s);
+              const kmh = enVitesse && pace ? kmhDepuisAllure(pace) : null;
               // Largeur relative : la plus rapide remplit, la plus lente garde 45 %.
               const largeur = pace && pire > meilleure
                 ? 45 + 55 * (1 - (pace - meilleure) / (pire - meilleure))
@@ -135,7 +139,7 @@ export function StravaBlocks({ polyline, chiffres, splits, profil, efforts = [],
               return (
                 <div key={s.km} className="grid grid-cols-[2.5rem_3.5rem_1fr_3rem] items-center gap-2 px-4 py-1.5 text-sm">
                   <span className="font-semibold text-zinc-700">{s.km}</span>
-                  <span className="tabular-nums text-zinc-900">{pace ? paceLabel(pace) : "—"}</span>
+                  <span className="tabular-nums text-zinc-900">{kmh != null ? chiffreKmh(kmh) : pace ? paceLabel(pace) : "—"}</span>
                   <span className="flex items-center gap-2">
                     <span className="h-4 rounded-sm bg-emerald-500" style={{ width: `${largeur}%` }} />
                     {/* Le tronçon incomplet est ÉTIQUETÉ, jamais présenté comme un km plein. */}
@@ -163,8 +167,7 @@ export function StravaBlocks({ polyline, chiffres, splits, profil, efforts = [],
             })}
           </div>
           <p className="border-t border-zinc-100 px-4 py-2 text-[11px] text-zinc-400">
-            Allures calculées sur le temps en mouvement, à partir de la trace GPS.
-            Les arrêts de plus de 30 s sont signalés et exclus de l&apos;allure.
+            {t(enVitesse ? "act.splitsNoteKmh" : "act.splitsNote")}
           </p>
         </section>
       )}

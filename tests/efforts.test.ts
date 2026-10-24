@@ -17,7 +17,7 @@ import { readFileSync } from "node:fs";
 import { meilleursEfforts, chrono, allure, DISTANCES } from "../src/lib/activities/efforts";
 import type { TrackPoint } from "../src/lib/segments/geo";
 import { cap, flechesLeLongDe, BASE_CAP_M } from "../src/lib/activities/fleches";
-import { seLitEnVitesse, vitesseKmh } from "../src/lib/activities/vitesse";
+import { seLitEnVitesse, vitesseKmh, kmhDepuisAllure, chiffreKmh, fmtKmh } from "../src/lib/activities/vitesse";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -278,8 +278,31 @@ test("le vélo se lit en km/h, la course en allure — dans le fil ET dans la fi
   const fil = codeOf("src/app/dashboard/activites/page.tsx");
   assert.match(fil, /seLitEnVitesse\(s\.sport \?\? s\.type\)[\s\S]{0,40}\? \{ label: d\["feed\.speed"\]/, "le fil n'affiche plus la vitesse du vélo");
   const fiche = codeOf("src/app/dashboard/activite/page.tsx");
-  assert.match(fiche, /seLitEnVitesse\(wk\.sport[^)]*\)\) chiffres\.push\(\{ label: "Vitesse moyenne"/, "la fiche n'affiche plus la vitesse du vélo");
+  assert.match(fiche, /enVitesse = seLitEnVitesse\(wk\.sport[^)]*\);/, "la fiche ne choisit plus selon le sport");
+  assert.match(fiche, /if \(kmh != null && enVitesse\) chiffres\.push\(\{ label: "Vitesse moyenne"/, "la fiche n'affiche plus la vitesse du vélo");
   assert.match(fiche, /"id, title, sport,/, "la fiche ne lit plus le sport : tout se lirait en allure");
+});
+
+test("à vélo, les meilleurs efforts et le découpage au kilomètre se lisent aussi en km/h", () => {
+  // Cyprien, 24/10/2026 : « oui passe en kilomètre/heure ». La moyenne était passée en km/h,
+  // mais les meilleurs efforts et le découpage de la même fiche restaient en min/km.
+  assert.equal(kmhDepuisAllure(187)?.toFixed(1), "19.3", "3:07 /km ne donne plus 19,3 km/h");
+  assert.equal(kmhDepuisAllure(0), null, "une allure nulle devient une vitesse infinie");
+  assert.equal(chiffreKmh(19.25), "19,3");
+  assert.equal(fmtKmh(19.24), "19,2 km/h");
+  const fiche = codeOf("src/app/dashboard/activite/page.tsx");
+  assert.match(fiche, /allure: kmhEffort != null \? fmtKmh\(kmhEffort\) : fmtAllure\(e\.allureSecKm\)/,
+    "les meilleurs efforts à vélo sont revenus en allure");
+  assert.match(fiche, /const kmhEffort = enVitesse \? kmhDepuisAllure\(e\.allureSecKm\) : null/, "les meilleurs efforts ne suivent plus le sport");
+  // « Semi-marathon » ne se dit pas à vélo : la distance est nommée.
+  assert.match(fiche, /LIBELLE_VELO[^=]*= \{ semi: "21,1 km", marathon: "42,2 km" \}/);
+  assert.match(fiche, /label: \(enVitesse && LIBELLE_VELO\[e\.cle\]\)/, "le vélo affiche encore « Semi-marathon »");
+  assert.match(fiche, /<StravaBlocks[\s\S]{0,200}enVitesse=\{enVitesse\}/, "la fiche ne transmet plus le sport au découpage");
+  const blocs = codeOf("src/components/activity/StravaBlocks.tsx");
+  assert.match(blocs, /const kmh = enVitesse && pace \? kmhDepuisAllure\(pace\) : null;/, "le découpage ne calcule plus la vitesse");
+  assert.match(blocs, /\{kmh != null \? chiffreKmh\(kmh\) : pace \? paceLabel\(pace\) : "—"\}/, "le découpage à vélo est revenu en allure");
+  assert.match(blocs, /\{enVitesse \? "km\/h" : t\("feed\.pace"\)\}/, "l'en-tête du découpage ne dit plus « km/h » à vélo");
+  assert.match(blocs, /t\(enVitesse \? "act\.splitsNoteKmh" : "act\.splitsNote"\)/, "la note du découpage parle encore d'allure à vélo");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

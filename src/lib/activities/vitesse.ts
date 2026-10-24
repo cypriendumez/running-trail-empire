@@ -22,3 +22,14 @@ export function vitesseKmh(km: number | null | undefined, sec: number | null | u
   if (typeof km !== "number" || typeof sec !== "number" || !(km > 0) || !(sec > 0)) return null;
   return km / (sec / 3600);
 }
+
+/** Vitesse d'une allure (secondes par km) — pour les meilleurs efforts et le découpage
+ *  au kilomètre, qui sont calculés en allure sur la trace GPS. */
+export const kmhDepuisAllure = (secParKm: number): number | null =>
+  Number.isFinite(secParKm) && secParKm > 0 ? 3600 / secParKm : null;
+
+/** « 19,2 » : le chiffre seul, quand l'unité est déjà dans l'en-tête de colonne. */
+export const chiffreKmh = (kmh: number): string => kmh.toFixed(1).replace(".", ",");
+
+/** « 19,2 km/h ». */
+export const fmtKmh = (kmh: number): string => `${chiffreKmh(kmh)} km/h`;
