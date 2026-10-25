@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  estPubliable, estPubliableSansDate, aUneDate, motsUrl, slugCourse, idDepuisSlug, bornesId,
+  estPubliable, estPubliableSansDate, aUneDate, motsUrl, slugCourse, idDepuisSlug, bornesId, basculeALaLecture,
   titrePage, descriptionPage,
   dateEnClair, DATE_INCONNUE,
 } from "../src/lib/races/publique";
@@ -521,6 +521,67 @@ test("la région part en clair dans les données structurées", () => {
   const page = readFileSync("src/app/courses/[slug]/page.tsx", "utf8");
   assert.ok(/addressRegion: c\.region \? nomRegion\(c\.region\) : undefined/.test(page),
     "l'identifiant technique de la région repart vers les moteurs");
+});
+
+test("une adresse non canonique redirige au lieu de servir un double", () => {
+  // ⚠️ ALERTE SEARCH CONSOLE DU 24/10/2026 : « Autre page avec balise canonique
+  // correcte ». Seul l'identifiant désigne la course, donc `/courses/<n'importe quoi>-<id>`
+  // répondait 200 avec une canonique vers la vraie adresse : chaque correction de nom, de
+  // ville ou de distance laissait chez Google une adresse en double. Même chose pour une
+  // région écrite autrement (« provence-alpes-cote-azur »).
+  const nu = (f: string) => readFileSync(f, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+
+  const fiche = nu("src/app/courses/[slug]/page.tsx");
+  assert.ok(/const canonique = slugCourse\(c\);/.test(fiche), "la fiche ne calcule plus son adresse canonique");
+  assert.ok(/if \(demande !== canonique\) permanentRedirect\(`\/courses\/\$\{canonique\}`\)/.test(fiche),
+    "une ancienne adresse de course répond de nouveau 200 en double de la vraie");
+  const region = nu("src/app/courses/region/[slug]/page.tsx");
+  assert.ok(/if \(demande !== slug\) permanentRedirect\(`\/courses\/region\/\$\{slug\}`\)/.test(region),
+    "une écriture non canonique de région répond de nouveau 200 en double");
+
+  // ⚠️ ET AUCUNE BOUCLE : l'adresse canonique doit se reconnaître elle-même, sinon la
+  // redirection renverrait indéfiniment vers elle-même.
+  const s = slugCourse(base);
+  assert.equal(idDepuisSlug(s), base.id.replace(/-/g, "").slice(0, 8));
+  assert.ok(/^[a-z0-9-]+$/.test(s), `adresse canonique hors ASCII : ${s}`);
+  for (const [canon, ecritures] of Object.entries(ECRITURES_REGION)) {
+    assert.equal(regionCanonique(canon), canon, `la région « ${canon} » se redirigerait vers une autre`);
+    for (const e of ecritures) assert.equal(regionCanonique(e), canon, `« ${e} » ne mène pas à « ${canon} »`);
+  }
+});
+
+test("le lendemain de course, la page reste en ligne au lieu de répondre 404", () => {
+  // ⚠️ SEARCH CONSOLE, RAPPORT DU 16/10/2026 : quatre fiches en 404, toutes revenues en
+  // 200 depuis. Les Boucles Roses (Besançon), courues le dimanche 04/10 : dès minuit la
+  // date est passée, donc plus « publiable », et la page répondait 404 jusqu'à ce que la
+  // maintenance (cron GitHub étranglé, passé à 11 h 22 UTC) la bascule sur 2027.
+  const course = { ...base, name: "Les Boucles Roses", city: "Besançon", date: "2026-10-04", date_confirmee: true };
+  const LENDEMAIN = "2026-10-05";
+  assert.equal(estPubliable(course, LENDEMAIN), false, "prémisse : la date brute n'est plus publiable le lendemain");
+
+  const lue = basculeALaLecture(course, LENDEMAIN);
+  assert.equal(lue.date, "2027-10-03", "la page n'annonce pas l'édition suivante estimée");
+  assert.equal(lue.date_confirmee, false, "l'estimation partirait à Google comme une date sûre");
+  assert.equal(estPubliable(lue, LENDEMAIN), true, "le lendemain de course, la page répond encore 404");
+
+  // Une course de semaine n'est jamais devinée : elle passe en « date à venir », qui a
+  // aussi sa page — et son drapeau reste tel quel, comme dans la maintenance.
+  const semaine = basculeALaLecture({ ...course, date: "2026-10-07" }, "2026-10-08");
+  assert.equal(semaine.date, DATE_INCONNUE);
+  assert.equal(semaine.date_confirmee, true);
+  assert.equal(estPubliableSansDate(semaine), true, "une course de semaine passée répond 404");
+
+  // Rien ne bouge pour une course à venir, ni le jour même, ni pour « date à venir ».
+  assert.equal(basculeALaLecture(course, "2026-10-04"), course, "la course du jour est déjà basculée");
+  const inconnue = { ...course, date: DATE_INCONNUE };
+  assert.equal(basculeALaLecture(inconnue, LENDEMAIN), inconnue);
+
+  // Et c'est bien ce que la page lit — dans `lire`, donc aussi pour ses métadonnées.
+  const page = readFileSync("src/app/courses/[slug]/page.tsx", "utf8");
+  assert.ok(/return basculeALaLecture\(data\[0\] as CoursePublique, jourFrance\(\)\);/.test(page),
+    "la page relit la date brute : 404 chaque lundi matin pour les courses du week-end");
 });
 
 console.log(`\n${passed} test(s) des courses publiques passé(s), ${fails.length} échec(s)`);

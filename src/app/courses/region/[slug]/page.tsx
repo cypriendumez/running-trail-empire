@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { getPublicLang } from "@/lib/i18n/serverLang";
 import { regionsAvecCourses, prochainesCourses, sansDateAnnoncee } from "@/lib/races/catalogue";
 import { nomRegion, regionCanonique, regionAvecPreposition } from "@/lib/races/libelles";
@@ -41,6 +41,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function RegionPage({ params }: { params: Promise<{ slug: string }> }) {
   const demande = (await params).slug;
   const slug = regionCanonique(demande);
+  // ⚠️ L'ÉCRITURE NON CANONIQUE REDIRIGE (« provence-alpes-cote-azur » répondait 200 en
+  // double de « provence-alpes-cote-d-azur ») : même motif que les fiches de course.
+  if (demande !== slug) permanentRedirect(`/courses/region/${slug}`);
   const [lang, regions, courses, sansDate] = await Promise.all([
     getPublicLang(), regionsAvecCourses(), prochainesCourses(slug, PAR_PAGE),
     sansDateAnnoncee(slug, SANS_DATE_PAR_PAGE),

@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -11,7 +11,7 @@ import { nomDestination, estCalendrierTiers, organisateurReel } from "@/lib/race
 import { texteCourses } from "../coursesI18n";
 import { jourFrance } from "@/lib/races/jourFrance";
 import {
-  estPubliable, estPubliableSansDate, aUneDate, idDepuisSlug, bornesId, slugCourse,
+  estPubliable, estPubliableSansDate, aUneDate, idDepuisSlug, bornesId, slugCourse, basculeALaLecture,
   titrePage, descriptionPage, dateEnClair,
   type CoursePublique,
 } from "@/lib/races/publique";
@@ -55,7 +55,7 @@ async function lire(slug: string): Promise<CoursePublique | null> {
   // Deux résultats voudraient dire que huit caractères ne suffisent plus à distinguer :
   // on préfère une page absente à une page qui parlerait d'une autre course.
   if (error || !data || data.length !== 1) return null;
-  return data[0] as CoursePublique;
+  return basculeALaLecture(data[0] as CoursePublique, jourFrance());
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -79,13 +79,21 @@ const Ligne = ({ k, v }: { k: string; v: string }) => (
 );
 
 export default async function CoursePage({ params }: { params: Promise<{ slug: string }> }) {
-  const c = await lire((await params).slug);
+  const demande = (await params).slug;
+  const c = await lire(demande);
   const lang = await getPublicLang();
   const t = (k: string, p?: Record<string, string | number>) => texteCourses(lang, k, p);
   // ⚠️ LE MÊME FILTRE QUE LE SITEMAP. Une course sans date réelle ou déjà courue n'a pas
   // de page : la publier laisserait en ligne une information périmée que Google
   // continuerait de servir pendant des semaines.
   if (!c || !publiable(c)) notFound();
+  // ⚠️ UNE SEULE ADRESSE PAR COURSE. Seul l'identifiant désigne la course : une adresse
+  // déjà indexée survit donc à la correction du nom, de la ville ou de la distance. Elle
+  // répondait 200 avec une canonique vers la nouvelle — la Search Console les rangeait
+  // en « Autre page avec balise canonique correcte » (alerte du 24/10/2026). Une
+  // redirection définitive transmet l'ancienne à la nouvelle au lieu de servir un double.
+  const canonique = slugCourse(c);
+  if (demande !== canonique) permanentRedirect(`/courses/${canonique}`);
 
   const km = Number(c.distance_km);
   const dplus = Number(c.elevation_gain_m);

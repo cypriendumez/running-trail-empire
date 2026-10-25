@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { editionSuivanteEstimee, datesAnnoncees, dateDepuisPage } from "../src/lib/races/prochaineEdition";
 import { pageOfficielle, pageNommeLaCourse, datesDeLaCourse } from "../src/lib/races/veille";
+import { dateApresBascule, DATE_INCONNUE } from "../src/lib/races/publique";
 import { tousLesModeles, suggererModeles, compact } from "../src/lib/gear/modelesChaussures";
 
 let passed = 0; const fails: string[] = [];
@@ -123,7 +124,11 @@ test("une date ne vaut que pour la course nommée à côté d'elle (sauf site à
 
 test("la maintenance estime au lieu de tout basculer en « Date à venir » ; Google ne voit jamais une estimation", () => {
   const cron = codeNu("src/app/api/cron/races-maintenance/route.ts");
-  assert.ok(/const cible = \(colonneConfirmee && editionSuivanteEstimee\(r\.date, aujourdhui\)\) \|\| A_VENIR;/.test(cron), "la maintenance ne devine plus l'édition suivante");
+  // La règle vit dans `dateApresBascule`, partagée avec la page (24/10/2026) : on exige
+  // que le cron l'appelle ET qu'elle estime toujours, au lieu d'un motif d'écriture figé.
+  assert.ok(/const cible = colonneConfirmee \? dateApresBascule\(r\.date, aujourdhui\) : A_VENIR;/.test(cron), "la maintenance ne devine plus l'édition suivante");
+  assert.equal(dateApresBascule("2026-09-27", AUJ), "2027-09-26", "une course de week-end n'est plus estimée à la bascule");
+  assert.equal(dateApresBascule("2026-09-29", AUJ), DATE_INCONNUE, "une course de semaine reçoit une date devinée");
   assert.ok(/\{ date: cible, date_confirmee: false,/.test(cron), "l'estimation serait écrite comme une date sûre");
   assert.ok(/if \(error\?\.code === "42703"\) \{ colonneConfirmee = false; continue; \}/.test(cron), "sans la colonne, l'estimation passerait pour sûre");
   const page = codeNu("src/app/courses/[slug]/page.tsx");

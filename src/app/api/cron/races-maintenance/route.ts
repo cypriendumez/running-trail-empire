@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { editionSuivanteEstimee } from "@/lib/races/prochaineEdition";
+import { dateApresBascule, DATE_INCONNUE } from "@/lib/races/publique";
 
 /**
  * BASCULEMENT QUOTIDIEN DES COURSES PASSÉES.
@@ -51,7 +51,7 @@ export async function GET(req: Request) {
   //    Borné à 5 tours — au-delà, c'est un problème qu'une boucle ne réglera pas.
   const PAGE = 1000;
   const LOT = 200;
-  const A_VENIR = "2099-01-01";
+  const A_VENIR = DATE_INCONNUE;
   let bascules = 0, estimees = 0;
   let tours = 0;
   let colonneConfirmee = true;
@@ -66,7 +66,9 @@ export async function GET(req: Request) {
       if (error) return NextResponse.json({ error: error.message, bascules }, { status: 500 });
       if (!data?.length) break;
       for (const r of data) {
-        const cible = (colonneConfirmee && editionSuivanteEstimee(r.date, aujourdhui)) || A_VENIR;
+        // ⚠️ MÊME RÈGLE QUE LA PAGE (`basculeALaLecture`) : elle montre dès minuit ce
+        // que ce passage écrira, sans quoi la page et la base se contrediraient.
+        const cible = colonneConfirmee ? dateApresBascule(r.date, aujourdhui) : A_VENIR;
         parCible.set(cible, [...(parCible.get(cible) ?? []), r.id as string]);
       }
       lues += data.length;

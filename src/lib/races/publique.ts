@@ -1,4 +1,5 @@
 import { nomAffichable } from "./libelles";
+import { editionSuivanteEstimee } from "./prochaineEdition";
 
 /**
  * LES COURSES EN PAGES PUBLIQUES — le principal actif du site, jusqu'ici invisible.
@@ -46,6 +47,36 @@ export type CoursePublique = {
 
 /** La date que le catalogue emploie pour « on ne sait pas encore ». */
 export const DATE_INCONNUE = "2099-01-01";
+
+/**
+ * La date qu'une course déjà courue reçoit à la bascule : l'édition suivante estimée
+ * (course de week-end), sinon « date à venir ». UNE SEULE RÈGLE, employée par la
+ * maintenance quotidienne qui l'écrit ET par la page qui la lit.
+ */
+export function dateApresBascule(date: unknown, aujourdhui: string): string {
+  return editionSuivanteEstimee(date, aujourdhui) ?? DATE_INCONNUE;
+}
+
+/**
+ * La course telle que la maintenance quotidienne la laissera.
+ *
+ * ⚠️ LE TROU DU LENDEMAIN DE COURSE (Search Console, 24/10/2026). Dès minuit, une course
+ * courue la veille n'est plus « à venir » : sa page répondait 404 jusqu'au passage de la
+ * maintenance, qui la bascule sur l'édition suivante. Ce cron GitHub est étranglé : prévu
+ * à 4 h 10 UTC, il est passé à 11 h 22 le 05/10, et Googlebot avait relevé quatre 404
+ * entre-temps — le lendemain de course, précisément quand on cherche les résultats. La
+ * page applique donc la bascule elle-même, sans attendre l'heure du robot.
+ */
+export function basculeALaLecture<T extends { date?: string | null; date_confirmee?: boolean | null }>(
+  c: T, aujourdhui: string,
+): T {
+  const date = String(c.date ?? "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date >= String(aujourdhui).slice(0, 10)) return c;
+  const cible = dateApresBascule(date, aujourdhui);
+  // Comme la maintenance : « date à venir » ne touche pas au drapeau, une estimation le
+  // pose — c'est lui qui interdit d'annoncer cette date à Google comme un fait.
+  return cible === DATE_INCONNUE ? { ...c, date: cible } : { ...c, date: cible, date_confirmee: false };
+}
 
 /**
  * Cette course mérite-t-elle une page publique ?
