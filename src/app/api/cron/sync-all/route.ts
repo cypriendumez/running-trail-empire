@@ -27,8 +27,11 @@ const EVERY_MINUTES = 10;  // cadence du déclencheur externe — sert au décou
 const PER_PASS = 25;       // athlètes traités par passage (intervals.icu : ~200 requêtes)
 
 export async function GET(req: Request) {
+  // ⚠️ `!attendu` d'abord : sans la variable, `undefined !== undefined` laissait passer une
+  // requête SANS en-tête (audit du 24/10/2026). Secret absent = porte fermée.
   const secret = req.headers.get("authorization")?.replace("Bearer ", "");
-  if (secret !== process.env.CRON_SECRET) {
+  const attendu = process.env.CRON_SECRET;
+  if (!attendu || secret !== attendu) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
