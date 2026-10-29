@@ -984,6 +984,39 @@ await atest("alerte : un corps qui n'est pas une livraison est refusé (400) san
   }
 });
 
+// Audit du 24/10/2026 : `secret !== process.env.CRON_SECRET` laissait passer une requête SANS
+// en-tête quand la variable manquait (`undefined !== undefined` est faux), et auto-coach ne
+// vérifiait le secret que s'il existait. Une variable oubliée sur Vercel ouvrait donc à
+// n'importe qui la synchro de tous les athlètes, avec leurs jetons intervals.icu.
+await atest("crons de synchro : sans CRON_SECRET, la porte reste FERMÉE (401, rien lu ni demandé)", async () => {
+  const env = process.env as Record<string, string | undefined>;
+  const avant = { secret: env.CRON_SECRET, mode: env.NODE_ENV };
+  const { GET: syncAll } = await import("../src/app/api/cron/sync-all/route");
+  const { GET: autoCoach } = await import("../src/app/api/cron/auto-coach/route");
+  try {
+    delete env.CRON_SECRET;
+    env.NODE_ENV = "production";
+    const routes: [string, (req: Request) => Promise<Response>][] = [["sync-all", syncAll], ["auto-coach", autoCoach]];
+    const variantes: Record<string, string>[] = [{}, { authorization: "Bearer " }, { authorization: "Bearer undefined" }];
+    for (const [nom, GET] of routes) {
+      for (const entetes of variantes) {
+        const ecrits = banc({ activites: [SORTIE] });
+        const { r: res } = await enSilence(() => GET(new Request(`https://pacevo.fr/api/cron/${nom}`, { headers: entetes })));
+        assert.equal(res.status, 401, `${nom} ${JSON.stringify(entetes)} : ouvert alors que CRON_SECRET manque`);
+        assert.deepEqual([ecrits.lus.length, ecrits.length, ecrits.intervals.length], [0, 0, 0], `${nom} a lu ou écrit avant de refuser`);
+      }
+    }
+    // Seule exception gardée : auto-coach sans secret en `next dev`, sur le poste de Cyprien.
+    env.NODE_ENV = "development";
+    banc({});
+    const { r: dev } = await enSilence(() => autoCoach(new Request("http://localhost:3000/api/cron/auto-coach")));
+    assert.equal(dev.status, 200, "auto-coach ne s'ouvre plus en développement local sans CRON_SECRET");
+  } finally {
+    if (avant.secret === undefined) delete env.CRON_SECRET; else env.CRON_SECRET = avant.secret;
+    if (avant.mode === undefined) delete env.NODE_ENV; else env.NODE_ENV = avant.mode;
+  }
+});
+
 globalThis.fetch = vraiFetch;
 for (const [k, v] of Object.entries(envAvant)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
 

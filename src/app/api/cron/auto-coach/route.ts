@@ -10,10 +10,13 @@ type AutoSummary = { userId: string; processed: boolean; days?: number; pushed?:
 // GET /api/cron/auto-coach
 // Coach AUTONOME : republie chaque nuit un plan glissant de 7 jours pour CHAQUE athlète,
 // recalculé sur sa forme du moment (VFC, sommeil, charge, santé, objectif, périodisation).
-// Sécurisé par CRON_SECRET (Bearer) si défini ; ouvert en local sinon (dev).
+// Sécurisé par CRON_SECRET (Bearer). Sans la variable, ouvert UNIQUEMENT en `next dev` ;
+// ailleurs, porte fermée : « ouvert si absent » valait aussi en production (audit du 24/10/2026).
 export async function GET(req: Request) {
   const secret = req.headers.get("authorization")?.replace("Bearer ", "");
-  if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
+  const attendu = process.env.CRON_SECRET;
+  const ouvertEnDev = !attendu && process.env.NODE_ENV === "development";
+  if (!ouvertEnDev && (!attendu || secret !== attendu)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
