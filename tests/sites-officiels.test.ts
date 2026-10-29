@@ -10,7 +10,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { siteCandidatAcceptable, candidatsSite, promptSiteOfficiel, citeLeLieu, dateConcorde, dedicaceFiable, verdictSite, adresseAuNom, titreAuNom, domainesDevines, sansPistage, candidatsOuverts, indexOuvert, type EpreuveARechercher } from "../src/lib/races/siteOfficielWeb";
-import { epreuvesDepuisLignes, epreuvesAChercher, chercherSiteOfficiel, chercherSansIA, patchsPourEpreuve, sitesDesJumeaux, fenetreFinDeQuota, REESSAI_JOURS, type LigneCourse } from "../src/lib/races/sitesOfficiels";
+import { epreuvesDepuisLignes, epreuvesAChercher, chercherSiteOfficiel, chercherSansIA, patchsPourEpreuve, sitesDesJumeaux, fenetreFinDeQuota, traiterGratuit, REESSAI_JOURS, type LigneCourse } from "../src/lib/races/sitesOfficiels";
 import { lirePage } from "../src/lib/races/veille";
 import { SITES_EXCLUS } from "../src/lib/races/robot";
 
@@ -303,6 +303,44 @@ const page = (url: string, html: string) => lirePage(`<html><head><title>${html.
     assert.doesNotMatch(wf, /GEMINI/);
     const script = readFileSync("scripts/sites-officiels.ts", "utf8");
     assert.ok(script.indexOf('if (process.argv.includes("--gratuit")) {') < script.indexOf("await idEditeur()"), "le passage gratuit exige un compte d'administration que GitHub n'a pas");
+  });
+
+  console.log("\nLENTEUR — une page lente ne fait pas tomber le passage (workflow du 28/10/2026)");
+  // Le délai de 10 s couvre TOUTE la lecture : un site qui répond vite mais envoie sa page au
+  // compte-gouttes lève son TimeoutError pendant `r.text()`, hors de la garde du `fetch`. Le
+  // 28/10/2026, ce rejet a arrêté le script au bout de 33 min, sans rapport.
+  const coupee = () => new Response(new ReadableStream({ start(c) { c.error(new DOMException("The operation was aborted due to timeout", "TimeoutError")); } }),
+    { status: 200, headers: { "content-type": "text/html" } });
+  const bonne = () => new Response("<html><head><title>Course du Marais</title></head><body>Saint-Omer, dimanche 4 octobre 2026.</body></html>", { status: 200, headers: { "content-type": "text/html" } });
+
+  await test("une page coupée en cours de lecture est écartée, et le candidat suivant est lu", async () => {
+    const e = ep({ nom: "Course du Marais", ville: "Saint Omer", departement: "Pas-de-Calais", date: "2026-10-04" });
+    const r = await chercherSiteOfficiel(e, AUJ, {
+      generer: (async () => ({ ok: true, text: "https://lent-marais.fr/ puis https://coursedumarais.fr/", model: "test", sources: [] })) as never,
+      lire: async (url: string) => (url.includes("lent-marais") ? coupee() : bonne()),
+    });
+    assert.equal(r.url, "https://coursedumarais.fr/", "la page lente a fait échouer toute la recherche");
+    assert.match(r.candidats[0].motif, /lente|coupée/);
+  });
+
+  await test("une épreuve qui plante est notée au rapport ; les suivantes sont cherchées quand même", async () => {
+    const lignes = [
+      L({ id: "a", name: "Course Alpha", date: "2099-01-01", registration_url: "https://www.jogging-plus.com/x/alpha/" }),
+      L({ id: "b", date: "2099-02-01", registration_url: "https://www.jogging-plus.com/x/course-du-marais/" }),
+    ];
+    const q: Record<string, unknown> = {};
+    for (const m of ["select", "like", "is", "order", "update"]) q[m] = () => q;
+    q.range = async () => ({ data: lignes, error: null });
+    q.eq = async () => ({ error: null });
+    const sb = { from: () => q } as never;
+    const b = await traiterGratuit(sb, {
+      aujourdhui: AUJ, ecrire: false,
+      existe: async (u) => { if (!u.includes("marais")) throw new Error("résolveur en panne"); return u === "https://coursedumarais.org/"; },
+      lire: async () => bonne(),
+    });
+    assert.equal(b.cherchees, 2, "le passage s'est arrêté à l'épreuve qui a planté");
+    assert.match(b.details[0].motif, /résolveur en panne/, "l'incident n'est pas au rapport");
+    assert.equal(b.details[1].url, "https://coursedumarais.org/");
   });
 
   console.log(`\n${ok} test(s) des sites officiels passé(s), ${ko} échec(s)`);
