@@ -20,6 +20,7 @@ import { computeForme } from "../src/lib/dashboard/forme";
 import { loadRisk, chargesQuotidiennes } from "../src/lib/running/fitness";
 import { computeLoad } from "../src/lib/dashboard/charge";
 import { computeWeeklyTrend } from "../src/lib/dashboard/semaines";
+import { decaleJour } from "../src/lib/streak/compute";
 import type { Workout } from "../src/types";
 
 let ok = 0, ko = 0;
@@ -82,12 +83,32 @@ test("VFC, ACWR, charge et vitesse : les mêmes valeurs que les cartes", () => {
 
 test("la charge quotidienne de la page est celle que l'ACWR additionne", () => {
   // Une séance CHAQUE jour, charge différente : une fenêtre décalée d'un jour se voit.
+  // ⚠️ AUJ est PASSÉ : les séances sont datées par `jour()` (UTC), les fonctions comptaient
+  // depuis aujourd'hui à Paris. Entre minuit à Paris et minuit UTC, la séance du jour tombait
+  // à l'indice 1 et le test rougissait (25/10/2026 à 00 h 30, puis CHAQUE nuit à cette heure).
   const d = donnees({ seances: Array.from({ length: 30 }, (_, i) => seance(i, 6 + (i % 7) * 2)) });
-  const q = chargesQuotidiennes(d.seances, 28);
+  const q = chargesQuotidiennes(d.seances, 28, AUJ);
   assert.equal(q.length, 28);
   assert.ok(q.every((v) => v > 0), "un jour couru compté à zéro");
   const r = (q.slice(0, 7).reduce((a, b) => a + b, 0)) / (q.reduce((a, b) => a + b, 0) / 4);
-  assert.equal(Math.round(r * 100) / 100, loadRisk(d.seances).acwr);
+  assert.equal(Math.round(r * 100) / 100, loadRisk(d.seances, AUJ).acwr);
+});
+
+test("la fiche ACWR lit le jour de la page, pas l'horloge (même à travers un changement d'heure)", () => {
+  // Un jour figé loin de l'horloge : un ratio calculé sur « maintenant » ne verrait AUCUNE
+  // séance et la fiche se dirait vide, pendant que ses barres, elles, liraient le bon jour.
+  // La fenêtre de 28 jours TRAVERSE le passage à l'heure d'été du 30/03/2025 (journée de 23 h) :
+  // un écart de jours compté de minuit à minuit en heure locale y perdrait un jour.
+  const ref = "2025-04-05";
+  const seances = Array.from({ length: 30 }, (_, i) => ({ ...seance(0, 6 + (i % 7) * 2), id: `f${i}`, date: decaleJour(ref, -i) }));
+  const attendu = loadRisk(seances, ref).acwr;
+  assert.ok(attendu > 0, "loadRisk ignore le jour de référence qu'on lui passe");
+  // Case par case, et non « aucune case vide » : avec une séance chaque jour, un décalage d'un
+  // jour empile deux séances dans une case sans en vider aucune (prouvé par mutation).
+  chargesQuotidiennes(seances, 28, ref).forEach((v, i) =>
+    assert.equal(v, seances[i].tss, `la case ${i} (${seances[i].date}) ne contient pas sa seule séance : jour décalé autour du changement d'heure`));
+  const fiche = ficheIndicateur("acwr", donnees({ aujourdhui: ref, seances, historique: seances }));
+  assert.equal(Number(fiche.valeur.replace(",", ".")), attendu, `la fiche affiche « ${fiche.valeur} » au lieu de ${attendu}`);
 });
 
 test("le volume par semaine est celui de la carte (12 semaines, la dernière en cours)", () => {

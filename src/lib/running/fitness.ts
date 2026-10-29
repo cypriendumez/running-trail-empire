@@ -275,14 +275,19 @@ export function chargesQuotidiennes(
 }
 
 export type LoadRisk = { acwr: number; monotony: number; deload: boolean; level: "ok" | "vigilance" | "deload"; reason: string };
-export function loadRisk(workouts: { date: string; type?: string | null; duration_seconds?: number | null; tss?: number | null }[]): LoadRisk {
+export function loadRisk(
+  workouts: { date: string; type?: string | null; duration_seconds?: number | null; tss?: number | null }[],
+  // Le jour de référence (défaut : aujourd'hui à Paris). La page détaillée passe le SIEN : sans
+  // lui, le ratio se lisait sur l'horloge et les barres sur la page — deux jours différents
+  // entre minuit à Paris et minuit UTC (test indicateurs rouge le 25/10/2026 à 00 h 30).
+  aujourdhui: string = jourLocal(),
+): LoadRisk {
   // ⚠️ JOURS DE CALENDRIER, comme partout ailleurs sur le tableau de bord. Les fenêtres
   //    étaient ancrées sur l'heure exacte de l'appel et le découpage quotidien se faisait
   //    en UTC : le ratio bougeait selon le moment de la consultation, et la journée
   //    d'entraînement d'un athlète parisien basculait à 02 h du matin. Le 0,58 affiché
   //    était juste, mais il n'était pas STABLE — et il est lu à côté d'un volume et d'une
   //    charge qui, eux, comptent en cases de calendrier.
-  const aujourdhui = jourLocal();
   // Une seule lecture jour par jour, partagée avec la page détaillée de l'ACWR
   // (`chargesQuotidiennes`) : 7 jours et 28 jours sont des sommes de la même série.
   const q = chargesQuotidiennes(workouts, 28, aujourdhui);

@@ -380,7 +380,7 @@ function acwr(d: DonneesFiche): Fiche {
   const T = TEXTES[d.lang], t = T.acwr, L = d.lang;
   const base: Fiche = { cle: "acwr", titre: t.titre, mesure: t.mesure, valeur: "—", verdict: "", calcul: [], conseils: [], pourquoi: t.pourquoi,
     sources: ["Gabbett T. J. — The training–injury prevention paradox, Br J Sports Med, 2016.", "Foster C. — Monitoring training in athletes with reference to overtraining syndrome, Med Sci Sports Exerc, 1998."] };
-  const r = loadRisk(d.seances);
+  const r = loadRisk(d.seances, d.aujourdhui);
   if (!(r.acwr > 0)) return { ...base, vide: T.commun.vide };
   const q = chargesQuotidiennes(d.seances, 28, d.aujourdhui);
   const sept = q.slice(0, 7).reduce((a, b) => a + b, 0), moyenne = q.reduce((a, b) => a + b, 0) / 4;
