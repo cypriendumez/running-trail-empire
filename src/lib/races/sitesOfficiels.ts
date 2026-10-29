@@ -162,7 +162,12 @@ export async function essayerCandidats(e: EpreuveARechercher, urls: readonly str
     // Une adresse qui REDIRIGE vers un calendrier ou une plateforme n'est pas l'organisateur.
     const finale = r.url || url;
     if (!siteCandidatAcceptable(finale)) { candidats.push({ url, motif: `redirige vers ${finale}` }); continue; }
-    const page = lirePage((await r.text()).slice(0, 1_500_000), finale, aujourdhui);
+    // ⚠️ Le délai de 10 s court PENDANT la lecture du corps : une page envoyée au compte-gouttes
+    // lève son TimeoutError ici, hors de la garde du `fetch` (script arrêté le 28/10/2026).
+    let html: string;
+    try { html = (await r.text()).slice(0, 1_500_000); }
+    catch { candidats.push({ url: finale, motif: "page trop lente ou coupée en cours de lecture" }); continue; }
+    const page = lirePage(html, finale, aujourdhui);
     const v = verdictSite(e, page);
     if (v.ok) return { url: finale, force: v.force, motif: "trouvé", candidats: [...candidats, { url: finale, motif: `retenu (${v.force})` }], page };
     candidats.push({ url: finale, motif: v.motif });
@@ -237,7 +242,14 @@ export async function traiterGratuit(sb: SupabaseClient, o: { aujourdhui: string
     .slice(0, o.max ?? Infinity);
   const bilan: BilanLot = { cherchees: 0, trouvees: 0, lignesMisesAJour: 0, erreursEcriture: 0, indisponible: false, details: [] };
   for (const ep of eps) {
-    const r = await chercherSansIA(ep, o.aujourdhui, o);
+    // Une épreuve qui plante ne doit pas emporter tout le passage, ni son rapport, écrit à la fin.
+    let r: Recherche;
+    try { r = await chercherSansIA(ep, o.aujourdhui, o); }
+    catch (err) {
+      bilan.cherchees++;
+      bilan.details.push({ nom: ep.nom, ville: ep.ville, date: ep.date, url: null, motif: `erreur : ${err instanceof Error ? err.message : String(err)}`.slice(0, 300), candidats: [] });
+      continue;
+    }
     bilan.cherchees++;
     const patchs = r.url && r.page ? patchsPourEpreuve(ep, r.url, r.page, o.aujourdhui) : [];
     if (r.url) bilan.trouvees++;
