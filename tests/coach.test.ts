@@ -3971,11 +3971,24 @@ test("les migrations récentes ne contiennent AUCUNE instruction DROP", () => {
   //
   // Périmètre : à partir de la migration 007. La 006 en contient douze, écrites avant
   // cette règle — les réécrire n'apporterait rien, elles sont déjà passées.
+  //
+  // ⚠️ UNE SEULE EXCEPTION, ÉTROITE : la 040 retire PostGIS (inutilisé), seul moyen de
+  // fermer `spatial_ref_sys` (propriété de supabase_admin, alerte de sécurité du
+  // 27/10/2026). Toute autre instruction DROP, dans la 040 comme ailleurs, rougit.
+  const TOLEREES: Record<string, string> = { "040_retrait_postgis.sql": "drop extension if exists postgis cascade;" };
   for (const f of readdirSync("supabase/migrations").filter((x) => x.endsWith(".sql") && x >= "007")) {
     const lignes = readFileSync(`supabase/migrations/${f}`, "utf8").split("\n")
       .filter((l) => !l.trim().startsWith("--"));
-    const drops = lignes.filter((l) => /^\s*drop\b/i.test(l));
+    const drops = lignes.filter((l) => /^\s*drop\b/i.test(l) && l.trim() !== TOLEREES[f]);
     assert.deepEqual(drops, [], `${f} contient une instruction DROP : ${drops[0]?.trim()}`);
+  }
+  // L'exception ne vaut que tant que PostGIS reste inutilisé : aucun code ne doit lire ni
+  // écrire les colonnes qu'elle a emportées, ni appeler une fonction ST_*.
+  for (const f of ["src", "scripts"].flatMap((d) => readdirSync(d, { recursive: true }).map((x) => `${d}/${x}`))
+    .filter((x) => /\.(ts|tsx)$/.test(x))) {
+    const src = readFileSync(f, "utf8");
+    assert.ok(!/start_location|races_location_idx|\bST_[A-Z][a-zA-Z]+\(/i.test(src),
+      `${f} utilise PostGIS, retiré par la migration 040 : le réinstaller (schéma extensions) avant`);
   }
 });
 
