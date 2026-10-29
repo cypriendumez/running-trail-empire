@@ -250,8 +250,10 @@ export async function autoCoachForUser(
   const apiKey = ids?.apiKey;
   if (athleteId && apiKey && planComplet) {
     try {
-      const { data: objRow } = await admin.from("notifications").select("data").eq("user_id", userId).eq("type", "race_objective").maybeSingle();
-      const objectiveRace = ((objRow?.data as { race?: string } | undefined)?.race) || null;
+      // L'objectif du CONTEXTE, pas la ligne brute : elle survit à la course, et chaque
+      // séance envoyée après le marathon de Lille s'intitulait encore « Prépa Marathon
+      // International de Lille — Footing ». Le contexte, lui, écarte un objectif passé.
+      const objectiveRace = ctx.objective?.race || null;
       const { data: prof } = await admin.from("profiles").select("*").eq("id", userId).maybeSingle();
       const warmMin = (prof?.warmup_min as number | null | undefined) ?? null;
       const coolMin = (prof?.cooldown_min as number | null | undefined) ?? null;

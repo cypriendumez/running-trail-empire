@@ -83,6 +83,9 @@ export type QualityBudgetInput = {
   hasObjective: boolean;
   daysToRace: number | null;
   isShortGoal: boolean;
+  /** Récupération après une course courue (`lib/coach/apresCourse`) : le motif, en
+   *  français, ou `null`. Présente, elle ramène la qualité à zéro. */
+  apresCourse?: string | null;
 };
 
 export type QualityBudget = {
@@ -235,6 +238,11 @@ export function computeQualityBudget(i: QualityBudgetInput): QualityBudget {
   // Un athlète en obésité de classe II avec un objectif chrono déclencherait sinon le
   // plancher : du fractionné sur des articulations qui encaissent près de 300 kg par appui.
   if (i.weightLossMaxQuality != null) qBudget = Math.min(qBudget, i.weightLossMaxQuality);
+
+  // APRÈS UNE COURSE : aucune intensité, quel que soit le plancher. Placé en DERNIER pour
+  // la même raison que le plafond ci-dessus — un athlète frais à J+5 de son marathon
+  // déclencherait sinon le plancher « jamais zéro qualité » et repartirait au fractionné.
+  if (i.apresCourse) { qBudget = 0; easeReasons.push(i.apresCourse); }
 
   return {
     // Le français sort du MÊME gabarit que les autres langues : les deux ne peuvent

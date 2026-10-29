@@ -246,6 +246,9 @@ export function longRunForWeek(args: {
  */
 export function longRunGap(peakPlanned: number, peakNeeded: number | null, raceKm: number | null): string | null {
   if (peakNeeded == null || raceKm == null) return null;
+  // Une sortie longue « planifiée » à 0 km n'est pas un plan trop court : c'est l'absence de
+  // plan (course passée, VMA inconnue). On ne fabrique pas un « plafonnera à ~0 km ».
+  if (!(peakPlanned > 0)) return null;
   if (peakPlanned >= peakNeeded * 0.85) return null;
   const km = raceKm.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
   return `⚠️ PRÉPARATION INSUFFISANTE POUR LA DISTANCE : au rythme de progression actuel, la plus longue sortie de la préparation plafonnera à ~${peakPlanned} km pour une course de ${km} km (il en faudrait ~${peakNeeded}). Dis-le-lui clairement et propose l'un des deux : augmenter la fréquence des sorties pour faire monter le volume, ou viser une distance plus courte cette fois-ci. Ne fais pas comme si le plan préparait la course.`;

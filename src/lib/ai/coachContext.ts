@@ -36,7 +36,8 @@ const dureeLoc = (min: number, l: Lang) => {
   return h ? `${h} h ${String(m).padStart(2, "0")}` : `${m} min`;
 };
 import { QUALITE_T } from "@/lib/ai/qualityI18n";
-import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
+import { aujourdhui, FUSEAU_DEFAUT, formatDateCivile } from "@/lib/time/fuseau";
+import { apresCourse } from "@/lib/coach/apresCourse";
 import { libellesActifs, type Douleur } from "@/lib/health/douleurs";
 import { qualiteRecente as qualiteDesSeptJours, type QualiteRecente, type Prescription } from "@/lib/coach/qualiteRecente";
 import { phaseDeSemaine, specifiqueEnTete } from "@/lib/coach/phase";
@@ -436,7 +437,18 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // déclaration et un garde-fou. Le ressenti (RPE) et les notes sont de l'analyse de séance.
   const feedback = ((fbRes.data ?? []) as { data: { rpe?: number; pain?: string[]; note?: string } }[])
     .map((f) => objectifSeul ? { data: { pain: f.data?.pain } } : f);
-  const objective = (objRes.data?.data ?? null) as CoachObjective | null;
+  // ⚠️ UN OBJECTIF PASSÉ RESTAIT L'OBJECTIF. `race_objective` est une ligne unique que rien
+  // n'efface après la course. Cas réel (Cyprien, marathon de Lille couru le 25/10/2026) :
+  // cinq jours plus tard, le coach se croyait encore en AFFÛTAGE (`weeksToRace` = −1, donc
+  // « ≤ 2 »), son macro-plan était vide (`daysToRace < 0`), et l'encadré « réalisme »
+  // annonçait une préparation qui « plafonnera à ~0 km » pour une course déjà courue —
+  // pendant que l'en-tête du même calendrier, qui lit `lib/coach/prochaineCourse`, disait
+  // « Aucune course ». Même règle qu'elle : une course reste l'objectif jusqu'au soir de
+  // son jour, dans le fuseau des coureurs. Un objectif SANS date n'est jamais périmé.
+  const objectifDeclare = (objRes.data?.data ?? null) as CoachObjective | null;
+  const objective = objectifDeclare?.raceDate && String(objectifDeclare.raceDate).slice(0, 10) < aujourdhui(FUSEAU_DEFAUT)
+    ? null
+    : objectifDeclare;
   // `tags` est lu en plus de la date et du type : c'est lui qui dit qu'une séance d'un
   // autre écrivain que le plan automatique était une séance de qualité (`qualiteRecente`).
   const coachSessions = ((csRes.data ?? []) as { data: Prescription & { date?: string; sessionType?: string } }[]).map(r => r.data).filter((d): d is Prescription & { date?: string; sessionType?: string } => !!d?.date);
@@ -1098,6 +1110,19 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const noHistory = runs.length === 0;
   const fade = qe?.fadeSec ?? null;
   const faded = fade != null && fade >= 10;
+  // ── APRÈS LA COURSE ─────────────────────────────────────────────────────────
+  // L'objectif passé n'est plus l'objectif, mais il n'est pas oublié : s'il a été couru
+  // (une sortie enregistrée ce jour-là), l'intensité attend. Voir `lib/coach/apresCourse`.
+  const recup = objectifDeclare && !objective && objectifDeclare.raceDate
+    ? apresCourse({
+        course: { nom: objectifDeclare.race, date: objectifDeclare.raceDate, distanceKm: Number(objectifDeclare.distanceKm) },
+        sorties: runs.map((w) => ({ date: String(w.date), distanceKm: num(w.distance_km) })),
+        aujourdhui: todayStr,
+      })
+    : null;
+  const recupMotif = recup
+    ? tr((l) => MOTIF_T[l].apresCourse(recup.nom, nRaw(recup.joursDepuis, l), formatDateCivile(recup.reprise, l, { day: "numeric", month: "long" })))
+    : null;
   // ── ARBITRAGE DU BUDGET DE QUALITÉ ───────────────────────────────────────────
   // Extrait dans `lib/coach/qualityBudget` : c'est la décision la plus lourde du coach
   // et elle était intestable au milieu des requêtes. Deux défauts y ont été corrigés —
@@ -1117,6 +1142,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     hardTimePct, fadeSec: fade, plateau, noMaxEffort, runYears,
     weightLossMaxQuality: weightLoss ? weightLoss.rules.maxQualityPerWeek : null,
     hasObjective: !!objective, daysToRace, isShortGoal,
+    apresCourse: recupMotif?.fr ?? null,
   });
   const qBudget = qb.qBudget;
   const { structuralQBudget, easeReasons, expCapped, expCap } = qb;
@@ -1143,6 +1169,9 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     ? MOTIF_T[l].origineCross(cross.sharePct, cross.labelAll[l]) : "";
   // La ZONE de douleur est stockée en français (l'IA et le budget de qualité la
   // reconnaissent par mots-clés français) : on la traduit à l'affichage seulement.
+  // La récupération d'après-course est un état du corps comme un autre : elle s'affiche
+  // dans le bandeau, sinon « aucune séance de qualité » n'aurait aucune raison visible.
+  if (recupMotif) orangeFlags.push(recupMotif);
   if (pains.length) redFlags.push(tr((l) => MOTIF_T[l].douleur(pains.map((x) => traduireDouleur(x, l)).join(", "))));
   // ── LA CHARGE SEULE NE SUFFIT PLUS À DÉCLARER ROUGE ─────────────────────────
   // Le feu rouge annule l'intensité du JOUR. Comme le plan est republié chaque jour et
@@ -1732,9 +1761,18 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
       }
     }
     // 2. La préparation atteindra-t-elle une sortie longue à la hauteur de la distance ?
-    const plannedPeak = Math.max(0, ...macroPlan.map(w => w.longRunKm));
-    const gap = longRunGap(plannedPeak, longRunPeakKm(libGoal as RaceGoal, objective.distanceKm), objective.distanceKm);
-    if (gap) out.push(gap);
+    // ⚠️ SANS FEUILLE DE ROUTE, PAS DE VERDICT. `Math.max(0, ...[])` vaut 0 : sans VMA, le
+    // macro-plan est vide et l'encadré annonçait une préparation qui « plafonnera à ~0 km ».
+    // Ce 0 n'est pas une mesure, c'est l'absence de plan.
+    // ⚠️ ET LA PRÉPARATION COMPREND CE QUI EST DÉJÀ COURU. Le macro-plan ne porte que les
+    // semaines à venir : à trois semaines de la course, il ne contient plus que l'affûtage
+    // (75 %, 55 % de la plus longue, puis la semaine de course à 0), et un athlète qui venait
+    // de courir 30 km lisait que sa préparation « plafonnera à ~22 km ».
+    if (macroPlan.length) {
+      const plannedPeak = Math.max(longestRecentKm, ...macroPlan.map(w => w.longRunKm));
+      const gap = longRunGap(plannedPeak, longRunPeakKm(libGoal as RaceGoal, objective.distanceKm), objective.distanceKm);
+      if (gap) out.push(gap);
+    }
     // 3. L'ÂGE autorise-t-il cette distance ? Un athlète de 18 ans qui vise un marathon
     // ne pourra pas s'inscrire à une épreuve officielle en France (limite Junior : 25 km).
     // On ne le bloque pas — c'est son objectif, son plan est construit — mais le lui

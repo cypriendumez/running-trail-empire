@@ -754,6 +754,19 @@ function CoachWhy({ state, lang, t, sessions, realismeMasque = null }: { state: 
           {(noQuality || easedQuality) && (
             <span className={`mt-1.5 block text-sm leading-relaxed ${tone.body}`}>
               {t(noQuality ? "cal.why.noQuality" : "cal.why.easedQuality")}
+              {/* ⚠️ LES MOTIFS SUIVENT LES DEUX-POINTS, repliés comme dépliés. Repliée, la
+                  phrase « … ce n'est pas un oubli : » ne disait rien : ce qui la suivait à
+                  l'écran était l'encadré de réalisme, et l'athlète l'a lu comme LA raison
+                  (Cyprien, 30/10/2026 : « c'est faux, je comprends rien »). Deux ou trois
+                  motifs courts, pas les 123 mots du raisonnement. Des <span> et non une
+                  liste : un <summary> n'accepte que du contenu de phrase. */}
+              {reasons.map((r, i) => <span key={i} className="mt-0.5 block">· {r}</span>)}
+              {/* La charge d'un autre sport est la cause la plus souvent invisible : le
+                  calendrier ne montre que la course, donc une semaine de randonnée ne
+                  laissait aucune trace expliquant l'allègement. */}
+              {state.cross?.label && (
+                <span className="mt-0.5 block">· {t("cal.why.cross")} : {state.cross.label}{state.cross.sharePct ? ` (${state.cross.sharePct} %)` : ""}</span>
+              )}
             </span>
           )}
           {/* Visible repliée : c'est la réponse à « où est passée ma séance ? ». */}
@@ -801,18 +814,10 @@ function CoachWhy({ state, lang, t, sessions, realismeMasque = null }: { state: 
         </div>
       )}
 
-      {noQuality || easedQuality ? (
+      {(noQuality || easedQuality) && (hasObjective || nextQuality.length > 0) ? (
         <div className={`mt-2 text-sm leading-relaxed ${tone.body}`}>
-          {/* L'intro est déjà dans le résumé : la répéter ici ferait doublon au dépliage. */}
-          <ul className="mt-1 space-y-0.5">
-            {reasons.map((r, i) => <li key={i}>· {r}</li>)}
-            {/* La charge d'un autre sport est la cause la plus souvent invisible : le
-                calendrier ne montre que la course, donc une semaine de randonnée ne
-                laissait aucune trace expliquant l'allègement. */}
-            {state.cross?.label && (
-              <li>· {t("cal.why.cross")} : {state.cross.label}{state.cross.sharePct ? ` (${state.cross.sharePct} %)` : ""}</li>
-            )}
-          </ul>
+          {/* L'intro et ses motifs sont déjà dans le résumé : les répéter ici ferait doublon
+              au dépliage. */}
           {hasObjective && <p className="mt-1.5">{t(noQuality ? "cal.why.noQualityTail" : "cal.why.easedQualityTail", { race })}</p>}
           {nextQuality.length > 0 && (
             <p className="mt-1.5"><span className="font-semibold">{t("cal.why.nextWeek")} :</span> {nextQuality.join(" + ")}</p>
