@@ -57,6 +57,7 @@ function fichiersSrc(dir = join(ROOT, "src"), out: string[] = []): string[] {
 const CALLBACK = "src/app/api/intervals/oauth/callback/route.ts";
 const START = "src/app/api/intervals/oauth/start/route.ts";
 const CREDENTIALS = "src/app/api/intervals/credentials/route.ts";
+const SUPPRESSION_COMPTE = "src/app/api/account/delete/route.ts";
 
 void (async () => {
 
@@ -286,6 +287,22 @@ await testA("la déconnexion révoque l'autorisation chez intervals.icu", async 
   assert.equal(await revoquer("x", faux(() => new Error("panne")).f), false, "une panne ne doit pas lever d'exception");
   const code = codeSeul(CREDENTIALS);
   assert.ok(/estJetonOAuth\([^)]*\)\)\s*\{\s*await revoquer\(/.test(code), "DELETE ne révoque pas un jeton OAuth");
+});
+
+// Audit du 24/10/2026 : supprimer son compte effaçait le jeton sans le rendre à intervals.icu.
+// Pacevo restait dans les applications autorisées de l'ancien coureur, et ses alertes
+// continuaient d'arriver. Le jeton se lit AVANT d'effacer le profil (qui l'emporte), et se
+// rend APRÈS que le profil est bien parti : un échec de suppression laisse la montre reliée.
+test("supprimer son compte révoque aussi l'autorisation intervals.icu", () => {
+  const code = codeSeul(SUPPRESSION_COMPTE);
+  const lu = code.search(/\.select\("intervals_api_key"\)/);
+  const efface = code.indexOf('.from("profiles").delete()');
+  const rendu = code.search(/estJetonOAuth\([^)]*\)\)\s*await revoquer\(jetonDe\(/);
+  const compte = code.indexOf("deleteUser(");
+  assert.ok(lu >= 0, "le jeton n'est pas lu avant l'effacement du profil");
+  assert.ok(rendu >= 0, "la suppression du compte ne révoque pas un jeton OAuth");
+  assert.ok(lu < efface && efface < rendu && rendu < compte,
+    "ordre attendu : lire le jeton, effacer le profil, révoquer, puis supprimer le compte");
 });
 
 test("la route des identifiants ne montre jamais un jeton, même tronqué", () => {
