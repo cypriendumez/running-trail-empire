@@ -584,5 +584,49 @@ test("le lendemain de course, la page reste en ligne au lieu de répondre 404", 
     "la page relit la date brute : 404 chaque lundi matin pour les courses du week-end");
 });
 
+test("une course effacée par le dédoublonnage renvoie vers sa jumelle (308), jamais une suppression bloquée", () => {
+  // ⚠️ SEARCH CONSOLE, 29/10/2026 : dix fiches en 404 (Trail du Buis 21 km, Volvic 17 km…),
+  // toutes effacées par le rafraîchissement du mardi parce qu'en double. La jumelle
+  // conservée existait sous un autre identifiant ; l'adresse connue de Google était perdue.
+  const nu = (f: string) => readFileSync(f, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  const page = nu("src/app/courses/[slug]/page.tsx");
+  const renvoi = page.indexOf("if (jumelle) permanentRedirect(`/courses/${jumelle}`);");
+  assert.ok(/if \(!c\) \{\s*const jumelle = await jumelleDe\(demande\);/.test(page) && renvoi > 0,
+    "une course effacée répond de nouveau 404 au lieu de renvoyer vers sa jumelle");
+  assert.ok(renvoi < page.indexOf("if (!c || !publiable(c)) notFound();"), "le 404 tombe avant la recherche de la jumelle");
+  assert.ok(/from\("races_redirections"\)\s*\.select\("nouvel_id"\)\.eq\("ancien_court", court\)/.test(page),
+    "la jumelle n'est plus cherchée par le préfixe que porte l'adresse");
+  assert.ok(/return c && publiable\(c\) \? slugCourse\(c\) : null;/.test(page),
+    "on renverrait vers une jumelle qui n'a pas de page (redirection vers un 404)");
+
+  const sql = readFileSync("supabase/migrations/039_races_redirections.sql", "utf8")
+    .split("\n").filter((l) => !l.trim().startsWith("--")).map((l) => l.replace(/--.*$/, "")).join("\n");
+  assert.ok(/create table if not exists public\.races_redirections \(\s*ancien_court text primary key/.test(sql), "table de redirection absente");
+  assert.ok(/alter table races_redirections enable row level security/.test(sql), "la table serait lisible par n'importe qui");
+  assert.ok(/security definer set search_path = public/.test(sql), "fonction sans search_path figé (voir migration 038)");
+  assert.ok(/after delete on public\.races\s+for each row execute function public\.races_noter_jumelle\(\)/.test(sql),
+    "plus aucun déclencheur à la suppression : seuls les scripts qui y penseraient noteraient la jumelle");
+  // Le préfixe calculé en base doit être celui de l'adresse (`slugCourse`).
+  assert.ok(/left\(replace\(old\.id::text, '-', ''\), 8\)/.test(sql), "le préfixe noté n'est plus celui que porte l'adresse");
+  assert.ok(/r\.id <> old\.id/.test(sql), "la ligne effacée pourrait se désigner elle-même");
+  assert.ok(/exception when others then/.test(sql), "une erreur du déclencheur bloquerait le dédoublonnage");
+  assert.ok(/update races_redirections set nouvel_id = jumelle where nouvel_id = old\.id/.test(sql),
+    "une jumelle effacée à son tour laisserait ses anciennes adresses sans destination");
+  // ⚠️ UNE SEULE TOLÉRANCE : celle qui apparie les formats décide aussi de la jumelle.
+  assert.ok(/greatest\(0\.25, old\.distance_km \* 0\.025\)/.test(sql), "la tolérance de distance du déclencheur a changé");
+  assert.ok(/const tolere = \(km: number\) => Math\.max\(0\.25, km \* 0\.025\);/.test(readFileSync("src/lib/races/majFinishers.ts", "utf8")),
+    "la tolérance d'appariement a changé : la reporter dans le déclencheur (migration 039)");
+
+  // Le rattrapage : dix adresses, chacune vers une AUTRE course, au bon format.
+  const rattrapage = [...sql.matchAll(/\('([0-9a-f]+)', '([0-9a-f-]+)'\)/g)];
+  assert.equal(rattrapage.length, 10, "le rattrapage ne couvre plus les dix adresses relevées");
+  for (const [, court, id] of rattrapage) {
+    assert.ok(/^[0-9a-f]{8}$/.test(court) && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(id), `ligne mal formée : ${court} → ${id}`);
+    assert.notEqual(id.replace(/-/g, "").slice(0, 8), court, `${court} renverrait vers lui-même`);
+  }
+});
+
 console.log(`\n${passed} test(s) des courses publiques passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log(`  KO ${f}`); process.exit(1); }

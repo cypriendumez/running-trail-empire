@@ -58,6 +58,24 @@ async function lire(slug: string): Promise<CoursePublique | null> {
   return basculeALaLecture(data[0] as CoursePublique, jourFrance());
 }
 
+/**
+ * ⚠️ UNE COURSE SUPPRIMÉE N'EST PAS UNE PAGE MORTE (Search Console, 29/10/2026). Le
+ * dédoublonnage du mardi efface l'un des deux exemplaires d'une course ; l'adresse de
+ * l'exemplaire effacé, déjà connue de Google, répondait 404 alors que sa jumelle existe.
+ * Le déclencheur de la migration 039 note la jumelle à chaque suppression : on y renvoie.
+ * Table absente (migration pas encore passée) : la lecture échoue, l'adresse répond 404
+ * comme avant.
+ */
+async function jumelleDe(slug: string): Promise<string | null> {
+  const court = idDepuisSlug(slug);
+  if (!court) return null;
+  const { data, error } = await createAdminClient().from("races_redirections")
+    .select("nouvel_id").eq("ancien_court", court).maybeSingle();
+  if (error || !data?.nouvel_id) return null;
+  const c = await lire(String(data.nouvel_id).replace(/-/g, "").slice(0, 8));
+  return c && publiable(c) ? slugCourse(c) : null;
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const c = await lire((await params).slug);
   if (!c || !publiable(c)) return { title: texteCourses(await getPublicLang(), "introuvable") };
@@ -83,6 +101,10 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
   const c = await lire(demande);
   const lang = await getPublicLang();
   const t = (k: string, p?: Record<string, string | number>) => texteCourses(lang, k, p);
+  if (!c) {
+    const jumelle = await jumelleDe(demande);
+    if (jumelle) permanentRedirect(`/courses/${jumelle}`);
+  }
   // ⚠️ LE MÊME FILTRE QUE LE SITEMAP. Une course sans date réelle ou déjà courue n'a pas
   // de page : la publier laisserait en ligne une information périmée que Google
   // continuerait de servir pendant des semaines.
