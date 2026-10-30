@@ -18,6 +18,7 @@ import { PPS_URL, PPS_PRIX_EUR, PPS_VALIDITE_MOIS, type PpsStatus } from "@/lib/
 import { normLang } from "@/lib/i18n/translations";
 import { ShieldCheck, ExternalLink, Award, Baby, ArrowRight } from "lucide-react";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
+import { estOfficielle } from "@/lib/coach/prochaineCourse";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pass Prévention Santé" };
@@ -41,7 +42,11 @@ export default async function PpsPage() {
 
   // LA PROCHAINE ÉCHÉANCE, objectif ou course simplement notée : c'est contre ELLE que
   // le pass doit tenir. Sans cette date, le verdict n'est qu'un compte à rebours.
-  const obj = (objRow?.data ?? {}) as { race?: string; raceDate?: string };
+  // ⚠️ UN DÉFI PERSONNEL N'EXIGE AUCUN PASS (« sub 16 min sur 5 km, pas une course
+  // officielle », Cyprien, 30/10/2026) : sans ce filtre, la page lui réclamait un PPS
+  // valable à la date de son test chrono. Il est écarté ici comme des dates ci-dessous.
+  const objBrut = (objRow?.data ?? {}) as { race?: string; raceDate?: string; officielle?: boolean };
+  const obj = estOfficielle(objBrut) ? objBrut : {};
   // Les courses de l'athlète, objectif compris : c'est contre ELLES que le pass doit tenir.
   const coursesAVenir = [
     ...(obj.raceDate ? [{ date: String(obj.raceDate).slice(0, 10), nom: obj.race || "Objectif" }] : []),
@@ -54,7 +59,7 @@ export default async function PpsPage() {
    .sort((a, b) => a.date.localeCompare(b.date));
 
   const dates = [
-    String(((objRow?.data ?? {}) as { raceDate?: string }).raceDate ?? "").slice(0, 10),
+    String(obj.raceDate ?? "").slice(0, 10),
     ...(plannedRows ?? []).map((r) => String(((r.data ?? {}) as { date?: string }).date ?? "").slice(0, 10)),
   ].filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d) && d >= today).sort();
   const prochaineCourse = dates[0] ?? null;

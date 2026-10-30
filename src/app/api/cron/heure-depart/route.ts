@@ -35,7 +35,7 @@ export async function GET(req: Request) {
     .select("id,user_id,data").eq("type", "race_objective").order("id").limit(200);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  type Obj = { race?: string; raceDate?: string; distanceKm?: number; heureDepart?: string | null;
+  type Obj = { race?: string; raceDate?: string; distanceKm?: number; heureDepart?: string | null; officielle?: boolean;
                heureSource?: string[] | null; heureCherchéeLe?: string | null };
 
   let cherchees = 0, trouvees = 0;
@@ -46,6 +46,9 @@ export async function GET(req: Request) {
     if (!o.race || !o.raceDate) continue;
     // Course passée : plus rien à chercher.
     if (o.raceDate < aujourdhui) continue;
+    // Défi personnel : aucun organisateur ne publie son heure, et chercher « Chrono 5 km »
+    // sur le web dépenserait le quota du modèle pour une réponse inventée.
+    if (o.officielle === false) continue;
     // Déjà connue — saisie par l'athlète ou trouvée précédemment.
     if (o.heureDepart) continue;
     // Une seule recherche par jour et par objectif : l'organisateur ne publie pas

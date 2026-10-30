@@ -38,6 +38,8 @@ const dureeLoc = (min: number, l: Lang) => {
 import { QUALITE_T } from "@/lib/ai/qualityI18n";
 import { aujourdhui, FUSEAU_DEFAUT, formatDateCivile } from "@/lib/time/fuseau";
 import { apresCourse } from "@/lib/coach/apresCourse";
+import { objectifEnCours, estOfficielle } from "@/lib/coach/prochaineCourse";
+import { decaleJour } from "@/lib/streak/compute";
 import { libellesActifs, type Douleur } from "@/lib/health/douleurs";
 import { qualiteRecente as qualiteDesSeptJours, type QualiteRecente, type Prescription } from "@/lib/coach/qualiteRecente";
 import { phaseDeSemaine, specifiqueEnTete } from "@/lib/coach/phase";
@@ -50,6 +52,11 @@ export type CoachObjective = {
   /** Heure de départ « HH:MM », saisie par l'athlète. Absente du catalogue : les
    *  agrégateurs qui l'alimentent ne publient pas d'heure (vérifié à la source). */
   heureDepart?: string | null;
+  /** `false` pour un défi personnel (test chrono, tentative de record) : ni catalogue,
+   *  ni règlement fédéral. Absent = course officielle (`lib/coach/prochaineCourse`). */
+  officielle?: boolean;
+  /** La course passée que cet objectif a remplacée (`lib/coach/objective`). */
+  precedente?: { race: string; raceDate: string; distanceKm: number } | null;
 };
 
 /**
@@ -443,12 +450,10 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // « ≤ 2 »), son macro-plan était vide (`daysToRace < 0`), et l'encadré « réalisme »
   // annonçait une préparation qui « plafonnera à ~0 km » pour une course déjà courue —
   // pendant que l'en-tête du même calendrier, qui lit `lib/coach/prochaineCourse`, disait
-  // « Aucune course ». Même règle qu'elle : une course reste l'objectif jusqu'au soir de
-  // son jour, dans le fuseau des coureurs. Un objectif SANS date n'est jamais périmé.
+  // « Aucune course ». Même règle qu'elle (`objectifEnCours`) : une course reste
+  // l'objectif jusqu'au soir de son jour, dans le fuseau des coureurs.
   const objectifDeclare = (objRes.data?.data ?? null) as CoachObjective | null;
-  const objective = objectifDeclare?.raceDate && String(objectifDeclare.raceDate).slice(0, 10) < aujourdhui(FUSEAU_DEFAUT)
-    ? null
-    : objectifDeclare;
+  const objective = objectifEnCours(objectifDeclare, aujourdhui(FUSEAU_DEFAUT));
   // `tags` est lu en plus de la date et du type : c'est lui qui dit qu'une séance d'un
   // autre écrivain que le plan automatique était une séance de qualité (`qualiteRecente`).
   const coachSessions = ((csRes.data ?? []) as { data: Prescription & { date?: string; sessionType?: string } }[]).map(r => r.data).filter((d): d is Prescription & { date?: string; sessionType?: string } => !!d?.date);
@@ -748,7 +753,11 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   if (objective?.raceDate) {
     daysToRace = Math.ceil((new Date(objective.raceDate + "T00:00:00").getTime() - now) / 86400000);
     weeksToRace = Math.floor(daysToRace / 7);
-    objLines.push(`• Course : ${objective.race} — ${objective.distanceKm} km, le ${objective.raceDate} (J-${daysToRace}, ~${weeksToRace} sem.)`);
+    objLines.push(estOfficielle(objective)
+      ? `• Course : ${objective.race} — ${objective.distanceKm} km, le ${objective.raceDate} (J-${daysToRace}, ~${weeksToRace} sem.)`
+      // Un défi personnel le dit au modèle : sans ça, il parle de dossard, de ravitaillement
+      // et de meneurs d'allure à quelqu'un qui court seul sur une piste.
+      : `• Défi personnel, PAS une course officielle (ni dossard, ni ravitaillement, ni meneur d'allure : il court seul) : ${objective.race} — ${objective.distanceKm} km, le ${objective.raceDate} (J-${daysToRace}, ~${weeksToRace} sem.)`);
     objLines.push(`• Temps visé : ${objective.targetTime} → allure cible ${objective.targetPace}`);
     if (vma && objective.distanceKm && objective.targetSeconds) {
       const targetSpeed = objective.distanceKm / (objective.targetSeconds / 3600);
@@ -1113,9 +1122,12 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // ── APRÈS LA COURSE ─────────────────────────────────────────────────────────
   // L'objectif passé n'est plus l'objectif, mais il n'est pas oublié : s'il a été couru
   // (une sortie enregistrée ce jour-là), l'intensité attend. Voir `lib/coach/apresCourse`.
-  const recup = objectifDeclare && !objective && objectifDeclare.raceDate
+  // ⚠️ ET UN NOUVEL OBJECTIF NE L'EFFACE PAS : fixé à J+5 du marathon, il écrasait la ligne
+  // et la récupération avec elle. La course remplacée voyage donc dans `precedente`.
+  const coursePassee = objectifDeclare && !objective ? objectifDeclare : objectifDeclare?.precedente ?? null;
+  const recup = coursePassee?.raceDate
     ? apresCourse({
-        course: { nom: objectifDeclare.race, date: objectifDeclare.raceDate, distanceKm: Number(objectifDeclare.distanceKm) },
+        course: { nom: coursePassee.race, date: coursePassee.raceDate, distanceKm: Number(coursePassee.distanceKm) },
         sorties: runs.map((w) => ({ date: String(w.date), distanceKm: num(w.distance_km) })),
         aujourdhui: todayStr,
       })
@@ -1645,8 +1657,13 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
         : ph === "Spécifique" || ph === "Affûtage"
           ? [...menuTypes].sort((a, b) => Number(/allure|spécifique|spé/i.test(b)) - Number(/allure|spécifique|spé/i.test(a)))
           : menuTypes;
-      const quality = priority.slice(0, Math.max(1, qn));
-      const focus = ph === "Base" ? "Volume aérobie + pose de vitesse"
+      // Une semaine qui commence avant la fin de la récupération d'après-course n'a PAS de
+      // qualité : sinon la feuille de route annonçait « la semaine prochaine : VMA » sous un
+      // bandeau qui interdit l'intensité jusqu'au 21 novembre.
+      const enRecup = recup != null && decaleJour(todayStr, 7 * i) < recup.reprise;
+      const quality = enRecup ? [] : priority.slice(0, Math.max(1, qn));
+      const focus = enRecup ? `Récupération après ${recup.nom} : footings seulement`
+        : ph === "Base" ? "Volume aérobie + pose de vitesse"
         : ph === "Développement" ? "VMA & seuil — montée en charge"
         : ph === "Spécifique" ? `Allure course${goalPace ? ` (${goalPace}/km)` : ""} + endurance spécifique`
         : wkUntil <= 1 ? "Fraîcheur — repos, rappels d'allure" : "Volume −, on garde l'intensité (fraîcheur jour J)";
@@ -1684,7 +1701,8 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // jour : « Foulées de Bondues » existe en 1,5 km, 5 km et 10 km à la même date. Sans
   // le filtre de DISTANCE, la recherche rendait 3 lignes, était jugée ambiguë, et le
   // dénivelé passait pour inconnu alors qu'il était là.
-  const courseCible = objective?.race && objective?.raceDate && num(objective.distanceKm) != null
+  // Un défi personnel n'est pas au catalogue : un homonyme le même jour y serait pris pour lui.
+  const courseCible = objective?.race && objective?.raceDate && num(objective.distanceKm) != null && estOfficielle(objective)
     ? (await sb.from("races").select("elevation_gain_m, terrain, difficulty, distance_km")
         .ilike("name", objective.race).eq("date", objective.raceDate)
         .gte("distance_km", objective.distanceKm - 0.5).lte("distance_km", objective.distanceKm + 0.5)
@@ -1787,6 +1805,9 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
       // km effort, donc l'avertissement est PRUDENT (il sous-estime plutôt que d'inventer).
       trail: libGoal === "trail" || libGoal === "ultra",
     })) {
+      // Le règlement fédéral encadre l'INSCRIPTION aux épreuves : un défi couru seul n'en
+      // a pas. L'avis médical, lui, vaut quelle que soit la façon de courir la distance.
+      if (a.niveau === "reglement" && !estOfficielle(objective)) continue;
       out.push(`${a.texte} [source : ${a.sources.join(" ; ")}]`);
     }
     return out;

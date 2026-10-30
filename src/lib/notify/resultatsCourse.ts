@@ -25,7 +25,7 @@ import { lienClassementPropre } from "@/lib/races/lienPropre";
 export const TYPE_ENVOI = "resultats_course_envoye";
 export const JOURS_MIN = 2, JOURS_MAX = 10, JOURS_RECHERCHE = 6;
 
-export type Objectif = { race?: unknown; raceDate?: unknown; distanceKm?: unknown } | null | undefined;
+export type Objectif = { race?: unknown; raceDate?: unknown; distanceKm?: unknown; officielle?: unknown } | null | undefined;
 export type LigneCourse = { name: string; date: string; distance_km: number | null; resultats_url?: string | null; resultats_annee?: number | null; city?: string | null };
 export type Lien = { url: string; direct: boolean };
 
@@ -35,6 +35,8 @@ const jours = (a: string, b: string) => Math.round((Date.parse(`${a}T12:00:00Z`)
 export function courseTerminee(o: Objectif, aujourdhui: string): { nom: string; date: string; distanceKm: number | null; ilYa: number } | null {
   const nom = String(o?.race ?? "").trim(), date = String(o?.raceDate ?? "").slice(0, 10);
   if (!nom || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  // Un défi couru seul n'a pas de classement : « tes résultats sont en ligne » serait faux.
+  if (o?.officielle === false) return null;
   const ilYa = jours(aujourdhui, date);
   if (ilYa < JOURS_MIN || ilYa > JOURS_MAX) return null;
   const km = Number(o?.distanceKm);
@@ -147,7 +149,10 @@ export async function envoyerResultatsCourse(admin: SupabaseClient, opts: { user
   // 2. La course visée, dans la fenêtre.
   const { data: obj, error: eo } = await admin.from("notifications").select("data").eq("user_id", opts.userId).eq("type", "race_objective").maybeSingle();
   if (eo) return { sent: false, skipped: `objectif illisible : ${eo.message}` };
-  const c = courseTerminee((obj as { data?: Objectif } | null)?.data, opts.aujourdhui);
+  // La course visée, ou celle qu'un nouvel objectif vient de remplacer : fixer son prochain
+  // objectif le lendemain d'un marathon ne doit pas priver du classement de celui-ci.
+  const o = (obj as { data?: Objectif & { precedente?: Objectif } } | null)?.data;
+  const c = courseTerminee(o, opts.aujourdhui) ?? courseTerminee(o?.precedente, opts.aujourdhui);
   if (!c) return { sent: false, skipped: "pas de course terminée dans la fenêtre d'envoi" };
 
   // 4. Une seule fois par course (vérifié avant de chercher le lien).

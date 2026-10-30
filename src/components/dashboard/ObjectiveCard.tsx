@@ -8,10 +8,15 @@ import { Target, Loader2, Check, Pencil, Search, MapPin } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import type { AvertissementAge as Avertissement } from "@/lib/coach/ageDistance";
 import { formatDateCivile } from "@/lib/time/fuseau";
+import { useFuseau } from "@/lib/time/FuseauProvider";
+import { jourLocal } from "@/lib/streak/compute";
+import { estOfficielle } from "@/lib/coach/prochaineCourse";
 
 export type Objective = {
   race: string; distanceKm: number; raceDate: string; heureDepart?: string | null;
   targetSeconds: number; targetTime: string; targetPace: string;
+  /** `false` : défi personnel, pas une course officielle. Absent = course officielle. */
+  officielle?: boolean;
 };
 
 type RaceSug = { name: string; city: string; distanceKm: number | null; date: string; type: string };
@@ -38,9 +43,16 @@ function inferDistance(name: string, dbKm: number | null): number | null {
   return dbKm;                                                  // sinon : distance du catalogue
 }
 
-export function ObjectiveCard({ objective, currentVma }: { objective: Objective | null; currentVma?: number | null }) {
+export function ObjectiveCard({ objective, derniereCourse = null, currentVma }: { objective: Objective | null; derniereCourse?: { race: string; raceDate: string } | null; currentVma?: number | null }) {
   const router = useRouter();
   const { t, lang } = useT();
+  const fuseau = useFuseau();
+  // ⚠️ UN OBJECTIF N'EST PAS TOUJOURS UNE COURSE (Cyprien, 30/10/2026 : « vers la mi-décembre
+  // je vais tenter le sub 16 min, mais ce n'est pas une course officielle »). Le formulaire
+  // exigeait une course du catalogue : un test chrono ne pouvait pas s'enregistrer. Un défi
+  // personnel garde distance, chrono et date ; il perd ce qui n'existe que pour une épreuve
+  // (catalogue, heure de départ de l'organisateur, PPS, classement).
+  const [officielle, setOfficielle] = useState(estOfficielle(objective));
   const [editing, setEditing] = useState(!objective);
   const [race, setRace] = useState(objective?.race ?? "");
   const [distance, setDistance] = useState(objective ? String(objective.distanceKm) : "");
@@ -93,15 +105,21 @@ export function ObjectiveCard({ objective, currentVma }: { objective: Objective 
   const targetSeconds = (Number(th) || 0) * 3600 + (Number(tm) || 0) * 60 + (Number(ts) || 0);
 
   const save = async () => {
-    if (!race.trim()) return toast.error(t("obj.errRace"));
+    if (officielle && !race.trim()) return toast.error(t("obj.errRace"));
     if (!(Number(distance) > 0)) return toast.error(t("obj.errDistance"));
+    // Un défi personnel peut rester sans nom : il en reçoit un, lisible partout où l'objectif
+    // s'affiche (tableau de bord, calendrier, titre des séances sur la montre).
+    const nom = race.trim() || t("obj.unofficialDefault", { km: Number(distance).toLocaleString(lang) });
     if (targetSeconds <= 0) return toast.error(t("obj.errTime"));
     if (!date) return toast.error(t("obj.errDate"));
+    // Une date déjà passée ferait un objectif périmé dès l'enregistrement, que le coach
+    // ignorerait aussitôt. Jour de l'ATHLÈTE, lu au clic (jamais pendant le rendu).
+    if (date < jourLocal(new Date(), fuseau)) return toast.error(t("obj.errPast"));
     setSaving(true);
     try {
       const r = await fetch("/api/objective", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ race: race.trim(), distanceKm: Number(distance), targetTime: `${Number(th) || 0}:${Number(tm) || 0}:${Number(ts) || 0}`, raceDate: date , startTime: heure || undefined}),
+        body: JSON.stringify({ race: nom, distanceKm: Number(distance), targetTime: `${Number(th) || 0}:${Number(tm) || 0}:${Number(ts) || 0}`, raceDate: date, startTime: officielle ? heure || undefined : undefined, officielle }),
       });
       const j = await r.json();
       if (j.ok) {
@@ -145,6 +163,9 @@ export function ObjectiveCard({ objective, currentVma }: { objective: Objective 
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
           <Target className="h-4 w-4 flex-shrink-0 text-indigo-500" />
           <span className="text-sm font-bold text-zinc-900">{objective.race}</span>
+          {!estOfficielle(objective) && (
+            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold leading-none text-zinc-500">{t("obj.unofficialBadge")}</span>
+          )}
           {daysTo != null && daysTo >= 0 && (
             <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[11px] font-bold leading-none text-white">J-{daysTo}</span>
           )}
@@ -202,14 +223,23 @@ export function ObjectiveCard({ objective, currentVma }: { objective: Objective 
           <Target className="h-3.5 w-3.5 text-indigo-500" />
         </span>
         <div>
-          <div className="text-sm font-bold text-zinc-900">{objective ? t("obj.editTitle") : t("obj.createTitle")}</div>
+          <div className="text-sm font-bold text-zinc-900">{objective ? t("obj.editTitle") : derniereCourse ? t("obj.nextTitle") : t("obj.createTitle")}</div>
           <div className="text-[11px] text-zinc-400">{t("obj.sub")}</div>
         </div>
       </div>
 
+      {/* La course passée est NOMMÉE, plus reproposée : le formulaire s'ouvre vide. */}
+      {!objective && derniereCourse && (
+        <p className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs leading-relaxed text-emerald-800">
+          {t("obj.pastRace", { race: derniereCourse.race, date: formatDateCivile(derniereCourse.raceDate, lang, { day: "numeric", month: "long" }) })}
+        </p>
+      )}
+
       <div className="space-y-2.5">
+        <div>
         <label className="block">
-          <span className="mb-1 block text-xs font-semibold text-zinc-600">{t("obj.race")}</span>
+          <span className="mb-1 block text-xs font-semibold text-zinc-600">{officielle ? t("obj.race") : t("obj.unofficialName")}</span>
+          {officielle ? (
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-300" />
             <input value={race} onChange={(e) => onRace(e.target.value)} onFocus={() => sug.length && setOpenSug(true)}
@@ -232,7 +262,18 @@ export function ObjectiveCard({ objective, currentVma }: { objective: Objective 
               </div>
             )}
           </div>
+          ) : (
+            <input value={race} onChange={(e) => setRace(e.target.value)} placeholder={t("obj.unofficialPh")}
+              maxLength={80} className={inputCls} autoComplete="off" />
+          )}
         </label>
+        <label className="mt-1.5 inline-flex cursor-pointer items-center gap-2 text-xs text-zinc-600">
+          <input type="checkbox" checked={!officielle}
+            onChange={(e) => { setOfficielle(!e.target.checked); setSug([]); setOpenSug(false); }}
+            className="h-3.5 w-3.5 rounded border-zinc-300 accent-indigo-600" />
+          {t("obj.unofficial")}
+        </label>
+        </div>
 
         <div>
           <span className="mb-1 block text-xs font-semibold text-zinc-600">{t("obj.distance")}</span>
@@ -263,14 +304,17 @@ export function ObjectiveCard({ objective, currentVma }: { objective: Objective 
             </div>
           </div>
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold text-zinc-600">{t("obj.date")}</span>
+            <span className="mb-1 block text-xs font-semibold text-zinc-600">{officielle ? t("obj.date") : t("obj.dateTarget")}</span>
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
           </label>
+          {/* L'heure de départ est celle d'un ORGANISATEUR : un défi personnel n'en a pas. */}
+          {officielle && (
           <label className="block">
             <span className="mb-1 block text-xs font-semibold text-zinc-600">{t("obj.startTime")}</span>
             <input type="time" value={heure} onChange={(e) => setHeure(e.target.value)} className={inputCls} />
             <span className="mt-1 block text-[11px] leading-snug text-zinc-400">{t("obj.startTimeHint")}</span>
           </label>
+          )}
         </div>
 
         <div className="flex items-center gap-2 pt-0.5">

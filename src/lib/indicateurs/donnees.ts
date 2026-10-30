@@ -13,6 +13,7 @@ import type { DonneesFiche } from "./fiches";
 import type { SeanceCharge } from "@/lib/dashboard/charge";
 import { vmaAffichee } from "@/lib/dashboard/vmaAffichee";
 import { COLONNES_VFC, serieVfc } from "@/lib/health/vfc";
+import { objectifEnCours } from "@/lib/coach/prochaineCourse";
 
 const decale = (iso: string, n: number) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const PANNE: Record<Lang, string> = {
@@ -52,7 +53,9 @@ export async function chargerDonnees(sb: SupabaseClient, userId: string, lang: L
     sommeil: (sommeil.data ?? []) as DonneesFiche["sommeil"],
     charge: (charge.data ?? []) as SeanceCharge[],
     vma: vmaAffichee({ seances: ws, baseline: base.data as { vma_kmh?: number | null; tested_at?: string | null } | null, profil: p }),
-    objectif: o && o.raceDate && o.distanceKm ? o : null,
+    // Une course passée n'est plus l'objectif : la vitesse se juge alors sur la VMA, comme
+    // sur la carte du tableau de bord (`objectifEnCours`, même règle des deux côtés).
+    objectif: o && o.raceDate && o.distanceKm ? objectifEnCours(o, aujourdhui) : null,
     plan: (plan.data ?? null) as DonneesFiche["plan"],
     fcRepos: Number(p?.resting_hr) || null,
     pannes: enPanne.length ? [PANNE[lang]] : [],

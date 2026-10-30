@@ -10,6 +10,7 @@ import { InviteAvis } from "@/components/dashboard/InviteAvis";
 import { TYPE_AVIS } from "@/lib/avis/store";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import type { Objective } from "@/components/dashboard/ObjectiveCard";
+import { objectifEnCours } from "@/lib/coach/prochaineCourse";
 import { loadRisk } from "@/lib/running/fitness";
 import { vmaAffichee } from "@/lib/dashboard/vmaAffichee";
 import { validerRecordDeclare, type RecordDeclare } from "@/lib/dashboard/records";
@@ -138,7 +139,16 @@ export default async function DashboardPage() {
   });
   const newMembersWeek = newMembersRes.count ?? 0;
 
-  const objective = (objRes.data?.data ?? null) as Objective | null;
+  // ⚠️ UNE COURSE PASSÉE N'EST PLUS L'OBJECTIF. Cinq jours après le marathon de Lille, la
+  // carte proposait « Modifier mon objectif » prérempli avec Lille, 2 h 40 et le 25/10, et
+  // la carte de forme jugeait encore la vitesse contre ce chrono. La course passée reste
+  // nommée — « c'est derrière toi » — mais le formulaire s'ouvre vide, sur la suivante.
+  // Jour de l'ATHLÈTE (cookie de fuseau), le même que celui de la série.
+  const objectifEnregistre = (objRes.data?.data ?? null) as Objective | null;
+  const objective = objectifEnCours(objectifEnregistre, streakToday);
+  const derniereCourse = objectifEnregistre && !objective
+    ? { race: objectifEnregistre.race, raceDate: objectifEnregistre.raceDate }
+    : null;
 
   // VMA actuelle (test sinon estimée) + risque de charge (déload proactif).
   const wks = (workoutsRes.data ?? []) as { date: string; type?: string | null; distance_km?: number | null; duration_seconds?: number | null; avg_hr?: number | null; max_hr?: number | null; tss?: number | null }[];
@@ -250,6 +260,7 @@ export default async function DashboardPage() {
       coachSession={coachSession}
       ressenti={ressenti}
       objective={objective}
+      derniereCourse={derniereCourse}
       currentVma={currentVma}
       sourceVma={sourceVma}
       loadRisk={risk}

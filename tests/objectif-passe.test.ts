@@ -27,6 +27,10 @@ import { buildAthleteContext } from "../src/lib/ai/coachContext";
 import { longRunGap } from "../src/lib/running/volume";
 import { apresCourse, joursSansIntensite, JOURS_MAX } from "../src/lib/coach/apresCourse";
 import { computeQualityBudget } from "../src/lib/coach/qualityBudget";
+import { objectifEnCours, estOfficielle } from "../src/lib/coach/prochaineCourse";
+import { courseTerminee } from "../src/lib/notify/resultatsCourse";
+import { avertissementsAge } from "../src/lib/coach/ageDistance";
+import { coursePrecedente } from "../src/lib/coach/objective";
 import { aujourdhui, FUSEAU_DEFAUT } from "../src/lib/time/fuseau";
 
 let passed = 0; const fails: string[] = [];
@@ -43,7 +47,7 @@ const codeNu = (p: string) => readFileSync(p, "utf8").replace(/\/\*[\s\S]*?\*\//
  * sinon la requête des douleurs ou des séances prescrites recevrait la ligne de
  * l'objectif, et le test mesurerait un contexte que la base réelle ne produit jamais.
  */
-function fauxClient(tables: Record<string, unknown[]>) {
+function fauxClient(tables: Record<string, unknown[]>, lues: string[] = []) {
   const requete = (toutes: unknown[]) => {
     const filtres: [string, unknown][] = [];
     const lignes = () => toutes.filter((l) => filtres.every(([c, v]) => !(c in (l as object)) || (l as Record<string, unknown>)[c] === v));
@@ -55,7 +59,7 @@ function fauxClient(tables: Record<string, unknown[]>) {
     q.then = (ok: (v: unknown) => unknown, ko: (e: unknown) => unknown) => Promise.resolve({ data: lignes(), error: null, count: lignes().length }).then(ok, ko);
     return q;
   };
-  return { from: (t: string) => requete(tables[t] ?? []) } as never;
+  return { from: (t: string) => { lues.push(t); return requete(tables[t] ?? []); } } as never;
 }
 
 // Le jour du COACH (Paris), pas celui d'UTC : c'est lui qui décide si la course est passée.
@@ -240,6 +244,119 @@ async function main() {
     assert.ok(debut > 0 && fin > debut, "résumé du bandeau introuvable");
     assert.ok(motifs > debut && motifs < fin, "les motifs sont de nouveau cachés dans la partie repliée");
     assert.equal(src.split("reasons.map(").length - 1, 1, "les motifs s'affichent deux fois au dépliage");
+  });
+
+  console.log("\nCOURSE PASSÉE ET DÉFI PERSONNEL — partout où l'objectif est lu");
+
+  await test("une règle unique : l'objectif expire le lendemain de sa date, jamais sans date", () => {
+    assert.equal(objectifEnCours({ raceDate: ilYa(5) }, AUJOURDHUI), null, "une course passée est encore l'objectif");
+    assert.deepEqual(objectifEnCours({ raceDate: AUJOURDHUI }, AUJOURDHUI), { raceDate: AUJOURDHUI }, "la course du jour a expiré avant le départ");
+    assert.deepEqual(objectifEnCours({ race: "X", raceDate: "" }, AUJOURDHUI), { race: "X", raceDate: "" }, "un objectif sans date a expiré");
+    assert.equal(objectifEnCours(null, AUJOURDHUI), null);
+  });
+
+  await test("un objectif est officiel sauf s'il dit le contraire — les anciens le restent", () => {
+    assert.equal(estOfficielle({}), true, "un objectif enregistré avant l'option devient un défi perso");
+    assert.equal(estOfficielle({ officielle: true }), true);
+    assert.equal(estOfficielle({ officielle: false }), false);
+    assert.equal(estOfficielle(null), true);
+  });
+
+  await test("pas d'e-mail « tes résultats sont en ligne » après un défi couru seul", () => {
+    const c = { race: "Chrono 5 km", raceDate: ilYa(3), distanceKm: 5 };
+    assert.ok(courseTerminee(c, AUJOURDHUI), "précondition : la course officielle déclenche l'e-mail");
+    assert.equal(courseTerminee({ ...c, officielle: false }, AUJOURDHUI), null, "un classement est annoncé pour un test chrono");
+  });
+
+  const AGE16 = { ...PROFIL, age: 16 };
+  const DEFI = (officielle: boolean) => ({
+    user_id: "u", type: "race_objective",
+    data: { race: "Défi marathon", raceDate: ilYa(-120), distanceKm: 42.2, targetTime: "3h30", targetSeconds: 12600, targetPace: "4'59/km", officielle },
+  });
+  const reglement = avertissementsAge({ age: 16, distanceKm: 42.2, lang: "fr", trail: false }).filter((a) => a.niveau === "reglement");
+  const medical = avertissementsAge({ age: 16, distanceKm: 42.2, lang: "fr", trail: false }).filter((a) => a.niveau === "medical");
+
+  await test("défi personnel : ni catalogue, ni règlement fédéral, mais l'avis médical reste", async () => {
+    assert.ok(reglement.length && medical.length, "précondition : à 16 ans, un marathon déclenche règlement ET avis médical");
+    const lues: string[] = [];
+    const ctx = await buildAthleteContext(fauxClient({ profiles: [AGE16], performance_baselines: BASE, workouts: SEANCES, notifications: [DEFI(false)] }, lues), "u");
+    assert.ok(!lues.includes("races"), "un défi personnel est cherché dans le catalogue des courses");
+    assert.ok(!reglement.some((r) => ctx.objectiveWarnings.some((w) => w.startsWith(r.texte))), "le règlement d'inscription est opposé à un défi couru seul");
+    assert.ok(medical.some((m) => ctx.objectiveWarnings.some((w) => w.startsWith(m.texte))), "l'avis médical a disparu avec le règlement");
+    assert.match(ctx.text, /Défi personnel, PAS une course officielle/, "le coach n'est pas prévenu qu'il ne s'agit pas d'une course");
+  });
+
+  await test("contre-épreuve : la course officielle garde catalogue et règlement", async () => {
+    const lues: string[] = [];
+    const ctx = await buildAthleteContext(fauxClient({ profiles: [AGE16], performance_baselines: BASE, workouts: SEANCES, notifications: [DEFI(true)] }, lues), "u");
+    assert.ok(lues.includes("races"), "la course officielle n'est plus cherchée au catalogue");
+    assert.ok(reglement.some((r) => ctx.objectiveWarnings.some((w) => w.startsWith(r.texte))), "le règlement a disparu pour une vraie course");
+    assert.match(ctx.text, /• Course : Défi marathon/);
+  });
+
+  await test("le formulaire propose le défi personnel et ne demande pas d'heure de départ", () => {
+    const src = codeNu("src/components/dashboard/ObjectiveCard.tsx");
+    assert.match(src, /t\("obj\.unofficial"\)/, "la case « pas une course officielle » a disparu");
+    assert.match(src, /\{officielle && \(\s*<label className="block">\s*<span[^>]*>\{t\("obj\.startTime"\)\}/, "l'heure de départ est demandée pour un défi");
+    assert.match(src, /startTime: officielle \? heure \|\| undefined : undefined, officielle \}/, "le caractère officiel n'est plus envoyé");
+    assert.match(src, /officielle && !race\.trim\(\)/, "un défi sans nom est refusé");
+    // Côté serveur : enregistré, et le règlement d'âge écarté de la réponse immédiate.
+    const api = codeNu("src/app/api/objective/route.ts");
+    assert.match(api, /setRaceObjective\(admin, user\.id, \{[^}]*officielle \}\)/, "la route n'enregistre pas le caractère officiel");
+    assert.match(api, /\.filter\(\(a\) => officielle \|\| a\.niveau !== "reglement"\)/, "la réponse oppose le règlement à un défi");
+    assert.match(codeNu("src/lib/coach/objective.ts"), /officielle: input\.officielle !== false/);
+  });
+
+  await test("après la course, le tableau de bord ouvre un formulaire VIDE et nomme la course passée", () => {
+    const page = codeNu("src/app/dashboard/page.tsx");
+    assert.match(page, /const objective = objectifEnCours\(objectifEnregistre, streakToday\)/, "le tableau de bord sert encore une course passée comme objectif");
+    assert.match(page, /derniereCourse=\{derniereCourse\}/);
+    const carte = codeNu("src/components/dashboard/ObjectiveCard.tsx");
+    assert.match(carte, /!objective && derniereCourse && \(/, "la course passée n'est plus nommée");
+    // Les indicateurs suivent la même règle, sinon la carte de forme et sa page divergent.
+    assert.match(codeNu("src/lib/indicateurs/donnees.ts"), /objectifEnCours\(o, aujourdhui\)/, "les indicateurs jugent encore contre une course passée");
+  });
+
+  await test("ni Pass Prévention Santé ni recherche d'heure de départ pour un défi personnel", () => {
+    assert.match(codeNu("src/app/dashboard/pps/page.tsx"), /const obj = estOfficielle\(objBrut\) \? objBrut : \{\};/, "le PPS est réclamé pour un test chrono");
+    assert.match(codeNu("src/app/api/cron/heure-depart/route.ts"), /if \(o\.officielle === false\) continue;/, "l'heure d'un défi est cherchée sur le web");
+  });
+
+  console.log("\nUN NOUVEL OBJECTIF N'EFFACE PAS LA COURSE QU'IL REMPLACE");
+
+  await test("l'objectif remplacé devient la course précédente s'il est passé, et seulement alors", () => {
+    const lille = { race: "Marathon International de Lille", raceDate: ilYa(5), distanceKm: 42.2 };
+    assert.deepEqual(coursePrecedente(lille, AUJOURDHUI), { ...lille, officielle: true }, "le marathon couru est oublié dès qu'on fixe le suivant");
+    // On corrige un objectif encore à venir : la course précédente qu'il portait est gardée.
+    const sub16 = { race: "Sub 16 min sur 5 km", raceDate: ilYa(-46), distanceKm: 5, precedente: { ...lille, officielle: true } };
+    assert.deepEqual(coursePrecedente(sub16, AUJOURDHUI), { ...lille, officielle: true }, "corriger son nouvel objectif efface la course précédente");
+    assert.equal(coursePrecedente({ race: "X", raceDate: ilYa(-10), distanceKm: 10 }, AUJOURDHUI), null, "une course à venir est prise pour la précédente");
+    assert.equal(coursePrecedente(null, AUJOURDHUI), null);
+  });
+
+  await test("nouvel objectif fixé à J+5 : la récupération du marathon tient toujours", async () => {
+    const sub16 = {
+      user_id: "u", type: "race_objective",
+      data: { race: "Sub 16 min sur 5 km", raceDate: ilYa(-46), distanceKm: 5, targetTime: "16'00", targetSeconds: 960, targetPace: "3'12/km", officielle: false,
+              precedente: { race: "Marathon International de Lille", raceDate: ilYa(5), distanceKm: 42.2, officielle: true } },
+    };
+    const ctx = await contexte(sub16, {
+      seances: [...SEANCES, { ...SEANCES[0], date: ilYa(5), type: "race", distance_km: 42.5, duration_seconds: 9720, tss: 260 }],
+    });
+    assert.equal(ctx.objective?.race, "Sub 16 min sur 5 km", "précondition : le nouvel objectif est pris en compte");
+    assert.equal(ctx.weekPlan.qBudget, 0, `${ctx.weekPlan.qBudget} séance(s) de qualité à J+5 du marathon, sous prétexte d'un nouvel objectif`);
+    assert.ok(ctx.readiness.reasons.some((r) => /récupération après Marathon International de Lille \(J\+5\)/.test(r)), "le bandeau ne dit plus pourquoi");
+    // La feuille de route : rien avant la reprise (J+27), de la qualité ensuite.
+    const avant = ctx.macroPlan.filter((_, i) => i * 7 < 22);
+    const apres = ctx.macroPlan.filter((_, i) => i * 7 >= 22);
+    assert.ok(avant.length && avant.every((w) => w.quality.length === 0), `qualité annoncée pendant la récupération : ${avant.map((w) => w.quality.join("+")).join(" | ")}`);
+    assert.ok(apres.some((w) => w.quality.length > 0), "contre-épreuve : la qualité ne revient jamais après la récupération");
+  });
+
+  await test("l'e-mail de résultats et l'enregistrement de l'objectif suivent la course précédente", () => {
+    assert.match(codeNu("src/lib/notify/resultatsCourse.ts"), /courseTerminee\(o, opts\.aujourdhui\) \?\? courseTerminee\(o\?\.precedente, opts\.aujourdhui\)/,
+      "un nouvel objectif fixé à J+3 prive de l'e-mail de classement");
+    assert.match(codeNu("src/lib/coach/objective.ts"), /data\.precedente = coursePrecedente\(existing\?\.data/, "l'objectif remplacé n'est plus conservé");
   });
 
   await test("contre-épreuve : une préparation réellement trop courte est toujours signalée", async () => {

@@ -71,6 +71,8 @@ interface Props {
   /** Séances récentes sans ressenti, et les paires du Garage (lib/dashboard/ressenti). */
   ressenti?: { seances: SeanceRessenti[]; chaussures: ChaussureGarage[] } | null;
   objective?: Objective | null;
+  /** L'objectif dont la date est passée : nommé sur la carte, plus jamais prérempli. */
+  derniereCourse?: { race: string; raceDate: string } | null;
   currentVma?: number | null;
   /** D'où vient la VMA affichée, et de quand — pour qu'on voie qu'elle suit la forme. */
   sourceVma?: SourceVma | null;
@@ -181,7 +183,7 @@ export type { SourceVma } from "@/lib/dashboard/vmaAffichee";
 import type { SourceVma } from "@/lib/dashboard/vmaAffichee";
 import type { CleIndicateur } from "@/lib/indicateurs/types";
 
-export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, plan, league, prWorkouts, recordsDeclares = [], premiereSeance = null, chargeHistory, sleep, coachSession, ressenti, objective, currentVma, sourceVma = null, loadRisk, newMembersWeek, streak, acces, donneesIncompletes, jourAujourdhui }: Props) {
+export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, plan, league, prWorkouts, recordsDeclares = [], premiereSeance = null, chargeHistory, sleep, coachSession, ressenti, objective, derniereCourse = null, currentVma, sourceVma = null, loadRisk, newMembersWeek, streak, acces, donneesIncompletes, jourAujourdhui }: Props) {
   const { t, lang } = useT();
   // État RELATIF à la base de l'athlète, et seulement si la mesure est fraîche — même
   // règle que la fiche détaillée (`etatPhysiologique`), qui ne peut pas dire autre chose.
@@ -675,7 +677,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
       <StreakCard streak={streak ?? null} />
 
       {/* Objectif de course — saisi par le client → e-mail coach + perso IA */}
-      <ObjectiveCard objective={objective ?? null} currentVma={currentVma ?? null} />
+      <ObjectiveCard objective={objective ?? null} derniereCourse={derniereCourse} currentVma={currentVma ?? null} />
 
       {/* Prochaine séance — bannière compacte (uniquement si pas de bandeau coach) */}
       {!coachKey && (
