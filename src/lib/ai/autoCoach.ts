@@ -341,6 +341,9 @@ export async function autoCoachForUser(
     at: new Date().toISOString(), days: rows.length, pushed,
     readiness: ctx.readiness.level,
     reasons: ctx.readiness.reasons.slice(0, 4),
+    // La récupération d'après-course, STRUCTURÉE (course, date de reprise) : le tableau de
+    // bord la rappelle dans la langue de l'athlète au lieu d'y promettre une séance de qualité.
+    recuperation: ctx.recuperation ?? null,
     advice: ctx.readiness.advice.slice(0, 400),
     qBudget: ctx.weekPlan.qBudget,
     // La dernière qualité n'a survécu que grâce au plancher « préparation en cours » :

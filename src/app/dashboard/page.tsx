@@ -46,7 +46,7 @@ export default async function DashboardPage() {
   // Le jour de l'athlète, calculé AVANT les requêtes : il en filtre une.
   const today = aujourdhui(FUSEAU_DEFAUT);
 
-  const [profileRes, hrvRes, workoutsRes, planRes, leagueRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, newMembersRes, prRes, chargeRes, streakWkRes, streakPlanRes, avisRes, nbSeancesRes, premiereRes, declaresRes, garageRes] = await Promise.all([
+  const [profileRes, hrvRes, workoutsRes, planRes, leagueRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, newMembersRes, prRes, chargeRes, streakWkRes, streakPlanRes, avisRes, nbSeancesRes, premiereRes, declaresRes, garageRes, etatCoachRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single(),
     supabase.from("hrv_data").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(14),
     supabase.from("workouts").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(40),
@@ -112,6 +112,9 @@ export default async function DashboardPage() {
     supabase.from("notifications").select("data").eq("user_id", user!.id).eq("type", "record_declare").limit(8),
     // Les paires du Garage, pour « quelles chaussures as-tu portées ? » dans le ressenti.
     supabase.from("shoes").select("id, brand, model, current_km, max_km").eq("user_id", user!.id).eq("is_active", true).limit(12),
+    // La décision du coach pour la semaine (la même que lit le calendrier) : la phrase du
+    // jour ne doit jamais promettre une séance que le plan ne contient pas.
+    supabase.from("notifications").select("data").eq("user_id", user!.id).eq("type", "auto_coach_state").maybeSingle(),
   ]);
   if (garageRes.error) console.error("[accueil] garage illisible :", garageRes.error.message);
   if (declaresRes.error) console.error("[accueil] records déclarés illisibles :", declaresRes.error.message);
@@ -146,6 +149,16 @@ export default async function DashboardPage() {
   // Jour de l'ATHLÈTE (cookie de fuseau), le même que celui de la série.
   const objectifEnregistre = (objRes.data?.data ?? null) as Objective | null;
   const objective = objectifEnCours(objectifEnregistre, streakToday);
+  // ⚠️ LA PHRASE DU JOUR SUIT LE PLAN (lib/dashboard/discipline › phraseDuJour). Une
+  // récupération n'est rappelée que tant que sa date de reprise est à venir : l'état du
+  // coach peut dater, si aucune séance n'a été synchronisée depuis.
+  const etatCoach = (etatCoachRes.data?.data ?? null) as { qBudget?: unknown; recuperation?: { course?: unknown; reprise?: unknown } | null } | null;
+  const recupCoach = etatCoach?.recuperation;
+  const planCoach = etatCoach ? {
+    qBudget: typeof etatCoach.qBudget === "number" ? etatCoach.qBudget : null,
+    recuperation: recupCoach && typeof recupCoach.course === "string" && typeof recupCoach.reprise === "string" && recupCoach.reprise > streakToday
+      ? { course: recupCoach.course, reprise: recupCoach.reprise } : null,
+  } : null;
   const derniereCourse = objectifEnregistre && !objective
     ? { race: objectifEnregistre.race, raceDate: objectifEnregistre.raceDate }
     : null;
@@ -261,6 +274,7 @@ export default async function DashboardPage() {
       ressenti={ressenti}
       objective={objective}
       derniereCourse={derniereCourse}
+      planCoach={planCoach}
       currentVma={currentVma}
       sourceVma={sourceVma}
       loadRisk={risk}

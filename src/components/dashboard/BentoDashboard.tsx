@@ -24,7 +24,7 @@ import { ObjectiveCard, type Objective } from "@/components/dashboard/ObjectiveC
 import { cleanActivityName } from "@/lib/utils/activityName";
 import { isRun } from "@/lib/intervals/sport";
 import { computeHrZones } from "@/lib/dashboard/zones";
-import { computeDiscipline, etatDuJour, etatPhysiologique, statsVfc } from "@/lib/dashboard/discipline";
+import { computeDiscipline, etatDuJour, etatPhysiologique, statsVfc, phraseDuJour, type PlanDuCoach } from "@/lib/dashboard/discipline";
 import type { MetriqueVfc } from "@/lib/health/vfc";
 import { computeWeeklyTrend } from "@/lib/dashboard/semaines";
 import { dansFenetre, ageJours } from "@/lib/dashboard/fenetre";
@@ -92,6 +92,8 @@ interface Props {
    * FIXE et on le met en forme avec `formatDateCivile`, déterministe des deux côtés.
    */
   jourAujourdhui?: string;
+  /** La décision du coach pour la semaine : la phrase du jour ne doit pas la contredire. */
+  planCoach?: PlanDuCoach;
   /**
    * Les lectures qui ont RÉELLEMENT échoué (identifiants stables, traduits ici).
    * Vide dans le cas normal — y compris pour un compte sans historique : une absence
@@ -183,7 +185,7 @@ export type { SourceVma } from "@/lib/dashboard/vmaAffichee";
 import type { SourceVma } from "@/lib/dashboard/vmaAffichee";
 import type { CleIndicateur } from "@/lib/indicateurs/types";
 
-export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, plan, league, prWorkouts, recordsDeclares = [], premiereSeance = null, chargeHistory, sleep, coachSession, ressenti, objective, derniereCourse = null, currentVma, sourceVma = null, loadRisk, newMembersWeek, streak, acces, donneesIncompletes, jourAujourdhui }: Props) {
+export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, plan, league, prWorkouts, recordsDeclares = [], premiereSeance = null, chargeHistory, sleep, coachSession, ressenti, objective, derniereCourse = null, currentVma, sourceVma = null, loadRisk, newMembersWeek, streak, acces, donneesIncompletes, jourAujourdhui, planCoach = null }: Props) {
   const { t, lang } = useT();
   // État RELATIF à la base de l'athlète, et seulement si la mesure est fraîche — même
   // règle que la fiche détaillée (`etatPhysiologique`), qui ne peut pas dire autre chose.
@@ -244,7 +246,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
   const hrvFraiche = hrvJours != null && hrvJours <= 2;
 
   // État du jour = lecture honnête de la forme (VFC vs base + sommeil récent), pas un label figé.
-  const readiness = computeReadiness(hrvFraiche ? hrvDelta : null, hrvFraiche ? hrvBaseline : null, freshSleep?.sleep_score ?? null, t);
+  const readiness = computeReadiness(hrvFraiche ? hrvDelta : null, hrvFraiche ? hrvBaseline : null, freshSleep?.sleep_score ?? null, t, lang, planCoach);
 
   const raceDate = (plan as { race_date?: string } | null)?.race_date ?? null;
 
@@ -1675,13 +1677,17 @@ function buildLastMetrics(w: Workout, t: TFn): { label: string; value: string | 
 //  TOUJOURS aux 3 barres. Toutes les constantes sont regroupées ici pour être
 //  ajustées sans toucher à la logique.
 
-// État du jour — lecture honnête de la forme (VFC vs base 14 j + sommeil RÉCENT).
-function computeReadiness(hrvDelta: number | null, hrvBaseline: number | null, sleepScore: number | null, t: TFn) {
+// État du jour — lecture honnête de la forme (VFC vs base 14 j + sommeil RÉCENT), dite
+// SANS contredire le plan : la phrase vient de `phraseDuJour` (lib/dashboard/discipline).
+function computeReadiness(hrvDelta: number | null, hrvBaseline: number | null, sleepScore: number | null, t: TFn, lang: string, plan: PlanDuCoach) {
   const e = etatDuJour(hrvDelta, hrvBaseline, sleepScore);
-  if (e === "aucun") return { accent: "#0d9488", tagline: t("dash.ready.none") };
-  if (e === "top") return { accent: "#059669", tagline: t("dash.ready.top") };
-  if (e === "repos") return { accent: "#0284C7", tagline: t("dash.ready.rest") };
-  return { accent: "#0d9488", tagline: t("dash.ready.ok") };
+  const { cle, recuperation } = phraseDuJour(e, plan);
+  const phrase = recuperation
+    ? t(cle, { course: recuperation.course, date: formatDateCivile(recuperation.reprise, lang, { day: "numeric", month: "long" }) })
+    : t(cle);
+  if (e === "top") return { accent: "#059669", tagline: phrase };
+  if (e === "repos") return { accent: "#0284C7", tagline: phrase };
+  return { accent: "#0d9488", tagline: phrase };
 }
 
 

@@ -292,6 +292,8 @@ export type AthleteContext = {
    *  la distance). Destinés à l'ÉCRAN autant qu'à l'IA — ils ne servaient à rien tant
    *  qu'ils ne quittaient pas le prompt. */
   objectiveWarnings: string[];
+  /** Récupération d'après-course en cours (`lib/coach/apresCourse`), pour les écrans qui la rappellent. */
+  recuperation: { course: string; reprise: string } | null;
   /** Construit pour le palier gratuit (`LectureContexte.objectifSeul`) : l'objectif et le
    *  déclaré, aucune mesure. Optionnel : un contexte sérialisé avant cette version ne l'a pas. */
   objectifSeul?: boolean;
@@ -2168,6 +2170,7 @@ ${catalog}`;
     thresholdPace,
     macroPlan,
     objectiveWarnings,
+    recuperation: recup ? { course: recup.nom, reprise: recup.reprise } : null,
     weightLoss,
     // Palier gratuit : « ce que ta dernière séance a montré » EST une analyse de séance.
     lastSession: objectifSeul ? null : lastSession,

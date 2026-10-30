@@ -31,6 +31,7 @@ import { objectifEnCours, estOfficielle } from "../src/lib/coach/prochaineCourse
 import { courseTerminee } from "../src/lib/notify/resultatsCourse";
 import { avertissementsAge } from "../src/lib/coach/ageDistance";
 import { coursePrecedente } from "../src/lib/coach/objective";
+import { phraseDuJour } from "../src/lib/dashboard/discipline";
 import { aujourdhui, FUSEAU_DEFAUT } from "../src/lib/time/fuseau";
 
 let passed = 0; const fails: string[] = [];
@@ -375,6 +376,42 @@ async function main() {
     assert.match(codeNu("src/lib/notify/resultatsCourse.ts"), /courseTerminee\(o, opts\.aujourdhui\) \?\? courseTerminee\(o\?\.precedente, opts\.aujourdhui\)/,
       "un nouvel objectif fixé à J+3 prive de l'e-mail de classement");
     assert.match(codeNu("src/lib/coach/objective.ts"), /data\.precedente = coursePrecedente\(existing\?\.data/, "l'objectif remplacé n'est plus conservé");
+  });
+
+  console.log("\nLE TABLEAU DE BORD NE CONTREDIT PLUS LE PLAN");
+
+  await test("frais pendant la récupération : la phrase rappelle la récupération, pas une séance de qualité", () => {
+    // Cyprien, 30/10/2026, J+5 du marathon : « Tu es frais — bon jour pour une séance de
+    // qualité » en tête du tableau de bord, « pas d'intensité avant le 21 novembre » au calendrier.
+    const recup = { course: "Marathon International de Lille", reprise: "2026-11-21" };
+    assert.deepEqual(phraseDuJour("top", { qBudget: 0, recuperation: recup }), { cle: "dash.ready.recup", recuperation: recup },
+      "un athlète frais en récupération est encore invité à une séance de qualité");
+    assert.equal(phraseDuJour("correct", { qBudget: 0, recuperation: recup }).cle, "dash.ready.recup");
+    // Fatigue et absence de mesure gardent leur message : ils disent déjà « facile ».
+    assert.equal(phraseDuJour("repos", { qBudget: 0, recuperation: recup }).cle, "dash.ready.rest");
+    assert.equal(phraseDuJour("aucun", { qBudget: 0, recuperation: recup }).cle, "dash.ready.none");
+  });
+
+  await test("frais mais aucune qualité au plan : la phrase ne la promet plus", () => {
+    assert.equal(phraseDuJour("top", { qBudget: 0, recuperation: null }).cle, "dash.ready.topSansQualite",
+      "le tableau de bord promet une séance de qualité que le plan ne contient pas");
+    // Contre-épreuve : quand le plan en contient, « bon jour pour une séance de qualité » est juste.
+    assert.equal(phraseDuJour("top", { qBudget: 2, recuperation: null }).cle, "dash.ready.top");
+    assert.equal(phraseDuJour("top", null).cle, "dash.ready.top", "sans état du coach, rien n'est présumé");
+  });
+
+  await test("le coach écrit sa récupération sous forme structurée, le tableau de bord la lit", async () => {
+    const ctx = await contexte(MARATHON(ilYa(5)), {
+      seances: [...SEANCES, { ...SEANCES[0], date: ilYa(5), type: "race", distance_km: 42.5, duration_seconds: 9720, tss: 260 }],
+    });
+    assert.deepEqual(ctx.recuperation, { course: "Marathon International de Lille", reprise: ilYa(5 - 27) },
+      "le contexte du coach n'expose plus la récupération en cours");
+    assert.match(codeNu("src/lib/ai/autoCoach.ts"), /recuperation: ctx\.recuperation \?\? null/, "le coach n'enregistre plus sa récupération");
+    const page = codeNu("src/app/dashboard/page.tsx");
+    assert.match(page, /eq\("type", "auto_coach_state"\)/, "le tableau de bord ne lit plus la décision du coach");
+    assert.match(page, /recupCoach\.reprise > streakToday/, "une récupération terminée serait encore rappelée");
+    assert.match(page, /planCoach=\{planCoach\}/, "la décision du coach n'atteint plus le tableau de bord");
+    assert.match(codeNu("src/components/dashboard/BentoDashboard.tsx"), /phraseDuJour\(e, plan\)/, "la phrase du jour ignore de nouveau le plan");
   });
 
   await test("contre-épreuve : une préparation réellement trop courte est toujours signalée", async () => {

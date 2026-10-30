@@ -34,6 +34,36 @@ export function etatDuJour(hrvDelta: number | null, hrvBaseline: number | null, 
   return avg >= 0.5 ? "top" : avg <= -0.5 ? "repos" : "correct";
 }
 
+/** Ce que le coach a décidé pour la semaine (`auto_coach_state`), tel que le tableau de bord le lit. */
+export type PlanDuCoach = {
+  qBudget: number | null;
+  /** Récupération d'après-course en cours (`lib/coach/apresCourse`), sinon `null`. */
+  recuperation: { course: string; reprise: string } | null;
+} | null;
+
+export type PhraseDuJour = {
+  cle: "dash.ready.none" | "dash.ready.top" | "dash.ready.rest" | "dash.ready.ok" | "dash.ready.recup" | "dash.ready.topSansQualite";
+  recuperation?: { course: string; reprise: string };
+};
+
+/**
+ * LA PHRASE DU JOUR SUIT LA DÉCISION DU COACH.
+ *
+ * ⚠️ Elle ne lisait que la VFC et le sommeil. Cas réel (Cyprien, 30/10/2026, J+5 du
+ * marathon de Lille) : « Tu es frais — bon jour pour une séance de qualité » en tête du
+ * tableau de bord, pendant que le calendrier disait « footings seulement, pas d'intensité
+ * avant le 21 novembre ». Le corps peut être frais ; c'est le plan qui décide de la séance.
+ * La phrase ne promet donc plus une qualité que le plan ne contient pas. Les signaux de
+ * fatigue et l'absence de mesure gardent leur propre message : ils disent déjà « facile ».
+ */
+export function phraseDuJour(etat: EtatDuJour, plan: PlanDuCoach): PhraseDuJour {
+  if (etat === "aucun") return { cle: "dash.ready.none" };
+  if (etat === "repos") return { cle: "dash.ready.rest" };
+  if (plan?.recuperation) return { cle: "dash.ready.recup", recuperation: plan.recuperation };
+  if (etat === "top") return { cle: plan?.qBudget === 0 ? "dash.ready.topSansQualite" : "dash.ready.top" };
+  return { cle: "dash.ready.ok" };
+}
+
 /** Les chiffres de la carte VFC : mesure la plus récente, base 14 j, écart, fraîcheur. */
 export function statsVfc(hrv: readonly Pick<HRVData, "date" | "hrv_ms">[], maintenant = Date.now()) {
   const dernier = hrv[0]?.hrv_ms ?? null;
