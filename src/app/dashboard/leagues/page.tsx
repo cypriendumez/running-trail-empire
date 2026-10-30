@@ -5,7 +5,7 @@ import { isRun } from "@/lib/intervals/sport";
 import { createClient } from "@/lib/supabase/server";
 import { LeaguesHub } from "@/components/gamification/LeaguesHub";
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
-import { computeStreak, jourLocal, decaleJour, type StreakWorkout, type StreakPrescription } from "@/lib/streak/compute";
+import { computeStreak, coursesDeLObjectif, jourLocal, decaleJour, type StreakWorkout, type StreakPrescription } from "@/lib/streak/compute";
 import { lecturesEnEchec } from "@/lib/dashboard/lectures";
 
 export const metadata = { title: "Ligues & Gamification" };
@@ -34,6 +34,7 @@ export default async function LeaguesPage() {
     { data: challenges },
     { data: streakPlan },
     { data: streakFeedback },
+    { data: objectifSerie },
   ] = await Promise.all([
     supabase.from("profiles").select("full_name, avatar_url, discipline_score, league").eq("id", user.id).single(),
 
@@ -76,6 +77,9 @@ export default async function LeaguesPage() {
     supabase.from("notifications").select("data")
       .eq("user_id", user.id).eq("type", "session_feedback")
       .order("created_at", { ascending: false }).limit(200),
+    // L'objectif et la course qu'il a remplacée : le lendemain d'une course courue, la série
+    // est protégée, ici comme sur le tableau de bord.
+    supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "race_objective").maybeSingle(),
   ]);
 
   /**
@@ -183,6 +187,7 @@ export default async function LeaguesPage() {
       (r) => slotKey(r.data as { date?: unknown; moment?: unknown }),
     ).map((r) => r.data),
     feedbacks: ((streakFeedback ?? []) as { data: { date?: unknown; pain?: unknown } }[]).map((r) => r.data),
+    courses: coursesDeLObjectif((objectifSerie?.data ?? null) as Parameters<typeof coursesDeLObjectif>[0]),
     today: aujourdhuiAthlete,
   });
   const longestStreak = serie.best;

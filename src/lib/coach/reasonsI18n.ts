@@ -35,7 +35,7 @@ export type TextesMotifs = {
   /** Récupération après une course courue (`lib/coach/apresCourse`). La date est déjà
    *  mise en forme dans la langue ; le nom de la course est un nom propre, il ne se
    *  traduit pas. */
-  apresCourse: (course: string, jours: string, reprise: string) => string;
+  apresCourse: (course: string, jours: string, reprise: string, volumePct: string) => string;
 };
 
 export const MOTIF_T: Record<Lang, TextesMotifs> = {
@@ -56,7 +56,7 @@ export const MOTIF_T: Record<Lang, TextesMotifs> = {
     partRatio: (a) => `ratio aigu:chronique ${a}`,
     partTsb: (t) => `TSB ${t}`,
     chargeVueMaisMaintenue: (p) => `charge récente élevée (${p}) MAIS VFC nettement au-dessus de sa base, sommeil correct et aucune douleur : la qualité est maintenue. À surveiller si la VFC redescend.`,
-    apresCourse: (c, j, r) => `récupération après ${c} (J+${j}) : footings seulement, pas d'intensité avant le ${r} — un jour facile par mile couru`,
+    apresCourse: (c, j, r, v) => `récupération après ${c} (J+${j}) : footings seulement, pas d'intensité avant le ${r}, et ${v} % de ton volume habituel cette semaine — un jour facile par mile couru`,
   },
   en: {
     douleur: (z) => `ongoing pain (${z})`,
@@ -75,7 +75,7 @@ export const MOTIF_T: Record<Lang, TextesMotifs> = {
     partRatio: (a) => `acute:chronic ratio ${a}`,
     partTsb: (t) => `TSB ${t}`,
     chargeVueMaisMaintenue: (p) => `high recent load (${p}) BUT HRV clearly above baseline, decent sleep and no pain: the quality session stays. To watch if HRV comes back down.`,
-    apresCourse: (c, j, r) => `recovering from ${c} (day ${j} after): easy runs only, no hard sessions before ${r} — one easy day per mile raced`,
+    apresCourse: (c, j, r, v) => `recovering from ${c} (day ${j} after): easy runs only, no hard sessions before ${r}, and ${v}% of your usual volume this week — one easy day per mile raced`,
   },
   de: {
     douleur: (z) => `bestehende Schmerzen (${z})`,
@@ -94,7 +94,7 @@ export const MOTIF_T: Record<Lang, TextesMotifs> = {
     partRatio: (a) => `Akut-Chronisch-Verhältnis ${a}`,
     partTsb: (t) => `TSB ${t}`,
     chargeVueMaisMaintenue: (p) => `hohe jüngste Belastung (${p}), ABER HRV deutlich über dem Ausgangswert, ordentlicher Schlaf und keine Schmerzen: die Qualitätseinheit bleibt. Im Auge behalten, falls die HRV wieder fällt.`,
-    apresCourse: (c, j, r) => `Erholung nach ${c} (Tag ${j} danach): nur lockere Läufe, keine intensiven Einheiten vor dem ${r} — ein lockerer Tag pro gelaufener Meile`,
+    apresCourse: (c, j, r, v) => `Erholung nach ${c} (Tag ${j} danach): nur lockere Läufe, keine intensiven Einheiten vor dem ${r}, und ${v} % deines üblichen Umfangs diese Woche — ein lockerer Tag pro gelaufener Meile`,
   },
   es: {
     douleur: (z) => `dolor en curso (${z})`,
@@ -113,7 +113,7 @@ export const MOTIF_T: Record<Lang, TextesMotifs> = {
     partRatio: (a) => `ratio agudo:crónico ${a}`,
     partTsb: (t) => `TSB ${t}`,
     chargeVueMaisMaintenue: (p) => `carga reciente elevada (${p}) PERO VFC claramente por encima de su base, sueño correcto y sin dolor: la sesión de calidad se mantiene. A vigilar si la VFC vuelve a bajar.`,
-    apresCourse: (c, j, r) => `recuperación tras ${c} (día ${j} después): solo rodajes suaves, sin intensidad antes del ${r} — un día suave por cada milla corrida`,
+    apresCourse: (c, j, r, v) => `recuperación tras ${c} (día ${j} después): solo rodajes suaves, sin intensidad antes del ${r}, y un ${v} % de tu volumen habitual esta semana — un día suave por cada milla corrida`,
   },
   pt: {
     douleur: (z) => `dor em curso (${z})`,
@@ -132,6 +132,6 @@ export const MOTIF_T: Record<Lang, TextesMotifs> = {
     partRatio: (a) => `rácio agudo:crónico ${a}`,
     partTsb: (t) => `TSB ${t}`,
     chargeVueMaisMaintenue: (p) => `carga recente elevada (${p}) MAS VFC claramente acima da sua base, sono correto e sem dores: a sessão de qualidade mantém-se. A vigiar se a VFC voltar a descer.`,
-    apresCourse: (c, j, r) => `recuperação após ${c} (dia ${j} depois): só corridas fáceis, sem intensidade antes de ${r} — um dia fácil por cada milha corrida`,
+    apresCourse: (c, j, r, v) => `recuperação após ${c} (dia ${j} depois): só corridas fáceis, sem intensidade antes de ${r}, e ${v} % do teu volume habitual esta semana — um dia fácil por cada milha corrida`,
   },
 };

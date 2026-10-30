@@ -76,9 +76,9 @@ export function butDe(distanceKm: number | null): RaceGoal {
  * modèle de prédiction (lib/running/vdot) lit pour ajuster tout ce qui dépasse le semi —
  * le même pour la carte « Vitesse & prédictions » et pour le score de forme.
  */
-export function socleDesSeances(workouts: Seance[]): Socle {
+export function socleDesSeances(workouts: Seance[], aujourdhui?: string): Socle {
   const courses = workouts.filter((w) => isRun(w.sport));
-  const recentes = courses.filter((w) => dansFenetre(w.date, 42));
+  const recentes = courses.filter((w) => dansFenetre(w.date, 42, aujourdhui));
   const plusLongue = Math.max(0, ...recentes.map((w) => w.distance_km ?? 0));
   return {
     sortieLongueKm: plusLongue > 0 ? plusLongue : null,

@@ -37,7 +37,7 @@ const dureeLoc = (min: number, l: Lang) => {
 };
 import { QUALITE_T } from "@/lib/ai/qualityI18n";
 import { aujourdhui, FUSEAU_DEFAUT, formatDateCivile } from "@/lib/time/fuseau";
-import { apresCourse } from "@/lib/coach/apresCourse";
+import { apresCourse, facteurVolumeApresCourse } from "@/lib/coach/apresCourse";
 import { objectifEnCours, estOfficielle } from "@/lib/coach/prochaineCourse";
 import { decaleJour } from "@/lib/streak/compute";
 import { niveauDeVma } from "@/lib/running/niveau";
@@ -1140,8 +1140,11 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
         aujourdhui: todayStr,
       })
     : null;
+  // Le volume aussi : 50, 70 puis 85 % de l'habitude, moyenne des 7 jours du plan.
+  const partVolumeRecup = recup ? facteurVolumeApresCourse(recup) : 1;
   const recupMotif = recup
-    ? tr((l) => MOTIF_T[l].apresCourse(recup.nom, nRaw(recup.joursDepuis, l), formatDateCivile(recup.reprise, l, { day: "numeric", month: "long" })))
+    ? tr((l) => MOTIF_T[l].apresCourse(recup.nom, nRaw(recup.joursDepuis, l), formatDateCivile(recup.reprise, l, { day: "numeric", month: "long" }),
+        nRaw(Math.round(partVolumeRecup * 100), l)))
     : null;
   // ── ARBITRAGE DU BUDGET DE QUALITÉ ───────────────────────────────────────────
   // Extrait dans `lib/coach/qualityBudget` : c'est la décision la plus lourde du coach
@@ -1605,6 +1608,10 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
     const lrShare = longRunShare(libGoal as RaceGoal, objective?.distanceKm ?? null);
     const out: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[] = [];
     let longueDuBloc = 0;   // plus longue sortie planifiée avant l'affûtage
+    // Semaines qui commencent pendant la récupération d'après-course : la montée en charge
+    // (+6 %/semaine) ne repart qu'APRÈS elles. Sinon elle les comptait comme des semaines de
+    // progression, et la feuille de route sautait de 65 à 87 km à la sortie de récupération.
+    const semainesRecup = recup ? Array.from({ length: W }, (_, i) => i).filter((i) => decaleJour(todayStr, 7 * i) < recup.reprise).length : 0;
     for (let i = 0; i < W; i++) {
       // Semaines PLEINES avant la semaine de course : même sens que `weeksToRace`, donc
       // mêmes seuils de phase qu'avant (0 = semaine de course, 1 = J−13 → J−7…).
@@ -1625,10 +1632,13 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
         // écran ne le dise. Le RYTHME de progression (+6 %/semaine) ne bouge pas : seul
         // le toit se lève, et le ratio aigu:chronique continue de piloter le présent.
         const ceilFactor = demonstratedKm && baseKm > 0 ? Math.max(1.4, demonstratedKm / baseKm) : 1.4;
-        factor = Math.min(ceilFactor, 1 + i * 0.06);
+        factor = Math.min(ceilFactor, 1 + Math.max(0, i - semainesRecup) * 0.06);
         if ((i + 1) % 4 === 0) factor *= 0.8; // semaine allégée 1 sur 4
       }
-      const volumeKm = Math.round(baseKm * factor);
+      // Après une course courue, chaque semaine de la récupération porte sa part du volume
+      // (lib/coach/apresCourse) : la feuille de route dit ce que le plan fera.
+      const volumeKm = Math.round(baseKm * factor
+        * (recup ? facteurVolumeApresCourse({ joursDepuis: recup.joursDepuis + 7 * i, joursTotal: recup.joursTotal }) : 1));
       // La sortie longue se déduit de la DISTANCE VISÉE, plus seulement d'un pourcentage
       // du volume. Le plafond de Daniels (25 %) empêche la sortie longue d'écraser la
       // semaine ; il ne dit pas ce qu'il faut courir pour préparer un marathon. Employé
@@ -1837,11 +1847,18 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   const growth = weightLoss ? Math.min(growthBase, 1 + weightLoss.rules.maxWeeklyProgressPct / 100) : growthBase;
   // VOLUME CIBLE déclaré à l'inscription (migration 035, voir lib/coach/volumeCible) : le
   // plan cesse de MONTER au-delà, sans jamais couper sous ce qui est déjà couru.
+  // ⚠️ APRÈS UNE COURSE COURUE, LE VOLUME REPART DE LA MOITIÉ (lib/coach/apresCourse) : sans
+  // cette réduction, la récupération ne retirait que l'intensité, et le plan conseillait
+  // de doubler les footings pour loger 70 km à J+5 d'un marathon. Le macro-plan porte déjà
+  // la réduction semaine par semaine ; sans macro-plan, on l'applique ici.
   const targetKm = volumeAvecCible(macroPlan.length ? macroPlan[0].volumeKm
-    : Math.round(baseKm * (taper ? 0.65 : deload ? 0.8 : growth)),
+    : Math.round(baseKm * (taper ? 0.65 : deload ? 0.8 : growth) * partVolumeRecup),
     volumeCible((p as Record<string, unknown> | null)?.target_weekly_km),
     robustWeekly?.km ?? (avg4wkKm > 0 ? avg4wkKm : weekKm));
-  const longRunPlanned = macroPlan.length ? macroPlan[0].longRunKm : Math.round(targetKm * (taper ? 0.20 : 0.25));
+  const longRunPrevu = macroPlan.length ? macroPlan[0].longRunKm : Math.round(targetKm * (taper ? 0.20 : 0.25));
+  // Pendant la récupération, la sortie longue du macro-plan (28 km si l'objectif suivant est
+  // un marathon) ne dépasse pas 30 % du volume réduit.
+  const longRunPlanned = recup ? Math.min(longRunPrevu, Math.round(targetKm * 0.3)) : longRunPrevu;
 
   /**
    * LA SORTIE LONGUE RÉPOND AU VERDICT DE FRAÎCHEUR, comme la qualité.
@@ -2135,6 +2152,7 @@ ${catalog}`;
       // seuil, donc des doubles refusés en silence chez un athlète qui y avait droit.
       weeklyKm: robustWeekly?.km ?? (avg4wkKm > 0 ? avg4wkKm : weekKm),
       runYears, readiness: readyLevel, pains, taper, lang: langAthlete,
+      recuperation: recup?.nom ?? null,
     }),
     cross,
     longRunMode: bikeLong ? "bike" : "run",

@@ -11,6 +11,7 @@ import type { AvertissementAge as Avertissement } from "@/lib/coach/ageDistance"
 import { formatDateCivile } from "@/lib/time/fuseau";
 import { useFuseau } from "@/lib/time/FuseauProvider";
 import { jourLocal } from "@/lib/streak/compute";
+import { avancementObjectif } from "@/lib/dashboard/fenetre";
 import { estOfficielle } from "@/lib/coach/prochaineCourse";
 
 export type Objective = {
@@ -18,6 +19,10 @@ export type Objective = {
   targetSeconds: number; targetTime: string; targetPace: string;
   /** `false` : défi personnel, pas une course officielle. Absent = course officielle. */
   officielle?: boolean;
+  /** Début de la préparation de CET objectif (AAAA-MM-JJ), et date d'enregistrement (ISO) :
+   *  l'anneau « préparation » part de là (`avancementObjectif`). */
+  depuis?: string | null;
+  ts?: string | null;
 };
 
 type RaceSug = { name: string; city: string; distanceKm: number | null; date: string; type: string };
@@ -49,7 +54,9 @@ function inferDistance(name: string, dbKm: number | null): number | null {
   return dbKm;                                                  // sinon : distance du catalogue
 }
 
-export function ObjectiveCard({ objective, derniereCourse = null, currentVma }: { objective: Objective | null; derniereCourse?: { race: string; raceDate: string } | null; currentVma?: number | null }) {
+export function ObjectiveCard({ objective, derniereCourse = null, currentVma, aujourdhui }: { objective: Objective | null; derniereCourse?: { race: string; raceDate: string } | null; currentVma?: number | null;
+  /** Jour civil de l'athlète, fourni par le serveur : « J-50 » doit être le même au rendu et à l'hydratation. */
+  aujourdhui?: string }) {
   const router = useRouter();
   const { t, lang } = useT();
   const fuseau = useFuseau();
@@ -163,9 +170,9 @@ export function ObjectiveCard({ objective, derniereCourse = null, currentVma }: 
     finally { setSaving(false); }
   };
 
-  const daysTo = objective
-    ? Math.ceil((new Date(objective.raceDate + "T00:00:00").getTime() - Date.now()) / 86400000)
-    : null;
+  // En jours CIVILS : l'heure exacte et le fuseau de la machine donnaient « J-51 » au serveur
+  // (UTC) et « J-50 » au téléphone entre minuit et 1 h — erreur React #418.
+  const daysTo = avancementObjectif(objective, aujourdhui ?? jourLocal(new Date(), fuseau))?.joursRestants ?? null;
 
   // ── Vue lecture — une ligne : l'objectif, son échéance, son chrono ──
   if (objective && !editing) {

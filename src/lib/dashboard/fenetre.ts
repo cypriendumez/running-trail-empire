@@ -41,3 +41,35 @@ export function dansFenetre(date: string | null | undefined, n: number, aujourdh
   const age = ageJours(date, aujourdhui);
   return age != null && age >= 0 && age < n;
 }
+
+/**
+ * COMPTE À REBOURS ET PRÉPARATION D'UN OBJECTIF, EN JOURS CIVILS.
+ *
+ * ⚠️ DEUX DÉFAUTS, UN SEUL CALCUL (Cyprien, 30/10/2026).
+ *  · « J-50 » se calculait sur l'heure exacte (`Date.now()`) et sur une date lue dans le
+ *    fuseau de la machine : entre minuit et 1 h à Paris, le serveur (UTC) rendait « J-51 »
+ *    et le téléphone « J-50 », sur trois cartes — erreur React #418.
+ *  · « 56 % PRÉPARATION » ne mesurait rien : sans plan daté, l'anneau supposait une
+ *    préparation de 16 semaines. Le sub 16 du 19/12, fixé le jour même, affichait 56 % —
+ *    une préparation commencée le 29 août qui n'a jamais existé.
+ *
+ * La préparation part du jour où l'objectif a été fixé (`depuis`, sinon la date
+ * d'enregistrement `ts`), ou d'un plan démarré plus tard. Sans aucune date, pas de
+ * pourcentage : on ne l'invente pas.
+ */
+export function avancementObjectif(
+  objectif: { raceDate: string; depuis?: string | null; ts?: string | null } | null | undefined,
+  aujourdhui: string,
+  debutPlan?: string | null,
+): { joursRestants: number; pct: number | null } | null {
+  const course = String(objectif?.raceDate ?? "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(course)) return null;
+  const restants = ecartJours(aujourdhui, course);
+  if (restants < 0) return null;
+  const debut = [objectif?.depuis ?? objectif?.ts, debutPlan]
+    .map((d) => String(d ?? "").slice(0, 10)).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort().pop();
+  const total = debut ? ecartJours(debut, course) : 0;
+  if (!debut || total <= 0) return { joursRestants: restants, pct: null };
+  const ecoule = Math.min(total, Math.max(0, ecartJours(debut, aujourdhui)));
+  return { joursRestants: restants, pct: Math.round((100 * ecoule) / total) };
+}

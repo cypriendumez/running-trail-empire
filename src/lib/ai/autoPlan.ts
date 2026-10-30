@@ -568,7 +568,9 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // Plancher à 4 km SAUF si le budget ne le permet pas : mieux vaut une sortie de moins
   // qu'un dépassement de la cible hebdomadaire.
   const easyKm = Math.min(easyCap, Math.max(rawEasy >= 3 ? 4 : 3, Math.round(rawEasy)));
-  const doubles = rawEasy > easyCap && raceIdx < 0;
+  // Jamais pendant la récupération d'après-course : le volume y est volontairement réduit,
+  // et « scinde en DEUX sorties » à J+5 d'un marathon disait l'inverse du bandeau.
+  const doubles = rawEasy > easyCap && raceIdx < 0 && !ctx.recuperation;
   // ⚠️ TOUS les créneaux recevaient EXACTEMENT la même séance : même titre, même
   // distance, même texte. Trois footings de suite étaient donc trois fois le même
   // footing — l'athlète l'a signalé, et il avait raison. On fait varier la distance

@@ -72,6 +72,7 @@ export type DayReason =
   | "attente-synchro"   // la séance peut encore arriver
   | "protege-charge"    // surcharge : ne pas courir était le bon choix
   | "protege-douleur"   // douleur déclarée : ne pas courir était le bon choix
+  | "protege-course"    // lendemain d'une course courue : se reposer était le bon choix
   | "sans-plan"         // aucune prescription ce jour-là
   | "repos-charge"      // gros effort un jour de repos : ni récompensé, ni puni
   | "manquee";          // séance prescrite et non faite
@@ -256,10 +257,22 @@ export function acwrAu(date: string, tssParJour: Map<string, number>): number {
 
 // ── Le moteur ────────────────────────────────────────────────────────────────
 
+/** Une course de l'athlète (`race_objective.data` : l'objectif, ou la course qu'il a remplacée). */
+export type StreakCourse = { date?: unknown; distanceKm?: unknown };
+
+/** Les courses portées par l'objectif enregistré : lui-même, et la course précédente qu'il a remplacée. */
+export function coursesDeLObjectif(
+  o: { raceDate?: unknown; distanceKm?: unknown; precedente?: { raceDate?: unknown; distanceKm?: unknown } | null } | null | undefined,
+): StreakCourse[] {
+  return [o, o?.precedente].filter((c) => c != null).map((c) => ({ date: c!.raceDate, distanceKm: c!.distanceKm }));
+}
+
 export type StreakInput = {
   workouts: StreakWorkout[];
   prescriptions: StreakPrescription[];
   feedbacks?: StreakFeedback[];
+  /** Les courses de l'athlète : le lendemain d'une course COURUE est protégé. */
+  courses?: StreakCourse[];
   /** Aujourd'hui, `AAAA-MM-JJ`. Toujours fourni par l'appelant → fonction pure. */
   today: string;
   /** Profondeur d'observation, en jours. */
@@ -323,8 +336,23 @@ export function computeStreak(input: StreakInput): StreakResult {
    * ratio aigu:chronique de 1,82 : elle allait être protégée, pas rompue. On
    * annonçait une casse qui n'aurait jamais eu lieu.
    */
+  // ⚠️ LE LENDEMAIN D'UNE COURSE (Cyprien, 30/10/2026). Le marathon de Lille couru le 25/10,
+  // le plan publié le 26 prévoyait 25 min de récupération ; il s'est reposé, la série est
+  // tombée à 0 (« manqué »). Se reposer le lendemain d'une course est la bonne décision.
+  // « Courue » = une sortie d'au moins la moitié de la distance ce jour-là, la même règle
+  // que la récupération du coach (`lib/coach/apresCourse`).
+  const lendemainsDeCourse = new Set<string>();
+  for (const c of input.courses ?? []) {
+    const d = txt(c?.date).slice(0, 10);
+    const km = Number(c?.distanceKm);
+    if (d.length < 10 || !(km > 0)) continue;
+    const couru = Math.max(0, ...workouts.filter((w) => txt(w.date).slice(0, 10) === d).map((w) => Number(w.distance_km) || 0));
+    if (couru >= km * 0.5) lendemainsDeCourse.add(decaleJour(d, 1));
+  }
+
   const protectionDe = (d: string): DayReason | null =>
-    douleurProche(d) ? "protege-douleur"
+    lendemainsDeCourse.has(d) ? "protege-course"
+      : douleurProche(d) ? "protege-douleur"
       : acwrAu(d, tssParJour) >= SEUIL_SURCHARGE_ACWR ? "protege-charge"
       : null;
 

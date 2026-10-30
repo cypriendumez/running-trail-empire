@@ -69,6 +69,9 @@ export function etatDouble(i: {
   pains: string[];
   /** Semaine d'affûtage : on ne multiplie pas les séances quand on cherche la fraîcheur. */
   taper: boolean;
+  /** Récupération après une course courue (nom de la course), sinon `null` : le volume se
+   *  reconstruit, il ne se double pas (`lib/coach/apresCourse`). */
+  recuperation?: string | null;
   /** Langue de l'athlète. Ces motifs s'affichent dans son profil à la seconde où il
    *  coche la case : les lui servir en français quand son écran est en allemand
    *  reviendrait à traduire l'étiquette et pas la réponse. */
@@ -80,6 +83,7 @@ export function etatDouble(i: {
   if (i.pains.length) manque.push(T.douleur(i.pains.map((x) => traduireDouleur(x, i.lang && DOUBLE_T[i.lang] ? i.lang : "fr")).join(", ")));
   if (i.readiness === "rouge") manque.push(T.rouge);
   if (i.taper) manque.push(T.affutage);
+  if (i.recuperation) manque.push(T.recuperation(i.recuperation));
   if (!(i.weeklyKm >= VOLUME_MINI_DOUBLE_KM)) {
     manque.push(T.volume(Math.round(i.weeklyKm), VOLUME_MINI_DOUBLE_KM));
   }

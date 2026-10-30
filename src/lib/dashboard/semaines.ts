@@ -7,14 +7,16 @@ import { ageJours } from "./fenetre";
 
 type SeanceKm = { date: string; sport?: string | null; distance_km?: number | null };
 
-export function computeWeeklyTrend(workouts: readonly SeanceKm[], weeks = 6): { km: number; isCurrent: boolean }[] {
+export function computeWeeklyTrend(workouts: readonly SeanceKm[], weeks = 6,
+  /** Jour civil de l'athlète (AAAA-MM-JJ) : celui du serveur, pas l'horloge de la machine. */
+  aujourdhui?: string): { km: number; isCurrent: boolean }[] {
   return Array.from({ length: weeks }, (_, i) => {
     // i = 0 est la semaine la plus ANCIENNE ; la dernière est celle en cours.
     const recul = weeks - 1 - i;
     const km = workouts
       .filter((w) => {
         if (!isRun(w.sport)) return false;
-        const age = ageJours(w.date);
+        const age = ageJours(w.date, aujourdhui);
         if (age == null || age < 0) return false;
         return Math.floor(age / 7) === recul;
       })

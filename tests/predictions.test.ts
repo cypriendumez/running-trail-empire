@@ -147,7 +147,8 @@ test("le socle se lit dans les séances : plus longue course de 6 semaines, vél
 
 console.log("\nBRANCHEMENTS — le même socle partout où un marathon est prédit");
 test("tableau de bord, score de forme et nutrition du coach lisent le socle réel", () => {
-  assert.match(code("src/components/dashboard/BentoDashboard.tsx"), /racePredictions\(currentVma, socleDesSeances\(workouts\)\)/);
+  // Le socle se lit sur le jour civil de l'athlète (`jour`, fourni par le serveur) depuis le 30/10/2026.
+  assert.match(code("src/components/dashboard/BentoDashboard.tsx"), /racePredictions\(currentVma, socleDesSeances\(workouts, jour\)\)/);
   assert.match(code("src/lib/dashboard/forme.ts"), /raceProjection\(currentVma, raceKm, objectif\.targetSeconds, null, null, \{ sortieLongueKm: longest \|\| null, volumeHebdoKm: cibleVolumeKm \}\)/);
   const f = code("src/lib/running/fitness.ts");
   assert.doesNotMatch(f, /function pctVmaBrut|return 0\.83;|return 0\.79;/, "le barème en escalier est revenu");

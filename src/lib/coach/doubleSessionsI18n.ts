@@ -22,6 +22,8 @@ export type TextesDouble = {
   douleur: (zones: string) => string;
   rouge: string;
   affutage: string;
+  /** Récupération après une course courue (`lib/coach/apresCourse`) : le nom de la course est un nom propre. */
+  recuperation: (course: string) => string;
   volume: (km: number, seuil: number) => string;
   seuilPrealable: string;
   seuilVolume: (seuil: number, km: number) => string;
@@ -36,6 +38,7 @@ export const DOUBLE_T: Record<Lang, TextesDouble> = {
     douleur: (z) => `douleur en cours (${z})`,
     rouge: "fraîcheur au rouge : on ne double pas un jour où le corps demande du repos",
     affutage: "semaine d'affûtage : on cherche la fraîcheur, pas le volume",
+    recuperation: (c) => `récupération après ${c} : on reconstruit le volume, on ne le double pas`,
     volume: (km, s) => `volume hebdomadaire de ${km} km : en dessous de ${s} km, une seule sortie par jour suffit et doubler n'ajoute que de la logistique`,
     seuilPrealable: "les conditions du double facile ne sont pas réunies",
     seuilVolume: (s, km) => `le double seuil demande un socle d'environ ${s} km/semaine (tu es à ${km})`,
@@ -47,6 +50,7 @@ export const DOUBLE_T: Record<Lang, TextesDouble> = {
     douleur: (z) => `ongoing pain (${z})`,
     rouge: "freshness in the red: you do not double on a day when the body is asking for rest",
     affutage: "taper week: we are after freshness, not volume",
+    recuperation: (c) => `recovering from ${c}: we rebuild volume, we don't double it`,
     volume: (km, s) => `weekly volume of ${km} km: below ${s} km, one run a day is enough and doubling only adds logistics`,
     seuilPrealable: "the conditions for the easy double are not met",
     seuilVolume: (s, km) => `double threshold needs a base of roughly ${s} km/week (you are at ${km})`,
@@ -58,6 +62,7 @@ export const DOUBLE_T: Record<Lang, TextesDouble> = {
     douleur: (z) => `bestehende Schmerzen (${z})`,
     rouge: "Frische auf Rot: An einem Tag, an dem der Körper Ruhe verlangt, wird nicht verdoppelt",
     affutage: "Tapering-Woche: Es geht um Frische, nicht um Umfang",
+    recuperation: (c) => `Erholung nach ${c}: Der Umfang wird wieder aufgebaut, nicht verdoppelt`,
     volume: (km, s) => `Wochenumfang von ${km} km: unter ${s} km reicht ein Lauf pro Tag, und Verdoppeln bringt nur Organisationsaufwand`,
     seuilPrealable: "die Bedingungen für den lockeren Doppel sind nicht erfüllt",
     seuilVolume: (s, km) => `die doppelte Schwelle verlangt eine Basis von rund ${s} km/Woche (du bist bei ${km})`,
@@ -69,6 +74,7 @@ export const DOUBLE_T: Record<Lang, TextesDouble> = {
     douleur: (z) => `dolor en curso (${z})`,
     rouge: "frescura en rojo: no se dobla un día en que el cuerpo pide descanso",
     affutage: "semana de afinamiento: buscamos frescura, no volumen",
+    recuperation: (c) => `recuperación tras ${c}: reconstruimos el volumen, no lo duplicamos`,
     volume: (km, s) => `volumen semanal de ${km} km: por debajo de ${s} km basta una salida al día y doblar solo añade logística`,
     seuilPrealable: "no se cumplen las condiciones del doble suave",
     seuilVolume: (s, km) => `el doble umbral exige una base de unos ${s} km/semana (estás en ${km})`,
@@ -80,6 +86,7 @@ export const DOUBLE_T: Record<Lang, TextesDouble> = {
     douleur: (z) => `dor em curso (${z})`,
     rouge: "frescura no vermelho: não se duplica num dia em que o corpo pede descanso",
     affutage: "semana de afinamento: procuramos frescura, não volume",
+    recuperation: (c) => `recuperação após ${c}: reconstruímos o volume, não o duplicamos`,
     volume: (km, s) => `volume semanal de ${km} km: abaixo de ${s} km basta uma saída por dia e duplicar só acrescenta logística`,
     seuilPrealable: "as condições do duplo leve não estão reunidas",
     seuilVolume: (s, km) => `o duplo limiar exige uma base de cerca de ${s} km/semana (estás em ${km})`,

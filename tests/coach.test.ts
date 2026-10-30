@@ -6568,9 +6568,11 @@ test("aucun calcul du tableau de bord ne découpe le temps en millisecondes", ()
         `${fn} redécoupe le temps en millisecondes : sa fenêtre rebougera avec l'heure`);
     }
   }
-  // Et le gros chiffre de la carte Volume doit passer par le même helper que le reste.
+  // Et le gros chiffre de la carte Volume doit passer par le même helper que le reste —
+  // depuis le 30/10/2026, sur le jour civil de l'athlète fourni par le serveur (`jour`),
+  // le même au rendu et à l'hydratation (tests/hydratation.test.ts).
   const bento = codeOf("src/components/dashboard/BentoDashboard.tsx");
-  assert.match(bento, /const weeklyKm = runs\s*\n\s*\.filter\(w => dansFenetre\(w\.date, 7\)\)/,
+  assert.match(bento, /const weeklyKm = runs\s*\n\s*\.filter\(w => dansFenetre\(w\.date, 7, jour\)\)/,
     "le volume de la semaine n'est plus compté en jours de calendrier");
 });
 

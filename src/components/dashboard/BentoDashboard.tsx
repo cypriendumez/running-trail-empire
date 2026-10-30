@@ -27,7 +27,7 @@ import { computeHrZones } from "@/lib/dashboard/zones";
 import { computeDiscipline, etatDuJour, etatPhysiologique, statsVfc, phraseDuJour, type PlanDuCoach } from "@/lib/dashboard/discipline";
 import type { MetriqueVfc } from "@/lib/health/vfc";
 import { computeWeeklyTrend } from "@/lib/dashboard/semaines";
-import { dansFenetre, ageJours } from "@/lib/dashboard/fenetre";
+import { dansFenetre, ageJours, avancementObjectif } from "@/lib/dashboard/fenetre";
 import { computeForme, socleDesSeances } from "@/lib/dashboard/forme";
 import { computeDistancePRs, type RecordDeclare } from "@/lib/dashboard/records";
 import { AjoutRecord } from "@/components/dashboard/AjoutRecord";
@@ -37,7 +37,7 @@ import { ProfileCompletionBanner } from "@/components/dashboard/ProfileCompletio
 import { StreakCard } from "@/components/dashboard/StreakCard";
 import { TrialBanner } from "@/components/dashboard/TrialBanner";
 import type { EtatAcces } from "@/lib/billing/access";
-import type { StreakResult } from "@/lib/streak/compute";
+import { jourLocal, decaleJour, type StreakResult } from "@/lib/streak/compute";
 import { formatDateCivile } from "@/lib/time/fuseau";
 import { CLE_NIVEAU, niveauDeVma } from "@/lib/running/niveau";
 
@@ -183,8 +183,16 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
   // règle que la fiche détaillée (`etatPhysiologique`), qui ne peut pas dire autre chose.
   const state = etatPhysiologique(hrv);
 
-  // Sommeil : on n'exploite/affiche que des données RÉCENTES (montre réellement portée).
-  const freshSleep = sleep && sleep.date && Date.now() - new Date(sleep.date + "T00:00:00").getTime() <= 2 * 86400000 ? sleep : null;
+  // ⚠️ LE JOUR DE L'ATHLÈTE, PAS CELUI DE LA MACHINE. Tout ce qui dépend d'« aujourd'hui »
+  // part de ce jour civil, calculé UNE fois par le serveur dans le fuseau de l'athlète.
+  // Avec l'horloge, entre minuit et 1 h à Paris, le serveur (UTC) vivait encore la veille :
+  // « J-51 » au rendu, « J-50 » à l'hydratation, et les sept barres de la semaine décalées
+  // d'un jour — erreurs React #418 (rejoué : rendu UTC contre rendu Paris, 30/10/2026).
+  const jour = jourAujourdhui ?? jourLocal();
+
+  // Sommeil : on n'exploite/affiche que des données RÉCENTES (la nuit d'hier ou d'aujourd'hui).
+  const ageSommeil = ageJours(sleep?.date, jour);
+  const freshSleep = sleep && ageSommeil != null && ageSommeil >= 0 && ageSommeil <= 1 ? sleep : null;
 
   // Volume de COURSE : le vélo et la randonnée n'en font pas partie. Sans ce filtre,
   // le tableau de bord affichait 102 km là où le coach en comptait 62 — deux chiffres
@@ -197,7 +205,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
   //    à 00 h 30, 37,5 km le même jour quelques heures plus tard, sans qu'une seule
   //    séance ait changé. Voir `lib/dashboard/fenetre`.
   const weeklyKm = runs
-    .filter(w => dansFenetre(w.date, 7))
+    .filter(w => dansFenetre(w.date, 7, jour))
     .reduce((sum, w) => sum + (w.distance_km ?? 0), 0);
 
   const hrvChartData = hrv.slice(0, 14).reverse()
@@ -208,11 +216,10 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
     }));
 
   const weeklyData = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
-    const dayWorkouts = runs.filter(w => new Date(w.date).toDateString() === d.toDateString());
+    const d = decaleJour(jour, i - 6);
+    const dayWorkouts = runs.filter(w => String(w.date).slice(0, 10) === d);
     return {
-      day: d.toLocaleDateString(lang, { weekday: "short" }),
+      day: formatDateCivile(d, lang, { weekday: "short" }),
       km: dayWorkouts.reduce((s, w) => s + (w.distance_km ?? 0), 0),
       elev: dayWorkouts.reduce((s, w) => s + (w.elevation_gain_m ?? 0), 0),
     };
@@ -244,7 +251,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
 
   // Séance-clé du jour : l'algo s'affiche INSTANTANÉMENT (repli fiable),
   // puis la version IA (Gemini) le remplace dès qu'elle répond (badge ✨).
-  const keySession = recommendSession({ state, weeklyKm, workouts, sleep, raceDate, t });
+  const keySession = recommendSession({ state, weeklyKm, workouts, sleep, raceDate, jour, t });
   // Séance prescrite par le coach = prioritaire, et affichée dans la langue de l'athlète.
   // La résolution se fait ici, côté client : le sélecteur de langue est instantané.
   const coachKey = coachSession
@@ -271,8 +278,8 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
   // ── Données dérivées (toutes calculées depuis le réel — rien d'inventé) ──────────
   // ⚠️ LE SOCLE RÉEL (02/10/2026) : sans lui, le marathon était prédit pour un coureur
   // sans sortie longue ni volume — la prédiction prudente, servie à tout le monde.
-  const predictions = currentVma && currentVma > 0 ? racePredictions(currentVma, socleDesSeances(workouts)) : null;
-  const volumeTrend = computeWeeklyTrend(workouts, 6);
+  const predictions = currentVma && currentVma > 0 ? racePredictions(currentVma, socleDesSeances(workouts, jour)) : null;
+  const volumeTrend = computeWeeklyTrend(workouts, 6, jour);
   const trendMax = Math.max(1, ...volumeTrend.map((v) => v.km));
   const prevWeeks = volumeTrend.slice(0, -1);
   const prevAvg = prevWeeks.length ? prevWeeks.reduce((s, v) => s + v.km, 0) / prevWeeks.length : 0;
@@ -290,7 +297,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
   const volumeDelta = volRef ? weeklyKm - volRef.km : prevAvg > 0 ? weeklyKm - prevAvg : null;
   const volumeRefLabel = volRef ? "dash.volume.vsMedian" : "dash.volume.vsAvg";
   const records = computeRecords(workouts);
-  const weekSummary = computeWeekSummary(workouts);
+  const weekSummary = computeWeekSummary(workouts, jour);
   const acwr = loadRisk?.acwr ?? 0;
   // Historique du Score Discipline (8 sem.) — du plus ancien au plus récent.
   const coachMinimal = !!coachKey && coachKey.tags.length === 0 && !coachKey.why;
@@ -416,27 +423,17 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
   ) });
   const fillers = fillerPool.slice(0, 2);
 
-  // Compte à rebours vers la prochaine course (objectif) pour le panneau de l'en-tête.
-  const objDaysTo = objective
-    ? Math.ceil((new Date(objective.raceDate + "T00:00:00").getTime() - Date.now()) / 86400000)
-    : null;
-
-  // Progression de la préparation = part du temps écoulé dans la fenêtre de prépa
-  // (départ du plan si connu, sinon build standard de 16 semaines avant la course).
+  // Compte à rebours vers l'objectif et part de sa préparation déjà écoulée, en jours
+  // CIVILS (lib/dashboard/fenetre). L'anneau part du jour où l'objectif a été fixé, ou d'un
+  // plan démarré plus tard : il supposait 16 semaines de préparation quand rien ne le disait.
   const planMeta = plan as { start_date?: string; created_at?: string } | null;
-  const objStartMs = objective
-    ? (planMeta?.start_date ? new Date(planMeta.start_date).getTime()
-      : planMeta?.created_at ? new Date(planMeta.created_at).getTime()
-      : new Date(objective.raceDate + "T00:00:00").getTime() - 112 * 86400000)
-    : 0;
-  const objEndMs = objective ? new Date(objective.raceDate + "T00:00:00").getTime() : 0;
-  const objProgress = objective && objDaysTo != null && objDaysTo >= 0 && objEndMs > objStartMs
-    ? Math.max(0, Math.min(100, Math.round(((Date.now() - objStartMs) / (objEndMs - objStartMs)) * 100)))
-    : null;
+  const avancement = avancementObjectif(objective, jour, planMeta?.start_date ?? planMeta?.created_at ?? null);
+  const objDaysTo = avancement?.joursRestants ?? null;
+  const objProgress = avancement?.pct ?? null;
 
   // Score de forme — 4 axes réels (endurance + vitesse dérivées des séances/VMA).
   const forme = computeForme(workouts, currentVma ?? 0, disc.recovery, disc.consistency,
-    objective ? { distanceKm: objective.distanceKm ?? null, targetSeconds: objective.targetSeconds ?? null } : null);
+    objective ? { distanceKm: objective.distanceKm ?? null, targetSeconds: objective.targetSeconds ?? null } : null, jour);
   /**
    * LE PLUS HAUT ET LE PLUS BAS DES QUATRE COMPOSANTES.
    *
@@ -466,7 +463,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
   // dérivait les zones de `profiles.max_hr` — COLONNE QUI N'EXISTE PAS EN BASE, donc
   // toujours vide — puis retombait sur 220−âge, une estimation qui décale toutes les
   // bornes. On lit maintenant le temps en zone mesuré par la montre elle-même.
-  const hrZones = computeHrZones(workouts);
+  const hrZones = computeHrZones(workouts, jour);
 
   // KPI de l'en-tête « hero » — résumé exécutif (valeurs réelles, repli « — »).
   const kpi = KPI_LABELS[lang] ?? KPI_LABELS.fr;
@@ -671,7 +668,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
       <StreakCard streak={streak ?? null} />
 
       {/* Objectif de course — saisi par le client → e-mail coach + perso IA */}
-      <ObjectiveCard objective={objective ?? null} derniereCourse={derniereCourse} currentVma={currentVma ?? null} />
+      <ObjectiveCard objective={objective ?? null} derniereCourse={derniereCourse} currentVma={currentVma ?? null} aujourdhui={jour} />
 
       {/* Prochaine séance — bannière compacte (uniquement si pas de bandeau coach) */}
       {!coachKey && (
@@ -1019,7 +1016,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
           className="group relative col-span-12 md:col-span-6"
         >
-          <TaperingWidget workouts={chargeHistory} raceDate={raceDate} />
+          <TaperingWidget workouts={chargeHistory} raceDate={raceDate} aujourdhui={jour} />
           <VersFiche cle="charge" titre={t("tap.title")} lang={lang} />
         </motion.div>
 
@@ -1562,19 +1559,21 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
 type KeyTag = { l: string; c: string };
 type KeySession = { title: string; subtitle: string; accent: string; tags: KeyTag[]; why: string };
 
-function recommendSession({ state, weeklyKm, workouts, sleep, raceDate, t }: {
+function recommendSession({ state, weeklyKm, workouts, sleep, raceDate, jour, t }: {
   state: string; weeklyKm: number; workouts: Workout[];
-  sleep?: { sleep_score: number } | null; raceDate: string | null; t: TFn;
+  sleep?: { sleep_score: number } | null; raceDate: string | null;
+  /** Jour civil de l'athlète : le week-end et le compte à rebours ne dépendent pas de la machine. */
+  jour: string; t: TFn;
 }): KeySession {
   const Z1 = "bg-sky-100 text-sky-700", Z2 = "bg-green-100 text-green-700",
     Z4 = "bg-orange-100 text-orange-700", NEU = "bg-zinc-100 text-zinc-600", RED = "bg-red-100 text-red-700";
   const ss = sleep?.sleep_score ?? null;
   const last = workouts[0];
-  const daysSinceLast = last ? Math.floor((Date.now() - new Date(last.date).getTime()) / 86400000) : 99;
+  const daysSinceLast = last ? ageJours(last.date, jour) ?? 99 : 99;
   const lastHard = !!last && /interval|vma|tempo|race|hill|seuil/i.test(String(last.type ?? ""));
   const lastLong = !!last && (last.distance_km ?? 0) >= 18;
-  const dow = new Date().getDay();
-  const daysToRace = raceDate ? Math.ceil((new Date(raceDate).getTime() - Date.now()) / 86400000) : null;
+  const dow = new Date(`${jour}T12:00:00Z`).getUTCDay();
+  const daysToRace = raceDate ? avancementObjectif({ raceDate }, jour)?.joursRestants ?? null : null;
   const tired = state === "recovery" || (ss != null && ss < 55);
 
   if (tired) return {
@@ -1713,8 +1712,8 @@ function computeRecords(workouts: Workout[]): { longest: number; maxElev: number
 
 
 // Résumé de la semaine en cours (7 derniers jours).
-function computeWeekSummary(workouts: Workout[]): { sessions: number; km: number; elev: number; sec: number } {
-  const wk = workouts.filter(w => isRun(w.sport) && dansFenetre(w.date, 7));
+function computeWeekSummary(workouts: Workout[], jour: string): { sessions: number; km: number; elev: number; sec: number } {
+  const wk = workouts.filter(w => isRun(w.sport) && dansFenetre(w.date, 7, jour));
   // ⚠️ `?? 0` NE RATTRAPE PAS `NaN`. Il ne voit que `null` et `undefined` : une seule
   // valeur non numérique dans la colonne, et la somme entière devient NaN — le total
   // hebdomadaire s'affiche alors « NaN km » et la durée « NaN:NaN », sur la première

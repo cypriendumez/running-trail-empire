@@ -77,3 +77,35 @@ export function apresCourse(args: {
   reprise.setUTCDate(reprise.getUTCDate() + joursTotal + 1);
   return { nom: course.nom, date, joursDepuis, joursTotal, reprise: reprise.toISOString().slice(0, 10), distanceCourueKm: courue };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  LE VOLUME AUSSI, PAS SEULEMENT L'INTENSITÉ.
+//
+//  ⚠️ LA RÉCUPÉRATION NE RETIRAIT QUE LA QUALITÉ. Le volume visé restait celui d'une
+//  semaine normale : cinq jours après son marathon (2 h 42), Cyprien recevait un objectif
+//  de 70 km, sa médiane des huit semaines précédentes. Le plan ne pouvant pas le loger
+//  dans ses footings (plafonnés par la sortie longue), il ajoutait « 💡 À ton volume,
+//  scinde en DEUX sorties dans la journée » — le contraire de ce qu'il faut à J+5.
+//
+//  LA RÈGLE (validée par Cyprien le 30/10/2026) : le volume repart de la moitié et
+//  remonte par paliers — 50 %, 70 %, puis 85 % du volume habituel, chacun sur un tiers
+//  de la fenêtre de récupération (neuf jours chacun après un marathon, deux après un
+//  10 km). Le plan couvrant sept jours, on applique la MOYENNE de ces sept jours : un
+//  plan qui déborde sur le palier suivant, ou au-delà de la récupération, en tient compte.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Part du volume habituel sur chaque tiers de la récupération. */
+export const PALIERS_VOLUME = [0.5, 0.7, 0.85] as const;
+
+/** Part du volume habituel le `joursDepuis`-ième jour après la course (1 au-delà de la fenêtre). */
+export function partVolumeDuJour(joursDepuis: number, joursTotal: number): number {
+  if (!(joursDepuis >= 1) || joursDepuis > joursTotal) return 1;
+  return PALIERS_VOLUME[Math.min(2, Math.floor(((joursDepuis - 1) * 3) / joursTotal))];
+}
+
+/** Part du volume habituel à viser sur les `jours` jours du plan qui commence aujourd'hui. */
+export function facteurVolumeApresCourse(r: Pick<ApresCourse, "joursDepuis" | "joursTotal">, jours = 7): number {
+  let somme = 0;
+  for (let k = 0; k < jours; k++) somme += partVolumeDuJour(r.joursDepuis + k, r.joursTotal);
+  return somme / jours;
+}

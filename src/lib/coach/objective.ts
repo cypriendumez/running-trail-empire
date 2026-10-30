@@ -16,7 +16,29 @@ export type ObjectiveInput = {
   officielle?: boolean };
 /** Une course passée, gardée quand un nouvel objectif la remplace. */
 export type CoursePrecedente = { race: string; raceDate: string; distanceKm: number; officielle: boolean };
-export type ObjectiveData = ObjectiveInput & { targetTime: string; targetPace: string; ts: string; precedente?: CoursePrecedente | null };
+export type ObjectiveData = ObjectiveInput & { targetTime: string; targetPace: string; ts: string; precedente?: CoursePrecedente | null;
+  /** Jour (AAAA-MM-JJ) où la préparation de CET objectif a commencé : l'anneau
+   *  « préparation » du tableau de bord part de là (`avancementObjectif`). */
+  depuis?: string };
+
+/**
+ * LE JOUR OÙ LA PRÉPARATION A COMMENCÉ.
+ *
+ * L'anneau « 56 % PRÉPARATION » supposait 16 semaines de préparation faute de date
+ * (Cyprien, 30/10/2026 : sub 16 fixé le jour même, déjà « à 56 % »). Corriger le chrono ou
+ * le nom d'un objectif ne remet pas sa préparation à zéro : la date de départ ne change
+ * qu'avec la course elle-même (sa date). Un objectif enregistré avant ce champ part de sa
+ * date d'enregistrement.
+ */
+export function debutPreparation(
+  ancien: { raceDate?: unknown; depuis?: unknown; ts?: unknown } | null | undefined,
+  raceDate: string,
+  aujourdhui: string,
+): string {
+  if (!ancien || String(ancien.raceDate ?? "") !== raceDate) return aujourdhui;
+  const connu = String(ancien.depuis ?? ancien.ts ?? "").slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(connu) && connu <= aujourdhui ? connu : aujourdhui;
+}
 
 /**
  * LA COURSE QU'UN NOUVEL OBJECTIF REMPLACE N'EST PAS OUBLIÉE.
@@ -96,6 +118,7 @@ export async function setRaceObjective(admin: SupabaseClient, userId: string, in
     .select("id, data").eq("user_id", userId).eq("type", "race_objective").maybeSingle();
   if (eLecture) throw new Error(`objectif illisible : ${eLecture.message}`);
   data.precedente = coursePrecedente(existing?.data as Parameters<typeof coursePrecedente>[0], today);
+  data.depuis = debutPreparation(existing?.data as Parameters<typeof debutPreparation>[0], input.raceDate, today);
 
   const row = { title: "Objectif de course", body: `${data.race} · ${data.targetTime}`, read: true, data };
   // Et l'écriture elle-même : sans ce contrôle, la fonction rendait l'objectif à

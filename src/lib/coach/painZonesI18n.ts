@@ -16,6 +16,18 @@
 import type { Lang } from "@/lib/i18n/translations";
 import { T } from "@/lib/i18n/translations";
 
+/** La valeur stockée quand l'athlète coche « Aucune douleur » : ce n'est PAS une douleur. */
+export const AUCUNE_DOULEUR = "Aucune douleur";
+
+/**
+ * Les douleurs RÉELLEMENT déclarées. L'e-mail de ressenti comptait « Aucune douleur »
+ * comme une douleur : « ⚠️ RPE 2/10 · douleur » pour une séance facile sans aucune gêne
+ * (Cyprien, 24 et 25/10/2026).
+ */
+export function douleursDeclarees(pain: unknown): string[] {
+  return Array.isArray(pain) ? pain.map((p) => String(p ?? "").trim()).filter((p) => p && p !== AUCUNE_DOULEUR) : [];
+}
+
 /** Valeur stockée (français) → clé de traduction. Miroir exact du formulaire. */
 export const ZONE_KEY: Record<string, string> = {
   "Aucune douleur": "fb.pain.none",

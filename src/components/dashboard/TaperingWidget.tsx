@@ -6,6 +6,7 @@ import { TrendingUp, Target, Calendar, Zap, AlertTriangle } from "lucide-react";
 import type { Workout } from "@/types";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { computeLoad, type SeanceCharge } from "@/lib/dashboard/charge";
+import { ecartJours } from "@/lib/streak/compute";
 
 interface TaperingWidgetProps {
   /** Historique de charge sur un an, chargé par une requête dédiée. La liste
@@ -13,15 +14,18 @@ interface TaperingWidgetProps {
    *  laissait pas au modèle le temps de converger (voir `computeLoad`). */
   workouts: SeanceCharge[];
   raceDate?: string | null;
+  /** Jour civil de l'athlète, fourni par le serveur : le même au rendu et à l'hydratation
+   *  (l'horloge de la machine donnait la veille au serveur entre minuit et 1 h). */
+  aujourdhui?: string;
 }
 
-export function TaperingWidget({ workouts, raceDate }: TaperingWidgetProps) {
+export function TaperingWidget({ workouts, raceDate, aujourdhui }: TaperingWidgetProps) {
   const { t } = useT();
-  const { ctl, atl, tsb, history, estimees } = useMemo(() => computeLoad(workouts), [workouts]);
+  const { ctl, atl, tsb, history, estimees } = useMemo(() => computeLoad(workouts, aujourdhui), [workouts, aujourdhui]);
 
-  const daysToRace = raceDate
-    ? Math.ceil((new Date(raceDate).getTime() - Date.now()) / 86400000)
-    : null;
+  const daysToRace = raceDate && aujourdhui
+    ? ecartJours(aujourdhui, String(raceDate).slice(0, 10))
+    : raceDate ? Math.ceil((new Date(raceDate).getTime() - Date.now()) / 86400000) : null;
 
   const isTaperingWindow = daysToRace !== null && daysToRace <= 21 && daysToRace > 0;
   const targetTSB = 15;

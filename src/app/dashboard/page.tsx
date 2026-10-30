@@ -16,7 +16,7 @@ import { vmaAffichee } from "@/lib/dashboard/vmaAffichee";
 import { validerRecordDeclare, type RecordDeclare } from "@/lib/dashboard/records";
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 import { seancesSansRessenti } from "@/lib/dashboard/ressenti";
-import { computeStreak, jourLocal, decaleJour, type StreakWorkout, type StreakPrescription } from "@/lib/streak/compute";
+import { computeStreak, coursesDeLObjectif, jourLocal, decaleJour, type StreakWorkout, type StreakPrescription } from "@/lib/streak/compute";
 import { accesDe } from "@/lib/billing/access";
 import { estAdmin } from "@/lib/admin/acces";
 import { serieVfc } from "@/lib/health/vfc";
@@ -138,6 +138,8 @@ export default async function DashboardPage() {
       (r) => slotKey(r.data as { date?: unknown; moment?: unknown }),
     ).map((r) => r.data),
     feedbacks: ((feedbackRes.data ?? []) as { data: { date?: unknown; pain?: unknown } }[]).map((r) => r.data),
+    // Le lendemain d'une course courue est protégé : l'objectif et la course qu'il a remplacée.
+    courses: coursesDeLObjectif((objRes.data?.data ?? null) as Parameters<typeof coursesDeLObjectif>[0]),
     today: streakToday,
   });
   const newMembersWeek = newMembersRes.count ?? 0;

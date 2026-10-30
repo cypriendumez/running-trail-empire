@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { coquilleEmail, ech } from "@/lib/newsletter/gabarit";
 import { envoyerEmail } from "@/lib/email/envoyer";
 import { kmApres } from "@/lib/dashboard/ressenti";
+import { douleursDeclarees } from "@/lib/coach/painZonesI18n";
 
 // POST /api/feedback {workout_id?, date, title, rpe (0-10), pain: string[], note, chaussure_id?}
 // → enregistre le ressenti post-séance (lu par le coach, informe la perso IA), rattaché à
@@ -91,7 +92,7 @@ export async function POST(req: Request) {
       const { data: prof } = await admin.from("profiles").select("full_name, email").eq("id", user.id).single();
       const name = (prof?.full_name as string) || (prof?.email as string) || "Un client";
       const r = Math.round(Number(rpe));
-      const douleurs = Array.isArray(pain) ? pain.filter(Boolean).map(String) : [];
+      const douleurs = douleursDeclarees(pain);
       const painTxt = douleurs.length ? douleurs.join(", ") : "aucune douleur signalée";
       const alerte = r >= 8 || douleurs.length > 0;
       const dateFr = new Date(String(date).slice(0, 10) + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });

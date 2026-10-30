@@ -8,6 +8,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { seancesSansRessenti, kmApres } from "../src/lib/dashboard/ressenti";
+import { douleursDeclarees, AUCUNE_DOULEUR } from "../src/lib/coach/painZonesI18n";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -96,6 +97,16 @@ test("l'écran : la séance nommée, « 1 sur 3 », « Plus tard », et le Garag
   assert.ok(/\{seance\.aPied && \(/.test(src), "on propose des chaussures pour une sortie vélo");
   // Le Garage s'ouvre sur son onglet.
   assert.ok(/get\("onglet"\) === "garage"\) setTab\("shoes"\)/.test(code("src/components/profile/ProfileSettings.tsx")));
+});
+
+test("« Aucune douleur » n'est pas une douleur dans l'e-mail du ressenti (Cyprien, 24-25/10 : « ⚠️ · douleur »)", () => {
+  assert.deepEqual(douleursDeclarees([AUCUNE_DOULEUR]), [], "« Aucune douleur » comptée comme une douleur");
+  assert.deepEqual(douleursDeclarees(["Genou"]), ["Genou"]);
+  assert.deepEqual(douleursDeclarees([AUCUNE_DOULEUR, "Mollet", ""]), ["Mollet"]);
+  assert.deepEqual(douleursDeclarees(undefined), []);
+  // La valeur stockée est celle du formulaire : si elle change, ce test doit le voir.
+  assert.match(code("src/components/dashboard/SessionFeedback.tsx"), /v: "Aucune douleur"/, "le formulaire n'enregistre plus « Aucune douleur »");
+  assert.match(code("src/app/api/feedback/route.ts"), /const douleurs = douleursDeclarees\(pain\);/, "l'e-mail compte de nouveau « Aucune douleur » comme une douleur");
 });
 
 console.log(`\n${passed} test(s) du ressenti passé(s), ${fails.length} échec(s)`);
