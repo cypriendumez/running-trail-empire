@@ -296,7 +296,11 @@ async function main() {
 
   await test("le formulaire propose le défi personnel et ne demande pas d'heure de départ", () => {
     const src = codeNu("src/components/dashboard/ObjectiveCard.tsx");
-    assert.match(src, /t\("obj\.unofficial"\)/, "la case « pas une course officielle » a disparu");
+    // Course ou défi : un choix franc en tête du formulaire, plus une case à cocher qu'on
+    // découvrait après avoir cherché sa « course » en vain dans le catalogue.
+    assert.match(src, /role="radiogroup"/, "le choix course officielle / défi perso a disparu");
+    assert.match(src, /choix \? t\("obj\.kindRace"\) : t\("obj\.kindChallenge"\)/, "le défi perso n'est plus proposé");
+    assert.match(src, /onClick=\{\(\) => \{ setOfficielle\(choix\);/, "le choix ne change plus le formulaire");
     assert.match(src, /\{officielle && \(\s*<label className="block">\s*<span[^>]*>\{t\("obj\.startTime"\)\}/, "l'heure de départ est demandée pour un défi");
     assert.match(src, /startTime: officielle \? heure \|\| undefined : undefined, officielle \}/, "le caractère officiel n'est plus envoyé");
     assert.match(src, /officielle && !race\.trim\(\)/, "un défi sans nom est refusé");
@@ -305,6 +309,20 @@ async function main() {
     assert.match(api, /setRaceObjective\(admin, user\.id, \{[^}]*officielle \}\)/, "la route n'enregistre pas le caractère officiel");
     assert.match(api, /\.filter\(\(a\) => officielle \|\| a\.niveau !== "reglement"\)/, "la réponse oppose le règlement à un défi");
     assert.match(codeNu("src/lib/coach/objective.ts"), /officielle: input\.officielle !== false/);
+  });
+
+  await test("la carte d'objectif suit la charte : ni indigo, ni bouton fait main, et un vrai chrono", () => {
+    // Cyprien, 30/10/2026 : « ça fait trop IA ». La carte était la seule de l'application en
+    // violet, avec ses propres boutons ; la charte (DESIGN.md) veut l'émeraude par petites
+    // touches et les primitives partagées.
+    const src = codeNu("src/components/dashboard/ObjectiveCard.tsx");
+    assert.doesNotMatch(src, /indigo/, "l'indigo est revenu dans la carte d'objectif");
+    assert.match(src, /className=\{btnClass\("primary", "md"\)\}/, "le bouton d'enregistrement ne vient plus des primitives de la charte");
+    // Ancré sur le style des CASES de saisie : les deux-points portent la même police, et
+    // une assertion trop large se contentait d'eux (mutation « chrono ordinaire » survivante).
+    assert.match(src, /const chiffreCls = "[^"]*\bfont-sport text-\[2\.5rem\]/, "le chrono n'est plus saisi en chiffres de course");
+    assert.match(src, /aria-label=\{aria\} className=\{chiffreCls\}/, "les cases du chrono n'ont plus le style des chiffres de course");
+    assert.match(src, /t\("obj\.paceLive", \{ pace: allure \}\)/, "l'allure n'est plus calculée pendant la saisie");
   });
 
   await test("après la course, le tableau de bord ouvre un formulaire VIDE et nomme la course passée", () => {

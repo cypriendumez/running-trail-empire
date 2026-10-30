@@ -2,9 +2,10 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { Target, Loader2, Check, Pencil, Search, MapPin } from "lucide-react";
+import { Loader2, Check, Pencil, Search, MapPin, Flag } from "lucide-react";
+import { btnClass } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import type { AvertissementAge as Avertissement } from "@/lib/coach/ageDistance";
 import { formatDateCivile } from "@/lib/time/fuseau";
@@ -22,13 +23,18 @@ export type Objective = {
 type RaceSug = { name: string; city: string; distanceKm: number | null; date: string; type: string };
 
 const PRESETS: { label: string; km: number }[] = [
-  { label: "1000 m", km: 1 }, { label: "1500 m", km: 1.5 }, { label: "3000 m", km: 3 },
+  { label: "1\u00a0000 m", km: 1 }, { label: "1\u00a0500 m", km: 1.5 }, { label: "3\u00a0000 m", km: 3 },
   { label: "5 km", km: 5 }, { label: "10 km", km: 10 },
   { label: "Semi", km: 21.1 }, { label: "Marathon", km: 42.2 }, { label: "Trail 25K", km: 25 },
 ];
 
-const inputCls = "w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm outline-none transition-colors focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100";
-const numCls = "w-14 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-2 text-center text-sm tabular-nums outline-none transition-colors focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100";
+// ⚠️ LA CHARTE (DESIGN.md), PLUS L'INDIGO. Cette carte était la seule de l'application en
+// violet — boutons, pastilles, focus — et Cyprien la trouvait « trop IA » (30/10/2026). Champs
+// à liseré fin et focus émeraude, bouton principal noir, émeraude par petites touches.
+const champCls = "w-full rounded-xl bg-white px-3 py-2.5 text-sm text-zinc-900 ring-1 ring-inset ring-zinc-200 outline-none transition-shadow placeholder:text-zinc-400 focus:ring-2 focus:ring-[#059669]";
+const libelleCls = "mb-1.5 block text-[13px] font-medium text-zinc-700";
+// Le chrono se saisit en chiffres de course (Anton) : c'est le seul élément appuyé de la carte.
+const chiffreCls = "bg-transparent p-0 text-center font-sport text-[2.5rem] leading-none text-[#11201d] outline-none placeholder:text-zinc-300 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
 
 // Distance fiable d'une course : déduite du NOM (plus fiable que le catalogue, parfois
 // erroné — ex. « Marathon de Lille » tagué 10 km). Une distance explicite dans le nom prime.
@@ -103,6 +109,14 @@ export function ObjectiveCard({ objective, derniereCourse = null, currentVma }: 
   };
 
   const targetSeconds = (Number(th) || 0) * 3600 + (Number(tm) || 0) * 60 + (Number(ts) || 0);
+  // L'allure que ce chrono impose, recalculée à chaque frappe : c'est elle qui dit à un
+  // coureur ce que vaut son objectif (16 min sur 5 km, c'est 3'12 au kilomètre).
+  const allure = (() => {
+    const km = Number(distance);
+    if (!(targetSeconds > 0) || !(km > 0)) return null;
+    const sec = Math.round(targetSeconds / km);
+    return `${Math.floor(sec / 60)}'${String(sec % 60).padStart(2, "0")}`;
+  })();
 
   const save = async () => {
     if (officielle && !race.trim()) return toast.error(t("obj.errRace"));
@@ -153,28 +167,29 @@ export function ObjectiveCard({ objective, derniereCourse = null, currentVma }: 
     ? Math.ceil((new Date(objective.raceDate + "T00:00:00").getTime() - Date.now()) / 86400000)
     : null;
 
-  // ── Vue lecture — barre compacte (mini) ──
+  // ── Vue lecture — une ligne : l'objectif, son échéance, son chrono ──
   if (objective && !editing) {
     return (
-      <motion.div
-        initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
-        className="mb-5 rounded-2xl border border-indigo-100 bg-white px-3.5 py-2.5 shadow-sm"
-      >
-        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-          <Target className="h-4 w-4 flex-shrink-0 text-indigo-500" />
-          <span className="text-sm font-bold text-zinc-900">{objective.race}</span>
-          {!estOfficielle(objective) && (
-            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold leading-none text-zinc-500">{t("obj.unofficialBadge")}</span>
-          )}
-          {daysTo != null && daysTo >= 0 && (
-            <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[11px] font-bold leading-none text-white">J-{daysTo}</span>
-          )}
-          <span className="text-xs font-medium tabular-nums text-zinc-400">
-            {objective.distanceKm} km · {objective.targetTime} · {objective.targetPace}
-          </span>
-          <button onClick={() => setEditing(true)}
-            className="ml-auto inline-flex items-center gap-1 rounded-lg border border-zinc-200 px-2 py-1 text-xs font-semibold text-zinc-500 transition-colors hover:bg-zinc-50">
-            <Pencil className="h-3 w-3" /> {t("obj.edit")}
+      <div className="mb-5 rounded-2xl bg-white px-4 py-3.5 ring-1 ring-zinc-200 sm:px-5">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="truncate text-[15px] font-semibold tracking-tight text-zinc-900">{objective.race}</span>
+              {!estOfficielle(objective) && <Badge className="px-2 py-0.5">{t("obj.unofficialBadge")}</Badge>}
+            </div>
+            <p className="mt-0.5 flex flex-wrap gap-x-3 text-[13px] text-zinc-500">
+              <span className="tabular-nums">{objective.distanceKm.toLocaleString(lang)} km</span>
+              <span>{formatDateCivile(objective.raceDate, lang, { day: "numeric", month: "long", year: "numeric" })}</span>
+              {daysTo != null && daysTo >= 0 && <span className="font-semibold tabular-nums text-[#059669]">J-{daysTo}</span>}
+            </p>
+          </div>
+          {/* Le chrono, en chiffres de course : c'est lui qu'on vient relire. */}
+          <div className="text-right">
+            <div className="font-sport text-[1.75rem] leading-none text-[#11201d]">{objective.targetTime}</div>
+            <div className="mt-1 text-[12px] tabular-nums text-zinc-500">{objective.targetPace}</div>
+          </div>
+          <button onClick={() => setEditing(true)} className={btnClass("secondary", "sm")}>
+            <Pencil className="h-3.5 w-3.5" /> {t("obj.edit")}
           </button>
         </div>
         {/* Avertissement d'âge. Ambre pour un conseil de progression, rouge quand la
@@ -208,55 +223,73 @@ export function ObjectiveCard({ objective, derniereCourse = null, currentVma }: 
             )}
           </div>
         ))}
-      </motion.div>
+      </div>
     );
   }
 
-  // ── Vue édition / création — formulaire compact ──
+  // ── Vue édition / création ──
+  const titre = objective ? t("obj.editTitle") : derniereCourse ? t("obj.nextTitle") : t("obj.createTitle");
+  // Chaque case prend la largeur de ce qu'elle affiche : à largeur fixe, « 3 » h laissait un
+  // trou avant les deux-points (« 3 :30:00 »), là où une horloge de course écrit 3:30:00.
+  const caseChrono = (valeur: string, maj: (v: string) => void, unite: string, aria: string, max: number) => {
+    const exemple = unite === "h" ? "0" : "00";
+    return (
+      <input type="number" min="0" max={max} inputMode="numeric" value={valeur} onChange={(e) => maj(e.target.value)}
+        placeholder={exemple} aria-label={aria} className={chiffreCls}
+        style={{ width: `${Math.max(1, (valeur || exemple).length) + 0.15}ch` }} />
+    );
+  };
+  const deuxPoints = <span aria-hidden className="px-0.5 font-sport text-[2.5rem] leading-none text-zinc-300">:</span>;
+  const unite = (u: string) => <span aria-hidden className="justify-self-center text-[11px] text-zinc-400">{u}</span>;
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}
-      className="mb-5 rounded-2xl border border-zinc-200/70 bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_10px_30px_-16px_rgba(16,24,40,0.12)] sm:p-5"
-    >
-      <div className="mb-3 flex items-center gap-2">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50">
-          <Target className="h-3.5 w-3.5 text-indigo-500" />
-        </span>
-        <div>
-          <div className="text-sm font-bold text-zinc-900">{objective ? t("obj.editTitle") : derniereCourse ? t("obj.nextTitle") : t("obj.createTitle")}</div>
-          <div className="text-[11px] text-zinc-400">{t("obj.sub")}</div>
+    <section aria-label={titre} className="mb-5 rounded-2xl bg-white p-5 ring-1 ring-zinc-200 sm:p-6">
+      <header>
+        <h2 className="text-[15px] font-semibold tracking-tight text-zinc-900">{titre}</h2>
+        <p className="mt-0.5 text-[13px] text-zinc-500">{t("obj.sub")}</p>
+        {/* La course passée est NOMMÉE, plus reproposée : le formulaire s'ouvre vide. */}
+        {!objective && derniereCourse && (
+          <p className="mt-3 flex items-start gap-2 text-[13px] leading-snug text-zinc-600">
+            <Flag aria-hidden className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[#059669]" />
+            {t("obj.pastRace", { race: derniereCourse.race, date: formatDateCivile(derniereCourse.raceDate, lang, { day: "numeric", month: "long" }) })}
+          </p>
+        )}
+      </header>
+
+      <div className="mt-5 space-y-5">
+        {/* Course officielle ou défi perso : un choix franc, en tête — la case à cocher
+            placée sous le champ « Course » arrivait après qu'on avait cherché en vain. */}
+        <div role="radiogroup" aria-label={t("obj.kind")} className="inline-flex rounded-xl bg-zinc-100 p-1">
+          {([true, false] as const).map((choix) => (
+            <button key={String(choix)} type="button" role="radio" aria-checked={officielle === choix}
+              onClick={() => { setOfficielle(choix); setSug([]); setOpenSug(false); }}
+              className={`rounded-lg px-3.5 py-1.5 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#059669] ${
+                officielle === choix ? "bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200" : "text-zinc-500 hover:text-zinc-800"}`}>
+              {choix ? t("obj.kindRace") : t("obj.kindChallenge")}
+            </button>
+          ))}
         </div>
-      </div>
 
-      {/* La course passée est NOMMÉE, plus reproposée : le formulaire s'ouvre vide. */}
-      {!objective && derniereCourse && (
-        <p className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs leading-relaxed text-emerald-800">
-          {t("obj.pastRace", { race: derniereCourse.race, date: formatDateCivile(derniereCourse.raceDate, lang, { day: "numeric", month: "long" }) })}
-        </p>
-      )}
-
-      <div className="space-y-2.5">
-        <div>
         <label className="block">
-          <span className="mb-1 block text-xs font-semibold text-zinc-600">{officielle ? t("obj.race") : t("obj.unofficialName")}</span>
+          <span className={libelleCls}>{officielle ? t("obj.race") : t("obj.unofficialName")}</span>
           {officielle ? (
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-300" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
             <input value={race} onChange={(e) => onRace(e.target.value)} onFocus={() => sug.length && setOpenSug(true)}
               onBlur={() => setTimeout(() => setOpenSug(false), 150)}
-              placeholder={t("obj.racePh")} className={inputCls + " pl-8"} autoComplete="off" />
+              placeholder={t("obj.racePh")} className={champCls + " pl-9"} autoComplete="off" />
             {openSug && (
-              <div className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-zinc-200 bg-white py-1 shadow-lg">
+              <div className="absolute z-20 mt-1.5 max-h-60 w-full overflow-auto rounded-xl bg-white py-1 shadow-[0_18px_40px_-22px_rgba(16,24,40,.35)] ring-1 ring-zinc-200">
                 {sug.map((s, i) => (
                   <button key={i} type="button" onMouseDown={(e) => { e.preventDefault(); pickRace(s); }}
-                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-indigo-50">
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-zinc-50">
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold text-zinc-800">{s.name}</span>
-                      <span className="flex items-center gap-1 truncate text-[11px] text-zinc-400">
-                        {s.city && <><MapPin className="h-2.5 w-2.5" />{s.city} · </>}{formatDateCivile(s.date, lang, { day: "numeric", month: "short", year: "numeric" })}
+                      <span className="block truncate text-sm font-medium text-zinc-900">{s.name}</span>
+                      <span className="flex items-center gap-1 truncate text-[12px] text-zinc-500">
+                        {s.city && <><MapPin className="h-3 w-3" />{s.city} · </>}{formatDateCivile(s.date, lang, { day: "numeric", month: "short", year: "numeric" })}
                       </span>
                     </span>
-                    {(() => { const dk = inferDistance(s.name, s.distanceKm); return dk != null ? <span className="flex-shrink-0 rounded-md bg-zinc-100 px-1.5 py-0.5 text-[11px] font-semibold text-zinc-600">{dk} km</span> : null; })()}
+                    {(() => { const dk = inferDistance(s.name, s.distanceKm); return dk != null ? <span className="flex-shrink-0 text-[12px] font-medium tabular-nums text-zinc-500">{dk} km</span> : null; })()}
                   </button>
                 ))}
               </div>
@@ -264,71 +297,75 @@ export function ObjectiveCard({ objective, derniereCourse = null, currentVma }: 
           </div>
           ) : (
             <input value={race} onChange={(e) => setRace(e.target.value)} placeholder={t("obj.unofficialPh")}
-              maxLength={80} className={inputCls} autoComplete="off" />
+              maxLength={80} className={champCls} autoComplete="off" />
           )}
         </label>
-        <label className="mt-1.5 inline-flex cursor-pointer items-center gap-2 text-xs text-zinc-600">
-          <input type="checkbox" checked={!officielle}
-            onChange={(e) => { setOfficielle(!e.target.checked); setSug([]); setOpenSug(false); }}
-            className="h-3.5 w-3.5 rounded border-zinc-300 accent-indigo-600" />
-          {t("obj.unofficial")}
-        </label>
-        </div>
 
         <div>
-          <span className="mb-1 block text-xs font-semibold text-zinc-600">{t("obj.distance")}</span>
+          <span className={libelleCls}>{t("obj.distance")}</span>
           <div className="flex flex-wrap items-center gap-1.5">
-            {PRESETS.map((p) => (
-              <button key={p.label} type="button" onClick={() => setDistance(String(p.km))}
-                className={`rounded-lg px-2 py-1 text-xs font-semibold transition-colors ${Number(distance) === p.km ? "bg-indigo-600 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}>
-                {p.km === 21.1 ? t("obj.presetHalf") : p.km === 25 ? t("obj.presetTrail25") : p.label}
-              </button>
-            ))}
-            <div className="relative ml-auto w-[88px]">
-              <input type="number" inputMode="decimal" step="0.1" min="0" value={distance} onChange={(e) => setDistance(e.target.value)} placeholder="42.2" className={inputCls + " pr-7 text-right"} />
-              <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-zinc-400">km</span>
+            {PRESETS.map((p) => {
+              const actif = Number(distance) === p.km;
+              return (
+                <button key={p.label} type="button" aria-pressed={actif} onClick={() => setDistance(String(p.km))}
+                  className={`rounded-lg px-2.5 py-1.5 text-[13px] font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#059669] ${
+                    actif ? "bg-zinc-900 text-white" : "text-zinc-600 ring-1 ring-inset ring-zinc-200 hover:bg-zinc-50 hover:text-zinc-900"}`}>
+                  {p.km === 21.1 ? t("obj.presetHalf") : p.km === 25 ? t("obj.presetTrail25") : p.label}
+                </button>
+              );
+            })}
+            <div className="relative ml-auto w-[96px]">
+              <input type="number" inputMode="decimal" step="0.1" min="0" value={distance} onChange={(e) => setDistance(e.target.value)}
+                placeholder="42.2" aria-label={t("obj.distance")} className={champCls + " pr-9 text-right tabular-nums"} />
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-zinc-400">km</span>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+        <div className="grid gap-5 sm:grid-cols-2">
           <div>
-            <span className="mb-1 block text-xs font-semibold text-zinc-600">{t("obj.target")}</span>
-            <div className="flex items-center gap-1.5">
-              <input type="number" min="0" max="99" inputMode="numeric" value={th} onChange={(e) => setTh(e.target.value)} placeholder="3" className={numCls} aria-label={t("obj.hours")} />
-              <span className="text-xs text-zinc-400">h</span>
-              <input type="number" min="0" max="59" inputMode="numeric" value={tm} onChange={(e) => setTm(e.target.value)} placeholder="30" className={numCls} aria-label={t("obj.minutes")} />
-              <span className="text-xs text-zinc-400">min</span>
-              <input type="number" min="0" max="59" inputMode="numeric" value={ts} onChange={(e) => setTs(e.target.value)} placeholder="00" className={numCls} aria-label={t("obj.seconds")} />
-              <span className="text-xs text-zinc-400">s</span>
+            <span className={libelleCls}>{t("obj.target")}</span>
+            <div className="rounded-2xl bg-zinc-50 px-4 pb-3 pt-3.5 ring-1 ring-inset ring-zinc-200 transition-shadow focus-within:bg-white focus-within:ring-2 focus-within:ring-[#059669]">
+              {/* Chiffres et deux-points sur une même ligne, centrés entre eux comme sur une
+                  horloge de course ; les unités dessous, sur leur propre ligne. */}
+              <div className="grid w-max grid-cols-[auto_auto_auto_auto_auto] items-center gap-y-1">
+                {caseChrono(th, setTh, "h", t("obj.hours"), 99)}
+                {deuxPoints}
+                {caseChrono(tm, setTm, "min", t("obj.minutes"), 59)}
+                {deuxPoints}
+                {caseChrono(ts, setTs, "s", t("obj.seconds"), 59)}
+                {unite("h")}<span />{unite("min")}<span />{unite("s")}
+              </div>
+              <p aria-live="polite" className="mt-2 min-h-[1.25rem] text-[13px] font-medium tabular-nums text-[#059669]">
+                {allure ? t("obj.paceLive", { pace: allure }) : ""}
+              </p>
             </div>
           </div>
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold text-zinc-600">{officielle ? t("obj.date") : t("obj.dateTarget")}</span>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
-          </label>
-          {/* L'heure de départ est celle d'un ORGANISATEUR : un défi personnel n'en a pas. */}
-          {officielle && (
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold text-zinc-600">{t("obj.startTime")}</span>
-            <input type="time" value={heure} onChange={(e) => setHeure(e.target.value)} className={inputCls} />
-            <span className="mt-1 block text-[11px] leading-snug text-zinc-400">{t("obj.startTimeHint")}</span>
-          </label>
-          )}
+          <div className="space-y-4">
+            <label className="block">
+              <span className={libelleCls}>{officielle ? t("obj.date") : t("obj.dateTarget")}</span>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={champCls} />
+            </label>
+            {/* L'heure de départ est celle d'un ORGANISATEUR : un défi personnel n'en a pas. */}
+            {officielle && (
+            <label className="block">
+              <span className={libelleCls}>{t("obj.startTime")}</span>
+              <input type="time" value={heure} onChange={(e) => setHeure(e.target.value)} className={champCls} />
+              <span className="mt-1.5 block text-[12px] leading-snug text-zinc-500">{t("obj.startTimeHint")}</span>
+            </label>
+            )}
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 pt-0.5">
-          <button onClick={save} disabled={saving}
-            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50">
+        <div className="flex items-center gap-2">
+          <button onClick={save} disabled={saving} className={btnClass("primary", "md")}>
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} {t("obj.save")}
           </button>
           {objective && (
-            <button onClick={() => setEditing(false)} className="rounded-lg px-3 py-2 text-sm font-semibold text-zinc-500 transition-colors hover:bg-zinc-100">
-              {t("obj.cancel")}
-            </button>
+            <button onClick={() => setEditing(false)} className={btnClass("ghost", "md")}>{t("obj.cancel")}</button>
           )}
         </div>
       </div>
-    </motion.div>
+    </section>
   );
 }
