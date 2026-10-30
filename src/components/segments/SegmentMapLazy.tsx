@@ -6,9 +6,11 @@ import dynamic from "next/dynamic";
 
 const SegmentMap = dynamic(() => import("./SegmentMap").then((m) => m.SegmentMap), {
   ssr: false,
-  loading: () => <div className="h-[180px] animate-pulse rounded-xl bg-zinc-100" />,
+  loading: () => <div className="h-full animate-pulse rounded-xl bg-zinc-100" />,
 });
 
-export function SegmentMapLazy({ polyline, height }: { polyline: string; height?: number }) {
-  return <SegmentMap polyline={polyline} height={height} />;
+// L'attente occupe la hauteur de la VRAIE carte : fixée à 180 px, elle faisait sauter la
+// liste des segments de 60 px par vignette (120 px) à l'arrivée de chaque carte.
+export function SegmentMapLazy({ polyline, height = 180 }: { polyline: string; height?: number }) {
+  return <div style={{ height }}><SegmentMap polyline={polyline} height={height} /></div>;
 }

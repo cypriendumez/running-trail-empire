@@ -256,6 +256,32 @@ test("la carte montre le sens de parcours et se laisse manipuler", () => {
   assert.doesNotMatch(src, /dragging=\{false\}/, "la carte est de nouveau figée");
 });
 
+test("une tuile refusée ne laisse plus un carré gris pour toujours", () => {
+  // Cyprien, 30/10/2026 : « il y a des bugs de carte ». Reproduit sur banc d'essai : une
+  // seule demande de tuile qui échoue, et la vignette reste grise, le tracé dessiné
+  // par-dessus — Leaflet ne redemande jamais une tuile. Et il en demandait 2,3 fois trop.
+  const src = codeOf("src/components/segments/SegmentMap.tsx");
+  assert.match(src, /eventHandlers=\{\{ tileerror: reessayerTuile \}\}/, "plus aucune relance : une tuile refusée reste grise");
+  assert.match(src, /if \(n > ESSAIS_MAX\) return;/, "la relance n'est plus bornée : une panne durable relancerait sans fin");
+  assert.match(src, /\(e\.target as L\.TileLayer\)\.getTileUrl\(e\.coords\)/, "la relance recopie l'adresse qui a échoué");
+  // Les tuiles MapTiler font 512 px : déclarées en 256, chacune était réduite de moitié.
+  assert.match(src, /outdoor-v2\/\{z\}\/\{x\}\/\{y\}\.webp\?key=\$\{MAPTILER\}`, attribution: "© MapTiler © OpenStreetMap", tileSize: 512, zoomOffset: -1/,
+    "les tuiles MapTiler sont de nouveau déclarées en 256 px (ou servies en PNG, 29 % plus lourd)");
+  assert.match(src, /tileSize=\{TUILES\.tileSize\} zoomOffset=\{TUILES\.zoomOffset\}/, "la taille des tuiles n'est plus transmise à la couche");
+});
+
+test("la vignette n'est plus mangée par ses boutons ni par son crédit — qui reste affiché", () => {
+  const src = codeOf("src/components/segments/SegmentMap.tsx");
+  assert.match(src, /zoomControl=\{height >= HAUTEUR_VIGNETTE\}/, "les boutons +/− couvrent de nouveau la moitié d'une vignette de 120 px");
+  // Le crédit est obligatoire (licences OSM et MapTiler), sa taille ne l'est pas.
+  assert.match(src, /\[&_\.leaflet-control-attribution\]:!text-\[8px\]/, "le crédit a retrouvé sa taille d'origine");
+  assert.doesNotMatch(src, /attributionControl \/>|<AttributionControl[^>]*hidden/, "le crédit a disparu");
+  // L'attente occupe la hauteur de la vraie carte : 180 px fixes faisaient sauter la liste.
+  const lazy = codeOf("src/components/segments/SegmentMapLazy.tsx");
+  assert.doesNotMatch(lazy, /h-\[180px\]/, "l'attente a de nouveau une hauteur fixe qui fait sauter la liste");
+  assert.match(lazy, /return <div style=\{\{ height \}\}><SegmentMap/, "l'attente n'a plus la hauteur de la carte");
+});
+
 test("le survol 3D s'atteint par la FLÈCHE, plus par un onglet", () => {
   const src = codeOf("src/components/segments/PerfTabs.tsx");
   assert.doesNotMatch(src, /dashboard\/survol/, "l'onglet Survol 3D est revenu : la flèche le rend inutile");
