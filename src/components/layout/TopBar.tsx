@@ -10,6 +10,7 @@ import { colorOf } from "@/lib/avatarColors";
 import { RX } from "@/components/races/racesI18n";
 import { timeAgo } from "@/lib/utils/time";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { CLE_NIVEAU, type NiveauCoureur } from "@/lib/running/niveau";
 import { deconnexion } from "@/lib/auth/deconnexion";
 import { formatDateCivile } from "@/lib/time/fuseau";
 import { fmtKm } from "@/lib/i18n/nombres";
@@ -19,18 +20,11 @@ type Notif = LigneNotification;
 type RaceHit = { name: string; city: string; distanceKm: number | null; date: string };
 type ParcoursHit = { id: number; nom: string; distance_km: number; localisation: { departement: string } };
 
-const LEVELS: Record<string, { elite: string; inter: string }> = {
-  fr: { elite: "Niveau Élite", inter: "Niveau Intermédiaire" },
-  en: { elite: "Elite level", inter: "Intermediate level" },
-  de: { elite: "Elite-Niveau", inter: "Mittleres Niveau" },
-  es: { elite: "Nivel Élite", inter: "Nivel intermedio" },
-  pt: { elite: "Nível Elite", inter: "Nível intermédio" },
-};
-
-export function TopBar({ profile, avatarColor, notifsMasquees: masqueesInitiales = [] }: { profile: Record<string, unknown> | null; avatarColor?: string; /** Clés des notifications écartées d'une croix (réglages, lues côté serveur). */ notifsMasquees?: string[] }) {
+export function TopBar({ profile, avatarColor, notifsMasquees: masqueesInitiales = [], niveau = null }: { profile: Record<string, unknown> | null; avatarColor?: string; /** Clés des notifications écartées d'une croix (réglages, lues côté serveur). */ notifsMasquees?: string[]; /** Niveau d'après la VMA effective (calculé côté serveur), `null` si elle est inconnue. */ niveau?: NiveauCoureur | null }) {
   const { t, lang } = useT();
-  const lv = LEVELS[lang] ?? LEVELS.fr;
-  const levelLabel = String(profile?.mode ?? "") === "elite" ? lv.elite : lv.inter;
+  // ⚠️ PLUS `profiles.mode` : figé à l'inscription, il affichait « Élite » ou « Intermédiaire »
+  // sans rien mesurer. Le niveau vient de la VMA effective (lib/running/niveau).
+  const levelLabel = t(CLE_NIVEAU[niveau ?? "inconnu"]);
   const router = useRouter();
   const name = String(profile?.full_name ?? "").trim();
   const initial = (name || "U")[0].toUpperCase();

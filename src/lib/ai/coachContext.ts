@@ -40,6 +40,7 @@ import { aujourdhui, FUSEAU_DEFAUT, formatDateCivile } from "@/lib/time/fuseau";
 import { apresCourse } from "@/lib/coach/apresCourse";
 import { objectifEnCours, estOfficielle } from "@/lib/coach/prochaineCourse";
 import { decaleJour } from "@/lib/streak/compute";
+import { niveauDeVma } from "@/lib/running/niveau";
 import { libellesActifs, type Douleur } from "@/lib/health/douleurs";
 import { qualiteRecente as qualiteDesSeptJours, type QualiteRecente, type Prescription } from "@/lib/coach/qualiteRecente";
 import { phaseDeSemaine, specifiqueEnTete } from "@/lib/coach/phase";
@@ -706,7 +707,10 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     && (curvePts[curvePts.length - 1].t - curvePts[0].t) >= 21 * 86400000;
 
 
-  const level = vma == null ? "à évaluer (VMA inconnue)" : vma < 13 ? "débutant" : vma < 16 ? "intermédiaire" : vma < 19 ? "confirmé" : "expert/élite";
+  // L'échelle unique (lib/running/niveau), nommée pour le prompt : plus de bornes recopiées.
+  const niveauMesure = niveauDeVma(vma);
+  const level = niveauMesure == null ? "à évaluer (VMA inconnue)"
+    : ({ debutant: "débutant", intermediaire: "intermédiaire", confirme: "confirmé", elite: "expert/élite" } as const)[niveauMesure];
 
   // Zones FC (Karvonen) si dispo
   // ── ZONES DE FRÉQUENCE CARDIAQUE ─────────────────────────────────────────────
@@ -933,7 +937,9 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   })();
 
   // Palette de séances adaptée au niveau + objectif (la lib est la base de connaissances).
-  const libLevel: Level = vma == null || vma < 13 ? "debutant" : vma < 16 ? "intermediaire" : vma < 19 ? "confirme" : "elite";
+  // La MÊME règle que l'étiquette affichée sous le nom (lib/running/niveau). VMA inconnue :
+  // le coach la traite en débutant, l'écran dit « à évaluer » — il ne l'invente pas.
+  const libLevel: Level = niveauDeVma(vma) ?? "debutant";
   const libGoal: Goal = !objective ? "general"
     : (/trail|utmb|ultra|vertical|\bkv\b|montagne/i.test(objective.race) || (objective.distanceKm ?? 0) > 45) ? ((objective.distanceKm ?? 0) > 60 ? "ultra" : "trail")
     : (objective.distanceKm ?? 99) <= 5 ? "5k" : (objective.distanceKm ?? 99) <= 10 ? "10k" : (objective.distanceKm ?? 99) <= 21.5 ? "semi" : "marathon";

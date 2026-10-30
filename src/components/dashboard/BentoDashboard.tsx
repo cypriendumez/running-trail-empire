@@ -39,6 +39,7 @@ import { TrialBanner } from "@/components/dashboard/TrialBanner";
 import type { EtatAcces } from "@/lib/billing/access";
 import type { StreakResult } from "@/lib/streak/compute";
 import { formatDateCivile } from "@/lib/time/fuseau";
+import { CLE_NIVEAU, niveauDeVma } from "@/lib/running/niveau";
 
 // Fonction de traduction (avec interpolation {clé}) passée aux helpers.
 type TFn = (k: string, params?: Record<string, string | number>) => string;
@@ -132,15 +133,6 @@ const NEXT_LABELS: Record<string, { next: string; details: string }> = {
 // Libellé FC pour la carte VFC (multilingue).
 const VITALS: Record<string, { hr: string }> = {
   fr: { hr: "Fréquence cardiaque" }, en: { hr: "Heart rate" }, de: { hr: "Herzfrequenz" }, es: { hr: "Frecuencia cardíaca" }, pt: { hr: "Frequência cardíaca" },
-};
-
-// Niveau du coureur (depuis profile.mode), multilingue.
-const LEVELS: Record<string, { elite: string; inter: string }> = {
-  fr: { elite: "Niveau Élite", inter: "Niveau Intermédiaire" },
-  en: { elite: "Elite level", inter: "Intermediate level" },
-  de: { elite: "Elite-Niveau", inter: "Mittleres Niveau" },
-  es: { elite: "Nivel Élite", inter: "Nivel intermedio" },
-  pt: { elite: "Nível Elite", inter: "Nível intermédio" },
 };
 
 // Libellés du rail de droite (multilingue).
@@ -482,8 +474,8 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
   const rl = RAIL_LABELS[lang] ?? RAIL_LABELS.fr;
   const fl = FORME_LABELS[lang] ?? FORME_LABELS.fr;
   const zl = ZONES_LABELS[lang] ?? ZONES_LABELS.fr;
-  const lvl = LEVELS[lang] ?? LEVELS.fr;
-  const levelLabel = String((profile as { mode?: string } | null)?.mode ?? "") === "elite" ? lvl.elite : lvl.inter;
+  // Le niveau d'après la VMA affichée juste à côté (lib/running/niveau), plus `profiles.mode`.
+  const levelLabel = t(CLE_NIVEAU[niveauDeVma(currentVma) ?? "inconnu"]);
   const leagueName = String((league as { leagues?: { name?: string } } | null)?.leagues?.name ?? "");
   const nx = NEXT_LABELS[lang] ?? NEXT_LABELS.fr;
   const vit = VITALS[lang] ?? VITALS.fr;

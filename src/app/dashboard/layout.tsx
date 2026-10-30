@@ -3,6 +3,8 @@ import { stripProfileSecrets } from "@/lib/profile/safe";
 import { T, normLang } from "@/lib/i18n/translations";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
+import { vmaAffichee } from "@/lib/dashboard/vmaAffichee";
+import { niveauDeVma } from "@/lib/running/niveau";
 import { MobileTabBar } from "@/components/layout/MobileTabBar";
 import { FileAttenteCourses } from "@/components/courses/FileAttenteCourses";
 import { MedicalDisclaimer } from "@/components/layout/MedicalDisclaimer";
@@ -37,14 +39,25 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // deux machines ne sont pas le même jour.
   const fuseau = decodeURIComponent((await cookies()).get("pacevo_tz")?.value ?? "");
 
-  const [{ data: profile }, { count: unreadMessages }, { data: settingsRow }] = await Promise.all([
+  const [{ data: profile }, { count: unreadMessages }, { data: settingsRow }, { data: seancesVma }, { data: testVma }] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase.from("notifications").select("id", { count: "exact", head: true })
       // La pastille compte AUSSI les messages d'athlètes : un message qu'on ne voit pas
       // arriver est un message auquel on ne répond pas.
       .eq("user_id", user.id).in("type", ["coach_message", "athlete_message"]).eq("read", false),
     supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "user_settings").maybeSingle(),
+    // Le NIVEAU affiché sous le nom se déduit de la VMA effective (lib/running/niveau) :
+    // les mêmes séances et le même calcul que la carte VMA du tableau de bord.
+    supabase.from("workouts").select("date,type,distance_km,duration_seconds,avg_hr,max_hr,weather_temp_c")
+      .eq("user_id", user.id).order("date", { ascending: false }).limit(40),
+    supabase.from("performance_baselines").select("vma_kmh,tested_at").eq("user_id", user.id)
+      .order("tested_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
+  const niveau = niveauDeVma(vmaAffichee({
+    seances: (seancesVma ?? []) as Parameters<typeof vmaAffichee>[0]["seances"],
+    baseline: testVma,
+    profil: profile as Parameters<typeof vmaAffichee>[0]["profil"],
+  }).vma);
   const avatarColor = String(((settingsRow?.data ?? {}) as Record<string, unknown>).avatarColor ?? "emerald");
   const brutMasquees = ((settingsRow?.data ?? {}) as Record<string, unknown>).notifsMasquees;
   const notifsMasquees = Array.isArray(brutMasquees) ? brutMasquees.filter((x): x is string => typeof x === "string") : [];
@@ -73,7 +86,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <FileAttenteCourses />
         <Sidebar profile={stripProfileSecrets(profile)} unreadMessages={unreadMessages ?? 0} estEditeur={estAdmin(user.email)} />
         <div className="flex-1 flex flex-col min-w-0">
-          <TopBar profile={stripProfileSecrets(profile)} avatarColor={avatarColor} notifsMasquees={notifsMasquees} />
+          <TopBar profile={stripProfileSecrets(profile)} avatarColor={avatarColor} notifsMasquees={notifsMasquees} niveau={niveau} />
           <main className="flex-1 overflow-auto p-3 md:p-6">
             {children}
             {/* ⚠️ EN FIN DE CONTENU, PLUS FIXÉ SOUS L'ÉCRAN (30/09/2026). Cyprien : « ce qu'il y
