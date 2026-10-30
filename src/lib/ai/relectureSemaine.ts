@@ -113,7 +113,10 @@ export function chiffresInconnus(conseil: string, source: string, seance?: strin
     // L'ordre des unités compte : « min » avant « m », « ms » avant « m ».
     ...(c.match(/\d+(?:\.\d+)?(?:km|ms|min|bpm|m|%|°c|°|h|s)(?![a-z])/g) ?? []),
   ];
-  return [...new Set([...alluresInconnues, ...jetons.filter((j) => !src.includes(j))])];
+  // ⚠️ UN NOMBRE ENTIER, PAS UN MORCEAU DE NOMBRE (30/10/2026). `src.includes("7%")` trouvait
+  // « 7 % » dans « 3,7 % » : un chiffre inventé passait dès qu'il terminait un vrai chiffre.
+  const present = (j: string) => new RegExp(`(^|[^0-9.])${j.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`).test(src);
+  return [...new Set([...alluresInconnues, ...jetons.filter((j) => !present(j))])];
 }
 
 /**

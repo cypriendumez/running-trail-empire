@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { exigeAcces } from "@/lib/billing/guard";
 import { generateContent } from "@/lib/ai/gemini";
 import {
-  contraintesDe, validerAjustement, empreintePlan, CONSIGNE_AJUSTEMENT,
+  contraintesDe, validerAjustement, empreintePlan, CONSIGNE_AJUSTEMENT, TYPE_PROPOSITION,
   type JourPlan, type Ajustement,
 } from "@/lib/ai/ajustement";
 
@@ -40,7 +40,7 @@ import {
  * ici, et non une ligne inventée pour remplir la carte.
  */
 
-const TYPE_CACHE = "ai_ajustement";
+const TYPE_CACHE = TYPE_PROPOSITION;
 
 export async function POST(req: Request) {
   const supabase = await createClient();

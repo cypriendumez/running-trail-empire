@@ -18,6 +18,7 @@ import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 import { estAdmin } from "@/lib/admin/acces";
 import { normLang } from "@/lib/i18n/base";
 import { relireSemaine } from "@/lib/ai/relectureServeur";
+import { appliquerAjustements, TYPE_AJUSTEMENTS, type AjustementApplique } from "@/lib/coach/ajustementApplique";
 import { appliquerConseils } from "@/lib/ai/relectureSemaine";
 
 type Admin = SupabaseClient;
@@ -152,8 +153,8 @@ export async function autoCoachForUser(
   const ctx = await buildAthleteContext(admin as unknown as Parameters<typeof buildAthleteContext>[0], userId, { objectifSeul }).catch(() => null);
   if (!ctx) return { processed: false, reason: "ctx_failed" };
 
-  const week = buildWeekPlan(ctx);
-  const today = week[0].date;
+  const semaineMoteur = buildWeekPlan(ctx);
+  const today = semaineMoteur[0].date;
 
   // ── LA SÉANCE DÉJÀ COURUE NE SE RÉÉCRIT PAS ─────────────────────────────────
   // L'effacement portait sur « date >= aujourd'hui ». Tant que le plan n'était
@@ -170,7 +171,29 @@ export async function autoCoachForUser(
   const { data: doneToday } = await admin.from("workouts")
     .select("id").eq("user_id", userId).eq("date", today).limit(1);
   const dayZeroFrozen = (doneToday?.length ?? 0) > 0;
-  const from = dayZeroFrozen ? week[1].date : today;
+  const from = dayZeroFrozen ? semaineMoteur[1].date : today;
+
+  // ── LES AJUSTEMENTS QUE L'ATHLÈTE A APPLIQUÉS (« Un avis sur ma semaine », Premium) ──
+  // Le plan vient d'être reconstruit de zéro : ce que l'athlète a accepté d'un geste est
+  // réappliqué ICI, à chaque passage, avec les garde-fous du moteur (voir
+  // lib/coach/ajustementApplique). Sans ça, la séance déplacée reviendrait à sa place dix
+  // minutes plus tard — et sur la montre avec elle.
+  const { data: ligneAjustements, error: eAjust } = await admin.from("notifications").select("id, data")
+    .eq("user_id", userId).eq("type", TYPE_AJUSTEMENTS).maybeSingle();
+  if (eAjust) console.error("[coach-auto] ajustements illisibles, plan publié sans eux :", eAjust.message);
+  const ajustementsEnregistres = ((ligneAjustements?.data ?? null) as { ajustements?: AjustementApplique[] } | null)?.ajustements ?? [];
+  const ajuste = appliquerAjustements(semaineMoteur, ajustementsEnregistres, {
+    from, qBudget: ctx.weekPlan.qBudget,
+    // Les jours où il court vraiment : déclarés, moins ceux qu'il rate systématiquement.
+    joursCourables: ctx.availability.days.filter((d) => !ctx.skippedWeekdays.includes(d)),
+    warm: ctx.warmCool.warm, cool: ctx.warmCool.cool,
+  });
+  for (const e of ajuste.ecartes) console.warn("[coach-auto] ajustement écarté :", e.ajustement.action, e.ajustement.date, "—", e.motif);
+  if (ligneAjustements?.id && ajuste.gardes.length !== ajustementsEnregistres.length) {
+    const { error: eElague } = await admin.from("notifications").update({ data: { ajustements: ajuste.gardes } }).eq("id", ligneAjustements.id);
+    if (eElague) console.error("[coach-auto] ajustements non élagués :", eElague.message);
+  }
+  const week = ajuste.week;
 
   // ── LE COACH AVANCÉ (Premium, et l'essai qui le montre) ─────────────────────
   // Le modèle relit les séances CLÉS et ajoute à leur « pourquoi » un conseil d'exécution

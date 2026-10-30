@@ -36,7 +36,8 @@ import { fill } from "@/lib/i18n/base";
 import { ProfileCompletionBanner } from "@/components/dashboard/ProfileCompletionBanner";
 import { StreakCard } from "@/components/dashboard/StreakCard";
 import { TrialBanner } from "@/components/dashboard/TrialBanner";
-import type { EtatAcces } from "@/lib/billing/access";
+import { peut, type EtatAcces } from "@/lib/billing/access";
+import { BilanSemaine } from "@/components/dashboard/BilanSemaine";
 import { jourLocal, decaleJour, type StreakResult } from "@/lib/streak/compute";
 import { formatDateCivile } from "@/lib/time/fuseau";
 import { CLE_NIVEAU, niveauDeVma } from "@/lib/running/niveau";
@@ -1437,6 +1438,9 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
           </div>
           <p className="mt-2.5 text-sm leading-relaxed text-zinc-600">{coachKey?.why || coachKey?.subtitle || readiness.tagline}</p>
         </div>
+
+        {/* Bilan de la semaine (Premium) : plusieurs séances lues ensemble. Starter voit la carte verrouillée. */}
+        <BilanSemaine ouvert={!!acces && peut(acces.etat, "bilan")} />
 
         {/* Badges — jalons de distance réels */}
         {records && (

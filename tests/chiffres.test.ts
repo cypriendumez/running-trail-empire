@@ -1125,7 +1125,7 @@ test("ce que la page des tarifs promet, le verrou l'accorde vraiment", () => {
   assert.ok(!peut("gratuit", "gpx"), "le gratuit ne doit pas avoir l'export GPX");
   assert.ok(peut("gratuit", "plan_objectif"), "le gratuit doit recevoir ses séances vers son objectif");
   assert.ok(peut("gratuit", "lecture"), "l'historique reste ouvert : on ne prend personne en otage");
-  for (const c of ["plan_ia", "analyse_longue", "journal"] as const) {
+  for (const c of ["plan_ia", "analyse_longue", "journal", "bilan"] as const) {
     assert.ok(!peut("gratuit", c), `« ${c} » est ouvert au palier gratuit`);
   }
 
@@ -1140,6 +1140,9 @@ test("ce que la page des tarifs promet, le verrou l'accorde vraiment", () => {
   assert.ok(!peut("starter", "plan_ia"), "le coach avancé est annoncé Premium mais ouvert à Starter");
   assert.ok(peut("premium", "plan_ia"), "le coach avancé est annoncé Premium mais fermé à Premium");
   assert.ok(peut("essai", "plan_ia"), "l'essai doit montrer le coach avancé, sinon il fait choisir par méconnaissance");
+  // Le BILAN DE LA SEMAINE (30/10/2026) : plusieurs séances lues ensemble, l'écart Premium qui agit.
+  assert.ok(!peut("starter", "bilan"), "le bilan de la semaine est annoncé Premium mais ouvert à Starter");
+  assert.ok(peut("premium", "bilan") && peut("essai", "bilan"), "le bilan de la semaine est fermé à Premium ou à l'essai");
 
   // Les cartes, dans les CINQ langues.
   const tarifs = sansCommentaires(readFileSync(join(ROOT, "src/components/landing/landingI18n.ts"), "utf8"));
@@ -1163,6 +1166,14 @@ test("ce que la page des tarifs promet, le verrou l'accorde vraiment", () => {
   assert.equal(avec("starter", AVIS), 0, "Starter annonce l'avis sur la semaine, que sa formule refuse");
   assert.match(sansCommentaires(readFileSync(join(ROOT, "src/app/api/ai/ajustement/route.ts"), "utf8")),
     /exigeAcces\(supabase, user\.id, "plan_ia"\)/, "l'avis sur la semaine n'est plus réservé à Premium");
+  // « Appliqué en un geste jusqu'à ta montre » : la route qui l'applique existe et est réservée à Premium.
+  assert.match(sansCommentaires(readFileSync(join(ROOT, "src/app/api/ai/ajustement/appliquer/route.ts"), "utf8")),
+    /exigeAcces\(supabase, user\.id, "plan_ia"\)/, "l'avis « appliqué en un geste » n'est plus réservé à Premium");
+  const BILAN = /Bilan de la semaine|Weekly review|Wochenbilanz|Balance de la semana|Balanço da semana/;
+  assert.equal(avec("premium", BILAN), 5, "le bilan de la semaine n'est pas annoncé dans Premium dans les 5 langues");
+  assert.equal(avec("starter", BILAN), 0, "Starter annonce le bilan de la semaine, que sa formule refuse");
+  assert.match(sansCommentaires(readFileSync(join(ROOT, "src/app/api/ai/bilan/route.ts"), "utf8")),
+    /exigeAcces\(supabase, user\.id, "bilan"\)/, "le bilan de la semaine n'est plus réservé à Premium");
 
   // ⚠️ AUCUN BADGE DE POPULARITÉ. « Le plus demandé » s'affichait sur Premium alors
   // qu'aucun abonnement n'avait été vendu : un fait inventé, comme les faux avis.

@@ -39,7 +39,8 @@ export type Capacite =
   | "plan"     // le plan ADAPTATIF : séances, sommeil, VFC, FC lus ; poussé sur la montre
   | "gpx"      // exporter une trace en GPX (Carte et parcours) — la carte elle-même est ouverte
   | "ia"       // faire parler un modèle (analyse, kiné, coach, assistant)
-  | "plan_ia"  // le coach avancé : le modèle relit le PLAN (séances clés, avis sur la semaine)
+  | "plan_ia"  // le coach avancé : le modèle relit le PLAN (séances clés, avis sur la semaine appliqué en un geste)
+  | "bilan"    // le bilan de la semaine : plusieurs séances lues ENSEMBLE (tendances, dérive, objectif)
   | "journal"  // l'analyse du Smart Journal — écran retiré le 30/09/2026, route sans appelant
   | "analyse_longue"; // l'analyse de séance en version développée
 
@@ -159,7 +160,7 @@ const DROITS: Record<Acces, Capacite[]> = {
   gratuit: ["lecture", "plan_objectif"],
   // L'essai montre le niveau Premium : juger le produit sur la formule basse ferait
   // choisir Starter par méconnaissance, ou renoncer.
-  essai: ["lecture", "plan_objectif", "plan", "ia", "gpx", "analyse_longue", "plan_ia", "journal"],
+  essai: ["lecture", "plan_objectif", "plan", "ia", "gpx", "analyse_longue", "plan_ia", "journal", "bilan"],
   // ⚠️ L'ANALYSE DÉVELOPPÉE ET LE GPX DANS LES DEUX FORMULES PAYANTES (Cyprien, 22/10) :
   // « pour les deux abonnements, il faut que le coach IA soit très puissant en analyse de
   // séance », et l'export GPX vers la montre « dans les abonnements payants ». Le kiné IA
@@ -168,7 +169,12 @@ const DROITS: Record<Acces, Capacite[]> = {
   // séances clés chaque jour, et « Un avis sur ma semaine » à la demande (route
   // `ai/ajustement`, réservée le 23/10/2026 pour que Premium ait une exclusivité RÉELLE).
   starter: ["lecture", "plan_objectif", "plan", "ia", "gpx", "analyse_longue"],
-  premium: ["lecture", "plan_objectif", "plan", "ia", "gpx", "analyse_longue", "plan_ia", "journal"],
+  // ⚠️ L'ÉCART DU 30/10/2026 (Cyprien : « y a-t-il réellement une différence d'analyse ? »).
+  // Vérifié : non — l'analyse d'UNE séance et le moteur du plan sont identiques dans les deux
+  // formules. Premium gagne deux fonctions qui agissent : l'avis sur la semaine s'APPLIQUE en
+  // un geste (séance modifiée jusqu'à la montre, `ai/ajustement/appliquer`), et le BILAN de la
+  // semaine lit plusieurs séances ensemble (`ai/bilan`, capacité `bilan`).
+  premium: ["lecture", "plan_objectif", "plan", "ia", "gpx", "analyse_longue", "plan_ia", "journal", "bilan"],
 };
 
 /**

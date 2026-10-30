@@ -3508,7 +3508,8 @@ test("la séance DÉJÀ COURUE aujourd'hui n'est pas réécrite", () => {
   // fournir. L'effacement ET l'insertion ET la poussée montre doivent partir de la
   // MÊME date, sans quoi le calendrier et la montre divergent.
   const src = codeOf("src/lib/ai/autoCoach.ts");
-  assert.ok(/const from = dayZeroFrozen \? week\[1\]\.date : today/.test(src), "le gel du jour 0 a disparu");
+  // `semaineMoteur` (30/10/2026) : la semaine du moteur AVANT les ajustements appliqués par l'athlète.
+  assert.ok(/const from = dayZeroFrozen \? (week|semaineMoteur)\[1\]\.date : today/.test(src), "le gel du jour 0 a disparu");
   assert.ok(/\.gte\("data->>date", from\)/.test(src), "l'effacement ne part pas de la date gelée");
   // `semaineCoach` : la même semaine, enrichie des conseils du coach avancé (Premium).
   assert.ok(/(week|semaineCoach)\.filter\(\(d: PlanDay\) => d\.date >= from\)/.test(src), "l'insertion ne part pas de la date gelée");
@@ -4386,13 +4387,14 @@ test("l'IA propose, mais ne peut pas rouvrir l'intensité que le plan a fermée"
   const ferme = contraintesDe(week, 0, ["ratio aigu:chronique à 1,4"]);
   const long = "Ton seuil tombe deux jours après ta course : le décaler au samedi te laisse un jour de récupération de plus.";
 
-  // Budget ouvert : déplacer une séance est un conseil légitime.
-  const a = validerAjustement({ date: "2026-08-23", action: "decaler", texte: long }, ouvert);
+  // Budget ouvert : déplacer une séance est un conseil légitime — vers un jour de repos, que la
+  // proposition doit nommer (« vers ») depuis qu'elle s'applique en un geste (30/10/2026).
+  const a = validerAjustement({ date: "2026-08-23", action: "decaler", vers: "2026-08-24", texte: long }, ouvert);
   assert.ok(a.ok && a.ajustement.action === "decaler");
 
   // ⚠️ LE CŒUR. Budget à ZÉRO — fatigue réelle — déplacer une séance de qualité, c'est
   // la reposer ailleurs dans la semaine. Seul l'allègement reste recevable.
-  const refus = validerAjustement({ date: "2026-08-23", action: "decaler", texte: long }, ferme);
+  const refus = validerAjustement({ date: "2026-08-23", action: "decaler", vers: "2026-08-24", texte: long }, ferme);
   assert.ok(!refus.ok, "un déplacement sur budget nul doit être REFUSÉ");
   const allege = validerAjustement({ date: "2026-08-23", action: "alleger", texte: long }, ferme);
   assert.ok(allege.ok, "alléger reste possible quand le budget est nul");
