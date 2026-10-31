@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { exigeAcces } from "@/lib/billing/guard";
-import { COLONNES_ACCES, profilPeut } from "@/lib/billing/access";
+import { COLONNES_ACCES, profilPeut, lectureDuCoach } from "@/lib/billing/access";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildAthleteContext, COACH_SYSTEM } from "@/lib/ai/coachContext";
 import { COLONNES_VFC, serieVfc } from "@/lib/health/vfc";
@@ -83,7 +83,10 @@ export async function POST() {
   }
 
   // ── 2. Rien de mémorisé d'utilisable : on paie l'appel ────────────────────────
-  const ctx = await buildAthleteContext(supabase, user.id);
+  // La MÊME lecture que le plan (`lectureDuCoach`) : Starter ne lit ni la VFC, ni la dérive
+  // cardiaque, ni la foulée — une séance du jour tirée de signaux que son plan ignore le
+  // contredirait.
+  const ctx = await buildAthleteContext(supabase, user.id, lectureDuCoach(acces));
   const jour = new Date().toLocaleDateString("fr-FR", { weekday: "long" });
 
   const prompt = `${COACH_SYSTEM}
@@ -98,7 +101,7 @@ MISSION : recommande LA séance-clé à faire AUJOURD'HUI (${jour}), parfaitemen
 - Dose le volume sur le volume hebdomadaire réel et reste prudent si une douleur est signalée.
 
 Réponds UNIQUEMENT par un objet JSON valide (aucun texte autour) :
-{"title":"nom court de la séance","subtitle":"description concrète : structure, allure/zone, durée/distance","tags":["2 à 3 tags très courts ex Z2, 10 km, VMA, Allure marathon"],"why":"1 phrase de justification personnalisée citant une donnée clé (VFC, sommeil, charge ou objectif)"}`;
+{"title":"nom court de la séance","subtitle":"description concrète : structure, allure/zone, durée/distance","tags":["2 à 3 tags très courts ex Z2, 10 km, VMA, Allure marathon"],"why":"1 phrase de justification personnalisée citant une donnée clé FOURNIE ci-dessus (sommeil, charge, objectif, ou VFC si elle y figure) — jamais une donnée absente"}`;
 
   try {
     // Passe par la chaîne de repli commune : la route appelait `gemini-2.5-flash` en dur,
@@ -113,7 +116,7 @@ Réponds UNIQUEMENT par un objet JSON valide (aucun texte autour) :
         // recevaient exactement la même analyse. C'est ici que la promesse devient vraie.
         // La longueur du texte est le seul levier honnête — on ne dégrade pas la
         // PERTINENCE d'une analyse selon ce qu'on paie, on en donne plus ou moins.
-        maxOutputTokens: profilPeut(acces, "analyse_longue") ? 600 : 380,
+        maxOutputTokens: profilPeut(acces, "analyse_complete") ? 600 : 380,
         responseMimeType: "application/json",
         thinkingConfig: { thinkingBudget: 0 },
       },

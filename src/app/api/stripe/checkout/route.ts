@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
-import { stripe, priceIdDe, estFormule, estPeriode, stripeConfigured } from "@/lib/stripe/client";
+import { stripe, priceIdDe, estFormule, estPeriode, stripeConfigured, TARIFS } from "@/lib/stripe/client";
 import { createClient } from "@/lib/supabase/server";
 import { joursEssaiStripe } from "@/lib/billing/access";
 import { mediateurConso } from "@/lib/brand/mediateur";
@@ -28,6 +28,19 @@ export async function POST(req: Request) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    // ⚠️ LE PRIX DÉBITÉ DOIT ÊTRE LE PRIX AFFICHÉ. L'identifiant du tarif vit dans une
+    // variable d'environnement, et un prix Stripe ne se modifie pas : un tarif créé à
+    // l'ancien montant (Premium annuel à 149,90 € avant le 30/10/2026) ferait débiter autre
+    // chose que ce que la page annonce — un litige, pas un défaut d'affichage. On relit le
+    // montant chez Stripe AVANT de créer quoi que ce soit, client compris.
+    const idPrix = priceIdDe(formule, periode);
+    const prixStripe = idPrix ? await stripe.prices.retrieve(idPrix) : null;
+    const attendu = TARIFS[formule][periode].centimes;
+    if (!prixStripe || prixStripe.unit_amount !== attendu || prixStripe.currency !== "eur") {
+      console.error(`[stripe] paiement refusé : ${formule}/${periode} vaut ${prixStripe?.unit_amount ?? "?"} ${prixStripe?.currency ?? "(aucun tarif)"} chez Stripe, ${attendu} eur affichés`);
+      return NextResponse.json({ error: "Le paiement n'est pas encore ouvert. Reviens très bientôt." }, { status: 503 });
+    }
 
     // `created_at` et `subscription_tier` servent à calculer les jours d'essai RESTANTS :
     // sans eux, on ne peut pas distinguer un athlète qui vient de s'inscrire d'un autre

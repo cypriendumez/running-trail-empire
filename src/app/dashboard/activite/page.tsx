@@ -251,6 +251,7 @@ export default async function ActivitePage({ searchParams }: { searchParams: Pro
               titre: T[langue]["an.titre"], demander: T[langue]["an.demander"], encours: T[langue]["an.encours"],
               verrou: T[langue]["an.verrou"], offre: T[langue]["an.offre"], echec: T[langue]["an.echec"],
               memorise: T[langue]["an.memorise"], tronquee: T[langue]["an.tronquee"],
+              essentielle: T[langue]["an.essentielle"], essentielleCta: T[langue]["an.essentielleCta"],
             }} />
           )}
           {courbes.map((c) => <MetricChart key={c.titre} {...c} />)}

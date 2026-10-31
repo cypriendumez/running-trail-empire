@@ -35,7 +35,7 @@ import { T as T_UI } from "../src/lib/i18n/translations";
 import { LANDING as LANDING_T } from "../src/components/landing/landingI18n";
 import { accesDe, peut, motifRefus, JOURS_ESSAI } from "../src/lib/billing/access";
 import { TARIFS, FORMULES, accesDuPrice } from "../src/lib/stripe/client";
-import { PRIX_AFFICHES, REMISE_ANNUELLE_PCT, MOIS_FACTURES_PAR_AN, MOIS_OFFERTS, economieAnnuelle } from "../src/lib/billing/prix";
+import { PRIX_AFFICHES, moisOfferts, MOIS_OFFERTS_MAX, economieAnnuelle, parMois } from "../src/lib/billing/prix";
 import { jetonDesinscription, jetonValide } from "../src/lib/newsletter/token";
 import { emailConfirmation } from "../src/lib/newsletter/confirmation";
 import { emailNouvelInscrit } from "../src/lib/notify/nouvelInscrit";
@@ -4915,9 +4915,19 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
         `${formule} : ${PLAFOND_JOUR[etat]} appels/j coûtent ${pireCas.toFixed(2)} €/mois au pire, `
         + `soit ${(part * 100).toFixed(0)} % des ${net(ttc).toFixed(2)} € nets — au-delà de ${PART_MAX * 100} %, la marge ne tient plus`);
     }
+    // À L'ANNÉE (Premium à 119,90 € depuis le 30/10/2026) : la commission fixe ne se paie
+    // qu'une fois par an. Au pire, l'IA ne doit pas manger plus de 40 % du net annuel.
+    for (const [formule, etat] of [["starter", "starter"], ["premium", "premium"]] as const) {
+      const ht = TARIFS[formule].an.centimes / 100 / 1.2;
+      const netMois = (ht - (ht * 0.029 + 0.25)) / 12;
+      const part = (PLAFOND_JOUR[etat] * 30 * COUT_APPEL) / netMois;
+      assert.ok(part <= 0.4, `${formule} annuel : au pire ${(part * 100).toFixed(0)} % du net, la remise annuelle mange la marge`);
+    }
     assert.equal(PLAFOND_JOUR.gratuit, 0, "le palier gratuit ne doit consommer aucun jeton");
     assert.ok(PLAFOND_JOUR.essai > 0, "sans crédits pendant l'essai, personne ne peut juger ce qu'il achète");
-    assert.equal(PLAFOND_JOUR.essai, PLAFOND_JOUR.premium, "l'essai doit montrer le niveau Premium");
+    // Décision du 30/10/2026 (Cyprien) : l'essai garde les FONCTIONS Premium, mais le VOLUME
+    // d'IA de Starter — de quoi juger en sept jours sans payer trente appels par jour.
+    assert.equal(PLAFOND_JOUR.essai, PLAFOND_JOUR.starter, "l'essai doit avoir le volume d'IA de Starter");
   });
 
   test("la vitrine ne promet pas au gratuit ce que le code lui refuse", () => {
@@ -5400,22 +5410,34 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
       assert.ok(!/const PRIX(_AFFICHES)? *[:=]/.test(src),
         `${f} : redéclare des prix en local au lieu d'importer la source`);
     }
-    // La remise annoncée doit être celle qu'on applique vraiment. On affiche « 2 mois
-    // offerts » — exact — et JAMAIS un pourcentage : 1 − 10/12 vaut 16,67 %, qu'un
-    // arrondi à « −17 % » surestimerait sur une promesse commerciale.
-    assert.equal(MOIS_FACTURES_PAR_AN, 10, "la remise annuelle n'est plus de deux mois offerts");
-    assert.equal(MOIS_OFFERTS, 2);
+    // La remise annoncée doit être celle qu'on applique vraiment : des MOIS offerts, comptés
+    // vers le bas sur les prix réels — jamais un pourcentage, qu'un arrondi surestimerait.
     for (const f of FORMULES) {
-      assert.equal(economieAnnuelle(f), TARIFS[f].mois.centimes * 2,
-        `${f} : l'économie annoncée ne vaut pas deux mensualités`);
+      assert.ok(economieAnnuelle(f) >= moisOfferts(f) * TARIFS[f].mois.centimes,
+        `${f} : « ${moisOfferts(f)} mois offerts » annoncés pour une économie plus petite`);
+      assert.ok(economieAnnuelle(f) < (moisOfferts(f) + 1) * TARIFS[f].mois.centimes, `${f} : des mois offerts oubliés dans l'annonce`);
     }
-    assert.ok(REMISE_ANNUELLE_PCT < 17, "on ne doit jamais afficher une remise arrondie vers le HAUT");
-    // La remise annuelle doit valoir DEUX MOIS OFFERTS, ni plus ni moins : l'ancien
-    // « −33 % » (80 € contre 120 €) bradait l'abonnement sans raison.
-    for (const f of FORMULES) {
-      assert.equal(TARIFS[f].an.centimes, TARIFS[f].mois.centimes * 10,
-        `${f} : la remise annuelle ne vaut pas deux mois offerts`);
+    // LES DEUX REMISES DÉCIDÉES (30/10/2026) : deux mois sur Starter, quatre sur Premium —
+    // Premium à l'année revient au prix de Starter au mois, et sous l'annuel de Runna.
+    assert.equal(moisOfferts("starter"), 2, "Starter annuel n'offre plus deux mois");
+    assert.equal(moisOfferts("premium"), 4, "Premium annuel n'offre plus quatre mois");
+    assert.equal(MOIS_OFFERTS_MAX, 4, "le sélecteur « jusqu'à N mois offerts » ne suit plus les prix");
+    assert.ok(parMois("premium", "an") <= PRIX_AFFICHES.starter.mois, "Premium à l'année coûte plus par mois que Starter au mois");
+    assert.ok(TARIFS.premium.an.centimes > TARIFS.starter.an.centimes, "Premium annuel doit rester plus cher que Starter annuel");
+    // Aucune vitrine n'écrit le nombre de mois en dur : il vient des prix.
+    for (const l of ALL_LANGS) {
+      const p = LANDING_T[l].pricing;
+      assert.ok(p.economie.includes("{n}") && p.moisOfferts.includes("{n}"), `${l} : le nombre de mois offerts est écrit en dur`);
     }
+    for (const f of ["src/app/page.tsx", "src/app/pricing/page.tsx"]) {
+      assert.match(codeOf(f), /economie\.replace\("\{n\}", String\(MOIS_OFFERTS_MAX\)\)/, `${f} : le sélecteur n'affiche plus les mois calculés`);
+      assert.match(codeOf(f), /moisOfferts\.replace\("\{n\}", String\(moisOfferts\(plan\.cle/, `${f} : la carte n'affiche plus ses mois offerts`);
+    }
+    // LE PRIX DÉBITÉ EST RELU CHEZ STRIPE : un tarif créé à l'ancien montant ne passe pas.
+    const checkout = codeOf("src/app/api/stripe/checkout/route.ts");
+    assert.match(checkout, /prixStripe\.unit_amount !== attendu/, "le paiement ne vérifie plus le montant chez Stripe");
+    assert.ok(checkout.indexOf("prixStripe.unit_amount !== attendu") < checkout.indexOf("stripe.customers.create"),
+      "le montant est vérifié APRÈS la création du client : un refus laisserait un client orphelin");
     // Et l'écart entre les deux formules doit rester positif — Premium contient Starter.
     assert.ok(TARIFS.premium.mois.centimes > TARIFS.starter.mois.centimes,
       "Premium doit coûter plus cher que Starter");
@@ -5682,11 +5704,8 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     // meilleure, il la rend plus chère — et `coach` est le cas d'école : son propre
     // prompt demande « max 4 phrases ».
     const PLAFONDS: Record<string, number> = {
-      coach: 600, session: 600, "journal-analyze": 500, support: 1200, cours: 1400,
+      coach: 600, session: 600, support: 1200, cours: 1400,
       physio: 1600,
-      // Le plan complet rend un JSON de plusieurs semaines : c'est la seule route qui
-      // justifie un budget large, et elle n'est appelée qu'à la demande.
-      "training-plan": 8192,
       // L'ajustement rend DEUX PHRASES et un champ d'action. Le budget couvre le
       // raisonnement interne de Gemini 2.5, pas un essai : c'est la route la plus
       // susceptible d'être appelée souvent — chaque ouverture du plan — donc celle où

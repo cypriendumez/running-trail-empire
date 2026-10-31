@@ -54,7 +54,12 @@ export type LandingDict = {
   // sélecteur, et l'essai annoncé au-dessus plutôt que déguisé en offre.
   pricing: {
     eyebrow: string; title: string; subtitle: string;
-    mois: string; an: string; economie: string; parMois: string; essai: string;
+    mois: string; an: string; parMois: string; essai: string;
+    /** « jusqu'à {n} mois offerts » (sélecteur) et « {n} mois offerts » (carte) : les mois
+     *  viennent de `lib/billing/prix`, calculés sur les prix réels, jamais écrits en dur. */
+    economie: string; moisOfferts: string;
+    /** Le tarif étudiant : « {pct} » vient de `REMISE_ETUDIANTE_PCT`. */
+    etudiant: string; etudiantCta: string; etudiantSujet: string;
     /** Libellé du bouton d'une formule payante, ADAPTÉ aux jours réellement accordés.
      *  `ctaEssai` quand il reste des jours, `ctaAbo` quand l'essai est terminé : un
      *  « Essayer 7 jours » figé mentirait dès le lendemain de l'inscription. */
@@ -119,17 +124,19 @@ const fr: LandingDict = {
   pricing: {
     eyebrow: "Tarifs", title: "Ton plan est gratuit. Le coach qui l'adapte s'abonne.",
     subtitle: "Fixe ton objectif — une course, un chrono, une distance — et reçois tes séances sans payer. Le coach qui lit tes séances, ton sommeil et ta physiologie pour adapter chaque jour, lui, est dans les formules.",
-    mois: "Mensuel", an: "Annuel", economie: "2 mois offerts", parMois: "/mois",
+    mois: "Mensuel", an: "Annuel", economie: "jusqu'à {n} mois offerts", moisOfferts: "{n} mois offerts",
+    etudiant: "Étudiant ? −{pct} % sur Starter et Premium. Écris-nous depuis ton adresse e-mail étudiante, ou avec ton certificat de scolarité : tu reçois un code à saisir au moment du paiement.",
+    etudiantCta: "Demander mon code étudiant", etudiantSujet: "Tarif étudiant Pacevo", parMois: "/mois",
     essai: "{n} jours d'essai du coach IA, sans engagement",
     ctaEssai: "Essayer {n} jours", ctaAbo: "S'abonner",
     gratuitNote: "Aucune carte bancaire pour le palier gratuit.",
     plans: [
-      { cle: "gratuit", name: "Gratuit", pitch: "Tes séances vers ton objectif, sans analyse de tes données.", cta: "Créer mon compte",
+      { cle: "gratuit", name: "Gratuit", pitch: "Tes séances vers ton objectif, à l'écoute de ton ressenti, sans analyse de tes données.", cta: "Créer mon compte",
         features: ["Séances vers ton objectif : course, chrono ou distance", "Plans d'entraînement tout construits", "Carte et accès à tous les parcours", "Ghost Runner : ton allure annoncée à l'oreille", "Comparateur de chaussures", "Sync montre, historique, 10 000 courses à venir", "Série, ligues et trophées"] },
-      { cle: "starter", name: "Starter", pitch: "Le coach qui lit tout et adapte ton plan après chaque sortie.", cta: "Essayer 7 jours",
-        features: ["Tout le gratuit", "Plan adapté à tes séances, ton sommeil, ta VFC et ta FC", "Analyse IA complète de chaque séance", "Séances poussées sur la montre", "Kiné IA, avec photo", "Export GPX de tes tracés et des parcours", "10 échanges avec l'IA par jour"] },
-      { cle: "premium", name: "Premium", pitch: "Le coach IA au maximum, pour préparer une grande échéance.", badge: "Le plus complet", cta: "Essayer 7 jours",
-        features: ["Tout le Starter", "30 échanges avec l'IA par jour", "Coach IA avancé : séances clés relues par l'IA", "L'avis du coach IA sur ta semaine, appliqué en un geste jusqu'à ta montre", "Bilan de la semaine : tes séances lues ensemble (tendances, dérive cardiaque, objectif)"] },
+      { cle: "starter", name: "Starter", pitch: "Le coach qui lit tes séances et adapte ton plan après chaque sortie.", cta: "Essayer 7 jours",
+        features: ["Tout le gratuit", "Plan adapté à tes séances, ton sommeil, ta FC et ta charge", "Analyse IA de chaque séance : l'essentiel (intensité réelle, écart au prévu)", "Séances poussées sur la montre", "Kiné IA, avec photo", "Export GPX de tes tracés et des parcours", "10 échanges avec l'IA par jour"] },
+      { cle: "premium", name: "Premium", pitch: "Le coach qui lit tout, de ta VFC à ta foulée, jusqu'au jour J.", badge: "Le plus complet", cta: "Essayer 7 jours",
+        features: ["Tout le Starter", "Le coach lit aussi ta VFC, ta dérive cardiaque et ta foulée pour ajuster ton plan", "Analyse complète de chaque séance : zones, foulée, puissance, dérive cardiaque, rang parmi tes séances", "L'avis du coach IA sur ta semaine, appliqué en un geste jusqu'à ta montre", "Bilan de la semaine chaque lundi, aussi par e-mail : tes séances lues ensemble (tendances, dérive cardiaque, objectif)", "Pack jour J : ton chrono réaliste, ton tableau de marche, tes allures selon la météo, ton ravitaillement", "Coach IA avancé : séances clés relues, 30 échanges avec l'IA par jour"] },
     ],
     apres: "À la fin de l'essai, rien n'est effacé : ton compte passe au palier gratuit. Tes activités continuent d'être synchronisées et ton plan continue, bâti sur ton objectif. Ce qui s'arrête : l'adaptation à tes données, l'analyse de tes séances, l'envoi sur la montre et les échanges avec l'IA.",
   },
@@ -182,17 +189,19 @@ const en: LandingDict = {
   pricing: {
     eyebrow: "Pricing", title: "Your plan is free. The coach that adapts it is a subscription.",
     subtitle: "Set your goal — a race, a finish time, a distance — and get your sessions without paying. The coach that reads your sessions, your sleep and your physiology to adapt every day lives in the paid tiers.",
-    mois: "Monthly", an: "Yearly", economie: "2 months free", parMois: "/month",
+    mois: "Monthly", an: "Yearly", economie: "up to {n} months free", moisOfferts: "{n} months free",
+    etudiant: "Student? {pct}% off Starter and Premium. Email us from your student address, or with your enrolment certificate: you'll get a code to enter at checkout.",
+    etudiantCta: "Request my student code", etudiantSujet: "Pacevo student discount", parMois: "/month",
     essai: "{n}-day trial of the AI coach, cancel anytime",
     ctaEssai: "Try {n} days", ctaAbo: "Subscribe",
     gratuitNote: "No card needed for the free tier.",
     plans: [
-      { cle: "gratuit", name: "Free", pitch: "Your sessions toward your goal, with no analysis of your data.", cta: "Create my account",
+      { cle: "gratuit", name: "Free", pitch: "Your sessions toward your goal, tuned to how you feel, with no analysis of your data.", cta: "Create my account",
         features: ["Sessions toward your goal: race, time or distance", "Ready-made training plans", "Map and access to every route", "Ghost Runner: your pace called out in your ear", "Shoe comparison", "Watch sync, history, 10,000 upcoming races", "Streak, leagues and trophies"] },
-      { cle: "starter", name: "Starter", pitch: "The coach that reads everything and adapts your plan after every run.", cta: "Try 7 days",
-        features: ["Everything in Free", "Plan adapted to your sessions, sleep, HRV and heart rate", "Full AI analysis of every session", "Sessions pushed to your watch", "AI physio, with photo", "GPX export of your routes and of the trails", "10 AI exchanges per day"] },
-      { cle: "premium", name: "Premium", pitch: "The AI coach at full power, to prepare a big goal.", badge: "Most complete", cta: "Try 7 days",
-        features: ["Everything in Starter", "30 AI exchanges per day", "Advanced AI coach: key sessions reviewed by AI", "The AI coach's view on your week, applied in one tap, right to your watch", "Weekly review: your sessions read together (trends, cardiac drift, goal)"] },
+      { cle: "starter", name: "Starter", pitch: "The coach that reads your sessions and adapts your plan after every run.", cta: "Try 7 days",
+        features: ["Everything in Free", "Plan adapted to your sessions, sleep, heart rate and load", "AI analysis of every session: the essentials (real intensity, versus the plan)", "Sessions pushed to your watch", "AI physio, with photo", "GPX export of your routes and of the trails", "10 AI exchanges per day"] },
+      { cle: "premium", name: "Premium", pitch: "The coach that reads everything, from your HRV to your stride, right up to race day.", badge: "Most complete", cta: "Try 7 days",
+        features: ["Everything in Starter", "The coach also reads your HRV, cardiac drift and stride to adjust your plan", "Full analysis of every session: zones, stride, power, cardiac drift, rank among your sessions", "The AI coach's view on your week, applied in one tap, right to your watch", "Weekly review every Monday, also by email: your sessions read together (trends, cardiac drift, goal)", "Race-day pack: your realistic time, pacing chart, paces by weather and fuelling", "Advanced AI coach: key sessions reviewed, 30 AI exchanges per day"] },
     ],
     apres: "When the trial ends nothing is deleted: your account moves to the free tier. Your activities keep syncing and your plan carries on, built on your goal. What stops: adapting to your data, analysing your sessions, sending to your watch and the AI exchanges.",
   },
@@ -245,17 +254,19 @@ const de: LandingDict = {
   pricing: {
     eyebrow: "Preise", title: "Dein Plan ist gratis. Der Coach, der ihn anpasst, ist ein Abo.",
     subtitle: "Leg dein Ziel fest — ein Rennen, eine Zielzeit, eine Distanz — und erhalte deine Einheiten, ohne zu zahlen. Der Coach, der deine Einheiten, deinen Schlaf und deine Physiologie liest, um jeden Tag anzupassen, steckt in den Abos.",
-    mois: "Monatlich", an: "Jährlich", economie: "2 Monate geschenkt", parMois: "/Monat",
+    mois: "Monatlich", an: "Jährlich", economie: "bis zu {n} Monate geschenkt", moisOfferts: "{n} Monate geschenkt",
+    etudiant: "Student? {pct} % Rabatt auf Starter und Premium. Schreib uns von deiner Hochschul-E-Mail-Adresse oder mit deiner Immatrikulationsbescheinigung: Du erhältst einen Code für den Bezahlvorgang.",
+    etudiantCta: "Studentencode anfordern", etudiantSujet: "Pacevo Studentenrabatt", parMois: "/Monat",
     essai: "{n} Tage KI-Coach testen, jederzeit kündbar",
     ctaEssai: "{n} Tage testen", ctaAbo: "Abonnieren",
     gratuitNote: "Keine Karte nötig für die Gratis-Stufe.",
     plans: [
-      { cle: "gratuit", name: "Gratis", pitch: "Deine Einheiten zu deinem Ziel, ohne Analyse deiner Daten.", cta: "Konto erstellen",
+      { cle: "gratuit", name: "Gratis", pitch: "Deine Einheiten zu deinem Ziel, nach deinem Empfinden, ohne Analyse deiner Daten.", cta: "Konto erstellen",
         features: ["Einheiten zu deinem Ziel: Rennen, Zeit oder Distanz", "Fertige Trainingspläne", "Karte und Zugang zu allen Strecken", "Ghost Runner: dein Tempo im Ohr", "Schuhvergleich", "Uhr-Sync, Verlauf, 10 000 kommende Rennen", "Serie, Ligen und Trophäen"] },
-      { cle: "starter", name: "Starter", pitch: "Der Coach, der alles liest und deinen Plan nach jedem Lauf anpasst.", cta: "7 Tage testen",
-        features: ["Alles aus Gratis", "Plan angepasst an Einheiten, Schlaf, HRV und Puls", "Vollständige KI-Analyse jeder Einheit", "Einheiten direkt auf die Uhr", "KI-Physio, mit Foto", "GPX-Export deiner Runden und der Strecken", "10 KI-Dialoge pro Tag"] },
-      { cle: "premium", name: "Premium", pitch: "Der KI-Coach mit voller Leistung, für ein großes Ziel.", badge: "Das Komplettpaket", cta: "7 Tage testen",
-        features: ["Alles aus Starter", "30 KI-Dialoge pro Tag", "Erweiterter KI-Coach: Schlüsseleinheiten von der KI geprüft", "Die Einschätzung des KI-Coachs zu deiner Woche, mit einem Tipp übernommen, bis auf deine Uhr", "Wochenbilanz: deine Einheiten zusammen gelesen (Trends, kardiale Drift, Ziel)"] },
+      { cle: "starter", name: "Starter", pitch: "Der Coach, der deine Einheiten liest und deinen Plan nach jedem Lauf anpasst.", cta: "7 Tage testen",
+        features: ["Alles aus Gratis", "Plan angepasst an Einheiten, Schlaf, Puls und Belastung", "KI-Analyse jeder Einheit: das Wesentliche (echte Intensität, Abweichung vom Plan)", "Einheiten direkt auf die Uhr", "KI-Physio, mit Foto", "GPX-Export deiner Runden und der Strecken", "10 KI-Dialoge pro Tag"] },
+      { cle: "premium", name: "Premium", pitch: "Der Coach, der alles liest, von deiner HRV bis zu deinem Laufstil, bis zum Wettkampftag.", badge: "Das Komplettpaket", cta: "7 Tage testen",
+        features: ["Alles aus Starter", "Der Coach liest auch deine HRV, kardiale Drift und Laufdynamik, um deinen Plan anzupassen", "Vollständige Analyse jeder Einheit: Zonen, Laufdynamik, Leistung, kardiale Drift, Rang unter deinen Einheiten", "Die Einschätzung des KI-Coachs zu deiner Woche, mit einem Tipp übernommen, bis auf deine Uhr", "Wochenbilanz jeden Montag, auch per E-Mail: deine Einheiten zusammen gelesen (Trends, kardiale Drift, Ziel)", "Wettkampf-Paket: realistische Zielzeit, Zwischenzeiten, Tempo je nach Wetter und Verpflegung", "Erweiterter KI-Coach: Schlüsseleinheiten geprüft, 30 KI-Dialoge pro Tag"] },
     ],
     apres: "Am Ende des Tests wird nichts gelöscht: dein Konto wechselt auf die Gratis-Stufe. Deine Aktivitäten werden weiter synchronisiert und dein Plan läuft weiter, gebaut auf dein Ziel. Es enden: die Anpassung an deine Daten, die Analyse deiner Einheiten, das Senden auf die Uhr und die KI-Dialoge.",
   },
@@ -308,17 +319,19 @@ const es: LandingDict = {
   pricing: {
     eyebrow: "Precios", title: "Tu plan es gratis. El entrenador que lo adapta se suscribe.",
     subtitle: "Fija tu objetivo — una carrera, un tiempo, una distancia — y recibe tus sesiones sin pagar. El entrenador que lee tus sesiones, tu sueño y tu fisiología para adaptar cada día está en las fórmulas.",
-    mois: "Mensual", an: "Anual", economie: "2 meses gratis", parMois: "/mes",
+    mois: "Mensual", an: "Anual", economie: "hasta {n} meses gratis", moisOfferts: "{n} meses gratis",
+    etudiant: "¿Estudiante? −{pct} % en Starter y Premium. Escríbenos desde tu correo de estudiante o con tu certificado de matrícula: recibirás un código para introducir al pagar.",
+    etudiantCta: "Pedir mi código de estudiante", etudiantSujet: "Descuento de estudiante Pacevo", parMois: "/mes",
     essai: "{n} días de prueba del coach IA, sin compromiso",
     ctaEssai: "Probar {n} días", ctaAbo: "Suscribirme",
     gratuitNote: "Sin tarjeta para el nivel gratuito.",
     plans: [
-      { cle: "gratuit", name: "Gratis", pitch: "Tus sesiones hacia tu objetivo, sin análisis de tus datos.", cta: "Crear mi cuenta",
+      { cle: "gratuit", name: "Gratis", pitch: "Tus sesiones hacia tu objetivo, según tus sensaciones, sin análisis de tus datos.", cta: "Crear mi cuenta",
         features: ["Sesiones hacia tu objetivo: carrera, tiempo o distancia", "Planes de entrenamiento ya hechos", "Mapa y acceso a todas las rutas", "Ghost Runner: tu ritmo anunciado al oído", "Comparador de zapatillas", "Sync del reloj, historial, 10 000 carreras próximas", "Racha, ligas y trofeos"] },
-      { cle: "starter", name: "Starter", pitch: "El entrenador que lo lee todo y adapta tu plan tras cada salida.", cta: "Probar 7 días",
-        features: ["Todo lo gratuito", "Plan adaptado a tus sesiones, sueño, VFC y FC", "Análisis IA completo de cada sesión", "Sesiones enviadas al reloj", "Fisio IA, con foto", "Exportación GPX de tus trazados y de las rutas", "10 intercambios con la IA al día"] },
-      { cle: "premium", name: "Premium", pitch: "El coach IA a máxima potencia, para preparar un gran objetivo.", badge: "El más completo", cta: "Probar 7 días",
-        features: ["Todo lo de Starter", "30 intercambios con la IA al día", "Coach IA avanzado: sesiones clave revisadas por la IA", "La opinión del coach IA sobre tu semana, aplicada con un toque hasta tu reloj", "Balance de la semana: tus sesiones leídas en conjunto (tendencias, deriva cardiaca, objetivo)"] },
+      { cle: "starter", name: "Starter", pitch: "El entrenador que lee tus sesiones y adapta tu plan tras cada salida.", cta: "Probar 7 días",
+        features: ["Todo lo gratuito", "Plan adaptado a tus sesiones, sueño, FC y carga", "Análisis IA de cada sesión: lo esencial (intensidad real, desvío respecto a lo previsto)", "Sesiones enviadas al reloj", "Fisio IA, con foto", "Exportación GPX de tus trazados y de las rutas", "10 intercambios con la IA al día"] },
+      { cle: "premium", name: "Premium", pitch: "El entrenador que lo lee todo, de tu VFC a tu zancada, hasta el día D.", badge: "El más completo", cta: "Probar 7 días",
+        features: ["Todo lo de Starter", "El coach lee también tu VFC, tu deriva cardiaca y tu zancada para ajustar tu plan", "Análisis completo de cada sesión: zonas, zancada, potencia, deriva cardiaca, puesto entre tus sesiones", "La opinión del coach IA sobre tu semana, aplicada con un toque hasta tu reloj", "Balance de la semana cada lunes, también por e-mail: tus sesiones leídas en conjunto (tendencias, deriva cardiaca, objetivo)", "Pack día D: tu marca realista, tabla de pasos, ritmos según el tiempo y avituallamiento", "Coach IA avanzado: sesiones clave revisadas, 30 intercambios con la IA al día"] },
     ],
     apres: "Al terminar la prueba no se borra nada: tu cuenta pasa al nivel gratuito. Tus actividades se siguen sincronizando y tu plan continúa, construido sobre tu objetivo. Lo que se detiene: la adaptación a tus datos, el análisis de tus sesiones, el envío al reloj y los intercambios con la IA.",
   },
@@ -371,17 +384,19 @@ const pt: LandingDict = {
   pricing: {
     eyebrow: "Preços", title: "O teu plano é grátis. O treinador que o adapta é uma subscrição.",
     subtitle: "Define o teu objetivo — uma prova, um tempo, uma distância — e recebe os teus treinos sem pagar. O treinador que lê os teus treinos, o teu sono e a tua fisiologia para adaptar cada dia está nas fórmulas.",
-    mois: "Mensal", an: "Anual", economie: "2 meses grátis", parMois: "/mês",
+    mois: "Mensal", an: "Anual", economie: "até {n} meses grátis", moisOfferts: "{n} meses grátis",
+    etudiant: "Estudante? −{pct} % no Starter e no Premium. Escreve-nos a partir do teu e-mail de estudante ou com o teu comprovativo de matrícula: recebes um código para introduzir no pagamento.",
+    etudiantCta: "Pedir o meu código de estudante", etudiantSujet: "Desconto de estudante Pacevo", parMois: "/mês",
     essai: "{n} dias de teste do coach IA, sem compromisso",
     ctaEssai: "Testar {n} dias", ctaAbo: "Subscrever",
     gratuitNote: "Sem cartão para o nível gratuito.",
     plans: [
-      { cle: "gratuit", name: "Grátis", pitch: "Os teus treinos rumo ao teu objetivo, sem análise dos teus dados.", cta: "Criar a minha conta",
+      { cle: "gratuit", name: "Grátis", pitch: "Os teus treinos rumo ao teu objetivo, conforme as tuas sensações, sem análise dos teus dados.", cta: "Criar a minha conta",
         features: ["Treinos rumo ao teu objetivo: prova, tempo ou distância", "Planos de treino prontos", "Mapa e acesso a todos os percursos", "Ghost Runner: o teu ritmo anunciado ao ouvido", "Comparador de ténis", "Sync do relógio, histórico, 10 000 provas futuras", "Série, ligas e troféus"] },
-      { cle: "starter", name: "Starter", pitch: "O treinador que lê tudo e adapta o teu plano após cada saída.", cta: "Testar 7 dias",
-        features: ["Tudo o gratuito", "Plano adaptado aos teus treinos, sono, VFC e FC", "Análise IA completa de cada treino", "Treinos enviados para o relógio", "Fisio IA, com foto", "Exportação GPX dos teus traçados e dos percursos", "10 trocas com a IA por dia"] },
-      { cle: "premium", name: "Premium", pitch: "O coach IA no máximo, para preparar um grande objetivo.", badge: "O mais completo", cta: "Testar 7 dias",
-        features: ["Tudo o do Starter", "30 trocas com a IA por dia", "Coach IA avançado: sessões-chave revistas pela IA", "A opinião do coach IA sobre a tua semana, aplicada com um toque até ao teu relógio", "Balanço da semana: as tuas sessões lidas em conjunto (tendências, deriva cardíaca, objetivo)"] },
+      { cle: "starter", name: "Starter", pitch: "O treinador que lê os teus treinos e adapta o teu plano após cada saída.", cta: "Testar 7 dias",
+        features: ["Tudo o gratuito", "Plano adaptado aos teus treinos, sono, FC e carga", "Análise IA de cada treino: o essencial (intensidade real, desvio face ao previsto)", "Treinos enviados para o relógio", "Fisio IA, com foto", "Exportação GPX dos teus traçados e dos percursos", "10 trocas com a IA por dia"] },
+      { cle: "premium", name: "Premium", pitch: "O treinador que lê tudo, da tua VFC à tua passada, até ao dia D.", badge: "O mais completo", cta: "Testar 7 dias",
+        features: ["Tudo o do Starter", "O coach lê também a tua VFC, a tua deriva cardíaca e a tua passada para ajustar o teu plano", "Análise completa de cada treino: zonas, passada, potência, deriva cardíaca, posição entre os teus treinos", "A opinião do coach IA sobre a tua semana, aplicada com um toque até ao teu relógio", "Balanço da semana todas as segundas-feiras, também por e-mail: as tuas sessões lidas em conjunto (tendências, deriva cardíaca, objetivo)", "Pack dia D: a tua marca realista, tabela de passagens, ritmos conforme o tempo e abastecimento", "Coach IA avançado: sessões-chave revistas, 30 trocas com a IA por dia"] },
     ],
     apres: "No fim do teste nada é apagado: a tua conta passa ao nível gratuito. As tuas atividades continuam a sincronizar e o teu plano continua, construído sobre o teu objetivo. O que para: a adaptação aos teus dados, a análise dos teus treinos, o envio para o relógio e as trocas com a IA.",
   },

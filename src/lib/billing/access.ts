@@ -28,7 +28,7 @@ export const COLONNES_ACCES = "created_at, subscription_tier";
 /** Ce à quoi un compte a droit, à un instant donné. */
 export type Acces =
   | "gratuit"    // permanent, sans carte : ses données, son historique, les courses
-  | "essai"      // 7 jours d'IA au niveau Premium, pour juger le module payant
+  | "essai"      // 7 jours : les fonctions Premium, avec le volume d'IA de Starter
   | "starter"    // + 10 appels IA par jour
   | "premium";   // + 30 appels IA par jour
 
@@ -41,8 +41,8 @@ export type Capacite =
   | "ia"       // faire parler un modèle (analyse, kiné, coach, assistant)
   | "plan_ia"  // le coach avancé : le modèle relit le PLAN (séances clés, avis sur la semaine appliqué en un geste)
   | "bilan"    // le bilan de la semaine : plusieurs séances lues ENSEMBLE (tendances, dérive, objectif)
-  | "journal"  // l'analyse du Smart Journal — écran retiré le 30/09/2026, route sans appelant
-  | "analyse_longue"; // l'analyse de séance en version développée
+  | "jour_j"   // le pack jour J : chrono réaliste, tableau de marche, allures selon la météo, ravitaillement
+  | "analyse_complete"; // TOUT lire : chaque séance relue en entier, et le coach qui lit aussi VFC, dérive cardiaque et foulée
 
 /**
  * Durée de l'essai du module IA, en jours.
@@ -149,32 +149,42 @@ const DROITS: Record<Acces, Capacite[]> = {
   // sommeil, leurs caractéristiques physiques et physiologiques ».
   //
   // Le gratuit reçoit donc un VRAI plan de sept jours, mais bâti sur l'objectif et sur ce
-  // que l'athlète DÉCLARE (disponibilités, VMA du test, douleurs signalées), plus les
-  // kilomètres qu'il court — seul garde-fou contre une montée de volume qui blesse. Ce
-  // qu'il ne lit pas : sommeil, VFC, fréquence cardiaque, puissance, foulée, ressenti,
-  // météo, analyse de chaque séance. Voir `buildAthleteContext(…, { objectifSeul })`.
+  // que l'athlète DÉCLARE (disponibilités, VMA du test, douleurs signalées, et son ressenti
+  // d'après-séance depuis le 30/10/2026), plus les kilomètres qu'il court — seul garde-fou
+  // contre une montée de volume qui blesse. Ce qu'il ne lit pas : sommeil, VFC, fréquence
+  // cardiaque, puissance, foulée, météo, analyse de chaque séance. Voir `buildAthleteContext(…, { objectifSeul })`.
   // Rien n'est poussé sur la montre et aucun modèle ne parle.
   //
   // La carte, tous les parcours, le Ghost Runner vocal et le comparateur sont ouverts à
   // tous : ils relèvent de `lecture`, qu'aucune route ne refuse.
   gratuit: ["lecture", "plan_objectif"],
-  // L'essai montre le niveau Premium : juger le produit sur la formule basse ferait
-  // choisir Starter par méconnaissance, ou renoncer.
-  essai: ["lecture", "plan_objectif", "plan", "ia", "gpx", "analyse_longue", "plan_ia", "journal", "bilan"],
-  // ⚠️ L'ANALYSE DÉVELOPPÉE ET LE GPX DANS LES DEUX FORMULES PAYANTES (Cyprien, 22/10) :
-  // « pour les deux abonnements, il faut que le coach IA soit très puissant en analyse de
-  // séance », et l'export GPX vers la montre « dans les abonnements payants ». Le kiné IA
-  // y est par `ia`. Ce qui sépare encore Premium : trois fois plus d'appels IA par jour
-  // (`PLAFOND_JOUR`) et le coach avancé (`plan_ia`) — le modèle qui relit le PLAN : les
-  // séances clés chaque jour, et « Un avis sur ma semaine » à la demande (route
-  // `ai/ajustement`, réservée le 23/10/2026 pour que Premium ait une exclusivité RÉELLE).
-  starter: ["lecture", "plan_objectif", "plan", "ia", "gpx", "analyse_longue"],
+  // L'essai montre les FONCTIONS Premium : juger le produit sur la formule basse ferait
+  // choisir Starter par méconnaissance, ou renoncer. Son VOLUME d'IA, lui, est celui de
+  // Starter (`PLAFOND_JOUR`, décision du 30/10/2026).
+  essai: ["lecture", "plan_objectif", "plan", "ia", "gpx", "analyse_complete", "plan_ia", "bilan", "jour_j"],
+  // L'export GPX vers la montre « dans les abonnements payants » (Cyprien, 22/10), le kiné
+  // IA par `ia`. Le coach avancé (`plan_ia`) — le modèle qui relit le PLAN : les séances
+  // clés chaque jour, et « Un avis sur ma semaine » (route `ai/ajustement`, réservée le
+  // 23/10/2026 pour que Premium ait une exclusivité RÉELLE) — reste à Premium.
+  //
+  // ⚠️ STARTER LIT L'ESSENTIEL, PREMIUM LIT TOUT (Cyprien, 30/10/2026 : « le Starter doit
+  // être un peu moins puissant, il doit analyser un peu moins, alors que le Premium doit
+  // tout analyser »). Starter : le plan lit les séances, la fréquence cardiaque, la charge,
+  // le sommeil, les douleurs, le ressenti et la météo, et l'analyse d'une séance en donne
+  // l'essentiel (intensité réelle, ce qui était prévu). Premium (`analyse_complete`) : le
+  // plan lit AUSSI la VFC, la dérive cardiaque et la foulée (cadence, puissance, temps de
+  // contact), et l'analyse d'une séance ajoute zones, cadence, foulée, dérive, chaleur et
+  // rang parmi ses semblables. Voir `lectureDuCoach` et `api/ai/analyse-seance`.
+  starter: ["lecture", "plan_objectif", "plan", "ia", "gpx"],
   // ⚠️ L'ÉCART DU 30/10/2026 (Cyprien : « y a-t-il réellement une différence d'analyse ? »).
-  // Vérifié : non — l'analyse d'UNE séance et le moteur du plan sont identiques dans les deux
-  // formules. Premium gagne deux fonctions qui agissent : l'avis sur la semaine s'APPLIQUE en
+  // Vérifié ce jour-là : non — l'analyse d'UNE séance et le moteur du plan étaient identiques
+  // dans les deux formules (ils diffèrent depuis, voir Starter ci-dessus). Premium gagne deux
+  // fonctions qui agissent : l'avis sur la semaine s'APPLIQUE en
   // un geste (séance modifiée jusqu'à la montre, `ai/ajustement/appliquer`), et le BILAN de la
   // semaine lit plusieurs séances ensemble (`ai/bilan`, capacité `bilan`).
-  premium: ["lecture", "plan_objectif", "plan", "ia", "gpx", "analyse_longue", "plan_ia", "journal", "bilan"],
+  // Puis le PACK JOUR J (même jour, après l'audit des formules) : tout ce qu'il faut le jour
+  // de la course, calculé sans modèle (`lib/coach/jourJ`, page /dashboard/jour-j).
+  premium: ["lecture", "plan_objectif", "plan", "ia", "gpx", "analyse_complete", "plan_ia", "bilan", "jour_j"],
 };
 
 /**
@@ -217,6 +227,26 @@ export function peut(etat: Acces, quoi: Capacite): boolean {
 /** Raccourci pour les appelants qui n'ont qu'un profil sous la main. */
 export function profilPeut(p: ProfilAcces | null | undefined, quoi: Capacite, maintenant?: number): boolean {
   return peut(accesDe(p, maintenant).etat, quoi);
+}
+
+/**
+ * CE QUE LE COACH A LE DROIT DE LIRE pour ce compte (`LectureContexte`, coachContext) :
+ *  · gratuit → l'OBJECTIF seul, rien de ce que mesure la montre ;
+ *  · Starter → la lecture ESSENTIELLE : séances, FC, charge, sommeil, douleurs, ressenti, météo ;
+ *  · Premium et essai → TOUT, VFC, dérive cardiaque et foulée comprises.
+ *
+ * ⚠️ UN SEUL CALCUL pour tous les appelants (coach autonome, doubles, séance du jour) : une
+ * réponse bâtie sur une autre lecture que celle du plan le contredirait quelques heures
+ * plus tard. Le plan gratuit et le plan Starter ne lisent pas « moins bien » : ils ne
+ * lisent pas, et le moteur traite ce qu'il ne voit pas comme une montre qui ne le mesure pas.
+ */
+export function lectureDuCoach(p: ProfilAcces | null | undefined, maintenant?: number): { objectifSeul: boolean; essentielle: boolean } {
+  const etat = accesDe(p, maintenant).etat;
+  const complet = peut(etat, "plan");
+  return {
+    objectifSeul: !complet && peut(etat, "plan_objectif"),
+    essentielle: complet && !peut(etat, "analyse_complete"),
+  };
 }
 
 /**

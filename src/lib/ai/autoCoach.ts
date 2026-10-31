@@ -12,7 +12,7 @@ import { buildAthleteContext } from "@/lib/ai/coachContext";
 import { buildWeekPlan, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
 import { estQualitePrescrite } from "@/lib/coach/qualiteRecente";
 import { pushIntervalsWorkout, supprimerIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
-import { profilPeut, COLONNES_ACCES } from "@/lib/billing/access";
+import { profilPeut, lectureDuCoach, COLONNES_ACCES } from "@/lib/billing/access";
 import { identifiantsDePaire } from "@/lib/intervals/identifiants";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 import { estAdmin } from "@/lib/admin/acces";
@@ -120,8 +120,9 @@ export async function autoCoachForUser(
   // exactement l'inverse de ce qui se vend : le gratuit profitait de l'analyse du sommeil
   // et de la VFC, et n'avait pas de quoi organiser une semaine. Désormais le contexte ne
   // lit, pour lui, que l'objectif, le déclaré et le volume couru (`objectifSeul`) ; rien
-  // ne part sur la montre et aucun modèle ne relit le plan.
-  const objectifSeul = !planComplet && profilPeut(acces, "plan_objectif");
+  // ne part sur la montre et aucun modèle ne relit le plan. Starter lit l'essentiel
+  // (`essentielle`, 30/10/2026) : ni VFC, ni dérive cardiaque, ni foulée — Premium lit tout.
+  const { objectifSeul, essentielle } = lectureDuCoach(acces);
   if (!planComplet && !objectifSeul) {
     return { processed: false, reason: "essai_expire" };
   }
@@ -150,7 +151,7 @@ export async function autoCoachForUser(
     return prescrireTestVma(admin, { userId, athleteId: opts.athleteId, apiKey: opts.apiKey, pushToWatch: planComplet });
   }
 
-  const ctx = await buildAthleteContext(admin as unknown as Parameters<typeof buildAthleteContext>[0], userId, { objectifSeul }).catch(() => null);
+  const ctx = await buildAthleteContext(admin as unknown as Parameters<typeof buildAthleteContext>[0], userId, { objectifSeul, essentielle }).catch(() => null);
   if (!ctx) return { processed: false, reason: "ctx_failed" };
 
   const semaineMoteur = buildWeekPlan(ctx);

@@ -17,8 +17,9 @@
 
 import { useEffect, useState } from "react";
 import { JOURS_ESSAI } from "@/lib/billing/access";
-import { PRIX_AFFICHES as PRIX, euros } from "@/lib/billing/prix";
+import { PRIX_AFFICHES as PRIX, euros, moisOfferts, MOIS_OFFERTS_MAX } from "@/lib/billing/prix";
 import { Check, Loader2 } from "lucide-react";
+import { OffreEtudiante } from "@/components/landing/OffreEtudiante";
 import { toast } from "sonner";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
@@ -99,7 +100,7 @@ export default function PricingPage() {
                   className={`rounded-full px-5 py-2 text-sm font-semibold transition-colors ${
                     periode === p ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-900"}`}>
                   {p === "mois" ? P.mois : P.an}
-                  {p === "an" && <span className={`ml-2 text-[11px] font-bold ${periode === "an" ? "text-[#34d399]" : "text-[#059669]"}`}>{P.economie}</span>}
+                  {p === "an" && <span className={`ml-2 text-[11px] font-bold ${periode === "an" ? "text-[#34d399]" : "text-[#059669]"}`}>{P.economie.replace("{n}", String(MOIS_OFFERTS_MAX))}</span>}
                 </button>
               ))}
             </div>
@@ -126,7 +127,7 @@ export default function PricingPage() {
                     <span className={`text-sm ${vedette ? "text-white/40" : "text-zinc-400"}`}>{plan.cle === "gratuit" ? "" : P.parMois}</span>
                   </div>
                   <div className={`mt-1 h-5 text-xs ${vedette ? "text-white/40" : "text-zinc-400"}`}>
-                    {plan.cle === "gratuit" ? P.gratuitNote : periode === "an" ? `${euros(centimes, lang)} / ${P.an.toLowerCase()}` : ""}
+                    {plan.cle === "gratuit" ? P.gratuitNote : periode === "an" ? `${euros(centimes, lang)} / ${P.an.toLowerCase()} · ${P.moisOfferts.replace("{n}", String(moisOfferts(plan.cle as "starter" | "premium")))}` : ""}
                   </div>
                   <p className={`mt-4 text-sm ${vedette ? "text-white/70" : "text-zinc-500"}`}>{plan.pitch}</p>
                   <ul className="mt-6 flex-1 space-y-3">
@@ -150,6 +151,7 @@ export default function PricingPage() {
             })}
           </div>
 
+          <OffreEtudiante texte={P.etudiant} cta={P.etudiantCta} sujet={P.etudiantSujet} />
           <p className="mx-auto mt-8 max-w-2xl text-center text-sm leading-relaxed text-zinc-500">{P.apres}</p>
         </Container>
       </Section>

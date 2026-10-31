@@ -2,7 +2,8 @@
  * LE BILAN DE LA SEMAINE (Premium, Cyprien, 30/10/2026) — plusieurs séances lues ensemble.
  *
  * « Je dois savoir s'il y a réellement une différence d'analyse entre les abonnements. »
- * Vérifié : l'analyse d'UNE séance est la même à 9,99 € et à 14,99 €. Ce bilan est ce que
+ * Vérifié ce jour-là : l'analyse d'UNE séance était la même à 9,99 € et à 14,99 € (elle diffère depuis :
+ * Starter l'essentiel, Premium tout, voir `analyse_complete`). Ce bilan est ce que
  * Premium lit EN PLUS : intensité, dérive cardiaque, efficacité, sommeil, VFC, objectif.
  *
  * Le modèle rédige, il ne calcule pas : ces tests gardent les FAITS qu'il reçoit, ce qui est
@@ -14,6 +15,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { faitsDuBilan, lignesDuBilan, chrono, type EntreeBilan } from "../src/lib/ai/bilanSemaine";
 import { chiffresInconnus } from "../src/lib/ai/relectureSemaine";
+import { buildPlanSemaineEmail, lignesBilanEmail, type PlanSemaineInput } from "../src/lib/notify/planSemaine";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -130,6 +132,59 @@ test("le tableau de bord montre la carte à tous, ouverte seulement en Premium",
   assert.match(codeNu("src/components/dashboard/BentoDashboard.tsx"), /<BilanSemaine ouvert=\{!!acces && peut\(acces\.etat, "bilan"\)\} \/>/);
   const carte = readFileSync("src/components/dashboard/BilanSemaine.tsx", "utf8");
   for (const l of ["fr", "en", "de", "es", "pt"]) assert.match(carte, new RegExp(`\\n  ${l}: \\{ titre: "`), `la carte n'existe pas en ${l}`);
+});
+
+console.log("\nL'E-MAIL DU LUNDI — la semaine écoulée, en tête de « Ta semaine »");
+
+const SEMAINE: PlanSemaineInput = {
+  lang: "fr", firstName: "Cyprien", appUrl: "https://pacevo.fr", objective: null,
+  jours: ["2026-11-09", "2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13", "2026-11-14", "2026-11-15"]
+    .map((date, k) => ({ date, titre: k % 2 ? null : "Footing", repos: false })),
+};
+
+test("Premium : les faits de la semaine écoulée ouvrent l'e-mail, chiffres de la carte", () => {
+  const f = faitsDuBilan(ENTREE);
+  const m = buildPlanSemaineEmail({ ...SEMAINE, bilan: { faits: f, texte: null } })!;
+  assert.ok(m.html.indexOf("Ta semaine écoulée") > 0 && m.html.indexOf("Ta semaine écoulée") < m.html.indexOf("Voici tes sept prochains jours"), "le bilan n'ouvre pas l'e-mail");
+  assert.match(m.text, /- 4 séances de course · 45 km · 3\u00a0h\u00a033 · D\+ 160 m/, "le volume n'est pas celui des faits");
+  assert.match(m.text, /- Dérive cardiaque \(sorties faciles\) : 3,7 %/, "la dérive n'est pas celle des faits");
+  assert.match(m.text, /- Course de la semaine : Semi de Bondues, 15 km/, "la course de la semaine n'est pas nommée");
+  // Sans texte déjà écrit, un LIEN vers la carte — jamais un texte rédigé pour l'occasion.
+  assert.match(m.text, /Lire le bilan du coach : https:\/\/pacevo\.fr\/dashboard/);
+  assert.ok(!m.html.includes("Découvrir Premium"), "un abonné Premium reçoit l'invitation à Premium");
+});
+
+test("ce qui est inconnu n'a pas de ligne : rien n'est mis à zéro", () => {
+  const f = faitsDuBilan({ ...ENTREE, sommeil: [], vfc: [], seances: ENTREE.seances.map((x) => ({ ...x, cardiac_decoupling: null })) });
+  const l = lignesBilanEmail(f, "fr").join("\n");
+  assert.doesNotMatch(l, /Dérive|Sommeil|VFC/, "une mesure absente s'affiche quand même");
+  for (const lang of ["en", "de", "es", "pt"] as const) {
+    const lg = lignesBilanEmail(faitsDuBilan(ENTREE), lang);
+    assert.equal(lg.length, lignesBilanEmail(faitsDuBilan(ENTREE), "fr").length, `${lang} : des lignes manquent`);
+    assert.ok(!lg.join(" ").includes("undefined"), `${lang} : « undefined » dans le bilan`);
+  }
+});
+
+test("le texte du coach, s'il existe déjà, est repris ÉCHAPPÉ ; Starter reçoit l'invitation", () => {
+  const m = buildPlanSemaineEmail({ ...SEMAINE, bilan: { faits: faitsDuBilan(ENTREE), texte: "Belle semaine <b>régulière</b>." } })!;
+  assert.ok(m.html.includes("Belle semaine &lt;b&gt;régulière&lt;/b&gt;."), "le texte du coach n'est pas échappé");
+  assert.ok(!m.text.includes("Lire le bilan du coach"), "le lien remplace un texte déjà écrit");
+  const starter = buildPlanSemaineEmail({ ...SEMAINE, teaserPremium: true })!;
+  assert.match(starter.html, /href="https:\/\/pacevo\.fr\/pricing"[^>]*>Découvrir Premium/, "Starter ne voit pas ce que Premium ajouterait");
+  assert.ok(!starter.html.includes("Ta semaine écoulée"), "Starter reçoit le bilan réservé à Premium");
+  const nu = buildPlanSemaineEmail(SEMAINE)!;
+  assert.ok(!nu.html.includes("Premium") && !nu.html.includes("Ta semaine écoulée"), "le gratuit reçoit un bloc qui ne le concerne pas");
+});
+
+test("l'envoi : la formule décide, la semaine finit dimanche, aucun modèle n'est appelé", () => {
+  const src = codeNu("src/lib/notify/planSemaine.ts");
+  assert.match(src, /if \(peut\(etat, "bilan"\)\) \{/, "le bilan n'est plus réservé à Premium et à l'essai");
+  assert.match(src, /faitsDeLaSemaine\(admin, opts\.userId, decaleJour\(dates\[0\], -1\)\)/, "la semaine du bilan n'est plus celle qui finit dimanche");
+  assert.match(src, /prec\.empreinte === empreinteBilan\(lignesDuBilan\(faits\), lang\)/, "un texte écrit pour d'autres faits serait repris");
+  assert.match(src, /teaserPremium: etat === "starter"/, "l'invitation n'est plus adressée à Starter");
+  assert.doesNotMatch(src, /generateContent|gemini/, "l'e-mail du lundi appelle un modèle : le balayage paierait et dépasserait les quotas");
+  // UNE lecture des faits pour la carte et l'e-mail.
+  assert.match(codeNu("src/app/api/ai/bilan/route.ts"), /faitsDeLaSemaine\(/, "la carte et l'e-mail ne lisent plus la semaine de la même façon");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

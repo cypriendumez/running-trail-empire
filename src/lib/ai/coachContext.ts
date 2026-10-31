@@ -298,6 +298,9 @@ export type AthleteContext = {
   /** Construit pour le palier gratuit (`LectureContexte.objectifSeul`) : l'objectif et le
    *  déclaré, aucune mesure. Optionnel : un contexte sérialisé avant cette version ne l'a pas. */
   objectifSeul?: boolean;
+  /** Construit pour Starter (`LectureContexte.essentielle`) : ni VFC, ni dérive cardiaque,
+   *  ni foulée. Les écrans s'en servent pour dire ce que Premium lirait en plus. */
+  essentielle?: boolean;
   /** Mode perte de poids — `null` s'il n'est pas activé OU si le profil n'y est pas
    *  éligible. Quand il est présent, il PLAFONNE la qualité et la progression du volume
    *  dans le plan déterministe, il ne se contente pas d'informer l'IA. */
@@ -312,12 +315,14 @@ export type AthleteContext = {
  * encore (42703). Nommer `sport` avant l'application de la migration 015 priverait
  * donc le coach de TOUT l'historique, et pas seulement du sport. On retente sans.
  */
-async function fetchWorkouts(sb: SB, userId: string, objectifSeul = false) {
+async function fetchWorkouts(sb: SB, userId: string, objectifSeul = false, essentielle = false) {
   // Palier gratuit : le VOLUME seul (quand, quoi, combien de kilomètres et de minutes).
   // Aucune fréquence cardiaque, puissance, foulée ni charge mesurée — voir `LectureContexte`.
+  // Starter : l'ESSENTIEL, sans la foulée ni la dérive cardiaque.
   const cols = objectifSeul
     ? COLONNES_VOLUME
-    : "vertical_ratio_pct,hrr_bpm,date,type,distance_km,duration_seconds,elevation_gain_m,avg_hr,max_hr,training_effect,tss,avg_cadence_spm,avg_power_watts,vertical_oscillation_cm,ground_contact_ms,stride_length_m,cardiac_decoupling,weather_temp_c,gap_min_km,hr_zone_seconds,intensity_pct";
+    : essentielle ? COLONNES_ESSENTIELLES
+    : `${COLONNES_ESSENTIELLES},${COLONNES_AVANCEES}`;
   const q = async (c: string) => {
     const r = await sb.from("workouts").select(c).eq("user_id", userId).order("date", { ascending: false }).limit(60);
     return { data: r.data as unknown as Wk[] | null, error: r.error };
@@ -334,12 +339,13 @@ async function fetchWorkouts(sb: SB, userId: string, objectifSeul = false) {
  * ses caractéristiques physiques, physiologiques ». Le plan se bâtit alors sur :
  *  · l'OBJECTIF (course, date, chrono, distance) ;
  *  · ce que l'athlète DÉCLARE : disponibilités, terrains, VMA du test, âge (espacement
- *    des séances dures), pathologies, zones fragiles et douleurs signalées ;
+ *    des séances dures), pathologies, zones fragiles, douleurs signalées, et le ressenti
+ *    d'après-séance (RPE, depuis le 30/10/2026) ;
  *  · les KILOMÈTRES courus — date, durée, distance, dénivelé, type —, seul garde-fou
  *    contre une montée de volume qui blesse.
  * Il NE lit PAS : VFC, sommeil, fréquence cardiaque (repos, max, zones), puissance,
  * foulée, charge mesurée (TSS), dérive cardiaque, courbe d'allure, VO2max Garmin,
- * relecture des répétitions, ressenti et notes de séance, chaussures, poids et
+ * relecture des répétitions, notes de séance, chaussures, poids et
  * morphologie, cycle, position (donc ni météo, ni altitude).
  *
  * ⚠️ LES LECTURES INTERDITES NE SONT PAS FAITES, ELLES NE SONT PAS « IGNORÉES ». Rendre
@@ -354,10 +360,27 @@ async function fetchWorkouts(sb: SB, userId: string, objectifSeul = false) {
  * une liste BLANCHE, pas noire : une colonne de mesure ajoutée demain reste hors du
  * plan gratuit sans que personne ait à y penser.
  */
-export type LectureContexte = { objectifSeul?: boolean };
+export type LectureContexte = {
+  objectifSeul?: boolean;
+  /**
+   * `essentielle` — STARTER (Cyprien, 30/10/2026 : « le Starter doit analyser un peu moins,
+   * le Premium doit tout analyser »). Le plan s'adapte toujours à ce que l'athlète FAIT et
+   * à la façon dont il RÉCUPÈRE : séances, fréquence cardiaque (repos, max, zones), charge,
+   * sommeil, douleurs, ressenti, météo et altitude, chaussures. Il NE LIT PAS les signaux
+   * fins que Premium ajoute : la VFC, la dérive cardiaque, la FC de récupération et la
+   * foulée (cadence, puissance, temps de contact, oscillation et ratio verticaux, longueur
+   * de foulée). Même règle que le gratuit : la lecture n'est PAS FAITE, et le moteur traite
+   * l'athlète comme celui dont la montre ne mesure pas ces signaux. Ignoré si `objectifSeul`.
+   */
+  essentielle?: boolean;
+};
 
 /** Les seules colonnes de séance lues pour le palier gratuit : le volume, rien du corps. */
 const COLONNES_VOLUME = "date,type,distance_km,duration_seconds,elevation_gain_m";
+/** Starter : le volume, la fréquence cardiaque et la charge — ce qu'il faut pour adapter. */
+const COLONNES_ESSENTIELLES = "date,type,distance_km,duration_seconds,elevation_gain_m,avg_hr,max_hr,training_effect,tss,weather_temp_c,gap_min_km,hr_zone_seconds,intensity_pct";
+/** Premium en plus : la foulée, la dérive cardiaque et la FC de récupération. */
+export const COLONNES_AVANCEES = "avg_cadence_spm,avg_power_watts,vertical_oscillation_cm,ground_contact_ms,stride_length_m,vertical_ratio_pct,cardiac_decoupling,hrr_bpm";
 
 /** Les seules colonnes du profil lues pour le palier gratuit — toutes DÉCLARÉES. */
 export const PROFIL_DECLARE = [
@@ -373,15 +396,16 @@ const garder = (o: Record<string, unknown> | null, cles: readonly string[]) =>
 
 export async function buildAthleteContext(sb: SB, userId: string, lecture: LectureContexte = {}): Promise<AthleteContext> {
   const objectifSeul = !!lecture.objectifSeul;
+  const essentielle = !objectifSeul && !!lecture.essentielle;
   // Une lecture qu'on ne fait pas : la forme exacte d'une réponse vide de PostgREST.
   const nonLu = () => Promise.resolve({ data: [] as never[], error: null });
   const nonLuUne = () => Promise.resolve({ data: null, error: null });
   const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, shoeRes, objRes, csRes, wlRes, histRes, sleepDatesRes, hrvDatesRes, formeRes, fcMaxRes] = await Promise.all([
     sb.from("profiles").select("*").eq("id", userId).single(),
     sb.from("performance_baselines").select("*").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).single(),
-    objectifSeul ? nonLu() : sb.from("hrv_data").select(COLONNES_VFC).eq("user_id", userId).order("date", { ascending: false }).limit(30),
+    objectifSeul || essentielle ? nonLu() : sb.from("hrv_data").select(COLONNES_VFC).eq("user_id", userId).order("date", { ascending: false }).limit(30),
     objectifSeul ? nonLu() : sb.from("sleep_data").select("sleep_score,total_sleep_min,deep_sleep_min,rem_sleep_min,body_battery_end,respiration_rate,date").eq("user_id", userId).order("date", { ascending: false }).limit(30),
-    fetchWorkouts(sb, userId, objectifSeul),
+    fetchWorkouts(sb, userId, objectifSeul, essentielle),
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "session_feedback").order("created_at", { ascending: false }).limit(5),
     // Douleurs déclarées depuis l'espace Santé (schéma corporel) — elles n'atteignaient
     // pas le coach, qui ne regardait que le formulaire post-séance.
@@ -406,7 +430,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     objectifSeul ? nonLu() : sb.from("sleep_data").select("date").eq("user_id", userId)
       .gte("date", new Date(Date.now() - 190 * 86400000).toISOString().slice(0, 10))
       .order("date", { ascending: false }).limit(200),
-    objectifSeul ? nonLu() : sb.from("hrv_data").select("date").eq("user_id", userId)
+    objectifSeul || essentielle ? nonLu() : sb.from("hrv_data").select("date").eq("user_id", userId)
       .gte("date", new Date(Date.now() - 190 * 86400000).toISOString().slice(0, 10))
       .order("date", { ascending: false }).limit(200),
     // Fenêtre LONGUE et colonnes minimales, pour mesurer la PENTE de forme : la requête
@@ -443,10 +467,13 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const { metrique: metriqueVfc, lignes: hrv } = serieVfc((hrvRes.data ?? []) as { date: string; rmssd: number | null; sdnn: number | null }[]);
   const sleep = (sleepRes.data ?? []) as { sleep_score: number | null; total_sleep_min: number | null; deep_sleep_min: number | null; rem_sleep_min: number | null; body_battery_end: number | null; respiration_rate: number | null; date: string }[];
   const workouts = (woRes.data ?? []) as Wk[];
-  // Palier gratuit : du formulaire d'après-séance, la DOULEUR signalée seule — c'est une
-  // déclaration et un garde-fou. Le ressenti (RPE) et les notes sont de l'analyse de séance.
+  // Palier gratuit : du formulaire d'après-séance, ce que l'athlète DÉCLARE et qui le protège
+  // — la douleur signalée, et le RESSENTI (RPE) depuis le 30/10/2026 (Cyprien : « ressenti lu
+  // par le plan gratuit »). Un « 9/10, épuisé » qui laissait le lendemain inchangé était un
+  // plan qui n'écoutait pas : le ressenti n'est pas une mesure, c'est ce que l'athlète dit.
+  // Les NOTES libres restent dehors : seul un modèle les lit, et aucun ne parle au gratuit.
   const feedback = ((fbRes.data ?? []) as { data: { rpe?: number; pain?: string[]; note?: string } }[])
-    .map((f) => objectifSeul ? { data: { pain: f.data?.pain } } : f);
+    .map((f) => objectifSeul ? { data: { pain: f.data?.pain, rpe: f.data?.rpe } } : f);
   // ⚠️ UN OBJECTIF PASSÉ RESTAIT L'OBJECTIF. `race_objective` est une ligne unique que rien
   // n'efface après la course. Cas réel (Cyprien, marathon de Lille couru le 25/10/2026) :
   // cinq jours plus tard, le coach se croyait encore en AFFÛTAGE (`weeksToRace` = −1, donc
@@ -2199,6 +2226,7 @@ ${catalog}`;
     // Palier gratuit : « ce que ta dernière séance a montré » EST une analyse de séance.
     lastSession: objectifSeul ? null : lastSession,
     objectifSeul,
+    essentielle,
   };
 }
 

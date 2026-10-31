@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Loader2, Sparkles, GraduationCap } from "lucide-react";
+import Link from "next/link";
+import { Send, Loader2, Sparkles, GraduationCap, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { RichText } from "@/components/ui/RichText";
@@ -9,35 +10,35 @@ import { RichText } from "@/components/ui/RichText";
 type Msg = { role: "user" | "model"; text: string };
 
 // Dictionnaire local 5 langues (UI du chat — le contenu des réponses vient de l'IA dans la langue de la question).
-const D: Record<string, { title: string; sub: string; hint: string; ph: string; thinking: string; errReply: string; errConn: string; sug: string[] }> = {
+const D: Record<string, { title: string; sub: string; hint: string; ph: string; thinking: string; errReply: string; errConn: string; sug: string[]; verrou: string; verrouCta: string; quota: string }> = {
   fr: {
     title: "Pose ta question au coach IA", sub: "Une réponse claire, pour tous les niveaux — même grand débutant.",
     hint: "Choisis une question ou écris la tienne 👇", ph: "Écris ta question… (ex : comment gérer une côte ?)",
-    thinking: "Le coach réfléchit…", errReply: "Désolé, je n'ai pas pu répondre. Réessaie dans un instant 🙏", errConn: "Connexion impossible pour le moment.",
+    thinking: "Le coach réfléchit…", errReply: "Désolé, je n'ai pas pu répondre. Réessaie dans un instant 🙏", errConn: "Connexion impossible pour le moment.", verrou: "Poser tes questions au coach sur les cours fait partie des formules Starter et Premium.", verrouCta: "Voir les formules", quota: "Tu as atteint ta limite d'échanges avec l'IA pour aujourd'hui.",
     sug: ["C'est quoi la VMA, simplement ?", "Combien de fois courir par semaine pour débuter ?", "Que manger avant et pendant une course longue ?", "Comment choisir mes chaussures de running ?", "Pourquoi courir lentement me fait progresser ?", "Comment préparer mon premier trail ?"],
   },
   en: {
     title: "Ask the AI coach", sub: "A clear answer, for every level — even complete beginners.",
     hint: "Pick a question or write your own 👇", ph: "Type your question… (e.g. how do I handle hills?)",
-    thinking: "The coach is thinking…", errReply: "Sorry, I couldn't answer. Try again in a moment 🙏", errConn: "Connection unavailable right now.",
+    thinking: "The coach is thinking…", errReply: "Sorry, I couldn't answer. Try again in a moment 🙏", errConn: "Connection unavailable right now.", verrou: "Asking the coach about the lessons is part of the Starter and Premium plans.", verrouCta: "See the plans", quota: "You've reached today's AI limit.",
     sug: ["What is MAS (VMA), simply?", "How many runs per week to get started?", "What should I eat before and during a long race?", "How do I choose my running shoes?", "Why does running slow make me faster?", "How do I prepare my first trail race?"],
   },
   de: {
     title: "Frag den KI-Coach", sub: "Eine klare Antwort, für jedes Niveau — auch für absolute Anfänger.",
     hint: "Wähle eine Frage oder schreibe deine eigene 👇", ph: "Schreibe deine Frage… (z. B. wie laufe ich Anstiege?)",
-    thinking: "Der Coach überlegt…", errReply: "Entschuldige, ich konnte nicht antworten. Versuch es gleich nochmal 🙏", errConn: "Verbindung derzeit nicht möglich.",
+    thinking: "Der Coach überlegt…", errReply: "Entschuldige, ich konnte nicht antworten. Versuch es gleich nochmal 🙏", errConn: "Verbindung derzeit nicht möglich.", verrou: "Dem Coach Fragen zu den Kursen zu stellen ist Teil der Tarife Starter und Premium.", verrouCta: "Tarife ansehen", quota: "Du hast dein KI-Tageslimit erreicht.",
     sug: ["Was ist die vVO2max (MAS), einfach erklärt?", "Wie oft pro Woche laufen für den Einstieg?", "Was essen vor und während eines langen Laufs?", "Wie wähle ich meine Laufschuhe?", "Warum macht langsames Laufen mich schneller?", "Wie bereite ich meinen ersten Trail vor?"],
   },
   es: {
     title: "Pregunta al coach IA", sub: "Una respuesta clara, para todos los niveles — incluso principiantes.",
     hint: "Elige una pregunta o escribe la tuya 👇", ph: "Escribe tu pregunta… (ej.: ¿cómo gestiono una cuesta?)",
-    thinking: "El coach está pensando…", errReply: "Lo siento, no pude responder. Inténtalo de nuevo en un momento 🙏", errConn: "Conexión no disponible ahora mismo.",
+    thinking: "El coach está pensando…", errReply: "Lo siento, no pude responder. Inténtalo de nuevo en un momento 🙏", errConn: "Conexión no disponible ahora mismo.", verrou: "Hacer preguntas al coach sobre los cursos forma parte de los planes Starter y Premium.", verrouCta: "Ver los planes", quota: "Has alcanzado tu límite diario de IA.",
     sug: ["¿Qué es la VAM, explicado simple?", "¿Cuántas veces correr por semana para empezar?", "¿Qué comer antes y durante una carrera larga?", "¿Cómo elegir mis zapatillas de running?", "¿Por qué correr despacio me hace progresar?", "¿Cómo preparar mi primer trail?"],
   },
   pt: {
     title: "Pergunta ao coach IA", sub: "Uma resposta clara, para todos os níveis — mesmo principiantes.",
     hint: "Escolhe uma pergunta ou escreve a tua 👇", ph: "Escreve a tua pergunta… (ex.: como gerir uma subida?)",
-    thinking: "O coach está a pensar…", errReply: "Desculpa, não consegui responder. Tenta novamente daqui a pouco 🙏", errConn: "Ligação indisponível de momento.",
+    thinking: "O coach está a pensar…", errReply: "Desculpa, não consegui responder. Tenta novamente daqui a pouco 🙏", errConn: "Ligação indisponível de momento.", verrou: "Fazer perguntas ao coach sobre os cursos faz parte dos planos Starter e Premium.", verrouCta: "Ver os planos", quota: "Atingiste o teu limite diário de IA.",
     sug: ["O que é a VAM, explicado de forma simples?", "Quantas vezes correr por semana para começar?", "O que comer antes e durante uma prova longa?", "Como escolher as minhas sapatilhas de corrida?", "Porque é que correr devagar me faz progredir?", "Como preparar o meu primeiro trail?"],
   },
 };
@@ -48,6 +49,10 @@ export function CoursChat() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  // ⚠️ UN REFUS DE FORMULE N'EST PAS UNE PANNE (30/10/2026). La route répond 402 avec un code
+  // (« formule_insuffisante ») que l'écran affichait TEL QUEL dans un toast d'erreur : un compte
+  // gratuit lisait un code technique au lieu d'apprendre que la fonction est dans Starter.
+  const [verrou, setVerrou] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages, loading]);
@@ -75,8 +80,10 @@ export function CoursChat() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: q, history: messages }),
       });
+      if (r.status === 402) { setVerrou(true); return; }
       const j = await r.json();
-      if (j.error) { toast.error(j.error); setMessages((m) => [...m, { role: "model", text: d.errReply }]); }
+      if (r.status === 429) setMessages((m) => [...m, { role: "model", text: d.quota }]);
+      else if (j.error) { toast.error(d.errReply); setMessages((m) => [...m, { role: "model", text: d.errReply }]); }
       else setMessages((m) => [...m, { role: "model", text: j.reply }]);
     } catch {
       toast.error("Connexion impossible");
@@ -142,6 +149,13 @@ export function CoursChat() {
       </div>
 
       {/* Saisie */}
+      {verrou && (
+        <p className="flex flex-wrap items-center gap-2 border-t border-zinc-100 px-4 py-3 text-sm leading-relaxed text-zinc-700">
+          <Lock className="h-3.5 w-3.5 flex-shrink-0 text-zinc-500" />
+          <span className="min-w-0 flex-1">{d.verrou}</span>
+          <Link href="/pricing" className="text-xs font-semibold text-emerald-700 underline-offset-2 hover:underline">{d.verrouCta}</Link>
+        </p>
+      )}
       <form onSubmit={(e) => { e.preventDefault(); send(input); }} className="flex items-center gap-2 border-t border-zinc-100 p-3">
         <input
           value={input} onChange={(e) => setInput(e.target.value)}

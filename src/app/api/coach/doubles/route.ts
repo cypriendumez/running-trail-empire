@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildAthleteContext } from "@/lib/ai/coachContext";
+import { COLONNES_ACCES, lectureDuCoach } from "@/lib/billing/access";
 
 /**
  * GET /api/coach/doubles → l'athlète peut-il doubler, et sinon que lui manque-t-il ?
@@ -25,9 +26,13 @@ export async function GET() {
     // Client admin : `buildAthleteContext` lit des tables (wellness, séances, objectif)
     // dont certaines politiques ne rendent que ses propres lignes — c'est bien ce qu'on
     // veut, et l'identifiant vient de la session, jamais du corps de la requête.
+    // La MÊME lecture que le plan (`lectureDuCoach`) : un verdict tiré de signaux que le
+    // plan de cette formule ne lit pas le contredirait au prochain recalcul.
+    const { data: acces } = await sb.from("profiles").select(COLONNES_ACCES).eq("id", user.id).maybeSingle();
     const ctx = await buildAthleteContext(
       createAdminClient() as unknown as Parameters<typeof buildAthleteContext>[0],
       user.id,
+      lectureDuCoach(acces as Parameters<typeof lectureDuCoach>[0]),
     );
     return NextResponse.json({
       ...ctx.doubles,

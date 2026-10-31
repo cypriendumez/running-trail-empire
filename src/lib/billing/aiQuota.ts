@@ -64,15 +64,16 @@ export const TYPE_QUOTA = "ai_quota";
  *
  *   Starter  9,99 €/mois (99,90 €/an) → 10 appels/j = 0,90 €/mois au pire
  *              = 11 % du net mensuel, 13 % du net ANNUEL — marge brute 87 %
- *   Premium 14,99 €/mois (149,90 €/an) → 30 appels/j = 2,70 €/mois au pire
- *              = 22 % du net mensuel, 26 % du net ANNUEL — marge brute 74 %
+ *   Premium 14,99 €/mois (119,90 €/an depuis le 30/10/2026) → 30 appels/j = 2,70 €/mois au pire
+ *              = 22 % du net mensuel, 33 % du net ANNUEL — marge brute 67 % au pire
  *
  * ⚠️ Les MONTANTS ont bougé (0,87 → 0,90 et 2,61 → 2,70) avec l'invite plus riche, mais
  * les POURCENTAGES sont inchangés au point de pourcentage près : la marge tient. C'est
  * elle qu'il faut surveiller, pas les euros — un plafond se juge en part du revenu.
  *
- * ⚠️ C'est le tarif ANNUEL qui contraint, pas le mensuel : deux mois offerts diminuent
- * le revenu sans diminuer le plafond. Une remise de −33 % (80 €/an, comme envisagé un
+ * ⚠️ C'est le tarif ANNUEL qui contraint, pas le mensuel : les mois offerts diminuent
+ * le revenu sans diminuer le plafond. Premium à 119,90 €/an garde environ deux tiers
+ * de marge même si l'abonné saturait ses 30 appels chaque jour de l'année. Une remise de −33 % (80 €/an, comme envisagé un
  * moment) aurait ramené Starter à 12 appels/jour maximum pour tenir la marge.
  *
  * Ce sont des PIRES CAS : un athlète qui saturerait son plafond tous les jours du
@@ -126,9 +127,10 @@ export const PLAFOND_JOUR: Record<Acces, number> = {
   // gratuitement tout ce qui ne coûte rien (le plan, la synchro, les courses) et rien
   // de ce qui coûte. C'est ce qui protège la marge sans fermer la porte à personne.
   gratuit: 0,
-  // L'essai montre le niveau Premium : juger le module sur la formule basse ferait
-  // choisir Starter par méconnaissance, ou renoncer.
-  essai: 30,
+  // L'essai montre les FONCTIONS Premium (on ne choisit pas une formule qu'on n'a pas vue),
+  // mais avec le VOLUME d'IA de Starter (Cyprien, 30/10/2026 : « mets comme le Starter ») :
+  // sept jours suffisent à juger, et un essai à 30 appels/jour se paie sans rien rapporter.
+  essai: 10,
   starter: 10,
   premium: 30,
 };

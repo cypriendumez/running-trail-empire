@@ -43,6 +43,9 @@ export type SeanceBrute = {
   avg_hr?: number | null; max_hr?: number | null;
   elevation_gain_m?: number | null; hr_zone_seconds?: unknown;
   avg_cadence_spm?: number | null; weather_temp_c?: number | null;
+  // La foulée et la dérive cardiaque, lues pour l'analyse COMPLÈTE (Premium) seulement.
+  cardiac_decoupling?: number | null; avg_power_watts?: number | null; ground_contact_ms?: number | null;
+  vertical_oscillation_cm?: number | null; stride_length_m?: number | null;
 };
 
 export type Reperes = { fcMax?: number | null; vma?: number | null; allureFacile?: string | null };
@@ -70,6 +73,10 @@ export type FaitsSeance = {
   dplus: number | null;
   tempC: number | null;
   cadence: number | null;
+  /** Dérive cardiaque (%), mesurée sur une sortie continue ; `null` si la montre ne l'a pas. */
+  derive: number | null;
+  /** La foulée, champ par champ : chacun `null` s'il n'a pas été mesuré. */
+  foulee: { puissanceW: number | null; contactSolMs: number | null; oscillationCm: number | null; longueurM: number | null };
   /** Rang parmi les séances comparables, du plus rapide au plus lent. */
   rang: { place: number; total: number } | null;
   prescrit: { type: string; titre: string } | null;
@@ -166,6 +173,11 @@ export function faitsDeSeance(
     allureCorrigee: allureCorrigee == null ? null : Math.round(allureCorrigee * 100) / 100,
     fcMoy, fcMax: positif(s.max_hr), partFcMax, intensite, zonesMin,
     dplus: n(s.elevation_gain_m), tempC: n(s.weather_temp_c), cadence: positif(s.avg_cadence_spm),
+    derive: n(s.cardiac_decoupling) == null ? null : Math.round(n(s.cardiac_decoupling)! * 10) / 10,
+    foulee: {
+      puissanceW: positif(s.avg_power_watts), contactSolMs: positif(s.ground_contact_ms),
+      oscillationCm: positif(s.vertical_oscillation_cm), longueurM: positif(s.stride_length_m),
+    },
     rang,
     prescrit: prescrit?.type ? { type: String(prescrit.type), titre: String(prescrit.titre ?? "") } : null,
     manques,

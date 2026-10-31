@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import Link from "next/link";
 import { Loader2, Check, Pencil, Search, MapPin, Flag } from "lucide-react";
 import { btnClass } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -188,6 +189,10 @@ export function ObjectiveCard({ objective, derniereCourse = null, currentVma, au
               <span className="tabular-nums">{objective.distanceKm.toLocaleString(lang)} km</span>
               <span>{formatDateCivile(objective.raceDate, lang, { day: "numeric", month: "long", year: "numeric" })}</span>
               {daysTo != null && daysTo >= 0 && <span className="font-semibold tabular-nums text-[#059669]">J-{daysTo}</span>}
+              {/* Le pack jour J (Premium) : visible pour tous, la page dit ce qu'il contient à qui ne l'a pas. */}
+              <Link href="/dashboard/jour-j" className="inline-flex items-center gap-1 font-semibold text-emerald-700 underline-offset-2 hover:underline">
+                <Flag className="h-3 w-3" /> {t("obj.packJourJ")}
+              </Link>
             </p>
           </div>
           {/* Le chrono, en chiffres de course : c'est lui qu'on vient relire. */}

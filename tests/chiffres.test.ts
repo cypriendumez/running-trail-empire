@@ -28,7 +28,9 @@ import { ARTICLES } from "../src/app/blog/articles";
 import { ARTICLES_I18N } from "../src/app/blog/articlesI18n";
 import { LEGAL } from "../src/app/legalI18n";
 import { accesDe, peut } from "../src/lib/billing/access";
-import { PRIX_AFFICHES } from "../src/lib/billing/prix";
+import { PRIX_AFFICHES, REMISE_ETUDIANTE_PCT } from "../src/lib/billing/prix";
+import { LANDING } from "../src/components/landing/landingI18n";
+import { PLAFOND_JOUR } from "../src/lib/billing/aiQuota";
 import { ATTRIBUTION_GARMIN, PAGES_ATTRIBUTION } from "../src/components/legal/attributionI18n";
 import { liensStore } from "../src/lib/brand/stores";
 import { estAdmin, adminsAutorises, emailEditeur, ADMIN_PAR_DEFAUT } from "../src/lib/admin/acces";
@@ -1118,20 +1120,21 @@ test("ce que la page des tarifs promet, le verrou l'accorde vraiment", () => {
   // vérifiable — les capacités, pas la prose.
   //
   // ⚠️ DÉCOUPAGE DU 22/10/2026 (Cyprien). Le gratuit reçoit ses séances vers son
-  // objectif, sans analyse de ses données ; l'analyse développée, le GPX et le kiné sont
-  // dans LES DEUX formules payantes ; Premium garde le coach avancé et le triple d'IA.
+  // objectif, sans analyse de ses données ; le GPX et le kiné sont dans LES DEUX formules
+  // payantes ; Premium garde le coach avancé et le triple d'IA. Depuis le 30/10/2026,
+  // Starter LIT L'ESSENTIEL et Premium TOUT (`analyse_complete`).
   assert.ok(!peut("gratuit", "ia"), "le gratuit ne doit RIEN consommer en IA");
   assert.ok(!peut("gratuit", "plan"), "le gratuit ne doit pas avoir le plan adaptatif");
   assert.ok(!peut("gratuit", "gpx"), "le gratuit ne doit pas avoir l'export GPX");
   assert.ok(peut("gratuit", "plan_objectif"), "le gratuit doit recevoir ses séances vers son objectif");
   assert.ok(peut("gratuit", "lecture"), "l'historique reste ouvert : on ne prend personne en otage");
-  for (const c of ["plan_ia", "analyse_longue", "journal", "bilan"] as const) {
+  for (const c of ["plan_ia", "analyse_complete", "bilan", "jour_j"] as const) {
     assert.ok(!peut("gratuit", c), `« ${c} » est ouvert au palier gratuit`);
   }
 
   // Ce que les DEUX formules payantes annoncent, et l'essai qui doit le montrer.
   for (const e of ["starter", "premium", "essai"] as const) {
-    for (const c of ["plan_objectif", "plan", "ia", "gpx", "analyse_longue"] as const) {
+    for (const c of ["plan_objectif", "plan", "ia", "gpx"] as const) {
       assert.ok(peut(e, c), `${e} : « ${c} » est annoncé dans les formules payantes mais fermé`);
     }
   }
@@ -1143,6 +1146,13 @@ test("ce que la page des tarifs promet, le verrou l'accorde vraiment", () => {
   // Le BILAN DE LA SEMAINE (30/10/2026) : plusieurs séances lues ensemble, l'écart Premium qui agit.
   assert.ok(!peut("starter", "bilan"), "le bilan de la semaine est annoncé Premium mais ouvert à Starter");
   assert.ok(peut("premium", "bilan") && peut("essai", "bilan"), "le bilan de la semaine est fermé à Premium ou à l'essai");
+  // STARTER LIT L'ESSENTIEL, PREMIUM TOUT (30/10/2026) : la VFC, la dérive cardiaque et la
+  // foulée, dans le plan comme dans l'analyse d'une séance.
+  assert.ok(!peut("starter", "analyse_complete"), "l'analyse complète est annoncée Premium mais ouverte à Starter");
+  assert.ok(peut("premium", "analyse_complete") && peut("essai", "analyse_complete"), "l'analyse complète est fermée à Premium ou à l'essai");
+  // Le PACK JOUR J (30/10/2026) : réservé à Premium, montré par l'essai.
+  assert.ok(!peut("starter", "jour_j"), "le pack jour J est annoncé Premium mais ouvert à Starter");
+  assert.ok(peut("premium", "jour_j") && peut("essai", "jour_j"), "le pack jour J est fermé à Premium ou à l'essai");
 
   // Les cartes, dans les CINQ langues.
   const tarifs = sansCommentaires(readFileSync(join(ROOT, "src/components/landing/landingI18n.ts"), "utf8"));
@@ -1174,6 +1184,40 @@ test("ce que la page des tarifs promet, le verrou l'accorde vraiment", () => {
   assert.equal(avec("starter", BILAN), 0, "Starter annonce le bilan de la semaine, que sa formule refuse");
   assert.match(sansCommentaires(readFileSync(join(ROOT, "src/app/api/ai/bilan/route.ts"), "utf8")),
     /exigeAcces\(supabase, user\.id, "bilan"\)/, "le bilan de la semaine n'est plus réservé à Premium");
+  const JOURJ = /Pack jour J|Race-day pack|Wettkampf-Paket|Pack día D|Pack dia D/;
+  assert.equal(avec("premium", JOURJ), 5, "le pack jour J n'est pas annoncé dans Premium dans les 5 langues");
+  assert.equal(avec("starter", JOURJ), 0, "Starter annonce le pack jour J, que sa formule refuse");
+  assert.match(sansCommentaires(readFileSync(join(ROOT, "src/app/dashboard/jour-j/page.tsx"), "utf8")),
+    /peut\(accesDe\([^)]*\)\.etat, "jour_j"\)\) return <VerrouJourJ/, "le pack jour J n'est plus réservé à Premium");
+
+  // CE QUE PREMIUM LIT EN PLUS — la VFC, la dérive, la foulée : annoncé dans Premium, et
+  // Starter, qui ne les lit plus, ne doit plus annoncer la VFC.
+  const VFC = /VFC|HRV/;
+  const FOULEE = /foulée|stride|Laufdynamik|zancada|passada/i;
+  assert.equal(avec("premium", VFC), 5, "Premium n'annonce pas la lecture de la VFC dans les 5 langues");
+  assert.equal(avec("premium", FOULEE), 5, "Premium n'annonce pas la lecture de la foulée dans les 5 langues");
+  assert.equal(avec("starter", VFC), 0, "Starter annonce la VFC, que son plan ne lit plus");
+  assert.equal(avec("starter", /complète|Full AI|Vollständige|completo|completa/i), 0, "Starter annonce une analyse complète, réservée à Premium");
+  // LES ÉCHANGES AFFICHÉS SONT CEUX QUE LE CODE ACCORDE : 10 en Starter, 30 en Premium.
+  for (const [cle, n] of [["starter", PLAFOND_JOUR.starter], ["premium", PLAFOND_JOUR.premium]] as const) {
+    assert.equal(avec(cle, new RegExp(`\\b${n} (échanges|AI exchanges|KI-Dialoge|intercambios|trocas)`)), 5, `${cle} n'annonce pas ses ${n} échanges par jour dans les 5 langues`);
+  }
+
+  // LE TARIF ÉTUDIANT (30/10/2026) : −20 %, par un code demandé et saisi au paiement Stripe.
+  assert.equal(REMISE_ETUDIANTE_PCT, 20, "le tarif étudiant n'est plus de −20 %");
+  for (const [l, d] of Object.entries(LANDING)) {
+    assert.ok(d.pricing.etudiant.includes("{pct}"), `${l} : le pourcentage étudiant est écrit en dur`);
+    assert.ok(!/\b20\b/.test(d.pricing.etudiant), `${l} : « 20 » recopié dans le texte étudiant`);
+  }
+  for (const f of ["src/app/page.tsx", "src/app/pricing/page.tsx"]) {
+    assert.match(sansCommentaires(readFileSync(join(ROOT, f), "utf8")), /<OffreEtudiante texte=/, `${f} n'affiche plus le tarif étudiant`);
+  }
+  const offre = sansCommentaires(readFileSync(join(ROOT, "src/components/landing/OffreEtudiante.tsx"), "utf8"));
+  assert.match(offre, /replace\("\{pct\}", String\(REMISE_ETUDIANTE_PCT\)\)/, "l'offre étudiante n'affiche plus la constante");
+  assert.match(offre, /mailto:\$\{EDITEUR\.email\}/, "la demande de code ne part plus vers l'adresse de l'éditeur");
+  // Sans le champ de code au paiement, le code étudiant ne peut être saisi nulle part.
+  assert.match(sansCommentaires(readFileSync(join(ROOT, "src/app/api/stripe/checkout/route.ts"), "utf8")), /allow_promotion_codes: true/,
+    "le paiement n'accepte plus de code : le tarif étudiant est annoncé mais impossible");
 
   // ⚠️ AUCUN BADGE DE POPULARITÉ. « Le plus demandé » s'affichait sur Premium alors
   // qu'aucun abonnement n'avait été vendu : un fait inventé, comme les faux avis.

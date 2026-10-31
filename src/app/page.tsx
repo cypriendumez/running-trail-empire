@@ -20,8 +20,9 @@ import { LANDING, CATEGORY_CODES } from "@/components/landing/landingI18n";
 import { CHIFFRES_LANDING } from "@/lib/brand/stats";
 // Les montants et le formatage viennent de `lib/billing/prix` — ils étaient
 // recopiés ici, dans /pricing, et une TROISIÈME fois (faux) dans les réglages.
-import { PRIX_AFFICHES as PRIX, euros } from "@/lib/billing/prix";
+import { PRIX_AFFICHES as PRIX, euros, moisOfferts, MOIS_OFFERTS_MAX } from "@/lib/billing/prix";
 import { StoreBadges } from "@/components/layout/StoreBadges";
+import { OffreEtudiante } from "@/components/landing/OffreEtudiante";
 import { WaitlistSection } from "@/components/WaitlistSection";
 import { PHOTOS_PROGRAMMES } from "@/lib/brand/photosProgrammes";
 
@@ -846,7 +847,7 @@ export default function LandingPage() {
                   className={`rounded-full px-5 py-2 text-sm font-semibold transition-colors ${
                     periode === p ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-900"}`}>
                   {p === "mois" ? L.pricing.mois : L.pricing.an}
-                  {p === "an" && <span className={`ml-2 text-[11px] font-bold ${periode === "an" ? "text-[#34d399]" : "text-[#047857]"}`}>{L.pricing.economie}</span>}
+                  {p === "an" && <span className={`ml-2 text-[11px] font-bold ${periode === "an" ? "text-[#34d399]" : "text-[#047857]"}`}>{L.pricing.economie.replace("{n}", String(MOIS_OFFERTS_MAX))}</span>}
                 </button>
               ))}
             </div>
@@ -876,7 +877,7 @@ export default function LandingPage() {
                     <span className={`text-sm ${vedette ? "text-white/40" : "text-zinc-500"}`}>{plan.cle === "gratuit" ? "" : L.pricing.parMois}</span>
                   </div>
                   <div className={`mt-1 h-5 text-xs ${vedette ? "text-white/40" : "text-zinc-500"}`}>
-                    {plan.cle === "gratuit" ? L.pricing.gratuitNote : periode === "an" ? `${euros(centimes, lang)} / ${L.pricing.an.toLowerCase()}` : ""}
+                    {plan.cle === "gratuit" ? L.pricing.gratuitNote : periode === "an" ? `${euros(centimes, lang)} / ${L.pricing.an.toLowerCase()} · ${L.pricing.moisOfferts.replace("{n}", String(moisOfferts(plan.cle as "starter" | "premium")))}` : ""}
                   </div>
                   <p className={`mt-4 text-sm ${vedette ? "text-white/70" : "text-zinc-500"}`}>{plan.pitch}</p>
                   <ul className="mt-6 flex-1 space-y-3">
@@ -895,6 +896,8 @@ export default function LandingPage() {
               );
             })}
           </div>
+
+          <OffreEtudiante texte={L.pricing.etudiant} cta={L.pricing.etudiantCta} sujet={L.pricing.etudiantSujet} />
 
           {/* Ce qui se passe APRÈS l'essai, écrit noir sur blanc. Une app qui coupe tout
               sans prévenir se fait désinstaller ; le dire à l'avance rassure, et c'est vrai. */}

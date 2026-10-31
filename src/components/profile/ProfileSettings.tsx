@@ -14,7 +14,7 @@ import { HEALTH_CONDITIONS, INJURY_ZONES, healthLabel } from "@/data/healthCatal
 import { TERRAINS, terrainLabel } from "@/data/terrainCatalog";
 import type { Lang } from "@/lib/i18n/translations";
 import { JOURS_ESSAI } from "@/lib/billing/access";
-import { PRIX_AFFICHES, euros, MOIS_OFFERTS } from "@/lib/billing/prix";
+import { PRIX_AFFICHES, euros, moisOfferts } from "@/lib/billing/prix";
 import { EDITEUR } from "@/lib/brand/editeur";
 import { messageAbo, type EtatAbonnement } from "@/lib/billing/etatAbonnement";
 import { fenetreRetractation } from "@/lib/billing/retractation";
@@ -2013,8 +2013,8 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                 </div>
                 {/* ⚠️ Ce bloc annonçait « 10 € /mois, ou 84 €/an (-30 %) » pour un palier
                     « Pro ». TROIS chiffres dont aucun n'existait : les formules sont
-                    Starter et Premium, à 9,99 € et 14,99 €, et l'annuel vaut deux mois
-                    offerts (-17 %), pas -30 %. Les montants viennent maintenant de
+                    Starter et Premium, à 9,99 € et 14,99 €, et l'annuel offre deux mois
+                    (Starter) ou quatre (Premium), pas -30 %. Les montants viennent maintenant de
                     `lib/billing/prix`, la même source que l'accueil et /pricing. */}
                 <div className="space-y-2 mb-4">
                   {(["starter", "premium"] as const).map((f) => (
@@ -2025,7 +2025,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       <span className="ml-auto text-xs text-emerald-400 font-semibold tabular-nums">
                         {tr("sub.yearly")
                           .replace("{an}", euros(PRIX_AFFICHES[f].an, lang))
-                          .replace("{mois}", String(MOIS_OFFERTS))}
+                          .replace("{mois}", String(moisOfferts(f)))}
                       </span>
                     </div>
                   ))}

@@ -20,6 +20,7 @@ import {
   PART_FC_DURE, PART_FC_FACILE, ECART_DISTANCE, COMPARABLES_MIN, FC_PLANCHER,
   type SeanceBrute,
 } from "../src/lib/ai/analyseSeance";
+import { peut } from "../src/lib/billing/access";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -215,6 +216,12 @@ test("l'affichage suit le verrou, il ne le remplace pas", () => {
   assert.match(src, /r\.status === 402/,
     "le refus d'abonnement n'est plus distingué d'une panne : un verrou commercial passerait pour un bug");
   assert.match(src, /tronquee/, "une réponse coupée serait affichée comme complète");
+  // Starter voit, sous son analyse, ce que Premium y ajouterait — et Premium ne le voit pas.
+  assert.match(src, /setComplete\(j\.complete !== false\)/, "l'écran ne sait plus si l'analyse est l'essentielle");
+  assert.match(src, /\{!complete && \(/, "l'analyse essentielle ne dit plus ce que Premium ajoute");
+  const route = codeOf("src/app/api/ai/analyse-seance/route.ts");
+  assert.match(route, /memorise: true, complete: memoComplet \}/, "une analyse mémorisée ne dit plus si elle est complète");
+  assert.match(route, /tronquee: r\.tronquee === true, complete: complet \}/, "une analyse fraîche ne dit plus si elle est complète");
 });
 
 test("Premium reçoit des DIMENSIONS en plus, pas des mots en plus", () => {
@@ -226,25 +233,61 @@ test("Premium reçoit des DIMENSIONS en plus, pas des mots en plus", () => {
   assert.match(src, /function lignesDeFaits\(f: FaitsSeance, lang: Lang, complet: boolean\)/,
     "les faits ne dépendent plus de la formule : les deux clients voient la même chose");
   assert.match(src, /if \(complet\) \{/, "le bloc réservé à la formule haute a disparu");
-  // Les quatre dimensions doivent être DANS ce bloc, pas avant lui.
-  const bloc = src.slice(src.indexOf("if (complet) {"), src.indexOf("if (complet) {") + 700);
+  // Les dimensions doivent être DANS ce bloc, pas avant lui ni après.
+  const bloc = src.slice(src.indexOf("if (complet) {"), src.indexOf("if (f.prescrit)"));
   // ⚠️ ON VISE LA CONDITION, PAS LE MOTIF. Chercher « f.rang » quelque part restait vert
   // quand la ligne devenait `if (false) l.push(\`… ${f.rang.place} …\`)` : le champ
   // apparaissait encore dans le gabarit de texte. C'est le TEST qui décide de l'affichage.
   for (const [motif, quoi] of [
     [/if \(f\.rang\) l\.push/, "le rang"], [/if \(f\.zonesMin\) l\.push/, "les zones"],
     [/if \(f\.cadence != null\) l\.push/, "la cadence"], [/if \(f\.tempC != null\) l\.push/, "la température"],
+    [/if \(foulee\.length\) l\.push/, "la foulée"], [/if \(f\.derive != null\) l\.push/, "la dérive cardiaque"],
   ] as const) {
     assert.match(bloc, motif, `${quoi} n'est plus réservé à la formule haute`);
   }
-  assert.match(src, /lignesDeFaits\(faits, lang, longue\)/, "la formule ne commande plus le contenu des faits");
+  assert.match(src, /lignesDeFaits\(faits, lang, complet\)/, "la formule ne commande plus le contenu des faits");
+  // Les colonnes de la foulée et de la dérive sont LUES : sinon le bloc Premium est vide.
+  const cols = src.match(/const COLS = "([^"]+)"/)?.[1].split(",") ?? [];
+  for (const c of ["cardiac_decoupling", "avg_power_watts", "ground_contact_ms", "vertical_oscillation_cm", "stride_length_m"]) {
+    assert.ok(cols.includes(c), `« ${c} » n'est plus lu : l'analyse Premium ne peut pas en parler`);
+  }
+});
+
+test("la foulée et la dérive : lues quand la montre les mesure, jamais supposées", () => {
+  const f = faitsDeSeance({ ...SEANCE, cardiac_decoupling: 4.26, avg_power_watts: 301.4, ground_contact_ms: 228, vertical_oscillation_cm: 8.4, stride_length_m: 1.32 }, { fcMax: 212 });
+  assert.equal(f.derive, 4.3);
+  assert.deepEqual(f.foulee, { puissanceW: 301.4, contactSolMs: 228, oscillationCm: 8.4, longueurM: 1.32 });
+  const rien = faitsDeSeance(SEANCE, { fcMax: 212 });
+  assert.equal(rien.derive, null, "une dérive annoncée sans mesure");
+  assert.deepEqual(rien.foulee, { puissanceW: null, contactSolMs: null, oscillationCm: null, longueurM: null }, "une foulée annoncée sans mesure");
+  // Une dérive NULLE mesurée reste une mesure : 0 % n'est pas « inconnu ».
+  assert.equal(faitsDeSeance({ ...SEANCE, cardiac_decoupling: 0 }, { fcMax: 212 }).derive, 0);
+});
+
+test("Starter reçoit l'essentiel, Premium et l'essai l'analyse complète", () => {
+  assert.ok(!peut("starter", "analyse_complete"), "Starter reçoit l'analyse complète, réservée à Premium");
+  assert.ok(peut("premium", "analyse_complete") && peut("essai", "analyse_complete"), "Premium ou l'essai ne reçoit plus l'analyse complète");
+});
+
+test("passé à Premium, une séance relue en Starter est relue EN ENTIER, dans la même ligne", () => {
+  // Sans ça, l'abonné qui monte en gamme rouvrait ses séances et lisait pour toujours
+  // l'analyse courte, mémorisée du temps de Starter.
+  const src = codeOf("src/app/api/ai/analyse-seance/route.ts");
+  assert.match(src, /if \(memo\?\.body && \(memoComplet \|\| !complet\)\) return/, "l'analyse essentielle est resservie à Premium");
+  assert.match(src, /const memoComplet = memo\?\.data\?\.complete \?\? memo\?\.data\?\.longue \?\? false;/, "les analyses complètes d'avant le 30/10 seraient refaites et repayées");
+  assert.match(src, /memo\?\.id\s*\?\s*await admin\.from\("notifications"\)\.update\(ligne\)\.eq\("id", memo\.id\)/, "la version complète s'ajoute au lieu de remplacer : le cache n'en lit qu'une, au hasard");
+  assert.match(src, /data: \{ workout_id: workoutId, date: [^}]*complete: complet/, "la ligne ne dit plus si l'analyse est complète");
+  // Et pendant la mise à niveau, l'analyse déjà écrite n'est jamais remplacée par une erreur :
+  // plafond du jour atteint, ou modèle en panne, on la ressert telle quelle.
+  assert.match(src, /if \(refus\) return memo\?\.body \? resservir\(\) : refus\.reponse;/, "le plafond du jour fait perdre l'analyse déjà écrite");
+  assert.match(src, /if \(!r\.ok \|\| !r\.text\?\.trim\(\)\) \{\s*if \(memo\?\.body\) return resservir\(\);/, "une panne du modèle fait perdre l'analyse déjà écrite");
 });
 
 test("l'écart de formule repose sur une capacité, pas sur un nom écrit en dur", () => {
   // Un `tier === "premium"` en dur diverge le jour où une formule est renommée, et il
   // laisserait l'essai — qui montre le niveau Premium — sur la version basse.
   const src = codeOf("src/app/api/ai/analyse-seance/route.ts");
-  assert.match(src, /profilPeut\([^)]*"analyse_longue"\)/, "la capacité n'est plus interrogée");
+  assert.match(src, /profilPeut\([^)]*"analyse_complete"\)/, "la capacité n'est plus interrogée");
   assert.ok(!/"premium"/.test(src), "le nom d'une formule est codé en dur dans la route");
 });
 

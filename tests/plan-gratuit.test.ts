@@ -18,9 +18,9 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { buildAthleteContext, PROFIL_DECLARE } from "../src/lib/ai/coachContext";
+import { buildAthleteContext, PROFIL_DECLARE, COLONNES_AVANCEES, type LectureContexte } from "../src/lib/ai/coachContext";
 import { buildWeekPlan } from "../src/lib/ai/autoPlan";
-import { peut } from "../src/lib/billing/access";
+import { peut, lectureDuCoach } from "../src/lib/billing/access";
 import { aujourdhui, FUSEAU_DEFAUT } from "../src/lib/time/fuseau";
 
 let passed = 0; const fails: string[] = [];
@@ -108,12 +108,15 @@ const EPUISE = {
 const BASE = [{ vma_kmh: 16, max_hr: 199, resting_hr: 44, lt_hr: 176, tested_at: ilYa(20) }];
 
 async function contexte(mesures: typeof FRAIS, profilMesure: Record<string, unknown>, objectifSeul: boolean) {
+  return contexteLu(mesures, profilMesure, { objectifSeul });
+}
+async function contexteLu(mesures: typeof FRAIS, profilMesure: Record<string, unknown>, lecture: LectureContexte) {
   const { client, lus } = fauxClient({
     profiles: [{ ...DECLARE, ...profilMesure }],
     performance_baselines: BASE,
     ...mesures,
   });
-  const ctx = await buildAthleteContext(client, "u", { objectifSeul });
+  const ctx = await buildAthleteContext(client, "u", lecture);
   return { ctx, lus };
 }
 /** Le plan tel que l'athlète le lit : type, titre, détail, pour chaque jour. */
@@ -163,11 +166,12 @@ async function main() {
   console.log("\nCE QUI EN SORT");
 
   await test("deux athlètes que tout sépare sauf l'objectif et le déclaré : le MÊME plan gratuit", async () => {
-    const ctxA = (await contexte(FRAIS, MESURE_A, true)).ctx;
+    // Le MÊME ressenti déclaré des deux côtés : depuis le 30/10/2026, il fait partie du
+    // déclaré que le gratuit lit (test suivant). Tout le reste les sépare.
+    const ctxA = (await contexte({ ...FRAIS, notifications: EPUISE.notifications }, MESURE_A, true)).ctx;
     const ctxB = (await contexte(EPUISE, MESURE_B, true)).ctx;
-    // Le VERDICT du jour et ses motifs aussi : un ressenti « 9/10 » qui passe en orange ne
-    // change pas forcément la séance, mais il s'affiche sur le calendrier — c'est déjà
-    // une analyse de séance que le gratuit ne fait pas.
+    // Le VERDICT du jour et ses motifs aussi : ils s'affichent sur le calendrier, et ne
+    // doivent rien devoir aux mesures.
     assert.equal(ctxB.readiness.level, ctxA.readiness.level, "le verdict du jour du gratuit dépend encore des mesures ou du ressenti");
     assert.deepEqual(ctxB.readiness.reasons, ctxA.readiness.reasons, "les motifs du verdict gratuit citent des mesures ou le ressenti");
     const a = empreinte(ctxA);
@@ -175,6 +179,18 @@ async function main() {
     // Sept JOURS, pas sept lignes : un jour peut porter deux séances (renfo du soir).
     assert.equal(new Set(a.split("\n").map((l) => l.slice(0, 10))).size, 7, "le plan gratuit ne couvre plus sept jours");
     assert.equal(b, a, "le plan gratuit dépend encore du sommeil, de la VFC, de la FC ou du ressenti");
+  });
+
+  await test("le RESSENTI déclaré est lu par le gratuit : un « 9/10 » allume le verdict, la note libre non", async () => {
+    // Cyprien, 30/10/2026 : « ressenti lu par le plan gratuit ». Ce n'est pas une mesure,
+    // c'est ce que l'athlète DIT de sa séance — et un plan qui ne l'écoute pas le blesse.
+    const sans = (await contexte(FRAIS, MESURE_A, true)).ctx;
+    const avec = (await contexte({ ...FRAIS, notifications: [{ type: "session_feedback", data: { rpe: 9, note: "jambes lourdes", pain: [] } }] }, MESURE_A, true)).ctx;
+    assert.equal(sans.readiness.level, "vert", "sans ressenti, le verdict gratuit n'est plus neutre : le jeu de données ne prouve rien");
+    assert.notEqual(avec.readiness.level, "vert", "un ressenti de 9/10 ne change rien au verdict du plan gratuit");
+    assert.ok(avec.readiness.reasons.some((r) => /9/.test(r)), "le motif ne cite pas le ressenti déclaré");
+    // La note libre, elle, n'est lue que par un modèle : elle n'entre pas dans le gratuit.
+    assert.ok(!avec.text.includes("jambes lourdes"), "la note libre atteint le contexte du plan gratuit");
   });
 
   await test("contre-épreuve : le plan PAYANT, lui, ne traite pas ces deux athlètes pareil", async () => {
@@ -198,12 +214,63 @@ async function main() {
     assert.ok((await contexte(EPUISE, MESURE_B, false)).ctx.lastSession, "contre-épreuve : le payant ne la reçoit plus");
   });
 
+  console.log("\nSTARTER LIT L'ESSENTIEL, PREMIUM LIT TOUT (30/10/2026)");
+
+  // Deux athlètes PAREILS en tout, sauf ce que seul Premium lit : la VFC effondrée depuis
+  // quatre matins, la dérive cardiaque, la foulée.
+  const FINS = (x: typeof FRAIS) => ({ ...x, workouts: x.workouts.map((w) => ({ ...w, cardiac_decoupling: 12, avg_cadence_spm: 150, vertical_ratio_pct: 11, ground_contact_ms: 300 })) });
+  const VFC_BASSE = FINS({ ...FRAIS, hrv_data: EPUISE.hrv_data });
+
+  await test("la lecture suit la formule : gratuit l'objectif, Starter l'essentiel, Premium et l'essai tout", () => {
+    const vieux = new Date(Date.now() - 60 * 86400000).toISOString();
+    assert.deepEqual(lectureDuCoach({ created_at: vieux, subscription_tier: null }), { objectifSeul: true, essentielle: false });
+    assert.deepEqual(lectureDuCoach({ subscription_tier: "starter" }), { objectifSeul: false, essentielle: true }, "Starter lit tout");
+    assert.deepEqual(lectureDuCoach({ subscription_tier: "premium" }), { objectifSeul: false, essentielle: false }, "Premium ne lit pas tout");
+    assert.deepEqual(lectureDuCoach({ created_at: new Date().toISOString(), subscription_tier: null }), { objectifSeul: false, essentielle: false }, "l'essai ne montre pas la lecture Premium");
+  });
+
+  await test("Starter : ni VFC ni foulée ni dérive LUES ; le sommeil, la FC et la charge, oui", async () => {
+    const { lus } = await contexteLu(VFC_BASSE, MESURE_B, { essentielle: true });
+    const tables = new Set(lus.map((l) => l.table));
+    assert.ok(!tables.has("hrv_data"), "le plan Starter lit la VFC");
+    assert.ok(tables.has("sleep_data"), "le plan Starter ne lit plus le sommeil : il n'adapte plus à la récupération");
+    const seances = lus.filter((l) => l.table === "workouts").map((l) => l.colonnes).join(",");
+    for (const c of COLONNES_AVANCEES.split(",")) assert.ok(!seances.split(",").includes(c), `le plan Starter lit « ${c} »`);
+    for (const c of ["avg_hr", "max_hr", "tss", "hr_zone_seconds"]) assert.ok(seances.split(",").includes(c), `le plan Starter ne lit plus « ${c} »`);
+    // Contre-épreuve : Premium lit tout, sinon le test ne prouve rien.
+    const premium = (await contexteLu(VFC_BASSE, MESURE_B, {})).lus;
+    assert.ok(premium.some((l) => l.table === "hrv_data"), "le plan Premium ne lit plus la VFC");
+    const colsPremium = premium.filter((l) => l.table === "workouts").map((l) => l.colonnes).join(",").split(",");
+    for (const c of COLONNES_AVANCEES.split(",")) assert.ok(colsPremium.includes(c), `le plan Premium ne lit plus « ${c} »`);
+  });
+
+  await test("ce que seul Premium lit change le plan Premium, jamais le plan Starter", async () => {
+    const starterA = empreinte((await contexteLu(FRAIS, MESURE_A, { essentielle: true })).ctx);
+    const starterB = empreinte((await contexteLu(VFC_BASSE, MESURE_A, { essentielle: true })).ctx);
+    assert.equal(starterB, starterA, "le plan Starter dépend de la VFC, de la dérive ou de la foulée");
+    const premiumA = empreinte((await contexteLu(FRAIS, MESURE_A, {})).ctx);
+    const premiumB = empreinte((await contexteLu(VFC_BASSE, MESURE_A, {})).ctx);
+    assert.notEqual(premiumB, premiumA, "contre-épreuve : ces signaux ne changent rien au plan Premium, le test ne prouverait rien");
+  });
+
+  await test("Starter reste un plan ADAPTATIF : des nuits courtes le changent", async () => {
+    const a = empreinte((await contexteLu(FRAIS, MESURE_A, { essentielle: true })).ctx);
+    const b = empreinte((await contexteLu({ ...FRAIS, sleep_data: EPUISE.sleep_data }, MESURE_A, { essentielle: true })).ctx);
+    assert.notEqual(b, a, "le plan Starter ignore le sommeil : il est tombé au niveau du gratuit");
+    assert.equal((await contexteLu(FRAIS, MESURE_A, { essentielle: true })).ctx.essentielle, true, "le contexte ne dit plus qu'il est réduit");
+  });
+
+  await test("le doublé et la séance du jour lisent comme le plan de la formule", () => {
+    assert.match(codeNu("src/app/api/coach/doubles/route.ts"), /buildAthleteContext\([^;]*lectureDuCoach\(/, "les doubles lisent autre chose que le plan");
+    assert.match(codeNu("src/app/api/ai/session/route.ts"), /buildAthleteContext\(supabase, user\.id, lectureDuCoach\(acces\)\)/, "la séance du jour lit autre chose que le plan");
+  });
+
   console.log("\nLE BRANCHEMENT");
 
   await test("le coach autonome construit le gratuit en objectif seul, sans montre ni e-mail ni modèle", () => {
     const src = codeNu("src/lib/ai/autoCoach.ts");
-    assert.match(src, /const objectifSeul = !planComplet && profilPeut\(acces, "plan_objectif"\);/);
-    assert.match(src, /buildAthleteContext\([^;]*\{ objectifSeul \}\)/, "le contexte n'est plus construit en objectif seul");
+    assert.match(src, /const \{ objectifSeul, essentielle \} = lectureDuCoach\(acces\);/, "la lecture du coach ne vient plus de la formule");
+    assert.match(src, /buildAthleteContext\([^;]*\{ objectifSeul, essentielle \}\)/, "le contexte n'est plus construit selon la formule");
     assert.match(src, /if \(athleteId && apiKey && planComplet\)/, "le plan gratuit part sur la montre");
     assert.match(src, /if \(opts\.notify && planComplet\)/, "le plan gratuit déclenche l'e-mail qui analyse la séance");
     assert.match(src, /const coachAvance = planComplet && /, "le plan gratuit est relu par un modèle");
