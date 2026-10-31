@@ -111,7 +111,11 @@ export const PLAFOND_SUPPORT_JOUR: Record<Acces, number> = {
   // l'application ne coûte pas le même contexte qu'un appel au coach, et bloquer le
   // support d'un client qui paie est le pire endroit où économiser.
   starter: 20,
-  premium: 30,
+  // 20 et non plus 30 (Cyprien, 31/10/2026, après l'audit de rentabilité) : à 30, un abonné
+  // Premium à l'année avec la remise fondateur (−30 %) ou étudiante (−20 %) qui saturerait
+  // chaque jour le coach ET l'aide coûtait plus qu'il ne rapporte. Premium reste le plus servi
+  // sur ce qui fait sa valeur — le coach (`PLAFOND_JOUR`, 30 contre 10) —, pas sur l'aide.
+  premium: 20,
 };
 
 /** Quel compteur du jour : le coach et l'analyse, ou la bulle d'aide. */
