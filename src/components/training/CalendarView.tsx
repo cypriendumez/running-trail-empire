@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import {
   Target, X, Plus, StickyNote, Flag, Loader2, Trash2,
   ChevronLeft, ChevronRight, LayoutGrid, List, CalendarRange,
-  CalendarDays, CalendarClock, ListChecks, ArrowLeft, Sparkles, ChevronDown, AlertTriangle } from "lucide-react";
+  CalendarDays, CalendarClock, ListChecks, ArrowLeft, Sparkles, ChevronDown, AlertTriangle, Crown } from "lucide-react";
+import Link from "next/link";
 import { RenfoGuide } from "@/components/training/RenfoGuide";
 import { fmtDistance, type UnitSystem } from "@/lib/units";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -17,6 +18,7 @@ import { libelleType } from "@/lib/ai/planI18n";
 import { AvisCoach } from "@/components/training/AvisCoach";
 import { formatDateCivile } from "@/lib/time/fuseau";
 import { useFuseau } from "@/lib/time/FuseauProvider";
+import type { RappelAffiche } from "@/lib/coach/rappelPremium";
 
 /** Le même jour dans une autre langue — affichage seulement (cf. lib/ai/planI18n.ts). */
 export type PlannedText = { title?: string; subtitle?: string; why?: string; tags?: string[] };
@@ -110,7 +112,7 @@ function sessionDetail(type: string, detail: string): SessionDetail | null {
   return { mode: "wrapped", body: extractBody(raw) };
 }
 
-export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], races: racesProp = [], coachState = null, weekStart = "mon", units = "metric", warmupMin = 15, cooldownMin = 10, enPanne = false, realismeMasque = null, vueParDefaut = "month" }: { sessions: Planned[]; notes?: CalNote[]; races?: CalRace[]; coachState?: CoachState | null; weekStart?: "mon" | "sun"; units?: UnitSystem; warmupMin?: number; cooldownMin?: number; /** La lecture des séances a ÉCHOUÉ : le mois est vide par accident, pas parce qu'il n'y a rien. */ enPanne?: boolean; /** Clé de l'avertissement de réalisme que l'athlète a choisi de ne plus voir (réglages). */ realismeMasque?: string | null; /** Vue ouverte à l'arrivée : « agenda » sur téléphone (décidé côté serveur, donc sans clignotement). */ vueParDefaut?: "month" | "agenda" }) {
+export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], races: racesProp = [], coachState = null, rappelPremium = null, weekStart = "mon", units = "metric", warmupMin = 15, cooldownMin = 10, enPanne = false, realismeMasque = null, vueParDefaut = "month" }: { sessions: Planned[]; notes?: CalNote[]; races?: CalRace[]; coachState?: CoachState | null; /** Ce que Premium aurait changé à ce plan (Starter seulement, décidé par la page). */ rappelPremium?: RappelAffiche | null; weekStart?: "mon" | "sun"; units?: UnitSystem; warmupMin?: number; cooldownMin?: number; /** La lecture des séances a ÉCHOUÉ : le mois est vide par accident, pas parce qu'il n'y a rien. */ enPanne?: boolean; /** Clé de l'avertissement de réalisme que l'athlète a choisi de ne plus voir (réglages). */ realismeMasque?: string | null; /** Vue ouverte à l'arrivée : « agenda » sur téléphone (décidé côté serveur, donc sans clignotement). */ vueParDefaut?: "month" | "agenda" }) {
   const { t, lang } = useT();
   // LA SÉANCE EST AFFICHÉE DANS LA LANGUE DE L'ATHLÈTE, résolue ICI et pas au serveur :
   // le sélecteur de langue est instantané et ne recharge pas la page. `type` n'est jamais
@@ -421,7 +423,7 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
 
       <div className="mx-auto max-w-6xl px-0 py-3 sm:px-5 sm:py-6">
       {/* Pourquoi le plan ressemble à ça — voir le commentaire du type CoachState. */}
-      <CoachWhy state={coachState} lang={lang} t={t} sessions={sessionsProp} realismeMasque={realismeMasque} />
+      <CoachWhy state={coachState} rappel={rappelPremium} lang={lang} t={t} sessions={sessionsProp} realismeMasque={realismeMasque} />
 
       {/* Barre de contrôle : navigation période + bascule de vue */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -658,7 +660,7 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
  * On n'affiche rien s'il n'y a rien de notable à dire : un bandeau permanent redevient
  * un décor qu'on ne lit plus.
  */
-function CoachWhy({ state, lang, t, sessions, realismeMasque = null }: { state: CoachState | null; lang: string; t: (k: string, p?: Record<string, string | number>) => string; sessions: Planned[]; realismeMasque?: string | null }) {
+function CoachWhy({ state, rappel = null, lang, t, sessions, realismeMasque = null }: { state: CoachState | null; rappel?: RappelAffiche | null; lang: string; t: (k: string, p?: Record<string, string | number>) => string; sessions: Planned[]; realismeMasque?: string | null }) {
   const fuseau = useFuseau();
   // La clé mémorisée côté serveur, puis celle qu'on vient d'enregistrer d'un clic : le
   // bloc disparaît tout de suite, sans attendre un rechargement. (Déclaré AVANT le
@@ -707,8 +709,13 @@ function CoachWhy({ state, lang, t, sessions, realismeMasque = null }: { state: 
   // défaut du premier jet : la fonction était livrée et invisible pour presque tout le
   // monde.
   if (!noQuality && !easedQuality && !hasObjective && !warnings.length && !state.lastSession?.label && !(state.qualiteManquee ?? []).length) {
-    return semaine.length
-      ? <div className="mb-4"><AvisCoach week={semaine} qBudget={state.qBudget ?? 0} raisons={reasons} /></div>
+    return semaine.length || rappel
+      ? (
+        <div className="mb-4">
+          {rappel && <RappelPremium rappel={rappel} lang={lang} t={t} />}
+          {semaine.length > 0 && <AvisCoach week={semaine} qBudget={state.qBudget ?? 0} raisons={reasons} />}
+        </div>
+      )
       : null;
   }
 
@@ -867,7 +874,31 @@ function CoachWhy({ state, lang, t, sessions, realismeMasque = null }: { state: 
         </div>
       )}
 
+      {/* Hors du repli, comme l'avertissement : il parle de la semaine affichée juste au-dessous. */}
+      {rappel && <RappelPremium rappel={rappel} lang={lang} t={t} />}
+
       <AvisCoach week={semaine} qBudget={state.qBudget ?? 0} raisons={reasons} />
+    </div>
+  );
+}
+
+/**
+ * « Premium aurait changé ton plan » — l'écart entre le plan Starter et le plan complet,
+ * calculé par le coach (lib/coach/rappelPremium). La phrase est déjà écrite dans les cinq
+ * langues : le composant ne fabrique rien, il choisit la sienne.
+ */
+function RappelPremium({ rappel, lang, t }: { rappel: RappelAffiche; lang: string; t: (k: string) => string }) {
+  const dans = (x: Record<string, string>) => x[lang] ?? x.fr;
+  return (
+    <div className="mt-2 rounded-xl bg-white/70 px-3 py-2 text-sm leading-relaxed text-zinc-700">
+      <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-600">
+        <Crown className="h-3.5 w-3.5" /> {t("cal.premium.titre")}
+      </p>
+      <p className="mt-1">{dans(rappel.phrase)}</p>
+      {rappel.detail && <p className="mt-0.5 text-xs text-zinc-500">{dans(rappel.detail)}</p>}
+      <Link href="/pricing" className="mt-1 inline-block text-xs font-semibold text-emerald-700 underline-offset-2 hover:underline">
+        {t("cal.premium.cta")}
+      </Link>
     </div>
   );
 }
