@@ -373,6 +373,14 @@ export type LectureContexte = {
    * l'athlète comme celui dont la montre ne mesure pas ces signaux. Ignoré si `objectifSeul`.
    */
   essentielle?: boolean;
+  /**
+   * La météo DÉJÀ LUE pour ce même athlète par un autre contexte, à l'instant (le rappel
+   * « Premium aurait changé ton plan » bâtit le plan complet juste après le plan Starter).
+   * Elle ne dépend pas de la formule : la relire coûterait deux appels à Open-Meteo, et un
+   * bulletin rafraîchi entre les deux lectures ferait diverger les deux plans sur la
+   * chaleur, un écart que le rappel attribuerait à tort à ce que lit Premium.
+   */
+  meteo?: Pick<AthleteContext, "forecast" | "altitude" | "heatAcclim">;
 };
 
 /** Les seules colonnes de séance lues pour le palier gratuit : le volume, rien du corps. */
@@ -1274,8 +1282,11 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // mais le relevé réel à la position d'entraînement, et surtout les PRÉVISIONS :
   // anticiper une canicule vaut mieux que la constater après la séance.
   const lat = num(p?.last_lat), lon = num(p?.last_lon);
-  // Prévisions ET altitude en une seule requête : Open-Meteo renvoie les deux.
-  const weather = lat != null && lon != null
+  // Prévisions ET altitude en une seule requête : Open-Meteo renvoie les deux. Déjà lues
+  // par un autre contexte du même athlète (`LectureContexte.meteo`) : on les reprend.
+  const weather = lecture.meteo
+    ? { days: lecture.meteo.forecast, elevationM: lecture.meteo.altitude.elevationM }
+    : lat != null && lon != null
     ? await forecastWithElevation(lat, lon).catch(() => ({ days: [], elevationM: null }))
     : { days: [], elevationM: null };
   const forecast = weather.days;
@@ -1288,7 +1299,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // On compte les jours où il a RÉELLEMENT COURU dans la chaleur, pas les jours
   // calendaires chauds : rester au frais pendant une canicule n'acclimate personne.
   // Un seul appel d'archive couvre les 21 jours.
-  const heatAcclim = await (async () => {
+  const heatAcclim = lecture.meteo ? lecture.meteo.heatAcclim : await (async () => {
     if (lat == null || lon == null) return { hotDays: 0, ...heatAcclimation(0) };
     const past = await archiveDailyMax(lat, lon, 21).catch(() => new Map<string, number>());
     if (!past.size) return { hotDays: 0, ...heatAcclimation(0) };

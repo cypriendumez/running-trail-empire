@@ -12,7 +12,8 @@ import { buildAthleteContext } from "@/lib/ai/coachContext";
 import { buildWeekPlan, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
 import { estQualitePrescrite } from "@/lib/coach/qualiteRecente";
 import { pushIntervalsWorkout, supprimerIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
-import { profilPeut, lectureDuCoach, COLONNES_ACCES } from "@/lib/billing/access";
+import { profilPeut, lectureDuCoach, rappelPremiumPour, COLONNES_ACCES } from "@/lib/billing/access";
+import { actualiserRappelPremium, type IssueRappel } from "@/lib/ai/rappelPremiumServeur";
 import { identifiantsDePaire } from "@/lib/intervals/identifiants";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 import { estAdmin } from "@/lib/admin/acces";
@@ -87,6 +88,8 @@ export type AutoResult = {
   processed: boolean; days?: number; pushed?: number; reason?: string;
   /** E-mail « ton plan est à jour » : envoyé, ou motif de non-envoi. Jamais silencieux. */
   emailed?: boolean; emailSkipped?: string;
+  /** Rappel « Premium aurait changé ton plan » (Starter seulement) : recalculé, inchangé ou en échec. */
+  rappelPremium?: IssueRappel;
 };
 
 export async function autoCoachForUser(
@@ -154,7 +157,9 @@ export async function autoCoachForUser(
   const ctx = await buildAthleteContext(admin as unknown as Parameters<typeof buildAthleteContext>[0], userId, { objectifSeul, essentielle }).catch(() => null);
   if (!ctx) return { processed: false, reason: "ctx_failed" };
 
-  const semaineMoteur = buildWeekPlan(ctx);
+  // L'instant est retenu : le rappel Premium bâtit le plan complet pour le MÊME jour.
+  const maintenant = new Date();
+  const semaineMoteur = buildWeekPlan(ctx, maintenant);
   const today = semaineMoteur[0].date;
 
   // ── LA SÉANCE DÉJÀ COURUE NE SE RÉÉCRIT PAS ─────────────────────────────────
@@ -427,5 +432,13 @@ export async function autoCoachForUser(
     : await admin.from("notifications").insert({ user_id: userId, type: "auto_coach_state", title: "auto-coach", body: "", data: stateData });
   if (eEtat) console.error("[coach-auto] état non enregistré (risque d'e-mails répétés) :", eEtat.message);
 
-  return { processed: true, days: rows.length, pushed, emailed, emailSkipped };
+  // 6) CE QUE PREMIUM AURAIT CHANGÉ — pour un plan bâti sur la lecture essentielle seulement.
+  // Le même moteur sur le contexte complet, aucun modèle ; recalculé seulement quand ses
+  // entrées changent (voir lib/ai/rappelPremiumServeur). Après la publication : le plan de
+  // l'athlète ne doit jamais attendre un rappel commercial.
+  const rappelPremium = rappelPremiumPour(acces)
+    ? await actualiserRappelPremium(admin, { userId, ctx, semaine: semaineMoteur, affichee: semaineCoach, depuis: from, maintenant })
+    : undefined;
+
+  return { processed: true, days: rows.length, pushed, emailed, emailSkipped, ...(rappelPremium ? { rappelPremium } : {}) };
 }

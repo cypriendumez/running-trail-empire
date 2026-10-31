@@ -250,6 +250,22 @@ export function lectureDuCoach(p: ProfilAcces | null | undefined, maintenant?: n
 }
 
 /**
+ * LE RAPPEL « PREMIUM AURAIT CHANGÉ TON PLAN » S'ADRESSE-T-IL À CE COMPTE ?
+ *
+ * À celui dont le plan est construit avec la lecture ESSENTIELLE, et à lui seul : c'est
+ * pour lui que le coach calcule aussi le plan complet, et lui montre l'écart quand il y en
+ * a un (`lib/ai/rappelPremiumServeur`). Le gratuit n'a pas de plan adaptatif à comparer ;
+ * l'essai et Premium lisent déjà tout.
+ *
+ * ⚠️ DÉDUIT DES CAPACITÉS, JAMAIS D'UN NOM DE FORMULE. Une formule ajoutée demain avec le
+ * plan mais sans `analyse_complete` recevra le rappel parce que son plan lit moins, pas
+ * parce que quelqu'un aura pensé à l'inscrire dans une liste.
+ */
+export function rappelPremiumPour(p: ProfilAcces | null | undefined, maintenant?: number): boolean {
+  return lectureDuCoach(p, maintenant).essentielle;
+}
+
+/**
  * Le motif de refus, destiné à être renvoyé tel quel par une route.
  *
  * On ne renvoie JAMAIS un 403 muet : l'athlète doit savoir laquelle des deux
