@@ -80,7 +80,30 @@ async function contexte(profil: Ligne, opts: { seances?: Ligne[]; notifications?
     profiles: [profil], performance_baselines: BASE, workouts: opts.seances ?? VOLUME, notifications: opts.notifications ?? [],
   }), "u");
 }
-const sec = (p: string) => { const m = p.match(/(\d+)'(\d{2})/); return m ? Number(m[1]) * 60 + Number(m[2]) : NaN; };
+/**
+ * Rejoue `fn` comme si l'on était `d` jours plus tard : horloge, séances et test VMA décalés
+ * d'autant. Le plan démarre AUJOURD'HUI, et ce qu'il pose dépend du jour de départ.
+ */
+async function auJour<T>(d: number, fn: (seances: Ligne[], base: Ligne[]) => Promise<T>): Promise<T> {
+  const Reelle = Date, decalage = d * 86400000;
+  class Decalee extends Reelle {
+    constructor(...a: unknown[]) {
+      if (a.length === 0) super(Reelle.now() + decalage);
+      else super(...(a as [string]));
+    }
+    static now() { return Reelle.now() + decalage; }
+  }
+  const plus = (iso: unknown) => {
+    const x = new Reelle(`${iso}T12:00:00Z`); x.setUTCDate(x.getUTCDate() + d); return x.toISOString().slice(0, 10);
+  };
+  (globalThis as { Date: DateConstructor }).Date = Decalee as unknown as DateConstructor;
+  try {
+    return await fn(VOLUME.map((s) => ({ ...s, date: plus(s.date) })), BASE.map((b) => ({ ...b, tested_at: plus(b.tested_at) })));
+  } finally {
+    (globalThis as { Date: DateConstructor }).Date = Reelle;
+  }
+}
+const sec =(p: string) => { const m = p.match(/(\d+)'(\d{2})/); return m ? Number(m[1]) * 60 + Number(m[2]) : NaN; };
 
 async function main() {
   console.log("\nLA RÈGLE — une option explicite, des séances sous le seuil, une dose selon le volume");
@@ -144,13 +167,30 @@ async function main() {
     assert.doesNotMatch(longue!.title, /progressive|allure/i, `sortie longue : ${longue!.title}`);
   });
 
+  // ⚠️ SEPT JOURS DE DÉPART, pas un. Selon le jour, les footings tombent ou non sur des
+  // journées doublées, dont la distance ne dépend pas du budget : les deux plans portent
+  // alors les mêmes. Lancé le seul jour courant, ce test rougissait 4 jours sur 7 (06/11/2026 :
+  // « 26 km avec le double seuil, 26 sans ») quand la semaine restait sous sa cible (≈ 107 km
+  // pour 125). Jamais plus de footings avec le double seuil, et moins le jour où le budget les borne.
   await test("le volume compte la séance du matin : la semaine ne déborde pas de sa cible", async () => {
-    const ctx = await contexte(ELITE);
-    const avec = buildWeekPlan(ctx, new Date());
-    const sans = buildWeekPlan(await contexte({ ...ELITE, double_seuil: false }), new Date());
     const kmFaciles = (p: ReturnType<typeof buildWeekPlan>) => p.filter((j) => j.type === "Endurance")
       .reduce((s, j) => s + Number(/~?(\d+(?:[.,]\d+)?)\s*km/.exec(j.detail)?.[1]?.replace(",", ".") ?? 0), 0);
-    assert.ok(kmFaciles(avec) < kmFaciles(sans), `footings : ${kmFaciles(avec)} km avec le double seuil, ${kmFaciles(sans)} sans`);
+    const constats: string[] = [];
+    let reduits = 0;
+    for (let d = 0; d < 7; d++) {
+      const [avec, sans] = await auJour(d, async (seances, base) => {
+        const plan = async (profil: Ligne) => buildWeekPlan(await buildAthleteContext(fauxClient({
+          profiles: [profil], performance_baselines: base, workouts: seances, notifications: [],
+        }), "u"), new Date());
+        return [await plan(ELITE), await plan({ ...ELITE, double_seuil: false })];
+      });
+      assert.ok(avec.some((j) => /Double seuil/.test(j.title)), `J+${d} : précondition, aucun double seuil posé`);
+      const a = kmFaciles(avec), s = kmFaciles(sans);
+      constats.push(`J+${d} : ${a} km contre ${s}`);
+      assert.ok(a <= s, `J+${d} : le double seuil AJOUTE des footings (${a} km avec, ${s} sans)`);
+      if (a < s) reduits++;
+    }
+    assert.ok(reduits > 0, `les matins ne réduisent jamais les footings : ${constats.join(" ; ")}`);
     assert.match(codeNu("src/lib/ai/autoPlan.ts"), /qualityKept\.length \* QUALITY_KM \+ matinsSeuilKm/, "le constat d'écart de volume oublie les matins");
   });
 
