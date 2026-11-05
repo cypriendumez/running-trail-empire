@@ -29,7 +29,8 @@ test("la feuille de route compte la semaine de course, et l'affûtage descend ju
   const src = codeNu("src/lib/ai/coachContext.ts");
   assert.match(src, /const semainesAvecCourse = Math\.floor\(daysToRace \/ 7\) \+ 1;/);
   assert.match(src, /const W = Math\.min\(semainesAvecCourse, 26\);/);
-  assert.match(src, /if \(daysToRace == null \|\| daysToRace < 0 \|\| !vma\) return \[\];/, "la semaine de course (0 à 6 jours) n'aurait pas de feuille de route");
+  // Depuis le 05/11/2026, la marche-course n'a pas de feuille de route (le programme en tient lieu).
+  assert.match(src, /if \(daysToRace == null \|\| daysToRace < 0 \|\| !vma \|\| marcheCourse\) return \[\];/, "la semaine de course (0 à 6 jours) n'aurait pas de feuille de route");
   // Les parts d'affûtage vivent dans `lib/coach/phase` depuis qu'elles dépendent de la distance
   // (05/11/2026) : la feuille de route doit les lire là, et elles doivent descendre jusqu'au bout.
   assert.match(src, /const partTaper = partAffutage\(wkUntil, objective\?\.distanceKm\);/, "la feuille de route ne lit plus les parts d'affûtage");

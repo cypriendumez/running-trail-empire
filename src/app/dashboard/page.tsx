@@ -154,7 +154,10 @@ export default async function DashboardPage() {
   // ⚠️ LA PHRASE DU JOUR SUIT LE PLAN (lib/dashboard/discipline › phraseDuJour). Une
   // récupération n'est rappelée que tant que sa date de reprise est à venir : l'état du
   // coach peut dater, si aucune séance n'a été synchronisée depuis.
-  const etatCoach = (etatCoachRes.data?.data ?? null) as { qBudget?: unknown; recuperation?: { course?: unknown; reprise?: unknown } | null } | null;
+  const etatCoach = (etatCoachRes.data?.data ?? null) as { qBudget?: unknown; recuperation?: { course?: unknown; reprise?: unknown } | null; marcheCourse?: { etape?: unknown } | null } | null;
+  // Programme marche-course en cours (lib/coach/marcheCourse) : pas de test VMA à réclamer,
+  // le coach n'en prescrit pas tant que l'athlète ne court pas 30 minutes d'affilée.
+  const enMarcheCourse = typeof etatCoach?.marcheCourse?.etape === "number";
   const recupCoach = etatCoach?.recuperation;
   const planCoach = etatCoach ? {
     qBudget: typeof etatCoach.qBudget === "number" ? etatCoach.qBudget : null,
@@ -258,7 +261,7 @@ export default async function DashboardPage() {
         la seule chose sur laquelle on agit en ouvrant l'application (Cyprien, 23/09/2026 :
         « quand j'ouvre l'application on voit toute la page verte »). On demande un avis
         APRÈS avoir rendu service, pas avant. */}
-    <TestVmaBanner measured={vmaMesuree || estFondateur} />
+    <TestVmaBanner measured={vmaMesuree || estFondateur || enMarcheCourse} />
     <BentoDashboard
       donneesIncompletes={donneesIncompletes}
       profile={stripProfileSecrets(profileRes.data)}

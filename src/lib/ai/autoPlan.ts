@@ -14,6 +14,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import type { AthleteContext } from "@/lib/ai/coachContext";
 import { heatAdvice, windAdvice } from "@/lib/weather/openMeteo";
+import { dureesMarcheCourse } from "@/lib/coach/marcheCourse";
 import { choisirJourQualite } from "@/lib/coach/meteoPlacement";
 import { fenetreRespectee } from "@/lib/coach/qualiteRecente";
 import { repartirFootings, varianteFooting } from "@/lib/coach/footings";
@@ -249,6 +250,44 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   const brut = (s: string) => () => s;
   /** Étiquettes : la liste est fixe, chaque langue rend la sienne. */
   const tags = (...keys: (keyof (typeof PLAN_T)["fr"]["tags"])[]) => (l: Lang) => keys.map((k) => PLAN_T[l].tags[k]);
+
+  // ── PROGRAMME MARCHE-COURSE (lib/coach/marcheCourse) ───────────────────────
+  // Qui ne court pas encore 30 minutes d'affilée reçoit SA semaine : trois fois la séance
+  // de son étape, jamais deux jours de suite, un renforcement pour débuter, du repos
+  // ailleurs. Ni qualité, ni sortie longue, ni allure : la séance se mesure en minutes.
+  const mc = ctx.marcheCourse;
+  if (mc) {
+    const voulues = Math.max(2, Math.min(3, ctx.availability.daysPerWeek || 3));
+    const dispo = (i: number) => ctx.availability.days.includes(dates[i].getDay());
+    const poses: number[] = [];
+    for (let i = 0; i <= 6 && poses.length < voulues; i++) if (dispo(i) && !poses.includes(i - 1)) poses.push(i);
+    // Trop peu de jours espacés : les jours disponibles restants, plutôt qu'une séance de moins.
+    for (let i = 0; i <= 6 && poses.length < voulues; i++) if (dispo(i) && !poses.includes(i)) poses.push(i);
+    const seance = mc.seance;
+    const { totalMin } = dureesMarcheCourse(seance);
+    for (const i of poses) put(i, {
+      type: "Marche/course",
+      title: (l) => PLAN_T[l].mcTitre(nRaw(mc.etape, l), nRaw(mc.total, l)),
+      detail: (l) => ("continuMin" in seance
+        ? PLAN_T[l].mcContinu(seance.continuMin)
+        : PLAN_T[l].mcAlternance(seance.reps, seance.courseMin, seance.marcheMin)),
+      why: (l) => PLAN_T[l].mcWhy(nRaw(mc.etape, l), nRaw(mc.total, l)),
+      tags: (l) => [PLAN_T[l].marcheCourseTitre, `${totalMin} min`],
+    });
+    // Le renforcement : un jour sans séance, de préférence pas la veille d'une séance.
+    const libres = [0, 1, 2, 3, 4, 5, 6].filter((i) => !slot[i]);
+    const renfo = libres.find((i) => !poses.includes(i + 1)) ?? libres[0];
+    if (renfo != null) put(renfo, {
+      type: "Renfo", title: (l) => PLAN_T[l].renfoTitre,
+      detail: (l) => PLAN_T[l].renfoDebutant, why: (l) => PLAN_T[l].renfoDebutantWhy,
+      tags: tags("Renfo", "Prévention"),
+    });
+    for (let i = 0; i <= 6; i++) put(i, {
+      type: "Repos", title: (l) => PLAN_T[l].reposTitre, tags: tags("Repos"),
+      detail: (l) => PLAN_T[l].reposFinalDetail, why: (l) => PLAN_T[l].reposFinalWhy,
+    });
+    return slot as PlanDay[];
+  }
 
   // ── 0. LA COURSE. Elle prime sur tout le reste : c'est l'objectif, pas une séance.
   // Sans ce bloc, le moteur pouvait poser une VMA la veille ou une sortie longue le

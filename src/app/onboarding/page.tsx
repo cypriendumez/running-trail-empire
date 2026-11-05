@@ -171,6 +171,9 @@ export default function OnboardingPage() {
     long_run_mode: "run" as "run" | "bike",
     // Contexte d'entraînement : aucun défaut, ces réponses changent radicalement la prescription.
     running_years: null as number | null,
+    // « Peux-tu courir 30 min sans t'arrêter ? » — posée seulement à moins d'un an de pratique.
+    // « non » ouvre le programme marche-course (lib/coach/marcheCourse) au lieu du test VMA.
+    peut_courir_30min: "" as "" | "oui" | "non",
     // Terrains MULTIPLES : beaucoup alternent route en semaine et sentier/sable le week-end.
     main_terrains: [] as string[],
     elevation_pref: "" as "" | "evite" | "modere" | "aime" | "specialiste",
@@ -224,6 +227,7 @@ export default function OnboardingPage() {
         [!profile.gender, `${cid}-genre`, tr("gender")],
       ] : s === "training" ? [
         [profile.running_years == null, `${cid}-anciennete`, tr("expTitle")],
+        [profile.running_years === 0 && !profile.peut_courir_30min, `${cid}-trente`, tr("q30Title")],
         [profile.days_per_week == null, `${cid}-frequence`, tr("dpwShort")],
         [profile.main_terrains.length === 0, `${cid}-terrains`, tr("terrTitle")],
         [!profile.elevation_pref, `${cid}-denivele`, tr("elevTitle")],
@@ -367,6 +371,14 @@ export default function OnboardingPage() {
       const { error: eVol } = await supabase.from("profiles").update({ target_weekly_km: volume }).eq("id", user.id);
       if (eVol) journaliserFacultatif("volume visé", eVol.message);
     }
+    // Marche-course : écriture ISOLÉE et non bloquante, comme le volume visé — la colonne
+    // `peut_courir_30min` vient d'un SQL lancé à la main. Plus d'un an de pratique : la
+    // question n'est pas posée et rien n'est écrit (null = court déjà 30 minutes).
+    if (profile.running_years === 0 && profile.peut_courir_30min) {
+      const { error: e30 } = await supabase.from("profiles")
+        .update({ peut_courir_30min: profile.peut_courir_30min === "oui" }).eq("id", user.id);
+      if (e30) journaliserFacultatif("marche-course", e30.message);
+    }
 
     if (profileError || echecs.length) {
       if (profileError) echecs.unshift(`profil: ${profileError.message}`);
@@ -493,6 +505,14 @@ export default function OnboardingPage() {
                 valeur={profile.running_years} onChange={(v) => setProfile(p => ({ ...p, running_years: v }))}
                 options={([[0, "exp0"], [1, "exp1"], [2, "exp2"], [4, "exp4"], [8, "exp8"], [12, "exp12"]] as const).map(([v, k]) => ({ v, l: tr(k) }))} />
             </Question>
+            {/* Débutant complet ? Décide entre la marche-course et le plan habituel (test VMA d'abord). */}
+            {profile.running_years === 0 && (
+              <Question id={`${cid}-trente`} titre={tr("q30Title")} aide={tr("q30Hint")} marque={marqueManque(`${cid}-trente`)}>
+                <Choix id={`${cid}-trente`} variante="segment" grille="grid-cols-2" aide
+                  valeur={profile.peut_courir_30min} onChange={(v) => setProfile(p => ({ ...p, peut_courir_30min: v }))}
+                  options={[{ v: "oui" as const, l: tr("q30Oui") }, { v: "non" as const, l: tr("q30Non") }]} />
+              </Question>
+            )}
             {/* Disponibilités — le plan n'a de valeur que s'il est tenable. */}
             <Question id={`${cid}-frequence`} titre={tr("dpwShort")} aide={tr("dpwHint")} marque={marqueManque(`${cid}-frequence`)}>
               <Choix id={`${cid}-frequence`} variante="segment" grille="grid-cols-6" aide

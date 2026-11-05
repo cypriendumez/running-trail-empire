@@ -87,6 +87,9 @@ export type QualityBudgetInput = {
    *  en français, et si la reprise tombe dans les sept jours du plan. Sans reprise dans la
    *  semaine, aucune qualité ; avec, une seule au plus. */
   apresCourse?: { motif: string; reprise: boolean } | null;
+  /** Programme marche-course en cours (`lib/coach/marcheCourse`) : aucune qualité, quel que
+   *  soit le plancher. Son motif s'affiche à part — c'est un cadre, pas un allègement. */
+  marcheCourse?: boolean;
 };
 
 export type QualityBudget = {
@@ -249,6 +252,9 @@ export function computeQualityBudget(i: QualityBudgetInput): QualityBudget {
     qBudget = i.apresCourse.reprise ? Math.min(qBudget, 1) : 0;
     easeReasons.push(i.apresCourse.motif);
   }
+  // MARCHE-COURSE : qui ne court pas encore 30 minutes d'affilée n'a rien à faire d'une
+  // séance de VMA ou de seuil. En dernier, comme la récupération : aucun plancher ne la relève.
+  if (i.marcheCourse) qBudget = 0;
 
   return {
     // Le français sort du MÊME gabarit que les autres langues : les deux ne peuvent

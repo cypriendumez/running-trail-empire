@@ -87,6 +87,15 @@ export type TextesPlan = {
   marcheCourseTitre: string;
   marcheCourseDetail: (duree: string) => string;
   marcheCourseWhy: string;
+  /** Programme marche-course des débutants complets (`lib/coach/marcheCourse`). ⚠️ Le
+   *  français est lu par la montre : « N × (X min de course … / Y min de marche) » et
+   *  « X min de course continue » doivent garder cette forme. */
+  mcTitre: (etape: string, total: string) => string;
+  mcAlternance: (reps: number, courseMin: number, marcheMin: number) => string;
+  mcContinu: (min: number) => string;
+  mcWhy: (etape: string, total: string) => string;
+  renfoDebutant: string;
+  renfoDebutantWhy: string;
   sansImpactTitre: string;
   sansImpactDetail: (duree: string) => string;
   sansImpactWhy: string;
@@ -220,6 +229,12 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     marcheCourseTitre: "Marche/course",
     marcheCourseDetail: (d) => `Environ ${d} en alternant course très facile et marche : cours deux minutes en restant capable de parler, puis marche une minute, et recommence jusqu'au bout. La marche fait PARTIE de la séance, ce n'est pas un échec.`,
     marcheCourseWhy: "Ton cœur encaisse déjà la course continue ; tes tendons et tes articulations, pas encore. L'alternance donne le même travail aérobie en divisant les chocs, et c'est ce qui évite la périostite du deuxième mois.",
+    mcTitre: (e, t) => `Marche/course · étape ${e}/${t}`,
+    mcAlternance: (n, c, m) => `5 min de marche active → Corps : ${n} × (${c} min de course très facile / ${m} min de marche) → 5 min de marche pour finir. Cours assez lentement pour pouvoir parler. La marche fait partie de la séance, ce n'est pas un échec.`,
+    mcContinu: (m) => `5 min de marche active → Corps : ${m} min de course continue très facile → 5 min de marche pour finir. Si tu dois marcher un moment, marche, puis repars : l'étape se refait sans regret.`,
+    mcWhy: (e, t) => `Étape ${e} sur ${t} du programme marche-course : trois séances par étape, puis la course s'allonge. Le but : 30 minutes de course continue en une dizaine de semaines, sans te blesser — le souffle progresse vite, les tendons et les os prennent des semaines. Une étape te semble dure ? Refais-la, rien ne presse.`,
+    renfoDebutant: `20 min, POUR COMMENCER : gainage 3×20 s (sur les genoux si besoin), squats au poids du corps 3×10, fentes 2×8 par jambe, pont fessier 3×12, montées de mollets 3×12, équilibre sur une jambe 2×20 s. Le but : préparer tendons et articulations aux impacts de la course.`,
+    renfoDebutantWhy: `Au début, les blessures viennent surtout des tibias, des chevilles et des genoux, qui encaissent les impacts avant d'y être prêts. Un peu de renforcement chaque semaine réduit nettement ce risque.`,
     sansImpactTitre: "Volume sans impact (vélo ou elliptique)",
     sansImpactDetail: (d) => `Environ ${d} à vélo, en elliptique ou en rameur, en FC Z2 — allure conversationnelle, aucune allure cible. Remplace le footing du jour : même temps d'effort, zéro impact au sol.`,
     sansImpactWhy: "Une part du volume passe hors course pour construire le moteur sans répéter les chocs, le temps que la charge articulaire redevienne soutenable.",
@@ -334,6 +349,12 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     marcheCourseTitre: "Walk/run",
     marcheCourseDetail: (d) => `About ${d} alternating very easy running and walking: run two minutes while still able to talk, then walk one minute, and repeat to the end. The walking is PART of the session, not a failure.`,
     marcheCourseWhy: "Your heart already handles continuous running; your tendons and joints do not yet. Alternating gives the same aerobic work while dividing the impact — that is what prevents the second-month shin splints.",
+    mcTitre: (e, t) => `Walk/run · stage ${e}/${t}`,
+    mcAlternance: (n, c, m) => `5 min brisk walk → Main set: ${n} × (${c} min very easy running / ${m} min walking) → 5 min walk to finish. Run slowly enough to talk. Walking is part of the session, not a failure.`,
+    mcContinu: (m) => `5 min brisk walk → Main set: ${m} min of very easy continuous running → 5 min walk to finish. If you need to walk for a bit, walk, then start again: repeating a stage is fine.`,
+    mcWhy: (e, t) => `Stage ${e} of ${t} of the walk/run programme: three sessions per stage, then the running gets longer. The goal: 30 minutes of continuous running in about ten weeks, without injury — your breathing improves fast, tendons and bones take weeks. A stage feels hard? Repeat it, there is no rush.`,
+    renfoDebutant: `20 min, TO GET STARTED: plank 3×20 s (on your knees if needed), bodyweight squats 3×10, lunges 2×8 per leg, glute bridges 3×12, calf raises 3×12, single-leg balance 2×20 s. The aim: get tendons and joints ready for the impact of running.`,
+    renfoDebutantWhy: `Early on, injuries mostly hit the shins, ankles and knees, which take the impact before they are ready for it. A little strength work every week clearly lowers that risk.`,
     sansImpactTitre: "Impact-free volume (bike or elliptical)",
     sansImpactDetail: (d) => `About ${d} on the bike, elliptical or rower, at HR Z2 — conversational, no target pace. Replaces today's easy run: same time on task, zero ground impact.`,
     sansImpactWhy: "Part of the volume moves off running to build the engine without repeating the impact, until the joint load becomes sustainable again.",
@@ -448,6 +469,12 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     marcheCourseTitre: "Geh-/Lauf-Wechsel",
     marcheCourseDetail: (d) => `Etwa ${d} im Wechsel aus sehr lockerem Laufen und Gehen: zwei Minuten laufen, so dass du noch sprechen kannst, dann eine Minute gehen, und so weiter bis zum Schluss. Das Gehen gehört ZUR Einheit, es ist kein Scheitern.`,
     marcheCourseWhy: "Dein Herz verkraftet Dauerlauf bereits, deine Sehnen und Gelenke noch nicht. Der Wechsel bringt denselben aeroben Reiz bei halber Stoßbelastung — genau das verhindert das Schienbeinkantensyndrom im zweiten Monat.",
+    mcTitre: (e, t) => `Gehen/Laufen · Stufe ${e}/${t}`,
+    mcAlternance: (n, c, m) => `5 Min zügiges Gehen → Hauptteil: ${n} × (${c} Min sehr lockeres Laufen / ${m} Min Gehen) → 5 Min Gehen zum Abschluss. Lauf so langsam, dass du dich unterhalten kannst. Das Gehen gehört zur Einheit, es ist kein Scheitern.`,
+    mcContinu: (m) => `5 Min zügiges Gehen → Hauptteil: ${m} Min sehr lockeres Dauerlaufen → 5 Min Gehen zum Abschluss. Musst du ein Stück gehen, geh und lauf dann weiter: Eine Stufe zu wiederholen ist völlig in Ordnung.`,
+    mcWhy: (e, t) => `Stufe ${e} von ${t} des Geh-Lauf-Programms: drei Einheiten pro Stufe, dann wird das Laufen länger. Ziel: 30 Minuten am Stück in etwa zehn Wochen, ohne Verletzung — die Ausdauer wächst schnell, Sehnen und Knochen brauchen Wochen. Fühlt sich eine Stufe schwer an? Wiederhole sie, es eilt nicht.`,
+    renfoDebutant: `20 Min, FÜR DEN EINSTIEG: Unterarmstütz 3×20 s (bei Bedarf auf den Knien), Kniebeugen mit Körpergewicht 3×10, Ausfallschritte 2×8 pro Bein, Glute Bridge 3×12, Wadenheben 3×12, Einbeinstand 2×20 s. Ziel: Sehnen und Gelenke auf die Stöße des Laufens vorbereiten.`,
+    renfoDebutantWhy: `Am Anfang treffen Verletzungen vor allem Schienbeine, Sprunggelenke und Knie, die die Stöße abfangen, bevor sie dafür bereit sind. Ein wenig Krafttraining pro Woche senkt dieses Risiko deutlich.`,
     sansImpactTitre: "Umfang ohne Stoßbelastung (Rad oder Crosstrainer)",
     sansImpactDetail: (d) => `Etwa ${d} auf dem Rad, Crosstrainer oder Ruderergometer, in HF Z2 — im Gesprächstempo, keine Pace-Vorgabe. Ersetzt den heutigen Dauerlauf: gleiche Belastungszeit, null Aufprall.`,
     sansImpactWhy: "Ein Teil des Umfangs läuft abseits des Laufens, um den Motor zu bauen, ohne die Stöße zu wiederholen — bis die Gelenkbelastung wieder tragbar ist.",
@@ -562,6 +589,12 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     marcheCourseTitre: "Caminar/correr",
     marcheCourseDetail: (d) => `Unos ${d} alternando carrera muy suave y caminata: corre dos minutos pudiendo hablar, luego camina un minuto, y repite hasta el final. Caminar FORMA PARTE de la sesión, no es un fracaso.`,
     marcheCourseWhy: "Tu corazón ya aguanta la carrera continua; tus tendones y articulaciones todavía no. Alternar da el mismo trabajo aeróbico dividiendo los impactos, y es lo que evita la periostitis del segundo mes.",
+    mcTitre: (e, t) => `Caminar/correr · etapa ${e}/${t}`,
+    mcAlternance: (n, c, m) => `5 min caminando a buen paso → Parte principal: ${n} × (${c} min de carrera muy suave / ${m} min caminando) → 5 min caminando para terminar. Corre lo bastante despacio como para poder hablar. Caminar forma parte de la sesión, no es un fracaso.`,
+    mcContinu: (m) => `5 min caminando a buen paso → Parte principal: ${m} min de carrera continua muy suave → 5 min caminando para terminar. Si necesitas caminar un rato, camina y vuelve a empezar: repetir una etapa no pasa nada.`,
+    mcWhy: (e, t) => `Etapa ${e} de ${t} del programa de caminar y correr: tres sesiones por etapa, luego la carrera se alarga. El objetivo: 30 minutos de carrera continua en unas diez semanas, sin lesionarte; el aliento mejora rápido, los tendones y los huesos tardan semanas. ¿Una etapa se te hace dura? Repítela, no hay prisa.`,
+    renfoDebutant: `20 min, PARA EMPEZAR: plancha 3×20 s (de rodillas si hace falta), sentadillas con el peso del cuerpo 3×10, zancadas 2×8 por pierna, puente de glúteos 3×12, elevaciones de gemelos 3×12, equilibrio sobre una pierna 2×20 s. El objetivo: preparar tendones y articulaciones para los impactos de la carrera.`,
+    renfoDebutantWhy: `Al principio, las lesiones afectan sobre todo a tibias, tobillos y rodillas, que encajan los impactos antes de estar preparados. Un poco de fuerza cada semana reduce claramente ese riesgo.`,
     sansImpactTitre: "Volumen sin impacto (bici o elíptica)",
     sansImpactDetail: (d) => `Unos ${d} en bici, elíptica o remo, en FC Z2 — ritmo conversacional, sin ritmo objetivo. Sustituye el rodaje de hoy: mismo tiempo de esfuerzo, cero impacto contra el suelo.`,
     sansImpactWhy: "Parte del volumen sale de la carrera para construir el motor sin repetir los impactos, hasta que la carga articular vuelva a ser sostenible.",
@@ -676,6 +709,12 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     marcheCourseTitre: "Caminhar/correr",
     marcheCourseDetail: (d) => `Cerca de ${d} alternando corrida muito fácil e caminhada: corre dois minutos conseguindo falar, depois caminha um minuto, e repete até ao fim. A caminhada FAZ PARTE da sessão, não é um fracasso.`,
     marcheCourseWhy: "O teu coração já aguenta a corrida contínua; os teus tendões e articulações ainda não. Alternar dá o mesmo trabalho aeróbio dividindo os impactos, e é isso que evita a periostite do segundo mês.",
+    mcTitre: (e, t) => `Caminhar/correr · etapa ${e}/${t}`,
+    mcAlternance: (n, c, m) => `5 min de caminhada rápida → Parte principal: ${n} × (${c} min de corrida muito leve / ${m} min de caminhada) → 5 min de caminhada para terminar. Corre devagar o suficiente para conseguires falar. Caminhar faz parte da sessão, não é um fracasso.`,
+    mcContinu: (m) => `5 min de caminhada rápida → Parte principal: ${m} min de corrida contínua muito leve → 5 min de caminhada para terminar. Se precisares de caminhar um pouco, caminha e volta a correr: repetir uma etapa não faz mal.`,
+    mcWhy: (e, t) => `Etapa ${e} de ${t} do programa de caminhada e corrida: três sessões por etapa, depois a corrida aumenta. O objetivo: 30 minutos de corrida contínua em cerca de dez semanas, sem lesões; o fôlego melhora depressa, tendões e ossos levam semanas. Uma etapa parece-te difícil? Repete-a, não há pressa.`,
+    renfoDebutant: `20 min, PARA COMEÇAR: prancha 3×20 s (de joelhos se precisares), agachamentos com o peso do corpo 3×10, afundos 2×8 por perna, ponte de glúteos 3×12, elevações de gémeos 3×12, equilíbrio numa perna 2×20 s. O objetivo: preparar tendões e articulações para os impactos da corrida.`,
+    renfoDebutantWhy: `No início, as lesões atingem sobretudo canelas, tornozelos e joelhos, que absorvem os impactos antes de estarem prontos. Um pouco de reforço todas as semanas reduz claramente esse risco.`,
     sansImpactTitre: "Volume sem impacto (bicicleta ou elíptica)",
     sansImpactDetail: (d) => `Cerca de ${d} de bicicleta, elíptica ou remo, em FC Z2 — ritmo conversacional, sem ritmo alvo. Substitui o rodagem de hoje: mesmo tempo de esforço, zero impacto no solo.`,
     sansImpactWhy: "Parte do volume sai da corrida para construir o motor sem repetir os impactos, até a carga articular voltar a ser sustentável.",

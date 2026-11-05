@@ -3,6 +3,7 @@
 //  On cible des ZONES de fréquence cardiaque : elles s'exportent nativement vers
 //  Garmin (pas besoin d'allure seuil) → le client reçoit la séance sans rien faire.
 // ─────────────────────────────────────────────────────────────────────────────
+import { MARCHE_ENCADRANTE_MIN } from "@/lib/coach/marcheCourse";
 import { enteteIntervals } from "@/lib/intervals/auth";
 
 const BASE = "https://intervals.icu/api/v1";
@@ -348,6 +349,37 @@ export function warmCoolMin(warmMin?: number | null, coolMin?: number | null): {
   };
 }
 
+/**
+ * Les étapes d'une séance du programme marche-course, lues dans son texte français
+ * (`PLAN_T.fr.mcAlternance` / `mcContinu`) : marche d'encadrement, puis chaque course et
+ * chaque marche, numérotées. La course se pilote à la fréquence cardiaque (Z2), la marche
+ * en Z1 : un débutant n'a pas d'allure à tenir. `null` si le texte n'a pas cette forme.
+ */
+export function etapesMarcheCourse(detail: string): string | null {
+  const t = (detail || "").replace(/\u00a0/g, " ").toLowerCase();
+  const marche = (min: number, label: string) => `- ${min}m Z1 HR ${label}`;
+  const encadrement = MARCHE_ENCADRANTE_MIN;
+  const alt = t.match(/(\d{1,2})\s*[×x]\s*\(\s*(\d{1,2})\s*min de course[^/)]*\/\s*(\d{1,2})\s*min de marche\s*\)/);
+  if (alt) {
+    const [n, c, m] = [Number(alt[1]), Number(alt[2]), Number(alt[3])];
+    if (!(n >= 1 && n <= 20 && c >= 1 && c <= 30 && m >= 1 && m <= 10)) return null;
+    const out = [marche(encadrement, "Marche active")];
+    for (let i = 1; i <= n; i++) {
+      out.push(`- ${c}m Z2 HR Course ${i}/${n}`);
+      if (i < n) out.push(marche(m, `Marche ${i}/${n - 1}`));
+    }
+    out.push(marche(encadrement, "Marche pour finir"));
+    return out.join("\n");
+  }
+  const continu = t.match(/(\d{1,3})\s*min de course continue/);
+  if (continu) {
+    const min = Number(continu[1]);
+    if (!(min >= 5 && min <= 60)) return null;
+    return [marche(encadrement, "Marche active"), `- ${min}m Z2 HR Course continue`, marche(encadrement, "Marche pour finir")].join("\n");
+  }
+  return null;
+}
+
 export function stepsForType(type: string, durationMin: number, vmaKmh?: number | null, mainPaceSec?: number | null, warmMin?: number | null, coolMin?: number | null, reps?: RepBlock | null, rawDetail?: string, toutEnAllure?: boolean): string | null {
   const s = (type || "").toLowerCase();
   // ⚠️ BORNÉ EN HAUT AUSSI. `durationForType` plafonne à 90 min, mais la durée peut venir
@@ -409,6 +441,10 @@ export function stepsForType(type: string, durationMin: number, vmaKmh?: number 
 
   if (/repos|rest/.test(s)) return null;
   if (/renfo|muscu|gainage|force|ppg/.test(s)) return null; // pas une course
+  // MARCHE/COURSE (programme des débutants complets) : chaque bascule entre course et
+  // marche est une étape que la montre annonce. Sans elle, le débutant recevait un footing
+  // continu de la durée totale — exactement ce qu'il ne peut pas encore faire.
+  if (/marche\/course/.test(s)) return etapesMarcheCourse(rawDetail ?? "");
   if (/vélo|velo|bike|cycl|home ?trainer|\bride\b/.test(s)) {
     // Vélo (cross-training) : tout piloté à la FRÉQUENCE CARDIAQUE (pas d'allure course à vélo).
     const main = Math.max(15, d - warm - cool);

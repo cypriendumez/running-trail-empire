@@ -21,6 +21,9 @@ import { normLang } from "@/lib/i18n/base";
 import { relireSemaine } from "@/lib/ai/relectureServeur";
 import { appliquerAjustements, TYPE_AJUSTEMENTS, type AjustementApplique } from "@/lib/coach/ajustementApplique";
 import { appliquerConseils } from "@/lib/ai/relectureSemaine";
+import { programmeMarcheCourse, FENETRE_JOURS as FENETRE_MARCHE_COURSE, type ProgrammeMarcheCourse } from "@/lib/coach/marcheCourse";
+import { isRun } from "@/lib/intervals/sport";
+import { decaleJour } from "@/lib/streak/compute";
 
 type Admin = SupabaseClient;
 
@@ -37,6 +40,25 @@ const TEST_VMA = {
   es: { title: "Test de VMA (6 min)", subtitle: "Calienta 15 min suave, luego corre 6 min A TOPE (el ritmo más rápido que aguantes), en llano — una pista es ideal. Vuelta a la calma 10 min. Anota la distancia de los 6 min: da tu VMA y desbloquea tu plan.", why: "Tu VMA calibra TODOS tus ritmos, zonas y el coaching. Una sesión, y todo se ajusta a ti. Hasta medirla, no se prescribe ninguna otra sesión.", tags: ["Test", "VMA"] },
   pt: { title: "Teste de VMA (6 min)", subtitle: "Aquece 15 min leve, depois corre 6 min NO MÁXIMO (o ritmo mais rápido que aguentas), em plano — uma pista é ideal. Volta à calma 10 min. Regista a distância dos 6 min: dá a tua VMA e desbloqueia o teu plano.", why: "A tua VMA calibra TODOS os teus ritmos, zonas e o coaching. Uma sessão, e tudo se ajusta a ti. Até ser medida, nenhuma outra sessão é prescrita.", tags: ["Test", "VMA"] },
 } as const;
+
+/**
+ * Le programme marche-course de l'athlète, lu avant le verrou du test VMA : la réponse
+ * « pas encore » à « Peux-tu courir 30 min sans t'arrêter ? » et ses sorties récentes, avec
+ * la même règle que le contexte du coach. Colonne absente ou illisible : aucun programme
+ * (on ne déduit pas un débutant d'une panne). Sorties illisibles : la première étape —
+ * la réponse suffit à écarter un effort maximal.
+ */
+async function marcheCourseDe(admin: Admin, userId: string): Promise<ProgrammeMarcheCourse | null> {
+  const { data: profil, error } = await admin.from("profiles").select("peut_courir_30min").eq("id", userId).maybeSingle();
+  if (error || (profil as { peut_courir_30min?: boolean | null } | null)?.peut_courir_30min !== false) return null;
+  const jour = aujourdhui(FUSEAU_DEFAUT);
+  const { data: seances, error: eSeances } = await admin.from("workouts").select("date, sport").eq("user_id", userId)
+    .gte("date", decaleJour(jour, -FENETRE_MARCHE_COURSE)).order("date", { ascending: false }).limit(200);
+  if (eSeances) console.error("[coach] sorties illisibles pour la marche-course :", eSeances.message);
+  const joursCourus = ((seances ?? []) as { date: string; sport?: string | null }[])
+    .filter((w) => isRun(w.sport)).map((w) => String(w.date).slice(0, 10));
+  return programmeMarcheCourse({ peutCourir30: false, joursCourus, aujourdhui: jour });
+}
 
 /**
  * Prescrit UNIQUEMENT le test VMA : purge le plan à venir, pose la séance test du jour,
@@ -151,7 +173,13 @@ export async function autoCoachForUser(
   // `estAdmin` lit ADMIN_EMAILS côté serveur (repli : le propriétaire historique).
   const estFondateur = estAdmin((profilAcces as { email?: string } | null)?.email);
   if (!vmaMesuree && !estFondateur) {
-    return prescrireTestVma(admin, { userId, athleteId: opts.athleteId, apiKey: opts.apiKey, pushToWatch: planComplet });
+    // ⚠️ SAUF EN MARCHE-COURSE. « Cours 6 minutes À FOND » était le premier effort de
+    // coureur d'une personne qui ne court pas encore 30 minutes d'affilée (Cyprien,
+    // 05/11/2026). Son programme ne dépend d'aucune allure : il démarre sans test, et le
+    // test revient à la dernière étape franchie (`lib/coach/marcheCourse`).
+    if (!(await marcheCourseDe(admin, userId))) {
+      return prescrireTestVma(admin, { userId, athleteId: opts.athleteId, apiKey: opts.apiKey, pushToWatch: planComplet });
+    }
   }
 
   const ctx = await buildAthleteContext(admin as unknown as Parameters<typeof buildAthleteContext>[0], userId, { objectifSeul, essentielle }).catch(() => null);
@@ -373,6 +401,8 @@ export async function autoCoachForUser(
     // La récupération d'après-course, STRUCTURÉE (course, date de reprise) : le tableau de
     // bord la rappelle dans la langue de l'athlète au lieu d'y promettre une séance de qualité.
     recuperation: ctx.recuperation ?? null,
+    // Le tableau de bord tait le bandeau « Fais ton test VMA » tant que le programme dure.
+    marcheCourse: ctx.marcheCourse ? { etape: ctx.marcheCourse.etape, total: ctx.marcheCourse.total } : null,
     advice: ctx.readiness.advice.slice(0, 400),
     qBudget: ctx.weekPlan.qBudget,
     // La dernière qualité n'a survécu que grâce au plancher « préparation en cours » :

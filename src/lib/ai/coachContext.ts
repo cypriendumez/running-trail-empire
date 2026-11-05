@@ -39,6 +39,7 @@ import { QUALITE_T } from "@/lib/ai/qualityI18n";
 import { aujourdhui, FUSEAU_DEFAUT, formatDateCivile } from "@/lib/time/fuseau";
 import { apresCourse, facteurVolumeApresCourse, type PhaseApresCourse } from "@/lib/coach/apresCourse";
 import { repriseApresArret, partApresArret } from "@/lib/coach/repriseArret";
+import { programmeMarcheCourse, dureesMarcheCourse, type SeanceMarcheCourse } from "@/lib/coach/marcheCourse";
 import { objectifEnCours, estOfficielle } from "@/lib/coach/prochaineCourse";
 import { decaleJour } from "@/lib/streak/compute";
 import { niveauDeVma } from "@/lib/running/niveau";
@@ -302,6 +303,9 @@ export type AthleteContext = {
   objectiveWarnings: string[];
   /** Récupération d'après-course en cours (`lib/coach/apresCourse`), pour les écrans qui la rappellent. */
   recuperation: { course: string; reprise: string; fin?: string; phase?: PhaseApresCourse } | null;
+  /** Programme marche-course en cours (`lib/coach/marcheCourse`). Optionnel : un contexte
+   *  sérialisé avant cette version ne l'a pas. */
+  marcheCourse?: { etape: number; total: number; seance: SeanceMarcheCourse } | null;
   /** Construit pour le palier gratuit (`LectureContexte.objectifSeul`) : l'objectif et le
    *  déclaré, aucune mesure. Optionnel : un contexte sérialisé avant cette version ne l'a pas. */
   objectifSeul?: boolean;
@@ -404,6 +408,9 @@ export const PROFIL_DECLARE = [
   "elevation_pref", "main_terrain", "main_terrains", "running_years",
   "days_per_week", "available_days", "warmup_min", "cooldown_min",
   "target_weekly_km", "double_sessions", "long_run_mode",
+  // « Peux-tu courir 30 min sans t'arrêter ? » : un débutant complet sur le plan gratuit
+  // a autant besoin de la marche-course qu'un abonné.
+  "peut_courir_30min",
 ] as const;
 
 const garder = (o: Record<string, unknown> | null, cles: readonly string[]) =>
@@ -1186,6 +1193,17 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const noHistory = runs.length === 0;
   const fade = qe?.fadeSec ?? null;
   const faded = fade != null && fade >= 10;
+  // ── PROGRAMME MARCHE-COURSE (lib/coach/marcheCourse) ────────────────────────
+  // « Pas encore » à « Peux-tu courir 30 min sans t'arrêter ? » : onze étapes de trois
+  // séances, ni qualité ni test VMA tant qu'elles durent. L'étape se déduit des sorties.
+  const marcheCourse = programmeMarcheCourse({
+    peutCourir30: (p as Record<string, unknown> | null)?.peut_courir_30min as boolean | null | undefined,
+    joursCourus: runs.map((w) => String(w.date).slice(0, 10)),
+    aujourdhui: todayStr,
+  });
+  const marcheCourseMotif = marcheCourse
+    ? tr((l) => MOTIF_T[l].marcheCourse(nRaw(marcheCourse.etape, l), nRaw(marcheCourse.total, l)))
+    : null;
   // ── REPRISE APRÈS UN ARRÊT (lib/coach/repriseArret) ─────────────────────────
   // De 6 à 28 jours sans courir : 50 % puis 75 % du volume habituel pendant une reprise
   // aussi longue que l'arrêt (Daniels). Sans elle, la semaine vide plafonnait tout à
@@ -1252,6 +1270,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     weightLossMaxQuality: weightLoss ? weightLoss.rules.maxQualityPerWeek : null,
     hasObjective: !!objective, daysToRace, isShortGoal,
     apresCourse: recupMotif ? { motif: recupMotif.fr, reprise: repriseCetteSemaine } : null,
+    marcheCourse: !!marcheCourse,
   });
   const qBudget = qb.qBudget;
   const { structuralQBudget, easeReasons, expCapped, expCap } = qb;
@@ -1286,6 +1305,8 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // L'arrêt n'est pas une fatigue : il borne déjà le volume (Daniels), il ne doit pas en
   // plus faire passer le feu à l'orange et raccourcir la sortie longue une seconde fois.
   if (arretMotif) infoFlags.push(arretMotif);
+  // Le programme marche-course est un cadre, pas une fatigue : il se dit sans colorer le feu.
+  if (marcheCourseMotif) infoFlags.push(marcheCourseMotif);
   if (pains.length) redFlags.push(tr((l) => MOTIF_T[l].douleur(pains.map((x) => traduireDouleur(x, l)).join(", "))));
   // ── LA CHARGE SEULE NE SUFFIT PLUS À DÉCLARER ROUGE ─────────────────────────
   // Le feu rouge annule l'intensité du JOUR. Comme le plan est republié chaque jour et
@@ -1695,7 +1716,10 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
     // sans feuille de route, retombait sur un repli à −35 % : l'affûtage REMONTAIT juste
     // avant le départ, avec des footings de 10 km la veille de l'avant-veille.
     // On compte donc les semaines EN INCLUANT celle de la course (J−6 → J = la dernière).
-    if (daysToRace == null || daysToRace < 0 || !vma) return [];
+    // Pendant la marche-course, le programme EST la feuille de route : des semaines de VMA
+    // et de seuil affichées au-dessus de « 8 × (1 min de course / 2 min de marche) »
+    // promettraient un entraînement que l'athlète ne peut pas encore faire.
+    if (daysToRace == null || daysToRace < 0 || !vma || marcheCourse) return [];
     const semainesAvecCourse = Math.floor(daysToRace / 7) + 1;
     const W = Math.min(semainesAvecCourse, 26);
     const baseKm = targetFrom(20);
@@ -2178,7 +2202,7 @@ FORME & RÉCUPÉRATION (aujourd'hui)
 
 CHARGE D'ENTRAÎNEMENT
 ${demonstratedKm ? `- 📈 CAPACITÉ DÉJÀ DÉMONTRÉE : ${demonstratedKm} km/semaine tenus sur ses meilleures semaines des 6 derniers mois. Son système musculo-tendineux CONNAÎT ce volume — il y reviendra bien plus vite qu'il n'y est monté la première fois. Ne le traite pas comme un débutant sous prétexte que ses dernières semaines sont basses ; mais ne t'en sers pas non plus pour justifier une charge élevée AUJOURD'HUI : c'est la fraîcheur du moment qui en décide.\n` : ""}- Volume : ${Math.round(weekKm)} km COURUS cette semaine${cross.label ? ` (+ ${fmtMinutes(cross.minutes)} d'AUTRES SPORTS, ${cross.tss} TSS = ${cross.sharePct} % de sa charge : ${cross.label}${cross.impactMinutes > 0 ? ` — dont ${fmtMinutes(cross.impactMinutes)} avec impact sur les jambes, qui s'ajoutent à l'usure de la course` : " — sans impact sur les jambes : ça fatigue le cardio, pas les tendons"}. Ça compte dans la charge, mais ce N'EST PAS du volume de course : ne dimensionne AUCUNE séance dessus)` : ""} · ~${Math.round(avg4wkKm)} km/sem (moy. 4 sem.)
-${lacune ? `- ⚠️ TROU DE DONNÉES : ${lacune.jours} jours SANS AUCUNE trace (ni séance, ni nuit, ni VFC) du ${lacune.debut} au ${lacune.fin}. Une coupure, une blessure et une montre non portée produisent exactement ce silence — et appellent des plans OPPOSÉS. Les moyennes qui traversent cette période sont donc peu fiables : DIS-LUI que tu l'as remarqué et DEMANDE-LUI ce qui s'est passé, ne suppose pas.\n` : ""}- 🎯 VOLUME CIBLE de la semaine à venir : ~${targetKm} km, dont une sortie longue de ~${longRunKm} km. Dimensionne les séances sur CES chiffres, pas sur des durées passe-partout.
+${lacune ? `- ⚠️ TROU DE DONNÉES : ${lacune.jours} jours SANS AUCUNE trace (ni séance, ni nuit, ni VFC) du ${lacune.debut} au ${lacune.fin}. Une coupure, une blessure et une montre non portée produisent exactement ce silence — et appellent des plans OPPOSÉS. Les moyennes qui traversent cette période sont donc peu fiables : DIS-LUI que tu l'as remarqué et DEMANDE-LUI ce qui s'est passé, ne suppose pas.\n` : ""}${marcheCourse ? `- 🚶 PROGRAMME MARCHE-COURSE, étape ${marcheCourse.etape}/${marcheCourse.total} : ${"continuMin" in marcheCourse.seance ? `${marcheCourse.seance.continuMin} min de course continue` : `${marcheCourse.seance.reps} × (${marcheCourse.seance.courseMin} min de course / ${marcheCourse.seance.marcheMin} min de marche)`}, trois fois par semaine, ${dureesMarcheCourse(marcheCourse.seance).totalMin} min marche comprise. Il ne court pas encore 30 minutes d'affilée : AUCUNE allure, AUCUN volume en kilomètres, AUCUNE séance de qualité ni test VMA. Encourage la régularité ; la marche fait partie de la séance.` : `- 🎯 VOLUME CIBLE de la semaine à venir : ~${targetKm} km, dont une sortie longue de ~${longRunKm} km. Dimensionne les séances sur CES chiffres, pas sur des durées passe-partout.`}
 - 🔄 PHASE DU CYCLE : ${cycleLabel}.
 - 📆 DISPONIBILITÉS : ${availDaysPerWeek} séance(s) de course par semaine${availDays.length < 7 ? `, uniquement les ${availDays.map(d => ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d]).join(", ")}` : ""}${declaredDpw ? " (déclaré par l'athlète)" : " (déduit de son niveau et de sa pratique actuelle — demande-lui de le préciser)"}. NE DÉPASSE PAS ce nombre : un plan qu'il ne peut pas suivre ne vaut rien.
 - ⏱️ Dernière séance DURE réellement effectuée : ${lastHardDaysAgo == null ? "aucune trace récente" : lastHardDaysAgo === 0 ? "AUJOURD'HUI ⚠️ → pas de deuxième séance dure aujourd'hui ni demain" : `il y a ${lastHardDaysAgo} j`}${lastHardDaysAgo != null && lastHardDaysAgo * 24 < hardGapH ? ` ⚠️ moins de ${hardGapH} h se sont écoulées : la prochaine qualité doit attendre.` : ""}${qualiteRecente.manquees.length ? `\n- ⏭️ QUALITÉ PRESCRITE ET NON FAITE (7 derniers jours) : ${qualiteRecente.manquees.join(", ")} — elle compte dans la semaine et NE SE RATTRAPE PAS : ne la re-propose pas le lendemain.` : ""}${skippedWeekdays.length ? `\n- 🚫 JOURS SYSTÉMATIQUEMENT RATÉS : ${skippedWeekdays.map(d => ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d]).join(", ")} — prescrits plusieurs fois, jamais courus. Ne t'obstine pas : place-y du repos ou rien, et redistribue ailleurs.` : ""}
@@ -2335,6 +2359,7 @@ ${catalog}`;
     macroPlan,
     objectiveWarnings,
     recuperation: recup ? { course: recup.nom, reprise: recup.reprise, fin: recup.fin, phase: recup.phase } : null,
+    marcheCourse: marcheCourse ? { etape: marcheCourse.etape, total: marcheCourse.total, seance: marcheCourse.seance } : null,
     weightLoss,
     // Palier gratuit : « ce que ta dernière séance a montré » EST une analyse de séance.
     lastSession: objectifSeul ? null : lastSession,
