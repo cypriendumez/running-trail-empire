@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { lireRapportCsp, rapportLocal } from "@/lib/csp/rapport";
 
 /**
  * COLLECTE DES VIOLATIONS CSP (report-only) — cible de `report-uri` (voir next.config.ts, M4).
@@ -25,24 +26,14 @@ export async function POST(req: Request) {
     const brut = await req.text();
     if (brut.length > CORPS_MAX) return rien();
 
+    const { directive, bloque, page } = lireRapportCsp(brut);
+    // Un poste de développement ne remplit pas la base de production (lib/csp/rapport).
+    if (rapportLocal(page, req.headers.get("host"))) return rien();
     const admin = createAdminClient();
     const { count } = await admin.from("error_logs")
       .select("*", { count: "exact", head: true })
       .gte("created_at", new Date(Date.now() - 60_000).toISOString());
     if ((count ?? 0) >= PAR_MINUTE_MAX) return rien();
-
-    // Un rapport CSP : { "csp-report": { "violated-directive", "blocked-uri", "document-uri", … } }
-    // (ancien format) ou un tableau de { body: … } (Reporting API). On lit au mieux.
-    let r: Record<string, unknown> = {};
-    try {
-      const j = JSON.parse(brut || "{}");
-      r = (j["csp-report"] ?? (Array.isArray(j) ? (j[0]?.body ?? j[0]) : j) ?? {}) as Record<string, unknown>;
-    } catch { /* corps illisible : on journalise quand même l'extrait brut */ }
-
-    const directive = String(r["violated-directive"] ?? r["effectiveDirective"] ?? r["effective-directive"] ?? "?").slice(0, 200);
-    const bloque = String(r["blocked-uri"] ?? r["blockedURL"] ?? "?").slice(0, 500);
-    const page = String(r["document-uri"] ?? r["documentURL"] ?? "").slice(0, 500);
-
     const { error } = await admin.from("error_logs").insert({
       user_id: null,
       source: "csp",

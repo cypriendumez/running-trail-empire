@@ -12,6 +12,7 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { lireRapportCsp, rapportLocal } from "../src/lib/csp/rapport";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -64,6 +65,29 @@ test("une CSP est servie en report-only, et pas (encore) appliquée", () => {
   }
   // ⚠️ REPORT-ONLY, PAS APPLIQUÉE : l'appliquer sans nonces rendrait les pages mortes chez le visiteur.
   assert.ok(!/"Content-Security-Policy"\s*,/.test(conf), "la CSP est passée en mode APPLIQUÉ sans nonces : risque de page morte");
+});
+
+test("un rapport CSP se lit dans ses deux formats", () => {
+  assert.deepEqual(lireRapportCsp(JSON.stringify({ "csp-report": { "violated-directive": "script-src", "blocked-uri": "eval", "document-uri": "https://pacevo.fr/" } })),
+    { directive: "script-src", bloque: "eval", page: "https://pacevo.fr/" });
+  assert.deepEqual(lireRapportCsp(JSON.stringify([{ body: { effectiveDirective: "img-src", blockedURL: "https://x.test/a.png", documentURL: "https://pacevo.fr/dashboard" } }])),
+    { directive: "img-src", bloque: "https://x.test/a.png", page: "https://pacevo.fr/dashboard" });
+  assert.deepEqual(lireRapportCsp("pas du json"), { directive: "?", bloque: "?", page: "" });
+});
+
+test("les rapports d'un poste de développement n'entrent pas dans la base de production", () => {
+  // 05/11/2026 : 27 lignes « http://localhost:3000/ » dans error_logs, écrites par des `next dev`
+  // locaux branchés sur la base de production.
+  for (const [page, hote] of [["http://localhost:3000/", "localhost:3000"], ["http://127.0.0.1:3000/dashboard", null],
+    ["", "localhost:3000"], ["http://app.localhost:3000/", null], ["http://[::1]:3000/", null]] as const) {
+    assert.equal(rapportLocal(page, hote), true, `${page} / ${hote}`);
+  }
+  assert.equal(rapportLocal("https://pacevo.fr/dashboard", "pacevo.fr"), false, "un vrai visiteur est ignoré");
+  assert.equal(rapportLocal("", "pacevo.fr"), false);
+  // Et la route trie AVANT d'ouvrir la base (ni écriture, ni même le comptage par minute).
+  const route = readFileSync("src/app/api/csp-report/route.ts", "utf8");
+  const tri = route.indexOf('if (rapportLocal(page, req.headers.get("host"))) return rien();');
+  assert.ok(tri > 0 && tri < route.indexOf("const admin = createAdminClient();"), "la route écrit les rapports locaux, ou les trie trop tard");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
