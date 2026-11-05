@@ -4,9 +4,17 @@ import { stripe, priceIdDe, estFormule, estPeriode, stripeConfigured, TARIFS } f
 import { createClient } from "@/lib/supabase/server";
 import { joursEssaiStripe } from "@/lib/billing/access";
 import { mediateurConso } from "@/lib/brand/mediateur";
+import { estAppliNativeUA } from "@/lib/natif/appli";
 
 export async function POST(req: Request) {
   try {
+    // ⚠️ JAMAIS DE PAIEMENT WEB DANS L'APPLI DES STORES : Apple et Google imposent leur achat
+    // intégré pour un abonnement numérique (règle 3.1.1 d'Apple), et une appli qui ouvre un
+    // paiement Stripe est refusée — ou retirée. La page d'abonnement de l'appli passe par
+    // l'achat intégré (lib/natif/achat) ; ce refus est le filet si un lien y menait quand même.
+    if (estAppliNativeUA(req.headers.get("user-agent"))) {
+      return NextResponse.json({ error: "Dans l'appli, l'abonnement se prend par l'achat intégré." }, { status: 403 });
+    }
     if (!stripeConfigured) {
       return NextResponse.json({ error: "Le paiement n'est pas encore ouvert. Reviens très bientôt." }, { status: 503 });
     }

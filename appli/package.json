@@ -1,0 +1,23 @@
+{
+  "name": "pacevo-appli",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Coquille native (iPhone, Android) de Pacevo : affiche https://pacevo.fr et y branche l'achat intégré et les notifications. Voir README.md.",
+  "scripts": {
+    "sync": "cap sync",
+    "ios": "cap open ios",
+    "android": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/ios": "8.5.3",
+    "@capacitor/push-notifications": "8.1.3",
+    "@revenuecat/purchases-capacitor": "13.7.4"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3",
+    "typescript": "5.6.3"
+  }
+}

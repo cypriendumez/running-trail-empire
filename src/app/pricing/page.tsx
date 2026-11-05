@@ -27,6 +27,20 @@ import { Container, Section, SectionHeading } from "@/components/ui/Container";
 import { btnClass } from "@/components/ui/Button";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { LANDING } from "@/components/landing/landingI18n";
+import { estAppliNative } from "@/lib/natif/appli";
+import { acheterDansLAppli, restaurerAchats, prixDansLAppli } from "@/lib/natif/achat";
+import { PRODUITS_STORES } from "@/lib/billing/stores";
+import { createClient } from "@/lib/supabase/client";
+import type { Lang } from "@/lib/i18n/translations";
+
+/** Les messages de l'achat intégré (appli native), dans les cinq langues. */
+const NATIF: Record<Lang, { indispo: string; erreur: string; merci: string; restaurer: string; restaure: string; storeNote: string }> = {
+  fr: { indispo: "L'abonnement dans l'appli n'est pas encore ouvert. Reviens très bientôt.", erreur: "L'achat n'a pas abouti. Aucun montant n'a été prélevé par Pacevo.", merci: "Merci ! Ton abonnement est actif.", restaurer: "Restaurer mes achats", restaure: "Achats restaurés.", storeNote: "Paiement et résiliation par ton compte App Store ou Google Play." },
+  en: { indispo: "In-app subscriptions aren't open yet. Check back very soon.", erreur: "The purchase didn't go through. Pacevo charged nothing.", merci: "Thank you! Your subscription is active.", restaurer: "Restore purchases", restaure: "Purchases restored.", storeNote: "Payment and cancellation through your App Store or Google Play account." },
+  de: { indispo: "Abos in der App sind noch nicht verfügbar. Schau bald wieder vorbei.", erreur: "Der Kauf wurde nicht abgeschlossen. Pacevo hat nichts abgebucht.", merci: "Danke! Dein Abo ist aktiv.", restaurer: "Käufe wiederherstellen", restaure: "Käufe wiederhergestellt.", storeNote: "Zahlung und Kündigung über dein App-Store- oder Google-Play-Konto." },
+  es: { indispo: "La suscripción en la app aún no está disponible. Vuelve muy pronto.", erreur: "La compra no se completó. Pacevo no ha cobrado nada.", merci: "¡Gracias! Tu suscripción está activa.", restaurer: "Restaurar compras", restaure: "Compras restauradas.", storeNote: "Pago y cancelación desde tu cuenta de App Store o Google Play." },
+  pt: { indispo: "A assinatura no app ainda não está disponível. Volte em breve.", erreur: "A compra não foi concluída. A Pacevo não cobrou nada.", merci: "Obrigado! Sua assinatura está ativa.", restaurer: "Restaurar compras", restaure: "Compras restauradas.", storeNote: "Pagamento e cancelamento pela sua conta App Store ou Google Play." },
+};
 
 
 export default function PricingPage() {
@@ -46,6 +60,23 @@ export default function PricingPage() {
    * n'affiche pas un chiffre optimiste en attendant la réponse.
    */
   const [essai, setEssai] = useState<{ connecte: boolean; jours: number } | null>(null);
+  /**
+   * DANS L'APPLI DES STORES, L'ACHAT INTÉGRÉ — JAMAIS STRIPE (règle 3.1.1 d'Apple : aucun
+   * autre moyen de paiement, ni invitation à en utiliser un). Lu APRÈS le montage : le
+   * serveur ne connaît pas l'appli, et deux rendus différents feraient une erreur #418.
+   * Les prix affichés sont alors ceux du STORE (ce qui sera réellement facturé), pas ceux du site.
+   */
+  const [natif, setNatif] = useState(false);
+  const [prixStore, setPrixStore] = useState<Record<string, string>>({});
+  const N = NATIF[lang as Lang] ?? NATIF.fr;
+  const idUtilisateur = async (): Promise<string | null> => {
+    try { return (await createClient().auth.getUser()).data.user?.id ?? null; } catch { return null; }
+  };
+  useEffect(() => {
+    if (!estAppliNative()) return;
+    setNatif(true);
+    idUtilisateur().then((id) => (id ? prixDansLAppli(id) : {})).then(setPrixStore).catch(() => {});
+  }, []);
   useEffect(() => {
     fetch("/api/billing/essai")
       .then((r) => (r.ok ? r.json() : null))
@@ -59,7 +90,31 @@ export default function PricingPage() {
     return essai.jours > 0 ? P.ctaEssai.replace("{n}", String(essai.jours)) : P.ctaAbo;
   };
 
+  async function souscrireDansLAppli(formule: "starter" | "premium") {
+    setLoading(formule);
+    try {
+      const id = await idUtilisateur();
+      if (!id) { window.location.href = `/signup?formule=${formule}&periode=${periode}`; return; }
+      const r = await acheterDansLAppli(formule, periode, id);
+      if (r === "achete") { toast.success(N.merci); window.location.href = "/dashboard"; }
+      else if (r === "indisponible") toast.error(N.indispo);
+      else if (r === "erreur") toast.error(N.erreur);
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function restaurer() {
+    const id = await idUtilisateur();
+    if (!id) { window.location.href = "/login"; return; }
+    const r = await restaurerAchats(id);
+    if (r === "achete") toast.success(N.restaure);
+    else if (r === "indisponible") toast.error(N.indispo);
+    else if (r === "erreur") toast.error(N.erreur);
+  }
+
   async function souscrire(formule: "starter" | "premium") {
+    if (natif) return souscrireDansLAppli(formule);
     setLoading(formule);
     try {
       const res = await fetch("/api/stripe/checkout", {
@@ -123,11 +178,12 @@ export default function PricingPage() {
                   )}
                   <div className={`text-sm font-semibold ${vedette ? "text-white/50" : "text-zinc-400"}`}>{plan.name}</div>
                   <div className="mt-2 flex items-baseline gap-1">
-                    <span className="text-5xl font-bold tracking-tight">{plan.cle === "gratuit" ? euros(0, lang) : euros(grand, lang)}</span>
-                    <span className={`text-sm ${vedette ? "text-white/40" : "text-zinc-400"}`}>{plan.cle === "gratuit" ? "" : P.parMois}</span>
+                    <span className="text-5xl font-bold tracking-tight">{plan.cle === "gratuit" ? euros(0, lang)
+                      : natif ? (prixStore[PRODUITS_STORES[plan.cle as "starter" | "premium"][periode]] ?? "…") : euros(grand, lang)}</span>
+                    <span className={`text-sm ${vedette ? "text-white/40" : "text-zinc-400"}`}>{plan.cle === "gratuit" || natif ? "" : P.parMois}</span>
                   </div>
                   <div className={`mt-1 h-5 text-xs ${vedette ? "text-white/40" : "text-zinc-400"}`}>
-                    {plan.cle === "gratuit" ? P.gratuitNote : periode === "an" ? `${euros(centimes, lang)} / ${P.an.toLowerCase()} · ${P.moisOfferts.replace("{n}", String(moisOfferts(plan.cle as "starter" | "premium")))}` : ""}
+                    {plan.cle === "gratuit" ? P.gratuitNote : natif ? (periode === "an" ? `/ ${P.an.toLowerCase()}` : `/ ${P.mois.toLowerCase()}`) : periode === "an" ? `${euros(centimes, lang)} / ${P.an.toLowerCase()} · ${P.moisOfferts.replace("{n}", String(moisOfferts(plan.cle as "starter" | "premium")))}` : ""}
                   </div>
                   <p className={`mt-4 text-sm ${vedette ? "text-white/70" : "text-zinc-500"}`}>{plan.pitch}</p>
                   <ul className="mt-6 flex-1 space-y-3">
@@ -151,7 +207,15 @@ export default function PricingPage() {
             })}
           </div>
 
-          <OffreEtudiante texte={P.etudiant} cta={P.etudiantCta} sujet={P.etudiantSujet} />
+          {/* L'offre étudiante se demande par e-mail, hors de l'appli : interdit dans l'appli des stores. */}
+          {natif ? (
+            <div className="mt-8 text-center">
+              <p className="text-sm text-zinc-500">{N.storeNote}</p>
+              <button type="button" onClick={restaurer} className={btnClass("ghost", "sm", "mt-3")}>{N.restaurer}</button>
+            </div>
+          ) : (
+            <OffreEtudiante texte={P.etudiant} cta={P.etudiantCta} sujet={P.etudiantSujet} />
+          )}
           <p className="mx-auto mt-8 max-w-2xl text-center text-sm leading-relaxed text-zinc-500">{P.apres}</p>
         </Container>
       </Section>

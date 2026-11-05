@@ -11,11 +11,17 @@ export const dynamic = "force-dynamic";
  * Le portail est hébergé par Stripe : aucune donnée bancaire ne transite par nous.
  */
 import { NextResponse } from "next/server";
+import { estAppliNativeUA } from "@/lib/natif/appli";
 import { stripe, stripeConfigured } from "@/lib/stripe/client";
 import { createClient } from "@/lib/supabase/server";
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
+    // Le portail Stripe permet aussi de CHANGER de formule, donc d'acheter : interdit dans
+    // l'appli des stores, comme le paiement (voir /api/stripe/checkout et lib/natif/appli).
+    if (estAppliNativeUA(req.headers.get("user-agent"))) {
+      return NextResponse.json({ error: "Ton abonnement web se gère sur pacevo.fr, depuis un navigateur." }, { status: 403 });
+    }
     if (!stripeConfigured) return NextResponse.json({ error: "Paiement non configuré" }, { status: 503 });
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();

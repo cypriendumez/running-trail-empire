@@ -103,3 +103,10 @@ public/brands/polar.svg
 #  Ignoré ici pour qu'un `git add -A` ne le remette pas en ligne par accident.
 # ─────────────────────────────────────────────────────────────────────────────
 /docs/audit-securite-*.md
+
+# Coquille native (appli/) : dépendances et constructions locales
+/appli/node_modules
+/appli/ios/App/build
+/appli/android/build
+/appli/android/app/build
+/appli/android/.gradle
