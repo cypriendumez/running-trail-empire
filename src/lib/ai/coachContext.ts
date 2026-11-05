@@ -41,6 +41,7 @@ import { aujourdhui, FUSEAU_DEFAUT, formatDateCivile } from "@/lib/time/fuseau";
 import { apresCourse, facteurVolumeApresCourse, type PhaseApresCourse } from "@/lib/coach/apresCourse";
 import { repriseApresArret, partApresArret } from "@/lib/coach/repriseArret";
 import { programmeMarcheCourse, dureesMarcheCourse, type SeanceMarcheCourse } from "@/lib/coach/marcheCourse";
+import { testEnVigueur, allureFacileMaxSec, fmtAllure, TYPE_TEST_LACTATE, type TestLactate } from "@/lib/coach/lactate";
 import { objectifEnCours, estOfficielle } from "@/lib/coach/prochaineCourse";
 import { decaleJour } from "@/lib/streak/compute";
 import { niveauDeVma } from "@/lib/running/niveau";
@@ -427,7 +428,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // Une lecture qu'on ne fait pas : la forme exacte d'une réponse vide de PostgREST.
   const nonLu = () => Promise.resolve({ data: [] as never[], error: null });
   const nonLuUne = () => Promise.resolve({ data: null, error: null });
-  const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, shoeRes, objRes, csRes, wlRes, histRes, sleepDatesRes, hrvDatesRes, formeRes, fcMaxRes] = await Promise.all([
+  const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, shoeRes, objRes, csRes, wlRes, histRes, sleepDatesRes, hrvDatesRes, formeRes, fcMaxRes, lactateRes] = await Promise.all([
     sb.from("profiles").select("*").eq("id", userId).single(),
     sb.from("performance_baselines").select("*").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).single(),
     objectifSeul || essentielle ? nonLu() : sb.from("hrv_data").select(COLONNES_VFC).eq("user_id", userId).order("date", { ascending: false }).limit(30),
@@ -478,6 +479,10 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     // plafonnée. Le tri fait le travail, on ne ramène qu'une ligne.
     objectifSeul ? nonLuUne() : sb.from("workouts").select("max_hr").eq("user_id", userId)
       .not("max_hr", "is", null).order("max_hr", { ascending: false }).limit(1).maybeSingle(),
+    // Test de lactate le plus récent (lib/coach/lactate) : une donnée DÉCLARÉE, lue pour
+    // toutes les formules comme les autres réponses de l'athlète.
+    sb.from("notifications").select("data").eq("user_id", userId).eq("type", TYPE_TEST_LACTATE)
+      .order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
 
   // Palier gratuit : le profil réduit à ce qui est DÉCLARÉ, et du test de VMA, la VMA seule
@@ -510,6 +515,9 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // « Aucune course ». Même règle qu'elle (`objectifEnCours`) : une course reste
   // l'objectif jusqu'au soir de son jour, dans le fuseau des coureurs.
   const objectifDeclare = (objRes.data?.data ?? null) as CoachObjective | null;
+  // Test de lactate en vigueur (lib/coach/lactate) : six mois au plus, sinon rien.
+  const lactate: TestLactate | null = testEnVigueur(
+    ((lactateRes as { data?: { data?: TestLactate } | null } | null)?.data?.data) ?? null, aujourdhui(FUSEAU_DEFAUT));
   const objective = objectifEnCours(objectifDeclare, aujourdhui(FUSEAU_DEFAUT));
   // `tags` est lu en plus de la date et du type : c'est lui qui dit qu'une séance d'un
   // autre écrivain que le plan automatique était une séance de qualité (`qualiteRecente`).
@@ -1023,6 +1031,8 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
    */
   const easyPaceSource: "mesurée" | "modèle" | null =
     easyPaceMesure != null ? "mesurée" : vma ? "modèle" : null;
+  // Le plafond d'un test de lactate (seuil 1) s'applique UNE fois, à la fin (`easyPaceCorrige`) :
+  // posé ici, il faussait la relecture, qui « corrigeait » vers plus vite un écart fabriqué.
   const easyPaceLisible = easyPaceMesure != null
     ? `${Math.floor(easyPaceMesure / 60)}'${String(Math.round(easyPaceMesure % 60)).padStart(2, "0")}`
     : vma ? paceAt(70) : null;
@@ -1153,7 +1163,10 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const pc = paceCurve;
   const csMs = num(pc?.criticalSpeed);
   const fmtPace = (secPerKm: number) => `${Math.floor(secPerKm / 60)}'${String(Math.round(secPerKm % 60)).padStart(2, "0")}`;
-  const thresholdPace = csMs && csMs > 1 ? fmtPace(1000 / csMs) : null;
+  // ⚠️ UN TEST DE LACTATE PASSE DEVANT (lib/coach/lactate) : il MESURE le seuil, la vitesse
+  // critique l'ajuste sur des efforts. Six mois au plus ; sinon, la vitesse critique.
+  const thresholdPace = lactate ? fmtAllure(lactate.lt2.allureSec)
+    : csMs && csMs > 1 ? fmtPace(1000 / csMs) : null;
   const bestLine = pc?.best?.length
     ? pc.best.map(b => {
         const t = b.sec, mm = Math.floor(t / 60), ss = Math.round(t % 60);
@@ -1979,9 +1992,18 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   );
   // La correction ne s'applique QUE si la relecture a conclu. Sinon l'allure d'origine
   // reste : une cible ajustée sur du bruit serait pire que pas d'ajustement du tout.
-  const easyPaceCorrige = relecture?.correctionSec
+  const easyPaceRelu = relecture?.correctionSec
     ? corrigerAllure(easyPaceLisible, relecture.correctionSec) ?? easyPaceLisible
     : easyPaceLisible;
+  // ⚠️ LA RELECTURE NE REPASSE PAS AU-DESSUS DU SEUIL 1 MESURÉ. Elle recale la cible sur ce
+  // que l'athlète court vraiment : un coureur qui fait ses footings à 4'10 la tirait vers
+  // 4'20 quand son test de lactate place le seuil aérobie à 4'20 (relevé par le test).
+  const easyPaceCorrige = (() => {
+    if (!lactate || !easyPaceRelu) return easyPaceRelu;
+    const m = easyPaceRelu.match(/(\d+)['’](\d{2})/);
+    const sec = m ? Number(m[1]) * 60 + Number(m[2]) : null;
+    return sec != null && sec < allureFacileMaxSec(lactate) ? fmtAllure(allureFacileMaxSec(lactate)) : easyPaceRelu;
+  })();
 
   const objectiveWarnings: string[] = (() => {
     const out: string[] = [];
@@ -2238,7 +2260,7 @@ ${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${lim
     + `Départ en négative split : c'est ce qui produit le plus de records, et ça se RÉPÈTE à l'entraînement — `
     + `${daysToRace > 14 ? "programme une SIMULATION à J-10/J-14 : 60-70 % de la distance à l'allure cible, mêmes chaussures, même petit-déjeuner, même heure." : "la simulation est passée : plus rien de nouveau d'ici le départ, on ne teste plus, on répète."} `
     + `Échauffement le jour J : ${objective.distanceKm <= 10 ? "20 min footing + gammes + 4-5 lignes droites, fini 10 min avant le départ" : "15 min footing léger + 3 lignes droites, on garde le carburant"}.\n`;
-})()}${nutrition ? `- 🍫 NUTRITION DE SA SORTIE LONGUE (${Math.round(nutrition.longRunMin / 60)} h ~${longRunKm} km${nutrition.tempC != null ? `, ${Math.round(nutrition.tempC)} °C prévus` : ""}) : ${nutrition.preRun ? `${nutrition.preRun} g de glucides 2-3 h avant, ` : ""}puis ${nutrition.carbsPerH} g/h À PARTIR DE LA 1re HEURE (soit ~${nutrition.carbsTotal} g sur la sortie, ~${Math.max(1, Math.round(nutrition.carbsTotal / 25))} gels ou équivalent), et ${nutrition.mlPerH} ml/h de boisson à ~${nutrition.sodium} mg/L de sodium. Donne-lui CES chiffres, pas une fourchette — et rappelle-lui de les TESTER à l'entraînement, jamais le jour J.\n` : ""}${shoeLines.length ? `- 👟 USURE DES CHAUSSURES : ${shoeLines.join(" · ")}\n` : ""}${plateau ? `- 🛑 PLATEAU DÉTECTÉ : sa capacité stagne (${vmaSlopePerWeek} km/h/sem sur ${Math.round((curvePts[curvePts.length - 1].t - curvePts[0].t) / 86400000)} j) ALORS QUE sa charge monte. N'AJOUTE PAS de volume ni de séances : c'est le réflexe qui blesse. CHANGE le stimulus — format de séance inédit, côtes, force, technique de foulée — ou impose une vraie semaine de décharge. Explique-lui pourquoi.\n` : vmaSlopePerWeek != null ? `- 📈 TRAJECTOIRE DE CAPACITÉ : ${vmaSlopePerWeek > 0 ? "+" : ""}${vmaSlopePerWeek} km/h de VMA par semaine sur ses efforts mesurés.\n` : ""}${vrLine ? `- 🦵 ÉCONOMIE DE COURSE (ratio vertical, ${vr!.n} séances) : ${vrLine}\n` : ""}${thresholdPace ? `- 🧊 ALLURE SOUS-SEUIL : ${subPace}/km — c'est ICI que se fait le VOLUME au seuil (méthode norvégienne, Bakken : 0,4 à 0,8 mmol sous le seuil). Une allure qu'il doit pouvoir répéter le lendemain. Les blocs LONGS s'y tiennent ; seules les fractions COURTES touchent le seuil réel. Beaucoup de volume sous-seuil DÉPLACE le seuil ; peu de volume AU seuil ne fait que fatiguer.\n` : ""}${thresholdPace ? `- 🎯 ALLURE SEUIL **MESURÉE** : ${thresholdPace}/km (vitesse critique ${(csMs! * 3.6).toFixed(2)} km/h, ajustée sur ses efforts réels)${pc?.dPrime ? ` · réserve anaérobie D' ${pc.dPrime} m` : ""}. UTILISE CETTE VALEUR pour les séances au seuil plutôt qu'un pourcentage de VMA estimée.\n` : ""}${qeLine ? `- 🔍 EXÉCUTION DE SA DERNIÈRE QUALITÉ : ${qeLine}${faded ? " → il a DÉCROCHÉ : la prochaine série doit être plus courte ou plus lente, pas plus dure. Ne répète pas la même erreur." : fade != null && fade <= -6 ? " → il a ACCÉLÉRÉ en fin de série : il en avait sous le pied, tu peux durcir (allure ou volume, pas les deux)." : ""}\n` : ""}- Repères physio : seuil lactique ~${thresholdPace ?? (vma ? paceAt(86) : "?")}/km · vitesse critique ~${vma ? r1(vma * 0.90) : "?"} km/h (${vma ? paceAt(90) : "?"}/km) · VO2max estimé ~${vo2 ?? "?"} ml/kg/min
+})()}${nutrition ? `- 🍫 NUTRITION DE SA SORTIE LONGUE (${Math.round(nutrition.longRunMin / 60)} h ~${longRunKm} km${nutrition.tempC != null ? `, ${Math.round(nutrition.tempC)} °C prévus` : ""}) : ${nutrition.preRun ? `${nutrition.preRun} g de glucides 2-3 h avant, ` : ""}puis ${nutrition.carbsPerH} g/h À PARTIR DE LA 1re HEURE (soit ~${nutrition.carbsTotal} g sur la sortie, ~${Math.max(1, Math.round(nutrition.carbsTotal / 25))} gels ou équivalent), et ${nutrition.mlPerH} ml/h de boisson à ~${nutrition.sodium} mg/L de sodium. Donne-lui CES chiffres, pas une fourchette — et rappelle-lui de les TESTER à l'entraînement, jamais le jour J.\n` : ""}${shoeLines.length ? `- 👟 USURE DES CHAUSSURES : ${shoeLines.join(" · ")}\n` : ""}${plateau ? `- 🛑 PLATEAU DÉTECTÉ : sa capacité stagne (${vmaSlopePerWeek} km/h/sem sur ${Math.round((curvePts[curvePts.length - 1].t - curvePts[0].t) / 86400000)} j) ALORS QUE sa charge monte. N'AJOUTE PAS de volume ni de séances : c'est le réflexe qui blesse. CHANGE le stimulus — format de séance inédit, côtes, force, technique de foulée — ou impose une vraie semaine de décharge. Explique-lui pourquoi.\n` : vmaSlopePerWeek != null ? `- 📈 TRAJECTOIRE DE CAPACITÉ : ${vmaSlopePerWeek > 0 ? "+" : ""}${vmaSlopePerWeek} km/h de VMA par semaine sur ses efforts mesurés.\n` : ""}${vrLine ? `- 🦵 ÉCONOMIE DE COURSE (ratio vertical, ${vr!.n} séances) : ${vrLine}\n` : ""}${thresholdPace ? `- 🧊 ALLURE SOUS-SEUIL : ${subPace}/km — c'est ICI que se fait le VOLUME au seuil (méthode norvégienne, Bakken : 0,4 à 0,8 mmol sous le seuil). Une allure qu'il doit pouvoir répéter le lendemain. Les blocs LONGS s'y tiennent ; seules les fractions COURTES touchent le seuil réel. Beaucoup de volume sous-seuil DÉPLACE le seuil ; peu de volume AU seuil ne fait que fatiguer.\n` : ""}${lactate ? `- 🧪 TEST DE LACTATE du ${lactate.date} : seuil 1 (aérobie) ${fmtAllure(lactate.lt1.allureSec)}/km${lactate.lt1.fc ? ` à ${lactate.lt1.fc} bpm` : ""}, seuil 2 ${fmtAllure(lactate.lt2.allureSec)}/km${lactate.lt2.fc ? ` à ${lactate.lt2.fc} bpm` : ""}. Ce sont des seuils MESURÉS : les allures de seuil et de footing en découlent, ne les recalcule pas depuis la VMA.\n` : ""}${thresholdPace ? `- 🎯 ALLURE SEUIL **MESURÉE** : ${thresholdPace}/km (${lactate ? `seuil 2 du test de lactate du ${lactate.date}` : `vitesse critique ${(csMs! * 3.6).toFixed(2)} km/h, ajustée sur ses efforts réels`})${!lactate && pc?.dPrime ? ` · réserve anaérobie D' ${pc.dPrime} m` : ""}. UTILISE CETTE VALEUR pour les séances au seuil plutôt qu'un pourcentage de VMA estimée.\n` : ""}${qeLine ? `- 🔍 EXÉCUTION DE SA DERNIÈRE QUALITÉ : ${qeLine}${faded ? " → il a DÉCROCHÉ : la prochaine série doit être plus courte ou plus lente, pas plus dure. Ne répète pas la même erreur." : fade != null && fade <= -6 ? " → il a ACCÉLÉRÉ en fin de série : il en avait sous le pied, tu peux durcir (allure ou volume, pas les deux)." : ""}\n` : ""}- Repères physio : seuil lactique ~${thresholdPace ?? (vma ? paceAt(86) : "?")}/km · vitesse critique ~${vma ? r1(vma * 0.90) : "?"} km/h (${vma ? paceAt(90) : "?"}/km) · VO2max estimé ~${vo2 ?? "?"} ml/kg/min
 
 FORME & RÉCUPÉRATION (aujourd'hui)
 - État physiologique (dernière VFC face à SA base, zone normale ± 6 %) : ${state}

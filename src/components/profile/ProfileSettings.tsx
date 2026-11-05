@@ -25,6 +25,7 @@ import {
   CheckCircle, X, Save, AlertCircle, Star, Camera, Loader2, Download,
 } from "lucide-react";
 import { formatDateCivile } from "@/lib/time/fuseau";
+import { TestLactateCard } from "@/components/profile/TestLactateCard";
 
 // ── i18n local (5 langues) — la page Profil naît traduite. ──────────────────────
 type Tr = (k: string, p?: Record<string, string | number>) => string;
@@ -1724,6 +1725,9 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                 </div>
               </div>
             )}
+
+            {/* Test de lactate : les seuils MESURÉS passent devant les allures estimées. */}
+            <TestLactateCard />
           </motion.div>
         )}
 
