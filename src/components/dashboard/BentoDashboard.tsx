@@ -1382,7 +1382,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             La carte porte désormais le nom de ce qu'elle montre. */}
         <div className="group relative bento-card">
           <div className="metric-label">{t("dash.discipline.title")}</div>
-            <VersFiche cle="discipline" titre={t("dash.discipline.title")} lang={lang} />
+            <VersFiche cle="discipline" titre={t("dash.discipline.title")} lang={lang} coin="haut" />
           <div className="mt-4 flex items-center gap-4">
             <div className="relative h-20 w-20 flex-shrink-0">
               <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
@@ -1741,21 +1741,23 @@ function computeWeekSummary(workouts: Workout[], jour: string): { sessions: numb
  * qu'au survol : sur téléphone, la carte entière se touche.
  */
 const DETAIL_LIBELLE: Record<string, string> = { fr: "Détails", en: "Details", de: "Details", es: "Detalles", pt: "Detalhes" };
-function VersPage({ href, titre, lang }: { href: string; titre: string; lang: string }) {
+// `coin="haut"` : pour une carte dont le bas porte déjà un lien (« Voir les
+// recommandations ») — la pastille en bas à droite le recouvrait au survol.
+function VersPage({ href, titre, lang, coin = "bas" }: { href: string; titre: string; lang: string; coin?: "haut" | "bas" }) {
   const l = DETAIL_LIBELLE[lang] ?? DETAIL_LIBELLE.fr;
   return (
     <>
       <Link href={href} aria-label={`${titre} — ${l}`}
         className="absolute inset-0 z-[1] rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2" />
       <span aria-hidden
-        className="pointer-events-none absolute bottom-3 right-3 z-[2] inline-flex items-center gap-1 rounded-full bg-zinc-900 px-2.5 py-1 text-[10px] font-semibold text-white opacity-0 shadow-lg transition-opacity duration-200 group-hover:opacity-100">
+        className={`pointer-events-none absolute ${coin === "haut" ? "top-3" : "bottom-3"} right-3 z-[2] inline-flex items-center gap-1 rounded-full bg-zinc-900 px-2.5 py-1 text-[10px] font-semibold text-white opacity-0 shadow-lg transition-opacity duration-200 group-hover:opacity-100`}>
         {l} <ArrowUpRight className="h-3 w-3" />
       </span>
     </>
   );
 }
-function VersFiche({ cle, titre, lang }: { cle: CleIndicateur; titre: string; lang: string }) {
-  return <VersPage href={`/dashboard/indicateurs/${cle}`} titre={titre} lang={lang} />;
+function VersFiche({ cle, titre, lang, coin }: { cle: CleIndicateur; titre: string; lang: string; coin?: "haut" | "bas" }) {
+  return <VersPage href={`/dashboard/indicateurs/${cle}`} titre={titre} lang={lang} coin={coin} />;
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
