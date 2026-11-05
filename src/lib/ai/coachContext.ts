@@ -1081,8 +1081,10 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const obsMaxHr = Math.max(0, ...workouts.map(w => num(w.max_hr) ?? 0));
   const ageNum = num(p?.age);
   const fcMax = maxHr ?? (obsMaxHr > 120 ? obsMaxHr : null) ?? (ageNum ? 220 - ageNum : null);
-  const fcRest = restHr ?? 55;
-  const easyCeiling = fcMax != null ? Math.round(fcRest + (fcMax - fcRest) * 0.78) : null;
+  // ⚠️ PLUS DE FC DE REPOS INVENTÉE (c'était `restHr ?? 55`) : sans FC de repos déclarée ni
+  // mesurée par la montre, le plafond de Karvonen n'a pas de base, et on le dit (« n/c »).
+  const fcRest = restHrEff;
+  const easyCeiling = fcMax != null && fcRest != null ? Math.round(fcRest + (fcMax - fcRest) * 0.78) : null;
   const easyRuns = recent14.filter(w => w.avg_hr != null && !isHardWk(w));
   const tooFastEasy = easyCeiling != null ? easyRuns.filter(w => (w.avg_hr ?? 0) > easyCeiling).length : 0;
   const easyDiscipline = easyRuns.length && easyCeiling != null

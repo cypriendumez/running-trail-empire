@@ -315,7 +315,7 @@ test("« record personnel » dit sur quelle profondeur d'historique il est calcu
     .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
   const b = nu("src/components/dashboard/BentoDashboard.tsx");
   if (!/\{premiereSeance && \(/.test(b)) fails.push("la carte des records n'annonce plus depuis quand elle calcule");
-  else if (!/t\("dash\.rec\.depuis", \{ d: new Date\(premiereSeance\)/.test(b)) fails.push("la profondeur affichée n'est plus celle de la première séance");
+  else if (!/t\("dash\.rec\.depuis", \{ d: formatDateCivile\(String\(premiereSeance\)/.test(b)) fails.push("la profondeur affichée n'est plus celle de la première séance");
   else passed++;
   // Et elle doit être RENSEIGNÉE : une propriété jamais transmise laisse la ligne muette.
   const page = nu("src/app/dashboard/page.tsx");

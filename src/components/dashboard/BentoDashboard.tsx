@@ -212,7 +212,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
   const hrvChartData = hrv.slice(0, 14).reverse()
     .filter(h => h.hrv_ms != null)
     .map(h => ({
-      date: new Date(h.date).toLocaleDateString(lang, { day: "2-digit", month: "2-digit" }),
+      date: formatDateCivile(String(h.date).slice(0, 10), lang, { day: "2-digit", month: "2-digit" }),
       hrv: h.hrv_ms,
     }));
 
@@ -1324,7 +1324,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-zinc-900 text-sm truncate group-hover:text-emerald-700">{cleanActivityName(w.title)}</div>
                     <div className="text-xs text-zinc-400">
-                      {new Date(w.date).toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "short" })}
+                      {formatDateCivile(String(w.date).slice(0, 10), lang, { weekday: "long", day: "numeric", month: "short" })}
                     </div>
                   </div>
                   {/* ⚠️ DÉBORDEMENT HORIZONTAL SUR TÉLÉPHONE, mesuré à 375 px : la page
@@ -1547,7 +1547,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                 seule façon de ne pas contredire l'athlète sur sa propre histoire. */}
             {premiereSeance && (
               <p className="mt-3 border-t border-zinc-100 pt-2.5 text-[11px] leading-snug text-zinc-400">
-                {t("dash.rec.depuis", { d: new Date(premiereSeance).toLocaleDateString(lang, { month: "long", year: "numeric" }) })}
+                {t("dash.rec.depuis", { d: formatDateCivile(String(premiereSeance).slice(0, 10), lang, { month: "long", year: "numeric" }) })}
               </p>
             )}
             {jourAujourdhui && <AjoutRecord aujourdhui={jourAujourdhui} />}

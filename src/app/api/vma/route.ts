@@ -66,10 +66,14 @@ export async function POST(req: Request) {
   const { error } = await admin.from("performance_baselines").insert({
     user_id: user.id,
     vma_kmh: vma,
-    // FC : facultatif à la saisie, mais NOT NULL en base → repli sur des valeurs neutres
-    // que le coach affine ensuite depuis les séances observées (coachContext).
-    max_hr: Number.isFinite(maxHr) && maxHr >= 140 && maxHr <= 220 ? Math.round(maxHr) : 190,
-    resting_hr: Number.isFinite(restHr) && restHr >= 30 && restHr <= 100 ? Math.round(restHr) : 50,
+    // FC : FACULTATIVES. Non saisies, elles restent ABSENTES. ⚠️ Avant le 05/11/2026, on
+    // écrivait 190 et 50 « neutres » : le coach les lisait comme une DÉCLARATION, et la FC
+    // max retenue étant la plus haute entre déclarée et observée, un coureur à 175 recevait
+    // des zones calées sur 190 — des footings trop rapides. Sans valeur, le coach prend la
+    // FC max observée en séance, puis la formule d'âge (coachContext). Les colonnes ont été
+    // rendues facultatives en base (`alter table … drop not null`) le même jour.
+    max_hr: Number.isFinite(maxHr) && maxHr >= 140 && maxHr <= 220 ? Math.round(maxHr) : null,
+    resting_hr: Number.isFinite(restHr) && restHr >= 30 && restHr <= 100 ? Math.round(restHr) : null,
     tested_at: aujourdhui(FUSEAU_DEFAUT),
   });
   if (error) {

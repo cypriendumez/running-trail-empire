@@ -19,6 +19,7 @@ import { createElement as h } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { BentoDashboard } from "../src/components/dashboard/BentoDashboard";
+import { CalendarView } from "../src/components/training/CalendarView";
 import { LanguageProvider } from "../src/lib/i18n/LanguageProvider";
 import { FuseauProvider } from "../src/lib/time/FuseauProvider";
 import { T } from "../src/lib/i18n/translations";
@@ -122,6 +123,30 @@ test("l'anneau de préparation part du jour où l'objectif a été fixé : 0 % l
   const html = rendu("Europe/Paris", "2026-10-30", true);
   assert.doesNotMatch(html, />56<span/, "« 56 % » : la préparation supposée de 16 semaines est revenue");
   assert.match(html, />0<span[^>]*>%</, "l'anneau n'affiche pas 0 % le jour où l'objectif est fixé");
+});
+
+console.log("\nLE CALENDRIER, À MINUIT À PARIS");
+
+/** Le vrai calendrier, rendu avec l'horloge d'une machine dans `fuseauMachine`. */
+function renduCalendrier(fuseauMachine: string): string {
+  process.env.TZ = fuseauMachine;
+  const s = (date: string, type: string, title: string) => ({ date, type, title, detail: "Corps : 8 km en Z2", why: "", feel: "", tags: [] });
+  const props = {
+    sessions: [s("2026-10-31", "Endurance", "Footing en endurance"), s("2026-11-01", "Repos", "Repos"), s("2026-11-02", "Seuil", "Séance au seuil")],
+    races: [{ id: "r", date: "2026-11-08", name: "10 km du parc", location: "", distanceKm: 10, priorite: "B" }],
+  };
+  return renderToStaticMarkup(h(AppRouterContext.Provider, { value: routeur as never },
+    h(LanguageProvider, { initialLang: "fr", dict: T.fr,
+      children: h(FuseauProvider, { fuseau: "Europe/Paris", children: h(CalendarView, props as never) }) })));
+}
+
+test("samedi 23 h 01 UTC (dimanche 1er novembre 0 h 01 à Paris) : le même calendrier au serveur et au téléphone", () => {
+  // L'erreur #418 enregistrée sur /dashboard/calendrier le 01/11/2026 à 0 h 01 : la grille
+  // partait de `new Date()` mis à minuit, la veille au serveur, le jour même au téléphone.
+  instant = DateReelle.parse("2026-10-31T23:01:00Z");
+  const serveur = renduCalendrier("UTC"), telephone = renduCalendrier("Europe/Paris");
+  assert.match(telephone, /Footing en endurance|Séance au seuil/, "précondition : le calendrier rend ses séances");
+  assert.deepEqual(ecarts(serveur, telephone), []);
 });
 
 process.env.TZ = "UTC";

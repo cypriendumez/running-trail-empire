@@ -641,7 +641,14 @@ export function buildWorkoutDescription(
   // Effet de bord bienvenu : `metriquesMixtesSupportees(null)` rend `false`, et la
   // construction dit maintenant la même chose. Les deux fonctions ne divergent plus.
   const toutEnAllure = !metriquesMixtesSupportees(montre ?? null);
-  const steps = stepsForType(type, dur, vmaKmh, mainPaceSec, warmMin, coolMin, reps, detail, toutEnAllure);
+  // L'ÉCHAUFFEMENT ET LE RETOUR AU CALME QUE LE TEXTE ANNONCE (prose française canonique),
+  // le réglage du profil sinon. Le plan les ajuste à la séance — un footing de 24 min n'en
+  // contient pas 25 (autoPlan, `decoupe`) — et une qualité annonce 5 min d'échauffement de
+  // plus : avec le seul réglage du profil, l'écran et la montre décrivaient deux séances.
+  const eTexte = Number(detail.match(/Échauffement (\d{1,2}) min/)?.[1]);
+  const kTexte = Number(detail.match(/Retour au calme (\d{1,2}) min/)?.[1]);
+  const steps = stepsForType(type, dur, vmaKmh, mainPaceSec,
+    eTexte > 0 ? eTexte : warmMin, kTexte > 0 ? kTexte : coolMin, reps, detail, toutEnAllure);
   if (!steps) return null;
   // Séance vélo (cross-training) → exporte un workout "Ride" sur la montre (sinon "Run").
   const isBike = /vélo|velo|bike|cycl|home ?trainer|\bride\b/i.test(`${title} ${type}`);

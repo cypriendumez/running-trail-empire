@@ -85,7 +85,6 @@ export type TextesPlan = {
   // (lib/watch/intervals) le lirait comme des répétitions et poserait des allures
   // sur ce qui doit rester une marche.
   marcheCourseTitre: string;
-  marcheCourseDetail: (duree: string) => string;
   marcheCourseWhy: string;
   /** Programme marche-course des débutants complets (`lib/coach/marcheCourse`). ⚠️ Le
    *  français est lu par la montre : « N × (X min de course … / Y min de marche) » et
@@ -237,7 +236,6 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     veloLongDetail: (e, d, n) => `Échauffement ${e} min très facile → ${d} à 2h en FC Z2, allure conversationnelle, cadence souple → 10 min de retour au calme. Pas d'allure cible : c'est du volume aérobie sans impact.${n}`,
     veloLongWhy: "Le volume aérobie de la semaine, sans les contraintes d'impact de la course.",
     marcheCourseTitre: "Marche/course",
-    marcheCourseDetail: (d) => `Environ ${d} en alternant course très facile et marche : cours deux minutes en restant capable de parler, puis marche une minute, et recommence jusqu'au bout. La marche fait PARTIE de la séance, ce n'est pas un échec.`,
     marcheCourseWhy: "Ton cœur encaisse déjà la course continue ; tes tendons et tes articulations, pas encore. L'alternance donne le même travail aérobie en divisant les chocs, et c'est ce qui évite la périostite du deuxième mois.",
     mcTitre: (e, t) => `Marche/course · étape ${e}/${t}`,
     mcAlternance: (n, c, m) => `5 min de marche active → Corps : ${n} × (${c} min de course très facile / ${m} min de marche) → 5 min de marche pour finir. Cours assez lentement pour pouvoir parler. La marche fait partie de la séance, ce n'est pas un échec.`,
@@ -365,7 +363,6 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     veloLongDetail: (e, d, n) => `Warm-up ${e} min very easy → ${d} to 2h at HR Z2, conversational, smooth cadence → 10 min of cool-down. No target pace: this is aerobic volume without impact.${n}`,
     veloLongWhy: "The aerobic volume of the week, without the impact load of running.",
     marcheCourseTitre: "Walk/run",
-    marcheCourseDetail: (d) => `About ${d} alternating very easy running and walking: run two minutes while still able to talk, then walk one minute, and repeat to the end. The walking is PART of the session, not a failure.`,
     marcheCourseWhy: "Your heart already handles continuous running; your tendons and joints do not yet. Alternating gives the same aerobic work while dividing the impact — that is what prevents the second-month shin splints.",
     mcTitre: (e, t) => `Walk/run · stage ${e}/${t}`,
     mcAlternance: (n, c, m) => `5 min brisk walk → Main set: ${n} × (${c} min very easy running / ${m} min walking) → 5 min walk to finish. Run slowly enough to talk. Walking is part of the session, not a failure.`,
@@ -493,7 +490,6 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     veloLongDetail: (e, d, n) => `Aufwärmen ${e} min sehr locker → ${d} bis 2h bei HF Z2, Unterhaltungstempo, runde Trittfrequenz → 10 min Auslaufen. Kein Zieltempo: Das ist aerober Umfang ohne Belastungsspitzen.${n}`,
     veloLongWhy: "Der aerobe Umfang der Woche, ohne die Aufprallbelastung des Laufens.",
     marcheCourseTitre: "Geh-/Lauf-Wechsel",
-    marcheCourseDetail: (d) => `Etwa ${d} im Wechsel aus sehr lockerem Laufen und Gehen: zwei Minuten laufen, so dass du noch sprechen kannst, dann eine Minute gehen, und so weiter bis zum Schluss. Das Gehen gehört ZUR Einheit, es ist kein Scheitern.`,
     marcheCourseWhy: "Dein Herz verkraftet Dauerlauf bereits, deine Sehnen und Gelenke noch nicht. Der Wechsel bringt denselben aeroben Reiz bei halber Stoßbelastung — genau das verhindert das Schienbeinkantensyndrom im zweiten Monat.",
     mcTitre: (e, t) => `Gehen/Laufen · Stufe ${e}/${t}`,
     mcAlternance: (n, c, m) => `5 Min zügiges Gehen → Hauptteil: ${n} × (${c} Min sehr lockeres Laufen / ${m} Min Gehen) → 5 Min Gehen zum Abschluss. Lauf so langsam, dass du dich unterhalten kannst. Das Gehen gehört zur Einheit, es ist kein Scheitern.`,
@@ -621,7 +617,6 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     veloLongDetail: (e, d, n) => `Calentamiento ${e} min muy suave → ${d} a 2h en FC Z2, ritmo conversacional, cadencia ágil → 10 min de vuelta a la calma. Sin ritmo objetivo: es volumen aeróbico sin impacto.${n}`,
     veloLongWhy: "El volumen aeróbico de la semana, sin las exigencias de impacto de la carrera.",
     marcheCourseTitre: "Caminar/correr",
-    marcheCourseDetail: (d) => `Unos ${d} alternando carrera muy suave y caminata: corre dos minutos pudiendo hablar, luego camina un minuto, y repite hasta el final. Caminar FORMA PARTE de la sesión, no es un fracaso.`,
     marcheCourseWhy: "Tu corazón ya aguanta la carrera continua; tus tendones y articulaciones todavía no. Alternar da el mismo trabajo aeróbico dividiendo los impactos, y es lo que evita la periostitis del segundo mes.",
     mcTitre: (e, t) => `Caminar/correr · etapa ${e}/${t}`,
     mcAlternance: (n, c, m) => `5 min caminando a buen paso → Parte principal: ${n} × (${c} min de carrera muy suave / ${m} min caminando) → 5 min caminando para terminar. Corre lo bastante despacio como para poder hablar. Caminar forma parte de la sesión, no es un fracaso.`,
@@ -749,7 +744,6 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     veloLongDetail: (e, d, n) => `Aquecimento ${e} min muito fácil → ${d} a 2h em FC Z2, ritmo conversacional, cadência solta → 10 min de retorno à calma. Sem ritmo alvo: é volume aeróbio sem impacto.${n}`,
     veloLongWhy: "O volume aeróbio da semana, sem as exigências de impacto da corrida.",
     marcheCourseTitre: "Caminhar/correr",
-    marcheCourseDetail: (d) => `Cerca de ${d} alternando corrida muito fácil e caminhada: corre dois minutos conseguindo falar, depois caminha um minuto, e repete até ao fim. A caminhada FAZ PARTE da sessão, não é um fracasso.`,
     marcheCourseWhy: "O teu coração já aguenta a corrida contínua; os teus tendões e articulações ainda não. Alternar dá o mesmo trabalho aeróbio dividindo os impactos, e é isso que evita a periostite do segundo mês.",
     mcTitre: (e, t) => `Caminhar/correr · etapa ${e}/${t}`,
     mcAlternance: (n, c, m) => `5 min de caminhada rápida → Parte principal: ${n} × (${c} min de corrida muito leve / ${m} min de caminhada) → 5 min de caminhada para terminar. Corre devagar o suficiente para conseguires falar. Caminhar faz parte da sessão, não é um fracasso.`,

@@ -14,7 +14,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import type { AthleteContext, QualitySession } from "@/lib/ai/coachContext";
 import { heatAdvice, windAdvice } from "@/lib/weather/openMeteo";
-import { dureesMarcheCourse } from "@/lib/coach/marcheCourse";
+import { dureesMarcheCourse, MARCHE_ENCADRANTE_MIN } from "@/lib/coach/marcheCourse";
 import { choisirJourQualite } from "@/lib/coach/meteoPlacement";
 import { fenetreRespectee } from "@/lib/coach/qualiteRecente";
 import { repartirFootings, varianteFooting } from "@/lib/coach/footings";
@@ -185,6 +185,32 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
     if (!penalty) return base;
     const sec = Number(m[1]) * 60 + Number(m[2]) + penalty;
     return `${Math.floor(sec / 60)}'${String(sec % 60).padStart(2, "0")}`;
+  };
+
+  /**
+   * UN FOOTING OU UNE SORTIE LONGUE DÉCOUPÉS : échauffement, corps, retour au calme.
+   *
+   * ⚠️ L'échauffement et le retour au calme s'AJOUTAIENT aux kilomètres annoncés : un
+   * footing de 8 km partait sur la montre en 15 min + 8 km + 10 min, ~5 km de plus, et la
+   * semaine dépassait sa cible d'autant par sortie (audit du 05/11/2026). Le chiffre annoncé
+   * (étiquette, volume de la semaine) est désormais la séance ENTIÈRE.
+   *
+   * Et ils sont à la MESURE de la séance : au plus le réglage du profil, au plus ~20 % et
+   * ~15 % de la séance, jamais moins de 5 min. Un footing de 24 min ne contient pas 25 min
+   * d'échauffement et de retour au calme. La montre lit ces durées dans le texte
+   * (`buildWorkoutDescription`) : l'écran et le poignet disent la même séance.
+   *
+   * Sans allure connue, la distance de l'échauffement l'est aussi peu : le corps garde
+   * toute la distance et l'échauffement le réglage du profil, faute de mieux que d'inventer.
+   */
+  const decoupe = (totalKm: number, i: number): { e: number; k: number; corps: number } => {
+    const m = paceFor(i)?.match(/(\d+)['’:](\d{1,2})/);
+    if (!m) return { e: warm, k: cool, corps: totalKm };
+    const secKm = Number(m[1]) * 60 + Number(m[2]);
+    const totalMin = (totalKm * secKm) / 60;
+    const e = Math.min(warm, Math.max(5, Math.round(totalMin * 0.2)));
+    const k = Math.min(cool, Math.max(5, Math.round(totalMin * 0.15)));
+    return { e, k, corps: Math.max(1, Math.round((totalKm - ((e + k) * 60) / secKm) * 2) / 2) };
   };
 
   /**
@@ -460,7 +486,7 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
             // déjà fatiguées, c'est ce qui se passe le jour J.
             const spec = Math.max(2, Math.round(longRunKm * 0.25));
             return { type: "Sortie longue", title: (l: Lang) => PLAN_T[l].longSpecTitre,
-              detail: (l: Lang) => PLAN_T[l].longSpecDetail(warm, kmAndTime(longRunKm - spec, p, l), easyTag, nRaw(spec, l), goalPace, cool, `${gapNote(l)}${cycleNote(l)}`),
+              detail: (l: Lang) => PLAN_T[l].longSpecDetail(decoupe(longRunKm - spec, longIdx).e, kmAndTime(decoupe(longRunKm - spec, longIdx).corps, p, l), easyTag, nRaw(spec, l), goalPace, decoupe(longRunKm - spec, longIdx).k, `${gapNote(l)}${cycleNote(l)}`),
               why: (l: Lang) => PLAN_T[l].longSpecWhy,
               tags: tagLong("Spécifique") };
           }
@@ -469,14 +495,14 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
             // finir fort plutôt qu'à survivre, et se paie en confiance le jour de course.
             const fast = p ? (() => { const m = p.match(/(\d+)['’](\d{2})/); if (!m) return null;
               const sec = Number(m[1]) * 60 + Number(m[2]) - 20; return `${Math.floor(sec / 60)}'${String(sec % 60).padStart(2, "0")}`; })() : null;
-            const third = Math.max(2, Math.round(longRunKm / 3));
+            const third = Math.max(2, Math.round(decoupe(longRunKm, longIdx).corps / 3));
             return { type: "Sortie longue", title: (l: Lang) => PLAN_T[l].longProgTitre,
-              detail: (l: Lang) => PLAN_T[l].longProgDetail(warm, kmAndTime(longRunKm, p, l), easyTag, nRaw(third, l), fast, cool, `${gapNote(l)}${cycleNote(l)}`),
+              detail: (l: Lang) => PLAN_T[l].longProgDetail(decoupe(longRunKm, longIdx).e, kmAndTime(decoupe(longRunKm, longIdx).corps, p, l), easyTag, nRaw(third, l), fast, decoupe(longRunKm, longIdx).k, `${gapNote(l)}${cycleNote(l)}`),
               why: (l: Lang) => PLAN_T[l].longProgWhy,
               tags: tagLong("Progressif") };
           }
           return { type: "Sortie longue", title: (l: Lang) => PLAN_T[l].longTitre,
-            detail: (l: Lang) => PLAN_T[l].longDetail(warm, kmAndTime(longRunKm, p, l), easyTag, cool, `${gapNote(l)}${cycleNote(l)}`),
+            detail: (l: Lang) => PLAN_T[l].longDetail(decoupe(longRunKm, longIdx).e, kmAndTime(decoupe(longRunKm, longIdx).corps, p, l), easyTag, decoupe(longRunKm, longIdx).k, `${gapNote(l)}${cycleNote(l)}`),
             why: (l: Lang) => (ctx.volume.longRunEased
               // Une sortie longue raccourcie sans explication passe pour une erreur du plan :
               // l'athlète voit un chiffre plus petit que la semaine d'avant et n'en sait rien.
@@ -642,7 +668,18 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // que d'y poser des footings au rabais — ce qui faisait dépasser la cible hebdomadaire —
   // on réduit le NOMBRE de sorties : un jour de repos vaut mieux qu'un footing de 2 km.
   const remaining = Math.max(0, targetKm - usedKm);
-  const affordable = Math.max(0, Math.floor(remaining / 4));
+  // ── UN FOOTING DURE AU MOINS 25 MINUTES ─────────────────────────────────────
+  //  Le plancher était de 4 km de CORPS, auxquels la montre ajoutait 25 min d'échauffement
+  //  et de retour au calme : la séance réelle faisait ~45 min pour « 4 km ». Depuis que
+  //  les kilomètres annoncés sont la séance entière (`decoupe`, 05/11/2026), 4 km à 5'15
+  //  donnaient 21 min — en dessous de ce qui vaut une séance (scénarios : « séance montre
+  //  trop courte »). Le plancher se dit donc en TEMPS : 25 min à l'allure facile, 4 km
+  //  au moins, et 4 km tout court quand l'allure est inconnue.
+  const kmMinFooting = (() => {
+    const m = ctx.easyPace?.match(/(\d+)['’:](\d{1,2})/);
+    return m ? Math.max(4, Math.ceil((25 * 60) / (Number(m[1]) * 60 + Number(m[2])))) : 4;
+  })();
+  const affordable = Math.max(0, Math.floor(remaining / kmMinFooting));
   if (easySlots.length > affordable) {
     for (const i of easySlots.splice(affordable)) { slot[i] = null; runBudget += 1; }
   }
@@ -658,7 +695,7 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   const easyCap = Math.min(raceIdx >= 0 ? 10 : 18, longIdx >= 0 ? Math.max(4, longRunKm * 0.85) : 18);
   // Plancher à 4 km SAUF si le budget ne le permet pas : mieux vaut une sortie de moins
   // qu'un dépassement de la cible hebdomadaire.
-  const easyKm = Math.min(easyCap, Math.max(rawEasy >= 3 ? 4 : 3, Math.round(rawEasy)));
+  const easyKm = Math.min(easyCap, Math.max(rawEasy >= 3 ? kmMinFooting : 3, Math.round(rawEasy)));
   // Jamais pendant la récupération d'après-course : le volume y est volontairement réduit,
   // et « scinde en DEUX sorties » à J+5 d'un marathon disait l'inverse du bandeau.
   const doubles = rawEasy > easyCap && raceIdx < 0 && !ctx.recuperation;
@@ -668,14 +705,14 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // autour de la moyenne SANS toucher au volume de la semaine, et un footing porte
   // des lignes droites (coût en fatigue quasi nul, entretien de la vitesse), ce qui
   // compte double une semaine sans aucune séance de qualité.
-  const distances = repartirFootings(easySlots.length, easyKm, rawEasy >= 3 ? 4 : 3, easyCap);
+  const distances = repartirFootings(easySlots.length, easyKm, rawEasy >= 3 ? kmMinFooting : 3, easyCap);
   const gardes = { taper: ctx.cycle.taper, semaineCourse: raceIdx >= 0, sansHistorique: ctx.noHistory };
   easySlots.forEach((i, rang) => put(i, {
     type: "Endurance",
     title: (l) => { const v = varianteFooting(rang, easySlots.length, gardes);
       return v === "lignes" ? PLAN_T[l].enduranceTitreLignes : v === "progressif" ? PLAN_T[l].enduranceTitreProg : PLAN_T[l].enduranceTitre; },
-    detail: (l) => PLAN_T[l].enduranceDetail(warm, kmAndTime(distances[rang] ?? easyKm, paceFor(i), l),
-      paceFor(i) ? ` (~${paceFor(i)}/km)` : "", cool, gapNote(l), doubles, cycleNote(l))
+    detail: (l) => PLAN_T[l].enduranceDetail(decoupe(distances[rang] ?? easyKm, i).e, kmAndTime(decoupe(distances[rang] ?? easyKm, i).corps, paceFor(i), l),
+      paceFor(i) ? ` (~${paceFor(i)}/km)` : "", decoupe(distances[rang] ?? easyKm, i).k, gapNote(l), doubles, cycleNote(l))
       + (() => { const v = varianteFooting(rang, easySlots.length, gardes);
         return v === "lignes" ? PLAN_T[l].lignesDroites : v === "progressif" ? PLAN_T[l].footingProgressif : ""; })(),
     why: (l) => (ctx.tooMuchIntensity
@@ -889,9 +926,18 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
     // Durée de la séance remplacée : on la relit dans la prose française, seule version
     // canonique (même procédé que le doublage plus haut). Sans distance ni allure
     // connues, on retombe sur une durée neutre plutôt que d'inventer un chiffre.
+    // ⚠️ La distance se lit dans l'ÉTIQUETTE (la séance entière), plus dans le texte : le
+    // « Corps : X km » n'en est que le milieu, échauffement et retour au calme déduits.
+    const kmDe = (d: PlanDay): number => Number(
+      (`${d.tags.join(" ")} ${d.detail}`.match(/(\d+(?:[.,]\d+)?)\s*km/)?.[1] ?? "").replace(",", "."));
     const dureeDe = (d: PlanDay): string => {
-      const km = Number(String(d.detail).match(/(\d+(?:[.,]\d+)?)\s*km/)?.[1]?.replace(",", "."));
+      const km = kmDe(d);
       return (Number.isFinite(km) && km > 0 ? durationFor(km, ctx.easyPace) : null) ?? "40 min";
+    };
+    const minutesDe = (d: PlanDay): number | null => {
+      const km = kmDe(d);
+      const m = ctx.easyPace?.match(/(\d+)['’:](\d{1,2})/);
+      return Number.isFinite(km) && km > 0 && m ? Math.round((km * (Number(m[1]) * 60 + Number(m[2]))) / 60) : null;
     };
 
     const out = [...jours];
@@ -911,13 +957,21 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
     }
 
     // 2) MARCHE/COURSE sur les séances à pied qui restent.
+    //    ⚠️ LA MONTRE RECEVAIT DE LA COURSE CONTINUE. La séance gardait le type « Endurance »
+    //    et un texte libre (« cours deux minutes, marche une minute… ») que rien ne lisait :
+    //    l'écran disait marche/course, la montre faisait courir 40 minutes d'affilée. Elle
+    //    prend désormais le type et le texte du programme marche-course des débutants
+    //    (`PLAN_T.mcAlternance`), que `etapesMarcheCourse` (lib/watch/intervals) transforme
+    //    en étapes : 2 min de course, 1 min de marche, encadrées de 5 min de marche.
     if (walkRunAdvised) {
       for (const { i } of faciles) {
         if (versVelo.has(i)) continue;
-        const duree = dureeDe(out[i]);
-        out[i] = reecrire(out[i], (l) => ({
+        const total = minutesDe(out[i]);
+        // Sans durée connue (ni distance ni allure), huit répétitions : 34 minutes en tout.
+        const reps = total == null ? 8 : Math.min(20, Math.max(4, Math.round((total - 2 * MARCHE_ENCADRANTE_MIN) / 3)));
+        out[i] = reecrire({ ...out[i], type: "Marche/course" }, (l) => ({
           title: PLAN_T[l].marcheCourseTitre,
-          detail: PLAN_T[l].marcheCourseDetail(duree),
+          detail: PLAN_T[l].mcAlternance(reps, 2, 1),
           why: PLAN_T[l].marcheCourseWhy,
           tags: [PLAN_T[l].tags["Endurance"], PLAN_T[l].tags["Z1"]],
         }));

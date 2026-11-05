@@ -5521,14 +5521,17 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
 
     assert.ok(p.some((d) => d.type === "Vélo"),
       "aucune séance sans impact alors que 60 % du volume doit sortir de la course");
-    const aPied = p.filter((d) => d.type === "Endurance" || d.type === "Récup");
+    const aPied = p.filter((d) => d.type === "Endurance" || d.type === "Récup" || d.type === "Marche/course");
     assert.ok(aPied.length > 0, "aucune séance à pied dans le plan : le scénario ne prouve rien");
     // On vise le TITRE canonique, pas le mot « marche » : « Repos complet. Marche,
     // étirements… » et la récupération en marchant des lignes droites le contiennent déjà,
     // donc une assertion sur le texte serait vraie sans que rien n'ait été converti.
+    // Et le TYPE : c'est lui que la montre lit (05/11/2026 — resté « Endurance », la séance
+    // partait en course continue sous un titre « Marche/course »).
     for (const d of aPied) {
       assert.match(d.title, /^Marche\/course$/,
         `séance à pied en course continue malgré l'alternance marche/course demandée : « ${d.title} »`);
+      assert.equal(d.type, "Marche/course", `séance « ${d.title} » envoyée à la montre comme « ${d.type} »`);
     }
     // Et les 4 autres langues suivent : sans cela, un athlète non francophone verrait la
     // consigne d'origine — la divergence silencieuse que `reecrire` existe pour éviter.
@@ -5549,13 +5552,31 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     const marche = p.filter((d) => /^Marche\/course$/.test(d.title));
     assert.ok(marche.length > 0, "aucune séance marche/course produite : le scénario ne teste rien");
     for (const d of marche) {
-      const b = buildWorkoutDescription(d.title, d.detail, `${d.type} ${d.tags.join(" ")}`, null, 17.6, 15, 10);
+      const b = buildWorkoutDescription(d.title, d.detail, `${d.type} ${d.tags.join(" ")}`, null, 17.6, 15, 10, "garmin");
       assert.ok(b, `séance marche/course non poussable → elle serait EFFACÉE de la montre : « ${d.title} »`);
-      // Le texte ne doit pas contenir de motif « N × valeur », que `parseReps` lirait comme
-      // des répétitions et transformerait en fractionné avec allures cibles.
-      assert.equal(parseReps(d.detail, null), null,
-        `la marche/course est lue comme un fractionné par la montre : « ${d.detail} »`);
+      // ⚠️ La montre recevait de la COURSE CONTINUE (05/11/2026). Elle doit recevoir
+      // l'alternance elle-même : des courses et des marches numérotées, à la fréquence
+      // cardiaque, sans aucune allure cible (pas un fractionné).
+      const etapes = b!.description.split("\n").filter((x) => x.startsWith("- "));
+      assert.ok(etapes.some((x) => /Z2 HR Course 1\//.test(x)) && etapes.some((x) => /Z1 HR Marche 1\//.test(x)),
+        `pas d'alternance course/marche sur la montre : ${etapes.join(" | ")}`);
+      assert.ok(!etapes.some((x) => /Pace|\/km/i.test(x)), `une allure cible est imposée : ${etapes.join(" | ")}`);
     }
+    // Elle dure autant que le footing qu'elle remplace (sa distance ENTIÈRE à l'allure
+    // facile, lue dans l'étiquette — le « Corps : » n'en est que le milieu).
+    const minutesMontre = (d: { title: string; detail: string; type: string; tags: string[] }) =>
+      (buildWorkoutDescription(d.title, d.detail, `${d.type} ${d.tags.join(" ")}`, null, 17.6, 15, 10, "garmin")?.description ?? "")
+        .split("\n").reduce((t, l) => t + Number(l.match(/^- (\d+)m /)?.[1] ?? 0), 0);
+    const sansRegle = buildWeekPlan(ctx(), new Date());
+    let compares = 0;
+    for (const d of marche) {
+      const avant = sansRegle.find((x) => x.date === d.date && x.type === "Endurance");
+      if (!avant) continue;
+      compares++;
+      assert.ok(Math.abs(minutesMontre(d) - minutesMontre(avant)) <= 4,
+        `marche/course de ${minutesMontre(d)} min à la place d'un footing de ${minutesMontre(avant)} min (${d.date})`);
+    }
+    assert.ok(compares > 0, "aucun footing remplacé à comparer : le contrôle de durée ne prouve rien");
   });
 
   test("sans mode perte de poids, aucune marche/course n'est imposée", () => {
@@ -5568,6 +5589,31 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
       "une marche/course est imposée à un athlète qui n'est pas en perte de poids");
     assert.ok(!p.some((d) => d.type === "Vélo" && /sans impact/i.test(d.title)),
       "du volume sans impact est imposé à un athlète qui n'est pas en perte de poids");
+  });
+
+  test("les kilomètres annoncés sont la séance ENTIÈRE, échauffement et retour au calme compris", () => {
+    // ⚠️ Audit du 05/11/2026 : l'échauffement (15 min) et le retour au calme (10 min)
+    // s'AJOUTAIENT aux kilomètres annoncés. Un footing « 8 km » partait sur la montre en
+    // 15 min + 8 km + 10 min, ~5 km de plus, et la semaine dépassait sa cible d'autant
+    // par sortie. On mesure ce que la montre fait courir, pas le texte.
+    const p = buildWeekPlan(ctx(), new Date());
+    const allureMin = 4 + 52 / 60;
+    const aMesurer = p.filter((d) => d.type === "Endurance" || d.type === "Sortie longue");
+    assert.ok(aMesurer.some((d) => d.type === "Endurance") && aMesurer.some((d) => d.type === "Sortie longue"),
+      "il faut au moins un footing et une sortie longue pour que ce test dise quelque chose");
+    for (const d of aMesurer) {
+      const km = Number(d.tags.join(" ").match(/(\d+(?:[.,]\d+)?) km/)?.[1]?.replace(",", "."));
+      assert.ok(km > 0, `pas de distance annoncée : ${d.tags.join(", ")}`);
+      const w = buildWorkoutDescription(d.title, d.detail, `${d.type} ${d.tags.join(" ")}`, null, 17.6, 15, 10, "garmin");
+      const minutes = (w?.description ?? "").split("\n").reduce((t, l) => t + Number(l.match(/^- (\d+)m /)?.[1] ?? 0), 0);
+      const attendu = km * allureMin;
+      assert.ok(Math.abs(minutes - attendu) <= Math.max(5, attendu * 0.12),
+        `${d.type} annoncé ${km} km (~${Math.round(attendu)} min) : la montre fait courir ${minutes} min`);
+      // Et l'échauffement reste à la mesure de la séance : le corps en est l'essentiel. Un
+      // footing de 24 min ne se court pas en 15 min d'échauffement et 5 min de footing.
+      const corps = Number((w?.description ?? "").match(/^- (\d+)m [^\n]*Endurance facile/m)?.[1] ?? 0);
+      assert.ok(corps >= minutes / 2, `${d.type} de ${minutes} min : seulement ${corps} min de corps`);
+    }
   });
 
   test("la FC max se lit sur TOUT l'historique, jamais sur la fenêtre de 60 séances", () => {

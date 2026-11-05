@@ -180,7 +180,15 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
   const racesByDate: Record<string, CalRace[]> = {};
   for (const r of races) (racesByDate[r.date] ??= []).push(r);
 
-  const today = new Date(); today.setHours(0, 0, 0, 0);
+  // ⚠️ LE JOUR DE L'ATHLÈTE, PAS CELUI DE LA MACHINE. C'était `new Date()` mis à minuit :
+  // entre minuit et 1 h à Paris, le serveur (UTC) vivait encore la veille — grille, jour
+  // surligné et compteurs de la semaine décalés d'un jour, erreur React #418 au chargement
+  // (01/11/2026 à 0 h 01). On part du jour civil dans le fuseau de l'athlète, posé à minuit
+  // LOCAL : les calculs qui suivent (getDate, setDate…) donnent alors les mêmes jours des
+  // deux côtés.
+  const fuseauGrille = useFuseau();
+  const [jy, jm, jd] = jourLocal(new Date(), fuseauGrille).split("-").map(Number);
+  const today = new Date(jy, jm - 1, jd);
   const todayKey = fmtKey(today);
   const baseStart = new Date(today);
   baseStart.setDate(today.getDate() - (weekStart === "sun" ? today.getDay() : (today.getDay() + 6) % 7));
