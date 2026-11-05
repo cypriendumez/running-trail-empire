@@ -182,7 +182,9 @@ test("coachContext : la phase s'applique au menu APRÈS le facteur limitant, AVA
   const src = codeNu("src/lib/ai/coachContext.ts");
   const limiteur = src.indexOf("if (limiter) {");
   const phase = src.indexOf("menu = specifiqueEnTete(menu, phaseSemaine)");
-  const budget = src.indexOf("const chosen = menu.slice(0, qBudget)");
+  // Depuis le 05/11/2026, le budget s'applique au menu OU aux journées de double seuil :
+  // le repère est l'application du budget au menu.
+  const budget = src.indexOf("menu.slice(0, qBudget)");
   assert.ok(limiteur > 0 && phase > 0 && budget > 0, "un des trois repères a disparu");
   assert.ok(limiteur < phase && phase < budget, "la phase doit passer après le facteur limitant et avant le budget");
   // Depuis le 05/11/2026, la phase dépend aussi de la distance (affûtage d'une semaine pour

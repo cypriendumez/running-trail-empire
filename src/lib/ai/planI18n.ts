@@ -122,6 +122,10 @@ export type TextesPlan = {
   suffixeReprise: string;
   /** Pourquoi cette séance de reprise ; le nom de la course est un nom propre. */
   qualiteWhyReprise: (course: string) => string;
+  /** Journée de DOUBLE SEUIL (méthode norvégienne) : titres du matin et du soir, et pourquoi. */
+  dsTitreMatin: string;
+  dsTitreSoir: string;
+  dsWhy: string;
   qualiteWhy: string;
 
   // ── Endurance ───────────────────────────────────────────────────────────────
@@ -255,6 +259,9 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     suffixeAllegee: " (allégée)",
     suffixeReprise: " (reprise)",
     qualiteWhyReprise: (c) => `Reprise après ${c} : une seule séance de qualité cette semaine, au seuil et volontairement courte. Elle réveille le rythme sans entamer une récupération qui n'est pas finie — ni VMA ni course tant qu'elle dure. Si les jambes sont encore lourdes à l'échauffement, transforme-la en footing.`,
+    dsTitreMatin: "Double seuil · matin",
+    dsTitreSoir: "Double seuil · soir",
+    dsWhy: "Méthode norvégienne : deux séances au seuil le même jour, toutes deux SOUS le seuil — c'est le cumul qui construit le seuil, pas l'intensité. Elle se pilote normalement au lactate ; sans lactatemètre, l'erreur classique est de courir trop vite et d'en faire deux séances dures. Tiens l'allure écrite, même si tu te sens bien.",
     qualiteDetail: (e, c, k, taper, all) => `Échauffement ${e} min progressif FC Z1→Z2 + 3 à 5 lignes droites de 80 m → Corps : ${c} → Retour au calme ${k} min FC Z1.${taper ? " ⚠️ Affûtage : garde l'intensité mais coupe le nombre de répétitions d'un tiers." : ""}${all ? " ⚠️ Version allégée : coupe le nombre de répétitions d'un tiers et garde l'allure. On préserve le stimulus, pas le volume." : ""}`,
     qualiteWhySauvee: (o) => `Ta charge récente est très au-dessus de ta charge de fond${o} — mais ton échéance approche et une semaine sans la moindre allure spécifique se paie le jour J. Donc : UNE séance, raccourcie, plutôt que zéro. Si les sensations ne viennent pas à l'échauffement, transforme-la en footing sans culpabiliser.`,
     qualiteWhy: "La séance de qualité de ton bloc, calée sur ta VMA et ton objectif. C'est elle qui te fait progresser.",
@@ -375,6 +382,9 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     suffixeAllegee: " (eased)",
     suffixeReprise: " (comeback)",
     qualiteWhyReprise: (c) => `Easing back after ${c}: one quality session this week, at threshold and deliberately short. It wakes the rhythm up without eating into a recovery that is not over yet — no VO2max work or racing while it lasts. If your legs still feel heavy in the warm-up, turn it into an easy run.`,
+    dsTitreMatin: "Double threshold · morning",
+    dsTitreSoir: "Double threshold · evening",
+    dsWhy: "Norwegian method: two threshold sessions on the same day, both BELOW threshold — the total builds the threshold, not the intensity. It is normally steered by blood lactate; without a lactate meter, the classic mistake is running too fast and turning it into two hard sessions. Hold the written pace, even if you feel good.",
     qualiteDetail: (e, c, k, taper, all) => `Warm-up ${e} min building HR Z1→Z2 + 3 to 5 strides of 80 m → Main set: ${c} → Cool-down ${k} min HR Z1.${taper ? " ⚠️ Taper: keep the intensity but cut the number of reps by a third." : ""}${all ? " ⚠️ Eased version: cut the number of reps by a third and keep the pace. We preserve the stimulus, not the volume." : ""}`,
     qualiteWhySauvee: (o) => `Your recent load is well above your chronic load${o} — but your race is coming and a week without any race-specific pace is paid for on the day. So: ONE session, shortened, rather than none. If the sensations do not come during the warm-up, turn it into an easy run without guilt.`,
     qualiteWhy: "The quality session of your block, set on your MAS and your goal. This is the one that makes you progress.",
@@ -495,6 +505,9 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     suffixeAllegee: " (reduziert)",
     suffixeReprise: " (Wiedereinstieg)",
     qualiteWhyReprise: (c) => `Wiedereinstieg nach ${c}: diese Woche eine einzige Qualitätseinheit, an der Schwelle und bewusst kurz. Sie weckt den Rhythmus, ohne die noch nicht abgeschlossene Erholung anzugreifen — kein VO2max-Training und kein Wettkampf, solange sie dauert. Fühlen sich die Beine beim Aufwärmen noch schwer an, mach einen lockeren Dauerlauf daraus.`,
+    dsTitreMatin: "Doppelte Schwelle · Morgen",
+    dsTitreSoir: "Doppelte Schwelle · Abend",
+    dsWhy: "Norwegische Methode: zwei Schwelleneinheiten am selben Tag, beide UNTER der Schwelle — die Summe baut die Schwelle auf, nicht die Intensität. Normalerweise wird sie per Laktat gesteuert; ohne Laktatmessgerät ist der klassische Fehler, zu schnell zu laufen und daraus zwei harte Einheiten zu machen. Halte das angegebene Tempo, auch wenn du dich gut fühlst.",
     qualiteDetail: (e, c, k, taper, all) => `Aufwärmen ${e} min ansteigend HF Z1→Z2 + 3 bis 5 Steigerungen über 80 m → Hauptteil: ${c} → Auslaufen ${k} min HF Z1.${taper ? " ⚠️ Tapering: Intensität halten, aber die Anzahl der Wiederholungen um ein Drittel kürzen." : ""}${all ? " ⚠️ Reduzierte Fassung: Anzahl der Wiederholungen um ein Drittel kürzen, Tempo beibehalten. Wir erhalten den Reiz, nicht den Umfang." : ""}`,
     qualiteWhySauvee: (o) => `Deine jüngste Belastung liegt deutlich über deiner Grundbelastung${o} — aber dein Termin rückt näher, und eine Woche ganz ohne wettkampfspezifisches Tempo zahlst du am Tag X. Also: EINE Einheit, verkürzt, statt keiner. Wenn beim Aufwärmen die Sensationen ausbleiben, mach ohne schlechtes Gewissen einen lockeren Dauerlauf daraus.`,
     qualiteWhy: "Die Qualitätseinheit deines Blocks, abgestimmt auf deine maximale aerobe Geschwindigkeit und dein Ziel. Sie ist es, die dich weiterbringt.",
@@ -615,6 +628,9 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     suffixeAllegee: " (aligerada)",
     suffixeReprise: " (vuelta)",
     qualiteWhyReprise: (c) => `Vuelta tras ${c}: una sola sesión de calidad esta semana, de umbral y corta a propósito. Despierta el ritmo sin comerse una recuperación que aún no ha terminado: ni VMA ni carreras mientras dure. Si en el calentamiento las piernas siguen pesadas, conviértela en rodaje.`,
+    dsTitreMatin: "Doble umbral · mañana",
+    dsTitreSoir: "Doble umbral · tarde",
+    dsWhy: "Método noruego: dos sesiones de umbral el mismo día, ambas POR DEBAJO del umbral; es la suma la que construye el umbral, no la intensidad. Normalmente se controla con lactato; sin lactatómetro, el error clásico es correr demasiado rápido y convertirlo en dos sesiones duras. Mantén el ritmo indicado, aunque te sientas bien.",
     qualiteDetail: (e, c, k, taper, all) => `Calentamiento ${e} min progresivo FC Z1→Z2 + 3 a 5 progresiones de 80 m → Parte principal: ${c} → Vuelta a la calma ${k} min FC Z1.${taper ? " ⚠️ Afinamiento: mantén la intensidad pero recorta un tercio las repeticiones." : ""}${all ? " ⚠️ Versión aligerada: recorta un tercio las repeticiones y mantén el ritmo. Preservamos el estímulo, no el volumen." : ""}`,
     qualiteWhySauvee: (o) => `Tu carga reciente está muy por encima de tu carga de fondo${o} — pero tu cita se acerca y una semana sin nada de ritmo específico se paga el día D. Así que: UNA sesión, acortada, mejor que ninguna. Si las sensaciones no llegan en el calentamiento, conviértela en rodaje sin culpa.`,
     qualiteWhy: "La sesión de calidad de tu bloque, ajustada a tu VAM y a tu objetivo. Es la que te hace progresar.",
@@ -735,6 +751,9 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     suffixeAllegee: " (aliviada)",
     suffixeReprise: " (retoma)",
     qualiteWhyReprise: (c) => `Retoma após ${c}: uma única sessão de qualidade esta semana, no limiar e curta de propósito. Desperta o ritmo sem comprometer uma recuperação que ainda não terminou — nem VMA nem provas enquanto durar. Se as pernas ainda estiverem pesadas no aquecimento, transforma-a em corrida fácil.`,
+    dsTitreMatin: "Duplo limiar · manhã",
+    dsTitreSoir: "Duplo limiar · tarde",
+    dsWhy: "Método norueguês: duas sessões de limiar no mesmo dia, ambas ABAIXO do limiar; é a soma que constrói o limiar, não a intensidade. Normalmente controla-se com lactato; sem lactatómetro, o erro clássico é correr depressa demais e transformá-la em duas sessões duras. Mantém o ritmo indicado, mesmo que te sintas bem.",
     qualiteDetail: (e, c, k, taper, all) => `Aquecimento ${e} min progressivo FC Z1→Z2 + 3 a 5 progressões de 80 m → Parte principal: ${c} → Retorno à calma ${k} min FC Z1.${taper ? " ⚠️ Afinamento: mantém a intensidade mas corta um terço das repetições." : ""}${all ? " ⚠️ Versão aliviada: corta um terço das repetições e mantém o ritmo. Preservamos o estímulo, não o volume." : ""}`,
     qualiteWhySauvee: (o) => `A tua carga recente está muito acima da tua carga de fundo${o} — mas a tua prova aproxima-se e uma semana sem qualquer ritmo específico paga-se no dia D. Portanto: UMA sessão, encurtada, em vez de nenhuma. Se as sensações não aparecerem no aquecimento, transforma-a em corrida fácil sem culpa.`,
     qualiteWhy: "A sessão de qualidade do teu bloco, ajustada à tua VAM e ao teu objetivo. É ela que te faz progredir.",

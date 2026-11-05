@@ -18,7 +18,8 @@ import { isRun } from "@/lib/intervals/sport";
 import { summarizeCross, fmtMinutes, type CrossSummary } from "@/lib/coach/crossTraining";
 import { computeQualityBudget } from "@/lib/coach/qualityBudget";
 import { avertissementsAge } from "@/lib/coach/ageDistance";
-import { etatDouble, type EtatDouble } from "@/lib/coach/doubleSessions";
+import { etatDouble, seanceDoubleSeuil, doseDoubleSeuil, type EtatDouble } from "@/lib/coach/doubleSessions";
+import { DOUBLE_T } from "@/lib/coach/doubleSessionsI18n";
 import { warmCoolMin } from "@/lib/watch/intervals";
 import { tr, nLoc, nRaw, type I18nText } from "@/lib/i18n/multi";
 import type { Lang } from "@/lib/i18n/translations";
@@ -71,7 +72,11 @@ export type CoachObjective = {
  * les 5 langues et ne sert QU'À L'AFFICHAGE — la traduire dans `desc` casserait la
  * poussée montre en silence.
  */
-export type QualitySession = { type: string; desc: string; descAll: I18nText };
+export type QualitySession = {
+  type: string; desc: string; descAll: I18nText;
+  /** Journée de DOUBLE SEUIL : la séance du matin (`desc` est celle du soir). */
+  matin?: I18nText;
+};
 
 // ── Persona coach élite — réutilisé par toutes les IA d'entraînement ────────────
 export const COACH_SYSTEM = `Tu es un entraîneur de course à pied et de trail de niveau INTERNATIONAL, capable de coacher aussi bien un grand débutant qu'un athlète élite. Tu raisonnes en scientifique de l'entraînement :
@@ -1692,14 +1697,54 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // REPRISE APRÈS UNE COURSE : la seule séance de la semaine est un SEUIL, quel que soit
   // l'objectif suivant — ni VMA ni côtes sur des fibres encore abîmées (lib/coach/apresCourse).
   if (repriseCetteSemaine) menu = [qSeuil, ...menu.filter((m) => m !== qSeuil)];
-  const chosen = menu.slice(0, qBudget);
+  // ── DOUBLE SEUIL (méthode norvégienne, lib/coach/doubleSessions) ─────────────
+  // ⚠️ IL N'ÉTAIT JAMAIS POSÉ. L'éligibilité se calculait et s'affichait dans le profil
+  // (« le double seuil reste hors de portée : … »), le texte des séances existait, et le
+  // plan n'en produisait aucune — même pour l'athlète qui remplissait toutes les conditions.
+  // Désormais : option cochée + éligible (volume, ancienneté, ni douleur ni feu rouge) +
+  // allure seuil connue + ni récupération, ni reprise, ni affûtage, ni marche-course → deux
+  // journées matin + soir, et les côtes en troisième séance si le budget le permet.
+  const enAffutage = weeksToRace != null && weeksToRace >= 0 && weeksToRace <= semainesAffutage(objective?.distanceKm) - 1;
+  const etatDoubles = etatDouble({
+    optIn: Boolean((p as Record<string, unknown> | null)?.double_sessions),
+    optInSeuil: (p as Record<string, unknown> | null)?.double_seuil === true,
+    // `robustWeeklyKm` renvoie un objet ({ km, weeksRun, weeksOff }) : le confondre
+    // avec un nombre donnait un volume `[object Object]` — donc jamais supérieur au
+    // seuil, donc des doubles refusés en silence chez un athlète qui y avait droit.
+    weeklyKm: habitudeKm,
+    runYears, readiness: readyLevel, pains, taper: enAffutage, lang: langAthlete,
+    recuperation: recup?.nom ?? null,
+  });
+  const allureSeuilConnue = /\d+['’]\d{2}/.test(sPace);
+  // La récupération d'après-course n'a pas besoin d'être exclue ici : `etatDouble` refuse
+  // tout double tant qu'elle dure (phase de reprise comprise) — vérifié par mutation.
+  const doubleSeuilActif = etatDoubles.seuilActif && allureSeuilConnue && qBudget >= 1
+    && !repriseArret && !marcheCourse;
+  const doseDS = doseDoubleSeuil(habitudeKm);
+  const qDoubleSeuil: QualitySession = {
+    ...quali("Seuil", (l) => seanceDoubleSeuil("soir", sPace, l, doseDS.soir)),
+    matin: tr((l) => seanceDoubleSeuil("matin", sPace, l, doseDS.matin)),
+  };
+  const chosen = doubleSeuilActif
+    ? [...Array.from({ length: Math.min(2, qBudget) }, () => qDoubleSeuil), ...(qBudget >= 3 ? [qCote] : [])]
+    : menu.slice(0, qBudget);
+  // Coché et à sa portée (volume, ancienneté), mais pas cette semaine — récupération,
+  // affûtage, feu rouge, douleur ou budget de qualité épuisé : on le dit, sinon l'option
+  // paraît morte. L'éligibilité DE FOND se lit sans ces empêchements passagers.
+  const seuilAPortee = etatDouble({
+    optIn: true, optInSeuil: true, weeklyKm: habitudeKm, runYears,
+    readiness: "vert", pains: [], taper: false, recuperation: null, lang: langAthlete,
+  }).seuilActif;
+  const doubleSeuilSuspendu = (p as Record<string, unknown> | null)?.double_seuil === true
+    && Boolean((p as Record<string, unknown> | null)?.double_sessions)
+    && seuilAPortee && !doubleSeuilActif && allureSeuilConnue;
   // Préférence athlète : remplacer la sortie longue course par du VÉLO (cross-training sans impact, comme beaucoup de pros).
   const bikeLong = String((p as Record<string, unknown> | null)?.long_run_mode ?? "run") === "bike";
   const longRunNote = bikeLong
     ? `1 SORTIE LONGUE EN VÉLO (cross-training) À LA PLACE de la sortie longue en course — même durée/volume aérobie (FC Z2, allure conversationnelle), SANS impact pour limiter le risque blessure (choix de l'athlète, comme beaucoup de pros). Pas d'allure /km (pilotée à la FC). ${(libGoal === "marathon" || libGoal === "trail" || libGoal === "ultra") ? "Garde au moins 1 sortie longue EN COURSE par mois pour la spécificité (impact, terrain)." : ""}`.trim()
     : `1 sortie longue facile en Z2${(phase.startsWith("SPÉ") || phase.startsWith("AFFÛ") || libGoal === "marathon") && goalPace ? ` avec un bloc à ${goalPace}/km` : ""}`;
 
-  const weekTarget = `${chosen.length ? chosen.map((s, i) => `• Qualité ${i + 1} : ${s.desc}`).join("\n") : "• Aucune séance dure ce cycle (récupération) : que du facile + mobilité/renfo léger."}
+  const weekTarget = `${chosen.length ? chosen.map((s, i) => `• Qualité ${i + 1} : ${s.matin ? `DOUBLE SEUIL — matin : ${s.matin.fr} / soir : ` : ""}${s.desc}`).join("\n") : "• Aucune séance dure ce cycle (récupération) : que du facile + mobilité/renfo léger."}
 • ${longRunNote}.
 • 1 renforcement musculaire (peut se greffer après un footing facile, pas un jour à part obligatoire).
 • ≥ 1 jour de repos complet.
@@ -2309,23 +2354,15 @@ ${catalog}`;
     // Doubles séances : on tranche ICI, avec le volume REPRÉSENTATIF (médiane des
     // semaines courues) et non le pic — une semaine à 90 km ne fait pas un athlète
     // qui double, et doubler sur un pic isolé est la meilleure façon de le payer.
-    doubles: etatDouble({
-      optIn: Boolean((p as Record<string, unknown> | null)?.double_sessions),
-      // `robustWeeklyKm` renvoie un objet ({ km, weeksRun, weeksOff }) : le confondre
-      // avec un nombre donnait un volume `[object Object]` — donc jamais supérieur au
-      // seuil, donc des doubles refusés en silence chez un athlète qui y avait droit.
-      weeklyKm: robustWeekly?.km ?? (avg4wkKm > 0 ? avg4wkKm : weekKm),
-      runYears, readiness: readyLevel, pains, taper, lang: langAthlete,
-      recuperation: recup?.nom ?? null,
-    }),
+    doubles: etatDoubles,
     cross,
     longRunMode: bikeLong ? "bike" : "run",
     readiness: {
       level: readyLevel,
       // Français canonique — inchangé pour tous les consommateurs existants.
-      reasons: [...redFr, ...orangeFr, ...infoFr],
+      reasons: [...redFr, ...orangeFr, ...infoFr, ...(doubleSeuilSuspendu ? [DOUBLE_T.fr.seuilSuspendu] : [])],
       // Les mêmes motifs dans les 5 langues, pour le « pourquoi » des séances.
-      reasonsAll: [...redFlags, ...orangeFlags, ...infoFlags],
+      reasonsAll: [...redFlags, ...orangeFlags, ...infoFlags, ...(doubleSeuilSuspendu ? [tr((l) => DOUBLE_T[l].seuilSuspendu)] : [])],
       advice: readinessRule,
     },
     hardGapHours: hardGapH,
