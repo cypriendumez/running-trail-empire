@@ -37,13 +37,14 @@ const dureeLoc = (min: number, l: Lang) => {
 };
 import { QUALITE_T } from "@/lib/ai/qualityI18n";
 import { aujourdhui, FUSEAU_DEFAUT, formatDateCivile } from "@/lib/time/fuseau";
-import { apresCourse, facteurVolumeApresCourse } from "@/lib/coach/apresCourse";
+import { apresCourse, facteurVolumeApresCourse, type PhaseApresCourse } from "@/lib/coach/apresCourse";
+import { repriseApresArret, partApresArret } from "@/lib/coach/repriseArret";
 import { objectifEnCours, estOfficielle } from "@/lib/coach/prochaineCourse";
 import { decaleJour } from "@/lib/streak/compute";
 import { niveauDeVma } from "@/lib/running/niveau";
 import { libellesActifs, type Douleur } from "@/lib/health/douleurs";
 import { qualiteRecente as qualiteDesSeptJours, type QualiteRecente, type Prescription } from "@/lib/coach/qualiteRecente";
-import { phaseDeSemaine, specifiqueEnTete } from "@/lib/coach/phase";
+import { phaseDeSemaine, specifiqueEnTete, semainesAffutage, partAffutage } from "@/lib/coach/phase";
 
 type SB = Awaited<ReturnType<typeof createClient>>;
 
@@ -214,6 +215,12 @@ export type AthleteContext = {
      *  elle doit être prescrite RACCOURCIE, et le plan doit dire pourquoi. Sans ce
      *  drapeau, le plan afficherait une séance normale au milieu d'une semaine allégée. */
     floored: boolean;
+    /** Semaine de reprise après une course (`lib/coach/apresCourse`) : la qualité est la
+     *  séance courte au seuil, annoncée comme telle. Optionnel : un contexte sérialisé
+     *  avant cette version ne l'a pas. */
+    reprise?: boolean;
+    /** Premier jour du plan (0 = aujourd'hui) où une qualité peut être posée. */
+    qualiteDes?: number;
   };
   /** Doubles séances (matin + soir) : autorisées ou non, et ce qui manque le cas
    *  échéant. Une case cochée qui ne produit rien est un mensonge silencieux —
@@ -294,7 +301,7 @@ export type AthleteContext = {
    *  qu'ils ne quittaient pas le prompt. */
   objectiveWarnings: string[];
   /** Récupération d'après-course en cours (`lib/coach/apresCourse`), pour les écrans qui la rappellent. */
-  recuperation: { course: string; reprise: string } | null;
+  recuperation: { course: string; reprise: string; fin?: string; phase?: PhaseApresCourse } | null;
   /** Construit pour le palier gratuit (`LectureContexte.objectifSeul`) : l'objectif et le
    *  déclaré, aucune mesure. Optionnel : un contexte sérialisé avant cette version ne l'a pas. */
   objectifSeul?: boolean;
@@ -575,15 +582,22 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // Compter les séances est trompeur : deux fractionnés courts dans une semaine de
   // plusieurs heures restent ~80 % facile. Seul le temps en zone tranche. Les secondes
   // par zone arrivent désormais d'intervals.icu (Z1-Z2 = facile, Z3+ = intensité).
-  const zoneTotals = recent14.reduce((acc, w) => {
-    const z = Array.isArray(w.hr_zone_seconds) ? w.hr_zone_seconds : null;
-    if (!z) return acc;
+  // ⚠️ UNE COURSE N'EST PAS UN FOOTING. Le marathon de Lille (2 h 42 en zone 4-5) pesait
+  // à lui seul 80 % du temps des quatorze jours : le calendrier de Cyprien affichait
+  // « Tes footings sont courus trop vite » sous chaque footing de sa récupération (relevé
+  // le 05/11/2026). Les jours de course connus (l'objectif et celui qu'il a remplacé) sont
+  // donc écartés, et il faut au moins trois sorties et une heure pour parler de répartition.
+  const joursDeCourse = new Set([objectifDeclare?.raceDate, objectifDeclare?.precedente?.raceDate]
+    .filter((d): d is string => typeof d === "string" && d.length >= 10).map((d) => d.slice(0, 10)));
+  const zonesLues = recent14.filter((w) => Array.isArray(w.hr_zone_seconds) && !joursDeCourse.has(String(w.date).slice(0, 10)));
+  const zoneTotals = zonesLues.reduce((acc, w) => {
+    const z = w.hr_zone_seconds as number[];
     acc.easy += (z[0] ?? 0) + (z[1] ?? 0);
     acc.hard += z.slice(2).reduce((a, b) => a + (b ?? 0), 0);
     return acc;
   }, { easy: 0, hard: 0 });
   const zoneTotal = zoneTotals.easy + zoneTotals.hard;
-  const hardTimePct = zoneTotal > 600 ? Math.round((zoneTotals.hard / zoneTotal) * 100) : null;
+  const hardTimePct = zonesLues.length >= 3 && zoneTotal >= 3600 ? Math.round((zoneTotals.hard / zoneTotal) * 100) : null;
 
   // Les fenêtres qui suivent sont exprimées en JOURS CIVILS, plus en nombre de lignes.
   // Mesuré le 05/09/2026 sur un compte réel : « les 14 dernières lignes » de VFC couvraient
@@ -982,7 +996,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
 
   // Phase de périodisation (selon l'échéance) → oriente l'emphase des séances.
   const phase = objective?.raceDate && weeksToRace != null
-    ? (weeksToRace <= 2 ? "AFFÛTAGE (volume −40 %, fraîcheur, TSB positif le jour J ; on GARDE de courtes touches de qualité/allure course, on coupe le VOLUME pas l'intensité)"
+    ? (weeksToRace <= semainesAffutage(objective.distanceKm) - 1 ? "AFFÛTAGE (volume réduit, fraîcheur, TSB positif le jour J ; on GARDE de courtes touches de qualité/allure course, on coupe le VOLUME pas l'intensité)"
       : weeksToRace <= 5 ? "SPÉCIFIQUE (allure course + terrain ; 2-3 qualités/sem dont l'allure objectif ; l'affûtage approche)"
       : weeksToRace <= 11 ? "DÉVELOPPEMENT (VMA, seuil, côtes, allure objectif ; 2-3 qualités/sem ; volume soutenu)"
       : "BASE AÉROBIE + VITESSE (volume facile en hausse, MAIS on pose DÉJÀ 2 qualités/sem : VMA courte pour le plafond + seuil/tempo — 'base' ne veut JAMAIS dire 'tout lent', surtout pour un objectif chrono)")
@@ -1039,7 +1053,16 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // randonnée pour une séance de course honorée : l'adhérence était surestimée et les
   // jours réellement ratés — ceux que la boucle doit justement détecter — invisibles.
   const doneDates = new Set(runs.map(w => String(w.date).slice(0, 10)));
-  const pastPrescribed = coachSessions.filter(c => c.date && c.date <= todayStr && now - new Date(c.date).getTime() <= 14 * 86400000);
+  // ⚠️ UNE SÉANCE N'EST « RATÉE » QUE SI L'ATHLÈTE COURAIT CETTE SEMAINE-LÀ. Pendant un arrêt
+  // — repos après une course, maladie, montre qui ne synchronise plus —, tous les jours
+  // sont manqués, quel que soit le jour : à J+11 du marathon de Lille, le jeudi et le lundi
+  // étaient déclarés « jours qui ne te conviennent pas » et retirés du plan (Cyprien,
+  // 05/11/2026). Une prescription ne compte que s'il a couru à trois jours ou moins d'elle.
+  const actifAutour = (d: string) => runs.some((w) => {
+    const e = ecartJours(String(w.date).slice(0, 10), d);
+    return e != null && Math.abs(e) <= 3;
+  });
+  const pastPrescribed = coachSessions.filter(c => c.date && c.date <= todayStr && now - new Date(c.date).getTime() <= 14 * 86400000 && actifAutour(c.date));
   // ── JOURS SYSTÉMATIQUEMENT RATÉS (boucle d'adhérence) ──
   // Un plan qu'on ne suit pas ne sert à rien. Si un jour de la semaine est prescrit
   // encore et encore sans jamais être couru, ce n'est pas de la paresse : c'est que
@@ -1050,7 +1073,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const wdStat = new Map<number, { p: number; d: number }>();
   for (const c of coachSessions) {
     if (!c.date || c.date > todayStr || now - new Date(c.date).getTime() > 28 * 86400000) continue;
-    if (!runnable(c.sessionType)) continue;
+    if (!runnable(c.sessionType) || !actifAutour(c.date)) continue;
     const wd = new Date(c.date + "T00:00:00").getDay();
     const s = wdStat.get(wd) ?? { p: 0, d: 0 };
     s.p++; if (doneDates.has(String(c.date).slice(0, 10))) s.d++;
@@ -1091,7 +1114,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // Deux signaux qui bougent AVANT le chrono. On ne regarde pas la valeur absolue mais
   // la TENDANCE : c'est elle qui distingue une forme qui monte d'une fatigue qui
   // s'installe, et elle parle plus tôt que la VFC.
-  const trendOf = (key: "vertical_ratio_pct" | "hrr_bpm") => {
+  const trendOf = (key: "vertical_ratio_pct") => {
     const vals = runs.filter(w => w[key] != null)
       .map(w => ({ d: new Date(w.date).getTime(), v: Number(w[key]) }));
     if (vals.length < 4) return null;
@@ -1101,14 +1124,15 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     return { now: r1(avg(recent)), before: r1(avg(older)), n: vals.length };
   };
   const vr = trendOf("vertical_ratio_pct");
-  const hrr = trendOf("hrr_bpm");
   // Ratio vertical : part du travail qui part vers le HAUT plutôt que vers l'avant.
   // Indépendant de la taille du coureur, contrairement à l'oscillation seule.
   const vrLine = vr ? `${vr.now} % (${vr.now < 6.5 ? "très économique" : vr.now < 8 ? "bon" : vr.now < 9 ? "correct" : "perfectible"})`
     + `${Math.abs(vr.now - vr.before) >= 0.2 ? ` — ${vr.now < vr.before ? `EN AMÉLIORATION (${vr.before} % avant) : sa foulée devient plus efficace, dis-le-lui` : `EN DÉGRADATION (${vr.before} % avant) : souvent un signe de fatigue neuromusculaire ou de foulée qui s'écrase — renfo et éducatifs`}` : " — stable"}` : null;
-  // Chute de FC sur 60 s après un effort dur : marqueur parasympathique.
-  const hrrLine = hrr ? `${hrr.now} bpm de chute en 60 s après effort`
-    + `${Math.abs(hrr.now - hrr.before) >= 2 ? ` — ${hrr.now > hrr.before ? `EN HAUSSE (${hrr.before} avant) : il récupère mieux, tu peux oser la charge` : `EN BAISSE (${hrr.before} avant) : sa récupération se dégrade AVANT que le chrono ne bouge — allège maintenant, pas dans trois semaines`}` : " — stable"}` : null;
+  // ⚠️ PLUS DE TENDANCE DE RÉCUPÉRATION CARDIAQUE (chute de FC sur 60 s). Mesurée le
+  // 07/09/2026 sur 14 mois : pente 0,09 bpm/semaine pour un bruit de 8,1 bpm (signal/bruit
+  // 0,62). Annoncée au modèle dès 2 bpm d'écart, elle a produit « après ton marathon, ta
+  // récupération cardiaque est en baisse » dans un conseil de la relecture (05/11/2026) :
+  // une tendance fabriquée sur du bruit. Voir la mémoire « colonnes sans signal ».
 
   // ── PERFORMANCE MESURÉE (courbe d'allure intervals.icu) ─────────────────────
   // La vitesse critique est ajustée sur les efforts RÉELS de l'athlète : c'est un
@@ -1162,6 +1186,17 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const noHistory = runs.length === 0;
   const fade = qe?.fadeSec ?? null;
   const faded = fade != null && fade >= 10;
+  // ── REPRISE APRÈS UN ARRÊT (lib/coach/repriseArret) ─────────────────────────
+  // De 6 à 28 jours sans courir : 50 % puis 75 % du volume habituel pendant une reprise
+  // aussi longue que l'arrêt (Daniels). Sans elle, la semaine vide plafonnait tout à
+  // 15 km — 14 km visés pour un coureur à 70 km par semaine (Cyprien, 05/11/2026).
+  const repriseArret = repriseApresArret(runs.map((w) => String(w.date).slice(0, 10)), todayStr);
+  const habitudeKm = robustWeekly?.km ?? (avg4wkKm > 0 ? avg4wkKm : weekKm);
+  /** Plafond de volume de la semaine qui commence dans `dansJours` jours (Infinity hors reprise). */
+  const plafondArretKm = (dansJours = 0) => {
+    const part = partApresArret(repriseArret, dansJours);
+    return part < 1 ? Math.round(habitudeKm * part) : Infinity;
+  };
   // ── APRÈS LA COURSE ─────────────────────────────────────────────────────────
   // L'objectif passé n'est plus l'objectif, mais il n'est pas oublié : s'il a été couru
   // (une sortie enregistrée ce jour-là), l'intensité attend. Voir `lib/coach/apresCourse`.
@@ -1177,9 +1212,25 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     : null;
   // Le volume aussi : 50, 70 puis 85 % de l'habitude, moyenne des 7 jours du plan.
   const partVolumeRecup = recup ? facteurVolumeApresCourse(recup) : 1;
+  // Ce que le bandeau annonce est ce que le plan vise : la plus basse des deux réductions,
+  // jamais leur produit (un arrêt pendant la récupération ne divise pas deux fois).
+  const partVolumeAnnoncee = Math.min(partVolumeRecup, partApresArret(repriseArret));
+  // LA REPRISE PEUT TOMBER DANS LES SEPT JOURS DU PLAN (0 = aujourd'hui). Le plan accueille
+  // alors sa séance ce jour-là, pas avant : sinon, le plan étant reconstruit chaque matin,
+  // la première qualité n'apparaissait au calendrier qu'une fois la reprise arrivée.
+  const joursAvantReprise = recup ? Math.max(0, ecartJours(recup.reprise, todayStr) ?? 0) : 0;
+  const repriseCetteSemaine = recup != null && joursAvantReprise <= 6;
   const recupMotif = recup
-    ? tr((l) => MOTIF_T[l].apresCourse(recup.nom, nRaw(recup.joursDepuis, l), formatDateCivile(recup.reprise, l, { day: "numeric", month: "long" }),
-        nRaw(Math.round(partVolumeRecup * 100), l)))
+    ? tr((l) => recup.phase === "sans-intensite"
+        ? MOTIF_T[l].apresCourse(recup.nom, nRaw(recup.joursDepuis, l), formatDateCivile(recup.reprise, l, { day: "numeric", month: "long" }),
+            nRaw(Math.round(partVolumeAnnoncee * 100), l))
+        : MOTIF_T[l].repriseApresCourse(recup.nom, nRaw(recup.joursDepuis, l), formatDateCivile(recup.fin, l, { day: "numeric", month: "long" }),
+            nRaw(Math.round(partVolumeAnnoncee * 100), l)))
+    : null;
+  // L'arrêt se DIT, et sa cause possible aussi : une montre qui ne synchronise plus produit
+  // le même silence qu'un vrai repos.
+  const arretMotif = repriseArret
+    ? tr((l) => MOTIF_T[l].repriseArret(nRaw(repriseArret.arretJours, l), nRaw(Math.round(repriseArret.part * 100), l), repriseArret.enCours))
     : null;
   // ── ARBITRAGE DU BUDGET DE QUALITÉ ───────────────────────────────────────────
   // Extrait dans `lib/coach/qualityBudget` : c'est la décision la plus lourde du coach
@@ -1200,7 +1251,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     hardTimePct, fadeSec: fade, plateau, noMaxEffort, runYears,
     weightLossMaxQuality: weightLoss ? weightLoss.rules.maxQualityPerWeek : null,
     hasObjective: !!objective, daysToRace, isShortGoal,
-    apresCourse: recupMotif?.fr ?? null,
+    apresCourse: recupMotif ? { motif: recupMotif.fr, reprise: repriseCetteSemaine } : null,
   });
   const qBudget = qb.qBudget;
   const { structuralQBudget, easeReasons, expCapped, expCap } = qb;
@@ -1215,6 +1266,8 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // (prompt du modèle, bandeau « pourquoi ce plan »).
   const redFlags: I18nText[] = [];
   const orangeFlags: I18nText[] = [];
+  // Ce qui s'affiche dans le bandeau SANS compter dans le feu : un fait, pas une fatigue.
+  const infoFlags: I18nText[] = [];
   // Mise en forme française : ces motifs ne partaient qu'au prompt de l'IA, où le format
   // était sans importance. Ils sont désormais AFFICHÉS à l'athlète sur son calendrier
   // (bandeau « pourquoi ce plan ») — « 2.4 » et « -44 » au milieu d'une phrase française
@@ -1230,6 +1283,9 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // La récupération d'après-course est un état du corps comme un autre : elle s'affiche
   // dans le bandeau, sinon « aucune séance de qualité » n'aurait aucune raison visible.
   if (recupMotif) orangeFlags.push(recupMotif);
+  // L'arrêt n'est pas une fatigue : il borne déjà le volume (Daniels), il ne doit pas en
+  // plus faire passer le feu à l'orange et raccourcir la sortie longue une seconde fois.
+  if (arretMotif) infoFlags.push(arretMotif);
   if (pains.length) redFlags.push(tr((l) => MOTIF_T[l].douleur(pains.map((x) => traduireDouleur(x, l)).join(", "))));
   // ── LA CHARGE SEULE NE SUFFIT PLUS À DÉCLARER ROUGE ─────────────────────────
   // Le feu rouge annule l'intensité du JOUR. Comme le plan est republié chaque jour et
@@ -1274,8 +1330,8 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   }[readyLevel];
   const readiness = READY.badge, readinessRule = READY.rule;
   // Le prompt du modèle reste INTÉGRALEMENT en français : il n'est pas lu par l'athlète.
-  const redFr = redFlags.map((f) => f.fr), orangeFr = orangeFlags.map((f) => f.fr);
-  const readinessBlock = `${readiness} — ${readinessRule}${redFr.length ? `\n  • Signaux rouges : ${redFr.join(" ; ")}` : ""}${orangeFr.length ? `\n  • Signaux orange : ${orangeFr.join(" ; ")}` : ""}${!redFr.length && !orangeFr.length ? "\n  • Aucun signal négatif : VFC, sommeil, charge et ressenti sont alignés." : ""}`;
+  const redFr = redFlags.map((f) => f.fr), orangeFr = orangeFlags.map((f) => f.fr), infoFr = infoFlags.map((f) => f.fr);
+  const readinessBlock = `${readiness} — ${readinessRule}${redFr.length ? `\n  • Signaux rouges : ${redFr.join(" ; ")}` : ""}${orangeFr.length ? `\n  • Signaux orange : ${orangeFr.join(" ; ")}` : ""}${!redFr.length && !orangeFr.length ? "\n  • Aucun signal négatif : VFC, sommeil, charge et ressenti sont alignés." : ""}${infoFr.length ? `\n  • À savoir : ${infoFr.join(" ; ")}` : ""}`;
 
   // ── MÉTÉO RÉELLE ────────────────────────────────────────────────────────────
   // Pas la température de la montre (capteur au poignet, jusqu'à 3 °C d'écart mesuré)
@@ -1414,7 +1470,9 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     const growth = load.acr > 1.5 ? 1.0 : load.acr > 1.3 ? 1.05 : 1.1;
     // Et jamais un bond brutal par rapport à ce qui vient d'être réellement couru
     // (reprise après coupure : la moyenne des 4 semaines est alors trop optimiste).
-    const capped = Math.min(blended * growth, Math.max(weekKm * 1.4, floorKm));
+    // Pendant une reprise après arrêt, la semaine vide ne plafonne plus rien : c'est la
+    // part de Daniels qui borne chaque semaine (`plafondArretKm`).
+    const capped = repriseArret ? blended * growth : Math.min(blended * growth, Math.max(weekKm * 1.4, floorKm));
     return Math.max(floorKm, Math.round(capped));
   };
 
@@ -1481,7 +1539,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
    * C'est la règle la plus simple qui existe pour ne pas blesser un coureur : elle
    * empêche mécaniquement de prescrire un volume dur que son kilométrage ne supporte pas.
    */
-  const weeklyRef = targetFrom(15);
+  const weeklyRef = Math.min(targetFrom(15), plafondArretKm(0));
   const capIntervalKm = Math.min(10, weeklyRef * 0.08);
   const capThresholdKm = weeklyRef * 0.10;
   const thrSecPerKm = (() => {
@@ -1489,15 +1547,19 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     return m ? Number(m[1]) * 60 + Number(m[2]) : null;
   })();
 
+  // REPRISE APRÈS UNE COURSE : la séance est écrite COURTE — le dosage de la semaine
+  // d'assimilation —, pas « coupe un tiers » ajouté au texte : la montre lit le texte de
+  // la séance, elle recevrait sinon la version complète.
+  const doseReduite = blockWeek === 3 || repriseCetteSemaine;
   /** Nombre de répétitions, plafonné par la règle des 8 % sur la distance travaillée. */
   const prog = (base: number, repMeters?: number): number => {
-    const n = blockWeek === 3 ? Math.max(2, Math.round(base * 0.7)) : base + Math.min(2, blockWeek);
+    const n = doseReduite ? Math.max(2, Math.round(base * 0.7)) : base + Math.min(2, blockWeek);
     if (!repMeters || !(weeklyRef > 0)) return n;
     return Math.min(n, Math.max(2, Math.floor((capIntervalKm * 1000) / repMeters)));
   };
   /** Durée d'un bloc au seuil, plafonnée par la règle des 10 % convertie en minutes. */
   const progMin = (base: number, blocks = 1): number => {
-    const m = blockWeek === 3 ? Math.max(5, Math.round(base * 0.75)) : base + blockWeek * 2;
+    const m = doseReduite ? Math.max(5, Math.round(base * 0.75)) : base + blockWeek * 2;
     if (!thrSecPerKm || !(weeklyRef > 0)) return m;
     const maxMinTotal = (capThresholdKm * thrSecPerKm) / 60;
     return Math.max(5, Math.min(m, Math.floor(maxMinTotal / blocks)));
@@ -1604,8 +1666,11 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // l'allure objectif prend la tête du menu — la même règle que la feuille de route, qui
   // annonçait « Allure mara » au-dessus d'une semaine qui posait un seuil (lib/coach/phase).
   // Une course déjà passée (semaines négatives) ne donne pas de phase.
-  const phaseSemaine = objective?.raceDate && weeksToRace != null && weeksToRace >= 0 ? phaseDeSemaine(weeksToRace) : null;
+  const phaseSemaine = objective?.raceDate && weeksToRace != null && weeksToRace >= 0 ? phaseDeSemaine(weeksToRace, objective.distanceKm) : null;
   menu = specifiqueEnTete(menu, phaseSemaine);
+  // REPRISE APRÈS UNE COURSE : la seule séance de la semaine est un SEUIL, quel que soit
+  // l'objectif suivant — ni VMA ni côtes sur des fibres encore abîmées (lib/coach/apresCourse).
+  if (repriseCetteSemaine) menu = [qSeuil, ...menu.filter((m) => m !== qSeuil)];
   const chosen = menu.slice(0, qBudget);
   // Préférence athlète : remplacer la sortie longue course par du VÉLO (cross-training sans impact, comme beaucoup de pros).
   const bikeLong = String((p as Record<string, unknown> | null)?.long_run_mode ?? "run") === "bike";
@@ -1642,26 +1707,41 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
     // Point de départ de la sortie longue : ce qu'il court DÉJÀ. Sans cette ancre, le plan
     // prescrivait 9 km à un athlète qui venait d'en courir 26 deux jours plus tôt.
     const lrCurrent = Math.max(longestRecentKm, Math.round(baseKm * 0.25));
-    const lrPeak = longRunPeakKm(libGoal as RaceGoal, objective?.distanceKm ?? null);
+    // ⚠️ POUR UN 5 OU UN 10 KM, LE PIC DE LA COURSE DEVENAIT UN PLAFOND : 12 km de sortie
+    // longue chaque semaine pour un coureur à 70-80 km (Cyprien, sub 16 sur 5 km, relevé le
+    // 05/11/2026). Les footings étant bornés à 85 % de la sortie longue, le volume ne
+    // tenait plus dans la semaine. Le pic de la course reste le MINIMUM exigé (`longRunGap`) ;
+    // la sortie longue peut aller jusqu'au quart de l'habitude (Daniels), plafond assumé
+    // de 22 km, soit 1 h 30 à 1 h 40 d'endurance pour ces distances.
+    const lrPeakCourse = longRunPeakKm(libGoal as RaceGoal, objective?.distanceKm ?? null);
+    const lrPeak = lrPeakCourse != null && (objective?.distanceKm ?? 0) <= 15
+      ? Math.max(lrPeakCourse, Math.min(22, Math.round(habitudeKm * 0.25)))
+      : lrPeakCourse;
     const lrShare = longRunShare(libGoal as RaceGoal, objective?.distanceKm ?? null);
     const out: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[] = [];
     let longueDuBloc = 0;   // plus longue sortie planifiée avant l'affûtage
     // Semaines qui commencent pendant la récupération d'après-course : la montée en charge
     // (+6 %/semaine) ne repart qu'APRÈS elles. Sinon elle les comptait comme des semaines de
     // progression, et la feuille de route sautait de 65 à 87 km à la sortie de récupération.
-    const semainesRecup = recup ? Array.from({ length: W }, (_, i) => i).filter((i) => decaleJour(todayStr, 7 * i) < recup.reprise).length : 0;
+    // Les semaines de reprise après un arrêt non plus : elles sont bornées par Daniels.
+    const semainesRecup = Array.from({ length: W }, (_, i) => i)
+      .filter((i) => (recup != null && decaleJour(todayStr, 7 * i) < recup.fin) || plafondArretKm(7 * i) < Infinity).length;
     for (let i = 0; i < W; i++) {
       // Semaines PLEINES avant la semaine de course : même sens que `weeksToRace`, donc
       // mêmes seuils de phase qu'avant (0 = semaine de course, 1 = J−13 → J−7…).
       const wkUntil = semainesAvecCourse - 1 - i;
-      const ph = phaseDeSemaine(wkUntil);
+      const ph = phaseDeSemaine(wkUntil, objective?.distanceKm);
+      // Semaine de récupération d'après-course ou de reprise après un arrêt : volume déjà
+      // réduit, ni progression ni semaine allégée par-dessus.
+      const semaineBornee = (recup != null && decaleJour(todayStr, 7 * i) < recup.fin) || plafondArretKm(7 * i) < Infinity;
       let factor: number;
       // L'affûtage DESCEND jusqu'au bout. La semaine de course est la plus légère — et son
       // volume s'entend HORS course : `autoPlan` ne compte pas la course dans la cible
       // (`usedKm`), il répartit ce chiffre entre les footings de J−6 à J−3.
-      if (wkUntil <= 0) factor = 0.40;                  // semaine de course (J−6 → J)
-      else if (wkUntil === 1) factor = 0.55;            // J−13 → J−7
-      else if (wkUntil === 2) factor = 0.72;            // J−20 → J−14
+      // Le NOMBRE de semaines d'affûtage dépend de la distance (lib/coach/phase) : trois
+      // pour un marathon (72, 55 puis 40 %), deux pour un semi, une seule pour 5 ou 10 km.
+      const partTaper = partAffutage(wkUntil, objective?.distanceKm);
+      if (partTaper != null) factor = partTaper;
       else {
         // Plafond de montée en charge : +40 % au-dessus du volume de départ… SAUF si
         // l'athlète a DÉJÀ tenu davantage. Un coureur de 20 ans revenu à 40 km après une
@@ -1671,19 +1751,24 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
         // le toit se lève, et le ratio aigu:chronique continue de piloter le présent.
         const ceilFactor = demonstratedKm && baseKm > 0 ? Math.max(1.4, demonstratedKm / baseKm) : 1.4;
         factor = Math.min(ceilFactor, 1 + Math.max(0, i - semainesRecup) * 0.06);
-        if ((i + 1) % 4 === 0) factor *= 0.8; // semaine allégée 1 sur 4
+        // UNE SEMAINE ALLÉGÉE SUR QUATRE, SUR UNE SEULE HORLOGE : la semaine 4 du bloc ISO, celle
+        // où la dose des qualités baisse déjà (`blockWeek === 3`). L'ancien `(i + 1) % 4` partait
+        // d'aujourd'hui : la feuille de route reportait l'allègement à dans trois semaines, chaque
+        // jour, et la semaine en cours ne l'était jamais — sous un texte « volume −20 % ».
+        if ((blockWeek + i) % 4 === 3 && !semaineBornee) factor *= 0.8;
       }
       // Après une course courue, chaque semaine de la récupération porte sa part du volume
       // (lib/coach/apresCourse) : la feuille de route dit ce que le plan fera.
-      const volumeKm = Math.round(baseKm * factor
-        * (recup ? facteurVolumeApresCourse({ joursDepuis: recup.joursDepuis + 7 * i, joursTotal: recup.joursTotal }) : 1));
+      const volumeKm = Math.round(Math.min(baseKm * factor
+        * (recup ? facteurVolumeApresCourse({ joursDepuis: recup.joursDepuis + 7 * i, joursTotal: recup.joursTotal }) : 1),
+        plafondArretKm(7 * i)));
       // La sortie longue se déduit de la DISTANCE VISÉE, plus seulement d'un pourcentage
       // du volume. Le plafond de Daniels (25 %) empêche la sortie longue d'écraser la
       // semaine ; il ne dit pas ce qu'il faut courir pour préparer un marathon. Employé
       // seul, il produisait un pic de 12 km de sortie longue pour une course de 42,2 km.
       // Semaine de course : AUCUNE sortie longue — la course est l'effort long (autoPlan n'en
       // pose pas). La feuille de route annonçait « ~6 km », que le coach IA répétait.
-      const longRunKm = wkUntil <= 0 ? 0 : longRunForWeek({
+      const longRunPrevuSemaine = wkUntil <= 0 ? 0 : longRunForWeek({
         weekIndex: i, weeksToPeak: Math.max(1, W - 3),
         current: lrCurrent, peak: lrPeak,
         weeklyKm: volumeKm, share: lrShare, taper: ph === "Affûtage",
@@ -1691,6 +1776,10 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
         // de ce que l'athlète court déjà) : il descend EN PENTE, il ne tombe pas à 20 %.
         semainesAvantCourse: wkUntil, reference: Math.max(lrCurrent, longueDuBloc),
       });
+      // Semaine de récupération ou de reprise après un arrêt : la MÊME borne que le plan de la
+      // semaine, 30 % du volume réduit. Sans elle, la feuille de route annonçait 16 km de
+      // sortie longue dans une semaine de 32 km — la moitié du volume (relevé le 05/11/2026).
+      const longRunKm = semaineBornee ? Math.min(longRunPrevuSemaine, Math.round(volumeKm * 0.3)) : longRunPrevuSemaine;
       if (ph !== "Affûtage") longueDuBloc = Math.max(longueDuBloc, longRunKm);
       // Semaine en cours : l'état de forme du jour compte. Semaines suivantes : on planifie
       // sur le budget structurel, sinon un ratio aigu:chronique élevé aujourd'hui viderait
@@ -1713,12 +1802,16 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
         : ph === "Spécifique" || ph === "Affûtage"
           ? [...menuTypes].sort((a, b) => Number(/allure|spécifique|spé/i.test(b)) - Number(/allure|spécifique|spé/i.test(a)))
           : menuTypes;
-      // Une semaine qui commence avant la fin de la récupération d'après-course n'a PAS de
-      // qualité : sinon la feuille de route annonçait « la semaine prochaine : VMA » sous un
-      // bandeau qui interdit l'intensité jusqu'au 21 novembre.
-      const enRecup = recup != null && decaleJour(todayStr, 7 * i) < recup.reprise;
-      const quality = enRecup ? [] : priority.slice(0, Math.max(1, qn));
-      const focus = enRecup ? `Récupération après ${recup.nom} : footings seulement`
+      // APRÈS UNE COURSE COURUE, LA FEUILLE DE ROUTE DIT CE QUE LE PLAN FERA : aucune qualité
+      // tant que la reprise ne tombe pas dans la semaine — sinon elle annonçait « la semaine
+      // prochaine : VMA » sous un bandeau qui interdit l'intensité —, puis un seul seuil court
+      // jusqu'à la fin de la récupération (lib/coach/apresCourse).
+      const debutSemaine = decaleJour(todayStr, 7 * i);
+      const sansQualite = recup != null && decaleJour(debutSemaine, 6) < recup.reprise;
+      const enReprise = recup != null && !sansQualite && debutSemaine < recup.fin;
+      const quality = sansQualite ? [] : enReprise ? ["Seuil"] : priority.slice(0, Math.max(1, qn));
+      const focus = sansQualite ? `Récupération après ${recup.nom} : footings seulement`
+        : enReprise ? `Reprise après ${recup.nom} : une séance courte au seuil`
         : ph === "Base" ? "Volume aérobie + pose de vitesse"
         : ph === "Développement" ? "VMA & seuil — montée en charge"
         : ph === "Spécifique" ? `Allure course${goalPace ? ` (${goalPace}/km)` : ""} + endurance spécifique`
@@ -1874,8 +1967,10 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // 25 ou 100 km par semaine. Le macro-plan calculait déjà ces chiffres : on les branche.
   // Semaine allégée toutes les 4 semaines : sans objectif de course, on s'ancre sur le
   // numéro de semaine ISO (stable d'un jour à l'autre, contrairement à un compteur maison).
-  const taper = weeksToRace != null && weeksToRace <= 2 && weeksToRace >= 0;
-  const deload = !taper && (macroPlan.length ? macroPlan[0].phase !== "Affûtage" && isoWeek % 4 === 0 : isoWeek % 4 === 0);
+  const taper = weeksToRace != null && weeksToRace >= 0 && weeksToRace <= semainesAffutage(objective?.distanceKm) - 1;
+  // La même horloge que la feuille de route et la dose des qualités (semaine 4 du bloc), et
+  // jamais par-dessus une récupération ou une reprise, déjà réduites.
+  const deload = !taper && blockWeek === 3 && !recup && !repriseArret;
   const baseKm = targetFrom(15);
   // Progression plafonnée à +10 %/semaine (+5 % si passif court ou antécédent de fracture).
   // Le mode perte de poids resserre encore ce plafond : l'impact au sol vaut 2,5 à 3 fois
@@ -1890,13 +1985,13 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // de doubler les footings pour loger 70 km à J+5 d'un marathon. Le macro-plan porte déjà
   // la réduction semaine par semaine ; sans macro-plan, on l'applique ici.
   const targetKm = volumeAvecCible(macroPlan.length ? macroPlan[0].volumeKm
-    : Math.round(baseKm * (taper ? 0.65 : deload ? 0.8 : growth) * partVolumeRecup),
+    : Math.round(Math.min(baseKm * (taper ? 0.65 : deload ? 0.8 : growth) * partVolumeRecup, plafondArretKm(0))),
     volumeCible((p as Record<string, unknown> | null)?.target_weekly_km),
-    robustWeekly?.km ?? (avg4wkKm > 0 ? avg4wkKm : weekKm));
+    habitudeKm);
   const longRunPrevu = macroPlan.length ? macroPlan[0].longRunKm : Math.round(targetKm * (taper ? 0.20 : 0.25));
   // Pendant la récupération, la sortie longue du macro-plan (28 km si l'objectif suivant est
   // un marathon) ne dépasse pas 30 % du volume réduit.
-  const longRunPlanned = recup ? Math.min(longRunPrevu, Math.round(targetKm * 0.3)) : longRunPrevu;
+  const longRunPlanned = recup || repriseArret ? Math.min(longRunPrevu, Math.round(targetKm * 0.3)) : longRunPrevu;
 
   /**
    * LA SORTIE LONGUE RÉPOND AU VERDICT DE FRAÎCHEUR, comme la qualité.
@@ -1913,7 +2008,10 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
    * justifiée même pour une séance placée dans 3 jours. L'orange, plus souvent dû à une
    * mauvaise nuit, n'entraîne qu'une réduction légère.
    */
-  const longRunEase = readyLevel === "rouge" ? 0.6 : readyLevel === "orange" ? 0.8 : easeReasons.length ? 0.85 : 1;
+  // La récupération d'après-course a DÉJÀ borné la sortie longue (30 % du volume réduit) :
+  // compter son motif ici la raccourcissait une seconde fois.
+  const motifsAllegement = easeReasons.filter((r) => r !== recupMotif?.fr).length;
+  const longRunEase = readyLevel === "rouge" ? 0.6 : readyLevel === "orange" ? 0.8 : motifsAllegement ? 0.85 : 1;
   const longRunKm = Math.max(4, Math.round(longRunPlanned * longRunEase));
   const longRunEased = longRunKm < longRunPlanned;
 
@@ -2071,7 +2169,7 @@ ${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${lim
     + `Départ en négative split : c'est ce qui produit le plus de records, et ça se RÉPÈTE à l'entraînement — `
     + `${daysToRace > 14 ? "programme une SIMULATION à J-10/J-14 : 60-70 % de la distance à l'allure cible, mêmes chaussures, même petit-déjeuner, même heure." : "la simulation est passée : plus rien de nouveau d'ici le départ, on ne teste plus, on répète."} `
     + `Échauffement le jour J : ${objective.distanceKm <= 10 ? "20 min footing + gammes + 4-5 lignes droites, fini 10 min avant le départ" : "15 min footing léger + 3 lignes droites, on garde le carburant"}.\n`;
-})()}${nutrition ? `- 🍫 NUTRITION DE SA SORTIE LONGUE (${Math.round(nutrition.longRunMin / 60)} h ~${longRunKm} km${nutrition.tempC != null ? `, ${Math.round(nutrition.tempC)} °C prévus` : ""}) : ${nutrition.preRun ? `${nutrition.preRun} g de glucides 2-3 h avant, ` : ""}puis ${nutrition.carbsPerH} g/h À PARTIR DE LA 1re HEURE (soit ~${nutrition.carbsTotal} g sur la sortie, ~${Math.max(1, Math.round(nutrition.carbsTotal / 25))} gels ou équivalent), et ${nutrition.mlPerH} ml/h de boisson à ~${nutrition.sodium} mg/L de sodium. Donne-lui CES chiffres, pas une fourchette — et rappelle-lui de les TESTER à l'entraînement, jamais le jour J.\n` : ""}${shoeLines.length ? `- 👟 USURE DES CHAUSSURES : ${shoeLines.join(" · ")}\n` : ""}${plateau ? `- 🛑 PLATEAU DÉTECTÉ : sa capacité stagne (${vmaSlopePerWeek} km/h/sem sur ${Math.round((curvePts[curvePts.length - 1].t - curvePts[0].t) / 86400000)} j) ALORS QUE sa charge monte. N'AJOUTE PAS de volume ni de séances : c'est le réflexe qui blesse. CHANGE le stimulus — format de séance inédit, côtes, force, technique de foulée — ou impose une vraie semaine de décharge. Explique-lui pourquoi.\n` : vmaSlopePerWeek != null ? `- 📈 TRAJECTOIRE DE CAPACITÉ : ${vmaSlopePerWeek > 0 ? "+" : ""}${vmaSlopePerWeek} km/h de VMA par semaine sur ses efforts mesurés.\n` : ""}${vrLine ? `- 🦵 ÉCONOMIE DE COURSE (ratio vertical, ${vr!.n} séances) : ${vrLine}\n` : ""}${hrrLine ? `- ❤️‍🩹 RÉCUPÉRATION CARDIAQUE : ${hrrLine}\n` : ""}${thresholdPace ? `- 🧊 ALLURE SOUS-SEUIL : ${subPace}/km — c'est ICI que se fait le VOLUME au seuil (méthode norvégienne, Bakken : 0,4 à 0,8 mmol sous le seuil). Une allure qu'il doit pouvoir répéter le lendemain. Les blocs LONGS s'y tiennent ; seules les fractions COURTES touchent le seuil réel. Beaucoup de volume sous-seuil DÉPLACE le seuil ; peu de volume AU seuil ne fait que fatiguer.\n` : ""}${thresholdPace ? `- 🎯 ALLURE SEUIL **MESURÉE** : ${thresholdPace}/km (vitesse critique ${(csMs! * 3.6).toFixed(2)} km/h, ajustée sur ses efforts réels)${pc?.dPrime ? ` · réserve anaérobie D' ${pc.dPrime} m` : ""}. UTILISE CETTE VALEUR pour les séances au seuil plutôt qu'un pourcentage de VMA estimée.\n` : ""}${qeLine ? `- 🔍 EXÉCUTION DE SA DERNIÈRE QUALITÉ : ${qeLine}${faded ? " → il a DÉCROCHÉ : la prochaine série doit être plus courte ou plus lente, pas plus dure. Ne répète pas la même erreur." : fade != null && fade <= -6 ? " → il a ACCÉLÉRÉ en fin de série : il en avait sous le pied, tu peux durcir (allure ou volume, pas les deux)." : ""}\n` : ""}- Repères physio : seuil lactique ~${thresholdPace ?? (vma ? paceAt(86) : "?")}/km · vitesse critique ~${vma ? r1(vma * 0.90) : "?"} km/h (${vma ? paceAt(90) : "?"}/km) · VO2max estimé ~${vo2 ?? "?"} ml/kg/min
+})()}${nutrition ? `- 🍫 NUTRITION DE SA SORTIE LONGUE (${Math.round(nutrition.longRunMin / 60)} h ~${longRunKm} km${nutrition.tempC != null ? `, ${Math.round(nutrition.tempC)} °C prévus` : ""}) : ${nutrition.preRun ? `${nutrition.preRun} g de glucides 2-3 h avant, ` : ""}puis ${nutrition.carbsPerH} g/h À PARTIR DE LA 1re HEURE (soit ~${nutrition.carbsTotal} g sur la sortie, ~${Math.max(1, Math.round(nutrition.carbsTotal / 25))} gels ou équivalent), et ${nutrition.mlPerH} ml/h de boisson à ~${nutrition.sodium} mg/L de sodium. Donne-lui CES chiffres, pas une fourchette — et rappelle-lui de les TESTER à l'entraînement, jamais le jour J.\n` : ""}${shoeLines.length ? `- 👟 USURE DES CHAUSSURES : ${shoeLines.join(" · ")}\n` : ""}${plateau ? `- 🛑 PLATEAU DÉTECTÉ : sa capacité stagne (${vmaSlopePerWeek} km/h/sem sur ${Math.round((curvePts[curvePts.length - 1].t - curvePts[0].t) / 86400000)} j) ALORS QUE sa charge monte. N'AJOUTE PAS de volume ni de séances : c'est le réflexe qui blesse. CHANGE le stimulus — format de séance inédit, côtes, force, technique de foulée — ou impose une vraie semaine de décharge. Explique-lui pourquoi.\n` : vmaSlopePerWeek != null ? `- 📈 TRAJECTOIRE DE CAPACITÉ : ${vmaSlopePerWeek > 0 ? "+" : ""}${vmaSlopePerWeek} km/h de VMA par semaine sur ses efforts mesurés.\n` : ""}${vrLine ? `- 🦵 ÉCONOMIE DE COURSE (ratio vertical, ${vr!.n} séances) : ${vrLine}\n` : ""}${thresholdPace ? `- 🧊 ALLURE SOUS-SEUIL : ${subPace}/km — c'est ICI que se fait le VOLUME au seuil (méthode norvégienne, Bakken : 0,4 à 0,8 mmol sous le seuil). Une allure qu'il doit pouvoir répéter le lendemain. Les blocs LONGS s'y tiennent ; seules les fractions COURTES touchent le seuil réel. Beaucoup de volume sous-seuil DÉPLACE le seuil ; peu de volume AU seuil ne fait que fatiguer.\n` : ""}${thresholdPace ? `- 🎯 ALLURE SEUIL **MESURÉE** : ${thresholdPace}/km (vitesse critique ${(csMs! * 3.6).toFixed(2)} km/h, ajustée sur ses efforts réels)${pc?.dPrime ? ` · réserve anaérobie D' ${pc.dPrime} m` : ""}. UTILISE CETTE VALEUR pour les séances au seuil plutôt qu'un pourcentage de VMA estimée.\n` : ""}${qeLine ? `- 🔍 EXÉCUTION DE SA DERNIÈRE QUALITÉ : ${qeLine}${faded ? " → il a DÉCROCHÉ : la prochaine série doit être plus courte ou plus lente, pas plus dure. Ne répète pas la même erreur." : fade != null && fade <= -6 ? " → il a ACCÉLÉRÉ en fin de série : il en avait sous le pied, tu peux durcir (allure ou volume, pas les deux)." : ""}\n` : ""}- Repères physio : seuil lactique ~${thresholdPace ?? (vma ? paceAt(86) : "?")}/km · vitesse critique ~${vma ? r1(vma * 0.90) : "?"} km/h (${vma ? paceAt(90) : "?"}/km) · VO2max estimé ~${vo2 ?? "?"} ml/kg/min
 
 FORME & RÉCUPÉRATION (aujourd'hui)
 - État physiologique (dernière VFC face à SA base, zone normale ± 6 %) : ${state}
@@ -2179,7 +2277,11 @@ ${catalog}`;
     text, objective, daysToRace, weeksToRace, athleteName: String(p?.full_name ?? "Athlète"), vma,
     // ⚠️ Allure CORRIGÉE par la relecture : c'est elle qui doit partir dans le plan,
     // sinon la boucle mesure sans jamais rien changer.
-    weekPlan: { qBudget, quality: chosen, easyPace: easyPaceCorrige, eased: easeReasons.length > 0, floored: qb.floored },
+    weekPlan: {
+      qBudget, quality: chosen, easyPace: easyPaceCorrige, eased: easeReasons.length > 0, floored: qb.floored,
+      // La reprise après une course : séance marquée comme telle, et jamais avant son jour.
+      reprise: repriseCetteSemaine && qBudget > 0, qualiteDes: repriseCetteSemaine ? joursAvantReprise : 0,
+    },
     // Doubles séances : on tranche ICI, avec le volume REPRÉSENTATIF (médiane des
     // semaines courues) et non le pic — une semaine à 90 km ne fait pas un athlète
     // qui double, et doubler sur un pic isolé est la meilleure façon de le payer.
@@ -2197,9 +2299,9 @@ ${catalog}`;
     readiness: {
       level: readyLevel,
       // Français canonique — inchangé pour tous les consommateurs existants.
-      reasons: [...redFr, ...orangeFr],
+      reasons: [...redFr, ...orangeFr, ...infoFr],
       // Les mêmes motifs dans les 5 langues, pour le « pourquoi » des séances.
-      reasonsAll: [...redFlags, ...orangeFlags],
+      reasonsAll: [...redFlags, ...orangeFlags, ...infoFlags],
       advice: readinessRule,
     },
     hardGapHours: hardGapH,
@@ -2232,7 +2334,7 @@ ${catalog}`;
     thresholdPace,
     macroPlan,
     objectiveWarnings,
-    recuperation: recup ? { course: recup.nom, reprise: recup.reprise } : null,
+    recuperation: recup ? { course: recup.nom, reprise: recup.reprise, fin: recup.fin, phase: recup.phase } : null,
     weightLoss,
     // Palier gratuit : « ce que ta dernière séance a montré » EST une analyse de séance.
     lastSession: objectifSeul ? null : lastSession,

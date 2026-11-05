@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-//  APRÈS LA COURSE — combien de jours sans intensité.
+//  APRÈS LA COURSE — quand l'intensité revient, et à quelle dose.
 //
 //  ⚠️ LE COACH N'AVAIT AUCUNE NOTION D'APRÈS-COURSE. Il ne posait que J+1 (repos) et
 //  J+2 (footing de reprise), et seulement tant que la course tombait dans les 7 jours du
@@ -8,10 +8,22 @@
 //  rendait DEUX séances de qualité pour la semaine. L'ancien n'en donnait qu'une, et par
 //  accident — l'objectif périmé le gardait en « marathon », qui retire une séance.
 //
-//  LA RÈGLE : « un jour facile par mile couru » — la règle empirique la plus citée,
-//  attribuée à Jack Foster et popularisée par Pete Pfitzinger : 26 jours après un
-//  marathon, 13 après un semi, 6 après un 10 km. Des footings, pas du repos : c'est
-//  l'INTENSITÉ qui attend, pas la course à pied.
+//  ⚠️ PUIS LA CORRECTION EST ALLÉE TROP LOIN. « Un jour facile par mile couru » (Jack
+//  Foster, popularisé par Pete Pfitzinger) a été appliqué à TOUTE intensité : aucune
+//  séance de qualité pendant 26 jours, jusqu'au 21 novembre. Cyprien, 05/11/2026 : « il
+//  faut pas 1 mois pour récupérer du marathon, c'est 2 semaines je pense ». Les deux
+//  règles existent, et elles ne disent pas la même chose :
+//    · Jack Daniels : un jour FACILE par tranche de 3 km courus — 14 jours après un
+//      marathon, 7 après un semi, 3 après un 10 km. Ces jours-là, aucune intensité.
+//    · Foster / Pfitzinger : un jour par mile avant de COURIR à nouveau à fond — 26 jours
+//      après un marathon. C'est le délai d'un retour à l'entraînement complet.
+//
+//  LA RÈGLE, EN DEUX TEMPS :
+//    1. AUCUNE INTENSITÉ pendant la fenêtre de Daniels : des footings, pas du repos.
+//    2. REPRISE jusqu'à la fenêtre de Pfitzinger : UNE séance de qualité par semaine,
+//       courte et AU SEUIL — ni VMA, ni côtes, ni course. Des fibres encore abîmées
+//       supportent l'allure seuil bien avant la vitesse.
+//  Le volume, lui, remonte par paliers sur TOUTE la fenêtre (voir plus bas).
 //
 //  ⚠️ ON NE SUPPOSE PAS QUE LA COURSE A ÉTÉ COURUE. Il faut une sortie enregistrée le
 //  jour même, d'au moins la moitié de la distance. Un forfait ne mérite pas quatre
@@ -23,19 +35,29 @@ import { ecartJours } from "@/lib/coach/recuperation";
 
 /** Un mile, en kilomètres. */
 const MILE_KM = 1.609;
+/** Daniels : un jour facile par tranche de 3 km courus. */
+const KM_PAR_JOUR_FACILE = 3;
 /**
- * Plafond ASSUMÉ, 4 semaines. La règle a été pensée pour la route : appliquée telle quelle,
- * elle interdirait l'intensité deux mois après un 100 km de trail. Ce plafond est un choix,
- * pas une mesure — il ne joue qu'au-delà du marathon.
+ * Plafond ASSUMÉ, 4 semaines. Les règles ont été pensées pour la route : appliquées telles
+ * quelles, elles interdiraient l'intensité deux mois après un 100 km de trail. Ce plafond
+ * est un choix, pas une mesure — il ne joue qu'au-delà du marathon.
  */
 export const JOURS_MAX = 28;
 /** Part de la distance qu'une sortie du jour doit couvrir pour dire que la course a été courue. */
 export const PART_COURUE = 0.5;
 
-/** Jours sans intensité après une course de `distanceKm` : un par mile, au moins un. */
+/** Jours SANS AUCUNE intensité après une course de `distanceKm` : un par 3 km (Daniels), au moins un. */
 export function joursSansIntensite(distanceKm: number): number {
+  return Math.max(1, Math.min(JOURS_MAX, Math.round(distanceKm / KM_PAR_JOUR_FACILE)));
+}
+
+/** Durée totale de la récupération : un jour par mile (Foster, Pfitzinger), au moins un. */
+export function joursDeRecuperation(distanceKm: number): number {
   return Math.max(1, Math.min(JOURS_MAX, Math.round(distanceKm / MILE_KM)));
 }
+
+/** « sans-intensite » : footings seulement. « reprise » : une séance courte au seuil par semaine. */
+export type PhaseApresCourse = "sans-intensite" | "reprise";
 
 export type ApresCourse = {
   nom: string;
@@ -43,9 +65,15 @@ export type ApresCourse = {
   date: string;
   /** Jours écoulés depuis la course (1 = le lendemain). */
   joursDepuis: number;
+  /** Durée totale de la récupération (un jour par mile) : le volume réduit la couvre entière. */
   joursTotal: number;
-  /** AAAA-MM-JJ, premier jour où l'intensité peut revenir. */
+  /** Jours sans aucune intensité (un par 3 km), au début de la récupération. */
+  joursSansIntensite: number;
+  phase: PhaseApresCourse;
+  /** AAAA-MM-JJ, premier jour où une séance de qualité — courte, au seuil — peut revenir. */
   reprise: string;
+  /** AAAA-MM-JJ, premier jour d'entraînement normal. */
+  fin: string;
   /** Distance réellement enregistrée le jour de la course. */
   distanceCourueKm: number;
 };
@@ -67,15 +95,27 @@ export function apresCourse(args: {
   const date = String(course.date).slice(0, 10);
   const joursDepuis = ecartJours(aujourdhui, date);
   if (joursDepuis == null || joursDepuis < 1) return null;
-  const joursTotal = joursSansIntensite(course.distanceKm);
+  const joursTotal = joursDeRecuperation(course.distanceKm);
   if (joursDepuis > joursTotal) return null;
   const courue = Math.max(0, ...sorties
     .filter((s) => String(s.date).slice(0, 10) === date)
     .map((s) => s.distanceKm ?? 0));
   if (courue < course.distanceKm * PART_COURUE) return null;
-  const reprise = new Date(`${date}T12:00:00Z`);
-  reprise.setUTCDate(reprise.getUTCDate() + joursTotal + 1);
-  return { nom: course.nom, date, joursDepuis, joursTotal, reprise: reprise.toISOString().slice(0, 10), distanceCourueKm: courue };
+  const sansIntensite = joursSansIntensite(course.distanceKm);
+  return {
+    nom: course.nom, date, joursDepuis, joursTotal, joursSansIntensite: sansIntensite,
+    phase: joursDepuis <= sansIntensite ? "sans-intensite" : "reprise",
+    reprise: plusJours(date, sansIntensite + 1),
+    fin: plusJours(date, joursTotal + 1),
+    distanceCourueKm: courue,
+  };
+}
+
+/** AAAA-MM-JJ décalé de `n` jours civils (midi UTC : aucun fuseau ne fait changer de jour). */
+function plusJours(jour: string, n: number): string {
+  const d = new Date(`${jour}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

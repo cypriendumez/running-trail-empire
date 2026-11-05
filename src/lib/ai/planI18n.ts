@@ -109,6 +109,10 @@ export type TextesPlan = {
   suffixeAllegee: string;
   qualiteDetail: (echauff: number, corps: string, calme: number, affutage: boolean, allegee: boolean) => string;
   qualiteWhySauvee: (origineCross: string) => string;
+  /** Suffixe « (reprise) » : la séance qui suit une course courue (`lib/coach/apresCourse`). */
+  suffixeReprise: string;
+  /** Pourquoi cette séance de reprise ; le nom de la course est un nom propre. */
+  qualiteWhyReprise: (course: string) => string;
   qualiteWhy: string;
 
   // ── Endurance ───────────────────────────────────────────────────────────────
@@ -132,6 +136,8 @@ export type TextesPlan = {
   renfoTitre: string;
   renfoAffutage: string;
   renfoBase: (series: number) => string;
+  /** Renforcement pendant la récupération d'après-course, avant la reprise de l'intensité. */
+  renfoRecup: string;
   renfoSpecifique: (series: number) => string;
   renfoDeveloppement: (series: number, enPlus: boolean) => string;
   renfoWhy: string;
@@ -232,6 +238,8 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     qualiteTitreSeuil: "Séance au seuil",
     qualiteTitreSpecifique: "Allure spécifique objectif",
     suffixeAllegee: " (allégée)",
+    suffixeReprise: " (reprise)",
+    qualiteWhyReprise: (c) => `Reprise après ${c} : une seule séance de qualité cette semaine, au seuil et volontairement courte. Elle réveille le rythme sans entamer une récupération qui n'est pas finie — ni VMA ni course tant qu'elle dure. Si les jambes sont encore lourdes à l'échauffement, transforme-la en footing.`,
     qualiteDetail: (e, c, k, taper, all) => `Échauffement ${e} min progressif FC Z1→Z2 + 3 à 5 lignes droites de 80 m → Corps : ${c} → Retour au calme ${k} min FC Z1.${taper ? " ⚠️ Affûtage : garde l'intensité mais coupe le nombre de répétitions d'un tiers." : ""}${all ? " ⚠️ Version allégée : coupe le nombre de répétitions d'un tiers et garde l'allure. On préserve le stimulus, pas le volume." : ""}`,
     qualiteWhySauvee: (o) => `Ta charge récente est très au-dessus de ta charge de fond${o} — mais ton échéance approche et une semaine sans la moindre allure spécifique se paie le jour J. Donc : UNE séance, raccourcie, plutôt que zéro. Si les sensations ne viennent pas à l'échauffement, transforme-la en footing sans culpabiliser.`,
     qualiteWhy: "La séance de qualité de ton bloc, calée sur ta VMA et ton objectif. C'est elle qui te fait progresser.",
@@ -250,6 +258,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     renfoTitre: "Renforcement musculaire",
     renfoAffutage: `20 à 25 min, ENTRETIEN seulement : gainage 3×45 s, montées de mollets 2×15, proprioception 2×30 s par jambe, quelques bondissements courts. AUCUNE charge lourde ni série longue à l'approche de la course — on préserve la fraîcheur, la force est déjà acquise.`,
     renfoBase: (s) => `35 à 45 min, FONDATIONS : gainage complet (planche, latéral, dos) ${s}×45 s, squats ${s}×12, fentes ${s}×10 par jambe, montées de mollets ${s}×15, ischios nordic curls ${s}×6, proprioception sur une jambe ${s}×30 s. Amplitude et contrôle avant tout — c'est la phase où l'on construit le tendon.`,
+    renfoRecup: `20 min, RÉCUPÉRATION : mobilité des hanches et des chevilles, gainage 3×30 s (planche, latéral), pont fessier 2×12, montées de mollets lentes 2×12, proprioception 2×30 s par jambe. Aucun saut ni travail excentrique (nordic curls, descentes) : les fibres abîmées par la course se réparent encore.`,
     renfoSpecifique: (s) => `30 à 35 min, FORCE UTILE À LA COURSE : squats bulgares ${s}×8 par jambe, fentes sautées ${s}×8, montées de mollets sur une jambe ${s}×12, nordic curls ${s}×6, gainage dynamique ${s}×40 s, bondissements ${s}×10. Explosif et court : on transfère la force vers la foulée, on ne cherche plus le volume.`,
     renfoDeveloppement: (s, plus) => `30 à 40 min, DÉVELOPPEMENT : gainage (planche, latéral) ${s}×45 s, squats ${s}×12, fentes ${s}×10 par jambe, montées de mollets ${s}×15, ischios nordic curls ${s}×6, proprioception sur une jambe ${s}×30 s. ${plus ? "Série supplémentaire par rapport à la semaine dernière — la surcharge vaut aussi pour le renfo." : "Charge maintenue cette semaine (assimilation)."}`,
     renfoWhy: "La prévention de blessure n°1, et un gain direct d'économie de foulée. Elle se périodise comme la course : fondations, puis force utile, puis simple entretien à l'approche du jour J.",
@@ -343,6 +352,8 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     qualiteTitreSeuil: "Threshold session",
     qualiteTitreSpecifique: "Goal race pace",
     suffixeAllegee: " (eased)",
+    suffixeReprise: " (comeback)",
+    qualiteWhyReprise: (c) => `Easing back after ${c}: one quality session this week, at threshold and deliberately short. It wakes the rhythm up without eating into a recovery that is not over yet — no VO2max work or racing while it lasts. If your legs still feel heavy in the warm-up, turn it into an easy run.`,
     qualiteDetail: (e, c, k, taper, all) => `Warm-up ${e} min building HR Z1→Z2 + 3 to 5 strides of 80 m → Main set: ${c} → Cool-down ${k} min HR Z1.${taper ? " ⚠️ Taper: keep the intensity but cut the number of reps by a third." : ""}${all ? " ⚠️ Eased version: cut the number of reps by a third and keep the pace. We preserve the stimulus, not the volume." : ""}`,
     qualiteWhySauvee: (o) => `Your recent load is well above your chronic load${o} — but your race is coming and a week without any race-specific pace is paid for on the day. So: ONE session, shortened, rather than none. If the sensations do not come during the warm-up, turn it into an easy run without guilt.`,
     qualiteWhy: "The quality session of your block, set on your MAS and your goal. This is the one that makes you progress.",
@@ -361,6 +372,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     renfoTitre: "Strength work",
     renfoAffutage: `20 to 25 min, MAINTENANCE only: core 3×45 s, calf raises 2×15, proprioception 2×30 s per leg, a few short bounds. NO heavy load and no long sets close to the race — we protect freshness, the strength is already banked.`,
     renfoBase: (s) => `35 to 45 min, FOUNDATIONS: full core (plank, side, back) ${s}×45 s, squats ${s}×12, lunges ${s}×10 per leg, calf raises ${s}×15, nordic hamstring curls ${s}×6, single-leg proprioception ${s}×30 s. Range and control above all — this is the phase where the tendon is built.`,
+    renfoRecup: `20 min, RECOVERY: hip and ankle mobility, core 3×30 s (plank, side plank), glute bridges 2×12, slow calf raises 2×12, single-leg balance 2×30 s per leg. No jumps and no eccentric work (Nordic curls, downhill running): the fibres damaged by the race are still repairing.`,
     renfoSpecifique: (s) => `30 to 35 min, STRENGTH THAT TRANSFERS TO RUNNING: Bulgarian split squats ${s}×8 per leg, jump lunges ${s}×8, single-leg calf raises ${s}×12, nordic curls ${s}×6, dynamic core ${s}×40 s, bounds ${s}×10. Explosive and short: we transfer strength into the stride, we no longer chase volume.`,
     renfoDeveloppement: (s, plus) => `30 to 40 min, DEVELOPMENT: core (plank, side) ${s}×45 s, squats ${s}×12, lunges ${s}×10 per leg, calf raises ${s}×15, nordic hamstring curls ${s}×6, single-leg proprioception ${s}×30 s. ${plus ? "One set more than last week — progressive overload applies to strength work too." : "Load held this week (assimilation)."}`,
     renfoWhy: "The number 1 injury prevention, and a direct gain in running economy. It is periodised like the running: foundations, then transferable strength, then simple maintenance as race day approaches.",
@@ -454,6 +466,8 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     qualiteTitreSeuil: "Schwelleneinheit",
     qualiteTitreSpecifique: "Wettkampftempo des Ziels",
     suffixeAllegee: " (reduziert)",
+    suffixeReprise: " (Wiedereinstieg)",
+    qualiteWhyReprise: (c) => `Wiedereinstieg nach ${c}: diese Woche eine einzige Qualitätseinheit, an der Schwelle und bewusst kurz. Sie weckt den Rhythmus, ohne die noch nicht abgeschlossene Erholung anzugreifen — kein VO2max-Training und kein Wettkampf, solange sie dauert. Fühlen sich die Beine beim Aufwärmen noch schwer an, mach einen lockeren Dauerlauf daraus.`,
     qualiteDetail: (e, c, k, taper, all) => `Aufwärmen ${e} min ansteigend HF Z1→Z2 + 3 bis 5 Steigerungen über 80 m → Hauptteil: ${c} → Auslaufen ${k} min HF Z1.${taper ? " ⚠️ Tapering: Intensität halten, aber die Anzahl der Wiederholungen um ein Drittel kürzen." : ""}${all ? " ⚠️ Reduzierte Fassung: Anzahl der Wiederholungen um ein Drittel kürzen, Tempo beibehalten. Wir erhalten den Reiz, nicht den Umfang." : ""}`,
     qualiteWhySauvee: (o) => `Deine jüngste Belastung liegt deutlich über deiner Grundbelastung${o} — aber dein Termin rückt näher, und eine Woche ganz ohne wettkampfspezifisches Tempo zahlst du am Tag X. Also: EINE Einheit, verkürzt, statt keiner. Wenn beim Aufwärmen die Sensationen ausbleiben, mach ohne schlechtes Gewissen einen lockeren Dauerlauf daraus.`,
     qualiteWhy: "Die Qualitätseinheit deines Blocks, abgestimmt auf deine maximale aerobe Geschwindigkeit und dein Ziel. Sie ist es, die dich weiterbringt.",
@@ -472,6 +486,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     renfoTitre: "Kräftigung",
     renfoAffutage: `20 bis 25 min, nur ERHALTUNG: Rumpf 3×45 s, Wadenheben 2×15, Propriozeption 2×30 s pro Bein, ein paar kurze Sprünge. KEINE schweren Lasten und keine langen Sätze kurz vor dem Wettkampf — wir schützen die Frische, die Kraft ist längst da.`,
     renfoBase: (s) => `35 bis 45 min, FUNDAMENT: kompletter Rumpf (Unterarmstütz, seitlich, Rücken) ${s}×45 s, Kniebeugen ${s}×12, Ausfallschritte ${s}×10 pro Bein, Wadenheben ${s}×15, Nordic Curls ${s}×6, Propriozeption auf einem Bein ${s}×30 s. Bewegungsumfang und Kontrolle vor allem — das ist die Phase, in der die Sehne gebaut wird.`,
+    renfoRecup: `20 min, ERHOLUNG: Mobilität für Hüfte und Sprunggelenke, Rumpfstabilität 3×30 s (Unterarmstütz, Seitstütz), Glute Bridge 2×12, langsames Wadenheben 2×12, Einbeinstand 2×30 s pro Bein. Keine Sprünge und keine exzentrische Arbeit (Nordic Curls, Bergabläufe): Die im Wettkampf geschädigten Muskelfasern reparieren sich noch.`,
     renfoSpecifique: (s) => `30 bis 35 min, LAUFSPEZIFISCHE KRAFT: bulgarische Kniebeugen ${s}×8 pro Bein, Sprungausfallschritte ${s}×8, einbeiniges Wadenheben ${s}×12, Nordic Curls ${s}×6, dynamischer Rumpf ${s}×40 s, Sprünge ${s}×10. Explosiv und kurz: Wir übertragen die Kraft in den Laufschritt, Umfang ist nicht mehr das Ziel.`,
     renfoDeveloppement: (s, plus) => `30 bis 40 min, ENTWICKLUNG: Rumpf (Unterarmstütz, seitlich) ${s}×45 s, Kniebeugen ${s}×12, Ausfallschritte ${s}×10 pro Bein, Wadenheben ${s}×15, Nordic Curls ${s}×6, Propriozeption auf einem Bein ${s}×30 s. ${plus ? "Ein Satz mehr als letzte Woche — progressive Überlastung gilt auch für die Kräftigung." : "Belastung diese Woche gehalten (Verarbeitung)."}`,
     renfoWhy: "Die Verletzungsprävention Nummer 1 und ein direkter Gewinn an Laufökonomie. Sie wird periodisiert wie das Laufen: Fundament, dann laufspezifische Kraft, dann nur noch Erhaltung, wenn der Tag X näher rückt.",
@@ -565,6 +580,8 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     qualiteTitreSeuil: "Sesión de umbral",
     qualiteTitreSpecifique: "Ritmo específico del objetivo",
     suffixeAllegee: " (aligerada)",
+    suffixeReprise: " (vuelta)",
+    qualiteWhyReprise: (c) => `Vuelta tras ${c}: una sola sesión de calidad esta semana, de umbral y corta a propósito. Despierta el ritmo sin comerse una recuperación que aún no ha terminado: ni VMA ni carreras mientras dure. Si en el calentamiento las piernas siguen pesadas, conviértela en rodaje.`,
     qualiteDetail: (e, c, k, taper, all) => `Calentamiento ${e} min progresivo FC Z1→Z2 + 3 a 5 progresiones de 80 m → Parte principal: ${c} → Vuelta a la calma ${k} min FC Z1.${taper ? " ⚠️ Afinamiento: mantén la intensidad pero recorta un tercio las repeticiones." : ""}${all ? " ⚠️ Versión aligerada: recorta un tercio las repeticiones y mantén el ritmo. Preservamos el estímulo, no el volumen." : ""}`,
     qualiteWhySauvee: (o) => `Tu carga reciente está muy por encima de tu carga de fondo${o} — pero tu cita se acerca y una semana sin nada de ritmo específico se paga el día D. Así que: UNA sesión, acortada, mejor que ninguna. Si las sensaciones no llegan en el calentamiento, conviértela en rodaje sin culpa.`,
     qualiteWhy: "La sesión de calidad de tu bloque, ajustada a tu VAM y a tu objetivo. Es la que te hace progresar.",
@@ -583,6 +600,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     renfoTitre: "Trabajo de fuerza",
     renfoAffutage: `20 a 25 min, solo MANTENIMIENTO: core 3×45 s, elevaciones de gemelos 2×15, propiocepción 2×30 s por pierna, algunos saltos cortos. NINGUNA carga pesada ni serie larga cerca de la carrera — preservamos la frescura, la fuerza ya está adquirida.`,
     renfoBase: (s) => `35 a 45 min, CIMIENTOS: core completo (plancha, lateral, espalda) ${s}×45 s, sentadillas ${s}×12, zancadas ${s}×10 por pierna, elevaciones de gemelos ${s}×15, nordic curls de isquios ${s}×6, propiocepción a una pierna ${s}×30 s. Amplitud y control ante todo — es la fase en la que se construye el tendón.`,
+    renfoRecup: `20 min, RECUPERACIÓN: movilidad de caderas y tobillos, core 3×30 s (plancha, lateral), puente de glúteos 2×12, elevaciones lentas de gemelos 2×12, propiocepción 2×30 s por pierna. Nada de saltos ni de trabajo excéntrico (nordic curls, bajadas): las fibras dañadas por la carrera aún se están reparando.`,
     renfoSpecifique: (s) => `30 a 35 min, FUERZA ÚTIL PARA CORRER: sentadillas búlgaras ${s}×8 por pierna, zancadas saltadas ${s}×8, elevaciones de gemelos a una pierna ${s}×12, nordic curls ${s}×6, core dinámico ${s}×40 s, saltos ${s}×10. Explosivo y corto: transferimos la fuerza a la zancada, ya no buscamos volumen.`,
     renfoDeveloppement: (s, plus) => `30 a 40 min, DESARROLLO: core (plancha, lateral) ${s}×45 s, sentadillas ${s}×12, zancadas ${s}×10 por pierna, elevaciones de gemelos ${s}×15, nordic curls de isquios ${s}×6, propiocepción a una pierna ${s}×30 s. ${plus ? "Una serie más que la semana pasada — la sobrecarga progresiva vale también para la fuerza." : "Carga mantenida esta semana (asimilación)."}`,
     renfoWhy: "La prevención de lesiones n.º 1, y una ganancia directa de economía de zancada. Se periodiza como la carrera: cimientos, luego fuerza útil, y solo mantenimiento al acercarse el día D.",
@@ -676,6 +694,8 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     qualiteTitreSeuil: "Sessão de limiar",
     qualiteTitreSpecifique: "Ritmo específico do objetivo",
     suffixeAllegee: " (aliviada)",
+    suffixeReprise: " (retoma)",
+    qualiteWhyReprise: (c) => `Retoma após ${c}: uma única sessão de qualidade esta semana, no limiar e curta de propósito. Desperta o ritmo sem comprometer uma recuperação que ainda não terminou — nem VMA nem provas enquanto durar. Se as pernas ainda estiverem pesadas no aquecimento, transforma-a em corrida fácil.`,
     qualiteDetail: (e, c, k, taper, all) => `Aquecimento ${e} min progressivo FC Z1→Z2 + 3 a 5 progressões de 80 m → Parte principal: ${c} → Retorno à calma ${k} min FC Z1.${taper ? " ⚠️ Afinamento: mantém a intensidade mas corta um terço das repetições." : ""}${all ? " ⚠️ Versão aliviada: corta um terço das repetições e mantém o ritmo. Preservamos o estímulo, não o volume." : ""}`,
     qualiteWhySauvee: (o) => `A tua carga recente está muito acima da tua carga de fundo${o} — mas a tua prova aproxima-se e uma semana sem qualquer ritmo específico paga-se no dia D. Portanto: UMA sessão, encurtada, em vez de nenhuma. Se as sensações não aparecerem no aquecimento, transforma-a em corrida fácil sem culpa.`,
     qualiteWhy: "A sessão de qualidade do teu bloco, ajustada à tua VAM e ao teu objetivo. É ela que te faz progredir.",
@@ -694,6 +714,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     renfoTitre: "Reforço muscular",
     renfoAffutage: `20 a 25 min, só MANUTENÇÃO: core 3×45 s, elevações de gémeos 2×15, propriocepção 2×30 s por perna, alguns saltos curtos. NENHUMA carga pesada nem série longa perto da prova — preservamos a frescura, a força já está adquirida.`,
     renfoBase: (s) => `35 a 45 min, FUNDAÇÕES: core completo (prancha, lateral, costas) ${s}×45 s, agachamentos ${s}×12, afundos ${s}×10 por perna, elevações de gémeos ${s}×15, nordic curls de isquiotibiais ${s}×6, propriocepção a uma perna ${s}×30 s. Amplitude e controlo acima de tudo — é a fase em que se constrói o tendão.`,
+    renfoRecup: `20 min, RECUPERAÇÃO: mobilidade de ancas e tornozelos, core 3×30 s (prancha, lateral), ponte de glúteos 2×12, elevações lentas de gémeos 2×12, propriocepção 2×30 s por perna. Nada de saltos nem de trabalho excêntrico (nordic curls, descidas): as fibras danificadas pela prova ainda estão a recuperar.`,
     renfoSpecifique: (s) => `30 a 35 min, FORÇA ÚTIL À CORRIDA: agachamentos búlgaros ${s}×8 por perna, afundos saltados ${s}×8, elevações de gémeos a uma perna ${s}×12, nordic curls ${s}×6, core dinâmico ${s}×40 s, saltos ${s}×10. Explosivo e curto: transferimos a força para a passada, já não procuramos volume.`,
     renfoDeveloppement: (s, plus) => `30 a 40 min, DESENVOLVIMENTO: core (prancha, lateral) ${s}×45 s, agachamentos ${s}×12, afundos ${s}×10 por perna, elevações de gémeos ${s}×15, nordic curls de isquiotibiais ${s}×6, propriocepção a uma perna ${s}×30 s. ${plus ? "Uma série a mais do que na semana passada — a sobrecarga progressiva vale também para o reforço." : "Carga mantida esta semana (assimilação)."}`,
     renfoWhy: "A prevenção de lesões n.º 1, e um ganho direto de economia de passada. Periodiza-se como a corrida: fundações, depois força útil, e simples manutenção à medida que o dia D se aproxima.",

@@ -491,19 +491,26 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // chevauche le passé (`okSpacing` → `fenetreRespectee`).
   const plafondQualite = Math.min(wp.qBudget, maxByVolume, maxByFrequency, maxByTaper);
   const quality = wp.quality.slice(0, Math.min(wp.quality.length, plafondQualite));
+  // Premier jour possible pour une qualité : jamais avant la reprise d'après-course
+  // (`qualiteDes`), qui peut tomber au milieu des sept jours du plan.
+  const debutQualite = Math.max(dayZeroDropped ? 1 : 0, Math.min(7, Math.max(0, Math.trunc(wp.qualiteDes ?? 0))));
+  // La reprise après une course : séance déjà écrite courte (coachContext), et annoncée.
+  // Elle l'emporte sur le « sauvée par le plancher », dont le texte parle de charge et
+  // couperait une seconde fois des répétitions déjà réduites.
+  const reprise = !!wp.reprise;
   for (let qi = 0; qi < quality.length; qi++) {
     const q = quality[qi];
     // Tous les jours possibles, plus seulement le premier : c'est ce qui permet à la
     // météo de départager. Sans cette liste, une séance de VMA pouvait tomber sur le
     // jour à 25 s/km de pénalité alors qu'un jour à 0 attendait 48 h plus tard.
     const eligibles: number[] = [];
-    for (let i = dayZeroDropped ? 1 : 0; i <= 6; i++) if (canRun(i) && okSpacing(i) && !coolerExists(i)) eligibles.push(i);
+    for (let i = debutQualite; i <= 6; i++) if (canRun(i) && okSpacing(i) && !coolerExists(i)) eligibles.push(i);
     let idx = choisirJourQualite(eligibles, penaliteMeteo, quality.length - 1 - qi);
     // Le repli ignorait `dayZeroDropped` : il replaçait la qualité sur le jour même,
     // que l'étape 7 convertissait ensuite en récupération. La séance disparaissait donc
     // de la semaine — le défaut que le premier correctif était censé supprimer, intact
     // dans le chemin de secours.
-    if (idx < 0) for (let i = dayZeroDropped ? 1 : 0; i <= 6; i++) if (canRun(i) && okSpacing(i)) { idx = i; break; }
+    if (idx < 0) for (let i = debutQualite; i <= 6; i++) if (canRun(i) && okSpacing(i)) { idx = i; break; }
     if (idx < 0) break; // impossible sans violer la récupération ou le budget → on n'insiste pas
     const title = (l: Lang) => q.type === "VMA" ? PLAN_T[l].qualiteTitreVMA
       : q.type === "Seuil" ? PLAN_T[l].qualiteTitreSeuil
@@ -518,16 +525,17 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
     // d'un marathon : semaine entière en footings lents, alors que c'est la période où
     // l'allure spécifique se construit. On garde donc UNE séance, mais RACCOURCIE et
     // annoncée comme telle : une qualité allégée n'est pas une qualité normale.
-    const rescued = ctx.weekPlan.floored;
+    const rescued = ctx.weekPlan.floored && !reprise;
+    const course = ctx.recuperation?.course ?? "";
     put(idx, {
       type: q.type,
-      title: (l) => (rescued ? `${title(l)}${PLAN_T[l].suffixeAllegee}` : title(l)),
+      title: (l) => (reprise ? `${title(l)}${PLAN_T[l].suffixeReprise}` : rescued ? `${title(l)}${PLAN_T[l].suffixeAllegee}` : title(l)),
       detail: (l) => PLAN_T[l].qualiteDetail(warmQ, corps(l), cool, ctx.cycle.taper, rescued),
-      why: (l) => (rescued ? PLAN_T[l].qualiteWhySauvee(crossNote(l)) : PLAN_T[l].qualiteWhy),
+      why: (l) => (reprise ? PLAN_T[l].qualiteWhyReprise(course) : rescued ? PLAN_T[l].qualiteWhySauvee(crossNote(l)) : PLAN_T[l].qualiteWhy),
       tags: (l) => [
         PLAN_T[l].tags[q.type as keyof (typeof PLAN_T)["fr"]["tags"]] ?? q.type,
         PLAN_T[l].tags["Qualité"],
-        ...(rescued ? [PLAN_T[l].tags["Allégée"]] : []),
+        ...(rescued || reprise ? [PLAN_T[l].tags["Allégée"]] : []),
       ],
     });
     placed.push(idx);
@@ -625,6 +633,13 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
         zones: ctx.zonesFragiles ?? [],
       });
       const enPlus = axes.map((a) => PLAN_T[l].renfoAxe[a] ?? "").join("");
+      // APRÈS UNE COURSE COURUE, tant que l'intensité attend : ni sauts ni excentrique, quelle
+      // que soit la phase de l'objectif suivant — « fentes sautées, bondissements, nordic
+      // curls » arrivaient à J+12 du marathon de Lille (Cyprien, 05/11/2026). Pendant la
+      // reprise, les fondations ; le renforcement spécifique attend la fin de la récupération.
+      const recup = ctx.recuperation;
+      if (recup && recup.phase !== "reprise") return PLAN_T[l].renfoRecup;
+      if (recup) return PLAN_T[l].renfoBase(sets) + enPlus;
       if (phase === "affûtage" || ctx.cycle.taper) return PLAN_T[l].renfoAffutage;
       if (phase === "Base") return PLAN_T[l].renfoBase(sets) + enPlus;
       if (phase === "Spécifique") return PLAN_T[l].renfoSpecifique(sets) + enPlus;

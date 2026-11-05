@@ -95,11 +95,37 @@ export type QualityExec = {
   at: string;
 };
 
+/** Un intervalle tel qu'intervals.icu le rend (`icu_intervals`). */
+export type IntervalleIcu = {
+  zone?: number; average_speed?: number; gap?: number; average_heartrate?: number; moving_time?: number; distance?: number;
+};
+
+/** Une répétition : allure en s/km (corrigée du dénivelé quand la montre la donne), durée, FC. */
+export type Repetition = { allureSec: number; dureeSec: number; distanceM: number | null; fc: number | null; zone: number };
+
+/** La série d'une séance de qualité, dans l'ordre où elle a été courue, et son décrochage. */
+export type SerieRepetitions = { reps: Repetition[]; fadeSec: number; fcMoy: number | null };
+
+/** Le corps d'une séance continue (seuil, tempo) : la plus longue suite d'efforts enchaînés en
+ *  zone 3 ou plus, avec l'allure de chacun des tours qui la composent. */
+export type BlocContinu = { allureSec: number; dureeSec: number; fc: number | null; tours: number[] };
+
+/** Les intervalles d'une séance, tels qu'intervals.icu les découpe : la série et le bloc s'en
+ *  déduisent selon ce qui était PRÉVU (le nombre de répétitions attendu), voir `faitsDeSeance`. */
+export type DetailIntervalles = { liste: IntervalleIcu[] };
+
+// Allure ajustée au dénivelé quand elle existe : sinon une répétition en montée
+// passerait pour un décrochage alors que l'effort était identique.
+const allureDe = (x: { average_speed?: number; gap?: number }) => {
+  const v = x.gap && x.gap > 0.3 ? x.gap : x.average_speed;
+  return v && v > 0.3 ? Math.round(1000 / v) : null;
+};
+
 /**
- * Analyse l'exécution de la dernière séance de qualité : on isole les répétitions
- * réellement dures et on regarde si l'allure a tenu du début à la fin.
- * Un décrochage marqué signifie que la séance était trop ambitieuse — information
- * qu'aucune moyenne globale ne révèle.
+ * Isole la SÉRIE de répétitions d'une séance : on retient les répétitions réellement
+ * dures et on regarde si l'allure a tenu du début à la fin. Un décrochage marqué
+ * signifie que la séance était trop ambitieuse — information qu'aucune moyenne
+ * globale ne révèle.
  *
  * ATTENTION au piège de la zone FC : après une série, le cœur redescend lentement.
  * Vérifié sur une séance réelle (04/08) — les quatre tours de retour au calme, courus
@@ -108,6 +134,104 @@ export type QualityExec = {
  * décrochage sur une séance en réalité parfaitement tenue. On identifie donc la série
  * par l'ALLURE — un paquet d'efforts homogènes autour du plus rapide — et la FC ne
  * sert plus que de garde-fou.
+ *
+ * Fonction PURE, partagée par le coach (`analyseQualityExecution`) et l'analyse Premium
+ * d'une séance (`faitsDeSeance`) : une seule définition d'une « répétition ».
+ *
+ * `minReps` : trois par défaut — en dessous, deux efforts proches ressemblent à n'importe quoi.
+ * L'analyse le ramène au nombre PRÉVU quand la séance en comptait deux (un over-under 2×5 min).
+ */
+export function serieDeRepetitions(intervalles: readonly IntervalleIcu[], minReps = 3): SerieRepetitions | null {
+  type Cand = { pace: number; dur: number; dist: number | null; hr: number | null; zone: number };
+  const cands: Cand[] = [];
+  for (const x of intervalles) {
+    const pace = allureDe(x);
+    const dur = x.moving_time ?? 0;
+    // Trop court = un tour parasite ; zone 1-2 = échauffement ou récupération.
+    if (pace == null || dur < 45 || (x.zone ?? 0) < 3) continue;
+    cands.push({
+      pace, dur, dist: typeof x.distance === "number" && x.distance > 0 ? Math.round(x.distance) : null,
+      hr: typeof x.average_heartrate === "number" ? x.average_heartrate : null, zone: x.zone ?? 0,
+    });
+  }
+  if (cands.length < minReps) return null;
+
+  // La série = les efforts à moins de 20 % du plus rapide. La marge laisse passer un
+  // vrai décrochage (c'est précisément ce qu'on cherche à mesurer) sans absorber un
+  // footing de récupération, toujours bien plus lent que ça.
+  const fastest = Math.min(...cands.map((c) => c.pace));
+  const inBand = cands.filter((c) => c.pace <= fastest * 1.2);
+  if (inBand.length < minReps) return null;
+
+  // Une série est aussi homogène en durée : on écarte le tour deux fois plus long
+  // que les autres, qui serait un bloc continu et non une répétition.
+  const durs = [...inBand.map((c) => c.dur)].sort((a, b) => a - b);
+  const medDur = durs[Math.floor(durs.length / 2)];
+  const reps = inBand.filter((c) => c.dur >= medDur * 0.5 && c.dur <= medDur * 2);
+  // Sans au moins un effort franchement dur, c'est une sortie régulière, pas une séance.
+  if (reps.length < minReps || !reps.some((c) => c.zone >= 4)) return null;
+
+  const repsSec = reps.map((c) => c.pace);
+  const hrs = reps.map((c) => c.hr).filter((h): h is number => h != null);
+  // Décrochage : moyenne du dernier tiers moins moyenne du premier tiers.
+  const n = Math.max(1, Math.floor(repsSec.length / 3));
+  const first = repsSec.slice(0, n).reduce((a, b) => a + b, 0) / n;
+  const last = repsSec.slice(-n).reduce((a, b) => a + b, 0) / n;
+  return {
+    reps: reps.map((c) => ({ allureSec: c.pace, dureeSec: c.dur, distanceM: c.dist, fc: c.hr, zone: c.zone })),
+    fadeSec: Math.round(last - first),
+    fcMoy: hrs.length ? Math.round(hrs.reduce((a, b) => a + b, 0) / hrs.length) : null,
+  };
+}
+
+/** Durée minimale du corps d'une séance continue : en dessous, c'est un tour, pas un seuil. */
+export const BLOC_MIN_SEC = 6 * 60;
+
+/**
+ * Le corps d'une séance continue de qualité (seuil, tempo, allure spécifique) : la plus
+ * longue suite d'efforts ENCHAÎNÉS en zone 3 ou plus, d'au moins six minutes au total.
+ *
+ * ⚠️ UNE SUITE, PAS UN SEUL INTERVALLE. Vu sur un vrai tempo (14/10/2026, « 30 min continues
+ * à 3'47/km ») : la montre l'avait coupé en 8 tours d'un kilomètre, aucun ne dépassant 4 min.
+ * Chercher UN effort de six minutes ne trouvait rien. Une récupération (zone 1-2) coupe la
+ * suite : un fractionné reste un fractionné.
+ *
+ * ⚠️ C'EST LUI QUI SE COMPARE À L'ALLURE PRÉVUE, PAS LA MOYENNE DE LA SÉANCE : un seuil de
+ * 20 min encadré de 25 min d'échauffement et de retour au calme affiche une moyenne bien
+ * plus lente que la cible — l'analyse aurait conclu à un seuil raté alors qu'il était tenu.
+ */
+export function blocPrincipal(intervalles: readonly IntervalleIcu[]): BlocContinu | null {
+  type Tour = { pace: number; dur: number; hr: number | null };
+  const suites: Tour[][] = [];
+  let courante: Tour[] = [];
+  for (const x of intervalles) {
+    const pace = allureDe(x);
+    const dur = x.moving_time ?? 0;
+    if (pace == null || dur <= 0 || (x.zone ?? 0) < 3) {
+      if (courante.length) suites.push(courante);
+      courante = [];
+      continue;
+    }
+    courante.push({ pace, dur, hr: typeof x.average_heartrate === "number" ? x.average_heartrate : null });
+  }
+  if (courante.length) suites.push(courante);
+  const total = (t: Tour[]) => t.reduce((s, x) => s + x.dur, 0);
+  const plusLongue = suites.filter((t) => total(t) >= BLOC_MIN_SEC).sort((a, b) => total(b) - total(a))[0];
+  if (!plusLongue) return null;
+  const duree = total(plusLongue);
+  const avecFc = plusLongue.filter((x) => x.hr != null);
+  return {
+    // L'allure MOYENNE du bloc, pondérée par la durée de chaque tour.
+    allureSec: Math.round(plusLongue.reduce((s, x) => s + x.pace * x.dur, 0) / duree),
+    dureeSec: duree,
+    fc: avecFc.length ? Math.round(avecFc.reduce((s, x) => s + x.hr! * x.dur, 0) / total(avecFc)) : null,
+    tours: plusLongue.map((x) => x.pace),
+  };
+}
+
+/**
+ * Analyse l'exécution de la dernière séance de qualité (voir `serieDeRepetitions`), pour
+ * le coach : il en tire le décrochage, qui dit si la séance était trop ambitieuse.
  */
 export async function analyseQualityExecution(
   activityId: string, apiKey: string, dateISO: string,
@@ -117,55 +241,57 @@ export async function analyseQualityExecution(
       headers: auth(apiKey), signal: AbortSignal.timeout(15000),
     });
     if (!r.ok) return null;
-    const j = await r.json() as { icu_intervals?: { zone?: number; average_speed?: number; gap?: number; average_heartrate?: number; moving_time?: number }[] };
-
-    // Allure ajustée au dénivelé quand elle existe : sinon une répétition en montée
-    // passerait pour un décrochage alors que l'effort était identique.
-    const paceOf = (x: { average_speed?: number; gap?: number }) => {
-      const v = x.gap && x.gap > 0.3 ? x.gap : x.average_speed;
-      return v && v > 0.3 ? Math.round(1000 / v) : null;
-    };
-
-    type Cand = { pace: number; dur: number; hr: number | null; zone: number };
-    const cands: Cand[] = [];
-    for (const x of j.icu_intervals ?? []) {
-      const pace = paceOf(x);
-      const dur = x.moving_time ?? 0;
-      // Trop court = un tour parasite ; zone 1-2 = échauffement ou récupération.
-      if (pace == null || dur < 45 || (x.zone ?? 0) < 3) continue;
-      cands.push({ pace, dur, hr: typeof x.average_heartrate === "number" ? x.average_heartrate : null, zone: x.zone ?? 0 });
-    }
-    if (cands.length < 3) return null;
-
-    // La série = les efforts à moins de 20 % du plus rapide. La marge laisse passer un
-    // vrai décrochage (c'est précisément ce qu'on cherche à mesurer) sans absorber un
-    // footing de récupération, toujours bien plus lent que ça.
-    const fastest = Math.min(...cands.map((c) => c.pace));
-    const inBand = cands.filter((c) => c.pace <= fastest * 1.2);
-    if (inBand.length < 3) return null;
-
-    // Une série est aussi homogène en durée : on écarte le tour deux fois plus long
-    // que les autres, qui serait un bloc continu et non une répétition.
-    const durs = [...inBand.map((c) => c.dur)].sort((a, b) => a - b);
-    const medDur = durs[Math.floor(durs.length / 2)];
-    const reps = inBand.filter((c) => c.dur >= medDur * 0.5 && c.dur <= medDur * 2);
-    // Sans au moins un effort franchement dur, c'est une sortie régulière, pas une séance.
-    if (reps.length < 3 || !reps.some((c) => c.zone >= 4)) return null;
-
-    const repsSec = reps.map((c) => c.pace);
-    const hrs = reps.map((c) => c.hr).filter((h): h is number => h != null);
-    // Décrochage : moyenne du dernier tiers moins moyenne du premier tiers.
-    const n = Math.max(1, Math.floor(repsSec.length / 3));
-    const first = repsSec.slice(0, n).reduce((a, b) => a + b, 0) / n;
-    const last = repsSec.slice(-n).reduce((a, b) => a + b, 0) / n;
+    const j = await r.json() as { icu_intervals?: IntervalleIcu[] };
+    const serie = serieDeRepetitions(j.icu_intervals ?? []);
+    if (!serie) return null;
     return {
       date: dateISO,
-      repsSec,
-      avgHr: hrs.length ? Math.round(hrs.reduce((a, b) => a + b, 0) / hrs.length) : null,
-      fadeSec: Math.round(last - first),
+      repsSec: serie.reps.map((x) => x.allureSec),
+      avgHr: serie.fcMoy,
+      fadeSec: serie.fadeSec,
       at: new Date().toISOString(),
     };
   } catch { return null; }
+}
+
+/** Les flux d'une séance, seconde par seconde : de quoi relire montées et descentes. */
+export type FluxSeance = { temps: number[]; distance: number[]; altitude: number[]; fc: number[] | null };
+
+/**
+ * LES FLUX D'UNE SÉANCE DE TRAIL, pour l'analyse Premium (vitesse en montée, descentes).
+ * « illisible » n'est pas « plat » : sans flux, l'analyse dit qu'elle ne sait pas.
+ */
+export async function fluxDeSeance(activityId: string, apiKey: string): Promise<FluxSeance | "illisible"> {
+  try {
+    const r = await fetch(`${BASE}/activity/${activityId}/streams?types=time,distance,altitude,heartrate`, {
+      headers: auth(apiKey), signal: AbortSignal.timeout(15000),
+    });
+    if (!r.ok) return "illisible";
+    const j = await r.json();
+    const arr = Array.isArray(j) ? j : [j];
+    const flux = (t: string) => arr.find((x) => x?.type === t)?.data as number[] | undefined;
+    const temps = flux("time"), distance = flux("distance"), altitude = flux("altitude") ?? flux("fixed_altitude");
+    if (!temps?.length || !distance?.length || !altitude?.length) return "illisible";
+    return { temps, distance, altitude, fc: flux("heartrate") ?? null };
+  } catch { return "illisible"; }
+}
+
+/**
+ * LES INTERVALLES D'UNE SÉANCE, pour l'analyse Premium (`api/ai/analyse-seance`) : la série
+ * de répétitions et le bloc principal, tirés de la même réponse d'intervals.icu.
+ *
+ * ⚠️ « illisible » N'EST PAS « rien » : sans réponse d'intervals.icu, on ne SAIT pas s'il y
+ * avait un fractionné, et l'analyse doit le dire au lieu de conclure qu'il n'a pas été fait.
+ */
+export async function intervallesDeSeance(activityId: string, apiKey: string): Promise<DetailIntervalles | "illisible"> {
+  try {
+    const r = await fetch(`${BASE}/activity/${activityId}/intervals`, {
+      headers: auth(apiKey), signal: AbortSignal.timeout(15000),
+    });
+    if (!r.ok) return "illisible";
+    const j = await r.json() as { icu_intervals?: IntervalleIcu[] };
+    return { liste: j.icu_intervals ?? [] };
+  } catch { return "illisible"; }
 }
 
 /**

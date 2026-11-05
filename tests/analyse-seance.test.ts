@@ -16,17 +16,22 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  faitsDeSeance, zonesEnMinutes, allureTexte, dateLisible,
+  faitsDeSeance, zonesEnMinutes, allureTexte, dateLisible, analyseTrail,
   PART_FC_DURE, PART_FC_FACILE, ECART_DISTANCE, COMPARABLES_MIN, FC_PLANCHER,
   type SeanceBrute,
 } from "../src/lib/ai/analyseSeance";
 import { peut } from "../src/lib/billing/access";
+import { serieDeRepetitions, blocPrincipal, BLOC_MIN_SEC, type IntervalleIcu } from "../src/lib/intervals/performance";
+import { FOURCHETTE_ALLURE_SEC } from "../src/lib/watch/intervals";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
   try { fn(); passed++; console.log(`  OK ${nom}`); }
   catch (e) { fails.push(`${nom} — ${(e as Error).message}`); console.log(`  ✗ ${nom}`); }
 }
+/** La route ET la consigne (sortie dans `lib/ai/inviteAnalyse` le 31/10/2026) : leurs garanties
+ *  se lisent ensemble, l'ordre de la route d'abord. */
+const codeAnalyse = () => codeOf("src/app/api/ai/analyse-seance/route.ts") + "\n" + codeOf("src/lib/ai/inviteAnalyse.ts");
 function codeOf(path: string): string {
   return readFileSync(path, "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "")
@@ -151,7 +156,7 @@ test("une date est écrite en toutes lettres, dans la langue du compte", () => {
 console.log("\nLA ROUTE — verrou, mémoire, et interdiction d'inventer");
 
 test("le verrou est SERVEUR et porte sur la capacité IA", () => {
-  const src = codeOf("src/app/api/ai/analyse-seance/route.ts");
+  const src = codeAnalyse();
   assert.match(src, /exigeAcces\(supabase, user\.id, "ia"\)/,
     "la route n'exige plus d'abonnement : elle est appelable à la main, et c'est l'appel qui coûte");
   // ⚠️ ON VISE LA REQUÊTE, PAS LE MOTIF. `.eq("user_id", user.id)` apparaît une dizaine de
@@ -166,7 +171,7 @@ test("le verrou est SERVEUR et porte sur la capacité IA", () => {
 });
 
 test("l'analyse est mémorisée, et l'erreur d'écriture est LUE", () => {
-  const src = codeOf("src/app/api/ai/analyse-seance/route.ts");
+  const src = codeAnalyse();
   assert.match(src, /\.eq\("data->>workout_id", workoutId\)/, "la mémoire n'est plus interrogée : chaque ouverture repaierait");
   assert.match(src, /const \{ error: eIns \}/,
     "l'écriture ne lit plus son erreur — Supabase RETOURNE ses erreurs, il ne les lève pas");
@@ -177,7 +182,7 @@ test("l'analyse est mémorisée, et l'erreur d'écriture est LUE", () => {
 });
 
 test("le modèle a interdiction d'inventer un chiffre", () => {
-  const src = codeOf("src/app/api/ai/analyse-seance/route.ts");
+  const src = codeAnalyse();
   assert.match(src, /N'écris AUCUN chiffre qui ne figure pas/, "la seule règle qui empêche le récit fabriqué a sauté");
   assert.match(src, /doit être DIT inconnu, jamais comblé/, "le modèle n'est plus tenu d'avouer ce qu'il ignore");
   assert.match(src, /jamais sur le titre de la séance/, "le modèle peut de nouveau juger l'intensité sur l'étiquette");
@@ -191,7 +196,7 @@ test("le modèle a interdiction d'inventer un chiffre", () => {
 test("l'analyse est écrite dans la langue du compte", () => {
   // L'invite imposait « en français » : un client allemand voyait le bouton traduit et
   // recevait une analyse en français.
-  const src = codeOf("src/app/api/ai/analyse-seance/route.ts");
+  const src = codeAnalyse();
   assert.match(src, /getAccountLang\(supabase, user\.id\)/, "la langue du compte n'est plus lue");
   assert.match(src, /\$\{LANGUE\[lang\]\}/, "l'invite ne demande plus la langue de l'athlète");
   // ⚠️ LES FAITS AUSSI. La date y est écrite en toutes lettres : figée en français, elle
@@ -206,7 +211,7 @@ test("l'analyse est écrite dans la langue du compte", () => {
 test("le budget de raisonnement est séparé de la réponse", () => {
   // Un `maxOutputTokens` sans `thinkingConfig` est un piège silencieux sur Gemini 2.5 :
   // le raisonnement mange la réponse, qui sort coupée en étant servie comme un succès.
-  const src = codeOf("src/app/api/ai/analyse-seance/route.ts");
+  const src = codeAnalyse();
   assert.match(src, /budget\(\d+, /, "appel sans réserve de raisonnement : la réponse sortira tronquée");
   assert.match(src, /tronquee: r\.tronquee === true/, "la troncature n'est plus signalée à l'athlète");
 });
@@ -219,7 +224,7 @@ test("l'affichage suit le verrou, il ne le remplace pas", () => {
   // Starter voit, sous son analyse, ce que Premium y ajouterait — et Premium ne le voit pas.
   assert.match(src, /setComplete\(j\.complete !== false\)/, "l'écran ne sait plus si l'analyse est l'essentielle");
   assert.match(src, /\{!complete && \(/, "l'analyse essentielle ne dit plus ce que Premium ajoute");
-  const route = codeOf("src/app/api/ai/analyse-seance/route.ts");
+  const route = codeAnalyse();
   assert.match(route, /memorise: true, complete: memoComplet \}/, "une analyse mémorisée ne dit plus si elle est complète");
   assert.match(route, /tronquee: r\.tronquee === true, complete: complet \}/, "une analyse fraîche ne dit plus si elle est complète");
 });
@@ -229,7 +234,7 @@ test("Premium reçoit des DIMENSIONS en plus, pas des mots en plus", () => {
   // à 14,99 € paierait des phrases, pas du service. L'écart doit porter sur ce que le
   // modèle a le droit de REGARDER — rang parmi les séances semblables, zones, cadence,
   // température — pas sur le nombre de phrases qu'il écrit.
-  const src = codeOf("src/app/api/ai/analyse-seance/route.ts");
+  const src = codeAnalyse();
   assert.match(src, /function lignesDeFaits\(f: FaitsSeance, lang: Lang, complet: boolean\)/,
     "les faits ne dépendent plus de la formule : les deux clients voient la même chose");
   assert.match(src, /if \(complet\) \{/, "le bloc réservé à la formule haute a disparu");
@@ -242,6 +247,8 @@ test("Premium reçoit des DIMENSIONS en plus, pas des mots en plus", () => {
     [/if \(f\.rang\) l\.push/, "le rang"], [/if \(f\.zonesMin\) l\.push/, "les zones"],
     [/if \(f\.cadence != null\) l\.push/, "la cadence"], [/if \(f\.tempC != null\) l\.push/, "la température"],
     [/if \(foulee\.length\) l\.push/, "la foulée"], [/if \(f\.derive != null\) l\.push/, "la dérive cardiaque"],
+    [/if \(f\.repetitions\) \{/, "les répétitions"], [/if \(f\.ecart\) \{/, "l'écart à la séance prévue"], [/if \(f\.zoneVisee\) \{/, "la zone visée"],
+    [/if \(f\.contexte\) \{/, "le contexte du jour"], [/if \(f\.progression\) \{/, "la progression"], [/if \(f\.trail\) \{/, "les montées et descentes"],
   ] as const) {
     assert.match(bloc, motif, `${quoi} n'est plus réservé à la formule haute`);
   }
@@ -272,7 +279,7 @@ test("Starter reçoit l'essentiel, Premium et l'essai l'analyse complète", () =
 test("passé à Premium, une séance relue en Starter est relue EN ENTIER, dans la même ligne", () => {
   // Sans ça, l'abonné qui monte en gamme rouvrait ses séances et lisait pour toujours
   // l'analyse courte, mémorisée du temps de Starter.
-  const src = codeOf("src/app/api/ai/analyse-seance/route.ts");
+  const src = codeAnalyse();
   assert.match(src, /if \(memo\?\.body && \(memoComplet \|\| !complet\)\) return/, "l'analyse essentielle est resservie à Premium");
   assert.match(src, /const memoComplet = memo\?\.data\?\.complete \?\? memo\?\.data\?\.longue \?\? false;/, "les analyses complètes d'avant le 30/10 seraient refaites et repayées");
   assert.match(src, /memo\?\.id\s*\?\s*await admin\.from\("notifications"\)\.update\(ligne\)\.eq\("id", memo\.id\)/, "la version complète s'ajoute au lieu de remplacer : le cache n'en lit qu'une, au hasard");
@@ -286,9 +293,246 @@ test("passé à Premium, une séance relue en Starter est relue EN ENTIER, dans 
 test("l'écart de formule repose sur une capacité, pas sur un nom écrit en dur", () => {
   // Un `tier === "premium"` en dur diverge le jour où une formule est renommée, et il
   // laisserait l'essai — qui montre le niveau Premium — sur la version basse.
-  const src = codeOf("src/app/api/ai/analyse-seance/route.ts");
+  const src = codeAnalyse();
   assert.match(src, /profilPeut\([^)]*"analyse_complete"\)/, "la capacité n'est plus interrogée");
   assert.ok(!/"premium"/.test(src), "le nom d'une formule est codé en dur dans la route");
+});
+
+console.log("\nLES RÉPÉTITIONS ET L'ÉCART À LA SÉANCE PRÉVUE (Premium, 31/10/2026)");
+
+// Une séance de 6×1000 m à 3'20/km : échauffement, six efforts qui ralentissent un peu,
+// récupérations, puis QUATRE tours de retour au calme que la FC encore haute classe en zone 4.
+const v = (secParKm: number) => 1000 / secParKm;
+const SERIE_6x1000: IntervalleIcu[] = [
+  { zone: 2, average_speed: v(330), moving_time: 900, average_heartrate: 140 },
+  ...[200, 200, 202, 202, 204, 206].flatMap((a, i) => [
+    { zone: 5, average_speed: v(a), moving_time: a, distance: 1000, average_heartrate: 180 + i },
+    { zone: 2, average_speed: v(420), moving_time: 120, average_heartrate: 150 },
+  ]),
+  ...[275, 280, 282, 285].map((a) => ({ zone: 4, average_speed: v(a), moving_time: 300, average_heartrate: 183 })),
+];
+
+test("la série : les six répétitions, sans les tours de retour au calme classés en zone 4", () => {
+  const sr = serieDeRepetitions(SERIE_6x1000)!;
+  assert.deepEqual(sr.reps.map((r) => r.allureSec), [200, 200, 202, 202, 204, 206], "les tours de retour au calme sont comptés comme répétitions");
+  assert.equal(sr.fadeSec, 5, "décrochage du premier au dernier tiers");
+  assert.equal(sr.fcMoy, 183);
+  assert.equal(serieDeRepetitions(SERIE_6x1000.slice(0, 5)), null, "deux efforts ne font pas une série");
+  assert.equal(serieDeRepetitions(SERIE_6x1000.map((x) => ({ ...x, zone: Math.min(3, x.zone ?? 0) }))), null, "une série sans effort en zone 4 est une sortie régulière");
+});
+
+test("le corps d'un seuil : le plus long effort en zone 3+, d'au moins six minutes", () => {
+  const seuil: IntervalleIcu[] = [
+    { zone: 2, average_speed: v(320), moving_time: 900 },
+    { zone: 3, average_speed: v(245), moving_time: 1200, average_heartrate: 175 },
+    { zone: 4, average_speed: v(230), moving_time: 300 },
+  ];
+  assert.deepEqual(blocPrincipal(seuil), { allureSec: 242, dureeSec: 1500, fc: 175, tours: [245, 230] },
+    "deux efforts ENCHAÎNÉS en zone 3+ forment un seul corps de séance, à l'allure pondérée par leur durée (242 s/km)");
+  assert.equal(blocPrincipal([{ zone: 4, average_speed: v(230), moving_time: BLOC_MIN_SEC - 1 }]), null, "un tour de cinq minutes pris pour un corps de séance");
+  // Un fractionné : les récupérations coupent la suite, aucune répétition ne fait six minutes.
+  assert.equal(blocPrincipal(SERIE_6x1000.slice(0, 13)), null, "un fractionné pris pour un bloc continu");
+});
+
+// LE CAS RÉEL DU 14/10/2026 : « Tempo marathon : 30 min continues à 3'47/km », que la montre a
+// découpé en tours d'un kilomètre (relu chez intervals.icu). Les tours de retour au calme sont
+// en zone 2 : ils coupent la suite.
+const TEMPO_14_10: IntervalleIcu[] = [
+  ...[302, 288, 293].map((a) => ({ zone: 1, average_speed: v(a), moving_time: a, average_heartrate: 140 })),
+  ...([[219, 3, 220, 173], [219, 4, 221, 183], [221, 4, 222, 186], [222, 4, 221, 188], [219, 4, 222, 189], [223, 4, 225, 190], [227, 4, 225, 191], [219, 5, 221, 192]] as const)
+    .map(([a, z, d, fc]) => ({ zone: z, average_speed: v(a), moving_time: d, average_heartrate: fc })),
+  ...[263, 268, 261, 269, 261, 275].map((a) => ({ zone: 2, average_speed: v(a), moving_time: a, average_heartrate: 168 })),
+];
+
+test("cas réel : un tempo de 30 min découpé en 8 tours est UN corps de séance, pas 8 répétitions", () => {
+  const prevu = { type: "Spécifique", titre: "Allure spécifique objectif", detail: "Échauffement 20 min progressif FC Z1→Z2 + 3 à 5 lignes droites de 80 m → Corps : Tempo marathon : 30 min continues à 3'47/km → Retour au calme 10 min FC Z1." };
+  const f = faitsDeSeance(SEANCE, { fcMax: 212 }, [], prevu, { liste: TEMPO_14_10 });
+  assert.equal(f.repetitions, null, "les tours d'un tempo continu sont présentés comme des répétitions");
+  assert.equal(f.ecart?.sur, "bloc");
+  assert.equal(f.ecart?.blocMin, 30);
+  assert.equal(f.ecart?.tours?.length, 8);
+  assert.equal(f.ecart?.ecartSec, -6, "3'41 de moyenne pour 3'47 prévus : 6 s/km plus vite");
+  assert.ok(!f.manques.some((m) => /corps de la séance/.test(m)), "le corps du tempo est déclaré introuvable");
+});
+
+const PREVU_6x1000 = { type: "VMA", titre: "6×1000 m", detail: "Échauffement 20 min progressif → Corps : 6×1000 m à 3'20/km, récup 2 min trottinée → Retour au calme 10 min." };
+
+test("répétitions prévues et relevées : l'écart moyen, et combien tombent dans la fourchette de la montre", () => {
+  const f = faitsDeSeance(SEANCE, { fcMax: 212 }, [], PREVU_6x1000, { liste: SERIE_6x1000 });
+  assert.deepEqual(f.repetitions?.allures, [200, 200, 202, 202, 204, 206]);
+  assert.equal(f.ecart?.sur, "repetitions");
+  assert.equal(f.ecart?.allureCibleSec, 200, "la cible n'est pas celle que la montre affichait");
+  assert.equal(f.ecart?.ecartSec, 2, "écart moyen faux (202 contre 200)");
+  assert.equal(f.ecart?.repsPrevues, 6);
+  assert.equal(f.ecart?.dansLaFourchette, 6, `les six sont à moins de ${FOURCHETTE_ALLURE_SEC} s/km de la cible`);
+  // Une répétition hors fourchette ne compte pas.
+  const lente = faitsDeSeance(SEANCE, { fcMax: 212 }, [], PREVU_6x1000,
+    { liste: SERIE_6x1000.map((x) => (x.average_speed === v(206) ? { ...x, average_speed: v(215) } : x)) });
+  assert.equal(lente.ecart?.dansLaFourchette, 5, "une répétition à +15 s/km est comptée dans la cible");
+});
+
+test("ce qu'on ne sait pas se dit : intervalles illisibles, série introuvable, ou rien demandé (Starter)", () => {
+  const illisible = faitsDeSeance(SEANCE, { fcMax: 212 }, [], PREVU_6x1000, "illisible");
+  assert.equal(illisible.ecart, null, "un écart inventé sans les répétitions");
+  assert.ok(illisible.manques.some((m) => /répétitions n'a pas pu être lu/.test(m)), "l'illisibilité n'est pas signalée");
+  const introuvable = faitsDeSeance(SEANCE, { fcMax: 212 }, [], PREVU_6x1000, { liste: [] });
+  assert.ok(introuvable.manques.some((m) => /aucune série de répétitions reconnue/.test(m) && /ne suppose pas/.test(m)), "une série introuvable devient un fractionné « pas fait »");
+  const starter = faitsDeSeance(SEANCE, { fcMax: 212 }, [], PREVU_6x1000);
+  assert.equal(starter.ecart, null);
+  assert.equal(starter.repetitions, null);
+  assert.ok(!starter.manques.some((m) => /répétitions|corps de/.test(m)), "Starter reçoit un « inconnu » sur ce qu'il n'a pas demandé");
+});
+
+test("footing : l'allure de toute la séance face à la cible ; plusieurs allures prévues : on ne compare pas", () => {
+  const footing = { ...SEANCE, distance_km: 10, duration_seconds: 3000, avg_pace_min_km: 5, gap_min_km: null };
+  const f = faitsDeSeance(footing, { fcMax: 212 }, [], { type: "Endurance", titre: "Footing", detail: "Échauffement 10 min → Corps : 50 min en Z2 à ~5'05/km → Retour au calme 5 min." }, { liste: [] });
+  assert.equal(f.ecart?.sur, "seance");
+  assert.equal(f.ecart?.ecartSec, -5, "5'00 pour 5'05 prévus : 5 s/km plus vite");
+  const ambigu = faitsDeSeance(footing, { fcMax: 212 }, [], { type: "Sortie longue", titre: "SL", detail: "Corps : 24 km en Z2 à ~5'05/km, dont les 5 derniers km à ~4'05/km." }, { liste: [] });
+  assert.equal(ambigu.ecart, null, "deux allures prévues : la comparaison choisit au hasard");
+});
+
+test("over-under : la cible est la moyenne des deux allures, et deux répétitions prévues suffisent", () => {
+  const prevu = { type: "Seuil", titre: "Séance au seuil", detail: "Échauffement 20 min → Corps : Over-under : 2×5 min en alternant 1 min à ~3'57/km (sous-seuil) / 1 min à ~3'49/km (au seuil), récup 3 min → Retour au calme 10 min FC Z1." };
+  const liste: IntervalleIcu[] = [
+    { zone: 2, average_speed: v(320), moving_time: 1200 },
+    { zone: 4, average_speed: v(233), moving_time: 300, average_heartrate: 178 },
+    { zone: 2, average_speed: v(400), moving_time: 180 },
+    { zone: 4, average_speed: v(231), moving_time: 300, average_heartrate: 181 },
+    { zone: 1, average_speed: v(360), moving_time: 600 },
+  ];
+  const f = faitsDeSeance(SEANCE, { fcMax: 212 }, [], prevu, { liste });
+  assert.equal(f.ecart?.sur, "repetitions", "une série de deux répétitions prévues n'est pas reconnue");
+  assert.equal(f.ecart?.allureCibleSec, 233, "la cible d'un over-under est la moyenne pondérée des deux allures (3'53)");
+  assert.deepEqual(f.ecart?.alternance, [237, 229]);
+  assert.equal(f.ecart?.dansLaFourchette, null, "une répétition entière jugée contre l'une des deux fourchettes");
+  assert.equal(f.ecart?.ecartSec, -1);
+});
+
+test("répétitions prévues, effort continu couru à la place : on le dit, on ne juge pas le fractionné", () => {
+  // Cas réel du 21/09/2026 : over-under 2×5 min prévu, 62 min d'effort continu relevées.
+  const prevu = { type: "Seuil", titre: "Séance au seuil", detail: "Corps : Over-under : 2×5 min en alternant 1 min à ~4'02/km (sous-seuil) / 1 min à ~3'54/km (au seuil), récup 3 min." };
+  const liste: IntervalleIcu[] = [{ zone: 2, average_speed: v(300), moving_time: 1200 }, { zone: 3, average_speed: v(238), moving_time: 3720, average_heartrate: 172 }];
+  const f = faitsDeSeance(SEANCE, { fcMax: 212 }, [], prevu, { liste });
+  assert.equal(f.ecart?.sur, "bloc");
+  assert.equal(f.ecart?.repsPrevues, 2);
+  assert.equal(f.ecart?.blocMin, 62);
+  assert.ok(!f.manques.some((m) => /aucune série/.test(m)), "on prétend ignorer ce qui a été couru alors que le bloc est relevé");
+  assert.match(codeAnalyse(), /au lieu des \$\{e\.repsPrevues\} répétitions prévues[\s\S]{0,400}?ne juge pas le fractionné/, "le modèle juge un fractionné qui n'a pas été couru");
+});
+
+test("la zone visée : celle du corps de séance, et le temps passé au-dessus", () => {
+  const footing = { ...SEANCE, hr_zone_seconds: [600, 2400, 300, 120, 0] };
+  const prevu = { type: "Endurance", titre: "Footing", detail: "Échauffement 10 min progressif FC Z1→Z2 → Corps : 50 min en Z2 à ~5'05/km → Retour au calme 5 min FC Z1." };
+  const f = faitsDeSeance(footing, { fcMax: 212 }, [], prevu, { liste: [] });
+  assert.deepEqual(f.zoneVisee, { zone: 2, minutesDans: 40, minutesAuDessus: 7, minutesTotal: 57 });
+  assert.equal(faitsDeSeance(footing, { fcMax: 212 }, [], PREVU_6x1000, { liste: [] }).zoneVisee, null, "une zone inventée pour un fractionné qui n'en prescrit pas");
+  assert.equal(faitsDeSeance(footing, { fcMax: 212 }, [], prevu).zoneVisee, null, "Starter reçoit la zone visée, réservée à l'analyse complète");
+});
+
+test("seuil : le corps de séance face à sa cible, jamais la moyenne avec l'échauffement", () => {
+  const prevu = { type: "Seuil", titre: "Seuil", detail: "Échauffement 20 min → Corps : 20 min à 4'10/km → Retour au calme 10 min." };
+  const f = faitsDeSeance(SEANCE, { fcMax: 212 }, [], prevu, { liste: [{ zone: 2, average_speed: v(320), moving_time: 900 }, { zone: 3, average_speed: v(245), moving_time: 1200, average_heartrate: 175 }] });
+  assert.equal(f.ecart?.sur, "bloc");
+  assert.equal(f.ecart?.ecartSec, -5);
+  assert.equal(f.ecart?.blocMin, 20);
+  const sansBloc = faitsDeSeance(SEANCE, { fcMax: 212 }, [], prevu, { liste: [] });
+  assert.equal(sansBloc.ecart, null, "la moyenne de la séance comparée à la cible du seuil");
+  assert.ok(sansBloc.manques.some((m) => /corps de la séance n'a pas pu être isolé/.test(m)));
+});
+
+test("le branchement : intervalles lus pour Premium seulement, clé jamais renvoyée, une seule détection", () => {
+  const src = codeAnalyse();
+  assert.match(src, /const intervalles = complet\s*\?\s*\(s\.external_id && creds \? await intervallesDeSeance\(String\(s\.external_id\), creds\.apiKey\) : "illisible" as const\)\s*:\s*undefined;/,
+    "les intervalles sont lus pour Starter, ou leur absence n'est plus dite");
+  assert.ok(src.indexOf("const intervalles = complet") > src.indexOf(`exigeAcces(supabase, user.id, "ia")`), "intervals.icu est appelé avant le contrôle du quota");
+  assert.match(src, /detail: p\.data\?\.subtitle \?\? p\.body \?\? null/, "la séance prévue n'est plus transmise en entier");
+  assert.ok((src.match(/const COLS = "([^"]+)"/)?.[1] ?? "").split(",").includes("external_id"), "l'identifiant d'activité n'est plus lu");
+  // La clé ne sert qu'à l'appel : elle n'apparaît dans aucune réponse.
+  for (const m of src.matchAll(/NextResponse\.json\(([^;]*)\);/g)) assert.ok(!/creds|intervals_api_key|apiKey/.test(m[1]), "une réponse contient la clé intervals.icu");
+  const perf = codeOf("src/lib/intervals/performance.ts");
+  assert.match(perf, /async function analyseQualityExecution[\s\S]*?const serie = serieDeRepetitions\(j\.icu_intervals \?\? \[\]\)/, "le coach et l'analyse n'ont plus la même définition d'une répétition");
+  const montre = codeOf("src/lib/watch/intervals.ts");
+  assert.equal((montre.match(/paceSec - FOURCHETTE_ALLURE_SEC/g) ?? []).length, 2, "la montre n'affiche plus la fourchette que l'analyse juge");
+});
+
+console.log("\nLE CONTEXTE DU JOUR, LE RESSENTI, LA PROGRESSION, LE TRAIL (Premium, 31/10/2026)");
+
+const FACILE: SeanceBrute = { ...SEANCE, date: "2026-08-24", distance_km: 10, duration_seconds: 3000, avg_pace_min_km: 5, gap_min_km: null, avg_hr: 145, max_hr: 160, hr_zone_seconds: [600, 2400, 0, 0, 0] };
+const CTX = { ressenti: { rpe: 8 }, nuit: { score: 58, minutes: 330 }, vfc: { matin: 58, base: 71 }, forme: { tsb: -14, ctl: 52, atl: 66 } };
+
+test("ressenti : un 8/10 sur un footing que la FC dit facile est un signal de fatigue", () => {
+  const f = faitsDeSeance(FACILE, { fcMax: 212 }, [], null, { liste: [] }, CTX);
+  assert.equal(f.intensite, "facile");
+  assert.equal(f.contexte?.signalRessenti, "fatigue");
+  assert.deepEqual(f.contexte?.vfc, { matin: 58, base: 71 });
+  // Un 2/10 sur une séance que la FC dit dure : l'autre contradiction.
+  assert.equal(faitsDeSeance(SEANCE, { fcMax: 212 }, [], null, { liste: [] }, { ...CTX, ressenti: { rpe: 2 } }).contexte?.signalRessenti, "facilite");
+  // Un ressenti cohérent ne déclenche rien.
+  assert.equal(faitsDeSeance(FACILE, { fcMax: 212 }, [], null, { liste: [] }, { ...CTX, ressenti: { rpe: 4 } }).contexte?.signalRessenti, null);
+});
+
+test("contexte : ce qui manque est dit ; Starter (rien demandé) n'a ni contexte ni « inconnu »", () => {
+  const f = faitsDeSeance(FACILE, { fcMax: 212 }, [], null, { liste: [] }, { ressenti: null, nuit: null, vfc: null, forme: null });
+  for (const motif of [/aucun ressenti/, /sommeil de la nuit précédente non mesuré/, /VFC du matin non mesurée/, /fraîcheur du jour inconnue/, /humidité non mesurée/]) {
+    assert.ok(f.manques.some((m) => motif.test(m)), `manque non dit : ${motif}`);
+  }
+  const starter = faitsDeSeance(FACILE, { fcMax: 212 });
+  assert.equal(starter.contexte, null);
+  assert.ok(!starter.manques.some((m) => /sommeil|VFC|ressenti|humidité/.test(m)), "Starter reçoit des « inconnus » sur ce qu'il n'a pas demandé");
+});
+
+test("progression : à intensité égale et distance proche, l'efficacité face à la médiane des 12 semaines", () => {
+  const sembl = (date: string, fc = 146) => ({ date, sport: "run", distance_km: 10, duration_seconds: 3120, avg_hr: fc, max_hr: 160 });
+  const comparables = [sembl("2026-08-10"), sembl("2026-07-30"), sembl("2026-07-15"), sembl("2026-06-20"),
+    sembl("2026-04-01"), /* hors des 12 semaines */ sembl("2026-08-12", 190) /* séance dure, pas comparable */];
+  const f = faitsDeSeance(FACILE, { fcMax: 212 }, comparables, null, { liste: [] });
+  assert.deepEqual(f.progression, { classe: "facile", n: 4, ecartPct: 5 }, "200 m/min à 145 contre 192 m/min à 146 : +5 %");
+  assert.equal(faitsDeSeance(FACILE, { fcMax: 212 }, comparables.slice(0, 2), null, { liste: [] }).progression, null, "une progression annoncée sur deux séances");
+  assert.equal(faitsDeSeance(FACILE, { fcMax: 212 }, comparables).progression, null, "Starter reçoit la progression, réservée à l'analyse complète");
+});
+
+// Un parcours de 9 km : 2 km de plat à 100 m, une montée de 200 m sur 2 km en 20 min, une
+// descente de 180 m sur 2 km en 9 min, puis du plat — avec ±2 m de bruit GPS à chaque point.
+function parcours(): import("../src/lib/intervals/performance").FluxSeance {
+  const temps: number[] = [], distance: number[] = [], altitude: number[] = [], fc: number[] = [];
+  let t = 0;
+  for (let d = 0; d <= 9000; d += 10) {
+    const [alt, vit] = d < 2000 ? [100, 3.5] : d < 4000 ? [100 + (d - 2000) * 0.1, 2000 / 1200] : d < 6000 ? [300 - (d - 4000) * 0.09, 2000 / 540] : [120, 3.5];
+    temps.push(Math.round(t)); distance.push(d); altitude.push(alt + (d % 20 === 0 ? 2 : -2)); fc.push(d >= 2000 && d < 4000 ? 172 : 150);
+    t += 10 / vit;
+  }
+  return { temps, distance, altitude, fc };
+}
+
+test("trail : vitesse ascensionnelle sur les MONTÉES seulement, allure en descente, bruit GPS ignoré", () => {
+  const t = analyseTrail(parcours())!;
+  assert.equal(t.montees.nombre, 1);
+  assert.ok(Math.abs(t.montees.dPlus - 200) <= 10, `D+ de la montée faux : ${t.montees.dPlus}`);
+  assert.ok(Math.abs((t.montees.vam ?? 0) - 600) <= 45, `vitesse ascensionnelle fausse : ${t.montees.vam} m/h pour 200 m en 20 min`);
+  assert.equal(t.montees.fc, 172);
+  assert.equal(t.descentes.nombre, 1);
+  assert.ok(Math.abs((t.descentes.allureSec ?? 0) - 270) <= 20, `allure de descente fausse : ${t.descentes.allureSec}`);
+  // Du plat bruité ne fait ni montée ni descente.
+  const plat = parcours(); plat.altitude = plat.altitude.map((_, i) => 100 + (i % 2 ? 2 : -2));
+  assert.equal(analyseTrail(plat), null, "le bruit du GPS fabrique des montées");
+  // De VRAIES petites bosses (12 m tous les 400 m, des ponts, un faux plat) : en dessous de
+  // 30 m de dénivelé, ce ne sont pas des montées qu'on chronomètre.
+  const bosses = parcours(); bosses.altitude = bosses.distance.map((d) => 100 + 12 * Math.abs(((d % 400) / 200) - 1));
+  assert.equal(analyseTrail(bosses), null, "des bosses de 12 m comptées comme des montées");
+  // Dans les faits : demandé et lu, demandé et illisible, ou pas demandé.
+  assert.ok(faitsDeSeance(FACILE, {}, [], null, undefined, undefined, parcours()).trail);
+  assert.ok(faitsDeSeance(FACILE, {}, [], null, undefined, undefined, "illisible").manques.some((m) => /flux d'altitude/.test(m)));
+  assert.equal(faitsDeSeance(FACILE, {}).trail, null);
+});
+
+test("branchement : contexte et flux lus pour l'analyse complète seulement, le ressenti de CETTE séance", () => {
+  const src = codeAnalyse();
+  assert.match(src, /const contexte: ContexteSeance \| undefined = complet \? await/, "le contexte du jour est lu pour Starter");
+  assert.match(src, /const trailLike = complet && dplus >= 150/, "les flux sont lus pour Starter ou pour une sortie plate");
+  assert.match(src, /fbs\.find\(\(d\) => d\.workout_id === workoutId\) \?\? \(fbs\.length === 1 && !fbs\[0\]\.workout_id \? fbs\[0\] : null\)/,
+    "le ressenti d'une autre séance du même jour serait attribué à celle-ci");
+  assert.match(src, /computeLoad\(charge, decaleJour\(jourSeance, -1\)\)/, "la fraîcheur n'est plus celle de la veille, avec le modèle du tableau de bord");
 });
 
 console.log(`\n${passed} test(s) d'analyse passé(s), ${fails.length} échec(s)`);

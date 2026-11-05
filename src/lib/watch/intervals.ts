@@ -208,10 +208,14 @@ function zoneStep(durMin: number, zone: number, vmaKmh: number | null, label: st
   // → on monte/descend en température par la FC, pas en visant un chrono.
   if (hrOnly) return `- ${d}m Z${zone} HR ${label}`;
   let range: string | null = null;
-  if (paceSec && paceSec > 0) range = `${fmtPace(Math.max(120, paceSec - 8))}-${fmtPace(paceSec + 8)}`;
+  if (paceSec && paceSec > 0) range = `${fmtPace(Math.max(120, paceSec - FOURCHETTE_ALLURE_SEC))}-${fmtPace(paceSec + FOURCHETTE_ALLURE_SEC)}`;
   else if (vmaKmh) range = zonePaceRange(vmaKmh, zone);
   return range ? `- ${d}m ${range} pace ${label}` : `- ${d}m Z${zone} HR ${label}`;
 }
+
+/** La fourchette d'allure que la montre affiche autour d'une cible (± s/km). L'analyse
+ *  d'une séance juge « dans la cible » avec la MÊME fourchette que l'athlète voyait au poignet. */
+export const FOURCHETTE_ALLURE_SEC = 8;
 
 // Extrait l'allure prescrite d'un texte de séance : « 4'20/km », « 4:20/km », « à 4'20 ».
 export function parsePaceSec(text: string): number | null {
@@ -304,7 +308,7 @@ function repSteps(b: RepBlock, vmaKmh: number | null, zone: number, hill?: boole
   const fmt = (sec: number) => (sec % 60 === 0 ? `${sec / 60}m` : `${sec}s`);
   // En côte, une allure au km n'a aucun sens : on pilote à la fréquence cardiaque.
   const range = hill ? `Z${zone} HR` : b.paceSec
-    ? `${fmtPace(Math.max(120, b.paceSec - 8))}-${fmtPace(b.paceSec + 8)} pace`
+    ? `${fmtPace(Math.max(120, b.paceSec - FOURCHETTE_ALLURE_SEC))}-${fmtPace(b.paceSec + FOURCHETTE_ALLURE_SEC)} pace`
     : (vmaKmh ? `${zonePaceRange(vmaKmh, zone)} pace` : `Z${zone} HR`);
   const out: string[] = [];
   const rangeAt = (sec: number) => `${fmtPace(Math.max(120, sec - 6))}-${fmtPace(sec + 6)} pace`;

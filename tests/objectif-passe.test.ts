@@ -25,7 +25,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildAthleteContext } from "../src/lib/ai/coachContext";
 import { longRunGap } from "../src/lib/running/volume";
-import { apresCourse, joursSansIntensite, JOURS_MAX, partVolumeDuJour, facteurVolumeApresCourse } from "../src/lib/coach/apresCourse";
+import { apresCourse, joursSansIntensite, joursDeRecuperation, JOURS_MAX, partVolumeDuJour, facteurVolumeApresCourse } from "../src/lib/coach/apresCourse";
 import { buildWeekPlan } from "../src/lib/ai/autoPlan";
 import { etatDouble } from "../src/lib/coach/doubleSessions";
 import type { AthleteContext } from "../src/lib/ai/coachContext";
@@ -113,25 +113,36 @@ async function main() {
     assert.match(longRunGap(12, 32, 42.2) ?? "", /PRÉPARATION INSUFFISANTE/);
   });
 
-  console.log("\nAPRÈS LA COURSE — un jour facile par mile couru");
+  console.log("\nAPRÈS LA COURSE — Daniels pour l'intensité, Pfitzinger pour le reste (Cyprien, 05/11 : « c'est 2 semaines »)");
 
-  await test("la durée suit la distance : 26 jours après un marathon, 13 après un semi, 6 après un 10 km", () => {
-    assert.equal(joursSansIntensite(42.195), 26);
-    assert.equal(joursSansIntensite(21.1), 13);
-    assert.equal(joursSansIntensite(10), 6);
-    assert.equal(joursSansIntensite(5), 3);
+  await test("deux durées : 14 jours sans intensité après un marathon, 26 de récupération en tout", () => {
+    // Daniels : un jour facile par tranche de 3 km courus. Aucune intensité ces jours-là.
+    assert.equal(joursSansIntensite(42.195), 14, "le calendrier refuse encore l'intensité au-delà de deux semaines");
+    assert.equal(joursSansIntensite(21.1), 7);
+    assert.equal(joursSansIntensite(10), 3);
+    assert.equal(joursSansIntensite(5), 2);
     assert.equal(joursSansIntensite(1.5), 1, "une course très courte doit au moins laisser le lendemain");
+    // Foster / Pfitzinger : un jour par mile avant l'entraînement complet (volume, VMA, course).
+    assert.equal(joursDeRecuperation(42.195), 26);
+    assert.equal(joursDeRecuperation(21.1), 13);
+    assert.equal(joursDeRecuperation(10), 6);
+    assert.equal(joursDeRecuperation(5), 3);
+    assert.equal(joursDeRecuperation(1.5), 1);
     // Au-delà du marathon, le plafond assumé : pas deux mois sans intensité après un 100 km.
     assert.equal(joursSansIntensite(100), JOURS_MAX);
+    assert.equal(joursDeRecuperation(100), JOURS_MAX);
   });
 
   const LILLE = { nom: "Marathon International de Lille", date: ilYa(5), distanceKm: 42.2 };
-  await test("cinq jours après un marathon COURU : footings seulement, et la date de reprise", () => {
+  await test("cinq jours après un marathon COURU : footings seulement, reprise au 15ᵉ jour, retour à la normale au 27ᵉ", () => {
     const r = apresCourse({ course: LILLE, sorties: [{ date: ilYa(5), distanceKm: 42.5 }], aujourdhui: AUJOURDHUI });
     assert.ok(r, "aucune récupération cinq jours après un marathon couru");
     assert.equal(r!.joursDepuis, 5);
-    // Reprise au 27ᵉ jour : les jours J+1 à J+26 restent faciles.
-    assert.equal(r!.reprise, ilYa(5 - 27));
+    assert.equal(r!.phase, "sans-intensite");
+    // J+1 à J+14 sans intensité : la qualité peut revenir le 15ᵉ jour.
+    assert.equal(r!.reprise, ilYa(5 - 15), "la reprise n'est plus au 15ᵉ jour");
+    // J+15 à J+26 en reprise : l'entraînement normal revient le 27ᵉ jour.
+    assert.equal(r!.fin, ilYa(5 - 27), "l'entraînement normal ne revient plus au 27ᵉ jour");
   });
 
   await test("une course non courue n'impose aucune récupération", () => {
@@ -143,28 +154,46 @@ async function main() {
       "une sortie du LENDEMAIN est prise pour la course");
   });
 
-  await test("la fenêtre se referme : rien le jour même, rien après le dernier jour facile", () => {
-    const couru = (n: number) => apresCourse({
-      course: { ...LILLE, date: ilYa(n) }, sorties: [{ date: ilYa(n), distanceKm: 42.5 }], aujourdhui: AUJOURDHUI,
-    });
+  const couru = (n: number) => apresCourse({
+    course: { ...LILLE, date: ilYa(n) }, sorties: [{ date: ilYa(n), distanceKm: 42.5 }], aujourdhui: AUJOURDHUI,
+  });
+  await test("la fenêtre se referme : rien le jour même, rien après le dernier jour de récupération", () => {
     assert.equal(couru(0), null, "le jour de la course est déjà traité comme une récupération");
-    assert.ok(couru(26), "le 26ᵉ jour, dernier jour facile, a perdu sa récupération");
+    assert.ok(couru(26), "le 26ᵉ jour, dernier jour de récupération, a perdu sa récupération");
     assert.equal(couru(27), null, "la récupération ne se referme jamais");
   });
 
-  await test("la récupération l'emporte sur tous les planchers du budget de qualité", () => {
-    // Athlète frais, préparation en cours : sans la récupération, le plancher « objectif »
-    // garantit au moins une séance. Après une course, plus rien ne doit la ramener.
-    const entree = {
-      level: "confirme" as const, goal: "marathon" as const, phase: "DÉVELOPPEMENT", noHistory: false, pains: [],
-      hrvDown: false, hrvUp: false, badNight: false, acr: 1.0, tsb: 0, rpeHigh: false, rpeAvg: null,
-      hardTimePct: null, fadeSec: null, plateau: false, noMaxEffort: false, runYears: 5,
-      weightLossMaxQuality: null, hasObjective: true, daysToRace: 72, isShortGoal: true,
-    };
-    assert.ok(computeQualityBudget(entree).qBudget >= 1, "précondition : l'athlète frais n'a déjà plus de qualité");
-    const r = computeQualityBudget({ ...entree, apresCourse: "récupération après le marathon" });
+  await test("la reprise commence le 15ᵉ jour et dure jusqu'au 26ᵉ", () => {
+    assert.equal(couru(14)?.phase, "sans-intensite", "le 14ᵉ jour, dernier jour sans intensité, autorise déjà la qualité");
+    assert.equal(couru(15)?.phase, "reprise", "le 15ᵉ jour n'ouvre pas la reprise");
+    assert.equal(couru(26)?.phase, "reprise");
+  });
+
+  // Athlète frais, préparation en cours : sans la récupération, le plancher « objectif »
+  // lui garantit DEUX séances (objectif court, aucun motif d'allègement).
+  const FRAIS = {
+    level: "confirme" as const, goal: "marathon" as const, phase: "DÉVELOPPEMENT", noHistory: false, pains: [] as string[],
+    hrvDown: false, hrvUp: false, badNight: false, acr: 1.0, tsb: 0, rpeHigh: false, rpeAvg: null,
+    hardTimePct: null, fadeSec: null, plateau: false, noMaxEffort: false, runYears: 5,
+    weightLossMaxQuality: null, hasObjective: true, daysToRace: 72, isShortGoal: true,
+  };
+  await test("avant la reprise, la récupération l'emporte sur tous les planchers du budget de qualité", () => {
+    assert.ok(computeQualityBudget(FRAIS).qBudget >= 1, "précondition : l'athlète frais n'a déjà plus de qualité");
+    const r = computeQualityBudget({ ...FRAIS, apresCourse: { motif: "récupération après le marathon", reprise: false } });
     assert.equal(r.qBudget, 0, `${r.qBudget} séance(s) de qualité pendant la récupération`);
     assert.ok(r.easeReasons.includes("récupération après le marathon"), "la raison n'est pas donnée au coach");
+  });
+
+  await test("la reprise rend UNE séance au plus, et ne relève jamais un budget tombé à zéro", () => {
+    assert.ok(computeQualityBudget(FRAIS).qBudget >= 2, "précondition : l'athlète frais a moins de deux qualités, le plafond n'est plus exercé");
+    const r = computeQualityBudget({ ...FRAIS, apresCourse: { motif: "reprise après le marathon", reprise: true } });
+    assert.equal(r.qBudget, 1, `${r.qBudget} séance(s) de qualité en reprise`);
+    assert.ok(r.easeReasons.includes("reprise après le marathon"), "la raison n'est pas donnée au coach");
+    // Douleur, VFC en baisse et mauvaise nuit : le corps a le dernier mot, la reprise attend.
+    const use = { ...FRAIS, pains: ["mollet"], hrvDown: true, badNight: true };
+    assert.equal(computeQualityBudget(use).qBudget, 0, "précondition : l'athlète fatigué garde de la qualité");
+    assert.equal(computeQualityBudget({ ...use, apresCourse: { motif: "reprise", reprise: true } }).qBudget, 0,
+      "la reprise relève une qualité que la douleur avait retirée");
   });
 
   console.log("\nLE CONTEXTE DU COACH");
@@ -185,6 +214,37 @@ async function main() {
     assert.equal(ctx.weekPlan.qBudget, 0, `${ctx.weekPlan.qBudget} séance(s) de qualité à J+5 d'un marathon`);
     const motif = ctx.readiness.reasons.find((r) => /récupération après Marathon International de Lille \(J\+5\)/.test(r));
     assert.ok(motif, `le bandeau ne dit pas pourquoi : ${JSON.stringify(ctx.readiness.reasons)}`);
+  });
+
+  /** Les séances, avec le marathon de Lille couru il y a `n` jours à la place de la sortie de ce jour-là. */
+  const avecMarathon = (n: number) => [...SEANCES.filter((x) => x.date !== ilYa(n)),
+    { ...SEANCES[0], date: ilYa(n), type: "race", distance_km: 42.5, duration_seconds: 9720, tss: 260 }];
+
+  await test("onze jours après : la reprise tombe dans la semaine, un seuil posé à partir du 15ᵉ jour, jamais avant", async () => {
+    // Le cas de Cyprien le 05/11/2026 : « pas de séance de qualité avant fin novembre ».
+    const ctx = await contexte(MARATHON(ilYa(11)), { seances: avecMarathon(11) });
+    assert.equal(ctx.weekPlan.qBudget, 1, `${ctx.weekPlan.qBudget} séance(s) de qualité la semaine de la reprise`);
+    assert.equal(ctx.weekPlan.quality[0]?.type, "Seuil", `la reprise commence par : ${ctx.weekPlan.quality[0]?.type}`);
+    assert.equal(ctx.weekPlan.reprise, true, "la séance n'est pas marquée comme la reprise");
+    assert.equal(ctx.weekPlan.qualiteDes, 4, `reprise dans ${ctx.weekPlan.qualiteDes} jour(s) au lieu de 4`);
+    // Tous les jours disponibles : la place ne manque pas, seule la reprise décide du jour.
+    const plan = buildWeekPlan({ ...ctx, availability: { daysPerWeek: 6, days: [0, 1, 2, 3, 4, 5, 6] } }, new Date());
+    const qualites = plan.map((j, i) => ({ j, i })).filter(({ j }) => /VMA|Seuil|Spécifique/.test(j.type));
+    assert.equal(qualites.length, 1, `${qualites.length} séance(s) de qualité au plan : ${plan.map((j) => j.type).join(", ")}`);
+    assert.ok(qualites[0].i >= 4, `séance de qualité au jour ${qualites[0].i}, avant la reprise (jour 4)`);
+    assert.match(qualites[0].j.title, /\(reprise\)$/, `titre : ${qualites[0].j.title}`);
+    assert.match(qualites[0].j.why, /^Reprise après Marathon International de Lille/, `pourquoi : ${qualites[0].j.why}`);
+    assert.ok(!/coupe le nombre de répétitions/.test(qualites[0].j.detail), "la séance, déjà courte, est coupée une seconde fois");
+  });
+
+  await test("seize jours après : la reprise est en cours, un seuil dès aujourd'hui, et le bandeau le dit", async () => {
+    const ctx = await contexte(MARATHON(ilYa(16)), { seances: avecMarathon(16) });
+    assert.equal(ctx.recuperation?.phase, "reprise");
+    assert.equal(ctx.weekPlan.qBudget, 1, `${ctx.weekPlan.qBudget} séance(s) de qualité en reprise`);
+    assert.equal(ctx.weekPlan.quality[0]?.type, "Seuil");
+    assert.equal(ctx.weekPlan.qualiteDes, 0, "la reprise est repoussée alors qu'elle a commencé");
+    assert.ok(ctx.readiness.reasons.some((r) => /^reprise après Marathon International de Lille \(J\+16\) : une seule séance de qualité par semaine/.test(r)),
+      `le bandeau ne dit pas la reprise : ${JSON.stringify(ctx.readiness.reasons)}`);
   });
 
   await test("course passée mais non courue : pas de récupération inventée", async () => {
@@ -370,11 +430,16 @@ async function main() {
     assert.equal(ctx.objective?.race, "Sub 16 min sur 5 km", "précondition : le nouvel objectif est pris en compte");
     assert.equal(ctx.weekPlan.qBudget, 0, `${ctx.weekPlan.qBudget} séance(s) de qualité à J+5 du marathon, sous prétexte d'un nouvel objectif`);
     assert.ok(ctx.readiness.reasons.some((r) => /récupération après Marathon International de Lille \(J\+5\)/.test(r)), "le bandeau ne dit plus pourquoi");
-    // La feuille de route : rien avant la reprise (J+27), de la qualité ensuite.
-    const avant = ctx.macroPlan.filter((_, i) => i * 7 < 22);
-    const apres = ctx.macroPlan.filter((_, i) => i * 7 >= 22);
-    assert.ok(avant.length && avant.every((w) => w.quality.length === 0), `qualité annoncée pendant la récupération : ${avant.map((w) => w.quality.join("+")).join(" | ")}`);
-    assert.ok(apres.some((w) => w.quality.length > 0), "contre-épreuve : la qualité ne revient jamais après la récupération");
+    // La feuille de route : rien tant que la reprise (J+15) n'est pas dans la semaine, un seul
+    // seuil jusqu'à la fin de la récupération (J+27), la qualité normale ensuite.
+    const m = ctx.macroPlan;
+    assert.deepEqual(m[0]?.quality, [], `qualité annoncée la semaine J+5 → J+11 : ${m[0]?.quality.join("+")}`);
+    assert.ok([1, 2, 3].every((i) => m[i]?.quality.join("+") === "Seuil"),
+      `reprise mal annoncée : ${m.slice(1, 4).map((w) => w.quality.join("+")).join(" | ")}`);
+    assert.ok(m.slice(4).some((w) => w.quality.length > 0 && w.quality.join("+") !== "Seuil"),
+      "contre-épreuve : la qualité normale ne revient jamais après la récupération");
+    assert.match(m[0].focus, /^Récupération après Marathon International de Lille : footings seulement/);
+    assert.match(m[1].focus, /^Reprise après Marathon International de Lille : une séance courte au seuil/);
   });
 
   await test("l'e-mail de résultats et l'enregistrement de l'objectif suivent la course précédente", () => {
@@ -388,7 +453,7 @@ async function main() {
   await test("frais pendant la récupération : la phrase rappelle la récupération, pas une séance de qualité", () => {
     // Cyprien, 30/10/2026, J+5 du marathon : « Tu es frais — bon jour pour une séance de
     // qualité » en tête du tableau de bord, « pas d'intensité avant le 21 novembre » au calendrier.
-    const recup = { course: "Marathon International de Lille", reprise: "2026-11-21" };
+    const recup = { course: "Marathon International de Lille", reprise: "2026-11-09" };
     assert.deepEqual(phraseDuJour("top", { qBudget: 0, recuperation: recup }), { cle: "dash.ready.recup", recuperation: recup },
       "un athlète frais en récupération est encore invité à une séance de qualité");
     assert.equal(phraseDuJour("correct", { qBudget: 0, recuperation: recup }).cle, "dash.ready.recup");
@@ -409,7 +474,7 @@ async function main() {
     const ctx = await contexte(MARATHON(ilYa(5)), {
       seances: [...SEANCES, { ...SEANCES[0], date: ilYa(5), type: "race", distance_km: 42.5, duration_seconds: 9720, tss: 260 }],
     });
-    assert.deepEqual(ctx.recuperation, { course: "Marathon International de Lille", reprise: ilYa(5 - 27) },
+    assert.deepEqual(ctx.recuperation, { course: "Marathon International de Lille", reprise: ilYa(5 - 15), fin: ilYa(5 - 27), phase: "sans-intensite" },
       "le contexte du coach n'expose plus la récupération en cours");
     assert.match(codeNu("src/lib/ai/autoCoach.ts"), /recuperation: ctx\.recuperation \?\? null/, "le coach n'enregistre plus sa récupération");
     const page = codeNu("src/app/dashboard/page.tsx");
@@ -516,7 +581,10 @@ async function main() {
       `semaine 2 : ${enRecup.macroPlan[1].volumeKm} km au lieu de ~70 % de ${habitude}`);
     assert.ok(proche(enRecup.macroPlan[2].volumeKm, Math.round(habitude * 0.85)),
       `semaine 3 : ${enRecup.macroPlan[2].volumeKm} km au lieu de ~85 % de ${habitude}`);
-    assert.equal(enRecup.macroPlan[5].volumeKm, sansRecup.macroPlan[5].volumeKm, "la réduction déborde au-delà de la récupération");
+    // Au-delà de la récupération, plus de réduction : la semaine de course (même part
+    // d'affûtage des deux côtés) est identique avec ou sans le marathon.
+    const derniere = (c: typeof enRecup) => c.macroPlan[c.macroPlan.length - 1].volumeKm;
+    assert.equal(derniere(enRecup), derniere(sansRecup), "la réduction déborde au-delà de la récupération");
     assert.ok(enRecup.readiness.reasons.some((r) => /56 % de ton volume habituel cette semaine/.test(r)), "le bandeau ne dit pas la part du volume");
   });
 
@@ -549,6 +617,45 @@ async function main() {
     // Première semaine après la récupération : l'habitude, pas quatre semaines de progression d'un coup.
     assert.ok(Math.abs(enRecup.macroPlan[4].volumeKm - habitude) <= 1,
       `${enRecup.macroPlan[4].volumeKm} km la semaine de la reprise, au lieu de ~${habitude} (l'habitude)`);
+  });
+
+  await test("la séance de reprise est ÉCRITE courte — la montre lit le texte, pas une consigne de le couper", async () => {
+    // ~72 km par semaine : le plafond de Daniels (10 % du volume au seuil) ne rogne pas déjà
+    // la séance normale — sinon les deux dosages coïncideraient et rien ne serait vérifié.
+    const jours = Array.from({ length: 56 }, (_, i) => i + 1).filter((i) => i % 7 !== 0 && i !== 16);
+    const seances = [
+      ...jours.map((i) => ({ date: ilYa(i), type: "easy", sport: "run", distance_km: 12, duration_seconds: 3600, elevation_gain_m: 30,
+        avg_hr: 145, max_hr: 170, tss: 60, hr_zone_seconds: [600, 3000, 0, 0, 0] })),
+      { date: ilYa(16), type: "race", sport: "run", distance_km: 42.5, duration_seconds: 9720, elevation_gain_m: 80,
+        avg_hr: 168, max_hr: 182, tss: 260, hr_zone_seconds: [0, 1200, 6000, 2520, 0] },
+    ];
+    // Un semi : le seuil est en tête de son menu, il figure donc aussi dans la semaine normale.
+    const SEMI = { race: "Semi de Paris", raceDate: ilYa(-70), distanceKm: 21.1, targetTime: "1h15", targetSeconds: 4500, targetPace: "3'33/km" };
+    const objectif = (precedente: boolean) => ({ user_id: "u", type: "race_objective",
+      data: precedente ? { ...SEMI, precedente: { ...lilleCouru, raceDate: ilYa(16) } } : SEMI });
+    const enReprise = await contexte(objectif(true), { seances });
+    const normal = await contexte(objectif(false), { seances });
+    assert.equal(enReprise.recuperation?.phase, "reprise", "précondition : l'athlète n'est pas en reprise");
+    const seuilReprise = enReprise.weekPlan.quality[0];
+    const seuilNormal = normal.weekPlan.quality.find((q) => q.type === "Seuil");
+    assert.ok(seuilReprise?.type === "Seuil" && seuilNormal,
+      `précondition : reprise ${seuilReprise?.type}, semaine normale ${normal.weekPlan.quality.map((q) => q.type).join("+")}`);
+    // Minutes de travail : « N×M min » ou le premier « M min » d'un bloc continu.
+    const travail = (d: string) => {
+      const n = /(\d+)\s*×\s*(\d+) min/.exec(d);
+      return n ? Number(n[1]) * Number(n[2]) : Number(/(\d+) min/.exec(d)?.[1] ?? NaN);
+    };
+    // La position dans le bloc de quatre semaines, calculée comme le coach (semaine ISO).
+    const semaineDuBloc = (() => {
+      const d = new Date(Date.UTC(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()));
+      d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+      return Math.ceil(((d.getTime() - Date.UTC(d.getUTCFullYear(), 0, 1)) / 86400000 + 1) / 7) % 4;
+    })();
+    // Même jour, même gabarit tiré : seule la dose diffère. En semaine d'assimilation, la
+    // séance normale est déjà réduite — les deux doivent alors être identiques.
+    if (semaineDuBloc === 3) assert.equal(seuilReprise!.desc, seuilNormal!.desc);
+    else assert.ok(travail(seuilReprise!.desc) < travail(seuilNormal!.desc),
+      `reprise : « ${seuilReprise!.desc} » ; semaine normale : « ${seuilNormal!.desc} »`);
   });
 
   await test("pendant la récupération, le plan ne conseille plus de doubler les footings", () => {

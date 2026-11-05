@@ -47,7 +47,7 @@ const ENTREE: EntreeBilan = {
   vfc: [{ date: "2026-11-07", hrv_ms: 62 }, { date: "2026-10-25", hrv_ms: 70 }],
   fcMax: 200,
   objectif: { nom: "sub 16 min", date: "2026-12-19", distanceKm: 5, viseSec: 959, predictionSec: 978 },
-  recuperation: { course: "Marathon International de Lille", reprise: "2026-11-21" },
+  recuperation: { course: "Marathon International de Lille", reprise: "2026-11-09" },
   courses: [{ nom: "Semi de Bondues", date: "2026-11-08", distanceKm: 21.1 }, { nom: "Sub 16", date: "2026-12-19", distanceKm: 5 }],
 };
 
@@ -81,7 +81,7 @@ test("l'objectif : jours restants, chrono visé, prédiction, et la récupérati
   const l = lignesDuBilan(f);
   assert.match(l, /visé en 15'59/);
   assert.match(l, /16'18, soit 19 s plus lent que l'objectif/);
-  assert.match(l, /Récupération après Marathon International de Lille en cours : footings seulement, pas d'intensité avant le 21 novembre/);
+  assert.match(l, /Récupération après Marathon International de Lille en cours : footings seulement, pas d'intensité avant le 9 novembre/);
   assert.match(l, /Semaine du 2 novembre au 8 novembre/, "les dates sont servies en ISO : le modèle les recopie telles quelles");
   assert.match(l, /Course disputée cette semaine : Semi de Bondues, 15 km le 8 novembre/, "la course de la semaine n'est pas nommée");
   assert.match(l, /Dérive cardiaque moyenne \(sorties faciles[^)]*\) : 3,7 %/, "décimale à l'anglaise dans un texte français");
