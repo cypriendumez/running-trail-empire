@@ -32,7 +32,9 @@ export type Planned = { date: string; type: string; title: string; detail: strin
    *  montre. Une langue absente retombe sur le français, jamais sur du vide. */
   i18n?: Record<string, PlannedText> };
 export type CalNote = { id: string; date: string; text: string };
-export type CalRace = { id: string; date: string; name: string; location: string; distanceKm: number | null; isObjective?: boolean };
+export type CalRace = { id: string; date: string; name: string; location: string; distanceKm: number | null; isObjective?: boolean;
+  /** Priorité dans la saison (`lib/coach/saison`) ; l'objectif déclaré est toujours A. */
+  priorite?: "A" | "B" | "C" };
 
 /**
  * Explication du plan de la semaine, sérialisée par le coach autonome AU MOMENT où il
@@ -129,7 +131,8 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
   const [races, setRaces] = useState<CalRace[]>(racesProp);
   const [adding, setAdding] = useState<null | "note" | "race">(null);
   const [noteText, setNoteText] = useState("");
-  const [race, setRace] = useState({ name: "", location: "", distanceKm: "" });
+  // Priorité par défaut : C — noter une course ne doit rien bouleverser (lib/coach/saison).
+  const [race, setRace] = useState({ name: "", location: "", distanceKm: "", priorite: "C" as "A" | "B" | "C" });
   const [busy, setBusy] = useState(false);
   /** Créneau affiché quand la journée est doublée (0 = matin, 1 = soir). Remis à zéro
    *  à chaque changement de jour : garder l'index du jour précédent afficherait le soir
@@ -159,7 +162,7 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
     }, 250);
   };
   const pickRace = (s: { name: string; city: string; distanceKm: number | null }) => {
-    setRace({ name: s.name, location: s.city || "", distanceKm: s.distanceKm != null ? String(s.distanceKm) : "" });
+    setRace((r) => ({ ...r, name: s.name, location: s.city || "", distanceKm: s.distanceKm != null ? String(s.distanceKm) : "" }));
     setSuggest([]);
   };
 
@@ -239,7 +242,7 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
   const plainSingle = detail && detail.mode === "plain" ? detail.text : null;
 
   const openDay = (key: string) => {
-    setSel(key); setAdding(null); setNoteText(""); setRace({ name: "", location: "", distanceKm: "" }); setSuggest([]);
+    setSel(key); setAdding(null); setNoteText(""); setRace({ name: "", location: "", distanceKm: "", priorite: "C" }); setSuggest([]);
     setMomentIdx(0);   // on ouvre toujours sur la première séance du jour
     // Si le jour a une séance, on remonte vers le hero pour y afficher son détail.
     if ((coachByDate[key] ?? []).length) heroRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -251,23 +254,36 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
     setBusy(true);
     try {
       const payload = adding === "race"
-        ? { date: sel, kind: "race", name: race.name, location: race.location, distanceKm: race.distanceKm }
+        ? { date: sel, kind: "race", name: race.name, location: race.location, distanceKm: race.distanceKm, priorite: race.priorite }
         : { date: sel, kind: "note", text: noteText };
       const r = await fetch("/api/calendar-entry", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const j = await r.json();
       if (!j.ok) { toast.error(j.error || t("cal.toast.failed")); return; }
       if (adding === "race") {
-        setRaces((rs) => [...rs, { id: j.id, date: sel, name: race.name, location: race.location, distanceKm: race.distanceKm ? Number(race.distanceKm) : null }]);
+        setRaces((rs) => [...rs, { id: j.id, date: sel, name: race.name, location: race.location, distanceKm: race.distanceKm ? Number(race.distanceKm) : null, priorite: race.priorite }]);
         toast.success(t("cal.toast.raceAdded"));
       } else {
         setNotes((ns) => [...ns, { id: j.id, date: sel, text: noteText }]);
         toast.success(t("cal.toast.noteAdded"));
       }
-      setAdding(null); setNoteText(""); setRace({ name: "", location: "", distanceKm: "" }); setSuggest([]);
+      setAdding(null); setNoteText(""); setRace({ name: "", location: "", distanceKm: "", priorite: "C" }); setSuggest([]);
     } catch { toast.error(t("cal.toast.saveFailed")); }
     finally { setBusy(false); }
   };
 
+  // Priorité d'une course notée (lib/coach/saison) : le serveur régénère le plan.
+  const changerPriorite = async (id: string, priorite: "A" | "B" | "C") => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const r = await fetch("/api/calendar-entry", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, priorite }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) { toast.error(j.error || t("cal.toast.failed")); return; }
+      setRaces((rs) => rs.map((x) => (x.id === id ? { ...x, priorite } : x)));
+      toast.success(t("cal.toast.prioOk"));
+    } catch { toast.error(t("cal.toast.failed")); }
+    finally { setBusy(false); }
+  };
   const del = async (id: string, kind: "note" | "race") => {
     try {
       const r = await fetch(`/api/calendar-entry?id=${id}`, { method: "DELETE" });
@@ -582,6 +598,18 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
                   <div>
                     <div className="font-bold text-zinc-900">{r.name}</div>
                     <div className="text-xs text-zinc-500">{[r.location, r.distanceKm != null ? fmtDistance(r.distanceKm, units) : ""].filter(Boolean).join(" · ") || t("cal.panel.plannedRace")}</div>
+                    {/* Priorité dans la saison : l'objectif déclaré reste A, les autres se choisissent. */}
+                    {!r.isObjective && (
+                      <div role="radiogroup" aria-label={t("cal.race.prio")} className="mt-1.5 flex gap-1">
+                        {(["A", "B", "C"] as const).map((p) => (
+                          <button key={p} type="button" role="radio" aria-checked={(r.priorite ?? "C") === p} disabled={busy}
+                            onClick={() => (r.priorite ?? "C") !== p && changerPriorite(r.id, p)}
+                            className={`rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 transition-colors ${(r.priorite ?? "C") === p ? "bg-amber-500 text-white ring-amber-500" : "bg-white text-amber-700 ring-amber-200 hover:bg-amber-100"}`}>
+                            {p}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <button onClick={() => del(r.id, "race")} className="text-zinc-300 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
@@ -632,6 +660,18 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
                 <div className="flex gap-2">
                   <input value={race.location} onChange={(e) => setRace({ ...race, location: e.target.value })} placeholder={t("cal.race.locPh")} className="flex-1 rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100" />
                   <input value={race.distanceKm} onChange={(e) => setRace({ ...race, distanceKm: e.target.value })} type="number" placeholder={t("cal.race.kmPh")} className="w-20 rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100" />
+                </div>
+                <div>
+                  <div className="mb-1 text-xs font-medium text-zinc-500">{t("cal.race.prio")}</div>
+                  <div role="radiogroup" aria-label={t("cal.race.prio")} className="grid grid-cols-3 gap-1">
+                    {(["A", "B", "C"] as const).map((p) => (
+                      <button key={p} type="button" role="radio" aria-checked={race.priorite === p} onClick={() => setRace({ ...race, priorite: p })}
+                        className={`rounded-xl px-2 py-1.5 text-xs font-semibold ring-1 transition-colors ${race.priorite === p ? "bg-amber-500 text-white ring-amber-500" : "bg-white text-amber-800 ring-amber-200 hover:bg-amber-50"}`}>
+                        {p === "A" ? t("cal.race.prioA") : p === "B" ? t("cal.race.prioB") : t("cal.race.prioC")}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1 text-[11px] leading-snug text-zinc-500">{t("cal.race.prioHint")}</p>
                 </div>
                 <div className="flex gap-2">
                   <button onClick={addEntry} disabled={busy || !race.name.trim()} className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-50">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flag className="h-4 w-4" />} {t("cal.plan")}</button>

@@ -123,6 +123,12 @@ export type TextesPlan = {
   /** Pourquoi cette séance de reprise ; le nom de la course est un nom propre. */
   qualiteWhyReprise: (course: string) => string;
   /** Journée de DOUBLE SEUIL (méthode norvégienne) : titres du matin et du soir, et pourquoi. */
+  /** Course B ou C de la saison (`lib/coach/saison`) : le nom est un nom propre. */
+  courseSecondaireTitre: (nom: string, priorite: string) => string;
+  courseBDetail: string;
+  courseBWhy: string;
+  courseCDetail: string;
+  courseCWhy: string;
   dsTitreMatin: string;
   dsTitreSoir: string;
   dsWhy: string;
@@ -259,6 +265,11 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     suffixeAllegee: " (allégée)",
     suffixeReprise: " (reprise)",
     qualiteWhyReprise: (c) => `Reprise après ${c} : une seule séance de qualité cette semaine, au seuil et volontairement courte. Elle réveille le rythme sans entamer une récupération qui n'est pas finie — ni VMA ni course tant qu'elle dure. Si les jambes sont encore lourdes à l'échauffement, transforme-la en footing.`,
+    courseSecondaireTitre: (n, p) => `${n} · course ${p}`,
+    courseBDetail: "Course de préparation : échauffe-toi 15 min avec quelques accélérations, puis cours-la vite mais sans te mettre dans le rouge — c'est une répétition générale de ton objectif, pas l'objectif. Note tes sensations et ton allure.",
+    courseBWhy: "Une course B se prépare légèrement — deux jours calmes avant, une semaine allégée — et se récupère ensuite : elle sert ton objectif sans le compromettre.",
+    courseCDetail: "Course d'entraînement : échauffe-toi 15 min, puis cours-la à l'effort d'une séance au seuil, pas à fond. Retour au calme 10 min.",
+    courseCWhy: "Une course C remplace une séance de qualité de la semaine : pas d'affûtage, on s'en sert pour s'entraîner en conditions de course.",
     dsTitreMatin: "Double seuil · matin",
     dsTitreSoir: "Double seuil · soir",
     dsWhy: "Méthode norvégienne : deux séances au seuil le même jour, toutes deux SOUS le seuil — c'est le cumul qui construit le seuil, pas l'intensité. Elle se pilote normalement au lactate ; sans lactatemètre, l'erreur classique est de courir trop vite et d'en faire deux séances dures. Tiens l'allure écrite, même si tu te sens bien.",
@@ -382,6 +393,11 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     suffixeAllegee: " (eased)",
     suffixeReprise: " (comeback)",
     qualiteWhyReprise: (c) => `Easing back after ${c}: one quality session this week, at threshold and deliberately short. It wakes the rhythm up without eating into a recovery that is not over yet — no VO2max work or racing while it lasts. If your legs still feel heavy in the warm-up, turn it into an easy run.`,
+    courseSecondaireTitre: (n, p) => `${n} · ${p} race`,
+    courseBDetail: "Tune-up race: warm up 15 min with a few strides, then run it fast but without going into the red — it is a dress rehearsal for your goal, not the goal. Note how it felt and your pace.",
+    courseBWhy: "A B race gets a light taper — two easy days before, a lighter week — and a recovery afterwards: it serves your goal without compromising it.",
+    courseCDetail: "Training race: warm up 15 min, then run it at threshold-session effort, not all out. Cool down 10 min.",
+    courseCWhy: "A C race replaces one quality session of the week: no taper, you use it to train in race conditions.",
     dsTitreMatin: "Double threshold · morning",
     dsTitreSoir: "Double threshold · evening",
     dsWhy: "Norwegian method: two threshold sessions on the same day, both BELOW threshold — the total builds the threshold, not the intensity. It is normally steered by blood lactate; without a lactate meter, the classic mistake is running too fast and turning it into two hard sessions. Hold the written pace, even if you feel good.",
@@ -505,6 +521,11 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     suffixeAllegee: " (reduziert)",
     suffixeReprise: " (Wiedereinstieg)",
     qualiteWhyReprise: (c) => `Wiedereinstieg nach ${c}: diese Woche eine einzige Qualitätseinheit, an der Schwelle und bewusst kurz. Sie weckt den Rhythmus, ohne die noch nicht abgeschlossene Erholung anzugreifen — kein VO2max-Training und kein Wettkampf, solange sie dauert. Fühlen sich die Beine beim Aufwärmen noch schwer an, mach einen lockeren Dauerlauf daraus.`,
+    courseSecondaireTitre: (n, p) => `${n} · ${p}-Rennen`,
+    courseBDetail: "Vorbereitungsrennen: 15 Min einlaufen mit ein paar Steigerungen, dann schnell laufen, aber ohne in den roten Bereich zu gehen — eine Generalprobe für dein Ziel, nicht das Ziel. Notiere Gefühl und Tempo.",
+    courseBWhy: "Ein B-Rennen bekommt ein leichtes Tapering — zwei ruhige Tage davor, eine leichtere Woche — und danach Erholung: Es dient deinem Ziel, ohne es zu gefährden.",
+    courseCDetail: "Trainingsrennen: 15 Min einlaufen, dann im Tempo einer Schwelleneinheit laufen, nicht voll. 10 Min auslaufen.",
+    courseCWhy: "Ein C-Rennen ersetzt eine Qualitätseinheit der Woche: kein Tapering, du trainierst damit unter Wettkampfbedingungen.",
     dsTitreMatin: "Doppelte Schwelle · Morgen",
     dsTitreSoir: "Doppelte Schwelle · Abend",
     dsWhy: "Norwegische Methode: zwei Schwelleneinheiten am selben Tag, beide UNTER der Schwelle — die Summe baut die Schwelle auf, nicht die Intensität. Normalerweise wird sie per Laktat gesteuert; ohne Laktatmessgerät ist der klassische Fehler, zu schnell zu laufen und daraus zwei harte Einheiten zu machen. Halte das angegebene Tempo, auch wenn du dich gut fühlst.",
@@ -628,6 +649,11 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     suffixeAllegee: " (aligerada)",
     suffixeReprise: " (vuelta)",
     qualiteWhyReprise: (c) => `Vuelta tras ${c}: una sola sesión de calidad esta semana, de umbral y corta a propósito. Despierta el ritmo sin comerse una recuperación que aún no ha terminado: ni VMA ni carreras mientras dure. Si en el calentamiento las piernas siguen pesadas, conviértela en rodaje.`,
+    courseSecondaireTitre: (n, p) => `${n} · carrera ${p}`,
+    courseBDetail: "Carrera de preparación: calienta 15 min con algunas progresiones y córrela rápido pero sin entrar en rojo; es un ensayo general de tu objetivo, no el objetivo. Anota tus sensaciones y tu ritmo.",
+    courseBWhy: "Una carrera B se prepara ligeramente (dos días tranquilos antes, una semana más suave) y se recupera después: sirve a tu objetivo sin comprometerlo.",
+    courseCDetail: "Carrera de entrenamiento: calienta 15 min y córrela al esfuerzo de una sesión de umbral, no a tope. Vuelta a la calma 10 min.",
+    courseCWhy: "Una carrera C sustituye una sesión de calidad de la semana: sin puesta a punto, te sirve para entrenar en condiciones de carrera.",
     dsTitreMatin: "Doble umbral · mañana",
     dsTitreSoir: "Doble umbral · tarde",
     dsWhy: "Método noruego: dos sesiones de umbral el mismo día, ambas POR DEBAJO del umbral; es la suma la que construye el umbral, no la intensidad. Normalmente se controla con lactato; sin lactatómetro, el error clásico es correr demasiado rápido y convertirlo en dos sesiones duras. Mantén el ritmo indicado, aunque te sientas bien.",
@@ -751,6 +777,11 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     suffixeAllegee: " (aliviada)",
     suffixeReprise: " (retoma)",
     qualiteWhyReprise: (c) => `Retoma após ${c}: uma única sessão de qualidade esta semana, no limiar e curta de propósito. Desperta o ritmo sem comprometer uma recuperação que ainda não terminou — nem VMA nem provas enquanto durar. Se as pernas ainda estiverem pesadas no aquecimento, transforma-a em corrida fácil.`,
+    courseSecondaireTitre: (n, p) => `${n} · prova ${p}`,
+    courseBDetail: "Prova de preparação: aquece 15 min com algumas acelerações e corre-a depressa, mas sem entrar no vermelho; é um ensaio geral do teu objetivo, não o objetivo. Anota as sensações e o ritmo.",
+    courseBWhy: "Uma prova B prepara-se de forma ligeira (dois dias calmos antes, uma semana mais leve) e recupera-se depois: serve o teu objetivo sem o comprometer.",
+    courseCDetail: "Prova de treino: aquece 15 min e corre-a ao esforço de uma sessão de limiar, não no máximo. Retorno à calma 10 min.",
+    courseCWhy: "Uma prova C substitui uma sessão de qualidade da semana: sem afinamento, serve para treinar em condições de prova.",
     dsTitreMatin: "Duplo limiar · manhã",
     dsTitreSoir: "Duplo limiar · tarde",
     dsWhy: "Método norueguês: duas sessões de limiar no mesmo dia, ambas ABAIXO do limiar; é a soma que constrói o limiar, não a intensidade. Normalmente controla-se com lactato; sem lactatómetro, o erro clássico é correr depressa demais e transformá-la em duas sessões duras. Mantém o ritmo indicado, mesmo que te sintas bem.",

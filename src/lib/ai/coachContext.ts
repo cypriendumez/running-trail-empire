@@ -42,6 +42,7 @@ import { apresCourse, facteurVolumeApresCourse, type PhaseApresCourse } from "@/
 import { repriseApresArret, partApresArret } from "@/lib/coach/repriseArret";
 import { programmeMarcheCourse, dureesMarcheCourse, type SeanceMarcheCourse } from "@/lib/coach/marcheCourse";
 import { testEnVigueur, allureFacileMaxSec, fmtAllure, TYPE_TEST_LACTATE, type TestLactate } from "@/lib/coach/lactate";
+import { coursesDeSaison, prochaineCourseA, courseSecondaireDeLaSemaine, coursesPassees, PART_VOLUME_COURSE_B, type Priorite } from "@/lib/coach/saison";
 import { objectifEnCours, estOfficielle } from "@/lib/coach/prochaineCourse";
 import { decaleJour } from "@/lib/streak/compute";
 import { niveauDeVma } from "@/lib/running/niveau";
@@ -312,6 +313,8 @@ export type AthleteContext = {
   /** Programme marche-course en cours (`lib/coach/marcheCourse`). Optionnel : un contexte
    *  sérialisé avant cette version ne l'a pas. */
   marcheCourse?: { etape: number; total: number; seance: SeanceMarcheCourse } | null;
+  /** Course B ou C dans les sept jours du plan (`lib/coach/saison`), hors objectif visé. */
+  courseSecondaire?: { idx: number; nom: string; distanceKm: number | null; priorite: Priorite } | null;
   /** Construit pour le palier gratuit (`LectureContexte.objectifSeul`) : l'objectif et le
    *  déclaré, aucune mesure. Optionnel : un contexte sérialisé avant cette version ne l'a pas. */
   objectifSeul?: boolean;
@@ -428,7 +431,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // Une lecture qu'on ne fait pas : la forme exacte d'une réponse vide de PostgREST.
   const nonLu = () => Promise.resolve({ data: [] as never[], error: null });
   const nonLuUne = () => Promise.resolve({ data: null, error: null });
-  const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, shoeRes, objRes, csRes, wlRes, histRes, sleepDatesRes, hrvDatesRes, formeRes, fcMaxRes, lactateRes] = await Promise.all([
+  const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, shoeRes, objRes, csRes, wlRes, histRes, sleepDatesRes, hrvDatesRes, formeRes, fcMaxRes, lactateRes, planifieesRes] = await Promise.all([
     sb.from("profiles").select("*").eq("id", userId).single(),
     sb.from("performance_baselines").select("*").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).single(),
     objectifSeul || essentielle ? nonLu() : sb.from("hrv_data").select(COLONNES_VFC).eq("user_id", userId).order("date", { ascending: false }).limit(30),
@@ -483,6 +486,9 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     // toutes les formules comme les autres réponses de l'athlète.
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", TYPE_TEST_LACTATE)
       .order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    // Les courses notées au calendrier (lib/coach/saison) : le coach les ignorait.
+    sb.from("notifications").select("data").eq("user_id", userId).eq("type", "planned_race")
+      .order("created_at", { ascending: false }).limit(40),
   ]);
 
   // Palier gratuit : le profil réduit à ce qui est DÉCLARÉ, et du test de VMA, la VMA seule
@@ -518,7 +524,19 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // Test de lactate en vigueur (lib/coach/lactate) : six mois au plus, sinon rien.
   const lactate: TestLactate | null = testEnVigueur(
     ((lactateRes as { data?: { data?: TestLactate } | null } | null)?.data?.data) ?? null, aujourdhui(FUSEAU_DEFAUT));
-  const objective = objectifEnCours(objectifDeclare, aujourdhui(FUSEAU_DEFAUT));
+  // ── LA SAISON (lib/coach/saison) ────────────────────────────────────────────
+  // L'objectif DÉCLARÉ reste la course que l'athlète a fixée ; l'objectif VISÉ est la
+  // course A la plus proche — la sienne, ou une course A du calendrier qui vient avant.
+  // Une saison à deux pics se prépare ainsi l'un après l'autre.
+  const saison = coursesDeSaison(objectifDeclare,
+    ((planifieesRes as { data?: { data?: Record<string, unknown> }[] | null } | null)?.data ?? []).map((r) => r.data ?? {}));
+  const objectifDeclareEnCours = objectifEnCours(objectifDeclare, aujourdhui(FUSEAU_DEFAUT));
+  const courseA = prochaineCourseA(saison, aujourdhui(FUSEAU_DEFAUT));
+  const objective: CoachObjective | null = courseA && !courseA.declaree
+    && (!objectifDeclareEnCours || courseA.date < String(objectifDeclareEnCours.raceDate).slice(0, 10))
+    // Une course du calendrier n'a pas de chrono visé : aucune allure spécifique inventée.
+    ? { race: courseA.nom, raceDate: courseA.date, distanceKm: courseA.distanceKm ?? 0, targetSeconds: 0, targetTime: "", targetPace: "" }
+    : objectifDeclareEnCours;
   // `tags` est lu en plus de la date et du type : c'est lui qui dit qu'une séance d'un
   // autre écrivain que le plan automatique était une séance de qualité (`qualiteRecente`).
   const coachSessions = ((csRes.data ?? []) as { data: Prescription & { date?: string; sessionType?: string } }[]).map(r => r.data).filter((d): d is Prescription & { date?: string; sessionType?: string } => !!d?.date);
@@ -1238,14 +1256,40 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // (une sortie enregistrée ce jour-là), l'intensité attend. Voir `lib/coach/apresCourse`.
   // ⚠️ ET UN NOUVEL OBJECTIF NE L'EFFACE PAS : fixé à J+5 du marathon, il écrasait la ligne
   // et la récupération avec elle. La course remplacée voyage donc dans `precedente`.
-  const coursePassee = objectifDeclare && !objective ? objectifDeclare : objectifDeclare?.precedente ?? null;
-  const recup = coursePassee?.raceDate
-    ? apresCourse({
-        course: { nom: coursePassee.race, date: coursePassee.raceDate, distanceKm: Number(coursePassee.distanceKm) },
-        sorties: runs.map((w) => ({ date: String(w.date), distanceKm: num(w.distance_km) })),
-        aujourdhui: todayStr,
-      })
+  // ⚠️ « PASSÉE » SE LIT SUR L'OBJECTIF DÉCLARÉ, plus sur l'objectif visé : quand une course
+  // A du calendrier prend le relais, l'objectif visé existe alors que le déclaré est passé.
+  const coursePassee = objectifDeclare && !objectifDeclareEnCours ? objectifDeclare : objectifDeclare?.precedente ?? null;
+  // Toute course de la saison courue récemment compte aussi (une B, une C, un pic A) : la
+  // récupération suit la PLUS RÉCENTE réellement courue.
+  const candidatsRecup = [
+    ...(coursePassee?.raceDate ? [{ nom: coursePassee.race, date: String(coursePassee.raceDate).slice(0, 10), distanceKm: Number(coursePassee.distanceKm) }] : []),
+    ...coursesPassees(saison, todayStr).map((c) => ({ nom: c.nom, date: c.date, distanceKm: c.distanceKm ?? 0 })),
+  ];
+  const sortiesCourues = runs.map((w) => ({ date: String(w.date), distanceKm: num(w.distance_km) }));
+  const recup = candidatsRecup
+    .map((course) => apresCourse({ course, sorties: sortiesCourues, aujourdhui: todayStr }))
+    .filter((r): r is NonNullable<ReturnType<typeof apresCourse>> => r != null)
+    .sort((a, b) => b.date.localeCompare(a.date))[0] ?? null;
+  // ── COURSE B OU C DANS LA SEMAINE (lib/coach/saison) ─────────────────────────
+  // Le coach ignorait les courses du calendrier : une VMA pouvait tomber le jour même.
+  const dateObjectifVise = objective?.raceDate ? String(objective.raceDate).slice(0, 10) : null;
+  const secondaire = courseSecondaireDeLaSemaine(saison, todayStr, dateObjectifVise);
+  const secondaireMotif = secondaire
+    ? tr((l) => MOTIF_T[l].courseSecondaire(secondaire.course.nom,
+        formatDateCivile(secondaire.course.date, l, { weekday: "long", day: "numeric", month: "long" }), secondaire.course.priorite === "B"))
     : null;
+  /** Course B dans la semaine `i` du plan (0 = celle qui commence aujourd'hui) : mini-affûtage. */
+  const partCourseB = (i: number) => saison.some((c) => {
+    if (c.priorite !== "B" || c.date === dateObjectifVise) return false;
+    const e = ecartJours(c.date, todayStr);
+    return e != null && e >= 7 * i && e <= 7 * i + 6;
+  }) ? PART_VOLUME_COURSE_B : 1;
+  /** La course B ou C de la semaine `i`, pour la feuille de route. */
+  const courseDeLaSemaine = (i: number) => saison.find((c) => {
+    if (c.priorite === "A" || c.date === dateObjectifVise) return false;
+    const e = ecartJours(c.date, todayStr);
+    return e != null && e >= 7 * i && e <= 7 * i + 6;
+  }) ?? null;
   // Le volume aussi : 50, 70 puis 85 % de l'habitude, moyenne des 7 jours du plan.
   const partVolumeRecup = recup ? facteurVolumeApresCourse(recup) : 1;
   // Ce que le bandeau annonce est ce que le plan vise : la plus basse des deux réductions,
@@ -1290,7 +1334,8 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     apresCourse: recupMotif ? { motif: recupMotif.fr, reprise: repriseCetteSemaine } : null,
     marcheCourse: !!marcheCourse,
   });
-  const qBudget = qb.qBudget;
+  // Une course B ou C dans la semaine EST une séance dure : elle prend la place d'une qualité.
+  const qBudget = Math.max(0, qb.qBudget - (secondaire ? 1 : 0));
   const { structuralQBudget, easeReasons, expCapped, expCap } = qb;
 
   // ── VERDICT DE FRAÎCHEUR DU JOUR — calculé, pas laissé à l'appréciation de l'IA ──
@@ -1325,6 +1370,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   if (arretMotif) infoFlags.push(arretMotif);
   // Le programme marche-course est un cadre, pas une fatigue : il se dit sans colorer le feu.
   if (marcheCourseMotif) infoFlags.push(marcheCourseMotif);
+  if (secondaireMotif) infoFlags.push(secondaireMotif);
   if (pains.length) redFlags.push(tr((l) => MOTIF_T[l].douleur(pains.map((x) => traduireDouleur(x, l)).join(", "))));
   // ── LA CHARGE SEULE NE SUFFIT PLUS À DÉCLARER ROUGE ─────────────────────────
   // Le feu rouge annule l'intensité du JOUR. Comme le plan est republié chaque jour et
@@ -1842,7 +1888,8 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
       // Après une course courue, chaque semaine de la récupération porte sa part du volume
       // (lib/coach/apresCourse) : la feuille de route dit ce que le plan fera.
       const volumeKm = Math.round(Math.min(baseKm * factor
-        * (recup ? facteurVolumeApresCourse({ joursDepuis: recup.joursDepuis + 7 * i, joursTotal: recup.joursTotal }) : 1),
+        * (recup ? facteurVolumeApresCourse({ joursDepuis: recup.joursDepuis + 7 * i, joursTotal: recup.joursTotal }) : 1)
+        * partCourseB(i),
         plafondArretKm(7 * i)));
       // La sortie longue se déduit de la DISTANCE VISÉE, plus seulement d'un pourcentage
       // du volume. Le plafond de Daniels (25 %) empêche la sortie longue d'écraser la
@@ -1898,7 +1945,9 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
         : ph === "Développement" ? "VMA & seuil — montée en charge"
         : ph === "Spécifique" ? `Allure course${goalPace ? ` (${goalPace}/km)` : ""} + endurance spécifique`
         : wkUntil <= 1 ? "Fraîcheur — repos, rappels d'allure" : "Volume −, on garde l'intensité (fraîcheur jour J)";
-      out.push({ week: i + 1, phase: ph, volumeKm, quality, longRunKm, focus });
+      // Une course B ou C de la semaine se lit dans la feuille de route, comme dans le plan.
+      const cs = courseDeLaSemaine(i);
+      out.push({ week: i + 1, phase: ph, volumeKm, quality, longRunKm, focus: cs ? `${focus} · course ${cs.priorite} : ${cs.nom}` : focus });
     }
     return out;
   })();
@@ -2076,7 +2125,7 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // de doubler les footings pour loger 70 km à J+5 d'un marathon. Le macro-plan porte déjà
   // la réduction semaine par semaine ; sans macro-plan, on l'applique ici.
   const targetKm = volumeAvecCible(macroPlan.length ? macroPlan[0].volumeKm
-    : Math.round(Math.min(baseKm * (taper ? 0.65 : deload ? 0.8 : growth) * partVolumeRecup, plafondArretKm(0))),
+    : Math.round(Math.min(baseKm * (taper ? 0.65 : deload ? 0.8 : growth) * partVolumeRecup * partCourseB(0), plafondArretKm(0))),
     volumeCible((p as Record<string, unknown> | null)?.target_weekly_km),
     habitudeKm);
   const longRunPrevu = macroPlan.length ? macroPlan[0].longRunKm : Math.round(targetKm * (taper ? 0.20 : 0.25));
@@ -2269,7 +2318,7 @@ FORME & RÉCUPÉRATION (aujourd'hui)
 
 CHARGE D'ENTRAÎNEMENT
 ${demonstratedKm ? `- 📈 CAPACITÉ DÉJÀ DÉMONTRÉE : ${demonstratedKm} km/semaine tenus sur ses meilleures semaines des 6 derniers mois. Son système musculo-tendineux CONNAÎT ce volume — il y reviendra bien plus vite qu'il n'y est monté la première fois. Ne le traite pas comme un débutant sous prétexte que ses dernières semaines sont basses ; mais ne t'en sers pas non plus pour justifier une charge élevée AUJOURD'HUI : c'est la fraîcheur du moment qui en décide.\n` : ""}- Volume : ${Math.round(weekKm)} km COURUS cette semaine${cross.label ? ` (+ ${fmtMinutes(cross.minutes)} d'AUTRES SPORTS, ${cross.tss} TSS = ${cross.sharePct} % de sa charge : ${cross.label}${cross.impactMinutes > 0 ? ` — dont ${fmtMinutes(cross.impactMinutes)} avec impact sur les jambes, qui s'ajoutent à l'usure de la course` : " — sans impact sur les jambes : ça fatigue le cardio, pas les tendons"}. Ça compte dans la charge, mais ce N'EST PAS du volume de course : ne dimensionne AUCUNE séance dessus)` : ""} · ~${Math.round(avg4wkKm)} km/sem (moy. 4 sem.)
-${lacune ? `- ⚠️ TROU DE DONNÉES : ${lacune.jours} jours SANS AUCUNE trace (ni séance, ni nuit, ni VFC) du ${lacune.debut} au ${lacune.fin}. Une coupure, une blessure et une montre non portée produisent exactement ce silence — et appellent des plans OPPOSÉS. Les moyennes qui traversent cette période sont donc peu fiables : DIS-LUI que tu l'as remarqué et DEMANDE-LUI ce qui s'est passé, ne suppose pas.\n` : ""}${marcheCourse ? `- 🚶 PROGRAMME MARCHE-COURSE, étape ${marcheCourse.etape}/${marcheCourse.total} : ${"continuMin" in marcheCourse.seance ? `${marcheCourse.seance.continuMin} min de course continue` : `${marcheCourse.seance.reps} × (${marcheCourse.seance.courseMin} min de course / ${marcheCourse.seance.marcheMin} min de marche)`}, trois fois par semaine, ${dureesMarcheCourse(marcheCourse.seance).totalMin} min marche comprise. Il ne court pas encore 30 minutes d'affilée : AUCUNE allure, AUCUN volume en kilomètres, AUCUNE séance de qualité ni test VMA. Encourage la régularité ; la marche fait partie de la séance.` : `- 🎯 VOLUME CIBLE de la semaine à venir : ~${targetKm} km, dont une sortie longue de ~${longRunKm} km. Dimensionne les séances sur CES chiffres, pas sur des durées passe-partout.`}
+${lacune ? `- ⚠️ TROU DE DONNÉES : ${lacune.jours} jours SANS AUCUNE trace (ni séance, ni nuit, ni VFC) du ${lacune.debut} au ${lacune.fin}. Une coupure, une blessure et une montre non portée produisent exactement ce silence — et appellent des plans OPPOSÉS. Les moyennes qui traversent cette période sont donc peu fiables : DIS-LUI que tu l'as remarqué et DEMANDE-LUI ce qui s'est passé, ne suppose pas.\n` : ""}${secondaire ? `- 🏁 COURSE ${secondaire.course.priorite} CETTE SEMAINE : ${secondaire.course.nom} le ${secondaire.course.date}${secondaire.course.distanceKm ? ` (${secondaire.course.distanceKm} km)` : ""} — ${secondaire.course.priorite === "B" ? "course de préparation : deux jours calmes avant, semaine allégée, récupération après" : "course d'entraînement : elle remplace une séance de qualité, sans affûtage"}.\n` : ""}${marcheCourse ? `- 🚶 PROGRAMME MARCHE-COURSE, étape ${marcheCourse.etape}/${marcheCourse.total} : ${"continuMin" in marcheCourse.seance ? `${marcheCourse.seance.continuMin} min de course continue` : `${marcheCourse.seance.reps} × (${marcheCourse.seance.courseMin} min de course / ${marcheCourse.seance.marcheMin} min de marche)`}, trois fois par semaine, ${dureesMarcheCourse(marcheCourse.seance).totalMin} min marche comprise. Il ne court pas encore 30 minutes d'affilée : AUCUNE allure, AUCUN volume en kilomètres, AUCUNE séance de qualité ni test VMA. Encourage la régularité ; la marche fait partie de la séance.` : `- 🎯 VOLUME CIBLE de la semaine à venir : ~${targetKm} km, dont une sortie longue de ~${longRunKm} km. Dimensionne les séances sur CES chiffres, pas sur des durées passe-partout.`}
 - 🔄 PHASE DU CYCLE : ${cycleLabel}.
 - 📆 DISPONIBILITÉS : ${availDaysPerWeek} séance(s) de course par semaine${availDays.length < 7 ? `, uniquement les ${availDays.map(d => ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d]).join(", ")}` : ""}${declaredDpw ? " (déclaré par l'athlète)" : " (déduit de son niveau et de sa pratique actuelle — demande-lui de le préciser)"}. NE DÉPASSE PAS ce nombre : un plan qu'il ne peut pas suivre ne vaut rien.
 - ⏱️ Dernière séance DURE réellement effectuée : ${lastHardDaysAgo == null ? "aucune trace récente" : lastHardDaysAgo === 0 ? "AUJOURD'HUI ⚠️ → pas de deuxième séance dure aujourd'hui ni demain" : `il y a ${lastHardDaysAgo} j`}${lastHardDaysAgo != null && lastHardDaysAgo * 24 < hardGapH ? ` ⚠️ moins de ${hardGapH} h se sont écoulées : la prochaine qualité doit attendre.` : ""}${qualiteRecente.manquees.length ? `\n- ⏭️ QUALITÉ PRESCRITE ET NON FAITE (7 derniers jours) : ${qualiteRecente.manquees.join(", ")} — elle compte dans la semaine et NE SE RATTRAPE PAS : ne la re-propose pas le lendemain.` : ""}${skippedWeekdays.length ? `\n- 🚫 JOURS SYSTÉMATIQUEMENT RATÉS : ${skippedWeekdays.map(d => ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d]).join(", ")} — prescrits plusieurs fois, jamais courus. Ne t'obstine pas : place-y du repos ou rien, et redistribue ailleurs.` : ""}
@@ -2419,6 +2468,9 @@ ${catalog}`;
     objectiveWarnings,
     recuperation: recup ? { course: recup.nom, reprise: recup.reprise, fin: recup.fin, phase: recup.phase } : null,
     marcheCourse: marcheCourse ? { etape: marcheCourse.etape, total: marcheCourse.total, seance: marcheCourse.seance } : null,
+    courseSecondaire: secondaire
+      ? { idx: secondaire.idx, nom: secondaire.course.nom, distanceKm: secondaire.course.distanceKm, priorite: secondaire.course.priorite }
+      : null,
     weightLoss,
     // Palier gratuit : « ce que ta dernière séance a montré » EST une analyse de séance.
     lastSession: objectifSeul ? null : lastSession,

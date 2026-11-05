@@ -201,12 +201,16 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
   // « M'entraîner pour cette course » → ajoute la course au calendrier (objectif coach).
   const trainForRace = async (r: Race) => {
     if (planning || findPlanned(r)) return; // déjà planifiée → pas de doublon
+    // ⚠️ PLUS DE DATE INVENTÉE. Une course « date à venir » partait au calendrier — et comme
+    // objectif — dans 60 jours, une date que rien ne justifiait. On le dit, on n'invente pas.
+    if (!r.date || r.date.startsWith("2099")) { toast(d["t.sansDate"]); return; }
     setPlanning(true);
     try {
-      const date = r.date && !r.date.startsWith("2099") ? r.date : new Date(Date.now() + 60 * 86400000).toISOString().slice(0, 10);
+      const date = r.date;
+      // « M'entraîner pour cette course » : une course A de la saison (lib/coach/saison).
       const res = await fetch("/api/calendar-entry", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, kind: "race", name: r.name, location: r.city || r.department || "", distanceKm: r.distance_km }),
+        body: JSON.stringify({ date, kind: "race", name: r.name, location: r.city || r.department || "", distanceKm: r.distance_km, priorite: "A" }),
       });
       const j = await res.json();
       if (j.ok) {

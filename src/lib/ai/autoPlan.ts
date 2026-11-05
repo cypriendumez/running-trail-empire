@@ -292,7 +292,14 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // ── 0. LA COURSE. Elle prime sur tout le reste : c'est l'objectif, pas une séance.
   // Sans ce bloc, le moteur pouvait poser une VMA la veille ou une sortie longue le
   // jour J — il ne consultait simplement jamais la date de course.
-  const raceIdx = ctx.daysToRace != null && ctx.daysToRace >= 0 && ctx.daysToRace <= 6 ? ctx.daysToRace : -1;
+  const objectifIdx = ctx.daysToRace != null && ctx.daysToRace >= 0 && ctx.daysToRace <= 6 ? ctx.daysToRace : -1;
+  // LA SAISON (lib/coach/saison) : une course B prend le protocole complet d'une course —
+  // avant-veille et veille calmes, repos et récupération après, pas de sortie longue.
+  // Une course C se court comme une séance de qualité : la course, une veille calme.
+  const cs = ctx.courseSecondaire ?? null;
+  const courseB = objectifIdx < 0 && cs?.priorite === "B";
+  const raceIdx = objectifIdx >= 0 ? objectifIdx : courseB ? cs!.idx : -1;
+  const courseCIdx = cs?.priorite === "C" && cs.idx !== raceIdx ? cs.idx : -1;
 
   // Budget de SORTIES de la semaine. Déclaré avant tout placement : la semaine de course
   // pose elle aussi des footings (déblocage, avant-veille, reprise) qui doivent le
@@ -302,12 +309,19 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
 
   if (raceIdx >= 0) {
     const o = ctx.objective;
-    put(raceIdx, {
+    put(raceIdx, courseB ? {
+      type: "Course",
+      title: (l) => PLAN_T[l].courseSecondaireTitre(cs!.nom, "B"),
+      detail: (l) => PLAN_T[l].courseBDetail,
+      why: (l) => PLAN_T[l].courseBWhy,
+      tags: (l) => [PLAN_T[l].tags["Course"], ...(cs!.distanceKm ? [PLAN_T[l].tagKm(nRaw(cs!.distanceKm, l))] : [])],
+    } : {
       type: "Course",
       // Le NOM DE LA COURSE est un nom propre : il traverse les cinq langues tel quel.
       title: (l) => PLAN_T[l].courseTitre(o?.race ?? null),
-      detail: (l) => PLAN_T[l].courseDetail(o?.targetPace ?? null),
-      why: (l) => PLAN_T[l].courseWhy(o?.targetTime ?? null),
+      // Une course A du calendrier n'a pas de chrono visé : chaîne vide → aucune allure écrite.
+      detail: (l) => PLAN_T[l].courseDetail(o?.targetPace || null),
+      why: (l) => PLAN_T[l].courseWhy(o?.targetTime || null),
       tags: (l) => [PLAN_T[l].tags["Course"], o?.distanceKm ? PLAN_T[l].tagKm(nRaw(o.distanceKm, l)) : PLAN_T[l].tags["Objectif"]],
     });
     // Les 2 jours qui précèdent : décrassage seulement. Aucune séance dure dans les 48 h.
@@ -345,6 +359,22 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
             why: (l) => PLAN_T[l].recupCourseWhy, tags: tags("Récup", "Z1") });
       if (placedRest && d === 2) spend();   // le footing de reprise est une sortie
     }
+  }
+
+  // Course C : la course, une veille calme ; elle compte comme une séance dure (étape 4).
+  if (courseCIdx >= 0) {
+    if (put(courseCIdx, {
+      type: "Course",
+      title: (l) => PLAN_T[l].courseSecondaireTitre(cs!.nom, "C"),
+      detail: (l) => PLAN_T[l].courseCDetail,
+      why: (l) => PLAN_T[l].courseCWhy,
+      tags: (l) => [PLAN_T[l].tags["Course"], ...(cs!.distanceKm ? [PLAN_T[l].tagKm(nRaw(cs!.distanceKm, l))] : [])],
+    })) spend();
+    const veille = courseCIdx - 1;
+    if (veille >= 0 && runBudget > 0 && put(veille, {
+      type: "Récup", title: (l) => PLAN_T[l].veilleTitre, detail: (l) => PLAN_T[l].veilleDetail,
+      why: (l) => PLAN_T[l].veilleWhy, tags: tags("Récup", "Veille de course"),
+    })) spend();
   }
 
   // ── 1. Jours systématiquement ratés → repos assumé.
@@ -390,14 +420,16 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   //  pouvait le voir. Sept jours consécutifs contenant toujours exactement un samedi et
   //  un dimanche, l'écarter laisse forcément l'autre jour de week-end disponible.
   const dayZeroDropped = ctx.readiness.level === "rouge" || ctx.lastHardDaysAgo === 0;
+  // Jamais le lendemain d'une course C : la course était la séance dure de la veille.
+  const apresCourseC = (i: number) => courseCIdx >= 0 && i === courseCIdx + 1;
   const weekend = dates.map((d, i) => ({ i, day: d.getDay() }))
-    .filter((x) => (x.day === 0 || x.day === 6) && canRun(x.i) && !(dayZeroDropped && x.i === 0));
+    .filter((x) => (x.day === 0 || x.day === 6) && canRun(x.i) && !(dayZeroDropped && x.i === 0) && !apresCourseC(x.i));
   // Une « sortie longue » de moins de 4 km n'est pas une sortie longue. Cas rencontré
   // sur un profil sans aucune donnée (volume cible nul) : le plan annonçait « Sortie
   // longue : ~0 km (environ 0 min) ». Mieux vaut ne rien poser.
   const longIdx = longRunKm < 4 ? -1 : raceIdx >= 0 ? -1
     : (weekend.find((x) => x.day === 0)?.i ?? weekend[0]?.i
-      ?? [6, 5, 4, 3, 2, 1, 0].find((i) => canRun(i) && !(dayZeroDropped && i === 0)) ?? -1);
+      ?? [6, 5, 4, 3, 2, 1, 0].find((i) => canRun(i) && !(dayZeroDropped && i === 0) && !apresCourseC(i)) ?? -1);
   const bike = ctx.longRunMode === "bike";
   if (longIdx >= 0) {
     put(longIdx, bike
@@ -471,6 +503,7 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   //  ici à la qualité. Deux déclarations auraient fini par diverger.)
   const placed: number[] = ctx.lastHardDaysAgo != null ? [-ctx.lastHardDaysAgo] : [];
   if (raceIdx >= 0) placed.push(raceIdx);
+  if (courseCIdx >= 0) placed.push(courseCIdx);
   // ── LE BUDGET S'APPLIQUE À SEPT JOURS GLISSANTS, PASSÉ COMPRIS ──────────────────
   //  Le plan repart d'aujourd'hui chaque matin. Sans mémoire du passé, « une qualité par
   //  semaine » voulait dire « une qualité dans les sept jours qui viennent », recalculé

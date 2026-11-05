@@ -1,3 +1,4 @@
+import { prioriteDe } from "@/lib/coach/saison";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -80,8 +81,8 @@ export default async function CalendrierPage() {
     return { id: String(r.id), date: String(d.date ?? "").slice(0, 10), text: d.text || "" };
   }).filter((n) => n.date);
   const racesPlanned: CalRace[] = rows.filter((r) => r.type === "planned_race").map((r) => {
-    const d = (r.data ?? {}) as { date?: string; name?: string; location?: string; distanceKm?: number | null };
-    return { id: String(r.id), date: String(d.date ?? "").slice(0, 10), name: d.name || r.title || "Course", location: d.location || "", distanceKm: d.distanceKm ?? null };
+    const d = (r.data ?? {}) as { date?: string; name?: string; location?: string; distanceKm?: number | null; priorite?: unknown };
+    return { id: String(r.id), date: String(d.date ?? "").slice(0, 10), name: d.name || r.title || "Course", location: d.location || "", distanceKm: d.distanceKm ?? null, priorite: prioriteDe(d.priorite) };
   }).filter((x) => x.date);
 
   // L'objectif rejoint les courses du calendrier — c'est la date la plus importante du
@@ -91,7 +92,7 @@ export default async function CalendrierPage() {
   const obj = (objRow?.data ?? null) as { race?: string; raceDate?: string; distanceKm?: number; targetTime?: string } | null;
   const objDate = String(obj?.raceDate ?? "").slice(0, 10);
   const races: CalRace[] = obj && /^\d{4}-\d{2}-\d{2}$/.test(objDate)
-    ? [{ id: "race-objective", date: objDate, name: obj.race || "Objectif", location: "", distanceKm: obj.distanceKm ?? null, isObjective: true },
+    ? [{ id: "race-objective", date: objDate, name: obj.race || "Objectif", location: "", distanceKm: obj.distanceKm ?? null, isObjective: true, priorite: "A" as const },
        ...racesPlanned.filter((r) => r.date !== objDate)]
     : racesPlanned;
 

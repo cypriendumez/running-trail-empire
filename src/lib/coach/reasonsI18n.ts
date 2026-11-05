@@ -44,6 +44,8 @@ export type TextesMotifs = {
   repriseArret: (jours: string, volumePct: string, enCours: boolean) => string;
   /** Programme marche-course en cours (`lib/coach/marcheCourse`). */
   marcheCourse: (etape: string, total: string) => string;
+  /** Course B ou C dans les sept jours du plan (`lib/coach/saison`) ; date déjà mise en forme. */
+  courseSecondaire: (nom: string, date: string, b: boolean) => string;
 };
 
 export const MOTIF_T: Record<Lang, TextesMotifs> = {
@@ -70,6 +72,7 @@ export const MOTIF_T: Record<Lang, TextesMotifs> = {
       ? `aucune course enregistrée depuis ${j} jours : on repart à ${v} % de ton volume habituel cette semaine (règle de Daniels). Si tu as couru, ta montre ne synchronise plus : vérifie sa connexion`
       : `reprise après ${j} jours sans courir : ${v} % de ton volume habituel cette semaine — la reprise dure autant que l'arrêt (règle de Daniels)`,
     marcheCourse: (e, t) => `programme marche-course, étape ${e}/${t} : ni séance de qualité ni test VMA tant que tu ne cours pas 30 minutes d'affilée — la course s'allonge à chaque étape`,
+    courseSecondaire: (n, d, b) => b ? `course B cette semaine : ${n} (${d}) — deux jours calmes avant et une semaine allégée de 15 %, puis la récupération` : `course C cette semaine : ${n} (${d}) — elle remplace une séance de qualité, sans affûtage`,
   },
   en: {
     douleur: (z) => `ongoing pain (${z})`,
@@ -94,6 +97,7 @@ export const MOTIF_T: Record<Lang, TextesMotifs> = {
       ? `no run recorded for ${j} days: we restart at ${v}% of your usual volume this week (Daniels' rule). If you did run, your watch is no longer syncing: check its connection`
       : `back after ${j} days without running: ${v}% of your usual volume this week — the comeback lasts as long as the break (Daniels' rule)`,
     marcheCourse: (e, t) => `walk/run programme, stage ${e}/${t}: no hard sessions and no VO2max test until you can run 30 minutes non-stop — the running gets longer at every stage`,
+    courseSecondaire: (n, d, b) => b ? `B race this week: ${n} (${d}) — two easy days before and a week 15% lighter, then recovery` : `C race this week: ${n} (${d}) — it replaces a quality session, no taper`,
   },
   de: {
     douleur: (z) => `bestehende Schmerzen (${z})`,
@@ -118,6 +122,7 @@ export const MOTIF_T: Record<Lang, TextesMotifs> = {
       ? `seit ${j} Tagen kein Lauf aufgezeichnet: Diese Woche starten wir mit ${v} % deines üblichen Umfangs neu (Daniels-Regel). Falls du gelaufen bist, synchronisiert deine Uhr nicht mehr: Prüfe ihre Verbindung`
       : `Wiedereinstieg nach ${j} Tagen ohne Laufen: ${v} % deines üblichen Umfangs diese Woche — der Wiedereinstieg dauert so lange wie die Pause (Daniels-Regel)`,
     marcheCourse: (e, t) => `Geh-Lauf-Programm, Stufe ${e}/${t}: keine intensiven Einheiten und kein VMA-Test, bis du 30 Minuten am Stück laufen kannst — das Laufen wird mit jeder Stufe länger`,
+    courseSecondaire: (n, d, b) => b ? `B-Rennen diese Woche: ${n} (${d}) — zwei ruhige Tage davor und eine um 15 % leichtere Woche, danach Erholung` : `C-Rennen diese Woche: ${n} (${d}) — es ersetzt eine Qualitätseinheit, ohne Tapering`,
   },
   es: {
     douleur: (z) => `dolor en curso (${z})`,
@@ -142,6 +147,7 @@ export const MOTIF_T: Record<Lang, TextesMotifs> = {
       ? `ninguna carrera registrada desde hace ${j} días: esta semana retomamos al ${v} % de tu volumen habitual (regla de Daniels). Si has corrido, tu reloj ya no sincroniza: revisa su conexión`
       : `vuelta tras ${j} días sin correr: un ${v} % de tu volumen habitual esta semana; la vuelta dura tanto como la pausa (regla de Daniels)`,
     marcheCourse: (e, t) => `programa de caminar y correr, etapa ${e}/${t}: ni sesiones de calidad ni test de VMA hasta que corras 30 minutos seguidos; la carrera se alarga en cada etapa`,
+    courseSecondaire: (n, d, b) => b ? `carrera B esta semana: ${n} (${d}); dos días tranquilos antes y una semana un 15 % más suave, luego la recuperación` : `carrera C esta semana: ${n} (${d}); sustituye una sesión de calidad, sin puesta a punto`,
   },
   pt: {
     douleur: (z) => `dor em curso (${z})`,
@@ -166,5 +172,6 @@ export const MOTIF_T: Record<Lang, TextesMotifs> = {
       ? `nenhuma corrida registada há ${j} dias: esta semana retomamos a ${v} % do teu volume habitual (regra de Daniels). Se correste, o teu relógio deixou de sincronizar: verifica a ligação`
       : `retoma após ${j} dias sem correr: ${v} % do teu volume habitual esta semana; a retoma dura tanto quanto a pausa (regra de Daniels)`,
     marcheCourse: (e, t) => `programa de caminhada e corrida, etapa ${e}/${t}: nem sessões de qualidade nem teste de VMA até conseguires correr 30 minutos seguidos; a corrida aumenta a cada etapa`,
+    courseSecondaire: (n, d, b) => b ? `prova B esta semana: ${n} (${d}); dois dias calmos antes e uma semana 15 % mais leve, depois a recuperação` : `prova C esta semana: ${n} (${d}); substitui uma sessão de qualidade, sem afinamento`,
   },
 };
