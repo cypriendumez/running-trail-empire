@@ -29,6 +29,8 @@ import type { MetriqueVfc } from "@/lib/health/vfc";
 import { computeWeeklyTrend } from "@/lib/dashboard/semaines";
 import { dansFenetre, ageJours, avancementObjectif } from "@/lib/dashboard/fenetre";
 import { computeForme, socleDesSeances } from "@/lib/dashboard/forme";
+import { etapesSeance } from "@/lib/dashboard/etapes";
+import { ZONE_NORMALE_VFC } from "@/lib/health/vfc";
 import { derniereAnalyse, lienSeance, type AnalyseMemorisee } from "@/lib/dashboard/derniereAnalyse";
 import { computeDistancePRs, type RecordDeclare } from "@/lib/dashboard/records";
 import { AjoutRecord } from "@/components/dashboard/AjoutRecord";
@@ -207,6 +209,9 @@ export type { SourceVma } from "@/lib/dashboard/vmaAffichee";
 import type { SourceVma } from "@/lib/dashboard/vmaAffichee";
 import type { CleIndicateur } from "@/lib/indicateurs/types";
 
+/** Une distance, un dénivelé : une valeur absente, négative ou illisible compte pour 0. */
+const positif = (v: number | null | undefined): number => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0);
+
 export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, plan, league, prWorkouts, recordsDeclares = [], premiereSeance = null, chargeHistory, sleep, coachSession, ressenti, objective, derniereCourse = null, currentVma, sourceVma = null, loadRisk, newMembersWeek, streak, acces, donneesIncompletes, jourAujourdhui, planCoach = null, montreReliee = false, analyses = [], cibleVolumeKm = null }: Props) {
   const { t, lang } = useT();
   // ⚠️ LES NOMBRES À LA LANGUE (06/11/2026). `toFixed` écrivait « 11.4 km/h » et « 15.0 km »
@@ -217,6 +222,8 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
   // Une durée en minutes → « 7h05 », arrondie : des minutes décimales donnaient
   // « 3h7.6699999999999875 » et faisaient déborder la carte (crash-test au hasard).
   const hm = (min: number) => { const m = Math.max(0, Math.round(Number.isFinite(min) ? min : 0)); return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`; };
+  // Une durée de séance : « 46 min » sous l'heure, « 1h02 » au-delà — « 0h46 » se lisait mal.
+  const duree = (min: number) => { const m = Math.max(0, Math.round(Number.isFinite(min) ? min : 0)); return m < 60 ? `${m} min` : hm(m); };
   // État RELATIF à la base de l'athlète, et seulement si la mesure est fraîche — même
   // règle que la fiche détaillée (`etatPhysiologique`), qui ne peut pas dire autre chose.
   // ⚠️ LE JOUR DE L'ATHLÈTE, PAS CELUI DE LA MACHINE. Tout ce qui dépend d'« aujourd'hui »
@@ -243,10 +250,11 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
   //    séance ait changé. Voir `lib/dashboard/fenetre`.
   const weeklyKm = runs
     .filter(w => dansFenetre(w.date, 7, jour))
-    .reduce((sum, w) => sum + (w.distance_km ?? 0), 0);
+    .reduce((sum, w) => sum + positif(w.distance_km), 0);
 
   const hrvChartData = hrv.slice(0, 14).reverse()
-    .filter(h => h.hrv_ms != null)
+    // Une mesure absente, nulle ou illisible ne devient pas un point « NaN ms » du graphe.
+    .filter(h => Number.isFinite(h.hrv_ms) && h.hrv_ms > 0)
     .map(h => ({
       date: formatDateCivile(String(h.date).slice(0, 10), lang, { day: "2-digit", month: "2-digit" }),
       hrv: h.hrv_ms,
@@ -257,8 +265,8 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
     const dayWorkouts = runs.filter(w => String(w.date).slice(0, 10) === d);
     return {
       day: formatDateCivile(d, lang, { weekday: "short" }),
-      km: dayWorkouts.reduce((s, w) => s + (w.distance_km ?? 0), 0),
-      elev: dayWorkouts.reduce((s, w) => s + (w.elevation_gain_m ?? 0), 0),
+      km: dayWorkouts.reduce((s, w) => s + positif(w.distance_km), 0),
+      elev: dayWorkouts.reduce((s, w) => s + positif(w.elevation_gain_m), 0),
     };
   });
 
@@ -281,6 +289,9 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
   const sv = statsVfc(hrv, Date.now(), jour);
   const hrvLatest = sv.dernier, hrvJours = sv.jours, hrvBaseline = sv.base, hrvDelta = sv.ecart;
   const hrvFraiche = sv.fraiche;
+  // Un léger creux sous la moyenne n'est pas un signal : même seuil que l'état du jour
+  // (`etatDuJour`, ZONE_NORMALE_VFC) — la pastille ne doit pas alarmer pour 2 ms.
+  const hrvDansNorme = hrvDelta != null && hrvBaseline != null && hrvBaseline > 0 && hrvDelta < 0 && -hrvDelta / hrvBaseline <= ZONE_NORMALE_VFC;
 
   // État du jour = lecture honnête de la forme (VFC vs base + sommeil récent), pas un label figé.
   const readiness = computeReadiness(hrvFraiche ? hrvDelta : null, hrvFraiche ? hrvBaseline : null, freshSleep?.sleep_score ?? null, t, lang, planCoach, montreReliee);
@@ -584,7 +595,9 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
           <AlertTriangle className="h-5 w-5 flex-shrink-0 text-rose-500" />
           <p className="text-rose-800">
             {fill(t("dash.incomplet"), {
-              quoi: (donneesIncompletes ?? []).map((k) => t(`dash.inc.${k}`)).join(", "),
+              // Un identifiant sans libellé n'affiche pas sa clé brute (« dash.inc.xxx ») :
+              // on nomme ce qu'on sait nommer, sinon « tes données » en général.
+              quoi: (donneesIncompletes ?? []).map((k) => t(`dash.inc.${k}`)).filter((l) => !l.startsWith("dash.inc.")).join(", ") || t("dash.inc.donnees"),
             })}
           </p>
         </div>
@@ -810,7 +823,26 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             </div>
 
             <h2 className="text-[1.4rem] font-bold leading-[1.1] tracking-tight drop-shadow-sm sm:text-[1.7rem]">{coachKey.title}</h2>
-            {coachKey.subtitle && <p className="mt-2 max-w-2xl text-[13.5px] leading-relaxed text-white/85 sm:text-[15px]">{coachKey.subtitle}</p>}
+            {/* La prescription en ÉTAPES quand le coach l'a chaînée par des flèches
+                (lib/dashboard/etapes) ; sinon, la phrase telle quelle. */}
+            {coachKey.subtitle && (() => {
+              const etapes = etapesSeance(coachKey.subtitle);
+              if (!etapes) return <p className="mt-2 max-w-2xl text-[13.5px] leading-relaxed text-white/85 sm:text-[15px]">{coachKey.subtitle}</p>;
+              return (
+                <ol className="mt-3.5 max-w-2xl space-y-2" aria-label={coachKey.subtitle}>
+                  {etapes.map((e, i) => (
+                    <li key={i} className="relative flex gap-3 pl-0.5">
+                      {i < etapes.length - 1 && <span aria-hidden className="absolute left-[9px] top-5 h-[calc(100%-4px)] w-px bg-white/20" />}
+                      <span aria-hidden className={`relative mt-1 flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-full text-[10px] font-bold tabular-nums ${e.coeur ? "bg-white text-emerald-800" : "bg-white/10 text-white/70 ring-1 ring-white/25"}`}>{i + 1}</span>
+                      <p className={`min-w-0 leading-relaxed ${e.coeur ? "text-[14px] font-medium text-white sm:text-[15px]" : "text-[13px] text-white/70 sm:text-[13.5px]"}`}>
+                        {e.libelle && <span className="mr-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-100/80">{e.libelle}</span>}
+                        {e.texte}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+              );
+            })()}
 
             {coachKey.tags.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-2">
@@ -904,7 +936,10 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                 au lieu de faire passer un repère générique pour la mesure de l'athlète. */}
             <div className="mt-3 border-t border-zinc-100 pt-2.5 text-[10px] leading-relaxed text-zinc-400">
               {forme.reference === "objectif" && forme.cibleLongueKm != null
-                ? t("dash.forme.ref", { l: forme.cibleLongueKm, v: forme.cibleVolumeKm ?? "—" })
+                ? (forme.cibleVolumeKm != null
+                  ? t("dash.forme.ref", { l: forme.cibleLongueKm, v: forme.cibleVolumeKm })
+                  // Sans cible de volume, on ne l'écrit pas : « volume — km/sem » se lisait comme une panne.
+                  : t("dash.forme.refLongue", { l: forme.cibleLongueKm }))
                 : t("dash.forme.refGen")}
             </div>
             {/* ⚠️ CE BLOC COMBLE 106 px DE VIDE MESURÉ, avec de la DONNÉE, pas du
@@ -969,18 +1004,18 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             <VersFiche cle="vfc" titre={t("dash.hrv.title")} lang={lang} />
               <div className="mt-1 flex items-baseline gap-2">
                 <span className="text-3xl font-bold tabular-nums text-zinc-900">
-                  {hrvLatest != null ? hrvLatest.toFixed(0) : "--"} <span className="text-sm font-normal text-zinc-400">ms</span>
+                  {hrvLatest != null ? hrvLatest.toFixed(0) : "—"} <span className="text-sm font-normal text-zinc-400">ms</span>
                 </span>
                 {hrvDelta != null && (
-                  <span className={`inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs font-semibold ${hrvDelta >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>
-                    {hrvDelta >= 0 ? "↑" : "↓"} {Math.round(Math.abs(hrvDelta))} ms
+                  <span className={`inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums ${hrvDansNorme ? "bg-zinc-100 text-zinc-600" : hrvDelta >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>
+                    {hrvDansNorme ? "≈" : hrvDelta >= 0 ? "↑" : "↓"} {Math.round(Math.abs(hrvDelta))} ms
                   </span>
                 )}
               </div>
               {hrvBaseline != null && (
                 <div className="mt-1 text-[11px] text-zinc-400">
                   {t("dash.hrv.baseline")}{deuxPoints}<span className="font-medium text-zinc-500">{hrvBaseline} ms</span>
-                  {hrvDelta != null && <span> · {hrvDelta >= 0 ? t("dash.hrv.above") : t("dash.hrv.below")}</span>}
+                  {hrvDelta != null && <span> · {hrvDansNorme ? t("dash.hrv.norme") : hrvDelta >= 0 ? t("dash.hrv.above") : t("dash.hrv.below")}</span>}
                 </div>
               )}
               {/* Une VFC affichée sans date se lit comme la mesure du matin. Quand elle
@@ -1053,7 +1088,8 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
               <div className="text-[11px] text-zinc-400">{t("dash.vma.sub")}</div>
               {sourceVma && (
                 <div className="mt-0.5 text-[11px] leading-snug text-zinc-400">
-                  {sourceVma.type === "seances" && sourceVma.date
+                  {/* Une séance sans distance mesurée ne se cite pas « (0 km) ». */}
+                  {sourceVma.type === "seances" && sourceVma.date && (sourceVma.km ?? 0) > 0
                     ? t("dash.vma.src.seances", {
                         d: formatDateCivile(sourceVma.date, lang, { day: "numeric", month: "long" }),
                         km: (Math.round((sourceVma.km ?? 0) * 10) / 10).toLocaleString(lang),
@@ -1427,10 +1463,12 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                       à partir de sm, une seule ligne comme avant. */}
                   <div className="order-last flex w-full gap-3 pl-[52px] text-sm text-zinc-600 sm:order-none sm:w-auto sm:flex-shrink-0 sm:gap-4 sm:pl-0">
                     {/* `> 0 ?` et pas `&&` : avec `&&`, une distance ou une FC à 0 affichait « 0 ». */}
-                    {Number(w.distance_km) > 0 ? <span>{nf(Number(w.distance_km))} km</span> : null}
-                    {Number(w.elevation_gain_m) >= 1 ? <span>+{Math.round(Number(w.elevation_gain_m))}m</span> : null}
-                    {Number(w.avg_hr) > 0 ? <span>{Math.round(Number(w.avg_hr))} bpm</span> : null}
-                    {Number(w.duration_seconds) > 0 ? <span className="text-zinc-400">{hm(Number(w.duration_seconds) / 60)}</span> : null}
+                    {/* Colonnes de largeur fixe, chiffres alignés à droite : d'une ligne à
+                        l'autre, les distances, FC et durées se lisent en colonne (07/11/2026). */}
+                    <span className="tabular-nums sm:w-16 sm:text-right">{Number(w.distance_km) > 0 ? `${nf(Number(w.distance_km))} km` : ""}</span>
+                    <span className="hidden tabular-nums text-zinc-400 sm:inline sm:w-14 sm:text-right">{Number(w.elevation_gain_m) >= 1 ? `+${Math.round(Number(w.elevation_gain_m))} m` : ""}</span>
+                    <span className="tabular-nums sm:w-16 sm:text-right">{Number(w.avg_hr) > 0 ? `${Math.round(Number(w.avg_hr))} bpm` : ""}</span>
+                    <span className="tabular-nums text-zinc-400 sm:w-14 sm:text-right">{Number(w.duration_seconds) > 0 ? duree(Number(w.duration_seconds) / 60) : ""}</span>
                   </div>
                   {(() => {
                     // La zone où la séance a le plus duré, MESURÉE (lib/dashboard/zones) — sinon rien.
@@ -1751,22 +1789,38 @@ function aiToSession(s: { title: string; subtitle: string; tags: string[]; why: 
 // ── Métriques réellement disponibles de la dernière séance (jamais de "--" vide) ──
 function buildLastMetrics(w: Workout, t: TFn, lang: string): { label: string; value: string | number; unit: string }[] {
   const out: { label: string; value: string | number; unit: string }[] = [];
-  if (w.distance_km != null) out.push({ label: t("dash.metric.distance"), value: w.distance_km.toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 }), unit: "km" });
-  if (w.duration_seconds) out.push({ label: t("dash.metric.duration"), value: `${Math.floor(w.duration_seconds / 3600)}h${String(Math.floor((w.duration_seconds % 3600) / 60)).padStart(2, "0")}`, unit: "" });
+  // ⚠️ UNE MESURE, C'EST UN NOMBRE POSITIF (crash-test du rendu, 07/11/2026). Une durée
+  // négative s'affichait « -278h-47 », une FC à 0 « 0 bpm » : un capteur muet n'est pas
+  // une mesure. Ce qui n'est pas mesuré n'est pas affiché.
+  const mesure = (v: unknown): number | null => { const n = Number(v); return v != null && Number.isFinite(n) && n > 0 ? n : null; };
+  const ent = (v: number) => Math.round(v);
+  const km = mesure(w.distance_km), sec = mesure(w.duration_seconds);
+  if (km != null) out.push({ label: t("dash.metric.distance"), value: km.toLocaleString(lang, { minimumFractionDigits: km >= 100 ? 0 : 1, maximumFractionDigits: km >= 100 ? 0 : 1 }), unit: "km" });
+  // Moins d'une heure : « 45 min », pas « 0h45 ».
+  if (sec != null) {
+    const min = Math.round(sec / 60);
+    out.push(min < 60
+      ? { label: t("dash.metric.duration"), value: min, unit: "min" }
+      : { label: t("dash.metric.duration"), value: `${Math.floor(min / 60)}h${String(min % 60).padStart(2, "0")}`, unit: "" });
+  }
   // L'ALLURE N'A DE SENS QU'À PIED (06/11/2026) : à vélo, 30 km/h s'affichaient « 2'00/km ».
-  if (w.distance_km && w.duration_seconds && isRun(w.sport)) {
-    const p = (w.duration_seconds / 60) / w.distance_km;
-    if (isFinite(p) && p > 0 && p < 30) out.push({ label: t("dash.metric.pace"), value: `${Math.floor(p)}'${String(Math.round((p - Math.floor(p)) * 60)).padStart(2, "0")}`, unit: "/km" });
+  // Arrondie en SECONDES entières d'abord : 4,9999 min/km donnait « 4'60 ».
+  if (km != null && sec != null && isRun(w.sport)) {
+    const s = Math.round(sec / km);
+    if (s > 0 && s < 30 * 60) out.push({ label: t("dash.metric.pace"), value: `${Math.floor(s / 60)}'${String(s % 60).padStart(2, "0")}`, unit: "/km" });
   }
   // Arrondis : la base peut porter des décimales (« 172.4 spm », « 35.6 m »).
-  const ent = (v: unknown) => Math.round(Number(v));
-  if (w.avg_hr != null) out.push({ label: t("dash.metric.avgHr"), value: ent(w.avg_hr), unit: "bpm" });
-  if (w.avg_cadence_spm != null) out.push({ label: t("dash.metric.cadence"), value: ent(w.avg_cadence_spm), unit: "spm" });
-  if (w.elevation_gain_m != null) out.push({ label: t("dash.metric.elevation"), value: ent(w.elevation_gain_m), unit: "m" });
-  if (w.vertical_oscillation_cm != null) out.push({ label: t("dash.metric.oscillation"), value: Number(w.vertical_oscillation_cm).toLocaleString(lang, { maximumFractionDigits: 1 }), unit: "cm" });
-  const gct = w.ground_contact_time_ms ?? w.ground_contact_ms;
+  const fc = mesure(w.avg_hr), cad = mesure(w.avg_cadence_spm), d = Number(w.elevation_gain_m);
+  if (fc != null && fc < 260) out.push({ label: t("dash.metric.avgHr"), value: ent(fc), unit: "bpm" });
+  if (cad != null && cad < 260) out.push({ label: t("dash.metric.cadence"), value: ent(cad), unit: "spm" });
+  // Le dénivelé peut valoir 0 (piste, route plate) : c'est une mesure ; négatif, non.
+  if (w.elevation_gain_m != null && Number.isFinite(d) && d >= 0) out.push({ label: t("dash.metric.elevation"), value: ent(d).toLocaleString(lang), unit: "m" });
+  const osc = mesure(w.vertical_oscillation_cm);
+  if (osc != null) out.push({ label: t("dash.metric.oscillation"), value: osc.toLocaleString(lang, { maximumFractionDigits: 1 }), unit: "cm" });
+  const gct = mesure(w.ground_contact_time_ms ?? w.ground_contact_ms);
   if (gct != null) out.push({ label: t("dash.metric.groundContact"), value: ent(gct), unit: "ms" });
-  if (w.avg_power_watts != null) out.push({ label: t("dash.metric.power"), value: ent(w.avg_power_watts), unit: "W" });
+  const pw = mesure(w.avg_power_watts);
+  if (pw != null) out.push({ label: t("dash.metric.power"), value: ent(pw), unit: "W" });
   return out.slice(0, 8);
 }
 
@@ -1840,7 +1894,7 @@ function computeWeekSummary(workouts: Workout[], jour: string): { sessions: numb
   // hebdomadaire s'affiche alors « NaN km » et la durée « NaN:NaN », sur la première
   // carte que voit l'athlète. La base est saine aujourd'hui (vérifié), mais le coût
   // d'une garde est nul et celui de l'affichage ne l'est pas.
-  const nombre = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  const nombre = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0);
   return {
     sessions: wk.length,
     km: wk.reduce((s, w) => s + nombre(w.distance_km), 0),

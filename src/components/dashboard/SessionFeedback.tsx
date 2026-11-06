@@ -7,6 +7,18 @@ import { Check, CheckCircle2, Footprints, Loader2, MessageSquareHeart } from "lu
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { kmApres, type SeanceRessenti } from "@/lib/dashboard/ressenti";
 
+/**
+ * Une séance SANS NOM est désignée par son type (lib/dashboard/ressenti) : le code technique
+ * (« easy », « long_run ») s'affichait tel quel, en anglais, dans toutes les langues.
+ */
+const TYPES_SEANCE: Record<string, Record<string, string>> = {
+  fr: { "Séance": "Séance", easy: "Footing", tempo: "Tempo", interval: "Fractionné", long_run: "Sortie longue", race: "Course", recovery: "Récupération", strength: "Renforcement", trail: "Trail", vma: "VMA", hill_repeat: "Côtes" },
+  en: { "Séance": "Session", easy: "Easy run", tempo: "Tempo", interval: "Intervals", long_run: "Long run", race: "Race", recovery: "Recovery run", strength: "Strength", trail: "Trail", vma: "VO₂max intervals", hill_repeat: "Hill repeats" },
+  de: { "Séance": "Einheit", easy: "Lockerer Lauf", tempo: "Tempolauf", interval: "Intervalle", long_run: "Langer Lauf", race: "Wettkampf", recovery: "Regenerationslauf", strength: "Kraft", trail: "Trail", vma: "VO₂max-Intervalle", hill_repeat: "Bergsprints" },
+  es: { "Séance": "Sesión", easy: "Rodaje", tempo: "Tempo", interval: "Series", long_run: "Tirada larga", race: "Carrera", recovery: "Recuperación", strength: "Fuerza", trail: "Trail", vma: "Series VAM", hill_repeat: "Cuestas" },
+  pt: { "Séance": "Sessão", easy: "Corrida leve", tempo: "Tempo", interval: "Intervalos", long_run: "Longão", race: "Prova", recovery: "Recuperação", strength: "Reforço", trail: "Trail", vma: "Séries VAM", hill_repeat: "Subidas" },
+};
+
 /** Une paire active du Garage, telle que le questionnaire la propose. */
 export type ChaussureGarage = { id: string; nom: string; km: number; maxKm: number };
 
@@ -129,7 +141,7 @@ export function SessionFeedback({ seances, chaussures }: { seances: SeanceRessen
             )}
           </div>
           {/* Ce qui DÉSIGNE la séance : son nom, sa date, sa distance, sa durée, son allure. */}
-          <p className="mt-0.5 truncate text-sm font-semibold text-zinc-700">{seance.titre}</p>
+          <p className="mt-0.5 truncate text-sm font-semibold text-zinc-700">{(TYPES_SEANCE[lang] ?? TYPES_SEANCE.fr)[seance.titre] ?? seance.titre}</p>
           <p className="text-xs text-zinc-500">
             {[
               new Date(`${seance.date}T12:00:00`).toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long" }),

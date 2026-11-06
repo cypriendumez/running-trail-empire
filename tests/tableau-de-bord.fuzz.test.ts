@@ -32,7 +32,7 @@ function test(nom: string, fn: () => void) {
 }
 
 // ── Hasard reproductible (mulberry32) ───────────────────────────────────────────
-let graine = 20261106;
+let graine = Number(process.env.FUZZ_GRAINE) || 20261106;
 const alea = () => { graine |= 0; graine = (graine + 0x6d2b79f5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 const entre = (a: number, b: number) => Math.floor(a + alea() * (b - a + 1));
 const un = <T,>(xs: readonly T[]): T => xs[Math.floor(alea() * xs.length)];
@@ -64,7 +64,7 @@ const sain = (v: unknown) => typeof v === "number" && Number.isFinite(v);
 const dansLeDomaine = (v: unknown, lo: number, hi: number) => sain(v) && (v as number) >= lo && (v as number) <= hi;
 const sansNaN = (s: unknown) => !/NaN|undefined|Infinity|null/.test(JSON.stringify(s) ?? "");
 
-const TOURS = 2000;
+const TOURS = Number(process.env.FUZZ_TOURS) || 2000;
 
 console.log(`\nCRASH-TEST AU HASARD — ${TOURS} tours par calcul, graine ${graine}\n`);
 

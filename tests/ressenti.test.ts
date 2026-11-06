@@ -88,7 +88,7 @@ test("le serveur : la distance vient de la SÉANCE, la paire de l'ATHLÈTE, une 
 test("l'écran : la séance nommée, « 1 sur 3 », « Plus tard », et le Garage exigé", () => {
   const src = code("src/components/dashboard/SessionFeedback.tsx");
   assert.ok(/t\("fb\.of", \{ i: index \+ 1, n: seances\.length \}\)/.test(src), "plus de repère « séance 1 sur 3 »");
-  assert.ok(/\{seance\.titre\}/.test(src) && /seance\.distanceKm/.test(src) && /duree\(seance\.dureeSec\)/.test(src), "la séance n'est plus nommée");
+  assert.ok(/\[seance\.titre\] \?\? seance\.titre\}/.test(src) && /seance\.distanceKm/.test(src) && /duree\(seance\.dureeSec\)/.test(src), "la séance n'est plus nommée");
   assert.ok(/body: JSON\.stringify\(\{ workout_id: seance\.id,/.test(src), "la réponse n'est plus rattachée à la séance");
   // Sans paire au Garage : aucune case à cocher, seulement le chemin du Garage.
   assert.ok(/garage\.length === 0 \? \([\s\S]{0,300}\/dashboard\/profile\?onglet=garage/.test(src), "sans paire, le questionnaire propose quand même un choix");

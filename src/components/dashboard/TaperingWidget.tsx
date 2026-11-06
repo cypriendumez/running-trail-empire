@@ -20,7 +20,7 @@ interface TaperingWidgetProps {
 }
 
 export function TaperingWidget({ workouts, raceDate, aujourdhui }: TaperingWidgetProps) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const { ctl, atl, tsb, history, estimees } = useMemo(() => computeLoad(workouts, aujourdhui), [workouts, aujourdhui]);
 
   const daysToRace = raceDate && aujourdhui
@@ -31,11 +31,14 @@ export function TaperingWidget({ workouts, raceDate, aujourdhui }: TaperingWidge
   const targetTSB = 15;
   const tsbProgress = Math.min(100, Math.max(0, ((tsb + 30) / (targetTSB + 30)) * 100));
 
+  // LA CHARTE (DESIGN.md, 07/11/2026) : surfaces neutres, la couleur ne marque que le SENS
+  // (fraîcheur positive ou négative, état). Les trois aplats pastel bleu/orange/vert et le
+  // bandeau coloré faisaient de cette carte la seule « arc-en-ciel » du tableau de bord.
   const tsbStatus =
-    tsb >= 10 ? { labelK: "tap.status.optimal", color: "text-green-600", bar: "bg-green-600", bg: "bg-[#D1FAE5]" }
-    : tsb >= 0 ? { labelK: "tap.status.rising", color: "text-blue-600", bar: "bg-blue-600", bg: "bg-[#E0F2FE]" }
-    : tsb >= -10 ? { labelK: "tap.status.balanced", color: "text-orange-500", bar: "bg-orange-500", bg: "bg-[#FFEDD5]" }
-    : { labelK: "tap.status.overload", color: "text-red-600", bar: "bg-red-600", bg: "bg-red-50" };
+    tsb >= 10 ? { labelK: "tap.status.optimal", color: "text-emerald-700", bar: "bg-emerald-500", dot: "bg-emerald-500" }
+    : tsb >= 0 ? { labelK: "tap.status.rising", color: "text-emerald-700", bar: "bg-emerald-400", dot: "bg-emerald-400" }
+    : tsb >= -10 ? { labelK: "tap.status.balanced", color: "text-amber-700", bar: "bg-amber-400", dot: "bg-amber-400" }
+    : { labelK: "tap.status.overload", color: "text-rose-700", bar: "bg-rose-500", dot: "bg-rose-500" };
 
   const predictedRaceTSB = isTaperingWindow && daysToRace
     ? Math.min(25, tsb + daysToRace * 1.2)
@@ -43,37 +46,36 @@ export function TaperingWidget({ workouts, raceDate, aujourdhui }: TaperingWidge
 
   return (
     <div className="bento-card h-full">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Zap className="w-4 h-4 text-zinc-500" />
-          <span className="text-sm font-semibold text-zinc-700">{t("tap.title")}</span>
-        </div>
-        {isTaperingWindow && (
-          <span className="text-xs font-semibold px-2 py-1 bg-orange-100 text-orange-700 rounded-full flex items-center gap-1">
-            <Calendar className="w-3 h-3" />
+      <div className="mb-4 flex items-center justify-between">
+        <div className="metric-label">{t("tap.title")}</div>
+        {isTaperingWindow ? (
+          <span className="flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-zinc-700">
+            <Calendar className="h-3 w-3" />
             J-{daysToRace}
           </span>
-        )}
+        ) : <Zap className="h-4 w-4 text-zinc-400" />}
       </div>
 
-      {/* CTL / ATL / TSB row */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        <MetricCard label="CTL" sublabel={t("tap.form")} value={Math.round(ctl)} color="text-blue-700" bg="bg-blue-50" />
-        <MetricCard label="ATL" sublabel={t("tap.fatigue")} value={Math.round(atl)} color="text-orange-700" bg="bg-orange-50" />
+      {/* CTL / ATL / TSB : le nom parlant d'abord, le sigle en petit pour qui le connaît. */}
+      <div className="mb-4 grid grid-cols-3 gap-2">
+        <MetricCard label="CTL" sublabel={t("tap.form")} value={Math.round(ctl)} color="text-zinc-900" />
+        <MetricCard label="ATL" sublabel={t("tap.fatigue")} value={Math.round(atl)} color="text-zinc-900" />
         <MetricCard
           label="TSB"
           sublabel={t("tap.freshness")}
           value={Math.round(tsb)}
-          color={tsb >= 0 ? "text-green-700" : "text-red-600"}
-          bg={tsb >= 0 ? "bg-green-50" : "bg-red-50"}
+          color={tsb >= 0 ? "text-emerald-600" : "text-rose-600"}
           showSign
         />
       </div>
 
       {/* TSB status */}
-      <div className={`rounded-xl px-4 py-3 mb-4 ${tsbStatus.bg}`}>
-        <div className={`text-xs font-semibold ${tsbStatus.color}`}>{t(tsbStatus.labelK)}</div>
-        <div className="mt-2 h-1.5 bg-white/60 rounded-full overflow-hidden">
+      <div className="mb-4">
+        <div className={`flex items-center gap-1.5 text-xs font-semibold ${tsbStatus.color}`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${tsbStatus.dot}`} />
+          {t(tsbStatus.labelK)}
+        </div>
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-zinc-100">
           {/* ⚠️ LA BARRE ÉTAIT NOIRE (06/11/2026) : `style={{ color: "bg-green-600" }}` mettait un
               NOM DE CLASSE dans une propriété CSS — invalide, donc `bg-current` prenait la
               couleur du texte. La classe de fond est maintenant posée directement. */}
@@ -95,19 +97,19 @@ export function TaperingWidget({ workouts, raceDate, aujourdhui }: TaperingWidge
               {t("tap.targetDay")} <span className="font-bold text-zinc-700">+{targetTSB}</span>
             </div>
             <div className="text-xs text-zinc-500">
-              {t("tap.predicted")} <span className={`font-bold ${predictedRaceTSB >= targetTSB ? "text-green-600" : "text-orange-500"}`}>
+              {t("tap.predicted")} <span className={`font-bold ${predictedRaceTSB >= targetTSB ? "text-emerald-600" : "text-amber-600"}`}>
                 +{Math.round(predictedRaceTSB)}
               </span>
             </div>
           </div>
           <div className="h-1.5 bg-zinc-100 rounded-full overflow-hidden">
             <div
-              className={`h-full rounded-full transition-all ${predictedRaceTSB >= targetTSB ? "bg-green-500" : "bg-orange-400"}`}
+              className={`h-full rounded-full transition-all ${predictedRaceTSB >= targetTSB ? "bg-emerald-500" : "bg-amber-400"}`}
               style={{ width: `${Math.min(100, (predictedRaceTSB / 25) * 100)}%` }}
             />
           </div>
           {predictedRaceTSB < targetTSB - 5 && (
-            <p className="mt-2 text-xs text-orange-600 flex items-center gap-1">
+            <p className="mt-2 text-xs text-amber-700 flex items-center gap-1">
               <AlertTriangle className="w-3 h-3" />
               {t("tap.reduce", { min: Math.round((targetTSB - predictedRaceTSB) * 3) })}
             </p>
@@ -125,10 +127,10 @@ export function TaperingWidget({ workouts, raceDate, aujourdhui }: TaperingWidge
               <div
                 key={i}
                 className={`flex-1 rounded-sm transition-all ${
-                  m.tsb >= 0 ? "bg-green-300" : m.tsb >= -15 ? "bg-orange-300" : "bg-red-300"
+                  m.tsb >= 0 ? "bg-emerald-300" : m.tsb >= -15 ? "bg-amber-300" : "bg-rose-300"
                 }`}
                 style={{ height: `${h}px` }}
-                title={`TSB: ${Math.round(m.tsb)}`}
+                title={`${t("tap.freshness")}${lang === "fr" ? "\u00a0: " : ": "}${Math.round(m.tsb) > 0 ? "+" : ""}${Math.round(m.tsb)}`}
               />
             );
           })}
@@ -139,17 +141,17 @@ export function TaperingWidget({ workouts, raceDate, aujourdhui }: TaperingWidge
 }
 
 function MetricCard({
-  label, sublabel, value, color, bg, showSign = false,
+  label, sublabel, value, color, showSign = false,
 }: {
-  label: string; sublabel: string; value: number; color: string; bg: string; showSign?: boolean;
+  label: string; sublabel: string; value: number; color: string; showSign?: boolean;
 }) {
   return (
-    <div className={`${bg} rounded-xl p-3 text-center`}>
-      <div className="text-xs text-zinc-500 mb-0.5">{sublabel}</div>
-      <div className={`text-xl font-black ${color}`}>
+    <div className="rounded-xl bg-zinc-50 px-2 py-2.5 text-center ring-1 ring-inset ring-zinc-100">
+      <div className="truncate text-[11px] font-medium text-zinc-500">{sublabel}</div>
+      <div className={`mt-0.5 text-xl font-bold tabular-nums tracking-tight ${color}`}>
         {showSign && value > 0 ? "+" : ""}{value}
       </div>
-      <div className="text-xs font-semibold text-zinc-400">{label}</div>
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">{label}</div>
     </div>
   );
 }

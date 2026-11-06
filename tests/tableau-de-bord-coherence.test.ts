@@ -23,6 +23,8 @@ import { computeStreak } from "../src/lib/streak/compute";
 import { PLAN_T } from "../src/lib/ai/planI18n";
 import { derniereAnalyse, lienSeance } from "../src/lib/dashboard/derniereAnalyse";
 import { zoneDominante } from "../src/lib/dashboard/zones";
+import { etapesSeance } from "../src/lib/dashboard/etapes";
+import { seancesSansRessenti } from "../src/lib/dashboard/ressenti";
 import { computeDistancePRs, NOMS_DISTANCE } from "../src/lib/dashboard/records";
 import { validerConseils, appliquerConseils, inviteRelecture } from "../src/lib/ai/relectureSemaine";
 
@@ -400,8 +402,8 @@ test("ligue, records, badges, dernière séance", () => {
   assert.match(BENTO, /\{ABREV_RECORD\[lang\] \?\? "RP"\}/, "« RP » s'affiche de nouveau dans toutes les langues");
   assert.match(BENTO, /const earned = plusLongueConnue >= b\.seuil;/, "les badges relisent de nouveau les 40 dernières séances");
   assert.match(BENTO, /\{ seuil: 42, l: "42K"/, "un marathon mesuré 42,19 km n'a de nouveau pas son badge");
-  assert.match(BENTO, /if \(w\.distance_km && w\.duration_seconds && isRun\(w\.sport\)\)/, "une allure au km s'affiche de nouveau pour le vélo");
-  assert.match(BENTO, /value: ent\(w\.avg_cadence_spm\)/);
+  assert.match(BENTO, /if \(km != null && sec != null && isRun\(w\.sport\)\)/, "une allure au km s'affiche de nouveau pour le vélo");
+  assert.match(BENTO, /value: ent\(cad\), unit: "spm"/, "la cadence n'est plus arrondie");
 });
 
 test("décimales et clés : jauge ACWR, cible, étiquettes du coach", () => {
@@ -463,6 +465,55 @@ test("aucune entrée absurde ne fait sortir un axe de 0–100 ni n'en fait un Na
       assert.ok(v != null && v >= 0 && v <= 100, `${c} = ${v} (vma ${vma}, r ${r}, objectif ${JSON.stringify(o)})`);
     }
   }
+});
+
+console.log("\nDESIGN & ÉCRITURE (07/11/2026)");
+
+test("la prescription du jour se lit en étapes ; « Z1→Z2 » collé ne coupe rien ; une phrase seule reste une phrase", () => {
+  const e = etapesSeance("Échauffement 8 min progressif FC Z1→Z2 → Corps : ~5,5 km en Z2 (~4'36/km) → Retour au calme 6 min FC Z1");
+  assert.ok(e && e.length === 3, `étapes : ${JSON.stringify(e)}`);
+  assert.equal(e![0].texte, "Échauffement 8 min progressif FC Z1→Z2");
+  assert.equal(e![1].libelle, "Cœur de séance", "« Corps », mot du format montre, ne s'affiche pas tel quel");
+  assert.equal(e![1].texte, "~5,5 km en Z2 (~4'36/km)");
+  assert.deepEqual(e!.map((x) => x.coeur), [false, true, false], "le cœur de séance n'est pas mis en avant");
+  assert.equal(etapesSeance("Repos complet. Marche ou mobilité si besoin."), null);
+  assert.equal(etapesSeance(""), null);
+  assert.equal(etapesSeance(null), null);
+  // Allemand : « Hauptteil: » est un libellé, gardé tel quel ; sans libellé, le cœur est l'étape du milieu.
+  assert.equal(etapesSeance("Aufwärmen 10 min → Hauptteil: 3 × 10 min → Auslaufen 5 min")![1].libelle, "Hauptteil");
+  assert.deepEqual(etapesSeance("A 10 min → B 20 min → C 5 min")!.map((x) => x.coeur), [false, true, false]);
+  // Rien n'est perdu : chaque morceau se retrouve dans la phrase d'origine.
+  const src = "Échauffement 20 min + 3 lignes droites → Corps : Seuil continu (SOUS-seuil) : 11 min à ~3'48/km → Retour au calme 10 min";
+  for (const x of etapesSeance(src)!) assert.ok(src.includes(x.texte), `texte inventé : ${x.texte}`);
+});
+
+test("le ressenti ne propose jamais une séance à la date illisible", () => {
+  const r = seancesSansRessenti([{ id: "a", date: "pas-une-date", title: "X" }, { id: "b", date: "2026-11-05", title: "Y" }], [], "2026-11-01");
+  assert.deepEqual(r.map((x) => x.id), ["b"]);
+});
+
+test("écriture : pas de « point(s) », pas de durée « 0h46 », pas de « volume — km/sem », pas de clé de panne brute", () => {
+  const banniere = codeNu("src/components/dashboard/ProfileCompletionBanner.tsx");
+  assert.doesNotMatch(banniere, /\(s\)|à l'aveugle/, "la bannière de profil parle de nouveau en « point(s) »");
+  assert.match(banniere, /missing\.length === 1 \? t\.title1/, "le singulier n'est plus distingué");
+  const b = codeNu("src/components/dashboard/BentoDashboard.tsx");
+  assert.match(b, /m < 60 \? `\$\{m\} min`/, "une durée de moins d'une heure s'écrit de nouveau « 0h46 »");
+  assert.match(b, /duree\(Number\(w\.duration_seconds\) \/ 60\)/, "la liste des activités n'utilise plus la durée lisible");
+  assert.doesNotMatch(b, /cibleVolumeKm \?\? "—"/, "« volume — km/sem » est de retour");
+  assert.match(b, /filter\(\(l\) => !l\.startsWith\("dash\.inc\."\)\)/, "une panne inconnue s'affiche de nouveau en clé brute");
+  for (const l of ["fr", "en", "de", "es", "pt"] as const) {
+    const d = T[l] as Record<string, string>;
+    for (const k of ["dash.inc.donnees", "dash.forme.refLongue", "dash.hrv.norme"]) assert.ok(d[k], `${k} manque en ${l}`);
+    assert.doesNotMatch(d["tap.spark"], /TSB/, `« TSB », sigle anglais, s'affiche en ${l}`);
+  }
+  assert.doesNotMatch((T.fr as Record<string, string>)["dash.hrv.empty"], /\bvous\b|votre/, "la carte VFC vouvoie de nouveau");
+});
+
+test("métriques de la dernière séance : une valeur nulle ou négative n'est pas une mesure ; l'allure ne s'écrit jamais 4'60", () => {
+  const b = codeNu("src/components/dashboard/BentoDashboard.tsx");
+  assert.match(b, /Number\.isFinite\(n\) && n > 0 \? n : null/, "une durée négative ou une FC à 0 s'affiche de nouveau");
+  assert.match(b, /const s = Math\.round\(sec \/ km\)/, "l'allure n'est plus arrondie à la seconde entière (4'60 possible)");
+  assert.match(b, /sourceVma\.type === "seances" && sourceVma\.date && \(sourceVma\.km \?\? 0\) > 0/, "la VMA cite de nouveau une séance « (0 km) »");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

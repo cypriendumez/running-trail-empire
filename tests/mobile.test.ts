@@ -286,7 +286,9 @@ test("l'accueil s'ouvre sur la séance du jour, pas sur une demande d'avis", () 
   const iVerte = b.indexOf('order-first relative mb-5 overflow-hidden rounded-3xl p-5');
   assert.ok(iVerte > 0, "la carte complète de la séance du jour a disparu");
   const carte = b.slice(iVerte, b.indexOf("</motion.div>", iVerte));
-  assert.match(carte, /\{coachKey\.subtitle\}/, "la prescription a disparu de la carte — c'est elle qu'on vient lire");
+  assert.match(carte, /etapesSeance\(coachKey\.subtitle\)/, "la prescription n'est plus découpée en étapes");
+  assert.match(carte, /\{coachKey\.subtitle\}<\/p>/, "la prescription d'un seul tenant a disparu de la carte — c'est elle qu'on vient lire");
+  assert.match(carte, /\{e\.texte\}/, "les étapes de la prescription ne s'affichent plus");
   assert.match(carte, /<details className="group mt-4/, "le repli n'est plus dans la carte complète");
   // Le badge ne se coupe pas en deux sur un écran étroit.
   // 06/11/2026 : `badgeCoach` (« Séance du jour », ou « Prochaine séance · 7 nov. » quand ce
