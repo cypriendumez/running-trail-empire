@@ -21,6 +21,7 @@ import {
 } from "../src/lib/visites/empreinte";
 import { agregerVisites, joursEntre, type LigneVisite } from "../src/lib/visites/agreger";
 import { appelSurveille, reponseAnormale } from "../src/components/ErrorReporter";
+import { erreurReseau } from "../src/lib/erreurs/reseau";
 import { INTERDITES } from "../src/lib/sauvegarde/tables";
 
 let passed = 0; const fails: string[] = [];
@@ -122,6 +123,11 @@ test("le bruit technique est masqué par défaut, jamais perdu — et un vrai bu
   // ⚠️ Une VRAIE erreur de prod avec un fichier n'est PAS du bruit — même si c'est « Script error. »
   //    ailleurs : c'est l'absence de fichier (cross-origin) qui la rend opaque, pas le message.
   assert.equal(estBruitDeDev({ url: "https://pacevo.fr/dashboard", message: "Script error.", meta: { file: "app.js", line: 12 } }), false, "une Script error AVEC fichier reste actionnable");
+  // 07/11/2026 : une violation CSP signée par une extension du visiteur n'est pas un défaut de Pacevo.
+  const ext = JSON.stringify({ "csp-report": { "document-uri": "https://pacevo.fr/courses/x", "blocked-uri": "https://joko.s3.amazonaws.com/a.png", "source-file": "safari-web-extension://1F/c.js" } });
+  assert.equal(estBruitDeDev({ url: "https://pacevo.fr/courses/x", message: "CSP report-only — img-src ← https://joko.s3.amazonaws.com/a.png", meta: { extrait: ext } }), true, "une extension du visiteur compte de nouveau comme un défaut");
+  const notre = JSON.stringify({ "csp-report": { "document-uri": "https://pacevo.fr/dashboard/actualite", "blocked-uri": "https://icons.duckduckgo.com/a.ico", "source-file": "https://pacevo.fr/_next/static/chunks/a.js" } });
+  assert.equal(estBruitDeDev({ url: "https://pacevo.fr/dashboard/actualite", message: "CSP report-only — img-src ← x", meta: { extrait: notre } }), false, "une violation de NOTRE code est masquée");
   assert.equal(estBruitDeDev({ url: "https://pacevo.fr/dashboard", message: "TypeError: x is not a function" }), false, "un vrai bug de prod ne doit pas être masqué");
   assert.equal(normaliserMessage("Minified React error #418; visit https://react.dev/errors/418?args[]=text"), "Minified React error #<n>; visit <url>");
 });
@@ -291,6 +297,35 @@ test("seuls les appels qui révèlent un bug sont journalisés — jamais les ba
   assert.equal(reponseAnormale("api", 500), true);
   assert.equal(reponseAnormale("supabase", 403), true, "le 42501 de l'inscription arrive en 403 : c'est LE cas à voir");
   assert.equal(reponseAnormale("supabase", 201), false);
+  // 07/11/2026 : une route introuvable ou une requête mal formée par NOTRE page est un bug.
+  for (const st of [400, 404, 405, 413, 415]) assert.equal(reponseAnormale("api", st), true, `une ${st} de nos routes n'est pas journalisée`);
+  for (const st of [401, 402, 403, 409, 422, 429]) assert.equal(reponseAnormale("api", st), false, `une ${st} est une réponse attendue`);
+});
+
+test("un bouton qui échoue remonte dans Bugs : message d'erreur affiché, bouton cliqué, sans rien changer à l'affichage", () => {
+  const src = codeNu("src/components/ErrorReporter.tsx");
+  assert.match(src, /toast\.error = toastEnveloppe/, "les messages d'erreur affichés ne remontent plus dans l'onglet Bugs");
+  assert.match(src, /return \(toastErreur as [\s\S]{0,80}?\)\(message, data\);/, "l'enveloppe n'affiche plus le message d'origine");
+  assert.match(src, /if \(toast\.error === toastEnveloppe\) toast\.error = toastErreur/, "l'enveloppe des messages ne se retire plus");
+  assert.match(src, /meta: \{ \.\.\.meta, clic: clicRecent\(\) \}/, "le bouton cliqué n'accompagne plus les rapports");
+  assert.match(src, /closest\?\.\('button, \[role="button"\], input\[type="submit"\], input\[type="button"\]'\)/, "le libellé est de nouveau lu sur les liens (noms de séance, de personne)");
+  const panel = codeNu("src/components/admin/BugsPanel.tsx");
+  assert.match(panel, /"bouton": "clic en échec"/);
+  assert.match(panel, /"reseau": "coupure réseau"/);
+  assert.match(panel, /Bouton cliqué/);
+});
+
+test("une coupure réseau n'est pas un écran planté : rangée à part, et la page se relève seule", () => {
+  for (const m of ["network error", "Failed to fetch", "Load failed", "NetworkError when attempting to fetch resource.", "Loading chunk 123 failed.", "fetch failed"])
+    assert.equal(erreurReseau(new TypeError(m)), true, m);
+  assert.equal(erreurReseau({ name: "ChunkLoadError", message: "x" }), true);
+  for (const m of ["hrvDansNorme is not defined", "Cannot read properties of undefined (reading 'node')", "Minified React error #418"])
+    assert.equal(erreurReseau(new Error(m)), false, m);
+  assert.equal(erreurReseau(null), false);
+  const ecran = codeNu("src/app/dashboard/error.tsx");
+  assert.match(ecran, /source: reseau \? "reseau" : "client-render"/, "une coupure réseau est de nouveau classée « écran planté »");
+  assert.match(ecran, /window\.addEventListener\("online", auRetour\)/, "la page ne se relève plus au retour du réseau");
+  assert.match(ecran, /router\.refresh\(\); reset\(\);/, "« Réessayer » ne redemande plus la page au serveur");
 });
 
 test("ErrorReporter enveloppe fetch, n'envoie jamais le corps de la requête, et se retire", () => {

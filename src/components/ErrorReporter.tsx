@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { toast } from "sonner";
 
 // Capture les erreurs JS non gérées (runtime + promesses rejetées) et les envoie à /api/log-error.
 // Dédupe + plafond par session pour ne pas inonder la base en cas de boucle d'erreurs.
@@ -42,14 +43,43 @@ export function appelSurveille(url: string, method: string, supabaseHote = SUPAB
   return null;
 }
 
+/**
+ * Nos routes : ≥ 500, et les refus qui ne peuvent venir que d'un défaut du CODE (07/11/2026) —
+ * 400 (requête mal formée par notre propre page), 404 (route ou ressource introuvable), 405
+ * (mauvaise méthode), 413 / 415 (corps refusé). Une 401 (session), 402/403 (formule), 409, 422
+ * (saisie) ou 429 (quota) restent des RÉPONSES : l'application les attend et les explique.
+ */
+const REFUS_DE_CODE = new Set([400, 404, 405, 413, 415]);
 export function reponseAnormale(genre: "api" | "supabase", status: number): boolean {
-  return genre === "api" ? status >= 500 : status >= 400;
+  return genre === "api" ? status >= 500 || REFUS_DE_CODE.has(status) : status >= 400;
+}
+
+/**
+ * Le libellé du bouton cliqué : c'est lui qui dit, dans l'onglet Bugs, QUEL bouton a échoué.
+ * Seulement les boutons (pas les liens, qui peuvent porter un nom de séance ou de personne),
+ * coupé à 80 caractères.
+ */
+export function libelleBouton(el: Element | null): string | null {
+  const b = el?.closest?.('button, [role="button"], input[type="submit"], input[type="button"]');
+  if (!b) return null;
+  const brut = b.getAttribute("aria-label") || (b as HTMLInputElement).value || b.textContent || b.getAttribute("title") || "";
+  const l = brut.replace(/\s+/g, " ").trim().slice(0, 80);
+  return l || null;
 }
 
 export function ErrorReporter() {
   useEffect(() => {
     const seen = new Set<string>();
     let count = 0;
+    // ── LE DERNIER BOUTON CLIQUÉ (15 s) ────────────────────────────────────────
+    // Un échec qui suit un clic est rattaché à CE bouton : « Enregistrer » plutôt qu'une URL.
+    let dernierClic: { libelle: string; t: number } | null = null;
+    const onClic = (e: MouseEvent) => {
+      const libelle = libelleBouton(e.target as Element | null);
+      if (libelle) dernierClic = { libelle, t: Date.now() };
+    };
+    document.addEventListener("click", onClic, true);
+    const clicRecent = () => (dernierClic && Date.now() - dernierClic.t < 15_000 ? dernierClic.libelle : null);
     const send = (message: string, stack?: string, meta?: Record<string, unknown>, source = "client") => {
       if (count >= 25) return; // garde-fou par session
       const key = (message + (stack ?? "")).slice(0, 200);
@@ -59,7 +89,7 @@ export function ErrorReporter() {
         fetch("/api/log-error", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ source, message, stack, url: location.href, meta }),
+          body: JSON.stringify({ source, message, stack, url: location.href, meta: { ...meta, clic: clicRecent() } }),
           keepalive: true,
         }).catch(() => {});
       } catch { /* ne jamais casser */ }
@@ -103,10 +133,28 @@ export function ErrorReporter() {
     };
     window.fetch = enveloppe;
 
+    // ── LES ÉCHECS QUE L'APPLICATION AFFICHE ELLE-MÊME (07/11/2026) ───────────────
+    // Un bouton qui échoue montre presque toujours un message d'erreur (`toast.error`) :
+    // l'erreur est GÉRÉE, donc invisible de `window.onerror`, et si l'appel répond 200 avec
+    // un `{ error }` ou si l'échec est local (géolocalisation, fichier illisible…), rien ne
+    // remontait. Ce que l'athlète lit comme un échec part désormais dans l'onglet Bugs,
+    // avec le bouton cliqué juste avant. L'affichage, lui, est inchangé.
+    const toastErreur = toast.error;
+    const toastEnveloppe = ((message: unknown, data?: unknown) => {
+      try {
+        const texte = typeof message === "string" ? message : typeof message === "function" ? "(message dynamique)" : "(message riche)";
+        send(`Échec affiché : ${texte.slice(0, 300)}`, undefined, { affiche: true }, "bouton");
+      } catch { /* ne jamais casser l'affichage */ }
+      return (toastErreur as (m: unknown, d?: unknown) => string | number)(message, data);
+    }) as typeof toast.error;
+    toast.error = toastEnveloppe;
+
     return () => {
       window.removeEventListener("error", onError);
       window.removeEventListener("unhandledrejection", onRejection);
       if (window.fetch === enveloppe) window.fetch = original;
+      if (toast.error === toastEnveloppe) toast.error = toastErreur;
+      document.removeEventListener("click", onClic, true);
     };
   }, []);
   return null;

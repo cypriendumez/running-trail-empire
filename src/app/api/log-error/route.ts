@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { rapportLocal } from "@/lib/csp/rapport";
 
 const cut = (s: unknown, n: number) => (typeof s === "string" && s ? s.slice(0, n) : null);
 
@@ -40,6 +41,11 @@ export async function POST(req: Request) {
     const brut = await req.text();
     if (brut.length > CORPS_MAX) return NextResponse.json({ ok: true });
     const body = (JSON.parse(brut || "{}") ?? {}) as Record<string, unknown>;
+    // ⚠️ UN POSTE DE DÉVELOPPEMENT N'ÉCRIT PAS DANS LA BASE DE PRODUCTION (07/11/2026). Même
+    // règle que /api/csp-report : `next dev` utilise la base de production, et une erreur
+    // passagère d'édition (« hrvDansNorme is not defined », page /essai-design-tmp) est
+    // apparue dans l'onglet Bugs comme un défaut de l'application.
+    if (rapportLocal(typeof body.url === "string" ? body.url : "", req.headers.get("host"))) return NextResponse.json({ ok: true });
 
     const admin = createAdminClient();
     const { count } = await admin.from("error_logs")

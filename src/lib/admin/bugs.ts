@@ -1,3 +1,4 @@
+import { rapportEtranger } from "@/lib/csp/rapport";
 /**
  * LE JOURNAL D'ERREURS, LU COMME UN COACH LIT SES ALERTES — regroupé, daté, compté.
  *
@@ -72,6 +73,11 @@ export function estBruitDeDev(l: Pick<LigneErreur, "url" | "message" | "user_age
   // 4. « Script error. » cross-origin, sans fichier : non diagnosticable.
   const fichier = (l.meta as { file?: unknown } | null)?.file;
   if (message.toLowerCase() === "script error." && !fichier) return true;
+  // 5. CSP déclenchée par une EXTENSION du visiteur (07/11/2026) : son script charge ses
+  //    propres images ou polices dans nos pages. La route ne les écrit plus (lib/csp/rapport) ;
+  //    les lignes déjà en base restent, masquées ici.
+  const extrait = (l.meta as { extrait?: unknown } | null)?.extrait;
+  if (typeof extrait === "string" && rapportEtranger(extrait)) return true;
   return false;
 }
 

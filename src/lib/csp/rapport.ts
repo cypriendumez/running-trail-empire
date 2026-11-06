@@ -30,3 +30,26 @@ export function rapportLocal(page: string, hoteRequete: string | null): boolean 
   try { if (page && local(new URL(page).hostname)) return true; } catch { /* page illisible */ }
   return local(String(hoteRequete ?? "").replace(/:\d+$/, ""));
 }
+
+/**
+ * ⚠️ LES EXTENSIONS DES VISITEURS ÉCRIVAIENT DANS « BUGS » (07/11/2026). Sur 30 jours, 36
+ * rapports venaient d'extensions de navigateur (Joko, une extension Firebase, scite…) : leur
+ * script, injecté dans NOS pages, chargeait SES images et SES polices, et la CSP le signalait
+ * comme si Pacevo le faisait. Rien à corriger chez nous, mais l'onglet Bugs comptait ces lignes
+ * comme des « défauts distincts » et noyait les vrais.
+ *
+ * Est étranger : un rapport dont le script source, ou la ressource bloquée, est une extension
+ * (`chrome-extension://`, `moz-extension://`, `safari-web-extension://`…), ou dont la page
+ * n'est pas une page web (`about:blank`, « about » : un cadre créé par une extension).
+ */
+export function rapportEtranger(brut: string): boolean {
+  let r: Record<string, unknown> = {};
+  try {
+    const j = JSON.parse(brut || "{}");
+    r = (j["csp-report"] ?? (Array.isArray(j) ? (j[0]?.body ?? j[0]) : j) ?? {}) as Record<string, unknown>;
+  } catch { return false; }
+  const extension = (v: unknown) => /^[a-z-]*extension:\/\//i.test(String(v ?? ""));
+  if (extension(r["source-file"]) || extension(r["sourceFile"]) || extension(r["blocked-uri"]) || extension(r["blockedURL"])) return true;
+  const page = String(r["document-uri"] ?? r["documentURL"] ?? "");
+  return page !== "" && !/^https?:\/\//i.test(page);
+}

@@ -12,7 +12,7 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { lireRapportCsp, rapportLocal } from "../src/lib/csp/rapport";
+import { lireRapportCsp, rapportLocal, rapportEtranger } from "../src/lib/csp/rapport";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -88,6 +88,33 @@ test("les rapports d'un poste de développement n'entrent pas dans la base de pr
   const route = readFileSync("src/app/api/csp-report/route.ts", "utf8");
   const tri = route.indexOf('if (rapportLocal(page, req.headers.get("host"))) return rien();');
   assert.ok(tri > 0 && tri < route.indexOf("const admin = createAdminClient();"), "la route écrit les rapports locaux, ou les trie trop tard");
+});
+
+test("les rapports des extensions de navigateur et des cadres « about: » n'entrent pas dans Bugs", () => {
+  // 07/11/2026 : 36 lignes en 30 jours venaient d'extensions (Joko, Firebase, scite…).
+  const r = (c: Record<string, unknown>) => JSON.stringify({ "csp-report": { "document-uri": "https://pacevo.fr/courses/x", ...c } });
+  assert.equal(rapportEtranger(r({ "blocked-uri": "https://joko.s3.amazonaws.com/a.png", "source-file": "safari-web-extension://1F1E/content.js" })), true);
+  assert.equal(rapportEtranger(r({ "blocked-uri": "https://www.gstatic.com/f.js", "source-file": "chrome-extension://abc/c.js" })), true);
+  assert.equal(rapportEtranger(r({ "blocked-uri": "moz-extension://abc/x.png" })), true);
+  assert.equal(rapportEtranger(JSON.stringify({ "csp-report": { "document-uri": "about", "blocked-uri": "https://fonts.gstatic.com/x.woff2" } })), true);
+  assert.equal(rapportEtranger(JSON.stringify([{ body: { documentURL: "https://pacevo.fr/", sourceFile: "chrome-extension://z/y.js", blockedURL: "eval" } }])), true);
+  // Une vraie violation de NOTRE code reste : c'est elle qu'on veut voir.
+  assert.equal(rapportEtranger(r({ "blocked-uri": "https://icons.duckduckgo.com/ip3/a.ico", "source-file": "https://pacevo.fr/_next/static/chunks/a.js" })), false);
+  assert.equal(rapportEtranger(r({ "blocked-uri": "eval" })), false);
+  assert.equal(rapportEtranger("pas du json"), false);
+  const route = readFileSync("src/app/api/csp-report/route.ts", "utf8");
+  const tri = route.indexOf("if (rapportEtranger(brut)) return rien();");
+  assert.ok(tri > 0 && tri < route.indexOf("const admin = createAdminClient();"), "la route écrit les rapports des extensions, ou les trie trop tard");
+});
+
+test("le journal d'erreurs ignore un poste de développement, et l'onglet Actualité peut afficher ses icônes", () => {
+  const route = readFileSync("src/app/api/log-error/route.ts", "utf8");
+  const tri = route.indexOf('if (rapportLocal(typeof body.url === "string" ? body.url : "", req.headers.get("host")))');
+  assert.ok(tri > 0 && tri < route.indexOf("const admin = createAdminClient();"), "un `next dev` local écrit de nouveau ses erreurs dans la base de production");
+  // Les icônes des sources de l'Actualité (lib/news/actualites) viennent de icons.duckduckgo.com.
+  const conf = readFileSync("next.config.ts", "utf8");
+  const img = conf.match(/"img-src[^"]*"/)?.[0] ?? "";
+  assert.match(img, /https:\/\/icons\.duckduckgo\.com/, "les icônes de l'Actualité sont de nouveau hors politique CSP");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

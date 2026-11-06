@@ -10,6 +10,8 @@ const TON_SOURCE: Record<string, string> = {
   "client": "bg-zinc-100 text-zinc-700",
   "client-render": "bg-red-50 text-red-700",
   "client-reseau": "bg-amber-50 text-amber-800",
+  "reseau": "bg-sky-50 text-sky-700",
+  "bouton": "bg-orange-50 text-orange-700",
   "onboarding": "bg-rose-50 text-rose-700",
   "server": "bg-violet-50 text-violet-700",
 };
@@ -17,6 +19,10 @@ const LIBELLE_SOURCE: Record<string, string> = {
   "client": "erreur JS",
   "client-render": "écran planté",
   "client-reseau": "appel refusé",
+  // Coupure du réseau de l'athlète pendant un chargement (lib/erreurs/reseau) : pas un bug du code.
+  "reseau": "coupure réseau",
+  // Un message d'erreur montré à l'utilisateur, souvent juste après un clic (ErrorReporter).
+  "bouton": "clic en échec",
   "onboarding": "inscription",
   "server": "serveur",
 };
@@ -138,6 +144,10 @@ export function BugsPanel() {
                         <span className="text-[11px] text-zinc-400">{g.pages[0]?.url}{g.pages.length > 1 ? ` +${g.pages.length - 1}` : ""}</span>
                       </div>
                       <div className="mt-1 truncate font-mono text-[13px] text-zinc-800">{g.message}</div>
+                      {/* Le bouton cliqué juste avant l'échec (ErrorReporter, 15 s) : c'est lui qu'on cherche. */}
+                      {typeof (g.exemple.meta as { clic?: unknown } | null)?.clic === "string" && (
+                        <div className="mt-0.5 truncate text-[11px] text-zinc-500">Bouton cliqué : <span className="font-semibold text-zinc-700">« {(g.exemple.meta as { clic: string }).clic} »</span></div>
+                      )}
                     </div>
                     <div className="flex-shrink-0 text-right text-[11px] text-zinc-500">
                       <div className="text-sm font-bold tabular-nums text-zinc-900">{g.occurrences}×</div>

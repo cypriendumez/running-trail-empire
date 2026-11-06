@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { lireRapportCsp, rapportLocal } from "@/lib/csp/rapport";
+import { lireRapportCsp, rapportLocal, rapportEtranger } from "@/lib/csp/rapport";
 
 /**
  * COLLECTE DES VIOLATIONS CSP (report-only) — cible de `report-uri` (voir next.config.ts, M4).
@@ -29,6 +29,8 @@ export async function POST(req: Request) {
     const { directive, bloque, page } = lireRapportCsp(brut);
     // Un poste de développement ne remplit pas la base de production (lib/csp/rapport).
     if (rapportLocal(page, req.headers.get("host"))) return rien();
+    // Ni les extensions des visiteurs, ni les cadres « about: » (lib/csp/rapport).
+    if (rapportEtranger(brut)) return rien();
     const admin = createAdminClient();
     const { count } = await admin.from("error_logs")
       .select("*", { count: "exact", head: true })
