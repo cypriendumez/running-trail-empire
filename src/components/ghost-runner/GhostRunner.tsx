@@ -669,6 +669,8 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
 
   // ── Séance FC guidée EN DIRECT (durée + zone cible) — annonces vocales, capteur optionnel ──
   function startHrSession() {
+    // Sans FC max, une zone n'a pas de battements : on bascule en libre au lieu d'inventer.
+    if (!libre && refsFc.max == null) { setLibre(true); return; }
     sessionKindRef.current = "hr"; setSessionKind("hr");
     libreRef.current = libre; dernierKmDitRef.current = 0;
     cpsRef.current = []; setCheckpoints([]);
@@ -683,8 +685,9 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
     const cible = intensite === "endurance" ? cibleEndurance(refsFc, fcFootings) : plageFc(intensite, refsFc);
     const z = HR_ZONES[hrZone - 1];
     // ⚠️ EN LIBRE, C'EST L'ATHLÈTE QUI DONNE LA FOURCHETTE : ni zone, ni théorie.
-    hrLoRef.current = libre ? Math.min(fcLo, fcHi) : cible ? cible.lo : Math.round(maxHr * z.lo);
-    hrHiRef.current = libre ? Math.max(fcLo, fcHi) : cible ? cible.hi : Math.round(maxHr * z.hi);
+    const fcMax = refsFc.max ?? 0; // non nul ici : sans FC max, on est passé en libre plus haut
+    hrLoRef.current = libre ? Math.min(fcLo, fcHi) : cible ? cible.lo : Math.round(fcMax * z.lo);
+    hrHiRef.current = libre ? Math.max(fcLo, fcHi) : cible ? cible.hi : Math.round(fcMax * z.hi);
     setPhase("running");
     wantLockRef.current = true; requestWakeLock();
     speak(libre
@@ -960,7 +963,13 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
     seuil: gm?.lthr,
     age: (profile as unknown as { age?: number } | null)?.age,
   });
-  const maxHr = refsFc.max ?? 190;
+  // ⚠️ PLUS DE 190 INVENTÉ (07/11/2026). `refsFc.max ?? 190` affichait des zones en bpm
+  // calculées sur une FC max que personne n'a mesurée — exactement la valeur par défaut
+  // présentée comme une mesure que la règle du projet interdit. Sans FC max (ni mesurée, ni
+  // déclarée, ni seuil, ni âge), les zones n'ont PAS de chiffre, et la séance cardiaque
+  // passe en mode libre : c'est l'athlète qui donne sa fourchette.
+  const maxHr: number | null = refsFc.max;
+  const bpmZone = (z: { lo: number; hi: number }) => (maxHr != null ? `${Math.round(maxHr * z.lo)}–${Math.round(maxHr * z.hi)}` : "—");
   // Zones d'allure = bandes de %VMA → fourchette d'allure (rapide → lent) + icône/teinte.
   const zoneBands = [
     { label: d["hz.1"], lo: 0.50, hi: 0.60, tint: "#0ea5e9", Icon: Heart },
@@ -997,7 +1006,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
         ? [
             { l: d["lb.dur"], v: String(durationMin), u: "min" },
             { l: d["sm.hrZone"], v: zn(hrZone) },
-            { l: d["sm.target"], v: `${Math.round(maxHr * HR_ZONES[hrZone - 1].lo)}–${Math.round(maxHr * HR_ZONES[hrZone - 1].hi)}`, u: "bpm" },
+            { l: d["sm.target"], v: bpmZone(HR_ZONES[hrZone - 1]), u: maxHr != null ? "bpm" : "" },
           ]
         : [
             { l: d["lb.time"], v: formatTime(targetTime) },
@@ -1508,7 +1517,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
               </div>
               {/* Les zones restent là comme RACCOURCIS : on ne les impose plus, on les propose. */}
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {HR_ZONES.map((z) => (
+                {maxHr != null && HR_ZONES.map((z) => (
                   <button key={z.z} onClick={() => { setFcLo(Math.round(maxHr * z.lo)); setFcHi(Math.round(maxHr * z.hi)); }}
                     className="rounded-lg bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-500 transition-colors hover:bg-zinc-200">
                     {zn(z.z)}
@@ -1516,7 +1525,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                 ))}
               </div>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-[11px] text-zinc-400">{tg("hr.max", { n: Math.round(maxHr) })}</p>
+                <p className="text-[11px] text-zinc-400">{maxHr != null ? tg("hr.max", { n: Math.round(maxHr) }) : d["hr.maxInconnue"]}</p>
                 {hrSensor === "on" ? (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700">
                     <Bluetooth className="h-3 w-3" /> {d["hr.on"]}{liveHr != null ? ` · ${liveHr} bpm` : ""}
@@ -1560,12 +1569,12 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                       <button key={z.z} onClick={() => setHrZone(z.z)}
                         className={`w-full flex items-center justify-between rounded-xl px-3 py-2 text-sm transition-all ${hrZone === z.z ? "bg-rose-500 text-white shadow-sm" : "bg-zinc-50 text-zinc-700 hover:bg-zinc-100"}`}>
                         <span className="font-semibold">{zn(z.z)}</span>
-                        <span className={`text-xs tabular-nums ${hrZone === z.z ? "text-rose-100" : "text-zinc-400"}`}>{Math.round(maxHr * z.lo)}–{Math.round(maxHr * z.hi)} bpm</span>
+                        <span className={`text-xs tabular-nums ${hrZone === z.z ? "text-rose-100" : "text-zinc-400"}`}>{bpmZone(z)}{maxHr != null ? " bpm" : ""}</span>
                       </button>
                     ))}
                   </div>
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-[11px] text-zinc-400">{tg("hr.max", { n: Math.round(maxHr) })}</p>
+                    <p className="text-[11px] text-zinc-400">{maxHr != null ? tg("hr.max", { n: Math.round(maxHr) }) : d["hr.maxInconnue"]}</p>
                     {hrSensor === "on" ? (
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-600 ring-1 ring-rose-200">
                         <Bluetooth className="h-3 w-3" /> {d["hr.on"]}{liveHr != null ? ` · ${liveHr} bpm` : ""}
@@ -1604,7 +1613,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                 <div className="flex items-center gap-6 sm:gap-8">
                   <div><div className="text-emerald-100/80 text-sm mb-1">{d["lb.dur"]}</div><div className="text-2xl font-bold">{durationMin} min</div></div>
                   <div><div className="text-emerald-100/80 text-sm mb-1">{d["sm.hrZone"]}</div><div className="text-2xl font-bold">{zn(hrZone)}</div></div>
-                  <div><div className="text-emerald-100/80 text-sm mb-1">{d["sm.target"]}</div><div className="text-2xl font-bold tabular-nums">{Math.round(maxHr * HR_ZONES[hrZone - 1].lo)}–{Math.round(maxHr * HR_ZONES[hrZone - 1].hi)}</div></div>
+                  <div><div className="text-emerald-100/80 text-sm mb-1">{d["sm.target"]}</div><div className="text-2xl font-bold tabular-nums">{bpmZone(HR_ZONES[hrZone - 1])}</div></div>
                 </div>
               )}
               <div className="flex items-center gap-3">

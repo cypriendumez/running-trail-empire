@@ -94,6 +94,20 @@ async function main() {
     assert.match(await discipline(45), /au-dessus du plafond facile \(~162 bpm\)/);
   });
 
+  console.log("\nLE GHOST RUNNER N'INVENTE PAS DE FC MAX (07/11/2026)");
+
+  await test("plus de « ?? 190 » : sans FC max, zones sans chiffre et séance cardiaque en libre", () => {
+    const src = codeNu("src/components/ghost-runner/GhostRunner.tsx");
+    assert.doesNotMatch(src, /\?\?\s*190\b/, "une FC max de 190 inventée est de retour");
+    assert.match(src, /const maxHr: number \| null = refsFc\.max;/);
+    assert.match(src, /if \(!libre && refsFc\.max == null\) \{ setLibre\(true\); return; \}/, "sans FC max, la séance par zone démarre sur des battements inventés");
+    assert.match(src, /maxHr != null \? `\$\{Math\.round\(maxHr \* z\.lo\)\}–\$\{Math\.round\(maxHr \* z\.hi\)\}` : "—"/, "les zones affichent des bpm sans FC max");
+    assert.match(src, /\{maxHr != null && HR_ZONES\.map/, "les raccourcis de zone remplissent la fourchette avec une FC max inconnue");
+    assert.match(src, /: d\["hr\.maxInconnue"\]/, "l'athlète n'est pas prévenu que sa FC max est inconnue");
+    const i18n = readFileSync("src/components/ghost-runner/ghostI18n.tsx", "utf8");
+    assert.equal((i18n.match(/"hr\.maxInconnue":/g) ?? []).length, 5, "le message manque dans une langue");
+  });
+
   console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
   if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }
 }
