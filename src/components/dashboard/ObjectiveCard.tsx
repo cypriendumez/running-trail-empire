@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Link from "next/link";
-import { Loader2, Check, Pencil, Search, MapPin, Flag } from "lucide-react";
+import { Loader2, Check, Pencil, Search, MapPin, Flag, TrendingUp } from "lucide-react";
 import { btnClass } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -192,6 +192,12 @@ export function ObjectiveCard({ objective, derniereCourse = null, currentVma, au
               {/* Le pack jour J (Premium) : visible pour tous, la page dit ce qu'il contient à qui ne l'a pas. */}
               <Link href="/dashboard/jour-j" className="inline-flex items-center gap-1 font-semibold text-emerald-700 underline-offset-2 hover:underline">
                 <Flag className="h-3 w-3" /> {t("obj.packJourJ")}
+              </Link>
+              {/* La page détaillée de l'objectif (préparation, chrono prédit face au visé) :
+                  elle n'était reliée que par la carte « Objectif principal » du rail, retirée
+                  le 06/11/2026 parce qu'elle répétait l'en-tête et cette carte. */}
+              <Link href="/dashboard/indicateurs/objectif" className="inline-flex items-center gap-1 font-semibold text-emerald-700 underline-offset-2 hover:underline">
+                <TrendingUp className="h-3 w-3" /> {t("obj.ouJenSuis")}
               </Link>
             </p>
           </div>

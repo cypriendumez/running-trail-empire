@@ -152,12 +152,12 @@ const TITRES_ETAT: Record<string, Record<string, string>> = {
 };
 
 // Libellés du rail de droite (multilingue).
-const RAIL_LABELS: Record<string, { goal: string; ai: string; badges: string; community: string; communitySub: string; see: string; newWeek: string; records: string; recommend: string; progress: string }> = {
-  fr: { goal: "Objectif principal", ai: "Analyse IA", badges: "Badges", community: "Communauté", communitySub: "Rejoins les coureurs Pacevo", see: "Voir", newWeek: "nouveaux cette semaine", records: "Records personnels", recommend: "Voir les recommandations", progress: "Préparation" },
-  en: { goal: "Main goal", ai: "AI analysis", badges: "Badges", community: "Community", communitySub: "Join the Pacevo runners", see: "View", newWeek: "new this week", records: "Personal records", recommend: "View recommendations", progress: "Preparation" },
-  de: { goal: "Hauptziel", ai: "KI-Analyse", badges: "Abzeichen", community: "Community", communitySub: "Triff die Pacevo-Läufer", see: "Ansehen", newWeek: "neue diese Woche", records: "Persönliche Rekorde", recommend: "Empfehlungen ansehen", progress: "Vorbereitung" },
-  es: { goal: "Objetivo principal", ai: "Análisis IA", badges: "Insignias", community: "Comunidad", communitySub: "Únete a los corredores Pacevo", see: "Ver", newWeek: "nuevos esta semana", records: "Records personales", recommend: "Ver recomendaciones", progress: "Preparación" },
-  pt: { goal: "Objetivo principal", ai: "Análise IA", badges: "Medalhas", community: "Comunidade", communitySub: "Junta-te aos corredores Pacevo", see: "Ver", newWeek: "novos esta semana", records: "Recordes pessoais", recommend: "Ver recomendações", progress: "Preparação" },
+const RAIL_LABELS: Record<string, { ai: string; badges: string; community: string; communitySub: string; see: string; newWeek: string; records: string; recommend: string }> = {
+  fr: { ai: "Analyse IA", badges: "Badges", community: "Communauté", communitySub: "Rejoins les coureurs Pacevo", see: "Voir", newWeek: "nouveaux cette semaine", records: "Records personnels", recommend: "Voir les recommandations" },
+  en: { ai: "AI analysis", badges: "Badges", community: "Community", communitySub: "Join the Pacevo runners", see: "View", newWeek: "new this week", records: "Personal records", recommend: "View recommendations" },
+  de: { ai: "KI-Analyse", badges: "Abzeichen", community: "Community", communitySub: "Triff die Pacevo-Läufer", see: "Ansehen", newWeek: "neue diese Woche", records: "Persönliche Rekorde", recommend: "Empfehlungen ansehen" },
+  es: { ai: "Análisis IA", badges: "Insignias", community: "Comunidad", communitySub: "Únete a los corredores Pacevo", see: "Ver", newWeek: "nuevos esta semana", records: "Records personales", recommend: "Ver recomendaciones" },
+  pt: { ai: "Análise IA", badges: "Medalhas", community: "Comunidade", communitySub: "Junta-te aos corredores Pacevo", see: "Ver", newWeek: "novos esta semana", records: "Recordes pessoais", recommend: "Ver recomendações" },
 };
 
 // Score de forme — 4 axes calculés du réel (endurance & vitesse dérivées des séances/VMA,
@@ -1430,29 +1430,10 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
           </Link>
         </div>
 
-        {/* Objectif principal */}
-        {objective && objDaysTo != null && objDaysTo >= 0 && (
-          <div className="group relative bento-card">
-            <div className="metric-label">{rl.goal}</div>
-            <VersFiche cle="objectif" titre={rl.goal} lang={lang} />
-            <div className="mt-2 truncate text-sm font-bold text-zinc-900">{objective.race}</div>
-            <div className="text-xs text-zinc-400">{objective.distanceKm} km · {objective.targetTime}</div>
-            <div className="mt-3 text-3xl font-black leading-none tabular-nums text-zinc-900">J‑{objDaysTo}</div>
-            {objProgress != null && (
-              <div className="mt-3">
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
-                  <div className="h-full rounded-full bg-[#059669] transition-all duration-1000" style={{ width: `${objProgress}%` }} />
-                </div>
-                <div className="mt-1.5 flex items-center justify-between text-[11px] text-zinc-400">
-                  <span>{rl.progress}</span><span className="font-semibold tabular-nums text-zinc-600">{objProgress}%</span>
-                </div>
-              </div>
-            )}
-            <Link href="/dashboard/calendrier" className="relative z-[3] mt-3 inline-flex items-center gap-1 text-xs font-bold text-[#059669] transition-colors hover:text-[#047857]">
-              {hl.plan} <ChevronRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-        )}
+        {/* ⚠️ PLUS DE CARTE « Objectif principal » ICI (06/11/2026). Elle répétait, mot pour
+            mot, ce que l'en-tête (J-43, course, date, préparation) et la carte Objectif
+            (chrono, allure, Modifier) affichent déjà : le même objectif trois fois sur la
+            page. Son seul apport — la page détaillée — est dans la carte Objectif. */}
 
         {/* Analyse IA */}
         <div className="group relative bento-card">

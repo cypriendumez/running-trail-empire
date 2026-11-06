@@ -50,6 +50,8 @@ export type StreakPrescription = {
   sessionType?: unknown;
   /** Créneau (« matin »/« soir ») — une journée doublée reste UNE journée. */
   moment?: unknown;
+  /** Le texte de la séance (français canonique) : dit si elle se remplace par du repos. */
+  subtitle?: unknown;
 };
 
 /** Ressenti post-séance : la seule source de douleur déclarée qui existe en base
@@ -212,6 +214,16 @@ const txt = (v: unknown) => String(v ?? "");
 
 /** Journée de repos prescrite. Les types du plan sont en français canonique. */
 export const estRepos = (type?: string | null): boolean => /repos|\brest\b/i.test(txt(type));
+/**
+ * LA SÉANCE QUI PROPOSE ELLE-MÊME LE REPOS. Constaté le 06/11/2026 : le 27/10, à J+2 du
+ * marathon de Lille, « Récupération… Ou repos complet si tu le sens mieux » — repos pris,
+ * journée comptée « manqué » : la série punissait l'option que le coach offrait.
+ * ⚠️ PAS LE TYPE « Récup » : la veille et l'avant-veille de course en sont aussi, et ne
+ * proposent pas le repos (c'est le déblocage). On lit ce que la séance DIT.
+ */
+// « Ou repos complet si tu le sens mieux » (récupération), « ou repos si les jambes sont
+// encore lourdes » (reprise à J+2 d'une course) : l'alternative est offerte par « ou repos ».
+export const reposPropose = (texte?: unknown): boolean => /\bou repos\b/i.test(txt(texte));
 
 /**
  * Renforcement musculaire. Invérifiable : une séance de gainage au salon n'arrive
@@ -302,9 +314,12 @@ export function computeStreak(input: StreakInput): StreakResult {
   // créneaux le sont : un jour qui porte « Repos (matin) + Endurance (soir) » est
   // un jour d'entraînement, pas un jour de repos.
   const planParJour = new Map<string, string[]>();
+  // Le jour où CHAQUE séance prescrite se remplace par du repos (repos, ou « ou repos complet »).
+  const reposAccepte = new Map<string, boolean>();
   for (const p of prescriptions) {
     const d = txt(p.date).slice(0, 10);
     const t = txt(p.sessionType) || "?";
+    reposAccepte.set(d, (reposAccepte.get(d) ?? true) && (estRepos(t) || reposPropose(p.subtitle)));
     const l = planParJour.get(d) ?? [];
     // Un même créneau republié plusieurs fois ne doit pas peser deux fois.
     if (!l.includes(t)) l.push(t);
@@ -406,6 +421,12 @@ export function computeStreak(input: StreakInput): StreakResult {
     //    la série, elle, mesure la présence au rendez-vous.
     if (entraine) {
       days.push({ date: d, verdict: "tenu", reason: "seance-faite", prescribed, trained: true });
+      continue;
+    }
+
+    // 4 bis. La séance proposait le repos, et il a été pris : c'est l'option offerte.
+    if (reposAccepte.get(d) === true) {
+      days.push({ date: d, verdict: "tenu", reason: "repos-respecte", prescribed, trained: false });
       continue;
     }
 

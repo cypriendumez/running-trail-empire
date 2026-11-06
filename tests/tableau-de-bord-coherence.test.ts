@@ -19,6 +19,7 @@ import { readFileSync } from "node:fs";
 import { statsVfc, etatDuJour, etatPhysiologique } from "../src/lib/dashboard/discipline";
 import { computeForme } from "../src/lib/dashboard/forme";
 import { T } from "../src/lib/i18n/translations";
+import { computeStreak } from "../src/lib/streak/compute";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -123,6 +124,54 @@ test("le titre de la carte suit l'état du jour, dans les cinq langues", () => {
   }
   assert.match(table, /fr: \{ "dash\.ready\.recup": "En récupération"/, "en récupération, la carte ne le dit plus");
   assert.match(BENTO, /return \{ accent: "#0d9488", tagline: phrase, cle \};/);
+});
+
+console.log("\nLA SÉRIE");
+
+test("une récupération remplacée par du repos tient la série ; un footing manqué la rompt", () => {
+  // Constaté le 06/11/2026 : le 27/10, « Récupération… Ou repos complet si tu le sens
+  // mieux » — repos pris, journée comptée « manqué ».
+  const s = computeStreak({
+    today: "2026-11-06", workouts: [{ date: "2026-10-20", sport: "run", duration_seconds: 3600 }],
+    prescriptions: [
+      { date: "2026-10-27", sessionType: "Récup", subtitle: "Échauffement 15 min très doux FC Z1 → Corps : 25 min en Z1 → Retour au calme 10 min FC Z1. Ou repos complet si tu le sens mieux." },
+      { date: "2026-10-28", sessionType: "Endurance", subtitle: "Corps : ~8 km en Z2" },
+      // La veille d'une course est aussi une « Récup », mais elle ne propose pas le repos.
+      { date: "2026-10-29", sessionType: "Récup", subtitle: "20 min de footing très facile FC Z1 + 3 lignes droites de 80 m à l'allure de course. Rien de plus : on réveille les jambes, on ne les fatigue pas." },
+      // Mentionner le repos n'est pas le proposer.
+      { date: "2026-10-30", sessionType: "Endurance", subtitle: "Footing facile 40 min. Demain : repos complet." },
+      // La reprise à J+2 d'une course le propose, avec d'autres mots.
+      { date: "2026-10-31", sessionType: "Récup", subtitle: "20 à 30 min de footing très facile FC Z1, ou repos si les jambes sont encore lourdes." },
+    ],
+  });
+  const jour = (d: string) => s.days.find((x) => x.date === d);
+  assert.equal(jour("2026-10-27")?.verdict, "tenu", `récupération non courue : ${jour("2026-10-27")?.verdict}`);
+  assert.equal(jour("2026-10-27")?.reason, "repos-respecte");
+  assert.equal(jour("2026-10-28")?.verdict, "rompu", "un footing non fait n'est plus compté manqué");
+  assert.equal(jour("2026-10-29")?.verdict, "rompu", "un déblocage de veille de course, non fait, passe pour un repos");
+  assert.equal(jour("2026-10-30")?.verdict, "rompu", "un footing qui MENTIONNE le repos passe pour un repos");
+  assert.equal(jour("2026-10-31")?.verdict, "tenu", "la reprise d'après-course « ou repos si… » n'accepte plus le repos");
+});
+
+test("« ta séance du 3 nov. » ne finit plus par deux points", () => {
+  for (const lang of ["fr", "en", "de", "es", "pt"] as const) {
+    const m = (T[lang] as Record<string, string>)["streak.threat"];
+    assert.ok(m?.includes("{d}"), `streak.threat manque en ${lang}`);
+    assert.ok(!m.endsWith("{d}."), `${lang} : l'abréviation du mois (« nov. ») prend un second point`);
+  }
+});
+
+console.log("\nL'OBJECTIF, UNE FOIS");
+
+test("l'objectif n'est plus répété dans le rail, et sa fiche reste accessible", () => {
+  // 06/11/2026 : le même objectif trois fois sur la page (en-tête, carte Objectif, carte
+  // « Objectif principal » du rail). La carte du rail répétait les deux autres.
+  assert.doesNotMatch(BENTO, /<VersFiche cle="objectif"/, "la carte « Objectif principal » revient dans le rail");
+  assert.doesNotMatch(BENTO, /rl\.goal|rl\.progress/, "les libellés de la carte retirée reviennent");
+  const carte = codeNu("src/components/dashboard/ObjectiveCard.tsx");
+  assert.match(carte, /<Link href="\/dashboard\/indicateurs\/objectif"[^>]*>\s*<TrendingUp[^>]*\/> \{t\("obj\.ouJenSuis"\)\}/,
+    "la page détaillée de l'objectif n'est plus reliée depuis la carte Objectif");
+  for (const lang of ["fr", "en", "de", "es", "pt"] as const) assert.ok((T[lang] as Record<string, string>)["obj.ouJenSuis"], `obj.ouJenSuis manque en ${lang}`);
 });
 
 console.log("\nCRASH-TEST DU SCORE DE FORME");
