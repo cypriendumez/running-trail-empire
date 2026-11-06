@@ -189,15 +189,39 @@ test("sur mobile, l'avertissement médical part dans « Plus » — mais la lign
   assert.ok(cache > debutMain && cache < finMain, "l'avertissement médical est de nouveau fixé sous l'écran");
 });
 
-test("sur téléphone, la séance du jour vient en deuxième, juste sous « Bonjour »", () => {
-  // Cyprien, 21/09/2026 : « c'est ce qui est très important sur mon application ».
-  // Trois variantes rendent la séance (bannière sans coach, carte compacte, carte
-  // complète) : chacune porte `order-first` sous lg, et la colonne est une pile flex.
+test("la séance du jour vient en deuxième, juste sous « Bonjour », sur téléphone ET sur ordinateur", () => {
+  // Cyprien, 21/09/2026 : « c'est ce qui est très important sur mon application » (téléphone) ;
+  // 07/11/2026 : « avoir la séance juste en dessous de l'onglet Bonjour Cyprien » (ordinateur).
+  // Trois variantes rendent la séance (bannière sans coach, carte compacte, carte complète) :
+  // chacune porte `order-first`, SANS `lg:order-none`, et la colonne est une pile flex partout.
   const src = codeNu("src/components/dashboard/BentoDashboard.tsx");
-  assert.ok(/<div className="flex min-w-0 flex-col lg:block">/.test(src),
-    "la colonne principale n'est plus une pile flex sur mobile : `order-first` n'aurait aucun effet");
-  const variantes = [...src.matchAll(/order-first[^"]*lg:order-none/g)].length;
-  assert.equal(variantes, 3, `${variantes} variante(s) de la séance passent en tête, 3 attendues`);
+  assert.ok(/<div className="flex min-w-0 flex-col">/.test(src),
+    "la colonne principale n'est plus une pile flex : `order-first` n'aurait aucun effet");
+  const variantes = [...src.matchAll(/className="order-first [^"]*"/g)].map((m) => m[0]);
+  assert.equal(variantes.length, 3, `${variantes.length} variante(s) de la séance passent en tête, 3 attendues`);
+  for (const v of variantes) assert.ok(!/lg:order-none/.test(v), `la séance redescend sous la série sur ordinateur : ${v.slice(0, 80)}`);
+});
+
+test("les modules du tableau de bord vont du plus important au moins important", () => {
+  // 07/11/2026 (Cyprien : « du plus important au moins »). Colonne : séance, série, puis
+  // « Aujourd'hui » (forme, VFC, vitesse), l'objectif, « Activité », enfin « Charge & forme ».
+  // Rail : analyse de la dernière séance, la semaine, la discipline, les records, puis bilan
+  // Premium, badges et communauté.
+  const src = codeNu("src/components/dashboard/BentoDashboard.tsx");
+  const ordre = (reperes: string[], ou: string) => {
+    const pos = reperes.map((r) => src.indexOf(r));
+    pos.forEach((p, i) => assert.ok(p > 0, `${ou} : repère introuvable ${reperes[i]}`));
+    for (let i = 1; i < pos.length; i++) assert.ok(pos[i - 1] < pos[i], `${ou} : « ${reperes[i - 1]} » doit précéder « ${reperes[i]} »`);
+  };
+  ordre(['<ProfileCompletionBanner', '<StreakCard', 't("dash.sec.today")', '<ObjectiveCard', 't("dash.sec.activity")', 't("dash.sec.load")'], "colonne");
+  // La bannière de profil est une invitation : DANS la colonne, sous la séance, plus au-dessus de « Bonjour ».
+  assert.ok(src.indexOf("<ProfileCompletionBanner") > src.indexOf('className="flex min-w-0 flex-col"'), "la bannière de profil repasse au-dessus de « Bonjour » et repousse la séance");
+  const rail = src.slice(src.indexOf("<aside"), src.indexOf("</aside>"));
+  const r = (x: string) => rail.indexOf(x);
+  const reperes = ["{analyse && (", 'dash.summary.title', 'disc.hasData', "{rl.records}", "<BilanSemaine", "plusLongueConnue > 0", "rl.community"];
+  const absents = reperes.filter((x) => r(x) < 0);
+  assert.deepEqual(absents, [], `rail : repères introuvables ${absents.join(", ")}`);
+  for (let i = 1; i < reperes.length; i++) assert.ok(r(reperes[i - 1]) < r(reperes[i]), `rail : « ${reperes[i - 1]} » doit précéder « ${reperes[i]} »`);
 });
 
 test("sur téléphone, le calendrier s'ouvre en vue Agenda (verticale), décidé côté serveur", () => {

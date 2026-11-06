@@ -577,9 +577,6 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
 
   return (
     <div className="min-h-full bg-gradient-to-b from-zinc-50 to-white">
-      {/* Profil incomplet : les comptes antérieurs au questionnaire complet ne repassent
-          jamais par l'inscription — on leur dit ce qui manque et ce que ça leur coûte. */}
-      <ProfileCompletionBanner profile={profile as unknown as Record<string, unknown> | null} />
 
       {/* ⚠️ Une lecture a échoué : on le DIT, plutôt que d'afficher des zéros qui
           donneraient à croire que les données ont disparu. */}
@@ -717,12 +714,13 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
 
       {/* ── Contenu principal + rail de droite (3 colonnes avec la sidebar) ── */}
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-6">
-      {/* ⚠️ SUR TÉLÉPHONE, LA SÉANCE VIENT EN DEUXIÈME, juste sous « Bonjour » (Cyprien,
-          21/09/2026 : « c'est ce qui est très important sur mon application »). La colonne
-          devient une pile flex sous `lg` pour que `order-first` sur les trois variantes de
-          la séance (bannière sans coach, carte compacte, carte complète) les fasse passer
-          devant série, objectif et bandeaux — sans toucher à l'ordre du bureau. */}
-      <div className="flex min-w-0 flex-col lg:block">
+      {/* ⚠️ LA SÉANCE VIENT EN DEUXIÈME, juste sous « Bonjour », SUR TÉLÉPHONE (21/09/2026 :
+          « c'est ce qui est très important sur mon application ») ET DÉSORMAIS SUR ORDINATEUR
+          (07/11/2026 : « avoir la séance juste en dessous de l'onglet Bonjour Cyprien »). La
+          colonne est une pile flex à toutes les tailles : `order-first` sur les trois variantes
+          de la séance (bannière sans coach, carte compacte, carte complète) les fait passer
+          devant le ressenti, les alertes, la série et les sections. */}
+      <div className="flex min-w-0 flex-col">
 
       {/* Ressenti post-séance — demandé après la dernière séance */}
       {ressenti && <SessionFeedback seances={ressenti.seances} chaussures={ressenti.chaussures} />}
@@ -743,15 +741,20 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
           lui-même tant qu'il reste plus d'une semaine. */}
       <TrialBanner acces={acces ?? null} />
 
+      {/* ⚠️ SOUS LA SÉANCE, PLUS AU-DESSUS DE « BONJOUR » (07/11/2026). En tête de page, ce
+          bandeau repoussait la séance du jour de 230 px sur téléphone : c'est une invitation,
+          elle passe après ce qu'on vient faire en ouvrant l'application. */}
+      {/* Profil incomplet : les comptes antérieurs au questionnaire complet ne repassent
+          jamais par l'inscription — on leur dit ce qui manque et ce que ça leur coûte. */}
+      <ProfileCompletionBanner profile={profile as unknown as Record<string, unknown> | null} />
+
       {/* La série — la boucle quotidienne, alignée sur le plan et non contre lui. */}
       <StreakCard streak={streak ?? null} />
 
-      {/* Objectif de course — saisi par le client → e-mail coach + perso IA */}
-      <ObjectiveCard objective={objective ?? null} derniereCourse={derniereCourse} currentVma={currentVma ?? null} aujourdhui={jour} />
 
       {/* Prochaine séance — bannière compacte (uniquement si pas de bandeau coach) */}
       {!coachKey && (
-        <div className="order-first mb-5 flex items-center gap-4 rounded-2xl border border-zinc-200/70 bg-white px-5 py-3.5 shadow-sm lg:order-none">
+        <div className="order-first mb-5 flex items-center gap-4 rounded-2xl border border-zinc-200/70 bg-white px-5 py-3.5 shadow-sm">
           <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#ecfdf5]" style={{ color: displaySession.accent }}>
             <Calendar className="h-5 w-5" />
           </span>
@@ -773,7 +776,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
         <motion.div
           initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-          className="order-first relative mb-5 flex items-center gap-4 overflow-hidden rounded-3xl px-5 py-4 text-white shadow-xl shadow-emerald-900/30 ring-1 ring-white/10 sm:px-6 lg:order-none"
+          className="order-first relative mb-5 flex items-center gap-4 overflow-hidden rounded-3xl px-5 py-4 text-white shadow-xl shadow-emerald-900/30 ring-1 ring-white/10 sm:px-6"
           style={{ background: "linear-gradient(120deg,#064e3b 0%,#047857 48%,#0d9488 100%)" }}
         >
           <div className="pointer-events-none absolute -top-16 -right-10 h-44 w-44 rounded-full bg-emerald-300/20 blur-3xl" />
@@ -794,7 +797,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
         <motion.div
           initial={{ opacity: 0, y: 18, scale: 0.99 }} animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          className="order-first relative mb-5 overflow-hidden rounded-3xl p-5 sm:p-6 text-white shadow-2xl shadow-emerald-900/40 ring-1 ring-white/10 lg:order-none"
+          className="order-first relative mb-5 overflow-hidden rounded-3xl p-5 sm:p-6 text-white shadow-2xl shadow-emerald-900/40 ring-1 ring-white/10"
           style={{ background: "linear-gradient(135deg,#064e3b 0%,#047857 44%,#0d9488 100%)" }}
         >
           {/* Halos lumineux — profondeur premium */}
@@ -1112,6 +1115,146 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
           )}
         </motion.div>
 
+        {/* L'OBJECTIF APRÈS « AUJOURD'HUI » (07/11/2026). Le bandeau du haut dit déjà J‑N et la
+            préparation : cette carte sert à fixer ou modifier l'objectif et à ouvrir « Où j'en
+            suis » — utile, mais moins que la séance et l'état du jour. Pleine largeur dans la
+            grille ; sa marge propre est neutralisée, la grille espace déjà ses cartes. */}
+        <div className="col-span-12 [&>div]:mb-0">
+          <ObjectiveCard objective={objective ?? null} derniereCourse={derniereCourse} currentVma={currentVma ?? null} aujourdhui={jour} />
+        </div>
+
+        <SectionLabel>{t("dash.sec.activity")}</SectionLabel>
+
+        {/* Activité 7 jours — barres km/jour */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+          className="col-span-12 md:col-span-8 bento-card flex flex-col"
+        >
+          <div className="mb-4 flex items-center justify-between">
+            <div className="metric-label">{t("dash.weekly.title")}</div>
+            <div className="flex items-center gap-4 text-xs">
+              <span className="text-zinc-400">{t("dash.weekly.total")} <strong className="tabular-nums text-zinc-900">{nf(weekSummary.km)} km</strong></span>
+              <span className="text-zinc-400">{t("dash.chart.elevation")} <strong className="tabular-nums text-zinc-900">+{Math.round(weekSummary.elev)} m</strong></span>
+            </div>
+          </div>
+          {/* Même raison que la carte VFC : la rangée impose sa hauteur, le graphique
+              était figé à 140 px et laissait 36 px de blanc mesuré sous lui. */}
+          <div className="min-h-[140px] flex-1">
+            <MiniBarres barres={weeklyData.map((d) => ({ jour: d.day, valeur: d.km }))} libelle={t("dash.chart.distance")} unite="km" lang={lang} />
+          </div>
+        </motion.div>
+
+        {/* Carte de droite n°1 — toujours remplie (pas de colonne vide) */}
+        <motion.div key={fillers[0].key}
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.10 }}
+          className="col-span-12 md:col-span-4"
+        >
+          {fillers[0].node}
+        </motion.div>
+
+        {/* Dernière séance (col-8) + carte de droite n°2 (col-4) — rangée pavée */}
+        {/* ⚠️ LA SECONDE CARTE PEUT MANQUER (06/11/2026, crash-test au hasard). Le vivier n'a
+            parfois qu'UNE carte : séance du coach publiée (pas de « séance-clé »), pas de nuit
+            récente, aucune COURSE avec une distance (cycliste, randonneur). `fillers[1].node`
+            levait alors une exception et tout le tableau de bord tombait en erreur 500. */}
+        {w0 && lastMetrics.length > 0 && (
+          <>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.30 }}
+              className={`col-span-12 bento-card ${fillers[1] ? "md:col-span-8" : ""}`}
+            >
+              <div className="mb-4 flex items-center gap-2">
+                <Footprints className="h-4 w-4 text-zinc-500" />
+                <div className="metric-label">{t("dash.last.title")}{w0.title ? ` — ${cleanActivityName(w0.title)}` : ""}</div>
+              </div>
+              <div className="grid grid-cols-3 gap-x-4 gap-y-5 sm:grid-cols-4">
+                {lastMetrics.map((m) => (
+                  <div key={m.label} className="text-center">
+                    <div className="text-2xl font-bold leading-none text-zinc-900">
+                      {m.value}<span className="ml-0.5 text-sm font-normal text-zinc-400">{m.unit}</span>
+                    </div>
+                    <div className="mt-1.5 text-xs text-zinc-500">{m.label}</div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+            {fillers[1] && <motion.div key={fillers[1].key}
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
+              className="col-span-12 md:col-span-4"
+            >
+              {fillers[1].node}
+            </motion.div>}
+          </>
+        )}
+
+        {/* Recent workouts */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.40 }}
+          className="col-span-12 bento-card"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="metric-label">{t("dash.recent.title")}</div>
+            {/* La LISTE des séances, pas le calendrier (qui montre le plan à venir). */}
+            <Link href="/dashboard/activites" className="text-xs text-emerald-600 font-medium hover:text-emerald-700">
+              {t("dash.recent.viewAll")}
+            </Link>
+          </div>
+          {workouts.length === 0 ? (
+            <div className="text-center py-8 text-zinc-400 text-sm">
+              {t("dash.recent.empty")}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {workouts.slice(0, 5).map((w) => (
+                <Link
+                  key={w.id}
+                  href={`/dashboard/activite?date=${String(w.date).slice(0, 10)}&dist=${w.distance_km ?? ""}&title=${encodeURIComponent(w.title ?? "")}`}
+                  className="group flex flex-wrap items-center gap-x-4 gap-y-1 p-3 rounded-2xl hover:bg-zinc-50 transition-colors cursor-pointer sm:flex-nowrap"
+                >
+                  <div className="w-9 h-9 bg-zinc-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Activity className="w-4 h-4 text-zinc-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-zinc-900 text-sm truncate group-hover:text-emerald-700">{cleanActivityName(w.title)}</div>
+                    <div className="text-xs text-zinc-400">
+                      {formatDateCivile(String(w.date).slice(0, 10), lang, { weekday: "long", day: "numeric", month: "short" })}
+                    </div>
+                  </div>
+                  {/* ⚠️ DÉBORDEMENT HORIZONTAL SUR TÉLÉPHONE, mesuré à 375 px : la page
+                      partait à 412 px de large et se faisait glisser latéralement. Cinq
+                      valeurs plus une pastille et un chevron ne tiennent pas sur une ligne
+                      de 375 px, et `flex-shrink-0` interdisait au bloc de céder.
+                      On garde donc les mesures qui décrivent l'EFFORT (distance, cardio,
+                      durée) et on masque le dénivelé sous 640 px — c'est la seule des
+                      quatre dont l'absence ne change pas la lecture d'une sortie, et elle
+                      reste disponible au clic sur la séance. */}
+                  {/* ⚠️ SUR TÉLÉPHONE, LES MESURES PASSENT SOUS LE TITRE (Cyprien, 21/09/2026,
+                      capture) : à 375 px elles prenaient ~250 px et ne laissaient que 40 px
+                      au titre et à la date — la date se pliait sur trois lignes SOUS les
+                      chiffres, et le titre de la séance disparaissait. `order-last` +
+                      `w-full` les font passer sur une deuxième ligne, alignée sur le titre ;
+                      à partir de sm, une seule ligne comme avant. */}
+                  <div className="order-last flex w-full gap-3 pl-[52px] text-sm text-zinc-600 sm:order-none sm:w-auto sm:flex-shrink-0 sm:gap-4 sm:pl-0">
+                    {/* `> 0 ?` et pas `&&` : avec `&&`, une distance ou une FC à 0 affichait « 0 ». */}
+                    {/* Colonnes de largeur fixe, chiffres alignés à droite : d'une ligne à
+                        l'autre, les distances, FC et durées se lisent en colonne (07/11/2026). */}
+                    <span className="tabular-nums sm:w-16 sm:text-right">{Number(w.distance_km) > 0 ? `${nf(Number(w.distance_km))} km` : ""}</span>
+                    <span className="hidden tabular-nums text-zinc-400 sm:inline sm:w-14 sm:text-right">{Number(w.elevation_gain_m) >= 1 ? `+${Math.round(Number(w.elevation_gain_m))} m` : ""}</span>
+                    <span className="tabular-nums sm:w-16 sm:text-right">{Number(w.avg_hr) > 0 ? `${Math.round(Number(w.avg_hr))} bpm` : ""}</span>
+                    <span className="tabular-nums text-zinc-400 sm:w-14 sm:text-right">{Number(w.duration_seconds) > 0 ? duree(Number(w.duration_seconds) / 60) : ""}</span>
+                  </div>
+                  {(() => {
+                    // La zone où la séance a le plus duré, MESURÉE (lib/dashboard/zones) — sinon rien.
+                    const z = zoneDominante(w.hr_zone_seconds);
+                    return z ? <span className={`px-2 py-1 rounded-lg text-xs font-medium zone-z${z}`}>Z{z}</span> : null;
+                  })()}
+                  <ChevronRight className="w-4 h-4 text-zinc-300 group-hover:text-emerald-600 flex-shrink-0" />
+                </Link>
+              ))}
+            </div>
+          )}
+        </motion.div>
+
         <SectionLabel>{t("dash.sec.load")}</SectionLabel>
 
         {/* Charge & Affûtage — CTL/ATL/TSB réels (modèle Banister) */}
@@ -1299,138 +1442,6 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             les profils en bronze — rien ne fait monter de palier. Volume et Zones se partagent
             désormais la rangée, moitié-moitié, sans trou. Le classement reste à un clic
             (lien « Voir le classement » de la carte Badges). */}
-
-        <SectionLabel>{t("dash.sec.activity")}</SectionLabel>
-
-        {/* Activité 7 jours — barres km/jour */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
-          className="col-span-12 md:col-span-8 bento-card flex flex-col"
-        >
-          <div className="mb-4 flex items-center justify-between">
-            <div className="metric-label">{t("dash.weekly.title")}</div>
-            <div className="flex items-center gap-4 text-xs">
-              <span className="text-zinc-400">{t("dash.weekly.total")} <strong className="tabular-nums text-zinc-900">{nf(weekSummary.km)} km</strong></span>
-              <span className="text-zinc-400">{t("dash.chart.elevation")} <strong className="tabular-nums text-zinc-900">+{Math.round(weekSummary.elev)} m</strong></span>
-            </div>
-          </div>
-          {/* Même raison que la carte VFC : la rangée impose sa hauteur, le graphique
-              était figé à 140 px et laissait 36 px de blanc mesuré sous lui. */}
-          <div className="min-h-[140px] flex-1">
-            <MiniBarres barres={weeklyData.map((d) => ({ jour: d.day, valeur: d.km }))} libelle={t("dash.chart.distance")} unite="km" lang={lang} />
-          </div>
-        </motion.div>
-
-        {/* Carte de droite n°1 — toujours remplie (pas de colonne vide) */}
-        <motion.div key={fillers[0].key}
-          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.10 }}
-          className="col-span-12 md:col-span-4"
-        >
-          {fillers[0].node}
-        </motion.div>
-
-        {/* Dernière séance (col-8) + carte de droite n°2 (col-4) — rangée pavée */}
-        {/* ⚠️ LA SECONDE CARTE PEUT MANQUER (06/11/2026, crash-test au hasard). Le vivier n'a
-            parfois qu'UNE carte : séance du coach publiée (pas de « séance-clé »), pas de nuit
-            récente, aucune COURSE avec une distance (cycliste, randonneur). `fillers[1].node`
-            levait alors une exception et tout le tableau de bord tombait en erreur 500. */}
-        {w0 && lastMetrics.length > 0 && (
-          <>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.30 }}
-              className={`col-span-12 bento-card ${fillers[1] ? "md:col-span-8" : ""}`}
-            >
-              <div className="mb-4 flex items-center gap-2">
-                <Footprints className="h-4 w-4 text-zinc-500" />
-                <div className="metric-label">{t("dash.last.title")}{w0.title ? ` — ${cleanActivityName(w0.title)}` : ""}</div>
-              </div>
-              <div className="grid grid-cols-3 gap-x-4 gap-y-5 sm:grid-cols-4">
-                {lastMetrics.map((m) => (
-                  <div key={m.label} className="text-center">
-                    <div className="text-2xl font-bold leading-none text-zinc-900">
-                      {m.value}<span className="ml-0.5 text-sm font-normal text-zinc-400">{m.unit}</span>
-                    </div>
-                    <div className="mt-1.5 text-xs text-zinc-500">{m.label}</div>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-            {fillers[1] && <motion.div key={fillers[1].key}
-              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
-              className="col-span-12 md:col-span-4"
-            >
-              {fillers[1].node}
-            </motion.div>}
-          </>
-        )}
-
-        {/* Recent workouts */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.40 }}
-          className="col-span-12 bento-card"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <div className="metric-label">{t("dash.recent.title")}</div>
-            {/* La LISTE des séances, pas le calendrier (qui montre le plan à venir). */}
-            <Link href="/dashboard/activites" className="text-xs text-emerald-600 font-medium hover:text-emerald-700">
-              {t("dash.recent.viewAll")}
-            </Link>
-          </div>
-          {workouts.length === 0 ? (
-            <div className="text-center py-8 text-zinc-400 text-sm">
-              {t("dash.recent.empty")}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {workouts.slice(0, 5).map((w) => (
-                <Link
-                  key={w.id}
-                  href={`/dashboard/activite?date=${String(w.date).slice(0, 10)}&dist=${w.distance_km ?? ""}&title=${encodeURIComponent(w.title ?? "")}`}
-                  className="group flex flex-wrap items-center gap-x-4 gap-y-1 p-3 rounded-2xl hover:bg-zinc-50 transition-colors cursor-pointer sm:flex-nowrap"
-                >
-                  <div className="w-9 h-9 bg-zinc-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <Activity className="w-4 h-4 text-zinc-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-zinc-900 text-sm truncate group-hover:text-emerald-700">{cleanActivityName(w.title)}</div>
-                    <div className="text-xs text-zinc-400">
-                      {formatDateCivile(String(w.date).slice(0, 10), lang, { weekday: "long", day: "numeric", month: "short" })}
-                    </div>
-                  </div>
-                  {/* ⚠️ DÉBORDEMENT HORIZONTAL SUR TÉLÉPHONE, mesuré à 375 px : la page
-                      partait à 412 px de large et se faisait glisser latéralement. Cinq
-                      valeurs plus une pastille et un chevron ne tiennent pas sur une ligne
-                      de 375 px, et `flex-shrink-0` interdisait au bloc de céder.
-                      On garde donc les mesures qui décrivent l'EFFORT (distance, cardio,
-                      durée) et on masque le dénivelé sous 640 px — c'est la seule des
-                      quatre dont l'absence ne change pas la lecture d'une sortie, et elle
-                      reste disponible au clic sur la séance. */}
-                  {/* ⚠️ SUR TÉLÉPHONE, LES MESURES PASSENT SOUS LE TITRE (Cyprien, 21/09/2026,
-                      capture) : à 375 px elles prenaient ~250 px et ne laissaient que 40 px
-                      au titre et à la date — la date se pliait sur trois lignes SOUS les
-                      chiffres, et le titre de la séance disparaissait. `order-last` +
-                      `w-full` les font passer sur une deuxième ligne, alignée sur le titre ;
-                      à partir de sm, une seule ligne comme avant. */}
-                  <div className="order-last flex w-full gap-3 pl-[52px] text-sm text-zinc-600 sm:order-none sm:w-auto sm:flex-shrink-0 sm:gap-4 sm:pl-0">
-                    {/* `> 0 ?` et pas `&&` : avec `&&`, une distance ou une FC à 0 affichait « 0 ». */}
-                    {/* Colonnes de largeur fixe, chiffres alignés à droite : d'une ligne à
-                        l'autre, les distances, FC et durées se lisent en colonne (07/11/2026). */}
-                    <span className="tabular-nums sm:w-16 sm:text-right">{Number(w.distance_km) > 0 ? `${nf(Number(w.distance_km))} km` : ""}</span>
-                    <span className="hidden tabular-nums text-zinc-400 sm:inline sm:w-14 sm:text-right">{Number(w.elevation_gain_m) >= 1 ? `+${Math.round(Number(w.elevation_gain_m))} m` : ""}</span>
-                    <span className="tabular-nums sm:w-16 sm:text-right">{Number(w.avg_hr) > 0 ? `${Math.round(Number(w.avg_hr))} bpm` : ""}</span>
-                    <span className="tabular-nums text-zinc-400 sm:w-14 sm:text-right">{Number(w.duration_seconds) > 0 ? duree(Number(w.duration_seconds) / 60) : ""}</span>
-                  </div>
-                  {(() => {
-                    // La zone où la séance a le plus duré, MESURÉE (lib/dashboard/zones) — sinon rien.
-                    const z = zoneDominante(w.hr_zone_seconds);
-                    return z ? <span className={`px-2 py-1 rounded-lg text-xs font-medium zone-z${z}`}>Z{z}</span> : null;
-                  })()}
-                  <ChevronRight className="w-4 h-4 text-zinc-300 group-hover:text-emerald-600 flex-shrink-0" />
-                </Link>
-              ))}
-            </div>
-          )}
-        </motion.div>
       </div>
       </div>
 
@@ -1445,6 +1456,51 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
           PAS de `overscroll-contain` : le défilement doit se propager à la page une
           fois le bas du rail atteint, sinon la molette se bloque dans le rail. */}
       <aside className="mt-4 space-y-4 lg:sticky lg:top-6 lg:mt-0 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:pr-1">
+        {/* ORDRE DU RAIL, du plus utile au moins utile (07/11/2026, Cyprien : « du plus important
+            au moins ») : ce que le coach dit de la dernière séance, le bilan chiffré de la
+            semaine, la discipline, les records, puis le bilan Premium, les badges et la
+            communauté, qui motivent sans rien dire de l'entraînement du jour. */}
+        {/* ⚠️ « ANALYSE IA » N'EST PLUS LE POURQUOI DE LA SÉANCE DU JOUR (06/11/2026). L'ancienne
+            carte le recopiait mot pour mot (« Pourquoi cette séance ? », carte verte voisine),
+            sous un badge « Beta » écrit en dur. Elle montre l'ANALYSE de la dernière séance
+            courue — mémorisée, jamais déclenchée d'ici : chaque analyse se paie. */}
+        {analyse && (
+          <div className="group relative bento-card">
+            <div className="metric-label">{al.titre}</div>
+            <VersPage href={lienSeance(analyse.seance)} titre={al.titre} lang={lang} />
+            <div className="mt-1 text-[11px] text-zinc-400">
+              {al.seance} · {formatDateCivile(String(analyse.seance.date).slice(0, 10), lang, { day: "numeric", month: "long" })}
+              {Number(analyse.seance.distance_km) > 0 && <> · {(Math.round(Number(analyse.seance.distance_km) * 10) / 10).toLocaleString(lang)} km</>}
+            </div>
+            {analyse.texte ? (
+              <p className="mt-2.5 line-clamp-6 text-sm leading-relaxed text-zinc-600">{analyse.texte}</p>
+            ) : (
+              <p className="mt-2.5 text-sm leading-relaxed text-zinc-500">{al.pasEncore}</p>
+            )}
+            <Link href={lienSeance(analyse.seance)} className="relative z-[3] mt-3 inline-flex items-center gap-1 text-xs font-bold text-[#059669] transition-colors hover:text-[#047857]">
+              {analyse.texte ? al.lire : al.analyser} <ChevronRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        )}
+
+        {/* Cette semaine */}
+        <div className="bento-card">
+          <div className="metric-label">{t("dash.summary.title")}</div>
+          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
+            {[
+              { v: String(weekSummary.sessions), u: "", l: t("dash.summary.sessions") },
+              { v: nf(weekSummary.km), u: "km", l: t("dash.metric.distance") },
+              { v: String(Math.round(weekSummary.elev)), u: "m", l: t("dash.metric.elevation") },
+              { v: fmtTime(weekSummary.sec), u: "", l: t("dash.metric.duration") },
+            ].map((s) => (
+              <div key={s.l}>
+                <div className="text-lg font-bold leading-none tabular-nums text-zinc-900">{s.v}<span className="ml-0.5 text-xs font-normal text-zinc-400">{s.u}</span></div>
+                <div className="mt-1 text-[11px] text-zinc-500">{s.l}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* ⚠️ CETTE CARTE S'APPELAIT « Statut de préparation » ET AFFICHAIT « 90 % ».
             Or `computeReadiness` ne produit AUCUN pourcentage — seulement une couleur et
             une phrase. Le nombre dans l'anneau est `disc.total`, le Score Discipline :
@@ -1498,106 +1554,6 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             (chrono, allure, Modifier) affichent déjà : le même objectif trois fois sur la
             page. Son seul apport — la page détaillée — est dans la carte Objectif. */}
 
-        {/* ⚠️ « ANALYSE IA » N'EST PLUS LE POURQUOI DE LA SÉANCE DU JOUR (06/11/2026). L'ancienne
-            carte le recopiait mot pour mot (« Pourquoi cette séance ? », carte verte voisine),
-            sous un badge « Beta » écrit en dur. Elle montre l'ANALYSE de la dernière séance
-            courue — mémorisée, jamais déclenchée d'ici : chaque analyse se paie. */}
-        {analyse && (
-          <div className="group relative bento-card">
-            <div className="metric-label">{al.titre}</div>
-            <VersPage href={lienSeance(analyse.seance)} titre={al.titre} lang={lang} />
-            <div className="mt-1 text-[11px] text-zinc-400">
-              {al.seance} · {formatDateCivile(String(analyse.seance.date).slice(0, 10), lang, { day: "numeric", month: "long" })}
-              {Number(analyse.seance.distance_km) > 0 && <> · {(Math.round(Number(analyse.seance.distance_km) * 10) / 10).toLocaleString(lang)} km</>}
-            </div>
-            {analyse.texte ? (
-              <p className="mt-2.5 line-clamp-6 text-sm leading-relaxed text-zinc-600">{analyse.texte}</p>
-            ) : (
-              <p className="mt-2.5 text-sm leading-relaxed text-zinc-500">{al.pasEncore}</p>
-            )}
-            <Link href={lienSeance(analyse.seance)} className="relative z-[3] mt-3 inline-flex items-center gap-1 text-xs font-bold text-[#059669] transition-colors hover:text-[#047857]">
-              {analyse.texte ? al.lire : al.analyser} <ChevronRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-        )}
-
-        {/* Bilan de la semaine (Premium) : plusieurs séances lues ensemble. Starter voit la carte verrouillée. */}
-        <BilanSemaine ouvert={!!acces && peut(acces.etat, "bilan")} />
-
-        {/* Badges — jalons de distance réels.
-            ⚠️ SUR TOUT L'HISTORIQUE ET AVEC LA TOLÉRANCE DU GPS (06/11/2026). La plus longue
-            sortie venait des 40 dernières séances : un marathon d'il y a trois mois faisait
-            perdre le badge 42K. Et le seuil était 42,2 km : un marathon mesuré 42,19 km par la
-            montre n'était jamais validé. Les records DÉCLARÉS comptent : ils ont été courus. */}
-        {plusLongueConnue > 0 && (
-          <div className="bento-card">
-            <div className="flex items-center justify-between">
-              <div className="metric-label">{rl.badges}</div>
-              <Link href="/dashboard/leagues" className="text-xs font-medium text-[#059669] hover:text-[#047857]">{t("dash.league.cta")}</Link>
-            </div>
-            <div className="mt-3 flex justify-around gap-2">
-              {[
-                { seuil: 9.9, l: "10K", rim: "#a7f3d0", grad: "linear-gradient(145deg,#10b981,#059669)" },
-                { seuil: 21, l: "21K", rim: "#c7d2fe", grad: "linear-gradient(145deg,#818cf8,#6366f1)" },
-                { seuil: 42, l: "42K", rim: "#fde68a", grad: "linear-gradient(145deg,#fbbf24,#d97706)" },
-              ].map((b) => {
-                const earned = plusLongueConnue >= b.seuil;
-                const HEX = "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)";
-                return (
-                  <div key={b.l} className="flex flex-col items-center gap-1.5">
-                    <div className="flex h-[52px] w-[46px] items-center justify-center" style={{ clipPath: HEX, background: earned ? b.rim : "#e4e4e7" }}>
-                      <div className="flex h-[44px] w-[39px] items-center justify-center text-[11px] font-black" style={{ clipPath: HEX, background: earned ? b.grad : "#f4f4f5", color: earned ? "#fff" : "#a1a1aa" }}>
-                        {b.l}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Cette semaine */}
-        <div className="bento-card">
-          <div className="metric-label">{t("dash.summary.title")}</div>
-          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
-            {[
-              { v: String(weekSummary.sessions), u: "", l: t("dash.summary.sessions") },
-              { v: nf(weekSummary.km), u: "km", l: t("dash.metric.distance") },
-              { v: String(Math.round(weekSummary.elev)), u: "m", l: t("dash.metric.elevation") },
-              { v: fmtTime(weekSummary.sec), u: "", l: t("dash.metric.duration") },
-            ].map((s) => (
-              <div key={s.l}>
-                <div className="text-lg font-bold leading-none tabular-nums text-zinc-900">{s.v}<span className="ml-0.5 text-xs font-normal text-zinc-400">{s.u}</span></div>
-                <div className="mt-1 text-[11px] text-zinc-500">{s.l}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Communauté active */}
-        <div className="bento-card">
-          <div className="flex items-center justify-between">
-            <div className="metric-label">{rl.community}</div>
-            <Link href="/dashboard/communaute" className="text-xs font-medium text-[#059669] hover:text-[#047857]">{rl.see}</Link>
-          </div>
-          <div className="mt-3 flex items-center gap-3">
-            <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#ecfdf5] text-[#059669]"><Users className="h-5 w-5" /></span>
-            <div className="min-w-0">
-              {newMembersWeek && newMembersWeek > 0 ? (
-                <>
-                  <div className="text-lg font-bold tabular-nums text-zinc-900">+{newMembersWeek}</div>
-                  <div className="text-xs text-zinc-400">{rl.newWeek}</div>
-                </>
-              ) : (
-                <>
-                  <div className="truncate text-sm font-semibold text-zinc-900">{leagueName || "Pacevo"}</div>
-                  <div className="text-xs text-zinc-400">{rl.communitySub}</div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
         {/* Records personnels — meilleurs temps réels par distance */}
         {/* Toujours affichée : même sans record mesuré, on peut y DÉCLARER celui d'avant Pacevo. */}
         {(
@@ -1639,6 +1595,65 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             {jourAujourdhui && <AjoutRecord aujourdhui={jourAujourdhui} />}
           </div>
         )}
+        {/* Bilan de la semaine (Premium) : plusieurs séances lues ensemble. Starter voit la carte verrouillée. */}
+        <BilanSemaine ouvert={!!acces && peut(acces.etat, "bilan")} />
+
+        {/* Badges — jalons de distance réels.
+            ⚠️ SUR TOUT L'HISTORIQUE ET AVEC LA TOLÉRANCE DU GPS (06/11/2026). La plus longue
+            sortie venait des 40 dernières séances : un marathon d'il y a trois mois faisait
+            perdre le badge 42K. Et le seuil était 42,2 km : un marathon mesuré 42,19 km par la
+            montre n'était jamais validé. Les records DÉCLARÉS comptent : ils ont été courus. */}
+        {plusLongueConnue > 0 && (
+          <div className="bento-card">
+            <div className="flex items-center justify-between">
+              <div className="metric-label">{rl.badges}</div>
+              <Link href="/dashboard/leagues" className="text-xs font-medium text-[#059669] hover:text-[#047857]">{t("dash.league.cta")}</Link>
+            </div>
+            <div className="mt-3 flex justify-around gap-2">
+              {[
+                { seuil: 9.9, l: "10K", rim: "#a7f3d0", grad: "linear-gradient(145deg,#10b981,#059669)" },
+                { seuil: 21, l: "21K", rim: "#c7d2fe", grad: "linear-gradient(145deg,#818cf8,#6366f1)" },
+                { seuil: 42, l: "42K", rim: "#fde68a", grad: "linear-gradient(145deg,#fbbf24,#d97706)" },
+              ].map((b) => {
+                const earned = plusLongueConnue >= b.seuil;
+                const HEX = "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)";
+                return (
+                  <div key={b.l} className="flex flex-col items-center gap-1.5">
+                    <div className="flex h-[52px] w-[46px] items-center justify-center" style={{ clipPath: HEX, background: earned ? b.rim : "#e4e4e7" }}>
+                      <div className="flex h-[44px] w-[39px] items-center justify-center text-[11px] font-black" style={{ clipPath: HEX, background: earned ? b.grad : "#f4f4f5", color: earned ? "#fff" : "#a1a1aa" }}>
+                        {b.l}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Communauté active */}
+        <div className="bento-card">
+          <div className="flex items-center justify-between">
+            <div className="metric-label">{rl.community}</div>
+            <Link href="/dashboard/communaute" className="text-xs font-medium text-[#059669] hover:text-[#047857]">{rl.see}</Link>
+          </div>
+          <div className="mt-3 flex items-center gap-3">
+            <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#ecfdf5] text-[#059669]"><Users className="h-5 w-5" /></span>
+            <div className="min-w-0">
+              {newMembersWeek && newMembersWeek > 0 ? (
+                <>
+                  <div className="text-lg font-bold tabular-nums text-zinc-900">+{newMembersWeek}</div>
+                  <div className="text-xs text-zinc-400">{rl.newWeek}</div>
+                </>
+              ) : (
+                <>
+                  <div className="truncate text-sm font-semibold text-zinc-900">{leagueName || "Pacevo"}</div>
+                  <div className="text-xs text-zinc-400">{rl.communitySub}</div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       </aside>
       </div>
     </div>
