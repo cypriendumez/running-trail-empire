@@ -84,6 +84,7 @@ MISSION : pour chaque séance ci-dessus, écris UN conseil d'exécution personna
 - Chiffres : UNIQUEMENT ceux qui figurent ci-dessus. Aucun autre.
 - ALLURES : si tu en cites une, c'est EXACTEMENT celle écrite dans CETTE séance (elle est déjà corrigée de la chaleur). Jamais une autre allure du contexte.
 - Le « pourquoi » de chaque séance est DÉJÀ affiché juste au-dessus de ton conseil : ne le répète pas, complète-le.
+- Les étiquettes du contexte (🟢🟡🟠🔴, « vert », « jaune », « feu orange », « verdict », « badge ») sont des repères INTERNES : ne les cite JAMAIS. Dis la raison en mots simples (« tu sors d'un marathon », « ta nuit a été courte »).
 - Temps : ${e.aujourdhui ? `aujourd'hui, c'est le ${e.aujourdhui}. N'écris « aujourd'hui » que pour cette date ; pour les autres, « jeudi », « dimanche »… ou rien.` : "n'écris pas « aujourd'hui » : tu ne sais pas quel jour l'athlète lira."}
 - 2 phrases COURTES au maximum, ${LONGUEUR_MAX} caractères AU TOTAL au maximum — la plus importante d'abord, car au-delà la fin est coupée. En ${NOM_LANGUE[e.lang]}, directement à l'athlète, sans salutation.
 - S'il n'y a rien de PERSONNEL à dire pour une séance, mets "" : un conseil générique ne vaut rien.
@@ -137,6 +138,14 @@ export function raccourcir(texte: string, max = LONGUEUR_MAX): string | null {
   return out.length >= LONGUEUR_MIN ? out : null;
 }
 
+/**
+ * LES ÉTIQUETTES INTERNES DU CONTEXTE, que l'athlète ne doit jamais lire. Constaté le
+ * 06/11/2026 : « avec ton verdict "feu orange léger" » — la règle du niveau JAUNE du
+ * prompt, recopiée entre guillemets. Un conseil qui en contient une est écarté, à
+ * l'écriture COMME à l'application (les conseils mémorisés ne repassent pas par le modèle).
+ */
+export const ETIQUETTE_INTERNE = /\bfeu (?:vert|orange|rouge)\b|\bverdict\b|[🟢🟡🟠🔴]|\b(?:green|yellow|amber|red|orange) light\b|\bampel\b|\bsem[áa]foro\b/i;
+
 /** Les conseils du modèle, validés un par un. Tout ce qui ne passe pas est écarté. */
 export function validerConseils(brut: string, jours: readonly JourPlan[], lang: Lang, source: string, motifs?: string[]): Conseil[] {
   const json = String(brut ?? "").replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").match(/\{[\s\S]*\}/)?.[0];
@@ -156,6 +165,7 @@ export function validerConseils(brut: string, jours: readonly JourPlan[], lang: 
     if (!texte || texte.length < LONGUEUR_MIN) { motifs?.push(`longueur ${brutTexte.length}`); continue; }
     const jour = jours.find((d) => d.date === date);
     const seance = jour ? `${jour.title} ${jour.detail} ${jour.why}` : "";
+    if (ETIQUETTE_INTERNE.test(texte)) { motifs?.push("étiquette interne"); continue; }
     const inconnus = chiffresInconnus(texte, source, seance);
     if (inconnus.length) { motifs?.push(`chiffres inventés ${inconnus.join(",")}`); continue; }
     vus.add(date);
@@ -194,7 +204,7 @@ export function decisionRelecture(prec: EtatRelecture | null | undefined, jour: 
 export function appliquerConseils<T extends { date: string; why: string; i18n?: Partial<Record<Lang, { why: string }>> }>(
   week: readonly T[], conseils: readonly Conseil[],
 ): T[] {
-  const par = new Map(conseils.map((c) => [c.date, c]));
+  const par = new Map(conseils.filter((c) => !ETIQUETTE_INTERNE.test(c.texte)).map((c) => [c.date, c]));
   return week.map((d) => {
     const c = par.get(d.date);
     if (!c) return d;

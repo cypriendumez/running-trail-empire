@@ -139,12 +139,12 @@ const VITALS: Record<string, { hr: string }> = {
 };
 
 // Libellés du rail de droite (multilingue).
-const RAIL_LABELS: Record<string, { ai: string; badges: string; community: string; communitySub: string; see: string; newWeek: string; records: string; recommend: string }> = {
-  fr: { ai: "Analyse IA", badges: "Badges", community: "Communauté", communitySub: "Rejoins les coureurs Pacevo", see: "Voir", newWeek: "nouveaux cette semaine", records: "Records personnels", recommend: "Voir les recommandations" },
-  en: { ai: "AI analysis", badges: "Badges", community: "Community", communitySub: "Join the Pacevo runners", see: "View", newWeek: "new this week", records: "Personal records", recommend: "View recommendations" },
-  de: { ai: "KI-Analyse", badges: "Abzeichen", community: "Community", communitySub: "Triff die Pacevo-Läufer", see: "Ansehen", newWeek: "neue diese Woche", records: "Persönliche Rekorde", recommend: "Empfehlungen ansehen" },
-  es: { ai: "Análisis IA", badges: "Insignias", community: "Comunidad", communitySub: "Únete a los corredores Pacevo", see: "Ver", newWeek: "nuevos esta semana", records: "Records personales", recommend: "Ver recomendaciones" },
-  pt: { ai: "Análise IA", badges: "Medalhas", community: "Comunidade", communitySub: "Junta-te aos corredores Pacevo", see: "Ver", newWeek: "novos esta semana", records: "Recordes pessoais", recommend: "Ver recomendações" },
+const RAIL_LABELS: Record<string, { badges: string; community: string; communitySub: string; see: string; newWeek: string; records: string; recommend: string }> = {
+  fr: { badges: "Badges", community: "Communauté", communitySub: "Rejoins les coureurs Pacevo", see: "Voir", newWeek: "nouveaux cette semaine", records: "Records personnels", recommend: "Voir les recommandations" },
+  en: { badges: "Badges", community: "Community", communitySub: "Join the Pacevo runners", see: "View", newWeek: "new this week", records: "Personal records", recommend: "View recommendations" },
+  de: { badges: "Abzeichen", community: "Community", communitySub: "Triff die Pacevo-Läufer", see: "Ansehen", newWeek: "neue diese Woche", records: "Persönliche Rekorde", recommend: "Empfehlungen ansehen" },
+  es: { badges: "Insignias", community: "Comunidad", communitySub: "Únete a los corredores Pacevo", see: "Ver", newWeek: "nuevos esta semana", records: "Records personales", recommend: "Ver recomendaciones" },
+  pt: { badges: "Medalhas", community: "Comunidade", communitySub: "Junta-te aos corredores Pacevo", see: "Ver", newWeek: "novos esta semana", records: "Recordes pessoais", recommend: "Ver recomendações" },
 };
 
 // Score de forme — 4 axes calculés du réel (endurance & vitesse dérivées des séances/VMA,
@@ -1438,15 +1438,10 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             (chrono, allure, Modifier) affichent déjà : le même objectif trois fois sur la
             page. Son seul apport — la page détaillée — est dans la carte Objectif. */}
 
-        {/* Analyse IA */}
-        <div className="group relative bento-card">
-          <div className="flex items-center justify-between">
-            <div className="metric-label">{rl.ai}</div>
-            <VersPage href="/dashboard/calendrier" titre={rl.ai} lang={lang} />
-            <span className="rounded-md bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-700">Beta</span>
-          </div>
-          <p className="mt-2.5 text-sm leading-relaxed text-zinc-600">{coachKey?.why || coachKey?.subtitle || readiness.tagline}</p>
-        </div>
+        {/* ⚠️ PLUS DE CARTE « Analyse IA · Beta » (06/11/2026). Elle affichait le « pourquoi »
+            de la séance du jour — mot pour mot le « Pourquoi cette séance ? » de la carte verte
+            juste à gauche — et, sans séance du coach, la phrase de l'en-tête. Jamais rien
+            d'autre. Et « Beta » était écrit en dur, sur une fonction qui n'en était pas une. */}
 
         {/* Bilan de la semaine (Premium) : plusieurs séances lues ensemble. Starter voit la carte verrouillée. */}
         <BilanSemaine ouvert={!!acces && peut(acces.etat, "bilan")} />

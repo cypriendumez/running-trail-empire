@@ -148,6 +148,8 @@ export type TextesPlan = {
   lignesDroites: string;
   enduranceDetail: (echauff: number, corps: string, allure: string, calme: number, gap: string, scinder: boolean, cycle: string) => string;
   enduranceWhyTropIntense: (pct: string) => string;
+  /** ⚠️ La CIBLE de la semaine, pas ce qui est couru : « tu es sur ~32 km cette semaine »
+   *  se lisait comme un bilan, constaté le 06/11/2026 chez un coureur à 0 km en 7 jours. */
   enduranceWhy: (cible: string) => string;
 
   // ── Renforcement ────────────────────────────────────────────────────────────
@@ -284,7 +286,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
   lignesDroites: " Termine par 5 lignes droites de 100 m en accélération progressive, récupération complète en marchant : ça entretient la vitesse sans fatiguer.",
     enduranceDetail: (e, c, a, k, g, s, cy) => `Échauffement ${e} min progressif FC Z1→Z2 → Corps : ${c} en Z2${a}, tu dois pouvoir tenir une conversation → Retour au calme ${k} min FC Z1.${g}${s ? " 💡 À ton volume, scinde en DEUX sorties dans la journée (matin + soir) plutôt qu'un seul footing interminable." : ""}${cy}`,
     enduranceWhyTropIntense: (p) => `⚠️ Tu passes ${p} % de ton temps de course en zone 3 et plus, alors que la cible est 20 %. Tes footings sont courus trop vite — c'est le frein n°1 à la progression. Ralentis jusqu'à pouvoir tenir une conversation complète : c'est censé paraître TROP facile.`,
-    enduranceWhy: (c) => `Le socle aérobie. Avec les autres séances, tu es sur ~${c} km cette semaine — c'est le volume facile qui construit la forme de fond, pas les séances dures.`,
+    enduranceWhy: (c) => `Le socle aérobie. Ta semaine vise ~${c} km au total, séances comprises — c'est le volume facile qui construit la forme de fond, pas les séances dures.`,
 
     renfoTitre: "Renforcement musculaire",
     renfoAffutage: `20 à 25 min, ENTRETIEN seulement : gainage 3×45 s, montées de mollets 2×15, proprioception 2×30 s par jambe, quelques bondissements courts. AUCUNE charge lourde ni série longue à l'approche de la course — on préserve la fraîcheur, la force est déjà acquise.`,
@@ -411,7 +413,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
   lignesDroites: " Finish with 5 × 100 m strides, building the pace, walking back to full recovery: it keeps your speed without adding fatigue.",
     enduranceDetail: (e, c, a, k, g, s, cy) => `Warm-up ${e} min building HR Z1→Z2 → Main set: ${c} at Z2${a}, you must be able to hold a conversation → Cool-down ${k} min HR Z1.${g}${s ? " 💡 At your volume, split it into TWO runs in the day (morning + evening) rather than one endless jog." : ""}${cy}`,
     enduranceWhyTropIntense: (p) => `⚠️ You spend ${p} % of your running time in zone 3 and above, when the target is 20 %. Your easy runs are run too fast — that is the number 1 brake on progress. Slow down until you can hold a full conversation: it is supposed to feel TOO easy.`,
-    enduranceWhy: (c) => `The aerobic base. With the other sessions you are on ~${c} km this week — it is the easy volume that builds deep fitness, not the hard sessions.`,
+    enduranceWhy: (c) => `The aerobic base. Your week aims for ~${c} km in total, all sessions included — it is the easy volume that builds deep fitness, not the hard sessions.`,
 
     renfoTitre: "Strength work",
     renfoAffutage: `20 to 25 min, MAINTENANCE only: core 3×45 s, calf raises 2×15, proprioception 2×30 s per leg, a few short bounds. NO heavy load and no long sets close to the race — we protect freshness, the strength is already banked.`,
@@ -538,7 +540,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
   lignesDroites: " Zum Abschluss 5 × 100 m Steigerungen mit vollständiger Gehpause: das erhält die Schnelligkeit, ohne zu ermüden.",
     enduranceDetail: (e, c, a, k, g, s, cy) => `Aufwärmen ${e} min ansteigend HF Z1→Z2 → Hauptteil: ${c} in Z2${a}, du musst dich unterhalten können → Auslaufen ${k} min HF Z1.${g}${s ? " 💡 Bei deinem Umfang teile ihn auf ZWEI Läufe am Tag auf (morgens + abends) statt eines endlosen Dauerlaufs." : ""}${cy}`,
     enduranceWhyTropIntense: (p) => `⚠️ Du verbringst ${p} % deiner Laufzeit in Zone 3 und höher, Ziel sind 20 %. Deine lockeren Läufe sind zu schnell — das ist die Bremse Nummer 1 für den Fortschritt. Werde so langsam, dass du dich vollständig unterhalten kannst: Es soll sich ZU leicht anfühlen.`,
-    enduranceWhy: (c) => `Die aerobe Basis. Mit den übrigen Einheiten liegst du diese Woche bei ~${c} km — es ist der lockere Umfang, der die Grundform baut, nicht die harten Einheiten.`,
+    enduranceWhy: (c) => `Die aerobe Basis. Deine Woche zielt auf insgesamt ~${c} km, alle Einheiten zusammen — es ist der lockere Umfang, der die Grundform baut, nicht die harten Einheiten.`,
 
     renfoTitre: "Kräftigung",
     renfoAffutage: `20 bis 25 min, nur ERHALTUNG: Rumpf 3×45 s, Wadenheben 2×15, Propriozeption 2×30 s pro Bein, ein paar kurze Sprünge. KEINE schweren Lasten und keine langen Sätze kurz vor dem Wettkampf — wir schützen die Frische, die Kraft ist längst da.`,
@@ -665,7 +667,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     lignesDroites: " Termina con 5 rectas de 100 m en progresión, recuperando andando por completo: mantiene la velocidad sin cansarte.",
     enduranceDetail: (e, c, a, k, g, s, cy) => `Calentamiento ${e} min progresivo FC Z1→Z2 → Parte principal: ${c} en Z2${a}, tienes que poder mantener una conversación → Vuelta a la calma ${k} min FC Z1.${g}${s ? " 💡 Con tu volumen, divídelo en DOS salidas en el día (mañana + tarde) en vez de un rodaje interminable." : ""}${cy}`,
     enduranceWhyTropIntense: (p) => `⚠️ Pasas el ${p} % de tu tiempo de carrera en zona 3 o más, cuando el objetivo es el 20 %. Tus rodajes van demasiado rápidos — es el freno n.º 1 al progreso. Baja hasta poder mantener una conversación completa: tiene que parecer DEMASIADO fácil.`,
-    enduranceWhy: (c) => `La base aeróbica. Con las demás sesiones estás en ~${c} km esta semana — es el volumen fácil el que construye la forma de fondo, no las sesiones duras.`,
+    enduranceWhy: (c) => `La base aeróbica. Tu semana apunta a ~${c} km en total, sesiones incluidas — es el volumen fácil el que construye la forma de fondo, no las sesiones duras.`,
 
     renfoTitre: "Trabajo de fuerza",
     renfoAffutage: `20 a 25 min, solo MANTENIMIENTO: core 3×45 s, elevaciones de gemelos 2×15, propiocepción 2×30 s por pierna, algunos saltos cortos. NINGUNA carga pesada ni serie larga cerca de la carrera — preservamos la frescura, la fuerza ya está adquirida.`,
@@ -792,7 +794,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     lignesDroites: " Termina com 5 acelerações de 100 m, recuperando a andar por completo: mantém a velocidade sem cansar.",
     enduranceDetail: (e, c, a, k, g, s, cy) => `Aquecimento ${e} min progressivo FC Z1→Z2 → Parte principal: ${c} em Z2${a}, tens de conseguir manter uma conversa → Retorno à calma ${k} min FC Z1.${g}${s ? " 💡 Com o teu volume, divide em DUAS saídas no dia (manhã + tarde) em vez de uma corrida interminável." : ""}${cy}`,
     enduranceWhyTropIntense: (p) => `⚠️ Passas ${p} % do teu tempo de corrida em zona 3 ou acima, quando o alvo são 20 %. As tuas corridas fáceis vão depressa demais — é o travão n.º 1 ao progresso. Abranda até conseguires manter uma conversa completa: é suposto parecer DEMASIADO fácil.`,
-    enduranceWhy: (c) => `A base aeróbia. Com as outras sessões estás em ~${c} km esta semana — é o volume fácil que constrói a forma de fundo, não as sessões duras.`,
+    enduranceWhy: (c) => `A base aeróbia. A tua semana aponta para ~${c} km no total, sessões incluídas — é o volume fácil que constrói a forma de fundo, não as sessões duras.`,
 
     renfoTitre: "Reforço muscular",
     renfoAffutage: `20 a 25 min, só MANUTENÇÃO: core 3×45 s, elevações de gémeos 2×15, propriocepção 2×30 s por perna, alguns saltos curtos. NENHUMA carga pesada nem série longa perto da prova — preservamos a frescura, a força já está adquirida.`,

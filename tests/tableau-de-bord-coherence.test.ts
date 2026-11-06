@@ -20,6 +20,8 @@ import { statsVfc, etatDuJour, etatPhysiologique, computeDiscipline } from "../s
 import { computeForme } from "../src/lib/dashboard/forme";
 import { T } from "../src/lib/i18n/translations";
 import { computeStreak } from "../src/lib/streak/compute";
+import { PLAN_T } from "../src/lib/ai/planI18n";
+import { validerConseils, appliquerConseils, inviteRelecture } from "../src/lib/ai/relectureSemaine";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -223,6 +225,41 @@ test("une VFC fraîche compte encore", () => {
   const fraiche = [88, 84, 86, 85].map((v, i) => ({ date: `2026-11-0${6 - i}`, hrv_ms: v })) as never[];
   const d = computeDiscipline([], fraiche, { sleep_score: 80 }, "optimal", { aujourdhui: "2026-11-06" });
   assert.ok(d.recovery != null && d.details.signalVfc != null, "une VFC du jour est ignorée");
+});
+
+console.log("\nLA SÉANCE DU JOUR ET SON POURQUOI");
+
+test("« ~32 km cette semaine » se lit comme la cible du plan, pas comme un bilan", () => {
+  // Constaté le 06/11/2026 : « tu es sur ~32 km cette semaine » chez un coureur à 0 km en 7 jours.
+  for (const lang of ["fr", "en", "de", "es", "pt"] as const) {
+    const t = PLAN_T[lang].enduranceWhy("32");
+    assert.ok(t.includes("32"), `${lang} : la cible a disparu`);
+    assert.doesNotMatch(t, /tu es sur|you are on|liegst du|estás en|estás em/i, `${lang} : la cible se lit encore comme du couru — ${t}`);
+  }
+  assert.match(PLAN_T.fr.enduranceWhy("32"), /^Le socle aérobie\. Ta semaine vise ~32 km au total/);
+});
+
+test("une étiquette interne du prompt (« feu orange léger ») n'atteint jamais l'athlète", () => {
+  const jours = [{ date: "2026-11-06", type: "Endurance", title: "Footing en endurance", detail: "Corps : ~5,5 km en Z2", why: "Le socle aérobie." }];
+  const brut = JSON.stringify({ conseils: [{ date: "2026-11-06", conseil: "Aujourd'hui, avec ton verdict \"feu orange léger\", sois très attentif à l'échauffement. Si ça ne vient pas, ralentis." }] });
+  const motifs: string[] = [];
+  assert.deepEqual(validerConseils(brut, jours, "fr", "", motifs), [], "le conseil qui cite le niveau interne est accepté");
+  assert.ok(motifs.includes("étiquette interne"), `motif : ${motifs.join(", ")}`);
+  // Un conseil déjà MÉMORISÉ ne repasse pas par le modèle : il doit être écarté à l'application aussi.
+  const memorise = [{ date: "2026-11-06", lang: "fr" as const, texte: "Avec ton verdict « feu orange léger », sois attentif à l'échauffement." }];
+  assert.equal(appliquerConseils(jours, memorise)[0].why, "Le socle aérobie.", "un conseil mémorisé avec l'étiquette interne est encore affiché");
+  // Chaque étiquette seule suffit à écarter le conseil.
+  for (const texte of ["Feu orange léger : sois attentif à l'échauffement.", "🟡 Reste attentif à l'échauffement.", "Ton verdict du jour : prudence sur l'échauffement."]) {
+    assert.equal(appliquerConseils(jours, [{ date: "2026-11-06", lang: "fr" as const, texte }])[0].why, "Le socle aérobie.", `passe encore : ${texte}`);
+  }
+  const propre = [{ date: "2026-11-06", lang: "fr" as const, texte: "Tu sors d'un marathon : laisse venir les sensations sur l'échauffement." }];
+  assert.match(appliquerConseils(jours, propre)[0].why, /Tu sors d'un marathon/, "un conseil sain est écarté à tort");
+  assert.match(inviteRelecture({ systeme: "", contexte: "", jours, lang: "fr" }), /ne les cite JAMAIS/, "l'invite n'interdit plus les étiquettes internes");
+});
+
+test("plus de carte « Analyse IA · Beta » qui répète le pourquoi de la séance", () => {
+  assert.doesNotMatch(BENTO, />Beta</, "le badge « Beta » écrit en dur revient");
+  assert.doesNotMatch(BENTO, /rl\.ai\b/, "la carte « Analyse IA » revient");
 });
 
 console.log("\nCRASH-TEST DU SCORE DE FORME");
