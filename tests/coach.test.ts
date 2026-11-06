@@ -6548,7 +6548,10 @@ test("aucune carte n'annonce un pourcentage qui n'est calculé nulle part", () =
   // la fonction — et tombait sur `sleepScore`, un simple nom de PARAMÈTRE. Un test qui
   // rougit sur le vocabulaire au lieu du comportement ne prouve rien.
   // Ce qui compte est ce que la fonction RENVOIE : uniquement une couleur et une phrase.
-  const readiness = src.slice(src.indexOf("function computeReadiness"), src.indexOf("function computeReadiness") + 700);
+  // Toute la fonction, jusqu'à son accolade fermante — une fenêtre de 700 caractères la
+  // coupait dès qu'un paramètre s'ajoutait (05/11/2026 : `montreReliee`).
+  const debutReadiness = src.indexOf("function computeReadiness");
+  const readiness = src.slice(debutReadiness, src.indexOf("\n}\n", debutReadiness));
   const retours = readiness.match(/return \{[^}]*\}/g) ?? [];
   assert.ok(retours.length >= 3, "computeReadiness a changé de forme, ce test ne l'inspecte plus");
   for (const r of retours) {
@@ -6581,8 +6584,11 @@ test("une VFC périmée est datée, et ne décide plus de la forme du jour", () 
   // Le sommeil imposait déjà 2 jours de fraîcheur ; la VFC, rien. Constaté le
   // 01/09/2026 : la dernière mesure datait du 26 août et s'affichait sans date, et
   // c'est elle qui produisait « Tu es frais — bon jour pour une séance de qualité ».
-  assert.match(src, /const hrvFraiche = hrvJours != null && hrvJours <= 2;/,
-    "la fraîcheur de la VFC n'est plus contrôlée");
+  // La règle vit dans `statsVfc` (partagée avec la fiche détaillée) ; la carte la lit.
+  // 05/11/2026 : une mesure datée du FUTUR n'est pas fraîche non plus (âge négatif).
+  assert.match(src, /const hrvFraiche = sv\.fraiche;/, "la fraîcheur de la VFC n'est plus contrôlée");
+  assert.match(codeOf("src/lib/dashboard/discipline.ts"), /fraiche: jours != null && jours >= 0 && jours <= 2,/,
+    "la fraîcheur de la VFC n'est plus bornée à 2 jours");
   assert.match(src, /computeReadiness\(hrvFraiche \? hrvDelta : null, hrvFraiche \? hrvBaseline : null,/,
     "la forme du jour se décide à nouveau sur une VFC qui peut être périmée");
   assert.ok(src.includes('t(hrvJours > 1 ? "dash.hrv.stale" : "dash.hrv.stale1"'),

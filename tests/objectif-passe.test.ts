@@ -457,9 +457,14 @@ async function main() {
     assert.deepEqual(phraseDuJour("top", { qBudget: 0, recuperation: recup }), { cle: "dash.ready.recup", recuperation: recup },
       "un athlète frais en récupération est encore invité à une séance de qualité");
     assert.equal(phraseDuJour("correct", { qBudget: 0, recuperation: recup }).cle, "dash.ready.recup");
-    // Fatigue et absence de mesure gardent leur message : ils disent déjà « facile ».
+    // La fatigue garde son message : il dit déjà « facile ».
     assert.equal(phraseDuJour("repos", { qBudget: 0, recuperation: recup }).cle, "dash.ready.rest");
-    assert.equal(phraseDuJour("aucun", { qBudget: 0, recuperation: recup }).cle, "dash.ready.none");
+    // ⚠️ L'absence de mesure, NON : « Connecte ta montre » ne dit rien de la récupération.
+    // Cas réel (Cyprien, 05/11/2026, J+11) : plus de VFC depuis le 30/10, et l'en-tête
+    // n'affichait que cette phrase pendant toute la récupération.
+    assert.deepEqual(phraseDuJour("aucun", { qBudget: 0, recuperation: recup }), { cle: "dash.ready.recup", recuperation: recup },
+      "sans mesure récente, la récupération en cours disparaît de l'en-tête");
+    assert.equal(phraseDuJour("aucun", { qBudget: 2, recuperation: null }).cle, "dash.ready.none");
   });
 
   await test("frais mais aucune qualité au plan : la phrase ne la promet plus", () => {

@@ -7,7 +7,7 @@ import {
   Activity, Heart, Trophy, Target,
   Calendar, Footprints, Moon, ChevronRight,
   Gauge, Mountain, Timer, Flame, Rocket, Award, TrendingUp, AlertTriangle, Shield, Users,
-  ArrowUpRight, type LucideIcon,
+  type LucideIcon,
 } from "lucide-react";
 // ⚠️ PLUS DE recharts ICI (22/09/2026) : ≈ 500 kB de JS pour deux petits dessins, sur
 // la page que le téléphone ouvre en premier. Voir MiniGraphes.tsx.
@@ -96,6 +96,8 @@ interface Props {
   jourAujourdhui?: string;
   /** La décision du coach pour la semaine : la phrase du jour ne doit pas la contredire. */
   planCoach?: PlanDuCoach;
+  /** Une montre est reliée (clé API ou OAuth intervals.icu) — calculé côté serveur, la clé ne quitte pas le serveur. */
+  montreReliee?: boolean;
   /**
    * Les lectures qui ont RÉELLEMENT échoué (identifiants stables, traduits ici).
    * Vide dans le cas normal — y compris pour un compte sans historique : une absence
@@ -133,7 +135,7 @@ const NEXT_LABELS: Record<string, { next: string; details: string }> = {
 
 // Libellé FC pour la carte VFC (multilingue).
 const VITALS: Record<string, { hr: string }> = {
-  fr: { hr: "Fréquence cardiaque" }, en: { hr: "Heart rate" }, de: { hr: "Herzfrequenz" }, es: { hr: "Frecuencia cardíaca" }, pt: { hr: "Frequência cardíaca" },
+  fr: { hr: "FC de repos" }, en: { hr: "Resting HR" }, de: { hr: "Ruhepuls" }, es: { hr: "FC en reposo" }, pt: { hr: "FC em repouso" },
 };
 
 // Libellés du rail de droite (multilingue).
@@ -178,18 +180,17 @@ export type { SourceVma } from "@/lib/dashboard/vmaAffichee";
 import type { SourceVma } from "@/lib/dashboard/vmaAffichee";
 import type { CleIndicateur } from "@/lib/indicateurs/types";
 
-export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, plan, league, prWorkouts, recordsDeclares = [], premiereSeance = null, chargeHistory, sleep, coachSession, ressenti, objective, derniereCourse = null, currentVma, sourceVma = null, loadRisk, newMembersWeek, streak, acces, donneesIncompletes, jourAujourdhui, planCoach = null }: Props) {
+export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, plan, league, prWorkouts, recordsDeclares = [], premiereSeance = null, chargeHistory, sleep, coachSession, ressenti, objective, derniereCourse = null, currentVma, sourceVma = null, loadRisk, newMembersWeek, streak, acces, donneesIncompletes, jourAujourdhui, planCoach = null, montreReliee = false }: Props) {
   const { t, lang } = useT();
   // État RELATIF à la base de l'athlète, et seulement si la mesure est fraîche — même
   // règle que la fiche détaillée (`etatPhysiologique`), qui ne peut pas dire autre chose.
-  const state = etatPhysiologique(hrv);
-
   // ⚠️ LE JOUR DE L'ATHLÈTE, PAS CELUI DE LA MACHINE. Tout ce qui dépend d'« aujourd'hui »
   // part de ce jour civil, calculé UNE fois par le serveur dans le fuseau de l'athlète.
   // Avec l'horloge, entre minuit et 1 h à Paris, le serveur (UTC) vivait encore la veille :
   // « J-51 » au rendu, « J-50 » à l'hydratation, et les sept barres de la semaine décalées
   // d'un jour — erreurs React #418 (rejoué : rendu UTC contre rendu Paris, 30/10/2026).
   const jour = jourAujourdhui ?? jourLocal();
+  const state = etatPhysiologique(hrv, Date.now(), jour);
 
   // Sommeil : on n'exploite/affiche que des données RÉCENTES (la nuit d'hier ou d'aujourd'hui).
   const ageSommeil = ageJours(sleep?.date, jour);
@@ -241,12 +242,12 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
   //    du jour au-delà de ce délai.
   //    Le calcul vit dans `statsVfc`, que la page détaillée (/dashboard/indicateurs/vfc)
   //    appelle aussi : la carte et la page ne peuvent pas afficher deux bases différentes.
-  const sv = statsVfc(hrv);
+  const sv = statsVfc(hrv, Date.now(), jour);
   const hrvLatest = sv.dernier, hrvJours = sv.jours, hrvBaseline = sv.base, hrvDelta = sv.ecart;
-  const hrvFraiche = hrvJours != null && hrvJours <= 2;
+  const hrvFraiche = sv.fraiche;
 
   // État du jour = lecture honnête de la forme (VFC vs base + sommeil récent), pas un label figé.
-  const readiness = computeReadiness(hrvFraiche ? hrvDelta : null, hrvFraiche ? hrvBaseline : null, freshSleep?.sleep_score ?? null, t, lang, planCoach);
+  const readiness = computeReadiness(hrvFraiche ? hrvDelta : null, hrvFraiche ? hrvBaseline : null, freshSleep?.sleep_score ?? null, t, lang, planCoach, montreReliee);
 
   const raceDate = (plan as { race_date?: string } | null)?.race_date ?? null;
 
@@ -477,7 +478,11 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
   const leagueName = String((league as { leagues?: { name?: string } } | null)?.leagues?.name ?? "");
   const nx = NEXT_LABELS[lang] ?? NEXT_LABELS.fr;
   const vit = VITALS[lang] ?? VITALS.fr;
-  const restingHr = Number((profile as { resting_hr?: number } | null)?.resting_hr) || Number(workouts[0]?.avg_hr) || 0;
+  // ⚠️ LA FC DE REPOS, OU RIEN. Le repli prenait la FC MOYENNE de la dernière séance, sous
+  // l'intitulé « Fréquence cardiaque », à côté de la VFC du matin. Constaté le 05/11/2026 :
+  // « 189 bpm », la FC moyenne du marathon couru onze jours plus tôt, lue comme une donnée
+  // du jour. Sans FC de repos connue, la vignette ne s'affiche pas.
+  const restingHr = Number((profile as { resting_hr?: number } | null)?.resting_hr) || 0;
   const distancePRs = computeDistancePRs(prWorkouts, lang, recordsDeclares);
   const router = useRouter();
   const [retrait, setRetrait] = useState<string | null>(null);
@@ -613,7 +618,11 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                   <span className="text-[1.5rem] font-black leading-none tabular-nums text-[#11201d] sm:text-[2.25rem]">J‑{objDaysTo}</span>
                   <span className="min-w-0 truncate text-sm font-bold text-[#11201d] sm:mt-1 sm:block">{objective.race}</span>
                 </div>
-                <div className="text-xs text-[#5f7d79]">{formatDateCivile(objective.raceDate, lang, { day: "numeric", month: "long", year: "numeric" })}</div>
+                {/* La distance : un objectif nommé « sub 16 min » ne dit pas sur quelle course. */}
+                <div className="text-xs text-[#5f7d79]">
+                  {objective.distanceKm > 0 && <>{objective.distanceKm.toLocaleString(lang)} km · </>}
+                  {formatDateCivile(objective.raceDate, lang, { day: "numeric", month: "long", year: "numeric" })}
+                </div>
                 {/* Un habillage, plus un lien : la rangée entière mène déjà au plan, et un
                     lien dans un lien est du HTML invalide. */}
                 <span className="mt-2.5 hidden items-center gap-1.5 rounded-xl bg-[#11201d] px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors group-hover/obj:bg-[#0b1714] sm:inline-flex sm:px-3.5 sm:py-2">
@@ -811,9 +820,10 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                   { label: fl.regularity, val: forme.regularity, c: "#ea580c" },
                 ].map(m => (
                   <div key={m.label}>
-                    <div className="mb-1 flex justify-between text-xs">
-                      <span className="text-zinc-500">{m.label}</span>
-                      <span className="font-semibold tabular-nums text-zinc-900">{m.val}%</span>
+                    {/* `gap-2` + `truncate` : « Récupération72% » collé sur une carte étroite. */}
+                    <div className="mb-1 flex justify-between gap-2 text-xs">
+                      <span className="min-w-0 truncate text-zinc-500">{m.label}</span>
+                      <span className="flex-shrink-0 font-semibold tabular-nums text-zinc-900">{m.val}%</span>
                     </div>
                     <div className="h-1.5 overflow-hidden rounded-full bg-zinc-100">
                       <div className="h-full rounded-full transition-all duration-700"
@@ -912,7 +922,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
               )}
               {/* Une VFC affichée sans date se lit comme la mesure du matin. Quand elle
                   ne l'est pas, on le dit — c'est ce qui distingue une donnée d'un chiffre. */}
-              {!hrvFraiche && hrvJours != null && (
+              {!hrvFraiche && hrvJours != null && hrvJours > 0 && (
                 <div className="mt-1 text-[11px] font-medium text-amber-600">
                   {t(hrvJours > 1 ? "dash.hrv.stale" : "dash.hrv.stale1", { n: hrvJours })}
                 </div>
@@ -1382,7 +1392,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             La carte porte désormais le nom de ce qu'elle montre. */}
         <div className="group relative bento-card">
           <div className="metric-label">{t("dash.discipline.title")}</div>
-            <VersFiche cle="discipline" titre={t("dash.discipline.title")} lang={lang} coin="haut" />
+            <VersFiche cle="discipline" titre={t("dash.discipline.title")} lang={lang} />
           <div className="mt-4 flex items-center gap-4">
             <div className="relative h-20 w-20 flex-shrink-0">
               <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
@@ -1674,12 +1684,14 @@ function buildLastMetrics(w: Workout, t: TFn): { label: string; value: string | 
 
 // État du jour — lecture honnête de la forme (VFC vs base 14 j + sommeil RÉCENT), dite
 // SANS contredire le plan : la phrase vient de `phraseDuJour` (lib/dashboard/discipline).
-function computeReadiness(hrvDelta: number | null, hrvBaseline: number | null, sleepScore: number | null, t: TFn, lang: string, plan: PlanDuCoach) {
+function computeReadiness(hrvDelta: number | null, hrvBaseline: number | null, sleepScore: number | null, t: TFn, lang: string, plan: PlanDuCoach, montreReliee = false) {
   const e = etatDuJour(hrvDelta, hrvBaseline, sleepScore);
   const { cle, recuperation } = phraseDuJour(e, plan);
+  // ⚠️ « Connecte ta montre » à un athlète dont la montre EST reliée : elle n'a simplement
+  // rien envoyé de récent (VFC, sommeil). On dit ce qui se passe, pas une consigne fausse.
   const phrase = recuperation
     ? t(cle, { course: recuperation.course, date: formatDateCivile(recuperation.reprise, lang, { day: "numeric", month: "long" }) })
-    : t(cle);
+    : t(cle === "dash.ready.none" && montreReliee ? "dash.ready.muette" : cle);
   if (e === "top") return { accent: "#059669", tagline: phrase };
   if (e === "repos") return { accent: "#0284C7", tagline: phrase };
   return { accent: "#0d9488", tagline: phrase };
@@ -1737,27 +1749,25 @@ function computeWeekSummary(workouts: Workout[], jour: string): { sessions: numb
  * CHAQUE CARTE OUVRE SA PAGE DÉTAILLÉE (04/10/2026) — Cyprien : « quand on clique sur ces
  * modules, une page qui donne les valeurs précises et qui explique pourquoi ».
  * Un lien couvre toute la carte (le doigt n'a pas à viser un bouton) ; les liens déjà
- * présents dans une carte passent au-dessus (`z-[3]`). La pastille « Détails » n'apparaît
- * qu'au survol : sur téléphone, la carte entière se touche.
+ * présents dans une carte passent au-dessus (`z-[3]`).
+ *
+ * ⚠️ PLUS DE PASTILLE « Détails » FLOTTANTE (05/11/2026). Posée en bas à droite au survol,
+ * elle recouvrait ce que la carte affiche à cet endroit — mesuré pastille forcée visible :
+ * « Voir les recommandations », l'allure du marathon (Vitesse & prédictions), « Objectif :
+ * 113 km » (Volume), le titre de la carte Assiduité, le texte d'Analyse IA. Aucun coin n'est
+ * libre sur toutes les cartes. Le survol se signale donc par un liseré sur le BORD de la
+ * carte (qui ne couvre rien) et par l'infobulle « Détails ».
  */
 const DETAIL_LIBELLE: Record<string, string> = { fr: "Détails", en: "Details", de: "Details", es: "Detalles", pt: "Detalhes" };
-// `coin="haut"` : pour une carte dont le bas porte déjà un lien (« Voir les
-// recommandations ») — la pastille en bas à droite le recouvrait au survol.
-function VersPage({ href, titre, lang, coin = "bas" }: { href: string; titre: string; lang: string; coin?: "haut" | "bas" }) {
+function VersPage({ href, titre, lang }: { href: string; titre: string; lang: string }) {
   const l = DETAIL_LIBELLE[lang] ?? DETAIL_LIBELLE.fr;
   return (
-    <>
-      <Link href={href} aria-label={`${titre} — ${l}`}
-        className="absolute inset-0 z-[1] rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2" />
-      <span aria-hidden
-        className={`pointer-events-none absolute ${coin === "haut" ? "top-3" : "bottom-3"} right-3 z-[2] inline-flex items-center gap-1 rounded-full bg-zinc-900 px-2.5 py-1 text-[10px] font-semibold text-white opacity-0 shadow-lg transition-opacity duration-200 group-hover:opacity-100`}>
-        {l} <ArrowUpRight className="h-3 w-3" />
-      </span>
-    </>
+    <Link href={href} aria-label={`${titre} — ${l}`} title={l}
+      className="absolute inset-0 z-[1] rounded-3xl ring-emerald-400/40 transition-shadow duration-200 group-hover:ring-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2" />
   );
 }
-function VersFiche({ cle, titre, lang, coin }: { cle: CleIndicateur; titre: string; lang: string; coin?: "haut" | "bas" }) {
-  return <VersPage href={`/dashboard/indicateurs/${cle}`} titre={titre} lang={lang} coin={coin} />;
+function VersFiche({ cle, titre, lang }: { cle: CleIndicateur; titre: string; lang: string }) {
+  return <VersPage href={`/dashboard/indicateurs/${cle}`} titre={titre} lang={lang} />;
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {

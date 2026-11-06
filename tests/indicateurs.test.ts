@@ -250,7 +250,10 @@ test("la route existe, refuse une clé inconnue et lit les mêmes séances que l
   assert.match(d, /vmaAffichee\(\{/);
   assert.match(code("src/app/dashboard/page.tsx"), /vmaAffichee\(\{/);
   // La carte VFC et la page partagent leur calcul (base 14 j, écart, âge de la mesure).
-  assert.match(code("src/components/dashboard/BentoDashboard.tsx"), /const sv = statsVfc\(hrv\);/);
+  // 05/11/2026 : toutes deux sur le jour de l'athlète, pas sur l'horloge de la machine.
+  assert.match(code("src/components/dashboard/BentoDashboard.tsx"), /const sv = statsVfc\(hrv, Date\.now\(\), jour\);/);
+  assert.match(code("src/lib/indicateurs/fiches.ts"), /const vfc = statsVfc\(d\.vfc, maintenant, d\.aujourdhui\);/,
+    "la fiche VFC recalcule l'âge de la mesure sur l'horloge : elle peut contredire la carte d'un jour");
 });
 
 test("les neuf cartes du tableau de bord mènent à leur fiche ; leurs liens internes passent au-dessus", () => {

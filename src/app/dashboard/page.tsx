@@ -280,6 +280,7 @@ export default async function DashboardPage() {
       objective={objective}
       derniereCourse={derniereCourse}
       planCoach={planCoach}
+      montreReliee={!!(profileRes.data as { intervals_api_key?: string | null } | null)?.intervals_api_key}
       currentVma={currentVma}
       sourceVma={sourceVma}
       loadRisk={risk}

@@ -8,6 +8,7 @@
  */
 import type { HRVData, Workout } from "@/types";
 import { ZONE_NORMALE_VFC } from "@/lib/health/vfc";
+import { ageJours } from "./fenetre";
 
 export const DISCIPLINE_CONFIG = {
   weights: { precision: 0.4, consistency: 0.4, recovery: 0.2 }, // somme = 1
@@ -27,8 +28,9 @@ export type EtatDuJour = "aucun" | "top" | "repos" | "correct";
 
 export function etatDuJour(hrvDelta: number | null, hrvBaseline: number | null, sleepScore: number | null): EtatDuJour {
   const sig: number[] = [];
-  if (hrvDelta != null && hrvBaseline) sig.push(hrvDelta >= 0 ? 1 : hrvDelta / hrvBaseline >= -ZONE_NORMALE_VFC ? 0 : -1);
-  if (sleepScore != null) sig.push(sleepScore >= 75 ? 1 : sleepScore >= 55 ? 0 : -1);
+  // `Number.isFinite` : un score de sommeil NaN se lisait « < 55 », donc comme de la fatigue.
+  if (hrvDelta != null && Number.isFinite(hrvDelta) && hrvBaseline) sig.push(hrvDelta >= 0 ? 1 : hrvDelta / hrvBaseline >= -ZONE_NORMALE_VFC ? 0 : -1);
+  if (sleepScore != null && Number.isFinite(sleepScore)) sig.push(sleepScore >= 75 ? 1 : sleepScore >= 55 ? 0 : -1);
   if (!sig.length) return "aucun";
   const avg = sig.reduce((a, b) => a + b, 0) / sig.length;
   return avg >= 0.5 ? "top" : avg <= -0.5 ? "repos" : "correct";
@@ -54,25 +56,43 @@ export type PhraseDuJour = {
  * tableau de bord, pendant que le calendrier disait « footings seulement, pas d'intensité
  * avant le 21 novembre ». Le corps peut être frais ; c'est le plan qui décide de la séance.
  * La phrase ne promet donc plus une qualité que le plan ne contient pas. Les signaux de
- * fatigue et l'absence de mesure gardent leur propre message : ils disent déjà « facile ».
+ * fatigue gardent leur propre message : il dit déjà « facile ».
+ *
+ * ⚠️ L'ABSENCE DE MESURE NE PASSE PLUS DEVANT LA RÉCUPÉRATION. Cas réel (Cyprien,
+ * 05/11/2026, J+11 du marathon) : plus de VFC depuis le 30/10, et l'en-tête affichait
+ * « Connecte ta montre pour une lecture de ta forme du jour » — rien sur la récupération
+ * en cours, alors que c'est la seule consigne qui vaille ce jour-là, et qu'elle ne dépend
+ * d'aucune mesure.
  */
 export function phraseDuJour(etat: EtatDuJour, plan: PlanDuCoach): PhraseDuJour {
-  if (etat === "aucun") return { cle: "dash.ready.none" };
   if (etat === "repos") return { cle: "dash.ready.rest" };
   if (plan?.recuperation) return { cle: "dash.ready.recup", recuperation: plan.recuperation };
+  if (etat === "aucun") return { cle: "dash.ready.none" };
   if (etat === "top") return { cle: plan?.qBudget === 0 ? "dash.ready.topSansQualite" : "dash.ready.top" };
   return { cle: "dash.ready.ok" };
 }
 
 /** Les chiffres de la carte VFC : mesure la plus récente, base 14 j, écart, fraîcheur. */
-export function statsVfc(hrv: readonly Pick<HRVData, "date" | "hrv_ms">[], maintenant = Date.now()) {
+export function statsVfc(
+  hrv: readonly Pick<HRVData, "date" | "hrv_ms">[],
+  maintenant = Date.now(),
+  /**
+   * Jour civil de l'athlète (AAAA-MM-JJ). ⚠️ Le tableau de bord DOIT le passer : l'âge
+   * calculé sur l'horloge et le fuseau de la machine différait entre le rendu serveur (UTC)
+   * et le navigateur (Paris) entre minuit et 1 h — « vieille de 5 jours » au rendu,
+   * « 6 jours » à l'hydratation : erreur React #418.
+   */
+  aujourdhui?: string,
+) {
   const dernier = hrv[0]?.hrv_ms ?? null;
-  const jours = hrv[0]?.date
-    ? Math.floor((maintenant - new Date(String(hrv[0].date).slice(0, 10) + "T00:00:00").getTime()) / 86400000)
-    : null;
+  const jours = !hrv[0]?.date ? null
+    : aujourdhui ? ageJours(String(hrv[0].date), aujourdhui)
+    : Math.floor((maintenant - new Date(String(hrv[0].date).slice(0, 10) + "T00:00:00").getTime()) / 86400000);
   const serie = hrv.slice(0, 14).map((h) => h.hrv_ms).filter((v): v is number => v != null);
   const base = serie.length ? Math.round(serie.reduce((a, b) => a + b, 0) / serie.length) : null;
-  return { dernier, jours, fraiche: jours != null && jours <= 2, base, ecart: dernier != null && base != null ? dernier - base : null, n: serie.length };
+  // Une mesure datée APRÈS aujourd'hui (horloge de montre fausse) n'est pas « fraîche » :
+  // elle passait pour la mesure du matin (âge négatif ≤ 2). Trouvé par crash-test, 05/11/2026.
+  return { dernier, jours, fraiche: jours != null && jours >= 0 && jours <= 2, base, ecart: dernier != null && base != null ? dernier - base : null, n: serie.length };
 }
 
 /**
@@ -82,8 +102,8 @@ export function statsVfc(hrv: readonly Pick<HRVData, "date" | "hrv_ms">[], maint
  * « récupération » vieille d'une semaine ne doit pas imposer un footing aujourd'hui.
  * Partagé par la carte et la fiche, qui ne peuvent pas annoncer deux scores différents.
  */
-export function etatPhysiologique(hrv: readonly Pick<HRVData, "date" | "hrv_ms" | "physiological_state">[], maintenant = Date.now()): string {
-  return (statsVfc(hrv, maintenant).fraiche ? hrv[0]?.physiological_state : null) ?? "optimal";
+export function etatPhysiologique(hrv: readonly Pick<HRVData, "date" | "hrv_ms" | "physiological_state">[], maintenant = Date.now(), aujourdhui?: string): string {
+  return (statsVfc(hrv, maintenant, aujourdhui).fraiche ? hrv[0]?.physiological_state : null) ?? "optimal";
 }
 
 export function computeDiscipline(

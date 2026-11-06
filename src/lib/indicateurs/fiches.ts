@@ -73,11 +73,12 @@ function contexte(d: DonneesFiche) {
   const sommeilFrais = s0 && s0.date && maintenant - new Date(`${s0.date}T00:00:00`).getTime() <= 2 * 86400000 && s0.sleep_score != null
     ? { sleep_score: Number(s0.sleep_score), total_sleep_min: Number(s0.total_sleep_min) || 0 } : null;
   // Même règle que la carte (`etatPhysiologique`) : sinon le score discipline différerait.
-  const etat = etatPhysiologique(d.vfc, maintenant);
+  // Le jour de l'athlète, comme la carte : sinon l'âge de la VFC diffère d'un jour la nuit.
+  const etat = etatPhysiologique(d.vfc, maintenant, d.aujourdhui);
   const disc = computeDiscipline(d.seances, d.vfc.slice(0, 14) as HRVData[], sommeilFrais, etat);
   const forme = computeForme(d.seances, d.vma.vma, disc.recovery, disc.consistency,
-    d.objectif ? { distanceKm: d.objectif.distanceKm ?? null, targetSeconds: d.objectif.targetSeconds ?? null } : null);
-  const vfc = statsVfc(d.vfc, maintenant);
+    d.objectif ? { distanceKm: d.objectif.distanceKm ?? null, targetSeconds: d.objectif.targetSeconds ?? null } : null, d.aujourdhui);
+  const vfc = statsVfc(d.vfc, maintenant, d.aujourdhui);
   return { maintenant, sommeilFrais, disc, forme, vfc };
 }
 

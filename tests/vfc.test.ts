@@ -456,8 +456,9 @@ test("le coach lit la série, et dit QUELLE mesure il lit", () => {
 });
 
 test("la carte et la fiche partagent la même règle d'état", () => {
-  assert.match(code("src/components/dashboard/BentoDashboard.tsx"), /const state = etatPhysiologique\(hrv\)/);
-  assert.match(code("src/lib/indicateurs/fiches.ts"), /etatPhysiologique\(d\.vfc, maintenant\)/);
+  // Et le même jour : celui de l'athlète (05/11/2026), pas l'horloge de la machine.
+  assert.match(code("src/components/dashboard/BentoDashboard.tsx"), /const state = etatPhysiologique\(hrv, Date\.now\(\), jour\)/);
+  assert.match(code("src/lib/indicateurs/fiches.ts"), /etatPhysiologique\(d\.vfc, maintenant, d\.aujourdhui\)/);
   assert.match(code("src/app/dashboard/page.tsx"), /hrv=\{vfc\.lignes\}/);
   assert.match(code("src/lib/indicateurs/donnees.ts"), /vfc: serie\.lignes/);
 });
