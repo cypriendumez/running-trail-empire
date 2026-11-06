@@ -156,15 +156,8 @@ const ANALYSE_LABELS: Record<string, { titre: string; seance: string; lire: stri
   pt: { titre: "Análise IA", seance: "A tua última sessão", lire: "Ler a análise completa", analyser: "Analisar esta sessão", pasEncore: "Ainda não analisada: o coach revê a tua sessão número a número, quando pedires." },
 };
 
-// Le nom des ligues et l'abréviation de « record personnel », par langue : « Silver » et
-// « RP » s'affichaient tels quels dans toutes les langues (audit du 06/11/2026).
-const NOMS_LIGUE: Record<string, Record<string, string>> = {
-  fr: { bronze: "Bronze", silver: "Argent", gold: "Or", platinum: "Platine", diamond: "Diamant" },
-  en: { bronze: "Bronze", silver: "Silver", gold: "Gold", platinum: "Platinum", diamond: "Diamond" },
-  de: { bronze: "Bronze", silver: "Silber", gold: "Gold", platinum: "Platin", diamond: "Diamant" },
-  es: { bronze: "Bronce", silver: "Plata", gold: "Oro", platinum: "Platino", diamond: "Diamante" },
-  pt: { bronze: "Bronze", silver: "Prata", gold: "Ouro", platinum: "Platina", diamond: "Diamante" },
-};
+// L'abréviation de « record personnel », par langue : « RP » s'affichait tel quel dans
+// toutes les langues (audit du 06/11/2026).
 const ABREV_RECORD: Record<string, string> = { fr: "RP", en: "PB", de: "PB", es: "MP", pt: "RP" };
 
 // Libellés du rail de droite (multilingue).
@@ -1186,7 +1179,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
         {/* Volume + tendance 6 semaines */}
         <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
-          className="group relative col-span-12 md:col-span-4 bento-card"
+          className="group relative col-span-12 md:col-span-6 bento-card"
         >
           <div className="mb-2 flex items-center justify-between">
             <div className="metric-label">{t("dash.volume.title")}</div>
@@ -1226,7 +1219,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
         {/* Zones d'entraînement (FC) — temps par zone + verdict de polarisation 80/20 */}
         <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.20 }}
-          className="group relative col-span-12 md:col-span-4 bento-card"
+          className="group relative col-span-12 md:col-span-6 bento-card"
         >
           <div className="mb-1 flex items-center justify-between">
             <div className="metric-label">{zl.title}</div>
@@ -1300,55 +1293,12 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
           )}
         </motion.div>
 
-        {/* Ligue — badge + score + tendance 8 sem. */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
-          className="col-span-12 md:col-span-4 bento-card flex flex-col"
-        >
-          <div className="mb-4 flex items-center justify-between">
-            <div className="metric-label">{t("dash.league.title")}</div>
-            <Trophy className="h-4 w-4 text-yellow-500" />
-          </div>
-          <div className={`inline-flex w-fit items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-semibold league-${profile?.league ?? "bronze"}`}>
-            <Trophy className="h-3.5 w-3.5" />
-            {(NOMS_LIGUE[lang] ?? NOMS_LIGUE.fr)[profile?.league ?? "bronze"] ?? (profile?.league ?? "bronze")}
-          </div>
-          <div className="mt-3 text-sm text-zinc-500">
-            {t("dash.league.weekly")}{deuxPoints}<strong className="tabular-nums text-zinc-900">{disc.hasData ? disc.total : "—"}</strong>
-          </div>
-          {/* ⚠️ ICI SE TROUVAIT UN TROU BLANC DE 85 px. La carte affichait une barre de
-              tendance sur 8 semaines lue dans `discipline_scores` — table VIDE pour
-              TOUS les comptes (0 ligne en base, vérifié), parce que rien n'appelle la
-              fonction SQL `calculate_discipline_score` : aucun cron, aucune route, aucun
-              script. Le graphe était donc du code qui ne s'affichait jamais, et son
-              `mt-auto` voisin poussait le lien tout en bas en laissant le vide au milieu.
-              Et même s'il avait tourné, cette fonction insère `v_consistency := 75`
-              écrit en dur — on aurait dessiné une courbe en partie inventée.
-
-              On montre à la place ce qui est RÉELLEMENT calculé, en direct, par
-              `computeDiscipline` juste au-dessus : les trois composantes du total déjà
-              affiché. Le chiffre « 90 » cessait d'être un score tombé du ciel : on lit
-              d'où il vient et ce qu'il faut travailler. Aucune donnée nouvelle n'est
-              nécessaire, aucune n'est inventée. */}
-          {disc.hasData && (
-            <div className="mt-3 space-y-2">
-              {([
-                ["dash.discipline.precision", disc.precision],
-                ["dash.discipline.consistency", disc.consistency],
-                ["dash.discipline.recovery", disc.recovery],
-              ] as const).map(([cle, valeur]) => (
-                <div key={cle} className="flex items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate text-[11px] text-zinc-500">{t(cle)}</span>
-                  <span className="h-1.5 w-16 flex-shrink-0 overflow-hidden rounded-full bg-zinc-100">
-                    <span className="block h-full rounded-full bg-yellow-400" style={{ width: `${valeur == null ? 0 : Math.max(2, valeur)}%` }} />
-                  </span>
-                  <span className="w-7 flex-shrink-0 text-right text-[11px] font-semibold tabular-nums text-zinc-700">{valeur ?? "—"}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          <Link href="/dashboard/leagues" className="mt-auto pt-3 text-xs font-medium text-emerald-600 hover:text-emerald-700">{t("dash.league.cta")}</Link>
-        </motion.div>
+        {/* ⚠️ LA CARTE LIGUE A ÉTÉ RETIRÉE (07/11/2026, Cyprien : « Retire-la »). Elle répétait
+            les trois composantes et le total de la carte Score discipline du rail, sous un
+            niveau « Bronze » identique pour tous : en base, une seule ligue (juin 2026) et tous
+            les profils en bronze — rien ne fait monter de palier. Volume et Zones se partagent
+            désormais la rangée, moitié-moitié, sans trou. Le classement reste à un clic
+            (lien « Voir le classement » de la carte Badges). */}
 
         <SectionLabel>{t("dash.sec.activity")}</SectionLabel>
 

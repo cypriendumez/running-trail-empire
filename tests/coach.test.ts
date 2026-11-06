@@ -6440,25 +6440,19 @@ test("la carte Ligue ne lit plus une table que personne ne remplit", () => {
   }
 });
 
-test("la carte Ligue montre les composantes RÉELLEMENT calculées", () => {
-  const src = codeOf("src/components/dashboard/BentoDashboard.tsx");
-  // Le trou est comblé par ce que `computeDiscipline` calcule en direct, à partir des
-  // séances et de la VFC : le total affiché cesse d'être un chiffre tombé du ciel.
-  // ⚠️ PREMIÈRE VERSION DE CE TEST : FAUSSE. Elle cherchait « disc.consistency »
-  // n'importe où dans le fichier — or la carte Score Discipline lit LES MÊMES champs.
-  // Retirer une composante de la carte Ligue laissait donc le test au VERT (mutation
-  // faite, mutation passée). On vise maintenant le COUPLE clé+valeur, qui n'existe
-  // que dans cette carte : retirer une seule ligne la fait rougir.
-  // 06/11/2026 : la carte Score discipline du rail affiche aussi ces couples ; on vise donc
-  // la SEULE carte Ligue (de son titre à son lien), sinon le rail masquerait un retrait.
-  const ligue = src.slice(src.indexOf('t("dash.league.title")'), src.indexOf('t("dash.league.cta")'));
-  assert.ok(ligue.length > 0, "carte Ligue introuvable");
-  for (const c of ["precision", "consistency", "recovery"]) {
-    assert.ok(ligue.includes(`["dash.discipline.${c}", disc.${c}]`),
-      `la carte Ligue n'affiche plus la composante ${c} : le trou blanc revient`);
+test("la carte Ligue est retirée et sa rangée reste pavée", () => {
+  // 07/11/2026 (Cyprien : « Retire-la ») : la carte Ligue répétait les trois composantes et le
+  // total de la carte Score discipline, sous un « Bronze » identique pour tous (une seule ligue
+  // en base, aucun palier jamais franchi). Retirée ; Volume et Zones se partagent la rangée.
+  const src = readFileSync("src/components/dashboard/BentoDashboard.tsx", "utf8").replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+  assert.ok(!src.includes('t("dash.league.title")'), "la carte Ligue est revenue : elle doublonne la carte Score discipline");
+  for (const titre of ['t("dash.volume.title")', "zl.title"]) {
+    const i = src.indexOf(titre);
+    const carte = src.slice(src.lastIndexOf("<motion.div", i), i);
+    assert.match(carte, /col-span-12 md:col-span-6 bento-card/, `${titre} ne prend plus la moitié de la rangée : un trou blanc revient`);
   }
-  // Aucune de ces valeurs n'est inventée : elles sortent toutes du même calcul que le total,
-  // qui lit la série et le jour de l'athlète.
+  // Le classement reste joignable depuis la carte Badges.
+  assert.match(src, /href="\/dashboard\/leagues"/, "plus aucun lien vers le classement");
   assert.match(src, /const disc = computeDiscipline\(workouts, hrv, freshSleep, state, \{ aujourdhui: jour, serie: streak\?\.days \?\? null \}\)/);
 });
 

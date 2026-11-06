@@ -397,8 +397,7 @@ test("liste des séances : vraie zone dominante, pas de « 0 » parasite, la lis
   assert.equal(zoneDominante([Number.NaN, -3]), null);
 });
 
-test("ligue, records, badges, dernière séance", () => {
-  assert.match(BENTO, /\(NOMS_LIGUE\[lang\] \?\? NOMS_LIGUE\.fr\)\[profile\?\.league \?\? "bronze"\]/, "le niveau de ligue s'affiche de nouveau en anglais brut");
+test("records, badges, dernière séance", () => {
   assert.match(BENTO, /\{ABREV_RECORD\[lang\] \?\? "RP"\}/, "« RP » s'affiche de nouveau dans toutes les langues");
   assert.match(BENTO, /const earned = plusLongueConnue >= b\.seuil;/, "les badges relisent de nouveau les 40 dernières séances");
   assert.match(BENTO, /\{ seuil: 42, l: "42K"/, "un marathon mesuré 42,19 km n'a de nouveau pas son badge");
