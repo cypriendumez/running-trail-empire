@@ -159,6 +159,9 @@ export async function syncIntervalsForUser(
     vo2max: latestVo2,
     restingHR: wLatest("restingHR"),
     lthr: Number(lastRunAct?.lthr) || null,
+    // La FC max de course appliquée à la séance (réglage intervals.icu, porté par chaque séance
+    // Garmin) : la « FC max de la montre » que le coach préfère au pic historique (fcCible).
+    maxHR: Number(lastRunAct?.athlete_max_hr) || null,
     thresholdPaceSecPerKm: tpMps > 0 ? Math.round(1000 / tpMps) : null,
     ctl: ctlV != null ? Math.round(ctlV) : null,
     atl: atlV != null ? Math.round(atlV) : null,

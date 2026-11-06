@@ -11,7 +11,7 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { referencesFc, ciblesFcAthlete, footingTropIntense, plageFc, MARGE_FOOTING_DUR, avecFcMaxMontre, plageEnPctMax } from "../src/lib/coach/fcCible";
+import { referencesFc, ciblesFcAthlete, footingTropIntense, plageFc, MARGE_FOOTING_DUR, avecFcMaxMontre, plageEnPctMax, maxDeReference, PIC_FC_JOURS } from "../src/lib/coach/fcCible";
 import { stepsForType, parseReps, buildWorkoutDescription } from "../src/lib/watch/intervals";
 
 let passed = 0; const fails: string[] = [];
@@ -135,6 +135,32 @@ test("les quatre envois vers la montre passent les cibles, avec la FC max de la 
     assert.match(c, /warmMin, coolMin, montre, ciblesFc[,)]/, f);
   }
   assert.match(code("src/lib/coach/ciblesFcServeur.ts"), /if \(profil\.error \|\| base\.error \|\| fcMax\.error \|\| footings\.error\) return null;/, "une lecture ratée fabriquerait des cibles");
+});
+
+console.log("\nLA FC MAX ACTUELLE — montre d'abord, sinon le pic des six derniers mois");
+
+test("ordre : déclarée, sinon la montre ; et jamais sous le pic des 6 derniers mois", () => {
+  assert.equal(PIC_FC_JOURS, 183);
+  assert.equal(maxDeReference(null, 212), 212, "la FC max de la montre sert quand rien n'est déclaré");
+  assert.equal(maxDeReference(205, 212), 205, "la déclarée passe avant la montre");
+  assert.equal(maxDeReference(null, null), null);
+  assert.equal(maxDeReference(null, 0), null, "un réglage vide n'est pas une FC max");
+  // Son compte : réglage montre 212, pic des 6 derniers mois 209 (04/08), 212 atteint le 04/04 (7 mois).
+  assert.equal(referencesFc({ maxDeclaree: maxDeReference(null, 212), maxObservee: 209 }).max, 212);
+  assert.equal(referencesFc({ maxDeclaree: maxDeReference(null, null), maxObservee: 209 }).max, 209, "sans montre : le pic des 6 mois, pas celui d'il y a 7 mois");
+  assert.equal(referencesFc({ maxDeclaree: maxDeReference(null, 190), maxObservee: 205 }).max, 205, "jamais sous un pic réellement atteint ces 6 mois");
+});
+
+test("la synchro garde la FC max de la montre ; coach et envois lisent 6 mois et la montre", () => {
+  for (const f of ["src/lib/intervals/syncUser.ts", "src/app/api/intervals/sync/route.ts"])
+    assert.match(code(f), /maxHR: Number\(lastRun(Act)?\?\.athlete_max_hr\) \|\| null,/, `${f} ne garde plus la FC max de la montre`);
+  const c = code("src/lib/ai/coachContext.ts");
+  assert.match(c, /\.not\("max_hr", "is", null\)\.gte\("date", new Date\(Date\.now\(\) - PIC_FC_JOURS \* 86400000\)/, "le coach relit le pic de TOUT l'historique");
+  assert.match(c, /const maxHrDeclare = maxDeReference\(num\(b\?\.max_hr\) \?\? num\(p\?\.max_hr\),\s*\(\(\(p as Record<string, unknown> \| null\)\?\.garmin_metrics\) as Record<string, unknown> \| null\)\?\.maxHR\)/, "le coach ignore la FC max de la montre");
+  assert.match(c, /\.filter\(w => now - new Date\(String\(w\.date\)\.slice\(0, 10\) \+ "T12:00:00Z"\)\.getTime\(\) <= PIC_FC_JOURS \* 86400000\)/, "les 60 séances lues peuvent remonter au-delà de 6 mois");
+  const srv = code("src/lib/coach/ciblesFcServeur.ts");
+  assert.match(srv, /\.gte\("date", new Date\(maintenant - PIC_FC_JOURS \* 86400000\)/);
+  assert.match(srv, /maxDeclaree: maxDeReference\(num\(b\?\.max_hr\) \?\? num\(p\?\.max_hr\), garmin\?\.maxHR\)/);
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

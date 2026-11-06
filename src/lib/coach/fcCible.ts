@@ -253,3 +253,22 @@ export function footingTropIntense(fcMoyenne: unknown, dureeSec: unknown, cibles
   const fc = Number(fcMoyenne), sec = Number(dureeSec);
   return !!cibles && fcMoyenne != null && Number.isFinite(fc) && Number.isFinite(sec) && sec >= 20 * 60 && fc >= cibles.plafondFooting;
 }
+
+/**
+ * LA FC MAX ACTUELLE (Cyprien, 07/11/2026 : « trouve ma FC max actuelle grâce à Garmin, sinon
+ * selon les anciennes séances : au moins la plus haute des 6 derniers mois »).
+ *
+ * ⚠️ PLUS LE MAXIMUM DE TOUT L'HISTORIQUE. Un pic d'il y a un an et demi ne dit plus la FC max
+ * d'aujourd'hui (elle baisse d'environ un battement par an, et un capteur peut s'emballer une
+ * fois) ; il faisait des zones trop hautes. Ordre retenu :
+ *  1. la FC max DÉCLARÉE (test, profil) ;
+ *  2. sinon la FC max de la MONTRE : le réglage de course d'intervals.icu, que chaque séance
+ *     Garmin porte (`athlete_max_hr`, gardé dans `garmin_metrics.maxHR` à la synchro) ;
+ *  3. et jamais SOUS le pic réellement atteint pendant les {@link PIC_FC_JOURS} derniers jours
+ *     (`referencesFc` garde le plus haut des deux) — sans autre source, ce pic seul.
+ */
+export const PIC_FC_JOURS = 183;
+export const maxDeReference = (declaree: unknown, montre: unknown): number | null => {
+  const v = (x: unknown) => { const n = Number(x); return x != null && x !== "" && Number.isFinite(n) && n > 100 && n < 240 ? n : null; };
+  return v(declaree) ?? v(montre);
+};

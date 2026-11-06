@@ -1,5 +1,5 @@
 import type { createClient } from "@/lib/supabase/server";
-import { referencesFc, ciblesFcAthlete, footingTropIntense, type CiblesFc } from "@/lib/coach/fcCible";
+import { referencesFc, ciblesFcAthlete, footingTropIntense, maxDeReference, PIC_FC_JOURS, type CiblesFc } from "@/lib/coach/fcCible";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
 import { menuSelonDenivele, preferenceDenivele } from "@/lib/coach/denivele";
@@ -479,7 +479,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
       .eq("user_id", userId).not("avg_hr", "is", null)
       .gte("date", new Date(Date.now() - 280 * 86400000).toISOString().slice(0, 10))
       .order("date", { ascending: false }).limit(500),
-    // ── FC MAX SUR TOUT L'HISTORIQUE — UNE LIGNE, AUCUNE FENÊTRE ────────────────
+    // ── FC MAX DES SIX DERNIERS MOIS — UNE LIGNE (fenêtre `PIC_FC_JOURS` depuis le 07/11/2026) ──
     // `fetchWorkouts` est plafonné à 60 séances, soit environ deux mois. La FC max d'un
     // athlète qui court depuis des années tombe presque toujours HORS de cette fenêtre :
     // le coach calait alors ses zones sur le maximum des deux derniers mois, plus bas que
@@ -487,8 +487,11 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     // le dise. Même leçon que les records par distance du tableau de bord : une donnée
     // « meilleur de tous les temps » se lit avec une requête DÉDIÉE, pas dans une liste
     // plafonnée. Le tri fait le travail, on ne ramène qu'une ligne.
+    // ⚠️ LES SIX DERNIERS MOIS, PLUS TOUT L'HISTORIQUE (07/11/2026, `PIC_FC_JOURS`) : la FC max
+    // d'aujourd'hui, pas celle d'il y a deux ans. Voir `maxDeReference` (lib/coach/fcCible).
     objectifSeul ? nonLuUne() : sb.from("workouts").select("max_hr").eq("user_id", userId)
-      .not("max_hr", "is", null).order("max_hr", { ascending: false }).limit(1).maybeSingle(),
+      .not("max_hr", "is", null).gte("date", new Date(Date.now() - PIC_FC_JOURS * 86400000).toISOString().slice(0, 10))
+      .order("max_hr", { ascending: false }).limit(1).maybeSingle(),
     // Test de lactate le plus récent (lib/coach/lactate) : une donnée DÉCLARÉE, lue pour
     // toutes les formules comme les autres réponses de l'athlète.
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", TYPE_TEST_LACTATE)
@@ -605,12 +608,17 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const recent14 = workouts.filter(w => isRun(w.sport) && now - new Date(w.date).getTime() <= 14 * 86400000);
   // FC max de repli (baseline → max observé en séance → formule d'âge) — sert à CLASSER l'effort
   // ET à estimer la VMA. Les imports intervals.icu étiquettent souvent TOUT en « easy » : on lit la FC.
-  // ⚠️ LE MAXIMUM RÉELLEMENT ENREGISTRÉ, SUR TOUT L'HISTORIQUE — pas sur les 60 dernières
-  // séances. `fcMaxRes` porte la ligne la plus haute de toute la table (requête dédiée).
-  const obsMaxHr0 = Math.max(0, ...workouts.map(w => num(w.max_hr) ?? 0),
+  // ⚠️ LE MAXIMUM RÉELLEMENT ENREGISTRÉ CES SIX DERNIERS MOIS — pas sur les 60 dernières
+  // séances. `fcMaxRes` porte la ligne la plus haute de la fenêtre (requête dédiée) ; avant le
+  // 07/11/2026, de toute la table : un pic ancien faisait des zones trop hautes.
+  const obsMaxHr0 = Math.max(0, ...workouts
+    .filter(w => now - new Date(String(w.date).slice(0, 10) + "T12:00:00Z").getTime() <= PIC_FC_JOURS * 86400000)
+    .map(w => num(w.max_hr) ?? 0),
     num((fcMaxRes.data as { max_hr?: number } | null)?.max_hr) ?? 0);
-  // FC max DÉCLARÉE : celle du test (baseline) d'abord, sinon celle saisie à l'inscription.
-  const maxHrDeclare = num(b?.max_hr) ?? num(p?.max_hr);
+  // FC max DE RÉFÉRENCE : celle du test (baseline) d'abord, sinon celle saisie à l'inscription,
+  // sinon celle de la MONTRE (réglage intervals.icu porté par ses séances Garmin, 07/11/2026).
+  const maxHrDeclare = maxDeReference(num(b?.max_hr) ?? num(p?.max_hr),
+    (((p as Record<string, unknown> | null)?.garmin_metrics) as Record<string, unknown> | null)?.maxHR);
   // ⚠️ JAMAIS SOUS UNE VALEUR RÉELLEMENT ATTEINTE. Une FC max déclarée à 190 alors que la
   // montre a enregistré 205 est fausse par construction — on ne peut pas avoir un maximum
   // inférieur à un battement qu'on a réellement produit. On retient donc la plus haute des

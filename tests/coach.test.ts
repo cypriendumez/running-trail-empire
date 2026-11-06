@@ -5640,7 +5640,8 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
       "maxHrEff retient la FC déclarée même si une FC plus haute a été enregistrée");
     // La FC déclarée au PROFIL (migration 029) doit être lue, sinon le champ de l'inscription
     // est un champ qui jette ce qu'on lui donne.
-    assert.ok(/maxHrDeclare = num\(b\?\.max_hr\) \?\? num\(p\?\.max_hr\)/.test(src),
+    // 07/11/2026 : la montre (réglage intervals.icu) sert de repli via `maxDeReference`.
+    assert.ok(/maxHrDeclare = maxDeReference\(num\(b\?\.max_hr\) \?\? num\(p\?\.max_hr\)/.test(src),
       "la FC max déclarée à l'inscription (profiles.max_hr) n'est pas lue");
     assert.ok(/restHr = num\(b\?\.resting_hr\) \?\? num\(p\?\.resting_hr\)/.test(src),
       "la FC de repos déclarée à l'inscription (profiles.resting_hr) n'est pas lue");
