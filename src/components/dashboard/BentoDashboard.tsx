@@ -119,12 +119,12 @@ const KPI_LABELS: Record<string, { form: string; hrv: string; vma: string; vol: 
 };
 
 // Libellés du panneau objectif de l'en-tête (multilingue).
-const HERO_LABELS: Record<string, { goal: string; plan: string; prep: string }> = {
-  fr: { goal: "Objectif", plan: "Voir mon plan", prep: "préparation" },
-  en: { goal: "Goal", plan: "View my plan", prep: "readiness" },
-  de: { goal: "Ziel", plan: "Mein Plan ansehen", prep: "Bereitschaft" },
-  es: { goal: "Objetivo", plan: "Ver mi plan", prep: "preparación" },
-  pt: { goal: "Objetivo", plan: "Ver o meu plano", prep: "preparação" },
+const HERO_LABELS: Record<string, { goal: string; plan: string; prep: string; sept: string }> = {
+  fr: { goal: "Objectif", plan: "Voir mon plan", prep: "préparation", sept: "7 j" },
+  en: { goal: "Goal", plan: "View my plan", prep: "readiness", sept: "7 d" },
+  de: { goal: "Ziel", plan: "Mein Plan ansehen", prep: "Bereitschaft", sept: "7 T" },
+  es: { goal: "Objetivo", plan: "Ver mi plan", prep: "preparación", sept: "7 d" },
+  pt: { goal: "Objetivo", plan: "Ver o meu plano", prep: "preparação", sept: "7 d" },
 };
 
 // Bannière « prochaine séance » (multilingue).
@@ -194,6 +194,11 @@ import type { CleIndicateur } from "@/lib/indicateurs/types";
 
 export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, plan, league, prWorkouts, recordsDeclares = [], premiereSeance = null, chargeHistory, sleep, coachSession, ressenti, objective, derniereCourse = null, currentVma, sourceVma = null, loadRisk, newMembersWeek, streak, acces, donneesIncompletes, jourAujourdhui, planCoach = null, montreReliee = false, analyses = [] }: Props) {
   const { t, lang } = useT();
+  // ⚠️ LES NOMBRES À LA LANGUE (06/11/2026). `toFixed` écrivait « 11.4 km/h » et « 15.0 km »
+  // en allemand, espagnol, portugais et français, où la décimale est une virgule. Et
+  // « Base 14 j : 43 ms » gardait l'espace insécable français avant les deux-points.
+  const nf = (v: number, d = 1) => (Number.isFinite(v) ? v : 0).toLocaleString(lang, { minimumFractionDigits: d, maximumFractionDigits: d });
+  const deuxPoints = lang === "fr" ? "\u00a0: " : ": ";
   // État RELATIF à la base de l'athlète, et seulement si la mesure est fraîche — même
   // règle que la fiche détaillée (`etatPhysiologique`), qui ne peut pas dire autre chose.
   // ⚠️ LE JOUR DE L'ATHLÈTE, PAS CELUI DE LA MACHINE. Tout ce qui dépend d'« aujourd'hui »
@@ -266,7 +271,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
 
   // Séance-clé du jour : l'algo s'affiche INSTANTANÉMENT (repli fiable),
   // puis la version IA (Gemini) le remplace dès qu'elle répond (badge ✨).
-  const keySession = recommendSession({ state, weeklyKm, workouts, sleep, raceDate, jour, t });
+  const keySession = recommendSession({ state, weeklyKm, workouts, sleep, raceDate, jour, t, recuperation: !!planCoach?.recuperation, mesureFraiche: hrvFraiche });
   // Séance prescrite par le coach = prioritaire, et affichée dans la langue de l'athlète.
   // La résolution se fait ici, côté client : le sélecteur de langue est instantané.
   const coachKey = coachSession
@@ -288,7 +293,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
 
   // Dernière séance : on n'affiche que les métriques réellement disponibles (pas de "--" vide).
   const w0 = workouts[0];
-  const lastMetrics = w0 ? buildLastMetrics(w0, t) : [];
+  const lastMetrics = w0 ? buildLastMetrics(w0, t, lang) : [];
 
   // ── Données dérivées (toutes calculées depuis le réel — rien d'inventé) ──────────
   // ⚠️ LE SOCLE RÉEL (02/10/2026) : sans lui, le marathon était prédit pour un coureur
@@ -386,7 +391,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
   ) });
   if (records) {
     const rows = ([
-      { icon: Footprints, label: t("dash.records.longest"), value: `${records.longest.toFixed(1)} km`, color: "text-emerald-600", bg: "bg-emerald-50" },
+      { icon: Footprints, label: t("dash.records.longest"), value: `${nf(records.longest)} km`, color: "text-emerald-600", bg: "bg-emerald-50" },
       records.bestPace != null ? { icon: TrendingUp, label: t("dash.records.pace"), value: `${fmtPaceSec(records.bestPace)}/km`, color: "text-sky-600", bg: "bg-sky-50" } : null,
       records.maxElev > 0 ? { icon: Mountain, label: t("dash.records.climb"), value: `${Math.round(records.maxElev)} m`, color: "text-orange-600", bg: "bg-orange-50" } : null,
       records.longestSec > 0 ? { icon: Timer, label: t("dash.records.duration"), value: fmtTime(records.longestSec), color: "text-violet-600", bg: "bg-violet-50" } : null,
@@ -510,9 +515,11 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
     } finally { setRetrait(null); }
   };
   const heroStats = [
-    { label: kpi.form, value: disc.hasData ? String(disc.total) : "—", unit: disc.hasData ? "/100" : "" },
+    // ⚠️ « FORME » = le Score de FORME (06/11/2026). Ce chiffre était le Score discipline :
+    // l'en-tête annonçait « Forme 76 » pendant que la carte Score de forme disait 66.
+    { label: kpi.form, value: forme.hasData ? String(forme.total) : "—", unit: forme.hasData ? "/100" : "" },
     { label: kpi.hrv, value: hrvLatest != null ? hrvLatest.toFixed(0) : "—", unit: hrvLatest != null ? "ms" : "" },
-    { label: kpi.vma, value: currentVma && currentVma > 0 ? currentVma.toFixed(1) : "—", unit: currentVma && currentVma > 0 ? "km/h" : "" },
+    { label: kpi.vma, value: currentVma && currentVma > 0 ? nf(currentVma) : "—", unit: currentVma && currentVma > 0 ? "km/h" : "" },
     { label: kpi.vol, value: weeklyKm.toFixed(0), unit: "km" },
   ];
 
@@ -595,7 +602,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                 <Gauge className="h-3.5 w-3.5 text-[#059669]" /> {levelLabel}
               </span>
               <span className="inline-flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-zinc-200/70 bg-white/70 px-3 py-1 text-xs font-medium text-zinc-600">
-                <Activity className="h-3.5 w-3.5 text-[#059669]" /> {weeklyKm.toFixed(0)} km · 7 j
+                <Activity className="h-3.5 w-3.5 text-[#059669]" /> {weeklyKm.toFixed(0)} km · {hl.sept}
               </span>
               {/* Série du jour — visible dès le premier coup d'œil, sans quitter l'en-tête. */}
               {streak && streak.current > 0 && (
@@ -648,7 +655,10 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
               <ChevronRight className="h-5 w-5 flex-shrink-0 text-[#8aa6a6] sm:hidden" aria-hidden />
             </Link>
           ) : (
-            <div className="flex flex-wrap gap-x-7 gap-y-4 sm:gap-x-9">
+            /* ⚠️ `w-full` SUR TÉLÉPHONE (06/11/2026) : sans lui, les quatre chiffres restaient
+               sur la ligne du « Bonjour » et l'écrasaient sur une colonne d'un mot de large
+               (« SEXTA- / FEIRA, / 6 / DE… ») — tout nouvel inscrit sans objectif, en mobile. */
+            <div className="flex w-full flex-wrap gap-x-7 gap-y-4 sm:w-auto sm:gap-x-9">
               {heroStats.map((s) => (
                 <div key={s.label}>
                   <div className="text-2xl font-bold tabular-nums text-[#11201d] sm:text-[1.7rem]">
@@ -932,7 +942,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
               </div>
               {hrvBaseline != null && (
                 <div className="mt-1 text-[11px] text-zinc-400">
-                  {t("dash.hrv.baseline")} : <span className="font-medium text-zinc-500">{hrvBaseline} ms</span>
+                  {t("dash.hrv.baseline")}{deuxPoints}<span className="font-medium text-zinc-500">{hrvBaseline} ms</span>
                   {hrvDelta != null && <span> · {hrvDelta >= 0 ? t("dash.hrv.above") : t("dash.hrv.below")}</span>}
                 </div>
               )}
@@ -1000,7 +1010,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
           {predictions ? (
             <>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-4xl font-bold tabular-nums text-zinc-900">{(currentVma ?? 0).toFixed(1)}</span>
+                <span className="text-4xl font-bold tabular-nums text-zinc-900">{nf(currentVma ?? 0)}</span>
                 <span className="text-sm text-zinc-400">km/h</span>
               </div>
               <div className="text-[11px] text-zinc-400">{t("dash.vma.sub")}</div>
@@ -1070,7 +1080,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             return (
               <div className="mt-auto pt-2">
                 <div className="flex items-end gap-3">
-                  <span className="text-4xl font-bold tabular-nums" style={{ color: zone.c }}>{acwr.toFixed(2)}</span>
+                  <span className="text-4xl font-bold tabular-nums" style={{ color: zone.c }}>{nf(acwr, 2)}</span>
                   <span className="mb-1 text-sm font-semibold" style={{ color: zone.c }}>{zone.l}</span>
                 </div>
                 <div className="relative mt-4 mb-6">
@@ -1086,7 +1096,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                   ))}
                 </div>
                 <div className="flex items-center gap-3 text-xs">
-                  <span className="text-zinc-400">{t("dash.acwr.monotony")} <strong className="tabular-nums text-zinc-700">{(loadRisk?.monotony ?? 0).toFixed(1)}</strong></span>
+                  <span className="text-zinc-400">{t("dash.acwr.monotony")} <strong className="tabular-nums text-zinc-700">{nf(loadRisk?.monotony ?? 0)}</strong></span>
                   <span className="text-zinc-300">·</span>
                   <span className="text-zinc-500">{t("dash.acwr.sweet")}</span>
                 </div>
@@ -1111,7 +1121,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             <TrendingUp className="h-4 w-4 text-zinc-300" />
           </div>
           <div className="flex items-baseline gap-1.5">
-            <span className="metric-value text-zinc-900">{weeklyKm.toFixed(1)}</span>
+            <span className="metric-value text-zinc-900">{nf(weeklyKm)}</span>
             <span className="text-sm text-zinc-400">km</span>
             {volumeDelta != null && Math.abs(volumeDelta) >= 0.1 && (
               <span className={`ml-auto inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs font-semibold ${volumeDelta >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>
@@ -1124,7 +1134,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             {volumeTrend.map((v, i) => (
               <div key={i} className="flex-1 rounded-t-md transition-all"
                 style={{ height: `${Math.max(4, (v.km / trendMax) * 56)}px`, background: v.isCurrent ? "#059669" : "#D1FAE5" }}
-                title={`${v.km.toFixed(1)} km`} />
+                title={`${nf(v.km)} km`} />
             ))}
           </div>
           <div className="mt-1 text-center text-[10px] text-zinc-400">{t("dash.volume.trend")}</div>
@@ -1225,7 +1235,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             {(profile?.league ?? "bronze").charAt(0).toUpperCase()}{(profile?.league ?? "bronze").slice(1)}
           </div>
           <div className="mt-3 text-sm text-zinc-500">
-            {t("dash.league.weekly")} : <strong className="tabular-nums text-zinc-900">{disc.hasData ? disc.total : "—"}</strong>
+            {t("dash.league.weekly")}{deuxPoints}<strong className="tabular-nums text-zinc-900">{disc.hasData ? disc.total : "—"}</strong>
           </div>
           {/* ⚠️ ICI SE TROUVAIT UN TROU BLANC DE 85 px. La carte affichait une barre de
               tendance sur 8 semaines lue dans `discipline_scores` — table VIDE pour
@@ -1271,7 +1281,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
           <div className="mb-4 flex items-center justify-between">
             <div className="metric-label">{t("dash.weekly.title")}</div>
             <div className="flex items-center gap-4 text-xs">
-              <span className="text-zinc-400">{t("dash.weekly.total")} <strong className="tabular-nums text-zinc-900">{weekSummary.km.toFixed(1)} km</strong></span>
+              <span className="text-zinc-400">{t("dash.weekly.total")} <strong className="tabular-nums text-zinc-900">{nf(weekSummary.km)} km</strong></span>
               <span className="text-zinc-400">{t("dash.chart.elevation")} <strong className="tabular-nums text-zinc-900">+{Math.round(weekSummary.elev)} m</strong></span>
             </div>
           </div>
@@ -1368,7 +1378,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                       `w-full` les font passer sur une deuxième ligne, alignée sur le titre ;
                       à partir de sm, une seule ligne comme avant. */}
                   <div className="order-last flex w-full gap-3 pl-[52px] text-sm text-zinc-600 sm:order-none sm:w-auto sm:flex-shrink-0 sm:gap-4 sm:pl-0">
-                    {w.distance_km && <span>{w.distance_km.toFixed(1)} km</span>}
+                    {w.distance_km && <span>{nf(w.distance_km)} km</span>}
                     {w.elevation_gain_m ? <span>+{w.elevation_gain_m}m</span> : null}
                     {w.avg_hr && <span>{w.avg_hr} bpm</span>}
                     <span className="text-zinc-400">
@@ -1514,7 +1524,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
           <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
             {[
               { v: String(weekSummary.sessions), u: "", l: t("dash.summary.sessions") },
-              { v: weekSummary.km.toFixed(1), u: "km", l: t("dash.metric.distance") },
+              { v: nf(weekSummary.km), u: "km", l: t("dash.metric.distance") },
               { v: String(Math.round(weekSummary.elev)), u: "m", l: t("dash.metric.elevation") },
               { v: fmtTime(weekSummary.sec), u: "", l: t("dash.metric.duration") },
             ].map((s) => (
@@ -1600,11 +1610,15 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
 type KeyTag = { l: string; c: string };
 type KeySession = { title: string; subtitle: string; accent: string; tags: KeyTag[]; why: string };
 
-function recommendSession({ state, weeklyKm, workouts, sleep, raceDate, jour, t }: {
+function recommendSession({ state, weeklyKm, workouts, sleep, raceDate, jour, t, recuperation = false, mesureFraiche = false }: {
   state: string; weeklyKm: number; workouts: Workout[];
   sleep?: { sleep_score: number } | null; raceDate: string | null;
   /** Jour civil de l'athlète : le week-end et le compte à rebours ne dépendent pas de la machine. */
   jour: string; t: TFn;
+  /** Récupération d'après-course en cours (le coach) : aucune intensité, aucune sortie longue. */
+  recuperation?: boolean;
+  /** La VFC du jour est-elle FRAÎCHE ? Sans elle, `state` vaut « optimal » PAR DÉFAUT. */
+  mesureFraiche?: boolean;
 }): KeySession {
   const Z1 = "bg-sky-100 text-sky-700", Z2 = "bg-green-100 text-green-700",
     Z4 = "bg-orange-100 text-orange-700", NEU = "bg-zinc-100 text-zinc-600", RED = "bg-red-100 text-red-700";
@@ -1628,19 +1642,33 @@ function recommendSession({ state, weeklyKm, workouts, sleep, raceDate, jour, t 
     tags: [{ l: "Z2", c: Z2 }, { l: t("dash.tag.short"), c: NEU }, { l: `J-${daysToRace}`, c: Z1 }],
     why: t("dash.rec.taper.why"),
   };
+  // ⚠️ LE REPLI NE PROPOSE PLUS D'INTENSITÉ À L'AVEUGLE (06/11/2026). Quand le coach n'a
+  // rien publié, cette séance s'affiche. Or `state` vaut « optimal » PAR DÉFAUT sans VFC
+  // fraîche : un nouvel inscrit sans aucune donnée recevait « Séries courtes 10 × 400 m »,
+  // un coureur en récupération d'après-marathon aussi. Sans mesure fraîche, sans séance
+  // connue ou en récupération : le footing de base.
+  const base: KeySession = {
+    title: t("dash.rec.base.title"), accent: "#059669", subtitle: t("dash.rec.base.sub"),
+    tags: [{ l: "Z2", c: Z2 }, { l: "50 min", c: NEU }],
+    why: t("dash.rec.base.why"),
+  };
+  if (recuperation || !last) return base;
   if ((lastHard || lastLong) && daysSinceLast <= 1) return {
     title: t("dash.rec.assim.title"), accent: "#059669", subtitle: t("dash.rec.assim.sub"),
     tags: [{ l: "Z2", c: Z2 }, { l: "45–60 min", c: NEU }],
     why: t("dash.rec.assim.why"),
   };
-  if (dow === 0 || dow === 6) {
-    const target = Math.max(12, Math.round(weeklyKm * 0.4));
+  // Sortie longue du week-end : proportionnée au volume RÉEL (12 km d'office pour un
+  // coureur à 10 km par semaine, c'était plus que sa semaine entière).
+  if ((dow === 0 || dow === 6) && weeklyKm >= 15) {
+    const target = Math.max(8, Math.round(weeklyKm * 0.4));
     return {
       title: t("dash.rec.long.title"), accent: "#059669", subtitle: t("dash.rec.long.sub", { km: target }),
       tags: [{ l: "Z2", c: Z2 }, { l: `${target} km`, c: NEU }],
       why: t("dash.rec.long.why"),
     };
   }
+  if (!mesureFraiche) return base;
   if (state === "competition") return {
     title: t("dash.rec.thr.title"), accent: "#EA580C", subtitle: t("dash.rec.thr.sub"),
     tags: [{ l: "Z4", c: Z4 }, { l: "~10 km", c: NEU }, { l: t("dash.tag.quality"), c: RED }],
@@ -1651,11 +1679,7 @@ function recommendSession({ state, weeklyKm, workouts, sleep, raceDate, jour, t 
     tags: [{ l: "Z4-Z5", c: Z4 }, { l: "VMA", c: RED }, { l: "~8 km", c: NEU }],
     why: t("dash.rec.vma.why"),
   };
-  return {
-    title: t("dash.rec.base.title"), accent: "#059669", subtitle: t("dash.rec.base.sub"),
-    tags: [{ l: "Z2", c: Z2 }, { l: "50 min", c: NEU }],
-    why: t("dash.rec.base.why"),
-  };
+  return base;
 }
 
 // ── Conversion de la séance IA (tags texte) en séance affichable (tags colorés) ──
@@ -1674,9 +1698,9 @@ function aiToSession(s: { title: string; subtitle: string; tags: string[]; why: 
 }
 
 // ── Métriques réellement disponibles de la dernière séance (jamais de "--" vide) ──
-function buildLastMetrics(w: Workout, t: TFn): { label: string; value: string | number; unit: string }[] {
+function buildLastMetrics(w: Workout, t: TFn, lang: string): { label: string; value: string | number; unit: string }[] {
   const out: { label: string; value: string | number; unit: string }[] = [];
-  if (w.distance_km != null) out.push({ label: t("dash.metric.distance"), value: w.distance_km.toFixed(1), unit: "km" });
+  if (w.distance_km != null) out.push({ label: t("dash.metric.distance"), value: w.distance_km.toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 }), unit: "km" });
   if (w.duration_seconds) out.push({ label: t("dash.metric.duration"), value: `${Math.floor(w.duration_seconds / 3600)}h${String(Math.floor((w.duration_seconds % 3600) / 60)).padStart(2, "0")}`, unit: "" });
   if (w.distance_km && w.duration_seconds) {
     const p = (w.duration_seconds / 60) / w.distance_km;

@@ -296,6 +296,44 @@ test("le tableau de bord lit les analyses mémorisées et n'en déclenche aucune
   assert.match(codeNu("src/app/dashboard/page.tsx"), /analyses=\{\(analysesRes\.data \?\? \[\]\) as AnalyseMemorisee\[\]\}/);
 });
 
+console.log("\nAUDIT DU 06/11/2026 — LANGUES, TÉLÉPHONE, AUTRES PROFILS");
+
+test("les nombres s'écrivent à la langue : « 11,4 km/h », pas « 11.4 »", () => {
+  assert.doesNotMatch(BENTO, /\.toFixed\([12]\)/, "une décimale s'affiche de nouveau avec un point, quelle que soit la langue");
+  assert.match(BENTO, /const nf = \(v: number, d = 1\) => \(Number\.isFinite\(v\) \? v : 0\)\.toLocaleString\(lang,/);
+  assert.equal((11.4).toLocaleString("de", { minimumFractionDigits: 1, maximumFractionDigits: 1 }), "11,4");
+});
+
+test("« 7 j » et « Base : » suivent la langue", () => {
+  assert.doesNotMatch(BENTO, /km · 7 j/, "« 7 j » écrit en dur revient (affiché tel quel en allemand, anglais…)");
+  for (const [lang, v] of [["fr", "7 j"], ["en", "7 d"], ["de", "7 T"], ["es", "7 d"], ["pt", "7 d"]]) {
+    assert.match(BENTO, new RegExp(`\\n  ${lang}: \\{[^}]*sept: "${v}"`), `${lang} : « ${v} » manque`);
+  }
+  assert.doesNotMatch(BENTO, /\)\} : </, "un « : » à la française écrit en dur revient (« Basis : 43 ms »)");
+  assert.match(BENTO, /const deuxPoints = lang === "fr" \? "\\u00a0: " : ": ";/);
+});
+
+test("téléphone : l'en-tête sans objectif et la carte Objectif ne s'écrasent plus", () => {
+  assert.match(BENTO, /<div className="flex w-full flex-wrap gap-x-7 gap-y-4 sm:w-auto sm:gap-x-9">/,
+    "les chiffres de l'en-tête restent sur la ligne du « Bonjour » et l'écrasent sur un mot de large");
+  assert.match(codeNu("src/components/dashboard/ObjectiveCard.tsx"), /<div className="min-w-0 basis-full sm:basis-0 sm:flex-1">/,
+    "le chrono et le bouton écrasent de nouveau la colonne de l'objectif sur téléphone");
+});
+
+test("« Forme » dans l'en-tête est le Score de forme, pas le Score discipline", () => {
+  assert.match(BENTO, /\{ label: kpi\.form, value: forme\.hasData \? String\(forme\.total\) : "—"/);
+});
+
+test("la séance de repli ne propose pas d'intensité à l'aveugle", () => {
+  // Constaté le 06/11/2026 : « Séries courtes 10 × 400 m » à un nouvel inscrit sans aucune donnée.
+  const repli = BENTO.slice(BENTO.indexOf("function recommendSession("), BENTO.indexOf("function colorizeTag("));
+  assert.match(repli, /if \(recuperation \|\| !last\) return base;/, "un nouvel inscrit ou un coureur en récupération reçoit de nouveau du fractionné");
+  assert.match(repli, /if \(!mesureFraiche\) return base;/, "l'état « optimal » PAR DÉFAUT décide de nouveau d'une séance VMA");
+  assert.ok(repli.indexOf("if (!mesureFraiche) return base;") < repli.indexOf('if (state === "optimal")'), "la garde passe après la séance VMA");
+  assert.match(repli, /\(dow === 0 \|\| dow === 6\) && weeklyKm >= 15/, "12 km de sortie longue d'office reviennent pour un coureur à 0 km");
+  assert.match(BENTO, /recommendSession\(\{ [^}]*recuperation: !!planCoach\?\.recuperation, mesureFraiche: hrvFraiche \}\)/);
+});
+
 console.log("\nCRASH-TEST DU SCORE DE FORME");
 
 test("aucune entrée absurde ne fait sortir un axe de 0–100 ni n'en fait un NaN", () => {

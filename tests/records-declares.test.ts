@@ -32,6 +32,31 @@ test("le temps se lit sous les formes qu'on tape vraiment", () => {
   assert.equal(lireTemps("abc"), null);
 });
 
+test("« 1h15 » au semi est accepté, et toutes les écritures courantes d'un chrono aussi", () => {
+  // Constaté le 06/11/2026 : « 1h15 » au semi → « Temps ou date invalide ». Le motif exigeait des secondes.
+  const semi = BORNES_SECONDES.semi;
+  const cas: [string, number][] = [
+    ["1h15", 4500], ["1h15min", 4500], ["1 h 15", 4500], ["1H15", 4500], ["1h15m32", 4532], ["1h15'32", 4532],
+    ["1h15'32\"", 4532], ["1 h 15 min 32 s", 4532], ["2h", 7200], ["1:15", 4500], ["1:15:00", 4500], ["1.15.32", 4532],
+    ["75min", 4500], ["75:32", 4532], ["75'32''", 4532], ["75’32", 4532],
+  ];
+  for (const [ecrit, attendu] of cas) assert.equal(lireTemps(ecrit, semi), attendu, `« ${ecrit} » au semi`);
+  // « 16:07 » au 5 km reste 16 min 07, pas 16 h 07.
+  assert.equal(lireTemps("16:07", BORNES_SECONDES["5k"]), 967);
+  assert.equal(lireTemps("16'07", BORNES_SECONDES["5k"]), 967);
+  // Sans bornes, deux parties restent minutes:secondes (aucune supposition).
+  assert.equal(lireTemps("1:15"), 75);
+  // Les fautes de frappe restent refusées.
+  for (const faux of ["1h75", "1h15m75", "1:15:60", "16'75", "h15", "1h15h", "", "12", "-1h15"]) assert.equal(lireTemps(faux, semi), null, `« ${faux} » accepté`);
+  // Côté serveur aussi : le semi « 1h15 » d'avril 2025 passe.
+  assert.deepEqual(validerRecordDeclare({ distance: "semi", temps: "1h15", date: "2025-03-15" }, AUJ), { distance: "semi", secondes: 4500, date: "2025-03-15", course: null });
+  // Le formulaire lit avec les bornes de la distance, et dit LEQUEL des deux champs corriger.
+  const form = codeNu("src/components/dashboard/AjoutRecord.tsx");
+  assert.match(form, /lireTemps\(temps, BORNES_SECONDES\[distance\]\)/);
+  assert.match(form, /t\("dash\.rec\.tempsInvalide"\)/);
+  assert.match(form, /t\("dash\.rec\.dateInvalide"\)/);
+});
+
 test("un record invraisemblable, futur ou sur une distance inconnue est refusé", () => {
   assert.ok(validerRecordDeclare({ distance: "semi", temps: "1:15:00", date: "2024-03-24" }, AUJ));
   assert.equal(validerRecordDeclare({ distance: "semi", temps: "0:50:00", date: "2024-03-24" }, AUJ), null, "plus rapide que le record du monde");

@@ -180,7 +180,10 @@ export function ObjectiveCard({ objective, derniereCourse = null, currentVma, au
     return (
       <div className="mb-5 rounded-2xl bg-white px-4 py-3.5 ring-1 ring-zinc-200 sm:px-5">
         <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-          <div className="min-w-0 flex-1">
+          {/* `basis-full` sur téléphone (06/11/2026) : le chrono et le bouton écrasaient cette
+              colonne — nom de course tronqué, date et liens coupés sur deux lignes. Ils
+              passent dessous ; à partir de `sm`, rien ne change. */}
+          <div className="min-w-0 basis-full sm:basis-0 sm:flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="truncate text-[15px] font-semibold tracking-tight text-zinc-900">{objective.race}</span>
               {!estOfficielle(objective) && <Badge className="px-2 py-0.5">{t("obj.unofficialBadge")}</Badge>}

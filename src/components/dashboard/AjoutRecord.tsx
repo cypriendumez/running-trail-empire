@@ -42,12 +42,11 @@ export function AjoutRecord({ aujourdhui }: { aujourdhui: string }) {
 
   const envoyer = async (e: React.FormEvent) => {
     e.preventDefault();
-    const secondes = lireTemps(temps);
     const [min, max] = BORNES_SECONDES[distance];
-    if (secondes == null || secondes < min || secondes > max || !date || date > aujourdhui) {
-      setErreur(t("dash.rec.invalide"));
-      return;
-    }
+    const secondes = lireTemps(temps, BORNES_SECONDES[distance]);
+    // Deux messages : « temps ou date invalide » ne disait pas LEQUEL corriger.
+    if (secondes == null || secondes < min || secondes > max) { setErreur(t("dash.rec.tempsInvalide")); return; }
+    if (!date || date > aujourdhui) { setErreur(t("dash.rec.dateInvalide")); return; }
     setEnCours(true); setErreur(null);
     try {
       const r = await fetch("/api/records", {
@@ -75,7 +74,7 @@ export function AjoutRecord({ aujourdhui }: { aujourdhui: string }) {
           </select>
         </label>
         <label htmlFor={`${id}-t`} className="text-[11px] text-zinc-500">{t("dash.rec.temps")}
-          <input id={`${id}-t`} value={temps} onChange={(e) => setTemps(e.target.value)} inputMode="numeric" placeholder="1:15:00" className={`mt-0.5 tabular-nums ${champ}`} />
+          <input id={`${id}-t`} value={temps} onChange={(e) => setTemps(e.target.value)} inputMode="numeric" placeholder="1h15" className={`mt-0.5 tabular-nums ${champ}`} />
         </label>
         <label htmlFor={`${id}-j`} className="text-[11px] text-zinc-500">{t("dash.rec.date")}
           <input id={`${id}-j`} type="date" value={date} max={aujourdhui} onChange={(e) => setDate(e.target.value)} className={`mt-0.5 ${champ}`} />
