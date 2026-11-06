@@ -11,7 +11,8 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { referencesFc, ciblesFcAthlete, footingTropIntense, plageFc, MARGE_FOOTING_DUR, avecFcMaxMontre, plageEnPctMax, maxDeReference, PIC_FC_JOURS } from "../src/lib/coach/fcCible";
+import { referencesFc, ciblesFcAthlete, footingTropIntense, plageFc, MARGE_FOOTING_DUR, avecFcMaxMontre, plageEnPctMax, maxDeReference, PIC_FC_JOURS, fcMaxSaison, FENETRE_SAISON_JOURS, DEMI_FENETRE_AN_DERNIER_JOURS } from "../src/lib/coach/fcCible";
+import { avecSaison } from "../src/lib/coach/ciblesFcServeur";
 import { stepsForType, parseReps, buildWorkoutDescription } from "../src/lib/watch/intervals";
 
 let passed = 0; const fails: string[] = [];
@@ -161,6 +162,47 @@ test("la synchro garde la FC max de la montre ; coach et envois lisent 6 mois et
   const srv = code("src/lib/coach/ciblesFcServeur.ts");
   assert.match(srv, /\.gte\("date", new Date\(maintenant - PIC_FC_JOURS \* 86400000\)/);
   assert.match(srv, /maxDeclaree: maxDeReference\(num\(b\?\.max_hr\) \?\? num\(p\?\.max_hr\), garmin\?\.maxHR\)/);
+});
+
+console.log("\nLA FC MAX DE SAISON — l'hiver, on atteint moins haut");
+
+test("son historique : pic 202 en décembre, 199 en janvier ; janvier 2027 serait calé vers 202, pas 212", () => {
+  assert.equal(FENETRE_SAISON_JOURS, 42);
+  assert.equal(DEMI_FENETRE_AN_DERNIER_JOURS, 21);
+  // Début novembre : 204 ces 6 semaines, 212 aux mêmes semaines l'an dernier (15/11/2025) → 212.
+  assert.equal(fcMaxSaison(212, 204, 212), 212);
+  // Janvier : ~200 ces 6 semaines, 202 aux mêmes semaines l'an dernier → 202.
+  assert.equal(fcMaxSaison(212, 200, 202), 202);
+  // Jamais au-dessus de la référence.
+  assert.equal(fcMaxSaison(205, 210, 212), 205);
+  // Un effort maximal récent l'emporte sur l'an dernier.
+  assert.equal(fcMaxSaison(212, 208, 199), 208);
+});
+
+test("sans saison déjà vécue (rien aux mêmes semaines l'an dernier), la référence reste", () => {
+  assert.equal(fcMaxSaison(212, 180, null), 212, "6 semaines sans effort dur ne font pas une FC max de 180");
+  assert.equal(fcMaxSaison(null, 200, 202), null);
+  assert.equal(fcMaxSaison(212, null, 120), 212, "un pic absurde n'est pas une saison");
+});
+
+test("les cibles suivent la saison : en janvier, footing et plafond descendent de 2 à 3 battements", () => {
+  const ete = ciblesFcAthlete(REFS, FOOTINGS)!;
+  const hiver = ciblesFcAthlete(avecSaison(REFS, { recent: 200, anDernier: 202 }), FOOTINGS)!;
+  assert.ok(hiver.plafondFooting < ete.plafondFooting, `plafond ${hiver.plafondFooting} contre ${ete.plafondFooting}`);
+  assert.ok(ete.plafondFooting - hiver.plafondFooting <= 8, "la saison ne doit pas effondrer les zones");
+  // Des pics plus bas que 220 − âge : recaler une estimation d'âge sur eux la ferait passer pour une mesure.
+  assert.equal(avecSaison(referencesFc({ age: 22 }), { recent: 190, anDernier: 185 }).max, 198, "une FC max tirée de l'âge n'est pas recalée sur la saison");
+  assert.equal(avecSaison(REFS, null), REFS, "une lecture ratée garde la référence");
+});
+
+test("le coach et les envois vers la montre appliquent la saison, sauf au palier gratuit", () => {
+  const c = code("src/lib/ai/coachContext.ts");
+  assert.match(c, /const picsDeSaison = objectifSeul \? null : await picsSaison\(sb as never, userId, now\);/);
+  assert.match(c, /ciblesFcAthlete\(\s*avecSaison\(referencesFc\(/, "le coach ignore la saison");
+  assert.match(c, /\}\), picsDeSaison\),/, "le coach ne passe plus les pics de saison");
+  const srv = code("src/lib/coach/ciblesFcServeur.ts");
+  assert.match(srv, /const refs = avecSaison\(refs0, await picsSaison\(sb, userId, maintenant\)\);/);
+  assert.match(srv, /if \(recent\.error \|\| anDernier\.error\) return null;/, "un pic à moitié lu fabriquerait une saison");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

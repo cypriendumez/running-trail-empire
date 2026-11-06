@@ -272,3 +272,36 @@ export const maxDeReference = (declaree: unknown, montre: unknown): number | nul
   const v = (x: unknown) => { const n = Number(x); return x != null && x !== "" && Number.isFinite(n) && n > 100 && n < 240 ? n : null; };
   return v(declaree) ?? v(montre);
 };
+
+/**
+ * LA FC MAX DE SAISON (Cyprien, 07/11/2026 : « c'était 209-212 quand il faisait chaud ; en
+ * hiver ma FC max monte jusqu'à 205 à peu près »).
+ *
+ * Mesuré sur son historique : pic du mois 202 en décembre, 199 en janvier, 198 en février,
+ * 204 à 212 le reste de l'année. La FC max PHYSIOLOGIQUE bouge peu, mais celle qu'on ATTEINT
+ * en séance suit la chaleur (le cœur bat plus vite pour refroidir le corps) : en hiver, des
+ * zones calées sur le pic de l'été sont trop hautes de 2 à 4 battements.
+ *
+ * Estimation : le plus haut de deux pics — celui des {@link FENETRE_SAISON_JOURS} derniers jours
+ * (la forme et la saison du moment) et celui des MÊMES semaines l'an dernier (pour ne pas
+ * plonger faute d'effort maximal récent) —, jamais au-dessus de la FC max de référence.
+ *
+ * ⚠️ SANS SAISON DÉJÀ VÉCUE, PAS D'ESTIMATION. Un coureur sans séance aux mêmes semaines l'an
+ * dernier garde sa référence : seul un pic récent pourrait n'être qu'une période sans effort
+ * dur, et ferait des zones trop basses. Une estimation inventée est pire que la référence.
+ *
+ * La température enregistrée sur une séance n'est PAS la température de l'air (capteur du
+ * poignet, chauffé par le corps : 15-16 °C en moyenne en plein hiver à Lille) : on ne s'en
+ * sert pas, la période suffit.
+ */
+export const FENETRE_SAISON_JOURS = 42;
+/** Demi-largeur de la fenêtre « mêmes semaines l'an dernier », centrée sur la date d'il y a un an. */
+export const DEMI_FENETRE_AN_DERNIER_JOURS = 21;
+
+export function fcMaxSaison(reference: number | null, picRecent: unknown, picAnDernier: unknown): number | null {
+  const v = (x: unknown) => { const n = Number(x); return x != null && x !== "" && Number.isFinite(n) && n > 150 && n < 240 ? n : null; };
+  const ref = v(reference);
+  const anDernier = v(picAnDernier);
+  if (ref == null || anDernier == null) return ref;
+  return Math.min(ref, Math.max(anDernier, v(picRecent) ?? 0));
+}

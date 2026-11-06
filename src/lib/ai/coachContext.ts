@@ -1,4 +1,5 @@
 import type { createClient } from "@/lib/supabase/server";
+import { picsSaison, avecSaison } from "@/lib/coach/ciblesFcServeur";
 import { referencesFc, ciblesFcAthlete, footingTropIntense, maxDeReference, PIC_FC_JOURS, type CiblesFc } from "@/lib/coach/fcCible";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
@@ -631,12 +632,15 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // seuil mesuré. Les footings récents (≥ 20 min, 60 jours) servent à suivre l'athlète
   // qui court PLUS facile que la théorie (`cibleEndurance`). Rien pour le palier gratuit :
   // il ne lit aucune fréquence cardiaque.
+  // La FC max de la SAISON (`fcMaxSaison`) : en hiver, des zones calées sur le pic de l'été
+  // sont trop hautes. Deux pics lus à part ; une lecture ratée garde la référence.
+  const picsDeSaison = objectifSeul ? null : await picsSaison(sb as never, userId, now);
   const ciblesFc: CiblesFc | null = objectifSeul ? null : ciblesFcAthlete(
-    referencesFc({
+    avecSaison(referencesFc({
       maxDeclaree: maxHrDeclare, maxObservee: obsMaxHr0,
       repos: num(b?.resting_hr) ?? num(p?.resting_hr) ?? num((((p as Record<string, unknown> | null)?.garmin_metrics) as Record<string, unknown> | null)?.restingHR),
       seuil: num(b?.lt_hr),
-    }),
+    }), picsDeSaison),
     workouts.filter((w) => isRun(w.sport) && !isHardType(w.type) && (num(w.duration_seconds) ?? 0) >= 20 * 60
       && now - new Date(String(w.date).slice(0, 10) + "T12:00:00Z").getTime() <= 60 * 86400000)
       .map((w) => num(w.avg_hr)).filter((v): v is number => v != null),
