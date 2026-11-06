@@ -16,7 +16,11 @@
  *  2. REGROUPEMENT : sept séances republiées le même jour = UNE entrée « Plan mis à
  *     jour » qui les nomme, pas sept notifications.
  */
-export type LigneNotification = { id: string; type: string; title: string; body: string | null; read: boolean; created_at: string };
+export type LigneNotification = {
+  id: string; type: string; title: string; body: string | null; read: boolean; created_at: string;
+  /** Jour de la séance (`data->>date`), pour les `coach_session` : cite le plan dans l'ordre des jours. */
+  date?: string | null;
+};
 
 export type EntreePanneau = {
   /** Clé stable : l'identifiant de la ligne, ou `plan:<jour>` pour un regroupement. */
@@ -67,7 +71,16 @@ export function construirePanneau(
     });
   }
 
-  for (const [jour, g] of plans) {
+  // ⚠️ SEULE LA DERNIÈRE MISE À JOUR DU PLAN. Chaque republication efface les séances à
+  // venir de la précédente : un regroupement plus ancien n'en garde que la séance de son
+  // propre jour. Le panneau affichait donc « hier : 1 séance — Repos » pour une mise à
+  // jour qui en comptait sept (constaté le 06/11/2026). Ces restes ne sont pas des nouvelles.
+  const dernierJour = [...plans.keys()].sort().at(-1);
+  for (const [jour, brut] of plans) {
+    if (jour !== dernierJour) continue;
+    // Dans l'ordre des JOURS, pas de l'écriture : « Repos · Seuil · Renfo » citait le
+    // repos du 12 avant la séance du jour même.
+    const g = [...brut].sort((a, b) => String(a.date ?? "").localeCompare(String(b.date ?? "")));
     const titres = g.map((x) => x.title).filter(Boolean);
     const cites = titres.slice(0, TITRES_CITES).join(" · ");
     const reste = titres.length - TITRES_CITES;

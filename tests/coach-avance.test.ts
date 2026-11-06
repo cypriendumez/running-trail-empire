@@ -137,7 +137,8 @@ test("Premium et essai seulement ; jamais le plan gratuit ; le plan ne dépend p
   // jamais être relu par un modèle, quel que soit le tableau des droits.
   assert.match(src, /const coachAvance = planComplet && profilPeut\(acces, "plan_ia"\);/);
   assert.match(src, /const relecture = coachAvance\s*\? await relireSemaine\(/);
-  assert.match(src, /const rows = semaineCoach\.filter\(/, "les conseils n'atteindraient pas les séances enregistrées");
+  // 06/11/2026 : les séances passent par `aEcrire` (comparées à l'ancien plan avant d'être écrites).
+  assert.match(src, /const aEcrire = semaineCoach\.filter\([\s\S]*?const rows = aEcrire\.map\(/, "les conseils n'atteindraient pas les séances enregistrées");
   assert.match(src, /\.\.\.\(relecture \? \{ relecture \} : \{\}\)/, "sans mémoire, chaque republication rappellerait le modèle");
   const serveur = codeNu("src/lib/ai/relectureServeur.ts");
   assert.match(serveur, /Promise\.race\(\[appel, delai\]\)/, "le plan attendrait le modèle");

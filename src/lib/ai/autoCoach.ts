@@ -24,6 +24,7 @@ import { appliquerConseils } from "@/lib/ai/relectureSemaine";
 import { programmeMarcheCourse, FENETRE_JOURS as FENETRE_MARCHE_COURSE, type ProgrammeMarcheCourse } from "@/lib/coach/marcheCourse";
 import { isRun } from "@/lib/intervals/sport";
 import { decaleJour } from "@/lib/streak/compute";
+import { reecritureLue, type SeanceEcrite } from "@/lib/coach/planNotifie";
 
 type Admin = SupabaseClient;
 
@@ -72,12 +73,19 @@ async function prescrireTestVma(admin: Admin, opts: { userId: string; athleteId?
   // Le test se pose AUJOURD'HUI et remplace tout le plan à venir : tant que la VMA n'est
   // pas mesurée, il ne doit exister aucune autre séance. Même règle que la purge du plan
   // normal — si elle échoue en silence, la séance test s'empilerait sur d'anciennes.
+  // La même séance test, reposée chaque jour à la date du jour, ne réannonce rien : on
+  // la compare à la DERNIÈRE séance écrite, quelle que soit sa date (comparer jour à jour
+  // verrait un plan « nouveau » chaque matin). Déjà annoncée et lue → réécrite lue.
+  const { data: derniere, error: eAvant } = await admin.from("notifications").select("title, body, read, data")
+    .eq("user_id", userId).eq("type", "coach_session").order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const lue = !eAvant && derniere != null && (derniere.data as { testVma?: boolean } | null)?.testVma === true
+    && derniere.read === true && derniere.title === T.title.slice(0, 80) && derniere.body === T.subtitle.slice(0, 200);
   const { error: ePurge } = await admin.from("notifications").delete()
     .eq("user_id", userId).eq("type", "coach_session").gte("data->>date", today);
   if (ePurge) return { processed: false, reason: `purge test vma: ${ePurge.message}` };
 
   const { error } = await admin.from("notifications").insert({
-    user_id: userId, type: "coach_session", title: T.title.slice(0, 80), body: T.subtitle.slice(0, 200),
+    user_id: userId, type: "coach_session", title: T.title.slice(0, 80), body: T.subtitle.slice(0, 200), read: lue,
     data: {
       from: "coach-auto", date: today, sessionType: "Test", subtitle: T.subtitle.slice(0, 500),
       why: T.why.slice(0, 400), feel: "", tags: [...T.tags], confirmed: true, testVma: true,
@@ -247,6 +255,16 @@ export async function autoCoachForUser(
   // écrans dédoublonnent par date (`oneSessionPerDate`) et masqueraient donc le
   // problème, mais la montre, elle, reçoit ce qui est en base : l'athlète se
   // retrouverait avec deux séances contradictoires pour le même jour.
+  // AVANT la purge : le plan qu'elle va effacer. Sans lui, impossible de savoir si la
+  // réécriture change quelque chose — et la cloche annonçait « Plan mis à jour » chaque
+  // nuit (lib/coach/planNotifie). Illisible : on annonce, plutôt que de taire un changement.
+  const { data: lignesAvant, error: eAvant } = await admin.from("notifications").select("title, body, read, data")
+    .eq("user_id", userId).eq("type", "coach_session").gte("data->>date", from);
+  if (eAvant) console.error("[coach-auto] plan précédent illisible, la réécriture sera annoncée :", eAvant.message);
+  const planAvant: SeanceEcrite[] | null = eAvant ? null : (lignesAvant ?? []).map((l) => {
+    const dl = (l.data ?? {}) as { date?: string; moment?: string };
+    return { date: String(dl.date ?? ""), moment: dl.moment ?? null, title: String(l.title ?? ""), body: (l.body as string | null) ?? null, read: l.read === true };
+  });
   const { error: ePurge } = await admin.from("notifications").delete()
     .eq("user_id", userId).eq("type", "coach_session").gte("data->>date", from);
   if (ePurge) {
@@ -254,9 +272,15 @@ export async function autoCoachForUser(
     return { processed: false, days: 0, pushed: 0, emailed: false, emailSkipped: "purge impossible" };
   }
 
-  const rows = semaineCoach.filter((d: PlanDay) => d.date >= from).map((d: PlanDay) => ({
+  const aEcrire = semaineCoach.filter((d: PlanDay) => d.date >= from);
+  // Lues si rien n'a changé et que tout était déjà lu : pas de « Plan mis à jour » à vide.
+  const lue = planAvant != null && reecritureLue(planAvant, aEcrire.map((d) => ({
+    date: d.date, moment: d.moment ?? null, title: d.title.slice(0, 80), body: d.detail.slice(0, 200),
+  })));
+  const rows = aEcrire.map((d: PlanDay) => ({
     user_id: userId,
     type: "coach_session",
+    read: lue,
     // ⚠️ `title` et `body` restent en FRANÇAIS : ce sont les champs canoniques, ceux
     // que la montre analyse et que l'IA relit. La version lue par l'athlète est dans
     // `data.i18n`, et l'écran choisit la sienne. Voir lib/ai/planI18n.ts.
