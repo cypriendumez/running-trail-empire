@@ -239,5 +239,28 @@ test("le coach et les envois lisent la météo de sa position, avant les cibles 
   assert.match(srv, /const refs = avecSaison\(refs0, await picsSaison\(sb, userId, maintenant\), froid\);/);
 });
 
+console.log("\nDÉFAUTS TROUVÉS PAR LE CRASH-TEST DU 07/11/2026");
+
+test("une FC hors du domaine humain n'est pas une mesure (repos à 1e9 → cibles de 1e9 bpm)", () => {
+  const r = referencesFc({ maxObservee: 190, repos: 1e9 });
+  assert.equal(r.repos, null, "une FC de repos absurde est lue");
+  const c = ciblesFcAthlete(r, [])!;
+  assert.ok(c.endurance.hi <= 190 && c.recup.hi <= 190, `cibles ${JSON.stringify(c)}`);
+  assert.equal(referencesFc({ maxObservee: 190, repos: 170 }).repos, null, "une réserve de 20 bpm est absurde");
+  assert.equal(referencesFc({ maxObservee: 190, repos: 10 }).repos, null, "une FC de repos de 10 n'existe pas (capteur, saisie)");
+  assert.equal(referencesFc({ maxDeclaree: 9999 }).source, "aucune");
+  assert.equal(referencesFc({ maxObservee: 190, seuil: 5 }).seuil, null);
+});
+
+test("une FC max de montre plus basse que nos cibles : on garde ses zones plutôt qu'un % impossible", () => {
+  assert.equal(avecFcMaxMontre(CIBLES, 150), null, "« 94-100.7% HR » partirait sur la montre");
+  assert.ok(avecFcMaxMontre(CIBLES, 212));
+});
+
+test("« air froid » : une case vide n'est pas 0 °C", () => {
+  assert.equal(airFroid([{ tempMin: "", tempMax: "" }, { tempMin: "", tempMax: "" }, { tempMin: "", tempMax: "" }] as never), false);
+  assert.equal(airFroid([{ tempMin: "1", tempMax: "2" }, { tempMin: 1, tempMax: 2 }, { tempMin: 1, tempMax: 2 }] as never), false, "du texte n'est pas une prévision");
+});
+
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }

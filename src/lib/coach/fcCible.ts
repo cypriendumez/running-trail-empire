@@ -51,13 +51,24 @@ const nb = (v: unknown): number | null =>
  * mesure, elle passe donc avant toute formule. On exige qu'elle dépasse 150 pour ne pas
  * retenir un capteur qui a décroché.
  */
+/**
+ * ⚠️ UNE FC HORS DU DOMAINE HUMAIN N'EST PAS UNE MESURE (crash-test du 07/11/2026). Une FC de
+ * repos lue à 1 000 000 000 passait ici telle quelle : la réserve cardiaque en faisait des
+ * cibles de 1 000 000 014 bpm, que la montre aurait reçues en « % HR ». Chaque référence est
+ * donc bornée : repos 25-110, seuil 100-230, maximum 100-240 — et un repos qui ne laisse pas
+ * 40 battements sous le maximum est écarté (réserve absurde).
+ */
+const dans = (v: unknown, lo: number, hi: number): number | null => { const n = nb(v); return n != null && n >= lo && n <= hi ? n : null; };
+
 export function referencesFc(e: {
   maxDeclaree?: unknown; maxObservee?: unknown; repos?: unknown; seuil?: unknown; age?: unknown;
 }): ReferencesFc {
-  const seuil = nb(e.seuil);
-  const repos = nb(e.repos);
-  const declaree = nb(e.maxDeclaree);
-  const observee = nb(e.maxObservee);
+  const seuil = dans(e.seuil, 100, 230);
+  const declaree = dans(e.maxDeclaree, 100, 240);
+  const observee = dans(e.maxObservee, 100, 240);
+  const maxConnu = Math.max(declaree ?? 0, observee ?? 0);
+  const reposBrut = dans(e.repos, 25, 110);
+  const repos = reposBrut != null && (maxConnu === 0 || reposBrut <= maxConnu - 40) ? reposBrut : null;
   // ⚠️ JAMAIS SOUS UNE VALEUR RÉELLEMENT ATTEINTE (même règle que le coach, `fcMaxEst`) :
   // une FC max déclarée à 180 quand la montre a enregistré 195 est fausse par construction.
   // Avant le 11/10/2026, la déclarée l'emportait toujours ici (`declaree ?? observee`).
@@ -214,6 +225,11 @@ export type CiblesFc = {
 /** Les cibles, avec la FC max qu'intervals.icu appliquera. `null` si l'une manque. */
 export function avecFcMaxMontre(cibles: CiblesFc | null, maxMontre: number | null): CiblesFc | null {
   if (!cibles || !(maxMontre != null && Number.isFinite(maxMontre) && maxMontre > 100)) return null;
+  // ⚠️ UNE FC MAX DE MONTRE PLUS BASSE QUE NOS CIBLES (crash-test du 07/11/2026) : un réglage
+  // intervals.icu jamais mis à jour (150) contre une FC réellement atteinte de 190 donnait
+  // « 94-100.7% HR » — une cible au-dessus du maximum que la montre croit possible. On garde
+  // alors ses zones plutôt qu'envoyer un pourcentage impossible.
+  if (Math.max(cibles.endurance.hi, cibles.recup.hi) > maxMontre) return null;
   return { ...cibles, maxMontre };
 }
 
@@ -327,9 +343,11 @@ export const SEUIL_FROID_C = 8;
 
 /** L'air de la semaine est-il froid ? Moyenne des (min + max) / 2 des prévisions ; `false` sans prévisions. */
 export function airFroid(jours: readonly { tempMax?: unknown; tempMin?: unknown }[] | null | undefined): boolean {
+  // Des NOMBRES seulement : « » se lisait 0 °C, et deux cases vides faisaient un jour glacial.
+  const t = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v > -60 && v < 60 ? v : null);
   const moyennes = (jours ?? []).map((j) => {
-    const a = Number(j?.tempMax), b = Number(j?.tempMin);
-    return j?.tempMax != null && j?.tempMin != null && Number.isFinite(a) && Number.isFinite(b) ? (a + b) / 2 : null;
+    const a = t(j?.tempMax), b = t(j?.tempMin);
+    return a != null && b != null ? (a + b) / 2 : null;
   }).filter((x): x is number => x != null);
   if (moyennes.length < 3) return false;
   return moyennes.reduce((s, x) => s + x, 0) / moyennes.length < SEUIL_FROID_C;
