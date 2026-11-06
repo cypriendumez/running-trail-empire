@@ -29,6 +29,7 @@ import type { MetriqueVfc } from "@/lib/health/vfc";
 import { computeWeeklyTrend } from "@/lib/dashboard/semaines";
 import { dansFenetre, ageJours, avancementObjectif } from "@/lib/dashboard/fenetre";
 import { computeForme, socleDesSeances } from "@/lib/dashboard/forme";
+import { derniereAnalyse, lienSeance, type AnalyseMemorisee } from "@/lib/dashboard/derniereAnalyse";
 import { computeDistancePRs, type RecordDeclare } from "@/lib/dashboard/records";
 import { AjoutRecord } from "@/components/dashboard/AjoutRecord";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -98,6 +99,8 @@ interface Props {
   planCoach?: PlanDuCoach;
   /** Une montre est reliée (clé API ou OAuth intervals.icu) — calculé côté serveur, la clé ne quitte pas le serveur. */
   montreReliee?: boolean;
+  /** Analyses de séance MÉMORISÉES (`seance_analyse`) — la carte « Analyse IA » n'en déclenche aucune. */
+  analyses?: AnalyseMemorisee[];
   /**
    * Les lectures qui ont RÉELLEMENT échoué (identifiants stables, traduits ici).
    * Vide dans le cas normal — y compris pour un compte sans historique : une absence
@@ -136,6 +139,15 @@ const NEXT_LABELS: Record<string, { next: string; details: string }> = {
 // Libellé FC pour la carte VFC (multilingue).
 const VITALS: Record<string, { hr: string }> = {
   fr: { hr: "FC de repos" }, en: { hr: "Resting HR" }, de: { hr: "Ruhepuls" }, es: { hr: "FC en reposo" }, pt: { hr: "FC em repouso" },
+};
+
+// La carte « Analyse IA » : l'analyse mémorisée de la dernière séance courue.
+const ANALYSE_LABELS: Record<string, { titre: string; seance: string; lire: string; analyser: string; pasEncore: string }> = {
+  fr: { titre: "Analyse IA", seance: "Ta dernière séance", lire: "Lire l'analyse complète", analyser: "Analyser cette séance", pasEncore: "Pas encore analysée : le coach relit ta séance chiffre par chiffre, à ta demande." },
+  en: { titre: "AI analysis", seance: "Your last session", lire: "Read the full analysis", analyser: "Analyse this session", pasEncore: "Not analysed yet: the coach reviews your session figure by figure, when you ask." },
+  de: { titre: "KI-Analyse", seance: "Deine letzte Einheit", lire: "Ganze Analyse lesen", analyser: "Diese Einheit analysieren", pasEncore: "Noch nicht analysiert: Der Coach geht deine Einheit Zahl für Zahl durch, wenn du es möchtest." },
+  es: { titre: "Análisis IA", seance: "Tu última sesión", lire: "Leer el análisis completo", analyser: "Analizar esta sesión", pasEncore: "Aún sin analizar: el coach revisa tu sesión cifra a cifra, cuando lo pidas." },
+  pt: { titre: "Análise IA", seance: "A tua última sessão", lire: "Ler a análise completa", analyser: "Analisar esta sessão", pasEncore: "Ainda não analisada: o coach revê a tua sessão número a número, quando pedires." },
 };
 
 // Libellés du rail de droite (multilingue).
@@ -180,7 +192,7 @@ export type { SourceVma } from "@/lib/dashboard/vmaAffichee";
 import type { SourceVma } from "@/lib/dashboard/vmaAffichee";
 import type { CleIndicateur } from "@/lib/indicateurs/types";
 
-export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, plan, league, prWorkouts, recordsDeclares = [], premiereSeance = null, chargeHistory, sleep, coachSession, ressenti, objective, derniereCourse = null, currentVma, sourceVma = null, loadRisk, newMembersWeek, streak, acces, donneesIncompletes, jourAujourdhui, planCoach = null, montreReliee = false }: Props) {
+export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, plan, league, prWorkouts, recordsDeclares = [], premiereSeance = null, chargeHistory, sleep, coachSession, ressenti, objective, derniereCourse = null, currentVma, sourceVma = null, loadRisk, newMembersWeek, streak, acces, donneesIncompletes, jourAujourdhui, planCoach = null, montreReliee = false, analyses = [] }: Props) {
   const { t, lang } = useT();
   // État RELATIF à la base de l'athlète, et seulement si la mesure est fraîche — même
   // règle que la fiche détaillée (`etatPhysiologique`), qui ne peut pas dire autre chose.
@@ -300,6 +312,9 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
   const volumeDelta = volRef ? weeklyKm - volRef.km : prevAvg > 0 ? weeklyKm - prevAvg : null;
   const volumeRefLabel = volRef ? "dash.volume.vsMedian" : "dash.volume.vsAvg";
   const records = computeRecords(workouts);
+  // La dernière séance COURUE et son analyse mémorisée (lib/dashboard/derniereAnalyse).
+  const analyse = derniereAnalyse(runs, analyses);
+  const al = ANALYSE_LABELS[lang] ?? ANALYSE_LABELS.fr;
   const weekSummary = computeWeekSummary(workouts, jour);
   const acwr = loadRisk?.acwr ?? 0;
   // Historique du Score Discipline (8 sem.) — du plus ancien au plus récent.
@@ -1438,10 +1453,28 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             (chrono, allure, Modifier) affichent déjà : le même objectif trois fois sur la
             page. Son seul apport — la page détaillée — est dans la carte Objectif. */}
 
-        {/* ⚠️ PLUS DE CARTE « Analyse IA · Beta » (06/11/2026). Elle affichait le « pourquoi »
-            de la séance du jour — mot pour mot le « Pourquoi cette séance ? » de la carte verte
-            juste à gauche — et, sans séance du coach, la phrase de l'en-tête. Jamais rien
-            d'autre. Et « Beta » était écrit en dur, sur une fonction qui n'en était pas une. */}
+        {/* ⚠️ « ANALYSE IA » N'EST PLUS LE POURQUOI DE LA SÉANCE DU JOUR (06/11/2026). L'ancienne
+            carte le recopiait mot pour mot (« Pourquoi cette séance ? », carte verte voisine),
+            sous un badge « Beta » écrit en dur. Elle montre l'ANALYSE de la dernière séance
+            courue — mémorisée, jamais déclenchée d'ici : chaque analyse se paie. */}
+        {analyse && (
+          <div className="group relative bento-card">
+            <div className="metric-label">{al.titre}</div>
+            <VersPage href={lienSeance(analyse.seance)} titre={al.titre} lang={lang} />
+            <div className="mt-1 text-[11px] text-zinc-400">
+              {al.seance} · {formatDateCivile(String(analyse.seance.date).slice(0, 10), lang, { day: "numeric", month: "long" })}
+              {Number(analyse.seance.distance_km) > 0 && <> · {(Math.round(Number(analyse.seance.distance_km) * 10) / 10).toLocaleString(lang)} km</>}
+            </div>
+            {analyse.texte ? (
+              <p className="mt-2.5 line-clamp-6 text-sm leading-relaxed text-zinc-600">{analyse.texte}</p>
+            ) : (
+              <p className="mt-2.5 text-sm leading-relaxed text-zinc-500">{al.pasEncore}</p>
+            )}
+            <Link href={lienSeance(analyse.seance)} className="relative z-[3] mt-3 inline-flex items-center gap-1 text-xs font-bold text-[#059669] transition-colors hover:text-[#047857]">
+              {analyse.texte ? al.lire : al.analyser} <ChevronRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        )}
 
         {/* Bilan de la semaine (Premium) : plusieurs séances lues ensemble. Starter voit la carte verrouillée. */}
         <BilanSemaine ouvert={!!acces && peut(acces.etat, "bilan")} />

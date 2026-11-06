@@ -4,6 +4,7 @@ import { fuseauOuDefaut } from "@/lib/time/fuseau";
 import { createClient } from "@/lib/supabase/server";
 import { lecturesEnEchec } from "@/lib/dashboard/lectures";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
+import type { AnalyseMemorisee } from "@/lib/dashboard/derniereAnalyse";
 import { BentoDashboard } from "@/components/dashboard/BentoDashboard";
 import { TestVmaBanner } from "@/components/dashboard/TestVmaBanner";
 import { InviteAvis } from "@/components/dashboard/InviteAvis";
@@ -46,7 +47,7 @@ export default async function DashboardPage() {
   // Le jour de l'athlète, calculé AVANT les requêtes : il en filtre une.
   const today = aujourdhui(FUSEAU_DEFAUT);
 
-  const [profileRes, hrvRes, workoutsRes, planRes, leagueRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, newMembersRes, prRes, chargeRes, streakWkRes, streakPlanRes, avisRes, nbSeancesRes, premiereRes, declaresRes, garageRes, etatCoachRes] = await Promise.all([
+  const [profileRes, hrvRes, workoutsRes, planRes, leagueRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, newMembersRes, prRes, chargeRes, streakWkRes, streakPlanRes, avisRes, nbSeancesRes, premiereRes, declaresRes, garageRes, etatCoachRes, analysesRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single(),
     supabase.from("hrv_data").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(14),
     supabase.from("workouts").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(40),
@@ -115,6 +116,9 @@ export default async function DashboardPage() {
     // La décision du coach pour la semaine (la même que lit le calendrier) : la phrase du
     // jour ne doit jamais promettre une séance que le plan ne contient pas.
     supabase.from("notifications").select("data").eq("user_id", user!.id).eq("type", "auto_coach_state").maybeSingle(),
+    // Les analyses de séance MÉMORISÉES (`/api/ai/analyse-seance`) : la carte « Analyse IA »
+    // les lit, elle n'en déclenche aucune — chaque analyse est un appel payant au modèle.
+    supabase.from("notifications").select("body,data").eq("user_id", user!.id).eq("type", "seance_analyse").order("created_at", { ascending: false }).limit(20),
   ]);
   if (garageRes.error) console.error("[accueil] garage illisible :", garageRes.error.message);
   if (declaresRes.error) console.error("[accueil] records déclarés illisibles :", declaresRes.error.message);
@@ -280,6 +284,7 @@ export default async function DashboardPage() {
       objective={objective}
       derniereCourse={derniereCourse}
       planCoach={planCoach}
+      analyses={(analysesRes.data ?? []) as AnalyseMemorisee[]}
       montreReliee={!!(profileRes.data as { intervals_api_key?: string | null } | null)?.intervals_api_key}
       currentVma={currentVma}
       sourceVma={sourceVma}

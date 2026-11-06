@@ -21,6 +21,7 @@ import { computeForme } from "../src/lib/dashboard/forme";
 import { T } from "../src/lib/i18n/translations";
 import { computeStreak } from "../src/lib/streak/compute";
 import { PLAN_T } from "../src/lib/ai/planI18n";
+import { derniereAnalyse, lienSeance } from "../src/lib/dashboard/derniereAnalyse";
 import { validerConseils, appliquerConseils, inviteRelecture } from "../src/lib/ai/relectureSemaine";
 
 let passed = 0; const fails: string[] = [];
@@ -260,6 +261,39 @@ test("une étiquette interne du prompt (« feu orange léger ») n'atteint jamai
 test("plus de carte « Analyse IA · Beta » qui répète le pourquoi de la séance", () => {
   assert.doesNotMatch(BENTO, />Beta</, "le badge « Beta » écrit en dur revient");
   assert.doesNotMatch(BENTO, /rl\.ai\b/, "la carte « Analyse IA » revient");
+});
+
+console.log("\nLA CARTE « ANALYSE IA »");
+
+test("elle montre l'analyse mémorisée de la dernière séance, la vraie (le marathon, pas le retour au calme)", () => {
+  // Le compte réel : le 25/10, le marathon (analysé) et 2,1 km de retour au calme.
+  const seances = [
+    { id: "retour", date: "2026-10-25", distance_km: 2.1, title: "Retour au calme" },
+    { id: "lille", date: "2026-10-25", distance_km: 42.47, title: "Marathon de Lille" },
+    { id: "veille", date: "2026-10-24", distance_km: 5.3, title: "Veille" },
+  ];
+  const analyses = [{ body: "Le 25 octobre, tu as couru 42.47 km en 162 min…", data: { workout_id: "lille", date: "2026-10-25" } }];
+  const a = derniereAnalyse(seances, analyses);
+  assert.equal(a?.seance.id, "lille");
+  assert.match(a?.texte ?? "", /^Le 25 octobre/);
+  // Sans analyse : la séance la plus longue du dernier jour, et pas de texte inventé.
+  const b = derniereAnalyse(seances, []);
+  assert.equal(b?.seance.id, "lille", "sans analyse, la carte propose les 2 km de retour au calme");
+  assert.equal(b?.texte, null);
+  // Une analyse d'une séance PLUS ANCIENNE ne passe pas pour celle de la dernière séance.
+  const c = derniereAnalyse([{ id: "neuf", date: "2026-11-06", distance_km: 8 }, ...seances], analyses);
+  assert.equal(c?.seance.id, "neuf");
+  assert.equal(c?.texte, null, "l'analyse du marathon est présentée comme celle de la séance du 06/11");
+  assert.equal(derniereAnalyse([], analyses), null);
+  assert.equal(lienSeance(seances[1]), "/dashboard/activite?date=2026-10-25&dist=42.47&title=Marathon%20de%20Lille");
+});
+
+test("le tableau de bord lit les analyses mémorisées et n'en déclenche aucune", () => {
+  assert.match(BENTO, /const analyse = derniereAnalyse\(runs, analyses\);/);
+  assert.doesNotMatch(BENTO, /api\/ai\/analyse-seance/, "le tableau de bord déclenche un appel payant au modèle");
+  assert.match(codeNu("src/app/dashboard/page.tsx"), /\.eq\("type", "seance_analyse"\)\.order\("created_at", \{ ascending: false \}\)\.limit\(20\)/,
+    "la page ne charge plus les analyses mémorisées");
+  assert.match(codeNu("src/app/dashboard/page.tsx"), /analyses=\{\(analysesRes\.data \?\? \[\]\) as AnalyseMemorisee\[\]\}/);
 });
 
 console.log("\nCRASH-TEST DU SCORE DE FORME");
