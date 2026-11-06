@@ -1,6 +1,6 @@
 import type { createClient } from "@/lib/supabase/server";
 import { picsSaison, avecSaison } from "@/lib/coach/ciblesFcServeur";
-import { referencesFc, ciblesFcAthlete, footingTropIntense, maxDeReference, PIC_FC_JOURS, type CiblesFc } from "@/lib/coach/fcCible";
+import { referencesFc, ciblesFcAthlete, footingTropIntense, maxDeReference, airFroid, PIC_FC_JOURS, type CiblesFc } from "@/lib/coach/fcCible";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
 import { menuSelonDenivele, preferenceDenivele } from "@/lib/coach/denivele";
@@ -632,15 +632,28 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // seuil mesuré. Les footings récents (≥ 20 min, 60 jours) servent à suivre l'athlète
   // qui court PLUS facile que la théorie (`cibleEndurance`). Rien pour le palier gratuit :
   // il ne lit aucune fréquence cardiaque.
+  // ── MÉTÉO RÉELLE (lue ICI, avant les cibles de FC qui en dépendent) ──────────
+  // Pas la température de la montre (capteur au poignet) mais le relevé et les PRÉVISIONS à la
+  // position d'entraînement. Le palier gratuit n'a pas de position (liste blanche du profil).
+  const lat = num(p?.last_lat), lon = num(p?.last_lon);
+  // Prévisions ET altitude en une seule requête : Open-Meteo renvoie les deux. Déjà lues
+  // par un autre contexte du même athlète (`LectureContexte.meteo`) : on les reprend.
+  const weather = lecture.meteo
+    ? { days: lecture.meteo.forecast, elevationM: lecture.meteo.altitude.elevationM }
+    : lat != null && lon != null
+    ? await forecastWithElevation(lat, lon).catch(() => ({ days: [], elevationM: null }))
+    : { days: [], elevationM: null };
+  const forecast = weather.days;
   // La FC max de la SAISON (`fcMaxSaison`) : en hiver, des zones calées sur le pic de l'été
-  // sont trop hautes. Deux pics lus à part ; une lecture ratée garde la référence.
+  // sont trop hautes. Deux pics lus à part ; une lecture ratée garde la référence. Sans hiver
+  // déjà enregistré, l'air froid de la semaine (`airFroid`) retire 5 bpm.
   const picsDeSaison = objectifSeul ? null : await picsSaison(sb as never, userId, now);
   const ciblesFc: CiblesFc | null = objectifSeul ? null : ciblesFcAthlete(
     avecSaison(referencesFc({
       maxDeclaree: maxHrDeclare, maxObservee: obsMaxHr0,
       repos: num(b?.resting_hr) ?? num(p?.resting_hr) ?? num((((p as Record<string, unknown> | null)?.garmin_metrics) as Record<string, unknown> | null)?.restingHR),
       seuil: num(b?.lt_hr),
-    }), picsDeSaison),
+    }), picsDeSaison, airFroid(forecast)),
     workouts.filter((w) => isRun(w.sport) && !isHardType(w.type) && (num(w.duration_seconds) ?? 0) >= 20 * 60
       && now - new Date(String(w.date).slice(0, 10) + "T12:00:00Z").getTime() <= 60 * 86400000)
       .map((w) => num(w.avg_hr)).filter((v): v is number => v != null),
@@ -1465,15 +1478,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // Pas la température de la montre (capteur au poignet, jusqu'à 3 °C d'écart mesuré)
   // mais le relevé réel à la position d'entraînement, et surtout les PRÉVISIONS :
   // anticiper une canicule vaut mieux que la constater après la séance.
-  const lat = num(p?.last_lat), lon = num(p?.last_lon);
-  // Prévisions ET altitude en une seule requête : Open-Meteo renvoie les deux. Déjà lues
-  // par un autre contexte du même athlète (`LectureContexte.meteo`) : on les reprend.
-  const weather = lecture.meteo
-    ? { days: lecture.meteo.forecast, elevationM: lecture.meteo.altitude.elevationM }
-    : lat != null && lon != null
-    ? await forecastWithElevation(lat, lon).catch(() => ({ days: [], elevationM: null }))
-    : { days: [], elevationM: null };
-  const forecast = weather.days;
+  // (Position et prévisions : lues plus haut, avant les cibles de FC — voir « MÉTÉO RÉELLE ».)
   // ALTITUDE — facteur totalement absent jusqu'ici. Au-delà de ~500 m, la performance
   // aérobie se dégrade d'environ 6 % par 1 000 m chez un athlète non acclimaté. Sans
   // cette information, le coach juge des allures d'altitude à l'aune du niveau de la

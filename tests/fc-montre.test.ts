@@ -11,7 +11,7 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { referencesFc, ciblesFcAthlete, footingTropIntense, plageFc, MARGE_FOOTING_DUR, avecFcMaxMontre, plageEnPctMax, maxDeReference, PIC_FC_JOURS, fcMaxSaison, FENETRE_SAISON_JOURS, DEMI_FENETRE_AN_DERNIER_JOURS } from "../src/lib/coach/fcCible";
+import { referencesFc, ciblesFcAthlete, footingTropIntense, plageFc, MARGE_FOOTING_DUR, avecFcMaxMontre, plageEnPctMax, maxDeReference, PIC_FC_JOURS, fcMaxSaison, FENETRE_SAISON_JOURS, DEMI_FENETRE_AN_DERNIER_JOURS, airFroid, BAISSE_HIVER_BPM, SEUIL_FROID_C } from "../src/lib/coach/fcCible";
 import { avecSaison } from "../src/lib/coach/ciblesFcServeur";
 import { stepsForType, parseReps, buildWorkoutDescription } from "../src/lib/watch/intervals";
 
@@ -199,10 +199,44 @@ test("le coach et les envois vers la montre appliquent la saison, sauf au palier
   const c = code("src/lib/ai/coachContext.ts");
   assert.match(c, /const picsDeSaison = objectifSeul \? null : await picsSaison\(sb as never, userId, now\);/);
   assert.match(c, /ciblesFcAthlete\(\s*avecSaison\(referencesFc\(/, "le coach ignore la saison");
-  assert.match(c, /\}\), picsDeSaison\),/, "le coach ne passe plus les pics de saison");
+  assert.match(c, /\}\), picsDeSaison, /, "le coach ne passe plus les pics de saison");
   const srv = code("src/lib/coach/ciblesFcServeur.ts");
-  assert.match(srv, /const refs = avecSaison\(refs0, await picsSaison\(sb, userId, maintenant\)\);/);
+  assert.match(srv, /const refs = avecSaison\(refs0, await picsSaison\(sb, userId, maintenant\), froid\);/);
   assert.match(srv, /if \(recent\.error \|\| anDernier\.error\) return null;/, "un pic à moitié lu fabriquerait une saison");
+});
+
+console.log("\nSANS HIVER ENREGISTRÉ : −5 bpm QUAND L'AIR EST FROID");
+
+const semaine = (min: number, max: number) => Array.from({ length: 7 }, () => ({ tempMin: min, tempMax: max }));
+
+test("l'air froid se lit dans les prévisions (moyenne sous 8 °C), jamais sur le calendrier", () => {
+  assert.equal(SEUIL_FROID_C, 8);
+  assert.equal(airFroid(semaine(1, 7)), true, "Lille en décembre : 4 °C de moyenne");
+  assert.equal(airFroid(semaine(9, 16)), false, "Nice en décembre : 12,5 °C");
+  assert.equal(airFroid(semaine(6, 10)), false, "8 °C pile n'est pas froid");
+  assert.equal(airFroid([]), false, "sans prévisions, pas de baisse");
+  assert.equal(airFroid(semaine(1, 7).slice(0, 2)), false, "deux jours ne font pas une semaine");
+  assert.equal(airFroid(null), false);
+});
+
+test("−5 bpm pour qui n'a pas d'hiver enregistré, par temps froid ; son effort récent l'emporte", () => {
+  assert.equal(BAISSE_HIVER_BPM, 5);
+  assert.equal(fcMaxSaison(212, 190, null, true), 207, "212 − 5");
+  assert.equal(fcMaxSaison(212, 210, null, true), 210, "jamais sous une FC réellement atteinte ces 6 semaines");
+  assert.equal(fcMaxSaison(212, 190, null, false), 212, "sans froid, rien ne bouge");
+  assert.equal(fcMaxSaison(212, 200, 202, true), 202, "avec un hiver enregistré, ce sont SES données qui comptent, pas la baisse");
+  assert.equal(fcMaxSaison(null, 190, null, true), null);
+  assert.equal(avecSaison(REFS, { recent: null, anDernier: null }, true).max, 207);
+  assert.equal(avecSaison(referencesFc({ age: 22 }), { recent: null, anDernier: null }, true).max, 198, "une FC max tirée de l'âge ne bouge pas");
+});
+
+test("le coach et les envois lisent la météo de sa position, avant les cibles de FC", () => {
+  const c = code("src/lib/ai/coachContext.ts");
+  assert.match(c, /\}\), picsDeSaison, airFroid\(forecast\)\),/, "le coach ignore l'air froid");
+  assert.ok(c.indexOf("const forecast = weather.days;") > 0 && c.indexOf("const forecast = weather.days;") < c.indexOf("const ciblesFc: CiblesFc"), "les prévisions doivent être lues avant les cibles");
+  const srv = code("src/lib/coach/ciblesFcServeur.ts");
+  assert.match(srv, /const froid = lat != null && lon != null \? airFroid\(await forecastWeek\(lat, lon\)\.catch\(\(\) => \[\]\)\) : false;/);
+  assert.match(srv, /const refs = avecSaison\(refs0, await picsSaison\(sb, userId, maintenant\), froid\);/);
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

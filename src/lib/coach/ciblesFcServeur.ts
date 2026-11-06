@@ -8,8 +8,9 @@
  * une séance re-poussée depuis l'admin partirait avec d'autres battements que celle du coach.
  * Serveur uniquement : client service role.
  */
-import { referencesFc, ciblesFcAthlete, maxDeReference, fcMaxSaison, PIC_FC_JOURS, FENETRE_SAISON_JOURS, DEMI_FENETRE_AN_DERNIER_JOURS, type CiblesFc, type ReferencesFc } from "@/lib/coach/fcCible";
+import { referencesFc, ciblesFcAthlete, maxDeReference, fcMaxSaison, airFroid, PIC_FC_JOURS, FENETRE_SAISON_JOURS, DEMI_FENETRE_AN_DERNIER_JOURS, type CiblesFc, type ReferencesFc } from "@/lib/coach/fcCible";
 import { isRun } from "@/lib/intervals/sport";
+import { forecastWeek } from "@/lib/weather/openMeteo";
 
 type Lecteur = { from: (t: string) => any }; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -43,9 +44,9 @@ export async function picsSaison(sb: Lecteur, userId: string, maintenant = Date.
 }
 
 /** Les références, avec la FC max ramenée à celle de la SAISON quand on sait l'estimer. */
-export function avecSaison(refs: ReferencesFc, pics: { recent: number | null; anDernier: number | null } | null): ReferencesFc {
+export function avecSaison(refs: ReferencesFc, pics: { recent: number | null; anDernier: number | null } | null, froid = false): ReferencesFc {
   if (refs.source !== "mesures" || !pics) return refs;
-  const saison = fcMaxSaison(refs.max, pics.recent, pics.anDernier);
+  const saison = fcMaxSaison(refs.max, pics.recent, pics.anDernier, froid);
   return saison != null && saison !== refs.max ? { ...refs, max: saison } : refs;
 }
 
@@ -76,7 +77,10 @@ export async function ciblesFcPour(sb: Lecteur, userId: string, maintenant = Dat
       .map((w) => num(w.avg_hr)).filter((v): v is number => v != null);
     // La FC max de la SAISON (lib/coach/fcCible, `fcMaxSaison`) : en hiver, des zones calées
     // sur le pic de l'été sont trop hautes.
-    const refs = avecSaison(refs0, await picsSaison(sb, userId, maintenant));
+    // L'air froid chez lui (prévisions à sa dernière position) : sans hiver enregistré, −5 bpm.
+    const lat = num(p?.last_lat), lon = num(p?.last_lon);
+    const froid = lat != null && lon != null ? airFroid(await forecastWeek(lat, lon).catch(() => [])) : false;
+    const refs = avecSaison(refs0, await picsSaison(sb, userId, maintenant), froid);
     return ciblesFcAthlete(refs, fcs);
   } catch {
     return null;

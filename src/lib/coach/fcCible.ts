@@ -298,10 +298,36 @@ export const FENETRE_SAISON_JOURS = 42;
 /** Demi-largeur de la fenêtre « mêmes semaines l'an dernier », centrée sur la date d'il y a un an. */
 export const DEMI_FENETRE_AN_DERNIER_JOURS = 21;
 
-export function fcMaxSaison(reference: number | null, picRecent: unknown, picAnDernier: unknown): number | null {
+/**
+ * ⚠️ ET SANS HIVER DÉJÀ ENREGISTRÉ, QUAND L'AIR EST FROID (Cyprien, 07/11/2026 : « fais baisser
+ * d'à peu près 5 bpm quand l'individu arrive en hiver, malgré le fait qu'il n'a pas de donnée
+ * d'avant »). C'est une ESTIMATION, pas une mesure — exception assumée à la règle « on ne
+ * fabrique pas la donnée », pour trois raisons : le sens est PRUDENT (zones un peu plus basses,
+ * footing compté dur un peu plus tôt), l'écart mesuré chez Cyprien est le double (198-202 l'hiver
+ * contre 209-212), et la baisse s'efface dès que l'athlète a ses propres données d'hiver.
+ * « Froid » se lit dans l'AIR, à l'endroit où il court (prévisions Open-Meteo de la semaine,
+ * moyenne des minimales et maximales sous {@link SEUIL_FROID_C} °C) — pas sur le calendrier :
+ * novembre à Nice ou en Australie n'est pas l'hiver de Lille. Un effort récent plus haut que la
+ * baisse l'emporte : on ne descend jamais sous une FC réellement atteinte ces 6 semaines.
+ */
+export const BAISSE_HIVER_BPM = 5;
+export const SEUIL_FROID_C = 8;
+
+/** L'air de la semaine est-il froid ? Moyenne des (min + max) / 2 des prévisions ; `false` sans prévisions. */
+export function airFroid(jours: readonly { tempMax?: unknown; tempMin?: unknown }[] | null | undefined): boolean {
+  const moyennes = (jours ?? []).map((j) => {
+    const a = Number(j?.tempMax), b = Number(j?.tempMin);
+    return j?.tempMax != null && j?.tempMin != null && Number.isFinite(a) && Number.isFinite(b) ? (a + b) / 2 : null;
+  }).filter((x): x is number => x != null);
+  if (moyennes.length < 3) return false;
+  return moyennes.reduce((s, x) => s + x, 0) / moyennes.length < SEUIL_FROID_C;
+}
+
+export function fcMaxSaison(reference: number | null, picRecent: unknown, picAnDernier: unknown, froid = false): number | null {
   const v = (x: unknown) => { const n = Number(x); return x != null && x !== "" && Number.isFinite(n) && n > 150 && n < 240 ? n : null; };
   const ref = v(reference);
   const anDernier = v(picAnDernier);
-  if (ref == null || anDernier == null) return ref;
+  if (ref == null) return ref;
+  if (anDernier == null) return froid ? Math.min(ref, Math.max(ref - BAISSE_HIVER_BPM, v(picRecent) ?? 0)) : ref;
   return Math.min(ref, Math.max(anDernier, v(picRecent) ?? 0));
 }
