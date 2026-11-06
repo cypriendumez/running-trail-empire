@@ -20,9 +20,9 @@ const TON: Record<Ton, { texte: string; barre: string; pastille: string; fond: s
   neutre: { texte: "text-zinc-700", barre: "#52525b", pastille: "bg-zinc-100 text-zinc-700 ring-zinc-200", fond: "linear-gradient(135deg,#052e2b 0%,#065f46 50%,#0f766e 100%)" },
 };
 
-function Section({ icone: Icone, titre, children, className = "" }: { icone: typeof Info; titre: string; children: React.ReactNode; className?: string }) {
+function Section({ icone: Icone, titre, children, className = "", id }: { icone: typeof Info; titre: string; children: React.ReactNode; className?: string; id?: string }) {
   return (
-    <section className={`rounded-3xl border border-zinc-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)] sm:p-6 ${className}`}>
+    <section id={id} className={`scroll-mt-24 rounded-3xl border border-zinc-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)] sm:p-6 ${className}`}>
       <h2 className="mb-4 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-zinc-400">
         <Icone className="h-3.5 w-3.5" aria-hidden /> {titre}
       </h2>
@@ -176,7 +176,8 @@ export function FicheIndicateur({ fiche: f, titres, textes: c, lang, pannes = []
           </div>
 
           {f.conseils.length > 0 && (
-            <Section icone={Lightbulb} titre={c.conseils}>
+            /* `id` : le bouton « Voir les recommandations » du tableau de bord y mène directement. */
+            <Section id="conseils" icone={Lightbulb} titre={c.conseils}>
               <ul className="grid gap-3 md:grid-cols-2">
                 {f.conseils.map((co) => (
                   <li key={co} className="flex gap-3 rounded-2xl bg-emerald-50/60 p-4">

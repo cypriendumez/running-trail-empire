@@ -138,13 +138,26 @@ const VITALS: Record<string, { hr: string }> = {
   fr: { hr: "FC de repos" }, en: { hr: "Resting HR" }, de: { hr: "Ruhepuls" }, es: { hr: "FC en reposo" }, pt: { hr: "FC em repouso" },
 };
 
+/**
+ * LE TITRE DE LA CARTE DU RAIL SUIT L'ÉTAT DU JOUR. Il était figé sur « Prêt à performer » :
+ * constaté le 06/11/2026 au-dessus de « Récupération après Marathon International de Lille :
+ * footings seulement, pas d'intensité avant le 9 novembre ». Une clé par phrase du jour.
+ */
+const TITRES_ETAT: Record<string, Record<string, string>> = {
+  fr: { "dash.ready.recup": "En récupération", "dash.ready.rest": "Journée facile", "dash.ready.top": "Prêt à performer", "dash.ready.topSansQualite": "En forme", "dash.ready.ok": "Forme correcte", "dash.ready.none": "Forme du jour" },
+  en: { "dash.ready.recup": "Recovering", "dash.ready.rest": "Easy day", "dash.ready.top": "Ready to perform", "dash.ready.topSansQualite": "Feeling fresh", "dash.ready.ok": "Decent form", "dash.ready.none": "Today's form" },
+  de: { "dash.ready.recup": "In Erholung", "dash.ready.rest": "Lockerer Tag", "dash.ready.top": "Bereit zu performen", "dash.ready.topSansQualite": "Gut erholt", "dash.ready.ok": "Solide Form", "dash.ready.none": "Tagesform" },
+  es: { "dash.ready.recup": "En recuperación", "dash.ready.rest": "Día suave", "dash.ready.top": "Listo para rendir", "dash.ready.topSansQualite": "En forma", "dash.ready.ok": "Forma correcta", "dash.ready.none": "Forma del día" },
+  pt: { "dash.ready.recup": "Em recuperação", "dash.ready.rest": "Dia leve", "dash.ready.top": "Pronto para performar", "dash.ready.topSansQualite": "Em forma", "dash.ready.ok": "Forma correta", "dash.ready.none": "Forma do dia" },
+};
+
 // Libellés du rail de droite (multilingue).
-const RAIL_LABELS: Record<string, { goal: string; ai: string; ready: string; badges: string; community: string; communitySub: string; see: string; newWeek: string; records: string; recommend: string; progress: string }> = {
-  fr: { goal: "Objectif principal", ai: "Analyse IA", ready: "Prêt à performer", badges: "Badges", community: "Communauté", communitySub: "Rejoins les coureurs Pacevo", see: "Voir", newWeek: "nouveaux cette semaine", records: "Records personnels", recommend: "Voir les recommandations", progress: "Préparation" },
-  en: { goal: "Main goal", ai: "AI analysis", ready: "Ready to perform", badges: "Badges", community: "Community", communitySub: "Join the Pacevo runners", see: "View", newWeek: "new this week", records: "Personal records", recommend: "View recommendations", progress: "Preparation" },
-  de: { goal: "Hauptziel", ai: "KI-Analyse", ready: "Bereit zu performen", badges: "Abzeichen", community: "Community", communitySub: "Triff die Pacevo-Läufer", see: "Ansehen", newWeek: "neue diese Woche", records: "Persönliche Rekorde", recommend: "Empfehlungen ansehen", progress: "Vorbereitung" },
-  es: { goal: "Objetivo principal", ai: "Análisis IA", ready: "Listo para rendir", badges: "Insignias", community: "Comunidad", communitySub: "Únete a los corredores Pacevo", see: "Ver", newWeek: "nuevos esta semana", records: "Records personales", recommend: "Ver recomendaciones", progress: "Preparación" },
-  pt: { goal: "Objetivo principal", ai: "Análise IA", ready: "Pronto para performar", badges: "Medalhas", community: "Comunidade", communitySub: "Junta-te aos corredores Pacevo", see: "Ver", newWeek: "novos esta semana", records: "Recordes pessoais", recommend: "Ver recomendações", progress: "Preparação" },
+const RAIL_LABELS: Record<string, { goal: string; ai: string; badges: string; community: string; communitySub: string; see: string; newWeek: string; records: string; recommend: string; progress: string }> = {
+  fr: { goal: "Objectif principal", ai: "Analyse IA", badges: "Badges", community: "Communauté", communitySub: "Rejoins les coureurs Pacevo", see: "Voir", newWeek: "nouveaux cette semaine", records: "Records personnels", recommend: "Voir les recommandations", progress: "Préparation" },
+  en: { goal: "Main goal", ai: "AI analysis", badges: "Badges", community: "Community", communitySub: "Join the Pacevo runners", see: "View", newWeek: "new this week", records: "Personal records", recommend: "View recommendations", progress: "Preparation" },
+  de: { goal: "Hauptziel", ai: "KI-Analyse", badges: "Abzeichen", community: "Community", communitySub: "Triff die Pacevo-Läufer", see: "Ansehen", newWeek: "neue diese Woche", records: "Persönliche Rekorde", recommend: "Empfehlungen ansehen", progress: "Vorbereitung" },
+  es: { goal: "Objetivo principal", ai: "Análisis IA", badges: "Insignias", community: "Comunidad", communitySub: "Únete a los corredores Pacevo", see: "Ver", newWeek: "nuevos esta semana", records: "Records personales", recommend: "Ver recomendaciones", progress: "Preparación" },
+  pt: { goal: "Objetivo principal", ai: "Análise IA", badges: "Medalhas", community: "Comunidade", communitySub: "Junta-te aos corredores Pacevo", see: "Ver", newWeek: "novos esta semana", records: "Recordes pessoais", recommend: "Ver recomendações", progress: "Preparação" },
 };
 
 // Score de forme — 4 axes calculés du réel (endurance & vitesse dérivées des séances/VMA,
@@ -1406,11 +1419,13 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
               </div>
             </div>
             <div className="min-w-0">
-              <div className="text-sm font-bold text-zinc-900">{rl.ready}</div>
+              <div className="text-sm font-bold text-zinc-900">{(TITRES_ETAT[lang] ?? TITRES_ETAT.fr)[readiness.cle] ?? TITRES_ETAT.fr[readiness.cle]}</div>
               <p className="mt-0.5 text-xs leading-relaxed text-zinc-500">{readiness.tagline}</p>
             </div>
           </div>
-          <Link href="/dashboard/health" className="relative z-[3] mt-4 flex items-center justify-between rounded-xl border border-zinc-100 px-3 py-2 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50">
+          {/* Les conseils de CE score, dans sa page détaillée — le bouton ouvrait le Kiné IA
+              (Santé), sans rapport avec lui, alors que le reste de la carte mène déjà ici. */}
+          <Link href="/dashboard/indicateurs/discipline#conseils" className="relative z-[3] mt-4 flex items-center justify-between rounded-xl border border-zinc-100 px-3 py-2 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50">
             {rl.recommend} <ChevronRight className="h-3.5 w-3.5 text-zinc-400" />
           </Link>
         </div>
@@ -1692,9 +1707,9 @@ function computeReadiness(hrvDelta: number | null, hrvBaseline: number | null, s
   const phrase = recuperation
     ? t(cle, { course: recuperation.course, date: formatDateCivile(recuperation.reprise, lang, { day: "numeric", month: "long" }) })
     : t(cle === "dash.ready.none" && montreReliee ? "dash.ready.muette" : cle);
-  if (e === "top") return { accent: "#059669", tagline: phrase };
-  if (e === "repos") return { accent: "#0284C7", tagline: phrase };
-  return { accent: "#0d9488", tagline: phrase };
+  if (e === "top") return { accent: "#059669", tagline: phrase, cle };
+  if (e === "repos") return { accent: "#0284C7", tagline: phrase, cle };
+  return { accent: "#0d9488", tagline: phrase, cle };
 }
 
 

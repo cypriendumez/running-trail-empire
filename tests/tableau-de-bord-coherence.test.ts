@@ -100,6 +100,31 @@ test("libellé et pourcentage des barres de forme ne se collent plus", () => {
   assert.match(BENTO, /mb-1 flex justify-between gap-2 text-xs/);
 });
 
+console.log("\nLA CARTE DU RAIL (score discipline)");
+
+test("« Voir les recommandations » ouvre les conseils de CE score, pas le Kiné IA", () => {
+  // Constaté le 06/11/2026 : le bouton menait à /dashboard/health (Kiné IA), sans rapport
+  // avec le score, alors que la carte entière ouvrait déjà sa page détaillée.
+  assert.match(BENTO, /<Link href="\/dashboard\/indicateurs\/discipline#conseils" className="relative z-\[3\]/);
+  assert.doesNotMatch(BENTO, /href="\/dashboard\/health"/, "un lien du tableau de bord renvoie de nouveau au Kiné IA");
+  assert.match(codeNu("src/components/indicateurs/FicheIndicateur.tsx"), /<Section id="conseils" icone=\{Lightbulb\} titre=\{c\.conseils\}>/,
+    "la section Conseils n'a plus d'ancre : le bouton tombe en haut de page");
+});
+
+test("le titre de la carte suit l'état du jour, dans les cinq langues", () => {
+  // « Prêt à performer » était écrit en dur, au-dessus de « Récupération… pas d'intensité ».
+  assert.doesNotMatch(BENTO, /\{rl\.ready\}/, "le titre figé « Prêt à performer » revient");
+  assert.match(BENTO, /\(TITRES_ETAT\[lang\] \?\? TITRES_ETAT\.fr\)\[readiness\.cle\]/);
+  const table = BENTO.slice(BENTO.indexOf("const TITRES_ETAT"), BENTO.indexOf("};", BENTO.indexOf("const TITRES_ETAT")));
+  const cles = ["dash.ready.recup", "dash.ready.rest", "dash.ready.top", "dash.ready.topSansQualite", "dash.ready.ok", "dash.ready.none"];
+  for (const lang of ["fr", "en", "de", "es", "pt"]) {
+    const ligne = table.split("\n").find((l) => l.trim().startsWith(`${lang}: {`)) ?? "";
+    for (const c of cles) assert.ok(ligne.includes(`"${c}":`), `${c} sans titre en ${lang}`);
+  }
+  assert.match(table, /fr: \{ "dash\.ready\.recup": "En récupération"/, "en récupération, la carte ne le dit plus");
+  assert.match(BENTO, /return \{ accent: "#0d9488", tagline: phrase, cle \};/);
+});
+
 console.log("\nCRASH-TEST DU SCORE DE FORME");
 
 test("aucune entrée absurde ne fait sortir un axe de 0–100 ni n'en fait un NaN", () => {

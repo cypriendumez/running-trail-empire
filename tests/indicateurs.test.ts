@@ -261,7 +261,8 @@ test("les neuf cartes du tableau de bord mènent à leur fiche ; leurs liens int
   for (const cle of INDICATEURS) assert.match(b, new RegExp(`<VersFiche cle="${cle}"`), `la carte « ${cle} » ne mène nulle part`);
   assert.match(b, /href=\{`\/dashboard\/indicateurs\/\$\{cle\}`\}/);
   assert.match(b, /className="absolute inset-0 z-\[1\] rounded-3xl/);
-  assert.match(b, /<Link href="\/dashboard\/health" className="relative z-\[3\]/, "« Voir les recommandations » serait recouvert par le lien de la carte");
+  // 06/11/2026 : il mène aux conseils du score (il ouvrait le Kiné IA, sans rapport).
+  assert.match(b, /<Link href="\/dashboard\/indicateurs\/discipline#conseils" className="relative z-\[3\]/, "« Voir les recommandations » serait recouvert par le lien de la carte");
   assert.match(b, /<Link href="\/dashboard\/calendrier" className="relative z-\[3\]/, "« Voir mon plan » serait recouvert par le lien de la carte");
 });
 
