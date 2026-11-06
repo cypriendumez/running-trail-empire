@@ -1,4 +1,5 @@
 import type { createClient } from "@/lib/supabase/server";
+import { sansAllureInconnue } from "@/lib/coach/allureInconnue";
 import { picsSaison, avecSaison } from "@/lib/coach/ciblesFcServeur";
 import { referencesFc, ciblesFcAthlete, footingTropIntense, maxDeReference, airFroid, PIC_FC_JOURS, type CiblesFc } from "@/lib/coach/fcCible";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -1638,7 +1639,8 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const pickT = <T,>(arr: T[]): T => arr[isoWeek % arr.length];
   /** Une séance de qualité + sa description dans les 5 langues (le français est canonique). */
   const quali = (type: string, gabarit: (l: Lang) => string): QualitySession => {
-    const descAll = tr(gabarit);
+    // Sans VMA, une allure s'écrivait « ~?/km » : on écrit « au ressenti » (lib/coach/allureInconnue).
+    const descAll = tr((l) => sansAllureInconnue(gabarit(l), l));
     return { type, desc: descAll.fr, descAll };
   };
 
@@ -1830,7 +1832,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const doseDS = doseDoubleSeuil(habitudeKm);
   const qDoubleSeuil: QualitySession = {
     ...quali("Seuil", (l) => seanceDoubleSeuil("soir", sPace, l, doseDS.soir)),
-    matin: tr((l) => seanceDoubleSeuil("matin", sPace, l, doseDS.matin)),
+    matin: tr((l) => sansAllureInconnue(seanceDoubleSeuil("matin", sPace, l, doseDS.matin), l)),
   };
   const chosen = doubleSeuilActif
     ? [...Array.from({ length: Math.min(2, qBudget) }, () => qDoubleSeuil), ...(qBudget >= 3 ? [qCote] : [])]
