@@ -84,6 +84,15 @@ export function lireTemps(brut: unknown, bornes?: readonly [number, number]): nu
 
 const CLES: readonly CleDistance[] = ["5k", "10k", "semi", "marathon"];
 
+/** Le nom des quatre distances, par langue : « Semi » s'affichait dans toutes les langues. */
+export const NOMS_DISTANCE: Record<string, Record<CleDistance, string>> = {
+  fr: { "5k": "5 km", "10k": "10 km", semi: "Semi", marathon: "Marathon" },
+  en: { "5k": "5 km", "10k": "10 km", semi: "Half", marathon: "Marathon" },
+  de: { "5k": "5 km", "10k": "10 km", semi: "Halbmarathon", marathon: "Marathon" },
+  es: { "5k": "5 km", "10k": "10 km", semi: "Media", marathon: "Maratón" },
+  pt: { "5k": "5 km", "10k": "10 km", semi: "Meia", marathon: "Maratona" },
+};
+
 /**
  * Un record reçu du navigateur, validé — ou `null`. `aujourdhui` est FOURNI (jour de
  * l'athlète) : un record « de demain » n'est pas un record.
@@ -114,13 +123,17 @@ export function computeDistancePRs(
   lang: string,
   declares: readonly RecordDeclare[] = [],
 ): LigneRecord[] {
+  const nom = NOMS_DISTANCE[lang] ?? NOMS_DISTANCE.fr;
   const targets: { cle: CleDistance; l: string; lo: number; hi: number }[] = [
-    { cle: "5k", l: "5 km", lo: 4.7, hi: 5.4 },
-    { cle: "10k", l: "10 km", lo: 9.4, hi: 10.6 },
-    { cle: "semi", l: "Semi", lo: 20, hi: 22 },
-    { cle: "marathon", l: "Marathon", lo: 40.5, hi: 43.5 },
+    { cle: "5k", l: nom["5k"], lo: 4.7, hi: 5.4 },
+    { cle: "10k", l: nom["10k"], lo: 9.4, hi: 10.6 },
+    { cle: "semi", l: nom.semi, lo: 20, hi: 22 },
+    { cle: "marathon", l: nom.marathon, lo: 40.5, hi: 43.5 },
   ];
-  const fmtDate = (d: string) => new Date(d).toLocaleDateString(lang, { day: "numeric", month: "short", year: "numeric" });
+  // ⚠️ À MIDI UTC, PAS À MINUIT (06/11/2026). `new Date("2025-10-25")` se lit minuit UTC :
+  // à l'ouest de Greenwich la carte affichait la VEILLE, et le rendu serveur et le navigateur
+  // n'étaient pas d'accord (erreur React #418). Midi reste le même jour sur tous les fuseaux.
+  const fmtDate = (d: string) => new Date(`${String(d).slice(0, 10)}T12:00:00Z`).toLocaleDateString(lang, { day: "numeric", month: "short", year: "numeric" });
   const out: LigneRecord[] = [];
   for (const tgt of targets) {
     const cands = workouts.filter((w) => (w.distance_km ?? 0) >= tgt.lo && (w.distance_km ?? 0) <= tgt.hi && (w.duration_seconds ?? 0) > 0);
@@ -128,7 +141,7 @@ export function computeDistancePRs(
     const decl = declares.filter((r) => r.distance === tgt.cle).sort((a, b) => a.secondes - b.secondes)[0] ?? null;
     // Le déclaré ne l'emporte que s'il est STRICTEMENT meilleur : à égalité, la mesure gagne.
     if (decl && (!best || decl.secondes < (best.duration_seconds as number))) {
-      out.push({ cle: tgt.cle, label: tgt.l, time: fmtTime(decl.secondes), date: fmtDate(`${decl.date}T12:00:00Z`), source: "declare", course: decl.course ?? null });
+      out.push({ cle: tgt.cle, label: tgt.l, time: fmtTime(decl.secondes), date: fmtDate(decl.date), source: "declare", course: decl.course ?? null });
     } else if (best) {
       out.push({ cle: tgt.cle, label: tgt.l, time: fmtTime(best.duration_seconds as number), date: fmtDate(best.date), source: "mesure" });
     }

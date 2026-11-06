@@ -71,8 +71,10 @@ export function MiniAire({ points, couleur, unite = "ms", libelle }: {
 }
 
 /** Sept barres de kilomètres, arrondies, jour en abscisse, avec info-bulle native. */
-export function MiniBarres({ barres, libelle, unite = "km" }: {
+export function MiniBarres({ barres, libelle, unite = "km", lang = "fr" }: {
   barres: { jour: string; valeur: number }[]; libelle: string; unite?: string;
+  /** Pour l'info-bulle : « 3,0 km » en français, « 3.0 km » en anglais. */
+  lang?: string;
 }) {
   const max = Math.max(1, ...barres.map((b) => b.valeur));
   return (
@@ -81,7 +83,7 @@ export function MiniBarres({ barres, libelle, unite = "km" }: {
         {barres.map((b, i) => {
           const h = b.valeur > 0 ? Math.max(6, (b.valeur / max) * 100) : 4;
           return (
-            <div key={i} className="flex h-full flex-1 items-end" title={`${b.jour} · ${b.valeur.toFixed(1)} ${unite}`}>
+            <div key={i} className="flex h-full flex-1 items-end" title={`${b.jour} · ${b.valeur.toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ${unite}`}>
               <div className="mx-auto w-full max-w-[36px] rounded-t-md transition-[height] duration-500" style={{ height: `${h}%`, background: b.valeur > 0 ? "#10b981" : "#E4E4E7" }} />
             </div>
           );

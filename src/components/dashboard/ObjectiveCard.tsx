@@ -234,7 +234,7 @@ export function ObjectiveCard({ objective, derniereCourse = null, currentVma, au
             {/* La SOURCE est affichée. Un avertissement de santé qu'on ne peut pas
                 vérifier ne se discute pas — et finit par ne plus se croire. */}
             {a.sources?.length > 0 && (
-              <p className="mt-1 text-[11px] italic opacity-75">Source : {a.sources.join(" · ")}</p>
+              <p className="mt-1 text-[11px] italic opacity-75">{t("obj.source")}{lang === "fr" ? "\u00a0: " : ": "}{a.sources.join(" · ")}</p>
             )}
             {i === avertissements.length - 1 && (
               <button onClick={() => setAvertissements([])}
@@ -310,7 +310,7 @@ export function ObjectiveCard({ objective, derniereCourse = null, currentVma, au
                         {s.city && <><MapPin className="h-3 w-3" />{s.city} · </>}{formatDateCivile(s.date, lang, { day: "numeric", month: "short", year: "numeric" })}
                       </span>
                     </span>
-                    {(() => { const dk = inferDistance(s.name, s.distanceKm); return dk != null ? <span className="flex-shrink-0 text-[12px] font-medium tabular-nums text-zinc-500">{dk} km</span> : null; })()}
+                    {(() => { const dk = inferDistance(s.name, s.distanceKm); return dk != null ? <span className="flex-shrink-0 text-[12px] font-medium tabular-nums text-zinc-500">{dk.toLocaleString(lang)} km</span> : null; })()}
                   </button>
                 ))}
               </div>
@@ -331,7 +331,7 @@ export function ObjectiveCard({ objective, derniereCourse = null, currentVma, au
                 <button key={p.label} type="button" aria-pressed={actif} onClick={() => setDistance(String(p.km))}
                   className={`rounded-lg px-2.5 py-1.5 text-[13px] font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#059669] ${
                     actif ? "bg-zinc-900 text-white" : "text-zinc-600 ring-1 ring-inset ring-zinc-200 hover:bg-zinc-50 hover:text-zinc-900"}`}>
-                  {p.km === 21.1 ? t("obj.presetHalf") : p.km === 25 ? t("obj.presetTrail25") : p.label}
+                  {p.km === 21.1 ? t("obj.presetHalf") : p.km === 42.2 ? t("obj.presetMarathon") : p.km === 25 ? t("obj.presetTrail25") : p.label}
                 </button>
               );
             })}

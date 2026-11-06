@@ -4,7 +4,7 @@ import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
-import { lireTemps, BORNES_SECONDES, type CleDistance } from "@/lib/dashboard/records";
+import { lireTemps, BORNES_SECONDES, NOMS_DISTANCE, type CleDistance } from "@/lib/dashboard/records";
 
 /**
  * « Ajouter un record d'avant Pacevo » — le semi de 2024 que la montre n'a jamais transmis.
@@ -14,12 +14,10 @@ import { lireTemps, BORNES_SECONDES, type CleDistance } from "@/lib/dashboard/re
  * pour répondre tout de suite, et À NOUVEAU sur le serveur (`validerRecordDeclare`), qui
  * seul fait foi.
  */
-const DISTANCES: { cle: CleDistance; label: string }[] = [
-  { cle: "5k", label: "5 km" }, { cle: "10k", label: "10 km" }, { cle: "semi", label: "Semi" }, { cle: "marathon", label: "Marathon" },
-];
+const DISTANCES: CleDistance[] = ["5k", "10k", "semi", "marathon"];
 
 export function AjoutRecord({ aujourdhui }: { aujourdhui: string }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const router = useRouter();
   const [ouvert, setOuvert] = useState(false);
   const [distance, setDistance] = useState<CleDistance>("semi");
@@ -70,7 +68,7 @@ export function AjoutRecord({ aujourdhui }: { aujourdhui: string }) {
       <div className="grid grid-cols-2 gap-2">
         <label htmlFor={`${id}-d`} className="text-[11px] text-zinc-500">{t("dash.rec.distance")}
           <select id={`${id}-d`} value={distance} onChange={(e) => setDistance(e.target.value as CleDistance)} className={`mt-0.5 ${champ}`}>
-            {DISTANCES.map((x) => <option key={x.cle} value={x.cle}>{x.label}</option>)}
+            {DISTANCES.map((cle) => <option key={cle} value={cle}>{(NOMS_DISTANCE[lang] ?? NOMS_DISTANCE.fr)[cle]}</option>)}
           </select>
         </label>
         <label htmlFor={`${id}-t`} className="text-[11px] text-zinc-500">{t("dash.rec.temps")}

@@ -45,7 +45,8 @@ const duree = (sec: number | null) => {
 const allure = (s: SeanceRessenti) => {
   if (!s.aPied || !s.distanceKm || !s.dureeSec || s.distanceKm < 1) return null;
   const secKm = Math.round(s.dureeSec / s.distanceKm);
-  return `${Math.floor(secKm / 60)}:${String(secKm % 60).padStart(2, "0")} /km`;
+  // Même écriture que partout ailleurs dans l'application : « 5'06/km ».
+  return `${Math.floor(secKm / 60)}'${String(secKm % 60).padStart(2, "0")}/km`;
 };
 
 /**

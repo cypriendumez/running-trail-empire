@@ -289,7 +289,9 @@ test("l'accueil s'ouvre sur la séance du jour, pas sur une demande d'avis", () 
   assert.match(carte, /\{coachKey\.subtitle\}/, "la prescription a disparu de la carte — c'est elle qu'on vient lire");
   assert.match(carte, /<details className="group mt-4/, "le repli n'est plus dans la carte complète");
   // Le badge ne se coupe pas en deux sur un écran étroit.
-  assert.match(b, /whitespace-nowrap text-\[11px\] font-bold uppercase[^"]*">\{t\("dash\.coach\.badge"\)\}/, "le badge de la séance se coupe de nouveau sur deux lignes");
+  // 06/11/2026 : `badgeCoach` (« Séance du jour », ou « Prochaine séance · 7 nov. » quand ce
+  // n'est pas celle du jour) — sur une ligne, et tronqué plutôt que de déborder.
+  assert.match(b, /whitespace-nowrap text-\[11px\] font-bold uppercase[^"]*truncate[^"]*">\{badgeCoach\}/, "le badge de la séance se coupe de nouveau sur deux lignes");
   const n = [...readFileSync("src/lib/i18n/translations.ts", "utf8").matchAll(/"dash\.coach\.pourquoi":/g)].length;
   assert.equal(n, 5, `« dash.coach.pourquoi » présent ${n} fois, attendu 5`);
 });

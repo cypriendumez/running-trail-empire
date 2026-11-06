@@ -22,6 +22,8 @@ import { T } from "../src/lib/i18n/translations";
 import { computeStreak } from "../src/lib/streak/compute";
 import { PLAN_T } from "../src/lib/ai/planI18n";
 import { derniereAnalyse, lienSeance } from "../src/lib/dashboard/derniereAnalyse";
+import { zoneDominante } from "../src/lib/dashboard/zones";
+import { computeDistancePRs, NOMS_DISTANCE } from "../src/lib/dashboard/records";
 import { validerConseils, appliquerConseils, inviteRelecture } from "../src/lib/ai/relectureSemaine";
 
 let passed = 0; const fails: string[] = [];
@@ -349,6 +351,101 @@ test("durées, VFC et FC arrondies à l'affichage : plus de « 3h7.6699999999999
   assert.match(BENTO, /const hm = \(min: number\) => \{ const m = Math\.max\(0, Math\.round\(/);
   assert.doesNotMatch(BENTO, /\{Math\.abs\(hrvDelta\)\} ms/, "l'écart de VFC s'affiche de nouveau avec ses décimales");
   assert.match(BENTO, /\{Math\.round\(restingHr\)\}<span/);
+});
+
+console.log("\nRELECTURE COMPLÈTE DU 06/11/2026 — PAGE SERVEUR");
+
+const PAGE = codeNu("src/app/dashboard/page.tsx");
+test("la séance du coach se choisit au jour de l'athlète, et sa date voyage avec elle", () => {
+  assert.match(PAGE, /const today = streakToday;/, "la séance du jour se filtre de nouveau sur le jour de Paris");
+  assert.doesNotMatch(PAGE, /aujourdhui\(FUSEAU_DEFAUT\)/);
+  assert.match(PAGE, /i18n: cn\.data\.i18n, date: cn\.data\.date \?\? null \}/, "la date de la séance n'est plus transmise");
+  assert.match(BENTO, /dateCoach !== jour\s*\? t\("dash\.coach\.badgeLe"/, "une séance d'un autre jour est de nouveau annoncée « Séance du jour »");
+  assert.equal((BENTO.match(/\{badgeCoach\}/g) ?? []).length, 2, "un badge écrit encore « Séance du jour » sans regarder la date");
+});
+
+test("le risque de charge lit un an de charge, au jour de l'athlète", () => {
+  assert.match(PAGE, /const risk = loadRisk\(\(chargeRes\.data \?\? \[\]\)[\s\S]{0,200}?, streakToday\);/, "le déload se calcule de nouveau sur 40 séances et le jour de Paris");
+});
+
+test("« nouveaux cette semaine » compte les autres inscrits, pas soi-même", () => {
+  assert.match(PAGE, /createAdminClient\(\)\.from\("profiles"\)\.select\("id", \{ count: "exact", head: true \}\)\s*\.gte\("created_at", [\s\S]{0,80}?\)\.neq\("id", user!\.id\)/,
+    "le compte repasse par la RLS (0 ou 1) ou se compte soi-même");
+});
+
+console.log("\nRELECTURE COMPLÈTE — TABLEAU DE BORD");
+
+test("la date de course vient de l'objectif ; le volume se mesure à la cible du coach", () => {
+  assert.match(BENTO, /const raceDate = objective\?\.raceDate \?\? \(plan as/, "l'affûtage relit de nouveau l'ancienne table training_plans d'abord");
+  assert.doesNotMatch(BENTO, /weeklyKm \/ 60\)/, "la barre de volume se mesure de nouveau à 60 km écrits en dur");
+  assert.match(BENTO, /const refVolume: number \| null = cibleVolumeKm != null && cibleVolumeKm > 0 \? cibleVolumeKm : forme\.cibleVolumeKm;/);
+  assert.match(BENTO, /\{refVolume != null && refVolume > 0 && \(/, "une barre de progression s'affiche sans référence");
+  assert.match(PAGE, /cibleVolumeKm=\{typeof \(etatCoach as \{ targetKm\?: unknown \} \| null\)\?\.targetKm === "number"/);
+  assert.match(BENTO, /Math\.abs\(volumeDelta\) >= 0\.5/, "« ↑ 0 km » peut de nouveau s'afficher");
+});
+
+test("liste des séances : vraie zone dominante, pas de « 0 » parasite, la liste des activités", () => {
+  assert.doesNotMatch(BENTO, /training_effect/, "la pastille de zone relit l'effet d'entraînement (vide en base) et vaut Z2 par défaut");
+  assert.match(BENTO, /const z = zoneDominante\(w\.hr_zone_seconds\);/);
+  assert.doesNotMatch(BENTO, /\{w\.distance_km && <span>|\{w\.avg_hr && <span>/, "`0 && …` affiche de nouveau un « 0 »");
+  assert.match(BENTO, /<Link href="\/dashboard\/activites"[^>]*>\s*\{t\("dash\.recent\.viewAll"\)\}/, "« Tout voir » mène de nouveau au calendrier");
+  assert.equal(zoneDominante([600, 3000, 300, 0, 0]), 2);
+  assert.equal(zoneDominante([0, 0, 0, 0, 0, 900, 1200]), 5, "les tranches au-delà de la 5e ne vont plus dans la dernière");
+  assert.equal(zoneDominante(null), null);
+  assert.equal(zoneDominante([Number.NaN, -3]), null);
+});
+
+test("ligue, records, badges, dernière séance", () => {
+  assert.match(BENTO, /\(NOMS_LIGUE\[lang\] \?\? NOMS_LIGUE\.fr\)\[profile\?\.league \?\? "bronze"\]/, "le niveau de ligue s'affiche de nouveau en anglais brut");
+  assert.match(BENTO, /\{ABREV_RECORD\[lang\] \?\? "RP"\}/, "« RP » s'affiche de nouveau dans toutes les langues");
+  assert.match(BENTO, /const earned = plusLongueConnue >= b\.seuil;/, "les badges relisent de nouveau les 40 dernières séances");
+  assert.match(BENTO, /\{ seuil: 42, l: "42K"/, "un marathon mesuré 42,19 km n'a de nouveau pas son badge");
+  assert.match(BENTO, /if \(w\.distance_km && w\.duration_seconds && isRun\(w\.sport\)\)/, "une allure au km s'affiche de nouveau pour le vélo");
+  assert.match(BENTO, /value: ent\(w\.avg_cadence_spm\)/);
+});
+
+test("décimales et clés : jauge ACWR, cible, étiquettes du coach", () => {
+  assert.match(BENTO, /\{ v: nf\(0\.8\), p: 23\.08 \}/, "les repères de la jauge ACWR s'écrivent de nouveau « 0.8 »");
+  for (const lang of ["fr", "de", "es", "pt"] as const) assert.doesNotMatch((T[lang] as Record<string, string>)["dash.acwr.sweet"], /\d\.\d/, `${lang} : « 0.8–1.3 »`);
+  assert.match(BENTO, /key=\{`\$\{i\}-\$\{t\.l\}`\}/, "deux étiquettes identiques du coach partagent de nouveau la même clé React");
+});
+
+console.log("\nRELECTURE COMPLÈTE — COMPOSANTS ENFANTS");
+
+test("la barre de fraîcheur porte une vraie couleur", () => {
+  const w = codeNu("src/components/dashboard/TaperingWidget.tsx");
+  assert.doesNotMatch(w, /style=\{\{ color: tsbStatus\.color\.replace/, "un nom de classe repasse dans une propriété CSS (barre noire)");
+  assert.match(w, /className=\{`h-full rounded-full \$\{tsbStatus\.bar\}`\}/);
+});
+
+test("records : la date ne recule pas d'un jour à l'ouest de Greenwich ; les distances sont traduites", () => {
+  const prev = process.env.TZ;
+  const lignes = computeDistancePRs([{ date: "2025-10-25", distance_km: 42.3, duration_seconds: 9696 }] as never, "fr");
+  const marathon = lignes.find((l) => l.cle === "marathon");
+  assert.match(marathon?.date ?? "", /^25 /, `date affichée « ${marathon?.date} » pour une course du 25`);
+  assert.doesNotMatch(codeNu("src/lib/dashboard/records.ts"), /const fmtDate = \(d: string\) => new Date\(d\)\./, "la date se relit de nouveau à minuit UTC");
+  for (const lang of ["fr", "en", "de", "es", "pt"]) assert.ok(NOMS_DISTANCE[lang]?.semi && NOMS_DISTANCE[lang]?.marathon, `distances manquantes en ${lang}`);
+  assert.equal(computeDistancePRs([{ date: "2025-03-15", distance_km: 21.1, duration_seconds: 4500 }] as never, "es").find((l) => l.cle === "semi")?.label, "Media");
+  assert.match(codeNu("src/components/dashboard/AjoutRecord.tsx"), /\(NOMS_DISTANCE\[lang\] \?\? NOMS_DISTANCE\.fr\)\[cle\]/);
+  process.env.TZ = prev;
+});
+
+test("test VMA, ressenti, bandeau de profil, objectif, barres : langue et mémoire", () => {
+  const v = codeNu("src/components/dashboard/TestVmaBanner.tsx");
+  assert.match(v, /const nombre = \(v: string\) => parseFloat\(String\(v\)\.replace\(",", "\."\)\);/, "« 16,5 » redevient 16");
+  assert.doesNotMatch(v, /placeholder="ex : 16\.5"/, "l'exemple de VMA est de nouveau en français pour toutes les langues");
+  assert.match(v, /apercuVma\.toLocaleString\(lang/);
+  assert.match(codeNu("src/components/dashboard/SessionFeedback.tsx"), /\$\{Math\.floor\(secKm \/ 60\)\}'\$\{String\(secKm % 60\)/, "l'allure du ressenti s'écrit de nouveau « 5:06 »");
+  const p = codeNu("src/components/dashboard/ProfileCompletionBanner.tsx");
+  assert.match(p, /localStorage\.setItem\(CLE_MASQUE, cle\)/, "« Masquer » ne se souvient de nouveau de rien");
+  const o = codeNu("src/components/dashboard/ObjectiveCard.tsx");
+  assert.doesNotMatch(o, />Source : /, "« Source : » est de nouveau écrit en français pour toutes les langues");
+  assert.match(o, /p\.km === 42\.2 \? t\("obj\.presetMarathon"\)/);
+  assert.match(codeNu("src/components/dashboard/MiniGraphes.tsx"), /b\.valeur\.toLocaleString\(lang,/);
+  for (const lang of ["fr", "en", "de", "es", "pt"] as const) {
+    const d = T[lang] as Record<string, string>;
+    for (const k of ["obj.presetMarathon", "obj.source", "dash.coach.badgeLe"]) assert.ok(d[k], `${k} manque en ${lang}`);
+  }
 });
 
 console.log("\nCRASH-TEST DU SCORE DE FORME");

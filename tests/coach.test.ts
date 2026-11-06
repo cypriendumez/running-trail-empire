@@ -6514,7 +6514,8 @@ test("le volume se compare à une médiane, et l'étiquette dit laquelle", () =>
   // L'étiquette annonçait « vs moy. 4 sem. » alors que le code moyennait CINQ semaines,
   // et une moyenne est écrasée par une coupure : une semaine à 5 km faisait tomber la
   // référence de 70,7 à 58 km. `robustWeeklyKm` écarte les semaines non courues.
-  assert.match(src, /const volRef = robustWeeklyKm\(runs, Date\.now\(\) - 7 \* 86400000, 8\)/,
+  // 06/11/2026 : ancrée sur le jour de l'athlète (plus l'horloge), toujours hors semaine en cours.
+  assert.match(src, /const volRef = robustWeeklyKm\(runs, Date\.parse\(`\$\{jour\}T12:00:00Z`\) - 7 \* 86400000, 8\)/,
     "la référence de volume n'est plus la médiane robuste, hors semaine en cours");
   // L'étiquette doit SUIVRE le calcul, sinon elle ment à nouveau.
   assert.match(src, /\{volumeDelta != null \? t\(volumeRefLabel\) :/,

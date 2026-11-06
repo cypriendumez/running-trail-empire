@@ -2,8 +2,8 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { fuseauOuDefaut } from "@/lib/time/fuseau";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { lecturesEnEchec } from "@/lib/dashboard/lectures";
-import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 import type { AnalyseMemorisee } from "@/lib/dashboard/derniereAnalyse";
 import { BentoDashboard } from "@/components/dashboard/BentoDashboard";
 import { TestVmaBanner } from "@/components/dashboard/TestVmaBanner";
@@ -44,8 +44,10 @@ export default async function DashboardPage() {
   const streakToday = jourLocal(new Date(), fuseauAthlete);
   const streakFrom = decaleJour(streakToday, -119);
 
-  // Le jour de l'athlète, calculé AVANT les requêtes : il en filtre une.
-  const today = aujourdhui(FUSEAU_DEFAUT);
+  // ⚠️ LE JOUR DE L'ATHLÈTE (06/11/2026). C'était `aujourdhui(FUSEAU_DEFAUT)`, le jour de
+  // PARIS : pour un coureur d'un autre fuseau, entre minuit à Paris et minuit chez lui, la
+  // séance de demain s'affichait comme « Séance du jour ». Le même jour que la série.
+  const today = streakToday;
 
   const [profileRes, hrvRes, workoutsRes, planRes, leagueRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, newMembersRes, prRes, chargeRes, streakWkRes, streakPlanRes, avisRes, nbSeancesRes, premiereRes, declaresRes, garageRes, etatCoachRes, analysesRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single(),
@@ -63,7 +65,12 @@ export default async function DashboardPage() {
     supabase.from("notifications").select("data").eq("user_id", user!.id).eq("type", "session_feedback").order("created_at", { ascending: false }).limit(60),
     supabase.from("notifications").select("data").eq("user_id", user!.id).eq("type", "race_objective").maybeSingle(),
     supabase.from("performance_baselines").select("vma_kmh,max_hr,tested_at").eq("user_id", user!.id).order("tested_at", { ascending: false }).limit(1).single(),
-    supabase.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", new Date(Date.now() - 7 * 86400000).toISOString()),
+    // ⚠️ COMPTÉ AVEC LA CLÉ DE SERVICE, ET SANS SOI-MÊME (06/11/2026). Avec la session, la
+    // règle RLS `profiles_select_own` ne laisse voir que son propre profil : la carte
+    // annonçait « +1 nouveaux cette semaine » à un inscrit de la semaine, qui se comptait
+    // lui-même, et 0 à tous les autres. Un COMPTE seulement (`head`), aucune ligne lue.
+    createAdminClient().from("profiles").select("id", { count: "exact", head: true })
+      .gte("created_at", new Date(Date.now() - 7 * 86400000).toISOString()).neq("id", user!.id),
     // ── RECORDS PAR DISTANCE — requête DÉDIÉE, sur TOUT l'historique ──────────────
     // La liste principale est plafonnée à 40 activités, soit ici deux mois seulement.
     // La carte « Records personnels » se calculait dessus et annonçait donc, avec le
@@ -181,7 +188,9 @@ export default async function DashboardPage() {
     baseline: baseRes.data as { vma_kmh?: number | null; tested_at?: string | null } | null,
     profil: profileRes.data as { garmin_vo2max?: number | null; pace_curve?: { best?: { m: number; sec: number }[] } | null } | null,
   });
-  const risk = loadRisk(wks);
+  // Sur l'historique de charge d'UN AN (pas les 40 dernières séances) et au jour de
+  // l'athlète (pas celui de Paris) : la même série que la carte Charge & affûtage.
+  const risk = loadRisk((chargeRes.data ?? []) as { date: string; type?: string | null; duration_seconds?: number | null; tss?: number | null }[], streakToday);
 
   // Prochaine séance prescrite par le coach (aujourd'hui ou à venir) → prioritaire sur l'IA/l'algo.
   type CoachText = { title?: string; subtitle?: string; tags?: string[]; why?: string };
@@ -192,7 +201,8 @@ export default async function DashboardPage() {
   const coachSession = cn
     // Le français reste ici ; `i18n` voyage à côté et c'est le composant client qui
     // choisit la langue (le sélecteur est instantané, il ne recharge pas la page).
-    ? { title: cn.title, subtitle: cn.data.subtitle || cn.body || "", tags: cn.data.tags ?? [], why: cn.data.why ?? "", i18n: cn.data.i18n }
+    // `date` : la carte verte dit « Séance du jour » seulement si c'est bien celle du jour.
+    ? { title: cn.title, subtitle: cn.data.subtitle || cn.body || "", tags: cn.data.tags ?? [], why: cn.data.why ?? "", i18n: cn.data.i18n, date: cn.data.date ?? null }
     : null;
 
   // Ressenti demandé pour CHAQUE séance récente (≤ 4 j) qui n'en a pas — désignée par son
@@ -284,6 +294,7 @@ export default async function DashboardPage() {
       objective={objective}
       derniereCourse={derniereCourse}
       planCoach={planCoach}
+      cibleVolumeKm={typeof (etatCoach as { targetKm?: unknown } | null)?.targetKm === "number" ? (etatCoach as { targetKm: number }).targetKm : null}
       analyses={(analysesRes.data ?? []) as AnalyseMemorisee[]}
       montreReliee={!!(profileRes.data as { intervals_api_key?: string | null } | null)?.intervals_api_key}
       currentVma={currentVma}

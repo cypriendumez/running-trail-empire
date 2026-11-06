@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertCircle, ArrowRight, X } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 
@@ -15,6 +15,8 @@ const T: Record<string, Record<string, string>> = {
   es: { title: "A tu entrenador le faltan {n} dato(s)", sub: "Sin ellos, aplica ajustes prudentes por defecto en lugar de adaptarse a ti.", cta: "Completar mi perfil", exp: "antigüedad corriendo", terr: "terreno habitual", elev: "relación con el desnivel", health: "salud y antecedentes", dismiss: "Ocultar" },
   pt: { title: "Faltam {n} dado(s) ao teu treinador", sub: "Sem eles, aplica definições prudentes por omissão em vez de se adaptar a ti.", cta: "Completar o meu perfil", exp: "experiência a correr", terr: "terreno habitual", elev: "relação com o desnível", health: "saúde e antecedentes", dismiss: "Ocultar" },
 };
+
+const CLE_MASQUE = "pacevo_profil_masque";
 
 export function ProfileCompletionBanner({ profile }: { profile: Record<string, unknown> | null }) {
   const { lang } = useT();
@@ -31,11 +33,23 @@ export function ProfileCompletionBanner({ profile }: { profile: Record<string, u
     !profile?.health_declared && t.health,
   ].filter((x): x is string => typeof x === "string");
 
+  // ⚠️ « MASQUER » SE SOUVIENT (06/11/2026). La croix ne valait que pour l'affichage en cours :
+  // le bandeau revenait à chaque visite. Mémorisé dans le navigateur pour CET ensemble de
+  // points manquants — s'il en manque un autre plus tard, le bandeau revient, à raison.
+  const cle = missing.join("|");
+  useEffect(() => {
+    try { if (localStorage.getItem(CLE_MASQUE) === cle) setHidden(true); } catch { /* stockage refusé */ }
+  }, [cle]);
+  const masquer = () => {
+    setHidden(true);
+    try { localStorage.setItem(CLE_MASQUE, cle); } catch { /* rien à mémoriser */ }
+  };
+
   if (hidden || missing.length === 0) return null;
 
   return (
     <div className="relative mb-4 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
-      <button onClick={() => setHidden(true)} aria-label={t.dismiss}
+      <button onClick={masquer} aria-label={t.dismiss}
         className="absolute right-3 top-3 rounded-lg p-1 text-amber-400 transition-colors hover:bg-amber-100 hover:text-amber-600">
         <X className="h-3.5 w-3.5" />
       </button>

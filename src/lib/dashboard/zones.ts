@@ -65,3 +65,23 @@ export function computeHrZones(workouts: SeanceZones[], aujourdhui?: string): { 
   }
   return { secs, total: secs.reduce((a, b) => a + b, 0), seances, ecartees };
 }
+
+/**
+ * LA ZONE OÙ LA SÉANCE A LE PLUS DURÉ (1 à 5), lue dans le temps en zone MESURÉ — ou `null`.
+ *
+ * ⚠️ LA PASTILLE « Z2 » DE LA LISTE DES SÉANCES ÉTAIT INVENTÉE (06/11/2026). Elle arrondissait
+ * vers le haut l'« effet d'entraînement » Garmin (`training_effect`, un indice de 0 à 5 qui
+ * n'est PAS une zone cardiaque) et valait Z2 PAR DÉFAUT quand il manquait — or il manque pour
+ * les 487 séances en base. Toutes les séances affichaient donc « Z2 ». Même regroupement en
+ * cinq bandes que la carte Zones : au-delà de la cinquième, tout va dans la dernière.
+ */
+export function zoneDominante(hrZoneSeconds: unknown): number | null {
+  if (!Array.isArray(hrZoneSeconds)) return null;
+  const secs = [0, 0, 0, 0, 0];
+  for (let i = 0; i < hrZoneSeconds.length; i++) {
+    const v = Number(hrZoneSeconds[i]);
+    secs[Math.min(i, secs.length - 1)] += Number.isFinite(v) && v > 0 ? v : 0;
+  }
+  const max = Math.max(...secs);
+  return max > 0 ? secs.indexOf(max) + 1 : null;
+}

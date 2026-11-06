@@ -32,10 +32,10 @@ export function TaperingWidget({ workouts, raceDate, aujourdhui }: TaperingWidge
   const tsbProgress = Math.min(100, Math.max(0, ((tsb + 30) / (targetTSB + 30)) * 100));
 
   const tsbStatus =
-    tsb >= 10 ? { labelK: "tap.status.optimal", color: "text-green-600", bg: "bg-[#D1FAE5]" }
-    : tsb >= 0 ? { labelK: "tap.status.rising", color: "text-blue-600", bg: "bg-[#E0F2FE]" }
-    : tsb >= -10 ? { labelK: "tap.status.balanced", color: "text-orange-500", bg: "bg-[#FFEDD5]" }
-    : { labelK: "tap.status.overload", color: "text-red-600", bg: "bg-red-50" };
+    tsb >= 10 ? { labelK: "tap.status.optimal", color: "text-green-600", bar: "bg-green-600", bg: "bg-[#D1FAE5]" }
+    : tsb >= 0 ? { labelK: "tap.status.rising", color: "text-blue-600", bar: "bg-blue-600", bg: "bg-[#E0F2FE]" }
+    : tsb >= -10 ? { labelK: "tap.status.balanced", color: "text-orange-500", bar: "bg-orange-500", bg: "bg-[#FFEDD5]" }
+    : { labelK: "tap.status.overload", color: "text-red-600", bar: "bg-red-600", bg: "bg-red-50" };
 
   const predictedRaceTSB = isTaperingWindow && daysToRace
     ? Math.min(25, tsb + daysToRace * 1.2)
@@ -74,9 +74,11 @@ export function TaperingWidget({ workouts, raceDate, aujourdhui }: TaperingWidge
       <div className={`rounded-xl px-4 py-3 mb-4 ${tsbStatus.bg}`}>
         <div className={`text-xs font-semibold ${tsbStatus.color}`}>{t(tsbStatus.labelK)}</div>
         <div className="mt-2 h-1.5 bg-white/60 rounded-full overflow-hidden">
+          {/* ⚠️ LA BARRE ÉTAIT NOIRE (06/11/2026) : `style={{ color: "bg-green-600" }}` mettait un
+              NOM DE CLASSE dans une propriété CSS — invalide, donc `bg-current` prenait la
+              couleur du texte. La classe de fond est maintenant posée directement. */}
           <motion.div
-            className="h-full bg-current rounded-full"
-            style={{ color: tsbStatus.color.replace("text-", "bg-") }}
+            className={`h-full rounded-full ${tsbStatus.bar}`}
             initial={{ width: 0 }}
             animate={{ width: `${tsbProgress}%` }}
             transition={{ duration: 0.8, ease: "easeOut" }}
