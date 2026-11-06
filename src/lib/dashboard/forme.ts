@@ -60,6 +60,12 @@ const VOLUME_GENERIQUE = 50;
 const VMA_PLANCHER = 8;
 const VMA_ETENDUE = 12;
 
+/** La distance d'une séance, ou 0 si elle est aberrante (négative, NaN, infinie). */
+const km = (w: { distance_km?: number | null }): number => {
+  const d = Number(w.distance_km);
+  return Number.isFinite(d) && d > 0 ? d : 0;
+};
+
 const clamp = (n: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, Number.isFinite(n) ? n : 0));
 
 /** Famille de course déduite de la distance visée — même découpage que `longRunPeakKm`. */
@@ -81,10 +87,10 @@ export function butDe(distanceKm: number | null): RaceGoal {
 export function socleDesSeances(workouts: Seance[], aujourdhui?: string): Socle {
   const courses = workouts.filter((w) => isRun(w.sport));
   const recentes = courses.filter((w) => dansFenetre(w.date, 42, aujourdhui));
-  const plusLongue = Math.max(0, ...recentes.map((w) => w.distance_km ?? 0));
+  const plusLongue = Math.max(0, ...recentes.map(km));
   return {
     sortieLongueKm: plusLongue > 0 ? plusLongue : null,
-    volumeHebdoKm: demonstratedWeeklyKm(courses.map((w) => ({ date: w.date, distance_km: w.distance_km ?? 0 }))),
+    volumeHebdoKm: demonstratedWeeklyKm(courses.map((w) => ({ date: w.date, distance_km: km(w) }))),
   };
 }
 
@@ -103,15 +109,15 @@ export function computeForme(
 ): Forme {
   const recent = workouts.filter((w) => isRun(w.sport) && dansFenetre(w.date, 42, aujourdhui));
   const hasData = workouts.length > 0;
-  const longest = Math.max(0, ...recent.map((w) => w.distance_km ?? 0));
-  const weeklyKm = recent.reduce((s, w) => s + (w.distance_km ?? 0), 0) / 6;
+  const longest = Math.max(0, ...recent.map(km));
+  const weeklyKm = recent.reduce((s, w) => s + km(w), 0) / 6;
 
   const raceKm = objectif?.distanceKm && objectif.distanceKm > 0 ? objectif.distanceKm : null;
   const cibleLongueKm = longRunPeakKm(butDe(raceKm), raceKm);
   // La capacité DÉMONTRÉE, pas une cible tombée du ciel : c'est le volume que
   // l'athlète a réellement tenu. `null` tant qu'il n'a pas 4 semaines courues.
   const cibleVolumeKm = demonstratedWeeklyKm(
-    workouts.filter((w) => isRun(w.sport)).map((w) => ({ date: w.date, distance_km: w.distance_km ?? 0 })),
+    workouts.filter((w) => isRun(w.sport)).map((w) => ({ date: w.date, distance_km: km(w) })),
     // Midi local : `demonstratedWeeklyKm` relit ce jour-là en jour LOCAL, sans glisser d'un cran.
     aujourdhui ? Date.parse(`${aujourdhui}T12:00:00`) : undefined,
   );

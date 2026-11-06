@@ -20,7 +20,8 @@ export function computeWeeklyTrend(workouts: readonly SeanceKm[], weeks = 6,
         if (age == null || age < 0) return false;
         return Math.floor(age / 7) === recul;
       })
-      .reduce((s, w) => s + (w.distance_km ?? 0), 0);
+      // Une distance aberrante (négative, NaN, infinie) ne pèse rien : « Infinity km » sinon.
+      .reduce((s, w) => s + (Number.isFinite(w.distance_km) && (w.distance_km as number) > 0 ? (w.distance_km as number) : 0), 0);
     return { km, isCurrent: i === weeks - 1 };
   });
 }

@@ -252,8 +252,12 @@ export function raceProjection(
 // ── Risque de charge (anti-blessure proactif / déload auto) ──
 const TSS_BY_TYPE: Record<string, number> = { easy: 50, tempo: 75, interval: 90, vma: 100, long_run: 65, trail: 70, hill_repeat: 85, race: 110, recovery: 30, strength: 40 };
 export function estimateTSS(w: { duration_seconds?: number | null; type?: string | null; tss?: number | null }): number {
-  if (w.tss != null) return Number(w.tss);
-  return Math.round(((w.duration_seconds ?? 0) / 3600) * (TSS_BY_TYPE[String(w.type ?? "")] ?? 60));
+  // Un TSS ou une durée aberrants (NaN, infini, négatif) ne pèsent rien : sinon l'ACWR devenait
+  // NaN et déclenchait « Déload recommandé » à tort (crash-test au hasard, 06/11/2026).
+  const tss = Number(w.tss);
+  if (w.tss != null && Number.isFinite(tss) && tss >= 0) return tss;
+  const duree = Number(w.duration_seconds);
+  return Math.round(((Number.isFinite(duree) && duree > 0 ? duree : 0) / 3600) * (TSS_BY_TYPE[String(w.type ?? "")] ?? 60));
 }
 /**
  * La charge (TSS mesuré, sinon estimé) de chacun des `jours` derniers jours de CALENDRIER —

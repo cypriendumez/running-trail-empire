@@ -83,11 +83,14 @@ export function statsVfc(
    */
   aujourdhui?: string,
 ) {
-  const dernier = hrv[0]?.hrv_ms ?? null;
+  // Une mesure n'est une mesure que finie et positive : un 0 ou un NaN venu d'une synchro
+  // ratée affichait « ↑ NaN ms » et faisait du score discipline un NaN (crash-test au hasard).
+  const mesure = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v > 0;
+  const dernier = mesure(hrv[0]?.hrv_ms) ? hrv[0].hrv_ms as number : null;
   const jours = !hrv[0]?.date ? null
     : aujourdhui ? ageJours(String(hrv[0].date), aujourdhui)
     : Math.floor((maintenant - new Date(String(hrv[0].date).slice(0, 10) + "T00:00:00").getTime()) / 86400000);
-  const serie = hrv.slice(0, 14).map((h) => h.hrv_ms).filter((v): v is number => v != null);
+  const serie = hrv.slice(0, 14).map((h) => h.hrv_ms).filter(mesure);
   const base = serie.length ? Math.round(serie.reduce((a, b) => a + b, 0) / serie.length) : null;
   // Une mesure datée APRÈS aujourd'hui (horloge de montre fausse) n'est pas « fraîche » :
   // elle passait pour la mesure du matin (âge négatif ≤ 2). Trouvé par crash-test, 05/11/2026.
@@ -156,8 +159,10 @@ export function computeDiscipline(
   // Récupération — mesures FRAÎCHES seulement : le sommeil arrive déjà filtré par
   // l'appelant ; la VFC ne compte que si sa dernière mesure a 2 jours au plus.
   const signals: number[] = [];
-  if (sleep?.sleep_score != null && Number.isFinite(sleep.sleep_score)) signals.push(sleep.sleep_score);
-  const hrvVals = hrv.slice(0, 14).map(h => h.hrv_ms).filter((v): v is number => v != null);
+  // Borné : un score hors 0–100 faisait du total un 333 333 393 (crash-test au hasard).
+  if (sleep?.sleep_score != null && Number.isFinite(sleep.sleep_score)) signals.push(clamp(sleep.sleep_score));
+  // Finies et positives seulement : une base à 0 divisait par zéro (total NaN).
+  const hrvVals = hrv.slice(0, 14).map(h => h.hrv_ms).filter((v): v is number => typeof v === "number" && Number.isFinite(v) && v > 0);
   let signalVfc: number | null = null;
   if (hrvVals.length >= 3 && statsVfc(hrv, Date.now(), jour).fraiche) {
     const base = hrvVals.reduce((a, b) => a + b, 0) / hrvVals.length;

@@ -334,6 +334,23 @@ test("la séance de repli ne propose pas d'intensité à l'aveugle", () => {
   assert.match(BENTO, /recommendSession\(\{ [^}]*recuperation: !!planCoach\?\.recuperation, mesureFraiche: hrvFraiche \}\)/);
 });
 
+console.log("\nCRASH-TEST AU HASARD DU RENDU (06/11/2026)");
+
+test("le tableau de bord ne plante plus quand une seule carte d'appoint est disponible", () => {
+  // 1 profil sur 300 tirés au hasard : séance du coach publiée, pas de nuit récente, aucune
+  // COURSE avec une distance (cycliste). `fillers[1].node` levait : erreur 500, page entière.
+  assert.doesNotMatch(BENTO, /\{fillers\[1\]\.node\}\s*<\/motion\.div>\s*<\/>/, "la seconde carte d'appoint est de nouveau lue sans garde");
+  assert.match(BENTO, /\{fillers\[1\] && <motion\.div key=\{fillers\[1\]\.key\}/);
+  assert.match(BENTO, /className=\{`col-span-12 bento-card \$\{fillers\[1\] \? "md:col-span-8" : ""\}`\}/, "sans seconde carte, la dernière séance ne prend pas toute la largeur");
+});
+
+test("durées, VFC et FC arrondies à l'affichage : plus de « 3h7.6699999999999875 »", () => {
+  assert.doesNotMatch(BENTO, /(total_sleep_min|s\.min) % 60/, "une durée se formate de nouveau sans arrondi");
+  assert.match(BENTO, /const hm = \(min: number\) => \{ const m = Math\.max\(0, Math\.round\(/);
+  assert.doesNotMatch(BENTO, /\{Math\.abs\(hrvDelta\)\} ms/, "l'écart de VFC s'affiche de nouveau avec ses décimales");
+  assert.match(BENTO, /\{Math\.round\(restingHr\)\}<span/);
+});
+
 console.log("\nCRASH-TEST DU SCORE DE FORME");
 
 test("aucune entrée absurde ne fait sortir un axe de 0–100 ni n'en fait un NaN", () => {

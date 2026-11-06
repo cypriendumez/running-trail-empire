@@ -43,4 +43,4 @@ export function derniereAnalyse(seances: readonly SeanceListee[], analyses: read
 
 /** Le lien de la page de la séance — le même format que la liste « Activités récentes ». */
 export const lienSeance = (s: SeanceListee): string =>
-  `/dashboard/activite?date=${String(s.date).slice(0, 10)}&dist=${s.distance_km ?? ""}&title=${encodeURIComponent(s.title ?? "")}`;
+  `/dashboard/activite?date=${String(s.date).slice(0, 10)}&dist=${Number.isFinite(s.distance_km) ? s.distance_km : ""}&title=${encodeURIComponent(s.title ?? "")}`;

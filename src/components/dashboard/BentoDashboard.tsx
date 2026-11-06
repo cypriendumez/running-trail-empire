@@ -199,6 +199,9 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
   // « Base 14 j : 43 ms » gardait l'espace insécable français avant les deux-points.
   const nf = (v: number, d = 1) => (Number.isFinite(v) ? v : 0).toLocaleString(lang, { minimumFractionDigits: d, maximumFractionDigits: d });
   const deuxPoints = lang === "fr" ? "\u00a0: " : ": ";
+  // Une durée en minutes → « 7h05 », arrondie : des minutes décimales donnaient
+  // « 3h7.6699999999999875 » et faisaient déborder la carte (crash-test au hasard).
+  const hm = (min: number) => { const m = Math.max(0, Math.round(Number.isFinite(min) ? min : 0)); return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`; };
   // État RELATIF à la base de l'athlète, et seulement si la mesure est fraîche — même
   // règle que la fiche détaillée (`etatPhysiologique`), qui ne peut pas dire autre chose.
   // ⚠️ LE JOUR DE L'ATHLÈTE, PAS CELUI DE LA MACHINE. Tout ce qui dépend d'« aujourd'hui »
@@ -336,7 +339,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
       </div>
       <div className="mb-3 grid grid-cols-2 gap-3">
         <div>
-          <div className="text-2xl font-bold text-zinc-900">{Math.floor(freshSleep.total_sleep_min / 60)}h{String(freshSleep.total_sleep_min % 60).padStart(2, "0")}</div>
+          <div className="text-2xl font-bold text-zinc-900">{hm(freshSleep.total_sleep_min)}</div>
           <div className="text-xs text-zinc-400">{t("dash.sleep.total")}</div>
         </div>
         <div>
@@ -356,7 +359,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
               <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-100">
                 <div className={`h-full ${s.color} rounded-full`} style={{ width: `${Math.min(100, (s.min / freshSleep.total_sleep_min) * 100)}%` }} />
               </div>
-              <span className="w-10 text-right text-zinc-600">{Math.floor(s.min / 60)}h{String(s.min % 60).padStart(2, "0")}</span>
+              <span className="w-10 text-right text-zinc-600">{hm(s.min)}</span>
             </div>
           ))}
         </div>
@@ -436,7 +439,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
       <p className="text-sm font-medium leading-relaxed text-zinc-700">{readiness.tagline}</p>
       <div className="mt-auto space-y-1.5 pt-4 text-xs">
         {hrvDelta != null && hrvBaseline != null && (
-          <div className="flex justify-between"><span className="text-zinc-400">{t("dash.hrv.title")}</span><span className={`font-semibold ${hrvDelta >= 0 ? "text-emerald-600" : "text-amber-600"}`}>{hrvDelta >= 0 ? "↑" : "↓"} {Math.abs(hrvDelta)} ms</span></div>
+          <div className="flex justify-between"><span className="text-zinc-400">{t("dash.hrv.title")}</span><span className={`font-semibold ${hrvDelta >= 0 ? "text-emerald-600" : "text-amber-600"}`}>{hrvDelta >= 0 ? "↑" : "↓"} {Math.round(Math.abs(hrvDelta))} ms</span></div>
         )}
         {freshSleep && (
           <div className="flex justify-between"><span className="text-zinc-400">{t("dash.sleep.title")}</span><span className="font-semibold text-zinc-700">{freshSleep.sleep_score}/100</span></div>
@@ -936,7 +939,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                 </span>
                 {hrvDelta != null && (
                   <span className={`inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs font-semibold ${hrvDelta >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>
-                    {hrvDelta >= 0 ? "↑" : "↓"} {Math.abs(hrvDelta)} ms
+                    {hrvDelta >= 0 ? "↑" : "↓"} {Math.round(Math.abs(hrvDelta))} ms
                   </span>
                 )}
               </div>
@@ -979,7 +982,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                 <div className="flex items-center gap-2.5 rounded-xl bg-zinc-50 px-3 py-2.5">
                   <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-400"><Heart className="h-4 w-4" /></span>
                   <div className="min-w-0">
-                    <div className="text-sm font-bold tabular-nums text-zinc-900">{restingHr}<span className="ml-0.5 text-[11px] font-normal text-zinc-400">bpm</span></div>
+                    <div className="text-sm font-bold tabular-nums text-zinc-900">{Math.round(restingHr)}<span className="ml-0.5 text-[11px] font-normal text-zinc-400">bpm</span></div>
                     <div className="truncate text-[10px] text-zinc-400">{vit.hr}</div>
                   </div>
                 </div>
@@ -988,7 +991,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                 <div className="flex items-center gap-2.5 rounded-xl bg-zinc-50 px-3 py-2.5">
                   <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-400"><Moon className="h-4 w-4" /></span>
                   <div className="min-w-0">
-                    <div className="text-sm font-bold tabular-nums text-zinc-900">{Math.floor(freshSleep.total_sleep_min / 60)}h{String(freshSleep.total_sleep_min % 60).padStart(2, "0")}</div>
+                    <div className="text-sm font-bold tabular-nums text-zinc-900">{hm(freshSleep.total_sleep_min)}</div>
                     <div className="truncate text-[10px] text-zinc-400">{t("dash.sleep.title")}</div>
                   </div>
                 </div>
@@ -1301,11 +1304,15 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
         </motion.div>
 
         {/* Dernière séance (col-8) + carte de droite n°2 (col-4) — rangée pavée */}
+        {/* ⚠️ LA SECONDE CARTE PEUT MANQUER (06/11/2026, crash-test au hasard). Le vivier n'a
+            parfois qu'UNE carte : séance du coach publiée (pas de « séance-clé »), pas de nuit
+            récente, aucune COURSE avec une distance (cycliste, randonneur). `fillers[1].node`
+            levait alors une exception et tout le tableau de bord tombait en erreur 500. */}
         {w0 && lastMetrics.length > 0 && (
           <>
             <motion.div
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.30 }}
-              className="col-span-12 md:col-span-8 bento-card"
+              className={`col-span-12 bento-card ${fillers[1] ? "md:col-span-8" : ""}`}
             >
               <div className="mb-4 flex items-center gap-2">
                 <Footprints className="h-4 w-4 text-zinc-500" />
@@ -1322,12 +1329,12 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                 ))}
               </div>
             </motion.div>
-            <motion.div key={fillers[1].key}
+            {fillers[1] && <motion.div key={fillers[1].key}
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
               className="col-span-12 md:col-span-4"
             >
               {fillers[1].node}
-            </motion.div>
+            </motion.div>}
           </>
         )}
 
