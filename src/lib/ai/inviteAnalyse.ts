@@ -6,7 +6,7 @@
 //  « NaN », « undefined » ni chiffre absent n'y entre — sans appeler de modèle.
 // ─────────────────────────────────────────────────────────────────────────────
 import { allureTexte, dateLisible, type FaitsSeance } from "@/lib/ai/analyseSeance";
-import { FOURCHETTE_ALLURE_SEC } from "@/lib/watch/intervals";
+import { FOURCHETTE_QUALITE_SEC } from "@/lib/watch/intervals";
 import { SPORT_LABEL, type Sport } from "@/lib/intervals/sport";
 
 /** Les sports qui se mesurent en VITESSE (km/h) : une allure au kilomètre n'y a pas de sens. */
@@ -105,7 +105,7 @@ export function lignesDeFaits(f: FaitsSeance, lang: Lang, complet: boolean): str
       const structure = e.repsPrevues != null && e.repsFaites != null && e.repsFaites > 0
         && Math.abs(e.repsFaites - e.repsPrevues) > Math.max(1, e.repsPrevues * 0.3)
         ? " — la séance courue ne suit pas la structure prévue" : "";
-      if (e.sur === "repetitions") l.push(`Écart à la séance prévue : ${e.repsPrevues} répétitions prévues à ${cible}, ${e.repsFaites} relevées${structure}, en moyenne à ${fr(e.allureFaiteSec)}/km (${ecart})${e.dansLaFourchette != null ? ` ; ${e.dansLaFourchette} sur ${e.repsFaites} dans la fourchette affichée par la montre (±${FOURCHETTE_ALLURE_SEC} s/km)` : ""}`);
+      if (e.sur === "repetitions") l.push(`Écart à la séance prévue : ${e.repsPrevues} répétitions prévues à ${cible}, ${e.repsFaites} relevées${structure}, en moyenne à ${fr(e.allureFaiteSec)}/km (${ecart})${e.dansLaFourchette != null ? ` ; ${e.dansLaFourchette} sur ${e.repsFaites} dans la fourchette affichée par la montre (±${FOURCHETTE_QUALITE_SEC} s/km)` : ""}`);
       else if (e.sur === "bloc" && e.repsPrevues) l.push(`Écart à la séance prévue : au lieu des ${e.repsPrevues} répétitions prévues à ${cible}, la montre a relevé un effort continu de ${e.blocMin} min${e.tours ? ` (${e.tours.length} tours : ${e.tours.map(fr).join(" · ")} /km)` : ""}, couru en moyenne à ${fr(e.allureFaiteSec)}/km — ce n'est pas la séance prévue, ne juge pas le fractionné`);
       else if (e.sur === "bloc") l.push(`Écart à la séance prévue : corps de séance (${e.blocMin} min${e.tours ? `, découpé par la montre en ${e.tours.length} tours : ${e.tours.map(fr).join(" · ")} /km` : ""}) couru en moyenne à ${fr(e.allureFaiteSec)}/km pour ${fr(e.allureCibleSec)}/km prévus (${ecart})`);
       else l.push(`Écart à la séance prévue : ${fr(e.allureFaiteSec)}/km pour ${fr(e.allureCibleSec)}/km prévus (${ecart})`);

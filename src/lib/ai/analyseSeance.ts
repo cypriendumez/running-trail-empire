@@ -16,7 +16,7 @@
 //  Se fier au champ `type` ferait analyser une séance de seuil comme un footing.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { parseReps, parsePaceSec, FOURCHETTE_ALLURE_SEC } from "@/lib/watch/intervals";
+import { parseReps, parsePaceSec, FOURCHETTE_QUALITE_SEC } from "@/lib/watch/intervals";
 import { serieDeRepetitions, blocPrincipal, type DetailIntervalles, type FluxSeance } from "@/lib/intervals/performance";
 
 /** Part de la FC max au-delà de laquelle une séance est DURE. Même valeur que le reste
@@ -131,7 +131,7 @@ export type FaitsSeance = {
     ecartSec: number;
     repsPrevues: number | null;
     repsFaites: number | null;
-    /** Répétitions dans la fourchette que la montre affichait (± `FOURCHETTE_ALLURE_SEC`). */
+    /** Répétitions dans la fourchette que la montre affichait (± `FOURCHETTE_QUALITE_SEC`). */
     dansLaFourchette: number | null;
     blocMin: number | null;
     /** Les tours qui composent le corps d'une séance continue, quand la montre l'a découpé. */
@@ -266,7 +266,7 @@ export function faitsDeSeance(
           repsPrevues: repsPrevues.reps, repsFaites: repetitions.allures.length,
           // Over-under : la montre affichait DEUX fourchettes ; juger une répétition entière
           // contre l'une ou l'autre n'a pas de sens.
-          dansLaFourchette: alt ? null : repetitions.allures.filter((a) => Math.abs(a - allureCible) <= FOURCHETTE_ALLURE_SEC).length,
+          dansLaFourchette: alt ? null : repetitions.allures.filter((a) => Math.abs(a - allureCible) <= FOURCHETTE_QUALITE_SEC).length,
           blocMin: null, tours: null, alternance: alt ? [alt.aPaceSec, alt.bPaceSec] : null,
         };
       } else if (lu?.bloc) {

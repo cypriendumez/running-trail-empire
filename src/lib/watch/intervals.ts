@@ -196,7 +196,7 @@ function zonePaceRange(vmaKmh: number, zone: number): string | null {
   const pct = ZONE_VMA_PCT[zone];
   if (!pct || !(vmaKmh > 0)) return null;
   const centerSec = 3600 / (vmaKmh * pct);             // s/km
-  const band = zone <= 2 ? 8 : zone === 5 ? 6 : 5;     // footing facile = plus de tolérance
+  const band = fourchetteAllure(zone);                  // footing facile = plus de tolérance
   return `${fmtPace(Math.max(120, centerSec - band))}-${fmtPace(centerSec + band)}`;
 }
 
@@ -209,14 +209,27 @@ function zoneStep(durMin: number, zone: number, vmaKmh: number | null, label: st
   // → on monte/descend en température par la FC, pas en visant un chrono.
   if (hrOnly) return `- ${d}m Z${zone} HR ${label}`;
   let range: string | null = null;
-  if (paceSec && paceSec > 0) range = `${fmtPace(Math.max(120, paceSec - FOURCHETTE_ALLURE_SEC))}-${fmtPace(paceSec + FOURCHETTE_ALLURE_SEC)}`;
+  if (paceSec && paceSec > 0) range = `${fmtPace(Math.max(120, paceSec - fourchetteAllure(zone)))}-${fmtPace(paceSec + fourchetteAllure(zone))}`;
   else if (vmaKmh) range = zonePaceRange(vmaKmh, zone);
   return range ? `- ${d}m ${range} pace ${label}` : `- ${d}m Z${zone} HR ${label}`;
 }
 
-/** La fourchette d'allure que la montre affiche autour d'une cible (± s/km). L'analyse
- *  d'une séance juge « dans la cible » avec la MÊME fourchette que l'athlète voyait au poignet. */
-export const FOURCHETTE_ALLURE_SEC = 8;
+/**
+ * LA FOURCHETTE D'ALLURE QUE LA MONTRE AFFICHE autour d'une cible (± s/km). L'analyse d'une
+ * séance juge « dans la cible » avec la MÊME fourchette que l'athlète voyait au poignet.
+ *
+ * ⚠️ DEUX LARGEURS (07/11/2026, Cyprien : « je préférerais 3'45 à 3'55 plutôt que 3'40 à 4'00 »).
+ * Une seule fourchette de ±8 s donnait 16 s d'écart à TOUTES les séances : sur une répétition au
+ * seuil ou à l'allure spécifique, c'est trop lâche pour se caler. Les séances de QUALITÉ (zone 3
+ * et plus : tempo, seuil, spécifique, VMA, répétitions) passent à ±5 s, soit 10 s d'écart.
+ * L'ENDURANCE (footing, sortie longue, allure douce) garde ±8 s : l'allure instantanée du GPS
+ * varie de 10 à 15 s/km (virages, arbres, immeubles), et une fourchette de 10 s ferait sonner
+ * la montre sans arrêt sur une séance dont le seul but est de rester facile.
+ */
+export const FOURCHETTE_QUALITE_SEC = 5;
+export const FOURCHETTE_ENDURANCE_SEC = 8;
+/** La fourchette d'une zone : qualité (≥ 3) ou endurance. */
+export const fourchetteAllure = (zone: number): number => (zone >= 3 ? FOURCHETTE_QUALITE_SEC : FOURCHETTE_ENDURANCE_SEC);
 
 // Extrait l'allure prescrite d'un texte de séance : « 4'20/km », « 4:20/km », « à 4'20 ».
 export function parsePaceSec(text: string): number | null {
@@ -309,10 +322,10 @@ function repSteps(b: RepBlock, vmaKmh: number | null, zone: number, hill?: boole
   const fmt = (sec: number) => (sec % 60 === 0 ? `${sec / 60}m` : `${sec}s`);
   // En côte, une allure au km n'a aucun sens : on pilote à la fréquence cardiaque.
   const range = hill ? `Z${zone} HR` : b.paceSec
-    ? `${fmtPace(Math.max(120, b.paceSec - FOURCHETTE_ALLURE_SEC))}-${fmtPace(b.paceSec + FOURCHETTE_ALLURE_SEC)} pace`
+    ? `${fmtPace(Math.max(120, b.paceSec - fourchetteAllure(zone)))}-${fmtPace(b.paceSec + fourchetteAllure(zone))} pace`
     : (vmaKmh ? `${zonePaceRange(vmaKmh, zone)} pace` : `Z${zone} HR`);
   const out: string[] = [];
-  const rangeAt = (sec: number) => `${fmtPace(Math.max(120, sec - 6))}-${fmtPace(sec + 6)} pace`;
+  const rangeAt = (sec: number) => `${fmtPace(Math.max(120, sec - FOURCHETTE_QUALITE_SEC))}-${fmtPace(sec + FOURCHETTE_QUALITE_SEC)} pace`;
   for (let i = 1; i <= b.reps; i++) {
     if (b.alt && !hill) {
       // Over-under : on déroule l'alternance À L'INTÉRIEUR de la répétition. Un bloc

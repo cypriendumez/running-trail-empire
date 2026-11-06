@@ -22,7 +22,7 @@ import {
 } from "../src/lib/ai/analyseSeance";
 import { peut } from "../src/lib/billing/access";
 import { serieDeRepetitions, blocPrincipal, BLOC_MIN_SEC, type IntervalleIcu } from "../src/lib/intervals/performance";
-import { FOURCHETTE_ALLURE_SEC } from "../src/lib/watch/intervals";
+import { FOURCHETTE_QUALITE_SEC, FOURCHETTE_ENDURANCE_SEC, fourchetteAllure, stepsForType, parseReps } from "../src/lib/watch/intervals";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -364,11 +364,13 @@ test("répétitions prévues et relevées : l'écart moyen, et combien tombent d
   assert.equal(f.ecart?.allureCibleSec, 200, "la cible n'est pas celle que la montre affichait");
   assert.equal(f.ecart?.ecartSec, 2, "écart moyen faux (202 contre 200)");
   assert.equal(f.ecart?.repsPrevues, 6);
-  assert.equal(f.ecart?.dansLaFourchette, 6, `les six sont à moins de ${FOURCHETTE_ALLURE_SEC} s/km de la cible`);
+  // Fourchette de qualité ±5 s (07/11/2026) : 3'20 à 3'22 et 3'24 y sont ; la dernière, à 3'26
+  // (+6 s), est hors des 3:15-3:25 que la montre affichait.
+  assert.equal(f.ecart?.dansLaFourchette, 5, `cinq sur six à moins de ${FOURCHETTE_QUALITE_SEC} s/km de la cible`);
   // Une répétition hors fourchette ne compte pas.
   const lente = faitsDeSeance(SEANCE, { fcMax: 212 }, [], PREVU_6x1000,
-    { liste: SERIE_6x1000.map((x) => (x.average_speed === v(206) ? { ...x, average_speed: v(215) } : x)) });
-  assert.equal(lente.ecart?.dansLaFourchette, 5, "une répétition à +15 s/km est comptée dans la cible");
+    { liste: SERIE_6x1000.map((x) => (x.average_speed === v(204) ? { ...x, average_speed: v(215) } : x)) });
+  assert.equal(lente.ecart?.dansLaFourchette, 4, "une répétition à +15 s/km est comptée dans la cible");
 });
 
 test("ce qu'on ne sait pas se dit : intervalles illisibles, série introuvable, ou rien demandé (Starter)", () => {
@@ -453,7 +455,28 @@ test("le branchement : intervalles lus pour Premium seulement, clé jamais renvo
   const perf = codeOf("src/lib/intervals/performance.ts");
   assert.match(perf, /async function analyseQualityExecution[\s\S]*?const serie = serieDeRepetitions\(j\.icu_intervals \?\? \[\]\)/, "le coach et l'analyse n'ont plus la même définition d'une répétition");
   const montre = codeOf("src/lib/watch/intervals.ts");
-  assert.equal((montre.match(/paceSec - FOURCHETTE_ALLURE_SEC/g) ?? []).length, 2, "la montre n'affiche plus la fourchette que l'analyse juge");
+  assert.equal((montre.match(/paceSec - fourchetteAllure\(zone\)/g) ?? []).length, 2, "la montre n'affiche plus la fourchette que l'analyse juge");
+  // Les répétitions sont jugées avec la fourchette de QUALITÉ, celle que la montre leur affiche.
+  assert.match(codeOf("src/lib/ai/analyseSeance.ts"), /Math\.abs\(a - allureCible\) <= FOURCHETTE_QUALITE_SEC/, "l'analyse ne juge plus les répétitions avec la fourchette de la montre");
+});
+
+test("fourchette d'allure : 10 s d'écart en qualité, 16 s en endurance (Cyprien, 07/11/2026)", () => {
+  // « je préférerais 3'45 à 3'55 » : la séance spécifique du 07/10 (3'47/km) partait en 3:39-3:55.
+  assert.equal(FOURCHETTE_QUALITE_SEC, 5);
+  assert.equal(FOURCHETTE_ENDURANCE_SEC, 8);
+  for (const z of [3, 4, 5]) assert.equal(fourchetteAllure(z), 5, `zone ${z}`);
+  for (const z of [1, 2]) assert.equal(fourchetteAllure(z), 8, `zone ${z}`);
+  // Seuil à 3'47 : le corps part en 3:42-3:52 sur la montre.
+  const seuil = stepsForType("Seuil", 60, 20, 227, 15, 10) ?? "";
+  assert.match(seuil, /3:42-3:52 pace/, `séance de seuil : ${seuil}`);
+  // Répétitions 6 × 1000 m à 3'20 : chaque répétition en 3:15-3:25.
+  const reps = parseReps("6×1000 m à 3'20/km, récup 2 min", null);
+  const vma = stepsForType("VMA", 60, 20, 200, 15, 10, reps) ?? "";
+  assert.match(vma, /3:15-3:25 pace/, `répétitions : ${vma}`);
+  assert.doesNotMatch(vma, /3:12-3:28/, "les répétitions gardent l'ancienne fourchette de 16 s");
+  // Footing à 4'52 : 4:44-5:00, l'endurance garde sa tolérance.
+  const footing = stepsForType("Endurance", 50, 20, 292, 15, 10) ?? "";
+  assert.match(footing, /4:44-5:00 pace/, `footing : ${footing}`);
 });
 
 console.log("\nLE CONTEXTE DU JOUR, LE RESSENTI, LA PROGRESSION, LE TRAIL (Premium, 31/10/2026)");
