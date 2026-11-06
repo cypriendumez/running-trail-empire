@@ -11,7 +11,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildAthleteContext } from "@/lib/ai/coachContext";
 import { buildWeekPlan, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
 import { estQualitePrescrite } from "@/lib/coach/qualiteRecente";
-import { pushIntervalsWorkout, supprimerIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
+import { pushIntervalsWorkout, supprimerIntervalsWorkout, buildWorkoutDescription, fcMaxMontre, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
+import { avecFcMaxMontre } from "@/lib/coach/fcCible";
 import { profilPeut, lectureDuCoach, rappelPremiumPour, COLONNES_ACCES } from "@/lib/billing/access";
 import { actualiserRappelPremium, type IssueRappel } from "@/lib/ai/rappelPremiumServeur";
 import { identifiantsDePaire } from "@/lib/intervals/identifiants";
@@ -342,6 +343,8 @@ export async function autoCoachForUser(
       // UNE seule lecture pour toute la semaine : la montre ne change pas entre deux jours
       // du même plan, et un appel par jour ferait sept requêtes pour une seule réponse.
       const montre = await litMontre({ athleteId, apiKey });
+      // Les battements partent en % de la FC max que la montre applique (lib/coach/fcCible).
+      const ciblesFc = avecFcMaxMontre(ctx.ciblesFc, await fcMaxMontre({ athleteId, apiKey }));
       // Même règle que pour le calendrier : on ne pousse pas sur la montre une séance
       // pour un jour déjà couru. Elle y remplacerait, après coup, celle qui a servi.
       // ⚠️ CONFIRMED_DAYS compte des JOURS, pas des entrées. `slice(0, 5)` était juste
@@ -350,7 +353,7 @@ export async function autoCoachForUser(
       // doublent. On sélectionne donc les dates, puis toutes leurs séances.
       const datesConfirmees = [...new Set(week.map((x) => x.date))].sort().slice(0, CONFIRMED_DAYS);
       for (const d of week.filter((x) => x.date >= from && datesConfirmees.includes(x.date))) {
-        const built = buildWorkoutDescription(d.title, d.detail, `${d.type} ${d.tags.join(" ")}`, objectiveRace, ctx.vma, warmMin, coolMin, montre, ctx.ciblesFc);
+        const built = buildWorkoutDescription(d.title, d.detail, `${d.type} ${d.tags.join(" ")}`, objectiveRace, ctx.vma, warmMin, coolMin, montre, ciblesFc);
         // ⚠️ UN JOUR SANS SÉANCE COURABLE DOIT ÊTRE NETTOYÉ, PAS IGNORÉ. `continue` seul
         // laissait sur la montre la séance poussée la veille, quand ce jour portait encore
         // un footing. Résultat constaté le 31/08/2026 : plan « Repos », montre « Footing ».

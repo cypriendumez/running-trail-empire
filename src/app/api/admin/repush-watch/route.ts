@@ -2,7 +2,8 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { pushIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
+import { pushIntervalsWorkout, buildWorkoutDescription, fcMaxMontre, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
+import { avecFcMaxMontre } from "@/lib/coach/fcCible";
 import { ciblesFcPour } from "@/lib/coach/ciblesFcServeur";
 import { getEffectiveVma } from "@/lib/ai/coachContext";
 import { oneSessionPerSlot } from "@/lib/coach/sessions";
@@ -58,7 +59,7 @@ export async function POST(req: Request) {
   // Détection UNE fois : les séances repoussées partent en parallèle, un appel chacune
   // ferait autant de requêtes que de séances pour une réponse qui ne change pas.
   const montre = await litMontre({ athleteId, apiKey });
-  const ciblesFc = await ciblesFcPour(admin, user_id);
+  const ciblesFc = avecFcMaxMontre(await ciblesFcPour(admin, user_id), await fcMaxMontre({ athleteId, apiKey }));
   const results = await Promise.all(sessions.map(async (r) => {
     const d = (r.data ?? {}) as { date?: string; sessionType?: string; subtitle?: string };
     const date = String(d.date ?? "").slice(0, 10);

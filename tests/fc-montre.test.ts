@@ -11,7 +11,7 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { referencesFc, ciblesFcAthlete, footingTropIntense, plageFc, MARGE_FOOTING_DUR } from "../src/lib/coach/fcCible";
+import { referencesFc, ciblesFcAthlete, footingTropIntense, plageFc, MARGE_FOOTING_DUR, avecFcMaxMontre, plageEnPctMax } from "../src/lib/coach/fcCible";
 import { stepsForType, parseReps, buildWorkoutDescription } from "../src/lib/watch/intervals";
 
 let passed = 0; const fails: string[] = [];
@@ -25,6 +25,8 @@ const REFS = referencesFc({ maxObservee: 212, repos: 49 });
 // Ses footings d'octobre (FC moyennes), dont trois courus trop vite.
 const FOOTINGS = [143, 145, 170, 164, 166, 144, 156, 142, 150, 153, 140];
 const CIBLES = ciblesFcAthlete(REFS, FOOTINGS)!;
+// Telles qu'elles partent : avec la FC max réglée dans SON intervals.icu (212, relue le 07/11/2026).
+const MONTRE = avecFcMaxMontre(CIBLES, 212)!;
 
 console.log("\nLES CIBLES — mesurées, personnelles, larges de 10 battements");
 
@@ -64,58 +66,74 @@ test("le coach range ce footing parmi les séances dures, sauf au palier gratuit
   assert.ok(c.indexOf("const ciblesFc: CiblesFc") < c.indexOf("const isHardWk"), "les cibles doivent exister avant le classement des séances");
 });
 
-console.log("\nLA MONTRE REÇOIT DES BATTEMENTS");
+console.log("\nLA MONTRE REÇOIT DES BATTEMENTS — écrits comme intervals.icu les comprend");
 
-const etapes = (type: string, ciblesFc: typeof CIBLES | null, toutEnAllure = false, detail = "", reps: ReturnType<typeof parseReps> = null, pace: number | null = 292) =>
-  stepsForType(type, 50, 20.1, pace, 10, 10, reps, detail, toutEnAllure, ciblesFc) ?? "";
-
-test("footing sur Garmin : échauffement et retour au calme 133-143 bpm, corps 143-153 bpm", () => {
-  const s = etapes("Endurance", CIBLES);
-  assert.match(s, /^- 10m 133-143bpm Échauffement$/m);
-  assert.match(s, /^- \d+m 143-153bpm Endurance facile$/m);
-  assert.match(s, /^- 10m 133-143bpm Retour au calme$/m);
-  assert.doesNotMatch(s, /pace|Z\d HR/, "un footing mêle de nouveau allure ou zones larges");
+test("« 133-143bpm » n'est PAS compris par intervals.icu : on écrit des % de SA FC max, au dixième", () => {
+  // Vérifié le 07/11/2026 sur son compte : « - 8m 133-143bpm Échauffement » arrivait SANS cible,
+  // « - Échauffement 8m 62.7-67.5% HR » arrivait avec { hr: { start: 62.7, end: 67.5, units: "%hr" } }.
+  assert.equal(plageEnPctMax({ lo: 133, hi: 143 }, 212), "62.7-67.5% HR");
+  assert.equal(plageEnPctMax({ lo: 143, hi: 153 }, 212), "67.5-72.2% HR");
+  assert.equal(avecFcMaxMontre(CIBLES, null), null, "sans la FC max de la montre, on ne convertit pas");
+  assert.equal(avecFcMaxMontre(CIBLES, 60), null, "une FC max absurde ne sert pas de base");
+  assert.equal(avecFcMaxMontre(null, 212), null);
 });
 
-test("sortie longue et récupération aussi ; sans cibles, rien ne change", () => {
-  assert.match(etapes("Sortie longue", CIBLES), /143-153bpm Endurance facile/);
-  assert.match(etapes("Récup", CIBLES), /133-143bpm Récup/);
-  const sans = etapes("Endurance", null);
-  assert.match(sans, /Z1 HR Échauffement/);
-  assert.match(sans, /4:44-5:00 pace Endurance facile/, "sans cibles mesurées, le footing garde son allure");
+const etapes = (type: string, ciblesFc: typeof MONTRE | null, toutEnAllure = false, detail = "", reps: ReturnType<typeof parseReps> = null, pace: number | null = 292) =>
+  stepsForType(type, 50, 20.1, pace, 10, 10, reps, detail, toutEnAllure, ciblesFc) ?? "";
+
+test("footing sur Garmin : échauffement et retour au calme 133-143 bpm, corps 143-153 bpm, libellé lu par la montre", () => {
+  const s = etapes("Endurance", MONTRE);
+  assert.match(s, /^- Échauffement 10m 62\.7-67\.5% HR$/m);
+  assert.match(s, /^- Endurance facile \d+m 67\.5-72\.2% HR$/m);
+  assert.match(s, /^- Retour au calme 10m 62\.7-67\.5% HR$/m);
+  assert.doesNotMatch(s, /pace|Z\d HR|bpm/, "un footing mêle de nouveau allure, zones larges ou battements bruts");
+});
+
+test("sortie longue et récupération aussi ; sans cibles ou sans la FC max de la montre, rien ne change", () => {
+  assert.match(etapes("Sortie longue", MONTRE), /- Endurance facile \d+m 67\.5-72\.2% HR/);
+  assert.match(etapes("Récup", MONTRE), /- Récup \d+m 62\.7-67\.5% HR/);
+  for (const c of [null, CIBLES]) {
+    const sans = etapes("Endurance", c);
+    assert.match(sans, /Z1 HR Échauffement/);
+    assert.match(sans, /4:44-5:00 pace Endurance facile/, "sans FC max de la montre, le footing garde son allure");
+  }
 });
 
 test("séance de qualité : échauffement en battements, corps toujours à l'allure (10 s)", () => {
-  const s = etapes("Seuil", CIBLES, false, "", null, 228);
-  assert.match(s, /133-143bpm Échauffement/);
+  const s = etapes("Seuil", MONTRE, false, "", null, 228);
+  assert.match(s, /- Échauffement 10m 62\.7-67\.5% HR/);
   assert.match(s, /3:43-3:53 pace Seuil/, "le corps d'une qualité n'est plus à l'allure");
   const r = parseReps("6×1000 m à 3'20/km, récup 2 min", null);
-  const v = etapes("VMA", CIBLES, false, "", r, 200);
+  const v = etapes("VMA", MONTRE, false, "", r, 200);
   assert.match(v, /3:15-3:25 pace/);
-  assert.match(v, /133-143bpm Récup/, "les récups entre répétitions repassent en zone large");
+  assert.match(v, /62\.7-67\.5% HR Récup/, "les récups entre répétitions repassent en zone large");
 });
 
 test("hors Garmin (tout en allure), aucune étape en battements : mêler les deux y vide une étape", () => {
-  const s = etapes("Endurance", CIBLES, true);
-  assert.doesNotMatch(s, /bpm/);
+  assert.doesNotMatch(etapes("Endurance", MONTRE, true), /% HR|bpm/);
 });
 
 test("le vélo garde ses zones : une FC de course n'est pas une FC de vélo", () => {
-  assert.doesNotMatch(etapes("Vélo endurance", CIBLES), /bpm/);
+  assert.doesNotMatch(etapes("Vélo endurance", MONTRE), /% HR|bpm/);
 });
 
 test("de bout en bout : la séance du 11/11 partirait en battements sur sa Garmin", () => {
-  const b = buildWorkoutDescription("Footing en endurance", "Échauffement 5 min progressif FC Z1→Z2 → Corps : ~3,5 km (environ 20 min) en Z2 (~5'43/km) → Retour au calme 5 min FC Z1.", "endurance Endurance Z2", "sub 16 min", 20.1, 15, 10, "Garmin", CIBLES);
+  const b = buildWorkoutDescription("Footing en endurance", "Échauffement 5 min progressif FC Z1→Z2 → Corps : ~3,5 km (environ 20 min) en Z2 (~5'43/km) → Retour au calme 5 min FC Z1.", "endurance Endurance Z2", "sub 16 min", 20.1, 15, 10, "Garmin", MONTRE);
   assert.ok(b);
-  assert.match(b!.description, /^- 5m 133-143bpm Échauffement$/m);
-  assert.match(b!.description, /^- 20m 143-153bpm Endurance facile$/m);
+  assert.match(b!.description, /^- Échauffement 5m 62\.7-67\.5% HR$/m);
+  assert.match(b!.description, /^- Endurance facile 20m 67\.5-72\.2% HR$/m);
+  assert.doesNotMatch(b!.description, /\dbpm/, "des battements bruts, qu'intervals.icu ignore");
 });
 
-test("les quatre envois vers la montre passent les cibles", () => {
-  assert.match(code("src/lib/ai/autoCoach.ts"), /objectiveRace, ctx\.vma, warmMin, coolMin, montre, ctx\.ciblesFc\)/);
-  assert.match(code("src/app/api/admin/assign-session/route.ts"), /await litMontre\(\{ athleteId, apiKey \}\), await ciblesFcPour\(admin, user_id\)\)/);
-  assert.match(code("src/app/api/admin/publish-plan/route.ts"), /warmMin, coolMin, montre, ciblesFc\)/);
-  assert.match(code("src/app/api/admin/repush-watch/route.ts"), /warmMin, coolMin, montre, ciblesFc,/);
+test("les quatre envois vers la montre passent les cibles, avec la FC max de la montre", () => {
+  assert.match(code("src/lib/ai/autoCoach.ts"), /const ciblesFc = avecFcMaxMontre\(ctx\.ciblesFc, await fcMaxMontre\(\{ athleteId, apiKey \}\)\)/);
+  assert.match(code("src/lib/ai/autoCoach.ts"), /objectiveRace, ctx\.vma, warmMin, coolMin, montre, ciblesFc\)/);
+  assert.match(code("src/app/api/admin/assign-session/route.ts"), /avecFcMaxMontre\(await ciblesFcPour\(admin, user_id\), await fcMaxMontre\(\{ athleteId, apiKey \}\)\)\)/);
+  for (const f of ["src/app/api/admin/publish-plan/route.ts", "src/app/api/admin/repush-watch/route.ts"]) {
+    const c = code(f);
+    assert.match(c, /const ciblesFc = avecFcMaxMontre\(await ciblesFcPour\(admin, user_id\), await fcMaxMontre\(\{ athleteId, apiKey \}\)\)/, f);
+    assert.match(c, /warmMin, coolMin, montre, ciblesFc[,)]/, f);
+  }
   assert.match(code("src/lib/coach/ciblesFcServeur.ts"), /if \(profil\.error \|\| base\.error \|\| fcMax\.error \|\| footings\.error\) return null;/, "une lecture ratée fabriquerait des cibles");
 });
 

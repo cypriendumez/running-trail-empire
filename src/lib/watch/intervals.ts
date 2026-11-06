@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { MARCHE_ENCADRANTE_MIN } from "@/lib/coach/marcheCourse";
 import { enteteIntervals } from "@/lib/intervals/auth";
-import type { CiblesFc, PlageFc } from "@/lib/coach/fcCible";
+import { plageEnPctMax, type CiblesFc, type PlageFc } from "@/lib/coach/fcCible";
 
 const BASE = "https://intervals.icu/api/v1";
 
@@ -159,6 +159,23 @@ export function montreDe(athlete: Record<string, unknown>): { nom: string; derni
  */
 export function metriquesMixtesSupportees(montre: string | null): boolean {
   return montre === "Garmin";
+}
+
+/**
+ * La FC max de COURSE réglée dans intervals.icu — celle qu'il applique aux cibles « % HR ».
+ * `null` si illisible : les étapes repartent alors en zones, jamais sur une FC max supposée.
+ */
+export async function fcMaxMontre(opts: { athleteId: string; apiKey: string }): Promise<number | null> {
+  try {
+    const res = await fetch(`${BASE}/athlete/${opts.athleteId}`, { headers: authHeader(opts.apiKey), cache: "no-store" });
+    if (!res.ok) return null;
+    const a = (await res.json()) as { sportSettings?: { types?: string[]; max_hr?: number | null }[] };
+    const course = (a.sportSettings ?? []).find((x) => (x.types ?? []).includes("Run"));
+    const m = Number(course?.max_hr);
+    return Number.isFinite(m) && m > 100 && m < 240 ? m : null;
+  } catch {
+    return null;
+  }
 }
 
 /** État de la montre du client, lu sur l'API. `null` si indéterminable. */
@@ -394,8 +411,14 @@ export function etapesMarcheCourse(detail: string): string | null {
   return null;
 }
 
-/** Une étape pilotée en battements : « - 40m 143-153bpm Endurance facile » (syntaxe intervals.icu). */
-const etapeBpm = (durMin: number, pl: PlageFc, label: string) => `- ${Math.max(1, Math.round(durMin))}m ${pl.lo}-${pl.hi}bpm ${label}`;
+/**
+ * Une étape pilotée en battements, écrite comme intervals.icu la comprend :
+ * « - Endurance facile 40m 67.5-72.2% HR ». Le libellé AVANT la durée devient le texte que la
+ * montre affiche (après la cible, intervals.icu l'ignore) ; les battements en % de la FC max
+ * que la montre applique (`plageEnPctMax`) — « 143-153bpm » arrivait sans aucune cible.
+ */
+const etapeBpm = (durMin: number, pl: PlageFc, label: string, max: number) =>
+  `- ${label} ${Math.max(1, Math.round(durMin))}m ${plageEnPctMax(pl, max)}`;
 
 export function stepsForType(type: string, durationMin: number, vmaKmh?: number | null, mainPaceSec?: number | null, warmMin?: number | null, coolMin?: number | null, reps?: RepBlock | null, rawDetail?: string, toutEnAllure?: boolean, ciblesFc?: CiblesFc | null): string | null {
   const s = (type || "").toLowerCase();
@@ -435,8 +458,9 @@ export function stepsForType(type: string, durationMin: number, vmaKmh?: number 
    * Seulement là où la FC est déjà la cible (Garmin, métriques mixtes) : ailleurs, la séance
    * reste en allure de bout en bout — mêler les deux y vide une étape sur deux.
    */
-  const fc = !toutEnAllure ? (ciblesFc ?? null) : null;
-  const echauffement = (label: string, min: number) => fc ? etapeBpm(min, fc.recup, label) : zoneStep(min, 1, v, label, alluredouce, douxHr);
+  const fc = !toutEnAllure && ciblesFc?.maxMontre ? ciblesFc : null;
+  const maxFc = fc?.maxMontre ?? 0;
+  const echauffement = (label: string, min: number) => fc ? etapeBpm(min, fc.recup, label, maxFc) : zoneStep(min, 1, v, label, alluredouce, douxHr);
   /**
    * La plage d'allure douce, réutilisée pour les RÉCUPS entre répétitions.
    * On la relit sur l'étape d'échauffement plutôt que de recalculer : deux formules pour
@@ -445,7 +469,7 @@ export function stepsForType(type: string, durationMin: number, vmaKmh?: number 
    */
   const recupPace = toutEnAllure && !enCote
     ? (echauffement("x", 1).match(/\d+:\d+-\d+:\d+ pace/)?.[0] ?? null)
-    : fc ? `${fc.recup.lo}-${fc.recup.hi}bpm` : null;
+    : fc ? plageEnPctMax(fc.recup, maxFc) : null;
   /**
    * Durée du CORPS de séance, lue dans le texte du plan (« → Corps : … »).
    *
@@ -481,14 +505,14 @@ export function stepsForType(type: string, durationMin: number, vmaKmh?: number 
     // Récupération : pilotée à la FRÉQUENCE CARDIAQUE, comme l'annonce son propre texte
     // (« Z1 très facile »). Y mettre une cible d'allure transformait une séance de
     // récupération en séance à chrono — exactement ce qu'elle ne doit pas être.
-    if (fc) return [etapeBpm(warm, fc.recup, "Échauffement"), etapeBpm(main, fc.recup, "Récup"), etapeBpm(cool, fc.recup, "Retour au calme")].join("\n");
+    if (fc) return [etapeBpm(warm, fc.recup, "Échauffement", maxFc), etapeBpm(main, fc.recup, "Récup", maxFc), etapeBpm(cool, fc.recup, "Retour au calme", maxFc)].join("\n");
     return [zoneStep(warm, 1, v, "Échauffement", null, true), zoneStep(main, 1, v, "Récup", null, true), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
   }
   if (/long|endurance|footing|fond|easy/.test(s)) {
     const main = bodyMin ?? Math.max(15, d - warm - cool);
     // Footing et sortie longue : le corps à la FC quand on la connaît — l'endurance se règle
     // au cœur, pas au chrono ; l'allure prescrite reste dans la note de la séance.
-    const corps = fc ? etapeBpm(main, fc.endurance, "Endurance facile") : zoneStep(main, 2, v, "Endurance facile", p);
+    const corps = fc ? etapeBpm(main, fc.endurance, "Endurance facile", maxFc) : zoneStep(main, 2, v, "Endurance facile", p);
     return [echauffement("Échauffement", warm), corps, echauffement("Retour au calme", cool)].join("\n");
   }
   // Durée explicitement annoncée pour le CORPS de séance : sans ça, « 25 min d'un bloc »
@@ -512,7 +536,7 @@ export function stepsForType(type: string, durationMin: number, vmaKmh?: number 
     ].join("\n");
   }
   const main = Math.max(15, d - warm - cool);
-  const corps = fc ? etapeBpm(main, fc.endurance, "Endurance facile") : zoneStep(main, 2, v, "Endurance facile", p);
+  const corps = fc ? etapeBpm(main, fc.endurance, "Endurance facile", maxFc) : zoneStep(main, 2, v, "Endurance facile", p);
   return [echauffement("Échauffement", warm), corps, echauffement("Retour au calme", cool)].join("\n");
 }
 

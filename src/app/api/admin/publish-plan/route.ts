@@ -2,7 +2,8 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { pushIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
+import { pushIntervalsWorkout, buildWorkoutDescription, fcMaxMontre, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
+import { avecFcMaxMontre } from "@/lib/coach/fcCible";
 import { ciblesFcPour } from "@/lib/coach/ciblesFcServeur";
 import { getEffectiveVma } from "@/lib/ai/coachContext";
 import { estAdmin } from "@/lib/admin/acces";
@@ -99,7 +100,7 @@ export async function POST(req: Request) {
       // UNE lecture pour toute la semaine : la montre ne change pas d'une séance à l'autre.
       const montre = await litMontre({ athleteId, apiKey });
       // Les battements de l'athlète, lus une fois (lib/coach/ciblesFcServeur) : mêmes que ceux du coach.
-      const ciblesFc = await ciblesFcPour(admin, user_id);
+      const ciblesFc = avecFcMaxMontre(await ciblesFcPour(admin, user_id), await fcMaxMontre({ athleteId, apiKey }));
       const results = await Promise.all(sessions.filter((s) => s.date).map((s) => {
         const built = buildWorkoutDescription(String(s.title || s.type || "Séance"), String(s.detail || ""), String(s.type || ""), objectiveRace, vma, warmMin, coolMin, montre, ciblesFc);
         if (!built) return Promise.resolve(false);

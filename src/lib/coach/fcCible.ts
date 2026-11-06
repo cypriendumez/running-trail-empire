@@ -201,7 +201,27 @@ export type CiblesFc = {
   recup: PlageFc;
   /** FC moyenne à partir de laquelle une course compte comme une séance DURE. */
   plafondFooting: number;
+  /**
+   * La FC max réglée dans intervals.icu, lue au moment de l'envoi (`fcMaxMontre`).
+   * ⚠️ intervals.icu NE COMPREND PAS les battements absolus (« 133-143bpm » : vérifié le
+   * 07/11/2026, l'étape arrive sans cible). Il comprend « 62.7-67.5% HR », en % de SA FC max.
+   * Sans elle, aucune étape en battements : on ne convertit pas avec une FC max qui n'est
+   * pas celle que la montre appliquera.
+   */
+  maxMontre?: number | null;
 };
+
+/** Les cibles, avec la FC max qu'intervals.icu appliquera. `null` si l'une manque. */
+export function avecFcMaxMontre(cibles: CiblesFc | null, maxMontre: number | null): CiblesFc | null {
+  if (!cibles || !(maxMontre != null && Number.isFinite(maxMontre) && maxMontre > 100)) return null;
+  return { ...cibles, maxMontre };
+}
+
+/** Une plage en battements, écrite en % de la FC max de la montre, au dixième (≈ 0,2 bpm). */
+export function plageEnPctMax(pl: PlageFc, max: number): string {
+  const pct = (b: number) => Math.round((b / max) * 1000) / 10;
+  return `${pct(pl.lo)}-${pct(pl.hi)}% HR`;
+}
 
 /**
  * Les cibles de FC d'un athlète, ou `null`.
