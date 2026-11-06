@@ -1,4 +1,5 @@
 import type { createClient } from "@/lib/supabase/server";
+import { referencesFc, ciblesFcAthlete, footingTropIntense, type CiblesFc } from "@/lib/coach/fcCible";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
 import { menuSelonDenivele, preferenceDenivele } from "@/lib/coach/denivele";
@@ -298,6 +299,12 @@ export type AthleteContext = {
   heatAcclim: { hotDays: number; factor: number; label: string };
   /** % du temps passé en Z3+ s'il dépasse la cible (footings trop rapides), sinon null. */
   tooMuchIntensity: number | null;
+  /**
+   * Les cibles de FC MESURÉES de l'athlète (`ciblesFcAthlete`) : battements envoyés à la
+   * montre pour l'endurance et la récupération, et plafond au-delà duquel un footing compte
+   * comme une séance dure. `null` sans FC max mesurée, et pour le palier gratuit.
+   */
+  ciblesFc: CiblesFc | null;
   /** true si l'athlète s'entraîne réellement en terrain vallonné (D+ hebdo significatif). */
   hillyTraining: boolean;
   /** Allure seuil MESURÉE (min/km) issue de la vitesse critique, si disponible. */
@@ -611,10 +618,32 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const fcMaxEst = (maxHrDeclare != null || obsMaxHr0 > 150)
     ? Math.max(maxHrDeclare ?? 0, obsMaxHr0 > 150 ? obsMaxHr0 : 0)
     : (num(p?.age) != null ? 220 - (num(p?.age) as number) : 190);
+  // ── LES CIBLES DE FC MESURÉES (07/11/2026) ─────────────────────────────────
+  // FC max réellement atteinte ou déclarée, FC de repos déclarée sinon celle de la montre,
+  // seuil mesuré. Les footings récents (≥ 20 min, 60 jours) servent à suivre l'athlète
+  // qui court PLUS facile que la théorie (`cibleEndurance`). Rien pour le palier gratuit :
+  // il ne lit aucune fréquence cardiaque.
+  const ciblesFc: CiblesFc | null = objectifSeul ? null : ciblesFcAthlete(
+    referencesFc({
+      maxDeclaree: maxHrDeclare, maxObservee: obsMaxHr0,
+      repos: num(b?.resting_hr) ?? num(p?.resting_hr) ?? num((((p as Record<string, unknown> | null)?.garmin_metrics) as Record<string, unknown> | null)?.restingHR),
+      seuil: num(b?.lt_hr),
+    }),
+    workouts.filter((w) => isRun(w.sport) && !isHardType(w.type) && (num(w.duration_seconds) ?? 0) >= 20 * 60
+      && now - new Date(String(w.date).slice(0, 10) + "T12:00:00Z").getTime() <= 60 * 86400000)
+      .map((w) => num(w.avg_hr)).filter((v): v is number => v != null),
+  );
   // Une séance est « dure » si son TYPE le dit OU si la FC révèle un effort élevé (≥ 90 % FCmax).
   // ⚠️ `isHardType` ne suffit PAS : mesuré sur 60 séances de ce compte, intervals.icu
   // n'émet que deux étiquettes, « easy » et « trail ». La FC est donc le seul juge réel.
-  const isHardWk = (w: Wk) => isHardType(w.type) || (fcMaxEst != null && w.avg_hr != null && w.avg_hr >= fcMaxEst * PART_FC_DURE);
+  // ⚠️ ET LE FOOTING COURU TROP VITE (07/11/2026). Le seul seuil « dur » était 85 % de la FC
+  // max : 180 bpm pour une FC max de 212. Un « Footing en endurance » couru à 170 bpm (relevé
+  // le 09/10 sur le compte de Cyprien) passait pour facile, et le plan pouvait placer une VMA
+  // le lendemain. Au-delà du haut de sa zone d'endurance + 5 bpm (`ciblesFcAthlete`), une
+  // course de 20 min et plus compte comme une séance dure : 48 h avant la prochaine qualité,
+  // et elle entre dans le budget de la semaine (`qualiteRecente`).
+  const isHardWk = (w: Wk) => isHardType(w.type) || (fcMaxEst != null && w.avg_hr != null && w.avg_hr >= fcMaxEst * PART_FC_DURE)
+    || (isRun(w.sport) && footingTropIntense(w.avg_hr, w.duration_seconds, ciblesFc));
   const hardShare = recent14.length ? Math.round(recent14.filter(isHardWk).length / recent14.length * 100) : null;
   // ── LE VRAI 80/20 : en TEMPS passé par zone, pas en nombre de séances ──
   // Compter les séances est trompeur : deux fractionnés courts dans une semaine de
@@ -2464,6 +2493,7 @@ ${catalog}`;
     warmCool: warmCoolMin(num(p?.warmup_min), num(p?.cooldown_min)),
     heatAcclim,
     tooMuchIntensity: hardTimePct != null && hardTimePct > 25 ? hardTimePct : null,
+    ciblesFc,
     hillyTraining: elevWeek >= 400 || terr.paceMeaningless || preferenceDenivele(p?.elevation_pref) === "specialiste",
     thresholdPace,
     macroPlan,

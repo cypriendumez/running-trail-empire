@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { MARCHE_ENCADRANTE_MIN } from "@/lib/coach/marcheCourse";
 import { enteteIntervals } from "@/lib/intervals/auth";
+import type { CiblesFc, PlageFc } from "@/lib/coach/fcCible";
 
 const BASE = "https://intervals.icu/api/v1";
 
@@ -393,7 +394,10 @@ export function etapesMarcheCourse(detail: string): string | null {
   return null;
 }
 
-export function stepsForType(type: string, durationMin: number, vmaKmh?: number | null, mainPaceSec?: number | null, warmMin?: number | null, coolMin?: number | null, reps?: RepBlock | null, rawDetail?: string, toutEnAllure?: boolean): string | null {
+/** Une étape pilotée en battements : « - 40m 143-153bpm Endurance facile » (syntaxe intervals.icu). */
+const etapeBpm = (durMin: number, pl: PlageFc, label: string) => `- ${Math.max(1, Math.round(durMin))}m ${pl.lo}-${pl.hi}bpm ${label}`;
+
+export function stepsForType(type: string, durationMin: number, vmaKmh?: number | null, mainPaceSec?: number | null, warmMin?: number | null, coolMin?: number | null, reps?: RepBlock | null, rawDetail?: string, toutEnAllure?: boolean, ciblesFc?: CiblesFc | null): string | null {
   const s = (type || "").toLowerCase();
   // ⚠️ BORNÉ EN HAUT AUSSI. `durationForType` plafonne à 90 min, mais la durée peut venir
   // du TEXTE de la séance (`parseDurationMin`), qui est de la prose : « 600 min » y passait
@@ -423,7 +427,16 @@ export function stepsForType(type: string, durationMin: number, vmaKmh?: number 
   const enCote = /c[ôo]te|mont[ée]e|hill/.test(`${s} ${(rawDetail || "").toLowerCase()}`);
   const douxHr = !toutEnAllure || enCote;
   const alluredouce = toutEnAllure && !v && p ? p + 60 : null;
-  const echauffement = (label: string, min: number) => zoneStep(min, 1, v, label, alluredouce, douxHr);
+  /**
+   * ⚠️ DES BATTEMENTS, PLUS DES « ZONES » (07/11/2026). « Z1 HR » renvoyait aux zones réglées
+   * dans intervals.icu, larges d'une vingtaine de battements : la montre ne sonnait qu'au
+   * bout du compte. Quand les cibles de l'athlète sont MESURÉES (`ciblesFcAthlete`), les
+   * étapes douces partent en fenêtre de 10 bpm, et le corps d'un footing aussi.
+   * Seulement là où la FC est déjà la cible (Garmin, métriques mixtes) : ailleurs, la séance
+   * reste en allure de bout en bout — mêler les deux y vide une étape sur deux.
+   */
+  const fc = !toutEnAllure ? (ciblesFc ?? null) : null;
+  const echauffement = (label: string, min: number) => fc ? etapeBpm(min, fc.recup, label) : zoneStep(min, 1, v, label, alluredouce, douxHr);
   /**
    * La plage d'allure douce, réutilisée pour les RÉCUPS entre répétitions.
    * On la relit sur l'étape d'échauffement plutôt que de recalculer : deux formules pour
@@ -432,7 +445,7 @@ export function stepsForType(type: string, durationMin: number, vmaKmh?: number 
    */
   const recupPace = toutEnAllure && !enCote
     ? (echauffement("x", 1).match(/\d+:\d+-\d+:\d+ pace/)?.[0] ?? null)
-    : null;
+    : fc ? `${fc.recup.lo}-${fc.recup.hi}bpm` : null;
   /**
    * Durée du CORPS de séance, lue dans le texte du plan (« → Corps : … »).
    *
@@ -468,11 +481,15 @@ export function stepsForType(type: string, durationMin: number, vmaKmh?: number 
     // Récupération : pilotée à la FRÉQUENCE CARDIAQUE, comme l'annonce son propre texte
     // (« Z1 très facile »). Y mettre une cible d'allure transformait une séance de
     // récupération en séance à chrono — exactement ce qu'elle ne doit pas être.
+    if (fc) return [etapeBpm(warm, fc.recup, "Échauffement"), etapeBpm(main, fc.recup, "Récup"), etapeBpm(cool, fc.recup, "Retour au calme")].join("\n");
     return [zoneStep(warm, 1, v, "Échauffement", null, true), zoneStep(main, 1, v, "Récup", null, true), zoneStep(cool, 1, v, "Retour au calme", null, true)].join("\n");
   }
   if (/long|endurance|footing|fond|easy/.test(s)) {
     const main = bodyMin ?? Math.max(15, d - warm - cool);
-    return [echauffement("Échauffement", warm), zoneStep(main, 2, v, "Endurance facile", p), echauffement("Retour au calme", cool)].join("\n");
+    // Footing et sortie longue : le corps à la FC quand on la connaît — l'endurance se règle
+    // au cœur, pas au chrono ; l'allure prescrite reste dans la note de la séance.
+    const corps = fc ? etapeBpm(main, fc.endurance, "Endurance facile") : zoneStep(main, 2, v, "Endurance facile", p);
+    return [echauffement("Échauffement", warm), corps, echauffement("Retour au calme", cool)].join("\n");
   }
   // Durée explicitement annoncée pour le CORPS de séance : sans ça, « 25 min d'un bloc »
   // se retrouvait amputé de l'échauffement et arrivait à 10 min sur la montre.
@@ -495,7 +512,8 @@ export function stepsForType(type: string, durationMin: number, vmaKmh?: number 
     ].join("\n");
   }
   const main = Math.max(15, d - warm - cool);
-  return [echauffement("Échauffement", warm), zoneStep(main, 2, v, "Endurance facile", p), echauffement("Retour au calme", cool)].join("\n");
+  const corps = fc ? etapeBpm(main, fc.endurance, "Endurance facile") : zoneStep(main, 2, v, "Endurance facile", p);
+  return [echauffement("Échauffement", warm), corps, echauffement("Retour au calme", cool)].join("\n");
 }
 
 // Crée (en remplaçant l'éventuelle séance coach déjà présente) une séance dans le
@@ -631,6 +649,8 @@ export function buildWorkoutDescription(
    * `null`/absent ⇒ on garde le comportement Garmin, le seul qui soit prouvé en production.
    */
   montre?: string | null,
+  /** Cibles de FC MESURÉES de l'athlète (`ciblesFcAthlete`) ; absentes → zones d'intervals.icu. */
+  ciblesFc?: CiblesFc | null,
 ): { name: string; description: string; sport: "Run" | "Ride" } | null {
   const dur = parseDurationMin(`${title} ${detail} ${type}`) ?? durationForType(type);
   const mainPaceSec = parsePaceSec(`${title} ${detail}`);
@@ -661,7 +681,7 @@ export function buildWorkoutDescription(
   const eTexte = Number(detail.match(/Échauffement (\d{1,2}) min/)?.[1]);
   const kTexte = Number(detail.match(/Retour au calme (\d{1,2}) min/)?.[1]);
   const steps = stepsForType(type, dur, vmaKmh, mainPaceSec,
-    eTexte > 0 ? eTexte : warmMin, kTexte > 0 ? kTexte : coolMin, reps, detail, toutEnAllure);
+    eTexte > 0 ? eTexte : warmMin, kTexte > 0 ? kTexte : coolMin, reps, detail, toutEnAllure, ciblesFc);
   if (!steps) return null;
   // Séance vélo (cross-training) → exporte un workout "Ride" sur la montre (sinon "Run").
   const isBike = /vélo|velo|bike|cycl|home ?trainer|\bride\b/i.test(`${title} ${type}`);

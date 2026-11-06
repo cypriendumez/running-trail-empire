@@ -177,3 +177,59 @@ export function cibleEndurance(refs: ReferencesFc, observees: readonly number[],
   const demi = Math.max(2, Math.min(LARGEUR_MAX, Math.round(largeur)) / 2);
   return borner({ lo: Math.round(centre - demi), hi: Math.round(centre + demi) }, refs);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  LES CIBLES DE FC ENVOYÉES À LA MONTRE, ET LE FOOTING « TROP INTENSE » (07/11/2026)
+//
+//  Cyprien : « est-ce que pour la fréquence cardiaque tu peux faire de même, ajuster s'il y
+//  a des différences trop majeures lors des séances ». Mesuré sur ses séances d'octobre :
+//  des « Footing en endurance » courus à 164, 166 et 170 bpm, comptés FACILES par le plan
+//  (le seul seuil « dur » était 85 % de la FC max, 180 bpm chez lui), et une montre qui ne
+//  recevait que « Z1 HR / Z2 HR » — les zones d'intervals.icu, larges d'une vingtaine de
+//  battements. Deux décisions, une seule source de chiffres :
+//   · la MONTRE reçoit des battements précis (10 bpm) pour l'endurance et la récupération ;
+//   · le PLAN compte comme dur un footing couru nettement au-dessus de l'endurance.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Battements au-dessus du haut de la zone d'endurance au-delà desquels un footing est « dur ». */
+export const MARGE_FOOTING_DUR = 5;
+
+export type CiblesFc = {
+  /** Corps d'un footing ou d'une sortie longue — suit l'athlète vers le BAS (`cibleEndurance`). */
+  endurance: PlageFc;
+  /** Échauffement, retour au calme, récupération et récups entre répétitions. */
+  recup: PlageFc;
+  /** FC moyenne à partir de laquelle une course compte comme une séance DURE. */
+  plafondFooting: number;
+};
+
+/**
+ * Les cibles de FC d'un athlète, ou `null`.
+ *
+ * ⚠️ SEULEMENT SUR DES MESURES. Une FC max tirée de l'âge (220 − âge) se trompe de ±10 à
+ * 12 bpm pour un individu : la montre ferait alors sonner un athlète sur une zone qui n'est
+ * pas la sienne. Sans FC max mesurée (ou seuil mesuré), on garde les zones d'intervals.icu.
+ *
+ * `footings` : FC moyennes de ses footings récents. Le plafond, lui, reste THÉORIQUE : le
+ * caler sur ses footings (qui peuvent être trop rapides) validerait l'erreur à corriger.
+ */
+export function ciblesFcAthlete(refs: ReferencesFc, footings: readonly number[]): CiblesFc | null {
+  if (refs.source !== "mesures" && refs.source !== "seuil") return null;
+  const theorique = plageFc("endurance", refs);
+  const recupTheorique = plageFc("recup", refs);
+  if (!theorique || !recupTheorique) return null;
+  const plafondFooting = theorique.hi + MARGE_FOOTING_DUR;
+  // Les footings trop intenses ne déplacent pas la cible : ce sont eux qu'on veut corriger.
+  const endurance = cibleEndurance(refs, footings.filter((v) => v < plafondFooting)) ?? theorique;
+  // La récupération reste SOUS l'endurance : une récup plus haute que le footing est absurde.
+  const hi = Math.min(recupTheorique.hi, endurance.lo);
+  const plancher = refs.repos != null ? refs.repos + 10 : 90;
+  const recup = { lo: Math.max(plancher, hi - 10), hi: Math.max(plancher + 4, hi) };
+  return { endurance, recup, plafondFooting };
+}
+
+/** Une course de plus de 20 min dont la FC moyenne atteint le plafond est une séance dure. */
+export function footingTropIntense(fcMoyenne: unknown, dureeSec: unknown, cibles: CiblesFc | null): boolean {
+  const fc = Number(fcMoyenne), sec = Number(dureeSec);
+  return !!cibles && fcMoyenne != null && Number.isFinite(fc) && Number.isFinite(sec) && sec >= 20 * 60 && fc >= cibles.plafondFooting;
+}

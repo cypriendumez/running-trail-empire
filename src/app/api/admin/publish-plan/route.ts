@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { pushIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
+import { ciblesFcPour } from "@/lib/coach/ciblesFcServeur";
 import { getEffectiveVma } from "@/lib/ai/coachContext";
 import { estAdmin } from "@/lib/admin/acces";
 import { identifiantsDe } from "@/lib/intervals/identifiants";
@@ -97,8 +98,10 @@ export async function POST(req: Request) {
       await ensureRunThresholdPace({ athleteId, apiKey, vmaKmh: vma }); // pour que Garmin transmette l'allure
       // UNE lecture pour toute la semaine : la montre ne change pas d'une séance à l'autre.
       const montre = await litMontre({ athleteId, apiKey });
+      // Les battements de l'athlète, lus une fois (lib/coach/ciblesFcServeur) : mêmes que ceux du coach.
+      const ciblesFc = await ciblesFcPour(admin, user_id);
       const results = await Promise.all(sessions.filter((s) => s.date).map((s) => {
-        const built = buildWorkoutDescription(String(s.title || s.type || "Séance"), String(s.detail || ""), String(s.type || ""), objectiveRace, vma, warmMin, coolMin, montre);
+        const built = buildWorkoutDescription(String(s.title || s.type || "Séance"), String(s.detail || ""), String(s.type || ""), objectiveRace, vma, warmMin, coolMin, montre, ciblesFc);
         if (!built) return Promise.resolve(false);
         return pushIntervalsWorkout({ athleteId, apiKey, userId: user_id, name: built.name, date: String(s.date).slice(0, 10), description: built.description, sport: built.sport }).then((r) => r.ok);
       }));

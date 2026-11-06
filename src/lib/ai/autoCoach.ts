@@ -350,7 +350,7 @@ export async function autoCoachForUser(
       // doublent. On sélectionne donc les dates, puis toutes leurs séances.
       const datesConfirmees = [...new Set(week.map((x) => x.date))].sort().slice(0, CONFIRMED_DAYS);
       for (const d of week.filter((x) => x.date >= from && datesConfirmees.includes(x.date))) {
-        const built = buildWorkoutDescription(d.title, d.detail, `${d.type} ${d.tags.join(" ")}`, objectiveRace, ctx.vma, warmMin, coolMin, montre);
+        const built = buildWorkoutDescription(d.title, d.detail, `${d.type} ${d.tags.join(" ")}`, objectiveRace, ctx.vma, warmMin, coolMin, montre, ctx.ciblesFc);
         // ⚠️ UN JOUR SANS SÉANCE COURABLE DOIT ÊTRE NETTOYÉ, PAS IGNORÉ. `continue` seul
         // laissait sur la montre la séance poussée la veille, quand ce jour portait encore
         // un footing. Résultat constaté le 31/08/2026 : plan « Repos », montre « Footing ».
