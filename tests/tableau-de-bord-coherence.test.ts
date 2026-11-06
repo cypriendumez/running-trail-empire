@@ -16,7 +16,7 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { statsVfc, etatDuJour, etatPhysiologique } from "../src/lib/dashboard/discipline";
+import { statsVfc, etatDuJour, etatPhysiologique, computeDiscipline } from "../src/lib/dashboard/discipline";
 import { computeForme } from "../src/lib/dashboard/forme";
 import { T } from "../src/lib/i18n/translations";
 import { computeStreak } from "../src/lib/streak/compute";
@@ -112,18 +112,15 @@ test("« Voir les recommandations » ouvre les conseils de CE score, pas le Kin�
     "la section Conseils n'a plus d'ancre : le bouton tombe en haut de page");
 });
 
-test("le titre de la carte suit l'état du jour, dans les cinq langues", () => {
-  // « Prêt à performer » était écrit en dur, au-dessus de « Récupération… pas d'intensité ».
-  assert.doesNotMatch(BENTO, /\{rl\.ready\}/, "le titre figé « Prêt à performer » revient");
-  assert.match(BENTO, /\(TITRES_ETAT\[lang\] \?\? TITRES_ETAT\.fr\)\[readiness\.cle\]/);
-  const table = BENTO.slice(BENTO.indexOf("const TITRES_ETAT"), BENTO.indexOf("};", BENTO.indexOf("const TITRES_ETAT")));
-  const cles = ["dash.ready.recup", "dash.ready.rest", "dash.ready.top", "dash.ready.topSansQualite", "dash.ready.ok", "dash.ready.none"];
-  for (const lang of ["fr", "en", "de", "es", "pt"]) {
-    const ligne = table.split("\n").find((l) => l.trim().startsWith(`${lang}: {`)) ?? "";
-    for (const c of cles) assert.ok(ligne.includes(`"${c}":`), `${c} sans titre en ${lang}`);
-  }
-  assert.match(table, /fr: \{ "dash\.ready\.recup": "En récupération"/, "en récupération, la carte ne le dit plus");
-  assert.match(BENTO, /return \{ accent: "#0d9488", tagline: phrase, cle \};/);
+test("la carte du rail montre les trois composantes, plus la phrase de l'en-tête", () => {
+  // 06/11/2026 : elle répétait mot pour mot « Récupération après Marathon… » du haut de page,
+  // et rien n'y expliquait le pourcentage.
+  const rail = BENTO.slice(BENTO.indexOf('<VersFiche cle="discipline"'), BENTO.indexOf("{rl.recommend}"));
+  assert.ok(rail.length > 0, "carte du rail introuvable");
+  assert.doesNotMatch(rail, /readiness\.tagline/, "la carte répète de nouveau la phrase de l'en-tête");
+  for (const c of ["precision", "consistency", "recovery"]) assert.ok(rail.includes(`["dash.discipline.${c}", disc.${c}]`), `composante ${c} absente de la carte`);
+  assert.match(rail, /valeur == null \? "—" : `\$\{valeur\} %`/, "une composante sans mesure s'affiche comme un nombre");
+  for (const lang of ["fr", "en", "de", "es", "pt"] as const) assert.ok((T[lang] as Record<string, string>)["dash.discipline.absent"], `dash.discipline.absent manque en ${lang}`);
 });
 
 console.log("\nLA SÉRIE");
@@ -174,16 +171,74 @@ test("l'objectif n'est plus répété dans le rail, et sa fiche reste accessible
   for (const lang of ["fr", "en", "de", "es", "pt"] as const) assert.ok((T[lang] as Record<string, string>)["obj.ouJenSuis"], `obj.ouJenSuis manque en ${lang}`);
 });
 
+console.log("\nLE SCORE DISCIPLINE");
+
+// Le compte réel au 06/11/2026 : séances du 24 et du 25/10 (marathon), VFC du 30/10,
+// série telle que la juge lib/streak (récupérations au repos = tenues).
+const SEANCES_REELLES = [
+  { date: "2026-10-24", sport: "run", type: "easy", distance_km: 5.3, duration_seconds: 1740, avg_hr: 145 },
+  { date: "2026-10-25", sport: "run", type: "race", distance_km: 42.47, duration_seconds: 9696, avg_hr: 189, hr_zone_seconds: [0, 0, 600, 4000, 4500, 600] },
+  { date: "2026-10-25", sport: "run", type: "easy", distance_km: 2.1, duration_seconds: 900, avg_hr: 134 },
+] as never[];
+const VFC_PERIMEE = [87, 91, 81, 87, 84, 90, 86].map((v, i) => ({ date: `2026-10-${30 - i}`, hrv_ms: v })) as never[];
+const SERIE_REELLE = [["24", "tenu"], ["25", "tenu"], ["26", "tenu"], ["27", "tenu"], ["28", "rompu"], ["29", "rompu"], ["30", "rompu"], ["31", "tenu"]]
+  .map(([j, v]) => ({ date: `2026-10-${j}`, verdict: v }))
+  .concat([["01", "rompu"], ["02", "rompu"], ["03", "attente"], ["04", "attente"], ["05", "tenu"], ["06", "attente"]].map(([j, v]) => ({ date: `2026-11-${j}`, verdict: v })));
+
+test("le compte réel : l'assiduité suit le plan, la VFC périmée ne compte plus, rien n'est inventé", () => {
+  const d = computeDiscipline(SEANCES_REELLES, VFC_PERIMEE, null, "optimal", { aujourdhui: "2026-11-06", serie: SERIE_REELLE });
+  assert.equal(d.details.jugees, 11, "les journées en attente ne se jugent pas");
+  assert.equal(d.consistency, 55, `assiduité ${d.consistency} : 6 tenues sur 11 jugées`);
+  assert.equal(d.recovery, null, `récupération ${d.recovery} tirée d'une VFC vieille d'une semaine`);
+  assert.equal(d.precision, 71);
+  assert.equal(d.total, 63, `total ${d.total} : (40 × 71 + 40 × 55) ÷ 80`);
+});
+
+test("une journée protégée tient l'assiduité ; sans plan ni mesure, on n'invente pas de composante", () => {
+  const serie = [{ date: "2026-11-01", verdict: "protege" }, { date: "2026-11-02", verdict: "rompu" }, { date: "2026-11-03", verdict: "hors" }];
+  assert.equal(computeDiscipline([], [], null, "optimal", { aujourdhui: "2026-11-06", serie }).consistency, 50);
+  const vide = computeDiscipline([], [], null, "optimal", { aujourdhui: "2026-11-06" });
+  assert.equal(vide.consistency, null, "assiduité sans plan : la cible de 8 séances est revenue");
+  assert.equal(vide.recovery, null, "récupération sans mesure : la valeur par défaut est revenue");
+  assert.equal(vide.hasData, false);
+  assert.doesNotMatch(codeNu("src/lib/dashboard/discipline.ts"), /stateBaseline|weeklyTarget/, "une valeur par défaut revient dans le score");
+});
+
+test("la fenêtre de 14 jours se compte en jours civils de l'athlète", () => {
+  const w = [{ date: "2026-10-24", sport: "run", type: "easy", duration_seconds: 1800 }, { date: "2026-10-23", sport: "run", type: "easy", duration_seconds: 1800 }] as never[];
+  assert.equal(computeDiscipline(w, [], null, "optimal", { aujourdhui: "2026-11-06" }).details.seances, 1, "le 23/10 est dans la fenêtre du 06/11");
+  assert.equal(computeDiscipline(w, [], null, "optimal", { aujourdhui: "2026-11-05" }).details.seances, 2);
+  assert.doesNotMatch(codeNu("src/lib/dashboard/discipline.ts"), /now - new Date\(w\.date\)/, "la fenêtre suit de nouveau l'horloge de la machine");
+});
+
+test("score de forme : une composante absente est écartée de la moyenne, pas comptée zéro", () => {
+  const w = Array.from({ length: 12 }, (_, i) => ({ date: `2026-10-${String(10 + i * 2).padStart(2, "0")}`, sport: "run", distance_km: 12 }));
+  const sans = computeForme(w, 18, null, null, null, "2026-11-06");
+  assert.equal(sans.total, Math.round((sans.endurance + sans.speed) / 2), `total ${sans.total} : les absentes ont tiré la moyenne vers le bas`);
+  const avec = computeForme(w, 18, 60, 40, null, "2026-11-06");
+  assert.equal(avec.total, Math.round((avec.endurance + avec.speed + 60 + 40) / 4));
+});
+
+test("une VFC fraîche compte encore", () => {
+  const fraiche = [88, 84, 86, 85].map((v, i) => ({ date: `2026-11-0${6 - i}`, hrv_ms: v })) as never[];
+  const d = computeDiscipline([], fraiche, { sleep_score: 80 }, "optimal", { aujourdhui: "2026-11-06" });
+  assert.ok(d.recovery != null && d.details.signalVfc != null, "une VFC du jour est ignorée");
+});
+
 console.log("\nCRASH-TEST DU SCORE DE FORME");
 
 test("aucune entrée absurde ne fait sortir un axe de 0–100 ni n'en fait un NaN", () => {
   const seances = [[], [{ date: "2026-11-05", sport: "run", distance_km: Number.NaN }], [{ date: "x", sport: "run", distance_km: -5 }],
     Array.from({ length: 200 }, (_, i) => ({ date: `2026-10-${String((i % 28) + 1).padStart(2, "0")}`, sport: "run", distance_km: 1000 }))];
   const objectifs = [null, { distanceKm: 0, targetSeconds: 0 }, { distanceKm: 5, targetSeconds: 1 }, { distanceKm: Number.NaN, targetSeconds: Number.NaN }, { distanceKm: 1000, targetSeconds: 100 }];
-  for (const w of seances) for (const vma of [0, -3, Number.NaN, 20.1, 1e9]) for (const o of objectifs) for (const r of [-50, 72, 500, Number.NaN]) {
+  for (const w of seances) for (const vma of [0, -3, Number.NaN, 20.1, 1e9]) for (const o of objectifs) for (const r of [-50, 72, 500, Number.NaN, null]) {
     const f = computeForme(w, vma, r, r, o, "2026-11-05");
-    for (const c of ["total", "endurance", "speed", "recovery", "regularity"] as const)
-      assert.ok(f[c] >= 0 && f[c] <= 100, `${c} = ${f[c]} (vma ${vma}, r ${r}, objectif ${JSON.stringify(o)})`);
+    for (const c of ["total", "endurance", "speed", "recovery", "regularity"] as const) {
+      const v = f[c];
+      // Absente si et seulement si elle manquait à l'entrée : jamais inventée, jamais perdue.
+      if (r === null && (c === "recovery" || c === "regularity")) { assert.equal(v, null, `${c} inventée : ${v}`); continue; }
+      assert.ok(v != null && v >= 0 && v <= 100, `${c} = ${v} (vma ${vma}, r ${r}, objectif ${JSON.stringify(o)})`);
+    }
   }
 });
 

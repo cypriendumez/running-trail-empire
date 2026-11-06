@@ -8,17 +8,16 @@
  */
 import type { HRVData, Workout } from "@/types";
 import { ZONE_NORMALE_VFC } from "@/lib/health/vfc";
-import { ageJours } from "./fenetre";
+import { ageJours, dansFenetre } from "./fenetre";
+import { jourLocal } from "@/lib/streak/compute";
 
 export const DISCIPLINE_CONFIG = {
   weights: { precision: 0.4, consistency: 0.4, recovery: 0.2 }, // somme = 1
   windowDays: 14,            // fenêtre d'analyse (lisse le bruit d'une semaine isolée)
-  weeklyTarget: 4,           // séances/semaine visées (Assiduité)
   easyShareTarget: 0.8,      // 80 % facile / 20 % qualité (modèle polarisé)
   penaltyTooHard: 220,       // trop d'intensité = pénalité forte (risque surcharge/blessure)
   penaltyTooEasy: 120,       // trop facile = pénalité plus douce (annulée en semaine de récup)
   minForPrecision: 3,        // sous ce nombre de séances, la Précision est peu fiable
-  stateBaseline: { optimal: 85, competition: 80, recovery: 55 } as Record<string, number>,
 };
 
 const clamp = (n: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, n));
@@ -106,58 +105,78 @@ export function etatPhysiologique(hrv: readonly Pick<HRVData, "date" | "hrv_ms" 
   return (statsVfc(hrv, maintenant, aujourdhui).fraiche ? hrv[0]?.physiological_state : null) ?? "optimal";
 }
 
+/** Une journée telle que la série l'a jugée (lib/streak) : seul ce que l'assiduité lit. */
+export type JourJuge = { date: string; verdict: string };
+
+/**
+ * LE SCORE DISCIPLINE, REFAIT LE 06/11/2026 — trois défauts constatés sur un vrai compte
+ * (J+12 d'un marathon, 58 %) :
+ *  · ASSIDUITÉ = séances ÷ 8, pour tout le monde. Pendant la récupération prescrite par le
+ *    coach, l'athlète était compté en retard parce qu'il ne courait pas quatre fois par
+ *    semaine. Elle mesure désormais ce que le coach a DEMANDÉ : journées tenues ÷ journées
+ *    jugées, avec les règles de la série (repos prescrit ou proposé = tenu).
+ *  · RÉCUPÉRATION sur une VFC vieille d'une semaine, et 85 inventés sans aucune mesure
+ *    (`stateBaseline`). Elle ne lit plus que des mesures FRAÎCHES (2 jours) ; sans mesure,
+ *    elle vaut `null` et le total se calcule sur les composantes mesurées.
+ *  · FENÊTRE sur l'horloge de la machine : le chiffre pouvait différer d'un point entre le
+ *    serveur et le navigateur autour de minuit. Elle se compte en jours CIVILS.
+ * Une composante `null` n'est pas un zéro : elle est absente, et le dire est l'affaire de
+ * l'écran.
+ */
 export function computeDiscipline(
   workouts: Workout[], hrv: HRVData[],
   sleep: { sleep_score: number } | null, state: string,
+  opts: { aujourdhui?: string; serie?: readonly JourJuge[] | null } = {},
 ): {
-  total: number; precision: number; consistency: number; recovery: number; hasData: boolean;
+  total: number; precision: number | null; consistency: number | null; recovery: number | null; hasData: boolean;
   /** Les valeurs intermédiaires, montrées par la page détaillée (/dashboard/indicateurs/discipline). */
-  details: { seances: number; faciles: number; qualites: number; cibleSeances: number; sommeil: number | null; signalVfc: number | null };
+  details: { seances: number; faciles: number; qualites: number; tenues: number; jugees: number; sommeil: number | null; signalVfc: number | null };
 } {
   const C = DISCIPLINE_CONFIG;
-  const now = Date.now();
-  const recent = workouts.filter(w => now - new Date(w.date).getTime() <= C.windowDays * 86400000);
-  const hasData = workouts.length > 0 || hrv.length > 0;
+  const jour = opts.aujourdhui ?? jourLocal();
+  const recent = workouts.filter((w) => dansFenetre(String(w.date), C.windowDays, jour));
 
-  // Assiduité — régularité sur la fenêtre vs cible (séances/sem × nb de semaines).
-  const consistency = clamp(Math.round((recent.length / (C.weeklyTarget * (C.windowDays / 7))) * 100));
+  // Assiduité — ce que le coach a demandé, jugé comme la série le juge.
+  const jugees = (opts.serie ?? []).filter((j) => dansFenetre(j.date, C.windowDays, jour)
+    && (j.verdict === "tenu" || j.verdict === "protege" || j.verdict === "rompu"));
+  const tenues = jugees.filter((j) => j.verdict !== "rompu").length;
+  const consistency = jugees.length ? clamp(Math.round((100 * tenues) / jugees.length)) : null;
 
   // Précision — proximité d'une répartition polarisée ~80 % facile / 20 % qualité.
   //  Pénalité asymétrique : le « trop dur » coûte plus cher que le « trop facile ».
-  let precision: number;
+  //  Sous `minForPrecision` séances, rien à juger (elle empruntait l'assiduité).
+  let precision: number | null = null;
   if (recent.length >= C.minForPrecision) {
     const easyShare = recent.filter(w => !isQualityWorkout(w)).length / recent.length;
     const dev = easyShare - C.easyShareTarget;                          // <0 trop dur · >0 trop facile
     const tooEasy = state === "recovery" ? 0 : C.penaltyTooEasy;        // semaine de récup → le facile est normal
     precision = clamp(Math.round(100 - (dev < 0 ? -dev * C.penaltyTooHard : dev * tooEasy)));
-  } else {
-    precision = recent.length ? consistency : 0;                        // pas assez d'historique
   }
 
-  // Récupération — données réelles : sommeil + tendance VFC (mesure du jour vs base 14 j,
-  // dans LA mesure de l'athlète : rMSSD, ou SDNN pour une Apple Watch — voir serieVfc).
+  // Récupération — mesures FRAÎCHES seulement : le sommeil arrive déjà filtré par
+  // l'appelant ; la VFC ne compte que si sa dernière mesure a 2 jours au plus.
   const signals: number[] = [];
-  if (sleep?.sleep_score != null) signals.push(sleep.sleep_score);
+  if (sleep?.sleep_score != null && Number.isFinite(sleep.sleep_score)) signals.push(sleep.sleep_score);
   const hrvVals = hrv.slice(0, 14).map(h => h.hrv_ms).filter((v): v is number => v != null);
   let signalVfc: number | null = null;
-  if (hrvVals.length >= 3) {
+  if (hrvVals.length >= 3 && statsVfc(hrv, Date.now(), jour).fraiche) {
     const base = hrvVals.reduce((a, b) => a + b, 0) / hrvVals.length;
     signalVfc = clamp(70 + ((hrvVals[0] - base) / base) * 300);        // à la base ≈ 70, +10 % ≈ 100
     signals.push(signalVfc);
   }
-  const recovery = signals.length
-    ? Math.round(signals.reduce((a, b) => a + b, 0) / signals.length)
-    : (C.stateBaseline[state] ?? 70);
+  const recovery = signals.length ? Math.round(signals.reduce((a, b) => a + b, 0) / signals.length) : null;
 
-  const total = Math.round(
-    C.weights.precision * precision + C.weights.consistency * consistency + C.weights.recovery * recovery,
-  );
+  // Total pondéré sur les composantes MESURÉES (poids renormalisés).
+  const parts = ([[precision, C.weights.precision], [consistency, C.weights.consistency], [recovery, C.weights.recovery]] as const)
+    .filter((p): p is readonly [number, number] => p[0] != null);
+  const poids = parts.reduce((a, [, w]) => a + w, 0);
+  const total = poids > 0 ? Math.round(parts.reduce((a, [v, w]) => a + v * w, 0) / poids) : 0;
   const qualites = recent.filter(isQualityWorkout).length;
   return {
-    total, precision, consistency, recovery, hasData,
+    total, precision, consistency, recovery, hasData: parts.length > 0,
     details: {
       seances: recent.length, faciles: recent.length - qualites, qualites,
-      cibleSeances: C.weeklyTarget * (C.windowDays / 7),
+      tenues, jugees: jugees.length,
       sommeil: sleep?.sleep_score ?? null, signalVfc: signalVfc != null ? Math.round(signalVfc) : null,
     },
   };

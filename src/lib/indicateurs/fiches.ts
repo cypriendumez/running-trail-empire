@@ -16,7 +16,7 @@ import { computeForme, socleDesSeances } from "@/lib/dashboard/forme";
 import { computeLoad, type SeanceCharge } from "@/lib/dashboard/charge";
 import { computeHrZones } from "@/lib/dashboard/zones";
 import { computeWeeklyTrend } from "@/lib/dashboard/semaines";
-import { dansFenetre } from "@/lib/dashboard/fenetre";
+import { ageJours, dansFenetre } from "@/lib/dashboard/fenetre";
 import { loadRisk, chargesQuotidiennes, predictRaceSec, raceProjection, fmtTime, fmtPaceSec } from "@/lib/running/fitness";
 import { vdotDeVma, preparationLongue, facteurSocle } from "@/lib/running/vdot";
 import { robustWeeklyKm, demonstratedWeeklyKm } from "@/lib/running/volume";
@@ -45,6 +45,8 @@ export type DonneesFiche = {
   objectif: { race: string; distanceKm: number; raceDate: string; targetSeconds: number; targetTime: string } | null;
   plan: { start_date?: string | null; created_at?: string | null; race_date?: string | null } | null;
   fcRepos: number | null;
+  /** Les journées jugées par la série (lib/streak) : l'assiduité les lit, comme la carte. */
+  serie?: { date: string; verdict: string }[] | null;
 };
 
 const LOC: Record<Lang, string> = { fr: "fr-FR", en: "en-GB", de: "de-DE", es: "es-ES", pt: "pt-PT" };
@@ -70,12 +72,16 @@ function contexte(d: DonneesFiche) {
   const maintenant = d.maintenant ?? Date.now();
   const s0 = d.sommeil[0];
   // Même règle que la carte : une nuit de plus de deux jours ne décrit plus la forme du jour.
-  const sommeilFrais = s0 && s0.date && maintenant - new Date(`${s0.date}T00:00:00`).getTime() <= 2 * 86400000 && s0.sleep_score != null
+  // En jours CIVILS, la nuit d'hier ou d'aujourd'hui — exactement la règle de la carte
+  // (`freshSleep`) : 48 h d'horloge gardaient une nuit de plus que le tableau de bord.
+  const ageNuit = s0?.date ? ageJours(String(s0.date), d.aujourdhui) : null;
+  const sommeilFrais = s0 && ageNuit != null && ageNuit >= 0 && ageNuit <= 1 && s0.sleep_score != null
     ? { sleep_score: Number(s0.sleep_score), total_sleep_min: Number(s0.total_sleep_min) || 0 } : null;
   // Même règle que la carte (`etatPhysiologique`) : sinon le score discipline différerait.
   // Le jour de l'athlète, comme la carte : sinon l'âge de la VFC diffère d'un jour la nuit.
   const etat = etatPhysiologique(d.vfc, maintenant, d.aujourdhui);
-  const disc = computeDiscipline(d.seances, d.vfc.slice(0, 14) as HRVData[], sommeilFrais, etat);
+  // La série (ce que le coach a prescrit) : l'assiduité la lit, comme sur la carte.
+  const disc = computeDiscipline(d.seances, d.vfc.slice(0, 14) as HRVData[], sommeilFrais, etat, { aujourdhui: d.aujourdhui, serie: d.serie ?? null });
   const forme = computeForme(d.seances, d.vma.vma, disc.recovery, disc.consistency,
     d.objectif ? { distanceKm: d.objectif.distanceKm ?? null, targetSeconds: d.objectif.targetSeconds ?? null } : null, d.aujourdhui);
   const vfc = statsVfc(d.vfc, maintenant, d.aujourdhui);
@@ -98,9 +104,10 @@ function forme(d: DonneesFiche): Fiche {
     { cle: "vitesse", libelle: t.vitesse, val: f.speed, detail: x.modeVitesse === "objectif" && x.chronoPreditSec && d.objectif
       ? t.dVitesseObjectif(fmtTime(x.chronoPreditSec), d.objectif.targetTime) : t.dVitesseVma(nb(L, d.vma.vma, 1)) },
     { cle: "recuperation", libelle: t.recuperation, val: f.recovery, detail: t.dRecup(disc.details.sommeil != null ? nb(L, disc.details.sommeil) : null, disc.details.signalVfc != null ? nb(L, disc.details.signalVfc) : null) },
-    { cle: "regularite", libelle: t.regularite, val: f.regularity, detail: t.dRegularite(disc.details.seances, disc.details.cibleSeances) },
+    { cle: "regularite", libelle: t.regularite, val: f.regularity, detail: t.dRegularite(disc.details.tenues, disc.details.jugees) },
   ];
-  const tries = [...comps].sort((a, b) => b.val - a.val);
+  // Une composante sans mesure (`null`) n'est ni le point fort ni le point faible.
+  const tries = comps.filter((c): c is typeof c & { val: number } => c.val != null).sort((a, b) => b.val - a.val);
   const fort = tries[0], faible = tries[tries.length - 1];
   const plat = fort.val - faible.val < 5;
   const rate = T.rate(f.total);
@@ -124,15 +131,17 @@ function forme(d: DonneesFiche): Fiche {
     statut: { libelle: rate, ton: tonScore(f.total) },
     verdict: t.verdict(String(f.total), rate, `${fort.libelle} (${fort.val} %)`, plat ? null : `${faible.libelle} (${faible.val} %)`),
     base: T.commun.seances(nRuns, 42),
-    composantes: comps.map((c): Composante => ({ libelle: c.libelle, valeur: String(c.val), unite: "%", part: c.val, ton: tonScore(c.val), detail: c.detail })),
+    composantes: comps.map((c): Composante => c.val == null
+      ? { libelle: c.libelle, valeur: "—", ton: "neutre", detail: c.detail }
+      : { libelle: c.libelle, valeur: String(c.val), unite: "%", part: c.val, ton: tonScore(c.val), detail: c.detail }),
     calcul: [
-      t.cTotal(String(f.endurance), String(f.speed), String(f.recovery), String(f.regularity), String(f.total)),
+      t.cTotal(String(f.endurance), String(f.speed), String(f.recovery ?? "—"), String(f.regularity ?? "—"), String(f.total)),
       t.cEndurance(nb(L, x.plusLongueKm, 1), nb(L, x.refLongueKm), nb(L, x.volumeMoyenKm, 1), nb(L, x.refVolumeKm), String(f.endurance)),
       x.modeVitesse === "objectif" && x.chronoPreditSec && d.objectif
         ? t.cVitesseObjectif(d.objectif.targetTime, fmtTime(x.chronoPreditSec), String(f.speed))
         : t.cVitesseVma(nb(L, d.vma.vma, 1), String(f.speed)),
-      t.cRecup(String(f.recovery)),
-      t.cRegularite(disc.details.seances, disc.details.cibleSeances, String(f.regularity)),
+      t.cRecup(String(f.recovery ?? "—")),
+      t.cRegularite(disc.details.tenues, disc.details.jugees, String(f.regularity ?? "—")),
     ],
     reperes: { titre: T.commun.reperes, lignes: reperesActifs(t.reperes, ["excellent", "bon", "moyen", "alerte"], f.total >= 80 ? 0 : f.total >= 60 ? 1 : f.total >= 40 ? 2 : 3) },
     conseils,
@@ -261,15 +270,18 @@ function discipline(d: DonneesFiche): Fiche {
   if (!disc.hasData) return { ...base, vide: T.commun.vide };
   const x = disc.details;
   const comps = [
-    { cle: "precision", libelle: t.precision, poids: 40, val: disc.precision, detail: t.dPrecision(x.faciles, x.seances, nb(L, x.seances ? (x.faciles / x.seances) * 100 : 0)) },
-    { cle: "assiduite", libelle: t.assiduite, poids: 40, val: disc.consistency, detail: t.dAssiduite(x.seances, x.cibleSeances) },
+    { cle: "precision", libelle: t.precision, poids: 40, val: disc.precision, detail: disc.precision == null
+      ? t.dPrecisionPeu(x.seances) : t.dPrecision(x.faciles, x.seances, nb(L, x.seances ? (x.faciles / x.seances) * 100 : 0)) },
+    { cle: "assiduite", libelle: t.assiduite, poids: 40, val: disc.consistency, detail: t.dAssiduite(x.tenues, x.jugees) },
     { cle: "recuperation", libelle: t.recuperation, poids: 20, val: disc.recovery, detail: t.dRecup(x.sommeil != null ? nb(L, x.sommeil) : null, x.signalVfc != null ? nb(L, x.signalVfc) : null) },
   ];
-  const faible = [...comps].sort((a, b) => a.val - b.val)[0];
+  // Les composantes MESURÉES : une absente n'est pas « le point à soigner ».
+  const mesurees = comps.filter((c): c is typeof c & { val: number } => c.val != null);
+  const faible = [...mesurees].sort((a, b) => a.val - b.val)[0];
   // Les séances de la fenêtre, telles que le score les a classées — même filtre que lui.
   const recentes = d.seances.filter((w) => maintenant - new Date(w.date).getTime() <= 14 * 86400000);
   const conseils: string[] = [];
-  for (const c of [...comps].sort((a, b) => a.val - b.val).filter((c) => c.val < 80)) {
+  for (const c of [...mesurees].sort((a, b) => a.val - b.val).filter((c) => c.val < 80)) {
     if (c.cle === "precision") conseils.push(x.seances && x.faciles / x.seances < 0.8 ? t.conseilPrecisionDur : t.conseilPrecisionFacile);
     if (c.cle === "assiduite") conseils.push(t.conseilAssiduite);
     if (c.cle === "recuperation") conseils.push(t.conseilRecup);
@@ -280,12 +292,14 @@ function discipline(d: DonneesFiche): Fiche {
     statut: { libelle: t.reperes[disc.total >= 80 ? 0 : disc.total >= 60 ? 1 : 2][0], ton: tonScore(disc.total) },
     verdict: disc.total >= 80 && faible.val >= 80 ? t.verdictTop(String(disc.total)) : t.verdict(String(disc.total), `${faible.libelle.toLowerCase()} (${faible.val} %)`),
     base: T.commun.seances(x.seances, 14),
-    composantes: comps.map((c): Composante => ({ libelle: `${c.libelle} · ${t.poids(c.poids)}`, valeur: String(c.val), unite: "%", part: c.val, ton: tonScore(c.val), detail: c.detail })),
+    composantes: comps.map((c): Composante => c.val == null
+      ? { libelle: `${c.libelle} · ${t.poids(c.poids)}`, valeur: "—", ton: "neutre", detail: c.detail }
+      : { libelle: `${c.libelle} · ${t.poids(c.poids)}`, valeur: String(c.val), unite: "%", part: c.val, ton: tonScore(c.val), detail: c.detail }),
     tableaux: recentes.length ? [{
       titre: t.tSeances, colonnes: [t.cDate, t.cSeance, t.cType],
       lignes: recentes.map((w) => ({ cellules: [dateMini(L, w.date), `${cleanActivityName(w.title) || "—"}${w.distance_km ? ` · ${nb(L, Number(w.distance_km), 1)} km` : ""}`, isQualityWorkout(w) ? t.qualite : t.facile], actif: isQualityWorkout(w) })),
     }] : undefined,
-    calcul: [t.cTotal(String(disc.precision), String(disc.consistency), String(disc.recovery), String(disc.total)), t.cPrecision, t.cAssiduite(x.cibleSeances)],
+    calcul: [t.cTotal(String(disc.precision ?? "—"), String(disc.consistency ?? "—"), String(disc.recovery ?? "—"), String(disc.total)), t.cPrecision, t.cAssiduite(x.jugees)],
     reperes: { titre: T.commun.reperes, lignes: reperesActifs(t.reperes, ["excellent", "bon", "alerte"], disc.total >= 80 ? 0 : disc.total >= 60 ? 1 : 2) },
     conseils: conseils.length ? conseils : [TEXTES[d.lang].forme.conseilEquilibre],
     liens: [{ libelle: T.commun.voirPlan, href: "/dashboard/calendrier" }],

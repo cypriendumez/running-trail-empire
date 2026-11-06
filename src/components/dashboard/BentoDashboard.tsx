@@ -138,19 +138,6 @@ const VITALS: Record<string, { hr: string }> = {
   fr: { hr: "FC de repos" }, en: { hr: "Resting HR" }, de: { hr: "Ruhepuls" }, es: { hr: "FC en reposo" }, pt: { hr: "FC em repouso" },
 };
 
-/**
- * LE TITRE DE LA CARTE DU RAIL SUIT L'ÉTAT DU JOUR. Il était figé sur « Prêt à performer » :
- * constaté le 06/11/2026 au-dessus de « Récupération après Marathon International de Lille :
- * footings seulement, pas d'intensité avant le 9 novembre ». Une clé par phrase du jour.
- */
-const TITRES_ETAT: Record<string, Record<string, string>> = {
-  fr: { "dash.ready.recup": "En récupération", "dash.ready.rest": "Journée facile", "dash.ready.top": "Prêt à performer", "dash.ready.topSansQualite": "En forme", "dash.ready.ok": "Forme correcte", "dash.ready.none": "Forme du jour" },
-  en: { "dash.ready.recup": "Recovering", "dash.ready.rest": "Easy day", "dash.ready.top": "Ready to perform", "dash.ready.topSansQualite": "Feeling fresh", "dash.ready.ok": "Decent form", "dash.ready.none": "Today's form" },
-  de: { "dash.ready.recup": "In Erholung", "dash.ready.rest": "Lockerer Tag", "dash.ready.top": "Bereit zu performen", "dash.ready.topSansQualite": "Gut erholt", "dash.ready.ok": "Solide Form", "dash.ready.none": "Tagesform" },
-  es: { "dash.ready.recup": "En recuperación", "dash.ready.rest": "Día suave", "dash.ready.top": "Listo para rendir", "dash.ready.topSansQualite": "En forma", "dash.ready.ok": "Forma correcta", "dash.ready.none": "Forma del día" },
-  pt: { "dash.ready.recup": "Em recuperação", "dash.ready.rest": "Dia leve", "dash.ready.top": "Pronto para performar", "dash.ready.topSansQualite": "Em forma", "dash.ready.ok": "Forma correta", "dash.ready.none": "Forma do dia" },
-};
-
 // Libellés du rail de droite (multilingue).
 const RAIL_LABELS: Record<string, { ai: string; badges: string; community: string; communitySub: string; see: string; newWeek: string; records: string; recommend: string }> = {
   fr: { ai: "Analyse IA", badges: "Badges", community: "Communauté", communitySub: "Rejoins les coureurs Pacevo", see: "Voir", newWeek: "nouveaux cette semaine", records: "Records personnels", recommend: "Voir les recommandations" },
@@ -242,7 +229,8 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
 
   // Score Discipline — calculé à partir des vraies données (l'anneau = moyenne
   // pondérée des 3 axes affichés → toujours cohérent, jamais de chiffres factices).
-  const disc = computeDiscipline(workouts, hrv, freshSleep, state);
+  // L'assiduité lit la SÉRIE (ce que le coach a prescrit), la fenêtre suit le jour de l'athlète.
+  const disc = computeDiscipline(workouts, hrv, freshSleep, state, { aujourdhui: jour, serie: streak?.days ?? null });
 
   // VFC : valeur du jour + base 14 j pour situer si elle est « bonne ».
   // ⚠️ AUCUN CONTRÔLE DE FRAÎCHEUR ICI, alors que le sommeil juste au-dessus en impose
@@ -469,7 +457,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
       { label: fl0.speed, val: forme.speed, c: "#2563eb" },
       { label: fl0.recovery, val: forme.recovery, c: "#7c3aed" },
       { label: fl0.regularity, val: forme.regularity, c: "#ea580c" },
-    ].slice().sort((a, b) => b.val - a.val);
+    ].filter((c): c is { label: string; val: number; c: string } => c.val != null).sort((a, b) => b.val - a.val);
     const fort = cs[0], faible = cs[cs.length - 1];
     return { fort, faible, plat: fort.val - faible.val < 5 };
   })();
@@ -836,11 +824,11 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                     {/* `gap-2` + `truncate` : « Récupération72% » collé sur une carte étroite. */}
                     <div className="mb-1 flex justify-between gap-2 text-xs">
                       <span className="min-w-0 truncate text-zinc-500">{m.label}</span>
-                      <span className="flex-shrink-0 font-semibold tabular-nums text-zinc-900">{m.val}%</span>
+                      <span className="flex-shrink-0 font-semibold tabular-nums text-zinc-900">{m.val == null ? "—" : `${m.val}%`}</span>
                     </div>
                     <div className="h-1.5 overflow-hidden rounded-full bg-zinc-100">
                       <div className="h-full rounded-full transition-all duration-700"
-                        style={{ width: `${m.val}%`, backgroundColor: m.c }} />
+                        style={{ width: `${m.val ?? 0}%`, backgroundColor: m.c }} />
                     </div>
                   </div>
                 ))}
@@ -1248,9 +1236,9 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                 <div key={cle} className="flex items-center gap-2">
                   <span className="min-w-0 flex-1 truncate text-[11px] text-zinc-500">{t(cle)}</span>
                   <span className="h-1.5 w-16 flex-shrink-0 overflow-hidden rounded-full bg-zinc-100">
-                    <span className="block h-full rounded-full bg-yellow-400" style={{ width: `${Math.max(2, valeur)}%` }} />
+                    <span className="block h-full rounded-full bg-yellow-400" style={{ width: `${valeur == null ? 0 : Math.max(2, valeur)}%` }} />
                   </span>
-                  <span className="w-7 flex-shrink-0 text-right text-[11px] font-semibold tabular-nums text-zinc-700">{valeur}</span>
+                  <span className="w-7 flex-shrink-0 text-right text-[11px] font-semibold tabular-nums text-zinc-700">{valeur ?? "—"}</span>
                 </div>
               ))}
             </div>
@@ -1418,11 +1406,26 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                 {disc.hasData ? disc.total : "—"}<span className="text-xs text-zinc-400">%</span>
               </div>
             </div>
-            <div className="min-w-0">
-              <div className="text-sm font-bold text-zinc-900">{(TITRES_ETAT[lang] ?? TITRES_ETAT.fr)[readiness.cle] ?? TITRES_ETAT.fr[readiness.cle]}</div>
-              <p className="mt-0.5 text-xs leading-relaxed text-zinc-500">{readiness.tagline}</p>
+            {/* ⚠️ LES TROIS COMPOSANTES, PLUS LA PHRASE DE L'EN-TÊTE (06/11/2026). La carte
+                répétait mot pour mot « Récupération après Marathon… » du haut de page, et rien
+                n'y expliquait le pourcentage. Elle dit maintenant d'où il vient ; « — » =
+                aucune mesure récente, composante écartée du total (pas un zéro). */}
+            <div className="min-w-0 flex-1 space-y-1.5">
+              {([
+                ["dash.discipline.precision", disc.precision],
+                ["dash.discipline.consistency", disc.consistency],
+                ["dash.discipline.recovery", disc.recovery],
+              ] as const).map(([cle, valeur]) => (
+                <div key={cle} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="min-w-0 truncate text-zinc-500">{t(cle)}</span>
+                  <span className="flex-shrink-0 font-semibold tabular-nums text-zinc-900">{valeur == null ? "—" : `${valeur} %`}</span>
+                </div>
+              ))}
             </div>
           </div>
+          {disc.hasData && (disc.precision == null || disc.consistency == null || disc.recovery == null) && (
+            <p className="mt-2 text-[10px] leading-snug text-zinc-400">{t("dash.discipline.absent")}</p>
+          )}
           {/* Les conseils de CE score, dans sa page détaillée — le bouton ouvrait le Kiné IA
               (Santé), sans rapport avec lui, alors que le reste de la carte mène déjà ici. */}
           <Link href="/dashboard/indicateurs/discipline#conseils" className="relative z-[3] mt-4 flex items-center justify-between rounded-xl border border-zinc-100 px-3 py-2 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50">

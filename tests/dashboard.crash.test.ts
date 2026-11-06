@@ -44,7 +44,7 @@ const zonesAu = (w: Parameters<typeof computeHrZones>[0]) => computeHrZones(w, A
 // 15/10/2026, toutes les séances de `seances()` (11/08 → 02/09) en étaient sorties : endurance
 // à 0 pour le 10 km comme pour le marathon, et « les repères suivent la distance » rougissait.
 const formeAu = (
-  w: Parameters<typeof computeForme>[0], vma: number, rec: number, reg: number,
+  w: Parameters<typeof computeForme>[0], vma: number, rec: number | null, reg: number | null,
   obj: Parameters<typeof computeForme>[4] = null,
 ) => computeForme(w, vma, rec, reg, obj, AUJOURD_HUI);
 
@@ -238,10 +238,14 @@ test("tous les axes restent bornés entre 0 et 100, quoi qu'on envoie", () => {
     formeAu(seances(1, 0), -5, -50, 500, { distanceKm: -10, targetSeconds: -1 }),
     formeAu([{ date: "pas-une-date", sport: "run", distance_km: NaN }], NaN, NaN, NaN, { distanceKm: NaN, targetSeconds: NaN }),
     formeAu([{ date: jour(1), sport: "bike", distance_km: 200 }], 17, 80, 80, null),
+    // 06/11/2026 : récupération et régularité peuvent manquer (aucune mesure récente,
+    // aucune journée prescrite) — absentes, pas zéro.
+    formeAu(seances(10, 8), 17, null, null, null),
   ];
   for (const f of cas) {
     for (const [k, v] of Object.entries({ total: f.total, endurance: f.endurance, speed: f.speed, recovery: f.recovery, regularity: f.regularity })) {
-      assert.ok(sain(v) && v >= 0 && v <= 100, `${k} vaut ${v}`);
+      if (v === null && (k === "recovery" || k === "regularity")) continue;
+      assert.ok(v != null && sain(v) && v >= 0 && v <= 100, `${k} vaut ${v}`);
     }
   }
 });

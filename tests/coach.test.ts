@@ -6449,12 +6449,17 @@ test("la carte Ligue montre les composantes RÉELLEMENT calculées", () => {
   // Retirer une composante de la carte Ligue laissait donc le test au VERT (mutation
   // faite, mutation passée). On vise maintenant le COUPLE clé+valeur, qui n'existe
   // que dans cette carte : retirer une seule ligne la fait rougir.
+  // 06/11/2026 : la carte Score discipline du rail affiche aussi ces couples ; on vise donc
+  // la SEULE carte Ligue (de son titre à son lien), sinon le rail masquerait un retrait.
+  const ligue = src.slice(src.indexOf('t("dash.league.title")'), src.indexOf('t("dash.league.cta")'));
+  assert.ok(ligue.length > 0, "carte Ligue introuvable");
   for (const c of ["precision", "consistency", "recovery"]) {
-    assert.ok(src.includes(`["dash.discipline.${c}", disc.${c}]`),
+    assert.ok(ligue.includes(`["dash.discipline.${c}", disc.${c}]`),
       `la carte Ligue n'affiche plus la composante ${c} : le trou blanc revient`);
   }
-  // Aucune de ces valeurs n'est inventée : elles sortent toutes du même calcul que le total.
-  assert.match(src, /const disc = computeDiscipline\(workouts, hrv, freshSleep, state\)/);
+  // Aucune de ces valeurs n'est inventée : elles sortent toutes du même calcul que le total,
+  // qui lit la série et le jour de l'athlète.
+  assert.match(src, /const disc = computeDiscipline\(workouts, hrv, freshSleep, state, \{ aujourdhui: jour, serie: streak\?\.days \?\? null \}\)/);
 });
 
 test("aucune route de mesure jetable n'est partie en production", () => {

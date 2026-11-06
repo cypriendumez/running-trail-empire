@@ -31,8 +31,10 @@ export type Forme = {
   total: number;
   endurance: number;
   speed: number;
-  recovery: number;
-  regularity: number;
+  /** `null` : aucune mesure récente (sommeil, VFC) — absente, pas zéro. */
+  recovery: number | null;
+  /** `null` : aucune journée prescrite à juger sur 14 jours. */
+  regularity: number | null;
   hasData: boolean;
   /** Sur quoi les échelles sont calées — affiché à l'athlète. */
   reference: "objectif" | "general";
@@ -89,8 +91,8 @@ export function socleDesSeances(workouts: Seance[], aujourdhui?: string): Socle 
 export function computeForme(
   workouts: Seance[],
   currentVma: number,
-  recovery: number,
-  regularity: number,
+  recovery: number | null,
+  regularity: number | null,
   objectif: ObjectifForme = null,
   /**
    * Jour de référence (AAAA-MM-JJ, jour local) ; par défaut, aujourd'hui. Pour les tests à date
@@ -138,9 +140,12 @@ export function computeForme(
   //    cercle et la carte aurait annoncé « 113 / 100 ». En production ces deux valeurs
   //    sont bornées à la source, mais un calcul ne doit pas dépendre de la prudence de
   //    son appelant — surtout quand il alimente un tracé. Trouvé par crash-test.
-  const rec = clamp(recovery);
-  const reg = clamp(regularity);
-  const total = clamp(Math.round((endurance + speed + rec + reg) / 4));
+  // ⚠️ ABSENTE N'EST PAS ZÉRO (06/11/2026) : sans mesure récente, la récupération valait
+  // 85 inventés par le score discipline. Une composante `null` est écartée de la moyenne.
+  const rec = recovery == null ? null : clamp(recovery);
+  const reg = regularity == null ? null : clamp(regularity);
+  const axes = [endurance, speed, rec, reg].filter((v): v is number => v != null);
+  const total = clamp(Math.round(axes.reduce((a, b) => a + b, 0) / axes.length));
   const reference: Forme["reference"] = cibleLongueKm != null ? "objectif" : "general";
   return {
     total, endurance, speed, recovery: rec, regularity: reg, hasData, reference, cibleLongueKm, cibleVolumeKm,

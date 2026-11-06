@@ -14,6 +14,8 @@ import type { SeanceCharge } from "@/lib/dashboard/charge";
 import { vmaAffichee } from "@/lib/dashboard/vmaAffichee";
 import { COLONNES_VFC, serieVfc } from "@/lib/health/vfc";
 import { objectifEnCours } from "@/lib/coach/prochaineCourse";
+import { computeStreak, coursesDeLObjectif, type StreakWorkout, type StreakPrescription } from "@/lib/streak/compute";
+import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 
 const decale = (iso: string, n: number) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const PANNE: Record<Lang, string> = {
@@ -25,7 +27,7 @@ const PANNE: Record<Lang, string> = {
 };
 
 export async function chargerDonnees(sb: SupabaseClient, userId: string, lang: Lang, aujourdhui: string): Promise<DonneesFiche & { pannes: string[] }> {
-  const [profil, seances, historique, vfc, sommeil, charge, base, obj, plan] = await Promise.all([
+  const [profil, seances, historique, vfc, sommeil, charge, base, obj, plan, serieSeances, seriePlan, serieRessentis] = await Promise.all([
     sb.from("profiles").select("resting_hr, garmin_vo2max, pace_curve").eq("id", userId).maybeSingle(),
     sb.from("workouts").select("*").eq("user_id", userId).order("date", { ascending: false }).limit(40),
     sb.from("workouts").select("date, sport, distance_km").eq("user_id", userId).gte("date", decale(aujourdhui, -120)).order("date", { ascending: false }).limit(1000),
@@ -35,8 +37,16 @@ export async function chargerDonnees(sb: SupabaseClient, userId: string, lang: L
     sb.from("performance_baselines").select("vma_kmh, tested_at").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).maybeSingle(),
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "race_objective").maybeSingle(),
     sb.from("training_plans").select("start_date, created_at, race_date").eq("user_id", userId).eq("is_active", true).maybeSingle(),
+    // ── LA SÉRIE, POUR L'ASSIDUITÉ (06/11/2026) : le score discipline juge ce que le coach a
+    // prescrit, avec les règles de la série. Mêmes lectures que le tableau de bord, sur la
+    // fenêtre utile (14 jours jugés + 28 de charge pour les protections de surcharge).
+    sb.from("workouts").select("date,sport,type,duration_seconds,distance_km,tss,training_effect")
+      .eq("user_id", userId).gte("date", decale(aujourdhui, -60)).order("date", { ascending: false }).limit(300),
+    sb.from("notifications").select("created_at,data").eq("user_id", userId).eq("type", "coach_session")
+      .gte("data->>date", decale(aujourdhui, -20)).order("created_at", { ascending: false }).limit(200),
+    sb.from("notifications").select("data").eq("user_id", userId).eq("type", "session_feedback").order("created_at", { ascending: false }).limit(60),
   ]);
-  const enPanne = [profil, seances, historique, vfc, sommeil, charge, base, obj, plan].filter((r) => r.error);
+  const enPanne = [profil, seances, historique, vfc, sommeil, charge, base, obj, plan, serieSeances, seriePlan, serieRessentis].filter((r) => r.error);
   for (const r of enPanne) console.error("[indicateurs] lecture impossible :", r.error?.message);
   const ws = (seances.data ?? []) as Workout[];
   const p = profil.data as { resting_hr?: number | null; garmin_vo2max?: number | null; pace_curve?: { best?: { m: number; sec: number }[] } | null } | null;
@@ -58,6 +68,14 @@ export async function chargerDonnees(sb: SupabaseClient, userId: string, lang: L
     objectif: o && o.raceDate && o.distanceKm ? objectifEnCours(o, aujourdhui) : null,
     plan: (plan.data ?? null) as DonneesFiche["plan"],
     fcRepos: Number(p?.resting_hr) || null,
+    // Une lecture en panne ne doit pas se lire comme « rien de prescrit » : pas de série.
+    serie: seriePlan.error || serieSeances.error ? null : computeStreak({
+      workouts: (serieSeances.data ?? []) as StreakWorkout[],
+      prescriptions: oneSessionPerSlot((seriePlan.data ?? []) as { data: StreakPrescription }[], (r) => slotKey(r.data as { date?: unknown; moment?: unknown })).map((r) => r.data),
+      feedbacks: ((serieRessentis.data ?? []) as { data: { date?: unknown; pain?: unknown } }[]).map((r) => r.data),
+      courses: coursesDeLObjectif((obj.data?.data ?? null) as Parameters<typeof coursesDeLObjectif>[0]),
+      today: aujourdhui, windowDays: 30,
+    }).days.map((j) => ({ date: j.date, verdict: j.verdict })),
     pannes: enPanne.length ? [PANNE[lang]] : [],
   };
 }
