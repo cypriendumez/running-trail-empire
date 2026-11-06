@@ -7,6 +7,7 @@ import { ligneSommeil, ligneVfc, type IcuWellness } from "@/lib/intervals/wellne
 import { roleOf } from "@/lib/intervals/sport";
 import { identifiantsDe } from "@/lib/intervals/identifiants";
 import { enteteIntervals } from "@/lib/intervals/auth";
+import { temperaturesAir, positionHabituelle, enInterieur } from "@/lib/weather/temperatureSeances";
 
 const BASE = "https://intervals.icu/api/v1";
 
@@ -105,13 +106,20 @@ export async function GET(req: Request) {
     const toUpdate: { id: string; payload: Record<string, unknown> }[] = [];
     const ri = (v: number | null | undefined) => v != null ? Math.round(v) : null;
 
+    // La VRAIE température de l'air de chaque séance (jamais le capteur de la montre).
+    const position = await positionHabituelle(supabase, user.id);
+    const tempsAir = position ? await temperaturesAir(validActivities
+      .filter((a) => !enInterieur(a.type))
+      .map((a) => ({ cle: String(a.id), lat: position.lat, lon: position.lon, debutLocal: String(a.start_date_local), dureeSec: a.moving_time ?? a.elapsed_time ?? null })))
+      : new Map<string, number>();
+
     for (const act of validActivities) {
       const workoutType = roleOf(act.type);
       const date = act.start_date_local!.split("T")[0];
       const title = act.name ?? workoutType;
 
       // Construction PARTAGÉE et testée : voir lib/intervals/workoutRow.
-      const payload = buildWorkoutRow(act, { userId: user.id, type: workoutType });
+      const payload = buildWorkoutRow(act, { userId: user.id, type: workoutType, tempAir: tempsAir.get(String(act.id)) ?? null });
 
       const existingId = byExt.get(String(act.id)) ?? existingMap.get(`${date}__${title}`);
       if (existingId) toUpdate.push({ id: existingId, payload });

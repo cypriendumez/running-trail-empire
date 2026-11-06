@@ -44,7 +44,16 @@ const ri = (v: number | null | undefined) => (v != null && Number.isFinite(v) ? 
 
 export function buildWorkoutRow(
   act: IcuActivity,
-  opts: { userId: string; type: string; hasNewCols?: boolean },
+  opts: {
+    userId: string; type: string; hasNewCols?: boolean;
+    /**
+     * La température de l'AIR au milieu de la séance (lib/weather/temperatureSeances), ou
+     * absente. ⚠️ JAMAIS `act.average_temp` : c'est le capteur du poignet, 12 °C trop haut en
+     * hiver (Cyprien, 07/11/2026). Absente → la clé n'est pas écrite : une mise à jour ne
+     * remplace pas une vraie température déjà enregistrée par un vide.
+     */
+    tempAir?: number | null;
+  },
 ): Record<string, unknown> {
   const title = act.name ?? opts.type;
   return {
@@ -80,7 +89,7 @@ export function buildWorkoutRow(
       ? Math.round(act.average_vertical_oscillation / 10 * 10) / 10 : null,
     stride_length_m: act.average_stride ?? null,
     cardiac_decoupling: act.decoupling ?? null,
-    weather_temp_c: act.average_temp ?? null,
+    ...(typeof opts.tempAir === "number" && Number.isFinite(opts.tempAir) ? { weather_temp_c: opts.tempAir } : {}),
     gap_min_km: act.gap && act.gap > 0.3 ? Math.round((1000 / 60 / act.gap) * 100) / 100 : null,
     hr_zone_seconds: Array.isArray(act.icu_hr_zone_times) ? act.icu_hr_zone_times : null,
     intensity_pct: ri(act.icu_intensity),

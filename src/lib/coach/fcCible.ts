@@ -309,6 +309,18 @@ export const DEMI_FENETRE_AN_DERNIER_JOURS = 21;
  * moyenne des minimales et maximales sous {@link SEUIL_FROID_C} °C) — pas sur le calendrier :
  * novembre à Nice ou en Australie n'est pas l'hiver de Lille. Un effort récent plus haut que la
  * baisse l'emporte : on ne descend jamais sous une FC réellement atteinte ces 6 semaines.
+ *
+ * ⚠️ POURQUOI 5, ET CE QUE DISENT LES SOURCES (recherche PubMed du 07/11/2026). Aucune ne donne
+ * une valeur valable pour tous :
+ *  · Renberg 2014, J Therm Biol (PMID 25436945) — 9 coureuses sur tapis de 20 à −14 °C : la FC
+ *    de pic AUGMENTE avec la température ambiante ; l'ampleur n'est pas dans le résumé.
+ *  · Sandsund 1998, Eur J Appl Physiol (PMID 9562357) — skieurs d'élite, −15 contre 23 °C :
+ *    AUCUNE différence de FC maximale.
+ *  · Pendergast 1988, Med Sci Sports Exerc (PMID 3057318) — la FC max baisse quand le CORPS se
+ *    refroidit (température centrale), ce que l'air froid ne fait pas à un coureur habillé.
+ * La donnée la plus sûre est l'athlète lui-même : chez Cyprien, les pics d'hiver (198-202)
+ * sont en moyenne ~7 bpm sous ceux d'été (202-209). 5 reste en deçà : une estimation prudente,
+ * que SES données remplacent dès qu'il a un hiver enregistré.
  */
 export const BAISSE_HIVER_BPM = 5;
 export const SEUIL_FROID_C = 8;

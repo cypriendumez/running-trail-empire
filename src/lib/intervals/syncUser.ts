@@ -8,6 +8,7 @@ import { buildWorkoutRow, makeMatcher } from "./workoutRow";
 import { ligneSommeil, ligneVfc, type IcuWellness } from "./wellnessRow";
 import { roleOf } from "./sport";
 import { enteteIntervals } from "@/lib/intervals/auth";
+import { temperaturesAir, positionHabituelle, enInterieur } from "@/lib/weather/temperatureSeances";
 
 const BASE = "https://intervals.icu/api/v1";
 
@@ -91,6 +92,14 @@ export async function syncIntervalsForUser(
   const probe = await admin.from("workouts").select("sport, external_id, vertical_ratio_pct, hrr_bpm").limit(1);
   const hasNewCols = probe.error?.code !== "42703";
 
+  // La VRAIE température de l'air de chaque séance, là où l'athlète court (jamais le capteur
+  // de la montre) : une requête Open-Meteo par lieu, pas une par séance.
+  const position = await positionHabituelle(admin, userId);
+  const tempsAir = position ? await temperaturesAir(activities
+    .filter((a) => a.start_date_local && !enInterieur(a.type))
+    .map((a) => ({ cle: String(a.id), lat: position.lat, lon: position.lon, debutLocal: String(a.start_date_local), dureeSec: a.moving_time ?? a.elapsed_time ?? null })))
+    : new Map<string, number>();
+
   for (const act of activities) {
     if (!act.type || !act.start_date_local) continue;
     const workoutType = roleOf(act.type);
@@ -99,7 +108,7 @@ export async function syncIntervalsForUser(
     // Construction PARTAGÉE avec l'autre chemin de synchronisation, et testée contre des
     // activités réelles : c'est ici que se logeaient l'arrondi manquant et les noms de
     // champs inexistants.
-    const payload = buildWorkoutRow(act, { userId, type: workoutType, hasNewCols });
+    const payload = buildWorkoutRow(act, { userId, type: workoutType, hasNewCols, tempAir: tempsAir.get(String(act.id)) ?? null });
 
     const id = match({ id: act.id, date, title });
     const { error: eEcriture } = id

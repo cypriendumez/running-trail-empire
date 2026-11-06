@@ -8,7 +8,8 @@
 //  et jusqu'à 3 °C d'écart avec la température relevée à la même heure et au même
 //  endroit. Prescrire des allures là-dessus, c'est se tromper de plusieurs degrés.
 //
-//  On garde la valeur de la montre en dernier recours, jamais en priorité.
+//  ⚠️ Depuis le 07/11/2026, la valeur de la montre n'est PLUS DU TOUT enregistrée, même en
+//  dernier recours (12 °C trop haut en hiver chez Cyprien) : voir lib/weather/temperatureSeances.
 // ─────────────────────────────────────────────────────────────────────────────
 import type { Lang } from "@/lib/i18n/translations";
 import { METEO_T } from "@/lib/weather/openMeteoI18n";
